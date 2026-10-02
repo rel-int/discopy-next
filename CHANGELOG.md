@@ -960,6 +960,23 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Fixed
 
+- A trace reads back from its tree and its representation: it is
+  serialised by its argument and its side, `serialised_attrs` being
+  `("arg", "left")` with a `from_tree` of its own, where it inherited
+  those of a bubble, which wrote a `dom` and `cod` its constructor
+  does not take and dropped `left`; and it represents its argument
+  with `repr` rather than `str`. `traced` and `symmetric` check
+  `repr_transparency` and `serialisation` again, `balanced` declaring
+  its own failing `serialisation` for the twist, the case of
+  [#742](https://github.com/discopy/discopy/issues/742) that remains
+  with the copies of `markov` and the spiders of `frobenius`.
+- `feedback.Trace` delays: the delay of a trace is the trace of the
+  delayed diagram, where it inherited the delay of a box, which
+  rebuilt it from a name, a domain and a codomain its constructor does
+  not take. `feedback.Diagram.delay_unit` and `delay_composition`
+  state that delaying is an action of the natural numbers, which a
+  diagram with a trace broke.
+
 - `Stream[C].sequence` builds a box of `C` rather than a
   `symmetric.Box`, which `Stream.__init__` then wrapped in a `C` diagram
   of one foreign box, since its `box_factory` keyword defaulted to

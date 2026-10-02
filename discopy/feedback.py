@@ -157,11 +157,11 @@ This satisfies the following equations:
 In the category of streams, this is just the identity.
 """
 
-from typing import ClassVar
+from typing import ClassVar, Self
 
 from discopy import monoidal, braided, markov, hypergraph, messages
 
-from discopy.axioms import GENERATORS, no_strategy
+from discopy.axioms import GENERATORS, axiom, no_strategy
 from discopy.abc import DelayedMonoid, FeedbackCategory
 from discopy.utils import (
     factory, Generator, factory_name, assert_isinstance, AxiomError,
@@ -395,6 +395,16 @@ class Diagram(markov.Diagram, FeedbackCategory):
         inside = tuple(box.delay(n_steps) for box in self.inside)
         return type(self)(inside, dom, cod, _scan=False)
 
+    @axiom
+    def delay_unit(cls, f: Self):
+        """ Delaying by no time step is the identity. """
+        return cls.Equation(f.delay(0), f)
+
+    @axiom
+    def delay_composition(cls, f: Self):
+        """ Delaying twice is delaying by two time steps. """
+        return cls.Equation(f.delay().delay(), f.delay(2))
+
     def feedback(self, dom=None, cod=None, mem=None, left=False):
         """
         A :class:`Feedback` of the memory, wire by wire: the outermost
@@ -557,9 +567,21 @@ class Merge(markov.Merge, Box):
         return type(self)(self.cod.delay(n_steps), len(self.dom))
 
 
-Discard, Trace, Sum, Bubble = (
-    Diagram.Discard, Diagram.Trace,
-    Diagram.Sum, Diagram.Bubble)
+@Diagram.generator
+class Trace(markov.Trace, Box):  # ty: ignore[inconsistent-mro]
+    """
+    The trace of a feedback diagram, whose delay is the trace of the
+    delayed diagram.
+
+    Parameters:
+        arg : The diagram to trace.
+        left : Whether to trace the wires on the left or right.
+    """
+    def delay(self, n_steps=1):
+        return self.arg.delay(n_steps).trace(left=self.left)
+
+
+Discard, Sum, Bubble = Diagram.Discard, Diagram.Sum, Diagram.Bubble
 
 
 class Head(

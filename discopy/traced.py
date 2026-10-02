@@ -130,11 +130,11 @@ from typing import ClassVar
 from discopy import monoidal, cmap, hypergraph
 from discopy.abc import TracedCategory
 
-from discopy.axioms import Serialisable
 from discopy.cat import factory, Generator
 from discopy.monoidal import Ty  # noqa: F401
 from discopy.utils import (
     factory_name,
+    from_tree,
     assert_isinstance,
     assert_istraceable,
 )
@@ -155,10 +155,6 @@ class Diagram(monoidal.Diagram, TracedCategory):
     """
     Trace: ClassVar[Generator]
     Functor: ClassVar[Generator]
-    repr_transparency = Serialisable.repr_transparency.failing(
-        "The generic representation of a trace does not read back (#742).")
-    serialisation = Serialisable.serialisation.failing(
-        "The generic tree of a trace does not read back (#742).")
 
     def trace(self, n=1, left=False):
         """
@@ -240,8 +236,15 @@ class Trace(Box, monoidal.Bubble):
     def __str__(self):
         return self.name
 
+    serialised_attrs = ("arg", "left")
+
     def __repr__(self):
-        return factory_name(type(self)) + f"({self.arg}, left={self.left})"
+        return factory_name(type(self)) + f"({self.arg!r}, left={self.left})"
+
+    @classmethod
+    def from_tree(cls, tree):
+        """ Decode a trace from its argument and its side. """
+        return cls(from_tree(tree["arg"]), left=tree["left"])
 
     def dagger(self):
         return self.arg.dagger().trace(left=self.left)
