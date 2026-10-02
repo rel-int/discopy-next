@@ -815,9 +815,10 @@ class BiclosedCategory[C0: ResiduatedMonoid, C1: BiclosedCategory](
     def uncurry_composition(cls, f, base, exponent, left: bool):
         """
         Curry ``f`` then evaluate it back, i.e. whisker the currying with
-        ``exponent`` and compose with :meth:`ev`, the roundtrip that
+        ``exponent`` and compose with the evaluation, the roundtrip that
         :meth:`currying_left` and :meth:`currying_right` state equal to
-        ``f``.
+        ``f``, through the one-wire rules :meth:`curry_left`,
+        :meth:`curry_right`, :meth:`ev_left` and :meth:`ev_right`.
 
         Parameters:
             f : The morphism to curry and evaluate back.
@@ -825,10 +826,11 @@ class BiclosedCategory[C0: ResiduatedMonoid, C1: BiclosedCategory](
             exponent : The objects curried out of the domain of ``f``.
             left : Whether to curry on the left or right.
         """
-        curried = f.curry(left=left)
-        ev = cls.ev(base, exponent, left)
-        return (curried @ exponent).then(ev) if left\
-            else (exponent @ curried).then(ev)
+        if left:
+            curried, ev = f.curry_left(), cls.ev_left(base, exponent)
+            return (curried @ exponent).then(ev)
+        curried, ev = f.curry_right(), cls.ev_right(base, exponent)
+        return (exponent @ curried).then(ev)
 
     @axiom
     def currying_left[A: Ob[C0], X: Atom[C0], E: Atom[C0]](
@@ -1243,6 +1245,13 @@ class MarkovCategory[C0: ColouredMonoid, C1: MarkovCategory](
             n : The number of copies, two by default in implementations.
         """
         return cls.copy(x, n).dagger()
+
+    @axiom
+    def merge_dagger[X: Atom[C0], N: Count](
+            cls, x: Ob[C0, X], n: Ob[int, N]
+    ) -> Equation[Hom[C1, Repeat[X, N], X]]:
+        """ Merging is the dagger of copying. """
+        return cls.Equation(cls.merge(x, n), cls.copy(x, n).dagger())
 
     @axiom
     def copy_counitality[X: Ob[C0]](
