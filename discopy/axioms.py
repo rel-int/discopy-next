@@ -347,6 +347,25 @@ class Equation[ar](NamedGeneric):
             else list(map(self.up_to, self.terms))
         return all(term == terms[0] for term in terms)
 
+    def checked(self) -> Equation:
+        """
+        The same equation with ``≠`` between two consecutive terms that
+        differ up to :attr:`up_to`, i.e. the inequation it is when it fails.
+
+        >>> from discopy.cat import Ob, Box, Equation
+        >>> x = Ob('x')
+        >>> f, g = Box('f', x, x), Box('g', x, x)
+        >>> Equation(f, f, g).checked().symbols
+        ('=', '$\\\\neq$', '=')
+        """
+        symbols = tuple(
+            symbol if type(self)(left, right, up_to=self.up_to)
+            else "$\\neq$" for symbol, left, right
+            in zip(self.symbols, self.terms, self.terms[1:]))
+        return type(self)(
+            *self.terms, symbols=symbols + self.symbols[len(symbols):],
+            up_to=self.up_to)
+
 
 class AxiomFailure(AxiomError):
     """
@@ -662,12 +681,21 @@ class Axiom[**P, T](Declaration[P, T]):
     def draw(self, **params):
         """
         Draw the :meth:`canonical` equation of the law, the parameters those
-        of :meth:`discopy.monoidal.Equation.draw`.
+        of :meth:`discopy.monoidal.Equation.draw`. A law the category breaks
+        on its canonical instance is drawn all the same, as the inequation it
+        is there, see :meth:`Equation.checked`.
+
+        >>> from discopy import braided
+        >>> braided.Diagram.braid_naturality.draw(
+        ...     doctest="docs/_static/braided/braid-naturality-failing.svg")
+
+        .. image:: /_static/braided/braid-naturality-failing.svg
+            :align: center
         """
         equation = self.canonical()
         if equation is NotImplemented:
             raise TypeError(f"{self} does not apply, so has nothing to draw.")
-        return equation.draw(**params)
+        return equation.checked().draw(**params)
 
     def arguments(self, /, *args: P.args, **kwargs: P.kwargs) -> dict:
         """ Bind the arguments to the :attr:`parameters` of the axiom. """

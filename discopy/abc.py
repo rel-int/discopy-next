@@ -219,26 +219,8 @@ class Category[C0, C1: Category](Testable, ABC):
         """ Associativity of composition. """
         return cls.Equation(f.then(g).then(h), f.then(g.then(h)))
 
-    @axiom
-    def identity_typing[X: Ob[C0]](
-            cls, x: Ob[C0, X]) -> Equation[Ob[C0, X]]:
-        """ Typing of identity morphisms. """
-        identity = cls.id(x)
-        return cls.ob.Equation(identity.dom, x, identity.cod)
 
-    @axiom
-    def composition_dom_typing[A: Ob[C0], B: Ob[C0], C: Ob[C0]](
-            cls, f: Hom[C1, A, B],
-            g: Hom[C1, B, C]) -> Equation[Ob[C0, A]]:
-        """ Domain typing of composition. """
-        return cls.ob.Equation(f.then(g).dom, f.dom)
 
-    @axiom
-    def composition_cod_typing[A: Ob[C0], B: Ob[C0], C: Ob[C0]](
-            cls, f: Hom[C1, A, B],
-            g: Hom[C1, B, C]) -> Equation[Ob[C0, C]]:
-        """ Codomain typing of composition. """
-        return cls.ob.Equation(f.then(g).cod, g.cod)
 
     __rshift__ = __llshift__ = lambda self, other: self.then(other)
     __lshift__ = __lrshift__ = lambda self, other: other.then(self)
@@ -481,19 +463,7 @@ class MonoidalCategory[C0: ColouredMonoid, C1: MonoidalCategory](
         return cls.Equation(
             cls.id(x) @ cls.id(y), cls.id(x @ y))
 
-    @axiom
-    def tensor_dom_typing[A: Ob[C0], B: Ob[C0], C: Ob[C0], D: Ob[C0]](
-            cls, f: Hom[C1, A, B],
-            g: Hom[C1, C, D]) -> Equation[Ob[C0, Tensor[A, C]]]:
-        """ Domain typing of tensor. """
-        return cls.ob.Equation((f @ g).dom, f.dom @ g.dom)
 
-    @axiom
-    def tensor_cod_typing[A: Ob[C0], B: Ob[C0], C: Ob[C0], D: Ob[C0]](
-            cls, f: Hom[C1, A, B],
-            g: Hom[C1, C, D]) -> Equation[Ob[C0, Tensor[B, D]]]:
-        """ Codomain typing of tensor. """
-        return cls.ob.Equation((f @ g).cod, f.cod @ g.cod)
 
     @axiom
     def dagger_monoidality[A: Ob[C0], B: Ob[C0], C: Ob[C0], D: Ob[C0]](
