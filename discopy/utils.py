@@ -244,7 +244,7 @@ class NamedGeneric:
             C.__module__ = origin.__module__
             names = [
                 factory_name(v)
-                if getattr(v, "__module__", "").startswith("discopy.")
+                if isinstance(v, type) and v.__module__.startswith("discopy.")
                 else getattr(v, "__name__", str(v)) for v in values]
             C.__name__ = C.__qualname__ = origin.__name__\
                 + f"[{', '.join(names)}]"
