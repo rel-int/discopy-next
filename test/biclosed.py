@@ -5,8 +5,8 @@ from pytest import raises
 
 def test_Over():
     x, y = Ty('x'), Ty('y')
-    assert isinstance(x.over_factory(x, y), cat.Ob)
-    assert not isinstance(x.over_factory(x, y), Ty)
+    assert isinstance(x.Over(x, y), cat.Ob)
+    assert not isinstance(x.Over(x, y), Ty)
     assert x.over(y) == x << y
     assert isinstance(x ** y, Ty)
     assert not isinstance((x ** y).inside[0], Ty)
@@ -21,8 +21,8 @@ def test_Over():
 
 def test_Under():
     x, y = Ty('x'), Ty('y')
-    assert isinstance(y.under_factory(y, x), cat.Ob)
-    assert not isinstance(y.under_factory(y, x), Ty)
+    assert isinstance(y.Under(y, x), cat.Ob)
+    assert not isinstance(y.Under(y, x), Ty)
     assert y.under(x) == x >> y
     assert isinstance(x >> y, Ty)
     assert not isinstance((x >> y).inside[0], Ty)
@@ -149,3 +149,33 @@ def test_to_compact():
         assert source.to_map().to_compact() == source.to_compact()
         assert not any(isinstance(box, Curry)
                        for box in source.to_compact().boxes)
+
+
+def test_Term_errors():
+    x, y = Ty('x'), Ty('y')
+    f, g = (x << y)("f"), (y >> x)("g")
+    with raises(NotImplementedError):
+        y(lambda a, left=None: a)  # The side must be a constant.
+    with raises(NotImplementedError):
+        y(lambda a, b: a)  # One variable at a time.
+    with raises(ValueError):
+        y(42)
+    with raises(ValueError):
+        f((y << x)("h"))
+    v, w = Variable('v', y), Variable('w', y)
+    body = ((x << y) << y)("k")(v)(w)
+    with raises(ValueError):
+        Abstraction(v, body)
+    with raises(ValueError):
+        Abstraction(w, body, left=True)
+
+
+def test_Abstraction_repr_and_constants():
+    x, y = Ty('x'), Ty('y')
+    f, g = (x << y)("f"), (y >> x)("g")
+    term = y(lambda v, left=True: v(g, left=True))
+    assert repr(term).endswith(", left=True), left=True)")
+    assert term.constants == [g] and y(lambda v: f(v)).constants == [f]
+    assert Coeval(x << y).dagger() == Eval(x << y)
+    with raises(AxiomError):
+        Curry(Box('f', x @ y, x), 1).dagger()

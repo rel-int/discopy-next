@@ -22,8 +22,10 @@ Summary
     Box
     Cup
     Cap
+    Permutation
     Swap
     Spider
+    Sum
     Bubble
     Functor
     CMap
@@ -58,15 +60,18 @@ Speciality
     :align: center
 """
 
-from __future__ import annotations
+from typing import ClassVar
 
 from collections.abc import Callable
 
 from discopy import (
     monoidal, rigid, markov, compact, pivotal, cmap, hypergraph)
 from discopy.abc import HypergraphCategory
-from discopy.cat import factory
-from discopy.utils import assert_isatomic, deprecated_alias, factory_name
+from typing import Annotated
+
+from discopy.axioms import Atom, Count, Hom, Ob, rule, Serialisable, UNIT
+from discopy.cat import factory, Generator
+from discopy.utils import assert_isatomic, factory_name
 
 
 class Wire(pivotal.Wire):
@@ -78,6 +83,12 @@ class Wire(pivotal.Wire):
     """
     l = r = property(lambda self: self)
 
+    @classmethod
+    def strategy(cls, **params):
+        """Generate self-dual wires, at winding number zero."""
+        return super().strategy(
+            **{"min_winding": 0, "max_winding": 0, **params})
+
 
 @factory
 class Ty(pivotal.Ty):
@@ -87,7 +98,14 @@ class Ty(pivotal.Ty):
     Parameters:
         inside (frobenius.Wire) : The objects inside the type.
     """
-    generator_factory = Wire
+    @classmethod
+    def strategy(cls, **params):
+        """A self-dual wire has no colours to swap: transparent words."""
+        return super().strategy(**{
+            **params,
+            "dom": monoidal.transparent, "cod": monoidal.transparent})
+
+    Wire: ClassVar[Generator] = Generator.subclass(Wire)
 
 
 @factory
@@ -122,16 +140,28 @@ class Diagram(compact.Diagram, markov.Diagram, HypergraphCategory):
         dom (Ty) : The domain of the diagram, i.e. its input.
         cod (Ty) : The codomain of the diagram, i.e. its output.
     """
+    serialisation = Serialisable.serialisation.failing(
+        "The generic tree of a spider does not read back (#742).")
+    pickling = Serialisable.pickling
 
     ob = Ty
+    Spider: ClassVar[Generator]
+    Functor: ClassVar[Generator]
 
     @classmethod
-    def caps(cls, left, right):
+    @rule
+    def caps[X: Atom](
+            cls, left: Annotated[Ty, Ob(X)], right: Annotated[Ty, Ob(X).l]
+    ) -> Annotated[Diagram, Hom(UNIT, Ob(X) @ Ob(X).l)]:
         return cls.cups(left, right).dagger()
 
     @classmethod
-    def spiders(cls, n_legs_in: int, n_legs_out: int, typ: Ty, phases=None
-                ) -> Diagram:
+    @rule
+    def spiders[X: Atom, M: Count, N: Count](
+            cls, n_legs_in: Annotated[int, Ob(M)],
+            n_legs_out: Annotated[int, Ob(N)],
+            typ: Annotated[Ty, Ob(X)], phases=None
+    ) -> Annotated[Diagram, Hom(Ob(X) ** Ob(M), Ob(X) ** Ob(N))]:
         """
         The spiders on a given type with ``n_legs_in`` and ``n_legs_out`` and
         some optional vector of ``phases``.
@@ -142,7 +172,7 @@ class Diagram(compact.Diagram, markov.Diagram, HypergraphCategory):
             typ : The type of the spiders.
             phases : The phase for each spider.
         """
-        return interleaving(cls, cls.spider_factory)(
+        return interleaving(cls, cls.Spider)(
             n_legs_in, n_legs_out, typ, phases)
 
     def unfuse(self) -> Diagram:
@@ -169,55 +199,12 @@ class Diagram(compact.Diagram, markov.Diagram, HypergraphCategory):
         return F(self)
 
 
-class Box(compact.Box, markov.Box, Diagram):
-    """
-    A frobenius box is a compact and Markov box in a frobenius diagram.
-
-    Parameters:
-        name (str) : The name of the box.
-        dom (Ty) : The domain of the box, i.e. its input.
-        cod (Ty) : The codomain of the box, i.e. its output.
-    """
+Box, Cup, Cap, Permutation, Swap = (
+    Diagram.Box, Diagram.Cup, Diagram.Cap,
+    Diagram.Permutation, Diagram.Swap)
 
 
-class Cup(compact.Cup, Box):
-    """
-    A frobenius cup is a compact cup in a frobenius diagram.
-
-    Parameters:
-        left (Ty) : The atomic type.
-        right (Ty) : Its adjoint.
-    """
-
-
-class Cap(compact.Cap, Box):
-    """
-    A frobenius cap is a compact cap in a frobenius diagram.
-
-    Parameters:
-        left (Ty) : The atomic type.
-        right (Ty) : Its adjoint.
-    """
-
-
-class Permutation(compact.Permutation, markov.Permutation, Box):
-    "A permutation in a Frobenius diagram."
-
-
-class Swap(Permutation, compact.Swap, markov.Swap, Box):
-    """
-    A frobenius swap is a compact and Markov swap in a frobenius diagram.
-
-    Parameters:
-        left (Ty) : The type on the top left and bottom right.
-        right (Ty) : The type on the top right and bottom left.
-    """
-
-    def rotate(self, left=False):
-        del left
-        return self
-
-
+@Diagram.generator
 class Spider(Box):
     """
     The spider with :code:`n_legs_in` and :code:`n_legs_out`
@@ -246,17 +233,9 @@ class Spider(Box):
         name = type(self).__name__\
             + f"({n_legs_in}, {n_legs_out}, {typ}{str_data})"
         dom, cod = typ ** n_legs_in, typ ** n_legs_out
-        Box.__init__(self, name, dom, cod, data=data, **params)
+        self.Box.__init__(
+            self, name, dom, cod, data=data, **params)
         self.drawing_name = "" if not data else str(data)
-
-    def __setstate__(self, state):
-        if "_name" in state and state["_name"] == type(self).__name__:
-            phase = state.get("_data", None)
-            str_data = "" if phase is None else f", {phase}"
-            cod, dom = state['_dom'], state['_cod']
-            state["_name"] = type(self).__name__\
-                + f"({dom.n}, {cod.n}, {state['_typ']}{str_data})"
-        super().__setstate__(state)
 
     @property
     def phase(self):
@@ -282,12 +261,13 @@ class Spider(Box):
             len(self.dom), len(self.cod), self.typ, self.phase)
 
 
-class Bubble(monoidal.Bubble, Box):
-    """
-    A Frobenius bubble is a monoidal bubble in a frobenius diagram.
-    """
+Sum, Bubble, Eval, Coeval, Curry, Copy, Merge, Discard = (
+    Diagram.Sum, Diagram.Bubble, Diagram.Eval,
+    Diagram.Coeval, Diagram.Curry, Diagram.Copy,
+    Diagram.Merge, Diagram.Discard)
 
 
+@Diagram.generator
 class Functor(compact.Functor, markov.Functor):
     """
     A hypergraph functor is a compact functor that preserves spiders.
@@ -310,8 +290,8 @@ class Functor(compact.Functor, markov.Functor):
         return compact.Functor.__call__(self, other)
 
 
-def interleaving(cls: type, factory: Callable
-                 ) -> Callable[[int, int, Ty], Diagram]:
+def interleaving(cls: type[Diagram], factory: Callable
+                 ) -> Callable[..., Diagram]:
     """
     Take a ``factory`` for spiders of atomic types and extend it recursively.
 
@@ -339,8 +319,7 @@ def interleaving(cls: type, factory: Callable
     return method
 
 
-def coherence(cls: type, factory: Callable
-              ) -> Callable[[int, int, Ty], Diagram]:
+def coherence(cls: type[Diagram], factory: Callable) -> Callable[..., Diagram]:
     """
     Take a ``factory`` for spiders with one or three legs of atomic types
     and extend it recursively to arbitrary spiders of atomic types.
@@ -386,12 +365,12 @@ def coherence(cls: type, factory: Callable
 
 CMap = cmap.CMap[Diagram]
 
-Diagram.functor_factory = Functor
-Diagram.cup_factory, Diagram.cap_factory = Cup, Cap
-Diagram.swap_factory, Diagram.spider_factory = Swap, Spider
-Diagram.permutation_factory = Permutation
-Diagram.bubble_factory = Bubble
 Hypergraph = hypergraph.Hypergraph[Diagram]
+Exp, Over, Under = Ty.Exp, Ty.Over, Ty.Under
+TermBase, Constant, Variable, Application, Abstraction = (
+    Diagram.TermBase, Diagram.Constant, Diagram.Variable,
+    Diagram.Application, Diagram.Abstraction)
+Layer = Diagram.Layer
 Id = Diagram.id
 
 
@@ -400,4 +379,6 @@ class Equation(compact.Equation):
     up_to = staticmethod(Diagram.to_hypergraph)
 
 
-__getattr__ = deprecated_alias(__name__, {"Ob": "Wire", "PRO": "Nat"})
+Diagram.Equation = Equation
+
+

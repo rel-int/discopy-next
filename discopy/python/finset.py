@@ -16,15 +16,16 @@ Summary
     Permutation
 """
 
-from __future__ import annotations
 from discopy.utils import assert_isinstance
-from typing import Iterable, Self, Any
+from typing import Annotated, Iterable, Self, Any, overload
 from collections.abc import Sequence
 
 from dataclasses import dataclass
 
 from discopy import messages
 from discopy.abc import MonoidalCategory, PROP, Nat
+from discopy.pattern import Atom, Hom, Ob
+from discopy.search import rule
 
 
 @dataclass
@@ -73,26 +74,38 @@ class Function(MonoidalCategory, Sequence):
         return len(self.cod)
 
     @staticmethod
-    def id(x: int | Nat = 0):
+    @rule
+    def id[A](x: Annotated[int | Nat, Ob(A)] = 0
+              ) -> Annotated[Function, Hom(A, A)]:
+        x = Nat(int(x))
         return Function(list(range(x)), x, x)
 
-    def then(self, other: Function) -> Function:
+    def then[A, B, C](
+            self: Annotated[Function, Hom(A, B)],
+            other: Annotated[Function, Hom(B, C)]
+    ) -> Annotated[Function, Hom(A, C)]:
         inside = [self[other[i]] for i in range(len(other))]
         return Function(inside, self.dom, other.cod)
 
-    def tensor(self, other: Function) -> Function:
+    def tensor[A, B, C, D](
+            self: Annotated[Function, Hom(A, B)],
+            other: Annotated[Function, Hom(C, D)]
+    ) -> Annotated[Function, Hom([A, C], [B, D])]:
         inside = list(self.inside) + [
             int(self.dom) + other[i] for i in range(len(other))]
         return Function(
             inside, self.dom.tensor(other.dom), self.cod.tensor(other.cod))
 
     @staticmethod
-    def swap(x: int | Nat, y: int | Nat) -> Function:
+    @rule
+    def swap[X: Atom, Y: Atom](
+            x: Annotated[int | Nat, Ob(X)], y: Annotated[int | Nat, Ob(Y)]
+    ) -> Annotated[Function, Hom([X, Y], [Y, X])]:
         m, n = int(x), int(y)
         inside = list(Permutation.swap(m, n))
-        return Function(inside, m + n, m + n)
+        return Function(inside, Nat(m + n), Nat(m + n))
 
-    def is_swap(self) -> bool:
+    def is_swap(self: Function | Sequence[int]) -> bool:
         """
         Whether this is the permutation ``(1, 0)``, callable on a raw
         sequence as well as on a :class:`Function` with a two-wire domain.
@@ -108,12 +121,12 @@ class Function(MonoidalCategory, Sequence):
         dom = sum(int(d) for d in doms)
         if xs.is_identity:
             return Function.id(dom)
-        return Function(list(Permutation(xs, dom)), dom, dom)
+        return Function(list(Permutation(xs, dom)), Nat(dom), Nat(dom))
 
     @staticmethod
     def copy(x: int | Nat, n=2) -> Function:
         k = int(x)
-        return Function([i % k for i in range(n * k)], k, n * k)
+        return Function([i % k for i in range(n * k)], Nat(k), Nat(n * k))
 
 
 type Cycle = Iterable[int]
@@ -149,12 +162,18 @@ class Permutation(Function, PROP):
             raise ValueError(
                 messages.WRONG_PERMUTATION.format(size, len(inside))
             )
-        super().__init__(list(inside), size, size)
+        super().__init__(list(inside), Nat(size), Nat(size))
 
     def __iter__(self):
         return (self[i] for i in range(len(self)))
 
-    def __getitem__(self, key: int) -> int:
+    @overload
+    def __getitem__(self, key: int) -> int: ...
+
+    @overload
+    def __getitem__(self, key: slice) -> tuple[int, ...]: ...
+
+    def __getitem__(self, key):
         if isinstance(key, slice):
             return tuple(self)[key]
         return super().__getitem__(key)
@@ -173,7 +192,9 @@ class Permutation(Function, PROP):
         return hash(tuple(self))
 
     @classmethod
-    def id(cls, dom: int | Nat = 0) -> Self:
+    @rule
+    def id[A](cls, dom: Annotated[int | Nat, Ob(A)] = 0
+              ) -> Annotated[Self, Hom(A, A)]:
         """ The identity permutation on ``range(size)``. """
         n = int(dom)
         return cls(range(n), n)
@@ -217,7 +238,7 @@ class Permutation(Function, PROP):
             result[left], result[right] = right, left
         return cls(result, size)
 
-    def cycles(self) -> Cycles:
+    def cycles(self) -> tuple[Cycle, ...]:
         """ Return the cycles of the permutation. """
         result, seen = [], set()
         for i in range(len(self)):
@@ -240,7 +261,9 @@ class Permutation(Function, PROP):
             i = self[i]
         return tuple(cycle)
 
-    def then(self, other: Self) -> Self:
+    def then[A, B, C](
+            self: Annotated[Self, Hom(A, B)],
+            other: Annotated[Self, Hom(B, C)]) -> Annotated[Self, Hom(A, C)]:
         """ Return ``self ; other``, i.e. ``result[i] == other[self[i]]``. """
         other = type(self)(other, len(self))
         elems = (other[self[i]] for i in range(len(self)))
@@ -263,7 +286,10 @@ class Permutation(Function, PROP):
         other = type(self)(other, len(self))
         return other.dagger().then(self).then(other)
 
-    def tensor(self, other=None, *others) -> Self:
+    def tensor[A, B, C, D](
+            self: Annotated[Self, Hom(A, B)],
+            other: Annotated[Self | None, Hom(C, D)] = None, *others
+    ) -> Annotated[Self, Hom([A, C], [B, D])]:
         """ Return the disjoint union of permutations. """
         if other is None:
             return self
@@ -319,12 +345,24 @@ class Permutation(Function, PROP):
         return component_of
 
     @classmethod
-    def swap(cls, left: int | Nat, right: int | Nat) -> Self:
+    @rule
+    def swap[X: Atom, Y: Atom](
+            cls, left: Annotated[int | Nat, Ob(X)],
+            right: Annotated[int | Nat, Ob(Y)]
+    ) -> Annotated[Self, Hom([X, Y], [Y, X])]:
         m, n = int(left), int(right)
         inside = tuple(
             i + n if i < m else i - m
             for i in range(m + n))
         return cls(inside, m + n)
+
+    def trace_left(self, n=1):
+        """ The trace of ``n`` wires on the left, see :meth:`trace`. """
+        return self.trace(n, left=True)
+
+    def trace_right(self, n=1):
+        """ The trace of ``n`` wires on the right, see :meth:`trace`. """
+        return self.trace(n)
 
     def trace(self, n: int = 1, left: bool = False) -> Self:
         raise NotImplementedError

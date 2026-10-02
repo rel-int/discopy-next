@@ -34,7 +34,7 @@ class Cut(frobenius.Bubble, Formula): pass
 class Ligature(frobenius.Spider, Formula): pass
 class Predicate(frobenius.Box, Formula): pass
 
-Id, Formula.bubble_factory = Formula.id, Cut
+Id, Formula.Bubble = Formula.id, Cut
 Tensor[bool].bubble = lambda self, **_: self.map(lambda x: not x)
 ```
 

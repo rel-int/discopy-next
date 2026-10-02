@@ -16,6 +16,7 @@ Summary
     Box
     Braid
     Sum
+    Bubble
     Functor
 
 .. admonition:: Functions
@@ -56,16 +57,19 @@ The hexagon equations hold on the nose.
     :align: center
 """
 
-from __future__ import annotations
+from typing import Any, ClassVar, Self
 
 from collections.abc import Callable
 
 from discopy import monoidal
 from discopy.abc import BraidedCategory
-from discopy.cat import factory
+from typing import Annotated
+
+from discopy.axioms import Atom, axiom, Equation, Hom, Ob, rule
+from discopy.cat import factory, Generator
 from discopy.monoidal import Ty, Match
 from discopy.utils import (
-    assert_isatomic, BinaryBoxConstructor, deprecated_alias, factory_name)
+    assert_isatomic, BinaryBoxConstructor, factory_name)
 
 
 class Wire(monoidal.Wire):
@@ -89,9 +93,15 @@ class Diagram(monoidal.Diagram, BraidedCategory):
         dom (monoidal.Ty) : The domain of the diagram, i.e. its input.
         cod (monoidal.Ty) : The codomain of the diagram, i.e. its output.
     """
+    Braid: ClassVar[Generator]
+    Functor: ClassVar[Generator]
 
     @classmethod
-    def braid(cls, left: monoidal.Ty, right: monoidal.Ty) -> Diagram:
+    @rule
+    def braid[X: Atom, Y: Atom](
+            cls, left: Annotated[monoidal.Ty, Ob(X)],
+            right: Annotated[monoidal.Ty, Ob(Y)]
+    ) -> Annotated[Self, Hom([X, Y], [Y, X])]:
         """
         The diagram braiding :code:`left` over :code:`right`.
 
@@ -101,9 +111,9 @@ class Diagram(monoidal.Diagram, BraidedCategory):
 
         Note
         ----
-        This calls :func:`hexagon` and :attr:`braid_factory`.
+        This calls :func:`hexagon` and :attr:`Braid`.
         """
-        return hexagon(cls, cls.braid_factory)(left, right)
+        return hexagon(cls, cls.Braid)(left, right)
 
     def simplify(self) -> Diagram:
         """ Remove braids followed by their dagger. """
@@ -116,7 +126,8 @@ class Diagram(monoidal.Diagram, BraidedCategory):
                     inside, self.dom, self.cod, _scan=False).simplify()
         return self
 
-    def naturality(self, i: int, left=True, down=True, braid=None) -> Diagram:
+    def naturality(self, i: int, left=True, down=True,
+                   braid=None) -> Diagram:
         """
         Slide a box through a braid.
 
@@ -157,20 +168,21 @@ class Diagram(monoidal.Diagram, BraidedCategory):
                       below=self[i + len(source):] if down else self[i + 1:],
                       left=left_wires[:-1] if left else left_wires,
                       right=right_wires if left else right_wires[1:])
-        return match.substitute(target)
+        return match.substitute(target)  # ty: ignore[invalid-return-type]
+
+    braid_naturality = BraidedCategory.braid_naturality.failing(
+        "A free braid does not commute past a box.")
+
+    hypergraph_section = monoidal.Diagram.hypergraph_section.failing(
+        "Decoding a hypergraph can cross wires, which needs swaps the "
+        "category does not have: a braid does not survive the symmetric "
+        "quotient.")
 
 
-class Box(monoidal.Box, Diagram):
-    """
-    A braided box is a monoidal box in a braided diagram.
-
-    Parameters:
-        name (str) : The name of the box.
-        dom (monoidal.Ty) : The domain of the box, i.e. its input.
-        cod (monoidal.Ty) : The codomain of the box, i.e. its output.
-    """
+Box = Diagram.Box
 
 
+@Diagram.generator
 class Braid(BinaryBoxConstructor, Box):
     """
     The braiding of atomic types :code:`left` and :code:`right`.
@@ -185,13 +197,15 @@ class Braid(BinaryBoxConstructor, Box):
     :class:`Braid` is only defined for atomic types (i.e. of length 1).
     For complex types, use :meth:`Diagram.braid` instead.
     """
+    serialised_attrs = ('left', 'right', 'is_dagger')
+
     def __init__(self, left: monoidal.Ty, right: monoidal.Ty, is_dagger=False):
         assert_isatomic(left, monoidal.Ty)
         assert_isatomic(right, monoidal.Ty)
         name = type(self).__name__\
             + (f"({right}, {left})" if is_dagger else f"({left}, {right})")
         dom, cod = left @ right, right @ left
-        Box.__init__(
+        self.Box.__init__(
             self, name, dom, cod, is_dagger=is_dagger, draw_as_braid=True)
         BinaryBoxConstructor.__init__(self, left, right)
 
@@ -204,7 +218,7 @@ class Braid(BinaryBoxConstructor, Box):
         return type(self)(self.right, self.left, not self.is_dagger)
 
 
-def hexagon(cls: type, factory: Callable) -> Callable[[Ty, Ty], Diagram]:
+def hexagon(cls: type[Diagram], factory: Callable) -> Callable[[Ty, Ty], Any]:
     """
     Take a ``factory`` for braids of atomic types and extend it recursively.
 
@@ -228,17 +242,10 @@ def hexagon(cls: type, factory: Callable) -> Callable[[Ty, Ty], Diagram]:
     return method
 
 
-class Sum(monoidal.Sum, Box):
-    """
-    A braided sum is a monoidal sum and a braided box.
-
-    Parameters:
-        terms (tuple[Diagram, ...]) : The terms of the formal sum.
-        dom (Ty) : The domain of the formal sum.
-        cod (Ty) : The codomain of the formal sum.
-    """
+Sum, Bubble = Diagram.Sum, Diagram.Bubble
 
 
+@Diagram.generator
 class Functor(monoidal.Functor):
     """
     A braided functor is a monoidal functor that preserves braids.
@@ -252,6 +259,18 @@ class Functor(monoidal.Functor):
     """
     dom = cod = Diagram
 
+    @axiom
+    def braided(cls) -> Equation:
+        """
+        A braided functor preserves the braid, but only up to the braid
+        relations: the braid of a composite type is a chosen sequence of
+        crossings and a functor rebrackets it. Free braided diagrams
+        compare presentations, so the law is checkable from
+        :class:`discopy.symmetric.Diagram`'s functor on, whose equations
+        hold up to hypergraph isomorphism.
+        """
+        return NotImplemented
+
     def __call__(self, other):
         if isinstance(other, Braid) and not other.is_dagger\
                 and hasattr(self.cod, "braid"):
@@ -259,8 +278,9 @@ class Functor(monoidal.Functor):
         return super().__call__(other)
 
 
-Diagram.braid_factory = Braid
-Diagram.sum_factory = Sum
+Layer = Diagram.Layer
+
+
 Id = Diagram.id
 
 
@@ -268,4 +288,6 @@ class Equation(monoidal.Equation):
     """ The :class:`monoidal.Equation` of braided diagrams. """
 
 
-__getattr__ = deprecated_alias(__name__, {"Ob": "Wire"})
+Diagram.Equation = Equation
+
+

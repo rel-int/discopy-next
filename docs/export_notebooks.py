@@ -20,8 +20,6 @@ It can also be run as a script::
     python docs/export_notebooks.py qnlp        # render a single notebook
     python docs/export_notebooks.py --check     # only check they execute
 """
-from __future__ import annotations
-
 import argparse
 import subprocess
 import sys

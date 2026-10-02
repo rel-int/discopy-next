@@ -5,8 +5,10 @@
 import doctest
 
 from discopy import (
-    axioms,
     abc,
+    pattern,
+    search,
+    axioms,
     cat,
     monoidal,
     braided,

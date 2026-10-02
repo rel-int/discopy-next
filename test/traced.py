@@ -5,7 +5,9 @@ from discopy.utils import AxiomError
 
 
 def test_trace_repr():
-    assert repr(Box('f', 'x', 'x').trace()) == "traced.Trace(f, left=False)"
+    trace = Box('f', 'x', 'x').trace()
+    assert repr(trace) == "traced.Trace(traced.Box('f', monoidal.Ty(cat.Ob("\
+        "'x')), monoidal.Ty(cat.Ob('x'))), left=False)"
 
 
 def test_trace_error():

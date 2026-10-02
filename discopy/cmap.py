@@ -34,8 +34,6 @@ Summary
     CMap
 """
 
-from __future__ import annotations
-
 import operator
 import shutil
 import subprocess
@@ -46,11 +44,12 @@ from functools import cached_property, reduce
 from inspect import isclass
 from io import BytesIO
 from math import inf, lcm
-from typing import TYPE_CHECKING, ClassVar, Literal
+from typing import TYPE_CHECKING, Annotated, Any, ClassVar, Literal, Self
 
-from discopy import hypergraph, messages
+from discopy import hypergraph, messages, pattern
 from discopy.abc import (
     CompactCategory,
+    DaggerCategory,
     NamedGeneric,
     Pregroup,
     RigidCategory,
@@ -59,6 +58,8 @@ from discopy.abc import (
 )
 from discopy.cat import Ob
 from discopy.python.finset import Permutation
+from discopy.pattern import Atom, Hom, UNIT
+from discopy.search import rule
 from discopy.utils import (
     AxiomError,
     assert_isatomic,
@@ -125,9 +126,8 @@ class Port:
     side: Literal["up", "down"]
 
 
-class CMap[C0: Pregroup, C1: CMap](
-    CompactCategory[C0, C1], NamedGeneric['category']
-):
+class CMap[category: Diagram](CompactCategory, DaggerCategory,
+                              NamedGeneric):
     r"""
     An open combinatorial map, i.e. a diagram represented as a bijection
     between its ports.
@@ -156,7 +156,7 @@ class CMap[C0: Pregroup, C1: CMap](
 
     Following :class:`Hypergraph`, the map is parametrised by a category.
     The functor used by :meth:`from_diagram` is read from
-    ``category.functor_factory``; :meth:`Diagram.to_map` parameterises
+    ``category.Functor``; :meth:`Diagram.to_map` parameterises
     ``CMap`` with the concrete diagram category automatically.
     A map is always compact, whatever the category that hosts it, so that
     every compact operation is available when manipulating maps. It is
@@ -222,19 +222,19 @@ class CMap[C0: Pregroup, C1: CMap](
         :align: center
     """
 
-    category: ClassVar[Diagram] = None
-    functor = classproperty(lambda cls: cls.category.functor_factory)
+    category: ClassVar[type[Diagram]] = None  # ty: ignore[invalid-assignment]
+    functor = classproperty(lambda cls: cls.category.Functor)
     ob = classproperty(lambda cls: cls.category.ob)
 
-    dom: C0
-    cod: C0
-    loops: tuple[C0, ...]
+    dom: Ty
+    cod: Ty
+    loops: tuple[Ty, ...]
     edges: Permutation
 
     def __init__(
-            self, dom: C0, cod: C0, boxes: tuple[Box, ...],
+            self, dom: Ty, cod: Ty, boxes: tuple[Box, ...],
             edges: Iterable[int],
-            loops: tuple[C0, ...] = (), *, check: bool = True):
+            loops: tuple[Ty, ...] = (), *, check: bool = True):
         assert_isinstance(dom, self.category.ob)
         assert_isinstance(cod, self.category.ob)
         for box in boxes:
@@ -450,7 +450,7 @@ class CMap[C0: Pregroup, C1: CMap](
                 factory_name(cls.category)))
 
     @property
-    def connected_components(self) -> list[CMap]:
+    def connected_components(self) -> list[Self]:
         """ The connected components, with the boundary component first. """
         if not self.n_ports:
             # Avoid recursively rebuilding the same portless component.
@@ -490,7 +490,7 @@ class CMap[C0: Pregroup, C1: CMap](
                 and not self.loops:
             return [self]
 
-        def make_component(component: int) -> CMap:
+        def make_component(component: int) -> Self:
             dom = self.dom if component == boundary_component else self.ob()
             cod = self.cod if component == boundary_component else self.ob()
             boxes = tuple(box for _, box in boxes_by_component.get(
@@ -774,7 +774,9 @@ class CMap[C0: Pregroup, C1: CMap](
             self.dom, self.cod, self.boxes, self.edges, self.loops))
 
     @classmethod
-    def id(cls, dom=None) -> CMap:
+    @rule
+    def id[A](cls, dom: Annotated[Any | None, pattern.Ob(A)] = None
+              ) -> Annotated[CMap, Hom(A, A)]:
         """ The identity map, with each input wired to its output. """
         dom = cls.ob() if dom is None else dom
         n_ports = 2 * len(dom)
@@ -910,7 +912,11 @@ class CMap[C0: Pregroup, C1: CMap](
             for box, offset in layer.boxes_and_offsets])
 
     @classmethod
-    def swap(cls, left: Ty, right: Ty) -> CMap:
+    @rule
+    def swap[X: Atom, Y: Atom](
+            cls, left: Annotated[Any, pattern.Ob(X)],
+            right: Annotated[Any, pattern.Ob(Y)]) -> Annotated[CMap,
+    Hom([X, Y], [Y, X])]:
         """ The symmetry encoded as boundary wiring. """
         dom, cod = left @ right, right @ left
         left_len, right_len = len(left), len(right)
@@ -923,13 +929,17 @@ class CMap[C0: Pregroup, C1: CMap](
             2 * len(dom))
         return cls(dom, cod, (), edge, check=False)
 
-    cup_factory = classmethod(lambda cls, left, right: cls.from_box(
-        cls.category.cup_factory(left, right)))
-    cap_factory = classmethod(lambda cls, left, right: cls.from_box(
-        cls.category.cap_factory(left, right)))
+    Cup = classmethod(lambda cls, left, right: cls.from_box(
+        cls.category.Cup(left, right)))
+    Cap = classmethod(lambda cls, left, right: cls.from_box(
+        cls.category.Cap(left, right)))
 
     @classmethod
-    def cups(cls, left: Ty, right: Ty) -> CMap:
+    @rule
+    def cups[X: Atom](
+            cls, left: Annotated[Any, pattern.Ob(X)],
+            right: Annotated[Any, pattern.Ob(X).r]
+    ) -> Annotated[CMap, Hom(pattern.Ob(X) @ pattern.Ob(X).r, UNIT)]:
         """ A cup encoded as boundary wiring between adjoint types. """
         assert_isinstance(left, Pregroup)
         assert_isinstance(right, Pregroup)
@@ -941,7 +951,11 @@ class CMap[C0: Pregroup, C1: CMap](
         return cls(left @ right, cls.ob(), (), edge, check=False)
 
     @classmethod
-    def caps(cls, left: Ty, right: Ty) -> CMap:
+    @rule
+    def caps[X: Atom](
+            cls, left: Annotated[Any, pattern.Ob(X)],
+            right: Annotated[Any, pattern.Ob(X).l]
+    ) -> Annotated[CMap, Hom(UNIT, pattern.Ob(X) @ pattern.Ob(X).l)]:
         """ A cap encoded as boundary wiring between adjoint types. """
         assert_isinstance(left, Pregroup)
         assert_isinstance(right, Pregroup)
@@ -968,13 +982,33 @@ class CMap[C0: Pregroup, C1: CMap](
         return cls.copy(typ, 0)
 
     @classmethod
+    @rule
+    def ev_left[Y: Atom, E: Atom](
+            cls, base: Annotated[Any, pattern.Ob(Y)],
+            exponent: Annotated[Any, pattern.Ob(E)]) -> Annotated[CMap,
+    Hom((pattern.Ob(Y) << pattern.Ob(E)) @ pattern.Ob(E), Y)]:
+        """ The left evaluation, see :meth:`ev`. """
+        return cls.ev(base, exponent, left=True)
+
+    @classmethod
+    @rule
+    def ev_right[Y: Atom, E: Atom](
+            cls, base: Annotated[Any, pattern.Ob(Y)],
+            exponent: Annotated[Any, pattern.Ob(E)]) -> Annotated[CMap,
+    Hom(pattern.Ob(E) @ (pattern.Ob(E) >> pattern.Ob(Y)), Y)]:
+        """ The right evaluation, see :meth:`ev`. """
+        return cls.ev(base, exponent, left=False)
+
+    @classmethod
     def ev(cls, base: Ty, exponent: Ty, left: bool = True) -> CMap:
         """
         Evaluation is kept as an explicit box by default, or comes from the
         wiring of cups when the host category is rigid.
         """
         if issubclass(cls.category, RigidCategory):
-            return super().ev(base, exponent, left)
+            return (RigidCategory.ev_left.__func__(cls, base, exponent)
+                    if left else
+                    RigidCategory.ev_right.__func__(cls, base, exponent))
         return cls.from_box(cls.category.ev(base, exponent, left))
 
     def curry(self, n: int = 1, left: bool = True) -> CMap:
@@ -998,12 +1032,12 @@ class CMap[C0: Pregroup, C1: CMap](
             :align: center
         """
         if issubclass(self.category, RigidCategory):
-            return super().curry(n, left)
+            return RigidCategory.curry(self, n, left)
         if n < 0 or n > len(self.dom):
             raise ValueError
         if not n:
             return self
-        return self.from_box(self.category.curry_factory(
+        return self.from_box(self.category.Curry(
             self.to_diagram(), n, left))
 
     def base_and_exponent(self, n: int, left: bool) -> tuple[Ty, Ty]:
@@ -1062,8 +1096,11 @@ class CMap[C0: Pregroup, C1: CMap](
         return cls.from_box(cls.category.spiders(
             n_legs_in, n_legs_out, typ, phases))
 
+    @rule
     @unbiased
-    def then(self, other: CMap) -> CMap:
+    def then[A, B, C](
+            self: Annotated[CMap, Hom(A, B)],
+            other: Annotated[CMap, Hom(B, C)]) -> Annotated[CMap, Hom(A, C)]:
         """
         Compose maps by gluing output ports to input ports.
 
@@ -1126,8 +1163,12 @@ class CMap[C0: Pregroup, C1: CMap](
         return type(self)(
             dom, cod, self.boxes, edge, loops=loops, check=False)
 
+    @rule
     @unbiased
-    def tensor(self, other: CMap) -> CMap:
+    def tensor[A, B, C, D](
+            self: Annotated[CMap, Hom(A, B)],
+            other: Annotated[CMap, Hom(C, D)]) -> Annotated[CMap,
+    Hom([A, C], [B, D])]:
         """ Tensor product given by disjoint union of the two maps. """
         dom, cod = self.dom @ other.dom, self.cod @ other.cod
         boxes = self.boxes + other.boxes
@@ -1181,7 +1222,7 @@ class CMap[C0: Pregroup, C1: CMap](
 
     def plug_input(
             self, input_index: int, box: Box,
-            cod: C0, root_index: int = 0) -> CMap:
+            cod: Ty, root_index: int = 0) -> CMap:
         """
         Plug an input boundary and the output root into a new box.
 
@@ -1258,13 +1299,13 @@ class CMap[C0: Pregroup, C1: CMap](
 
         Note
         ----
-        When ``category.trace_factory`` is a class, e.g. for symmetric
+        When ``category.Trace`` is a class, e.g. for symmetric
         diagrams, then the result is just one big trace box wrapped up as a
         map. Otherwise it is a class method, e.g. for compact diagrams, in
         which case we use it to introduce cup and cap boxes.
         """
         type(self).assert_istraced()
-        factory = self.category.trace_factory
+        factory = self.category.Trace
         if isclass(factory):
             return self.from_box(factory(self.to_diagram(), left))
         return factory.__func__(type(self), self, left)
@@ -1274,8 +1315,8 @@ class CMap[C0: Pregroup, C1: CMap](
         Introduce cup and cap boxes to make self :attr:`is_monogamous`,
         i.e. so that every wire connects a positive and a negative port.
 
-        The boxes come from ``category.cup_factory`` and
-        ``category.cap_factory``, so this needs a rigid category.
+        The boxes come from ``category.Cup`` and
+        ``category.Cap``, so this needs a rigid category.
 
         Example
         -------
@@ -1294,12 +1335,12 @@ class CMap[C0: Pregroup, C1: CMap](
                 continue
             source, target = ports[i].obj, ports[j].obj
             if ports[i].kind.is_positive:
-                box = self.category.cup_factory(source, target)
+                box = self.category.Cup(source, target)
                 boxes = self.boxes + (box, )
                 insert = self.n_ports - len(self.cod)
                 box_wires = [(insert, i), (insert + 1, j)]
             else:
-                box = self.category.cap_factory(source, target)
+                box = self.category.Cap(source, target)
                 boxes = (box, ) + self.boxes
                 insert = len(self.dom)
                 box_wires = [(insert + 1, i), (insert, j)]
@@ -1378,15 +1419,15 @@ class CMap[C0: Pregroup, C1: CMap](
         >>> assert f.to_map().curry().to_compact()\\
         ...     == (f.to_map() >> CMap.ev(z, y).dagger()).trace()
         """
-        curry_factory = self.category.curry_factory
-        if not any(isinstance(box, curry_factory) for box in self.boxes):
+        Curry = self.category.Curry
+        if not any(isinstance(box, Curry) for box in self.boxes):
             return self
         functor = self.functor(
             ob_map=lambda typ: typ, ar_map=type(self).from_box,
             dom=self.category, cod=type(self))
 
         def image(box):
-            if not isinstance(box, curry_factory):
+            if not isinstance(box, Curry):
                 return functor(box)
             exponent = box.cod.exponent
             return (type(self).from_diagram(box.arg).to_compact()
@@ -1460,27 +1501,24 @@ cycles of this map.
             dom_wires = [edge_wire[i] for i in dom_ports]
             cod_wires = [edge_wire[i] for i in cod_ports]
 
-            offset = None
+            offset = scan.index(dom_wires[0]) if dom_wires else len(scan)
             for i, wire_id in enumerate(dom_wires):
                 j = scan.index(wire_id)
-                if i == 0:
-                    offset = j
-                elif j != offset + i:
-                    if j > offset + i:
-                        diagram >>= diagram.cod[:offset + i] @ swap(
-                            diagram.cod[offset + i:j], diagram.cod[j]
-                        ) @ diagram.cod[j + 1:]
-                        scan = (scan[:offset + i] + scan[j:j + 1]) + (
-                            scan[offset + i:j] + scan[j + 1:])
-                    else:
-                        diagram >>= diagram.cod[:j] @ swap(
-                            diagram.cod[j], diagram.cod[j + 1:offset + i]
-                        ) @ diagram.cod[offset + i:]
-                        scan = (scan[:j] + scan[j + 1:offset + i]) + (
-                            scan[j:j + 1] + scan[offset + i:])
-                        offset -= 1
-
-            offset = len(scan) if offset is None else offset
+                if i == 0 or j == offset + i:
+                    continue
+                if j > offset + i:
+                    diagram >>= diagram.cod[:offset + i] @ swap(
+                        diagram.cod[offset + i:j], diagram.cod[j]
+                    ) @ diagram.cod[j + 1:]
+                    scan = (scan[:offset + i] + scan[j:j + 1]) + (
+                        scan[offset + i:j] + scan[j + 1:])
+                else:
+                    diagram >>= diagram.cod[:j] @ swap(
+                        diagram.cod[j], diagram.cod[j + 1:offset + i]
+                    ) @ diagram.cod[offset + i:]
+                    scan = (scan[:j] + scan[j + 1:offset + i]) + (
+                        scan[j:j + 1] + scan[offset + i:])
+                    offset -= 1
             scan = scan[:offset] + cod_wires + scan[offset + len(box.dom):]
             diagram >>= diagram.cod[:offset] @ box @ diagram.cod[
                 offset + len(box.dom):]
@@ -1503,7 +1541,8 @@ cycles of this map.
         given by the edge permutation. See documentation of
         :func:``Hypergraph.from_map`` for an example.
         """
-        return hypergraph.Hypergraph[self.category].from_map(self)
+        return hypergraph.Hypergraph[
+            self.category].from_map(self)  # ty: ignore[invalid-type-form]
 
     def to_dot(
             self, engine="dot", seed=None, graph_attr=None,

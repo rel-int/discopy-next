@@ -1,5 +1,14 @@
+import annotationlib
+import functools
+import inspect
 import os
 import sys
+
+# Sphinx predates PEP 649 and reads signatures with `inspect.signature`,
+# which evaluates every annotation: a name imported under `TYPE_CHECKING`
+# alone raises `NameError` there. Read it as written in the source instead.
+inspect.signature = functools.partial(
+    inspect.signature, annotation_format=annotationlib.Format.STRING)
 
 sys.path.insert(0, os.path.abspath('..'))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))

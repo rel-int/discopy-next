@@ -16,8 +16,6 @@ Summary
     Matplotlib
 """
 
-from __future__ import annotations
-
 from abc import ABC, abstractmethod
 from contextlib import contextmanager
 from math import sqrt
@@ -39,13 +37,13 @@ from PIL import Image, ImageSequence
 from discopy import config
 from discopy.drawing import Node, Point
 
-from discopy.config import (  # noqa: F401  pylint: disable=unused-import
+from discopy.config import (  # noqa: F401
     BOX_DRAWING_ATTRIBUTES as ATTRIBUTES,
     DRAWING_DEFAULT as DEFAULT, COLORS, SHAPES, RIBBON_FOLD_DEPTH,
     TRANSPARENT)
 
 if TYPE_CHECKING:
-    from discopy.drawing import PlaneGraph
+    from discopy.drawing import Drawing
 
 
 MATPLOTLIB_RC = {
@@ -79,8 +77,8 @@ def matplotlib_context():
         yield
 
 
-def draw(graph: PlaneGraph, **params):
-    """ Load a :class:`Backend` and draw a :class:`PlaneGraph` on it. """
+def draw(graph: Drawing, **params):
+    """ Load a :class:`Backend` and draw a :class:`Drawing` on it. """
     aspect = params.get('aspect', 'auto' if 'figsize' in params else 'equal')
     if params.get('legend', False) and not params.get('to_tikz', False):
         colours = Backend.region_colours(graph)
@@ -386,17 +384,14 @@ class Backend(ABC):
 
     def draw_text(self, text, i, j, **params):
         """ Draws a piece of text at a given position. """
-        # pylint: disable=unused-argument  # the base only measures the width
         self.max_width = max(self.max_width, i)
 
     def draw_node(self, i, j, **params):
         """ Draws a node for a given position, color and shape. """
-        # pylint: disable=unused-argument  # the base only measures the width
         self.max_width = max(self.max_width, i)
 
     def draw_polygon(self, *points, facecolor=None, edgecolor=None):
         """ Draws a polygon given a list of points. """
-        # pylint: disable=unused-argument  # the base only measures the width
         self.max_width = max(self.max_width, max(i for i, _ in points))
 
     @staticmethod
@@ -425,12 +420,10 @@ class Backend(ABC):
         """ Draws a wire from source to target, possibly with a Bezier.
         An ``adaptive`` wire lies on the neutral canvas, so its stroke may
         adapt to a dark page, see :meth:`Matplotlib.dark_gid`. """
-        # pylint: disable=unused-argument  # the base only measures the width
         self.max_width = max(self.max_width, source[0], target[0])
 
     def draw_bezier(self, points, adaptive=True):
         """ Draws a cubic Bezier curve from a list of four control points. """
-        # pylint: disable=unused-argument  # the base only measures the width
         self.max_width = max(self.max_width, max(x for x, _ in points))
 
     @staticmethod
@@ -460,7 +453,6 @@ class Backend(ABC):
         is filled with ``color`` and drawn without an outline, e.g. behind the
         wires to colour the inside of a ribbon.
         """
-        # pylint: disable=unused-argument  # the base only measures the width
         points = [start] + [step[-1] for step in steps]
         self.max_width = max([self.max_width] + [x for x, _ in points])
 
@@ -525,8 +517,10 @@ class Backend(ABC):
         around the crossing, matching the broken strands, so the ribbon going
         under is shadowed by the one going over.
         """
-        a, b = (self.braid_strand(*first, middle),
-                self.braid_strand(*second, middle))
+        a = self.braid_strand(
+            *first, middle)  # ty: ignore[too-many-positional-arguments]
+        b = self.braid_strand(
+            *second, middle)  # ty: ignore[too-many-positional-arguments]
         spans = [(0, 1)] if not gap else [(0, 0.5 - gap), (0.5 + gap, 1)]
         for t0, t1 in spans:
             a_sub, b_sub = (
@@ -553,7 +547,6 @@ class Backend(ABC):
 
     def draw_spiders(self, graph, draw_box_labels=True, **params):
         """ Draws a list of boxes depicted as spiders. """
-        # pylint: disable=unused-argument  # the base only measures the width
         spider_widths = [
             p.x for n, p in graph.positions.items()
             if n.kind == 'box' and n.box.draw_as_spider]
@@ -565,7 +558,6 @@ class Backend(ABC):
         """ Output the drawing. """
 
     def draw_boundary(self, graph, boundary_color="white", **params):
-        # pylint: disable=unused-argument  # params are a backend's
         x, y = graph.width, graph.height
         self.draw_polygon(
             (0, 0), (x, 0), (x, y), (0, y),
@@ -722,7 +714,6 @@ class Backend(ABC):
         given as ``(top, control, bottom)`` triples spanning the same
         height band, see :meth:`region_cells`.
         """
-        # pylint: disable=unused-argument  # the base only measures the width
         self.max_width = max(
             self.max_width, max(x for x, _ in left + right))
 
@@ -840,7 +831,6 @@ class Backend(ABC):
         rails of two ribbons, filled with the colour of their region. A wide
         cup is flattened into a half ellipse, see :meth:`fold_depths`.
         """
-        # pylint: disable=unused-argument  # draw_boxes passes params to all
         box, j = node.box, node.j
         xs = [positions[Node("box_dom", i=i, j=j, x=box.dom[i])]
               for i in range(4)]
@@ -864,7 +854,6 @@ class Backend(ABC):
         rails of two ribbons, filled with the colour of their region. A wide
         cap is flattened into a half ellipse, see :meth:`fold_depths`.
         """
-        # pylint: disable=unused-argument  # draw_boxes passes params to all
         box, j = node.box, node.j
         xs = [positions[Node("box_cod", i=i, j=j, x=box.cod[i])]
               for i in range(4)]
@@ -958,8 +947,7 @@ class Backend(ABC):
                            fontsize=params.get('fontsize', None))
 
     def draw_discard(self, positions, node, **params):
-        """ Draws a :class:`discopy.quantum.circuit.Discard` box. """
-        # pylint: disable=unused-argument  # draw_boxes passes params to all
+        """ Draws a :class:`discopy.quantum.gates.Discard` box. """
         box, j = node.box, node.j
         for i in range(len(box.dom)):
             x = box.dom[i]
@@ -973,7 +961,7 @@ class Backend(ABC):
                 self.draw_wire(source, target)
 
     def draw_measure(self, positions, node, **params):
-        """ Draws a :class:`discopy.quantum.circuit.Measure` box. """
+        """ Draws a :class:`discopy.quantum.gates.Measure` box. """
         self.draw_box(positions, node, **dict(params, draw_box_labels=False))
         i, j = positions[node]
         self.draw_wire(
@@ -988,7 +976,6 @@ class Backend(ABC):
         Draws a :class:`discopy.balanced.DualRailBraid`, i.e. the two ribbons
         ``(0, 1)`` and ``(2, 3)`` crossing as a whole rather than wire by wire.
         """
-        # pylint: disable=unused-argument  # draw_boxes passes params to all
         box, j = node.box, node.j
         dom = [positions[Node("box_dom", i=i, j=j, x=box.dom[i])]
                for i in range(len(box.dom))]
@@ -1018,7 +1005,6 @@ class Backend(ABC):
         Draws a :class:`discopy.balanced.DualRailTwist`, i.e. the two rails of
         a ribbon crossing each other twice in quick succession.
         """
-        # pylint: disable=unused-argument  # draw_boxes passes params to all
         box, j = node.box, node.j
         dom = [positions[Node("box_dom", i=i, j=j, x=box.dom[i])]
                for i in range(2)]
@@ -1545,7 +1531,8 @@ class Matplotlib(Backend):
         plt.margins(*margins)
         plt.subplots_adjust(
             top=1, bottom=0, right=1, left=0, hspace=0, wspace=0)
-        self.axis.set_aspect(params.get("aspect"))
+        self.axis.set_aspect(
+            params.get("aspect"))  # ty: ignore[invalid-argument-type]
         plt.axis('off')
         if xlim is not None:
             self.axis.set_xlim(*xlim)

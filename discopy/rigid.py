@@ -19,6 +19,7 @@ Summary
     Cup
     Cap
     Sum
+    Bubble
     Functor
 
 Axioms
@@ -145,25 +146,29 @@ out the two objects needed below as ``cat.Ob`` instances so that
 >>> assert all(epsilon(M_)(eta(M_)(x)) == x for x in (Z3(0), Z3(1), Z3(2)))
 """
 
-from __future__ import annotations
-
 import copy
 
 from collections.abc import Callable
 
-from typing import Iterator
+from typing import Any, ClassVar, Iterator, Self
 
 from discopy import cat, monoidal, biclosed, messages
-from discopy.abc import Pregroup, RigidCategory
-from discopy.cat import factory
+from discopy.abc import DaggerCategory, Pregroup, RigidCategory
+from typing import Annotated
+
+from discopy.axioms import Atom, GENERATORS, Hom, Ob, rule, Serialisable, UNIT
+from discopy.cat import factory, Generator
 from discopy.utils import (
     assert_isatomic,
     assert_isinstance,
     AxiomError,
     BinaryBoxConstructor,
-    deprecated_alias,
     factory_name,
 )
+
+PARTIAL_HYPERGRAPH = (
+    "to_hypergraph rejects a left-handed cup or cap: Hypergraph.cups and "
+    "caps only accept the right-adjoint orientation.")
 
 
 class Wire(monoidal.Wire):
@@ -187,12 +192,6 @@ class Wire(monoidal.Wire):
     >>> assert a.l.r == a.r.l == a and a != a.l.l != a.r.r
     """
 
-    def __setstate__(self, state):
-        if '_z' in state:  # Backward compatibility
-            self.z = state['_z']
-            del state['_z']
-        super().__setstate__(state)
-
     def __init__(self, name: str, z: int = 0,
                  dom: monoidal.Colour = monoidal.transparent,
                  cod: monoidal.Colour = monoidal.transparent):
@@ -200,16 +199,30 @@ class Wire(monoidal.Wire):
         self.z = z
         super().__init__(name, dom, cod)
 
+    @classmethod
+    def strategy(
+            cls, *, dom=monoidal.transparent, cod=monoidal.transparent,
+            min_winding=-1, max_winding=1):
+        """Generate rigid wires with a bounded winding number."""
+        from hypothesis import strategies as st
+
+        return st.tuples(
+            st.sampled_from(GENERATORS),
+            st.integers(min_value=min_winding, max_value=max_winding)).map(
+                lambda args: cls(args[0], args[1], dom=dom, cod=cod))
+
     def dagger(self) -> Wire:
         raise AxiomError("Rigid types have no dagger, use pivotal instead.")
 
+    repr_transparency = Serialisable.repr_transparency
+
     @property
-    def l(self) -> Wire:
+    def l(self) -> Self:
         """ The left adjoint of the object. """
         return type(self)(self.name, self.z - 1, dom=self.cod, cod=self.dom)
 
     @property
-    def r(self) -> Wire:
+    def r(self) -> Self:
         """ The right adjoint of the object. """
         return type(self)(self.name, self.z + 1, dom=self.cod, cod=self.dom)
 
@@ -264,12 +277,7 @@ class Ty(Pregroup, biclosed.Ty):
     >>> assert n.l.r == n == n.r.l
     >>> assert (s @ n).l == n.l @ s.l and (s @ n).r == n.r @ s.r
     """
-    generator_factory = Wire
-
-    def __setstate__(self, state):
-        if '_z' in state:  # Backward compatibility
-            del state['_z']
-        super().__setstate__(state)
+    Wire: ClassVar[Generator] = Generator.subclass(Wire)
 
     def assert_isadjoint(self, other):
         """
@@ -284,14 +292,16 @@ class Ty(Pregroup, biclosed.Ty):
             raise AxiomError(messages.NOT_RIGID_ADJOINT.format(self, other))
 
     @property
-    def l(self) -> Ty:
-        """ The left adjoint of the type. """
-        return self.ar(*[x.l for x in self.inside[::-1]])
+    def l(self) -> Self:
+        """ The left adjoint of the type, with its colours swapped. """
+        return self.ar(
+            *[x.l for x in self.inside[::-1]], dom=self.cod, cod=self.dom)
 
     @property
-    def r(self) -> Ty:
-        """ The right adjoint of the type. """
-        return self.ar(*[x.r for x in self.inside[::-1]])
+    def r(self) -> Self:
+        """ The right adjoint of the type, with its colours swapped. """
+        return self.ar(
+            *[x.r for x in self.inside[::-1]], dom=self.cod, cod=self.dom)
 
     @property
     def z(self) -> int:
@@ -381,17 +391,39 @@ class Diagram(biclosed.Diagram, RigidCategory):
     .. image:: /_static/rigid/curry.svg
         :align: center
     """
+    repr_transparency = Serialisable.repr_transparency
+    serialisation = Serialisable.serialisation
 
     ob = Ty
-    layer_factory = Layer
+    Layer: ClassVar[Generator] = Generator.subclass(Layer)
+
+    dagger_involution = DaggerCategory.dagger_involution.inapplicable(
+        "Rigid diagrams have no dagger, use pivotal instead.")
+    dagger_contravariance = DaggerCategory.dagger_contravariance\
+        .inapplicable("Rigid diagrams have no dagger, use pivotal instead.")
 
     to_drawing = monoidal.Diagram.to_drawing
 
     ev = classmethod(RigidCategory.ev.__func__)
+    ev_left = classmethod(RigidCategory.ev_left.__func__)
+    ev_right = classmethod(RigidCategory.ev_right.__func__)
     curry = RigidCategory.curry
+    curry_left = RigidCategory.curry_left.admissible(
+        "A caps composition: caps and cut reach every transpose.")
+    curry_right = RigidCategory.curry_right.admissible(
+        "A caps composition: caps and cut reach every transpose.")
+    base_and_exponent = RigidCategory.base_and_exponent
+    Box: ClassVar[Generator]
+    Sum: ClassVar[Generator]
+    Cup: ClassVar[Generator]
+    Cap: ClassVar[Generator]
+    Functor: ClassVar[Generator]
 
     @classmethod
-    def cups(cls, left: Ty, right: Ty) -> Diagram:
+    @rule
+    def cups[X: Atom](
+            cls, left: Annotated[Ty, Ob(X)], right: Annotated[Ty, Ob(X).r]
+    ) -> Annotated[Diagram, Hom(Ob(X) @ Ob(X).r, UNIT)]:
         """
         Construct a diagram of nested cups for types ``left`` and ``right``.
 
@@ -408,10 +440,13 @@ class Diagram(biclosed.Diagram, RigidCategory):
         .. image:: /_static/rigid/cups.svg
             :align: center
         """
-        return nesting(cls, cls.cup_factory)(left, right)
+        return nesting(cls, cls.Cup)(left, right)
 
     @classmethod
-    def caps(cls, left: Ty, right: Ty) -> Diagram:
+    @rule
+    def caps[X: Atom](
+            cls, left: Annotated[Ty, Ob(X)], right: Annotated[Ty, Ob(X).l]
+    ) -> Annotated[Diagram, Hom(UNIT, Ob(X) @ Ob(X).l)]:
         """
         Construct a diagram of nested caps for types ``left`` and ``right``.
 
@@ -428,7 +463,7 @@ class Diagram(biclosed.Diagram, RigidCategory):
         .. image:: /_static/rigid/caps.svg
             :align: center
         """
-        return nesting(cls, cls.cap_factory)(left, right)
+        return nesting(cls, cls.Cap)(left, right)
 
     def rotate(self, left=False):
         """
@@ -609,7 +644,7 @@ class Diagram(biclosed.Diagram, RigidCategory):
                 yield _diagram
                 diagram = _diagram
         for _diagram in monoidal.Diagram.normalize(diagram, left=left):
-            yield _diagram
+            yield _diagram  # ty: ignore[invalid-yield]
 
     normalize = snake_removal
 
@@ -640,7 +675,37 @@ class Diagram(biclosed.Diagram, RigidCategory):
         """
         return super().normal_form(**params)
 
+    snake_equations = RigidCategory.snake_equations.modulo(normal_form)
 
+    currying_left = RigidCategory.currying_left.modulo(
+        normal_form).weaken(boundary_connected=True)
+
+    currying_right = RigidCategory.currying_right.modulo(
+        normal_form).weaken(boundary_connected=True)
+
+    dagger_monoidality = RigidCategory.dagger_monoidality.inapplicable(
+        "Rigid cups and caps have no dagger, use pivotal instead.")
+
+    hypergraph_section = \
+        monoidal.Diagram.hypergraph_section.failing(PARTIAL_HYPERGRAPH)
+
+    hypergraph_composition = \
+        monoidal.Diagram.hypergraph_composition.failing(PARTIAL_HYPERGRAPH)
+
+    map_hypergraph_agreement = \
+        monoidal.Diagram.map_hypergraph_agreement.failing(PARTIAL_HYPERGRAPH)
+
+    normal_form_soundness = \
+        monoidal.Diagram.normal_form_soundness.failing(PARTIAL_HYPERGRAPH)
+
+    foliation_idempotence = \
+        monoidal.Diagram.foliation_idempotence.failing(PARTIAL_HYPERGRAPH)
+
+    foliation_soundness = \
+        monoidal.Diagram.foliation_soundness.failing(PARTIAL_HYPERGRAPH)
+
+
+@Diagram.generator
 class Box(biclosed.Box, Diagram):
     """
     A rigid box is a biclosed box in a rigid diagram.
@@ -659,13 +724,11 @@ class Box(biclosed.Box, Diagram):
     >>> assert f.l.z == -1 and f.z == 0 and f.r.z == 1
     >>> assert f.r.l == f == f.l.r
     >>> assert f.l.l != f != f.r.r
+    >>> from discopy.utils import dumps, loads
+    >>> assert loads(dumps(f.r)) == f.r
     """
-
-    def __setstate__(self, state):
-        if '_z' in state:  # Backward compatibility
-            self.z = state['_z']
-            del state['_z']
-        super().__setstate__(state)
+    z = 0
+    serialised_attrs = cat.Box.serialised_attrs + ('z', )
 
     def __init__(self, name: str, dom: Ty, cod: Ty, data=None, z=0, **params):
         self.z = z
@@ -674,12 +737,6 @@ class Box(biclosed.Box, Diagram):
     def __str__(self):
         return cat.Box.__str__(self) if not self.z\
             else str(self.r) + '.l' if self.z < 0 else str(self.l) + '.r'
-
-    def __repr__(self):
-        if self.is_dagger:
-            return biclosed.Box.__repr__(self)
-        return biclosed.Box.__repr__(self)[:-1] + (
-            f', z={self.z})' if self.z else ')')
 
     def setoid(self):
         """
@@ -706,7 +763,8 @@ class Box(biclosed.Box, Diagram):
         return result
 
 
-class Sum(biclosed.Sum, Box):
+@Diagram.generator
+class Sum(biclosed.Sum, Box):  # ty: ignore[inconsistent-mro]
     """
     A rigid sum is a biclosed sum that can be transposed.
 
@@ -718,12 +776,13 @@ class Sum(biclosed.Sum, Box):
 
     def rotate(self, left=False) -> Sum:
         if left:
-            return self.sum_factory(
+            return self.Sum(
                 tuple(term.l for term in self.terms), self.cod.l, self.dom.l)
-        return self.sum_factory(
+        return self.Sum(
             tuple(term.r for term in self.terms), self.cod.r, self.dom.r)
 
 
+@Diagram.generator
 class Cup(BinaryBoxConstructor, Box):
     """
     The counit of the adjunction for an atomic type.
@@ -748,11 +807,11 @@ class Cup(BinaryBoxConstructor, Box):
         name = f"Cup({left}, {right})"
         dom, cod = left @ right, self.ob(dom=left.dom, cod=left.dom)
         BinaryBoxConstructor.__init__(self, left, right)
-        Box.__init__(self, name, dom, cod, draw_as_cup=True)
+        self.Box.__init__(self, name, dom, cod, draw_as_cup=True)
 
     def rotate(self, left=False):
-        return self.cap_factory(self.right.l, self.left.l) if left\
-            else self.cap_factory(self.right.r, self.left.r)
+        return self.Cap(self.right.l, self.left.l) if left\
+            else self.Cap(self.right.r, self.left.r)
 
     def dagger(self):
         """
@@ -762,6 +821,7 @@ class Cup(BinaryBoxConstructor, Box):
         raise AxiomError("Rigid cups have no dagger, use pivotal instead.")
 
 
+@Diagram.generator
 class Cap(BinaryBoxConstructor, Box):
     """
     The unit of the adjunction for an atomic type.
@@ -786,11 +846,11 @@ class Cap(BinaryBoxConstructor, Box):
         name = f"Cap({left}, {right})"
         dom, cod = self.ob(dom=left.dom, cod=left.dom), left @ right
         BinaryBoxConstructor.__init__(self, left, right)
-        Box.__init__(self, name, dom, cod, draw_as_cap=True)
+        self.Box.__init__(self, name, dom, cod, draw_as_cap=True)
 
     def rotate(self, left=False):
-        return self.cup_factory(self.right.l, self.left.l) if left\
-            else self.cup_factory(self.right.r, self.left.r)
+        return self.Cup(self.right.l, self.left.l) if left\
+            else self.Cup(self.right.r, self.left.r)
 
     def dagger(self):
         """
@@ -800,6 +860,12 @@ class Cap(BinaryBoxConstructor, Box):
         raise AxiomError("Rigid caps have no dagger, use pivotal instead.")
 
 
+Bubble, Eval, Coeval, Curry = (
+    Diagram.Bubble, Diagram.Eval,
+    Diagram.Coeval, Diagram.Curry)
+
+
+@Diagram.generator
 class Functor(biclosed.Functor):
     """
     A rigid functor is a biclosed functor that preserves cups and caps.
@@ -853,7 +919,7 @@ class Functor(biclosed.Functor):
         return super().__call__(other)
 
 
-def nesting(cls: type, factory: Callable) -> Callable[[Ty, Ty], Diagram]:
+def nesting(cls: type[Diagram], factory: Callable) -> Callable[[Ty, Ty], Any]:
     """
     Take a :code:`factory` for cups or caps of atomic types
     and extends it recursively.
@@ -883,9 +949,11 @@ def to_rigid(self):
 
 biclosed.Diagram.to_rigid = to_rigid
 
-Diagram.cup_factory, Diagram.cap_factory, Diagram.sum_factory = Cup, Cap, Sum
-Diagram.functor_factory = Functor
 
+Exp, Over, Under = Ty.Exp, Ty.Over, Ty.Under
+TermBase, Constant, Variable, Application, Abstraction = (
+    Diagram.TermBase, Diagram.Constant, Diagram.Variable,
+    Diagram.Application, Diagram.Abstraction)
 Id = Diagram.id
 
 
@@ -893,4 +961,6 @@ class Equation(biclosed.Equation):
     """ The :class:`biclosed.Equation` of rigid diagrams. """
 
 
-__getattr__ = deprecated_alias(__name__, {"Ob": "Wire", "PRO": "Nat"})
+Diagram.Equation = Equation
+
+

@@ -34,28 +34,29 @@ See also
   Kronecker product as tensor.
 
 """
-from __future__ import annotations
-
 from contextlib import contextmanager
 from operator import index
 from types import ModuleType
-from typing import Union, Literal as L, Callable, TYPE_CHECKING
+from typing import Annotated, Any, Literal, Callable, TYPE_CHECKING
 
 from discopy import monoidal, config, messages
-from discopy.abc import MonoidalCategory, NamedGeneric, Nat
+from discopy.abc import (
+    DaggerCategory, MonoidalCategory, NamedGeneric, Nat)
 from discopy.cat import (
     factory,
     assert_iscomposable,
     assert_isparallel,
 )
 from discopy.utils import assert_isinstance, unbiased
+from discopy.pattern import Hom, Ob
+from discopy.search import rule
 
 if TYPE_CHECKING:
     import sympy
 
 
 @factory
-class Matrix(MonoidalCategory, NamedGeneric['dtype']):
+class Matrix[dtype](MonoidalCategory, DaggerCategory, NamedGeneric):
     """
     A matrix is an ``array`` with natural numbers as ``dom`` and ``cod``.
 
@@ -154,7 +155,7 @@ class Matrix(MonoidalCategory, NamedGeneric['dtype']):
                 return cls.__new__(cls[dtype], array, *args, **kwargs)
             return object.__new__(cls)
 
-    def __init__(self, array, dom: Nat, cod: Nat):
+    def __init__(self, array, dom: Nat | int, cod: Nat | int):
         dom, cod = (Nat(x) if isinstance(x, int) else x for x in (dom, cod))
         assert_isinstance(dom, Nat)
         assert_isinstance(cod, Nat)
@@ -238,7 +239,9 @@ class Matrix(MonoidalCategory, NamedGeneric['dtype']):
         return complex(self.array)
 
     @classmethod
-    def id(cls, dom=0) -> Matrix:
+    @rule
+    def id[A](cls, dom: Annotated[Any, Ob(A)] = 0
+              ) -> Annotated[Matrix, Hom(A, A)]:
         with backend('numpy') as np:
             array = np.identity(index(dom), dtype=cls.dtype or int)
         return cls(array, dom, dom)
@@ -246,16 +249,23 @@ class Matrix(MonoidalCategory, NamedGeneric['dtype']):
     twist = id
 
     @unbiased
-    def then(self, other: Matrix) -> Matrix:
+    def then[A, B, C](
+            self: Annotated[Matrix, Hom(A, B)],
+            other: Annotated[Matrix, Hom(B, C)]
+    ) -> Annotated[Matrix, Hom(A, C)]:
         assert_isinstance(other, type(self))
         assert_iscomposable(self, other)
         with backend() as np:
             array = np.matmul(self.array, other.array)
         return type(self)(array, self.dom, other.cod)
 
-    def tensor(self, other: Matrix = None, *others: Matrix):
+    def tensor[A, B, C, D](
+            self: Annotated[Matrix, Hom(A, B)],
+            other: Annotated[Matrix | None, Hom(C, D)] = None,
+            *others: Matrix) -> Annotated[Matrix, Hom([A, C], [B, D])]:
         if others or other is None:
-            return monoidal.Diagram.tensor(self, other, *others)
+            return monoidal.Diagram.tensor(
+                self, other, *others)
         assert_isinstance(other, type(self))
         dom, cod = self.dom @ other.dom, self.cod @ other.cod
         array = self.zero(dom, cod).array
@@ -272,7 +282,7 @@ class Matrix(MonoidalCategory, NamedGeneric['dtype']):
         return self if other == 0 else self.__add__(other)
 
     @classmethod
-    def zero(cls, dom: Nat, cod: Nat) -> Matrix:
+    def zero(cls, dom: Nat | int, cod: Nat | int) -> Matrix:
         """
         Returns the zero matrix of a given shape.
 
@@ -285,7 +295,7 @@ class Matrix(MonoidalCategory, NamedGeneric['dtype']):
                 (index(dom), index(cod)), dtype=cls.dtype or int), dom, cod)
 
     @classmethod
-    def swap(cls, left: Nat, right: Nat) -> Matrix:
+    def swap(cls, left: Nat | int, right: Nat | int) -> Matrix:
         """
         The matrix that swaps left and right dimensions.
 
@@ -329,22 +339,22 @@ class Matrix(MonoidalCategory, NamedGeneric['dtype']):
         return type(self)(array, self.dom, self.cod)
 
     @classmethod
-    def copy(cls, x: Nat, n: int) -> Matrix:
+    def copy(cls, x: Nat | int, n: int) -> Matrix:
         x = index(x)
         array = [[i + int(j % n * x) == j
                   for j in range(n * x)] for i in range(x)]
         return cls(array, x, n * x)
 
     @classmethod
-    def discard(cls, x: Nat) -> Matrix:
+    def discard(cls, x: Nat | int) -> Matrix:
         return cls.copy(x, 0)
 
     @classmethod
-    def merge(cls, x: Nat, n: int) -> Matrix:
+    def merge(cls, x: Nat | int, n: int) -> Matrix:
         return cls.copy(x, n).dagger()
 
     @classmethod
-    def ones(cls, x: Nat) -> Matrix:
+    def ones(cls, x: Nat | int) -> Matrix:
         return cls.merge(x, 0)
 
     @classmethod
@@ -376,6 +386,14 @@ class Matrix(MonoidalCategory, NamedGeneric['dtype']):
             raise TypeError(messages.MATRIX_REPEAT_ERROR)
         return sum(self.id(self.dom).then(*n * [self])
                    for n in range(index(self.dom) + 1))
+
+    def trace_left(self, n=1):
+        """ The trace of ``n`` wires on the left, see :meth:`trace`. """
+        return self.trace(n, left=True)
+
+    def trace_right(self, n=1):
+        """ The trace of ``n`` wires on the right, see :meth:`trace`. """
+        return self.trace(n)
 
     def trace(self, n=1, left=False) -> Matrix:
         """
@@ -425,7 +443,8 @@ def array2string(array, **params):
     """ Numpy array pretty print. """
     import numpy
     numpy.set_printoptions(threshold=config.NUMPY_THRESHOLD)
-    return numpy.array2string(array, **dict(params, separator=', '))\
+    params["separator"] = ', '
+    return numpy.array2string(array, **params)\
         .replace('[ ', '[').replace('  ', ' ')
 
 
@@ -437,7 +456,8 @@ class Backend:
         module : The main module of the backend.
         array : The array class of the backend.
     """
-    def __init__(self, module: ModuleType, array: type = None):
+    def __init__(self, module: ModuleType,
+                 array: Callable | None = None):
         self.module, self.array = module, array or module.array
 
     def __getattr__(self, attr):
@@ -468,8 +488,9 @@ class PyTorch(Backend):
 class TensorFlow(Backend):
     """ TensorFlow backend. """
     def __init__(self):
-        import tensorflow.experimental.numpy as tnp
-        from tensorflow.python.ops.numpy_ops import np_config
+        import tensorflow.experimental.numpy as tnp  # ty: ignore
+        from tensorflow.python.ops.numpy_ops import (  # ty: ignore
+            np_config)
         np_config.enable_numpy_behavior()
         super().__init__(tnp)
 
@@ -481,11 +502,11 @@ BACKENDS = {
     'tensorflow': TensorFlow,
 }
 
-BackendName = Union[tuple(L[x] for x in BACKENDS)]
+BackendName = Literal['numpy', 'jax', 'pytorch', 'tensorflow']
 
 
 @contextmanager
-def backend(name: BackendName = None,
+def backend(name: BackendName | None = None,
             _stack=[config.DEFAULT_BACKEND], _cache=dict()):
     """
     Context manager for matrix backend.
@@ -499,12 +520,12 @@ def backend(name: BackendName = None,
     ...     assert type(Matrix([0, 1, 1, 0], 2, 2).array).__module__\\
     ...         == 'jaxlib._jax'
     """
-    name = name or _stack[-1]
-    _stack.append(name)
+    chosen = name or _stack[-1]
+    _stack.append(chosen)
     try:
-        if name not in _cache:
-            _cache[name] = BACKENDS[name]()
-        yield _cache[name]
+        if chosen not in _cache:
+            _cache[chosen] = BACKENDS[chosen]()
+        yield _cache[chosen]
     finally:
         _stack.pop()
 

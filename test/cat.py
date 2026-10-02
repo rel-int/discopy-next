@@ -7,47 +7,6 @@ from discopy.cat import *
 from discopy.utils import AxiomError
 
 
-def test_main():
-    x, y, z = Ob('x'), Ob('y'), Ob('z')
-    f, g, h = Box('f', x, y), Box('g', y, z), Box('h', z, x)
-    assert Id(x) >> f == f == f >> Id(y)
-    assert (f >> g).dom == f.dom and (f >> g).cod == g.cod
-    assert f >> g >> h == f >> (g >> h)
-    F = Functor(ob_map={x: y, y: z, z: x}, ar_map={f: g, g: h})
-    assert F(Id(x)) == Id(F(x))
-    assert F(f >> g) == F(f) >> F(g)
-
-
-def test_Ob():
-    assert Ob('x') == Ob('x') and Ob('x') != Ob('y')
-
-
-def test_Ob_init():
-    assert (Ob('x'), Ob('Alice')) == (Ob('x'), Ob('Alice'))
-
-
-def test_Ob_name():
-    assert Ob('x').name == 'x'
-
-
-def test_Ob_repr():
-    assert repr(Ob('x')) == "cat.Ob('x')"
-
-
-def test_Ob_str():
-    assert str(Ob('x')) == 'x'
-
-
-def test_Ob_eq():
-    x, x1, y = Ob('x'), Ob('x'), Ob('y')
-    assert x == x1 and x != y and x != 'x'
-    assert 'x' != Ob('x')
-
-
-def test_Ob_hash():
-    assert {Ob('x'): 42}[Ob('x')] == 42
-
-
 def test_Arrow():
     x, y, z, w = Ob('x'), Ob('y'), Ob('z'), Ob('w')
     f, g, h = Box('f', x, y), Box('g', y, z), Box('h', z, w)
@@ -99,33 +58,6 @@ def test_Arrow_getitem():
             *arrow.inside[depth: depth + 2])
 
 
-def test_Arrow_repr():
-    assert repr(Arrow((), Ob('x'), Ob('x'))) == "cat.Arrow.id(cat.Ob('x'))"
-    inside = (Box('f', Ob('x'), Ob('y')), Box('g', Ob('y'), Ob('z')))
-    assert repr(Arrow(inside, Ob('x'), Ob('z')))\
-        == "cat.Arrow(inside=(cat.Box('f', cat.Ob('x'), cat.Ob('y')), "\
-           "cat.Box('g', cat.Ob('y'), cat.Ob('z'))), dom=cat.Ob('x'), "\
-           "cod=cat.Ob('z'))"
-
-
-def test_Arrow_str():
-    x, y, z = Ob('x'), Ob('y'), Ob('z')
-    f, g = Box('f', x, y), Box('g', y, z)
-    assert str(Arrow((), x, x) == "Id(x)")
-    assert str(Arrow((f, ), x, y) == "f")
-    assert str(Arrow((f, g), x, z)) == "f >> g"
-
-
-def test_Arrow_eq():
-    x, y, z = Ob('x'), Ob('y'), Ob('z')
-    f, g = Box('f', x, y), Box('g', y, z)
-    assert f >> g == Arrow((f, g), x, z)
-
-
-def test_Arrow_hash():
-    assert {Id(Ob('x')): 42}[Id(Ob('x'))] == 42
-
-
 def test_Arrow_then():
     x, y, z = Ob('x'), Ob('y'), Ob('z')
     f, g = Box('f', x, y), Box('g', y, z)
@@ -138,23 +70,9 @@ def test_Arrow_dagger():
     x, y, z = Ob('x'), Ob('y'), Ob('z')
     f, g = Box('f', x, y), Box('g', y, z)
     h = Arrow((f, g), x, z)
-    assert h.dagger() == g.dagger() >> f.dagger()
-    assert h.dagger().dagger() == h
-
-
-def test_Id_init():
-    idx = Id(Ob('x'))
-    assert idx >> idx == idx
-    assert idx.dagger() == idx
-
-
-def test_Id_repr():
-    assert repr(Id(Ob('x'))) == "cat.Arrow.id(cat.Ob('x'))"
-
-
-def test_Id_str():
-    x = Ob('x')
-    assert str(Id(x)) == "Id(x)"
+    assert isinstance(h, DaggerCategory)
+    assert not issubclass(FreeCategory, DaggerCategory)
+    assert not issubclass(Functor, DaggerCategory)
 
 
 def test_AxiomError():
@@ -168,44 +86,11 @@ def test_AxiomError():
         g >> f
 
 
-def test_Box():
-    f = Box('f', Ob('x'), Ob('y'), data=[42, {0: 1}, lambda x: x])
-    assert f >> Id(Ob('y')) == f == Id(Ob('x')) >> f
-
-
-def test_Box_dagger():
-    f = Box('f', Ob('x'), Ob('y'), data=[42, {0: 1}])
-    assert f.dom == f.dagger().cod and f.cod == f.dagger().dom
-    assert f == f.dagger().dagger()
-
-
 def test_Bubble_dagger():
     f = Box('f', Ob('x'), Ob('y'))
     b = f.bubble(data=42)
     assert b.dagger().data == 42 and b.dagger().is_dagger
     assert b.dagger().dagger() == b
-
-
-def test_Box_repr():
-    f = Box('f', Ob('x'), Ob('y'), data=42)
-    assert repr(f) == "cat.Box('f', cat.Ob('x'), cat.Ob('y'), data=42)"
-    assert repr(f.dagger())\
-        == "cat.Box('f', cat.Ob('x'), cat.Ob('y'), data=42).dagger()"
-
-
-def test_Box_str():
-    f = Box('f', Ob('x'), Ob('y'), data=42)
-    assert str(f) == "f"
-    assert str(f.dagger()) == "f[::-1]"
-
-
-def test_Box_hash():
-    assert {Box('f', Ob('x'), Ob('y')): 42}[Box('f', Ob('x'), Ob('y'))] == 42
-
-
-def test_Box_eq():
-    f = Box('f', Ob('x'), Ob('y'), data=[42, {0: 1}])
-    assert f == Arrow((f, ), Ob('x'), Ob('y')) and f != Ob('x')
 
 
 def test_Box_generator_hash():
@@ -215,14 +100,14 @@ def test_Box_generator_hash():
     """
     x, y = Ob('x'), Ob('y')
     f = Box('f', x, y)
-    assert f.is_generator and f.generator is f
+    assert f.is_atom and f.atom is f
     arrow = Id(x) >> f
-    assert arrow.is_generator and arrow.generator == f
+    assert arrow.is_atom and arrow.atom == f
     assert f == arrow and hash(f) == hash(arrow)
     assert {f: 42}[arrow] == 42 and {arrow: 42}[f] == 42
     # A genuine arrow of length two is not a generator.
     g = Box('g', y, x)
-    assert not (f >> g).is_generator and (f >> g).generator is None
+    assert not (f >> g).is_atom and (f >> g).atom is None
 
 
 def test_Sum_generator_hash():
@@ -235,6 +120,8 @@ def test_Sum_generator_hash():
     singleton = Sum((f, ), x, y)
     assert singleton == f and hash(singleton) == hash(f)
     assert {f: 42}[singleton] == 42
+    assert singleton.is_atom and singleton.atom == f
+    assert Sum((f, f), x, y).atom is None
 
 
 def test_Functor():
@@ -248,10 +135,6 @@ def test_Functor():
 def test_Functor_eq():
     x, y = Ob('x'), Ob('y')
     assert Functor({x: y, y: x}, {}) == Functor({y: x, x: y}, {})
-
-
-def test_Functor_repr():
-    assert repr(Functor({}, {})) == "cat.Functor(ob_map={}, ar_map={})"
 
 
 def test_Functor_call():
@@ -303,11 +186,6 @@ def test_Transformation_eq():
     assert Transformation({x: f, y: f[::-1]}, F, G) != F
 
 
-def test_Transformation_repr():
-    F = Functor.id()
-    assert "Transformation" in repr(Transformation.id(F))
-
-
 def test_Transformation_errors():
     x, y = Ob('x'), Ob('y')
     F = Functor.id()
@@ -322,6 +200,10 @@ def test_Transformation_errors():
     f = Box('f', x, y)
     with raises(AxiomError):
         Transformation({x: f, y: f[::-1]}, F, F)(x)
+    # The two functors must be parallel.
+    from discopy import tensor
+    with raises(AxiomError):
+        Transformation({}, F, tensor.Functor({}, {}))
 
 
 def test_total_ordering():
@@ -333,6 +215,8 @@ def test_total_ordering():
 
 def test_Bubble():
     f = Box('f', Ob('x'), Ob('y'))
+    with raises(ValueError):
+        Bubble(f, f, dom=f.dom, cod=f.cod).arg
     assert repr((f).bubble())\
         == "cat.Bubble(cat.Box('f', cat.Ob('x'), cat.Ob('y')))"
     assert str(f.bubble()) == "(f).bubble()"
@@ -398,3 +282,40 @@ def test_Functor_then_left_unit():
     assert F >> Functor.id() == F
     assert Functor.id() >> F != F
     assert (Functor.id() >> F)(x) == F(x)
+
+
+def test_Equivalence():
+    from discopy import monoidal
+
+    encode = monoidal.Diagram.hypergraph_equivalence()
+    f = monoidal.Box('f', monoidal.Ty('x'), monoidal.Ty('y'))
+    decode = encode.dagger()
+    assert decode.dagger() == encode
+    assert decode(encode(f)) == f
+    assert encode(f.dom) == f.dom
+    assert (decode.dom, decode.cod) == (encode.cod, encode.dom)
+    assert hash(encode) != hash(decode) and encode != decode
+    with raises(NotImplementedError):
+        monoidal.Diagram.hypergraph_equivalence().strategy()
+    assert repr(encode)\
+        == "cat.Equivalence(Diagram.to_hypergraph, Hypergraph.to_diagram)"
+
+
+def test_Functor_strategy():
+    """ The functors the matrix generates relabel the generators. """
+    from hypothesis import find
+    from discopy import monoidal, tensor
+    from discopy.quantum import circuit
+
+    x, a = monoidal.Ty('x'), monoidal.Ty('a')
+    F = find(monoidal.Functor.strategy(), lambda F: F(monoidal.Ty('b')) == a)
+    assert F(x) == x and len(F.ob_map) == len(list(F.ob_map)) == 5
+    assert F(monoidal.Box('f', monoidal.Ty('b'), x))\
+        == monoidal.Box('f', a, x)
+    assert repr(F.ob_map).startswith("axioms.Relabelling(images=(")
+    assert find(monoidal.Functor.associativity.strategy(),
+                lambda _: True)  # They compose.
+    with raises(NotImplementedError):  # Not an endofunctor.
+        tensor.Functor.strategy()
+    with raises(NotImplementedError):  # Information units have no names.
+        circuit.Functor.strategy()

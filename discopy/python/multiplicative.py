@@ -23,8 +23,6 @@ Summary
         exp
 """
 
-from __future__ import annotations
-
 from collections.abc import Callable
 from itertools import accumulate
 from typing import Self
@@ -44,7 +42,9 @@ def exp(base: Ty, exponent: Ty) -> Ty:
         exponent : The exponent types.
     """
     base, exponent = map(Ty.cast, (base, exponent))
-    return Ty(Callable[list(exponent.inside), tuple[base.inside]])
+    return Ty(
+        Callable[list(exponent.inside),  # ty: ignore[invalid-type-form]
+                 tuple[base.inside]])  # ty: ignore[invalid-type-form]
 
 
 @factory
@@ -154,6 +154,16 @@ class Function(function.Function, ClosedCategory):
         """
         return Function.copy(dom, 0)
 
+    @classmethod
+    def ev_left(cls, base, exponent):
+        """ The left evaluation, see :meth:`ev`. """
+        return cls.ev(base, exponent, left=True)
+
+    @classmethod
+    def ev_right(cls, base, exponent):
+        """ The right evaluation, see :meth:`ev`. """
+        return cls.ev(base, exponent, left=False)
+
     @staticmethod
     def ev(base: Ty, exponent: Ty, left=True) -> Function:
         """
@@ -171,6 +181,14 @@ class Function(function.Function, ClosedCategory):
             return Function(lambda f, *xs: f(*xs), dom, cod)
         dom, cod = exponent @ Function.exp(base, exponent), base
         return Function(lambda *xs: xs[-1](*xs[:-1]), dom, cod)
+
+    def curry_left(self, n=1):
+        """ The left currying of ``n`` objects, see :meth:`curry`. """
+        return self.curry(n, left=True)
+
+    def curry_right(self, n=1):
+        """ The right currying of ``n`` objects, see :meth:`curry`. """
+        return self.curry(n, left=False)
 
     def curry(self, n=1, left=True) -> Function:
         """
@@ -213,6 +231,14 @@ class Function(function.Function, ClosedCategory):
             return y if result == y else inside(*xs, y=result)
         return self if n == 0\
             else Function(inside, self.dom[:-1], self.cod).fix(n - 1)
+
+    def trace_left(self, n=1):
+        """ The trace of ``n`` wires on the left, see :meth:`trace`. """
+        return self.trace(n, left=True)
+
+    def trace_right(self, n=1):
+        """ The trace of ``n`` wires on the right, see :meth:`trace`. """
+        return self.trace(n)
 
     def trace(self, n=1, left=False):
         """

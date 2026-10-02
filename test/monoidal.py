@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 
-import pickle
 
 from pytest import raises
 
@@ -15,6 +14,8 @@ def test_Ty():
     assert Ty.ob is Colour and Ty.ar is Ty
     assert isinstance(transparent, cat.Ob)
     assert isinstance(x, cat.FreeCategory)
+    assert not isinstance(x, DaggerCategory) and issubclass(
+        Diagram, DaggerCategory)
     assert isinstance(x, cat.Ob) and not isinstance(x, Wire)
     assert x @ y != y @ x
     assert x.then(y) == x @ y  # >> is overridden by closed exponentials.
@@ -65,15 +66,11 @@ def test_coloured_Ty_power_and_steps():
         Ty(Wire("y", red, green)) ** 2
 
 
-def test_coloured_Ty_tree_and_legacy_tree():
+def test_coloured_Ty_tree():
     red, green = map(Colour, ("red", "green"))
     typ = Ty(Wire("x", red, green))
     assert from_tree(typ.to_tree()) == typ
     assert from_tree(Ty.id(red).to_tree()) == Ty.id(red)
-    legacy = {
-        'factory': 'monoidal.Ty',
-        'inside': [{'factory': 'cat.Ob', 'name': 'x'}]}
-    assert from_tree(legacy) == Ty('x')
 
 
 def test_Diagram_rejects_boxless_layer():
@@ -89,36 +86,8 @@ def test_Diagram_rejects_boxless_layer():
     assert (x @ Box('f', x, x)).inside[0].boxes
 
 
-def test_composition_never_emits_a_boxless_layer():
-    """ ``then``, ``tensor`` and ``normal_form`` build their layers with
-    ``_scan=False``, so the constructor cannot catch a boxless one: these are
-    the paths that have to be checked by hand. """
-    x, y, z = Ty('x'), Ty('y'), Ty('z')
-    f, g, h = Box('f', x, y), Box('g', y, z), Box('h', z, x)
-    interchanger = f @ Id(z) >> Id(y) @ h
-    diagrams = [
-        f >> g, f >> g >> h, f >> f.dagger(), (f >> g).dagger(),
-        f @ g, g @ f, f @ g @ h, f.tensor(), f.tensor(g, h),
-        x @ f, f @ x, Ty() @ f, f @ Ty(), Id(Ty()) @ f, f @ Id(Ty()),
-        Id(x) @ f, f @ Id(y), Id(Ty()) >> Id(Ty()),
-        interchanger, interchanger.normal_form(), interchanger.foliation(),
-        interchanger.interchange(0, 1),
-        (f @ Id(z) >> Id(y) @ h).normal_form().dagger(),
-    ]
-    for diagram in diagrams:
-        assert all(layer.boxes for layer in diagram.inside), repr(diagram)
-
-
 def test_Ty_init():
     assert list(Ty('x', 'y', 'z')) == [Ty('x'), Ty('y'), Ty('z')]
-
-
-def test_Ty_eq():
-    assert Ty('x') != 'x'
-
-
-def test_Ty_repr():
-    assert repr(Ty('x', 'y')) == "monoidal.Ty(cat.Ob('x'), cat.Ob('y'))"
 
 
 def test_Ty_str():
@@ -135,9 +104,18 @@ def test_Ty_getitem():
 
 def test_Ty_generator():
     x = Ty('x')
-    assert x.is_generator and x.generator == Wire('x')
-    assert not (x @ x).is_generator and (x @ x).generator is None
-    assert not Ty().is_generator and Ty().generator is None
+    assert x.is_atom and x.atom == Wire('x')
+    assert not (x @ x).is_atom and (x @ x).atom is None
+    assert not Ty().is_atom and Ty().atom is None
+
+
+def test_Ty_init_errors():
+    with raises(TypeError):
+        Ty('x', colour=Colour('red'))
+    with raises(AxiomError):
+        Ty(Ty('x'))  # A type is an object but not a wire.
+    with raises(TypeError):
+        Dim(2, colour=Colour('red'))
 
 
 def test_Ty_pow():
@@ -157,8 +135,14 @@ def test_Nat_tensor():
         Nat(2) @ Ty('x')
 
 
+def test_Nat_getitem():
+    assert Nat(42)[2: 4] == Nat(2)
+    assert all(Nat(42)[i] == Nat(1) for i in range(42))
+
+
 def test_Nat_repr():
     assert repr((Nat(0), Nat(1))) == "(monoidal.Nat(0), monoidal.Nat(1))"
+    assert str(Nat(2 * 3 * 7)) == "Nat(42)"
 
 
 def test_Nat_hash():
@@ -170,26 +154,10 @@ def test_Nat_to_tree():
     assert Nat.from_tree(Nat(0).to_tree()) == Nat(0)
 
 
-def test_Nat_str():
-    assert str(Nat(2 * 3 * 7)) == "Nat(42)"
-
-
-def test_Nat_getitem():
-    assert Nat(42)[2: 4] == Nat(2)
-    assert all(Nat(42)[i] == Nat(1) for i in range(42))
-
-
 def test_Nat_sequence_protocol():
     assert len(Nat(3)) == 3
     assert list(Nat(3)) == 3 * [Nat(1)]
     assert Nat(3)[:1] == Nat(1)
-
-
-def test_Nat_identity_and_dagger():
-    assert Nat(0) @ Nat(3) == Nat(3) == Nat(3) @ Nat(0)
-    assert Nat.id() == Nat(0) == Nat.id(Nat(0))
-    assert Nat(3)[::-1] == Nat(3)
-    assert Nat(3).dagger() == Nat(3)
 
 
 def test_Dim_identity_and_slicing():
@@ -220,21 +188,6 @@ def test_Layer_getitem():
     f = Box('f', 'x', 'x')
     layer = Layer(Ty(), f, Ty())
     assert layer[0] == f and layer.boxes_and_types == (Ty(), f, Ty())
-
-
-def test_Layer_legacy_serialisation():
-    f = Box('f', 'x', 'y')
-    factory = Layer(f).to_tree()['factory']
-    tree = dict(
-        factory=factory,
-        inside=[Ty().to_tree(), f.to_tree(), Ty().to_tree()])
-    assert from_tree(tree).boxes_or_types == (f, )
-
-    legacy = Layer(f)
-    legacy.boxes_or_types = (Ty(), f, Ty())
-    restored = pickle.loads(pickle.dumps(legacy))
-    assert restored == Layer(f)
-    assert restored.boxes_or_types == (f, )
 
 
 def test_Layer_coloured_units():
@@ -316,11 +269,6 @@ def test_Diagram_init():
         Diagram((1, ), Ty('x'), Ty('x'))
 
 
-def test_Diagram_eq():
-    assert Diagram((), Ty('x'), Ty('x')) != Ty('x')
-    assert Diagram((), Ty('x'), Ty('x')) == Id(Ty('x'))
-
-
 def test_Diagram_iter():
     x, y = Ty('x'), Ty('y')
     f0, f1 = Box('f0', x, y), Box('f1', y, y)
@@ -379,24 +327,6 @@ def test_Diagram_offsets():
     diagram = Diagram((layer,), layer.dom, layer.cod)
     assert layer.boxes_and_offsets == [(f, 0), (g, 2)]
     assert diagram.offsets == [0, 2]
-
-
-def test_Diagram_hash():
-    assert {Id(Ty('x')): 42}[Id(Ty('x'))] == 42
-
-
-def test_Diagram_str():
-    x, y, z, w = Ty('x'), Ty('y'), Ty('z'), Ty('w')
-    assert str(Diagram((), x, x)) == "Id(x)"
-    f0, f1 = Box('f0', x, y), Box('f1', z, w)
-    assert str(Diagram((Layer(f0), ), x, y)) == "f0"
-    assert str(f0 @ Id(z) >> Id(y) @ f1) == "f0 @ z >> y @ f1"
-    assert str(f0 @ Id(z) >> Id(y) @ f1) == "f0 @ z >> y @ f1"
-
-
-def test_Diagram_matmul():
-    assert Id(Ty('x')) @ Id(Ty('y')) == Id(Ty('x', 'y'))
-    assert Id(Ty('x')) @ Id(Ty('y')) == Id(Ty('x')).tensor(Id(Ty('y')))
 
 
 def test_Diagram_interchange():
@@ -514,43 +444,9 @@ def test_spiral(n_cups=2):
     assert spiral_nf.boxes[-1] == counit and spiral_nf.boxes[n_cups] == unit
 
 
-def test_Id_init():
-    assert Id(Ty('x')) == Diagram.id(Ty('x'))
-
-
-def test_Id_repr():
-    assert repr(Id(Ty('x')))\
-        == "monoidal.Diagram.id(monoidal.Ty(cat.Ob('x')))"
-
-
-def test_Id_str():
-    assert str(Id(Ty('x'))) == "Id(x)"
-
-
 def test_Box_init():
     f = Box('f', Ty('x', 'y'), Ty('z'), data=42)
     assert (f.name, f.dom, f.cod, f.data) == ('f', Ty('x', 'y'), Ty('z'), 42)
-
-
-def test_Box_hash():
-    f = Box('f', Ty('x', 'y'), Ty('z'), data=42)
-    assert {f: 42}[f] == 42
-
-
-def test_Box_eq():
-    f = Box('f', Ty('x', 'y'), Ty('z'), data=42)
-    assert f == Diagram((Layer(f), ), Ty('x', 'y'), Ty('z')) and f != 'f'
-
-
-def test_Functor_init():
-    F = Functor({Ty('x'): Ty('y')}, {})
-    assert F(Id(Ty('x'))) == Id(Ty('y'))
-
-
-def test_Functor_repr():
-    assert repr(Functor({Ty('x'): Ty('y')}, {})) ==\
-        "monoidal.Functor("\
-        "ob_map={monoidal.Ty(cat.Ob('x')): monoidal.Ty(cat.Ob('y'))}, ar_map={})"
 
 
 def test_Functor_call():
@@ -733,7 +629,7 @@ def test_List():
     from discopy import abc, monoidal
 
     # List[X] is a NamedGeneric on the generator type, cached like Hypergraph.
-    assert List[int].generator_factory is int and List[int] is List[int]
+    assert List[int].Atom is int and List[int] is List[int]
     a, b = List[int](2, 3), List[int](4)
     assert a @ b == List[int](2, 3, 4)
     with raises(TypeError):
@@ -752,7 +648,7 @@ def test_List():
         a[2]
 
     assert issubclass(List, abc.Monoid) and a.dom is a.cod is None
-    assert not issubclass(Ty, List) and Ty.generator_factory is Wire
+    assert not issubclass(Ty, List)
     assert all(issubclass(Ty, base)
                for base in (cat.Ob, cat.FreeCategory, abc.ColouredMonoid))
     assert Dim(2, 3)[::-1] == Dim(3, 2) and Dim(2, 3)[0] == Dim(2)
@@ -761,3 +657,58 @@ def test_List():
     assert eval(repr(Ty.id(red))) == Ty.id(red)
     with raises(AxiomError):
         Ty(Wire('x', red, red), Wire('y'))
+
+
+def test_transparent_colour_serialisation():
+    colour = Colour()
+    assert Colour.from_tree(colour.to_tree()) == colour
+
+
+def test_Diagram_str():
+    x, y, z, w = Ty('x'), Ty('y'), Ty('z'), Ty('w')
+    assert str(Diagram((), x, x)) == "Id(x)"
+    f0, f1 = Box('f0', x, y), Box('f1', z, w)
+    assert str(Diagram((Layer(f0), ), x, y)) == "f0"
+    assert str(f0 @ Id(z) >> Id(y) @ f1) == "f0 @ z >> y @ f1"
+
+
+def test_Diagram_decode_needs_boxes():
+    with raises(ValueError):
+        Diagram.decode(Ty('x'))
+
+
+def test_Layer_merge_to_identity():
+    f = Box('f', Ty('x'), Ty('x'))
+    with raises(AxiomError):  # f >> f[::-1] is no layer, see #599.
+        Layer(f).merge(Layer(f.dagger()))
+
+
+def test_Box_strategy():
+    with raises(NotImplementedError):
+        Sum.strategy()
+    f = Box('f', Ty('x'), Ty('x'))
+    assert f.size == (f + f).size == 1
+
+
+def test_Functor_repr_and_eq():
+    x, y = Ty('x'), Ty('y')
+    F = Functor({x: y}, {})
+    assert repr(F) == "monoidal.Functor("\
+        "ob_map={monoidal.Ty(cat.Ob('x')): monoidal.Ty(cat.Ob('y'))}, "\
+        "ar_map={})"
+    G = Functor({x: y}, {}, colour_map={Colour('red'): Colour('blue')})
+    assert F == Functor({x: y}, {}) != G
+    assert G(Colour('red')) == Colour('blue')
+
+
+def test_abc_Nat():
+    from discopy import abc
+    assert abc.Nat(1).then(abc.Nat(2)) == abc.Nat(3)
+    assert abc.Nat(3)[-3] == abc.Nat(1)
+    with raises(IndexError):
+        abc.Nat(3)[3]
+
+
+def test_Colour_strategy():
+    from hypothesis import find
+    assert find(Colour.strategy(), lambda c: c.name == "red") == Colour("red")

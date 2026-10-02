@@ -32,7 +32,7 @@ Example
     :align: center
 """
 from discopy import monoidal
-from discopy.monoidal import Ty  # noqa: F401  pylint: disable=unused-import
+from discopy.monoidal import Ty  # noqa: F401
 from discopy.utils import factory_name
 
 
@@ -46,8 +46,8 @@ class Rule(monoidal.Box):
         cod : The codomain of the rule, i.e. its output.
         name : The name of the rule, empty by default.
     """
-    def __init__(self, dom: monoidal.Ty, cod: monoidal.Ty, name: str = None,
-                 **params):
+    def __init__(self, dom: monoidal.Ty, cod: monoidal.Ty,
+                 name: str | None = None, **params):
         name = f"Rule({dom}, {cod})" if name is None else name
         monoidal.Box.__init__(self, name, dom, cod, **params)
 
@@ -66,8 +66,8 @@ class Word(Rule):
         cod : The grammatical type of the word.
         dom : An optional domain for the word, empty by default.
     """
-    def __init__(self, name: str, cod: monoidal.Ty, dom: monoidal.Ty = None,
-                 **params):
+    def __init__(self, name: str, cod: monoidal.Ty,
+                 dom: monoidal.Ty | None = None, **params):
         dom = self.ob() if dom is None else dom
         Rule.__init__(self, dom=dom, cod=cod, name=name, **params)
 

@@ -189,3 +189,9 @@ def test_circuit2zx():
                 boxes_and_offsets=zip(
                     [SWAP, Z(1, 2), X(2, 1), scalar(2 ** 0.5), SWAP],
                     [1, 0, 1, 2, 1])))
+
+
+def test_repr_and_rotate():
+    assert repr(SWAP) == "SWAP" and str(Scalar(2)) == "scalar(2)"
+    assert Z(1, 2, .5).rotate() == Z(2, 1, .5)
+    assert Z(1, 1).array is None  # A spider is evaluated by PyZX.
