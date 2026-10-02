@@ -715,7 +715,7 @@ class Drawing(TracedCategory, RichDisplay):
 
     @staticmethod
     @rule
-    def id[A](dom: Annotated[Any | None, Ob(A)] = None, length=0
+    def id[A](dom: Annotated[Any | None, Ob(A)] = None
               ) -> Annotated[Drawing, Hom(A, A)]:
         """
         Draw the identity diagram.

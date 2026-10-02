@@ -379,7 +379,7 @@ def bezier_subcurve(points, t0, t1):
 
 class Backend(ABC):
     """ Abstract drawing backend. """
-    def __init__(self, linewidth=1):
+    def __init__(self):
         self.max_width = 0
 
     def draw_text(self, text, i, j, **params):

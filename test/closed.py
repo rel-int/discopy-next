@@ -1,5 +1,7 @@
 from pytest import raises
 
+from pytest import raises
+
 from discopy.closed import *
 
 
