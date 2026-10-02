@@ -39,3 +39,8 @@ def test_Channel_measure():
     assert Channel.encode(Dim(1)) == Channel.measure(Dim(1)) == Channel.id(C())
     assert Channel.measure(Dim(2, 2))\
         == Channel.measure(Dim(2)) @ Channel.measure(Dim(2))
+
+
+def test_CQ_hash():
+    from discopy.tensor import Dim
+    assert {CQ(Dim(2)): 42}[CQ(Dim(2))] == 42

@@ -42,6 +42,28 @@ def test_parameterised_pickle_and_deepcopy():
             assert '__class_getitem__values__' not in vars(copy)
 
 
+def test_named_generic_needs_a_parameter():
+    class Plain(NamedGeneric):
+        pass
+    with pytest.raises(TypeError, match="no type parameter"):
+        Plain[int]
+
+
+def test_MappingOrCallable():
+    from typing import Callable, Mapping
+    f, g = MappingOrCallable(lambda x: x + 1), MappingOrCallable({0: 1})
+    assert f[0] == g[0] == 1 and len(g) == 1 and list(g) == [0]
+    assert MappingOrCallable[int, int]\
+        == Mapping[int, int] | Callable[[int], int]
+
+
+def test_inductive():
+    from discopy import stream, symmetric
+    x = stream.Ty.sequence(symmetric.Ty('x'))
+    with pytest.raises(ValueError):
+        x.delay(-1)
+
+
 def test_parameterised_factory_name():
     assert from_tree({'factory': 'cat.Ob[int]', 'name': 'x'}) == Ob('x')
 
@@ -87,6 +109,10 @@ def test_Generator_alias():
     """ A factory can be another factory of the same category. """
     from discopy import symmetric, closed
     assert symmetric.Diagram.Braid is symmetric.Swap
+    alias = vars(symmetric.Diagram)["Braid"]
+    assert alias.root is None and alias.parents == ()
+    with pytest.raises(TypeError, match="no class to build"):
+        alias.build(symmetric.Diagram)
     assert closed.Ty.Over is closed.Ty.Under is closed.Exp
 
 

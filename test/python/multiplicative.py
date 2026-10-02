@@ -48,3 +48,23 @@ def test_Functor_into_Function_folds_with_matmul():
     assert F(x @ x) == F(x) @ F(x) == monoidal.List[type](bool, bool)
     assert F(Ty()) == monoidal.List[type]()
     assert F(g)(True, True) is True and F(g)(True, False) is False
+
+
+def test_one_wire_forwarders():
+    x, y = Ty(int), Ty(bool)
+    g = Function(lambda n, b: n if b else -n, x @ y, x)
+    assert g.curry_left()(1)(False) == g.curry(left=True)(1)(False) == -1
+    assert g.curry_right()(True)(1) == 1
+    assert Function.ev_left(x, y)(lambda b: int(b), True) == 1
+    assert Function.ev_right(x, y)(True, lambda b: int(b)) == 1
+    assert Function.id(x @ y).trace_right().dom == x
+    with raises(NotImplementedError):
+        Function.id(x).trace_left()
+
+
+def test_type_checking():
+    f = Function(lambda n: (n, n), Ty(int), Ty(int, int, int))
+    with raises(ValueError):
+        f(1, 2)  # Two arguments for a domain of one.
+    with raises(RuntimeError):
+        f(1)  # Two outputs for a codomain of three.

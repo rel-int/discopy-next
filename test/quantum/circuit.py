@@ -747,3 +747,36 @@ def test_random_circuits():
         box in GATES.values() or isinstance(box, Swap)
         for box in circuit.boxes)
     assert circuit.eval().array.shape == (2, 2, 2, 2)
+
+
+def test_loads_dumps():
+    from discopy.utils import loads, dumps
+    assert loads(dumps(Rx(1))) == Rx(1)
+    assert loads(dumps(qubit @ bit)) == qubit @ bit
+
+
+def test_mixed_permutation():
+    circuit = Bits(1) @ Ket(0) >> Swap(bit, qubit)
+    assert np.allclose(
+        circuit.eval(contractor=tn.contractors.auto, mixed=True).array,
+        circuit.eval(mixed=True).array)
+    assert Swap(bit, bit).is_classical and not Swap(qubit, bit).is_classical
+    assert Swap(qubit, bit).array.shape == (2, 2, 2, 2)
+
+
+def test_errors():
+    with raises(ValueError):
+        Qudit(1)
+    with raises(ValueError):
+        Circuit.Cup(qubit, bit)
+    with raises(NotImplementedError):
+        Circuit.Spider(1, 2, qubit, phase=0.5)
+    with raises(NotImplementedError):
+        Circuit.Spider(0, 1, bit)
+    assert str(Controlled(Rx(0.5))) == str(CRx(0.5)) == "CRx(0.5)"
+    assert Rz(0.25).rotate().phase == 0.25
+
+
+def test_Ty_strategy():
+    from hypothesis import find
+    assert find(Ty.strategy(), lambda ty: ty == qubit @ bit) == qubit @ bit

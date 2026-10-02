@@ -40,3 +40,15 @@ def test_sequence_box_of_its_category():
         x = Ty.sequence(category.ob('x'))
         box = Stream[category].sequence("f", x, x).now
         assert type(box) is category.Box
+
+
+def test_feedback_errors():
+    x = Ty.sequence(symmetric.Ty('x'))
+    with raises(ValueError):  # A constant stream needs constant types.
+        Stream(symmetric.Box('g', x.now, x.now), dom=x, cod=x)
+    f = Stream.sequence('f', x, x)
+    with raises(NotImplementedError):
+        f.feedback()
+    with raises(NotImplementedError):
+        f.feedback_left()
+    assert Stream.permutation([0, 1], [x, x]).now == symmetric.Id(x.now @ x.now)

@@ -1,5 +1,6 @@
 """ DisCoPy's property-testing module in action. """
 
+import io
 from typing import Annotated, Any, Self
 
 from hypothesis import find
@@ -173,7 +174,28 @@ def test_canonical():
     assert inapplicable.canonical() is NotImplemented
     with raises(TypeError, match="nothing to draw"):
         inapplicable.draw()
+    Diagram.bifunctoriality.draw(path=io.BytesIO(), format="png")
     assert str(rigid.Diagram.snake_equations.canonical().terms[1]) == "Id(X)"
     cups = rigid.Diagram.generators["cups"].canonical()
     assert cups == {"left": rigid.Ty('X'), "right": rigid.Ty('X').r}
     assert feedback.Diagram.feedback_joining.canonical()
+
+
+def test_canonical_instances():
+    """ Every law of the free diagram categories holds on its canonical
+    instance, the schema :meth:`Axiom.draw` draws, unless declared broken,
+    so that a law that crashes on its own statement fails here before
+    the property matrix ever searches for a counterexample. """
+    from discopy import (
+        balanced, biclosed, closed, compact, frobenius, markov, pivotal,
+        ribbon, symmetric, traced)
+    levels = (Arrow, Diagram, braided.Diagram, traced.Diagram,
+              balanced.Diagram, symmetric.Diagram, markov.Diagram,
+              closed.Diagram, biclosed.Diagram, rigid.Diagram,
+              pivotal.Diagram, ribbon.Diagram, compact.Diagram,
+              frobenius.Diagram, feedback.Diagram)
+    for category in levels:
+        for law in category.axioms.values():
+            equation = law.canonical()
+            assert equation is NotImplemented or law.broken or equation,\
+                (category, law)

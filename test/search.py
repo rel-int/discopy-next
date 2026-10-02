@@ -154,6 +154,10 @@ def test_focusing():
     assert rules_in_focus(biclosed.Diagram, a, b << a) == ["curry_left"]
     assert [name for name, r in rigid.Diagram.rules.items()
             if r.recursive] == ["tensor", "cut"]
+    x, y, z = map(rigid.Ty, "xyz")
+    curry = rigid.Diagram.curry_left.bind(rigid.Diagram)
+    assert not focused([(curry, list(curry.match(x, y @ z.l)))],
+                       x, y @ z.l, rigid.Ty)  # z is no subformula of z.l.
     # A rigid curry is derived — caps and cut reach every transpose —
     # and self-dual types would let it focus on every goal.
 
@@ -185,3 +189,13 @@ def test_goal_patterns():
         lambda term: bool(term.boxes)
         and all(isinstance(box, markov.Copy) for box in term.boxes))
     assert copy.cod == copy.dom @ copy.dom
+
+
+def test_constant():
+    """ A word of a vocabulary is a rule with no premise. """
+    from discopy.grammar import pregroup
+    word = pregroup.Word('Alice', pregroup.Ty('n'))
+    constant = Rule.constant(word)
+    assert not constant.recursive and not constant.sequent.premises
+    assert constant.__doc__ == "The constant Alice."
+    assert constant.apply({}) == word

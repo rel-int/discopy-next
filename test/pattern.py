@@ -209,3 +209,19 @@ def test_level():
     assert parse(snake, owner=RigidCategory).conclusion is not None
     with raises(AttributeError):
         A.z
+
+
+def test_errors_and_inverses():
+    """ A head is a name, a bound names one, an annotation carries a
+    pattern, and an adjoint or a repetition reads back what it built. """
+    from discopy import abc, rigid
+    with raises(TypeError, match="Expected a head"):
+        Atom[42]
+    with raises(TypeError, match="one head"):
+        sort_of(abc.Ob["C0", "C1"])
+
+    def bad(cls, f: Annotated[Ty, 42]): ...
+    with raises(TypeError, match="pattern or a sort"):
+        parse(bad, conclusion=False)
+    assert list(X.r.match(rigid.Ty('x').r)) == [({"X": rigid.Ty('x')}, ())]
+    assert (M ** N).instantiate({"M": x, "N": 2}, Ty) == x @ x

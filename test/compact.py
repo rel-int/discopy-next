@@ -63,3 +63,10 @@ def test_mixed_Layer_rotation_and_transpose():
     assert diagram.transpose_box(0, 0).boxes[-1] == f
     assert f.r in diagram.transpose_box(0, 1).boxes
     assert list(diagram.snake_removal()) == []
+
+
+def test_twist_and_uncurry():
+    x, y = Ty('x'), Ty('y')
+    assert CMap.twist(x) == CMap.id(x)
+    with raises(ValueError):
+        Box('f', x, y).uncurry(-1)

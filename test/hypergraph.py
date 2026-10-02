@@ -13,10 +13,31 @@ def test_pushout():
 
 def test_Hypergraph_init():
     x, y = map(Ty, "xy")
+    f = Box('f', x, x)
     with raises(ValueError):
         H(x, x, (), ())
     with raises(AxiomError):
         H(x, y, (), ((0,), (), (0,)))
+    for wires in [((0, ), (), ()), ((0, ), (), (0, )),
+                  ((0, ), (((), (0, )), ), (0, )),
+                  ((0, ), (((0, ), ()), ), (0, ))]:
+        with raises(ValueError):  # Each boundary must match its type.
+            H(x, x, (f, ), wires)
+
+
+def test_Hypergraph_repr():
+    assert repr(H.spiders(0, 0, Ty('x'))).endswith(
+        "wires=((), (), ()), "
+        "spider_types=(frobenius.Ty(frobenius.Wire('x')),))")
+
+
+def test_Hypergraph_eq():
+    x, y = map(Ty, "xy")
+    f = Box('f', x, y).to_hypergraph()
+    assert f != 1 and f != H.id(x) and f != Box('g', x, y).to_hypergraph()
+    assert f.is_atom and f.atom == Box('f', x, y)
+    assert (f >> Box('g', y, x).to_hypergraph()).atom is None
+    assert H.permutation([0, 1], [x, y]) == H.id(x @ y)
 
 
 def test_Hypergraph_str():
@@ -101,7 +122,13 @@ def test_Hypergraph_rotate():
 
 
 def test_AxiomError():
+    from discopy import monoidal
     x, y = map(Ty, "xy")
+    f = monoidal.Box('f', monoidal.Ty('x'), monoidal.Ty('x'))
+    with raises(AxiomError):
+        Hypergraph[monoidal.Diagram].from_box(f).explicit_trace()
+    with raises(NotImplementedError):
+        Hypergraph.strategy()  # No host category to search.
     with raises(AxiomError):
         H.cups(x @ y, x @ y)
     with raises(AxiomError):

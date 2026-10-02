@@ -99,3 +99,16 @@ def test_random_sentences():
     assert find(Sentence.strategy(), bool).foliation() == (
         Word('Alice', n) @ Word('sleeps', n.r @ s) >> Cup(n, n.r) @ s
     ).foliation()
+
+
+def test_categorial_reductions():
+    from discopy.utils import AxiomError
+    n, s = Ty('n'), Ty('s')
+    with raises(AxiomError):
+        n.assert_isadjoint(s)
+    assert Diagram.fa(s, n) == s @ Cup(n.l, n)
+    assert Diagram.ba(n, s) == Cup(n, n.r) @ s
+    assert Diagram.fc(s, n, s) == s @ Cup(n.l, n) @ s.l
+    assert Diagram.bc(s, n, s) == s.r @ Cup(n, n.r) @ s
+    assert Spider(1, 2, n).rotate() == Spider(2, 1, n.r)
+    assert Spider(1, 2, n).rotate(left=True) == Spider(2, 1, n.l)

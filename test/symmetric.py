@@ -373,3 +373,10 @@ def test_coloured_Layer_boxes_and_types():
     assert Layer(f).boxes_and_types == (empty_red, f, empty_green)
     assert Layer(empty_red, f, empty_green).boxes_and_types\
         == (empty_red, f, empty_green)
+
+
+def test_Swap_from_permutation():
+    x, y = Ty('x'), Ty('y')
+    assert Swap(x @ y, [1, 0]) == Swap(x, y)
+    with raises(ValueError):
+        Swap(x @ y, [0, 1])
