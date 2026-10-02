@@ -1641,6 +1641,16 @@ class Diagram(cat.Arrow, MonoidalCategory, RichDisplay):
             cls.id(x).to_drawing(), Drawing.id(x.to_drawing()))
 
     @axiom
+    def drawing_dagger_involution(cls, f: Self):
+        """
+        Reflecting a drawing twice gives it back. Drawing does not commute
+        with the dagger on the nose, since the layout of ``f.dagger()`` is
+        computed afresh rather than reflected from that of ``f``.
+        """
+        drawing = f.to_drawing()
+        return AbstractEquation(drawing.dagger().dagger(), drawing)
+
+    @axiom
     def matplotlib_determinism(cls, f: Self):
         """
         Rendering a diagram with Matplotlib is deterministic: drawing it

@@ -960,6 +960,17 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Fixed
 
+- `Drawing.dagger` reflects a drawing of more than one box. A drawing
+  read its nodes in the order its graph happened to store them, and its
+  validation required that order to be the index of each node, which
+  the relabelling of a reflection reversed: the nodes of each kind are
+  now `Drawing.nodes_by_kind`, a `cached_property` sorted by the new
+  `Node.index` — a box, then a wire — and forgotten by `invalidate`
+  whenever the graph changes in place, so the order the graph stores is
+  no part of the drawing. Validating the empty drawing no longer takes
+  the maximum of no position, and `monoidal.Diagram.
+  drawing_dagger_involution` states that reflecting a drawing twice
+  gives it back.
 - A trace reads back from its tree and its representation: it is
   serialised by its argument and its side, `serialised_attrs` being
   `("arg", "left")` with a `from_tree` of its own, where it inherited

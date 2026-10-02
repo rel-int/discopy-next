@@ -846,6 +846,11 @@ class Node:
             self.__hash = hash(repr(self))
         return self.__hash
 
+    @property
+    def index(self) -> tuple[int, int]:
+        """ The position of the node in a diagram: its box, then its wire. """
+        return self.data.get("j", -1), self.data.get("i", -1)
+
     def shift_i(self, i):
         return Node(self.kind, **dict(self.data, i=self.i + i))
 
