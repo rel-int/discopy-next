@@ -169,6 +169,13 @@ class NamedGeneric:
     ...     inside: list
     >>> assert L[int]([1, 2, 3]).dtype == int
     >>> assert L[int]([1, 2, 3]) != L[float]([1, 2, 3])
+
+    A DisCoPy class is named by its module, since every level of the
+    hierarchy has a ``Diagram`` of its own:
+
+    >>> from discopy import frobenius
+    >>> frobenius.Hypergraph.__name__
+    'Hypergraph[frobenius.Diagram]'
     """
     if TYPE_CHECKING:
         #: The parameter names used in discopy, declared so that attribute
@@ -235,7 +242,10 @@ class NamedGeneric:
                     return func, args, data
 
             C.__module__ = origin.__module__
-            names = [getattr(v, "__name__", str(v)) for v in values]
+            names = [
+                factory_name(v)
+                if getattr(v, "__module__", "").startswith("discopy.")
+                else getattr(v, "__name__", str(v)) for v in values]
             C.__name__ = C.__qualname__ = origin.__name__\
                 + f"[{', '.join(names)}]"
             C.__origin__ = origin

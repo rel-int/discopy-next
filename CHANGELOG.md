@@ -546,6 +546,13 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Changed
 
+- A class subscripted with a DisCoPy class is named by its
+  `factory_name`, e.g. `hypergraph.Hypergraph[frobenius.Diagram]`
+  where every level read `Hypergraph[Diagram]`, since every level of
+  the hierarchy has a `Diagram` of its own: the representation of a
+  hypergraph or a map says which category it is over, and so does the
+  identifier of its cells in the property matrix.
+
 - The rules of the search are decoupled from the n-ary methods they
   derive from, each stated once in `discopy.abc` as its one-wire
   instance: `trace_left`/`trace_right`, `curry_left`/`curry_right`
