@@ -9,6 +9,23 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Added
 
+- `abc.MonoidalCategory.cut`, composition in context: the cut rule of
+  the Lambek calculus, from `Γ2 ⊢ A` and `Γ1, A, Γ3 ⊢ B` conclude
+  `Γ1, Γ2, Γ3 ⊢ B`, derived from `then` and `tensor` as
+  `left @ self @ right >> other`. It replaces both as the recursive
+  rule of the search from monoidal categories on — `then` and `tensor`
+  are marked inapplicable on `monoidal.Diagram`, staying the n-ary
+  methods they always were while `cat.Arrow` keeps `then` as the rule
+  of a mere category — so that rules answer to the sequent calculus
+  and methods to the programmer, decoupled where a convenient
+  signature cannot state an honest sequent. Every diagram is a
+  sequence of layers and every layer is one cut, so the search
+  generates a diagram the way `monoidal.Layer` stores it: the
+  conclusion anchors both premises on the goal by splitting its
+  boundary, where the fresh middle of `then` anchors neither, and one
+  rule application places a whiskered box where `tensor`-of-identities
+  and `then` spent three.
+
 - The codebase typechecks: `uv run ty check` passes in the full
   development environment, `ty` a dev dependency locked in
   `uv.lock`, configured by the `[tool.ty]` sections of

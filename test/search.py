@@ -21,12 +21,12 @@ x, y = Ty("x"), Ty("y")
 def test_rule():
     assert repr(Rule(Category.then.function)) == "Rule(then)"
     assert repr(Category.then) == "abc.Category.then"
-    assert Diagram.then is not None and Diagram.rules["then"].category\
-        is Diagram
+    assert cat.Arrow.then is not None and cat.Arrow.rules["then"].category\
+        is cat.Arrow
     assert hash(Category.then) == hash(Category.then.bind(Category))
     assert Category.then.__isabstractmethod__
-    assert Diagram.rules["then"].owner is cat.Arrow  # The latest wins.
-    assert Diagram.rules["then"].sequent.conclusion\
+    assert cat.Arrow.rules["then"].owner is cat.Arrow  # The latest wins.
+    assert cat.Arrow.rules["then"].sequent.conclusion\
         == Category.then.sequent.conclusion
     with raises(TypeError):
         Rule(Category.then.function).scope
@@ -42,7 +42,7 @@ def test_rule():
 
     f = Box("f", x, x)
     assert Wrapped.twice(f) == f >> f == Wrapped(f.inside, x, x).twice()
-    assert list(Wrapped.rules) == ["id", "then", "tensor", "twice"]
+    assert list(Wrapped.rules) == ["id", "cut", "twice"]
     assert str(Wrapped.rules["twice"])\
         == "twice: A: C0 | self: C1[A, A] ⊢ C1[A, A]"
     found = find(Wrapped.strategy(dom=x, cod=x, types=st.just(x)),
@@ -73,13 +73,29 @@ def test_generator():
         find(Lying.strategy(dom=x, cod=Ty()), lambda value: True)
 
 
+def test_cut():
+    """ The search composes in context by cut, while the methods the
+    rule derives from stay callable outside of it. """
+    z = Ty("z")
+    f, g = Box("f", y, y @ y), Box("g", x @ y @ y @ z, z)
+    assert f.cut(g, x, z) == x @ f @ z >> g
+    assert str(Diagram.rules["cut"]) == (
+        "cut: A: C0, B: C0, C: C0, X: C0, Y: C0 | self: C1[B, A], "
+        "other: C1[X @ A @ Y, C], left: X, right: Y ⊢ C1[X @ B @ Y, C]")
+    assert list(Diagram.rules) == ["id", "cut"]
+    assert Diagram.rules["cut"].recursive
+    assert "then" in cat.Arrow.rules  # A mere category composes by then,
+    assert f.then(Box("h", y @ y, z)).cod == z  # a monoidal one cuts.
+    assert (f @ g).dom == f.dom @ g.dom
+
+
 def test_declarations():
     class Hidden(Diagram):
         unitality = None
-        then = None
+        cut = None
 
     assert "unitality" not in Hidden.axioms
-    assert "then" not in Hidden.rules
+    assert "cut" not in Hidden.rules
     assert list(Category.generators) == ["id"]
 
     from discopy.python.finset import Function

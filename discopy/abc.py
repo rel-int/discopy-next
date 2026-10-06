@@ -440,6 +440,28 @@ class MonoidalCategory[C0: ColouredMonoid, C1: MonoidalCategory](
     def __rmatmul__(self, other):
         return self.whisker(other).tensor(self)
 
+    @rule
+    def cut[A: Ob[C0], B: Ob[C0], C: Ob[C0], X: Ob[C0], Y: Ob[C0]](
+            self: Hom[C1, B, A], other: Hom[C1, Tensor[X, A, Y], C],
+            left: Ob[C0, X], right: Ob[C0, Y]) -> Hom[C1, Tensor[X, B, Y], C]:
+        """
+        Composition in context, the `cut rule
+        <https://en.wikipedia.org/wiki/Cut_rule>`_ of the Lambek calculus:
+        plug a morphism into the middle of the domain of ``other``, i.e.
+        one layer of a diagram. The rule derives from
+        :meth:`Category.then` and :meth:`tensor`, and replaces them as
+        the recursive rule of the search from monoidal categories on:
+        every diagram is a sequence of layers and every layer is one
+        cut, while the conclusion anchors both premises on the goal
+        where the fresh middle of :meth:`Category.then` anchors neither.
+
+        Parameters:
+            other : The morphism consuming the codomain of ``self``.
+            left : The context on the left of ``self``.
+            right : The context on the right of ``self``.
+        """
+        return left @ self @ right >> other
+
     @axiom
     def bifunctoriality[A: Ob[C0], B: Ob[C0], C: Ob[C0], D: Ob[C0],
                         U: Ob[C0], V: Ob[C0]](

@@ -1141,6 +1141,12 @@ class Diagram(cat.Arrow, MonoidalCategory, RichDisplay):
         dom, cod = self.dom @ other.dom, self.cod @ other.cod
         return self.ar(inside, dom, cod, _scan=False)
 
+    #: Composition and tensor stay the methods they always were, while
+    #: the search composes in context with the one rule that derives
+    #: them both, see :meth:`discopy.abc.MonoidalCategory.cut`.
+    then = cat.Arrow.then.inapplicable("The search composes by cut.")
+    tensor = tensor.inapplicable("The search tensors by cut.")
+
     @property
     def boxes(self) -> list[Box]:
         """ The boxes in each layer of the diagram. """
