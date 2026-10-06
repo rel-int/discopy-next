@@ -15,9 +15,15 @@ forgetful functors between categories go the other way.
 Each class also declares its :func:`discopy.axioms.axiom` equations, which
 every free category inherits along with the structure they axiomatise:
 :class:`Category` states the unitality and associativity of composition,
-the typing of its identities and composites, and the involution and
-contravariance of its dagger; a :class:`ColouredMonoid` inherits them as
-the unitality and associativity of its product, its composition.
+the typing of its identities and composites, and a
+:class:`DaggerCategory` the involution and contravariance of its dagger;
+a :class:`ColouredMonoid` inherits them as
+the unitality and associativity of its product, its composition. The
+structural methods carry their own :func:`discopy.search.rule`, from
+which
+:meth:`discopy.monoidal.Diagram.strategy` searches for the diagrams the
+laws quantify over: a level of the hierarchy declares its structure here
+and inherits the search as is.
 
 Summary
 -------
@@ -28,6 +34,7 @@ Summary
     :toctree:
 
     Category
+    DaggerCategory
     ColouredMonoid
     Monoid
     Nat
@@ -45,6 +52,7 @@ Summary
     PROP
     MarkovCategory
     ClosedCategory
+    DelayedMonoid
     FeedbackCategory
     BalancedCategory
     RibbonCategory
@@ -53,17 +61,18 @@ Summary
     NamedGeneric
 """
 
-from __future__ import annotations
-
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Annotated, ClassVar
+from types import NoneType
+from typing import (
+    Annotated, ClassVar, Literal, Self, TYPE_CHECKING, overload)
 
-from discopy.axioms import (
-    Axiom, ComposablePair, ComposableTriple, Equation, axiom)
-from discopy.utils import NamedGeneric, classproperty  # noqa: F401
-
+from discopy.axioms import (  # noqa: F401
+    Atom, Axiom, axiom, Count, D, declarations, Equation, L, Over, R,
+    Repeat, Rule, rule, Serialisable, Tensor, Testable, Under, Unit)
+from discopy.utils import (  # noqa: F401
+    NamedGeneric, classproperty, factory_name)
 
 type Ob[T, X = None] = Annotated[T, X]
 """ The premise ``x: Ob[T, p]`` of a pattern ``p`` beside its coarse
@@ -77,7 +86,7 @@ between two sides, expanded by :func:`discopy.pattern.expand` and
 read as ``Annotated`` by a typechecker. """
 
 
-class Category[C0, C1: Category](ABC):
+class Category[C0, C1: Category](Testable, ABC):
     """
     A category is a class with two class variables ``ob, ar``, two attributes
     ``dom, cod`` and two methods ``id, then``.
@@ -94,8 +103,8 @@ class Category[C0, C1: Category](ABC):
     >>> assert List([1, 2]) >> List([3]) == List([1, 2, 3])
     >>> assert List([3]) << List([1, 2]) == List([1, 2, 3])
     """
-    ob: ClassVar[type[C0]]
-    factory: ClassVar[type[C1]]
+    ob: ClassVar[type]
+    factory: ClassVar[type]
     dom: C0
     cod: C0
 
@@ -111,35 +120,65 @@ class Category[C0, C1: Category](ABC):
     Equation: ClassVar[type[Equation]] = Equation
 
     @classproperty
-    def axioms(cls) -> dict[str, Axiom]:
+    def rules(cls: type) -> dict[str, Rule]:
         """
-        The axioms inherited by ``cls``, by name, subclasses overriding bases.
+        The inference rules inherited by ``cls``, by name: the rule each
+        structural method carries, see :func:`discopy.search.rule`, bound
+        to ``cls`` and owned by the class declaring it, the latest in the
+        method resolution order winning like ordinary attribute lookup. A
+        method implementing a rule is decorated
+        :func:`discopy.search.rule` itself, restating its sequent, and
+        the search calls it by name; one declared
+        :meth:`discopy.search.Rule.inapplicable` is dropped.
+        """
+        return declarations(cls, Rule)
 
-        Names are collected before they are filtered, so that assigning
-        anything that is not an axiom over an inherited one drops it
-        altogether, rather than restating it.
+    @classproperty
+    def generators(cls: type) -> dict[str, Rule]:
         """
-        visible = {
-            name: value
-            for base in reversed(cls.__mro__)
-            for name, value in base.__dict__.items()}
-        return {name: value.bind(cls) for name, value in visible.items()
-                if isinstance(value, Axiom)}
+        The logical constants inherited by ``cls``, by name: the rules
+        with no hom premise, which the search builds in one step, see
+        :meth:`discopy.search.Rule.recursive`. A class adjusts the set by
+        assigning a dictionary of rules instead,
+        :meth:`discopy.search.Rule.constant` giving the rule of one given
+        box, so that its strategy draws from a fixed vocabulary, e.g. the
+        words of a pregroup grammar or the gates of a circuit.
+
+        >>> from hypothesis import find
+        >>> from discopy.axioms import Rule
+        >>> from discopy.grammar import pregroup
+        >>> n, s = pregroup.Ty('n'), pregroup.Ty('s')
+        >>> Alice, sleeps = pregroup.Word('Alice', n), pregroup.Word(
+        ...     'sleeps', n.r @ s)
+        >>> class Sentence(pregroup.Diagram):
+        ...     generators = {
+        ...         "cups": pregroup.Diagram.generators["cups"],
+        ...         **{w.name: Rule.constant(w) for w in (Alice, sleeps)}}
+        >>> print(find(Sentence.strategy(), bool).foliation())
+        Alice @ sleeps >> Cup(n, n.r) @ s
+        """
+        return {name: rule for name, rule in cls.rules.items()
+                if not rule.recursive}
 
     @classmethod
+    @rule
     @abstractmethod
-    def id(cls, dom: C0) -> C1:
+    def id[A: Ob[C0]](cls, dom: Ob[C0, A]) -> Hom[C1, A, A]:
         """
-        Identity morphism on an object :code:`dom: C0`, to be instantiated.
+        Identity morphism on an object :code:`dom: C0`, to be instantiated:
+        as a rule, ``x ⊢ x`` with no box is the identity.
 
         Parameters:
             dom (C0) : The domain of an identity is also its codomain.
         """
 
+    @rule
     @abstractmethod
-    def then(self, *others: C1) -> C1:
+    def then[A: Ob[C0], B: Ob[C0], C: Ob[C0]](
+            self: Hom[C1, A, B], other: Hom[C1, B, C]) -> Hom[C1, A, C]:
         """
-        Sequential composition of `n >= 1` morphisms, to be instantiated.
+        Sequential composition, to be instantiated: the rule composes two
+        morphisms, an implementation may take ``n >= 1`` of them.
 
         Parameters:
             other : The other morphism to compose sequentially.
@@ -166,54 +205,72 @@ class Category[C0, C1: Category](ABC):
         return (self.dom, self.cod) == (other.dom, other.cod)
 
     @axiom
-    def unitality(
-            cls, f: C1) -> Equation[C1]:
+    def unitality[A: Ob[C0], B: Ob[C0]](
+            cls, f: Hom[C1, A, B]) -> Equation[Hom[C1, A, B]]:
         """ Left and right unitality of composition. """
         return cls.Equation(cls.id(f.dom).then(f), f, f.then(cls.id(f.cod)))
 
     @axiom
-    def associativity(
-            cls, triple: ComposableTriple[C1]) -> Equation[C1]:
+    def associativity[A: Ob[C0], B: Ob[C0], C: Ob[C0], D: Ob[C0]](
+            cls, f: Hom[C1, A, B],
+            g: Hom[C1, B, C],
+            h: Hom[C1, C, D]) -> Equation[Hom[C1, A, D]]:
         """ Associativity of composition. """
-        f, g, h = triple
         return cls.Equation(f.then(g).then(h), f.then(g.then(h)))
 
     @axiom
-    def identity_typing(
-            cls, x: C0) -> Equation[C0]:
+    def identity_typing[X: Ob[C0]](
+            cls, x: Ob[C0, X]) -> Equation[Ob[C0, X]]:
         """ Typing of identity morphisms. """
         identity = cls.id(x)
         return cls.ob.Equation(identity.dom, x, identity.cod)
 
     @axiom
-    def composition_dom_typing(
-            cls, pair: ComposablePair[C1]) -> Equation[C0]:
+    def composition_dom_typing[A: Ob[C0], B: Ob[C0], C: Ob[C0]](
+            cls, f: Hom[C1, A, B],
+            g: Hom[C1, B, C]) -> Equation[Ob[C0, A]]:
         """ Domain typing of composition. """
-        f, g = pair
         return cls.ob.Equation(f.then(g).dom, f.dom)
 
     @axiom
-    def composition_cod_typing(
-            cls, pair: ComposablePair[C1]) -> Equation[C0]:
+    def composition_cod_typing[A: Ob[C0], B: Ob[C0], C: Ob[C0]](
+            cls, f: Hom[C1, A, B],
+            g: Hom[C1, B, C]) -> Equation[Ob[C0, C]]:
         """ Codomain typing of composition. """
-        f, g = pair
         return cls.ob.Equation(f.then(g).cod, g.cod)
 
+    __rshift__ = __llshift__ = lambda self, other: self.then(other)
+    __lshift__ = __lrshift__ = lambda self, other: other.then(self)
+
+
+class DaggerCategory[C0, C1: DaggerCategory](Category[C0, C1]):
+    """
+    A `dagger category <https://ncatlab.org/nlab/show/dagger+category>`_ is a
+    :class:`Category` with a method :code:`dagger` for the identity-on-objects
+    contravariant involution, i.e. such that
+    ``(f >> g).dagger() == g.dagger() >> f.dagger()``
+    and ``f.dagger().dagger() == f``.
+
+    Its two laws are stated here rather than on :class:`Category`, so that a
+    category with no dagger does not have to declare them inapplicable.
+    """
+    @abstractmethod
+    def dagger[A: Ob[C0], B: Ob[C0]](
+            self: Hom[C1, A, B]) -> Hom[C1, B, A]:
+        """ The dagger of a morphism, to be instantiated. """
+
     @axiom
-    def dagger_involution(
-            cls, f: C1) -> Equation[C1]:
+    def dagger_involution[A: Ob[C0], B: Ob[C0]](
+            cls, f: Hom[C1, A, B]) -> Equation[Hom[C1, A, B]]:
         """ The dagger is involutive. """
         return cls.Equation(f.dagger().dagger(), f)
 
     @axiom
-    def dagger_contravariance(
-            cls, pair: ComposablePair[C1]) -> Equation[C1]:
+    def dagger_contravariance[A: Ob[C0], B: Ob[C0], C: Ob[C0]](
+            cls, f: Hom[C1, A, B],
+            g: Hom[C1, B, C]) -> Equation[Hom[C1, C, A]]:
         """ The dagger reverses composition. """
-        f, g = pair
         return cls.Equation(f.then(g).dagger(), g.dagger().then(f.dagger()))
-
-    __rshift__ = __llshift__ = lambda self, other: self.then(other)
-    __lshift__ = __lrshift__ = lambda self, other: other.then(self)
 
 
 class ColouredMonoid[C0, C1: ColouredMonoid](Category[C0, C1]):
@@ -226,13 +283,23 @@ class ColouredMonoid[C0, C1: ColouredMonoid](Category[C0, C1]):
     colour, i.e. :class:`type(None)`. We do not enforce this so
     that e.g. :class:`monoidal.Ty` can take colours as objects.
     """
-    @classmethod
-    def id(cls, dom: C0 = None) -> C1:
-        """The monoidal unit, i.e. the empty tensor ``cls()``."""
-        return cls()
+    if TYPE_CHECKING:
+        def __len__(self) -> int:
+            """ The number of generating objects inside, assumed free. """
+
+        def __getitem__(self, key) -> Self:
+            """ The slices of a free monoid, assumed to stay inside it. """
 
     @classmethod
-    def unit(cls, colour: C0 = None) -> C0 | C1:
+    @rule
+    def id[A: Ob[C0]](
+            cls, dom: Ob[C0 | None, A] = None) -> Hom[C1, A, A]:
+        """The monoidal unit, i.e. the empty tensor ``cls()``."""
+        return cls()  # ty: ignore[invalid-return-type]
+
+    @classmethod
+    def unit[A: Ob[C0]](
+            cls, colour: Ob[C0 | None, A] = None) -> Ob[C0 | C1, Unit[C0]]:
         """
         The unit at a colour, i.e. the identity on it.
 
@@ -243,15 +310,17 @@ class ColouredMonoid[C0, C1: ColouredMonoid](Category[C0, C1]):
         return cls.id(colour)
 
     @abstractmethod
-    def tensor(self, *objects: C1) -> C1:
+    def tensor(self, *objects: Self) -> Self:
         """ The n-ary product of a monoid for ``n > 0``. """
 
-    def then(self, *others: C1) -> C1:
+    @rule
+    def then[A: Ob[C0], B: Ob[C0], C: Ob[C0]](
+            self: Hom[C1, A, B], *others: Hom[C1, B, C]) -> Hom[C1, A, C]:
         """Sequential composition, given by the monoid product."""
         return self.tensor(*others)
 
     @classmethod
-    def cast(cls, atoms) -> C1:
+    def cast(cls, atoms) -> Self:
         """
         The element of a tuple of atoms, or of a single atom; an element of
         the monoid is unchanged.
@@ -263,17 +332,22 @@ class ColouredMonoid[C0, C1: ColouredMonoid](Category[C0, C1]):
         """
         if isinstance(atoms, cls):
             return atoms
-        return cls(*atoms) if isinstance(atoms, tuple) else cls(atoms)
+        if isinstance(atoms, tuple):
+            return cls(*atoms)
+        return cls(atoms)  # ty: ignore[too-many-positional-arguments]
 
     @classmethod
-    def whisker(cls, other: C0 | C1) -> C1:
+    def whisker[A: Ob[C0], B: Ob[C0]](
+            cls, other: Ob[C0, A] | Hom[C1, A, B]) -> Hom[C1, A, B]:
         """
         Do nothing if ``other`` is already a morphism else apply :meth:`id`.
 
         Parameters:
             other : The object or morphism to be tensored on the left or right.
         """
-        return other if isinstance(other, cls) else cls.id(other)
+        return (
+            other if isinstance(other, cls)  # ty: ignore[invalid-return-type]
+            else cls.id(other))  # ty: ignore[invalid-argument-type]
 
     def __matmul__(self, other):
         return self.tensor(other)
@@ -282,7 +356,7 @@ class ColouredMonoid[C0, C1: ColouredMonoid](Category[C0, C1]):
         return self.whisker(other).tensor(self)
 
 
-class Monoid[C1: Monoid](ColouredMonoid[type(None), C1]):
+class Monoid[C1: Monoid](ColouredMonoid[NoneType, C1]):
     """ A monoid is a coloured monoid with a single, trivial colour. """
 
 
@@ -330,37 +404,82 @@ class Nat(Monoid["Nat"]):
 class MonoidalCategory[C0: ColouredMonoid, C1: MonoidalCategory](
         Category[C0, C1]):
     """
-    A monoidal category is a :class:`Category` with a method :code:`tensor` for
-    both its objects and its morphisms.
+    A monoidal category is a :class:`Category` with a method :code:`tensor`
+    for both its objects and its morphisms.
 
     This base class also implements syntactic sugar :code:`@` for whiskering.
     """
-
-    @classmethod
+    @rule
     @abstractmethod
-    def tensor(cls, *morphisms: C1) -> C1:
+    def tensor[A: Ob[C0], B: Ob[C0], C: Ob[C0], D: Ob[C0]](
+            self: Hom[C1, A, B], other: Hom[C1, C, D]
+    ) -> Hom[C1, Tensor[A, C], Tensor[B, D]]:
         """
-        Parallel composition of ``n >= 0`` morphisms, to be instantiated.
+        Parallel composition, to be instantiated: the rule tensors two
+        morphisms, an implementation may take ``n >= 0`` of them.
 
         Parameters:
             other : The other morphism to compose in parallel.
         """
 
     @classmethod
-    def whisker(cls, other: C0 | C1) -> C1:
+    def whisker[A: Ob[C0], B: Ob[C0]](
+            cls, other: Ob[C0, A] | Hom[C1, A, B]) -> Hom[C1, A, B]:
         """
         Do nothing if ``other`` is already a morphism else apply :meth:`id`.
 
         Parameters:
             other : The object or morphism to be tensored on the left or right.
         """
-        return other if isinstance(other, MonoidalCategory) else cls.id(other)
+        return (other if isinstance(  # ty: ignore[invalid-return-type]
+            other, MonoidalCategory) else cls.id(other))
 
     def __matmul__(self, other):
         return self.tensor(self.whisker(other))
 
     def __rmatmul__(self, other):
         return self.whisker(other).tensor(self)
+
+    @axiom
+    def bifunctoriality[A: Ob[C0], B: Ob[C0], C: Ob[C0], D: Ob[C0],
+                        U: Ob[C0], V: Ob[C0]](
+            cls, f: Hom[C1, A, B],
+            g: Hom[C1, C, D],
+            h: Hom[C1, B, U],
+            k: Hom[C1, D, V]
+    ) -> Equation[Hom[C1, Tensor[A, C], Tensor[U, V]]]:
+        """ Bifunctoriality of the tensor. """
+        return cls.Equation(
+            f @ g >> h @ k, (f >> h) @ (g >> k))
+
+    @axiom
+    def tensor_unitality[X: Ob[C0], Y: Ob[C0]](
+            cls, x: Ob[C0, X], y: Ob[C0, Y]
+    ) -> Equation[Hom[C1, Tensor[X, Y], Tensor[X, Y]]]:
+        """ Preservation of identities by tensor. """
+        return cls.Equation(
+            cls.id(x) @ cls.id(y), cls.id(x @ y))
+
+    @axiom
+    def tensor_dom_typing[A: Ob[C0], B: Ob[C0], C: Ob[C0], D: Ob[C0]](
+            cls, f: Hom[C1, A, B],
+            g: Hom[C1, C, D]) -> Equation[Ob[C0, Tensor[A, C]]]:
+        """ Domain typing of tensor. """
+        return cls.ob.Equation((f @ g).dom, f.dom @ g.dom)
+
+    @axiom
+    def tensor_cod_typing[A: Ob[C0], B: Ob[C0], C: Ob[C0], D: Ob[C0]](
+            cls, f: Hom[C1, A, B],
+            g: Hom[C1, C, D]) -> Equation[Ob[C0, Tensor[B, D]]]:
+        """ Codomain typing of tensor. """
+        return cls.ob.Equation((f @ g).cod, f.cod @ g.cod)
+
+    @axiom
+    def dagger_monoidality[A: Ob[C0], B: Ob[C0], C: Ob[C0], D: Ob[C0]](
+            cls, f: Hom[C1, A, B], g: Hom[C1, C, D]
+    ) -> Equation[Hom[C1, Tensor[B, D], Tensor[A, C]]]:
+        """ The dagger distributes over the tensor. """
+        return cls.Equation((f @ g).dagger(), f.dagger() @ g.dagger())
 
 
 class PRO[C1: PRO](MonoidalCategory[Nat, C1]):
@@ -370,78 +489,301 @@ class PRO[C1: PRO](MonoidalCategory[Nat, C1]):
     """
 
 
-class TracedCategory[C0, C1](MonoidalCategory[C0, C1]):
+class TracedCategory[C0: ColouredMonoid, C1: TracedCategory](
+        MonoidalCategory[C0, C1]):
     """
-    A traced category is a :class:`MonoidalCategory` with a method
-    :code:`trace` for the partial trace of a morphism over some objects.
+    A traced category is a :class:`MonoidalCategory` with methods
+    :code:`trace_left` and :code:`trace_right` for the partial trace of a
+    morphism over some objects on either side.
     """
+    @rule
     @abstractmethod
-    def trace(self, n: int = 1, left: bool = False) -> C1:
+    def trace_left[A: Ob[C0], B: Ob[C0], M: Atom[C0]](
+            self: Hom[C1, Tensor[M, A], Tensor[M, B]], n: int = 1
+    ) -> Hom[C1, A, B]:
         """
-        The trace of a morphism, to be instantiated.
+        The trace of ``n`` wires on the left, to be instantiated: as a
+        rule, one wire.
 
-        Tracing no object at all is the identity, i.e. the vanishing axiom
-        ``f.trace(0) == f``, see `nLab
+        Parameters:
+            n : The number of objects to trace over.
+        """
+
+    @rule
+    @abstractmethod
+    def trace_right[A: Ob[C0], B: Ob[C0], M: Atom[C0]](
+            self: Hom[C1, Tensor[A, M], Tensor[B, M]], n: int = 1
+    ) -> Hom[C1, A, B]:
+        """
+        The trace of ``n`` wires on the right, to be instantiated: as a
+        rule, one wire.
+
+        Parameters:
+            n : The number of objects to trace over.
+        """
+
+    @overload
+    def trace[A: Ob[C0], B: Ob[C0], M: Atom[C0]](
+            self: Hom[C1, Tensor[A, M], Tensor[B, M]], n: int = ...,
+            left: Literal[False] = ...) -> Hom[C1, A, B]: ...
+
+    @overload
+    def trace[A: Ob[C0], B: Ob[C0], M: Atom[C0]](
+            self: Hom[C1, Tensor[M, A], Tensor[M, B]], n: int = ...,
+            left: Literal[True] = ...) -> Hom[C1, A, B]: ...
+
+    def trace(self, n=1, left=False):
+        """
+        The trace of a morphism on either side, :meth:`trace_left` or
+        :meth:`trace_right`, whose sequents the two overloads restate.
+        Tracing no object at all is the identity, i.e.
+        the vanishing axiom ``f.trace(0) == f``, see `nLab
         <https://ncatlab.org/nlab/show/traced+monoidal+category>`_.
 
         Parameters:
             n : The number of objects to trace over.
             left : Whether to trace the wires on the left or right.
         """
+        return self.trace_left(n) if left else self.trace_right(n)
+
+    @axiom
+    def trace_vanishing[A: Ob[C0], B: Ob[C0]](
+            cls, f: Hom[C1, A, B]) -> Equation[Hom[C1, A, B]]:
+        """ Vanishing of a trace over the unit. """
+        return cls.Equation(
+            f.trace(0), f, f.trace(0, left=True))
+
+    @axiom
+    def trace_superposing_left[A: Ob[C0], B: Ob[C0], X: Ob[C0], M: Atom[C0]](
+            cls, f: Hom[C1, Tensor[M, A], Tensor[M, B]], x: Ob[C0, X]
+    ) -> Equation[Hom[C1, Tensor[A, X], Tensor[B, X]]]:
+        """ Left-oriented superposing. """
+        return cls.Equation(
+            (f @ x).trace(left=True), f.trace(left=True) @ x)
+
+    @axiom
+    def trace_superposing_right[A: Ob[C0], B: Ob[C0], X: Ob[C0], M: Atom[C0]](
+            cls, f: Hom[C1, Tensor[A, M], Tensor[B, M]], x: Ob[C0, X]
+    ) -> Equation[Hom[C1, Tensor[X, A], Tensor[X, B]]]:
+        """ Right-oriented superposing. """
+        return cls.Equation(
+            (x @ f).trace(), x @ f.trace())
+
+    @axiom
+    def trace_naturality_left[M: Atom[C0], X: Ob[C0], A: Ob[C0], B: Ob[C0]](
+            cls, x: Ob[C0, Tensor[M, X]],
+            f: Hom[C1, Tensor[M, X, B], Tensor[M, X, A]],
+            g: Hom[C1, A, B]) -> Equation[Hom[C1, A, B]]:
+        """ Left-oriented trace naturality. """
+        return cls.Equation(
+            (x @ g).then(f).then(x @ g).trace(len(x), left=True),
+            g.then(f.trace(len(x), left=True)).then(g))
+
+    @axiom
+    def trace_naturality_right[M: Atom[C0], X: Ob[C0], A: Ob[C0], B: Ob[C0]](
+            cls, x: Ob[C0, Tensor[M, X]],
+            f: Hom[C1, Tensor[B, M, X], Tensor[A, M, X]],
+            g: Hom[C1, A, B]) -> Equation[Hom[C1, A, B]]:
+        """ Right-oriented trace naturality. """
+        return cls.Equation(
+            (g @ x).then(f).then(g @ x).trace(len(x)),
+            g.then(f.trace(len(x))).then(g))
+
+    @axiom
+    def trace_dinaturality_left[M: Atom[C0], N: Atom[C0], S: Ob[C0],
+                                T: Ob[C0], A: Ob[C0], B: Ob[C0]](
+            cls,
+            f: Hom[C1, Tensor[M, S, A], Tensor[N, T, B]],
+            g: Hom[C1, Tensor[N, T], Tensor[M, S]]
+    ) -> Equation[Hom[C1, A, B]]:
+        """ Left-oriented trace dinaturality. """
+        source, target = g.cod, g.dom
+        base, cobase = f.dom[len(source):], f.cod[len(target):]
+        return cls.Equation(
+            f.then(g @ cobase).trace(len(source), left=True),
+            (g @ base).then(f).trace(len(target), left=True))
+
+    @axiom
+    def trace_dinaturality_right[M: Atom[C0], N: Atom[C0], S: Ob[C0],
+                                 T: Ob[C0], A: Ob[C0], B: Ob[C0]](
+            cls,
+            f: Hom[C1, Tensor[A, M, S], Tensor[B, N, T]],
+            g: Hom[C1, Tensor[N, T], Tensor[M, S]]
+    ) -> Equation[Hom[C1, A, B]]:
+        """ Right-oriented trace dinaturality. """
+        source, target = g.cod, g.dom
+        base = f.dom[:-len(source)] if len(source) else f.dom
+        cobase = f.cod[:-len(target)] if len(target) else f.cod
+        return cls.Equation(
+            f.then(cobase @ g).trace(len(source)),
+            (base @ g).then(f).trace(len(target)))
 
 
 class ResiduatedMonoid[C0, C1: ResiduatedMonoid](ColouredMonoid[C0, C1]):
     """
     A monoid is residuated when it comes with methods ``over`` and ``under``
     with syntactic sugar ``<<`` and ``>>``.
+
+    We also assume the exponential objects can be recognised and taken apart,
+    see :class:`biclosed.Exp`.
     """
+    if TYPE_CHECKING:
+        @property
+        def is_exp(self) -> bool:
+            """ Whether this is an exponential object. """
+
+        @property
+        def base(self) -> Self:
+            """ The base of an exponential object. """
+
+        @property
+        def exponent(self) -> Self:
+            """ The exponent of an exponential object. """
+
     @abstractmethod
-    def over(self, other: C1) -> C1:
+    def over[X: Ob[C1], Y: Ob[C1]](
+            self: Ob[C1, X], other: Ob[C1, Y]) -> Ob[C1, Over[X, Y]]:
         """ The right-to-left exponential object ``self`` to the ``other``. """
 
     @abstractmethod
-    def under(self, other: C1) -> C1:
+    def under[X: Ob[C1], Y: Ob[C1]](
+            self: Ob[C1, X], other: Ob[C1, Y]) -> Ob[C1, Under[Y, X]]:
         """ The left-to-right exponential object ``self`` to the ``other``. """
 
-    def __lshift__(self, other):
+    def __lshift__[X: Ob[C1], Y: Ob[C1]](
+            self: Ob[C1, X], other: Ob[C1, Y]) -> Ob[C1, Over[X, Y]]:
         return self.over(other)
 
-    def __rshift__(self, other):
+    def __rshift__[X: Ob[C1], Y: Ob[C1]](
+            self: Ob[C1, X], other: Ob[C1, Y]) -> Ob[C1, Under[X, Y]]:
         return other.under(self)
 
 
-class BiclosedCategory[
-        C0: ResiduatedMonoid, C1: BiclosedCategory](MonoidalCategory[C0, C1]):
+class BiclosedCategory[C0: ResiduatedMonoid, C1: BiclosedCategory](
+        MonoidalCategory[C0, C1]):
     """
-    A biclosed category is a :class:`MonoidalCategory` with methods :code:`ev`
-    and :code:`curry` for the evaluation and currying of morphisms.
+    A biclosed category is a :class:`MonoidalCategory` with methods for the
+    evaluation and currying of morphisms on either side.
 
     We also assume the type for objects comes with methods for left and right
     exponentials :code`x << y` and :code`x >> y`.
     """
     @classmethod
+    @rule
     @abstractmethod
-    def ev(cls, base: C0, exponent: C0, left: bool = True) -> C1:
+    def ev_left[Y: Atom[C0], E: Atom[C0]](
+            cls, base: Ob[C0, Y], exponent: Ob[C0, E]
+    ) -> Hom[C1, Tensor[Over[Y, E], E], Y]:
         """
-        The evaluation of an exponential type, to be instantiated.
+        The left evaluation of an exponential type, to be instantiated:
+        as a rule, ``(y << e) @ e ⊢ y``.
+
+        Parameters:
+            base : The base of the exponential type.
+            exponent : The exponent of the exponential type.
+        """
+
+    @classmethod
+    @rule
+    @abstractmethod
+    def ev_right[Y: Atom[C0], E: Atom[C0]](
+            cls, base: Ob[C0, Y], exponent: Ob[C0, E]
+    ) -> Hom[C1, Tensor[E, Under[E, Y]], Y]:
+        """
+        The right evaluation of an exponential type, to be instantiated:
+        as a rule, ``e @ (e >> y) ⊢ y``.
+
+        Parameters:
+            base : The base of the exponential type.
+            exponent : The exponent of the exponential type.
+        """
+
+    @overload
+    @classmethod
+    def ev[Y: Atom[C0], E: Atom[C0]](
+            cls, base: Ob[C0, Y], exponent: Ob[C0, E],
+            left: Literal[True] = ...
+    ) -> Hom[C1, Tensor[Over[Y, E], E], Y]: ...
+
+    @overload
+    @classmethod
+    def ev[Y: Atom[C0], E: Atom[C0]](
+            cls, base: Ob[C0, Y], exponent: Ob[C0, E],
+            left: Literal[False] = ...
+    ) -> Hom[C1, Tensor[E, Under[E, Y]], Y]: ...
+
+    @classmethod
+    def ev(cls, base, exponent, left=True):
+        """
+        The evaluation of an exponential type on either side,
+        :meth:`ev_left` or :meth:`ev_right`, whose sequents the two
+        overloads restate.
 
         Parameters:
             base : The base of the exponential type.
             exponent : The exponent of the exponential type.
             left : Whether to take the left or right evaluation.
         """
+        return (cls.ev_left if left else cls.ev_right)(base, exponent)
 
+    @rule
     @abstractmethod
-    def curry(self, n: int = 1, left: bool = True) -> C1:
+    def curry_left[X: Ob[C0], Y: Atom[C0], Z: Ob[C0]](
+            self: Hom[C1, Tensor[X, Y], Z], n: int = 1
+    ) -> Hom[C1, X, Over[Z, Y]]:
         """
-        The currying of a morphism, to be instantiated.
+        The currying of ``n`` objects on the left, to be instantiated: as
+        a rule, one object.
+
+        Parameters:
+            n : The number of objects to curry.
+        """
+
+    @rule
+    @abstractmethod
+    def curry_right[Y: Atom[C0], X: Ob[C0], Z: Ob[C0]](
+            self: Hom[C1, Tensor[Y, X], Z], n: int = 1
+    ) -> Hom[C1, X, Under[Y, Z]]:
+        """
+        The currying of ``n`` objects on the right, to be instantiated: as
+        a rule, one object.
+
+        Parameters:
+            n : The number of objects to curry.
+        """
+
+    @overload
+    def curry[X: Ob[C0], Y: Atom[C0], Z: Ob[C0]](
+            self: Hom[C1, Tensor[X, Y], Z], n: int = ...,
+            left: Literal[True] = ...) -> Hom[C1, X, Over[Z, Y]]: ...
+
+    @overload
+    def curry[Y: Atom[C0], X: Ob[C0], Z: Ob[C0]](
+            self: Hom[C1, Tensor[Y, X], Z], n: int = ...,
+            left: Literal[False] = ...) -> Hom[C1, X, Under[Y, Z]]: ...
+
+    def curry(self, n=1, left=True):
+        """
+        The currying of a morphism on either side, :meth:`curry_left` or
+        :meth:`curry_right`, whose sequents the two overloads restate.
 
         Parameters:
             n : The number of objects to curry.
             left : Whether to curry on the left or right.
         """
+        return self.curry_left(n) if left else self.curry_right(n)
 
-    def base_and_exponent(self, n: int, left: bool) -> tuple[C0, C0]:
+    @overload
+    def base_and_exponent[X: Ob[C0], Y: Atom[C0], Z: Ob[C0]](
+            self: Hom[C1, X, Over[Z, Y]], n: int,
+            left: Literal[True]) -> tuple[Ob[C0, Z], Ob[C0, Y]]: ...
+
+    @overload
+    def base_and_exponent[X: Ob[C0], Y: Atom[C0], Z: Ob[C0]](
+            self: Hom[C1, X, Under[Y, Z]], n: int,
+            left: Literal[False]) -> tuple[Ob[C0, Z], Ob[C0, Y]]: ...
+
+    def base_and_exponent(self, n, left):
         """
         The base and exponent that :meth:`uncurry` evaluates, read off the
         exponential object in the codomain.
@@ -457,11 +799,22 @@ class BiclosedCategory[
             raise ValueError
         return base, exponent
 
-    def uncurry(self, n: int = 1, left: bool = True) -> C1:
+    @overload
+    def uncurry[X: Ob[C0], Y: Atom[C0], Z: Ob[C0]](
+            self: Hom[C1, X, Over[Z, Y]], n: int = ...,
+            left: Literal[True] = ...) -> Hom[C1, Tensor[X, Y], Z]: ...
+
+    @overload
+    def uncurry[Y: Atom[C0], X: Ob[C0], Z: Ob[C0]](
+            self: Hom[C1, X, Under[Y, Z]], n: int = ...,
+            left: Literal[False] = ...) -> Hom[C1, Tensor[Y, X], Z]: ...
+
+    def uncurry(self, n: int = 1, left: bool = True):
         """
         Uncurry a morphism by composing it with :meth:`ev`, assuming its
-        codomain is an exponential object. If the exponent has less than
-        ``n`` objects, we uncurry the remaining ones in turn.
+        codomain is an exponential object, i.e. undo :meth:`curry`, whose
+        sequents the two overloads state upside down. If the exponent has
+        less than ``n`` objects, we uncurry the remaining ones in turn.
 
         Parameters:
             n : The number of objects to uncurry.
@@ -471,10 +824,62 @@ class BiclosedCategory[
             raise ValueError
         if not n:
             return self
-        base, exponent = self.base_and_exponent(n, left)
+        base, exponent = self.base_and_exponent(
+            n, left)  # ty: ignore[no-matching-overload]
         result = self @ exponent >> self.ev(base, exponent, True) if left\
             else exponent @ self >> self.ev(base, exponent, False)
         return result.uncurry(n - len(exponent), left)
+
+    @overload
+    @classmethod
+    def uncurry_composition[A: Ob[C0], X: Atom[C0], E: Atom[C0]](
+            cls, f: Hom[C1, Tensor[A, E], X], base: Ob[C0, X],
+            exponent: Ob[C0, E], left: Literal[True]
+    ) -> Hom[C1, Tensor[A, E], X]: ...
+
+    @overload
+    @classmethod
+    def uncurry_composition[A: Ob[C0], X: Atom[C0], E: Atom[C0]](
+            cls, f: Hom[C1, Tensor[E, A], X], base: Ob[C0, X],
+            exponent: Ob[C0, E], left: Literal[False]
+    ) -> Hom[C1, Tensor[E, A], X]: ...
+
+    @classmethod
+    def uncurry_composition(cls, f, base, exponent, left: bool):
+        """
+        Curry ``f`` then evaluate it back, i.e. whisker the currying with
+        ``exponent`` and compose with :meth:`ev`, the roundtrip that
+        :meth:`currying_left` and :meth:`currying_right` state equal to
+        ``f``.
+
+        Parameters:
+            f : The morphism to curry and evaluate back.
+            base : The base of the exponential, i.e. the codomain of ``f``.
+            exponent : The objects curried out of the domain of ``f``.
+            left : Whether to curry on the left or right.
+        """
+        curried = f.curry(left=left)
+        ev = cls.ev(base, exponent, left)
+        return (curried @ exponent).then(ev) if left\
+            else (exponent @ curried).then(ev)
+
+    @axiom
+    def currying_left[A: Ob[C0], X: Atom[C0], E: Atom[C0]](
+            cls, f: Hom[C1, Tensor[A, E], X],
+            base: Ob[C0, X],
+            exponent: Ob[C0, E]) -> Equation[Hom[C1, Tensor[A, E], X]]:
+        """ Left currying followed by evaluation. """
+        return cls.Equation(
+            cls.uncurry_composition(f, base, exponent, left=True), f)
+
+    @axiom
+    def currying_right[A: Ob[C0], X: Atom[C0], E: Atom[C0]](
+            cls, f: Hom[C1, Tensor[E, A], X],
+            base: Ob[C0, X],
+            exponent: Ob[C0, E]) -> Equation[Hom[C1, Tensor[E, A], X]]:
+        """ Right currying followed by evaluation. """
+        return cls.Equation(
+            cls.uncurry_composition(f, base, exponent, left=False), f)
 
 
 class Pregroup[C0, C1: Pregroup](ResiduatedMonoid[C0, C1]):
@@ -482,14 +887,29 @@ class Pregroup[C0, C1: Pregroup](ResiduatedMonoid[C0, C1]):
     A pregroup is a residuated monoid where the left and right exponentials are
     given by tensoring with the chosen left and right duals for each object.
     """
-    l: C1
-    r: C1
+    @property
+    @abstractmethod
+    def l[X: Ob[C1]](self: Ob[C1, X]) -> Ob[C1, L[X]]:
+        """ The left adjoint, to be instantiated. """
 
-    def over(self, other: C1) -> C1:
+    @property
+    @abstractmethod
+    def r[X: Ob[C1]](self: Ob[C1, X]) -> Ob[C1, R[X]]:
+        """ The right adjoint, to be instantiated. """
+
+    def over[X: Ob[C1], Y: Ob[C1]](
+            self: Ob[C1, X], other: Ob[C1, Y]) -> Ob[C1, Over[X, Y]]:
         return self @ other.l
 
-    def under(self, other: C1) -> C1:
+    def under[X: Ob[C1], Y: Ob[C1]](
+            self: Ob[C1, X], other: Ob[C1, Y]) -> Ob[C1, Under[Y, X]]:
         return other.r @ self
+
+    @axiom
+    def adjunction[A: Ob[C0], B: Ob[C0]](
+            cls, x: Hom[C1, A, B]) -> Equation[Hom[C1, A, B]]:
+        """ The left and right adjoints are mutually inverse. """
+        return cls.Equation(x.l.r, x, x.r.l)
 
 
 class RigidCategory[C0: Pregroup, C1: RigidCategory](BiclosedCategory[C0, C1]):
@@ -498,10 +918,14 @@ class RigidCategory[C0: Pregroup, C1: RigidCategory](BiclosedCategory[C0, C1]):
     object type and methods for :code:`cups` and :code:`caps`.
     """
     @classmethod
+    @rule
     @abstractmethod
-    def cups(cls, left: C0, right: C0) -> C1:
+    def cups[X: Atom[C0]](
+            cls, left: Ob[C0, X], right: Ob[C0, R[X]]
+    ) -> Hom[C1, Tensor[X, R[X]], Unit[C0]]:
         """
-        The cups witnessing :code:`right` as the adjoint of :code:`left`.
+        The cups witnessing :code:`right` as the adjoint of :code:`left`:
+        as a rule, ``x @ x.r ⊢ 1`` is a cup, ``x.l @ x`` included.
 
         Parameters:
             left : The left-hand side of the cups.
@@ -509,10 +933,14 @@ class RigidCategory[C0: Pregroup, C1: RigidCategory](BiclosedCategory[C0, C1]):
         """
 
     @classmethod
+    @rule
     @abstractmethod
-    def caps(cls, left: C0, right: C0) -> C1:
+    def caps[X: Atom[C0]](
+            cls, left: Ob[C0, X], right: Ob[C0, L[X]]
+    ) -> Hom[C1, Unit[C0], Tensor[X, L[X]]]:
         """
-        The caps witnessing :code:`right` as the adjoint of :code:`left`.
+        The caps witnessing :code:`right` as the adjoint of :code:`left`:
+        as a rule, ``1 ⊢ x @ x.l`` is a cap, ``x.r @ x`` included.
 
         Parameters:
             left : The left-hand side of the caps.
@@ -520,37 +948,56 @@ class RigidCategory[C0: Pregroup, C1: RigidCategory](BiclosedCategory[C0, C1]):
         """
 
     @classmethod
-    def ev(cls, base: C0, exponent: C0, left: bool = True) -> C1:
-        """
-        The evaluation of a rigid morphism is obtained using cups.
+    @rule
+    def ev_left[Y: Atom[C0], E: Atom[C0]](
+            cls, base: Ob[C0, Y], exponent: Ob[C0, E]
+    ) -> Hom[C1, Tensor[Y, L[E], E], Y]:
+        """ The left evaluation of a rigid morphism is obtained using cups. """
+        return base @ cls.cups(exponent.l, exponent)
 
-        Parameters:
-            base : The base of the exponential type.
-            exponent : The exponent of the exponential type.
-            left : Whether to take the left or right evaluation.
-        """
-        return base @ cls.cups(exponent.l, exponent) if left\
-            else cls.cups(exponent, exponent.r) @ base
+    @classmethod
+    @rule
+    def ev_right[Y: Atom[C0], E: Atom[C0]](
+            cls, base: Ob[C0, Y], exponent: Ob[C0, E]
+    ) -> Hom[C1, Tensor[E, R[E], Y], Y]:
+        """ The right evaluation of a rigid morphism, using cups. """
+        return cls.cups(exponent, exponent.r) @ base
 
-    def curry(self, n: int = 1, left: bool = True) -> C1:
-        """
-        The curry of a rigid morphism is obtained using caps.
-
-        Parameters:
-            n : The number of objects to curry.
-            left : Whether to curry on the left or right.
-        """
+    @rule
+    def curry_left[X: Ob[C0], Y: Atom[C0], Z: Ob[C0]](
+            self: Hom[C1, Tensor[X, Y], Z], n: int = 1
+    ) -> Hom[C1, X, Tensor[Z, L[Y]]]:
+        """ The left curry of a rigid morphism is obtained using caps. """
         if n < 0 or n > len(self.dom):
             raise ValueError
         if not n:
             return self
-        if left:
-            base, exponent = self.dom[:-n], self.dom[-n:]
-            return base @ self.caps(exponent, exponent.l) >> self @ exponent.l
+        base, exponent = self.dom[:-n], self.dom[-n:]
+        return base @ self.caps(exponent, exponent.l) >> self @ exponent.l
+
+    @rule
+    def curry_right[Y: Atom[C0], X: Ob[C0], Z: Ob[C0]](
+            self: Hom[C1, Tensor[Y, X], Z], n: int = 1
+    ) -> Hom[C1, X, Tensor[R[Y], Z]]:
+        """ The right curry of a rigid morphism is obtained using caps. """
+        if n < 0 or n > len(self.dom):
+            raise ValueError
+        if not n:
+            return self
         base, exponent = self.dom[n:], self.dom[:n]
         return self.caps(exponent.r, exponent) @ base >> exponent.r @ self
 
-    def base_and_exponent(self, n: int, left: bool) -> tuple[C0, C0]:
+    @overload
+    def base_and_exponent[X: Ob[C0], Y: Atom[C0], Z: Ob[C0]](
+            self: Hom[C1, X, Tensor[Z, L[Y]]], n: int,
+            left: Literal[True]) -> tuple[Ob[C0, Z], Ob[C0, Y]]: ...
+
+    @overload
+    def base_and_exponent[X: Ob[C0], Y: Atom[C0], Z: Ob[C0]](
+            self: Hom[C1, X, Tensor[R[Y], Z]], n: int,
+            left: Literal[False]) -> tuple[Ob[C0, Z], Ob[C0, Y]]: ...
+
+    def base_and_exponent(self, n, left):
         """
         Contrary to :meth:`BiclosedCategory.base_and_exponent`, a pregroup has
         no exponential object to read the exponent off the codomain: it is the
@@ -562,10 +1009,21 @@ class RigidCategory[C0: Pregroup, C1: RigidCategory](BiclosedCategory[C0, C1]):
         """
         if n > len(self.cod):
             raise ValueError
-        return (self.cod[:-n], self.cod[-n:].r) if left\
-            else (self.cod[n:], self.cod[:n].l)
+        if left:
+            return self.cod[:-n], self.cod[-n:].r
+        return self.cod[n:], self.cod[:n].l
 
-    def transpose(self, left: bool = False) -> C1:
+    @overload
+    def transpose[A: Ob[C0], B: Ob[C0]](
+            self: Hom[C1, A, B], left: Literal[False] = ...
+    ) -> Hom[C1, R[B], R[A]]: ...
+
+    @overload
+    def transpose[A: Ob[C0], B: Ob[C0]](
+            self: Hom[C1, A, B], left: Literal[True] = ...
+    ) -> Hom[C1, L[B], L[A]]: ...
+
+    def transpose(self, left=False):
         """
         The transpose of a morphism, i.e. its composition with cups and caps.
 
@@ -592,29 +1050,120 @@ class RigidCategory[C0: Pregroup, C1: RigidCategory](BiclosedCategory[C0, C1]):
             >> self.dom.r @ self @ self.cod.r\
             >> self.dom.r @ self.cups(self.cod, self.cod.r)
 
+    @axiom
+    def snake_equations[X: Ob[C0]](
+            cls, x: Ob[C0, X]) -> Equation[Hom[C1, X, X]]:
+        """ The two snake equations. """
+        snake_r = (cls.id(x) @ cls.caps(x.r, x)).then(
+            cls.cups(x, x.r) @ cls.id(x))
+        snake_l = (cls.caps(x, x.l) @ cls.id(x)).then(
+            cls.id(x) @ cls.cups(x.l, x))
+        return cls.Equation(snake_r, cls.id(x), snake_l)
 
-class PivotalCategory[C0, C1](RigidCategory[C0, C1], TracedCategory[C0, C1]):
+    @axiom
+    def caps_coherence[M: Atom[C0], N: Atom[C0], X: Ob[C0], Y: Ob[C0]](
+            cls, x: Ob[C0, Tensor[M, X]],
+            y: Ob[C0, Tensor[N, Y]]) -> Equation[Hom[
+                C1, Unit[C0], Tensor[M, X, N, Y, L[Tensor[M, X, N, Y]]]]]:
+        """ Monoidal coherence of caps. """
+        return cls.Equation(
+            cls.caps(x @ y, (x @ y).l),
+            cls.caps(x, x.l).then(x @ cls.caps(y, y.l) @ x.l))
+
+    @axiom
+    def rotate_contravariance[A: Ob[C0], B: Ob[C0], C: Ob[C0]](
+            cls, f: Hom[C1, A, B],
+            g: Hom[C1, B, C]) -> Equation[Hom[C1, R[C], R[A]]]:
+        """ Rotation reverses composition. """
+        return cls.Equation(
+            f.then(g).rotate(), g.rotate().then(f.rotate()))
+
+
+class PivotalCategory[C0: Pregroup, C1: PivotalCategory](
+        RigidCategory[C0, C1], TracedCategory[C0, C1]):
     """
     A pivotal category is a :class:`RigidCategory` where the left and right
     adjoints coincide, hence it is also a :class:`TracedCategory`.
     """
 
+    @axiom
+    def self_dual[X: Ob[C0]](cls, x: Ob[C0, X]) -> Equation[Ob[C0, R[X]]]:
+        """ Equality of left and right adjoints. """
+        return cls.ob.Equation(x.r, x.l)
 
-class BraidedCategory[C0, C1](MonoidalCategory[C0, C1]):
+    @axiom
+    def pivotality[A: Ob[C0], B: Ob[C0]](
+            cls, f: Hom[C1, A, B]) -> Equation[Hom[C1, L[B], L[A]]]:
+        """ Equality of left and right transposes. """
+        dom, cod = f.dom, f.cod
+        left_transpose = (cod.l @ cls.caps(dom, dom.l)).then(
+            cod.l @ f @ dom.l).then(cls.cups(cod.l, cod) @ dom.l)
+        right_transpose = (cls.caps(dom.r, dom) @ cod.r).then(
+            dom.r @ f @ cod.r).then(dom.r @ cls.cups(cod, cod.r))
+        return cls.Equation(left_transpose, right_transpose)
+
+
+class BraidedCategory[C0: ColouredMonoid, C1: BraidedCategory](
+        MonoidalCategory[C0, C1]):
     """
     A braided category is a :class:`MonoidalCategory` with a method
     :code:`braid` for the natural isomorphism :code:`x @ y -> y @ x`.
     """
     @classmethod
+    @rule
     @abstractmethod
-    def braid(cls, left: C0, right: C0) -> C1:
+    def braid[X: Atom[C0], Y: Atom[C0]](
+            cls, left: Ob[C0, X], right: Ob[C0, Y]
+    ) -> Hom[C1, Tensor[X, Y], Tensor[Y, X]]:
         """
-        The braid of two objects, to be instantiated.
+        The braid of two objects, to be instantiated: as a rule, ``x @ y
+        ⊢ y @ x`` is a braid over.
 
         Parameters:
             left : The object on the left of the braid.
             right : The object on the right of the braid.
         """
+
+    @classmethod
+    @rule
+    def braid_inverse[X: Atom[C0], Y: Atom[C0]](
+            cls, left: Ob[C0, X], right: Ob[C0, Y]
+    ) -> Hom[C1, Tensor[Y, X], Tensor[X, Y]]:
+        """
+        The inverse of the braid of two objects, crossing the other way.
+
+        Parameters:
+            left : The object on the left of the braid.
+            right : The object on the right of the braid.
+        """
+        return cls.braid(left, right).dagger()
+
+    @axiom
+    def hexagon_left[X: Atom[C0], Y: Atom[C0], Z: Atom[C0]](
+            cls, x: Ob[C0, X], y: Ob[C0, Y], z: Ob[C0, Z]
+    ) -> Equation[Hom[C1, Tensor[X, Y, Z], Tensor[Y, Z, X]]]:
+        """ The left hexagon equation. """
+        return cls.Equation(
+            cls.braid(x, y @ z),
+            (cls.braid(x, y) @ z).then(y @ cls.braid(x, z)))
+
+    @axiom
+    def hexagon_right[X: Atom[C0], Y: Atom[C0], Z: Atom[C0]](
+            cls, x: Ob[C0, X], y: Ob[C0, Y], z: Ob[C0, Z]
+    ) -> Equation[Hom[C1, Tensor[X, Y, Z], Tensor[Z, X, Y]]]:
+        """ The right hexagon equation. """
+        return cls.Equation(
+            cls.braid(x @ y, z),
+            (x @ cls.braid(y, z)).then(cls.braid(x, z) @ y))
+
+    @axiom
+    def braid_naturality[A: Ob[C0], B: Ob[C0], C: Ob[C0], D: Ob[C0]](
+            cls, f: Hom[C1, A, B], g: Hom[C1, C, D]
+    ) -> Equation[Hom[C1, Tensor[A, C], Tensor[D, B]]]:
+        """ Naturality of the braid. """
+        return cls.Equation(
+            f @ g >> cls.braid(f.cod, g.cod),
+            cls.braid(f.dom, g.dom) >> g @ f)
 
 
 class PROB[C1: PROB](PRO[C1], BraidedCategory[Nat, C1]):
@@ -624,16 +1173,21 @@ class PROB[C1: PROB](PRO[C1], BraidedCategory[Nat, C1]):
     """
 
 
-class SymmetricCategory[C0, C1](BraidedCategory[C0, C1]):
+class SymmetricCategory[C0: ColouredMonoid, C1: SymmetricCategory](
+        BraidedCategory[C0, C1]):
     """
     A symmetric category is a :class:`BraidedCategory` where the braid is its
     own inverse called :code:`swap` for the symmetry :code:`x @ y -> y @ x`.
     """
     @classmethod
+    @rule
     @abstractmethod
-    def swap(cls, left: C0, right: C0) -> C1:
+    def swap[X: Atom[C0], Y: Atom[C0]](
+            cls, left: Ob[C0, X], right: Ob[C0, Y]
+    ) -> Hom[C1, Tensor[X, Y], Tensor[Y, X]]:
         """
-        The swap of two objects, to be instantiated.
+        The swap of two objects, to be instantiated: as a rule, ``x @ y ⊢
+        y @ x`` is a swap.
 
         Parameters:
             left : The object on the left of the swap.
@@ -641,7 +1195,7 @@ class SymmetricCategory[C0, C1](BraidedCategory[C0, C1]):
         """
 
     @classmethod
-    def permutation(cls, xs: Sequence[int], doms: Sequence[C0]) -> C1:
+    def permutation(cls, xs: Sequence[int], doms: Sequence[C0]) -> Self:
         """ Compose swaps to permute the atomic objects in ``dom``. """
         xs, doms = list(xs), list(doms)
         if list(range(len(doms))) != sorted(xs):
@@ -654,11 +1208,23 @@ class SymmetricCategory[C0, C1](BraidedCategory[C0, C1]):
             result >>= done @ cls.swap(left, head) @ tensor(doms[i + 1:])
             done, doms = done @ head, doms[:i] + doms[i + 1:]
             xs = [x - 1 if x > i else x for x in xs[1:]]
-        return result
+        return result  # ty: ignore[invalid-return-type]
 
     @classmethod
-    def braid(cls, left: C0, right: C0) -> C1:
+    @rule
+    def braid[X: Atom[C0], Y: Atom[C0]](
+            cls, left: Ob[C0, X], right: Ob[C0, Y]
+    ) -> Hom[C1, Tensor[X, Y], Tensor[Y, X]]:
+        """ The braid of a symmetric category is its swap. """
         return cls.swap(left, right)
+
+    @axiom
+    def swap_inverse[X: Ob[C0], Y: Ob[C0]](
+            cls, x: Ob[C0, X], y: Ob[C0, Y]
+    ) -> Equation[Hom[C1, Tensor[X, Y], Tensor[X, Y]]]:
+        """ Involutivity of the swap. """
+        return cls.Equation(
+            cls.swap(x, y).then(cls.swap(y, x)), cls.id(x @ y))
 
 
 class PROP[C1: PROP](PROB[C1], SymmetricCategory[Nat, C1]):
@@ -668,37 +1234,124 @@ class PROP[C1: PROP](PROB[C1], SymmetricCategory[Nat, C1]):
     """
 
 
-class MarkovCategory[C0, C1](SymmetricCategory[C0, C1]):
+class MarkovCategory[C0: ColouredMonoid, C1: MarkovCategory](
+        SymmetricCategory[C0, C1]):
     """
     A Markov category is a :class:`SymmetricCategory` with methods
     :code:`copy` and :code:`merge` for the supply of commutative comonoids.
     """
     @classmethod
+    @rule
     @abstractmethod
-    def copy(cls, x: C0, n: int = 2) -> C1:
+    def copy[X: Atom[C0], N: Count](
+            cls, x: Ob[C0, X], n: Ob[int, N]
+    ) -> Hom[C1, X, Repeat[X, N]]:
         """
-        Make :code:`n` copies of a given object :code:`x`.
+        Make :code:`n` copies of a given object :code:`x`: as a rule,
+        ``x ⊢ x @ .. @ x`` is a copy, none or up to three drawn.
 
         Parameters:
             x : The object to copy.
-            n : The number of copies.
+            n : The number of copies, two by default in implementations.
         """
 
+    @classmethod
+    @rule
+    def merge[X: Atom[C0], N: Count](
+            cls, x: Ob[C0, X], n: Ob[int, N]
+    ) -> Hom[C1, Repeat[X, N], X]:
+        """
+        Merge :code:`n` copies of a given object :code:`x`, the dagger of
+        :meth:`copy`.
 
-class ClosedCategory[C0, C1](BiclosedCategory[C0, C1], MarkovCategory[C0, C1]):
+        Parameters:
+            x : The object to merge.
+            n : The number of copies, two by default in implementations.
+        """
+        return cls.copy(x, n).dagger()
+
+    @axiom
+    def copy_counitality[X: Ob[C0]](
+            cls, x: Ob[C0, X]) -> Equation[Hom[C1, X, X]]:
+        """ Counitality of copying. """
+        copy, discard = cls.copy(x, n=2), cls.copy(x, n=0)
+        return cls.Equation(
+            copy.then(discard @ x), cls.id(x),
+            copy.then(x @ discard))
+
+    @axiom
+    def copy_coassociativity[X: Ob[C0]](
+            cls, x: Ob[C0, X]) -> Equation[Hom[C1, X, Tensor[X, X, X]]]:
+        """ Coassociativity of copying. """
+        copy = cls.copy(x, n=2)
+        return cls.Equation(
+            copy.then(copy @ x), copy.then(x @ copy))
+
+    @axiom
+    def copy_cocommutativity[X: Ob[C0]](
+            cls, x: Ob[C0, X]) -> Equation[Hom[C1, X, Tensor[X, X]]]:
+        """ Cocommutativity of copying. """
+        copy = cls.copy(x, n=2)
+        return cls.Equation(copy.then(cls.swap(x, x)), copy)
+
+    @axiom
+    def discard_coherence[X: Ob[C0]](
+            cls, x: Ob[C0, X]
+    ) -> Equation[Hom[C1, Tensor[X, X], Unit[C0]]]:
+        """ Monoidal coherence of discarding. """
+        return cls.Equation(
+            cls.copy(x @ x, n=0),
+            cls.copy(x, n=0) @ cls.copy(x, n=0))
+
+    @axiom
+    def copy_monoidal_coherence[X: Ob[C0]](
+            cls, x: Ob[C0, X]
+    ) -> Equation[Hom[C1, Tensor[X, X], Tensor[X, X, X, X]]]:
+        """ Monoidal coherence of copying. """
+        return cls.Equation(
+            cls.copy(x @ x, n=2),
+            (cls.copy(x, n=2) @ cls.copy(x, n=2)).then(
+                x @ cls.swap(x, x) @ x))
+
+
+class ClosedCategory[C0: ResiduatedMonoid, C1: ClosedCategory](
+        BiclosedCategory[C0, C1], MarkovCategory[C0, C1]):
     """
     A closed category is a symmetric :class:`BiclosedCategory`. We also assume
     it comes with copy and discard so it is also a :class:`MarkovCategory`.
     """
 
 
-class FeedbackCategory[C0, C1](MarkovCategory[C0, C1]):
+class DelayedMonoid[C0, C1: DelayedMonoid](ColouredMonoid[C0, C1]):
     """
-    A feedback category is a :class:`MarkovCategory` with a :code:`delay`
-    endofunctor and a :code:`feedback` operator.
+    A delayed monoid is a coloured monoid with a :meth:`delay` endomorphism,
+    the objects of a :class:`FeedbackCategory`: the memory it feeds back
+    is one time step later on the way in, shortened to :attr:`d`.
     """
     @abstractmethod
-    def delay(self, n_steps: int = 1) -> C1:
+    def delay(self, n_steps: int = 1) -> Self:
+        """
+        The delay of an object by some time steps, to be instantiated.
+
+        Parameters:
+            n_steps : The number of time steps to delay.
+        """
+
+    @property
+    def d[X: Ob[C1]](self: Ob[C1, X]) -> Ob[C1, D[X]]:
+        """ Syntactic sugar for :meth:`delay` by one time step. """
+        return self.delay()
+
+
+class FeedbackCategory[C0: DelayedMonoid, C1: FeedbackCategory](
+        MarkovCategory[C0, C1]):
+    """
+    A feedback category is a :class:`MarkovCategory` whose objects are a
+    :class:`DelayedMonoid`, with a :code:`delay` endofunctor and a
+    :code:`feedback` operator.
+    """
+    @abstractmethod
+    def delay(self, n_steps: int = 1) -> Self:
         """
         The delay endofunctor applied to a morphism.
 
@@ -706,19 +1359,91 @@ class FeedbackCategory[C0, C1](MarkovCategory[C0, C1]):
             n_steps : The number of time steps to delay.
         """
 
+    @rule
     @abstractmethod
-    def feedback(self, dom: C0, cod: C0, mem: C0) -> C1:
+    def feedback_left[A: Ob[C0], B: Ob[C0], M: Atom[C0]](
+            self: Hom[C1, Tensor[D[M], A], Tensor[M, B]],
+            dom: C0 | None = None, cod: C0 | None = None,
+            mem: C0 | None = None) -> Hom[C1, A, B]:
         """
-        The feedback operator on a morphism.
+        The feedback of the memory on the left, to be instantiated: as a
+        rule, one wire of memory.
 
         Parameters:
             dom : The domain of the feedback.
             cod : The codomain of the feedback.
-            mem : The memory type to trace over.
+            mem : The memory type to feed back.
         """
 
+    @rule
+    @abstractmethod
+    def feedback_right[A: Ob[C0], B: Ob[C0], M: Atom[C0]](
+            self: Hom[C1, Tensor[A, D[M]], Tensor[B, M]],
+            dom: C0 | None = None, cod: C0 | None = None,
+            mem: C0 | None = None) -> Hom[C1, A, B]:
+        """
+        The feedback of the memory on the right, to be instantiated: as a
+        rule, one wire of memory.
 
-class BalancedCategory[C0, C1](
+        Parameters:
+            dom : The domain of the feedback.
+            cod : The codomain of the feedback.
+            mem : The memory type to feed back.
+        """
+
+    @overload
+    def feedback[A: Ob[C0], B: Ob[C0], M: Atom[C0]](
+            self: Hom[C1, Tensor[A, D[M]], Tensor[B, M]],
+            dom: C0 | None = ..., cod: C0 | None = ...,
+            mem: C0 | None = ...,
+            left: Literal[False] = ...) -> Hom[C1, A, B]: ...
+
+    @overload
+    def feedback[A: Ob[C0], B: Ob[C0], M: Atom[C0]](
+            self: Hom[C1, Tensor[D[M], A], Tensor[M, B]],
+            dom: C0 | None = ..., cod: C0 | None = ...,
+            mem: C0 | None = ...,
+            left: Literal[True] = ...) -> Hom[C1, A, B]: ...
+
+    def feedback(self, dom=None, cod=None, mem=None, left=False):
+        """
+        The feedback operator on either side, :meth:`feedback_left` or
+        :meth:`feedback_right`, whose sequents the two overloads restate.
+
+        Parameters:
+            dom : The domain of the feedback.
+            cod : The codomain of the feedback.
+            mem : The memory type to feed back.
+            left : Whether the memory is on the left or right.
+        """
+        side = self.feedback_left if left else self.feedback_right
+        return side(dom, cod, mem)
+
+    @axiom
+    def feedback_vanishing[A: Ob[C0], B: Ob[C0]](
+            cls, f: Hom[C1, A, B]) -> Equation[Hom[C1, A, B]]:
+        """ Vanishing of feedback over the unit. """
+        return cls.Equation(f.feedback(mem=cls.ob()), f)
+
+    @axiom
+    def feedback_joining[X: Ob[C0], M: Atom[C0], N: Atom[C0]](
+            cls, f: Hom[C1, Tensor[X, D[Tensor[M, N]]], Tensor[X, M, N]]
+    ) -> Equation[Hom[C1, X, X]]:
+        """ Joining nested feedback loops. """
+        return cls.Equation(
+            f.feedback(mem=f.cod[-2:]), f.feedback().feedback())
+
+    dagger_involution = DaggerCategory.dagger_involution.inapplicable(
+        "The delay of a feedback category is not reversible.")
+
+    dagger_contravariance = DaggerCategory.dagger_contravariance\
+        .inapplicable("The delay of a feedback category is not reversible.")
+
+    dagger_monoidality = MonoidalCategory.dagger_monoidality.inapplicable(
+        "The delay of a feedback category is not reversible.")
+
+
+class BalancedCategory[C0: ColouredMonoid, C1: BalancedCategory](
         BraidedCategory[C0, C1], TracedCategory[C0, C1]):
     """
     A balanced category is a :class:`BraidedCategory` and a
@@ -726,37 +1451,79 @@ class BalancedCategory[C0, C1](
     automorphism :code:`x -> x`.
     """
     @classmethod
+    @rule
     @abstractmethod
-    def twist(cls, dom: C0) -> C1:
+    def twist[X: Atom[C0]](cls, dom: Ob[C0, X]) -> Hom[C1, X, X]:
         """
-        The twist on an object, to be instantiated.
+        The twist on an object, to be instantiated. As a rule, ``x ⊢ x``
+        is a twist.
 
         Parameters:
             dom : The object on which to take the twist.
         """
 
+    @axiom
+    def balanced_twist[X: Atom[C0], Y: Atom[C0]](
+            cls, x: Ob[C0, X], y: Ob[C0, Y]
+    ) -> Equation[Hom[C1, Tensor[X, Y], Tensor[X, Y]]]:
+        """ Compatibility of the twist and braid. """
+        return cls.Equation(
+            cls.twist(x @ y),
+            cls.braid(x, y).then(
+                cls.twist(y) @ cls.twist(x)).then(
+                    cls.braid(y, x)))
 
-class RibbonCategory[C0, C1](
+
+class RibbonCategory[C0: Pregroup, C1: RibbonCategory](
         PivotalCategory[C0, C1], BalancedCategory[C0, C1]):
     """
     A ribbon category is a :class:`PivotalCategory` which is also a
     :class:`BalancedCategory`, i.e. where diagrams can draw knots and links.
     """
 
+    @axiom
+    def twist_as_trace[X: Atom[C0]](
+            cls, x: Ob[C0, X]) -> Equation[Hom[C1, X, X]]:
+        """ The twist as both orientations of a traced braid. """
+        braid = cls.braid(x, x)
+        return cls.Equation(
+            braid.trace(left=True), cls.twist(x), braid.trace())
 
-class CompactCategory[C0, C1](
+
+class CompactCategory[C0: Pregroup, C1: CompactCategory](
         RibbonCategory[C0, C1], SymmetricCategory[C0, C1]):
     """
     A compact category is a :class:`RibbonCategory` which is also a
     :class:`SymmetricCategory`, i.e. with cups, caps and swaps and where
     the twist is the identity.
     """
-    @classmethod
-    def twist(cls, dom: C0) -> C1:
+    def twist[X: Atom[C0]](cls, dom: Ob[C0, X]) -> Hom[C1, X, X]:
+        """ The twist of a compact category is the identity. """
         return cls.id(dom)
 
+    twist = classmethod(  # ty: ignore[invalid-assignment]
+        rule(twist).inapplicable("The twist is the identity."))
 
-class HypergraphCategory[C0, C1](
+    @axiom
+    def reidemeister_1_cap[X: Ob[C0]](
+            cls, x: Ob[C0, X]
+    ) -> Equation[Hom[C1, Unit[C0], Tensor[R[X], X]]]:
+        """ Reidemeister move 1 for caps. """
+        return cls.Equation(
+            cls.caps(x, x.r).then(cls.swap(x, x.r)),
+            cls.caps(x.r, x))
+
+    @axiom
+    def reidemeister_1_cup[X: Ob[C0]](
+            cls, x: Ob[C0, X]
+    ) -> Equation[Hom[C1, Tensor[X, R[X]], Unit[C0]]]:
+        """ Reidemeister move 1 for cups. """
+        return cls.Equation(
+            cls.swap(x, x.r).then(cls.cups(x.r, x)),
+            cls.cups(x, x.r))
+
+
+class HypergraphCategory[C0: Pregroup, C1: HypergraphCategory](
         CompactCategory[C0, C1], MarkovCategory[C0, C1]):
     """
     A hypergraph category is a symmetric category with a supply of spiders,
@@ -765,10 +1532,16 @@ class HypergraphCategory[C0, C1](
     This makes it both a :class:`CompactCategory` and a :class:`MarkovCategory`
     """
     @classmethod
+    @rule
     @abstractmethod
-    def spiders(cls, n_legs_in: int, n_legs_out: int, typ: C0) -> C1:
+    def spiders[X: Atom[C0], M: Count, N: Count](
+            cls, n_legs_in: Ob[int, M],
+            n_legs_out: Ob[int, N],
+            typ: Ob[C0, X]) -> Hom[C1, Repeat[X, M], Repeat[X, N]]:
         """
-        The spiders on a given type with ``n_legs_in`` and ``n_legs_out``.
+        The spiders on a given type with ``n_legs_in`` and ``n_legs_out``:
+        as a rule, ``x @ .. @ x ⊢ x @ .. @ x`` is a spider, on up to three
+        legs a side drawn.
 
         Parameters:
             n_legs_in : The number of legs in for each spider.

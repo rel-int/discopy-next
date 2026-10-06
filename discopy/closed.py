@@ -58,6 +58,10 @@ from dataclasses import dataclass
 from typing import ClassVar, Dict
 
 from discopy import cat, monoidal, biclosed, markov, cmap, hypergraph
+from typing import Annotated
+
+from discopy.axioms import Atom, Hom, Ob
+from discopy.search import rule
 from discopy.abc import ClosedCategory
 from discopy.cat import factory, Generator
 
@@ -80,7 +84,7 @@ class Ty(biclosed.Ty):
         :align: center
     """
     Over = Under = Generator.alias("Exp")
-    Exp: ClassVar[Generator[..., "Exp"]]
+    Exp: ClassVar[Generator]
 
 
 Wire = Ty.Wire
@@ -104,18 +108,46 @@ class Diagram(markov.Diagram, biclosed.Diagram, ClosedCategory):
     A diagram applied to another post-composes their tensor with an `Eval`.
     """
     ob = Ty
-    Eval: ClassVar[Generator[..., "Eval"]]
-    Functor: ClassVar[Generator[..., "Functor"]]
-    TermBase: ClassVar[Generator[..., "TermBase"]]
-    Constant: ClassVar[Generator[..., "Constant"]]
-    Variable: ClassVar[Generator[..., "Variable"]]
-    Application: ClassVar[Generator[..., "Application"]]
-    Abstraction: ClassVar[Generator[..., "Abstraction"]]
+    #: :class:`markov.Diagram` re-enables the law that :mod:`biclosed`
+    #: declares inapplicable, so a closed diagram declares it again.
+    dagger_monoidality = biclosed.Diagram.dagger_monoidality
+
+    staircase_encoding = monoidal.Diagram.staircase_encoding.failing(
+        "The staircase encoding decomposes the permutations inside a "
+        "curry bubble into swaps, which the hypergraph of a bubble "
+        "compares syntactically.")
+
+    map_retract = markov.Diagram.map_retract.failing(
+        "Decoding re-whiskers the inside of a curry bubble, which the "
+        "hypergraph of a bubble compares syntactically.")
+    Eval: ClassVar[Generator]
+    Functor: ClassVar[Generator]
+    TermBase: ClassVar[Generator]
+    Constant: ClassVar[Generator]
+    Variable: ClassVar[Generator]
+    Application: ClassVar[Generator]
+    Abstraction: ClassVar[Generator]
 
     @property
     def is_linear(self):
         """ Whether the diagram has no copy or discard. """
         return not any(isinstance(box, markov.Copy) for box in self.boxes)
+
+    @classmethod
+    @rule
+    def ev_left[Y: Atom, E: Atom](
+            cls, base: Annotated[Ty, Ob(Y)], exponent: Annotated[Ty, Ob(E)]
+    ) -> Annotated[Diagram, Hom((Ob(Y) << Ob(E)) @ Ob(E), Y)]:
+        """ The left evaluation, see :meth:`ev`. """
+        return cls.ev(base, exponent, left=True)
+
+    @classmethod
+    @rule
+    def ev_right[Y: Atom, E: Atom](
+            cls, base: Annotated[Ty, Ob(Y)], exponent: Annotated[Ty, Ob(E)]
+    ) -> Annotated[Diagram, Hom(Ob(E) @ (Ob(E) >> Ob(Y)), Y)]:
+        """ The right evaluation, see :meth:`ev`. """
+        return cls.ev(base, exponent, left=False)
 
     @classmethod
     def ev(cls, base: Ty, exponent: Ty, left: bool = True):
@@ -202,13 +234,13 @@ Id = Diagram.id
 
 
 @Diagram.generator
-class TermBase(Box, biclosed.TermBase):
+class TermBase(Box, biclosed.TermBase):  # ty: ignore[inconsistent-mro]
     """
     A term in the internal language of a closed category.
     """
     functor = Functor.id(Diagram)
 
-    def __call__(self, other):
+    def __call__(self: Term, other: Term) -> Application:
         return Application(self, other, left=False)
 
 
@@ -239,6 +271,10 @@ class Variable(TermBase, biclosed.Variable):
 
 @Diagram.generator
 class Application(TermBase, biclosed.Application):
+    func: Term
+    args: Term
+    freevars: list[Variable]
+
     def __check_dom__(self, func, args, left):
         self.overlap = set(func.freevars).intersection(args.freevars)
         self.freevars = list(dict.fromkeys(func.freevars + args.freevars))
@@ -262,6 +298,9 @@ class Application(TermBase, biclosed.Application):
 
 @Diagram.generator
 class Abstraction(TermBase, biclosed.Abstraction):
+    var: Variable
+    body: Term
+
     def __check_dom__(self):
         self.freevars = [x for x in self.body.freevars if x != self.var]
         return self.ob().tensor(*[x.cod for x in self.freevars])
@@ -307,6 +346,7 @@ class Substitution:
             other = Substitution(
                 {k: v for k, v in self.inside.items() if k != term.var})
             return other(term)
+        return term
 
 
 Ty.Variable, Ty.Constant = (

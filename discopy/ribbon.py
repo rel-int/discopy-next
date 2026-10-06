@@ -83,6 +83,9 @@ from typing import ClassVar
 
 from discopy import pivotal, balanced
 from discopy.abc import RibbonCategory
+from typing import Annotated
+
+from discopy.axioms import Atom, Hom, rule, Serialisable
 from discopy.cat import factory, Generator
 from discopy.pivotal import Ty, Nat  # noqa: F401
 
@@ -97,9 +100,25 @@ class Diagram(pivotal.Diagram, balanced.Diagram, RibbonCategory):
         dom (pivotal.Ty) : The domain of the diagram, i.e. its input.
         cod (pivotal.Ty) : The codomain of the diagram, i.e. its output.
     """
-    Braid: ClassVar[Generator[..., "Braid"]]
-    Twist: ClassVar[Generator[..., "Twist"]]
-    Functor: ClassVar[Generator[..., "Functor"]]
+    Braid: ClassVar[Generator]
+    Twist: ClassVar[Generator]
+    Functor: ClassVar[Generator]
+    serialisation = Serialisable.serialisation.failing(
+        "The generic tree of a twist does not read back (#742).")
+
+    @rule
+    def trace_left[A, B, M: Atom](
+            self: Annotated[Diagram, Hom([M, A], [M, B])], n=1
+    ) -> Annotated[Diagram, Hom(A, B)]:
+        """ The trace of ``n`` wires on the left, see :meth:`trace`. """
+        return self.trace(n, left=True)
+
+    @rule
+    def trace_right[A, B, M: Atom](
+            self: Annotated[Diagram, Hom([A, M], [B, M])], n=1
+    ) -> Annotated[Diagram, Hom(A, B)]:
+        """ The trace of ``n`` wires on the right, see :meth:`trace`. """
+        return self.trace(n)
 
     def trace(self, n=1, left=False):
         """
@@ -136,7 +155,7 @@ class Diagram(pivotal.Diagram, balanced.Diagram, RibbonCategory):
         cup = self.Cup(self.cod[y - 1], self.cod[y])
         return self >> self.cod[:y - 1] @ cup @ self.cod[y + 1:]
 
-    def to_ribbons(self, width: float = None, colour="gray"):
+    def to_ribbons(self, width: float | None = None, colour="gray"):
         """
         Doubles every object and sends the twist to the braid, folding cups
         and caps into a single box.
@@ -160,6 +179,9 @@ class Diagram(pivotal.Diagram, balanced.Diagram, RibbonCategory):
         """
         return self.to_braided(width, colour)
 
+    twist_as_trace = RibbonCategory.twist_as_trace.failing(
+        "The traced braid does not reduce to the twist.")
+
 
 Box, Cup, Cap = (
     Diagram.Box, Diagram.Cup, Diagram.Cap)
@@ -178,8 +200,7 @@ class Braid(balanced.Braid, Box):
 
     def rotate(self, left=False):
         del left
-        braid = type(self)(*self.cod.r)
-        return braid.dagger() if self.is_dagger else braid
+        return type(self)(self.left.r, self.right.r, self.is_dagger)
 
 
 class DualRailBraid(balanced.DualRailBraid, Box):

@@ -9,6 +9,55 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Added
 
+- Every law is an `Axiom` and every operation a `Rule`, both stated
+  once on the abstract base classes of `discopy.abc` as the typed
+  signatures the pattern language reads, and inherited by every
+  category below: `then` reads `def then[A: Ob[C0], B: Ob[C0], C:
+  Ob[C0]](self: Hom[C1, A, B], other: Hom[C1, B, C]) -> Hom[C1, A,
+  C]`, a trace takes `Hom[C1, Tensor[M, A], Tensor[M, B]]`, the cups
+  take `right: Ob[C0, R[X]]`, and `discopy.abc` is written wholly in
+  these brackets, every return fully typed — an axiom concludes
+  `Equation[Hom[C1, A, B]]`, an object equation `Equation[Ob[C0,
+  Tensor[A, C]]]`, and `test/axioms.py` checks every `Equation`
+  subscript against the canonical equation it types. A helper taking
+  `left` states each side as an `@overload` whose `left:
+  Literal[True]`/`Literal[False]` links the branch to the argument,
+  checked against the sides' sequents, and what an n-ary monoid
+  operation cannot pattern-type lands in `Self`. An implementation
+  overriding a rule wraps itself in `@rule` and states its full
+  sequent; `declarations` is ordinary attribute lookup, the latest
+  rule in the method resolution order winning, and a mark lives on
+  the class where it must win. `.failing` and `.inapplicable`
+  classify a law as broken or not applicable, `.modulo` compares up
+  to a function and `.weaken` quantifies over a named subspace;
+  `Axiom.canonical` is the law as a schema and `Axiom.draw` draws
+  it.
+- `axioms.Serialisable`, the serialisation interface of DisCoPy, one
+  hook driving all three mechanisms: `serialised_attrs` names the
+  attributes that are also keyword arguments of `__init__`, from
+  which follow generic inverse `to_tree` and `from_tree`, a generic
+  `__repr__` such that `eval(repr(x)) == x`, and `__setstate__` for
+  the pickle protocol. Each mechanism comes with the law that it is
+  a roundtrip — `repr_transparency`, `pickling`, `copying` and
+  `serialisation` — stated as axioms like any other: both `Category`
+  and `Serialisable` subclass `axioms.Testable`, which carries the
+  `axioms` classproperty they share, so a type stating the
+  roundtrips without being a category is enrolled like the rest. A
+  class enrols itself by implementing `strategy`, and one that would
+  inherit a strategy for the wrong terms declares `strategy =
+  no_strategy` until it implements its own.
+- The conversion, rewriting and drawing laws of the free diagram
+  categories, stated as axioms on the classes introducing the
+  methods: the hypergraph and map sections and retracts, the
+  staircase encoding, the idempotence and soundness of `normal_form`
+  and `foliation`, `drawing_identity` and the rendering determinism
+  of both backends, together with `cat.Equivalence`, a functor with
+  an inverse, and the equivalences each level builds from its
+  conversion methods. The classifications live on the levels where
+  the laws break, verified against observed failures, and re-enabled
+  where the hierarchy's diamonds would otherwise skip a level that
+  passes.
+
 - `discopy.pattern`, the language in which a category will state its
   structure: patterns for the objects of a category with variables to
   instantiate, and their collection into sequents. A sequent is the
@@ -590,6 +639,19 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   ([#566](https://github.com/discopy/discopy/pull/566)).
 
 ### Removed
+
+- Backward compatibility with past DisCoPy versions: the deprecation
+  machinery, the `__setstate__` methods migrating attribute names
+  out of old pickles, the `from_tree` branches reading outdated
+  dumps and the cross-version pickle fixtures that exercised them.
+  What the current version writes reads back, which the `pickling`,
+  `copying` and `serialisation` axioms state; what a past version
+  wrote does not.
+- The unit tests the axioms state generically: the per-type repr,
+  equality, hash, pickle and tree roundtrips of enrolled types and
+  the law restatements on hand-picked examples — the unit suite
+  keeps to what the laws cannot state: behaviours, error cases,
+  exact encodings and recorded regressions.
 
 - `cat.Bubble.dagger`: a bubble's dagger was inherited from `Box.dagger`,
   which reconstructs with `type(self)(name, cod, dom, ...)` — positional

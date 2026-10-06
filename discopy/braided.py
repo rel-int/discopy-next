@@ -57,16 +57,19 @@ The hexagon equations hold on the nose.
     :align: center
 """
 
-from typing import ClassVar
+from typing import Any, ClassVar, Self
 
 from collections.abc import Callable
 
 from discopy import monoidal
 from discopy.abc import BraidedCategory
+from typing import Annotated
+
+from discopy.axioms import Atom, axiom, Equation, Hom, Ob, rule
 from discopy.cat import factory, Generator
 from discopy.monoidal import Ty, Match
 from discopy.utils import (
-    assert_isatomic, BinaryBoxConstructor, deprecated_alias, factory_name)
+    assert_isatomic, BinaryBoxConstructor, factory_name)
 
 
 class Wire(monoidal.Wire):
@@ -90,11 +93,15 @@ class Diagram(monoidal.Diagram, BraidedCategory):
         dom (monoidal.Ty) : The domain of the diagram, i.e. its input.
         cod (monoidal.Ty) : The codomain of the diagram, i.e. its output.
     """
-    Braid: ClassVar[Generator[..., "Braid"]]
-    Functor: ClassVar[Generator[..., "Functor"]]
+    Braid: ClassVar[Generator]
+    Functor: ClassVar[Generator]
 
     @classmethod
-    def braid(cls, left: monoidal.Ty, right: monoidal.Ty) -> Diagram:
+    @rule
+    def braid[X: Atom, Y: Atom](
+            cls, left: Annotated[monoidal.Ty, Ob(X)],
+            right: Annotated[monoidal.Ty, Ob(Y)]
+    ) -> Annotated[Self, Hom([X, Y], [Y, X])]:
         """
         The diagram braiding :code:`left` over :code:`right`.
 
@@ -119,7 +126,8 @@ class Diagram(monoidal.Diagram, BraidedCategory):
                     inside, self.dom, self.cod, _scan=False).simplify()
         return self
 
-    def naturality(self, i: int, left=True, down=True, braid=None) -> Diagram:
+    def naturality(self, i: int, left=True, down=True,
+                   braid=None) -> Diagram:
         """
         Slide a box through a braid.
 
@@ -160,7 +168,15 @@ class Diagram(monoidal.Diagram, BraidedCategory):
                       below=self[i + len(source):] if down else self[i + 1:],
                       left=left_wires[:-1] if left else left_wires,
                       right=right_wires if left else right_wires[1:])
-        return match.substitute(target)
+        return match.substitute(target)  # ty: ignore[invalid-return-type]
+
+    braid_naturality = BraidedCategory.braid_naturality.failing(
+        "A free braid does not commute past a box.")
+
+    hypergraph_section = monoidal.Diagram.hypergraph_section.failing(
+        "Decoding a hypergraph can cross wires, which needs swaps the "
+        "category does not have: a braid does not survive the symmetric "
+        "quotient.")
 
 
 Box = Diagram.Box
@@ -181,6 +197,8 @@ class Braid(BinaryBoxConstructor, Box):
     :class:`Braid` is only defined for atomic types (i.e. of length 1).
     For complex types, use :meth:`Diagram.braid` instead.
     """
+    serialised_attrs = ('left', 'right', 'is_dagger')
+
     def __init__(self, left: monoidal.Ty, right: monoidal.Ty, is_dagger=False):
         assert_isatomic(left, monoidal.Ty)
         assert_isatomic(right, monoidal.Ty)
@@ -200,7 +218,7 @@ class Braid(BinaryBoxConstructor, Box):
         return type(self)(self.right, self.left, not self.is_dagger)
 
 
-def hexagon(cls: type, factory: Callable) -> Callable[[Ty, Ty], Diagram]:
+def hexagon(cls: type[Diagram], factory: Callable) -> Callable[[Ty, Ty], Any]:
     """
     Take a ``factory`` for braids of atomic types and extend it recursively.
 
@@ -241,6 +259,18 @@ class Functor(monoidal.Functor):
     """
     dom = cod = Diagram
 
+    @axiom
+    def braided(cls) -> Equation:
+        """
+        A braided functor preserves the braid, but only up to the braid
+        relations: the braid of a composite type is a chosen sequence of
+        crossings and a functor rebrackets it. Free braided diagrams
+        compare presentations, so the law is checkable from
+        :class:`discopy.symmetric.Diagram`'s functor on, whose equations
+        hold up to hypergraph isomorphism.
+        """
+        return NotImplemented
+
     def __call__(self, other):
         if isinstance(other, Braid) and not other.is_dagger\
                 and hasattr(self.cod, "braid"):
@@ -249,6 +279,8 @@ class Functor(monoidal.Functor):
 
 
 Layer = Diagram.Layer
+
+
 Id = Diagram.id
 
 
@@ -259,4 +291,3 @@ class Equation(monoidal.Equation):
 Diagram.Equation = Equation
 
 
-__getattr__ = deprecated_alias(__name__, {"Ob": "Wire"})

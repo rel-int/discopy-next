@@ -1,4 +1,3 @@
-from __future__ import annotations
 from pytest import raises
 
 from discopy.python import Function
@@ -19,22 +18,6 @@ def test_Merge_dagger():
 def test_Discard():
     assert isinstance(Discard(Ty('x')), Discard)
     assert isinstance(Copy(Ty('x'), n=0), Discard)
-
-
-def test_equations():
-    x = Ty('x')
-    copy, discard = Copy(x), Copy(x, 0)
-    add, minus, zero = Box('+', x @ x, x), Box('-', x, x), Box('0', Ty(), x)
-
-    add >> copy, copy @ copy >> x @ Swap(x, x) @ x >> add @ add
-    add >> discard, discard @ discard
-    zero >> discard, Diagram.id(Ty())
-    copy >> minus @ x >> add, discard >> zero, copy >> x @ minus >> add
-
-    Diagram.id(x)
-    x @ zero >> x @ copy >> add @ x >> discard @ x
-    x @ zero @ zero >> discard @ discard @ x
-    discard >> zero
 
 
 def test_neural_network():

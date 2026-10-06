@@ -34,7 +34,7 @@ circuit will be exactly equivalent to those of the DisCoPy circuit
 
 If `probabilities` is set to True, the output states of the PennyLane
 circuit will be the probabilities of the output states, equivalent
-to appending :class:`discopy.quantum.circuit.Measure` to all the
+to appending :class:`discopy.quantum.gates.Measure` to all the
 open wires in the DisCoPy circuit.
 
 Once a :class:`PennyLaneCircuit` has been constructed, it

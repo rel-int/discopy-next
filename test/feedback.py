@@ -97,3 +97,10 @@ def test_Permutation_delay():
     assert perm.delay(2) == perm.delay().delay()
     assert (perm >> Swap(z, x) @ y).delay()\
         == perm.delay() >> Swap(z, x).delay() @ y.delay()
+
+
+def test_discard_is_a_feedback_diagram():
+    x = Ty('x')
+    discard = Diagram.copy(x, n=0)
+    assert isinstance(discard, Diagram) and isinstance(discard, Discard)
+    assert (discard >> Diagram.id(Ty())).boxes == [discard]

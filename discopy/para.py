@@ -142,8 +142,12 @@ Parametric maps compose like layers of a neural network, e.g. over
 """
 
 from dataclasses import dataclass
+from typing import Annotated, Self
 
-from discopy import symmetric, markov, closed, feedback, compact, frobenius
+from discopy.pattern import Atom, Count, Hom, Ob, UNIT
+from discopy.search import rule
+from discopy import (
+    monoidal, symmetric, markov, closed, feedback, compact, frobenius)
 from discopy.abc import (
     ClosedCategory, CompactCategory, FeedbackCategory, HypergraphCategory,
     MarkovCategory, NamedGeneric, SymmetricCategory, TracedCategory)
@@ -152,7 +156,7 @@ from discopy.utils import (
 
 
 @dataclass
-class Symmetric(SymmetricCategory, NamedGeneric['category']):
+class Symmetric[category: symmetric.Diagram](SymmetricCategory, NamedGeneric):
     """
     A parametric map from `dom` to `cod` with parameter space `param` is a
     morphism `inside : dom @ param -> cod` in an underlying `category`,
@@ -178,14 +182,13 @@ class Symmetric(SymmetricCategory, NamedGeneric['category']):
             reparam
             recopar
     """
-    category = symmetric.Diagram
     ob = classproperty(lambda cls: cls.category.ob)
 
-    dom: ob
-    cod: ob
+    dom: monoidal.Ty
+    cod: monoidal.Ty
     inside: category
-    param: ob = None
-    copar: ob = None
+    param: monoidal.Ty = None  # ty: ignore[invalid-assignment]
+    copar: monoidal.Ty = None  # ty: ignore[invalid-assignment]
 
     def __post_init__(self):
         if self.param is None:
@@ -201,7 +204,7 @@ class Symmetric(SymmetricCategory, NamedGeneric['category']):
             self.inside, self.category.id(self.cod @ self.copar))
 
     @classmethod
-    def lift(cls, inside: category) -> Symmetric:
+    def lift(cls, inside: category) -> Self:
         """
         A morphism of the underlying category as a parametric map with the
         empty parameter space, i.e. the injection functor from a category
@@ -213,7 +216,9 @@ class Symmetric(SymmetricCategory, NamedGeneric['category']):
         return cls(inside.dom, inside.cod, inside)
 
     @classmethod
-    def id(cls, dom: ob = None) -> Symmetric:
+    @rule
+    def id[A](cls, dom: Annotated[monoidal.Ty | None, Ob(A)] = None
+              ) -> Annotated[Symmetric, Hom(A, A)]:
         """
         The identity parametric map on `dom`, with empty parameter space.
 
@@ -222,8 +227,12 @@ class Symmetric(SymmetricCategory, NamedGeneric['category']):
         """
         return cls.lift(cls.category.id(cls.ob() if dom is None else dom))
 
+    @rule
     @unbiased
-    def then(self, other: Symmetric) -> Symmetric:
+    def then[A, B, C](
+            self: Annotated[Symmetric, Hom(A, B)],
+            other: Annotated[Symmetric, Hom(B, C)]
+    ) -> Annotated[Symmetric, Hom(A, C)]:
         """
         Sequential composition tensors the hidden spaces on both sides,
         i.e. `(p, f) >> (q, g) == (p @ q, f @ q >> g)` for empty
@@ -243,8 +252,12 @@ class Symmetric(SymmetricCategory, NamedGeneric['category']):
                           self.param @ other.param,
                           self.copar @ other.copar)
 
+    @rule
     @unbiased
-    def tensor(self, other: Symmetric) -> Symmetric:
+    def tensor[A, B, C, D](
+            self: Annotated[Symmetric, Hom(A, B)],
+            other: Annotated[Symmetric, Hom(C, D)]
+    ) -> Annotated[Symmetric, Hom([A, C], [B, D])]:
         """
         Parallel composition tensors the hidden spaces on both sides, with
         swaps routing the parameters to the right of the domains and the
@@ -262,7 +275,11 @@ class Symmetric(SymmetricCategory, NamedGeneric['category']):
                           self.copar @ other.copar)
 
     @classmethod
-    def swap(cls, left: ob, right: ob) -> Symmetric:
+    @rule
+    def swap[X: Atom, Y: Atom](
+            cls, left: Annotated[monoidal.Ty, Ob(X)],
+            right: Annotated[monoidal.Ty, Ob(Y)]
+    ) -> Annotated[Symmetric, Hom([X, Y], [Y, X])]:
         """
         The swap of the underlying category, with empty parameter space.
 
@@ -311,11 +328,30 @@ class Symmetric(SymmetricCategory, NamedGeneric['category']):
                           self.param, other.cod)
 
 
+Symmetric.category = symmetric.Diagram
+
+
 class Traced(Symmetric, TracedCategory):
     """
     Parametric maps over a traced symmetric underlying `category` form a
     traced category, with the parameters swapped out of the way.
     """
+    @rule
+    def trace_left[A, B, M: Atom](
+            self: Annotated[
+                Traced, Hom([M, A], [M, B])],
+            n=1) -> Annotated[Traced, Hom(A, B)]:
+        """ The trace of ``n`` wires on the left, see :meth:`trace`. """
+        return self.trace(n, left=True)
+
+    @rule
+    def trace_right[A, B, M: Atom](
+            self: Annotated[
+                Traced, Hom([A, M], [B, M])],
+            n=1) -> Annotated[Traced, Hom(A, B)]:
+        """ The trace of ``n`` wires on the right, see :meth:`trace`. """
+        return self.trace(n)
+
     def trace(self, n: int = 1, left: bool = False) -> Traced:
         """
         The trace of a parametric map is the trace of the underlying
@@ -346,7 +382,11 @@ class Markov(Symmetric, MarkovCategory):
     category = markov.Diagram
 
     @classmethod
-    def copy(cls, x: Symmetric.ob, n: int = 2) -> Markov:
+    @rule
+    def copy[X: Atom, N: Count](
+            cls, x: Annotated[monoidal.Ty, Ob(X)],
+            n: Annotated[int, Ob(N)] = 2
+    ) -> Annotated[Markov, Hom(X, Ob(X) ** Ob(N))]:
         """
         The copy of the underlying category, with empty parameter space.
 
@@ -365,7 +405,25 @@ class Closed(Markov, ClosedCategory):
     category = closed.Diagram
 
     @classmethod
-    def ev(cls, base: Symmetric.ob, exponent: Symmetric.ob, left: bool = True
+    @rule
+    def ev_left[Y: Atom, E: Atom](
+            cls, base: Annotated[monoidal.Ty, Ob(Y)],
+            exponent: Annotated[monoidal.Ty, Ob(E)]
+    ) -> Annotated[Closed, Hom((Ob(Y) << Ob(E)) @ Ob(E), Y)]:
+        """ The left evaluation, see :meth:`ev`. """
+        return cls.ev(base, exponent, left=True)
+
+    @classmethod
+    @rule
+    def ev_right[Y: Atom, E: Atom](
+            cls, base: Annotated[monoidal.Ty, Ob(Y)],
+            exponent: Annotated[monoidal.Ty, Ob(E)]
+    ) -> Annotated[Closed, Hom(Ob(E) @ (Ob(E) >> Ob(Y)), Y)]:
+        """ The right evaluation, see :meth:`ev`. """
+        return cls.ev(base, exponent, left=False)
+
+    @classmethod
+    def ev(cls, base: monoidal.Ty, exponent: monoidal.Ty, left: bool = True
            ) -> Closed:
         """
         The evaluation of the underlying category, with empty parameters.
@@ -375,9 +433,24 @@ class Closed(Markov, ClosedCategory):
             exponent : The exponent of the exponential type.
             left : Whether to take the left or right evaluation.
         """
-        return cls.lift(cls.category.ev(base, exponent, left))
+        return cls.lift(cls.category.ev(
+            base, exponent, left))  # ty: ignore[invalid-argument-type]
 
-    def curry(self, n: int = 1, left: bool = False) -> Closed:
+    @rule
+    def curry_left[X, Y: Atom, Z](
+            self: Annotated[Closed, Hom([X, Y], Z)], n=1
+    ) -> Annotated[Closed, Hom(X, (Ob(Z) << Ob(Y)))]:
+        """ The left currying of ``n`` objects, see :meth:`curry`. """
+        return self.curry(n, left=True)
+
+    @rule
+    def curry_right[Y: Atom, X, Z](
+            self: Annotated[Closed, Hom([Y, X], Z)], n=1
+    ) -> Annotated[Closed, Hom(X, (Ob(Y) >> Ob(Z)))]:
+        """ The right currying of ``n`` objects, see :meth:`curry`. """
+        return self.curry(n, left=False)
+
+    def curry(self, n: int = 1, left: bool = True) -> Closed:
         """
         Curry the last `n` objects of the domain if `left` else the first,
         i.e. everything but the parameters, which a left currying swaps out
@@ -414,8 +487,32 @@ class Feedback(Markov, FeedbackCategory):
         return type(self)(*(x.delay(n_steps) for x in (
             self.dom, self.cod, self.inside, self.param, self.copar)))
 
-    def feedback(self, dom: Symmetric.ob = None, cod: Symmetric.ob = None,
-                 mem: Symmetric.ob = None) -> Feedback:
+    @rule
+    def feedback_left[A, B, M: Atom](
+            self: Annotated[
+                Feedback,
+                Hom(Ob(M).d @ Ob(A), [M, B])],
+            dom: monoidal.Ty | None = None,
+            cod: monoidal.Ty | None = None,
+            mem: monoidal.Ty | None = None) -> Annotated[Feedback, Hom(A, B)]:
+        """ A parametric feedback keeps its memory on the right. """
+        raise NotImplementedError(
+            "A parametric feedback keeps its memory on the right.")
+
+    @rule
+    def feedback_right[A, B, M: Atom](
+            self: Annotated[
+                Feedback,
+                Hom(Ob(A) @ Ob(M).d, [B, M])],
+            dom: monoidal.Ty | None = None,
+            cod: monoidal.Ty | None = None,
+            mem: monoidal.Ty | None = None) -> Annotated[Feedback, Hom(A, B)]:
+        """ The feedback of the memory on the right, see :meth:`feedback`. """
+        return self.feedback(dom, cod, mem)
+
+    def feedback(self, dom: monoidal.Ty | None = None,
+                 cod: monoidal.Ty | None = None,
+                 mem: monoidal.Ty | None = None) -> Feedback:
         """
         The feedback of the underlying category, with the parameters
         swapped out of the way the same as :meth:`Traced.trace`.
@@ -444,7 +541,11 @@ class Compact(Traced, CompactCategory):
     category = compact.Diagram
 
     @classmethod
-    def cups(cls, left: Symmetric.ob, right: Symmetric.ob) -> Compact:
+    @rule
+    def cups[X: Atom](
+            cls, left: Annotated[monoidal.Ty, Ob(X)],
+            right: Annotated[monoidal.Ty, Ob(X).r]
+    ) -> Annotated[Compact, Hom(Ob(X) @ Ob(X).r, UNIT)]:
         """
         The cups of the underlying category, with empty parameter space.
 
@@ -452,10 +553,15 @@ class Compact(Traced, CompactCategory):
             left : The left-hand side of the cups.
             right : Its adjoint, i.e. the right-hand side of the cups.
         """
-        return cls.lift(cls.category.cups(left, right))
+        return cls.lift(cls.category.cups(
+            left, right))  # ty: ignore[invalid-argument-type]
 
     @classmethod
-    def caps(cls, left: Symmetric.ob, right: Symmetric.ob) -> Compact:
+    @rule
+    def caps[X: Atom](
+            cls, left: Annotated[monoidal.Ty, Ob(X)],
+            right: Annotated[monoidal.Ty, Ob(X).l]
+    ) -> Annotated[Compact, Hom(UNIT, Ob(X) @ Ob(X).l)]:
         """
         The caps of the underlying category, with empty parameter space.
 
@@ -463,7 +569,8 @@ class Compact(Traced, CompactCategory):
             left : The left-hand side of the caps.
             right : Its adjoint, i.e. the right-hand side of the caps.
         """
-        return cls.lift(cls.category.caps(left, right))
+        return cls.lift(cls.category.caps(
+            left, right))  # ty: ignore[invalid-argument-type]
 
     ev = classmethod(Closed.ev.__func__)
     curry = Closed.curry
@@ -477,8 +584,12 @@ class Hypergraph(Compact, Markov, HypergraphCategory):
     category = frobenius.Diagram
 
     @classmethod
-    def spiders(cls, n_legs_in: int, n_legs_out: int, typ: Symmetric.ob
-                ) -> Hypergraph:
+    @rule
+    def spiders[X: Atom, M: Count, N: Count](
+            cls, n_legs_in: Annotated[int, Ob(M)],
+            n_legs_out: Annotated[int, Ob(N)],
+            typ: Annotated[monoidal.Ty, Ob(X)]
+    ) -> Annotated[Hypergraph, Hom(Ob(X) ** Ob(M), Ob(X) ** Ob(N))]:
         """
         The spiders of the underlying category, with empty parameters.
 
@@ -487,4 +598,5 @@ class Hypergraph(Compact, Markov, HypergraphCategory):
             n_legs_out : The number of legs out for each spider.
             typ : The type of the spiders.
         """
-        return cls.lift(cls.category.spiders(n_legs_in, n_legs_out, typ))
+        return cls.lift(cls.category.spiders(
+            n_legs_in, n_legs_out, typ))  # ty: ignore[invalid-argument-type]

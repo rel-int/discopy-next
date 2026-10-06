@@ -5,11 +5,12 @@ from typing import Annotated
 from pytest import raises
 
 from discopy.abc import (
-    Category, ColouredMonoid, Pregroup, ResiduatedMonoid)
+    Category, ColouredMonoid, DelayedMonoid, FeedbackCategory, Pregroup,
+    ResiduatedMonoid)
 from discopy.monoidal import Ty
 from discopy import pattern
 from discopy.pattern import (
-    UNIT, Adjoint, Atom, Count, Exp, Hom, L, Ob, Over, R, Repeat,
+    UNIT, Adjoint, Atom, Count, Delay, Exp, Hom, L, Ob, Over, R, Repeat,
     Sort, Tensor, Under, Unit, parse, sort_of)
 
 
@@ -17,6 +18,7 @@ x, y, z = map(Ty, "xyz")
 A, B = (Ob(name, Sort(bound=ColouredMonoid)) for name in "AB")
 M = Ob("M", Sort(atomic=True, bound=ColouredMonoid))
 X = Ob("X", Sort(atomic=True, bound=Pregroup))
+D = Ob("D", Sort(bound=DelayedMonoid))
 E = Ob("E", Sort(bound=ResiduatedMonoid))
 N = Ob("N", Sort("Count"))
 ONE = Unit(A.sort)
@@ -26,12 +28,13 @@ def test_operators():
     """ The operators of the objects build the compound patterns. """
     assert A @ B == Tensor(A, B) and A @ B @ M == Tensor(A, B, M)
     assert X.l == Adjoint(X, "l") and X.r == Adjoint(X, "r")
+    assert D.d == Delay(D)
     assert (E << E) == Exp("<<", E, E) and (E >> E) == Exp(">>", E, E)
     assert M ** N == Repeat(M, N)
     assert str(Hom(X @ X.r, ONE)) == "C1[X @ X.r, Unit[C0]]"
     assert str(M ** N) == "M ** N"
     assert str((X @ X).l) == "(X @ X).l"
-    assert str((E << E) @ E) == "(E << E) @ E"
+    assert str(D.d) == "D.d" and str((E << E) @ E) == "(E << E) @ E"
 
     with raises(TypeError):
         Tensor(A)
@@ -57,7 +60,7 @@ def test_formers():
     """ Subscripting a pattern class builds the pattern a bound states. """
     assert Atom["C0"] == Sort("C0", atomic=True)
     assert Unit["C0"] == UNIT and Tensor[A, B] == A @ B
-    assert L[X] == X.l and R[X] == X.r
+    assert L[X] == X.l and R[X] == X.r and pattern.D[D] == D.d
     assert Over[E, E] == (E << E) and Under[E, E] == (E >> E)
     assert Repeat[M, N] == M ** N
 
@@ -83,6 +86,41 @@ def test_alias():
         ...
     with raises(TypeError):
         parse(bare, conclusion=False)
+
+
+def test_overloads():
+    """ The overloads of a helper taking ``left`` restate the sequents of
+    its two rules, and those of ``uncurry`` state ``curry`` upside down. """
+    from typing import get_args, get_overloads
+    import inspect
+
+    from discopy.abc import BiclosedCategory, TracedCategory
+
+    def sides(helper, owner):
+        stubs = {}
+        for stub in get_overloads(helper):
+            function = getattr(stub, "__func__", stub)
+            annotation = inspect.signature(
+                function).parameters["left"].annotation
+            stubs[get_args(annotation)[0]] = parse(function, owner=owner)
+        return stubs[True], stubs[False]
+
+    for owner, helper, left_rule, right_rule in (
+            (TracedCategory, "trace", "trace_left", "trace_right"),
+            (BiclosedCategory, "ev", "ev_left", "ev_right"),
+            (BiclosedCategory, "curry", "curry_left", "curry_right"),
+            (FeedbackCategory, "feedback", "feedback_left",
+             "feedback_right")):
+        left, right = sides(getattr(owner, helper), owner)
+        assert str(left) == str(getattr(owner, left_rule).sequent)
+        assert str(right) == str(getattr(owner, right_rule).sequent)
+
+    for uncurried, rule in zip(
+            sides(BiclosedCategory.uncurry, BiclosedCategory),
+            ("curry_left", "curry_right")):
+        curried = getattr(BiclosedCategory, rule).sequent
+        assert uncurried.premises["self"] == curried.conclusion
+        assert uncurried.conclusion == curried.premises["self"]
 
 
 def test_parse():
@@ -126,17 +164,32 @@ def test_parse():
         ...
     with raises(TypeError, match="no premise states"):
         parse(unstated)
+    assert str(FeedbackCategory.feedback_right.sequent) == (
+        "A: C0, B: C0, M: Atom[C0] | self: C1[A @ M.d, B @ M] ⊢ C1[A, B]")
+    assert FeedbackCategory.feedback_left.sequent.variables["M"].bound\
+        is DelayedMonoid
 
 
 def test_level():
     """ A pattern needs the level its known objects are bounded by. """
     assert Ob.level() is Category and Tensor.level() is ColouredMonoid
-    assert Adjoint.level() is Pregroup
+    assert Adjoint.level() is Pregroup and Delay.level() is DelayedMonoid
     assert Exp.level() is ResiduatedMonoid and Unit.level() is ColouredMonoid
+    assert (X @ D).l == Adjoint(Tensor(X, D), "l")
     assert X.l.r.bound is Pregroup and Unit(X.sort).bound is Pregroup
-    with raises(TypeError, match="needs a"):
-        Adjoint(A, "r")
+    for build in (lambda: X.d, lambda: D.r, lambda: D >> D,
+                  lambda: (A @ X).d, lambda: Adjoint(A, "r")):
+        with raises(TypeError, match="needs a"):
+            build()
     unknown = Ob("U", Sort())
     assert (unknown @ A).bound is None  # Checked by parse with owner.
+
+    def snake[U: Atom](cls, u: Annotated[Ty, Ob(U)]) -> Annotated[
+            Ty, Hom(Ob(U) @ Ob(U).r, UNIT)]:
+        ...
+    from discopy.abc import MonoidalCategory, RigidCategory
+    with raises(TypeError, match="needs a"):
+        parse(snake, owner=MonoidalCategory)
+    assert parse(snake, owner=RigidCategory).conclusion is not None
     with raises(AttributeError):
         A.z

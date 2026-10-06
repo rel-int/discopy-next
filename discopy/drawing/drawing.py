@@ -196,7 +196,7 @@ Coloured regions are also checked as part of the gallery:
 """
 
 
-from typing import NamedTuple, TYPE_CHECKING, Sequence
+from typing import Annotated, Any, NamedTuple, TYPE_CHECKING, Sequence
 from dataclasses import dataclass
 
 import networkx as nx
@@ -205,6 +205,8 @@ from discopy.drawing import backend, Node, Point
 from discopy.config import BOX_DRAWING_ATTRIBUTES, TRANSPARENT
 from discopy.abc import TracedCategory
 from discopy.python import finset
+from discopy.pattern import Atom, Hom, Ob
+from discopy.search import rule
 from discopy.utils import (
     assert_isinstance, assert_iscomposable, unbiased, factory, RichDisplay)
 
@@ -330,7 +332,7 @@ class Drawing(TracedCategory, RichDisplay):
         assert self.height >= max(y for (_, y) in self.positions.values())
 
         assert set(self.positions.keys()) == set(self.nodes) == set(
-            self.dom_nodes + self.cod_nodes) + set(
+            self.dom_nodes + self.cod_nodes) | set(
                 self.box_dom_nodes + self.box_nodes + self.box_cod_nodes)
         assert all(isinstance(x, Point) for x in self.positions.values())
 
@@ -712,7 +714,9 @@ class Drawing(TracedCategory, RichDisplay):
         return result
 
     @staticmethod
-    def id(dom: "monoidal.Ty" = None, length=0) -> Drawing:
+    @rule
+    def id[A](dom: Annotated[Any | None, Ob(A)] = None, length=0
+              ) -> Annotated[Drawing, Hom(A, A)]:
         """
         Draw the identity diagram.
 
@@ -750,8 +754,13 @@ class Drawing(TracedCategory, RichDisplay):
         result.add_edges(list(zip(dom_nodes, cod_nodes)))
         return result
 
+    @rule
     @unbiased
-    def then(self, other: Drawing, draw_step_by_step=False) -> Drawing:
+    def then[A, B, C](
+            self: Annotated[Drawing, Hom(A, B)],
+            other: Annotated[Drawing, Hom(B, C)],
+            draw_step_by_step=False
+    ) -> Annotated[Drawing | list[Drawing], Hom(A, C)]:
         """
         Draw one diagram composed with another.
 
@@ -858,8 +867,12 @@ class Drawing(TracedCategory, RichDisplay):
         result.height += y
         return result
 
+    @rule
     @unbiased
-    def tensor(self, other: Drawing) -> Drawing:
+    def tensor[A, B, C, D](
+            self: Annotated[Drawing, Hom(A, B)],
+            other: Annotated[Drawing, Hom(C, D)]) -> Annotated[Drawing,
+                   Hom([A, C], [B, D])]:
         """
         Draw two diagrams side by side.
 
@@ -893,6 +906,22 @@ class Drawing(TracedCategory, RichDisplay):
             dom=self.dom @ other.dom, cod=self.cod @ other.cod, _check=False)
         result.width = x_shift + other.width
         return result
+
+    @rule
+    def trace_left[A, B, M: Atom](
+            self: Annotated[
+                Drawing, Hom([M, A], [M, B])],
+            n=1) -> Annotated[Drawing, Hom(A, B)]:
+        """ The trace of ``n`` wires on the left, see :meth:`trace`. """
+        return self.trace(n, left=True)
+
+    @rule
+    def trace_right[A, B, M: Atom](
+            self: Annotated[
+                Drawing, Hom([A, M], [B, M])],
+            n=1) -> Annotated[Drawing, Hom(A, B)]:
+        """ The trace of ``n`` wires on the right, see :meth:`trace`. """
+        return self.trace(n)
 
     def trace(self, n=1, left=False) -> Drawing:
         from discopy.monoidal import Box, Ty
@@ -1176,7 +1205,8 @@ class Drawing(TracedCategory, RichDisplay):
 
     def zero(dom, cod):
         from discopy.monoidal import Box
-        result = Box("zero", dom, cod).to_drawing()
+        result = Box(
+            "zero", dom, cod).to_drawing()  # ty: ignore[invalid-argument-type]
         result.zero_drawing = True
         return result
 

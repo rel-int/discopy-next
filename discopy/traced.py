@@ -129,6 +129,9 @@ from typing import ClassVar
 
 from discopy import monoidal, cmap, hypergraph
 from discopy.abc import TracedCategory
+from typing import Annotated
+
+from discopy.axioms import Atom, Hom, rule, Serialisable
 from discopy.cat import factory, Generator
 from discopy.monoidal import Ty  # noqa: F401
 from discopy.utils import (
@@ -136,6 +139,9 @@ from discopy.utils import (
     assert_isinstance,
     assert_istraceable,
 )
+
+
+FREE_TRACE = "A free trace is a box, not a rewrite."
 
 
 @factory
@@ -148,16 +154,22 @@ class Diagram(monoidal.Diagram, TracedCategory):
         dom (monoidal.Ty) : The domain of the diagram, i.e. its input.
         cod (monoidal.Ty) : The codomain of the diagram, i.e. its output.
     """
-    Trace: ClassVar[Generator[..., "Trace"]]
-    Functor: ClassVar[Generator[..., "Functor"]]
+    Trace: ClassVar[Generator]
+    Functor: ClassVar[Generator]
+    repr_transparency = Serialisable.repr_transparency.failing(
+        "The generic representation of a trace does not read back (#742).")
+    serialisation = Serialisable.serialisation.failing(
+        "The generic tree of a trace does not read back (#742).")
 
-    def trace(self, n=1, left=False):
+    @rule
+    def trace_left[A, B, M: Atom](
+            self: Annotated[Diagram, Hom([M, A], [M, B])], n=1
+    ) -> Annotated[Diagram, Hom(A, B)]:
         """
-        Feed ``n`` outputs back into inputs.
+        Feed ``n`` outputs on the left back into inputs.
 
         Parameters:
             n : The number of output wires to feedback into inputs.
-            left : Whether to trace the wires on the left or right.
 
         Example
         -------
@@ -172,10 +184,45 @@ class Diagram(monoidal.Diagram, TracedCategory):
         .. image:: /_static/traced/trace.svg
         """
         return self if n == 0\
-            else self.Trace(self, left).trace(n - 1, left)
+            else self.Trace(self, left=True).trace_left(n - 1)
+
+    @rule
+    def trace_right[A, B, M: Atom](
+            self: Annotated[Diagram, Hom([A, M], [B, M])], n=1
+    ) -> Annotated[Diagram, Hom(A, B)]:
+        """
+        Feed ``n`` outputs on the right back into inputs.
+
+        Parameters:
+            n : The number of output wires to feedback into inputs.
+        """
+        return self if n == 0\
+            else self.Trace(self, left=False).trace_right(n - 1)
 
     def to_drawing(self):
         return monoidal.Diagram.to_drawing(self, functor=Functor)
+
+    trace_dinaturality_left = \
+        TracedCategory.trace_dinaturality_left.inapplicable(FREE_TRACE)
+
+    trace_dinaturality_right = \
+        TracedCategory.trace_dinaturality_right.inapplicable(FREE_TRACE)
+
+    trace_naturality_left = \
+        TracedCategory.trace_naturality_left.inapplicable(FREE_TRACE)
+
+    trace_naturality_right = \
+        TracedCategory.trace_naturality_right.inapplicable(FREE_TRACE)
+
+    trace_superposing_left = \
+        TracedCategory.trace_superposing_left.inapplicable(FREE_TRACE)
+
+    trace_superposing_right = \
+        TracedCategory.trace_superposing_right.inapplicable(FREE_TRACE)
+
+    hypergraph_section = monoidal.Diagram.hypergraph_section.failing(
+        "Decoding a trace can cross wires, which needs swaps the "
+        "category does not have.")
 
 
 Box = Diagram.Box

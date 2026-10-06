@@ -1,66 +1,17 @@
 """ DisCoPy's property-testing module in action. """
 
-from __future__ import annotations
-
-from dataclasses import dataclass
-from typing import Self
+from typing import Annotated, Any, Self
 
 from hypothesis import find
-from hypothesis import strategies as st
 from hypothesis.errors import NoSuchExample
 from pytest import raises
 
-from discopy import cat
+from discopy import braided, cat, feedback, rigid
+from discopy.abc import MonoidalCategory
 from discopy.axioms import (
-    C1,
-    Axiom,
-    AxiomFailure,
-    ComposablePair,
-    ComposableTriple,
-    Equation,
-    Grid,
-    Testable,
-    assert_axioms,
-    axiom,
-    resolve,
-    substitute,
-)
+    Axiom, AxiomFailure, Equation, Hom, assert_axioms, axiom)
 from discopy.cat import Arrow, Box, Functor, Ob
-from discopy.utils import AxiomError, NamedGeneric
-
-
-@dataclass(frozen=True)
-class Endo(Testable, NamedGeneric["factory"]):
-    """ An endomorphism of the factory, the subspace a law is weakened to. """
-
-    value: C1
-
-    def __post_init__(self):
-        if self.value.dom != self.value.cod:
-            raise ValueError("Expected an endomorphism.")
-
-    @classmethod
-    def strategy(cls, **params):
-        """Generate an arrow with equal domain and codomain."""
-        return resolve(cls.factory, **params).filter(
-            lambda arrow: arrow.dom == arrow.cod).map(cls)
-
-
-class Word(str, Testable["Word"]):
-    """ A word with tensor given by concatenation, a monoid to grid. """
-
-    __matmul__ = lambda self, other: Word(str(self) + str(other))
-
-    @classmethod
-    def strategy(cls, **params):
-        """Generate a word over two letters."""
-        return st.text("ab", max_size=3).map(cls)
-
-
-class Row(Grid):
-    """ Two horizontally composable cells. """
-
-    n_rows, n_columns = 1, 2
+from discopy.monoidal import Diagram
 
 
 def test_axioms():
@@ -72,36 +23,6 @@ def test_axioms():
         dagger_involution = Arrow.dagger_involution.inapplicable("No dagger.")
 
     assert_axioms(Classified)
-
-
-def test_strategy():
-    x, y = Ob('x'), Ob('y')
-    find(Ob.strategy(), lambda ob: ob.name == "a")
-    assert find(Arrow.strategy(dom=x, cod=x), lambda _: True) == Arrow.id(x)
-    assert find(Arrow.strategy(dom=x, cod=y), lambda _: True).cod == y
-    assert find(Arrow.strategy(dom=x), lambda _: True).dom == x
-    assert find(Arrow.strategy(cod=y), lambda _: True).cod == y
-    assert find(Box.strategy(dom=x), lambda _: True).dom == x
-
-
-def test_composable_shapes():
-    x, y = Ob('x'), Ob('y')
-    f, g = Box('f', x, y), Box('g', y, x)
-    assert ComposablePair(f, g) == (f, g)
-    assert ComposableTriple(f, g, f) == (f, g, f)
-    with raises(ValueError):
-        ComposablePair(f)
-    with raises(AxiomError):
-        ComposablePair(f, f)
-    pair = find(resolve(ComposablePair[Arrow]), lambda _: True)
-    assert isinstance(pair, ComposablePair) and pair[0].cod == pair[1].dom
-    assert Row(Word("a"), Word("b")) == ("a", "b")
-    with raises(TypeError):
-        resolve(int)
-    scope = {"C1": Arrow}
-    assert substitute(int, scope) is int
-    assert substitute(ComposablePair[Arrow], scope) is ComposablePair[Arrow]
-    assert substitute(ComposablePair[C1], scope) is ComposablePair[Arrow]
 
 
 def test_axiom_binding():
@@ -118,20 +39,11 @@ def test_axiom_binding():
     assert axiom(lambda cls: NotImplemented).bind(Arrow)() is NotImplemented
     box = Box('f', Ob('x'), Ob('y'))
     assert Arrow.unitality(box)
-    broken = Arrow.unitality.weaken(f=Endo[C1]).failing("Never holds.")
-    assert broken.subspaces == {"f": Endo[C1]}
-    loop = Box('g', Ob('x'), Ob('x'))
+    broken = Arrow.unitality.weaken(max_leaves=1).failing("Never holds.")
+    assert broken.params == {"max_leaves": 1}
     with raises(AxiomFailure) as failure:
-        broken(Endo(loop))
+        broken(box)
     assert failure.value.equation
-
-
-def test_deferred_annotations():
-    """ A law compiled without deferred annotations is refused. """
-    namespace, source = {}, "def eager(cls, f: int): return NotImplemented"
-    exec(compile(source, "<eager>", "exec", dont_inherit=True), namespace)
-    with raises(TypeError, match="__future__"):
-        axiom(namespace["eager"])
 
 
 def test_inapplicable():
@@ -147,10 +59,10 @@ def test_modulo():
 
 
 def test_weaken():
-    law = Arrow.unitality.weaken(f=Endo[C1]).bind(Arrow)
-    assert law.modulo(lambda term: term).subspaces == law.subspaces
-    args = find(law.strategy(), lambda _: True)
-    assert isinstance(args[0], Endo) and law(*args)
+    law = Arrow.unitality.weaken(max_leaves=1).bind(Arrow)
+    assert law.modulo(lambda term: term).params == law.params
+    equation = find(law.strategy(), lambda _: True)
+    assert equation and all(len(term.inside) <= 1 for term in equation.terms)
 
 
 def test_self_annotation():
@@ -160,21 +72,21 @@ def test_self_annotation():
         return Equation(cls.id(f.dom) >> f, f)
 
     law = absorbing.bind(Arrow)
-    args = find(law.strategy(), lambda _: True)
-    assert isinstance(args[0], Arrow) and law(*args)
+    equation = find(law.strategy(), lambda _: True)
+    assert isinstance(equation.terms[1], Arrow) and equation
 
 
 def test_falsify():
     @axiom
-    def trivial(cls, f: C1) -> Equation:
+    def trivial[A, B](cls, f: Annotated[Any, Hom(A, B)]) -> Equation:
         """ Every arrow is an identity, which a box refutes. """
         return Equation(f, cls.id(f.dom))
 
-    counterexample, = trivial.bind(Arrow).falsify()
-    assert isinstance(counterexample, Arrow) and counterexample.inside
-    assert Arrow.unitality.failing("Never holds.").falsify()
-    with raises(NoSuchExample):
-        Arrow.associativity.falsify()
+    equation = trivial.bind(Arrow).falsify()
+    assert not equation and equation.terms[0].inside
+    for law in (Arrow.associativity, Arrow.unitality.failing("Declared.")):
+        with raises(NoSuchExample):
+            law.falsify()
 
 
 def test_axioms_of_category():
@@ -192,13 +104,66 @@ def test_axioms_of_category():
     assert "unitality" not in Hidden.axioms
 
 
-def test_Equation_of_a_category():
-    """ An axiom compares up to the equation its category binds. """
-    from discopy import symmetric
-    x, y = symmetric.Ty('x'), symmetric.Ty('y')
-    f, g = symmetric.Box('f', x, x), symmetric.Box('g', y, y)
-    left, right = f @ g.dom >> f.cod @ g, f.dom @ g >> f @ g.cod
-    assert left != right and not cat.Equation(left, right)
-    assert symmetric.Diagram.Equation(left, right)
-    assert type(symmetric.Diagram.unitality(f)) is symmetric.Equation
-    assert type(symmetric.Diagram.identity_typing(x)) is cat.Equation
+def test_axiom():
+    assert MonoidalCategory.bifunctoriality.parameters[0].name == "f"
+    assert str(MonoidalCategory.bifunctoriality.sequent).startswith(
+        "A: C0, B: C0, C: C0, D: C0, U: C0, V: C0 | f: C1[A, B]")
+    assert MonoidalCategory.tensor.sequent.conclusion is not None
+    assert Axiom.concludes is False
+    @axiom
+    def unannotated(cls, f):
+        """ An unannotated premise has no pattern. """
+    with raises(TypeError, match="states no pattern"):
+        unannotated.bind(Diagram).sequent
+
+
+def test_equation_types():
+    """ The Equation subscript of an axiom types its canonical equation. """
+    import inspect
+    from discopy import (
+        balanced, closed, compact, pivotal, ribbon, symmetric, traced)
+    from discopy.pattern import cell, expand
+    (parameter, ) = Equation.__type_params__
+    levels = (Diagram, braided.Diagram, traced.Diagram, balanced.Diagram,
+              symmetric.Diagram, closed.Diagram, rigid.Diagram,
+              pivotal.Diagram, ribbon.Diagram, compact.Diagram,
+              feedback.Diagram)
+    checked = set()
+    for category in levels:
+        for law in category.axioms.values():
+            returns = inspect.signature(law.function).return_annotation
+            pattern = expand(getattr(returns, parameter.__name__, None))
+            if pattern is None\
+                    or (equation := law.canonical()) is NotImplemented:
+                continue
+            subst = {
+                name: 2 if sort.head == "Count"
+                else cell(sort.resolve(law.scope), name)
+                for name, sort in law.sequent.variables.items()}
+            value = pattern.instantiate(subst, law.unit)
+            boundary = (lambda term: (term.dom, term.cod))\
+                if isinstance(pattern, Hom) else (lambda term: term)
+            assert all(
+                boundary(term) == value for term in equation.terms), law
+            checked.add(law.name)
+    assert len(checked) > 30
+
+
+def test_canonical():
+    equation = Diagram.bifunctoriality.canonical()
+    assert equation and str(equation.terms[0])\
+        == "f @ C >> B @ g >> h @ D >> U @ k"
+    assert str(Arrow.associativity.canonical())\
+        == "Equation(f >> g >> h, f >> g >> h)"
+    assert str(Diagram.tensor_unitality.canonical())\
+        == "Equation(Id(X @ Y), Id(X @ Y))"
+    assert Arrow.unitality.failing("Declared.").canonical()
+    assert not braided.Diagram.braid_naturality.canonical()
+    inapplicable = Arrow.unitality.inapplicable("No identities.")
+    assert inapplicable.canonical() is NotImplemented
+    with raises(TypeError, match="nothing to draw"):
+        inapplicable.draw()
+    assert str(rigid.Diagram.snake_equations.canonical().terms[1]) == "Id(X)"
+    cups = rigid.Diagram.generators["cups"].canonical()
+    assert cups == {"left": rigid.Ty('X'), "right": rigid.Ty('X').r}
+    assert feedback.Diagram.feedback_joining.canonical()

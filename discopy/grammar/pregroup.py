@@ -37,8 +37,9 @@ Summary
 from typing import ClassVar
 
 from discopy import rigid, frobenius, messages
+from discopy.axioms import no_strategy
 from discopy.cat import factory, Generator
-from discopy.utils import AxiomError, deprecated_alias
+from discopy.utils import AxiomError
 from discopy.grammar import thue
 from discopy.rigid import Wire  # noqa: F401
 
@@ -106,9 +107,14 @@ class Diagram(frobenius.Diagram):
     >>> assert F(sentence)
     """
     ob = Ty
-    Box: ClassVar[Generator[..., "Box"]]
-    Swap: ClassVar[Generator[..., "Swap"]]
-    Spider: ClassVar[Generator[..., "Spider"]]
+    Box: ClassVar[Generator]
+    Swap: ClassVar[Generator]
+    Spider: ClassVar[Generator]
+
+    trace_left = frobenius.Diagram.trace_left.inapplicable(
+        "No loop in a sentence.")
+    trace_right = frobenius.Diagram.trace_right.inapplicable(
+        "No loop in a sentence.")
 
     def normal_form(self, **params):
         """
@@ -171,6 +177,7 @@ class Box(frobenius.Box, Diagram):
     """
     A pregroup box is a frobenius box in a pregroup diagram.
     """
+    strategy = no_strategy
     rotate = rigid.Box.rotate
 
 
@@ -266,4 +273,3 @@ Layer = Diagram.Layer
 Id = Diagram.id
 
 
-__getattr__ = deprecated_alias(__name__, {"Ob": "Wire"})

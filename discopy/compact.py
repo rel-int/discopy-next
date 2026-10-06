@@ -59,9 +59,10 @@ Coherence
 from typing import ClassVar
 
 from discopy import symmetric, ribbon, rigid, cmap, hypergraph
-from discopy.abc import CompactCategory
+from discopy.abc import (
+    BiclosedCategory, CompactCategory, PivotalCategory, RibbonCategory)
+from discopy.axioms import Serialisable
 from discopy.cat import factory, Generator
-from discopy.utils import deprecated_alias
 from discopy.pivotal import Wire, Ty  # noqa: F401
 
 
@@ -79,10 +80,30 @@ class Diagram(symmetric.Diagram, ribbon.Diagram, CompactCategory):
         dom (pivotal.Ty) : The domain of the diagram, i.e. its input.
         cod (pivotal.Ty) : The codomain of the diagram, i.e. its output.
     """
+    serialisation = Serialisable.serialisation
+
+    twist = classmethod(ribbon.Diagram.twist.__func__.inapplicable(
+        "The twist is the identity."))
+
     ob = Ty
-    Layer: ClassVar[Generator[..., Layer]] = Generator.subclass(Layer)
-    Permutation: ClassVar[Generator[..., "Permutation"]]
-    Functor: ClassVar[Generator[..., "Functor"]]
+    Layer: ClassVar[Generator] = Generator.subclass(Layer)
+    Permutation: ClassVar[Generator]
+    Functor: ClassVar[Generator]
+
+    pivotality = PivotalCategory.pivotality
+
+    twist_as_trace = RibbonCategory.twist_as_trace
+
+    foliation_idempotence = ribbon.Diagram.foliation_idempotence.failing(
+        "The hypergraph decode follows the box order of its encoding, so "
+        "the foliation of a composition written backwards through a snake "
+        "keeps a cut that foliating it again straightens.")
+
+    currying_left = BiclosedCategory.currying_left.weaken(
+        boundary_connected=True)
+
+    currying_right = BiclosedCategory.currying_right.weaken(
+        boundary_connected=True)
 
 
 Box, Cup, Cap = (
@@ -148,4 +169,3 @@ class Equation(symmetric.Equation):
 Diagram.Equation = Equation
 
 
-__getattr__ = deprecated_alias(__name__, {"Ob": "Wire"})

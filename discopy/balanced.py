@@ -39,6 +39,9 @@ from dataclasses import dataclass
 
 from discopy import config, monoidal, braided, traced, cmap, hypergraph
 from discopy.abc import BalancedCategory
+from typing import Annotated
+
+from discopy.axioms import Atom, Hom, no_strategy, Ob, rule
 from discopy.cat import factory, Generator
 from discopy.monoidal import Colour, Ty  # noqa: F401
 from discopy.utils import factory_name, assert_isatomic
@@ -67,7 +70,7 @@ class Ribbon(Colour):
     >>> assert Ribbon() == Ribbon("gray", width=0.25)
     """
     name: str = "gray"
-    width: float = None
+    width: float | None = None
 
     def __post_init__(self):
         super().__post_init__()
@@ -89,8 +92,8 @@ class Ribbon(Colour):
                    width=tree['width'])
 
 
-def double_rail(
-        typ: monoidal.Ty, width: float = None, colour="gray") -> monoidal.Ty:
+def double_rail(typ: monoidal.Ty, width: float | None = None,
+                colour="gray") -> monoidal.Ty:
     """
     Doubles every object of a type into the two rails of a ribbon, i.e. two
     copies of the object with a shared :class:`Ribbon` as the colour region
@@ -131,11 +134,13 @@ class Diagram(braided.Diagram, traced.Diagram, BalancedCategory):
 
     .. _nLab: https://ncatlab.org/nlab/show/traced+monoidal+category)
     """
-    Twist: ClassVar[Generator[..., "Twist"]]
-    Functor: ClassVar[Generator[..., "Functor"]]
+    Twist: ClassVar[Generator]
+    Functor: ClassVar[Generator]
 
     @classmethod
-    def twist(cls, dom: monoidal.Ty) -> Diagram:
+    @rule
+    def twist[X: Atom](cls, dom: Annotated[monoidal.Ty, Ob(X)]
+                       ) -> Annotated[Diagram, Hom(X, X)]:
         """
         The twist on an object.
 
@@ -152,7 +157,7 @@ class Diagram(braided.Diagram, traced.Diagram, BalancedCategory):
             >> cls.twist(dom[1:]) @ cls.Twist(dom[0])\
             >> cls.braid(dom[1:], dom[0])
 
-    def to_braided(self, width: float = None, colour="gray"):
+    def to_braided(self, width: float | None = None, colour="gray"):
         """
         Doubles every object and sends the twist to the braid.
 
@@ -177,8 +182,8 @@ class Diagram(braided.Diagram, traced.Diagram, BalancedCategory):
 
         .. image:: /_static/balanced/twist_dual_rail.svg
         """
-        width = config.DRAWING_DEFAULT["ribbon_width"]\
-            if width is None else width
+        if width is None:
+            width = config.DRAWING_DEFAULT["ribbon_width"]
         return self if not width\
             else self.DualRail(width, colour)(self)
 
@@ -316,7 +321,11 @@ class DualRail(Functor):
     DualRailTwist = DualRailTwist
     DualRailBraid = DualRailBraid
 
-    def __init__(self, width: float = None, colour="gray"):
+    #: One functor rather than a category of functors: the inherited
+    #: relabelling strategy generates the wrong terms.
+    strategy = no_strategy
+
+    def __init__(self, width: float | None = None, colour="gray"):
         self.width = config.DRAWING_DEFAULT["ribbon_width"]\
             if width is None else width
         self.colour = colour

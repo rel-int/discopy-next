@@ -67,8 +67,11 @@ from collections.abc import Callable
 from discopy import (
     monoidal, rigid, markov, compact, pivotal, cmap, hypergraph)
 from discopy.abc import HypergraphCategory
+from typing import Annotated
+
+from discopy.axioms import Atom, Count, Hom, Ob, rule, Serialisable, UNIT
 from discopy.cat import factory, Generator
-from discopy.utils import assert_isatomic, deprecated_alias, factory_name
+from discopy.utils import assert_isatomic, factory_name
 
 
 class Wire(pivotal.Wire):
@@ -80,7 +83,6 @@ class Wire(pivotal.Wire):
     """
     l = r = property(lambda self: self)
 
-
 @factory
 class Ty(pivotal.Ty):
     """
@@ -89,7 +91,7 @@ class Ty(pivotal.Ty):
     Parameters:
         inside (frobenius.Wire) : The objects inside the type.
     """
-    Wire: ClassVar[Generator[..., Wire]] = Generator.subclass(Wire)
+    Wire: ClassVar[Generator] = Generator.subclass(Wire)
 
 
 @factory
@@ -124,18 +126,28 @@ class Diagram(compact.Diagram, markov.Diagram, HypergraphCategory):
         dom (Ty) : The domain of the diagram, i.e. its input.
         cod (Ty) : The codomain of the diagram, i.e. its output.
     """
+    serialisation = Serialisable.serialisation.failing(
+        "The generic tree of a spider does not read back (#742).")
+    pickling = Serialisable.pickling
 
     ob = Ty
-    Spider: ClassVar[Generator[..., "Spider"]]
-    Functor: ClassVar[Generator[..., "Functor"]]
+    Spider: ClassVar[Generator]
+    Functor: ClassVar[Generator]
 
     @classmethod
-    def caps(cls, left, right):
+    @rule
+    def caps[X: Atom](
+            cls, left: Annotated[Ty, Ob(X)], right: Annotated[Ty, Ob(X).l]
+    ) -> Annotated[Diagram, Hom(UNIT, Ob(X) @ Ob(X).l)]:
         return cls.cups(left, right).dagger()
 
     @classmethod
-    def spiders(cls, n_legs_in: int, n_legs_out: int, typ: Ty, phases=None
-                ) -> Diagram:
+    @rule
+    def spiders[X: Atom, M: Count, N: Count](
+            cls, n_legs_in: Annotated[int, Ob(M)],
+            n_legs_out: Annotated[int, Ob(N)],
+            typ: Annotated[Ty, Ob(X)], phases=None
+    ) -> Annotated[Diagram, Hom(Ob(X) ** Ob(M), Ob(X) ** Ob(N))]:
         """
         The spiders on a given type with ``n_legs_in`` and ``n_legs_out`` and
         some optional vector of ``phases``.
@@ -211,15 +223,6 @@ class Spider(Box):
             self, name, dom, cod, data=data, **params)
         self.drawing_name = "" if not data else str(data)
 
-    def __setstate__(self, state):
-        if "_name" in state and state["_name"] == type(self).__name__:
-            phase = state.get("_data", None)
-            str_data = "" if phase is None else f", {phase}"
-            cod, dom = state['_dom'], state['_cod']
-            state["_name"] = type(self).__name__\
-                + f"({dom.n}, {cod.n}, {state['_typ']}{str_data})"
-        super().__setstate__(state)
-
     @property
     def phase(self):
         """ The phase of the spider. """
@@ -273,8 +276,8 @@ class Functor(compact.Functor, markov.Functor):
         return compact.Functor.__call__(self, other)
 
 
-def interleaving(cls: type, factory: Callable
-                 ) -> Callable[[int, int, Ty], Diagram]:
+def interleaving(cls: type[Diagram], factory: Callable
+                 ) -> Callable[..., Diagram]:
     """
     Take a ``factory`` for spiders of atomic types and extend it recursively.
 
@@ -302,8 +305,7 @@ def interleaving(cls: type, factory: Callable
     return method
 
 
-def coherence(cls: type, factory: Callable
-              ) -> Callable[[int, int, Ty], Diagram]:
+def coherence(cls: type[Diagram], factory: Callable) -> Callable[..., Diagram]:
     """
     Take a ``factory`` for spiders with one or three legs of atomic types
     and extend it recursively to arbitrary spiders of atomic types.
@@ -366,4 +368,3 @@ class Equation(compact.Equation):
 Diagram.Equation = Equation
 
 
-__getattr__ = deprecated_alias(__name__, {"Ob": "Wire", "PRO": "Nat"})

@@ -43,7 +43,7 @@ from discopy.config import (  # noqa: F401
     TRANSPARENT)
 
 if TYPE_CHECKING:
-    from discopy.drawing import PlaneGraph
+    from discopy.drawing import Drawing
 
 
 MATPLOTLIB_RC = {
@@ -77,8 +77,8 @@ def matplotlib_context():
         yield
 
 
-def draw(graph: PlaneGraph, **params):
-    """ Load a :class:`Backend` and draw a :class:`PlaneGraph` on it. """
+def draw(graph: Drawing, **params):
+    """ Load a :class:`Backend` and draw a :class:`Drawing` on it. """
     aspect = params.get('aspect', 'auto' if 'figsize' in params else 'equal')
     if params.get('legend', False) and not params.get('to_tikz', False):
         colours = Backend.region_colours(graph)
@@ -517,8 +517,10 @@ class Backend(ABC):
         around the crossing, matching the broken strands, so the ribbon going
         under is shadowed by the one going over.
         """
-        a, b = (self.braid_strand(*first, middle),
-                self.braid_strand(*second, middle))
+        a = self.braid_strand(
+            *first, middle)  # ty: ignore[too-many-positional-arguments]
+        b = self.braid_strand(
+            *second, middle)  # ty: ignore[too-many-positional-arguments]
         spans = [(0, 1)] if not gap else [(0, 0.5 - gap), (0.5 + gap, 1)]
         for t0, t1 in spans:
             a_sub, b_sub = (
@@ -945,7 +947,7 @@ class Backend(ABC):
                            fontsize=params.get('fontsize', None))
 
     def draw_discard(self, positions, node, **params):
-        """ Draws a :class:`discopy.quantum.circuit.Discard` box. """
+        """ Draws a :class:`discopy.quantum.gates.Discard` box. """
         box, j = node.box, node.j
         for i in range(len(box.dom)):
             x = box.dom[i]
@@ -959,7 +961,7 @@ class Backend(ABC):
                 self.draw_wire(source, target)
 
     def draw_measure(self, positions, node, **params):
-        """ Draws a :class:`discopy.quantum.circuit.Measure` box. """
+        """ Draws a :class:`discopy.quantum.gates.Measure` box. """
         self.draw_box(positions, node, **dict(params, draw_box_labels=False))
         i, j = positions[node]
         self.draw_wire(
@@ -1529,7 +1531,8 @@ class Matplotlib(Backend):
         plt.margins(*margins)
         plt.subplots_adjust(
             top=1, bottom=0, right=1, left=0, hspace=0, wspace=0)
-        self.axis.set_aspect(params.get("aspect"))
+        self.axis.set_aspect(
+            params.get("aspect"))  # ty: ignore[invalid-argument-type]
         plt.axis('off')
         if xlim is not None:
             self.axis.set_xlim(*xlim)

@@ -56,10 +56,10 @@ We also have its dagger and its transpose:
 
 from typing import ClassVar
 
-from discopy import cat, cmap, rigid, traced
-from discopy.abc import PivotalCategory
+from discopy import cat, cmap, monoidal, rigid, traced
+from discopy.abc import (
+    DaggerCategory, PivotalCategory, TracedCategory)
 from discopy.cat import factory, Generator
-from discopy.utils import deprecated_alias
 
 
 class Wire(rigid.Wire):
@@ -90,7 +90,10 @@ class Ty(rigid.Ty):
     Parameters:
         inside (Wire) : The objects inside the type.
     """
-    Wire: ClassVar[Generator[..., Wire]] = Generator.subclass(Wire)
+    Wire: ClassVar[Generator] = Generator.subclass(Wire)
+
+    dagger_involution = DaggerCategory.dagger_involution
+    dagger_contravariance = DaggerCategory.dagger_contravariance
 
 
 @factory
@@ -118,10 +121,13 @@ class Diagram(rigid.Diagram, traced.Diagram, PivotalCategory):
         dom (Ty) : The domain of the diagram, i.e. its input.
         cod (Ty) : The codomain of the diagram, i.e. its output.
     """
+    dagger_involution = DaggerCategory.dagger_involution
+    dagger_contravariance = DaggerCategory.dagger_contravariance
+
     ob = Ty
-    Box: ClassVar[Generator[..., "Box"]]
-    Cup: ClassVar[Generator[..., "Cup"]]
-    Cap: ClassVar[Generator[..., "Cap"]]
+    Box: ClassVar[Generator]
+    Cup: ClassVar[Generator]
+    Cap: ClassVar[Generator]
 
     def dagger(self):
         """
@@ -164,7 +170,8 @@ class Diagram(rigid.Diagram, traced.Diagram, PivotalCategory):
         return self.rotate().dagger()
 
     @Generator.classmethod
-    def Trace(cls, diagram: Diagram, left=False):
+    def Trace(  # ty: ignore[invalid-attribute-override]
+            cls, diagram: Diagram, left=False):
         """
         The trace of a pivotal diagram is its pre- and post-composition with
         cups and caps to form a feedback loop.
@@ -182,6 +189,35 @@ class Diagram(rigid.Diagram, traced.Diagram, PivotalCategory):
             else dom @ cls.Cap(traced_wire, traced_wire.r)\
             >> diagram @ traced_wire.r\
             >> cod @ cls.Cup(traced_wire, traced_wire.r)
+
+    pivotality = PivotalCategory.pivotality.failing(
+        "The two transposes differ by a snake the normal form does not "
+        "close.")
+
+    trace_superposing_left = TracedCategory.trace_superposing_left
+
+    trace_superposing_right = TracedCategory.trace_superposing_right
+
+    hypergraph_section = monoidal.Diagram.hypergraph_section.failing(
+        "Decoding a cup or cap can cross wires, which needs swaps the "
+        "category does not have.")
+
+    #: A pivotal hypergraph encodes a cup and a cap of either
+    #: orientation, so the composition law comes back.
+    hypergraph_composition = monoidal.Diagram.hypergraph_composition
+
+    map_hypergraph_agreement = monoidal.Diagram.map_hypergraph_agreement\
+        .weaken(boundary_connected=True)
+
+    normal_form_soundness = monoidal.Diagram.normal_form_soundness
+
+    foliation_idempotence = monoidal.Diagram.foliation_idempotence.weaken(
+        boundary_connected=True)
+
+    foliation_soundness = monoidal.Diagram.foliation_soundness.weaken(
+        boundary_connected=True)
+
+    dagger_monoidality = monoidal.Diagram.dagger_monoidality
 
 
 @Diagram.generator
@@ -269,4 +305,3 @@ class Equation(rigid.Equation):
 Diagram.Equation = Equation
 
 
-__getattr__ = deprecated_alias(__name__, {"Ob": "Wire", "PRO": "Nat"})

@@ -754,11 +754,8 @@ class Sequent:
     :class:`Sort` to generate, a :class:`Pattern` to instantiate — and
     an optional conclusion.
 
-    >>> def tensor[A, B, C, D](
-    ...         self: Annotated[str, Hom(A, B)],
-    ...         other: Annotated[str, Hom(C, D)]
-    ... ) -> Annotated[str, Hom([A, C], [B, D])]: ...
-    >>> print(parse(tensor))
+    >>> from discopy.abc import MonoidalCategory
+    >>> print(MonoidalCategory.tensor.sequent)
     ... # doctest: +NORMALIZE_WHITESPACE
     A: C0, B: C0, C: C0, D: C0
     | self: C1[A, B], other: C1[C, D] ⊢ C1[A @ C, B @ D]
@@ -966,13 +963,10 @@ class Declaration[**P, T]:
     stored under and ``owner`` the class declaring the sequent, whose
     objects bound the sorts of its variables.
 
-    >>> def then[A, B, C](
-    ...         self: Annotated[str, Hom(A, B)],
-    ...         other: Annotated[str, Hom(B, C)]
-    ... ) -> Annotated[str, Hom(A, C)]: ...
-    >>> Declaration(then)
-    Declaration(then)
-    >>> print(Declaration(then).sequent)
+    >>> from discopy.abc import Category
+    >>> Category.then
+    abc.Category.then
+    >>> print(Category.then.sequent)
     A: C0, B: C0, C: C0 | self: C1[A, B], other: C1[B, C] ⊢ C1[A, C]
     """
 
@@ -1069,12 +1063,9 @@ class Declaration[**P, T]:
         :func:`cell` named after its parameter, so that a declaration
         reads as a schema.
 
+        >>> from discopy.abc import MonoidalCategory
         >>> from discopy.monoidal import Diagram
-        >>> def tensor[A, B, C, D](
-        ...         self: Annotated[str, Hom(A, B)],
-        ...         other: Annotated[str, Hom(C, D)]
-        ... ) -> Annotated[str, Hom([A, C], [B, D])]: ...
-        >>> tensor = Declaration(tensor).bind(Diagram)
+        >>> tensor = MonoidalCategory.tensor.bind(Diagram)
         >>> for name, box in tensor.canonical().items():
         ...     print(f"{name}: {box.dom} -> {box.cod}")
         self: A -> B
@@ -1185,10 +1176,10 @@ def declarations[D: Declaration](cls: type, kind: type[D]) -> dict[str, D]:
     decorator; a declaration marked inapplicable, or anything that is
     not a declaration, assigned over an inherited one drops it.
 
-    >>> class Widget:
-    ...     rule = Declaration(lambda cls: None, name="rule")
-    >>> list(declarations(Widget, Declaration))
-    ['rule']
+    >>> from discopy.monoidal import Diagram
+    >>> from discopy.search import Rule
+    >>> list(declarations(Diagram, Rule))
+    ['id', 'then', 'tensor']
     """
     result: dict[str, D] = {}
     for base in reversed(cls.__mro__):

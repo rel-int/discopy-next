@@ -81,22 +81,26 @@ which lands in :class:`CMap` as a biclosed category has no trace.
 
 from abc import abstractmethod
 from inspect import signature
-from typing import Callable, ClassVar
+from typing import Callable, ClassVar, Self, overload
 
 from discopy import monoidal, cmap
-from discopy.abc import BiclosedCategory
+from typing import Annotated
+
+from discopy.axioms import Atom, Hom, no_strategy, Ob, rule, Serialisable
+from discopy.abc import BiclosedCategory, DaggerCategory, ResiduatedMonoid
 from discopy.drawing import Drawing
 from discopy.cat import factory, Generator
 from discopy.utils import (
+    AxiomError,
+    assert_isatomic,
     assert_isinstance,
-    deprecated_alias,
     factory_name,
     from_tree,
 )
 
 
 @factory
-class Ty(monoidal.Ty):
+class Ty(monoidal.Ty, ResiduatedMonoid):
     """
     A biclosed type is a monoidal type that can be exponentiated.
 
@@ -108,12 +112,18 @@ class Ty(monoidal.Ty):
     Applying a biclosed type to a callable yields a :class:`Abstraction`,
     applying it to a string yields a :class:`Constant`.
     """
-    Wire: ClassVar[Generator[..., "Wire"]]
-    Exp: ClassVar[Generator[..., "Exp"]]
-    Over: ClassVar[Generator[..., "Over"]]
-    Under: ClassVar[Generator[..., "Under"]]
+    Wire: ClassVar[Generator]
+    Exp: ClassVar[Generator]
+    Over: ClassVar[Generator]
+    Under: ClassVar[Generator]
 
-    def __pow__(self, other: Ty) -> Ty:
+    @overload
+    def __pow__(self, other: int) -> Self: ...
+
+    @overload
+    def __pow__(self, other: Ty) -> Ty: ...
+
+    def __pow__(self, other):
         return self.exp(other) if isinstance(other, Ty)\
             else monoidal.Ty.__pow__(self, other)
 
@@ -149,10 +159,6 @@ class Ty(monoidal.Ty):
             var = self.Variable(varnames[0], self)
             return self.Abstraction(var, arg(var), left)
         raise ValueError
-
-    def __repr__(self):
-        return factory_name(type(self))\
-            + f"({', '.join(map(repr, self.inside))})"
 
     @property
     def is_exp(self):
@@ -223,6 +229,7 @@ class Exp(Wire):
         base : The base type.
         exponent : The exponent type.
     """
+    strategy = no_strategy
 
     ob = Ty
 
@@ -301,17 +308,36 @@ class Diagram(monoidal.Diagram, BiclosedCategory):
         dom (Ty) : The domain of the diagram, i.e. its input.
         cod (Ty) : The codomain of the diagram, i.e. its output.
     """
+    repr_transparency = Serialisable.repr_transparency.failing(
+        "The generic representation of an evaluation does not read back "
+        "(#742).")
+    serialisation = Serialisable.serialisation.failing(
+        "The generic tree of an evaluation does not read back (#742).")
 
     ob = Ty
-    Eval: ClassVar[Generator[..., "Eval"]]
-    Coeval: ClassVar[Generator[..., "Coeval"]]
-    Curry: ClassVar[Generator[..., "Curry"]]
-    Functor: ClassVar[Generator[..., "Functor"]]
-    TermBase: ClassVar[Generator[..., "TermBase"]]
-    Constant: ClassVar[Generator[..., "Constant"]]
-    Variable: ClassVar[Generator[..., "Variable"]]
-    Application: ClassVar[Generator[..., "Application"]]
-    Abstraction: ClassVar[Generator[..., "Abstraction"]]
+    Eval: ClassVar[Generator]
+    Coeval: ClassVar[Generator]
+    Curry: ClassVar[Generator]
+    Functor: ClassVar[Generator]
+    TermBase: ClassVar[Generator]
+    Constant: ClassVar[Generator]
+    Variable: ClassVar[Generator]
+    Application: ClassVar[Generator]
+    Abstraction: ClassVar[Generator]
+
+    @rule
+    def curry_left[X, Y: Atom, Z](
+            self: Annotated[Diagram, Hom([X, Y], Z)], n=1
+    ) -> Annotated[Diagram, Hom(X, (Ob(Z) << Ob(Y)))]:
+        """ The left currying of ``n`` objects, see :meth:`curry`. """
+        return self.curry(n, left=True)
+
+    @rule
+    def curry_right[Y: Atom, X, Z](
+            self: Annotated[Diagram, Hom([Y, X], Z)], n=1
+    ) -> Annotated[Diagram, Hom(X, (Ob(Y) >> Ob(Z)))]:
+        """ The right currying of ``n`` objects, see :meth:`curry`. """
+        return self.curry(n, left=False)
 
     def curry(self, n=1, left=True) -> Diagram:
         """
@@ -323,6 +349,22 @@ class Diagram(monoidal.Diagram, BiclosedCategory):
                 or on the right, i.e. into :class:`Under`.
         """
         return self.Curry(self, n, left)
+
+    @classmethod
+    @rule
+    def ev_left[Y: Atom, E: Atom](
+            cls, base: Annotated[Ty, Ob(Y)], exponent: Annotated[Ty, Ob(E)]
+    ) -> Annotated[Diagram, Hom((Ob(Y) << Ob(E)) @ Ob(E), Y)]:
+        """ The left evaluation, see :meth:`ev`. """
+        return cls.ev(base, exponent, left=True)
+
+    @classmethod
+    @rule
+    def ev_right[Y: Atom, E: Atom](
+            cls, base: Annotated[Ty, Ob(Y)], exponent: Annotated[Ty, Ob(E)]
+    ) -> Annotated[Diagram, Hom(Ob(E) @ (Ob(E) >> Ob(Y)), Y)]:
+        """ The right evaluation, see :meth:`ev`. """
+        return cls.ev(base, exponent, left=False)
 
     @classmethod
     def ev(cls, base: Ty, exponent: Ty, left=True) -> Eval:
@@ -356,6 +398,30 @@ class Diagram(monoidal.Diagram, BiclosedCategory):
     def to_drawing(self):
         return monoidal.Diagram.to_drawing(self, functor=Functor)
 
+    dagger_involution = DaggerCategory.dagger_involution.inapplicable(
+        "A curried diagram has no dagger.")
+
+    dagger_contravariance = DaggerCategory.dagger_contravariance\
+        .inapplicable("A curried diagram has no dagger.")
+
+    dagger_monoidality = BiclosedCategory.dagger_monoidality.inapplicable(
+        "A curried diagram has no dagger.")
+
+    map_hypergraph_agreement = \
+        monoidal.Diagram.map_hypergraph_agreement.failing(
+            "Mapping a curry bubble decodes the map of its inside, which "
+            "re-whiskers its states, reorders its independent boxes and "
+            "can ask a planar category for swaps, while the hypergraph "
+            "of a bubble compares its inside syntactically.")
+
+    currying_left = BiclosedCategory.currying_left.failing(
+        "A free currying is a bubble, equal to its evaluation only "
+        "semantically.")
+
+    currying_right = BiclosedCategory.currying_right.failing(
+        "A free currying is a bubble, equal to its evaluation only "
+        "semantically.")
+
 
 Box = Diagram.Box
 
@@ -368,7 +434,7 @@ class Eval(Box):
     Parameters:
         x : The exponential type to evaluate.
     """
-    def __init__(self, x: Exp, left=None):
+    def __init__(self, x: Ty, left=None):
         assert x.is_exp
         self.x = x
         exp = x.inside[0]
@@ -404,7 +470,7 @@ class Coeval(Box):
     """
     drawing_name = "lambda"
 
-    def __init__(self, x: Exp, left=None):
+    def __init__(self, x: Ty, left=None):
         assert x.is_exp
         self.x = x
         exp = x.inside[0]
@@ -444,6 +510,9 @@ class Curry(monoidal.Bubble, Box):
         monoidal.Bubble.__init__(
             self, arg, dom=dom, cod=cod, drawing_name="$\\Lambda$")
         self.Box.__init__(self, name, dom, cod)
+
+    def dagger(self) -> Curry:
+        raise AxiomError("A curried diagram has no dagger.")
 
     def __str__(self):
         return self.name
@@ -547,7 +616,7 @@ class TermBase(Box):
     functor: ClassVar[Functor] = Functor.id(Diagram)
 
     @abstractmethod
-    def eval(functor: Functor = None) -> BiclosedCategory:
+    def eval(self, functor: Functor | None = None) -> BiclosedCategory:
         """
         The evaluation of a :class:`Functor` on a term gives a morphism in its
         codomain. By default, this is the identity functor on the free biclosed
@@ -574,7 +643,7 @@ class Constant(TermBase):
         inside (Diagram): The diagram which defines the constant.
         left (Optional[bool]): Whether the domain comes from the left or right.
     """
-    def __init__(self, name: Ty, cod: Ty, **kwargs):
+    def __init__(self, name: str, cod: Ty, **kwargs):
         super().__init__(name, dom=self.ob(), cod=cod, **kwargs)
         self.freevars = []
 
@@ -596,13 +665,19 @@ class Constant(TermBase):
 @Diagram.generator
 class Variable(TermBase):
     """
-    A variable with a string as name and a :class:`Ty`.
+    A variable with a string as name and an atomic :class:`Ty`.
+
+    A variable stands for exactly one wire in the internal language of a
+    (bi)closed category, the way a lambda term binds one variable at a
+    time: the abstraction machinery indexes contexts and free variables by
+    variable, counting on that index to coincide with a wire index.
 
     Attributes:
         name (str): The name of the variable
-        cod (Ty): The type of the variable.
+        cod (Ty): The atomic type of the variable.
     """
     def __init__(self, name: str, cod: Ty):
+        assert_isatomic(cod)
         super().__init__(name, dom=cod, cod=cod)
         self.freevars = [self]
 
@@ -725,4 +800,3 @@ class Equation(monoidal.Equation):
 Diagram.Equation = Equation
 
 
-__getattr__ = deprecated_alias(__name__, {"Ob": "Wire"})

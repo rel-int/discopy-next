@@ -67,15 +67,17 @@ Examples
     :align: center
 """
 
-from typing import ClassVar
+from typing import Annotated, ClassVar
 
 from collections.abc import Mapping
 
 from discopy import messages, tensor, frobenius
+from discopy.axioms import Hom, no_strategy, Ob, rule
 from discopy.cat import factory, Generator
 from discopy.matrix import backend
 from discopy.tensor import Dim, Tensor
-from discopy.utils import assert_isinstance, deprecated_alias, factory_name
+from discopy.utils import (
+    assert_isinstance, factory_name)
 
 
 class Wire(frobenius.Wire):
@@ -92,6 +94,8 @@ class Wire(frobenius.Wire):
     :class:`Qudit`, but feel free to open a pull-request if you discover a
     third kind of information unit.
     """
+    strategy = no_strategy
+
     def __init__(self, name: str, dim=2, z=0):
         assert_isinstance(dim, int)
         assert_isinstance(self, (Digit, Qudit))
@@ -106,7 +110,7 @@ class Wire(frobenius.Wire):
     @classmethod
     def from_tree(cls, tree: dict) -> Wire:
         dim, z = tree['dim'], tree.get('z', 0)
-        return cls(dim=dim, z=z)
+        return cls(dim=dim, z=z)  # ty: ignore[missing-argument]
 
     def to_tree(self) -> dict:
         return dict(dim=self.dim, **super().to_tree())
@@ -127,12 +131,6 @@ class Digit(Wire):
         name = "bit" if dim == 2 else f"Digit({dim})"
         super().__init__(name, dim)
 
-    def __setstate__(self, state):
-        if "_dim" in state:
-            state["dim"] = state["_dim"]
-            del state["_dim"]
-        super(type(self), self).__setstate__(state)
-
 
 class Qudit(Wire):
     """
@@ -148,8 +146,6 @@ class Qudit(Wire):
     def __init__(self, dim, z=0):
         name = "qubit" if dim == 2 else f"Qudit({dim})"
         super().__init__(name, dim)
-
-    __setstate__ = Digit.__setstate__
 
 
 @factory
@@ -187,14 +183,21 @@ class Circuit(tensor.Diagram[complex]):
     """
     ob = Ty
     Discard = tensor.Discard
-    Box: ClassVar[Generator[..., "Box"]]
-    Sum: ClassVar[Generator[..., "Sum"]]
-    Permutation: ClassVar[Generator[..., "Permutation"]]
-    Swap: ClassVar[Generator[..., "Swap"]]
-    Functor: ClassVar[Generator[..., "Functor"]]
+    Box: ClassVar[Generator]
+    Sum: ClassVar[Generator]
+    Permutation: ClassVar[Generator]
+    Swap: ClassVar[Generator]
+    Functor: ClassVar[Generator]
+
+    trace_left = tensor.Diagram.trace_left.inapplicable(
+        "A trace unfolds into kets and bras.")
+    trace_right = tensor.Diagram.trace_right.inapplicable(
+        "A trace unfolds into kets and bras.")
 
     @classmethod
-    def id(cls, dom: int | Ty = None):
+    @rule
+    def id[A](cls, dom: Annotated[int | Ty | None, Ob(A)] = None
+              ) -> Annotated[Circuit, Hom(A, A)]:
         """
         The identity circuit on a given domain.
 
@@ -449,8 +452,9 @@ class Circuit(tensor.Diagram[complex]):
         diag = Id(self.dom)
         last_i = 0
         for i, box in enumerate(self.boxes):
-            if hasattr(box, '_decompose'):
-                decomp = box._decompose()
+            decompose = getattr(box, '_decompose', None)
+            if decompose is not None:
+                decomp = decompose()
                 diag >>= self[last_i:i]
                 left, _, right = self.inside[i].boxes_and_types
                 diag >>= Id(left) @ decomp @ Id(right)
@@ -458,12 +462,21 @@ class Circuit(tensor.Diagram[complex]):
         diag >>= self[last_i:]
         self = diag
 
-        c_nodes = [tn.CopyNode(2, 2, f'c_input_{i}', dtype=complex)
-                   for i in range(self.dom.count(bit))]
-        q_nodes1 = [tn.CopyNode(2, 2, f'q1_input_{i}', dtype=complex)
-                    for i in range(self.dom.count(qubit))]
-        q_nodes2 = [tn.CopyNode(2, 2, f'q2_input_{i}', dtype=complex)
-                    for i in range(self.dom.count(qubit))]
+        c_nodes: list = [
+            tn.CopyNode(
+                2, 2, f'c_input_{i}',
+                dtype=complex)  # ty: ignore[invalid-argument-type]
+            for i in range(self.dom.count(bit))]
+        q_nodes1 = [
+            tn.CopyNode(
+                2, 2, f'q1_input_{i}',
+                dtype=complex)  # ty: ignore[invalid-argument-type]
+            for i in range(self.dom.count(qubit))]
+        q_nodes2 = [
+            tn.CopyNode(
+                2, 2, f'q2_input_{i}',
+                dtype=complex)  # ty: ignore[invalid-argument-type]
+            for i in range(self.dom.count(qubit))]
 
         inputs = [n[0] for n in c_nodes + q_nodes1 + q_nodes2]
         c_scan = [n[1] for n in c_nodes]
@@ -509,7 +522,9 @@ class Circuit(tensor.Diagram[complex]):
             elif box.is_mixed or isinstance(box, ClassicalGate):
                 if isinstance(box, (Copy, Match, Measure, Encode)):
                     assert len(box.dom) == 1 or len(box.cod) == 1
-                    node = tn.CopyNode(3, 2, 'cq_' + str(box), dtype=complex)
+                    node = tn.CopyNode(
+                        3, 2, 'cq_' + str(box),
+                        dtype=complex)  # ty: ignore[invalid-argument-type]
                 else:
                     # only unoptimised gate is MixedState()
                     array = box.eval(mixed=True).array
@@ -870,12 +885,6 @@ class Box(tensor.Box[complex], Circuit):
         self._is_mixed = is_mixed
         tensor.Box[complex].__init__(self, name, dom, cod, data, **params)
 
-    def __setstate__(self, state):
-        if "_is_mixed" not in state:
-            state["_is_mixed"] = state["_mixed"]
-            del state["_mixed"]
-        super().__setstate__(state)
-
     @property
     def array(self):
         """ The array of a quantum box. """
@@ -901,8 +910,11 @@ class Box(tensor.Box[complex], Circuit):
 
 
 @Circuit.generator
-class Sum(tensor.Sum[complex], Box):
+class Sum(  # ty: ignore[inconsistent-mro]
+        tensor.Sum[complex], Box):
     """ Sums of circuits. """
+    terms: tuple[Circuit, ...]
+
     @property
     def is_mixed(self):
         return any(circuit.is_mixed for circuit in self.terms)
@@ -951,7 +963,8 @@ class Permutation(tensor.Permutation[complex], Box):
 
 
 @Circuit.generator
-class Swap(Permutation, tensor.Swap, Box):
+class Swap(  # ty: ignore[inconsistent-mro]
+        Permutation, tensor.Swap, Box):
     """
     The logical swap of two circuit wires, i.e. plumbing.
 
@@ -1006,4 +1019,3 @@ Layer = Circuit.Layer
 Id = Circuit.id
 
 
-__getattr__ = deprecated_alias(__name__, {"Ob": "Wire"})

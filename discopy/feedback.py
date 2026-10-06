@@ -120,19 +120,25 @@ Note
 Every traced symmetric category is a feedback category with a trivial delay:
 
 >>> from discopy import symmetric
->>> symmetric.Ty.delay = symmetric.Diagram.delay = lambda self: self
->>> symmetric.Diagram.feedback = lambda self, dom=None, cod=None, mem=None:\\
-...     self.trace(len(mem))
+>>> @factory
+... class TracedTy(symmetric.Ty):
+...     delay = lambda self, n_steps=1: self
+>>> @factory
+... class Traced(symmetric.Diagram):
+...     ob = TracedTy
+...     delay = lambda self, n_steps=1: self
+...     feedback = lambda self, dom=None, cod=None, mem=None, left=False:\\
+...         self.trace(len(mem), left)
+>>> class TracedBox(symmetric.Box, Traced):
+...     pass
 
 >>> F0 = Functor(
-...     ob_map=lambda x: symmetric.Ty(x.atom.name), ar_map={},
-...     cod=symmetric.Diagram)
+...     ob_map=lambda x: TracedTy(x.atom.name), ar_map={}, cod=Traced)
 >>> assert F0(x.delay()) == F0(x)
 
 >>> F = Functor(
 ...     ob_map=F0,
-...     ar_map=lambda f: symmetric.Box(f.name, F0(f.dom), F0(f.cod)),
-...     cod=symmetric.Diagram)
+...     ar_map=lambda f: TracedBox(f.name, F0(f.dom), F0(f.cod)), cod=Traced)
 >>> f = Box('f', x @ m.delay(), y @ m)
 >>> assert F(f.delay()) == F(f) and F(f.feedback()) == F(f).trace()
 
@@ -153,12 +159,15 @@ In the category of streams, this is just the identity.
 
 from typing import ClassVar
 
-from discopy import monoidal, braided, markov, hypergraph
-from discopy.abc import FeedbackCategory
+from discopy import monoidal, braided, markov, hypergraph, messages
+from typing import Annotated
+
+from discopy.axioms import no_strategy
+from discopy.abc import DelayedMonoid, FeedbackCategory
+from discopy.axioms import Atom, Hom, Ob, rule
 from discopy.utils import (
-    deprecated_alias,
     factory, Generator, factory_name, assert_isinstance, AxiomError,
-)
+    from_tree)
 
 
 def str_delayed(time_step: int):
@@ -242,6 +251,8 @@ class HeadOb(Wire):
 
     Note the object `arg: Wire` cannot be itself a `HeadOb` or be delayed.
     """
+    strategy = no_strategy
+
     def __init__(self, arg: Wire, time_step: int = 0):
         assert_isinstance(arg, Wire)
         if isinstance(arg, HeadOb) or arg.time_step:
@@ -278,6 +289,8 @@ class TailOb(Wire):
     >>> x = Wire('x', is_constant=False)
     >>> assert x.tail == TailOb(x)
     """
+    strategy = no_strategy
+
     def __init__(self, arg: Wire, time_step: int = 0):
         assert_isinstance(arg, Wire)
         if isinstance(arg, HeadOb) or arg.is_constant or arg.time_step > 0:
@@ -289,7 +302,7 @@ class TailOb(Wire):
 
 
 @factory
-class Ty(monoidal.Ty):
+class Ty(monoidal.Ty, DelayedMonoid):
     """ A feedback type is a monoidal type with `delay`, `head` and `tail`. """
     def delay(self, n_steps=1):
         """ The delay of a feedback type by `n_steps`. """
@@ -307,7 +320,7 @@ class Ty(monoidal.Ty):
 
     d = Wire.d
 
-    Wire: ClassVar[Generator[..., Wire]] = Generator.subclass(Wire)
+    Wire: ClassVar[Generator] = Generator.subclass(Wire)
 
 
 class Layer(markov.Layer):
@@ -341,16 +354,27 @@ class Diagram(markov.Diagram, FeedbackCategory):
     .. image:: /_static/feedback/feedback-random-walk.svg
         :align: center
     """
+    staircase_encoding = monoidal.Diagram.staircase_encoding.failing(
+        "The staircase encoding decomposes the permutations inside a "
+        "trace or feedback bubble, which the hypergraph of a bubble "
+        "compares syntactically: a feedback category has no trace to "
+        "absorb the loop into wiring.")
+
     ob = Ty
-    Layer: ClassVar[Generator[..., Layer]] = Generator.subclass(Layer)
-    Box: ClassVar[Generator[..., "Box"]]
-    Permutation: ClassVar[Generator[..., "Permutation"]]
-    Swap: ClassVar[Generator[..., "Swap"]]
-    Copy: ClassVar[Generator[..., "Copy"]]
-    Merge: ClassVar[Generator[..., "Merge"]]
-    FollowedBy: ClassVar[Generator[..., "FollowedBy"]]
-    Feedback: ClassVar[Generator[..., "Feedback"]]
-    Functor: ClassVar[Generator[..., "Functor"]]
+    #: :class:`markov.Diagram` re-enables what
+    #: :class:`discopy.abc.FeedbackCategory` declares inapplicable, so a
+    #: feedback diagram declares it again.
+    dagger_involution = FeedbackCategory.dagger_involution
+    dagger_contravariance = FeedbackCategory.dagger_contravariance
+    Layer: ClassVar[Generator] = Generator.subclass(Layer)
+    Box: ClassVar[Generator]
+    Permutation: ClassVar[Generator]
+    Swap: ClassVar[Generator]
+    Copy: ClassVar[Generator]
+    Merge: ClassVar[Generator]
+    FollowedBy: ClassVar[Generator]
+    Feedback: ClassVar[Generator]
+    Functor: ClassVar[Generator]
 
     def delay(self, n_steps=1):
         """ The delay of a feedback diagram. """
@@ -358,11 +382,32 @@ class Diagram(markov.Diagram, FeedbackCategory):
         inside = tuple(box.delay(n_steps) for box in self.inside)
         return type(self)(inside, dom, cod, _scan=False)
 
-    def feedback(self, dom=None, cod=None, mem=None):
-        """ Syntactic sugar for :class:`Feedback`. """
+    @rule
+    def feedback_left[A, B, M: Atom](
+            self: Annotated[Diagram, Hom(Ob(M).d @ Ob(A), [M, B])],
+            dom=None, cod=None, mem=None) -> Annotated[Diagram, Hom(A, B)]:
+        """
+        A :class:`Feedback` of the memory on the left, wire by wire: the
+        outermost memory wire, the first, feeds back first.
+        """
+        if mem is None or len(mem) == 1:
+            return self.Feedback(self, dom=dom, cod=cod, mem=mem, left=True)
+        return self if not mem\
+            else self.feedback_left(mem=mem[:1]).feedback_left(mem=mem[1:])
+
+    @rule
+    def feedback_right[A, B, M: Atom](
+            self: Annotated[Diagram, Hom(Ob(A) @ Ob(M).d, [B, M])],
+            dom=None, cod=None, mem=None) -> Annotated[Diagram, Hom(A, B)]:
+        """
+        A :class:`Feedback` of the memory on the right, wire by wire: the
+        outermost memory wire, the last, feeds back first.
+        """
         if mem is None or len(mem) == 1:
             return self.Feedback(self, dom=dom, cod=cod, mem=mem)
-        return self if not mem else self.feedback(mem=mem[:-1]).feedback()
+        return self if not mem\
+            else self.feedback_right(mem=mem[-1:]).feedback_right(
+                mem=mem[:-1])
 
     @classmethod
     def wait(cls, dom: Ty) -> Diagram:
@@ -407,6 +452,8 @@ class Diagram(markov.Diagram, FeedbackCategory):
         return Tail(self)
 
     d = Wire.d
+
+    dagger_monoidality = FeedbackCategory.dagger_monoidality
 
 
 @Diagram.generator
@@ -457,7 +504,8 @@ class Box(markov.Box, Diagram):
 
 
 @Diagram.generator
-class Permutation(markov.Permutation, Box):
+class Permutation(  # ty: ignore[inconsistent-mro]
+        markov.Permutation, Box):
     "A permutation in a feedback diagram."
 
     def delay(self, n_steps=1):
@@ -465,7 +513,8 @@ class Permutation(markov.Permutation, Box):
 
 
 @Diagram.generator
-class Swap(Permutation, markov.Swap, Box):
+class Swap(  # ty: ignore[inconsistent-mro]
+        Permutation, markov.Swap, Box):
     """
     The swap of feedback types :code:`left` and :code:`right`.
 
@@ -508,7 +557,8 @@ Discard, Trace, Sum, Bubble = (
     Diagram.Sum, Diagram.Bubble)
 
 
-class Head(monoidal.Bubble, Box):
+class Head(
+        monoidal.Bubble, Box):
     """
     The head of a feedback diagram, interpreted as the first element followed
     by the identity stream on the empty type.
@@ -524,20 +574,24 @@ class Head(monoidal.Bubble, Box):
     __str__ = Box.__str__
 
 
-class Tail(monoidal.Bubble, Box):
+class Tail(
+        monoidal.Bubble, Box):
     """
     The tail of a feedback diagram, interpreted as the stream starting from the
     second time step with the identity on the empty type at the first step.
     """
     def __init__(self, arg: Diagram, time_step=0):
-        Head.__init__(self, arg, time_step, _attr="tail")
+        Head.__init__(
+            self,
+            arg, time_step, _attr="tail")
 
     delay, reset, __repr__ = HeadOb.delay, HeadOb.reset, HeadOb.__repr__
     __str__ = Box.__str__
 
 
 @Diagram.generator
-class Feedback(monoidal.Bubble, Box):
+class Feedback(
+        monoidal.Bubble, Box):
     """
     Feedback is a bubble that takes a diagram from `dom @ mem.delay()` to
     `cod @ mem` and returns a box from `dom` to `cod`.
@@ -554,32 +608,54 @@ class Feedback(monoidal.Bubble, Box):
         :align: center
     """
     def __init__(self, arg: Diagram, dom=None, cod=None, mem=None, left=False):
-        if left:
-            raise NotImplementedError
-        mem = arg.cod[-1:] if mem is None else mem
-        dom = arg.dom[:-len(mem)] if dom is None else dom
-        cod = arg.cod[:-len(mem)] if cod is None else cod
-        if arg.dom != dom @ mem.delay():
-            raise AxiomError
-        if arg.cod != cod @ mem:
-            raise AxiomError
+        if mem is None:
+            mem = arg.cod[:1] if left else arg.cod[-1:]
+        if dom is None:
+            dom = arg.dom[len(mem):] if left else arg.dom[:-len(mem)]
+        if cod is None:
+            cod = arg.cod[len(mem):] if left else arg.cod[:-len(mem)]
+        expected_dom = mem.delay() @ dom if left else dom @ mem.delay()
+        expected_cod = mem @ cod if left else cod @ mem
+        if arg.dom != expected_dom:
+            raise AxiomError(messages.WRONG_DOM.format(expected_dom, arg.dom))
+        if arg.cod != expected_cod:
+            raise AxiomError(messages.WRONG_COD.format(expected_cod, arg.cod))
         self.mem, self.left = mem, left
         monoidal.Bubble.__init__(self, arg, dom=dom, cod=cod)
         self.Box.__init__(self, self.name, dom, cod)
 
+    serialised_attrs = ('args', 'dom', 'cod', 'mem', 'left')
+
+    def setoid(self):
+        """ The memory and its side tell two feedbacks of one arg apart. """
+        return super().setoid() + (self.mem, self.left)
+
+    @classmethod
+    def from_tree(cls, tree):
+        arg, mem = map(from_tree, (tree['args'][0], tree['mem']))
+        return cls(arg, mem=mem, left=tree.get('left', False))
+
+    def dagger(self):
+        raise AxiomError("Feedback has no dagger, "
+                         "the delay of its memory is not reversible.")
+
     def delay(self, n_steps=1):
-        return type(self)(self.arg.delay(n_steps), mem=self.mem.delay(n_steps))
+        return type(self)(self.arg.delay(n_steps),
+                          mem=self.mem.delay(n_steps), left=self.left)
 
     def __str__(self):
         mem_name = "" if len(self.mem) == 1 else f"mem={self.mem}"
-        return f"({self.arg}).feedback({mem_name})"
+        left_name = f"{', ' if mem_name else ''}left=True" if self.left\
+            else ""
+        return f"({self.arg}).feedback({mem_name}{left_name})"
 
     def __repr__(self):
         arg, mem = map(repr, (self.arg, self.mem))
-        return factory_name(type(self)) + f"({arg}, mem={mem})"
+        left = ", left=True" if self.left else ""
+        return factory_name(type(self)) + f"({arg}, mem={mem}{left})"
 
     def to_drawing(self):
-        return self.arg.to_drawing().trace()
+        return self.arg.to_drawing().trace(left=self.left)
 
 
 @Diagram.generator
@@ -678,12 +754,18 @@ class Functor(markov.Functor):
             arg = other.dom if other.is_dagger else other.cod
             return self.cod.FollowedBy(self(arg))
         if isinstance(other, Feedback) and hasattr(self.cod, "feedback"):
-            return self(other.arg).feedback(*map(self, (
-                other.dom, other.cod, other.mem)))
+            arguments = map(self, (other.dom, other.cod, other.mem))
+            image = self(other.arg)
+            if other.left:
+                return image.feedback_left(*arguments)
+            return image.feedback(*arguments)
         return super().__call__(other)
 
 
 Hypergraph = hypergraph.Hypergraph[Diagram]
+Hypergraph.dagger_involution = FeedbackCategory.dagger_involution
+Hypergraph.dagger_contravariance = FeedbackCategory.dagger_contravariance
+Hypergraph.dagger_monoidality = FeedbackCategory.dagger_monoidality
 Id = Diagram.id
 
 
@@ -695,4 +777,3 @@ class Equation(markov.Equation):
 Diagram.Equation = Equation
 
 
-__getattr__ = deprecated_alias(__name__, {"Ob": "Wire"})

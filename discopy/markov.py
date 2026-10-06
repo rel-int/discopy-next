@@ -80,6 +80,9 @@ from typing import ClassVar
 
 from discopy import symmetric, monoidal, cmap, hypergraph
 from discopy.abc import MarkovCategory
+from typing import Annotated
+
+from discopy.axioms import Atom, Count, Hom, Ob, rule, Serialisable
 from discopy.cat import factory, Generator
 from discopy.monoidal import Ty  # noqa: F401
 from discopy.utils import assert_isatomic, factory_name
@@ -116,10 +119,25 @@ class Diagram(symmetric.Diagram, MarkovCategory):
 
     .. image:: /_static/markov/copy_and_apply.svg
     """
-    Copy: ClassVar[Generator[..., "Copy"]]
-    Merge: ClassVar[Generator[..., "Merge"]]
-    Discard: ClassVar[Generator[..., "Discard"]]
-    Functor: ClassVar[Generator[..., "Functor"]]
+    Copy: ClassVar[Generator]
+    Merge: ClassVar[Generator]
+    Discard: ClassVar[Generator]
+    Functor: ClassVar[Generator]
+    map_hypergraph_agreement = \
+        monoidal.Diagram.map_hypergraph_agreement.inapplicable(
+            "to_hypergraph encodes copies and merges as spiders while "
+            "to_map keeps them as boxes.")
+
+    pickling = Serialisable.pickling.failing(
+        "A copy does not unpickle, its __new__ wanting its type (#742).")
+    copying = Serialisable.copying.failing(
+        "A copy does not deep-copy, its __new__ wanting its type (#742).")
+    repr_transparency = Serialisable.repr_transparency.failing(
+        "The generic representation of a copy does not read back, its "
+        "__new__ wanting its type (#742).")
+    serialisation = Serialisable.serialisation.failing(
+        "The generic tree of a copy does not read back, its __new__ "
+        "wanting its type (#742).")
 
     @Generator.classmethod
     def Spider(cls, n_legs_in, n_legs_out, typ, phase=None):
@@ -129,7 +147,10 @@ class Diagram(symmetric.Diagram, MarkovCategory):
             else cls.Merge(typ, n_legs_in)
 
     @classmethod
-    def copy(cls, x: monoidal.Ty, n=2) -> Diagram:
+    @rule
+    def copy[X: Atom, N: Count](
+            cls, x: Annotated[monoidal.Ty, Ob(X)], n: Annotated[int, Ob(N)] = 2
+    ) -> Annotated[Diagram, Hom(X, Ob(X) ** Ob(N))]:
         """
         Make :code:`n` copies of a given type :code:`x`.
 
@@ -138,10 +159,14 @@ class Diagram(symmetric.Diagram, MarkovCategory):
             n : The number of copies.
         """
         from discopy import frobenius
-        return frobenius.Diagram.spiders.__func__(cls, 1, n, x)
+        return frobenius.Diagram.spiders.__func__(
+            cls, 1, n, x)  # ty: ignore[invalid-argument-type]
 
     @classmethod
-    def merge(cls, x: monoidal.Ty, n=2) -> Diagram:
+    @rule
+    def merge[X: Atom, N: Count](
+            cls, x: Annotated[monoidal.Ty, Ob(X)], n: Annotated[int, Ob(N)] = 2
+    ) -> Annotated[Diagram, Hom(Ob(X) ** Ob(N), X)]:
         """
         Merge :code:`n` copies of a given type :code:`x`.
 

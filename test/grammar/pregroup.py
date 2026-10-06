@@ -1,7 +1,6 @@
 from pytest import raises
 
 from discopy.grammar.pregroup import *
-from discopy.utils import from_tree
 
 
 def test_Word():
@@ -55,14 +54,6 @@ def test_normal_form():
         == (w2 >> w1 @ Id(n)).normal_form()
 
 
-def test_from_tree():
-    s, n = Ty('s'), Ty('n')
-    Alice, Bob = Word('Alice', n), Word('Bob', n)
-    loves = Word('loves', n.r @ s @ n.l)
-    sentence = Alice @ loves @ Bob >> Cup(n, n.r) @ Id(s) @ Cup(n.l, n)
-    assert sentence == from_tree(sentence.to_tree())
-
-
 def test_pregroup_swap_rotation():
     s, n = Ty('s'), Ty('n')
     assert Swap(n, s).r.dom == Swap(n, s).cod.r
@@ -82,3 +73,5 @@ def test_to_hypergraph():
     assert isinstance(round_trip, Diagram)
     assert round_trip.to_hypergraph() == hypergraph
     assert hash(round_trip.to_hypergraph()) == hash(hypergraph)
+
+

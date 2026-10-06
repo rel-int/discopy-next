@@ -1,4 +1,4 @@
-from __future__ import annotations
+from pytest import raises
 
 from discopy.closed import *
 
@@ -134,6 +134,25 @@ def test_nonlinear_eval():
 
     discarded, = Y(lambda y: X(lambda x: g(x)(x))).eval().boxes
     assert any(isinstance(box, Discard) for box in discarded.arg.boxes)
+
+
+def test_Variable_atomic():
+    """
+    `closed.Variable` inherits `biclosed.Variable`'s atomicity check: a
+    variable stands for exactly one wire, so a non-atomic codomain used to
+    reach `Abstraction.eval`, which indexes a permutation by variable
+    count and a domain by wire count, and raised from inside `finset`
+    whenever the two disagreed (regression test for #609).
+    """
+    X, Y = Ty('X'), Ty('Y')
+    with raises(ValueError):
+        Variable('v', X @ Y)
+    v = Variable('v', X)
+    abstraction = Abstraction(v, v).eval()
+    assert abstraction.dom == Ty()
+    assert abstraction.cod == (X >> X)
+
+
 def test_context_dom():
     """
     `Context.dom` instantiates `category.ob` before calling `.tensor`, so
@@ -210,3 +229,10 @@ def test_draw_copy_and_swap():
     # A non-linear term evaluates to such a diagram, so it draws too.
     X = Ty('X')
     assert X(lambda x: (X >> X)(lambda f: f(x))).eval().to_drawing()
+
+
+def test_merge_is_a_closed_diagram():
+    x = Ty('x')
+    merge = Diagram.copy(x).dagger()
+    assert isinstance(merge, Diagram) and isinstance(merge, Merge)
+    assert (Diagram.id(x @ x) >> merge).boxes == [merge]

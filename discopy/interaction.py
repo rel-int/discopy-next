@@ -62,7 +62,7 @@ Example
     :align: center
 """
 
-from typing import Sequence
+from typing import Annotated, Sequence
 from dataclasses import dataclass
 from functools import wraps
 
@@ -74,16 +74,18 @@ from discopy import (
     ribbon,
     messages
 )
-from discopy.abc import RibbonCategory, TracedCategory, NamedGeneric
+from discopy.abc import Pregroup, RibbonCategory, TracedCategory, NamedGeneric
 from discopy.cat import assert_iscomposable
 from discopy.python import finset
+from discopy.pattern import Atom, Hom, Ob, UNIT
+from discopy.search import rule
 from discopy.utils import (
     factory, Generator, classproperty, unbiased, assert_isinstance,
     factory_name)
 
 
 @dataclass
-class Ty(NamedGeneric['natural']):
+class Ty[natural](NamedGeneric, Pregroup):
     """
     An integer type is a pair of :attr:`natural` types.
 
@@ -108,7 +110,8 @@ class Ty(NamedGeneric['natural']):
     positive: natural
     negative: natural
 
-    def __init__(self, positive: natural = None, negative: natural = None):
+    def __init__(self, positive: natural | None = None,
+                 negative: natural | None = None):
         positive, negative = (
             self.natural() if x is None else x for x in (positive, negative))
         positive, negative = (
@@ -156,7 +159,7 @@ class Ty(NamedGeneric['natural']):
 
 @factory
 @dataclass
-class Diagram(RibbonCategory, NamedGeneric['natural']):
+class Diagram[natural](RibbonCategory, NamedGeneric):
     """
     An integer diagram from ``x`` to ``y`` is a :attr:`natural` diagram
     from ``x.positive @ y.negative`` to ``x.negative @ y.positive``.
@@ -200,8 +203,12 @@ class Diagram(RibbonCategory, NamedGeneric['natural']):
                 cod.positive @ dom.negative, inside.cod))
         self.inside, self.dom, self.cod = inside, dom, cod
 
+    @rule
     @unbiased
-    def then(self, other: Diagram):
+    def then[A, B, C](
+            self: Annotated[Diagram, Hom(A, B)],
+            other: Annotated[Diagram, Hom(B, C)]
+    ) -> Annotated[Diagram, Hom(A, C)]:
         """
         The composition of two integer diagrams.
 
@@ -255,7 +262,9 @@ class Diagram(RibbonCategory, NamedGeneric['natural']):
         return type(self)(inside, dom, cod)
 
     @classmethod
-    def id(cls, dom: Ty = None) -> Diagram:
+    @rule
+    def id[A](cls, dom: Annotated[Ty | None, Ob(A)] = None
+              ) -> Annotated[Diagram, Hom(A, A)]:
         """
         The identity on an integer type.
 
@@ -280,13 +289,18 @@ class Diagram(RibbonCategory, NamedGeneric['natural']):
         .. image:: /_static/int/idr.svg
             :align: center
         """
-        dom = Ty[cls.natural.ob]() if dom is None else dom
+        if dom is None:
+            dom = Ty[cls.natural.ob]()  # ty: ignore[invalid-type-form]
         positive, negative = dom
         inside = cls.natural.id(positive) @ cls.natural.twist(negative)
         return cls(inside, dom, dom)
 
+    @rule
     @unbiased
-    def tensor(self, other):
+    def tensor[A, B, C, D](
+            self: Annotated[Diagram, Hom(A, B)],
+            other: Annotated[Diagram, Hom(C, D)]
+    ) -> Annotated[Diagram, Hom([A, C], [B, D])]:
         """
         The tensor of two integer diagrams.
 
@@ -317,7 +331,10 @@ class Diagram(RibbonCategory, NamedGeneric['natural']):
         return type(self)(inside, self.dom @ other.dom, self.cod @ other.cod)
 
     @classmethod
-    def braid(cls, left: Ty, right: Ty) -> Diagram:
+    @rule
+    def braid[X: Atom, Y: Atom](
+            cls, left: Annotated[Ty, Ob(X)], right: Annotated[Ty, Ob(Y)]
+    ) -> Annotated[Diagram, Hom([X, Y], [Y, X])]:
         """
         The braid of integer diagrams is given by the following diagram:
 
@@ -359,7 +376,10 @@ class Diagram(RibbonCategory, NamedGeneric['natural']):
         return cls(inside, dom, cod)
 
     @classmethod
-    def cups(cls, left: Ty, right: Ty) -> Diagram:
+    @rule
+    def cups[X: Atom](
+            cls, left: Annotated[Ty, Ob(X)], right: Annotated[Ty, Ob(X).r]
+    ) -> Annotated[Diagram, Hom(Ob(X) @ Ob(X).r, UNIT)]:
         """
         The integer cups are given by natural identities.
 
@@ -383,12 +403,16 @@ class Diagram(RibbonCategory, NamedGeneric['natural']):
         .. image:: /_static/int/int-snake-equations.svg
             :align: center
         """
-        rigid.Ty.assert_isadjoint(left, right)
+        rigid.Ty.assert_isadjoint(
+            left, right)  # ty: ignore[invalid-argument-type]
         inside = cls.natural.id(left.positive @ left.negative)
         return cls(inside, left @ right, type(left)())
 
     @classmethod
-    def caps(cls, left: Ty, right: Ty) -> Diagram:
+    @rule
+    def caps[X: Atom](
+            cls, left: Annotated[Ty, Ob(X)], right: Annotated[Ty, Ob(X).l]
+    ) -> Annotated[Diagram, Hom(UNIT, Ob(X) @ Ob(X).l)]:
         """
         The integer caps are given by natural identities.
 
@@ -396,7 +420,8 @@ class Diagram(RibbonCategory, NamedGeneric['natural']):
             left : The left-hand side of the caps.
             right : The right-hand side of the caps.
         """
-        rigid.Ty.assert_isadjoint(right, left)
+        rigid.Ty.assert_isadjoint(
+            right, left)  # ty: ignore[invalid-argument-type]
         inside = cls.natural.id(left.negative @ left.positive)
         return cls(inside, type(left)(), left @ right)
 
@@ -447,14 +472,19 @@ class Diagram(RibbonCategory, NamedGeneric['natural']):
         .. image:: /_static/int/simplify.svg
             :align: center
         """
-        return type(self)(self.inside.simplify(), self.dom, self.cod)
+        return type(self)(
+            self.inside.simplify(),  # ty: ignore[invalid-argument-type]
+            self.dom, self.cod)
 
     @wraps(balanced.Diagram.naturality)
     def naturality(self, i: int, left=True, down=True, braid=None) -> Diagram:
         return type(self)(
-            self.inside.naturality(i, left, down, braid), self.dom, self.cod)
+            self.inside.naturality(
+                i, left, down, braid),  # ty: ignore[invalid-argument-type]
+            self.dom, self.cod)
 
-    trace = traced.Diagram.trace
+    trace_left = traced.Diagram.trace_left
+    trace_right = traced.Diagram.trace_right
     Trace = Generator.classmethod(
         pivotal.Diagram.Trace.__func__)
     transpose = rigid.Diagram.transpose
@@ -468,7 +498,7 @@ class Diagram(RibbonCategory, NamedGeneric['natural']):
     to_drawing = lambda self: self.inside.to_drawing()
 
 
-def Int(category: TracedCategory) -> RibbonCategory:
+def Int(category: type[TracedCategory]) -> type[Diagram]:
     """
     The Int construction, i.e. the free ribbon category on a given balanced
     traced `category`, with :class:`interaction.Ty` as objects and
@@ -482,7 +512,7 @@ def Int(category: TracedCategory) -> RibbonCategory:
     >>> from discopy.ribbon import Diagram as D
     >>> assert Int(D) == Diagram[D]
     """
-    return Diagram[category]
+    return Diagram[category]  # ty: ignore[invalid-type-form]
 
 
 Id = Diagram.id

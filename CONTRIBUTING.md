@@ -78,9 +78,16 @@ cores, with `-p no:benchmark` unloading the benchmark plugin that is
 incompatible with it; drop both to run serially, e.g. when debugging a
 single cell.
 
-Every cell of the matrix is one axiom of one category, named
-`<module>.<Category>.<law>`, so pytest's own `-k` selects cells for
-shorter, targeted tests.
+Every cell of the matrix is one axiom of one testable type, named
+`<module>.<Type>.<law>`, so pytest's own `-k` selects cells for
+shorter, targeted tests. The types are discovered rather than listed:
+every subclass of `discopy.axioms.Testable` that implements `strategy`,
+so a type enrols itself by saying how to generate its instances. One
+that would inherit a strategy for the wrong terms declares
+`strategy = no_strategy` until it implements its own. Most are
+categories; the roundtrip laws of `discopy.axioms.Serialisable` are also
+checked on the terms that state them without being categories, e.g. the
+objects of a category.
 
 ```shell
 uv run pytest proptest/ -k unitality -v
@@ -103,6 +110,17 @@ your machine before any search; it reaches GitHub only when selected.
 
 ```shell
 HYPOTHESIS_PROFILE=explore uv run pytest proptest/ -n auto -p no:benchmark
+```
+
+A fifth, `fast`, has the settings of `dev` but tests every law once,
+bound to the enrolled type nearest the class declaring it, rather than
+on every type inheriting it; a type restating an inherited law, as
+broken, weakened or modulo a quotient, declares it anew and gets its own
+cell. It is the profile to run while developing, the full matrix being
+for `main` and the nightly run:
+
+```shell
+HYPOTHESIS_PROFILE=fast uv run pytest proptest/ -n auto -p no:benchmark
 ```
 
 `Axiom.falsify` searches for a shrunk counterexample to a law on demand,
@@ -175,7 +193,7 @@ uv run sphinx-build docs docs/_build/html
 
 ## Build without uv
 
-The project uses the `uv_build` PEP 517 build backend, so package builds still work from standard Python tooling.
+The project uses the `setuptools` PEP 517 build backend, so package builds work from standard Python tooling.
 If you do not use `uv`, create a virtual environment and install the relevant extras manually:
 
 ```shell
@@ -183,7 +201,7 @@ python -m venv .venv
 . .venv/bin/activate
 python -m pip install --upgrade pip
 python -m pip install -e '.[test]'
-python -m pip install coverage pyproject-flake8 pytest marimo
+python -m pip install coverage pytest marimo ruff
 ```
 
 Then run:

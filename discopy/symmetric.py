@@ -90,17 +90,19 @@ Both sides foliate to the same single permutation.
 
 """
 
-from typing import ClassVar
+from typing import Annotated, ClassVar, Self
 
 from collections.abc import Sequence
 
-from discopy import monoidal, balanced, hypergraph, cmap, messages
-from discopy.abc import SymmetricCategory
+from discopy import cat, monoidal, balanced, hypergraph, cmap, messages
+from discopy.abc import BraidedCategory, MonoidalCategory, SymmetricCategory
+from discopy.axioms import (
+    Atom, axiom, Equation as AbstractEquation, Hom, Ob, rule, Sort)
 from discopy.cat import factory, Generator
 from discopy.monoidal import Wire, Ty, Nat  # noqa: F401
 from discopy.python import finset
 from discopy.utils import (
-    AxiomError, assert_iscomposable, factory_name, from_tree)
+    AxiomError, assert_iscomposable, assert_isatomic, factory_name, from_tree)
 
 
 class Layer(monoidal.Layer):
@@ -189,7 +191,7 @@ class Layer(monoidal.Layer):
             if perm == sorted(perm):
                 raise AxiomError(messages.NOT_MERGEABLE.format(self, other))
             return type(self)(first.Permutation(self.dom, perm))
-        return super().merge(other)
+        return super().merge(other)  # ty: ignore[invalid-return-type]
 
 
 @factory
@@ -267,11 +269,11 @@ class Diagram(balanced.Diagram, SymmetricCategory):
     >>> assert Permutation.Braid is Transposition
     """
     Braid = Generator.alias("Swap")
-    Layer: ClassVar[Generator[..., Layer]] = Generator.subclass(Layer)
+    Layer: ClassVar[Generator] = Generator.subclass(Layer)
     Twist = Generator.classmethod(lambda cls, dom: cls.id(dom))
-    Permutation: ClassVar[Generator[..., "Permutation"]]
-    Swap: ClassVar[Generator[..., "Swap"]]
-    Functor: ClassVar[Generator[..., "Functor"]]
+    Permutation: ClassVar[Generator]
+    Swap: ClassVar[Generator]
+    Functor: ClassVar[Generator]
 
     @property
     def is_plumbing(self) -> bool:
@@ -279,7 +281,11 @@ class Diagram(balanced.Diagram, SymmetricCategory):
         return any(layer.is_plumbing for layer in self.inside)
 
     @classmethod
-    def swap(cls, left: monoidal.Ty, right: monoidal.Ty) -> Diagram:
+    @rule
+    def swap[X: Atom, Y: Atom](
+            cls, left: Annotated[monoidal.Ty, Ob(X)],
+            right: Annotated[monoidal.Ty, Ob(Y)]
+    ) -> Annotated[Diagram, Hom([X, Y], [Y, X])]:
         """
         The diagram that swaps the ``left`` and ``right`` wires.
 
@@ -295,7 +301,7 @@ class Diagram(balanced.Diagram, SymmetricCategory):
 
     @classmethod
     def permutation(cls, xs: Sequence[int],
-                    doms: Sequence[monoidal.Ty] | None = None) -> Diagram:
+                    doms: Sequence | monoidal.Ty | None = None) -> Diagram:
         """
         The diagram that encodes a given permutation as a composition of
         swaps.
@@ -307,7 +313,8 @@ class Diagram(balanced.Diagram, SymmetricCategory):
                   default is :code:`Nat(len(xs))`.
         """
 
-        doms = Nat(len(xs)) if doms is None else doms
+        if doms is None:
+            doms = Nat(len(xs))
         size = len(doms)
         unit = type(doms)() if isinstance(doms, Nat) else cls.ob()
         tensor = lambda tys: unit.tensor(*tys)
@@ -323,14 +330,37 @@ class Diagram(balanced.Diagram, SymmetricCategory):
                 slice(0, i), i, slice(i + 1, None)
             )
         )
-        rest = left @ right if isinstance(doms, monoidal.Ty) else left + right
-        return cls.swap(tensor(left), head) @ tensor(right)\
+        rest = (left @ right  # ty: ignore[unsupported-operator]
+                if isinstance(doms, monoidal.Ty)
+                else left + right)  # ty: ignore[unsupported-operator]
+        return cls.swap(
+            tensor(left), head  # ty: ignore[invalid-argument-type]
+        ) @ tensor(right)\
             >> head @ cls.permutation(
                 [x - 1 if x > i else x for x in xs[1:]], rest)
 
     @classmethod
-    def from_permutation(cls, perm: Sequence[int], dom: monoidal.Ty = None
-                         ) -> Diagram:
+    @rule
+    def cycle[X: Atom, A](
+            cls, x: Annotated[Ty, Ob(X)], a: Annotated[Ty, Ob(A)]
+    ) -> Annotated[Diagram, Hom([X, A], [A, X])]:
+        """
+        The permutation moving a wire past a type, a native
+        :class:`Permutation` of any length.
+
+        Parameters:
+            x : The wire to move.
+            a : The type to move it past.
+
+        >>> x, y, z = Ty('x'), Ty('y'), Ty('z')
+        >>> assert Diagram.cycle(x, y @ z) == Permutation(x @ y @ z, [1, 2, 0])
+        """
+        assert_isatomic(x, cls.ob)
+        return cls.from_permutation([*range(1, len(a) + 1), 0], x @ a)
+
+    @classmethod
+    def from_permutation(cls, perm: Sequence[int],
+                         dom: monoidal.Ty | None = None) -> Diagram:
         """
         Encode a permutation natively when the category has a matching
         :class:`Permutation` factory. Descendant categories without one use
@@ -409,6 +439,86 @@ class Diagram(balanced.Diagram, SymmetricCategory):
         """
         return self.to_hypergraph().depth()
 
+    bifunctoriality = MonoidalCategory.bifunctoriality
+
+    dagger_monoidality = MonoidalCategory.dagger_monoidality
+
+    #: A free braid is a box, but the braid of a symmetric category is
+    #: its swap, whose naturality holds in the hypergraph quotient.
+    braid_naturality = BraidedCategory.braid_naturality
+
+    #: The category has the swaps that decoding asks for, so the
+    #: section of the hypergraph encoding comes back.
+    hypergraph_section = monoidal.Diagram.hypergraph_section
+
+    @axiom
+    def hypergraph_retract(cls, f: Self):
+        """
+        Decoding the hypergraph of a diagram gives it back: from
+        symmetric on the equation is the hypergraph quotient, which is
+        where decoding lands.
+        """
+        functor = cls.hypergraph_equivalence()
+        return cls.Equation(functor.decode(functor(f)), f)
+
+    @classmethod
+    def map_equivalence(cls) -> cat.Equivalence:
+        """
+        The equivalence sending a diagram to its combinatorial map:
+        :meth:`~discopy.monoidal.Diagram.to_map` encodes and
+        :meth:`discopy.cmap.CMap.to_diagram` decodes. A map is compact
+        whatever category hosts it, so decoding one asks for swaps: the
+        equivalence is stated where the swaps are.
+        """
+        return cat.Equivalence(
+            cls.ar.to_map, cmap.CMap.to_diagram,
+            cls.ar, cmap.CMap[cls.ar])
+
+    @axiom
+    def map_section(cls, f: Self):
+        """
+        Decoding is a section of the map encoding, modulo the
+        hypergraph, which does not order the boxes: a diagram orders
+        its boxes totally where a map orders them only by their wiring,
+        so decoding picks one topological order among the diagrams of
+        the same map and re-encoding can permute independent boxes.
+        """
+        functor = cls.map_equivalence()
+        image = functor(f)
+        return AbstractEquation(
+            functor(functor.decode(image)), image,
+            up_to=cmap.CMap.to_hypergraph)
+
+    @axiom
+    def map_retract(cls, f: Self):
+        """
+        Decoding the map of a diagram gives it back, up to the
+        equation of the level, which is essential: a map is spacial —
+        it cannot distinguish nested scalars from scalars side by
+        side — and so is the hypergraph the equation compares by,
+        while the syntactic comparison up to
+        :meth:`~discopy.monoidal.Diagram.foliation` is false even on
+        the boundary-connected subspace.
+        """
+        functor = cls.map_equivalence()
+        return cls.Equation(functor.decode(functor(f)), f)
+
+    @axiom
+    def map_composition(cls, f: Self):
+        """
+        The encoding preserves composition: the map of a diagram is
+        the composition of the maps of any two halves of it.
+        """
+        functor = cls.map_equivalence()
+        top, bottom = f[:len(f) // 2], f[len(f) // 2:]
+        return AbstractEquation(functor(f), functor(top) >> functor(bottom))
+
+    @axiom
+    def map_identity[X](cls, x: Annotated[Ty, Ob(X)]):
+        """ The encoding preserves identities. """
+        functor = cls.map_equivalence()
+        return AbstractEquation(functor(cls.id(x)), functor.cod.id(x))
+
 
 Box = Diagram.Box
 
@@ -460,8 +570,8 @@ class Permutation(Box):
         :align: center
     """
 
-    def __new__(cls, dom: monoidal.Ty = None,
-                perm: Sequence[int] = None):
+    def __new__(cls, dom: monoidal.Ty | None = None,
+                perm: Sequence[int] | None = None):
         if dom is None or cls is cls.ar.Swap:
             return super().__new__(cls)
         factory = cls.ar.Swap\
@@ -534,7 +644,11 @@ class Permutation(Box):
     def dagger(self) -> Permutation:
         return type(self)(self.cod, self.perm.dagger())
 
-    def tensor(self, other=None, *others):
+    @rule
+    def tensor[A, B, C, D](
+            self: Annotated[Permutation, Hom(A, B)],
+            other: Annotated[Diagram | monoidal.Ty | None, Hom(C, D)] = None,
+            *others) -> Annotated[Diagram, Hom([A, C], [B, D])]:
         if other is None:
             return self
         if isinstance(other, Permutation):
@@ -579,10 +693,6 @@ class Swap(Permutation, balanced.Braid, Box):
     :class:`Swap` is only defined for atomic types (i.e. of length 1).
     For complex types, use :meth:`Diagram.swap` instead.
     """
-    def __setstate__(self, state):
-        state.setdefault('perm', finset.Permutation([1, 0], 2))
-        super().__setstate__(state)
-
     def __init__(self, left, right):
         if len(left) == 2:
             perm = finset.Permutation(right, len(left))
@@ -629,6 +739,16 @@ class Functor(balanced.Functor):
     """
     dom = cod = Diagram
 
+    @axiom
+    def symmetric(
+            cls, functor: Self,
+            x: Annotated[Ty, Sort("In0", atomic=True)],
+            y: Annotated[Ty, Sort("In0", atomic=True)]) -> Equation:
+        """ A symmetric functor preserves the swap. """
+        return functor.cod.Equation(
+            functor(functor.dom.swap(x, y)),
+            functor.cod.swap(functor(x), functor(y)))
+
     def __call__(self, other):
         if isinstance(other, Swap) and hasattr(self.cod.ar, "swap"):
             return self.cod.ar.swap(self(other.dom[0]), self(other.dom[1]))
@@ -638,6 +758,12 @@ class Functor(balanced.Functor):
                 doms = self(other.dom)
             else:
                 doms = list(map(self, other.dom))
+            atoms = list(doms)
+            if hasattr(self.cod.ar, "Permutation")\
+                    and len(atoms) == len(other.perm)\
+                    and all(len(atom) == 1 for atom in atoms):
+                dom = self.cod.ar.ob().tensor(*atoms)
+                return self.cod.ar.Permutation(dom, other.perm)
             return self.cod.ar.permutation(other.perm, doms)
         return super().__call__(other)
 
@@ -645,6 +771,8 @@ class Functor(balanced.Functor):
 CMap = cmap.CMap[Diagram]
 
 Hypergraph = hypergraph.Hypergraph[Diagram]
+
+
 Id = Diagram.id
 
 

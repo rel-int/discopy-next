@@ -48,7 +48,6 @@ Summary
         sqrt
         scalar
 """
-import copy
 from math import e, pi
 
 from discopy import messages
@@ -236,16 +235,6 @@ class QuantumGate(Box):
         if data is not None and hasattr(data, "__len__"):
             data = [complex(v) for v in data]
         super().__init__(name, dom, cod, data, **params)
-
-    def __setstate__(self, state):
-        if "_array" in state and state["_array"] is not None:
-            state["data"] = state['_array'].flatten().tolist()
-        if "_name" in state:
-            if state["_name"] in GATES and hasattr(
-                    GATES[state["_name"]], "data"):
-                state["data"] = copy.deepcopy(GATES[state["_name"]].data)
-                state["_z"] = GATES[state["_name"]].z
-        super().__setstate__(state)
 
     def setoid(self):
         """ Avoid checking for equality of matrices when comparing gates. """
@@ -587,13 +576,14 @@ class Parametrized(Box):
 
     def subs(self, *args):
         data = rsubs(self.data, *args)
-        return type(self)(data)
+        return type(self)(data)  # ty: ignore[missing-argument]
 
     def lambdify(self, *symbols, **kwargs):
         from sympy import lambdify
         with backend() as np:
             data = lambdify(symbols, self.data, dict(kwargs, modules=np))
-        return lambda *xs: type(self)(data(*xs))
+        return lambda *xs: type(self)(  # ty: ignore[missing-argument]
+            data(*xs))
 
     def __str__(self):
         if isinstance(self, Controlled):
@@ -725,10 +715,6 @@ class Scalar(Parametrized):
         dom, cod = qubit ** 0, qubit ** 0
         super().__init__(name, dom, cod, is_mixed=is_mixed, data=data, z=None)
 
-    def __setstate__(self, state):
-        state["_z"] = None
-        super().__setstate__(state)
-
     def __repr__(self):
         return super().__repr__()[:-1] + (
             ', is_mixed=True)' if self.is_mixed else ')')
@@ -759,15 +745,11 @@ class Sqrt(Scalar):
         super().__init__(data, name="sqrt")
         self.drawing_name = f"sqrt({format_number(data)})"
 
-    def __setstate__(self, state):
-        super().__setstate__(state)
-        if self.is_dagger is None:
-            self.is_dagger = False
-
     @property
     def array(self):
         with backend() as np:
-            return np.array(self.data ** .5)
+            return np.array(
+                self.data ** .5)
 
     def dagger(self):
         return self
