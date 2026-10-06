@@ -99,11 +99,12 @@ import inspect
 import operator
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Iterator
-from dataclasses import KW_ONLY, dataclass, field, replace
+from dataclasses import KW_ONLY, dataclass, field, fields, replace
 from functools import cache, reduce
 from types import GenericAlias
 from typing import (
-    Annotated, ClassVar, Self, TypeAliasType, TypeVar, get_args, get_origin)
+    Annotated, Any, ClassVar, Self, TypeAliasType, TypeVar, get_args,
+    get_origin)
 
 from discopy import abc
 from discopy.utils import factory_name
@@ -300,13 +301,8 @@ class Pattern(ABC):
     @property
     def parts(self) -> tuple[Pattern, ...]:
         """ The immediate sub-patterns, the fields holding one. """
-        values = (
-            getattr(self, name)
-            for name in getattr(self, "__dataclass_fields__", ()))
-        return tuple(
-            part for value in values
-            for part in (value if isinstance(value, tuple) else (value, ))
-            if isinstance(part, Pattern))
+        values = (getattr(self, f.name) for f in fields(self))
+        return tuple(value for value in values if isinstance(value, Pattern))
 
     def walk(self) -> Iterator[Pattern]:
         """ The pattern and every sub-pattern below it. """
@@ -351,6 +347,12 @@ class Pattern(ABC):
         Ty() | x @ y
         x | y
         x @ y | Ty()
+
+        Matching no value yields the substitution as it is, once:
+
+        >>> for subst, _ in (A @ B).match(None, {'A': x}):
+        ...     print(subst)
+        {'A': monoidal.Ty(cat.Ob('x'))}
         """
         subst = {} if subst is None else subst
         if value is None:
@@ -397,9 +399,9 @@ class Pattern(ABC):
 @dataclass(frozen=True, init=False)
 class Var(Pattern):
     """
-    A variable over the objects of a category: the lift ``Var(A)`` of
-    one of the declaration's own type parameters, its sort the bound —
-    or a name and a sort directly.
+    A variable over the objects of a category, given either as the lift
+    ``Var(A)`` of a type parameter of the declaration, whose bound is its
+    sort, or as a name and a sort.
 
     >>> def cups[X: Atom](): ...
     >>> X, = cups.__type_params__
@@ -503,6 +505,10 @@ class Tensor[*Ts](Pattern):
     @classmethod
     def level(cls) -> type[abc.Category]:
         return abc.ColouredMonoid
+
+    @property
+    def parts(self) -> tuple[Pattern, ...]:
+        return self.factors
 
     @property
     def variables(self):
@@ -901,7 +907,9 @@ class Sequent:
         right = "" if self.conclusion is None else f" ⊢ {self.conclusion}"
         return left + right
 
-def alias_of(annotation) -> TypeAliasType | None:
+
+
+def alias_of(annotation: object) -> TypeAliasType | None:
     """ The alias of :mod:`discopy.abc` an annotation subscripts,
     ``Obj[T, X]`` or ``Hom[C1, dom, cod]``, :obj:`None` otherwise. """
     origin = get_origin(annotation)
@@ -911,7 +919,7 @@ def alias_of(annotation) -> TypeAliasType | None:
     return None
 
 
-def expand(annotation) -> Pattern | None:
+def expand(annotation: object) -> Pattern | None:
     """
     The pattern a subscripted alias of :mod:`discopy.abc` states:
     ``Hom[C1, dom, cod]`` the hom between its lifted sides, ``Obj[T,
@@ -938,7 +946,7 @@ def expand(annotation) -> Pattern | None:
     return lift(args[1])
 
 
-def states_pattern(annotation) -> bool:
+def states_pattern(annotation: object) -> bool:
     """ Whether an annotation states a pattern or a sort. """
     return annotation is Self or get_origin(annotation) is Annotated\
         or alias_of(annotation) is not None
@@ -970,17 +978,59 @@ def premises_of(function: Callable, missing: bool = False) -> list[str]:
         and parameter.kind is not inspect.Parameter.VAR_KEYWORD]
 
 
+def stated(annotation: object, level: type | None = None,
+           function: Callable | None = None) -> Pattern | Sort:
+    """
+    The pattern or the sort an annotation states: :obj:`Self` the sort
+    of the class stating it, a subscripted alias of :mod:`discopy.abc`
+    the pattern :func:`expand` gives, and an ``Annotated`` the one
+    pattern or sort it carries. A pattern needing more structure than
+    the ``level`` bounding the objects of the ``function`` is refused.
+
+    >>> from discopy import abc
+    >>> print(stated(abc.Hom["C1", Var("A"), Var("B")]))
+    C1[A, B]
+    >>> stated(Annotated[object, Var("A") @ Var("B")], level=abc.Category)
+    Traceback (most recent call last):
+    ...
+    TypeError: A @ B needs a ColouredMonoid, ...
+    """
+    if annotation is Self:
+        return Sort(SELF)
+    value = expand(annotation)
+    if value is None:
+        try:
+            (value, ) = annotation.__metadata__
+        except (AttributeError, ValueError):
+            raise TypeError(
+                "An annotation carries exactly one pattern, got "
+                f"{annotation!r}.") from None
+    if not isinstance(value, (Pattern, Sort)):
+        raise TypeError(f"Expected a pattern or a sort, got {value!r}.")
+    if not isinstance(value, Pattern) or level is None:
+        return value
+    for node in value.walk():
+        if isinstance(node, (Var, Hom)):
+            continue
+        required = type(node).level()
+        if not issubclass(level, required):
+            where = "its objects" if function is None\
+                else f"the objects of {function.__name__}"
+            raise TypeError(
+                f"{node} needs a {required.__name__}, {where} "
+                f"are bounded by {level.__name__}.")
+    return value
+
+
 def parse(function: Callable, owner: type | None = None,
           conclusion: bool = True) -> Sequent:
     """
-    The sequent a function states with its signature, collected from
-    the pattern objects its annotations built when they were read:
-    each parameter stating a pattern a premise, the return annotation
-    the conclusion when asked for, the variables the :class:`Var` patterns the
-    patterns lift, carrying the bound of the objects of the ``owner``
-    class stating it. A pattern needing more structure than the
-    owner's objects have is refused. An annotation subscripting an
-    alias of :mod:`discopy.abc` is the pattern :func:`expand` gives.
+    The sequent a function states with its signature, read from the
+    patterns its annotations build: the premises are the parameters whose
+    annotation states a pattern, the conclusion is the return annotation
+    when asked for, and the variables are the :class:`Var` patterns they
+    contain, each carrying the bound of the objects of the ``owner``
+    class stating it. Each annotation is read by :func:`stated`.
 
     >>> def then[A, B, C](
     ...         self: Annotated["object", Hom(Var(A), Var(B))],
@@ -1023,35 +1073,11 @@ def parse(function: Callable, owner: type | None = None,
         raise TypeError(
             f"{function.__name__} states no pattern for {name}.")
 
-    def stated(annotation) -> Pattern | Sort:
-        if annotation is Self:
-            return Sort(SELF)
-        value = expand(annotation)
-        if value is None:
-            try:
-                (value, ) = annotation.__metadata__
-            except (AttributeError, ValueError):
-                raise TypeError(
-                    "An annotation carries exactly one pattern, got "
-                    f"{annotation!r}.") from None
-        if not isinstance(value, (Pattern, Sort)):
-            raise TypeError(f"Expected a pattern or a sort, got {value!r}.")
-        if isinstance(value, Pattern) and level is not None:
-            for node in value.walk():
-                if isinstance(node, (Var, Hom)):
-                    continue
-                required = type(node).level()
-                if not issubclass(level, required):
-                    raise TypeError(
-                        f"{node} needs a {required.__name__}, the objects "
-                        f"of {function.__name__} are bounded by "
-                        f"{level.__name__}.")
-        return value
-
     premises = {
-        name: stated(signature.parameters[name].annotation)
+        name: stated(signature.parameters[name].annotation, level, function)
         for name in premises_of(function)}
-    returns = stated(signature.return_annotation) if conclusion\
+    returns = stated(signature.return_annotation, level, function)\
+        if conclusion\
         and signature.return_annotation is not inspect.Signature.empty\
         else None
     if conclusion and not isinstance(returns, Hom):
@@ -1091,9 +1117,9 @@ def parse(function: Callable, owner: type | None = None,
 @dataclass(repr=False)
 class Declaration[**P, T]:
     """
-    A sequent stated by a ``function`` on an abstract base class and
-    inherited by every category below it: the base of the rules and
-    generators of :mod:`discopy.search` and of the axioms of
+    A declaration is a sequent stated by a ``function`` on an abstract
+    base class and inherited by every category below it: the base of the
+    rules and generators of :mod:`discopy.search` and of the axioms of
     :mod:`discopy.axioms`. The ``category`` is the class the
     declaration is bound to, :obj:`None` until :meth:`bind` or the
     attribute access on a class binds it, ``name`` the attribute it is
@@ -1183,12 +1209,13 @@ class Declaration[**P, T]:
         """ The object type of the category, called to build the unit. """
         return self.scope[OBJECTS]
 
-    def canonical(self) -> dict:
+    def canonical(self) -> dict[str, Any]:
         """
-        The canonical arguments of the sequent, by name: each variable an
-        object named after it — a count the number two — each premise a
-        :func:`cell` named after its parameter, so that a declaration
-        reads as a schema.
+        The canonical arguments of the sequent, by name, so that a
+        declaration reads as a schema: each variable is the canonical
+        instance of its sort, e.g. an object named after it or the number
+        two for a :class:`Count`, and each premise is a :func:`cell` named
+        after its parameter.
 
         >>> from discopy.abc import MonoidalCategory
         >>> from discopy.monoidal import Diagram
@@ -1215,18 +1242,19 @@ class Declaration[**P, T]:
     def generate(self, draw: Callable, hom: Callable, subst=None,
                  residuals: Residuals = (), types=None) -> tuple:
         """
-        Draw the arguments of the sequent inside a composite strategy —
-        ``draw`` its draw function, ``hom(category, dom, cod)`` a strategy
-        for the morphisms of that type, ``types`` one for the objects
-        overriding that of ``C0`` — one premise at a time: a pattern is
-        instantiated, a sort drawn, a hom drawn through ``hom``, a
-        premise of the sort of the arrows being the hom with both sides
-        free. A variable is drawn from its sort the first time a premise
-        needs it, except one standing alone on a side of a hom, which is
-        read off the term the search finds so that the goal guides the
-        search. The ``subst`` and ``residuals`` of a match seed the draw,
-        and the residuals are checked once every variable is bound,
-        rejecting the example otherwise.
+        Sample the arguments of the sequent inside a composite strategy —
+        ``draw`` the function sampling a value from a strategy that
+        :func:`hypothesis.strategies.composite` passes it,
+        ``hom(category, dom, cod)`` a strategy for the morphisms of that
+        type, ``types`` one for the objects overriding that of ``C0`` —
+        one premise at a time: a pattern is instantiated, a sort sampled,
+        a hom sampled through ``hom``, a premise of the sort of the arrows
+        being the hom with both sides free. A variable is sampled from its
+        sort the first time a premise needs it, except one standing alone
+        on a side of a hom, which is read off the term the search finds so
+        that the goal guides the search. The ``subst`` and ``residuals``
+        of a match seed the sample, and the residuals are checked once
+        every variable is bound, rejecting the example otherwise.
         """
         from hypothesis import assume
 
