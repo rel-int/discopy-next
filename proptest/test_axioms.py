@@ -20,7 +20,7 @@ def types() -> tuple[type[Testable], ...]:
     package rather than a list kept beside it. A class stating no law
     gets no cell, nor does a category over a fixed vocabulary, whose
     :attr:`discopy.abc.Category.generators` are the
-    :class:`discopy.search.Constant` rules of its words or gates: it
+    :class:`discopy.pattern.Constant` rules of its words or gates: it
     fills only the sequents its vocabulary derives, not the ones a law
     samples, and its laws are those of the free category it lives in.
     """
