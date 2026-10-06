@@ -712,3 +712,34 @@ def test_abc_Nat():
 def test_Colour_strategy():
     from hypothesis import find
     assert find(Colour.strategy(), lambda c: c.name == "red") == Colour("red")
+
+
+def test_composition_never_emits_a_boxless_layer():
+    """ ``then``, ``tensor`` and ``normal_form`` build their layers with
+    ``_scan=False``, so the constructor cannot catch a boxless one: these are
+    the paths that have to be checked by hand. """
+    x, y, z = Ty('x'), Ty('y'), Ty('z')
+    f, g, h = Box('f', x, y), Box('g', y, z), Box('h', z, x)
+    interchanger = f @ Id(z) >> Id(y) @ h
+    diagrams = [
+        f >> g, f >> g >> h, f >> f.dagger(), (f >> g).dagger(),
+        f @ g, g @ f, f @ g @ h, f.tensor(), f.tensor(g, h),
+        x @ f, f @ x, Ty() @ f, f @ Ty(), Id(Ty()) @ f, f @ Id(Ty()),
+        Id(x) @ f, f @ Id(y), Id(Ty()) >> Id(Ty()),
+        interchanger, interchanger.normal_form(), interchanger.foliation(),
+        interchanger.interchange(0, 1),
+        (f @ Id(z) >> Id(y) @ h).normal_form().dagger(),
+    ]
+    for diagram in diagrams:
+        assert all(layer.boxes for layer in diagram.inside), repr(diagram)
+
+
+def test_coloured_Ty_tree_and_legacy_tree():
+    red, green = map(Colour, ("red", "green"))
+    typ = Ty(Wire("x", red, green))
+    assert from_tree(typ.to_tree()) == typ
+    assert from_tree(Ty.id(red).to_tree()) == Ty.id(red)
+    legacy = {
+        'factory': 'monoidal.Ty',
+        'inside': [{'factory': 'cat.Ob', 'name': 'x'}]}
+    assert from_tree(legacy) == Ty('x')

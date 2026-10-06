@@ -735,3 +735,68 @@ def test_portless_box_and_explicit_trace():
         == closed.CMap.ev(base, exponent, left=True)
     assert closed.CMap.ev_right(base, exponent)\
         == closed.CMap.ev(base, exponent, left=False)
+
+
+def test_from_glued_agrees_with_folding():
+    from discopy.compact import Ty, Box, Cup, Cap, Swap, Diagram, CMap as M
+    x, y = map(Ty, "xy")
+    f, g, h = Box("f", x, y), Box("g", y @ y, x), Box("h", x, y @ y)
+    diagrams = [
+        Diagram.id(x),
+        f,
+        f >> f.dagger(),
+        h >> g,
+        f @ Diagram.id(x),
+        Diagram.id(x) @ f,
+        h >> Swap(y, y) >> g,
+        Diagram.id(x) @ Cap(x.r, x) >> Cup(x, x.r) @ Diagram.id(x),
+        Cap(x.r, x) >> Cup(x.r, x),
+        h >> Cup(y, y.r) if y.r == y else h >> g,
+    ]
+    for diagram in diagrams:
+        folded = M.functor(
+            ob_map=lambda typ: typ, ar_map=M.from_box,
+            dom=Diagram, cod=M)(diagram)
+        assert diagram.to_map() == folded
+
+
+def test_eliminate_swaps():
+    from discopy.compact import Ty, Id, Box
+
+    x, y, w, z = map(Ty, "xyzw")
+
+    diagram = Id(x @ y).permute(1, 0).permute(1, 0)
+    assert diagram != Id(x @ y)  # there are swaps to eliminate
+    assert diagram.to_map().to_diagram().normal_form() == Id(x @ y)
+
+    diagram = Id(x @ y @ w @ z).permute(2, 3, 0, 1).permute(2, 3, 0, 1)
+    assert diagram != Id(x @ y @ w @ z)
+    assert diagram.to_map().to_diagram().normal_form() == Id(x @ y @ w @ z)
+
+    f, g = Box("f", x, z), Box("g", y, w)
+
+    diagram = Id(x @ y).permute(1, 0) >> g @ x\
+        >> Id(w @ x).permute(1, 0) >> f @ w
+    assert diagram.to_map().to_diagram() == x @ g >> f @ w
+    assert diagram.to_map() == diagram.to_map().to_diagram().to_map()
+    assert diagram.to_map() == diagram.to_hypergraph().to_diagram().to_map()
+
+
+def test_zipping_cups_and_caps():
+    """
+    │ ╭─╮ ╭─╮ ╭─╮ ╭─╮    │
+    │ │ │ │ │ │ │ │ │  = │
+    ╰─╯ ╰─╯ ╰─╯ ╰─╯ │    │
+    """
+
+    from discopy.compact import Ty, Diagram as D, CMap as M
+
+    x, y = map(Ty, 'xy')
+
+    def zipping_expr(c, z):
+        id, cup, cap = c.id(z), c.cups(z, z.r), c.caps(z.r, z)
+        return id @ cap @ cap @ cap @ cap >> cup @ cup @ cup @ cup @ id
+
+    assert zipping_expr(D, x).to_map() == zipping_expr(M, x) == M.id(x)
+    assert zipping_expr(D, x @ y).to_map()\
+        == zipping_expr(M, x @ y) == M.id(x @ y)

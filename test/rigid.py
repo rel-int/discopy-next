@@ -196,3 +196,10 @@ def test_Wire_strategy():
     assert find(pivotal.Wire.strategy(), lambda wire: wire.z).z == 1
     assert find(frobenius.Wire.strategy(), lambda wire: True).z == 0
     assert len(find(frobenius.Ty.strategy(), lambda ty: len(ty) == 1)) == 1
+
+
+def test_functor_factory():
+    """ The functor of a rigid diagram rotates, so a boundary keeps its z. """
+    x, y = Ty('x'), Ty('y')
+    assert Diagram.Functor is Functor
+    assert Diagram.Functor({x: y}, {})(x.r) == y.r

@@ -4,7 +4,7 @@ from pytest import raises
 
 from discopy.hypergraph import *
 from discopy.frobenius import (
-    Ty, Box, Cap, Cup, Spider, Hypergraph as H)
+    Ty, Box, Cap, Cup, Diagram, Spider, Hypergraph as H)
 
 def test_pushout():
     with raises(ValueError):
@@ -316,3 +316,27 @@ def test_subclass_to_hypergraph():
     f, g = Gate('f', x, x), Gate('g', x, x)
     assert (f >> g).to_hypergraph().category == Circuit
     assert isinstance((f >> g).to_hypergraph().to_diagram(), Circuit)
+
+
+def test_Hypergraph_from_diagram_matches_naive_composition():
+    """ Gluing every box in one pass agrees with folding their images with
+    :meth:`Hypergraph.then` one layer at a time, on diagrams that exercise
+    a chain of swaps, states and effects, and boxes of different arity and
+    coarity sharing a layer, see issue #623. """
+    x = Ty('x')
+    f = Box('f', x, x)
+    state, effect = Box('s', Ty(), x), Box('e', x, Ty())
+    split, merge = Box('p', x, x @ x), Box('m', x @ x, x)
+
+    chain = Diagram.id(x @ x)
+    for _ in range(6):
+        chain = chain >> (f @ x) >> Diagram.swap(x, x)
+
+    diagrams = [
+        chain,
+        state >> split >> merge >> effect,
+        Diagram.id(x) @ split >> f @ merge,
+        Cap(x, x) @ x >> x @ Cup(x, x),
+    ]
+    for diagram in diagrams:
+        assert diagram.to_hypergraph() == _naive_from_diagram(diagram)
