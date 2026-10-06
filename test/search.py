@@ -116,11 +116,10 @@ def test_focusing():
             dom, cod, type(dom))]
 
     assert rules_in_focus(biclosed.Diagram, a, b << a) == ["curry_left"]
-    s, t = rigid.Ty("a"), rigid.Ty("b")
-    assert rules_in_focus(rigid.Diagram, s, t << s) == ["curry_left"]
-    # The transpose is forced: its premise keeps to the goal's atoms.
-    assert not rules_in_focus(rigid.Diagram, s, t)
-    # A bare codomain curries only by inventing an adjoint: a choice.
+    assert [name for name, r in rigid.Diagram.rules.items()
+            if r.recursive] == ["tensor", "cut"]
+    # A rigid curry is derived — caps and cut reach every transpose —
+    # and self-dual types would let it focus on every goal.
 
     curried = find(search(
         biclosed.Diagram, biclosed.Box.strategy,

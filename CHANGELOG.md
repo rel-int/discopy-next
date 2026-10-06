@@ -59,7 +59,12 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   that would invent an adjoint. `epsilon=0` is a focused decision
   procedure, any `epsilon > 0` preserves the support of the search —
   every term keeps a positive chance — and `epsilon=1` disables
-  focusing; the default is `0.05`.
+  focusing; the default is `0.05`. A focused rule must make progress,
+  a premise equal to the goal staying a choice, and the curries of
+  `rigid.Diagram` are marked inapplicable, since a rigid curry is
+  derived — its body is a caps composition, so caps and cut reach
+  every transpose — and the self-dual types of a quantum circuit
+  would otherwise let it focus on every goal.
 
 - The codebase typechecks: `uv run ty check` passes in the full
   development environment, `ty` a dev dependency locked in

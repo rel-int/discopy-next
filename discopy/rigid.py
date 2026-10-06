@@ -408,8 +408,10 @@ class Diagram(biclosed.Diagram, RigidCategory):
     ev_left = classmethod(RigidCategory.ev_left.__func__)
     ev_right = classmethod(RigidCategory.ev_right.__func__)
     curry = RigidCategory.curry
-    curry_left = RigidCategory.curry_left
-    curry_right = RigidCategory.curry_right
+    curry_left = RigidCategory.curry_left.inapplicable(
+        'A rigid curry is derived: caps and cut reach every transpose.')
+    curry_right = RigidCategory.curry_right.inapplicable(
+        'A rigid curry is derived: caps and cut reach every transpose.')
     base_and_exponent = RigidCategory.base_and_exponent
     Box: ClassVar[Generator]
     Sum: ClassVar[Generator]
