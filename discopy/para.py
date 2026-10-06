@@ -227,7 +227,6 @@ class Symmetric[category: symmetric.Diagram](SymmetricCategory, NamedGeneric):
         """
         return cls.lift(cls.category.id(cls.ob() if dom is None else dom))
 
-    @rule
     @unbiased
     def then[A, B, C](
             self: Annotated[Symmetric, Hom(A, B)],
@@ -252,7 +251,6 @@ class Symmetric[category: symmetric.Diagram](SymmetricCategory, NamedGeneric):
                           self.param @ other.param,
                           self.copar @ other.copar)
 
-    @rule
     @unbiased
     def tensor[A, B, C, D](
             self: Annotated[Symmetric, Hom(A, B)],
@@ -336,22 +334,6 @@ class Traced(Symmetric, TracedCategory):
     Parametric maps over a traced symmetric underlying `category` form a
     traced category, with the parameters swapped out of the way.
     """
-    @rule
-    def trace_left[A, B, M: Atom](
-            self: Annotated[
-                Traced, Hom([M, A], [M, B])],
-            n=1) -> Annotated[Traced, Hom(A, B)]:
-        """ The trace of ``n`` wires on the left, see :meth:`trace`. """
-        return self.trace(n, left=True)
-
-    @rule
-    def trace_right[A, B, M: Atom](
-            self: Annotated[
-                Traced, Hom([A, M], [B, M])],
-            n=1) -> Annotated[Traced, Hom(A, B)]:
-        """ The trace of ``n`` wires on the right, see :meth:`trace`. """
-        return self.trace(n)
-
     def trace(self, n: int = 1, left: bool = False) -> Traced:
         """
         The trace of a parametric map is the trace of the underlying
@@ -436,20 +418,6 @@ class Closed(Markov, ClosedCategory):
         return cls.lift(cls.category.ev(
             base, exponent, left))  # ty: ignore[invalid-argument-type]
 
-    @rule
-    def curry_left[X, Y: Atom, Z](
-            self: Annotated[Closed, Hom([X, Y], Z)], n=1
-    ) -> Annotated[Closed, Hom(X, (Ob(Z) << Ob(Y)))]:
-        """ The left currying of ``n`` objects, see :meth:`curry`. """
-        return self.curry(n, left=True)
-
-    @rule
-    def curry_right[Y: Atom, X, Z](
-            self: Annotated[Closed, Hom([Y, X], Z)], n=1
-    ) -> Annotated[Closed, Hom(X, (Ob(Y) >> Ob(Z)))]:
-        """ The right currying of ``n`` objects, see :meth:`curry`. """
-        return self.curry(n, left=False)
-
     def curry(self, n: int = 1, left: bool = True) -> Closed:
         """
         Curry the last `n` objects of the domain if `left` else the first,
@@ -487,28 +455,10 @@ class Feedback(Markov, FeedbackCategory):
         return type(self)(*(x.delay(n_steps) for x in (
             self.dom, self.cod, self.inside, self.param, self.copar)))
 
-    @rule
-    def feedback_left[A, B, M: Atom](
-            self: Annotated[
-                Feedback,
-                Hom(Ob(M).d @ Ob(A), [M, B])],
-            dom: monoidal.Ty | None = None,
-            cod: monoidal.Ty | None = None,
-            mem: monoidal.Ty | None = None) -> Annotated[Feedback, Hom(A, B)]:
+    def feedback_left(self, dom=None, cod=None, mem=None):
         """ A parametric feedback keeps its memory on the right. """
         raise NotImplementedError(
             "A parametric feedback keeps its memory on the right.")
-
-    @rule
-    def feedback_right[A, B, M: Atom](
-            self: Annotated[
-                Feedback,
-                Hom(Ob(A) @ Ob(M).d, [B, M])],
-            dom: monoidal.Ty | None = None,
-            cod: monoidal.Ty | None = None,
-            mem: monoidal.Ty | None = None) -> Annotated[Feedback, Hom(A, B)]:
-        """ The feedback of the memory on the right, see :meth:`feedback`. """
-        return self.feedback(dom, cod, mem)
 
     def feedback(self, dom: monoidal.Ty | None = None,
                  cod: monoidal.Ty | None = None,

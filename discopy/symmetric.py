@@ -644,7 +644,6 @@ class Permutation(Box):
     def dagger(self) -> Permutation:
         return type(self)(self.cod, self.perm.dagger())
 
-    @rule
     def tensor[A, B, C, D](
             self: Annotated[Permutation, Hom(A, B)],
             other: Annotated[Diagram | monoidal.Ty | None, Hom(C, D)] = None,

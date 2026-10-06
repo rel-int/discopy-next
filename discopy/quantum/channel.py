@@ -181,13 +181,13 @@ class Channel(Tensor):
             cls.dtype].id(dom.to_dim()).array,  # ty: ignore[invalid-type-form]
             dom, dom)
 
-    @rule
     def then[A, B, C](
             self: Annotated[Channel, Hom(A, B)],
             other: Annotated[Channel | None, Hom(B, C)] = None,
             *others: Channel) -> Annotated[Channel, Hom(A, C)]:
         if other is None or others:
-            return super().then(other, *others)
+            return super().then(
+                other, *others)  # ty: ignore[invalid-return-type]
         assert_isinstance(other, type(self))
         array = (self.to_tensor() >> other.to_tensor()).array
         return type(self)(array, self.dom, other.cod)
@@ -195,13 +195,13 @@ class Channel(Tensor):
     def dagger(self) -> Channel:
         return type(self)(self.to_tensor().dagger().array, self.cod, self.dom)
 
-    @rule
     def tensor[A, B, C, D](
             self: Annotated[Channel, Hom(A, B)],
             other: Annotated[Channel | None, Hom(C, D)] = None,
             *others: Channel) -> Annotated[Channel, Hom([A, C], [B, D])]:
         if other is None or others:
-            return super().tensor(other, *others)
+            return super().tensor(
+                other, *others)  # ty: ignore[invalid-return-type]
         assert_isinstance(other, type(self))
         f = Box('f', Ty('c00', 'q00', 'q00'), Ty('c10', 'q10', 'q10'))
         g = Box('g', Ty('c01', 'q01', 'q01'), Ty('c11', 'q11', 'q11'))

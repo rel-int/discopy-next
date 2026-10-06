@@ -488,7 +488,6 @@ class Stream[category](MonoidalCategory, NamedGeneric):
         _later = None if x.is_constant else lambda: cls.id(x.later)
         return cls(now, dom, cod, _later=_later)
 
-    @rule
     @unbiased
     def then[A, B, C](
             self: Annotated[Stream, Hom(A, B)],
@@ -517,7 +516,6 @@ class Stream[category](MonoidalCategory, NamedGeneric):
             lambda: self.later >> other.later)
         return type(self)(now, dom, cod, mem, _later)
 
-    @rule
     @unbiased
     def tensor[A, B, C, D](
             self: Annotated[Stream, Hom(A, B)],

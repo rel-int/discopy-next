@@ -80,7 +80,6 @@ class Function(MonoidalCategory, Sequence):
         x = Nat(int(x))
         return Function(list(range(x)), x, x)
 
-    @rule
     def then[A, B, C](
             self: Annotated[Function, Hom(A, B)],
             other: Annotated[Function, Hom(B, C)]
@@ -88,7 +87,6 @@ class Function(MonoidalCategory, Sequence):
         inside = [self[other[i]] for i in range(len(other))]
         return Function(inside, self.dom, other.cod)
 
-    @rule
     def tensor[A, B, C, D](
             self: Annotated[Function, Hom(A, B)],
             other: Annotated[Function, Hom(C, D)]
@@ -263,7 +261,6 @@ class Permutation(Function, PROP):
             i = self[i]
         return tuple(cycle)
 
-    @rule
     def then[A, B, C](
             self: Annotated[Self, Hom(A, B)],
             other: Annotated[Self, Hom(B, C)]) -> Annotated[Self, Hom(A, C)]:
@@ -289,7 +286,6 @@ class Permutation(Function, PROP):
         other = type(self)(other, len(self))
         return other.dagger().then(self).then(other)
 
-    @rule
     def tensor[A, B, C, D](
             self: Annotated[Self, Hom(A, B)],
             other: Annotated[Self | None, Hom(C, D)] = None, *others

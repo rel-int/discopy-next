@@ -160,11 +160,9 @@ In the category of streams, this is just the identity.
 from typing import ClassVar
 
 from discopy import monoidal, braided, markov, hypergraph, messages
-from typing import Annotated
 
 from discopy.axioms import GENERATORS, no_strategy
 from discopy.abc import DelayedMonoid, FeedbackCategory
-from discopy.axioms import Atom, Hom, Ob, rule
 from discopy.utils import (
     factory, Generator, factory_name, assert_isinstance, AxiomError,
     from_tree)
@@ -397,32 +395,24 @@ class Diagram(markov.Diagram, FeedbackCategory):
         inside = tuple(box.delay(n_steps) for box in self.inside)
         return type(self)(inside, dom, cod, _scan=False)
 
-    @rule
-    def feedback_left[A, B, M: Atom](
-            self: Annotated[Diagram, Hom(Ob(M).d @ Ob(A), [M, B])],
-            dom=None, cod=None, mem=None) -> Annotated[Diagram, Hom(A, B)]:
+    def feedback(self, dom=None, cod=None, mem=None, left=False):
         """
-        A :class:`Feedback` of the memory on the left, wire by wire: the
-        outermost memory wire, the first, feeds back first.
-        """
-        if mem is None or len(mem) == 1:
-            return self.Feedback(self, dom=dom, cod=cod, mem=mem, left=True)
-        return self if not mem\
-            else self.feedback_left(mem=mem[:1]).feedback_left(mem=mem[1:])
+        A :class:`Feedback` of the memory, wire by wire: the outermost
+        memory wire — the first on the left, the last on the right —
+        feeds back first.
 
-    @rule
-    def feedback_right[A, B, M: Atom](
-            self: Annotated[Diagram, Hom(Ob(A) @ Ob(M).d, [B, M])],
-            dom=None, cod=None, mem=None) -> Annotated[Diagram, Hom(A, B)]:
-        """
-        A :class:`Feedback` of the memory on the right, wire by wire: the
-        outermost memory wire, the last, feeds back first.
+        Parameters:
+            dom : The domain of the feedback.
+            cod : The codomain of the feedback.
+            mem : The memory type to feed back.
+            left : Whether the memory is on the left or right.
         """
         if mem is None or len(mem) == 1:
-            return self.Feedback(self, dom=dom, cod=cod, mem=mem)
-        return self if not mem\
-            else self.feedback_right(mem=mem[-1:]).feedback_right(
-                mem=mem[:-1])
+            return self.Feedback(self, dom=dom, cod=cod, mem=mem, left=left)
+        result = self
+        for i in range(len(mem)) if left else reversed(range(len(mem))):
+            result = result.feedback(mem=mem[i:i + 1], left=left)
+        return result
 
     @classmethod
     def wait(cls, dom: Ty) -> Diagram:

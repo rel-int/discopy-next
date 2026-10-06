@@ -356,7 +356,6 @@ class Hypergraph[category: Diagram](MonoidalCategory, DaggerCategory,
 
     twist = id
 
-    @rule
     @unbiased
     def then[A, B, C](
             self: Annotated[Hypergraph, Hom(A, B)],
@@ -385,7 +384,6 @@ class Hypergraph[category: Diagram](MonoidalCategory, DaggerCategory,
             right[i]: t for i, t in enumerate(other.spider_types)})
         return type(self)(dom, cod, boxes, wires, spider_types, offsets)
 
-    @rule
     @unbiased
     def tensor[A, B, C, D](
             self: Annotated[Hypergraph, Hom(A, B)],

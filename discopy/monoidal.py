@@ -385,7 +385,8 @@ class Ty(cat.Ob, cat.FreeCategory, ColouredMonoid):
     def tensor(self, *others: Ty) -> Self:
         if any(not isinstance(other, self.factory) for other in others):
             return NotImplemented  # This allows whiskering on the left.
-        return cat.FreeCategory.then(self, *others)
+        return cat.FreeCategory.then(
+            self, *others)  # ty: ignore[invalid-return-type]
 
     def __pow__(self, n_times: int) -> Self:
         assert_isinstance(n_times, int)

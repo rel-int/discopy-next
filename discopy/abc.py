@@ -313,9 +313,7 @@ class ColouredMonoid[C0, C1: ColouredMonoid](Category[C0, C1]):
     def tensor(self, *objects: Self) -> Self:
         """ The n-ary product of a monoid for ``n > 0``. """
 
-    @rule
-    def then[A: Ob[C0], B: Ob[C0], C: Ob[C0]](
-            self: Hom[C1, A, B], *others: Hom[C1, B, C]) -> Hom[C1, A, C]:
+    def then(self, *others: Self) -> Self:
         """Sequential composition, given by the monoid product."""
         return self.tensor(*others)
 
@@ -519,30 +517,16 @@ class TracedCategory[C0: ColouredMonoid, C1: TracedCategory](
     morphism over some objects on either side.
     """
     @rule
-    @abstractmethod
     def trace_left[A: Ob[C0], B: Ob[C0], M: Atom[C0]](
-            self: Hom[C1, Tensor[M, A], Tensor[M, B]], n: int = 1
-    ) -> Hom[C1, A, B]:
-        """
-        The trace of ``n`` wires on the left, to be instantiated: as a
-        rule, one wire.
-
-        Parameters:
-            n : The number of objects to trace over.
-        """
+            self: Hom[C1, Tensor[M, A], Tensor[M, B]]) -> Hom[C1, A, B]:
+        """ The trace of one wire on the left, :meth:`trace` takes ``n``. """
+        return self.trace(1, left=True)
 
     @rule
-    @abstractmethod
     def trace_right[A: Ob[C0], B: Ob[C0], M: Atom[C0]](
-            self: Hom[C1, Tensor[A, M], Tensor[B, M]], n: int = 1
-    ) -> Hom[C1, A, B]:
-        """
-        The trace of ``n`` wires on the right, to be instantiated: as a
-        rule, one wire.
-
-        Parameters:
-            n : The number of objects to trace over.
-        """
+            self: Hom[C1, Tensor[A, M], Tensor[B, M]]) -> Hom[C1, A, B]:
+        """ The trace of one wire on the right, :meth:`trace` takes ``n``. """
+        return self.trace(1)
 
     @overload
     def trace[A: Ob[C0], B: Ob[C0], M: Atom[C0]](
@@ -554,19 +538,20 @@ class TracedCategory[C0: ColouredMonoid, C1: TracedCategory](
             self: Hom[C1, Tensor[M, A], Tensor[M, B]], n: int = ...,
             left: Literal[True] = ...) -> Hom[C1, A, B]: ...
 
+    @abstractmethod
     def trace(self, n=1, left=False):
         """
-        The trace of a morphism on either side, :meth:`trace_left` or
-        :meth:`trace_right`, whose sequents the two overloads restate.
-        Tracing no object at all is the identity, i.e.
-        the vanishing axiom ``f.trace(0) == f``, see `nLab
+        The trace of ``n`` wires on either side, to be instantiated: the
+        rules :meth:`trace_left` and :meth:`trace_right`, whose sequents
+        the two overloads restate, are its one-wire instances. Tracing no
+        object at all is the identity, i.e. the vanishing axiom
+        ``f.trace(0) == f``, see `nLab
         <https://ncatlab.org/nlab/show/traced+monoidal+category>`_.
 
         Parameters:
             n : The number of objects to trace over.
             left : Whether to trace the wires on the left or right.
         """
-        return self.trace_left(n) if left else self.trace_right(n)
 
     @axiom
     def trace_vanishing[A: Ob[C0], B: Ob[C0]](
@@ -749,30 +734,18 @@ class BiclosedCategory[C0: ResiduatedMonoid, C1: BiclosedCategory](
         return (cls.ev_left if left else cls.ev_right)(base, exponent)
 
     @rule
-    @abstractmethod
     def curry_left[X: Ob[C0], Y: Atom[C0], Z: Ob[C0]](
-            self: Hom[C1, Tensor[X, Y], Z], n: int = 1
-    ) -> Hom[C1, X, Over[Z, Y]]:
-        """
-        The currying of ``n`` objects on the left, to be instantiated: as
-        a rule, one object.
-
-        Parameters:
-            n : The number of objects to curry.
-        """
+            self: Hom[C1, Tensor[X, Y], Z]) -> Hom[C1, X, Over[Z, Y]]:
+        """ The currying of one object on the left, :meth:`curry` takes
+        ``n``. """
+        return self.curry(1, left=True)
 
     @rule
-    @abstractmethod
     def curry_right[Y: Atom[C0], X: Ob[C0], Z: Ob[C0]](
-            self: Hom[C1, Tensor[Y, X], Z], n: int = 1
-    ) -> Hom[C1, X, Under[Y, Z]]:
-        """
-        The currying of ``n`` objects on the right, to be instantiated: as
-        a rule, one object.
-
-        Parameters:
-            n : The number of objects to curry.
-        """
+            self: Hom[C1, Tensor[Y, X], Z]) -> Hom[C1, X, Under[Y, Z]]:
+        """ The currying of one object on the right, :meth:`curry` takes
+        ``n``. """
+        return self.curry(1, left=False)
 
     @overload
     def curry[X: Ob[C0], Y: Atom[C0], Z: Ob[C0]](
@@ -784,16 +757,17 @@ class BiclosedCategory[C0: ResiduatedMonoid, C1: BiclosedCategory](
             self: Hom[C1, Tensor[Y, X], Z], n: int = ...,
             left: Literal[False] = ...) -> Hom[C1, X, Under[Y, Z]]: ...
 
+    @abstractmethod
     def curry(self, n=1, left=True):
         """
-        The currying of a morphism on either side, :meth:`curry_left` or
-        :meth:`curry_right`, whose sequents the two overloads restate.
+        The currying of ``n`` objects on either side, to be instantiated:
+        the rules :meth:`curry_left` and :meth:`curry_right`, whose
+        sequents the two overloads restate, are its one-object instances.
 
         Parameters:
             n : The number of objects to curry.
             left : Whether to curry on the left or right.
         """
-        return self.curry_left(n) if left else self.curry_right(n)
 
     @overload
     def base_and_exponent[X: Ob[C0], Y: Atom[C0], Z: Ob[C0]](
@@ -987,25 +961,32 @@ class RigidCategory[C0: Pregroup, C1: RigidCategory](BiclosedCategory[C0, C1]):
 
     @rule
     def curry_left[X: Ob[C0], Y: Atom[C0], Z: Ob[C0]](
-            self: Hom[C1, Tensor[X, Y], Z], n: int = 1
-    ) -> Hom[C1, X, Tensor[Z, L[Y]]]:
-        """ The left curry of a rigid morphism is obtained using caps. """
-        if n < 0 or n > len(self.dom):
-            raise ValueError
-        if not n:
-            return self
-        base, exponent = self.dom[:-n], self.dom[-n:]
-        return base @ self.caps(exponent, exponent.l) >> self @ exponent.l
+            self: Hom[C1, Tensor[X, Y], Z]) -> Hom[C1, X, Tensor[Z, L[Y]]]:
+        """ The left curry of one object of a rigid morphism. """
+        return self.curry(1, left=True)
 
     @rule
     def curry_right[Y: Atom[C0], X: Ob[C0], Z: Ob[C0]](
-            self: Hom[C1, Tensor[Y, X], Z], n: int = 1
-    ) -> Hom[C1, X, Tensor[R[Y], Z]]:
-        """ The right curry of a rigid morphism is obtained using caps. """
+            self: Hom[C1, Tensor[Y, X], Z]) -> Hom[C1, X, Tensor[R[Y], Z]]:
+        """ The right curry of one object of a rigid morphism. """
+        return self.curry(1, left=False)
+
+    def curry(self, n=1, left=True):
+        """
+        The curry of a rigid morphism is obtained using caps.
+
+        Parameters:
+            n : The number of objects to curry.
+            left : Whether to curry on the left or right.
+        """
         if n < 0 or n > len(self.dom):
             raise ValueError
         if not n:
             return self
+        if left:
+            base, exponent = self.dom[:-n], self.dom[-n:]
+            return base @ self.caps(exponent, exponent.l)\
+                >> self @ exponent.l
         base, exponent = self.dom[n:], self.dom[:n]
         return self.caps(exponent.r, exponent) @ base >> exponent.r @ self
 
@@ -1382,36 +1363,36 @@ class FeedbackCategory[C0: DelayedMonoid, C1: FeedbackCategory](
         """
 
     @rule
-    @abstractmethod
     def feedback_left[A: Ob[C0], B: Ob[C0], M: Atom[C0]](
             self: Hom[C1, Tensor[D[M], A], Tensor[M, B]],
             dom: C0 | None = None, cod: C0 | None = None,
             mem: C0 | None = None) -> Hom[C1, A, B]:
         """
-        The feedback of the memory on the left, to be instantiated: as a
-        rule, one wire of memory.
+        The feedback of one wire of memory on the left, :meth:`feedback`
+        takes a compound memory.
 
         Parameters:
             dom : The domain of the feedback.
             cod : The codomain of the feedback.
             mem : The memory type to feed back.
         """
+        return self.feedback(dom, cod, mem, left=True)
 
     @rule
-    @abstractmethod
     def feedback_right[A: Ob[C0], B: Ob[C0], M: Atom[C0]](
             self: Hom[C1, Tensor[A, D[M]], Tensor[B, M]],
             dom: C0 | None = None, cod: C0 | None = None,
             mem: C0 | None = None) -> Hom[C1, A, B]:
         """
-        The feedback of the memory on the right, to be instantiated: as a
-        rule, one wire of memory.
+        The feedback of one wire of memory on the right, :meth:`feedback`
+        takes a compound memory.
 
         Parameters:
             dom : The domain of the feedback.
             cod : The codomain of the feedback.
             mem : The memory type to feed back.
         """
+        return self.feedback(dom, cod, mem)
 
     @overload
     def feedback[A: Ob[C0], B: Ob[C0], M: Atom[C0]](
@@ -1427,10 +1408,12 @@ class FeedbackCategory[C0: DelayedMonoid, C1: FeedbackCategory](
             mem: C0 | None = ...,
             left: Literal[True] = ...) -> Hom[C1, A, B]: ...
 
+    @abstractmethod
     def feedback(self, dom=None, cod=None, mem=None, left=False):
         """
-        The feedback operator on either side, :meth:`feedback_left` or
-        :meth:`feedback_right`, whose sequents the two overloads restate.
+        The feedback operator on either side, to be instantiated: the
+        rules :meth:`feedback_left` and :meth:`feedback_right`, whose
+        sequents the two overloads restate, are its one-wire instances.
 
         Parameters:
             dom : The domain of the feedback.
@@ -1438,8 +1421,6 @@ class FeedbackCategory[C0: DelayedMonoid, C1: FeedbackCategory](
             mem : The memory type to feed back.
             left : Whether the memory is on the left or right.
         """
-        side = self.feedback_left if left else self.feedback_right
-        return side(dom, cod, mem)
 
     @axiom
     def feedback_vanishing[A: Ob[C0], B: Ob[C0]](

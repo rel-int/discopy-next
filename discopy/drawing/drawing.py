@@ -205,7 +205,7 @@ from discopy.drawing import backend, Node, Point
 from discopy.config import BOX_DRAWING_ATTRIBUTES, TRANSPARENT
 from discopy.abc import TracedCategory
 from discopy.python import finset
-from discopy.pattern import Atom, Hom, Ob
+from discopy.pattern import Hom, Ob
 from discopy.search import rule
 from discopy.utils import (
     assert_isinstance, assert_iscomposable, unbiased, factory, RichDisplay)
@@ -754,7 +754,6 @@ class Drawing(TracedCategory, RichDisplay):
         result.add_edges(list(zip(dom_nodes, cod_nodes)))
         return result
 
-    @rule
     @unbiased
     def then[A, B, C](
             self: Annotated[Drawing, Hom(A, B)],
@@ -867,7 +866,6 @@ class Drawing(TracedCategory, RichDisplay):
         result.height += y
         return result
 
-    @rule
     @unbiased
     def tensor[A, B, C, D](
             self: Annotated[Drawing, Hom(A, B)],
@@ -906,22 +904,6 @@ class Drawing(TracedCategory, RichDisplay):
             dom=self.dom @ other.dom, cod=self.cod @ other.cod, _check=False)
         result.width = x_shift + other.width
         return result
-
-    @rule
-    def trace_left[A, B, M: Atom](
-            self: Annotated[
-                Drawing, Hom([M, A], [M, B])],
-            n=1) -> Annotated[Drawing, Hom(A, B)]:
-        """ The trace of ``n`` wires on the left, see :meth:`trace`. """
-        return self.trace(n, left=True)
-
-    @rule
-    def trace_right[A, B, M: Atom](
-            self: Annotated[
-                Drawing, Hom([A, M], [B, M])],
-            n=1) -> Annotated[Drawing, Hom(A, B)]:
-        """ The trace of ``n`` wires on the right, see :meth:`trace`. """
-        return self.trace(n)
 
     def trace(self, n=1, left=False) -> Drawing:
         from discopy.monoidal import Box, Ty

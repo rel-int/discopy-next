@@ -415,6 +415,32 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Changed
 
+- The rules of the search are decoupled from the n-ary methods they
+  derive from, each stated once in `discopy.abc` as its one-wire
+  instance: `trace_left`/`trace_right`, `curry_left`/`curry_right`
+  and `feedback_left`/`feedback_right` lose their `n` and
+  compound-memory handling and forward to the per-level methods
+  `trace(n, left)`, `curry(n, left)` and
+  `feedback(dom, cod, mem, left)`, now abstract on their abstract
+  base classes — `traced.Diagram` iterates its `Trace` one wire at a
+  time, `feedback.Diagram` its `Feedback`, and
+  `abc.RigidCategory.curry` holds the caps construction its two
+  rules used to duplicate — so the rule forwarders that `ribbon`,
+  `cmap`, `drawing`, `para` and `biclosed` restated are deleted and
+  inherited instead, while the semantic categories outside the
+  traced tower (`Matrix`, `Hypergraph` and `python`) keep their
+  method forwarders. Composing objects is a method and not a rule:
+  `abc.ColouredMonoid.then` and `cat.FreeCategory.then` shed the
+  `@rule` whose starred spelling stated a binary sequent by
+  convention, and so do the `then`/`tensor` restatements of the
+  concrete categories nothing searches — `Matrix`, `Tensor`,
+  `Channel`, `Hypergraph`, `Stream`, `para.Symmetric`, `Drawing`,
+  `interaction`, `python.finset` and `symmetric.Permutation` —
+  whose sequents live on the abstract base classes. Code calling
+  `trace_left(n)`, `curry_left(n)` or a compound-memory
+  `feedback_left` on a diagram goes through `trace`, `curry` and
+  `feedback` instead.
+
 - DisCoPy requires Python 3.14. Annotations are the lazy objects of
   PEP 649 rather than quoted strings: the `from __future__ import
   annotations` of every module goes — kept only where the previous

@@ -203,7 +203,6 @@ class Diagram[natural](RibbonCategory, NamedGeneric):
                 cod.positive @ dom.negative, inside.cod))
         self.inside, self.dom, self.cod = inside, dom, cod
 
-    @rule
     @unbiased
     def then[A, B, C](
             self: Annotated[Diagram, Hom(A, B)],
@@ -295,7 +294,6 @@ class Diagram[natural](RibbonCategory, NamedGeneric):
         inside = cls.natural.id(positive) @ cls.natural.twist(negative)
         return cls(inside, dom, dom)
 
-    @rule
     @unbiased
     def tensor[A, B, C, D](
             self: Annotated[Diagram, Hom(A, B)],

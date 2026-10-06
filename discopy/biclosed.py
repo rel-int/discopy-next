@@ -325,20 +325,6 @@ class Diagram(monoidal.Diagram, BiclosedCategory):
     Application: ClassVar[Generator]
     Abstraction: ClassVar[Generator]
 
-    @rule
-    def curry_left[X, Y: Atom, Z](
-            self: Annotated[Diagram, Hom([X, Y], Z)], n=1
-    ) -> Annotated[Diagram, Hom(X, (Ob(Z) << Ob(Y)))]:
-        """ The left currying of ``n`` objects, see :meth:`curry`. """
-        return self.curry(n, left=True)
-
-    @rule
-    def curry_right[Y: Atom, X, Z](
-            self: Annotated[Diagram, Hom([Y, X], Z)], n=1
-    ) -> Annotated[Diagram, Hom(X, (Ob(Y) >> Ob(Z)))]:
-        """ The right currying of ``n`` objects, see :meth:`curry`. """
-        return self.curry(n, left=False)
-
     def curry(self, n=1, left=True) -> Diagram:
         """
         Wrapper around :class:`Curry` called by :class:`Functor`.

@@ -155,7 +155,6 @@ class Tensor[dtype](Matrix[dtype]):
               ) -> Annotated[Tensor, Hom(A, A)]:
         return cls(Matrix.id(product(dom.inside)).array, dom, dom)
 
-    @rule
     def then[A, B, C](
             self: Annotated[Tensor, Hom(A, B)],
             other: Annotated[Tensor | None, Hom(B, C)] = None,
@@ -170,7 +169,6 @@ class Tensor[dtype](Matrix[dtype]):
                 else self.array * other.array
         return type(self)(array, self.dom, other.cod)
 
-    @rule
     def tensor[A, B, C, D](
             self: Annotated[Tensor, Hom(A, B)],
             other: Annotated[Tensor | None, Hom(C, D)] = None,

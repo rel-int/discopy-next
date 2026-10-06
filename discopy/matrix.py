@@ -248,7 +248,6 @@ class Matrix[dtype](MonoidalCategory, DaggerCategory, NamedGeneric):
 
     twist = id
 
-    @rule
     @unbiased
     def then[A, B, C](
             self: Annotated[Matrix, Hom(A, B)],
@@ -260,7 +259,6 @@ class Matrix[dtype](MonoidalCategory, DaggerCategory, NamedGeneric):
             array = np.matmul(self.array, other.array)
         return type(self)(array, self.dom, other.cod)
 
-    @rule
     def tensor[A, B, C, D](
             self: Annotated[Matrix, Hom(A, B)],
             other: Annotated[Matrix | None, Hom(C, D)] = None,

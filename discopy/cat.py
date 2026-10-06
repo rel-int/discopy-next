@@ -198,10 +198,7 @@ class FreeCategory(Category):
         dom = cls.ob() if dom is None else dom
         return cls.ar(inside=(), dom=dom, cod=dom, _scan=False)
 
-    @rule
-    def then[A, B, C](
-            self: Annotated[Any, Hom(A, B)],
-            *others: Annotated[Any, Hom(B, C)]) -> Annotated[Any, Hom(A, C)]:
+    def then(self, *others: Self) -> Self:
         inside, dom, cod = self.inside, self.dom, self.cod
         for other in others:
             assert_isinstance(other, self.ar)

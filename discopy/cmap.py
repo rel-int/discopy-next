@@ -983,20 +983,6 @@ class CMap[category: Diagram](CompactCategory, DaggerCategory,
                     RigidCategory.ev_right.__func__(cls, base, exponent))
         return cls.from_box(cls.category.ev(base, exponent, left))
 
-    @rule
-    def curry_left[X, Y: Atom, Z](
-            self: Annotated[CMap, Hom([X, Y], Z)], n=1
-    ) -> Annotated[CMap, Hom(X, (pattern.Ob(Z) << pattern.Ob(Y)))]:
-        """ The left currying of ``n`` objects, see :meth:`curry`. """
-        return self.curry(n, left=True)
-
-    @rule
-    def curry_right[Y: Atom, X, Z](
-            self: Annotated[CMap, Hom([Y, X], Z)], n=1
-    ) -> Annotated[CMap, Hom(X, (pattern.Ob(Y) >> pattern.Ob(Z)))]:
-        """ The right currying of ``n`` objects, see :meth:`curry`. """
-        return self.curry(n, left=False)
-
     def curry(self, n: int = 1, left: bool = True) -> CMap:
         """
         Currying is kept as an explicit curry box by default, the more
@@ -1018,8 +1004,7 @@ class CMap[category: Diagram](CompactCategory, DaggerCategory,
             :align: center
         """
         if issubclass(self.category, RigidCategory):
-            return (RigidCategory.curry_left(self, n) if left
-                    else RigidCategory.curry_right(self, n))
+            return RigidCategory.curry(self, n, left)
         if n < 0 or n > len(self.dom):
             raise ValueError
         if not n:
@@ -1115,26 +1100,6 @@ class CMap[category: Diagram](CompactCategory, DaggerCategory,
         loops = self.loops + other.loops + new_scalars
         return type(self)(
             dom, cod, boxes, edge, loops=loops, check=False)
-
-    @rule
-    def trace_left[A, B, M: Atom](
-            self: Annotated[
-                CMap,
-                Hom([M, A],
-                    [M, B])],
-            n=1) -> Annotated[CMap, Hom(A, B)]:
-        """ The trace of ``n`` wires on the left, see :meth:`trace`. """
-        return self.trace(n, left=True)
-
-    @rule
-    def trace_right[A, B, M: Atom](
-            self: Annotated[
-                CMap,
-                Hom([A, M],
-                    [B, M])],
-            n=1) -> Annotated[CMap, Hom(A, B)]:
-        """ The trace of ``n`` wires on the right, see :meth:`trace`. """
-        return self.trace(n)
 
     def trace(self, n: int = 1, left: bool = False) -> CMap:
         """

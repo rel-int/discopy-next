@@ -129,9 +129,8 @@ from typing import ClassVar
 
 from discopy import monoidal, cmap, hypergraph
 from discopy.abc import TracedCategory
-from typing import Annotated
 
-from discopy.axioms import Atom, Hom, rule, Serialisable
+from discopy.axioms import Serialisable
 from discopy.cat import factory, Generator
 from discopy.monoidal import Ty  # noqa: F401
 from discopy.utils import (
@@ -161,15 +160,13 @@ class Diagram(monoidal.Diagram, TracedCategory):
     serialisation = Serialisable.serialisation.failing(
         "The generic tree of a trace does not read back (#742).")
 
-    @rule
-    def trace_left[A, B, M: Atom](
-            self: Annotated[Diagram, Hom([M, A], [M, B])], n=1
-    ) -> Annotated[Diagram, Hom(A, B)]:
+    def trace(self, n=1, left=False):
         """
-        Feed ``n`` outputs on the left back into inputs.
+        Feed ``n`` outputs back into inputs, one :class:`Trace` per wire.
 
         Parameters:
             n : The number of output wires to feedback into inputs.
+            left : Whether to trace the wires on the left or right.
 
         Example
         -------
@@ -183,21 +180,10 @@ class Diagram(monoidal.Diagram, TracedCategory):
 
         .. image:: /_static/traced/trace.svg
         """
-        return self if n == 0\
-            else self.Trace(self, left=True).trace_left(n - 1)
-
-    @rule
-    def trace_right[A, B, M: Atom](
-            self: Annotated[Diagram, Hom([A, M], [B, M])], n=1
-    ) -> Annotated[Diagram, Hom(A, B)]:
-        """
-        Feed ``n`` outputs on the right back into inputs.
-
-        Parameters:
-            n : The number of output wires to feedback into inputs.
-        """
-        return self if n == 0\
-            else self.Trace(self, left=False).trace_right(n - 1)
+        result = self
+        for _ in range(n):
+            result = self.Trace(result, left=left)
+        return result
 
     def to_drawing(self):
         return monoidal.Diagram.to_drawing(self, functor=Functor)
