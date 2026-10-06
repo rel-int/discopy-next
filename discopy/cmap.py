@@ -47,7 +47,7 @@ from math import inf, lcm
 from typing import TYPE_CHECKING, Any, ClassVar, Literal, Self
 
 from discopy import hypergraph, messages
-from discopy.pattern import Obj, Tensor, Unit, L, R  # noqa: F401
+from discopy.pattern import Obj, Var, Tensor, Unit, L, R  # noqa: F401
 from discopy.abc import (
     CompactCategory,
     DaggerCategory,
@@ -60,7 +60,7 @@ from discopy.abc import (
 from discopy.cat import Ob
 from discopy.python.finset import Permutation
 from discopy.pattern import Atom, Hom
-from discopy.search import rule
+from discopy.pattern import rule
 from discopy.utils import (
     AxiomError,
     assert_isatomic,
@@ -777,7 +777,7 @@ class CMap[category: Diagram](CompactCategory, DaggerCategory,
 
     @classmethod
     @rule
-    def id[A](cls, dom: Obj[Any | None, A] = None
+    def id[A](cls, dom: Var[Any | None, A] = None
               ) -> Hom[CMap, A, A]:
         """ The identity map, with each input wired to its output. """
         dom = cls.ob() if dom is None else dom
@@ -916,8 +916,8 @@ class CMap[category: Diagram](CompactCategory, DaggerCategory,
     @classmethod
     @rule
     def swap[X: Atom, Y: Atom](
-            cls, left: Obj[Any, X],
-            right: Obj[Any, Y]) -> Hom[CMap, Tensor[X, Y], Tensor[Y, X]]:
+            cls, left: Var[Any, X],
+            right: Var[Any, Y]) -> Hom[CMap, Tensor[X, Y], Tensor[Y, X]]:
         """ The symmetry encoded as boundary wiring. """
         dom, cod = left @ right, right @ left
         left_len, right_len = len(left), len(right)
@@ -938,8 +938,8 @@ class CMap[category: Diagram](CompactCategory, DaggerCategory,
     @classmethod
     @rule
     def cups[X: Atom](
-            cls, left: Obj[Any, X],
-            right: Obj[Any, R[X]]
+            cls, left: Var[Any, X],
+            right: Var[Any, R[X]]
     ) -> Hom[CMap, Tensor[X, R[X]], Unit[Any]]:
         """ A cup encoded as boundary wiring between adjoint types. """
         assert_isinstance(left, Pregroup)
@@ -954,8 +954,8 @@ class CMap[category: Diagram](CompactCategory, DaggerCategory,
     @classmethod
     @rule
     def caps[X: Atom](
-            cls, left: Obj[Any, X],
-            right: Obj[Any, L[X]]
+            cls, left: Var[Any, X],
+            right: Var[Any, L[X]]
     ) -> Hom[CMap, Unit[Any], Tensor[X, L[X]]]:
         """ A cap encoded as boundary wiring between adjoint types. """
         assert_isinstance(left, Pregroup)
@@ -984,9 +984,9 @@ class CMap[category: Diagram](CompactCategory, DaggerCategory,
 
     @classmethod
     @rule
-    def ev[Y, E, S: bool](
-            cls, base: Obj[Any, Y], exponent: Obj[Any, E],
-            left: Obj[bool, S] = True
+    def ev[Y: Obj[Any], E: Obj[Any], S: bool](
+            cls, base: Var[Any, Y], exponent: Var[Any, E],
+            left: Var[bool, S] = True
     ) -> Hom[CMap, TensorDir[ExpDir[Y, E, S], E, S], Y]:
         """
         Evaluation is kept as an explicit box by default, or comes from the
@@ -997,9 +997,9 @@ class CMap[category: Diagram](CompactCategory, DaggerCategory,
         return cls.from_box(cls.category.ev(base, exponent, left))
 
     @rule
-    def curry[X, S: bool, N: Count, Y: Obj[Any, None, N], Z](
-            self: Hom[CMap, TensorDir[X, Y, S], Z], n: Obj[int, N] = 1,
-            left: Obj[bool, S] = True) -> Hom[CMap, X, ExpDir[Z, Y, S]]:
+    def curry[X: Obj[Any], S: bool, N: Count, Y: Obj[Any, N], Z: Obj[Any]](
+            self: Hom[CMap, TensorDir[X, Y, S], Z], n: Var[int, N] = 1,
+            left: Var[bool, S] = True) -> Hom[CMap, X, ExpDir[Z, Y, S]]:
         """
         Currying is kept as an explicit curry box by default, the more
         rigorous representation, or comes from the wiring of caps when the
@@ -1118,9 +1118,9 @@ class CMap[category: Diagram](CompactCategory, DaggerCategory,
             dom, cod, boxes, edge, loops=loops, check=False)
 
     @rule
-    def trace[A, B, S: bool, N: Count, M: Obj[Any, None, N]](
+    def trace[A: Obj[Any], B: Obj[Any], S: bool, N: Count, M: Obj[Any, N]](
             self: Hom[CMap, TensorDir[M, A, S], TensorDir[M, B, S]],
-            n: Obj[int, N] = 1, left: Obj[bool, S] = False
+            n: Var[int, N] = 1, left: Var[bool, S] = False
     ) -> Hom[CMap, A, B]:
         """
         Trace boundary wires by splicing the selected inputs and outputs.

@@ -40,7 +40,7 @@ from types import ModuleType
 from typing import Any, Literal, Callable, TYPE_CHECKING
 
 from discopy import monoidal, config, messages
-from discopy.pattern import Obj, Tensor  # noqa: F401
+from discopy.pattern import Obj, Var, Tensor  # noqa: F401
 from discopy.abc import (
     DaggerCategory, MonoidalCategory, NamedGeneric, Nat)
 from discopy.cat import (
@@ -50,7 +50,7 @@ from discopy.cat import (
 )
 from discopy.utils import assert_isinstance, unbiased
 from discopy.pattern import Hom
-from discopy.search import rule
+from discopy.pattern import rule
 from discopy.pattern import Count, TensorDir  # noqa: F401
 
 if TYPE_CHECKING:
@@ -242,7 +242,7 @@ class Matrix[dtype](MonoidalCategory, DaggerCategory, NamedGeneric):
 
     @classmethod
     @rule
-    def id[A](cls, dom: Obj[Any, A] = 0
+    def id[A](cls, dom: Var[Any, A] = 0
               ) -> Hom[Matrix, A, A]:
         with backend('numpy') as np:
             array = np.identity(index(dom), dtype=cls.dtype or int)
@@ -390,9 +390,9 @@ class Matrix[dtype](MonoidalCategory, DaggerCategory, NamedGeneric):
                    for n in range(index(self.dom) + 1))
 
     @rule
-    def trace[A, B, S: bool, N: Count, M: Obj[Any, None, N]](
+    def trace[A: Obj[Any], B: Obj[Any], S: bool, N: Count, M: Obj[Any, N]](
             self: Hom[Matrix, TensorDir[M, A, S], TensorDir[M, B, S]],
-            n: Obj[int, N] = 1, left: Obj[bool, S] = False
+            n: Var[int, N] = 1, left: Var[bool, S] = False
     ) -> Hom[Matrix, A, B]:
         """
         The trace of a Boolean matrix, computed with :meth:`Matrix.repeat`.

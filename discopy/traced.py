@@ -138,7 +138,7 @@ from discopy.utils import (
     assert_isinstance,
     assert_istraceable,
 )
-from discopy.pattern import Count, Hom, Obj, TensorDir  # noqa: F401
+from discopy.pattern import Count, Hom, Obj, Var, TensorDir  # noqa: F401
 from discopy.axioms import rule
 
 
@@ -159,9 +159,9 @@ class Diagram(monoidal.Diagram, TracedCategory):
     Functor: ClassVar[Generator]
 
     @rule
-    def trace[A, B, S: bool, N: Count, M: Obj[Ty, None, N]](
+    def trace[A: Obj[Ty], B: Obj[Ty], S: bool, N: Count, M: Obj[Ty, N]](
             self: Hom[Diagram, TensorDir[M, A, S], TensorDir[M, B, S]],
-            n: Obj[int, N] = 1, left: Obj[bool, S] = False
+            n: Var[int, N] = 1, left: Var[bool, S] = False
     ) -> Hom[Diagram, A, B]:
         """
         Feed ``n`` outputs back into inputs, one :class:`Trace` per wire.

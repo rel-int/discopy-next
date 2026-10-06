@@ -203,12 +203,12 @@ from functools import cached_property
 import networkx as nx
 
 from discopy.drawing import backend, Node, Point
-from discopy.pattern import Obj, Tensor  # noqa: F401
+from discopy.pattern import Obj, Var, Tensor  # noqa: F401
 from discopy.config import BOX_DRAWING_ATTRIBUTES, TRANSPARENT
 from discopy.abc import TracedCategory
 from discopy.python import finset
 from discopy.pattern import Hom
-from discopy.search import rule
+from discopy.pattern import rule
 from discopy.utils import (
     assert_isinstance, assert_iscomposable, unbiased, factory, RichDisplay)
 from discopy.pattern import Count, TensorDir  # noqa: F401
@@ -747,7 +747,7 @@ class Drawing(TracedCategory, RichDisplay):
 
     @staticmethod
     @rule
-    def id[A](dom: Obj[Any | None, A] = None
+    def id[A](dom: Var[Any | None, A] = None
               ) -> Hom[Drawing, A, A]:
         """
         Draw the identity diagram.
@@ -937,9 +937,9 @@ class Drawing(TracedCategory, RichDisplay):
         return result
 
     @rule
-    def trace[A, B, S: bool, N: Count, M: Obj[Any, None, N]](
+    def trace[A: Obj[Any], B: Obj[Any], S: bool, N: Count, M: Obj[Any, N]](
             self: Hom[Drawing, TensorDir[M, A, S], TensorDir[M, B, S]],
-            n: Obj[int, N] = 1, left: Obj[bool, S] = False
+            n: Var[int, N] = 1, left: Var[bool, S] = False
     ) -> Hom[Drawing, A, B]:
         from discopy.monoidal import Box, Ty
         if n == 0:

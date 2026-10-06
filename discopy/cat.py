@@ -83,7 +83,7 @@ from typing import (
     TYPE_CHECKING, overload)
 
 from discopy import messages, utils
-from discopy.pattern import Obj  # noqa: F401
+from discopy.pattern import Var  # noqa: F401
 from discopy.abc import Category, DaggerCategory, Serialisable
 from discopy.axioms import (
     axiom, Equation as AbstractEquation, GENERATORS, Hom, no_strategy, rule)
@@ -200,7 +200,7 @@ class FreeCategory(Category):
 
     @classmethod
     @rule
-    def id[A](cls, dom: Obj[Any | None, A] = None
+    def id[A](cls, dom: Var[Any | None, A] = None
               ) -> Hom[Any, A, A]:
         """The identity path on ``dom``, with no generators inside."""
         dom = cls.ob() if dom is None else dom
@@ -868,7 +868,7 @@ class Functor[In0, In1, Out0, Out1](Category, Serialisable):
 
     @classmethod
     @rule
-    def id[A](cls, dom: Obj[type | None, A] = None
+    def id[A](cls, dom: Var[type | None, A] = None
               ) -> Hom[Functor, A, A]:
         """
         The identity functor on a given category ``dom``.
@@ -1145,7 +1145,7 @@ class Transformation(Category):
 
     @classmethod
     @rule
-    def id[A](cls, dom: Obj[Functor, A]) -> Hom[Transformation, A, A]:
+    def id[A](cls, dom: Var[Functor, A]) -> Hom[Transformation, A, A]:
         """
         The identity transformation on a given functor ``dom``, i.e. the
         transformation whose component at each object ``x`` is the

@@ -62,7 +62,7 @@ from typing import Any, ClassVar, Self
 from collections.abc import Callable
 
 from discopy import monoidal
-from discopy.pattern import Obj, Tensor  # noqa: F401
+from discopy.pattern import Var, Tensor  # noqa: F401
 from discopy.abc import BraidedCategory
 
 from discopy.axioms import Atom, axiom, Equation, Hom, rule
@@ -100,8 +100,8 @@ class Diagram(monoidal.Diagram, BraidedCategory):
     @classmethod
     @rule
     def braid[X: Atom, Y: Atom](
-            cls, left: Obj[monoidal.Ty, X],
-            right: Obj[monoidal.Ty, Y]
+            cls, left: Var[monoidal.Ty, X],
+            right: Var[monoidal.Ty, Y]
     ) -> Hom[Self, Tensor[X, Y], Tensor[Y, X]]:
         """
         The diagram braiding :code:`left` over :code:`right`.

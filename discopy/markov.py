@@ -79,7 +79,7 @@ in the same diagram they automatically satisfy the :mod:`frobenius` axioms.
 from typing import ClassVar
 
 from discopy import symmetric, monoidal, cmap, hypergraph
-from discopy.pattern import Obj, Repeat  # noqa: F401
+from discopy.pattern import Var, Repeat  # noqa: F401
 from discopy.abc import MarkovCategory
 
 from discopy.axioms import Atom, Count, Hom, rule, Serialisable
@@ -149,8 +149,8 @@ class Diagram(symmetric.Diagram, MarkovCategory):
     @classmethod
     @rule
     def copy[X: Atom, N: Count](
-            cls, x: Obj[monoidal.Ty, X],
-            n: Obj[int, N] = 2
+            cls, x: Var[monoidal.Ty, X],
+            n: Var[int, N] = 2
     ) -> Hom[Diagram, X, Repeat[X, N]]:
         """
         Make :code:`n` copies of a given type :code:`x`.
@@ -166,8 +166,8 @@ class Diagram(symmetric.Diagram, MarkovCategory):
     @classmethod
     @rule
     def merge[X: Atom, N: Count](
-            cls, x: Obj[monoidal.Ty, X],
-            n: Obj[int, N] = 2
+            cls, x: Var[monoidal.Ty, X],
+            n: Var[int, N] = 2
     ) -> Hom[Diagram, Repeat[X, N], X]:
         """
         Merge :code:`n` copies of a given type :code:`x`.

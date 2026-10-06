@@ -95,7 +95,7 @@ from typing import ClassVar, Self
 from collections.abc import Sequence
 
 from discopy import cat, monoidal, balanced, hypergraph, cmap, messages
-from discopy.pattern import Obj, Tensor  # noqa: F401
+from discopy.pattern import Var, Tensor  # noqa: F401
 from discopy.abc import (
     BraidedCategory, MonoidalCategory, SymmetricCategory, TracedCategory)
 from discopy.axioms import (
@@ -285,8 +285,8 @@ class Diagram(balanced.Diagram, SymmetricCategory):
     @classmethod
     @rule
     def swap[X: Atom, Y: Atom](
-            cls, left: Obj[monoidal.Ty, X],
-            right: Obj[monoidal.Ty, Y]
+            cls, left: Var[monoidal.Ty, X],
+            right: Var[monoidal.Ty, Y]
     ) -> Hom[Diagram, Tensor[X, Y], Tensor[Y, X]]:
         """
         The diagram that swaps the ``left`` and ``right`` wires.
@@ -344,7 +344,7 @@ class Diagram(balanced.Diagram, SymmetricCategory):
     @classmethod
     @rule
     def cycle[X: Atom, A](
-            cls, x: Obj[Ty, X], a: Obj[Ty, A]
+            cls, x: Var[Ty, X], a: Var[Ty, A]
     ) -> Hom[Diagram, Tensor[X, A], Tensor[A, X]]:
         """
         The permutation moving a wire past a type, a native
@@ -531,7 +531,7 @@ class Diagram(balanced.Diagram, SymmetricCategory):
         return AbstractEquation(functor(f), functor(top) >> functor(bottom))
 
     @axiom
-    def map_identity[X](cls, x: Obj[Ty, X]):
+    def map_identity[X](cls, x: Var[Ty, X]):
         """ The encoding preserves identities. """
         functor = cls.map_equivalence()
         return AbstractEquation(functor(cls.id(x)), functor.cod.id(x))
@@ -761,7 +761,7 @@ class Functor[In0, In1, Out0, Out1](balanced.Functor):
 
     @axiom
     def symmetric[X: Atom[In0], Y: Atom[In0]](
-            cls, functor: Self, x: Obj[Ty, X], y: Obj[Ty, Y]) -> Equation:
+            cls, functor: Self, x: Var[Ty, X], y: Var[Ty, Y]) -> Equation:
         """ A symmetric functor preserves the swap. """
         return functor.cod.Equation(
             functor(functor.dom.swap(x, y)),

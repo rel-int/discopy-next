@@ -2,9 +2,9 @@
 Property-based testing of the axioms with `Hypothesis
 <https://hypothesis.readthedocs.io>`_: an :class:`Axiom` is stated once
 on an abstract base class of :mod:`discopy.abc` as a sequent — see
-:mod:`discopy.pattern` for the language and :mod:`discopy.search` for
+:mod:`discopy.pattern` for the language and the search for
 the rules — a category generates its own objects and arrows through
-:meth:`Testable.strategy` — by the rules of :mod:`discopy.search` for
+:meth:`Testable.strategy` — by the rules of :mod:`discopy.pattern` for
 diagrams — and the matrix in ``proptest/`` searches every cell for a
 counterexample.
 
@@ -89,7 +89,7 @@ properties. Before implementing anything, write the laws down:
    operations the feature will provide; until they exist, the cell fails.
    That is the red state of the loop.
 3. **Reach the structure.** Declare the new structure as a
-   :func:`discopy.search.rule` on the abstract base class, so that the
+   :func:`discopy.pattern.rule` on the abstract base class, so that the
    search builds terms containing it, and check the reach with a
    :func:`hypothesis.find`: a green cell whose strategy never generates
    the structure proves nothing.
@@ -254,15 +254,8 @@ from functools import wraps
 from typing import TYPE_CHECKING, Self
 
 from discopy.pattern import (  # noqa: F401  pylint: disable=unused-import
-    Atom, Count, D, Hom, L, Obj, Over, R, Repeat, Tensor, Under, Unit)
-from discopy.sequent import (  # noqa: F401  pylint: disable=unused-import
-    Declaration, declarations, Sort)
-from discopy.search import (  # noqa: F401  pylint: disable=unused-import
-    Constant,
-    Rule,
-    rule,
-    search,
-)
+    Atom, Constant, Count, D, Declaration, declarations, Hom, L, Obj, Over,
+    R, Repeat, Rule, rule, search, Sort, Tensor, Under, Unit, Var)
 from discopy.utils import (
     AxiomError,
     NamedGeneric,
@@ -503,7 +496,7 @@ until it implements its own.
 @dataclass(repr=False)
 class Axiom[**P, T](Declaration[P, T]):
     """
-    An axiom of a category: a :class:`discopy.sequent.Declaration` with no
+    An axiom of a category: a :class:`discopy.pattern.Declaration` with no
     conclusion, whose premises are the arguments of a property test. The
     axiom is a classmethod of the category it is bound to, implicitly:
     its first parameter is the category and the remaining ones are

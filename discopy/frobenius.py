@@ -66,7 +66,7 @@ from collections.abc import Callable
 
 from discopy import (
     monoidal, rigid, markov, compact, pivotal, cmap, hypergraph)
-from discopy.pattern import Obj, Tensor, Unit, L, Repeat  # noqa: F401
+from discopy.pattern import Var, Tensor, Unit, L, Repeat  # noqa: F401
 from discopy.abc import HypergraphCategory
 
 from discopy.axioms import Atom, Count, Hom, rule, Serialisable
@@ -151,16 +151,16 @@ class Diagram(compact.Diagram, markov.Diagram, HypergraphCategory):
     @classmethod
     @rule
     def caps[X: Atom](
-            cls, left: Obj[Ty, X], right: Obj[Ty, L[X]]
+            cls, left: Var[Ty, X], right: Var[Ty, L[X]]
     ) -> Hom[Diagram, Unit[Ty], Tensor[X, L[X]]]:
         return cls.cups(left, right).dagger()
 
     @classmethod
     @rule
     def spiders[X: Atom, M: Count, N: Count](
-            cls, n_legs_in: Obj[int, M],
-            n_legs_out: Obj[int, N],
-            typ: Obj[Ty, X], phases=None
+            cls, n_legs_in: Var[int, M],
+            n_legs_out: Var[int, N],
+            typ: Var[Ty, X], phases=None
     ) -> Hom[Diagram, Repeat[X, M], Repeat[X, N]]:
         """
         The spiders on a given type with ``n_legs_in`` and ``n_legs_out`` and

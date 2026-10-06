@@ -38,7 +38,7 @@ from copy import copy
 from dataclasses import dataclass
 
 from discopy import config, monoidal, braided, traced, cmap, hypergraph
-from discopy.pattern import Obj  # noqa: F401
+from discopy.pattern import Var  # noqa: F401
 from discopy.abc import BalancedCategory
 
 from discopy.axioms import Atom, Hom, no_strategy, rule, Serialisable
@@ -141,7 +141,7 @@ class Diagram(braided.Diagram, traced.Diagram, BalancedCategory):
 
     @classmethod
     @rule
-    def twist[X: Atom](cls, dom: Obj[monoidal.Ty, X]
+    def twist[X: Atom](cls, dom: Var[monoidal.Ty, X]
                        ) -> Hom[Diagram, X, X]:
         """
         The twist on an object.

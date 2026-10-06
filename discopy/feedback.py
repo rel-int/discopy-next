@@ -167,7 +167,7 @@ from discopy.utils import (
     deprecated_alias,
     factory, Generator, factory_name, assert_isinstance, AxiomError,
     from_tree)
-from discopy.pattern import D, Hom, Obj, TensorDir  # noqa: F401
+from discopy.pattern import D, Hom, Obj, Var, TensorDir  # noqa: F401
 from discopy.axioms import rule
 
 
@@ -409,10 +409,10 @@ class Diagram(markov.Diagram, FeedbackCategory):
         return cls.Equation(f.delay().delay(), f.delay(2))
 
     @rule
-    def feedback[A, B, S: bool, M](
+    def feedback[A: Obj[Ty], B: Obj[Ty], S: bool, M: Obj[Ty]](
             self: Hom[Diagram, TensorDir[D[M], A, S], TensorDir[M, B, S]],
-            dom: Obj[Ty | None, A] = None, cod: Obj[Ty | None, B] = None,
-            mem: Obj[Ty | None, M] = None, left: Obj[bool, S] = False
+            dom: Var[Ty | None, A] = None, cod: Var[Ty | None, B] = None,
+            mem: Var[Ty | None, M] = None, left: Var[bool, S] = False
     ) -> Hom[Diagram, A, B]:
         """
         A :class:`Feedback` of the memory, wire by wire: the outermost

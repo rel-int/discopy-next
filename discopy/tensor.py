@@ -63,7 +63,7 @@ from typing import (
 
 from discopy import (
     cat, monoidal, rigid, frobenius, cmap, config)
-from discopy.pattern import Obj  # noqa: F401
+from discopy.pattern import Var  # noqa: F401
 from discopy import pattern
 from discopy.axioms import Hom, no_strategy, rule
 from discopy.cat import factory, Generator, assert_iscomposable
@@ -153,7 +153,7 @@ class Tensor[dtype](Matrix[dtype]):
 
     @classmethod
     @rule
-    def id[A](cls, dom: Obj[Any, A] = Dim(1)
+    def id[A](cls, dom: Var[Any, A] = Dim(1)
               ) -> Hom[Tensor, A, A]:
         return cls(Matrix.id(product(dom.inside)).array, dom, dom)
 

@@ -145,14 +145,14 @@ from dataclasses import dataclass
 from typing import Self
 
 from discopy.pattern import Atom, Count, Hom
-from discopy.pattern import Obj, Tensor, Unit, L, R, Repeat  # noqa: F401
-from discopy.search import rule
+from discopy.pattern import Obj, Var, Tensor, Unit, L, R, Repeat  # noqa: F401
+from discopy.pattern import rule
 from discopy import (
     monoidal, symmetric, markov, closed, compact, frobenius)
 from discopy.abc import (
     ClosedCategory, CompactCategory, FeedbackCategory, HypergraphCategory,
     MarkovCategory, NamedGeneric, SymmetricCategory, TracedCategory)
-from discopy.feedback import Diagram as FeedbackDiagram
+from discopy.feedback import Diagram as FeedbackDiagram, Ty as FeedbackTy
 from discopy.utils import (
     assert_iscomposable, assert_isinstance, classproperty, unbiased)
 from discopy.pattern import D, ExpDir, TensorDir  # noqa: F401
@@ -220,7 +220,7 @@ class Symmetric[category: symmetric.Diagram](SymmetricCategory, NamedGeneric):
 
     @classmethod
     @rule
-    def id[A](cls, dom: Obj[monoidal.Ty | None, A] = None
+    def id[A](cls, dom: Var[monoidal.Ty | None, A] = None
               ) -> Hom[Symmetric, A, A]:
         """
         The identity parametric map on `dom`, with empty parameter space.
@@ -278,8 +278,8 @@ class Symmetric[category: symmetric.Diagram](SymmetricCategory, NamedGeneric):
     @classmethod
     @rule
     def swap[X: Atom, Y: Atom](
-            cls, left: Obj[monoidal.Ty, X],
-            right: Obj[monoidal.Ty, Y]
+            cls, left: Var[monoidal.Ty, X],
+            right: Var[monoidal.Ty, Y]
     ) -> Hom[Symmetric, Tensor[X, Y], Tensor[Y, X]]:
         """
         The swap of the underlying category, with empty parameter space.
@@ -338,9 +338,10 @@ class Traced(Symmetric, TracedCategory):
     traced category, with the parameters swapped out of the way.
     """
     @rule
-    def trace[A, B, S: bool, N: Count, M: Obj[monoidal.Ty, None, N]](
+    def trace[A: Obj[monoidal.Ty], B: Obj[monoidal.Ty], S: bool, N: Count,
+              M: Obj[monoidal.Ty, N]](
             self: Hom[Traced, TensorDir[M, A, S], TensorDir[M, B, S]],
-            n: Obj[int, N] = 1, left: Obj[bool, S] = False
+            n: Var[int, N] = 1, left: Var[bool, S] = False
     ) -> Hom[Traced, A, B]:
         """
         The trace of a parametric map is the trace of the underlying
@@ -373,8 +374,8 @@ class Markov(Symmetric, MarkovCategory):
     @classmethod
     @rule
     def copy[X: Atom, N: Count](
-            cls, x: Obj[monoidal.Ty, X],
-            n: Obj[int, N] = 2
+            cls, x: Var[monoidal.Ty, X],
+            n: Var[int, N] = 2
     ) -> Hom[Markov, X, Repeat[X, N]]:
         """
         The copy of the underlying category, with empty parameter space.
@@ -395,9 +396,9 @@ class Closed(Markov, ClosedCategory):
 
     @classmethod
     @rule
-    def ev[Y, E, S: bool](
-            cls, base: Obj[monoidal.Ty, Y], exponent: Obj[monoidal.Ty, E],
-            left: Obj[bool, S] = True
+    def ev[Y: Obj[closed.Ty], E: Obj[closed.Ty], S: bool](
+            cls, base: Var[closed.Ty, Y], exponent: Var[closed.Ty, E],
+            left: Var[bool, S] = True
     ) -> Hom[Closed, TensorDir[ExpDir[Y, E, S], E, S], Y]:
         """
         The evaluation of the underlying category, with empty parameters.
@@ -408,12 +409,13 @@ class Closed(Markov, ClosedCategory):
             left : Whether to take the left or right evaluation.
         """
         return cls.lift(cls.category.ev(
-            base, exponent, left))  # ty: ignore[invalid-argument-type]
+            base, exponent, left))
 
     @rule
-    def curry[X, S: bool, N: Count, Y: Obj[monoidal.Ty, None, N], Z](
-            self: Hom[Closed, TensorDir[X, Y, S], Z], n: Obj[int, N] = 1,
-            left: Obj[bool, S] = True) -> Hom[Closed, X, ExpDir[Z, Y, S]]:
+    def curry[X: Obj[closed.Ty], S: bool, N: Count, Y: Obj[closed.Ty, N],
+              Z: Obj[closed.Ty]](
+            self: Hom[Closed, TensorDir[X, Y, S], Z], n: Var[int, N] = 1,
+            left: Var[bool, S] = True) -> Hom[Closed, X, ExpDir[Z, Y, S]]:
         """
         Curry the last `n` objects of the domain if `left` else the first,
         i.e. everything but the parameters, which a left currying swaps out
@@ -451,12 +453,13 @@ class Feedback(Markov, FeedbackCategory):
             self.dom, self.cod, self.inside, self.param, self.copar)))
 
     @rule
-    def feedback[A, B, S: bool, M](
+    def feedback[A: Obj[FeedbackTy], B: Obj[FeedbackTy], S: bool,
+                 M: Obj[FeedbackTy]](
             self: Hom[Feedback, TensorDir[D[M], A, S], TensorDir[M, B, S]],
-            dom: Obj[monoidal.Ty | None, A] = None,
-            cod: Obj[monoidal.Ty | None, B] = None,
-            mem: Obj[monoidal.Ty | None, M] = None,
-            left: Obj[bool, S] = False) -> Hom[Feedback, A, B]:
+            dom: Var[FeedbackTy | None, A] = None,
+            cod: Var[FeedbackTy | None, B] = None,
+            mem: Var[FeedbackTy | None, M] = None,
+            left: Var[bool, S] = False) -> Hom[Feedback, A, B]:
         """
         The feedback of the underlying category, with the parameters
         swapped out of the way the same as :meth:`Traced.trace`.
@@ -492,8 +495,8 @@ class Compact(Traced, CompactCategory):
     @classmethod
     @rule
     def cups[X: Atom](
-            cls, left: Obj[monoidal.Ty, X],
-            right: Obj[monoidal.Ty, R[X]]
+            cls, left: Var[monoidal.Ty, X],
+            right: Var[monoidal.Ty, R[X]]
     ) -> Hom[Compact, Tensor[X, R[X]], Unit[monoidal.Ty]]:
         """
         The cups of the underlying category, with empty parameter space.
@@ -508,8 +511,8 @@ class Compact(Traced, CompactCategory):
     @classmethod
     @rule
     def caps[X: Atom](
-            cls, left: Obj[monoidal.Ty, X],
-            right: Obj[monoidal.Ty, L[X]]
+            cls, left: Var[monoidal.Ty, X],
+            right: Var[monoidal.Ty, L[X]]
     ) -> Hom[Compact, Unit[monoidal.Ty], Tensor[X, L[X]]]:
         """
         The caps of the underlying category, with empty parameter space.
@@ -535,9 +538,9 @@ class Hypergraph(Compact, Markov, HypergraphCategory):
     @classmethod
     @rule
     def spiders[X: Atom, M: Count, N: Count](
-            cls, n_legs_in: Obj[int, M],
-            n_legs_out: Obj[int, N],
-            typ: Obj[monoidal.Ty, X]
+            cls, n_legs_in: Var[int, M],
+            n_legs_out: Var[int, N],
+            typ: Var[monoidal.Ty, X]
     ) -> Hom[Hypergraph, Repeat[X, M], Repeat[X, N]]:
         """
         The spiders of the underlying category, with empty parameters.

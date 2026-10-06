@@ -1,19 +1,182 @@
-""" The rules and generators of a category, and the search by them. """
+""" The patterns read off signatures, their matching, and the search
+for the terms of a category by its rules. """
 
+from typing import TypeVar, get_args, get_origin
 
 from hypothesis import find
 from hypothesis import strategies as st
 from pytest import raises
 
 from discopy import braided, cat, rigid
-from discopy.abc import Category, ColouredMonoid
+from discopy.abc import (
+    BiclosedCategory, Category, ColouredMonoid, FeedbackCategory,
+    MonoidalCategory, TracedCategory)
 from discopy.monoidal import Box, Diagram, Ty
-from discopy.pattern import Hom, Obj, Tensor, Unit
-from discopy.search import Rule, rule, search
+from discopy.pattern import (
+    Atom, Count, D, Declaration, Hom, Obj, Over, R, Repeat, Rule, Sort,
+    Tensor, Unit, Var, match, rule, search)
 from discopy.utils import AxiomError
 
 
+A, B = TypeVar("A"), TypeVar("B")
 x, y = Ty("x"), Ty("y")
+
+
+def test_read_off():
+    """ Variables, premises and conclusion are what Python evaluates. """
+    then = Category.then
+    assert list(then.variables) == ["A", "B", "C"]
+    assert all(sort == Sort() for sort in then.variables.values())
+    assert list(then.premises) == ["self", "other"]
+    assert str(then.conclusion) == "Hom[C1, A, C]"
+    _, dom, _ = get_args(MonoidalCategory.tensor.conclusion)
+    assert get_origin(dom) is Tensor
+    assert [variable.__name__ for variable in get_args(dom)] == ["A", "C"]
+
+    def spiders[X: Atom, N: Count](): ...
+    X, N = spiders.__type_params__
+    assert Sort.of(X).atomic and Sort.of(N).count
+
+
+def test_sorts():
+    """ ``Obj``, ``Atom``, ``Unit``, ``Count`` and ``bool`` are sorts
+    with no variable, bounding one or sampled as a premise; ``Var``
+    refers to a variable, or a pattern over them, bound elsewhere. """
+    from discopy.axioms import Axiom
+
+    def bound[X: Atom[Ty], N: Count, M: Obj[Ty, N]](): ...
+    sorts = [Sort.of(variable) for variable in bound.__type_params__]
+    assert list(map(str, sorts)) == ["Atom[Ty]", "Count", "Obj[Ty, N]"]
+
+    def law[X: Atom[Ty]](cls, x: Var[Ty, X], y: Atom[Ty]):
+        return cls.Equation(cls.id(x), cls.id(y))
+    law = Axiom(law).bind(Diagram)
+    assert law.variables["X"].atomic and law.premises["y"].atomic
+    equation = find(law.strategy(), lambda _: True)
+    assert len(equation.terms[0].dom) == len(equation.terms[1].dom) == 1
+    assert [s for s, _ in match(Var[Ty, A], x)] == [{"A": x}]
+    assert list(match(Atom[Ty], x)) == [({}, ())]
+    assert not list(match(Atom[Ty], x @ y))
+    assert list(match(Unit[Ty], Ty())) and not list(match(Unit[Ty], x))
+
+
+def test_match():
+    from discopy import rigid
+    x, y = rigid.Ty("x"), rigid.Ty("y")
+    X = TypeVar("X", bound=Atom)
+    N = TypeVar("N", bound=Count)
+    assert [s["X"] for s, _ in match(Tensor[X, R[X]], x @ x.r)] == [x]
+    assert not list(match(Tensor[X, R[X]], x @ y.r))
+    assert list(match(Hom[None, A, B], (x, None))) == [({"A": x}, ())]
+    assert [s for s, _ in match(Repeat[X, N], x @ x @ x)]\
+        == [{"N": 3, "X": x}]
+
+
+def test_exp_unify():
+    """ An exponential pattern decomposes a single exponential object
+    its base and exponent rebuild, matches nothing else, and keeps the
+    residual of a pregroup, whose exponentials are adjoint atoms. """
+    from discopy import biclosed, rigid
+
+    a, b = biclosed.Ty("a"), biclosed.Ty("b")
+    ((subst, residuals),) = match(Over[A, B], b << a)
+    assert subst == {"A": b, "B": a} and not residuals
+    assert not list(match(Over[A, B], b @ a))
+    ((_, residual),) = match(Over[A, B], rigid.Ty("b") << rigid.Ty("a"))
+    assert residual
+
+
+def test_delay_unify():
+    from discopy import feedback
+
+    x, y = feedback.Ty("x"), feedback.Ty("y")
+    assert list(match(D[A], x.d @ y.d)) == [({"A": x @ y}, ())]
+    assert not list(match(D[A], x.d @ y))
+
+
+def test_sides():
+    """ A side ``S: bool`` orients ``TensorDir``, ``ExpDir`` and
+    ``AdjDir``: matching tries both sides unless the side is bound. """
+    from discopy import biclosed, rigid
+    from discopy.pattern import AdjDir, ExpDir, TensorDir
+    from discopy.pattern import instantiate
+
+    S = TypeVar("S", bound=bool)
+    x, y = biclosed.Ty("x"), biclosed.Ty("y")
+    assert [(s["S"], s["A"], s["B"]) for s, _ in match(
+        TensorDir[A, B, S], x @ y) if len(s["A"]) == 1]\
+        == [(True, x, y), (False, y, x)]
+    assert [s["S"] for s, _ in match(ExpDir[A, B, S], x << y)] == [True]
+    assert [s["S"] for s, _ in match(ExpDir[A, B, S], y >> x)] == [False]
+    assert instantiate(TensorDir[A, B, S], {"A": x, "B": y, "S": False},
+                       biclosed.Ty) == y @ x
+    r = rigid.Ty("r")
+    assert [s["S"] for s, _ in match(AdjDir[A, S], r.l)] == [True, False]
+    assert Sort.of(S) == Sort("bool", side=True)
+
+
+def test_trace():
+    """ The n-ary trace is one rule on both sides: ``M`` is of size
+    ``n``, the side ``S`` is ``left``. """
+    from discopy import traced
+
+    trace = TracedCategory.trace
+    assert trace.variables["M"] == Sort(size="N")
+    assert list(trace.premises) == ["self", "n", "left"]
+    x, y, a, b = map(traced.Ty, "xyab")
+    found = [(s["S"], s["N"], s["M"]) for s, _ in match(
+        trace.premises["self"], (x @ y @ a, x @ y @ b))]
+    assert found == [  # The right ends a and b share no wire.
+        (True, 0, traced.Ty()), (True, 1, x), (True, 2, x @ y),
+        (False, 0, traced.Ty())]
+    assert str(Sort(size="N")) == "Obj[C0, N]"
+    canonical = traced.Diagram.trace_iteration.canonical()
+    assert str(canonical.terms[0]).count("Trace") == 2
+
+
+def test_curry_and_uncurry():
+    """ The curry concludes on the exponential of all ``n`` objects at
+    once, as ``curry(n, left)`` builds it, and the uncurry states it
+    upside down. """
+    from discopy import biclosed
+    from discopy.pattern import instantiate
+
+    curry, uncurry = BiclosedCategory.curry, Declaration(
+        BiclosedCategory.uncurry)
+    assert str(uncurry.premises["self"]) == str(curry.conclusion)
+    assert str(uncurry.conclusion) == str(curry.premises["self"])
+    x, y, z, w = map(biclosed.Ty, "xyzw")
+    f = biclosed.Box("f", x @ y @ z, w)
+    for subst, _ in match(curry.premises["self"], (f.dom, f.cod)):
+        curried = f.curry(subst["N"], left=subst["S"])
+        assert instantiate(curry.conclusion, subst, biclosed.Ty)\
+            == (curried.dom, curried.cod)
+    for left in (True, False):
+        g = biclosed.Box("g", x, w << y @ z if left else y @ z >> w)
+        (subst, _), = match(uncurry.premises["self"], (g.dom, g.cod))
+        assert (subst["S"], subst["N"], subst["Y"]) == (left, 2, y @ z)
+        uncurried = g.uncurry(2, left)
+        assert instantiate(uncurry.conclusion, subst, biclosed.Ty)\
+            == (uncurried.dom, uncurried.cod)
+
+
+def test_ev_and_feedback():
+    """ The evaluation and the feedback are one rule each, on both
+    sides; the memory of a feedback is any object. """
+    from discopy import biclosed
+    from discopy.pattern import instantiate
+
+    ev = BiclosedCategory.ev
+    assert list(ev.premises) == ["base", "exponent", "left"]
+    x, y = biclosed.Ty("x"), biclosed.Ty("y")
+    for left in (True, False):
+        subst = {"Y": y, "E": x, "S": left}
+        built = biclosed.Diagram.ev(y, x, left)
+        assert instantiate(ev.conclusion, subst, biclosed.Ty)\
+            == (built.dom, built.cod)
+    feedback = FeedbackCategory.feedback
+    assert feedback.variables["M"] == Sort()
+    assert str(feedback.premises["mem"]) == "Var[C0 | None, M]"
 
 
 def test_rule():
@@ -62,7 +225,7 @@ def test_generator():
         @classmethod
         @rule
         def wrong[A: ColouredMonoid](
-                cls, dom: Obj[Ty, A]) -> Hom[Diagram, A, Unit[Ty]]:
+                cls, dom: Var[Ty, A]) -> Hom[Diagram, A, Unit[Ty]]:
             """ A generator whose conclusion lies. """
             return cls.id(dom)
 
@@ -137,7 +300,7 @@ def test_focusing():
     """ A goal commits to the rule it applies deterministically, with an
     ``epsilon`` chance of escaping back to the full search. """
     from discopy import biclosed, rigid
-    from discopy.search import focused
+    from discopy.pattern import focused
 
     a, b = biclosed.Ty("a"), biclosed.Ty("b")
 

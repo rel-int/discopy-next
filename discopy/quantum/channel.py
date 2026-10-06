@@ -42,7 +42,7 @@ Channel([0.5+0.j, 0.5+0.j, 0.5+0.j, 0.5+0.j], dom=CQ(), cod=Q(Dim(2)))
 """
 
 from discopy import frobenius, tensor
-from discopy.pattern import Obj  # noqa: F401
+from discopy.pattern import Var  # noqa: F401
 from discopy import pattern
 from discopy.abc import ColouredMonoid
 from discopy.cat import factory
@@ -55,7 +55,7 @@ from discopy.tensor import Dim, Tensor
 from discopy.utils import assert_isinstance
 
 from discopy.pattern import Hom
-from discopy.search import rule
+from discopy.pattern import rule
 
 
 class CQ(ColouredMonoid):
@@ -175,7 +175,7 @@ class Channel(Tensor):
 
     @classmethod
     @rule
-    def id[A](cls, dom: Obj[CQ, A] = CQ()
+    def id[A](cls, dom: Var[CQ, A] = CQ()
               ) -> Hom[Channel, A, A]:
         assert_isinstance(dom, CQ)
         return cls(Tensor[

@@ -51,14 +51,14 @@ from networkx import (
 from networkx.algorithms.isomorphism import is_isomorphic
 
 from discopy import cmap, messages, utils
-from discopy.pattern import Obj, Tensor  # noqa: F401
+from discopy.pattern import Obj, Var, Tensor  # noqa: F401
 from discopy.abc import (
     DaggerCategory, HypergraphCategory, MarkovCategory, MonoidalCategory,
     NamedGeneric, RigidCategory, SymmetricCategory, TracedCategory)
 from discopy.drawing import Node, backend
 from discopy.python.finset import Permutation
 from discopy.pattern import Hom
-from discopy.search import rule
+from discopy.pattern import rule
 from discopy.utils import (
     factory_name,
     assert_isinstance,
@@ -350,7 +350,7 @@ class Hypergraph[category: Diagram](MonoidalCategory, DaggerCategory,
 
     @classmethod
     @rule
-    def id[A](cls, dom: Obj[Any | None, A] = None
+    def id[A](cls, dom: Var[Any | None, A] = None
               ) -> Hom[Hypergraph, A, A]:
         dom = cls.category.ob() if dom is None else dom
         dom_wires = cod_wires = tuple(range(len(dom)))
@@ -547,9 +547,9 @@ class Hypergraph[category: Diagram](MonoidalCategory, DaggerCategory,
         return factory.__func__(type(self), self, left)
 
     @rule
-    def trace[A, B, S: bool, N: Count, M: Obj[Any, None, N]](
+    def trace[A: Obj[Any], B: Obj[Any], S: bool, N: Count, M: Obj[Any, N]](
             self: Hom[Hypergraph, TensorDir[M, A, S], TensorDir[M, B, S]],
-            n: Obj[int, N] = 1, left: Obj[bool, S] = False
+            n: Var[int, N] = 1, left: Var[bool, S] = False
     ) -> Hom[Hypergraph, A, B]:
         """
         The trace of a hypergraph is its pre- and post-composition with

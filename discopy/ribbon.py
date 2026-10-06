@@ -87,7 +87,7 @@ from discopy.abc import RibbonCategory
 from discopy.axioms import Serialisable
 from discopy.cat import factory, Generator
 from discopy.pivotal import Ty, Nat  # noqa: F401  pylint: disable=unused-import
-from discopy.pattern import Count, Hom, Obj, TensorDir  # noqa: F401
+from discopy.pattern import Count, Hom, Obj, Var, TensorDir  # noqa: F401
 from discopy.axioms import rule
 
 
@@ -108,9 +108,9 @@ class Diagram(pivotal.Diagram, balanced.Diagram, RibbonCategory):
         "The generic tree of a twist does not read back (#742).")
 
     @rule
-    def trace[A, B, S: bool, N: Count, M: Obj[Ty, None, N]](
+    def trace[A: Obj[Ty], B: Obj[Ty], S: bool, N: Count, M: Obj[Ty, N]](
             self: Hom[Diagram, TensorDir[M, A, S], TensorDir[M, B, S]],
-            n: Obj[int, N] = 1, left: Obj[bool, S] = False
+            n: Var[int, N] = 1, left: Var[bool, S] = False
     ) -> Hom[Diagram, A, B]:
         """
         The trace of a ribbon diagram.

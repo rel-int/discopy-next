@@ -22,7 +22,7 @@ from discopy.abc import SymmetricCategory
 from discopy.utils import assert_isinstance
 from discopy.python import finset, function
 from discopy.python.function import Ty
-from discopy.pattern import Count, Hom, Obj, TensorDir  # noqa: F401
+from discopy.pattern import Count, Hom, Obj, Var, TensorDir  # noqa: F401
 from discopy.axioms import rule
 
 
@@ -122,9 +122,9 @@ class Function(function.Function, SymmetricCategory):
         return Function.swap(*self.is_swap_of[::-1])
 
     @rule
-    def trace[A, B, S: bool, N: Count, M: Obj[Ty, None, N]](
+    def trace[A: Obj[Ty], B: Obj[Ty], S: bool, N: Count, M: Obj[Ty, N]](
             self: Hom[Function, TensorDir[M, A, S], TensorDir[M, B, S]],
-            n: Obj[int, N] = 1, left: Obj[bool, S] = False
+            n: Var[int, N] = 1, left: Var[bool, S] = False
     ) -> Hom[Function, A, B]:
         """
         The additive trace of a function.

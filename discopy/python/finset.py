@@ -17,7 +17,7 @@ Summary
 """
 
 from discopy.utils import assert_isinstance
-from discopy.pattern import Obj, Tensor  # noqa: F401
+from discopy.pattern import Obj, Var, Tensor  # noqa: F401
 from typing import Iterable, Self, Any, overload
 from collections.abc import Sequence
 
@@ -26,7 +26,7 @@ from dataclasses import dataclass
 from discopy import messages
 from discopy.abc import MonoidalCategory, PROP, Nat
 from discopy.pattern import Atom, Hom
-from discopy.search import rule
+from discopy.pattern import rule
 from discopy.pattern import Count, TensorDir  # noqa: F401
 
 
@@ -77,7 +77,7 @@ class Function(MonoidalCategory, Sequence):
 
     @staticmethod
     @rule
-    def id[A](x: Obj[int | Nat, A] = 0
+    def id[A](x: Var[int | Nat, A] = 0
               ) -> Hom[Function, A, A]:
         x = Nat(int(x))
         return Function(list(range(x)), x, x)
@@ -101,7 +101,7 @@ class Function(MonoidalCategory, Sequence):
     @staticmethod
     @rule
     def swap[X: Atom, Y: Atom](
-            x: Obj[int | Nat, X], y: Obj[int | Nat, Y]
+            x: Var[int | Nat, X], y: Var[int | Nat, Y]
     ) -> Hom[Function, Tensor[X, Y], Tensor[Y, X]]:
         m, n = int(x), int(y)
         inside = list(Permutation.swap(m, n))
@@ -195,7 +195,7 @@ class Permutation(Function, PROP):
 
     @classmethod
     @rule
-    def id[A](cls, dom: Obj[int | Nat, A] = 0
+    def id[A](cls, dom: Var[int | Nat, A] = 0
               ) -> Hom[Self, A, A]:
         """ The identity permutation on ``range(size)``. """
         n = int(dom)
@@ -351,8 +351,8 @@ class Permutation(Function, PROP):
     @classmethod
     @rule
     def swap[X: Atom, Y: Atom](
-            cls, left: Obj[int | Nat, X],
-            right: Obj[int | Nat, Y]
+            cls, left: Var[int | Nat, X],
+            right: Var[int | Nat, Y]
     ) -> Hom[Self, Tensor[X, Y], Tensor[Y, X]]:
         m, n = int(left), int(right)
         inside = tuple(
@@ -361,9 +361,9 @@ class Permutation(Function, PROP):
         return cls(inside, m + n)
 
     @rule
-    def trace[A, B, S: bool, N: Count, M: Obj[Nat, None, N]](
+    def trace[A: Obj[Nat], B: Obj[Nat], S: bool, N: Count, M: Obj[Nat, N]](
             self: Hom[Permutation, TensorDir[M, A, S], TensorDir[M, B, S]],
-            n: Obj[int, N] = 1, left: Obj[bool, S] = False
+            n: Var[int, N] = 1, left: Var[bool, S] = False
     ) -> Hom[Permutation, A, B]:
         raise NotImplementedError
 

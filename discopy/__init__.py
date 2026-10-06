@@ -7,7 +7,6 @@ import doctest
 from discopy import (
     abc,
     pattern,
-    search,
     axioms,
     cat,
     monoidal,

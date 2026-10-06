@@ -558,6 +558,23 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Changed
 
+- `discopy.search` and `discopy.sequent` merge into `discopy.pattern`,
+  where each pattern interprets its own aliases: `Pattern` declares the
+  abstract classmethods `instantiate` and `unify` that `Tensor`,
+  `TensorDir`, `ExpDir`, `AdjDir`, `D` and `Repeat` implement, `Over`
+  and `Under` being `ExpDir` on a fixed side and `L` and `R` being
+  `AdjDir`. Sorts and references are separate: `Obj[T]`, `Obj[T, N]`,
+  `Atom[T]`, `Unit[T]`, `Hom[C, A, B]`, `Count` and `bool` are sorts
+  with no variable, bounding one or sampled as a premise, and `Var[T,
+  p]` stands for a pattern `p` over variables bound elsewhere, e.g.
+  `x: Var[C0, X]` for `X: Obj[C0]` or `n: Var[int, N]` for `N: Count`,
+  where `Obj[T, p]` played both parts. The type parameters of a pattern
+  are bounded by the structure it needs, e.g. `D[T: DelayedMonoid]`, so
+  that a typechecker refuses a delay in a sequent whose objects are not
+  delayed: this found that `stream.Ty` is a `DelayedMonoid`, which it
+  now declares, and that the exponential of Python types is not `<<`,
+  so `python.Function.curry`, `ev` and `uncurry` are methods rather than
+  rules.
 - `trace`, `curry`, `ev` and `feedback` are each one rule, stated by
   their own signature on both sides: `trace(n=1, left=False)` traces an
   object `M` of size `n` on the side `left` says, its domain
@@ -995,6 +1012,12 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   reviewer first.
 
 ### Fixed
+
+- `biclosed.Curry.to_drawing` traces the `n` wires it curries, where it
+  traced one whatever `n` was, so the drawing of a curry of zero or of
+  two wires had the wrong boundary and did not compose. The n-ary
+  `curry` rule found it on its first run, sampling `n` from zero to
+  three where the one-wire rules only ever drew one.
 
 - `Equation` has one symbol fewer than terms, a symbol between each pair
   of consecutive terms, where it defaulted to one per term and the last

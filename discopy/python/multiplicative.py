@@ -31,7 +31,7 @@ from discopy.abc import ClosedCategory
 from discopy.utils import assert_isinstance, tuplify, untuplify, factory
 from discopy.python import finset, function
 from discopy.python.function import Ty
-from discopy.pattern import Count, ExpDir, Hom, Obj, TensorDir  # noqa: F401
+from discopy.pattern import Count, Hom, Obj, Var, TensorDir  # noqa: F401
 from discopy.axioms import rule
 
 
@@ -157,13 +157,11 @@ class Function(function.Function, ClosedCategory):
         return Function.copy(dom, 0)
 
     @staticmethod
-    @rule
-    def ev[Y, E, S: bool](
-            base: Obj[Ty, Y], exponent: Obj[Ty, E],
-            left: Obj[bool, S] = True
-    ) -> Hom[Function, TensorDir[ExpDir[Y, E, S], E, S], Y]:
+    def ev(base: Ty, exponent: Ty, left: bool = True) -> Function:
         """
-        The evaluation function,
+        The evaluation function, a method rather than a rule since the
+        exponential of Python types is :meth:`exp` and not ``<<``, which
+        no pattern states,
         i.e. take a function and apply it to an argument.
 
         Parameters:
@@ -178,12 +176,10 @@ class Function(function.Function, ClosedCategory):
         dom, cod = exponent @ Function.exp(base, exponent), base
         return Function(lambda *xs: xs[-1](*xs[:-1]), dom, cod)
 
-    @rule
-    def curry[X, S: bool, N: Count, Y: Obj[Ty, None, N], Z](
-            self: Hom[Function, TensorDir[X, Y, S], Z], n: Obj[int, N] = 1,
-            left: Obj[bool, S] = True) -> Hom[Function, X, ExpDir[Z, Y, S]]:
+    def curry(self, n: int = 1, left: bool = True) -> Function:
         """
-        Currying, i.e. turn a binary function into a function-valued function.
+        Currying, i.e. turn a binary function into a function-valued function,
+        a method rather than a rule as :meth:`ev` is.
 
         Parameters:
             n : The number of types to curry.
@@ -197,9 +193,7 @@ class Function(function.Function, ClosedCategory):
         return Function(dom=dom, cod=cod, inside=lambda *xs: lambda *ys:
                         self(*(xs + ys) if left else (ys + xs)))
 
-    def uncurry[X, S: bool, N: Count, Y: Obj[Ty, None, N], Z](
-            self: Hom[Function, X, ExpDir[Z, Y, S]], n: Obj[int, N] = 1,
-            left: Obj[bool, S] = True) -> Hom[Function, TensorDir[X, Y, S], Z]:
+    def uncurry(self, n: int = 1, left: bool = True) -> Function:
         """
         Uncurrying,
         i.e. turn a function-valued function into a binary function: the
@@ -236,9 +230,9 @@ class Function(function.Function, ClosedCategory):
             else Function(inside, self.dom[:-1], self.cod).fix(n - 1)
 
     @rule
-    def trace[A, B, S: bool, N: Count, M: Obj[Ty, None, N]](
+    def trace[A: Obj[Ty], B: Obj[Ty], S: bool, N: Count, M: Obj[Ty, N]](
             self: Hom[Function, TensorDir[M, A, S], TensorDir[M, B, S]],
-            n: Obj[int, N] = 1, left: Obj[bool, S] = False
+            n: Var[int, N] = 1, left: Var[bool, S] = False
     ) -> Hom[Function, A, B]:
         """
         The multiplicative trace of a function.

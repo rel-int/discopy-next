@@ -84,7 +84,7 @@ from inspect import signature
 from typing import Callable, ClassVar, Self, overload
 
 from discopy import monoidal, cmap
-from discopy.pattern import Obj  # noqa: F401
+from discopy.pattern import Obj, Var  # noqa: F401
 
 from discopy.axioms import Hom, no_strategy, rule, Serialisable
 from discopy.abc import BiclosedCategory, DaggerCategory, ResiduatedMonoid
@@ -328,9 +328,9 @@ class Diagram(monoidal.Diagram, BiclosedCategory):
     Abstraction: ClassVar[Generator]
 
     @rule
-    def curry[X, S: bool, N: Count, Y: Obj[Ty, None, N], Z](
-            self: Hom[Diagram, TensorDir[X, Y, S], Z], n: Obj[int, N] = 1,
-            left: Obj[bool, S] = True) -> Hom[Diagram, X, ExpDir[Z, Y, S]]:
+    def curry[X: Obj[Ty], S: bool, N: Count, Y: Obj[Ty, N], Z: Obj[Ty]](
+            self: Hom[Diagram, TensorDir[X, Y, S], Z], n: Var[int, N] = 1,
+            left: Var[bool, S] = True) -> Hom[Diagram, X, ExpDir[Z, Y, S]]:
         """
         Wrapper around :class:`Curry` called by :class:`Functor`.
 
@@ -343,9 +343,9 @@ class Diagram(monoidal.Diagram, BiclosedCategory):
 
     @classmethod
     @rule
-    def ev[Y, E, S: bool](
-            cls, base: Obj[Ty, Y], exponent: Obj[Ty, E],
-            left: Obj[bool, S] = True
+    def ev[Y: Obj[Ty], E: Obj[Ty], S: bool](
+            cls, base: Var[Ty, Y], exponent: Var[Ty, E],
+            left: Var[bool, S] = True
     ) -> Hom[Diagram, TensorDir[ExpDir[Y, E, S], E, S], Y]:
         """
         Wrapper around :class:`Eval` called by :class:`Functor`.
@@ -499,9 +499,9 @@ class Curry(monoidal.Bubble, Box):
     def to_drawing(self):
         if self.left:
             f, e = self.arg, self.Coeval(self.cod, left=True)
-            return (f >> e).to_drawing().trace()
+            return (f >> e).to_drawing().trace(self.n)
         f, e = self.arg, self.Coeval(self.cod)
-        return (f >> e).to_drawing().trace(left=True)
+        return (f >> e).to_drawing().trace(self.n, left=True)
 
 
 Sum, Bubble = Diagram.Sum, Diagram.Bubble

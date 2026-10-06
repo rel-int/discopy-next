@@ -144,7 +144,7 @@ def test_equation_types():
     from discopy import (
         balanced, closed, compact, pivotal, ribbon, symmetric, traced)
     from typing import get_origin
-    from discopy.sequent import instantiate
+    from discopy.pattern import instantiate
     (parameter, ) = Equation.__type_params__
     levels = (Diagram, braided.Diagram, traced.Diagram, balanced.Diagram,
               symmetric.Diagram, closed.Diagram, rigid.Diagram,

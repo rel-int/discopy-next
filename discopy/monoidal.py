@@ -65,7 +65,7 @@ from typing import (
     TYPE_CHECKING)
 
 from discopy import abc, cat, drawing, hypergraph, cmap, messages
-from discopy.pattern import Obj, Tensor  # noqa: F401
+from discopy.pattern import Var, Tensor  # noqa: F401
 from discopy.abc import (
     ColouredMonoid, Monoid, MonoidalCategory, NamedGeneric)
 from discopy.axioms import (
@@ -1035,7 +1035,7 @@ class Diagram(cat.Arrow, MonoidalCategory, RichDisplay):
             boundary_connected=False):
         """
         Generate diagrams by the :attr:`rules` and :attr:`generators` of
-        the category, see :func:`discopy.search.search`: a subclass with
+        the category, see :func:`discopy.pattern.search`: a subclass with
         more structure declares it there and inherits the search as is.
 
         Parameters:
@@ -1624,7 +1624,7 @@ class Diagram(cat.Arrow, MonoidalCategory, RichDisplay):
         return AbstractEquation(functor(f), functor(top) >> functor(bottom))
 
     @axiom
-    def hypergraph_identity[X](cls, x: Obj[Ty, X]):
+    def hypergraph_identity[X](cls, x: Var[Ty, X]):
         """ The encoding preserves identities. """
         functor = cls.hypergraph_equivalence()
         return AbstractEquation(functor(cls.id(x)), functor.cod.id(x))
@@ -1689,7 +1689,7 @@ class Diagram(cat.Arrow, MonoidalCategory, RichDisplay):
         return cls.Equation(f.foliation(), f, up_to=cls.to_hypergraph)
 
     @axiom
-    def drawing_identity[X](cls, x: Obj[Ty, X]):
+    def drawing_identity[X](cls, x: Var[Ty, X]):
         """
         :meth:`to_drawing` preserves identities on the nose. It does not
         preserve composition or whiskering on the nose, since the layout
@@ -2052,7 +2052,7 @@ class Functor(cat.Functor):
 
     @classmethod
     @rule
-    def id[A](cls, dom: Obj[type | None, A] = None
+    def id[A](cls, dom: Var[type | None, A] = None
               ) -> Hom[Any, A, A]:
         return cls(lambda x: x, lambda f: f, dom=dom, cod=dom)
 

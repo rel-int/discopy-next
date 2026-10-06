@@ -74,12 +74,12 @@ from discopy import (
     ribbon,
     messages
 )
-from discopy.pattern import Obj, Tensor, Unit, L, R  # noqa: F401
+from discopy.pattern import Var, Tensor, Unit, L, R  # noqa: F401
 from discopy.abc import Pregroup, RibbonCategory, TracedCategory, NamedGeneric
 from discopy.cat import assert_iscomposable
 from discopy.python import finset
 from discopy.pattern import Atom, Hom
-from discopy.search import rule
+from discopy.pattern import rule
 from discopy.utils import (
     factory, Generator, classproperty, unbiased, assert_isinstance,
     factory_name)
@@ -263,7 +263,7 @@ class Diagram[natural](RibbonCategory, NamedGeneric):
 
     @classmethod
     @rule
-    def id[A](cls, dom: Obj[Ty | None, A] = None
+    def id[A](cls, dom: Var[Ty | None, A] = None
               ) -> Hom[Diagram, A, A]:
         """
         The identity on an integer type.
@@ -332,7 +332,7 @@ class Diagram[natural](RibbonCategory, NamedGeneric):
     @classmethod
     @rule
     def braid[X: Atom, Y: Atom](
-            cls, left: Obj[Ty, X], right: Obj[Ty, Y]
+            cls, left: Var[Ty, X], right: Var[Ty, Y]
     ) -> Hom[Diagram, Tensor[X, Y], Tensor[Y, X]]:
         """
         The braid of integer diagrams is given by the following diagram:
@@ -377,7 +377,7 @@ class Diagram[natural](RibbonCategory, NamedGeneric):
     @classmethod
     @rule
     def cups[X: Atom](
-            cls, left: Obj[Ty, X], right: Obj[Ty, R[X]]
+            cls, left: Var[Ty, X], right: Var[Ty, R[X]]
     ) -> Hom[Diagram, Tensor[X, R[X]], Unit[Ty]]:
         """
         The integer cups are given by natural identities.
@@ -410,7 +410,7 @@ class Diagram[natural](RibbonCategory, NamedGeneric):
     @classmethod
     @rule
     def caps[X: Atom](
-            cls, left: Obj[Ty, X], right: Obj[Ty, L[X]]
+            cls, left: Var[Ty, X], right: Var[Ty, L[X]]
     ) -> Hom[Diagram, Unit[Ty], Tensor[X, L[X]]]:
         """
         The integer caps are given by natural identities.
