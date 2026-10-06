@@ -58,10 +58,10 @@ Round 2: review of @toumix, 2026-10-06, quoted verbatim.
 - [x] doctest of `match` with `value is None` (pattern.py:297)
 - [x] grammar of the docstrings (pattern.py:349, :926, :1147, :1054)
 - [x] annotate `annotation`, the `dict` of `canonical` (pattern.py:852, :1144)
-- [ ] the `*_of` functions (pattern.py:895)
+- [ ] the `*_of` functions: proposal posted, waiting on @toumix (pattern.py:895)
 - [x] `stated` a standalone function with its own docstring (pattern.py:974)
 - [x] "draw" in `generate` reads as sampling (pattern.py:1177)
-- [ ] the names `x` and `y` of `cell` (pattern.py:1250)
+- [ ] the names `x` and `y` of `cell`: options posted, waiting on @toumix (pattern.py:1250)
 - [ ] `#:` comments of `abc.Category` as docstrings: waiting on @toumix after @daydream6728's reply (abc.py:112)
 - [ ] decoupling patterns from `abc`, the import cycle: deferred by the user to later in this PR (pattern.py:107, :246)
 - [ ] carried over from round 1: pylint in the dev group and CI, waiting on `uv lock`, blocked by `download-r2.pytorch.org`
