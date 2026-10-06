@@ -622,7 +622,12 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   it reads wrongly there — a PEP 695 bound naming its own class, a
   lazy annotation, a method `@axiom` or `@rule` makes a classmethod, a
   generator built on first access — with `fail-under` raised to the
-  9.19 it scores. The CI test matrix runs 3.14 alone.
+  9.25 it scores under the pylint locked in `uv.lock`, now a dev
+  dependency run by the `lint` job: the type parameters of the `Obj`
+  and `Hom` aliases are named `Coarse`, `Fine`, `Dom` and `Cod`, since
+  pylint reads those of a PEP 695 alias as module-level names that
+  every `A`, `B` and `X` of a sequent would redefine. The CI test
+  matrix runs 3.14 alone.
 
 - `monoidal.Colour` is transparent by default rather than white, i.e. its
   `name` defaults to the new `config.TRANSPARENT` and `monoidal.white` is

@@ -45,6 +45,7 @@ dev = [
     "coverage",
     "hypothesis",
     "marimo",
+    "pylint",
     "pytest",
     "pytest-benchmark",
     "polars",

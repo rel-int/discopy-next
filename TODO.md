@@ -64,4 +64,4 @@ Round 2: review of @toumix, 2026-10-06, quoted verbatim.
 - [ ] the names `x` and `y` of `cell`: options posted, waiting on @toumix (pattern.py:1250)
 - [ ] `#:` comments of `abc.Category` as docstrings: waiting on @toumix after @daydream6728's reply (abc.py:112)
 - [ ] decoupling patterns from `abc`, the import cycle: deferred by the user to later in this PR (pattern.py:107, :246)
-- [WIP] @session_01D6C2TAAAQ7iKN8iWX1dGJx-2026-10-06 12:00 carried over from round 1: pylint in the dev group and CI, waiting on `uv lock`, blocked by `download-r2.pytorch.org`
+- [x] carried over from round 1: pylint in the dev group and CI, scoring 9.25 under the locked pylint

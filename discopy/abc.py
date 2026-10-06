@@ -74,13 +74,13 @@ from discopy.axioms import (  # noqa: F401  pylint: disable=unused-import
 from discopy.utils import (  # noqa: F401  pylint: disable=unused-import
     NamedGeneric, classproperty, factory_name)
 
-type Obj[T, X = None] = Annotated[T, X]
+type Obj[Coarse, Fine = None] = Annotated[Coarse, Fine]
 """ The premise ``x: Obj[T, p]`` of a pattern ``p`` beside its coarse
 type, ``Obj[C0]`` in a bound the sort of an object variable, expanded
 by :func:`discopy.pattern.expand` and read as ``Annotated`` by a
 typechecker. """
 
-type Hom[T, A, B] = Annotated[T, A, B]
+type Hom[Coarse, Dom, Cod] = Annotated[Coarse, Dom, Cod]
 """ The premise or conclusion ``Hom[C1, dom, cod]`` of a morphism
 between two sides, expanded by :func:`discopy.pattern.expand` and
 read as ``Annotated`` by a typechecker. """

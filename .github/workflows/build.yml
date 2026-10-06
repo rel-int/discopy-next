@@ -53,6 +53,9 @@ jobs:
       run:
         # stop the build if there are Python syntax errors or undefined names
         uv run ruff check discopy
+    - name: pylint
+      run:
+        uv run pylint discopy
   test:
     runs-on: ubuntu-latest
     timeout-minutes: 15
