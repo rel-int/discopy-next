@@ -49,6 +49,9 @@ jobs:
     - uses: ./.github/actions/setup
       with:
         python-version: ${{ matrix.python-version }}
+        # pylint reads the optional dependencies the code imports, and scores
+        # an import it cannot resolve as an error
+        groups: dev all
     - name: Check for errors
       run:
         # stop the build if there are Python syntax errors or undefined names

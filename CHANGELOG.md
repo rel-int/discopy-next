@@ -621,9 +621,12 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   stays, `.pylintrc` reading Python 3.14 and disabling the messages
   it reads wrongly there — a PEP 695 bound naming its own class, a
   lazy annotation, a method `@axiom` or `@rule` makes a classmethod, a
-  generator built on first access — with `fail-under` raised to the
-  9.25 it scores under the pylint locked in `uv.lock`, now a dev
-  dependency run by the `lint` job: the type parameters of the `Obj`
+  generator built on first access — with `fail-under` raised to 9.19.
+  The pylint locked in `uv.lock`, now a dev dependency run by the
+  `lint` job over the same groups as the tests, scores between 9.24
+  and 9.27, the number of `cyclic-import` it reports varying from one
+  run to the next, so the threshold stays below that range rather than
+  at a score a rerun can miss. The type parameters of the `Obj`
   and `Hom` aliases are named `Coarse`, `Fine`, `Dom` and `Cod`, since
   pylint reads those of a PEP 695 alias as module-level names that
   every `A`, `B` and `X` of a sequent would redefine. The CI test
