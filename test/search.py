@@ -165,12 +165,13 @@ def test_focusing():
         biclosed.Diagram, biclosed.Box.strategy,
         dom=a, cod=b << a, epsilon=0), bool)
     assert isinstance(curried.boxes[-1], biclosed.Curry)
-    escaped = find(search(
-        biclosed.Diagram, biclosed.Box.strategy,
-        dom=a, cod=b << a, epsilon=0.5),
-        lambda term: not any(
-            isinstance(box, biclosed.Curry) for box in term.boxes))
-    assert escaped.cod == b << a  # Support survives any epsilon > 0.
+    for epsilon in (0.5, 1e-4):  # Support survives any epsilon > 0.
+        escaped = find(search(
+            biclosed.Diagram, biclosed.Box.strategy,
+            dom=a, cod=b << a, epsilon=epsilon),
+            lambda term: not any(
+                isinstance(box, biclosed.Curry) for box in term.boxes))
+        assert escaped.cod == b << a
 
 
 def test_goal_patterns():

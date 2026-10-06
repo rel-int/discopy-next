@@ -332,7 +332,7 @@ def search(category: type[abc.Category], free: Callable | None = None, *,
         branches = matching(rules, dom, cod) if depth else []
         focus = focused(branches, dom, cod, scope["C0"])
         if focus and not (epsilon >= 1 or epsilon > 0 and draw(
-                st.integers(0, 999)) < round(1000 * epsilon)):
+                st.floats(0, 1, exclude_max=True)) < epsilon):
             choice = focus[0]
         else:
             leaves = ([] if free is None else [None])\
