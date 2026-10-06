@@ -981,7 +981,7 @@ class Diagram(cat.Arrow, MonoidalCategory, RichDisplay):
 
     @classmethod
     def strategy(
-            cls, *, types=None, dom=None, cod=None, max_depth=3,
+            cls, *, types=None, dom=None, cod=None, max_depth=None,
             boundary_connected=False):
         """
         Generate diagrams by the :attr:`rules` and :attr:`generators` of
@@ -992,7 +992,9 @@ class Diagram(cat.Arrow, MonoidalCategory, RichDisplay):
             dom : The domain of the diagrams, if any.
             cod : The codomain of the diagrams, if any.
             types : A strategy for the types, that of :attr:`ob` by default.
-            max_depth : The number of nested rules a diagram may apply.
+            max_depth : The number of nested rules a diagram may apply:
+                three by default, or six for a category over a fixed
+                vocabulary, whose every box costs a rule.
             boundary_connected : Whether to keep only the diagrams that are
                 :attr:`is_boundary_connected`, the subspace
                 :meth:`normal_form` is defined on, which is how
@@ -1001,6 +1003,8 @@ class Diagram(cat.Arrow, MonoidalCategory, RichDisplay):
         """
         free = None if cls.Box.strategy.__func__ is no_strategy.__func__\
             else cls.Box.strategy
+        if max_depth is None:
+            max_depth = 3 if free else 6
         diagrams = search(
             cls, free, dom=dom, cod=cod, types=types, max_depth=max_depth)
         if not boundary_connected:
