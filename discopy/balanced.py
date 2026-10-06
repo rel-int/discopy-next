@@ -41,7 +41,7 @@ from discopy import config, monoidal, braided, traced, cmap, hypergraph
 from discopy.abc import BalancedCategory
 from typing import Annotated
 
-from discopy.axioms import Atom, Hom, no_strategy, Ob, rule
+from discopy.axioms import Atom, Hom, no_strategy, Ob, rule, Serialisable
 from discopy.cat import factory, Generator
 from discopy.monoidal import Colour, Ty  # noqa: F401
 from discopy.utils import factory_name, assert_isatomic
@@ -136,6 +136,8 @@ class Diagram(braided.Diagram, traced.Diagram, BalancedCategory):
     """
     Twist: ClassVar[Generator]
     Functor: ClassVar[Generator]
+    serialisation = Serialisable.serialisation.failing(
+        "The generic tree of a twist does not read back (#742).")
 
     @classmethod
     @rule
