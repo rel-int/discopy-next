@@ -50,6 +50,7 @@ dev = [
     "polars",
     "pytest-xdist",
     "ruff",
+    "ty",
 ]
 docs = ["discopy[docs]"]
 quantum = ["discopy[quantum]"]
@@ -87,6 +88,7 @@ test = [
     "pytest",
     "pytest-xdist",
     "ruff",
+    "ty",
 ]
 docs  = [
     "IPython",
@@ -137,6 +139,32 @@ ignore = ["E731", "E741", "E743", "F811"]
 
 [tool.ruff.lint.per-file-ignores]
 "**/__init__.py" = ["F401"]
+
+[tool.ty.src]
+include = ["discopy"]
+
+[tool.ty.environment]
+python-version = "3.14"
+
+# Two rules stay off; see CHANGELOG.md. The factory-method pattern
+# narrows the signatures of `then`, `tensor` and their friends down the
+# tower, unsoundly but by design, and aligning them means changing runtime
+# APIs (invalid-method-override). Attribute access is dynamic by design in
+# about ninety places: the downgrade paths of Hypergraph and CMap ask the
+# host category for structure it may not have, Node holds arbitrary data,
+# and implementations are borrowed across levels (unresolved-attribute).
+[tool.ty.rules]
+invalid-method-override = "ignore"
+unresolved-attribute = "ignore"
+# The bounds of a declaration's type parameters carry the sorts of its
+# sequent, written with the pattern classes as type formers, e.g.
+# `F: Hom[C1, A, B]` — deliberately referencing the sibling parameters
+# and the heads of the declaring class, which the typing spec forbids
+# (invalid-type-variable-bound). The variables bounded this way appear
+# only inside Annotated metadata, never in a type expression, so the
+# coarse types stay fully checked; discopy.pattern.parse validates the
+# bounds at runtime instead.
+invalid-type-variable-bound = "ignore"
 
 [tool.pytest.ini_options]
 pythonpath = [

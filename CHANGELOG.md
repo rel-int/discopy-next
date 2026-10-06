@@ -9,6 +9,23 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Added
 
+- The codebase typechecks: `uv run ty check` passes in the full
+  development environment, `ty` a dev dependency locked in
+  `uv.lock`, configured by the `[tool.ty]` sections of
+  `pyproject.toml`. `NamedGeneric` is reimplemented on PEP 695 type
+  parameters, so typecheckers understand a specialisation like
+  `tensor.Box[complex]` both as a value and as a base class; the
+  abstract base classes bound their type variables all the way down
+  the tower and `Self` return types express the covariance the
+  tower used to assert. Three rules stay off, documented in
+  `pyproject.toml`: `invalid-method-override`, since aligning the
+  n-ary signatures the tower narrows means changing runtime APIs;
+  `unresolved-attribute`, since the downgrade paths of `Hypergraph`
+  and `CMap` ask the host category for structure behind runtime
+  guards; and `invalid-type-variable-bound`, the one typing-spec
+  rule the sequent bounds break, `pattern.parse` validating them at
+  runtime instead.
+
 - Search strategies for the semantic side of the matrix.
   `cat.Functor.strategy` enrols the functors with `Relabelling`
   endofunctors — for the functors whose domain has objects freely

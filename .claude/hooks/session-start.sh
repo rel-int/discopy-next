@@ -1,6 +1,6 @@
 #!/bin/bash
 # Install the full development environment in a Claude Code on the web
-# session, so that `uv run pflake8 discopy` and `uv run coverage run -m pytest`
+# session, so that `uv run ruff check discopy` and `uv run coverage run -m pytest`
 # run as CONTRIBUTING.md says, extras included.
 #
 # `pyproject.toml` pins torch to the CPU index at download.pytorch.org on
