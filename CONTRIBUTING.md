@@ -55,7 +55,7 @@ if you want to run the full test suite involving all extra dependencies.
 
 ```shell
 uv sync --dev --group all
-uv run pflake8 discopy
+uv run ruff check discopy
 uv run coverage run -m pytest
 uv run coverage report -m
 ```
@@ -189,7 +189,7 @@ python -m pip install coverage pyproject-flake8 pytest marimo
 Then run:
 
 ```shell
-pflake8 discopy
+ruff check discopy
 coverage run -m pytest
 coverage report -m
 ```

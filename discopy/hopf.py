@@ -120,8 +120,6 @@ tensor network that gets contracted):
     :align: center
 """
 
-from __future__ import annotations
-
 from functools import cached_property
 
 import numpy as np

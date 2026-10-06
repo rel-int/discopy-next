@@ -14,8 +14,6 @@ Summary
     Function
 """
 
-from __future__ import annotations
-
 from functools import cache
 from itertools import accumulate
 from typing import Self

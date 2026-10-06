@@ -159,8 +159,6 @@ Note that we can only check equality of streams up to a finite number of steps.
 
 See :mod:`discopy.feedback` for the other axioms for feedback categories.
 """
-from __future__ import annotations
-
 from typing import Optional
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass

@@ -196,8 +196,6 @@ Coloured regions are also checked as part of the gallery:
 """
 
 
-from __future__ import annotations
-
 from typing import NamedTuple, TYPE_CHECKING, Sequence
 from dataclasses import dataclass
 

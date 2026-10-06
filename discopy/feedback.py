@@ -151,8 +151,6 @@ This satisfies the following equations:
 In the category of streams, this is just the identity.
 """
 
-from __future__ import annotations
-
 from typing import ClassVar
 
 from discopy import monoidal, braided, markov, hypergraph

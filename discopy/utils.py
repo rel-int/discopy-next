@@ -2,8 +2,6 @@
 
 """ DisCoPy utility functions. """
 
-from __future__ import annotations
-
 import json
 from functools import lru_cache, wraps
 from math import ceil

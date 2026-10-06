@@ -54,8 +54,6 @@ We also have its dagger and its transpose:
     :align: center
 """
 
-from __future__ import annotations
-
 from typing import ClassVar
 
 from discopy import cat, cmap, rigid, traced

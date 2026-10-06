@@ -76,8 +76,6 @@ Both copy and merge boxes are translated to spiders, thus when they appear
 in the same diagram they automatically satisfy the :mod:`frobenius` axioms.
 """
 
-from __future__ import annotations
-
 from typing import ClassVar
 
 from discopy import symmetric, monoidal, cmap, hypergraph

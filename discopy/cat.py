@@ -76,8 +76,6 @@ Functors are bubble-preserving.
 >>> assert F(f.bubble()) == F(f).bubble()
 """
 
-from __future__ import annotations
-
 from functools import total_ordering, cached_property
 from typing import (
     ClassVar,

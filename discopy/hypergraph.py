@@ -28,8 +28,6 @@ Summary
         pushout
 """
 
-from __future__ import annotations
-
 from collections.abc import Callable, Mapping
 from functools import cached_property
 from inspect import isclass

@@ -45,8 +45,6 @@ Summary
         tree2diagram
 """
 
-from __future__ import annotations
-
 from typing import ClassVar
 
 from dataclasses import dataclass

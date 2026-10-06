@@ -60,8 +60,6 @@ Speciality
     :align: center
 """
 
-from __future__ import annotations
-
 from typing import ClassVar
 
 from collections.abc import Callable

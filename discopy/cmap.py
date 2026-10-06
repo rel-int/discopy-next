@@ -34,8 +34,6 @@ Summary
     CMap
 """
 
-from __future__ import annotations
-
 import operator
 import shutil
 import subprocess

@@ -79,8 +79,6 @@ which lands in :class:`CMap` as a biclosed category has no trace.
 
 """
 
-from __future__ import annotations
-
 from abc import abstractmethod
 from inspect import signature
 from typing import Callable, ClassVar

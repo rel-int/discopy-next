@@ -58,11 +58,23 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import ClassVar
+from typing import Annotated, ClassVar
 
 from discopy.axioms import (
     Axiom, ComposablePair, ComposableTriple, Equation, axiom)
 from discopy.utils import NamedGeneric, classproperty  # noqa: F401
+
+
+type Ob[T, X = None] = Annotated[T, X]
+""" The premise ``x: Ob[T, p]`` of a pattern ``p`` beside its coarse
+type, ``Ob[C0]`` in a bound the sort of an object variable, expanded
+by :func:`discopy.pattern.expand` and read as ``Annotated`` by a
+typechecker. """
+
+type Hom[T, A, B] = Annotated[T, A, B]
+""" The premise or conclusion ``Hom[C1, dom, cod]`` of a morphism
+between two sides, expanded by :func:`discopy.pattern.expand` and
+read as ``Annotated`` by a typechecker. """
 
 
 class Category[C0, C1: Category](ABC):

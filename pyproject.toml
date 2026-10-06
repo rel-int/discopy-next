@@ -12,7 +12,7 @@ name = "discopy"
 dynamic = ["version"]
 description = "The Python toolkit for computing with string diagrams."
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.14"
 license =  {file = "LICENSE"}
 keywords = [
     "category theory",
@@ -30,8 +30,6 @@ classifiers = [
     "Intended Audience :: Developers",
     "Intended Audience :: Science/Research",
     "Operating System :: OS Independent",
-    "Programming Language :: Python :: 3.12",
-    "Programming Language :: Python :: 3.13",
     "Programming Language :: Python :: 3.14",
     "Topic :: Scientific/Engineering"
 ]
@@ -47,12 +45,11 @@ dev = [
     "coverage",
     "hypothesis",
     "marimo",
-    "pyproject-flake8",
-    "pylint",
     "pytest",
     "pytest-benchmark",
     "polars",
     "pytest-xdist",
+    "ruff",
 ]
 docs = ["discopy[docs]"]
 quantum = ["discopy[quantum]"]
@@ -87,10 +84,9 @@ test = [
     "coverage",
     "hypothesis",
     "marimo",
-    "pyproject-flake8",
-    "pylint",
     "pytest",
     "pytest-xdist",
+    "ruff",
 ]
 docs  = [
     "IPython",
@@ -124,11 +120,6 @@ name = "pytorch-cpu"
 url = "https://download.pytorch.org/whl/cpu"
 explicit = true
 
-[tool.uv.build-backend]
-module-root = ""
-source-exclude = ["discopy/version.py"]
-wheel-exclude = ["discopy/version.py"]
-
 [project.urls]
 Homepage = "https://discopy.org"
 Documentation = "https://docs.discopy.org"
@@ -136,16 +127,16 @@ Repository = "https://github.com/discopy/discopy"
 Issue-Tracker = "https://github.com/discopy/discopy/issues"
 Download = "https://pypi.org/project/discopy"
 
-[tool.flake8]
-extend-ignore = [
-    "E731",
-    "E741",
-    "E743",
-    "F811",
-]
-per-file-ignores = [
-    "__init__.py:F401"
-]
+[tool.ruff]
+line-length = 79
+target-version = "py314"
+
+[tool.ruff.lint]
+select = ["E", "W", "F"]
+ignore = ["E731", "E741", "E743", "F811"]
+
+[tool.ruff.lint.per-file-ignores]
+"**/__init__.py" = ["F401"]
 
 [tool.pytest.ini_options]
 pythonpath = [

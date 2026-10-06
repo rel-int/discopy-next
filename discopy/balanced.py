@@ -32,8 +32,6 @@ The axiom for the twist holds on the nose.
 .. image:: /_static/balanced/twist.svg
 """
 
-from __future__ import annotations
-
 from typing import ClassVar
 
 from copy import copy

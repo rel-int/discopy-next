@@ -41,8 +41,6 @@ Example
 Channel([0.5+0.j, 0.5+0.j, 0.5+0.j, 0.5+0.j], dom=CQ(), cod=Q(Dim(2)))
 """
 
-from __future__ import annotations
-
 from discopy import frobenius, tensor
 from discopy.cat import factory
 from discopy.frobenius import Ty, Diagram, Box

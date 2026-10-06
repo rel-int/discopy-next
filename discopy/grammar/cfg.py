@@ -35,8 +35,6 @@ The axioms of multicategories (aka operads) hold on the nose.
 >>> assert f(g, h) == left == right
 """
 
-from __future__ import annotations
-
 from typing import TYPE_CHECKING
 
 from discopy import monoidal

@@ -34,8 +34,6 @@ See also
   Kronecker product as tensor.
 
 """
-from __future__ import annotations
-
 from contextlib import contextmanager
 from operator import index
 from types import ModuleType

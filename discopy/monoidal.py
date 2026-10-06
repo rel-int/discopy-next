@@ -53,8 +53,6 @@ We can check the Eckmann-Hilton argument, up to interchanger.
     :align: center
 """
 
-from __future__ import annotations
-
 import itertools
 from dataclasses import dataclass, field
 from functools import cached_property

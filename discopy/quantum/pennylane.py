@@ -46,8 +46,6 @@ associated weights should be passed to `eval()` as `symbols=` and
 `weights=`.
 """
 
-from __future__ import annotations
-
 from itertools import product
 import pennylane as qml
 import sympy

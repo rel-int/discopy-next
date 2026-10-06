@@ -238,7 +238,7 @@ class QuantumGate(Box):
         super().__init__(name, dom, cod, data, **params)
 
     def __setstate__(self, state):
-        if "_array" in state and not state["_array"] is None:
+        if "_array" in state and state["_array"] is not None:
             state["data"] = state['_array'].flatten().tolist()
         if "_name" in state:
             if state["_name"] in GATES and hasattr(

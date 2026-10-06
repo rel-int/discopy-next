@@ -57,8 +57,6 @@ indices. Swaps, cups and caps become wiring while spiders stay as boxes.
 ...     assert jax.grad(f)(1.) == 4.
 """
 
-from __future__ import annotations
-
 from itertools import count
 from typing import ClassVar, Sequence, TYPE_CHECKING
 

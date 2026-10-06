@@ -146,8 +146,6 @@ out the two objects needed below as ``cat.Ob`` instances so that
 >>> assert all(epsilon(M_)(eta(M_)(x)) == x for x in (Z3(0), Z3(1), Z3(2)))
 """
 
-from __future__ import annotations
-
 import copy
 
 from collections.abc import Callable

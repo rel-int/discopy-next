@@ -9,6 +9,37 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Added
 
+- `discopy.pattern`, the language in which a category will state its
+  structure: patterns for the objects of a category with variables to
+  instantiate, and their collection into sequents. A sequent is the
+  signature of a method: its PEP 695 type parameter list is the
+  context, each bound a sort — `A: Ob[C0]` an object, `X: Atom[C0]`
+  an atomic one, `N: Count` a number of repetitions — the parameters
+  the premises and the return annotation the conclusion, each a
+  subscript of the new type aliases `Ob` and `Hom` of `discopy.abc`:
+  `f: Hom[C1, A, B]` a morphism between two sides and `x: Ob[C0, p]`
+  a pattern beside its coarse type, the compound sides built by the
+  formers `Tensor[A, C]`, `Unit[C0]`, `L[A]`, `R[A]`, `D[A]`,
+  `Over[A, B]`, `Under[A, B]` and `Repeat[X, N]`. The aliases are
+  PEP 695 `type` statements expanding to the `Annotated[T, ...]` a
+  typechecker reads, so the coarse types stay fully checked while
+  `pattern.expand` rebuilds the pattern from the subscript. The
+  patterns remain plain values that an `Annotated` may carry inline:
+  `Ob(A)` lifts a type parameter, `Hom(p, q)`, `p @ q`, `p.l`,
+  `p.r`, `p.d`, `p << q`, `p >> q`, `p ** n` and `UNIT` build the
+  compounds, and a side of `Hom` lifts itself — a bare type
+  parameter is one variable, a list or tuple the tensor of its
+  elements. Each pattern class declares its level, the least
+  structure the objects it stands in must have, refusing objects
+  bounded below what its shape needs. A conclusion is matched
+  against a goal by unification over the free monoid of objects — a
+  `Tensor` splits the goal at every position, an `Ob` binds once, an
+  adjoint inverts to the other side — and what matching cannot
+  invert is a residual equation checked once the variables are
+  instantiated. Nothing is `eval`ed and nothing is quoted: the
+  annotations are the lazy objects of PEP 649, built in their
+  defining scope when first read.
+
 - `utils.Generator` declares a generator once, on the category that
   introduces it and under its own name: `@Diagram.generator` above
   `class Swap` in `symmetric` binds `Diagram.Swap`, with a `ClassVar`
@@ -263,6 +294,18 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   ([#484](https://github.com/discopy/discopy/pull/484)).
 
 ### Changed
+
+- DisCoPy requires Python 3.14. Annotations are the lazy objects of
+  PEP 649 rather than quoted strings: the `from __future__ import
+  annotations` of every module goes — kept only where the previous
+  axioms machinery still reads strings, until it moves onto the
+  sequents — the forward references it quoted are plain names, and
+  every signature is read lazily, when a declaration's sequent is
+  first parsed. `pflake8` and `pylint`, each of which reads a lazy
+  forward reference as an undefined name, are replaced by `ruff`
+  targeting `py314` — one linter, configured in `pyproject.toml`
+  with the same style rules — and the CI test matrix runs 3.14
+  alone.
 
 - `monoidal.Colour` is transparent by default rather than white, i.e. its
   `name` defaults to the new `config.TRANSPARENT` and `monoidal.white` is

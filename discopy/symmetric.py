@@ -90,8 +90,6 @@ Both sides foliate to the same single permutation.
 
 """
 
-from __future__ import annotations
-
 from typing import ClassVar
 
 from collections.abc import Sequence
