@@ -36,7 +36,8 @@ from itertools import count
 from types import MethodType
 from typing import Self, TYPE_CHECKING, TypeVar
 
-from discopy.pattern import Declaration, Hom, Match, Pattern, Sequent, Var
+from discopy.pattern import (
+    OBJECTS, Declaration, Hom, Match, Pattern, Sequent, Var, heads)
 from discopy.utils import AxiomError
 
 if TYPE_CHECKING:
@@ -302,9 +303,7 @@ def search(category: type[abc.Category], free: Callable | None = None, *,
     generators = tuple(category.generators.values())
     rules = tuple(
         rule for rule in category.rules.values() if rule.recursive)
-    scope = {"Self": category,
-             "C0": getattr(category, "ob", category),
-             "C1": getattr(category, "ar", category)}
+    scope = heads(category)
     fresh = count()
 
     def as_pattern(side):
@@ -318,7 +317,7 @@ def search(category: type[abc.Category], free: Callable | None = None, *,
         if not isinstance(side, Pattern):
             return side
         if all(name in subst for name in side.variables):
-            return side.instantiate(subst, scope["C0"])
+            return side.instantiate(subst, scope[OBJECTS])
         return None
 
     def matching(candidates, dom, cod) -> list:
@@ -330,7 +329,7 @@ def search(category: type[abc.Category], free: Callable | None = None, *,
         local, unchecked = dict(subst), list(residuals)
         dom, cod = (guidance(side, local) for side in goal)
         branches = matching(rules, dom, cod) if depth else []
-        focus = focused(branches, dom, cod, scope["C0"])
+        focus = focused(branches, dom, cod, scope[OBJECTS])
         if focus and not (epsilon >= 1 or epsilon > 0 and draw(
                 st.floats(0, 1, exclude_max=True)) < epsilon):
             choice = focus[0]
@@ -398,7 +397,7 @@ def search(category: type[abc.Category], free: Callable | None = None, *,
                 if isinstance(variable, Var) and variable.name not in subst:
                     subst[variable.name] = draw(
                         variable.sort.strategy(scope, types))
-            assume(pattern.instantiate(subst, scope["C0"]) == value)
+            assume(pattern.instantiate(subst, scope[OBJECTS]) == value)
         return result
 
     return goals(dom, cod, max_depth)

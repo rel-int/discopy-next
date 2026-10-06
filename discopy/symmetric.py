@@ -99,6 +99,7 @@ from discopy.abc import (
     BraidedCategory, MonoidalCategory, SymmetricCategory, TracedCategory)
 from discopy.axioms import (
     Atom, axiom, Equation as AbstractEquation, Hom, Var, rule, Sort)
+from discopy.pattern import DOM_OBJECTS
 from discopy.cat import factory, Generator
 from discopy.monoidal import Wire, Ty, Nat  # noqa: F401  pylint: disable=unused-import
 from discopy.python import finset
@@ -761,8 +762,8 @@ class Functor(balanced.Functor):
     @axiom
     def symmetric(
             cls, functor: Self,
-            x: Annotated[Ty, Sort("In0", atomic=True)],
-            y: Annotated[Ty, Sort("In0", atomic=True)]) -> Equation:
+            x: Annotated[Ty, Sort(DOM_OBJECTS, atomic=True)],
+            y: Annotated[Ty, Sort(DOM_OBJECTS, atomic=True)]) -> Equation:
         """ A symmetric functor preserves the swap. """
         return functor.cod.Equation(
             functor(functor.dom.swap(x, y)),

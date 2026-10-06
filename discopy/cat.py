@@ -87,6 +87,8 @@ from discopy.abc import Category, DaggerCategory, Serialisable
 from discopy.axioms import (
     axiom, Equation as AbstractEquation, GENERATORS, Hom, no_strategy, rule,
     Sort)
+from discopy.pattern import (
+    COD_ARROWS, COD_OBJECTS, DOM_ARROWS, DOM_OBJECTS)
 from discopy.utils import (  # noqa: F401
     factory,
     Generator,
@@ -933,13 +935,13 @@ class Functor(Category, Serialisable):
             + f"(ob_map={self.ob_map}, ar_map={self.ar_map}{cod_repr})"
 
     @overload
-    def __call__(self, other: Annotated[Any, Sort("In0")]
-    ) -> Annotated[Any, Sort("Out0")]:
+    def __call__(self, other: Annotated[Any, Sort(DOM_OBJECTS)]
+    ) -> Annotated[Any, Sort(COD_OBJECTS)]:
         ...
 
     @overload
-    def __call__(self, other: Annotated[Any, Sort("In1")]
-    ) -> Annotated[Any, Sort("Out1")]:
+    def __call__(self, other: Annotated[Any, Sort(DOM_ARROWS)]
+    ) -> Annotated[Any, Sort(COD_ARROWS)]:
         ...
 
     def __call__(self, other):

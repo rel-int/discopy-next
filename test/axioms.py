@@ -142,7 +142,7 @@ def test_equation_types():
     import inspect
     from discopy import (
         balanced, closed, compact, pivotal, ribbon, symmetric, traced)
-    from discopy.pattern import cell, expand
+    from discopy.pattern import expand
     (parameter, ) = Equation.__type_params__
     levels = (Diagram, braided.Diagram, traced.Diagram, balanced.Diagram,
               symmetric.Diagram, closed.Diagram, rigid.Diagram,
@@ -157,8 +157,7 @@ def test_equation_types():
                     or (equation := law.canonical()) is NotImplemented:
                 continue
             subst = {
-                name: 2 if sort.head == "Count"
-                else cell(sort.resolve(law.scope), name)
+                name: sort.canonical(law.scope, name)
                 for name, sort in law.sequent.variables.items()}
             value = pattern.instantiate(subst, law.unit)
             boundary = (lambda term: (term.dom, term.cod))\

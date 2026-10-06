@@ -20,7 +20,7 @@ M = Var("M", Sort(atomic=True, bound=ColouredMonoid))
 X = Var("X", Sort(atomic=True, bound=Pregroup))
 D = Var("D", Sort(bound=DelayedMonoid))
 E = Var("E", Sort(bound=ResiduatedMonoid))
-N = Var("N", Sort("Count"))
+N = Var("N", Count())
 ONE = Unit(A.sort)
 
 
@@ -46,7 +46,7 @@ def test_operators():
     def cups[V: Atom](cls): ...
     def spiders[K: Count](cls): ...
     V, K = cups.__type_params__ + spiders.__type_params__
-    assert Var(V).sort.atomic and Var(K).sort == Sort("Count")
+    assert Var(V).sort.atomic and Var(K).sort == Count()
     assert Hom(V, "W") == Hom(Var(V), Var("W"))  # Hom lifts a bare side.
     assert Hom([V, "W"], ()) == Hom(Var(V) @ Var("W"), UNIT)
     with raises(TypeError):

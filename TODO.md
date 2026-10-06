@@ -51,9 +51,9 @@ Round 2: review of @toumix, 2026-10-06, quoted verbatim.
 > **discopy/axioms.py:358** Looks wrong, there should be one less relation symbol than elements in the list
 
 - [x] `axioms.Equation`: one symbol fewer than terms (axioms.py:358)
-- [WIP] @session_01G8reWuAReExte9CgboA8wK-2026-10-06 11:31 `Count` a subclass of `Sort`, no hard-coded `"Count"` (pattern.py:206, :1160)
-- [WIP] @session_01G8reWuAReExte9CgboA8wK-2026-10-06 11:31 the heads `"C0"`, `"C1"`, `"Self"` as named constants (pattern.py:159, :197)
-- [WIP] @session_01G8reWuAReExte9CgboA8wK-2026-10-06 11:31 `sort_of`: annotate `bound`, say it expected a bound (pattern.py:193, :218)
+- [x] `Count` a subclass of `Sort`, no hard-coded `"Count"` (pattern.py:206, :1160)
+- [x] the heads `"C0"`, `"C1"`, `"Self"` as named constants (pattern.py:159, :197)
+- [x] `sort_of`: annotate `bound`, say it expected a bound (pattern.py:193, :218)
 - [ ] `Pattern.__dataclass_fields__ = ()`, no tuple wrapping in `parts` (pattern.py:253, :256)
 - [ ] doctest of `match` with `value is None` (pattern.py:297)
 - [ ] grammar of the docstrings (pattern.py:349, :926, :1147, :1054)

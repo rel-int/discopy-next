@@ -101,6 +101,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Callable, Iterator
 from dataclasses import KW_ONLY, dataclass, field, replace
 from functools import cache, reduce
+from types import GenericAlias
 from typing import (
     Annotated, ClassVar, Self, TypeAliasType, TypeVar, get_args, get_origin)
 
@@ -111,6 +112,34 @@ from discopy.utils import factory_name
 type Substitution = dict[str, object]
 type Residuals = tuple[tuple[Pattern, object], ...]
 type Match = tuple[Substitution, Residuals]
+
+#: The heads of the sequents of a category, the names its
+#: :func:`heads` gives to its objects, its arrows and to itself.
+OBJECTS, ARROWS, SELF = "C0", "C1", "Self"
+#: The heads of the sequents of a functor, the objects and the arrows of
+#: its domain and of its codomain.
+DOM_OBJECTS, DOM_ARROWS, COD_OBJECTS, COD_ARROWS = "In0", "In1", "Out0", "Out1"
+
+
+def heads(category: type) -> dict[str, type]:
+    """
+    The types the heads of a sequent stand for in a category, the
+    objects and the arrows of its domain and codomain too when it is a
+    functor between categories.
+
+    >>> from discopy.monoidal import Ty, Diagram
+    >>> assert heads(Diagram)[OBJECTS] is Ty
+    """
+    scope = {
+        SELF: category,
+        OBJECTS: getattr(category, "ob", category),
+        ARROWS: getattr(category, "ar", category)}
+    dom, cod = (getattr(category, name, None) for name in ("dom", "cod"))
+    if isinstance(dom, type) and isinstance(cod, type):
+        scope.update({
+            DOM_OBJECTS: getattr(dom, "ob", dom), DOM_ARROWS: dom,
+            COD_OBJECTS: getattr(cod, "ob", cod), COD_ARROWS: cod})
+    return scope
 
 
 @dataclass(frozen=True)
@@ -130,7 +159,7 @@ class Sort:
     Atom[C0]
     """
 
-    head: str = "C0"
+    head: str = OBJECTS
     atomic: bool = False
     bound: type | None = field(default=None, compare=False, repr=False)
 
@@ -148,18 +177,18 @@ class Sort:
     def strategy(self, scope: dict, types=None):
         """
         Generate an object of the sort, from ``types`` in place of the
-        strategy of the objects when given; a :class:`Count` draws a
-        small number.
+        strategy of the objects when given.
         """
-        from hypothesis import strategies as st
-
-        if self.head == "Count":
-            return st.integers(min_value=0, max_value=3)
         resolved = self.resolve(scope)
-        base = types if types is not None and resolved is scope["C0"]\
+        base = types if types is not None and resolved is scope[OBJECTS]\
             else resolved.strategy()
         return base.filter(lambda value: len(value) == 1)\
             if self.atomic else base
+
+    def canonical(self, scope: dict, name: str):
+        """ The canonical instance of the sort, a :func:`cell` named
+        after its variable. """
+        return cell(self.resolve(scope), name)
 
     def __str__(self):
         return f"Atom[{self.head}]" if self.atomic else self.head
@@ -185,12 +214,35 @@ class Atom[T]:
         return Sort(head_of(head), atomic=True)
 
 
-class Count:
-    """ The bound ``def spiders[N: Count]`` declares a number of
-    repetitions, see :class:`Repeat`. """
+@dataclass(frozen=True)
+class Count(Sort):
+    """
+    The sort of a number of repetitions, see :class:`Repeat`, which the
+    bound ``def spiders[N: Count]`` declares: a natural number, two in
+    the canonical instance of a sequent.
+
+    >>> print(Count())
+    Count
+    >>> assert Count().canonical(scope={}, name="N") == 2
+    """
+
+    head: str = "Count"
+
+    def resolve(self, scope: dict) -> type:
+        return int
+
+    def strategy(self, scope: dict, types=None):
+        from hypothesis import strategies as st
+
+        return st.integers(min_value=0, max_value=3)
+
+    def canonical(self, scope: dict, name: str) -> int:
+        return 2
 
 
-def sort_of(bound, level: type | None = None) -> Sort:
+def sort_of(
+        bound: type | Sort | GenericAlias | None,
+        level: type | None = None) -> Sort:
     """
     The sort a bound declares: an object when :obj:`None`, an
     :class:`Atom` or a :class:`Count` when the bound says so, a
@@ -199,23 +251,23 @@ def sort_of(bound, level: type | None = None) -> Sort:
     ``level`` of the declaring class is carried by every object sort.
     """
     if bound is None:
-        return Sort("C0", bound=level)
+        return Sort(bound=level)
     if isinstance(bound, type) and issubclass(bound, Atom):
-        return Sort("C0", atomic=True, bound=level)
+        return Sort(atomic=True, bound=level)
     if isinstance(bound, type) and issubclass(bound, Count):
-        return Sort("Count")
+        return Count()
     if isinstance(bound, Sort):
         return replace(bound, bound=bound.bound or level)
     if isinstance(bound, type) and issubclass(bound, abc.Category):
         return Sort(bound=bound)
-    if alias_of(bound) is getattr(abc, "Obj", None):
+    if alias_of(bound) is abc.Obj:
         try:
             (head, ) = get_args(bound)
         except ValueError:
             raise TypeError(
                 f"A bound names one head, Obj[C0], got {bound!r}.") from None
         return Sort(head_of(head), bound=level)
-    raise TypeError(f"Expected a sort, got {bound!r}.")
+    raise TypeError(f"Expected a bound, got {bound!r}.")
 
 
 @dataclass(frozen=True)
@@ -396,7 +448,7 @@ class Unit[T](Pattern):
     """ The unit of a monoid of objects, :data:`UNIT` in an annotation
     and the former ``Unit[C0]`` in a bound. """
 
-    sort: Sort = Sort("C0")
+    sort: Sort = Sort()
 
     def __class_getitem__(cls, head) -> Unit:
         return cls(Sort(head_of(head)))
@@ -625,7 +677,7 @@ class Repeat[P, N](Pattern):
 
     def __post_init__(self):
         if not isinstance(self.count, Var)\
-                or self.count.sort.head != "Count":
+                or not isinstance(self.count.sort, Count):
             raise TypeError(f"Expected a Count variable, got {self.count!r}.")
         if not getattr(getattr(self.base, "sort", None), "atomic", False):
             raise TypeError(
@@ -711,11 +763,11 @@ class Hom(Pattern):
 
     dom: Pattern
     cod: Pattern
-    head: str = "C1"
+    head: str = ARROWS
 
     def __init__(self, dom: Pattern | TypeVar | str | list | tuple,
                  cod: Pattern | TypeVar | str | list | tuple,
-                 head: str = "C1"):
+                 head: str = ARROWS):
         object.__setattr__(self, "dom", lift(dom))
         object.__setattr__(self, "cod", lift(cod))
         object.__setattr__(self, "head", head)
@@ -854,7 +906,7 @@ def alias_of(annotation) -> TypeAliasType | None:
     ``Obj[T, X]`` or ``Hom[C1, dom, cod]``, :obj:`None` otherwise. """
     origin = get_origin(annotation)
     if isinstance(origin, TypeAliasType) and origin in (
-            getattr(abc, "Obj", None), getattr(abc, "Hom", None)):
+            abc.Obj, abc.Hom):
         return origin
     return None
 
@@ -973,7 +1025,7 @@ def parse(function: Callable, owner: type | None = None,
 
     def stated(annotation) -> Pattern | Sort:
         if annotation is Self:
-            return Sort("Self")
+            return Sort(SELF)
         value = expand(annotation)
         if value is None:
             try:
@@ -1115,7 +1167,7 @@ class Declaration[**P, T]:
             self, category=category, owner=self.owner or owner)
 
     @property
-    def scope(self) -> dict:
+    def scope(self) -> dict[str, type]:
         """
         What the heads stand for: the category for ``Self``, its
         objects and arrows for ``C0`` and ``C1`` (a monoid stands for
@@ -1124,22 +1176,12 @@ class Declaration[**P, T]:
         """
         if self.category is None:
             raise TypeError(f"{self.name} is not bound to a class.")
-        scope = {
-            "Self": self.category,
-            "C0": getattr(self.category, "ob", self.category),
-            "C1": getattr(self.category, "ar", self.category)}
-        dom, cod = (getattr(self.category, name, None)
-                    for name in ("dom", "cod"))
-        if isinstance(dom, type) and isinstance(cod, type):
-            scope.update({
-                "In0": getattr(dom, "ob", dom), "In1": dom,
-                "Out0": getattr(cod, "ob", cod), "Out1": cod})
-        return scope
+        return heads(self.category)
 
     @property
     def unit(self) -> Callable:
         """ The object type of the category, called to build the unit. """
-        return self.scope["C0"]
+        return self.scope[OBJECTS]
 
     def canonical(self) -> dict:
         """
@@ -1157,8 +1199,7 @@ class Declaration[**P, T]:
         other: C -> D
         """
         subst = {
-            name: 2 if sort.head == "Count"
-            else cell(sort.resolve(self.scope), name)
+            name: sort.canonical(self.scope, name)
             for name, sort in self.sequent.variables.items()}
         args = {}
         for name, premise in self.sequent.premises.items():
@@ -1219,9 +1260,9 @@ class Declaration[**P, T]:
                 read_off(premise.cod, term.cod)
                 args[name] = term
             elif isinstance(premise, Sort)\
-                    and premise.resolve(self.scope) is self.scope["C1"]\
-                    and issubclass(self.scope["C1"], abc.Category):
-                arrows = hom(self.scope["C1"], None, None)
+                    and premise.resolve(self.scope) is self.scope[ARROWS]\
+                    and issubclass(self.scope[ARROWS], abc.Category):
+                arrows = hom(self.scope[ARROWS], None, None)
                 args[name] = draw(arrows, label=name)
             elif isinstance(premise, Sort):
                 strategy = premise.strategy(self.scope, types)
