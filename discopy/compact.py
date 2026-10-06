@@ -63,7 +63,7 @@ from discopy.abc import (
     BiclosedCategory, CompactCategory, PivotalCategory, RibbonCategory)
 from discopy.axioms import Serialisable
 from discopy.cat import factory, Generator
-from discopy.pivotal import Wire, Ty  # noqa: F401
+from discopy.pivotal import Wire, Ty  # noqa: F401  pylint: disable=unused-import
 from discopy.utils import deprecated_alias
 
 

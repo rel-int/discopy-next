@@ -615,11 +615,14 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   axioms machinery still reads strings, until it moves onto the
   sequents — the forward references it quoted are plain names, and
   every signature is read lazily, when a declaration's sequent is
-  first parsed. `pflake8` and `pylint`, each of which reads a lazy
-  forward reference as an undefined name, are replaced by `ruff`
-  targeting `py314` — one linter, configured in `pyproject.toml`
-  with the same style rules — and the CI test matrix runs 3.14
-  alone.
+  first parsed. `pflake8`, which reads a lazy forward reference as an
+  undefined name, is replaced by `ruff` targeting `py314`, configured
+  in `pyproject.toml` with the codes and ignores of flake8. `pylint`
+  stays, `.pylintrc` reading Python 3.14 and disabling the messages
+  it reads wrongly there — a PEP 695 bound naming its own class, a
+  lazy annotation, a method `@axiom` or `@rule` makes a classmethod, a
+  generator built on first access — with `fail-under` raised to the
+  9.19 it scores. The CI test matrix runs 3.14 alone.
 
 - `monoidal.Colour` is transparent by default rather than white, i.e. its
   `name` defaults to the new `config.TRANSPARENT` and `monoidal.white` is

@@ -459,6 +459,7 @@ class Controlled(QuantumGate):
         return Controlled(controlled_conj, distance=-self.distance)
 
     def lambdify(self, *symbols, **kwargs):
+        # pylint: disable=unused-argument  # the signature of lambdify
         c_fn = self.controlled.lambdify(*symbols)
         return lambda *xs: type(self)(c_fn(*xs), distance=self.distance)
 

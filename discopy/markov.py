@@ -84,7 +84,7 @@ from typing import Annotated
 
 from discopy.axioms import Atom, Count, Hom, Var, rule, Serialisable
 from discopy.cat import factory, Generator
-from discopy.monoidal import Ty  # noqa: F401
+from discopy.monoidal import Ty  # noqa: F401  pylint: disable=unused-import
 from discopy.utils import assert_isatomic, factory_name
 
 

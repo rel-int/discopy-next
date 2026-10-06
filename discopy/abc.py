@@ -68,10 +68,10 @@ from types import NoneType
 from typing import (
     Annotated, ClassVar, Literal, Self, TYPE_CHECKING, overload)
 
-from discopy.axioms import (  # noqa: F401
+from discopy.axioms import (  # noqa: F401  pylint: disable=unused-import
     Atom, Axiom, axiom, Count, D, declarations, Equation, L, Over, R,
     Repeat, Rule, rule, Serialisable, Tensor, Testable, Under, Unit)
-from discopy.utils import (  # noqa: F401
+from discopy.utils import (  # noqa: F401  pylint: disable=unused-import
     NamedGeneric, classproperty, factory_name)
 
 type Obj[T, X = None] = Annotated[T, X]
@@ -763,6 +763,7 @@ class BiclosedCategory[C0: ResiduatedMonoid, C1: BiclosedCategory](
             n : The number of objects to uncurry.
             left : Whether to uncurry on the left or right.
         """
+        # pylint: disable=unused-argument  # the exponential says the side
         if not self.cod.is_exp:
             raise ValueError
         base, exponent = self.cod.base, self.cod.exponent

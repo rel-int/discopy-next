@@ -179,6 +179,7 @@ class Ty(frobenius.Ty):
     """
     @classmethod
     def strategy(cls, *, min_length=0, max_length=3, dom=None, cod=None):
+        # pylint: disable=unused-argument  # a circuit has no colours
         """
         Generate words of qubits and bits of the given lengths, a circuit
         having no colours for its wires to sit between.

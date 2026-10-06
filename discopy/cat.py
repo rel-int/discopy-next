@@ -981,6 +981,7 @@ class Functor(Category, Serialisable):
         does a category whose objects are dimensions or information
         units, which has no relabelling.
         """
+        # pylint: disable=unused-argument  # a canonical term has one leaf
         from hypothesis import strategies as st
 
         from discopy.axioms import Relabelling

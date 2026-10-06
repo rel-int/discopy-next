@@ -100,7 +100,7 @@ from discopy.abc import (
 from discopy.axioms import (
     Atom, axiom, Equation as AbstractEquation, Hom, Var, rule, Sort)
 from discopy.cat import factory, Generator
-from discopy.monoidal import Wire, Ty, Nat  # noqa: F401
+from discopy.monoidal import Wire, Ty, Nat  # noqa: F401  pylint: disable=unused-import
 from discopy.python import finset
 from discopy.utils import (
     AxiomError, assert_iscomposable, assert_isatomic, factory_name, from_tree)

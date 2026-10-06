@@ -66,7 +66,7 @@ from discopy import (
 from discopy.axioms import Hom, no_strategy, Var, rule
 from discopy.cat import factory, Generator, assert_iscomposable
 from discopy.frobenius import Dim, Cup
-from discopy.matrix import (  # noqa: F401
+from discopy.matrix import (  # noqa: F401  pylint: disable=unused-import
     Matrix, backend, set_backend, get_backend,
     NumPy, JAX, PyTorch, TensorFlow)
 from discopy.abc import NamedGeneric
@@ -302,6 +302,7 @@ class Tensor[dtype](Matrix[dtype]):
         ----
         This is *not* the same as the algebraic transpose for non-atomic dims.
         """
+        # pylint: disable=unused-argument  # Dim is self-dual: one transpose
         return type(self)(
             self.array.transpose(), self.cod[::-1], self.dom[::-1])
 
@@ -778,6 +779,7 @@ class Box[dtype](frobenius.Box, Diagram[dtype]):
                     self.dom.inside + self.cod.inside)
 
     def grad(self, var, **params):
+        # pylint: disable=unused-argument  # the signature of grad
         return self.bubble(
             func=lambda x: getattr(x, "diff", lambda _: 0)(var),
             drawing_name=f"$\\partial {var}$")
@@ -860,6 +862,7 @@ class Bubble(  # ty: ignore[inconsistent-mro]
         super().__init__(inside, **params)
 
     def grad(self, var, **params):
+        # pylint: disable=unused-argument  # the signature of grad
         """
         The gradient of a bubble is given by the chain rule.
 

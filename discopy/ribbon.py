@@ -86,7 +86,7 @@ from discopy.abc import RibbonCategory
 
 from discopy.axioms import Serialisable
 from discopy.cat import factory, Generator
-from discopy.pivotal import Ty, Nat  # noqa: F401
+from discopy.pivotal import Ty, Nat  # noqa: F401  pylint: disable=unused-import
 
 
 @factory

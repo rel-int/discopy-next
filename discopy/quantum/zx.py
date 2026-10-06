@@ -280,6 +280,7 @@ class Spider(tensor.Spider[complex], Box):
         return type(self)(len(self.dom), len(self.cod), phase=phase)
 
     def grad(self, var, **params):
+        # pylint: disable=unused-argument  # the signature of grad
         if var not in self.free_symbols:
             return Sum((), self.dom, self.cod)
         gradient = self.phase.diff(var)
@@ -334,6 +335,7 @@ class Scalar(Box):
         return Scalar(self.data.conjugate())
 
     def grad(self, var, **params):
+        # pylint: disable=unused-argument  # the signature of grad
         if var not in self.free_symbols:
             return Sum((), self.dom, self.cod)
         return Scalar(self.data.diff(var))

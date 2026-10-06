@@ -43,7 +43,7 @@ from typing import Annotated
 
 from discopy.axioms import Atom, Hom, no_strategy, Var, rule, Serialisable
 from discopy.cat import factory, Generator
-from discopy.monoidal import Colour, Ty  # noqa: F401
+from discopy.monoidal import Colour, Ty  # noqa: F401  pylint: disable=unused-import
 from discopy.utils import factory_name, assert_isatomic
 
 

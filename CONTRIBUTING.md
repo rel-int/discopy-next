@@ -56,11 +56,17 @@ if you want to run the full test suite involving all extra dependencies.
 ```shell
 uv sync --dev --group all
 uv run ruff check discopy
+uv run pylint discopy
 uv run coverage run -m pytest
 uv run coverage report -m
 ```
 
 Without the extras installed, run `uv run pytest --skip-extra` to skip what needs them.
+
+`pylint` fails on any unused import, variable or argument, and on a score below the
+`fail-under` of `.pylintrc`, which is the score of `main` when it was last raised: fix the
+finding, or disable the message on that line with the reason, and raise `fail-under` to the
+new score when your change lifts it, so that the score never goes down.
 
 ## Run the property tests
 
@@ -205,13 +211,14 @@ python -m venv .venv
 . .venv/bin/activate
 python -m pip install --upgrade pip
 python -m pip install -e '.[test]'
-python -m pip install coverage pytest marimo ruff
+python -m pip install coverage pylint pytest marimo ruff
 ```
 
 Then run:
 
 ```shell
 ruff check discopy
+pylint discopy
 coverage run -m pytest
 coverage report -m
 ```

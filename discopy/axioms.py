@@ -253,10 +253,10 @@ from dataclasses import KW_ONLY, dataclass, field, replace
 from functools import wraps
 from typing import TYPE_CHECKING, Self
 
-from discopy.pattern import (  # noqa: F401
+from discopy.pattern import (  # noqa: F401  pylint: disable=unused-import
     Atom, Count, D, Declaration, declarations, Hom, L, Over, R,
     Repeat, Sort, Tensor, Under, Unit, UNIT, Var)
-from discopy.search import (  # noqa: F401
+from discopy.search import (  # noqa: F401  pylint: disable=unused-import
     Constant,
     Rule,
     rule,
@@ -570,6 +570,7 @@ class Axiom[**P, T](Declaration[P, T]):
         TracedCategory.trace_vanishing.inapplicable("No trace.")``.
         """
         def law(cls):
+            # pylint: disable=unused-argument  # a law that does not apply
             return NotImplemented
         law.__doc__ = reason
         return replace(self, function=law, params={}, broken=False)

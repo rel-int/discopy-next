@@ -41,7 +41,7 @@ from discopy.axioms import no_strategy, Rule
 from discopy.cat import factory, Generator
 from discopy.utils import deprecated_alias, AxiomError, classproperty
 from discopy.grammar import thue
-from discopy.rigid import Wire  # noqa: F401
+from discopy.rigid import Wire  # noqa: F401  pylint: disable=unused-import
 
 
 @factory
