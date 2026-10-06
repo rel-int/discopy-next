@@ -792,7 +792,8 @@ def common(*patterns: Pattern) -> type | None:
     have one: the objects satisfy every bound, so it is their
     :func:`meet`, whatever order the patterns stand in. """
     bounds = [pattern.bound for pattern in patterns]
-    return None if None in bounds else meet(*bounds)
+    known = [bound for bound in bounds if bound is not None]
+    return meet(*known) if len(known) == len(bounds) else None
 
 
 def meet(*bounds: type) -> type:

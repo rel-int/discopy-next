@@ -939,20 +939,24 @@ class Generator[**P, T]:
                    and value.aliased == self.name}
         roots = dict.fromkeys(
             root for base in cls.__bases__
-            for name in (self.name, *sorted(aliases))
-            if isinstance(root := getattr(base, name, None), type))
+            if isinstance(root := getattr(base, self.name, None), type))
         if not roots:
             return self.root
         parents = [getattr(cls, name) for name in self.parents]
+        aliased = [
+            root for base in cls.__bases__ for name in sorted(aliases)
+            if isinstance(root := getattr(base, name, None), type)
+            and root not in roots and root not in parents]
         root, *_ = roots
         level = (cls, ) if issubclass(self.root, self.owner) else ()
         attributes = {key: cls for key, value in vars(self.root).items()
                       if value is self.owner}
         references = " and ".join(
-            f":class:`~{r.__module__}.{r.__name__}`" for r in roots)
+            f":class:`~{r.__module__}.{r.__name__}`"
+            for r in (*roots, *aliased))
         qualname = root.__name__ if cls.__module__.startswith("discopy.")\
             else f"{cls.__qualname__}.{self.name}"
-        return type(root.__name__, (*roots, *parents, *level), {
+        return type(root.__name__, (*roots, *parents, *aliased, *level), {
             **attributes,
             "__module__": cls.__module__,
             "__qualname__": qualname,

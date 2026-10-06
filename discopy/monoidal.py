@@ -606,7 +606,7 @@ class Nat(abc.Nat, Ty):
         self.dom = self.cod = transparent
         cat.Ob.__init__(self, type(self).__name__)
 
-    def __setstate__(self, state):
+    def __setstate__(self, state: dict):
         if "n" not in state:
             state = {"n": len(state["_objects"])}
         state.setdefault("dom", transparent)
