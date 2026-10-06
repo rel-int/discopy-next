@@ -94,7 +94,7 @@ def test_calculus():
         balanced, biclosed, closed, compact, feedback, frobenius, markov,
         monoidal, pivotal, ribbon, symmetric, traced)
 
-    composition, trace = ["tensor", "cut"], ["trace_left", "trace_right"]
+    composition, trace = ["tensor", "cut"], ["trace"]
     for module, calculus in (
             (monoidal, composition),
             (braided, composition),
@@ -107,10 +107,10 @@ def test_calculus():
             (ribbon, composition + trace),
             (compact, composition + trace),
             (frobenius, composition + trace),
-            (biclosed, composition + ["curry_left", "curry_right"]),
-            (closed, composition + trace + ["curry_left", "curry_right"]),
+            (biclosed, composition + ["curry"]),
+            (closed, composition + trace + ["curry"]),
             (feedback, composition + trace
-             + ["feedback_left", "feedback_right"])):
+             + ["feedback"])):
         assert [name for name, found in module.Diagram.rules.items()
                 if found.recursive] == calculus, module.__name__
 
@@ -146,11 +146,11 @@ def test_focusing():
             (r, list(r.match(dom, cod))) for r in cls.rules.values()],
             dom, cod, type(dom))]
 
-    assert rules_in_focus(biclosed.Diagram, a, b << a) == ["curry_left"]
+    assert rules_in_focus(biclosed.Diagram, a, b << a) == ["curry"]
     assert [name for name, r in rigid.Diagram.rules.items()
             if r.recursive] == ["tensor", "cut"]
     x, y, z = map(rigid.Ty, "xyz")
-    curry = rigid.Diagram.curry_left.bind(rigid.Diagram)
+    curry = rule(rigid.Diagram.curry).bind(rigid.Diagram)
     assert not focused([(curry, list(curry.match(x, y @ z.l)))],
                        x, y @ z.l, rigid.Ty)  # z is no subformula of z.l.
     # A rigid curry is derived — caps and cut reach every transpose —

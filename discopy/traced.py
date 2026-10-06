@@ -138,6 +138,8 @@ from discopy.utils import (
     assert_isinstance,
     assert_istraceable,
 )
+from discopy.pattern import Count, Hom, Obj, TensorDir  # noqa: F401
+from discopy.axioms import rule
 
 
 FREE_TRACE = "A free trace is a box, not a rewrite."
@@ -156,7 +158,11 @@ class Diagram(monoidal.Diagram, TracedCategory):
     Trace: ClassVar[Generator]
     Functor: ClassVar[Generator]
 
-    def trace(self, n=1, left=False):
+    @rule
+    def trace[A, B, S: bool, N: Count, M: Obj[Ty, None, N]](
+            self: Hom[Diagram, TensorDir[M, A, S], TensorDir[M, B, S]],
+            n: Obj[int, N] = 1, left: Obj[bool, S] = False
+    ) -> Hom[Diagram, A, B]:
         """
         Feed ``n`` outputs back into inputs, one :class:`Trace` per wire.
 

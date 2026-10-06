@@ -147,11 +147,9 @@ def test_copar_python():
     assert network.inside(2., 1., 10.) == (13., 2., 3.)
 
 
-def test_one_wire_forwarders():
+def test_sides():
     base, exponent = closed.Ty('y'), closed.Ty('x')
-    assert Closed.ev_left(base, exponent)\
-        == Closed.ev(base, exponent, left=True)
-    assert Closed.ev_right(base, exponent)\
-        == Closed.ev(base, exponent, left=False)
+    assert Closed.ev(base, exponent).cod == base
+    assert Closed.ev(base, exponent, left=False).cod == base
     with raises(NotImplementedError):
-        Feedback.id(feedback.Ty('x')).feedback_left()
+        Feedback.id(feedback.Ty('x')).feedback(left=True)

@@ -84,10 +84,9 @@ from inspect import signature
 from typing import Callable, ClassVar, Self, overload
 
 from discopy import monoidal, cmap
-from discopy import pattern
-from discopy.pattern import Obj, Tensor  # noqa: F401
+from discopy.pattern import Obj  # noqa: F401
 
-from discopy.axioms import Atom, Hom, no_strategy, rule, Serialisable
+from discopy.axioms import Hom, no_strategy, rule, Serialisable
 from discopy.abc import BiclosedCategory, DaggerCategory, ResiduatedMonoid
 from discopy.drawing import Drawing
 from discopy.cat import factory, Generator
@@ -99,6 +98,7 @@ from discopy.utils import (
     factory_name,
     from_tree,
 )
+from discopy.pattern import Count, ExpDir, TensorDir  # noqa: F401
 
 
 @factory
@@ -327,7 +327,10 @@ class Diagram(monoidal.Diagram, BiclosedCategory):
     Application: ClassVar[Generator]
     Abstraction: ClassVar[Generator]
 
-    def curry(self, n=1, left=True) -> Diagram:
+    @rule
+    def curry[X, S: bool, N: Count, Y: Obj[Ty, None, N], Z](
+            self: Hom[Diagram, TensorDir[X, Y, S], Z], n: Obj[int, N] = 1,
+            left: Obj[bool, S] = True) -> Hom[Diagram, X, ExpDir[Z, Y, S]]:
         """
         Wrapper around :class:`Curry` called by :class:`Functor`.
 
@@ -340,22 +343,10 @@ class Diagram(monoidal.Diagram, BiclosedCategory):
 
     @classmethod
     @rule
-    def ev_left[Y: Atom, E: Atom](
-            cls, base: Obj[Ty, Y], exponent: Obj[Ty, E]
-    ) -> Hom[Diagram, Tensor[pattern.Over[Y, E], E], Y]:
-        """ The left evaluation, see :meth:`ev`. """
-        return cls.ev(base, exponent, left=True)
-
-    @classmethod
-    @rule
-    def ev_right[Y: Atom, E: Atom](
-            cls, base: Obj[Ty, Y], exponent: Obj[Ty, E]
-    ) -> Hom[Diagram, Tensor[E, pattern.Under[E, Y]], Y]:
-        """ The right evaluation, see :meth:`ev`. """
-        return cls.ev(base, exponent, left=False)
-
-    @classmethod
-    def ev(cls, base: Ty, exponent: Ty, left=True) -> Eval:
+    def ev[Y, E, S: bool](
+            cls, base: Obj[Ty, Y], exponent: Obj[Ty, E],
+            left: Obj[bool, S] = True
+    ) -> Hom[Diagram, TensorDir[ExpDir[Y, E, S], E, S], Y]:
         """
         Wrapper around :class:`Eval` called by :class:`Functor`.
 

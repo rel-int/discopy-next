@@ -127,9 +127,9 @@ def test_Feedback():
         Box('g', x @ x.delay(), x @ x.d).feedback(dom=x, cod=x, mem=x)
     h = Box('h', x.delay() @ x, x @ x)
     loop = h.feedback(dom=x, cod=x, mem=x, left=True)
-    assert h.feedback_left(x, x, x) == loop
+    assert h.feedback(x, x, x, True) == loop
     k = Box('k', x @ x.delay(), x @ x)
-    assert k.feedback_right(x, x, x) == k.feedback(x, x, x)
+    assert k.feedback(x, x, x, False) == k.feedback(x, x, x)
     assert Functor({x: x}, {h: h})(loop) == loop
     with raises(AxiomError):
         loop.dagger()

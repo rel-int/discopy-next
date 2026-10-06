@@ -211,6 +211,7 @@ from discopy.pattern import Hom
 from discopy.search import rule
 from discopy.utils import (
     assert_isinstance, assert_iscomposable, unbiased, factory, RichDisplay)
+from discopy.pattern import Count, TensorDir  # noqa: F401
 
 if TYPE_CHECKING:
     from discopy import monoidal
@@ -935,7 +936,11 @@ class Drawing(TracedCategory, RichDisplay):
         result.width = x_shift + other.width
         return result
 
-    def trace(self, n=1, left=False) -> Drawing:
+    @rule
+    def trace[A, B, S: bool, N: Count, M: Obj[Any, None, N]](
+            self: Hom[Drawing, TensorDir[M, A, S], TensorDir[M, B, S]],
+            n: Obj[int, N] = 1, left: Obj[bool, S] = False
+    ) -> Hom[Drawing, A, B]:
         from discopy.monoidal import Box, Ty
         if n == 0:
             return self

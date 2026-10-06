@@ -145,7 +145,7 @@ from dataclasses import dataclass
 from typing import Self
 
 from discopy.pattern import Atom, Count, Hom
-from discopy.pattern import Obj, Tensor, Unit, L, R, Over, Under, Repeat  # noqa: F401
+from discopy.pattern import Obj, Tensor, Unit, L, R, Repeat  # noqa: F401
 from discopy.search import rule
 from discopy import (
     monoidal, symmetric, markov, closed, compact, frobenius)
@@ -155,6 +155,7 @@ from discopy.abc import (
 from discopy.feedback import Diagram as FeedbackDiagram
 from discopy.utils import (
     assert_iscomposable, assert_isinstance, classproperty, unbiased)
+from discopy.pattern import D, ExpDir, TensorDir  # noqa: F401
 
 
 @dataclass
@@ -336,7 +337,11 @@ class Traced(Symmetric, TracedCategory):
     Parametric maps over a traced symmetric underlying `category` form a
     traced category, with the parameters swapped out of the way.
     """
-    def trace(self, n: int = 1, left: bool = False) -> Traced:
+    @rule
+    def trace[A, B, S: bool, N: Count, M: Obj[monoidal.Ty, None, N]](
+            self: Hom[Traced, TensorDir[M, A, S], TensorDir[M, B, S]],
+            n: Obj[int, N] = 1, left: Obj[bool, S] = False
+    ) -> Hom[Traced, A, B]:
         """
         The trace of a parametric map is the trace of the underlying
         morphism, with the parameters swapped out of the way.
@@ -390,25 +395,10 @@ class Closed(Markov, ClosedCategory):
 
     @classmethod
     @rule
-    def ev_left[Y: Atom, E: Atom](
-            cls, base: Obj[monoidal.Ty, Y],
-            exponent: Obj[monoidal.Ty, E]
-    ) -> Hom[Closed, Tensor[Over[Y, E], E], Y]:
-        """ The left evaluation, see :meth:`ev`. """
-        return cls.ev(base, exponent, left=True)
-
-    @classmethod
-    @rule
-    def ev_right[Y: Atom, E: Atom](
-            cls, base: Obj[monoidal.Ty, Y],
-            exponent: Obj[monoidal.Ty, E]
-    ) -> Hom[Closed, Tensor[E, Under[E, Y]], Y]:
-        """ The right evaluation, see :meth:`ev`. """
-        return cls.ev(base, exponent, left=False)
-
-    @classmethod
-    def ev(cls, base: monoidal.Ty, exponent: monoidal.Ty, left: bool = True
-           ) -> Closed:
+    def ev[Y, E, S: bool](
+            cls, base: Obj[monoidal.Ty, Y], exponent: Obj[monoidal.Ty, E],
+            left: Obj[bool, S] = True
+    ) -> Hom[Closed, TensorDir[ExpDir[Y, E, S], E, S], Y]:
         """
         The evaluation of the underlying category, with empty parameters.
 
@@ -420,7 +410,10 @@ class Closed(Markov, ClosedCategory):
         return cls.lift(cls.category.ev(
             base, exponent, left))  # ty: ignore[invalid-argument-type]
 
-    def curry(self, n: int = 1, left: bool = True) -> Closed:
+    @rule
+    def curry[X, S: bool, N: Count, Y: Obj[monoidal.Ty, None, N], Z](
+            self: Hom[Closed, TensorDir[X, Y, S], Z], n: Obj[int, N] = 1,
+            left: Obj[bool, S] = True) -> Hom[Closed, X, ExpDir[Z, Y, S]]:
         """
         Curry the last `n` objects of the domain if `left` else the first,
         i.e. everything but the parameters, which a left currying swaps out
@@ -457,14 +450,13 @@ class Feedback(Markov, FeedbackCategory):
         return type(self)(*(x.delay(n_steps) for x in (
             self.dom, self.cod, self.inside, self.param, self.copar)))
 
-    def feedback_left(self, dom=None, cod=None, mem=None):
-        """ A parametric feedback keeps its memory on the right. """
-        raise NotImplementedError(
-            "A parametric feedback keeps its memory on the right.")
-
-    def feedback(self, dom: monoidal.Ty | None = None,
-                 cod: monoidal.Ty | None = None,
-                 mem: monoidal.Ty | None = None) -> Feedback:
+    @rule
+    def feedback[A, B, S: bool, M](
+            self: Hom[Feedback, TensorDir[D[M], A, S], TensorDir[M, B, S]],
+            dom: Obj[monoidal.Ty | None, A] = None,
+            cod: Obj[monoidal.Ty | None, B] = None,
+            mem: Obj[monoidal.Ty | None, M] = None,
+            left: Obj[bool, S] = False) -> Hom[Feedback, A, B]:
         """
         The feedback of the underlying category, with the parameters
         swapped out of the way the same as :meth:`Traced.trace`.
@@ -473,7 +465,12 @@ class Feedback(Markov, FeedbackCategory):
             dom : The domain of the feedback.
             cod : The codomain of the feedback.
             mem : The memory type to trace over.
+            left : Always false: a parametric feedback keeps its memory on
+                the right.
         """
+        if left:
+            raise NotImplementedError(
+                "A parametric feedback keeps its memory on the right.")
         mem = self.cod[-1:] if mem is None else mem
         dom = self.dom[:len(self.dom) - len(mem)] if dom is None else dom
         cod = self.cod[:len(self.cod) - len(mem)] if cod is None else cod

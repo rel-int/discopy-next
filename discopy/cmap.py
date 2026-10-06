@@ -47,7 +47,7 @@ from math import inf, lcm
 from typing import TYPE_CHECKING, Any, ClassVar, Literal, Self
 
 from discopy import hypergraph, messages
-from discopy.pattern import Obj, Tensor, Unit, L, R, Over, Under  # noqa: F401
+from discopy.pattern import Obj, Tensor, Unit, L, R  # noqa: F401
 from discopy.abc import (
     CompactCategory,
     DaggerCategory,
@@ -69,6 +69,7 @@ from discopy.utils import (
     factory_name,
     unbiased,
 )
+from discopy.pattern import Count, ExpDir, TensorDir  # noqa: F401
 
 if TYPE_CHECKING:
     from discopy.monoidal import Box, Diagram, Ty
@@ -983,33 +984,22 @@ class CMap[category: Diagram](CompactCategory, DaggerCategory,
 
     @classmethod
     @rule
-    def ev_left[Y: Atom, E: Atom](
-            cls, base: Obj[Any, Y],
-            exponent: Obj[Any, E]) -> Hom[CMap, Tensor[Over[Y, E], E], Y]:
-        """ The left evaluation, see :meth:`ev`. """
-        return cls.ev(base, exponent, left=True)
-
-    @classmethod
-    @rule
-    def ev_right[Y: Atom, E: Atom](
-            cls, base: Obj[Any, Y],
-            exponent: Obj[Any, E]) -> Hom[CMap, Tensor[E, Under[E, Y]], Y]:
-        """ The right evaluation, see :meth:`ev`. """
-        return cls.ev(base, exponent, left=False)
-
-    @classmethod
-    def ev(cls, base: Ty, exponent: Ty, left: bool = True) -> CMap:
+    def ev[Y, E, S: bool](
+            cls, base: Obj[Any, Y], exponent: Obj[Any, E],
+            left: Obj[bool, S] = True
+    ) -> Hom[CMap, TensorDir[ExpDir[Y, E, S], E, S], Y]:
         """
         Evaluation is kept as an explicit box by default, or comes from the
         wiring of cups when the host category is rigid.
         """
         if issubclass(cls.category, RigidCategory):
-            return (RigidCategory.ev_left.__func__(cls, base, exponent)
-                    if left else
-                    RigidCategory.ev_right.__func__(cls, base, exponent))
+            return RigidCategory.ev.__func__(cls, base, exponent, left)
         return cls.from_box(cls.category.ev(base, exponent, left))
 
-    def curry(self, n: int = 1, left: bool = True) -> CMap:
+    @rule
+    def curry[X, S: bool, N: Count, Y: Obj[Any, None, N], Z](
+            self: Hom[CMap, TensorDir[X, Y, S], Z], n: Obj[int, N] = 1,
+            left: Obj[bool, S] = True) -> Hom[CMap, X, ExpDir[Z, Y, S]]:
         """
         Currying is kept as an explicit curry box by default, the more
         rigorous representation, or comes from the wiring of caps when the
@@ -1127,7 +1117,11 @@ class CMap[category: Diagram](CompactCategory, DaggerCategory,
         return type(self)(
             dom, cod, boxes, edge, loops=loops, check=False)
 
-    def trace(self, n: int = 1, left: bool = False) -> CMap:
+    @rule
+    def trace[A, B, S: bool, N: Count, M: Obj[Any, None, N]](
+            self: Hom[CMap, TensorDir[M, A, S], TensorDir[M, B, S]],
+            n: Obj[int, N] = 1, left: Obj[bool, S] = False
+    ) -> Hom[CMap, A, B]:
         """
         Trace boundary wires by splicing the selected inputs and outputs.
 

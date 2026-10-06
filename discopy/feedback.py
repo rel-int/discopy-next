@@ -167,6 +167,8 @@ from discopy.utils import (
     deprecated_alias,
     factory, Generator, factory_name, assert_isinstance, AxiomError,
     from_tree)
+from discopy.pattern import D, Hom, Obj, TensorDir  # noqa: F401
+from discopy.axioms import rule
 
 
 def str_delayed(time_step: int):
@@ -406,7 +408,12 @@ class Diagram(markov.Diagram, FeedbackCategory):
         """ Delaying twice is delaying by two time steps. """
         return cls.Equation(f.delay().delay(), f.delay(2))
 
-    def feedback(self, dom=None, cod=None, mem=None, left=False):
+    @rule
+    def feedback[A, B, S: bool, M](
+            self: Hom[Diagram, TensorDir[D[M], A, S], TensorDir[M, B, S]],
+            dom: Obj[Ty | None, A] = None, cod: Obj[Ty | None, B] = None,
+            mem: Obj[Ty | None, M] = None, left: Obj[bool, S] = False
+    ) -> Hom[Diagram, A, B]:
         """
         A :class:`Feedback` of the memory, wire by wire: the outermost
         memory wire — the first on the left, the last on the right —
@@ -784,9 +791,7 @@ class Functor(markov.Functor):
         if isinstance(other, Feedback) and hasattr(self.cod, "feedback"):
             arguments = map(self, (other.dom, other.cod, other.mem))
             image = self(other.arg)
-            if other.left:
-                return image.feedback_left(*arguments)
-            return image.feedback(*arguments)
+            return image.feedback(*arguments, left=other.left)
         return super().__call__(other)
 
 

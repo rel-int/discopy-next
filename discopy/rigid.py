@@ -417,13 +417,7 @@ class Diagram(biclosed.Diagram, RigidCategory):
     to_drawing = monoidal.Diagram.to_drawing
 
     ev = classmethod(RigidCategory.ev.__func__)
-    ev_left = classmethod(RigidCategory.ev_left.__func__)
-    ev_right = classmethod(RigidCategory.ev_right.__func__)
     curry = RigidCategory.curry
-    curry_left = RigidCategory.curry_left.admissible(
-        "A caps composition: caps and cut reach every transpose.")
-    curry_right = RigidCategory.curry_right.admissible(
-        "A caps composition: caps and cut reach every transpose.")
     base_and_exponent = RigidCategory.base_and_exponent
     Box: ClassVar[Generator]
     Sum: ClassVar[Generator]

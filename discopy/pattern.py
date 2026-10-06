@@ -35,6 +35,9 @@ Summary
     :toctree:
 
     Tensor
+    TensorDir
+    ExpDir
+    AdjDir
     L
     R
     D
@@ -69,6 +72,21 @@ between two patterns: a typechecker reads it as ``C1``. """
 
 class Tensor[*Ts]:
     """ The tensor ``Tensor[A, B, ...]`` of two or more patterns. """
+
+
+class TensorDir[P, Q, S]:
+    """ The tensor ``P @ Q`` when ``S`` is true, ``Q @ P`` otherwise: the
+    side ``S: bool`` of a method taking ``left`` puts ``P`` first. """
+
+
+class ExpDir[Z, Y, S]:
+    """ The exponential ``Z << Y`` when ``S`` is true, ``Y >> Z``
+    otherwise, i.e. ``Over[Z, Y]`` or ``Under[Y, Z]``. """
+
+
+class AdjDir[X, S]:
+    """ The left adjoint ``L[X]`` when ``S`` is true, the right adjoint
+    ``R[X]`` otherwise. """
 
 
 class L[T]:

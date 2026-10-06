@@ -51,6 +51,7 @@ from discopy.cat import (
 from discopy.utils import assert_isinstance, unbiased
 from discopy.pattern import Hom
 from discopy.search import rule
+from discopy.pattern import Count, TensorDir  # noqa: F401
 
 if TYPE_CHECKING:
     import sympy
@@ -388,15 +389,11 @@ class Matrix[dtype](MonoidalCategory, DaggerCategory, NamedGeneric):
         return sum(self.id(self.dom).then(*n * [self])
                    for n in range(index(self.dom) + 1))
 
-    def trace_left(self, n=1):
-        """ The trace of ``n`` wires on the left, see :meth:`trace`. """
-        return self.trace(n, left=True)
-
-    def trace_right(self, n=1):
-        """ The trace of ``n`` wires on the right, see :meth:`trace`. """
-        return self.trace(n)
-
-    def trace(self, n=1, left=False) -> Matrix:
+    @rule
+    def trace[A, B, S: bool, N: Count, M: Obj[Any, None, N]](
+            self: Hom[Matrix, TensorDir[M, A, S], TensorDir[M, B, S]],
+            n: Obj[int, N] = 1, left: Obj[bool, S] = False
+    ) -> Hom[Matrix, A, B]:
         """
         The trace of a Boolean matrix, computed with :meth:`Matrix.repeat`.
 

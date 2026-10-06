@@ -558,6 +558,22 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Changed
 
+- `trace`, `curry`, `ev` and `feedback` are each one rule, stated by
+  their own signature on both sides: `trace(n=1, left=False)` traces an
+  object `M` of size `n` on the side `left` says, its domain
+  `TensorDir[M, A, S]` read `M @ A` when the side `S` is true and
+  `A @ M` otherwise, with `ExpDir` and `AdjDir` orienting exponentials
+  and adjoints the same way. The one-wire rules `trace_left`,
+  `trace_right`, `curry_left`, `curry_right`, `ev_left`, `ev_right`,
+  `feedback_left` and `feedback_right` are removed: call the rule with
+  `n` and `left`, e.g. `f.trace(1, left=True)`. Every implementation
+  restates its sequent with `@rule`, an override without it dropping
+  the rule; `uncurry` and the rigid `curry` stay methods since the
+  evaluation, caps and cut reach what they build. `feedback` takes
+  `left` everywhere, a stream and a parametric map raising
+  `NotImplementedError` on the left, and the `uncurry` of a Python
+  function takes `n` like the others.
+
 - `Diagram.to_hypergraph` records the offset of every state of a diagram,
   where it only did so for a diagram with one box per layer, so that a
   foliated diagram whose states share a layer is placed back without

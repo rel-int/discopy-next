@@ -173,6 +173,7 @@ from discopy.search import rule
 from discopy.utils import (
     AxiomError,
     assert_isinstance, unbiased, inductive, classproperty, factory_name)
+from discopy.pattern import D, TensorDir  # noqa: F401
 
 
 @dataclass
@@ -578,15 +579,12 @@ class Stream[category](MonoidalCategory, NamedGeneric):
         _later = None if dom.is_constant else lambda: cls.copy(dom.later, n)
         return cls(now, dom, cod, _later=_later)
 
-    def feedback_left(self, dom: Ty | None = None, cod: Ty | None = None,
-                      mem: Ty | None = None) -> Stream:
-        """ A monoidal stream keeps its memory on the right. """
-        raise NotImplementedError(
-            "A monoidal stream keeps its memory on the right.")
-
-    def feedback(
-        self, dom: Ty | None = None, cod: Ty | None = None,
-        mem: Ty | None = None, _first_call=True) -> Stream:
+    @rule
+    def feedback[A, B, S: bool, M](
+            self: Hom[Stream, TensorDir[D[M], A, S], TensorDir[M, B, S]],
+            dom: Obj[Ty | None, A] = None, cod: Obj[Ty | None, B] = None,
+            mem: Obj[Ty | None, M] = None, left: Obj[bool, S] = False,
+            _first_call=True) -> Hom[Stream, A, B]:
         """
         The delayed feedback of a monoidal stream.
 
@@ -594,6 +592,8 @@ class Stream[category](MonoidalCategory, NamedGeneric):
             dom (Ty) : The domain of the result.
             cod (Ty) : The domain of the result.
             mem (Ty) : The memory over which we are taking a feedback.
+            left (bool) : Always false: a monoidal stream keeps its
+                memory on the right.
 
         Example
         -------
@@ -608,6 +608,9 @@ class Stream[category](MonoidalCategory, NamedGeneric):
         .. image:: /_static/stream/feedback-unrolling.svg
             :align: center
         """
+        if left:
+            raise NotImplementedError(
+                "A monoidal stream keeps its memory on the right.")
         if mem is None or dom is None or cod is None:
             if not self.is_constant or dom is not None or cod is not None:
                 raise NotImplementedError
@@ -618,7 +621,8 @@ class Stream[category](MonoidalCategory, NamedGeneric):
             self.cod.now == cod.now @ mem.later.now)
 
         def _later():
-            return self.later.feedback(dom.later, cod.later, mem.later, False)
+            return self.later.feedback(
+                dom.later, cod.later, mem.later, _first_call=False)
         mem = mem.delay() if _first_call else mem
         return type(self)(
             self.now, dom, cod,

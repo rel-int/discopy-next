@@ -71,9 +71,9 @@ def test_FinSet():
     assert permutation != [1, 0] and hash(permutation) == hash((1, 0))
     assert permutation.embed([2, 0], 3) == (2, 1, 0)
     with raises(NotImplementedError):
-        permutation.trace_left()
+        permutation.trace(left=True)
     with raises(NotImplementedError):
-        permutation.trace_right()
+        permutation.trace()
 
     x = Ty('x')
     copy, discard, swap = Diagram.copy(x), Diagram.copy(x, 0), Diagram.swap(x, x)

@@ -71,6 +71,7 @@ from discopy.utils import (
     tuplify,
     untuplify,
 )
+from discopy.pattern import Count, TensorDir  # noqa: F401
 if TYPE_CHECKING:
     from discopy.monoidal import Ty, Box, Diagram
 
@@ -545,15 +546,11 @@ class Hypergraph[category: Diagram](MonoidalCategory, DaggerCategory,
             return self.from_box(factory(self.to_diagram(), left))
         return factory.__func__(type(self), self, left)
 
-    def trace_left(self, n=1):
-        """ The trace of ``n`` wires on the left, see :meth:`trace`. """
-        return self.trace(n, left=True)
-
-    def trace_right(self, n=1):
-        """ The trace of ``n`` wires on the right, see :meth:`trace`. """
-        return self.trace(n)
-
-    def trace(self, n=1, left=False):
+    @rule
+    def trace[A, B, S: bool, N: Count, M: Obj[Any, None, N]](
+            self: Hom[Hypergraph, TensorDir[M, A, S], TensorDir[M, B, S]],
+            n: Obj[int, N] = 1, left: Obj[bool, S] = False
+    ) -> Hom[Hypergraph, A, B]:
         """
         The trace of a hypergraph is its pre- and post-composition with
         cups and caps to form a feedback loop.

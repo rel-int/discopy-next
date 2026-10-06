@@ -27,6 +27,7 @@ from discopy import messages
 from discopy.abc import MonoidalCategory, PROP, Nat
 from discopy.pattern import Atom, Hom
 from discopy.search import rule
+from discopy.pattern import Count, TensorDir  # noqa: F401
 
 
 @dataclass
@@ -359,15 +360,11 @@ class Permutation(Function, PROP):
             for i in range(m + n))
         return cls(inside, m + n)
 
-    def trace_left(self, n=1):
-        """ The trace of ``n`` wires on the left, see :meth:`trace`. """
-        return self.trace(n, left=True)
-
-    def trace_right(self, n=1):
-        """ The trace of ``n`` wires on the right, see :meth:`trace`. """
-        return self.trace(n)
-
-    def trace(self, n: int = 1, left: bool = False) -> Self:
+    @rule
+    def trace[A, B, S: bool, N: Count, M: Obj[Nat, None, N]](
+            self: Hom[Permutation, TensorDir[M, A, S], TensorDir[M, B, S]],
+            n: Obj[int, N] = 1, left: Obj[bool, S] = False
+    ) -> Hom[Permutation, A, B]:
         raise NotImplementedError
 
     def is_fixpoint_free_involution(self) -> bool:

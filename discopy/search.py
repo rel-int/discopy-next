@@ -136,8 +136,8 @@ class Rule[**P, T](Declaration[P, T]):
         class it is assigned on, because the structure it builds lies
         outside the category's terms, with the reason as its record:
         the method still runs, the search just never applies it, e.g.
-        ``trace_left = rule(Diagram.trace_left).inapplicable("No loop
-        in a sentence.")``. A rule the category does have, whose terms
+        ``trace = frobenius.Diagram.trace.inapplicable("No loop in a
+        sentence.")``. A rule the category does have, whose terms
         other rules reach, is :meth:`admissible` instead.
         """
         result = replace(self)
@@ -227,7 +227,7 @@ def focused(matches: list, dom=None, cod=None, unit=None) -> list:
     >>> [rule.name for rule, _ in focused([
     ...     (rule, list(rule.match(x, y << x)))
     ...     for rule in Diagram.rules.values()], x, y << x, Ty)]
-    ['curry_left']
+    ['curry']
     """
     goal = {
         atom for side in (dom, cod) if side is not None

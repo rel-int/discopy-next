@@ -50,5 +50,5 @@ def test_feedback_errors():
     with raises(NotImplementedError):
         f.feedback()
     with raises(NotImplementedError):
-        f.feedback_left()
+        f.feedback(left=True)
     assert Stream.permutation([0, 1], [x, x]).now == symmetric.Id(x.now @ x.now)

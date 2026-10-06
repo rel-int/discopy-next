@@ -58,13 +58,13 @@ from dataclasses import dataclass
 from typing import ClassVar, Dict
 
 from discopy import cat, monoidal, biclosed, markov, cmap, hypergraph
-from discopy import pattern
-from discopy.pattern import Obj, Tensor  # noqa: F401
+from discopy.pattern import Obj  # noqa: F401
 
-from discopy.axioms import Atom, Hom
+from discopy.axioms import Hom
 from discopy.search import rule
 from discopy.abc import ClosedCategory
 from discopy.cat import factory, Generator
+from discopy.pattern import ExpDir, TensorDir  # noqa: F401
 
 
 @factory
@@ -136,22 +136,10 @@ class Diagram(markov.Diagram, biclosed.Diagram, ClosedCategory):
 
     @classmethod
     @rule
-    def ev_left[Y: Atom, E: Atom](
-            cls, base: Obj[Ty, Y], exponent: Obj[Ty, E]
-    ) -> Hom[Diagram, Tensor[pattern.Over[Y, E], E], Y]:
-        """ The left evaluation, see :meth:`ev`. """
-        return cls.ev(base, exponent, left=True)
-
-    @classmethod
-    @rule
-    def ev_right[Y: Atom, E: Atom](
-            cls, base: Obj[Ty, Y], exponent: Obj[Ty, E]
-    ) -> Hom[Diagram, Tensor[E, pattern.Under[E, Y]], Y]:
-        """ The right evaluation, see :meth:`ev`. """
-        return cls.ev(base, exponent, left=False)
-
-    @classmethod
-    def ev(cls, base: Ty, exponent: Ty, left: bool = True):
+    def ev[Y, E, S: bool](
+            cls, base: Obj[Ty, Y], exponent: Obj[Ty, E],
+            left: Obj[bool, S] = True
+    ) -> Hom[Diagram, TensorDir[ExpDir[Y, E, S], E, S], Y]:
         return cls.Eval(exponent >> base, left=left)
 
     def to_compact(self) -> Diagram:

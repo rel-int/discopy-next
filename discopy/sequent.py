@@ -53,10 +53,12 @@ import operator
 from collections.abc import Callable, Iterator
 from dataclasses import KW_ONLY, dataclass, replace
 from functools import reduce
-from typing import Any, ClassVar, Self, TypeVar, get_args, get_origin
+from typing import (
+    Any, ClassVar, Literal, Self, TypeVar, get_args, get_origin)
 
 from discopy.pattern import (
-    Atom, Count, D, Hom, L, Obj, Over, R, Repeat, Tensor, Under, Unit)
+    AdjDir, Atom, Count, D, ExpDir, Hom, L, Obj, Over, R, Repeat, Tensor,
+    TensorDir, Under, Unit)
 from discopy.utils import factory_name
 
 
@@ -99,7 +101,8 @@ class Sort:
     ``Self``. The head names what the sort ranges over: a type parameter
     of the declaring class, e.g. ``C0``, or else the objects of the
     category. The size is a number, the name of a ``Count`` variable or
-    :obj:`None` for any.
+    :obj:`None` for any. A side ``S: bool`` is a sort of its own, the
+    value of the ``left`` of a method.
 
     >>> from discopy.monoidal import Ty
     >>> def cups[X: Atom[Ty]](): ...
@@ -113,6 +116,7 @@ class Sort:
     head: str = OBJECTS
     size: int | str | None = None
     count: bool = False
+    side: bool = False
 
     @property
     def atomic(self) -> bool:
@@ -125,6 +129,8 @@ class Sort:
         bound = variable.__bound__
         if bound is Count:
             return cls("Count", count=True)
+        if bound is bool:
+            return cls("bool", side=True)
         args = get_args(bound)
         return cls(name(args[0]) if args else OBJECTS, size=size(bound))
 
@@ -137,8 +143,8 @@ class Sort:
 
     def resolve(self, scope: dict) -> type:
         """ The type the head stands for in the scope. """
-        if self.count:
-            return int
+        if self.count or self.side:
+            return int if self.count else bool
         return scope.get(self.head, scope[OBJECTS])
 
     def strategy(self, scope: dict, types=None, length: int | None = None):
@@ -149,6 +155,8 @@ class Sort:
 
         if self.count:
             return st.integers(min_value=0, max_value=3)
+        if self.side:
+            return st.booleans()
         resolved = self.resolve(scope)
         base = types if types is not None and resolved is scope[OBJECTS]\
             else resolved.strategy()
@@ -164,8 +172,8 @@ class Sort:
         """ The canonical instance of the sort, named after a variable,
         ``length`` wires named ``label0, label1...`` when the size is a
         variable. """
-        if self.count:
-            return 2
+        if self.count or self.side:
+            return 2 if self.count else True
         if not isinstance(self.size, str):
             return cell(self.resolve(scope), label)
         return reduce(operator.matmul, (
@@ -173,7 +181,7 @@ class Sort:
             self.resolve(scope)())
 
     def __str__(self):
-        if self.size is None or self.count:
+        if self.size is None or self.count or self.side:
             return self.head
         return f"Atom[{self.head}]" if self.atomic\
             else f"Obj[{self.head}, {self.size}]"
@@ -252,9 +260,17 @@ def instantiate(pattern, subst: Substitution, unit: Any):
         return instantiate(args[1], subst, unit)
     if origin is Unit:
         return unit()
+    if origin is Literal:
+        return args[0]
     values: list[Any] = [instantiate(arg, subst, unit) for arg in args]
     if origin is Tensor:
         return reduce(operator.matmul, values)
+    if origin is TensorDir:
+        return values[0] @ values[1] if values[2] else values[1] @ values[0]
+    if origin is ExpDir:
+        return values[0] << values[1] if values[2] else values[1] >> values[0]
+    if origin is AdjDir:
+        return values[0].l if values[1] else values[0].r
     if origin in (L, R):
         return getattr(values[0], "l" if origin is L else "r")
     if origin is D:
@@ -316,6 +332,10 @@ def unify(pattern, value, subst: Substitution,
             yield from unify(args[1], value, sized, residuals)
     elif origin is Tensor:
         yield from split(args, value, subst, residuals)
+    elif origin in (TensorDir, ExpDir, AdjDir):
+        for subst_, left in sides(args[-1], subst):
+            yield from unify(oriented(origin, args, left), value, subst_,
+                             residuals)
     elif origin in (L, R):
         inverse = getattr(value, "r" if origin is L else "l")
         yield from unify(args[0], inverse, subst, residuals)
@@ -327,6 +347,29 @@ def unify(pattern, value, subst: Substitution,
         yield from unify_repeat(args[0], args[1], value, subst, residuals)
     else:
         raise TypeError(f"Expected a pattern, got {pattern!r}.")
+
+
+def sides(side, subst: Substitution) -> Iterator[tuple[Substitution, bool]]:
+    """ The values of a side: a ``Literal`` its own, a bound variable
+    its binding, an unbound one both, each binding it. """
+    if not isinstance(side, TypeVar):
+        yield subst, get_args(side)[0]
+    elif side.__name__ in subst:
+        yield subst, bool(subst[side.__name__])
+    else:
+        for left in (True, False):
+            yield {**subst, side.__name__: left}, left
+
+
+def oriented(origin, args, left: bool):
+    """ The pattern a former with a side stands for on that side. """
+    if origin is TensorDir:
+        first, second = args[:2] if left else args[1::-1]
+        return Tensor[first, second]
+    if origin is ExpDir:
+        base, exponent = args[:2]
+        return Over[base, exponent] if left else Under[exponent, base]
+    return L[args[0]] if left else R[args[0]]
 
 
 def split(factors, value, subst, residuals) -> Iterator[Match]:

@@ -71,7 +71,8 @@ from typing import (
 from discopy.axioms import (  # noqa: F401  pylint: disable=unused-import
     Axiom, axiom, declarations, Equation, Rule, rule, Serialisable, Testable)
 from discopy.pattern import (  # noqa: F401  pylint: disable=unused-import
-    Atom, Count, D, Hom, L, Obj, Over, R, Repeat, Tensor, Under, Unit)
+    AdjDir, Atom, Count, D, ExpDir, Hom, L, Obj, Over, R, Repeat, Tensor,
+    TensorDir, Under, Unit)
 from discopy.utils import (  # noqa: F401  pylint: disable=unused-import
     NamedGeneric, classproperty, factory_name)
 
@@ -474,42 +475,22 @@ class PRO[C1: PRO](MonoidalCategory[Nat, C1]):
 class TracedCategory[C0: ColouredMonoid, C1: TracedCategory](
         MonoidalCategory[C0, C1]):
     """
-    A traced category is a :class:`MonoidalCategory` with methods
-    :code:`trace_left` and :code:`trace_right` for the partial trace of a
-    morphism over some objects on either side.
+    A traced category is a :class:`MonoidalCategory` with a method
+    :code:`trace` for the partial trace of a morphism over some objects on
+    either side.
     """
     @rule
-    def trace_left[A: Obj[C0], B: Obj[C0], M: Atom[C0]](
-            self: Hom[C1, Tensor[M, A], Tensor[M, B]]) -> Hom[C1, A, B]:
-        """ The trace of one wire on the left, :meth:`trace` takes ``n``. """
-        return self.trace(1, left=True)
-
-    @rule
-    def trace_right[A: Obj[C0], B: Obj[C0], M: Atom[C0]](
-            self: Hom[C1, Tensor[A, M], Tensor[B, M]]) -> Hom[C1, A, B]:
-        """ The trace of one wire on the right, :meth:`trace` takes ``n``. """
-        return self.trace(1)
-
-    @overload
-    def trace[A: Obj[C0], B: Obj[C0], N: Count, M: Obj[C0, None, N]](
-            self: Hom[C1, Tensor[A, M], Tensor[B, M]], n: Obj[int, N] = ...,
-            left: Literal[False] = ...) -> Hom[C1, A, B]: ...
-
-    @overload
-    def trace[A: Obj[C0], B: Obj[C0], N: Count, M: Obj[C0, None, N]](
-            self: Hom[C1, Tensor[M, A], Tensor[M, B]], n: Obj[int, N] = ...,
-            left: Literal[True] = ...) -> Hom[C1, A, B]: ...
-
     @abstractmethod
-    def trace(self, n=1, left=False):
+    def trace[
+            A: Obj[C0], B: Obj[C0], S: bool, N: Count, M: Obj[C0, None, N]](
+            self: Hom[C1, TensorDir[M, A, S], TensorDir[M, B, S]],
+            n: Obj[int, N] = 1, left: Obj[bool, S] = False
+    ) -> Hom[C1, A, B]:
         """
-        The trace of ``n`` wires on either side, to be instantiated, as
-        the two overloads state: ``M`` is of size ``n``. The rules
-        :meth:`trace_left` and :meth:`trace_right` are its one-wire
-        instances, and :meth:`trace_iteration` states that they are
-        enough. Tracing no
-        object at all is the identity, i.e. the vanishing axiom
-        ``f.trace(0) == f``, see `nLab
+        The trace of ``n`` wires on either side, to be instantiated: ``M``
+        is of size ``n``, on the left of ``A`` and ``B`` when ``left`` and
+        on their right otherwise. Tracing no object at all is the
+        identity, i.e. the vanishing axiom ``f.trace(0) == f``, see `nLab
         <https://ncatlab.org/nlab/show/traced+monoidal+category>`_.
 
         Parameters:
@@ -532,7 +513,7 @@ class TracedCategory[C0: ColouredMonoid, C1: TracedCategory](
         """ The trace of ``n`` wires is ``n`` traces of one wire. """
         traced = f
         for _ in range(n):
-            traced = traced.trace_left()
+            traced = traced.trace(1, left=True)
         return cls.Equation(f.trace(n, left=True), traced)
 
     @axiom
@@ -656,111 +637,42 @@ class BiclosedCategory[C0: ResiduatedMonoid, C1: BiclosedCategory](
     @classmethod
     @rule
     @abstractmethod
-    def ev_left[Y: Atom[C0], E: Atom[C0]](
-            cls, base: Obj[C0, Y], exponent: Obj[C0, E]
-    ) -> Hom[C1, Tensor[Over[Y, E], E], Y]:
-        """
-        The left evaluation of an exponential type, to be instantiated:
-        as a rule, ``(y << e) @ e ⊢ y``.
-
-        Parameters:
-            base : The base of the exponential type.
-            exponent : The exponent of the exponential type.
-        """
-
-    @classmethod
-    @rule
-    @abstractmethod
-    def ev_right[Y: Atom[C0], E: Atom[C0]](
-            cls, base: Obj[C0, Y], exponent: Obj[C0, E]
-    ) -> Hom[C1, Tensor[E, Under[E, Y]], Y]:
-        """
-        The right evaluation of an exponential type, to be instantiated:
-        as a rule, ``e @ (e >> y) ⊢ y``.
-
-        Parameters:
-            base : The base of the exponential type.
-            exponent : The exponent of the exponential type.
-        """
-
-    @overload
-    @classmethod
-    def ev[Y: Atom[C0], E: Atom[C0]](
+    def ev[Y: Obj[C0], E: Obj[C0], S: bool](
             cls, base: Obj[C0, Y], exponent: Obj[C0, E],
-            left: Literal[True] = ...
-    ) -> Hom[C1, Tensor[Over[Y, E], E], Y]: ...
-
-    @overload
-    @classmethod
-    def ev[Y: Atom[C0], E: Atom[C0]](
-            cls, base: Obj[C0, Y], exponent: Obj[C0, E],
-            left: Literal[False] = ...
-    ) -> Hom[C1, Tensor[E, Under[E, Y]], Y]: ...
-
-    @classmethod
-    def ev(cls, base, exponent, left=True):
+            left: Obj[bool, S] = True
+    ) -> Hom[C1, TensorDir[ExpDir[Y, E, S], E, S], Y]:
         """
-        The evaluation of an exponential type on either side,
-        :meth:`ev_left` or :meth:`ev_right`, whose sequents the two
-        overloads restate.
+        The evaluation of an exponential type on either side, to be
+        instantiated: as a rule, ``(y << e) @ e ⊢ y`` on the left and
+        ``e @ (e >> y) ⊢ y`` on the right.
 
         Parameters:
             base : The base of the exponential type.
             exponent : The exponent of the exponential type.
             left : Whether to take the left or right evaluation.
         """
-        return (cls.ev_left if left else cls.ev_right)(base, exponent)
 
     @rule
-    def curry_left[X: Obj[C0], Y: Atom[C0], Z: Obj[C0]](
-            self: Hom[C1, Tensor[X, Y], Z]) -> Hom[C1, X, Over[Z, Y]]:
-        """ The currying of one object on the left, :meth:`curry` takes
-        ``n``. """
-        return self.curry(1, left=True)
-
-    @rule
-    def curry_right[Y: Atom[C0], X: Obj[C0], Z: Obj[C0]](
-            self: Hom[C1, Tensor[Y, X], Z]) -> Hom[C1, X, Under[Y, Z]]:
-        """ The currying of one object on the right, :meth:`curry` takes
-        ``n``. """
-        return self.curry(1, left=False)
-
-    @overload
-    def curry[X: Obj[C0], N: Count, Y: Obj[C0, None, N], Z: Obj[C0]](
-            self: Hom[C1, Tensor[X, Y], Z], n: Obj[int, N] = ...,
-            left: Literal[True] = ...) -> Hom[C1, X, Over[Z, Y]]: ...
-
-    @overload
-    def curry[N: Count, Y: Obj[C0, None, N], X: Obj[C0], Z: Obj[C0]](
-            self: Hom[C1, Tensor[Y, X], Z], n: Obj[int, N] = ...,
-            left: Literal[False] = ...) -> Hom[C1, X, Under[Y, Z]]: ...
-
     @abstractmethod
-    def curry(self, n=1, left=True):
+    def curry[X: Obj[C0], S: bool, N: Count, Y: Obj[C0, None, N],
+              Z: Obj[C0]](
+            self: Hom[C1, TensorDir[X, Y, S], Z], n: Obj[int, N] = 1,
+            left: Obj[bool, S] = True) -> Hom[C1, X, ExpDir[Z, Y, S]]:
         """
-        The currying of ``n`` objects on either side, to be instantiated,
-        as the two overloads state: ``Y`` is of size ``n``. The rules
-        :meth:`curry_left` and :meth:`curry_right` are its one-object
-        instances.
+        The currying of ``n`` objects on either side, to be instantiated:
+        ``Y`` is of size ``n``, curried out of the end of the domain into
+        ``Z << Y`` when ``left``, out of its start into ``Y >> Z``
+        otherwise.
 
         Parameters:
             n : The number of objects to curry.
             left : Whether to curry on the left or right.
         """
 
-    @overload
-    def base_and_exponent[
-            X: Obj[C0], N: Count, Y: Obj[C0, None, N], Z: Obj[C0]](
-            self: Hom[C1, X, Over[Z, Y]], n: Obj[int, N],
-            left: Literal[True]) -> tuple[Obj[C0, Z], Obj[C0, Y]]: ...
-
-    @overload
-    def base_and_exponent[
-            X: Obj[C0], N: Count, Y: Obj[C0, None, N], Z: Obj[C0]](
-            self: Hom[C1, X, Under[Y, Z]], n: Obj[int, N],
-            left: Literal[False]) -> tuple[Obj[C0, Z], Obj[C0, Y]]: ...
-
-    def base_and_exponent(self, n, left):
+    def base_and_exponent[X: Obj[C0], S: bool, N: Count,
+                          Y: Obj[C0, None, N], Z: Obj[C0]](
+            self: Hom[C1, X, ExpDir[Z, Y, S]], n: Obj[int, N],
+            left: Obj[bool, S]) -> tuple[Obj[C0, Z], Obj[C0, Y]]:
         """
         The base and exponent that :meth:`uncurry` evaluates, read off the
         exponential object in the codomain.
@@ -777,24 +689,18 @@ class BiclosedCategory[C0: ResiduatedMonoid, C1: BiclosedCategory](
             raise ValueError
         return base, exponent
 
-    @overload
-    def uncurry[X: Obj[C0], N: Count, Y: Obj[C0, None, N], Z: Obj[C0]](
-            self: Hom[C1, X, Over[Z, Y]], n: Obj[int, N] = ...,
-            left: Literal[True] = ...) -> Hom[C1, Tensor[X, Y], Z]: ...
-
-    @overload
-    def uncurry[N: Count, Y: Obj[C0, None, N], X: Obj[C0], Z: Obj[C0]](
-            self: Hom[C1, X, Under[Y, Z]], n: Obj[int, N] = ...,
-            left: Literal[False] = ...) -> Hom[C1, Tensor[Y, X], Z]: ...
-
-    def uncurry(self, n: int = 1, left: bool = True):
+    def uncurry[X: Obj[C0], S: bool, N: Count, Y: Obj[C0, None, N],
+                Z: Obj[C0]](
+            self: Hom[C1, X, ExpDir[Z, Y, S]], n: Obj[int, N] = 1,
+            left: Obj[bool, S] = True) -> Hom[C1, TensorDir[X, Y, S], Z]:
         """
         Uncurry a morphism by composing it with :meth:`ev`, assuming its
         codomain is an exponential object, i.e. undo :meth:`curry`, whose
-        sequents the two overloads state upside down: ``Y`` is the
-        exponent, of size ``n``. If the exponent has less than ``n``
-        objects, we uncurry the remaining ones in turn, which the
-        overloads leave out.
+        sequent its own states upside down: ``Y`` is the exponent, of size
+        ``n``. If the exponent has less than ``n`` objects, we uncurry the
+        remaining ones in turn, which the sequent leaves out. It is a
+        method rather than a rule since it is admissible: the evaluation
+        and a cut reach every uncurried morphism.
 
         Parameters:
             n : The number of objects to uncurry.
@@ -804,34 +710,22 @@ class BiclosedCategory[C0: ResiduatedMonoid, C1: BiclosedCategory](
             raise ValueError
         if not n:
             return self
-        base, exponent = self.base_and_exponent(
-            n, left)  # ty: ignore[no-matching-overload]
+        base, exponent = self.base_and_exponent(n, left)
         result = self @ exponent >> self.ev(base, exponent, True) if left\
             else exponent @ self >> self.ev(base, exponent, False)
         return result.uncurry(n - len(exponent), left)
 
-    @overload
     @classmethod
-    def uncurry_composition[A: Obj[C0], X: Atom[C0], E: Atom[C0]](
-            cls, f: Hom[C1, Tensor[A, E], X], base: Obj[C0, X],
-            exponent: Obj[C0, E], left: Literal[True]
-    ) -> Hom[C1, Tensor[A, E], X]: ...
-
-    @overload
-    @classmethod
-    def uncurry_composition[A: Obj[C0], X: Atom[C0], E: Atom[C0]](
-            cls, f: Hom[C1, Tensor[E, A], X], base: Obj[C0, X],
-            exponent: Obj[C0, E], left: Literal[False]
-    ) -> Hom[C1, Tensor[E, A], X]: ...
-
-    @classmethod
-    def uncurry_composition(cls, f, base, exponent, left: bool):
+    def uncurry_composition[
+            A: Obj[C0], X: Atom[C0], E: Atom[C0], S: bool](
+            cls, f: Hom[C1, TensorDir[A, E, S], X], base: Obj[C0, X],
+            exponent: Obj[C0, E], left: Obj[bool, S]
+    ) -> Hom[C1, TensorDir[A, E, S], X]:
         """
         Curry ``f`` then evaluate it back, i.e. whisker the currying with
         ``exponent`` and compose with the evaluation, the roundtrip that
         :meth:`currying_left` and :meth:`currying_right` state equal to
-        ``f``, through the one-wire rules :meth:`curry_left`,
-        :meth:`curry_right`, :meth:`ev_left` and :meth:`ev_right`.
+        ``f``, through the rules :meth:`curry` and :meth:`ev`.
 
         Parameters:
             f : The morphism to curry and evaluate back.
@@ -839,11 +733,9 @@ class BiclosedCategory[C0: ResiduatedMonoid, C1: BiclosedCategory](
             exponent : The objects curried out of the domain of ``f``.
             left : Whether to curry on the left or right.
         """
-        if left:
-            curried, ev = f.curry_left(), cls.ev_left(base, exponent)
-            return (curried @ exponent).then(ev)
-        curried, ev = f.curry_right(), cls.ev_right(base, exponent)
-        return (exponent @ curried).then(ev)
+        curried, ev = f.curry(1, left), cls.ev(base, exponent, left)
+        whiskered = curried @ exponent if left else exponent @ curried
+        return whiskered.then(ev)
 
     @axiom
     def currying_left[A: Obj[C0], X: Atom[C0], E: Atom[C0]](
@@ -931,35 +823,35 @@ class RigidCategory[C0: Pregroup, C1: RigidCategory](BiclosedCategory[C0, C1]):
 
     @classmethod
     @rule
-    def ev_left[Y: Atom[C0], E: Atom[C0]](
-            cls, base: Obj[C0, Y], exponent: Obj[C0, E]
-    ) -> Hom[C1, Tensor[Y, L[E], E], Y]:
-        """ The left evaluation of a rigid morphism is obtained using cups. """
-        return base @ cls.cups(exponent.l, exponent)
+    def ev[Y: Obj[C0], E: Obj[C0], S: bool](
+            cls, base: Obj[C0, Y], exponent: Obj[C0, E],
+            left: Obj[bool, S] = True
+    ) -> Hom[C1, TensorDir[Y, TensorDir[AdjDir[E, S], E, S], S], Y]:
+        """
+        The evaluation of a rigid morphism is obtained using cups, as a
+        rule ``y @ e.l @ e ⊢ y`` on the left and ``e @ e.r @ y ⊢ y`` on
+        the right.
 
-    @classmethod
-    @rule
-    def ev_right[Y: Atom[C0], E: Atom[C0]](
-            cls, base: Obj[C0, Y], exponent: Obj[C0, E]
-    ) -> Hom[C1, Tensor[E, R[E], Y], Y]:
-        """ The right evaluation of a rigid morphism, using cups. """
+        Parameters:
+            base : The base of the exponential type.
+            exponent : The exponent of the exponential type.
+            left : Whether to take the left or right evaluation.
+        """
+        if left:
+            return base @ cls.cups(exponent.l, exponent)
         return cls.cups(exponent, exponent.r) @ base
 
-    @rule
-    def curry_left[X: Obj[C0], Y: Atom[C0], Z: Obj[C0]](
-            self: Hom[C1, Tensor[X, Y], Z]) -> Hom[C1, X, Tensor[Z, L[Y]]]:
-        """ The left curry of one object of a rigid morphism. """
-        return self.curry(1, left=True)
-
-    @rule
-    def curry_right[Y: Atom[C0], X: Obj[C0], Z: Obj[C0]](
-            self: Hom[C1, Tensor[Y, X], Z]) -> Hom[C1, X, Tensor[R[Y], Z]]:
-        """ The right curry of one object of a rigid morphism. """
-        return self.curry(1, left=False)
-
-    def curry(self, n=1, left=True):
+    def curry[X: Obj[C0], S: bool, N: Count, Y: Obj[C0, None, N],
+              Z: Obj[C0]](
+            self: Hom[C1, TensorDir[X, Y, S], Z], n: Obj[int, N] = 1,
+            left: Obj[bool, S] = True
+    ) -> Hom[C1, X, TensorDir[Z, AdjDir[Y, S], S]]:
         """
-        The curry of a rigid morphism is obtained using caps.
+        The curry of a rigid morphism is obtained using caps, ``Z @ Y.l``
+        on the left and ``Y.r @ Z`` on the right. It is a method rather
+        than a rule since it is admissible: caps and cut reach every
+        transpose, and the self-dual types of a quantum circuit would
+        otherwise let it focus on every goal.
 
         Parameters:
             n : The number of objects to curry.
@@ -976,17 +868,10 @@ class RigidCategory[C0: Pregroup, C1: RigidCategory](BiclosedCategory[C0, C1]):
         base, exponent = self.dom[n:], self.dom[:n]
         return self.caps(exponent.r, exponent) @ base >> exponent.r @ self
 
-    @overload
-    def base_and_exponent[X: Obj[C0], Y: Atom[C0], Z: Obj[C0]](
-            self: Hom[C1, X, Tensor[Z, L[Y]]], n: int,
-            left: Literal[True]) -> tuple[Obj[C0, Z], Obj[C0, Y]]: ...
-
-    @overload
-    def base_and_exponent[X: Obj[C0], Y: Atom[C0], Z: Obj[C0]](
-            self: Hom[C1, X, Tensor[R[Y], Z]], n: int,
-            left: Literal[False]) -> tuple[Obj[C0, Z], Obj[C0, Y]]: ...
-
-    def base_and_exponent(self, n, left):
+    def base_and_exponent[X: Obj[C0], S: bool, N: Count,
+                          Y: Obj[C0, None, N], Z: Obj[C0]](
+            self: Hom[C1, X, TensorDir[Z, AdjDir[Y, S], S]], n: Obj[int, N],
+            left: Obj[bool, S]) -> tuple[Obj[C0, Z], Obj[C0, Y]]:
         """
         Contrary to :meth:`BiclosedCategory.base_and_exponent`, a pregroup has
         no exponential object to read the exponent off the codomain: it is the
@@ -1356,59 +1241,18 @@ class FeedbackCategory[C0: DelayedMonoid, C1: FeedbackCategory](
         """
 
     @rule
-    def feedback_left[A: Obj[C0], B: Obj[C0], M: Atom[C0]](
-            self: Hom[C1, Tensor[D[M], A], Tensor[M, B]],
-            dom: C0 | None = None, cod: C0 | None = None,
-            mem: C0 | None = None) -> Hom[C1, A, B]:
-        """
-        The feedback of one wire of memory on the left, :meth:`feedback`
-        takes a compound memory.
-
-        Parameters:
-            dom : The domain of the feedback.
-            cod : The codomain of the feedback.
-            mem : The memory type to feed back.
-        """
-        return self.feedback(dom, cod, mem, left=True)
-
-    @rule
-    def feedback_right[A: Obj[C0], B: Obj[C0], M: Atom[C0]](
-            self: Hom[C1, Tensor[A, D[M]], Tensor[B, M]],
-            dom: C0 | None = None, cod: C0 | None = None,
-            mem: C0 | None = None) -> Hom[C1, A, B]:
-        """
-        The feedback of one wire of memory on the right, :meth:`feedback`
-        takes a compound memory.
-
-        Parameters:
-            dom : The domain of the feedback.
-            cod : The codomain of the feedback.
-            mem : The memory type to feed back.
-        """
-        return self.feedback(dom, cod, mem)
-
-    @overload
-    def feedback[A: Obj[C0], B: Obj[C0], M: Obj[C0]](
-            self: Hom[C1, Tensor[A, D[M]], Tensor[B, M]],
-            dom: Obj[C0 | None, A] = ..., cod: Obj[C0 | None, B] = ...,
-            mem: Obj[C0 | None, M] = ...,
-            left: Literal[False] = ...) -> Hom[C1, A, B]: ...
-
-    @overload
-    def feedback[A: Obj[C0], B: Obj[C0], M: Obj[C0]](
-            self: Hom[C1, Tensor[D[M], A], Tensor[M, B]],
-            dom: Obj[C0 | None, A] = ..., cod: Obj[C0 | None, B] = ...,
-            mem: Obj[C0 | None, M] = ...,
-            left: Literal[True] = ...) -> Hom[C1, A, B]: ...
-
     @abstractmethod
-    def feedback(self, dom=None, cod=None, mem=None, left=False):
+    def feedback[A: Obj[C0], B: Obj[C0], S: bool, M: Obj[C0]](
+            self: Hom[C1, TensorDir[D[M], A, S], TensorDir[M, B, S]],
+            dom: Obj[C0 | None, A] = None, cod: Obj[C0 | None, B] = None,
+            mem: Obj[C0 | None, M] = None, left: Obj[bool, S] = False
+    ) -> Hom[C1, A, B]:
         """
-        The feedback operator on either side, to be instantiated, as the
-        two overloads state: the memory ``mem`` is any object, so its
-        sequent needs no size. The rules :meth:`feedback_left` and
-        :meth:`feedback_right` are its one-wire instances, and
-        :meth:`feedback_joining` states that they are enough.
+        The feedback operator on either side, to be instantiated: the
+        memory ``mem`` is any object, delayed in the domain and on the
+        left of ``A`` and ``B`` when ``left``, on their right otherwise.
+        :meth:`feedback_joining` states that it is fed back one wire at a
+        time.
 
         Parameters:
             dom : The domain of the feedback.

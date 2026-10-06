@@ -31,6 +31,8 @@ from discopy.abc import ClosedCategory
 from discopy.utils import assert_isinstance, tuplify, untuplify, factory
 from discopy.python import finset, function
 from discopy.python.function import Ty
+from discopy.pattern import Count, ExpDir, Hom, Obj, TensorDir  # noqa: F401
+from discopy.axioms import rule
 
 
 def exp(base: Ty, exponent: Ty) -> Ty:
@@ -154,18 +156,12 @@ class Function(function.Function, ClosedCategory):
         """
         return Function.copy(dom, 0)
 
-    @classmethod
-    def ev_left(cls, base, exponent):
-        """ The left evaluation, see :meth:`ev`. """
-        return cls.ev(base, exponent, left=True)
-
-    @classmethod
-    def ev_right(cls, base, exponent):
-        """ The right evaluation, see :meth:`ev`. """
-        return cls.ev(base, exponent, left=False)
-
     @staticmethod
-    def ev(base: Ty, exponent: Ty, left=True) -> Function:
+    @rule
+    def ev[Y, E, S: bool](
+            base: Obj[Ty, Y], exponent: Obj[Ty, E],
+            left: Obj[bool, S] = True
+    ) -> Hom[Function, TensorDir[ExpDir[Y, E, S], E, S], Y]:
         """
         The evaluation function,
         i.e. take a function and apply it to an argument.
@@ -182,15 +178,10 @@ class Function(function.Function, ClosedCategory):
         dom, cod = exponent @ Function.exp(base, exponent), base
         return Function(lambda *xs: xs[-1](*xs[:-1]), dom, cod)
 
-    def curry_left(self, n=1):
-        """ The left currying of ``n`` objects, see :meth:`curry`. """
-        return self.curry(n, left=True)
-
-    def curry_right(self, n=1):
-        """ The right currying of ``n`` objects, see :meth:`curry`. """
-        return self.curry(n, left=False)
-
-    def curry(self, n=1, left=True) -> Function:
+    @rule
+    def curry[X, S: bool, N: Count, Y: Obj[Ty, None, N], Z](
+            self: Hom[Function, TensorDir[X, Y, S], Z], n: Obj[int, N] = 1,
+            left: Obj[bool, S] = True) -> Hom[Function, X, ExpDir[Z, Y, S]]:
         """
         Currying, i.e. turn a binary function into a function-valued function.
 
@@ -206,18 +197,30 @@ class Function(function.Function, ClosedCategory):
         return Function(dom=dom, cod=cod, inside=lambda *xs: lambda *ys:
                         self(*(xs + ys) if left else (ys + xs)))
 
-    def uncurry(self, left=True) -> Function:
+    def uncurry[X, S: bool, N: Count, Y: Obj[Ty, None, N], Z](
+            self: Hom[Function, X, ExpDir[Z, Y, S]], n: Obj[int, N] = 1,
+            left: Obj[bool, S] = True) -> Hom[Function, TensorDir[X, Y, S], Z]:
         """
         Uncurrying,
-        i.e. turn a function-valued function into a binary function.
+        i.e. turn a function-valued function into a binary function: the
+        exponent has ``n`` types, and if it has less we uncurry the
+        remaining ones in turn, as :meth:`BiclosedCategory.uncurry` does.
 
         Parameters:
+            n : The number of types to uncurry.
             left : Whether to uncurry on the left or right.
         """
+        if n < 0:
+            raise ValueError
+        if not n:
+            return self
         traced = self.cod.inside[0].__args__
         base, exponent = map(Ty.cast, (traced[-1].__args__, traced[:-1]))
-        return self @ exponent >> Function.ev(base, exponent) if left\
+        if n < len(exponent):
+            raise ValueError
+        result = self @ exponent >> Function.ev(base, exponent) if left\
             else exponent @ self >> Function.ev(base, exponent, left=False)
+        return result.uncurry(n - len(exponent), left)
 
     def fix(self, n=1) -> Function:
         """
@@ -232,15 +235,11 @@ class Function(function.Function, ClosedCategory):
         return self if n == 0\
             else Function(inside, self.dom[:-1], self.cod).fix(n - 1)
 
-    def trace_left(self, n=1):
-        """ The trace of ``n`` wires on the left, see :meth:`trace`. """
-        return self.trace(n, left=True)
-
-    def trace_right(self, n=1):
-        """ The trace of ``n`` wires on the right, see :meth:`trace`. """
-        return self.trace(n)
-
-    def trace(self, n=1, left=False):
+    @rule
+    def trace[A, B, S: bool, N: Count, M: Obj[Ty, None, N]](
+            self: Hom[Function, TensorDir[M, A, S], TensorDir[M, B, S]],
+            n: Obj[int, N] = 1, left: Obj[bool, S] = False
+    ) -> Hom[Function, A, B]:
         """
         The multiplicative trace of a function.
 

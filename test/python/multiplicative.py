@@ -53,13 +53,13 @@ def test_Functor_into_Function_folds_with_matmul():
 def test_one_wire_forwarders():
     x, y = Ty(int), Ty(bool)
     g = Function(lambda n, b: n if b else -n, x @ y, x)
-    assert g.curry_left()(1)(False) == g.curry(left=True)(1)(False) == -1
-    assert g.curry_right()(True)(1) == 1
-    assert Function.ev_left(x, y)(lambda b: int(b), True) == 1
-    assert Function.ev_right(x, y)(True, lambda b: int(b)) == 1
-    assert Function.id(x @ y).trace_right().dom == x
+    assert g.curry(left=True)(1)(False) == -1
+    assert g.curry(left=False)(True)(1) == 1
+    assert Function.ev(x, y)(lambda b: int(b), True) == 1
+    assert Function.ev(x, y, left=False)(True, lambda b: int(b)) == 1
+    assert Function.id(x @ y).trace().dom == x
     with raises(NotImplementedError):
-        Function.id(x).trace_left()
+        Function.id(x).trace(left=True)
 
 
 def test_type_checking():

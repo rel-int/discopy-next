@@ -731,10 +731,8 @@ def test_portless_box_and_explicit_trace():
     traced = M.from_box(Box("t", x @ y, x @ y)).explicit_trace()
     assert (traced.dom, traced.cod, len(traced.boxes)) == (x, x, 3)
     base, exponent = closed.Ty("y"), closed.Ty("x")
-    assert closed.CMap.ev_left(base, exponent)\
-        == closed.CMap.ev(base, exponent, left=True)
-    assert closed.CMap.ev_right(base, exponent)\
-        == closed.CMap.ev(base, exponent, left=False)
+    assert closed.CMap.ev(base, exponent).cod == base
+    assert closed.CMap.ev(base, exponent, left=False).cod == base
 
 
 def test_from_glued_agrees_with_folding():

@@ -22,6 +22,8 @@ from discopy.abc import SymmetricCategory
 from discopy.utils import assert_isinstance
 from discopy.python import finset, function
 from discopy.python.function import Ty
+from discopy.pattern import Count, Hom, Obj, TensorDir  # noqa: F401
+from discopy.axioms import rule
 
 
 class Function(function.Function, SymmetricCategory):
@@ -119,15 +121,11 @@ class Function(function.Function, SymmetricCategory):
             raise ValueError
         return Function.swap(*self.is_swap_of[::-1])
 
-    def trace_left(self, n=1):
-        """ The trace of ``n`` wires on the left, see :meth:`trace`. """
-        return self.trace(n, left=True)
-
-    def trace_right(self, n=1):
-        """ The trace of ``n`` wires on the right, see :meth:`trace`. """
-        return self.trace(n)
-
-    def trace(self, n=1, left=False):
+    @rule
+    def trace[A, B, S: bool, N: Count, M: Obj[Ty, None, N]](
+            self: Hom[Function, TensorDir[M, A, S], TensorDir[M, B, S]],
+            n: Obj[int, N] = 1, left: Obj[bool, S] = False
+    ) -> Hom[Function, A, B]:
         """
         The additive trace of a function.
 

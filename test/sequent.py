@@ -1,6 +1,6 @@
 """ The sequents read off signatures, and their matching. """
 
-from typing import TypeVar, get_args, get_origin, get_overloads
+from typing import TypeVar, get_args, get_origin
 
 from discopy.abc import (
     BiclosedCategory, Category, FeedbackCategory, MonoidalCategory,
@@ -82,89 +82,86 @@ def test_delay_unify():
     assert not list(match(D[A], x.d @ y))
 
 
-def test_overloads():
-    """ The overloads of a helper taking ``left`` restate the sequents of
-    its two rules, read off the same way. """
-    for owner, helper, left_rule, right_rule in (
-            (BiclosedCategory, "ev", "ev_left", "ev_right"), ):
-        stubs = {}
-        for stub in get_overloads(getattr(owner, helper)):
-            stub = Declaration(getattr(stub, "__func__", stub))
-            left = stub.__signature__.parameters["left"].annotation
-            stubs[get_args(left)[0]] = stub
-        for left, name in ((True, left_rule), (False, right_rule)):
-            rule = getattr(owner, name)
-            assert str(stubs[left].conclusion) == str(rule.conclusion)
-            assert list(map(str, stubs[left].premises.values()))\
-                == list(map(str, rule.premises.values()))
+def test_sides():
+    """ A side ``S: bool`` orients ``TensorDir``, ``ExpDir`` and
+    ``AdjDir``: matching tries both sides unless the side is bound. """
+    from discopy import biclosed, rigid
+    from discopy.pattern import AdjDir, ExpDir, TensorDir
+    from discopy.sequent import instantiate
+
+    S = TypeVar("S", bound=bool)
+    x, y = biclosed.Ty("x"), biclosed.Ty("y")
+    assert [(s["S"], s["A"], s["B"]) for s, _ in match(
+        TensorDir[A, B, S], x @ y) if len(s["A"]) == 1]\
+        == [(True, x, y), (False, y, x)]
+    assert [s["S"] for s, _ in match(ExpDir[A, B, S], x << y)] == [True]
+    assert [s["S"] for s, _ in match(ExpDir[A, B, S], y >> x)] == [False]
+    assert instantiate(TensorDir[A, B, S], {"A": x, "B": y, "S": False},
+                       biclosed.Ty) == y @ x
+    r = rigid.Ty("r")
+    assert [s["S"] for s, _ in match(AdjDir[A, S], r.l)] == [True, False]
+    assert Sort.of(S) == Sort("bool", side=True)
 
 
-def test_size():
-    """ ``Obj[T, X, N]`` sizes an object by a ``Count`` variable, which
-    matching binds and sampling draws first: the overloads of ``trace``
-    state the n-ary method, its rules the one-wire instances. """
+def test_trace():
+    """ The n-ary trace is one rule on both sides: ``M`` is of size
+    ``n``, the side ``S`` is ``left``. """
     from discopy import traced
 
-    stubs = [Declaration(stub) for stub in get_overloads(TracedCategory.trace)]
-    for stub in stubs:
-        assert stub.variables["M"] == Sort(size="N")
-        assert list(stub.premises) == ["self", "n"]
-    assert TracedCategory.trace_left.variables["M"].atomic
+    trace = TracedCategory.trace
+    assert trace.variables["M"] == Sort(size="N")
+    assert list(trace.premises) == ["self", "n", "left"]
     x, y, a, b = map(traced.Ty, "xyab")
-    left = stubs[1].premises["self"]
-    assert [(s["N"], s["M"]) for s, _ in match(left, (x @ y @ a, x @ y @ b))]\
-        == [(0, traced.Ty()), (1, x), (2, x @ y)]
+    found = [(s["S"], s["N"], s["M"]) for s, _ in match(
+        trace.premises["self"], (x @ y @ a, x @ y @ b))]
+    assert found == [  # The right ends a and b share no wire.
+        (True, 0, traced.Ty()), (True, 1, x), (True, 2, x @ y),
+        (False, 0, traced.Ty())]
     assert str(Sort(size="N")) == "Obj[C0, N]"
     canonical = traced.Diagram.trace_iteration.canonical()
     assert str(canonical.terms[0]).count("Trace") == 2
 
 
-def test_nary_curry():
-    """ The n-ary curry concludes on the exponential of all ``n``
-    objects at once, as ``curry(n)`` builds it. """
+def test_curry_and_uncurry():
+    """ The curry concludes on the exponential of all ``n`` objects at
+    once, as ``curry(n, left)`` builds it, and the uncurry states it
+    upside down. """
     from discopy import biclosed
     from discopy.sequent import instantiate
 
+    curry, uncurry = BiclosedCategory.curry, Declaration(
+        BiclosedCategory.uncurry)
+    assert str(uncurry.premises["self"]) == str(curry.conclusion)
+    assert str(uncurry.conclusion) == str(curry.premises["self"])
     x, y, z, w = map(biclosed.Ty, "xyzw")
     f = biclosed.Box("f", x @ y @ z, w)
-    for left, stub in zip(
-            (True, False), get_overloads(BiclosedCategory.curry)):
-        stub = Declaration(stub)
-        assert stub.variables["Y"] == Sort(size="N")
-        for subst, _ in match(stub.premises["self"], (f.dom, f.cod)):
-            curried = f.curry(subst["N"], left=left)
-            assert instantiate(stub.conclusion, subst, biclosed.Ty)\
-                == (curried.dom, curried.cod)
-
-
-def test_nary_uncurry():
-    """ The n-ary uncurry states the n-ary curry upside down: its
-    premise matches the exponential and binds the size of its exponent,
-    and it concludes on the morphism ``uncurry(n)`` builds. """
-    from discopy import biclosed
-    from discopy.sequent import instantiate
-
-    x, y, z, w = map(biclosed.Ty, "xyzw")
-    curries = get_overloads(BiclosedCategory.curry)
-    uncurries = get_overloads(BiclosedCategory.uncurry)
-    for left, curry, uncurry in zip((True, False), curries, uncurries):
-        curry, uncurry = Declaration(curry), Declaration(uncurry)
-        assert str(uncurry.premises["self"]) == str(curry.conclusion)
-        assert str(uncurry.conclusion) == str(curry.premises["self"])
-        exp = w << y @ z if left else y @ z >> w
-        f = biclosed.Box("f", x, exp)
-        (subst, _), = match(uncurry.premises["self"], (f.dom, f.cod))
-        assert subst["N"] == 2 and subst["Y"] == y @ z
-        uncurried = f.uncurry(subst["N"], left=left)
+    for subst, _ in match(curry.premises["self"], (f.dom, f.cod)):
+        curried = f.curry(subst["N"], left=subst["S"])
+        assert instantiate(curry.conclusion, subst, biclosed.Ty)\
+            == (curried.dom, curried.cod)
+    for left in (True, False):
+        g = biclosed.Box("g", x, w << y @ z if left else y @ z >> w)
+        (subst, _), = match(uncurry.premises["self"], (g.dom, g.cod))
+        assert (subst["S"], subst["N"], subst["Y"]) == (left, 2, y @ z)
+        uncurried = g.uncurry(2, left)
         assert instantiate(uncurry.conclusion, subst, biclosed.Ty)\
             == (uncurried.dom, uncurried.cod)
 
 
-def test_nary_feedback():
-    """ The memory of the n-ary feedback is an object of any size,
-    stated by its own premise rather than by a count. """
-    stubs = [Declaration(stub)
-             for stub in get_overloads(FeedbackCategory.feedback)]
-    for stub in stubs:
-        assert stub.variables["M"] == Sort()
-        assert str(stub.premises["mem"]) == "Obj[C0 | None, M]"
+def test_ev_and_feedback():
+    """ The evaluation and the feedback are one rule each, on both
+    sides; the memory of a feedback is any object. """
+    from discopy import biclosed
+    from discopy.sequent import instantiate
+
+    ev = BiclosedCategory.ev
+    assert list(ev.premises) == ["base", "exponent", "left"]
+    x, y = biclosed.Ty("x"), biclosed.Ty("y")
+    for left in (True, False):
+        subst = {"Y": y, "E": x, "S": left}
+        built = biclosed.Diagram.ev(y, x, left)
+        assert instantiate(ev.conclusion, subst, biclosed.Ty)\
+            == (built.dom, built.cod)
+    feedback = FeedbackCategory.feedback
+    assert feedback.variables["M"] == Sort()
+    assert str(feedback.premises["mem"]) == "Obj[C0 | None, M]"
