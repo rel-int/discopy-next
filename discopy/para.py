@@ -497,7 +497,7 @@ class Compact(Traced, CompactCategory):
     def cups[X: Atom](
             cls, left: Obj[monoidal.Ty, X],
             right: Obj[monoidal.Ty, R[X]]
-    ) -> Hom[Compact, Tensor[X, R[X]], Unit[None]]:
+    ) -> Hom[Compact, Tensor[X, R[X]], Unit[monoidal.Ty]]:
         """
         The cups of the underlying category, with empty parameter space.
 
@@ -513,7 +513,7 @@ class Compact(Traced, CompactCategory):
     def caps[X: Atom](
             cls, left: Obj[monoidal.Ty, X],
             right: Obj[monoidal.Ty, L[X]]
-    ) -> Hom[Compact, Unit[None], Tensor[X, L[X]]]:
+    ) -> Hom[Compact, Unit[monoidal.Ty], Tensor[X, L[X]]]:
         """
         The caps of the underlying category, with empty parameter space.
 

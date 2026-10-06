@@ -184,6 +184,8 @@ def size(annotation) -> int | str | None:
     its ``Count`` variable or :obj:`None` for any. """
     if annotation is Atom or get_origin(annotation) is Atom:
         return 1
+    if get_origin(annotation) is Unit:
+        return 0
     args = get_args(annotation) if get_origin(annotation) is Obj else ()
     stated = args[2] if len(args) > 2 else None
     if isinstance(stated, TypeVar):
@@ -219,7 +221,7 @@ def premise(annotation) -> object | Sort | None:
         return Sort.premise(annotation)
     if get_origin(annotation) is Hom:
         return annotation
-    if get_origin(annotation) in (Obj, Atom):
+    if get_origin(annotation) in (Obj, Atom, Unit):
         args = get_args(annotation)
         return annotation if len(args) >= 2 and args[1] is not None\
             else Sort.premise(annotation)
@@ -231,9 +233,9 @@ def variables(pattern) -> tuple[str, ...]:
     if isinstance(pattern, TypeVar):
         return (pattern.__name__, )
     origin, args = get_origin(pattern), get_args(pattern)
-    if origin is Unit or origin is None:
+    if origin is None:
         return ()
-    if origin in (Hom, Obj, Atom):
+    if origin in (Hom, Obj, Atom, Unit):
         args = args[1:]
     return tuple(label for arg in args for label in variables(arg))
 
@@ -306,12 +308,12 @@ def unify(pattern, value, subst: Substitution,
             yield {**sized, label: value}, residuals
         return
     origin, args = get_origin(pattern), get_args(pattern)
-    if origin in (Obj, Atom):
-        if (sized := fits(size(pattern), value, subst)) is not None:
+    if origin in (Obj, Atom, Unit):
+        sized = fits(size(pattern), value, subst)
+        if sized is not None and (len(args) < 2 or args[1] is None):
+            yield sized, residuals
+        elif sized is not None:
             yield from unify(args[1], value, sized, residuals)
-    elif origin is Unit:
-        if not len(value):
-            yield subst, residuals
     elif origin is Tensor:
         yield from split(args, value, subst, residuals)
     elif origin in (L, R):

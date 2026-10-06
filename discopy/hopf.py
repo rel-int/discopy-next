@@ -958,7 +958,7 @@ class Intertwiner[algebra](tensor.Diagram, RibbonCategory):
     def cups[X: Atom](
             cls, left: Obj[Representation, X],
             right: Obj[Representation, R[X]]
-    ) -> Hom[Intertwiner, Tensor[X, R[X]], Unit[None]]:
+    ) -> Hom[Intertwiner, Tensor[X, R[X]], Unit[Representation]]:
         """
         The evaluation of a module against its dual. When ``right`` is the
         right dual of ``left`` — read off the ``action`` of the two
@@ -985,7 +985,7 @@ class Intertwiner[algebra](tensor.Diagram, RibbonCategory):
     def caps[X: Atom](
             cls, left: Obj[Representation, X],
             right: Obj[Representation, L[X]]
-    ) -> Hom[Intertwiner, Unit[None], Tensor[X, L[X]]]:
+    ) -> Hom[Intertwiner, Unit[Representation], Tensor[X, L[X]]]:
         """
         The coevaluation of a module against its dual. When ``right`` is
         the right dual of ``left`` this is the plain copairing; a dual

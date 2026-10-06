@@ -435,7 +435,7 @@ class Diagram(biclosed.Diagram, RigidCategory):
     @rule
     def cups[X: Atom](
             cls, left: Obj[Ty, X], right: Obj[Ty, R[X]]
-    ) -> Hom[Diagram, Tensor[X, R[X]], Unit[None]]:
+    ) -> Hom[Diagram, Tensor[X, R[X]], Unit[Ty]]:
         """
         Construct a diagram of nested cups for types ``left`` and ``right``.
 
@@ -458,7 +458,7 @@ class Diagram(biclosed.Diagram, RigidCategory):
     @rule
     def caps[X: Atom](
             cls, left: Obj[Ty, X], right: Obj[Ty, L[X]]
-    ) -> Hom[Diagram, Unit[None], Tensor[X, L[X]]]:
+    ) -> Hom[Diagram, Unit[Ty], Tensor[X, L[X]]]:
         """
         Construct a diagram of nested caps for types ``left`` and ``right``.
 

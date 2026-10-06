@@ -378,7 +378,7 @@ class Diagram[natural](RibbonCategory, NamedGeneric):
     @rule
     def cups[X: Atom](
             cls, left: Obj[Ty, X], right: Obj[Ty, R[X]]
-    ) -> Hom[Diagram, Tensor[X, R[X]], Unit[None]]:
+    ) -> Hom[Diagram, Tensor[X, R[X]], Unit[Ty]]:
         """
         The integer cups are given by natural identities.
 
@@ -411,7 +411,7 @@ class Diagram[natural](RibbonCategory, NamedGeneric):
     @rule
     def caps[X: Atom](
             cls, left: Obj[Ty, X], right: Obj[Ty, L[X]]
-    ) -> Hom[Diagram, Unit[None], Tensor[X, L[X]]]:
+    ) -> Hom[Diagram, Unit[Ty], Tensor[X, L[X]]]:
         """
         The integer caps are given by natural identities.
 

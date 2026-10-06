@@ -152,7 +152,7 @@ class Diagram(compact.Diagram, markov.Diagram, HypergraphCategory):
     @rule
     def caps[X: Atom](
             cls, left: Obj[Ty, X], right: Obj[Ty, L[X]]
-    ) -> Hom[Diagram, Unit[None], Tensor[X, L[X]]]:
+    ) -> Hom[Diagram, Unit[Ty], Tensor[X, L[X]]]:
         return cls.cups(left, right).dagger()
 
     @classmethod

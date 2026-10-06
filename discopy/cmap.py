@@ -939,7 +939,7 @@ class CMap[category: Diagram](CompactCategory, DaggerCategory,
     def cups[X: Atom](
             cls, left: Obj[Any, X],
             right: Obj[Any, R[X]]
-    ) -> Hom[CMap, Tensor[X, R[X]], Unit[None]]:
+    ) -> Hom[CMap, Tensor[X, R[X]], Unit[Any]]:
         """ A cup encoded as boundary wiring between adjoint types. """
         assert_isinstance(left, Pregroup)
         assert_isinstance(right, Pregroup)
@@ -955,7 +955,7 @@ class CMap[category: Diagram](CompactCategory, DaggerCategory,
     def caps[X: Atom](
             cls, left: Obj[Any, X],
             right: Obj[Any, L[X]]
-    ) -> Hom[CMap, Unit[None], Tensor[X, L[X]]]:
+    ) -> Hom[CMap, Unit[Any], Tensor[X, L[X]]]:
         """ A cap encoded as boundary wiring between adjoint types. """
         assert_isinstance(left, Pregroup)
         assert_isinstance(right, Pregroup)

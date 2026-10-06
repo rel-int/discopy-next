@@ -86,10 +86,7 @@ def test_overloads():
     """ The overloads of a helper taking ``left`` restate the sequents of
     its two rules, read off the same way. """
     for owner, helper, left_rule, right_rule in (
-            (BiclosedCategory, "ev", "ev_left", "ev_right"),
-            (BiclosedCategory, "curry", "curry_left", "curry_right"),
-            (FeedbackCategory, "feedback", "feedback_left",
-             "feedback_right")):
+            (BiclosedCategory, "ev", "ev_left", "ev_right"), ):
         stubs = {}
         for stub in get_overloads(getattr(owner, helper)):
             stub = Declaration(getattr(stub, "__func__", stub))
@@ -120,3 +117,31 @@ def test_size():
     assert str(Sort(size="N")) == "Obj[C0, N]"
     canonical = traced.Diagram.trace_iteration.canonical()
     assert str(canonical.terms[0]).count("Trace") == 2
+
+
+def test_nary_curry():
+    """ The n-ary curry concludes on the exponential of all ``n``
+    objects at once, as ``curry(n)`` builds it. """
+    from discopy import biclosed
+    from discopy.sequent import instantiate
+
+    x, y, z, w = map(biclosed.Ty, "xyzw")
+    f = biclosed.Box("f", x @ y @ z, w)
+    for left, stub in zip(
+            (True, False), get_overloads(BiclosedCategory.curry)):
+        stub = Declaration(stub)
+        assert stub.variables["Y"] == Sort(size="N")
+        for subst, _ in match(stub.premises["self"], (f.dom, f.cod)):
+            curried = f.curry(subst["N"], left=left)
+            assert instantiate(stub.conclusion, subst, biclosed.Ty)\
+                == (curried.dom, curried.cod)
+
+
+def test_nary_feedback():
+    """ The memory of the n-ary feedback is an object of any size,
+    stated by its own premise rather than by a count. """
+    stubs = [Declaration(stub)
+             for stub in get_overloads(FeedbackCategory.feedback)]
+    for stub in stubs:
+        assert stub.variables["M"] == Sort()
+        assert str(stub.premises["mem"]) == "Obj[C0 | None, M]"

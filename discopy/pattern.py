@@ -35,7 +35,6 @@ Summary
     :toctree:
 
     Tensor
-    Unit
     L
     R
     D
@@ -59,6 +58,10 @@ type Atom[Coarse, Fine = None] = Obj[Coarse, Fine, Literal[1]]
 """ An object of size one, i.e. a single wire: the premise ``x:
 Atom[T, p]`` and the bound ``X: Atom[C0]``. """
 
+type Unit[Coarse] = Obj[Coarse, None, Literal[0]]
+""" The unit ``Unit[T]`` of the objects of type ``T``, i.e. the one
+object of size zero. """
+
 type Hom[Coarse, Dom, Cod] = Annotated[Coarse, Dom, Cod]
 """ The premise or conclusion ``Hom[C1, dom, cod]`` of a morphism
 between two patterns: a typechecker reads it as ``C1``. """
@@ -66,10 +69,6 @@ between two patterns: a typechecker reads it as ``C1``. """
 
 class Tensor[*Ts]:
     """ The tensor ``Tensor[A, B, ...]`` of two or more patterns. """
-
-
-class Unit[T]:
-    """ The unit ``Unit[C0]`` of a monoid of objects. """
 
 
 class L[T]:

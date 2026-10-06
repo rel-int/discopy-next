@@ -726,21 +726,22 @@ class BiclosedCategory[C0: ResiduatedMonoid, C1: BiclosedCategory](
         return self.curry(1, left=False)
 
     @overload
-    def curry[X: Obj[C0], Y: Atom[C0], Z: Obj[C0]](
-            self: Hom[C1, Tensor[X, Y], Z], n: int = ...,
+    def curry[X: Obj[C0], N: Count, Y: Obj[C0, None, N], Z: Obj[C0]](
+            self: Hom[C1, Tensor[X, Y], Z], n: Obj[int, N] = ...,
             left: Literal[True] = ...) -> Hom[C1, X, Over[Z, Y]]: ...
 
     @overload
-    def curry[Y: Atom[C0], X: Obj[C0], Z: Obj[C0]](
-            self: Hom[C1, Tensor[Y, X], Z], n: int = ...,
+    def curry[N: Count, Y: Obj[C0, None, N], X: Obj[C0], Z: Obj[C0]](
+            self: Hom[C1, Tensor[Y, X], Z], n: Obj[int, N] = ...,
             left: Literal[False] = ...) -> Hom[C1, X, Under[Y, Z]]: ...
 
     @abstractmethod
     def curry(self, n=1, left=True):
         """
-        The currying of ``n`` objects on either side, to be instantiated:
-        the rules :meth:`curry_left` and :meth:`curry_right`, whose
-        sequents the two overloads restate, are its one-object instances.
+        The currying of ``n`` objects on either side, to be instantiated,
+        as the two overloads state: ``Y`` is of size ``n``. The rules
+        :meth:`curry_left` and :meth:`curry_right` are its one-object
+        instances.
 
         Parameters:
             n : The number of objects to curry.
@@ -1383,25 +1384,27 @@ class FeedbackCategory[C0: DelayedMonoid, C1: FeedbackCategory](
         return self.feedback(dom, cod, mem)
 
     @overload
-    def feedback[A: Obj[C0], B: Obj[C0], M: Atom[C0]](
+    def feedback[A: Obj[C0], B: Obj[C0], M: Obj[C0]](
             self: Hom[C1, Tensor[A, D[M]], Tensor[B, M]],
-            dom: C0 | None = ..., cod: C0 | None = ...,
-            mem: C0 | None = ...,
+            dom: Obj[C0 | None, A] = ..., cod: Obj[C0 | None, B] = ...,
+            mem: Obj[C0 | None, M] = ...,
             left: Literal[False] = ...) -> Hom[C1, A, B]: ...
 
     @overload
-    def feedback[A: Obj[C0], B: Obj[C0], M: Atom[C0]](
+    def feedback[A: Obj[C0], B: Obj[C0], M: Obj[C0]](
             self: Hom[C1, Tensor[D[M], A], Tensor[M, B]],
-            dom: C0 | None = ..., cod: C0 | None = ...,
-            mem: C0 | None = ...,
+            dom: Obj[C0 | None, A] = ..., cod: Obj[C0 | None, B] = ...,
+            mem: Obj[C0 | None, M] = ...,
             left: Literal[True] = ...) -> Hom[C1, A, B]: ...
 
     @abstractmethod
     def feedback(self, dom=None, cod=None, mem=None, left=False):
         """
-        The feedback operator on either side, to be instantiated: the
-        rules :meth:`feedback_left` and :meth:`feedback_right`, whose
-        sequents the two overloads restate, are its one-wire instances.
+        The feedback operator on either side, to be instantiated, as the
+        two overloads state: the memory ``mem`` is any object, so its
+        sequent needs no size. The rules :meth:`feedback_left` and
+        :meth:`feedback_right` are its one-wire instances, and
+        :meth:`feedback_joining` states that they are enough.
 
         Parameters:
             dom : The domain of the feedback.
@@ -1417,12 +1420,15 @@ class FeedbackCategory[C0: DelayedMonoid, C1: FeedbackCategory](
         return cls.Equation(f.feedback(mem=cls.ob()), f)
 
     @axiom
-    def feedback_joining[X: Obj[C0], M: Atom[C0], N: Atom[C0]](
-            cls, f: Hom[C1, Tensor[X, D[Tensor[M, N]]], Tensor[X, M, N]]
+    def feedback_joining[X: Obj[C0], M: Obj[C0]](
+            cls, f: Hom[C1, Tensor[X, D[M]], Tensor[X, M]], mem: Obj[C0, M]
     ) -> Equation[Hom[C1, X, X]]:
-        """ Joining nested feedback loops. """
-        return cls.Equation(
-            f.feedback(mem=f.cod[-2:]), f.feedback().feedback())
+        """ Joining nested feedback loops: the feedback of a memory is
+        the feedback of its wires, the last one first. """
+        joined = f
+        for _ in range(len(mem)):
+            joined = joined.feedback()
+        return cls.Equation(f.feedback(mem=mem), joined)
 
     dagger_involution = DaggerCategory.dagger_involution.inapplicable(
         "The delay of a feedback category is not reversible.")
