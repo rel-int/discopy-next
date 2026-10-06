@@ -740,3 +740,20 @@ def test_draw_nested_ribbons():
         >> Diagram.cups(x @ y, (x @ y).r)).to_ribbons().draw(
         wire_labels=False, aspect='equal', show=False,
         doctest="docs/_static/ribbon/nested-ribbons.svg")
+
+
+def test_Drawing_validate_attributes():
+    x, y = Ty('x'), Ty('y')
+    drawing = (Box('f', x, y) >> Box('g', y, x)).to_drawing()
+    drawing.validate_attributes()
+    assert drawing == Drawing(
+        drawing.inside, drawing.dom, drawing.cod, drawing.boxes,
+        drawing.width, drawing.height) != 1
+    with raises(ValueError):
+        drawing.box  # Not a layer.
+    z = monoidal.Ty('z')
+    assert Drawing.permutation([0, 1], [z, z]) == Drawing.id(z @ z)
+    h = Box('h', x @ x @ y, x @ x @ y).to_drawing()
+    assert h.trace(2) == h.trace().trace()
+    zero = Drawing.zero(x, y)
+    assert h.add(zero) == h == zero.add(h)

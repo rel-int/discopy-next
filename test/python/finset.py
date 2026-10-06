@@ -61,6 +61,19 @@ def test_FinSet():
         permutation[2]
     with raises(ValueError):
         permutation.index(2)
+    assert finset.Function({0: 1, 1: 0}, 2, 2) == function
+    with raises(ValueError):
+        finset.Function([0], 1, 2)
+    assert finset.Function.permutation([1, 2, 0], [1, 1, 1]).inside\
+        == [1, 2, 0]
+    assert finset.Function.permutation([0, 1], [1, 1])\
+        == finset.Function.id(2)
+    assert permutation != [1, 0] and hash(permutation) == hash((1, 0))
+    assert permutation.embed([2, 0], 3) == (2, 1, 0)
+    with raises(NotImplementedError):
+        permutation.trace_left()
+    with raises(NotImplementedError):
+        permutation.trace_right()
 
     x = Ty('x')
     copy, discard, swap = Diagram.copy(x), Diagram.copy(x, 0), Diagram.swap(x, x)

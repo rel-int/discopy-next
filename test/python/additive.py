@@ -46,3 +46,21 @@ def test_trace_unequal_arity():
 
     f = Function(inside, (int, int), (int, int, int))
     assert f.trace()(7) == (7, 1)
+
+
+def test_permutation():
+    from pytest import raises
+    from discopy.python.additive import Function
+
+    X = Function.ob(int)
+    # The blocks X, X @ X, X go to positions 2, 0, 1, carrying their tags.
+    p = Function.permutation([1, 2, 0], [X, X @ X, X])
+    assert [p(5, tag) for tag in range(4)] == [(5, 3), (5, 0), (5, 1), (5, 2)]
+    assert Function.permutation([0], [X])(5) == 5
+    assert Function.swap(X, X).dagger()(1, 0) == (1, 1)
+    with raises(ValueError):
+        Function(lambda obj: obj, X, X).dagger()  # Only swaps have one.
+    f = Function(lambda obj, tag=0: (obj, 1 - tag), X @ X, X @ X)
+    assert f.trace_right()(3) == 3 and f.trace(0) is f
+    with raises(NotImplementedError):
+        f.trace_left()

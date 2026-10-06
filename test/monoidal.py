@@ -109,6 +109,15 @@ def test_Ty_generator():
     assert not Ty().is_atom and Ty().atom is None
 
 
+def test_Ty_init_errors():
+    with raises(TypeError):
+        Ty('x', colour=Colour('red'))
+    with raises(AxiomError):
+        Ty(Ty('x'))  # A type is an object but not a wire.
+    with raises(TypeError):
+        Dim(2, colour=Colour('red'))
+
+
 def test_Ty_pow():
     assert Ty('x') ** 42 == Ty('x') ** 21 @ Ty('x') ** 21
     with raises(TypeError) as err:
@@ -129,6 +138,20 @@ def test_Nat_tensor():
 def test_Nat_getitem():
     assert Nat(42)[2: 4] == Nat(2)
     assert all(Nat(42)[i] == Nat(1) for i in range(42))
+
+
+def test_Nat_repr():
+    assert repr((Nat(0), Nat(1))) == "(monoidal.Nat(0), monoidal.Nat(1))"
+    assert str(Nat(2 * 3 * 7)) == "Nat(42)"
+
+
+def test_Nat_hash():
+    assert hash(Nat(0)) == hash(Nat(0)) != hash(Nat(1))
+
+
+def test_Nat_to_tree():
+    assert Nat(0).to_tree() == {'factory': 'monoidal.Nat', 'n': 0}
+    assert Nat.from_tree(Nat(0).to_tree()) == Nat(0)
 
 
 def test_Nat_sequence_protocol():
@@ -639,3 +662,53 @@ def test_List():
 def test_transparent_colour_serialisation():
     colour = Colour()
     assert Colour.from_tree(colour.to_tree()) == colour
+
+
+def test_Diagram_str():
+    x, y, z, w = Ty('x'), Ty('y'), Ty('z'), Ty('w')
+    assert str(Diagram((), x, x)) == "Id(x)"
+    f0, f1 = Box('f0', x, y), Box('f1', z, w)
+    assert str(Diagram((Layer(f0), ), x, y)) == "f0"
+    assert str(f0 @ Id(z) >> Id(y) @ f1) == "f0 @ z >> y @ f1"
+
+
+def test_Diagram_decode_needs_boxes():
+    with raises(ValueError):
+        Diagram.decode(Ty('x'))
+
+
+def test_Layer_merge_to_identity():
+    f = Box('f', Ty('x'), Ty('x'))
+    with raises(AxiomError):  # f >> f[::-1] is no layer, see #599.
+        Layer(f).merge(Layer(f.dagger()))
+
+
+def test_Box_strategy():
+    with raises(NotImplementedError):
+        Sum.strategy()
+    f = Box('f', Ty('x'), Ty('x'))
+    assert f.size == (f + f).size == 1
+
+
+def test_Functor_repr_and_eq():
+    x, y = Ty('x'), Ty('y')
+    F = Functor({x: y}, {})
+    assert repr(F) == "monoidal.Functor("\
+        "ob_map={monoidal.Ty(cat.Ob('x')): monoidal.Ty(cat.Ob('y'))}, "\
+        "ar_map={})"
+    G = Functor({x: y}, {}, colour_map={Colour('red'): Colour('blue')})
+    assert F == Functor({x: y}, {}) != G
+    assert G(Colour('red')) == Colour('blue')
+
+
+def test_abc_Nat():
+    from discopy import abc
+    assert abc.Nat(1).then(abc.Nat(2)) == abc.Nat(3)
+    assert abc.Nat(3)[-3] == abc.Nat(1)
+    with raises(IndexError):
+        abc.Nat(3)[3]
+
+
+def test_Colour_strategy():
+    from hypothesis import find
+    assert find(Colour.strategy(), lambda c: c.name == "red") == Colour("red")

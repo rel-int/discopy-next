@@ -54,3 +54,11 @@ def test_autotyping():
         assert Matrix([0.5, 0.5], dom=1, cod=2).dtype == np.float32
     with backend('pytorch'):
         assert Matrix([0.5, 0.5], dom=1, cod=2).dtype == torch.float32
+
+
+def test_trace_one_wire():
+    m = Matrix[bool]([True, False, False, True] * 4, 4, 4)
+    assert m.trace_left() == m.trace(1, left=True)
+    assert m.trace_right() == m.trace()
+    with raises(TypeError):
+        Matrix[int]([1, 0, 0, 1], 2, 2).repeat()

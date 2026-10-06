@@ -104,3 +104,38 @@ def test_discard_is_a_feedback_diagram():
     discard = Diagram.copy(x, n=0)
     assert isinstance(discard, Diagram) and isinstance(discard, Discard)
     assert (discard >> Diagram.id(Ty())).boxes == [discard]
+
+
+def test_Wire_to_tree():
+    x = Wire('x')
+    assert x.to_tree() == {'factory': 'feedback.Wire', 'name': 'x'}
+    assert Wire('x', 2, is_constant=False).to_tree() == {
+        'factory': 'feedback.Wire', 'name': 'x', 'time_step': 2,
+        'is_constant': False}
+
+
+def test_Feedback():
+    x = Ty('x')
+    f = Box('f', x, x)
+    assert f.delay(2).time_step == 2
+    with raises(ValueError):
+        (f >> f).time_step
+    assert Copy(x).delay() == Copy(x.delay())
+    with raises(AxiomError):
+        Box('g', x.delay() @ x, x @ x).feedback(dom=x, cod=x, mem=x)
+    with raises(AxiomError):
+        Box('g', x @ x.delay(), x @ x.d).feedback(dom=x, cod=x, mem=x)
+    h = Box('h', x.delay() @ x, x @ x)
+    loop = h.feedback(dom=x, cod=x, mem=x, left=True)
+    assert h.feedback_left(x, x, x) == loop
+    k = Box('k', x @ x.delay(), x @ x)
+    assert k.feedback_right(x, x, x) == k.feedback(x, x, x)
+    assert Functor({x: x}, {h: h})(loop) == loop
+    with raises(AxiomError):
+        loop.dagger()
+
+
+def test_strategy():
+    from hypothesis import find
+    assert find(Wire.strategy(), lambda wire: True).time_step == 0
+    assert len(find(Ty.strategy(), lambda ty: len(ty) == 2)) == 2

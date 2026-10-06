@@ -616,6 +616,16 @@ def test_draw_plain_path(tmp_path):
         for _ in range(2):  # A plain path saves, overwriting silently.
             f.draw(path=path, show=False)
         assert path.exists()
+    f.draw(show=True, block=False)  # Displayed with matplotlib.
+    import matplotlib.pyplot as plt
+    plt.close("all")
+
+
+def test_draw_without_graphviz(monkeypatch):
+    monkeypatch.setattr(shutil, "which", lambda name: None)
+    f = compact.Box("f", compact.Ty("x"), compact.Ty("y")).to_map()
+    with raises(RuntimeError):
+        f.draw(show=False)
 
 
 def test_boxes_with_no_domain_decode_at_the_right():
@@ -690,3 +700,38 @@ def test_from_glued_loops():
         (M.caps(x.r, x), 0), (M.caps(y.r, y), 2),
         (M.cups(y.r, y), 2), (M.cups(x.r, x), 0)])
     assert two.loops == (x, y)
+
+
+def test_to_diagram_swaps_the_wires_into_place():
+    from discopy.cmap import PortKind
+    from discopy.symmetric import Ty, Box, Swap
+
+    x, y, z, w = map(Ty, "xyzw")
+    g, h = Box("g", x @ z, w), Box("h", y @ x, w)
+    for diagram in [Swap(x, y), Swap(x, y) >> h, x @ Swap(y, z) >> g @ y]:
+        assert diagram.to_map().to_diagram().to_map() == diagram.to_map()
+    assert 'start="42"' in (Swap(x, y) >> h).to_map().to_dot(seed=42)
+    assert [kind.is_output for kind in PortKind] == [
+        kind in ("cod", "output") for kind in PortKind]
+
+
+def test_portless_box_and_explicit_trace():
+    from discopy.compact import Ty, Box, CMap as M
+
+    x, y, z = map(Ty, "xyz")
+    f = M.from_box(Box("f", x, y))
+    assert hash(f) == hash(M.from_box(Box("f", x, y)))
+    with raises(AxiomError):
+        f >> f
+    components = (f @ M.from_box(Box("s", Ty(), Ty()))).connected_components
+    assert [len(c.boxes) for c in components] == [1, 1]
+    g = M.from_box(Box("g", z @ x, x))
+    plugged = g.plug_input(1, Box("lambda", x, y @ x), y)
+    assert (plugged.dom, plugged.cod) == (z, y)
+    traced = M.from_box(Box("t", x @ y, x @ y)).explicit_trace()
+    assert (traced.dom, traced.cod, len(traced.boxes)) == (x, x, 3)
+    base, exponent = closed.Ty("y"), closed.Ty("x")
+    assert closed.CMap.ev_left(base, exponent)\
+        == closed.CMap.ev(base, exponent, left=True)
+    assert closed.CMap.ev_right(base, exponent)\
+        == closed.CMap.ev(base, exponent, left=False)

@@ -77,3 +77,20 @@ def test_to_braided_default_and_zero_width():
 
     # width=0 returns the diagram as is, i.e. without dual rails.
     assert twist.to_braided(width=0) == twist
+
+
+def test_repr():
+    x, y = Ty('x'), Ty('y')
+    assert repr(Twist(x))\
+        == "balanced.Twist(monoidal.Ty(cat.Ob('x')))"
+    assert repr(Twist(x).dagger())\
+        == "balanced.Twist(monoidal.Ty(cat.Ob('x'))).dagger()"
+    assert repr(DualRailBraid(x, y).dagger()) == (
+        "balanced.DualRailBraid(monoidal.Ty(cat.Ob('y')), "
+        "monoidal.Ty(cat.Ob('x')), is_dagger=True)")
+    assert repr(DualRailTwist(x).dagger()) == (
+        "balanced.DualRailTwist(monoidal.Ty(cat.Ob('x')), is_dagger=True)")
+    assert DualRailTwist(x).dagger().dagger() == DualRailTwist(x)
+    ribbon = Ribbon("red", label="r", width=.5)
+    assert repr(ribbon) == "balanced.Ribbon('red', label='r', width=0.5)"
+    assert Ribbon.from_tree(ribbon.to_tree()) == ribbon

@@ -39,3 +39,16 @@ def test_ValueError():
 def test_IndexError():
     with raises(IndexError):
         return Id()[:]
+
+
+def test_Ty_repr():
+    t = Ty[int](positive=1, negative=2)
+    assert repr(t)\
+        == str(t) == "interaction.Ty[int](positive=1, negative=2)"
+
+
+def test_Ty_exponentials():
+    from discopy import compact
+    x, y = compact.Ty('x'), compact.Ty('y')
+    a, b = Ty[compact.Ty](x, y), Ty[compact.Ty](y, x)
+    assert a << b == a.over(b) and a >> b == b.under(a)

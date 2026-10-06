@@ -120,6 +120,8 @@ def test_Sum_generator_hash():
     singleton = Sum((f, ), x, y)
     assert singleton == f and hash(singleton) == hash(f)
     assert {f: 42}[singleton] == 42
+    assert singleton.is_atom and singleton.atom == f
+    assert Sum((f, f), x, y).atom is None
 
 
 def test_Functor():
@@ -198,6 +200,10 @@ def test_Transformation_errors():
     f = Box('f', x, y)
     with raises(AxiomError):
         Transformation({x: f, y: f[::-1]}, F, F)(x)
+    # The two functors must be parallel.
+    from discopy import tensor
+    with raises(AxiomError):
+        Transformation({}, F, tensor.Functor({}, {}))
 
 
 def test_total_ordering():
@@ -209,6 +215,8 @@ def test_total_ordering():
 
 def test_Bubble():
     f = Box('f', Ob('x'), Ob('y'))
+    with raises(ValueError):
+        Bubble(f, f, dom=f.dom, cod=f.cod).arg
     assert repr((f).bubble())\
         == "cat.Bubble(cat.Box('f', cat.Ob('x'), cat.Ob('y')))"
     assert str(f.bubble()) == "(f).bubble()"
@@ -289,3 +297,25 @@ def test_Equivalence():
     assert hash(encode) != hash(decode) and encode != decode
     with raises(NotImplementedError):
         monoidal.Diagram.hypergraph_equivalence().strategy()
+    assert repr(encode)\
+        == "cat.Equivalence(Diagram.to_hypergraph, Hypergraph.to_diagram)"
+
+
+def test_Functor_strategy():
+    """ The functors the matrix generates relabel the generators. """
+    from hypothesis import find
+    from discopy import monoidal, tensor
+    from discopy.quantum import circuit
+
+    x, a = monoidal.Ty('x'), monoidal.Ty('a')
+    F = find(monoidal.Functor.strategy(), lambda F: F(monoidal.Ty('b')) == a)
+    assert F(x) == x and len(F.ob_map) == len(list(F.ob_map)) == 5
+    assert F(monoidal.Box('f', monoidal.Ty('b'), x))\
+        == monoidal.Box('f', a, x)
+    assert repr(F.ob_map).startswith("axioms.Relabelling(images=(")
+    assert find(monoidal.Functor.associativity.strategy(),
+                lambda _: True)  # They compose.
+    with raises(NotImplementedError):  # Not an endofunctor.
+        tensor.Functor.strategy()
+    with raises(NotImplementedError):  # Information units have no names.
+        circuit.Functor.strategy()

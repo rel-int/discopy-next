@@ -351,3 +351,16 @@ def test_Functor_bubble():
     assert np.allclose(
         np.asarray(F(men_are_mortal.arg).array, dtype=float),
         np.asarray(men_are_mortal.arg.eval().array, dtype=float))
+
+
+def test_parameterised_box_pickle():
+    import pickle
+    box = Box("A", 2, 3)
+    assert pickle.loads(pickle.dumps(box)) == box
+
+
+def test_Permutation_array():
+    diagram = Diagram.permutation([1, 2, 0], Dim(2) @ Dim(3) @ Dim(4))
+    assert diagram.boxes[0].array.shape == (2, 3, 4, 3, 2, 4)
+    assert Tensor.permutation([0, 1], [Dim(2), Dim(3)])\
+        == Tensor.id(Dim(2, 3))
