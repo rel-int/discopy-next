@@ -749,13 +749,15 @@ class BiclosedCategory[C0: ResiduatedMonoid, C1: BiclosedCategory](
         """
 
     @overload
-    def base_and_exponent[X: Obj[C0], Y: Atom[C0], Z: Obj[C0]](
-            self: Hom[C1, X, Over[Z, Y]], n: int,
+    def base_and_exponent[
+            X: Obj[C0], N: Count, Y: Obj[C0, None, N], Z: Obj[C0]](
+            self: Hom[C1, X, Over[Z, Y]], n: Obj[int, N],
             left: Literal[True]) -> tuple[Obj[C0, Z], Obj[C0, Y]]: ...
 
     @overload
-    def base_and_exponent[X: Obj[C0], Y: Atom[C0], Z: Obj[C0]](
-            self: Hom[C1, X, Under[Y, Z]], n: int,
+    def base_and_exponent[
+            X: Obj[C0], N: Count, Y: Obj[C0, None, N], Z: Obj[C0]](
+            self: Hom[C1, X, Under[Y, Z]], n: Obj[int, N],
             left: Literal[False]) -> tuple[Obj[C0, Z], Obj[C0, Y]]: ...
 
     def base_and_exponent(self, n, left):
@@ -776,21 +778,23 @@ class BiclosedCategory[C0: ResiduatedMonoid, C1: BiclosedCategory](
         return base, exponent
 
     @overload
-    def uncurry[X: Obj[C0], Y: Atom[C0], Z: Obj[C0]](
-            self: Hom[C1, X, Over[Z, Y]], n: int = ...,
+    def uncurry[X: Obj[C0], N: Count, Y: Obj[C0, None, N], Z: Obj[C0]](
+            self: Hom[C1, X, Over[Z, Y]], n: Obj[int, N] = ...,
             left: Literal[True] = ...) -> Hom[C1, Tensor[X, Y], Z]: ...
 
     @overload
-    def uncurry[Y: Atom[C0], X: Obj[C0], Z: Obj[C0]](
-            self: Hom[C1, X, Under[Y, Z]], n: int = ...,
+    def uncurry[N: Count, Y: Obj[C0, None, N], X: Obj[C0], Z: Obj[C0]](
+            self: Hom[C1, X, Under[Y, Z]], n: Obj[int, N] = ...,
             left: Literal[False] = ...) -> Hom[C1, Tensor[Y, X], Z]: ...
 
     def uncurry(self, n: int = 1, left: bool = True):
         """
         Uncurry a morphism by composing it with :meth:`ev`, assuming its
         codomain is an exponential object, i.e. undo :meth:`curry`, whose
-        sequents the two overloads state upside down. If the exponent has
-        less than ``n`` objects, we uncurry the remaining ones in turn.
+        sequents the two overloads state upside down: ``Y`` is the
+        exponent, of size ``n``. If the exponent has less than ``n``
+        objects, we uncurry the remaining ones in turn, which the
+        overloads leave out.
 
         Parameters:
             n : The number of objects to uncurry.

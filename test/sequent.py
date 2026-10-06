@@ -137,6 +137,29 @@ def test_nary_curry():
                 == (curried.dom, curried.cod)
 
 
+def test_nary_uncurry():
+    """ The n-ary uncurry states the n-ary curry upside down: its
+    premise matches the exponential and binds the size of its exponent,
+    and it concludes on the morphism ``uncurry(n)`` builds. """
+    from discopy import biclosed
+    from discopy.sequent import instantiate
+
+    x, y, z, w = map(biclosed.Ty, "xyzw")
+    curries = get_overloads(BiclosedCategory.curry)
+    uncurries = get_overloads(BiclosedCategory.uncurry)
+    for left, curry, uncurry in zip((True, False), curries, uncurries):
+        curry, uncurry = Declaration(curry), Declaration(uncurry)
+        assert str(uncurry.premises["self"]) == str(curry.conclusion)
+        assert str(uncurry.conclusion) == str(curry.premises["self"])
+        exp = w << y @ z if left else y @ z >> w
+        f = biclosed.Box("f", x, exp)
+        (subst, _), = match(uncurry.premises["self"], (f.dom, f.cod))
+        assert subst["N"] == 2 and subst["Y"] == y @ z
+        uncurried = f.uncurry(subst["N"], left=left)
+        assert instantiate(uncurry.conclusion, subst, biclosed.Ty)\
+            == (uncurried.dom, uncurried.cod)
+
+
 def test_nary_feedback():
     """ The memory of the n-ary feedback is an object of any size,
     stated by its own premise rather than by a count. """
