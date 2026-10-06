@@ -9,6 +9,27 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Added
 
+- `discopy.search`, the proof search generating the terms of the free
+  diagram categories: `monoidal.Diagram.strategy` is the one
+  goal-directed search by the `rules` and `generators` a category
+  declares, every level inheriting it as is. The two sides of a goal
+  are a type, a pattern, a type parameter standing for its variable,
+  or `None` for a fresh one, the substitution shared across the
+  sides and down the attempts: a side guides the search once its
+  variables are all bound and constrains it afterwards, a failed
+  unification rejecting the attempt and rolling the substitution
+  back, the residuals checked once the term is found and a term
+  built outside its declared conclusion an `AxiomError`. A
+  category's `generators` are the rules with no hom premise, so the
+  search recurses on the recursive rules alone; a dead-ended goal is
+  retried a bounded number of times before the example is rejected.
+  The strategy's one subspace parameter is `boundary_connected`,
+  through which `Axiom.weaken` quantifies a law over the subspace
+  `normal_form` is defined on. The matrix lights up: every free
+  diagram level generates the terms its axioms quantify over,
+  checking the categorical, serialisation, conversion and drawing
+  laws on drawn diagrams.
+
 - Every law is an `Axiom` and every operation a `Rule`, both stated
   once on the abstract base classes of `discopy.abc` as the typed
   signatures the pattern language reads, and inherited by every

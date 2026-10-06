@@ -162,7 +162,7 @@ from typing import ClassVar
 from discopy import monoidal, braided, markov, hypergraph, messages
 from typing import Annotated
 
-from discopy.axioms import no_strategy
+from discopy.axioms import GENERATORS, no_strategy
 from discopy.abc import DelayedMonoid, FeedbackCategory
 from discopy.axioms import Atom, Hom, Ob, rule
 from discopy.utils import (
@@ -187,6 +187,14 @@ class Wire(braided.Wire):
             raise NotImplementedError
         self.time_step, self.is_constant = time_step, is_constant
         super().__init__(name)
+
+    @classmethod
+    def strategy(cls, **params):
+        """Generate constant feedback wires at time zero, colours ignored."""
+        from hypothesis import strategies as st
+
+        del params
+        return st.sampled_from(GENERATORS).map(cls)
 
     def delay(self, n_steps=1):
         """ The delay of a feedback object. """
@@ -304,6 +312,13 @@ class TailOb(Wire):
 @factory
 class Ty(monoidal.Ty, DelayedMonoid):
     """ A feedback type is a monoidal type with `delay`, `head` and `tail`. """
+    @classmethod
+    def strategy(cls, **params):
+        """A feedback wire carries no colours: transparent words."""
+        return super().strategy(**{
+            **params,
+            "dom": monoidal.transparent, "cod": monoidal.transparent})
+
     def delay(self, n_steps=1):
         """ The delay of a feedback type by `n_steps`. """
         return type(self)(*(x.delay(n_steps) for x in self.inside))

@@ -108,6 +108,8 @@ def test_axiom():
     assert MonoidalCategory.bifunctoriality.parameters[0].name == "f"
     assert str(MonoidalCategory.bifunctoriality.sequent).startswith(
         "A: C0, B: C0, C: C0, D: C0, U: C0, V: C0 | f: C1[A, B]")
+    equation = find(Diagram.bifunctoriality.strategy(), lambda _: True)
+    assert equation and len(equation.terms) == 2
     assert MonoidalCategory.tensor.sequent.conclusion is not None
     assert Axiom.concludes is False
     @axiom
@@ -115,6 +117,14 @@ def test_axiom():
         """ An unannotated premise has no pattern. """
     with raises(TypeError, match="states no pattern"):
         unannotated.bind(Diagram).sequent
+
+
+def test_weaken_params():
+    law = MonoidalCategory.bifunctoriality.weaken(max_depth=0).bind(Diagram)
+    equation = find(law.strategy(), lambda _: True)
+    assert equation and all(len(term.boxes) <= 4 for term in equation.terms)
+    assert law.weaken(max_depth=1).params == {"max_depth": 1}
+    assert law.modulo(lambda term: term).params == law.params
 
 
 def test_equation_types():

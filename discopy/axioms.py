@@ -260,6 +260,7 @@ from discopy.search import (  # noqa: F401
     Constant,
     Rule,
     rule,
+    search,
 )
 from discopy.utils import (
     AxiomError,

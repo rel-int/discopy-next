@@ -156,7 +156,7 @@ from discopy import cat, monoidal, biclosed, messages
 from discopy.abc import DaggerCategory, Pregroup, RigidCategory
 from typing import Annotated
 
-from discopy.axioms import Atom, Hom, Ob, rule, Serialisable, UNIT
+from discopy.axioms import Atom, GENERATORS, Hom, Ob, rule, Serialisable, UNIT
 from discopy.cat import factory, Generator
 from discopy.utils import (
     assert_isatomic,
@@ -198,6 +198,18 @@ class Wire(monoidal.Wire):
         assert_isinstance(z, int)
         self.z = z
         super().__init__(name, dom, cod)
+
+    @classmethod
+    def strategy(
+            cls, *, dom=monoidal.transparent, cod=monoidal.transparent,
+            min_winding=-1, max_winding=1):
+        """Generate rigid wires with a bounded winding number."""
+        from hypothesis import strategies as st
+
+        return st.tuples(
+            st.sampled_from(GENERATORS),
+            st.integers(min_value=min_winding, max_value=max_winding)).map(
+                lambda args: cls(args[0], args[1], dom=dom, cod=cod))
 
     def dagger(self) -> Wire:
         raise AxiomError("Rigid types have no dagger, use pivotal instead.")

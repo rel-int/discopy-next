@@ -83,6 +83,13 @@ class Wire(pivotal.Wire):
     """
     l = r = property(lambda self: self)
 
+    @classmethod
+    def strategy(cls, **params):
+        """Generate self-dual wires, at winding number zero."""
+        return super().strategy(
+            **{"min_winding": 0, "max_winding": 0, **params})
+
+
 @factory
 class Ty(pivotal.Ty):
     """
@@ -91,6 +98,13 @@ class Ty(pivotal.Ty):
     Parameters:
         inside (frobenius.Wire) : The objects inside the type.
     """
+    @classmethod
+    def strategy(cls, **params):
+        """A self-dual wire has no colours to swap: transparent words."""
+        return super().strategy(**{
+            **params,
+            "dom": monoidal.transparent, "cod": monoidal.transparent})
+
     Wire: ClassVar[Generator] = Generator.subclass(Wire)
 
 
