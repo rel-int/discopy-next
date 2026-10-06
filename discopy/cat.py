@@ -83,7 +83,7 @@ from typing import (
     TYPE_CHECKING, overload)
 
 from discopy import messages, utils
-from discopy.pattern import In0, In1, Obj, Out0, Out1  # noqa: F401
+from discopy.pattern import Obj  # noqa: F401
 from discopy.abc import Category, DaggerCategory, Serialisable
 from discopy.axioms import (
     axiom, Equation as AbstractEquation, GENERATORS, Hom, no_strategy, rule)
@@ -822,7 +822,7 @@ class Bubble(Box):
 
 
 @factory
-class Functor(Category, Serialisable):
+class Functor[In0, In1, Out0, Out1](Category, Serialisable):
     """
     A functor is a pair of maps :code:`ob_map` and :code:`ar_map` and an
     optional codomain category :code:`cod`.
@@ -933,11 +933,11 @@ class Functor(Category, Serialisable):
             + f"(ob_map={self.ob_map}, ar_map={self.ar_map}{cod_repr})"
 
     @overload
-    def __call__(self, other: Obj[Any, In0]) -> Obj[Any, Out0]:
+    def __call__(self, other: In0) -> Out0:
         ...
 
     @overload
-    def __call__(self, other: Obj[Any, In1]) -> Obj[Any, Out1]:
+    def __call__(self, other: In1) -> Out1:
         ...
 
     def __call__(self, other):
@@ -950,12 +950,13 @@ class Functor(Category, Serialisable):
             return result if isinstance(result, origin)\
                 else self.cod.ob(result)
         if isinstance(other, Sum):
-            return sum(map(self, other.terms),
+            return sum(map(self, other.terms),  # ty: ignore[invalid-argument-type]
                        self.cod.zero(self(other.dom), self(other.cod)))
         if isinstance(other, Bubble) and hasattr(self.cod, other.method):
             dom, cod = map(self, (other.dom, other.cod))
             return getattr(self.cod, other.method)(
-                *map(self, other.args), dom=dom, cod=cod)
+                *map(self, other.args),  # ty: ignore[invalid-argument-type]
+                dom=dom, cod=cod)
         if isinstance(other, Box) and other.is_dagger:
             return self(other.dagger()).dagger()
         if isinstance(other, Box):

@@ -97,9 +97,8 @@ class Sort:
     a number of repetitions; or the sort of a premise, ``Obj[C0]`` with
     no pattern or ``Self``.
 
-    >>> from discopy.pattern import In0
-    >>> def cups[X: Atom[In0]](): ...
-    >>> print(Sort.of(cups.__type_params__[0]))
+    >>> def cups[In0, X: Atom[In0]](): ...
+    >>> print(Sort.of(cups.__type_params__[1]))
     Atom[In0]
     """
 

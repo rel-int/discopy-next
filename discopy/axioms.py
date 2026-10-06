@@ -254,8 +254,7 @@ from functools import wraps
 from typing import TYPE_CHECKING, Self
 
 from discopy.pattern import (  # noqa: F401  pylint: disable=unused-import
-    Atom, Count, D, Hom, In0, In1, L, Obj, Out0, Out1, Over, R, Repeat,
-    Tensor, Under, Unit)
+    Atom, Count, D, Hom, L, Obj, Over, R, Repeat, Tensor, Under, Unit)
 from discopy.sequent import (  # noqa: F401  pylint: disable=unused-import
     Declaration, declarations, Sort)
 from discopy.search import (  # noqa: F401  pylint: disable=unused-import

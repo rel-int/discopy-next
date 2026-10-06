@@ -44,10 +44,6 @@ Summary
     Repeat
     Atom
     Count
-    In0
-    In1
-    Out0
-    Out1
 """
 
 from typing import Annotated
@@ -102,19 +98,3 @@ class Atom[T]:
 
 class Count:
     """ The bound ``N: Count`` of a number of repetitions. """
-
-
-class In0:
-    """ The objects of the domain of a functor, as a head. """
-
-
-class In1:
-    """ The arrows of the domain of a functor, as a head. """
-
-
-class Out0:
-    """ The objects of the codomain of a functor, as a head. """
-
-
-class Out1:
-    """ The arrows of the codomain of a functor, as a head. """

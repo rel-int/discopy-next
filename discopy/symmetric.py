@@ -95,7 +95,7 @@ from typing import ClassVar, Self
 from collections.abc import Sequence
 
 from discopy import cat, monoidal, balanced, hypergraph, cmap, messages
-from discopy.pattern import In0, Obj, Tensor  # noqa: F401
+from discopy.pattern import Obj, Tensor  # noqa: F401
 from discopy.abc import (
     BraidedCategory, MonoidalCategory, SymmetricCategory, TracedCategory)
 from discopy.axioms import (
@@ -746,7 +746,7 @@ Trace, Sum, Bubble = (
 
 
 @Diagram.generator
-class Functor(balanced.Functor):
+class Functor[In0, In1, Out0, Out1](balanced.Functor):
     """
     A symmetric functor is a monoidal functor that preserves swaps.
 
