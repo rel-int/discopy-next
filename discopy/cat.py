@@ -79,16 +79,14 @@ Functors are bubble-preserving.
 
 from functools import total_ordering, cached_property
 from typing import (
-    Annotated, Any, Callable, ClassVar, Mapping, Iterable, Self,
+    Any, Callable, ClassVar, Mapping, Iterable, Self,
     TYPE_CHECKING, overload)
 
-from discopy import messages, pattern, utils
+from discopy import messages, utils
+from discopy.pattern import In0, In1, Obj, Out0, Out1  # noqa: F401
 from discopy.abc import Category, DaggerCategory, Serialisable
 from discopy.axioms import (
-    axiom, Equation as AbstractEquation, GENERATORS, Hom, no_strategy, rule,
-    Sort)
-from discopy.pattern import (
-    COD_ARROWS, COD_OBJECTS, DOM_ARROWS, DOM_OBJECTS)
+    axiom, Equation as AbstractEquation, GENERATORS, Hom, no_strategy, rule)
 from discopy.utils import (  # noqa: F401
     factory,
     Generator,
@@ -202,8 +200,8 @@ class FreeCategory(Category):
 
     @classmethod
     @rule
-    def id[A](cls, dom: Annotated[Any | None, pattern.Var(A)] = None
-              ) -> Annotated[Any, Hom(A, A)]:
+    def id[A](cls, dom: Obj[Any | None, A] = None
+              ) -> Hom[Any, A, A]:
         """The identity path on ``dom``, with no generators inside."""
         dom = cls.ob() if dom is None else dom
         return cls.ar(inside=(), dom=dom, cod=dom, _scan=False)
@@ -427,9 +425,9 @@ class Arrow(FreeCategory, DaggerCategory, Serialisable):
 
     @rule
     def then[A, B, C](
-            self: Annotated[Arrow, Hom(A, B)],
-            *others: Annotated[Arrow, Hom(B, C)]
-    ) -> Annotated[Arrow, Hom(A, C)]:
+            self: Hom[Arrow, A, B],
+            *others: Hom[Arrow, B, C]
+    ) -> Hom[Arrow, A, C]:
         """
         Sequential composition, called with :code:`>>` and :code:`<<`.
 
@@ -714,8 +712,8 @@ class Sum(Box):
     @rule
     @unbiased
     def then[A, B, C](
-            self: Annotated[Sum, Hom(A, B)],
-            other: Annotated[Arrow, Hom(B, C)]) -> Annotated[Sum, Hom(A, C)]:
+            self: Hom[Sum, A, B],
+            other: Hom[Arrow, B, C]) -> Hom[Sum, A, C]:
         other = other if isinstance(other, Sum)\
             else self.Sum((other, ))
         terms = tuple(f.then(g) for f in self.terms for g in other.terms)
@@ -870,8 +868,8 @@ class Functor(Category, Serialisable):
 
     @classmethod
     @rule
-    def id[A](cls, dom: Annotated[type | None, pattern.Var(A)] = None
-              ) -> Annotated[Functor, Hom(A, A)]:
+    def id[A](cls, dom: Obj[type | None, A] = None
+              ) -> Hom[Functor, A, A]:
         """
         The identity functor on a given category ``dom``.
 
@@ -882,9 +880,9 @@ class Functor(Category, Serialisable):
 
     @rule
     def then[A, B, C](
-            self: Annotated[Functor, Hom(A, B)],
-            other: Annotated[Functor, Hom(B, C)]
-    ) -> Annotated[Functor, Hom(A, C)]:
+            self: Hom[Functor, A, B],
+            other: Hom[Functor, B, C]
+    ) -> Hom[Functor, A, C]:
         """
         The composition of functor with another.
 
@@ -935,13 +933,11 @@ class Functor(Category, Serialisable):
             + f"(ob_map={self.ob_map}, ar_map={self.ar_map}{cod_repr})"
 
     @overload
-    def __call__(self, other: Annotated[Any, Sort(DOM_OBJECTS)]
-    ) -> Annotated[Any, Sort(COD_OBJECTS)]:
+    def __call__(self, other: Obj[Any, In0]) -> Obj[Any, Out0]:
         ...
 
     @overload
-    def __call__(self, other: Annotated[Any, Sort(DOM_ARROWS)]
-    ) -> Annotated[Any, Sort(COD_ARROWS)]:
+    def __call__(self, other: Obj[Any, In1]) -> Obj[Any, Out1]:
         ...
 
     def __call__(self, other):
@@ -1148,8 +1144,7 @@ class Transformation(Category):
 
     @classmethod
     @rule
-    def id[A](cls, dom: Annotated[Functor, pattern.Var(A)]) -> Annotated[
-            Transformation, Hom(A, A)]:
+    def id[A](cls, dom: Obj[Functor, A]) -> Hom[Transformation, A, A]:
         """
         The identity transformation on a given functor ``dom``, i.e. the
         transformation whose component at each object ``x`` is the
@@ -1171,9 +1166,9 @@ class Transformation(Category):
 
     @rule
     def then[A, B, C](
-            self: Annotated[Transformation, Hom(A, B)],
-            other: Annotated[Transformation, Hom(B, C)]
-    ) -> Annotated[Transformation, Hom(A, C)]:
+            self: Hom[Transformation, A, B],
+            other: Hom[Transformation, B, C]
+    ) -> Hom[Transformation, A, C]:
         """
         The vertical composition of a transformation with another.
 

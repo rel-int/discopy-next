@@ -38,9 +38,9 @@ The axioms of multicategories (aka operads) hold on the nose.
 from typing import TYPE_CHECKING
 
 from discopy import monoidal
-from typing import Annotated
+from discopy.pattern import Obj  # noqa: F401
 
-from discopy.axioms import Hom, no_strategy, Var, rule
+from discopy.axioms import Hom, no_strategy, rule
 from discopy.cat import factory, Functor
 from discopy.grammar import thue
 from discopy.monoidal import Ty
@@ -106,7 +106,7 @@ class Tree:
 
     @staticmethod
     @rule
-    def id[A](dom: Annotated[Ty, Var(A)]) -> Annotated[Tree, Hom(A, A)]:
+    def id[A](dom: Obj[Ty, A]) -> Hom[Tree, A, A]:
         return Id(dom)
 
     def __eq__(self, other):

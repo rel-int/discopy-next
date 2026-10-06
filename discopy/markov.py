@@ -79,10 +79,10 @@ in the same diagram they automatically satisfy the :mod:`frobenius` axioms.
 from typing import ClassVar
 
 from discopy import symmetric, monoidal, cmap, hypergraph
+from discopy.pattern import Obj, Repeat  # noqa: F401
 from discopy.abc import MarkovCategory
-from typing import Annotated
 
-from discopy.axioms import Atom, Count, Hom, Var, rule, Serialisable
+from discopy.axioms import Atom, Count, Hom, rule, Serialisable
 from discopy.cat import factory, Generator
 from discopy.monoidal import Ty  # noqa: F401  pylint: disable=unused-import
 from discopy.utils import assert_isatomic, factory_name
@@ -149,9 +149,9 @@ class Diagram(symmetric.Diagram, MarkovCategory):
     @classmethod
     @rule
     def copy[X: Atom, N: Count](
-            cls, x: Annotated[monoidal.Ty, Var(X)],
-            n: Annotated[int, Var(N)] = 2
-    ) -> Annotated[Diagram, Hom(X, Var(X) ** Var(N))]:
+            cls, x: Obj[monoidal.Ty, X],
+            n: Obj[int, N] = 2
+    ) -> Hom[Diagram, X, Repeat[X, N]]:
         """
         Make :code:`n` copies of a given type :code:`x`.
 
@@ -166,9 +166,9 @@ class Diagram(symmetric.Diagram, MarkovCategory):
     @classmethod
     @rule
     def merge[X: Atom, N: Count](
-            cls, x: Annotated[monoidal.Ty, Var(X)],
-            n: Annotated[int, Var(N)] = 2
-    ) -> Annotated[Diagram, Hom(Var(X) ** Var(N), X)]:
+            cls, x: Obj[monoidal.Ty, X],
+            n: Obj[int, N] = 2
+    ) -> Hom[Diagram, Repeat[X, N], X]:
         """
         Merge :code:`n` copies of a given type :code:`x`.
 

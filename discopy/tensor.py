@@ -59,11 +59,13 @@ indices. Swaps, cups and caps become wiring while spiders stay as boxes.
 
 from itertools import count
 from typing import (
-    TYPE_CHECKING, Annotated, Any, Callable, ClassVar, Mapping, Sequence)
+    TYPE_CHECKING, Any, Callable, ClassVar, Mapping, Sequence)
 
 from discopy import (
     cat, monoidal, rigid, frobenius, cmap, config)
-from discopy.axioms import Hom, no_strategy, Var, rule
+from discopy.pattern import Obj  # noqa: F401
+from discopy import pattern
+from discopy.axioms import Hom, no_strategy, rule
 from discopy.cat import factory, Generator, assert_iscomposable
 from discopy.frobenius import Dim, Cup
 from discopy.matrix import (  # noqa: F401  pylint: disable=unused-import
@@ -151,14 +153,14 @@ class Tensor[dtype](Matrix[dtype]):
 
     @classmethod
     @rule
-    def id[A](cls, dom: Annotated[Any, Var(A)] = Dim(1)
-              ) -> Annotated[Tensor, Hom(A, A)]:
+    def id[A](cls, dom: Obj[Any, A] = Dim(1)
+              ) -> Hom[Tensor, A, A]:
         return cls(Matrix.id(product(dom.inside)).array, dom, dom)
 
     def then[A, B, C](
-            self: Annotated[Tensor, Hom(A, B)],
-            other: Annotated[Tensor | None, Hom(B, C)] = None,
-            *others: Tensor) -> Annotated[Tensor, Hom(A, C)]:
+            self: Hom[Tensor, A, B],
+            other: Hom[Tensor | None, B, C] = None,
+            *others: Tensor) -> Hom[Tensor, A, C]:
         if other is None or others:
             return super().then(other, *others)
         assert_isinstance(other, type(self))
@@ -170,9 +172,10 @@ class Tensor[dtype](Matrix[dtype]):
         return type(self)(array, self.dom, other.cod)
 
     def tensor[A, B, C, D](
-            self: Annotated[Tensor, Hom(A, B)],
-            other: Annotated[Tensor | None, Hom(C, D)] = None,
-            *others: Tensor) -> Annotated[Tensor, Hom([A, C], [B, D])]:
+            self: Hom[Tensor, A, B],
+            other: Hom[Tensor | None, C, D] = None,
+            *others: Tensor
+    ) -> Hom[Tensor, pattern.Tensor[A, C], pattern.Tensor[B, D]]:
         if other is None or others:
             return Diagram.tensor(self, other, *others)
         assert_isinstance(other, Tensor)

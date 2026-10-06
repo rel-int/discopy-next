@@ -142,9 +142,10 @@ Parametric maps compose like layers of a neural network, e.g. over
 """
 
 from dataclasses import dataclass
-from typing import Annotated, Self
+from typing import Self
 
-from discopy.pattern import Atom, Count, Hom, Var, UNIT
+from discopy.pattern import Atom, Count, Hom
+from discopy.pattern import Obj, Tensor, Unit, L, R, Over, Under, Repeat  # noqa: F401
 from discopy.search import rule
 from discopy import (
     monoidal, symmetric, markov, closed, compact, frobenius)
@@ -218,8 +219,8 @@ class Symmetric[category: symmetric.Diagram](SymmetricCategory, NamedGeneric):
 
     @classmethod
     @rule
-    def id[A](cls, dom: Annotated[monoidal.Ty | None, Var(A)] = None
-              ) -> Annotated[Symmetric, Hom(A, A)]:
+    def id[A](cls, dom: Obj[monoidal.Ty | None, A] = None
+              ) -> Hom[Symmetric, A, A]:
         """
         The identity parametric map on `dom`, with empty parameter space.
 
@@ -230,9 +231,9 @@ class Symmetric[category: symmetric.Diagram](SymmetricCategory, NamedGeneric):
 
     @unbiased
     def then[A, B, C](
-            self: Annotated[Symmetric, Hom(A, B)],
-            other: Annotated[Symmetric, Hom(B, C)]
-    ) -> Annotated[Symmetric, Hom(A, C)]:
+            self: Hom[Symmetric, A, B],
+            other: Hom[Symmetric, B, C]
+    ) -> Hom[Symmetric, A, C]:
         """
         Sequential composition tensors the hidden spaces on both sides,
         i.e. `(p, f) >> (q, g) == (p @ q, f @ q >> g)` for empty
@@ -254,9 +255,9 @@ class Symmetric[category: symmetric.Diagram](SymmetricCategory, NamedGeneric):
 
     @unbiased
     def tensor[A, B, C, D](
-            self: Annotated[Symmetric, Hom(A, B)],
-            other: Annotated[Symmetric, Hom(C, D)]
-    ) -> Annotated[Symmetric, Hom([A, C], [B, D])]:
+            self: Hom[Symmetric, A, B],
+            other: Hom[Symmetric, C, D]
+    ) -> Hom[Symmetric, Tensor[A, C], Tensor[B, D]]:
         """
         Parallel composition tensors the hidden spaces on both sides, with
         swaps routing the parameters to the right of the domains and the
@@ -276,9 +277,9 @@ class Symmetric[category: symmetric.Diagram](SymmetricCategory, NamedGeneric):
     @classmethod
     @rule
     def swap[X: Atom, Y: Atom](
-            cls, left: Annotated[monoidal.Ty, Var(X)],
-            right: Annotated[monoidal.Ty, Var(Y)]
-    ) -> Annotated[Symmetric, Hom([X, Y], [Y, X])]:
+            cls, left: Obj[monoidal.Ty, X],
+            right: Obj[monoidal.Ty, Y]
+    ) -> Hom[Symmetric, Tensor[X, Y], Tensor[Y, X]]:
         """
         The swap of the underlying category, with empty parameter space.
 
@@ -367,9 +368,9 @@ class Markov(Symmetric, MarkovCategory):
     @classmethod
     @rule
     def copy[X: Atom, N: Count](
-            cls, x: Annotated[monoidal.Ty, Var(X)],
-            n: Annotated[int, Var(N)] = 2
-    ) -> Annotated[Markov, Hom(X, Var(X) ** Var(N))]:
+            cls, x: Obj[monoidal.Ty, X],
+            n: Obj[int, N] = 2
+    ) -> Hom[Markov, X, Repeat[X, N]]:
         """
         The copy of the underlying category, with empty parameter space.
 
@@ -390,18 +391,18 @@ class Closed(Markov, ClosedCategory):
     @classmethod
     @rule
     def ev_left[Y: Atom, E: Atom](
-            cls, base: Annotated[monoidal.Ty, Var(Y)],
-            exponent: Annotated[monoidal.Ty, Var(E)]
-    ) -> Annotated[Closed, Hom((Var(Y) << Var(E)) @ Var(E), Y)]:
+            cls, base: Obj[monoidal.Ty, Y],
+            exponent: Obj[monoidal.Ty, E]
+    ) -> Hom[Closed, Tensor[Over[Y, E], E], Y]:
         """ The left evaluation, see :meth:`ev`. """
         return cls.ev(base, exponent, left=True)
 
     @classmethod
     @rule
     def ev_right[Y: Atom, E: Atom](
-            cls, base: Annotated[monoidal.Ty, Var(Y)],
-            exponent: Annotated[monoidal.Ty, Var(E)]
-    ) -> Annotated[Closed, Hom(Var(E) @ (Var(E) >> Var(Y)), Y)]:
+            cls, base: Obj[monoidal.Ty, Y],
+            exponent: Obj[monoidal.Ty, E]
+    ) -> Hom[Closed, Tensor[E, Under[E, Y]], Y]:
         """ The right evaluation, see :meth:`ev`. """
         return cls.ev(base, exponent, left=False)
 
@@ -494,9 +495,9 @@ class Compact(Traced, CompactCategory):
     @classmethod
     @rule
     def cups[X: Atom](
-            cls, left: Annotated[monoidal.Ty, Var(X)],
-            right: Annotated[monoidal.Ty, Var(X).r]
-    ) -> Annotated[Compact, Hom(Var(X) @ Var(X).r, UNIT)]:
+            cls, left: Obj[monoidal.Ty, X],
+            right: Obj[monoidal.Ty, R[X]]
+    ) -> Hom[Compact, Tensor[X, R[X]], Unit[None]]:
         """
         The cups of the underlying category, with empty parameter space.
 
@@ -510,9 +511,9 @@ class Compact(Traced, CompactCategory):
     @classmethod
     @rule
     def caps[X: Atom](
-            cls, left: Annotated[monoidal.Ty, Var(X)],
-            right: Annotated[monoidal.Ty, Var(X).l]
-    ) -> Annotated[Compact, Hom(UNIT, Var(X) @ Var(X).l)]:
+            cls, left: Obj[monoidal.Ty, X],
+            right: Obj[monoidal.Ty, L[X]]
+    ) -> Hom[Compact, Unit[None], Tensor[X, L[X]]]:
         """
         The caps of the underlying category, with empty parameter space.
 
@@ -537,10 +538,10 @@ class Hypergraph(Compact, Markov, HypergraphCategory):
     @classmethod
     @rule
     def spiders[X: Atom, M: Count, N: Count](
-            cls, n_legs_in: Annotated[int, Var(M)],
-            n_legs_out: Annotated[int, Var(N)],
-            typ: Annotated[monoidal.Ty, Var(X)]
-    ) -> Annotated[Hypergraph, Hom(Var(X) ** Var(M), Var(X) ** Var(N))]:
+            cls, n_legs_in: Obj[int, M],
+            n_legs_out: Obj[int, N],
+            typ: Obj[monoidal.Ty, X]
+    ) -> Hom[Hypergraph, Repeat[X, M], Repeat[X, N]]:
         """
         The spiders of the underlying category, with empty parameters.
 

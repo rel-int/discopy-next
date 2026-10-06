@@ -42,6 +42,8 @@ Channel([0.5+0.j, 0.5+0.j, 0.5+0.j, 0.5+0.j], dom=CQ(), cod=Q(Dim(2)))
 """
 
 from discopy import frobenius, tensor
+from discopy.pattern import Obj  # noqa: F401
+from discopy import pattern
 from discopy.abc import ColouredMonoid
 from discopy.cat import factory
 from discopy.frobenius import Ty, Diagram, Box
@@ -51,9 +53,8 @@ from discopy.quantum.circuit import (
 from discopy.quantum.gates import Discard, Measure, MixedState, Encode, Scalar
 from discopy.tensor import Dim, Tensor
 from discopy.utils import assert_isinstance
-from typing import Annotated
 
-from discopy.pattern import Hom, Var
+from discopy.pattern import Hom
 from discopy.search import rule
 
 
@@ -174,17 +175,17 @@ class Channel(Tensor):
 
     @classmethod
     @rule
-    def id[A](cls, dom: Annotated[CQ, Var(A)] = CQ()
-              ) -> Annotated[Channel, Hom(A, A)]:
+    def id[A](cls, dom: Obj[CQ, A] = CQ()
+              ) -> Hom[Channel, A, A]:
         assert_isinstance(dom, CQ)
         return cls(Tensor[
             cls.dtype].id(dom.to_dim()).array,  # ty: ignore[invalid-type-form]
             dom, dom)
 
     def then[A, B, C](
-            self: Annotated[Channel, Hom(A, B)],
-            other: Annotated[Channel | None, Hom(B, C)] = None,
-            *others: Channel) -> Annotated[Channel, Hom(A, C)]:
+            self: Hom[Channel, A, B],
+            other: Hom[Channel | None, B, C] = None,
+            *others: Channel) -> Hom[Channel, A, C]:
         if other is None or others:
             return super().then(
                 other, *others)  # ty: ignore[invalid-return-type]
@@ -196,9 +197,10 @@ class Channel(Tensor):
         return type(self)(self.to_tensor().dagger().array, self.cod, self.dom)
 
     def tensor[A, B, C, D](
-            self: Annotated[Channel, Hom(A, B)],
-            other: Annotated[Channel | None, Hom(C, D)] = None,
-            *others: Channel) -> Annotated[Channel, Hom([A, C], [B, D])]:
+            self: Hom[Channel, A, B],
+            other: Hom[Channel | None, C, D] = None,
+            *others: Channel
+    ) -> Hom[Channel, pattern.Tensor[A, C], pattern.Tensor[B, D]]:
         if other is None or others:
             return super().tensor(
                 other, *others)  # ty: ignore[invalid-return-type]

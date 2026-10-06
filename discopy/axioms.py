@@ -254,8 +254,10 @@ from functools import wraps
 from typing import TYPE_CHECKING, Self
 
 from discopy.pattern import (  # noqa: F401  pylint: disable=unused-import
-    Atom, Count, D, Declaration, declarations, Hom, L, Over, R,
-    Repeat, Sort, Tensor, Under, Unit, UNIT, Var)
+    Atom, Count, D, Hom, In0, In1, L, Obj, Out0, Out1, Over, R, Repeat,
+    Tensor, Under, Unit)
+from discopy.sequent import (  # noqa: F401  pylint: disable=unused-import
+    Declaration, declarations, Sort)
 from discopy.search import (  # noqa: F401  pylint: disable=unused-import
     Constant,
     Rule,
@@ -502,7 +504,7 @@ until it implements its own.
 @dataclass(repr=False)
 class Axiom[**P, T](Declaration[P, T]):
     """
-    An axiom of a category: a :class:`discopy.pattern.Declaration` with no
+    An axiom of a category: a :class:`discopy.sequent.Declaration` with no
     conclusion, whose premises are the arguments of a property test. The
     axiom is a classmethod of the category it is bound to, implicitly:
     its first parameter is the category and the remaining ones are

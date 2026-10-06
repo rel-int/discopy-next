@@ -84,9 +84,10 @@ from inspect import signature
 from typing import Callable, ClassVar, Self, overload
 
 from discopy import monoidal, cmap
-from typing import Annotated
+from discopy import pattern
+from discopy.pattern import Obj, Tensor  # noqa: F401
 
-from discopy.axioms import Atom, Hom, no_strategy, Var, rule, Serialisable
+from discopy.axioms import Atom, Hom, no_strategy, rule, Serialisable
 from discopy.abc import BiclosedCategory, DaggerCategory, ResiduatedMonoid
 from discopy.drawing import Drawing
 from discopy.cat import factory, Generator
@@ -340,16 +341,16 @@ class Diagram(monoidal.Diagram, BiclosedCategory):
     @classmethod
     @rule
     def ev_left[Y: Atom, E: Atom](
-            cls, base: Annotated[Ty, Var(Y)], exponent: Annotated[Ty, Var(E)]
-    ) -> Annotated[Diagram, Hom((Var(Y) << Var(E)) @ Var(E), Y)]:
+            cls, base: Obj[Ty, Y], exponent: Obj[Ty, E]
+    ) -> Hom[Diagram, Tensor[pattern.Over[Y, E], E], Y]:
         """ The left evaluation, see :meth:`ev`. """
         return cls.ev(base, exponent, left=True)
 
     @classmethod
     @rule
     def ev_right[Y: Atom, E: Atom](
-            cls, base: Annotated[Ty, Var(Y)], exponent: Annotated[Ty, Var(E)]
-    ) -> Annotated[Diagram, Hom(Var(E) @ (Var(E) >> Var(Y)), Y)]:
+            cls, base: Obj[Ty, Y], exponent: Obj[Ty, E]
+    ) -> Hom[Diagram, Tensor[E, pattern.Under[E, Y]], Y]:
         """ The right evaluation, see :meth:`ev`. """
         return cls.ev(base, exponent, left=False)
 

@@ -153,10 +153,10 @@ from collections.abc import Callable
 from typing import Any, ClassVar, Iterator, Self
 
 from discopy import cat, monoidal, biclosed, messages
+from discopy.pattern import Obj, Tensor, Unit, L, R  # noqa: F401
 from discopy.abc import DaggerCategory, Pregroup, RigidCategory
-from typing import Annotated
 
-from discopy.axioms import Atom, GENERATORS, Hom, Var, rule, Serialisable, UNIT
+from discopy.axioms import Atom, GENERATORS, Hom, rule, Serialisable
 from discopy.cat import factory, Generator
 from discopy.utils import (
     deprecated_alias,
@@ -434,8 +434,8 @@ class Diagram(biclosed.Diagram, RigidCategory):
     @classmethod
     @rule
     def cups[X: Atom](
-            cls, left: Annotated[Ty, Var(X)], right: Annotated[Ty, Var(X).r]
-    ) -> Annotated[Diagram, Hom(Var(X) @ Var(X).r, UNIT)]:
+            cls, left: Obj[Ty, X], right: Obj[Ty, R[X]]
+    ) -> Hom[Diagram, Tensor[X, R[X]], Unit[None]]:
         """
         Construct a diagram of nested cups for types ``left`` and ``right``.
 
@@ -457,8 +457,8 @@ class Diagram(biclosed.Diagram, RigidCategory):
     @classmethod
     @rule
     def caps[X: Atom](
-            cls, left: Annotated[Ty, Var(X)], right: Annotated[Ty, Var(X).l]
-    ) -> Annotated[Diagram, Hom(UNIT, Var(X) @ Var(X).l)]:
+            cls, left: Obj[Ty, X], right: Obj[Ty, L[X]]
+    ) -> Hom[Diagram, Unit[None], Tensor[X, L[X]]]:
         """
         Construct a diagram of nested caps for types ``left`` and ``right``.
 

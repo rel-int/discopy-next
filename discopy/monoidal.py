@@ -61,14 +61,15 @@ from dataclasses import dataclass, field
 from functools import cached_property
 from warnings import warn
 from typing import (
-    Annotated, Any, ClassVar, Iterable, Iterator, Callable, Self, Sequence,
+    Any, ClassVar, Iterable, Iterator, Callable, Self, Sequence,
     TYPE_CHECKING)
 
 from discopy import abc, cat, drawing, hypergraph, cmap, messages
+from discopy.pattern import Obj, Tensor  # noqa: F401
 from discopy.abc import (
     ColouredMonoid, Monoid, MonoidalCategory, NamedGeneric)
 from discopy.axioms import (
-    axiom, Equation as AbstractEquation, GENERATORS, Hom, no_strategy, Var,
+    axiom, Equation as AbstractEquation, GENERATORS, Hom, no_strategy,
     rule, search, Serialisable)
 from discopy.drawing import Drawing
 from discopy.config import (
@@ -1154,9 +1155,9 @@ class Diagram(cat.Arrow, MonoidalCategory, RichDisplay):
 
     @rule
     def tensor[A, B, C, D](
-            self: Annotated[Diagram, Hom(A, B)],
-            other: Annotated[Diagram | None, Hom(C, D)] = None,
-            *others: Diagram) -> Annotated[Diagram, Hom([A, C], [B, D])]:
+            self: Hom[Diagram, A, B],
+            other: Hom[Diagram | None, C, D] = None,
+            *others: Diagram) -> Hom[Diagram, Tensor[A, C], Tensor[B, D]]:
         """
         Parallel composition, called using :code:`@`.
 
@@ -1623,7 +1624,7 @@ class Diagram(cat.Arrow, MonoidalCategory, RichDisplay):
         return AbstractEquation(functor(f), functor(top) >> functor(bottom))
 
     @axiom
-    def hypergraph_identity[X](cls, x: Annotated[Ty, Var(X)]):
+    def hypergraph_identity[X](cls, x: Obj[Ty, X]):
         """ The encoding preserves identities. """
         functor = cls.hypergraph_equivalence()
         return AbstractEquation(functor(cls.id(x)), functor.cod.id(x))
@@ -1688,7 +1689,7 @@ class Diagram(cat.Arrow, MonoidalCategory, RichDisplay):
         return cls.Equation(f.foliation(), f, up_to=cls.to_hypergraph)
 
     @axiom
-    def drawing_identity[X](cls, x: Annotated[Ty, Var(X)]):
+    def drawing_identity[X](cls, x: Obj[Ty, X]):
         """
         :meth:`to_drawing` preserves identities on the nose. It does not
         preserve composition or whiskering on the nose, since the layout
@@ -1886,9 +1887,9 @@ class Sum(cat.Sum, Box):
 
     @rule
     def tensor[A, B, C, D](
-            self: Annotated[Sum, Hom(A, B)],
-            other: Annotated[Diagram | None, Hom(C, D)] = None, *others
-    ) -> Annotated[Sum, Hom([A, C], [B, D])]:
+            self: Hom[Sum, A, B],
+            other: Hom[Diagram | None, C, D] = None, *others
+    ) -> Hom[Sum, Tensor[A, C], Tensor[B, D]]:
         if other is None or others:
             return Diagram.tensor(self, other, *others)
         other = other if isinstance(other, Sum)\
@@ -2051,15 +2052,15 @@ class Functor(cat.Functor):
 
     @classmethod
     @rule
-    def id[A](cls, dom: Annotated[type | None, Var(A)] = None
-              ) -> Annotated[Any, Hom(A, A)]:
+    def id[A](cls, dom: Obj[type | None, A] = None
+              ) -> Hom[Any, A, A]:
         return cls(lambda x: x, lambda f: f, dom=dom, cod=dom)
 
     @rule
     def then[A, B, C](
-            self: Annotated[Functor, Hom(A, B)],
-            other: Annotated[Functor, Hom(B, C)]
-    ) -> Annotated[Functor, Hom(A, C)]:
+            self: Hom[Functor, A, B],
+            other: Hom[Functor, B, C]
+    ) -> Hom[Functor, A, C]:
         assert_isinstance(other, Functor)
         assert_iscomposable(self, other)
         return type(self)(

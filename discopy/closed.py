@@ -58,9 +58,10 @@ from dataclasses import dataclass
 from typing import ClassVar, Dict
 
 from discopy import cat, monoidal, biclosed, markov, cmap, hypergraph
-from typing import Annotated
+from discopy import pattern
+from discopy.pattern import Obj, Tensor  # noqa: F401
 
-from discopy.axioms import Atom, Hom, Var
+from discopy.axioms import Atom, Hom
 from discopy.search import rule
 from discopy.abc import ClosedCategory
 from discopy.cat import factory, Generator
@@ -136,16 +137,16 @@ class Diagram(markov.Diagram, biclosed.Diagram, ClosedCategory):
     @classmethod
     @rule
     def ev_left[Y: Atom, E: Atom](
-            cls, base: Annotated[Ty, Var(Y)], exponent: Annotated[Ty, Var(E)]
-    ) -> Annotated[Diagram, Hom((Var(Y) << Var(E)) @ Var(E), Y)]:
+            cls, base: Obj[Ty, Y], exponent: Obj[Ty, E]
+    ) -> Hom[Diagram, Tensor[pattern.Over[Y, E], E], Y]:
         """ The left evaluation, see :meth:`ev`. """
         return cls.ev(base, exponent, left=True)
 
     @classmethod
     @rule
     def ev_right[Y: Atom, E: Atom](
-            cls, base: Annotated[Ty, Var(Y)], exponent: Annotated[Ty, Var(E)]
-    ) -> Annotated[Diagram, Hom(Var(E) @ (Var(E) >> Var(Y)), Y)]:
+            cls, base: Obj[Ty, Y], exponent: Obj[Ty, E]
+    ) -> Hom[Diagram, Tensor[E, pattern.Under[E, Y]], Y]:
         """ The right evaluation, see :meth:`ev`. """
         return cls.ev(base, exponent, left=False)
 

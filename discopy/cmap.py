@@ -44,9 +44,10 @@ from functools import cached_property, reduce
 from inspect import isclass
 from io import BytesIO
 from math import inf, lcm
-from typing import TYPE_CHECKING, Annotated, Any, ClassVar, Literal, Self
+from typing import TYPE_CHECKING, Any, ClassVar, Literal, Self
 
-from discopy import hypergraph, messages, pattern
+from discopy import hypergraph, messages
+from discopy.pattern import Obj, Tensor, Unit, L, R, Over, Under  # noqa: F401
 from discopy.abc import (
     CompactCategory,
     DaggerCategory,
@@ -58,7 +59,7 @@ from discopy.abc import (
 )
 from discopy.cat import Ob
 from discopy.python.finset import Permutation
-from discopy.pattern import Atom, Hom, UNIT
+from discopy.pattern import Atom, Hom
 from discopy.search import rule
 from discopy.utils import (
     AxiomError,
@@ -775,8 +776,8 @@ class CMap[category: Diagram](CompactCategory, DaggerCategory,
 
     @classmethod
     @rule
-    def id[A](cls, dom: Annotated[Any | None, pattern.Var(A)] = None
-              ) -> Annotated[CMap, Hom(A, A)]:
+    def id[A](cls, dom: Obj[Any | None, A] = None
+              ) -> Hom[CMap, A, A]:
         """ The identity map, with each input wired to its output. """
         dom = cls.ob() if dom is None else dom
         n_ports = 2 * len(dom)
@@ -914,9 +915,8 @@ class CMap[category: Diagram](CompactCategory, DaggerCategory,
     @classmethod
     @rule
     def swap[X: Atom, Y: Atom](
-            cls, left: Annotated[Any, pattern.Var(X)],
-            right: Annotated[Any, pattern.Var(Y)]) -> Annotated[CMap,
-    Hom([X, Y], [Y, X])]:
+            cls, left: Obj[Any, X],
+            right: Obj[Any, Y]) -> Hom[CMap, Tensor[X, Y], Tensor[Y, X]]:
         """ The symmetry encoded as boundary wiring. """
         dom, cod = left @ right, right @ left
         left_len, right_len = len(left), len(right)
@@ -937,9 +937,9 @@ class CMap[category: Diagram](CompactCategory, DaggerCategory,
     @classmethod
     @rule
     def cups[X: Atom](
-            cls, left: Annotated[Any, pattern.Var(X)],
-            right: Annotated[Any, pattern.Var(X).r]
-    ) -> Annotated[CMap, Hom(pattern.Var(X) @ pattern.Var(X).r, UNIT)]:
+            cls, left: Obj[Any, X],
+            right: Obj[Any, R[X]]
+    ) -> Hom[CMap, Tensor[X, R[X]], Unit[None]]:
         """ A cup encoded as boundary wiring between adjoint types. """
         assert_isinstance(left, Pregroup)
         assert_isinstance(right, Pregroup)
@@ -953,9 +953,9 @@ class CMap[category: Diagram](CompactCategory, DaggerCategory,
     @classmethod
     @rule
     def caps[X: Atom](
-            cls, left: Annotated[Any, pattern.Var(X)],
-            right: Annotated[Any, pattern.Var(X).l]
-    ) -> Annotated[CMap, Hom(UNIT, pattern.Var(X) @ pattern.Var(X).l)]:
+            cls, left: Obj[Any, X],
+            right: Obj[Any, L[X]]
+    ) -> Hom[CMap, Unit[None], Tensor[X, L[X]]]:
         """ A cap encoded as boundary wiring between adjoint types. """
         assert_isinstance(left, Pregroup)
         assert_isinstance(right, Pregroup)
@@ -984,18 +984,16 @@ class CMap[category: Diagram](CompactCategory, DaggerCategory,
     @classmethod
     @rule
     def ev_left[Y: Atom, E: Atom](
-            cls, base: Annotated[Any, pattern.Var(Y)],
-            exponent: Annotated[Any, pattern.Var(E)]) -> Annotated[CMap,
-    Hom((pattern.Var(Y) << pattern.Var(E)) @ pattern.Var(E), Y)]:
+            cls, base: Obj[Any, Y],
+            exponent: Obj[Any, E]) -> Hom[CMap, Tensor[Over[Y, E], E], Y]:
         """ The left evaluation, see :meth:`ev`. """
         return cls.ev(base, exponent, left=True)
 
     @classmethod
     @rule
     def ev_right[Y: Atom, E: Atom](
-            cls, base: Annotated[Any, pattern.Var(Y)],
-            exponent: Annotated[Any, pattern.Var(E)]) -> Annotated[CMap,
-    Hom(pattern.Var(E) @ (pattern.Var(E) >> pattern.Var(Y)), Y)]:
+            cls, base: Obj[Any, Y],
+            exponent: Obj[Any, E]) -> Hom[CMap, Tensor[E, Under[E, Y]], Y]:
         """ The right evaluation, see :meth:`ev`. """
         return cls.ev(base, exponent, left=False)
 
@@ -1099,8 +1097,8 @@ class CMap[category: Diagram](CompactCategory, DaggerCategory,
     @rule
     @unbiased
     def then[A, B, C](
-            self: Annotated[CMap, Hom(A, B)],
-            other: Annotated[CMap, Hom(B, C)]) -> Annotated[CMap, Hom(A, C)]:
+            self: Hom[CMap, A, B],
+            other: Hom[CMap, B, C]) -> Hom[CMap, A, C]:
         """
         Compose maps by gluing output ports to input ports.
 
@@ -1166,9 +1164,8 @@ class CMap[category: Diagram](CompactCategory, DaggerCategory,
     @rule
     @unbiased
     def tensor[A, B, C, D](
-            self: Annotated[CMap, Hom(A, B)],
-            other: Annotated[CMap, Hom(C, D)]) -> Annotated[CMap,
-    Hom([A, C], [B, D])]:
+            self: Hom[CMap, A, B],
+            other: Hom[CMap, C, D]) -> Hom[CMap, Tensor[A, C], Tensor[B, D]]:
         """ Tensor product given by disjoint union of the two maps. """
         dom, cod = self.dom @ other.dom, self.cod @ other.cod
         boxes = self.boxes + other.boxes

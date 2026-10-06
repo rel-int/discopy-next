@@ -125,9 +125,9 @@ from functools import cached_property
 import numpy as np
 
 from discopy import monoidal, ribbon, tensor, frobenius
-from typing import Annotated
+from discopy.pattern import Obj, Tensor, Unit, L, R  # noqa: F401
 
-from discopy.axioms import Atom, Hom, no_strategy, Var, rule, UNIT
+from discopy.axioms import Atom, Hom, no_strategy, rule
 from discopy.tensor import Dim, Box, Id
 from discopy.abc import RibbonCategory, NamedGeneric
 from discopy.utils import (
@@ -909,9 +909,9 @@ class Intertwiner[algebra](tensor.Diagram, RibbonCategory):
     @classmethod
     @rule
     def braid[X: Atom, Y: Atom](
-            cls, left: Annotated[Representation, Var(X)],
-            right: Annotated[Representation, Var(Y)], is_dagger=False
-    ) -> Annotated[Intertwiner, Hom([X, Y], [Y, X])]:
+            cls, left: Obj[Representation, X],
+            right: Obj[Representation, Y], is_dagger=False
+    ) -> Hom[Intertwiner, Tensor[X, Y], Tensor[Y, X]]:
         """
         The braiding :math:`V \\otimes W \\to W \\otimes V` (its inverse
         :math:`R^{-1} = (S \\otimes 1) R` when ``is_dagger``): the R-matrix
@@ -956,9 +956,9 @@ class Intertwiner[algebra](tensor.Diagram, RibbonCategory):
     @classmethod
     @rule
     def cups[X: Atom](
-            cls, left: Annotated[Representation, Var(X)],
-            right: Annotated[Representation, Var(X).r]
-    ) -> Annotated[Intertwiner, Hom(Var(X) @ Var(X).r, UNIT)]:
+            cls, left: Obj[Representation, X],
+            right: Obj[Representation, R[X]]
+    ) -> Hom[Intertwiner, Tensor[X, R[X]], Unit[None]]:
         """
         The evaluation of a module against its dual. When ``right`` is the
         right dual of ``left`` — read off the ``action`` of the two
@@ -983,9 +983,9 @@ class Intertwiner[algebra](tensor.Diagram, RibbonCategory):
     @classmethod
     @rule
     def caps[X: Atom](
-            cls, left: Annotated[Representation, Var(X)],
-            right: Annotated[Representation, Var(X).l]
-    ) -> Annotated[Intertwiner, Hom(UNIT, Var(X) @ Var(X).l)]:
+            cls, left: Obj[Representation, X],
+            right: Obj[Representation, L[X]]
+    ) -> Hom[Intertwiner, Unit[None], Tensor[X, L[X]]]:
         """
         The coevaluation of a module against its dual. When ``right`` is
         the right dual of ``left`` this is the plain copairing; a dual

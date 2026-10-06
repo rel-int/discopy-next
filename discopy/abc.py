@@ -66,24 +66,14 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from types import NoneType
 from typing import (
-    Annotated, ClassVar, Literal, Self, TYPE_CHECKING, overload)
+    ClassVar, Literal, Self, TYPE_CHECKING, overload)
 
 from discopy.axioms import (  # noqa: F401  pylint: disable=unused-import
-    Atom, Axiom, axiom, Count, D, declarations, Equation, L, Over, R,
-    Repeat, Rule, rule, Serialisable, Tensor, Testable, Under, Unit)
+    Axiom, axiom, declarations, Equation, Rule, rule, Serialisable, Testable)
+from discopy.pattern import (  # noqa: F401  pylint: disable=unused-import
+    Atom, Count, D, Hom, L, Obj, Over, R, Repeat, Tensor, Under, Unit)
 from discopy.utils import (  # noqa: F401  pylint: disable=unused-import
     NamedGeneric, classproperty, factory_name)
-
-type Obj[Coarse, Fine = None] = Annotated[Coarse, Fine]
-""" The premise ``x: Obj[T, p]`` of a pattern ``p`` beside its coarse
-type, ``Obj[C0]`` in a bound the sort of an object variable, expanded
-by :func:`discopy.pattern.expand` and read as ``Annotated`` by a
-typechecker. """
-
-type Hom[Coarse, Dom, Cod] = Annotated[Coarse, Dom, Cod]
-""" The premise or conclusion ``Hom[C1, dom, cod]`` of a morphism
-between two sides, expanded by :func:`discopy.pattern.expand` and
-read as ``Annotated`` by a typechecker. """
 
 
 class Category[C0, C1: Category](Testable, ABC):

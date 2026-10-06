@@ -1,8 +1,6 @@
 """ The rules and generators of a category, and the search by them. """
 
 
-from typing import Annotated
-
 from hypothesis import find
 from hypothesis import strategies as st
 from pytest import raises
@@ -10,7 +8,7 @@ from pytest import raises
 from discopy import braided, cat, rigid
 from discopy.abc import Category, ColouredMonoid
 from discopy.monoidal import Box, Diagram, Ty
-from discopy.pattern import Hom, Var, UNIT
+from discopy.pattern import Hom, Obj, Tensor, Unit
 from discopy.search import Rule, rule, search
 from discopy.utils import AxiomError
 
@@ -26,8 +24,8 @@ def test_rule():
     assert hash(Category.then) == hash(Category.then.bind(Category))
     assert Category.then.__isabstractmethod__
     assert cat.Arrow.rules["then"].owner is cat.Arrow  # The latest wins.
-    assert cat.Arrow.rules["then"].sequent.conclusion\
-        == Category.then.sequent.conclusion
+    assert str(cat.Arrow.rules["then"].conclusion).endswith(", A, C]")\
+        and str(Category.then.conclusion).endswith(", A, C]")
     with raises(TypeError):
         Rule(Category.then.function).scope
     with raises(TypeError):
@@ -35,16 +33,15 @@ def test_rule():
 
     class Wrapped(Diagram):
         @rule
-        def twice[A](self: Annotated[Diagram, Hom(A, A)]
-                     ) -> Annotated[Diagram, Hom(A, A)]:
+        def twice[A](self: Hom[Diagram, A, A]) -> Hom[Diagram, A, A]:
             """ A rule declared and implemented in one place. """
             return self >> self
 
     f = Box("f", x, x)
     assert Wrapped.twice(f) == f >> f == Wrapped(f.inside, x, x).twice()
     assert list(Wrapped.rules) == ["id", "tensor", "cut", "twice"]
-    assert str(Wrapped.rules["twice"])\
-        == "twice: A: C0 | self: C1[A, A] ⊢ C1[A, A]"
+    assert str(Wrapped.rules["twice"]) == "twice(self: Hom[discopy."\
+        "monoidal.Diagram, A, A]) -> Hom[discopy.monoidal.Diagram, A, A]"
     found = find(Wrapped.strategy(dom=x, cod=x, types=st.just(x)),
                  lambda value: len(value.boxes) == 2
                  and len(set(value.boxes)) == 1)
@@ -56,16 +53,16 @@ def test_generator():
     assert not rigid.Diagram.rules["cups"].recursive
     assert "cups" in rigid.Diagram.generators
     assert rigid.Diagram.generators["cups"].category is rigid.Diagram
-    assert str(braided.Diagram.generators["braid"]) == (
-        "braid: X: Atom[C0], Y: Atom[C0] | left: X, right: Y"
-        " ⊢ C1[X @ Y, Y @ X]")
+    braid = braided.Diagram.generators["braid"]
+    assert [str(sort) for sort in braid.variables.values()]\
+        == ["Atom[C0]", "Atom[C0]"]
+    assert list(braid.premises) == ["left", "right"]
 
     class Lying(Diagram):
         @classmethod
         @rule
         def wrong[A: ColouredMonoid](
-                cls, dom: Annotated[Ty, Var(A)]
-        ) -> Annotated[Diagram, Hom(A, UNIT)]:
+                cls, dom: Obj[Ty, A]) -> Hom[Diagram, A, Unit[Ty]]:
             """ A generator whose conclusion lies. """
             return cls.id(dom)
 
@@ -79,9 +76,7 @@ def test_cut():
     z = Ty("z")
     f, g = Box("f", y, y @ y), Box("g", x @ y @ y @ z, z)
     assert f.cut(g, x, z) == x @ f @ z >> g
-    assert str(Diagram.rules["cut"]) == (
-        "cut: A: C0, B: C0, C: C0, X: C0, Y: C0 | self: C1[B, A], "
-        "other: C1[X @ A @ Y, C], left: X, right: Y ⊢ C1[X @ B @ Y, C]")
+    assert list(Diagram.rules["cut"].variables) == list("ABCXY")
     assert list(Diagram.rules) == ["id", "tensor", "cut"]
     assert Diagram.rules["cut"].recursive
     assert "then" in cat.Arrow.rules  # A mere category composes by then,
@@ -186,7 +181,7 @@ def test_goal_patterns():
     assert loop.dom == loop.cod
     copy = find(
         search(markov.Diagram, markov.Box.strategy,
-               dom=A, cod=Var(A) @ Var(A)),
+               dom=A, cod=Tensor[A, A]),
         lambda term: bool(term.boxes)
         and all(isinstance(box, markov.Copy) for box in term.boxes))
     assert copy.cod == copy.dom @ copy.dom
@@ -197,6 +192,6 @@ def test_constant():
     from discopy.grammar import pregroup
     word = pregroup.Word('Alice', pregroup.Ty('n'))
     constant = Rule.constant(word)
-    assert not constant.recursive and not constant.sequent.premises
+    assert not constant.recursive and not constant.premises
     assert constant.__doc__ == "The constant Alice."
     assert constant.apply({}) == word

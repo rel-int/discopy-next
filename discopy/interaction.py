@@ -62,7 +62,7 @@ Example
     :align: center
 """
 
-from typing import Annotated, Sequence
+from typing import Sequence
 from dataclasses import dataclass
 from functools import wraps
 
@@ -74,10 +74,11 @@ from discopy import (
     ribbon,
     messages
 )
+from discopy.pattern import Obj, Tensor, Unit, L, R  # noqa: F401
 from discopy.abc import Pregroup, RibbonCategory, TracedCategory, NamedGeneric
 from discopy.cat import assert_iscomposable
 from discopy.python import finset
-from discopy.pattern import Atom, Hom, Var, UNIT
+from discopy.pattern import Atom, Hom
 from discopy.search import rule
 from discopy.utils import (
     factory, Generator, classproperty, unbiased, assert_isinstance,
@@ -205,9 +206,9 @@ class Diagram[natural](RibbonCategory, NamedGeneric):
 
     @unbiased
     def then[A, B, C](
-            self: Annotated[Diagram, Hom(A, B)],
-            other: Annotated[Diagram, Hom(B, C)]
-    ) -> Annotated[Diagram, Hom(A, C)]:
+            self: Hom[Diagram, A, B],
+            other: Hom[Diagram, B, C]
+    ) -> Hom[Diagram, A, C]:
         """
         The composition of two integer diagrams.
 
@@ -262,8 +263,8 @@ class Diagram[natural](RibbonCategory, NamedGeneric):
 
     @classmethod
     @rule
-    def id[A](cls, dom: Annotated[Ty | None, Var(A)] = None
-              ) -> Annotated[Diagram, Hom(A, A)]:
+    def id[A](cls, dom: Obj[Ty | None, A] = None
+              ) -> Hom[Diagram, A, A]:
         """
         The identity on an integer type.
 
@@ -296,9 +297,9 @@ class Diagram[natural](RibbonCategory, NamedGeneric):
 
     @unbiased
     def tensor[A, B, C, D](
-            self: Annotated[Diagram, Hom(A, B)],
-            other: Annotated[Diagram, Hom(C, D)]
-    ) -> Annotated[Diagram, Hom([A, C], [B, D])]:
+            self: Hom[Diagram, A, B],
+            other: Hom[Diagram, C, D]
+    ) -> Hom[Diagram, Tensor[A, C], Tensor[B, D]]:
         """
         The tensor of two integer diagrams.
 
@@ -331,8 +332,8 @@ class Diagram[natural](RibbonCategory, NamedGeneric):
     @classmethod
     @rule
     def braid[X: Atom, Y: Atom](
-            cls, left: Annotated[Ty, Var(X)], right: Annotated[Ty, Var(Y)]
-    ) -> Annotated[Diagram, Hom([X, Y], [Y, X])]:
+            cls, left: Obj[Ty, X], right: Obj[Ty, Y]
+    ) -> Hom[Diagram, Tensor[X, Y], Tensor[Y, X]]:
         """
         The braid of integer diagrams is given by the following diagram:
 
@@ -376,8 +377,8 @@ class Diagram[natural](RibbonCategory, NamedGeneric):
     @classmethod
     @rule
     def cups[X: Atom](
-            cls, left: Annotated[Ty, Var(X)], right: Annotated[Ty, Var(X).r]
-    ) -> Annotated[Diagram, Hom(Var(X) @ Var(X).r, UNIT)]:
+            cls, left: Obj[Ty, X], right: Obj[Ty, R[X]]
+    ) -> Hom[Diagram, Tensor[X, R[X]], Unit[None]]:
         """
         The integer cups are given by natural identities.
 
@@ -409,8 +410,8 @@ class Diagram[natural](RibbonCategory, NamedGeneric):
     @classmethod
     @rule
     def caps[X: Atom](
-            cls, left: Annotated[Ty, Var(X)], right: Annotated[Ty, Var(X).l]
-    ) -> Annotated[Diagram, Hom(UNIT, Var(X) @ Var(X).l)]:
+            cls, left: Obj[Ty, X], right: Obj[Ty, L[X]]
+    ) -> Hom[Diagram, Unit[None], Tensor[X, L[X]]]:
         """
         The integer caps are given by natural identities.
 

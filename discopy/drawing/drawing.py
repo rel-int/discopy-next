@@ -196,17 +196,18 @@ Coloured regions are also checked as part of the gallery:
 """
 
 
-from typing import Annotated, Any, NamedTuple, TYPE_CHECKING, Sequence
+from typing import Any, NamedTuple, TYPE_CHECKING, Sequence
 from dataclasses import dataclass
 from functools import cached_property
 
 import networkx as nx
 
 from discopy.drawing import backend, Node, Point
+from discopy.pattern import Obj, Tensor  # noqa: F401
 from discopy.config import BOX_DRAWING_ATTRIBUTES, TRANSPARENT
 from discopy.abc import TracedCategory
 from discopy.python import finset
-from discopy.pattern import Hom, Var
+from discopy.pattern import Hom
 from discopy.search import rule
 from discopy.utils import (
     assert_isinstance, assert_iscomposable, unbiased, factory, RichDisplay)
@@ -745,8 +746,8 @@ class Drawing(TracedCategory, RichDisplay):
 
     @staticmethod
     @rule
-    def id[A](dom: Annotated[Any | None, Var(A)] = None
-              ) -> Annotated[Drawing, Hom(A, A)]:
+    def id[A](dom: Obj[Any | None, A] = None
+              ) -> Hom[Drawing, A, A]:
         """
         Draw the identity diagram.
 
@@ -786,10 +787,10 @@ class Drawing(TracedCategory, RichDisplay):
 
     @unbiased
     def then[A, B, C](
-            self: Annotated[Drawing, Hom(A, B)],
-            other: Annotated[Drawing, Hom(B, C)],
+            self: Hom[Drawing, A, B],
+            other: Hom[Drawing, B, C],
             draw_step_by_step=False
-    ) -> Annotated[Drawing | list[Drawing], Hom(A, C)]:
+    ) -> Hom[Drawing | list[Drawing], A, C]:
         """
         Draw one diagram composed with another.
 
@@ -897,9 +898,9 @@ class Drawing(TracedCategory, RichDisplay):
 
     @unbiased
     def tensor[A, B, C, D](
-            self: Annotated[Drawing, Hom(A, B)],
-            other: Annotated[Drawing, Hom(C, D)]) -> Annotated[Drawing,
-                   Hom([A, C], [B, D])]:
+            self: Hom[Drawing, A, B],
+            other: Hom[Drawing, C, D]
+    ) -> Hom[Drawing, Tensor[A, C], Tensor[B, D]]:
         """
         Draw two diagrams side by side.
 

@@ -159,14 +159,15 @@ Note that we can only check equality of streams up to a finite number of steps.
 
 See :mod:`discopy.feedback` for the other axioms for feedback categories.
 """
-from typing import Annotated, Optional
+from typing import Optional
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 
 from discopy import symmetric
+from discopy.pattern import Obj, Tensor  # noqa: F401
 from discopy.abc import MonoidalCategory, NamedGeneric
 from discopy.python import finset
-from discopy.pattern import Hom, Var
+from discopy.pattern import Hom
 from discopy.abc import ColouredMonoid
 from discopy.search import rule
 from discopy.utils import (
@@ -471,8 +472,8 @@ class Stream[category](MonoidalCategory, NamedGeneric):
 
     @classmethod
     @rule
-    def id[A](cls, x: Annotated[Optional[Ty], Var(A)] = None
-              ) -> Annotated[Stream, Hom(A, A)]:
+    def id[A](cls, x: Obj[Optional[Ty], A] = None
+              ) -> Hom[Stream, A, A]:
         """
         Construct a stream of identity arrows.
 
@@ -490,9 +491,9 @@ class Stream[category](MonoidalCategory, NamedGeneric):
 
     @unbiased
     def then[A, B, C](
-            self: Annotated[Stream, Hom(A, B)],
-            other: Annotated[Stream, Hom(B, C)]
-    ) -> Annotated[Stream, Hom(A, C)]:
+            self: Hom[Stream, A, B],
+            other: Hom[Stream, B, C]
+    ) -> Hom[Stream, A, C]:
         """
         Composition of streams is given by swapping the memories as follows:
 
@@ -518,9 +519,9 @@ class Stream[category](MonoidalCategory, NamedGeneric):
 
     @unbiased
     def tensor[A, B, C, D](
-            self: Annotated[Stream, Hom(A, B)],
-            other: Annotated[Stream, Hom(C, D)]
-    ) -> Annotated[Stream, Hom([A, C], [B, D])]:
+            self: Hom[Stream, A, B],
+            other: Hom[Stream, C, D]
+    ) -> Hom[Stream, Tensor[A, C], Tensor[B, D]]:
         """
         Tensor of streams is given by swapping the memories as follows:
 

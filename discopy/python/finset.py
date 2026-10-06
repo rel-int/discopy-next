@@ -17,14 +17,15 @@ Summary
 """
 
 from discopy.utils import assert_isinstance
-from typing import Annotated, Iterable, Self, Any, overload
+from discopy.pattern import Obj, Tensor  # noqa: F401
+from typing import Iterable, Self, Any, overload
 from collections.abc import Sequence
 
 from dataclasses import dataclass
 
 from discopy import messages
 from discopy.abc import MonoidalCategory, PROP, Nat
-from discopy.pattern import Atom, Hom, Var
+from discopy.pattern import Atom, Hom
 from discopy.search import rule
 
 
@@ -75,22 +76,22 @@ class Function(MonoidalCategory, Sequence):
 
     @staticmethod
     @rule
-    def id[A](x: Annotated[int | Nat, Var(A)] = 0
-              ) -> Annotated[Function, Hom(A, A)]:
+    def id[A](x: Obj[int | Nat, A] = 0
+              ) -> Hom[Function, A, A]:
         x = Nat(int(x))
         return Function(list(range(x)), x, x)
 
     def then[A, B, C](
-            self: Annotated[Function, Hom(A, B)],
-            other: Annotated[Function, Hom(B, C)]
-    ) -> Annotated[Function, Hom(A, C)]:
+            self: Hom[Function, A, B],
+            other: Hom[Function, B, C]
+    ) -> Hom[Function, A, C]:
         inside = [self[other[i]] for i in range(len(other))]
         return Function(inside, self.dom, other.cod)
 
     def tensor[A, B, C, D](
-            self: Annotated[Function, Hom(A, B)],
-            other: Annotated[Function, Hom(C, D)]
-    ) -> Annotated[Function, Hom([A, C], [B, D])]:
+            self: Hom[Function, A, B],
+            other: Hom[Function, C, D]
+    ) -> Hom[Function, Tensor[A, C], Tensor[B, D]]:
         inside = list(self.inside) + [
             int(self.dom) + other[i] for i in range(len(other))]
         return Function(
@@ -99,8 +100,8 @@ class Function(MonoidalCategory, Sequence):
     @staticmethod
     @rule
     def swap[X: Atom, Y: Atom](
-            x: Annotated[int | Nat, Var(X)], y: Annotated[int | Nat, Var(Y)]
-    ) -> Annotated[Function, Hom([X, Y], [Y, X])]:
+            x: Obj[int | Nat, X], y: Obj[int | Nat, Y]
+    ) -> Hom[Function, Tensor[X, Y], Tensor[Y, X]]:
         m, n = int(x), int(y)
         inside = list(Permutation.swap(m, n))
         return Function(inside, Nat(m + n), Nat(m + n))
@@ -193,8 +194,8 @@ class Permutation(Function, PROP):
 
     @classmethod
     @rule
-    def id[A](cls, dom: Annotated[int | Nat, Var(A)] = 0
-              ) -> Annotated[Self, Hom(A, A)]:
+    def id[A](cls, dom: Obj[int | Nat, A] = 0
+              ) -> Hom[Self, A, A]:
         """ The identity permutation on ``range(size)``. """
         n = int(dom)
         return cls(range(n), n)
@@ -262,8 +263,9 @@ class Permutation(Function, PROP):
         return tuple(cycle)
 
     def then[A, B, C](
-            self: Annotated[Self, Hom(A, B)],
-            other: Annotated[Self, Hom(B, C)]) -> Annotated[Self, Hom(A, C)]:
+            self: Hom[Self, A, B],
+            other: Hom[Self, B, C]  # ty: ignore[invalid-type-form]
+    ) -> Hom[Self, A, C]:  # ty: ignore[invalid-type-form]
         """ Return ``self ; other``, i.e. ``result[i] == other[self[i]]``. """
         other = type(self)(other, len(self))
         elems = (other[self[i]] for i in range(len(self)))
@@ -287,9 +289,10 @@ class Permutation(Function, PROP):
         return other.dagger().then(self).then(other)
 
     def tensor[A, B, C, D](
-            self: Annotated[Self, Hom(A, B)],
-            other: Annotated[Self | None, Hom(C, D)] = None, *others
-    ) -> Annotated[Self, Hom([A, C], [B, D])]:
+            self: Hom[Self, A, B],
+            other: Hom[Self | None, C, D] = None,  # ty: ignore[invalid-type-form]
+            *others
+    ) -> Hom[Self, Tensor[A, C], Tensor[B, D]]:  # ty: ignore[invalid-type-form]
         """ Return the disjoint union of permutations. """
         if other is None:
             return self
@@ -347,9 +350,9 @@ class Permutation(Function, PROP):
     @classmethod
     @rule
     def swap[X: Atom, Y: Atom](
-            cls, left: Annotated[int | Nat, Var(X)],
-            right: Annotated[int | Nat, Var(Y)]
-    ) -> Annotated[Self, Hom([X, Y], [Y, X])]:
+            cls, left: Obj[int | Nat, X],
+            right: Obj[int | Nat, Y]
+    ) -> Hom[Self, Tensor[X, Y], Tensor[Y, X]]:
         m, n = int(left), int(right)
         inside = tuple(
             i + n if i < m else i - m

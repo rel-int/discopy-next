@@ -35,7 +35,7 @@ from itertools import chain
 
 import random
 from typing import (
-    Annotated, Any, ClassVar, Iterable, Union, TYPE_CHECKING, Sequence)
+    Any, ClassVar, Iterable, Union, TYPE_CHECKING, Sequence)
 
 import matplotlib.pyplot as plt
 
@@ -51,12 +51,13 @@ from networkx import (
 from networkx.algorithms.isomorphism import is_isomorphic
 
 from discopy import cmap, messages, utils
+from discopy.pattern import Obj, Tensor  # noqa: F401
 from discopy.abc import (
     DaggerCategory, HypergraphCategory, MarkovCategory, MonoidalCategory,
     NamedGeneric, RigidCategory, SymmetricCategory, TracedCategory)
 from discopy.drawing import Node, backend
 from discopy.python.finset import Permutation
-from discopy.pattern import Hom, Var
+from discopy.pattern import Hom
 from discopy.search import rule
 from discopy.utils import (
     factory_name,
@@ -348,8 +349,8 @@ class Hypergraph[category: Diagram](MonoidalCategory, DaggerCategory,
 
     @classmethod
     @rule
-    def id[A](cls, dom: Annotated[Any | None, Var(A)] = None
-              ) -> Annotated[Hypergraph, Hom(A, A)]:
+    def id[A](cls, dom: Obj[Any | None, A] = None
+              ) -> Hom[Hypergraph, A, A]:
         dom = cls.category.ob() if dom is None else dom
         dom_wires = cod_wires = tuple(range(len(dom)))
         return cls(dom, dom, (), (dom_wires, (), cod_wires))
@@ -358,9 +359,9 @@ class Hypergraph[category: Diagram](MonoidalCategory, DaggerCategory,
 
     @unbiased
     def then[A, B, C](
-            self: Annotated[Hypergraph, Hom(A, B)],
-            other: Annotated[Hypergraph, Hom(B, C)]
-    ) -> Annotated[Hypergraph, Hom(A, C)]:
+            self: Hom[Hypergraph, A, B],
+            other: Hom[Hypergraph, B, C]
+    ) -> Hom[Hypergraph, A, C]:
         """
         Composition of two hypergraph diagrams, i.e. their :func:`pushout`.
         """
@@ -386,9 +387,9 @@ class Hypergraph[category: Diagram](MonoidalCategory, DaggerCategory,
 
     @unbiased
     def tensor[A, B, C, D](
-            self: Annotated[Hypergraph, Hom(A, B)],
-            other: Annotated[Hypergraph, Hom(C, D)]) -> Annotated[Hypergraph,
-                   Hom([A, C], [B, D])]:
+            self: Hom[Hypergraph, A, B],
+            other: Hom[Hypergraph, C, D]
+    ) -> Hom[Hypergraph, Tensor[A, C], Tensor[B, D]]:
         """ Tensor of two hypergraph diagrams, i.e. their disjoint union. """
         dom, cod = self.dom @ other.dom, self.cod @ other.cod
         boxes, offsets = self.boxes + other.boxes, self.offsets + other.offsets

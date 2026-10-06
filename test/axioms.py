@@ -1,7 +1,7 @@
 """ DisCoPy's property-testing module in action. """
 
 import io
-from typing import Annotated, Any, Self
+from typing import Any, Self
 
 from hypothesis import find, settings
 from hypothesis.errors import NoSuchExample
@@ -10,7 +10,7 @@ from pytest import raises
 from discopy import braided, cat, feedback, rigid
 from discopy.abc import MonoidalCategory
 from discopy.axioms import (
-    Axiom, AxiomFailure, Equation, Hom, assert_axioms, axiom)
+    Axiom, AxiomFailure, Equation, Hom, Obj, assert_axioms, axiom)
 from discopy.cat import Arrow, Box, Functor, Ob
 from discopy.monoidal import Diagram
 
@@ -88,7 +88,7 @@ def test_self_annotation():
 
 def test_falsify():
     @axiom
-    def trivial[A, B](cls, f: Annotated[Any, Hom(A, B)]) -> Equation:
+    def trivial[A, B](cls, f: Hom[Any, A, B]) -> Equation:
         """ Every arrow is an identity, which a box refutes. """
         return Equation(f, cls.id(f.dom))
 
@@ -116,17 +116,18 @@ def test_axioms_of_category():
 
 def test_axiom():
     assert MonoidalCategory.bifunctoriality.parameters[0].name == "f"
-    assert str(MonoidalCategory.bifunctoriality.sequent).startswith(
-        "A: C0, B: C0, C: C0, D: C0, U: C0, V: C0 | f: C1[A, B]")
+    assert list(MonoidalCategory.bifunctoriality.variables)\
+        == list("ABCDUV")
+    assert str(MonoidalCategory.bifunctoriality.premises["f"])\
+        == "Hom[C1, A, B]"
     equation = find(Diagram.bifunctoriality.strategy(), lambda _: True)
     assert equation and len(equation.terms) == 2
-    assert MonoidalCategory.tensor.sequent.conclusion is not None
+    assert MonoidalCategory.tensor.conclusion is not None
     assert Axiom.concludes is False
     @axiom
     def unannotated(cls, f):
         """ An unannotated premise has no pattern. """
-    with raises(TypeError, match="states no pattern"):
-        unannotated.bind(Diagram).sequent
+    assert not unannotated.bind(Diagram).premises
 
 
 def test_weaken_params():
@@ -142,7 +143,8 @@ def test_equation_types():
     import inspect
     from discopy import (
         balanced, closed, compact, pivotal, ribbon, symmetric, traced)
-    from discopy.pattern import expand
+    from typing import get_origin
+    from discopy.sequent import instantiate
     (parameter, ) = Equation.__type_params__
     levels = (Diagram, braided.Diagram, traced.Diagram, balanced.Diagram,
               symmetric.Diagram, closed.Diagram, rigid.Diagram,
@@ -152,16 +154,16 @@ def test_equation_types():
     for category in levels:
         for law in category.axioms.values():
             returns = inspect.signature(law.function).return_annotation
-            pattern = expand(getattr(returns, parameter.__name__, None))
-            if pattern is None\
+            pattern = getattr(returns, parameter.__name__, None)
+            if get_origin(pattern) not in (Hom, Obj)\
                     or (equation := law.canonical()) is NotImplemented:
                 continue
             subst = {
                 name: sort.canonical(law.scope, name)
-                for name, sort in law.sequent.variables.items()}
-            value = pattern.instantiate(subst, law.unit)
+                for name, sort in law.variables.items()}
+            value = instantiate(pattern, subst, law.unit)
             boundary = (lambda term: (term.dom, term.cod))\
-                if isinstance(pattern, Hom) else (lambda term: term)
+                if get_origin(pattern) is Hom else (lambda term: term)
             assert all(
                 boundary(term) == value for term in equation.terms), law
             checked.add(law.name)

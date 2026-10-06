@@ -90,16 +90,16 @@ Both sides foliate to the same single permutation.
 
 """
 
-from typing import Annotated, ClassVar, Self
+from typing import ClassVar, Self
 
 from collections.abc import Sequence
 
 from discopy import cat, monoidal, balanced, hypergraph, cmap, messages
+from discopy.pattern import In0, Obj, Tensor  # noqa: F401
 from discopy.abc import (
     BraidedCategory, MonoidalCategory, SymmetricCategory, TracedCategory)
 from discopy.axioms import (
-    Atom, axiom, Equation as AbstractEquation, Hom, Var, rule, Sort)
-from discopy.pattern import DOM_OBJECTS
+    Atom, axiom, Equation as AbstractEquation, Hom, rule)
 from discopy.cat import factory, Generator
 from discopy.monoidal import Wire, Ty, Nat  # noqa: F401  pylint: disable=unused-import
 from discopy.python import finset
@@ -285,9 +285,9 @@ class Diagram(balanced.Diagram, SymmetricCategory):
     @classmethod
     @rule
     def swap[X: Atom, Y: Atom](
-            cls, left: Annotated[monoidal.Ty, Var(X)],
-            right: Annotated[monoidal.Ty, Var(Y)]
-    ) -> Annotated[Diagram, Hom([X, Y], [Y, X])]:
+            cls, left: Obj[monoidal.Ty, X],
+            right: Obj[monoidal.Ty, Y]
+    ) -> Hom[Diagram, Tensor[X, Y], Tensor[Y, X]]:
         """
         The diagram that swaps the ``left`` and ``right`` wires.
 
@@ -344,8 +344,8 @@ class Diagram(balanced.Diagram, SymmetricCategory):
     @classmethod
     @rule
     def cycle[X: Atom, A](
-            cls, x: Annotated[Ty, Var(X)], a: Annotated[Ty, Var(A)]
-    ) -> Annotated[Diagram, Hom([X, A], [A, X])]:
+            cls, x: Obj[Ty, X], a: Obj[Ty, A]
+    ) -> Hom[Diagram, Tensor[X, A], Tensor[A, X]]:
         """
         The permutation moving a wire past a type, a native
         :class:`Permutation` of any length.
@@ -531,7 +531,7 @@ class Diagram(balanced.Diagram, SymmetricCategory):
         return AbstractEquation(functor(f), functor(top) >> functor(bottom))
 
     @axiom
-    def map_identity[X](cls, x: Annotated[Ty, Var(X)]):
+    def map_identity[X](cls, x: Obj[Ty, X]):
         """ The encoding preserves identities. """
         functor = cls.map_equivalence()
         return AbstractEquation(functor(cls.id(x)), functor.cod.id(x))
@@ -662,9 +662,9 @@ class Permutation(Box):
         return type(self)(self.cod, self.perm.dagger())
 
     def tensor[A, B, C, D](
-            self: Annotated[Permutation, Hom(A, B)],
-            other: Annotated[Diagram | monoidal.Ty | None, Hom(C, D)] = None,
-            *others) -> Annotated[Diagram, Hom([A, C], [B, D])]:
+            self: Hom[Permutation, A, B],
+            other: Hom[Diagram | monoidal.Ty | None, C, D] = None,
+            *others) -> Hom[Diagram, Tensor[A, C], Tensor[B, D]]:
         if other is None:
             return self
         if isinstance(other, Permutation):
@@ -760,10 +760,8 @@ class Functor(balanced.Functor):
     dom = cod = Diagram
 
     @axiom
-    def symmetric(
-            cls, functor: Self,
-            x: Annotated[Ty, Sort(DOM_OBJECTS, atomic=True)],
-            y: Annotated[Ty, Sort(DOM_OBJECTS, atomic=True)]) -> Equation:
+    def symmetric[X: Atom[In0], Y: Atom[In0]](
+            cls, functor: Self, x: Obj[Ty, X], y: Obj[Ty, Y]) -> Equation:
         """ A symmetric functor preserves the swap. """
         return functor.cod.Equation(
             functor(functor.dom.swap(x, y)),

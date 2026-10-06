@@ -37,9 +37,10 @@ See also
 from contextlib import contextmanager
 from operator import index
 from types import ModuleType
-from typing import Annotated, Any, Literal, Callable, TYPE_CHECKING
+from typing import Any, Literal, Callable, TYPE_CHECKING
 
 from discopy import monoidal, config, messages
+from discopy.pattern import Obj, Tensor  # noqa: F401
 from discopy.abc import (
     DaggerCategory, MonoidalCategory, NamedGeneric, Nat)
 from discopy.cat import (
@@ -48,7 +49,7 @@ from discopy.cat import (
     assert_isparallel,
 )
 from discopy.utils import assert_isinstance, unbiased
-from discopy.pattern import Hom, Var
+from discopy.pattern import Hom
 from discopy.search import rule
 
 if TYPE_CHECKING:
@@ -240,8 +241,8 @@ class Matrix[dtype](MonoidalCategory, DaggerCategory, NamedGeneric):
 
     @classmethod
     @rule
-    def id[A](cls, dom: Annotated[Any, Var(A)] = 0
-              ) -> Annotated[Matrix, Hom(A, A)]:
+    def id[A](cls, dom: Obj[Any, A] = 0
+              ) -> Hom[Matrix, A, A]:
         with backend('numpy') as np:
             array = np.identity(index(dom), dtype=cls.dtype or int)
         return cls(array, dom, dom)
@@ -250,9 +251,9 @@ class Matrix[dtype](MonoidalCategory, DaggerCategory, NamedGeneric):
 
     @unbiased
     def then[A, B, C](
-            self: Annotated[Matrix, Hom(A, B)],
-            other: Annotated[Matrix, Hom(B, C)]
-    ) -> Annotated[Matrix, Hom(A, C)]:
+            self: Hom[Matrix, A, B],
+            other: Hom[Matrix, B, C]
+    ) -> Hom[Matrix, A, C]:
         assert_isinstance(other, type(self))
         assert_iscomposable(self, other)
         with backend() as np:
@@ -260,9 +261,9 @@ class Matrix[dtype](MonoidalCategory, DaggerCategory, NamedGeneric):
         return type(self)(array, self.dom, other.cod)
 
     def tensor[A, B, C, D](
-            self: Annotated[Matrix, Hom(A, B)],
-            other: Annotated[Matrix | None, Hom(C, D)] = None,
-            *others: Matrix) -> Annotated[Matrix, Hom([A, C], [B, D])]:
+            self: Hom[Matrix, A, B],
+            other: Hom[Matrix | None, C, D] = None,
+            *others: Matrix) -> Hom[Matrix, Tensor[A, C], Tensor[B, D]]:
         if others or other is None:
             return monoidal.Diagram.tensor(
                 self, other, *others)

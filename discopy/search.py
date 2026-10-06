@@ -1,6 +1,6 @@
 """
 The search for diagrams by the rules of their category: a :class:`Rule`
-is a :class:`discopy.pattern.Declaration` with a conclusion, and
+is a :class:`discopy.sequent.Declaration` with a conclusion, and
 :func:`search` builds a term of a goal type by choosing at each step a
 free box, a rule with no hom premise whose conclusion matches the goal —
 a generator, built in one step — or, below the depth bound, a
@@ -34,10 +34,11 @@ from dataclasses import dataclass, replace
 from inspect import signature
 from itertools import count
 from types import MethodType
-from typing import Self, TYPE_CHECKING, TypeVar
+from typing import Self, TYPE_CHECKING, TypeVar, get_origin
 
-from discopy.pattern import (
-    OBJECTS, Declaration, Hom, Match, Pattern, Sequent, Var, heads)
+from discopy.pattern import Hom
+from discopy.sequent import (
+    OBJECTS, Declaration, Match, Sort, heads, instantiate, match, variables)
 from discopy.utils import AxiomError
 
 if TYPE_CHECKING:
@@ -55,7 +56,7 @@ class DeadEnd(Exception):
 class Rule[**P, T](Declaration[P, T]):
     """
     An inference rule of a category, a
-    :class:`discopy.pattern.Declaration` with a conclusion: every rule
+    :class:`discopy.sequent.Declaration` with a conclusion: every rule
     states its sequent as its own signature and :func:`search` calls
     the attribute of the same name on the category. Accessed on a
     class, a rule binds to it, once per class; on an instance, it
@@ -63,7 +64,7 @@ class Rule[**P, T](Declaration[P, T]):
 
     >>> from discopy.abc import Category
     >>> print(Category.then)
-    then: A: C0, B: C0, C: C0 | self: C1[A, B], other: C1[B, C] ⊢ C1[A, C]
+    then(self: Hom[C1, A, B], other: Hom[C1, B, C]) -> Hom[C1, A, C]
     """
 
     __hash__ = Declaration.__hash__
@@ -92,7 +93,7 @@ class Rule[**P, T](Declaration[P, T]):
 
     def match(self, dom=None, cod=None) -> Iterator[Match]:
         """ Unify the conclusion with a goal. """
-        return self.sequent.conclusion.match((dom, cod))
+        return match(self.conclusion, (dom, cod))
 
     @property
     def recursive(self) -> bool:
@@ -106,8 +107,7 @@ class Rule[**P, T](Declaration[P, T]):
         >>> assert not RigidCategory.cups.recursive
         """
         return any(
-            isinstance(premise, Hom)
-            for premise in self.sequent.premises.values())
+            get_origin(premise) is Hom for premise in self.premises.values())
 
     def apply(self, arguments: dict) -> T:
         """ The implementation of the rule on the category, applied
@@ -179,9 +179,8 @@ class Constant(Rule):
         self.name = self.name or str(self.function)
         self.__doc__ = f"The constant {self.name}."
 
-    @property
-    def sequent(self) -> Sequent:
-        return Sequent()
+    variables = premises = {}
+    conclusion = None
 
     def match(self, dom=None, cod=None) -> Iterator[Match]:
         box = self.function
@@ -235,11 +234,11 @@ def focused(matches: list, dom=None, cod=None, unit=None) -> list:
         for atom in materials(side)}
 
     def subformulae(rule, subst):
-        for premise in rule.sequent.premises.values():
-            if not isinstance(premise, Pattern)\
-                    or not set(premise.variables) <= subst.keys():
+        for premise in rule.premises.values():
+            if isinstance(premise, Sort)\
+                    or not set(variables(premise)) <= subst.keys():
                 return False
-            value = premise.instantiate(subst, unit)
+            value = instantiate(premise, subst, unit)
             if isinstance(value, tuple) and value == (dom, cod):
                 return False  # No progress: the premise is the goal.
             for side in value if isinstance(value, tuple) else (value, ):
@@ -307,17 +306,17 @@ def search(category: type[abc.Category], free: Callable | None = None, *,
     fresh = count()
 
     def as_pattern(side):
-        if side is None:
-            return Var(f"?{next(fresh)}")
-        if isinstance(side, TypeVar):
-            return Var(side)
-        return side
+        return side if side is not None else TypeVar(  # ty: ignore[invalid-legacy-type-variable]
+            f"?{next(fresh)}")
+
+    def is_pattern(side):
+        return isinstance(side, TypeVar) or get_origin(side) is not None
 
     def guidance(side, subst):
-        if not isinstance(side, Pattern):
+        if not is_pattern(side):
             return side
-        if all(name in subst for name in side.variables):
-            return side.instantiate(subst, scope[OBJECTS])
+        if all(name in subst for name in variables(side)):
+            return instantiate(side, subst, scope[OBJECTS])
         return None
 
     def matching(candidates, dom, cod) -> list:
@@ -355,8 +354,8 @@ def search(category: type[abc.Category], free: Callable | None = None, *,
             result = rule.apply(args)
         for side, guide, value in zip(
                 goal, (dom, cod), (result.dom, result.cod)):
-            if isinstance(side, Pattern):
-                found = list(side.match(value, local, tuple(unchecked)))
+            if is_pattern(side):
+                found = list(match(side, value, local, tuple(unchecked)))
             else:
                 found = [(local, tuple(unchecked))] if value == side else []
             if not found:
@@ -393,11 +392,10 @@ def search(category: type[abc.Category], free: Callable | None = None, *,
         except DeadEnd:
             assume(False)
         for pattern, value in residuals:
-            for variable in pattern.walk():
-                if isinstance(variable, Var) and variable.name not in subst:
-                    subst[variable.name] = draw(
-                        variable.sort.strategy(scope, types))
-            assume(pattern.instantiate(subst, scope[OBJECTS]) == value)
+            for name in variables(pattern):
+                if name not in subst:
+                    subst[name] = draw(Sort().strategy(scope, types))
+            assume(instantiate(pattern, subst, scope[OBJECTS]) == value)
         return result
 
     return goals(dom, cod, max_depth)

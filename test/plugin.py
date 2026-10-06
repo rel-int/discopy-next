@@ -17,7 +17,7 @@ UNIMPORTABLE = ("discopy/quantum/pennylane.py", "discopy/quantum/tk.py")
 def pytest_configure(config):
     """
     Register the doctests of the rules: a method decorated
-    :func:`discopy.search.rule` is a :class:`discopy.pattern.Declaration`
+    :func:`discopy.search.rule` is a :class:`discopy.sequent.Declaration`
     in its class's dict, which doctest's finder does not recurse into,
     so each module lists the functions they wrap in its ``__test__``.
     """
@@ -26,7 +26,7 @@ def pytest_configure(config):
     import sys
 
     import discopy
-    from discopy.pattern import Declaration
+    from discopy.sequent import Declaration
 
     for info in pkgutil.walk_packages(discopy.__path__, "discopy."):
         try:
