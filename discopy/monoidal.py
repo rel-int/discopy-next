@@ -1150,7 +1150,7 @@ class Diagram(cat.Arrow, MonoidalCategory, RichDisplay):
     #: composes in context by :meth:`discopy.abc.MonoidalCategory.cut`,
     #: which subsumes it — a cut with empty contexts — and keeps
     #: :meth:`tensor` as the rule that puts diagrams side by side.
-    then = cat.Arrow.then.inapplicable("The search composes by cut.")
+    then = cat.Arrow.then.admissible("A cut with empty contexts.")
 
     @property
     def boxes(self) -> list[Box]:

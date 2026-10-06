@@ -15,10 +15,12 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   `left @ self @ right >> other`. It replaces `then` as the
   sequential rule of the search from monoidal categories on, which
   it subsumes as the empty-context case — `then` is marked
-  inapplicable on `monoidal.Diagram`, staying the n-ary method it
-  always was while `cat.Arrow` keeps it as the rule of a mere
-  category, and `tensor` stays the rule that puts diagrams side by
-  side — so that rules answer to the sequent calculus and methods to
+  admissible on `monoidal.Diagram` — `Rule.admissible` records a rule
+  the search drops because the others reach everything it builds,
+  where `.inapplicable` keeps meaning structure outside a category's
+  terms — staying the n-ary method it always was while `cat.Arrow`
+  keeps it as the rule of a mere category, and `tensor` stays the
+  rule that puts diagrams side by side — so that rules answer to the sequent calculus and methods to
   the programmer, decoupled where a convenient signature cannot
   state an honest sequent. Every diagram is a sequence of layers and
   every layer is one cut, so the search generates a diagram the way
@@ -64,10 +66,12 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   every box costs a rule, and three with a free box as before.
   A focused rule must make progress,
   a premise equal to the goal staying a choice, and the curries of
-  `rigid.Diagram` are marked inapplicable, since a rigid curry is
-  derived — its body is a caps composition, so caps and cut reach
-  every transpose — and the self-dual types of a quantum circuit
-  would otherwise let it focus on every goal.
+  `rigid.Diagram` are marked admissible, since a rigid curry is a
+  caps composition — caps and cut reach every transpose — and the
+  self-dual types of a quantum circuit would otherwise let it focus
+  on every goal; the traces of a circuit, unfolding into kets and
+  bras, and the twist of a compact category, the identity, carry the
+  same mark.
 
 - The codebase typechecks: `uv run ty check` passes in the full
   development environment, `ty` a dev dependency locked in

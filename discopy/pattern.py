@@ -1191,8 +1191,9 @@ def declarations[D: Declaration](cls: type, kind: type[D]) -> dict[str, D]:
     The declarations of exactly a kind inherited by a class, bound to
     it and keyed by name, the latest in the method resolution order
     winning like ordinary attribute lookup, found under any inner
-    decorator; a declaration marked inapplicable, or anything that is
-    not a declaration, assigned over an inherited one drops it.
+    decorator; a declaration marked inapplicable or admissible, or
+    anything that is not a declaration, assigned over an inherited
+    one drops it.
 
     >>> from discopy.monoidal import Diagram
     >>> from discopy.search import Rule
@@ -1205,7 +1206,8 @@ def declarations[D: Declaration](cls: type, kind: type[D]) -> dict[str, D]:
             while isinstance(value, (classmethod, staticmethod)):
                 value = value.__func__
             if type(value) is kind\
-                    and getattr(value, "__inapplicable__", None) is None:
+                    and getattr(value, "__inapplicable__", None) is None\
+                    and getattr(value, "__admissible__", None) is None:
                 result[name] = value.bind(cls, owner=base)
             else:
                 result.pop(name, None)

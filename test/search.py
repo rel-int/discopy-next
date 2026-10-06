@@ -89,6 +89,42 @@ def test_cut():
     assert (f @ g).dom == f.dom @ g.dom
 
 
+def test_calculus():
+    """ The recursive rules in action at each level of the tower, the
+    admissible and inapplicable ones curated out: ``then`` is a cut
+    with empty contexts everywhere, the rigid curries are caps
+    compositions, and a method an admissible rule leaves behind still
+    runs. """
+    from discopy import (
+        balanced, biclosed, closed, compact, feedback, frobenius, markov,
+        monoidal, pivotal, ribbon, symmetric, traced)
+
+    composition, trace = ["tensor", "cut"], ["trace_left", "trace_right"]
+    for module, calculus in (
+            (monoidal, composition),
+            (braided, composition),
+            (rigid, composition),
+            (balanced, composition + trace),
+            (symmetric, composition + trace),
+            (traced, composition + trace),
+            (markov, composition + trace),
+            (pivotal, composition + trace),
+            (ribbon, composition + trace),
+            (compact, composition + trace),
+            (frobenius, composition + trace),
+            (biclosed, composition + ["curry_left", "curry_right"]),
+            (closed, composition + trace + ["curry_left", "curry_right"]),
+            (feedback, composition + trace
+             + ["feedback_left", "feedback_right"])):
+        assert [name for name, found in module.Diagram.rules.items()
+                if found.recursive] == calculus, module.__name__
+
+    assert monoidal.Diagram.__dict__["then"].__admissible__
+    assert "twist" not in compact.Diagram.generators
+    twist = compact.Diagram.twist(compact.Ty("x"))
+    assert twist.dom == twist.cod and not twist.inside
+
+
 def test_declarations():
     class Hidden(Diagram):
         unitality = None

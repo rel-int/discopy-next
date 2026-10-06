@@ -132,13 +132,29 @@ class Rule[**P, T](Declaration[P, T]):
     def inapplicable(self, reason: str) -> Self:
         """
         The same rule dropped from the rules and generators of the
-        class it is assigned on, with the reason as its record: the
-        method still runs, the search just never applies it, e.g.
+        class it is assigned on, because the structure it builds lies
+        outside the category's terms, with the reason as its record:
+        the method still runs, the search just never applies it, e.g.
         ``trace_left = rule(Diagram.trace_left).inapplicable("No loop
-        in a sentence.")``.
+        in a sentence.")``. A rule the category does have, whose terms
+        other rules reach, is :meth:`admissible` instead.
         """
         result = replace(self)
         result.__inapplicable__ = reason
+        return result
+
+    def admissible(self, reason: str) -> Self:
+        """
+        The same rule dropped from the rules and generators of the
+        class it is assigned on, because it is `admissible
+        <https://en.wikipedia.org/wiki/Admissible_rule>`_: the search
+        reaches everything it builds through the other rules, which
+        the reason names as its record, e.g. ``then =
+        cat.Arrow.then.admissible("A cut with empty contexts.")``.
+        The method still runs and remains applicable.
+        """
+        result = replace(self)
+        result.__admissible__ = reason
         return result
 
 

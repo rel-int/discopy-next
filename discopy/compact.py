@@ -82,7 +82,7 @@ class Diagram(symmetric.Diagram, ribbon.Diagram, CompactCategory):
     """
     serialisation = Serialisable.serialisation
 
-    twist = classmethod(ribbon.Diagram.twist.__func__.inapplicable(
+    twist = classmethod(ribbon.Diagram.twist.__func__.admissible(
         "The twist is the identity."))
 
     ob = Ty

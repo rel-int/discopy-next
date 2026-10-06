@@ -129,7 +129,8 @@ class Category[C0, C1: Category](Testable, ABC):
         method implementing a rule is decorated
         :func:`discopy.search.rule` itself, restating its sequent, and
         the search calls it by name; one declared
-        :meth:`discopy.search.Rule.inapplicable` is dropped.
+        :meth:`discopy.search.Rule.inapplicable` or
+        :meth:`discopy.search.Rule.admissible` is dropped.
         """
         return declarations(cls, Rule)
 
@@ -1505,7 +1506,7 @@ class CompactCategory[C0: Pregroup, C1: CompactCategory](
         return cls.id(dom)
 
     twist = classmethod(  # ty: ignore[invalid-assignment]
-        rule(twist).inapplicable("The twist is the identity."))
+        rule(twist).admissible("The twist is the identity."))
 
     @axiom
     def reidemeister_1_cap[X: Ob[C0]](
