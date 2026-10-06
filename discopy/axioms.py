@@ -292,8 +292,8 @@ class Equation[ar](NamedGeneric):
     Parameters:
         terms : The terms of the equation.
         symbol : The symbol between each pair of terms, ``"="`` by default.
-        symbols : The symbols between each pair of terms, overriding
-            ``symbol``; ``len(terms) * (symbol, )`` by default.
+        symbols : The symbols between each pair of consecutive terms, one
+            fewer than the terms, overriding ``symbol``.
         up_to : The function up to which ``bool(equation)`` compares its
             terms, overriding the subclass' :attr:`up_to` if given.
 
@@ -313,8 +313,13 @@ class Equation[ar](NamedGeneric):
 
     def __init__(self, *terms, symbol="=", symbols=None, up_to=None):
         self.terms = terms
-        self.symbols = tuple(symbols) if symbols is not None\
-            else len(terms) * (symbol, )
+        gaps = max(len(terms) - 1, 0)
+        self.symbols = gaps * (symbol, ) if symbols is None\
+            else tuple(symbols)
+        if len(self.symbols) != gaps:
+            raise ValueError(
+                f"Expected {gaps} symbols between {len(terms)} terms, "
+                f"got {len(self.symbols)}.")
         if up_to is not None:
             self.up_to = up_to
 
@@ -356,15 +361,13 @@ class Equation[ar](NamedGeneric):
         >>> x = Ob('x')
         >>> f, g = Box('f', x, x), Box('g', x, x)
         >>> Equation(f, f, g).checked().symbols
-        ('=', '$\\\\neq$', '=')
+        ('=', '$\\\\neq$')
         """
-        symbols = tuple(
+        symbols = (
             symbol if type(self)(left, right, up_to=self.up_to)
             else "$\\neq$" for symbol, left, right
             in zip(self.symbols, self.terms, self.terms[1:]))
-        return type(self)(
-            *self.terms, symbols=symbols + self.symbols[len(symbols):],
-            up_to=self.up_to)
+        return type(self)(*self.terms, symbols=symbols, up_to=self.up_to)
 
 
 class AxiomFailure(AxiomError):

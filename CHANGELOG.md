@@ -972,6 +972,11 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Fixed
 
+- `Equation` has one symbol fewer than terms, a symbol between each pair
+  of consecutive terms, where it defaulted to one per term and the last
+  went unused; `symbols` of any other length raise `ValueError`, and
+  `Equation.checked` no longer pads its symbols with the unused one.
+
 - `Drawing.dagger` reflects a drawing of more than one box. A drawing
   read its nodes in the order its graph happened to store them, and its
   validation required that order to be the index of each node, which

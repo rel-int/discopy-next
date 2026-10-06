@@ -59,6 +59,15 @@ def test_modulo():
     assert law(Box('f', Ob('x'), Ob('y')))
 
 
+def test_equation_symbols():
+    x = Ob('x')
+    f, g = Box('f', x, x), Box('g', x, x)
+    assert Equation(f).symbols == ()
+    assert Equation(f, g, symbol="<").symbols == ("<", )
+    with raises(ValueError):
+        Equation(f, g, symbols=("=", "="))
+
+
 def test_weaken():
     law = Arrow.unitality.weaken(max_leaves=1).bind(Arrow)
     assert law.modulo(lambda term: term).params == law.params
