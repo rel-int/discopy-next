@@ -1290,7 +1290,8 @@ class Diagram(cat.Arrow, MonoidalCategory, RichDisplay):
         """
         graph = hypergraph.Hypergraph[
             type(self).ar].from_diagram(self)  # ty: ignore[invalid-type-form]
-        if len(graph.boxes) == len(self.boxes):
+        has_states = any(not box.dom for box in self.boxes)
+        if has_states and len(graph.boxes) == len(self.boxes):
             offsets = tuple(
                 offset if not box.dom else None
                 for box, offset in zip(self.boxes, self.offsets))

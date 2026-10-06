@@ -548,6 +548,12 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Changed
 
+- `Diagram.to_hypergraph` records the offset of every state of a diagram,
+  where it only did so for a diagram with one box per layer, so that a
+  foliated diagram whose states share a layer is placed back without
+  swaps too. A diagram with no state has no offset to record and its
+  hypergraph is built once, as before.
+
 - The trace laws hold from `symmetric` down: a free trace is a box,
   so `traced` and `balanced` keep the (di)naturality and superposing
   laws out of the matrix, but the trace of a symmetric category is a
