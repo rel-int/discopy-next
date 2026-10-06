@@ -30,7 +30,7 @@ COMMON = dict(
 """
 ``filter_too_much`` is suppressed because the search rejects by design:
 a dead-ended goal rejects its example and a law weakened to a subspace,
-e.g. the boundary-connected diagrams, filters what the search draws.
+e.g. the boundary-connected diagrams, filters what the search samples.
 The ``checked_enough`` fixture of ``test_axioms.py`` stands in for it.
 """
 

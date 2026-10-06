@@ -22,7 +22,7 @@ def types() -> tuple[type[Testable], ...]:
     :attr:`discopy.abc.Category.generators` are the
     :class:`discopy.search.Constant` rules of its words or gates: it
     fills only the sequents its vocabulary derives, not the ones a law
-    draws, and its laws are those of the free category it lives in.
+    samples, and its laws are those of the free category it lives in.
     """
     def generates(testable):
         try:
@@ -96,14 +96,14 @@ def axiom_parameters(broken: bool = False):
             axiom, marks=marks, id=f"{factory_name(testable)}.{axiom.name}")
 
 
-DRAWN, CHECKED = Counter(), Counter()
-""" The number of examples drawn for each axiom, and of the equations it
+SAMPLED, CHECKED = Counter(), Counter()
+""" The number of examples sampled for each axiom, and of the equations it
 was checked on, the others rejected by the search. """
 
 
 def check(axiom: Axiom, data: st.DataObject) -> None:
     """ Check an axiom of a testable type on a generated equation. """
-    DRAWN[axiom] += 1
+    SAMPLED[axiom] += 1
     equation = data.draw(axiom.strategy(), label=axiom.name)
     note(equation)
     CHECKED[axiom] += 1
@@ -115,7 +115,7 @@ def checked_enough(request):
     """
     Fail a law that passed on fewer than a tenth of the examples of the
     budget because the search rejected the others, i.e. it was checked on
-    fewer than a tenth of the examples drawn for it, rather than because
+    fewer than a tenth of the examples sampled for it, rather than because
     it has few terms: the search rejects by design, so the health check
     against filtering is off and this floor stands in for it, a law whose
     terms the search rarely reaches failing rather than passing on a
@@ -123,13 +123,13 @@ def checked_enough(request):
     """
     yield
     axiom = request.node.callspec.params["axiom"]
-    checked, drawn = CHECKED[axiom], DRAWN[axiom]
+    checked, sampled = CHECKED[axiom], SAMPLED[axiom]
     if getattr(request.node, "passed", False)\
             and 10 * checked < settings.default.max_examples\
-            and 10 * checked < drawn:
+            and 10 * checked < sampled:
         pytest.fail(
-            f"{axiom.name} was checked on {checked} of the {drawn} "
-            "examples drawn, the search rejecting the others.")
+            f"{axiom.name} was checked on {checked} of the {sampled} "
+            "examples sampled, the search rejecting the others.")
 
 
 @pytest.mark.parametrize("axiom", axiom_parameters())

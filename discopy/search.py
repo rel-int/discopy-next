@@ -216,7 +216,7 @@ def focused(matches: list, dom=None, cod=None, unit=None) -> list:
     The rules a goal applies deterministically: the conclusion unifies
     with the goal in exactly one way, the match binds every premise
     without residuals, and the premises keep to the subformulae of the
-    goal — so committing to one draws nothing and manufactures nothing.
+    goal — so committing to one samples nothing and manufactures nothing.
     These are the invertible rules of a focused proof search, read off
     the sequents at each goal: the curry of a biclosed category opens
     the goal's own exponential, while at a rigid level, where the

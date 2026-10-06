@@ -106,12 +106,12 @@ reason: pass `-rsxX` to list the skips, xfails and unexpected passes with
 their reasons, and `-x` to stop at the first genuine failure. An xfail is
 strict, so a law declared broken that holds fails its cell until the
 declaration goes, and a law checked on fewer than a tenth of its budget
-fails too when the search rejected most of the examples drawn for it.
+fails too when the search rejected most of the examples sampled for it.
 
 `proptest/conftest.py` registers four Hypothesis profiles over the
 `.hypothesis/examples` database, selected by `HYPOTHESIS_PROFILE`: `dev`
 by default, `pr` for the small budget a pull request runs with, under a
-fixed `--hypothesis-seed` so that it draws the same examples every time,
+fixed `--hypothesis-seed` so that it samples the same examples every time,
 and `explore` for the large one `main` and the nightly run search with.
 A fourth, `shared`, is `dev` reading the database CI uploads as a workflow
 artifact, through a `GITHUB_TOKEN`, so a failure found on CI replays on
