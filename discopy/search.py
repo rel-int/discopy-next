@@ -223,6 +223,8 @@ def focused(matches: list, dom=None, cod=None, unit=None) -> list:
                     or not set(premise.variables) <= subst.keys():
                 return False
             value = premise.instantiate(subst, unit)
+            if isinstance(value, tuple) and value == (dom, cod):
+                return False  # No progress: the premise is the goal.
             for side in value if isinstance(value, tuple) else (value, ):
                 if hasattr(side, "inside")\
                         and not set(materials(side)) <= goal:
