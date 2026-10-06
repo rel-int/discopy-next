@@ -50,7 +50,7 @@ Round 2: review of @toumix, 2026-10-06, quoted verbatim.
 >
 > **discopy/axioms.py:358** Looks wrong, there should be one less relation symbol than elements in the list
 
-- [ ] `axioms.Equation`: one symbol fewer than terms (axioms.py:358)
+- [WIP] @session_01G8reWuAReExte9CgboA8wK-2026-10-06 11:28 `axioms.Equation`: one symbol fewer than terms (axioms.py:358)
 - [ ] `Count` a subclass of `Sort`, no hard-coded `"Count"` (pattern.py:206, :1160)
 - [ ] the heads `"C0"`, `"C1"`, `"Self"` as named constants (pattern.py:159, :197)
 - [ ] `sort_of`: annotate `bound`, say it expected a bound (pattern.py:193, :218)
