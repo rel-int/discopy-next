@@ -135,9 +135,9 @@ def test_Ty_getitem():
 
 def test_Ty_generator():
     x = Ty('x')
-    assert x.is_generator and x.generator == Wire('x')
-    assert not (x @ x).is_generator and (x @ x).generator is None
-    assert not Ty().is_generator and Ty().generator is None
+    assert x.is_atom and x.atom == Wire('x')
+    assert not (x @ x).is_atom and (x @ x).atom is None
+    assert not Ty().is_atom and Ty().atom is None
 
 
 def test_Ty_pow():
@@ -733,7 +733,7 @@ def test_List():
     from discopy import abc, monoidal
 
     # List[X] is a NamedGeneric on the generator type, cached like Hypergraph.
-    assert List[int].generator_factory is int and List[int] is List[int]
+    assert List[int].Atom is int and List[int] is List[int]
     a, b = List[int](2, 3), List[int](4)
     assert a @ b == List[int](2, 3, 4)
     with raises(TypeError):
@@ -752,7 +752,7 @@ def test_List():
         a[2]
 
     assert issubclass(List, abc.Monoid) and a.dom is a.cod is None
-    assert not issubclass(Ty, List) and Ty.generator_factory is Wire
+    assert not issubclass(Ty, List)
     assert all(issubclass(Ty, base)
                for base in (cat.Ob, cat.FreeCategory, abc.ColouredMonoid))
     assert Dim(2, 3)[::-1] == Dim(3, 2) and Dim(2, 3)[0] == Dim(2)

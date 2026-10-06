@@ -355,7 +355,7 @@ def test_explicit_trace_on_a_subclass():
     class Reduce(sym.Trace, Step):
         """ A recipe knows how to feed one of its outputs back. """
 
-    Recipe.trace_factory = Reduce
+    Recipe.Trace = Reduce
     x = sym.Ty("x")
     f = Step("f", x, x)
 
@@ -363,7 +363,7 @@ def test_explicit_trace_on_a_subclass():
     assert traced.to_diagram() == Reduce(f, False)
     assert f.to_hypergraph().trace().to_diagram() == Reduce(f, False)
 
-    Recipe.trace_factory = sym.Trace
+    Recipe.Trace = sym.Trace
     with raises(TypeError, match="Expected .*Recipe, got symmetric.Trace"):
         cmap.CMap[Recipe].from_box(f).trace().to_diagram()
 
@@ -421,13 +421,13 @@ def test_curry_uncurry_roundtrip(module):
     right = cmap.curry(left=False)
     assert right.dom == y
     assert right.cod == x >> z
-    assert right.boxes == (module.Diagram.curry_factory(f, 1, False), )
+    assert right.boxes == (module.Diagram.Curry(f, 1, False), )
     assert f.curry(left=False).to_map() == right
 
     left = cmap.curry(left=True)
     assert left.dom == x
     assert left.cod == z << y
-    assert left.boxes == (module.Diagram.curry_factory(f, 1, True), )
+    assert left.boxes == (module.Diagram.Curry(f, 1, True), )
     assert f.curry(left=True).to_map() == left
     assert cmap.curry() == left, "curry defaults to the left, see #560"
 
@@ -436,7 +436,7 @@ def test_curry_uncurry_roundtrip(module):
     assert uncurried.dom == x @ y
     assert uncurried.cod == z
     assert uncurried.boxes == (
-        h, module.Diagram.eval_factory(x >> z, left=False))
+        h, module.Diagram.Eval(x >> z, left=False))
     assert h.uncurry(left=False).to_map() == uncurried
 
     w = module.Ty("w")
@@ -445,16 +445,16 @@ def test_curry_uncurry_roundtrip(module):
     assert right_two.dom == x @ y @ z
     assert right_two.cod == w
     assert right_two.boxes == (
-        module.Diagram.curry_factory(k, 2, False),
-        module.Diagram.eval_factory(x @ y >> w, left=False))
+        module.Diagram.Curry(k, 2, False),
+        module.Diagram.Eval(x @ y >> w, left=False))
 
     left_two = k.to_map().curry(n=2, left=True).uncurry(
         n=2, left=True)
     assert left_two.dom == x @ y @ z
     assert left_two.cod == w
     assert left_two.boxes == (
-        module.Diagram.curry_factory(k, 2, True),
-        module.Diagram.eval_factory(w << y @ z, left=True))
+        module.Diagram.Curry(k, 2, True),
+        module.Diagram.Eval(w << y @ z, left=True))
 
     right_nested = k.to_map().curry(left=False).curry(
         left=False).uncurry(n=2, left=False)
@@ -766,7 +766,7 @@ def test_curry_is_wiring_only_when_the_category_is_rigid():
         x, y, z = map(module.Ty, "xyz")
         f = module.Box("f", x @ y, z)
         curried = f.to_map().curry(left=False)
-        assert curried.boxes == (module.Diagram.curry_factory(f, 1, False), )
+        assert curried.boxes == (module.Diagram.Curry(f, 1, False), )
         assert curried.uncurry(left=False) != f.to_map()
 
     for module in (compact, rigid, pivotal):

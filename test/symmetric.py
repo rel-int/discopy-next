@@ -96,7 +96,7 @@ def test_Permutation():
     assert list(perm.perm) == [1, 2, 0]
     assert perm.inside == (Layer(perm),)
     assert perm.boxes == [perm] and perm.size == 0
-    assert perm.is_generator and perm.generator == perm
+    assert perm.is_atom and perm.atom == perm
     assert perm.encode() == (perm.dom, [(perm, 0)])
     assert Diagram.decode(*perm.encode()) == perm
     identity = Permutation(x @ y @ z, [0, 1, 2])
@@ -190,19 +190,18 @@ def test_Layer_coalesces_plumbing():
         x, f, Permutation(y @ x @ y @ z, [0, 2, 1, 3]))
 
 
-def test_Layer_factory_ownership():
+def test_Layer_ownership():
     from discopy import compact, markov, symmetric
 
     for module in (compact, markov):
-        assert module.Diagram.permutation_factory is module.Permutation
         x, y = module.Ty('x'), module.Ty('y')
         permutation = module.Permutation(x @ y, [1, 0])
         layer = module.Layer(permutation)
         assert type(layer.boxes_and_types[1]) is module.Swap
         assert issubclass(module.Swap, module.Permutation)
         assert type(x @ permutation) is module.Permutation
-    assert markov.Layer is symmetric.Layer
-    assert not hasattr(symmetric.Layer, 'permutation_factory')
+    assert markov.Layer.__bases__ == (symmetric.Layer, )
+    assert not hasattr(symmetric.Layer, 'Permutation')
 
 
 def test_Layer_tensor():
@@ -248,9 +247,8 @@ def test_Permutation_box_setoid():
     assert Equation((p @ q) @ f, p @ (q @ f))
 
 
-def test_permutation_factory():
+def test_Permutation_functor():
     x, y, z = Ty('x'), Ty('y'), Ty('z')
-    assert Diagram.permutation_factory is Permutation
     perm = Permutation(x @ y @ z, [2, 0, 1])
     functor = Functor(ob_map={x: y, y: z, z: x}, ar_map={})
     assert Equation(
@@ -259,7 +257,7 @@ def test_permutation_factory():
     assert Equation(functor(perm), functor(perm.to_swaps()))
 
 
-def test_inherited_permutation_factory():
+def test_inherited_Permutation():
     from discopy import closed, feedback, frobenius, tensor
 
     cases = [

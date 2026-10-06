@@ -22,8 +22,14 @@ Summary
     Eval
     Coeval
     Curry
+    Permutation
+    Swap
+    Trace
+    Copy
+    Merge
     Discard
     Sum
+    Bubble
     Functor
     CMap
 
@@ -50,11 +56,11 @@ Axioms
 
 from __future__ import annotations
 from dataclasses import dataclass
-from typing import Dict, ClassVar
+from typing import ClassVar, Dict
 
 from discopy import cat, monoidal, biclosed, markov, cmap, hypergraph
 from discopy.abc import ClosedCategory
-from discopy.cat import factory
+from discopy.cat import factory, Generator
 
 
 @factory
@@ -74,9 +80,15 @@ class Ty(biclosed.Ty):
     .. image:: /_static/closed/diagram.svg
         :align: center
     """
+    Over = Under = Generator.alias("Exp")
+    Exp: ClassVar[Generator[..., "Exp"]]
 
 
-class Exp(biclosed.Exp):
+Wire = Ty.Wire
+
+
+@Ty.generator
+class Exp(biclosed.Exp, Wire):
     "An exponential object in a markov category."
 
     ob = Ty
@@ -93,14 +105,22 @@ class Diagram(markov.Diagram, biclosed.Diagram, ClosedCategory):
     A diagram applied to another post-composes their tensor with an `Eval`.
     """
     ob = Ty
+    Eval: ClassVar[Generator[..., "Eval"]]
+    Functor: ClassVar[Generator[..., "Functor"]]
+    TermBase: ClassVar[Generator[..., "TermBase"]]
+    Constant: ClassVar[Generator[..., "Constant"]]
+    Variable: ClassVar[Generator[..., "Variable"]]
+    Application: ClassVar[Generator[..., "Application"]]
+    Abstraction: ClassVar[Generator[..., "Abstraction"]]
 
     @property
     def is_linear(self):
-        return all(box.is_linear for box in self.boxes)
+        """ Whether the diagram has no copy or discard. """
+        return not any(isinstance(box, markov.Copy) for box in self.boxes)
 
     @classmethod
     def ev(cls, base: Ty, exponent: Ty, left: bool = True):
-        return cls.eval_factory(exponent >> base, left=left)
+        return cls.Eval(exponent >> base, left=left)
 
     def to_compact(self) -> Diagram:
         """
@@ -133,60 +153,26 @@ class Diagram(markov.Diagram, biclosed.Diagram, ClosedCategory):
         return result
 
     def to_drawing(self):
-        return monoidal.Diagram.to_drawing(self, functor_factory=Functor)
+        return monoidal.Diagram.to_drawing(self, functor=Functor)
 
 
-class Box(markov.Box, biclosed.Box, Diagram):
-    "A closed box is a markov and biclosed box in a closed diagram."
-    is_linear = True
+Box = Diagram.Box
 
 
+@Diagram.generator
 class Eval(biclosed.Eval, Box):
     "The evaluation of an exponential type."
     drawing_name = "__call__"
 
 
-class Coeval(biclosed.Coeval, Box):
-    "The coevaluation of an exponential type, i.e. the dagger of an Eval."
+Coeval, Curry, Permutation, Swap, Trace, Copy, Merge, Discard, Sum, Bubble = (
+    Diagram.Coeval, Diagram.Curry,
+    Diagram.Permutation, Diagram.Swap, Diagram.Trace,
+    Diagram.Copy, Diagram.Merge, Diagram.Discard,
+    Diagram.Sum, Diagram.Bubble)
 
 
-class Curry(biclosed.Curry, Box):
-    "The currying of a closed diagram."
-
-
-class Permutation(markov.Permutation, Box):
-    "A permutation in a closed diagram."
-
-
-class Swap(Permutation, markov.Swap, Box):
-    "Symmetric swap in a closed diagram."
-
-
-class Trace(markov.Trace, Box):
-    "A trace in a closed category."
-
-
-class Copy(markov.Copy, Box):
-    "A markov copy in a closed category"
-
-    is_linear = False
-
-
-class Discard(markov.Discard, Copy):
-    "A markov discard in a closed category."
-
-
-class Sum(markov.Sum, biclosed.Sum, Box):
-    """
-    A markov sum is a symmetric sum and a markov box.
-
-    Parameters:
-        terms (tuple[Diagram, ...]) : The terms of the formal sum.
-        dom (Ty) : The domain of the formal sum.
-        cod (Ty) : The codomain of the formal sum.
-    """
-
-
+@Diagram.generator
 class Functor(biclosed.Functor, markov.Functor):
     """
     A closed functor is a markov functor
@@ -210,22 +196,13 @@ class Functor(biclosed.Functor, markov.Functor):
 CMap = cmap.CMap[Diagram]
 
 
-Diagram.functor_factory = Functor
 Hypergraph = hypergraph.Hypergraph[Diagram]
-Diagram.copy_factory = Copy
-Diagram.swap_factory = Swap
-Diagram.permutation_factory = Permutation
-Diagram.curry_factory = Curry
-Diagram.eval_factory = Eval
-Diagram.coeval_factory = Coeval
-Diagram.trace_factory = Trace
-Diagram.discard_factory = Discard
-Diagram.sum_factory = Sum
-Ty.exp_factory = Ty.under_factory = Ty.over_factory = staticmethod(Exp)
 
+Layer = Diagram.Layer
 Id = Diagram.id
 
 
+@Diagram.generator
 class TermBase(Box, biclosed.TermBase):
     """
     A term in the internal language of a closed category.
@@ -239,6 +216,7 @@ class TermBase(Box, biclosed.TermBase):
 type Term = Constant | Variable | Application | Abstraction
 
 
+@Diagram.generator
 class Constant(TermBase, biclosed.Constant):
     def eval(self, functor=None, context=None):
         functor = functor or self.functor
@@ -248,6 +226,7 @@ class Constant(TermBase, biclosed.Constant):
             functor)
 
 
+@Diagram.generator
 class Variable(TermBase, biclosed.Variable):
     def eval(self, functor=None, context=None):
         functor = functor or self.functor
@@ -259,6 +238,7 @@ class Variable(TermBase, biclosed.Variable):
             for x in context.inside])
 
 
+@Diagram.generator
 class Application(TermBase, biclosed.Application):
     def __check_dom__(self, func, args, left):
         self.overlap = set(func.freevars).intersection(args.freevars)
@@ -281,6 +261,7 @@ class Application(TermBase, biclosed.Application):
             >> func @ args >> evaluate
 
 
+@Diagram.generator
 class Abstraction(TermBase, biclosed.Abstraction):
     def __check_dom__(self):
         self.freevars = [x for x in self.body.freevars if x != self.var]
@@ -329,11 +310,14 @@ class Substitution:
             return other(term)
 
 
-Ty.variable_factory = Variable
-Ty.constant_factory = Constant
-Ty.application_factory = Application
-Ty.abstraction_factory = Abstraction
+Ty.Variable, Ty.Constant = (
+    Diagram.Variable, Diagram.Constant)
+Ty.Application, Ty.Abstraction = (
+    Diagram.Application, Diagram.Abstraction)
 
 
 class Equation(markov.Equation):
     """ The :class:`markov.Equation` of closed diagrams. """
+
+
+Diagram.Equation = Equation

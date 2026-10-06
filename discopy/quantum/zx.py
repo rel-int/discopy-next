@@ -13,6 +13,8 @@ Summary
 
     Diagram
     Box
+    Sum
+    Permutation
     Swap
     Spider
     Z
@@ -21,10 +23,12 @@ Summary
     Scalar
 """
 
+from typing import ClassVar
+
 from math import pi
 
 from discopy import cat, rigid, tensor, quantum
-from discopy.cat import factory
+from discopy.cat import factory, Generator
 from discopy.quantum.circuit import qubit, Circuit
 from discopy.quantum.gates import (
     Bra, Ket, Rz, Rx, CX, CZ, Controlled, format_number)
@@ -37,6 +41,8 @@ from discopy.utils import factory_name
 class Diagram(tensor.Diagram[complex]):
     """ ZX Diagram. """
     ob = Nat
+    Spider = tensor.Spider
+    Swap: ClassVar[Generator[..., "Swap"]]
 
     @staticmethod
     def swap(left, right):
@@ -45,7 +51,7 @@ class Diagram(tensor.Diagram[complex]):
         return tensor.Diagram.swap.__func__(Diagram, left, right)
 
     @staticmethod
-    def cup_factory(left, right):
+    def Cup(left, right):
         del left, right
         return Z(2, 0)
 
@@ -220,32 +226,15 @@ class Diagram(tensor.Diagram[complex]):
         return diagram
 
 
-class Box(tensor.Box[complex], Diagram):
-    """
-    A ZX box is a tensor box in a ZX diagram.
-
-    Parameters:
-        name (str) : The name of the box.
-        dom (rigid.Nat) : The domain of the box, i.e. its input.
-        cod (rigid.Nat) : The codomain of the box, i.e. its output.
-    """
+Box, Sum, Permutation, Cap, Bubble, Eval, Coeval, Curry, Copy, Merge, Discard\
+    = (Diagram.Box, Diagram.Sum,
+       Diagram.Permutation, Diagram.Cap,
+       Diagram.Bubble, Diagram.Eval, Diagram.Coeval,
+       Diagram.Curry, Diagram.Copy, Diagram.Merge,
+       Diagram.Discard)
 
 
-class Sum(tensor.Sum[complex], Box):
-    """
-    A formal sum of ZX diagrams with the same domain and codomain.
-
-    Parameters:
-        terms (tuple[Diagram, ...]) : The terms of the formal sum.
-        dom (Dim) : The domain of the formal sum.
-        cod (Dim) : The codomain of the formal sum.
-    """
-
-
-class Permutation(tensor.Permutation[complex], Box):
-    "A permutation in a ZX diagram."
-
-
+@Diagram.generator
 class Swap(Permutation, tensor.Swap[complex], Box):
     """ Swap in a ZX diagram. """
     def __repr__(self):
@@ -396,6 +385,8 @@ H.drawing_name, H.tikzstyle_name, = '', 'H'
 H.color, H.shape = "yellow", "rectangle"
 
 SWAP = Swap(Nat(1), Nat(1))
-Diagram.swap_factory, Diagram.sum_factory = Swap, Sum
-Diagram.permutation_factory = Permutation
+TermBase, Constant, Variable, Application, Abstraction = (
+    Diagram.TermBase, Diagram.Constant, Diagram.Variable,
+    Diagram.Application, Diagram.Abstraction)
+Layer = Diagram.Layer
 Id = Diagram.id

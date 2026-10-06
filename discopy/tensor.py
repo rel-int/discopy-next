@@ -17,12 +17,28 @@ Summary
     Diagram
     CMap
     Box
-    Swap
     Cup
     Cap
+    Permutation
+    Swap
     Spider
     Sum
     Bubble
+
+Spiders
+-------
+
+The spiders of a tensor diagram evaluate to the copy tensors of the
+frobenius algebra on each dimension.
+
+>>> vector = Box('vec', Dim(1), Dim(2), [0, 1])
+>>> spider = Spider(1, 2, Dim(2))
+>>> assert (vector >> spider).eval() == (vector @ vector).eval()
+>>> Equation(vector >> spider, vector @ vector).draw(figsize=(3, 2),
+...     doctest='docs/_static/tensor/frobenius-example.svg')
+
+.. image:: /_static/tensor/frobenius-example.svg
+    :align: center
 
 Tensor combinatorial maps
 -------------------------
@@ -44,11 +60,11 @@ indices. Swaps, cups and caps become wiring while spiders stay as boxes.
 from __future__ import annotations
 
 from itertools import count
-from typing import TYPE_CHECKING, Sequence
+from typing import ClassVar, Sequence, TYPE_CHECKING
 
 from discopy import (
     cat, monoidal, rigid, frobenius, cmap, config)
-from discopy.cat import factory, assert_iscomposable
+from discopy.cat import factory, Generator, assert_iscomposable
 from discopy.frobenius import Dim, Cup
 from discopy.matrix import (  # noqa: F401
     Matrix, backend, set_backend, get_backend,
@@ -174,7 +190,7 @@ class Tensor(Matrix):
         return type(self)(array, self.cod, self.dom)
 
     @classmethod
-    def cup_factory(cls, left: Dim, right: Dim) -> Tensor:
+    def Cup(cls, left: Dim, right: Dim) -> Tensor:
         assert_isinstance(left, Dim)
         assert_isinstance(right, Dim)
         left.assert_isadjoint(right)
@@ -182,7 +198,7 @@ class Tensor(Matrix):
 
     @classmethod
     def cups(cls, left: Dim, right: Dim) -> Tensor:
-        return rigid.nesting(cls, cls.cup_factory)(left, right)
+        return rigid.nesting(cls, cls.Cup)(left, right)
 
     @classmethod
     def caps(cls, left: Dim, right: Dim) -> Tensor:
@@ -217,8 +233,8 @@ class Tensor(Matrix):
         return cls(array, dom, cod)
 
     @classmethod
-    def spider_factory(cls, n_legs_in: int, n_legs_out: int,
-                       typ: Dim, phase=None) -> Tensor:
+    def Spider(cls, n_legs_in: int, n_legs_out: int,
+               typ: Dim, phase=None) -> Tensor:
         if phase is not None:
             raise NotImplementedError
         assert_isatomic(typ, Dim)
@@ -503,6 +519,9 @@ class Diagram(NamedGeneric['dtype'], frobenius.Diagram):
     vector[::-1] >> vector >> Dim(2) @ vector
     """
     ob = Dim
+    Box: ClassVar[Generator[..., "Box"]]
+    Permutation: ClassVar[Generator[..., "Permutation"]]
+    Bubble: ClassVar[Generator[..., "Bubble"]]
 
     def eval(self, dtype: type = None, optimize="greedy",
              **params) -> Tensor:
@@ -641,7 +660,7 @@ class Diagram(NamedGeneric['dtype'], frobenius.Diagram):
     def grad(self, var, **params):
         """ Gradient with respect to :code:`var`. """
         if var not in self.free_symbols:
-            return self.sum_factory((), self.dom, self.cod)
+            return self.Sum((), self.dom, self.cod)
         left, box, right = self.inside[0].boxes_and_types
         tail = self[1:]
         t1 = self.id(left) @ box.grad(var, **params) @ self.id(right) >> tail
@@ -679,10 +698,13 @@ class Diagram(NamedGeneric['dtype'], frobenius.Diagram):
             result += Box(str(var), Dim(1), dim, onehot.array) @ self.grad(var)
         return result
 
+    Functor = frobenius.Functor
+
 
 CMap = cmap.CMap[Diagram]
 
 
+@Diagram.generator
 class Box(frobenius.Box, Diagram):
     """
     A tensor box is a frobenius box with an array as data.
@@ -747,26 +769,10 @@ class Box(frobenius.Box, Diagram):
         return (self.name, self.dom, self.cod, self.dtype) + data
 
 
-class Cup(frobenius.Cup, Box):
-    """
-    A tensor cup is a frobenius cup in a tensor diagram.
-
-    Parameters:
-        left (Dim) : The atomic type.
-        right (Dim) : Its adjoint.
-    """
+Cup, Cap = Diagram.Cup, Diagram.Cap
 
 
-class Cap(frobenius.Cap, Box):
-    """
-    A tensor cap is a frobenius cap in a tensor diagram.
-
-    Parameters:
-        left (Dim) : The atomic type.
-        right (Dim) : Its adjoint.
-    """
-
-
+@Diagram.generator
 class Permutation(frobenius.Permutation, Box):
     "A permutation in a tensor diagram."
 
@@ -777,51 +783,14 @@ class Permutation(frobenius.Permutation, Box):
         return Tensor.permutation(self.perm, doms).array
 
 
-class Swap(Permutation, frobenius.Swap, Box):
-    """
-    A tensor swap is a frobenius swap in a tensor diagram.
-
-    Parameters:
-        left (Dim) : The type on the top left and bottom right.
-        right (Dim) : The type on the top right and bottom left.
-    """
+Swap, Spider, Sum, Eval, Coeval, Curry, Copy, Merge, Discard = (
+    Diagram.Swap, Diagram.Spider, Diagram.Sum,
+    Diagram.Eval, Diagram.Coeval, Diagram.Curry,
+    Diagram.Copy, Diagram.Merge, Diagram.Discard)
 
 
-class Spider(frobenius.Spider, Box):
-    """
-    A tensor spider is a frobenius spider in a tensor diagram.
-
-    Parameters:
-        n_legs_in (int) : The number of legs in.
-        n_legs_out (int) : The number of legs out.
-        typ (Dim) : The dimension of the spider.
-        data : The phase of the spider.
-
-    Examples
-    --------
-    >>> vector = Box('vec', Dim(1), Dim(2), [0, 1])
-    >>> spider = Spider(1, 2, Dim(2))
-    >>> assert (vector >> spider).eval() == (vector @ vector).eval()
-    >>> Equation(vector >> spider, vector @ vector).draw(figsize=(3, 2),
-    ...     doctest='docs/_static/tensor/frobenius-example.svg')
-
-    .. image:: /_static/tensor/frobenius-example.svg
-        :align: center
-    """
-
-
-class Sum(monoidal.Sum, Box):
-    """
-    A formal sum of tensor diagrams with the same domain and codomain.
-
-    Parameters:
-        terms (tuple[Diagram, ...]) : The terms of the formal sum.
-        dom (Dim) : The domain of the formal sum.
-        cod (Dim) : The codomain of the formal sum.
-    """
-
-
-class Bubble(monoidal.Bubble, Box):
+@Diagram.generator
+class Bubble(frobenius.Bubble, Box):
     """
     Bubble in a tensor diagram, applies a function elementwise.
 
@@ -893,12 +862,15 @@ class Bubble(monoidal.Bubble, Box):
             @ self.arg.grad(var) >> Spider(2, 1, self.cod)
 
 
-Diagram.sum_factory, Diagram.swap_factory = Sum, Swap
-Diagram.permutation_factory = Permutation
-Diagram.cup_factory, Diagram.cap_factory = Cup, Cap
-Diagram.spider_factory, Diagram.bubble_factory = Spider, Bubble
+TermBase, Constant, Variable, Application, Abstraction = (
+    Diagram.TermBase, Diagram.Constant, Diagram.Variable,
+    Diagram.Application, Diagram.Abstraction)
+Layer = Diagram.Layer
 Id = Diagram.id
 
 
 class Equation(frobenius.Equation):
     """ The :class:`frobenius.Equation` of tensor diagrams. """
+
+
+Diagram.Equation = Equation

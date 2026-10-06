@@ -103,3 +103,106 @@ def test_wire_tree_roundtrip():
     with warns(DeprecationWarning):
         assert from_tree({'factory': 'discopy.frobenius.Ob', 'name': 'x'})\
             == frobenius.Wire('x')
+
+
+def test_generator():
+    from discopy import symmetric, markov, closed, compact, feedback
+    from discopy import biclosed, rigid, pivotal
+    from discopy.grammar import categorial
+    assert closed.Wire.__bases__ == (biclosed.Wire, )
+    assert categorial.Over.ob is categorial.Ty
+    assert pivotal.Functor.dom is pivotal.Functor.cod is pivotal.Diagram
+    assert rigid.Nat.Exp is rigid.Exp
+    assert closed.Swap.__bases__ == (
+        markov.Swap, closed.Permutation, closed.Box, closed.Diagram)
+    assert closed.Discard.__bases__ == (
+        markov.Discard, closed.Copy, closed.Diagram)
+    assert pickle.loads(pickle.dumps(closed.Swap)) is closed.Swap
+    x, y = compact.Ty('x'), feedback.Ty('y')
+    assert compact.Swap(x, x).r == compact.Swap(x.r, x.r)
+    assert feedback.Swap(y, y).delay().dom == y.delay() @ y.delay()
+
+
+def test_generator_decorator():
+    """ A category binds a generator under its own name, and is inherited. """
+    from discopy import cat
+
+    @factory
+    class Base(cat.Arrow):
+        pass
+
+    @Base.generator
+    class Atom(cat.Box, Base):
+        pass
+
+    @factory
+    class Sub(Base):
+        pass
+
+    assert Base.Atom is Atom is Sub.Atom
+
+
+def test_Generator_alias():
+    """ A factory can be another factory of the same category. """
+    from discopy import symmetric, closed
+    assert symmetric.Diagram.Braid is symmetric.Swap
+    assert closed.Ty.Over is closed.Ty.Under is closed.Exp
+
+
+def test_Generator_outside_the_hierarchy():
+    """ A factory class with no generator in its bases keeps the root. """
+    from discopy import monoidal
+    from discopy.grammar import cfg
+    assert cfg.Rule.Layer is monoidal.Layer
+    assert cfg.Word.Box is monoidal.Box
+
+
+def test_Generator_call():
+    """ A factory taken out of its class calls the generator of its owner. """
+    from discopy import symmetric
+    x = symmetric.Ty('x')
+    swap = vars(symmetric.Diagram)["Swap"]
+    twist = vars(symmetric.Diagram)["Twist"]
+    assert swap(x, x) == symmetric.Swap(x, x)
+    assert twist(x) == symmetric.Diagram.id(x)
+
+
+def test_generator_override():
+    """ A generator declared or assigned by hand wins over a built one. """
+    from discopy import monoidal, symmetric, tensor
+
+    @factory
+    class Recipe(symmetric.Diagram):
+        pass
+
+    @Recipe.generator
+    class Box(symmetric.Box, Recipe):
+        pass
+
+    assert Recipe.Swap.__bases__ == (
+        symmetric.Swap, Recipe.Permutation, Box, Recipe)
+    assert monoidal.Nat.Wire is monoidal.Dim.Wire is int
+    assert tensor.Diagram[complex].Swap is tensor.Swap
+
+
+@pytest.mark.parametrize("path", [
+    "braided.Diagram", "traced.Diagram", "balanced.Diagram",
+    "symmetric.Diagram", "markov.Diagram", "closed.Diagram",
+    "biclosed.Diagram", "rigid.Diagram", "pivotal.Diagram", "ribbon.Diagram",
+    "compact.Diagram", "frobenius.Diagram", "feedback.Diagram",
+    "tensor.Diagram", "grammar.pregroup.Diagram", "grammar.categorial.Diagram",
+    "quantum.circuit.Circuit", "quantum.zx.Diagram"])
+def test_generator_exports(path):
+    """ Every generator of a level is exported by the module defining it. """
+    import sys
+    from importlib import import_module
+    module, name = path.rsplit(".", 1)
+    D = getattr(import_module(f"discopy.{module}"), name)
+    for owner in (D, D.ob):
+        names = {name for klass in owner.__mro__ for name, value
+                 in vars(klass).items() if isinstance(value, Generator)}
+        assert names
+        for name in names:
+            if isinstance(cls := getattr(owner, name), type):
+                assert getattr(sys.modules[cls.__module__], cls.__name__)\
+                    is cls

@@ -20,6 +20,8 @@ Summary
     Diagram
     Box
     Trace
+    Sum
+    Bubble
     Functor
 
 Axioms
@@ -123,9 +125,11 @@ Dinaturality
 >>> assert sliding_left and sliding_right
 """
 
+from typing import ClassVar
+
 from discopy import monoidal, cmap, hypergraph
 from discopy.abc import TracedCategory
-from discopy.cat import factory
+from discopy.cat import factory, Generator
 from discopy.monoidal import Ty  # noqa: F401
 from discopy.utils import (
     factory_name,
@@ -144,6 +148,9 @@ class Diagram(monoidal.Diagram, TracedCategory):
         dom (monoidal.Ty) : The domain of the diagram, i.e. its input.
         cod (monoidal.Ty) : The codomain of the diagram, i.e. its output.
     """
+    Trace: ClassVar[Generator[..., "Trace"]]
+    Functor: ClassVar[Generator[..., "Functor"]]
+
     def trace(self, n=1, left=False):
         """
         Feed ``n`` outputs back into inputs.
@@ -165,23 +172,16 @@ class Diagram(monoidal.Diagram, TracedCategory):
         .. image:: /_static/traced/trace.svg
         """
         return self if n == 0\
-            else self.trace_factory(self, left).trace(n - 1, left)
+            else self.Trace(self, left).trace(n - 1, left)
 
     def to_drawing(self):
-        return monoidal.Diagram.to_drawing(self, functor_factory=Functor)
+        return monoidal.Diagram.to_drawing(self, functor=Functor)
 
 
-class Box(monoidal.Box, Diagram):
-    """
-    A traced box is a monoidal box in a traced diagram.
-
-    Parameters:
-        name (str) : The name of the box.
-        dom (monoidal.Ty) : The domain of the box, i.e. its input.
-        cod (monoidal.Ty) : The codomain of the box, i.e. its output.
-    """
+Box = Diagram.Box
 
 
+@Diagram.generator
 class Trace(Box, monoidal.Bubble):
     """
     A trace is a diagram ``arg`` with an output wire fed back into an input.
@@ -202,7 +202,7 @@ class Trace(Box, monoidal.Bubble):
         dom, cod = (arg.dom[1:], arg.cod[1:]) if left\
             else (arg.dom[:-1], arg.cod[:-1])
         monoidal.Bubble.__init__(self, arg, dom=dom, cod=cod)
-        Box.__init__(self, name, dom, cod)
+        self.Box.__init__(self, name, dom, cod)
 
     def __str__(self):
         return self.name
@@ -217,6 +217,10 @@ class Trace(Box, monoidal.Bubble):
         return self.ar.to_drawing(self)
 
 
+Sum, Bubble = Diagram.Sum, Diagram.Bubble
+
+
+@Diagram.generator
 class Functor(monoidal.Functor):
     """
     A traced functor is a monoidal functor that preserves traces.
@@ -262,7 +266,6 @@ class Functor(monoidal.Functor):
 
 CMap = cmap.CMap[Diagram]
 
-Diagram.functor_factory = Functor
-Diagram.trace_factory = Trace
 Hypergraph = hypergraph.Hypergraph[Diagram]
+Layer = Diagram.Layer
 Id = Diagram.id

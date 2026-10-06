@@ -15,7 +15,11 @@ Summary
     Box
     Cup
     Cap
+    Permutation
     Swap
+    Spider
+    Sum
+    Bubble
     Word
     Functor
 
@@ -30,8 +34,10 @@ Summary
         brute_force
 """
 
+from typing import ClassVar
+
 from discopy import rigid, frobenius, messages
-from discopy.cat import factory
+from discopy.cat import factory, Generator
 from discopy.utils import AxiomError, deprecated_alias
 from discopy.grammar import thue
 from discopy.rigid import Wire  # noqa: F401
@@ -56,6 +62,8 @@ class Ty(rigid.Ty):
     >>> n.assert_isadjoint(n.l)
     >>> n.assert_isadjoint(n.r)
     """
+    Wire = rigid.Wire
+
     def assert_isadjoint(self, other):
         """
         Raise ``AxiomError`` if two pregroup types are not adjoints.
@@ -98,6 +106,9 @@ class Diagram(frobenius.Diagram):
     >>> assert F(sentence)
     """
     ob = Ty
+    Box: ClassVar[Generator[..., "Box"]]
+    Swap: ClassVar[Generator[..., "Swap"]]
+    Spider: ClassVar[Generator[..., "Spider"]]
 
     def normal_form(self, **params):
         """
@@ -155,6 +166,7 @@ class Diagram(frobenius.Diagram):
     caps = classmethod(rigid.Diagram.caps.__func__)
 
 
+@Diagram.generator
 class Box(frobenius.Box, Diagram):
     """
     A pregroup box is a frobenius box in a pregroup diagram.
@@ -162,22 +174,11 @@ class Box(frobenius.Box, Diagram):
     rotate = rigid.Box.rotate
 
 
-class Cup(frobenius.Cup, Box):
-    """
-    A pregroup cup is a frobenius cup in a pregroup diagram.
-    """
+Cup, Cap, Permutation = (
+    Diagram.Cup, Diagram.Cap, Diagram.Permutation)
 
 
-class Cap(frobenius.Cap, Box):
-    """
-    A pregroup cap is a frobenius cap in a pregroup diagram.
-    """
-
-
-class Permutation(frobenius.Permutation, Box):
-    "A permutation in a pregroup diagram."
-
-
+@Diagram.generator
 class Swap(Permutation, frobenius.Swap, Box):
     """
     A pregroup swap is a frobenius swap in a pregroup diagram.
@@ -187,6 +188,7 @@ class Swap(Permutation, frobenius.Swap, Box):
                 type(self)(self.left.r, self.right.r))
 
 
+@Diagram.generator
 class Spider(frobenius.Spider, Box):
     """
     A pregroup spider is a frobenius spider in a pregroup diagram.
@@ -196,6 +198,12 @@ class Spider(frobenius.Spider, Box):
         return type(self)(len(self.cod), len(self.dom), typ, self.phase)
 
 
+Sum, Bubble, Eval, Coeval, Curry, Copy, Merge, Discard = (
+    Diagram.Sum, Diagram.Bubble, Diagram.Eval,
+    Diagram.Coeval, Diagram.Curry, Diagram.Copy,
+    Diagram.Merge, Diagram.Discard)
+
+
 class Word(thue.Word, Box):
     """
     A word is a rigid box with a ``name``, a grammatical type as ``cod`` and
@@ -203,7 +211,7 @@ class Word(thue.Word, Box):
     """
     def __init__(self, name: str, cod: rigid.Ty, dom: rigid.Ty = Ty(),
                  **params):
-        Box.__init__(self, name, dom, cod, **params)
+        self.Box.__init__(self, name, dom, cod, **params)
 
     def __repr__(self):
         extra = f", dom={repr(self.dom)}" if self.dom else ""
@@ -212,9 +220,7 @@ class Word(thue.Word, Box):
         return f"Word({repr(self.name)}, {repr(self.cod)}{extra})"
 
 
-class Functor(frobenius.Functor):
-    """ A pregroup functor is a frobenius functor with a pregroup domain. """
-    dom = cod = Diagram
+Functor = Diagram.Functor
 
 
 def eager_parse(*words, target=Ty('s')):
@@ -252,10 +258,11 @@ def brute_force(*vocab, target=Ty('s')):
             test.append(words + (word, ))
 
 
-Diagram.swap_factory, Diagram.spider_factory = Swap, Spider
-Diagram.permutation_factory = Permutation
-Diagram.cup_factory, Diagram.cap_factory = Cup, Cap
-
+Exp, Over, Under = Ty.Exp, Ty.Over, Ty.Under
+TermBase, Constant, Variable, Application, Abstraction = (
+    Diagram.TermBase, Diagram.Constant, Diagram.Variable,
+    Diagram.Application, Diagram.Abstraction)
+Layer = Diagram.Layer
 Id = Diagram.id
 
 

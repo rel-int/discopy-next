@@ -8,8 +8,10 @@ import json
 from functools import lru_cache, wraps
 from math import ceil
 from pathlib import Path
+from types import MethodType
 from typing import (
     Callable,
+    Concatenate,
     Generic,
     Mapping,
     Iterable,
@@ -17,6 +19,7 @@ from typing import (
     Any,
     Collection,
     NamedTuple,
+    overload,
     TYPE_CHECKING,
 )
 
@@ -594,10 +597,13 @@ def factory(cls):
     ... class Circuit(Arrow):
     ...     ob = Qubit
 
-    The :code:`Circuit` subclass itself has a subclass :code:`Gate` as boxes.
+    The boxes of a :code:`Circuit` are a subclass of both :class:`Box` and
+    :code:`Circuit`, built by :attr:`Arrow.Box`, a
+    :class:`Generator`.
 
-    >>> class Gate(Box, Circuit):
-    ...     pass
+    >>> Gate = Circuit.Box
+    >>> assert issubclass(Gate, Box) and issubclass(Gate, Circuit)
+    >>> assert Gate.__name__ == "Box" and Gate.__module__ == Circuit.__module__
 
     The identity and composition of :code:`Circuit` is again a :code:`Circuit`.
 
@@ -667,6 +673,142 @@ class classproperty(object):
 
     def __get__(self, _, x):
         return self.f(x)
+
+
+class Generator[**P, T]:
+    """
+    The generator of a category, bound under its own name, e.g. ``Swap``
+    on ``symmetric.Diagram``, and taking the parameters ``P`` of that class
+    to an instance ``T`` of it. :meth:`discopy.cat.FreeCategory.generator`
+    declares one at its class statement.
+
+    :meth:`subclass` declares the class of the generator: on that category
+    the attribute is the class itself, on any other category decorated with
+    :func:`factory` it is a subclass built on first access, extending the
+    attribute of each base and the generators of the category that the
+    class extends, so that a module writes ``Swap = Diagram.Swap``.
+    The level enters through the root: a box extends the level's
+    ``Diagram``, an ``Exp`` gets the level's ``Ty`` as ``ob`` and a
+    ``Functor`` its ``Diagram`` as ``dom`` and ``cod``. A generator is built
+    once per module and a class attribute assigned by hand wins.
+    :meth:`classmethod` declares a generator that is behaviour rather than
+    a class, e.g. the trace of a pivotal diagram, and :meth:`alias` one that
+    is another generator of the same category, e.g. the braid of a symmetric
+    category is its swap.
+
+    Example
+    -------
+    >>> from discopy import symmetric, markov, closed
+    >>> assert symmetric.Diagram.Swap is symmetric.Swap
+    >>> assert closed.Swap.__bases__ == (
+    ...     markov.Swap, closed.Permutation, closed.Box, closed.Diagram)
+    """
+    def __init__(self, root: Callable[P, T] = None,
+                 method: Callable[Concatenate[Any, P], T] = None,
+                 aliased: str = None):
+        self.root, self.method, self.aliased = root, method, aliased
+
+    @classmethod
+    def subclass[**Q, U](cls, root: Callable[Q, U]) -> Generator[Q, U]:
+        """ The factory building a subclass of ``root`` at every level. """
+        return Generator(root=root)
+
+    @classmethod
+    def alias(cls, name: str) -> Generator[..., Any]:
+        """
+        The factory named ``name`` on the same category, e.g. the braid of
+        a symmetric category is its swap.
+        """
+        return Generator(aliased=name)
+
+    @classmethod
+    def classmethod[**Q, U](
+            cls, method: Callable[Concatenate[Any, Q], U]) -> Generator[Q, U]:
+        """ The factory calling ``method`` on the category. """
+        return Generator(method=method)
+
+    def __set_name__(self, owner: type, name: str):
+        self.owner, self.name, self.cache = owner, name, {}
+
+    @overload
+    def __get__(self, instance: None, cls: type) -> Callable[P, T]: ...
+
+    @overload
+    def __get__(self, instance: object, cls: type) -> Callable[P, T]: ...
+
+    def __get__(self, instance, cls: type) -> Callable[P, T]:
+        try:
+            return self.cache[cls]
+        except KeyError:
+            self.cache[cls] = generator = self.resolve(cls)
+            return generator
+
+    def resolve(self, cls: type) -> Callable[P, T]:
+        """
+        The generator of ``cls``, computed once and cached under both the
+        class it is read from and the category that keys it, so that a box
+        and its diagram get the same class rather than two equal ones.
+        """
+        if self.aliased is not None:
+            return getattr(cls, self.aliased)
+        if self.method is not None:
+            return MethodType(self.method, cls)
+        category = cls.ar
+        if (generator := self.cache.get(category)) is None:
+            self.cache[category] = generator = self.root\
+                if category is self.owner\
+                else self.shared(category) or self.build(category)
+        return generator
+
+    def __call__(self, *args: P.args, **kwargs: P.kwargs) -> T:
+        """
+        Call the factory of the category that declares it, e.g. the ``Swap``
+        of ``symmetric.Diagram``. Attribute access goes through
+        :meth:`__get__`, so this is reached only by a factory taken out of
+        the class where it is declared.
+        """
+        return self.__get__(None, self.owner)(*args, **kwargs)
+
+    def shared(self, cls: type) -> type | None:
+        """ The generator of a base of ``cls`` defined in the same module. """
+        return next((
+            root for base in cls.__bases__ if base.__module__ == cls.__module__
+            and isinstance(root := getattr(base, self.name, None), type)),
+            None)
+
+    @property
+    def parents(self) -> tuple[str, ...]:
+        """ The generators of the owner that the root extends. """
+        names = {name for klass in self.owner.__mro__ for name, value
+                 in vars(klass).items() if isinstance(value, Generator)}
+        return tuple(name for base in self.root.__bases__
+                     for name in sorted(names)
+                     if getattr(self.owner, name) is base)
+
+    def build(self, cls: type) -> type:
+        """
+        The subclass of the generators of the bases of ``cls``, or the root
+        itself when no base of ``cls`` has one, i.e. when ``cls`` is outside
+        the hierarchy of the category that declares the generator.
+        """
+        roots = dict.fromkeys(
+            root for base in cls.__bases__
+            if isinstance(root := getattr(base, self.name, None), type))
+        if not roots:
+            return self.root
+        parents = [getattr(cls, name) for name in self.parents]
+        root, *_ = roots
+        level = (cls, ) if issubclass(self.root, self.owner) else ()
+        attributes = {key: cls for key, value in vars(self.root).items()
+                      if value is self.owner}
+        references = " and ".join(
+            f":class:`~{r.__module__}.{r.__name__}`" for r in roots)
+        return type(root.__name__, (*roots, *parents, *level), {
+            **attributes,
+            "__module__": cls.__module__,
+            "__qualname__": root.__name__,
+            "__doc__": f"A {references} in a "
+                       f":class:`~{cls.__module__}.{cls.__name__}`."})
 
 
 class Node:

@@ -149,7 +149,7 @@ class Hypergraph(MonoidalCategory, NamedGeneric['category']):
     >>> assert H.category.ob == Ty and H.category == Diagram
 
     The :class:`Functor` used by :meth:`from_diagram` is read off the category
-    itself, i.e. ``H.functor == H.category.functor_factory``.
+    itself, i.e. ``H.functor == H.category.Functor``.
 
     >>> from discopy.frobenius import Functor
     >>> assert H.functor == Functor
@@ -186,7 +186,7 @@ class Hypergraph(MonoidalCategory, NamedGeneric['category']):
     """
     category = None
 
-    functor = classproperty(lambda cls: cls.category.functor_factory)
+    functor = classproperty(lambda cls: cls.category.Functor)
     ob = classproperty(lambda cls: cls.category.ob)
 
     def __init__(
@@ -457,10 +457,10 @@ class Hypergraph(MonoidalCategory, NamedGeneric['category']):
     def merge(cls, typ, n=2) -> Hypergraph:
         return cls.spiders(n, 1, typ)
 
-    cup_factory = classmethod(lambda cls, left, right: cls.from_box(
-        cls.category.cup_factory(left, right)))
-    cap_factory = classmethod(lambda cls, left, right: cls.from_box(
-        cls.category.cap_factory(left, right)))
+    Cup = classmethod(lambda cls, left, right: cls.from_box(
+        cls.category.Cup(left, right)))
+    Cap = classmethod(lambda cls, left, right: cls.from_box(
+        cls.category.Cap(left, right)))
 
     @classmethod
     def cups(cls, left, right):
@@ -517,7 +517,7 @@ class Hypergraph(MonoidalCategory, NamedGeneric['category']):
 
         Note
         ----
-        When ``category.trace_factory`` is a subclass of ``category``,
+        When ``category.Trace`` is a subclass of ``category``,
         e.g. for symmetric diagrams, then the result is just one big trace box
         wrapped up as a hypergraph.
 
@@ -528,7 +528,7 @@ class Hypergraph(MonoidalCategory, NamedGeneric['category']):
         if not issubclass(self.category, TracedCategory):
             raise AxiomError(messages.NOT_TRACED.format(
                 factory_name(self.category)))
-        factory = self.category.trace_factory
+        factory = self.category.Trace
         if isclass(factory) and issubclass(factory, self.category):
             return self.from_box(factory(self.to_diagram(), left))
         return factory.__func__(type(self), self, left)
@@ -1159,7 +1159,7 @@ class Hypergraph(MonoidalCategory, NamedGeneric['category']):
             else:
                 node = self.ports[min(output_wires)]
                 depth = len(boxes) if node.kind == "output" else node.depth
-            boxes = boxes[:depth] + [self.category.spider_factory(
+            boxes = boxes[:depth] + [self.category.Spider(
                 len(input_wires), len(output_wires), typ)] + boxes[depth:]
             offsets = self.offsets[:depth] + (None, ) + self.offsets[depth:]
             port_key = lambda port: (
@@ -1218,13 +1218,13 @@ class Hypergraph(MonoidalCategory, NamedGeneric['category']):
                     fwires = list(self.flat_wires)
                     fwires[source], fwires[target] = left, right
                     if cups_or_caps == "cups":
-                        boxes = self.boxes + (self.category.cup_factory(
+                        boxes = self.boxes + (self.category.Cup(
                             source_obj, target_obj), )
                         offsets = self.offsets + (None, )
                         fwires = fwires[:len(fwires) - len(self.cod)] + [
                             left, right] + fwires[len(fwires) - len(self.cod):]
                     else:
-                        boxes = (self.category.cap_factory(
+                        boxes = (self.category.Cap(
                             source_obj, target_obj), ) + self.boxes
                         offsets = (None, ) + self.offsets
                         fwires = fwires[:len(self.dom)] + [
@@ -1255,7 +1255,7 @@ class Hypergraph(MonoidalCategory, NamedGeneric['category']):
                 continue
             depth = getattr(self.ports[max(input_wires)], "depth", -1) + 1\
                 if input_wires else 0
-            boxes = self.boxes[:depth] + (self.category.spider_factory(
+            boxes = self.boxes[:depth] + (self.category.Spider(
                 len(input_wires), 1, typ), ) + self.boxes[depth:]
             offsets = self.offsets[:depth] + (None, ) + self.offsets[depth:]
             fwires = list(self.flat_wires)
@@ -1329,14 +1329,14 @@ class Hypergraph(MonoidalCategory, NamedGeneric['category']):
         return self
 
     @property
-    def is_generator(self):
-        """ Whether the hypergraph is a single generator. """
+    def is_atom(self):
+        """ Whether the hypergraph is a single generator, i.e. an atom. """
         return len(self.boxes) == 1 and self == self.from_box(self.boxes[0])
 
     @property
-    def generator(self):
-        """ Return the `f` from `Hypergraph.from_box(f)` if `is_generator`. """
-        return self.boxes[0] if self.is_generator else None
+    def atom(self):
+        """ Return the `f` from `Hypergraph.from_box(f)` if `is_atom`. """
+        return self.boxes[0] if self.is_atom else None
 
     @classmethod
     def from_box(cls, box: Box) -> Hypergraph:
@@ -1545,7 +1545,7 @@ class Hypergraph(MonoidalCategory, NamedGeneric['category']):
                     parts += [layer_dom[cursor:placed_offset], placed]
                     cursor = placed_offset + len(placed.dom)
                 parts.append(layer_dom[cursor:])
-                layer = diagram.layer_factory(*parts)
+                layer = diagram.Layer(*parts)
                 diagram >>= diagram.ar((layer,), layer.dom, layer.cod)
             pending, layer_right, shift = [], 0, 0
 

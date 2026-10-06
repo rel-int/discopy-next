@@ -156,7 +156,7 @@ class CMap[C0: Pregroup, C1: CMap](
 
     Following :class:`Hypergraph`, the map is parametrised by a category.
     The functor used by :meth:`from_diagram` is read from
-    ``category.functor_factory``; :meth:`Diagram.to_map` parameterises
+    ``category.Functor``; :meth:`Diagram.to_map` parameterises
     ``CMap`` with the concrete diagram category automatically.
     A map is always compact, whatever the category that hosts it, so that
     every compact operation is available when manipulating maps. It is
@@ -223,7 +223,7 @@ class CMap[C0: Pregroup, C1: CMap](
     """
 
     category: ClassVar[Diagram] = None
-    functor = classproperty(lambda cls: cls.category.functor_factory)
+    functor = classproperty(lambda cls: cls.category.Functor)
     ob = classproperty(lambda cls: cls.category.ob)
 
     dom: C0
@@ -895,10 +895,10 @@ class CMap[C0: Pregroup, C1: CMap](
             2 * len(dom))
         return cls(dom, cod, (), edge, check=False)
 
-    cup_factory = classmethod(lambda cls, left, right: cls.from_box(
-        cls.category.cup_factory(left, right)))
-    cap_factory = classmethod(lambda cls, left, right: cls.from_box(
-        cls.category.cap_factory(left, right)))
+    Cup = classmethod(lambda cls, left, right: cls.from_box(
+        cls.category.Cup(left, right)))
+    Cap = classmethod(lambda cls, left, right: cls.from_box(
+        cls.category.Cap(left, right)))
 
     @classmethod
     def cups(cls, left: Ty, right: Ty) -> CMap:
@@ -975,7 +975,7 @@ class CMap[C0: Pregroup, C1: CMap](
             raise ValueError
         if not n:
             return self
-        return self.from_box(self.category.curry_factory(
+        return self.from_box(self.category.Curry(
             self.to_diagram(), n, left))
 
     def base_and_exponent(self, n: int, left: bool) -> tuple[Ty, Ty]:
@@ -1230,13 +1230,13 @@ class CMap[C0: Pregroup, C1: CMap](
 
         Note
         ----
-        When ``category.trace_factory`` is a class, e.g. for symmetric
+        When ``category.Trace`` is a class, e.g. for symmetric
         diagrams, then the result is just one big trace box wrapped up as a
         map. Otherwise it is a class method, e.g. for compact diagrams, in
         which case we use it to introduce cup and cap boxes.
         """
         type(self).assert_istraced()
-        factory = self.category.trace_factory
+        factory = self.category.Trace
         if isclass(factory):
             return self.from_box(factory(self.to_diagram(), left))
         return factory.__func__(type(self), self, left)
@@ -1246,8 +1246,8 @@ class CMap[C0: Pregroup, C1: CMap](
         Introduce cup and cap boxes to make self :attr:`is_monogamous`,
         i.e. so that every wire connects a positive and a negative port.
 
-        The boxes come from ``category.cup_factory`` and
-        ``category.cap_factory``, so this needs a rigid category.
+        The boxes come from ``category.Cup`` and
+        ``category.Cap``, so this needs a rigid category.
 
         Example
         -------
@@ -1266,12 +1266,12 @@ class CMap[C0: Pregroup, C1: CMap](
                 continue
             source, target = ports[i].obj, ports[j].obj
             if ports[i].kind.is_positive:
-                box = self.category.cup_factory(source, target)
+                box = self.category.Cup(source, target)
                 boxes = self.boxes + (box, )
                 insert = self.n_ports - len(self.cod)
                 box_wires = [(insert, i), (insert + 1, j)]
             else:
-                box = self.category.cap_factory(source, target)
+                box = self.category.Cap(source, target)
                 boxes = (box, ) + self.boxes
                 insert = len(self.dom)
                 box_wires = [(insert + 1, i), (insert, j)]
@@ -1350,15 +1350,15 @@ class CMap[C0: Pregroup, C1: CMap](
         >>> assert f.to_map().curry().to_compact()\\
         ...     == (f.to_map() >> CMap.ev(z, y).dagger()).trace()
         """
-        curry_factory = self.category.curry_factory
-        if not any(isinstance(box, curry_factory) for box in self.boxes):
+        Curry = self.category.Curry
+        if not any(isinstance(box, Curry) for box in self.boxes):
             return self
         functor = self.functor(
             ob_map=lambda typ: typ, ar_map=type(self).from_box,
             dom=self.category, cod=type(self))
 
         def image(box):
-            if not isinstance(box, curry_factory):
+            if not isinstance(box, Curry):
                 return functor(box)
             exponent = box.cod.exponent
             return (type(self).from_diagram(box.arg).to_compact()

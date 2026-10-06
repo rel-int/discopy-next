@@ -56,8 +56,9 @@ Or you can keep scrolling down, skip the theory and go straight to the examples 
 - a `Diagram(inside, dom, cod)` is a sequence of composable layers `inside` with a designated input `dom` and output `cod`: the identity diagram is the empty sequence with `dom == cod`, composition `f >> g` is sequence concatenation
 - the tensor of diagrams is decomposed in terms of composition and whiskering i.e. `f @ g = f @ g.dom >> f.cod @ g`, this is biased in the sense that `f` happens before `g` so that diagrams really live in a [premonoidal category](https://en.wikipedia.org/wiki/Premonoidal_category)
 - *the first gotcha of DisCoPy:* `Box` is a subclass of `Diagram` with a cyclic reference `list(box.inside) == [Layer(box)]`
-- every categorical structure is implemented with the factory method pattern so that e.g. the method `Diagram.swap` computes the symmetry of arbitrary types with `Diagram.swap_factory = Swap` as subroutine for generating subclasses of `Box` for the symmetry of atomic types
+- every categorical structure is implemented with the factory method pattern so that e.g. the method `Diagram.swap` computes the symmetry of arbitrary types with `Diagram.Swap` as subroutine for generating the subclass of `Box` for the symmetry of atomic types
 - *the second gotcha of DisCoPy:* each `C: Category` comes with a class attribute `ar` such that `C.ar = C`; this happens with the decorator `@factory` and it allows for e.g. the subclass `Box` to know that it lives inside a bigger `Diagram` category
+- a generator is defined once, in the module that introduces it: `symmetric` writes `@Diagram.generator` above `class Swap`, with a `ClassVar` annotation for it in the body of `Diagram`, and every level below gets its own `Swap` built from those of its bases, e.g. `closed.Swap = closed.Diagram.Swap`, and the same goes for the wires and exponentials of a `Ty`, the terms and the `Functor` of a `Diagram`; a level only writes a generator by hand when it adds behaviour to it
 
 ## Example: Cooking
 
@@ -84,8 +85,8 @@ class CookingPermutation(Permutation, CookingStep):
 class CookingSwap(CookingPermutation, Swap, CookingStep):
   "A cooking swap takes two ingredients `X @ Y` and gives `Y @ X`."
 
-Recipe.swap_factory = CookingSwap  # Recipes need to know how to swap.
-Recipe.permutation_factory = CookingPermutation
+Recipe.Swap = CookingSwap  # Recipes need to know how to swap.
+Recipe.Permutation = CookingPermutation
 
 egg, white, yolk = Ingredient("egg"), Ingredient("white"), Ingredient("yolk")
 crack = CookingStep("crack", egg, white @ yolk)
@@ -136,11 +137,13 @@ crack_two_eggs_at_once = crack_two_eggs.foliation()
 
 empty = Ingredient()
 
+CookingLayer = Recipe.Layer  # Every level has its own layers.
+
 assert crack_two_eggs_at_once == Recipe(
   dom=egg @ egg, cod=white @ yolk, inside=(
-    Layer(crack, crack),
-    Layer(white, CookingSwap(yolk, white), yolk),
-    Layer(merge(white), merge(yolk))))
+    CookingLayer(crack, crack),
+    CookingLayer(white, CookingSwap(yolk, white), yolk),
+    CookingLayer(merge(white), merge(yolk))))
 
 crack_two_eggs_at_once.draw(
   doctest="docs/_static/readme/crack-two-eggs-at-once.svg")

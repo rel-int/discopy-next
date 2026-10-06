@@ -251,7 +251,7 @@ def test_parameterisation():
     from discopy import frobenius
     assert H == Hypergraph[frobenius.Diagram]
     assert H.category == frobenius.Diagram
-    assert H.functor == frobenius.Functor == H.category.functor_factory
+    assert H.functor == frobenius.Functor == H.category.Functor
     assert H.ob == frobenius.Ty
 
 

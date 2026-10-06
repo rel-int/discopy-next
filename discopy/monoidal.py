@@ -58,7 +58,7 @@ from __future__ import annotations
 import itertools
 from dataclasses import dataclass, field
 from functools import cached_property
-from typing import Iterator, Callable, TYPE_CHECKING
+from typing import Callable, ClassVar, Iterator, TYPE_CHECKING
 from warnings import warn
 
 from discopy import abc, cat, drawing, hypergraph, cmap, messages
@@ -70,6 +70,7 @@ from discopy.config import (
     COLOUR_DRAWING_ATTRIBUTES, TRANSPARENT)
 from discopy.utils import (
     factory,
+    Generator,
     factory_name,
     from_tree,
     assert_isinstance,
@@ -180,10 +181,10 @@ class Wire(cat.Ob):
         return cls(tree['name'], dom, cod, is_dagger='is_dagger' in tree)
 
 
-class List(Monoid, NamedGeneric['generator_factory']):
+class List(Monoid, NamedGeneric['Atom']):
     """
-    The free monoid on a ``generator_factory``, i.e. lists of its instances
-    with concatenation as :meth:`tensor` and the empty list as unit.
+    The free monoid on an ``Atom``, i.e. lists of its instances with
+    concatenation as :meth:`tensor` and the empty list as unit.
 
     ``List[X]`` is the free monoid on ``X`` the way ``Hypergraph[C]`` is the
     hypergraph category over a category ``C``, e.g. ``python.Function.ob``
@@ -201,6 +202,15 @@ class List(Monoid, NamedGeneric['generator_factory']):
     A list is a sequence of its length-one sublists, e.g.
     ``List[int](2, 3)[0] == List[int](2)``; the atoms themselves are its
     :attr:`inside`, e.g. ``List[int](2, 3).inside[0] == 2``.
+
+    Note
+    ----
+    ``Atom`` types what a list is made of, ``ob`` what it goes between:
+    a monoid has one object, so ``List.ob`` is :class:`type(None)` and
+    every list has ``dom = cod = None``.
+
+    >>> assert List[int].Atom is int and List[int].ob is type(None)
+    >>> assert List[int](2, 3).dom is List[int](2, 3).cod is None
     """
     ob = type(None)
     dom = cod = None
@@ -289,24 +299,25 @@ class Ty(cat.Ob, cat.FreeCategory, ColouredMonoid):
     >>> assert t[1:] == t[-2:] == Ty('y', 'z')
     """
     ob = Colour
-    generator_factory = Wire
+
+    Wire: ClassVar[Generator[..., Wire]] = Generator.subclass(Wire)
 
     def cast_wire(self, x: str | cat.Ob) -> cat.Ob:
         """
-        Turn a constructor argument into a ``self.generator_factory``.
+        Turn a constructor argument into a ``self.Wire``.
 
         Old dumps and pickles used a plain ``cat.Ob``, with no colour, as
         the generators: upgrade it to ``Wire(x.name)`` for subclasses whose
-        generators are plain ``Wire``.
+        generators are built from a name alone.
         """
-        if isinstance(x, self.generator_factory):
+        wire = self.Wire
+        if isinstance(x, wire):
             return x
         if isinstance(x, str):
-            return self.generator_factory(x)
-        if self.generator_factory is Wire and type(x) is cat.Ob:
-            return self.generator_factory(x.name)
-        raise AxiomError(
-            messages.TYPE_ERROR.format(self.generator_factory, type(x)))
+            return wire(x)
+        if wire.__init__ is Wire.__init__ and type(x) is cat.Ob:
+            return wire(x.name)
+        raise AxiomError(messages.TYPE_ERROR.format(wire, type(x)))
 
     def __init__(self, *inside: str | cat.Ob,
                  dom: Colour = None, cod: Colour = None,
@@ -314,9 +325,11 @@ class Ty(cat.Ob, cat.FreeCategory, ColouredMonoid):
         inside = kwargs.pop('inside', inside)
         if kwargs:
             raise TypeError(f"Unexpected keyword arguments: {list(kwargs)}.")
+        wire = self.Wire
+        expected = (str, wire) + (
+            (cat.Ob, ) if wire.__init__ is Wire.__init__ else ())
         for obj in inside:
-            assert_isinstance(obj, (str, self.generator_factory) + (
-                (cat.Ob, ) if self.generator_factory is Wire else ()))
+            assert_isinstance(obj, expected)
         inside = tuple(map(self.cast_wire, inside))
         if dom is None:
             dom = inside[0].dom if inside else transparent
@@ -355,14 +368,14 @@ class Ty(cat.Ob, cat.FreeCategory, ColouredMonoid):
             + f"({', '.join(map(repr, self.inside))})"
 
     @property
-    def is_generator(self) -> bool:
+    def is_atom(self) -> bool:
         """ Whether a type is a single generating object. """
         return len(self.inside) == 1
 
     @property
-    def generator(self) -> Wire:
-        """ The single object inside a generator type. """
-        return self.inside[0] if self.is_generator else None
+    def atom(self) -> Wire:
+        """ The single object inside an atomic type. """
+        return self.inside[0] if self.is_atom else None
 
     def count(self, obj: cat.Ob) -> int:
         """
@@ -449,7 +462,7 @@ class Ty(cat.Ob, cat.FreeCategory, ColouredMonoid):
         inside = tuple(map(from_tree, tree['inside']))
         # Old dumps used cat.Ob as the generators of monoidal.Ty.
         inside = tuple(
-            cls.generator_factory(x.name) if type(x) is cat.Ob else x
+            cls.Wire(x.name) if type(x) is cat.Ob else x
             for x in inside)
         if inside:
             return cls(*inside)
@@ -530,7 +543,7 @@ class Nat(abc.Nat, Ty):
 
     >>> assert CX @ 2 >> 2 @ CX == CX @ CX
     """
-    generator_factory = int
+    Wire = int
 
     def __init__(self, inside: int | tuple = 0, dom: Colour = None,
                  cod: Colour = None, _scan: bool = True):
@@ -594,7 +607,7 @@ class Dim(Ty):
     >>> Dim(1) @ Dim(2) @ Dim(3)
     Dim(2, 3)
     """
-    generator_factory = int
+    Wire = int
 
     def __init__(self, *inside: int, dom=None, cod=None, _scan=True, **kwargs):
         inside = kwargs.pop('inside', inside)
@@ -834,13 +847,13 @@ class Layer(cat.Box, ColouredMonoid):
             normalise=False)
 
     @property
-    def is_generator(self):
+    def is_atom(self):
         return len(self.boxes_or_types) == 1\
             and isinstance(self.boxes_or_types[0], Box)
 
     @property
-    def generator(self):
-        return self.boxes_or_types[0] if self.is_generator else None
+    def atom(self):
+        return self.boxes_or_types[0] if self.is_atom else None
 
     def dagger(self) -> Layer:
         return type(self)(*(
@@ -940,7 +953,11 @@ class Diagram(cat.Arrow, MonoidalCategory, RichDisplay):
             normal_form
     """
     ob = Ty
-    layer_factory = Layer
+    Layer: ClassVar[Generator[..., Layer]] = Generator.subclass(Layer)
+    Box: ClassVar[Generator[..., "Box"]]
+    Sum: ClassVar[Generator[..., "Sum"]]
+    Bubble: ClassVar[Generator[..., "Bubble"]]
+    Functor: ClassVar[Generator[..., "Functor"]]
 
     def __setstate__(self, state):
         if 'inside' not in state:  # Backward compatibility
@@ -956,21 +973,21 @@ class Diagram(cat.Arrow, MonoidalCategory, RichDisplay):
                 assert_isinstance(layer, Layer)
                 if not layer.boxes:
                     raise ValueError(messages.LAYERS_MUST_HAVE_A_BOX)
-        super().__init__(inside, dom, cod, _scan=_scan)
+        cat.FreeCategory.__init__(self, inside, dom, cod, _scan=_scan)
 
     @property
     def size(self):
         return sum(box.size for box in self.inside)
 
     @property
-    def is_generator(self):
-        """ Whether a `Diagram` is a generator, i.e. a single box. """
-        return len(self) == 1 and self.inside[0].is_generator
+    def is_atom(self):
+        """ Whether a `Diagram` is an atom, i.e. a single box. """
+        return len(self) == 1 and self.inside[0].is_atom
 
     @property
-    def generator(self):
-        """ The single box in a generator `Diagram`. """
-        return self.inside[0].generator if self.is_generator else None
+    def atom(self):
+        """ The single box in an atomic `Diagram`. """
+        return self.inside[0].atom if self.is_atom else None
 
     @classmethod
     def from_callable(cls, dom: Ty, cod: Ty) -> Callable[Callable, Diagram]:
@@ -1031,7 +1048,7 @@ class Diagram(cat.Arrow, MonoidalCategory, RichDisplay):
         if others:
             return self.tensor(other).tensor(*others)
         if isinstance(other, Sum):
-            return self.sum_factory((self, )).tensor(other)
+            return self.Sum((self, )).tensor(other)
         assert_isinstance(other, self.ar)
         assert_isinstance(self, other.ar)
         inside = tuple(layer @ other.dom for layer in self.inside)\
@@ -1127,12 +1144,12 @@ class Diagram(cat.Arrow, MonoidalCategory, RichDisplay):
             assert_iscomposable(diagram, cls.id(cod))
         return diagram
 
-    def to_drawing(self, functor_factory=None) -> Drawing:
+    def to_drawing(self, functor=None) -> Drawing:
         """ Called before :meth:`Diagram.draw`. """
         ob = ar = lambda x: x.to_drawing()
         dom = self.ar
         cod = Drawing
-        return (functor_factory or Functor)(ob, ar, dom, cod)(self)
+        return (functor or Functor)(ob, ar, dom, cod)(self)
 
     def to_map(self) -> CMap:
         """ Translate a diagram into a combinatorial map. """
@@ -1403,6 +1420,7 @@ class Diagram(cat.Arrow, MonoidalCategory, RichDisplay):
         return super().from_tree(tree)
 
 
+@Diagram.generator
 class Box(cat.Box, Diagram):
     """
     A box is a diagram with a :code:`name` and the layer of just itself inside.
@@ -1468,7 +1486,7 @@ class Box(cat.Box, Diagram):
                 setattr(self, attr, params.pop(attr))
         cat.Box.__init__(self, name, dom, cod, **params)
         inside = () if self.is_identity\
-            else (self.layer_factory(self, normalise=False), )
+            else (self.Layer(self, normalise=False), )
         Diagram.__init__(self, inside, dom, cod)
 
     is_identity = False
@@ -1481,6 +1499,7 @@ class Box(cat.Box, Diagram):
         return Drawing.from_box(self)
 
 
+@Diagram.generator
 class Sum(cat.Sum, Box):
     """
     A sum is a tuple of diagrams :code:`terms`
@@ -1508,14 +1527,15 @@ class Sum(cat.Sum, Box):
         if other is None or others:
             return Diagram.tensor(self, other, *others)
         other = other if isinstance(other, Sum)\
-            else self.sum_factory((other, ))
+            else self.Sum((other, ))
         dom, cod = self.dom @ other.dom, self.cod @ other.cod
         terms = tuple(f.tensor(g) for f in self.terms for g in other.terms)
-        return self.sum_factory(terms, dom, cod)
+        return self.Sum(terms, dom, cod)
 
     to_drawing = Diagram.to_drawing
 
 
+@Diagram.generator
 class Bubble(cat.Bubble, Box):
     """
     A bubble is a box with diagrams :code:`args` inside and an optional pair of
@@ -1577,7 +1597,7 @@ class Bubble(cat.Bubble, Box):
             draw_as_square: bool = None,
             draw_vertically=False, **kwargs):
         cat.Bubble.__init__(self, *args, **kwargs)
-        Box.__init__(self, self.name, self.dom, self.cod)
+        self.Box.__init__(self, self.name, self.dom, self.cod)
         self.drawing_name = "" if drawing_name is None else drawing_name
         self.draw_vertically = draw_vertically
         self.frame_colour = BOX_DRAWING_ATTRIBUTES['frame_colour'](self)
@@ -1615,6 +1635,7 @@ class Bubble(cat.Bubble, Box):
         return getattr(Drawing, method)(*args, **kwargs)
 
 
+@Diagram.generator
 class Functor(cat.Functor):
     """
     A monoidal functor is a functor that preserves the tensor product.
@@ -1702,7 +1723,7 @@ class Functor(cat.Functor):
                 return self.cod.ob.id(self(other.dom))
             head, *tail = map(self, other.inside)
             return head.tensor(*tail)
-        if isinstance(other, self.dom.ob.generator_factory):
+        if isinstance(other, self.dom.ob.Wire):
             if isinstance(other, Wire) and other.is_dagger:
                 # Map a daggered coloured generator functorially: its image is
                 # the dagger of the image of the underlying generator.
@@ -1796,12 +1817,12 @@ class Equation(cat.Equation, RichDisplay):
         return self.to_drawing().draw(path=path, **params)
 
 
+Diagram.Equation = Equation
+
+
 Diagram.draw = drawing.draw
 Diagram.to_gif = drawing.to_gif
 
-Diagram.sum_factory = Sum
-Diagram.bubble_factory = Bubble
-Diagram.functor_factory = Functor
 Hypergraph = hypergraph.Hypergraph[Diagram]
 Drawing.ob = Ty
 Id = Diagram.id

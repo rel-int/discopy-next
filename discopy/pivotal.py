@@ -18,6 +18,8 @@ Summary
     Box
     Cup
     Cap
+    Sum
+    Bubble
     Functor
 
 Axioms
@@ -54,9 +56,11 @@ We also have its dagger and its transpose:
 
 from __future__ import annotations
 
+from typing import ClassVar
+
 from discopy import cat, cmap, rigid, traced
 from discopy.abc import PivotalCategory
-from discopy.cat import factory
+from discopy.cat import factory, Generator
 from discopy.utils import deprecated_alias
 
 
@@ -88,7 +92,7 @@ class Ty(rigid.Ty):
     Parameters:
         inside (Wire) : The objects inside the type.
     """
-    generator_factory = Wire
+    Wire: ClassVar[Generator[..., Wire]] = Generator.subclass(Wire)
 
 
 @factory
@@ -117,6 +121,9 @@ class Diagram(rigid.Diagram, traced.Diagram, PivotalCategory):
         cod (Ty) : The codomain of the diagram, i.e. its output.
     """
     ob = Ty
+    Box: ClassVar[Generator[..., "Box"]]
+    Cup: ClassVar[Generator[..., "Cup"]]
+    Cap: ClassVar[Generator[..., "Cap"]]
 
     def dagger(self):
         """
@@ -158,8 +165,8 @@ class Diagram(rigid.Diagram, traced.Diagram, PivotalCategory):
         """
         return self.rotate().dagger()
 
-    @classmethod
-    def trace_factory(cls, diagram: Diagram, left=False):
+    @Generator.classmethod
+    def Trace(cls, diagram: Diagram, left=False):
         """
         The trace of a pivotal diagram is its pre- and post-composition with
         cups and caps to form a feedback loop.
@@ -171,17 +178,18 @@ class Diagram(rigid.Diagram, traced.Diagram, PivotalCategory):
         traced_wire = diagram.dom[:1] if left else diagram.dom[-1:]
         dom, cod = (diagram.dom[1:], diagram.cod[1:]) if left\
             else (diagram.dom[:-1], diagram.cod[:-1])
-        return cls.cap_factory(traced_wire.r, traced_wire) @ dom\
+        return cls.Cap(traced_wire.r, traced_wire) @ dom\
             >> traced_wire.r @ diagram\
-            >> cls.cup_factory(traced_wire.r, traced_wire) @ cod if left\
-            else dom @ cls.cap_factory(traced_wire, traced_wire.r)\
+            >> cls.Cup(traced_wire.r, traced_wire) @ cod if left\
+            else dom @ cls.Cap(traced_wire, traced_wire.r)\
             >> diagram @ traced_wire.r\
-            >> cod @ cls.cup_factory(traced_wire, traced_wire.r)
+            >> cod @ cls.Cup(traced_wire, traced_wire.r)
 
 
-class Box(rigid.Box, Diagram):
+@Diagram.generator
+class Box(rigid.Box, traced.Box, Diagram):
     """
-    A pivotal box is a rigid box in a pivotal diagram.
+    A pivotal box is a rigid and traced box in a pivotal diagram.
 
     Parameters:
         name (str) : The name of the box.
@@ -211,6 +219,7 @@ class Box(rigid.Box, Diagram):
         return result
 
 
+@Diagram.generator
 class Cup(rigid.Cup, Box):
     """
     A pivotal cup is a rigid cup of pivotal types.
@@ -222,9 +231,10 @@ class Cup(rigid.Cup, Box):
 
     def dagger(self) -> Cap:
         """ The dagger of a pivotal cup. """
-        return self.cap_factory(self.left, self.right)
+        return self.Cap(self.left, self.right)
 
 
+@Diagram.generator
 class Cap(rigid.Cap, Box):
     """
     A pivotal cap is a rigid cap of pivotal types.
@@ -236,30 +246,29 @@ class Cap(rigid.Cap, Box):
 
     def dagger(self) -> Cup:
         """ The dagger of a pivotal cap. """
-        return self.cup_factory(self.left, self.right)
+        return self.Cup(self.left, self.right)
 
 
-class Functor(rigid.Functor):
-    """
-    A pivotal functor is a rigid functor on a pivotal category.
-
-    Parameters:
-        ob_map (Mapping[Ty, Ty]) :
-            Map from atomic :class:`Ty` to :code:`cod.ob`.
-        ar_map (Mapping[Box, Diagram]) : Map from :class:`Box` to :code:`cod`.
-        cod (Category) : The codomain of the functor.
-    """
-    dom = cod = Diagram
+Sum, Bubble, Eval, Coeval, Curry = (
+    Diagram.Sum, Diagram.Bubble, Diagram.Eval,
+    Diagram.Coeval, Diagram.Curry)
 
 
-Diagram.functor_factory = Functor
-Diagram.cup_factory, Diagram.cap_factory = Cup, Cap
+Functor = Diagram.Functor
 CMap = cmap.CMap[Diagram]
+Exp, Over, Under = Ty.Exp, Ty.Over, Ty.Under
+TermBase, Constant, Variable, Application, Abstraction = (
+    Diagram.TermBase, Diagram.Constant, Diagram.Variable,
+    Diagram.Application, Diagram.Abstraction)
+Layer = Diagram.Layer
 Id = Diagram.id
 
 
 class Equation(rigid.Equation):
     """ The :class:`rigid.Equation` of pivotal diagrams. """
+
+
+Diagram.Equation = Equation
 
 
 __getattr__ = deprecated_alias(__name__, {"Ob": "Wire", "PRO": "Nat"})

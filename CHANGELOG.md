@@ -9,10 +9,76 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Added
 
+- `utils.Generator` declares a generator once, on the category that
+  introduces it and under its own name: `@Diagram.generator` above
+  `class Swap` in `symmetric` binds `Diagram.Swap`, with a `ClassVar`
+  annotation for it in the body of `Diagram`. Naming the attribute after
+  the class couples the two, so a category reads `cls.Swap` where it used
+  to read `cls.swap_factory` and `cat.FreeCategory.generator` needs no
+  name of its own. That name was taken: the `generator` of an `Arrow`,
+  `Ty`, `Layer`, `Diagram`, `Sum` or `Hypergraph` -- the single box or
+  object of a term that has exactly one -- is now its `atom`, with
+  `is_generator` following as `is_atom`, which is what a term of length
+  one is. `Sum.atom` is a property like the other five, where it was a
+  method returning itself. Every level below
+  gets its own subclass built on first access, extending the swaps of its
+  bases, the generators its root extends (a swap is a permutation, a
+  discard a copy) and the level itself, so a module writes
+  `Swap = Diagram.Swap` in place of `class Swap(markov.Swap, Box)`
+  and `Diagram.swap_factory = Swap`; a level adding behaviour declares it
+  again, a generator that is behaviour rather than a class is a
+  `Generator.classmethod`, e.g. the trace of a pivotal diagram, one that is
+  another generator of the same category a `Generator.alias`, e.g. the braid
+  of a symmetric category is its swap, and a class attribute assigned by
+  hand still wins. Two slots name a role rather than a class, since they
+  are read on whichever free monoid or category is at hand: a stream
+  answers to `FollowedBy`, and a `List` names the class of its atoms
+  `Atom` where a `Ty` names its generators `Wire`, since `Atom` types
+  what a list is made of and `ob` what it goes between. `abc.Category.equation_factory` becomes `Category.Equation`
+  and each level binds the `Equation` it declares, where every one of them
+  read `cat.Equation`: an axiom of a category that quotients its equations
+  is now checked up to that quotient, e.g. by hypergraph isomorphism from
+  `symmetric` on, as the slot always said it would be.
+  `Generator[**P, T]` is generic in
+  the parameters of its generator and the instance it builds, `subclass`
+  and `classmethod` scoping their own, so that a binding carries the
+  signature of its root and a `ClassVar` spelling that signature out is
+  checked against it; `__get__` returns `Callable[P, T]` and `__call__`
+  takes `P` to `T`, for a generator read off the class that declares it. Fifty-six
+  trivial subclasses go, and every generator a level builds (bubbles,
+  sums, traces, copies, merges, evaluations) is a diagram of that level
+  rather than of the level that introduced it. Roots initialise through
+  `self.Box.__init__`, i.e. the box of the level they are
+  built in, so the six `z = 0` of the ribbon generators go where a braid
+  used to have no winding number of its own, `feedback.Swap`, `Copy` and
+  `Merge` keep only their `delay`, and `ribbon.Functor` recognises any
+  `balanced.Braid`. `cat.Arrow`
+  type-checks its boxes itself, `pivotal.Box` is a `traced.Box` and
+  `closed.Diagram.is_linear` reads its boxes. The same declaration serves
+  types, terms and functors: a `Ty` declares its wire, `biclosed.Ty` its
+  exponentials, `biclosed.Diagram` its terms with
+  `Ty.Constant = Diagram.Constant` linking the two at each
+  level, and every `Diagram` its `Functor`. A built class is tied to its
+  level by its root: it extends the level when the root is a subclass of
+  the owner, and the class attributes of the root equal to the owner are
+  lifted, so a built `Exp` has the level's `Ty` as `ob` and a built
+  `Functor` the level's `Diagram` as `dom` and `cod`. A generator is built
+  once per module, `Nat` and `Dim` sharing those of their `Ty`.
+  `categorial.Over` and `Under`, `pivotal.Functor` and `pregroup.Functor`
+  go, `biclosed.Ty` is made of the `biclosed.Wire` it never used, and the
+  braided, ribbon, pregroup and circuit diagrams have their own
+  `Functor` where they inherited a higher level's. `Layer`
+  is a `Generator` like the rest, so every level has its own `Layer` rather
+  than the one of the level that last added behaviour to it: a diagram
+  names its own layers when it serialises, and a layer built by hand from
+  a parent's class is not equal to one of the level below, as was already
+  the case for boxes. A factory class whose `ar` has no generator in its
+  bases, e.g. `grammar.cfg.Tree`, keeps the root of the declaration rather
+  than raising `ValueError`.
 - `monoidal.List`, the free monoid on a generator type: `List[X]` is a
   tuple of instances of `X` with concatenation as `tensor` and the empty
   list as unit, an `abc.Monoid` parameterised as
-  `NamedGeneric["generator_factory"]` the way `Hypergraph[C]` is the
+  `NamedGeneric["Atom"]` the way `Hypergraph[C]` is the
   hypergraph category over `C`. Free monoids come at three levels: `Ty`
   has arbitrary colours and generators, `List` a single colour and
   arbitrary generators, `Nat` a single colour and a single generator. A
@@ -398,7 +464,7 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   ([#350](https://github.com/discopy/discopy/pull/350)).
 - The `tensor` module is refactored to go through `CMap` for `einsum`
   ([#402](https://github.com/discopy/discopy/pull/402)).
-- Add a `functor_factory` attribute to each `Diagram` class and remove
+- Add a `Functor` attribute to each `Diagram` class and remove
   `hypergraph_factory` and `map_factory`: `Hypergraph` and `CMap` are
   parameterised directly as `NamedGeneric["category"]`
   ([#379](https://github.com/discopy/discopy/pull/379),
@@ -427,8 +493,8 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   [#470](https://github.com/discopy/discopy/pull/470)).
 - The `test/` directory is reorganised to mirror `discopy/`
   ([#403](https://github.com/discopy/discopy/pull/403)).
-- Symmetric categories generate their swaps with `swap_factory` rather than
-  `braid_factory`, which is now a `classproperty` reading it
+- Symmetric categories generate their swaps with `Swap` rather than
+  `Braid`, which is now a `classproperty` reading it
   ([#440](https://github.com/discopy/discopy/pull/440)).
 - `abc.SymmetricCategory` extends `abc.BraidedCategory` directly, so
   symmetric and Markov categories are not required to implement `twist` and
@@ -520,6 +586,19 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Fixed
 
+- `Stream[C].sequence` builds a box of `C` rather than a
+  `symmetric.Box`, which `Stream.__init__` then wrapped in a `C` diagram
+  of one foreign box, since its `box_factory` keyword defaulted to
+  `symmetric.Box` whatever the stream was parameterised over. It reads
+  `cls.category.Box` and the keyword goes, nothing having passed it.
+- Two docs notebooks call attributes that do not exist: the Kauffman
+  bracket of `examples.md` reads `Kauffman.Cup`, `Cap` and `Box` where
+  the slot rename left it on `cup_factory`, `cap_factory` and
+  `generator_factory`, and the cooking example of `diagrams.md` declares
+  the objects of its category with `ob` rather than a `ty_factory` that
+  never was an attribute, so the annotated `dom` and `cod` of a recipe
+  are `Ingredient` rather than a plain `cat.Ob`. No test runs the
+  notebooks, only the docs build does.
 - The marimo notebook previews in the docs follow the theme switch. The
   notebooks are exported with marimo's `system` theme and the docs relay
   the resolved theme into each notebook's iframe through marimo's
@@ -544,7 +623,7 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   `Hypergraph.__init__` when the two arities differ, an `AxiomError` on
   the spider types when they do not. `.l` and `.r` are involutions again
   ([#716](https://github.com/discopy/discopy/issues/716)).
-- `rigid.Diagram.functor_factory` is `rigid.Functor`: it inherited
+- `rigid.Diagram.Functor` is `rigid.Functor`: it inherited
   `biclosed.Functor`, which does not rotate, so a box mapped through
   it lost the rotation of its boundary.
 - Region painting computes the exact extents of each coloured region —
@@ -564,7 +643,7 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   oriented cups and caps, rather than fixing the handedness at downgrade time.
   ([#532](https://github.com/discopy/discopy/pull/532)).
 - `Hypergraph.explicit_trace` and `CMap.explicit_trace` no longer mistake the
-  inherited `trace_factory` of a user-defined subclass for a class method,
+  inherited `Trace` of a user-defined subclass for a class method,
   which used to raise `AttributeError: type object 'Trace' has no attribute
   '__func__'` ([#532](https://github.com/discopy/discopy/pull/532)).
 - `CMap.topological_order` raises `AxiomError` on a map with a directed
@@ -653,7 +732,7 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   applied to an argument sharing a free variable did not compose, and a
   left abstraction evaluates through its right counterpart
   ([#562](https://github.com/discopy/discopy/issues/562)).
-- `Tensor.spider_factory` returns its array on the active backend instead
+- `Tensor.Spider` returns its array on the active backend instead
   of always on NumPy, so diagrams with spiders evaluate — and
   differentiate — under the PyTorch backend
   ([#582](https://github.com/discopy/discopy/issues/582)).

@@ -19,6 +19,7 @@ Summary
     Cup
     Cap
     Sum
+    Bubble
     Functor
 
 Axioms
@@ -151,11 +152,11 @@ import copy
 
 from collections.abc import Callable
 
-from typing import Iterator
+from typing import ClassVar, Iterator
 
 from discopy import cat, monoidal, biclosed, messages
 from discopy.abc import Pregroup, RigidCategory
-from discopy.cat import factory
+from discopy.cat import factory, Generator
 from discopy.utils import (
     assert_isatomic,
     assert_isinstance,
@@ -264,7 +265,7 @@ class Ty(Pregroup, biclosed.Ty):
     >>> assert n.l.r == n == n.r.l
     >>> assert (s @ n).l == n.l @ s.l and (s @ n).r == n.r @ s.r
     """
-    generator_factory = Wire
+    Wire: ClassVar[Generator[..., Wire]] = Generator.subclass(Wire)
 
     def __setstate__(self, state):
         if '_z' in state:  # Backward compatibility
@@ -383,12 +384,17 @@ class Diagram(biclosed.Diagram, RigidCategory):
     """
 
     ob = Ty
-    layer_factory = Layer
+    Layer: ClassVar[Generator[..., Layer]] = Generator.subclass(Layer)
 
     to_drawing = monoidal.Diagram.to_drawing
 
     ev = classmethod(RigidCategory.ev.__func__)
     curry = RigidCategory.curry
+    Box: ClassVar[Generator[..., "Box"]]
+    Sum: ClassVar[Generator[..., "Sum"]]
+    Cup: ClassVar[Generator[..., "Cup"]]
+    Cap: ClassVar[Generator[..., "Cap"]]
+    Functor: ClassVar[Generator[..., "Functor"]]
 
     @classmethod
     def cups(cls, left: Ty, right: Ty) -> Diagram:
@@ -408,7 +414,7 @@ class Diagram(biclosed.Diagram, RigidCategory):
         .. image:: /_static/rigid/cups.svg
             :align: center
         """
-        return nesting(cls, cls.cup_factory)(left, right)
+        return nesting(cls, cls.Cup)(left, right)
 
     @classmethod
     def caps(cls, left: Ty, right: Ty) -> Diagram:
@@ -428,7 +434,7 @@ class Diagram(biclosed.Diagram, RigidCategory):
         .. image:: /_static/rigid/caps.svg
             :align: center
         """
-        return nesting(cls, cls.cap_factory)(left, right)
+        return nesting(cls, cls.Cap)(left, right)
 
     def rotate(self, left=False):
         """
@@ -641,6 +647,7 @@ class Diagram(biclosed.Diagram, RigidCategory):
         return super().normal_form(**params)
 
 
+@Diagram.generator
 class Box(biclosed.Box, Diagram):
     """
     A rigid box is a biclosed box in a rigid diagram.
@@ -706,6 +713,7 @@ class Box(biclosed.Box, Diagram):
         return result
 
 
+@Diagram.generator
 class Sum(biclosed.Sum, Box):
     """
     A rigid sum is a biclosed sum that can be transposed.
@@ -718,12 +726,13 @@ class Sum(biclosed.Sum, Box):
 
     def rotate(self, left=False) -> Sum:
         if left:
-            return self.sum_factory(
+            return self.Sum(
                 tuple(term.l for term in self.terms), self.cod.l, self.dom.l)
-        return self.sum_factory(
+        return self.Sum(
             tuple(term.r for term in self.terms), self.cod.r, self.dom.r)
 
 
+@Diagram.generator
 class Cup(BinaryBoxConstructor, Box):
     """
     The counit of the adjunction for an atomic type.
@@ -748,11 +757,11 @@ class Cup(BinaryBoxConstructor, Box):
         name = f"Cup({left}, {right})"
         dom, cod = left @ right, self.ob(dom=left.dom, cod=left.dom)
         BinaryBoxConstructor.__init__(self, left, right)
-        Box.__init__(self, name, dom, cod, draw_as_cup=True)
+        self.Box.__init__(self, name, dom, cod, draw_as_cup=True)
 
     def rotate(self, left=False):
-        return self.cap_factory(self.right.l, self.left.l) if left\
-            else self.cap_factory(self.right.r, self.left.r)
+        return self.Cap(self.right.l, self.left.l) if left\
+            else self.Cap(self.right.r, self.left.r)
 
     def dagger(self):
         """
@@ -762,6 +771,7 @@ class Cup(BinaryBoxConstructor, Box):
         raise AxiomError("Rigid cups have no dagger, use pivotal instead.")
 
 
+@Diagram.generator
 class Cap(BinaryBoxConstructor, Box):
     """
     The unit of the adjunction for an atomic type.
@@ -786,11 +796,11 @@ class Cap(BinaryBoxConstructor, Box):
         name = f"Cap({left}, {right})"
         dom, cod = self.ob(dom=left.dom, cod=left.dom), left @ right
         BinaryBoxConstructor.__init__(self, left, right)
-        Box.__init__(self, name, dom, cod, draw_as_cap=True)
+        self.Box.__init__(self, name, dom, cod, draw_as_cap=True)
 
     def rotate(self, left=False):
-        return self.cup_factory(self.right.l, self.left.l) if left\
-            else self.cup_factory(self.right.r, self.left.r)
+        return self.Cup(self.right.l, self.left.l) if left\
+            else self.Cup(self.right.r, self.left.r)
 
     def dagger(self):
         """
@@ -800,6 +810,12 @@ class Cap(BinaryBoxConstructor, Box):
         raise AxiomError("Rigid caps have no dagger, use pivotal instead.")
 
 
+Bubble, Eval, Coeval, Curry = (
+    Diagram.Bubble, Diagram.Eval,
+    Diagram.Coeval, Diagram.Curry)
+
+
+@Diagram.generator
 class Functor(biclosed.Functor):
     """
     A rigid functor is a biclosed functor that preserves cups and caps.
@@ -883,14 +899,19 @@ def to_rigid(self):
 
 biclosed.Diagram.to_rigid = to_rigid
 
-Diagram.cup_factory, Diagram.cap_factory, Diagram.sum_factory = Cup, Cap, Sum
-Diagram.functor_factory = Functor
 
+Exp, Over, Under = Ty.Exp, Ty.Over, Ty.Under
+TermBase, Constant, Variable, Application, Abstraction = (
+    Diagram.TermBase, Diagram.Constant, Diagram.Variable,
+    Diagram.Application, Diagram.Abstraction)
 Id = Diagram.id
 
 
 class Equation(biclosed.Equation):
     """ The :class:`biclosed.Equation` of rigid diagrams. """
+
+
+Diagram.Equation = Equation
 
 
 __getattr__ = deprecated_alias(__name__, {"Ob": "Wire", "PRO": "Nat"})
