@@ -44,6 +44,23 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   map over a host below `rigid` cannot draw the adjoint types they
   quantify over. An issue should be filed upstream for both.
 
+- Epsilon-greedy focusing in `discopy.search`: a goal commits to a
+  rule it applies deterministically — the conclusion unifies in
+  exactly one way, binding every premise without residuals, and the
+  premises keep to the subformulae of the goal — except with
+  probability `epsilon`, where the full search resumes. The
+  invertible rules are computed by `search.focused` from the
+  sequents at each goal rather than declared: `Exp` patterns gain
+  the unify that decomposes a single exponential object its base and
+  exponent rebuild, so the curry of a biclosed category opens the
+  goal's own exponential and focuses, while at a rigid level the
+  collapsed exponential focuses only when the transpose is forced by
+  the goal's own atoms, the subformula condition blocking a curry
+  that would invent an adjoint. `epsilon=0` is a focused decision
+  procedure, any `epsilon > 0` preserves the support of the search —
+  every term keeps a positive chance — and `epsilon=1` disables
+  focusing; the default is `0.05`.
+
 - The codebase typechecks: `uv run ty check` passes in the full
   development environment, `ty` a dev dependency locked in
   `uv.lock`, configured by the `[tool.ty]` sections of

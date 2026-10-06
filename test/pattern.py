@@ -170,6 +170,22 @@ def test_parse():
         is DelayedMonoid
 
 
+def test_exp_unify():
+    """ An exponential pattern decomposes a single exponential object
+    its base and exponent rebuild, and keeps the residual otherwise. """
+    from discopy import biclosed, rigid
+
+    a, b = biclosed.Ty("a"), biclosed.Ty("b")
+    Z = Ob("Z", Sort(bound=ResiduatedMonoid))
+    Y = Ob("Y", Sort(bound=ResiduatedMonoid))
+    ((subst, residuals),) = (Z << Y).match(b << a)
+    assert subst == {"Z": b, "Y": a} and not residuals
+    ((_, residual),) = (Z >> Y).match(b << a)
+    assert residual  # The symbols disagree, so the equation is kept.
+    ((_, residual),) = (Z << Y).match(rigid.Ty("b") << rigid.Ty("a"))
+    assert residual  # A pregroup exponential is two adjoint atoms.
+
+
 def test_level():
     """ A pattern needs the level its known objects are bounded by. """
     assert Ob.level() is Category and Tensor.level() is ColouredMonoid

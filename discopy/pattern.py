@@ -533,7 +533,11 @@ class Delay(Pattern):
 
 @dataclass(frozen=True)
 class Exp(Pattern):
-    """ An exponential ``p << q`` or ``p >> q`` of two patterns. """
+    """ An exponential ``p << q`` or ``p >> q`` of two patterns,
+    decomposed against a single exponential object that its base and
+    exponent rebuild, kept as a residual otherwise — so a level that
+    collapses its exponentials, e.g. into the adjoints of a pregroup,
+    keeps the residual. """
 
     symbol: str
     left: Pattern
@@ -557,6 +561,20 @@ class Exp(Pattern):
         return self.OPERATORS[self.symbol](
             self.left.instantiate(subst, unit),
             self.right.instantiate(subst, unit))
+
+    def unify(self, value, subst, residuals):
+        atom = value.inside[0] if len(value) == 1 else None
+        base = getattr(atom, "base", None)
+        exponent = getattr(atom, "exponent", None)
+        operands = (base, exponent) if self.symbol == "<<"\
+            else (exponent, base)
+        if base is None or exponent is None\
+                or value != self.OPERATORS[self.symbol](*operands):
+            yield from super().unify(value, subst, residuals)
+            return
+        for subst_, residuals_ in self.left.unify(
+                operands[0], subst, residuals):
+            yield from self.right.unify(operands[1], subst_, residuals_)
 
     def __str__(self):
         return f"({self.left} {self.symbol} {self.right})"

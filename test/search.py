@@ -102,6 +102,38 @@ def test_declarations():
     # not a rule: Ty.then shadows the rule a mere category declares.
 
 
+def test_focusing():
+    """ A goal commits to the rule it applies deterministically, with an
+    ``epsilon`` chance of escaping back to the full search. """
+    from discopy import biclosed, rigid
+    from discopy.search import focused
+
+    a, b = biclosed.Ty("a"), biclosed.Ty("b")
+
+    def rules_in_focus(cls, dom, cod):
+        return [found.name for found, _ in focused([
+            (r, list(r.match(dom, cod))) for r in cls.rules.values()],
+            dom, cod, type(dom))]
+
+    assert rules_in_focus(biclosed.Diagram, a, b << a) == ["curry_left"]
+    s, t = rigid.Ty("a"), rigid.Ty("b")
+    assert rules_in_focus(rigid.Diagram, s, t << s) == ["curry_left"]
+    # The transpose is forced: its premise keeps to the goal's atoms.
+    assert not rules_in_focus(rigid.Diagram, s, t)
+    # A bare codomain curries only by inventing an adjoint: a choice.
+
+    curried = find(search(
+        biclosed.Diagram, biclosed.Box.strategy,
+        dom=a, cod=b << a, epsilon=0), bool)
+    assert isinstance(curried.boxes[-1], biclosed.Curry)
+    escaped = find(search(
+        biclosed.Diagram, biclosed.Box.strategy,
+        dom=a, cod=b << a, epsilon=0.5),
+        lambda term: not any(
+            isinstance(box, biclosed.Curry) for box in term.boxes))
+    assert escaped.cod == b << a  # Support survives any epsilon > 0.
+
+
 def test_goal_patterns():
     """ The sides of a goal are patterns under a shared substitution. """
     from typing import TypeVar
