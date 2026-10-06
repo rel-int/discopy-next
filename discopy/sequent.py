@@ -93,21 +93,31 @@ def heads(category: type) -> dict[str, type]:
 class Sort:
     """
     The sort of a variable, as its bound states it: ``Obj[C0]`` or no
-    bound an object, ``Atom[C0]`` or ``Atom`` an atomic one, ``Count``
-    a number of repetitions; or the sort of a premise, ``Obj[C0]`` or
-    ``Atom[C0]`` with no pattern, or ``Self``. The head names what the
-    sort ranges over: a type parameter of the declaring class, e.g.
-    ``C0``, or else the objects of the category.
+    bound an object, ``Atom[C0]`` or ``Atom`` one of size one,
+    ``Obj[C0, None, N]`` one of size ``N``, ``Count`` a number; or the
+    sort of a premise, ``Obj[C0]`` or ``Atom[C0]`` with no pattern, or
+    ``Self``. The head names what the sort ranges over: a type parameter
+    of the declaring class, e.g. ``C0``, or else the objects of the
+    category. The size is a number, the name of a ``Count`` variable or
+    :obj:`None` for any.
 
     >>> from discopy.monoidal import Ty
     >>> def cups[X: Atom[Ty]](): ...
     >>> print(Sort.of(cups.__type_params__[0]))
     Atom[Ty]
+    >>> def trace[N: Count, M: Obj[Ty, None, N]](): ...
+    >>> print(Sort.of(trace.__type_params__[1]))
+    Obj[Ty, N]
     """
 
     head: str = OBJECTS
-    atomic: bool = False
+    size: int | str | None = None
     count: bool = False
+
+    @property
+    def atomic(self) -> bool:
+        """ Whether the sort is of size one. """
+        return self.size == 1
 
     @classmethod
     def of(cls, variable: TypeVar) -> Sort:
@@ -116,16 +126,14 @@ class Sort:
         if bound is Count:
             return cls("Count", count=True)
         args = get_args(bound)
-        head = name(args[0]) if args else OBJECTS
-        return cls(head, atomic=bound is Atom or get_origin(bound) is Atom)
+        return cls(name(args[0]) if args else OBJECTS, size=size(bound))
 
     @classmethod
     def premise(cls, annotation) -> Sort:
         """ The sort of a premise ``Obj[C0]`` or ``Atom[C0]``, or ``Self``. """
         if annotation is Self:
             return cls(SELF)
-        return cls(name(get_args(annotation)[0]),
-                   atomic=get_origin(annotation) is Atom)
+        return cls(name(get_args(annotation)[0]), size=size(annotation))
 
     def resolve(self, scope: dict) -> type:
         """ The type the head stands for in the scope. """
@@ -133,9 +141,10 @@ class Sort:
             return int
         return scope.get(self.head, scope[OBJECTS])
 
-    def strategy(self, scope: dict, types=None):
+    def strategy(self, scope: dict, types=None, length: int | None = None):
         """ Generate an instance of the sort, from ``types`` in place of
-        the strategy of the objects when given. """
+        the strategy of the objects when given, of the given ``length``
+        when the size is a variable. """
         from hypothesis import strategies as st
 
         if self.count:
@@ -143,15 +152,56 @@ class Sort:
         resolved = self.resolve(scope)
         base = types if types is not None and resolved is scope[OBJECTS]\
             else resolved.strategy()
-        return base.filter(lambda value: len(value) == 1)\
-            if self.atomic else base
+        length = self.size if isinstance(self.size, int) else length
+        if length is None:
+            return base
+        atoms = base.filter(lambda value: len(value) == 1)
+        return atoms if length == 1 else st.lists(
+            atoms, min_size=length, max_size=length).map(
+                lambda values: reduce(operator.matmul, values, resolved()))
 
-    def canonical(self, scope: dict, label: str):
-        """ The canonical instance of the sort, named after a variable. """
-        return 2 if self.count else cell(self.resolve(scope), label)
+    def canonical(self, scope: dict, label: str, length: int = 1):
+        """ The canonical instance of the sort, named after a variable,
+        ``length`` wires named ``label0, label1...`` when the size is a
+        variable. """
+        if self.count:
+            return 2
+        if not isinstance(self.size, str):
+            return cell(self.resolve(scope), label)
+        return reduce(operator.matmul, (
+            cell(self.resolve(scope), f"{label}{i}") for i in range(length)),
+            self.resolve(scope)())
 
     def __str__(self):
-        return f"Atom[{self.head}]" if self.atomic else self.head
+        if self.size is None or self.count:
+            return self.head
+        return f"Atom[{self.head}]" if self.atomic\
+            else f"Obj[{self.head}, {self.size}]"
+
+
+def size(annotation) -> int | str | None:
+    """ The size an ``Obj`` or an ``Atom`` states: a number, the name of
+    its ``Count`` variable or :obj:`None` for any. """
+    if annotation is Atom or get_origin(annotation) is Atom:
+        return 1
+    args = get_args(annotation) if get_origin(annotation) is Obj else ()
+    stated = args[2] if len(args) > 2 else None
+    if isinstance(stated, TypeVar):
+        return stated.__name__
+    return get_args(stated)[0] if stated is not None else None
+
+
+def fits(length: int | str | None, value,
+         subst: Substitution) -> Substitution | None:
+    """ The substitution with an object of a size, binding the size
+    when it is an unbound variable, :obj:`None` when it does not fit. """
+    if length is None:
+        return subst
+    if isinstance(length, int):
+        return subst if len(value) == length else None
+    if length in subst:
+        return subst if subst[length] == len(value) else None
+    return {**subst, length: len(value)}
 
 
 def name(head) -> str:
@@ -171,7 +221,7 @@ def premise(annotation) -> object | Sort | None:
         return annotation
     if get_origin(annotation) in (Obj, Atom):
         args = get_args(annotation)
-        return annotation if len(args) == 2 and args[1] is not None\
+        return annotation if len(args) >= 2 and args[1] is not None\
             else Sort.premise(annotation)
     return None
 
@@ -248,17 +298,17 @@ def unify(pattern, value, subst: Substitution,
     """ Unify a pattern with a concrete value, yielding every
     substitution with the residual equations it could not invert. """
     if isinstance(pattern, TypeVar):
-        label, sort = pattern.__name__, Sort.of(pattern)
+        label = pattern.__name__
         if label in subst:
             if subst[label] == value:
                 yield subst, residuals
-        elif not sort.atomic or len(value) == 1:
-            yield dict(subst, **{label: value}), residuals
+        elif (sized := fits(Sort.of(pattern).size, value, subst)) is not None:
+            yield {**sized, label: value}, residuals
         return
     origin, args = get_origin(pattern), get_args(pattern)
     if origin in (Obj, Atom):
-        if origin is Obj or len(value) == 1:
-            yield from unify(args[1], value, subst, residuals)
+        if (sized := fits(size(pattern), value, subst)) is not None:
+            yield from unify(args[1], value, sized, residuals)
     elif origin is Unit:
         if not len(value):
             yield subst, residuals
@@ -370,16 +420,18 @@ class Declaration[**P, T]:
 
     @property
     def variables(self) -> dict[str, Sort]:
-        """ The type parameters of the function and their sorts, atomic
-        when a premise ``Atom[T, X]`` states the variable alone. """
+        """ The type parameters of the function and their sorts, sized
+        when a premise ``Atom[T, X]`` or ``Obj[T, X, N]`` states the
+        variable alone. """
         sorts = {
             variable.__name__: Sort.of(variable) for variable in getattr(
                 inspect.unwrap(self.function), "__type_params__", ())}
         for value in self.premises.values():
-            if get_origin(value) is Atom\
-                    and isinstance(get_args(value)[1], TypeVar):
+            if get_origin(value) in (Obj, Atom)\
+                    and isinstance(get_args(value)[1], TypeVar)\
+                    and size(value) is not None:
                 label = get_args(value)[1].__name__
-                sorts[label] = replace(sorts[label], atomic=True)
+                sorts[label] = replace(sorts[label], size=size(value))
         return sorts
 
     @property
@@ -459,9 +511,14 @@ class Declaration[**P, T]:
         self: A -> B
         other: C -> D
         """
-        subst = {
+        sorts = self.variables
+        counts = {
             label: sort.canonical(self.scope, label)
-            for label, sort in self.variables.items()}
+            for label, sort in sorts.items() if sort.count}
+        subst = {
+            label: counts.get(label) or sort.canonical(
+                self.scope, label, counts.get(str(sort.size), 1))
+            for label, sort in sorts.items()}
         args = {}
         for label, value in self.premises.items():
             if isinstance(value, Sort):
@@ -496,14 +553,23 @@ class Declaration[**P, T]:
 
         def read_off(pattern, value):
             if isinstance(pattern, TypeVar) and pattern.__name__ not in subst:
-                assume(not sorts[pattern.__name__].atomic or len(value) == 1)
+                check(sorts[pattern.__name__].size, value)
                 subst[pattern.__name__] = value
+
+        def check(length, value):
+            sized = fits(length, value, subst)
+            assume(sized is not None)
+            subst.update(sized or {})
 
         def bound(*labels):
             for label in labels:
-                if label not in subst:
-                    subst[label] = draw(
-                        sorts[label].strategy(self.scope, types), label=label)
+                if label in subst:
+                    continue
+                length = sorts[label].size
+                if isinstance(length, str):
+                    bound(length)
+                subst[label] = draw(sorts[label].strategy(
+                    self.scope, types, subst.get(str(length))), label=label)
 
         args = {}
         for label, value in self.premises.items():
@@ -525,7 +591,7 @@ class Declaration[**P, T]:
             else:
                 bound(*variables(value))
                 args[label] = instantiate(value, subst, self.unit)
-                assume(get_origin(value) is Obj or len(args[label]) == 1)
+                check(size(value), args[label])
         for pattern, value in residuals:
             bound(*variables(pattern))
             assume(instantiate(pattern, subst, self.unit) == value)

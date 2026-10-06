@@ -491,21 +491,23 @@ class TracedCategory[C0: ColouredMonoid, C1: TracedCategory](
         return self.trace(1)
 
     @overload
-    def trace[A: Obj[C0], B: Obj[C0], M: Atom[C0]](
-            self: Hom[C1, Tensor[A, M], Tensor[B, M]], n: int = ...,
+    def trace[A: Obj[C0], B: Obj[C0], N: Count, M: Obj[C0, None, N]](
+            self: Hom[C1, Tensor[A, M], Tensor[B, M]], n: Obj[int, N] = ...,
             left: Literal[False] = ...) -> Hom[C1, A, B]: ...
 
     @overload
-    def trace[A: Obj[C0], B: Obj[C0], M: Atom[C0]](
-            self: Hom[C1, Tensor[M, A], Tensor[M, B]], n: int = ...,
+    def trace[A: Obj[C0], B: Obj[C0], N: Count, M: Obj[C0, None, N]](
+            self: Hom[C1, Tensor[M, A], Tensor[M, B]], n: Obj[int, N] = ...,
             left: Literal[True] = ...) -> Hom[C1, A, B]: ...
 
     @abstractmethod
     def trace(self, n=1, left=False):
         """
-        The trace of ``n`` wires on either side, to be instantiated: the
-        rules :meth:`trace_left` and :meth:`trace_right`, whose sequents
-        the two overloads restate, are its one-wire instances. Tracing no
+        The trace of ``n`` wires on either side, to be instantiated, as
+        the two overloads state: ``M`` is of size ``n``. The rules
+        :meth:`trace_left` and :meth:`trace_right` are its one-wire
+        instances, and :meth:`trace_iteration` states that they are
+        enough. Tracing no
         object at all is the identity, i.e. the vanishing axiom
         ``f.trace(0) == f``, see `nLab
         <https://ncatlab.org/nlab/show/traced+monoidal+category>`_.
@@ -521,6 +523,17 @@ class TracedCategory[C0: ColouredMonoid, C1: TracedCategory](
         """ Vanishing of a trace over the unit. """
         return cls.Equation(
             f.trace(0), f, f.trace(0, left=True))
+
+    @axiom
+    def trace_iteration[
+            A: Obj[C0], B: Obj[C0], N: Count, M: Obj[C0, None, N]](
+            cls, f: Hom[C1, Tensor[M, A], Tensor[M, B]], n: Obj[int, N]
+    ) -> Equation[Hom[C1, A, B]]:
+        """ The trace of ``n`` wires is ``n`` traces of one wire. """
+        traced = f
+        for _ in range(n):
+            traced = traced.trace_left()
+        return cls.Equation(f.trace(n, left=True), traced)
 
     @axiom
     def trace_superposing_left[

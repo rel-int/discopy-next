@@ -45,16 +45,18 @@ Summary
     Count
 """
 
-from typing import Annotated
+from typing import Annotated, Literal
 
 
-type Obj[Coarse, Fine = None] = Annotated[Coarse, Fine]
+type Obj[Coarse, Fine = None, Size = None] = Annotated[Coarse, Fine, Size]
 """ The premise ``x: Obj[T, p]`` of an object standing for a pattern
 ``p``, beside its coarse type ``T``, and the bound ``A: Obj[C0]`` of
-an object variable: a typechecker reads it as ``T``. """
+an object variable: a typechecker reads it as ``T``. The size, when
+given, is the number of wires: ``Literal[n]`` or a variable ``N:
+Count``, e.g. ``M: Obj[C0, None, N]``. """
 
-type Atom[Coarse, Fine = None] = Annotated[Coarse, Fine]
-""" The same as :data:`Obj` for an atomic object: the premise ``x:
+type Atom[Coarse, Fine = None] = Obj[Coarse, Fine, Literal[1]]
+""" An object of size one, i.e. a single wire: the premise ``x:
 Atom[T, p]`` and the bound ``X: Atom[C0]``. """
 
 type Hom[Coarse, Dom, Cod] = Annotated[Coarse, Dom, Cod]

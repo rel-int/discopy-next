@@ -86,7 +86,6 @@ def test_overloads():
     """ The overloads of a helper taking ``left`` restate the sequents of
     its two rules, read off the same way. """
     for owner, helper, left_rule, right_rule in (
-            (TracedCategory, "trace", "trace_left", "trace_right"),
             (BiclosedCategory, "ev", "ev_left", "ev_right"),
             (BiclosedCategory, "curry", "curry_left", "curry_right"),
             (FeedbackCategory, "feedback", "feedback_left",
@@ -101,3 +100,23 @@ def test_overloads():
             assert str(stubs[left].conclusion) == str(rule.conclusion)
             assert list(map(str, stubs[left].premises.values()))\
                 == list(map(str, rule.premises.values()))
+
+
+def test_size():
+    """ ``Obj[T, X, N]`` sizes an object by a ``Count`` variable, which
+    matching binds and sampling draws first: the overloads of ``trace``
+    state the n-ary method, its rules the one-wire instances. """
+    from discopy import traced
+
+    stubs = [Declaration(stub) for stub in get_overloads(TracedCategory.trace)]
+    for stub in stubs:
+        assert stub.variables["M"] == Sort(size="N")
+        assert list(stub.premises) == ["self", "n"]
+    assert TracedCategory.trace_left.variables["M"].atomic
+    x, y, a, b = map(traced.Ty, "xyab")
+    left = stubs[1].premises["self"]
+    assert [(s["N"], s["M"]) for s, _ in match(left, (x @ y @ a, x @ y @ b))]\
+        == [(0, traced.Ty()), (1, x), (2, x @ y)]
+    assert str(Sort(size="N")) == "Obj[C0, N]"
+    canonical = traced.Diagram.trace_iteration.canonical()
+    assert str(canonical.terms[0]).count("Trace") == 2
