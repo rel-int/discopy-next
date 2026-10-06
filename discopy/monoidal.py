@@ -59,6 +59,7 @@ import os
 import tempfile
 from dataclasses import dataclass, field
 from functools import cached_property
+from warnings import warn
 from typing import (
     Annotated, Any, ClassVar, Iterable, Iterator, Callable, Self, Sequence,
     TYPE_CHECKING)
@@ -67,13 +68,14 @@ from discopy import abc, cat, drawing, hypergraph, cmap, messages
 from discopy.abc import (
     ColouredMonoid, Monoid, MonoidalCategory, NamedGeneric)
 from discopy.axioms import (
-    axiom, Equation as AbstractEquation, GENERATORS, Hom, no_strategy, Ob,
+    axiom, Equation as AbstractEquation, GENERATORS, Hom, no_strategy, Var,
     rule, search, Serialisable)
 from discopy.drawing import Drawing
 from discopy.config import (
     BOX_DRAWING_ATTRIBUTES, WIRE_DRAWING_ATTRIBUTES,
     COLOUR_DRAWING_ATTRIBUTES, TRANSPARENT)
 from discopy.utils import (
+    deprecated_alias,
     factory,
     Generator,
     factory_name,
@@ -158,6 +160,12 @@ class Wire(cat.Ob):
         self.is_dagger = is_dagger
         self.dom, self.cod = dom, cod
         super().__init__(name)
+
+    def __setstate__(self, state):
+        state.setdefault('dom', transparent)
+        state.setdefault('cod', transparent)
+        state.setdefault('is_dagger', False)
+        super().__setstate__(state)
 
     repr_transparency = Serialisable.repr_transparency.failing(
         "An uncoloured wire reprs as the cat.Ob its type coerces, which its "
@@ -478,6 +486,16 @@ class Ty(cat.Ob, cat.FreeCategory, ColouredMonoid):
         return (len(self.inside), self.inside)\
             < (len(other.inside), other.inside)
 
+    def __setstate__(self, state):
+        if 'inside' not in state and "_objects" in state:
+            state["inside"] = state['_objects']
+            del state['_objects']
+        if 'dom' not in state:
+            state['dom'] = transparent
+        if 'cod' not in state:
+            state['cod'] = transparent
+        cat.Ob.__setstate__(self, state)
+
     def to_tree(self):
         tree = {
             'factory': factory_name(type(self)),
@@ -489,7 +507,13 @@ class Ty(cat.Ob, cat.FreeCategory, ColouredMonoid):
 
     @classmethod
     def from_tree(cls, tree):
+        if "objects" in tree:
+            warn("Outdated dumps", DeprecationWarning)
+            return cls(*map(from_tree, tree['objects']))
         inside = tuple(map(from_tree, tree['inside']))
+        # Old dumps used cat.Ob as the generators of monoidal.Ty.
+        inside = tuple(
+            cls.Wire(x.name) if type(x) is cat.Ob else x for x in inside)
         if inside:
             return cls(*inside)
         if 'dom' in tree:
@@ -581,6 +605,14 @@ class Nat(abc.Nat, Ty):
         self.dom = self.cod = transparent
         cat.Ob.__init__(self, type(self).__name__)
 
+    def __setstate__(self, state):
+        if "n" not in state:
+            state = {"n": len(state["_objects"])}
+        state.setdefault("dom", transparent)
+        state.setdefault("cod", transparent)
+        state.setdefault("name", type(self).__name__)
+        cat.Ob.__setstate__(self, state)
+
     @property
     def inside(self):
         return self.n * (1, )
@@ -670,6 +702,15 @@ class Layer(cat.Box, ColouredMonoid):
     """
     ob = Ty
     strategy = no_strategy
+
+    def __setstate__(self, state):
+        if 'boxes_or_types' not in state:
+            state['boxes_or_types'] = tuple(
+                state[key] for key in ['_left', '_box', '_right'])
+            del state['_left'], state['_box'], state['_right']
+        state['boxes_or_types'] = type(self).normalise(
+            state['boxes_or_types'])
+        super().__setstate__(state)
 
     def __init__(self, *inside: Ty | Box, normalise: bool = True):
         if normalise:
@@ -979,6 +1020,13 @@ class Diagram(cat.Arrow, MonoidalCategory, RichDisplay):
     draw: ClassVar[Callable]
     to_gif: ClassVar[Callable]
 
+    def __setstate__(self, state):
+        if 'inside' not in state:  # Backward compatibility
+            state |= {
+                'dom': state['_dom'], 'cod': state['_cod'],
+                'inside': tuple(state['_layers'])}
+        super().__setstate__(state)
+
     @classmethod
     def strategy(
             cls, *, types=None, dom=None, cod=None, max_depth=None,
@@ -1198,6 +1246,14 @@ class Diagram(cat.Arrow, MonoidalCategory, RichDisplay):
             :align: center
         """
         return self.dom, list(zip(self.boxes, self.offsets))
+
+    @classmethod
+    def from_tree(cls, tree):
+        if "boxes" in tree:
+            warn("Outdated dumps", DeprecationWarning)
+            boxes, offsets = map(from_tree, tree['boxes']), tree['offsets']
+            return cls.decode(from_tree(tree['dom']), zip(boxes, offsets))
+        return super().from_tree(tree)
 
     @classmethod
     def decode(
@@ -1566,7 +1622,7 @@ class Diagram(cat.Arrow, MonoidalCategory, RichDisplay):
         return AbstractEquation(functor(f), functor(top) >> functor(bottom))
 
     @axiom
-    def hypergraph_identity[X](cls, x: Annotated[Ty, Ob(X)]):
+    def hypergraph_identity[X](cls, x: Annotated[Ty, Var(X)]):
         """ The encoding preserves identities. """
         functor = cls.hypergraph_equivalence()
         return AbstractEquation(functor(cls.id(x)), functor.cod.id(x))
@@ -1631,7 +1687,7 @@ class Diagram(cat.Arrow, MonoidalCategory, RichDisplay):
         return cls.Equation(f.foliation(), f, up_to=cls.to_hypergraph)
 
     @axiom
-    def drawing_identity[X](cls, x: Annotated[Ty, Ob(X)]):
+    def drawing_identity[X](cls, x: Annotated[Ty, Var(X)]):
         """
         :meth:`to_drawing` preserves identities on the nose. It does not
         preserve composition or whiskering on the nose, since the layout
@@ -1994,7 +2050,7 @@ class Functor(cat.Functor):
 
     @classmethod
     @rule
-    def id[A](cls, dom: Annotated[type | None, Ob(A)] = None
+    def id[A](cls, dom: Annotated[type | None, Var(A)] = None
               ) -> Annotated[Any, Hom(A, A)]:
         return cls(lambda x: x, lambda f: f, dom=dom, cod=dom)
 
@@ -2144,3 +2200,4 @@ Hypergraph = hypergraph.Hypergraph[Diagram]
 Drawing.ob = Ty
 Id = Diagram.id
 
+__getattr__ = deprecated_alias(__name__, {"PRO": "Nat"})

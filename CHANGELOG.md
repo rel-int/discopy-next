@@ -130,12 +130,12 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 - Every law is an `Axiom` and every operation a `Rule`, both stated
   once on the abstract base classes of `discopy.abc` as the typed
   signatures the pattern language reads, and inherited by every
-  category below: `then` reads `def then[A: Ob[C0], B: Ob[C0], C:
-  Ob[C0]](self: Hom[C1, A, B], other: Hom[C1, B, C]) -> Hom[C1, A,
+  category below: `then` reads `def then[A: Obj[C0], B: Obj[C0], C:
+  Obj[C0]](self: Hom[C1, A, B], other: Hom[C1, B, C]) -> Hom[C1, A,
   C]`, a trace takes `Hom[C1, Tensor[M, A], Tensor[M, B]]`, the cups
-  take `right: Ob[C0, R[X]]`, and `discopy.abc` is written wholly in
+  take `right: Obj[C0, R[X]]`, and `discopy.abc` is written wholly in
   these brackets, every return fully typed — an axiom concludes
-  `Equation[Hom[C1, A, B]]`, an object equation `Equation[Ob[C0,
+  `Equation[Hom[C1, A, B]]`, an object equation `Equation[Obj[C0,
   Tensor[A, C]]]`, and `test/axioms.py` checks every `Equation`
   subscript against the canonical equation it types. A helper taking
   `left` states each side as an `@overload` whose `left:
@@ -182,11 +182,11 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   structure: patterns for the objects of a category with variables to
   instantiate, and their collection into sequents. A sequent is the
   signature of a method: its PEP 695 type parameter list is the
-  context, each bound a sort — `A: Ob[C0]` an object, `X: Atom[C0]`
+  context, each bound a sort — `A: Obj[C0]` an object, `X: Atom[C0]`
   an atomic one, `N: Count` a number of repetitions — the parameters
   the premises and the return annotation the conclusion, each a
-  subscript of the new type aliases `Ob` and `Hom` of `discopy.abc`:
-  `f: Hom[C1, A, B]` a morphism between two sides and `x: Ob[C0, p]`
+  subscript of the new type aliases `Obj` and `Hom` of `discopy.abc`:
+  `f: Hom[C1, A, B]` a morphism between two sides and `x: Obj[C0, p]`
   a pattern beside its coarse type, the compound sides built by the
   formers `Tensor[A, C]`, `Unit[C0]`, `L[A]`, `R[A]`, `D[A]`,
   `Over[A, B]`, `Under[A, B]` and `Repeat[X, N]`. The aliases are
@@ -194,7 +194,7 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   typechecker reads, so the coarse types stay fully checked while
   `pattern.expand` rebuilds the pattern from the subscript. The
   patterns remain plain values that an `Annotated` may carry inline:
-  `Ob(A)` lifts a type parameter, `Hom(p, q)`, `p @ q`, `p.l`,
+  `Var(A)` lifts a type parameter, `Hom(p, q)`, `p @ q`, `p.l`,
   `p.r`, `p.d`, `p << q`, `p >> q`, `p ** n` and `UNIT` build the
   compounds, and a side of `Hom` lifts itself — a bare type
   parameter is one variable, a list or tuple the tensor of its
@@ -202,12 +202,14 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   structure the objects it stands in must have, refusing objects
   bounded below what its shape needs. A conclusion is matched
   against a goal by unification over the free monoid of objects — a
-  `Tensor` splits the goal at every position, an `Ob` binds once, an
+  `Tensor` splits the goal at every position, a `Var` binds once, an
   adjoint inverts to the other side — and what matching cannot
   invert is a residual equation checked once the variables are
   instantiated. Nothing is `eval`ed and nothing is quoted: the
   annotations are the lazy objects of PEP 649, built in their
-  defining scope when first read.
+  defining scope when first read. The alias is `Obj` and the variable
+  `Var` rather than `Ob`, which keeps naming the objects of a category
+  in every module, the deprecated `rigid.Ob` included.
 
 - `utils.Generator` declares a generator once, on the category that
   introduces it and under its own name: `@Diagram.generator` above
@@ -230,7 +232,15 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   `Generator.classmethod`, e.g. the trace of a pivotal diagram, one that is
   another generator of the same category a `Generator.alias`, e.g. the braid
   of a symmetric category is its swap, and a class attribute assigned by
-  hand still wins. Two slots name a role rather than a class, since they
+  hand still wins. The old names read the new ones with a
+  `DeprecationWarning`: every generator declares the `*_factory` it
+  replaces, e.g. `Diagram.swap_factory` reads `Diagram.Swap`, one
+  assigned by hand, e.g. `Recipe.swap_factory = CookingSwap`, is still
+  the generator of that category, and `is_generator` reads `is_atom`. A
+  generator built for a category outside the package is named after it,
+  e.g. `Recipe.Swap`, so that it pickles, and a level's generator extends
+  those its bases declare under an alias, so a compact swap is still a
+  ribbon braid. Two slots name a role rather than a class, since they
   are read on whichever free monoid or category is at hand: a stream
   answers to `FollowedBy`, and a `List` names the class of its atoms
   `Atom` where a `Ty` names its generators `Wire`, since `Atom` types
@@ -362,7 +372,7 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 - `monoidal.List`, the free monoid on a generator type: `List[X]` is a
   tuple of instances of `X` with concatenation as `tensor` and the empty
   list as unit, an `abc.Monoid` parameterised as
-  `NamedGeneric["Atom"]` the way `Hypergraph[C]` is the
+  `NamedGeneric["generator_factory"]` the way `Hypergraph[C]` is the
   hypergraph category over `C`. Free monoids come at three levels: `Ty`
   has arbitrary colours and generators, `List` a single colour and
   arbitrary generators, `Nat` a single colour and a single generator. A
@@ -811,7 +821,7 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   ([#350](https://github.com/discopy/discopy/pull/350)).
 - The `tensor` module is refactored to go through `CMap` for `einsum`
   ([#402](https://github.com/discopy/discopy/pull/402)).
-- Add a `Functor` attribute to each `Diagram` class and remove
+- Add a `functor_factory` attribute to each `Diagram` class and remove
   `hypergraph_factory` and `map_factory`: `Hypergraph` and `CMap` are
   parameterised directly as `NamedGeneric["category"]`
   ([#379](https://github.com/discopy/discopy/pull/379),
@@ -840,8 +850,8 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   [#470](https://github.com/discopy/discopy/pull/470)).
 - The `test/` directory is reorganised to mirror `discopy/`
   ([#403](https://github.com/discopy/discopy/pull/403)).
-- Symmetric categories generate their swaps with `Swap` rather than
-  `Braid`, which is now a `classproperty` reading it
+- Symmetric categories generate their swaps with `swap_factory` rather than
+  `braid_factory`, which is now a `classproperty` reading it
   ([#440](https://github.com/discopy/discopy/pull/440)).
 - `abc.SymmetricCategory` extends `abc.BraidedCategory` directly, so
   symmetric and Markov categories are not required to implement `twist` and
@@ -901,13 +911,6 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   boundary its sequent declares, which a dynamic check of the
   conclusion of every rule states once for every operation, rather
   than one axiom per operation and per side.
-- Backward compatibility with past DisCoPy versions: the deprecation
-  machinery, the `__setstate__` methods migrating attribute names
-  out of old pickles, the `from_tree` branches reading outdated
-  dumps and the cross-version pickle fixtures that exercised them.
-  What the current version writes reads back, which the `pickling`,
-  `copying` and `serialisation` axioms state; what a past version
-  wrote does not.
 - The unit tests the axioms state generically: the per-type repr,
   equality, hash, pickle and tree roundtrips of enrolled types and
   the law restatements on hand-picked examples — the unit suite
@@ -1042,7 +1045,7 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   `Hypergraph.__init__` when the two arities differ, an `AxiomError` on
   the spider types when they do not. `.l` and `.r` are involutions again
   ([#716](https://github.com/discopy/discopy/issues/716)).
-- `rigid.Diagram.Functor` is `rigid.Functor`: it inherited
+- `rigid.Diagram.functor_factory` is `rigid.Functor`: it inherited
   `biclosed.Functor`, which does not rotate, so a box mapped through
   it lost the rotation of its boundary.
 - Region painting computes the exact extents of each coloured region —
@@ -1062,7 +1065,7 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   oriented cups and caps, rather than fixing the handedness at downgrade time.
   ([#532](https://github.com/discopy/discopy/pull/532)).
 - `Hypergraph.explicit_trace` and `CMap.explicit_trace` no longer mistake the
-  inherited `Trace` of a user-defined subclass for a class method,
+  inherited `trace_factory` of a user-defined subclass for a class method,
   which used to raise `AttributeError: type object 'Trace' has no attribute
   '__func__'` ([#532](https://github.com/discopy/discopy/pull/532)).
 - `CMap.topological_order` raises `AxiomError` on a map with a directed
@@ -1151,7 +1154,7 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   applied to an argument sharing a free variable did not compose, and a
   left abstraction evaluates through its right counterpart
   ([#562](https://github.com/discopy/discopy/issues/562)).
-- `Tensor.Spider` returns its array on the active backend instead
+- `Tensor.spider_factory` returns its array on the active backend instead
   of always on NumPy, so diagrams with spiders evaluate — and
   differentiate — under the PyTorch backend
   ([#582](https://github.com/discopy/discopy/issues/582)).
@@ -1213,6 +1216,21 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Project
 
+- The `lint` job fails on any unused import, variable, argument, wildcard
+  import or private member, and on a pylint score below `fail-under`, set
+  to the score of `main` at the time so that it never goes down:
+  `.pylintrc`'s `fail-on` names the six messages, `fail-under` rises from
+  7 to 8.58, and its `suggestion-mode` option, which the pylint in the
+  lock no longer knows and reported as an error on every run, is gone.
+  The 65 findings on `main` are fixed or excepted explicitly on their
+  line with the reason: the re-exports carry `pylint: disable` beside
+  their `noqa`, and the drawing backend's interface primitives keep the
+  parameters a backend reads. `AGENTS.md` and `CONTRIBUTING.md` list
+  `pylint discopy` beside `pflake8`, and `CONTRIBUTING.md` says what to do
+  with a finding and when to raise the threshold. Proposed on
+  [#767](https://github.com/discopy/discopy/pull/767#discussion_r4040064818)
+  after an unused parameter was the whole bug
+  ([#768](https://github.com/discopy/discopy/pull/768)).
 - The docs build on Sphinx 7.4 rather than 7.2, whose `stringify_annotation`
   handled a `TypeVar` but not a `ParamSpec`, so a signature such as
   `Callable[Concatenate[type, P], T]` crashed autodoc on Python 3.14, where

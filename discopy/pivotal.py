@@ -60,6 +60,7 @@ from discopy import cat, cmap, monoidal, rigid, traced
 from discopy.abc import (
     DaggerCategory, PivotalCategory, TracedCategory)
 from discopy.cat import factory, Generator
+from discopy.utils import deprecated_alias
 
 
 class Wire(rigid.Wire):
@@ -310,4 +311,4 @@ class Equation(rigid.Equation):
 
 Diagram.Equation = Equation
 
-
+__getattr__ = deprecated_alias(__name__, {"Ob": "Wire", "PRO": "Nat"})

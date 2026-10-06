@@ -144,7 +144,7 @@ Parametric maps compose like layers of a neural network, e.g. over
 from dataclasses import dataclass
 from typing import Annotated, Self
 
-from discopy.pattern import Atom, Count, Hom, Ob, UNIT
+from discopy.pattern import Atom, Count, Hom, Var, UNIT
 from discopy.search import rule
 from discopy import (
     monoidal, symmetric, markov, closed, compact, frobenius)
@@ -218,7 +218,7 @@ class Symmetric[category: symmetric.Diagram](SymmetricCategory, NamedGeneric):
 
     @classmethod
     @rule
-    def id[A](cls, dom: Annotated[monoidal.Ty | None, Ob(A)] = None
+    def id[A](cls, dom: Annotated[monoidal.Ty | None, Var(A)] = None
               ) -> Annotated[Symmetric, Hom(A, A)]:
         """
         The identity parametric map on `dom`, with empty parameter space.
@@ -276,8 +276,8 @@ class Symmetric[category: symmetric.Diagram](SymmetricCategory, NamedGeneric):
     @classmethod
     @rule
     def swap[X: Atom, Y: Atom](
-            cls, left: Annotated[monoidal.Ty, Ob(X)],
-            right: Annotated[monoidal.Ty, Ob(Y)]
+            cls, left: Annotated[monoidal.Ty, Var(X)],
+            right: Annotated[monoidal.Ty, Var(Y)]
     ) -> Annotated[Symmetric, Hom([X, Y], [Y, X])]:
         """
         The swap of the underlying category, with empty parameter space.
@@ -367,9 +367,9 @@ class Markov(Symmetric, MarkovCategory):
     @classmethod
     @rule
     def copy[X: Atom, N: Count](
-            cls, x: Annotated[monoidal.Ty, Ob(X)],
-            n: Annotated[int, Ob(N)] = 2
-    ) -> Annotated[Markov, Hom(X, Ob(X) ** Ob(N))]:
+            cls, x: Annotated[monoidal.Ty, Var(X)],
+            n: Annotated[int, Var(N)] = 2
+    ) -> Annotated[Markov, Hom(X, Var(X) ** Var(N))]:
         """
         The copy of the underlying category, with empty parameter space.
 
@@ -390,18 +390,18 @@ class Closed(Markov, ClosedCategory):
     @classmethod
     @rule
     def ev_left[Y: Atom, E: Atom](
-            cls, base: Annotated[monoidal.Ty, Ob(Y)],
-            exponent: Annotated[monoidal.Ty, Ob(E)]
-    ) -> Annotated[Closed, Hom((Ob(Y) << Ob(E)) @ Ob(E), Y)]:
+            cls, base: Annotated[monoidal.Ty, Var(Y)],
+            exponent: Annotated[monoidal.Ty, Var(E)]
+    ) -> Annotated[Closed, Hom((Var(Y) << Var(E)) @ Var(E), Y)]:
         """ The left evaluation, see :meth:`ev`. """
         return cls.ev(base, exponent, left=True)
 
     @classmethod
     @rule
     def ev_right[Y: Atom, E: Atom](
-            cls, base: Annotated[monoidal.Ty, Ob(Y)],
-            exponent: Annotated[monoidal.Ty, Ob(E)]
-    ) -> Annotated[Closed, Hom(Ob(E) @ (Ob(E) >> Ob(Y)), Y)]:
+            cls, base: Annotated[monoidal.Ty, Var(Y)],
+            exponent: Annotated[monoidal.Ty, Var(E)]
+    ) -> Annotated[Closed, Hom(Var(E) @ (Var(E) >> Var(Y)), Y)]:
         """ The right evaluation, see :meth:`ev`. """
         return cls.ev(base, exponent, left=False)
 
@@ -494,9 +494,9 @@ class Compact(Traced, CompactCategory):
     @classmethod
     @rule
     def cups[X: Atom](
-            cls, left: Annotated[monoidal.Ty, Ob(X)],
-            right: Annotated[monoidal.Ty, Ob(X).r]
-    ) -> Annotated[Compact, Hom(Ob(X) @ Ob(X).r, UNIT)]:
+            cls, left: Annotated[monoidal.Ty, Var(X)],
+            right: Annotated[monoidal.Ty, Var(X).r]
+    ) -> Annotated[Compact, Hom(Var(X) @ Var(X).r, UNIT)]:
         """
         The cups of the underlying category, with empty parameter space.
 
@@ -510,9 +510,9 @@ class Compact(Traced, CompactCategory):
     @classmethod
     @rule
     def caps[X: Atom](
-            cls, left: Annotated[monoidal.Ty, Ob(X)],
-            right: Annotated[monoidal.Ty, Ob(X).l]
-    ) -> Annotated[Compact, Hom(UNIT, Ob(X) @ Ob(X).l)]:
+            cls, left: Annotated[monoidal.Ty, Var(X)],
+            right: Annotated[monoidal.Ty, Var(X).l]
+    ) -> Annotated[Compact, Hom(UNIT, Var(X) @ Var(X).l)]:
         """
         The caps of the underlying category, with empty parameter space.
 
@@ -537,10 +537,10 @@ class Hypergraph(Compact, Markov, HypergraphCategory):
     @classmethod
     @rule
     def spiders[X: Atom, M: Count, N: Count](
-            cls, n_legs_in: Annotated[int, Ob(M)],
-            n_legs_out: Annotated[int, Ob(N)],
-            typ: Annotated[monoidal.Ty, Ob(X)]
-    ) -> Annotated[Hypergraph, Hom(Ob(X) ** Ob(M), Ob(X) ** Ob(N))]:
+            cls, n_legs_in: Annotated[int, Var(M)],
+            n_legs_out: Annotated[int, Var(N)],
+            typ: Annotated[monoidal.Ty, Var(X)]
+    ) -> Annotated[Hypergraph, Hom(Var(X) ** Var(M), Var(X) ** Var(N))]:
         """
         The spiders of the underlying category, with empty parameters.
 

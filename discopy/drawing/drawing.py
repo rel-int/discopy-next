@@ -206,7 +206,7 @@ from discopy.drawing import backend, Node, Point
 from discopy.config import BOX_DRAWING_ATTRIBUTES, TRANSPARENT
 from discopy.abc import TracedCategory
 from discopy.python import finset
-from discopy.pattern import Hom, Ob
+from discopy.pattern import Hom, Var
 from discopy.search import rule
 from discopy.utils import (
     assert_isinstance, assert_iscomposable, unbiased, factory, RichDisplay)
@@ -745,7 +745,7 @@ class Drawing(TracedCategory, RichDisplay):
 
     @staticmethod
     @rule
-    def id[A](dom: Annotated[Any | None, Ob(A)] = None
+    def id[A](dom: Annotated[Any | None, Var(A)] = None
               ) -> Annotated[Drawing, Hom(A, A)]:
         """
         Draw the identity diagram.

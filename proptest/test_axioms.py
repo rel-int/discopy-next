@@ -86,7 +86,8 @@ def axiom_parameters(broken: bool = False):
         if not axiom.parameters and axiom() is NotImplemented:
             marks = pytest.mark.skip(reason=axiom.__doc__.strip())
         elif axiom.broken:
-            marks = pytest.mark.xfail(reason=axiom.__doc__.strip())
+            marks = pytest.mark.xfail(
+                reason=axiom.__doc__.strip(), strict=True)
         else:
             marks = ()
         yield pytest.param(

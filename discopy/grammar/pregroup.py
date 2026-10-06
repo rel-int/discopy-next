@@ -39,7 +39,7 @@ from typing import ClassVar
 from discopy import axioms, rigid, frobenius, messages
 from discopy.axioms import no_strategy, Rule
 from discopy.cat import factory, Generator
-from discopy.utils import AxiomError, classproperty
+from discopy.utils import deprecated_alias, AxiomError, classproperty
 from discopy.grammar import thue
 from discopy.rigid import Wire  # noqa: F401
 
@@ -321,4 +321,4 @@ TermBase, Constant, Variable, Application, Abstraction = (
 Layer = Diagram.Layer
 Id = Diagram.id
 
-
+__getattr__ = deprecated_alias(__name__, {"Ob": "Wire"})

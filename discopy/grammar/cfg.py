@@ -40,7 +40,7 @@ from typing import TYPE_CHECKING
 from discopy import monoidal
 from typing import Annotated
 
-from discopy.axioms import Hom, no_strategy, Ob, rule
+from discopy.axioms import Hom, no_strategy, Var, rule
 from discopy.cat import factory, Functor
 from discopy.grammar import thue
 from discopy.monoidal import Ty
@@ -106,7 +106,7 @@ class Tree:
 
     @staticmethod
     @rule
-    def id[A](dom: Annotated[Ty, Ob(A)]) -> Annotated[Tree, Hom(A, A)]:
+    def id[A](dom: Annotated[Ty, Var(A)]) -> Annotated[Tree, Hom(A, A)]:
         return Id(dom)
 
     def __eq__(self, other):

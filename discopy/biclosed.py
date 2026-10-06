@@ -86,11 +86,12 @@ from typing import Callable, ClassVar, Self, overload
 from discopy import monoidal, cmap
 from typing import Annotated
 
-from discopy.axioms import Atom, Hom, no_strategy, Ob, rule, Serialisable
+from discopy.axioms import Atom, Hom, no_strategy, Var, rule, Serialisable
 from discopy.abc import BiclosedCategory, DaggerCategory, ResiduatedMonoid
 from discopy.drawing import Drawing
 from discopy.cat import factory, Generator
 from discopy.utils import (
+    deprecated_alias,
     AxiomError,
     assert_isatomic,
     assert_isinstance,
@@ -339,16 +340,16 @@ class Diagram(monoidal.Diagram, BiclosedCategory):
     @classmethod
     @rule
     def ev_left[Y: Atom, E: Atom](
-            cls, base: Annotated[Ty, Ob(Y)], exponent: Annotated[Ty, Ob(E)]
-    ) -> Annotated[Diagram, Hom((Ob(Y) << Ob(E)) @ Ob(E), Y)]:
+            cls, base: Annotated[Ty, Var(Y)], exponent: Annotated[Ty, Var(E)]
+    ) -> Annotated[Diagram, Hom((Var(Y) << Var(E)) @ Var(E), Y)]:
         """ The left evaluation, see :meth:`ev`. """
         return cls.ev(base, exponent, left=True)
 
     @classmethod
     @rule
     def ev_right[Y: Atom, E: Atom](
-            cls, base: Annotated[Ty, Ob(Y)], exponent: Annotated[Ty, Ob(E)]
-    ) -> Annotated[Diagram, Hom(Ob(E) @ (Ob(E) >> Ob(Y)), Y)]:
+            cls, base: Annotated[Ty, Var(Y)], exponent: Annotated[Ty, Var(E)]
+    ) -> Annotated[Diagram, Hom(Var(E) @ (Var(E) >> Var(Y)), Y)]:
         """ The right evaluation, see :meth:`ev`. """
         return cls.ev(base, exponent, left=False)
 
@@ -785,4 +786,4 @@ class Equation(monoidal.Equation):
 
 Diagram.Equation = Equation
 
-
+__getattr__ = deprecated_alias(__name__, {"Ob": "Wire"})

@@ -127,7 +127,7 @@ import numpy as np
 from discopy import monoidal, ribbon, tensor, frobenius
 from typing import Annotated
 
-from discopy.axioms import Atom, Hom, no_strategy, Ob, rule, UNIT
+from discopy.axioms import Atom, Hom, no_strategy, Var, rule, UNIT
 from discopy.tensor import Dim, Box, Id
 from discopy.abc import RibbonCategory, NamedGeneric
 from discopy.utils import (
@@ -909,8 +909,8 @@ class Intertwiner[algebra](tensor.Diagram, RibbonCategory):
     @classmethod
     @rule
     def braid[X: Atom, Y: Atom](
-            cls, left: Annotated[Representation, Ob(X)],
-            right: Annotated[Representation, Ob(Y)], is_dagger=False
+            cls, left: Annotated[Representation, Var(X)],
+            right: Annotated[Representation, Var(Y)], is_dagger=False
     ) -> Annotated[Intertwiner, Hom([X, Y], [Y, X])]:
         """
         The braiding :math:`V \\otimes W \\to W \\otimes V` (its inverse
@@ -956,9 +956,9 @@ class Intertwiner[algebra](tensor.Diagram, RibbonCategory):
     @classmethod
     @rule
     def cups[X: Atom](
-            cls, left: Annotated[Representation, Ob(X)],
-            right: Annotated[Representation, Ob(X).r]
-    ) -> Annotated[Intertwiner, Hom(Ob(X) @ Ob(X).r, UNIT)]:
+            cls, left: Annotated[Representation, Var(X)],
+            right: Annotated[Representation, Var(X).r]
+    ) -> Annotated[Intertwiner, Hom(Var(X) @ Var(X).r, UNIT)]:
         """
         The evaluation of a module against its dual. When ``right`` is the
         right dual of ``left`` — read off the ``action`` of the two
@@ -983,9 +983,9 @@ class Intertwiner[algebra](tensor.Diagram, RibbonCategory):
     @classmethod
     @rule
     def caps[X: Atom](
-            cls, left: Annotated[Representation, Ob(X)],
-            right: Annotated[Representation, Ob(X).l]
-    ) -> Annotated[Intertwiner, Hom(UNIT, Ob(X) @ Ob(X).l)]:
+            cls, left: Annotated[Representation, Var(X)],
+            right: Annotated[Representation, Var(X).l]
+    ) -> Annotated[Intertwiner, Hom(UNIT, Var(X) @ Var(X).l)]:
         """
         The coevaluation of a module against its dual. When ``right`` is
         the right dual of ``left`` this is the plain copairing; a dual

@@ -98,7 +98,7 @@ from discopy import cat, monoidal, balanced, hypergraph, cmap, messages
 from discopy.abc import (
     BraidedCategory, MonoidalCategory, SymmetricCategory, TracedCategory)
 from discopy.axioms import (
-    Atom, axiom, Equation as AbstractEquation, Hom, Ob, rule, Sort)
+    Atom, axiom, Equation as AbstractEquation, Hom, Var, rule, Sort)
 from discopy.cat import factory, Generator
 from discopy.monoidal import Wire, Ty, Nat  # noqa: F401
 from discopy.python import finset
@@ -284,8 +284,8 @@ class Diagram(balanced.Diagram, SymmetricCategory):
     @classmethod
     @rule
     def swap[X: Atom, Y: Atom](
-            cls, left: Annotated[monoidal.Ty, Ob(X)],
-            right: Annotated[monoidal.Ty, Ob(Y)]
+            cls, left: Annotated[monoidal.Ty, Var(X)],
+            right: Annotated[monoidal.Ty, Var(Y)]
     ) -> Annotated[Diagram, Hom([X, Y], [Y, X])]:
         """
         The diagram that swaps the ``left`` and ``right`` wires.
@@ -343,7 +343,7 @@ class Diagram(balanced.Diagram, SymmetricCategory):
     @classmethod
     @rule
     def cycle[X: Atom, A](
-            cls, x: Annotated[Ty, Ob(X)], a: Annotated[Ty, Ob(A)]
+            cls, x: Annotated[Ty, Var(X)], a: Annotated[Ty, Var(A)]
     ) -> Annotated[Diagram, Hom([X, A], [A, X])]:
         """
         The permutation moving a wire past a type, a native
@@ -530,7 +530,7 @@ class Diagram(balanced.Diagram, SymmetricCategory):
         return AbstractEquation(functor(f), functor(top) >> functor(bottom))
 
     @axiom
-    def map_identity[X](cls, x: Annotated[Ty, Ob(X)]):
+    def map_identity[X](cls, x: Annotated[Ty, Var(X)]):
         """ The encoding preserves identities. """
         functor = cls.map_equivalence()
         return AbstractEquation(functor(cls.id(x)), functor.cod.id(x))
@@ -708,6 +708,10 @@ class Swap(Permutation, balanced.Braid, Box):
     :class:`Swap` is only defined for atomic types (i.e. of length 1).
     For complex types, use :meth:`Diagram.swap` instead.
     """
+    def __setstate__(self, state):
+        state.setdefault('perm', finset.Permutation([1, 0], 2))
+        super().__setstate__(state)
+
     def __init__(self, left, right):
         if len(left) == 2:
             perm = finset.Permutation(right, len(left))

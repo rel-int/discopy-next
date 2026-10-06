@@ -112,12 +112,16 @@ your machine before any search; it reaches GitHub only when selected.
 HYPOTHESIS_PROFILE=explore uv run pytest proptest/ -n auto -p no:benchmark
 ```
 
-A fifth, `fast`, has the settings of `dev` but tests every law once,
-bound to the enrolled type nearest the class declaring it, rather than
-on every type inheriting it; a type restating an inherited law, as
-broken, weakened or modulo a quotient, declares it anew and gets its own
-cell. It is the profile to run while developing, the full matrix being
-for `main` and the nightly run:
+A fifth, `fast`, has the budget of `dev` but is derandomized, drawing
+the same examples on every run, and so has no database: it replays
+nothing an earlier run found. It also tests every law once, bound to
+the enrolled type nearest the class declaring it, rather than on every
+type inheriting it; a type restating an inherited law, as broken,
+weakened or modulo a quotient, declares it anew and gets its own cell.
+A subclass that overrides a method a law is about without restating the
+law, e.g. `to_hypergraph`, is therefore not checked by `fast`. It is
+the profile to run while developing, the full matrix being for `main`
+and the nightly run:
 
 ```shell
 HYPOTHESIS_PROFILE=fast uv run pytest proptest/ -n auto -p no:benchmark

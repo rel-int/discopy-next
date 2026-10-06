@@ -36,7 +36,7 @@ from itertools import count
 from types import MethodType
 from typing import Self, TYPE_CHECKING, TypeVar
 
-from discopy.pattern import Declaration, Hom, Match, Ob, Pattern, Sequent
+from discopy.pattern import Declaration, Hom, Match, Pattern, Sequent, Var
 from discopy.utils import AxiomError
 
 if TYPE_CHECKING:
@@ -309,9 +309,9 @@ def search(category: type[abc.Category], free: Callable | None = None, *,
 
     def as_pattern(side):
         if side is None:
-            return Ob(f"?{next(fresh)}")
+            return Var(f"?{next(fresh)}")
         if isinstance(side, TypeVar):
-            return Ob(side)
+            return Var(side)
         return side
 
     def guidance(side, subst):
@@ -395,7 +395,7 @@ def search(category: type[abc.Category], free: Callable | None = None, *,
             assume(False)
         for pattern, value in residuals:
             for variable in pattern.walk():
-                if isinstance(variable, Ob) and variable.name not in subst:
+                if isinstance(variable, Var) and variable.name not in subst:
                     subst[variable.name] = draw(
                         variable.sort.strategy(scope, types))
             assume(pattern.instantiate(subst, scope["C0"]) == value)

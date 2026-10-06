@@ -123,6 +123,12 @@ class Ob(Serialisable):
     """
     serialised_attrs = ('name', )
 
+    def __setstate__(self, state):
+        if "name" not in state and "_name" in state:
+            state["name"] = state["_name"]
+            del state["_name"]
+        super().__setstate__(state)
+
     def __init__(self, name: str = ""):
         assert_isinstance(name, str)
         self.name = name
@@ -163,6 +169,8 @@ class FreeCategory(Category):
     type of what they put ``inside`` themselves, e.g. :class:`Arrow` its
     ``Box`` and :class:`discopy.monoidal.Diagram` its layers.
     """
+    is_generator = utils.DeprecatedAttribute("is_atom")
+
     @classmethod
     def generator[U](cls, root: type[U]) -> type[U]:
         """
@@ -192,7 +200,7 @@ class FreeCategory(Category):
 
     @classmethod
     @rule
-    def id[A](cls, dom: Annotated[Any | None, pattern.Ob(A)] = None
+    def id[A](cls, dom: Annotated[Any | None, pattern.Var(A)] = None
               ) -> Annotated[Any, Hom(A, A)]:
         """The identity path on ``dom``, with no generators inside."""
         dom = cls.ob() if dom is None else dom
@@ -345,6 +353,13 @@ class Arrow(FreeCategory, DaggerCategory, Serialisable):
 
         return arrows.filter(
             lambda arrow: len(set(arrow.inside)) == len(arrow.inside))
+
+    def __setstate__(self, state):
+        if '_dom' in state:  # Backward compatibility
+            self.dom, self.cod, self.inside = (
+                state['_dom'], state['_cod'], tuple(state['_boxes']))
+            del state['_dom'], state['_cod'], state['_boxes']
+        super().__setstate__(state)
 
     def __repr__(self):
         if not self.inside:  # i.e. self is identity.
@@ -544,6 +559,13 @@ class Box(Arrow):
         cods = types if cod is None else st.just(cod)
         return st.tuples(st.uuids(), doms, cods).map(
             lambda args: cls(str(args[0]), args[1], args[2]))
+
+    def __setstate__(self, state):
+        if '_name' in state:  # Backward compatibility
+            self.name, self.data, self.is_dagger = (
+                state['_name'], state['_data'], state['_dagger'])
+            del state['_name'], state['_data'], state['_dagger']
+        super().__setstate__(state)
 
     def __init__(
             self, name: str, dom: Ob, cod: Ob, data=None, is_dagger=False):
@@ -846,7 +868,7 @@ class Functor(Category, Serialisable):
 
     @classmethod
     @rule
-    def id[A](cls, dom: Annotated[type | None, pattern.Ob(A)] = None
+    def id[A](cls, dom: Annotated[type | None, pattern.Var(A)] = None
               ) -> Annotated[Functor, Hom(A, A)]:
         """
         The identity functor on a given category ``dom``.
@@ -1123,7 +1145,7 @@ class Transformation(Category):
 
     @classmethod
     @rule
-    def id[A](cls, dom: Annotated[Functor, pattern.Ob(A)]) -> Annotated[
+    def id[A](cls, dom: Annotated[Functor, pattern.Var(A)]) -> Annotated[
             Transformation, Hom(A, A)]:
         """
         The identity transformation on a given functor ``dom``, i.e. the

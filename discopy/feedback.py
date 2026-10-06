@@ -164,6 +164,7 @@ from discopy import monoidal, braided, markov, hypergraph, messages
 from discopy.axioms import GENERATORS, axiom, no_strategy
 from discopy.abc import DelayedMonoid, FeedbackCategory
 from discopy.utils import (
+    deprecated_alias,
     factory, Generator, factory_name, assert_isinstance, AxiomError,
     from_tree)
 
@@ -803,4 +804,4 @@ class Equation(markov.Equation):
 
 Diagram.Equation = Equation
 
-
+__getattr__ = deprecated_alias(__name__, {"Ob": "Wire"})

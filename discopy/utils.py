@@ -274,6 +274,88 @@ def product(xs: Sequence, unit=1):
     return unit if not xs else product(xs[1:], unit * xs[0])
 
 
+def deprecated_alias(module_name: str, aliases: dict[str, str]):
+    """
+    The module-level ``__getattr__`` of a module with one or more classes
+    that were renamed, returning each new class with a
+    :class:`DeprecationWarning`.
+
+    Parameters:
+        module_name : The ``__name__`` of the module deprecating names.
+        aliases : A mapping from each deprecated name to its new name.
+
+    Example
+    -------
+    >>> import warnings
+    >>> from discopy import rigid
+    >>> with warnings.catch_warnings(record=True) as w:
+    ...     warnings.simplefilter("always")
+    ...     assert rigid.PRO is rigid.Nat
+    >>> print(w[-1].message)
+    discopy.rigid.PRO is deprecated, use discopy.rigid.Nat instead.
+    """
+    def __getattr__(name):
+        if name in aliases:
+            import sys
+            import warnings
+            new_name = aliases[name]
+            warnings.warn(
+                f"{module_name}.{name} is deprecated, "
+                f"use {module_name}.{new_name} instead.",
+                DeprecationWarning, stacklevel=2)
+            return getattr(sys.modules[module_name], new_name)
+        raise AttributeError(
+            f"module {module_name!r} has no attribute {name!r}")
+    return __getattr__
+
+
+class DeprecatedAttribute:
+    """
+    A class attribute renamed ``new``, read through the new name with a
+    :class:`DeprecationWarning`. :class:`Generator` declares one for the
+    ``*_factory`` name each generator had before it was bound under its
+    own, e.g. ``swap_factory`` for ``Swap``.
+
+    Parameters:
+        new : The name the attribute is read under.
+
+    Example
+    -------
+    >>> import warnings
+    >>> from discopy import symmetric
+    >>> with warnings.catch_warnings(record=True) as w:
+    ...     warnings.simplefilter("always")
+    ...     assert symmetric.Diagram.swap_factory is symmetric.Swap
+    >>> print(w[-1].message)  # doctest: +NORMALIZE_WHITESPACE
+    symmetric.Diagram.swap_factory is deprecated,
+    use symmetric.Diagram.Swap instead.
+    """
+    def __init__(self, new: str):
+        self.new = new
+
+    def __set_name__(self, owner: type, name: str):
+        self.name = name
+
+    def __get__(self, instance, cls: type) -> Any:
+        import warnings
+        warnings.warn(
+            f"{factory_name(cls)}.{self.name} is deprecated, "
+            f"use {factory_name(cls)}.{self.new} instead.",
+            DeprecationWarning, stacklevel=2)
+        return getattr(cls if instance is None else instance, self.new)
+
+
+def snake_case(name: str) -> str:
+    """
+    The snake case of a class name.
+
+    >>> assert snake_case("DualRailTwist") == "dual_rail_twist"
+    """
+    return "".join(
+        f"_{char.lower()}" if char.isupper() and i else char.lower()
+        for i, char in enumerate(name))
+
+
 def factory_name(cls: type) -> str:
     """
     Returns a string describing a DisCoPy class.
@@ -282,9 +364,15 @@ def factory_name(cls: type) -> str:
     -------
     >>> from discopy.grammar.pregroup import Word
     >>> assert factory_name(Word) == "grammar.pregroup.Word"
+
+    A class is named by its qualified name, e.g. the ``Recipe.Swap`` that
+    a :class:`Generator` builds for a category ``Recipe`` outside the
+    package, unless it is defined in a function.
     """
     module = cls.__module__.removeprefix('discopy.')
-    return f"{module}.{cls.__name__}".removeprefix('builtins.')
+    name = cls.__name__ if "<locals>" in cls.__qualname__\
+        else cls.__qualname__
+    return f"{module}.{name}".removeprefix('builtins.')
 
 
 def from_tree(tree: dict):
@@ -529,6 +617,15 @@ class BinaryBoxConstructor:
     def __init__(self, left, right):
         self.left, self.right = left, right
 
+    def __setstate__(self, state):
+        if "_name" in state:
+            state["_name"] = type(self).__name__ + (
+                              f"({state['right']}, {state['left']})"
+                              if state.get("_is_dagger", False) else
+                              f"({state['left']}, {state['right']})"
+            )
+        super().__setstate__(state)
+
 
 @lru_cache(maxsize=1024)
 def text_width(text: str, fontsize=12, points_per_inch=72., grid=16):
@@ -694,7 +791,11 @@ class Generator[**P, T]:
     The level enters through the root: a box extends the level's
     ``Diagram``, an ``Exp`` gets the level's ``Ty`` as ``ob`` and a
     ``Functor`` its ``Diagram`` as ``dom`` and ``cod``. A generator is built
-    once per module and a class attribute assigned by hand wins.
+    once per module and a class attribute assigned by hand wins, as does
+    one assigned under the name the generator had before, e.g.
+    ``swap_factory``, which is read with a :class:`DeprecationWarning`.
+    A class built for a category outside the package is named after the
+    category, e.g. ``Recipe.Swap``, so that it pickles by reference.
     :meth:`classmethod` declares a generator that is behaviour rather than
     a class, e.g. the trace of a pivotal diagram, and :meth:`alias` one that
     is another generator of the same category, e.g. the braid of a symmetric
@@ -733,6 +834,35 @@ class Generator[**P, T]:
 
     def __set_name__(self, owner: type, name: str):
         self.owner, self.name, self.cache = owner, name, {}
+        if self.legacy not in vars(owner):
+            deprecated = DeprecatedAttribute(name)
+            deprecated.__set_name__(owner, self.legacy)
+            setattr(owner, self.legacy, deprecated)
+
+    @property
+    def legacy(self) -> str:
+        """ The name the generator had before, e.g. ``swap_factory``. """
+        return f"{snake_case(self.name)}_factory"
+
+    def assigned(self, cls: type) -> Any:
+        """
+        The generator assigned by hand under its :attr:`legacy` name on
+        ``cls`` or a base below the owner, e.g. ``swap_factory = MySwap``,
+        read with a :class:`DeprecationWarning`, :obj:`None` otherwise.
+        """
+        for klass in cls.__mro__:
+            value = vars(klass).get(self.legacy)
+            if value is not None\
+                    and not isinstance(value, DeprecatedAttribute):
+                import warnings
+                warnings.warn(
+                    f"{factory_name(klass)}.{self.legacy} is deprecated, "
+                    f"assign {factory_name(klass)}.{self.name} instead.",
+                    DeprecationWarning, stacklevel=4)
+                return value
+            if klass is self.owner:
+                return None
+        return None
 
     def __get__(self, instance, cls: type) -> Any:
         """
@@ -753,6 +883,8 @@ class Generator[**P, T]:
         class it is read from and the category that keys it, so that a box
         and its diagram get the same class rather than two equal ones.
         """
+        if (assigned := self.assigned(cls)) is not None:
+            return assigned
         if self.aliased is not None:
             return getattr(cls, self.aliased)
         if self.method is not None:
@@ -793,15 +925,22 @@ class Generator[**P, T]:
 
     def build(self, cls: type) -> type:
         """
-        The subclass of the generators of the bases of ``cls``, or the root
+        The subclass of the generators of the bases of ``cls``, under its
+        name or one aliased to it, e.g. a compact swap is both a symmetric
+        swap and a ribbon braid, or the root
         itself when no base of ``cls`` has one, i.e. when ``cls`` is outside
         the hierarchy of the category that declares the generator.
         """
         if self.root is None:
             raise TypeError(f"{self.name} declares no class to build from.")
+        aliases = {name for klass in cls.__mro__
+                   for name, value in vars(klass).items()
+                   if isinstance(value, Generator)
+                   and value.aliased == self.name}
         roots = dict.fromkeys(
             root for base in cls.__bases__
-            if isinstance(root := getattr(base, self.name, None), type))
+            for name in (self.name, *sorted(aliases))
+            if isinstance(root := getattr(base, name, None), type))
         if not roots:
             return self.root
         parents = [getattr(cls, name) for name in self.parents]
@@ -811,10 +950,12 @@ class Generator[**P, T]:
                       if value is self.owner}
         references = " and ".join(
             f":class:`~{r.__module__}.{r.__name__}`" for r in roots)
+        qualname = root.__name__ if cls.__module__.startswith("discopy.")\
+            else f"{cls.__qualname__}.{self.name}"
         return type(root.__name__, (*roots, *parents, *level), {
             **attributes,
             "__module__": cls.__module__,
-            "__qualname__": root.__name__,
+            "__qualname__": qualname,
             "__doc__": f"A {references} in a "
                        f":class:`~{cls.__module__}.{cls.__name__}`."})
 

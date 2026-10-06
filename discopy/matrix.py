@@ -48,7 +48,7 @@ from discopy.cat import (
     assert_isparallel,
 )
 from discopy.utils import assert_isinstance, unbiased
-from discopy.pattern import Hom, Ob
+from discopy.pattern import Hom, Var
 from discopy.search import rule
 
 if TYPE_CHECKING:
@@ -240,7 +240,7 @@ class Matrix[dtype](MonoidalCategory, DaggerCategory, NamedGeneric):
 
     @classmethod
     @rule
-    def id[A](cls, dom: Annotated[Any, Ob(A)] = 0
+    def id[A](cls, dom: Annotated[Any, Var(A)] = 0
               ) -> Annotated[Matrix, Hom(A, A)]:
         with backend('numpy') as np:
             array = np.identity(index(dom), dtype=cls.dtype or int)

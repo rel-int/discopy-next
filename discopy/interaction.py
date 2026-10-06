@@ -77,7 +77,7 @@ from discopy import (
 from discopy.abc import Pregroup, RibbonCategory, TracedCategory, NamedGeneric
 from discopy.cat import assert_iscomposable
 from discopy.python import finset
-from discopy.pattern import Atom, Hom, Ob, UNIT
+from discopy.pattern import Atom, Hom, Var, UNIT
 from discopy.search import rule
 from discopy.utils import (
     factory, Generator, classproperty, unbiased, assert_isinstance,
@@ -262,7 +262,7 @@ class Diagram[natural](RibbonCategory, NamedGeneric):
 
     @classmethod
     @rule
-    def id[A](cls, dom: Annotated[Ty | None, Ob(A)] = None
+    def id[A](cls, dom: Annotated[Ty | None, Var(A)] = None
               ) -> Annotated[Diagram, Hom(A, A)]:
         """
         The identity on an integer type.
@@ -331,7 +331,7 @@ class Diagram[natural](RibbonCategory, NamedGeneric):
     @classmethod
     @rule
     def braid[X: Atom, Y: Atom](
-            cls, left: Annotated[Ty, Ob(X)], right: Annotated[Ty, Ob(Y)]
+            cls, left: Annotated[Ty, Var(X)], right: Annotated[Ty, Var(Y)]
     ) -> Annotated[Diagram, Hom([X, Y], [Y, X])]:
         """
         The braid of integer diagrams is given by the following diagram:
@@ -376,8 +376,8 @@ class Diagram[natural](RibbonCategory, NamedGeneric):
     @classmethod
     @rule
     def cups[X: Atom](
-            cls, left: Annotated[Ty, Ob(X)], right: Annotated[Ty, Ob(X).r]
-    ) -> Annotated[Diagram, Hom(Ob(X) @ Ob(X).r, UNIT)]:
+            cls, left: Annotated[Ty, Var(X)], right: Annotated[Ty, Var(X).r]
+    ) -> Annotated[Diagram, Hom(Var(X) @ Var(X).r, UNIT)]:
         """
         The integer cups are given by natural identities.
 
@@ -409,8 +409,8 @@ class Diagram[natural](RibbonCategory, NamedGeneric):
     @classmethod
     @rule
     def caps[X: Atom](
-            cls, left: Annotated[Ty, Ob(X)], right: Annotated[Ty, Ob(X).l]
-    ) -> Annotated[Diagram, Hom(UNIT, Ob(X) @ Ob(X).l)]:
+            cls, left: Annotated[Ty, Var(X)], right: Annotated[Ty, Var(X).l]
+    ) -> Annotated[Diagram, Hom(UNIT, Var(X) @ Var(X).l)]:
         """
         The integer caps are given by natural identities.
 

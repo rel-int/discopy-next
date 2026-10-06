@@ -50,13 +50,13 @@ from networkx import (
 )
 from networkx.algorithms.isomorphism import is_isomorphic
 
-from discopy import cmap, messages
+from discopy import cmap, messages, utils
 from discopy.abc import (
     DaggerCategory, HypergraphCategory, MarkovCategory, MonoidalCategory,
     NamedGeneric, RigidCategory, SymmetricCategory, TracedCategory)
 from discopy.drawing import Node, backend
 from discopy.python.finset import Permutation
-from discopy.pattern import Hom, Ob
+from discopy.pattern import Hom, Var
 from discopy.search import rule
 from discopy.utils import (
     factory_name,
@@ -348,7 +348,7 @@ class Hypergraph[category: Diagram](MonoidalCategory, DaggerCategory,
 
     @classmethod
     @rule
-    def id[A](cls, dom: Annotated[Any | None, Ob(A)] = None
+    def id[A](cls, dom: Annotated[Any | None, Var(A)] = None
               ) -> Annotated[Hypergraph, Hom(A, A)]:
         dom = cls.category.ob() if dom is None else dom
         dom_wires = cod_wires = tuple(range(len(dom)))
@@ -1351,6 +1351,8 @@ class Hypergraph[category: Diagram](MonoidalCategory, DaggerCategory,
                 return arg.make_causal().explicit_trace()
         assert self.is_causal
         return self
+
+    is_generator = utils.DeprecatedAttribute("is_atom")
 
     @property
     def is_atom(self):

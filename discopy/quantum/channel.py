@@ -53,7 +53,7 @@ from discopy.tensor import Dim, Tensor
 from discopy.utils import assert_isinstance
 from typing import Annotated
 
-from discopy.pattern import Hom, Ob
+from discopy.pattern import Hom, Var
 from discopy.search import rule
 
 
@@ -174,7 +174,7 @@ class Channel(Tensor):
 
     @classmethod
     @rule
-    def id[A](cls, dom: Annotated[CQ, Ob(A)] = CQ()
+    def id[A](cls, dom: Annotated[CQ, Var(A)] = CQ()
               ) -> Annotated[Channel, Hom(A, A)]:
         assert_isinstance(dom, CQ)
         return cls(Tensor[

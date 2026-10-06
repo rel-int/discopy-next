@@ -69,9 +69,9 @@ from discopy import (
 from discopy.abc import HypergraphCategory
 from typing import Annotated
 
-from discopy.axioms import Atom, Count, Hom, Ob, rule, Serialisable, UNIT
+from discopy.axioms import Atom, Count, Hom, Var, rule, Serialisable, UNIT
 from discopy.cat import factory, Generator
-from discopy.utils import assert_isatomic, factory_name
+from discopy.utils import deprecated_alias, assert_isatomic, factory_name
 
 
 class Wire(pivotal.Wire):
@@ -151,17 +151,17 @@ class Diagram(compact.Diagram, markov.Diagram, HypergraphCategory):
     @classmethod
     @rule
     def caps[X: Atom](
-            cls, left: Annotated[Ty, Ob(X)], right: Annotated[Ty, Ob(X).l]
-    ) -> Annotated[Diagram, Hom(UNIT, Ob(X) @ Ob(X).l)]:
+            cls, left: Annotated[Ty, Var(X)], right: Annotated[Ty, Var(X).l]
+    ) -> Annotated[Diagram, Hom(UNIT, Var(X) @ Var(X).l)]:
         return cls.cups(left, right).dagger()
 
     @classmethod
     @rule
     def spiders[X: Atom, M: Count, N: Count](
-            cls, n_legs_in: Annotated[int, Ob(M)],
-            n_legs_out: Annotated[int, Ob(N)],
-            typ: Annotated[Ty, Ob(X)], phases=None
-    ) -> Annotated[Diagram, Hom(Ob(X) ** Ob(M), Ob(X) ** Ob(N))]:
+            cls, n_legs_in: Annotated[int, Var(M)],
+            n_legs_out: Annotated[int, Var(N)],
+            typ: Annotated[Ty, Var(X)], phases=None
+    ) -> Annotated[Diagram, Hom(Var(X) ** Var(M), Var(X) ** Var(N))]:
         """
         The spiders on a given type with ``n_legs_in`` and ``n_legs_out`` and
         some optional vector of ``phases``.
@@ -236,6 +236,15 @@ class Spider(Box):
         self.Box.__init__(
             self, name, dom, cod, data=data, **params)
         self.drawing_name = "" if not data else str(data)
+
+    def __setstate__(self, state):
+        if "_name" in state and state["_name"] == type(self).__name__:
+            phase = state.get("_data", None)
+            str_data = "" if phase is None else f", {phase}"
+            cod, dom = state['_dom'], state['_cod']
+            state["_name"] = type(self).__name__\
+                + f"({dom.n}, {cod.n}, {state['_typ']}{str_data})"
+        super().__setstate__(state)
 
     @property
     def phase(self):
@@ -381,4 +390,4 @@ class Equation(compact.Equation):
 
 Diagram.Equation = Equation
 
-
+__getattr__ = deprecated_alias(__name__, {"Ob": "Wire", "PRO": "Nat"})

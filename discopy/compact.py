@@ -64,6 +64,7 @@ from discopy.abc import (
 from discopy.axioms import Serialisable
 from discopy.cat import factory, Generator
 from discopy.pivotal import Wire, Ty  # noqa: F401
+from discopy.utils import deprecated_alias
 
 
 class Layer(symmetric.Layer, rigid.Layer):
@@ -168,4 +169,4 @@ class Equation(symmetric.Equation):
 
 Diagram.Equation = Equation
 
-
+__getattr__ = deprecated_alias(__name__, {"Ob": "Wire"})

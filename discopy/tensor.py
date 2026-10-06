@@ -63,7 +63,7 @@ from typing import (
 
 from discopy import (
     cat, monoidal, rigid, frobenius, cmap, config)
-from discopy.axioms import Hom, no_strategy, Ob, rule
+from discopy.axioms import Hom, no_strategy, Var, rule
 from discopy.cat import factory, Generator, assert_iscomposable
 from discopy.frobenius import Dim, Cup
 from discopy.matrix import (  # noqa: F401
@@ -151,7 +151,7 @@ class Tensor[dtype](Matrix[dtype]):
 
     @classmethod
     @rule
-    def id[A](cls, dom: Annotated[Any, Ob(A)] = Dim(1)
+    def id[A](cls, dom: Annotated[Any, Var(A)] = Dim(1)
               ) -> Annotated[Tensor, Hom(A, A)]:
         return cls(Matrix.id(product(dom.inside)).array, dom, dom)
 
@@ -744,6 +744,9 @@ class Box[dtype](frobenius.Box, Diagram[dtype]):
     strategy = no_strategy
 
     def __setstate__(self, state):
+        if "data" not in state and state.get("_array", None) is not None:
+            state['data'] = state['_array']
+            del state["_array"]
         super().__setstate__(state)
         if self.dtype is None and self.data is not None:
             self.data, dtype = self._get_data_dtype(self.data)

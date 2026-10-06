@@ -41,7 +41,7 @@ from discopy import config, monoidal, braided, traced, cmap, hypergraph
 from discopy.abc import BalancedCategory
 from typing import Annotated
 
-from discopy.axioms import Atom, Hom, no_strategy, Ob, rule, Serialisable
+from discopy.axioms import Atom, Hom, no_strategy, Var, rule, Serialisable
 from discopy.cat import factory, Generator
 from discopy.monoidal import Colour, Ty  # noqa: F401
 from discopy.utils import factory_name, assert_isatomic
@@ -141,7 +141,7 @@ class Diagram(braided.Diagram, traced.Diagram, BalancedCategory):
 
     @classmethod
     @rule
-    def twist[X: Atom](cls, dom: Annotated[monoidal.Ty, Ob(X)]
+    def twist[X: Atom](cls, dom: Annotated[monoidal.Ty, Var(X)]
                        ) -> Annotated[Diagram, Hom(X, X)]:
         """
         The twist on an object.

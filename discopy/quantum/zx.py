@@ -35,7 +35,7 @@ from discopy.quantum.gates import (
 from discopy.quantum.gates import Scalar as GatesScalar
 from discopy.rigid import Sum, Nat
 from discopy.utils import factory_name
-from discopy.pattern import Atom, Hom, Ob
+from discopy.pattern import Atom, Hom, Var
 from discopy.search import rule
 
 
@@ -49,8 +49,8 @@ class Diagram(tensor.Diagram[complex]):
     @staticmethod
     @rule
     def swap[X: Atom, Y: Atom](
-            left: Annotated[int | Nat, Ob(X)],
-            right: Annotated[int | Nat, Ob(Y)]
+            left: Annotated[int | Nat, Var(X)],
+            right: Annotated[int | Nat, Var(Y)]
     ) -> Annotated[Diagram, Hom([X, Y], [Y, X])]:
         left = left if isinstance(left, Nat) else Nat(left)
         right = right if isinstance(right, Nat) else Nat(right)
@@ -261,6 +261,16 @@ class Spider(tensor.Spider[complex], Box):
         factory_str = type(self).__name__
         phase_str = f", {self.phase}" if self.phase else ""
         self.name = f"{factory_str}({n_legs_in}, {n_legs_out}{phase_str})"
+
+    def __setstate__(self, state):
+        if "_name" in state and state["_name"] == type(self).__name__:
+            phase = state.get("_data", None)
+            phase_str = f', {phase}' if phase else ''
+            state["_name"] = (
+                type(self).__name__ +
+                f"({state['_dom'].n}, {state['_cod'].n}{phase_str})"
+            )
+        super().__setstate__(state)
 
     def __repr__(self):
         return str(self).replace(type(self).__name__, factory_name(type(self)))

@@ -10,17 +10,17 @@ from discopy.abc import (
 from discopy.monoidal import Ty
 from discopy import pattern
 from discopy.pattern import (
-    UNIT, Adjoint, Atom, Count, Delay, Exp, Hom, L, Ob, Over, R, Repeat,
+    UNIT, Adjoint, Atom, Count, Delay, Exp, Hom, L, Over, R, Repeat, Var,
     Sort, Tensor, Under, Unit, parse, sort_of)
 
 
 x, y, z = map(Ty, "xyz")
-A, B = (Ob(name, Sort(bound=ColouredMonoid)) for name in "AB")
-M = Ob("M", Sort(atomic=True, bound=ColouredMonoid))
-X = Ob("X", Sort(atomic=True, bound=Pregroup))
-D = Ob("D", Sort(bound=DelayedMonoid))
-E = Ob("E", Sort(bound=ResiduatedMonoid))
-N = Ob("N", Sort("Count"))
+A, B = (Var(name, Sort(bound=ColouredMonoid)) for name in "AB")
+M = Var("M", Sort(atomic=True, bound=ColouredMonoid))
+X = Var("X", Sort(atomic=True, bound=Pregroup))
+D = Var("D", Sort(bound=DelayedMonoid))
+E = Var("E", Sort(bound=ResiduatedMonoid))
+N = Var("N", Sort("Count"))
 ONE = Unit(A.sort)
 
 
@@ -46,14 +46,21 @@ def test_operators():
     def cups[V: Atom](cls): ...
     def spiders[K: Count](cls): ...
     V, K = cups.__type_params__ + spiders.__type_params__
-    assert Ob(V).sort.atomic and Ob(K).sort == Sort("Count")
-    assert Hom(V, "W") == Hom(Ob(V), Ob("W"))  # Hom lifts a bare side.
-    assert Hom([V, "W"], ()) == Hom(Ob(V) @ Ob("W"), UNIT)
+    assert Var(V).sort.atomic and Var(K).sort == Sort("Count")
+    assert Hom(V, "W") == Hom(Var(V), Var("W"))  # Hom lifts a bare side.
+    assert Hom([V, "W"], ()) == Hom(Var(V) @ Var("W"), UNIT)
     with raises(TypeError):
         Hom(42, "W")
     assert sort_of(Pregroup).bound is Pregroup
     with raises(TypeError):
         sort_of(int)
+
+
+def test_repr():
+    """ A pattern reads back from its representation. """
+    for value in (A, X, A @ X @ A, Hom(A, A @ X), X.l, D.d, E << E,
+                  X ** N, UNIT, Sort("C0", atomic=True)):
+        assert eval(repr(value), vars(pattern)) == value
 
 
 def test_formers():
@@ -71,7 +78,7 @@ def test_alias():
     C0, C1 = "C0", "C1"
 
     def cups[V: Atom](
-            cls, left: abc.Ob[Ty, V], right: abc.Ob[Ty, R[V]]
+            cls, left: abc.Obj[Ty, V], right: abc.Obj[Ty, R[V]]
     ) -> abc.Hom[C1, Tensor[V, R[V]], Unit[C0]]:
         ...
     assert str(parse(cups))\
@@ -82,7 +89,7 @@ def test_alias():
     with raises(TypeError):
         parse(unary, conclusion=False)
 
-    def bare[V: Atom](cls, x: abc.Ob[Ty]) -> None:
+    def bare[V: Atom](cls, x: abc.Obj[Ty]) -> None:
         ...
     with raises(TypeError):
         parse(bare, conclusion=False)
@@ -135,7 +142,7 @@ def test_parse():
     assert str(sequent.conclusion) == "C1[A, C]"
     assert parse(then, conclusion=False).conclusion is None
 
-    def law[X](cls, x: Annotated[Ty, Ob(X)], n: int = 1, *args, **kwargs):
+    def law[X](cls, x: Annotated[Ty, Var(X)], n: int = 1, *args, **kwargs):
         ...
     assert list(parse(law, conclusion=False).premises) == ["x"]
     assert str(parse(lambda cls: None, conclusion=False)) == ""
@@ -153,14 +160,14 @@ def test_parse():
     with raises(TypeError, match="states no pattern"):
         parse(unannotated, conclusion=False)
 
-    def two[V, W](cls) -> Annotated[str, Ob(V), Ob(W)]:
+    def two[V, W](cls) -> Annotated[str, Var(V), Var(W)]:
         ...
     with raises(TypeError, match="exactly one pattern"):
         parse(two)
 
     def unstated[X: Atom, N: Count](  # The conclusion's N has no premise.
-            cls, x: Annotated[Ty, Ob(X)]
-    ) -> Annotated[Ty, Hom(X, Ob(X) ** Ob(N))]:
+            cls, x: Annotated[Ty, Var(X)]
+    ) -> Annotated[Ty, Hom(X, Var(X) ** Var(N))]:
         ...
     with raises(TypeError, match="no premise states"):
         parse(unstated)
@@ -172,36 +179,48 @@ def test_parse():
 
 def test_exp_unify():
     """ An exponential pattern decomposes a single exponential object
-    its base and exponent rebuild, and keeps the residual otherwise. """
+    its base and exponent rebuild, matches nothing else, and keeps the
+    residual of a pregroup, whose exponentials are adjoint atoms. """
     from discopy import biclosed, rigid
 
     a, b = biclosed.Ty("a"), biclosed.Ty("b")
-    Z = Ob("Z", Sort(bound=ResiduatedMonoid))
-    Y = Ob("Y", Sort(bound=ResiduatedMonoid))
+    Z = Var("Z", Sort(bound=ResiduatedMonoid))
+    Y = Var("Y", Sort(bound=ResiduatedMonoid))
     ((subst, residuals),) = (Z << Y).match(b << a)
     assert subst == {"Z": b, "Y": a} and not residuals
-    ((_, residual),) = (Z >> Y).match(b << a)
-    assert residual  # The symbols disagree, so the equation is kept.
+    assert not list((Z >> Y).match(b << a))  # The symbols disagree.
+    assert not list((Z << Y).match(b @ a))
     ((_, residual),) = (Z << Y).match(rigid.Ty("b") << rigid.Ty("a"))
     assert residual  # A pregroup exponential is two adjoint atoms.
 
 
+def test_delay_unify():
+    """ A delay pattern matches the delayed objects, undelayed. """
+    from discopy import feedback
+
+    x, y = feedback.Ty("x"), feedback.Ty("y")
+    assert list(D.d.match(x.d @ y.d)) == [({"D": x @ y}, ())]
+    assert not list(D.d.match(x.d @ y))
+    assert list((D.d @ D.d).match((x @ x).d)) == [({"D": x}, ())]
+
+
 def test_level():
     """ A pattern needs the level its known objects are bounded by. """
-    assert Ob.level() is Category and Tensor.level() is ColouredMonoid
+    assert Var.level() is Category and Tensor.level() is ColouredMonoid
     assert Adjoint.level() is Pregroup and Delay.level() is DelayedMonoid
     assert Exp.level() is ResiduatedMonoid and Unit.level() is ColouredMonoid
     assert (X @ D).l == Adjoint(Tensor(X, D), "l")
+    assert (D @ X).l == Adjoint(Tensor(D, X), "l")  # Whatever the order.
     assert X.l.r.bound is Pregroup and Unit(X.sort).bound is Pregroup
     for build in (lambda: X.d, lambda: D.r, lambda: D >> D,
                   lambda: (A @ X).d, lambda: Adjoint(A, "r")):
         with raises(TypeError, match="needs a"):
             build()
-    unknown = Ob("U", Sort())
+    unknown = Var("U", Sort())
     assert (unknown @ A).bound is None  # Checked by parse with owner.
 
-    def snake[U: Atom](cls, u: Annotated[Ty, Ob(U)]) -> Annotated[
-            Ty, Hom(Ob(U) @ Ob(U).r, UNIT)]:
+    def snake[U: Atom](cls, u: Annotated[Ty, Var(U)]) -> Annotated[
+            Ty, Hom(Var(U) @ Var(U).r, UNIT)]:
         ...
     from discopy.abc import MonoidalCategory, RigidCategory
     with raises(TypeError, match="needs a"):
@@ -218,10 +237,18 @@ def test_errors_and_inverses():
     with raises(TypeError, match="Expected a head"):
         Atom[42]
     with raises(TypeError, match="one head"):
-        sort_of(abc.Ob["C0", "C1"])
+        sort_of(abc.Obj["C0", "C1"])
 
     def bad(cls, f: Annotated[Ty, 42]): ...
     with raises(TypeError, match="pattern or a sort"):
         parse(bad, conclusion=False)
+
+    with raises(KeyError, match="T is no head of this scope, which names C0"):
+        Sort("T").resolve({"C0": Ty})
+
+    def conflicting(cls, a: Annotated[Ty, Var("A", Sort(atomic=True))],
+                    b: Annotated[Ty, Var("A")]): ...
+    with raises(TypeError, match="both as Atom\\[C0\\] and as C0"):
+        parse(conflicting, conclusion=False)
     assert list(X.r.match(rigid.Ty('x').r)) == [({"X": rigid.Ty('x')}, ())]
     assert (M ** N).instantiate({"M": x, "N": 2}, Ty) == x @ x

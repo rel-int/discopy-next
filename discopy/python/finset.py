@@ -24,7 +24,7 @@ from dataclasses import dataclass
 
 from discopy import messages
 from discopy.abc import MonoidalCategory, PROP, Nat
-from discopy.pattern import Atom, Hom, Ob
+from discopy.pattern import Atom, Hom, Var
 from discopy.search import rule
 
 
@@ -75,7 +75,7 @@ class Function(MonoidalCategory, Sequence):
 
     @staticmethod
     @rule
-    def id[A](x: Annotated[int | Nat, Ob(A)] = 0
+    def id[A](x: Annotated[int | Nat, Var(A)] = 0
               ) -> Annotated[Function, Hom(A, A)]:
         x = Nat(int(x))
         return Function(list(range(x)), x, x)
@@ -99,7 +99,7 @@ class Function(MonoidalCategory, Sequence):
     @staticmethod
     @rule
     def swap[X: Atom, Y: Atom](
-            x: Annotated[int | Nat, Ob(X)], y: Annotated[int | Nat, Ob(Y)]
+            x: Annotated[int | Nat, Var(X)], y: Annotated[int | Nat, Var(Y)]
     ) -> Annotated[Function, Hom([X, Y], [Y, X])]:
         m, n = int(x), int(y)
         inside = list(Permutation.swap(m, n))
@@ -193,7 +193,7 @@ class Permutation(Function, PROP):
 
     @classmethod
     @rule
-    def id[A](cls, dom: Annotated[int | Nat, Ob(A)] = 0
+    def id[A](cls, dom: Annotated[int | Nat, Var(A)] = 0
               ) -> Annotated[Self, Hom(A, A)]:
         """ The identity permutation on ``range(size)``. """
         n = int(dom)
@@ -347,8 +347,8 @@ class Permutation(Function, PROP):
     @classmethod
     @rule
     def swap[X: Atom, Y: Atom](
-            cls, left: Annotated[int | Nat, Ob(X)],
-            right: Annotated[int | Nat, Ob(Y)]
+            cls, left: Annotated[int | Nat, Var(X)],
+            right: Annotated[int | Nat, Var(Y)]
     ) -> Annotated[Self, Hom([X, Y], [Y, X])]:
         m, n = int(left), int(right)
         inside = tuple(

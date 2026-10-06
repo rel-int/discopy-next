@@ -775,7 +775,7 @@ class CMap[category: Diagram](CompactCategory, DaggerCategory,
 
     @classmethod
     @rule
-    def id[A](cls, dom: Annotated[Any | None, pattern.Ob(A)] = None
+    def id[A](cls, dom: Annotated[Any | None, pattern.Var(A)] = None
               ) -> Annotated[CMap, Hom(A, A)]:
         """ The identity map, with each input wired to its output. """
         dom = cls.ob() if dom is None else dom
@@ -914,8 +914,8 @@ class CMap[category: Diagram](CompactCategory, DaggerCategory,
     @classmethod
     @rule
     def swap[X: Atom, Y: Atom](
-            cls, left: Annotated[Any, pattern.Ob(X)],
-            right: Annotated[Any, pattern.Ob(Y)]) -> Annotated[CMap,
+            cls, left: Annotated[Any, pattern.Var(X)],
+            right: Annotated[Any, pattern.Var(Y)]) -> Annotated[CMap,
     Hom([X, Y], [Y, X])]:
         """ The symmetry encoded as boundary wiring. """
         dom, cod = left @ right, right @ left
@@ -937,9 +937,9 @@ class CMap[category: Diagram](CompactCategory, DaggerCategory,
     @classmethod
     @rule
     def cups[X: Atom](
-            cls, left: Annotated[Any, pattern.Ob(X)],
-            right: Annotated[Any, pattern.Ob(X).r]
-    ) -> Annotated[CMap, Hom(pattern.Ob(X) @ pattern.Ob(X).r, UNIT)]:
+            cls, left: Annotated[Any, pattern.Var(X)],
+            right: Annotated[Any, pattern.Var(X).r]
+    ) -> Annotated[CMap, Hom(pattern.Var(X) @ pattern.Var(X).r, UNIT)]:
         """ A cup encoded as boundary wiring between adjoint types. """
         assert_isinstance(left, Pregroup)
         assert_isinstance(right, Pregroup)
@@ -953,9 +953,9 @@ class CMap[category: Diagram](CompactCategory, DaggerCategory,
     @classmethod
     @rule
     def caps[X: Atom](
-            cls, left: Annotated[Any, pattern.Ob(X)],
-            right: Annotated[Any, pattern.Ob(X).l]
-    ) -> Annotated[CMap, Hom(UNIT, pattern.Ob(X) @ pattern.Ob(X).l)]:
+            cls, left: Annotated[Any, pattern.Var(X)],
+            right: Annotated[Any, pattern.Var(X).l]
+    ) -> Annotated[CMap, Hom(UNIT, pattern.Var(X) @ pattern.Var(X).l)]:
         """ A cap encoded as boundary wiring between adjoint types. """
         assert_isinstance(left, Pregroup)
         assert_isinstance(right, Pregroup)
@@ -984,18 +984,18 @@ class CMap[category: Diagram](CompactCategory, DaggerCategory,
     @classmethod
     @rule
     def ev_left[Y: Atom, E: Atom](
-            cls, base: Annotated[Any, pattern.Ob(Y)],
-            exponent: Annotated[Any, pattern.Ob(E)]) -> Annotated[CMap,
-    Hom((pattern.Ob(Y) << pattern.Ob(E)) @ pattern.Ob(E), Y)]:
+            cls, base: Annotated[Any, pattern.Var(Y)],
+            exponent: Annotated[Any, pattern.Var(E)]) -> Annotated[CMap,
+    Hom((pattern.Var(Y) << pattern.Var(E)) @ pattern.Var(E), Y)]:
         """ The left evaluation, see :meth:`ev`. """
         return cls.ev(base, exponent, left=True)
 
     @classmethod
     @rule
     def ev_right[Y: Atom, E: Atom](
-            cls, base: Annotated[Any, pattern.Ob(Y)],
-            exponent: Annotated[Any, pattern.Ob(E)]) -> Annotated[CMap,
-    Hom(pattern.Ob(E) @ (pattern.Ob(E) >> pattern.Ob(Y)), Y)]:
+            cls, base: Annotated[Any, pattern.Var(Y)],
+            exponent: Annotated[Any, pattern.Var(E)]) -> Annotated[CMap,
+    Hom(pattern.Var(E) @ (pattern.Var(E) >> pattern.Var(Y)), Y)]:
         """ The right evaluation, see :meth:`ev`. """
         return cls.ev(base, exponent, left=False)
 

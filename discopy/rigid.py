@@ -156,9 +156,10 @@ from discopy import cat, monoidal, biclosed, messages
 from discopy.abc import DaggerCategory, Pregroup, RigidCategory
 from typing import Annotated
 
-from discopy.axioms import Atom, GENERATORS, Hom, Ob, rule, Serialisable, UNIT
+from discopy.axioms import Atom, GENERATORS, Hom, Var, rule, Serialisable, UNIT
 from discopy.cat import factory, Generator
 from discopy.utils import (
+    deprecated_alias,
     assert_isatomic,
     assert_isinstance,
     AxiomError,
@@ -191,6 +192,12 @@ class Wire(monoidal.Wire):
     >>> a = Wire('a')
     >>> assert a.l.r == a.r.l == a and a != a.l.l != a.r.r
     """
+
+    def __setstate__(self, state):
+        if '_z' in state:  # Backward compatibility
+            self.z = state['_z']
+            del state['_z']
+        super().__setstate__(state)
 
     def __init__(self, name: str, z: int = 0,
                  dom: monoidal.Colour = monoidal.transparent,
@@ -278,6 +285,11 @@ class Ty(Pregroup, biclosed.Ty):
     >>> assert (s @ n).l == n.l @ s.l and (s @ n).r == n.r @ s.r
     """
     Wire: ClassVar[Generator] = Generator.subclass(Wire)
+
+    def __setstate__(self, state):
+        if '_z' in state:  # Backward compatibility
+            del state['_z']
+        super().__setstate__(state)
 
     def assert_isadjoint(self, other):
         """
@@ -422,8 +434,8 @@ class Diagram(biclosed.Diagram, RigidCategory):
     @classmethod
     @rule
     def cups[X: Atom](
-            cls, left: Annotated[Ty, Ob(X)], right: Annotated[Ty, Ob(X).r]
-    ) -> Annotated[Diagram, Hom(Ob(X) @ Ob(X).r, UNIT)]:
+            cls, left: Annotated[Ty, Var(X)], right: Annotated[Ty, Var(X).r]
+    ) -> Annotated[Diagram, Hom(Var(X) @ Var(X).r, UNIT)]:
         """
         Construct a diagram of nested cups for types ``left`` and ``right``.
 
@@ -445,8 +457,8 @@ class Diagram(biclosed.Diagram, RigidCategory):
     @classmethod
     @rule
     def caps[X: Atom](
-            cls, left: Annotated[Ty, Ob(X)], right: Annotated[Ty, Ob(X).l]
-    ) -> Annotated[Diagram, Hom(UNIT, Ob(X) @ Ob(X).l)]:
+            cls, left: Annotated[Ty, Var(X)], right: Annotated[Ty, Var(X).l]
+    ) -> Annotated[Diagram, Hom(UNIT, Var(X) @ Var(X).l)]:
         """
         Construct a diagram of nested caps for types ``left`` and ``right``.
 
@@ -730,6 +742,12 @@ class Box(biclosed.Box, Diagram):
     z = 0
     serialised_attrs = cat.Box.serialised_attrs + ('z', )
 
+    def __setstate__(self, state):
+        if '_z' in state:  # Backward compatibility
+            self.z = state['_z']
+            del state['_z']
+        super().__setstate__(state)
+
     def __init__(self, name: str, dom: Ty, cod: Ty, data=None, z=0, **params):
         self.z = z
         biclosed.Box.__init__(self, name, dom, cod, data=data, **params)
@@ -963,4 +981,4 @@ class Equation(biclosed.Equation):
 
 Diagram.Equation = Equation
 
-
+__getattr__ = deprecated_alias(__name__, {"Ob": "Wire", "PRO": "Nat"})

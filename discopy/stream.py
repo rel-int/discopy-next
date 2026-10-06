@@ -166,7 +166,7 @@ from dataclasses import dataclass
 from discopy import symmetric
 from discopy.abc import MonoidalCategory, NamedGeneric
 from discopy.python import finset
-from discopy.pattern import Hom, Ob
+from discopy.pattern import Hom, Var
 from discopy.abc import ColouredMonoid
 from discopy.search import rule
 from discopy.utils import (
@@ -471,7 +471,7 @@ class Stream[category](MonoidalCategory, NamedGeneric):
 
     @classmethod
     @rule
-    def id[A](cls, x: Annotated[Optional[Ty], Ob(A)] = None
+    def id[A](cls, x: Annotated[Optional[Ty], Var(A)] = None
               ) -> Annotated[Stream, Hom(A, A)]:
         """
         Construct a stream of identity arrows.

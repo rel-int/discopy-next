@@ -4,19 +4,19 @@ states its rules, generators and axioms.
 
 A sequent is the signature of a method on an abstract base class of
 :mod:`discopy.abc`: its :pep:`695` type parameter list is the context,
-each parameter one variable with its sort as the bound — ``A: Ob[C0]``
+each parameter one variable with its sort as the bound — ``A: Obj[C0]``
 an object, ``X: Atom[C0]`` an atomic one, ``N: Count`` a number of
 repetitions — its parameters the premises and its return annotation
-the conclusion, each a subscript of the ``Ob`` and ``Hom`` aliases of
+the conclusion, each a subscript of the ``Obj`` and ``Hom`` aliases of
 :mod:`discopy.abc`: ``f: Hom[C1, A, B]`` a morphism between two sides
-and ``x: Ob[C0, p]`` a pattern beside its coarse type, the compound
+and ``x: Obj[C0, p]`` a pattern beside its coarse type, the compound
 sides built by the formers ``Tensor[A, B]``, ``Unit[C0]``, ``L[A]``,
 ``R[A]``, ``D[A]``, ``Over[A, B]``, ``Under[A, B]`` and
 ``Repeat[X, N]``.
 
 .. code-block:: python
 
-    def tensor[A: Ob[C0], B: Ob[C0], C: Ob[C0], D: Ob[C0]](
+    def tensor[A: Obj[C0], B: Obj[C0], C: Obj[C0], D: Obj[C0]](
             self: Hom[C1, A, B], other: Hom[C1, C, D]
     ) -> Hom[C1, Tensor[A, C], Tensor[B, D]]:
         ...
@@ -28,7 +28,7 @@ fully checked — a ``C0`` in a ``C1`` slot is an error — while
 sequent is parsed, its args evaluated lazily in a scope where the
 sibling parameters and the heads of the declaring class are visible.
 The patterns remain plain values that an ``Annotated`` may carry
-inline: ``Ob(A)`` lifts one of the declaration's own type parameters,
+inline: ``Var(A)`` lifts one of the declaration's own type parameters,
 its sort the bound, and the operators build the compounds —
 ``Hom(p, q)``, ``p @ q``, ``p.l``, ``p.r``, ``p.d``, ``p << q``,
 ``p >> q``, ``p ** n`` and :data:`UNIT` — a side of :class:`Hom`
@@ -44,7 +44,7 @@ its shape needs.
 
 A conclusion is matched against a goal, a pair of an optional domain and
 codomain, by unification over the free monoid of objects: a
-:class:`Tensor` splits the goal at every position, an :class:`Ob` binds
+:class:`Tensor` splits the goal at every position, a :class:`Var` binds
 once, an adjoint ``p.r`` inverts to ``p``. What cannot be inverted, an
 exponential or a delay, is a residual equation checked once every
 variable is instantiated.
@@ -58,7 +58,7 @@ Summary
     :toctree:
 
     Pattern
-    Ob
+    Var
     Unit
     Tensor
     Adjoint
@@ -85,6 +85,8 @@ Summary
         :toctree:
 
         lift
+        meet
+        intersection
         alias_of
         expand
         parse
@@ -98,7 +100,7 @@ import operator
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Iterator
 from dataclasses import KW_ONLY, dataclass, field, replace
-from functools import reduce
+from functools import cache, reduce
 from typing import (
     Annotated, ClassVar, Self, TypeAliasType, TypeVar, get_args, get_origin)
 
@@ -119,6 +121,11 @@ class Sort:
     or not, and the class of :mod:`discopy.abc` bounding them when
     known.
 
+    The bound is the context a sort is read in, filled by :func:`parse`
+    from the class stating it, rather than part of what the sort says:
+    it is left out of comparisons and of the representation, so that a
+    variable is the same wherever it is stated.
+
     >>> print(Sort("C0", atomic=True))
     Atom[C0]
     """
@@ -128,8 +135,15 @@ class Sort:
     bound: type | None = field(default=None, compare=False, repr=False)
 
     def resolve(self, scope: dict) -> type:
-        """ The type the head stands for in the scope. """
-        return scope[self.head]
+        """ The type the head stands for in the scope, whose names are
+        the heads a sequent may state, e.g. ``C0``, ``C1`` and ``Self``
+        for a category. """
+        try:
+            return scope[self.head]
+        except KeyError:
+            raise KeyError(
+                f"{self.head} is no head of this scope, which names "
+                f"{', '.join(scope)}.") from None
 
     def strategy(self, scope: dict, types=None):
         """
@@ -180,7 +194,7 @@ def sort_of(bound, level: type | None = None) -> Sort:
     """
     The sort a bound declares: an object when :obj:`None`, an
     :class:`Atom` or a :class:`Count` when the bound says so, a
-    :class:`Sort` as it is, ``Ob[C0]`` an object of the named head,
+    :class:`Sort` as it is, ``Obj[C0]`` an object of the named head,
     or a class of :mod:`discopy.abc` bounding the objects; the
     ``level`` of the declaring class is carried by every object sort.
     """
@@ -194,12 +208,12 @@ def sort_of(bound, level: type | None = None) -> Sort:
         return replace(bound, bound=bound.bound or level)
     if isinstance(bound, type) and issubclass(bound, abc.Category):
         return Sort(bound=bound)
-    if alias_of(bound) is getattr(abc, "Ob", None):
+    if alias_of(bound) is getattr(abc, "Obj", None):
         try:
             (head, ) = get_args(bound)
         except ValueError:
             raise TypeError(
-                f"A bound names one head, Ob[C0], got {bound!r}.") from None
+                f"A bound names one head, Obj[C0], got {bound!r}.") from None
         return Sort(head_of(head), bound=level)
     raise TypeError(f"Expected a sort, got {bound!r}.")
 
@@ -279,7 +293,7 @@ class Pattern(ABC):
 
         >>> from discopy.monoidal import Ty
         >>> x, y = Ty('x'), Ty('y')
-        >>> A, B = Ob("A"), Ob("B")
+        >>> A, B = Var("A"), Var("B")
         >>> for subst, _ in (A @ B).match(x @ y):
         ...     print(subst['A'], '|', subst['B'])
         Ty() | x @ y
@@ -324,33 +338,33 @@ class Pattern(ABC):
     def __rshift__(self, other: Pattern) -> Exp:
         return Exp(">>", self, other)
 
-    def __pow__(self, count: Ob) -> Repeat:
+    def __pow__(self, count: Var) -> Repeat:
         return Repeat(self, count)
 
 
 @dataclass(frozen=True, init=False)
-class Ob(Pattern):
+class Var(Pattern):
     """
-    A variable over the objects of a category: the lift ``Ob(A)`` of
+    A variable over the objects of a category: the lift ``Var(A)`` of
     one of the declaration's own type parameters, its sort the bound —
     or a name and a sort directly.
 
     >>> def cups[X: Atom](): ...
     >>> X, = cups.__type_params__
-    >>> print(Ob(X) @ Ob(X).r)
+    >>> print(Var(X) @ Var(X).r)
     X @ X.r
     """
 
     name: str
     sort: Sort
 
-    def __init__(self, var: TypeVar | str, sort: Sort | None = None):
-        if not isinstance(var, (TypeVar, str)):
+    def __init__(self, name: TypeVar | str, sort: Sort | None = None):
+        if not isinstance(name, (TypeVar, str)):
             raise TypeError(
-                f"Expected a type parameter or a name, got {var!r}.")
-        name = var if isinstance(var, str) else var.__name__
+                f"Expected a type parameter or a name, got {name!r}.")
         if sort is None:
-            sort = sort_of(getattr(var, "__bound__", None))
+            sort = sort_of(getattr(name, "__bound__", None))
+        name = name if isinstance(name, str) else name.__name__
         object.__setattr__(self, "name", name)
         object.__setattr__(self, "sort", sort)
         super().__post_init__()
@@ -412,7 +426,7 @@ UNIT = Unit()
 """ The unit of the objects, e.g. the codomain of the cups. """
 
 
-@dataclass(frozen=True, init=False)
+@dataclass(frozen=True, init=False, repr=False)
 class Tensor[*Ts](Pattern):
     """ The tensor of two or more patterns, flattened: ``p @ q`` and
     the former ``Tensor[p, q]`` in a bound. """
@@ -465,6 +479,9 @@ class Tensor[*Ts](Pattern):
             for subst_, residuals_ in head.unify(value[:n], subst, residuals):
                 yield from cls.split(tail, value[n:], subst_, residuals_)
 
+    def __repr__(self):
+        return f"Tensor({', '.join(map(repr, self.factors))})"
+
     def __str__(self):
         return " @ ".join(map(str, self.factors))
 
@@ -506,7 +523,8 @@ class Adjoint(Pattern):
 
 @dataclass(frozen=True)
 class Delay(Pattern):
-    """ The delay ``p.d`` of a pattern by one time step. """
+    """ The delay ``p.d`` of a pattern by one time step, inverted by
+    the delay ``-1`` steps back when matching. """
 
     base: Pattern
 
@@ -525,6 +543,14 @@ class Delay(Pattern):
     def instantiate(self, subst, unit):
         return self.base.instantiate(subst, unit).d
 
+    def unify(self, value, subst, residuals):
+        try:
+            undelayed = value.delay(-1)
+        except NotImplementedError:  # Not the delay of anything.
+            return
+        if undelayed.d == value:
+            yield from self.base.unify(undelayed, subst, residuals)
+
     def __str__(self):
         base = f"({self.base})"\
             if isinstance(self.base, (Tensor, Repeat)) else str(self.base)
@@ -535,8 +561,8 @@ class Delay(Pattern):
 class Exp(Pattern):
     """ An exponential ``p << q`` or ``p >> q`` of two patterns,
     decomposed against a single exponential object that its base and
-    exponent rebuild, kept as a residual otherwise — so a level that
-    collapses its exponentials, e.g. into the adjoints of a pregroup,
+    exponent rebuild, matching nothing else — except at a level that
+    collapses its exponentials into the adjoints of a pregroup, which
     keeps the residual. """
 
     symbol: str
@@ -570,7 +596,8 @@ class Exp(Pattern):
             else (exponent, base)
         if base is None or exponent is None\
                 or value != self.OPERATORS[self.symbol](*operands):
-            yield from super().unify(value, subst, residuals)
+            if isinstance(value, abc.Pregroup):
+                yield from super().unify(value, subst, residuals)
             return
         for subst_, residuals_ in self.left.unify(
                 operands[0], subst, residuals):
@@ -590,14 +617,14 @@ class Repeat[P, N](Pattern):
     """
 
     base: Pattern
-    count: Ob
+    count: Var
 
     def __class_getitem__(cls, args) -> Repeat:
         base, count = args
-        return cls(lift(base), count if isinstance(count, Ob) else Ob(count))
+        return cls(lift(base), count if isinstance(count, Var) else Var(count))
 
     def __post_init__(self):
-        if not isinstance(self.count, Ob)\
+        if not isinstance(self.count, Var)\
                 or self.count.sort.head != "Count":
             raise TypeError(f"Expected a Count variable, got {self.count!r}.")
         if not getattr(getattr(self.base, "sort", None), "atomic", False):
@@ -642,12 +669,12 @@ def lift(side: Pattern | TypeVar | str | list | tuple) -> Pattern:
     """
     The pattern a side of a :class:`Hom` stands for: a pattern as it
     is, a list or tuple tensored — each element a side itself, none
-    the :data:`UNIT` — and anything else lifted by :class:`Ob`.
+    the :data:`UNIT` — and anything else lifted by :class:`Var`.
 
     >>> def cups[X: Atom](): ...
     >>> X, = cups.__type_params__
-    >>> assert lift([X, Ob(X).r]) == Ob(X) @ Ob(X).r
-    >>> assert lift(()) == UNIT and lift([X]) == Ob(X)
+    >>> assert lift([X, Var(X).r]) == Var(X) @ Var(X).r
+    >>> assert lift(()) == UNIT and lift([X]) == Var(X)
     """
     if isinstance(side, Pattern):
         return side
@@ -656,7 +683,7 @@ def lift(side: Pattern | TypeVar | str | list | tuple) -> Pattern:
         if not parts:
             return UNIT
         return parts[0] if len(parts) == 1 else Tensor(*parts)
-    return Ob(side)
+    return Var(side)
 
 
 @dataclass(frozen=True, init=False)
@@ -668,7 +695,7 @@ class Hom(Pattern):
     its own type parameters and ``Hom([M, A], [M, B])`` for tensors.
 
     >>> from discopy.monoidal import Ty
-    >>> A, B = Ob("A"), Ob("B")
+    >>> A, B = Var("A"), Var("B")
     >>> hom = Hom(A @ B, A)
     >>> print(hom)
     C1[A @ B, A]
@@ -678,7 +705,7 @@ class Hom(Pattern):
     >>> list(hom.match((x @ y, y)))
     []
     >>> def then[A, B](): ...
-    >>> assert Hom(*then.__type_params__) == Hom(Ob("A"), Ob("B"))
+    >>> assert Hom(*then.__type_params__) == Hom(Var("A"), Var("B"))
     >>> assert Hom([A, B], A) == hom
     """
 
@@ -723,7 +750,7 @@ class Hom(Pattern):
 class L[T]:
     """ The former ``L[p]`` of the left adjoint ``p.l``.
 
-    >>> assert L[Ob("X")] == Ob("X").l
+    >>> assert L[Var("X")] == Var("X").l
     """
 
     def __class_getitem__(cls, base) -> Adjoint:
@@ -761,9 +788,40 @@ class Under[A, B]:
 
 
 def common(*patterns: Pattern) -> type | None:
-    """ The bound of the objects of patterns standing together, if all do. """
+    """ The bound of the objects of patterns standing together, if all
+    have one: the objects satisfy every bound, so it is their
+    :func:`meet`, whatever order the patterns stand in. """
     bounds = [pattern.bound for pattern in patterns]
-    return None if None in bounds else bounds[0]
+    return None if None in bounds else meet(*bounds)
+
+
+def meet(*bounds: type) -> type:
+    """
+    The most specific of some bounds, or the class subclassing the
+    most specific ones when they are unrelated.
+
+    >>> from discopy.abc import ColouredMonoid, DelayedMonoid, Pregroup
+    >>> assert meet(ColouredMonoid, Pregroup) is Pregroup
+    >>> both = meet(DelayedMonoid, Pregroup)
+    >>> print(both.__name__)
+    DelayedMonoid & Pregroup
+    >>> assert both is meet(Pregroup, DelayedMonoid)
+    >>> assert issubclass(both, Pregroup) and issubclass(both, DelayedMonoid)
+    """
+    minimal = sorted({
+        bound for bound in bounds if not any(
+            other is not bound and issubclass(other, bound)
+            for other in bounds)}, key=lambda bound: bound.__name__)
+    return minimal[0] if len(minimal) == 1 else intersection(*minimal)
+
+
+@cache
+def intersection(*classes: type) -> type:
+    """ The class subclassing some classes and nothing else, built once
+    for each tuple of them. """
+    return type(" & ".join(cls.__name__ for cls in classes),
+                classes, {"__module__": __name__})
+
 
 @dataclass(frozen=True)
 class Sequent:
@@ -792,10 +850,10 @@ class Sequent:
 
 def alias_of(annotation) -> TypeAliasType | None:
     """ The alias of :mod:`discopy.abc` an annotation subscripts,
-    ``Ob[T, X]`` or ``Hom[C1, dom, cod]``, :obj:`None` otherwise. """
+    ``Obj[T, X]`` or ``Hom[C1, dom, cod]``, :obj:`None` otherwise. """
     origin = get_origin(annotation)
     if isinstance(origin, TypeAliasType) and origin in (
-            getattr(abc, "Ob", None), getattr(abc, "Hom", None)):
+            getattr(abc, "Obj", None), getattr(abc, "Hom", None)):
         return origin
     return None
 
@@ -803,7 +861,7 @@ def alias_of(annotation) -> TypeAliasType | None:
 def expand(annotation) -> Pattern | None:
     """
     The pattern a subscripted alias of :mod:`discopy.abc` states:
-    ``Hom[C1, dom, cod]`` the hom between its lifted sides, ``Ob[T,
+    ``Hom[C1, dom, cod]`` the hom between its lifted sides, ``Obj[T,
     p]`` the pattern beside the coarse type, :obj:`None` for anything
     else — so a premise or a conclusion is one subscript, the
     ``Annotated`` inside the alias.
@@ -822,7 +880,7 @@ def expand(annotation) -> Pattern | None:
         return Hom(dom, cod, head=head_of(head))
     if len(args) != 2:
         raise TypeError(
-            f"Ob[T, p] states one pattern beside the coarse type, "
+            f"Obj[T, p] states one pattern beside the coarse type, "
             f"got {annotation!r}.")
     return lift(args[1])
 
@@ -865,23 +923,23 @@ def parse(function: Callable, owner: type | None = None,
     The sequent a function states with its signature, collected from
     the pattern objects its annotations built when they were read:
     each parameter stating a pattern a premise, the return annotation
-    the conclusion when asked for, the variables the :class:`Ob` s the
+    the conclusion when asked for, the variables the :class:`Var` patterns the
     patterns lift, carrying the bound of the objects of the ``owner``
     class stating it. A pattern needing more structure than the
     owner's objects have is refused. An annotation subscripting an
     alias of :mod:`discopy.abc` is the pattern :func:`expand` gives.
 
     >>> def then[A, B, C](
-    ...         self: Annotated["object", Hom(Ob(A), Ob(B))],
-    ...         other: Annotated["object", Hom(Ob(B), Ob(C))]
-    ... ) -> Annotated["object", Hom(Ob(A), Ob(C))]:
+    ...         self: Annotated["object", Hom(Var(A), Var(B))],
+    ...         other: Annotated["object", Hom(Var(B), Var(C))]
+    ... ) -> Annotated["object", Hom(Var(A), Var(C))]:
     ...     ...
     >>> print(parse(then))
     A: C0, B: C0, C: C0 | self: C1[A, B], other: C1[B, C] ⊢ C1[A, C]
     >>> print(parse(then, conclusion=False))
     A: C0, B: C0, C: C0 | self: C1[A, B], other: C1[B, C]
     >>> from discopy import abc
-    >>> def bracketed[A: abc.Ob["C0"], B: abc.Ob["C0"], C: abc.Ob["C0"]](
+    >>> def bracketed[A: abc.Obj["C0"], B: abc.Obj["C0"], C: abc.Obj["C0"]](
     ...         self: abc.Hom["C1", A, B], other: abc.Hom["C1", B, C]
     ... ) -> abc.Hom["C1", A, C]:
     ...     ...
@@ -927,7 +985,7 @@ def parse(function: Callable, owner: type | None = None,
             raise TypeError(f"Expected a pattern or a sort, got {value!r}.")
         if isinstance(value, Pattern) and level is not None:
             for node in value.walk():
-                if isinstance(node, (Ob, Hom)):
+                if isinstance(node, (Var, Hom)):
                     continue
                 required = type(node).level()
                 if not issubclass(level, required):
@@ -945,11 +1003,19 @@ def parse(function: Callable, owner: type | None = None,
         else None
     if conclusion and not isinstance(returns, Hom):
         raise TypeError(f"{function.__name__} concludes no hom type.")
-    found = {
-        node.name: replace(node.sort, bound=node.sort.bound or level)
-        for value in (*premises.values(), returns)
-        if isinstance(value, Pattern)
-        for node in value.walk() if isinstance(node, Ob)}
+    found: dict[str, Sort] = {}
+    for value in (*premises.values(), returns):
+        if not isinstance(value, Pattern):
+            continue
+        for node in value.walk():
+            if not isinstance(node, Var):
+                continue
+            sort = found.setdefault(node.name, replace(
+                node.sort, bound=node.sort.bound or level))
+            if sort != node.sort:
+                raise TypeError(
+                    f"{function.__name__} states {node.name} both as "
+                    f"{sort} and as {node.sort}.")
     order = [
         parameter.__name__
         for parameter in getattr(function, "__type_params__", ())
@@ -1126,13 +1192,13 @@ class Declaration[**P, T]:
         sorts = self.sequent.variables
 
         def side(pattern):
-            if isinstance(pattern, Ob) and pattern.name not in subst:
+            if isinstance(pattern, Var) and pattern.name not in subst:
                 return None
             bound(*pattern.variables)
             return pattern.instantiate(subst, self.unit)
 
         def read_off(pattern, value):
-            if isinstance(pattern, Ob) and pattern.name not in subst:
+            if isinstance(pattern, Var) and pattern.name not in subst:
                 assume(not pattern.sort.atomic or len(value) == 1)
                 subst[pattern.name] = value
 

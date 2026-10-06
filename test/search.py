@@ -10,7 +10,7 @@ from pytest import raises
 from discopy import braided, cat, rigid
 from discopy.abc import Category, ColouredMonoid
 from discopy.monoidal import Box, Diagram, Ty
-from discopy.pattern import Hom, Ob, UNIT
+from discopy.pattern import Hom, Var, UNIT
 from discopy.search import Rule, rule, search
 from discopy.utils import AxiomError
 
@@ -64,7 +64,7 @@ def test_generator():
         @classmethod
         @rule
         def wrong[A: ColouredMonoid](
-                cls, dom: Annotated[Ty, Ob(A)]
+                cls, dom: Annotated[Ty, Var(A)]
         ) -> Annotated[Diagram, Hom(A, UNIT)]:
             """ A generator whose conclusion lies. """
             return cls.id(dom)
@@ -186,7 +186,7 @@ def test_goal_patterns():
     assert loop.dom == loop.cod
     copy = find(
         search(markov.Diagram, markov.Box.strategy,
-               dom=A, cod=Ob(A) @ Ob(A)),
+               dom=A, cod=Var(A) @ Var(A)),
         lambda term: bool(term.boxes)
         and all(isinstance(box, markov.Copy) for box in term.boxes))
     assert copy.cod == copy.dom @ copy.dom

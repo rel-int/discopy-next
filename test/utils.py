@@ -1,10 +1,14 @@
 import pickle
+import re
+from os import listdir
 
 import pytest
+from pytest import warns
 
 from unittest.mock import MagicMock
 from unittest.mock import patch
 
+from discopy import rigid
 from discopy.cat import Ob
 from discopy.utils import *
 
@@ -19,6 +23,18 @@ def test_load_corpus(a, b):
     assert load_corpus("[fake url]") == [Ob("a")]
 
 
+def test_deprecated_from_tree():
+    tree = {
+        'factory': 'discopy.rigid.Diagram',
+        'dom': {'factory': 'discopy.rigid.Ty',
+                'objects': [{'factory': 'discopy.rigid.Ob', 'name': 'n'}]},
+        'cod': {'factory': 'discopy.rigid.Ty',
+                'objects': [{'factory': 'discopy.rigid.Ob', 'name': 'n'}]},
+        'boxes': [], 'offsets': []}
+    with warns(DeprecationWarning):
+        assert from_tree(tree) == rigid.Id(rigid.Ty('n'))
+
+
 def test_named_generic_cache():
     from discopy import tensor as dt
     box, box_int, box_float = dt.Box, dt.Box[int], dt.Box[float]
@@ -27,6 +43,105 @@ def test_named_generic_cache():
     diag_int = dt.Diagram[int]
     assert diag_int is dt.Diagram[int]
     assert box_int is dt.Box[int]
+
+
+def _rounded_repr(obj):
+    # Gate matrices such as the Hadamard's 1 / sqrt(2) entries are stored as
+    # floats whose last bit depends on the numpy version that generated the
+    # pickle, so exact equality across versions is not portable. Round every
+    # float in the repr to 12 significant figures before comparing.
+    return re.sub(
+        r'\d+\.\d+', lambda m: format(float(m.group()), '.12g'), repr(obj))
+
+
+@pytest.mark.parametrize('version', ['0.6', '1.2'])
+@pytest.mark.parametrize('fn', listdir('test/fixtures/pickles/1.3/'))
+def test_pickle_version_compatibility(fn, version):
+    if fn == 'quantum.Circuit.pickle':
+        pytest.importorskip("pytket")
+    with open(f"test/fixtures/pickles/1.3/{fn}", 'rb') as f:
+        new = pickle.load(f)
+    with open(f"test/fixtures/pickles/{version}/{fn}", 'rb') as f:
+        old = pickle.load(f)
+    assert old == new or _rounded_repr(old) == _rounded_repr(new)
+
+
+def test_deprecated_ob():
+    from discopy import (
+        biclosed, braided, compact, feedback, frobenius, pivotal, rigid)
+    from discopy.grammar import pregroup
+    from discopy.quantum import circuit
+    for module in (rigid, braided, biclosed, pivotal, frobenius, feedback,
+                   circuit, pregroup, compact):
+        with warns(DeprecationWarning):
+            assert module.Ob is module.Wire
+        with pytest.raises(AttributeError):
+            module.not_an_attribute
+
+
+def test_module_ob_is_an_object():
+    """ A module's ``Ob`` names the objects of a category, deprecated or
+    not, never a pattern of :mod:`discopy.pattern`. """
+    import importlib
+    import pkgutil
+    import warnings
+    import discopy
+    from discopy import cat
+    for info in pkgutil.walk_packages(discopy.__path__, "discopy."):
+        try:
+            module = importlib.import_module(info.name)
+        except ImportError:
+            continue
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", DeprecationWarning)
+            ob = getattr(module, "Ob", None)
+        assert ob is None or issubclass(ob, cat.Ob), info.name
+
+
+def test_wire_tree_roundtrip():
+    from discopy import biclosed, braided, feedback, frobenius, pivotal, rigid
+    from discopy.quantum import circuit
+    for x in (rigid.Wire('x'), braided.Wire('x'), biclosed.Wire('x'),
+              pivotal.Wire('x'), frobenius.Wire('x'), feedback.Wire('x'),
+              circuit.Digit(2)):
+        assert from_tree(x.to_tree()) == x
+    with warns(DeprecationWarning):
+        assert from_tree({'factory': 'discopy.frobenius.Ob', 'name': 'x'})\
+            == frobenius.Wire('x')
+
+
+def test_deprecated_factory():
+    from discopy import symmetric
+    x, y = symmetric.Ty('x'), symmetric.Ty('y')
+    with warns(DeprecationWarning, match="use symmetric.Diagram.Swap"):
+        assert symmetric.Diagram.swap_factory is symmetric.Swap
+    with warns(DeprecationWarning, match="use symmetric.Diagram.Braid"):
+        assert symmetric.Diagram.braid_factory is symmetric.Swap
+    with warns(DeprecationWarning, match="is_atom"):
+        assert symmetric.Box('f', x, y).is_generator
+
+    @factory
+    class Recipe(symmetric.Diagram):
+        pass
+
+    class Step(symmetric.Box, Recipe):
+        pass
+
+    class StepSwap(symmetric.Swap, Step):
+        pass
+
+    Recipe.swap_factory = StepSwap
+    with warns(DeprecationWarning, match="assign .*Recipe.Swap instead"):
+        assert type(Recipe.swap(x, y)) is StepSwap
+
+
+def test_user_generator_pickles():
+    from discopy import symmetric
+    swap = UserRecipe.swap(symmetric.Ty('x'), symmetric.Ty('y'))
+    assert isinstance(swap, UserRecipe)
+    assert factory_name(type(swap)) == "test.utils.UserRecipe.Swap"\
+        or factory_name(type(swap)).endswith("utils.UserRecipe.Swap")
+    assert pickle.loads(pickle.dumps(swap)) == swap
 
 
 def test_parameterised_pickle_and_deepcopy():
@@ -78,6 +193,9 @@ def test_generator():
     assert rigid.Nat.Exp is rigid.Exp
     assert closed.Swap.__bases__ == (
         markov.Swap, closed.Permutation, closed.Box, closed.Diagram)
+    from discopy import frobenius, ribbon
+    assert issubclass(compact.Swap, ribbon.Braid)  # The braid of a ribbon
+    assert issubclass(frobenius.Swap, ribbon.Braid)  # category is its swap.
     assert closed.Discard.__bases__ == (
         markov.Discard, closed.Copy, closed.Diagram)
     assert pickle.loads(pickle.dumps(closed.Swap)) is closed.Swap
@@ -173,3 +291,8 @@ def test_generator_exports(path):
             if isinstance(cls := getattr(owner, name), type):
                 assert getattr(sys.modules[cls.__module__], cls.__name__)\
                     is cls
+
+
+@factory
+class UserRecipe(__import__("discopy.symmetric").symmetric.Diagram):
+    """ A category outside the package, see test_user_generator_pickles. """
