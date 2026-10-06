@@ -8,6 +8,8 @@ Under ``CI`` a registered profile inherits Hypothesis's ``ci`` defaults,
 
 import os
 
+import pytest
+
 import matplotlib
 from hypothesis import HealthCheck, settings
 
@@ -29,6 +31,7 @@ COMMON = dict(
 ``filter_too_much`` is suppressed because the search rejects by design:
 a dead-ended goal rejects its example and a law weakened to a subspace,
 e.g. the boundary-connected diagrams, filters what the search draws.
+The ``checked_enough`` fixture of ``test_axioms.py`` stands in for it.
 """
 
 PROFILE = os.environ.get("HYPOTHESIS_PROFILE", "dev")
@@ -64,3 +67,13 @@ def pytest_configure(config):
         settings.register_profile(
             "shared", max_examples=100, **dict(COMMON, database=database))
         settings.load_profile("shared")
+
+
+@pytest.hookimpl(wrapper=True)
+def pytest_runtest_makereport(item, call):
+    """ Record on the item whether its test passed, for the fixtures that
+    check what a passing test did, e.g. ``checked_enough``. """
+    report = yield
+    if call.when == "call":
+        item.passed = report.passed
+    return report

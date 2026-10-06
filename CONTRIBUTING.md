@@ -103,7 +103,10 @@ uv run pytest proptest/ -k 'Arrow and not typing'
 A cell is skipped when its axiom declares that the structure does not
 apply, and xfailed when the law is declared broken, each carrying its
 reason: pass `-rsxX` to list the skips, xfails and unexpected passes with
-their reasons, and `-x` to stop at the first genuine failure.
+their reasons, and `-x` to stop at the first genuine failure. An xfail is
+strict, so a law declared broken that holds fails its cell until the
+declaration goes, and a law checked on fewer than a tenth of its budget
+fails too when the search rejected most of the examples drawn for it.
 
 `proptest/conftest.py` registers four Hypothesis profiles over the
 `.hypothesis/examples` database, selected by `HYPOTHESIS_PROFILE`: `dev`

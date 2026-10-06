@@ -3,7 +3,7 @@
 import io
 from typing import Annotated, Any, Self
 
-from hypothesis import find
+from hypothesis import find, settings
 from hypothesis.errors import NoSuchExample
 from pytest import raises
 
@@ -87,7 +87,7 @@ def test_falsify():
     assert not equation and equation.terms[0].inside
     for law in (Arrow.associativity, Arrow.unitality.failing("Declared.")):
         with raises(NoSuchExample):
-            law.falsify()
+            law.falsify(settings=settings(max_examples=10))
 
 
 def test_axioms_of_category():

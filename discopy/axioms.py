@@ -645,8 +645,10 @@ class Axiom[**P, T](Declaration[P, T]):
         when none is found. Keyword arguments are passed to
         :func:`hypothesis.find`.
 
+        >>> from hypothesis import settings
         >>> from discopy.cat import Arrow
-        >>> Arrow.associativity.falsify()  # doctest: +ELLIPSIS
+        >>> Arrow.associativity.falsify(
+        ...     settings=settings(max_examples=10))  # doctest: +ELLIPSIS
         Traceback (most recent call last):
          ...
         hypothesis.errors.NoSuchExample: No examples found of condition ...

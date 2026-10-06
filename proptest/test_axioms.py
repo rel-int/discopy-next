@@ -1,5 +1,7 @@
 """ Property tests for DisCoPy's principal categorical data structures. """
 
+from collections import Counter
+
 import pytest
 from hypothesis import Phase, given, note, settings
 from hypothesis import strategies as st
@@ -94,14 +96,44 @@ def axiom_parameters(broken: bool = False):
             axiom, marks=marks, id=f"{factory_name(testable)}.{axiom.name}")
 
 
+DRAWN, CHECKED = Counter(), Counter()
+""" The number of examples drawn for each axiom, and of the equations it
+was checked on, the others rejected by the search. """
+
+
 def check(axiom: Axiom, data: st.DataObject) -> None:
     """ Check an axiom of a testable type on a generated equation. """
+    DRAWN[axiom] += 1
     equation = data.draw(axiom.strategy(), label=axiom.name)
     note(equation)
+    CHECKED[axiom] += 1
     assert equation
 
 
+@pytest.fixture
+def checked_enough(request):
+    """
+    Fail a law that passed on fewer than a tenth of the examples of the
+    budget because the search rejected the others, i.e. it was checked on
+    fewer than a tenth of the examples drawn for it, rather than because
+    it has few terms: the search rejects by design, so the health check
+    against filtering is off and this floor stands in for it, a law whose
+    terms the search rarely reaches failing rather than passing on a
+    handful of examples.
+    """
+    yield
+    axiom = request.node.callspec.params["axiom"]
+    checked, drawn = CHECKED[axiom], DRAWN[axiom]
+    if getattr(request.node, "passed", False)\
+            and 10 * checked < settings.default.max_examples\
+            and 10 * checked < drawn:
+        pytest.fail(
+            f"{axiom.name} was checked on {checked} of the {drawn} "
+            "examples drawn, the search rejecting the others.")
+
+
 @pytest.mark.parametrize("axiom", axiom_parameters())
+@pytest.mark.usefixtures("checked_enough")
 @given(data=st.data())
 def test_axiom(axiom, data):
     """ Check a law that is expected to hold. """
