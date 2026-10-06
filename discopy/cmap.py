@@ -853,16 +853,6 @@ class CMap[category: Diagram](CompactCategory, DaggerCategory,
         return cls(dom, cod, boxes, edges, loops=loops)
 
     @classmethod
-    def strategy(cls, **params):
-        """
-        Generate maps as the image of :meth:`from_diagram` on the search
-        of the host category, reusing its generators and rules.
-        """
-        if cls.category is None:
-            raise NotImplementedError
-        return cls.category.strategy(**params).map(cls.from_diagram)
-
-    @classmethod
     def from_diagram(cls, old: Diagram) -> CMap:
         """
         Turn a :class:`Diagram` into a :class:`CMap`.

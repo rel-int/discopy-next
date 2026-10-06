@@ -27,15 +27,22 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   `then` anchors neither, and one rule application places a
   whiskered box where `tensor`-of-identities and `then` spent three.
 
-- `Hypergraph` and `CMap` enrol in the property-testing matrix by
-  reusing the search of their host category: `strategy` is the image
-  of `from_diagram` on `category.strategy`, so every parameterised
-  alias — `frobenius.Hypergraph`, `compact.CMap` and the others down
-  to `monoidal` — generates the terms its laws quantify over with
-  the generators of its host, and a vocabulary host keeps its
-  vocabulary. Unparameterised, the strategy raises
-  `NotImplementedError`, which is how a type stays out of the
-  matrix.
+- `Hypergraph` enrols in the property-testing matrix by reusing the
+  search of its host category: `strategy` is the image of
+  `from_diagram` on `category.strategy`, so every parameterised
+  alias — `frobenius.Hypergraph` and the others down to `monoidal` —
+  generates the terms its laws quantify over with the generators of
+  its host, and a vocabulary host keeps its vocabulary.
+  Unparameterised, the strategy raises `NotImplementedError`, which
+  is how a type stays out of the matrix. The same strategy on `CMap`
+  found its first counterexamples within a minute and is withheld
+  until they are addressed: `CMap` equality distinguishes the order
+  its `boxes` are listed in, so every law that reorders disconnected
+  boxes — `braid_naturality` on two scalars is the smallest — fails
+  under strict equality and holds only up to a map isomorphism that
+  `CMap.Equation` does not yet compare by; and the compact laws of a
+  map over a host below `rigid` cannot draw the adjoint types they
+  quantify over. An issue should be filed upstream for both.
 
 - The codebase typechecks: `uv run ty check` passes in the full
   development environment, `ty` a dev dependency locked in

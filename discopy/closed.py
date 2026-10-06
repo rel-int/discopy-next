@@ -228,6 +228,10 @@ CMap = cmap.CMap[Diagram]
 
 
 Hypergraph = hypergraph.Hypergraph[Diagram]
+Hypergraph.dagger_involution = biclosed.Diagram.dagger_involution
+Hypergraph.dagger_contravariance = biclosed.Diagram.dagger_contravariance
+Hypergraph.dagger_monoidality = Hypergraph.dagger_monoidality.inapplicable(
+    "A curried diagram has no dagger.")
 
 Layer = Diagram.Layer
 Id = Diagram.id
