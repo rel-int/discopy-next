@@ -548,6 +548,18 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Changed
 
+- The trace laws hold from `symmetric` down: a free trace is a box,
+  so `traced` and `balanced` keep the (di)naturality and superposing
+  laws out of the matrix, but the trace of a symmetric category is a
+  feedback wire, which the hypergraph quotient its equations compare
+  by identifies on both sides. `symmetric.Diagram` restates the six
+  laws its levels below inherited unchecked. The currying laws state
+  their roundtrip through the one-wire rules `curry_left`,
+  `curry_right`, `ev_left` and `ev_right`, which the search leaves
+  out as admissible at a rigid level, and `MarkovCategory.merge_dagger`
+  states that merging is the dagger of copying, the default its
+  `merge` implements.
+
 - A class subscripted with a DisCoPy class is named by its
   `factory_name`, e.g. `hypergraph.Hypergraph[frobenius.Diagram]`
   where every level read `Hypergraph[Diagram]`, since every level of

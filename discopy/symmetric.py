@@ -95,7 +95,8 @@ from typing import Annotated, ClassVar, Self
 from collections.abc import Sequence
 
 from discopy import cat, monoidal, balanced, hypergraph, cmap, messages
-from discopy.abc import BraidedCategory, MonoidalCategory, SymmetricCategory
+from discopy.abc import (
+    BraidedCategory, MonoidalCategory, SymmetricCategory, TracedCategory)
 from discopy.axioms import (
     Atom, axiom, Equation as AbstractEquation, Hom, Ob, rule, Sort)
 from discopy.cat import factory, Generator
@@ -450,6 +451,21 @@ class Diagram(balanced.Diagram, SymmetricCategory):
     #: The category has the swaps that decoding asks for, so the
     #: section of the hypergraph encoding comes back.
     hypergraph_section = monoidal.Diagram.hypergraph_section
+
+    #: A free trace is a box, but the trace of a symmetric category is a
+    #: feedback wire, whose (di)naturality and superposing hold in the
+    #: hypergraph quotient.
+    trace_naturality_left = TracedCategory.trace_naturality_left
+
+    trace_naturality_right = TracedCategory.trace_naturality_right
+
+    trace_dinaturality_left = TracedCategory.trace_dinaturality_left
+
+    trace_dinaturality_right = TracedCategory.trace_dinaturality_right
+
+    trace_superposing_left = TracedCategory.trace_superposing_left
+
+    trace_superposing_right = TracedCategory.trace_superposing_right
 
     @axiom
     def hypergraph_retract(cls, f: Self):
