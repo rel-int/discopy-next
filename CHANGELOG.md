@@ -149,7 +149,9 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   classify a law as broken or not applicable, `.modulo` compares up
   to a function and `.weaken` quantifies over a named subspace;
   `Axiom.canonical` is the law as a schema and `Axiom.draw` draws
-  it.
+  it, a law the category breaks included: `Equation.checked` puts
+  `≠` between the terms that differ, so a broken law is drawn as
+  the inequation it is.
 - `axioms.Serialisable`, the serialisation interface of DisCoPy, one
   hook driving all three mechanisms: `serialised_attrs` names the
   attributes that are also keyword arguments of `__init__`, from
@@ -875,6 +877,12 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Removed
 
+- The typing axioms `identity_typing`, `composition_dom_typing`,
+  `composition_cod_typing`, `tensor_dom_typing` and
+  `tensor_cod_typing`: each says that an operation lands on the
+  boundary its sequent declares, which a dynamic check of the
+  conclusion of every rule states once for every operation, rather
+  than one axiom per operation and per side.
 - Backward compatibility with past DisCoPy versions: the deprecation
   machinery, the `__setstate__` methods migrating attribute names
   out of old pickles, the `from_tree` branches reading outdated

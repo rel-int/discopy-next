@@ -990,16 +990,6 @@ class Functor(Category, Serialisable):
         "left of a functor given by mappings acts the same but compares "
         "unequal (#648).")
 
-    @axiom
-    def identity_typing(cls):
-        """
-        Typing of the identity functor.
-
-        The objects of ``Cat`` are categories, which the property matrix does
-        not generate, so this is stated of the one the functor maps.
-        """
-        identity = cls.id()
-        return AbstractEquation(identity.dom, cls.dom, identity.cod)
 
     @axiom
     def associativity(cls, f: Self, g: Self, h: Self):
@@ -1011,15 +1001,7 @@ class Functor(Category, Serialisable):
         """
         return AbstractEquation(f.then(g).then(h), f.then(g.then(h)))
 
-    @axiom
-    def composition_dom_typing(cls, f: Self, g: Self):
-        """ Composition of functors preserves the source category. """
-        return AbstractEquation(f.then(g).dom, f.dom)
 
-    @axiom
-    def composition_cod_typing(cls, f: Self, g: Self):
-        """ Composition of functors preserves the target category. """
-        return AbstractEquation(f.then(g).cod, g.cod)
 
 
 class Equivalence(Functor, DaggerCategory):
