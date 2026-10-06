@@ -74,4 +74,28 @@ def test_to_hypergraph():
     assert round_trip.to_hypergraph() == hypergraph
     assert hash(round_trip.to_hypergraph()) == hash(hypergraph)
 
+def test_random_sentences():
+    """ The strategy of a pregroup diagram draws grammatical sentences. """
+    from hypothesis import find
 
+    from discopy.axioms import Rule
+
+    n, s = Ty('n'), Ty('s')
+    sentence = find(
+        Diagram.strategy(),
+        lambda diagram: diagram.foliation().boxes[0].name == 'Bob')
+    assert Diagram.Equation(sentence, (
+        Word('Bob', n) @ Word('loves', n.r @ s @ n.l) @ Word('Alice', n)
+        >> Cup(n, n.r) @ s @ Cup(n.l, n)))
+    assert all(isinstance(box, (Word, Cup)) for box in sentence.boxes)
+
+    class Sentence(Diagram):
+        """ A grammar assigns its own words. """
+        generators = {
+            "cups": Diagram.generators["cups"], **{
+                word.name: Rule.constant(word)
+                for word in (Word('Alice', n), Word('sleeps', n.r @ s))}}
+
+    assert find(Sentence.strategy(), bool).foliation() == (
+        Word('Alice', n) @ Word('sleeps', n.r @ s) >> Cup(n, n.r) @ s
+    ).foliation()
