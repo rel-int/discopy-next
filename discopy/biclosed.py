@@ -130,13 +130,13 @@ class Ty(monoidal.Ty, ResiduatedMonoid):
             else monoidal.Ty.__pow__(self, other)
 
     def exp(self, other: Ty) -> Ty:
-        return self.ar(self.Exp(self, other))
+        return self.ar(self.Exp(self, other)) if other else self
 
     def over(self, other: Ty) -> Ty:
-        return self.ar(self.Over(self, other))
+        return self.ar(self.Over(self, other)) if other else self
 
     def under(self, other: Ty) -> Ty:
-        return self.ar(self.Under(self, other))
+        return self.ar(self.Under(self, other)) if other else self
 
     def __lshift__(self, other):
         return self.over(other)
@@ -332,14 +332,19 @@ class Diagram(monoidal.Diagram, BiclosedCategory):
             self: Hom[Diagram, TensorDir[X, Y, S], Z], n: Var[int, N] = 1,
             left: Var[bool, S] = True) -> Hom[Diagram, X, ExpDir[Z, Y, S]]:
         """
-        Wrapper around :class:`Curry` called by :class:`Functor`.
+        Wrapper around :class:`Curry` called by :class:`Functor`: currying
+        no type at all is the identity, since an exponential of the unit
+        is its base.
 
         Parameters:
             n : The number of atomic types to curry.
             left : Whether to curry on the left, i.e. into :class:`Over`,
                 or on the right, i.e. into :class:`Under`.
+
+        >>> f = Box('f', Ty('x'), Ty('z'))
+        >>> assert f.curry(0) == f and Ty('z') << Ty() == Ty('z')
         """
-        return self.Curry(self, n, left)
+        return self if not n else self.Curry(self, n, left)
 
     @classmethod
     @rule
@@ -348,7 +353,9 @@ class Diagram(monoidal.Diagram, BiclosedCategory):
             left: Var[bool, S] = True
     ) -> Hom[Diagram, TensorDir[ExpDir[Y, E, S], E, S], Y]:
         """
-        Wrapper around :class:`Eval` called by :class:`Functor`.
+        Wrapper around :class:`Eval` called by :class:`Functor`: the
+        evaluation at the unit is the identity, an exponential of the unit
+        being its base.
 
         Parameters:
             base : The base of the exponential type to evaluate.
@@ -356,6 +363,8 @@ class Diagram(monoidal.Diagram, BiclosedCategory):
             left : Whether to evaluate on the left, i.e. from :class:`Over`,
                 or on the right, i.e. from :class:`Under`.
         """
+        if not exponent:
+            return cls.id(base)
         return cls.Eval(
             base << exponent if left else exponent >> base)
 

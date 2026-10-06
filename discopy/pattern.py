@@ -109,10 +109,10 @@ variable ``A: Obj[C0]`` or as a premise to sample, of a given size when
 one is given: ``Literal[n]`` or a variable ``N: Count``. A typechecker
 reads it as ``T``. """
 
-type Atom[Coarse] = Var[Coarse, Literal[1]]
+type Atom[Coarse] = Obj[Coarse, Literal[1]]
 """ The sort of the objects of size one, i.e. a single wire. """
 
-type Unit[Coarse] = Var[Coarse, Literal[0]]
+type Unit[Coarse] = Obj[Coarse, Literal[0]]
 """ The sort of the objects of size zero, i.e. the unit. """
 
 type Var[Coarse, Fine] = Annotated[Coarse, Fine]

@@ -185,6 +185,8 @@ class Function(function.Function, ClosedCategory):
             n : The number of types to curry.
             left : Whether to curry on the left or right.
         """
+        if not n:
+            return self
         if left:
             dom = self.dom[:len(self.dom) - n]
             cod = Function.exp(self.cod, self.dom[len(self.dom) - n:])

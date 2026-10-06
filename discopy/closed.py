@@ -140,6 +140,8 @@ class Diagram(markov.Diagram, biclosed.Diagram, ClosedCategory):
             cls, base: Var[Ty, Y], exponent: Var[Ty, E],
             left: Var[bool, S] = True
     ) -> Hom[Diagram, TensorDir[ExpDir[Y, E, S], E, S], Y]:
+        if not exponent:
+            return cls.id(base)
         return cls.Eval(exponent >> base, left=left)
 
     def to_compact(self) -> Diagram:

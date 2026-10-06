@@ -1013,6 +1013,16 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Fixed
 
+- `curry(0)` is the identity everywhere, as `trace(0)` already was: an
+  exponential of the unit is its base, `z << Ty()`, `Ty() >> z` and
+  `z ** Ty()` being `z` on `biclosed` and `closed` types as they already
+  were on rigid ones, so `biclosed.Diagram.curry(0)` and the curry of a
+  Python function return themselves rather than a curry into a type
+  isomorphic to their codomain, and `ev` at the unit is the identity.
+  The two disagreed with `CMap.curry(0)`, which was already the
+  identity, so a diagram holding a curry of no wire did not convert to
+  a map.
+
 - `biclosed.Curry.to_drawing` traces the `n` wires it curries, where it
   traced one whatever `n` was, so the drawing of a curry of zero or of
   two wires had the wrong boundary and did not compose. The n-ary
