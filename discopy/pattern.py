@@ -42,7 +42,6 @@ Summary
     Over
     Under
     Repeat
-    Atom
     Count
 """
 
@@ -53,6 +52,10 @@ type Obj[Coarse, Fine = None] = Annotated[Coarse, Fine]
 """ The premise ``x: Obj[T, p]`` of an object standing for a pattern
 ``p``, beside its coarse type ``T``, and the bound ``A: Obj[C0]`` of
 an object variable: a typechecker reads it as ``T``. """
+
+type Atom[Coarse, Fine = None] = Annotated[Coarse, Fine]
+""" The same as :data:`Obj` for an atomic object: the premise ``x:
+Atom[T, p]`` and the bound ``X: Atom[C0]``. """
 
 type Hom[Coarse, Dom, Cod] = Annotated[Coarse, Dom, Cod]
 """ The premise or conclusion ``Hom[C1, dom, cod]`` of a morphism
@@ -90,10 +93,6 @@ class Under[A, B]:
 class Repeat[X, N]:
     """ An atomic pattern ``X`` repeated ``N`` times, for the legs of a
     spider, ``N`` a variable of sort :class:`Count`. """
-
-
-class Atom[T]:
-    """ The bound ``X: Atom[C0]`` of an atomic object variable. """
 
 
 class Count:

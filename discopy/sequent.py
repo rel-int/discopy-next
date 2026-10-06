@@ -94,12 +94,15 @@ class Sort:
     """
     The sort of a variable, as its bound states it: ``Obj[C0]`` or no
     bound an object, ``Atom[C0]`` or ``Atom`` an atomic one, ``Count``
-    a number of repetitions; or the sort of a premise, ``Obj[C0]`` with
-    no pattern or ``Self``.
+    a number of repetitions; or the sort of a premise, ``Obj[C0]`` or
+    ``Atom[C0]`` with no pattern, or ``Self``. The head names what the
+    sort ranges over: a type parameter of the declaring class, e.g.
+    ``C0``, or else the objects of the category.
 
-    >>> def cups[In0, X: Atom[In0]](): ...
-    >>> print(Sort.of(cups.__type_params__[1]))
-    Atom[In0]
+    >>> from discopy.monoidal import Ty
+    >>> def cups[X: Atom[Ty]](): ...
+    >>> print(Sort.of(cups.__type_params__[0]))
+    Atom[Ty]
     """
 
     head: str = OBJECTS
@@ -116,16 +119,19 @@ class Sort:
         head = name(args[0]) if args else OBJECTS
         return cls(head, atomic=bound is Atom or get_origin(bound) is Atom)
 
+    @classmethod
+    def premise(cls, annotation) -> Sort:
+        """ The sort of a premise ``Obj[C0]`` or ``Atom[C0]``, or ``Self``. """
+        if annotation is Self:
+            return cls(SELF)
+        return cls(name(get_args(annotation)[0]),
+                   atomic=get_origin(annotation) is Atom)
+
     def resolve(self, scope: dict) -> type:
         """ The type the head stands for in the scope. """
         if self.count:
             return int
-        try:
-            return scope[self.head]
-        except KeyError:
-            raise KeyError(
-                f"{self.head} is no head of this scope, which names "
-                f"{', '.join(scope)}.") from None
+        return scope.get(self.head, scope[OBJECTS])
 
     def strategy(self, scope: dict, types=None):
         """ Generate an instance of the sort, from ``types`` in place of
@@ -149,24 +155,24 @@ class Sort:
 
 
 def name(head) -> str:
-    """ The name of a head: ``C0``, ``C1``, ``In0``... or ``Self``. """
-    return "Self" if head is Self else getattr(head, "__name__", ARROWS)
+    """ The name of a head: ``C0``, ``C1``, ``Ty``... or ``Self``. """
+    return "Self" if head is Self else getattr(head, "__name__", str(head))
 
 
 def premise(annotation) -> object | Sort | None:
     """
     What a parameter annotation states, :obj:`None` when it is no
-    premise: ``Hom[...]`` and ``Obj[T, p]`` are their own pattern, while
-    ``Obj[C0]`` and ``Self`` are sorts.
+    premise: ``Hom[...]``, ``Obj[T, p]`` and ``Atom[T, p]`` are their
+    own pattern, while ``Obj[C0]``, ``Atom[C0]`` and ``Self`` are sorts.
     """
     if annotation is Self:
-        return Sort(SELF)
+        return Sort.premise(annotation)
     if get_origin(annotation) is Hom:
         return annotation
-    if get_origin(annotation) is Obj:
+    if get_origin(annotation) in (Obj, Atom):
         args = get_args(annotation)
         return annotation if len(args) == 2 and args[1] is not None\
-            else Sort(name(args[0]))
+            else Sort.premise(annotation)
     return None
 
 
@@ -177,7 +183,7 @@ def variables(pattern) -> tuple[str, ...]:
     origin, args = get_origin(pattern), get_args(pattern)
     if origin is Unit or origin is None:
         return ()
-    if origin in (Hom, Obj):
+    if origin in (Hom, Obj, Atom):
         args = args[1:]
     return tuple(label for arg in args for label in variables(arg))
 
@@ -190,7 +196,7 @@ def instantiate(pattern, subst: Substitution, unit: Any):
     origin, args = get_origin(pattern), get_args(pattern)
     if origin is Hom:
         return tuple(instantiate(arg, subst, unit) for arg in args[1:])
-    if origin is Obj:
+    if origin in (Obj, Atom):
         return instantiate(args[1], subst, unit)
     if origin is Unit:
         return unit()
@@ -250,8 +256,9 @@ def unify(pattern, value, subst: Substitution,
             yield dict(subst, **{label: value}), residuals
         return
     origin, args = get_origin(pattern), get_args(pattern)
-    if origin is Obj:
-        yield from unify(args[1], value, subst, residuals)
+    if origin in (Obj, Atom):
+        if origin is Obj or len(value) == 1:
+            yield from unify(args[1], value, subst, residuals)
     elif origin is Unit:
         if not len(value):
             yield subst, residuals
@@ -363,10 +370,17 @@ class Declaration[**P, T]:
 
     @property
     def variables(self) -> dict[str, Sort]:
-        """ The type parameters of the function and their sorts. """
-        return {
+        """ The type parameters of the function and their sorts, atomic
+        when a premise ``Atom[T, X]`` states the variable alone. """
+        sorts = {
             variable.__name__: Sort.of(variable) for variable in getattr(
                 inspect.unwrap(self.function), "__type_params__", ())}
+        for value in self.premises.values():
+            if get_origin(value) is Atom\
+                    and isinstance(get_args(value)[1], TypeVar):
+                label = get_args(value)[1].__name__
+                sorts[label] = replace(sorts[label], atomic=True)
+        return sorts
 
     @property
     def premises(self) -> dict[str, object]:
@@ -511,6 +525,7 @@ class Declaration[**P, T]:
             else:
                 bound(*variables(value))
                 args[label] = instantiate(value, subst, self.unit)
+                assume(get_origin(value) is Obj or len(args[label]) == 1)
         for pattern, value in residuals:
             bound(*variables(pattern))
             assume(instantiate(pattern, subst, self.unit) == value)

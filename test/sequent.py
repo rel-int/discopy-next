@@ -28,6 +28,26 @@ def test_read_off():
     assert Sort.of(X).atomic and Sort.of(N).count
 
 
+def test_atom():
+    """ ``Atom`` has the interface of ``Obj``: a coarse type, and an
+    optional pattern unifying it with the other annotations. """
+    from hypothesis import find
+    from discopy.axioms import Axiom
+    from discopy.monoidal import Diagram, Ty
+
+    def bound[X: Atom[Ty]](): ...
+    assert str(Sort.of(bound.__type_params__[0])) == "Atom[Ty]"
+
+    def law[X](cls, x: Atom[Ty, X], y: Atom[Ty]):
+        return cls.Equation(cls.id(x), cls.id(x))
+    law = Axiom(law).bind(Diagram)
+    assert law.variables["X"].atomic and law.premises["y"].atomic
+    assert len(find(law.strategy(), lambda _: True).terms[0].dom) == 1
+    x, y = Ty("x"), Ty("y")
+    assert [s for s, _ in match(Atom[Ty, A], x)] == [{"A": x}]
+    assert not list(match(Atom[Ty, A], x @ y))
+
+
 def test_match():
     from discopy import rigid
     x, y = rigid.Ty("x"), rigid.Ty("y")
