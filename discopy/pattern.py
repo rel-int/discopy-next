@@ -1179,7 +1179,7 @@ def declarations[D: Declaration](cls: type, kind: type[D]) -> dict[str, D]:
     >>> from discopy.monoidal import Diagram
     >>> from discopy.search import Rule
     >>> list(declarations(Diagram, Rule))
-    ['id', 'cut']
+    ['id', 'tensor', 'cut']
     """
     result: dict[str, D] = {}
     for base in reversed(cls.__mro__):

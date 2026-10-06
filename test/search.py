@@ -42,7 +42,7 @@ def test_rule():
 
     f = Box("f", x, x)
     assert Wrapped.twice(f) == f >> f == Wrapped(f.inside, x, x).twice()
-    assert list(Wrapped.rules) == ["id", "cut", "twice"]
+    assert list(Wrapped.rules) == ["id", "tensor", "cut", "twice"]
     assert str(Wrapped.rules["twice"])\
         == "twice: A: C0 | self: C1[A, A] ⊢ C1[A, A]"
     found = find(Wrapped.strategy(dom=x, cod=x, types=st.just(x)),
@@ -82,7 +82,7 @@ def test_cut():
     assert str(Diagram.rules["cut"]) == (
         "cut: A: C0, B: C0, C: C0, X: C0, Y: C0 | self: C1[B, A], "
         "other: C1[X @ A @ Y, C], left: X, right: Y ⊢ C1[X @ B @ Y, C]")
-    assert list(Diagram.rules) == ["id", "cut"]
+    assert list(Diagram.rules) == ["id", "tensor", "cut"]
     assert Diagram.rules["cut"].recursive
     assert "then" in cat.Arrow.rules  # A mere category composes by then,
     assert f.then(Box("h", y @ y, z)).cod == z  # a monoidal one cuts.

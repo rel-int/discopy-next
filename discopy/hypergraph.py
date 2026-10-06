@@ -1469,6 +1469,16 @@ class Hypergraph[category: Diagram](MonoidalCategory, DaggerCategory,
             dom, cod, tuple(boxes), wires, spider_types, tuple(offsets))
 
     @classmethod
+    def strategy(cls, **params):
+        """
+        Generate hypergraphs as the image of :meth:`from_diagram` on the
+        search of the host category, reusing its generators and rules.
+        """
+        if cls.category is None:
+            raise NotImplementedError
+        return cls.category.strategy(**params).map(cls.from_diagram)
+
+    @classmethod
     def from_diagram(cls, old: Diagram) -> Hypergraph:
         """
         Turn a :class:`Diagram` into a :class:`Hypergraph`.
