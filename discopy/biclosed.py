@@ -84,9 +84,8 @@ from inspect import signature
 from typing import Callable, ClassVar, Self, overload
 
 from discopy import monoidal, cmap
-from discopy.pattern import Obj, Var  # noqa: F401
 
-from discopy.axioms import Hom, no_strategy, rule, Serialisable
+from discopy.axioms import no_strategy, Serialisable
 from discopy.abc import BiclosedCategory, DaggerCategory, ResiduatedMonoid
 from discopy.drawing import Drawing
 from discopy.cat import factory, Generator
@@ -98,7 +97,6 @@ from discopy.utils import (
     factory_name,
     from_tree,
 )
-from discopy.pattern import ExpDir, TensorDir  # noqa: F401
 
 
 @factory
@@ -327,14 +325,7 @@ class Diagram(monoidal.Diagram, BiclosedCategory):
     Application: ClassVar[Generator]
     Abstraction: ClassVar[Generator]
 
-    @rule
-    def curry[X: Obj[Ty], Y: Obj[Ty], Z: Obj[Ty], S: bool](
-            self: Hom[Diagram, TensorDir[X, Y, S], Z],
-            context: Var[Ty | None, X] = None,
-            base: Var[Ty | None, Z] = None,
-            exponent: Var[Ty | None, Y] = None,
-            left: Var[bool, S] = True
-    ) -> Hom[Diagram, X, ExpDir[Z, Y, S]]:
+    def curry(self, context=None, base=None, exponent=None, left=True):
         """
         Wrapper around :class:`Curry` called by :class:`Functor`: currying
         the unit is the identity, since an exponential of the unit is its
@@ -354,11 +345,7 @@ class Diagram(monoidal.Diagram, BiclosedCategory):
         return self.Curry(self, len(exponent), left) if exponent else self
 
     @classmethod
-    @rule
-    def ev[Y: Obj[Ty], E: Obj[Ty], S: bool](
-            cls, base: Var[Ty, Y], exponent: Var[Ty, E],
-            left: Var[bool, S] = True
-    ) -> Hom[Diagram, TensorDir[ExpDir[Y, E, S], E, S], Y]:
+    def ev(cls, base, exponent, left=True):
         """
         Wrapper around :class:`Eval` called by :class:`Functor`: the
         evaluation at the unit is the identity, an exponential of the unit
@@ -420,11 +407,21 @@ class Diagram(monoidal.Diagram, BiclosedCategory):
         "A free currying is a bubble, equal to its evaluation only "
         "semantically.")
 
-    currying_eta = BiclosedCategory.currying_eta.failing(
+    currying_eta_left = BiclosedCategory.currying_eta_left.failing(
         "A free currying is a bubble, equal to its evaluation only "
         "semantically.")
 
-    currying_naturality = BiclosedCategory.currying_naturality.failing(
+    currying_eta_right = BiclosedCategory.currying_eta_right.failing(
+        "A free currying is a bubble, equal to its evaluation only "
+        "semantically.")
+
+    currying_naturality_left = BiclosedCategory\
+        .currying_naturality_left.failing(
+        "A free currying is a bubble, equal to its evaluation only "
+        "semantically.")
+
+    currying_naturality_right = BiclosedCategory\
+        .currying_naturality_right.failing(
         "A free currying is a bubble, equal to its evaluation only "
         "semantically.")
 

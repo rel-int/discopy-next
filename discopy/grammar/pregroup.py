@@ -154,7 +154,11 @@ class Diagram(frobenius.Diagram):
 
         return sentences()
 
-    trace = frobenius.Diagram.trace.inapplicable("No loop in a sentence.")
+    trace_left = frobenius.Diagram.trace_left.inapplicable(
+        "No loop in a sentence.")
+
+    trace_right = frobenius.Diagram.trace_right.inapplicable(
+        "No loop in a sentence.")
 
     def normal_form(self, **params):
         """

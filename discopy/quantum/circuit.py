@@ -246,7 +246,10 @@ class Circuit(tensor.Diagram[complex]):
             cls, dom=dom, cod=dom if cod is None else cod,
             boundary_connected=True, **params)
 
-    trace = tensor.Diagram.trace.admissible(
+    trace_left = tensor.Diagram.trace_left.admissible(
+        "A trace unfolds into kets and bras.")
+
+    trace_right = tensor.Diagram.trace_right.admissible(
         "A trace unfolds into kets and bras.")
 
     @classmethod

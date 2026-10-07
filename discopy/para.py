@@ -155,7 +155,7 @@ from discopy.abc import (
 from discopy.feedback import Diagram as FeedbackDiagram, Ty as FeedbackTy
 from discopy.utils import (
     assert_iscomposable, assert_isinstance, classproperty, unbiased)
-from discopy.pattern import D, ExpDir, TensorDir  # noqa: F401
+from discopy.pattern import D  # noqa: F401
 
 
 @dataclass
@@ -337,15 +337,7 @@ class Traced(Symmetric, TracedCategory):
     Parametric maps over a traced symmetric underlying `category` form a
     traced category, with the parameters swapped out of the way.
     """
-    @rule
-    def trace[A: Obj[monoidal.Ty], B: Obj[monoidal.Ty], M: Obj[monoidal.Ty],
-              S: bool](
-            self: Hom[Traced, TensorDir[M, A, S], TensorDir[M, B, S]],
-            dom: Var[monoidal.Ty | None, A] = None,
-            cod: Var[monoidal.Ty | None, B] = None,
-            mem: Var[monoidal.Ty | None, M] = None,
-            left: Var[bool, S] = False
-    ) -> Hom[Traced, A, B]:
+    def trace(self, dom=None, cod=None, mem=None, left=False):
         """
         The trace of a parametric map is the trace of the underlying
         morphism, with the parameters swapped out of the way.
@@ -399,11 +391,7 @@ class Closed(Markov, ClosedCategory):
     category = closed.Diagram
 
     @classmethod
-    @rule
-    def ev[Y: Obj[closed.Ty], E: Obj[closed.Ty], S: bool](
-            cls, base: Var[closed.Ty, Y], exponent: Var[closed.Ty, E],
-            left: Var[bool, S] = True
-    ) -> Hom[Closed, TensorDir[ExpDir[Y, E, S], E, S], Y]:
+    def ev(cls, base, exponent, left=True):
         """
         The evaluation of the underlying category, with empty parameters.
 
@@ -415,15 +403,7 @@ class Closed(Markov, ClosedCategory):
         return cls.lift(cls.category.ev(
             base, exponent, left))
 
-    @rule
-    def curry[X: Obj[closed.Ty], Y: Obj[closed.Ty], Z: Obj[closed.Ty],
-              S: bool](
-            self: Hom[Closed, TensorDir[X, Y, S], Z],
-            context: Var[closed.Ty | None, X] = None,
-            base: Var[closed.Ty | None, Z] = None,
-            exponent: Var[closed.Ty | None, Y] = None,
-            left: Var[bool, S] = True
-    ) -> Hom[Closed, X, ExpDir[Z, Y, S]]:
+    def curry(self, context=None, base=None, exponent=None, left=True):
         """
         Curry an exponent out of the end of the domain if `left` else out
         of its start, i.e. never the parameters, which a left currying
@@ -467,14 +447,7 @@ class Feedback(Markov, FeedbackCategory):
         return type(self)(*(x.delay(n_steps) for x in (
             self.dom, self.cod, self.inside, self.param, self.copar)))
 
-    @rule
-    def feedback[A: Obj[FeedbackTy], B: Obj[FeedbackTy], S: bool,
-                 M: Obj[FeedbackTy]](
-            self: Hom[Feedback, TensorDir[D[M], A, S], TensorDir[M, B, S]],
-            dom: Var[FeedbackTy | None, A] = None,
-            cod: Var[FeedbackTy | None, B] = None,
-            mem: Var[FeedbackTy | None, M] = None,
-            left: Var[bool, S] = False) -> Hom[Feedback, A, B]:
+    def feedback(self, dom=None, cod=None, mem=None, left=False):
         """
         The feedback of the underlying category, with the parameters
         swapped out of the way the same as :meth:`Traced.trace`.

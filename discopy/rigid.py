@@ -691,11 +691,19 @@ class Diagram(biclosed.Diagram, RigidCategory):
     currying_right = RigidCategory.currying_right.modulo(
         normal_form).weaken(boundary_connected=True)
 
-    currying_eta = RigidCategory.currying_eta.modulo(
+    currying_eta_left = RigidCategory.currying_eta_left.modulo(
         normal_form).weaken(boundary_connected=True)
 
-    currying_naturality = RigidCategory.currying_naturality.modulo(
+    currying_eta_right = RigidCategory.currying_eta_right.modulo(
         normal_form).weaken(boundary_connected=True)
+
+    currying_naturality_left = RigidCategory\
+        .currying_naturality_left.modulo(normal_form).weaken(
+            boundary_connected=True)
+
+    currying_naturality_right = RigidCategory\
+        .currying_naturality_right.modulo(normal_form).weaken(
+            boundary_connected=True)
 
     dagger_monoidality = RigidCategory.dagger_monoidality.inapplicable(
         "Rigid cups and caps have no dagger, use pivotal instead.")

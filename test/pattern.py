@@ -10,11 +10,11 @@ from pytest import raises
 from discopy import braided, cat, rigid
 from discopy.abc import (
     BiclosedCategory, Category, ColouredMonoid, FeedbackCategory,
-    MonoidalCategory, TracedCategory)
+    MonoidalCategory, RigidCategory, TracedCategory)
 from discopy.monoidal import Box, Diagram, Ty
 from discopy.pattern import (
     Atom, Count, Counts, D, Declaration, Hom, Obj, Objects, Over, R, Repeat,
-    Rule, Sides, Sort, Tensor, Terms, Unit, Var, match, rule)
+    Rule, Sort, Tensor, Terms, Unit, Var, match, rule)
 from discopy.utils import AxiomError
 
 
@@ -116,93 +116,84 @@ def test_delay_unify():
     assert not list(match(D[A], x.d @ y))
 
 
-def test_sides():
-    """ A side ``S: bool`` orients ``TensorDir``, ``ExpDir`` and
-    ``AdjDir``: matching tries both sides unless the side is bound. """
+def test_adjoints():
+    """ An adjoint pattern inverts to the adjoint on the other side, an
+    exponential one matches the exponential of its own side only. """
     from discopy import biclosed, rigid
-    from discopy.pattern import AdjDir, ExpDir, TensorDir
-    from discopy.pattern import instantiate
+    from discopy.pattern import L, Under, instantiate
 
-    S = TypeVar("S", bound=bool)
-    x, y = biclosed.Ty("x"), biclosed.Ty("y")
-    assert [(s["S"], s["A"], s["B"]) for s, _ in match(
-        TensorDir[A, B, S], x @ y) if len(s["A"]) == 1]\
-        == [(True, x, y), (False, y, x)]
-    assert [s["S"] for s, _ in match(ExpDir[A, B, S], x << y)] == [True]
-    assert [s["S"] for s, _ in match(ExpDir[A, B, S], y >> x)] == [False]
-    assert instantiate(TensorDir[A, B, S], {"A": x, "B": y, "S": False},
-                       biclosed.Ty) == y @ x
     r = rigid.Ty("r")
-    assert [s["S"] for s, _ in match(AdjDir[A, S], r.l)] == [True, False]
-    assert Sort.of(S) == Sides()
+    assert [s for s, _ in match(L[A], r.l)] == [{"A": r}]
+    assert [s for s, _ in match(R[A], r.r)] == [{"A": r}]
+    x, y = biclosed.Ty("x"), biclosed.Ty("y")
+    assert [s for s, _ in match(Under[B, A], y >> x)] == [{"A": x, "B": y}]
+    assert not list(match(Under[B, A], x << y))
+    assert instantiate(Under[B, A], {"A": x, "B": y}, biclosed.Ty) == y >> x
 
 
 def test_trace():
-    """ The trace is one rule on both sides, of a memory partitioning the
-    boundary as that of a feedback does: the side ``S`` is ``left``. """
+    """ A trace is a rule per side forwarding to the one method
+    :meth:`trace`, of a memory partitioning the boundary as that of a
+    feedback does. """
     from discopy import traced
 
-    trace = TracedCategory.trace
-    assert trace.variables["M"].size is None
-    assert list(trace.premises) == ["self", "dom", "cod", "mem", "left"]
+    left, right = TracedCategory.trace_left, TracedCategory.trace_right
+    assert left.variables["M"].size is None
+    assert list(left.premises) == ["self", "dom", "cod", "mem"]
     x, y, a, b = map(traced.Ty, "xyab")
-    found = [(s["S"], s["M"]) for s, _ in match(
-        trace.premises["self"], (x @ y @ a, x @ y @ b))]
-    assert found == [  # The right ends a and b share no wire.
-        (True, traced.Ty()), (True, x), (True, x @ y), (False, traced.Ty())]
-    f = traced.Box("f", x @ y @ a, x @ y @ b)
-    assert f.trace(mem=x @ y, left=True) == f.trace(dom=a, cod=b, left=True)\
+    goal = (x @ y @ a, x @ y @ b)
+    assert [s["M"] for s, _ in match(left.premises["self"], goal)]\
+        == [traced.Ty(), x, x @ y]
+    assert [s["M"] for s, _ in match(right.premises["self"], goal)]\
+        == [traced.Ty()]  # The right ends a and b share no wire.
+    f = traced.Box("f", *goal)
+    assert f.trace_left(mem=x @ y) == f.trace(dom=a, cod=b, left=True)\
         == f.trace(dom=y @ a, cod=y @ b, left=True).trace(left=True)
     with raises(AxiomError):
         f.trace(mem=x, cod=b, left=True)
     assert str(Objects(size="N")) == "Obj[_, N]"
-    canonical = traced.Diagram.trace_iteration.canonical()
+    canonical = traced.Diagram.trace_iteration_left.canonical()
     assert canonical and str(canonical.terms[0]).count("Trace") == 1
 
 
 def test_curry_and_uncurry():
-    """ The curry concludes on the exponential of all ``n`` objects at
-    once, as ``curry(n, left)`` builds it, and the uncurry states it
-    upside down. """
+    """ A curry is a rule per side, concluding on the exponential of its
+    whole exponent, which the uncurry evaluates back. """
     from discopy import biclosed
     from discopy.pattern import instantiate
 
-    curry, uncurry = BiclosedCategory.curry, Declaration(
-        BiclosedCategory.uncurry)
-    assert str(uncurry.premises["self"]) == str(curry.conclusion)
-    assert str(uncurry.conclusion) == str(curry.premises["self"])
     x, y, z, w = map(biclosed.Ty, "xyzw")
     f = biclosed.Box("f", x @ y @ z, w)
-    for subst, _ in match(curry.premises["self"], (f.dom, f.cod)):
-        curried = f.curry(exponent=subst["Y"], left=subst["S"])
-        assert instantiate(curry.conclusion, subst, biclosed.Ty)\
-            == (curried.dom, curried.cod)
-    for left in (True, False):
-        g = biclosed.Box("g", x, w << y @ z if left else y @ z >> w)
-        (subst, _), = match(uncurry.premises["self"], (g.dom, g.cod))
-        assert (subst["S"], subst["Y"]) == (left, y @ z)
-        uncurried = g.uncurry(left=left)
-        assert instantiate(uncurry.conclusion, subst, biclosed.Ty)\
-            == (uncurried.dom, uncurried.cod)
+    for curry, left in ((BiclosedCategory.curry_left, True),
+                        (BiclosedCategory.curry_right, False)):
+        assert list(curry.premises) == [
+            "self", "context", "base", "exponent"]
+        for subst, _ in match(curry.premises["self"], (f.dom, f.cod)):
+            curried = f.curry(exponent=subst["Y"], left=left)
+            assert instantiate(curry.conclusion, subst, biclosed.Ty)\
+                == (curried.dom, curried.cod)
+            if subst["Y"]:
+                uncurried = curried.uncurry(left=left)
+                assert (uncurried.dom, uncurried.cod) == (f.dom, f.cod)
 
 
 def test_ev_and_feedback():
-    """ The evaluation and the feedback are one rule each, on both
-    sides; the memory of a feedback is any object. """
+    """ The evaluation and the feedback are a rule per side each, the
+    memory of a feedback any object. """
     from discopy import biclosed
     from discopy.pattern import instantiate
 
-    ev = BiclosedCategory.ev
-    assert list(ev.premises) == ["base", "exponent", "left"]
     x, y = biclosed.Ty("x"), biclosed.Ty("y")
-    for left in (True, False):
-        subst = {"Y": y, "E": x, "S": left}
+    for ev, left in ((BiclosedCategory.ev_left, True),
+                     (BiclosedCategory.ev_right, False)):
+        assert list(ev.premises) == ["base", "exponent"]
         built = biclosed.Diagram.ev(y, x, left)
-        assert instantiate(ev.conclusion, subst, biclosed.Ty)\
+        assert instantiate(ev.conclusion, {"Y": y, "E": x}, biclosed.Ty)\
             == (built.dom, built.cod)
-    feedback = FeedbackCategory.feedback
-    assert feedback.variables["M"].size is None
-    assert str(feedback.premises["mem"]) == "Var[C0 | None, M]"
+    for feedback in (FeedbackCategory.feedback_left,
+                     FeedbackCategory.feedback_right):
+        assert feedback.variables["M"].size is None
+        assert str(feedback.premises["mem"]) == "Var[C0 | None, M]"
 
 
 def test_rule():
@@ -283,7 +274,9 @@ def test_calculus():
         balanced, biclosed, closed, compact, feedback, frobenius, markov,
         monoidal, pivotal, ribbon, symmetric, traced)
 
-    composition, trace, dagger = ["tensor", "cut"], ["trace"], ["dagger"]
+    composition, dagger = ["tensor", "cut"], ["dagger"]
+    trace = ["trace_left", "trace_right"]
+    curry = ["curry_left", "curry_right"]
     for module, calculus in (
             (monoidal, composition + dagger),
             (braided, composition + dagger),
@@ -296,10 +289,10 @@ def test_calculus():
             (ribbon, composition + trace + dagger),
             (compact, composition + trace + dagger),
             (frobenius, composition + trace + dagger),
-            (biclosed, composition + ["curry"]),
-            (closed, composition + trace + ["curry"]),
+            (biclosed, composition + curry),
+            (closed, composition + trace + curry),
             (feedback, composition + trace
-             + ["delay", "feedback"])):
+             + ["delay", "feedback_left", "feedback_right"])):
         assert [name for name, found in module.Diagram.rules.items()
                 if found.recursive] == calculus, module.__name__
 
@@ -334,11 +327,11 @@ def test_focusing():
         return [found.name for found, _ in cls.focus(
             cls.branches(dom, cod), dom, cod)]
 
-    assert rules_in_focus(biclosed.Diagram, a, b << a) == ["curry"]
+    assert rules_in_focus(biclosed.Diagram, a, b << a) == ["curry_left"]
     assert [name for name, r in rigid.Diagram.rules.items()
             if r.recursive] == ["tensor", "cut"]
     x, y, z = map(rigid.Ty, "xyz")
-    curry = rule(rigid.Diagram.curry).bind(rigid.Diagram)
+    curry = vars(RigidCategory)["curry_left"].bind(rigid.Diagram)
     assert not rigid.Diagram.focus(
         [(curry, list(curry.match(x, y @ z.l)))],
         x, y @ z.l)  # z is no subformula of z.l.

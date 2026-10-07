@@ -203,7 +203,7 @@ from functools import cached_property
 import networkx as nx
 
 from discopy.drawing import backend, Node, Point
-from discopy.pattern import Obj, Var, Tensor  # noqa: F401
+from discopy.pattern import Var, Tensor
 from discopy.config import BOX_DRAWING_ATTRIBUTES, TRANSPARENT
 from discopy.abc import TracedCategory
 from discopy.python import finset
@@ -211,7 +211,6 @@ from discopy.pattern import Hom
 from discopy.pattern import rule
 from discopy.utils import (
     assert_isinstance, assert_iscomposable, unbiased, factory, RichDisplay)
-from discopy.pattern import TensorDir  # noqa: F401
 
 if TYPE_CHECKING:
     from discopy import monoidal
@@ -936,14 +935,7 @@ class Drawing(TracedCategory, RichDisplay):
         result.width = x_shift + other.width
         return result
 
-    @rule
-    def trace[A: Obj[Any], B: Obj[Any], M: Obj[Any], S: bool](
-            self: Hom[Drawing, TensorDir[M, A, S], TensorDir[M, B, S]],
-            dom: Var[Any | None, A] = None,
-            cod: Var[Any | None, B] = None,
-            mem: Var[Any | None, M] = None,
-            left: Var[bool, S] = False
-    ) -> Hom[Drawing, A, B]:
+    def trace(self, dom=None, cod=None, mem=None, left=False):
         """
         The trace of a drawing, one wire at a time, the outermost first. A
         drawing traces by position: the memory is the outputs fed back,

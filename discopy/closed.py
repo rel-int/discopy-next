@@ -58,13 +58,9 @@ from dataclasses import dataclass
 from typing import ClassVar, Dict
 
 from discopy import cat, monoidal, biclosed, markov, cmap, hypergraph
-from discopy.pattern import Obj, Var  # noqa: F401
 
-from discopy.axioms import Hom
-from discopy.pattern import rule
 from discopy.abc import ClosedCategory
 from discopy.cat import factory, Generator
-from discopy.pattern import ExpDir, TensorDir  # noqa: F401
 
 
 @factory
@@ -139,11 +135,7 @@ class Diagram(markov.Diagram, biclosed.Diagram, ClosedCategory):
         return not any(isinstance(box, markov.Copy) for box in self.boxes)
 
     @classmethod
-    @rule
-    def ev[Y: Obj[Ty], E: Obj[Ty], S: bool](
-            cls, base: Var[Ty, Y], exponent: Var[Ty, E],
-            left: Var[bool, S] = True
-    ) -> Hom[Diagram, TensorDir[ExpDir[Y, E, S], E, S], Y]:
+    def ev(cls, base, exponent, left=True):
         if not exponent:
             return cls.id(base)
         return cls.Eval(exponent >> base, left=left)

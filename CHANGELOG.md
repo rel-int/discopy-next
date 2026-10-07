@@ -640,7 +640,7 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   lose their `free` and `types` parameters. The sort of a variable or
   a premise is one subclass of `pattern.Sort` per head — `Objects` of
   a class or type parameter, of a size, `Terms` for `Self`, `Counts`
-  for `Count` and `Sides` for `bool` — whose head is the type itself
+  for `Count` — whose head is the type itself
   rather than its name: `Self` stands for the category, a class for the
   category's own subclass of it, and a type parameter for what
   `Category.parameters` says of its position among the parameters of
@@ -653,10 +653,10 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 - `discopy.search` and `discopy.sequent` merge into `discopy.pattern`,
   where each pattern interprets its own aliases: `Pattern` declares the
   abstract classmethods `instantiate` and `unify` that `Tensor`,
-  `TensorDir`, `ExpDir`, `AdjDir`, `D` and `Repeat` implement, `Over`
-  and `Under` being `ExpDir` on a fixed side and `L` and `R` being
-  `AdjDir`. Sorts and references are separate: `Obj[T]`, `Obj[T, N]`,
-  `Atom[T]`, `Unit[T]`, `Hom[C, A, B]`, `Count` and `bool` are sorts
+  `Over`, `Under`, `L`, `R`, `D` and `Repeat` implement, each side of
+  an operation its own pattern. Sorts and references are separate:
+  `Obj[T]`, `Obj[T, N]`, `Atom[T]`, `Unit[T]`, `Hom[C, A, B]` and
+  `Count` are sorts
   with no variable, bounding one or sampled as a premise, and `Var[T,
   p]` stands for a pattern `p` over variables bound elsewhere, e.g.
   `x: Var[C0, X]` for `X: Obj[C0]` or `n: Var[int, N]` for `N: Count`,
@@ -667,12 +667,16 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   now declares, and that the exponential of Python types is not `<<`,
   so `python.Function.curry`, `ev` and `uncurry` are methods rather than
   rules.
-- `trace`, `curry`, `ev` and `feedback` are each one rule, stated by
-  their own signature on both sides, and none of them takes a number of
-  wires: like `feedback`, `trace(dom, cod, mem, left=False)` takes an
-  already partitioned boundary, its domain `mem @ dom` and codomain
-  `mem @ cod` when `left`, `dom @ mem` and `cod @ mem` otherwise, read
-  `TensorDir[M, A, S]` by its sequent, and `curry(context, base,
+- `trace`, `curry` and `feedback` take an already partitioned
+  boundary rather than a number of wires, and each side of them, and of
+  `ev`, is a rule of its own forwarding to that one method, so that an
+  implementation overrides a single entry point: `trace_left` and
+  `trace_right`, `curry_left` and `curry_right`, `ev_left` and
+  `ev_right`, `feedback_left` and `feedback_right`, each stated by the
+  sequent of its side, e.g. `trace_left` from `Hom[C1, Tensor[M, A],
+  Tensor[M, B]]` to `Hom[C1, A, B]`. Like `feedback`, `trace(dom, cod,
+  mem, left=False)` traces `mem @ dom -> mem @ cod` when `left` and
+  `dom @ mem -> cod @ mem` otherwise, and `curry(context, base,
   exponent, left=True)` curries `context @ exponent -> base` into
   `context -> base << exponent`, or `exponent @ context -> base` into
   `context -> exponent >> base`, any two parts determining the third
@@ -681,21 +685,25 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   every implementation, an `AxiomError` where it does not partition the
   boundary, and `uncurry(base, exponent, left=True)` reads what it is
   not given off the codomain through `base_and_exponent`, one
-  exponential at a time. The rule's object variables are plain objects,
-  so `Count` is left to the spiders, copies and merges: a delay states
-  one step, `D[T]`. The one-wire rules `trace_left`, `trace_right`,
-  `curry_left`, `curry_right`, `ev_left`, `ev_right`, `feedback_left`
-  and `feedback_right` are removed: call the rule with a memory or an
-  exponent and `left`, e.g. `f.trace(mem=x, left=True)` where `f.trace(1,
-  left=True)` was written, and `f.trace(mem=f.dom[:0])` is the vanishing
-  axiom. Every implementation restates its sequent with `@rule`, an
-  override without it dropping the rule; `uncurry` and the rigid `curry`
-  stay methods since the evaluation, caps and cut reach what they build.
-  `feedback` takes `left` everywhere, a stream and a parametric map
-  raising `NotImplementedError` on the left. A drawing traces by
-  position, its memory the outputs fed back and the inputs they feed as
-  many on the same side, so a feedback whose memory comes back delayed
-  is still drawn as a trace.
+  exponential at a time. The object variables of the rules are plain
+  objects, so `Count` is left to the spiders, copies and merges, and a
+  delay states one step, `D[T]`. The laws are stated per side too —
+  `trace_iteration_left` and `_right`, `currying_eta_left` and
+  `_right`, the joining, tightening, sliding and superposing of
+  feedback on either side — except where both sides collapse to one
+  morphism, which is one equation chaining three terms: the vanishing
+  of a trace and of feedback, the yanking of a braid and the snake
+  equations. The directional patterns `TensorDir`, `ExpDir` and
+  `AdjDir`, and the sort `Sides` of a `left` premise, go: no sequent
+  takes a side any more. Calls change from `f.trace(1, left=True)` to
+  `f.trace(left=True)` or `f.trace_left()`, and from `f.curry(n)` to
+  `f.curry(exponent=x)`. `uncurry` and the rigid `curry` stay methods,
+  the evaluation, caps and cut reaching what they build. `feedback`
+  takes `left` everywhere, a stream and a parametric map raising
+  `NotImplementedError` on the left. A drawing traces by position, its
+  memory the outputs fed back and the inputs they feed as many on the
+  same side, so a feedback whose memory comes back delayed is still
+  drawn as a trace.
 
 - `Diagram.to_hypergraph` records the offset of every state of a diagram,
   where it only did so for a diagram with one box per layer, so that a
@@ -709,7 +717,7 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   feedback wire, which the hypergraph quotient its equations compare
   by identifies on both sides. `symmetric.Diagram` restates the six
   laws its levels below inherited unchecked. The currying laws state
-  their roundtrip through the one-wire rules `curry_left`,
+  their roundtrip through the rules `curry_left`,
   `curry_right`, `ev_left` and `ev_right`, which the search leaves
   out as admissible at a rigid level, and `MarkovCategory.merge_dagger`
   states that merging is the dagger of copying, the default its
@@ -722,31 +730,14 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   hypergraph or a map says which category it is over, and so does the
   identifier of its cells in the property matrix.
 
-- The rules of the search are decoupled from the n-ary methods they
-  derive from, each stated once in `discopy.abc` as its one-wire
-  instance: `trace_left`/`trace_right`, `curry_left`/`curry_right`
-  and `feedback_left`/`feedback_right` lose their `n` and
-  compound-memory handling and forward to the per-level methods
-  `trace(n, left)`, `curry(n, left)` and
-  `feedback(dom, cod, mem, left)`, now abstract on their abstract
-  base classes — `traced.Diagram` iterates its `Trace` one wire at a
-  time, `feedback.Diagram` its `Feedback`, and
-  `abc.RigidCategory.curry` holds the caps construction its two
-  rules used to duplicate — so the rule forwarders that `ribbon`,
-  `cmap`, `drawing`, `para` and `biclosed` restated are deleted and
-  inherited instead, while the semantic categories outside the
-  traced tower (`Matrix`, `Hypergraph` and `python`) keep their
-  method forwarders. Composing objects is a method and not a rule:
+- Composing objects is a method and not a rule:
   `abc.ColouredMonoid.then` and `cat.FreeCategory.then` shed the
   `@rule` whose starred spelling stated a binary sequent by
   convention, and so do the `then`/`tensor` restatements of the
   concrete categories nothing searches — `Matrix`, `Tensor`,
   `Channel`, `Hypergraph`, `Stream`, `para.Symmetric`, `Drawing`,
   `interaction`, `python.finset` and `symmetric.Permutation` —
-  whose sequents live on the abstract base classes. Code calling
-  `trace_left(n)`, `curry_left(n)` or a compound-memory
-  `feedback_left` on a diagram goes through `trace`, `curry` and
-  `feedback` instead.
+  whose sequents live on the abstract base classes.
 
 - DisCoPy requires Python 3.14. Annotations are the lazy objects of
   PEP 649 rather than quoted strings: the `from __future__ import

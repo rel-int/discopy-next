@@ -51,7 +51,7 @@ from networkx import (
 from networkx.algorithms.isomorphism import is_isomorphic
 
 from discopy import cmap, messages, utils
-from discopy.pattern import Obj, Var, Tensor  # noqa: F401
+from discopy.pattern import Var, Tensor
 from discopy.abc import (
     DaggerCategory, HypergraphCategory, MarkovCategory, MonoidalCategory,
     NamedGeneric, RigidCategory, SymmetricCategory, TracedCategory)
@@ -70,7 +70,6 @@ from discopy.utils import (
     tuplify,
     untuplify,
 )
-from discopy.pattern import TensorDir  # noqa: F401
 if TYPE_CHECKING:
     from discopy.monoidal import Ty, Box, Diagram
 
@@ -549,14 +548,7 @@ class Hypergraph[category: Diagram](MonoidalCategory, DaggerCategory,
             return self.from_box(factory(self.to_diagram(), left))
         return factory.__func__(type(self), self, left)
 
-    @rule
-    def trace[A: Obj[Any], B: Obj[Any], M: Obj[Any], S: bool](
-            self: Hom[Hypergraph, TensorDir[M, A, S], TensorDir[M, B, S]],
-            dom: Var[Any | None, A] = None,
-            cod: Var[Any | None, B] = None,
-            mem: Var[Any | None, M] = None,
-            left: Var[bool, S] = False
-    ) -> Hom[Hypergraph, A, B]:
+    def trace(self, dom=None, cod=None, mem=None, left=False):
         """
         The trace of a hypergraph is its pre- and post-composition with
         cups and caps to form a feedback loop.

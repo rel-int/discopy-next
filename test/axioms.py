@@ -188,7 +188,7 @@ def test_canonical():
     assert str(rigid.Diagram.snake_equations.canonical().terms[1]) == "Id(X)"
     cups = rigid.Diagram.generators["cups"].canonical()
     assert cups == {"left": rigid.Ty('X'), "right": rigid.Ty('X').r}
-    assert feedback.Diagram.feedback_joining.canonical()
+    assert feedback.Diagram.feedback_joining_right.canonical()
 
 
 def test_canonical_instances():

@@ -47,7 +47,7 @@ from math import inf, lcm
 from typing import TYPE_CHECKING, Any, ClassVar, Literal, Self
 
 from discopy import hypergraph, messages
-from discopy.pattern import Obj, Var, Tensor, Unit, L, R  # noqa: F401
+from discopy.pattern import Var, Tensor, Unit, L, R
 from discopy.abc import (
     CompactCategory,
     DaggerCategory,
@@ -69,7 +69,6 @@ from discopy.utils import (
     factory_name,
     unbiased,
 )
-from discopy.pattern import ExpDir, TensorDir  # noqa: F401
 
 if TYPE_CHECKING:
     from discopy.monoidal import Box, Diagram, Ty
@@ -983,11 +982,7 @@ class CMap[category: Diagram](CompactCategory, DaggerCategory,
         return cls.copy(typ, 0)
 
     @classmethod
-    @rule
-    def ev[Y: Obj[Any], E: Obj[Any], S: bool](
-            cls, base: Var[Any, Y], exponent: Var[Any, E],
-            left: Var[bool, S] = True
-    ) -> Hom[CMap, TensorDir[ExpDir[Y, E, S], E, S], Y]:
+    def ev(cls, base, exponent, left=True):
         """
         Evaluation is kept as an explicit box by default, or comes from the
         wiring of cups when the host category is rigid.
@@ -996,14 +991,7 @@ class CMap[category: Diagram](CompactCategory, DaggerCategory,
             return RigidCategory.ev.__func__(cls, base, exponent, left)
         return cls.from_box(cls.category.ev(base, exponent, left))
 
-    @rule
-    def curry[X: Obj[Any], Y: Obj[Any], Z: Obj[Any], S: bool](
-            self: Hom[CMap, TensorDir[X, Y, S], Z],
-            context: Var[Any | None, X] = None,
-            base: Var[Any | None, Z] = None,
-            exponent: Var[Any | None, Y] = None,
-            left: Var[bool, S] = True
-    ) -> Hom[CMap, X, ExpDir[Z, Y, S]]:
+    def curry(self, context=None, base=None, exponent=None, left=True):
         """
         Currying is kept as an explicit curry box by default, the more
         rigorous representation, or comes from the wiring of caps when the
@@ -1125,14 +1113,7 @@ class CMap[category: Diagram](CompactCategory, DaggerCategory,
         return type(self)(
             dom, cod, boxes, edge, loops=loops, check=False)
 
-    @rule
-    def trace[A: Obj[Any], B: Obj[Any], M: Obj[Any], S: bool](
-            self: Hom[CMap, TensorDir[M, A, S], TensorDir[M, B, S]],
-            dom: Var[Any | None, A] = None,
-            cod: Var[Any | None, B] = None,
-            mem: Var[Any | None, M] = None,
-            left: Var[bool, S] = False
-    ) -> Hom[CMap, A, B]:
+    def trace(self, dom=None, cod=None, mem=None, left=False):
         """
         Trace boundary wires by splicing the selected inputs and outputs.
 

@@ -167,7 +167,7 @@ from discopy.utils import (
     deprecated_alias,
     factory, Generator, factory_name, assert_isinstance, AxiomError,
     from_tree)
-from discopy.pattern import D, Hom, Obj, Var, TensorDir  # noqa: F401
+from discopy.pattern import D, Hom, Obj
 from discopy.axioms import rule
 
 
@@ -385,15 +385,33 @@ class Diagram(markov.Diagram, FeedbackCategory):
     dagger = monoidal.Diagram.dagger.inapplicable(
         "The delay of a feedback category is not reversible.")
 
-    feedback_tightening = FeedbackCategory.feedback_tightening.failing(
+    feedback_tightening_left = FeedbackCategory.feedback_tightening_left\
+        .failing(
         "A free feedback is a box, which the hypergraph of a bubble "
         "compares syntactically: nothing slides into it.")
 
-    feedback_sliding = FeedbackCategory.feedback_sliding.failing(
+    feedback_tightening_right = FeedbackCategory.feedback_tightening_right\
+        .failing(
         "A free feedback is a box, which the hypergraph of a bubble "
         "compares syntactically: nothing slides into it.")
 
-    feedback_superposing = FeedbackCategory.feedback_superposing.failing(
+    feedback_sliding_left = FeedbackCategory.feedback_sliding_left\
+        .failing(
+        "A free feedback is a box, which the hypergraph of a bubble "
+        "compares syntactically: nothing slides into it.")
+
+    feedback_sliding_right = FeedbackCategory.feedback_sliding_right\
+        .failing(
+        "A free feedback is a box, which the hypergraph of a bubble "
+        "compares syntactically: nothing slides into it.")
+
+    feedback_superposing_left = FeedbackCategory.feedback_superposing_left\
+        .failing(
+        "A free feedback is a box, which the hypergraph of a bubble "
+        "compares syntactically: nothing slides into it.")
+
+    feedback_superposing_right = FeedbackCategory.feedback_superposing_right\
+        .failing(
         "A free feedback is a box, which the hypergraph of a bubble "
         "compares syntactically: nothing slides into it.")
     Layer: ClassVar[Generator] = Generator.subclass(Layer)
@@ -415,12 +433,7 @@ class Diagram(markov.Diagram, FeedbackCategory):
         inside = tuple(box.delay(n_steps) for box in self.inside)
         return self.ar(inside, dom, cod, _scan=False)
 
-    @rule
-    def feedback[A: Obj[Ty], B: Obj[Ty], S: bool, M: Obj[Ty]](
-            self: Hom[Diagram, TensorDir[D[M], A, S], TensorDir[M, B, S]],
-            dom: Var[Ty | None, A] = None, cod: Var[Ty | None, B] = None,
-            mem: Var[Ty | None, M] = None, left: Var[bool, S] = False
-    ) -> Hom[Diagram, A, B]:
+    def feedback(self, dom=None, cod=None, mem=None, left=False):
         """
         A :class:`Feedback` of the memory, wire by wire: the outermost
         memory wire — the first on the left, the last on the right —

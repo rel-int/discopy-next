@@ -173,7 +173,7 @@ from discopy.pattern import rule
 from discopy.utils import (
     AxiomError,
     assert_isinstance, unbiased, inductive, classproperty, factory_name)
-from discopy.pattern import D, TensorDir  # noqa: F401
+from discopy.pattern import D  # noqa: F401
 
 
 @dataclass
@@ -581,12 +581,8 @@ class Stream[category](MonoidalCategory, NamedGeneric):
         _later = None if dom.is_constant else lambda: cls.copy(dom.later, n)
         return cls(now, dom, cod, _later=_later)
 
-    @rule
-    def feedback[A: Obj[Ty], B: Obj[Ty], S: bool, M: Obj[Ty]](
-            self: Hom[Stream, TensorDir[D[M], A, S], TensorDir[M, B, S]],
-            dom: Var[Ty | None, A] = None, cod: Var[Ty | None, B] = None,
-            mem: Var[Ty | None, M] = None, left: Var[bool, S] = False,
-            _first_call=True) -> Hom[Stream, A, B]:
+    def feedback(self, dom=None, cod=None, mem=None, left=False,
+                 _first_call=True):
         """
         The delayed feedback of a monoidal stream.
 

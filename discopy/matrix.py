@@ -40,7 +40,7 @@ from types import ModuleType
 from typing import Any, Literal, Callable, TYPE_CHECKING
 
 from discopy import monoidal, config, messages
-from discopy.pattern import Obj, Var, Tensor  # noqa: F401
+from discopy.pattern import Var, Tensor
 from discopy.abc import (
     DaggerCategory, MonoidalCategory, NamedGeneric, Nat)
 from discopy.cat import (
@@ -51,7 +51,6 @@ from discopy.cat import (
 from discopy.utils import assert_isinstance, unbiased
 from discopy.pattern import Hom
 from discopy.pattern import rule
-from discopy.pattern import TensorDir  # noqa: F401
 
 if TYPE_CHECKING:
     import sympy
@@ -393,14 +392,7 @@ class Matrix[dtype](MonoidalCategory, DaggerCategory, NamedGeneric):
         return sum(self.id(self.dom).then(*n * [self])
                    for n in range(index(self.dom) + 1))
 
-    @rule
-    def trace[A: Obj[Any], B: Obj[Any], M: Obj[Any], S: bool](
-            self: Hom[Matrix, TensorDir[M, A, S], TensorDir[M, B, S]],
-            dom: Var[Any | None, A] = None,
-            cod: Var[Any | None, B] = None,
-            mem: Var[Any | None, M] = None,
-            left: Var[bool, S] = False
-    ) -> Hom[Matrix, A, B]:
+    def trace(self, dom=None, cod=None, mem=None, left=False):
         """
         The trace of a Boolean matrix, computed with :meth:`Matrix.repeat`.
 

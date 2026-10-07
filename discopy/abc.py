@@ -73,8 +73,8 @@ from typing import (
 from discopy.axioms import (  # noqa: F401  pylint: disable=unused-import
     Axiom, axiom, declarations, Equation, Rule, rule, Serialisable, Testable)
 from discopy.pattern import (  # noqa: F401  pylint: disable=unused-import
-    AdjDir, Atom, Count, D, ExpDir, Hom, L, Obj, Over, R, Repeat, Tensor,
-    TensorDir, Under, Unit, Var, Match, Objects, Sort, instantiate, match,
+    Atom, Count, D, Hom, L, Obj, Over, R, Repeat, Tensor, Under, Unit, Var,
+    Match, Objects, Sort, instantiate, match,
     variables)
 from discopy.utils import (  # noqa: F401  pylint: disable=unused-import
     NamedGeneric, classproperty, factory_name)
@@ -758,10 +758,10 @@ class MonoidalCategory[C0: ColouredMonoid, C1: MonoidalCategory](
             return super().contexts(draw, applied, found, dom, cod)
         _, dom_pattern, cod_pattern = get_args(applied.conclusion)
         new_dom, before = (dom, None) if dom is None\
-            or get_origin(dom_pattern) not in (Tensor, TensorDir)\
+            or get_origin(dom_pattern) is not Tensor\
             else cls.rewire(draw, dom, True, cod)
         new_cod, after = (cod, None) if cod is None\
-            or get_origin(cod_pattern) not in (Tensor, TensorDir)\
+            or get_origin(cod_pattern) is not Tensor\
             else cls.rewire(draw, cod, False, dom)
         if before is None and after is None:
             return super().contexts(draw, applied, found, dom, cod)
@@ -871,19 +871,16 @@ class TracedCategory[C0: ColouredMonoid, C1: TracedCategory](
     :code:`trace` for the partial trace of a morphism over some objects on
     either side.
     """
-    @rule
     @abstractmethod
-    def trace[A: Obj[C0], B: Obj[C0], M: Obj[C0], S: bool](
-            self: Hom[C1, TensorDir[M, A, S], TensorDir[M, B, S]],
-            dom: Var[C0 | None, A] = None, cod: Var[C0 | None, B] = None,
-            mem: Var[C0 | None, M] = None, left: Var[bool, S] = False
-    ) -> Hom[C1, A, B]:
+    def trace(self, dom=None, cod=None, mem=None, left=False) -> Self:
         """
         The trace of a memory ``mem`` on either side, to be instantiated:
-        a partition of the boundary, see :meth:`trace_boundary`, the
-        memory on the left of ``dom`` and ``cod`` when ``left`` and on
-        their right otherwise, one wire by default. Tracing the unit is
-        the identity, i.e. the vanishing axiom, see `nLab
+        the one entry point of the rules :meth:`trace_left` and
+        :meth:`trace_right`. Its boundary is partitioned, see
+        :meth:`trace_boundary`, the memory on the left of ``dom`` and
+        ``cod`` when ``left`` and on their right otherwise, one wire by
+        default. Tracing the unit is the identity, i.e. the vanishing
+        axiom, see `nLab
         <https://ncatlab.org/nlab/show/traced+monoidal+category>`_.
 
         Parameters:
@@ -893,24 +890,67 @@ class TracedCategory[C0: ColouredMonoid, C1: TracedCategory](
             left : Whether to trace the wires on the left or right.
         """
 
+    @rule
+    def trace_left[A: Obj[C0], B: Obj[C0], M: Obj[C0]](
+            self: Hom[C1, Tensor[M, A], Tensor[M, B]],
+            dom: Var[C0 | None, A] = None, cod: Var[C0 | None, B] = None,
+            mem: Var[C0 | None, M] = None) -> Hom[C1, A, B]:
+        """
+        The trace on the left: as a rule, from ``m @ a ⊢ m @ b`` conclude
+        ``a ⊢ b``, see :meth:`trace`.
+
+        Parameters:
+            dom : The domain of the trace.
+            cod : The codomain of the trace.
+            mem : The objects to trace over.
+        """
+        return self.trace(dom, cod, mem, left=True)
+
+    @rule
+    def trace_right[A: Obj[C0], B: Obj[C0], M: Obj[C0]](
+            self: Hom[C1, Tensor[A, M], Tensor[B, M]],
+            dom: Var[C0 | None, A] = None, cod: Var[C0 | None, B] = None,
+            mem: Var[C0 | None, M] = None) -> Hom[C1, A, B]:
+        """
+        The trace on the right: as a rule, from ``a @ m ⊢ b @ m`` conclude
+        ``a ⊢ b``, see :meth:`trace`.
+
+        Parameters:
+            dom : The domain of the trace.
+            cod : The codomain of the trace.
+            mem : The objects to trace over.
+        """
+        return self.trace(dom, cod, mem, left=False)
+
     @axiom
     def trace_vanishing[A: Obj[C0], B: Obj[C0]](
             cls, f: Hom[C1, A, B]) -> Equation[Hom[C1, A, B]]:
-        """ Vanishing of a trace over the unit. """
+        """ Vanishing of a trace over the unit, on either side. """
         unit = f.dom[:0]
         return cls.Equation(
-            f.trace(mem=unit), f, f.trace(mem=unit, left=True))
+            f.trace_left(mem=unit), f, f.trace_right(mem=unit))
 
     @axiom
-    def trace_iteration[A: Obj[C0], B: Obj[C0], M: Obj[C0]](
+    def trace_iteration_left[A: Obj[C0], B: Obj[C0], M: Obj[C0]](
             cls, f: Hom[C1, Tensor[M, A], Tensor[M, B]], mem: Var[C0, M]
     ) -> Equation[Hom[C1, A, B]]:
-        """ The trace of a memory is the trace of its wires, one at a
+        """ The left trace of a memory is the trace of its wires, one at a
         time, the first first. """
         traced = f
         for i in range(len(mem)):
-            traced = traced.trace(mem=mem[i:i + 1], left=True)
-        return cls.Equation(f.trace(mem=mem, left=True), traced)
+            traced = traced.trace_left(mem=mem[i:i + 1])
+        return cls.Equation(f.trace_left(mem=mem), traced)
+
+    @axiom
+    def trace_iteration_right[A: Obj[C0], B: Obj[C0], M: Obj[C0]](
+            cls, f: Hom[C1, Tensor[A, M], Tensor[B, M]], mem: Var[C0, M]
+    ) -> Equation[Hom[C1, A, B]]:
+        """ The right trace of a memory is the trace of its wires, one at a
+        time, the last first. """
+        traced = f
+        for i in reversed(range(len(mem))):
+            traced = traced.trace_right(mem=mem[i:i + 1])
+        return cls.Equation(f.trace_right(mem=mem), traced)
 
     @axiom
     def trace_superposing_left[
@@ -919,7 +959,7 @@ class TracedCategory[C0: ColouredMonoid, C1: TracedCategory](
     ) -> Equation[Hom[C1, Tensor[A, X], Tensor[B, X]]]:
         """ Left-oriented superposing. """
         return cls.Equation(
-            (f @ x).trace(left=True), f.trace(left=True) @ x)
+            (f @ x).trace_left(), f.trace_left() @ x)
 
     @axiom
     def trace_superposing_right[
@@ -928,7 +968,7 @@ class TracedCategory[C0: ColouredMonoid, C1: TracedCategory](
     ) -> Equation[Hom[C1, Tensor[X, A], Tensor[X, B]]]:
         """ Right-oriented superposing. """
         return cls.Equation(
-            (x @ f).trace(), x @ f.trace())
+            (x @ f).trace_right(), x @ f.trace_right())
 
     @axiom
     def trace_naturality_left[M: Atom[C0], X: Obj[C0], A: Obj[C0], B: Obj[C0]](
@@ -937,8 +977,8 @@ class TracedCategory[C0: ColouredMonoid, C1: TracedCategory](
             g: Hom[C1, A, B]) -> Equation[Hom[C1, A, B]]:
         """ Left-oriented trace naturality. """
         return cls.Equation(
-            (x @ g).then(f).then(x @ g).trace(mem=x, left=True),
-            g.then(f.trace(mem=x, left=True)).then(g))
+            (x @ g).then(f).then(x @ g).trace_left(mem=x),
+            g.then(f.trace_left(mem=x)).then(g))
 
     @axiom
     def trace_naturality_right[
@@ -948,8 +988,8 @@ class TracedCategory[C0: ColouredMonoid, C1: TracedCategory](
             g: Hom[C1, A, B]) -> Equation[Hom[C1, A, B]]:
         """ Right-oriented trace naturality. """
         return cls.Equation(
-            (g @ x).then(f).then(g @ x).trace(mem=x),
-            g.then(f.trace(mem=x)).then(g))
+            (g @ x).then(f).then(g @ x).trace_right(mem=x),
+            g.then(f.trace_right(mem=x)).then(g))
 
     @axiom
     def trace_dinaturality_left[M: Atom[C0], N: Atom[C0], S: Obj[C0],
@@ -962,8 +1002,8 @@ class TracedCategory[C0: ColouredMonoid, C1: TracedCategory](
         source, target = g.cod, g.dom
         base, cobase = f.dom[len(source):], f.cod[len(target):]
         return cls.Equation(
-            f.then(g @ cobase).trace(mem=source, left=True),
-            (g @ base).then(f).trace(mem=target, left=True))
+            f.then(g @ cobase).trace_left(mem=source),
+            (g @ base).then(f).trace_left(mem=target))
 
     @axiom
     def trace_dinaturality_right[M: Atom[C0], N: Atom[C0], S: Obj[C0],
@@ -977,8 +1017,8 @@ class TracedCategory[C0: ColouredMonoid, C1: TracedCategory](
         base = f.dom[:-len(source)] if len(source) else f.dom
         cobase = f.cod[:-len(target)] if len(target) else f.cod
         return cls.Equation(
-            f.then(cobase @ g).trace(mem=source),
-            (base @ g).then(f).trace(mem=target))
+            f.then(cobase @ g).trace_right(mem=source),
+            (base @ g).then(f).trace_right(mem=target))
 
 
 class ResiduatedMonoid[C0, C1: ResiduatedMonoid](ColouredMonoid[C0, C1]):
@@ -1038,16 +1078,12 @@ class BiclosedCategory[C0: ResiduatedMonoid, C1: BiclosedCategory](
     exponentials :code`x << y` and :code`x >> y`.
     """
     @classmethod
-    @rule
     @abstractmethod
-    def ev[Y: Obj[C0], E: Obj[C0], S: bool](
-            cls, base: Var[C0, Y], exponent: Var[C0, E],
-            left: Var[bool, S] = True
-    ) -> Hom[C1, TensorDir[ExpDir[Y, E, S], E, S], Y]:
+    def ev(cls, base: C0, exponent: C0, left: bool = True) -> C1:
         """
         The evaluation of an exponential type on either side, to be
-        instantiated: as a rule, ``(y << e) @ e ⊢ y`` on the left and
-        ``e @ (e >> y) ⊢ y`` on the right.
+        instantiated: the one entry point of the rules :meth:`ev_left` and
+        :meth:`ev_right`.
 
         Parameters:
             base : The base of the exponential type.
@@ -1055,17 +1091,41 @@ class BiclosedCategory[C0: ResiduatedMonoid, C1: BiclosedCategory](
             left : Whether to take the left or right evaluation.
         """
 
+    @classmethod
     @rule
+    def ev_left[Y: Obj[C0], E: Obj[C0]](
+            cls, base: Var[C0, Y], exponent: Var[C0, E]
+    ) -> Hom[C1, Tensor[Over[Y, E], E], Y]:
+        """
+        The evaluation on the left: as a rule, ``(y << e) @ e ⊢ y``.
+
+        Parameters:
+            base : The base of the exponential type.
+            exponent : The exponent of the exponential type.
+        """
+        return cls.ev(base, exponent, left=True)
+
+    @classmethod
+    @rule
+    def ev_right[Y: Obj[C0], E: Obj[C0]](
+            cls, base: Var[C0, Y], exponent: Var[C0, E]
+    ) -> Hom[C1, Tensor[E, Under[E, Y]], Y]:
+        """
+        The evaluation on the right: as a rule, ``e @ (e >> y) ⊢ y``.
+
+        Parameters:
+            base : The base of the exponential type.
+            exponent : The exponent of the exponential type.
+        """
+        return cls.ev(base, exponent, left=False)
+
     @abstractmethod
-    def curry[X: Obj[C0], Y: Obj[C0], Z: Obj[C0], S: bool](
-            self: Hom[C1, TensorDir[X, Y, S], Z],
-            context: Var[C0 | None, X] = None,
-            base: Var[C0 | None, Z] = None,
-            exponent: Var[C0 | None, Y] = None,
-            left: Var[bool, S] = True) -> Hom[C1, X, ExpDir[Z, Y, S]]:
+    def curry(self, context=None, base=None, exponent=None, left=True
+              ) -> Self:
         """
         The currying of an exponent out of the domain on either side, to be
-        instantiated: a partition of the boundary, see
+        instantiated: the one entry point of the rules :meth:`curry_left`
+        and :meth:`curry_right`. Its boundary is partitioned, see
         :meth:`curry_boundary`, ``context @ exponent -> base`` curried into
         ``context -> base << exponent`` when ``left`` and ``exponent @
         context -> base`` into ``context -> exponent >> base`` otherwise,
@@ -1077,6 +1137,40 @@ class BiclosedCategory[C0: ResiduatedMonoid, C1: BiclosedCategory](
             exponent : The objects to curry.
             left : Whether to curry on the left or right.
         """
+
+    @rule
+    def curry_left[X: Obj[C0], Y: Obj[C0], Z: Obj[C0]](
+            self: Hom[C1, Tensor[X, Y], Z],
+            context: Var[C0 | None, X] = None,
+            base: Var[C0 | None, Z] = None,
+            exponent: Var[C0 | None, Y] = None) -> Hom[C1, X, Over[Z, Y]]:
+        """
+        The curry on the left: as a rule, from ``x @ y ⊢ z`` conclude
+        ``x ⊢ z << y``, see :meth:`curry`.
+
+        Parameters:
+            context : The domain of the curry.
+            base : The base of the exponential, the codomain.
+            exponent : The objects to curry.
+        """
+        return self.curry(context, base, exponent, left=True)
+
+    @rule
+    def curry_right[X: Obj[C0], Y: Obj[C0], Z: Obj[C0]](
+            self: Hom[C1, Tensor[Y, X], Z],
+            context: Var[C0 | None, X] = None,
+            base: Var[C0 | None, Z] = None,
+            exponent: Var[C0 | None, Y] = None) -> Hom[C1, X, Under[Y, Z]]:
+        """
+        The curry on the right: as a rule, from ``y @ x ⊢ z`` conclude
+        ``x ⊢ y >> z``, see :meth:`curry`.
+
+        Parameters:
+            context : The domain of the curry.
+            base : The base of the exponential, the codomain.
+            exponent : The objects to curry.
+        """
+        return self.curry(context, base, exponent, left=False)
 
     def curry_boundary(self, context=None, base=None, exponent=None,
                        left=True) -> tuple[C0, C0, C0]:
@@ -1142,14 +1236,10 @@ class BiclosedCategory[C0: ResiduatedMonoid, C1: BiclosedCategory](
                 f"{'left' if left else 'right'}.")
         return base, exponent
 
-    def uncurry[X: Obj[C0], Y: Obj[C0], Z: Obj[C0], S: bool](
-            self: Hom[C1, X, ExpDir[Z, Y, S]],
-            base: Var[C0 | None, Z] = None,
-            exponent: Var[C0 | None, Y] = None,
-            left: Var[bool, S] = True) -> Hom[C1, TensorDir[X, Y, S], Z]:
+    def uncurry(self, base=None, exponent=None, left=True) -> Self:
         """
         Uncurry a morphism by composing it with :meth:`ev`, i.e. undo
-        :meth:`curry`, whose sequent its own states upside down, the base
+        :meth:`curry`, whose sequents its own state upside down, the base
         and exponent read off the codomain where not given, see
         :meth:`base_and_exponent`. It is a method rather than a rule since
         it is admissible: the evaluation and a cut reach every uncurried
@@ -1167,16 +1257,13 @@ class BiclosedCategory[C0: ResiduatedMonoid, C1: BiclosedCategory](
             else exponent @ self >> self.ev(base, exponent, False)
 
     @classmethod
-    def uncurry_composition[
-            A: Obj[C0], X: Atom[C0], E: Atom[C0], S: bool](
-            cls, f: Hom[C1, TensorDir[A, E, S], X], base: Var[C0, X],
-            exponent: Var[C0, E], left: Var[bool, S]
-    ) -> Hom[C1, TensorDir[A, E, S], X]:
+    def uncurry_composition(cls, f: C1, base: C0, exponent: C0, left: bool
+                            ) -> C1:
         """
         Curry ``f`` then evaluate it back, i.e. whisker the currying with
         ``exponent`` and compose with the evaluation, the roundtrip that
         :meth:`currying_left` and :meth:`currying_right` state equal to
-        ``f``, through the rules :meth:`curry` and :meth:`ev`.
+        ``f``, through :meth:`curry` and :meth:`ev`.
 
         Parameters:
             f : The morphism to curry and evaluate back.
@@ -1225,7 +1312,7 @@ class BiclosedCategory[C0: ResiduatedMonoid, C1: BiclosedCategory](
         >>> x, y = Ty('x'), Ty('y')
         >>> [rule.name for rule, _ in Diagram.focus(
         ...     Diagram.branches(x, y << x), x, y << x)]
-        ['curry']
+        ['curry_left']
         """
         unit = cls.ob
         goal = {
@@ -1252,28 +1339,42 @@ class BiclosedCategory[C0: ResiduatedMonoid, C1: BiclosedCategory](
             and subformulae(applied, found[0][0])]
 
     @axiom
-    def currying_eta[Y: Obj[C0], E: Obj[C0], S: bool](
-            cls, base: Var[C0, Y], exponent: Var[C0, E],
-            left: Var[bool, S]
-    ) -> Equation[Hom[C1, ExpDir[Y, E, S], ExpDir[Y, E, S]]]:
-        """ The currying of the evaluation is the identity. """
-        exp = base << exponent if left else exponent >> base
+    def currying_eta_left[Y: Obj[C0], E: Obj[C0]](
+            cls, base: Var[C0, Y], exponent: Var[C0, E]
+    ) -> Equation[Hom[C1, Over[Y, E], Over[Y, E]]]:
+        """ The left currying of the left evaluation is the identity. """
         return cls.Equation(
-            cls.ev(base, exponent, left).curry(
-                exponent=exponent, left=left),
-            cls.id(exp))
+            cls.ev_left(base, exponent).curry_left(exponent=exponent),
+            cls.id(base << exponent))
 
     @axiom
-    def currying_naturality[
-            A: Obj[C0], U: Obj[C0], E: Obj[C0], Z: Obj[C0], S: bool](
-            cls, f: Hom[C1, TensorDir[A, E, S], Z], g: Hom[C1, U, A],
-            exponent: Var[C0, E], left: Var[bool, S]
-    ) -> Equation[Hom[C1, U, ExpDir[Z, E, S]]]:
-        """ Currying is natural in the base of the domain. """
-        whiskered = g @ exponent if left else exponent @ g
+    def currying_eta_right[Y: Obj[C0], E: Obj[C0]](
+            cls, base: Var[C0, Y], exponent: Var[C0, E]
+    ) -> Equation[Hom[C1, Under[E, Y], Under[E, Y]]]:
+        """ The right currying of the right evaluation is the identity. """
         return cls.Equation(
-            whiskered.then(f).curry(exponent=exponent, left=left),
-            g.then(f.curry(exponent=exponent, left=left)))
+            cls.ev_right(base, exponent).curry_right(exponent=exponent),
+            cls.id(exponent >> base))
+
+    @axiom
+    def currying_naturality_left[
+            A: Obj[C0], U: Obj[C0], E: Obj[C0], Z: Obj[C0]](
+            cls, f: Hom[C1, Tensor[A, E], Z], g: Hom[C1, U, A],
+            exponent: Var[C0, E]) -> Equation[Hom[C1, U, Over[Z, E]]]:
+        """ Left currying is natural in the context. """
+        return cls.Equation(
+            (g @ exponent).then(f).curry_left(exponent=exponent),
+            g.then(f.curry_left(exponent=exponent)))
+
+    @axiom
+    def currying_naturality_right[
+            A: Obj[C0], U: Obj[C0], E: Obj[C0], Z: Obj[C0]](
+            cls, f: Hom[C1, Tensor[E, A], Z], g: Hom[C1, U, A],
+            exponent: Var[C0, E]) -> Equation[Hom[C1, U, Under[E, Z]]]:
+        """ Right currying is natural in the context. """
+        return cls.Equation(
+            (exponent @ g).then(f).curry_right(exponent=exponent),
+            g.then(f.curry_right(exponent=exponent)))
 
 
 class Pregroup[C0, C1: Pregroup](ResiduatedMonoid[C0, C1]):
@@ -1342,15 +1443,11 @@ class RigidCategory[C0: Pregroup, C1: RigidCategory](BiclosedCategory[C0, C1]):
         """
 
     @classmethod
-    @rule
-    def ev[Y: Obj[C0], E: Obj[C0], S: bool](
-            cls, base: Var[C0, Y], exponent: Var[C0, E],
-            left: Var[bool, S] = True
-    ) -> Hom[C1, TensorDir[Y, TensorDir[AdjDir[E, S], E, S], S], Y]:
+    def ev(cls, base: C0, exponent: C0, left: bool = True) -> C1:
         """
-        The evaluation of a rigid morphism is obtained using cups, as a
-        rule ``y @ e.l @ e ⊢ y`` on the left and ``e @ e.r @ y ⊢ y`` on
-        the right.
+        The evaluation of a rigid morphism is obtained using cups,
+        ``y @ e.l @ e -> y`` on the left and ``e @ e.r @ y -> y`` on the
+        right.
 
         Parameters:
             base : The base of the exponential type.
@@ -1361,19 +1458,40 @@ class RigidCategory[C0: Pregroup, C1: RigidCategory](BiclosedCategory[C0, C1]):
             return base @ cls.cups(exponent.l, exponent)
         return cls.cups(exponent, exponent.r) @ base
 
-    def curry[X: Obj[C0], Y: Obj[C0], Z: Obj[C0], S: bool](
-            self: Hom[C1, TensorDir[X, Y, S], Z],
-            context: Var[C0 | None, X] = None,
-            base: Var[C0 | None, Z] = None,
-            exponent: Var[C0 | None, Y] = None,
-            left: Var[bool, S] = True
-    ) -> Hom[C1, X, TensorDir[Z, AdjDir[Y, S], S]]:
+    @classmethod
+    @rule
+    def ev_left[Y: Obj[C0], E: Obj[C0]](
+            cls, base: Var[C0, Y], exponent: Var[C0, E]
+    ) -> Hom[C1, Tensor[Y, L[E], E], Y]:
+        """
+        The rigid evaluation on the left: as a rule, ``y @ e.l @ e ⊢ y``.
+
+        Parameters:
+            base : The base of the exponential type.
+            exponent : The exponent of the exponential type.
+        """
+        return cls.ev(base, exponent, left=True)
+
+    @classmethod
+    @rule
+    def ev_right[Y: Obj[C0], E: Obj[C0]](
+            cls, base: Var[C0, Y], exponent: Var[C0, E]
+    ) -> Hom[C1, Tensor[E, R[E], Y], Y]:
+        """
+        The rigid evaluation on the right: as a rule, ``e @ e.r @ y ⊢ y``.
+
+        Parameters:
+            base : The base of the exponential type.
+            exponent : The exponent of the exponential type.
+        """
+        return cls.ev(base, exponent, left=False)
+
+    def curry(self, context=None, base=None, exponent=None, left=True
+              ) -> Self:
         """
         The curry of a rigid morphism is obtained using caps, ``Z @ Y.l``
-        on the left and ``Y.r @ Z`` on the right. It is a method rather
-        than a rule since it is admissible: caps and cut reach every
-        transpose, and the self-dual types of a quantum circuit would
-        otherwise let it focus on every goal.
+        on the left and ``Y.r @ Z`` on the right, see :meth:`curry_left`
+        and :meth:`curry_right` for why they are no rules here.
 
         Parameters:
             context : The domain of the curry.
@@ -1390,6 +1508,16 @@ class RigidCategory[C0: Pregroup, C1: RigidCategory](BiclosedCategory[C0, C1]):
                 >> self @ exponent.l
         return self.caps(exponent.r, exponent) @ context\
             >> exponent.r @ self
+
+    curry_left = BiclosedCategory.curry_left.admissible(
+        "A rigid curry is a caps composition: caps and cut reach every "
+        "transpose, and the self-dual types of a quantum circuit would "
+        "otherwise let it focus on every goal.")
+
+    curry_right = BiclosedCategory.curry_right.admissible(
+        "A rigid curry is a caps composition: caps and cut reach every "
+        "transpose, and the self-dual types of a quantum circuit would "
+        "otherwise let it focus on every goal.")
 
     def base_and_exponent(self, base=None, exponent=None, left=True
                           ) -> tuple[C0, C0]:
@@ -1835,9 +1963,8 @@ class ClosedCategory[C0: ResiduatedMonoid, C1: ClosedCategory](
         """ Currying on the left is currying on the right after a swap. """
         base = f.dom[:len(f.dom) - len(exponent)]
         return cls.Equation(
-            f.curry(exponent=exponent, left=True),
-            cls.swap(exponent, base).then(f).curry(
-                exponent=exponent, left=False))
+            f.curry_left(exponent=exponent),
+            cls.swap(exponent, base).then(f).curry_right(exponent=exponent))
 
 
 class DelayedMonoid[C0, C1: DelayedMonoid](ColouredMonoid[C0, C1]):
@@ -1900,19 +2027,14 @@ class FeedbackCategory[C0: DelayedMonoid, C1: FeedbackCategory](
             n_steps : The number of time steps to delay.
         """
 
-    @rule
     @abstractmethod
-    def feedback[A: Obj[C0], B: Obj[C0], S: bool, M: Obj[C0]](
-            self: Hom[C1, TensorDir[D[M], A, S], TensorDir[M, B, S]],
-            dom: Var[C0 | None, A] = None, cod: Var[C0 | None, B] = None,
-            mem: Var[C0 | None, M] = None, left: Var[bool, S] = False
-    ) -> Hom[C1, A, B]:
+    def feedback(self, dom=None, cod=None, mem=None, left=False) -> Self:
         """
-        The feedback operator on either side, to be instantiated: the
-        memory ``mem`` is any object, delayed in the domain and on the
-        left of ``A`` and ``B`` when ``left``, on their right otherwise.
-        :meth:`feedback_joining` states that it is fed back one wire at a
-        time.
+        The feedback operator on either side, to be instantiated: the one
+        entry point of the rules :meth:`feedback_left` and
+        :meth:`feedback_right`. The memory ``mem`` is any object, delayed
+        in the domain and on the left of ``dom`` and ``cod`` when ``left``,
+        on their right otherwise.
 
         Parameters:
             dom : The domain of the feedback.
@@ -1921,22 +2043,67 @@ class FeedbackCategory[C0: DelayedMonoid, C1: FeedbackCategory](
             left : Whether the memory is on the left or right.
         """
 
+    @rule
+    def feedback_left[A: Obj[C0], B: Obj[C0], M: Obj[C0]](
+            self: Hom[C1, Tensor[D[M], A], Tensor[M, B]],
+            dom: Var[C0 | None, A] = None, cod: Var[C0 | None, B] = None,
+            mem: Var[C0 | None, M] = None) -> Hom[C1, A, B]:
+        """
+        The feedback on the left: as a rule, from ``m.d @ a ⊢ m @ b``
+        conclude ``a ⊢ b``, see :meth:`feedback`.
+
+        Parameters:
+            dom : The domain of the feedback.
+            cod : The codomain of the feedback.
+            mem : The memory type to feed back.
+        """
+        return self.feedback(dom, cod, mem, left=True)
+
+    @rule
+    def feedback_right[A: Obj[C0], B: Obj[C0], M: Obj[C0]](
+            self: Hom[C1, Tensor[A, D[M]], Tensor[B, M]],
+            dom: Var[C0 | None, A] = None, cod: Var[C0 | None, B] = None,
+            mem: Var[C0 | None, M] = None) -> Hom[C1, A, B]:
+        """
+        The feedback on the right: as a rule, from ``a @ m.d ⊢ b @ m``
+        conclude ``a ⊢ b``, see :meth:`feedback`.
+
+        Parameters:
+            dom : The domain of the feedback.
+            cod : The codomain of the feedback.
+            mem : The memory type to feed back.
+        """
+        return self.feedback(dom, cod, mem, left=False)
+
     @axiom
     def feedback_vanishing[A: Obj[C0], B: Obj[C0]](
             cls, f: Hom[C1, A, B]) -> Equation[Hom[C1, A, B]]:
-        """ Vanishing of feedback over the unit. """
-        return cls.Equation(f.feedback(mem=cls.ob()), f)
+        """ Vanishing of feedback over the unit, on either side. """
+        unit = f.dom[:0]
+        return cls.Equation(
+            f.feedback_left(mem=unit), f, f.feedback_right(mem=unit))
 
     @axiom
-    def feedback_joining[X: Obj[C0], M: Obj[C0]](
-            cls, f: Hom[C1, Tensor[X, D[M]], Tensor[X, M]], mem: Var[C0, M]
+    def feedback_joining_left[X: Obj[C0], M: Obj[C0]](
+            cls, f: Hom[C1, Tensor[D[M], X], Tensor[M, X]], mem: Var[C0, M]
     ) -> Equation[Hom[C1, X, X]]:
-        """ Joining nested feedback loops: the feedback of a memory is
-        the feedback of its wires, the last one first. """
+        """ Joining nested feedback loops on the left: the feedback of a
+        memory is the feedback of its wires, the first one first. """
         joined = f
         for _ in range(len(mem)):
-            joined = joined.feedback()
-        return cls.Equation(f.feedback(mem=mem), joined)
+            joined = joined.feedback_left()
+        return cls.Equation(f.feedback_left(mem=mem), joined)
+
+    @axiom
+    def feedback_joining_right[X: Obj[C0], M: Obj[C0]](
+            cls, f: Hom[C1, Tensor[X, D[M]], Tensor[X, M]], mem: Var[C0, M]
+    ) -> Equation[Hom[C1, X, X]]:
+        """ Joining nested feedback loops on the right: the feedback of a
+        memory is the feedback of its wires, the last one first. """
+        joined = f
+        for _ in range(len(mem)):
+            joined = joined.feedback_right()
+        return cls.Equation(f.feedback_right(mem=mem), joined)
 
     @axiom
     def delay_unit[A: Obj[C0], B: Obj[C0]](
@@ -1953,37 +2120,71 @@ class FeedbackCategory[C0: DelayedMonoid, C1: FeedbackCategory](
         return cls.Equation(f.delay().delay(), f.delay(2))
 
     @axiom
-    def feedback_tightening[
+    def feedback_tightening_left[
+            A: Obj[C0], B: Obj[C0], U: Obj[C0], V: Obj[C0], M: Obj[C0]](
+            cls, f: Hom[C1, Tensor[D[M], A], Tensor[M, B]],
+            g: Hom[C1, U, A], h: Hom[C1, B, V], mem: Var[C0, M]
+    ) -> Equation[Hom[C1, U, V]]:
+        """ Left feedback is natural in its domain and codomain. """
+        return cls.Equation(
+            (mem.d @ g).then(f).then(mem @ h).feedback_left(mem=mem),
+            g.then(f.feedback_left(mem=mem)).then(h))
+
+    @axiom
+    def feedback_tightening_right[
             A: Obj[C0], B: Obj[C0], U: Obj[C0], V: Obj[C0], M: Obj[C0]](
             cls, f: Hom[C1, Tensor[A, D[M]], Tensor[B, M]],
             g: Hom[C1, U, A], h: Hom[C1, B, V], mem: Var[C0, M]
     ) -> Equation[Hom[C1, U, V]]:
-        """ Feedback is natural in its domain and codomain. """
+        """ Right feedback is natural in its domain and codomain. """
         return cls.Equation(
-            (g @ mem.d).then(f).then(h @ mem).feedback(mem=mem),
-            g.then(f.feedback(mem=mem)).then(h))
+            (g @ mem.d).then(f).then(h @ mem).feedback_right(mem=mem),
+            g.then(f.feedback_right(mem=mem)).then(h))
 
     @axiom
-    def feedback_sliding[
+    def feedback_sliding_left[
+            A: Obj[C0], B: Obj[C0], M: Obj[C0], N: Obj[C0]](
+            cls, f: Hom[C1, Tensor[D[M], A], Tensor[N, B]],
+            k: Hom[C1, N, M]) -> Equation[Hom[C1, A, B]]:
+        """ A morphism slides around a left feedback loop, delayed on the
+        way back in. """
+        base, cobase = f.dom[len(k.cod):], f.cod[len(k.dom):]
+        return cls.Equation(
+            f.then(k @ cobase).feedback_left(mem=k.cod),
+            (k.delay() @ base).then(f).feedback_left(mem=k.dom))
+
+    @axiom
+    def feedback_sliding_right[
             A: Obj[C0], B: Obj[C0], M: Obj[C0], N: Obj[C0]](
             cls, f: Hom[C1, Tensor[A, D[M]], Tensor[B, N]],
             k: Hom[C1, N, M]) -> Equation[Hom[C1, A, B]]:
-        """ A morphism slides around a feedback loop, delayed on the way
-        back in. """
+        """ A morphism slides around a right feedback loop, delayed on the
+        way back in. """
         base = f.dom[:len(f.dom) - len(k.cod)]
         cobase = f.cod[:len(f.cod) - len(k.dom)]
         return cls.Equation(
-            f.then(cobase @ k).feedback(mem=k.cod),
-            (base @ k.delay()).then(f).feedback(mem=k.dom))
+            f.then(cobase @ k).feedback_right(mem=k.cod),
+            (base @ k.delay()).then(f).feedback_right(mem=k.dom))
 
     @axiom
-    def feedback_superposing[A: Obj[C0], B: Obj[C0], X: Obj[C0], M: Obj[C0]](
+    def feedback_superposing_left[
+            A: Obj[C0], B: Obj[C0], X: Obj[C0], M: Obj[C0]](
+            cls, f: Hom[C1, Tensor[D[M], A], Tensor[M, B]],
+            x: Var[C0, X], mem: Var[C0, M]
+    ) -> Equation[Hom[C1, Tensor[A, X], Tensor[B, X]]]:
+        """ Left feedback is natural with respect to the tensor. """
+        return cls.Equation(
+            (f @ x).feedback_left(mem=mem), f.feedback_left(mem=mem) @ x)
+
+    @axiom
+    def feedback_superposing_right[
+            A: Obj[C0], B: Obj[C0], X: Obj[C0], M: Obj[C0]](
             cls, f: Hom[C1, Tensor[A, D[M]], Tensor[B, M]],
             x: Var[C0, X], mem: Var[C0, M]
     ) -> Equation[Hom[C1, Tensor[X, A], Tensor[X, B]]]:
-        """ Feedback is natural with respect to the tensor. """
+        """ Right feedback is natural with respect to the tensor. """
         return cls.Equation(
-            (x @ f).feedback(mem=mem), x @ f.feedback(mem=mem))
+            (x @ f).feedback_right(mem=mem), x @ f.feedback_right(mem=mem))
 
     dagger_involution = DaggerCategory.dagger_involution.inapplicable(
         "The delay of a feedback category is not reversible.")
@@ -2044,7 +2245,7 @@ class BalancedCategory[C0: ColouredMonoid, C1: BalancedCategory](
         in a symmetric category the trace of a swap is the identity. """
         braid = cls.braid(x, x)
         return cls.Equation(
-            braid.trace(left=True), cls.twist(x), braid.trace())
+            braid.trace_left(), cls.twist(x), braid.trace_right())
 
 
 class RibbonCategory[C0: Pregroup, C1: RibbonCategory](

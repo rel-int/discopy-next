@@ -31,7 +31,7 @@ from discopy.abc import ClosedCategory
 from discopy.utils import assert_isinstance, tuplify, untuplify, factory
 from discopy.python import finset, function
 from discopy.python.function import Ty
-from discopy.pattern import Count, Hom, Obj, Repeat, Var, Tensor, TensorDir
+from discopy.pattern import Count, Hom, Obj, Repeat, Var, Tensor
 from discopy.axioms import rule
 
 
@@ -239,14 +239,7 @@ class Function(function.Function, ClosedCategory):
         return self if n == 0\
             else Function(inside, self.dom[:-1], self.cod).fix(n - 1)
 
-    @rule
-    def trace[A: Obj[Ty], B: Obj[Ty], M: Obj[Ty], S: bool](
-            self: Hom[Function, TensorDir[M, A, S], TensorDir[M, B, S]],
-            dom: Var[Ty | None, A] = None,
-            cod: Var[Ty | None, B] = None,
-            mem: Var[Ty | None, M] = None,
-            left: Var[bool, S] = False
-    ) -> Hom[Function, A, B]:
+    def trace(self, dom=None, cod=None, mem=None, left=False):
         """
         The multiplicative trace of a function.
 

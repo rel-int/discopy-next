@@ -106,10 +106,18 @@ class Diagram(symmetric.Diagram, ribbon.Diagram, CompactCategory):
     currying_right = BiclosedCategory.currying_right.weaken(
         boundary_connected=True)
 
-    currying_eta = BiclosedCategory.currying_eta.weaken(
+    currying_eta_left = BiclosedCategory.currying_eta_left.weaken(
         boundary_connected=True)
 
-    currying_naturality = BiclosedCategory.currying_naturality.weaken(
+    currying_eta_right = BiclosedCategory.currying_eta_right.weaken(
+        boundary_connected=True)
+
+    currying_naturality_left = BiclosedCategory\
+        .currying_naturality_left.weaken(
+        boundary_connected=True)
+
+    currying_naturality_right = BiclosedCategory\
+        .currying_naturality_right.weaken(
         boundary_connected=True)
 
 

@@ -6,7 +6,7 @@ A sequent is the signature of a method on an abstract base class of
 :mod:`discopy.abc`: its :pep:`695` type parameter list is the context,
 each parameter one variable with its sort as the bound — ``A: Obj[C0]``
 an object, ``X: Atom[C0]`` a single wire, ``M: Obj[C0, N]`` an object
-of size ``N``, ``N: Count`` a number and ``S: bool`` a side — its
+of size ``N`` and ``N: Count`` a number — its
 parameters the premises and its return annotation the conclusion.
 A premise is a sort to sample, e.g. ``f: Hom[C1, A, B]`` a morphism
 between two patterns, or ``Var[T, p]`` the value an already bound
@@ -54,11 +54,8 @@ Summary
 
     Pattern
     Tensor
-    TensorDir
-    ExpDir
     Over
     Under
-    AdjDir
     L
     R
     D
@@ -69,7 +66,6 @@ Summary
     Objects
     Terms
     Counts
-    Sides
     Declaration
     Rule
     Constant
@@ -189,132 +185,89 @@ class Tensor[*Ts](Pattern):
                 yield from cls.unify(tail, value[n:], subst_, residuals_)
 
 
-class TensorDir[P, Q, S: bool](Pattern):
-    """ The tensor ``P @ Q`` when the side ``S`` is true, ``Q @ P``
-    otherwise: the ``left`` of a method puts ``P`` first. """
+def unify_exponential(base, exponent, value, left: bool, subst, residuals
+                      ) -> Iterator[Match]:
+    """
+    Unify ``base << exponent`` when ``left``, ``exponent >> base``
+    otherwise, with a value: a single exponential object that its base and
+    exponent rebuild, and nothing else — except at a level that collapses
+    its exponentials into the adjoints of a pregroup, which keeps the
+    residual.
+    """
+    atom = value.inside[0] if len(value) == 1 else None
+    found_base: Any = getattr(atom, "base", None)
+    found_exponent: Any = getattr(atom, "exponent", None)
+    if found_base is None or found_exponent is None or value != (
+            found_base << found_exponent if left
+            else found_exponent >> found_base):
+        if hasattr(value, "r"):  # A pregroup: the residual stays.
+            pattern = Over[base, exponent] if left else Under[exponent, base]
+            yield subst, residuals + ((pattern, value), )
+        return
+    for subst_, residuals_ in unify(base, found_base, subst, residuals):
+        yield from unify(exponent, found_exponent, subst_, residuals_)
+
+
+class Over[Z: abc.ResiduatedMonoid, Y: abc.ResiduatedMonoid](Pattern):
+    """ The exponential ``Over[Z, Y]``, i.e. ``Z << Y``, see
+    :func:`unify_exponential`. """
 
     @classmethod
     def instantiate(cls, args, subst, unit):
-        first, second, left = (instantiate(arg, subst, unit) for arg in args)
-        return first @ second if left else second @ first
+        base, exponent = (instantiate(arg, subst, unit) for arg in args)
+        return base << exponent
 
     @classmethod
     def unify(cls, args, value, subst, residuals):
-        first, second, side = args
-        for subst_, left in sides(side, subst):
-            yield from Tensor.unify(
-                (first, second) if left else (second, first),
-                value, subst_, residuals)
+        base, exponent = args
+        yield from unify_exponential(
+            base, exponent, value, True, subst, residuals)
 
 
-class ExpDir[Z: abc.ResiduatedMonoid, Y: abc.ResiduatedMonoid, S: bool](
-        Pattern):
-    """ The exponential ``Z << Y`` when the side ``S`` is true, ``Y >> Z``
-    otherwise, decomposed against a single exponential object that its
-    base and exponent rebuild, matching nothing else — except at a level
-    that collapses its exponentials into the adjoints of a pregroup,
-    which keeps the residual. """
+class Under[Y: abc.ResiduatedMonoid, Z: abc.ResiduatedMonoid](Pattern):
+    """ The exponential ``Under[Y, Z]``, i.e. ``Y >> Z``, see
+    :func:`unify_exponential`. """
 
     @classmethod
     def instantiate(cls, args, subst, unit):
-        base, exponent, left = (instantiate(arg, subst, unit) for arg in args)
-        return base << exponent if left else exponent >> base
-
-    @classmethod
-    def unify(cls, args, value, subst, residuals):
-        pattern_base, pattern_exponent, side = args
-        atom = value.inside[0] if len(value) == 1 else None
-        base: Any = getattr(atom, "base", None)
-        exponent: Any = getattr(atom, "exponent", None)
-        for subst_, left in sides(side, subst):
-            if base is None or exponent is None or value != (
-                    base << exponent if left else exponent >> base):
-                if hasattr(value, "r"):  # A pregroup: the residual stays.
-                    oriented = ExpDir[
-                        pattern_base, pattern_exponent, Literal[True]]\
-                        if left else ExpDir[
-                            pattern_base, pattern_exponent, Literal[False]]
-                    yield subst_, residuals + ((oriented, value), )
-                continue
-            for subst__, residuals_ in unify(
-                    pattern_base, base, subst_, residuals):
-                yield from unify(
-                    pattern_exponent, exponent, subst__, residuals_)
-
-
-class Over[Z: abc.ResiduatedMonoid, Y: abc.ResiduatedMonoid](
-        ExpDir[Z, Y, Literal[True]]):
-    """ The exponential ``Over[Z, Y]``, i.e. ``Z << Y``. """
-
-    @classmethod
-    def instantiate(cls, args, subst, unit):
-        return ExpDir.instantiate((*args, Literal[True]), subst, unit)
-
-    @classmethod
-    def unify(cls, args, value, subst, residuals):
-        yield from ExpDir.unify((*args, Literal[True]), value, subst,
-                                residuals)
-
-
-class Under[Y: abc.ResiduatedMonoid, Z: abc.ResiduatedMonoid](
-        ExpDir[Z, Y, Literal[False]]):
-    """ The exponential ``Under[Y, Z]``, i.e. ``Y >> Z``. """
-
-    @classmethod
-    def instantiate(cls, args, subst, unit):
-        exponent, base = args
-        return ExpDir.instantiate(
-            (base, exponent, Literal[False]), subst, unit)
+        exponent, base = (instantiate(arg, subst, unit) for arg in args)
+        return exponent >> base
 
     @classmethod
     def unify(cls, args, value, subst, residuals):
         exponent, base = args
-        yield from ExpDir.unify(
-            (base, exponent, Literal[False]), value, subst, residuals)
+        yield from unify_exponential(
+            base, exponent, value, False, subst, residuals)
 
 
-class AdjDir[T: abc.Pregroup, S: bool](Pattern):
-    """ The left adjoint ``T.l`` when the side ``S`` is true, the right
-    adjoint ``T.r`` otherwise, inverted by the adjoint on the other side
-    when matching. """
-
-    @classmethod
-    def instantiate(cls, args, subst, unit):
-        base, left = (instantiate(arg, subst, unit) for arg in args)
-        return base.l if left else base.r
-
-    @classmethod
-    def unify(cls, args, value, subst, residuals):
-        base, side = args
-        for subst_, left in sides(side, subst):
-            yield from unify(
-                base, value.r if left else value.l, subst_, residuals)
-
-
-class L[T: abc.Pregroup](AdjDir[T, Literal[True]]):
-    """ The left adjoint ``L[T]``, i.e. ``T.l``. """
+class L[T: abc.Pregroup](Pattern):
+    """ The left adjoint ``L[T]``, i.e. ``T.l``, inverted by the right
+    adjoint when matching. """
 
     @classmethod
     def instantiate(cls, args, subst, unit):
-        return AdjDir.instantiate((*args, Literal[True]), subst, unit)
+        (base, ) = args
+        return instantiate(base, subst, unit).l
 
     @classmethod
     def unify(cls, args, value, subst, residuals):
-        yield from AdjDir.unify((*args, Literal[True]), value, subst,
-                                residuals)
+        (base, ) = args
+        yield from unify(base, value.r, subst, residuals)
 
 
-class R[T: abc.Pregroup](AdjDir[T, Literal[False]]):
-    """ The right adjoint ``R[T]``, i.e. ``T.r``. """
+class R[T: abc.Pregroup](Pattern):
+    """ The right adjoint ``R[T]``, i.e. ``T.r``, inverted by the left
+    adjoint when matching. """
 
     @classmethod
     def instantiate(cls, args, subst, unit):
-        return AdjDir.instantiate((*args, Literal[False]), subst, unit)
+        (base, ) = args
+        return instantiate(base, subst, unit).r
 
     @classmethod
     def unify(cls, args, value, subst, residuals):
-        yield from AdjDir.unify((*args, Literal[False]), value, subst,
-                                residuals)
+        (base, ) = args
+        yield from unify(base, value.l, subst, residuals)
 
 
 class D[T: abc.DelayedMonoid](Pattern):
@@ -452,8 +405,8 @@ class Sort(ABC):
     """
     The sort of a variable, as its bound states it, or of a premise, as
     its annotation does: one subclass for each kind of head, the objects
-    of a class or type parameter, the terms of the category ``Self``, a
-    number ``Count`` and a side ``bool``.
+    of a class or type parameter, the terms of the category ``Self`` and
+    a number ``Count``.
 
     >>> from discopy.monoidal import Ty
     >>> def cups[X: Atom[Ty]](): ...
@@ -470,8 +423,6 @@ class Sort(ABC):
         bound = variable.__bound__
         if bound is Count:
             return Counts()
-        if bound is bool:
-            return Sides()
         args = get_args(bound)
         return Objects(args[0] if args else None, size(bound))
 
@@ -588,27 +539,6 @@ class Counts(Sort):
 
     def __str__(self):
         return "Count"
-
-
-@dataclass(frozen=True)
-class Sides(Sort):
-    """ The sides ``S: bool``, the value of the ``left`` of a method. """
-    head: ClassVar = bool
-
-    def resolve(self, category: type, owner: type | None = None) -> type:
-        return bool
-
-    def strategy(self, category: type, owner: type | None = None,
-                 length: int | None = None):
-        from hypothesis import strategies as st
-        return st.booleans()
-
-    def canonical(self, category: type, label: str,
-                  owner: type | None = None, length: int = 1):
-        return True
-
-    def __str__(self):
-        return "bool"
 
 
 def size(annotation) -> int | str | None:
@@ -732,18 +662,6 @@ def unify(pattern, value, subst: Substitution,
         yield from origin.unify(args, value, subst, residuals)
     else:
         raise TypeError(f"Expected a pattern, got {pattern!r}.")
-
-
-def sides(side, subst: Substitution) -> Iterator[tuple[Substitution, bool]]:
-    """ The values of a side: a ``Literal`` its own, a bound variable
-    its binding, an unbound one both, each binding it. """
-    if not isinstance(side, TypeVar):
-        yield subst, get_args(side)[0]
-    elif side.__name__ in subst:
-        yield subst, bool(subst[side.__name__])
-    else:
-        for left in (True, False):
-            yield {**subst, side.__name__: left}, left
 
 
 @dataclass(repr=False)
@@ -1081,8 +999,8 @@ class Rule[**P, T](Declaration[P, T]):
         class it is assigned on, because the structure it builds lies
         outside the category's terms, with the reason as its record:
         the method still runs, the search just never applies it, e.g.
-        ``trace = frobenius.Diagram.trace.inapplicable("No loop in a
-        sentence.")``. A rule the category does have, whose terms
+        ``trace_left = frobenius.Diagram.trace_left.inapplicable("No loop
+        in a sentence.")``. A rule the category does have, whose terms
         other rules reach, is :meth:`admissible` instead.
         """
         result = replace(self)
