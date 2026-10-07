@@ -5,16 +5,16 @@ add everything, fix everything
 - [x] the Python functions lost their `id` rule (and keep stray ones)
 
 ## Laws
-- [ ] `HypergraphCategory`: spider fusion, specialness, commutativity
-- [ ] yanking: the trace of a swap is the identity
-- [ ] `BraidedCategory`: braid invertibility, both ways
-- [ ] `FeedbackCategory`: tightening, sliding, superposing
-- [ ] objects: tensor associativity and unit; delay zero, addition, tensor; unit exponentials
-- [ ] `BiclosedCategory`: the η law of currying, currying naturality
-- [ ] `ClosedCategory`: left and right currying agree up to a swap
-- [ ] `RigidCategory`: `cups_coherence`
-- [ ] `BalancedCategory`: twist naturality, twist of the unit
-- [ ] `MonoidalCategory`: `cut` is `x @ f @ y >> g`
+- [WIP] @session_019jj2d1JBnEGRPmjqSAP37A-2026-10-07 08:46 `HypergraphCategory`: spider fusion, specialness, commutativity
+- [WIP] @session_019jj2d1JBnEGRPmjqSAP37A-2026-10-07 08:46 yanking: the trace of a swap is the identity
+- [WIP] @session_019jj2d1JBnEGRPmjqSAP37A-2026-10-07 08:46 `BraidedCategory`: braid invertibility, both ways
+- [WIP] @session_019jj2d1JBnEGRPmjqSAP37A-2026-10-07 08:46 `FeedbackCategory`: tightening, sliding, superposing
+- [WIP] @session_019jj2d1JBnEGRPmjqSAP37A-2026-10-07 08:46 objects: tensor associativity and unit; delay zero, addition, tensor; unit exponentials
+- [WIP] @session_019jj2d1JBnEGRPmjqSAP37A-2026-10-07 08:46 `BiclosedCategory`: the η law of currying, currying naturality
+- [WIP] @session_019jj2d1JBnEGRPmjqSAP37A-2026-10-07 08:46 `ClosedCategory`: left and right currying agree up to a swap
+- [WIP] @session_019jj2d1JBnEGRPmjqSAP37A-2026-10-07 08:46 `RigidCategory`: `cups_coherence`
+- [WIP] @session_019jj2d1JBnEGRPmjqSAP37A-2026-10-07 08:46 `BalancedCategory`: twist naturality, twist of the unit
+- [WIP] @session_019jj2d1JBnEGRPmjqSAP37A-2026-10-07 08:46 `MonoidalCategory`: `cut` is `x @ f @ y >> g`
 
 ## Rules
 - [ ] `dagger` as a rule
