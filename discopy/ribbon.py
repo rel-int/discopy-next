@@ -81,7 +81,7 @@ cap becomes a ribbon folding back.
 
 from typing import ClassVar
 
-from discopy import pivotal, balanced
+from discopy import pivotal, balanced, messages
 from discopy.abc import BalancedCategory, RibbonCategory
 
 from discopy.axioms import Serialisable
@@ -102,8 +102,7 @@ class Diagram(pivotal.Diagram, balanced.Diagram, RibbonCategory):
     Braid: ClassVar[Generator]
     Twist: ClassVar[Generator]
     Functor: ClassVar[Generator]
-    serialisation = Serialisable.serialisation.failing(
-        "The generic tree of a twist does not read back (#742).")
+    serialisation = Serialisable.serialisation.failing(messages.TWIST_TREE)
 
     def trace(self, dom=None, cod=None, mem=None, left=False):
         """

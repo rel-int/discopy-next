@@ -167,11 +167,6 @@ from discopy.utils import (
     factory_name,
 )
 
-PARTIAL_HYPERGRAPH = (
-    "to_hypergraph rejects a left-handed cup or cap: Hypergraph.cups and "
-    "caps only accept the right-adjoint orientation.")
-
-
 class Wire(monoidal.Wire):
     """
     A rigid object has adjoints :meth:`Wire.l` and :meth:`Wire.r`.
@@ -410,11 +405,10 @@ class Diagram(biclosed.Diagram, RigidCategory):
     Layer: ClassVar[Generator] = Generator.subclass(Layer)
 
     dagger_involution = DaggerCategory.dagger_involution.inapplicable(
-        "Rigid diagrams have no dagger, use pivotal instead.")
+        messages.RIGID_HAS_NO_DAGGER)
     dagger_contravariance = DaggerCategory.dagger_contravariance\
-        .inapplicable("Rigid diagrams have no dagger, use pivotal instead.")
-    dagger = monoidal.Diagram.dagger.inapplicable(
-        "Rigid diagrams have no dagger, use pivotal instead.")
+        .inapplicable(messages.RIGID_HAS_NO_DAGGER)
+    dagger = monoidal.Diagram.dagger.inapplicable(messages.RIGID_HAS_NO_DAGGER)
 
     to_drawing = monoidal.Diagram.to_drawing
 
@@ -709,22 +703,28 @@ class Diagram(biclosed.Diagram, RigidCategory):
         "Rigid cups and caps have no dagger, use pivotal instead.")
 
     hypergraph_section = \
-        monoidal.Diagram.hypergraph_section.failing(PARTIAL_HYPERGRAPH)
+        monoidal.Diagram.hypergraph_section.failing(
+            messages.LEFT_HANDED_HYPERGRAPH)
 
     hypergraph_composition = \
-        monoidal.Diagram.hypergraph_composition.failing(PARTIAL_HYPERGRAPH)
+        monoidal.Diagram.hypergraph_composition.failing(
+            messages.LEFT_HANDED_HYPERGRAPH)
 
     map_hypergraph_agreement = \
-        monoidal.Diagram.map_hypergraph_agreement.failing(PARTIAL_HYPERGRAPH)
+        monoidal.Diagram.map_hypergraph_agreement.failing(
+            messages.LEFT_HANDED_HYPERGRAPH)
 
     normal_form_soundness = \
-        monoidal.Diagram.normal_form_soundness.failing(PARTIAL_HYPERGRAPH)
+        monoidal.Diagram.normal_form_soundness.failing(
+            messages.LEFT_HANDED_HYPERGRAPH)
 
     foliation_idempotence = \
-        monoidal.Diagram.foliation_idempotence.failing(PARTIAL_HYPERGRAPH)
+        monoidal.Diagram.foliation_idempotence.failing(
+            messages.LEFT_HANDED_HYPERGRAPH)
 
     foliation_soundness = \
-        monoidal.Diagram.foliation_soundness.failing(PARTIAL_HYPERGRAPH)
+        monoidal.Diagram.foliation_soundness.failing(
+            messages.LEFT_HANDED_HYPERGRAPH)
 
 
 @Diagram.generator

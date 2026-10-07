@@ -37,7 +37,8 @@ from typing import ClassVar
 from copy import copy
 from dataclasses import dataclass
 
-from discopy import config, monoidal, braided, traced, cmap, hypergraph
+from discopy import (
+    config, monoidal, braided, traced, cmap, hypergraph, messages)
 from discopy.pattern import Atom, Hom, rule, Var
 from discopy.axioms import no_strategy, Serialisable
 from discopy.abc import BalancedCategory
@@ -142,8 +143,7 @@ class Diagram(braided.Diagram, traced.Diagram, BalancedCategory):
     yanking = BalancedCategory.yanking.failing(
         "A free twist is a box, not the trace of a braid.")
 
-    serialisation = Serialisable.serialisation.failing(
-        "The generic tree of a twist does not read back (#742).")
+    serialisation = Serialisable.serialisation.failing(messages.TWIST_TREE)
 
     @classmethod
     @rule

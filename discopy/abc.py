@@ -69,6 +69,7 @@ from typing import (
     Any, ClassVar, Self, TYPE_CHECKING, get_args,
     get_origin)
 
+from discopy import messages
 from discopy.axioms import axiom, Equation, Testable
 from discopy.pattern import (
     Atom, Count, D, Hom, L, Obj, Objects, Over, Pattern, R, Repeat, Rule,
@@ -2185,13 +2186,13 @@ class FeedbackCategory[C0: DelayedMonoid, C1: FeedbackCategory](
             (x @ f).feedback_right(mem=mem), x @ f.feedback_right(mem=mem))
 
     dagger_involution = DaggerCategory.dagger_involution.inapplicable(
-        "The delay of a feedback category is not reversible.")
+        messages.DELAY_IS_NOT_REVERSIBLE)
 
     dagger_contravariance = DaggerCategory.dagger_contravariance\
-        .inapplicable("The delay of a feedback category is not reversible.")
+        .inapplicable(messages.DELAY_IS_NOT_REVERSIBLE)
 
     dagger_monoidality = MonoidalCategory.dagger_monoidality.inapplicable(
-        "The delay of a feedback category is not reversible.")
+        messages.DELAY_IS_NOT_REVERSIBLE)
 
 
 class BalancedCategory[C0: ColouredMonoid, C1: BalancedCategory](

@@ -989,7 +989,6 @@ class Functor[In0, In1, Out0, Out1](Category, Serialisable):
         does a category whose objects are dimensions or information
         units, which has no relabelling.
         """
-        # pylint: disable=unused-argument  # a canonical term has one leaf
         from hypothesis import strategies as st
 
         if cls.dom is not cls.cod:

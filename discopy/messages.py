@@ -31,3 +31,28 @@ NOT_SYMMETRIC = "{} has no swaps to downgrade this map."
 NOT_ACYCLIC = "{} has a directed cycle, its boxes cannot be ordered."
 PERMUTATION_HAS_NO_OFFSET = (
     "A layer with a non-identity permutation has no single offset.")
+
+FREE_FEEDBACK = (
+    "A free feedback is a box, which the hypergraph of a bubble compares "
+    "syntactically: nothing slides into it.")
+
+FREE_CURRY = (
+    "A free currying is a bubble, equal to its evaluation only semantically.")
+
+CURRY_HAS_NO_DAGGER = "A curried diagram has no dagger."
+
+DELAY_IS_NOT_REVERSIBLE = "The delay of a feedback category is not reversible."
+
+RIGID_HAS_NO_DAGGER = "Rigid diagrams have no dagger, use pivotal instead."
+
+TWIST_TREE = "The generic tree of a twist does not read back (#742)."
+
+FREE_BRAID_INVERSE = (
+    "A free braid and its inverse are two boxes, which the equation of "
+    "braided diagrams does not cancel.")
+
+LEFT_HANDED_HYPERGRAPH = (
+    "to_hypergraph rejects a left-handed cup or cap: Hypergraph.cups and "
+    "caps only accept the right-adjoint orientation.")
+
+FREE_TRACE = "A free trace is a box, not a rewrite."

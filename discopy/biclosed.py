@@ -83,7 +83,7 @@ from abc import abstractmethod
 from inspect import signature
 from typing import Callable, ClassVar, Self, overload
 
-from discopy import monoidal, cmap
+from discopy import monoidal, cmap, messages
 
 from discopy.axioms import no_strategy, Serialisable
 from discopy.abc import BiclosedCategory, DaggerCategory, ResiduatedMonoid
@@ -381,16 +381,15 @@ class Diagram(monoidal.Diagram, BiclosedCategory):
         return monoidal.Diagram.to_drawing(self, functor=Functor)
 
     dagger_involution = DaggerCategory.dagger_involution.inapplicable(
-        "A curried diagram has no dagger.")
+        messages.CURRY_HAS_NO_DAGGER)
 
     dagger_contravariance = DaggerCategory.dagger_contravariance\
-        .inapplicable("A curried diagram has no dagger.")
+        .inapplicable(messages.CURRY_HAS_NO_DAGGER)
 
     dagger_monoidality = BiclosedCategory.dagger_monoidality.inapplicable(
-        "A curried diagram has no dagger.")
+        messages.CURRY_HAS_NO_DAGGER)
 
-    dagger = monoidal.Diagram.dagger.inapplicable(
-        "A curried diagram has no dagger.")
+    dagger = monoidal.Diagram.dagger.inapplicable(messages.CURRY_HAS_NO_DAGGER)
 
     map_hypergraph_agreement = \
         monoidal.Diagram.map_hypergraph_agreement.failing(
@@ -399,31 +398,22 @@ class Diagram(monoidal.Diagram, BiclosedCategory):
             "can ask a planar category for swaps, while the hypergraph "
             "of a bubble compares its inside syntactically.")
 
-    currying_left = BiclosedCategory.currying_left.failing(
-        "A free currying is a bubble, equal to its evaluation only "
-        "semantically.")
+    currying_left = BiclosedCategory.currying_left.failing(messages.FREE_CURRY)
 
     currying_right = BiclosedCategory.currying_right.failing(
-        "A free currying is a bubble, equal to its evaluation only "
-        "semantically.")
+        messages.FREE_CURRY)
 
     currying_eta_left = BiclosedCategory.currying_eta_left.failing(
-        "A free currying is a bubble, equal to its evaluation only "
-        "semantically.")
+        messages.FREE_CURRY)
 
     currying_eta_right = BiclosedCategory.currying_eta_right.failing(
-        "A free currying is a bubble, equal to its evaluation only "
-        "semantically.")
+        messages.FREE_CURRY)
 
     currying_naturality_left = BiclosedCategory\
-        .currying_naturality_left.failing(
-        "A free currying is a bubble, equal to its evaluation only "
-        "semantically.")
+        .currying_naturality_left.failing(messages.FREE_CURRY)
 
     currying_naturality_right = BiclosedCategory\
-        .currying_naturality_right.failing(
-        "A free currying is a bubble, equal to its evaluation only "
-        "semantically.")
+        .currying_naturality_right.failing(messages.FREE_CURRY)
 
 
 Box = Diagram.Box

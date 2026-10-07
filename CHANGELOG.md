@@ -18,7 +18,7 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   `FeedbackCategory.delay` concludes `a.delay(n) ⊢ b.delay(n)` through
   the delay pattern `D[T, N]`, which takes an optional number of steps,
   one by default, and matches every number of steps up to
-  `pattern.MAX_COUNT` that a value is the delay of. A stream delays by
+  `pattern.Counts.maximum` that a value is the delay of. A stream delays by
   one step. Delaying a box of a feedback diagram through
   `feedback.Diagram.delay`, as the search does, builds a diagram rather
   than calling the box's constructor with the arguments of a diagram.
@@ -471,13 +471,11 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   generation — wired up in `proptest/test_axioms.py`, enrolled so far for
   `cat.Arrow`, and run by the new `proptest` GitHub
   workflow on PRs labelled `proptest`, on `main`, nightly and on manual
-  dispatch. `proptest/conftest.py` registers four Hypothesis profiles
-  over one example database, keyed per cell: `pr` replays what the
-  database remembers and generates a few examples from a fixed seed,
-  `explore` searches with a large budget, `dev` works on the local
-  database alone and `shared`, registered only when selected, backs it
-  with CI's through a read-only `GitHubArtifactDatabase` and a
-  `GITHUB_TOKEN`. The workflow downloads the database from the previous
+  dispatch. `proptest/conftest.py` registers four Hypothesis profiles:
+  `pr` replays what the example database remembers and generates a few
+  examples from a fixed seed, `explore` searches with a large budget,
+  `dev` with a middling one and `fast`, derandomized and with no
+  database, checks every law once per declaration. The workflow downloads the database from the previous
   run's artifact, and a run of `main`, the nightly search or a dispatch
   uploads its own afterwards — a pull request only reads it — so a
   counterexample found by one night's search fails every pull request
@@ -630,9 +628,8 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   search spent most of a goal-directed budget daggering back and forth
   — a planar goal sampled 120 distinct diagrams out of 300 where it now
   samples 270 — and a rigid category, whose curry collapses into caps,
-  focuses on nothing. `pattern.search`,
-  `pattern.focused`, `pattern.materials` and `pattern.DeadEnd` move to
-  `abc`, the unification of `discopy.pattern` staying planar.
+  focuses on nothing. The search and `DeadEnd` move to `abc`, the
+  unification of `discopy.pattern` staying planar.
   A category owns the strategies it searches with: objects are drawn
   from `ob.strategy` and free boxes from `Category.free`, which a
   diagram reads off its `Box`, so `search`, `Diagram.strategy`,
@@ -648,7 +645,6 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   arrows of a category or the four of a functor. The string constants
   `OBJECTS`, `ARROWS` and `SELF`, `pattern.heads` and
   `Declaration.scope` go.
-  `proptest/search_experiment.py` measures what the search samples.
 
 - `discopy.search` and `discopy.sequent` merge into `discopy.pattern`,
   where each pattern interprets its own aliases: `Pattern` declares the
@@ -667,6 +663,47 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   now declares, and that the exponential of Python types is not `<<`,
   so `python.Function.curry`, `ev` and `uncurry` are methods rather than
   rules.
+- The pattern language is frozen and its functions are methods of the
+  classes they belong to: a `pattern.Substitution` carries its residuals
+  and `unify`, `instantiate`, `fit`, `guide` and names `fresh` variables,
+  where `match`, `unify`, `instantiate` and `fits` were functions and
+  `Match` and `Residuals` type aliases; `Pattern.variables`,
+  `Sort.read`, `Sort.position`, `Sort.stands_for`, `Sort.named` and
+  `Declaration.inherited` replace `variables`, `size`, `premise`,
+  `position`, `stands_for`, `cell` and `declarations`;
+  `pattern.Exponential` hosts what `Over` and `Under` share, and
+  `Counts.maximum` is `MAX_COUNT`. Modules import the pattern language
+  from `discopy.pattern` alone rather than through `discopy.axioms`.
+  The search is the classmethods `prove`, `attempt` and `choose` of
+  `abc.Category`, taking the draw as `contexts` and `rewire` do, rather
+  than closures nested in `search`; `ColouredMonoid.atoms` and
+  `BiclosedCategory.subformulae` replace the functions `atomic_parts`
+  and `materials`, and `uncurry_composition` and `tensor_all` go, being
+  `uncurry` and the unbiased `tensor`. The categories with no strategy
+  — `Matrix`, `Tensor`, `Channel`, `CMap`, `Hypergraph`, `Drawing`,
+  `Stream`, `para`, `interaction`, `hopf`, `zx` and the Python functions
+  — implement `dagger`, `swap`, `braid`, `cups`, `caps`, `copy`,
+  `delay` and `spiders` as plain methods, their sequents living on the
+  abstract base classes, and the reasons several levels share for a law
+  they break are constants of `discopy.messages`.
+- The property suite is integrated into the hierarchy and cut to the
+  bare minimum: `Testable.enrolled` and `Testable.matrix` list the cells,
+  so that `proptest/` is one parametrised test and four profiles. Two
+  changes to the search keep the statistics good enough for Hypothesis's
+  own health check against filtering, which replaces the floor of the
+  `checked_enough` fixture: an object of a fixed size is sampled at that
+  size rather than filtered to it, and a lone variable of a fixed size
+  is sampled before the term it bounds rather than read off it, which
+  takes the currying laws of rigid and compact diagrams from five
+  rejected examples per valid one to one per seven, and the share of
+  rejected examples on an open goal from a third to an eighth at most
+  levels with plumbing. `proptest/test_counterexamples.py`, the `shared`
+  profile, `assert_axioms` and `proptest/search_experiment.py` go;
+  `Relabelling` and `Ob.alphabet`, the names generators are sampled
+  from, move to `discopy.cat`. The unit tests of `CMap`, `Tensor`, the
+  hash of a gate and the tree of a sentence come back, none of these
+  types being a cell of the matrix.
+
 - Rules and methods are distinct: a rule is annotated with its sequent
   and forwards to a method, which keeps plain Python typing and says
   nothing of coherence. `Category.ax` concludes `x ⊢ x` by the identity

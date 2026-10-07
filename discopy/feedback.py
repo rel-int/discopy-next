@@ -382,37 +382,25 @@ class Diagram(markov.Diagram, FeedbackCategory):
     dagger_involution = FeedbackCategory.dagger_involution
     dagger_contravariance = FeedbackCategory.dagger_contravariance
     dagger = monoidal.Diagram.dagger.inapplicable(
-        "The delay of a feedback category is not reversible.")
+        messages.DELAY_IS_NOT_REVERSIBLE)
 
     feedback_tightening_left = FeedbackCategory.feedback_tightening_left\
-        .failing(
-        "A free feedback is a box, which the hypergraph of a bubble "
-        "compares syntactically: nothing slides into it.")
+        .failing(messages.FREE_FEEDBACK)
 
     feedback_tightening_right = FeedbackCategory.feedback_tightening_right\
-        .failing(
-        "A free feedback is a box, which the hypergraph of a bubble "
-        "compares syntactically: nothing slides into it.")
+        .failing(messages.FREE_FEEDBACK)
 
     feedback_sliding_left = FeedbackCategory.feedback_sliding_left\
-        .failing(
-        "A free feedback is a box, which the hypergraph of a bubble "
-        "compares syntactically: nothing slides into it.")
+        .failing(messages.FREE_FEEDBACK)
 
     feedback_sliding_right = FeedbackCategory.feedback_sliding_right\
-        .failing(
-        "A free feedback is a box, which the hypergraph of a bubble "
-        "compares syntactically: nothing slides into it.")
+        .failing(messages.FREE_FEEDBACK)
 
     feedback_superposing_left = FeedbackCategory.feedback_superposing_left\
-        .failing(
-        "A free feedback is a box, which the hypergraph of a bubble "
-        "compares syntactically: nothing slides into it.")
+        .failing(messages.FREE_FEEDBACK)
 
     feedback_superposing_right = FeedbackCategory.feedback_superposing_right\
-        .failing(
-        "A free feedback is a box, which the hypergraph of a bubble "
-        "compares syntactically: nothing slides into it.")
+        .failing(messages.FREE_FEEDBACK)
     Layer: ClassVar[Generator] = Generator.subclass(Layer)
     Box: ClassVar[Generator]
     Permutation: ClassVar[Generator]

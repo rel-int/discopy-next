@@ -61,9 +61,9 @@ from typing import Any, ClassVar, Self
 
 from collections.abc import Callable
 
-from discopy import monoidal
+from discopy import monoidal, messages
 from discopy.pattern import Atom, Hom, rule, Tensor, Var
-from discopy.axioms import axiom, Equation
+from discopy.axioms import Equation
 from discopy.abc import BraidedCategory
 
 from discopy.cat import factory, Generator
@@ -175,12 +175,10 @@ class Diagram(monoidal.Diagram, BraidedCategory):
         "A free braid does not commute past a box.")
 
     braid_then_inverse = BraidedCategory.braid_then_inverse.failing(
-        "A free braid and its inverse are two boxes, which the equation "
-        "of braided diagrams does not cancel.")
+        messages.FREE_BRAID_INVERSE)
 
     inverse_then_braid = BraidedCategory.inverse_then_braid.failing(
-        "A free braid and its inverse are two boxes, which the equation "
-        "of braided diagrams does not cancel.")
+        messages.FREE_BRAID_INVERSE)
 
     hypergraph_section = monoidal.Diagram.hypergraph_section.failing(
         "Decoding a hypergraph can cross wires, which needs swaps the "
@@ -267,18 +265,6 @@ class Functor(monoidal.Functor):
             The codomain, :code:`Diagram` by default.
     """
     dom = cod = Diagram
-
-    @axiom
-    def braided(cls) -> Equation:
-        """
-        A braided functor preserves the braid, but only up to the braid
-        relations: the braid of a composite type is a chosen sequence of
-        crossings and a functor rebrackets it. Free braided diagrams
-        compare presentations, so the law is checkable from
-        :class:`discopy.symmetric.Diagram`'s functor on, whose equations
-        hold up to hypergraph isomorphism.
-        """
-        return NotImplemented
 
     def __call__(self, other):
         if isinstance(other, Braid) and not other.is_dagger\

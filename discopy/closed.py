@@ -57,7 +57,7 @@ Axioms
 from dataclasses import dataclass
 from typing import ClassVar, Dict
 
-from discopy import cat, monoidal, biclosed, markov, cmap, hypergraph
+from discopy import cat, monoidal, biclosed, markov, cmap, hypergraph, messages
 
 from discopy.abc import ClosedCategory
 from discopy.cat import factory, Generator
@@ -218,7 +218,7 @@ Hypergraph = hypergraph.Hypergraph[Diagram]
 Hypergraph.dagger_involution = biclosed.Diagram.dagger_involution
 Hypergraph.dagger_contravariance = biclosed.Diagram.dagger_contravariance
 Hypergraph.dagger_monoidality = Hypergraph.dagger_monoidality.inapplicable(
-    "A curried diagram has no dagger.")
+    messages.CURRY_HAS_NO_DAGGER)
 
 Layer = Diagram.Layer
 Id = Diagram.id
