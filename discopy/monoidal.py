@@ -1031,7 +1031,7 @@ class Diagram(cat.Arrow, MonoidalCategory, RichDisplay):
 
     @classmethod
     def strategy(
-            cls, *, types=None, dom=None, cod=None, max_depth=None,
+            cls, *, dom=None, cod=None, max_depth=None,
             boundary_connected=False):
         """
         Generate diagrams by the :attr:`rules` and :attr:`generators` of
@@ -1042,7 +1042,6 @@ class Diagram(cat.Arrow, MonoidalCategory, RichDisplay):
         Parameters:
             dom : The domain of the diagrams, if any.
             cod : The codomain of the diagrams, if any.
-            types : A strategy for the types, that of :attr:`ob` by default.
             max_depth : The number of nested rules a diagram may apply:
                 three by default, or six for a category over a fixed
                 vocabulary, whose every box costs a rule.
@@ -1052,15 +1051,27 @@ class Diagram(cat.Arrow, MonoidalCategory, RichDisplay):
                 :meth:`discopy.axioms.Axiom.weaken` quantifies a law
                 over it.
         """
-        free = None if cls.Box.strategy.__func__ is no_strategy.__func__\
-            else cls.Box.strategy
         if max_depth is None:
-            max_depth = 3 if free else 6
-        diagrams = cls.search(
-            free, dom=dom, cod=cod, types=types, max_depth=max_depth)
+            max_depth = 6 if cls.free() is None else 3
+        diagrams = cls.search(dom=dom, cod=cod, max_depth=max_depth)
         if not boundary_connected:
             return diagrams
         return diagrams.filter(lambda diagram: diagram.is_boundary_connected)
+
+    @classmethod
+    def free(cls, dom=None, cod=None):
+        """
+        The strategy of the free boxes of the level closing a goal, those
+        of :attr:`Box`, :obj:`None` when its boxes have no strategy, i.e.
+        for a category over a fixed vocabulary.
+
+        Parameters:
+            dom : The domain of the goal, :obj:`None` when unknown.
+            cod : The codomain of the goal, :obj:`None` when unknown.
+        """
+        if cls.Box.strategy.__func__ is no_strategy.__func__:
+            return None
+        return cls.Box.strategy(dom=dom, cod=cod)
 
     def __init__(
             self, inside: tuple[cat.Box, ...], dom: Ty, cod: Ty, _scan=True):

@@ -310,16 +310,15 @@ class Arrow(FreeCategory, DaggerCategory, Serialisable):
 
     @classmethod
     def strategy(
-            cls, *, types=None, dom=None, cod=None,
-            min_leaves=None, max_leaves=10):
+            cls, *, dom=None, cod=None, min_leaves=None, max_leaves=10):
         """Generate typed paths recursively from identities and boxes."""
         from hypothesis import strategies as st
 
-        types = cls.ob.strategy() if types is None else types
+        types = cls.ob.strategy()
 
         def generators(dom=None, cod=None):
             """ Generator boxes between the given boundaries. """
-            return cls.Box.strategy(types=types, dom=dom, cod=cod)
+            return cls.Box.strategy(dom=dom, cod=cod)
 
         atoms = st.one_of(types.map(cls.id), generators())
 
@@ -554,12 +553,11 @@ class Box(Arrow):
     serialised_attrs = ('name', 'dom', 'cod', 'is_dagger', 'data')
 
     @classmethod
-    def strategy(
-            cls, *, types=None, dom=None, cod=None):
+    def strategy(cls, *, dom=None, cod=None):
         """Generate fresh free boxes with optional exact boundaries."""
         from hypothesis import strategies as st
 
-        types = cls.ob.strategy() if types is None else types
+        types = cls.ob.strategy()
         doms = types if dom is None else st.just(dom)
         cods = types if cod is None else st.just(cod)
         return st.tuples(st.uuids(), doms, cods).map(
@@ -870,6 +868,16 @@ class Functor[In0, In1, Out0, Out1](Category, Serialisable):
     """
     ob = type[Category]
     dom = cod = Arrow
+
+    @classmethod
+    def parameters(cls) -> tuple[type, ...]:
+        """
+        What the type parameters ``In0, In1, Out0, Out1`` of a functor
+        stand for: the objects and arrows of its domain then those of its
+        codomain.
+        """
+        return (getattr(cls.dom, "ob", cls.dom), cls.dom,
+                getattr(cls.cod, "ob", cls.cod), cls.cod)
 
     @classmethod
     @rule

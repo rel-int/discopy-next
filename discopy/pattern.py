@@ -66,6 +66,10 @@ Summary
     Image
     Count
     Sort
+    Objects
+    Terms
+    Counts
+    Sides
     Declaration
     Rule
     Constant
@@ -77,7 +81,8 @@ Summary
         :nosignatures:
         :toctree:
 
-        heads
+        position
+        stands_for
         variables
         instantiate
         match
@@ -95,8 +100,8 @@ from dataclasses import KW_ONLY, dataclass, replace
 from functools import reduce
 from types import MethodType
 from typing import (
-    Annotated, Any, ClassVar, Literal, Self, TYPE_CHECKING, TypeVar,
-    get_args, get_origin)
+    Annotated, Any, ClassVar, Generic, Literal, Self, TYPE_CHECKING,
+    TypeVar, get_args, get_origin)
 
 from discopy.utils import factory_name
 
@@ -130,10 +135,6 @@ typechecker reads it as ``C1``. """
 type Substitution = dict[str, object]
 type Residuals = tuple[tuple[object, object], ...]
 type Match = tuple[Substitution, Residuals]
-
-#: The heads of the sequents of a category.
-OBJECTS, ARROWS, SELF = "C0", "C1", "Self"
-
 
 class Count:
     """ The bound ``N: Count`` of a number, e.g. of repetitions. """
@@ -405,39 +406,72 @@ class Image[F, X](Pattern):
             yield subst, residuals
 
 
-def heads(category: type) -> dict[str, type]:
+def position(owner: type, variable: TypeVar) -> int:
     """
-    The types the heads of a sequent stand for in a category, by the
-    name of the type parameter or class naming them, the objects and
-    arrows of its domain and codomain too when it is a functor.
+    The position of a type parameter among those of the class at the
+    root of its generic bases, e.g. ``C1`` of :class:`discopy.abc.Monoid`
+    is the second parameter of :class:`discopy.abc.Category`, since a
+    monoid is a ``ColouredMonoid[NoneType, C1]``. A class whose bases do
+    not mention its parameter, e.g. a functor redeclaring its own, is
+    such a root. ``owner`` is the class declaring the sequent, the
+    parameter one of its own or of a class above it.
 
-    >>> from discopy.monoidal import Ty, Diagram
-    >>> assert heads(Diagram)[OBJECTS] is Ty
+    >>> from discopy.abc import Category, Monoid
+    >>> assert position(Monoid, Monoid.__type_params__[0]) == 1
     """
-    scope = {
-        SELF: category,
-        OBJECTS: getattr(category, "ob", category),
-        ARROWS: getattr(category, "ar", category)}
-    dom, cod = (getattr(category, name, None) for name in ("dom", "cod"))
-    if isinstance(dom, type) and isinstance(cod, type):
-        scope.update({
-            "In0": getattr(dom, "ob", dom), "In1": dom,
-            "Out0": getattr(cod, "ob", cod), "Out1": cod})
-    return scope
+    found = next(
+        (base for base in owner.__mro__
+         if variable in getattr(base, "__type_params__", ())), None)
+    if found is None:
+        raise TypeError(f"{variable} is no parameter above {owner}.")
+    owner = found
+    while True:
+        alias = next((
+            base for base in vars(owner).get("__orig_bases__", ())
+            if get_origin(base) is not Generic
+            and variable in get_args(base)), None)
+        if alias is None:
+            return owner.__type_params__.index(variable)
+        owner = get_origin(alias)
+        variable = owner.__type_params__[get_args(alias).index(variable)]
+
+
+def stands_for(head, category: type, default: type,
+               owner: type | None = None) -> type:
+    """
+    The type a head of a sequent stands for in a category: the category
+    itself for ``Self``, what the category says of a type parameter of
+    the class ``owner`` declaring the sequent, the category by default,
+    by its :func:`position` among
+    :meth:`discopy.abc.Category.parameters`, and for a class the
+    category's own subclass of it when it has one, e.g. the objects of a
+    symmetric diagram for ``monoidal.Ty``. :obj:`None` and ``Any`` stand
+    for the ``default``.
+
+    >>> from discopy import monoidal, symmetric
+    >>> assert stands_for(monoidal.Ty, symmetric.Diagram, None)\\
+    ...     is symmetric.Diagram.ob
+    """
+    if head is Self:
+        return category
+    if head is None or head is Any:
+        return default
+    if isinstance(head, TypeVar):
+        return category.parameters()[position(owner or category, head)]
+    for own in (category, getattr(category, "ob", None)):
+        if isinstance(own, type) and isinstance(head, type)\
+                and issubclass(own, head):
+            return own
+    return head
 
 
 @dataclass(frozen=True)
-class Sort:
+class Sort(ABC):
     """
-    The sort of a variable, as its bound states it: ``Obj[C0]`` or no
-    bound an object, ``Atom[C0]`` or ``Atom`` one of size one,
-    ``Obj[C0, N]`` one of size ``N``, ``Count`` a number; or the
-    sort of a premise, ``Obj[C0]`` or ``Atom[C0]`` with no pattern, or
-    ``Self``. The head names what the sort ranges over: a type parameter
-    of the declaring class, e.g. ``C0``, or else the objects of the
-    category. The size is a number, the name of a ``Count`` variable or
-    :obj:`None` for any. A side ``S: bool`` is a sort of its own, the
-    value of the ``left`` of a method.
+    The sort of a variable, as its bound states it, or of a premise, as
+    its annotation does: one subclass for each kind of head, the objects
+    of a class or type parameter, the terms of the category ``Self``, a
+    number ``Count`` and a side ``bool``.
 
     >>> from discopy.monoidal import Ty
     >>> def cups[X: Atom[Ty]](): ...
@@ -448,53 +482,65 @@ class Sort:
     Obj[Ty, N]
     """
 
-    head: str = OBJECTS
+    @classmethod
+    def of(cls, variable: TypeVar) -> Sort:
+        """ The sort of a variable, read off its bound. """
+        bound = variable.__bound__
+        if bound is Count:
+            return Counts()
+        if bound is bool:
+            return Sides()
+        args = get_args(bound)
+        return Objects(args[0] if args else None, size(bound))
+
+    @classmethod
+    def premise(cls, annotation) -> Sort:
+        """ The sort of a premise ``Obj[C0]`` or ``Atom[C0]``, or ``Self``. """
+        if annotation is Self:
+            return Terms()
+        return Objects(get_args(annotation)[0], size(annotation))
+
+    @abstractmethod
+    def resolve(self, category: type, owner: type | None = None) -> type:
+        """ The type the sort ranges over in a category, for a sequent
+        declared by ``owner``, see :func:`stands_for`. """
+
+    @abstractmethod
+    def strategy(self, category: type, owner: type | None = None,
+                 length: int | None = None):
+        """ Generate an instance of the sort in a category, of the given
+        ``length`` when its size is a variable. """
+
+    @abstractmethod
+    def canonical(self, category: type, label: str,
+                  owner: type | None = None, length: int = 1):
+        """ The canonical instance of the sort, named after a variable. """
+
+
+@dataclass(frozen=True)
+class Objects(Sort):
+    """
+    The objects of a class or of a type parameter, of a size: a number,
+    the name of a ``Count`` variable or :obj:`None` for any. A head
+    :obj:`None` stands for the objects of the category.
+    """
+    head: Any = None
     size: int | str | None = None
-    count: bool = False
-    side: bool = False
 
     @property
     def atomic(self) -> bool:
         """ Whether the sort is of size one. """
         return self.size == 1
 
-    @classmethod
-    def of(cls, variable: TypeVar) -> Sort:
-        """ The sort of a variable, read off its bound. """
-        bound = variable.__bound__
-        if bound is Count:
-            return cls("Count", count=True)
-        if bound is bool:
-            return cls("bool", side=True)
-        args = get_args(bound)
-        return cls(name(args[0]) if args else OBJECTS, size=size(bound))
+    def resolve(self, category: type, owner: type | None = None) -> type:
+        return stands_for(self.head, category, category.ob, owner)
 
-    @classmethod
-    def premise(cls, annotation) -> Sort:
-        """ The sort of a premise ``Obj[C0]`` or ``Atom[C0]``, or ``Self``. """
-        if annotation is Self:
-            return cls(SELF)
-        return cls(name(get_args(annotation)[0]), size=size(annotation))
-
-    def resolve(self, scope: dict) -> type:
-        """ The type the head stands for in the scope. """
-        if self.count or self.side:
-            return int if self.count else bool
-        return scope.get(self.head, scope[OBJECTS])
-
-    def strategy(self, scope: dict, types=None, length: int | None = None):
-        """ Generate an instance of the sort, from ``types`` in place of
-        the strategy of the objects when given, of the given ``length``
-        when the size is a variable. """
+    def strategy(self, category: type, owner: type | None = None,
+                 length: int | None = None):
         from hypothesis import strategies as st
 
-        if self.count:
-            return st.integers(min_value=0, max_value=MAX_COUNT)
-        if self.side:
-            return st.booleans()
-        resolved = self.resolve(scope)
-        base = types if types is not None and resolved is scope[OBJECTS]\
-            else resolved.strategy()
+        resolved = self.resolve(category, owner)
+        base = resolved.strategy()
         length = self.size if isinstance(self.size, int) else length
         if length is None:
             return base
@@ -503,23 +549,84 @@ class Sort:
             atoms, min_size=length, max_size=length).map(
                 lambda values: reduce(operator.matmul, values, resolved()))
 
-    def canonical(self, scope: dict, label: str, length: int = 1):
-        """ The canonical instance of the sort, named after a variable,
-        ``length`` wires named ``label0, label1...`` when the size is a
-        variable. """
-        if self.count or self.side:
-            return 2 if self.count else True
+    def canonical(self, category: type, label: str,
+                  owner: type | None = None, length: int = 1):
+        resolved = self.resolve(category, owner)
         if not isinstance(self.size, str):
-            return cell(self.resolve(scope), label)
+            return cell(resolved, label)
         return reduce(operator.matmul, (
-            cell(self.resolve(scope), f"{label}{i}") for i in range(length)),
-            self.resolve(scope)())
+            cell(resolved, f"{label}{i}") for i in range(length)),
+            resolved())
 
     def __str__(self):
-        if self.size is None or self.count or self.side:
-            return self.head
-        return f"Atom[{self.head}]" if self.atomic\
-            else f"Obj[{self.head}, {self.size}]"
+        head = getattr(self.head, "__name__", None)
+        if self.size is None:
+            return f"Obj[{head}]" if head else "Obj"
+        if self.atomic:
+            return f"Atom[{head}]" if head else "Atom"
+        return f"Obj[{head or '_'}, {self.size}]"
+
+
+@dataclass(frozen=True)
+class Terms(Sort):
+    """ The terms of the category, the sort of a premise ``Self``. """
+    head: ClassVar = Self
+
+    def resolve(self, category: type, owner: type | None = None) -> type:
+        return category
+
+    def strategy(self, category: type, owner: type | None = None,
+                 length: int | None = None):
+        return category.strategy()
+
+    def canonical(self, category: type, label: str,
+                  owner: type | None = None, length: int = 1):
+        return cell(category, label)
+
+    def __str__(self):
+        return "Self"
+
+
+@dataclass(frozen=True)
+class Counts(Sort):
+    """ The numbers a ``Count`` stands for, up to :data:`MAX_COUNT`. """
+    head: ClassVar = Count
+
+    def resolve(self, category: type, owner: type | None = None) -> type:
+        return int
+
+    def strategy(self, category: type, owner: type | None = None,
+                 length: int | None = None):
+        from hypothesis import strategies as st
+        return st.integers(min_value=0, max_value=MAX_COUNT)
+
+    def canonical(self, category: type, label: str,
+                  owner: type | None = None, length: int = 1):
+        return 2
+
+    def __str__(self):
+        return "Count"
+
+
+@dataclass(frozen=True)
+class Sides(Sort):
+    """ The sides ``S: bool``, the value of the ``left`` of a method. """
+    head: ClassVar = bool
+
+    def resolve(self, category: type, owner: type | None = None) -> type:
+        return bool
+
+    def strategy(self, category: type, owner: type | None = None,
+                 length: int | None = None):
+        from hypothesis import strategies as st
+        return st.booleans()
+
+    def canonical(self, category: type, label: str,
+                  owner: type | None = None, length: int = 1):
+        return True
+
+    def __str__(self):
+        return "bool"
 
 
 def size(annotation) -> int | str | None:
@@ -547,11 +654,6 @@ def fits(length: int | str | None, value,
     if length in subst:
         return subst if subst[length] == len(value) else None
     return {**subst, length: len(value)}
-
-
-def name(head) -> str:
-    """ The name of a head: ``C0``, ``C1``, ``Ty``... or ``Self``. """
-    return "Self" if head is Self else getattr(head, "__name__", str(head))
 
 
 def premise(annotation) -> object | Sort | None:
@@ -747,20 +849,21 @@ class Declaration[**P, T]:
         return replace(self, category=category, owner=self.owner or owner)
 
     @property
-    def scope(self) -> dict[str, type]:
-        """ What the heads stand for, see :func:`heads`. """
+    def bound(self) -> type:
+        """ The category the declaration is bound to. """
         if self.category is None:
             raise TypeError(f"{self.name} is not bound to a class.")
-        return heads(self.category)
+        return self.category
 
     @property
     def unit(self) -> Callable:
         """ The object type of the category, called to build the unit. """
-        return self.scope[OBJECTS]
+        return self.bound.ob
 
     def resolve(self, hom) -> type:
         """ The category a hom premise is a morphism of, by its head. """
-        return self.scope.get(name(get_args(hom)[0]), self.scope[ARROWS])
+        return stands_for(
+            get_args(hom)[0], self.bound, self.bound, self.owner)
 
     def canonical(self) -> dict[str, Any]:
         """
@@ -776,18 +879,20 @@ class Declaration[**P, T]:
         self: A -> B
         other: C -> D
         """
-        sorts = self.variables
+        category, sorts = self.bound, self.variables
         counts = {
-            label: sort.canonical(self.scope, label)
-            for label, sort in sorts.items() if sort.count}
-        subst = {
-            label: counts.get(label) or sort.canonical(
-                self.scope, label, counts.get(str(sort.size), 1))
-            for label, sort in sorts.items()}
+            label: sort.canonical(category, label, self.owner)
+            for label, sort in sorts.items() if isinstance(sort, Counts)}
+        subst = dict(counts)
+        for label, sort in sorts.items():
+            if label not in counts:
+                length = counts.get(str(getattr(sort, "size", None)), 1)
+                subst[label] = sort.canonical(
+                    category, label, self.owner, length)
         args = {}
         for label, value in self.premises.items():
             if isinstance(value, Sort):
-                args[label] = cell(value.resolve(self.scope), label)
+                args[label] = cell(value.resolve(category, self.owner), label)
             elif get_origin(value) is Hom:
                 dom, cod = instantiate(value, subst, self.unit)
                 args[label] = cell(self.resolve(value), label, dom, cod)
@@ -796,19 +901,19 @@ class Declaration[**P, T]:
         return args
 
     def generate(self, draw: Callable, hom: Callable, subst=None,
-                 residuals: Residuals = (), types=None) -> tuple:
+                 residuals: Residuals = ()) -> tuple:
         """
         Sample the arguments of the sequent inside a composite strategy,
-        one premise at a time: a pattern is instantiated, a sort sampled,
-        a hom sampled through ``hom(category, dom, cod)``. A variable
-        standing alone on a side of a hom is read off the term found, so
-        that the goal guides the search; the residuals of a match are
-        checked once every variable is bound.
+        one premise at a time: a pattern is instantiated, a sort sampled
+        from the strategy of the class it ranges over, a hom or a term of
+        the category sampled through ``hom(category, dom, cod)``. A
+        variable standing alone on a side of a hom is read off the term
+        found, so that the goal guides the search; the residuals of a
+        match are checked once every variable is bound.
         """
         from hypothesis import assume
 
-        subst = dict(subst or {})
-        sorts = self.variables
+        category, subst, sorts = self.bound, dict(subst or {}), self.variables
 
         def side(pattern):
             if isinstance(pattern, TypeVar) and pattern.__name__ not in subst:
@@ -818,7 +923,7 @@ class Declaration[**P, T]:
 
         def read_off(pattern, value):
             if isinstance(pattern, TypeVar) and pattern.__name__ not in subst:
-                check(sorts[pattern.__name__].size, value)
+                check(getattr(sorts[pattern.__name__], "size", None), value)
                 subst[pattern.__name__] = value
 
         def check(length, value):
@@ -826,29 +931,24 @@ class Declaration[**P, T]:
             assume(sized is not None)
             subst.update(sized or {})
 
+        def sample(sort, label):
+            length = getattr(sort, "size", None)
+            if isinstance(length, str):
+                bound(length)
+            return draw(sort.strategy(
+                category, self.owner, subst.get(str(length))), label=label)
+
         def bound(*labels):
             for label in labels:
-                if label in subst:
-                    continue
-                length = sorts[label].size
-                if isinstance(length, str):
-                    bound(length)
-                subst[label] = draw(sorts[label].strategy(
-                    self.scope, types, subst.get(str(length))), label=label)
+                if label not in subst:
+                    subst[label] = sample(sorts[label], label)
 
         args = {}
         for label, value in self.premises.items():
-            if isinstance(value, Sort) and value.resolve(self.scope)\
-                    is self.scope[ARROWS] and hasattr(
-                        self.scope[ARROWS], "rules"):
-                args[label] = draw(
-                    hom(self.scope[ARROWS], None, None), label=label)
+            if isinstance(value, Terms) and hasattr(category, "rules"):
+                args[label] = draw(hom(category, None, None), label=label)
             elif isinstance(value, Sort):
-                if isinstance(value.size, str):
-                    bound(value.size)
-                args[label] = draw(value.strategy(
-                    self.scope, types, subst.get(str(value.size))),
-                    label=label)
+                args[label] = sample(value, label)
             elif get_origin(value) is Hom:
                 _, dom_pattern, cod_pattern = get_args(value)
                 dom, cod = side(dom_pattern), side(cod_pattern)
@@ -1051,7 +1151,7 @@ class Constant(Rule):
         if dom in (None, box.dom) and cod in (None, box.cod):
             yield {}, ()
 
-    def generate(self, draw, hom, subst=None, residuals=(), types=None):
+    def generate(self, draw, hom, subst=None, residuals=()):
         return dict(subst or {}), {}
 
     def apply(self, arguments: dict):

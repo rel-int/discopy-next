@@ -633,6 +633,21 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   focuses on nothing. `pattern.search`,
   `pattern.focused`, `pattern.materials` and `pattern.DeadEnd` move to
   `abc`, the unification of `discopy.pattern` staying planar.
+  A category owns the strategies it searches with: objects are drawn
+  from `ob.strategy` and free boxes from `Category.free`, which a
+  diagram reads off its `Box`, so `search`, `Diagram.strategy`,
+  `Declaration.generate`, `cat.Arrow.strategy` and `cat.Box.strategy`
+  lose their `free` and `types` parameters. The sort of a variable or
+  a premise is one subclass of `pattern.Sort` per head — `Objects` of
+  a class or type parameter, of a size, `Terms` for `Self`, `Counts`
+  for `Count` and `Sides` for `bool` — whose head is the type itself
+  rather than its name: `Self` stands for the category, a class for the
+  category's own subclass of it, and a type parameter for what
+  `Category.parameters` says of its position among the parameters of
+  the class at the root of its generic bases, e.g. the objects and
+  arrows of a category or the four of a functor. The string constants
+  `OBJECTS`, `ARROWS` and `SELF`, `pattern.heads` and
+  `Declaration.scope` go.
   `proptest/search_experiment.py` measures what the search samples.
 
 - `discopy.search` and `discopy.sequent` merge into `discopy.pattern`,

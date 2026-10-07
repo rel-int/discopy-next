@@ -13,8 +13,8 @@ from discopy.abc import (
     MonoidalCategory, TracedCategory)
 from discopy.monoidal import Box, Diagram, Ty
 from discopy.pattern import (
-    Atom, Count, D, Declaration, Hom, Obj, Over, R, Repeat, Rule, Sort,
-    Tensor, Unit, Var, match, rule)
+    Atom, Count, Counts, D, Declaration, Hom, Obj, Objects, Over, R, Repeat,
+    Rule, Sides, Sort, Tensor, Terms, Unit, Var, match, rule)
 from discopy.utils import AxiomError
 
 
@@ -26,7 +26,8 @@ def test_read_off():
     """ Variables, premises and conclusion are what Python evaluates. """
     then = Category.then
     assert list(then.variables) == ["A", "B", "C"]
-    assert all(sort == Sort() for sort in then.variables.values())
+    assert all(isinstance(sort, Objects) and sort.size is None
+               for sort in then.variables.values())
     assert list(then.premises) == ["self", "other"]
     assert str(then.conclusion) == "Hom[C1, A, C]"
     _, dom, _ = get_args(MonoidalCategory.tensor.conclusion)
@@ -35,7 +36,7 @@ def test_read_off():
 
     def spiders[X: Atom, N: Count](): ...
     X, N = spiders.__type_params__
-    assert Sort.of(X).atomic and Sort.of(N).count
+    assert Sort.of(X).atomic and Sort.of(N) == Counts()
 
 
 def test_sorts():
@@ -135,7 +136,7 @@ def test_sides():
                        biclosed.Ty) == y @ x
     r = rigid.Ty("r")
     assert [s["S"] for s, _ in match(AdjDir[A, S], r.l)] == [True, False]
-    assert Sort.of(S) == Sort("bool", side=True)
+    assert Sort.of(S) == Sides()
 
 
 def test_trace():
@@ -144,7 +145,7 @@ def test_trace():
     from discopy import traced
 
     trace = TracedCategory.trace
-    assert trace.variables["M"] == Sort(size="N")
+    assert trace.variables["M"].size == "N"
     assert list(trace.premises) == ["self", "n", "left"]
     x, y, a, b = map(traced.Ty, "xyab")
     found = [(s["S"], s["N"], s["M"]) for s, _ in match(
@@ -152,7 +153,7 @@ def test_trace():
     assert found == [  # The right ends a and b share no wire.
         (True, 0, traced.Ty()), (True, 1, x), (True, 2, x @ y),
         (False, 0, traced.Ty())]
-    assert str(Sort(size="N")) == "Obj[C0, N]"
+    assert str(Objects(size="N")) == "Obj[_, N]"
     canonical = traced.Diagram.trace_iteration.canonical()
     assert str(canonical.terms[0]).count("Trace") == 2
 
@@ -198,7 +199,7 @@ def test_ev_and_feedback():
         assert instantiate(ev.conclusion, subst, biclosed.Ty)\
             == (built.dom, built.cod)
     feedback = FeedbackCategory.feedback
-    assert feedback.variables["M"] == Sort()
+    assert feedback.variables["M"].size is None
     assert str(feedback.premises["mem"]) == "Var[C0 | None, M]"
 
 
@@ -213,7 +214,7 @@ def test_rule():
     assert str(cat.Arrow.rules["then"].conclusion).endswith(", A, C]")\
         and str(Category.then.conclusion).endswith(", A, C]")
     with raises(TypeError):
-        Rule(Category.then.function).scope
+        Rule(Category.then.function).unit
     with raises(TypeError):
         rule(classmethod(lambda cls: None))
 
@@ -228,7 +229,7 @@ def test_rule():
     assert list(Wrapped.rules) == ["id", "tensor", "cut", "dagger", "twice"]
     assert str(Wrapped.rules["twice"]) == "twice(self: Hom[discopy."\
         "monoidal.Diagram, A, A]) -> Hom[discopy.monoidal.Diagram, A, A]"
-    found = find(Wrapped.strategy(dom=x, cod=x, types=st.just(x)),
+    found = find(Wrapped.strategy(dom=x, cod=x),
                  lambda value: len(value.boxes) == 2
                  and len(set(value.boxes)) == 1)
     assert found.boxes[0] == found.boxes[1]
@@ -241,7 +242,7 @@ def test_generator():
     assert rigid.Diagram.generators["cups"].category is rigid.Diagram
     braid = braided.Diagram.generators["braid"]
     assert [str(sort) for sort in braid.variables.values()]\
-        == ["Atom[C0]", "Atom[C0]"]
+        == ["Atom", "Atom"]
     assert list(braid.premises) == ["left", "right"]
 
     class Lying(Diagram):
@@ -346,11 +347,11 @@ def test_focusing():
         symmetric.Diagram.branches(s, s), s, s) == []
 
     curried = find(biclosed.Diagram.search(
-        biclosed.Box.strategy, dom=a, cod=b << a, epsilon=0), bool)
+        dom=a, cod=b << a, epsilon=0), bool)
     assert isinstance(curried.boxes[-1], biclosed.Curry)
     for epsilon in (0.5, 1e-4):  # Support survives any epsilon > 0.
         escaped = find(biclosed.Diagram.search(
-            biclosed.Box.strategy, dom=a, cod=b << a, epsilon=epsilon),
+            dom=a, cod=b << a, epsilon=epsilon),
             lambda term: not any(
                 isinstance(box, biclosed.Curry) for box in term.boxes))
         assert escaped.cod == b << a
@@ -363,12 +364,11 @@ def test_goal_patterns():
     from discopy import markov
 
     A = TypeVar("A")
-    loop = find(Diagram.search(Box.strategy, dom=A, cod=A),
+    loop = find(Diagram.search(dom=A, cod=A),
                 lambda term: len(term.boxes) == 1)
     assert loop.dom == loop.cod
     copy = find(
-        markov.Diagram.search(
-            markov.Box.strategy, dom=A, cod=Tensor[A, A]),
+        markov.Diagram.search(dom=A, cod=Tensor[A, A]),
         lambda term: bool(term.boxes)
         and all(isinstance(box, markov.Copy) for box in term.boxes))
     assert copy.cod == copy.dom @ copy.dom

@@ -159,7 +159,7 @@ def test_equation_types():
                     or (equation := law.canonical()) is NotImplemented:
                 continue
             subst = {
-                name: sort.canonical(law.scope, name)
+                name: sort.canonical(law.bound, name, law.owner)
                 for name, sort in law.variables.items()}
             value = instantiate(pattern, subst, law.unit)
             boundary = (lambda term: (term.dom, term.cod))\
