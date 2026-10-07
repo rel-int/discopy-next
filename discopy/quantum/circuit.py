@@ -72,7 +72,8 @@ from typing import ClassVar
 from collections.abc import Mapping
 
 from discopy import messages, tensor, frobenius
-from discopy.axioms import no_strategy, Rule
+from discopy.pattern import Rule
+from discopy.axioms import no_strategy
 from discopy.cat import factory, Generator
 from discopy.matrix import backend
 from discopy.tensor import Dim, Tensor

@@ -144,9 +144,8 @@ Parametric maps compose like layers of a neural network, e.g. over
 from dataclasses import dataclass
 from typing import Self
 
-from discopy.pattern import Atom, Count, Hom
-from discopy.pattern import Obj, Var, Tensor, Unit, L, R, Repeat
-from discopy.pattern import rule
+from discopy.pattern import (
+    Atom, Count, D, Hom, L, Obj, R, Repeat, rule, Tensor, Unit, Var)
 from discopy import (
     monoidal, symmetric, markov, closed, compact, frobenius)
 from discopy.abc import (
@@ -155,7 +154,6 @@ from discopy.abc import (
 from discopy.feedback import Diagram as FeedbackDiagram, Ty as FeedbackTy
 from discopy.utils import (
     assert_iscomposable, assert_isinstance, classproperty, unbiased)
-from discopy.pattern import D
 
 
 @dataclass

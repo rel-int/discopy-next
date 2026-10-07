@@ -17,7 +17,7 @@ Summary
 """
 
 from discopy.utils import assert_isinstance, unbiased
-from discopy.pattern import Var, Tensor
+from discopy.pattern import Atom, Hom, rule, Tensor, Var
 from typing import Iterable, Self, Any, overload
 from collections.abc import Sequence
 
@@ -25,8 +25,6 @@ from dataclasses import dataclass
 
 from discopy import messages
 from discopy.abc import MonoidalCategory, PROP, Nat
-from discopy.pattern import Atom, Hom
-from discopy.pattern import rule
 
 
 @dataclass

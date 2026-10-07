@@ -78,7 +78,7 @@ def test_random_sentences():
     """ The strategy of a pregroup diagram draws grammatical sentences. """
     from hypothesis import find
 
-    from discopy.axioms import Rule
+    from discopy.pattern import Rule
 
     n, s = Ty('n'), Ty('s')
     sentence = find(

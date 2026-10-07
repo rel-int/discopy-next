@@ -52,6 +52,7 @@ import re
 from typing import TYPE_CHECKING
 
 from discopy import biclosed, cmap, messages
+from discopy.pattern import Constant
 from discopy.axioms import no_strategy
 from discopy.cat import factory, Generator
 from discopy.grammar import thue

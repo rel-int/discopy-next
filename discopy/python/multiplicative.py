@@ -32,8 +32,7 @@ from discopy.utils import (
     assert_isinstance, tuplify, untuplify, factory, unbiased)
 from discopy.python import finset, function
 from discopy.python.function import Ty
-from discopy.pattern import Count, Hom, Obj, Repeat, Var, Tensor
-from discopy.axioms import rule
+from discopy.pattern import Count, Hom, Obj, Repeat, rule, Tensor, Var
 
 
 def exp(base: Ty, exponent: Ty) -> Ty:

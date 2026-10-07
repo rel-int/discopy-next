@@ -38,10 +38,10 @@ from copy import copy
 from dataclasses import dataclass
 
 from discopy import config, monoidal, braided, traced, cmap, hypergraph
-from discopy.pattern import Var
+from discopy.pattern import Atom, Hom, rule, Var
+from discopy.axioms import no_strategy, Serialisable
 from discopy.abc import BalancedCategory
 
-from discopy.axioms import Atom, Hom, no_strategy, rule, Serialisable
 from discopy.cat import factory, Generator
 from discopy.monoidal import Colour, Ty  # noqa: F401  pylint: disable=unused-import
 from discopy.utils import factory_name, assert_isatomic

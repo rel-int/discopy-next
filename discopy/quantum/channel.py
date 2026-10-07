@@ -52,8 +52,7 @@ from discopy.quantum.gates import Discard, Measure, MixedState, Encode, Scalar
 from discopy.tensor import Dim, Tensor
 from discopy.utils import assert_isinstance, unbiased
 
-from discopy.pattern import Hom
-from discopy.pattern import rule
+from discopy.pattern import Hom, rule
 
 
 class CQ(ColouredMonoid):

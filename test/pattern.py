@@ -4,7 +4,6 @@ for the terms of a category by its rules. """
 from typing import TypeVar, get_args, get_origin
 
 from hypothesis import find
-from hypothesis import strategies as st
 from pytest import raises
 
 from discopy import braided, cat, rigid
@@ -13,13 +12,23 @@ from discopy.abc import (
     MonoidalCategory, RigidCategory, TracedCategory)
 from discopy.monoidal import Box, Diagram, Ty
 from discopy.pattern import (
-    Atom, Count, Counts, D, Declaration, Hom, Obj, Objects, Over, R, Repeat,
-    Rule, Sort, Tensor, Terms, Unit, Var, match, rule)
+    Atom, Count, Counts, D, Hom, Obj, Objects, Over,
+    R, Repeat, Rule, rule, Sort, Substitution, Tensor, Unit, Var)
 from discopy.utils import AxiomError
 
 
 A, B = TypeVar("A"), TypeVar("B")
 x, y = Ty("x"), Ty("y")
+
+
+def match(pattern, value, subst=None):
+    """ Every substitution under which a pattern stands for a value. """
+    return list(Substitution(subst or {}).unify(pattern, value))
+
+
+def instantiate(pattern, subst, ob):
+    """ The value a pattern stands for under a substitution. """
+    return Substitution(subst).instantiate(pattern, ob)
 
 
 def test_read_off():
@@ -36,7 +45,8 @@ def test_read_off():
 
     def spiders[X: Atom, N: Count](): ...
     X, N = spiders.__type_params__
-    assert Sort.of(X).atomic and Sort.of(N) == Counts()
+    assert Sort.read(X.__bound__).size == 1
+    assert Sort.read(N.__bound__) == Counts()
 
 
 def test_sorts():
@@ -46,19 +56,20 @@ def test_sorts():
     from discopy.axioms import Axiom
 
     def bound[X: Atom[Ty], N: Count, M: Obj[Ty, N]](): ...
-    sorts = [Sort.of(variable) for variable in bound.__type_params__]
+    sorts = [Sort.read(variable.__bound__)
+             for variable in bound.__type_params__]
     assert list(map(str, sorts)) == ["Atom[Ty]", "Count", "Obj[Ty, N]"]
 
     def law[X: Atom[Ty]](cls, x: Var[Ty, X], y: Atom[Ty]):
         return cls.Equation(cls.id(x), cls.id(y))
     law = Axiom(law).bind(Diagram)
-    assert law.variables["X"].atomic and law.premises["y"].atomic
+    assert law.variables["X"].size == law.premises["y"].size == 1
     equation = find(law.strategy(), lambda _: True)
     assert len(equation.terms[0].dom) == len(equation.terms[1].dom) == 1
-    assert [s for s, _ in match(Var[Ty, A], x)] == [{"A": x}]
-    assert list(match(Atom[Ty], x)) == [({}, ())]
-    assert not list(match(Atom[Ty], x @ y))
-    assert list(match(Unit[Ty], Ty())) and not list(match(Unit[Ty], x))
+    assert [dict(s) for s in match(Var[Ty, A], x)] == [{"A": x}]
+    assert match(Atom[Ty], x) == [{}]
+    assert not match(Atom[Ty], x @ y)
+    assert match(Unit[Ty], Ty()) and not match(Unit[Ty], x)
 
 
 def test_match():
@@ -66,10 +77,10 @@ def test_match():
     x, y = rigid.Ty("x"), rigid.Ty("y")
     X = TypeVar("X", bound=Atom)
     N = TypeVar("N", bound=Count)
-    assert [s["X"] for s, _ in match(Tensor[X, R[X]], x @ x.r)] == [x]
-    assert not list(match(Tensor[X, R[X]], x @ y.r))
-    assert list(match(Hom[None, A, B], (x, None))) == [({"A": x}, ())]
-    assert [s for s, _ in match(Repeat[X, N], x @ x @ x)]\
+    assert [s["X"] for s in match(Tensor[X, R[X]], x @ x.r)] == [x]
+    assert not match(Tensor[X, R[X]], x @ y.r)
+    assert match(Hom[None, A, B], (x, None)) == [{"A": x}]
+    assert [dict(s) for s in match(Repeat[X, N], x @ x @ x)]\
         == [{"N": 3, "X": x}]
 
 
@@ -77,21 +88,20 @@ def test_delay_and_image():
     """ A delay matches every number of steps the value is the delay of,
     and the image of a functor is checked once it is bound, a residual
     until then. """
-    from typing import Literal
     from discopy import feedback
-    from discopy.pattern import Image, instantiate
+    from discopy.pattern import Image
 
     x = feedback.Ty("x")
     X, F = TypeVar("X"), TypeVar("F")
-    assert [s for s, _ in match(D[X], x.d)] == [{"X": x}]
-    assert not list(match(D[X], x))
+    assert [dict(s) for s in match(D[X], x.d)] == [{"X": x}]
+    assert not match(D[X], x)
     assert instantiate(D[D[X]], {"X": x}, feedback.Ty) == x.delay(2)
     relabel = feedback.Functor({x: x.d}, {})
     assert instantiate(Image[F, X], {"F": relabel, "X": x}, None) == x.d
-    ((_, residuals), ) = match(Image[F, X], x.d)
-    assert residuals == ((Image[F, X], x.d), )
-    assert list(match(Image[F, X], x.d, {"F": relabel, "X": x}))
-    assert not list(match(Image[F, X], x, {"F": relabel, "X": x}))
+    (found, ) = match(Image[F, X], x.d)
+    assert found.residuals == ((Image[F, X], x.d), )
+    assert match(Image[F, X], x.d, {"F": relabel, "X": x})
+    assert not match(Image[F, X], x, {"F": relabel, "X": x})
 
 
 def test_exp_unify():
@@ -101,33 +111,33 @@ def test_exp_unify():
     from discopy import biclosed, rigid
 
     a, b = biclosed.Ty("a"), biclosed.Ty("b")
-    ((subst, residuals),) = match(Over[A, B], b << a)
-    assert subst == {"A": b, "B": a} and not residuals
-    assert not list(match(Over[A, B], b @ a))
-    ((_, residual),) = match(Over[A, B], rigid.Ty("b") << rigid.Ty("a"))
-    assert residual
+    (subst, ) = match(Over[A, B], b << a)
+    assert subst == {"A": b, "B": a} and not subst.residuals
+    assert not match(Over[A, B], b @ a)
+    (subst, ) = match(Over[A, B], rigid.Ty("b") << rigid.Ty("a"))
+    assert subst.residuals
 
 
 def test_delay_unify():
     from discopy import feedback
 
     x, y = feedback.Ty("x"), feedback.Ty("y")
-    assert list(match(D[A], x.d @ y.d)) == [({"A": x @ y}, ())]
-    assert not list(match(D[A], x.d @ y))
+    assert match(D[A], x.d @ y.d) == [{"A": x @ y}]
+    assert not match(D[A], x.d @ y)
 
 
 def test_adjoints():
     """ An adjoint pattern inverts to the adjoint on the other side, an
     exponential one matches the exponential of its own side only. """
     from discopy import biclosed, rigid
-    from discopy.pattern import L, Under, instantiate
+    from discopy.pattern import L, Under
 
     r = rigid.Ty("r")
-    assert [s for s, _ in match(L[A], r.l)] == [{"A": r}]
-    assert [s for s, _ in match(R[A], r.r)] == [{"A": r}]
+    assert [dict(s) for s in match(L[A], r.l)] == [{"A": r}]
+    assert [dict(s) for s in match(R[A], r.r)] == [{"A": r}]
     x, y = biclosed.Ty("x"), biclosed.Ty("y")
-    assert [s for s, _ in match(Under[B, A], y >> x)] == [{"A": x, "B": y}]
-    assert not list(match(Under[B, A], x << y))
+    assert [dict(s) for s in match(Under[B, A], y >> x)] == [{"A": x, "B": y}]
+    assert not match(Under[B, A], x << y)
     assert instantiate(Under[B, A], {"A": x, "B": y}, biclosed.Ty) == y >> x
 
 
@@ -142,9 +152,9 @@ def test_trace():
     assert list(left.premises) == ["self", "dom", "cod", "mem"]
     x, y, a, b = map(traced.Ty, "xyab")
     goal = (x @ y @ a, x @ y @ b)
-    assert [s["M"] for s, _ in match(left.premises["self"], goal)]\
+    assert [s["M"] for s in match(left.premises["self"], goal)]\
         == [traced.Ty(), x, x @ y]
-    assert [s["M"] for s, _ in match(right.premises["self"], goal)]\
+    assert [s["M"] for s in match(right.premises["self"], goal)]\
         == [traced.Ty()]  # The right ends a and b share no wire.
     f = traced.Box("f", *goal)
     assert f.trace_left(mem=x @ y) == f.trace(dom=a, cod=b, left=True)\
@@ -160,7 +170,6 @@ def test_curry_and_uncurry():
     """ A curry is a rule per side, concluding on the exponential of its
     whole exponent, which the uncurry evaluates back. """
     from discopy import biclosed
-    from discopy.pattern import instantiate
 
     x, y, z, w = map(biclosed.Ty, "xyzw")
     f = biclosed.Box("f", x @ y @ z, w)
@@ -168,7 +177,7 @@ def test_curry_and_uncurry():
                         (BiclosedCategory.curry_right, False)):
         assert list(curry.premises) == [
             "self", "context", "base", "exponent"]
-        for subst, _ in match(curry.premises["self"], (f.dom, f.cod)):
+        for subst in match(curry.premises["self"], (f.dom, f.cod)):
             curried = f.curry(exponent=subst["Y"], left=left)
             assert instantiate(curry.conclusion, subst, biclosed.Ty)\
                 == (curried.dom, curried.cod)
@@ -181,7 +190,6 @@ def test_ev_and_feedback():
     """ The evaluation and the feedback are a rule per side each, the
     memory of a feedback any object. """
     from discopy import biclosed
-    from discopy.pattern import instantiate
 
     x, y = biclosed.Ty("x"), biclosed.Ty("y")
     for ev, left in ((BiclosedCategory.ev_left, True),
@@ -206,7 +214,7 @@ def test_rule():
     assert Diagram.rules["cut"].owner is MonoidalCategory  # The latest wins.
     assert str(cat.Arrow.rules["cut"].conclusion).endswith(", A, C]")
     with raises(TypeError):
-        Rule(Category.cut.function).unit
+        Rule(Category.cut.function).bound
     with raises(TypeError):
         rule(classmethod(lambda cls: None))
 

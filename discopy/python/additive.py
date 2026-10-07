@@ -22,8 +22,7 @@ from discopy.abc import SymmetricCategory
 from discopy.utils import assert_isinstance, unbiased
 from discopy.python import finset, function
 from discopy.python.function import Ty
-from discopy.pattern import Hom, Obj, Var, Tensor
-from discopy.axioms import rule
+from discopy.pattern import Hom, Obj, rule, Tensor, Var
 
 
 class Function(function.Function, SymmetricCategory):

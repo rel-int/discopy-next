@@ -164,16 +164,14 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 
 from discopy import symmetric
-from discopy.pattern import Obj
-from discopy.abc import MonoidalCategory, NamedGeneric
+from discopy.pattern import D, Hom, Obj, rule
+from discopy.abc import MonoidalCategory
 from discopy.python import finset
-from discopy.pattern import Hom
 from discopy.abc import DelayedMonoid
-from discopy.pattern import rule
 from discopy.utils import (
+    NamedGeneric,
     AxiomError,
     assert_isinstance, unbiased, inductive, classproperty, factory_name)
-from discopy.pattern import D
 
 
 @dataclass

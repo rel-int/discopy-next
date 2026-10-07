@@ -79,10 +79,10 @@ in the same diagram they automatically satisfy the :mod:`frobenius` axioms.
 from typing import ClassVar
 
 from discopy import symmetric, monoidal, cmap, hypergraph
-from discopy.pattern import Var, Repeat
+from discopy.pattern import Atom, Count, Hom, Repeat, rule, Var
+from discopy.axioms import Serialisable
 from discopy.abc import MarkovCategory
 
-from discopy.axioms import Atom, Count, Hom, rule, Serialisable
 from discopy.cat import factory, Generator
 from discopy.monoidal import Ty  # noqa: F401  pylint: disable=unused-import
 from discopy.utils import assert_isatomic, factory_name

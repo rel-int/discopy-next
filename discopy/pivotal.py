@@ -59,7 +59,7 @@ from typing import ClassVar
 from discopy import cat, cmap, monoidal, rigid, traced
 from discopy.abc import (
     DaggerCategory, PivotalCategory, TracedCategory)
-from discopy.axioms import Hom, rule
+from discopy.pattern import Hom, rule
 from discopy.cat import factory, Generator
 from discopy.utils import deprecated_alias
 

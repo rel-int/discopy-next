@@ -66,10 +66,11 @@ from collections.abc import Callable
 
 from discopy import (
     monoidal, rigid, markov, compact, pivotal, cmap, hypergraph)
-from discopy.pattern import Var, Tensor, Unit, L, Repeat
+from discopy.pattern import (
+    Atom, Count, Hom, L, Repeat, rule, Tensor, Unit, Var)
+from discopy.axioms import Serialisable
 from discopy.abc import HypergraphCategory
 
-from discopy.axioms import Atom, Count, Hom, rule, Serialisable
 from discopy.cat import factory, Generator
 from discopy.utils import deprecated_alias, assert_isatomic, factory_name
 

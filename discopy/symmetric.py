@@ -95,12 +95,11 @@ from typing import ClassVar, Self
 from collections.abc import Sequence
 
 from discopy import cat, monoidal, balanced, hypergraph, cmap, messages
-from discopy.pattern import Image, Obj, Var, Tensor
+from discopy.pattern import Atom, Hom, Image, Obj, rule, Tensor, Var
+from discopy.axioms import axiom, Equation as AbstractEquation
 from discopy.abc import (
     BalancedCategory, BraidedCategory, MonoidalCategory, SymmetricCategory,
     TracedCategory)
-from discopy.axioms import (
-    Atom, axiom, Equation as AbstractEquation, Hom, rule)
 from discopy.cat import factory, Generator
 from discopy.monoidal import Wire, Ty, Nat  # noqa: F401  pylint: disable=unused-import
 from discopy.python import finset

@@ -7,7 +7,8 @@ from hypothesis import Phase, given, note, settings
 from hypothesis import strategies as st
 
 from conftest import PROFILE
-from discopy.axioms import Axiom, Constant, Testable
+from discopy.pattern import Constant
+from discopy.axioms import Axiom, Testable
 from discopy.utils import factory_name
 
 

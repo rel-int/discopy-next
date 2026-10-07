@@ -8,7 +8,7 @@ from typing import NamedTuple
 import pytest
 
 from discopy import biclosed, braided, cat, pivotal, ribbon
-from discopy.axioms import GENERATORS, Axiom, AxiomFailure, Relabelling
+from discopy.axioms import Axiom, AxiomFailure, GENERATORS, Relabelling
 from discopy.utils import AxiomError, factory_name
 
 

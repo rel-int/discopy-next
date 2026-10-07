@@ -125,12 +125,13 @@ from functools import cached_property
 import numpy as np
 
 from discopy import monoidal, ribbon, tensor, frobenius
-from discopy.pattern import Var, Tensor, Unit, L, R
+from discopy.pattern import Atom, Hom, L, R, rule, Tensor, Unit, Var
+from discopy.axioms import no_strategy
 
-from discopy.axioms import Atom, Hom, no_strategy, rule
 from discopy.tensor import Dim, Box, Id
-from discopy.abc import RibbonCategory, NamedGeneric
+from discopy.abc import RibbonCategory
 from discopy.utils import (
+    NamedGeneric,
     assert_isinstance, classproperty, factory_name, get_origin, product)
 
 Diagram = tensor.Diagram

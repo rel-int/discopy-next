@@ -56,8 +56,7 @@ from discopy.abc import (
     NamedGeneric, RigidCategory, SymmetricCategory, TracedCategory)
 from discopy.drawing import Node, backend
 from discopy.python.finset import Permutation
-from discopy.pattern import Hom
-from discopy.pattern import rule
+from discopy.pattern import Hom, rule
 from discopy.utils import (
     factory_name,
     assert_isinstance,

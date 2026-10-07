@@ -161,14 +161,13 @@ from typing import ClassVar
 
 from discopy import monoidal, braided, markov, hypergraph, messages
 
+from discopy.pattern import D, Hom, Obj, rule
 from discopy.axioms import GENERATORS, no_strategy
 from discopy.abc import DelayedMonoid, FeedbackCategory
 from discopy.utils import (
     deprecated_alias,
     factory, Generator, factory_name, assert_isinstance, AxiomError,
     from_tree)
-from discopy.pattern import D, Hom, Obj
-from discopy.axioms import rule
 
 
 def str_delayed(time_step: int):

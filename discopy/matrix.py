@@ -48,8 +48,7 @@ from discopy.cat import (
     assert_isparallel,
 )
 from discopy.utils import assert_isinstance, unbiased
-from discopy.pattern import Hom
-from discopy.pattern import rule
+from discopy.pattern import Hom, rule
 
 if TYPE_CHECKING:
     import sympy

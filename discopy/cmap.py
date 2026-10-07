@@ -47,7 +47,7 @@ from math import inf, lcm
 from typing import TYPE_CHECKING, Any, ClassVar, Literal, Self
 
 from discopy import hypergraph, messages
-from discopy.pattern import Var, Tensor, Unit, L, R
+from discopy.pattern import Atom, Hom, L, R, rule, Tensor, Unit, Var
 from discopy.abc import (
     CompactCategory,
     DaggerCategory,
@@ -59,8 +59,6 @@ from discopy.abc import (
 )
 from discopy.cat import Ob
 from discopy.python.finset import Permutation
-from discopy.pattern import Atom, Hom
-from discopy.pattern import rule
 from discopy.utils import (
     AxiomError,
     assert_isatomic,

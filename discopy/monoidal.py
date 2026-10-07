@@ -66,11 +66,10 @@ from typing import (
 
 from discopy import abc, cat, drawing, hypergraph, cmap, messages
 from discopy.pattern import Var
+from discopy.axioms import (
+    axiom, Equation as AbstractEquation, GENERATORS, no_strategy, Serialisable)
 from discopy.abc import (
     ColouredMonoid, Monoid, MonoidalCategory, NamedGeneric)
-from discopy.axioms import (
-    axiom, Equation as AbstractEquation, GENERATORS, no_strategy,
-    Serialisable)
 from discopy.drawing import Drawing
 from discopy.config import (
     BOX_DRAWING_ATTRIBUTES, WIRE_DRAWING_ATTRIBUTES,

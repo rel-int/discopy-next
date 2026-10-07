@@ -83,10 +83,11 @@ from typing import (
     TYPE_CHECKING, overload)
 
 from discopy import messages, utils
-from discopy.pattern import Image, Obj, Var
-from discopy.abc import Category, DaggerCategory, Serialisable
+from discopy.pattern import Hom, Image, Obj, rule, Var
 from discopy.axioms import (
-    axiom, Equation as AbstractEquation, GENERATORS, Hom, no_strategy, rule)
+    Serialisable,
+    axiom, Equation as AbstractEquation, GENERATORS, no_strategy)
+from discopy.abc import Category, DaggerCategory
 from discopy.utils import (  # noqa: F401
     factory,
     Generator,

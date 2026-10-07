@@ -74,13 +74,12 @@ from discopy import (
     ribbon,
     messages
 )
-from discopy.pattern import Var, Tensor, Unit, L, R
-from discopy.abc import Pregroup, RibbonCategory, TracedCategory, NamedGeneric
+from discopy.pattern import Atom, Hom, L, R, rule, Tensor, Unit, Var
+from discopy.abc import Pregroup, RibbonCategory, TracedCategory
 from discopy.cat import assert_iscomposable
 from discopy.python import finset
-from discopy.pattern import Atom, Hom
-from discopy.pattern import rule
 from discopy.utils import (
+    NamedGeneric,
     factory, Generator, classproperty, unbiased, assert_isinstance,
     factory_name)
 

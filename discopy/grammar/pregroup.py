@@ -36,8 +36,9 @@ Summary
 
 from typing import ClassVar
 
-from discopy import axioms, rigid, frobenius, messages
-from discopy.axioms import no_strategy, Rule
+from discopy import pattern, rigid, frobenius, messages
+from discopy.pattern import Rule
+from discopy.axioms import no_strategy
 from discopy.cat import factory, Generator
 from discopy.utils import deprecated_alias, AxiomError, classproperty
 from discopy.grammar import thue
@@ -141,7 +142,7 @@ class Diagram(frobenius.Diagram):
         from hypothesis import assume, strategies as st
 
         words = [rule.apply({}) for rule in cls.generators.values()
-                 if isinstance(rule, axioms.Constant)]
+                 if isinstance(rule, pattern.Constant)]
 
         @st.composite
         def sentences(draw):

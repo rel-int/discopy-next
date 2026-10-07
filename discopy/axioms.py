@@ -253,9 +253,7 @@ from dataclasses import KW_ONLY, dataclass, field, replace
 from functools import wraps
 from typing import TYPE_CHECKING, Self
 
-from discopy.pattern import (  # noqa: F401  pylint: disable=unused-import
-    Atom, Constant, Count, D, Declaration, declarations, Hom, L, Obj, Over,
-    R, Repeat, Rule, rule, Sort, Tensor, Under, Unit, Var)
+from discopy.pattern import Declaration
 from discopy.utils import (
     AxiomError,
     NamedGeneric,
@@ -432,7 +430,7 @@ class Testable[T](metaclass=ABCMeta):
         bases: assigning anything that is not an axiom over an inherited
         one drops it altogether, rather than restating it.
         """
-        return declarations(cls, Axiom)
+        return Axiom.inherited(cls)
 
     @classmethod
     def environment(cls) -> dict:

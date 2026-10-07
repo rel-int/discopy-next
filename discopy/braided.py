@@ -62,10 +62,10 @@ from typing import Any, ClassVar, Self
 from collections.abc import Callable
 
 from discopy import monoidal
-from discopy.pattern import Var, Tensor
+from discopy.pattern import Atom, Hom, rule, Tensor, Var
+from discopy.axioms import axiom, Equation
 from discopy.abc import BraidedCategory
 
-from discopy.axioms import Atom, axiom, Equation, Hom, rule
 from discopy.cat import factory, Generator
 from discopy.monoidal import Ty, Match
 from discopy.utils import (

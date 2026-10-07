@@ -9,8 +9,8 @@ from pytest import raises
 
 from discopy import braided, cat, feedback, rigid
 from discopy.abc import MonoidalCategory
-from discopy.axioms import (
-    Axiom, AxiomFailure, Equation, Hom, Obj, assert_axioms, axiom)
+from discopy.pattern import Hom, Obj
+from discopy.axioms import assert_axioms, Axiom, axiom, AxiomFailure, Equation
 from discopy.cat import Arrow, Box, Functor, Ob
 from discopy.monoidal import Diagram
 
@@ -144,7 +144,7 @@ def test_equation_types():
     from discopy import (
         balanced, closed, compact, pivotal, ribbon, symmetric, traced)
     from typing import get_origin
-    from discopy.pattern import instantiate
+    from discopy.pattern import Substitution
     (parameter, ) = Equation.__type_params__
     levels = (Diagram, braided.Diagram, traced.Diagram, balanced.Diagram,
               symmetric.Diagram, closed.Diagram, rigid.Diagram,
@@ -158,10 +158,10 @@ def test_equation_types():
             if get_origin(pattern) not in (Hom, Obj)\
                     or (equation := law.canonical()) is NotImplemented:
                 continue
-            subst = {
+            subst = Substitution({
                 name: sort.canonical(law.bound, name, law.owner)
-                for name, sort in law.variables.items()}
-            value = instantiate(pattern, subst, law.unit)
+                for name, sort in law.variables.items()})
+            value = subst.instantiate(pattern, law.bound.ob)
             boundary = (lambda term: (term.dom, term.cod))\
                 if get_origin(pattern) is Hom else (lambda term: term)
             assert all(

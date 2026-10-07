@@ -153,10 +153,10 @@ from collections.abc import Callable
 from typing import Any, ClassVar, Iterator, Self
 
 from discopy import cat, monoidal, biclosed, messages
-from discopy.pattern import Var, Tensor, Unit, L, R
+from discopy.pattern import Atom, Hom, L, R, rule, Tensor, Unit, Var
+from discopy.axioms import GENERATORS, Serialisable
 from discopy.abc import DaggerCategory, Pregroup, RigidCategory
 
-from discopy.axioms import Atom, GENERATORS, Hom, rule, Serialisable
 from discopy.cat import factory, Generator
 from discopy.utils import (
     deprecated_alias,
