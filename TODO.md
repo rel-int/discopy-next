@@ -6,18 +6,18 @@ run an experiment and report whether it helps with the hypothesis statistics, in
 go ahead, on a new branch off this one
 
 ## Baseline
-- [WIP] @session_019jj2d1JBnEGRPmjqSAP37A-2026-10-07 09:57 experiment script measuring hypothesis statistics, dead ends and the sampling distribution, run on the unified search
+- [x] experiment script measuring hypothesis statistics, dead ends and the sampling distribution, run on the unified search
 
 ## Search in abc
-- [WIP] @session_019jj2d1JBnEGRPmjqSAP37A-2026-10-07 09:59 move the search out of `pattern.py` into a family of classmethods of `abc.Category`: `search`, `leaves`, `branches`, `contexts`, `focus`
-- [WIP] @session_019jj2d1JBnEGRPmjqSAP37A-2026-10-07 09:59 planar contexts: a split, i.e. the unification of the patterns
-- [WIP] @session_019jj2d1JBnEGRPmjqSAP37A-2026-10-07 09:59 symmetric contexts: a permutation
-- [WIP] @session_019jj2d1JBnEGRPmjqSAP37A-2026-10-07 09:59 Markov contexts: copies and discards
-- [WIP] @session_019jj2d1JBnEGRPmjqSAP37A-2026-10-07 09:59 compact contexts: cups and caps
-- [WIP] @session_019jj2d1JBnEGRPmjqSAP37A-2026-10-07 09:59 hypergraph contexts: spiders
-- [WIP] @session_019jj2d1JBnEGRPmjqSAP37A-2026-10-07 09:59 focusing only in biclosed categories
-- [WIP] @session_019jj2d1JBnEGRPmjqSAP37A-2026-10-07 09:59 tests and docs
+- [x] move the search out of `pattern.py` into a family of classmethods of `abc.Category`: `search`, `leaves`, `branches`, `contexts`, `focus`
+- [x] planar contexts: a split, i.e. the unification of the patterns
+- [x] symmetric contexts: a permutation
+- [x] Markov contexts: copies and discards
+- [x] compact contexts: cups and caps
+- [x] hypergraph contexts: spiders
+- [x] focusing only in biclosed categories
+- [x] tests and docs
 
 ## Experiment
-- [ ] rerun the experiment on the doctrine search and compare
-- [ ] full checks, changelog
+- [WIP] @session_019jj2d1JBnEGRPmjqSAP37A-2026-10-07 10:19 rerun the experiment on the doctrine search and compare
+- [WIP] @session_019jj2d1JBnEGRPmjqSAP37A-2026-10-07 10:19 full checks, changelog

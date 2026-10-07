@@ -2,9 +2,9 @@
 Property-based testing of the axioms with `Hypothesis
 <https://hypothesis.readthedocs.io>`_: an :class:`Axiom` is stated once
 on an abstract base class of :mod:`discopy.abc` as a sequent — see
-:mod:`discopy.pattern` for the language and the search for
+:mod:`discopy.pattern` for the language of
 the rules — a category generates its own objects and arrows through
-:meth:`Testable.strategy` — by the rules of :mod:`discopy.pattern` for
+:meth:`Testable.strategy` — by :meth:`discopy.abc.Category.search` for
 diagrams — and the matrix in ``proptest/`` searches every cell for a
 counterexample.
 
@@ -255,7 +255,7 @@ from typing import TYPE_CHECKING, Self
 
 from discopy.pattern import (  # noqa: F401  pylint: disable=unused-import
     Atom, Constant, Count, D, Declaration, declarations, Hom, L, Obj, Over,
-    R, Repeat, Rule, rule, search, Sort, Tensor, Under, Unit, Var)
+    R, Repeat, Rule, rule, Sort, Tensor, Under, Unit, Var)
 from discopy.utils import (
     AxiomError,
     NamedGeneric,

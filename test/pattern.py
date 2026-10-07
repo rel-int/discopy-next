@@ -14,7 +14,7 @@ from discopy.abc import (
 from discopy.monoidal import Box, Diagram, Ty
 from discopy.pattern import (
     Atom, Count, D, Declaration, Hom, Obj, Over, R, Repeat, Rule, Sort,
-    Tensor, Unit, Var, match, rule, search)
+    Tensor, Unit, Var, match, rule)
 from discopy.utils import AxiomError
 
 
@@ -321,35 +321,36 @@ def test_declarations():
 
 def test_focusing():
     """ A goal commits to the rule it applies deterministically, with an
-    ``epsilon`` chance of escaping back to the full search. """
-    from discopy import biclosed, rigid
-    from discopy.pattern import focused
+    ``epsilon`` chance of escaping back to the full search: only a
+    biclosed category has invertible rules to focus on. """
+    from discopy import biclosed, rigid, symmetric
 
     a, b = biclosed.Ty("a"), biclosed.Ty("b")
 
     def rules_in_focus(cls, dom, cod):
-        return [found.name for found, _ in focused([
-            (r, list(r.match(dom, cod))) for r in cls.rules.values()],
-            dom, cod, type(dom))]
+        return [found.name for found, _ in cls.focus(
+            cls.branches(dom, cod), dom, cod)]
 
     assert rules_in_focus(biclosed.Diagram, a, b << a) == ["curry"]
     assert [name for name, r in rigid.Diagram.rules.items()
             if r.recursive] == ["tensor", "cut"]
     x, y, z = map(rigid.Ty, "xyz")
     curry = rule(rigid.Diagram.curry).bind(rigid.Diagram)
-    assert not focused([(curry, list(curry.match(x, y @ z.l)))],
-                       x, y @ z.l, rigid.Ty)  # z is no subformula of z.l.
+    assert not rigid.Diagram.focus(
+        [(curry, list(curry.match(x, y @ z.l)))],
+        x, y @ z.l)  # z is no subformula of z.l.
     # A rigid curry is derived — caps and cut reach every transpose —
     # and self-dual types would let it focus on every goal.
+    s = symmetric.Ty("s")
+    assert symmetric.Diagram.focus(
+        symmetric.Diagram.branches(s, s), s, s) == []
 
-    curried = find(search(
-        biclosed.Diagram, biclosed.Box.strategy,
-        dom=a, cod=b << a, epsilon=0), bool)
+    curried = find(biclosed.Diagram.search(
+        biclosed.Box.strategy, dom=a, cod=b << a, epsilon=0), bool)
     assert isinstance(curried.boxes[-1], biclosed.Curry)
     for epsilon in (0.5, 1e-4):  # Support survives any epsilon > 0.
-        escaped = find(search(
-            biclosed.Diagram, biclosed.Box.strategy,
-            dom=a, cod=b << a, epsilon=epsilon),
+        escaped = find(biclosed.Diagram.search(
+            biclosed.Box.strategy, dom=a, cod=b << a, epsilon=epsilon),
             lambda term: not any(
                 isinstance(box, biclosed.Curry) for box in term.boxes))
         assert escaped.cod == b << a
@@ -362,15 +363,59 @@ def test_goal_patterns():
     from discopy import markov
 
     A = TypeVar("A")
-    loop = find(search(Diagram, Box.strategy, dom=A, cod=A),
+    loop = find(Diagram.search(Box.strategy, dom=A, cod=A),
                 lambda term: len(term.boxes) == 1)
     assert loop.dom == loop.cod
     copy = find(
-        search(markov.Diagram, markov.Box.strategy,
-               dom=A, cod=Tensor[A, A]),
+        markov.Diagram.search(
+            markov.Box.strategy, dom=A, cod=Tensor[A, A]),
         lambda term: bool(term.boxes)
         and all(isinstance(box, markov.Copy) for box in term.boxes))
     assert copy.cod == copy.dom @ copy.dom
+
+
+def test_contexts():
+    """ Each doctrine rewires a side of a goal by its own plumbing before
+    a split of it puts a term in context: none for a planar category, a
+    permutation for a symmetric one, copies and discards on the domain of
+    a Markov one, cups and caps for a compact one, spiders for a
+    hypergraph one. """
+    from hypothesis import given, settings, strategies as st
+    from discopy import compact, frobenius, markov, monoidal, symmetric
+
+    def plumbing(level, dom, side, other):
+        @st.composite
+        def rewirings(draw):
+            return level.Diagram.rewire(draw, dom, side, other)
+        return rewirings()
+
+    x, y = Ty("x"), Ty("y")
+    assert find(plumbing(monoidal, x @ y, True, None), bool) == (
+        x @ y, None)
+
+    for level, kinds in (
+            (symmetric, ("Swap", "Permutation")),
+            (markov, ("Copy", "Discard")),
+            (compact, ("Cup", "Cap")),
+            (frobenius, ("Spider", ))):
+        a, b = level.Ty("a"), level.Ty("b")
+        for side in (True, False):
+            if level is markov and not side:
+                kinds = ("Swap", "Permutation")
+
+            @settings(max_examples=30, database=None)
+            @given(plumbing(level, a @ b @ a, side, b))
+            def wired(rewiring):
+                value, wiring = rewiring
+                if wiring is not None:
+                    assert (wiring.dom, wiring.cod) == (
+                        (a @ b @ a, value) if side else (value, a @ b @ a))
+            wired()
+            found = find(plumbing(level, a @ b @ a, side, b),
+                         lambda rewiring: rewiring[1] is not None and any(
+                             type(box).__name__ in kinds
+                             for box in rewiring[1].boxes))
+            assert found[1] is not None, (level, side)
 
 
 def test_constant():

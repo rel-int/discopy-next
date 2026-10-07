@@ -1,6 +1,6 @@
 """
 The patterns in which a category states its rules, generators and
-axioms, and the search for its terms by them.
+axioms, which :meth:`discopy.abc.Category.search` searches its terms by.
 
 A sequent is the signature of a method on an abstract base class of
 :mod:`discopy.abc`: its :pep:`695` type parameter list is the context,
@@ -36,10 +36,13 @@ splits the goal at every position, a variable binds once, an adjoint
 ``R[p]`` inverts to ``p``. What cannot be inverted, an exponential that
 collapsed into adjoints, is a residual equation checked once every
 variable is instantiated. A :class:`Rule` is a declaration with a
-conclusion, and :func:`search` builds a term of a goal type by choosing
-at each step a free box, a rule with no hom premise whose conclusion
-matches the goal — a generator, built in one step — or, below the depth
-bound, a :meth:`Rule.recursive` one whose hom premises are searched.
+conclusion, and :meth:`discopy.abc.Category.search` builds a term of a
+goal type by choosing at each step a free box, a rule with no hom
+premise whose conclusion matches the goal — a generator, built in one
+step — or, below the depth bound, a :meth:`Rule.recursive` one whose hom
+premises are searched. The unification here is planar: a category with
+more structure puts a term in context by its own plumbing, see
+:meth:`discopy.abc.MonoidalCategory.rewire`.
 
 Summary
 -------
@@ -82,8 +85,6 @@ Summary
         cell
         declarations
         rule
-        focused
-        search
 """
 
 import inspect
@@ -92,16 +93,15 @@ from abc import ABC, abstractmethod
 from collections.abc import Callable, Iterator
 from dataclasses import KW_ONLY, dataclass, replace
 from functools import reduce
-from itertools import count
 from types import MethodType
 from typing import (
     Annotated, Any, ClassVar, Literal, Self, TYPE_CHECKING, TypeVar,
     get_args, get_origin)
 
-from discopy.utils import AxiomError, factory_name
+from discopy.utils import factory_name
 
 if TYPE_CHECKING:
-    from hypothesis import strategies as st
+    pass
 
 
 type Obj[Coarse, Size = None] = Annotated[Coarse, Size]
@@ -667,7 +667,7 @@ class Declaration[**P, T]:
     """
     A declaration is a sequent stated by a ``function`` on an abstract
     base class and inherited by every category below it: the base of the
-    rules of :func:`search` and of the axioms of
+    rules of :meth:`discopy.abc.Category.search` and of the axioms of
     :mod:`discopy.axioms`. The ``category`` is the class the
     declaration is bound to, ``name`` the attribute it is stored under
     and ``owner`` the class declaring the sequent.
@@ -914,18 +914,13 @@ def declarations[K: Declaration](cls: type, kind: type[K]) -> dict[str, K]:
 
 
 
-class DeadEnd(Exception):
-    """ A goal nothing closes within the depth: :func:`search` retries
-    it a bounded number of times before rejecting the example. """
-
-
-
 @dataclass(repr=False)
 class Rule[**P, T](Declaration[P, T]):
     """
     An inference rule of a category, a
     :class:`Declaration` with a conclusion: every rule
-    states its sequent as its own signature and :func:`search` calls
+    states its sequent as its own signature and
+    :meth:`discopy.abc.Category.search` calls
     the attribute of the same name on the category. Accessed on a
     class, a rule binds to it, once per class; on an instance, it
     behaves as the method it decorates.
@@ -1067,211 +1062,6 @@ class Constant(Rule):
 def rule[**P, T](function: Callable[P, T]) -> Rule[P, T]:
     """ Decorate a method as an inference rule, its signature the sequent. """
     return Rule(function)
-
-
-
-def materials(value) -> Iterator:
-    """ The subformulae of an object: its atoms, and recursively the
-    base and exponent of each exponential atom. """
-    for i in range(len(value)):
-        yield value[i:i + 1]
-        for part in ("base", "exponent"):
-            inner = getattr(value.inside[i], part, None)
-            if inner is not None:
-                yield from materials(inner)
-
-
-
-def focused(matches: list, dom=None, cod=None, unit=None) -> list:
-    """
-    The rules a goal applies deterministically: the conclusion unifies
-    with the goal in exactly one way, the match binds every premise
-    without residuals, and the premises keep to the subformulae of the
-    goal — so committing to one samples nothing and manufactures nothing.
-    These are the invertible rules of a focused proof search, read off
-    the sequents at each goal: the curry of a biclosed category opens
-    the goal's own exponential, while at a rigid level, where the
-    exponential collapses into adjoints, the same rule would invert an
-    adjoint into material the goal does not have, and stays a choice.
-
-    >>> from discopy.biclosed import Diagram, Ty
-    >>> x, y = Ty('x'), Ty('y')
-    >>> [rule.name for rule, _ in focused([
-    ...     (rule, list(rule.match(x, y << x)))
-    ...     for rule in Diagram.rules.values()], x, y << x, Ty)]
-    ['curry']
-    """
-    goal = {
-        atom for side in (dom, cod) if side is not None
-        for atom in materials(side)}
-
-    def subformulae(rule, subst):
-        for premise in rule.premises.values():
-            if isinstance(premise, Sort)\
-                    or not set(variables(premise)) <= subst.keys():
-                return False
-            value = instantiate(premise, subst, unit)
-            if isinstance(value, tuple) and value == (dom, cod):
-                return False  # No progress: the premise is the goal.
-            for side in value if isinstance(value, tuple) else (value, ):
-                if hasattr(side, "inside")\
-                        and not set(materials(side)) <= goal:
-                    return False
-        return True
-
-    return [
-        (rule, found) for rule, found in matches
-        if len(found) == 1 and not found[0][1]
-        and subformulae(rule, found[0][0])]
-
-
-
-def search(category: type[abc.Category], free: Callable | None = None, *,
-           dom=None, cod=None, types=None,
-           max_depth: int = 3, epsilon: float = 0.05) -> st.SearchStrategy:
-    """
-    Generate a term of a category by its rules, toward a goal whose
-    two sides are patterns under one shared substitution: a side is a
-    type, a pattern, a type parameter standing for its variable, or
-    :obj:`None` for a fresh variable, so the goal ``A ⊢ A`` finds an
-    endomorphism on anything. A term is built as a free box, a
-    generator whose conclusion matches, or below the depth bound a
-    :meth:`Rule.recursive` rule whose premises are searched. A side
-    guides the search once its variables are all bound, instantiating
-    to the type the conclusions unify with, and constrains it
-    afterwards, unifying with the boundary of the built term: a failed
-    unification rejects the attempt, unless the side was fully bound
-    already — then the term was built outside the declared conclusion,
-    an :class:`discopy.utils.AxiomError`: the declaration lies.
-    ``category`` is the class with the rules and
-    generators; ``free`` a strategy factory ``free(dom=, cod=, types=)``
-    for its free generator, e.g. the strategy of its boxes, or
-    :obj:`None` for a category generated by a fixed vocabulary, whose
-    search fills only the sequents its generators derive; ``types`` a
-    strategy for the objects, overriding that of ``C0``;
-    ``max_depth`` the number of nested rules a term may apply; and
-    ``epsilon`` the chance of escaping the focusing discipline — a goal
-    with a :func:`focused` rule commits to it, except with probability
-    ``epsilon``, where the full search resumes. At ``epsilon=0`` the
-    search is a focused decision procedure; any ``epsilon > 0``
-    preserves the support of the search without it, every term keeping
-    a positive chance; ``epsilon=1`` disables focusing.
-
-    >>> from hypothesis import find
-    >>> from discopy.monoidal import Ty, Diagram, Box
-    >>> x, y = Ty('x'), Ty('y')
-    >>> term = find(search(Diagram, Box.strategy, dom=x, cod=y),
-    ...             lambda term: len(term.boxes) > 1)
-    >>> assert (term.dom, term.cod) == (x, y) and len(term.boxes) > 1
-
-    >>> from typing import TypeVar
-    >>> A = TypeVar("A")
-    >>> endo = find(search(Diagram, Box.strategy, dom=A, cod=A),
-    ...             lambda term: not term.boxes)
-    >>> assert endo.dom == endo.cod
-    """
-    from hypothesis import assume, strategies as st
-
-    generators = tuple(category.generators.values())
-    rules = tuple(
-        rule for rule in category.rules.values() if rule.recursive)
-    scope = heads(category)
-    fresh = count()
-
-    def as_pattern(side):
-        return side if side is not None else TypeVar(  # ty: ignore[invalid-legacy-type-variable]
-            f"?{next(fresh)}")
-
-    def is_pattern(side):
-        return isinstance(side, TypeVar) or get_origin(side) is not None
-
-    def guidance(side, subst):
-        if not is_pattern(side):
-            return side
-        if all(name in subst for name in variables(side)):
-            return instantiate(side, subst, scope[OBJECTS])
-        return None
-
-    def matching(candidates, dom, cod) -> list:
-        matches = [(rule, list(rule.match(dom, cod))) for rule in candidates]
-        return [(rule, found) for rule, found in matches if found]
-
-    @st.composite
-    def attempt(draw, goal, depth, subst, residuals):
-        local, unchecked = dict(subst), list(residuals)
-        dom, cod = (guidance(side, local) for side in goal)
-        branches = matching(rules, dom, cod) if depth else []
-        focus = focused(branches, dom, cod, scope[OBJECTS])
-        if focus and not (epsilon >= 1 or epsilon > 0 and draw(
-                st.floats(0, 1, exclude_max=True)) < epsilon):
-            choice = focus[0]
-        else:
-            leaves = ([] if free is None else [None])\
-                + matching(generators, dom, cod)
-            candidates = branches if branches\
-                and (not leaves or draw(st.booleans())) else leaves
-            if not candidates:
-                raise DeadEnd(f"{dom} -> {cod}")
-            choice = draw(st.sampled_from(candidates))
-        if choice is None:
-            assert free is not None
-            result = draw(free(dom=dom, cod=cod, types=types))
-        else:
-            rule, found = choice
-            rule_subst, rule_residuals = draw(st.sampled_from(found))
-            _, args = rule.generate(
-                draw, lambda _, dom, cod: terms(
-                    (as_pattern(dom), as_pattern(cod)),
-                    depth - 1, local, unchecked),
-                subst=rule_subst, residuals=rule_residuals, types=types)
-            result = rule.apply(args)
-        for side, guide, value in zip(
-                goal, (dom, cod), (result.dom, result.cod)):
-            if is_pattern(side):
-                found = list(match(side, value, local, tuple(unchecked)))
-            else:
-                found = [(local, tuple(unchecked))] if value == side else []
-            if not found:
-                if guide is None:
-                    raise DeadEnd(f"{dom} -> {cod}")
-                raise AxiomError(
-                    f"The goal reads {guide} where "
-                    f"{choice[0] if choice else free} built "
-                    f"{result.dom} -> {result.cod}.")
-            chosen = found[0] if len(found) == 1\
-                else draw(st.sampled_from(found))
-            local, unchecked = dict(chosen[0]), list(chosen[1])
-        subst.clear()
-        subst.update(local)
-        residuals[:] = unchecked
-        return result
-
-    @st.composite
-    def terms(draw, goal, depth, subst, residuals, tries: int = 8):
-        for _ in range(tries):
-            try:
-                return draw(attempt(goal, depth, subst, residuals))
-            except DeadEnd:
-                continue
-        raise DeadEnd(f"{goal[0]} -> {goal[1]}")
-
-    @st.composite
-    def goals(draw, dom, cod, depth):
-        subst: dict = {}
-        residuals: list = []
-        goal = (as_pattern(dom), as_pattern(cod))
-        try:
-            result = draw(terms(goal, depth, subst, residuals))
-        except DeadEnd:
-            assume(False)
-        for pattern, value in residuals:
-            for name in variables(pattern):
-                if name not in subst:
-                    subst[name] = draw(Sort().strategy(scope, types))
-            assume(instantiate(pattern, subst, scope[OBJECTS]) == value)
-        return result
-
-    return goals(dom, cod, max_depth)
 
 
 

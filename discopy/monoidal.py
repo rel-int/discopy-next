@@ -70,7 +70,7 @@ from discopy.abc import (
     ColouredMonoid, Monoid, MonoidalCategory, NamedGeneric)
 from discopy.axioms import (
     axiom, Equation as AbstractEquation, GENERATORS, Hom, no_strategy,
-    rule, search, Serialisable)
+    rule, Serialisable)
 from discopy.drawing import Drawing
 from discopy.config import (
     BOX_DRAWING_ATTRIBUTES, WIRE_DRAWING_ATTRIBUTES,
@@ -1035,8 +1035,9 @@ class Diagram(cat.Arrow, MonoidalCategory, RichDisplay):
             boundary_connected=False):
         """
         Generate diagrams by the :attr:`rules` and :attr:`generators` of
-        the category, see :func:`discopy.pattern.search`: a subclass with
-        more structure declares it there and inherits the search as is.
+        the category, see :meth:`discopy.abc.Category.search`: a level
+        with more structure declares its rules and its plumbing on its
+        abstract base class.
 
         Parameters:
             dom : The domain of the diagrams, if any.
@@ -1055,8 +1056,8 @@ class Diagram(cat.Arrow, MonoidalCategory, RichDisplay):
             else cls.Box.strategy
         if max_depth is None:
             max_depth = 3 if free else 6
-        diagrams = search(
-            cls, free, dom=dom, cod=cod, types=types, max_depth=max_depth)
+        diagrams = cls.search(
+            free, dom=dom, cod=cod, types=types, max_depth=max_depth)
         if not boundary_connected:
             return diagrams
         return diagrams.filter(lambda diagram: diagram.is_boundary_connected)
