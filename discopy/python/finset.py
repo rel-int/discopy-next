@@ -27,7 +27,7 @@ from discopy import messages
 from discopy.abc import MonoidalCategory, PROP, Nat
 from discopy.pattern import Atom, Hom
 from discopy.pattern import rule
-from discopy.pattern import Count, TensorDir  # noqa: F401
+from discopy.pattern import TensorDir  # noqa: F401
 
 
 @dataclass
@@ -362,10 +362,15 @@ class Permutation(Function, PROP):
         return cls(inside, m + n)
 
     @rule
-    def trace[A: Obj[Nat], B: Obj[Nat], S: bool, N: Count, M: Obj[Nat, N]](
+    def trace[A: Obj[Nat], B: Obj[Nat], M: Obj[Nat], S: bool](
             self: Hom[Permutation, TensorDir[M, A, S], TensorDir[M, B, S]],
-            n: Var[int, N] = 1, left: Var[bool, S] = False
+            dom: Var[Nat | None, A] = None,
+            cod: Var[Nat | None, B] = None,
+            mem: Var[Nat | None, M] = None,
+            left: Var[bool, S] = False
     ) -> Hom[Permutation, A, B]:
+        """ A permutation has no trace in general, see :class:`Function`. """
+        # pylint: disable=unused-argument  # no trace to partition
         raise NotImplementedError
 
     def is_fixpoint_free_involution(self) -> bool:

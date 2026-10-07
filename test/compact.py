@@ -1,5 +1,7 @@
 from pytest import raises
 
+from discopy.utils import AxiomError
+
 from discopy.compact import *
 
 
@@ -68,5 +70,5 @@ def test_mixed_Layer_rotation_and_transpose():
 def test_twist_and_uncurry():
     x, y = Ty('x'), Ty('y')
     assert CMap.twist(x) == CMap.id(x)
-    with raises(ValueError):
-        Box('f', x, y).uncurry(-1)
+    with raises(AxiomError):
+        Box('f', x, y).uncurry(exponent=x)

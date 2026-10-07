@@ -22,7 +22,7 @@ from discopy.abc import SymmetricCategory
 from discopy.utils import assert_isinstance
 from discopy.python import finset, function
 from discopy.python.function import Ty
-from discopy.pattern import Count, Hom, Obj, Var, Tensor, TensorDir
+from discopy.pattern import Hom, Obj, Var, Tensor, TensorDir
 from discopy.axioms import rule
 
 
@@ -129,21 +129,27 @@ class Function(function.Function, SymmetricCategory):
         return Function.swap(*self.is_swap_of[::-1])
 
     @rule
-    def trace[A: Obj[Ty], B: Obj[Ty], S: bool, N: Count, M: Obj[Ty, N]](
+    def trace[A: Obj[Ty], B: Obj[Ty], M: Obj[Ty], S: bool](
             self: Hom[Function, TensorDir[M, A, S], TensorDir[M, B, S]],
-            n: Var[int, N] = 1, left: Var[bool, S] = False
+            dom: Var[Ty | None, A] = None,
+            cod: Var[Ty | None, B] = None,
+            mem: Var[Ty | None, M] = None,
+            left: Var[bool, S] = False
     ) -> Hom[Function, A, B]:
         """
         The additive trace of a function.
 
         Parameters:
-            n : The number of types to trace over.
+            dom : The domain of the trace.
+            cod : The codomain of the trace.
+            mem : The objects to trace over, one wire by default.
+            left : Whether to trace the wires on the left or right.
         """
-        if n == 0:
+        dom, cod, mem = self.trace_boundary(dom, cod, mem, left)
+        if not mem:
             return self
         if left:
             raise NotImplementedError
-        dom, cod = self.dom[:-n], self.cod[:-n]
 
         def inside(obj, tag=0):
             run_at_least_once = True

@@ -128,7 +128,7 @@ Every traced symmetric category is a feedback category with a trivial delay:
 ...     ob = TracedTy
 ...     delay = lambda self, n_steps=1: self
 ...     feedback = lambda self, dom=None, cod=None, mem=None, left=False:\\
-...         self.trace(len(mem), left)
+...         self.trace(dom=dom, cod=cod, mem=mem, left=left)
 >>> class TracedBox(symmetric.Box, Traced):
 ...     pass
 
@@ -167,7 +167,7 @@ from discopy.utils import (
     deprecated_alias,
     factory, Generator, factory_name, assert_isinstance, AxiomError,
     from_tree)
-from discopy.pattern import Count, D, Hom, Obj, Var, TensorDir  # noqa: F401
+from discopy.pattern import D, Hom, Obj, Var, TensorDir  # noqa: F401
 from discopy.axioms import rule
 
 
@@ -407,9 +407,9 @@ class Diagram(markov.Diagram, FeedbackCategory):
     Functor: ClassVar[Generator]
 
     @rule
-    def delay[A: Obj[Ty], B: Obj[Ty], N: Count](
-            self: Hom[Diagram, A, B], n_steps: Var[int, N] = 1
-    ) -> Hom[Diagram, D[A, N], D[B, N]]:
+    def delay[A: Obj[Ty], B: Obj[Ty]](
+            self: Hom[Diagram, A, B], n_steps: int = 1
+    ) -> Hom[Diagram, D[A], D[B]]:
         """ The delay of a feedback diagram. """
         dom, cod = self.dom.delay(n_steps), self.cod.delay(n_steps)
         inside = tuple(box.delay(n_steps) for box in self.inside)

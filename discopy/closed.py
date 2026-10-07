@@ -166,7 +166,7 @@ class Diagram(markov.Diagram, biclosed.Diagram, ClosedCategory):
             if isinstance(box, Curry):
                 return (box.arg.to_compact() >> Coeval(
                     box.cod, left=box.left)).trace(
-                        len(box.cod.exponent), left=not box.left)
+                        mem=box.cod.exponent, left=not box.left)
             if isinstance(box, (Application, Abstraction)):
                 return box.eval(Functor.id(Diagram)).to_compact()
             return box

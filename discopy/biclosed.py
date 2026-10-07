@@ -98,7 +98,7 @@ from discopy.utils import (
     factory_name,
     from_tree,
 )
-from discopy.pattern import Count, ExpDir, TensorDir  # noqa: F401
+from discopy.pattern import ExpDir, TensorDir  # noqa: F401
 
 
 @factory
@@ -328,23 +328,30 @@ class Diagram(monoidal.Diagram, BiclosedCategory):
     Abstraction: ClassVar[Generator]
 
     @rule
-    def curry[X: Obj[Ty], S: bool, N: Count, Y: Obj[Ty, N], Z: Obj[Ty]](
-            self: Hom[Diagram, TensorDir[X, Y, S], Z], n: Var[int, N] = 1,
-            left: Var[bool, S] = True) -> Hom[Diagram, X, ExpDir[Z, Y, S]]:
+    def curry[X: Obj[Ty], Y: Obj[Ty], Z: Obj[Ty], S: bool](
+            self: Hom[Diagram, TensorDir[X, Y, S], Z],
+            context: Var[Ty | None, X] = None,
+            base: Var[Ty | None, Z] = None,
+            exponent: Var[Ty | None, Y] = None,
+            left: Var[bool, S] = True
+    ) -> Hom[Diagram, X, ExpDir[Z, Y, S]]:
         """
         Wrapper around :class:`Curry` called by :class:`Functor`: currying
-        no type at all is the identity, since an exponential of the unit
-        is its base.
+        the unit is the identity, since an exponential of the unit is its
+        base.
 
         Parameters:
-            n : The number of atomic types to curry.
+            context : The domain of the curry.
+            base : The base of the exponential, the codomain.
+            exponent : The objects to curry, one wire by default.
             left : Whether to curry on the left, i.e. into :class:`Over`,
                 or on the right, i.e. into :class:`Under`.
 
         >>> f = Box('f', Ty('x'), Ty('z'))
-        >>> assert f.curry(0) == f and Ty('z') << Ty() == Ty('z')
+        >>> assert f.curry(exponent=Ty()) == f and Ty('z') << Ty() == Ty('z')
         """
-        return self if not n else self.Curry(self, n, left)
+        _, _, exponent = self.curry_boundary(context, base, exponent, left)
+        return self.Curry(self, len(exponent), left) if exponent else self
 
     @classmethod
     @rule
@@ -517,11 +524,11 @@ class Curry(monoidal.Bubble, Box):
         return self.name
 
     def to_drawing(self):
-        if self.left:
-            f, e = self.arg, self.Coeval(self.cod, left=True)
-            return (f >> e).to_drawing().trace(self.n)
-        f, e = self.arg, self.Coeval(self.cod)
-        return (f >> e).to_drawing().trace(self.n, left=True)
+        f, e = self.arg, self.Coeval(self.cod, left=self.left)
+        drawing = (f >> e).to_drawing()
+        exponent = drawing.dom[len(drawing.dom) - self.n:] if self.left\
+            else drawing.dom[:self.n]
+        return drawing.trace(mem=exponent, left=not self.left)
 
 
 Sum, Bubble = Diagram.Sum, Diagram.Bubble
@@ -555,7 +562,8 @@ class Functor(monoidal.Functor):
                     return getattr(self.cod, attr)(base, exponent)
         if isinstance(other, Curry) and hasattr(self.cod, "curry"):
             return self.cod.curry(
-                self(other.arg), len(self(other.cod.exponent)), other.left)
+                self(other.arg), exponent=self(other.cod.exponent),
+                left=other.left)
         if isinstance(other, (Eval, Coeval)) and hasattr(self.cod, "ev"):
             base, exponent, left = other.x.base, other.x.exponent, other.left
             result = self.cod.ev(self(base), self(exponent), left)

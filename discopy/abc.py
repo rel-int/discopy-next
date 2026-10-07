@@ -696,9 +696,48 @@ class MonoidalCategory[C0: ColouredMonoid, C1: MonoidalCategory](
         """
         return left @ self @ right >> other
 
+    def trace_boundary(self, dom=None, cod=None, mem=None, left=False
+                       ) -> tuple[C0, C0, C0]:
+        """
+        Partition the boundary of a morphism for a trace or a feedback:
+        its domain is ``mem @ dom`` and its codomain ``mem @ cod`` when
+        ``left``, ``dom @ mem`` and ``cod @ mem`` otherwise, any two of
+        the three determining the third: the memory is what the codomain,
+        or else the domain, leaves when given, and one wire of the
+        codomain on that side when neither is.
+
+        Parameters:
+            dom : The domain of the trace.
+            cod : The codomain of the trace.
+            mem : The objects to trace over.
+            left : Whether the memory is on the left or right.
+
+        Raises:
+            AxiomError : When the three do not partition the boundary.
+        """
+        from discopy.utils import AxiomError
+
+        if mem is None:
+            side, part = (self.cod, cod) if cod is not None\
+                else (self.dom, dom) if dom is not None else (self.cod, None)
+            width = 1 if part is None else len(side) - len(part)
+            mem = side[:width] if left else side[len(side) - width:]
+
+        def rest(side):
+            return side[len(mem):] if left else side[:len(side) - len(mem)]
+
+        dom = rest(self.dom) if dom is None else dom
+        cod = rest(self.cod) if cod is None else cod
+        for side, part in ((self.dom, dom), (self.cod, cod)):
+            if side != (mem @ part if left else part @ mem):
+                raise AxiomError(
+                    f"{side} is not {mem} and {part} on the "
+                    f"{'left' if left else 'right'}.")
+        return dom, cod, mem
+
     @classmethod
     def contexts(cls, draw, applied: Rule, found: list[Match], dom, cod
-                 ) -> tuple[Match, Any, Any]:  # pylint: disable=unused-argument
+                 ) -> tuple[Match, Any, Any]:
         """
         A monoidal category puts the term of a recursive rule in context
         wherever its conclusion is a tensor: that side of the goal is
@@ -834,20 +873,23 @@ class TracedCategory[C0: ColouredMonoid, C1: TracedCategory](
     """
     @rule
     @abstractmethod
-    def trace[
-            A: Obj[C0], B: Obj[C0], S: bool, N: Count, M: Obj[C0, N]](
+    def trace[A: Obj[C0], B: Obj[C0], M: Obj[C0], S: bool](
             self: Hom[C1, TensorDir[M, A, S], TensorDir[M, B, S]],
-            n: Var[int, N] = 1, left: Var[bool, S] = False
+            dom: Var[C0 | None, A] = None, cod: Var[C0 | None, B] = None,
+            mem: Var[C0 | None, M] = None, left: Var[bool, S] = False
     ) -> Hom[C1, A, B]:
         """
-        The trace of ``n`` wires on either side, to be instantiated: ``M``
-        is of size ``n``, on the left of ``A`` and ``B`` when ``left`` and
-        on their right otherwise. Tracing no object at all is the
-        identity, i.e. the vanishing axiom ``f.trace(0) == f``, see `nLab
+        The trace of a memory ``mem`` on either side, to be instantiated:
+        a partition of the boundary, see :meth:`trace_boundary`, the
+        memory on the left of ``dom`` and ``cod`` when ``left`` and on
+        their right otherwise, one wire by default. Tracing the unit is
+        the identity, i.e. the vanishing axiom, see `nLab
         <https://ncatlab.org/nlab/show/traced+monoidal+category>`_.
 
         Parameters:
-            n : The number of objects to trace over.
+            dom : The domain of the trace.
+            cod : The codomain of the trace.
+            mem : The objects to trace over.
             left : Whether to trace the wires on the left or right.
         """
 
@@ -855,19 +897,20 @@ class TracedCategory[C0: ColouredMonoid, C1: TracedCategory](
     def trace_vanishing[A: Obj[C0], B: Obj[C0]](
             cls, f: Hom[C1, A, B]) -> Equation[Hom[C1, A, B]]:
         """ Vanishing of a trace over the unit. """
+        unit = f.dom[:0]
         return cls.Equation(
-            f.trace(0), f, f.trace(0, left=True))
+            f.trace(mem=unit), f, f.trace(mem=unit, left=True))
 
     @axiom
-    def trace_iteration[
-            A: Obj[C0], B: Obj[C0], N: Count, M: Obj[C0, N]](
-            cls, f: Hom[C1, Tensor[M, A], Tensor[M, B]], n: Var[int, N]
+    def trace_iteration[A: Obj[C0], B: Obj[C0], M: Obj[C0]](
+            cls, f: Hom[C1, Tensor[M, A], Tensor[M, B]], mem: Var[C0, M]
     ) -> Equation[Hom[C1, A, B]]:
-        """ The trace of ``n`` wires is ``n`` traces of one wire. """
+        """ The trace of a memory is the trace of its wires, one at a
+        time, the first first. """
         traced = f
-        for _ in range(n):
-            traced = traced.trace(1, left=True)
-        return cls.Equation(f.trace(n, left=True), traced)
+        for i in range(len(mem)):
+            traced = traced.trace(mem=mem[i:i + 1], left=True)
+        return cls.Equation(f.trace(mem=mem, left=True), traced)
 
     @axiom
     def trace_superposing_left[
@@ -894,8 +937,8 @@ class TracedCategory[C0: ColouredMonoid, C1: TracedCategory](
             g: Hom[C1, A, B]) -> Equation[Hom[C1, A, B]]:
         """ Left-oriented trace naturality. """
         return cls.Equation(
-            (x @ g).then(f).then(x @ g).trace(len(x), left=True),
-            g.then(f.trace(len(x), left=True)).then(g))
+            (x @ g).then(f).then(x @ g).trace(mem=x, left=True),
+            g.then(f.trace(mem=x, left=True)).then(g))
 
     @axiom
     def trace_naturality_right[
@@ -905,8 +948,8 @@ class TracedCategory[C0: ColouredMonoid, C1: TracedCategory](
             g: Hom[C1, A, B]) -> Equation[Hom[C1, A, B]]:
         """ Right-oriented trace naturality. """
         return cls.Equation(
-            (g @ x).then(f).then(g @ x).trace(len(x)),
-            g.then(f.trace(len(x))).then(g))
+            (g @ x).then(f).then(g @ x).trace(mem=x),
+            g.then(f.trace(mem=x)).then(g))
 
     @axiom
     def trace_dinaturality_left[M: Atom[C0], N: Atom[C0], S: Obj[C0],
@@ -919,8 +962,8 @@ class TracedCategory[C0: ColouredMonoid, C1: TracedCategory](
         source, target = g.cod, g.dom
         base, cobase = f.dom[len(source):], f.cod[len(target):]
         return cls.Equation(
-            f.then(g @ cobase).trace(len(source), left=True),
-            (g @ base).then(f).trace(len(target), left=True))
+            f.then(g @ cobase).trace(mem=source, left=True),
+            (g @ base).then(f).trace(mem=target, left=True))
 
     @axiom
     def trace_dinaturality_right[M: Atom[C0], N: Atom[C0], S: Obj[C0],
@@ -934,8 +977,8 @@ class TracedCategory[C0: ColouredMonoid, C1: TracedCategory](
         base = f.dom[:-len(source)] if len(source) else f.dom
         cobase = f.cod[:-len(target)] if len(target) else f.cod
         return cls.Equation(
-            f.then(cobase @ g).trace(len(source)),
-            (base @ g).then(f).trace(len(target)))
+            f.then(cobase @ g).trace(mem=source),
+            (base @ g).then(f).trace(mem=target))
 
 
 class ResiduatedMonoid[C0, C1: ResiduatedMonoid](ColouredMonoid[C0, C1]):
@@ -1014,66 +1057,114 @@ class BiclosedCategory[C0: ResiduatedMonoid, C1: BiclosedCategory](
 
     @rule
     @abstractmethod
-    def curry[X: Obj[C0], S: bool, N: Count, Y: Obj[C0, N],
-              Z: Obj[C0]](
-            self: Hom[C1, TensorDir[X, Y, S], Z], n: Var[int, N] = 1,
+    def curry[X: Obj[C0], Y: Obj[C0], Z: Obj[C0], S: bool](
+            self: Hom[C1, TensorDir[X, Y, S], Z],
+            context: Var[C0 | None, X] = None,
+            base: Var[C0 | None, Z] = None,
+            exponent: Var[C0 | None, Y] = None,
             left: Var[bool, S] = True) -> Hom[C1, X, ExpDir[Z, Y, S]]:
         """
-        The currying of ``n`` objects on either side, to be instantiated:
-        ``Y`` is of size ``n``, curried out of the end of the domain into
-        ``Z << Y`` when ``left``, out of its start into ``Y >> Z``
-        otherwise.
+        The currying of an exponent out of the domain on either side, to be
+        instantiated: a partition of the boundary, see
+        :meth:`curry_boundary`, ``context @ exponent -> base`` curried into
+        ``context -> base << exponent`` when ``left`` and ``exponent @
+        context -> base`` into ``context -> exponent >> base`` otherwise,
+        the exponent one wire by default.
 
         Parameters:
-            n : The number of objects to curry.
+            context : The domain of the curry.
+            base : The base of the exponential, the codomain.
+            exponent : The objects to curry.
             left : Whether to curry on the left or right.
         """
 
-    def base_and_exponent[X: Obj[C0], S: bool, N: Count,
-                          Y: Obj[C0, N], Z: Obj[C0]](
-            self: Hom[C1, X, ExpDir[Z, Y, S]], n: Var[int, N],
-            left: Var[bool, S]) -> tuple[Var[C0, Z], Var[C0, Y]]:
+    def curry_boundary(self, context=None, base=None, exponent=None,
+                       left=True) -> tuple[C0, C0, C0]:
+        """
+        Partition the boundary of a morphism for a curry: its domain is
+        ``context @ exponent`` when ``left``, ``exponent @ context``
+        otherwise, and its codomain ``base``. The exponent is what the
+        context leaves of the domain when given, and one wire of the
+        domain on that side when not, the context what remains.
+
+        Parameters:
+            context : The domain of the curry.
+            base : The base of the exponential, the codomain.
+            exponent : The objects to curry.
+            left : Whether to curry on the left or right.
+
+        Raises:
+            AxiomError : When the three do not partition the boundary.
+        """
+        from discopy.utils import AxiomError
+
+        dom = self.dom
+        if exponent is None:
+            width = 1 if context is None else len(dom) - len(context)
+            exponent = dom[len(dom) - width:] if left else dom[:width]
+        if context is None:
+            context = dom[:len(dom) - len(exponent)] if left\
+                else dom[len(exponent):]
+        base = self.cod if base is None else base
+        if dom != (context @ exponent if left else exponent @ context)\
+                or base != self.cod:
+            raise AxiomError(
+                f"{dom} -> {self.cod} is not {context} and {exponent} on "
+                f"the {'left' if left else 'right'} to {base}.")
+        return context, base, exponent
+
+    def base_and_exponent(self, base=None, exponent=None, left=True
+                          ) -> tuple[C0, C0]:
         """
         The base and exponent that :meth:`uncurry` evaluates, read off the
-        exponential object in the codomain.
+        exponential object in the codomain where not given.
 
         Parameters:
-            n : The number of objects to uncurry.
+            base : The base of the exponential.
+            exponent : The exponent of the exponential.
             left : Whether to uncurry on the left or right.
+
+        Raises:
+            AxiomError : When the codomain is not their exponential.
         """
-        # pylint: disable=unused-argument  # the exponential says the side
-        if not self.cod.is_exp:
-            raise ValueError
-        base, exponent = self.cod.base, self.cod.exponent
-        if n < len(exponent):
-            raise ValueError
+        from discopy.utils import AxiomError
+
+        if exponent is not None and not exponent:
+            base = self.cod if base is None else base
+        elif base is None or exponent is None:
+            if not self.cod.is_exp:
+                raise AxiomError(f"{self.cod} is not an exponential.")
+            base = self.cod.base if base is None else base
+            exponent = self.cod.exponent if exponent is None else exponent
+        if self.cod != (base << exponent if left else exponent >> base):
+            raise AxiomError(
+                f"{self.cod} is not {base} to the {exponent} on the "
+                f"{'left' if left else 'right'}.")
         return base, exponent
 
-    def uncurry[X: Obj[C0], S: bool, N: Count, Y: Obj[C0, N],
-                Z: Obj[C0]](
-            self: Hom[C1, X, ExpDir[Z, Y, S]], n: Var[int, N] = 1,
+    def uncurry[X: Obj[C0], Y: Obj[C0], Z: Obj[C0], S: bool](
+            self: Hom[C1, X, ExpDir[Z, Y, S]],
+            base: Var[C0 | None, Z] = None,
+            exponent: Var[C0 | None, Y] = None,
             left: Var[bool, S] = True) -> Hom[C1, TensorDir[X, Y, S], Z]:
         """
-        Uncurry a morphism by composing it with :meth:`ev`, assuming its
-        codomain is an exponential object, i.e. undo :meth:`curry`, whose
-        sequent its own states upside down: ``Y`` is the exponent, of size
-        ``n``. If the exponent has less than ``n`` objects, we uncurry the
-        remaining ones in turn, which the sequent leaves out. It is a
-        method rather than a rule since it is admissible: the evaluation
-        and a cut reach every uncurried morphism.
+        Uncurry a morphism by composing it with :meth:`ev`, i.e. undo
+        :meth:`curry`, whose sequent its own states upside down, the base
+        and exponent read off the codomain where not given, see
+        :meth:`base_and_exponent`. It is a method rather than a rule since
+        it is admissible: the evaluation and a cut reach every uncurried
+        morphism.
 
         Parameters:
-            n : The number of objects to uncurry.
+            base : The base of the exponential.
+            exponent : The exponent of the exponential.
             left : Whether to uncurry on the left or right.
         """
-        if n < 0:
-            raise ValueError
-        if not n:
+        base, exponent = self.base_and_exponent(base, exponent, left)
+        if not exponent:
             return self
-        base, exponent = self.base_and_exponent(n, left)
-        result = self @ exponent >> self.ev(base, exponent, True) if left\
+        return self @ exponent >> self.ev(base, exponent, True) if left\
             else exponent @ self >> self.ev(base, exponent, False)
-        return result.uncurry(n - len(exponent), left)
 
     @classmethod
     def uncurry_composition[
@@ -1093,7 +1184,8 @@ class BiclosedCategory[C0: ResiduatedMonoid, C1: BiclosedCategory](
             exponent : The objects curried out of the domain of ``f``.
             left : Whether to curry on the left or right.
         """
-        curried, ev = f.curry(1, left), cls.ev(base, exponent, left)
+        curried = f.curry(exponent=exponent, left=left)
+        ev = cls.ev(base, exponent, left)
         whiskered = curried @ exponent if left else exponent @ curried
         return whiskered.then(ev)
 
@@ -1167,7 +1259,8 @@ class BiclosedCategory[C0: ResiduatedMonoid, C1: BiclosedCategory](
         """ The currying of the evaluation is the identity. """
         exp = base << exponent if left else exponent >> base
         return cls.Equation(
-            cls.ev(base, exponent, left).curry(len(exponent), left),
+            cls.ev(base, exponent, left).curry(
+                exponent=exponent, left=left),
             cls.id(exp))
 
     @axiom
@@ -1178,9 +1271,9 @@ class BiclosedCategory[C0: ResiduatedMonoid, C1: BiclosedCategory](
     ) -> Equation[Hom[C1, U, ExpDir[Z, E, S]]]:
         """ Currying is natural in the base of the domain. """
         whiskered = g @ exponent if left else exponent @ g
-        n = len(exponent)
         return cls.Equation(
-            whiskered.then(f).curry(n, left), g.then(f.curry(n, left)))
+            whiskered.then(f).curry(exponent=exponent, left=left),
+            g.then(f.curry(exponent=exponent, left=left)))
 
 
 class Pregroup[C0, C1: Pregroup](ResiduatedMonoid[C0, C1]):
@@ -1268,9 +1361,11 @@ class RigidCategory[C0: Pregroup, C1: RigidCategory](BiclosedCategory[C0, C1]):
             return base @ cls.cups(exponent.l, exponent)
         return cls.cups(exponent, exponent.r) @ base
 
-    def curry[X: Obj[C0], S: bool, N: Count, Y: Obj[C0, N],
-              Z: Obj[C0]](
-            self: Hom[C1, TensorDir[X, Y, S], Z], n: Var[int, N] = 1,
+    def curry[X: Obj[C0], Y: Obj[C0], Z: Obj[C0], S: bool](
+            self: Hom[C1, TensorDir[X, Y, S], Z],
+            context: Var[C0 | None, X] = None,
+            base: Var[C0 | None, Z] = None,
+            exponent: Var[C0 | None, Y] = None,
             left: Var[bool, S] = True
     ) -> Hom[C1, X, TensorDir[Z, AdjDir[Y, S], S]]:
         """
@@ -1281,38 +1376,53 @@ class RigidCategory[C0: Pregroup, C1: RigidCategory](BiclosedCategory[C0, C1]):
         otherwise let it focus on every goal.
 
         Parameters:
-            n : The number of objects to curry.
+            context : The domain of the curry.
+            base : The base of the exponential, the codomain.
+            exponent : The objects to curry.
             left : Whether to curry on the left or right.
         """
-        if n < 0 or n > len(self.dom):
-            raise ValueError
-        if not n:
+        context, _, exponent = self.curry_boundary(
+            context, base, exponent, left)
+        if not exponent:
             return self
         if left:
-            base, exponent = self.dom[:-n], self.dom[-n:]
-            return base @ self.caps(exponent, exponent.l)\
+            return context @ self.caps(exponent, exponent.l)\
                 >> self @ exponent.l
-        base, exponent = self.dom[n:], self.dom[:n]
-        return self.caps(exponent.r, exponent) @ base >> exponent.r @ self
+        return self.caps(exponent.r, exponent) @ context\
+            >> exponent.r @ self
 
-    def base_and_exponent[X: Obj[C0], S: bool, N: Count,
-                          Y: Obj[C0, N], Z: Obj[C0]](
-            self: Hom[C1, X, TensorDir[Z, AdjDir[Y, S], S]], n: Var[int, N],
-            left: Var[bool, S]) -> tuple[Var[C0, Z], Var[C0, Y]]:
+    def base_and_exponent(self, base=None, exponent=None, left=True
+                          ) -> tuple[C0, C0]:
         """
-        Contrary to :meth:`BiclosedCategory.base_and_exponent`, a pregroup has
-        no exponential object to read the exponent off the codomain: it is the
-        ``n`` objects at the end resp. the start of the codomain, dualised.
+        Contrary to :meth:`BiclosedCategory.base_and_exponent`, a pregroup
+        has no exponential object to read the exponent off the codomain:
+        it is the objects at the end resp. the start of the codomain,
+        dualised, the ones the base leaves when it is given and one wire
+        otherwise.
 
         Parameters:
-            n : The number of objects to uncurry.
+            base : The base of the exponential.
+            exponent : The exponent of the exponential.
             left : Whether to uncurry on the left or right.
+
+        Raises:
+            AxiomError : When the codomain is not their exponential.
         """
-        if n > len(self.cod):
-            raise ValueError
-        if left:
-            return self.cod[:-n], self.cod[-n:].r
-        return self.cod[n:], self.cod[:n].l
+        from discopy.utils import AxiomError
+
+        cod = self.cod
+        if exponent is None:
+            width = 1 if base is None else len(cod) - len(base)
+            exponent = cod[len(cod) - width:].r if left\
+                else cod[:width].l
+        if base is None:
+            base = cod[:len(cod) - len(exponent)] if left\
+                else cod[len(exponent):]
+        if cod != (base @ exponent.l if left else exponent.r @ base):
+            raise AxiomError(
+                f"{cod} is not {base} to the {exponent} on the "
+                f"{'left' if left else 'right'}.")
+        return base, exponent
 
     @classmethod
     def focus(cls, branches: list, dom, cod) -> list:
@@ -1724,10 +1834,10 @@ class ClosedCategory[C0: ResiduatedMonoid, C1: ClosedCategory](
     ) -> Equation[Hom[C1, A, Over[Z, E]]]:
         """ Currying on the left is currying on the right after a swap. """
         base = f.dom[:len(f.dom) - len(exponent)]
-        n = len(exponent)
         return cls.Equation(
-            f.curry(n, left=True),
-            cls.swap(exponent, base).then(f).curry(n, left=False))
+            f.curry(exponent=exponent, left=True),
+            cls.swap(exponent, base).then(f).curry(
+                exponent=exponent, left=False))
 
 
 class DelayedMonoid[C0, C1: DelayedMonoid](ColouredMonoid[C0, C1]):
@@ -1757,11 +1867,10 @@ class DelayedMonoid[C0, C1: DelayedMonoid](ColouredMonoid[C0, C1]):
         return cls.Equation(x.delay(0), x)
 
     @axiom
-    def delay_addition[A: Obj[C0], B: Obj[C0], N: Count](
-            cls, x: Hom[C1, A, B], n: Var[int, N]
-    ) -> Equation[Hom[C1, A, B]]:
-        """ Delaying by one then by ``n`` steps is delaying by ``n + 1``. """
-        return cls.Equation(x.delay().delay(n), x.delay(n + 1))
+    def delay_addition[A: Obj[C0], B: Obj[C0]](
+            cls, x: Hom[C1, A, B]) -> Equation[Hom[C1, A, B]]:
+        """ Delaying by one step twice is delaying by two steps. """
+        return cls.Equation(x.delay().delay(), x.delay(2))
 
     @axiom
     def delay_tensor[A: Obj[C0], B: Obj[C0], C: Obj[C0]](
@@ -1780,12 +1889,12 @@ class FeedbackCategory[C0: DelayedMonoid, C1: FeedbackCategory](
     """
     @rule
     @abstractmethod
-    def delay[A: Obj[C0], B: Obj[C0], N: Count](
-            self: Hom[C1, A, B], n_steps: Var[int, N] = 1
-    ) -> Hom[C1, D[A, N], D[B, N]]:
+    def delay[A: Obj[C0], B: Obj[C0]](
+            self: Hom[C1, A, B], n_steps: int = 1
+    ) -> Hom[C1, D[A], D[B]]:
         """
         The delay endofunctor applied to a morphism, to be instantiated:
-        as a rule, from ``a ⊢ b`` conclude ``a.delay(n) ⊢ b.delay(n)``.
+        as a rule, from ``a ⊢ b`` conclude ``a.d ⊢ b.d``, one step.
 
         Parameters:
             n_steps : The number of time steps to delay.

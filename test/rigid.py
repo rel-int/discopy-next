@@ -144,20 +144,22 @@ def test_sum_adjoint():
 def test_curry_uncurry():
     x, y, z = map(Ty, "xyz")
     f = Box('f', x @ y, z)
-    assert f.curry(n=0) == f == f.uncurry(n=0)
+    assert f.curry(exponent=Ty()) == f == f.uncurry(exponent=Ty())
     assert f.curry().uncurry().normal_form() == f
     assert f.curry(left=False).uncurry(left=False).normal_form() == f
-    assert f.curry(n=2).uncurry(n=2).normal_form() == f
-    with raises(ValueError):
-        f.curry(n=3)
-    with raises(ValueError):
-        f.uncurry(n=2)
+    assert f.curry(exponent=x @ y).uncurry(
+        exponent=x @ y).normal_form() == f
+    with raises(AxiomError):
+        f.curry(exponent=x @ y @ z)
+    with raises(AxiomError):
+        f.uncurry(exponent=x @ y)
 
 
 def test_curry_zero():
     x = Ty('x')
     f = Box('f', x @ x, x)
-    assert f.curry(0) == f == f.curry(0, left=False)
+    assert f.curry(exponent=Ty()) == f\
+        == f.curry(exponent=Ty(), left=False)
 
 
 def test_Functor():

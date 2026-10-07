@@ -317,28 +317,24 @@ class R[T: abc.Pregroup](AdjDir[T, Literal[False]]):
                                 residuals)
 
 
-class D[T: abc.DelayedMonoid, N = Literal[1]](Pattern):
-    """ The delay ``D[T, N]`` of a pattern by ``N`` time steps, one by
-    default, inverted by the delay ``-N`` steps back when matching: an
-    unbound ``N`` binds to every number of steps up to
-    :data:`MAX_COUNT` that the value is the delay of. """
+class D[T: abc.DelayedMonoid](Pattern):
+    """ The delay ``D[T]`` of a pattern by one time step, inverted by the
+    delay ``-1`` steps back when matching. """
 
     @classmethod
     def instantiate(cls, args, subst, unit):
-        base, steps = args
-        return instantiate(base, subst, unit).delay(
-            instantiate(steps, subst, unit))
+        (base, ) = args
+        return instantiate(base, subst, unit).d
 
     @classmethod
     def unify(cls, args, value, subst, residuals):
-        base, steps = args
-        for n_steps, bound in counts(steps, subst):
-            try:
-                undelayed = value.delay(-n_steps)
-            except NotImplementedError:  # Not the delay of anything.
-                return
-            if undelayed.delay(n_steps) == value:
-                yield from unify(base, undelayed, bound, residuals)
+        (base, ) = args
+        try:
+            undelayed = value.delay(-1)
+        except NotImplementedError:  # Not the delay of anything.
+            return
+        if undelayed.d == value:
+            yield from unify(base, undelayed, subst, residuals)
 
 
 class Repeat[X: abc.ColouredMonoid, N: Count](Pattern):
@@ -367,21 +363,7 @@ class Repeat[X: abc.ColouredMonoid, N: Count](Pattern):
 
 
 MAX_COUNT = 3
-""" The largest number a ``Count`` stands for, drawn or matched. """
-
-
-def counts(count, subst: Substitution
-           ) -> Iterator[tuple[Any, Substitution]]:
-    """ The numbers a count stands for, each with the substitution
-    binding it: a ``Literal`` its own, a bound variable its binding, an
-    unbound one every number up to :data:`MAX_COUNT`. """
-    if get_origin(count) is Literal:
-        yield get_args(count)[0], subst
-    elif count.__name__ in subst:
-        yield subst[count.__name__], subst
-    else:
-        for n in range(MAX_COUNT + 1):
-            yield n, {**subst, count.__name__: n}
+""" The largest number a ``Count`` stands for, when drawn. """
 
 
 class Image[F, X](Pattern):

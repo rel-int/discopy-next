@@ -668,20 +668,34 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   so `python.Function.curry`, `ev` and `uncurry` are methods rather than
   rules.
 - `trace`, `curry`, `ev` and `feedback` are each one rule, stated by
-  their own signature on both sides: `trace(n=1, left=False)` traces an
-  object `M` of size `n` on the side `left` says, its domain
-  `TensorDir[M, A, S]` read `M @ A` when the side `S` is true and
-  `A @ M` otherwise, with `ExpDir` and `AdjDir` orienting exponentials
-  and adjoints the same way. The one-wire rules `trace_left`,
-  `trace_right`, `curry_left`, `curry_right`, `ev_left`, `ev_right`,
-  `feedback_left` and `feedback_right` are removed: call the rule with
-  `n` and `left`, e.g. `f.trace(1, left=True)`. Every implementation
-  restates its sequent with `@rule`, an override without it dropping
-  the rule; `uncurry` and the rigid `curry` stay methods since the
-  evaluation, caps and cut reach what they build. `feedback` takes
-  `left` everywhere, a stream and a parametric map raising
-  `NotImplementedError` on the left, and the `uncurry` of a Python
-  function takes `n` like the others.
+  their own signature on both sides, and none of them takes a number of
+  wires: like `feedback`, `trace(dom, cod, mem, left=False)` takes an
+  already partitioned boundary, its domain `mem @ dom` and codomain
+  `mem @ cod` when `left`, `dom @ mem` and `cod @ mem` otherwise, read
+  `TensorDir[M, A, S]` by its sequent, and `curry(context, base,
+  exponent, left=True)` curries `context @ exponent -> base` into
+  `context -> base << exponent`, or `exponent @ context -> base` into
+  `context -> exponent >> base`, any two parts determining the third
+  and one wire being the default. `MonoidalCategory.trace_boundary` and
+  `BiclosedCategory.curry_boundary` compute and check the partition for
+  every implementation, an `AxiomError` where it does not partition the
+  boundary, and `uncurry(base, exponent, left=True)` reads what it is
+  not given off the codomain through `base_and_exponent`, one
+  exponential at a time. The rule's object variables are plain objects,
+  so `Count` is left to the spiders, copies and merges: a delay states
+  one step, `D[T]`. The one-wire rules `trace_left`, `trace_right`,
+  `curry_left`, `curry_right`, `ev_left`, `ev_right`, `feedback_left`
+  and `feedback_right` are removed: call the rule with a memory or an
+  exponent and `left`, e.g. `f.trace(mem=x, left=True)` where `f.trace(1,
+  left=True)` was written, and `f.trace(mem=f.dom[:0])` is the vanishing
+  axiom. Every implementation restates its sequent with `@rule`, an
+  override without it dropping the rule; `uncurry` and the rigid `curry`
+  stay methods since the evaluation, caps and cut reach what they build.
+  `feedback` takes `left` everywhere, a stream and a parametric map
+  raising `NotImplementedError` on the left. A drawing traces by
+  position, its memory the outputs fed back and the inputs they feed as
+  many on the same side, so a feedback whose memory comes back delayed
+  is still drawn as a trace.
 
 - `Diagram.to_hypergraph` records the offset of every state of a diagram,
   where it only did so for a diagram with one box per layer, so that a

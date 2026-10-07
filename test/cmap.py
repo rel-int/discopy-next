@@ -176,11 +176,11 @@ def test_diagram_to_map_structure_and_errors():
             Port(PortKind.INPUT, 0, x, 0, "up"),
             Port(PortKind.COD, 0, x, 0, "down"))
     f = compact.CMap.from_box(compact.Box("f", x, y))
-    assert f.trace(0) is f
-    with raises(ValueError):
-        f.trace(-1)
-    with raises(ValueError):
-        f.trace(2)
+    assert f.trace(mem=x[:0]) is f
+    with raises(AxiomError):
+        f.trace(mem=y)
+    with raises(AxiomError):
+        f.trace(mem=x @ x)
 
     x = monoidal.Ty("x")
     with raises(TypeError, match="Pregroup"):
@@ -345,16 +345,18 @@ def test_curry_uncurry_roundtrip(module):
     f = module.Box("f", x @ y, z)
     cmap = f.to_map()
 
-    assert cmap.curry(n=0).uncurry(n=0) == cmap
-    with raises(ValueError):
-        cmap.curry(n=3)
-    with raises(ValueError):
-        cmap.uncurry(n=2)
+    unit = x[:0]
+    assert cmap.curry(exponent=unit).uncurry(exponent=unit) == cmap
+    with raises(AxiomError):
+        cmap.curry(exponent=x @ y @ z)
+    with raises(AxiomError):
+        cmap.uncurry(exponent=x @ y)
 
     if module is compact:
         assert cmap.curry().uncurry() == cmap
         assert cmap.curry(left=True).uncurry(left=True) == cmap
-        assert cmap.curry(n=2, left=True).uncurry(n=2, left=True) == cmap
+        assert cmap.curry(exponent=x @ y, left=True).uncurry(
+            exponent=x @ y, left=True) == cmap
         return
 
     right = cmap.curry(left=False)
@@ -380,15 +382,16 @@ def test_curry_uncurry_roundtrip(module):
 
     w = module.Ty("w")
     k = module.Box("k", x @ y @ z, w)
-    right_two = k.to_map().curry(n=2, left=False).uncurry(n=2, left=False)
+    right_two = k.to_map().curry(
+        exponent=x @ y, left=False).uncurry(left=False)
     assert right_two.dom == x @ y @ z
     assert right_two.cod == w
     assert right_two.boxes == (
         module.Diagram.Curry(k, 2, False),
         module.Diagram.Eval(x @ y >> w, left=False))
 
-    left_two = k.to_map().curry(n=2, left=True).uncurry(
-        n=2, left=True)
+    left_two = k.to_map().curry(
+        exponent=y @ z, left=True).uncurry(left=True)
     assert left_two.dom == x @ y @ z
     assert left_two.cod == w
     assert left_two.boxes == (
@@ -396,17 +399,18 @@ def test_curry_uncurry_roundtrip(module):
         module.Diagram.Eval(w << y @ z, left=True))
 
     right_nested = k.to_map().curry(left=False).curry(
-        left=False).uncurry(n=2, left=False)
+        left=False).uncurry(left=False).uncurry(left=False)
     assert right_nested.dom == x @ y @ z
     assert right_nested.cod == w
 
     left_nested = k.to_map().curry(left=True).curry(
-        left=True).uncurry(n=2, left=True)
+        left=True).uncurry(left=True).uncurry(left=True)
     assert left_nested.dom == x @ y @ z
     assert left_nested.cod == w
 
-    with raises(ValueError):
-        k.to_map().curry(n=2, left=False).uncurry(left=False)
+    with raises(AxiomError):
+        k.to_map().curry(exponent=x @ y, left=False).uncurry(
+            exponent=y, left=False)
 
 
 def test_trace():
@@ -444,7 +448,7 @@ def test_make_causal_cuts_every_backward_wire_at_once():
     from discopy import traced
     x = traced.Ty("x")
     f, g = traced.Box("f", x @ x, x @ x), traced.Box("g", x, x)
-    cmap = (f.to_map() >> g.to_map() @ x).trace(2)
+    cmap = (f.to_map() >> g.to_map() @ x).trace(mem=x @ x)
     assert not cmap.is_acyclic
     assert cmap.make_causal().boxes == (
         traced.Trace(traced.Trace(f >> g @ x)), )

@@ -186,47 +186,45 @@ class Function(function.Function, ClosedCategory):
         dom, cod = exponent @ Function.exp(base, exponent), base
         return Function(lambda *xs: xs[-1](*xs[:-1]), dom, cod)
 
-    def curry(self, n: int = 1, left: bool = True) -> Function:
+    def curry(self, context=None, base=None, exponent=None, left=True
+              ) -> Function:
         """
         Currying, i.e. turn a binary function into a function-valued function,
         a method rather than a rule as :meth:`ev` is.
 
         Parameters:
-            n : The number of types to curry.
+            context : The domain of the curry.
+            base : The base of the exponential, the codomain.
+            exponent : The objects to curry, one wire by default.
             left : Whether to curry on the left or right.
         """
-        if not n:
+        context, _, exponent = self.curry_boundary(
+            context, base, exponent, left)
+        if not exponent:
             return self
-        if left:
-            dom = self.dom[:len(self.dom) - n]
-            cod = Function.exp(self.cod, self.dom[len(self.dom) - n:])
-        else:
-            dom, cod = self.dom[n:], Function.exp(self.cod, self.dom[:n])
-        return Function(dom=dom, cod=cod, inside=lambda *xs: lambda *ys:
-                        self(*(xs + ys) if left else (ys + xs)))
+        return Function(
+            dom=context, cod=Function.exp(self.cod, exponent),
+            inside=lambda *xs: lambda *ys: self(
+                *(xs + ys) if left else (ys + xs)))
 
-    def uncurry(self, n: int = 1, left: bool = True) -> Function:
+    def uncurry(self, base=None, exponent=None, left=True) -> Function:
         """
-        Uncurrying,
-        i.e. turn a function-valued function into a binary function: the
-        exponent has ``n`` types, and if it has less we uncurry the
-        remaining ones in turn, as :meth:`BiclosedCategory.uncurry` does.
+        Uncurrying, i.e. turn a function-valued function into a binary
+        function, its base and exponent read off the callable type of its
+        codomain where not given.
 
         Parameters:
-            n : The number of types to uncurry.
+            base : The base of the exponential.
+            exponent : The exponent of the exponential.
             left : Whether to uncurry on the left or right.
         """
-        if n < 0:
-            raise ValueError
-        if not n:
-            return self
         traced = self.cod.inside[0].__args__
-        base, exponent = map(Ty.cast, (traced[-1].__args__, traced[:-1]))
-        if n < len(exponent):
-            raise ValueError
-        result = self @ exponent >> Function.ev(base, exponent) if left\
+        base = Ty.cast(traced[-1].__args__) if base is None else base
+        exponent = Ty.cast(traced[:-1]) if exponent is None else exponent
+        if not exponent:
+            return self
+        return self @ exponent >> Function.ev(base, exponent) if left\
             else exponent @ self >> Function.ev(base, exponent, left=False)
-        return result.uncurry(n - len(exponent), left)
 
     def fix(self, n=1) -> Function:
         """
@@ -242,21 +240,27 @@ class Function(function.Function, ClosedCategory):
             else Function(inside, self.dom[:-1], self.cod).fix(n - 1)
 
     @rule
-    def trace[A: Obj[Ty], B: Obj[Ty], S: bool, N: Count, M: Obj[Ty, N]](
+    def trace[A: Obj[Ty], B: Obj[Ty], M: Obj[Ty], S: bool](
             self: Hom[Function, TensorDir[M, A, S], TensorDir[M, B, S]],
-            n: Var[int, N] = 1, left: Var[bool, S] = False
+            dom: Var[Ty | None, A] = None,
+            cod: Var[Ty | None, B] = None,
+            mem: Var[Ty | None, M] = None,
+            left: Var[bool, S] = False
     ) -> Hom[Function, A, B]:
         """
         The multiplicative trace of a function.
 
         Parameters:
-            n : The number of types to trace over.
+            dom : The domain of the trace.
+            cod : The codomain of the trace.
+            mem : The objects to trace over, one wire by default.
+            left : Whether to trace the wires on the left or right.
         """
-        if n == 0:
+        dom, cod, traced = self.trace_boundary(dom, cod, mem, left)
+        if not traced:
             return self
         if left:
             raise NotImplementedError
-        dom, cod, traced = self.dom[:-n], self.cod[:-n], self.dom[-n:]
         fixed = (self >> self.discard(cod) @ traced).fix()
         return self.copy(dom) >> dom @ fixed\
             >> self >> cod @ self.discard(traced)

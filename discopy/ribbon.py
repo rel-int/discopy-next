@@ -87,7 +87,7 @@ from discopy.abc import BalancedCategory, RibbonCategory
 from discopy.axioms import Serialisable
 from discopy.cat import factory, Generator
 from discopy.pivotal import Ty, Nat  # noqa: F401  pylint: disable=unused-import
-from discopy.pattern import Count, Hom, Obj, Var, TensorDir  # noqa: F401
+from discopy.pattern import Hom, Obj, Var, TensorDir  # noqa: F401
 from discopy.axioms import rule
 
 
@@ -108,25 +108,30 @@ class Diagram(pivotal.Diagram, balanced.Diagram, RibbonCategory):
         "The generic tree of a twist does not read back (#742).")
 
     @rule
-    def trace[A: Obj[Ty], B: Obj[Ty], S: bool, N: Count, M: Obj[Ty, N]](
+    def trace[A: Obj[Ty], B: Obj[Ty], M: Obj[Ty], S: bool](
             self: Hom[Diagram, TensorDir[M, A, S], TensorDir[M, B, S]],
-            n: Var[int, N] = 1, left: Var[bool, S] = False
+            dom: Var[Ty | None, A] = None,
+            cod: Var[Ty | None, B] = None,
+            mem: Var[Ty | None, M] = None,
+            left: Var[bool, S] = False
     ) -> Hom[Diagram, A, B]:
         """
-        The trace of a ribbon diagram.
+        The trace of a ribbon diagram, by caps and cups.
 
         Parameters:
-            n : The number of wires to trace.
+            dom : The domain of the trace.
+            cod : The codomain of the trace.
+            mem : The objects to trace over, one wire by default.
+            left : Whether to trace the wires on the left or right.
         """
-        if not n:
+        dom, cod, mem = self.trace_boundary(dom, cod, mem, left)
+        if not mem:
             return self
         if left:
-            return self.caps(self.dom[:n].r, self.dom[:n]) @ self.dom[n:]\
-                >> self.dom[:n].r @ self\
-                >> self.cups(self.cod[:n].r, self.cod[:n]) @ self.cod[n:]
-        return self.dom[:-n] @ self.caps(self.dom[-n:], self.dom[-n:].r)\
-            >> self @ self.dom[-n:].r\
-            >> self.cod[:-n] @ self.cups(self.cod[-n:], self.cod[-n:].r)
+            return self.caps(mem.r, mem) @ dom >> mem.r @ self\
+                >> self.cups(mem.r, mem) @ cod
+        return dom @ self.caps(mem, mem.r) >> self @ mem.r\
+            >> cod @ self.cups(mem, mem.r)
 
     def cup(self, x, y):
         """

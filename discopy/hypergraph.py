@@ -66,12 +66,11 @@ from discopy.utils import (
     unbiased,
     AxiomError,
     assert_isatomic,
-    assert_istraceable,
     classproperty,
     tuplify,
     untuplify,
 )
-from discopy.pattern import Count, TensorDir  # noqa: F401
+from discopy.pattern import TensorDir  # noqa: F401
 if TYPE_CHECKING:
     from discopy.monoidal import Ty, Box, Diagram
 
@@ -551,24 +550,26 @@ class Hypergraph[category: Diagram](MonoidalCategory, DaggerCategory,
         return factory.__func__(type(self), self, left)
 
     @rule
-    def trace[A: Obj[Any], B: Obj[Any], S: bool, N: Count, M: Obj[Any, N]](
+    def trace[A: Obj[Any], B: Obj[Any], M: Obj[Any], S: bool](
             self: Hom[Hypergraph, TensorDir[M, A, S], TensorDir[M, B, S]],
-            n: Var[int, N] = 1, left: Var[bool, S] = False
+            dom: Var[Any | None, A] = None,
+            cod: Var[Any | None, B] = None,
+            mem: Var[Any | None, M] = None,
+            left: Var[bool, S] = False
     ) -> Hom[Hypergraph, A, B]:
         """
         The trace of a hypergraph is its pre- and post-composition with
         cups and caps to form a feedback loop.
 
         Parameters:
-            n : The number of wires to trace.
-            left : Whether to trace on the left or right.
+            dom : The domain of the trace.
+            cod : The codomain of the trace.
+            mem : The objects to trace over, one wire by default.
+            left : Whether to trace the wires on the left or right.
         """
-        if n == 0:
+        dom, cod, traced_wires = self.trace_boundary(dom, cod, mem, left)
+        if not traced_wires:
             return self
-        assert_istraceable(self, n, left)
-        dom, cod = (self.dom[n:], self.cod[n:]) if left\
-            else (self.dom[:-n], self.cod[:-n])
-        traced_wires = self.dom[:n] if left else self.dom[len(self.dom) - n:]
         traced_wires_r = traced_wires.r if hasattr(traced_wires, "r")\
             else traced_wires[::-1]
         return self.caps(traced_wires_r, traced_wires) @ dom\

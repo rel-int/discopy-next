@@ -53,9 +53,10 @@ equality of planar traced diagrams is not implemented, only symmetric traced.
 Vanishing
 =========
 
->>> assert f.trace(n=0) == f == f.trace(n=0, left=True)
->>> assert f.trace(n=2) == f.trace().trace()
->>> assert f.trace(n=2, left=True) == f.trace(left=True).trace(left=True)
+>>> assert f.trace(mem=Ty()) == f == f.trace(mem=Ty(), left=True)
+>>> assert f.trace(mem=x @ x) == f.trace().trace()
+>>> assert f.trace(mem=x @ x, left=True)\\
+...     == f.trace(left=True).trace(left=True)
 
 Superposing
 ===========
@@ -138,7 +139,7 @@ from discopy.utils import (
     assert_isinstance,
     assert_istraceable,
 )
-from discopy.pattern import Count, Hom, Obj, Var, TensorDir  # noqa: F401
+from discopy.pattern import Hom, Obj, Var, TensorDir  # noqa: F401
 from discopy.axioms import rule
 
 
@@ -159,15 +160,21 @@ class Diagram(monoidal.Diagram, TracedCategory):
     Functor: ClassVar[Generator]
 
     @rule
-    def trace[A: Obj[Ty], B: Obj[Ty], S: bool, N: Count, M: Obj[Ty, N]](
+    def trace[A: Obj[Ty], B: Obj[Ty], M: Obj[Ty], S: bool](
             self: Hom[Diagram, TensorDir[M, A, S], TensorDir[M, B, S]],
-            n: Var[int, N] = 1, left: Var[bool, S] = False
+            dom: Var[Ty | None, A] = None,
+            cod: Var[Ty | None, B] = None,
+            mem: Var[Ty | None, M] = None,
+            left: Var[bool, S] = False
     ) -> Hom[Diagram, A, B]:
         """
-        Feed ``n`` outputs back into inputs, one :class:`Trace` per wire.
+        Feed a memory of outputs back into inputs, one :class:`Trace` per
+        wire, the outermost first.
 
         Parameters:
-            n : The number of output wires to feedback into inputs.
+            dom : The domain of the trace.
+            cod : The codomain of the trace.
+            mem : The objects to trace over, one wire by default.
             left : Whether to trace the wires on the left or right.
 
         Example
@@ -182,8 +189,9 @@ class Diagram(monoidal.Diagram, TracedCategory):
 
         .. image:: /_static/traced/trace.svg
         """
+        _, _, mem = self.trace_boundary(dom, cod, mem, left)
         result = self
-        for _ in range(n):
+        for _ in range(len(mem)):
             result = self.Trace(result, left=left)
         return result
 
@@ -301,8 +309,10 @@ class Functor(monoidal.Functor):
 
     def __call__(self, other):
         if isinstance(other, Trace):
-            n = len(self(other.arg.dom)) - len(self(other.dom))
-            return self.cod.trace(self(other.arg), n, left=other.left)
+            traced = other.arg.cod[:1] if other.left\
+                else other.arg.cod[len(other.arg.cod) - 1:]
+            return self.cod.trace(
+                self(other.arg), mem=self(traced), left=other.left)
         return super().__call__(other)
 
 

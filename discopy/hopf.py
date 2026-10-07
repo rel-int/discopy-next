@@ -52,7 +52,7 @@ unlink.
 >>> x = ribbon.Ty('x')
 >>> F = Functor(ob_map={x: V}, ar_map={}, cod=Intertwiner[H])
 >>> braid = ribbon.Braid(x, x)
->>> hopf_link = (braid >> braid).trace(n=2)
+>>> hopf_link = (braid >> braid).trace(mem=x @ x)
 >>> unlink = (ribbon.Cap(x, x.r) >> ribbon.Cup(x, x.r)) @ (
 ...     ribbon.Cap(x, x.r) >> ribbon.Cup(x, x.r))
 

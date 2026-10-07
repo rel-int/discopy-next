@@ -51,7 +51,7 @@ from discopy.cat import (
 from discopy.utils import assert_isinstance, unbiased
 from discopy.pattern import Hom
 from discopy.pattern import rule
-from discopy.pattern import Count, TensorDir  # noqa: F401
+from discopy.pattern import TensorDir  # noqa: F401
 
 if TYPE_CHECKING:
     import sympy
@@ -394,17 +394,22 @@ class Matrix[dtype](MonoidalCategory, DaggerCategory, NamedGeneric):
                    for n in range(index(self.dom) + 1))
 
     @rule
-    def trace[A: Obj[Any], B: Obj[Any], S: bool, N: Count, M: Obj[Any, N]](
+    def trace[A: Obj[Any], B: Obj[Any], M: Obj[Any], S: bool](
             self: Hom[Matrix, TensorDir[M, A, S], TensorDir[M, B, S]],
-            n: Var[int, N] = 1, left: Var[bool, S] = False
+            dom: Var[Any | None, A] = None,
+            cod: Var[Any | None, B] = None,
+            mem: Var[Any | None, M] = None,
+            left: Var[bool, S] = False
     ) -> Hom[Matrix, A, B]:
         """
         The trace of a Boolean matrix, computed with :meth:`Matrix.repeat`.
 
         Parameters:
-            n : The number of dimensions to trace.
-            left : Whether to trace the first ``n`` dimensions rather than
-                the last, by conjugating with swaps.
+            dom : The domain of the trace.
+            cod : The codomain of the trace.
+            mem : The dimensions to trace, one by default.
+            left : Whether to trace the first dimensions rather than the
+                last, by conjugating with swaps.
 
         Example
         -------
@@ -413,9 +418,11 @@ class Matrix[dtype](MonoidalCategory, DaggerCategory, NamedGeneric):
         >>> assert f.trace() == Matrix[bool]([[1]], 1, 1)
         >>> assert f.trace(left=True) == Matrix[bool]([[0]], 1, 1)
         """
-        dom, cod = index(self.dom) - n, index(self.cod) - n
+        dom, cod, mem = self.trace_boundary(dom, cod, mem, left)
+        n, dom, cod = index(mem), index(dom), index(cod)
         if left:
-            return (self.swap(dom, n) >> self >> self.swap(n, cod)).trace(n)
+            return (self.swap(dom, n) >> self >> self.swap(n, cod)).trace(
+                mem=mem)
         A, B, C, D = (row >> self >> column
                       for row in [self.id(dom) @ self.ones(n),
                                   self.ones(dom) @ self.id(n)]

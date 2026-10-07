@@ -69,7 +69,7 @@ from discopy.utils import (
     factory_name,
     unbiased,
 )
-from discopy.pattern import Count, ExpDir, TensorDir  # noqa: F401
+from discopy.pattern import ExpDir, TensorDir  # noqa: F401
 
 if TYPE_CHECKING:
     from discopy.monoidal import Box, Diagram, Ty
@@ -997,16 +997,22 @@ class CMap[category: Diagram](CompactCategory, DaggerCategory,
         return cls.from_box(cls.category.ev(base, exponent, left))
 
     @rule
-    def curry[X: Obj[Any], S: bool, N: Count, Y: Obj[Any, N], Z: Obj[Any]](
-            self: Hom[CMap, TensorDir[X, Y, S], Z], n: Var[int, N] = 1,
-            left: Var[bool, S] = True) -> Hom[CMap, X, ExpDir[Z, Y, S]]:
+    def curry[X: Obj[Any], Y: Obj[Any], Z: Obj[Any], S: bool](
+            self: Hom[CMap, TensorDir[X, Y, S], Z],
+            context: Var[Any | None, X] = None,
+            base: Var[Any | None, Z] = None,
+            exponent: Var[Any | None, Y] = None,
+            left: Var[bool, S] = True
+    ) -> Hom[CMap, X, ExpDir[Z, Y, S]]:
         """
         Currying is kept as an explicit curry box by default, the more
         rigorous representation, or comes from the wiring of caps when the
         host category is rigid.
 
         Parameters:
-            n : The number of objects to curry.
+            context : The domain of the curry.
+            base : The base of the exponential, the codomain.
+            exponent : The objects to curry, one wire by default.
             left : Whether to curry on the left or right.
 
         >>> from discopy.compact import Ty, Box
@@ -1020,24 +1026,25 @@ class CMap[category: Diagram](CompactCategory, DaggerCategory,
             :align: center
         """
         if issubclass(self.category, RigidCategory):
-            return RigidCategory.curry(self, n, left)
-        if n < 0 or n > len(self.dom):
-            raise ValueError
-        if not n:
+            return RigidCategory.curry(self, context, base, exponent, left)
+        _, _, exponent = self.curry_boundary(context, base, exponent, left)
+        if not exponent:
             return self
         return self.from_box(self.category.Curry(
-            self.to_diagram(), n, left))
+            self.to_diagram(), len(exponent), left))
 
-    def base_and_exponent(self, n: int, left: bool) -> tuple[Ty, Ty]:
+    def base_and_exponent(self, base=None, exponent=None, left=True
+                          ) -> tuple[Ty, Ty]:
         """
         The base and exponent that :meth:`uncurry` evaluates, read off the
         codomain as in the host category.
 
         Parameters:
-            n : The number of objects to uncurry.
+            base : The base of the exponential.
+            exponent : The exponent of the exponential.
             left : Whether to uncurry on the left or right.
         """
-        return self.category.base_and_exponent(self, n, left)
+        return self.category.base_and_exponent(self, base, exponent, left)
 
     l = property(lambda self: self.transpose(left=True))
     r = property(lambda self: self.transpose(left=False))
@@ -1119,32 +1126,32 @@ class CMap[category: Diagram](CompactCategory, DaggerCategory,
             dom, cod, boxes, edge, loops=loops, check=False)
 
     @rule
-    def trace[A: Obj[Any], B: Obj[Any], S: bool, N: Count, M: Obj[Any, N]](
+    def trace[A: Obj[Any], B: Obj[Any], M: Obj[Any], S: bool](
             self: Hom[CMap, TensorDir[M, A, S], TensorDir[M, B, S]],
-            n: Var[int, N] = 1, left: Var[bool, S] = False
+            dom: Var[Any | None, A] = None,
+            cod: Var[Any | None, B] = None,
+            mem: Var[Any | None, M] = None,
+            left: Var[bool, S] = False
     ) -> Hom[CMap, A, B]:
         """
         Trace boundary wires by splicing the selected inputs and outputs.
 
         Parameters:
-            n : The number of wires to trace.
-            left : Whether to trace the leftmost rather than rightmost wires.
+            dom : The domain of the trace.
+            cod : The codomain of the trace.
+            mem : The objects to trace over, one wire by default.
+            left : Whether to trace the wires on the left or right.
         """
-        if n < 0:
-            raise ValueError
-        if not n:
+        dom, cod, mem = self.trace_boundary(dom, cod, mem, left)
+        if not mem:
             return self
-        if n > min(len(self.dom), len(self.cod)):
-            raise ValueError
-
+        n = len(mem)
         if left:
-            dom, cod = self.dom[n:], self.cod[n:]
             traced_inputs = range(n)
             traced_outputs = range(
                 self.n_ports - len(self.cod),
                 self.n_ports - len(self.cod) + n)
         else:
-            dom, cod = self.dom[:-n], self.cod[:-n]
             traced_inputs = range(len(dom), len(self.dom))
             traced_outputs = range(self.n_ports - n, self.n_ports)
 
@@ -1424,7 +1431,7 @@ class CMap[category: Diagram](CompactCategory, DaggerCategory,
             exponent = box.cod.exponent
             return (type(self).from_diagram(box.arg).to_compact()
                     >> self.ev(box.cod.base, exponent, box.left).dagger()
-                    ).trace(len(exponent), left=not box.left)
+                    ).trace(mem=exponent, left=not box.left)
 
         diagram = self.to_diagram()
         return type(self).from_glued(diagram.dom, diagram.cod, [

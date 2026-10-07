@@ -46,10 +46,11 @@ def test_to_compact():
 
     h = Box("h", w @ x @ y, z)
     for left in (True, False):
-        source = h.curry(n=2, left=left)
+        exponent = x @ y if left else w @ x
+        source = h.curry(exponent=exponent, left=left)
         assert source.to_compact() == (
             h >> Coeval(source.cod, left=left)).trace(
-                n=2, left=not left)
+                mem=exponent, left=not left)
 
     g = Box("g", z << y, x)
     assert (f.curry() >> g).to_compact() == f.curry().to_compact() >>\

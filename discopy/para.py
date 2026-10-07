@@ -338,30 +338,34 @@ class Traced(Symmetric, TracedCategory):
     traced category, with the parameters swapped out of the way.
     """
     @rule
-    def trace[A: Obj[monoidal.Ty], B: Obj[monoidal.Ty], S: bool, N: Count,
-              M: Obj[monoidal.Ty, N]](
+    def trace[A: Obj[monoidal.Ty], B: Obj[monoidal.Ty], M: Obj[monoidal.Ty],
+              S: bool](
             self: Hom[Traced, TensorDir[M, A, S], TensorDir[M, B, S]],
-            n: Var[int, N] = 1, left: Var[bool, S] = False
+            dom: Var[monoidal.Ty | None, A] = None,
+            cod: Var[monoidal.Ty | None, B] = None,
+            mem: Var[monoidal.Ty | None, M] = None,
+            left: Var[bool, S] = False
     ) -> Hom[Traced, A, B]:
         """
         The trace of a parametric map is the trace of the underlying
         morphism, with the parameters swapped out of the way.
 
         Parameters:
-            n : The number of objects to trace over.
+            dom : The domain of the trace.
+            cod : The codomain of the trace.
+            mem : The objects to trace over, one wire by default.
             left : Whether to trace the wires on the left or right.
         """
-        if n == 0:
+        dom, cod, mem = self.trace_boundary(dom, cod, mem, left)
+        if not mem:
             return self
         if left:
-            return type(self)(self.dom[n:], self.cod[n:],
-                              self.inside.trace(n, left=True),
+            return type(self)(dom, cod, self.inside.trace(mem=mem, left=True),
                               self.param, self.copar)
-        inside = self.dom[:-n] @ self.category.swap(
-            self.param, self.dom[-n:]) >> self.inside >> self.cod[:-n]\
-            @ self.category.swap(self.cod[-n:], self.copar)
-        return type(self)(self.dom[:-n], self.cod[:-n],
-                          inside.trace(n), self.param, self.copar)
+        inside = dom @ self.category.swap(self.param, mem) >> self.inside\
+            >> cod @ self.category.swap(mem, self.copar)
+        return type(self)(
+            dom, cod, inside.trace(mem=mem), self.param, self.copar)
 
 
 class Markov(Symmetric, MarkovCategory):
@@ -412,26 +416,34 @@ class Closed(Markov, ClosedCategory):
             base, exponent, left))
 
     @rule
-    def curry[X: Obj[closed.Ty], S: bool, N: Count, Y: Obj[closed.Ty, N],
-              Z: Obj[closed.Ty]](
-            self: Hom[Closed, TensorDir[X, Y, S], Z], n: Var[int, N] = 1,
-            left: Var[bool, S] = True) -> Hom[Closed, X, ExpDir[Z, Y, S]]:
+    def curry[X: Obj[closed.Ty], Y: Obj[closed.Ty], Z: Obj[closed.Ty],
+              S: bool](
+            self: Hom[Closed, TensorDir[X, Y, S], Z],
+            context: Var[closed.Ty | None, X] = None,
+            base: Var[closed.Ty | None, Z] = None,
+            exponent: Var[closed.Ty | None, Y] = None,
+            left: Var[bool, S] = True
+    ) -> Hom[Closed, X, ExpDir[Z, Y, S]]:
         """
-        Curry the last `n` objects of the domain if `left` else the first,
-        i.e. everything but the parameters, which a left currying swaps out
-        of the way the same as :meth:`Traced.trace`.
+        Curry an exponent out of the end of the domain if `left` else out
+        of its start, i.e. never the parameters, which a left currying
+        swaps out of the way the same as :meth:`Traced.trace`.
 
         Parameters:
-            n : The number of objects to curry.
-            left : Whether to curry into a left or right exponential.
+            context : The domain of the curry.
+            base : The base of the exponential, the codomain.
+            exponent : The objects to curry, one wire by default.
+            left : Whether to curry on the left or right.
         """
+        context, _, exponent = self.curry_boundary(
+            context, base, exponent, left)
         if not left:
-            inside = self.inside.curry(n, left=False)
-            return type(self)(self.dom[n:], inside.cod, inside, self.param)
-        inside = self.dom[:-n] @ self.category.swap(
-            self.param, self.dom[-n:]) >> self.inside
-        inside = inside.curry(n, left=True)
-        return type(self)(self.dom[:-n], inside.cod, inside, self.param)
+            inside = self.inside.curry(exponent=exponent, left=False)
+            return type(self)(context, inside.cod, inside, self.param)
+        inside = context @ self.category.swap(self.param, exponent)\
+            >> self.inside
+        inside = inside.curry(exponent=exponent, left=True)
+        return type(self)(context, inside.cod, inside, self.param)
 
 
 class Feedback(Markov, FeedbackCategory):
@@ -442,9 +454,9 @@ class Feedback(Markov, FeedbackCategory):
     category = FeedbackDiagram
 
     @rule
-    def delay[A: Obj[FeedbackTy], B: Obj[FeedbackTy], N: Count](
-            self: Hom[Feedback, A, B], n_steps: Var[int, N] = 1
-    ) -> Hom[Feedback, D[A, N], D[B, N]]:
+    def delay[A: Obj[FeedbackTy], B: Obj[FeedbackTy]](
+            self: Hom[Feedback, A, B], n_steps: int = 1
+    ) -> Hom[Feedback, D[A], D[B]]:
         """
         Delay a parametric map by delaying its underlying morphism together
         with its domain, codomain, parameter and coparameter spaces.

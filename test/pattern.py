@@ -83,11 +83,9 @@ def test_delay_and_image():
 
     x = feedback.Ty("x")
     X, F = TypeVar("X"), TypeVar("F")
-    N = TypeVar("N", bound=Count)
-    assert [s for s, _ in match(D[X, N], x.delay(2))] == [
-        {"N": 0, "X": x.delay(2)}, {"N": 1, "X": x.d}, {"N": 2, "X": x}]
     assert [s for s, _ in match(D[X], x.d)] == [{"X": x}]
-    assert instantiate(D[X, Literal[2]], {"X": x}, feedback.Ty) == x.delay(2)
+    assert not list(match(D[X], x))
+    assert instantiate(D[D[X]], {"X": x}, feedback.Ty) == x.delay(2)
     relabel = feedback.Functor({x: x.d}, {})
     assert instantiate(Image[F, X], {"F": relabel, "X": x}, None) == x.d
     ((_, residuals), ) = match(Image[F, X], x.d)
@@ -140,22 +138,26 @@ def test_sides():
 
 
 def test_trace():
-    """ The n-ary trace is one rule on both sides: ``M`` is of size
-    ``n``, the side ``S`` is ``left``. """
+    """ The trace is one rule on both sides, of a memory partitioning the
+    boundary as that of a feedback does: the side ``S`` is ``left``. """
     from discopy import traced
 
     trace = TracedCategory.trace
-    assert trace.variables["M"].size == "N"
-    assert list(trace.premises) == ["self", "n", "left"]
+    assert trace.variables["M"].size is None
+    assert list(trace.premises) == ["self", "dom", "cod", "mem", "left"]
     x, y, a, b = map(traced.Ty, "xyab")
-    found = [(s["S"], s["N"], s["M"]) for s, _ in match(
+    found = [(s["S"], s["M"]) for s, _ in match(
         trace.premises["self"], (x @ y @ a, x @ y @ b))]
     assert found == [  # The right ends a and b share no wire.
-        (True, 0, traced.Ty()), (True, 1, x), (True, 2, x @ y),
-        (False, 0, traced.Ty())]
+        (True, traced.Ty()), (True, x), (True, x @ y), (False, traced.Ty())]
+    f = traced.Box("f", x @ y @ a, x @ y @ b)
+    assert f.trace(mem=x @ y, left=True) == f.trace(dom=a, cod=b, left=True)\
+        == f.trace(dom=y @ a, cod=y @ b, left=True).trace(left=True)
+    with raises(AxiomError):
+        f.trace(mem=x, cod=b, left=True)
     assert str(Objects(size="N")) == "Obj[_, N]"
     canonical = traced.Diagram.trace_iteration.canonical()
-    assert str(canonical.terms[0]).count("Trace") == 2
+    assert canonical and str(canonical.terms[0]).count("Trace") == 1
 
 
 def test_curry_and_uncurry():
@@ -172,14 +174,14 @@ def test_curry_and_uncurry():
     x, y, z, w = map(biclosed.Ty, "xyzw")
     f = biclosed.Box("f", x @ y @ z, w)
     for subst, _ in match(curry.premises["self"], (f.dom, f.cod)):
-        curried = f.curry(subst["N"], left=subst["S"])
+        curried = f.curry(exponent=subst["Y"], left=subst["S"])
         assert instantiate(curry.conclusion, subst, biclosed.Ty)\
             == (curried.dom, curried.cod)
     for left in (True, False):
         g = biclosed.Box("g", x, w << y @ z if left else y @ z >> w)
         (subst, _), = match(uncurry.premises["self"], (g.dom, g.cod))
-        assert (subst["S"], subst["N"], subst["Y"]) == (left, 2, y @ z)
-        uncurried = g.uncurry(2, left)
+        assert (subst["S"], subst["Y"]) == (left, y @ z)
+        uncurried = g.uncurry(left=left)
         assert instantiate(uncurry.conclusion, subst, biclosed.Ty)\
             == (uncurried.dom, uncurried.cod)
 

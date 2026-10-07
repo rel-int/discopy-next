@@ -8,7 +8,8 @@ from discopy.hopf import (
 
 circle = lambda x: ribbon.Cap(x, x.r) >> ribbon.Cup(x, x.r)
 unlink = lambda x: circle(x) @ circle(x)
-hopf_link = lambda x: (ribbon.Braid(x, x) >> ribbon.Braid(x, x)).trace(n=2)
+hopf_link = lambda x: (ribbon.Braid(x, x) >> ribbon.Braid(x, x)).trace(
+    mem=x @ x)
 
 
 def double_and_module():
@@ -311,7 +312,7 @@ def test_nontrivial_link_invariant():
     D, V = double_and_module()
     x = ribbon.Ty('x')
     F = Functor(ob_map={x: V}, ar_map={}, cod=Intertwiner[D])
-    unknot = ribbon.Braid(x, x).trace(n=2)
+    unknot = ribbon.Braid(x, x).trace(mem=x @ x)
     networks = [F(d) for d in [circle(x), unlink(x), hopf_link(x), unknot]]
     assert all(isinstance(network, tensor.Diagram) for network in networks)
     values = [complex(network.eval(dtype=complex)) for network in networks]
@@ -327,7 +328,7 @@ def test_two_colour_mutual_braiding():
     F = Functor(ob_map={xe: e, xm: m}, ar_map={}, cod=Intertwiner[D])
 
     def value(a, b):
-        link = (ribbon.Braid(a, b) >> ribbon.Braid(b, a)).trace(n=2)
+        link = (ribbon.Braid(a, b) >> ribbon.Braid(b, a)).trace(mem=a @ b)
         return complex(F(link).eval(dtype=complex))
 
     assert np.isclose(value(xe, xm), -1)

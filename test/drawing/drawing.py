@@ -754,7 +754,7 @@ def test_Drawing_validate_attributes():
     z = monoidal.Ty('z')
     assert Drawing.permutation([0, 1], [z, z]) == Drawing.id(z @ z)
     h = Box('h', x @ x @ y, x @ x @ y).to_drawing()
-    assert h.trace(2) == h.trace().trace()
+    assert h.trace(mem=h.cod[len(h.cod) - 2:]) == h.trace().trace()
     zero = Drawing.zero(x, y)
     assert h.add(zero) == h == zero.add(h)
 

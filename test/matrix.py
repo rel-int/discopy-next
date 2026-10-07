@@ -58,6 +58,6 @@ def test_autotyping():
 
 def test_trace_one_wire():
     m = Matrix[bool]([True, False, False, True] * 4, 4, 4)
-    assert m.trace(left=True) == m.trace(1, left=True)
+    assert m.trace(left=True) == m.trace(mem=m.cod[:1], left=True)
     with raises(TypeError):
         Matrix[int]([1, 0, 0, 1], 2, 2).repeat()

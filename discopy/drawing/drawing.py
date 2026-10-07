@@ -211,7 +211,7 @@ from discopy.pattern import Hom
 from discopy.pattern import rule
 from discopy.utils import (
     assert_isinstance, assert_iscomposable, unbiased, factory, RichDisplay)
-from discopy.pattern import Count, TensorDir  # noqa: F401
+from discopy.pattern import TensorDir  # noqa: F401
 
 if TYPE_CHECKING:
     from discopy import monoidal
@@ -937,19 +937,46 @@ class Drawing(TracedCategory, RichDisplay):
         return result
 
     @rule
-    def trace[A: Obj[Any], B: Obj[Any], S: bool, N: Count, M: Obj[Any, N]](
+    def trace[A: Obj[Any], B: Obj[Any], M: Obj[Any], S: bool](
             self: Hom[Drawing, TensorDir[M, A, S], TensorDir[M, B, S]],
-            n: Var[int, N] = 1, left: Var[bool, S] = False
+            dom: Var[Any | None, A] = None,
+            cod: Var[Any | None, B] = None,
+            mem: Var[Any | None, M] = None,
+            left: Var[bool, S] = False
     ) -> Hom[Drawing, A, B]:
+        """
+        The trace of a drawing, one wire at a time, the outermost first. A
+        drawing traces by position: the memory is the outputs fed back,
+        and the inputs they feed into as many on the same side whatever
+        their labels, so that a feedback, whose memory comes back delayed,
+        is drawn as a trace.
+
+        Parameters:
+            dom : The domain of the trace.
+            cod : The codomain of the trace.
+            mem : The objects to trace over, one wire by default.
+            left : Whether to trace the wires on the left or right.
+        """
         from discopy.monoidal import Box, Ty
-        if n == 0:
+        if mem is None:
+            width = 1 if cod is None else len(self.cod) - len(cod)
+            mem = self.cod[:width] if left\
+                else self.cod[len(self.cod) - width:]
+
+        def rest(side):
+            return side[len(mem):] if left else side[:len(side) - len(mem)]
+
+        dom = rest(self.dom) if dom is None else dom
+        cod = rest(self.cod) if cod is None else cod
+        if not mem:
             return self
-        if n > 1:
-            return self.trace(left=left).trace(n=n - 1, left=left)
-        dom = self.dom[1:] if left else self.dom[:-1]
-        cod = self.cod[1:] if left else self.cod[:-1]
-        traced_dom = self.dom[:1] if left else self.dom[-1:]
-        traced_cod = self.cod[:1] if left else self.cod[-1:]
+        if len(mem) > 1:
+            outermost, rest = (mem[:1], mem[1:]) if left\
+                else (mem[len(mem) - 1:], mem[:len(mem) - 1])
+            return self.trace(mem=outermost, left=left).trace(
+                mem=rest, left=left)
+        traced_dom = self.dom[:1] if left else self.dom[len(self.dom) - 1:]
+        traced_cod = mem
         cap_cod, cup_dom = traced_dom ** 2, (
             traced_dom @ traced_cod if left else traced_cod @ traced_dom)
         cup = Box('cup', cup_dom, Ty(), draw_as_wires=True).to_drawing()

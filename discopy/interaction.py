@@ -258,7 +258,7 @@ class Diagram[natural](RibbonCategory, NamedGeneric):
             >> self.inside @ w
             >> y @ braid(w, u).dagger()
             >> other.inside @ u
-            >> z @ braid(v, u)).trace(n=v if isinstance(v, int) else len(v))
+            >> z @ braid(v, u)).trace(mem=v)
         return type(self)(inside, dom, cod)
 
     @classmethod

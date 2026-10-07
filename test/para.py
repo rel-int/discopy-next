@@ -39,7 +39,7 @@ def test_symmetric_axioms():
 
 def test_trace():
     t = Traced(x @ y, z @ y, Box('t', x @ y @ p, z @ y), p)
-    assert t.trace(0) == t
+    assert t.trace(mem=t.dom[:0]) == t
     inside = x @ Diagram.swap(p, y) >> t.inside
     assert t.trace() == Traced(x, z, inside.trace(), p)
     u = Traced(y @ x, y @ z, Box('u', y @ x @ p, y @ z), p)
