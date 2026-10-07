@@ -6,7 +6,7 @@ run an experiment and report whether it helps with the hypothesis statistics, in
 go ahead, on a new branch off this one
 
 ## Baseline
-- [ ] experiment script measuring hypothesis statistics, dead ends and the sampling distribution, run on the unified search
+- [WIP] @session_019jj2d1JBnEGRPmjqSAP37A-2026-10-07 09:57 experiment script measuring hypothesis statistics, dead ends and the sampling distribution, run on the unified search
 
 ## Search in abc
 - [ ] move the search out of `pattern.py` into a family of classmethods of `abc.Category`: `search`, `leaves`, `branches`, `contexts`, `focus`
