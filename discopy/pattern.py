@@ -1,6 +1,6 @@
 """
 The patterns in which a category states its rules, generators and
-axioms, which :meth:`discopy.abc.Category.search` searches its terms by.
+axioms, which :meth:`discopy.cat.Arrow.search` searches its terms by.
 
 A sequent is the signature of a method on an abstract base class of
 :mod:`discopy.abc`: its :pep:`695` type parameter list is the context,
@@ -36,13 +36,13 @@ splits the goal at every position, a variable binds once, an adjoint
 ``R[p]`` inverts to ``p``. What cannot be inverted, an exponential that
 collapsed into adjoints, is a residual equation checked once every
 variable is instantiated. A :class:`Rule` is a declaration with a
-conclusion, and :meth:`discopy.abc.Category.search` builds a term of a
+conclusion, and :meth:`discopy.cat.Arrow.search` builds a term of a
 goal type by choosing at each step a free box, a rule with no hom
 premise whose conclusion matches the goal — a generator, built in one
 step — or, below the depth bound, a :meth:`Rule.recursive` one whose hom
 premises are searched. The unification here is planar: a category with
 more structure puts a term in context by its own plumbing, see
-:meth:`discopy.abc.MonoidalCategory.rewire`.
+:meth:`discopy.monoidal.Diagram.rewire`.
 
 Summary
 -------
@@ -665,7 +665,7 @@ class Declaration[**P, T]:
     """
     A declaration is a sequent stated by a ``function`` on an abstract
     base class and inherited by every category below it: the base of the
-    rules of :meth:`discopy.abc.Category.search` and of the axioms of
+    rules of :meth:`discopy.cat.Arrow.search` and of the axioms of
     :mod:`discopy.axioms`. The ``category`` is the class the
     declaration is bound to, ``name`` the attribute it is stored under
     and ``owner`` the class declaring the sequent.
@@ -900,7 +900,7 @@ class Rule[**P, T](Declaration[P, T]):
     An inference rule of a category, a
     :class:`Declaration` with a conclusion: every rule
     states its sequent as its own signature and
-    :meth:`discopy.abc.Category.search` calls
+    :meth:`discopy.cat.Arrow.search` calls
     the attribute of the same name on the category. Accessed on a
     class, a rule binds to it, once per class; on an instance, it
     behaves as the method it decorates.
@@ -939,7 +939,7 @@ class Rule[**P, T](Declaration[P, T]):
         """
         Whether a premise is a hom, which the search proves recursively
         below its depth bound; a rule with none is a generator, built in
-        one step, see :meth:`discopy.abc.Category.generators`.
+        one step, see :meth:`discopy.cat.Arrow.generators`.
 
         >>> from discopy.abc import Category, RigidCategory
         >>> assert Category.cut.recursive

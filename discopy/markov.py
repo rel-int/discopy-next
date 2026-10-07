@@ -76,7 +76,7 @@ Both copy and merge boxes are translated to spiders, thus when they appear
 in the same diagram they automatically satisfy the :mod:`frobenius` axioms.
 """
 
-from typing import ClassVar
+from typing import Any, ClassVar
 
 from discopy import symmetric, monoidal, cmap, hypergraph
 from discopy.pattern import Atom, Count, Hom, Repeat, rule, Var
@@ -187,6 +187,27 @@ class Diagram(symmetric.Diagram, MarkovCategory):
             x : The type to discard.
         """
         return cls.copy(x, 0)
+
+    @classmethod
+    def rewire(cls, draw, value: monoidal.Ty, dom: bool,
+               other: monoidal.Ty | None) -> tuple[monoidal.Ty, Any]:
+        """
+        A Markov category copies or discards each wire of the domain of a
+        goal, with even odds of leaving them as they are, then permutes
+        them: a term may use an input any number of times. The codomain
+        is only permuted, since nothing merges in a Markov category.
+        """
+        from hypothesis import strategies as st
+
+        if "copy" not in cls.generators or not dom or not value\
+                or not draw(st.booleans()):
+            return super().rewire(draw, value, dom, other)
+        copies = [draw(st.sampled_from((1, 0, 2))) for _ in range(len(value))]
+        plumbing = cls.id(value[:0]).tensor(*(
+            cls.id(x) if n == 1 else cls.copy(x, n)
+            for x, n in zip(value.atoms, copies)))
+        return cls.plumb(plumbing, dom, super().rewire(
+            draw, plumbing.cod, dom, other))
 
 
 Box, Permutation, Swap, Trace = (

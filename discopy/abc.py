@@ -12,18 +12,16 @@ the characteristic generator of its categorical structure as an
 Software dependencies between modules go top-to-bottom, left-to-right and
 forgetful functors between categories go the other way.
 
-Each class also declares its :func:`discopy.axioms.axiom` equations, which
-every free category inherits along with the structure they axiomatise:
-:class:`Category` states the unitality and associativity of composition,
-the typing of its identities and composites, and a
-:class:`DaggerCategory` the involution and contravariance of its dagger;
-a :class:`ColouredMonoid` inherits them as
-the unitality and associativity of its product, its composition. The
-structural methods carry their own :func:`discopy.pattern.rule`, from
-which
-:meth:`discopy.monoidal.Diagram.strategy` searches for the diagrams the
-laws quantify over: a level of the hierarchy declares its structure here
-and inherits the search as is.
+Each class states its structure twice: as abstract methods with plain
+Python typing, which a concrete category implements, and as
+:func:`discopy.pattern.rule` sequents forwarding to them, e.g.
+:meth:`Category.cut` to :meth:`Category.then`. It also declares the
+:func:`discopy.axioms.axiom` equations that every category below
+inherits along with the structure they axiomatise, e.g.
+:class:`Category` the unitality and associativity of composition. How
+the terms of a category are generated to check its laws is no business
+of this module: a concrete category says so by implementing
+:meth:`discopy.axioms.Testable.strategy`.
 
 Summary
 -------
@@ -62,28 +60,22 @@ Summary
 """
 
 from abc import ABC, abstractmethod
-from collections.abc import Iterator, Sequence
+from collections.abc import Sequence
 from dataclasses import dataclass
 from types import NoneType
 from typing import (
-    Any, ClassVar, Self, TYPE_CHECKING, get_args,
-    get_origin)
+    ClassVar, Self, TYPE_CHECKING)
 
 from discopy import messages
-from discopy.axioms import axiom, Equation, Testable
+from discopy.axioms import axiom, Equation
 from discopy.pattern import (
-    Atom, Count, D, Hom, L, Obj, Objects, Over, Pattern, R, Repeat, Rule,
-    rule, Sort, Substitution, Tensor, Under, Unit, Var)
+    Atom, Count, D, Hom, L, Obj, Over, R, Repeat, rule, Tensor, Under, Unit,
+    Var)
 from discopy.utils import classproperty, unbiased
 from discopy.utils import NamedGeneric  # noqa: F401  pylint: disable=unused-import  # re-exported
 
 
-class DeadEnd(Exception):
-    """ A goal nothing closes within the depth: :meth:`Category.search`
-    retries it a bounded number of times before rejecting the example. """
-
-
-class Category[C0, C1: Category](Testable, ABC):
+class Category[C0, C1: Category](ABC):
     """
     A category is a class with two class variables ``ob, ar``, two attributes
     ``dom, cod`` and two methods ``id, then``.
@@ -116,48 +108,6 @@ class Category[C0, C1: Category](Testable, ABC):
     #: further.
     Equation: ClassVar[type[Equation]] = Equation
 
-    @classproperty
-    def rules(cls: type) -> dict[str, Rule]:
-        """
-        The inference rules inherited by ``cls``, by name: the rule each
-        structural method carries, see :func:`discopy.pattern.rule`, bound
-        to ``cls`` and owned by the class declaring it, the latest in the
-        method resolution order winning like ordinary attribute lookup. A
-        method implementing a rule is decorated
-        :func:`discopy.pattern.rule` itself, restating its sequent, and
-        the search calls it by name; one declared
-        :meth:`discopy.pattern.Rule.inapplicable` or
-        :meth:`discopy.pattern.Rule.admissible` is dropped.
-        """
-        return Rule.inherited(cls)
-
-    @classproperty
-    def generators(cls: type) -> dict[str, Rule]:
-        """
-        The logical constants inherited by ``cls``, by name: the rules
-        with no hom premise, which the search builds in one step, see
-        :meth:`discopy.pattern.Rule.recursive`. A class adjusts the set by
-        assigning a dictionary of rules instead,
-        :meth:`discopy.pattern.Rule.constant` giving the rule of one given
-        box, so that its strategy draws from a fixed vocabulary, e.g. the
-        words of a pregroup grammar or the gates of a circuit.
-
-        >>> from hypothesis import find
-        >>> from discopy.pattern import Rule
-        >>> from discopy.grammar import pregroup
-        >>> n, s = pregroup.Ty('n'), pregroup.Ty('s')
-        >>> Alice, sleeps = pregroup.Word('Alice', n), pregroup.Word(
-        ...     'sleeps', n.r @ s)
-        >>> class Sentence(pregroup.Diagram):
-        ...     generators = {
-        ...         "cups": pregroup.Diagram.generators["cups"],
-        ...         **{w.name: Rule.constant(w) for w in (Alice, sleeps)}}
-        >>> print(find(Sentence.strategy(), bool).foliation())
-        Alice @ sleeps >> Cup(n, n.r) @ s
-        """
-        return {name: rule for name, rule in cls.rules.items()
-                if not rule.recursive}
-
     @classmethod
     def parameters(cls) -> tuple[type, ...]:
         """
@@ -170,245 +120,6 @@ class Category[C0, C1: Category](Testable, ABC):
         >>> assert Diagram.parameters() == (Ty, Diagram)
         """
         return cls.ob, cls.ar
-
-    @classmethod
-    def free(cls, dom=None, cod=None):
-        """
-        The strategy of the free boxes closing a goal, :obj:`None` for a
-        category generated by its :attr:`generators` alone.
-
-        Parameters:
-            dom : The domain of the goal, :obj:`None` when unknown.
-            cod : The codomain of the goal, :obj:`None` when unknown.
-        """
-        # pylint: disable=unused-argument  # no free box to draw
-        return None
-
-    @classmethod
-    def search(cls, *, dom=None, cod=None, max_depth: int = 3,
-               epsilon: float = 0.05):
-        """
-        Generate a term of the category toward a goal whose two sides are
-        patterns under one shared substitution: a side is a type, a
-        pattern, a type parameter standing for its variable, or
-        :obj:`None` for a fresh variable, so the goal ``A ⊢ A`` finds an
-        endomorphism on anything.
-
-        This is a template: a term is one of the :meth:`leaves` of the
-        goal — a :meth:`free` box or a generator — or, below the depth
-        bound, one
-        of its :meth:`branches`, a recursive rule whose premises are
-        searched in turn. The category says how the conclusion of the rule
-        it applies meets the goal, :meth:`contexts`, and which rules it
-        commits to without a choice, :meth:`focus`. A side guides the
-        search once its variables are all bound, and constrains it
-        afterwards: a failed unification is a :class:`DeadEnd`, retried a
-        bounded number of times before the example is rejected, unless the
-        side was fully bound already — then the term was built outside the
-        declared conclusion, an :class:`discopy.utils.AxiomError`.
-
-        Parameters:
-            dom : The domain of the goal.
-            cod : The codomain of the goal.
-            max_depth : The number of nested rules a term may apply.
-            epsilon : The chance of escaping the focusing discipline: a
-                goal with a :meth:`focus` rule commits to it, except with
-                probability ``epsilon``.
-
-        >>> from hypothesis import find
-        >>> from discopy.monoidal import Ty, Diagram, Box
-        >>> x, y = Ty('x'), Ty('y')
-        >>> term = find(Diagram.search(dom=x, cod=y),
-        ...             lambda term: len(term.boxes) > 1)
-        >>> assert (term.dom, term.cod) == (x, y) and len(term.boxes) > 1
-        """
-        from hypothesis import assume, strategies as st
-
-        @st.composite
-        def terms(draw):
-            subst = Substitution()
-            try:
-                result = cls.prove(draw, (dom, cod), max_depth, subst, epsilon)
-            except DeadEnd:
-                assume(False)
-            for pattern, value in subst.residuals:
-                for name in Pattern.variables(pattern):
-                    if name not in subst:
-                        subst[name] = draw(Objects().strategy(cls))
-                assume(subst.instantiate(pattern, cls.ob) == value)
-            return result
-
-        return terms()
-
-    @classmethod
-    def prove(cls, draw, goal: tuple, depth: int, subst: Substitution,
-              epsilon: float = 0.05, tries: int = 8):
-        """
-        A term of a goal, extending the substitution with what it binds:
-        an :meth:`attempt`, retried on a :class:`DeadEnd` a bounded
-        number of times.
-
-        Parameters:
-            draw : The draw of the composite strategy.
-            goal : The pair of sides of the goal, :obj:`None` for fresh.
-            depth : The number of nested rules the term may apply.
-            subst : The substitution the sides of the goal are under.
-            epsilon : The chance of escaping the focusing discipline.
-            tries : The number of attempts before giving up.
-        """
-        for _ in range(tries):
-            try:
-                return cls.attempt(draw, goal, depth, subst, epsilon)
-            except DeadEnd:
-                continue
-        raise DeadEnd(f"{goal[0]} -> {goal[1]}")
-
-    @classmethod
-    def attempt(cls, draw, goal: tuple, depth: int, subst: Substitution,
-                epsilon: float = 0.05):
-        """
-        One attempt at a term of a goal, the parameters those of
-        :meth:`prove`: a side guides the choice of a leaf or a branch once
-        its variables are bound, and the term built is unified back with
-        both sides, a :class:`DeadEnd` when it fails on a side that did
-        not guide it and an :class:`discopy.utils.AxiomError` when it fails
-        on one that did, the term then lying outside its conclusion.
-        """
-        from hypothesis import strategies as st
-        from discopy.utils import AxiomError
-
-        goal = tuple(
-            Substitution.fresh() if side is None else side for side in goal)
-        local = Substitution(subst, residuals=subst.residuals)
-        dom, cod = (local.guide(side, cls.ob) for side in goal)
-        choice = cls.choose(draw, dom, cod, depth, epsilon)
-        if choice is None:
-            result = draw(cls.free(dom, cod))
-        else:
-            applied, found = choice
-            rule_subst, before, after = cls.contexts(
-                draw, applied, found, dom, cod)
-            _, args = applied.generate(draw, lambda _, dom, cod: st.just(
-                cls.prove(draw, (dom, cod), depth - 1, local, epsilon)),
-                subst=rule_subst)
-            result = applied.apply(args)
-            result = result if before is None else before.then(result)
-            result = result if after is None else result.then(after)
-        for side, guide, value in zip(
-                goal, (dom, cod), (result.dom, result.cod)):
-            found = list(local.unify(side, value))
-            if not found and guide is None:
-                raise DeadEnd(f"{dom} -> {cod}")
-            if not found:
-                raise AxiomError(
-                    f"The goal reads {guide} where "
-                    f"{choice[0] if choice else 'a free box'} built "
-                    f"{result.dom} -> {result.cod}.")
-            local = draw(st.sampled_from(found))
-        subst.clear()
-        subst.update(local)
-        subst.residuals = local.residuals
-        return result
-
-    @classmethod
-    def choose(cls, draw, dom, cod, depth: int, epsilon: float = 0.05):
-        """
-        The way to close a goal: a rule in :meth:`focus` if any, except
-        with probability ``epsilon``, else one of its :meth:`leaves` or,
-        while ``depth`` is positive, of its :meth:`branches`, :obj:`None`
-        standing for a free box.
-
-        Parameters:
-            draw : The draw of the composite strategy.
-            dom : The domain of the goal, :obj:`None` when unknown.
-            cod : The codomain of the goal, :obj:`None` when unknown.
-            depth : The number of nested rules the term may apply.
-            epsilon : The chance of escaping the focusing discipline.
-        """
-        from hypothesis import strategies as st
-
-        branches = cls.branches(dom, cod) if depth else []
-        focus = cls.focus(branches, dom, cod)
-        if focus and not (epsilon >= 1 or epsilon > 0 and draw(
-                st.floats(0, 1, exclude_max=True)) < epsilon):
-            return focus[0]
-        leaves = cls.leaves(dom, cod)
-        candidates = branches if branches\
-            and (not leaves or draw(st.booleans())) else leaves
-        if not candidates:
-            raise DeadEnd(f"{dom} -> {cod}")
-        return draw(st.sampled_from(candidates))
-
-    @classmethod
-    def leaves(cls, dom, cod) -> list:
-        """
-        The ways to close a goal in one step: :obj:`None` for a
-        :meth:`free` box when there is one, which fits any goal, and each
-        generator whose conclusion unifies with the goal, with its matches.
-
-        Parameters:
-            dom : The domain of the goal, :obj:`None` when unknown.
-            cod : The codomain of the goal, :obj:`None` when unknown.
-        """
-        return ([] if cls.free(dom, cod) is None else [None]) + cls.matching(
-            cls.generators.values(), dom, cod)
-
-    @classmethod
-    def branches(cls, dom, cod) -> list:
-        """
-        The recursive rules whose conclusion unifies with a goal, each with
-        its matches, whose premises the search proves in turn.
-
-        Parameters:
-            dom : The domain of the goal, :obj:`None` when unknown.
-            cod : The codomain of the goal, :obj:`None` when unknown.
-        """
-        return cls.matching(
-            (rule for rule in cls.rules.values() if rule.recursive), dom, cod)
-
-    @staticmethod
-    def matching(rules, dom, cod) -> list:
-        """ The rules whose conclusion unifies with a goal, with their
-        matches, those with none left out. """
-        matches = [(rule, list(rule.match(dom, cod))) for rule in rules]
-        return [(rule, found) for rule, found in matches if found]
-
-    @classmethod
-    def contexts(cls, draw, applied: Rule, found: list[Substitution],
-                 dom, cod) -> tuple[Substitution, Any, Any]:
-        """
-        How the conclusion of a rule meets the goal: a match, and the
-        morphisms to compose before and after the term the rule builds,
-        :obj:`None` for nothing. A mere category has no context to put a
-        term in, so it draws one of the matches, which unify the
-        conclusion with the goal as it is.
-
-        Parameters:
-            draw : The draw of the composite strategy.
-            applied : The rule applied.
-            found : The matches of its conclusion with the goal.
-            dom : The domain of the goal, :obj:`None` when unknown.
-            cod : The codomain of the goal, :obj:`None` when unknown.
-        """
-        # pylint: disable=unused-argument  # the goal is already matched
-        from hypothesis import strategies as st
-
-        return draw(st.sampled_from(found)), None, None
-
-    @classmethod
-    def focus(cls, branches: list, dom, cod) -> list:
-        """
-        The branches a goal commits to without a choice, none by default:
-        a category whose rules are invertible on some goals says which,
-        see :meth:`BiclosedCategory.focus`.
-
-        Parameters:
-            branches : The recursive rules matching the goal.
-            dom : The domain of the goal, :obj:`None` when unknown.
-            cod : The codomain of the goal, :obj:`None` when unknown.
-        """
-        # pylint: disable=unused-argument  # no rule is invertible
-        return []
 
     @classmethod
     @abstractmethod
@@ -488,9 +199,6 @@ class Category[C0, C1: Category](Testable, ABC):
             h: Hom[C1, C, D]) -> Equation[Hom[C1, A, D]]:
         """ Associativity of composition. """
         return cls.Equation(f.then(g).then(h), f.then(g.then(h)))
-
-
-
 
     __rshift__ = __llshift__ = lambda self, other: self.then(other)
     __lshift__ = __lrshift__ = lambda self, other: other.then(self)
@@ -572,9 +280,6 @@ class ColouredMonoid[C0, C1: ColouredMonoid](Category[C0, C1]):
         >>> assert Nat(2).atoms == [Nat(1), Nat(1)]
         """
         return [self[i:i + 1] for i in range(len(self))]
-
-    cut = Category.cut.inapplicable(
-        "Objects compose by their tensor, which no search of objects uses.")
 
     def then(self, *others: Self) -> Self:
         """Sequential composition, given by the monoid product."""
@@ -772,80 +477,6 @@ class MonoidalCategory[C0: ColouredMonoid, C1: MonoidalCategory](
                     f"{'left' if left else 'right'}.")
         return dom, cod, mem
 
-    @classmethod
-    def contexts(cls, draw, applied: Rule, found: list[Substitution],
-                 dom, cod) -> tuple[Substitution, Any, Any]:
-        """
-        A monoidal category puts the term of a recursive rule in context
-        wherever its conclusion is a tensor: that side of the goal is
-        :meth:`rewire`d first, and a match of the conclusion with the
-        rewired goal is a split of it. The planar rewiring is the
-        identity, so that the context is a split of the goal as it is.
-
-        Parameters:
-            draw : The draw of the composite strategy.
-            applied : The rule applied.
-            found : The matches of its conclusion with the goal.
-            dom : The domain of the goal, :obj:`None` when unknown.
-            cod : The codomain of the goal, :obj:`None` when unknown.
-        """
-        from hypothesis import strategies as st
-
-        if not applied.recursive:
-            return super().contexts(draw, applied, found, dom, cod)
-        _, dom_pattern, cod_pattern = get_args(applied.conclusion)
-        new_dom, before = (dom, None) if dom is None\
-            or get_origin(dom_pattern) is not Tensor\
-            else cls.rewire(draw, dom, True, cod)
-        new_cod, after = (cod, None) if cod is None\
-            or get_origin(cod_pattern) is not Tensor\
-            else cls.rewire(draw, cod, False, dom)
-        if before is None and after is None:
-            return super().contexts(draw, applied, found, dom, cod)
-        rewired = list(applied.match(new_dom, new_cod))
-        if not rewired:
-            raise DeadEnd(f"{new_dom} -> {new_cod}")
-        return draw(st.sampled_from(rewired)), before, after
-
-    @classmethod
-    def rewire(cls, draw, value: C0, dom: bool, other: C0 | None
-               ) -> tuple[C0, Any]:
-        """
-        The plumbing of a side of a goal, sampled: an object and a morphism
-        from the side to it when ``dom``, from it to the side otherwise,
-        :obj:`None` for the identity. A planar category has no plumbing
-        but the identity, the levels with more structure sample their own:
-        a permutation, copies, cups and caps or spiders — each only when it
-        is among the :attr:`generators`, so that a category over a fixed
-        vocabulary wires with nothing it does not have.
-
-        Parameters:
-            draw : The draw of the composite strategy.
-            value : The side of the goal to rewire.
-            dom : Whether it is the domain.
-            other : The other side of the goal, :obj:`None` when unknown.
-        """
-        # pylint: disable=unused-argument  # a planar category has no wiring
-        return value, None
-
-    @classmethod
-    def plumb(cls, plumbing, dom: bool, rest: tuple[C0, Any]
-              ) -> tuple[C0, Any]:
-        """
-        Compose a piece of plumbing with the rewiring ``rest`` of its far
-        end: after it on the domain side, before it on the codomain side.
-
-        Parameters:
-            plumbing : The piece of plumbing, from the side to its far end
-                when ``dom``, from its far end to the side otherwise.
-            dom : Whether it is the domain side.
-            rest : The rewiring of the far end, as :meth:`rewire` returns.
-        """
-        value, more = rest
-        if more is None:
-            return value, plumbing
-        return value, plumbing.then(more) if dom else more.then(plumbing)
-
     @axiom
     def cut_derivation[
             A: Obj[C0], B: Obj[C0], C: Obj[C0], X: Obj[C0], Y: Obj[C0]](
@@ -874,8 +505,6 @@ class MonoidalCategory[C0: ColouredMonoid, C1: MonoidalCategory](
         """ Preservation of identities by tensor. """
         return cls.Equation(
             cls.id(x) @ cls.id(y), cls.id(x @ y))
-
-
 
     @axiom
     def dagger_monoidality[A: Obj[C0], B: Obj[C0], C: Obj[C0], D: Obj[C0]](
@@ -1295,60 +924,6 @@ class BiclosedCategory[C0: ResiduatedMonoid, C1: BiclosedCategory](
         return cls.Equation(f.curry_right(exponent=exponent).uncurry(
             base, exponent, left=False), f)
 
-    @classmethod
-    def focus(cls, branches: list, dom, cod) -> list:
-        """
-        The rules a goal applies deterministically: the conclusion unifies
-        with the goal in exactly one way, the match binds every premise
-        without residuals, and the premises keep to the subformulae of the
-        goal — so committing to one samples nothing and manufactures
-        nothing. These are the invertible rules of a focused proof search,
-        read off the sequents at each goal: the curry of a biclosed
-        category opens the goal's own exponential, while at a rigid level,
-        where the exponential collapses into adjoints, the same rule would
-        invert an adjoint into material the goal does not have, and stays
-        a choice.
-
-        >>> from discopy.biclosed import Diagram, Ty
-        >>> x, y = Ty('x'), Ty('y')
-        >>> [rule.name for rule, _ in Diagram.focus(
-        ...     Diagram.branches(x, y << x), x, y << x)]
-        ['curry_left']
-        """
-        goal = {
-            atom for side in (dom, cod) if side is not None
-            for atom in cls.subformulae(side)}
-
-        def keeps_to_goal(applied, subst):
-            for premise in applied.premises.values():
-                if isinstance(premise, Sort) or not set(
-                        Pattern.variables(premise)) <= subst.keys():
-                    return False
-                value = subst.instantiate(premise, cls.ob)
-                if isinstance(value, tuple) and value == (dom, cod):
-                    return False  # No progress: the premise is the goal.
-                for side in value if isinstance(value, tuple) else (value, ):
-                    if hasattr(side, "inside")\
-                            and not set(cls.subformulae(side)) <= goal:
-                        return False
-            return True
-
-        return [
-            (applied, found) for applied, found in branches
-            if len(found) == 1 and not found[0].residuals
-            and keeps_to_goal(applied, found[0])]
-
-    @staticmethod
-    def subformulae(value) -> Iterator:
-        """ The subformulae of an object: its atoms, and recursively the
-        base and exponent of each exponential atom. """
-        for i in range(len(value)):
-            yield value[i:i + 1]
-            for part in ("base", "exponent"):
-                inner = getattr(value.inside[i], part, None)
-                if inner is not None:
-                    yield from BiclosedCategory.subformulae(inner)
-
     @axiom
     def currying_eta_left[Y: Obj[C0], E: Obj[C0]](
             cls, base: Var[C0, Y], exponent: Var[C0, E]
@@ -1518,16 +1093,6 @@ class RigidCategory[C0: Pregroup, C1: RigidCategory](BiclosedCategory[C0, C1]):
         return self.caps(exponent.r, exponent) @ context\
             >> exponent.r @ self
 
-    curry_left = BiclosedCategory.curry_left.admissible(
-        "A rigid curry is a caps composition: caps and cut reach every "
-        "transpose, and the self-dual types of a quantum circuit would "
-        "otherwise let it focus on every goal.")
-
-    curry_right = BiclosedCategory.curry_right.admissible(
-        "A rigid curry is a caps composition: caps and cut reach every "
-        "transpose, and the self-dual types of a quantum circuit would "
-        "otherwise let it focus on every goal.")
-
     def base_and_exponent(self, base=None, exponent=None, left=True
                           ) -> tuple[C0, C0]:
         """
@@ -1560,17 +1125,6 @@ class RigidCategory[C0: Pregroup, C1: RigidCategory](BiclosedCategory[C0, C1]):
                 f"{cod} is not {base} to the {exponent} on the "
                 f"{'left' if left else 'right'}.")
         return base, exponent
-
-    @classmethod
-    def focus(cls, branches: list, dom, cod) -> list:
-        """
-        A rigid category does not focus: its exponentials collapse into
-        adjoints, so its curry is a caps composition rather than an
-        invertible rule, and the one rule left that a goal could apply
-        without a choice is the dagger, which only sends the goal back
-        and forth.
-        """
-        return Category.focus.__func__(cls, branches, dom, cod)
 
     def transpose(self, left: bool = False) -> Self:
         """
@@ -1794,30 +1348,6 @@ class SymmetricCategory[C0: ColouredMonoid, C1: SymmetricCategory](
         return cls.swap(left, right)
 
     @classmethod
-    def rewire(cls, draw, value: C0, dom: bool, other: C0 | None
-               ) -> tuple[C0, Any]:
-        """
-        A symmetric category permutes the wires of a side of a goal, with
-        even odds of leaving them in place, so that the context of a term
-        is any subset of the wires rather than a contiguous split.
-        """
-        from hypothesis import strategies as st
-
-        parts = value.atoms
-        if "swap" not in cls.generators or len(parts) < 2\
-                or not draw(st.booleans()):
-            return super().rewire(draw, value, dom, other)
-        xs = list(draw(st.permutations(range(len(parts)))))
-        if xs == sorted(xs):
-            return value, None
-        if dom:
-            plumbing = cls.permutation(xs, parts)
-            return plumbing.cod, plumbing
-        inverse = [xs.index(i) for i in range(len(xs))]
-        plumbing = cls.permutation(inverse, [parts[i] for i in xs])
-        return plumbing.dom, plumbing
-
-    @classmethod
     @rule
     def braid_inverse[X: Atom[C0], Y: Atom[C0]](
             cls, left: Var[C0, X], right: Var[C0, Y]
@@ -1883,27 +1413,6 @@ class MarkovCategory[C0: ColouredMonoid, C1: MarkovCategory](
     ) -> Equation[Hom[C1, Repeat[X, N], X]]:
         """ Merging is the dagger of copying. """
         return cls.Equation(cls.merge(x, n), cls.copy(x, n).dagger())
-
-    @classmethod
-    def rewire(cls, draw, value: C0, dom: bool, other: C0 | None
-               ) -> tuple[C0, Any]:
-        """
-        A Markov category copies or discards each wire of the domain of a
-        goal, with even odds of leaving them as they are, then permutes
-        them: a term may use an input any number of times. The codomain
-        is only permuted, since nothing merges in a Markov category.
-        """
-        from hypothesis import strategies as st
-
-        if "copy" not in cls.generators or not dom or not value\
-                or not draw(st.booleans()):
-            return super().rewire(draw, value, dom, other)
-        copies = [draw(st.sampled_from((1, 0, 2))) for _ in range(len(value))]
-        plumbing = cls.id(value[:0]).tensor(*(
-            cls.id(x) if n == 1 else cls.copy(x, n)
-            for x, n in zip(value.atoms, copies)))
-        return cls.plumb(plumbing, dom, super().rewire(
-            draw, plumbing.cod, dom, other))
 
     @axiom
     def copy_counitality[X: Obj[C0]](
@@ -2262,12 +1771,10 @@ class CompactCategory[C0: Pregroup, C1: CompactCategory](
     :class:`SymmetricCategory`, i.e. with cups, caps and swaps and where
     the twist is the identity.
     """
-    def twist[X: Atom[C0]](cls, dom: Var[C0, X]) -> Hom[C1, X, X]:
+    @classmethod
+    def twist(cls, dom: C0) -> C1:
         """ The twist of a compact category is the identity. """
         return cls.id(dom)
-
-    twist = classmethod(  # ty: ignore[invalid-assignment]
-        rule(twist).admissible("The twist is the identity."))
 
     @axiom
     def reidemeister_1_cap[X: Obj[C0]](
@@ -2286,46 +1793,6 @@ class CompactCategory[C0: Pregroup, C1: CompactCategory](
         return cls.Equation(
             cls.swap(x, x.r).then(cls.cups(x.r, x)),
             cls.cups(x, x.r))
-
-    @classmethod
-    def rewire(cls, draw, value: C0, dom: bool, other: C0 | None
-               ) -> tuple[C0, Any]:
-        """
-        A compact category bends wires: on the domain of a goal, a cup
-        may close a wire and its adjoint, and a cap may open a wire of the
-        other side with its adjoint, then the wires are permuted; the
-        codomain is rewired the other way round, a cap opening a pair of
-        it and a cup closing a wire of the other side.
-        """
-        from hypothesis import strategies as st
-
-        closing, opening = ("cups", "caps") if dom else ("caps", "cups")
-        parts = value.atoms
-        pairs = [
-            (i, j) for i, x in enumerate(parts) for j, y in enumerate(parts)
-            if i != j and y == (x.r if dom else x.l)]
-        if closing in cls.generators and pairs and draw(st.booleans()):
-            i, j = draw(st.sampled_from(pairs))
-            xs = [k for k in range(len(parts)) if k not in (i, j)] + [i, j]
-            rest = value[:0].tensor(*(parts[k] for k in xs[:-2]))
-            if dom:
-                plumbing = cls.permutation(xs, parts).then(
-                    rest @ cls.cups(parts[i], parts[j]))
-                return cls.plumb(plumbing, dom, cls.rewire(
-                    draw, rest, dom, other))
-            inverse = [xs.index(k) for k in range(len(xs))]
-            plumbing = (rest @ cls.caps(parts[i], parts[j])).then(
-                cls.permutation(inverse, [parts[k] for k in xs]))
-            return cls.plumb(plumbing, dom, cls.rewire(
-                draw, rest, dom, other))
-        if opening in cls.generators and other and draw(st.booleans()):
-            x = draw(st.sampled_from(other.atoms))
-            plumbing = value @ cls.caps(x, x.l) if dom\
-                else value @ cls.cups(x, x.r)
-            bent = plumbing.cod if dom else plumbing.dom
-            return cls.plumb(plumbing, dom, super().rewire(
-                draw, bent, dom, None))
-        return super().rewire(draw, value, dom, other)
 
 
 class HypergraphCategory[C0: Pregroup, C1: HypergraphCategory](
@@ -2377,42 +1844,3 @@ class HypergraphCategory[C0: Pregroup, C1: HypergraphCategory](
         merge = cls.spiders(2, 1, x)
         return cls.Equation(cls.swap(x, x).then(merge), merge)
 
-    @classmethod
-    def rewire(cls, draw, value: C0, dom: bool, other: C0 | None
-               ) -> tuple[C0, Any]:
-        """
-        A hypergraph category connects wires by spiders: on the domain of a
-        goal, a spider may merge two equal wires or start a wire of the
-        other side from nothing, and on the codomain split a wire in two or
-        end a wire of the other side, before the cups, caps, copies and
-        permutations of the levels it extends.
-        """
-        from hypothesis import strategies as st
-
-        if "spiders" not in cls.generators:
-            return super().rewire(draw, value, dom, other)
-        parts = value.atoms
-        pairs = [(i, j) for i, x in enumerate(parts)
-                 for j, y in enumerate(parts) if i < j and x == y]
-        if pairs and draw(st.booleans()):
-            i, j = draw(st.sampled_from(pairs))
-            xs = [k for k in range(len(parts)) if k not in (i, j)] + [i, j]
-            rest = value[:0].tensor(*(parts[k] for k in xs[:-2]))
-            if dom:
-                plumbing = cls.permutation(xs, parts).then(
-                    rest @ cls.spiders(2, 1, parts[i]))
-            else:
-                inverse = [xs.index(k) for k in range(len(xs))]
-                plumbing = (rest @ cls.spiders(1, 2, parts[i])).then(
-                    cls.permutation(inverse, [parts[k] for k in xs]))
-            merged = plumbing.cod if dom else plumbing.dom
-            return cls.plumb(plumbing, dom, super().rewire(
-                draw, merged, dom, other))
-        if other and draw(st.booleans()):
-            x = draw(st.sampled_from(other.atoms))
-            plumbing = value @ cls.spiders(0, 1, x) if dom\
-                else value @ cls.spiders(1, 0, x)
-            started = plumbing.cod if dom else plumbing.dom
-            return cls.plumb(plumbing, dom, super().rewire(
-                draw, started, dom, other))
-        return super().rewire(draw, value, dom, other)

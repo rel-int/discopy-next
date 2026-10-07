@@ -9,7 +9,7 @@ from pytest import raises
 from discopy import braided, cat, rigid
 from discopy.abc import (
     BiclosedCategory, Category, ColouredMonoid, FeedbackCategory,
-    MonoidalCategory, RigidCategory, TracedCategory)
+    MonoidalCategory, TracedCategory)
 from discopy.monoidal import Box, Diagram, Ty
 from discopy.pattern import (
     Atom, Count, Counts, D, Hom, Obj, Objects, Over,
@@ -314,8 +314,8 @@ def test_declarations():
 
     assert "unitality" not in Hidden.axioms
     assert "cut" not in Hidden.rules
-    assert list(Category.generators) == ["ax"]
-    assert list(Ty.rules) == ["ax"]  # Objects compose by their tensor.
+    assert list(cat.Arrow.generators) == ["ax"]
+    assert list(Rule.inherited(Category)) == ["ax", "cut"]
 
 
 def test_focusing():
@@ -334,7 +334,7 @@ def test_focusing():
     assert [name for name, r in rigid.Diagram.rules.items()
             if r.recursive] == ["cut", "mix"]
     x, y, z = map(rigid.Ty, "xyz")
-    curry = vars(RigidCategory)["curry_left"].bind(rigid.Diagram)
+    curry = vars(rigid.Diagram)["curry_left"].bind(rigid.Diagram)
     assert not rigid.Diagram.focus(
         [(curry, list(curry.match(x, y @ z.l)))],
         x, y @ z.l)  # z is no subformula of z.l.

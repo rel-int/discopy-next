@@ -56,9 +56,9 @@ Coherence
 ...     Cap(x, x.r) @ Cap(y, y.r) >> x @ Diagram.swap(x.r, y @ y.r))
 """
 
-from typing import ClassVar
+from typing import Any, ClassVar
 
-from discopy import symmetric, ribbon, rigid, cmap, hypergraph
+from discopy import symmetric, ribbon, rigid, cmap, hypergraph, monoidal
 from discopy.abc import (
     BalancedCategory, BiclosedCategory, CompactCategory, PivotalCategory)
 from discopy.axioms import Serialisable
@@ -119,6 +119,46 @@ class Diagram(symmetric.Diagram, ribbon.Diagram, CompactCategory):
     currying_naturality_right = BiclosedCategory\
         .currying_naturality_right.weaken(
         boundary_connected=True)
+
+    @classmethod
+    def rewire(cls, draw, value: monoidal.Ty, dom: bool,
+               other: monoidal.Ty | None) -> tuple[monoidal.Ty, Any]:
+        """
+        A compact category bends wires: on the domain of a goal, a cup
+        may close a wire and its adjoint, and a cap may open a wire of the
+        other side with its adjoint, then the wires are permuted; the
+        codomain is rewired the other way round, a cap opening a pair of
+        it and a cup closing a wire of the other side.
+        """
+        from hypothesis import strategies as st
+
+        closing, opening = ("cups", "caps") if dom else ("caps", "cups")
+        parts = value.atoms
+        pairs = [
+            (i, j) for i, x in enumerate(parts) for j, y in enumerate(parts)
+            if i != j and y == (x.r if dom else x.l)]
+        if closing in cls.generators and pairs and draw(st.booleans()):
+            i, j = draw(st.sampled_from(pairs))
+            xs = [k for k in range(len(parts)) if k not in (i, j)] + [i, j]
+            rest = value[:0].tensor(*(parts[k] for k in xs[:-2]))
+            if dom:
+                plumbing = cls.permutation(xs, parts).then(
+                    rest @ cls.cups(parts[i], parts[j]))
+                return cls.plumb(plumbing, dom, cls.rewire(
+                    draw, rest, dom, other))
+            inverse = [xs.index(k) for k in range(len(xs))]
+            plumbing = (rest @ cls.caps(parts[i], parts[j])).then(
+                cls.permutation(inverse, [parts[k] for k in xs]))
+            return cls.plumb(plumbing, dom, cls.rewire(
+                draw, rest, dom, other))
+        if opening in cls.generators and other and draw(st.booleans()):
+            x = draw(st.sampled_from(other.atoms))
+            plumbing = value @ cls.caps(x, x.l) if dom\
+                else value @ cls.cups(x, x.r)
+            bent = plumbing.cod if dom else plumbing.dom
+            return cls.plumb(plumbing, dom, super().rewire(
+                draw, bent, dom, None))
+        return super().rewire(draw, value, dom, other)
 
 
 Box, Cup, Cap = (

@@ -4,7 +4,7 @@ Property-based testing of the axioms with `Hypothesis
 on an abstract base class of :mod:`discopy.abc` as a sequent — see
 :mod:`discopy.pattern` for the language of the rules — every subclass
 inherits it, and a type generates the terms it quantifies over through
-:meth:`Testable.strategy`, by :meth:`discopy.abc.Category.search` for
+:meth:`Testable.strategy`, by :meth:`discopy.cat.Arrow.search` for
 diagrams. :meth:`Testable.matrix` lists every law of every type that does,
 which ``proptest/`` checks against generated terms.
 
@@ -248,7 +248,7 @@ class Testable[T](metaclass=ABCMeta):
         The subclasses that state laws and generate the terms those laws
         quantify over, by name: a type enrols itself by implementing
         :meth:`strategy`, except a category over a fixed vocabulary, whose
-        :attr:`discopy.abc.Category.generators` are the
+        :attr:`discopy.cat.Arrow.generators` are the
         :class:`discopy.pattern.Constant` rules of its words or gates: it
         fills only the sequents its vocabulary derives, and its laws are
         those of the free category it lives in.

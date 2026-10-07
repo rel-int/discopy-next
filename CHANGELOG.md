@@ -607,9 +607,9 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Changed
 
-- The search is a family of classmethods of `abc.Category`, each level
-  implementing its own, rather than one function of `discopy.pattern`:
-  `Category.search` is the template, closing a goal by one of its
+- The search is a family of classmethods, each level implementing its
+  own, rather than one function of `discopy.pattern`: `search` is the
+  template, closing a goal by one of its
   `leaves` — the free box or a generator — or, below the depth bound,
   one of its `branches`, a recursive rule whose premises are searched;
   `contexts` says how the conclusion of a rule meets the goal and
@@ -663,6 +663,19 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   now declares, and that the exponential of Python types is not `<<`,
   so `python.Function.curry`, `ev` and `uncurry` are methods rather than
   rules.
+- `discopy.abc` states structure and nothing else: abstract methods, the
+  rules forwarding to them and the axioms, with no base class from
+  `discopy.axioms` but the decorators. Its structures no longer subclass
+  `Testable`, which only the concrete categories implement, and the
+  search moves to the categories that search: the template — `search`,
+  `prove`, `attempt`, `choose`, `leaves`, `branches`, `contexts`,
+  `focus`, `free`, `rules`, `generators` and `DeadEnd` — to `cat.Arrow`,
+  the planar `contexts`, `rewire` and `plumb` to `monoidal.Diagram`, the
+  plumbing of each doctrine to the `rewire` of `symmetric`, `markov`,
+  `compact` and `frobenius` diagrams, and focusing to `biclosed.Diagram`
+  and `rigid.Diagram`, the latter with its admissible curries.
+  `CompactCategory.twist` is a plain method, `ColouredMonoid` loses its
+  mark on `cut`, and `Hypergraph` implements `Testable` itself.
 - The pattern language is frozen and its functions are methods of the
   classes they belong to: a `pattern.Substitution` carries its residuals
   and `unify`, `instantiate`, `fit`, `guide` and names `fresh` variables,

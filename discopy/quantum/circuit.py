@@ -219,7 +219,7 @@ class Circuit(tensor.Diagram[complex]):
         :data:`discopy.quantum.gates.GATES` that take no parameter and by
         the swap, so that :meth:`strategy` draws circuits over them; a
         gate set assigns its own, see
-        :attr:`discopy.abc.Category.generators`.
+        :attr:`discopy.cat.Arrow.generators`.
         """
         from discopy.quantum.gates import GATES
 
