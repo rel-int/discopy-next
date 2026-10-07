@@ -30,8 +30,8 @@
 >
 > lets go back to making a clear distinction between rules (annotated) and methods (regular python typing, no description of coherence)
 
-- [ ] `ax` rule forwarding to a plain `id` classmethod, on `abc.Category` and every implementation
-- [ ] `cut` rule forwarding to a plain variadic `then`; `mix` rule forwarding to a plain variadic `tensor`
-- [ ] `Hom[Nat, ...]` rather than `Hom[Self, ...]` in `python.finset` and the other `ty: ignore[invalid-type-form]`
-- [ ] Plain methods lose their pattern annotations: rules annotated, methods typed
-- [ ] Tests, docs, checks, changelog; report the other rules that could split
+- [WIP] @session_019jj2d1JBnEGRPmjqSAP37A-2026-10-07 12:00 `ax` rule forwarding to a plain `id` classmethod, on `abc.Category` and every implementation
+- [WIP] @session_019jj2d1JBnEGRPmjqSAP37A-2026-10-07 12:00 `cut` rule forwarding to a plain variadic `then`; `mix` rule forwarding to a plain variadic `tensor`
+- [WIP] @session_019jj2d1JBnEGRPmjqSAP37A-2026-10-07 12:00 `Hom[Nat, ...]` rather than `Hom[Self, ...]` in `python.finset` and the other `ty: ignore[invalid-type-form]`
+- [WIP] @session_019jj2d1JBnEGRPmjqSAP37A-2026-10-07 12:00 Plain methods lose their pattern annotations: rules annotated, methods typed
+- [WIP] @session_019jj2d1JBnEGRPmjqSAP37A-2026-10-07 12:00 Tests, docs, checks, changelog; report the other rules that could split
