@@ -17,9 +17,9 @@ add everything, fix everything
 - [x] `MonoidalCategory`: `cut` is `x @ f @ y >> g`
 
 ## Rules
-- [ ] `dagger` as a rule
-- [ ] `delay` as a rule
-- [ ] functor application through an `Image` pattern
+- [WIP] @session_019jj2d1JBnEGRPmjqSAP37A-2026-10-07 09:03 `dagger` as a rule
+- [WIP] @session_019jj2d1JBnEGRPmjqSAP37A-2026-10-07 09:03 `delay` as a rule
+- [WIP] @session_019jj2d1JBnEGRPmjqSAP37A-2026-10-07 09:03 functor application through an `Image` pattern
 
 ## Structure the semantic categories have
 - [ ] `Matrix`, `Tensor`, `Channel` declare the structure they implement
