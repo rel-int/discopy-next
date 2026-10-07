@@ -1292,6 +1292,17 @@ class RigidCategory[C0: Pregroup, C1: RigidCategory](BiclosedCategory[C0, C1]):
             return self.cod[:-n], self.cod[-n:].r
         return self.cod[n:], self.cod[:n].l
 
+    @classmethod
+    def focus(cls, branches: list, dom, cod) -> list:
+        """
+        A rigid category does not focus: its exponentials collapse into
+        adjoints, so its curry is a caps composition rather than an
+        invertible rule, and the one rule left that a goal could apply
+        without a choice is the dagger, which only sends the goal back
+        and forth.
+        """
+        return Category.focus.__func__(cls, branches, dom, cod)
+
     @overload
     def transpose[A: Obj[C0], B: Obj[C0]](
             self: Hom[C1, A, B], left: Literal[False] = ...

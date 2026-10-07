@@ -146,7 +146,14 @@ def main():
     parser.add_argument("--out")
     parser.add_argument("--compare")
     parser.add_argument("--only", default="")
+    parser.add_argument(
+        "--planar", action="store_true",
+        help="Ablate the plumbing: every level rewires like a planar one.")
     args = parser.parse_args()
+    if args.planar:
+        from discopy import abc
+        abc.MonoidalCategory.contexts = classmethod(
+            abc.Category.contexts.__func__)
     results = {}
     for level, goal in CELLS:
         name = f"{level}:{goal or '-'}"
