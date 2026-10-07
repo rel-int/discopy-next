@@ -1,34 +1,23 @@
-add everything, fix everything
+forget about making a single unified search. implement the specific search strategy in each of the concrete categories, while keeping it modular. there should be a method for searching generators, another guiding unification of context in different doctrines, etc...
+for example, unifying Tensor[A, B] with C depends on the level of the hierarchy. in planar diagrams, it amounts to sampling a split then unifying A with C[:n] and B with C[n:], for symmetric unifying A and B would involve sampling a permutation sigma such that B = sigma(A), same for markov, frobenius, compact, etc... basically plumbing should be actively searched instead of waiting for a structural plumbing generator to give us the correct context.
+remove search from pattern.py and simply implement it as a family of possibly abstract methods in abc then implement them in concrete categories. implement focusing only in categories where it makes sense
+run an experiment and report whether it helps with the hypothesis statistics, in dead ends or even just overall sampling distribution
 
-## Bugs
-- [x] `twist = id` / `identity = id` register the `id` rule under another name
-- [x] the Python functions lost their `id` rule (and keep stray ones)
+go ahead, on a new branch off this one
 
-## Laws
-- [x] `HypergraphCategory`: spider fusion, specialness, commutativity
-- [x] yanking: the trace of a swap is the identity
-- [x] `BraidedCategory`: braid invertibility, both ways
-- [x] `FeedbackCategory`: tightening, sliding, superposing
-- [x] objects: tensor associativity and unit; delay zero, addition, tensor; unit exponentials
-- [x] `BiclosedCategory`: the η law of currying, currying naturality
-- [x] `ClosedCategory`: left and right currying agree up to a swap
-- [x] `RigidCategory`: `cups_coherence`
-- [x] `BalancedCategory`: twist naturality, twist of the unit
-- [x] `MonoidalCategory`: `cut` is `x @ f @ y >> g`
+## Baseline
+- [ ] experiment script measuring hypothesis statistics, dead ends and the sampling distribution, run on the unified search
 
-## Rules
-- [x] `dagger` as a rule
-- [x] `delay` as a rule
-- [x] functor application through an `Image` pattern
+## Search in abc
+- [ ] move the search out of `pattern.py` into a family of classmethods of `abc.Category`: `search`, `leaves`, `branches`, `contexts`, `focus`
+- [ ] planar contexts: a split, i.e. the unification of the patterns
+- [ ] symmetric contexts: a permutation
+- [ ] Markov contexts: copies and discards
+- [ ] compact contexts: cups and caps
+- [ ] hypergraph contexts: spiders
+- [ ] focusing only in biclosed categories
+- [ ] tests and docs
 
-## Structure the semantic categories have
-- [ ] `Matrix`, `Tensor`, `Channel` declare the structure they implement
-- [ ] `Hypergraph[C]` is a `HypergraphCategory`
-
-## Broken declarations
-- [ ] serialisation of twists, copies and spiders (#742)
-- [ ] `Functor.unitality`
-- [ ] free currying, modulo `to_compact`
-- [ ] rigid `normal_form_soundness`, `foliation_soundness`, `foliation_idempotence`
-- [ ] `pivotality` on pivotal and ribbon
-- [ ] frobenius `foliation_idempotence`
+## Experiment
+- [ ] rerun the experiment on the doctrine search and compare
+- [ ] full checks, changelog
