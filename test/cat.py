@@ -312,7 +312,7 @@ def test_Functor_strategy():
     assert F(x) == x and len(F.ob_map) == len(list(F.ob_map)) == 5
     assert F(monoidal.Box('f', monoidal.Ty('b'), x))\
         == monoidal.Box('f', a, x)
-    assert repr(F.ob_map).startswith("axioms.Relabelling(images=(")
+    assert repr(F.ob_map).startswith("cat.Relabelling(images=(")
     assert find(monoidal.Functor.associativity.strategy(),
                 lambda _: True)  # They compose.
     with raises(NotImplementedError):  # Not an endofunctor.

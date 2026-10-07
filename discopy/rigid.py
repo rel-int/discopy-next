@@ -154,7 +154,7 @@ from typing import Any, ClassVar, Iterator, Self
 
 from discopy import cat, monoidal, biclosed, messages
 from discopy.pattern import Atom, Hom, L, R, rule, Tensor, Unit, Var
-from discopy.axioms import GENERATORS, Serialisable
+from discopy.axioms import Serialisable
 from discopy.abc import DaggerCategory, Pregroup, RigidCategory
 
 from discopy.cat import factory, Generator
@@ -214,7 +214,7 @@ class Wire(monoidal.Wire):
         from hypothesis import strategies as st
 
         return st.tuples(
-            st.sampled_from(GENERATORS),
+            st.sampled_from(cat.Ob.alphabet),
             st.integers(min_value=min_winding, max_value=max_winding)).map(
                 lambda args: cls(args[0], args[1], dom=dom, cod=cod))
 

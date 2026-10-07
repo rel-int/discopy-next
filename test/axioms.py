@@ -10,20 +10,25 @@ from pytest import raises
 from discopy import braided, cat, feedback, rigid
 from discopy.abc import MonoidalCategory
 from discopy.pattern import Hom, Obj
-from discopy.axioms import assert_axioms, Axiom, axiom, AxiomFailure, Equation
+from discopy.axioms import Axiom, axiom, AxiomFailure, Equation, Testable
 from discopy.cat import Arrow, Box, Functor, Ob
 from discopy.monoidal import Diagram
 
 
-def test_axioms():
-    assert_axioms(Arrow)
-
+def test_matrix():
     class Classified(Arrow):
         """ A category with a broken law and an inapplicable one. """
         unitality = Arrow.unitality.failing("Never holds.")
         dagger_involution = Arrow.dagger_involution.inapplicable("No dagger.")
 
-    assert_axioms(Classified)
+    assert Classified in Testable.enrolled()
+    laws = {law.name: law for law in Testable.matrix()
+            if law.bound is Classified}
+    assert laws["unitality"].broken and laws["dagger_involution"]()\
+        is NotImplemented
+    once = Testable.matrix(once=True)
+    assert Arrow.unitality in once and Classified.unitality in once
+    assert Classified.associativity not in once  # Inherited, not restated.
 
 
 def test_axiom_binding():

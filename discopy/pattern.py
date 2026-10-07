@@ -567,11 +567,13 @@ class Objects(Sort):
         from hypothesis import strategies as st
 
         resolved = self.resolve(category, owner)
-        base = resolved.strategy()
         length = self.size if isinstance(self.size, int) else length
         if length is None:
-            return base
-        atoms = base.filter(lambda value: len(value) == 1)
+            return resolved.strategy()
+        try:
+            return resolved.strategy(min_length=length, max_length=length)
+        except TypeError:  # A strategy with no length to ask for.
+            atoms = resolved.strategy().filter(lambda value: len(value) == 1)
         return atoms if length == 1 else st.lists(
             atoms, min_size=length, max_size=length).map(
                 lambda values: reduce(operator.matmul, values, resolved()))
@@ -809,9 +811,9 @@ class Declaration[**P, T]:
         one premise at a time: a pattern is instantiated, a sort sampled
         from the strategy of the class it ranges over, a hom or a term of
         the category sampled through ``hom(category, dom, cod)``. A
-        variable standing alone on a side of a hom is read off the term
-        found, so that the goal guides the search; the residuals of a
-        match are checked once every variable is bound.
+        variable of any size standing alone on a side of a hom is read
+        off the term found, so that the goal guides the search; the
+        residuals of a match are checked once every variable is bound.
         """
         from hypothesis import assume
 
@@ -820,7 +822,8 @@ class Declaration[**P, T]:
         subst = Substitution(subst or {})
 
         def side(pattern):
-            if isinstance(pattern, TypeVar) and pattern.__name__ not in subst:
+            if isinstance(pattern, TypeVar) and pattern.__name__ not in subst\
+                    and getattr(sorts[pattern.__name__], "size", None) is None:
                 return None
             bound(*Pattern.variables(pattern))
             return subst.instantiate(pattern, category.ob)

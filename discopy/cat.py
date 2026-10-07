@@ -77,6 +77,7 @@ Functors are bubble-preserving.
 >>> assert F(f.bubble()) == F(f).bubble()
 """
 
+from dataclasses import dataclass
 from functools import total_ordering, cached_property
 from typing import (
     Any, Callable, ClassVar, Mapping, Iterable, Self,
@@ -86,7 +87,7 @@ from discopy import messages, utils
 from discopy.pattern import Hom, Image, Obj, rule, Var
 from discopy.axioms import (
     Serialisable,
-    axiom, Equation as AbstractEquation, GENERATORS, no_strategy)
+    axiom, Equation as AbstractEquation, no_strategy)
 from discopy.abc import Category, DaggerCategory
 from discopy.utils import (  # noqa: F401
     factory,
@@ -146,12 +147,20 @@ class Ob(Serialisable):
     def __lt__(self, other):
         return self.name < other.name
 
+    alphabet: ClassVar[tuple[str, ...]] = tuple("abcde")
+    """
+    The names the strategy of a free category samples its generators
+    from: finitely many and shared, so that a generated functor names
+    every one of them, since composing two functors keeps only the keys
+    of the left-hand map.
+    """
+
     @classmethod
     def strategy(cls):
         """Generate named objects."""
         from hypothesis import strategies as st
 
-        return st.sampled_from(GENERATORS).map(cls)
+        return st.sampled_from(cls.alphabet).map(cls)
 
 
 class FreeCategory(Category):
@@ -983,14 +992,12 @@ class Functor[In0, In1, Out0, Out1](Category, Serialisable):
         # pylint: disable=unused-argument  # a canonical term has one leaf
         from hypothesis import strategies as st
 
-        from discopy.axioms import Relabelling
-
         if cls.dom is not cls.cod:
             raise NotImplementedError(
                 f"A relabelling is an endofunctor, {cls.__name__} goes "
                 f"from {cls.dom.__name__} to {cls.cod.__name__}.")
         try:
-            atoms = [cls.dom.ob(name) for name in GENERATORS]
+            atoms = [cls.dom.ob(name) for name in Ob.alphabet]
         except (TypeError, ValueError) as error:
             raise NotImplementedError from error
 
@@ -1095,6 +1102,59 @@ class Equivalence(Functor, DaggerCategory):
     def __repr__(self):
         return factory_name(type(self)) + (
             f"({self.encode.__qualname__}, {self.decode.__qualname__})")
+
+
+@dataclass(frozen=True, eq=False)
+class Relabelling(Mapping):
+    """
+    A map on the generators of a free category, sending the atoms it names to
+    a chosen object, every other atom to itself, and a box to one of the
+    same name on the relabelled boundary.
+
+    It is a :class:`Mapping` rather than a closure so that functors built
+    from it can be composed and compared, which is what makes the axioms of
+    ``Cat`` itself checkable: :meth:`discopy.utils.MappingOrCallable.then`
+    composes by iterating the keys of the left-hand map, and equality
+    compares the wrapped maps. Iterating yields only the atoms it renames,
+    while looking up is total, so a functor built from it as both its
+    object and its arrow map applies to any diagram and still composes to
+    something comparable.
+    """
+    images: tuple[tuple[object, object], ...] = ()
+
+    def __repr__(self):
+        return factory_name(type(self)) + f"(images={self.images!r})"
+
+    def __getitem__(self, key):
+        """
+        The image of an atom, looked up by name, or of a box, relabelled on
+        its boundary by the functor of the box's own category: a rotation or
+        a delay of an atom is that functor's business, e.g.
+        :class:`discopy.rigid.Functor`'s, on a box's boundary as on an
+        object.
+
+        """
+        if not isinstance(key, Ob):
+            functor = getattr(type(key), "Functor", Functor)
+            relabel = functor(self, self)
+            return type(key)(key.name, relabel(key.dom), relabel(key.cod))
+        wire, = getattr(key, "inside", (key, ))
+        for atom, image in self.images:
+            other, = getattr(atom, "inside", (atom, ))
+            if other.name == wire.name:
+                return image
+        return key
+
+    def __iter__(self):
+        return iter([atom for atom, _ in self.images])
+
+    def __len__(self):
+        return len(self.images)
+
+    def __bool__(self):
+        """ A relabelling is total, even when it renames nothing. """
+        return True
+
 
 
 @factory

@@ -159,10 +159,10 @@ In the category of streams, this is just the identity.
 
 from typing import ClassVar
 
-from discopy import monoidal, braided, markov, hypergraph, messages
+from discopy import cat, monoidal, braided, markov, hypergraph, messages
 
 from discopy.pattern import D, Hom, Obj, rule
-from discopy.axioms import GENERATORS, no_strategy
+from discopy.axioms import no_strategy
 from discopy.abc import DelayedMonoid, FeedbackCategory
 from discopy.utils import (
     deprecated_alias,
@@ -194,7 +194,7 @@ class Wire(braided.Wire):
         from hypothesis import strategies as st
 
         del params
-        return st.sampled_from(GENERATORS).map(cls)
+        return st.sampled_from(cat.Ob.alphabet).map(cls)
 
     def delay(self, n_steps=1):
         """ The delay of a feedback object. """

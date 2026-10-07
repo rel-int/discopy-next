@@ -67,7 +67,7 @@ from typing import (
 from discopy import abc, cat, drawing, hypergraph, cmap, messages
 from discopy.pattern import Var
 from discopy.axioms import (
-    axiom, Equation as AbstractEquation, GENERATORS, no_strategy, Serialisable)
+    axiom, Equation as AbstractEquation, no_strategy, Serialisable)
 from discopy.abc import (
     ColouredMonoid, Monoid, MonoidalCategory, NamedGeneric)
 from discopy.drawing import Drawing
@@ -151,7 +151,7 @@ class Wire(cat.Ob):
         """Generate named wires with the given colours on either side."""
         from hypothesis import strategies as st
 
-        return st.sampled_from(GENERATORS).map(
+        return st.sampled_from(cat.Ob.alphabet).map(
             lambda name: cls(name, dom=dom, cod=cod))
 
     def __init__(self, name: str, dom: Colour = transparent,
