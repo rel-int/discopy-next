@@ -157,11 +157,11 @@ This satisfies the following equations:
 In the category of streams, this is just the identity.
 """
 
-from typing import ClassVar, Self
+from typing import ClassVar
 
 from discopy import monoidal, braided, markov, hypergraph, messages
 
-from discopy.axioms import GENERATORS, axiom, no_strategy
+from discopy.axioms import GENERATORS, no_strategy
 from discopy.abc import DelayedMonoid, FeedbackCategory
 from discopy.utils import (
     deprecated_alias,
@@ -382,6 +382,18 @@ class Diagram(markov.Diagram, FeedbackCategory):
     #: feedback diagram declares it again.
     dagger_involution = FeedbackCategory.dagger_involution
     dagger_contravariance = FeedbackCategory.dagger_contravariance
+
+    feedback_tightening = FeedbackCategory.feedback_tightening.failing(
+        "A free feedback is a box, which the hypergraph of a bubble "
+        "compares syntactically: nothing slides into it.")
+
+    feedback_sliding = FeedbackCategory.feedback_sliding.failing(
+        "A free feedback is a box, which the hypergraph of a bubble "
+        "compares syntactically: nothing slides into it.")
+
+    feedback_superposing = FeedbackCategory.feedback_superposing.failing(
+        "A free feedback is a box, which the hypergraph of a bubble "
+        "compares syntactically: nothing slides into it.")
     Layer: ClassVar[Generator] = Generator.subclass(Layer)
     Box: ClassVar[Generator]
     Permutation: ClassVar[Generator]
@@ -397,16 +409,6 @@ class Diagram(markov.Diagram, FeedbackCategory):
         dom, cod = self.dom.delay(n_steps), self.cod.delay(n_steps)
         inside = tuple(box.delay(n_steps) for box in self.inside)
         return type(self)(inside, dom, cod, _scan=False)
-
-    @axiom
-    def delay_unit(cls, f: Self):
-        """ Delaying by no time step is the identity. """
-        return cls.Equation(f.delay(0), f)
-
-    @axiom
-    def delay_composition(cls, f: Self):
-        """ Delaying twice is delaying by two time steps. """
-        return cls.Equation(f.delay().delay(), f.delay(2))
 
     @rule
     def feedback[A: Obj[Ty], B: Obj[Ty], S: bool, M: Obj[Ty]](

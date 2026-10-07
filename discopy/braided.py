@@ -174,6 +174,14 @@ class Diagram(monoidal.Diagram, BraidedCategory):
     braid_naturality = BraidedCategory.braid_naturality.failing(
         "A free braid does not commute past a box.")
 
+    braid_then_inverse = BraidedCategory.braid_then_inverse.failing(
+        "A free braid and its inverse are two boxes, which the equation "
+        "of braided diagrams does not cancel.")
+
+    inverse_then_braid = BraidedCategory.inverse_then_braid.failing(
+        "A free braid and its inverse are two boxes, which the equation "
+        "of braided diagrams does not cancel.")
+
     hypergraph_section = monoidal.Diagram.hypergraph_section.failing(
         "Decoding a hypergraph can cross wires, which needs swaps the "
         "category does not have: a braid does not survive the symmetric "

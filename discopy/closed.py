@@ -121,6 +121,10 @@ class Diagram(markov.Diagram, biclosed.Diagram, ClosedCategory):
     map_retract = markov.Diagram.map_retract.failing(
         "Decoding re-whiskers the inside of a curry bubble, which the "
         "hypergraph of a bubble compares syntactically.")
+
+    currying_symmetry = ClosedCategory.currying_symmetry.failing(
+        "A free currying is a bubble, which the hypergraph of a bubble "
+        "compares syntactically: a swap does not slide into it.")
     Eval: ClassVar[Generator]
     Functor: ClassVar[Generator]
     TermBase: ClassVar[Generator]

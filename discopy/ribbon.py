@@ -82,7 +82,7 @@ cap becomes a ribbon folding back.
 from typing import ClassVar
 
 from discopy import pivotal, balanced
-from discopy.abc import RibbonCategory
+from discopy.abc import BalancedCategory, RibbonCategory
 
 from discopy.axioms import Serialisable
 from discopy.cat import factory, Generator
@@ -170,7 +170,7 @@ class Diagram(pivotal.Diagram, balanced.Diagram, RibbonCategory):
         """
         return self.to_braided(width, colour)
 
-    twist_as_trace = RibbonCategory.twist_as_trace.failing(
+    yanking = BalancedCategory.yanking.failing(
         "The traced braid does not reduce to the twist.")
 
 

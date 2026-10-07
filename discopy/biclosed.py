@@ -410,6 +410,14 @@ class Diagram(monoidal.Diagram, BiclosedCategory):
         "A free currying is a bubble, equal to its evaluation only "
         "semantically.")
 
+    currying_eta = BiclosedCategory.currying_eta.failing(
+        "A free currying is a bubble, equal to its evaluation only "
+        "semantically.")
+
+    currying_naturality = BiclosedCategory.currying_naturality.failing(
+        "A free currying is a bubble, equal to its evaluation only "
+        "semantically.")
+
 
 Box = Diagram.Box
 

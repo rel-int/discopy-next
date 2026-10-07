@@ -64,7 +64,7 @@ COUNTEREXAMPLES = (
         reason="The two transposes of a free pivotal diagram are distinct "
                "diagrams, already on the identity wire."),
     Counterexample(
-        axiom=ribbon.Diagram.twist_as_trace,
+        axiom=ribbon.Diagram.yanking,
         args=(pivotal.Ty("a"), ),
         reason="A free twist is a box, not the trace of a braid."),
 )

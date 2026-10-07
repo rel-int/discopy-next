@@ -60,7 +60,7 @@ from typing import ClassVar
 
 from discopy import symmetric, ribbon, rigid, cmap, hypergraph
 from discopy.abc import (
-    BiclosedCategory, CompactCategory, PivotalCategory, RibbonCategory)
+    BalancedCategory, BiclosedCategory, CompactCategory, PivotalCategory)
 from discopy.axioms import Serialisable
 from discopy.cat import factory, Generator
 from discopy.pivotal import Wire, Ty  # noqa: F401  pylint: disable=unused-import
@@ -93,7 +93,7 @@ class Diagram(symmetric.Diagram, ribbon.Diagram, CompactCategory):
 
     pivotality = PivotalCategory.pivotality
 
-    twist_as_trace = RibbonCategory.twist_as_trace
+    yanking = BalancedCategory.yanking
 
     foliation_idempotence = ribbon.Diagram.foliation_idempotence.failing(
         "The hypergraph decode follows the box order of its encoding, so "
@@ -104,6 +104,12 @@ class Diagram(symmetric.Diagram, ribbon.Diagram, CompactCategory):
         boundary_connected=True)
 
     currying_right = BiclosedCategory.currying_right.weaken(
+        boundary_connected=True)
+
+    currying_eta = BiclosedCategory.currying_eta.weaken(
+        boundary_connected=True)
+
+    currying_naturality = BiclosedCategory.currying_naturality.weaken(
         boundary_connected=True)
 
 

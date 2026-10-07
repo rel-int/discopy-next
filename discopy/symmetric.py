@@ -97,7 +97,8 @@ from collections.abc import Sequence
 from discopy import cat, monoidal, balanced, hypergraph, cmap, messages
 from discopy.pattern import Var, Tensor  # noqa: F401
 from discopy.abc import (
-    BraidedCategory, MonoidalCategory, SymmetricCategory, TracedCategory)
+    BalancedCategory, BraidedCategory, MonoidalCategory, SymmetricCategory,
+    TracedCategory)
 from discopy.axioms import (
     Atom, axiom, Equation as AbstractEquation, Hom, rule)
 from discopy.cat import factory, Generator
@@ -448,6 +449,16 @@ class Diagram(balanced.Diagram, SymmetricCategory):
     #: A free braid is a box, but the braid of a symmetric category is
     #: its swap, whose naturality holds in the hypergraph quotient.
     braid_naturality = BraidedCategory.braid_naturality
+
+    braid_then_inverse = BraidedCategory.braid_then_inverse
+
+    inverse_then_braid = BraidedCategory.inverse_then_braid
+
+    #: A free twist is a box, but the twist of a symmetric category is
+    #: the identity, natural and the trace of a swap.
+    twist_naturality = BalancedCategory.twist_naturality
+
+    yanking = BalancedCategory.yanking
 
     #: The category has the swaps that decoding asks for, so the
     #: section of the hypergraph encoding comes back.

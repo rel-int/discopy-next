@@ -136,6 +136,12 @@ class Diagram(braided.Diagram, traced.Diagram, BalancedCategory):
     """
     Twist: ClassVar[Generator]
     Functor: ClassVar[Generator]
+    twist_naturality = BalancedCategory.twist_naturality.failing(
+        "A free twist does not commute past a box.")
+
+    yanking = BalancedCategory.yanking.failing(
+        "A free twist is a box, not the trace of a braid.")
+
     serialisation = Serialisable.serialisation.failing(
         "The generic tree of a twist does not read back (#742).")
 

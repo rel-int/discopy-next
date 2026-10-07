@@ -9,6 +9,34 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Added
 
+- The laws the hierarchy was missing, stated once on its abstract base
+  classes: the cut is derived from tensor and composition
+  (`cut_derivation`); the braid has an inverse both ways
+  (`braid_then_inverse`, `inverse_then_braid`); the twist is natural
+  and trivial on the unit (`twist_naturality`, `twist_unit`) and the
+  trace of a braid, `yanking`, which is `RibbonCategory.twist_as_trace`
+  moved down to `BalancedCategory` where both the trace and the braid
+  are; the currying of an evaluation is the identity (`currying_eta`)
+  and currying is natural (`currying_naturality`), on either side, and
+  a closed category curries on the left what it curries on the right
+  after a swap (`currying_symmetry`); `cups_coherence` beside
+  `caps_coherence`; the spiders of a hypergraph category fuse, are
+  special and commutative; feedback is natural on both sides, slides
+  a morphism round its loop delayed and superposes
+  (`feedback_tightening`, `feedback_sliding`,
+  `feedback_superposing`), with the delay laws of `feedback.Diagram`
+  moving up to `FeedbackCategory`; and the objects say that an
+  exponential of the unit is its base (`exponential_unit`) and that
+  delaying is an action of the natural numbers preserving the tensor
+  (`delay_unit`, `delay_addition`, `delay_tensor`), the associativity
+  and unit of their tensor being those of a category whose composition
+  is the tensor. Each law is declared failing on the free level whose
+  boxes it does not rewrite — a free braid, twist, currying or
+  feedback is a box — and restated on `symmetric.Diagram`, whose
+  hypergraph quotient identifies the swap, twist and trace on both
+  sides; `rigid.Diagram` checks the currying laws modulo its normal
+  form.
+
 - `abc.MonoidalCategory.cut`, composition in context: the cut rule of
   the Lambek calculus, from `Γ2 ⊢ A` and `Γ1, A, Γ3 ⊢ B` conclude
   `Γ1, Γ2, Γ3 ⊢ B`, derived from `then` and `tensor` as
