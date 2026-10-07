@@ -64,10 +64,9 @@ Summary
 from abc import ABC, abstractmethod
 from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
-from itertools import count
 from types import NoneType
 from typing import (
-    Any, ClassVar, Self, TYPE_CHECKING, TypeVar, get_args,
+    Any, ClassVar, Self, TYPE_CHECKING, get_args,
     get_origin)
 
 from discopy.axioms import axiom, Equation, Testable
@@ -223,90 +222,12 @@ class Category[C0, C1: Category](Testable, ABC):
         >>> assert (term.dom, term.cod) == (x, y) and len(term.boxes) > 1
         """
         from hypothesis import assume, strategies as st
-        from discopy.utils import AxiomError
-
-        fresh = count()
-
-        def as_pattern(side):
-            if side is not None:
-                return side
-            return TypeVar(  # ty: ignore[invalid-legacy-type-variable]
-                f"?{next(fresh)}")
-
-        def is_pattern(side):
-            return isinstance(side, TypeVar) or get_origin(side) is not None
-
-        def guidance(side, subst):
-            if not is_pattern(side):
-                return side
-            if all(name in subst for name in Pattern.variables(side)):
-                return subst.instantiate(side, cls.ob)
-            return None
 
         @st.composite
-        def attempt(draw, goal, depth, subst: Substitution):
-            local = Substitution(subst, residuals=subst.residuals)
-            dom, cod = (guidance(side, local) for side in goal)
-            branches = cls.branches(dom, cod) if depth else []
-            focus = cls.focus(branches, dom, cod)
-            if focus and not (epsilon >= 1 or epsilon > 0 and draw(
-                    st.floats(0, 1, exclude_max=True)) < epsilon):
-                choice = focus[0]
-            else:
-                leaves = cls.leaves(dom, cod)
-                candidates = branches if branches\
-                    and (not leaves or draw(st.booleans())) else leaves
-                if not candidates:
-                    raise DeadEnd(f"{dom} -> {cod}")
-                choice = draw(st.sampled_from(candidates))
-            if choice is None:
-                result = draw(cls.free(dom, cod))
-            else:
-                applied, found = choice
-                rule_subst, before, after = cls.contexts(
-                    draw, applied, found, dom, cod)
-                _, args = applied.generate(
-                    draw, lambda _, dom, cod: terms(
-                        (as_pattern(dom), as_pattern(cod)), depth - 1, local),
-                    subst=rule_subst)
-                result = applied.apply(args)
-                result = result if before is None else before.then(result)
-                result = result if after is None else result.then(after)
-            for side, guide, value in zip(
-                    goal, (dom, cod), (result.dom, result.cod)):
-                if is_pattern(side):
-                    found = list(local.unify(side, value))
-                else:
-                    found = [local] if value == side else []
-                if not found:
-                    if guide is None:
-                        raise DeadEnd(f"{dom} -> {cod}")
-                    raise AxiomError(
-                        f"The goal reads {guide} where "
-                        f"{choice[0] if choice else 'a free box'} built "
-                        f"{result.dom} -> {result.cod}.")
-                local = found[0] if len(found) == 1\
-                    else draw(st.sampled_from(found))
-            subst.clear()
-            subst.update(local)
-            subst.residuals = local.residuals
-            return result
-
-        @st.composite
-        def terms(draw, goal, depth, subst: Substitution, tries: int = 8):
-            for _ in range(tries):
-                try:
-                    return draw(attempt(goal, depth, subst))
-                except DeadEnd:
-                    continue
-            raise DeadEnd(f"{goal[0]} -> {goal[1]}")
-
-        @st.composite
-        def goals(draw, dom, cod, depth):
+        def terms(draw):
             subst = Substitution()
-            goal = (as_pattern(dom), as_pattern(cod))
             try:
-                result = draw(terms(goal, depth, subst))
+                result = cls.prove(draw, (dom, cod), max_depth, subst, epsilon)
             except DeadEnd:
                 assume(False)
             for pattern, value in subst.residuals:
@@ -316,7 +237,106 @@ class Category[C0, C1: Category](Testable, ABC):
                 assume(subst.instantiate(pattern, cls.ob) == value)
             return result
 
-        return goals(dom, cod, max_depth)
+        return terms()
+
+    @classmethod
+    def prove(cls, draw, goal: tuple, depth: int, subst: Substitution,
+              epsilon: float = 0.05, tries: int = 8):
+        """
+        A term of a goal, extending the substitution with what it binds:
+        an :meth:`attempt`, retried on a :class:`DeadEnd` a bounded
+        number of times.
+
+        Parameters:
+            draw : The draw of the composite strategy.
+            goal : The pair of sides of the goal, :obj:`None` for fresh.
+            depth : The number of nested rules the term may apply.
+            subst : The substitution the sides of the goal are under.
+            epsilon : The chance of escaping the focusing discipline.
+            tries : The number of attempts before giving up.
+        """
+        for _ in range(tries):
+            try:
+                return cls.attempt(draw, goal, depth, subst, epsilon)
+            except DeadEnd:
+                continue
+        raise DeadEnd(f"{goal[0]} -> {goal[1]}")
+
+    @classmethod
+    def attempt(cls, draw, goal: tuple, depth: int, subst: Substitution,
+                epsilon: float = 0.05):
+        """
+        One attempt at a term of a goal, the parameters those of
+        :meth:`prove`: a side guides the choice of a leaf or a branch once
+        its variables are bound, and the term built is unified back with
+        both sides, a :class:`DeadEnd` when it fails on a side that did
+        not guide it and an :class:`discopy.utils.AxiomError` when it fails
+        on one that did, the term then lying outside its conclusion.
+        """
+        from hypothesis import strategies as st
+        from discopy.utils import AxiomError
+
+        goal = tuple(
+            Substitution.fresh() if side is None else side for side in goal)
+        local = Substitution(subst, residuals=subst.residuals)
+        dom, cod = (local.guide(side, cls.ob) for side in goal)
+        choice = cls.choose(draw, dom, cod, depth, epsilon)
+        if choice is None:
+            result = draw(cls.free(dom, cod))
+        else:
+            applied, found = choice
+            rule_subst, before, after = cls.contexts(
+                draw, applied, found, dom, cod)
+            _, args = applied.generate(draw, lambda _, dom, cod: st.just(
+                cls.prove(draw, (dom, cod), depth - 1, local, epsilon)),
+                subst=rule_subst)
+            result = applied.apply(args)
+            result = result if before is None else before.then(result)
+            result = result if after is None else result.then(after)
+        for side, guide, value in zip(
+                goal, (dom, cod), (result.dom, result.cod)):
+            found = list(local.unify(side, value))
+            if not found and guide is None:
+                raise DeadEnd(f"{dom} -> {cod}")
+            if not found:
+                raise AxiomError(
+                    f"The goal reads {guide} where "
+                    f"{choice[0] if choice else 'a free box'} built "
+                    f"{result.dom} -> {result.cod}.")
+            local = draw(st.sampled_from(found))
+        subst.clear()
+        subst.update(local)
+        subst.residuals = local.residuals
+        return result
+
+    @classmethod
+    def choose(cls, draw, dom, cod, depth: int, epsilon: float = 0.05):
+        """
+        The way to close a goal: a rule in :meth:`focus` if any, except
+        with probability ``epsilon``, else one of its :meth:`leaves` or,
+        while ``depth`` is positive, of its :meth:`branches`, :obj:`None`
+        standing for a free box.
+
+        Parameters:
+            draw : The draw of the composite strategy.
+            dom : The domain of the goal, :obj:`None` when unknown.
+            cod : The codomain of the goal, :obj:`None` when unknown.
+            depth : The number of nested rules the term may apply.
+            epsilon : The chance of escaping the focusing discipline.
+        """
+        from hypothesis import strategies as st
+
+        branches = cls.branches(dom, cod) if depth else []
+        focus = cls.focus(branches, dom, cod)
+        if focus and not (epsilon >= 1 or epsilon > 0 and draw(
+                st.floats(0, 1, exclude_max=True)) < epsilon):
+            return focus[0]
+        leaves = cls.leaves(dom, cod)
+        candidates = branches if branches\
+            and (not leaves or draw(st.booleans())) else leaves
+        if not candidates:
+            raise DeadEnd(f"{dom} -> {cod}")
+        return draw(st.sampled_from(candidates))
 
     @classmethod
     def leaves(cls, dom, cod) -> list:
@@ -702,11 +722,8 @@ class MonoidalCategory[C0: ColouredMonoid, C1: MonoidalCategory](
         <https://en.wikipedia.org/wiki/Cut_rule>`_ of the Lambek calculus:
         plug a morphism into the middle of the domain of ``other``, i.e.
         one layer of a diagram. It restates :meth:`Category.cut` with a
-        context on either side, derived from :meth:`Category.then` and
-        :meth:`tensor`: every diagram is a sequence of layers and every
-        layer is one cut, while the conclusion anchors both premises on
-        the goal where the fresh middle of a cut with no context anchors
-        neither.
+        context on either side: every diagram is a sequence of layers and
+        every layer is one cut.
 
         Parameters:
             other : The morphism consuming the codomain of ``self``.
@@ -827,15 +844,6 @@ class MonoidalCategory[C0: ColouredMonoid, C1: MonoidalCategory](
         if more is None:
             return value, plumbing
         return value, plumbing.then(more) if dom else more.then(plumbing)
-
-    @classmethod
-    def tensor_all(cls, parts: list, unit: C0) -> Self:
-        """ The tensor of a list of morphisms, the identity on ``unit``
-        when it is empty. """
-        result = cls.id(unit)
-        for part in parts:
-            result = result @ part
-        return result  # ty: ignore[invalid-return-type]
 
     @axiom
     def cut_derivation[
@@ -1254,11 +1262,8 @@ class BiclosedCategory[C0: ResiduatedMonoid, C1: BiclosedCategory](
     def uncurry(self, base=None, exponent=None, left=True) -> Self:
         """
         Uncurry a morphism by composing it with :meth:`ev`, i.e. undo
-        :meth:`curry`, whose sequents its own state upside down, the base
-        and exponent read off the codomain where not given, see
-        :meth:`base_and_exponent`. It is a method rather than a rule since
-        it is admissible: the evaluation and a cut reach every uncurried
-        morphism.
+        :meth:`curry`, the base and exponent read off the codomain where
+        not given, see :meth:`base_and_exponent`.
 
         Parameters:
             base : The base of the exponential.
@@ -1271,26 +1276,6 @@ class BiclosedCategory[C0: ResiduatedMonoid, C1: BiclosedCategory](
         return self @ exponent >> self.ev(base, exponent, True) if left\
             else exponent @ self >> self.ev(base, exponent, False)
 
-    @classmethod
-    def uncurry_composition(cls, f: C1, base: C0, exponent: C0, left: bool
-                            ) -> C1:
-        """
-        Curry ``f`` then evaluate it back, i.e. whisker the currying with
-        ``exponent`` and compose with the evaluation, the roundtrip that
-        :meth:`currying_left` and :meth:`currying_right` state equal to
-        ``f``, through :meth:`curry` and :meth:`ev`.
-
-        Parameters:
-            f : The morphism to curry and evaluate back.
-            base : The base of the exponential, i.e. the codomain of ``f``.
-            exponent : The objects curried out of the domain of ``f``.
-            left : Whether to curry on the left or right.
-        """
-        curried = f.curry(exponent=exponent, left=left)
-        ev = cls.ev(base, exponent, left)
-        whiskered = curried @ exponent if left else exponent @ curried
-        return whiskered.then(ev)
-
     @axiom
     def currying_left[A: Obj[C0], X: Atom[C0], E: Atom[C0]](
             cls, f: Hom[C1, Tensor[A, E], X],
@@ -1298,7 +1283,7 @@ class BiclosedCategory[C0: ResiduatedMonoid, C1: BiclosedCategory](
             exponent: Var[C0, E]) -> Equation[Hom[C1, Tensor[A, E], X]]:
         """ Left currying followed by evaluation. """
         return cls.Equation(
-            cls.uncurry_composition(f, base, exponent, left=True), f)
+            f.curry_left(exponent=exponent).uncurry(base, exponent), f)
 
     @axiom
     def currying_right[A: Obj[C0], X: Atom[C0], E: Atom[C0]](
@@ -1306,8 +1291,8 @@ class BiclosedCategory[C0: ResiduatedMonoid, C1: BiclosedCategory](
             base: Var[C0, X],
             exponent: Var[C0, E]) -> Equation[Hom[C1, Tensor[E, A], X]]:
         """ Right currying followed by evaluation. """
-        return cls.Equation(
-            cls.uncurry_composition(f, base, exponent, left=False), f)
+        return cls.Equation(f.curry_right(exponent=exponent).uncurry(
+            base, exponent, left=False), f)
 
     @classmethod
     def focus(cls, branches: list, dom, cod) -> list:
@@ -1913,9 +1898,9 @@ class MarkovCategory[C0: ColouredMonoid, C1: MarkovCategory](
                 or not draw(st.booleans()):
             return super().rewire(draw, value, dom, other)
         copies = [draw(st.sampled_from((1, 0, 2))) for _ in range(len(value))]
-        plumbing = cls.tensor_all([
+        plumbing = cls.id(value[:0]).tensor(*(
             cls.id(x) if n == 1 else cls.copy(x, n)
-            for x, n in zip(value.atoms, copies)], value[:0])
+            for x, n in zip(value.atoms, copies)))
         return cls.plumb(plumbing, dom, super().rewire(
             draw, plumbing.cod, dom, other))
 

@@ -88,6 +88,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Callable, Iterator
 from dataclasses import KW_ONLY, dataclass, replace
 from functools import reduce
+from itertools import count
 from types import MethodType
 from typing import (
     Annotated, Any, ClassVar, Generic, Literal, Self, TypeVar, get_args,
@@ -137,9 +138,24 @@ class Substitution(dict[str, Any]):
     x | y
     x @ y | Ty()
     """
+    fresh_names: ClassVar = count()
+
     def __init__(self, *args, residuals: tuple = (), **kwargs):
         super().__init__(*args, **kwargs)
         self.residuals = tuple(residuals)
+
+    @classmethod
+    def fresh(cls) -> TypeVar:
+        """ A variable named apart from every other. """
+        return TypeVar(  # ty: ignore[invalid-legacy-type-variable]
+            f"?{next(cls.fresh_names)}")
+
+    def guide(self, side, ob: Any):
+        """ The value a side of a goal stands for once its variables are
+        bound, :obj:`None` until then. """
+        if all(name in self for name in Pattern.variables(side)):
+            return self.instantiate(side, ob)
+        return None
 
     def __repr__(self):
         return f"Substitution({dict(self)!r}, residuals={self.residuals!r})"
@@ -181,6 +197,8 @@ class Substitution(dict[str, Any]):
             return ob()
         if isinstance(origin, type) and issubclass(origin, Pattern):
             return origin.instantiate(args, self, ob)
+        if origin is None:  # A value is a pattern with no variable.
+            return pattern
         raise TypeError(f"Expected a pattern, got {pattern!r}.")
 
     def unify(self, pattern, value) -> Iterator[Substitution]:
@@ -215,6 +233,9 @@ class Substitution(dict[str, Any]):
                 yield fit
         elif isinstance(origin, type) and issubclass(origin, Pattern):
             yield from origin.unify(args, value, self)
+        elif origin is None:  # A value is a pattern with no variable.
+            if pattern == value:
+                yield self
         else:
             raise TypeError(f"Expected a pattern, got {pattern!r}.")
 
