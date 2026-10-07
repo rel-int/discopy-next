@@ -356,7 +356,10 @@ class Hypergraph[category: Diagram](MonoidalCategory, DaggerCategory,
         dom_wires = cod_wires = tuple(range(len(dom)))
         return cls(dom, dom, (), (dom_wires, (), cod_wires))
 
-    twist = id
+    @classmethod
+    def twist(cls, dom):
+        """ The twist, i.e. the identity. """
+        return cls.id(dom)
 
     @unbiased
     def then[A, B, C](

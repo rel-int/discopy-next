@@ -31,7 +31,7 @@ from discopy.abc import ClosedCategory
 from discopy.utils import assert_isinstance, tuplify, untuplify, factory
 from discopy.python import finset, function
 from discopy.python.function import Ty
-from discopy.pattern import Count, Hom, Obj, Var, TensorDir  # noqa: F401
+from discopy.pattern import Count, Hom, Obj, Repeat, Var, Tensor, TensorDir
 from discopy.axioms import rule
 
 
@@ -89,7 +89,10 @@ class Function(function.Function, ClosedCategory):
                 callable(y) or assert_isinstance(y, t)
         return ys
 
-    def tensor(self, other: Function) -> Function:
+    @rule
+    def tensor[A: Obj[Ty], B: Obj[Ty], C: Obj[Ty], D: Obj[Ty]](
+            self: Hom[Function, A, B], other: Hom[Function, C, D]
+    ) -> Hom[Function, Tensor[A, C], Tensor[B, D]]:
         """
         The parallel composition of two functions, called with :code:`@`.
 
@@ -101,8 +104,11 @@ class Function(function.Function, ClosedCategory):
             return untuplify(tuplify(self(*left)) + tuplify(other(*right)))
         return Function(inside, self.dom @ other.dom, self.cod @ other.cod)
 
-    @staticmethod
-    def swap(x: Ty, y: Ty) -> Function:
+    @classmethod
+    @rule
+    def swap[X: Obj[Ty], Y: Obj[Ty]](
+            cls, x: Var[Ty | type, X], y: Var[Ty | type, Y]
+    ) -> Hom[Function, Tensor[X, Y], Tensor[Y, X]]:
         """
         The function for swapping two lists of types :code:`x` and :code:`y`.
 
@@ -114,7 +120,7 @@ class Function(function.Function, ClosedCategory):
 
         def inside(*xs):
             return untuplify(tuplify(xs)[len(x):] + tuplify(xs)[:len(x)])
-        return Function(inside, dom=x @ y, cod=y @ x)
+        return cls(inside, dom=x @ y, cod=y @ x)
 
     @classmethod
     def permutation(cls, xs, doms) -> Self:
@@ -132,10 +138,11 @@ class Function(function.Function, ClosedCategory):
         cod = cls.ob().tensor(*(doms[i] for i in xs))
         return cls(inside, dom, cod)
 
-    braid = swap
-
-    @staticmethod
-    def copy(x: Ty, n=2) -> Function:
+    @classmethod
+    @rule
+    def copy[X: Obj[Ty], N: Count](
+            cls, x: Var[Ty | type, X], n: Var[int, N] = 2
+    ) -> Hom[Function, X, Repeat[X, N]]:
         """
         The function for making :code:`n` copies of a list of types :code:`x`.
 
@@ -144,7 +151,10 @@ class Function(function.Function, ClosedCategory):
             n : The number of copies.
         """
         x = Ty.cast(x)
-        return Function(lambda *xs: n * xs, dom=x, cod=x ** n)
+        return cls(lambda *xs: n * xs, dom=x, cod=x ** n)
+
+    merge = classmethod(ClosedCategory.merge.__func__.inapplicable(
+        "A Python function cannot merge copies."))
 
     @staticmethod
     def discard(dom: Ty) -> Function:

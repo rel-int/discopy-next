@@ -22,7 +22,7 @@ from discopy.abc import SymmetricCategory
 from discopy.utils import assert_isinstance
 from discopy.python import finset, function
 from discopy.python.function import Ty
-from discopy.pattern import Count, Hom, Obj, Var, TensorDir  # noqa: F401
+from discopy.pattern import Count, Hom, Obj, Var, Tensor, TensorDir
 from discopy.axioms import rule
 
 
@@ -57,7 +57,10 @@ class Function(function.Function, SymmetricCategory):
             assert_isinstance(obj, self.cod.inside[tag])
         return result
 
-    def tensor(self, other: Function) -> Function:
+    @rule
+    def tensor[A: Obj[Ty], B: Obj[Ty], C: Obj[Ty], D: Obj[Ty]](
+            self: Hom[Function, A, B], other: Hom[Function, C, D]
+    ) -> Hom[Function, Tensor[A, C], Tensor[B, D]]:
         """
         The disjoint union of two functions, called with :code:`@`.
 
@@ -77,9 +80,12 @@ class Function(function.Function, SymmetricCategory):
             return obj if len(cod) == 1 else (obj, tag)
         return Function(inside, dom, cod)
 
-    @staticmethod
+    @classmethod
+    @rule
     @cache
-    def swap(x: Ty, y: Ty) -> Function:
+    def swap[X: Obj[Ty], Y: Obj[Ty]](
+            cls, x: Var[Ty | type, X], y: Var[Ty | type, Y]
+    ) -> Hom[Function, Tensor[X, Y], Tensor[Y, X]]:
         """
         Swap the tags of a disjoint union from `x @ y` to `y @ x`.
 
@@ -95,7 +101,7 @@ class Function(function.Function, SymmetricCategory):
                 assert new_tag == 0
                 return obj
             return (obj, new_tag)
-        return Function(inside, dom=x @ y, cod=y @ x, is_swap_of=(x, y))
+        return cls(inside, dom=x @ y, cod=y @ x, is_swap_of=(x, y))
 
     @classmethod
     def permutation(cls, xs, doms) -> Self:
@@ -168,6 +174,6 @@ class Function(function.Function, SymmetricCategory):
         return Function(inside, x ** n, x)
 
 
-Swap = Function.braid = Function.swap  # ty: ignore[invalid-assignment]
+Swap = Function.swap
 Id = Function.twist = Function.id
 Merge = Function.merge

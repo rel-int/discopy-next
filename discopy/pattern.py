@@ -678,10 +678,6 @@ class Declaration[**P, T]:
             return None
         return inspect.signature(self.function).return_annotation
 
-    def __set_name__(self, owner: type, name: str):
-        if self.category is None:
-            self.name = name
-
     @property
     def __isabstractmethod__(self):
         return getattr(self.function, "__isabstractmethod__", False)
@@ -849,7 +845,8 @@ def declarations[K: Declaration](cls: type, kind: type[K]) -> dict[str, K]:
     The declarations of exactly a kind inherited by a class, bound to
     it and keyed by name, the latest in the method resolution order
     winning like ordinary attribute lookup; a declaration marked
-    inapplicable or admissible, or anything that is not a declaration,
+    inapplicable or admissible, a declaration under a label other than
+    its name, i.e. an alias, or anything that is not a declaration,
     assigned over an inherited one drops it.
 
     >>> from discopy.monoidal import Diagram
@@ -862,7 +859,7 @@ def declarations[K: Declaration](cls: type, kind: type[K]) -> dict[str, K]:
         for label, value in base.__dict__.items():
             while isinstance(value, (classmethod, staticmethod)):
                 value = value.__func__
-            if type(value) is kind\
+            if type(value) is kind and value.name == label\
                     and getattr(value, "__inapplicable__", None) is None\
                     and getattr(value, "__admissible__", None) is None:
                 result[label] = value.bind(cls, owner=base)

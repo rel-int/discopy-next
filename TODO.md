@@ -1,8 +1,8 @@
 add everything, fix everything
 
 ## Bugs
-- [WIP] @session_019jj2d1JBnEGRPmjqSAP37A-2026-10-07 08:38 `twist = id` / `identity = id` register the `id` rule under another name
-- [WIP] @session_019jj2d1JBnEGRPmjqSAP37A-2026-10-07 08:38 the Python functions lost their `id` rule (and keep stray ones)
+- [x] `twist = id` / `identity = id` register the `id` rule under another name
+- [x] the Python functions lost their `id` rule (and keep stray ones)
 
 ## Laws
 - [ ] `HypergraphCategory`: spider fusion, specialness, commutativity

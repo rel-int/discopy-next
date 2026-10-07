@@ -248,7 +248,10 @@ class Matrix[dtype](MonoidalCategory, DaggerCategory, NamedGeneric):
             array = np.identity(index(dom), dtype=cls.dtype or int)
         return cls(array, dom, dom)
 
-    twist = id
+    @classmethod
+    def twist(cls, dom):
+        """ The twist, i.e. the identity. """
+        return cls.id(dom)
 
     @unbiased
     def then[A, B, C](

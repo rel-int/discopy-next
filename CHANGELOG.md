@@ -1013,6 +1013,20 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Fixed
 
+- A rule assigned under a second name is an alias, not a rule:
+  `Matrix.twist = id` made `twist` a second identity rule and renamed
+  the shared rule object `twist`, since `Declaration.__set_name__`
+  renamed a declaration after whatever attribute it landed on. The
+  name is the function's, an alias is dropped from `declarations`,
+  `Matrix.twist` and `Hypergraph.twist` are methods returning the
+  identity and `finset.Permutation.identity` goes, `id` being the
+  name. The Python functions restate `id`, `then`, `tensor`, `swap`
+  and the multiplicative `copy` as rules, which their plain
+  overrides dropped while keeping a `braid_inverse` taking the
+  dagger they lack and a `merge` they cannot build:
+  `abc.SymmetricCategory.braid_inverse` is the swap the other way
+  and the multiplicative `merge` is inapplicable.
+
 - `curry(0)` is the identity everywhere, as `trace(0)` already was: an
   exponential of the unit is its base, `z << Ty()`, `Ty() >> z` and
   `z ** Ty()` being `z` on `biclosed` and `closed` types as they already

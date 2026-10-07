@@ -1092,6 +1092,14 @@ class SymmetricCategory[C0: ColouredMonoid, C1: SymmetricCategory](
         """ The braid of a symmetric category is its swap. """
         return cls.swap(left, right)
 
+    @classmethod
+    @rule
+    def braid_inverse[X: Atom[C0], Y: Atom[C0]](
+            cls, left: Var[C0, X], right: Var[C0, Y]
+    ) -> Hom[C1, Tensor[Y, X], Tensor[X, Y]]:
+        """ The inverse of a swap is the swap the other way. """
+        return cls.swap(right, left)
+
     @axiom
     def swap_inverse[X: Obj[C0], Y: Obj[C0]](
             cls, x: Var[C0, X], y: Var[C0, Y]

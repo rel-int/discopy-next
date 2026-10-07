@@ -201,8 +201,6 @@ class Permutation(Function, PROP):
         n = int(dom)
         return cls(range(n), n)
 
-    identity = id
-
     @property
     def is_identity(self) -> bool:
         """ Whether this is the identity permutation. """
