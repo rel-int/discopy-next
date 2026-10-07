@@ -72,8 +72,7 @@ from typing import ClassVar
 from collections.abc import Mapping
 
 from discopy import messages, tensor, frobenius
-from discopy.pattern import Var  # noqa: F401
-from discopy.axioms import Hom, no_strategy, Rule, rule
+from discopy.axioms import no_strategy, Rule
 from discopy.cat import factory, Generator
 from discopy.matrix import backend
 from discopy.tensor import Dim, Tensor
@@ -223,7 +222,7 @@ class Circuit(tensor.Diagram[complex]):
         """
         from discopy.quantum.gates import GATES
 
-        return {"id": cls.rules["id"], "braid": cls.rules["braid"],
+        return {"ax": cls.rules["ax"], "braid": cls.rules["braid"],
                 **{name: Rule.constant(gate) for name, gate in GATES.items()
                    if not isinstance(gate, type)}}
 
@@ -253,9 +252,7 @@ class Circuit(tensor.Diagram[complex]):
         "A trace unfolds into kets and bras.")
 
     @classmethod
-    @rule
-    def id[A](cls, dom: Var[int | Ty | None, A] = None
-              ) -> Hom[Circuit, A, A]:
+    def id(cls, dom: int | Ty | None = None) -> Circuit:
         """
         The identity circuit on a given domain.
 

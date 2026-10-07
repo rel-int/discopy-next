@@ -38,7 +38,7 @@ from copy import copy
 from dataclasses import dataclass
 
 from discopy import config, monoidal, braided, traced, cmap, hypergraph
-from discopy.pattern import Var  # noqa: F401
+from discopy.pattern import Var
 from discopy.abc import BalancedCategory
 
 from discopy.axioms import Atom, Hom, no_strategy, rule, Serialisable

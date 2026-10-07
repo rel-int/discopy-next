@@ -65,12 +65,12 @@ from typing import (
     TYPE_CHECKING)
 
 from discopy import abc, cat, drawing, hypergraph, cmap, messages
-from discopy.pattern import Var, Tensor  # noqa: F401
+from discopy.pattern import Var
 from discopy.abc import (
     ColouredMonoid, Monoid, MonoidalCategory, NamedGeneric)
 from discopy.axioms import (
-    axiom, Equation as AbstractEquation, GENERATORS, Hom, no_strategy,
-    rule, Serialisable)
+    axiom, Equation as AbstractEquation, GENERATORS, no_strategy,
+    Serialisable)
 from discopy.drawing import Drawing
 from discopy.config import (
     BOX_DRAWING_ATTRIBUTES, WIRE_DRAWING_ATTRIBUTES,
@@ -86,6 +86,7 @@ from discopy.utils import (
     AxiomError,
     MappingOrCallable,
     RichDisplay,
+    unbiased,
 )
 
 if TYPE_CHECKING:
@@ -867,6 +868,7 @@ class Layer(cat.Box, ColouredMonoid):
         return factory_name(type(self))\
             + f"({', '.join(map(repr, self))})"
 
+    @unbiased
     def tensor(self, other: Ty | Box | Layer) -> Layer:
         """
         Tensor another layer on the right, normalising the common boundary.
@@ -1165,17 +1167,13 @@ class Diagram(cat.Arrow, MonoidalCategory, RichDisplay):
 
         return decorator
 
-    @rule
-    def tensor[A, B, C, D](
-            self: Hom[Diagram, A, B],
-            other: Hom[Diagram | None, C, D] = None,
-            *others: Diagram) -> Hom[Diagram, Tensor[A, C], Tensor[B, D]]:
+    @unbiased
+    def tensor(self, other: Diagram) -> Diagram:
         """
-        Parallel composition, called using :code:`@`.
+        Parallel composition of ``n >= 0`` diagrams, called using :code:`@`.
 
         Parameters:
             other : The other diagram to tensor.
-            rest : More diagrams to tensor.
 
         Important
         ---------
@@ -1195,10 +1193,6 @@ class Diagram(cat.Arrow, MonoidalCategory, RichDisplay):
         .. image:: /_static/monoidal/tensor-example.svg
             :align: center
         """
-        if other is None:
-            return self
-        if others:
-            return self.tensor(other).tensor(*others)
         if isinstance(other, Sum):
             return self.Sum((self, )).tensor(other)
         assert_isinstance(other, self.ar)
@@ -1207,12 +1201,6 @@ class Diagram(cat.Arrow, MonoidalCategory, RichDisplay):
             + tuple(self.cod @ layer for layer in other.inside)
         dom, cod = self.dom @ other.dom, self.cod @ other.cod
         return self.ar(inside, dom, cod, _scan=False)
-
-    #: Composition stays the method it always was, while the search
-    #: composes in context by :meth:`discopy.abc.MonoidalCategory.cut`,
-    #: which subsumes it — a cut with empty contexts — and keeps
-    #: :meth:`tensor` as the rule that puts diagrams side by side.
-    then = cat.Arrow.then.admissible("A cut with empty contexts.")
 
     @property
     def boxes(self) -> list[Box]:
@@ -1897,13 +1885,8 @@ class Sum(cat.Sum, Box):
     def size(self):
         return 1
 
-    @rule
-    def tensor[A, B, C, D](
-            self: Hom[Sum, A, B],
-            other: Hom[Diagram | None, C, D] = None, *others
-    ) -> Hom[Sum, Tensor[A, C], Tensor[B, D]]:
-        if other is None or others:
-            return Diagram.tensor(self, other, *others)
+    @unbiased
+    def tensor(self, other: Diagram) -> Sum:
         other = other if isinstance(other, Sum)\
             else self.Sum((other, ))
         dom, cod = self.dom @ other.dom, self.cod @ other.cod
@@ -2063,16 +2046,11 @@ class Functor(cat.Functor):
         self.colour_map = MappingOrCallable(colour_map or {})
 
     @classmethod
-    @rule
-    def id[A](cls, dom: Var[type | None, A] = None
-              ) -> Hom[Any, A, A]:
+    def id(cls, dom: type | None = None) -> Any:
         return cls(lambda x: x, lambda f: f, dom=dom, cod=dom)
 
-    @rule
-    def then[A, B, C](
-            self: Hom[Functor, A, B],
-            other: Hom[Functor, B, C]
-    ) -> Hom[Functor, A, C]:
+    @unbiased
+    def then(self, other: Functor) -> Functor:
         assert_isinstance(other, Functor)
         assert_iscomposable(self, other)
         return type(self)(

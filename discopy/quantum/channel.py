@@ -42,8 +42,6 @@ Channel([0.5+0.j, 0.5+0.j, 0.5+0.j, 0.5+0.j], dom=CQ(), cod=Q(Dim(2)))
 """
 
 from discopy import frobenius, tensor
-from discopy.pattern import Var  # noqa: F401
-from discopy import pattern
 from discopy.abc import ColouredMonoid
 from discopy.cat import factory
 from discopy.frobenius import Ty, Diagram, Box
@@ -52,7 +50,7 @@ from discopy.quantum.circuit import (
     Digit, Qudit)
 from discopy.quantum.gates import Discard, Measure, MixedState, Encode, Scalar
 from discopy.tensor import Dim, Tensor
-from discopy.utils import assert_isinstance
+from discopy.utils import assert_isinstance, unbiased
 
 from discopy.pattern import Hom
 from discopy.pattern import rule
@@ -174,21 +172,14 @@ class Channel(Tensor):
             self.array, self.dom.to_dim(), self.cod.to_dim())
 
     @classmethod
-    @rule
-    def id[A](cls, dom: Var[CQ, A] = CQ()
-              ) -> Hom[Channel, A, A]:
+    def id(cls, dom: CQ = CQ()) -> Channel:
         assert_isinstance(dom, CQ)
         return cls(Tensor[
             cls.dtype].id(dom.to_dim()).array,  # ty: ignore[invalid-type-form]
             dom, dom)
 
-    def then[A, B, C](
-            self: Hom[Channel, A, B],
-            other: Hom[Channel | None, B, C] = None,
-            *others: Channel) -> Hom[Channel, A, C]:
-        if other is None or others:
-            return super().then(
-                other, *others)  # ty: ignore[invalid-return-type]
+    @unbiased
+    def then(self, other: Channel) -> Channel:
         assert_isinstance(other, type(self))
         array = (self.to_tensor() >> other.to_tensor()).array
         return type(self)(array, self.dom, other.cod)
@@ -197,14 +188,8 @@ class Channel(Tensor):
     def dagger[A, B](self: Hom[Channel, A, B]) -> Hom[Channel, B, A]:
         return type(self)(self.to_tensor().dagger().array, self.cod, self.dom)
 
-    def tensor[A, B, C, D](
-            self: Hom[Channel, A, B],
-            other: Hom[Channel | None, C, D] = None,
-            *others: Channel
-    ) -> Hom[Channel, pattern.Tensor[A, C], pattern.Tensor[B, D]]:
-        if other is None or others:
-            return super().tensor(
-                other, *others)  # ty: ignore[invalid-return-type]
+    @unbiased
+    def tensor(self, other: Channel) -> Channel:
         assert_isinstance(other, type(self))
         f = Box('f', Ty('c00', 'q00', 'q00'), Ty('c10', 'q10', 'q10'))
         g = Box('g', Ty('c01', 'q01', 'q01'), Ty('c11', 'q11', 'q11'))

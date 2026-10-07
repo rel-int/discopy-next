@@ -122,7 +122,7 @@ def test_axiom():
         == "Hom[C1, A, B]"
     equation = find(Diagram.bifunctoriality.strategy(), lambda _: True)
     assert equation and len(equation.terms) == 2
-    assert MonoidalCategory.tensor.conclusion is not None
+    assert MonoidalCategory.mix.conclusion is not None
     assert Axiom.concludes is False
     @axiom
     def unannotated(cls, f):

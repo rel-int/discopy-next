@@ -28,7 +28,8 @@ from itertools import accumulate
 from typing import Self
 
 from discopy.abc import ClosedCategory
-from discopy.utils import assert_isinstance, tuplify, untuplify, factory
+from discopy.utils import (
+    assert_isinstance, tuplify, untuplify, factory, unbiased)
 from discopy.python import finset, function
 from discopy.python.function import Ty
 from discopy.pattern import Count, Hom, Obj, Repeat, Var, Tensor
@@ -89,10 +90,8 @@ class Function(function.Function, ClosedCategory):
                 callable(y) or assert_isinstance(y, t)
         return ys
 
-    @rule
-    def tensor[A: Obj[Ty], B: Obj[Ty], C: Obj[Ty], D: Obj[Ty]](
-            self: Hom[Function, A, B], other: Hom[Function, C, D]
-    ) -> Hom[Function, Tensor[A, C], Tensor[B, D]]:
+    @unbiased
+    def tensor(self, other: Function) -> Function:
         """
         The parallel composition of two functions, called with :code:`@`.
 

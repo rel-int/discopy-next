@@ -67,8 +67,8 @@ from dataclasses import dataclass
 from itertools import count
 from types import NoneType
 from typing import (
-    Any, ClassVar, Literal, Self, TYPE_CHECKING, TypeVar, get_args,
-    get_origin, overload)
+    Any, ClassVar, Self, TYPE_CHECKING, TypeVar, get_args,
+    get_origin)
 
 from discopy.axioms import (  # noqa: F401  pylint: disable=unused-import
     Axiom, axiom, declarations, Equation, Rule, rule, Serialisable, Testable)
@@ -77,7 +77,7 @@ from discopy.pattern import (  # noqa: F401  pylint: disable=unused-import
     Match, Objects, Sort, instantiate, match,
     variables)
 from discopy.utils import (  # noqa: F401  pylint: disable=unused-import
-    NamedGeneric, classproperty, factory_name)
+    NamedGeneric, classproperty, factory_name, unbiased)
 
 
 class DeadEnd(Exception):
@@ -412,28 +412,49 @@ class Category[C0, C1: Category](Testable, ABC):
         return []
 
     @classmethod
-    @rule
     @abstractmethod
-    def id[A: Obj[C0]](cls, dom: Var[C0, A]) -> Hom[C1, A, A]:
+    def id(cls, dom: C0) -> C1:
         """
-        Identity morphism on an object :code:`dom: C0`, to be instantiated:
-        as a rule, ``x ⊢ x`` with no box is the identity.
+        Identity morphism on an object :code:`dom: C0`, to be instantiated.
 
         Parameters:
             dom (C0) : The domain of an identity is also its codomain.
         """
 
-    @rule
     @abstractmethod
-    def then[A: Obj[C0], B: Obj[C0], C: Obj[C0]](
-            self: Hom[C1, A, B], other: Hom[C1, B, C]) -> Hom[C1, A, C]:
+    @unbiased
+    def then(self, other: C1) -> C1:
         """
-        Sequential composition, to be instantiated: the rule composes two
-        morphisms, an implementation may take ``n >= 1`` of them.
+        Sequential composition, to be instantiated: binary for a biased
+        implementation, unbiased for the caller, which may compose any
+        number of morphisms.
 
         Parameters:
             other : The other morphism to compose sequentially.
         """
+
+    @classmethod
+    @rule
+    def ax[A: Obj[C0]](cls, dom: Var[C0, A]) -> Hom[C1, A, A]:
+        """
+        The axiom rule ``x ⊢ x``, concluded by the identity :meth:`id`.
+
+        Parameters:
+            dom : The domain of the identity, also its codomain.
+        """
+        return cls.id(dom)
+
+    @rule
+    def cut[A: Obj[C0], B: Obj[C0], C: Obj[C0]](
+            self: Hom[C1, A, B], other: Hom[C1, B, C]) -> Hom[C1, A, C]:
+        """
+        The cut rule, from ``a ⊢ b`` and ``b ⊢ c`` conclude ``a ⊢ c``,
+        concluded by the sequential composition :meth:`then`.
+
+        Parameters:
+            other : The morphism consuming the codomain of ``self``.
+        """
+        return self.then(other)
 
     def is_composable(self, other: C1) -> bool:
         """
@@ -526,15 +547,12 @@ class ColouredMonoid[C0, C1: ColouredMonoid](Category[C0, C1]):
             """ The slices of a free monoid, assumed to stay inside it. """
 
     @classmethod
-    @rule
-    def id[A: Obj[C0]](
-            cls, dom: Var[C0 | None, A] = None) -> Hom[C1, A, A]:
+    def id(cls, dom: C0 | None = None) -> C1:
         """The monoidal unit, i.e. the empty tensor ``cls()``."""
         return cls()  # ty: ignore[invalid-return-type]
 
     @classmethod
-    def unit[A: Obj[C0]](
-            cls, colour: Var[C0 | None, A] = None) -> Var[C0 | C1, Unit[C0]]:
+    def unit(cls, colour: C0 | None = None) -> C0 | C1:
         """
         The unit at a colour, i.e. the identity on it.
 
@@ -547,6 +565,9 @@ class ColouredMonoid[C0, C1: ColouredMonoid](Category[C0, C1]):
     @abstractmethod
     def tensor(self, *objects: Self) -> Self:
         """ The n-ary product of a monoid for ``n > 0``. """
+
+    cut = Category.cut.inapplicable(
+        "Objects compose by their tensor, which no search of objects uses.")
 
     def then(self, *others: Self) -> Self:
         """Sequential composition, given by the monoid product."""
@@ -570,8 +591,7 @@ class ColouredMonoid[C0, C1: ColouredMonoid](Category[C0, C1]):
         return cls(atoms)  # ty: ignore[too-many-positional-arguments]
 
     @classmethod
-    def whisker[A: Obj[C0], B: Obj[C0]](
-            cls, other: Var[C0, A] | Hom[C1, A, B]) -> Hom[C1, A, B]:
+    def whisker(cls, other: C0 | C1) -> C1:
         """
         Do nothing if ``other`` is already a morphism else apply :meth:`id`.
 
@@ -642,22 +662,34 @@ class MonoidalCategory[C0: ColouredMonoid, C1: MonoidalCategory](
 
     This base class also implements syntactic sugar :code:`@` for whiskering.
     """
-    @rule
     @abstractmethod
-    def tensor[A: Obj[C0], B: Obj[C0], C: Obj[C0], D: Obj[C0]](
-            self: Hom[C1, A, B], other: Hom[C1, C, D]
-    ) -> Hom[C1, Tensor[A, C], Tensor[B, D]]:
+    @unbiased
+    def tensor(self, other: C1) -> C1:
         """
-        Parallel composition, to be instantiated: the rule tensors two
-        morphisms, an implementation may take ``n >= 0`` of them.
+        Parallel composition, to be instantiated: binary for a biased
+        implementation, unbiased for the caller, which may tensor any
+        number of morphisms.
 
         Parameters:
             other : The other morphism to compose in parallel.
         """
 
+    @rule
+    def mix[A: Obj[C0], B: Obj[C0], C: Obj[C0], D: Obj[C0]](
+            self: Hom[C1, A, B], other: Hom[C1, C, D]
+    ) -> Hom[C1, Tensor[A, C], Tensor[B, D]]:
+        """
+        The mix rule, from ``a ⊢ b`` and ``c ⊢ d`` conclude
+        ``a, c ⊢ b, d``, concluded by the parallel composition
+        :meth:`tensor`.
+
+        Parameters:
+            other : The other morphism to compose in parallel.
+        """
+        return self.tensor(other)
+
     @classmethod
-    def whisker[A: Obj[C0], B: Obj[C0]](
-            cls, other: Var[C0, A] | Hom[C1, A, B]) -> Hom[C1, A, B]:
+    def whisker(cls, other: C0 | C1) -> C1:
         """
         Do nothing if ``other`` is already a morphism else apply :meth:`id`.
 
@@ -674,7 +706,8 @@ class MonoidalCategory[C0: ColouredMonoid, C1: MonoidalCategory](
         return self.whisker(other).tensor(self)
 
     @rule
-    def cut[A: Obj[C0], B: Obj[C0], C: Obj[C0], X: Obj[C0], Y: Obj[C0]](
+    def cut[  # pylint: disable=arguments-differ  # a cut in context
+            A: Obj[C0], B: Obj[C0], C: Obj[C0], X: Obj[C0], Y: Obj[C0]](
             self: Hom[C1, B, A], other: Hom[C1, Tensor[X, A, Y], C],
             left: Var[C0, X], right: Var[C0, Y]
     ) -> Hom[C1, Tensor[X, B, Y], C]:
@@ -682,12 +715,12 @@ class MonoidalCategory[C0: ColouredMonoid, C1: MonoidalCategory](
         Composition in context, the `cut rule
         <https://en.wikipedia.org/wiki/Cut_rule>`_ of the Lambek calculus:
         plug a morphism into the middle of the domain of ``other``, i.e.
-        one layer of a diagram. The rule derives from
-        :meth:`Category.then` and :meth:`tensor`, and replaces them as
-        the recursive rule of the search from monoidal categories on:
-        every diagram is a sequence of layers and every layer is one
-        cut, while the conclusion anchors both premises on the goal
-        where the fresh middle of :meth:`Category.then` anchors neither.
+        one layer of a diagram. It restates :meth:`Category.cut` with a
+        context on either side, derived from :meth:`Category.then` and
+        :meth:`tensor`: every diagram is a sequence of layers and every
+        layer is one cut, while the conclusion anchors both premises on
+        the goal where the fresh middle of a cut with no context anchors
+        neither.
 
         Parameters:
             other : The morphism consuming the codomain of ``self``.
@@ -1043,21 +1076,17 @@ class ResiduatedMonoid[C0, C1: ResiduatedMonoid](ColouredMonoid[C0, C1]):
             """ The exponent of an exponential object. """
 
     @abstractmethod
-    def over[X: Obj[C1], Y: Obj[C1]](
-            self: Var[C1, X], other: Var[C1, Y]) -> Var[C1, Over[X, Y]]:
+    def over(self, other: C0 | C1) -> C1:
         """ The right-to-left exponential object ``self`` to the ``other``. """
 
     @abstractmethod
-    def under[X: Obj[C1], Y: Obj[C1]](
-            self: Var[C1, X], other: Var[C1, Y]) -> Var[C1, Under[Y, X]]:
+    def under(self, other: C0 | C1) -> C1:
         """ The left-to-right exponential object ``self`` to the ``other``. """
 
-    def __lshift__[X: Obj[C1], Y: Obj[C1]](
-            self: Var[C1, X], other: Var[C1, Y]) -> Var[C1, Over[X, Y]]:
+    def __lshift__(self, other: C0 | C1) -> C1:
         return self.over(other)
 
-    def __rshift__[X: Obj[C1], Y: Obj[C1]](
-            self: Var[C1, X], other: Var[C1, Y]) -> Var[C1, Under[X, Y]]:
+    def __rshift__(self, other: C0 | C1) -> C1:
         return other.under(self)
 
     @axiom
@@ -1384,20 +1413,18 @@ class Pregroup[C0, C1: Pregroup](ResiduatedMonoid[C0, C1]):
     """
     @property
     @abstractmethod
-    def l[X: Obj[C1]](self: Var[C1, X]) -> Var[C1, L[X]]:
+    def l(self) -> Self:
         """ The left adjoint, to be instantiated. """
 
     @property
     @abstractmethod
-    def r[X: Obj[C1]](self: Var[C1, X]) -> Var[C1, R[X]]:
+    def r(self) -> Self:
         """ The right adjoint, to be instantiated. """
 
-    def over[X: Obj[C1], Y: Obj[C1]](
-            self: Var[C1, X], other: Var[C1, Y]) -> Var[C1, Over[X, Y]]:
+    def over(self, other: C0 | C1) -> C1:
         return self @ other.l
 
-    def under[X: Obj[C1], Y: Obj[C1]](
-            self: Var[C1, X], other: Var[C1, Y]) -> Var[C1, Under[Y, X]]:
+    def under(self, other: C0 | C1) -> C1:
         return other.r @ self
 
     @axiom
@@ -1563,17 +1590,7 @@ class RigidCategory[C0: Pregroup, C1: RigidCategory](BiclosedCategory[C0, C1]):
         """
         return Category.focus.__func__(cls, branches, dom, cod)
 
-    @overload
-    def transpose[A: Obj[C0], B: Obj[C0]](
-            self: Hom[C1, A, B], left: Literal[False] = ...
-    ) -> Hom[C1, R[B], R[A]]: ...
-
-    @overload
-    def transpose[A: Obj[C0], B: Obj[C0]](
-            self: Hom[C1, A, B], left: Literal[True] = ...
-    ) -> Hom[C1, L[B], L[A]]: ...
-
-    def transpose(self, left=False):
+    def transpose(self, left: bool = False) -> Self:
         """
         The transpose of a morphism, i.e. its composition with cups and caps.
 
@@ -1983,7 +2000,7 @@ class DelayedMonoid[C0, C1: DelayedMonoid](ColouredMonoid[C0, C1]):
         """
 
     @property
-    def d[X: Obj[C1]](self: Var[C1, X]) -> Var[C1, D[X]]:
+    def d(self) -> Self:
         """ Syntactic sugar for :meth:`delay` by one time step. """
         return self.delay()
 

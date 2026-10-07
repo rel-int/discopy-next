@@ -24,13 +24,13 @@ x, y = Ty("x"), Ty("y")
 
 def test_read_off():
     """ Variables, premises and conclusion are what Python evaluates. """
-    then = Category.then
-    assert list(then.variables) == ["A", "B", "C"]
+    cut = Category.cut
+    assert list(cut.variables) == ["A", "B", "C"]
     assert all(isinstance(sort, Objects) and sort.size is None
-               for sort in then.variables.values())
-    assert list(then.premises) == ["self", "other"]
-    assert str(then.conclusion) == "Hom[C1, A, C]"
-    _, dom, _ = get_args(MonoidalCategory.tensor.conclusion)
+               for sort in cut.variables.values())
+    assert list(cut.premises) == ["self", "other"]
+    assert str(cut.conclusion) == "Hom[C1, A, C]"
+    _, dom, _ = get_args(MonoidalCategory.mix.conclusion)
     assert get_origin(dom) is Tensor
     assert [variable.__name__ for variable in get_args(dom)] == ["A", "C"]
 
@@ -197,17 +197,16 @@ def test_ev_and_feedback():
 
 
 def test_rule():
-    assert repr(Rule(Category.then.function)) == "Rule(then)"
-    assert repr(Category.then) == "abc.Category.then"
-    assert cat.Arrow.then is not None and cat.Arrow.rules["then"].category\
-        is cat.Arrow
-    assert hash(Category.then) == hash(Category.then.bind(Category))
-    assert Category.then.__isabstractmethod__
-    assert cat.Arrow.rules["then"].owner is cat.Arrow  # The latest wins.
-    assert str(cat.Arrow.rules["then"].conclusion).endswith(", A, C]")\
-        and str(Category.then.conclusion).endswith(", A, C]")
+    assert repr(Rule(Category.cut.function)) == "Rule(cut)"
+    assert repr(Category.cut) == "abc.Category.cut"
+    assert cat.Arrow.rules["cut"].category is cat.Arrow
+    assert hash(Category.cut) == hash(Category.cut.bind(Category))
+    assert Category.then.__isabstractmethod__  # A method, not a rule.
+    assert not isinstance(vars(Category)["then"], Rule)
+    assert Diagram.rules["cut"].owner is MonoidalCategory  # The latest wins.
+    assert str(cat.Arrow.rules["cut"].conclusion).endswith(", A, C]")
     with raises(TypeError):
-        Rule(Category.then.function).unit
+        Rule(Category.cut.function).unit
     with raises(TypeError):
         rule(classmethod(lambda cls: None))
 
@@ -219,7 +218,7 @@ def test_rule():
 
     f = Box("f", x, x)
     assert Wrapped.twice(f) == f >> f == Wrapped(f.inside, x, x).twice()
-    assert list(Wrapped.rules) == ["id", "tensor", "cut", "dagger", "twice"]
+    assert list(Wrapped.rules) == ["ax", "cut", "mix", "dagger", "twice"]
     assert str(Wrapped.rules["twice"]) == "twice(self: Hom[discopy."\
         "monoidal.Diagram, A, A]) -> Hom[discopy.monoidal.Diagram, A, A]"
     found = find(Wrapped.strategy(dom=x, cod=x),
@@ -229,7 +228,7 @@ def test_rule():
 
 
 def test_generator():
-    assert Category.then.recursive
+    assert Category.cut.recursive
     assert not rigid.Diagram.rules["cups"].recursive
     assert "cups" in rigid.Diagram.generators
     assert rigid.Diagram.generators["cups"].category is rigid.Diagram
@@ -257,24 +256,23 @@ def test_cut():
     f, g = Box("f", y, y @ y), Box("g", x @ y @ y @ z, z)
     assert f.cut(g, x, z) == x @ f @ z >> g
     assert list(Diagram.rules["cut"].variables) == list("ABCXY")
-    assert list(Diagram.rules) == ["id", "tensor", "cut", "dagger"]
+    assert list(Diagram.rules) == ["ax", "cut", "mix", "dagger"]
     assert Diagram.rules["cut"].recursive
-    assert "then" in cat.Arrow.rules  # A mere category composes by then,
-    assert f.then(Box("h", y @ y, z)).cod == z  # a monoidal one cuts.
+    assert list(cat.Arrow.rules["cut"].premises) == ["self", "other"]
+    assert f.then(Box("h", y @ y, z)).cod == z  # A method, n-ary.
     assert (f @ g).dom == f.dom @ g.dom
 
 
 def test_calculus():
     """ The recursive rules in action at each level of the tower, the
-    admissible and inapplicable ones curated out: ``then`` is a cut
-    with empty contexts everywhere, the rigid curries are caps
-    compositions, and a method an admissible rule leaves behind still
-    runs. """
+    admissible and inapplicable ones curated out: the rigid curries are
+    caps compositions, and a method an admissible rule leaves behind
+    still runs. """
     from discopy import (
         balanced, biclosed, closed, compact, feedback, frobenius, markov,
         monoidal, pivotal, ribbon, symmetric, traced)
 
-    composition, dagger = ["tensor", "cut"], ["dagger"]
+    composition, dagger = ["cut", "mix"], ["dagger"]
     trace = ["trace_left", "trace_right"]
     curry = ["curry_left", "curry_right"]
     for module, calculus in (
@@ -296,7 +294,6 @@ def test_calculus():
         assert [name for name, found in module.Diagram.rules.items()
                 if found.recursive] == calculus, module.__name__
 
-    assert monoidal.Diagram.__dict__["then"].__admissible__
     assert "twist" not in compact.Diagram.generators
     twist = compact.Diagram.twist(compact.Ty("x"))
     assert twist.dom == twist.cod and not twist.inside
@@ -309,10 +306,8 @@ def test_declarations():
 
     assert "unitality" not in Hidden.axioms
     assert "cut" not in Hidden.rules
-    assert list(Category.generators) == ["id"]
-
-    assert list(Ty.rules) == ["id"]  # Composing objects is a method,
-    # not a rule: Ty.then shadows the rule a mere category declares.
+    assert list(Category.generators) == ["ax"]
+    assert list(Ty.rules) == ["ax"]  # Objects compose by their tensor.
 
 
 def test_focusing():
@@ -329,7 +324,7 @@ def test_focusing():
 
     assert rules_in_focus(biclosed.Diagram, a, b << a) == ["curry_left"]
     assert [name for name, r in rigid.Diagram.rules.items()
-            if r.recursive] == ["tensor", "cut"]
+            if r.recursive] == ["cut", "mix"]
     x, y, z = map(rigid.Ty, "xyz")
     curry = vars(RigidCategory)["curry_left"].bind(rigid.Diagram)
     assert not rigid.Diagram.focus(

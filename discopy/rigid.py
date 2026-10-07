@@ -153,7 +153,7 @@ from collections.abc import Callable
 from typing import Any, ClassVar, Iterator, Self
 
 from discopy import cat, monoidal, biclosed, messages
-from discopy.pattern import Var, Tensor, Unit, L, R  # noqa: F401
+from discopy.pattern import Var, Tensor, Unit, L, R
 from discopy.abc import DaggerCategory, Pregroup, RigidCategory
 
 from discopy.axioms import Atom, GENERATORS, Hom, rule, Serialisable

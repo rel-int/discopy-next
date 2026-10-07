@@ -667,6 +667,26 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   now declares, and that the exponential of Python types is not `<<`,
   so `python.Function.curry`, `ev` and `uncurry` are methods rather than
   rules.
+- Rules and methods are distinct: a rule is annotated with its sequent
+  and forwards to a method, which keeps plain Python typing and says
+  nothing of coherence. `Category.ax` concludes `x ⊢ x` by the identity
+  `id`, `Category.cut` concludes `a ⊢ c` from `a ⊢ b` and `b ⊢ c` by
+  the sequential composition `then`, restated with a context on either
+  side by `MonoidalCategory.cut`, and `MonoidalCategory.mix` concludes
+  `a, c ⊢ b, d` by the parallel composition `tensor`. `then` and
+  `tensor` are unbiased by contract: the abstract methods are
+  `@unbiased`, an implementation states the binary case and a caller
+  composes any number of morphisms, so the `other=None, *others`
+  signatures of `monoidal.Diagram`, `Sum`, `Matrix`, `Tensor`,
+  `Channel`, `symmetric.Permutation` and `finset.Permutation` go, and
+  `utils.unbiased` calls the method of the result so far after the
+  first step, so that a diagram tensored with a sum keeps tensoring
+  sums. No implementation restates `id`, `then` or `tensor` as a rule
+  any more, the `then` that `monoidal.Diagram` marked admissible goes
+  with them, and the operations on objects — `over`, `under`, `l`,
+  `r`, `d` — and `RigidCategory.transpose` lose their pattern
+  annotations, `transpose` its two overloads.
+
 - `trace`, `curry` and `feedback` take an already partitioned
   boundary rather than a number of wires, and each side of them, and of
   `ev`, is a rule of its own forwarding to that one method, so that an

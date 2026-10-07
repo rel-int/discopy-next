@@ -18,12 +18,10 @@ from dataclasses import dataclass
 from contextlib import contextmanager
 
 from discopy.abc import Category
-from discopy.axioms import rule
-from discopy.pattern import Hom, Obj, Var
 from discopy.monoidal import List
 from discopy.utils import (
     assert_iscomposable, assert_isinstance,
-    tuplify, untuplify, classproperty, factory)
+    tuplify, untuplify, classproperty, factory, unbiased)
 
 
 Ty = List[type]
@@ -67,9 +65,7 @@ class Function(Category):
             inside, self.ob.cast(dom), self.ob.cast(cod))
 
     @classmethod
-    @rule
-    def id[A: Obj[Ty]](cls, dom: Var[Ty | type | tuple[type, ...], A]
-                       ) -> Hom[Function, A, A]:
+    def id(cls, dom: Ty | type | tuple[type, ...]) -> Function:
         """
         The identity function on a given list of types :code:`dom`.
 
@@ -78,10 +74,8 @@ class Function(Category):
         """
         return cls(lambda *xs: untuplify(xs), dom, dom)
 
-    @rule
-    def then[A: Obj[Ty], B: Obj[Ty], C: Obj[Ty]](
-            self: Hom[Function, A, B], other: Hom[Function, B, C]
-    ) -> Hom[Function, A, C]:
+    @unbiased
+    def then(self, other: Function) -> Function:
         """
         The sequential composition of two functions, called with :code:`>>`.
 

@@ -16,7 +16,7 @@ Summary
     Permutation
 """
 
-from discopy.utils import assert_isinstance
+from discopy.utils import assert_isinstance, unbiased
 from discopy.pattern import Var, Tensor
 from typing import Iterable, Self, Any, overload
 from collections.abc import Sequence
@@ -75,23 +75,17 @@ class Function(MonoidalCategory, Sequence):
         return len(self.cod)
 
     @staticmethod
-    @rule
-    def id[A](x: Var[int | Nat, A] = 0
-              ) -> Hom[Function, A, A]:
+    def id(x: int | Nat = 0) -> Function:
         x = Nat(int(x))
         return Function(list(range(x)), x, x)
 
-    def then[A, B, C](
-            self: Hom[Function, A, B],
-            other: Hom[Function, B, C]
-    ) -> Hom[Function, A, C]:
+    @unbiased
+    def then(self, other: Function) -> Function:
         inside = [self[other[i]] for i in range(len(other))]
         return Function(inside, self.dom, other.cod)
 
-    def tensor[A, B, C, D](
-            self: Hom[Function, A, B],
-            other: Hom[Function, C, D]
-    ) -> Hom[Function, Tensor[A, C], Tensor[B, D]]:
+    @unbiased
+    def tensor(self, other: Function) -> Function:
         inside = list(self.inside) + [
             int(self.dom) + other[i] for i in range(len(other))]
         return Function(
@@ -193,9 +187,7 @@ class Permutation(Function, PROP):
         return hash(tuple(self))
 
     @classmethod
-    @rule
-    def id[A](cls, dom: Var[int | Nat, A] = 0
-              ) -> Hom[Self, A, A]:
+    def id(cls, dom: int | Nat = 0) -> Self:
         """ The identity permutation on ``range(size)``. """
         n = int(dom)
         return cls(range(n), n)
@@ -260,10 +252,8 @@ class Permutation(Function, PROP):
             i = self[i]
         return tuple(cycle)
 
-    def then[A, B, C](
-            self: Hom[Self, A, B],
-            other: Hom[Self, B, C]  # ty: ignore[invalid-type-form]
-    ) -> Hom[Self, A, C]:  # ty: ignore[invalid-type-form]
+    @unbiased
+    def then(self, other: Self) -> Self:
         """ Return ``self ; other``, i.e. ``result[i] == other[self[i]]``. """
         other = type(self)(other, len(self))
         elems = (other[self[i]] for i in range(len(self)))
@@ -271,8 +261,7 @@ class Permutation(Function, PROP):
 
     @rule
     def dagger[A, B](
-            self: Hom[Self, A, B]
-    ) -> Hom[Self, B, A]:  # ty: ignore[invalid-type-form]
+            self: Hom[Permutation, A, B]) -> Hom[Permutation, B, A]:
         """ Return the inverse permutation. """
         result = list(range(len(self)))
         for source, target in enumerate(self):
@@ -289,20 +278,14 @@ class Permutation(Function, PROP):
         other = type(self)(other, len(self))
         return other.dagger().then(self).then(other)
 
-    def tensor[A, B, C, D](
-            self: Hom[Self, A, B],
-            other: Hom[Self | None, C, D] = None,  # ty: ignore[invalid-type-form]
-            *others
-    ) -> Hom[Self, Tensor[A, C], Tensor[B, D]]:  # ty: ignore[invalid-type-form]
+    @unbiased
+    def tensor(self, other: Self) -> Self:
         """ Return the disjoint union of permutations. """
-        if other is None:
-            return self
         other = type(self)(other)
         shift = len(self)
-        result = type(self)(
+        return type(self)(
             tuple(self) + tuple(shift + i for i in other),
             len(self) + len(other))
-        return result.tensor(*others)
 
     def embed(self, injection: Iterable[int], size: int) -> Self:
         """ Embed into ``range(size)`` along ``injection``. """

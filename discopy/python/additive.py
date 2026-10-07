@@ -19,7 +19,7 @@ from itertools import accumulate
 from typing import Self
 
 from discopy.abc import SymmetricCategory
-from discopy.utils import assert_isinstance
+from discopy.utils import assert_isinstance, unbiased
 from discopy.python import finset, function
 from discopy.python.function import Ty
 from discopy.pattern import Hom, Obj, Var, Tensor
@@ -57,10 +57,8 @@ class Function(function.Function, SymmetricCategory):
             assert_isinstance(obj, self.cod.inside[tag])
         return result
 
-    @rule
-    def tensor[A: Obj[Ty], B: Obj[Ty], C: Obj[Ty], D: Obj[Ty]](
-            self: Hom[Function, A, B], other: Hom[Function, C, D]
-    ) -> Hom[Function, Tensor[A, C], Tensor[B, D]]:
+    @unbiased
+    def tensor(self, other: Function) -> Function:
         """
         The disjoint union of two functions, called with :code:`@`.
 

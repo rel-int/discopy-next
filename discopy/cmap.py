@@ -775,9 +775,7 @@ class CMap[category: Diagram](CompactCategory, DaggerCategory,
             self.dom, self.cod, self.boxes, self.edges, self.loops))
 
     @classmethod
-    @rule
-    def id[A](cls, dom: Var[Any | None, A] = None
-              ) -> Hom[CMap, A, A]:
+    def id(cls, dom: Any | None = None) -> CMap:
         """ The identity map, with each input wired to its output. """
         dom = cls.ob() if dom is None else dom
         n_ports = 2 * len(dom)
@@ -1080,11 +1078,8 @@ class CMap[category: Diagram](CompactCategory, DaggerCategory,
         return cls.from_box(cls.category.spiders(
             n_legs_in, n_legs_out, typ, phases))
 
-    @rule
     @unbiased
-    def then[A, B, C](
-            self: Hom[CMap, A, B],
-            other: Hom[CMap, B, C]) -> Hom[CMap, A, C]:
+    def then(self, other: CMap) -> CMap:
         """
         Compose maps by gluing output ports to input ports.
 
@@ -1144,11 +1139,8 @@ class CMap[category: Diagram](CompactCategory, DaggerCategory,
         return type(self)(
             dom, cod, self.boxes, edge, loops=loops, check=False)
 
-    @rule
     @unbiased
-    def tensor[A, B, C, D](
-            self: Hom[CMap, A, B],
-            other: Hom[CMap, C, D]) -> Hom[CMap, Tensor[A, C], Tensor[B, D]]:
+    def tensor(self, other: CMap) -> CMap:
         """ Tensor product given by disjoint union of the two maps. """
         dom, cod = self.dom @ other.dom, self.cod @ other.cod
         boxes = self.boxes + other.boxes

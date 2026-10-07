@@ -39,8 +39,7 @@ from operator import index
 from types import ModuleType
 from typing import Any, Literal, Callable, TYPE_CHECKING
 
-from discopy import monoidal, config, messages
-from discopy.pattern import Var, Tensor
+from discopy import config, messages
 from discopy.abc import (
     DaggerCategory, MonoidalCategory, NamedGeneric, Nat)
 from discopy.cat import (
@@ -240,9 +239,7 @@ class Matrix[dtype](MonoidalCategory, DaggerCategory, NamedGeneric):
         return complex(self.array)
 
     @classmethod
-    @rule
-    def id[A](cls, dom: Var[Any, A] = 0
-              ) -> Hom[Matrix, A, A]:
+    def id(cls, dom: Any = 0) -> Matrix:
         with backend('numpy') as np:
             array = np.identity(index(dom), dtype=cls.dtype or int)
         return cls(array, dom, dom)
@@ -253,23 +250,15 @@ class Matrix[dtype](MonoidalCategory, DaggerCategory, NamedGeneric):
         return cls.id(dom)
 
     @unbiased
-    def then[A, B, C](
-            self: Hom[Matrix, A, B],
-            other: Hom[Matrix, B, C]
-    ) -> Hom[Matrix, A, C]:
+    def then(self, other: Matrix) -> Matrix:
         assert_isinstance(other, type(self))
         assert_iscomposable(self, other)
         with backend() as np:
             array = np.matmul(self.array, other.array)
         return type(self)(array, self.dom, other.cod)
 
-    def tensor[A, B, C, D](
-            self: Hom[Matrix, A, B],
-            other: Hom[Matrix | None, C, D] = None,
-            *others: Matrix) -> Hom[Matrix, Tensor[A, C], Tensor[B, D]]:
-        if others or other is None:
-            return monoidal.Diagram.tensor(
-                self, other, *others)
+    @unbiased
+    def tensor(self, other: Matrix) -> Matrix:
         assert_isinstance(other, type(self))
         dom, cod = self.dom @ other.dom, self.cod @ other.cod
         array = self.zero(dom, cod).array

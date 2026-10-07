@@ -62,7 +62,7 @@ from typing import Any, ClassVar, Self
 from collections.abc import Callable
 
 from discopy import monoidal
-from discopy.pattern import Var, Tensor  # noqa: F401
+from discopy.pattern import Var, Tensor
 from discopy.abc import BraidedCategory
 
 from discopy.axioms import Atom, axiom, Equation, Hom, rule

@@ -675,9 +675,9 @@ class Declaration[**P, T]:
     and ``owner`` the class declaring the sequent.
 
     >>> from discopy.abc import Category
-    >>> Category.then
-    abc.Category.then
-    >>> Category.then.conclusion
+    >>> Category.cut
+    abc.Category.cut
+    >>> Category.cut.conclusion
     Hom[C1, A, C]
     """
 
@@ -773,8 +773,8 @@ class Declaration[**P, T]:
 
         >>> from discopy.abc import MonoidalCategory
         >>> from discopy.monoidal import Diagram
-        >>> tensor = MonoidalCategory.tensor.bind(Diagram)
-        >>> for label, box in tensor.canonical().items():
+        >>> mix = MonoidalCategory.mix.bind(Diagram)
+        >>> for label, box in mix.canonical().items():
         ...     print(f"{label}: {box.dom} -> {box.cod}")
         self: A -> B
         other: C -> D
@@ -897,7 +897,7 @@ def declarations[K: Declaration](cls: type, kind: type[K]) -> dict[str, K]:
     >>> from discopy.monoidal import Diagram
     >>> from discopy.pattern import Rule
     >>> list(declarations(Diagram, Rule))
-    ['id', 'tensor', 'cut', 'dagger']
+    ['ax', 'cut', 'mix', 'dagger']
     """
     result: dict[str, K] = {}
     for base in reversed(cls.__mro__):
@@ -926,8 +926,8 @@ class Rule[**P, T](Declaration[P, T]):
     behaves as the method it decorates.
 
     >>> from discopy.abc import Category
-    >>> print(Category.then)
-    then(self: Hom[C1, A, B], other: Hom[C1, B, C]) -> Hom[C1, A, C]
+    >>> print(Category.cut)
+    cut(self: Hom[C1, A, B], other: Hom[C1, B, C]) -> Hom[C1, A, C]
     """
 
     __hash__ = Declaration.__hash__
@@ -966,7 +966,7 @@ class Rule[**P, T](Declaration[P, T]):
         one step, see :meth:`discopy.abc.Category.generators`.
 
         >>> from discopy.abc import Category, RigidCategory
-        >>> assert Category.then.recursive
+        >>> assert Category.cut.recursive
         >>> assert not RigidCategory.cups.recursive
         """
         return any(
@@ -1013,8 +1013,8 @@ class Rule[**P, T](Declaration[P, T]):
         class it is assigned on, because it is `admissible
         <https://en.wikipedia.org/wiki/Admissible_rule>`_: the search
         reaches everything it builds through the other rules, which
-        the reason names as its record, e.g. ``then =
-        cat.Arrow.then.admissible("A cut with empty contexts.")``.
+        the reason names as its record, e.g. the curries of a
+        rigid category, which caps and cuts reach.
         The method still runs and remains applicable.
         """
         result = replace(self)

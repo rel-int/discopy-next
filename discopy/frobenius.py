@@ -66,7 +66,7 @@ from collections.abc import Callable
 
 from discopy import (
     monoidal, rigid, markov, compact, pivotal, cmap, hypergraph)
-from discopy.pattern import Var, Tensor, Unit, L, Repeat  # noqa: F401
+from discopy.pattern import Var, Tensor, Unit, L, Repeat
 from discopy.abc import HypergraphCategory
 
 from discopy.axioms import Atom, Count, Hom, rule, Serialisable

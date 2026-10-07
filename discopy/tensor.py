@@ -63,8 +63,6 @@ from typing import (
 
 from discopy import (
     cat, monoidal, rigid, frobenius, cmap, config)
-from discopy.pattern import Var  # noqa: F401
-from discopy import pattern
 from discopy.axioms import Hom, no_strategy, rule
 from discopy.cat import factory, Generator, assert_iscomposable
 from discopy.frobenius import Dim, Cup
@@ -74,7 +72,7 @@ from discopy.matrix import (  # noqa: F401  pylint: disable=unused-import
 from discopy.abc import NamedGeneric
 from discopy.python import finset
 from discopy.utils import (
-    factory_name, assert_isinstance, product, assert_isatomic)
+    factory_name, assert_isinstance, product, assert_isatomic, unbiased)
 
 if TYPE_CHECKING:
     import sympy
@@ -152,17 +150,11 @@ class Tensor[dtype](Matrix[dtype]):
         self.dom, self.cod = dom, cod
 
     @classmethod
-    @rule
-    def id[A](cls, dom: Var[Any, A] = Dim(1)
-              ) -> Hom[Tensor, A, A]:
+    def id(cls, dom: Any = Dim(1)) -> Tensor:
         return cls(Matrix.id(product(dom.inside)).array, dom, dom)
 
-    def then[A, B, C](
-            self: Hom[Tensor, A, B],
-            other: Hom[Tensor | None, B, C] = None,
-            *others: Tensor) -> Hom[Tensor, A, C]:
-        if other is None or others:
-            return super().then(other, *others)
+    @unbiased
+    def then(self, other: Tensor) -> Tensor:
         assert_isinstance(other, type(self))
         assert_iscomposable(self, other)
         with backend() as np:
@@ -171,13 +163,8 @@ class Tensor[dtype](Matrix[dtype]):
                 else self.array * other.array
         return type(self)(array, self.dom, other.cod)
 
-    def tensor[A, B, C, D](
-            self: Hom[Tensor, A, B],
-            other: Hom[Tensor | None, C, D] = None,
-            *others: Tensor
-    ) -> Hom[Tensor, pattern.Tensor[A, C], pattern.Tensor[B, D]]:
-        if other is None or others:
-            return Diagram.tensor(self, other, *others)
+    @unbiased
+    def tensor(self, other: Tensor) -> Tensor:
         assert_isinstance(other, Tensor)
         dom, cod = self.dom @ other.dom, self.cod @ other.cod
         source = range(len(dom @ cod))

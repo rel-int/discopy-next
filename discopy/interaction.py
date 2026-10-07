@@ -74,7 +74,7 @@ from discopy import (
     ribbon,
     messages
 )
-from discopy.pattern import Var, Tensor, Unit, L, R  # noqa: F401
+from discopy.pattern import Var, Tensor, Unit, L, R
 from discopy.abc import Pregroup, RibbonCategory, TracedCategory, NamedGeneric
 from discopy.cat import assert_iscomposable
 from discopy.python import finset
@@ -205,10 +205,7 @@ class Diagram[natural](RibbonCategory, NamedGeneric):
         self.inside, self.dom, self.cod = inside, dom, cod
 
     @unbiased
-    def then[A, B, C](
-            self: Hom[Diagram, A, B],
-            other: Hom[Diagram, B, C]
-    ) -> Hom[Diagram, A, C]:
+    def then(self, other: Diagram) -> Diagram:
         """
         The composition of two integer diagrams.
 
@@ -262,9 +259,7 @@ class Diagram[natural](RibbonCategory, NamedGeneric):
         return type(self)(inside, dom, cod)
 
     @classmethod
-    @rule
-    def id[A](cls, dom: Var[Ty | None, A] = None
-              ) -> Hom[Diagram, A, A]:
+    def id(cls, dom: Ty | None = None) -> Diagram:
         """
         The identity on an integer type.
 
@@ -296,10 +291,7 @@ class Diagram[natural](RibbonCategory, NamedGeneric):
         return cls(inside, dom, dom)
 
     @unbiased
-    def tensor[A, B, C, D](
-            self: Hom[Diagram, A, B],
-            other: Hom[Diagram, C, D]
-    ) -> Hom[Diagram, Tensor[A, C], Tensor[B, D]]:
+    def tensor(self, other: Diagram) -> Diagram:
         """
         The tensor of two integer diagrams.
 

@@ -95,7 +95,7 @@ from typing import ClassVar, Self
 from collections.abc import Sequence
 
 from discopy import cat, monoidal, balanced, hypergraph, cmap, messages
-from discopy.pattern import Image, Obj, Var, Tensor  # noqa: F401
+from discopy.pattern import Image, Obj, Var, Tensor
 from discopy.abc import (
     BalancedCategory, BraidedCategory, MonoidalCategory, SymmetricCategory,
     TracedCategory)
@@ -105,7 +105,8 @@ from discopy.cat import factory, Generator
 from discopy.monoidal import Wire, Ty, Nat  # noqa: F401  pylint: disable=unused-import
 from discopy.python import finset
 from discopy.utils import (
-    AxiomError, assert_iscomposable, assert_isatomic, factory_name, from_tree)
+    AxiomError, assert_iscomposable, assert_isatomic, factory_name, from_tree,
+    unbiased)
 
 
 class Layer(monoidal.Layer):
@@ -672,23 +673,17 @@ class Permutation(Box):
     def dagger(self) -> Permutation:
         return type(self)(self.cod, self.perm.dagger())
 
-    def tensor[A, B, C, D](
-            self: Hom[Permutation, A, B],
-            other: Hom[Diagram | monoidal.Ty | None, C, D] = None,
-            *others) -> Hom[Diagram, Tensor[A, C], Tensor[B, D]]:
-        if other is None:
-            return self
+    @unbiased
+    def tensor(self, other: Diagram | monoidal.Ty) -> Diagram:
         if isinstance(other, Permutation):
-            result = self.Permutation(
+            return self.Permutation(
                 self.dom @ other.dom, self.perm.tensor(other.perm))
-        elif isinstance(other, monoidal.Ty)\
+        if isinstance(other, monoidal.Ty)\
                 or isinstance(other, Diagram) and not other.inside:
             typ = other if isinstance(other, monoidal.Ty) else other.dom
-            result = self.Permutation(self.dom @ typ, self.perm.tensor(
+            return self.Permutation(self.dom @ typ, self.perm.tensor(
                 finset.Permutation.id(len(typ))))
-        else:
-            result = super().tensor(other)
-        return result.tensor(*others)
+        return super().tensor(other)
 
     def __rmatmul__(self, other):
         if not isinstance(other, monoidal.Ty):

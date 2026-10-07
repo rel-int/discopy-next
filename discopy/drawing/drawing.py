@@ -203,7 +203,6 @@ from functools import cached_property
 import networkx as nx
 
 from discopy.drawing import backend, Node, Point
-from discopy.pattern import Var, Tensor
 from discopy.config import BOX_DRAWING_ATTRIBUTES, TRANSPARENT
 from discopy.abc import TracedCategory
 from discopy.python import finset
@@ -745,9 +744,7 @@ class Drawing(TracedCategory, RichDisplay):
         return result
 
     @staticmethod
-    @rule
-    def id[A](dom: Var[Any | None, A] = None
-              ) -> Hom[Drawing, A, A]:
+    def id(dom: Any | None = None) -> Drawing:
         """
         Draw the identity diagram.
 
@@ -786,11 +783,11 @@ class Drawing(TracedCategory, RichDisplay):
         return result
 
     @unbiased
-    def then[A, B, C](
-            self: Hom[Drawing, A, B],
-            other: Hom[Drawing, B, C],
+    def then(
+            self,
+            other: Drawing,
             draw_step_by_step=False
-    ) -> Hom[Drawing | list[Drawing], A, C]:
+    ) -> Drawing | list[Drawing]:
         """
         Draw one diagram composed with another.
 
@@ -897,10 +894,7 @@ class Drawing(TracedCategory, RichDisplay):
         return result
 
     @unbiased
-    def tensor[A, B, C, D](
-            self: Hom[Drawing, A, B],
-            other: Hom[Drawing, C, D]
-    ) -> Hom[Drawing, Tensor[A, C], Tensor[B, D]]:
+    def tensor(self, other: Drawing) -> Drawing:
         """
         Draw two diagrams side by side.
 

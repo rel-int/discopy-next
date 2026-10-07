@@ -51,7 +51,6 @@ from networkx import (
 from networkx.algorithms.isomorphism import is_isomorphic
 
 from discopy import cmap, messages, utils
-from discopy.pattern import Var, Tensor
 from discopy.abc import (
     DaggerCategory, HypergraphCategory, MarkovCategory, MonoidalCategory,
     NamedGeneric, RigidCategory, SymmetricCategory, TracedCategory)
@@ -347,9 +346,7 @@ class Hypergraph[category: Diagram](MonoidalCategory, DaggerCategory,
             i for i, (x, y) in enumerate(self.spider_wires) if not x and not y]
 
     @classmethod
-    @rule
-    def id[A](cls, dom: Var[Any | None, A] = None
-              ) -> Hom[Hypergraph, A, A]:
+    def id(cls, dom: Any | None = None) -> Hypergraph:
         dom = cls.category.ob() if dom is None else dom
         dom_wires = cod_wires = tuple(range(len(dom)))
         return cls(dom, dom, (), (dom_wires, (), cod_wires))
@@ -360,10 +357,7 @@ class Hypergraph[category: Diagram](MonoidalCategory, DaggerCategory,
         return cls.id(dom)
 
     @unbiased
-    def then[A, B, C](
-            self: Hom[Hypergraph, A, B],
-            other: Hom[Hypergraph, B, C]
-    ) -> Hom[Hypergraph, A, C]:
+    def then(self, other: Hypergraph) -> Hypergraph:
         """
         Composition of two hypergraph diagrams, i.e. their :func:`pushout`.
         """
@@ -388,10 +382,7 @@ class Hypergraph[category: Diagram](MonoidalCategory, DaggerCategory,
         return type(self)(dom, cod, boxes, wires, spider_types, offsets)
 
     @unbiased
-    def tensor[A, B, C, D](
-            self: Hom[Hypergraph, A, B],
-            other: Hom[Hypergraph, C, D]
-    ) -> Hom[Hypergraph, Tensor[A, C], Tensor[B, D]]:
+    def tensor(self, other: Hypergraph) -> Hypergraph:
         """ Tensor of two hypergraph diagrams, i.e. their disjoint union. """
         dom, cod = self.dom @ other.dom, self.cod @ other.cod
         boxes, offsets = self.boxes + other.boxes, self.offsets + other.offsets

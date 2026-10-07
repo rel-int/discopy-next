@@ -164,7 +164,7 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 
 from discopy import symmetric
-from discopy.pattern import Obj, Var, Tensor  # noqa: F401
+from discopy.pattern import Obj
 from discopy.abc import MonoidalCategory, NamedGeneric
 from discopy.python import finset
 from discopy.pattern import Hom
@@ -173,7 +173,7 @@ from discopy.pattern import rule
 from discopy.utils import (
     AxiomError,
     assert_isinstance, unbiased, inductive, classproperty, factory_name)
-from discopy.pattern import D  # noqa: F401
+from discopy.pattern import D
 
 
 @dataclass
@@ -474,9 +474,7 @@ class Stream[category](MonoidalCategory, NamedGeneric):
         return type(self)(now, dom, cod, mem, _later=lambda: later.later)
 
     @classmethod
-    @rule
-    def id[A](cls, x: Var[Optional[Ty], A] = None
-              ) -> Hom[Stream, A, A]:
+    def id(cls, x: Optional[Ty] = None) -> Stream:
         """
         Construct a stream of identity arrows.
 
@@ -493,10 +491,7 @@ class Stream[category](MonoidalCategory, NamedGeneric):
         return cls(now, dom, cod, _later=_later)
 
     @unbiased
-    def then[A, B, C](
-            self: Hom[Stream, A, B],
-            other: Hom[Stream, B, C]
-    ) -> Hom[Stream, A, C]:
+    def then(self, other: Stream) -> Stream:
         """
         Composition of streams is given by swapping the memories as follows:
 
@@ -521,10 +516,7 @@ class Stream[category](MonoidalCategory, NamedGeneric):
         return type(self)(now, dom, cod, mem, _later)
 
     @unbiased
-    def tensor[A, B, C, D](
-            self: Hom[Stream, A, B],
-            other: Hom[Stream, C, D]
-    ) -> Hom[Stream, Tensor[A, C], Tensor[B, D]]:
+    def tensor(self, other: Stream) -> Stream:
         """
         Tensor of streams is given by swapping the memories as follows:
 

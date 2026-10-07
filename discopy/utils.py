@@ -531,15 +531,19 @@ def assert_isinstance(object_, cls: type | tuple[type, ...]):
 def unbiased(binary_method):
     """
     Turn a biased method with signature (self, other) to an unbiased one, i.e.
-    with signature (self, *others), see the `nLab`_.
+    with signature (self, *others), see the `nLab`_. Each step after the
+    first calls the method of the result so far, which may be of another
+    class, e.g. a sum of diagrams.
 
     .. _nLab: https://ncatlab.org/nlab/show/biased+definition
     """
     @wraps(binary_method)
     def method(self, *others, **params):
-        result = self
-        for other in others:
-            result = binary_method(result, other, **params)
+        if not others:
+            return self
+        result = binary_method(self, others[0], **params)
+        for other in others[1:]:
+            result = getattr(result, binary_method.__name__)(other, **params)
         return result
     return method
 

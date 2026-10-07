@@ -119,7 +119,7 @@ class Diagram(frobenius.Diagram):
         grammatical sentences; a grammar assigns its own words, see
         :attr:`discopy.abc.Category.generators`.
         """
-        return {"id": cls.rules["id"], "cups": cls.rules["cups"],
+        return {"ax": cls.rules["ax"], "cups": cls.rules["cups"],
                 **{word.name: Rule.constant(word) for word in VOCABULARY}}
 
     @classmethod

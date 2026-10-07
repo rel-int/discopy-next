@@ -145,7 +145,7 @@ from dataclasses import dataclass
 from typing import Self
 
 from discopy.pattern import Atom, Count, Hom
-from discopy.pattern import Obj, Var, Tensor, Unit, L, R, Repeat  # noqa: F401
+from discopy.pattern import Obj, Var, Tensor, Unit, L, R, Repeat
 from discopy.pattern import rule
 from discopy import (
     monoidal, symmetric, markov, closed, compact, frobenius)
@@ -155,7 +155,7 @@ from discopy.abc import (
 from discopy.feedback import Diagram as FeedbackDiagram, Ty as FeedbackTy
 from discopy.utils import (
     assert_iscomposable, assert_isinstance, classproperty, unbiased)
-from discopy.pattern import D  # noqa: F401
+from discopy.pattern import D
 
 
 @dataclass
@@ -219,9 +219,7 @@ class Symmetric[category: symmetric.Diagram](SymmetricCategory, NamedGeneric):
         return cls(inside.dom, inside.cod, inside)
 
     @classmethod
-    @rule
-    def id[A](cls, dom: Var[monoidal.Ty | None, A] = None
-              ) -> Hom[Symmetric, A, A]:
+    def id(cls, dom: monoidal.Ty | None = None) -> Symmetric:
         """
         The identity parametric map on `dom`, with empty parameter space.
 
@@ -231,10 +229,7 @@ class Symmetric[category: symmetric.Diagram](SymmetricCategory, NamedGeneric):
         return cls.lift(cls.category.id(cls.ob() if dom is None else dom))
 
     @unbiased
-    def then[A, B, C](
-            self: Hom[Symmetric, A, B],
-            other: Hom[Symmetric, B, C]
-    ) -> Hom[Symmetric, A, C]:
+    def then(self, other: Symmetric) -> Symmetric:
         """
         Sequential composition tensors the hidden spaces on both sides,
         i.e. `(p, f) >> (q, g) == (p @ q, f @ q >> g)` for empty
@@ -255,10 +250,7 @@ class Symmetric[category: symmetric.Diagram](SymmetricCategory, NamedGeneric):
                           self.copar @ other.copar)
 
     @unbiased
-    def tensor[A, B, C, D](
-            self: Hom[Symmetric, A, B],
-            other: Hom[Symmetric, C, D]
-    ) -> Hom[Symmetric, Tensor[A, C], Tensor[B, D]]:
+    def tensor(self, other: Symmetric) -> Symmetric:
         """
         Parallel composition tensors the hidden spaces on both sides, with
         swaps routing the parameters to the right of the domains and the

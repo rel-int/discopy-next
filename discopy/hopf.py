@@ -125,7 +125,7 @@ from functools import cached_property
 import numpy as np
 
 from discopy import monoidal, ribbon, tensor, frobenius
-from discopy.pattern import Var, Tensor, Unit, L, R  # noqa: F401
+from discopy.pattern import Var, Tensor, Unit, L, R
 
 from discopy.axioms import Atom, Hom, no_strategy, rule
 from discopy.tensor import Dim, Box, Id
