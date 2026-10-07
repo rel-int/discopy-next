@@ -624,7 +624,13 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   compact one and spiders for a hypergraph one, each only when its
   generator is among the category's `generators`, so that a circuit
   wires with swaps alone. Only a biclosed category focuses, its curry
-  being the one rule invertible on the goals it opens. `pattern.search`,
+  being the one rule invertible on the goals it opens: focusing at every
+  level committed every goal `a ⊢ b` with a dagger to the dagger, whose
+  one premise `b ⊢ a` the old test read as invertible, so that the
+  search spent most of a goal-directed budget daggering back and forth
+  — a planar goal sampled 120 distinct diagrams out of 300 where it now
+  samples 270 — and a rigid category, whose curry collapses into caps,
+  focuses on nothing. `pattern.search`,
   `pattern.focused`, `pattern.materials` and `pattern.DeadEnd` move to
   `abc`, the unification of `discopy.pattern` staying planar.
   `proptest/search_experiment.py` measures what the search samples.

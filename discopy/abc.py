@@ -85,7 +85,7 @@ class DeadEnd(Exception):
     retries it a bounded number of times before rejecting the example. """
 
 
-def atoms(value) -> list:
+def atomic_parts(value) -> list:
     """ The atoms of an object, each as an object of length one. """
     return [value[i:i + 1] for i in range(len(value))]
 
@@ -224,7 +224,9 @@ class Category[C0, C1: Category](Testable, ABC):
         scope, fresh = heads(cls), count()
 
         def as_pattern(side):
-            return side if side is not None else TypeVar(  # ty: ignore[invalid-legacy-type-variable]
+            if side is not None:
+                return side
+            return TypeVar(  # ty: ignore[invalid-legacy-type-variable]
                 f"?{next(fresh)}")
 
         def is_pattern(side):
@@ -257,15 +259,15 @@ class Category[C0, C1: Category](Testable, ABC):
                 assert free is not None
                 result = draw(free(dom=dom, cod=cod, types=types))
             else:
-                rule, found = choice
+                applied, found = choice
                 (rule_subst, rule_residuals), before, after = cls.contexts(
-                    draw, rule, found, dom, cod)
-                _, args = rule.generate(
+                    draw, applied, found, dom, cod)
+                _, args = applied.generate(
                     draw, lambda _, dom, cod: terms(
                         (as_pattern(dom), as_pattern(cod)),
                         depth - 1, local, unchecked),
                     subst=rule_subst, residuals=rule_residuals, types=types)
-                result = rule.apply(args)
+                result = applied.apply(args)
                 result = result if before is None else before.then(result)
                 result = result if after is None else result.then(after)
             for side, guide, value in zip(
@@ -353,7 +355,7 @@ class Category[C0, C1: Category](Testable, ABC):
         return [(rule, found) for rule, found in matches if found]
 
     @classmethod
-    def contexts(cls, draw, rule: Rule, found: list[Match], dom, cod
+    def contexts(cls, draw, applied: Rule, found: list[Match], dom, cod
                  ) -> tuple[Match, Any, Any]:
         """
         How the conclusion of a rule meets the goal: a match, and the
@@ -364,14 +366,14 @@ class Category[C0, C1: Category](Testable, ABC):
 
         Parameters:
             draw : The draw of the composite strategy.
-            rule : The rule applied.
+            applied : The rule applied.
             found : The matches of its conclusion with the goal.
             dom : The domain of the goal, :obj:`None` when unknown.
             cod : The codomain of the goal, :obj:`None` when unknown.
         """
+        # pylint: disable=unused-argument  # the goal is already matched
         from hypothesis import strategies as st
 
-        # pylint: disable=unused-argument  # the goal is already matched
         return draw(st.sampled_from(found)), None, None
 
     @classmethod
@@ -675,8 +677,8 @@ class MonoidalCategory[C0: ColouredMonoid, C1: MonoidalCategory](
         return left @ self @ right >> other
 
     @classmethod
-    def contexts(cls, draw, rule: Rule, found: list[Match], dom, cod
-                 ) -> tuple[Match, Any, Any]:
+    def contexts(cls, draw, applied: Rule, found: list[Match], dom, cod
+                 ) -> tuple[Match, Any, Any]:  # pylint: disable=unused-argument
         """
         A monoidal category puts the term of a recursive rule in context
         wherever its conclusion is a tensor: that side of the goal is
@@ -686,16 +688,16 @@ class MonoidalCategory[C0: ColouredMonoid, C1: MonoidalCategory](
 
         Parameters:
             draw : The draw of the composite strategy.
-            rule : The rule applied.
+            applied : The rule applied.
             found : The matches of its conclusion with the goal.
             dom : The domain of the goal, :obj:`None` when unknown.
             cod : The codomain of the goal, :obj:`None` when unknown.
         """
         from hypothesis import strategies as st
 
-        if not rule.recursive:
-            return super().contexts(draw, rule, found, dom, cod)
-        _, dom_pattern, cod_pattern = get_args(rule.conclusion)
+        if not applied.recursive:
+            return super().contexts(draw, applied, found, dom, cod)
+        _, dom_pattern, cod_pattern = get_args(applied.conclusion)
         new_dom, before = (dom, None) if dom is None\
             or get_origin(dom_pattern) not in (Tensor, TensorDir)\
             else cls.rewire(draw, dom, True, cod)
@@ -703,8 +705,8 @@ class MonoidalCategory[C0: ColouredMonoid, C1: MonoidalCategory](
             or get_origin(cod_pattern) not in (Tensor, TensorDir)\
             else cls.rewire(draw, cod, False, dom)
         if before is None and after is None:
-            return super().contexts(draw, rule, found, dom, cod)
-        rewired = list(rule.match(new_dom, new_cod))
+            return super().contexts(draw, applied, found, dom, cod)
+        rewired = list(applied.match(new_dom, new_cod))
         if not rewired:
             raise DeadEnd(f"{new_dom} -> {new_cod}")
         return draw(st.sampled_from(rewired)), before, after
@@ -1118,8 +1120,8 @@ class BiclosedCategory[C0: ResiduatedMonoid, C1: BiclosedCategory](
             atom for side in (dom, cod) if side is not None
             for atom in materials(side)}
 
-        def subformulae(rule, subst):
-            for premise in rule.premises.values():
+        def subformulae(applied, subst):
+            for premise in applied.premises.values():
                 if isinstance(premise, Sort)\
                         or not set(variables(premise)) <= subst.keys():
                     return False
@@ -1133,9 +1135,9 @@ class BiclosedCategory[C0: ResiduatedMonoid, C1: BiclosedCategory](
             return True
 
         return [
-            (rule, found) for rule, found in branches
+            (applied, found) for applied, found in branches
             if len(found) == 1 and not found[0][1]
-            and subformulae(rule, found[0][0])]
+            and subformulae(applied, found[0][0])]
 
     @axiom
     def currying_eta[Y: Obj[C0], E: Obj[C0], S: bool](
@@ -1544,7 +1546,7 @@ class SymmetricCategory[C0: ColouredMonoid, C1: SymmetricCategory](
         """
         from hypothesis import strategies as st
 
-        parts = atoms(value)
+        parts = atomic_parts(value)
         if "swap" not in cls.generators or len(parts) < 2\
                 or not draw(st.booleans()):
             return super().rewire(draw, value, dom, other)
@@ -1642,7 +1644,7 @@ class MarkovCategory[C0: ColouredMonoid, C1: MarkovCategory](
         copies = [draw(st.sampled_from((1, 0, 2))) for _ in range(len(value))]
         plumbing = cls.tensor_all([
             cls.id(x) if n == 1 else cls.copy(x, n)
-            for x, n in zip(atoms(value), copies)], value[:0])
+            for x, n in zip(atomic_parts(value), copies)], value[:0])
         return cls.plumb(plumbing, dom, super().rewire(
             draw, plumbing.cod, dom, other))
 
@@ -1969,7 +1971,7 @@ class CompactCategory[C0: Pregroup, C1: CompactCategory](
         from hypothesis import strategies as st
 
         closing, opening = ("cups", "caps") if dom else ("caps", "cups")
-        parts = atoms(value)
+        parts = atomic_parts(value)
         pairs = [
             (i, j) for i, x in enumerate(parts) for j, y in enumerate(parts)
             if i != j and y == (x.r if dom else x.l)]
@@ -1988,7 +1990,7 @@ class CompactCategory[C0: Pregroup, C1: CompactCategory](
             return cls.plumb(plumbing, dom, cls.rewire(
                 draw, rest, dom, other))
         if opening in cls.generators and other and draw(st.booleans()):
-            x = draw(st.sampled_from(atoms(other)))
+            x = draw(st.sampled_from(atomic_parts(other)))
             plumbing = value @ cls.caps(x, x.l) if dom\
                 else value @ cls.cups(x, x.r)
             bent = plumbing.cod if dom else plumbing.dom
@@ -2060,7 +2062,7 @@ class HypergraphCategory[C0: Pregroup, C1: HypergraphCategory](
 
         if "spiders" not in cls.generators:
             return super().rewire(draw, value, dom, other)
-        parts = atoms(value)
+        parts = atomic_parts(value)
         pairs = [(i, j) for i, x in enumerate(parts)
                  for j, y in enumerate(parts) if i < j and x == y]
         if pairs and draw(st.booleans()):
@@ -2078,7 +2080,7 @@ class HypergraphCategory[C0: Pregroup, C1: HypergraphCategory](
             return cls.plumb(plumbing, dom, super().rewire(
                 draw, merged, dom, other))
         if other and draw(st.booleans()):
-            x = draw(st.sampled_from(atoms(other)))
+            x = draw(st.sampled_from(atomic_parts(other)))
             plumbing = value @ cls.spiders(0, 1, x) if dom\
                 else value @ cls.spiders(1, 0, x)
             started = plumbing.cod if dom else plumbing.dom
