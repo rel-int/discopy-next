@@ -112,3 +112,12 @@ def test_categorial_reductions():
     assert Diagram.bc(s, n, s) == s.r @ Cup(n, n.r) @ s
     assert Spider(1, 2, n).rotate() == Spider(2, 1, n.r)
     assert Spider(1, 2, n).rotate(left=True) == Spider(2, 1, n.l)
+
+
+def test_from_tree():
+    s, n = Ty('s'), Ty('n')
+    Alice, Bob = Word('Alice', n), Word('Bob', n)
+    loves = Word('loves', n.r @ s @ n.l)
+    sentence = Alice @ loves @ Bob >> Cup(n, n.r) @ Id(s) @ Cup(n.l, n)
+    from discopy.utils import from_tree
+    assert sentence == from_tree(sentence.to_tree())

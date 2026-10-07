@@ -144,14 +144,12 @@ Parametric maps compose like layers of a neural network, e.g. over
 from dataclasses import dataclass
 from typing import Self
 
-from discopy.pattern import (
-    Atom, Count, D, Hom, L, Obj, R, Repeat, rule, Tensor, Unit, Var)
 from discopy import (
     monoidal, symmetric, markov, closed, compact, frobenius)
 from discopy.abc import (
     ClosedCategory, CompactCategory, FeedbackCategory, HypergraphCategory,
     MarkovCategory, NamedGeneric, SymmetricCategory, TracedCategory)
-from discopy.feedback import Diagram as FeedbackDiagram, Ty as FeedbackTy
+from discopy.feedback import Diagram as FeedbackDiagram
 from discopy.utils import (
     assert_iscomposable, assert_isinstance, classproperty, unbiased)
 
@@ -266,11 +264,7 @@ class Symmetric[category: symmetric.Diagram](SymmetricCategory, NamedGeneric):
                           self.copar @ other.copar)
 
     @classmethod
-    @rule
-    def swap[X: Atom, Y: Atom](
-            cls, left: Var[monoidal.Ty, X],
-            right: Var[monoidal.Ty, Y]
-    ) -> Hom[Symmetric, Tensor[X, Y], Tensor[Y, X]]:
+    def swap(cls, left: monoidal.Ty, right: monoidal.Ty) -> Symmetric:
         """
         The swap of the underlying category, with empty parameter space.
 
@@ -358,11 +352,7 @@ class Markov(Symmetric, MarkovCategory):
     category = markov.Diagram
 
     @classmethod
-    @rule
-    def copy[X: Atom, N: Count](
-            cls, x: Var[monoidal.Ty, X],
-            n: Var[int, N] = 2
-    ) -> Hom[Markov, X, Repeat[X, N]]:
+    def copy(cls, x: monoidal.Ty, n: int = 2) -> Markov:
         """
         The copy of the underlying category, with empty parameter space.
 
@@ -423,10 +413,7 @@ class Feedback(Markov, FeedbackCategory):
     """
     category = FeedbackDiagram
 
-    @rule
-    def delay[A: Obj[FeedbackTy], B: Obj[FeedbackTy]](
-            self: Hom[Feedback, A, B], n_steps: int = 1
-    ) -> Hom[Feedback, D[A], D[B]]:
+    def delay(self, n_steps: int = 1) -> Feedback:
         """
         Delay a parametric map by delaying its underlying morphism together
         with its domain, codomain, parameter and coparameter spaces.
@@ -471,11 +458,7 @@ class Compact(Traced, CompactCategory):
     category = compact.Diagram
 
     @classmethod
-    @rule
-    def cups[X: Atom](
-            cls, left: Var[monoidal.Ty, X],
-            right: Var[monoidal.Ty, R[X]]
-    ) -> Hom[Compact, Tensor[X, R[X]], Unit[monoidal.Ty]]:
+    def cups(cls, left: monoidal.Ty, right: monoidal.Ty) -> Compact:
         """
         The cups of the underlying category, with empty parameter space.
 
@@ -487,11 +470,7 @@ class Compact(Traced, CompactCategory):
             left, right))  # ty: ignore[invalid-argument-type]
 
     @classmethod
-    @rule
-    def caps[X: Atom](
-            cls, left: Var[monoidal.Ty, X],
-            right: Var[monoidal.Ty, L[X]]
-    ) -> Hom[Compact, Unit[monoidal.Ty], Tensor[X, L[X]]]:
+    def caps(cls, left: monoidal.Ty, right: monoidal.Ty) -> Compact:
         """
         The caps of the underlying category, with empty parameter space.
 
@@ -514,12 +493,11 @@ class Hypergraph(Compact, Markov, HypergraphCategory):
     category = frobenius.Diagram
 
     @classmethod
-    @rule
-    def spiders[X: Atom, M: Count, N: Count](
-            cls, n_legs_in: Var[int, M],
-            n_legs_out: Var[int, N],
-            typ: Var[monoidal.Ty, X]
-    ) -> Hom[Hypergraph, Repeat[X, M], Repeat[X, N]]:
+    def spiders(
+            cls, n_legs_in: int,
+            n_legs_out: int,
+            typ: monoidal.Ty
+    ) -> Hypergraph:
         """
         The spiders of the underlying category, with empty parameters.
 

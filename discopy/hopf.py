@@ -125,7 +125,6 @@ from functools import cached_property
 import numpy as np
 
 from discopy import monoidal, ribbon, tensor, frobenius
-from discopy.pattern import Atom, Hom, L, R, rule, Tensor, Unit, Var
 from discopy.axioms import no_strategy
 
 from discopy.tensor import Dim, Box, Id
@@ -908,11 +907,10 @@ class Intertwiner[algebra](tensor.Diagram, RibbonCategory):
         super().__init__(inside, dom, cod, _scan=_scan)
 
     @classmethod
-    @rule
-    def braid[X: Atom, Y: Atom](
-            cls, left: Var[Representation, X],
-            right: Var[Representation, Y], is_dagger=False
-    ) -> Hom[Intertwiner, Tensor[X, Y], Tensor[Y, X]]:
+    def braid(
+            cls, left: Representation,
+            right: Representation, is_dagger=False
+    ) -> Intertwiner:
         """
         The braiding :math:`V \\otimes W \\to W \\otimes V` (its inverse
         :math:`R^{-1} = (S \\otimes 1) R` when ``is_dagger``): the R-matrix
@@ -955,11 +953,7 @@ class Intertwiner[algebra](tensor.Diagram, RibbonCategory):
         return cls(body.inside, body.dom, body.cod)
 
     @classmethod
-    @rule
-    def cups[X: Atom](
-            cls, left: Var[Representation, X],
-            right: Var[Representation, R[X]]
-    ) -> Hom[Intertwiner, Tensor[X, R[X]], Unit[Representation]]:
+    def cups(cls, left: Representation, right: Representation) -> Intertwiner:
         """
         The evaluation of a module against its dual. When ``right`` is the
         right dual of ``left`` — read off the ``action`` of the two
@@ -982,11 +976,7 @@ class Intertwiner[algebra](tensor.Diagram, RibbonCategory):
         return cls(body.inside, body.dom, body.cod)
 
     @classmethod
-    @rule
-    def caps[X: Atom](
-            cls, left: Var[Representation, X],
-            right: Var[Representation, L[X]]
-    ) -> Hom[Intertwiner, Unit[Representation], Tensor[X, L[X]]]:
+    def caps(cls, left: Representation, right: Representation) -> Intertwiner:
         """
         The coevaluation of a module against its dual. When ``right`` is
         the right dual of ``left`` this is the plain copairing; a dual

@@ -48,7 +48,6 @@ from discopy.cat import (
     assert_isparallel,
 )
 from discopy.utils import assert_isinstance, unbiased
-from discopy.pattern import Hom, rule
 
 if TYPE_CHECKING:
     import sympy
@@ -317,8 +316,7 @@ class Matrix[dtype](MonoidalCategory, DaggerCategory, NamedGeneric):
     def conjugate(self) -> Matrix:
         return type(self)(self.array.conjugate(), self.dom, self.cod)
 
-    @rule
-    def dagger[A, B](self: Hom[Matrix, A, B]) -> Hom[Matrix, B, A]:
+    def dagger(self) -> Matrix:
         return self.conjugate().transpose()
 
     def map(self, func: Callable, dtype: type | None = None) -> Matrix:

@@ -40,7 +40,7 @@ reviews:
       instructions: |
         Review for STYLE.md and consistency ONLY — never correctness of the
         code or the mathematics, test coverage, or performance, and nothing
-        pflake8/pylint already flag. Spend findings on the lines the diff
+        ruff/pylint already flag. Spend findings on the lines the diff
         adds; read the whole file only to judge the change against what
         surrounds it. Check the diff against STYLE.md:
         - Pure: diagram composition has no side effects; only functor

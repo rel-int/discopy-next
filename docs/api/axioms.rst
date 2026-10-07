@@ -1,10 +1,11 @@
 axioms
 ======
 
-Property-based testing of the axioms, and how to develop against it.
+The language of sequents and the property-based testing of the axioms.
 
 .. autosummary::
     :template: module.rst
     :toctree: ../_api
 
+    discopy.pattern
     discopy.axioms

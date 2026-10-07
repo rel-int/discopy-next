@@ -47,7 +47,6 @@ from math import inf, lcm
 from typing import TYPE_CHECKING, Any, ClassVar, Literal, Self
 
 from discopy import hypergraph, messages
-from discopy.pattern import Atom, Hom, L, R, rule, Tensor, Unit, Var
 from discopy.abc import (
     CompactCategory,
     DaggerCategory,
@@ -909,10 +908,7 @@ class CMap[category: Diagram](CompactCategory, DaggerCategory,
             for box, offset in layer.boxes_and_offsets])
 
     @classmethod
-    @rule
-    def swap[X: Atom, Y: Atom](
-            cls, left: Var[Any, X],
-            right: Var[Any, Y]) -> Hom[CMap, Tensor[X, Y], Tensor[Y, X]]:
+    def swap(cls, left: Any, right: Any) -> CMap:
         """ The symmetry encoded as boundary wiring. """
         dom, cod = left @ right, right @ left
         left_len, right_len = len(left), len(right)
@@ -931,11 +927,7 @@ class CMap[category: Diagram](CompactCategory, DaggerCategory,
         cls.category.Cap(left, right)))
 
     @classmethod
-    @rule
-    def cups[X: Atom](
-            cls, left: Var[Any, X],
-            right: Var[Any, R[X]]
-    ) -> Hom[CMap, Tensor[X, R[X]], Unit[Any]]:
+    def cups(cls, left: Any, right: Any) -> CMap:
         """ A cup encoded as boundary wiring between adjoint types. """
         assert_isinstance(left, Pregroup)
         assert_isinstance(right, Pregroup)
@@ -947,11 +939,7 @@ class CMap[category: Diagram](CompactCategory, DaggerCategory,
         return cls(left @ right, cls.ob(), (), edge, check=False)
 
     @classmethod
-    @rule
-    def caps[X: Atom](
-            cls, left: Var[Any, X],
-            right: Var[Any, L[X]]
-    ) -> Hom[CMap, Unit[Any], Tensor[X, L[X]]]:
+    def caps(cls, left: Any, right: Any) -> CMap:
         """ A cap encoded as boundary wiring between adjoint types. """
         assert_isinstance(left, Pregroup)
         assert_isinstance(right, Pregroup)
@@ -1033,8 +1021,7 @@ class CMap[category: Diagram](CompactCategory, DaggerCategory,
     l = property(lambda self: self.transpose(left=True))
     r = property(lambda self: self.transpose(left=False))
 
-    @rule
-    def dagger[A, B](self: Hom[CMap, A, B]) -> Hom[CMap, B, A]:
+    def dagger(self) -> CMap:
         """
         Reverse a combinatorial map: swap the boundary, dagger each box in
         reverse order and conjugate the edges by the port relabeling.

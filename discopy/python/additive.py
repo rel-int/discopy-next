@@ -22,7 +22,6 @@ from discopy.abc import SymmetricCategory
 from discopy.utils import assert_isinstance, unbiased
 from discopy.python import finset, function
 from discopy.python.function import Ty
-from discopy.pattern import Hom, Obj, rule, Tensor, Var
 
 
 class Function(function.Function, SymmetricCategory):
@@ -78,11 +77,8 @@ class Function(function.Function, SymmetricCategory):
         return Function(inside, dom, cod)
 
     @classmethod
-    @rule
     @cache
-    def swap[X: Obj[Ty], Y: Obj[Ty]](
-            cls, x: Var[Ty | type, X], y: Var[Ty | type, Y]
-    ) -> Hom[Function, Tensor[X, Y], Tensor[Y, X]]:
+    def swap(cls, x: Ty | type, y: Ty | type) -> Function:
         """
         Swap the tags of a disjoint union from `x @ y` to `y @ x`.
 
@@ -119,8 +115,7 @@ class Function(function.Function, SymmetricCategory):
         cod = cls.ob().tensor(*(doms[i] for i in xs))
         return cls(inside, dom, cod)
 
-    @rule
-    def dagger[A, B](self: Hom[Function, A, B]) -> Hom[Function, B, A]:
+    def dagger(self) -> Function:
         if self.is_swap_of is None:
             raise ValueError
         return Function.swap(*self.is_swap_of[::-1])

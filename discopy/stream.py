@@ -164,7 +164,6 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 
 from discopy import symmetric
-from discopy.pattern import D, Hom, Obj, rule
 from discopy.abc import MonoidalCategory
 from discopy.python import finset
 from discopy.abc import DelayedMonoid
@@ -434,10 +433,8 @@ class Stream[category](MonoidalCategory, NamedGeneric):
         return cls(now, dom, cod, mem, _later=lambda: cls.sequence(
             name, dom.later, cod.later, mem.later, n_steps + 1))
 
-    @rule
     @inductive
-    def delay[A: Obj[Ty], B: Obj[Ty]](
-            self: Hom[Stream, A, B]) -> Hom[Stream, D[A], D[B]]:
+    def delay(self) -> Stream:
         """ Delay a stream by one time step, shortened to `self.d`. """
         dom, cod, mem = [x.delay() for x in (self.dom, self.cod, self.mem)]
         now, _later = self.category.id(self.mem.now), lambda: self

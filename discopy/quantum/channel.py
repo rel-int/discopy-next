@@ -52,7 +52,6 @@ from discopy.quantum.gates import Discard, Measure, MixedState, Encode, Scalar
 from discopy.tensor import Dim, Tensor
 from discopy.utils import assert_isinstance, unbiased
 
-from discopy.pattern import Hom, rule
 
 
 class CQ(ColouredMonoid):
@@ -183,8 +182,7 @@ class Channel(Tensor):
         array = (self.to_tensor() >> other.to_tensor()).array
         return type(self)(array, self.dom, other.cod)
 
-    @rule
-    def dagger[A, B](self: Hom[Channel, A, B]) -> Hom[Channel, B, A]:
+    def dagger(self) -> Channel:
         return type(self)(self.to_tensor().dagger().array, self.cod, self.dom)
 
     @unbiased

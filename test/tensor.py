@@ -364,3 +364,37 @@ def test_Permutation_array():
     assert diagram.boxes[0].array.shape == (2, 3, 4, 3, 2, 4)
     assert Tensor.permutation([0, 1], [Dim(2), Dim(3)])\
         == Tensor.id(Dim(2, 3))
+
+
+def test_Tensor_transpose():
+    assert Tensor.caps(Dim(2), Dim(2)).transpose()\
+        == Tensor.cups(Dim(2), Dim(2))
+
+
+def test_tensor_swap():
+    f = Tensor([1, 0, 0, 1], Dim(2), Dim(2))
+    g = Tensor(list(range(9)), Dim(3), Dim(3))
+    swap = Tensor.swap(Dim(2), Dim(3))
+    assert f @ g >> swap == swap >> g @ f
+
+
+def test_Functor_swap():
+    x, y = frobenius.Ty('x'), frobenius.Ty('y')
+    f, g = frobenius.Box('f', x, x), frobenius.Box('g', y, y)
+    F = Functor({x: 2, y: 3}, {f: [1, 2, 3, 4], g: list(range(9))})
+    assert F(f @ g >> frobenius.Swap(x, y)) == \
+           F(frobenius.Swap(x, y) >> g @ f)
+
+
+def test_Functor_repr():
+    x = frobenius.Ty('x')
+    F = Functor({x: 2}, {}, dom=frobenius.Diagram, dtype=bool)
+    assert repr(F) ==\
+        "tensor.Functor(ob_map={frobenius.Ty(frobenius.Wire('x')): 2}, "\
+        "ar_map={}, dom=frobenius.Diagram, dtype=bool)"
+
+
+def test_Diagram_swap():
+    x, y, z = Dim(2), Dim(3), Dim(4)
+    assert Diagram.swap(x, y @ z) == \
+        (Swap(x, y) @ Id(z)) >> (Id(y) @ Swap(x, z))

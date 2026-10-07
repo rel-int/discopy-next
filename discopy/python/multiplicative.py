@@ -32,7 +32,6 @@ from discopy.utils import (
     assert_isinstance, tuplify, untuplify, factory, unbiased)
 from discopy.python import finset, function
 from discopy.python.function import Ty
-from discopy.pattern import Count, Hom, Obj, Repeat, rule, Tensor, Var
 
 
 def exp(base: Ty, exponent: Ty) -> Ty:
@@ -103,10 +102,7 @@ class Function(function.Function, ClosedCategory):
         return Function(inside, self.dom @ other.dom, self.cod @ other.cod)
 
     @classmethod
-    @rule
-    def swap[X: Obj[Ty], Y: Obj[Ty]](
-            cls, x: Var[Ty | type, X], y: Var[Ty | type, Y]
-    ) -> Hom[Function, Tensor[X, Y], Tensor[Y, X]]:
+    def swap(cls, x: Ty | type, y: Ty | type) -> Function:
         """
         The function for swapping two lists of types :code:`x` and :code:`y`.
 
@@ -137,10 +133,7 @@ class Function(function.Function, ClosedCategory):
         return cls(inside, dom, cod)
 
     @classmethod
-    @rule
-    def copy[X: Obj[Ty], N: Count](
-            cls, x: Var[Ty | type, X], n: Var[int, N] = 2
-    ) -> Hom[Function, X, Repeat[X, N]]:
+    def copy(cls, x: Ty | type, n: int = 2) -> Function:
         """
         The function for making :code:`n` copies of a list of types :code:`x`.
 
@@ -150,9 +143,6 @@ class Function(function.Function, ClosedCategory):
         """
         x = Ty.cast(x)
         return cls(lambda *xs: n * xs, dom=x, cod=x ** n)
-
-    merge = classmethod(ClosedCategory.merge.__func__.inapplicable(
-        "A Python function cannot merge copies."))
 
     @staticmethod
     def discard(dom: Ty) -> Function:

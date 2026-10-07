@@ -56,7 +56,6 @@ from discopy.abc import (
     NamedGeneric, RigidCategory, SymmetricCategory, TracedCategory)
 from discopy.drawing import Node, backend
 from discopy.python.finset import Permutation
-from discopy.pattern import Hom, rule
 from discopy.utils import (
     factory_name,
     assert_isinstance,
@@ -394,8 +393,7 @@ class Hypergraph[category: Diagram](MonoidalCategory, DaggerCategory,
         spiders = self.spider_types + other.spider_types
         return type(self)(dom, cod, boxes, wires, spiders, offsets)
 
-    @rule
-    def dagger[A, B](self: Hom[Hypergraph, A, B]) -> Hom[Hypergraph, B, A]:
+    def dagger(self) -> Hypergraph:
         """
         Dagger of a hypergraph diagram, called with :code:`[::-1]`.
 

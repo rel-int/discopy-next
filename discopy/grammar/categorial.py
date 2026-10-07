@@ -52,7 +52,6 @@ import re
 from typing import TYPE_CHECKING
 
 from discopy import biclosed, cmap, messages
-from discopy.pattern import Constant
 from discopy.axioms import no_strategy
 from discopy.cat import factory, Generator
 from discopy.grammar import thue
@@ -65,8 +64,8 @@ from discopy.utils import (
 
 @factory
 class Ty(biclosed.Ty):
-    strategy = no_strategy
     "Base class for categorial grammar types."
+    strategy = no_strategy
 
 
 Wire, Exp, Over, Under = (
@@ -223,13 +222,12 @@ CMap = cmap.CMap[Diagram]
 @Diagram.generator
 class TermBase(  # ty: ignore[inconsistent-mro]
         Box, biclosed.TermBase):
-    if TYPE_CHECKING:
-        def simplify(self) -> TermBase:
-            """ Recursively simplify the compositions of a term. """
-
     """
     A term in the internal language of a categorial grammar.
     """
+    if TYPE_CHECKING:
+        def simplify(self) -> TermBase:
+            """ Recursively simplify the compositions of a term. """
     functor = Functor.id(Diagram)
     freevars = None
 

@@ -206,7 +206,6 @@ from discopy.drawing import backend, Node, Point
 from discopy.config import BOX_DRAWING_ATTRIBUTES, TRANSPARENT
 from discopy.abc import TracedCategory
 from discopy.python import finset
-from discopy.pattern import Hom, rule
 from discopy.utils import (
     assert_isinstance, assert_iscomposable, unbiased, factory, RichDisplay)
 
@@ -970,8 +969,7 @@ class Drawing(TracedCategory, RichDisplay):
             cap @ dom >> traced_dom @ self >> cup @ cod if left
             else dom @ cap >> self @ traced_dom >> cod @ cup)
 
-    @rule
-    def dagger[A, B](self: Hom[Drawing, A, B]) -> Hom[Drawing, B, A]:
+    def dagger(self) -> Drawing:
         """ The reflection of a drawing along the the horizontal axis. """
         def box_dagger(box):
             result = box.dagger()

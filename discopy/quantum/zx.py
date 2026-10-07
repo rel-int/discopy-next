@@ -28,7 +28,6 @@ from typing import ClassVar
 from math import pi
 
 from discopy import cat, rigid, tensor, quantum
-from discopy.pattern import Atom, Hom, rule, Tensor, Var
 from discopy.cat import factory, Generator
 from discopy.quantum.circuit import qubit, Circuit
 from discopy.quantum.gates import (
@@ -46,11 +45,7 @@ class Diagram(tensor.Diagram[complex]):
     Swap: ClassVar[Generator]
 
     @staticmethod
-    @rule
-    def swap[X: Atom, Y: Atom](
-            left: Var[int | Nat, X],
-            right: Var[int | Nat, Y]
-    ) -> Hom[Diagram, Tensor[X, Y], Tensor[Y, X]]:
+    def swap(left: int | Nat, right: int | Nat) -> Diagram:
         left = left if isinstance(left, Nat) else Nat(left)
         right = right if isinstance(right, Nat) else Nat(right)
         return tensor.Diagram.swap.__func__(

@@ -780,3 +780,16 @@ def test_errors():
 def test_Ty_strategy():
     from hypothesis import find
     assert find(Ty.strategy(), lambda ty: ty == qubit @ bit) == qubit @ bit
+
+
+def test_gate_hash():
+    """
+    Quantum gates carry their matrix as data, which numpy makes unhashable.
+    They must nevertheless be hashable and usable as functor keys, with a hash
+    that does not depend on hypergraph equality, see
+    https://github.com/discopy/discopy/pull/387
+    """
+    assert hash(Rx(0.25)) == hash(Rx(0.25)) and Rx(0.25) == Rx(0.25)
+    # A data-carrying gate can be stored and looked up in a dictionary.
+    assert {Rx(0.25): 42}[Rx(0.25)] == 42
+    assert X in {X} and hash(X) == hash(X)

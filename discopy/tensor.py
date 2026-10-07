@@ -63,7 +63,6 @@ from typing import (
 
 from discopy import (
     cat, monoidal, rigid, frobenius, cmap, config)
-from discopy.pattern import Hom, rule
 from discopy.axioms import no_strategy
 from discopy.cat import factory, Generator, assert_iscomposable
 from discopy.frobenius import Dim, Cup
@@ -180,8 +179,7 @@ class Tensor[dtype](Matrix[dtype]):
             array = np.moveaxis(array, source, target)
         return type(self)(array, dom, cod)
 
-    @rule
-    def dagger[A, B](self: Hom[Tensor, A, B]) -> Hom[Tensor, B, A]:
+    def dagger(self) -> Tensor:
         source = list(range(len(self.dom @ self.cod)))
         target = [i + len(self.cod) if i < len(self.dom) else
                   i - len(self.dom) for i in range(len(self.dom @ self.cod))]

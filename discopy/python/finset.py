@@ -17,7 +17,6 @@ Summary
 """
 
 from discopy.utils import assert_isinstance, unbiased
-from discopy.pattern import Atom, Hom, rule, Tensor, Var
 from typing import Iterable, Self, Any, overload
 from collections.abc import Sequence
 
@@ -90,10 +89,7 @@ class Function(MonoidalCategory, Sequence):
             inside, self.dom.tensor(other.dom), self.cod.tensor(other.cod))
 
     @staticmethod
-    @rule
-    def swap[X: Atom, Y: Atom](
-            x: Var[int | Nat, X], y: Var[int | Nat, Y]
-    ) -> Hom[Function, Tensor[X, Y], Tensor[Y, X]]:
+    def swap(x: int | Nat, y: int | Nat) -> Function:
         m, n = int(x), int(y)
         inside = list(Permutation.swap(m, n))
         return Function(inside, Nat(m + n), Nat(m + n))
@@ -257,9 +253,7 @@ class Permutation(Function, PROP):
         elems = (other[self[i]] for i in range(len(self)))
         return type(self)(elems, len(self))
 
-    @rule
-    def dagger[A, B](
-            self: Hom[Permutation, A, B]) -> Hom[Permutation, B, A]:
+    def dagger(self) -> Self:
         """ Return the inverse permutation. """
         result = list(range(len(self)))
         for source, target in enumerate(self):
@@ -330,11 +324,7 @@ class Permutation(Function, PROP):
         return component_of
 
     @classmethod
-    @rule
-    def swap[X: Atom, Y: Atom](
-            cls, left: Var[int | Nat, X],
-            right: Var[int | Nat, Y]
-    ) -> Hom[Self, Tensor[X, Y], Tensor[Y, X]]:
+    def swap(cls, left: int | Nat, right: int | Nat) -> Self:
         m, n = int(left), int(right)
         inside = tuple(
             i + n if i < m else i - m

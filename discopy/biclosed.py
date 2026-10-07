@@ -85,7 +85,6 @@ from typing import Callable, ClassVar, Self, overload
 
 from discopy import monoidal, cmap
 
-from discopy.pattern import Constant
 from discopy.axioms import no_strategy, Serialisable
 from discopy.abc import BiclosedCategory, DaggerCategory, ResiduatedMonoid
 from discopy.drawing import Drawing

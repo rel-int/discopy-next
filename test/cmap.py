@@ -802,3 +802,127 @@ def test_zipping_cups_and_caps():
     assert zipping_expr(D, x).to_map() == zipping_expr(M, x) == M.id(x)
     assert zipping_expr(D, x @ y).to_map()\
         == zipping_expr(M, x @ y) == M.id(x @ y)
+
+
+def test_repr_eq_and_hash():
+    from discopy.compact import Ty, Box, CMap as M
+
+    x, y = map(Ty, "xy")
+    cm = M.from_box(Box("f", x, y))
+    with_metadata = M(cm.dom, cm.cod, cm.boxes, cm.edges, loops=(x, ))
+    namespace = {}
+    exec("from discopy import *", namespace)
+    back = eval(repr(with_metadata), namespace)
+    assert back == with_metadata
+    assert back.loops == with_metadata.loops
+    assert cm == M.from_box(Box("f", x, y))
+    assert cm != object()
+    assert hash(cm) == hash(M.from_box(Box("f", x, y)))
+
+    g = M.from_box(Box("g", y, x))
+    interchanged = (cm @ g).interchange(0, 1)
+    assert interchanged.boxes != (cm @ g).boxes
+    assert (cm @ g).to_hypergraph() == interchanged.to_hypergraph()
+
+
+def test_id_and_tensor():
+    from discopy.compact import Ty, CMap as M, Hypergraph as H
+    x, y = map(Ty, "xy")
+    assert M.id(x).edges == (1, 0)
+    assert M.id(x).orientation == (1, 0)
+    assert M.id(x).faces == (0, 1)
+    assert M.id().tensor() == M.id()
+    assert M.id(x).tensor(M.id(y)) == M.id(x) @ M.id(y)
+    assert (M.id(x) @ M.id(y)).to_hypergraph() == H.id(x @ y)
+
+
+def test_then():
+    from discopy.compact import Ty, Box, CMap as M
+
+    x, y, z, w = map(Ty, "xyzw")
+    f, g, h = [
+        M.from_box(box) for box in [
+            Box("f", x, y), Box("g", y, z), Box("h", z, w)]
+    ]
+    assert ((f >> g) >> h) == (f >> (g >> h))
+    assert (f >> M.id(y)) == f
+    assert (M.id(x) >> f) == f
+    assert (f >> g).to_hypergraph() == f.to_hypergraph() >> g.to_hypergraph()
+    with raises(AxiomError):
+        f >> f
+
+
+def test_tensor():
+    from discopy.compact import Ty, Box, CMap as M
+
+    x, y, z = map(Ty, "xyz")
+    f = M.from_box(Box("f", x, y))
+    g = M.from_box(Box("g", y, z))
+    assert (f @ g).to_hypergraph() == f.to_hypergraph() @ g.to_hypergraph()
+    assert (f @ M.id()) == f
+    assert (M.id() @ f) == f
+
+
+@pytest.mark.parametrize("module", [symmetric, compact, closed])
+def test_interchange(module):
+    Ty, Box, M = module.Ty, module.Box, module.CMap
+
+    # interchange of independent boxes
+    x, y, z, w, a, b = map(Ty, "xyzwab")
+    f, g, h = Box("f", x, y), Box("g", z, w), Box("h", a, b)
+    cm = M.from_box(f) @ M.from_box(g) @ M.from_box(h)
+    swapped = cm.interchange(0, 2)
+    assert swapped.boxes == (h, g, f)
+    assert swapped.dom == cm.dom
+    assert swapped.cod == cm.cod
+    assert swapped.edges == Permutation.from_transpositions(
+        [(0, 7), (1, 5), (2, 3), (4, 11), (6, 10), (8, 9)],
+        12,
+    )
+    assert swapped != cm
+    assert swapped.interchange(2, 0) == cm
+    with raises(IndexError):
+        cm.interchange(0, 3)
+
+    f, g = Box("f", x, y), Box("t", y, z)
+    cm = M.from_box(f) >> M.from_box(g)
+    assert cm.is_causal
+    unordered = cm.interchange(0, 1)
+    assert unordered.boxes == (g, f)
+    assert not unordered.is_topologically_ordered
+    assert unordered.topological_order() == cm
+
+
+def test_tensor_then():
+    from discopy.compact import Ty, Box, CMap as M
+
+    x, y, z, a, b = map(Ty, "xyzab")
+    f1 = M.from_box(Box("f1", x, y))
+    f2 = M.from_box(Box("f2", y, z))
+    g = M.from_box(Box("g", a, b))
+    assert ((f1 >> f2) @ g).to_hypergraph() == (
+        f1.to_hypergraph() >> f2.to_hypergraph()
+    ) @ g.to_hypergraph()
+
+
+def test_then_tensor():
+    from discopy.compact import Ty, Box, CMap as M
+    x1, x2, y1, y2, z = map(Ty, ["x1", "x2", "y1", "y2", "z"])
+    f1 = M.from_box(Box("f1", x1, y1))
+    f2 = M.from_box(Box("f2", x2, y2))
+    g = M.from_box(Box("g", y1 @ y2, z))
+    assert ((f1 @ f2) >> g).to_hypergraph() == (
+        f1.to_hypergraph() @ f2.to_hypergraph()
+    ) >> g.to_hypergraph()
+
+
+def test_hypergraph_to_map():
+    from discopy import compact, frobenius
+
+    x, y = map(compact.Ty, "xy")
+    f = compact.Box("f", x, y).to_hypergraph()
+    assert f.to_map().to_hypergraph() == f
+
+    fx = frobenius.Ty("x")
+    assert frobenius.Hypergraph.spiders(1, 2, fx).to_map()\
+        == frobenius.CMap.spiders(1, 2, fx)
