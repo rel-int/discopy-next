@@ -1064,6 +1064,11 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Fixed
 
+- A balanced functor sends the dagger of a twist to the dagger of its
+  image, where it dropped the dagger: `to_staircases`, the identity
+  functor, turned a daggered twist into a twist, and the dual rails of
+  a ribbon did the same. The dagger rule found it on its first run.
+
 - A rule assigned under a second name is an alias, not a rule:
   `Matrix.twist = id` made `twist` a second identity rule and renamed
   the shared rule object `twist`, since `Declaration.__set_name__`

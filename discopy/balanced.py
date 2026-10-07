@@ -301,7 +301,8 @@ class Functor(braided.Functor, traced.Functor):
     dom = cod = Diagram
 
     def __call__(self, other):
-        if isinstance(other, Twist) and hasattr(self.cod, "twist"):
+        if isinstance(other, Twist) and not other.is_dagger\
+                and hasattr(self.cod, "twist"):
             return self.cod.twist(self(other.dom))
         if isinstance(other, Trace):
             return traced.Functor.__call__(self, other)
@@ -343,7 +344,8 @@ class DualRail(Functor):
 
     def __call__(self, other):
         if isinstance(other, Twist):
-            return self.DualRailTwist(self(other.dom))
+            twist = self.DualRailTwist(self(other.dom))
+            return twist.dagger() if other.is_dagger else twist
         if isinstance(other, Braid):
             return self.DualRailBraid(
                 self(other.left), self(other.right), other.is_dagger)
