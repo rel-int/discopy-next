@@ -609,6 +609,26 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Changed
 
+- The search is a family of classmethods of `abc.Category`, each level
+  implementing its own, rather than one function of `discopy.pattern`:
+  `Category.search` is the template, closing a goal by one of its
+  `leaves` — the free box or a generator — or, below the depth bound,
+  one of its `branches`, a recursive rule whose premises are searched;
+  `contexts` says how the conclusion of a rule meets the goal and
+  `focus` which rules a goal commits to. Plumbing is searched rather
+  than waited for: wherever a recursive rule concludes a tensor, a
+  monoidal category `rewire`s that side of the goal before a split of it
+  puts the term in context, and each doctrine samples its own — the
+  identity for a planar category, a permutation for a symmetric one,
+  copies and discards on the domain of a Markov one, cups and caps for a
+  compact one and spiders for a hypergraph one, each only when its
+  generator is among the category's `generators`, so that a circuit
+  wires with swaps alone. Only a biclosed category focuses, its curry
+  being the one rule invertible on the goals it opens. `pattern.search`,
+  `pattern.focused`, `pattern.materials` and `pattern.DeadEnd` move to
+  `abc`, the unification of `discopy.pattern` staying planar.
+  `proptest/search_experiment.py` measures what the search samples.
+
 - `discopy.search` and `discopy.sequent` merge into `discopy.pattern`,
   where each pattern interprets its own aliases: `Pattern` declares the
   abstract classmethods `instantiate` and `unify` that `Tensor`,
