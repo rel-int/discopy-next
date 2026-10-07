@@ -436,8 +436,10 @@ class Stream[category](MonoidalCategory, NamedGeneric):
         return cls(now, dom, cod, mem, _later=lambda: cls.sequence(
             name, dom.later, cod.later, mem.later, n_steps + 1))
 
+    @rule
     @inductive
-    def delay(self) -> Stream:
+    def delay[A: Obj[Ty], B: Obj[Ty]](
+            self: Hom[Stream, A, B]) -> Hom[Stream, D[A], D[B]]:
         """ Delay a stream by one time step, shortened to `self.d`. """
         dom, cod, mem = [x.delay() for x in (self.dom, self.cod, self.mem)]
         now, _later = self.category.id(self.mem.now), lambda: self

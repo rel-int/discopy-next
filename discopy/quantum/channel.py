@@ -193,7 +193,8 @@ class Channel(Tensor):
         array = (self.to_tensor() >> other.to_tensor()).array
         return type(self)(array, self.dom, other.cod)
 
-    def dagger(self) -> Channel:
+    @rule
+    def dagger[A, B](self: Hom[Channel, A, B]) -> Hom[Channel, B, A]:
         return type(self)(self.to_tensor().dagger().array, self.cod, self.dom)
 
     def tensor[A, B, C, D](

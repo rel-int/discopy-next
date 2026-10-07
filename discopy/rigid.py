@@ -413,6 +413,8 @@ class Diagram(biclosed.Diagram, RigidCategory):
         "Rigid diagrams have no dagger, use pivotal instead.")
     dagger_contravariance = DaggerCategory.dagger_contravariance\
         .inapplicable("Rigid diagrams have no dagger, use pivotal instead.")
+    dagger = monoidal.Diagram.dagger.inapplicable(
+        "Rigid diagrams have no dagger, use pivotal instead.")
 
     to_drawing = monoidal.Diagram.to_drawing
 

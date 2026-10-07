@@ -406,7 +406,8 @@ class Hypergraph[category: Diagram](MonoidalCategory, DaggerCategory,
         spiders = self.spider_types + other.spider_types
         return type(self)(dom, cod, boxes, wires, spiders, offsets)
 
-    def dagger(self):
+    @rule
+    def dagger[A, B](self: Hom[Hypergraph, A, B]) -> Hom[Hypergraph, B, A]:
         """
         Dagger of a hypergraph diagram, called with :code:`[::-1]`.
 

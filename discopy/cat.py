@@ -83,7 +83,7 @@ from typing import (
     TYPE_CHECKING, overload)
 
 from discopy import messages, utils
-from discopy.pattern import Var  # noqa: F401
+from discopy.pattern import Image, Obj, Var  # noqa: F401
 from discopy.abc import Category, DaggerCategory, Serialisable
 from discopy.axioms import (
     axiom, Equation as AbstractEquation, GENERATORS, Hom, no_strategy, rule)
@@ -422,6 +422,11 @@ class Arrow(FreeCategory, DaggerCategory, Serialisable):
 
     def __hash__(self):
         return hash(self.setoid())
+
+    @rule
+    def dagger[A, B](self: Hom[Arrow, A, B]) -> Hom[Arrow, B, A]:
+        """ Contravariant involution, called with :code:`[::-1]`. """
+        return self[::-1]
 
     @rule
     def then[A, B, C](
@@ -1006,6 +1011,23 @@ class Functor[In0, In1, Out0, Out1](Category, Serialisable):
 
     serialisation = Serialisable.serialisation.inapplicable(
         "A functor has no tree.")
+
+    @axiom
+    def functor_identity[F: Obj[Self], A: Obj[In0]](
+            cls, functor: Var[Self, F], x: Var[In0, A]
+    ) -> AbstractEquation[Hom[Out1, Image[F, A], Image[F, A]]]:
+        """ A functor preserves identities. """
+        return functor.cod.Equation(
+            functor(functor.dom.id(x)), functor.cod.id(functor(x)))
+
+    @axiom
+    def functor_composition[
+            F: Obj[Self], A: Obj[In0], B: Obj[In0], C: Obj[In0]](
+            cls, functor: Var[Self, F], f: Hom[In1, A, B], g: Hom[In1, B, C]
+    ) -> AbstractEquation[Hom[Out1, Image[F, A], Image[F, C]]]:
+        """ A functor preserves composition. """
+        return functor.cod.Equation(
+            functor(f.then(g)), functor(f).then(functor(g)))
 
     unitality = Category.unitality.failing(
         "The identity functor is a pair of functions: composing it on the "

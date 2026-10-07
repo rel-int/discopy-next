@@ -95,7 +95,7 @@ from typing import ClassVar, Self
 from collections.abc import Sequence
 
 from discopy import cat, monoidal, balanced, hypergraph, cmap, messages
-from discopy.pattern import Var, Tensor  # noqa: F401
+from discopy.pattern import Image, Obj, Var, Tensor  # noqa: F401
 from discopy.abc import (
     BalancedCategory, BraidedCategory, MonoidalCategory, SymmetricCategory,
     TracedCategory)
@@ -771,8 +771,10 @@ class Functor[In0, In1, Out0, Out1](balanced.Functor):
     dom = cod = Diagram
 
     @axiom
-    def symmetric[X: Atom[In0], Y: Atom[In0]](
-            cls, functor: Self, x: Var[Ty, X], y: Var[Ty, Y]) -> Equation:
+    def symmetric[F: Obj[Self], X: Atom[In0], Y: Atom[In0]](
+            cls, functor: Var[Self, F], x: Var[Ty, X], y: Var[Ty, Y]
+    ) -> AbstractEquation[Hom[
+            Out1, Image[F, Tensor[X, Y]], Image[F, Tensor[Y, X]]]]:
         """ A symmetric functor preserves the swap. """
         return functor.cod.Equation(
             functor(functor.dom.swap(x, y)),

@@ -167,7 +167,7 @@ from discopy.utils import (
     deprecated_alias,
     factory, Generator, factory_name, assert_isinstance, AxiomError,
     from_tree)
-from discopy.pattern import D, Hom, Obj, Var, TensorDir  # noqa: F401
+from discopy.pattern import Count, D, Hom, Obj, Var, TensorDir  # noqa: F401
 from discopy.axioms import rule
 
 
@@ -382,6 +382,8 @@ class Diagram(markov.Diagram, FeedbackCategory):
     #: feedback diagram declares it again.
     dagger_involution = FeedbackCategory.dagger_involution
     dagger_contravariance = FeedbackCategory.dagger_contravariance
+    dagger = monoidal.Diagram.dagger.inapplicable(
+        "The delay of a feedback category is not reversible.")
 
     feedback_tightening = FeedbackCategory.feedback_tightening.failing(
         "A free feedback is a box, which the hypergraph of a bubble "
@@ -404,11 +406,14 @@ class Diagram(markov.Diagram, FeedbackCategory):
     Feedback: ClassVar[Generator]
     Functor: ClassVar[Generator]
 
-    def delay(self, n_steps=1):
+    @rule
+    def delay[A: Obj[Ty], B: Obj[Ty], N: Count](
+            self: Hom[Diagram, A, B], n_steps: Var[int, N] = 1
+    ) -> Hom[Diagram, D[A, N], D[B, N]]:
         """ The delay of a feedback diagram. """
         dom, cod = self.dom.delay(n_steps), self.cod.delay(n_steps)
         inside = tuple(box.delay(n_steps) for box in self.inside)
-        return type(self)(inside, dom, cod, _scan=False)
+        return self.ar(inside, dom, cod, _scan=False)
 
     @rule
     def feedback[A: Obj[Ty], B: Obj[Ty], S: bool, M: Obj[Ty]](

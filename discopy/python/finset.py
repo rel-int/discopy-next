@@ -270,7 +270,10 @@ class Permutation(Function, PROP):
         elems = (other[self[i]] for i in range(len(self)))
         return type(self)(elems, len(self))
 
-    def dagger(self) -> Self:
+    @rule
+    def dagger[A, B](
+            self: Hom[Self, A, B]
+    ) -> Hom[Self, B, A]:  # ty: ignore[invalid-type-form]
         """ Return the inverse permutation. """
         result = list(range(len(self)))
         for source, target in enumerate(self):

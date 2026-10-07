@@ -1042,7 +1042,8 @@ class CMap[category: Diagram](CompactCategory, DaggerCategory,
     l = property(lambda self: self.transpose(left=True))
     r = property(lambda self: self.transpose(left=False))
 
-    def dagger(self) -> CMap:
+    @rule
+    def dagger[A, B](self: Hom[CMap, A, B]) -> Hom[CMap, B, A]:
         """
         Reverse a combinatorial map: swap the boundary, dagger each box in
         reverse order and conjugate the edges by the port relabeling.

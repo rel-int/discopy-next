@@ -60,6 +60,7 @@ Summary
     R
     D
     Repeat
+    Image
     Count
     Sort
     Declaration
@@ -315,24 +316,28 @@ class R[T: abc.Pregroup](AdjDir[T, Literal[False]]):
                                 residuals)
 
 
-class D[T: abc.DelayedMonoid](Pattern):
-    """ The delay ``D[T]`` of a pattern by one time step, inverted by the
-    delay ``-1`` steps back when matching. """
+class D[T: abc.DelayedMonoid, N = Literal[1]](Pattern):
+    """ The delay ``D[T, N]`` of a pattern by ``N`` time steps, one by
+    default, inverted by the delay ``-N`` steps back when matching: an
+    unbound ``N`` binds to every number of steps up to
+    :data:`MAX_COUNT` that the value is the delay of. """
 
     @classmethod
     def instantiate(cls, args, subst, unit):
-        (base, ) = args
-        return instantiate(base, subst, unit).d
+        base, steps = args
+        return instantiate(base, subst, unit).delay(
+            instantiate(steps, subst, unit))
 
     @classmethod
     def unify(cls, args, value, subst, residuals):
-        (base, ) = args
-        try:
-            undelayed = value.delay(-1)
-        except NotImplementedError:  # Not the delay of anything.
-            return
-        if undelayed.d == value:
-            yield from unify(base, undelayed, subst, residuals)
+        base, steps = args
+        for n_steps, bound in counts(steps, subst):
+            try:
+                undelayed = value.delay(-n_steps)
+            except NotImplementedError:  # Not the delay of anything.
+                return
+            if undelayed.delay(n_steps) == value:
+                yield from unify(base, undelayed, bound, residuals)
 
 
 class Repeat[X: abc.ColouredMonoid, N: Count](Pattern):
@@ -358,6 +363,46 @@ class Repeat[X: abc.ColouredMonoid, N: Count](Pattern):
             yield from unify(base, atoms[0], sized, residuals)
         else:
             yield sized, residuals
+
+
+MAX_COUNT = 3
+""" The largest number a ``Count`` stands for, drawn or matched. """
+
+
+def counts(count, subst: Substitution
+           ) -> Iterator[tuple[Any, Substitution]]:
+    """ The numbers a count stands for, each with the substitution
+    binding it: a ``Literal`` its own, a bound variable its binding, an
+    unbound one every number up to :data:`MAX_COUNT`. """
+    if get_origin(count) is Literal:
+        yield get_args(count)[0], subst
+    elif count.__name__ in subst:
+        yield subst[count.__name__], subst
+    else:
+        for n in range(MAX_COUNT + 1):
+            yield n, {**subst, count.__name__: n}
+
+
+class Image[F, X](Pattern):
+    """ The image ``Image[F, X]`` of a pattern under a functor, ``F`` the
+    variable a premise ``functor: Var[Self, F]`` binds: instantiating
+    applies the functor, which matching cannot invert, so the image is
+    compared once the functor and the pattern are bound and is a
+    residual until then. """
+
+    @classmethod
+    def instantiate(cls, args, subst, unit):
+        functor, pattern = args
+        return instantiate(functor, subst, unit)(
+            instantiate(pattern, subst, unit))
+
+    @classmethod
+    def unify(cls, args, value, subst, residuals):
+        functor, pattern = args
+        if not all(label in subst for label in cls.variables(args)):
+            yield subst, residuals + ((Image[functor, pattern], value), )
+        elif cls.instantiate(args, subst, type(value)) == value:
+            yield subst, residuals
 
 
 def heads(category: type) -> dict[str, type]:
@@ -444,7 +489,7 @@ class Sort:
         from hypothesis import strategies as st
 
         if self.count:
-            return st.integers(min_value=0, max_value=3)
+            return st.integers(min_value=0, max_value=MAX_COUNT)
         if self.side:
             return st.booleans()
         resolved = self.resolve(scope)
@@ -852,7 +897,7 @@ def declarations[K: Declaration](cls: type, kind: type[K]) -> dict[str, K]:
     >>> from discopy.monoidal import Diagram
     >>> from discopy.pattern import Rule
     >>> list(declarations(Diagram, Rule))
-    ['id', 'tensor', 'cut']
+    ['id', 'tensor', 'cut', 'dagger']
     """
     result: dict[str, K] = {}
     for base in reversed(cls.__mro__):

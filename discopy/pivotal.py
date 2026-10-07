@@ -59,6 +59,7 @@ from typing import ClassVar
 from discopy import cat, cmap, monoidal, rigid, traced
 from discopy.abc import (
     DaggerCategory, PivotalCategory, TracedCategory)
+from discopy.axioms import Hom, rule
 from discopy.cat import factory, Generator
 from discopy.utils import deprecated_alias
 
@@ -102,6 +103,12 @@ class Ty(rigid.Ty):
     dagger_involution = DaggerCategory.dagger_involution
     dagger_contravariance = DaggerCategory.dagger_contravariance
 
+    @rule
+    def dagger[A, B](self: Hom[Ty, A, B]) -> Hom[Ty, B, A]:
+        """ The dagger of a pivotal type, its reverse with every wire
+        daggered. """
+        return self[::-1]
+
 
 @factory
 class Nat(rigid.Nat, Ty):
@@ -136,7 +143,8 @@ class Diagram(rigid.Diagram, traced.Diagram, PivotalCategory):
     Cup: ClassVar[Generator]
     Cap: ClassVar[Generator]
 
-    def dagger(self):
+    @rule
+    def dagger[A, B](self: Hom[Diagram, A, B]) -> Hom[Diagram, B, A]:
         """
         The dagger of a pivotal diagram is its vertical reflection.
 

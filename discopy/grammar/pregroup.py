@@ -274,6 +274,8 @@ VOCABULARY = (
 
 
 Functor = Diagram.Functor
+Functor.functor_composition = rigid.Functor.functor_composition.inapplicable(
+    "A sentence goes from the unit to a sentence type, so no two compose.")
 
 
 def eager_parse(*words, target=Ty('s')):

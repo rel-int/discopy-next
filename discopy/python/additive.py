@@ -122,7 +122,8 @@ class Function(function.Function, SymmetricCategory):
         cod = cls.ob().tensor(*(doms[i] for i in xs))
         return cls(inside, dom, cod)
 
-    def dagger(self):
+    @rule
+    def dagger[A, B](self: Hom[Function, A, B]) -> Hom[Function, B, A]:
         if self.is_swap_of is None:
             raise ValueError
         return Function.swap(*self.is_swap_of[::-1])

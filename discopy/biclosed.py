@@ -395,6 +395,9 @@ class Diagram(monoidal.Diagram, BiclosedCategory):
     dagger_monoidality = BiclosedCategory.dagger_monoidality.inapplicable(
         "A curried diagram has no dagger.")
 
+    dagger = monoidal.Diagram.dagger.inapplicable(
+        "A curried diagram has no dagger.")
+
     map_hypergraph_agreement = \
         monoidal.Diagram.map_hypergraph_agreement.failing(
             "Mapping a curry bubble decodes the map of its inside, which "

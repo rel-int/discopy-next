@@ -195,6 +195,13 @@ class Functor(biclosed.Functor):
     """
     dom = cod = Diagram
 
+    functor_identity = biclosed.Functor.functor_identity.inapplicable(
+        "Categorial types have no strategy to quantify over.")
+
+    functor_composition = biclosed.Functor.functor_composition\
+        .inapplicable("Categorial diagrams have no strategy to quantify "
+                      "over.")
+
     def __call__(self, other):
         if isinstance(other, ForwardCrossedComposition):
             left = other.dom.inside[0].left

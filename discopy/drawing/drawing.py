@@ -958,7 +958,8 @@ class Drawing(TracedCategory, RichDisplay):
             cap @ dom >> traced_dom @ self >> cup @ cod if left
             else dom @ cap >> self @ traced_dom >> cod @ cup)
 
-    def dagger(self) -> Drawing:
+    @rule
+    def dagger[A, B](self: Hom[Drawing, A, B]) -> Hom[Drawing, B, A]:
         """ The reflection of a drawing along the the horizontal axis. """
         def box_dagger(box):
             result = box.dagger()

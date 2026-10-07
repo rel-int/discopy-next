@@ -424,7 +424,8 @@ class Diagram[natural](RibbonCategory, NamedGeneric):
         inside = cls.natural.id(left.negative @ left.positive)
         return cls(inside, type(left)(), left @ right)
 
-    def dagger(self):
+    @rule
+    def dagger[A, B](self: Hom[Diagram, A, B]) -> Hom[Diagram, B, A]:
         """
         The dagger of an integer diagram is given by the dagger of its inside.
 

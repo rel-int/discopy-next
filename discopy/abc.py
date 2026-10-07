@@ -228,10 +228,12 @@ class DaggerCategory[C0, C1: DaggerCategory](Category[C0, C1]):
     Its two laws are stated here rather than on :class:`Category`, so that a
     category with no dagger does not have to declare them inapplicable.
     """
+    @rule
     @abstractmethod
     def dagger[A: Obj[C0], B: Obj[C0]](
             self: Hom[C1, A, B]) -> Hom[C1, B, A]:
-        """ The dagger of a morphism, to be instantiated. """
+        """ The dagger of a morphism, to be instantiated: as a rule, from
+        ``a ⊢ b`` conclude ``b ⊢ a``. """
 
     @axiom
     def dagger_involution[A: Obj[C0], B: Obj[C0]](
@@ -1334,10 +1336,14 @@ class FeedbackCategory[C0: DelayedMonoid, C1: FeedbackCategory](
     :class:`DelayedMonoid`, with a :code:`delay` endofunctor and a
     :code:`feedback` operator.
     """
+    @rule
     @abstractmethod
-    def delay(self, n_steps: int = 1) -> Self:
+    def delay[A: Obj[C0], B: Obj[C0], N: Count](
+            self: Hom[C1, A, B], n_steps: Var[int, N] = 1
+    ) -> Hom[C1, D[A, N], D[B, N]]:
         """
-        The delay endofunctor applied to a morphism.
+        The delay endofunctor applied to a morphism, to be instantiated:
+        as a rule, from ``a ⊢ b`` conclude ``a.delay(n) ⊢ b.delay(n)``.
 
         Parameters:
             n_steps : The number of time steps to delay.

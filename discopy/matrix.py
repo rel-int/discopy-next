@@ -330,7 +330,8 @@ class Matrix[dtype](MonoidalCategory, DaggerCategory, NamedGeneric):
     def conjugate(self) -> Matrix:
         return type(self)(self.array.conjugate(), self.dom, self.cod)
 
-    def dagger(self) -> Matrix:
+    @rule
+    def dagger[A, B](self: Hom[Matrix, A, B]) -> Hom[Matrix, B, A]:
         return self.conjugate().transpose()
 
     def map(self, func: Callable, dtype: type | None = None) -> Matrix:

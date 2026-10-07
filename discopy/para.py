@@ -441,7 +441,10 @@ class Feedback(Markov, FeedbackCategory):
     """
     category = FeedbackDiagram
 
-    def delay(self, n_steps: int = 1) -> Feedback:
+    @rule
+    def delay[A: Obj[FeedbackTy], B: Obj[FeedbackTy], N: Count](
+            self: Hom[Feedback, A, B], n_steps: Var[int, N] = 1
+    ) -> Hom[Feedback, D[A, N], D[B, N]]:
         """
         Delay a parametric map by delaying its underlying morphism together
         with its domain, codomain, parameter and coparameter spaces.

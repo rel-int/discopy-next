@@ -72,6 +72,29 @@ def test_match():
         == [{"N": 3, "X": x}]
 
 
+def test_delay_and_image():
+    """ A delay matches every number of steps the value is the delay of,
+    and the image of a functor is checked once it is bound, a residual
+    until then. """
+    from typing import Literal
+    from discopy import feedback
+    from discopy.pattern import Image, instantiate
+
+    x = feedback.Ty("x")
+    X, F = TypeVar("X"), TypeVar("F")
+    N = TypeVar("N", bound=Count)
+    assert [s for s, _ in match(D[X, N], x.delay(2))] == [
+        {"N": 0, "X": x.delay(2)}, {"N": 1, "X": x.d}, {"N": 2, "X": x}]
+    assert [s for s, _ in match(D[X], x.d)] == [{"X": x}]
+    assert instantiate(D[X, Literal[2]], {"X": x}, feedback.Ty) == x.delay(2)
+    relabel = feedback.Functor({x: x.d}, {})
+    assert instantiate(Image[F, X], {"F": relabel, "X": x}, None) == x.d
+    ((_, residuals), ) = match(Image[F, X], x.d)
+    assert residuals == ((Image[F, X], x.d), )
+    assert list(match(Image[F, X], x.d, {"F": relabel, "X": x}))
+    assert not list(match(Image[F, X], x, {"F": relabel, "X": x}))
+
+
 def test_exp_unify():
     """ An exponential pattern decomposes a single exponential object
     its base and exponent rebuild, matches nothing else, and keeps the
@@ -202,7 +225,7 @@ def test_rule():
 
     f = Box("f", x, x)
     assert Wrapped.twice(f) == f >> f == Wrapped(f.inside, x, x).twice()
-    assert list(Wrapped.rules) == ["id", "tensor", "cut", "twice"]
+    assert list(Wrapped.rules) == ["id", "tensor", "cut", "dagger", "twice"]
     assert str(Wrapped.rules["twice"]) == "twice(self: Hom[discopy."\
         "monoidal.Diagram, A, A]) -> Hom[discopy.monoidal.Diagram, A, A]"
     found = find(Wrapped.strategy(dom=x, cod=x, types=st.just(x)),
@@ -240,7 +263,7 @@ def test_cut():
     f, g = Box("f", y, y @ y), Box("g", x @ y @ y @ z, z)
     assert f.cut(g, x, z) == x @ f @ z >> g
     assert list(Diagram.rules["cut"].variables) == list("ABCXY")
-    assert list(Diagram.rules) == ["id", "tensor", "cut"]
+    assert list(Diagram.rules) == ["id", "tensor", "cut", "dagger"]
     assert Diagram.rules["cut"].recursive
     assert "then" in cat.Arrow.rules  # A mere category composes by then,
     assert f.then(Box("h", y @ y, z)).cod == z  # a monoidal one cuts.
@@ -257,23 +280,23 @@ def test_calculus():
         balanced, biclosed, closed, compact, feedback, frobenius, markov,
         monoidal, pivotal, ribbon, symmetric, traced)
 
-    composition, trace = ["tensor", "cut"], ["trace"]
+    composition, trace, dagger = ["tensor", "cut"], ["trace"], ["dagger"]
     for module, calculus in (
-            (monoidal, composition),
-            (braided, composition),
+            (monoidal, composition + dagger),
+            (braided, composition + dagger),
             (rigid, composition),
-            (balanced, composition + trace),
-            (symmetric, composition + trace),
-            (traced, composition + trace),
-            (markov, composition + trace),
-            (pivotal, composition + trace),
-            (ribbon, composition + trace),
-            (compact, composition + trace),
-            (frobenius, composition + trace),
+            (balanced, composition + trace + dagger),
+            (symmetric, composition + trace + dagger),
+            (traced, composition + trace + dagger),
+            (markov, composition + trace + dagger),
+            (pivotal, composition + trace + dagger),
+            (ribbon, composition + trace + dagger),
+            (compact, composition + trace + dagger),
+            (frobenius, composition + trace + dagger),
             (biclosed, composition + ["curry"]),
             (closed, composition + trace + ["curry"]),
             (feedback, composition + trace
-             + ["feedback"])):
+             + ["delay", "feedback"])):
         assert [name for name, found in module.Diagram.rules.items()
                 if found.recursive] == calculus, module.__name__
 

@@ -192,7 +192,8 @@ class Tensor[dtype](Matrix[dtype]):
             array = np.moveaxis(array, source, target)
         return type(self)(array, dom, cod)
 
-    def dagger(self) -> Tensor:
+    @rule
+    def dagger[A, B](self: Hom[Tensor, A, B]) -> Hom[Tensor, B, A]:
         source = list(range(len(self.dom @ self.cod)))
         target = [i + len(self.cod) if i < len(self.dom) else
                   i - len(self.dom) for i in range(len(self.dom @ self.cod))]

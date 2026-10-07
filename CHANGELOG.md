@@ -9,6 +9,29 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Added
 
+- `dagger` and `delay` are rules: `DaggerCategory.dagger` concludes
+  `b ⊢ a` from `a ⊢ b`, restated by `cat.Arrow`, the pivotal diagrams
+  and types and the semantic categories that implement it — `Matrix`,
+  `Tensor`, `Channel`, `Hypergraph`, `CMap`, `Drawing`, the `Int`
+  construction, permutations and additive functions — and inapplicable
+  where its laws are, on rigid, biclosed, closed and feedback diagrams;
+  `FeedbackCategory.delay` concludes `a.delay(n) ⊢ b.delay(n)` through
+  the delay pattern `D[T, N]`, which takes an optional number of steps,
+  one by default, and matches every number of steps up to
+  `pattern.MAX_COUNT` that a value is the delay of. A stream delays by
+  one step. Delaying a box of a feedback diagram through
+  `feedback.Diagram.delay`, as the search does, builds a diagram rather
+  than calling the box's constructor with the arguments of a diagram.
+- `pattern.Image[F, X]`, the image of a pattern under a functor `F`
+  that a premise `functor: Var[Self, F]` binds, so that a functor law
+  types its equation: `cat.Functor.functor_identity` and
+  `functor_composition` state that a functor preserves identities and
+  composition, `Equation[Hom[Out1, Image[F, A], Image[F, C]]]`, and the
+  symmetric functor preserves the swap between the images of `X @ Y`
+  and `Y @ X`. Matching cannot invert a functor, so an image is
+  compared once its functor and pattern are bound and is a residual
+  until then.
+
 - The laws the hierarchy was missing, stated once on its abstract base
   classes: the cut is derived from tensor and composition
   (`cut_derivation`); the braid has an inverse both ways
