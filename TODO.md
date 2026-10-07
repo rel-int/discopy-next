@@ -9,14 +9,14 @@ go ahead, on a new branch off this one
 - [WIP] @session_019jj2d1JBnEGRPmjqSAP37A-2026-10-07 09:57 experiment script measuring hypothesis statistics, dead ends and the sampling distribution, run on the unified search
 
 ## Search in abc
-- [ ] move the search out of `pattern.py` into a family of classmethods of `abc.Category`: `search`, `leaves`, `branches`, `contexts`, `focus`
-- [ ] planar contexts: a split, i.e. the unification of the patterns
-- [ ] symmetric contexts: a permutation
-- [ ] Markov contexts: copies and discards
-- [ ] compact contexts: cups and caps
-- [ ] hypergraph contexts: spiders
-- [ ] focusing only in biclosed categories
-- [ ] tests and docs
+- [WIP] @session_019jj2d1JBnEGRPmjqSAP37A-2026-10-07 09:59 move the search out of `pattern.py` into a family of classmethods of `abc.Category`: `search`, `leaves`, `branches`, `contexts`, `focus`
+- [WIP] @session_019jj2d1JBnEGRPmjqSAP37A-2026-10-07 09:59 planar contexts: a split, i.e. the unification of the patterns
+- [WIP] @session_019jj2d1JBnEGRPmjqSAP37A-2026-10-07 09:59 symmetric contexts: a permutation
+- [WIP] @session_019jj2d1JBnEGRPmjqSAP37A-2026-10-07 09:59 Markov contexts: copies and discards
+- [WIP] @session_019jj2d1JBnEGRPmjqSAP37A-2026-10-07 09:59 compact contexts: cups and caps
+- [WIP] @session_019jj2d1JBnEGRPmjqSAP37A-2026-10-07 09:59 hypergraph contexts: spiders
+- [WIP] @session_019jj2d1JBnEGRPmjqSAP37A-2026-10-07 09:59 focusing only in biclosed categories
+- [WIP] @session_019jj2d1JBnEGRPmjqSAP37A-2026-10-07 09:59 tests and docs
 
 ## Experiment
 - [ ] rerun the experiment on the doctrine search and compare
