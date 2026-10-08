@@ -65,7 +65,8 @@ from typing import (
     TYPE_CHECKING)
 
 from discopy import abc, cat, drawing, hypergraph, cmap, messages
-from discopy.pattern import Var
+from discopy.abc import Var
+from discopy.pattern import Hom, Obj, Pattern
 from discopy.axioms import (
     axiom, Equation as AbstractEquation, no_strategy, Serialisable)
 from discopy.abc import (
@@ -90,6 +91,7 @@ from discopy.utils import (
 
 if TYPE_CHECKING:
     import sympy
+    from hypothesis import strategies as st
 
 
 @dataclass(frozen=True)
@@ -108,9 +110,12 @@ class Colour(cat.Ob):
     label: "str | None" = field(default=None, compare=False)
 
     @classmethod
-    def strategy(cls):
-        """Generate a colour, transparent or one of four."""
+    def strategy(cls, pattern: Pattern[Self]) -> "st.SearchStrategy[Self]":
+        """ Generate a colour, transparent or one of four, whatever the
+        pattern. """
         from hypothesis import strategies as st
+
+        del pattern
 
         return st.sampled_from(
             (TRANSPARENT, "white", "red", "green", "blue")).map(cls)
@@ -147,12 +152,23 @@ class Wire(cat.Ob):
     """A generating 1-cell with a colour on either side."""
 
     @classmethod
-    def strategy(cls, *, dom=transparent, cod=transparent):
-        """Generate named wires with the given colours on either side."""
+    def strategy(cls, pattern: Pattern[Self]) -> "st.SearchStrategy[Self]":
+        """ Generate named wires: transparent for an :class:`Obj`, a
+        wire between the colours of a :class:`Hom` otherwise, any colour
+        for a side left :obj:`None`. """
         from hypothesis import strategies as st
 
-        return st.sampled_from(cat.Ob.alphabet).map(
-            lambda name: cls(name, dom=dom, cod=cod))
+        def side(colour):
+            if not isinstance(pattern, Hom):
+                return st.just(transparent)
+            return Colour.strategy(Obj()) if colour is None\
+                else st.just(colour)
+
+        return st.builds(
+            lambda name, dom, cod: cls(name, dom=dom, cod=cod),
+            st.sampled_from(cat.Ob.alphabet),
+            side(getattr(pattern, "dom", None)),
+            side(getattr(pattern, "cod", None)))
 
     def __init__(self, name: str, dom: Colour = transparent,
                  cod: Colour = transparent, is_dagger: bool = False):
@@ -329,29 +345,41 @@ class Ty(cat.Ob, cat.FreeCategory, ColouredMonoid):
 
     Wire: ClassVar[Generator] = Generator.subclass(Wire)
 
+    coloured: ClassVar[bool] = True
+    """ Whether the wires of a type sit between colours, which a
+    :class:`Hom` pattern asks for. """
+
     @classmethod
-    def strategy(
-            cls, *, min_length=0, max_length=3,
-            dom=transparent, cod=transparent):
+    def strategy(cls, pattern: Pattern[Self]) -> "st.SearchStrategy[Self]":
         """
-        Generate words of wires, transparent between the given colours; a
-        colour left :obj:`None` is drawn, which is how the laws of the
-        category of colours a type is quantify over coloured words.
+        Generate words of wires: transparent of the size of an
+        :class:`Obj` pattern, up to three wires for any size, and
+        between the colours of a :class:`Hom` pattern, a colour left
+        :obj:`None` drawn, which is how the laws of the category of
+        colours a type is quantify over coloured words, unless its wires
+        are not :attr:`coloured`.
         """
         from hypothesis import strategies as st
 
+        coloured = cls.coloured and isinstance(pattern, Hom)
+        size = getattr(pattern, "size", None)
+
         @st.composite
         def words(draw):
-            source = draw(cls.ob.strategy()) if dom is None else dom
-            target = draw(cls.ob.strategy()) if cod is None else cod
-            minimum = max(min_length, int(source != target))
-            length = draw(st.integers(min_value=minimum, max_value=max_length))
+            source, target = (
+                (colour if colour is not None
+                 else draw(cls.ob.strategy(Obj())))
+                if coloured else transparent
+                for colour in (getattr(pattern, "dom", None),
+                               getattr(pattern, "cod", None)))
+            length = draw(st.integers(
+                min_value=int(source != target), max_value=3)
+                if size is None else st.just(size))
             if not length:
                 return cls(dom=source, cod=target)
             colours = [source] + [transparent] * (length - 1) + [target]
             return cls(*(
-                draw(cls.Wire.strategy(
-                    dom=colours[i], cod=colours[i + 1]))
+                draw(cls.Wire.strategy(Hom(colours[i], colours[i + 1])))
                 for i in range(length)))
 
         return words()
@@ -1525,10 +1553,10 @@ class Diagram(cat.Arrow, MonoidalCategory, RichDisplay):
         return diagram
 
     bifunctoriality = MonoidalCategory.bifunctoriality.modulo(
-        normal_form).weaken(boundary_connected=True)
+        normal_form).weaken("is_boundary_connected")
 
     dagger_monoidality = MonoidalCategory.dagger_monoidality.modulo(
-        normal_form).weaken(boundary_connected=True)
+        normal_form).weaken("is_boundary_connected")
 
     @classmethod
     def hypergraph_equivalence(cls) -> cat.Equivalence:
@@ -1611,7 +1639,7 @@ class Diagram(cat.Arrow, MonoidalCategory, RichDisplay):
         return AbstractEquation(normal.normal_form(), normal)
 
     normal_form_idempotence = normal_form_idempotence.weaken(
-        boundary_connected=True)
+        "is_boundary_connected")
 
     @axiom
     def normal_form_soundness(cls, f: Self):
@@ -1623,7 +1651,7 @@ class Diagram(cat.Arrow, MonoidalCategory, RichDisplay):
         return cls.Equation(f.normal_form(), f, up_to=cls.to_hypergraph)
 
     normal_form_soundness = normal_form_soundness.weaken(
-        boundary_connected=True)
+        "is_boundary_connected")
 
     @axiom
     def foliation_idempotence(cls, f: Self):
@@ -1778,19 +1806,16 @@ class Box(cat.Box, Diagram):
     min_width: float
 
     @classmethod
-    def strategy(cls, **params):
+    def strategy(cls, pattern: Pattern[Self]) -> "st.SearchStrategy[Self]":
         """
         Generate fresh boxes, for the generator class of a level only: a
         structural box such as a cup is generated by the rules of its
         category, inside a diagram, so its own strategy is left to raise.
-        A box has no closed component, so it honours ``boundary_connected``
-        by consuming it.
         """
         if cls is not cls.ar.Box:
             raise NotImplementedError(
                 f"No search strategy implemented for {cls.__name__}")
-        params.pop("boundary_connected", None)
-        return super().strategy(**params)
+        return super().strategy(pattern)
 
     def __init__(self, name: str, dom: Ty, cod: Ty, **params):
         dom = dom if isinstance(dom, self.ob) else self.ob(dom)

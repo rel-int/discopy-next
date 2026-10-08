@@ -2,6 +2,7 @@ import random
 
 from pytest import raises
 
+from discopy import pattern
 from discopy.hypergraph import *
 from discopy.frobenius import (
     Ty, Box, Cap, Cup, Diagram, Spider, Hypergraph as H)
@@ -128,7 +129,7 @@ def test_AxiomError():
     with raises(AxiomError):
         Hypergraph[monoidal.Diagram].from_box(f).explicit_trace()
     with raises(NotImplementedError):
-        Hypergraph.strategy()  # No host category to search.
+        Hypergraph.strategy(pattern.Hom())  # No host category to search.
     with raises(AxiomError):
         H.cups(x @ y, x @ y)
     with raises(AxiomError):

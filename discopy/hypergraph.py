@@ -68,7 +68,9 @@ from discopy.utils import (
     untuplify,
 )
 if TYPE_CHECKING:
+    from hypothesis import strategies as st
     from discopy.monoidal import Ty, Box, Diagram
+    from discopy.pattern import Pattern
 
 
 Spider = Any
@@ -1454,14 +1456,20 @@ class Hypergraph[category: Diagram](MonoidalCategory, DaggerCategory,
             dom, cod, tuple(boxes), wires, spider_types, tuple(offsets))
 
     @classmethod
-    def strategy(cls, **params):
+    def strategy(cls, pattern: Pattern[Hypergraph]
+                 ) -> "st.SearchStrategy[Hypergraph]":
         """
         Generate hypergraphs as the image of :meth:`from_diagram` on the
-        search of the host category, reusing its generators and rules.
+        diagrams of the host category between the same sides, reusing
+        its generators and rules.
         """
+        from discopy.pattern import Hom
+
         if cls.category is None:
             raise NotImplementedError
-        return cls.category.strategy(**params).map(cls.from_diagram)
+        return cls.category.strategy(Hom(
+            getattr(pattern, "dom", None), getattr(pattern, "cod", None)
+        )).map(cls.from_diagram)
 
     @classmethod
     def from_diagram(cls, old: Diagram) -> Hypergraph:

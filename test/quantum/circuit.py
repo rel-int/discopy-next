@@ -737,10 +737,11 @@ def test_random_circuits():
     """ The strategy of a circuit draws circuits over the gate set. """
     from hypothesis import find
 
+    from discopy.pattern import Hom
     from discopy.quantum.gates import GATES
 
     circuit = find(
-        Circuit.strategy(dom=qubit @ qubit, max_depth=2),
+        Circuit.strategy(Hom(qubit @ qubit)),
         lambda diagram: any(box.name == 'CX' for box in diagram.boxes)
         and any(box.name == 'H' for box in diagram.boxes))
     assert all(
@@ -779,7 +780,10 @@ def test_errors():
 
 def test_Ty_strategy():
     from hypothesis import find
-    assert find(Ty.strategy(), lambda ty: ty == qubit @ bit) == qubit @ bit
+    from discopy.pattern import Obj
+    assert find(Ty.strategy(Obj()), lambda ty: ty == qubit @ bit)\
+        == qubit @ bit
+    assert len(find(Ty.strategy(Obj(size=2)), bool)) == 2
 
 
 def test_gate_hash():

@@ -8,8 +8,8 @@ from hypothesis.errors import NoSuchExample
 from pytest import raises
 
 from discopy import braided, cat, feedback, rigid
-from discopy.abc import MonoidalCategory
-from discopy.pattern import Hom, Obj, Rule
+from discopy.abc import Hom, MonoidalCategory
+from discopy.pattern import Pattern, Rule
 from discopy.axioms import Axiom, axiom, AxiomFailure, Equation, Testable
 from discopy.cat import Arrow, Box, Functor, Ob
 from discopy.monoidal import Diagram
@@ -45,8 +45,8 @@ def test_axiom_binding():
     assert axiom(lambda cls: NotImplemented).bind(Arrow)() is NotImplemented
     box = Box('f', Ob('x'), Ob('y'))
     assert Arrow.unitality(box)
-    broken = Arrow.unitality.weaken(max_leaves=1).failing("Never holds.")
-    assert broken.params == {"max_leaves": 1}
+    broken = Arrow.unitality.weaken("is_atom").failing("Never holds.")
+    assert broken.subspace == "is_atom"
     with raises(AxiomFailure) as failure:
         broken(box)
     assert failure.value.equation
@@ -74,10 +74,10 @@ def test_equation_symbols():
 
 
 def test_weaken():
-    law = Arrow.unitality.weaken(max_leaves=1).bind(Arrow)
-    assert law.modulo(lambda term: term).params == law.params
+    law = Arrow.unitality.weaken("is_atom").bind(Arrow)
+    assert law.modulo(lambda term: term).subspace == law.subspace
     equation = find(law.strategy(), lambda _: True)
-    assert equation and all(len(term.inside) <= 1 for term in equation.terms)
+    assert equation and all(term.is_atom for term in equation.terms)
 
 
 def test_self_annotation():
@@ -135,13 +135,12 @@ def test_axiom():
     assert not unannotated.bind(Diagram).premises
 
 
-def test_weaken_params():
-    law = Diagram.bifunctoriality.weaken(max_depth=0)
-    equation = find(law.strategy(), lambda _: True)
-    assert equation and all(len(term.boxes) <= 4 for term in equation.terms)
-    assert law.weaken(max_depth=1).params == {
-        "boundary_connected": True, "max_depth": 1}
-    assert law.modulo(lambda term: term).params == law.params
+def test_weaken_subspace():
+    law = Diagram.bifunctoriality.weaken("is_boundary_connected")
+    equation = find(law.strategy(), lambda equation: any(
+        len(term.boxes) > 4 for term in equation.terms))
+    assert equation and all(
+        term.is_boundary_connected for term in equation.terms)
 
 
 def test_equation_types():
@@ -149,8 +148,7 @@ def test_equation_types():
     import inspect
     from discopy import (
         balanced, closed, compact, pivotal, ribbon, symmetric, traced)
-    from typing import get_origin
-    from discopy.pattern import Substitution
+    from discopy import pattern
     (parameter, ) = Equation.__type_params__
     levels = (Diagram, braided.Diagram, traced.Diagram, balanced.Diagram,
               symmetric.Diagram, closed.Diagram, rigid.Diagram,
@@ -160,16 +158,13 @@ def test_equation_types():
     for category in levels:
         for law in category.axioms.values():
             returns = inspect.signature(law.function).return_annotation
-            pattern = getattr(returns, parameter.__name__, None)
-            if get_origin(pattern) not in (Hom, Obj)\
+            typed = Pattern.read(getattr(returns, parameter.__name__, None))
+            if not isinstance(typed, pattern.Hom)\
                     or (equation := law.canonical()) is NotImplemented:
                 continue
-            subst = Substitution({
-                name: sort.canonical(law.bound, name, law.owner)
-                for name, sort in law.variables.items()})
-            value = subst.instantiate(pattern, law.bound.ob)
-            boundary = (lambda term: (term.dom, term.cod))\
-                if get_origin(pattern) is Hom else (lambda term: term)
+            value = law.context().instantiate(typed, law.bound.ob)
+            boundary = lambda term: pattern.Hom(
+                term.dom, term.cod, head=typed.head)
             assert all(
                 boundary(term) == value for term in equation.terms), law
             checked.add(law.name)

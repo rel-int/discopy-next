@@ -15,7 +15,10 @@ forgetful functors between categories go the other way.
 Each class states its structure twice: as abstract methods with plain
 Python typing, which a concrete category implements, and as
 :func:`discopy.pattern.rule` sequents forwarding to them, e.g.
-:meth:`Category.cut` to :meth:`Category.then`. It also declares the
+:meth:`Category.cut` to :meth:`Category.then`, the sequent written with
+the aliases :data:`Obj`, :data:`Atom`, :data:`Unit`, :data:`Var` and
+:data:`Hom` that a typechecker reads as plain types and
+:meth:`discopy.pattern.Pattern.read` as patterns. It also declares the
 :func:`discopy.axioms.axiom` equations that every category below
 inherits along with the structure they axiomatise, e.g.
 :class:`Category` the unitality and associativity of composition. Every
@@ -64,15 +67,39 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from types import NoneType
 from typing import (
-    ClassVar, Self, TYPE_CHECKING)
+    Annotated, ClassVar, Literal, Self, TYPE_CHECKING)
 
 from discopy import messages
 from discopy.axioms import axiom, Equation, Testable
 from discopy.pattern import (
-    Atom, Count, D, Hom, L, Obj, Over, R, Repeat, rule, Tensor, Under, Unit,
-    Var)
+    Count, D, L, Over, R, Repeat, rule, Tensor, Under)
 from discopy.utils import classproperty, unbiased
 from discopy.utils import NamedGeneric  # noqa: F401  pylint: disable=unused-import  # re-exported
+
+type Obj[Coarse, Size = None] = Annotated[Coarse, Size]
+""" The sort ``Obj[T]`` of the objects of type ``T``, as the bound of a
+variable ``A: Obj[C0]`` or as a premise to sample, of a given size when
+one is given: ``Literal[n]`` or a variable ``N: Count``. A typechecker
+reads it as ``T``, :meth:`discopy.pattern.Pattern.read` as a
+:class:`discopy.pattern.Obj`. """
+
+type Atom[Coarse] = Obj[Coarse, Literal[1]]
+""" The sort of the objects of size one, i.e. a single wire. """
+
+type Unit[Coarse] = Obj[Coarse, Literal[0]]
+""" The sort of the objects of size zero, i.e. the unit. """
+
+type Var[Coarse, Fine] = Annotated[Coarse, Fine]
+""" The premise or conclusion ``Var[T, p]`` standing for the value of a
+pattern ``p`` over variables bound elsewhere, e.g. ``x: Var[C0, X]``
+for a variable ``X: Obj[C0]`` or ``n: Var[int, N]`` for ``N: Count``. A
+typechecker reads it as ``T``. """
+
+type Hom[Coarse, Dom, Cod] = Annotated[Coarse, Dom, Cod]
+""" The sort ``Hom[C1, dom, cod]`` of the morphisms between two
+patterns, as a premise to sample or a conclusion to match. A
+typechecker reads it as ``C1``, :meth:`discopy.pattern.Pattern.read` as
+a :class:`discopy.pattern.Hom`. """
 
 
 class Category[C0, C1: Category](Testable, ABC):
@@ -114,7 +141,7 @@ class Category[C0, C1: Category](Testable, ABC):
         What the type parameters of the category stand for, in order: its
         objects ``C0`` and its arrows ``C1``, so that the head of a
         sequent stated with them resolves to the classes of the category
-        it is bound to, see :func:`discopy.pattern.stands_for`.
+        it is bound to, see :meth:`discopy.pattern.Declaration.resolve`.
 
         >>> from discopy.monoidal import Ty, Diagram
         >>> assert Diagram.parameters() == (Ty, Diagram)

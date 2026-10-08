@@ -39,7 +39,8 @@ from dataclasses import dataclass
 
 from discopy import (
     config, monoidal, braided, traced, cmap, hypergraph, messages)
-from discopy.pattern import Atom, Hom, rule, Var
+from discopy.pattern import rule
+from discopy.abc import Atom, Hom, Var
 from discopy.axioms import no_strategy, Serialisable
 from discopy.abc import BalancedCategory
 

@@ -67,12 +67,13 @@ Examples
     :align: center
 """
 
-from typing import ClassVar
+from dataclasses import replace
+from typing import ClassVar, Self, TYPE_CHECKING
 
 from collections.abc import Mapping
 
 from discopy import messages, tensor, frobenius
-from discopy.pattern import Rule
+from discopy.pattern import Pattern, Rule
 from discopy.axioms import no_strategy
 from discopy.cat import factory, Generator
 from discopy.matrix import backend
@@ -80,6 +81,9 @@ from discopy.tensor import Dim, Tensor
 from discopy.utils import (
     deprecated_alias,
     assert_isinstance, classproperty, factory_name)
+
+if TYPE_CHECKING:
+    from hypothesis import strategies as st
 
 
 class Wire(frobenius.Wire):
@@ -179,17 +183,18 @@ class Ty(frobenius.Ty):
     bit @ bit @ qubit @ qubit @ qubit
     """
     @classmethod
-    def strategy(cls, *, min_length=0, max_length=3, dom=None, cod=None):
-        # pylint: disable=unused-argument  # a circuit has no colours
+    def strategy(cls, pattern: Pattern[Self]) -> "st.SearchStrategy[Self]":
         """
-        Generate words of qubits and bits of the given lengths, a circuit
-        having no colours for its wires to sit between.
+        Generate words of qubits and bits of the size of the pattern, up
+        to three for any, a circuit having no colours for its wires to sit
+        between.
         """
         from hypothesis import strategies as st
 
+        size = getattr(pattern, "size", None)
         return st.lists(
             st.sampled_from([Qudit(2), Digit(2)]),
-            min_size=min_length, max_size=max_length
+            min_size=size or 0, max_size=3 if size is None else size
         ).map(lambda wires: cls(*wires))
     Wire = Wire
 
@@ -228,23 +233,29 @@ class Circuit(tensor.Diagram[complex]):
                 **{name: Rule.constant(gate) for name, gate in GATES.items()
                    if not isinstance(gate, type)}}
 
+    max_depth = 6  # Every box of a circuit is a rule.
+
     @classmethod
-    def strategy(cls, *, dom=None, cod=None, **params):
+    def strategy(cls, pattern: Pattern[Self]) -> "st.SearchStrategy[Self]":
         """
-        Generate circuits by :meth:`discopy.axioms.Testable.sample` over
-        :attr:`generators`, on the given qubits and bits, the codomain
-        being the domain by default, a gate keeping its wires.
+        Generate the boundary-connected circuits of a pattern by
+        :meth:`discopy.axioms.Testable.sample` over :attr:`generators`,
+        the codomain being the domain by default, a gate keeping its
+        wires.
 
         >>> from hypothesis import find
+        >>> from discopy.pattern import Hom
         >>> from discopy.quantum.gates import CX
         >>> circuit = find(
-        ...     Circuit.strategy(dom=qubit ** 2, max_depth=2),
+        ...     Circuit.strategy(Hom(qubit ** 2)),
         ...     lambda c: any(box.name == 'CX' for box in c.boxes))
         >>> assert circuit.dom == circuit.cod == qubit ** 2
         >>> assert CX in circuit.boxes
         """
-        return cls.sample(dom=dom, cod=dom if cod is None else cod,
-                          boundary_connected=True, **params)
+        if pattern.cod is None:
+            pattern = replace(pattern, cod=pattern.dom)
+        return cls.sample(pattern).filter(
+            lambda circuit: circuit.is_boundary_connected)
 
     trace_left = tensor.Diagram.trace_left.admissible(
         "A trace unfolds into kets and bras.")

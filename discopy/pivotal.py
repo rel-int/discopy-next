@@ -59,7 +59,8 @@ from typing import ClassVar
 from discopy import cat, cmap, monoidal, rigid, traced
 from discopy.abc import (
     DaggerCategory, PivotalCategory, TracedCategory)
-from discopy.pattern import Hom, rule
+from discopy.pattern import rule
+from discopy.abc import Hom
 from discopy.cat import factory, Generator
 from discopy.utils import deprecated_alias
 
@@ -75,11 +76,7 @@ class Wire(rigid.Wire):
     l = r = property(lambda self: type(self)(
         self.name, (self.z + 1) % 2, dom=self.cod, cod=self.dom))
 
-    @classmethod
-    def strategy(cls, **params):
-        """Generate pivotal wires, whose winding number is a parity."""
-        return super().strategy(
-            **{"min_winding": 0, "max_winding": 1, **params})
+    windings = range(2)  # A pivotal winding number is a parity.
 
     def dagger(self) -> Wire:
         """
@@ -222,15 +219,15 @@ class Diagram(rigid.Diagram, traced.Diagram, PivotalCategory):
     hypergraph_composition = monoidal.Diagram.hypergraph_composition
 
     map_hypergraph_agreement = monoidal.Diagram.map_hypergraph_agreement\
-        .weaken(boundary_connected=True)
+        .weaken("is_boundary_connected")
 
     normal_form_soundness = monoidal.Diagram.normal_form_soundness
 
     foliation_idempotence = monoidal.Diagram.foliation_idempotence.weaken(
-        boundary_connected=True)
+        "is_boundary_connected")
 
     foliation_soundness = monoidal.Diagram.foliation_soundness.weaken(
-        boundary_connected=True)
+        "is_boundary_connected")
 
     dagger_monoidality = monoidal.Diagram.dagger_monoidality
 

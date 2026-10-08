@@ -66,10 +66,9 @@ from collections.abc import Callable
 
 from discopy import (
     monoidal, rigid, markov, compact, pivotal, cmap, hypergraph)
-from discopy.pattern import (
-    Atom, Count, Hom, L, Repeat, rule, Tensor, Unit, Var)
+from discopy.pattern import Count, L, Repeat, rule, Tensor
 from discopy.axioms import Serialisable
-from discopy.abc import HypergraphCategory
+from discopy.abc import Atom, Hom, HypergraphCategory, Unit, Var
 
 from discopy.cat import factory, Generator
 from discopy.utils import deprecated_alias, assert_isatomic, factory_name
@@ -84,11 +83,7 @@ class Wire(pivotal.Wire):
     """
     l = r = property(lambda self: self)
 
-    @classmethod
-    def strategy(cls, **params):
-        """Generate self-dual wires, at winding number zero."""
-        return super().strategy(
-            **{"min_winding": 0, "max_winding": 0, **params})
+    windings = range(1)  # A self-dual wire does not wind.
 
 
 @factory
@@ -99,12 +94,7 @@ class Ty(pivotal.Ty):
     Parameters:
         inside (frobenius.Wire) : The objects inside the type.
     """
-    @classmethod
-    def strategy(cls, **params):
-        """A self-dual wire has no colours to swap: transparent words."""
-        return super().strategy(**{
-            **params,
-            "dom": monoidal.transparent, "cod": monoidal.transparent})
+    coloured = False  # A self-dual wire has no colours to swap.
 
     Wire: ClassVar[Generator] = Generator.subclass(Wire)
 

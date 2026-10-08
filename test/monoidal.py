@@ -6,6 +6,7 @@ from pytest import raises
 from discopy.cat import *
 from discopy.monoidal import *
 from discopy.drawing import spiral
+from discopy import pattern
 from discopy.utils import AxiomError, from_tree
 
 
@@ -685,7 +686,7 @@ def test_Layer_merge_to_identity():
 
 def test_Box_strategy():
     with raises(NotImplementedError):
-        Sum.strategy()
+        Sum.strategy(pattern.Hom())
     f = Box('f', Ty('x'), Ty('x'))
     assert f.size == (f + f).size == 1
 
@@ -711,7 +712,9 @@ def test_abc_Nat():
 
 def test_Colour_strategy():
     from hypothesis import find
-    assert find(Colour.strategy(), lambda c: c.name == "red") == Colour("red")
+    assert find(Colour.strategy(pattern.Obj()),
+                lambda c: c.name == "red") == Colour("red")
+    assert find(Ty.strategy(pattern.Hom()), lambda ty: ty.dom != ty.cod)
 
 
 def test_composition_never_emits_a_boxless_layer():

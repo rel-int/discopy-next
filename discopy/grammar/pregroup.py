@@ -34,15 +34,18 @@ Summary
         brute_force
 """
 
-from typing import ClassVar
+from typing import ClassVar, Self, TYPE_CHECKING
 
-from discopy import pattern, rigid, frobenius, messages
-from discopy.pattern import Rule
+from discopy import rigid, frobenius, messages
+from discopy.pattern import Pattern, Rule
 from discopy.axioms import no_strategy
 from discopy.cat import factory, Generator
 from discopy.utils import deprecated_alias, AxiomError, classproperty
 from discopy.grammar import thue
 from discopy.rigid import Wire  # noqa: F401  pylint: disable=unused-import
+
+if TYPE_CHECKING:
+    from hypothesis import strategies as st
 
 
 @factory
@@ -125,30 +128,35 @@ class Diagram(frobenius.Diagram):
                 **{word.name: Rule.constant(word) for word in VOCABULARY}}
 
     @classmethod
-    def strategy(cls, *, dom=Ty(), cod=Ty('s'), max_words=4):
+    def strategy(cls, pattern: Pattern[Self]) -> "st.SearchStrategy[Self]":
         """
         Generate sentences, from the empty type to the sentence type by
-        default: a sequence of words drawn from the constants of
-        :attr:`generators`, reduced onto the goal by :func:`eager_parse`,
-        an utterance the parser rejects rejected with it.
+        default: a sequence of up to four words drawn from the constants
+        of :attr:`generators`, reduced onto the goal by
+        :func:`eager_parse`, an utterance the parser rejects rejected with
+        it.
 
         >>> from hypothesis import find
+        >>> from discopy.pattern import Hom
         >>> sentence = find(
-        ...     Diagram.strategy(),
+        ...     Diagram.strategy(Hom()),
         ...     lambda d: [box.name for box in d.foliation().boxes[:3]]
         ...     == ['Alice', 'loves', 'Bob'])
         >>> print(sentence.foliation())
         Alice @ loves @ Bob >> Cup(n, n.r) @ s @ Cup(n.l, n)
         """
         from hypothesis import assume, strategies as st
+        from discopy.pattern import Constant  # the rule, not the term
 
         words = [rule.apply({}) for rule in cls.generators.values()
-                 if isinstance(rule, pattern.Constant)]
+                 if isinstance(rule, Constant)]
+        dom = Ty() if pattern.dom is None else pattern.dom
+        cod = Ty('s') if pattern.cod is None else pattern.cod
 
         @st.composite
         def sentences(draw):
             utterance = draw(st.lists(
-                st.sampled_from(words), min_size=1, max_size=max_words))
+                st.sampled_from(words), min_size=1, max_size=4))
             try:
                 return cls.id(dom) @ eager_parse(*utterance, target=cod)
             except NotImplementedError:

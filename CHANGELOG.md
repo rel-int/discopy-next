@@ -607,6 +607,28 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Changed
 
+- Every strategy has one signature, `Testable.strategy(cls, pattern:
+  Pattern[T]) -> SearchStrategy[T]`: it samples the instances a ground
+  pattern stands for, e.g. `Diagram.strategy(Hom(x, y))` the diagrams
+  from `x` to `y`, `Ty.strategy(Obj(size=2))` the types of two wires and
+  `strategy(Hom())` any term, which is how `Testable.enrolled` asks. A
+  pattern is a runtime instance of a frozen dataclass generic in what it
+  stands for — `Var`, `Obj`, `Count`, `Hom`, `Tensor`, `Over`, `Under`,
+  `L`, `R`, `D`, `Repeat` and `Image` — absorbing the sorts `Sort`,
+  `Objects`, `Terms` and `Counts`: a premise `Self` reads as `Hom(head=Self)`
+  and a variable as a `Var` of the sort its bound reads as. Sequents keep
+  the aliases a typechecker reads as plain types, `Obj`, `Atom`, `Unit`,
+  `Var` and `Hom`, which move to `discopy.abc` and read as patterns
+  through `Pattern.read`; `Rule.match` takes a goal `Hom`, and
+  `Declaration.context` gives the canonical values of the variables
+  `Declaration.canonical` builds on. The keywords the strategies took go:
+  the colours of a type are the sides of a `Hom` pattern, its length the
+  size of an `Obj`, a rigid wire winds within its class's `windings`, a
+  type whose wires carry no colours says so with `coloured = False`, a
+  category nests up to its `max_depth` rules, six for a circuit, and
+  `Axiom.weaken` names the boolean attribute of its subspace,
+  `weaken("is_boundary_connected")`, where it took `boundary_connected=True`.
+
 - A category owns the strategies it samples with: objects are drawn
   from `ob.strategy` and free boxes from `Box.strategy`. The sort of a variable or
   a premise is one subclass of `pattern.Sort` per head — `Objects` of

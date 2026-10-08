@@ -95,7 +95,8 @@ from typing import ClassVar, Self
 from collections.abc import Sequence
 
 from discopy import cat, monoidal, balanced, hypergraph, cmap, messages
-from discopy.pattern import Atom, Hom, Image, Obj, rule, Tensor, Var
+from discopy.pattern import Image, rule, Tensor
+from discopy.abc import Atom, Hom, Obj, Var
 from discopy.axioms import axiom, Equation as AbstractEquation
 from discopy.abc import (
     BalancedCategory, BraidedCategory, MonoidalCategory, SymmetricCategory,

@@ -46,12 +46,13 @@ import sys
 from abc import ABCMeta
 from collections.abc import Callable
 from copy import deepcopy
-from dataclasses import KW_ONLY, dataclass, field, replace
+from dataclasses import KW_ONLY, dataclass, replace
 from functools import wraps
-from typing import TYPE_CHECKING, Self, get_origin
+from operator import attrgetter
+from typing import TYPE_CHECKING, ClassVar, Self
 
 from discopy.pattern import (
-    Constant, Counts, Declaration, Hom, Rule, Sort, Substitution, Terms)
+    Constant, Count, Declaration, Hom, Obj, Pattern, Rule, Substitution)
 from discopy.utils import (
     AxiomError,
     NamedGeneric,
@@ -180,21 +181,19 @@ class Testable[T](metaclass=ABCMeta):
     leaving :meth:`strategy` to raise.
     """
 
+    max_depth: ClassVar[int] = 3
+    """ The number of rules a term :meth:`sample` builds may nest. """
+
     @classmethod
-    def strategy(cls, **params) -> "st.SearchStrategy[T]":
+    def strategy(cls, pattern: Pattern[T]) -> "st.SearchStrategy[T]":
         """
         Build a `search strategy
-        <https://hypothesis.readthedocs.io/en/latest/data.html>`_ for
-        instances of ``cls``, which is how a class enrols itself in the
-        property matrix.
-
-        An override that delegates to another strategy accepts
-        ``**params``, pops the parameters it consumes and forwards the
-        rest, so that a caller's bounds pass through unchanged and a
-        subclass overrides what a base popped just by passing it. A
-        terminal strategy instead declares exactly the parameters it
-        implements: a constraint it cannot honour fails loudly as an
-        unexpected keyword rather than being silently dropped.
+        <https://hypothesis.readthedocs.io/en/latest/data.html>`_ for the
+        instances of ``cls`` a ground pattern stands for, e.g.
+        ``Hom(x, y)`` the morphisms from ``x`` to ``y``, ``Obj(size=2)``
+        the objects of size two and ``Hom()`` any term, which is the
+        pattern a premise ``Self`` reads as. Implementing it is how a
+        class enrols itself in the property matrix.
 
         The default raises: a class states its laws as soon as it has
         them, and is checked against them once it says how to sample their
@@ -203,7 +202,7 @@ class Testable[T](metaclass=ABCMeta):
         uninstantiable rather than merely unchecked.
 
         >>> from discopy.monoidal import Layer
-        >>> Layer.strategy()
+        >>> Layer.strategy(Hom())
         Traceback (most recent call last):
          ...
         NotImplementedError: No search strategy implemented for Layer
@@ -221,39 +220,28 @@ class Testable[T](metaclass=ABCMeta):
         return Axiom.inherited(cls)
 
     @classmethod
-    def sample(cls, declaration: Declaration | None = None, *,
-               dom=None, cod=None, max_depth: int | None = None,
-               **params) -> "st.SearchStrategy":
+    def sample(cls, goal: Pattern | Declaration) -> "st.SearchStrategy":
         """
-        Sample at random by applying the rules of the category: the
-        arguments of a ``declaration`` bound to it when one is given, else
-        a term from ``dom`` to ``cod``, either :obj:`None` for any.
+        Sample at random by applying the rules of the category: a term
+        the ``goal`` stands for, a ground :class:`discopy.pattern.Hom` or
+        any other pattern for any term, or the arguments of a declaration
+        bound to the category.
 
         A term is a free :attr:`Box` or the conclusion of a rule chosen at
         random among those whose conclusion matches the goal, its premises
-        sampled in turn: an object of a class by the strategy of that
-        class, a morphism of the category as a term while fewer than
-        ``max_depth`` rules are nested, one of another category by the
-        strategy of that category. A category over a fixed vocabulary of
-        ``generators`` has no free box and gets six nested rules rather
-        than three, its every box being a rule. A term built outside its
-        goal is a rule lying about its conclusion, an
-        :class:`discopy.utils.AxiomError`, an example whose residual
-        equations fail is rejected, and ``boundary_connected=True`` keeps
-        the terms :meth:`discopy.monoidal.Diagram.normal_form` is defined
-        on.
-
-        Parameters:
-            declaration : The rule or law whose arguments to sample.
-            dom : The domain of the term, :obj:`None` for any.
-            cod : The codomain of the term, :obj:`None` for any.
-            max_depth : The number of rules a term may nest.
-            params : Passed to the strategies of other categories.
+        sampled in turn: a morphism of the category as a term while fewer
+        than :attr:`max_depth` rules are nested, anything else by the
+        strategy of its class on the ground pattern of the premise. A
+        category over a fixed vocabulary of ``generators`` has no free
+        box. A term built outside its goal is a rule lying about its
+        conclusion, an :class:`discopy.utils.AxiomError`, and an example
+        whose residual equations fail is rejected. The premises of an
+        :class:`Axiom` keep to the subspace it was weakened to.
 
         >>> from hypothesis import find
         >>> from discopy.monoidal import Ty, Diagram
         >>> x, y = Ty('x'), Ty('y')
-        >>> term = find(Diagram.sample(dom=x, cod=y),
+        >>> term = find(Diagram.sample(Hom(x, y)),
         ...             lambda term: len(term.boxes) > 1)
         >>> assert (term.dom, term.cod) == (x, y)
         """
@@ -264,85 +252,66 @@ class Testable[T](metaclass=ABCMeta):
         if vocabulary is not None:
             rules = [rule for rule in rules if rule.recursive]\
                 + list(vocabulary.values())
-        if max_depth is None:
-            max_depth = 3 if vocabulary is None else 6
 
         @st.composite
         def arguments(draw, declaration, subst, depth):
-            category = declaration.category or cls
-            owner = declaration.owner
+            ob = getattr(declaration.category or cls, "ob", None)
             subst = Substitution(subst, residuals=subst.residuals)
+            subspace = declaration.subspace\
+                if isinstance(declaration, Axiom) else None
 
-            def value(sort, label):
-                if isinstance(sort, Counts):
-                    return draw(st.integers(0, Counts.maximum), label=label)
-                resolved = sort.resolve(category, owner)
-                if isinstance(sort, Terms):
-                    return draw(resolved.strategy(**params), label=label)
-                length = subst[sort.size] if isinstance(sort.size, str)\
-                    else sort.size
-                if length is None:
-                    return draw(resolved.strategy(), label=label)
-                try:
-                    return draw(resolved.strategy(
-                        min_length=length, max_length=length), label=label)
-                except TypeError:  # A strategy with no length to ask for.
-                    atoms = st.lists(resolved.strategy().filter(
-                        lambda atom: len(atom) == 1),
-                        min_size=length, max_size=length)
-                    return resolved().tensor(*draw(atoms, label=label))
+            def value(pattern, label):
+                ground = subst.instantiate(pattern, ob)
+                if isinstance(ground, Count):
+                    return draw(st.integers(0, Count.maximum), label=label)
+                if not isinstance(ground, (Obj, Hom)):
+                    return ground
+                resolved = declaration.resolve(ground)
+                ground = replace(ground, head=None)
+                if isinstance(declaration, Rule) and resolved is cls\
+                        and isinstance(ground, Hom):
+                    return draw(term(ground, depth - 1), label=label)
+                strategy = resolved.strategy(ground)
+                if subspace is not None and isinstance(ground, Hom):
+                    strategy = strategy.filter(attrgetter(subspace))
+                return draw(strategy, label=label)
 
             variables = sorted(declaration.variables.items(), key=lambda
-                               item: not isinstance(item[1], Counts))
+                               item: not isinstance(item[1], Count))
             for label, sort in variables:
                 if label not in subst:
                     subst[label] = value(sort, label)
             for pattern, residual in subst.residuals:
-                assume(subst.instantiate(pattern, category.ob) == residual)
-            result = {}
-            for label, premise in declaration.premises.items():
-                if isinstance(premise, Sort):
-                    result[label] = value(premise, label)
-                elif get_origin(premise) is not Hom:
-                    result[label] = subst.instantiate(premise, category.ob)
-                elif isinstance(declaration, Rule)\
-                        and declaration.resolve(premise) is cls:
-                    sides = subst.instantiate(premise, category.ob)
-                    result[label] = draw(
-                        term(sides[0], sides[1], depth - 1), label=label)
-                else:
-                    sides = subst.instantiate(premise, category.ob)
-                    result[label] = draw(declaration.resolve(premise).strategy(
-                        dom=sides[0], cod=sides[1], **params), label=label)
-            return result
+                assume(subst.instantiate(pattern, ob) == residual)
+            return {label: value(premise, label)
+                    for label, premise in declaration.premises.items()}
 
         @st.composite
-        def term(draw, dom, cod, depth):
+        def term(draw, goal, depth):
             options = [None] if vocabulary is None else []
             options += [
                 (rule, found) for rule in rules
                 if depth > 0 or not rule.recursive
-                for found in [list(rule.match(dom, cod))] if found]
+                for found in [list(rule.match(goal))] if found]
             assume(options)
             choice = draw(st.sampled_from(options))
             if choice is None:
-                result = draw(cls.Box.strategy(dom=dom, cod=cod))
+                result = draw(cls.Box.strategy(goal))
             else:
                 rule, found = choice
                 result = rule.apply(draw(arguments(
                     rule, draw(st.sampled_from(found)), depth)))
-            if dom not in (None, result.dom) or cod not in (None, result.cod):
+            if goal.dom not in (None, result.dom)\
+                    or goal.cod not in (None, result.cod):
                 raise AxiomError(
                     f"{choice[0] if choice else 'A free box'} concludes "
-                    f"{dom} -> {cod} but built {result.dom} -> {result.cod}.")
+                    f"{goal.dom} -> {goal.cod} but built "
+                    f"{result.dom} -> {result.cod}.")
             return result
 
-        if declaration is not None:
-            return arguments(declaration, Substitution(), max_depth)
-        terms = term(dom, cod, max_depth)
-        if not params.get("boundary_connected"):
-            return terms
-        return terms.filter(lambda term: term.is_boundary_connected)
+        if isinstance(goal, Declaration):
+            return arguments(goal, Substitution(), cls.max_depth)
+        return term(goal if isinstance(goal, Hom) else Hom(), cls.max_depth)
 
     @classmethod
     def enrolled(cls) -> tuple[type[Testable], ...]:
@@ -360,7 +329,7 @@ class Testable[T](metaclass=ABCMeta):
         """
         def generates(testable):
             try:
-                testable.strategy()
+                testable.strategy(Hom())
             except NotImplementedError:
                 return False
             return not any(
@@ -459,13 +428,13 @@ class Axiom[**P, T](Declaration[P, T]):
         function : The function stating the law, from the category and the
             generated arguments to an :class:`Equation`, or to
             :obj:`NotImplemented` when the structure does not apply.
-        params : The parameters :meth:`weaken` passes to the strategy of
-            every hom premise, restricting the law to a subspace.
+        subspace : The name of the boolean attribute that :meth:`weaken`
+            restricts the morphisms of the law to, if any.
         broken : Whether the law is declared broken by :meth:`failing`.
     """
 
     _: KW_ONLY
-    params: dict = field(default_factory=dict)
+    subspace: str | None = None
     broken: bool = False
 
     concludes = False
@@ -515,19 +484,22 @@ class Axiom[**P, T](Declaration[P, T]):
             # pylint: disable=unused-argument  # a law that does not apply
             return NotImplemented
         law.__doc__ = reason
-        return replace(self, function=law, params={}, broken=False)
+        return replace(self, function=law, subspace=None, broken=False)
 
-    def weaken(self, **params) -> Self:
+    def weaken(self, subspace: str) -> Self:
         """
-        The same law quantified over the subspace the given parameters cut
-        out of the strategy of each hom premise, e.g.
-        ``bifunctoriality.weaken(boundary_connected=True)`` on a diagram
-        category compares the interchange law on the diagrams its normal
-        form is defined for. Assigned to its own attribute beside a
-        ``.failing`` declaration, it shows the matrix one expected failure
-        and one green cell instead of one blanket expected failure.
+        The same law quantified over the subspace of the morphisms whose
+        attribute of that name holds, both its premises and the terms of
+        its equation, e.g. ``bifunctoriality.weaken(
+        "is_boundary_connected")`` on a diagram category compares the
+        interchange law on the diagrams its normal form is defined for: a
+        state and an effect are each boundary-connected while composing
+        into a closed component, on which it is not. Assigned to its own
+        attribute beside a ``.failing`` declaration, it shows the matrix
+        one expected failure and one green cell instead of one blanket
+        expected failure.
         """
-        return replace(self, params=dict(self.params, **params))
+        return replace(self, subspace=subspace)
 
     @property
     def parameters(self) -> tuple[inspect.Parameter, ...]:
@@ -538,41 +510,29 @@ class Axiom[**P, T](Declaration[P, T]):
         return tuple(
             inspect.signature(self.function).parameters.values())[1:]
 
-    def equations(self, evaluate: Callable,
-                  **params) -> "st.SearchStrategy":
-        """
-        The law evaluated by a function of its arguments, sampled from their
-        patterns; keyword arguments are passed to the strategy of each hom
-        premise, after those :meth:`weaken` declared. A law weakened to
-        the boundary-connected subspace also keeps its equations there: a
-        state and an effect are each boundary-connected while composing
-        into a closed component, on which the normal form of a term of
-        the equation would not be defined.
-        """
-
-        if self.category is None:
-            raise TypeError(f"{self.name} is not bound to a class.")
-        params = dict(self.params, **params)
-
-        equations = self.bound.sample(self, **params).map(
+    def equations(self, evaluate: Callable) -> "st.SearchStrategy":
+        """ The law evaluated by a function of its arguments, sampled by
+        :meth:`Testable.sample`, in the subspace it was weakened to. """
+        equations = self.bound.sample(self).map(
             lambda arguments: evaluate(**arguments))
-        if not params.get("boundary_connected"):
+        if self.subspace is None:
             return equations
-        return equations.filter(lambda equation: all(
-            term.is_boundary_connected for term in equation.terms))
+        holds = attrgetter(self.subspace)
+        return equations.filter(
+            lambda equation: all(map(holds, equation.terms)))
 
-    def strategy(self, **params) -> "st.SearchStrategy[Equation]":
+    def strategy(self) -> "st.SearchStrategy[Equation]":
         """
         Generate the equations the bound axiom states: a law declared
         broken raises its :class:`AxiomFailure` from the sample, as it does
-        from a call. Keyword arguments are those of :meth:`equations`.
+        from a call.
 
         >>> from hypothesis import find
         >>> from discopy.cat import Arrow
         >>> equation = find(Arrow.unitality.strategy(), lambda _: True)
         >>> assert equation and len(equation.terms) == 3
         """
-        return self.equations(self, **params)
+        return self.equations(self)
 
     def falsify(self, **params) -> Equation:
         """

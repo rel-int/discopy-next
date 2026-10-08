@@ -101,24 +101,22 @@ class Diagram(symmetric.Diagram, ribbon.Diagram, CompactCategory):
         "keeps a cut that foliating it again straightens.")
 
     currying_left = BiclosedCategory.currying_left.weaken(
-        boundary_connected=True)
+        "is_boundary_connected")
 
     currying_right = BiclosedCategory.currying_right.weaken(
-        boundary_connected=True)
+        "is_boundary_connected")
 
     currying_eta_left = BiclosedCategory.currying_eta_left.weaken(
-        boundary_connected=True)
+        "is_boundary_connected")
 
     currying_eta_right = BiclosedCategory.currying_eta_right.weaken(
-        boundary_connected=True)
+        "is_boundary_connected")
 
     currying_naturality_left = BiclosedCategory\
-        .currying_naturality_left.weaken(
-        boundary_connected=True)
+        .currying_naturality_left.weaken("is_boundary_connected")
 
     currying_naturality_right = BiclosedCategory\
-        .currying_naturality_right.weaken(
-        boundary_connected=True)
+        .currying_naturality_right.weaken("is_boundary_connected")
 
 
 Box, Cup, Cap = (

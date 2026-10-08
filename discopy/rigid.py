@@ -150,10 +150,11 @@ import copy
 
 from collections.abc import Callable
 
-from typing import Any, ClassVar, Iterator, Self
+from typing import Any, ClassVar, Iterator, Self, TYPE_CHECKING
 
 from discopy import cat, monoidal, biclosed, messages
-from discopy.pattern import Atom, Hom, L, R, rule, Tensor, Unit, Var
+from discopy.pattern import L, Pattern, R, rule, Tensor
+from discopy.abc import Atom, Hom, Unit, Var
 from discopy.axioms import Serialisable
 from discopy.abc import DaggerCategory, Pregroup, RigidCategory
 
@@ -166,6 +167,10 @@ from discopy.utils import (
     BinaryBoxConstructor,
     factory_name,
 )
+
+if TYPE_CHECKING:
+    from hypothesis import strategies as st
+
 
 class Wire(monoidal.Wire):
     """
@@ -201,17 +206,19 @@ class Wire(monoidal.Wire):
         self.z = z
         super().__init__(name, dom, cod)
 
+    windings: ClassVar[range] = range(-1, 2)
+    """ The winding numbers a wire is sampled with. """
+
     @classmethod
-    def strategy(
-            cls, *, dom=monoidal.transparent, cod=monoidal.transparent,
-            min_winding=-1, max_winding=1):
-        """Generate rigid wires with a bounded winding number."""
+    def strategy(cls, pattern: Pattern[Self]) -> "st.SearchStrategy[Self]":
+        """ Generate the wires of :meth:`monoidal.Wire.strategy` with a
+        winding number among :attr:`windings`. """
         from hypothesis import strategies as st
 
         return st.tuples(
-            st.sampled_from(cat.Ob.alphabet),
-            st.integers(min_value=min_winding, max_value=max_winding)).map(
-                lambda args: cls(args[0], args[1], dom=dom, cod=cod))
+            super().strategy(pattern), st.sampled_from(cls.windings)).map(
+                lambda args: cls(
+                    args[0].name, args[1], dom=args[0].dom, cod=args[0].cod))
 
     def dagger(self) -> Wire:
         raise AxiomError("Rigid types have no dagger, use pivotal instead.")
@@ -680,24 +687,24 @@ class Diagram(biclosed.Diagram, RigidCategory):
     snake_equations = RigidCategory.snake_equations.modulo(normal_form)
 
     currying_left = RigidCategory.currying_left.modulo(
-        normal_form).weaken(boundary_connected=True)
+        normal_form).weaken("is_boundary_connected")
 
     currying_right = RigidCategory.currying_right.modulo(
-        normal_form).weaken(boundary_connected=True)
+        normal_form).weaken("is_boundary_connected")
 
     currying_eta_left = RigidCategory.currying_eta_left.modulo(
-        normal_form).weaken(boundary_connected=True)
+        normal_form).weaken("is_boundary_connected")
 
     currying_eta_right = RigidCategory.currying_eta_right.modulo(
-        normal_form).weaken(boundary_connected=True)
+        normal_form).weaken("is_boundary_connected")
 
     currying_naturality_left = RigidCategory\
-        .currying_naturality_left.modulo(normal_form).weaken(
-            boundary_connected=True)
+        .currying_naturality_left.modulo(normal_form)\
+        .weaken("is_boundary_connected")
 
     currying_naturality_right = RigidCategory\
-        .currying_naturality_right.modulo(normal_form).weaken(
-            boundary_connected=True)
+        .currying_naturality_right.modulo(normal_form)\
+        .weaken("is_boundary_connected")
 
     dagger_monoidality = RigidCategory.dagger_monoidality.inapplicable(
         "Rigid cups and caps have no dagger, use pivotal instead.")

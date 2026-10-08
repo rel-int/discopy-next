@@ -157,17 +157,21 @@ This satisfies the following equations:
 In the category of streams, this is just the identity.
 """
 
-from typing import ClassVar
+from typing import ClassVar, Self, TYPE_CHECKING
 
 from discopy import cat, monoidal, braided, markov, hypergraph, messages
 
-from discopy.pattern import D, Hom, Obj, rule
+from discopy.pattern import D, Pattern, rule
+from discopy.abc import Hom, Obj
 from discopy.axioms import no_strategy
 from discopy.abc import DelayedMonoid, FeedbackCategory
 from discopy.utils import (
     deprecated_alias,
     factory, Generator, factory_name, assert_isinstance, AxiomError,
     from_tree)
+
+if TYPE_CHECKING:
+    from hypothesis import strategies as st
 
 
 def str_delayed(time_step: int):
@@ -189,11 +193,11 @@ class Wire(braided.Wire):
         super().__init__(name)
 
     @classmethod
-    def strategy(cls, **params):
-        """Generate constant feedback wires at time zero, colours ignored."""
+    def strategy(cls, pattern: Pattern[Self]) -> "st.SearchStrategy[Self]":
+        """ Generate feedback wires at time zero, whatever the pattern. """
         from hypothesis import strategies as st
 
-        del params
+        del pattern
         return st.sampled_from(cat.Ob.alphabet).map(cls)
 
     def delay(self, n_steps=1):
@@ -312,12 +316,7 @@ class TailOb(Wire):
 @factory
 class Ty(monoidal.Ty, DelayedMonoid):
     """ A feedback type is a monoidal type with `delay`, `head` and `tail`. """
-    @classmethod
-    def strategy(cls, **params):
-        """A feedback wire carries no colours: transparent words."""
-        return super().strategy(**{
-            **params,
-            "dom": monoidal.transparent, "cod": monoidal.transparent})
+    coloured = False  # A feedback wire carries no colours.
 
     def delay(self, n_steps=1):
         """ The delay of a feedback type by `n_steps`. """

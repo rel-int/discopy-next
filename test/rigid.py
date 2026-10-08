@@ -194,10 +194,12 @@ def test_Wire_strategy():
     ones not at all. """
     from hypothesis import find
     from discopy import frobenius, pivotal
-    assert find(Wire.strategy(), lambda wire: wire.z == -1).z == -1
-    assert find(pivotal.Wire.strategy(), lambda wire: wire.z).z == 1
-    assert find(frobenius.Wire.strategy(), lambda wire: True).z == 0
-    assert len(find(frobenius.Ty.strategy(), lambda ty: len(ty) == 1)) == 1
+    from discopy.pattern import Hom, Obj
+    assert find(Wire.strategy(Obj()), lambda wire: wire.z == -1).z == -1
+    assert find(pivotal.Wire.strategy(Obj()), lambda wire: wire.z).z == 1
+    assert find(frobenius.Wire.strategy(Obj()), lambda wire: True).z == 0
+    assert len(find(frobenius.Ty.strategy(Hom()), bool)) <= 3
+    assert len(find(frobenius.Ty.strategy(Obj(size=1)), bool)) == 1
 
 
 def test_functor_factory():
