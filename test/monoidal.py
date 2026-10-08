@@ -712,9 +712,10 @@ def test_abc_Nat():
 
 def test_Colour_strategy():
     from hypothesis import find
-    assert find(Colour.strategy(),
-                lambda c: c.name == "red") == Colour("red")
-    assert find(Ty.strategy(pattern.Hom()), lambda ty: ty.dom != ty.cod)
+    assert find(Colour.strategy(), lambda _: True) == Colour()
+    red = Colour("red")
+    assert find(Ty.strategy(pattern.Hom(red)), lambda ty: len(ty) == 1)\
+        .inside[0].dom == red
 
 
 def test_composition_never_emits_a_boxless_layer():

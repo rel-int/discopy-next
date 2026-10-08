@@ -66,9 +66,9 @@ from typing import (
 
 from discopy import abc, cat, drawing, hypergraph, cmap, messages
 from discopy.abc import Var
-from discopy.pattern import Hom, Obj, Pattern
+from discopy.pattern import Pattern
 from discopy.axioms import (
-    axiom, Equation as AbstractEquation, no_strategy, Serialisable)
+    axiom, Equation as AbstractEquation, MAX_FUEL, no_strategy, Serialisable)
 from discopy.abc import (
     ColouredMonoid, Monoid, MonoidalCategory, NamedGeneric)
 from discopy.drawing import Drawing
@@ -110,16 +110,15 @@ class Colour(cat.Ob):
     label: "str | None" = field(default=None, compare=False)
 
     @classmethod
-    def strategy(cls, pattern: Pattern[Self] | None = None
-                 ) -> "st.SearchStrategy[Self]":
-        """ Generate a colour, transparent or one of four, whatever the
-        pattern. """
+    def strategy(cls, pattern: Pattern[Self] | None = None,
+                 fuel: int = MAX_FUEL) -> "st.SearchStrategy[Self]":
+        """ Generate the transparent colour, whatever the pattern and
+        fuel: the property matrix checks the free categories over one
+        colour. """
         from hypothesis import strategies as st
 
-        del pattern
-
-        return st.sampled_from(
-            (TRANSPARENT, "white", "red", "green", "blue")).map(cls)
+        del pattern, fuel
+        return st.just(cls())
 
     def __post_init__(self):
         assert_isinstance(self.name, str)
@@ -153,24 +152,19 @@ class Wire(cat.Ob):
     """A generating 1-cell with a colour on either side."""
 
     @classmethod
-    def strategy(cls, pattern: Pattern[Self] | None = None
-                 ) -> "st.SearchStrategy[Self]":
-        """ Generate named wires: transparent for an :class:`Obj`, a
-        wire between the colours of a :class:`Hom` otherwise, any colour
-        for a side left :obj:`None`. """
+    def strategy(cls, pattern: Pattern[Self] | None = None,
+                 fuel: int = MAX_FUEL) -> "st.SearchStrategy[Self]":
+        """ Generate named wires between the colours of a :class:`Hom`
+        pattern, transparent for a side left :obj:`None`, whatever the
+        fuel. """
         from hypothesis import strategies as st
 
-        def side(colour):
-            if not isinstance(pattern, Hom):
-                return st.just(transparent)
-            return Colour.strategy(Obj()) if colour is None\
-                else st.just(colour)
-
-        return st.builds(
-            lambda name, dom, cod: cls(name, dom=dom, cod=cod),
-            st.sampled_from(cat.Ob.alphabet),
-            side(getattr(pattern, "dom", None)),
-            side(getattr(pattern, "cod", None)))
+        del fuel
+        dom, cod = (
+            getattr(pattern, side, None) or transparent
+            for side in ("dom", "cod"))
+        return st.sampled_from(cat.Ob.alphabet).map(
+            lambda name: cls(name, dom=dom, cod=cod))
 
     def __init__(self, name: str, dom: Colour = transparent,
                  cod: Colour = transparent, is_dagger: bool = False):
@@ -347,45 +341,13 @@ class Ty(cat.Ob, cat.FreeCategory, ColouredMonoid):
 
     Wire: ClassVar[Generator] = Generator.subclass(Wire)
 
-    coloured: ClassVar[bool] = True
-    """ Whether the wires of a type sit between colours, which a
-    :class:`Hom` pattern asks for. """
+    strategy = vars(cat.FreeCategory)["strategy"]  # A term, not a name.
 
     @classmethod
-    def strategy(cls, pattern: Pattern[Self] | None = None
-                 ) -> "st.SearchStrategy[Self]":
-        """
-        Generate words of wires: transparent of the size of an
-        :class:`Obj` pattern, up to three wires for any size, and
-        between the colours of a :class:`Hom` pattern, a colour left
-        :obj:`None` drawn, which is how the laws of the category of
-        colours a type is quantify over coloured words, unless its wires
-        are not :attr:`coloured`.
-        """
-        from hypothesis import strategies as st
-
-        coloured = cls.coloured and isinstance(pattern, Hom)
-        size = getattr(pattern, "size", None)
-
-        @st.composite
-        def words(draw):
-            source, target = (
-                (colour if colour is not None
-                 else draw(cls.ob.strategy(Obj())))
-                if coloured else transparent
-                for colour in (getattr(pattern, "dom", None),
-                               getattr(pattern, "cod", None)))
-            length = draw(st.integers(
-                min_value=int(source != target), max_value=3)
-                if size is None else st.just(size))
-            if not length:
-                return cls(dom=source, cod=target)
-            colours = [source] + [transparent] * (length - 1) + [target]
-            return cls(*(
-                draw(cls.Wire.strategy(Hom(colours[i], colours[i + 1])))
-                for i in range(length)))
-
-        return words()
+    def generators(cls, goal: Pattern) -> "st.SearchStrategy[Self]":
+        """ Generate the types of one wire from ``goal.dom`` to
+        ``goal.cod``. """
+        return cls.Wire.strategy(goal).map(cls)
 
     def cast_wire(self, x: str | cat.Ob) -> cat.Ob:
         """
@@ -1807,19 +1769,6 @@ class Box(cat.Box, Diagram):
     drawing_name: str
     no_label: bool
     min_width: float
-
-    @classmethod
-    def strategy(cls, pattern: Pattern[Self] | None = None
-                 ) -> "st.SearchStrategy[Self]":
-        """
-        Generate fresh boxes, for the generator class of a level only: a
-        structural box such as a cup is generated by the rules of its
-        category, inside a diagram, so its own strategy is left to raise.
-        """
-        if cls is not cls.ar.Box:
-            raise NotImplementedError(
-                f"No search strategy implemented for {cls.__name__}")
-        return super().strategy(pattern)
 
     def __init__(self, name: str, dom: Ty, cod: Ty, **params):
         dom = dom if isinstance(dom, self.ob) else self.ob(dom)

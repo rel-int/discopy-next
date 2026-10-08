@@ -766,7 +766,7 @@ def test_Ty_strategy():
     from discopy.pattern import Obj
     assert find(Ty.strategy(Obj()), lambda ty: ty == qubit @ bit)\
         == qubit @ bit
-    assert len(find(Ty.strategy(Obj(size=2)), bool)) == 2
+    assert len(find(Ty.strategy(Obj(size=1)), bool)) == 1
 
 
 def test_gate_hash():

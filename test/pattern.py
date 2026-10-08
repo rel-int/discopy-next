@@ -53,10 +53,10 @@ def test_sorts():
     variable, or a pattern over them, bound elsewhere. """
     from discopy.axioms import Axiom
 
-    def bound[X: abc.Atom[Ty], N: Count, M: abc.Obj[Ty, N]](): ...
+    def bound[X: abc.Atom[Ty], N: Count, M: abc.Obj[Ty]](): ...
     sorts = [Pattern.read(variable).sort
              for variable in bound.__type_params__]
-    assert list(map(str, sorts)) == ["Atom[Ty]", "Count", "Obj[Ty, N]"]
+    assert list(map(str, sorts)) == ["Atom[Ty]", "Count", "Obj[Ty]"]
 
     def law[X: abc.Atom[Ty]](cls, x: abc.Var[Ty, X], y: abc.Atom[Ty]):
         return cls.Equation(cls.id(x), cls.id(y))
@@ -68,7 +68,7 @@ def test_sorts():
     assert match(Obj(size=1), x) == [{}]
     assert not match(Obj(size=1), x @ y)
     assert match(Obj(size=0), Ty()) and not match(Obj(size=0), x)
-    assert str(Obj(size="N")) == "Obj[_, N]"
+    assert str(Obj(size=0)) == "Unit"
 
 
 def test_match():

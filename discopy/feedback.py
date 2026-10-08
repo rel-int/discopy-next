@@ -163,7 +163,7 @@ from discopy import cat, monoidal, braided, markov, hypergraph, messages
 
 from discopy.pattern import D, Pattern, rule
 from discopy.abc import Hom, Obj
-from discopy.axioms import no_strategy
+from discopy.axioms import MAX_FUEL, no_strategy
 from discopy.abc import DelayedMonoid, FeedbackCategory
 from discopy.utils import (
     deprecated_alias,
@@ -193,12 +193,13 @@ class Wire(braided.Wire):
         super().__init__(name)
 
     @classmethod
-    def strategy(cls, pattern: Pattern[Self] | None = None
-                 ) -> "st.SearchStrategy[Self]":
-        """ Generate feedback wires at time zero, whatever the pattern. """
+    def strategy(cls, pattern: Pattern[Self] | None = None,
+                 fuel: int = MAX_FUEL) -> "st.SearchStrategy[Self]":
+        """ Generate feedback wires at time zero, whatever the pattern and
+        fuel: a feedback wire carries no colours. """
         from hypothesis import strategies as st
 
-        del pattern
+        del pattern, fuel
         return st.sampled_from(cat.Ob.alphabet).map(cls)
 
     def delay(self, n_steps=1):
@@ -317,8 +318,6 @@ class TailOb(Wire):
 @factory
 class Ty(monoidal.Ty, DelayedMonoid):
     """ A feedback type is a monoidal type with `delay`, `head` and `tail`. """
-    coloured = False  # A feedback wire carries no colours.
-
     def delay(self, n_steps=1):
         """ The delay of a feedback type by `n_steps`. """
         return type(self)(*(x.delay(n_steps) for x in self.inside))

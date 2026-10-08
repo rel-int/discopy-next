@@ -94,7 +94,6 @@ class Ty(pivotal.Ty):
     Parameters:
         inside (frobenius.Wire) : The objects inside the type.
     """
-    coloured = False  # A self-dual wire has no colours to swap.
 
     Wire: ClassVar[Generator] = Generator.subclass(Wire)
 

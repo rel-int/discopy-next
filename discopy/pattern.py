@@ -4,7 +4,7 @@ The patterns in which a category states its rules and axioms, which
 
 A pattern ``Pattern[T]`` stands for values of type ``T`` with variables
 to instantiate: ``Hom(dom, cod)`` for the morphisms between two
-patterns, ``Obj(size=n)`` for the objects of a size, ``Var(name)`` for
+patterns, ``Obj()`` for the objects, ``Var(name)`` for
 the value a variable is bound to, and ``Tensor(p, q)``, ``Over(z, y)``,
 ``Under(y, z)``, ``L(p)``, ``R(p)``, ``D(p)``, ``Repeat(x, n)`` and
 ``Image(f, p)`` for the objects these operations build. A ground
@@ -17,8 +17,8 @@ A sequent is the signature of a method on an abstract base class of
 :data:`discopy.abc.Hom` and :data:`discopy.abc.Var` that a typechecker
 reads as plain types: its :pep:`695` type parameter list is the context,
 each parameter one variable with its sort as the bound — ``A: Obj[C0]``
-an object, ``X: Atom[C0]`` a single wire, ``M: Obj[C0, N]`` an object
-of size ``N`` and ``N: Count`` a number — its parameters the premises
+an object, ``X: Atom[C0]`` a single wire and ``N: Count`` a number —
+its parameters the premises
 and its return annotation the conclusion, e.g.
 
 .. code-block:: python
@@ -125,18 +125,6 @@ class Substitution(dict[str, Any]):
         return Substitution(
             self, residuals=self.residuals + ((pattern, value), ))
 
-    def fit(self, size: int | str | None, value) -> Substitution | None:
-        """ The substitution with a value of a size, binding the size when
-        it is an unbound variable, :obj:`None` when the value does not
-        fit. """
-        if size is None:
-            return self
-        if isinstance(size, int):
-            return self if len(value) == size else None
-        if size in self:
-            return self if self[size] == len(value) else None
-        return self.bind(**{size: len(value)})
-
     def instantiate(self, pattern, ob: Any):
         """ The value a pattern stands for, ``ob`` the type of objects
         called to build the unit: anything but a pattern is a value, its
@@ -197,9 +185,9 @@ class Pattern[T](ABC):
 
         >>> from discopy.abc import Atom, Hom, Obj
         >>> from discopy.monoidal import Ty, Diagram
-        >>> def trace[N: Count, M: Obj[Ty, N]](): ...
-        >>> print(Pattern.read(trace.__type_params__[1].__bound__))
-        Obj[Ty, N]
+        >>> def spiders[N: Count, X: Atom[Ty]](): ...
+        >>> print(*map(Pattern.read, spiders.__type_params__))
+        N X
         >>> def cups[X: Atom[Ty]](f: Hom[Diagram, Tensor[X, R[X]], X]): ...
         >>> print(Pattern.read(cups.__annotations__['f']))
         Hom[Diagram, Tensor[X, R[X]], X]
@@ -224,8 +212,7 @@ class Pattern[T](ABC):
         if origin in (abc.Atom, abc.Unit):
             return Obj(args[0], 1 if origin is abc.Atom else 0)
         if origin is abc.Obj:
-            size = Pattern.read(args[1]) if len(args) > 1 else None
-            return Obj(args[0], size.name if isinstance(size, Var) else size)
+            return Obj(args[0], *map(Pattern.read, args[1:]))
         if isinstance(origin, type) and issubclass(origin, Pattern):
             return origin(*map(Pattern.read, args))
         return annotation
@@ -273,30 +260,24 @@ class Var[T](Pattern[T]):
 @dataclass(frozen=True)
 class Obj[T](Pattern[T]):
     """
-    The objects of a ``head``, a class or a type parameter, of a ``size``:
-    a number, the name of a :class:`Count` variable or :obj:`None` for
-    any. The head :obj:`None` stands for the objects of the category, and
-    the size ``0`` for its unit, the one object instantiating it.
+    The objects of a ``head``, a class or a type parameter, of a
+    ``size``: :obj:`None` for any, one for a single wire and zero for the
+    unit, the one object instantiating it. The head :obj:`None` stands for
+    the objects of the category.
 
     >>> from discopy.monoidal import Ty
     >>> assert Obj(size=0).instantiate(Substitution(), Ty) == Ty()
-    >>> assert Obj(size='N').instantiate(Substitution(N=2), Ty) == Obj(size=2)
+    >>> assert Obj(size=1).instantiate(Substitution(), Ty) == Obj(size=1)
     """
     head: Any = None
-    size: int | str | None = None
-
-    @property
-    def variables(self):
-        return (self.size, ) if isinstance(self.size, str) else ()
+    size: Literal[0, 1] | None = None
 
     def instantiate(self, subst, ob):
-        if self.size == 0:
-            return ob()
-        return replace(self, size=subst.get(self.size, self.size))
+        return ob() if self.size == 0 else self
 
     def unify(self, value, subst):
-        if (fit := subst.fit(self.size, value)) is not None:
-            yield fit
+        if self.size is None or len(value) == self.size:
+            yield subst
 
     def __str__(self):
         head = self.head and self.heading(self.head)
@@ -304,9 +285,7 @@ class Obj[T](Pattern[T]):
             return f"Obj[{head}]" if head else "Obj"
         if self.size == 1:
             return f"Atom[{head}]" if head else "Atom"
-        if self.size == 0:
-            return f"Unit[{head}]" if head else "Unit"
-        return f"Obj[{head or '_'}, {self.size}]"
+        return f"Unit[{head}]" if head else "Unit"
 
 
 @dataclass(frozen=True)
@@ -512,9 +491,10 @@ class Repeat[X: abc.ColouredMonoid, N: Count](Pattern):
         atoms = [value[i:i + 1] for i in range(len(value))]
         if any(atom != atoms[0] for atom in atoms[1:]):
             return
-        fit = subst.fit(self.times.name, value)
-        if fit is None:
+        label = self.times.name
+        if subst.get(label, len(value)) != len(value):
             return
+        fit = subst.bind(**{label: len(value)})
         if atoms:
             yield from fit.unify(self.base, atoms[0])
         else:
@@ -756,30 +736,22 @@ class Declaration[**P, T]:
     def context(self) -> Substitution:
         """
         The canonical values of the variables of the sequent: each number
-        is two and each object a wire named after its variable, or as many
-        wires as its size.
+        is two and each object a wire named after its variable.
 
         >>> from discopy.abc import MonoidalCategory
         >>> from discopy.monoidal import Diagram
         >>> print(*MonoidalCategory.mix.bind(Diagram).context().values())
         A B C D
         """
-        ob, sorts = self.bound.ob, self.variables
-        subst = Substitution({
-            label: 2 for label, sort in sorts.items()
-            if isinstance(sort, Count)})
-        for label, sort in sorts.items():
-            if label in subst:
-                continue
-            ground = subst.instantiate(sort, ob)
-            if not isinstance(ground, Obj):
-                subst[label] = ground
-            elif isinstance(sort.size, str):
-                subst[label] = reduce(operator.matmul, (
-                    self.named(self.resolve(ground), f"{label}{i}")
-                    for i in range(ground.size)), self.resolve(ground)())
-            else:
+        subst = Substitution()
+        for label, sort in self.variables.items():
+            ground = subst.instantiate(sort, self.bound.ob)
+            if isinstance(ground, Count):
+                subst[label] = 2
+            elif isinstance(ground, Obj):
                 subst[label] = self.named(self.resolve(ground), label)
+            else:
+                subst[label] = ground
         return subst
 
     def canonical(self) -> dict[str, Any]:

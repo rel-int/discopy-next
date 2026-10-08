@@ -51,6 +51,7 @@ from networkx import (
 from networkx.algorithms.isomorphism import is_isomorphic
 
 from discopy import cmap, messages, utils
+from discopy.axioms import MAX_FUEL
 from discopy.abc import (
     DaggerCategory, HypergraphCategory, MarkovCategory, MonoidalCategory,
     NamedGeneric, RigidCategory, SymmetricCategory, TracedCategory)
@@ -1456,8 +1457,8 @@ class Hypergraph[category: Diagram](MonoidalCategory, DaggerCategory,
             dom, cod, tuple(boxes), wires, spider_types, tuple(offsets))
 
     @classmethod
-    def strategy(cls, pattern: Pattern[Hypergraph] | None = None
-                 ) -> "st.SearchStrategy[Hypergraph]":
+    def strategy(cls, pattern: Pattern[Hypergraph] | None = None,
+                 fuel: int = MAX_FUEL) -> "st.SearchStrategy[Hypergraph]":
         """
         Generate hypergraphs as the image of :meth:`from_diagram` on the
         diagrams of the host category between the same sides, reusing
@@ -1469,7 +1470,7 @@ class Hypergraph[category: Diagram](MonoidalCategory, DaggerCategory,
             raise NotImplementedError
         return cls.category.strategy(Hom(
             getattr(pattern, "dom", None), getattr(pattern, "cod", None)
-        )).map(cls.from_diagram)
+        ), fuel).map(cls.from_diagram)
 
     @classmethod
     def from_diagram(cls, old: Diagram) -> Hypergraph:

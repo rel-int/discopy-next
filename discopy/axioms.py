@@ -49,7 +49,7 @@ from copy import deepcopy
 from dataclasses import KW_ONLY, dataclass, replace
 from functools import wraps
 from operator import attrgetter
-from typing import TYPE_CHECKING, ClassVar, Self
+from typing import TYPE_CHECKING, Self
 
 from discopy.pattern import (
     Count, Declaration, Hom, Obj, Pattern, Rule, Substitution)
@@ -163,6 +163,10 @@ class AxiomFailure(AxiomError):
         self.equation = equation
 
 
+MAX_FUEL = 3
+""" The number of rules a sampled term nests by default. """
+
+
 class Testable[T](metaclass=ABCMeta):
     """
     A testable class states axioms, which its subclasses inherit along
@@ -181,20 +185,17 @@ class Testable[T](metaclass=ABCMeta):
     leaving :meth:`strategy` to raise.
     """
 
-    max_depth: ClassVar[int] = 3
-    """ The number of rules a term :meth:`sample` builds may nest. """
-
     @classmethod
-    def strategy(cls, pattern: Pattern[T] | None = None
-                 ) -> "st.SearchStrategy[T]":
+    def strategy(cls, pattern: Pattern[T] | None = None,
+                 fuel: int = MAX_FUEL) -> "st.SearchStrategy[T]":
         """
         Build a `search strategy
         <https://hypothesis.readthedocs.io/en/latest/data.html>`_ for the
         instances of ``cls`` a ground pattern stands for, e.g.
-        ``Hom(x, y)`` the morphisms from ``x`` to ``y`` and ``Obj(size=2)``
-        the objects of size two, or any instance when the pattern is
-        :obj:`None`, the default. Implementing it is how a class enrols
-        itself in the property matrix.
+        ``Hom(x, y)`` the morphisms from ``x`` to ``y``, or any instance
+        when the pattern is :obj:`None`, the default, nesting at most
+        ``fuel`` rules. Implementing it is how a class enrols itself in
+        the property matrix.
 
         The default raises: a class states its laws as soon as it has
         them, and is checked against them once it says how to sample their
@@ -221,22 +222,20 @@ class Testable[T](metaclass=ABCMeta):
         return Axiom.inherited(cls)
 
     @classmethod
-    def sample(cls, goal: Pattern | Declaration | None = None
-               ) -> "st.SearchStrategy":
+    def sample(cls, goal: Pattern | Declaration | None = None,
+               fuel: int = MAX_FUEL) -> "st.SearchStrategy":
         """
-        Sample at random by applying the rules of the category: a term
-        the ``goal`` stands for, a ground :class:`discopy.pattern.Hom`,
-        any term for anything else, or the arguments of a declaration
-        bound to the category.
-
-        A term is a free :attr:`Box` or the conclusion of a rule chosen at
-        random among those whose conclusion matches the goal, its premises
-        sampled in turn: a morphism of the category as a term while fewer
-        than :attr:`max_depth` rules are nested, anything else by the
-        strategy of its class on the ground pattern of the premise. A
-        term built outside its goal is a rule lying about its
-        conclusion, an :class:`discopy.utils.AxiomError`, and an example
-        whose residual equations fail is rejected. The premises of an
+        Sample at random by applying the rules of the category: the
+        arguments of a declaration bound to it, or a term the ``goal``
+        stands for, any term for no goal and a term on the unit colour for
+        an object. A term is one of the :meth:`generators` or the
+        conclusion of a rule chosen at random among those whose
+        conclusion matches the goal, a rule with a hom premise only while
+        there is ``fuel`` left. Each premise is sampled by the strategy of
+        its class with the fuel left, a term built outside its goal is a
+        rule lying about its conclusion, an
+        :class:`discopy.utils.AxiomError`, an example whose residual
+        equations fail is rejected and the morphisms of an
         :class:`Axiom` keep to the subspace it was weakened to.
 
         >>> from hypothesis import find
@@ -248,10 +247,8 @@ class Testable[T](metaclass=ABCMeta):
         """
         from hypothesis import assume, strategies as st
 
-        rules = list(Rule.inherited(cls).values())
-
         @st.composite
-        def arguments(draw, declaration, subst, depth):
+        def arguments(draw, declaration, subst):
             ob = getattr(declaration.category or cls, "ob", None)
             subst = Substitution(subst, residuals=subst.residuals)
             subspace = declaration.subspace\
@@ -263,19 +260,13 @@ class Testable[T](metaclass=ABCMeta):
                     return draw(st.integers(0, Count.maximum), label=label)
                 if not isinstance(ground, (Obj, Hom)):
                     return ground
-                resolved = declaration.resolve(ground)
-                ground = replace(ground, head=None)
-                if isinstance(declaration, Rule) and resolved is cls\
-                        and isinstance(ground, Hom):
-                    return draw(term(ground, depth - 1), label=label)
-                strategy = resolved.strategy(ground)
+                strategy = declaration.resolve(ground).strategy(
+                    replace(ground, head=None), fuel - 1)
                 if subspace is not None and isinstance(ground, Hom):
                     strategy = strategy.filter(attrgetter(subspace))
                 return draw(strategy, label=label)
 
-            variables = sorted(declaration.variables.items(), key=lambda
-                               item: not isinstance(item[1], Count))
-            for label, sort in variables:
+            for label, sort in declaration.variables.items():
                 if label not in subst:
                     subst[label] = value(sort, label)
             for pattern, residual in subst.residuals:
@@ -283,30 +274,35 @@ class Testable[T](metaclass=ABCMeta):
             return {label: value(premise, label)
                     for label, premise in declaration.premises.items()}
 
+        if isinstance(goal, Declaration):
+            return arguments(goal, Substitution())
+        if isinstance(goal, Obj) and goal.size == 1:
+            return cls.generators(Hom(cls.ob(), cls.ob()))
+        if isinstance(goal, Obj):
+            goal = Hom(cls.ob(), cls.ob())
+        goal = goal if isinstance(goal, Hom) else Hom()
+        generators = cls.generators(goal)
+        options = [None] + [
+            (rule, found) for rule in Rule.inherited(cls).values()
+            if fuel > 0 or not rule.recursive
+            for found in [list(rule.match(goal))] if found]
+
         @st.composite
-        def term(draw, goal, depth):
-            options = [None] + [
-                (rule, found) for rule in rules
-                if depth > 0 or not rule.recursive
-                for found in [list(rule.match(goal))] if found]
+        def term(draw):
             choice = draw(st.sampled_from(options))
             if choice is None:
-                result = draw(cls.Box.strategy(goal))
-            else:
-                rule, found = choice
-                result = rule.apply(draw(arguments(
-                    rule, draw(st.sampled_from(found)), depth)))
+                return draw(generators)
+            rule, found = choice
+            result = rule.apply(draw(arguments(rule, draw(
+                st.sampled_from(found)))))
             if goal.dom not in (None, result.dom)\
                     or goal.cod not in (None, result.cod):
                 raise AxiomError(
-                    f"{choice[0] if choice else 'A free box'} concludes "
-                    f"{goal.dom} -> {goal.cod} but built "
-                    f"{result.dom} -> {result.cod}.")
+                    f"{rule} concludes {goal.dom} -> {goal.cod} "
+                    f"but built {result.dom} -> {result.cod}.")
             return result
 
-        if isinstance(goal, Declaration):
-            return arguments(goal, Substitution(), cls.max_depth)
-        return term(goal if isinstance(goal, Hom) else Hom(), cls.max_depth)
+        return term()
 
     @classmethod
     def enrolled(cls) -> tuple[type[Testable], ...]:

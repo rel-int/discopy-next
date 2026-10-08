@@ -67,13 +67,13 @@ Examples
     :align: center
 """
 
-from typing import ClassVar, Self, TYPE_CHECKING
+from typing import ClassVar, TYPE_CHECKING
 
 from collections.abc import Mapping
 
 from discopy import messages, tensor, frobenius
 from discopy.pattern import Pattern
-from discopy.axioms import no_strategy
+from discopy.axioms import MAX_FUEL
 from discopy.cat import factory, Generator
 from discopy.matrix import backend
 from discopy.tensor import Dim, Tensor
@@ -98,7 +98,14 @@ class Wire(frobenius.Wire):
     :class:`Qudit`, but feel free to open a pull-request if you discover a
     third kind of information unit.
     """
-    strategy = no_strategy
+    @classmethod
+    def strategy(cls, pattern: Pattern[Wire] | None = None,
+                 fuel: int = MAX_FUEL) -> "st.SearchStrategy[Wire]":
+        """ Generate a qubit or a bit, whatever the pattern and fuel. """
+        from hypothesis import strategies as st
+
+        del pattern, fuel
+        return st.sampled_from([Qudit(2), Digit(2)])
 
     def __init__(self, name: str, dim=2, z=0):
         assert_isinstance(dim, int)
@@ -180,21 +187,6 @@ class Ty(frobenius.Ty):
     >>> print(bit ** 2 @ qubit ** 3)
     bit @ bit @ qubit @ qubit @ qubit
     """
-    @classmethod
-    def strategy(cls, pattern: Pattern[Self] | None = None
-                 ) -> "st.SearchStrategy[Self]":
-        """
-        Generate words of qubits and bits of the size of the pattern, up
-        to three for any, a circuit having no colours for its wires to sit
-        between.
-        """
-        from hypothesis import strategies as st
-
-        size = getattr(pattern, "size", None)
-        return st.lists(
-            st.sampled_from([Qudit(2), Digit(2)]),
-            min_size=size or 0, max_size=3 if size is None else size
-        ).map(lambda wires: cls(*wires))
     Wire = Wire
 
 

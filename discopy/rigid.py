@@ -155,7 +155,7 @@ from typing import Any, ClassVar, Iterator, Self, TYPE_CHECKING
 from discopy import cat, monoidal, biclosed, messages
 from discopy.pattern import L, Pattern, R, rule, Tensor
 from discopy.abc import Atom, Hom, Unit, Var
-from discopy.axioms import Serialisable
+from discopy.axioms import MAX_FUEL, Serialisable
 from discopy.abc import DaggerCategory, Pregroup, RigidCategory
 
 from discopy.cat import factory, Generator
@@ -210,14 +210,15 @@ class Wire(monoidal.Wire):
     """ The winding numbers a wire is sampled with. """
 
     @classmethod
-    def strategy(cls, pattern: Pattern[Self] | None = None
-                 ) -> "st.SearchStrategy[Self]":
+    def strategy(cls, pattern: Pattern[Self] | None = None,
+                 fuel: int = MAX_FUEL) -> "st.SearchStrategy[Self]":
         """ Generate the wires of :meth:`monoidal.Wire.strategy` with a
         winding number among :attr:`windings`. """
         from hypothesis import strategies as st
 
         return st.tuples(
-            super().strategy(pattern), st.sampled_from(cls.windings)).map(
+            super().strategy(pattern, fuel), st.sampled_from(cls.windings)
+        ).map(
                 lambda args: cls(
                     args[0].name, args[1], dom=args[0].dom, cod=args[0].cod))
 

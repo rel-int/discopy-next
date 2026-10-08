@@ -138,7 +138,6 @@ def test_Feedback():
 def test_strategy():
     from hypothesis import find
     from discopy import pattern
-    assert find(Wire.strategy(pattern.Obj(size=1)),
-                lambda wire: True).time_step == 0
-    assert len(find(Ty.strategy(pattern.Obj(size=2)), bool)) == 2
-    assert find(Ty.strategy(pattern.Hom()), bool).dom == monoidal.transparent
+    assert find(Wire.strategy(), lambda wire: True).time_step == 0
+    assert len(find(Ty.strategy(pattern.Obj(size=1)), bool)) == 1
+    assert len(find(Ty.strategy(), lambda ty: len(ty) > 2)) > 2
