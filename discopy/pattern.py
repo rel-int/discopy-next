@@ -561,6 +561,7 @@ class Declaration[**P, T]:
                 "classmethod, not outside.")
         self.name = self.name or self.function.__name__
         self.__doc__ = self.function.__doc__
+        self.__module__ = self.function.__module__
 
     @property
     def variables(self) -> dict[str, Pattern]:
