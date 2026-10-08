@@ -632,8 +632,7 @@ class Declaration[**P, T]:
                 while isinstance(value, (classmethod, staticmethod)):
                     value = value.__func__
                 if type(value) is cls and value.name == label\
-                        and getattr(value, "__inapplicable__", None) is None\
-                        and getattr(value, "__admissible__", None) is None:
+                        and getattr(value, "dropped", None) is None:
                     result[label] = value.bind(category, owner=base)
                 else:
                     result.pop(label, None)
@@ -793,7 +792,13 @@ class Rule[**P, T](Declaration[P, T]):
     >>> from discopy.abc import Category
     >>> print(Category.cut)
     cut(self: Hom[C1, A, B], other: Hom[C1, B, C]) -> Hom[C1, A, C]
+
+    Parameters:
+        dropped : Why sampling never applies the rule, if it does not,
+            see :meth:`inapplicable` and :meth:`admissible`.
     """
+    _: KW_ONLY
+    dropped: str | None = None
 
     __hash__ = Declaration.__hash__
 
@@ -859,9 +864,7 @@ class Rule[**P, T](Declaration[P, T]):
         dagger.")``. A rule the category does have, whose terms other
         rules reach, is :meth:`admissible` instead.
         """
-        result = replace(self)
-        result.__inapplicable__ = reason
-        return result
+        return replace(self, dropped=reason)
 
     def admissible(self, reason: str) -> Self:
         """
@@ -873,9 +876,7 @@ class Rule[**P, T](Declaration[P, T]):
         rigid category, which caps and cuts reach.
         The method still runs and remains applicable.
         """
-        result = replace(self)
-        result.__admissible__ = reason
-        return result
+        return replace(self, dropped=reason)
 
 
 def rule[**P, T](function: Callable[P, T]) -> Rule[P, T]:

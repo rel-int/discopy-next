@@ -696,7 +696,6 @@ class Layer(cat.Box, ColouredMonoid):
             tensoring ``n`` layers takes linear rather than quadratic time.
     """
     ob = Ty
-    strategy = no_strategy
 
     def __setstate__(self, state):
         if 'boxes_or_types' not in state:

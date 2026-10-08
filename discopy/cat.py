@@ -642,7 +642,6 @@ class Sum(Box):
     The sum is non-commutative, i.e. :code:`Sum([f, g]) != Sum([g, f])`.
     """
     serialised_attrs = ('terms', 'dom', 'cod')
-    strategy = no_strategy
 
     def __init__(self, terms: Iterable[Arrow],
                  dom: Ob | None = None, cod: Ob | None = None):
@@ -735,7 +734,6 @@ class Bubble(Box):
         ValueError : When dom is None but all the args have the same dom.
     """
     serialised_attrs = ('args', 'dom', 'cod')
-    strategy = no_strategy
 
     def __init__(self, *args: Arrow, dom: Ob | None = None,
                  cod: Ob | None = None, name="", method="bubble", **kwargs):

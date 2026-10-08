@@ -732,7 +732,6 @@ class Box[dtype](frobenius.Box, Diagram[dtype]):
     >>> b1.eval()
     Tensor[float64]([0.84193562, 0.91343221], dom=Dim(1), cod=Dim(2))
     """
-    strategy = no_strategy
 
     def __setstate__(self, state):
         if "data" not in state and state.get("_array", None) is not None:

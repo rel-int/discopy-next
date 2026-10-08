@@ -138,7 +138,6 @@ class Diagram(biclosed.Diagram):
 Box, Eval, Coeval, Curry, Sum, Bubble = (
     Diagram.Box, Diagram.Eval, Diagram.Coeval,
     Diagram.Curry, Diagram.Sum, Diagram.Bubble)
-Box.strategy = no_strategy
 
 
 class Word(thue.Word, Box):

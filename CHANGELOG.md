@@ -599,27 +599,37 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 ### Changed
 
 - Every strategy has one signature, `Testable.strategy(cls, pattern:
-  Pattern[T] | None = None) -> SearchStrategy[T]`: it samples the
-  instances a ground pattern stands for, e.g. `Diagram.strategy(Hom(x,
-  y))` the diagrams from `x` to `y` and `Ty.strategy(Obj(size=2))` the
-  types of two wires, or any instance with no pattern, which is how
-  `Testable.enrolled` asks. A
-  pattern is a runtime instance of a frozen dataclass generic in what it
-  stands for — `Var`, `Obj`, `Count`, `Hom`, `Tensor`, `Over`, `Under`,
-  `L`, `R`, `D`, `Repeat` and `Image` — absorbing the sorts `Sort`,
-  `Objects`, `Terms` and `Counts`: a premise `Self` reads as `Hom(head=Self)`
-  and a variable as a `Var` of the sort its bound reads as. Sequents keep
-  the aliases a typechecker reads as plain types, `Obj`, `Atom`, `Unit`,
-  `Var` and `Hom`, which move to `discopy.abc` and read as patterns
-  through `Pattern.read`; `Rule.match` takes a goal `Hom`, and
+  Pattern[T] | None = None, fuel: int = MAX_FUEL) -> SearchStrategy[T]`:
+  it samples the instances a ground pattern stands for, e.g.
+  `Diagram.strategy(Hom(x, y))` the diagrams from `x` to `y`, or any
+  instance with no pattern, which is how `Testable.enrolled` asks,
+  nesting at most `fuel` rules, three by default. A pattern is a runtime
+  instance of a frozen dataclass generic in what it stands for — `Var`,
+  `Obj`, `Count`, `Hom`, `Tensor`, `Over`, `Under`, `L`, `R`, `D`,
+  `Repeat` and `Image` — absorbing the sorts `Sort`, `Objects`, `Terms`
+  and `Counts`: a premise `Self` reads as `Hom(head=Self)` and a variable
+  as a `Var` of the sort its bound reads as. Sequents keep the aliases a
+  typechecker reads as plain types, `Obj`, `Atom`, `Unit`, `Var` and
+  `Hom`, which move to `discopy.abc` and read as patterns through
+  `Pattern.read`; an object has no size but any, one or zero, so a size
+  variable `Obj[C0, N]` goes. `Rule.match` takes a goal `Hom`,
   `Declaration.context` gives the canonical values of the variables
-  `Declaration.canonical` builds on. The keywords the strategies took go:
-  the colours of a type are the sides of a `Hom` pattern, its length the
-  size of an `Obj`, a rigid wire winds within its class's `windings`, a
-  type whose wires carry no colours says so with `coloured = False`, a
-  category nests up to its `max_depth` rules, and
+  `Declaration.canonical` builds on, and a rule dropped from sampling
+  says why in its field `Rule.dropped`. `Testable.sample` samples each
+  premise by the strategy of its class with the fuel left, so the
+  recursion through the category being sampled is no special case. A
+  free category samples its terms by its rules, types included:
+  `FreeCategory.strategy` samples and `FreeCategory.generators` draws
+  the terms of length one, fresh boxes for an arrow and wires for a
+  type, an object of a monoidal category being a term on the unit
+  colour, so the strategies of `Ty`, `Box` and the circuit `Ty` go and a
+  box is only sampled inside its category. Colours are sampled
+  transparent and a rigid wire winds within its class's `windings`, and
   `Axiom.weaken` names the boolean attribute of its subspace,
-  `weaken("is_boundary_connected")`, where it took `boundary_connected=True`.
+  `weaken("is_boundary_connected")`, where it took
+  `boundary_connected=True`. Pregroup diagrams are sampled like every
+  other level: the sentences drawn from a vocabulary go with
+  `pattern.Constant` and `Rule.constant`.
 
 - A category owns the strategies it samples with: objects are drawn
   from `ob.strategy` and free boxes from `Box.strategy`. The sort of a variable or
