@@ -142,7 +142,7 @@ class Colour(cat.Ob):
 
     @classmethod
     def from_tree(cls, tree):
-        return cls(tree.get('name', TRANSPARENT), label=tree.get('label'))
+        return cls(tree.get('name', cls.name), label=tree.get('label'))
 
 
 transparent = Colour(TRANSPARENT)

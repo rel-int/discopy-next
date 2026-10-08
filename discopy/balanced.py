@@ -90,7 +90,7 @@ class Ribbon(Colour):
 
     @classmethod
     def from_tree(cls, tree):
-        return cls(tree['name'], label=tree.get('label'),
+        return cls(tree.get('name', cls.name), label=tree.get('label'),
                    width=tree['width'])
 
 

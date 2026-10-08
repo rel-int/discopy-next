@@ -1181,6 +1181,13 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Fixed
 
+- A colour reads back from its tree when its name is the default of its
+  class: `to_tree` drops such a name and `balanced.Ribbon.from_tree` read
+  it as `tree['name']`, so a default ribbon raised `KeyError`, and
+  `Colour.from_tree` fell back on the transparent colour whatever the
+  default of its class. The serialisation law found it as soon as colours
+  were sampled at the default of their class.
+
 - A balanced functor sends the dagger of a twist to the dagger of its
   image, where it dropped the dagger: `to_staircases`, the identity
   functor, turned a daggered twist into a twist, and the dual rails of
