@@ -157,7 +157,8 @@ class Ob(Serialisable):
     """
 
     @classmethod
-    def strategy(cls, pattern: Pattern[Self]) -> "st.SearchStrategy[Self]":
+    def strategy(cls, pattern: Pattern[Self] | None = None
+                 ) -> "st.SearchStrategy[Self]":
         """ Generate named objects, of size one whatever the pattern. """
         from hypothesis import strategies as st
 
@@ -308,7 +309,8 @@ class Arrow(FreeCategory, DaggerCategory, Serialisable):
     """
 
     @classmethod
-    def strategy(cls, pattern: Pattern[Self]) -> "st.SearchStrategy[Self]":
+    def strategy(cls, pattern: Pattern[Self] | None = None
+                 ) -> "st.SearchStrategy[Self]":
         """ Sample arrows by applying rules at random, see
         :meth:`discopy.axioms.Testable.sample`. """
         return cls.sample(pattern)
@@ -521,15 +523,18 @@ class Box(Arrow):
     serialised_attrs = ('name', 'dom', 'cod', 'is_dagger', 'data')
 
     @classmethod
-    def strategy(cls, pattern: Pattern[Self]) -> "st.SearchStrategy[Self]":
+    def strategy(cls, pattern: Pattern[Self] | None = None
+                 ) -> "st.SearchStrategy[Self]":
         """ Generate fresh free boxes between the sides of a ``Hom``
-        pattern, any object for a side left :obj:`None`. """
+        pattern, any object for a side left :obj:`None` and any box for no
+        pattern. """
         from hypothesis import strategies as st
         from discopy.pattern import Obj  # the pattern, not the sort
 
+        dom, cod = getattr(pattern, "dom", None), getattr(pattern, "cod", None)
         types = cls.ob.strategy(Obj())
-        doms = types if pattern.dom is None else st.just(pattern.dom)
-        cods = types if pattern.cod is None else st.just(pattern.cod)
+        doms = types if dom is None else st.just(dom)
+        cods = types if cod is None else st.just(cod)
         return st.tuples(st.uuids(), doms, cods).map(
             lambda args: cls(str(args[0]), args[1], args[2]))
 
@@ -946,7 +951,8 @@ class Functor[In0, In1, Out0, Out1](Category, Serialisable):
         return result
 
     @classmethod
-    def strategy(cls, pattern: Pattern[Self]) -> "st.SearchStrategy[Self]":
+    def strategy(cls, pattern: Pattern[Self] | None = None
+                 ) -> "st.SearchStrategy[Self]":
         """
         Generate an endofunctor relabelling every generator, whatever the
         pattern, for the functors whose domain has objects freely

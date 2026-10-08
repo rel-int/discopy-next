@@ -67,13 +67,12 @@ Examples
     :align: center
 """
 
-from dataclasses import replace
 from typing import ClassVar, Self, TYPE_CHECKING
 
 from collections.abc import Mapping
 
 from discopy import messages, tensor, frobenius
-from discopy.pattern import Pattern, Rule
+from discopy.pattern import Hom, Pattern, Rule
 from discopy.axioms import no_strategy
 from discopy.cat import factory, Generator
 from discopy.matrix import backend
@@ -183,7 +182,8 @@ class Ty(frobenius.Ty):
     bit @ bit @ qubit @ qubit @ qubit
     """
     @classmethod
-    def strategy(cls, pattern: Pattern[Self]) -> "st.SearchStrategy[Self]":
+    def strategy(cls, pattern: Pattern[Self] | None = None
+                 ) -> "st.SearchStrategy[Self]":
         """
         Generate words of qubits and bits of the size of the pattern, up
         to three for any, a circuit having no colours for its wires to sit
@@ -236,9 +236,11 @@ class Circuit(tensor.Diagram[complex]):
     max_depth = 6  # Every box of a circuit is a rule.
 
     @classmethod
-    def strategy(cls, pattern: Pattern[Self]) -> "st.SearchStrategy[Self]":
+    def strategy(cls, pattern: Pattern[Self] | None = None
+                 ) -> "st.SearchStrategy[Self]":
         """
-        Generate the boundary-connected circuits of a pattern by
+        Generate the boundary-connected circuits of a pattern, any by
+        default, by
         :meth:`discopy.axioms.Testable.sample` over :attr:`generators`,
         the codomain being the domain by default, a gate keeping its
         wires.
@@ -252,9 +254,8 @@ class Circuit(tensor.Diagram[complex]):
         >>> assert circuit.dom == circuit.cod == qubit ** 2
         >>> assert CX in circuit.boxes
         """
-        if pattern.cod is None:
-            pattern = replace(pattern, cod=pattern.dom)
-        return cls.sample(pattern).filter(
+        dom, cod = getattr(pattern, "dom", None), getattr(pattern, "cod", None)
+        return cls.sample(Hom(dom, dom if cod is None else cod)).filter(
             lambda circuit: circuit.is_boundary_connected)
 
     trace_left = tensor.Diagram.trace_left.admissible(

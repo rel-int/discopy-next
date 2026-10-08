@@ -686,7 +686,7 @@ def test_Layer_merge_to_identity():
 
 def test_Box_strategy():
     with raises(NotImplementedError):
-        Sum.strategy(pattern.Hom())
+        Sum.strategy()
     f = Box('f', Ty('x'), Ty('x'))
     assert f.size == (f + f).size == 1
 
@@ -712,7 +712,7 @@ def test_abc_Nat():
 
 def test_Colour_strategy():
     from hypothesis import find
-    assert find(Colour.strategy(pattern.Obj()),
+    assert find(Colour.strategy(),
                 lambda c: c.name == "red") == Colour("red")
     assert find(Ty.strategy(pattern.Hom()), lambda ty: ty.dom != ty.cod)
 

@@ -198,7 +198,7 @@ def test_Wire_strategy():
     assert find(Wire.strategy(Obj()), lambda wire: wire.z == -1).z == -1
     assert find(pivotal.Wire.strategy(Obj()), lambda wire: wire.z).z == 1
     assert find(frobenius.Wire.strategy(Obj()), lambda wire: True).z == 0
-    assert len(find(frobenius.Ty.strategy(Hom()), bool)) <= 3
+    assert len(find(frobenius.Ty.strategy(), bool)) <= 3
     assert len(find(frobenius.Ty.strategy(Obj(size=1)), bool)) == 1
 
 

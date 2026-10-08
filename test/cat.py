@@ -4,7 +4,6 @@ import pytest
 from pytest import raises
 
 from discopy.cat import *
-from discopy import pattern
 from discopy.utils import AxiomError
 
 
@@ -297,7 +296,7 @@ def test_Equivalence():
     assert (decode.dom, decode.cod) == (encode.cod, encode.dom)
     assert hash(encode) != hash(decode) and encode != decode
     with raises(NotImplementedError):
-        monoidal.Diagram.hypergraph_equivalence().strategy(pattern.Hom())
+        monoidal.Diagram.hypergraph_equivalence().strategy()
     assert repr(encode)\
         == "cat.Equivalence(Diagram.to_hypergraph, Hypergraph.to_diagram)"
 
@@ -307,11 +306,9 @@ def test_Functor_strategy():
     from hypothesis import find
     from discopy import monoidal, tensor
     from discopy.quantum import circuit
-    from discopy.pattern import Hom
 
     x, a = monoidal.Ty('x'), monoidal.Ty('a')
-    F = find(monoidal.Functor.strategy(Hom()),
-             lambda F: F(monoidal.Ty('b')) == a)
+    F = find(monoidal.Functor.strategy(), lambda F: F(monoidal.Ty('b')) == a)
     assert F(x) == x and len(F.ob_map) == len(list(F.ob_map)) == 5
     assert F(monoidal.Box('f', monoidal.Ty('b'), x))\
         == monoidal.Box('f', a, x)
@@ -319,6 +316,6 @@ def test_Functor_strategy():
     assert find(monoidal.Functor.associativity.strategy(),
                 lambda _: True)  # They compose.
     with raises(NotImplementedError):  # Not an endofunctor.
-        tensor.Functor.strategy(Hom())
+        tensor.Functor.strategy()
     with raises(NotImplementedError):  # Information units have no names.
-        circuit.Functor.strategy(Hom())
+        circuit.Functor.strategy()

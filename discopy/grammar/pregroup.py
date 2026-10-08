@@ -128,7 +128,8 @@ class Diagram(frobenius.Diagram):
                 **{word.name: Rule.constant(word) for word in VOCABULARY}}
 
     @classmethod
-    def strategy(cls, pattern: Pattern[Self]) -> "st.SearchStrategy[Self]":
+    def strategy(cls, pattern: Pattern[Self] | None = None
+                 ) -> "st.SearchStrategy[Self]":
         """
         Generate sentences, from the empty type to the sentence type by
         default: a sequence of up to four words drawn from the constants
@@ -137,9 +138,8 @@ class Diagram(frobenius.Diagram):
         it.
 
         >>> from hypothesis import find
-        >>> from discopy.pattern import Hom
         >>> sentence = find(
-        ...     Diagram.strategy(Hom()),
+        ...     Diagram.strategy(),
         ...     lambda d: [box.name for box in d.foliation().boxes[:3]]
         ...     == ['Alice', 'loves', 'Bob'])
         >>> print(sentence.foliation())
@@ -150,8 +150,10 @@ class Diagram(frobenius.Diagram):
 
         words = [rule.apply({}) for rule in cls.generators.values()
                  if isinstance(rule, Constant)]
-        dom = Ty() if pattern.dom is None else pattern.dom
-        cod = Ty('s') if pattern.cod is None else pattern.cod
+        dom = getattr(pattern, "dom", None)
+        dom = Ty() if dom is None else dom
+        cod = getattr(pattern, "cod", None)
+        cod = Ty('s') if cod is None else cod
 
         @st.composite
         def sentences(draw):

@@ -608,10 +608,11 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 ### Changed
 
 - Every strategy has one signature, `Testable.strategy(cls, pattern:
-  Pattern[T]) -> SearchStrategy[T]`: it samples the instances a ground
-  pattern stands for, e.g. `Diagram.strategy(Hom(x, y))` the diagrams
-  from `x` to `y`, `Ty.strategy(Obj(size=2))` the types of two wires and
-  `strategy(Hom())` any term, which is how `Testable.enrolled` asks. A
+  Pattern[T] | None = None) -> SearchStrategy[T]`: it samples the
+  instances a ground pattern stands for, e.g. `Diagram.strategy(Hom(x,
+  y))` the diagrams from `x` to `y` and `Ty.strategy(Obj(size=2))` the
+  types of two wires, or any instance with no pattern, which is how
+  `Testable.enrolled` asks. A
   pattern is a runtime instance of a frozen dataclass generic in what it
   stands for — `Var`, `Obj`, `Count`, `Hom`, `Tensor`, `Over`, `Under`,
   `L`, `R`, `D`, `Repeat` and `Image` — absorbing the sorts `Sort`,

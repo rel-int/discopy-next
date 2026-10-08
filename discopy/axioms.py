@@ -185,15 +185,16 @@ class Testable[T](metaclass=ABCMeta):
     """ The number of rules a term :meth:`sample` builds may nest. """
 
     @classmethod
-    def strategy(cls, pattern: Pattern[T]) -> "st.SearchStrategy[T]":
+    def strategy(cls, pattern: Pattern[T] | None = None
+                 ) -> "st.SearchStrategy[T]":
         """
         Build a `search strategy
         <https://hypothesis.readthedocs.io/en/latest/data.html>`_ for the
         instances of ``cls`` a ground pattern stands for, e.g.
-        ``Hom(x, y)`` the morphisms from ``x`` to ``y``, ``Obj(size=2)``
-        the objects of size two and ``Hom()`` any term, which is the
-        pattern a premise ``Self`` reads as. Implementing it is how a
-        class enrols itself in the property matrix.
+        ``Hom(x, y)`` the morphisms from ``x`` to ``y`` and ``Obj(size=2)``
+        the objects of size two, or any instance when the pattern is
+        :obj:`None`, the default. Implementing it is how a class enrols
+        itself in the property matrix.
 
         The default raises: a class states its laws as soon as it has
         them, and is checked against them once it says how to sample their
@@ -202,7 +203,7 @@ class Testable[T](metaclass=ABCMeta):
         uninstantiable rather than merely unchecked.
 
         >>> from discopy.monoidal import Layer
-        >>> Layer.strategy(Hom())
+        >>> Layer.strategy()
         Traceback (most recent call last):
          ...
         NotImplementedError: No search strategy implemented for Layer
@@ -220,11 +221,12 @@ class Testable[T](metaclass=ABCMeta):
         return Axiom.inherited(cls)
 
     @classmethod
-    def sample(cls, goal: Pattern | Declaration) -> "st.SearchStrategy":
+    def sample(cls, goal: Pattern | Declaration | None = None
+               ) -> "st.SearchStrategy":
         """
         Sample at random by applying the rules of the category: a term
-        the ``goal`` stands for, a ground :class:`discopy.pattern.Hom` or
-        any other pattern for any term, or the arguments of a declaration
+        the ``goal`` stands for, a ground :class:`discopy.pattern.Hom`,
+        any term for anything else, or the arguments of a declaration
         bound to the category.
 
         A term is a free :attr:`Box` or the conclusion of a rule chosen at
@@ -329,7 +331,7 @@ class Testable[T](metaclass=ABCMeta):
         """
         def generates(testable):
             try:
-                testable.strategy(Hom())
+                testable.strategy()
             except NotImplementedError:
                 return False
             return not any(

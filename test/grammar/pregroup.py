@@ -78,11 +78,11 @@ def test_random_sentences():
     """ The strategy of a pregroup diagram draws grammatical sentences. """
     from hypothesis import find
 
-    from discopy.pattern import Hom, Rule
+    from discopy.pattern import Rule
 
     n, s = Ty('n'), Ty('s')
     sentence = find(
-        Diagram.strategy(Hom()),
+        Diagram.strategy(),
         lambda diagram: diagram.foliation().boxes[0].name == 'Bob')
     assert Diagram.Equation(sentence, (
         Word('Bob', n) @ Word('loves', n.r @ s @ n.l) @ Word('Alice', n)
@@ -96,7 +96,7 @@ def test_random_sentences():
                 word.name: Rule.constant(word)
                 for word in (Word('Alice', n), Word('sleeps', n.r @ s))}}
 
-    assert find(Sentence.strategy(Hom()), bool).foliation() == (
+    assert find(Sentence.strategy(), bool).foliation() == (
         Word('Alice', n) @ Word('sleeps', n.r @ s) >> Cup(n, n.r) @ s
     ).foliation()
 

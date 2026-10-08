@@ -193,7 +193,8 @@ class Wire(braided.Wire):
         super().__init__(name)
 
     @classmethod
-    def strategy(cls, pattern: Pattern[Self]) -> "st.SearchStrategy[Self]":
+    def strategy(cls, pattern: Pattern[Self] | None = None
+                 ) -> "st.SearchStrategy[Self]":
         """ Generate feedback wires at time zero, whatever the pattern. """
         from hypothesis import strategies as st
 

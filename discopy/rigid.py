@@ -210,7 +210,8 @@ class Wire(monoidal.Wire):
     """ The winding numbers a wire is sampled with. """
 
     @classmethod
-    def strategy(cls, pattern: Pattern[Self]) -> "st.SearchStrategy[Self]":
+    def strategy(cls, pattern: Pattern[Self] | None = None
+                 ) -> "st.SearchStrategy[Self]":
         """ Generate the wires of :meth:`monoidal.Wire.strategy` with a
         winding number among :attr:`windings`. """
         from hypothesis import strategies as st

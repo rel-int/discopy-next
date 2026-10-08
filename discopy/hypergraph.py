@@ -1456,7 +1456,7 @@ class Hypergraph[category: Diagram](MonoidalCategory, DaggerCategory,
             dom, cod, tuple(boxes), wires, spider_types, tuple(offsets))
 
     @classmethod
-    def strategy(cls, pattern: Pattern[Hypergraph]
+    def strategy(cls, pattern: Pattern[Hypergraph] | None = None
                  ) -> "st.SearchStrategy[Hypergraph]":
         """
         Generate hypergraphs as the image of :meth:`from_diagram` on the
