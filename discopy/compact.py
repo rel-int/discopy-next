@@ -160,6 +160,7 @@ CMap = cmap.CMap[Diagram]
 
 Id = Diagram.id
 
+Diagram.box_factory = Box
 Diagram.swap_factory = Swap
 Diagram.functor_factory = Functor
 Diagram.permutation_factory = Permutation

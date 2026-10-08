@@ -57,6 +57,7 @@ from discopy.abc import (
     SymmetricCategory,
     TracedCategory,
 )
+from discopy.axioms import Testable
 from discopy.cat import Ob
 from discopy.python.finset import Permutation
 from discopy.utils import (
@@ -126,7 +127,7 @@ class Port:
 
 
 class CMap[C0: Pregroup, C1: CMap](
-    CompactCategory[C0, C1], NamedGeneric['category']
+    CompactCategory[C0, C1], NamedGeneric['category'], Testable
 ):
     r"""
     An open combinatorial map, i.e. a diagram represented as a bijection
@@ -781,6 +782,59 @@ class CMap[C0: Pregroup, C1: CMap](
         edge = Permutation.from_transpositions(
             ((i, i + len(dom)) for i in range(len(dom))), n_ports)
         return cls(dom, dom, (), edge, check=False)
+
+    @classmethod
+    def strategy(  # pylint: disable=too-many-arguments  # keyword-only bounds
+            cls, *, types=None, dom=None, cod=None, min_leaves=None,
+            max_leaves=4, monogamous=None, max_loops=None):
+        """
+        Generate maps of :attr:`category` by drawing their edge involution.
+
+        When the category is symmetric, the involution pairs ports of
+        different kinds with equal types, and ports of the same kind with
+        adjoint types unless ``monogamous``: this is the ``"bijective"`` and
+        ``"monogamous"`` wiring of :meth:`Hypergraph.strategy`, which the map
+        reads off with :meth:`Hypergraph.to_map`. Otherwise a map is not
+        determined by its edges, since a planar diagram has an orientation
+        that a map does not record, and the maps are those of the diagrams
+        that ``category.strategy`` generates.
+
+        Parameters:
+            types : A strategy for the types of boxes and boundaries.
+            dom : The domain, drawn from ``types`` if ``None``.
+            cod : The codomain, drawn from ``types`` if ``None``.
+            min_leaves : The minimum number of boxes.
+            max_leaves : The maximum number of boxes, not counting the
+                balancing box of :meth:`Hypergraph.strategy`.
+            monogamous : Whether every wire goes from a box output or an
+                input to a box input or an output, i.e. there are no cups and
+                caps, by default whether the category is not rigid.
+            max_loops : The maximum number of scalar loops, see
+                ``max_scalars`` in :meth:`Hypergraph.strategy`.
+
+        Example
+        -------
+        >>> from hypothesis import find
+        >>> from discopy.compact import Ty, Diagram
+        >>> x = Ty('x')
+        >>> cmap = find(
+        ...     CMap[Diagram].strategy(dom=x, cod=x),
+        ...     lambda m: not m.is_monogamous)
+        >>> assert (cmap.dom, cmap.cod) == (x, x)
+        """
+        if cls.category is None:
+            raise TypeError(f"Expected {factory_name(cls)}[category].")
+        if not issubclass(cls.category, SymmetricCategory):
+            return cls.category.strategy(
+                types=types, dom=dom, cod=cod, min_leaves=min_leaves,
+                max_leaves=max_leaves).map(cls.from_diagram)
+        if monogamous is None:
+            monogamous = not issubclass(cls.category, RigidCategory)
+        graphs = hypergraph.Hypergraph[cls.category].strategy(
+            types=types, dom=dom, cod=cod, min_leaves=min_leaves,
+            max_leaves=max_leaves, max_scalars=max_loops,
+            spiders="monogamous" if monogamous else "bijective")
+        return graphs.map(lambda graph: graph.to_map())
 
     @classmethod
     def from_box(cls, box: Box) -> CMap:

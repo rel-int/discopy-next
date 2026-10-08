@@ -291,6 +291,23 @@ class Ty(cat.Ob, cat.FreeCategory, ColouredMonoid):
     ob = Colour
     generator_factory = Wire
 
+    @classmethod
+    def strategy(cls, *, atoms=None, min_length=0, max_length=3):
+        """
+        Generate types as lists of generating objects.
+
+        Parameters:
+            atoms : A strategy for the generating objects, by default that of
+                :attr:`generator_factory`.
+            min_length : The minimum number of objects in a type.
+            max_length : The maximum number of objects in a type.
+        """
+        from hypothesis import strategies as st
+
+        atoms = cls.generator_factory.strategy() if atoms is None else atoms
+        return st.lists(atoms, min_size=min_length, max_size=max_length).map(
+            lambda inside: cls(*inside))
+
     def cast_wire(self, x: str | cat.Ob) -> cat.Ob:
         """
         Turn a constructor argument into a ``self.generator_factory``.
@@ -1396,6 +1413,135 @@ class Diagram(cat.Arrow, MonoidalCategory, RichDisplay):
         return diagram
 
     @classmethod
+    def strategy(  # pylint: disable=too-many-arguments  # keyword-only bounds
+            cls, *, types=None, dom=None, cod=None, min_leaves=None,
+            max_leaves=4, normal_form=True):
+        """
+        Generate planar diagrams by a sequence of moves on the open wires,
+        then put them in :meth:`normal_form` when it exists.
+
+        Each move rewrites the list of open wires: a box on a contiguous
+        segment, plus a braid of two adjacent wires in a braided category, a
+        twist in a balanced one, a cup on two adjacent adjoint wires or a cap
+        inserted anywhere in a rigid one. In a traced category, the diagram
+        is the trace of one generated from ``dom @ fed_back`` to
+        ``cod @ fed_back``. No move ever crosses wires, so the diagram is
+        planar whatever the category. A given ``cod`` is reached by one more
+        box on the segment between the longest common prefix and suffix of
+        the open wires and ``cod``, so boundaries are always honoured with no
+        filtering. Each choice shrinks to the simplest move: a box.
+
+        Planar diagrams have no quotient structure that forgets their
+        orientation, so their equality is that of :meth:`normal_form`, which
+        is the representative this returns; it raises on diagrams that are not
+        boundary-connected, which are returned as generated.
+
+        Parameters:
+            types : A strategy for the types of boxes and boundaries.
+            dom : The domain, drawn from ``types`` if ``None``.
+            cod : The codomain, drawn from ``types`` if ``None``.
+            min_leaves : The minimum number of moves.
+            max_leaves : The maximum number of moves, not counting the box
+                that reaches ``cod``.
+            normal_form : Whether to return the :meth:`normal_form`.
+
+        Example
+        -------
+        >>> from hypothesis import find
+        >>> x = Ty('x')
+        >>> diagram = find(Diagram.strategy(dom=x, cod=x @ x),
+        ...                lambda d: len(d.boxes) > 2)
+        >>> assert (diagram.dom, diagram.cod) == (x, x @ x)
+        """
+        from hypothesis import strategies as st
+
+        types = cls.ob.strategy() if types is None else types
+        min_leaves = min_leaves or 0
+        moves = ("box", ) + (
+            ("braid", ) if issubclass(cls, abc.BraidedCategory) else ()) + (
+            ("twist", ) if issubclass(cls, abc.BalancedCategory) else ()) + (
+            ("cup", "cap") if issubclass(cls, abc.RigidCategory) else ())
+        is_traced = issubclass(cls, abc.TracedCategory)
+
+        @st.composite
+        def diagrams(draw):
+            def box(dom, cod):
+                return draw(cls.box_factory.strategy(dom=dom, cod=cod))
+
+            def move(scan):
+                # The structure of a move is only looked up once it is drawn,
+                # i.e. when the category has it, hence ``getattr``.
+                kind = draw(st.sampled_from(moves))
+                adjoints = [
+                    i for i in range(len(scan) - 1)
+                    if kind == "cup" and scan[i + 1:i + 2] == scan[i:i + 1].r]
+                if kind == "braid" and len(scan) > 1:
+                    i = draw(st.integers(0, len(scan) - 2))
+                    left, right = scan[i:i + 1], scan[i + 1:i + 2]
+                    braid = getattr(cls, "braid")
+                    braid = braid(right, left).dagger()\
+                        if draw(st.booleans()) else braid(left, right)
+                    return scan[:i] @ braid @ scan[i + 2:]
+                if kind == "twist" and scan:
+                    i = draw(st.integers(0, len(scan) - 1))
+                    twist = getattr(cls, "twist")(scan[i:i + 1])
+                    twist = twist.dagger() if draw(st.booleans()) else twist
+                    return scan[:i] @ twist @ scan[i + 1:]
+                if kind == "cup" and adjoints:
+                    i = adjoints[draw(st.integers(0, len(adjoints) - 1))]
+                    return scan[:i] @ getattr(cls, "cups")(
+                        scan[i:i + 1], scan[i + 1:i + 2]) @ scan[i + 2:]
+                if kind == "cap":
+                    typ = draw(types.filter(len))
+                    obj = typ[draw(st.integers(0, len(typ) - 1))]
+                    i = draw(st.integers(0, len(scan)))
+                    return scan[:i] @ getattr(cls, "caps")(
+                        obj, obj.l) @ scan[i:]
+                offset = draw(st.integers(0, len(scan)))
+                arity = draw(st.integers(0, len(scan) - offset))
+                return scan[:offset] @ box(
+                    scan[offset:offset + arity], draw(types)
+                ) @ scan[offset + arity:]
+
+            def reach(scan, target):
+                common = min(len(scan), len(target))
+                prefix = next((i for i in range(common)
+                               if scan[i] != target[i]), common)
+                prefix -= draw(st.integers(0, prefix))
+                common -= prefix
+                suffix = next((i for i in range(common)
+                               if scan[-1 - i] != target[-1 - i]), common)
+                suffix -= draw(st.integers(0, suffix))
+                middle = (slice(prefix, len(scan) - suffix),
+                          slice(prefix, len(target) - suffix))
+                if scan == target and not scan[middle[0]]:
+                    return cls.id(scan)
+                return scan[:prefix] @ box(
+                    scan[middle[0]], target[middle[1]]
+                ) @ scan[len(scan) - suffix:]
+
+            domain = draw(types) if dom is None else dom
+            fed_back = draw(types) if is_traced and draw(st.booleans())\
+                else domain[:0]
+            codomain = draw(types) if cod is None and fed_back else cod
+            diagram = cls.id(domain @ fed_back)
+            for _ in range(draw(st.integers(
+                    min_leaves, max(min_leaves, max_leaves)))):
+                diagram >>= move(diagram.cod)
+            if codomain is not None:
+                diagram >>= reach(diagram.cod, codomain @ fed_back)
+            if fed_back:
+                diagram = diagram.trace(len(fed_back))
+            if normal_form:
+                try:
+                    diagram = diagram.normal_form()
+                except NotImplementedError:
+                    pass
+            return diagram
+
+        return diagrams()
+
+    @classmethod
     def from_tree(cls, tree):
         if "inside" not in tree:
             warn("Outdated dumps", DeprecationWarning)
@@ -1797,6 +1943,7 @@ class Equation(cat.Equation, RichDisplay):
 Diagram.draw = drawing.draw
 Diagram.to_gif = drawing.to_gif
 
+Diagram.box_factory = Box
 Diagram.sum_factory = Sum
 Diagram.bubble_factory = Bubble
 Diagram.functor_factory = Functor

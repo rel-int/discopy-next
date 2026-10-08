@@ -70,6 +70,7 @@ class Wire(rigid.Wire):
     """
     l = r = property(lambda self: type(self)(
         self.name, (self.z + 1) % 2, dom=self.cod, cod=self.dom))
+    windings = (0, 1)
 
     def dagger(self) -> Wire:
         """
@@ -252,6 +253,7 @@ class Functor(rigid.Functor):
     dom = cod = Diagram
 
 
+Diagram.box_factory = Box
 Diagram.functor_factory = Functor
 Diagram.cup_factory, Diagram.cap_factory = Cup, Cap
 CMap = cmap.CMap[Diagram]

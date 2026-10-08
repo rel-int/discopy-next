@@ -115,6 +115,22 @@ class Diagram(symmetric.Diagram, MarkovCategory):
     .. image:: /_static/markov/copy_and_apply.svg
     """
     @classmethod
+    def strategy(cls, **params):
+        """
+        Generate Markov diagrams through their quotient: a hypergraph drawn
+        by :meth:`discopy.hypergraph.Hypergraph.strategy` with the spiders
+        that the category supports, see
+        :meth:`discopy.hypergraph.Hypergraph.default_spiders`, i.e. copies
+        and discards here and every spider in a hypergraph category,
+        downgraded with :meth:`discopy.hypergraph.Hypergraph.to_diagram`.
+
+        Parameters are those of
+        :meth:`discopy.hypergraph.Hypergraph.strategy`.
+        """
+        return hypergraph.Hypergraph[cls].strategy(**params).map(
+            lambda graph: graph.to_diagram())
+
+    @classmethod
     def spider_factory(cls, n_legs_in, n_legs_out, typ, phase=None):
         if phase is not None or 1 not in (n_legs_in, n_legs_out):
             raise ValueError
@@ -315,6 +331,7 @@ class Functor(symmetric.Functor):
 
 CMap = cmap.CMap[Diagram]
 
+Diagram.box_factory = Box
 Diagram.functor_factory = Functor
 Hypergraph = hypergraph.Hypergraph[Diagram]
 Diagram.copy_factory, Diagram.merge_factory = Copy, Merge

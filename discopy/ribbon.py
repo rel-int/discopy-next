@@ -358,6 +358,7 @@ class DualRail(balanced.DualRail, Functor):
         return super().__call__(other)
 
 
+Diagram.box_factory = Box
 Diagram.braid_factory = Braid
 Diagram.cup_factory, Diagram.cap_factory = Cup, Cap
 Diagram.twist_factory = Twist

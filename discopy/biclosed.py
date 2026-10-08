@@ -486,6 +486,7 @@ class Sum(monoidal.Sum, Box):
 
 
 Id = Diagram.id
+Diagram.box_factory = Box
 Diagram.curry_factory = Curry
 Diagram.eval_factory = Eval
 Diagram.coeval_factory = Coeval

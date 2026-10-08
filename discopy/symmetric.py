@@ -269,6 +269,26 @@ class Diagram(balanced.Diagram, SymmetricCategory):
     layer_factory = Layer
     twist_factory = classmethod(lambda cls, dom: cls.id(dom))
 
+    @classmethod
+    def strategy(cls, **params):
+        """
+        Generate symmetric diagrams through their quotient: a combinatorial
+        map drawn by :meth:`discopy.cmap.CMap.strategy`, monogamous unless
+        the category has cups and caps, downgraded with
+        :meth:`discopy.cmap.CMap.to_diagram`, which makes its cycles
+        explicit as traces and its crossings as swaps.
+
+        Parameters are those of :meth:`discopy.cmap.CMap.strategy`.
+
+        >>> from hypothesis import find
+        >>> x = Ty('x')
+        >>> diagram = find(Diagram.strategy(dom=x, cod=x),
+        ...                lambda d: len(d.boxes) > 1)
+        >>> assert (diagram.dom, diagram.cod) == (x, x)
+        """
+        return cmap.CMap[cls].strategy(**params).map(
+            lambda graph: graph.to_diagram())
+
     @property
     def is_plumbing(self) -> bool:
         """ Whether one of the layers plumbs its wires non-trivially. """
@@ -665,6 +685,7 @@ class Functor(balanced.Functor):
 
 CMap = cmap.CMap[Diagram]
 
+Diagram.box_factory = Box
 Diagram.functor_factory = Functor
 Hypergraph = hypergraph.Hypergraph[Diagram]
 Diagram.swap_factory = Swap

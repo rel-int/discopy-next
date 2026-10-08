@@ -362,6 +362,7 @@ class DualRail(Functor):
         return super().__call__(other)
 
 
+Diagram.box_factory = Box
 Diagram.functor_factory = Functor
 CMap = cmap.CMap[Diagram]
 Hypergraph = hypergraph.Hypergraph[Diagram]

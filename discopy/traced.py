@@ -262,6 +262,7 @@ class Functor(monoidal.Functor):
 
 CMap = cmap.CMap[Diagram]
 
+Diagram.box_factory = Box
 Diagram.functor_factory = Functor
 Diagram.trace_factory = Trace
 Hypergraph = hypergraph.Hypergraph[Diagram]

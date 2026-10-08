@@ -337,6 +337,44 @@ class Diagram(markov.Diagram, FeedbackCategory):
     ob = Ty
     layer_factory = Layer
 
+    @classmethod
+    def strategy(cls, *, dom=None, cod=None, max_feedback=2, **params):
+        """
+        Generate feedback diagrams as the :meth:`feedback` of an acyclic
+        Markov diagram: a feedback category is not traced, its cycles go
+        through a delayed memory, so the wiring is drawn acyclic, from
+        ``dom @ mem.delay()`` to ``cod @ mem``, then fed back.
+
+        Parameters:
+            dom : The domain, drawn if ``None``.
+            cod : The codomain, drawn if ``None``.
+            max_feedback : The maximum number of memory wires.
+            params : Passed to
+                :meth:`discopy.hypergraph.Hypergraph.strategy`.
+
+        >>> from hypothesis import find
+        >>> x = Ty('x')
+        >>> loop = find(Diagram.strategy(dom=x, cod=x), lambda d: any(
+        ...     isinstance(box, Feedback) for box in d.boxes))
+        >>> assert (loop.dom, loop.cod) == (x, x)
+        """
+        from hypothesis import strategies as st
+
+        types = params.get("types") or cls.ob.strategy()
+        params.setdefault("acyclic", True)
+
+        @st.composite
+        def feedbacks(draw):
+            domain = draw(types) if dom is None else dom
+            codomain = draw(types) if cod is None else cod
+            mem = draw(cls.ob.strategy(max_length=max_feedback))
+            graph = draw(hypergraph.Hypergraph[cls].strategy(
+                dom=domain @ mem.delay(), cod=codomain @ mem, **params))
+            return graph.to_diagram().feedback(
+                dom=domain, cod=codomain, mem=mem)
+
+        return feedbacks()
+
     def delay(self, n_steps=1):
         """ The delay of a feedback diagram. """
         dom, cod = self.dom.delay(n_steps), self.cod.delay(n_steps)
@@ -344,10 +382,25 @@ class Diagram(markov.Diagram, FeedbackCategory):
         return type(self)(inside, dom, cod, _scan=False)
 
     def feedback(self, dom=None, cod=None, mem=None):
-        """ Syntactic sugar for :class:`Feedback`. """
+        """
+        Syntactic sugar for :class:`Feedback`, feeding back the last wire of
+        a memory ``mem`` of many wires first.
+
+        >>> x, y = Ty('x'), Ty('y')
+        >>> f = Box('f', x @ (x @ y).delay(), x @ x @ y)
+        >>> fb = f.feedback(dom=x, cod=x, mem=x @ y)
+        >>> assert fb == f.feedback(mem=y).feedback(mem=x)
+        >>> assert (fb.dom, fb.cod) == (x, x)
+        """
         if mem is None or len(mem) == 1:
             return self.feedback_factory(self, dom=dom, cod=cod, mem=mem)
-        return self if not mem else self.feedback(mem=mem[:-1]).feedback()
+        if not mem:
+            return self
+        dom = self.dom[:len(self.dom) - len(mem)] if dom is None else dom
+        cod = self.cod[:len(self.cod) - len(mem)] if cod is None else cod
+        return self.feedback(
+            dom=dom @ mem[:-1].delay(), cod=cod @ mem[:-1], mem=mem[-1:]
+        ).feedback(dom=dom, cod=cod, mem=mem[:-1])
 
     @classmethod
     def wait(cls, dom: Ty) -> Diagram:
@@ -477,6 +530,27 @@ class Copy(markov.Copy, Box):
 
     def delay(self, n_steps=1):
         return type(self)(self.dom.delay(n_steps), len(self.cod))
+
+
+class Discard(markov.Discard, Copy):
+    """
+    The discard of an atomic type :code:`x`, a copy with no output.
+
+    Parameters:
+        x : The type to discard.
+
+    >>> x = Ty('x')
+    >>> assert (Diagram.discard(x).dom, Diagram.discard(x).cod) == (x, Ty())
+    """
+    # Copy.__init__ initialises both markov.Copy and the feedback Box.
+    def __init__(  # pylint: disable=super-init-not-called
+            self, x: Ty, n: int = 0):
+        if n:
+            raise ValueError(f"A discard has no copies, got n={n}.")
+        Copy.__init__(self, x, 0)
+
+    def delay(self, n_steps=1):
+        return type(self)(self.dom.delay(n_steps))
 
 
 class Merge(markov.Merge, Box):
@@ -666,9 +740,11 @@ class Functor(markov.Functor):
         return super().__call__(other)
 
 
+Diagram.box_factory = Box
 Diagram.functor_factory = Functor
 Diagram.swap_factory = Swap
 Diagram.permutation_factory = Permutation
+Diagram.discard_factory = Discard
 Diagram.copy_factory, Diagram.merge_factory = Copy, Merge
 Diagram.feedback_factory, Diagram.followed_by = Feedback, FollowedBy
 Hypergraph = hypergraph.Hypergraph[Diagram]

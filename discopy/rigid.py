@@ -155,6 +155,7 @@ from typing import Iterator
 
 from discopy import cat, monoidal, biclosed, messages
 from discopy.abc import Pregroup, RigidCategory
+from discopy.axioms import GENERATORS
 from discopy.cat import factory
 from discopy.utils import (
     assert_isatomic,
@@ -218,6 +219,19 @@ class Wire(monoidal.Wire):
         result = copy.copy(self)
         result.z = 0
         return result
+
+    windings = (0, 1, -1)
+    """ The winding numbers :meth:`strategy` draws from, simplest first. """
+
+    @classmethod
+    def strategy(cls):
+        """ Generate named objects with a winding number in
+        :attr:`windings`. """
+        from hypothesis import strategies as st
+
+        return st.tuples(
+            st.sampled_from(GENERATORS), st.sampled_from(cls.windings),
+        ).map(lambda args: cls(args[0], z=args[1]))
 
     def __eq__(self, other):
         return monoidal.Wire.__eq__(self, other)\
@@ -883,6 +897,7 @@ def to_rigid(self):
 
 biclosed.Diagram.to_rigid = to_rigid
 
+Diagram.box_factory = Box
 Diagram.cup_factory, Diagram.cap_factory, Diagram.sum_factory = Cup, Cap, Sum
 Diagram.functor_factory = Functor
 

@@ -259,6 +259,7 @@ class Functor(monoidal.Functor):
         return super().__call__(other)
 
 
+Diagram.box_factory = Box
 Diagram.braid_factory = Braid
 Diagram.sum_factory = Sum
 Id = Diagram.id

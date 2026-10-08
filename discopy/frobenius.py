@@ -77,6 +77,7 @@ class Wire(pivotal.Wire):
         name : The name of the object.
     """
     l = r = property(lambda self: self)
+    windings = (0, )
 
 
 @factory
@@ -386,6 +387,7 @@ def coherence(cls: type, factory: Callable
 
 CMap = cmap.CMap[Diagram]
 
+Diagram.box_factory = Box
 Diagram.functor_factory = Functor
 Diagram.cup_factory, Diagram.cap_factory = Cup, Cap
 Diagram.swap_factory, Diagram.spider_factory = Swap, Spider
