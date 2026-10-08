@@ -37,6 +37,7 @@ Summary
 from typing import ClassVar
 
 from discopy import rigid, frobenius, messages
+from discopy.axioms import no_strategy
 from discopy.cat import factory, Generator
 from discopy.utils import deprecated_alias, AxiomError
 from discopy.grammar import thue
@@ -89,6 +90,9 @@ class Diagram(frobenius.Diagram):
     ----
     In order to define more general DisCoCat diagrams, pregroup diagrams
     subclass frobenius rather than rigid. Have fun with swaps and spiders!
+    Their wires wind where a frobenius wire is self-dual, so their
+    equations, which compare by a hypergraph, refuse even a cap: the
+    property matrix leaves them out until they compare otherwise.
 
     Example
     -------
@@ -109,6 +113,7 @@ class Diagram(frobenius.Diagram):
     Box: ClassVar[Generator]
     Swap: ClassVar[Generator]
     Spider: ClassVar[Generator]
+    strategy = no_strategy
 
     def normal_form(self, **params):
         """
