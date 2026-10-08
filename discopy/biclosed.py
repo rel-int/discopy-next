@@ -81,10 +81,9 @@ which lands in :class:`CMap` as a biclosed category has no trace.
 
 from abc import abstractmethod
 from inspect import signature
-from typing import Callable, ClassVar, Iterator, Self, overload
+from typing import Callable, ClassVar, Self, overload
 
 from discopy import monoidal, cmap, messages
-from discopy.pattern import Pattern, Sort
 
 from discopy.axioms import no_strategy, Serialisable
 from discopy.abc import BiclosedCategory, DaggerCategory, ResiduatedMonoid
@@ -415,60 +414,6 @@ class Diagram(monoidal.Diagram, BiclosedCategory):
 
     currying_naturality_right = BiclosedCategory\
         .currying_naturality_right.failing(messages.FREE_CURRY)
-
-    @classmethod
-    def focus(cls, branches: list, dom, cod) -> list:
-        """
-        The rules a goal applies deterministically: the conclusion unifies
-        with the goal in exactly one way, the match binds every premise
-        without residuals, and the premises keep to the subformulae of the
-        goal — so committing to one samples nothing and manufactures
-        nothing. These are the invertible rules of a focused proof search,
-        read off the sequents at each goal: the curry of a biclosed
-        category opens the goal's own exponential, while at a rigid level,
-        where the exponential collapses into adjoints, the same rule would
-        invert an adjoint into material the goal does not have, and stays
-        a choice.
-
-        >>> from discopy.biclosed import Diagram, Ty
-        >>> x, y = Ty('x'), Ty('y')
-        >>> [rule.name for rule, _ in Diagram.focus(
-        ...     Diagram.branches(x, y << x), x, y << x)]
-        ['curry_left']
-        """
-        goal = {
-            atom for side in (dom, cod) if side is not None
-            for atom in cls.subformulae(side)}
-
-        def keeps_to_goal(applied, subst):
-            for premise in applied.premises.values():
-                if isinstance(premise, Sort) or not set(
-                        Pattern.variables(premise)) <= subst.keys():
-                    return False
-                value = subst.instantiate(premise, cls.ob)
-                if isinstance(value, tuple) and value == (dom, cod):
-                    return False  # No progress: the premise is the goal.
-                for side in value if isinstance(value, tuple) else (value, ):
-                    if hasattr(side, "inside")\
-                            and not set(cls.subformulae(side)) <= goal:
-                        return False
-            return True
-
-        return [
-            (applied, found) for applied, found in branches
-            if len(found) == 1 and not found[0].residuals
-            and keeps_to_goal(applied, found[0])]
-
-    @staticmethod
-    def subformulae(value) -> Iterator:
-        """ The subformulae of an object: its atoms, and recursively the
-        base and exponent of each exponential atom. """
-        for i in range(len(value)):
-            yield value[i:i + 1]
-            for part in ("base", "exponent"):
-                inner = getattr(value.inside[i], part, None)
-                if inner is not None:
-                    yield from Diagram.subformulae(inner)
 
 
 Box = Diagram.Box

@@ -607,34 +607,8 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Changed
 
-- The search is a family of classmethods, each level implementing its
-  own, rather than one function of `discopy.pattern`: `search` is the
-  template, closing a goal by one of its
-  `leaves` — the free box or a generator — or, below the depth bound,
-  one of its `branches`, a recursive rule whose premises are searched;
-  `contexts` says how the conclusion of a rule meets the goal and
-  `focus` which rules a goal commits to. Plumbing is searched rather
-  than waited for: wherever a recursive rule concludes a tensor, a
-  monoidal category `rewire`s that side of the goal before a split of it
-  puts the term in context, and each doctrine samples its own — the
-  identity for a planar category, a permutation for a symmetric one,
-  copies and discards on the domain of a Markov one, cups and caps for a
-  compact one and spiders for a hypergraph one, each only when its
-  generator is among the category's `generators`, so that a circuit
-  wires with swaps alone. Only a biclosed category focuses, its curry
-  being the one rule invertible on the goals it opens: focusing at every
-  level committed every goal `a ⊢ b` with a dagger to the dagger, whose
-  one premise `b ⊢ a` the old test read as invertible, so that the
-  search spent most of a goal-directed budget daggering back and forth
-  — a planar goal sampled 120 distinct diagrams out of 300 where it now
-  samples 270 — and a rigid category, whose curry collapses into caps,
-  focuses on nothing. The search and `DeadEnd` move to `abc`, the
-  unification of `discopy.pattern` staying planar.
-  A category owns the strategies it searches with: objects are drawn
-  from `ob.strategy` and free boxes from `Category.free`, which a
-  diagram reads off its `Box`, so `search`, `Diagram.strategy`,
-  `Declaration.generate`, `cat.Arrow.strategy` and `cat.Box.strategy`
-  lose their `free` and `types` parameters. The sort of a variable or
+- A category owns the strategies it samples with: objects are drawn
+  from `ob.strategy` and free boxes from `Box.strategy`. The sort of a variable or
   a premise is one subclass of `pattern.Sort` per head — `Objects` of
   a class or type parameter, of a size, `Terms` for `Self`, `Counts`
   for `Count` — whose head is the type itself
@@ -663,19 +637,24 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   now declares, and that the exponential of Python types is not `<<`,
   so `python.Function.curry`, `ev` and `uncurry` are methods rather than
   rules.
-- `discopy.abc` states structure and nothing else: abstract methods, the
-  rules forwarding to them and the axioms, with no base class from
-  `discopy.axioms` but the decorators. Its structures no longer subclass
-  `Testable`, which only the concrete categories implement, and the
-  search moves to the categories that search: the template — `search`,
-  `prove`, `attempt`, `choose`, `leaves`, `branches`, `contexts`,
-  `focus`, `free`, `rules`, `generators` and `DeadEnd` — to `cat.Arrow`,
-  the planar `contexts`, `rewire` and `plumb` to `monoidal.Diagram`, the
-  plumbing of each doctrine to the `rewire` of `symmetric`, `markov`,
-  `compact` and `frobenius` diagrams, and focusing to `biclosed.Diagram`
-  and `rigid.Diagram`, the latter with its admissible curries.
-  `CompactCategory.twist` is a plain method, `ColouredMonoid` loses its
-  mark on `cut`, and `Hypergraph` implements `Testable` itself.
+- Sampling is naive and is one function, `axioms.Testable.sample`: a
+  term is a free box or the conclusion of a rule chosen at random among
+  those whose conclusion matches the goal, its premises sampled in turn,
+  objects by the strategy of their class and morphisms as terms below a
+  depth of three nested rules, six over a fixed vocabulary; with a
+  declaration it samples the arguments of a law instead, so that
+  `Axiom.equations` and `cat.Arrow.strategy` both read it. The
+  goal-directed search goes with its helpers: `search`, `prove`,
+  `attempt`, `choose`, `leaves`, `branches`, `matching`, `contexts`,
+  `focus`, `free`, `rewire`, `plumb`, `subformulae`, `DeadEnd`,
+  `Declaration.generate`, `Sort.strategy`, `Substitution.guide` and
+  `fresh`, `ColouredMonoid.atoms` and the `rules` and `generators` of
+  `cat.Arrow`, `pattern.Rule.inherited` listing the rules and only a
+  category over a fixed vocabulary, a pregroup or a circuit, declaring
+  `generators`. A rule whose result lies outside its conclusion is an
+  `AxiomError`. `abc.Category` is a `Testable` again, and
+  `Testable.environment`, which only the representation law reads,
+  moves to `Serialisable`.
 - The pattern language is frozen and its functions are methods of the
   classes they belong to: a `pattern.Substitution` carries its residuals
   and `unify`, `instantiate`, `fit`, `guide` and names `fresh` variables,
@@ -687,12 +666,8 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   `pattern.Exponential` hosts what `Over` and `Under` share, and
   `Counts.maximum` is `MAX_COUNT`. Modules import the pattern language
   from `discopy.pattern` alone rather than through `discopy.axioms`.
-  The search is the classmethods `prove`, `attempt` and `choose` of
-  `abc.Category`, taking the draw as `contexts` and `rewire` do, rather
-  than closures nested in `search`; `ColouredMonoid.atoms` and
-  `BiclosedCategory.subformulae` replace the functions `atomic_parts`
-  and `materials`, and `uncurry_composition` and `tensor_all` go, being
-  `uncurry` and the unbiased `tensor`. The categories with no strategy
+  `uncurry_composition` and `tensor_all` go, being `uncurry` and the
+  unbiased `tensor`. The categories with no strategy
   — `Matrix`, `Tensor`, `Channel`, `CMap`, `Hypergraph`, `Drawing`,
   `Stream`, `para`, `interaction`, `hopf`, `zx` and the Python functions
   — implement `dagger`, `swap`, `braid`, `cups`, `caps`, `copy`,

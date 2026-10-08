@@ -60,7 +60,7 @@ Speciality
     :align: center
 """
 
-from typing import Any, ClassVar
+from typing import ClassVar
 
 from collections.abc import Callable
 
@@ -198,46 +198,6 @@ class Diagram(compact.Diagram, markov.Diagram, HypergraphCategory):
                 f.unfuse() if isinstance(f, Spider) else f,
             dom=Diagram, cod=Diagram)
         return F(self)
-
-    @classmethod
-    def rewire(cls, draw, value: monoidal.Ty, dom: bool,
-               other: monoidal.Ty | None) -> tuple[monoidal.Ty, Any]:
-        """
-        A hypergraph category connects wires by spiders: on the domain of a
-        goal, a spider may merge two equal wires or start a wire of the
-        other side from nothing, and on the codomain split a wire in two or
-        end a wire of the other side, before the cups, caps, copies and
-        permutations of the levels it extends.
-        """
-        from hypothesis import strategies as st
-
-        if "spiders" not in cls.generators:
-            return super().rewire(draw, value, dom, other)
-        parts = value.atoms
-        pairs = [(i, j) for i, x in enumerate(parts)
-                 for j, y in enumerate(parts) if i < j and x == y]
-        if pairs and draw(st.booleans()):
-            i, j = draw(st.sampled_from(pairs))
-            xs = [k for k in range(len(parts)) if k not in (i, j)] + [i, j]
-            rest = value[:0].tensor(*(parts[k] for k in xs[:-2]))
-            if dom:
-                plumbing = cls.permutation(xs, parts).then(
-                    rest @ cls.spiders(2, 1, parts[i]))
-            else:
-                inverse = [xs.index(k) for k in range(len(xs))]
-                plumbing = (rest @ cls.spiders(1, 2, parts[i])).then(
-                    cls.permutation(inverse, [parts[k] for k in xs]))
-            merged = plumbing.cod if dom else plumbing.dom
-            return cls.plumb(plumbing, dom, super().rewire(
-                draw, merged, dom, other))
-        if other and draw(st.booleans()):
-            x = draw(st.sampled_from(other.atoms))
-            plumbing = value @ cls.spiders(0, 1, x) if dom\
-                else value @ cls.spiders(1, 0, x)
-            started = plumbing.cod if dom else plumbing.dom
-            return cls.plumb(plumbing, dom, super().rewire(
-                draw, started, dom, other))
-        return super().rewire(draw, value, dom, other)
 
 
 Box, Cup, Cap, Permutation, Swap = (

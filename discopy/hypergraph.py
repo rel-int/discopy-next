@@ -51,7 +51,6 @@ from networkx import (
 from networkx.algorithms.isomorphism import is_isomorphic
 
 from discopy import cmap, messages, utils
-from discopy.axioms import Testable
 from discopy.abc import (
     DaggerCategory, HypergraphCategory, MarkovCategory, MonoidalCategory,
     NamedGeneric, RigidCategory, SymmetricCategory, TracedCategory)
@@ -95,7 +94,7 @@ Mapping from :class:`Spider` to atomic :class:`frobenius.Ty`.
 """
 
 
-class Hypergraph[category: Diagram](MonoidalCategory, DaggerCategory, Testable,
+class Hypergraph[category: Diagram](MonoidalCategory, DaggerCategory,
                                      NamedGeneric):
     """
     A hypergraph is given by:

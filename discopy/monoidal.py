@@ -62,10 +62,10 @@ from functools import cached_property
 from warnings import warn
 from typing import (
     Any, ClassVar, Iterable, Iterator, Callable, Self, Sequence,
-    TYPE_CHECKING, get_args, get_origin)
+    TYPE_CHECKING)
 
 from discopy import abc, cat, drawing, hypergraph, cmap, messages
-from discopy.pattern import Rule, Substitution, Tensor, Var
+from discopy.pattern import Var
 from discopy.axioms import (
     axiom, Equation as AbstractEquation, no_strategy, Serialisable)
 from discopy.abc import (
@@ -1030,50 +1030,6 @@ class Diagram(cat.Arrow, MonoidalCategory, RichDisplay):
                 'inside': tuple(state['_layers'])}
         super().__setstate__(state)
 
-    @classmethod
-    def strategy(
-            cls, *, dom=None, cod=None, max_depth=None,
-            boundary_connected=False):
-        """
-        Generate diagrams by the :attr:`rules` and :attr:`generators` of
-        the category, see :meth:`discopy.cat.Arrow.search`: a level
-        with more structure declares its rules and its plumbing on its
-        abstract base class.
-
-        Parameters:
-            dom : The domain of the diagrams, if any.
-            cod : The codomain of the diagrams, if any.
-            max_depth : The number of nested rules a diagram may apply:
-                three by default, or six for a category over a fixed
-                vocabulary, whose every box costs a rule.
-            boundary_connected : Whether to keep only the diagrams that are
-                :attr:`is_boundary_connected`, the subspace
-                :meth:`normal_form` is defined on, which is how
-                :meth:`discopy.axioms.Axiom.weaken` quantifies a law
-                over it.
-        """
-        if max_depth is None:
-            max_depth = 6 if cls.free() is None else 3
-        diagrams = cls.search(dom=dom, cod=cod, max_depth=max_depth)
-        if not boundary_connected:
-            return diagrams
-        return diagrams.filter(lambda diagram: diagram.is_boundary_connected)
-
-    @classmethod
-    def free(cls, dom=None, cod=None):
-        """
-        The strategy of the free boxes of the level closing a goal, those
-        of :attr:`Box`, :obj:`None` when its boxes have no strategy, i.e.
-        for a category over a fixed vocabulary.
-
-        Parameters:
-            dom : The domain of the goal, :obj:`None` when unknown.
-            cod : The codomain of the goal, :obj:`None` when unknown.
-        """
-        if cls.Box.strategy.__func__ is no_strategy.__func__:
-            return None
-        return cls.Box.strategy(dom=dom, cod=cod)
-
     def __init__(
             self, inside: tuple[cat.Box, ...], dom: Ty, cod: Ty, _scan=True):
         if _scan:
@@ -1733,80 +1689,6 @@ class Diagram(cat.Arrow, MonoidalCategory, RichDisplay):
                 with open(path) as file:
                     return file.read()
         return AbstractEquation(render(), render())
-
-    @classmethod
-    def contexts(cls, draw, applied: Rule, found: list[Substitution],
-                 dom, cod) -> tuple[Substitution, Any, Any]:
-        """
-        A monoidal category puts the term of a recursive rule in context
-        wherever its conclusion is a tensor: that side of the goal is
-        :meth:`rewire`d first, and a match of the conclusion with the
-        rewired goal is a split of it. The planar rewiring is the
-        identity, so that the context is a split of the goal as it is.
-
-        Parameters:
-            draw : The draw of the composite strategy.
-            applied : The rule applied.
-            found : The matches of its conclusion with the goal.
-            dom : The domain of the goal, :obj:`None` when unknown.
-            cod : The codomain of the goal, :obj:`None` when unknown.
-        """
-        from hypothesis import strategies as st
-
-        if not applied.recursive:
-            return super().contexts(draw, applied, found, dom, cod)
-        _, dom_pattern, cod_pattern = get_args(applied.conclusion)
-        new_dom, before = (dom, None) if dom is None\
-            or get_origin(dom_pattern) is not Tensor\
-            else cls.rewire(draw, dom, True, cod)
-        new_cod, after = (cod, None) if cod is None\
-            or get_origin(cod_pattern) is not Tensor\
-            else cls.rewire(draw, cod, False, dom)
-        if before is None and after is None:
-            return super().contexts(draw, applied, found, dom, cod)
-        rewired = list(applied.match(new_dom, new_cod))
-        if not rewired:
-            raise cat.DeadEnd(f"{new_dom} -> {new_cod}")
-        return draw(st.sampled_from(rewired)), before, after
-
-    @classmethod
-    def rewire(cls, draw, value: Ty, dom: bool, other: Ty | None
-               ) -> tuple[Ty, Any]:
-        """
-        The plumbing of a side of a goal, sampled: an object and a morphism
-        from the side to it when ``dom``, from it to the side otherwise,
-        :obj:`None` for the identity. A planar category has no plumbing
-        but the identity, the levels with more structure sample their own:
-        a permutation, copies, cups and caps or spiders — each only when it
-        is among the :attr:`generators`, so that a category over a fixed
-        vocabulary wires with nothing it does not have.
-
-        Parameters:
-            draw : The draw of the composite strategy.
-            value : The side of the goal to rewire.
-            dom : Whether it is the domain.
-            other : The other side of the goal, :obj:`None` when unknown.
-        """
-        # pylint: disable=unused-argument  # a planar category has no wiring
-        return value, None
-
-    @classmethod
-    def plumb(cls, plumbing, dom: bool, rest: tuple[Ty, Any]
-              ) -> tuple[Ty, Any]:
-        """
-        Compose a piece of plumbing with the rewiring ``rest`` of its far
-        end: after it on the domain side, before it on the codomain side.
-
-        Parameters:
-            plumbing : The piece of plumbing, from the side to its far end
-                when ``dom``, from its far end to the side otherwise.
-            dom : Whether it is the domain side.
-            rest : The rewiring of the far end, as :meth:`rewire` returns.
-        """
-        value, more = rest
-        if more is None:
-            return value, plumbing
-        return value, plumbing.then(more) if dom else more.then(plumbing)
 
 
 @Diagram.generator

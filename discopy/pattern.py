@@ -1,6 +1,6 @@
 """
 The patterns in which a category states its rules, generators and
-axioms, which :meth:`discopy.cat.Arrow.search` searches its terms by.
+axioms, which :meth:`discopy.axioms.Testable.sample` samples its terms by.
 
 A sequent is the signature of a method on an abstract base class of
 :mod:`discopy.abc`: its :pep:`695` type parameter list is the context,
@@ -36,13 +36,9 @@ splits the goal at every position, a variable binds once, an adjoint
 ``R[p]`` inverts to ``p``. What cannot be inverted, an exponential that
 collapsed into adjoints, is a residual equation checked once every
 variable is instantiated. A :class:`Rule` is a declaration with a
-conclusion, and :meth:`discopy.cat.Arrow.search` builds a term of a
-goal type by choosing at each step a free box, a rule with no hom
-premise whose conclusion matches the goal — a generator, built in one
-step — or, below the depth bound, a :meth:`Rule.recursive` one whose hom
-premises are searched. The unification here is planar: a category with
-more structure puts a term in context by its own plumbing, see
-:meth:`discopy.monoidal.Diagram.rewire`.
+conclusion, and :meth:`discopy.axioms.Testable.sample` builds a term of
+a goal by applying at random a free box or a rule whose conclusion
+matches the goal, sampling its premises in turn.
 
 Summary
 -------
@@ -88,7 +84,6 @@ from abc import ABC, abstractmethod
 from collections.abc import Callable, Iterator
 from dataclasses import KW_ONLY, dataclass, replace
 from functools import reduce
-from itertools import count
 from types import MethodType
 from typing import (
     Annotated, Any, ClassVar, Generic, Literal, Self, TypeVar, get_args,
@@ -138,24 +133,10 @@ class Substitution(dict[str, Any]):
     x | y
     x @ y | Ty()
     """
-    fresh_names: ClassVar = count()
 
     def __init__(self, *args, residuals: tuple = (), **kwargs):
         super().__init__(*args, **kwargs)
         self.residuals = tuple(residuals)
-
-    @classmethod
-    def fresh(cls) -> TypeVar:
-        """ A variable named apart from every other. """
-        return TypeVar(  # ty: ignore[invalid-legacy-type-variable]
-            f"?{next(cls.fresh_names)}")
-
-    def guide(self, side, ob: Any):
-        """ The value a side of a goal stands for once its variables are
-        bound, :obj:`None` until then. """
-        if all(name in self for name in Pattern.variables(side)):
-            return self.instantiate(side, ob)
-        return None
 
     def __repr__(self):
         return f"Substitution({dict(self)!r}, residuals={self.residuals!r})"
@@ -559,12 +540,6 @@ class Sort(ABC):
         declared by ``owner``, see :meth:`stands_for`. """
 
     @abstractmethod
-    def strategy(self, category: type, owner: type | None = None,
-                 length: int | None = None):
-        """ Generate an instance of the sort in a category, of the given
-        ``length`` when its size is a variable. """
-
-    @abstractmethod
     def canonical(self, category: type, label: str,
                   owner: type | None = None, length: int = 1):
         """ The canonical instance of the sort, named after a variable. """
@@ -582,22 +557,6 @@ class Objects(Sort):
 
     def resolve(self, category: type, owner: type | None = None) -> type:
         return self.stands_for(self.head, category, category.ob, owner)
-
-    def strategy(self, category: type, owner: type | None = None,
-                 length: int | None = None):
-        from hypothesis import strategies as st
-
-        resolved = self.resolve(category, owner)
-        length = self.size if isinstance(self.size, int) else length
-        if length is None:
-            return resolved.strategy()
-        try:
-            return resolved.strategy(min_length=length, max_length=length)
-        except TypeError:  # A strategy with no length to ask for.
-            atoms = resolved.strategy().filter(lambda value: len(value) == 1)
-        return atoms if length == 1 else st.lists(
-            atoms, min_size=length, max_size=length).map(
-                lambda values: reduce(operator.matmul, values, resolved()))
 
     def canonical(self, category: type, label: str,
                   owner: type | None = None, length: int = 1):
@@ -625,10 +584,6 @@ class Terms(Sort):
     def resolve(self, category: type, owner: type | None = None) -> type:
         return category
 
-    def strategy(self, category: type, owner: type | None = None,
-                 length: int | None = None):
-        return category.strategy()
-
     def canonical(self, category: type, label: str,
                   owner: type | None = None, length: int = 1):
         return self.named(category, label)
@@ -647,11 +602,6 @@ class Counts(Sort):
     def resolve(self, category: type, owner: type | None = None) -> type:
         return int
 
-    def strategy(self, category: type, owner: type | None = None,
-                 length: int | None = None):
-        from hypothesis import strategies as st
-        return st.integers(min_value=0, max_value=self.maximum)
-
     def canonical(self, category: type, label: str,
                   owner: type | None = None, length: int = 1):
         return 2
@@ -665,7 +615,7 @@ class Declaration[**P, T]:
     """
     A declaration is a sequent stated by a ``function`` on an abstract
     base class and inherited by every category below it: the base of the
-    rules of :meth:`discopy.cat.Arrow.search` and of the axioms of
+    rules of :meth:`discopy.axioms.Testable.sample` and of the axioms of
     :mod:`discopy.axioms`. The ``category`` is the class the
     declaration is bound to, ``name`` the attribute it is stored under
     and ``owner`` the class declaring the sequent.
@@ -825,74 +775,6 @@ class Declaration[**P, T]:
                 args[label] = subst.instantiate(value, category.ob)
         return args
 
-    def generate(self, draw: Callable, hom: Callable,
-                 subst: Substitution | None = None) -> tuple:
-        """
-        Sample the arguments of the sequent inside a composite strategy,
-        one premise at a time: a pattern is instantiated, a sort sampled
-        from the strategy of the class it ranges over, a hom or a term of
-        the category sampled through ``hom(category, dom, cod)``. A
-        variable of any size standing alone on a side of a hom is read
-        off the term found, so that the goal guides the search; the
-        residuals of a match are checked once every variable is bound.
-        """
-        from hypothesis import assume
-
-        category, sorts = self.bound, self.variables
-        residuals = subst.residuals if subst else ()
-        subst = Substitution(subst or {})
-
-        def side(pattern):
-            if isinstance(pattern, TypeVar) and pattern.__name__ not in subst\
-                    and getattr(sorts[pattern.__name__], "size", None) is None:
-                return None
-            bound(*Pattern.variables(pattern))
-            return subst.instantiate(pattern, category.ob)
-
-        def read_off(pattern, value):
-            if isinstance(pattern, TypeVar) and pattern.__name__ not in subst:
-                check(getattr(sorts[pattern.__name__], "size", None), value)
-                subst[pattern.__name__] = value
-
-        def check(length, value):
-            fit = subst.fit(length, value)
-            assume(fit is not None)
-            subst.update(fit or {})
-
-        def sample(sort, label):
-            length = getattr(sort, "size", None)
-            if isinstance(length, str):
-                bound(length)
-            return draw(sort.strategy(
-                category, self.owner, subst.get(str(length))), label=label)
-
-        def bound(*labels):
-            for label in labels:
-                if label not in subst:
-                    subst[label] = sample(sorts[label], label)
-
-        args = {}
-        for label, value in self.premises.items():
-            if isinstance(value, Terms) and hasattr(category, "rules"):
-                args[label] = draw(hom(category, None, None), label=label)
-            elif isinstance(value, Sort):
-                args[label] = sample(value, label)
-            elif get_origin(value) is Hom:
-                _, dom_pattern, cod_pattern = get_args(value)
-                dom, cod = side(dom_pattern), side(cod_pattern)
-                term = draw(hom(self.resolve(value), dom, cod), label=label)
-                read_off(dom_pattern, term.dom)
-                read_off(cod_pattern, term.cod)
-                args[label] = term
-            else:
-                bound(*Pattern.variables(value))
-                args[label] = subst.instantiate(value, category.ob)
-        for pattern, value in residuals:
-            bound(*Pattern.variables(pattern))
-            assume(subst.instantiate(pattern, category.ob) == value)
-        return subst, args
-
-
 
 @dataclass(repr=False)
 class Rule[**P, T](Declaration[P, T]):
@@ -900,7 +782,7 @@ class Rule[**P, T](Declaration[P, T]):
     An inference rule of a category, a
     :class:`Declaration` with a conclusion: every rule
     states its sequent as its own signature and
-    :meth:`discopy.cat.Arrow.search` calls
+    :meth:`discopy.axioms.Testable.sample` calls
     the attribute of the same name on the category. Accessed on a
     class, a rule binds to it, once per class; on an instance, it
     behaves as the method it decorates.
@@ -937,9 +819,9 @@ class Rule[**P, T](Declaration[P, T]):
     @property
     def recursive(self) -> bool:
         """
-        Whether a premise is a hom, which the search proves recursively
+        Whether a premise is a hom, which sampling proves recursively
         below its depth bound; a rule with none is a generator, built in
-        one step, see :meth:`discopy.cat.Arrow.generators`.
+        one step.
 
         >>> from discopy.abc import Category, RigidCategory
         >>> assert Category.cut.recursive
@@ -975,7 +857,7 @@ class Rule[**P, T](Declaration[P, T]):
         The same rule dropped from the rules and generators of the
         class it is assigned on, because the structure it builds lies
         outside the category's terms, with the reason as its record:
-        the method still runs, the search just never applies it, e.g.
+        the method still runs, sampling just never applies it, e.g.
         ``trace_left = frobenius.Diagram.trace_left.inapplicable("No loop
         in a sentence.")``. A rule the category does have, whose terms
         other rules reach, is :meth:`admissible` instead.
@@ -988,7 +870,7 @@ class Rule[**P, T](Declaration[P, T]):
         """
         The same rule dropped from the rules and generators of the
         class it is assigned on, because it is `admissible
-        <https://en.wikipedia.org/wiki/Admissible_rule>`_: the search
+        <https://en.wikipedia.org/wiki/Admissible_rule>`_: sampling
         reaches everything it builds through the other rules, which
         the reason names as its record, e.g. the curries of a
         rigid category, which caps and cuts reach.
@@ -1026,9 +908,6 @@ class Constant(Rule):
         box = self.function
         if dom in (None, box.dom) and cod in (None, box.cod):
             yield Substitution()
-
-    def generate(self, draw, hom, subst=None):
-        return Substitution(subst or {}), {}
 
     def apply(self, arguments: dict):
         return self.function

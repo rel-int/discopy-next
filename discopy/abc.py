@@ -18,10 +18,10 @@ Python typing, which a concrete category implements, and as
 :meth:`Category.cut` to :meth:`Category.then`. It also declares the
 :func:`discopy.axioms.axiom` equations that every category below
 inherits along with the structure they axiomatise, e.g.
-:class:`Category` the unitality and associativity of composition. How
-the terms of a category are generated to check its laws is no business
-of this module: a concrete category says so by implementing
-:meth:`discopy.axioms.Testable.strategy`.
+:class:`Category` the unitality and associativity of composition. Every
+category is a :class:`discopy.axioms.Testable`, whose laws are checked
+on terms that :meth:`discopy.axioms.Testable.sample` builds by applying
+these rules at random.
 
 Summary
 -------
@@ -67,7 +67,7 @@ from typing import (
     ClassVar, Self, TYPE_CHECKING)
 
 from discopy import messages
-from discopy.axioms import axiom, Equation
+from discopy.axioms import axiom, Equation, Testable
 from discopy.pattern import (
     Atom, Count, D, Hom, L, Obj, Over, R, Repeat, rule, Tensor, Under, Unit,
     Var)
@@ -75,7 +75,7 @@ from discopy.utils import classproperty, unbiased
 from discopy.utils import NamedGeneric  # noqa: F401  pylint: disable=unused-import  # re-exported
 
 
-class Category[C0, C1: Category](ABC):
+class Category[C0, C1: Category](Testable, ABC):
     """
     A category is a class with two class variables ``ob, ar``, two attributes
     ``dom, cod`` and two methods ``id, then``.
@@ -272,14 +272,6 @@ class ColouredMonoid[C0, C1: ColouredMonoid](Category[C0, C1]):
     @abstractmethod
     def tensor(self, *objects: Self) -> Self:
         """ The n-ary product of a monoid for ``n > 0``. """
-
-    @property
-    def atoms(self) -> list[Self]:
-        """ The atoms of an element of a free monoid, each of length one.
-
-        >>> assert Nat(2).atoms == [Nat(1), Nat(1)]
-        """
-        return [self[i:i + 1] for i in range(len(self))]
 
     def then(self, *others: Self) -> Self:
         """Sequential composition, given by the monoid product."""

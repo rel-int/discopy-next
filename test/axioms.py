@@ -9,7 +9,7 @@ from pytest import raises
 
 from discopy import braided, cat, feedback, rigid
 from discopy.abc import MonoidalCategory
-from discopy.pattern import Hom, Obj
+from discopy.pattern import Hom, Obj, Rule
 from discopy.axioms import Axiom, axiom, AxiomFailure, Equation, Testable
 from discopy.cat import Arrow, Box, Functor, Ob
 from discopy.monoidal import Diagram
@@ -136,10 +136,11 @@ def test_axiom():
 
 
 def test_weaken_params():
-    law = MonoidalCategory.bifunctoriality.weaken(max_depth=0).bind(Diagram)
+    law = Diagram.bifunctoriality.weaken(max_depth=0)
     equation = find(law.strategy(), lambda _: True)
     assert equation and all(len(term.boxes) <= 4 for term in equation.terms)
-    assert law.weaken(max_depth=1).params == {"max_depth": 1}
+    assert law.weaken(max_depth=1).params == {
+        "boundary_connected": True, "max_depth": 1}
     assert law.modulo(lambda term: term).params == law.params
 
 
@@ -191,7 +192,7 @@ def test_canonical():
         inapplicable.draw()
     Diagram.bifunctoriality.draw(path=io.BytesIO(), format="png")
     assert str(rigid.Diagram.snake_equations.canonical().terms[1]) == "Id(X)"
-    cups = rigid.Diagram.generators["cups"].canonical()
+    cups = Rule.inherited(rigid.Diagram)["cups"].canonical()
     assert cups == {"left": rigid.Ty('X'), "right": rigid.Ty('X').r}
     assert feedback.Diagram.feedback_joining_right.canonical()
 

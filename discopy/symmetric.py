@@ -90,7 +90,7 @@ Both sides foliate to the same single permutation.
 
 """
 
-from typing import Any, ClassVar, Self
+from typing import ClassVar, Self
 
 from collections.abc import Sequence
 
@@ -546,30 +546,6 @@ class Diagram(balanced.Diagram, SymmetricCategory):
         """ The encoding preserves identities. """
         functor = cls.map_equivalence()
         return AbstractEquation(functor(cls.id(x)), functor.cod.id(x))
-
-    @classmethod
-    def rewire(cls, draw, value: monoidal.Ty, dom: bool,
-               other: monoidal.Ty | None) -> tuple[monoidal.Ty, Any]:
-        """
-        A symmetric category permutes the wires of a side of a goal, with
-        even odds of leaving them in place, so that the context of a term
-        is any subset of the wires rather than a contiguous split.
-        """
-        from hypothesis import strategies as st
-
-        parts = value.atoms
-        if "swap" not in cls.generators or len(parts) < 2\
-                or not draw(st.booleans()):
-            return super().rewire(draw, value, dom, other)
-        xs = list(draw(st.permutations(range(len(parts)))))
-        if xs == sorted(xs):
-            return value, None
-        if dom:
-            plumbing = cls.permutation(xs, parts)
-            return plumbing.cod, plumbing
-        inverse = [xs.index(i) for i in range(len(xs))]
-        plumbing = cls.permutation(inverse, [parts[i] for i in xs])
-        return plumbing.dom, plumbing
 
 
 Box = Diagram.Box

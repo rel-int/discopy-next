@@ -207,12 +207,13 @@ def test_ev_and_feedback():
 def test_rule():
     assert repr(Rule(Category.cut.function)) == "Rule(cut)"
     assert repr(Category.cut) == "abc.Category.cut"
-    assert cat.Arrow.rules["cut"].category is cat.Arrow
+    assert Rule.inherited(cat.Arrow)["cut"].category is cat.Arrow
     assert hash(Category.cut) == hash(Category.cut.bind(Category))
     assert Category.then.__isabstractmethod__  # A method, not a rule.
     assert not isinstance(vars(Category)["then"], Rule)
-    assert Diagram.rules["cut"].owner is MonoidalCategory  # The latest wins.
-    assert str(cat.Arrow.rules["cut"].conclusion).endswith(", A, C]")
+    # The latest wins.
+    assert Rule.inherited(Diagram)["cut"].owner is MonoidalCategory
+    assert str(Rule.inherited(cat.Arrow)["cut"].conclusion).endswith(", A, C]")
     with raises(TypeError):
         Rule(Category.cut.function).bound
     with raises(TypeError):
@@ -226,8 +227,9 @@ def test_rule():
 
     f = Box("f", x, x)
     assert Wrapped.twice(f) == f >> f == Wrapped(f.inside, x, x).twice()
-    assert list(Wrapped.rules) == ["ax", "cut", "mix", "dagger", "twice"]
-    assert str(Wrapped.rules["twice"]) == "twice(self: Hom[discopy."\
+    assert list(Rule.inherited(Wrapped))\
+        == ["ax", "cut", "mix", "dagger", "twice"]
+    assert str(Rule.inherited(Wrapped)["twice"]) == "twice(self: Hom[discopy."\
         "monoidal.Diagram, A, A]) -> Hom[discopy.monoidal.Diagram, A, A]"
     found = find(Wrapped.strategy(dom=x, cod=x),
                  lambda value: len(value.boxes) == 2
@@ -237,10 +239,9 @@ def test_rule():
 
 def test_generator():
     assert Category.cut.recursive
-    assert not rigid.Diagram.rules["cups"].recursive
-    assert "cups" in rigid.Diagram.generators
-    assert rigid.Diagram.generators["cups"].category is rigid.Diagram
-    braid = braided.Diagram.generators["braid"]
+    cups = Rule.inherited(rigid.Diagram)["cups"]
+    assert not cups.recursive and cups.category is rigid.Diagram
+    braid = Rule.inherited(braided.Diagram)["braid"]
     assert [str(sort) for sort in braid.variables.values()]\
         == ["Atom", "Atom"]
     assert list(braid.premises) == ["left", "right"]
@@ -254,7 +255,7 @@ def test_generator():
             return cls.id(dom)
 
     with raises(AxiomError):
-        find(Lying.strategy(dom=x, cod=Ty()), lambda value: True)
+        find(Lying.strategy(dom=x, cod=Ty()), lambda value: False)
 
 
 def test_cut():
@@ -263,10 +264,10 @@ def test_cut():
     z = Ty("z")
     f, g = Box("f", y, y @ y), Box("g", x @ y @ y @ z, z)
     assert f.cut(g, x, z) == x @ f @ z >> g
-    assert list(Diagram.rules["cut"].variables) == list("ABCXY")
-    assert list(Diagram.rules) == ["ax", "cut", "mix", "dagger"]
-    assert Diagram.rules["cut"].recursive
-    assert list(cat.Arrow.rules["cut"].premises) == ["self", "other"]
+    assert list(Rule.inherited(Diagram)["cut"].variables) == list("ABCXY")
+    assert list(Rule.inherited(Diagram)) == ["ax", "cut", "mix", "dagger"]
+    assert Rule.inherited(Diagram)["cut"].recursive
+    assert list(Rule.inherited(cat.Arrow)["cut"].premises) == ["self", "other"]
     assert f.then(Box("h", y @ y, z)).cod == z  # A method, n-ary.
     assert (f @ g).dom == f.dom @ g.dom
 
@@ -299,10 +300,10 @@ def test_calculus():
             (closed, composition + trace + curry),
             (feedback, composition + trace
              + ["delay", "feedback_left", "feedback_right"])):
-        assert [name for name, found in module.Diagram.rules.items()
+        assert [name for name, found in Rule.inherited(module.Diagram).items()
                 if found.recursive] == calculus, module.__name__
 
-    assert "twist" not in compact.Diagram.generators
+    assert "twist" not in Rule.inherited(compact.Diagram)
     twist = compact.Diagram.twist(compact.Ty("x"))
     assert twist.dom == twist.cod and not twist.inside
 
@@ -313,107 +314,8 @@ def test_declarations():
         cut = None
 
     assert "unitality" not in Hidden.axioms
-    assert "cut" not in Hidden.rules
-    assert list(cat.Arrow.generators) == ["ax"]
+    assert "cut" not in Rule.inherited(Hidden)
     assert list(Rule.inherited(Category)) == ["ax", "cut"]
-
-
-def test_focusing():
-    """ A goal commits to the rule it applies deterministically, with an
-    ``epsilon`` chance of escaping back to the full search: only a
-    biclosed category has invertible rules to focus on. """
-    from discopy import biclosed, rigid, symmetric
-
-    a, b = biclosed.Ty("a"), biclosed.Ty("b")
-
-    def rules_in_focus(cls, dom, cod):
-        return [found.name for found, _ in cls.focus(
-            cls.branches(dom, cod), dom, cod)]
-
-    assert rules_in_focus(biclosed.Diagram, a, b << a) == ["curry_left"]
-    assert [name for name, r in rigid.Diagram.rules.items()
-            if r.recursive] == ["cut", "mix"]
-    x, y, z = map(rigid.Ty, "xyz")
-    curry = vars(rigid.Diagram)["curry_left"].bind(rigid.Diagram)
-    assert not rigid.Diagram.focus(
-        [(curry, list(curry.match(x, y @ z.l)))],
-        x, y @ z.l)  # z is no subformula of z.l.
-    # A rigid curry is derived — caps and cut reach every transpose —
-    # and self-dual types would let it focus on every goal.
-    s = symmetric.Ty("s")
-    assert symmetric.Diagram.focus(
-        symmetric.Diagram.branches(s, s), s, s) == []
-
-    curried = find(biclosed.Diagram.search(
-        dom=a, cod=b << a, epsilon=0), bool)
-    assert isinstance(curried.boxes[-1], biclosed.Curry)
-    for epsilon in (0.5, 1e-4):  # Support survives any epsilon > 0.
-        escaped = find(biclosed.Diagram.search(
-            dom=a, cod=b << a, epsilon=epsilon),
-            lambda term: not any(
-                isinstance(box, biclosed.Curry) for box in term.boxes))
-        assert escaped.cod == b << a
-
-
-def test_goal_patterns():
-    """ The sides of a goal are patterns under a shared substitution. """
-    from typing import TypeVar
-
-    from discopy import markov
-
-    A = TypeVar("A")
-    loop = find(Diagram.search(dom=A, cod=A),
-                lambda term: len(term.boxes) == 1)
-    assert loop.dom == loop.cod
-    copy = find(
-        markov.Diagram.search(dom=A, cod=Tensor[A, A]),
-        lambda term: bool(term.boxes)
-        and all(isinstance(box, markov.Copy) for box in term.boxes))
-    assert copy.cod == copy.dom @ copy.dom
-
-
-def test_contexts():
-    """ Each doctrine rewires a side of a goal by its own plumbing before
-    a split of it puts a term in context: none for a planar category, a
-    permutation for a symmetric one, copies and discards on the domain of
-    a Markov one, cups and caps for a compact one, spiders for a
-    hypergraph one. """
-    from hypothesis import given, settings, strategies as st
-    from discopy import compact, frobenius, markov, monoidal, symmetric
-
-    def plumbing(level, dom, side, other):
-        @st.composite
-        def rewirings(draw):
-            return level.Diagram.rewire(draw, dom, side, other)
-        return rewirings()
-
-    x, y = Ty("x"), Ty("y")
-    assert find(plumbing(monoidal, x @ y, True, None), bool) == (
-        x @ y, None)
-
-    for level, kinds in (
-            (symmetric, ("Swap", "Permutation")),
-            (markov, ("Copy", "Discard")),
-            (compact, ("Cup", "Cap")),
-            (frobenius, ("Spider", ))):
-        a, b = level.Ty("a"), level.Ty("b")
-        for side in (True, False):
-            if level is markov and not side:
-                kinds = ("Swap", "Permutation")
-
-            @settings(max_examples=30, database=None)
-            @given(plumbing(level, a @ b @ a, side, b))
-            def wired(rewiring):
-                value, wiring = rewiring
-                if wiring is not None:
-                    assert (wiring.dom, wiring.cod) == (
-                        (a @ b @ a, value) if side else (value, a @ b @ a))
-            wired()
-            found = find(plumbing(level, a @ b @ a, side, b),
-                         lambda rewiring: rewiring[1] is not None and any(
-                             type(box).__name__ in kinds
-                             for box in rewiring[1].boxes))
-            assert found[1] is not None, (level, side)
 
 
 def test_constant():

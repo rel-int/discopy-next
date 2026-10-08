@@ -219,18 +219,19 @@ class Circuit(tensor.Diagram[complex]):
         :data:`discopy.quantum.gates.GATES` that take no parameter and by
         the swap, so that :meth:`strategy` draws circuits over them; a
         gate set assigns its own, see
-        :attr:`discopy.cat.Arrow.generators`.
+        :meth:`discopy.axioms.Testable.sample`.
         """
         from discopy.quantum.gates import GATES
 
-        return {"ax": cls.rules["ax"], "braid": cls.rules["braid"],
+        rules = Rule.inherited(cls)
+        return {"ax": rules["ax"], "braid": rules["braid"],
                 **{name: Rule.constant(gate) for name, gate in GATES.items()
                    if not isinstance(gate, type)}}
 
     @classmethod
     def strategy(cls, *, dom=None, cod=None, **params):
         """
-        Generate circuits by :func:`discopy.axioms.search` over
+        Generate circuits by :meth:`discopy.axioms.Testable.sample` over
         :attr:`generators`, on the given qubits and bits, the codomain
         being the domain by default, a gate keeping its wires.
 
@@ -242,9 +243,8 @@ class Circuit(tensor.Diagram[complex]):
         >>> assert circuit.dom == circuit.cod == qubit ** 2
         >>> assert CX in circuit.boxes
         """
-        return frobenius.Diagram.strategy.__func__(
-            cls, dom=dom, cod=dom if cod is None else cod,
-            boundary_connected=True, **params)
+        return cls.sample(dom=dom, cod=dom if cod is None else cod,
+                          boundary_connected=True, **params)
 
     trace_left = tensor.Diagram.trace_left.admissible(
         "A trace unfolds into kets and bras.")

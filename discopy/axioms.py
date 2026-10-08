@@ -4,7 +4,7 @@ Property-based testing of the axioms with `Hypothesis
 on an abstract base class of :mod:`discopy.abc` as a sequent — see
 :mod:`discopy.pattern` for the language of the rules — every subclass
 inherits it, and a type generates the terms it quantifies over through
-:meth:`Testable.strategy`, by :meth:`discopy.cat.Arrow.search` for
+:meth:`Testable.strategy`, by :meth:`discopy.axioms.Testable.sample` for
 diagrams. :meth:`Testable.matrix` lists every law of every type that does,
 which ``proptest/`` checks against generated terms.
 
@@ -48,9 +48,10 @@ from collections.abc import Callable
 from copy import deepcopy
 from dataclasses import KW_ONLY, dataclass, field, replace
 from functools import wraps
-from typing import TYPE_CHECKING, Self
+from typing import TYPE_CHECKING, Self, get_origin
 
-from discopy.pattern import Constant, Declaration
+from discopy.pattern import (
+    Constant, Counts, Declaration, Hom, Rule, Sort, Substitution, Terms)
 from discopy.utils import (
     AxiomError,
     NamedGeneric,
@@ -220,27 +221,128 @@ class Testable[T](metaclass=ABCMeta):
         return Axiom.inherited(cls)
 
     @classmethod
-    def environment(cls) -> dict:
+    def sample(cls, declaration: Declaration | None = None, *,
+               dom=None, cod=None, max_depth: int | None = None,
+               **params) -> "st.SearchStrategy":
         """
-        The namespace the representation of a term reads back in: the
-        public names of the package, as ``from discopy import *`` binds
-        them, so that a representation qualified by module such as
-        ``cat.Box('f', cat.Ob('x'), cat.Ob('y'))`` evaluates, and then
-        those of the module the class is defined in, so that one
-        printing bare names such as ``Tensor[int]([0], dom=Dim(1),
-        cod=Dim(1))`` evaluates too. The module comes second because a
-        term prints the names its own module binds: ``Dim`` in
-        ``discopy.tensor`` is the one a tensor is built from.
+        Sample at random by applying the rules of the category: the
+        arguments of a ``declaration`` bound to it when one is given, else
+        a term from ``dom`` to ``cod``, either :obj:`None` for any.
 
-        The import is local because the package imports this module.
+        A term is a free :attr:`Box` or the conclusion of a rule chosen at
+        random among those whose conclusion matches the goal, its premises
+        sampled in turn: an object of a class by the strategy of that
+        class, a morphism of the category as a term while fewer than
+        ``max_depth`` rules are nested, one of another category by the
+        strategy of that category. A category over a fixed vocabulary of
+        ``generators`` has no free box and gets six nested rules rather
+        than three, its every box being a rule. A term built outside its
+        goal is a rule lying about its conclusion, an
+        :class:`discopy.utils.AxiomError`, an example whose residual
+        equations fail is rejected, and ``boundary_connected=True`` keeps
+        the terms :meth:`discopy.monoidal.Diagram.normal_form` is defined
+        on.
+
+        Parameters:
+            declaration : The rule or law whose arguments to sample.
+            dom : The domain of the term, :obj:`None` for any.
+            cod : The codomain of the term, :obj:`None` for any.
+            max_depth : The number of rules a term may nest.
+            params : Passed to the strategies of other categories.
+
+        >>> from hypothesis import find
+        >>> from discopy.monoidal import Ty, Diagram
+        >>> x, y = Ty('x'), Ty('y')
+        >>> term = find(Diagram.sample(dom=x, cod=y),
+        ...             lambda term: len(term.boxes) > 1)
+        >>> assert (term.dom, term.cod) == (x, y)
         """
-        import discopy
+        from hypothesis import assume, strategies as st
 
-        public = lambda namespace: {
-            name: value for name, value in namespace.items()
-            if not name.startswith("_")}
-        module = sys.modules[cls.__module__]
-        return dict(public(vars(discopy)), **public(vars(module)))
+        vocabulary = getattr(cls, "generators", None)
+        rules = list(Rule.inherited(cls).values())
+        if vocabulary is not None:
+            rules = [rule for rule in rules if rule.recursive]\
+                + list(vocabulary.values())
+        if max_depth is None:
+            max_depth = 3 if vocabulary is None else 6
+
+        @st.composite
+        def arguments(draw, declaration, subst, depth):
+            category = declaration.category or cls
+            owner = declaration.owner
+            subst = Substitution(subst, residuals=subst.residuals)
+
+            def value(sort, label):
+                if isinstance(sort, Counts):
+                    return draw(st.integers(0, Counts.maximum), label=label)
+                resolved = sort.resolve(category, owner)
+                if isinstance(sort, Terms):
+                    return draw(resolved.strategy(**params), label=label)
+                length = subst[sort.size] if isinstance(sort.size, str)\
+                    else sort.size
+                if length is None:
+                    return draw(resolved.strategy(), label=label)
+                try:
+                    return draw(resolved.strategy(
+                        min_length=length, max_length=length), label=label)
+                except TypeError:  # A strategy with no length to ask for.
+                    atoms = st.lists(resolved.strategy().filter(
+                        lambda atom: len(atom) == 1),
+                        min_size=length, max_size=length)
+                    return resolved().tensor(*draw(atoms, label=label))
+
+            variables = sorted(declaration.variables.items(), key=lambda
+                               item: not isinstance(item[1], Counts))
+            for label, sort in variables:
+                if label not in subst:
+                    subst[label] = value(sort, label)
+            for pattern, residual in subst.residuals:
+                assume(subst.instantiate(pattern, category.ob) == residual)
+            result = {}
+            for label, premise in declaration.premises.items():
+                if isinstance(premise, Sort):
+                    result[label] = value(premise, label)
+                elif get_origin(premise) is not Hom:
+                    result[label] = subst.instantiate(premise, category.ob)
+                elif isinstance(declaration, Rule)\
+                        and declaration.resolve(premise) is cls:
+                    sides = subst.instantiate(premise, category.ob)
+                    result[label] = draw(
+                        term(sides[0], sides[1], depth - 1), label=label)
+                else:
+                    sides = subst.instantiate(premise, category.ob)
+                    result[label] = draw(declaration.resolve(premise).strategy(
+                        dom=sides[0], cod=sides[1], **params), label=label)
+            return result
+
+        @st.composite
+        def term(draw, dom, cod, depth):
+            options = [None] if vocabulary is None else []
+            options += [
+                (rule, found) for rule in rules
+                if depth > 0 or not rule.recursive
+                for found in [list(rule.match(dom, cod))] if found]
+            assume(options)
+            choice = draw(st.sampled_from(options))
+            if choice is None:
+                result = draw(cls.Box.strategy(dom=dom, cod=cod))
+            else:
+                rule, found = choice
+                result = rule.apply(draw(arguments(
+                    rule, draw(st.sampled_from(found)), depth)))
+            if dom not in (None, result.dom) or cod not in (None, result.cod):
+                raise AxiomError(
+                    f"{choice[0] if choice else 'A free box'} concludes "
+                    f"{dom} -> {cod} but built {result.dom} -> {result.cod}.")
+            return result
+
+        if declaration is not None:
+            return arguments(declaration, Substitution(), max_depth)
+        terms = term(dom, cod, max_depth)
+        if not params.get("boundary_connected"):
+            return terms
+        return terms.filter(lambda term: term.is_boundary_connected)
 
     @classmethod
     def enrolled(cls) -> tuple[type[Testable], ...]:
@@ -351,7 +453,7 @@ class Axiom[**P, T](Declaration[P, T]):
     carrying that equation instead. A law is broken when *some* argument
     is a counterexample, so :attr:`broken` is declared by :meth:`failing`
     before any argument is generated: the property matrix marks such a
-    law as an expected failure and lets the search find the counterexample.
+    law as an expected failure and lets sampling find the counterexample.
 
     Parameters:
         function : The function stating the law, from the category and the
@@ -447,22 +549,16 @@ class Axiom[**P, T](Declaration[P, T]):
         into a closed component, on which the normal form of a term of
         the equation would not be defined.
         """
-        from hypothesis import strategies as st
 
         if self.category is None:
             raise TypeError(f"{self.name} is not bound to a class.")
         params = dict(self.params, **params)
 
-        def hom(category, dom, cod):
-            return category.strategy(dom=dom, cod=cod, **params)
-
-        @st.composite
-        def arguments(draw):
-            return evaluate(**self.generate(draw, hom)[1])
-
+        equations = self.bound.sample(self, **params).map(
+            lambda arguments: evaluate(**arguments))
         if not params.get("boundary_connected"):
-            return arguments()
-        return arguments().filter(lambda equation: all(
+            return equations
+        return equations.filter(lambda equation: all(
             term.is_boundary_connected for term in equation.terms))
 
     def strategy(self, **params) -> "st.SearchStrategy[Equation]":
@@ -596,6 +692,29 @@ class Serialisable(Testable):
     >>> assert Box.from_tree(f.to_tree()) == f
     """
     serialised_attrs: tuple[str, ...] = ()
+
+    @classmethod
+    def environment(cls) -> dict:
+        """
+        The namespace the representation of a term reads back in: the
+        public names of the package, as ``from discopy import *`` binds
+        them, so that a representation qualified by module such as
+        ``cat.Box('f', cat.Ob('x'), cat.Ob('y'))`` evaluates, and then
+        those of the module the class is defined in, so that one
+        printing bare names such as ``Tensor[int]([0], dom=Dim(1),
+        cod=Dim(1))`` evaluates too. The module comes second because a
+        term prints the names its own module binds: ``Dim`` in
+        ``discopy.tensor`` is the one a tensor is built from.
+
+        The import is local because the package imports this module.
+        """
+        import discopy
+
+        public = lambda namespace: {
+            name: value for name, value in namespace.items()
+            if not name.startswith("_")}
+        module = sys.modules[cls.__module__]
+        return dict(public(vars(discopy)), **public(vars(module)))
 
     def is_default(self, key: str) -> bool:
         """
