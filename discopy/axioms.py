@@ -52,7 +52,7 @@ from operator import attrgetter
 from typing import TYPE_CHECKING, ClassVar, Self
 
 from discopy.pattern import (
-    Constant, Count, Declaration, Hom, Obj, Pattern, Rule, Substitution)
+    Count, Declaration, Hom, Obj, Pattern, Rule, Substitution)
 from discopy.utils import (
     AxiomError,
     NamedGeneric,
@@ -234,8 +234,7 @@ class Testable[T](metaclass=ABCMeta):
         sampled in turn: a morphism of the category as a term while fewer
         than :attr:`max_depth` rules are nested, anything else by the
         strategy of its class on the ground pattern of the premise. A
-        category over a fixed vocabulary of ``generators`` has no free
-        box. A term built outside its goal is a rule lying about its
+        term built outside its goal is a rule lying about its
         conclusion, an :class:`discopy.utils.AxiomError`, and an example
         whose residual equations fail is rejected. The premises of an
         :class:`Axiom` keep to the subspace it was weakened to.
@@ -249,11 +248,7 @@ class Testable[T](metaclass=ABCMeta):
         """
         from hypothesis import assume, strategies as st
 
-        vocabulary = getattr(cls, "generators", None)
         rules = list(Rule.inherited(cls).values())
-        if vocabulary is not None:
-            rules = [rule for rule in rules if rule.recursive]\
-                + list(vocabulary.values())
 
         @st.composite
         def arguments(draw, declaration, subst, depth):
@@ -290,12 +285,10 @@ class Testable[T](metaclass=ABCMeta):
 
         @st.composite
         def term(draw, goal, depth):
-            options = [None] if vocabulary is None else []
-            options += [
+            options = [None] + [
                 (rule, found) for rule in rules
                 if depth > 0 or not rule.recursive
                 for found in [list(rule.match(goal))] if found]
-            assume(options)
             choice = draw(st.sampled_from(options))
             if choice is None:
                 result = draw(cls.Box.strategy(goal))
@@ -320,11 +313,7 @@ class Testable[T](metaclass=ABCMeta):
         """
         The subclasses that state laws and generate the terms those laws
         quantify over, by name: a type enrols itself by implementing
-        :meth:`strategy`, except a category over a fixed vocabulary, whose
-        :attr:`discopy.cat.Arrow.generators` are the
-        :class:`discopy.pattern.Constant` rules of its words or gates: it
-        fills only the sequents its vocabulary derives, and its laws are
-        those of the free category it lives in.
+        :meth:`strategy`.
 
         >>> from discopy.cat import Arrow
         >>> assert Arrow in Testable.enrolled()
@@ -334,9 +323,7 @@ class Testable[T](metaclass=ABCMeta):
                 testable.strategy()
             except NotImplementedError:
                 return False
-            return not any(
-                isinstance(value, Constant)
-                for value in getattr(testable, "generators", {}).values())
+            return True
 
         return tuple(sorted(
             (testable for testable in cls.subclasses()

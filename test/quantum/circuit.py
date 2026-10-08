@@ -733,23 +733,6 @@ def test_logical_vs_physical_swap():
     assert physical.to_drawing().boxes[0].is_crossing
 
 
-def test_random_circuits():
-    """ The strategy of a circuit draws circuits over the gate set. """
-    from hypothesis import find
-
-    from discopy.pattern import Hom
-    from discopy.quantum.gates import GATES
-
-    circuit = find(
-        Circuit.strategy(Hom(qubit @ qubit)),
-        lambda diagram: any(box.name == 'CX' for box in diagram.boxes)
-        and any(box.name == 'H' for box in diagram.boxes))
-    assert all(
-        box in GATES.values() or isinstance(box, Swap)
-        for box in circuit.boxes)
-    assert circuit.eval().array.shape == (2, 2, 2, 2)
-
-
 def test_loads_dumps():
     from discopy.utils import loads, dumps
     assert loads(dumps(Rx(1))) == Rx(1)

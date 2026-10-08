@@ -314,12 +314,3 @@ def test_declarations():
     assert "cut" not in Rule.inherited(Hidden)
     assert list(Rule.inherited(Category)) == ["ax", "cut"]
 
-
-def test_constant():
-    """ A word of a vocabulary is a rule with no premise. """
-    from discopy.grammar import pregroup
-    word = pregroup.Word('Alice', pregroup.Ty('n'))
-    constant = Rule.constant(word)
-    assert not constant.recursive and not constant.premises
-    assert constant.__doc__ == "The constant Alice."
-    assert constant.apply({}) == word
