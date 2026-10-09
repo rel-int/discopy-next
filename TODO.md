@@ -76,7 +76,9 @@ Round 3: @daydream6728's directive, [2026-10-06T11:43:35Z](https://github.com/re
 >
 > Regardless, the alternative to the sequents would be the current shapes in main, e.g. ComposablePair, TraceSuperposing, etc... which is arguably even more boilerplate and definitely less general. I'm not sure what would be a good third approach.
 
-- [WIP] @session_01TM6ep2BEKAeLmFZomE14Qx-2026-10-09 00:15 measure the directive's example: what reads `Count`, and what is still hardcoded about it
-- [WIP] @session_01TM6ep2BEKAeLmFZomE14Qx-2026-10-09 00:15 a criterion for *conclusive* (option 1) and its first measurement, since nothing on the branch measures one
-- [WIP] @session_01TM6ep2BEKAeLmFZomE14Qx-2026-10-09 00:15 strip what nothing reads, measured rather than guessed: coverage of the new modules over the whole suite
-- [WIP] @session_01TM6ep2BEKAeLmFZomE14Qx-2026-10-09 00:15 answer the directive on the pull request with those numbers
+- [x] the directive's example, measured: **9 declarations quantify over a `Count`**, 12 variables between them — `abc.MarkovCategory.copy`/`merge`/`merge_dagger`, `abc.HypergraphCategory.spiders` and their restatements on `markov.Diagram`, `frobenius.Diagram`, `para.Markov`, `para.Hypergraph` — since `8028287` of `2026-10-06T09:26:46Z`. What is still hardcoded: `Count.canonical` is two, `Count.strategy` draws 0–3 and `Count.resolve` is executed by nothing
+- [x] *conclusive* (option 1), a criterion and its first measurement: every declaration **states** a sequent, it **parses**, and it **instantiates**. 163 distinct declarations, 1,773 bound cells over 77 enrolled types, **0 parse failures**, **1,666/1,773 canonical instances build** (94.0%)
+- [x] strip what nothing reads: coverage over the whole suite (815 unit tests, 150 proptest cells) leaves **11 unexecuted statements of 983**, 99% — one method, `Count.resolve`, and four defensive branches. **Nothing to delete**: what the branch accumulates is scope, not dead code
+- [x] the directive answered on the pull request with those numbers
+- [ ] `pattern.cell` builds a free inhabitant by calling `Box(name, dom, cod)` or `factory(name)`, which `Hypergraph[C]`, every `Functor` class and `quantum.circuit.Ty` refuse, so `Axiom.canonical` and `Axiom.draw` raise on **107** of the 1,773 cells — 64, 36 and 9. `test_canonical_instances` walks the free `Diagram` categories only, which is why nothing reported it: fix it or file it
+- [ ] the reviewable minimum is a **split**, not a deletion: waiting on @daydream6728, one 🚀 of two on the pull request
