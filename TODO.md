@@ -76,7 +76,7 @@ Round 3: @daydream6728's directive, [2026-10-06T11:43:35Z](https://github.com/re
 >
 > Regardless, the alternative to the sequents would be the current shapes in main, e.g. ComposablePair, TraceSuperposing, etc... which is arguably even more boilerplate and definitely less general. I'm not sure what would be a good third approach.
 
-- [ ] measure the directive's example: what reads `Count`, and what is still hardcoded about it
-- [ ] a criterion for *conclusive* (option 1) and its first measurement, since nothing on the branch measures one
-- [ ] strip what nothing reads, measured rather than guessed: coverage of the new modules over the whole suite
-- [ ] answer the directive on the pull request with those numbers
+- [WIP] @session_01TM6ep2BEKAeLmFZomE14Qx-2026-10-09 00:15 measure the directive's example: what reads `Count`, and what is still hardcoded about it
+- [WIP] @session_01TM6ep2BEKAeLmFZomE14Qx-2026-10-09 00:15 a criterion for *conclusive* (option 1) and its first measurement, since nothing on the branch measures one
+- [WIP] @session_01TM6ep2BEKAeLmFZomE14Qx-2026-10-09 00:15 strip what nothing reads, measured rather than guessed: coverage of the new modules over the whole suite
+- [WIP] @session_01TM6ep2BEKAeLmFZomE14Qx-2026-10-09 00:15 answer the directive on the pull request with those numbers
