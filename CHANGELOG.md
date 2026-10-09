@@ -9,6 +9,28 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Added
 
+- Hypothesis strategies for every free category of the hierarchy, each
+  generating diagrams through the structure it is compared up to:
+  `CMap.strategy` and `Hypergraph.strategy` draw a wiring port by port
+  under the spider constraint of their category (any, left monogamous,
+  monogamous or bijective), symmetric and compact diagrams are downgraded
+  from a map, Markov, closed and hypergraph diagrams from a hypergraph,
+  feedback diagrams are the feedback of an acyclic wiring, and planar
+  diagrams come from moves on the open wires, put in normal form. A
+  requested boundary is always honoured with no filtering, by one balancing
+  box. `Ty.strategy` draws words and rigid wires a winding number.
+- Every diagram category, `CMap[symmetric.Diagram]`, `CMap[compact.Diagram]`,
+  `Hypergraph[markov.Diagram]` and `Hypergraph[frobenius.Diagram]` are
+  enrolled in the property matrix of `proptest/`, with
+  `proptest/test_strategies.py` checking the strategies themselves. Rigid
+  and feedback diagrams declare their dagger laws broken, caps and feedback
+  having no dagger, and state them on the subspaces where they hold with
+  `axioms.Subspace`, a wrapper for `Axiom.weaken`; a map reverses
+  composition under the dagger up to isomorphism. Axioms are named after
+  the attribute they are stored under, so a weakened law is a cell.
+- `CMap` and `Hypergraph` serialise with `to_tree`, naming their category,
+  and the repr of a hypergraph names it too so that it evaluates back.
+
 - `grammar.abstract`, abstract categorial grammars after de Groote's
   *Towards abstract categorial grammars* (2001)
   ([#398](https://github.com/discopy/discopy/issues/398)).
@@ -625,6 +647,22 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   reviewer first.
 
 ### Fixed
+
+- A member of a subscripted `NamedGeneric`, e.g. `Tensor[int]` or
+  `Hypergraph[markov.Diagram]`, unpickled as a member of its origin, since
+  the subscripted class never inherited `NamedGeneric.__setstate__`: it is
+  now rebuilt by `NamedGeneric.__reduce__`. `Copy` and `Discard` unpickle,
+  passing their type to `__new__`.
+- `from_tree` reads back `Trace`, `Twist`, `Spider`, `Copy`, `Merge`,
+  `Discard`, `Feedback` and an inverse `Braid`, and the repr of a `Trace`
+  evaluates back to it.
+- The dagger of a copy or merge stays in the category of its module, which
+  `closed` gets a `Merge` for, so that the dagger is an involution there.
+- `Hypergraph.make_causal` traces a wire with the type of its producer,
+  where it took the unwound type of its spider, so compact hypergraphs with
+  adjoint wires downgrade to diagrams; `Hypergraph.caps` accepts the rigid
+  `Cap(x, x.l)`; `feedback.Diagram.discard` builds a feedback box and
+  `feedback.Diagram.feedback` takes a memory of several wires.
 
 - `biclosed.Curry`'s own constructor defaulted to `left=False`, disagreeing
   with `Diagram.curry`'s `left=True` default since #560 unified the two: a
