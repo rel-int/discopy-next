@@ -65,3 +65,18 @@ Round 2: review of @toumix, 2026-10-06, quoted verbatim.
 - [ ] `#:` comments of `abc.Category` as docstrings: waiting on @toumix after @daydream6728's reply (abc.py:112)
 - [ ] decoupling patterns from `abc`, the import cycle: deferred by the user to later in this PR (pattern.py:107, :246)
 - [x] carried over from round 1: pylint in the dev group and CI, scoring 9.25 under the locked pylint
+
+Round 3: @daydream6728's directive, [2026-10-06T11:43:35Z](https://github.com/rel-int/discopy-next/pull/1#issuecomment-6015513416), quoted verbatim.
+
+> > I really like the sequent idea but for now it's not clear if this saves us more bureaucracy than it creates.
+>
+> Agreed, I think its possible to make it work in a nicer way. The branch as such accumulates a lot of past attempts so we'd better clear it first and strip it down to a minimum. For example, Count isn't even used right now. We have two options:
+> - for now i recommend to keep trying to make Count and other type level shenanigans work to be able to express all rules.
+> - if it doesn't end up being conclusive, don't use rules to sample diagrams and instead annotate generators (which can be thought of atomic logical rules), while structural rules would just become part of the search strategies.
+>
+> Regardless, the alternative to the sequents would be the current shapes in main, e.g. ComposablePair, TraceSuperposing, etc... which is arguably even more boilerplate and definitely less general. I'm not sure what would be a good third approach.
+
+- [ ] measure the directive's example: what reads `Count`, and what is still hardcoded about it
+- [ ] a criterion for *conclusive* (option 1) and its first measurement, since nothing on the branch measures one
+- [ ] strip what nothing reads, measured rather than guessed: coverage of the new modules over the whole suite
+- [ ] answer the directive on the pull request with those numbers
