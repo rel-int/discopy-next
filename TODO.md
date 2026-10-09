@@ -71,7 +71,7 @@ no cups and caps, with no filtering.
 
 ## Work
 
-- [ ] `discopy/axioms.py`: `Equation` (one symbol between consecutive terms, `checked`), `Axiom` (`failing`, `inapplicable`, `modulo`, `weaken`, `strategy` of equations, `falsify`, `canonical`, `draw`), `Testable` (`strategy`, `axioms`, `enrolled`, `matrix(once)`, `subclasses`) and `Serialisable` (`repr_transparency`, `pickling`, `copying`, `serialisation`); the arguments of a law drawn from plain parameters, replacing `Grid`, `ComposablePair`, `ComposableTriple`, `Subspace`, `resolve`, `substitute` and `assert_axioms`
+- [WIP] @session_01GCA2WzH7yAjMjeXrcZ6EGz-2026-10-09 11:46 `discopy/axioms.py`: `Equation` (one symbol between consecutive terms, `checked`), `Axiom` (`failing`, `inapplicable`, `modulo`, `weaken`, `strategy` of equations, `falsify`, `canonical`, `draw`), `Testable` (`strategy`, `axioms`, `enrolled`, `matrix(once)`, `subclasses`) and `Serialisable` (`repr_transparency`, `pickling`, `copying`, `serialisation`); the arguments of a law drawn from plain parameters, replacing `Grid`, `ComposablePair`, `ComposableTriple`, `Subspace`, `resolve`, `substitute` and `assert_axioms`
 - [ ] the laws of `discopy/abc.py` restated with plain parameters
 - [ ] the functor, conversion, rewriting and drawing laws of `cat`, `monoidal` and `symmetric`
 - [ ] the `.failing`, `.inapplicable`, `.modulo` and `.weaken` declarations of each level, with the shared reasons in `discopy/messages.py`
