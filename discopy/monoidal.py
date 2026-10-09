@@ -1415,7 +1415,7 @@ class Diagram(cat.Arrow, MonoidalCategory, RichDisplay):
     @classmethod
     def strategy(  # pylint: disable=too-many-arguments  # keyword-only bounds
             cls, *, types=None, dom=None, cod=None, min_leaves=None,
-            max_leaves=4, normal_form=True):
+            max_leaves=4, normal_form=True, moves=None):
         """
         Generate planar diagrams by a sequence of moves on the open wires,
         then put them in :meth:`normal_form` when it exists.
@@ -1444,6 +1444,11 @@ class Diagram(cat.Arrow, MonoidalCategory, RichDisplay):
             max_leaves : The maximum number of moves, not counting the box
                 that reaches ``cod``.
             normal_form : Whether to return the :meth:`normal_form`.
+            moves : The moves to draw from, among ``"box"``, ``"braid"``,
+                ``"twist"``, ``"cup"``, ``"cap"`` and ``"trace"``, by default
+                all those the category has: a subset generates the diagrams
+                of a weaker structure, e.g. ``("box", )`` those of a monoidal
+                category.
 
         Example
         -------
@@ -1457,11 +1462,17 @@ class Diagram(cat.Arrow, MonoidalCategory, RichDisplay):
 
         types = cls.ob.strategy() if types is None else types
         min_leaves = min_leaves or 0
-        moves = ("box", ) + (
+        available = ("box", ) + (
             ("braid", ) if issubclass(cls, abc.BraidedCategory) else ()) + (
             ("twist", ) if issubclass(cls, abc.BalancedCategory) else ()) + (
-            ("cup", "cap") if issubclass(cls, abc.RigidCategory) else ())
-        is_traced = issubclass(cls, abc.TracedCategory)
+            ("cup", "cap") if issubclass(cls, abc.RigidCategory) else ()) + (
+            ("trace", ) if issubclass(cls, abc.TracedCategory) else ())
+        if moves is not None and not set(moves) <= set(available):
+            raise ValueError(f"{factory_name(cls)} has no moves "
+                             f"{sorted(set(moves) - set(available))}.")
+        is_traced = "trace" in (available if moves is None else moves)
+        moves = tuple(move for move in available if move != "trace"
+                      and (moves is None or move in moves)) or ("box", )
 
         @st.composite
         def diagrams(draw):

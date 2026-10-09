@@ -77,7 +77,7 @@ from discopy import symmetric, monoidal, cmap, hypergraph
 from discopy.abc import MarkovCategory
 from discopy.cat import factory
 from discopy.monoidal import Ty  # noqa: F401  pylint: disable=unused-import
-from discopy.utils import assert_isatomic, factory_name
+from discopy.utils import assert_isatomic, factory_name, from_tree
 
 
 Layer = symmetric.Layer
@@ -234,12 +234,39 @@ class Copy(Box):
         return super().__new__(cls) if n else\
             cls.discard_factory.__new__(cls.discard_factory, x)
 
+    def __getnewargs__(self):
+        """ The arguments of :meth:`__new__`, which a pickle needs. """
+        return self.dom, len(self.cod)
+
     def dagger(self) -> Merge:
-        return Merge(self.dom, len(self.cod))
+        """
+        The merge of the same type, in the category of the copy.
+
+        >>> x = Ty('x')
+        >>> assert Copy(x).dagger() == Merge(x)
+        >>> assert Diagram.discard(x).dagger().dagger() == Discard(x)
+        """
+        return self.merge_factory(self.dom, len(self.cod))
 
     def __repr__(self):
         return (
             factory_name(type(self)) + f"({repr(self.dom)}, {len(self.cod)})")
+
+    def to_tree(self) -> dict:
+        """
+        Serialise a copy by its type and number of copies.
+
+        >>> from discopy.utils import dumps, loads
+        >>> x = Ty('x')
+        >>> for box in (Copy(x), Copy(x, 3), Discard(x), Merge(x)):
+        ...     assert loads(dumps(box)) == box
+        """
+        return {'factory': factory_name(type(self)),
+                'x': self.dom.to_tree(), 'n': len(self.cod)}
+
+    @classmethod
+    def from_tree(cls, tree: dict) -> Copy:
+        return cls(from_tree(tree['x']), tree['n'])
 
 
 class Merge(Box):
@@ -256,12 +283,22 @@ class Merge(Box):
         Box.__init__(self, name, dom=x ** n, cod=x,
                      draw_as_spider=True, color="black", drawing_name="")
 
-    def dagger(self) -> Merge:
-        return Copy(self.cod, len(self.dom))
+    def dagger(self) -> Copy:
+        """ The copy of the same type, in the category of the merge. """
+        return self.copy_factory(self.cod, len(self.dom))
 
     def __repr__(self):
         return (
             factory_name(type(self)) + f"({repr(self.cod)}, {len(self.dom)})")
+
+    def to_tree(self) -> dict:
+        """ Serialise a merge by its type and number of wires merged. """
+        return {'factory': factory_name(type(self)),
+                'x': self.cod.to_tree(), 'n': len(self.dom)}
+
+    @classmethod
+    def from_tree(cls, tree: dict) -> Merge:
+        return cls(from_tree(tree['x']), tree['n'])
 
 
 class Discard(Copy):

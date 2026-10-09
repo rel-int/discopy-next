@@ -27,6 +27,7 @@ Summary
     Grid
     ComposablePair
     ComposableTriple
+    Subspace
 
 .. admonition:: Functions
 
@@ -550,6 +551,56 @@ class ComposableTriple(Grid):
 
     n_rows, n_columns = 3, 1
     n_active_rows = 3
+
+
+class Subspace(Testable, NamedGeneric["factory"]):
+    """
+    The values of ``factory`` in a subspace, which an axiom is weakened to
+    with :meth:`Axiom.weaken` so that the matrix shows where a law holds
+    beside where it fails, e.g. the dagger of the rigid diagrams with no
+    cups or caps, those of the underlying monoidal category.
+
+    A subclass names the subspace: :attr:`params` restrict the strategy of
+    ``factory`` so that it generates the subspace directly, with no
+    filtering, and :meth:`contains` checks membership on construction. The
+    factory may be a :class:`Grid` of values, e.g. a pair of composable
+    arrows in the subspace, to which :attr:`params` are passed on.
+
+    Parameters:
+        value : The value of ``factory`` in the subspace.
+
+    Example
+    -------
+    >>> from hypothesis import find
+    >>> from discopy.cat import Arrow
+    >>> class Short(Subspace):
+    ...     params = dict(max_leaves=1)
+    ...     @classmethod
+    ...     def contains(cls, value):
+    ...         return len(value) <= 1
+    >>> assert len(find(Short[Arrow].strategy(), lambda x: True).value) <= 1
+    """
+    params: ClassVar[dict] = {}
+
+    def __init__(self, value):
+        if not self.contains(value):
+            raise ValueError(
+                f"{value!r} is not in {factory_name(type(self))}.")
+        self.value = value
+
+    @classmethod
+    def contains(cls, value) -> bool:
+        """ Whether a value is in the subspace, by default every value. """
+        del value
+        return True
+
+    @classmethod
+    def strategy(cls, **params):
+        """ The strategy of ``factory`` restricted by :attr:`params`. """
+        return cls.factory.strategy(**dict(cls.params, **params)).map(cls)
+
+    def __repr__(self):
+        return f"{factory_name(type(self))}({self.value!r})"
 
 
 def resolve(annotation, **params) -> st.SearchStrategy:

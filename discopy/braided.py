@@ -65,7 +65,8 @@ from discopy.abc import BraidedCategory
 from discopy.cat import factory
 from discopy.monoidal import Ty, Match
 from discopy.utils import (
-    assert_isatomic, BinaryBoxConstructor, deprecated_alias, factory_name)
+    assert_isatomic, BinaryBoxConstructor, deprecated_alias, factory_name,
+    from_tree)
 
 
 class Wire(monoidal.Wire):
@@ -202,6 +203,24 @@ class Braid(BinaryBoxConstructor, Box):
 
     def dagger(self):
         return type(self)(self.right, self.left, not self.is_dagger)
+
+    def to_tree(self) -> dict:
+        """
+        Serialise a braid, keeping whether it is an inverse.
+
+        >>> from discopy.utils import dumps, loads
+        >>> x, y = Ty('x'), Ty('y')
+        >>> assert loads(dumps(Braid(x, y).dagger())) == Braid(x, y).dagger()
+        """
+        tree = BinaryBoxConstructor.to_tree(self)
+        if self.is_dagger:
+            tree['is_dagger'] = True
+        return tree
+
+    @classmethod
+    def from_tree(cls, tree: dict) -> Braid:
+        left, right = map(from_tree, (tree['left'], tree['right']))
+        return cls(left, right, is_dagger=tree.get('is_dagger', False))
 
 
 def hexagon(cls: type, factory: Callable) -> Callable[[Ty, Ty], Diagram]:

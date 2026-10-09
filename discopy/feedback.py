@@ -148,9 +148,10 @@ from __future__ import annotations
 
 from discopy import monoidal, braided, markov, hypergraph
 from discopy.abc import FeedbackCategory
+from discopy.axioms import C1, ComposablePair, Grid, Subspace
 from discopy.utils import (
     deprecated_alias,
-    factory, factory_name, assert_isinstance, AxiomError,
+    factory, factory_name, assert_isinstance, AxiomError, from_tree,
 )
 
 
@@ -637,6 +638,39 @@ class Feedback(monoidal.Bubble, Box):
         arg, mem = map(repr, (self.arg, self.mem))
         return factory_name(type(self)) + f"({arg}, mem={mem})"
 
+    def dagger(self):
+        """
+        Feedback has no dagger: that of ``arg`` goes from ``cod @ mem`` to
+        ``dom @ mem.delay()``, so its memory would be fed back in time.
+
+        >>> x = Ty('x')
+        >>> Box('f', x @ x.delay(), x @ x).feedback().dagger()
+        Traceback (most recent call last):
+        ...
+        discopy.utils.AxiomError: Feedback has no dagger...
+        """
+        raise AxiomError(
+            f"Feedback has no dagger, it would feed {self.mem} back in time.")
+
+    def to_tree(self) -> dict:
+        """
+        Serialise a feedback by its argument and its memory.
+
+        >>> from discopy.utils import dumps, loads
+        >>> x, y = Ty('x'), Ty('y')
+        >>> fb = Box('f', x @ y.delay(), x @ y).feedback()
+        >>> assert loads(dumps(fb)) == fb
+        """
+        return {'factory': factory_name(type(self)),
+                'arg': self.arg.to_tree(), 'dom': self.dom.to_tree(),
+                'cod': self.cod.to_tree(), 'mem': self.mem.to_tree()}
+
+    @classmethod
+    def from_tree(cls, tree: dict) -> Feedback:
+        dom, cod, mem = (
+            from_tree(tree[key]) for key in ('dom', 'cod', 'mem'))
+        return cls(from_tree(tree['arg']), dom=dom, cod=cod, mem=mem)
+
     def to_drawing(self):
         return self.arg.to_drawing().trace()
 
@@ -749,6 +783,39 @@ Diagram.copy_factory, Diagram.merge_factory = Copy, Merge
 Diagram.feedback_factory, Diagram.followed_by = Feedback, FollowedBy
 Hypergraph = hypergraph.Hypergraph[Diagram]
 Id = Diagram.id
+
+
+class Memoryless(Subspace):
+    """
+    The feedback diagrams with no :class:`Feedback`, i.e. those of the
+    underlying Markov category, where the dagger is defined.
+
+    >>> x = Ty('x')
+    >>> assert Memoryless[Diagram](Copy(x)).value == Copy(x)
+    >>> Memoryless[Diagram](Diagram.wait(x))
+    Traceback (most recent call last):
+    ...
+    ValueError: ... is not in feedback.Memoryless[Diagram].
+    """
+    params = {"max_feedback": 0}
+
+    @classmethod
+    def contains(cls, value) -> bool:
+        values = value if isinstance(value, Grid) else (value, )
+        return not any(
+            isinstance(box, Feedback) for diagram in values
+            for box in diagram.boxes)
+
+
+Diagram.dagger_involution = FeedbackCategory.dagger_involution.failing(
+    "Feedback has no dagger, it would feed its memory back in time.")
+Diagram.dagger_contravariance = FeedbackCategory.dagger_contravariance.failing(
+    "Feedback has no dagger, it would feed its memory back in time.")
+Diagram.dagger_involution_without_feedback\
+    = FeedbackCategory.dagger_involution.weaken(f=Memoryless[C1])
+Diagram.dagger_contravariance_without_feedback\
+    = FeedbackCategory.dagger_contravariance.weaken(
+        pair=Memoryless[ComposablePair[C1]])
 
 
 class Equation(markov.Equation):

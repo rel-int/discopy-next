@@ -57,7 +57,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import ClassVar
 
 from discopy.axioms import (
@@ -112,13 +112,17 @@ class Category[C0, C1: Category](ABC):
 
         Names are collected before they are filtered, so that assigning
         anything that is not an axiom over an inherited one drops it
-        altogether, rather than restating it.
+        altogether, rather than restating it. Each axiom is named after the
+        attribute it is stored under, so that a law weakened beside its
+        failing declaration, e.g. ``dagger_involution_without_caps``, is a
+        cell of its own in the matrix.
         """
         visible = {
             name: value
             for base in reversed(cls.__mro__)
             for name, value in base.__dict__.items()}
-        return {name: value.bind(cls) for name, value in visible.items()
+        return {name: replace(value.bind(cls), name=name)
+                for name, value in visible.items()
                 if isinstance(value, Axiom)}
 
     @classmethod

@@ -129,6 +129,7 @@ from discopy.cat import factory
 from discopy.monoidal import Ty  # noqa: F401  pylint: disable=unused-import
 from discopy.utils import (
     factory_name,
+    from_tree,
     assert_isinstance,
     assert_istraceable,
 )
@@ -208,7 +209,29 @@ class Trace(Box, monoidal.Bubble):
         return self.name
 
     def __repr__(self):
-        return factory_name(type(self)) + f"({self.arg}, left={self.left})"
+        """
+        >>> from discopy import cat, monoidal, traced
+        >>> x = Ty('x')
+        >>> trace = Box('f', x @ x, x @ x).trace()
+        >>> assert eval(repr(trace)) == trace
+        """
+        return factory_name(type(self)) + f"({self.arg!r}, left={self.left})"
+
+    def to_tree(self) -> dict:
+        """
+        Serialise a trace by its argument and the side it traces.
+
+        >>> from discopy.utils import dumps, loads
+        >>> x = Ty('x')
+        >>> trace = Box('f', x @ x, x @ x).trace(left=True)
+        >>> assert loads(dumps(trace)) == trace
+        """
+        return {'factory': factory_name(type(self)),
+                'arg': self.arg.to_tree(), 'left': self.left}
+
+    @classmethod
+    def from_tree(cls, tree: dict) -> "Trace":
+        return cls(from_tree(tree['arg']), left=tree.get('left', False))
 
     def dagger(self):
         return self.arg.dagger().trace(left=self.left)

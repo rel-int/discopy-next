@@ -120,6 +120,15 @@ def get_origin(typ):
     return getattr(typ, "__origin__", typ)
 
 
+def rebuild_named_generic(func, origin, values, args):
+    """
+    Unpickle a member of a subscripted :class:`NamedGeneric` by calling the
+    reconstructor ``func`` of its pickle on the subscripted class itself,
+    which is found by subscripting its ``origin`` again with its ``values``.
+    """
+    return func(origin[values], *args)
+
+
 class NamedGeneric(Generic[TypeVar('T')]):
     """
     A ``NamedGeneric`` is a ``Generic`` where the type parameter has a name.
@@ -174,18 +183,27 @@ class NamedGeneric(Generic[TypeVar('T')]):
 
                         def __reduce__(self):
                             """
-                            Pickle a member of the subscripted class as a
-                            member of its origin carrying the values, since
-                            a class created inside a function cannot be
-                            found by name, see `how can I pickle a
-                            dynamically created nested class
+                            Pickle a member of the subscripted class by its
+                            origin and values, since a class created inside
+                            a function cannot be found by name, see `how can
+                            I pickle a dynamically created nested class
                             <https://stackoverflow.com/questions/1947904>`_.
+                            The class is rebuilt before the state is set,
+                            so that unpickling needs no ``__setstate__``,
+                            which the subscripted class does not inherit.
+
+                            >>> import pickle
+                            >>> from discopy.tensor import Tensor, Dim
+                            >>> t = Tensor[int]([1, 0, 0, 1], Dim(2), Dim(2))
+                            >>> u = pickle.loads(pickle.dumps(t))
+                            >>> assert type(u) is Tensor[int] and u == t
                             """
-                            func, args, data = super().__reduce__()
-                            if '[' in args[0].__name__:
-                                args = (origin, ) + args[1:]
-                                data |= {"__class_getitem__values__": values}
-                            return func, args, data
+                            func, args, *rest = super().__reduce__()
+                            if not args or args[0] is not type(self):
+                                return (func, args, *rest)
+                            return (
+                                rebuild_named_generic,
+                                (func, origin, values, args[1:]), *rest)
 
                     C.__module__ = origin.__module__
                     names = [getattr(v, "__name__", str(v)) for v in values]
@@ -298,12 +316,22 @@ def from_tree(tree: dict):
     >>> f = Box('f', 'x', 'y', data=42)
     >>> assert from_tree(tree) == f >> f[::-1]
     """
-    *modules, factory = tree['factory'].removeprefix('discopy.').split('.')
-    import discopy
+    return resolve_factory(tree['factory']).from_tree(tree)
+
+
+def resolve_factory(name: str) -> type:
+    """
+    The DisCoPy class with a given :func:`factory_name`, the inverse of it.
+
+    >>> from discopy.markov import Diagram
+    >>> assert resolve_factory(factory_name(Diagram)) is Diagram
+    """
+    *modules, factory = name.removeprefix('discopy.').split('.')
+    import discopy  # pylint: disable=import-outside-toplevel
     module = discopy
     for attr in modules:
         module = getattr(module, attr)
-    return getattr(module, factory).from_tree(tree)
+    return getattr(module, factory)
 
 
 def dumps(obj, **kwargs):

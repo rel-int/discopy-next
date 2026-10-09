@@ -204,6 +204,18 @@ class Discard(markov.Discard, Copy):
     "A markov discard in a closed category."
 
 
+class Merge(markov.Merge, Box):
+    """
+    A markov merge in a closed category, the dagger of a copy.
+
+    >>> x = Ty('x')
+    >>> assert Copy(x).dagger() == Merge(x)
+    >>> assert Diagram.discard(x).dagger().dagger() == Discard(x)
+    """
+
+    is_linear = False
+
+
 class Sum(markov.Sum, biclosed.Sum, Box):
     """
     A markov sum is a symmetric sum and a markov box,
@@ -239,7 +251,7 @@ CMap = cmap.CMap[Diagram]
 Diagram.box_factory = Box
 Diagram.functor_factory = Functor
 Hypergraph = hypergraph.Hypergraph[Diagram]
-Diagram.copy_factory = Copy
+Diagram.copy_factory, Diagram.merge_factory = Copy, Merge
 Diagram.swap_factory = Swap
 Diagram.permutation_factory = Permutation
 Diagram.curry_factory = Curry

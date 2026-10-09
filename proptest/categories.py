@@ -7,10 +7,33 @@ rather than in any one of them.
 
 import pytest
 
-from discopy import cat
-from discopy.utils import factory_name
+from discopy import (
+    balanced, biclosed, braided, cat, closed, compact, feedback, frobenius,
+    markov, monoidal, pivotal, ribbon, rigid, symmetric, traced)
+from discopy.cmap import CMap
+from discopy.hypergraph import Hypergraph
+from discopy.utils import factory_name, get_origin
 
-CATEGORIES = (cat.Arrow, )
+DIAGRAMS = tuple(module.Diagram for module in (
+    monoidal, braided, balanced, traced, biclosed, rigid, pivotal, ribbon,
+    symmetric, compact, markov, feedback, closed, frobenius))
+""" The free categories of the hierarchy, from planar to hypergraph. """
+
+QUOTIENTS = (
+    CMap[symmetric.Diagram], CMap[compact.Diagram],
+    Hypergraph[markov.Diagram], Hypergraph[frobenius.Diagram])
+""" The combinatorial structures the symmetric diagrams are compared up to.
+"""
+
+CATEGORIES = (cat.Arrow, ) + DIAGRAMS + QUOTIENTS
+
+
+def category_id(category) -> str:
+    """ The name of a category, with the parameter of a quotient. """
+    parameter = getattr(category, "category", None)
+    if parameter is None or parameter is category:
+        return factory_name(category)
+    return f"{factory_name(get_origin(category))}[{factory_name(parameter)}]"
 
 
 def category_parameters(classify=lambda category: ()):
@@ -20,4 +43,4 @@ def category_parameters(classify=lambda category: ()):
     """
     for category in CATEGORIES:
         yield pytest.param(
-            category, marks=classify(category), id=factory_name(category))
+            category, marks=classify(category), id=category_id(category))

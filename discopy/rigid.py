@@ -155,7 +155,8 @@ from typing import Iterator
 
 from discopy import cat, monoidal, biclosed, messages
 from discopy.abc import Pregroup, RigidCategory
-from discopy.axioms import GENERATORS
+from discopy.axioms import (
+    C1, GENERATORS, ComposablePair, Grid, Subspace)
 from discopy.cat import factory
 from discopy.utils import (
     assert_isatomic,
@@ -900,6 +901,39 @@ biclosed.Diagram.to_rigid = to_rigid
 Diagram.box_factory = Box
 Diagram.cup_factory, Diagram.cap_factory, Diagram.sum_factory = Cup, Cap, Sum
 Diagram.functor_factory = Functor
+
+
+class Progressive(Subspace):
+    """
+    The rigid diagrams with no cups and caps, i.e. those of the underlying
+    monoidal category, which is a dagger category.
+
+    >>> x = Ty('x')
+    >>> assert Progressive[Diagram](Box('f', x, x)).value == Box('f', x, x)
+    >>> Progressive[Diagram](Cap(x, x.l))
+    Traceback (most recent call last):
+    ...
+    ValueError: ... is not in rigid.Progressive[Diagram].
+    """
+    params = {"moves": ("box", )}
+
+    @classmethod
+    def contains(cls, value) -> bool:
+        values = value if isinstance(value, Grid) else (value, )
+        return not any(
+            isinstance(box, (Cup, Cap)) for diagram in values
+            for box in diagram.boxes)
+
+
+Diagram.dagger_involution = RigidCategory.dagger_involution.failing(
+    "Rigid caps and cups have no dagger, use pivotal instead.")
+Diagram.dagger_contravariance = RigidCategory.dagger_contravariance.failing(
+    "Rigid caps and cups have no dagger, use pivotal instead.")
+Diagram.dagger_involution_without_caps\
+    = RigidCategory.dagger_involution.weaken(f=Progressive[C1])
+Diagram.dagger_contravariance_without_caps\
+    = RigidCategory.dagger_contravariance.weaken(
+        pair=Progressive[ComposablePair[C1]])
 
 Id = Diagram.id
 

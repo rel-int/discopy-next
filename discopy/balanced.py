@@ -40,7 +40,7 @@ from discopy.abc import BalancedCategory
 from discopy.cat import factory
 from discopy.monoidal import (  # noqa: F401  pylint: disable=unused-import
     Colour, Ty)
-from discopy.utils import factory_name, assert_isatomic
+from discopy.utils import factory_name, assert_isatomic, from_tree
 
 
 @dataclass(frozen=True)
@@ -290,6 +290,23 @@ class Twist(Box):
 
     def dagger(self):
         return type(self)(self.dom, not self.is_dagger)
+
+    def to_tree(self) -> dict:
+        """
+        Serialise a twist by its type, keeping whether it is an inverse.
+
+        >>> from discopy.utils import dumps, loads
+        >>> x = Ty('x')
+        >>> assert loads(dumps(Twist(x).dagger())) == Twist(x).dagger()
+        """
+        tree = {'factory': factory_name(type(self)), 'dom': self.dom.to_tree()}
+        if self.is_dagger:
+            tree['is_dagger'] = True
+        return tree
+
+    @classmethod
+    def from_tree(cls, tree: dict) -> Twist:
+        return cls(from_tree(tree['dom']), tree.get('is_dagger', False))
 
 
 class Sum(braided.Sum, Box):

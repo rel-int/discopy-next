@@ -66,6 +66,8 @@ from discopy.utils import (
     assert_isinstance,
     classproperty,
     factory_name,
+    from_tree,
+    resolve_factory,
     unbiased,
 )
 
@@ -773,6 +775,34 @@ class CMap[C0: Pregroup, C1: CMap](
     def __hash__(self):
         return hash((
             self.dom, self.cod, self.boxes, self.edges, self.loops))
+
+    def to_tree(self) -> dict:
+        """
+        Serialise a map, with the name of its category.
+
+        >>> from discopy.utils import dumps, loads
+        >>> from discopy.compact import Ty, Box, CMap
+        >>> x = Ty('x')
+        >>> cmap = CMap.caps(x, x.r) >> Box('f', x, x).to_map() @ x.r
+        >>> assert loads(dumps(cmap)) == cmap
+        """
+        return {
+            'factory': 'cmap.CMap',
+            'category': factory_name(self.category),
+            'dom': self.dom.to_tree(),
+            'cod': self.cod.to_tree(),
+            'boxes': [box.to_tree() for box in self.boxes],
+            'edges': [int(i) for i in self.edges],
+            'loops': [loop.to_tree() for loop in self.loops]}
+
+    @classmethod
+    def from_tree(cls, tree: dict) -> CMap:
+        """ Decode a serialised map, see :meth:`to_tree`. """
+        factory = cls[resolve_factory(tree['category'])]
+        return factory(
+            from_tree(tree['dom']), from_tree(tree['cod']),
+            tuple(map(from_tree, tree['boxes'])), tree['edges'],
+            loops=tuple(map(from_tree, tree['loops'])))
 
     @classmethod
     def id(cls, dom=None) -> CMap:
@@ -1843,3 +1873,11 @@ cycles of this map.
             top=1, bottom=0, right=1, left=0, hspace=0, wspace=0)
         plt.show(block=block)
         return
+
+
+CMap.dagger_contravariance = CompactCategory.dagger_contravariance.modulo(
+    CMap.to_hypergraph)
+"""
+The dagger reverses composition up to isomorphism: equality of maps compares
+their boxes and loops in order, which the dagger of a composite reverses.
+"""

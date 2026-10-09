@@ -256,6 +256,13 @@ class Functor(rigid.Functor):
 Diagram.box_factory = Box
 Diagram.functor_factory = Functor
 Diagram.cup_factory, Diagram.cap_factory = Cup, Cap
+
+# A pivotal category has a dagger: the rigid laws hold again in full, so
+# their failing declarations and weakenings are not inherited.
+Diagram.dagger_involution = PivotalCategory.dagger_involution
+Diagram.dagger_contravariance = PivotalCategory.dagger_contravariance
+Diagram.dagger_involution_without_caps = None
+Diagram.dagger_contravariance_without_caps = None
 CMap = cmap.CMap[Diagram]
 Id = Diagram.id
 

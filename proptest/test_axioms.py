@@ -4,9 +4,7 @@ import pytest
 from hypothesis import given, note
 from hypothesis import strategies as st
 
-from discopy.utils import factory_name
-
-from proptest.categories import CATEGORIES
+from proptest.categories import CATEGORIES, category_id
 
 
 def axiom_parameters():
@@ -29,7 +27,7 @@ def axiom_parameters():
                 marks = ()
             yield pytest.param(
                 axiom, marks=marks,
-                id=f"{factory_name(category)}.{axiom.name}")
+                id=f"{category_id(category)}.{axiom.name}")
 
 
 @pytest.mark.parametrize("axiom", axiom_parameters())

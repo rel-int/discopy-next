@@ -66,7 +66,8 @@ from discopy import (
     monoidal, rigid, markov, compact, pivotal, cmap, hypergraph)
 from discopy.abc import HypergraphCategory
 from discopy.cat import factory
-from discopy.utils import assert_isatomic, deprecated_alias, factory_name
+from discopy.utils import (
+    assert_isatomic, deprecated_alias, factory_name, from_tree)
 
 
 class Wire(pivotal.Wire):
@@ -273,6 +274,26 @@ class Spider(Box):
     def dagger(self):
         phase = None if self.phase is None else -self.phase
         return type(self)(len(self.cod), len(self.dom), self.typ, phase)
+
+    def to_tree(self) -> dict:
+        """
+        Serialise a spider by its legs, type and phase.
+
+        >>> from discopy.utils import dumps, loads
+        >>> x = Ty('x')
+        >>> assert loads(dumps(Spider(1, 2, x))) == Spider(1, 2, x)
+        """
+        tree = {'factory': factory_name(type(self)),
+                'n_legs_in': len(self.dom), 'n_legs_out': len(self.cod),
+                'typ': self.typ.to_tree()}
+        if self.phase is not None:
+            tree['phase'] = self.phase
+        return tree
+
+    @classmethod
+    def from_tree(cls, tree: dict) -> Spider:
+        return cls(tree['n_legs_in'], tree['n_legs_out'],
+                   from_tree(tree['typ']), tree.get('phase', None))
 
     def rotate(self, left=False):
         del left

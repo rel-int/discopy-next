@@ -60,6 +60,9 @@ from discopy.drawing import Node, backend
 from discopy.python.finset import Permutation
 from discopy.utils import (
     factory_name,
+    from_tree,
+    get_origin,
+    resolve_factory,
     assert_isinstance,
     pushout,
     unbiased,
@@ -1055,12 +1058,64 @@ class Hypergraph(MonoidalCategory, NamedGeneric['category'], Testable):
         return type(self)(self.dom, self.cod, boxes, wires, spider_types)
 
     def __repr__(self):
-        spider_types = f", spider_types={self.spider_types}"\
+        """
+        The representation of a hypergraph names the category it is
+        parameterised by, so that it evaluates back to it.
+
+        >>> from discopy.markov import Ty, Box, Diagram
+        >>> graph = Box('f', Ty('x'), Ty('y')).to_hypergraph()
+        >>> from discopy import hypergraph, markov, monoidal, cat
+        >>> assert eval(repr(graph)) == graph
+        >>> assert type(eval(repr(graph))) is Hypergraph[Diagram]
+        """
+        spider_types = f", spider_types={self.spider_types!r}"\
             if self.scalar_spiders else ""
-        return factory_name(type(self))\
+        return self.qualified_name()\
             + f"(dom={repr(self.dom)}, cod={repr(self.cod)}, " \
               f"boxes={repr(self.boxes)}, " \
               f"wires={repr(self.wires)}{spider_types})"
+
+    @classmethod
+    def qualified_name(cls) -> str:
+        """ The name of the class, with that of its category if any. """
+        name = factory_name(get_origin(cls))
+        if cls.category is None:
+            return name
+        return f"{name}[{factory_name(cls.category)}]"
+
+    def to_tree(self) -> dict:
+        """
+        Serialise a hypergraph, with the name of its category.
+
+        >>> from discopy.utils import dumps, loads
+        >>> from discopy.frobenius import Ty, Hypergraph as H
+        >>> graph = H.spiders(1, 2, Ty('x')) >> H.cups(Ty('x'), Ty('x'))
+        >>> assert loads(dumps(graph)) == graph
+        """
+        dom_wires, box_wires, cod_wires = self.wires
+        return {
+            'factory': factory_name(get_origin(type(self))),
+            'category': factory_name(self.category),
+            'dom': self.dom.to_tree(),
+            'cod': self.cod.to_tree(),
+            'boxes': [box.to_tree() for box in self.boxes],
+            'wires': [list(dom_wires), [
+                [list(inputs), list(outputs)]
+                for inputs, outputs in box_wires], list(cod_wires)],
+            'spider_types': [typ.to_tree() for typ in self.spider_types]}
+
+    @classmethod
+    def from_tree(cls, tree: dict) -> Hypergraph:
+        """ Decode a serialised hypergraph, see :meth:`to_tree`. """
+        factory = cls[resolve_factory(tree['category'])]
+        dom_wires, box_wires, cod_wires = tree['wires']
+        wires = (tuple(dom_wires), tuple(
+            (tuple(inputs), tuple(outputs)) for inputs, outputs in box_wires
+        ), tuple(cod_wires))
+        return factory(
+            from_tree(tree['dom']), from_tree(tree['cod']),
+            tuple(map(from_tree, tree['boxes'])), wires,
+            tuple(map(from_tree, tree['spider_types'])))
 
     def __str__(self):
         return str(self.to_diagram())
