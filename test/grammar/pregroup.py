@@ -1,7 +1,6 @@
 from pytest import raises
 
 from discopy.grammar.pregroup import *
-from discopy.utils import from_tree
 
 
 def test_Word():
@@ -55,14 +54,6 @@ def test_normal_form():
         == (w2 >> w1 @ Id(n)).normal_form()
 
 
-def test_from_tree():
-    s, n = Ty('s'), Ty('n')
-    Alice, Bob = Word('Alice', n), Word('Bob', n)
-    loves = Word('loves', n.r @ s @ n.l)
-    sentence = Alice @ loves @ Bob >> Cup(n, n.r) @ Id(s) @ Cup(n.l, n)
-    assert sentence == from_tree(sentence.to_tree())
-
-
 def test_pregroup_swap_rotation():
     s, n = Ty('s'), Ty('n')
     assert Swap(n, s).r.dom == Swap(n, s).cod.r
@@ -82,3 +73,42 @@ def test_to_hypergraph():
     assert isinstance(round_trip, Diagram)
     assert round_trip.to_hypergraph() == hypergraph
     assert hash(round_trip.to_hypergraph()) == hash(hypergraph)
+
+def test_random_sentences():
+    """ The strategy of a pregroup diagram draws grammatical sentences. """
+    from hypothesis import find
+
+    from discopy.axioms import Rule
+
+    n, s = Ty('n'), Ty('s')
+    sentence = find(
+        Diagram.strategy(),
+        lambda diagram: diagram.foliation().boxes[0].name == 'Bob')
+    assert Diagram.Equation(sentence, (
+        Word('Bob', n) @ Word('loves', n.r @ s @ n.l) @ Word('Alice', n)
+        >> Cup(n, n.r) @ s @ Cup(n.l, n)))
+    assert all(isinstance(box, (Word, Cup)) for box in sentence.boxes)
+
+    class Sentence(Diagram):
+        """ A grammar assigns its own words. """
+        generators = {
+            "cups": Diagram.generators["cups"], **{
+                word.name: Rule.constant(word)
+                for word in (Word('Alice', n), Word('sleeps', n.r @ s))}}
+
+    assert find(Sentence.strategy(), bool).foliation() == (
+        Word('Alice', n) @ Word('sleeps', n.r @ s) >> Cup(n, n.r) @ s
+    ).foliation()
+
+
+def test_categorial_reductions():
+    from discopy.utils import AxiomError
+    n, s = Ty('n'), Ty('s')
+    with raises(AxiomError):
+        n.assert_isadjoint(s)
+    assert Diagram.fa(s, n) == s @ Cup(n.l, n)
+    assert Diagram.ba(n, s) == Cup(n, n.r) @ s
+    assert Diagram.fc(s, n, s) == s @ Cup(n.l, n) @ s.l
+    assert Diagram.bc(s, n, s) == s.r @ Cup(n, n.r) @ s
+    assert Spider(1, 2, n).rotate() == Spider(2, 1, n.r)
+    assert Spider(1, 2, n).rotate(left=True) == Spider(2, 1, n.l)

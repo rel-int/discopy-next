@@ -16,8 +16,6 @@ Summary
     Matplotlib
 """
 
-from __future__ import annotations
-
 from abc import ABC, abstractmethod
 from contextlib import contextmanager
 from math import sqrt
@@ -45,7 +43,7 @@ from discopy.config import (  # noqa: F401  pylint: disable=unused-import
     TRANSPARENT)
 
 if TYPE_CHECKING:
-    from discopy.drawing import PlaneGraph
+    from discopy.drawing import Drawing
 
 
 MATPLOTLIB_RC = {
@@ -79,8 +77,8 @@ def matplotlib_context():
         yield
 
 
-def draw(graph: PlaneGraph, **params):
-    """ Load a :class:`Backend` and draw a :class:`PlaneGraph` on it. """
+def draw(graph: Drawing, **params):
+    """ Load a :class:`Backend` and draw a :class:`Drawing` on it. """
     aspect = params.get('aspect', 'auto' if 'figsize' in params else 'equal')
     if params.get('legend', False) and not params.get('to_tikz', False):
         colours = Backend.region_colours(graph)
@@ -525,8 +523,10 @@ class Backend(ABC):
         around the crossing, matching the broken strands, so the ribbon going
         under is shadowed by the one going over.
         """
-        a, b = (self.braid_strand(*first, middle),
-                self.braid_strand(*second, middle))
+        a = self.braid_strand(
+            *first, middle)  # ty: ignore[too-many-positional-arguments]
+        b = self.braid_strand(
+            *second, middle)  # ty: ignore[too-many-positional-arguments]
         spans = [(0, 1)] if not gap else [(0, 0.5 - gap), (0.5 + gap, 1)]
         for t0, t1 in spans:
             a_sub, b_sub = (
@@ -717,12 +717,12 @@ class Backend(ABC):
             cell for cell in cells if cell[-1] not in (None, TRANSPARENT)]
 
     def draw_region_cell(self, left, right, facecolor):
+        # pylint: disable=unused-argument  # the base only measures the width
         """
         Fill the cell between two quadratic Beziers ``left`` and ``right``
         given as ``(top, control, bottom)`` triples spanning the same
         height band, see :meth:`region_cells`.
         """
-        # pylint: disable=unused-argument  # the base only measures the width
         self.max_width = max(
             self.max_width, max(x for x, _ in left + right))
 
@@ -858,13 +858,13 @@ class Backend(ABC):
                                   adaptive=ribbon is None)
 
     def draw_dual_rail_cap(self, positions, node, **params):
+        # pylint: disable=unused-argument  # draw_boxes passes params to all
         """
         Draws a :class:`discopy.ribbon.DualRailCap` as a single constant-width
         fold, i.e. two concentric half circles joining the outer and inner
         rails of two ribbons, filled with the colour of their region. A wide
         cap is flattened into a half ellipse, see :meth:`fold_depths`.
         """
-        # pylint: disable=unused-argument  # draw_boxes passes params to all
         box, j = node.box, node.j
         xs = [positions[Node("box_cod", i=i, j=j, x=box.cod[i])]
               for i in range(4)]
@@ -958,8 +958,8 @@ class Backend(ABC):
                            fontsize=params.get('fontsize', None))
 
     def draw_discard(self, positions, node, **params):
-        """ Draws a :class:`discopy.quantum.circuit.Discard` box. """
         # pylint: disable=unused-argument  # draw_boxes passes params to all
+        """ Draws a :class:`discopy.quantum.gates.Discard` box. """
         box, j = node.box, node.j
         for i in range(len(box.dom)):
             x = box.dom[i]
@@ -973,7 +973,7 @@ class Backend(ABC):
                 self.draw_wire(source, target)
 
     def draw_measure(self, positions, node, **params):
-        """ Draws a :class:`discopy.quantum.circuit.Measure` box. """
+        """ Draws a :class:`discopy.quantum.gates.Measure` box. """
         self.draw_box(positions, node, **dict(params, draw_box_labels=False))
         i, j = positions[node]
         self.draw_wire(
@@ -984,11 +984,11 @@ class Backend(ABC):
             (i, j - .1), (i + .05, j + .15), style='->', adaptive=False)
 
     def draw_dual_rail_braid(self, positions, node, **params):
+        # pylint: disable=unused-argument  # draw_boxes passes params to all
         """
         Draws a :class:`discopy.balanced.DualRailBraid`, i.e. the two ribbons
         ``(0, 1)`` and ``(2, 3)`` crossing as a whole rather than wire by wire.
         """
-        # pylint: disable=unused-argument  # draw_boxes passes params to all
         box, j = node.box, node.j
         dom = [positions[Node("box_dom", i=i, j=j, x=box.dom[i])]
                for i in range(len(box.dom))]
@@ -1014,11 +1014,11 @@ class Backend(ABC):
                                        adaptive=color is None)
 
     def draw_dual_rail_twist(self, positions, node, **params):
+        # pylint: disable=unused-argument  # draw_boxes passes params to all
         """
         Draws a :class:`discopy.balanced.DualRailTwist`, i.e. the two rails of
         a ribbon crossing each other twice in quick succession.
         """
-        # pylint: disable=unused-argument  # draw_boxes passes params to all
         box, j = node.box, node.j
         dom = [positions[Node("box_dom", i=i, j=j, x=box.dom[i])]
                for i in range(2)]
@@ -1545,7 +1545,8 @@ class Matplotlib(Backend):
         plt.margins(*margins)
         plt.subplots_adjust(
             top=1, bottom=0, right=1, left=0, hspace=0, wspace=0)
-        self.axis.set_aspect(params.get("aspect"))
+        self.axis.set_aspect(
+            params.get("aspect"))  # ty: ignore[invalid-argument-type]
         plt.axis('off')
         if xlim is not None:
             self.axis.set_xlim(*xlim)

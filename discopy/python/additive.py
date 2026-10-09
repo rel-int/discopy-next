@@ -14,8 +14,6 @@ Summary
     Function
 """
 
-from __future__ import annotations
-
 from functools import cache
 from itertools import accumulate
 from typing import Self
@@ -121,6 +119,14 @@ class Function(function.Function, SymmetricCategory):
             raise ValueError
         return Function.swap(*self.is_swap_of[::-1])
 
+    def trace_left(self, n=1):
+        """ The trace of ``n`` wires on the left, see :meth:`trace`. """
+        return self.trace(n, left=True)
+
+    def trace_right(self, n=1):
+        """ The trace of ``n`` wires on the right, see :meth:`trace`. """
+        return self.trace(n)
+
     def trace(self, n=1, left=False):
         """
         The additive trace of a function.
@@ -164,6 +170,6 @@ class Function(function.Function, SymmetricCategory):
         return Function(inside, x ** n, x)
 
 
-Swap = Function.braid = Function.swap
+Swap = Function.braid = Function.swap  # ty: ignore[invalid-assignment]
 Id = Function.twist = Function.id
 Merge = Function.merge

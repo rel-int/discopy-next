@@ -8,7 +8,12 @@ Under ``CI`` a registered profile inherits Hypothesis's ``ci`` defaults,
 
 import os
 
+import pytest
+
+import matplotlib
 from hypothesis import HealthCheck, settings
+
+matplotlib.use("Agg")
 from hypothesis.database import (
     DirectoryBasedExampleDatabase, GitHubArtifactDatabase,
     MultiplexedDatabase, ReadOnlyDatabase)
@@ -22,13 +27,27 @@ previous run's artifact before the tests and uploaded after them.
 COMMON = dict(
     derandomize=False, database=LOCAL, deadline=None, print_blob=True,
     suppress_health_check=[HealthCheck.filter_too_much])
-
+"""
+``filter_too_much`` is suppressed because the search rejects by design:
+a dead-ended goal rejects its example and a law weakened to a subspace,
+e.g. the boundary-connected diagrams, filters what the search samples.
+The ``checked_enough`` fixture of ``test_axioms.py`` stands in for it.
+"""
 
 PROFILE = os.environ.get("HYPOTHESIS_PROFILE", "dev")
 
 settings.register_profile("pr", max_examples=20, **COMMON)
 settings.register_profile("explore", max_examples=1000, **COMMON)
 settings.register_profile("dev", max_examples=100, **COMMON)
+settings.register_profile(
+    "fast", max_examples=100, derandomize=True, deadline=None,
+    print_blob=True,
+    suppress_health_check=[HealthCheck.filter_too_much])
+"""
+The budget of ``dev``, derandomized and hence without the example
+database, for a matrix of one cell per declaration of a law, see
+``once_per_declaration`` in ``test_axioms.py``.
+"""
 if PROFILE != "shared":
     settings.load_profile(PROFILE)
 
@@ -48,3 +67,13 @@ def pytest_configure(config):
         settings.register_profile(
             "shared", max_examples=100, **dict(COMMON, database=database))
         settings.load_profile("shared")
+
+
+@pytest.hookimpl(wrapper=True)
+def pytest_runtest_makereport(item, call):
+    """ Record on the item whether its test passed, for the fixtures that
+    check what a passing test did, e.g. ``checked_enough``. """
+    report = yield
+    if call.when == "call":
+        item.passed = report.passed
+    return report

@@ -39,7 +39,7 @@ def test_spider_adjoint():
     assert diagram.r == diagram.l == Spider(1, 2, n) >> two.r @ n >> one.r
 
 
-def test_spider_factory():
+def test_spiders_types():
     a, b, c = map(Ty, 'abc')
     ts = [a, a @ b, a @ b @ c]
     for i in range(5):

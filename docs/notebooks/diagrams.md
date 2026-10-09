@@ -92,7 +92,7 @@ class Ingredient(Ob):
 @factory
 class Recipe(Arrow):
     """ A recipe is just an arrow. """
-    ty_factory = Ingredient
+    ob = Ingredient
     inside: tuple[Step, ...]
     dom: Ingredient
     cod: Ingredient
@@ -353,14 +353,14 @@ class Valuation(Functor):
 ```
 
 Disjunction is given for free by the sum of arrows.
-Let's implement this with a subclass of `Sum` which we attach to `Formula` using the `sum_factory` attribute.
+Let's implement this with a subclass of `Sum` which we attach to `Formula` using the `Sum` attribute.
 We can then check that this indeed satisfies [De Morgan's laws](https://en.wikipedia.org/wiki/De_Morgan%27s_laws).
 
 ```python {.marimo}
 class Disjunction(Sum, Formula):
     """ A Disjunction is a Sum in a Formula. """
 
-Formula.sum_factory = Disjunction
+Formula.Sum = Disjunction
 Formula.__or__ = Formula.__add__
 
 P, Q = Atom('P'), Atom('Q')

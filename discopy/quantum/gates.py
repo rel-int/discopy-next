@@ -238,11 +238,11 @@ class QuantumGate(Box):
         super().__init__(name, dom, cod, data, **params)
 
     def __setstate__(self, state):
-        if "_array" in state and not state["_array"] is None:
+        if "_array" in state and state["_array"] is not None:
             state["data"] = state['_array'].flatten().tolist()
         if "_name" in state:
-            if state["_name"] in GATES and hasattr(
-                    GATES[state["_name"]], "data"):
+            if state["_name"] in GATES and not isinstance(
+                    GATES[state["_name"]], type):
                 state["data"] = copy.deepcopy(GATES[state["_name"]].data)
                 state["_z"] = GATES[state["_name"]].z
         super().__setstate__(state)
@@ -459,6 +459,7 @@ class Controlled(QuantumGate):
         return Controlled(controlled_conj, distance=-self.distance)
 
     def lambdify(self, *symbols, **kwargs):
+        # pylint: disable=unused-argument  # the signature of lambdify
         c_fn = self.controlled.lambdify(*symbols)
         return lambda *xs: type(self)(c_fn(*xs), distance=self.distance)
 
@@ -587,13 +588,14 @@ class Parametrized(Box):
 
     def subs(self, *args):
         data = rsubs(self.data, *args)
-        return type(self)(data)
+        return type(self)(data)  # ty: ignore[missing-argument]
 
     def lambdify(self, *symbols, **kwargs):
         from sympy import lambdify
         with backend() as np:
             data = lambdify(symbols, self.data, dict(kwargs, modules=np))
-        return lambda *xs: type(self)(data(*xs))
+        return lambda *xs: type(self)(  # ty: ignore[missing-argument]
+            data(*xs))
 
     def __str__(self):
         if isinstance(self, Controlled):
@@ -767,7 +769,8 @@ class Sqrt(Scalar):
     @property
     def array(self):
         with backend() as np:
-            return np.array(self.data ** .5)
+            return np.array(
+                self.data ** .5)
 
     def dagger(self):
         return self

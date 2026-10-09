@@ -2,6 +2,7 @@ import numpy as np
 import pytest
 from pytest import raises
 
+from discopy.abc import DaggerCategory
 from discopy.matrix import Matrix, backend
 from discopy.utils import AxiomError
 
@@ -36,6 +37,7 @@ def test_matrix_add():
         m + 123
     with raises(AxiomError):
         m + m.dagger()
+    assert isinstance(m, DaggerCategory)
 
 
 def test_repeat():
@@ -53,3 +55,10 @@ def test_autotyping():
     with backend('pytorch'):
         assert Matrix([0.5, 0.5], dom=1, cod=2).dtype == torch.float32
 
+
+def test_trace_one_wire():
+    m = Matrix[bool]([True, False, False, True] * 4, 4, 4)
+    assert m.trace_left() == m.trace(1, left=True)
+    assert m.trace_right() == m.trace()
+    with raises(TypeError):
+        Matrix[int]([1, 0, 0, 1], 2, 2).repeat()

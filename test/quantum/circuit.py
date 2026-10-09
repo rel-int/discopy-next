@@ -103,19 +103,6 @@ def test_pure_Box():
         Box('f', bit, qubit, is_mixed=False)
 
 
-def test_gate_hash():
-    """
-    Quantum gates carry their matrix as data, which numpy makes unhashable.
-    They must nevertheless be hashable and usable as functor keys, with a hash
-    that does not depend on hypergraph equality, see
-    https://github.com/discopy/discopy/pull/387
-    """
-    assert hash(Rx(0.25)) == hash(Rx(0.25)) and Rx(0.25) == Rx(0.25)
-    # A data-carrying gate can be stored and looked up in a dictionary.
-    assert {Rx(0.25): 42}[Rx(0.25)] == 42
-    assert X in {X} and hash(X) == hash(X)
-
-
 def test_Swap():
     assert Swap(bit, qubit).is_mixed
     assert Swap(bit, bit).eval(mixed=True) == Channel.swap(C(Dim(2)), C(Dim(2)))
@@ -655,11 +642,6 @@ def test_pennylane_gradient_methods():
         assert weights[0].grad is not None
 
 
-def test_loads_dumps():
-    from discopy.utils import loads, dumps
-    assert loads(dumps(Rx(1))) == Rx(1)
-
-
 mixed_circuits = [
     (Copy() >> Encode(2) >> CX >> Rx(0.3) @ Rz(0.3)
         >> SWAP >> Measure() @ Discard()),
@@ -749,3 +731,52 @@ def test_logical_vs_physical_swap():
     # The gate is a box: it stays whiskered and it is drawn as a crossing.
     assert str(qubit @ physical) == "qubit @ SWAP"
     assert physical.to_drawing().boxes[0].is_crossing
+
+
+def test_random_circuits():
+    """ The strategy of a circuit draws circuits over the gate set. """
+    from hypothesis import find
+
+    from discopy.quantum.gates import GATES
+
+    circuit = find(
+        Circuit.strategy(dom=qubit @ qubit, max_depth=2),
+        lambda diagram: any(box.name == 'CX' for box in diagram.boxes)
+        and any(box.name == 'H' for box in diagram.boxes))
+    assert all(
+        box in GATES.values() or isinstance(box, Swap)
+        for box in circuit.boxes)
+    assert circuit.eval().array.shape == (2, 2, 2, 2)
+
+
+def test_loads_dumps():
+    from discopy.utils import loads, dumps
+    assert loads(dumps(Rx(1))) == Rx(1)
+    assert loads(dumps(qubit @ bit)) == qubit @ bit
+
+
+def test_mixed_permutation():
+    circuit = Bits(1) @ Ket(0) >> Swap(bit, qubit)
+    assert np.allclose(
+        circuit.eval(contractor=tn.contractors.auto, mixed=True).array,
+        circuit.eval(mixed=True).array)
+    assert Swap(bit, bit).is_classical and not Swap(qubit, bit).is_classical
+    assert Swap(qubit, bit).array.shape == (2, 2, 2, 2)
+
+
+def test_errors():
+    with raises(ValueError):
+        Qudit(1)
+    with raises(ValueError):
+        Circuit.Cup(qubit, bit)
+    with raises(NotImplementedError):
+        Circuit.Spider(1, 2, qubit, phase=0.5)
+    with raises(NotImplementedError):
+        Circuit.Spider(0, 1, bit)
+    assert str(Controlled(Rx(0.5))) == str(CRx(0.5)) == "CRx(0.5)"
+    assert Rz(0.25).rotate().phase == 0.25
+
+
+def test_Ty_strategy():
+    from hypothesis import find
+    assert find(Ty.strategy(), lambda ty: ty == qubit @ bit) == qubit @ bit

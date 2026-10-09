@@ -30,7 +30,6 @@ def test_cup_chaining():
 
 def test_Permutation():
     x, y, z = map(Ty, "xyz")
-    assert Diagram.permutation_factory is Permutation
     perm = Permutation(x @ y @ z, [2, 0, 1])
     assert isinstance(perm, Box) and perm.cod == z @ x @ y
     assert Equation(perm >> perm.dagger(), Id(x @ y @ z))
@@ -64,3 +63,10 @@ def test_mixed_Layer_rotation_and_transpose():
     assert diagram.transpose_box(0, 0).boxes[-1] == f
     assert f.r in diagram.transpose_box(0, 1).boxes
     assert list(diagram.snake_removal()) == []
+
+
+def test_twist_and_uncurry():
+    x, y = Ty('x'), Ty('y')
+    assert CMap.twist(x) == CMap.id(x)
+    with raises(ValueError):
+        Box('f', x, y).uncurry(-1)

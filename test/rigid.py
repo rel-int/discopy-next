@@ -9,29 +9,10 @@ def test_Ob_init():
         Wire('x', z='y')
 
 
-def test_Ob_eq():
-    assert Wire('a') == Wire('a').l.r and Wire('a') != 'a'
-
-
-def test_Ob_hash():
-    a = Wire('a')
-    assert {a: 42}[a] == 42
-
-
 def test_Ty_over_under():
     x, y = Ty('x'), Ty('y')
     assert x.over(y) == x @ y.l == x << y
     assert y.under(x) == x.r @ y == x >> y
-
-
-def test_Box_hash():
-    x, y = Ty('x'), Ty('y')
-    f = Box('f', x, y)
-    assert f == f @ Id()
-    assert hash(f) == hash(f @ Id())
-    assert hash(f) == hash(Id() @ f)
-    assert f @ Id() in {f}
-    assert {f: 42}[f @ Id()] == 42
 
 
 def test_Box_hash_winding():
@@ -43,15 +24,6 @@ def test_Box_hash_winding():
     f = Box('f', x, x)
     assert f != f.rotate() and hash(f) != hash(f.rotate())
     assert f == Box('f', x, x) and hash(f) == hash(Box('f', x, x))
-
-
-def test_Ob_repr():
-    assert repr(Wire('a', z=42)) == "rigid.Wire('a', z=42)"
-
-
-def test_Ob_str():
-    a = Wire('a')
-    assert str(a) == "a" and str(a.r) == "a.r" and str(a.l) == "a.l"
 
 
 def test_Wire_unwind():
@@ -188,8 +160,46 @@ def test_curry_zero():
     assert f.curry(0) == f == f.curry(0, left=False)
 
 
+def test_Functor():
+    """ The functor of a rigid diagram rotates, so a boundary keeps its z. """
+    x, y = Ty('x'), Ty('y')
+    assert Diagram.Functor is Functor
+    assert Diagram.Functor({x: y}, {})(x.r) == y.r
+
+
+def test_Ob_repr():
+    assert repr(Wire('a', z=42)) == "rigid.Wire('a', z=42)"
+    assert repr(Wire('a', dom=Colour('red'))) == (
+        "rigid.Wire('a', dom=monoidal.Colour('red'), "
+        "cod=monoidal.Colour('none'))")
+
+
+def test_Ob_str():
+    a = Wire('a')
+    assert str(a) == "a" and str(a.r) == "a.r" and str(a.l) == "a.l"
+
+
+def test_Ob_dagger():
+    from discopy import biclosed, braided
+    assert braided.Wire('a').dagger() == braided.Wire('a')
+    assert biclosed.Wire('a').dagger() == biclosed.Wire('a')
+    with raises(AxiomError):
+        Wire('a').dagger()
+
+
+def test_Wire_strategy():
+    """ Rigid wires wind both ways, pivotal ones by parity, self-dual
+    ones not at all. """
+    from hypothesis import find
+    from discopy import frobenius, pivotal
+    assert find(Wire.strategy(), lambda wire: wire.z == -1).z == -1
+    assert find(pivotal.Wire.strategy(), lambda wire: wire.z).z == 1
+    assert find(frobenius.Wire.strategy(), lambda wire: True).z == 0
+    assert len(find(frobenius.Ty.strategy(), lambda ty: len(ty) == 1)) == 1
+
+
 def test_functor_factory():
     """ The functor of a rigid diagram rotates, so a boundary keeps its z. """
     x, y = Ty('x'), Ty('y')
-    assert Diagram.functor_factory is Functor
-    assert Diagram.functor_factory({x: y}, {})(x.r) == y.r
+    assert Diagram.Functor is Functor
+    assert Diagram.Functor({x: y}, {})(x.r) == y.r

@@ -13,10 +13,31 @@ def test_pushout():
 
 def test_Hypergraph_init():
     x, y = map(Ty, "xy")
+    f = Box('f', x, x)
     with raises(ValueError):
         H(x, x, (), ())
     with raises(AxiomError):
         H(x, y, (), ((0,), (), (0,)))
+    for wires in [((0, ), (), ()), ((0, ), (), (0, )),
+                  ((0, ), (((), (0, )), ), (0, )),
+                  ((0, ), (((0, ), ()), ), (0, ))]:
+        with raises(ValueError):  # Each boundary must match its type.
+            H(x, x, (f, ), wires)
+
+
+def test_Hypergraph_repr():
+    assert repr(H.spiders(0, 0, Ty('x'))).endswith(
+        "wires=((), (), ()), "
+        "spider_types=(frobenius.Ty(frobenius.Wire('x')),))")
+
+
+def test_Hypergraph_eq():
+    x, y = map(Ty, "xy")
+    f = Box('f', x, y).to_hypergraph()
+    assert f != 1 and f != H.id(x) and f != Box('g', x, y).to_hypergraph()
+    assert f.is_atom and f.atom == Box('f', x, y)
+    assert (f >> Box('g', y, x).to_hypergraph()).atom is None
+    assert H.permutation([0, 1], [x, y]) == H.id(x @ y)
 
 
 def test_Hypergraph_str():
@@ -26,28 +47,10 @@ def test_Hypergraph_str():
         == "Spider(1, 0, x) @ Spider(1, 0, y)"
 
 
-def test_Hypergraph_repr():
-    x, y = map(Ty, "xy")
-    assert repr(H.spiders(1, 0, x @ y))\
-        == "hypergraph.Hypergraph[Diagram]("\
-           "dom=frobenius.Ty(frobenius.Wire('x'), frobenius.Wire('y')), "\
-           "cod=frobenius.Ty(), boxes=(), wires=((0, 1), (), ()))"
-
-
-def test_Hypergraph_hash():
-    x, y = map(Ty, "xy")
-    assert hash(H.id(x @ y)) == hash(H.id(x) @ H.id(y))
-
-
 def test_Hypergraph_then():
     x, y = map(Ty, "xy")
     with raises(AxiomError):
         H.id(x) >> H.id(y)
-
-
-def test_Hypergraph_tensor():
-    Id = H.id
-    assert Id().tensor(Id(), Id()) == Id().tensor() == Id()
 
 
 def test_Hypergraph_getitem():
@@ -118,13 +121,14 @@ def test_Hypergraph_rotate():
         assert graph.rotate() == box.rotate().to_hypergraph()
 
 
-def test_Box():
-    box = Box('box', Ty('x'), Ty('y')).to_hypergraph()
-    assert box == box and box == box @ H.id() and box != 1
-
-
 def test_AxiomError():
+    from discopy import monoidal
     x, y = map(Ty, "xy")
+    f = monoidal.Box('f', monoidal.Ty('x'), monoidal.Ty('x'))
+    with raises(AxiomError):
+        Hypergraph[monoidal.Diagram].from_box(f).explicit_trace()
+    with raises(NotImplementedError):
+        Hypergraph.strategy()  # No host category to search.
     with raises(AxiomError):
         H.cups(x @ y, x @ y)
     with raises(AxiomError):
@@ -174,6 +178,7 @@ def test_spider_producers_and_consumers():
 
 def test_cups():
     x = Ty('x')
+    assert issubclass(H, DaggerCategory)
     assert H.cups(x, x).make_monogamous().dagger()\
         == H.caps(x, x).make_monogamous()
     assert H.caps(x, x).make_monogamous().dagger()\
@@ -251,7 +256,7 @@ def test_parameterisation():
     from discopy import frobenius
     assert H == Hypergraph[frobenius.Diagram]
     assert H.category == frobenius.Diagram
-    assert H.functor == frobenius.Functor == H.category.functor_factory
+    assert H.functor == frobenius.Functor == H.category.Functor
     assert H.ob == frobenius.Ty
 
 
@@ -267,12 +272,6 @@ def _naive_from_diagram(old):
         dom=type(old), cod=factory)(old)
 
 
-def test_Hypergraph_from_glued():
-    x = Ty('x')
-    f, g = Box('f', x, x).to_hypergraph(), Box('g', x, x).to_hypergraph()
-    assert H.from_glued(x, x, [(f, 0), (g, 0)]) == f >> g
-
-
 def test_Hypergraph_from_diagram_closed_loop():
     """ A cap glued directly onto a cup leaves a closed loop: it must
     survive gluing as a scalar spider rather than vanish because it is
@@ -284,30 +283,6 @@ def test_Hypergraph_from_diagram_closed_loop():
     assert hypergraph.n_spiders == 1 and hypergraph.scalar_spiders == [0]
     assert not hypergraph.is_acyclic
     assert hypergraph == _naive_from_diagram(diagram)
-
-
-def test_Hypergraph_from_diagram_matches_naive_composition():
-    """ Gluing every box in one pass agrees with folding their images with
-    :meth:`Hypergraph.then` one layer at a time, on diagrams that exercise
-    a chain of swaps, states and effects, and boxes of different arity and
-    coarity sharing a layer, see issue #623. """
-    x = Ty('x')
-    f = Box('f', x, x)
-    state, effect = Box('s', Ty(), x), Box('e', x, Ty())
-    split, merge = Box('p', x, x @ x), Box('m', x @ x, x)
-
-    chain = Diagram.id(x @ x)
-    for _ in range(6):
-        chain = chain >> (f @ x) >> Diagram.swap(x, x)
-
-    diagrams = [
-        chain,
-        state >> split >> merge >> effect,
-        Diagram.id(x) @ split >> f @ merge,
-        Cap(x, x) @ x >> x @ Cup(x, x),
-    ]
-    for diagram in diagrams:
-        assert diagram.to_hypergraph() == _naive_from_diagram(diagram)
 
 
 def test_Hypergraph_from_diagram_pinned_category():
@@ -341,3 +316,27 @@ def test_subclass_to_hypergraph():
     f, g = Gate('f', x, x), Gate('g', x, x)
     assert (f >> g).to_hypergraph().category == Circuit
     assert isinstance((f >> g).to_hypergraph().to_diagram(), Circuit)
+
+
+def test_Hypergraph_from_diagram_matches_naive_composition():
+    """ Gluing every box in one pass agrees with folding their images with
+    :meth:`Hypergraph.then` one layer at a time, on diagrams that exercise
+    a chain of swaps, states and effects, and boxes of different arity and
+    coarity sharing a layer, see issue #623. """
+    x = Ty('x')
+    f = Box('f', x, x)
+    state, effect = Box('s', Ty(), x), Box('e', x, Ty())
+    split, merge = Box('p', x, x @ x), Box('m', x @ x, x)
+
+    chain = Diagram.id(x @ x)
+    for _ in range(6):
+        chain = chain >> (f @ x) >> Diagram.swap(x, x)
+
+    diagrams = [
+        chain,
+        state >> split >> merge >> effect,
+        Diagram.id(x) @ split >> f @ merge,
+        Cap(x, x) @ x >> x @ Cup(x, x),
+    ]
+    for diagram in diagrams:
+        assert diagram.to_hypergraph() == _naive_from_diagram(diagram)

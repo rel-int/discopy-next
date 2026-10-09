@@ -23,6 +23,11 @@ Summary
     BX
     Diagram
     Box
+    Eval
+    Coeval
+    Curry
+    Sum
+    Bubble
     Word
     ForwardCrossedComposition
     BackwardCrossedComposition
@@ -40,13 +45,15 @@ Summary
         tree2diagram
 """
 
-from __future__ import annotations
+from typing import ClassVar
 
 from dataclasses import dataclass
 import re
+from typing import TYPE_CHECKING
 
 from discopy import biclosed, cmap, messages
-from discopy.cat import factory
+from discopy.axioms import no_strategy
+from discopy.cat import factory, Generator
 from discopy.grammar import thue
 from discopy.utils import (
     BinaryBoxConstructor,
@@ -57,19 +64,12 @@ from discopy.utils import (
 
 @factory
 class Ty(biclosed.Ty):
+    strategy = no_strategy
     "Base class for categorial grammar types."
 
 
-class Over(biclosed.Over):
-    "Categorial grammar type ``base << exponent``."
-
-    ob = Ty
-
-
-class Under(biclosed.Under):
-    "Categorial grammar type ``exponent >> base``."
-
-    ob = Ty
+Wire, Exp, Over, Under = (
+    Ty.Wire, Ty.Exp, Ty.Over, Ty.Under)
 
 
 @factory
@@ -77,7 +77,18 @@ class Diagram(biclosed.Diagram):
     """
     A categorial diagram is a biclosed diagram with rules and words as boxes.
     """
+    strategy = no_strategy
     ob = Ty
+    Functor: ClassVar[Generator]
+    TermBase: ClassVar[Generator]
+    Constant: ClassVar[Generator]
+    Variable: ClassVar[Generator]
+    Abstraction: ClassVar[Generator]
+
+    @Generator.classmethod
+    def Application(  # ty: ignore[invalid-attribute-override]
+            cls, func, args, left=False):
+        return BA(args, func) if left else FA(func, args)
 
     def to_pregroup(self):
         from discopy.grammar import pregroup
@@ -124,10 +135,10 @@ class Diagram(biclosed.Diagram):
         return BackwardCrossedComposition(middle << left, middle >> right)
 
 
-class Box(biclosed.Box, Diagram):
-    """
-    A categorial box is a grammar rule in a categorial diagram.
-    """
+Box, Eval, Coeval, Curry, Sum, Bubble = (
+    Diagram.Box, Diagram.Eval, Diagram.Coeval,
+    Diagram.Curry, Diagram.Sum, Diagram.Bubble)
+Box.strategy = no_strategy
 
 
 class Word(thue.Word, Box):
@@ -142,18 +153,6 @@ class Word(thue.Word, Box):
     """
 
 
-class Eval(biclosed.Eval, Box):
-    """
-    Evaluation box in a categorial grammar.
-    """
-
-
-class Curry(biclosed.Curry, Box):
-    """
-    The currying of a categorial diagram.
-    """
-
-
 class ForwardCrossedComposition(BinaryBoxConstructor, Box):
     """ Forward crossed composition rule. """
     def __init__(self, left, right):
@@ -164,7 +163,7 @@ class ForwardCrossedComposition(BinaryBoxConstructor, Box):
                 left, right, left.exponent, right.base))
         name = f"ForwardCrossedComposition({left}, {right})"
         dom, cod = left @ right, right.exponent >> left.base
-        Box.__init__(self, name, dom, cod)
+        self.Box.__init__(self, name, dom, cod)
         BinaryBoxConstructor.__init__(self, left, right)
 
 
@@ -178,10 +177,11 @@ class BackwardCrossedComposition(BinaryBoxConstructor, Box):
                 left, right, left.base, right.exponent))
         name = f"BackwardCrossedComposition({left}, {right})"
         dom, cod = left @ right, right.base << left.exponent
-        Box.__init__(self, name, dom, cod)
+        self.Box.__init__(self, name, dom, cod)
         BinaryBoxConstructor.__init__(self, left, right)
 
 
+@Diagram.generator
 class Functor(biclosed.Functor):
     """
     A categorial functor is a biclosed functor with a predefined mapping
@@ -212,7 +212,13 @@ class Functor(biclosed.Functor):
 CMap = cmap.CMap[Diagram]
 
 
-class TermBase(Box, biclosed.TermBase):
+@Diagram.generator
+class TermBase(  # ty: ignore[inconsistent-mro]
+        Box, biclosed.TermBase):
+    if TYPE_CHECKING:
+        def simplify(self) -> TermBase:
+            """ Recursively simplify the compositions of a term. """
+
     """
     A term in the internal language of a categorial grammar.
     """
@@ -223,6 +229,7 @@ class TermBase(Box, biclosed.TermBase):
         return BA(self, other) if left else FA(self, other)
 
 
+@Diagram.generator
 class Constant(TermBase, biclosed.Constant):
     def __init__(self, name: str, cod: Ty):
         biclosed.Constant.__init__(self, name, cod)
@@ -232,18 +239,21 @@ class Constant(TermBase, biclosed.Constant):
         return self
 
 
+@Diagram.generator
 class Variable(TermBase, biclosed.Variable):
     def simplify(self):
         return self
 
 
+@Diagram.generator
 class Abstraction(TermBase, biclosed.Abstraction):
     var: Variable
     body: Term
     left: bool = False
 
     def __init__(self, var: Variable, body: Term, left: bool = False):
-        biclosed.Abstraction.__init__(self, var, body, left)
+        biclosed.Abstraction.__init__(
+            self, var, body, left)
         TermBase.__init__(self, self.name, self.dom, self.cod)
 
     def simplify(self):
@@ -252,6 +262,9 @@ class Abstraction(TermBase, biclosed.Abstraction):
 
 class FA(TermBase, biclosed.Application):
     "Application of type ``Y`` with subterms of type ``Y << X`` and ``X``."
+    func: Term
+    args: Term
+
     def __init__(self, func, args):
         biclosed.Application.__init__(self, func, args, left=False)
         TermBase.__init__(self, self.name, self.dom, self.cod)
@@ -262,6 +275,9 @@ class FA(TermBase, biclosed.Application):
 
 class BA(TermBase, biclosed.Application):
     "Application of type ``Y`` with subterms of type ``X`` and ``X >> Y``."
+    func: Term
+    args: Term
+
     def __init__(self, args, func):
         biclosed.Application.__init__(self, func, args, left=True)
         TermBase.__init__(self, self.name, self.dom, self.cod)
@@ -283,8 +299,8 @@ class TypeRaising(TermBase):
         self.base, self.child, self.freevars = base, child, child.freevars
         super().__init__(name, child.dom, cod)
 
-    def eval(self, **kwargs):
-        return self.simplify().eval(**kwargs)
+    def eval(self, functor=None):
+        return self.simplify().eval(functor)
 
     def __repr__(self):
         return factory_name(type(self)) + f"({self.base!r}, {self.child!r})"
@@ -321,10 +337,15 @@ class BinaryTerm(TermBase):
     right: Term
 
     def __post_init__(self):
-        if set(self.left.freevars).intersection(self.right.freevars):
+        if set(
+            self.left.freevars  # ty: ignore[invalid-argument-type]
+        ).intersection(
+                self.right.freevars):  # ty: ignore[invalid-argument-type]
             raise ValueError("Expected disjoint free variables.")
         object.__setattr__(
-            self, "freevars", self.left.freevars + self.right.freevars)
+            self, "freevars",
+            self.left.freevars
+            + self.right.freevars)  # ty: ignore[unsupported-operator]
         object.__setattr__(self, "dom", self.left.dom @ self.right.dom)
 
     def __str__(self):
@@ -333,8 +354,8 @@ class BinaryTerm(TermBase):
     def simplify(self):
         return type(self)(self.left.simplify(), self.right.simplify())
 
-    def eval(self, **kwargs):
-        return self.simplify().eval(**kwargs)
+    def eval(self, functor=None):
+        return self.simplify().eval(functor)
 
     def __repr__(self):
         return factory_name(type(self)) + f"({self.left!r}, {self.right!r})"
@@ -498,15 +519,10 @@ def tree2diagram(tree: dict, dom=Ty()) -> Diagram:
     return Id().tensor(*children) >> rule
 
 
+Layer = Diagram.Layer
 Id = Diagram.id
-Diagram.functor_factory = Functor
-Diagram.curry_factory = Curry
-Diagram.eval_factory = Eval
 
-Ty.variable_factory = Variable
-Ty.constant_factory = Constant
-Ty.application_factory =\
-    lambda func, args, left=False: BA(args, func) if left else FA(func, args)
-Ty.abstraction_factory = Abstraction
-
-Ty.over_factory, Ty.under_factory = Over, Under
+Ty.Variable, Ty.Constant = (
+    Diagram.Variable, Diagram.Constant)
+Ty.Application, Ty.Abstraction = (
+    Diagram.Application, Diagram.Abstraction)

@@ -41,9 +41,8 @@ Example
 Channel([0.5+0.j, 0.5+0.j, 0.5+0.j, 0.5+0.j], dom=CQ(), cod=Q(Dim(2)))
 """
 
-from __future__ import annotations
-
 from discopy import frobenius, tensor
+from discopy.abc import ColouredMonoid
 from discopy.cat import factory
 from discopy.frobenius import Ty, Diagram, Box
 from discopy.matrix import backend
@@ -52,9 +51,13 @@ from discopy.quantum.circuit import (
 from discopy.quantum.gates import Discard, Measure, MixedState, Encode, Scalar
 from discopy.tensor import Dim, Tensor
 from discopy.utils import assert_isinstance
+from typing import Annotated
+
+from discopy.pattern import Hom, Var
+from discopy.search import rule
 
 
-class CQ:
+class CQ(ColouredMonoid):
     """
     A classical-quantum dimension is a pair of dimensions
     ``classical`` and ``quantum``.
@@ -166,17 +169,25 @@ class Channel(Tensor):
 
     def to_tensor(self) -> Tensor:
         """ The underlying tensor of a channel. """
-        return Tensor[self.dtype](
+        return Tensor[self.dtype](  # ty: ignore[invalid-type-form]
             self.array, self.dom.to_dim(), self.cod.to_dim())
 
     @classmethod
-    def id(cls, dom=CQ()) -> Channel:
+    @rule
+    def id[A](cls, dom: Annotated[CQ, Var(A)] = CQ()
+              ) -> Annotated[Channel, Hom(A, A)]:
         assert_isinstance(dom, CQ)
-        return cls(Tensor[cls.dtype].id(dom.to_dim()).array, dom, dom)
+        return cls(Tensor[
+            cls.dtype].id(dom.to_dim()).array,  # ty: ignore[invalid-type-form]
+            dom, dom)
 
-    def then(self, other: Channel = None, *others: Channel) -> Channel:
+    def then[A, B, C](
+            self: Annotated[Channel, Hom(A, B)],
+            other: Annotated[Channel | None, Hom(B, C)] = None,
+            *others: Channel) -> Annotated[Channel, Hom(A, C)]:
         if other is None or others:
-            return super().then(other, *others)
+            return super().then(
+                other, *others)  # ty: ignore[invalid-return-type]
         assert_isinstance(other, type(self))
         array = (self.to_tensor() >> other.to_tensor()).array
         return type(self)(array, self.dom, other.cod)
@@ -184,9 +195,13 @@ class Channel(Tensor):
     def dagger(self) -> Channel:
         return type(self)(self.to_tensor().dagger().array, self.cod, self.dom)
 
-    def tensor(self, other: Channel = None, *others: Channel) -> Channel:
+    def tensor[A, B, C, D](
+            self: Annotated[Channel, Hom(A, B)],
+            other: Annotated[Channel | None, Hom(C, D)] = None,
+            *others: Channel) -> Annotated[Channel, Hom([A, C], [B, D])]:
         if other is None or others:
-            return super().tensor(other, *others)
+            return super().tensor(
+                other, *others)  # ty: ignore[invalid-return-type]
         assert_isinstance(other, type(self))
         f = Box('f', Ty('c00', 'q00', 'q00'), Ty('c10', 'q10', 'q10'))
         g = Box('g', Ty('c01', 'q01', 'q01'), Ty('c11', 'q11', 'q11'))
@@ -343,12 +358,14 @@ class Functor(tensor.Functor):
             return self.cod(scalar, CQ(), CQ())
         if not other.is_mixed and other.is_classical:
             dom, cod = self(other.dom).classical, self(other.cod).classical
-            return self.cod.single(
-                Tensor[self.dtype](other.array, dom, cod))
+            return self.cod.single(Tensor[
+                self.dtype](
+                    other.array, dom, cod))
         if not other.is_mixed:
             dom, cod = self(other.dom).quantum, self(other.cod).quantum
-            return self.cod.double(
-                Tensor[self.dtype](other.array, dom, cod))
+            return self.cod.double(Tensor[
+                self.dtype](
+                    other.array, dom, cod))
         if hasattr(other, "array"):
             return self.cod(other.array, self(other.dom), self(other.cod))
         return frobenius.Functor.__call__(self, other)

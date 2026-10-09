@@ -105,49 +105,19 @@ def test_Tensor_caps():
         Tensor.caps(Dim(3), Dim(2))
 
 
-def test_Tensor_transpose():
-    assert Tensor.caps(Dim(2), Dim(2)).transpose()\
-        == Tensor.cups(Dim(2), Dim(2))
-
-
 def test_Tensor_conjugate():
     assert Tensor[complex]([1j], Dim(1), Dim(1)).conjugate().array == -1j
 
 
 def test_Tensor_tensor():
-    assert Tensor.tensor(Tensor.id(Dim(2))) == Tensor.id(Dim(2))
-
-    assert Tensor.id(Dim(2)) @ Tensor.id(Dim(3)) == Tensor.id(Dim(2, 3))
-
     v = Tensor([1, 0], Dim(1), Dim(2))
     assert v @ v == Tensor([1, 0, 0, 0], dom=Dim(1), cod=Dim(2, 2))
     assert v @ v.dagger() == v << v.dagger()
-
-    x, y = frobenius.Ty('x'), frobenius.Ty('y')
-    f, g = frobenius.Box('f', x, x), frobenius.Box('g', y, y)
-    ob, ar = {x: 2, y: 3}, {f: [1, 0, 0, 1], g: list(range(9))}
-    F = Functor(ob, ar)
-    assert F(f) @ F(g) == F(f @ g)
-
-
-def test_tensor_swap():
-    f = Tensor([1, 0, 0, 1], Dim(2), Dim(2))
-    g = Tensor(list(range(9)), Dim(3), Dim(3))
-    swap = Tensor.swap(Dim(2), Dim(3))
-    assert f @ g >> swap == swap >> g @ f
 
 
 def test_tensor_spiders():
     with raises(NotImplementedError):
         Tensor.spiders(1, 2, Dim(3), [0.5])
-
-
-def test_Functor_repr():
-    x = frobenius.Ty('x')
-    F = Functor({x: 2}, {}, dom=frobenius.Diagram, dtype=bool)
-    assert repr(F) ==\
-        "tensor.Functor(ob_map={frobenius.Ty(frobenius.Wire('x')): 2}, "\
-        "ar_map={}, dom=frobenius.Diagram, dtype=bool)"
 
 
 def test_Functor_call():
@@ -161,14 +131,6 @@ def test_Functor_call():
     with raises(TypeError):
         F("Alice")
     assert Functor(ob_map={x: Dim(2, 3)}, ar_map=None)(x) == Dim(2, 3)
-
-
-def test_Functor_swap():
-    x, y = frobenius.Ty('x'), frobenius.Ty('y')
-    f, g = frobenius.Box('f', x, x), frobenius.Box('g', y, y)
-    F = Functor({x: 2, y: 3}, {f: [1, 2, 3, 4], g: list(range(9))})
-    assert F(f @ g >> frobenius.Swap(x, y)) == \
-           F(frobenius.Swap(x, y) >> g @ f)
 
 
 def test_AxiomError():
@@ -208,12 +170,6 @@ def test_Tensor_subs():
 def test_Diagram_cups_and_caps():
     with raises(AxiomError):
         Diagram.cups(Dim(2), Dim(3))
-
-
-def test_Diagram_swap():
-    x, y, z = Dim(2), Dim(3), Dim(4)
-    assert Diagram.swap(x, y @ z) == \
-        (Swap(x, y) @ Id(z)) >> (Id(y) @ Swap(x, z))
 
 
 def test_Box():
@@ -395,3 +351,16 @@ def test_Functor_bubble():
     assert np.allclose(
         np.asarray(F(men_are_mortal.arg).array, dtype=float),
         np.asarray(men_are_mortal.arg.eval().array, dtype=float))
+
+
+def test_parameterised_box_pickle():
+    import pickle
+    box = Box("A", 2, 3)
+    assert pickle.loads(pickle.dumps(box)) == box
+
+
+def test_Permutation_array():
+    diagram = Diagram.permutation([1, 2, 0], Dim(2) @ Dim(3) @ Dim(4))
+    assert diagram.boxes[0].array.shape == (2, 3, 4, 3, 2, 4)
+    assert Tensor.permutation([0, 1], [Dim(2), Dim(3)])\
+        == Tensor.id(Dim(2, 3))

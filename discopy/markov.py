@@ -14,9 +14,14 @@ Summary
 
     Diagram
     Box
-    Swap
     Permutation
+    Swap
+    Trace
     Copy
+    Merge
+    Discard
+    Sum
+    Bubble
     Functor
 
 
@@ -71,16 +76,16 @@ Both copy and merge boxes are translated to spiders, thus when they appear
 in the same diagram they automatically satisfy the :mod:`frobenius` axioms.
 """
 
-from __future__ import annotations
+from typing import ClassVar
 
 from discopy import symmetric, monoidal, cmap, hypergraph
 from discopy.abc import MarkovCategory
-from discopy.cat import factory
+from typing import Annotated
+
+from discopy.axioms import Atom, Count, Hom, Var, rule, Serialisable
+from discopy.cat import factory, Generator
 from discopy.monoidal import Ty  # noqa: F401  pylint: disable=unused-import
 from discopy.utils import assert_isatomic, factory_name
-
-
-Layer = symmetric.Layer
 
 
 @factory
@@ -114,15 +119,39 @@ class Diagram(symmetric.Diagram, MarkovCategory):
 
     .. image:: /_static/markov/copy_and_apply.svg
     """
-    @classmethod
-    def spider_factory(cls, n_legs_in, n_legs_out, typ, phase=None):
+    Copy: ClassVar[Generator]
+    Merge: ClassVar[Generator]
+    Discard: ClassVar[Generator]
+    Functor: ClassVar[Generator]
+    map_hypergraph_agreement = \
+        monoidal.Diagram.map_hypergraph_agreement.inapplicable(
+            "to_hypergraph encodes copies and merges as spiders while "
+            "to_map keeps them as boxes.")
+
+    pickling = Serialisable.pickling.failing(
+        "A copy does not unpickle, its __new__ wanting its type (#742).")
+    copying = Serialisable.copying.failing(
+        "A copy does not deep-copy, its __new__ wanting its type (#742).")
+    repr_transparency = Serialisable.repr_transparency.failing(
+        "The generic representation of a copy does not read back, its "
+        "__new__ wanting its type (#742).")
+    serialisation = Serialisable.serialisation.failing(
+        "The generic tree of a copy does not read back, its __new__ "
+        "wanting its type (#742).")
+
+    @Generator.classmethod
+    def Spider(cls, n_legs_in, n_legs_out, typ, phase=None):
         if phase is not None or 1 not in (n_legs_in, n_legs_out):
             raise ValueError
-        return cls.copy_factory(typ, n_legs_out) if n_legs_in == 1\
-            else cls.merge_factory(typ, n_legs_in)
+        return cls.Copy(typ, n_legs_out) if n_legs_in == 1\
+            else cls.Merge(typ, n_legs_in)
 
     @classmethod
-    def copy(cls, x: monoidal.Ty, n=2) -> Diagram:
+    @rule
+    def copy[X: Atom, N: Count](
+            cls, x: Annotated[monoidal.Ty, Var(X)],
+            n: Annotated[int, Var(N)] = 2
+    ) -> Annotated[Diagram, Hom(X, Var(X) ** Var(N))]:
         """
         Make :code:`n` copies of a given type :code:`x`.
 
@@ -131,10 +160,15 @@ class Diagram(symmetric.Diagram, MarkovCategory):
             n : The number of copies.
         """
         from discopy import frobenius
-        return frobenius.Diagram.spiders.__func__(cls, 1, n, x)
+        return frobenius.Diagram.spiders.__func__(
+            cls, 1, n, x)  # ty: ignore[invalid-argument-type]
 
     @classmethod
-    def merge(cls, x: monoidal.Ty, n=2) -> Diagram:
+    @rule
+    def merge[X: Atom, N: Count](
+            cls, x: Annotated[monoidal.Ty, Var(X)],
+            n: Annotated[int, Var(N)] = 2
+    ) -> Annotated[Diagram, Hom(Var(X) ** Var(N), X)]:
         """
         Merge :code:`n` copies of a given type :code:`x`.
 
@@ -155,51 +189,12 @@ class Diagram(symmetric.Diagram, MarkovCategory):
         return cls.copy(x, 0)
 
 
-class Box(symmetric.Box, Diagram):
-    """
-    A Markov box is a symmetric box in a Markov diagram.
-
-    Parameters:
-        name (str) : The name of the box.
-        dom (monoidal.Ty) : The domain of the box, i.e. its input.
-        cod (monoidal.Ty) : The codomain of the box, i.e. its output.
-    """
+Box, Permutation, Swap, Trace = (
+    Diagram.Box, Diagram.Permutation,
+    Diagram.Swap, Diagram.Trace)
 
 
-class Permutation(symmetric.Permutation, Box):
-    """
-    A permutation in a Markov category.
-
-    Parameters:
-        dom (monoidal.Ty) : The domain, i.e. the wires to permute.
-        perm : The permutation as a :class:`finset.Permutation` or a list.
-    """
-
-
-class Swap(Permutation, symmetric.Swap, Box):
-    """
-    Symmetric swap in a Markov diagram.
-
-    Parameters:
-        left (monoidal.Ty) : The type on the top left and bottom right.
-        right (monoidal.Ty) : The type on the top right and bottom left.
-    """
-
-
-class Trace(symmetric.Trace, Box):
-    """
-    A trace in a Markov category.
-
-    Parameters:
-        arg : The diagram to trace.
-        left : Whether to trace the wires on the left or right.
-
-    See also
-    --------
-    :meth:`Diagram.trace`
-    """
-
-
+@Diagram.generator
 class Copy(Box):
     """
     The copy of an atomic type :code:`x` some :code:`n` number of times.
@@ -211,21 +206,23 @@ class Copy(Box):
     def __init__(self, x: monoidal.Ty, n: int = 2):
         assert_isatomic(x, monoidal.Ty)
         name = f"Copy({x}" + ("" if n == 2 else f", {n}") + ")"
-        Box.__init__(self, name, dom=x, cod=x ** n,
-                     draw_as_spider=True, color="black", drawing_name="")
+        self.Box.__init__(
+            self, name, dom=x, cod=x ** n,
+            draw_as_spider=True, color="black", drawing_name="")
 
     def __new__(cls, x: monoidal.Ty, n: int = 2):
         return super().__new__(cls) if n else\
-            cls.discard_factory.__new__(cls.discard_factory, x)
+            cls.Discard.__new__(cls.Discard, x)
 
     def dagger(self) -> Merge:
-        return Merge(self.dom, len(self.cod))
+        return self.Merge(self.dom, len(self.cod))
 
     def __repr__(self):
         return (
             factory_name(type(self)) + f"({repr(self.dom)}, {len(self.cod)})")
 
 
+@Diagram.generator
 class Merge(Box):
     """
     The merge of an atomic type :code:`x` some :code:`n` number of times.
@@ -237,17 +234,19 @@ class Merge(Box):
     def __init__(self, x: monoidal.Ty, n: int = 2):
         assert_isatomic(x, monoidal.Ty)
         name = f"Merge({x}" + ("" if n == 2 else f", {n}") + ")"
-        Box.__init__(self, name, dom=x ** n, cod=x,
-                     draw_as_spider=True, color="black", drawing_name="")
+        self.Box.__init__(
+            self, name, dom=x ** n, cod=x,
+            draw_as_spider=True, color="black", drawing_name="")
 
-    def dagger(self) -> Merge:
-        return Copy(self.cod, len(self.dom))
+    def dagger(self) -> Copy:
+        return self.Copy(self.cod, len(self.dom))
 
     def __repr__(self):
         return (
             factory_name(type(self)) + f"({repr(self.cod)}, {len(self.dom)})")
 
 
+@Diagram.generator
 class Discard(Copy):
     """
     The discard of an atomic type :code:`x`.
@@ -261,17 +260,10 @@ class Discard(Copy):
         super().__init__(x, 0)
 
 
-class Sum(symmetric.Sum, Box):
-    """
-    A markov sum is a symmetric sum and a markov box.
-
-    Parameters:
-        terms (tuple[Diagram, ...]) : The terms of the formal sum.
-        dom (Ty) : The domain of the formal sum.
-        cod (Ty) : The codomain of the formal sum.
-    """
+Sum, Bubble = Diagram.Sum, Diagram.Bubble
 
 
+@Diagram.generator
 class Functor(symmetric.Functor):
     """
     A Markov functor is a symmetric functor that preserves copies.
@@ -315,17 +307,14 @@ class Functor(symmetric.Functor):
 
 CMap = cmap.CMap[Diagram]
 
-Diagram.functor_factory = Functor
 Hypergraph = hypergraph.Hypergraph[Diagram]
-Diagram.copy_factory, Diagram.merge_factory = Copy, Merge
-Diagram.swap_factory = Swap
-Diagram.permutation_factory = Permutation
-Diagram.trace_factory = Trace
-Diagram.discard_factory = Discard
-Diagram.sum_factory = Sum
+Layer = Diagram.Layer
 Id = Diagram.id
 
 
 class Equation(symmetric.Equation):
     """ The :class:`symmetric.Equation` of Markov diagrams. """
     up_to = staticmethod(Diagram.to_hypergraph)
+
+
+Diagram.Equation = Equation

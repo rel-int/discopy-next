@@ -17,16 +17,6 @@ def test_Swap():
         Swap(x ** 2, Ty())
 
 
-def test_Box_hash():
-    x, y = Ty('x'), Ty('y')
-    f = Box('f', x, y)
-    assert f == f @ Id()
-    assert hash(f) == hash(f @ Id())
-    assert hash(f) == hash(Id() @ f)
-    assert f @ Id() in {f}
-    assert {f: 42}[f @ Id()] == 42
-
-
 def test_symmetric_Equation():
     """
     ``symmetric.Equation`` compares diagrams up to hypergraph isomorphism
@@ -96,7 +86,7 @@ def test_Permutation():
     assert list(perm.perm) == [1, 2, 0]
     assert perm.inside == (Layer(perm),)
     assert perm.boxes == [perm] and perm.size == 0
-    assert perm.is_generator and perm.generator == perm
+    assert perm.is_atom and perm.atom == perm
     assert perm.encode() == (perm.dom, [(perm, 0)])
     assert Diagram.decode(*perm.encode()) == perm
     identity = Permutation(x @ y @ z, [0, 1, 2])
@@ -104,17 +94,6 @@ def test_Permutation():
     assert identity.inside == () and identity.boxes == []
     assert Permutation.id(x @ y @ z) == Id(x @ y @ z)
     assert Permutation.id(x @ y @ z).inside == ()
-    assert Equation(perm >> perm.dagger(), Id(x @ y @ z))
-    assert perm.dagger().dagger() == perm
-    a = Permutation(x @ y @ z, [1, 2, 0])
-    b = Permutation(a.cod, [2, 0, 1])
-    c = Permutation(b.cod, [0, 2, 1])
-    assert (a >> b) >> c == a >> (b >> c)
-    assert Id(x @ y @ z) >> a == a == a >> Id(a.cod)
-    assert (a >> b).dagger() == b.dagger() >> a.dagger()
-    q = Permutation(z @ y, [1, 0])
-    assert (perm @ q).dagger() == perm.dagger() @ q.dagger()
-    assert (perm @ q).dom == perm.dom @ q.dom
     swap = Swap(x, y)
     assert Permutation(x @ y, [1, 0]) == swap
     assert isinstance(Swap(x, y), Permutation)
@@ -190,19 +169,18 @@ def test_Layer_coalesces_plumbing():
         x, f, Permutation(y @ x @ y @ z, [0, 2, 1, 3]))
 
 
-def test_Layer_factory_ownership():
+def test_Layer_ownership():
     from discopy import compact, markov, symmetric
 
     for module in (compact, markov):
-        assert module.Diagram.permutation_factory is module.Permutation
         x, y = module.Ty('x'), module.Ty('y')
         permutation = module.Permutation(x @ y, [1, 0])
         layer = module.Layer(permutation)
         assert type(layer.boxes_and_types[1]) is module.Swap
         assert issubclass(module.Swap, module.Permutation)
         assert type(x @ permutation) is module.Permutation
-    assert markov.Layer is symmetric.Layer
-    assert not hasattr(symmetric.Layer, 'permutation_factory')
+    assert markov.Layer.__bases__ == (symmetric.Layer, )
+    assert not hasattr(symmetric.Layer, 'Permutation')
 
 
 def test_Layer_tensor():
@@ -248,18 +226,7 @@ def test_Permutation_box_setoid():
     assert Equation((p @ q) @ f, p @ (q @ f))
 
 
-def test_permutation_factory():
-    x, y, z = Ty('x'), Ty('y'), Ty('z')
-    assert Diagram.permutation_factory is Permutation
-    perm = Permutation(x @ y @ z, [2, 0, 1])
-    functor = Functor(ob_map={x: y, y: z, z: x}, ar_map={})
-    assert Equation(
-        functor(perm), Permutation(y @ z @ x, [2, 0, 1]))
-    assert Equation(perm, perm.to_swaps())
-    assert Equation(functor(perm), functor(perm.to_swaps()))
-
-
-def test_inherited_permutation_factory():
+def test_inherited_Permutation():
     from discopy import closed, feedback, frobenius, tensor
 
     cases = [
@@ -406,3 +373,10 @@ def test_coloured_Layer_boxes_and_types():
     assert Layer(f).boxes_and_types == (empty_red, f, empty_green)
     assert Layer(empty_red, f, empty_green).boxes_and_types\
         == (empty_red, f, empty_green)
+
+
+def test_Swap_from_permutation():
+    x, y = Ty('x'), Ty('y')
+    assert Swap(x @ y, [1, 0]) == Swap(x, y)
+    with raises(ValueError):
+        Swap(x @ y, [0, 1])

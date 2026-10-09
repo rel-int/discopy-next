@@ -40,7 +40,7 @@ fail-on=unused-import,
         possibly-unused-variable
 
 # Specify a score threshold under which the program will exit with error.
-fail-under=8.58
+fail-under=9.19
 
 # Interpret the stdin as a python script, whose filename needs to be passed as
 # the module_or_package argument.
@@ -89,7 +89,7 @@ persistent=yes
 
 # Minimum Python version to use for version dependent checks. Will default to
 # the version used to run pylint.
-py-version=3.10
+py-version=3.14
 
 # Discover python modules and packages in the file system subtree.
 recursive=no
@@ -417,7 +417,27 @@ disable=raw-checker-failed,
         useless-suppression,
         deprecated-pragma,
         use-symbolic-message-instead,
-        invalid-name,too-many-ancestors
+        invalid-name,too-many-ancestors,
+        # pylint reads none of the following the way Python 3.14 does: a PEP
+        # 695 bound naming its own class and the lazy annotations of PEP 649
+        # (undefined-variable, used-before-assignment, which ruff's F821
+        # checks instead), the methods @axiom and @rule make classmethods
+        # (no-self-argument, no-value-for-parameter, no-member), and the
+        # generators a utils.Generator builds on first access
+        # (not-callable, method-hidden, function-redefined, inconsistent-mro,
+        # access-member-before-definition, bad-super-call, astroid-error).
+        undefined-variable,
+        used-before-assignment,
+        no-self-argument,
+        no-value-for-parameter,
+        no-member,
+        not-callable,
+        method-hidden,
+        function-redefined,
+        inconsistent-mro,
+        access-member-before-definition,
+        bad-super-call,
+        astroid-error
 
 # Enable the message, report, category or checker with the given id(s). You can
 # either give multiple identifier separated by comma (,) or put this option
