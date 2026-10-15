@@ -30,7 +30,10 @@ Summary
         brute_force
 """
 
+from typing import ClassVar
+
 from discopy import rigid, frobenius, messages
+from discopy.axioms import no_strategy
 from discopy.cat import factory
 from discopy.utils import AxiomError, deprecated_alias
 from discopy.grammar import thue
@@ -97,6 +100,11 @@ class Diagram(frobenius.Diagram):
     >>> F = tensor.Functor(ob, ar, dom=Diagram, dtype=bool)
     >>> assert F(sentence)
     """
+    swap_factory: ClassVar[type["Swap"]]
+    permutation_factory: ClassVar[type["Permutation"]]
+    cup_factory: ClassVar[type["Cup"]]
+    cap_factory: ClassVar[type["Cap"]]
+    spider_factory: ClassVar[type["Spider"]]
     ob = Ty
 
     def normal_form(self, **params):
@@ -153,6 +161,12 @@ class Diagram(frobenius.Diagram):
     __eq__, __hash__ = rigid.Diagram.__eq__, rigid.Diagram.__hash__
     cups = classmethod(rigid.Diagram.cups.__func__)
     caps = classmethod(rigid.Diagram.caps.__func__)
+
+    # A pregroup diagram is a frobenius diagram over rigid wires, which wind
+    # where a frobenius wire is self-dual, so that the hypergraph its
+    # equations are compared by refuses even a single cap: it stays out of
+    # the matrix.
+    strategy = no_strategy
 
 
 class Box(frobenius.Box, Diagram):
@@ -252,9 +266,11 @@ def brute_force(*vocab, target=Ty('s')):
             test.append(words + (word, ))
 
 
-Diagram.swap_factory, Diagram.spider_factory = Swap, Spider
+Diagram.swap_factory = Swap
+Diagram.spider_factory = Spider
 Diagram.permutation_factory = Permutation
 Diagram.cup_factory, Diagram.cap_factory = Cup, Cap
+
 
 Id = Diagram.id
 

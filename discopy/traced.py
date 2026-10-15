@@ -123,12 +123,15 @@ Dinaturality
 >>> assert sliding_left and sliding_right
 """
 
-from discopy import monoidal, cmap, hypergraph
+from typing import ClassVar
+
+from discopy import monoidal, cmap, hypergraph, messages
 from discopy.abc import TracedCategory
 from discopy.cat import factory
 from discopy.monoidal import Ty  # noqa: F401  pylint: disable=unused-import
 from discopy.utils import (
     factory_name,
+    from_tree,
     assert_isinstance,
     assert_istraceable,
     from_tree,
@@ -145,6 +148,24 @@ class Diagram(monoidal.Diagram, TracedCategory):
         dom (monoidal.Ty) : The domain of the diagram, i.e. its input.
         cod (monoidal.Ty) : The codomain of the diagram, i.e. its output.
     """
+    trace_naturality_left = TracedCategory.trace_naturality_left.failing(
+        messages.NO_PLANAR_NORMAL_FORM)
+    trace_naturality_right = TracedCategory.trace_naturality_right.failing(
+        messages.NO_PLANAR_NORMAL_FORM)
+    trace_dinaturality_left = TracedCategory.trace_dinaturality_left.failing(
+        messages.NO_PLANAR_NORMAL_FORM)
+    trace_dinaturality_right = TracedCategory.trace_dinaturality_right.failing(
+        messages.NO_PLANAR_NORMAL_FORM)
+    trace_superposing_left = TracedCategory.trace_superposing_left.failing(
+        messages.NO_PLANAR_NORMAL_FORM)
+    trace_superposing_right = TracedCategory.trace_superposing_right.failing(
+        messages.NO_PLANAR_NORMAL_FORM)
+
+    sum_factory: ClassVar[type["Sum"]]
+    box_factory: ClassVar[type["Box"]]
+    functor_factory: ClassVar[type["Functor"]]
+    trace_factory: ClassVar[type["Trace"]]
+
     def trace(self, n=1, left=False):
         """
         Feed ``n`` outputs back into inputs.
@@ -170,6 +191,9 @@ class Diagram(monoidal.Diagram, TracedCategory):
 
     def to_drawing(self):
         return monoidal.Diagram.to_drawing(self, functor_factory=Functor)
+
+    hypergraph_section = monoidal.Diagram.hypergraph_section.failing(
+        messages.SECTION_NEEDS_SWAPS)
 
 
 class Box(monoidal.Box, Diagram):
@@ -209,21 +233,32 @@ class Trace(Box, monoidal.Bubble):
         return self.name
 
     def __repr__(self):
-        return factory_name(type(self)) + f"({self.arg}, left={self.left})"
-
-    def dagger(self):
-        return self.arg.dagger().trace(left=self.left)
+        """
+        >>> from discopy import cat, monoidal, traced
+        >>> x = Ty('x')
+        >>> trace = Box('f', x @ x, x @ x).trace()
+        >>> assert eval(repr(trace)) == trace
+        """
+        return factory_name(type(self)) + f"({self.arg!r}, left={self.left!r})"
 
     def to_tree(self) -> dict:
-        tree = super().to_tree()
-        if self.left:
-            tree['left'] = True
-        return tree
+        """
+        Serialise a trace by its argument and the side it traces.
+
+        >>> from discopy.utils import dumps, loads
+        >>> x = Ty('x')
+        >>> trace = Box('f', x @ x, x @ x).trace(left=True)
+        >>> assert loads(dumps(trace)) == trace
+        """
+        return {'factory': factory_name(type(self)),
+                'arg': self.arg.to_tree(), 'left': self.left}
 
     @classmethod
     def from_tree(cls, tree: dict) -> "Trace":
-        arg, = map(from_tree, tree['args'])
-        return cls(arg, left='left' in tree)
+        return cls(from_tree(tree['arg']), left=tree.get('left', False))
+
+    def dagger(self):
+        return self.arg.dagger().trace(left=self.left)
 
     def to_drawing(self):
         return self.ar.to_drawing(self)
@@ -285,6 +320,7 @@ class Functor(monoidal.Functor):
 
 CMap = cmap.CMap[Diagram]
 
+Diagram.box_factory = Box
 Diagram.functor_factory = Functor
 Diagram.trace_factory = Trace
 Diagram.sum_factory = Sum

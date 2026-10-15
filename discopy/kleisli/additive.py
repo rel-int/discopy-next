@@ -224,7 +224,7 @@ def injection(offset: int, source: Ty, target: Ty) -> function.Function:
 
 
 @factory
-class Channel(TracedCategory, NamedGeneric['monad']):
+class Channel[monad](TracedCategory, NamedGeneric):
     """
     A channel is a morphism in the Kleisli category of a monad ``M`` with
     disjoint union as tensor, i.e. a Python function from a tagged value of
@@ -268,7 +268,8 @@ class Channel(TracedCategory, NamedGeneric['monad']):
 
     def __init__(self, inside: Callable, dom: Ty, cod: Ty):
         dom, cod = self.ob.cast(dom), self.ob.cast(cod)
-        packed_cls = channel.Channel[type(self).monad]
+        monad = type(self).monad
+        packed_cls = channel.Channel[monad]  # ty: ignore[invalid-type-form]
 
         def call(value):
             value, tag = unpack_value(value)
@@ -287,7 +288,8 @@ class Channel(TracedCategory, NamedGeneric['monad']):
             dom : The disjoint union of wire types.
         """
         dom = cls.ob.cast(dom)
-        return cls(channel.Channel[cls.monad].id(pack(dom)), dom, dom)
+        packed = channel.Channel[cls.monad]  # ty: ignore[invalid-type-form]
+        return cls(packed.id(pack(dom)), dom, dom)
 
     def __call__(self, obj, tag: int = 0):
         return self.inside(pack_value(obj, tag, self.dom))
@@ -301,7 +303,9 @@ class Channel(TracedCategory, NamedGeneric['monad']):
         """
         assert_isinstance(other, type(self))
         assert_iscomposable(self, other)
-        return type(self)(self.inside >> other.inside, self.dom, other.cod)
+        return type(self)(
+            self.inside >> other.inside,  # ty: ignore[unsupported-operator]
+            self.dom, other.cod)
 
     def tensor(self, other: Channel) -> Channel:
         """
@@ -335,11 +339,12 @@ class Channel(TracedCategory, NamedGeneric['monad']):
             y : The disjoint union on the right.
         """
         x, y = cls.ob.cast(x), cls.ob.cast(y)
-        unit = cls.monad.unit(pack(y @ x))
+        unit = cls.monad.unit(pack(y @ x))  # ty: ignore[invalid-argument-type]
 
         def inside(obj, tag=0):
             tag = tag + len(y) if tag < len(x) else tag - len(x)
-            return unit(pack_value(obj, tag, y @ x))
+            return unit(  # ty: ignore[call-non-callable]
+                pack_value(obj, tag, y @ x))
         return cls(inside, x @ y, y @ x)
 
     @classmethod
@@ -353,9 +358,10 @@ class Channel(TracedCategory, NamedGeneric['monad']):
             n : The number of copies to merge.
         """
         x = cls.ob.cast(x)
-        unit = cls.monad.unit(pack(x))
+        unit = cls.monad.unit(pack(x))  # ty: ignore[invalid-argument-type]
         return cls(
-            lambda obj, tag=0: unit(pack_value(obj, tag % len(x), x)),
+            lambda obj, tag=0: unit(  # ty: ignore[call-non-callable]
+                pack_value(obj, tag % len(x), x)),
             x ** n, x)
 
     def trace(self, n: int = 1, left: bool = False) -> Channel:

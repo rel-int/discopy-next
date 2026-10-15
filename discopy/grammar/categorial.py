@@ -44,6 +44,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import re
+from typing import ClassVar
 
 from discopy import biclosed, cmap, messages
 from discopy.abc import ClosedCategory
@@ -60,6 +61,11 @@ from discopy.utils import (
 @factory
 class Ty(biclosed.Ty):
     "Base class for categorial grammar types."
+    variable_factory: ClassVar[type["Variable"]]
+    constant_factory: ClassVar[type["Constant"]]
+    abstraction_factory: ClassVar[type["Abstraction"]]
+    over_factory: ClassVar[type["Over"]]
+    under_factory: ClassVar[type["Under"]]
 
 
 class Over(biclosed.Over):
@@ -79,6 +85,11 @@ class Diagram(biclosed.Diagram):
     """
     A categorial diagram is a biclosed diagram with rules and words as boxes.
     """
+    box_factory: ClassVar[type["Box"]]
+    functor_factory: ClassVar[type["Functor"]]
+    curry_factory: ClassVar[type["Curry"]]
+    eval_factory: ClassVar[type["Eval"]]
+    coeval_factory: ClassVar[type["Coeval"]]
     ob = Ty
 
     def to_pregroup(self):
@@ -147,6 +158,12 @@ class Word(thue.Word, Box):
 class Eval(biclosed.Eval, Box):
     """
     Evaluation box in a categorial grammar.
+    """
+
+
+class Coeval(biclosed.Coeval, Box):
+    """
+    Coevaluation box in a categorial grammar, the dagger of an evaluation.
     """
 
 
@@ -219,7 +236,6 @@ class TermBase(Box, biclosed.TermBase):
     A term in the internal language of a categorial grammar.
     """
     functor = Functor.id(Diagram)
-    freevars = None
 
     def __call__(self, other, left=False):
         return BA(self, other) if left else FA(self, other)
@@ -253,7 +269,8 @@ class Abstraction(TermBase, biclosed.Abstraction):
     left: bool = False
 
     def __init__(self, var: Variable, body: Term, left: bool = False):
-        biclosed.Abstraction.__init__(self, var, body, left)
+        biclosed.Abstraction.__init__(
+            self, var, body, left)
         TermBase.__init__(self, self.name, self.dom, self.cod)
 
     def simplify(self):
@@ -293,8 +310,11 @@ class TypeRaising(TermBase):
         self.base, self.child, self.freevars = base, child, child.freevars
         super().__init__(name, child.dom, cod)
 
-    def eval(self, **kwargs):
-        return self.simplify().eval(**kwargs)
+    def eval(self, functor=None):
+        return self.simplify().eval(functor)
+
+    def map(self, functor, context):
+        return functor.map_term(self.simplify(), context)
 
     def alpha_eq_under(self, scopes, others, depth=0):
         """ Type raisings of one base with alpha-equivalent children. """
@@ -303,9 +323,6 @@ class TypeRaising(TermBase):
             return False
         return self.child.alpha_eq_under(
             scopes, [other.child for other in others], depth)
-
-    def map(self, functor, context):
-        return functor.map_term(self.simplify(), context)
 
     def __repr__(self):
         return factory_name(type(self)) + f"({self.base!r}, {self.child!r})"
@@ -358,8 +375,11 @@ class BinaryTerm(TermBase):
     def simplify(self):
         return type(self)(self.left.simplify(), self.right.simplify())
 
-    def eval(self, **kwargs):
-        return self.simplify().eval(**kwargs)
+    def eval(self, functor=None):
+        return self.simplify().eval(functor)
+
+    def map(self, functor, context):
+        return functor.map_term(self.simplify(), context)
 
     def alpha_eq_under(self, scopes, others, depth=0):
         """ Compositions of one kind with alpha-equivalent sides. """
@@ -369,9 +389,6 @@ class BinaryTerm(TermBase):
             scopes, [other.left for other in others], depth)\
             and self.right.alpha_eq_under(
                 scopes, [other.right for other in others], depth)
-
-    def map(self, functor, context):
-        return functor.map_term(self.simplify(), context)
 
     def __repr__(self):
         return factory_name(type(self)) + f"({self.left!r}, {self.right!r})"
@@ -560,14 +577,14 @@ def tree2diagram(tree: dict, dom=Ty()) -> Diagram:
 
 
 Id = Diagram.id
-Diagram.functor_factory = Functor
+Diagram.box_factory, Diagram.functor_factory = Box, Functor
 Diagram.curry_factory = Curry
-Diagram.eval_factory = Eval
+Diagram.eval_factory, Diagram.coeval_factory = Eval, Coeval
 
 Ty.variable_factory = Variable
 Ty.constant_factory = Constant
-Ty.application_factory =\
-    lambda func, args, left=False: BA(args, func) if left else FA(func, args)
+Ty.application_factory = (  # ty: ignore[invalid-assignment]
+    lambda func, args, left=False: BA(args, func) if left else FA(func, args))
 Ty.abstraction_factory = Abstraction
 
 Ty.over_factory, Ty.under_factory = Over, Under

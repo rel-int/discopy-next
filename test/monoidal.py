@@ -761,3 +761,11 @@ def test_List():
     assert eval(repr(Ty.id(red))) == Ty.id(red)
     with raises(AxiomError):
         Ty(Wire('x', red, red), Wire('y'))
+
+
+def test_coloured_diagram_has_no_hypergraph():
+    red = Colour("red")
+    x = Ty(Wire('x', red, red))
+    for convert in (Diagram.to_hypergraph, Diagram.to_map):
+        with raises(AxiomError):
+            convert(Box('f', x, x))

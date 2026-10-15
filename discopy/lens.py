@@ -108,7 +108,7 @@ def pairs(category) -> type:
 
 
 @dataclass
-class Symmetric(SymmetricCategory, NamedGeneric['category']):
+class Symmetric[category](SymmetricCategory, NamedGeneric):
     """
     A lens from `dom` to `cod` over a symmetric `category` is a `residual`
     with a `forward` morphism `dom.positive -> cod.positive @ residual` and
@@ -153,11 +153,11 @@ class Symmetric(SymmetricCategory, NamedGeneric['category']):
     category = symmetric.Diagram
     ob = classproperty(lambda cls: pairs(cls.category))
 
-    dom: ob
-    cod: ob
+    dom: ob  # ty: ignore[invalid-type-form]
+    cod: ob  # ty: ignore[invalid-type-form]
     forward: category
     backward: category
-    residual: category.ob = None
+    residual: category.ob = None  # ty: ignore[invalid-assignment]
 
     def __post_init__(self):
         if self.residual is None:
@@ -182,7 +182,10 @@ class Symmetric(SymmetricCategory, NamedGeneric['category']):
             f"{self.forward!r}, {self.backward!r}, {self.residual!r})"
 
     @classmethod
-    def lift(cls, forward: category, backward: category = None) -> Symmetric:
+    def lift(
+            cls, forward: category,
+            backward: category = None,  # ty: ignore[invalid-parameter-default]
+    ) -> Symmetric:
         """
         A morphism `x -> y` of the underlying category as a lens from
         `(x, x_)` to `(y, y_)` with empty residual, the backward morphism
@@ -199,7 +202,7 @@ class Symmetric(SymmetricCategory, NamedGeneric['category']):
                    cls.ob(forward.cod, backward.dom), forward, backward)
 
     @classmethod
-    def id(cls, dom: ob = None) -> Symmetric:
+    def id(cls, dom: ob = None) -> Symmetric:  # ty: ignore[invalid-type-form]
         """
         The identity lens on `dom`, with empty residual.
 
@@ -299,7 +302,9 @@ class Symmetric(SymmetricCategory, NamedGeneric['category']):
                           forward, backward, self.residual @ other.residual)
 
     @classmethod
-    def swap(cls, left: ob, right: ob) -> Symmetric:
+    def swap(
+            cls, left: ob,  # ty: ignore[invalid-type-form]
+            right: ob) -> Symmetric:  # ty: ignore[invalid-type-form]
         """
         The swap of two pairs is the swap of their positive halves forward
         and of their negative halves backward, with empty residual.
@@ -341,8 +346,9 @@ class Symmetric(SymmetricCategory, NamedGeneric['category']):
         inside = self.forward @ self.cod.negative\
             >> self.cod.positive @ self.backward
         ob = interaction.Ty[self.ob.natural]
-        return interaction.Diagram[self.category](
-            inside, ob(*self.dom), ob(*self.cod))
+        diagram = interaction.Diagram[
+            self.category]  # ty: ignore[invalid-type-form]
+        return diagram(inside, ob(*self.dom), ob(*self.cod))
 
     def to_markov(self) -> Markov:
         """
@@ -481,7 +487,10 @@ class Markov(Symmetric):
                 factory_name(cls.category)))
 
     @classmethod
-    def lift(cls, get: category, backward: category = None) -> Markov:
+    def lift(
+            cls, get: category,
+            backward: category = None,  # ty: ignore[invalid-parameter-default]
+    ) -> Markov:
         """
         A morphism `x -> y` of the underlying category as a lens from
         `(x, x_)` to `(y, y_)`, with `put` discarding the input and applying

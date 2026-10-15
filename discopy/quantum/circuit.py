@@ -69,6 +69,7 @@ Examples
 from __future__ import annotations
 
 from collections.abc import Mapping
+from typing import ClassVar
 
 from discopy import messages, tensor, frobenius
 from discopy.cat import factory
@@ -105,7 +106,7 @@ class Wire(frobenius.Wire):
     @classmethod
     def from_tree(cls, tree: dict) -> Wire:
         dim, z = tree['dim'], tree.get('z', 0)
-        return cls(dim=dim, z=z)
+        return cls(dim=dim, z=z)  # ty: ignore[missing-argument]
 
     def to_tree(self) -> dict:
         return dict(dim=self.dim, **super().to_tree())
@@ -172,6 +173,17 @@ class Ty(frobenius.Ty):
     bit @ bit @ qubit @ qubit @ qubit
     """
     generator_factory = Wire
+    box_factory = None
+    """ No generator of one colour is named, so there is no canonical
+    instance of a law, see :meth:`discopy.axioms.Axiom.canonical`. """
+
+    @classmethod
+    def generators(cls, *, dom=None, cod=None):
+        """ Generate a bit or a qubit, see :class:`frobenius.Ty`. """
+        # pylint: disable=unused-argument  # a circuit type has one colour
+        from hypothesis import strategies as st
+
+        return st.sampled_from([Digit(2), Qudit(2)]).map(cls)
 
 
 @factory
@@ -184,10 +196,13 @@ class Circuit(tensor.Diagram[complex]):
         dom (quantum.circuit.Ty) : The domain of the circuit diagram.
         cod (quantum.circuit.Ty) : The codomain of the circuit diagram.
     """
+    swap_factory: ClassVar[type["Swap"]]
+    sum_factory: ClassVar[type["Sum"]]
+    permutation_factory: ClassVar[type["Permutation"]]
     ob = Ty
 
     @classmethod
-    def id(cls, dom: int | Ty = None):
+    def id(cls, dom: int | Ty | None = None):
         """
         The identity circuit on a given domain.
 
@@ -437,7 +452,7 @@ class Circuit(tensor.Diagram[complex]):
         last_i = 0
         for i, box in enumerate(self.boxes):
             if hasattr(box, '_decompose'):
-                decomp = box._decompose()
+                decomp = box._decompose()  # ty: ignore[call-non-callable]
                 diag >>= self[last_i:i]
                 left, _, right = self.inside[i].boxes_and_types
                 diag >>= Id(left) @ decomp @ Id(right)
@@ -445,18 +460,24 @@ class Circuit(tensor.Diagram[complex]):
         diag >>= self[last_i:]
         self = diag
 
-        c_nodes = [tn.CopyNode(2, 2, f'c_input_{i}', dtype=complex)
-                   for i in range(self.dom.count(bit))]
-        q_nodes1 = [tn.CopyNode(2, 2, f'q1_input_{i}', dtype=complex)
-                    for i in range(self.dom.count(qubit))]
-        q_nodes2 = [tn.CopyNode(2, 2, f'q2_input_{i}', dtype=complex)
-                    for i in range(self.dom.count(qubit))]
+        c_nodes = [tn.CopyNode(
+            2, 2, f'c_input_{i}',
+            dtype=complex)  # ty: ignore[invalid-argument-type]
+            for i in range(self.dom.count(bit))]
+        q_nodes1 = [tn.CopyNode(
+            2, 2, f'q1_input_{i}',
+            dtype=complex)  # ty: ignore[invalid-argument-type]
+            for i in range(self.dom.count(qubit))]
+        q_nodes2 = [tn.CopyNode(
+            2, 2, f'q2_input_{i}',
+            dtype=complex)  # ty: ignore[invalid-argument-type]
+            for i in range(self.dom.count(qubit))]
 
         inputs = [n[0] for n in c_nodes + q_nodes1 + q_nodes2]
         c_scan = [n[1] for n in c_nodes]
         q_scan1 = [n[1] for n in q_nodes1]
         q_scan2 = [n[1] for n in q_nodes2]
-        nodes = c_nodes + q_nodes1 + q_nodes2
+        nodes: list[tn.AbstractNode] = [*c_nodes, *q_nodes1, *q_nodes2]
         for layer in self.inside:
             left, box, right = layer.boxes_and_types
             c_offset = left.count(bit)
@@ -496,7 +517,9 @@ class Circuit(tensor.Diagram[complex]):
             elif box.is_mixed or isinstance(box, ClassicalGate):
                 if isinstance(box, (Copy, Match, Measure, Encode)):
                     assert len(box.dom) == 1 or len(box.cod) == 1
-                    node = tn.CopyNode(3, 2, 'cq_' + str(box), dtype=complex)
+                    node = tn.CopyNode(
+                        3, 2, 'cq_' + str(box),
+                        dtype=complex)  # ty: ignore[invalid-argument-type]
                 else:
                     # only unoptimised gate is MixedState()
                     array = box.eval(mixed=True).array
@@ -897,7 +920,9 @@ class Sum(tensor.Sum[complex], Box):
             return {}
         if len(self.terms) == 1:
             return self.terms[0].get_counts(backend=backend, **params)
-        counts = Circuit.get_counts(*self.terms, backend=backend, **params)
+        counts = Circuit.get_counts(
+            *self.terms,  # ty: ignore[invalid-argument-type]
+            backend=backend, **params)
         result = {}
         for circuit_counts in counts:
             for bitstring, count in circuit_counts.items():
@@ -911,7 +936,9 @@ class Sum(tensor.Sum[complex], Box):
         if len(self.terms) == 1:
             return self.terms[0].eval(backend=backend, mixed=mixed, **params)
         return sum(
-            Circuit.eval(*self.terms, backend=backend, mixed=mixed, **params))
+            Circuit.eval(
+                *self.terms,  # ty: ignore[invalid-argument-type]
+                backend=backend, mixed=mixed, **params))
 
     def grad(self, var, **params):
         return sum(circuit.grad(var, **params) for circuit in self.terms)

@@ -14,3 +14,8 @@ def test_simplify():
     assert (Diagram.braid(x, y @ z) >> Diagram.braid(x, y @ z)[::-1]).simplify()\
         == Diagram.id(x @ y @ z)\
         == (Diagram.braid(y @ z, x)[::-1] >> Diagram.braid(y @ z, x)).simplify()
+
+
+def test_to_hypergraph():
+    # A braid is not a swap: it stays a box of the hypergraph.
+    assert Braid(x, y).to_hypergraph().boxes == (Braid(x, y), )

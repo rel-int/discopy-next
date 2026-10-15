@@ -91,9 +91,13 @@ Both sides foliate to the same single permutation.
 from __future__ import annotations
 
 from collections.abc import Sequence
+from typing import ClassVar
 
 from discopy import monoidal, balanced, hypergraph, cmap, messages
-from discopy.abc import SymmetricCategory
+from discopy.abc import (
+    BalancedCategory, BiclosedCategory, CompactCategory, PivotalCategory,
+    RigidCategory, SymmetricCategory, TracedCategory)
+from discopy.axioms import FUEL, Axiom
 from discopy.cat import factory
 from discopy.monoidal import (  # noqa: F401  pylint: disable=unused-import
     Wire, Ty, Nat)
@@ -188,7 +192,7 @@ class Layer(monoidal.Layer):
             if perm == sorted(perm):
                 raise AxiomError(messages.NOT_MERGEABLE.format(self, other))
             return type(self)(first.permutation_factory(self.dom, perm))
-        return super().merge(other)
+        return super().merge(other)  # ty: ignore[invalid-return-type]
 
 
 @factory
@@ -265,9 +269,84 @@ class Diagram(balanced.Diagram, SymmetricCategory):
     >>> Permutation.swap_factory = Transposition
     >>> assert Permutation.braid_factory is Transposition
     """
+    # A hypergraph is faithful from symmetric categories on.
+    bifunctoriality = SymmetricCategory.bifunctoriality
+    dagger_monoidality = SymmetricCategory.dagger_monoidality
+    braid_naturality = SymmetricCategory.braid_naturality
+    braid_then_inverse = SymmetricCategory.braid_then_inverse
+    inverse_then_braid = SymmetricCategory.inverse_then_braid
+    twist_naturality = BalancedCategory.twist_naturality
+    yanking = BalancedCategory.yanking
+    trace_naturality_left = TracedCategory.trace_naturality_left
+    trace_naturality_right = TracedCategory.trace_naturality_right
+    trace_dinaturality_left = TracedCategory.trace_dinaturality_left
+    trace_dinaturality_right = TracedCategory.trace_dinaturality_right
+    trace_superposing_left = TracedCategory.trace_superposing_left
+    trace_superposing_right = TracedCategory.trace_superposing_right
+
+    box_factory: ClassVar[type["Box"]]
+    functor_factory: ClassVar[type["Functor"]]
+    swap_factory: ClassVar[type["Swap"]]
+    permutation_factory: ClassVar[type["Permutation"]]
+    trace_factory: ClassVar[type["Trace"]]
+    sum_factory: ClassVar[type["Sum"]]
     braid_factory = classproperty(lambda cls: cls.swap_factory)
     layer_factory = Layer
     twist_factory = classmethod(lambda cls, dom: cls.id(dom))
+
+    @classmethod
+    def equation_factory(cls, *terms: Diagram) -> Equation:
+        """
+        The equation of a law, compared up to the isomorphism of the
+        hypergraphs of its terms, the coherence theorem of symmetric
+        categories: sliding boxes past each other and composing swaps is
+        absorbed, while a free trace, curry or feedback is a box of the
+        hypergraph like any other.
+
+        >>> x = Ty('x')
+        >>> f, g = Box('f', Ty(), x), Box('g', x, Ty())
+        >>> assert Diagram.equation_factory(f @ g, g >> f)
+        """
+        return Equation(*terms)
+
+    @classmethod
+    def strategy(cls, *, dom=None, cod=None, fuel=FUEL, within=None):
+        """
+        Draw a diagram by one of two ways: :meth:`search`, the derivation from
+        the rules of the category, or :meth:`sample`, the downgrade of its
+        combinatorial representation, which draws larger diagrams in one go.
+        A morphism premise of the search is drawn by this strategy in turn,
+        so a derived diagram can contain a sampled one. A search ``within``
+        the rules of a weaker structure is not mixed with the sample, which
+        has all the structure of the category.
+
+        Parameters are those of :meth:`search`.
+
+        >>> from hypothesis import find
+        >>> x = Ty('x')
+        >>> diagram = find(Diagram.strategy(dom=x, cod=x),
+        ...                lambda d: len(d.boxes) > 1)
+        >>> assert (diagram.dom, diagram.cod) == (x, x)
+        """
+        from hypothesis import strategies as st
+
+        derivations = cls.search(dom=dom, cod=cod, fuel=fuel, within=within)
+        if within is not None:
+            return derivations
+        return st.one_of(derivations, cls.sample(dom=dom, cod=cod, fuel=fuel))
+
+    @classmethod
+    def sample(cls, *, dom=None, cod=None, fuel=FUEL):
+        """
+        Sample symmetric diagrams through their quotient: a combinatorial map
+        drawn by :meth:`discopy.cmap.CMap.strategy` with at most ``fuel + 1``
+        boxes, monogamous unless the category has cups and caps, downgraded
+        with :meth:`discopy.cmap.CMap.to_diagram`, which makes its cycles
+        explicit as traces and its crossings as swaps.
+        """
+        return cmap.CMap[cls].strategy(  # ty: ignore[invalid-type-form]
+            dom=dom, cod=cod, max_leaves=fuel + 1).map(
+                lambda graph: graph.to_diagram())
 
     @property
     def is_plumbing(self) -> bool:
@@ -287,11 +366,10 @@ class Diagram(balanced.Diagram, SymmetricCategory):
         ----
         This calls :func:`balanced.hexagon` and :attr:`swap_factory`.
         """
-        return cls.braid(left, right)
+        return cls.braid(left, right)  # ty: ignore[invalid-return-type]
 
     @classmethod
-    def permutation(cls, xs: Sequence[int],
-                    doms: Sequence[monoidal.Ty] | None = None) -> Diagram:
+    def permutation(cls, xs: Sequence[int], doms=None) -> Diagram:
         """
         The diagram that encodes a given permutation as a composition of
         swaps.
@@ -319,14 +397,17 @@ class Diagram(balanced.Diagram, SymmetricCategory):
                 slice(0, i), i, slice(i + 1, None)
             )
         )
-        rest = left @ right if isinstance(doms, monoidal.Ty) else left + right
-        return cls.swap(tensor(left), head) @ tensor(right)\
-            >> head @ cls.permutation(
-                [x - 1 if x > i else x for x in xs[1:]], rest)
+        rest = (left @ right if isinstance(doms, monoidal.Ty)
+                else left + right)  # ty: ignore[unsupported-operator]
+        return cls.swap(
+            tensor(left), head  # ty: ignore[invalid-argument-type]
+        ) @ tensor(right) >> head @ cls.permutation(
+            [x - 1 if x > i else x for x in xs[1:]], rest)
 
     @classmethod
-    def from_permutation(cls, perm: Sequence[int], dom: monoidal.Ty = None
-                         ) -> Diagram:
+    def from_permutation(
+            cls, perm: Sequence[int], dom: monoidal.Ty | None = None
+    ) -> Diagram:
         """
         Encode a permutation natively when the category has a matching
         :class:`Permutation` factory. Descendant categories without one use
@@ -405,6 +486,8 @@ class Diagram(balanced.Diagram, SymmetricCategory):
         """
         return self.to_hypergraph().depth()
 
+    hypergraph_section = monoidal.Diagram.hypergraph_section
+
 
 class Box(balanced.Box, Diagram):
     """
@@ -463,8 +546,8 @@ class Permutation(Box):
         :align: center
     """
 
-    def __new__(cls, dom: monoidal.Ty = None,
-                perm: Sequence[int] = None):
+    def __new__(cls, dom: monoidal.Ty | None = None,
+                perm: Sequence[int] | None = None):
         if dom is None or cls is cls.ar.swap_factory:
             return super().__new__(cls)
         factory = cls.ar.swap_factory\
@@ -665,6 +748,13 @@ class Functor(balanced.Functor):
 
 CMap = cmap.CMap[Diagram]
 
+for level in (
+        BiclosedCategory, RigidCategory, PivotalCategory, CompactCategory):
+    for name, law in vars(level).items():
+        if isinstance(law, Axiom):
+            setattr(CMap, name, law.inapplicable(messages.MAP_HAS_NO_ADJOINTS))
+
+Diagram.box_factory = Box
 Diagram.functor_factory = Functor
 Hypergraph = hypergraph.Hypergraph[Diagram]
 Diagram.swap_factory = Swap

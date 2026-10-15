@@ -34,13 +34,15 @@ from __future__ import annotations
 
 from copy import copy
 from dataclasses import dataclass
+from typing import ClassVar
 
-from discopy import config, monoidal, braided, traced, cmap, hypergraph
+from discopy import (
+    config, monoidal, braided, traced, cmap, hypergraph, messages)
 from discopy.abc import BalancedCategory
 from discopy.cat import factory
 from discopy.monoidal import (  # noqa: F401  pylint: disable=unused-import
     Colour, Ty)
-from discopy.utils import factory_name, assert_isatomic
+from discopy.utils import factory_name, assert_isatomic, from_tree
 
 
 @dataclass(frozen=True)
@@ -66,7 +68,7 @@ class Ribbon(Colour):
     >>> assert Ribbon() == Ribbon("gray", width=0.25)
     """
     name: str = "gray"
-    width: float = None
+    width: float | None = None
 
     def __post_init__(self):
         super().__post_init__()
@@ -89,7 +91,8 @@ class Ribbon(Colour):
 
 
 def double_rail(
-        typ: monoidal.Ty, width: float = None, colour="gray") -> monoidal.Ty:
+        typ: monoidal.Ty, width: float | None = None, colour="gray"
+) -> monoidal.Ty:
     """
     Doubles every object of a type into the two rails of a ribbon, i.e. two
     copies of the object with a shared :class:`Ribbon` as the colour region
@@ -130,6 +133,18 @@ class Diagram(braided.Diagram, traced.Diagram, BalancedCategory):
 
     .. _nLab: https://ncatlab.org/nlab/show/traced+monoidal+category)
     """
+    twist_naturality = BalancedCategory.twist_naturality.failing(
+        messages.NO_PLANAR_NORMAL_FORM)
+    yanking = BalancedCategory.yanking.failing(
+        messages.NO_PLANAR_NORMAL_FORM)
+
+    box_factory: ClassVar[type["Box"]]
+    functor_factory: ClassVar[type["Functor"]]
+    braid_factory: ClassVar[type["Braid"]]
+    twist_factory: ClassVar[type["Twist"]]
+    trace_factory: ClassVar[type["Trace"]]
+    sum_factory: ClassVar[type["Sum"]]
+    dual_rail_factory: ClassVar[type["DualRail"]]
 
     @classmethod
     def twist(cls, dom: monoidal.Ty) -> Diagram:
@@ -149,7 +164,7 @@ class Diagram(braided.Diagram, traced.Diagram, BalancedCategory):
             >> cls.twist(dom[1:]) @ cls.twist_factory(dom[0])\
             >> cls.braid(dom[1:], dom[0])
 
-    def to_braided(self, width: float = None, colour="gray"):
+    def to_braided(self, width: float | None = None, colour="gray"):
         """
         Doubles every object and sends the twist to the braid.
 
@@ -291,6 +306,23 @@ class Twist(Box):
     def dagger(self):
         return type(self)(self.dom, not self.is_dagger)
 
+    def to_tree(self) -> dict:
+        """
+        Serialise a twist by its type, keeping whether it is an inverse.
+
+        >>> from discopy.utils import dumps, loads
+        >>> x = Ty('x')
+        >>> assert loads(dumps(Twist(x).dagger())) == Twist(x).dagger()
+        """
+        tree = {'factory': factory_name(type(self)), 'dom': self.dom.to_tree()}
+        if self.is_dagger:
+            tree['is_dagger'] = True
+        return tree
+
+    @classmethod
+    def from_tree(cls, tree: dict) -> Twist:
+        return cls(from_tree(tree['dom']), tree.get('is_dagger', False))
+
 
 class Sum(braided.Sum, Box):
     """
@@ -317,7 +349,8 @@ class Functor(braided.Functor, traced.Functor):
     dom = cod = Diagram
 
     def __call__(self, other):
-        if isinstance(other, Twist) and hasattr(self.cod, "twist"):
+        if isinstance(other, Twist) and not other.is_dagger\
+                and hasattr(self.cod, "twist"):
             return self.cod.twist(self(other.dom))
         if isinstance(other, Trace):
             return traced.Functor.__call__(self, other)
@@ -345,7 +378,7 @@ class DualRail(Functor):
     dual_rail_twist_factory = DualRailTwist
     dual_rail_braid_factory = DualRailBraid
 
-    def __init__(self, width: float = None, colour="gray"):
+    def __init__(self, width: float | None = None, colour="gray"):
         self.width = config.DRAWING_DEFAULT["ribbon_width"]\
             if width is None else width
         self.colour = colour
@@ -362,6 +395,7 @@ class DualRail(Functor):
         return super().__call__(other)
 
 
+Diagram.box_factory = Box
 Diagram.functor_factory = Functor
 CMap = cmap.CMap[Diagram]
 Hypergraph = hypergraph.Hypergraph[Diagram]

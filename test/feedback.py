@@ -97,3 +97,18 @@ def test_Permutation_delay():
     assert perm.delay(2) == perm.delay().delay()
     assert (perm >> Swap(z, x) @ y).delay()\
         == perm.delay() >> Swap(z, x).delay() @ y.delay()
+
+
+def test_discard_is_a_feedback_diagram():
+    x = Ty('x')
+    discard = Diagram.copy(x, n=0)
+    assert isinstance(discard, Diagram) and isinstance(discard, Discard)
+    assert (discard >> Diagram.id(Ty())).boxes == [discard]
+
+
+def test_Wire_to_tree():
+    x = Wire('x')
+    assert x.to_tree() == {'factory': 'feedback.Wire', 'name': 'x'}
+    assert Wire('x', 2, is_constant=False).to_tree() == {
+        'factory': 'feedback.Wire', 'name': 'x', 'time_step': 2,
+        'is_constant': False}

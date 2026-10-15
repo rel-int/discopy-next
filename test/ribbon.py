@@ -92,3 +92,9 @@ def test_Kauffman():
 def test_rotate():
     x = Ty('x')
     assert Twist(x).r == Twist(x)
+
+
+def test_to_hypergraph():
+    # A twist is not the identity: it stays a box of the hypergraph.
+    x = Ty('x')
+    assert Diagram.twist(x).to_hypergraph().boxes == (Diagram.twist(x), )

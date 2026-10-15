@@ -28,10 +28,13 @@ def test_Hypergraph_str():
 
 def test_Hypergraph_repr():
     x, y = map(Ty, "xy")
-    assert repr(H.spiders(1, 0, x @ y))\
-        == "hypergraph.Hypergraph[Diagram]("\
+    from discopy import frobenius, hypergraph
+    graph = H.spiders(1, 0, x @ y)
+    assert repr(graph)\
+        == "hypergraph.Hypergraph[frobenius.Diagram]("\
            "dom=frobenius.Ty(frobenius.Wire('x'), frobenius.Wire('y')), "\
            "cod=frobenius.Ty(), boxes=(), wires=((0, 1), (), ()))"
+    assert eval(repr(graph)) == graph
 
 
 def test_Hypergraph_hash():
@@ -341,3 +344,39 @@ def test_subclass_to_hypergraph():
     f, g = Gate('f', x, x), Gate('g', x, x)
     assert (f >> g).to_hypergraph().category == Circuit
     assert isinstance((f >> g).to_hypergraph().to_diagram(), Circuit)
+
+
+def test_trace_needs_traced_pivotal():
+    from discopy import rigid, pivotal, compact
+    x = rigid.Ty('x')
+    graph = rigid.Box('f', x @ x, x @ x).to_hypergraph()
+    for left in (True, False):
+        with raises(AxiomError):
+            graph.trace(left=left)
+    for module in (pivotal, compact):
+        x = module.Ty('x')
+        graph = module.Box('f', x @ x, x @ x).to_hypergraph()
+        assert graph.trace().cod == graph.trace(left=True).cod == x
+
+
+def test_planar_comparison():
+    """ Below symmetric categories, a hypergraph is not faithful, so the
+    laws of a planar level are compared on the nose: each pair here was
+    identified when they were compared by hypergraph. """
+    from discopy import balanced, braided, monoidal, rigid
+    x, y = braided.Ty('x'), braided.Ty('y')
+    braid, inverse = braided.Braid(x, y), braided.Braid(y, x)[::-1]
+    assert braid.to_hypergraph() != inverse.to_hypergraph()
+    assert not braided.Diagram.equation_factory(braid, inverse)
+    x = balanced.Ty('x')
+    twist, identity = balanced.Twist(x), balanced.Diagram.id(x)
+    assert twist.to_hypergraph() != identity.to_hypergraph()
+    assert not balanced.Diagram.equation_factory(twist, identity)
+    x = rigid.Ty('x')
+    left = rigid.Cap(x, x.l) @ x >> x @ rigid.Cup(x.l, x)
+    right = x @ rigid.Cap(x.r, x) >> rigid.Cup(x, x.r) @ x
+    assert left.to_hypergraph() != right.to_hypergraph()  # cups are boxes
+    assert not rigid.Diagram.equation_factory(left, right)
+    x, scalar = monoidal.Ty('x'), monoidal.Box('s', monoidal.Ty(), monoidal.Ty())
+    assert (scalar @ x).to_hypergraph() == (x @ scalar).to_hypergraph()
+    assert not monoidal.Diagram.equation_factory(scalar @ x, x @ scalar)

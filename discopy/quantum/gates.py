@@ -49,6 +49,7 @@ Summary
         scalar
 """
 import copy
+from collections.abc import Sized
 from math import e, pi
 
 from discopy import messages
@@ -237,7 +238,7 @@ class QuantumGate(Box):
     is_classical = False
 
     def __init__(self, name: str, dom: Ty, cod: Ty, data=None, **params):
-        if data is not None and hasattr(data, "__len__"):
+        if isinstance(data, Sized):
             data = [complex(v) for v in data]
         super().__init__(name, dom, cod, data, **params)
 
@@ -601,13 +602,14 @@ class Parametrized(Box):
 
     def subs(self, *args):
         data = rsubs(self.data, *args)
-        return type(self)(data)
+        return type(self)(data)  # ty: ignore[missing-argument]
 
     def lambdify(self, *symbols, **kwargs):
         from sympy import lambdify
         with backend() as np:
             data = lambdify(symbols, self.data, dict(kwargs, modules=np))
-        return lambda *xs: type(self)(data(*xs))
+        return lambda *xs: type(self)(
+            data(*xs))  # ty: ignore[missing-argument]
 
     def __str__(self):
         if isinstance(self, Controlled):
@@ -791,12 +793,14 @@ class Sqrt(Scalar):
     @property
     def is_self_adjoint(self):
         """ Whether the root is real, i.e. the dagger is the identity. """
-        return not self.free_symbols and not complex(self.data ** .5).imag
+        return not self.free_symbols and not complex(
+            self.data ** .5).imag  # ty: ignore[unsupported-operator]
 
     @property
     def array(self):
         with backend() as np:
-            root = np.array(self.data ** .5)
+            root = np.array(
+                self.data ** .5)  # ty: ignore[unsupported-operator]
             return root.conjugate() if self.is_dagger else root
 
     def dagger(self):

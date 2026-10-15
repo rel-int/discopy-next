@@ -398,3 +398,11 @@ def test_Functor_then_left_unit():
     assert F >> Functor.id() == F
     assert Functor.id() >> F != F
     assert (Functor.id() >> F)(x) == F(x)
+
+
+@pytest.mark.xfail(strict=True, reason="#648: the identity functor is a "
+                   "callable, which compares unequal to a mapping.")
+def test_Functor_left_unitality():
+    x, y = Ob('x'), Ob('y')
+    F = Functor({x: y}, {})
+    assert Functor.id() >> F == F

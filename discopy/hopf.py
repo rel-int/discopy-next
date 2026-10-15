@@ -635,7 +635,7 @@ class Double(Algebra):
         return factory_name(type(self)) + f"({self.base!r})"
 
 
-class Representation(NamedGeneric["algebra"], frobenius.Dim):
+class Representation[algebra](NamedGeneric, frobenius.Dim):
     """
     A finite-dimensional (left) module over the class parameter ``algebra``:
     given a :class:`Algebra` ``H``, the class ``Representation[H]`` is
@@ -846,7 +846,7 @@ class Representation(NamedGeneric["algebra"], frobenius.Dim):
         return cls(Dim(d), action)
 
 
-class Intertwiner(NamedGeneric["algebra"], tensor.Diagram, RibbonCategory):
+class Intertwiner[algebra](tensor.Diagram, RibbonCategory):
     """
     The ribbon category :math:`\\mathrm{Rep}(H)` of representations of the
     class parameter ``algebra``: given a :class:`Algebra` ``H``, the

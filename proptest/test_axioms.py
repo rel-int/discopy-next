@@ -1,42 +1,52 @@
-""" Property tests for DisCoPy's principal categorical data structures. """
+"""
+The property matrix: every law of every enrolled category, see
+:meth:`discopy.axioms.Testable.matrix`.
+"""
 
 import pytest
-from hypothesis import given, note
+from hypothesis import Phase, given, note, settings
 from hypothesis import strategies as st
 
-from discopy.utils import factory_name
+from discopy.axioms import Testable, inhabits
 
-from proptest.categories import CATEGORIES
+from proptest.conftest import PROFILE
 
 
-def axiom_parameters():
+def cells():
     """
-    Translate every axiom of every category to a pytest parameter.
-
-    An axiom taking no argument states its verdict without one, so we ask it
-    here: :obj:`NotImplemented` means the structure does not apply and the
-    test is skipped rather than generating arguments it could not satisfy.
-    A category need not state laws at all: one enrolled for the ad-hoc
-    properties only, such as a type of wires, has no ``axioms``.
+    One parameter per law, skipped when it does not apply and a strict
+    expected failure when it is declared broken.
     """
-    for category in CATEGORIES:
-        for axiom in category.axioms.values():
-            if not axiom.parameters and axiom() is NotImplemented:
-                marks = pytest.mark.skip(reason=axiom.__doc__.strip())
-            elif axiom.broken:
-                marks = pytest.mark.xfail(reason=axiom.__doc__.strip())
-            else:
-                marks = ()
-            yield pytest.param(
-                axiom, marks=marks,
-                id=f"{factory_name(category)}.{axiom.name}")
+    for law in Testable.matrix(once=PROFILE == "fast"):
+        reason = (law.__doc__ or "").strip()
+        if not law.parameters and law() is NotImplemented:
+            marks = pytest.mark.skip(reason=reason)
+        elif law.broken:
+            marks = pytest.mark.xfail(reason=reason, strict=True)
+        else:
+            marks = ()
+        yield pytest.param(law, marks=marks, id=repr(law))
 
 
-@pytest.mark.parametrize("axiom", axiom_parameters())
-@given(data=st.data())
-def test_axiom(axiom, data):
-    """ Check an axiom of a category against generated arguments. """
-    args = data.draw(axiom.strategy(), label=axiom.name)
-    verdict = axiom(*args)
-    note(verdict)
-    assert verdict
+@pytest.mark.parametrize("law", cells())
+def test_axiom(law):
+    """
+    Check a law against generated arguments, a broken one up to its first
+    counterexample, which :meth:`discopy.axioms.Axiom.falsify` shrinks on
+    demand, and the equation it states against the type of its output,
+    evaluated in the scope its arguments were drawn in.
+    """
+    phases = (Phase.explicit, Phase.reuse, Phase.generate)\
+        if law.broken else tuple(Phase)
+
+    @settings(phases=phases)
+    @given(data=st.data())
+    def check(data):
+        scope, arguments = data.draw(
+            law.sequents(**law.params), label=law.name)
+        verdict = law(**arguments)
+        note(verdict)
+        assert inhabits(verdict, law.output(scope))
+        assert verdict
+
+    check()

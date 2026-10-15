@@ -54,7 +54,9 @@ We also have its dagger and its transpose:
 
 from __future__ import annotations
 
-from discopy import cat, cmap, rigid, traced
+from typing import ClassVar
+
+from discopy import cat, cmap, messages, rigid, traced
 from discopy.abc import PivotalCategory
 from discopy.cat import factory
 from discopy.utils import deprecated_alias
@@ -70,6 +72,7 @@ class Wire(rigid.Wire):
     """
     l = r = property(lambda self: type(self)(
         self.name, (self.z + 1) % 2, dom=self.cod, cod=self.dom))
+    windings = (0, 1)
 
     def dagger(self) -> Wire:
         """
@@ -89,6 +92,9 @@ class Ty(rigid.Ty):
         inside (Wire) : The objects inside the type.
     """
     generator_factory = Wire
+
+    dagger_involution = PivotalCategory.dagger_involution
+    dagger_contravariance = PivotalCategory.dagger_contravariance
 
 
 @factory
@@ -116,6 +122,16 @@ class Diagram(rigid.Diagram, traced.Diagram, PivotalCategory):
         dom (Ty) : The domain of the diagram, i.e. its input.
         cod (Ty) : The codomain of the diagram, i.e. its output.
     """
+    pivotality = PivotalCategory.pivotality.failing(
+        messages.NO_PLANAR_NORMAL_FORM)
+    trace_superposing_left = PivotalCategory.trace_superposing_left
+    trace_superposing_right = PivotalCategory.trace_superposing_right
+
+    sum_factory: ClassVar[type["Sum"]]
+    box_factory: ClassVar[type["Box"]]
+    functor_factory: ClassVar[type["Functor"]]
+    cup_factory: ClassVar[type["Cup"]]
+    cap_factory: ClassVar[type["Cap"]]
     ob = Ty
 
     def dagger(self):
@@ -178,8 +194,18 @@ class Diagram(rigid.Diagram, traced.Diagram, PivotalCategory):
             >> diagram @ traced_wire.r\
             >> cod @ cls.cup_factory(traced_wire, traced_wire.r)
 
+    # The cups and caps of a pivotal category have a dagger, which needs no
+    # weakening to the diagrams without them.
+    dagger_involution = PivotalCategory.dagger_involution
+    dagger_contravariance = PivotalCategory.dagger_contravariance
+    dagger_monoidality = PivotalCategory.dagger_monoidality.failing(
+        messages.NO_PLANAR_NORMAL_FORM)
+    dagger_involution_monoidal = None
+    dagger_contravariance_monoidal = None
+    dagger_monoidality_monoidal = None
 
-class Box(rigid.Box, Diagram):
+
+class Box(rigid.Box, traced.Box, Diagram):
     """
     A pivotal box is a rigid box in a pivotal diagram.
 
@@ -263,6 +289,7 @@ class Functor(rigid.Functor):
     dom = cod = Diagram
 
 
+Diagram.box_factory = Box
 Diagram.functor_factory = Functor
 Diagram.cup_factory, Diagram.cap_factory = Cup, Cap
 Diagram.sum_factory = Sum

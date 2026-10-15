@@ -23,6 +23,7 @@ Summary
     Curry
     Copy
     Discard
+    Merge
     Permutation
     Swap
     Trace
@@ -146,6 +147,8 @@ loves(Bob)(Alice)
 
 from __future__ import annotations
 
+from typing import ClassVar
+
 from discopy import closed, cmap, hypergraph
 from discopy.cat import factory
 from discopy.grammar import categorial
@@ -154,6 +157,10 @@ from discopy.grammar import categorial
 @factory
 class Ty(closed.Ty):
     "An implicative type, the type of an abstract categorial grammar."
+    variable_factory: ClassVar[type["Variable"]]
+    constant_factory: ClassVar[type["Constant"]]
+    application_factory: ClassVar[type["Application"]]
+    abstraction_factory: ClassVar[type["Abstraction"]]
 
     @classmethod
     def from_categorial(cls, old: categorial.Ty) -> Ty:
@@ -189,6 +196,18 @@ class Diagram(closed.Diagram):
         dom (Ty) : The domain of the diagram, i.e. its input.
         cod (Ty) : The codomain of the diagram, i.e. its output.
     """
+    box_factory: ClassVar[type["Box"]]
+    functor_factory: ClassVar[type["Functor"]]
+    copy_factory: ClassVar[type["Copy"]]
+    merge_factory: ClassVar[type["Merge"]]
+    permutation_factory: ClassVar[type["Permutation"]]
+    swap_factory: ClassVar[type["Swap"]]
+    curry_factory: ClassVar[type["Curry"]]
+    eval_factory: ClassVar[type["Eval"]]
+    coeval_factory: ClassVar[type["Coeval"]]
+    trace_factory: ClassVar[type["Trace"]]
+    discard_factory: ClassVar[type["Discard"]]
+    sum_factory: ClassVar[type["Sum"]]
     ob = Ty
 
     @classmethod
@@ -283,6 +302,10 @@ class Discard(closed.Discard, Copy):
     "The discard of an abstract type, i.e. a copy with zero legs."
 
 
+class Merge(closed.Merge, Box):
+    "The merge of an abstract type, i.e. the dagger of a copy."
+
+
 class Permutation(closed.Permutation, Box):
     "A permutation of abstract types."
 
@@ -371,8 +394,8 @@ class Abstraction(TermBase, closed.Abstraction):
 type Term = Constant | Variable | Application | Abstraction
 
 Id = Diagram.id
-Diagram.functor_factory = Functor
-Diagram.copy_factory = Copy
+Diagram.box_factory, Diagram.functor_factory = Box, Functor
+Diagram.copy_factory, Diagram.merge_factory = Copy, Merge
 Diagram.permutation_factory = Permutation
 Diagram.swap_factory = Swap
 Diagram.curry_factory = Curry

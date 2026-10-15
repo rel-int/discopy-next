@@ -44,7 +44,9 @@ def exp(base: Ty, exponent: Ty) -> Ty:
         exponent : The exponent types.
     """
     base, exponent = map(Ty.cast, (base, exponent))
-    return Ty(Callable[list(exponent.inside), tuple[base.inside]])
+    return Ty(Callable[
+        list(exponent.inside),  # ty: ignore[invalid-type-form]
+        tuple[base.inside]])  # ty: ignore[invalid-type-form]
 
 
 @factory
@@ -87,7 +89,9 @@ class Function(function.Function, ClosedCategory):
                 callable(y) or assert_isinstance(y, t)
         return ys
 
-    def tensor(self, other: Function = None, *others: Function) -> Function:
+    def tensor(
+            self, other: Function | None = None, *others: Function
+    ) -> Function:
         """
         The parallel composition of two functions, called with :code:`@`.
 

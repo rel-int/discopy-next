@@ -74,6 +74,7 @@ def test_closed():
     k = Closed(a @ b, c, closed.Box('k', a @ b @ P, c), P)
     assert Closed.ev(c, b).param == closed.Ty()
     left, right = k.curry(left=True), k.curry(left=False)
+    assert k.curry() == left
     assert (left.dom, left.cod, left.param) == (a, c << b, P)
     assert (right.dom, right.cod, right.param) == (b, a >> c, P)
     assert left.inside\

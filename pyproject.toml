@@ -53,6 +53,7 @@ dev = [
     "pytest-benchmark",
     "polars",
     "pytest-xdist",
+    "ty == 0.0.69",
 ]
 docs = ["discopy[docs]"]
 quantum = ["discopy[quantum]"]
@@ -146,6 +147,19 @@ extend-ignore = [
 per-file-ignores = [
     "__init__.py:F401"
 ]
+
+[tool.ty.src]
+include = ["discopy"]
+
+[tool.ty.environment]
+python-version = "3.14"
+
+# The factory-method pattern narrows the signatures of `then`, `tensor` and
+# their friends down the tower, and attributes are dynamic by design where a
+# downgrade asks the host category for structure it may not have.
+[tool.ty.rules]
+invalid-method-override = "ignore"
+unresolved-attribute = "ignore"
 
 [tool.pytest.ini_options]
 pythonpath = [

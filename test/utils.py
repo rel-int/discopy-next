@@ -103,3 +103,10 @@ def test_wire_tree_roundtrip():
     with warns(DeprecationWarning):
         assert from_tree({'factory': 'discopy.frobenius.Ob', 'name': 'x'})\
             == frobenius.Wire('x')
+
+
+def test_MappingOrCallable():
+    from discopy.utils import MappingOrCallable
+    assert MappingOrCallable({0: 1})[0] == MappingOrCallable(lambda x: 1)[0]
+    with pytest.raises(TypeError):
+        MappingOrCallable([10, 20])

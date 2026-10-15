@@ -73,8 +73,11 @@ in the same diagram they automatically satisfy the :mod:`frobenius` axioms.
 
 from __future__ import annotations
 
-from discopy import symmetric, monoidal, cmap, hypergraph
+from typing import ClassVar
+
+from discopy import symmetric, monoidal, cmap, hypergraph, messages
 from discopy.abc import MarkovCategory
+from discopy.axioms import FUEL
 from discopy.cat import factory
 from discopy.monoidal import Ty  # noqa: F401  pylint: disable=unused-import
 from discopy.utils import assert_isatomic, factory_name, from_tree
@@ -114,6 +117,31 @@ class Diagram(symmetric.Diagram, MarkovCategory):
 
     .. image:: /_static/markov/copy_and_apply.svg
     """
+    box_factory: ClassVar[type["Box"]]
+    functor_factory: ClassVar[type["Functor"]]
+    copy_factory: ClassVar[type["Copy"]]
+    merge_factory: ClassVar[type["Merge"]]
+    swap_factory: ClassVar[type["Swap"]]
+    permutation_factory: ClassVar[type["Permutation"]]
+    trace_factory: ClassVar[type["Trace"]]
+    discard_factory: ClassVar[type["Discard"]]
+    sum_factory: ClassVar[type["Sum"]]
+
+    @classmethod
+    def sample(cls, *, dom=None, cod=None, fuel=FUEL):
+        """
+        Sample Markov diagrams through their quotient: a hypergraph drawn
+        by :meth:`discopy.hypergraph.Hypergraph.strategy` with at most
+        ``fuel + 1`` boxes, besides the one balancing box that may close its
+        boundary, and the spiders that the category supports, i.e.
+        copies and discards here and every spider in a hypergraph category,
+        downgraded with :meth:`discopy.hypergraph.Hypergraph.to_diagram`.
+        """
+        category = hypergraph.Hypergraph[cls]  # ty: ignore[invalid-type-form]
+        return category.strategy(
+            dom=dom, cod=cod, max_leaves=fuel + 1).map(
+                lambda graph: graph.to_diagram())
+
     @classmethod
     def spider_factory(cls, n_legs_in, n_legs_out, typ, phase=None):
         if phase is not None or 1 not in (n_legs_in, n_legs_out):
@@ -131,7 +159,8 @@ class Diagram(symmetric.Diagram, MarkovCategory):
             n : The number of copies.
         """
         from discopy import frobenius
-        return frobenius.Diagram.spiders.__func__(cls, 1, n, x)
+        return frobenius.Diagram.spiders.__func__(
+            cls, 1, n, x)  # ty: ignore[invalid-argument-type]
 
     @classmethod
     def merge(cls, x: monoidal.Ty, n=2) -> Diagram:
@@ -153,6 +182,9 @@ class Diagram(symmetric.Diagram, MarkovCategory):
             x : The type to discard.
         """
         return cls.copy(x, 0)
+
+    map_agreement = monoidal.Diagram.map_agreement.failing(
+        messages.MAP_HAS_NO_SPIDERS)
 
 
 class Box(symmetric.Box, Diagram):
@@ -218,16 +250,39 @@ class Copy(Box):
         return super().__new__(cls) if n else\
             cls.discard_factory.__new__(cls.discard_factory, x)
 
+    def __getnewargs__(self):
+        """ The arguments of :meth:`__new__`, which a pickle needs. """
+        return self.dom, len(self.cod)
+
     def dagger(self) -> Merge:
+        """
+        The merge of the same type, in the category of the copy.
+
+        >>> x = Ty('x')
+        >>> assert Copy(x).dagger() == Merge(x)
+        >>> assert Diagram.discard(x).dagger().dagger() == Discard(x)
+        """
         return self.merge_factory(self.dom, len(self.cod))
 
     def __repr__(self):
         return (
             factory_name(type(self)) + f"({repr(self.dom)}, {len(self.cod)})")
 
+    def to_tree(self) -> dict:
+        """
+        Serialise a copy by its type and number of copies.
+
+        >>> from discopy.utils import dumps, loads
+        >>> x = Ty('x')
+        >>> for box in (Copy(x), Copy(x, 3), Discard(x), Merge(x)):
+        ...     assert loads(dumps(box)) == box
+        """
+        return {'factory': factory_name(type(self)),
+                'x': self.dom.to_tree(), 'n': len(self.cod)}
+
     @classmethod
     def from_tree(cls, tree: dict) -> Copy:
-        return cls(from_tree(tree['dom']), len(from_tree(tree['cod'])))
+        return cls(from_tree(tree['x']), tree['n'])
 
 
 class Merge(Box):
@@ -245,15 +300,21 @@ class Merge(Box):
                      draw_as_spider=True, color="black", drawing_name="")
 
     def dagger(self) -> Copy:
+        """ The copy of the same type, in the category of the merge. """
         return self.copy_factory(self.cod, len(self.dom))
 
     def __repr__(self):
         return (
             factory_name(type(self)) + f"({repr(self.cod)}, {len(self.dom)})")
 
+    def to_tree(self) -> dict:
+        """ Serialise a merge by its type and number of wires merged. """
+        return {'factory': factory_name(type(self)),
+                'x': self.cod.to_tree(), 'n': len(self.dom)}
+
     @classmethod
     def from_tree(cls, tree: dict) -> Merge:
-        return cls(from_tree(tree['cod']), len(from_tree(tree['dom'])))
+        return cls(from_tree(tree['x']), tree['n'])
 
 
 class Discard(Copy):
@@ -323,6 +384,7 @@ class Functor(symmetric.Functor):
 
 CMap = cmap.CMap[Diagram]
 
+Diagram.box_factory = Box
 Diagram.functor_factory = Functor
 Hypergraph = hypergraph.Hypergraph[Diagram]
 Diagram.copy_factory, Diagram.merge_factory = Copy, Merge

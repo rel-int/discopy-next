@@ -75,7 +75,8 @@ from discopy import (
     ribbon,
     messages
 )
-from discopy.abc import RibbonCategory, TracedCategory, NamedGeneric
+from discopy.abc import (
+    NamedGeneric, Pregroup, RibbonCategory, TracedCategory)
 from discopy.cat import assert_iscomposable
 from discopy.python import finset
 from discopy.utils import (
@@ -84,7 +85,7 @@ from discopy.utils import (
 
 
 @dataclass
-class Ty(NamedGeneric['natural']):
+class Ty[natural](Pregroup, NamedGeneric):
     """
     An integer type is a pair of :attr:`natural` types.
 
@@ -119,7 +120,7 @@ class Ty(NamedGeneric['natural']):
     positive: natural
     negative: natural
 
-    def __init__(self, positive: natural = None, negative: natural = None):
+    def __init__(self, positive=None, negative=None):
         positive, negative = (
             self.natural() if x is None else x for x in (positive, negative))
         positive, negative = (
@@ -140,8 +141,9 @@ class Ty(NamedGeneric['natural']):
 
     def __str__(self):
         try:
+            negatives = self.negatives(self.negative)
             return " @ ".join(list(map(str, self.positive)) + [
-                f"-{x}" for x in self.negatives(self.negative)])
+                f"-{x}" for x in negatives])  # ty: ignore[not-iterable]
         except TypeError:  # e.g. when Ty.natural == int
             return repr(self)
 
@@ -160,6 +162,11 @@ class Ty(NamedGeneric['natural']):
 
     __matmul__ = tensor
 
+    def __rmatmul__(self, other):
+        """ A type does not whisker: the tensor with anything but a type of
+        the same natural numbers is undefined. """
+        return NotImplemented
+
     def __neg__(self):
         positive, negative = self
         return type(self)(negative, positive)
@@ -169,7 +176,7 @@ class Ty(NamedGeneric['natural']):
 
 @factory
 @dataclass
-class Diagram(RibbonCategory, NamedGeneric['natural']):
+class Diagram[natural](RibbonCategory, NamedGeneric):
     """
     An integer diagram from ``x`` to ``y`` is a :attr:`natural` diagram
     from ``x.positive @ y.negative`` to ``x.negative @ y.positive``.
@@ -203,7 +210,7 @@ class Diagram(RibbonCategory, NamedGeneric['natural']):
     dom: Ty
     cod: Ty
 
-    def __init__(self, inside: natural, dom: Ty, cod: Ty):
+    def __init__(self, inside, dom: Ty, cod: Ty):
         assert_isinstance(inside, self.natural)
         if inside.dom != dom.positive @ cod.negative:
             raise ValueError(messages.WRONG_DOM.format(
@@ -268,7 +275,7 @@ class Diagram(RibbonCategory, NamedGeneric['natural']):
         return type(self)(inside, dom, cod)
 
     @classmethod
-    def id(cls, dom: Ty = None) -> Diagram:
+    def id(cls, dom: Ty | None = None) -> Diagram:
         """
         The identity on an integer type.
 
@@ -293,7 +300,7 @@ class Diagram(RibbonCategory, NamedGeneric['natural']):
         .. image:: /_static/int/idr.svg
             :align: center
         """
-        dom = Ty[cls.natural.ob]() if dom is None else dom
+        dom = cls.ob() if dom is None else dom
         positive, negative = dom
         inside = cls.natural.id(positive) @ cls.natural.twist(negative)
         return cls(inside, dom, dom)
@@ -396,7 +403,7 @@ class Diagram(RibbonCategory, NamedGeneric['natural']):
         .. image:: /_static/int/int-snake-equations.svg
             :align: center
         """
-        rigid.Ty.assert_isadjoint(left, right)
+        left.assert_isadjoint(right)
         inside = cls.natural.id(left.positive @ left.negative)
         return cls(inside, left @ right, type(left)())
 
@@ -409,7 +416,7 @@ class Diagram(RibbonCategory, NamedGeneric['natural']):
             left : The left-hand side of the caps.
             right : The right-hand side of the caps.
         """
-        rigid.Ty.assert_isadjoint(right, left)
+        right.assert_isadjoint(left)
         inside = cls.natural.id(left.positive @ left.negative)
         return cls(inside, type(left)(), left @ right)
 
@@ -480,7 +487,7 @@ class Diagram(RibbonCategory, NamedGeneric['natural']):
     to_drawing = lambda self: self.inside.to_drawing()
 
 
-def Int(category: TracedCategory) -> RibbonCategory:
+def Int(category: type[TracedCategory]) -> type[RibbonCategory]:
     """
     The Int construction, i.e. the free ribbon category on a given balanced
     traced `category`, with :class:`interaction.Ty` as objects and
@@ -494,7 +501,7 @@ def Int(category: TracedCategory) -> RibbonCategory:
     >>> from discopy.ribbon import Diagram as D
     >>> assert Int(D) == Diagram[D]
     """
-    return Diagram[category]
+    return Diagram[category]  # ty: ignore[invalid-type-form]
 
 
 Id = Diagram.id

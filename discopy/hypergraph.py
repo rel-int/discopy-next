@@ -52,13 +52,18 @@ from networkx import (
 from networkx.algorithms.isomorphism import is_isomorphic
 
 from discopy import cmap, messages
+from discopy.axioms import Serialisable
 from discopy.abc import (
     HypergraphCategory, MarkovCategory, MonoidalCategory, NamedGeneric,
+    BalancedCategory, BraidedCategory, CompactCategory, Pregroup,
     RigidCategory, SymmetricCategory, TracedCategory)
 from discopy.drawing import Node, backend
 from discopy.python.finset import Permutation
 from discopy.utils import (
     factory_name,
+    from_tree,
+    get_origin,
+    resolve_factory,
     assert_isinstance,
     pushout,
     unbiased,
@@ -70,6 +75,7 @@ from discopy.utils import (
     untuplify,
 )
 if TYPE_CHECKING:
+    from hypothesis import strategies as st
     from discopy.monoidal import Ty, Box, Diagram
 
 
@@ -96,7 +102,8 @@ Mapping from :class:`Spider` to atomic :class:`frobenius.Ty`.
 """
 
 
-class Hypergraph(MonoidalCategory, NamedGeneric['category']):
+class Hypergraph[category](
+        MonoidalCategory["Ty", "Hypergraph"], NamedGeneric, Serialisable):
     """
     A hypergraph is given by:
 
@@ -184,15 +191,16 @@ class Hypergraph(MonoidalCategory, NamedGeneric['category']):
     >>> assert (f @ g).n_spiders == 4
     >>> assert (f @ g).wires == ((0, 1), (((0,), (2,)), ((1,), (3,))), (2, 3))
     """
-    category = None
+    MAX_ARITY = 3
+    """ The largest number of ports :meth:`strategy` samples for a box. """
 
     functor = classproperty(lambda cls: cls.category.functor_factory)
     ob = classproperty(lambda cls: cls.category.ob)
 
     def __init__(
             self, dom: Ty, cod: Ty, boxes: tuple[Box, ...],
-            wires: Wiring, spider_types: SpiderTypes = None,
-            offsets: tuple[int | None, ...] = None):
+            wires: Wiring, spider_types: SpiderTypes | None = None,
+            offsets: tuple[int | None, ...] | None = None):
         assert_isinstance(dom, self.category.ob)
         assert_isinstance(cod, self.category.ob)
         for box in boxes:
@@ -225,7 +233,8 @@ class Hypergraph(MonoidalCategory, NamedGeneric['category']):
         first_occurrence = {}
         for index, spider in enumerate(flat_wires):
             first_occurrence.setdefault(spider, index)
-        relabeling = sorted(connected_spiders, key=first_occurrence.get)
+        relabeling = sorted(
+            connected_spiders, key=first_occurrence.__getitem__)
         relabeling += sorted(set(spider_types.keys()) - connected_spiders)
         self.spider_types = tuple(
             spider_types[s].unwind() for s in relabeling)
@@ -316,7 +325,7 @@ class Hypergraph(MonoidalCategory, NamedGeneric['category']):
         return inputs + doms_and_cods + outputs
 
     def rebracket(
-            self, flat_wires: list[Spider], boxes=None, dom=None):
+            self, flat_wires: Sequence[Spider], boxes=None, dom=None):
         """
         Rebracket a flat list of :class:`Spider` into a proper :class:`Wiring`.
         """
@@ -348,8 +357,6 @@ class Hypergraph(MonoidalCategory, NamedGeneric['category']):
         dom = cls.category.ob() if dom is None else dom
         dom_wires = cod_wires = tuple(range(len(dom)))
         return cls(dom, dom, (), (dom_wires, (), cod_wires))
-
-    twist = id
 
     @unbiased
     def then(self, other: Hypergraph):
@@ -412,12 +419,63 @@ class Hypergraph(MonoidalCategory, NamedGeneric['category']):
 
     @classmethod
     def swap(cls, left, right):
+        """
+        The swap of a symmetric category, absorbed into the wiring.
+
+        >>> from discopy import braided
+        >>> x, y = braided.Ty('x'), braided.Ty('y')
+        >>> Hypergraph[braided.Diagram].swap(x, y)
+        Traceback (most recent call last):
+        ...
+        discopy.utils.AxiomError: braided.Diagram is not symmetric, ...
+        """
+        if not issubclass(cls.category, SymmetricCategory):
+            raise AxiomError(messages.NO_SWAP.format(
+                factory_name(cls.category)))
         dom, cod, boxes = left @ right, right @ left, ()
         dom_wires = tuple(range(len(dom)))
         cod_wires = tuple(range(len(left), len(dom))) + tuple(range(len(left)))
         return cls(dom, cod, boxes, (dom_wires, (), cod_wires))
 
-    braid = swap
+    @classmethod
+    def braid(cls, left, right):
+        """
+        The braid of a braided category: the :meth:`swap` of a symmetric one,
+        and boxes otherwise, a braid being no swap.
+
+        >>> from discopy import braided
+        >>> x, y = braided.Ty('x'), braided.Ty('y')
+        >>> braid = Hypergraph[braided.Diagram].braid(x, y)
+        >>> assert braid.boxes == (braided.Braid(x, y), )
+        """
+        if not issubclass(cls.category, BraidedCategory):
+            raise AxiomError(messages.NO_BRAID.format(
+                factory_name(cls.category)))
+        if issubclass(cls.category, SymmetricCategory):
+            return cls.swap(left, right)
+        if len(left) == len(right) == 1:
+            return cls.from_box(cls.category.braid_factory(left, right))
+        return cls.from_diagram(cls.category.braid(left, right))
+
+    @classmethod
+    def twist(cls, dom):
+        """
+        The twist of a balanced category: the identity of a symmetric one,
+        and boxes otherwise, a twist being no identity.
+
+        >>> from discopy import balanced
+        >>> x = balanced.Ty('x')
+        >>> twist = Hypergraph[balanced.Diagram].twist(x)
+        >>> assert twist.boxes == (balanced.Twist(x), )
+        """
+        if issubclass(cls.category, SymmetricCategory):
+            return cls.id(dom)
+        if not issubclass(cls.category, BalancedCategory):
+            raise AxiomError(messages.NO_TWIST.format(
+                factory_name(cls.category)))
+        if len(dom) == 1:
+            return cls.from_box(cls.category.twist_factory(dom))
+        return cls.from_diagram(cls.category.twist(dom))
 
     @classmethod
     def permutation(cls, xs: Sequence[int], doms: Sequence) -> Hypergraph:
@@ -464,18 +522,54 @@ class Hypergraph(MonoidalCategory, NamedGeneric['category']):
 
     @classmethod
     def cups(cls, left, right):
-        adjoint = left.r if hasattr(left, "r") else left[::-1]
-        if adjoint != right:
-            raise AxiomError
+        """
+        The cups of a type and its right adjoint: boxes over a rigid category
+        that is not compact, whose cups are planar and oriented, and wiring
+        from compact categories on, where a cup is faithfully a spider with
+        two ports of the same kind.
+
+        >>> from discopy.rigid import Ty, Cup
+        >>> x = Ty('x')
+        >>> assert Cup(x, x.r).to_hypergraph().dom == x @ x.r
+        """
+        if not issubclass(cls.category, RigidCategory):
+            raise AxiomError(messages.NO_CUPS.format(
+                factory_name(cls.category)))
+        if not issubclass(cls.category, CompactCategory):
+            if len(left) == 1:
+                return cls.from_box(cls.category.cup_factory(left, right))
+            return cls.from_diagram(cls.category.cups(left, right))
+        if isinstance(left, Pregroup):
+            left.assert_isadjoint(right)
+        elif left[::-1] != right:
+            raise AxiomError(messages.NOT_ADJOINT.format(left, right))
         dom_wires = tuple(range(len(left))) + tuple(reversed(range(len(left))))
         return cls(
             left @ right, cls.category.ob(), (), (dom_wires, (), ()))
 
     @classmethod
     def caps(cls, left, right):
-        adjoint = left.r if hasattr(left, "r") else left[::-1]
-        if adjoint != right:
-            raise AxiomError
+        """
+        The caps of a type and its left adjoint, e.g. ``Cap(x, x.l)`` and
+        ``Cap(x.r, x)``: boxes over a rigid category that is not compact and
+        wiring from compact categories on, see :meth:`cups`.
+
+        >>> from discopy.rigid import Ty, Cap
+        >>> x = Ty('x')
+        >>> assert Cap(x, x.l).to_hypergraph().cod == x @ x.l
+        >>> assert Cap(x.r, x).to_hypergraph().cod == x.r @ x
+        """
+        if not issubclass(cls.category, RigidCategory):
+            raise AxiomError(messages.NO_CUPS.format(
+                factory_name(cls.category)))
+        if not issubclass(cls.category, CompactCategory):
+            if len(left) == 1:
+                return cls.from_box(cls.category.cap_factory(left, right))
+            return cls.from_diagram(cls.category.caps(left, right))
+        if isinstance(right, Pregroup):
+            right.assert_isadjoint(left)
+        elif left[::-1] != right:
+            raise AxiomError(messages.NOT_ADJOINT.format(left, right))
         cod_wires = tuple(range(len(left))) + tuple(reversed(range(len(left))))
         return cls(
             cls.category.ob(), left @ right, (), ((), (), cod_wires))
@@ -535,27 +629,58 @@ class Hypergraph(MonoidalCategory, NamedGeneric['category']):
 
     def trace(self, n=1, left=False):
         """
-        The trace of a hypergraph is its pre- and post-composition with
-        cups and caps to form a feedback loop.
+        The trace of a hypergraph over a traced category: the traced outputs
+        wired back to the traced inputs over a symmetric one, where this is
+        faithful, and the trace of the category one wire at a time otherwise,
+        see :meth:`explicit_trace`, e.g. a box over a planar traced category
+        or its cups and caps, themselves boxes, over a pivotal one.
 
         Parameters:
             n : The number of wires to trace.
             left : Whether to trace on the left or right.
+
+        >>> from discopy import symmetric, traced
+        >>> x = symmetric.Ty('x')
+        >>> f = symmetric.Box('f', x @ x, x @ x).to_hypergraph()
+        >>> assert f.trace().cod == f.trace(left=True).cod == x
+        >>> g = traced.Box('g', x @ x, x @ x)
+        >>> assert g.to_hypergraph().trace().boxes == (g.trace(), )
         """
         if n == 0:
             return self
+        if not issubclass(self.category, TracedCategory):
+            raise AxiomError(messages.NOT_TRACED.format(
+                factory_name(self.category)))
         assert_istraceable(self, n, left)
+        if not issubclass(self.category, SymmetricCategory):
+            result = self
+            for _ in range(n):
+                result = result.explicit_trace(left)
+            return result
+        dom_wires, box_wires, cod_wires = self.wires
+        kept_dom, kept_cod = len(dom_wires) - n, len(cod_wires) - n
+        inputs, outputs = (dom_wires[:n], cod_wires[:n]) if left\
+            else (dom_wires[kept_dom:], cod_wires[kept_cod:])
+        parent = {}
+
+        def find(spider):
+            while parent.get(spider, spider) != spider:
+                spider = parent[spider]
+            return spider
+
+        for output, input_ in zip(outputs, inputs):
+            if find(output) != find(input_):
+                parent[find(output)] = find(input_)
         dom, cod = (self.dom[n:], self.cod[n:]) if left\
             else (self.dom[:-n], self.cod[:-n])
-        traced_wires = self.dom[:n] if left else self.dom[len(self.dom) - n:]
-        traced_wires_r = traced_wires.r if hasattr(traced_wires, "r")\
-            else traced_wires[::-1]
-        return self.caps(traced_wires_r, traced_wires) @ dom\
-            >> traced_wires_r @ self\
-            >> self.cups(traced_wires_r, traced_wires) @ cod if left\
-            else dom @ self.caps(traced_wires, traced_wires_r)\
-            >> self @ traced_wires_r\
-            >> cod @ self.cups(traced_wires, traced_wires_r)
+        dom_wires, cod_wires = (dom_wires[n:], cod_wires[n:]) if left\
+            else (dom_wires[:kept_dom], cod_wires[:kept_cod])
+        wires = (tuple(map(find, dom_wires)), tuple(
+            (tuple(map(find, x)), tuple(map(find, y))) for x, y in box_wires),
+            tuple(map(find, cod_wires)))
+        spider_types = {
+            find(spider): typ for spider, typ in enumerate(self.spider_types)}
+        return type(self)(dom, cod, self.boxes, wires, spider_types)
 
     def interchange(self, i: int, j: int) -> Hypergraph:
         """
@@ -766,7 +891,7 @@ class Hypergraph(MonoidalCategory, NamedGeneric['category']):
         for spider in self.cod_wires:
             see(spider)
 
-        box_rank = [None] * len(self.boxes)
+        box_rank: list[Any] = [None] * len(self.boxes)
         next_rank = 0
         position = 0
         while position < len(order):
@@ -801,12 +926,59 @@ class Hypergraph(MonoidalCategory, NamedGeneric['category']):
         return type(self)(self.dom, self.cod, boxes, wires, spider_types)
 
     def __repr__(self):
-        spider_types = f", spider_types={self.spider_types}"\
+        """
+        The representation of a hypergraph names the category it is
+        parameterised by, so that it evaluates back to it.
+
+        >>> from discopy.markov import Ty, Box, Diagram
+        >>> graph = Box('f', Ty('x'), Ty('y')).to_hypergraph()
+        >>> from discopy import hypergraph, markov, monoidal, cat
+        >>> assert eval(repr(graph)) == graph
+        >>> assert type(eval(repr(graph))) is Hypergraph[Diagram]
+        """
+        spider_types = f", spider_types={self.spider_types!r}"\
             if self.scalar_spiders else ""
         return factory_name(type(self))\
             + f"(dom={repr(self.dom)}, cod={repr(self.cod)}, " \
               f"boxes={repr(self.boxes)}, " \
               f"wires={repr(self.wires)}{spider_types})"
+
+    def to_tree(self) -> dict:
+        """
+        Serialise a hypergraph, with the name of its category.
+
+        >>> from discopy.utils import dumps, loads
+        >>> from discopy.frobenius import Ty, Hypergraph as H
+        >>> graph = H.spiders(1, 2, Ty('x')) >> H.cups(Ty('x'), Ty('x'))
+        >>> assert loads(dumps(graph)) == graph
+        """
+        dom_wires, box_wires, cod_wires = self.wires
+        return {
+            'factory': factory_name(get_origin(type(self))),
+            'category': factory_name(self.category),
+            'dom': self.dom.to_tree(),
+            'cod': self.cod.to_tree(),
+            'boxes': [box.to_tree() for box in self.boxes],
+            'wires': [list(dom_wires), [
+                [list(inputs), list(outputs)]
+                for inputs, outputs in box_wires], list(cod_wires)],
+            'spider_types': [typ.to_tree() for typ in self.spider_types]
+        } | ({'offsets': list(self.offsets)}
+             if any(offset is not None for offset in self.offsets) else {})
+
+    @classmethod
+    def from_tree(cls, tree: dict) -> Hypergraph:
+        """ Decode a serialised hypergraph, see :meth:`to_tree`. """
+        factory = cls[resolve_factory(tree['category'])]
+        dom_wires, box_wires, cod_wires = tree['wires']
+        wires = (tuple(dom_wires), tuple(
+            (tuple(inputs), tuple(outputs)) for inputs, outputs in box_wires
+        ), tuple(cod_wires))
+        return factory(
+            from_tree(tree['dom']), from_tree(tree['cod']),
+            tuple(map(from_tree, tree['boxes'])), wires,
+            tuple(map(from_tree, tree['spider_types'])),
+            tuple(tree['offsets']) if 'offsets' in tree else None)
 
     def __str__(self):
         return str(self.to_diagram())
@@ -894,7 +1066,8 @@ class Hypergraph(MonoidalCategory, NamedGeneric['category']):
             flat_wires[i] = flat_wires[j] = spider
         spider_types.extend(old.loops)
         wires = cls.rebracket(
-            None, flat_wires, dom=old.dom, boxes=old.boxes)
+            None,  # ty: ignore[invalid-argument-type]
+            flat_wires, dom=old.dom, boxes=old.boxes)
         factory = cls[old.category]
         return factory(
             old.dom, old.cod, old.boxes, wires, tuple(spider_types))
@@ -1314,7 +1487,10 @@ class Hypergraph(MonoidalCategory, NamedGeneric['category']):
                 if input_wire < output_wire and\
                         not has_path(causal_graph, output_wire, input_wire):
                     continue
-                dom, cod = self.dom @ typ, self.cod @ typ
+                # The traced wire has the type of its producer, which may be
+                # an adjoint of the unwound type labelling the spider.
+                obj = self.ports[input_wire].obj
+                dom, cod = self.dom @ obj, self.cod @ obj
                 spider_types = self.spider_types + (typ, )
                 output_spider = len(spider_types) - 1
                 fwires = list(self.flat_wires)
@@ -1337,6 +1513,301 @@ class Hypergraph(MonoidalCategory, NamedGeneric['category']):
     def generator(self):
         """ Return the `f` from `Hypergraph.from_box(f)` if `is_generator`. """
         return self.boxes[0] if self.is_generator else None
+
+    @classmethod
+    def strategy(  # pylint: disable=arguments-differ,too-many-arguments
+            # a terminal strategy declares exactly its keyword-only bounds
+            cls, *, types=None, dom=None, cod=None, min_leaves=None,
+            max_leaves=4, acyclic=None, max_scalars=None):
+        """
+        Generate hypergraphs of :attr:`category` by drawing their wiring,
+        then a box of the category for each box of the wiring.
+
+        The wiring is sampled port by port, in the order of :attr:`ports`,
+        under the constraint the category puts on the producers (inputs and
+        box outputs) and the consumers (box inputs and outputs) of a spider,
+        from the most structure to the least:
+
+        * a hypergraph category takes any spider, see :meth:`draw_any`;
+        * a Markov category spiders with one producer, which copy or discard
+          it, see :meth:`draw_directed`;
+        * a compact category spiders with two ports, of the same kind only
+          with adjoint types, i.e. cups and caps, see :meth:`draw_bijective`;
+        * a symmetric category spiders with one producer and one consumer,
+          see :meth:`draw_directed`;
+        * a category with no symmetry has no hypergraphs generated, since a
+          planar diagram is not determined by its wiring.
+
+        The box types are free, so a boundary the sampled wiring does not match
+        is closed by one extra balancing box: ``dom`` and ``cod`` are always
+        honoured, with no filtering. Every choice is an integer whose zero is
+        the simplest option, a fresh spider or the first candidate, so that
+        examples shrink to few boxes with few connections.
+
+        Parameters:
+            types : A strategy for the types of boxes and boundaries.
+            dom : The domain, sampled from ``types`` if ``None``.
+            cod : The codomain, sampled from ``types`` if ``None``.
+            min_leaves : The minimum number of boxes.
+            max_leaves : The maximum number of boxes, not counting the
+                balancing box.
+            acyclic : Whether every consumer comes after its producers. By
+                default this always holds when the category is not traced,
+                and holds for two hypergraphs in three when it is, shrinking
+                to acyclic. Only applies to the directed wirings.
+            max_scalars : The maximum number of spiders with no port, by
+                default one in a traced category unless ``acyclic``. A
+                scalar is sampled for about one hypergraph in four.
+
+        Example
+        -------
+        >>> from hypothesis import find
+        >>> from discopy.markov import Ty, Diagram
+        >>> x = Ty('x')
+        >>> H = Hypergraph[Diagram]
+        >>> graph = find(H.strategy(dom=x @ x, cod=x), lambda g: g.boxes)
+        >>> assert (graph.dom, graph.cod) == (x @ x, x)
+        >>> assert graph.is_left_monogamous
+        """
+        from hypothesis import strategies as st
+
+        category = cls.category
+        if category is None or not issubclass(category, SymmetricCategory):
+            raise NotImplementedError(
+                f"No strategy implemented for {factory_name(cls)}.")
+        is_traced = issubclass(category, TracedCategory)
+        if max_scalars is None:
+            max_scalars = 1 if is_traced and acyclic is not True else 0
+        types = cls.ob.strategy() if types is None else types
+        min_leaves = min_leaves or 0
+
+        @st.composite
+        def hypergraphs(draw):
+            n_boxes = draw(
+                st.integers(min_leaves, max(min_leaves, max_leaves)))
+            # In a traced category, two hypergraphs in three are acyclic.
+            is_acyclic = not is_traced or draw(st.integers(0, 2)) < 2\
+                if acyclic is None else acyclic
+            bounds = {"dom": dom, "cod": cod, "n_boxes": n_boxes}
+            if issubclass(category, HypergraphCategory):
+                wiring = cls.draw_any(draw, types, **bounds)
+            elif issubclass(category, MarkovCategory):
+                wiring = cls.draw_directed(
+                    draw, types, monogamous=False, acyclic=is_acyclic,
+                    **bounds)
+            elif issubclass(category, RigidCategory):
+                wiring = cls.draw_bijective(draw, types, **bounds)
+            else:
+                wiring = cls.draw_directed(
+                    draw, types, monogamous=True, acyclic=is_acyclic,
+                    **bounds)
+            domain, codomain, box_types, wires, spider_types = wiring
+            # A scalar is drawn one time in four, so as not to be in most.
+            n_scalars = max(0, draw(st.integers(0, max_scalars + 2)) - 2)
+            spider_types += [
+                cls.draw_atom(
+                    draw, types)  # ty: ignore[invalid-argument-type]
+                for _ in range(n_scalars)]
+            boxes = tuple(
+                draw(category.box_factory.strategy(dom=x, cod=y))
+                for x, y in box_types)
+            return cls(domain, codomain, boxes, wires, spider_types)
+
+        return hypergraphs()
+
+    @staticmethod
+    def draw_atom(draw: Callable, types: st.SearchStrategy[Ty]) -> Ty:
+        """ Draw an atomic type from a non-empty one. """
+        from hypothesis import strategies as st
+
+        typ = draw(types.filter(len))
+        i = draw(st.integers(0, len(typ) - 1))
+        return typ[i:i + 1]
+
+    @classmethod
+    def draw_any(  # pylint: disable=too-many-arguments  # one per bound
+            cls, draw: Callable, types: st.SearchStrategy[Ty], *,
+            dom: Ty | None, cod: Ty | None, n_boxes: int) -> tuple:
+        """
+        Draw the types of the boundary and the boxes, then merge each port
+        into a spider of its type or into a new one, the wiring of a
+        hypergraph category. It is drawn as the arguments of a hypergraph
+        but its boxes, their types in their place.
+        """
+        from hypothesis import strategies as st
+
+        dom = draw(types) if dom is None else dom
+        box_types = tuple((draw(types), draw(types)) for _ in range(n_boxes))
+        cod = draw(types) if cod is None else cod
+        opened = []
+
+        def merge(obj):
+            candidates = [
+                spider for spider, typ in enumerate(opened)
+                if typ.unwind() == obj.unwind()]
+            k = draw(st.integers(0, len(candidates)))
+            if k:
+                return candidates[k - 1]
+            opened.append(obj)
+            return len(opened) - 1
+
+        dom_wires = tuple(map(merge, dom))
+        box_wires = tuple(
+            (tuple(map(merge, x)), tuple(map(merge, y))) for x, y in box_types)
+        wires = dom_wires, box_wires, tuple(map(merge, cod))
+        return dom, cod, box_types, wires, opened
+
+    @classmethod
+    def draw_directed(  # pylint: disable=too-many-arguments,too-many-locals
+            # one per bound, one per kind of port
+            cls, draw: Callable, types: st.SearchStrategy[Ty], *,
+            dom: Ty | None, cod: Ty | None, n_boxes: int, monogamous: bool,
+            acyclic: bool) -> tuple:
+        """
+        Draw a wiring where each spider has exactly one producer, and at most
+        one consumer if ``monogamous``, those of a symmetric and of a Markov
+        category: each producer opens a spider, which each consumer picks
+        among the available ones, those opened before the box it feeds first,
+        so that closing a cycle is never the simplest choice. A balancing box
+        takes the producers left over and produces the outputs no spider
+        could feed. Unless ``acyclic``, the outputs of every box are opened
+        before any input is wired, so that a box can read the output of a
+        later one. It is drawn as in :meth:`draw_any`.
+        """
+        from hypothesis import strategies as st
+
+        opened, consumed = [], []
+
+        def open_spider(obj):
+            opened.append(obj)
+            consumed.append(False)
+            return len(opened) - 1
+
+        def available(obj=None, before=None):
+            spiders = [
+                spider for spider, typ in enumerate(opened)
+                if not (monogamous and consumed[spider])
+                and (obj is None or typ == obj)]
+            return spiders if before is None\
+                else sorted(spiders, key=lambda spider: spider >= before)
+
+        def pick(pool):
+            spider = pool[draw(st.integers(0, len(pool) - 1))]
+            consumed[spider] = True
+            return spider
+
+        def picks(before=None):
+            wires = []
+            for _ in range(draw(st.integers(0, cls.MAX_ARITY))):
+                pool = available(before=before)
+                if not pool:
+                    break
+                wires.append(pick(pool))
+            return wires
+
+        dom = draw(types) if dom is None else dom
+        dom_wires = [open_spider(obj) for obj in dom]
+        box_cods = [list(draw(types)) for _ in range(n_boxes)]
+        box_cod_wires = [] if acyclic else [
+            [open_spider(obj) for obj in box_cod] for box_cod in box_cods]
+        box_dom_wires = []
+        for depth, box_cod in enumerate(box_cods):
+            box_dom_wires.append(picks(
+                before=len(dom) + sum(map(len, box_cods[:depth]))))
+            if acyclic:
+                box_cod_wires.append([open_spider(obj) for obj in box_cod])
+        missing_wires, cod_wires = [], []
+        if cod is not None:
+            for obj in cod:
+                pool = available(obj)
+                spider = pick(pool) if pool else open_spider(obj)
+                missing_wires += [] if pool else [spider]
+                consumed[spider] = True
+                cod_wires.append(spider)
+        elif monogamous:
+            while pool := available():
+                cod_wires.append(pick(pool))
+        else:
+            cod_wires = picks()
+        leftovers = available() if monogamous else []
+        if leftovers or missing_wires:
+            box_dom_wires.append([pick([spider]) for spider in leftovers])
+            box_cods.append([opened[spider] for spider in missing_wires])
+            box_cod_wires.append(missing_wires)
+        ob = type(dom)
+        box_types = tuple(
+            (ob().tensor(*(opened[s] for s in box_dom)), ob().tensor(*box_cod))
+            for box_dom, box_cod in zip(box_dom_wires, box_cods))
+        wires = (tuple(dom_wires), tuple(
+            (tuple(x), tuple(y)) for x, y in zip(box_dom_wires, box_cod_wires)
+        ), tuple(cod_wires))
+        cod = ob().tensor(*(opened[s] for s in cod_wires))
+        return dom, cod, box_types, wires, opened
+
+    @classmethod
+    def draw_bijective(  # pylint: disable=too-many-arguments,too-many-locals
+            # one per bound, one per kind of port
+            cls, draw: Callable, types: st.SearchStrategy[Ty], *,
+            dom: Ty | None, cod: Ty | None, n_boxes: int) -> tuple:
+        """
+        Draw a wiring where each port is paired with an earlier open one or
+        left open, that of a compact category: ports of different kinds pair
+        when they have the same type, ports of the same kind when they have
+        adjoint types, i.e. by a cup or a cap. Without ``cod``, the ports left
+        open are the outputs, otherwise a balancing box closes them. It is
+        drawn as in :meth:`draw_any`.
+        """
+        from hypothesis import strategies as st
+
+        opened, open_ports = [], []  # (spider, is_producer, obj)
+
+        def port(is_producer, obj=None):
+            candidates = [
+                (i, required if obj is None else obj)
+                for i, (_, other_is_producer, other) in enumerate(open_ports)
+                for required in [other if is_producer != other_is_producer
+                                 else other.r]
+                if obj is None or obj == required
+                or is_producer == other_is_producer and obj.r == other]
+            k = draw(st.integers(0, len(candidates)))
+            if k:
+                i, obj = candidates[k - 1]
+                return open_ports.pop(i)[0], obj
+            obj = cls.draw_atom(draw, types) if obj is None else obj
+            opened.append(obj)
+            open_ports.append((len(opened) - 1, is_producer, obj))
+            return len(opened) - 1, obj
+
+        def ports(is_producer):
+            return [port(is_producer)
+                    for _ in range(draw(st.integers(0, cls.MAX_ARITY)))]
+
+        dom = draw(types) if dom is None else dom
+        ob = type(dom)
+        dom_wires = [port(True, obj)[0] for obj in dom]
+        boxes: list[tuple] = [
+            (ports(False), ports(True)) for _ in range(n_boxes)]
+        if cod is None:
+            outputs = [
+                open_ports.pop(draw(st.integers(0, len(open_ports) - 1)))
+                for _ in range(len(open_ports))]
+            cod_wires = [spider for spider, _, _ in outputs]
+            cod = ob().tensor(*(
+                obj if is_producer else obj.r
+                for _, is_producer, obj in outputs))
+        else:
+            cod_wires = [port(False, obj)[0] for obj in cod]
+        if open_ports:
+            boxes.append(tuple(
+                [(spider, obj) for spider, is_producer, obj in open_ports
+                 if is_producer == kind] for kind in (True, False)))
+        box_types = tuple(
+            tuple(ob().tensor(*(obj for _, obj in pairs)) for pairs in box)
+            for box in boxes)
+        wires = (tuple(dom_wires), tuple(
+            tuple(tuple(spider for spider, _ in pairs) for pairs in box)
+            for box in boxes), tuple(cod_wires))
+        return dom, cod, box_types, wires, opened
 
     @classmethod
     def from_box(cls, box: Box) -> Hypergraph:
@@ -1457,7 +1928,9 @@ class Hypergraph(MonoidalCategory, NamedGeneric['category']):
         The image of each box is computed by the functor into ``cls``, then
         the images are glued in a single pass with :meth:`from_glued`,
         rather than folding them one at a time with :meth:`then`, which
-        relabels the whole hypergraph built so far at every box.
+        relabels the whole hypergraph built so far at every box. The trace
+        of a planar traced category, which a hypergraph cannot wire, is a box
+        of its own, as decoding its argument would need swaps.
 
         Example
         -------
@@ -1474,8 +1947,12 @@ class Hypergraph(MonoidalCategory, NamedGeneric['category']):
         functor = factory.functor(
             ob_map=lambda typ: typ, ar_map=factory.from_box,
             dom=category, cod=factory)
+        trace = getattr(category, "trace_factory", ())
+        if not isclass(trace) or issubclass(category, SymmetricCategory):
+            trace = ()  # a trace the functor wires rather than boxes
         return factory.from_glued(old.dom, old.cod, [
-            (functor(box), offset)
+            (factory.from_box(box) if isinstance(box, trace)
+             else functor(box), offset)
             for layer in old.inside
             for box, offset in layer.boxes_and_offsets])
 
@@ -1553,7 +2030,7 @@ class Hypergraph(MonoidalCategory, NamedGeneric['category']):
             dom_wires, cod_wires = self.box_wires[depth]
             for i in range(len(box.dom)):
                 j = scan.index(dom_wires[i])
-                if i == 0 and offset is None:
+                if offset is None:
                     offset = j
                 elif j != offset + i:
                     flush()  # a swap is a layer of its own
@@ -1593,7 +2070,8 @@ class Hypergraph(MonoidalCategory, NamedGeneric['category']):
         return diagram
 
     @classmethod
-    def from_callable(cls, dom: Ty, cod: Ty) -> Callable[Callable, Hypergraph]:
+    def from_callable(
+            cls, dom: Ty, cod: Ty) -> Callable[[Callable], Hypergraph]:
         """
         Turns an arbitrary Python function into a causal hypergraph.
 
@@ -1681,7 +2159,9 @@ class Hypergraph(MonoidalCategory, NamedGeneric['category']):
                 graph.successors(box_node), key=lambda node: node.i)))
         wires += tuple(map(
             predecessor, sorted(outputs, key=lambda node: node.i)))
-        wires = Hypergraph.rebracket(None, wires, dom=dom, boxes=boxes)
+        wires = Hypergraph.rebracket(
+            None,  # ty: ignore[invalid-argument-type]
+            wires, dom=dom, boxes=boxes)
         return cls(dom, cod, boxes, wires, spider_types, offsets)
 
     def to_graph(self) -> Graph:
@@ -1691,10 +2171,10 @@ class Hypergraph(MonoidalCategory, NamedGeneric['category']):
         """
         graph = Graph()
         graph.add_nodes_from(
-            (Node("spider", i=i, obj=obj), dict(box=None))
+            (Node("spider", i=i, obj=obj), {"box": None})
             for i, obj in enumerate(self.spider_types))
         graph.add_nodes_from(
-            (Node("input", i=i, obj=obj), dict(i=i, box=None))
+            (Node("input", i=i, obj=obj), {"i": i, "box": None})
             for i, obj in enumerate(self.dom))
         graph.add_edges_from(
             (Node("input", i=i, obj=obj), Node("spider", i=j, obj=obj))
@@ -1717,7 +2197,7 @@ class Hypergraph(MonoidalCategory, NamedGeneric['category']):
                         graph.add_edge(box_node, port_node)
                         graph.add_edge(port_node, spider_node)
         graph.add_nodes_from(
-            (Node("output", i=i, obj=obj), dict(i=i, box=None))
+            (Node("output", i=i, obj=obj), {"i": i, "box": None})
             for i, obj in enumerate(self.cod))
         graph.add_edges_from(
             (Node("spider", i=j, obj=obj), Node("output", i=i, obj=obj))

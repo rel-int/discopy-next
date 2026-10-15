@@ -88,7 +88,7 @@ class Monad(EndoFunctor):
     ...     frozenset({mx})))
     >>> assert lhs == rhs == frozenset({1, 2, 3})
     """
-    iterate: Callable = None
+    iterate: Callable | None = None
     """
     The iteration operator, i.e. the extra structure of an `Elgot monad
     <https://ncatlab.org/nlab/show/Elgot+monad>`_, or ``None`` when the
@@ -116,10 +116,13 @@ class Monad(EndoFunctor):
     def __init__(  # a monad is a name and five maps
             self, name: str, ob_map: Callable, lift: Callable,
             unit_map: Callable, mult_map: Callable,
-            iterate: Callable = None):
+            iterate: Callable | None = None):
         def unwrap(X):
             return Ty.cast(X).inside[0]
-        super().__init__(lambda X: Ty(ob_map(unwrap(X))), lift)
+
+        def mapped(X):
+            return Ty(ob_map(unwrap(X)))
+        super().__init__(mapped, lift)
         self.__name__ = self.name = name
         self.unit = Transformation(
             lambda X: unit_map(unwrap(X)), EndoFunctor.id(), self)
@@ -285,7 +288,7 @@ def dist(X: type) -> type:
     through it and the ``isinstance`` checks in :class:`~discopy.python
     .function.Function.__call__` break on every subdistribution channel.
     """
-    return frozenset[tuple[X, float]]
+    return frozenset[tuple[X, float]]  # ty: ignore[invalid-type-form]
 
 
 def iterate_subdistribution[T](
@@ -423,7 +426,7 @@ def make_state(S: type) -> Monad:
     >>> assert State.mult(str)(lambda s: (tick("egg"), s + 1))(0) == ("egg", 2)
     """
     def ob_map(X):
-        return Callable[[S], tuple[X, S]]
+        return Callable[[S], tuple[X, S]]  # ty: ignore[invalid-type-form]
     return Monad(
         f"State[{factory_name(S)}]",
         ob_map=ob_map,

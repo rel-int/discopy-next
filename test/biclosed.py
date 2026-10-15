@@ -1,7 +1,7 @@
 import sys
 from discopy.biclosed import *
 from discopy import biclosed, cat
-from discopy.axioms import Related, assert_axioms
+from discopy.axioms import Related
 from discopy.utils import dumps, loads
 from pytest import raises
 
@@ -297,10 +297,6 @@ def test_deep_terms():
     assert depth == 6000
 
 
-def test_axioms():
-    assert_axioms(TermBase)
-
-
 def test_mapping_preserves_binding_and_lexical_boundaries():
     from discopy import closed
     X, Y, Z = map(closed.Ty, "XYZ")
@@ -331,3 +327,14 @@ def test_transparency():
                 curry(), curry(left=False), Constant('c', x)]:
         assert eval(repr(box), {"biclosed": biclosed, "cat": cat}) == box
         assert loads(dumps(box)) == box
+
+
+def test_Curry_to_drawing():
+    x = Ty('x')
+    f = Box('f', x @ x @ x, x)
+    for n in range(4):
+        for left in (True, False):
+            curry = f.curry(n, left=left)
+            drawing = curry.to_drawing()
+            assert (len(drawing.dom), len(drawing.cod))\
+                == (len(curry.dom), len(curry.cod))

@@ -85,3 +85,8 @@ def test_to_braided_default_and_zero_width():
 
     # width=0 returns the diagram as is, i.e. without dual rails.
     assert twist.to_braided(width=0) == twist
+
+
+def test_functor_twist_dagger():
+    twist = Twist(Ty('x')).dagger()
+    assert Functor(ob_map=lambda x: x, ar_map=lambda f: f)(twist) == twist

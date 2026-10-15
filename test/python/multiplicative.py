@@ -63,3 +63,11 @@ def test_Functor_into_Function_folds_with_matmul():
     assert F(x @ x) == F(x) @ F(x) == monoidal.List[type](bool, bool)
     assert F(Ty()) == monoidal.List[type]()
     assert F(g)(True, True) is True and F(g)(True, False) is False
+
+
+def test_type_checking():
+    f = Function(lambda n: (n, n), Ty(int), Ty(int, int, int))
+    with raises(ValueError):
+        f(1, 2)  # Two arguments for a domain of one.
+    with raises(RuntimeError):
+        f(1)  # Two outputs for a codomain of three.

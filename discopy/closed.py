@@ -75,10 +75,11 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from functools import cached_property, reduce
 from inspect import signature
-from typing import Callable, Dict
+from typing import Callable, ClassVar, Dict, Self
 
 from discopy import monoidal, biclosed, markov, cmap, hypergraph, messages
-from discopy.abc import ClosedCategory
+from discopy.abc import ClosedCategory, MonoidalCategory
+from discopy.axioms import Serialisable
 from discopy.cat import factory
 from discopy.drawing import Drawing
 from discopy.utils import (
@@ -102,6 +103,12 @@ class Ty(biclosed.Ty):
     .. image:: /_static/closed/diagram.svg
         :align: center
     """
+    product_factory: ClassVar[type["Product"]]
+    variable_factory: ClassVar[type["Variable"]]
+    constant_factory: ClassVar[type["Constant"]]
+    application_factory: ClassVar[type["Application"]]
+    abstraction_factory: ClassVar[type["Abstraction"]]
+
     def __mul__(self, other: Ty) -> Ty:
         return self.product(other)
 
@@ -128,7 +135,7 @@ class Ty(biclosed.Ty):
         return self.inside[0].factors
 
     @classmethod
-    def from_biclosed(cls, old: biclosed.Ty) -> Ty:
+    def from_biclosed(cls, old: biclosed.Ty) -> Self:
         """
         Translate a biclosed type into a closed type, collapsing left and
         right exponentials into a single exponential.
@@ -175,7 +182,7 @@ class Product(biclosed.Wire):
     """
     ob = Ty
 
-    def __init__(self, *factors: Ty):
+    def __init__(self, *factors: biclosed.Ty):
         for typ in factors:
             assert_isinstance(typ, self.ob)
         self.factors = factors
@@ -256,6 +263,20 @@ class Diagram(markov.Diagram, biclosed.Diagram, ClosedCategory):
 
     A diagram applied to another post-composes their tensor with an `Eval`.
     """
+    pack_factory: ClassVar[type["Pack"]]
+    unpack_factory: ClassVar[type["Unpack"]]
+    box_factory: ClassVar[type["Box"]]
+    functor_factory: ClassVar[type["Functor"]]
+    copy_factory: ClassVar[type["Copy"]]
+    merge_factory: ClassVar[type["Merge"]]
+    swap_factory: ClassVar[type["Swap"]]
+    permutation_factory: ClassVar[type["Permutation"]]
+    curry_factory: ClassVar[type["Curry"]]
+    eval_factory: ClassVar[type["Eval"]]
+    coeval_factory: ClassVar[type["Coeval"]]
+    trace_factory: ClassVar[type["Trace"]]
+    discard_factory: ClassVar[type["Discard"]]
+    sum_factory: ClassVar[type["Sum"]]
     ob = Ty
 
     @property
@@ -264,6 +285,8 @@ class Diagram(markov.Diagram, biclosed.Diagram, ClosedCategory):
 
     @classmethod
     def ev(cls, base: Ty, exponent: Ty, left: bool = True):
+        if not exponent:
+            return cls.id(base)
         return cls.eval_factory(exponent >> base, left=left)
 
     def to_compact(self) -> Diagram:
@@ -299,6 +322,13 @@ class Diagram(markov.Diagram, biclosed.Diagram, ClosedCategory):
 
     def to_drawing(self):
         return monoidal.Diagram.to_drawing(self, functor_factory=Functor)
+
+    dagger_monoidality = ClosedCategory.dagger_monoidality.failing(
+        messages.CURRY_HAS_NO_DAGGER)
+    dagger_monoidality_monoidal = ClosedCategory.dagger_monoidality.weaken(
+        within=MonoidalCategory)
+    currying_symmetry = ClosedCategory.currying_symmetry.failing(
+        messages.FREE_CURRY)
 
     def to_term(self) -> Term:
         """
@@ -336,7 +366,8 @@ class Diagram(markov.Diagram, biclosed.Diagram, ClosedCategory):
         graph = Hypergraph.from_diagram(self)
         if not graph.is_causal:
             raise ValueError(f"Expected a causal diagram, got {self}")
-        variables = [self.ob.variable_factory(f"x{i}", typ)
+        variables = [self.ob.variable_factory(
+            f"x{i}", typ)  # ty: ignore[invalid-argument-type]
                      for i, typ in enumerate(graph.spider_types)]
         outputs = [variables[i] for i in graph.cod_wires]
         result = outputs[0] if len(outputs) == 1 else Tuple(*outputs)
@@ -399,7 +430,7 @@ class Pack(Box):
     >>> assert Pack(X * Y).dom == X @ Y and Pack(X * Y).cod == X * Y
     >>> assert Pack(X * Y).dagger() == Unpack(X * Y)
     """
-    def __init__(self, cod: Ty):
+    def __init__(self, cod: biclosed.Ty):
         if not cod.is_product:
             raise TypeError(f"Expected {Product}, got {cod!r}")
         dom = self.ob().tensor(*cod.factors)
@@ -434,7 +465,7 @@ class Unpack(Box):
     >>> assert Unpack(X * Y).dom == X * Y and Unpack(X * Y).cod == X @ Y
     >>> assert Unpack(X * Y).dagger() == Pack(X * Y)
     """
-    def __init__(self, dom: Ty):
+    def __init__(self, dom: biclosed.Ty):
         if not dom.is_product:
             raise TypeError(f"Expected {Product}, got {dom!r}")
         cod = self.ob().tensor(*dom.factors)
@@ -479,6 +510,18 @@ class Copy(markov.Copy, Box):
 
 class Discard(markov.Discard, Copy):
     "A markov discard in a closed category."
+
+
+class Merge(markov.Merge, Box):
+    """
+    A markov merge in a closed category, the dagger of a copy.
+
+    >>> x = Ty('x')
+    >>> assert Copy(x).dagger() == Merge(x)
+    >>> assert Diagram.discard(x).dagger().dagger() == Discard(x)
+    """
+
+    is_linear = False
 
 
 class Sum(markov.Sum, biclosed.Sum, Box):
@@ -535,9 +578,10 @@ class Functor(biclosed.Functor, markov.Functor):
 CMap = cmap.CMap[Diagram]
 
 
+Diagram.box_factory = Box
 Diagram.functor_factory = Functor
 Hypergraph = hypergraph.Hypergraph[Diagram]
-Diagram.copy_factory = Copy
+Diagram.copy_factory, Diagram.merge_factory = Copy, Merge
 Diagram.swap_factory = Swap
 Diagram.permutation_factory = Permutation
 Diagram.pack_factory = Pack
@@ -582,7 +626,7 @@ class TermBase(Box, biclosed.TermBase):
         args = (other, self) if left else (self, other)
         return self.cod.application_factory(*args)
 
-    def compose(self, *others: Term) -> Term:
+    def compose(self, *others: Term) -> biclosed.TermBase:
         """
         The composition of terms of function types: ``t.compose(u)`` for
         ``t : x >> y`` and ``u : y >> z`` is ``x(lambda v: u(t(v)))``, i.e.
@@ -642,12 +686,13 @@ class TermBase(Box, biclosed.TermBase):
             [context.index(x) for x in self.freevars + unused],
             [functor(x.cod) for x in context])
         if not unused:
-            return permutation
+            return permutation  # ty: ignore[invalid-return-type]
         discard = functor.cod.discard(functor(
             self.ob().tensor(*[x.cod for x in unused])))
         return permutation >> functor.cod.id(functor(self.dom)) @ discard
 
-    def share(self, functor: Functor, *contexts: list[Variable]) -> Diagram:
+    def share(self, functor: Functor,
+              *contexts: list[biclosed.Variable]) -> Diagram:
         """
         The structural morphism from the image of the free variables of the
         term to that of the concatenation of ``contexts``, copying each
@@ -686,7 +731,8 @@ class TermBase(Box, biclosed.TermBase):
         :class:`Unpack`.
         """
         functor = functor or self.functor
-        result = self.eval(functor, context)
+        result = self.eval(
+            functor, context)  # ty: ignore[too-many-positional-arguments]
         return result >> functor(Unpack(self.cod))\
             if self.cod.is_product else result
 
@@ -695,13 +741,13 @@ class TermBase(Box, biclosed.TermBase):
         # pylint: disable=unused-argument  # a constant has no variable
         return 0
 
-    def substitute(self, substitution: Substitution) -> Term:
+    def substitute(self, substitution: Substitution) -> Self:
         "The term with the free variables of a substitution replaced."
         # pylint: disable=unused-argument  # a constant has no variable
         return self
 
     @classmethod
-    def from_biclosed(cls, term: biclosed.Term) -> Term:
+    def from_biclosed(cls, term: biclosed.TermBase) -> Term:
         """
         Translate a biclosed term into a closed term, dropping planarity by
         collapsing left and right exponentials and applications.
@@ -727,6 +773,17 @@ class TermBase(Box, biclosed.TermBase):
             ar_map=lambda c: cls.ob.constant_factory(c.name, functor(c.cod)),
             dom=biclosed.Diagram, cod=cls.functor.cod)
         return functor(term)
+
+    @classmethod
+    def strategy(cls, **params):
+        """
+        Generate closed terms, which need not be linear, see
+        :meth:`generate`.
+
+        Parameters:
+            params : Passed to :meth:`biclosed.TermBase.shapes`.
+        """
+        return super().strategy(**params)
 
     @classmethod
     def generate(cls, cod, choices, types, letters):
@@ -773,7 +830,7 @@ class TermBase(Box, biclosed.TermBase):
         >>> assert two(X(lambda x: x))(x).reduce(budget=1) is None
         """
         return (strategy or self.strategy_factory)(budget)(
-            self, tuple(self.freevars))
+            self, tuple(self.freevars))  # ty: ignore[invalid-argument-type]
 
     def normal_form(self, budget: int | None = None,
                     strategy: type[Strategy] | None = None) -> Term:
@@ -847,6 +904,9 @@ class Application(TermBase, biclosed.Application):
         overlap : The variables free in both ``func`` and ``args``, which
             :meth:`eval` copies.
     """
+    func: Term
+    args: Term
+
     def __init__(self, func: Term, args: Term, left: bool = False):
         # pylint: disable=unused-argument  # a closed category is symmetric
         biclosed.Application.__init__(self, func, args)
@@ -885,6 +945,9 @@ class Abstraction(TermBase, biclosed.Abstraction):
     The abstraction ``var.cod(lambda var: body)`` of a variable in a term,
     which need not occur in it or may occur several times.
     """
+    var: Variable
+    body: Term
+
     def __init__(self, var: Variable, body: Term, left: bool = False):
         # pylint: disable=unused-argument  # a closed category is symmetric
         biclosed.Abstraction.__init__(self, var, body)
@@ -928,7 +991,7 @@ class Compound(TermBase):
         dom : The domain of the term, i.e. the types of its free variables.
         cod : The codomain of the term.
     """
-    def __init__(self, dom: Ty, cod: Ty):
+    def __init__(self, dom: biclosed.Ty, cod: biclosed.Ty):
         super().__init__(type(self).__name__, dom, cod)
         del self.name
 
@@ -1178,7 +1241,7 @@ class Let(Compound):
         return f"let({self.expression}, lambda{params}: {self.body})"
 
     @property
-    def rest(self) -> list[Variable]:
+    def rest(self) -> list[biclosed.Variable]:
         "The free variables of the body that the statement does not bind."
         return [x for x in self.freevars if x in self.body.freevars]
 
@@ -1455,7 +1518,7 @@ class BohmTree:
             result = result(self[i].to_term(len(self.variables)))
         for var in reversed(self.variables[n:]):
             result = var.cod.abstraction_factory(var, result)
-        return result
+        return result  # ty: ignore[invalid-return-type]
 
     def __repr__(self):
         return factory_name(type(self)) + (
@@ -1481,8 +1544,8 @@ class Strategy:
     """
     budget: int | None = None
 
-    def __call__(self, term: Term,
-                 variables=()) -> BohmTree | None:
+    def __call__(self, term: Term, variables: tuple[Variable, ...] = ()
+                 ) -> BohmTree | None:
         """
         The head normal form of a term in a scope of variables as a
         :class:`BohmTree` with its arguments left lazy, or ``None`` when the
@@ -1493,7 +1556,8 @@ class Strategy:
             variables : The variables in scope, i.e. the free variables of
                 the term followed by the ones bound by its parents.
         """
-        variables, spine = list(variables), []
+        scope: list[Variable] = list(variables)
+        spine = []
         while isinstance(term, (Application, Abstraction)):
             if isinstance(term, Application):
                 spine.append(term.args)
@@ -1503,15 +1567,17 @@ class Strategy:
                     return None
                 term = Substitution({term.var: spine.pop()})(term.body)
             else:
-                variables.append(term.var)
+                scope.append(term.var)
                 term = term.body
         assert_isinstance(term, Variable)
-        head = len(variables) - 1 - variables[::-1].index(term)
+        index = scope[::-1].index(term)  # ty: ignore[invalid-argument-type]
+        head = len(scope) - 1 - index
         cod = term.cod
         for _ in spine:
             cod = cod.base
         return BohmTree(
-            cod, tuple(variables), head, self, tuple(reversed(spine)))
+            cod,  # ty: ignore[invalid-argument-type]
+            tuple(scope), head, self, tuple(reversed(spine)))
 
     def spend(self) -> bool:
         "Take one beta redex from the budget, or return ``False``."
@@ -1583,6 +1649,10 @@ Ty.application_factory = Application
 Ty.abstraction_factory = Abstraction
 Ty.product_factory = Product
 TermBase.strategy_factory = LeftmostOutermost
+
+for law in sorted(set(Box.axioms) - set(Serialisable.axioms)):
+    setattr(TermBase, law, getattr(Box, law).inapplicable(
+        "A term is a box: the laws of its category are the diagram's."))
 
 
 class Equation(markov.Equation):

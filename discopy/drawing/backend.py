@@ -45,7 +45,7 @@ from discopy.config import (  # noqa: F401  pylint: disable=unused-import
     TRANSPARENT)
 
 if TYPE_CHECKING:
-    from discopy.drawing import PlaneGraph
+    from discopy.drawing import Drawing
 
 
 MATPLOTLIB_RC = {
@@ -79,8 +79,8 @@ def matplotlib_context():
         yield
 
 
-def draw(graph: PlaneGraph, **params):
-    """ Load a :class:`Backend` and draw a :class:`PlaneGraph` on it. """
+def draw(graph: Drawing, **params):
+    """ Load a :class:`Backend` and draw a :class:`Drawing` on it. """
     aspect = params.get('aspect', 'auto' if 'figsize' in params else 'equal')
     if params.get('legend', False) and not params.get('to_tikz', False):
         colours = Backend.region_colours(graph)
@@ -289,14 +289,15 @@ def add_dark_mode_style(path):
     the elements tagged by :meth:`Matplotlib.dark_gid` white on a dark page,
     every other renderer keeping the static black on a transparent canvas.
     """
-    if hasattr(path, "getvalue"):
+    is_file = not isinstance(path, (str, bytes, os.PathLike))
+    if is_file:
         text = path.getvalue()
     else:
         with open(path, encoding="utf-8") as file:
             text = file.read()
     opening = text.index(">", text.index("<svg")) + 1
     text = text[:opening] + DARK_MODE_STYLE + text[opening:]
-    if hasattr(path, "getvalue"):
+    if is_file:
         path.seek(0)
         path.truncate()
         path.write(text)
@@ -518,7 +519,9 @@ class Backend(ABC):
         outer = min(radius, RIBBON_FOLD_DEPTH)
         return outer, outer - ribbon
 
-    def fill_strand_band(self, first, second, middle, color, gap=0):
+    def fill_strand_band(
+            self, first: tuple[Point, Point], second: tuple[Point, Point],
+            middle, color, gap=0):
         """
         Fills the band between the two parallel braid strands of a ribbon,
         see :meth:`draw_dual_rail_braid`. A non-zero ``gap`` breaks the band
@@ -1545,7 +1548,7 @@ class Matplotlib(Backend):
         plt.margins(*margins)
         plt.subplots_adjust(
             top=1, bottom=0, right=1, left=0, hspace=0, wspace=0)
-        self.axis.set_aspect(params.get("aspect"))
+        self.axis.set_aspect(params.get("aspect", "auto"))
         plt.axis('off')
         if xlim is not None:
             self.axis.set_xlim(*xlim)

@@ -4,7 +4,6 @@ from pytest import raises
 
 from discopy import biclosed
 from discopy.closed import *
-from discopy.axioms import assert_axioms
 from discopy.biclosed import Constraints, Sampler
 from discopy.utils import dumps, loads
 
@@ -708,10 +707,6 @@ def test_Sampler_nonlinear():
     term = TermBase.generate(Y << X, choices, [X], "x")
     assert term.alpha_eq(TermBase.generate(Y << X, choices, [X], "y"))
     assert str(term) == "X(lambda x0: c0(x0)(x0))"
-
-
-def test_axioms():
-    assert_axioms(TermBase)
 
 
 def test_from_biclosed():

@@ -92,7 +92,7 @@ class Ingredient(Ob):
 @factory
 class Recipe(Arrow):
     """ A recipe is just an arrow. """
-    ty_factory = Ingredient
+    ob = Ingredient
     inside: tuple[Step, ...]
     dom: Ingredient
     cod: Ingredient

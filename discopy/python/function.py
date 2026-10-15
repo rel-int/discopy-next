@@ -34,7 +34,7 @@ Ty = List[type]
 
 @factory
 @dataclass(unsafe_hash=True)
-class Function(Category):
+class Function(Category[Ty, "Function"]):
     """
     Python function with sequential composition.
 
@@ -62,7 +62,7 @@ class Function(Category):
     ob = Ty
     type_checking = True
 
-    def __init__(self, inside: Callable, dom: Ty, cod: Ty):
+    def __init__(self, inside: Callable, dom: Ty | type, cod: Ty | type):
         self.inside, self.dom, self.cod = (
             inside, self.ob.cast(dom), self.ob.cast(cod))
 
@@ -144,4 +144,4 @@ class EndoFunctor(Functor):
     def __call__(self, other):
         if isinstance(other, Function):
             return self.ar_map[other]
-        return self.ob_map[Ty.cast(other)]
+        return self.ob_map[Ty.cast(other)]  # ty: ignore[invalid-argument-type]

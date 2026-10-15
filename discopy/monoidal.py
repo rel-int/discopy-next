@@ -53,17 +53,16 @@ We can check the Eckmann-Hilton argument, up to interchanger.
     :align: center
 """
 
-from __future__ import annotations
-
 import itertools
 from dataclasses import dataclass, field
 from functools import cached_property
-from typing import Iterator, Callable, TYPE_CHECKING
+from typing import Iterable, Iterator, Callable, Self, TYPE_CHECKING, ClassVar
 from warnings import warn
 
-from discopy import abc, cat, drawing, hypergraph, cmap, messages
+from discopy import abc, axioms, cat, drawing, hypergraph, cmap, messages
 from discopy.abc import (
     ColouredMonoid, Monoid, MonoidalCategory, NamedGeneric)
+from discopy.axioms import Hom, Obj, Var, axiom
 from discopy.drawing import Drawing
 from discopy.config import (
     BOX_DRAWING_ATTRIBUTES, WIRE_DRAWING_ATTRIBUTES,
@@ -75,6 +74,7 @@ from discopy.utils import (
     assert_isinstance,
     assert_iscomposable,
     AxiomError,
+    classproperty,
     deprecated_alias,
     MappingOrCallable,
     RichDisplay,
@@ -98,6 +98,13 @@ class Colour(cat.Ob):
 
     name: str = TRANSPARENT
     label: "str | None" = field(default=None, compare=False)
+
+    @classmethod
+    def strategy(cls):
+        """ Generate the transparent colour, the one generated types have. """
+        from hypothesis import strategies as st
+
+        return st.just(cls())
 
     def __post_init__(self):
         assert_isinstance(self.name, str)
@@ -180,7 +187,7 @@ class Wire(cat.Ob):
         return cls(tree['name'], dom, cod, is_dagger='is_dagger' in tree)
 
 
-class List(Monoid, NamedGeneric['generator_factory']):
+class List[generator_factory](Monoid["List"], NamedGeneric):
     """
     The free monoid on a ``generator_factory``, i.e. lists of its instances
     with concatenation as :meth:`tensor` and the empty list as unit.
@@ -208,7 +215,7 @@ class List(Monoid, NamedGeneric['generator_factory']):
     def __init__(self, *inside):
         self.inside = inside
 
-    def tensor(self, *others: List) -> List:
+    def tensor(self, *others: "List") -> "List":
         for other in others:
             assert_isinstance(other, type(self))
         return type(self)(
@@ -222,7 +229,7 @@ class List(Monoid, NamedGeneric['generator_factory']):
     def __len__(self) -> int:
         return len(self.inside)
 
-    def __getitem__(self, key: int | slice) -> List:
+    def __getitem__(self, key: int | slice) -> "List":
         if isinstance(key, slice):
             return type(self)(*self.inside[key])
         return type(self)(self.inside[key])
@@ -231,7 +238,7 @@ class List(Monoid, NamedGeneric['generator_factory']):
         for i in range(len(self)):
             yield self[i:i + 1]
 
-    def __pow__(self, n_times: int) -> List:
+    def __pow__(self, n_times: int) -> "List":
         assert_isinstance(n_times, int)
         return self.tensor(*(n_times - 1) * [self]) if n_times > 0\
             else type(self)()
@@ -290,6 +297,36 @@ class Ty(cat.Ob, cat.FreeCategory, ColouredMonoid):
     """
     ob = Colour
     generator_factory = Wire
+    box_factory = classproperty(lambda cls: cls.generator_factory)
+    """
+    The generators of a type as a free category, i.e. its wires, a
+    :class:`cat.Ob` that :meth:`cast` embeds as a type of length one.
+    """
+
+    @classmethod
+    def strategy(cls, **params):
+        """
+        Generate types by the :meth:`search` of the free monoid, i.e. from
+        the identity and the composition of its rules with a wire as the
+        generator, with less fuel than a diagram since its types are the
+        boundaries of one.
+
+        Parameters are those of :meth:`search`.
+
+        >>> from hypothesis import find
+        >>> assert len(find(Ty.strategy(), lambda x: len(x) > 1)) == 2
+        """
+        return cls.search(**{"fuel": 1, **params})
+
+    @classmethod
+    def generators(cls, *, dom=None, cod=None):
+        """
+        Generate the types of one wire. Their colours are transparent, as
+        are those :meth:`Colour.strategy` draws: a coloured type is not
+        generated yet, so the boundary is not read.
+        """
+        # pylint: disable=unused-argument  # every colour is transparent
+        return cls.generator_factory.strategy().map(cls)
 
     def cast_wire(self, x: str | cat.Ob) -> cat.Ob:
         """
@@ -309,7 +346,7 @@ class Ty(cat.Ob, cat.FreeCategory, ColouredMonoid):
             messages.TYPE_ERROR.format(self.generator_factory, type(x)))
 
     def __init__(self, *inside: str | cat.Ob,
-                 dom: Colour = None, cod: Colour = None,
+                 dom: Colour | None = None, cod: Colour | None = None,
                  _scan: bool = True, **kwargs):
         inside = kwargs.pop('inside', inside)
         if kwargs:
@@ -325,14 +362,14 @@ class Ty(cat.Ob, cat.FreeCategory, ColouredMonoid):
         cat.FreeCategory.__init__(self, inside, dom, cod, _scan)
         cat.Ob.__init__(self, type(self).__name__)
 
-    def tensor(self, *others: Ty) -> Ty:
+    def tensor(self, *others: "Ty") -> Self:
         if any(not isinstance(other, self.factory) for other in others):
             return NotImplemented  # This allows whiskering on the left.
         return cat.FreeCategory.then(self, *others)
 
     then = tensor
 
-    def __pow__(self, n_times: int) -> Ty:
+    def __pow__(self, n_times: int) -> Self:
         assert_isinstance(n_times, int)
         if n_times <= 0:
             assert self.dom == self.cod
@@ -360,7 +397,7 @@ class Ty(cat.Ob, cat.FreeCategory, ColouredMonoid):
         return len(self.inside) == 1
 
     @property
-    def generator(self) -> Wire:
+    def generator(self) -> Wire | None:
         """ The single object inside a generator type. """
         return self.inside[0] if self.is_generator else None
 
@@ -381,7 +418,7 @@ class Ty(cat.Ob, cat.FreeCategory, ColouredMonoid):
         obj, = obj.inside if isinstance(obj, Ty) else (obj, )
         return self.inside.count(obj)
 
-    def unwind(self) -> Ty:
+    def unwind(self) -> "Ty":
         """
         Rotate an atomic type to winding number zero.
 
@@ -457,7 +494,7 @@ class Ty(cat.Ob, cat.FreeCategory, ColouredMonoid):
             return cls(dom=from_tree(tree['dom']), cod=from_tree(tree['cod']))
         return cls()
 
-    def to_drawing(self) -> Ty:
+    def to_drawing(self) -> "Ty":
         if not self.inside:
             return Ty.id(self.dom)
         result = Ty(*(
@@ -496,7 +533,7 @@ class Ty(cat.Ob, cat.FreeCategory, ColouredMonoid):
 
 
 @factory
-class Nat(abc.Nat, Ty):
+class Nat(abc.Nat, Ty):  # ty: ignore[invalid-generic-class]
     """
     ``Nat`` is a natural number ``n`` seen as a type with addition as
     tensor, i.e. the free monoid on one generator.
@@ -531,15 +568,26 @@ class Nat(abc.Nat, Ty):
     >>> assert CX @ 2 >> 2 @ CX == CX @ CX
     """
     generator_factory = int
+    box_factory = None
+    """ No generator of one colour is named, so there is no canonical
+    instance of a law, see :meth:`discopy.axioms.Axiom.canonical`. """
 
-    def __init__(self, inside: int | tuple = 0, dom: Colour = None,
-                 cod: Colour = None, _scan: bool = True):
+    @classmethod
+    def generators(cls, *, dom=None, cod=None):
+        """ Generate the one generator of the free monoid, ``Nat(1)``. """
+        # pylint: disable=unused-argument  # a Nat has one colour
+        from hypothesis import strategies as st
+
+        return st.just(cls(1))
+
+    def __init__(self, inside: int | tuple = 0, dom: Colour | None = None,
+                 cod: Colour | None = None, _scan: bool = True):
         # pylint: disable=unused-argument  # a Nat has one colour
         self.n = inside if isinstance(inside, int) else len(inside)
-        self.dom = self.cod = transparent
+        self.dom = self.cod = transparent  # ty: ignore[invalid-assignment]
         cat.Ob.__init__(self, type(self).__name__)
 
-    def __setstate__(self, state):
+    def __setstate__(self, state: dict):
         if "n" not in state:
             state = {"n": len(state["_objects"])}
         state.setdefault("dom", transparent)
@@ -551,7 +599,7 @@ class Nat(abc.Nat, Ty):
     def inside(self):
         return self.n * (1, )
 
-    def tensor(self, *others: Nat) -> Nat:
+    def tensor(self, *others: "Nat") -> "Nat":
         for other in others:
             if not isinstance(other, Ty):
                 return NotImplemented  # This allows whiskering on the left.
@@ -598,6 +646,17 @@ class Dim(Ty):
     >>> assert loads(dumps(Dim(2, 3))) == Dim(2, 3)
     """
     generator_factory = int
+    box_factory = None
+    """ No generator of one colour is named, so there is no canonical
+    instance of a law, see :meth:`discopy.axioms.Axiom.canonical`. """
+
+    @classmethod
+    def generators(cls, *, dom=None, cod=None):
+        """ Generate the dimensions of one wire, two or three. """
+        # pylint: disable=unused-argument  # a Dim has one colour
+        from hypothesis import strategies as st
+
+        return st.integers(2, 3).map(cls)
 
     def __init__(self, *inside: int, dom=None, cod=None, _scan=True, **kwargs):
         inside = kwargs.pop('inside', inside)
@@ -613,7 +672,7 @@ class Dim(Ty):
             transparent if cod is None else cod, _scan=False)
         cat.Ob.__init__(self, type(self).__name__)
 
-    def __getitem__(self, key: int | slice) -> Dim:
+    def __getitem__(self, key: int | slice) -> Self:
         if isinstance(key, slice):
             return self.factory(*self.inside[key])
         return self.factory(self.inside[key])
@@ -628,7 +687,7 @@ class Dim(Ty):
                 'inside': list(self.inside)}
 
     @classmethod
-    def from_tree(cls, tree: dict) -> Dim:
+    def from_tree(cls, tree: dict) -> "Dim":
         return cls(*tree['inside'])
 
 
@@ -655,7 +714,7 @@ class Layer(cat.Box, ColouredMonoid):
             state['boxes_or_types'])
         super().__setstate__(state)
 
-    def __init__(self, *inside: Ty | Box, normalise: bool = True):
+    def __init__(self, *inside: "Ty | Box", normalise: bool = True):
         if normalise:
             type(self).check(inside)
             inside = type(self).normalise(inside)
@@ -666,7 +725,7 @@ class Layer(cat.Box, ColouredMonoid):
     data, is_dagger = None, False
 
     @classmethod
-    def id(cls, dom: Ty = None) -> Layer:
+    def id(cls, dom: Ty | None = None) -> "Layer":
         """
         There is no identity layer: a layer has at least one box, and a
         layer of empty plumbing would denote the identity diagram, which is
@@ -678,7 +737,7 @@ class Layer(cat.Box, ColouredMonoid):
         raise ValueError(messages.LAYERS_MUST_HAVE_A_BOX)
 
     @classmethod
-    def whisker(cls, other: Ty | Box | Layer) -> Ty | Layer:
+    def whisker(cls, other: "Ty | Box | Layer") -> "Ty | Layer":
         """
         A type stays a type, which :meth:`tensor` merges into the boundary;
         anything else is embedded as a layer.
@@ -686,11 +745,11 @@ class Layer(cat.Box, ColouredMonoid):
         Parameters:
             other : The type, box or layer to be tensored on either side.
         """
-        return other if isinstance(other, (cls, cls.ob))\
-            else cls(other, normalise=False)
+        return other if isinstance(other, (cls, cls.ob)) else cls(
+            other, normalise=False)  # ty: ignore[invalid-argument-type]
 
     @classmethod
-    def unit(cls, colour: Colour = None) -> Ty:
+    def unit(cls, colour: Colour | None = None) -> Ty:
         """
         The unit of the layer product, i.e. the empty type on a colour.
 
@@ -726,7 +785,7 @@ class Layer(cat.Box, ColouredMonoid):
                   for x in self.boxes_or_types]
         return pieces[0][:0].tensor(*pieces)
 
-    plumbing = Ty
+    plumbing: type | tuple[type, ...] = Ty
 
     @staticmethod
     def check(inside):
@@ -807,7 +866,7 @@ class Layer(cat.Box, ColouredMonoid):
         return factory_name(type(self))\
             + f"({', '.join(map(repr, self))})"
 
-    def tensor(self, other: Ty | Box | Layer) -> Layer:
+    def tensor(self, other: "Ty | Box | Layer") -> "Layer":
         """
         Tensor another layer on the right, normalising the common boundary.
 
@@ -832,13 +891,13 @@ class Layer(cat.Box, ColouredMonoid):
             return type(self)(
                 *type(self).normalise((other, self[0])), *self[1:],
                 normalise=False)
-        return other.tensor(self)
+        return other.tensor(self)  # ty: ignore[invalid-argument-type]
 
     @property
     def free_symbols(self) -> "set[sympy.Symbol]":
         return {x for box in self.boxes for x in box.free_symbols}
 
-    def subs(self, *args) -> Layer:
+    def subs(self, *args) -> "Layer":
         return type(self)(*(
             x if isinstance(x, self.plumbing) else x.subs(*args)
             for x in self),
@@ -853,13 +912,13 @@ class Layer(cat.Box, ColouredMonoid):
     def generator(self):
         return self.boxes_or_types[0] if self.is_generator else None
 
-    def dagger(self) -> Layer:
+    def dagger(self) -> "Layer":
         return type(self)(*(
             x if isinstance(x, Ty) else x.dagger() for x in self),
             normalise=False)
 
     @property
-    def boxes_and_offsets(self) -> list[tuple[Box, int]]:
+    def boxes_and_offsets(self) -> "list[tuple[Box, int]]":
         """
         The offsets of each box inside the layer.
 
@@ -878,7 +937,7 @@ class Layer(cat.Box, ColouredMonoid):
                 offset += len(box_or_typ.cod)
         return result
 
-    def merge(self, other: Layer) -> Layer:
+    def merge(self, other: "Layer") -> "Layer":
         """
         Merge two layers into one or raise :class:`AxiomError`,
         used by :meth:`Diagram.foliation`.
@@ -900,6 +959,9 @@ class Layer(cat.Box, ColouredMonoid):
                 (self, other), self.dom, other.cod).to_staircases())
         except NotImplementedError as exception:  # Eckmann-Hilton argument.
             diagram = exception.last_step
+        if not diagram.inside:  # The layers compose to the identity,
+            raise AxiomError(  # which is not a layer, see #599.
+                messages.NOT_MERGEABLE.format(self, other))
         boxes_or_types, offset = [self.dom[:0]], 0
         for layer in diagram.inside:
             left, box, right = layer.boxes_and_types
@@ -923,7 +985,7 @@ class Layer(cat.Box, ColouredMonoid):
                     inside=[x.to_tree() for x in self])
 
     @classmethod
-    def from_tree(cls, tree: dict) -> Layer:
+    def from_tree(cls, tree: dict) -> "Layer":
         return cls(*(map(from_tree, tree['inside'])))
 
 
@@ -950,6 +1012,15 @@ class Diagram(cat.Arrow, MonoidalCategory, RichDisplay):
             normalize
             normal_form
     """
+    bifunctoriality = MonoidalCategory.bifunctoriality.failing(
+        messages.NO_PLANAR_NORMAL_FORM)
+    dagger_monoidality = MonoidalCategory.dagger_monoidality.failing(
+        messages.NO_PLANAR_NORMAL_FORM)
+
+    box_factory: ClassVar[type["Box"]]
+    sum_factory: ClassVar[type["Sum"]]
+    bubble_factory: ClassVar[type["Bubble"]]
+    functor_factory: ClassVar[type["Functor"]]
     ob = Ty
     layer_factory = Layer
 
@@ -984,7 +1055,8 @@ class Diagram(cat.Arrow, MonoidalCategory, RichDisplay):
         return self.inside[0].generator if self.is_generator else None
 
     @classmethod
-    def from_callable(cls, dom: Ty, cod: Ty) -> Callable[Callable, Diagram]:
+    def from_callable(
+            cls, dom: Ty, cod: Ty) -> "Callable[[Callable], Diagram]":
         """
         Define a diagram using the standard syntax for Python functions.
 
@@ -1011,7 +1083,8 @@ class Diagram(cat.Arrow, MonoidalCategory, RichDisplay):
 
         return decorator
 
-    def tensor(self, other: Diagram = None, *others: Diagram) -> Diagram:
+    def tensor(self, other: "Diagram | None" = None,
+               *others: "Diagram") -> "Diagram":
         """
         Parallel composition, called using :code:`@`.
 
@@ -1051,7 +1124,7 @@ class Diagram(cat.Arrow, MonoidalCategory, RichDisplay):
         return self.ar(inside, dom, cod, _scan=False)
 
     @property
-    def boxes(self) -> list[Box]:
+    def boxes(self) -> "list[Box]":
         """ The boxes in each layer of the diagram. """
         return sum([layer.boxes for layer in self.inside], [])
 
@@ -1077,7 +1150,7 @@ class Diagram(cat.Arrow, MonoidalCategory, RichDisplay):
         """
         return max(len(self.dom), max(len(layer.cod) for layer in self))
 
-    def encode(self) -> tuple[Ty, list[tuple[Box, int]]]:
+    def encode(self) -> "tuple[Ty, list[tuple[Box, int]]]":
         """
         Compact encoding of a diagram as a tuple of boxes and offsets.
 
@@ -1101,10 +1174,10 @@ class Diagram(cat.Arrow, MonoidalCategory, RichDisplay):
     def decode(
             cls,
             dom: Ty,
-            boxes_and_offsets: list[tuple[Box, int]] = None,
-            boxes: list[Box] = None,
-            offsets: list[int] = None,
-            cod: Ty = None) -> Diagram:
+            boxes_and_offsets: Iterable[tuple["Box", int]] | None = None,
+            boxes: "list[Box] | None" = None,
+            offsets: list[int] | None = None,
+            cod: Ty | None = None) -> "Diagram":
         """
         Turn a tuple of boxes and offsets into a diagram.
 
@@ -1128,6 +1201,8 @@ class Diagram(cat.Arrow, MonoidalCategory, RichDisplay):
         then we set it to ``zip(boxes, offstes)``.
         """
         if boxes_and_offsets is None:
+            if boxes is None or offsets is None:
+                raise ValueError(messages.MISSING_BOXES_AND_OFFSETS)
             boxes_and_offsets = zip(boxes, offsets)
         diagram = cls.id(dom)
         for box, offset in boxes_and_offsets:
@@ -1145,9 +1220,33 @@ class Diagram(cat.Arrow, MonoidalCategory, RichDisplay):
         cod = Drawing
         return (functor_factory or Functor)(ob, ar, dom, cod)(self)
 
-    def to_map(self) -> CMap:
-        """ Translate a diagram into a combinatorial map. """
+    def to_map(self) -> "CMap":
+        """ Translate a diagram into a combinatorial map, see
+        :meth:`assert_transparent`. """
+        self.assert_transparent()
         return cmap.CMap[self.ar].from_diagram(self)
+
+    def assert_transparent(self):
+        """
+        Raise ``AxiomError`` unless every wire of the diagram is transparent:
+        a hypergraph and a map are symmetric, and a swap is ill-typed across
+        0-cells, so a coloured diagram has neither rather than losing its
+        colours.
+
+        >>> red = Colour('red')
+        >>> x = Ty(Wire('x', dom=red, cod=red))
+        >>> Box('f', x, x).to_hypergraph()
+        Traceback (most recent call last):
+        ...
+        discopy.utils.AxiomError: ...
+        """
+        for typ in (self.dom, self.cod, *(
+                obj for box in self.boxes for obj in (box.dom, box.cod))):
+            if typ.dom != transparent or typ.cod != transparent or any(
+                    isinstance(wire, Wire) and (
+                        wire.dom != transparent or wire.cod != transparent)
+                    for wire in typ.inside):
+                raise AxiomError(messages.COLOURED_QUOTIENT.format(typ))
 
     def to_staircases(self):
         """
@@ -1163,9 +1262,77 @@ class Diagram(cat.Arrow, MonoidalCategory, RichDisplay):
         >>> print(diagram.foliation().to_staircases())
         f0 @ y >> y @ f1
         """
-        return Functor.id(self.ar)(self)
+        return self.functor_factory.id(self.ar)(self)
 
-    def to_hypergraph(self) -> Hypergraph:
+    @axiom
+    def hypergraph_identity[X: Obj[Ty]](
+            cls, x: Var[Ty, X]) -> axioms.Equation[hypergraph.Hypergraph]:
+        """ The hypergraph of an identity is the identity hypergraph. """
+        return cat.Equation(
+            cls.id(x).to_hypergraph(), hypergraph.Hypergraph[cls].id(x))
+
+    @axiom
+    def hypergraph_composition[A: Obj[Ty], B: Obj[Ty], C: Obj[Ty]](
+            cls, f: Hom[Self, A, B], g: Hom[Self, B, C]
+    ) -> axioms.Equation[hypergraph.Hypergraph]:
+        """ The hypergraph of a composite composes the hypergraphs. """
+        return cat.Equation(
+            (f >> g).to_hypergraph(), f.to_hypergraph() >> g.to_hypergraph())
+
+    @axiom
+    def hypergraph_tensor[A: Obj[Ty], B: Obj[Ty], C: Obj[Ty], D: Obj[Ty]](
+            cls, f: Hom[Self, A, B], g: Hom[Self, C, D]
+    ) -> axioms.Equation[hypergraph.Hypergraph]:
+        """ The hypergraph of a tensor tensors the hypergraphs. """
+        return cat.Equation(
+            (f @ g).to_hypergraph(), f.to_hypergraph() @ g.to_hypergraph())
+
+    @axiom
+    def hypergraph_section[A: Obj[Ty], B: Obj[Ty]](
+            cls, f: Hom[Self, A, B]) -> axioms.Equation[hypergraph.Hypergraph]:
+        """ Decoding a hypergraph gives a diagram that encodes back to it. """
+        graph = f.to_hypergraph()
+        return cat.Equation(graph.to_diagram().to_hypergraph(), graph)
+
+    @axiom
+    def map_agreement[A: Obj[Ty], B: Obj[Ty]](
+            cls, f: Hom[Self, A, B]) -> axioms.Equation[hypergraph.Hypergraph]:
+        """ Encoding through a map or directly gives the same hypergraph. """
+        return cat.Equation(f.to_map().to_hypergraph(), f.to_hypergraph())
+
+    @axiom
+    def drawing_dagger_involution[A: Obj[Ty], B: Obj[Ty]](
+            cls, f: Hom[Self, A, B]) -> axioms.Equation[Drawing]:
+        """ Reflecting the drawing of a diagram twice gives it back. """
+        drawing = f.to_drawing()
+        return cat.Equation(drawing.dagger().dagger(), drawing)
+
+    @axiom
+    def foliation_idempotence[A: Obj[Ty], B: Obj[Ty]](
+            cls, f: Hom[Self, A, B]) -> axioms.Equation[Hom[Self, A, B]]:
+        """ A foliation is its own foliation, on the nose. """
+        foliated = f.foliation()
+        return cat.Equation(foliated.foliation(), foliated)
+
+    @classmethod
+    def equation_factory(cls, *terms: "Diagram") -> "Equation":
+        """
+        The equation of a law, compared on the nose. A hypergraph is faithful
+        only from :class:`discopy.symmetric.Diagram` on, whose
+        ``equation_factory`` compares up to it: below, it is a quotient that
+        forgets the regions of a planar diagram and the side of its scalars,
+        identifies a braid with its inverse, a twist with the identity and
+        the adjoints of a type, so a planar law is compared syntactically
+        until each doctrine has a normal form of its own.
+
+        >>> x = Ty('x')
+        >>> f, g = Box('f', Ty(), x), Box('g', x, Ty())
+        >>> assert not Diagram.equation_factory(f @ g, g >> f)
+        >>> assert Diagram.equation_factory(f @ g, f @ g)
+        """
+        return Equation(*terms)
+
+    def to_hypergraph(self) -> "Hypergraph":
         """
         Translate a planar diagram into a hypergraph.
 
@@ -1182,10 +1349,14 @@ class Diagram(cat.Arrow, MonoidalCategory, RichDisplay):
         >>> f0, f1 = Box('f0', x, y), Box('f1', y, x)
         >>> diagram = f0 @ f1.dagger() >> f0.dagger() @ f1
         >>> assert diagram.to_hypergraph().to_diagram() == diagram.foliation()
+
+        A coloured diagram has no hypergraph, see :meth:`assert_transparent`.
         """
-        graph = hypergraph.Hypergraph[type(self).ar].from_diagram(self)
-        staircase = len(self.boxes) == len(self.inside)
-        if staircase and len(graph.boxes) == len(self.boxes):
+        self.assert_transparent()
+        graph = hypergraph.Hypergraph[
+            type(self).ar].from_diagram(self)  # ty: ignore[invalid-type-form]
+        has_states = any(not box.dom for box in self.boxes)
+        if has_states and len(graph.boxes) == len(self.boxes):
             offsets = tuple(
                 offset if not box.dom else None
                 for box, offset in zip(self.boxes, self.offsets))
@@ -1226,11 +1397,11 @@ class Diagram(cat.Arrow, MonoidalCategory, RichDisplay):
         to bottom and merges layers eagerly.
         """
         graph = self.to_hypergraph()
-        if hasattr(self, "swap") and graph.is_monogamous and graph.is_causal\
-                and graph.is_boundary_connected and all(
-                    getattr(obj, "l", obj) == getattr(obj, "r", obj)
+        if isinstance(self, abc.SymmetricCategory) and graph.is_monogamous\
+                and graph.is_causal and graph.is_boundary_connected and all(
+                    not isinstance(obj, abc.Pregroup) or obj.l == obj.r
                     for obj in graph.spider_types):
-            return graph.to_diagram()
+            return graph.to_diagram().merge_layers()
         return self.merge_layers()
 
     def merge_layers(self):
@@ -1271,7 +1442,7 @@ class Diagram(cat.Arrow, MonoidalCategory, RichDisplay):
         """
         return len(self.foliation())
 
-    def interchange(self, i: int, j: int, left=False) -> Diagram:
+    def interchange(self, i: int, j: int, left=False) -> "Diagram":
         """
         Interchange a box from layer ``i`` to layer ``j``.
 
@@ -1337,7 +1508,7 @@ class Diagram(cat.Arrow, MonoidalCategory, RichDisplay):
             raise AxiomError(messages.INTERCHANGER_ERROR.format(box0, box1))
         return self[:i] >> layer1 >> layer0 >> self[i + 2:]
 
-    def substitute(self, i: int, other: Diagram) -> Diagram:
+    def substitute(self, i: int, other: "Diagram") -> "Diagram":
         """
         Implements operadic composition of nested diagrams,
         replacing box :code:`i` with diagram :code:`other`.
@@ -1351,7 +1522,7 @@ class Diagram(cat.Arrow, MonoidalCategory, RichDisplay):
         outside = Match(self[:i], self[i + 1:], left, right)
         return outside.substitute(other)
 
-    def normalize(self, left=False) -> Iterator[Diagram]:
+    def normalize(self, left=False) -> "Iterator[Diagram]":
         """
         Implements normalisation of boundary-connected diagrams,
         see Delpeuch and Vicary :cite:t:`DelpeuchVicary22`.
@@ -1383,7 +1554,7 @@ class Diagram(cat.Arrow, MonoidalCategory, RichDisplay):
             if no_more_moves:
                 break
 
-    def normal_form(self, **params) -> Diagram:
+    def normal_form(self, **params) -> "Diagram":
         """
         Returns the normal form of a diagram.
 
@@ -1580,9 +1751,9 @@ class Bubble(cat.Bubble, Box):
 
     def __init__(
             self, *args: Diagram,
-            drawing_name: str = None,
-            draw_as_frame: bool = None,
-            draw_as_square: bool = None,
+            drawing_name: str | None = None,
+            draw_as_frame: bool | None = None,
+            draw_as_square: bool | None = None,
             draw_vertically=False, **kwargs):
         cat.Bubble.__init__(self, *args, **kwargs)
         Box.__init__(self, self.name, self.dom, self.cod)
@@ -1702,13 +1873,14 @@ class Functor(cat.Functor):
                 other, self.dom.ob.generator_factory):
             return self.cod.ob.cast(self.ob_map[self.dom.ob(other)])
         if isinstance(other, Dim):
-            return self.cod.ob().tensor(*(self.ob_map[x] for x in other))
+            return self.cod.ob().tensor(*(  # ty: ignore[invalid-argument-type]
+                self.ob_map[x] for x in other))
         if isinstance(other, Nat):
             image = super().__call__(other.factory(1))
             return image[:0].tensor(*other.n * [image])
         if isinstance(other, Ty):
             if not other.inside:
-                if not hasattr(self.cod.ob, 'id'):
+                if not issubclass(self.cod.ob, abc.Category):
                     return self.cod.ob()
                 return self.cod.ob.id(self(other.dom))
             head, *tail = map(self, other.inside)
@@ -1772,8 +1944,8 @@ class Equation(cat.Equation, RichDisplay):
     Parameters:
         terms : The terms of the equation.
         symbol : The symbol between each pair of terms, ``"="`` by default.
-        symbols : The symbols between each pair of terms, overriding
-            ``symbol``; ``len(terms) * (symbol, )`` by default.
+        symbols : The symbols between each pair of consecutive terms, one
+            fewer than the terms, overriding ``symbol``.
         space : The space between the terms when drawing the equation.
         up_to : The function up to which ``bool(equation)`` compares its terms,
             overriding the subclass' :attr:`up_to` if given.
@@ -1810,6 +1982,7 @@ class Equation(cat.Equation, RichDisplay):
 Diagram.draw = drawing.draw
 Diagram.to_gif = drawing.to_gif
 
+Diagram.box_factory = Box
 Diagram.sum_factory = Sum
 Diagram.bubble_factory = Bubble
 Diagram.functor_factory = Functor

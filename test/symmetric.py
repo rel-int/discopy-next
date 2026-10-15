@@ -406,3 +406,16 @@ def test_coloured_Layer_boxes_and_types():
     assert Layer(f).boxes_and_types == (empty_red, f, empty_green)
     assert Layer(empty_red, f, empty_green).boxes_and_types\
         == (empty_red, f, empty_green)
+
+
+def test_foliation_idempotence():
+    """ States keep their offsets and plumbing composes, whatever the
+    number of boxes in a layer. """
+    x, y = Ty('x'), Ty('y')
+    s, t, u = Box('s', Ty(), x), Box('t', Ty(), y), Box('u', Ty(), x)
+    f, g = Box('f', Ty(), x @ x @ x), Box('g', x, x)
+    traced = Trace(Diagram((Layer(x, f), ), x, x @ x @ x @ x), left=False)
+    for diagram in (s @ t @ u, s @ g @ u, s @ t >> Swap(x, y), traced):
+        foliated = diagram.foliation()
+        assert Equation(diagram, foliated)
+        assert foliated.foliation() == foliated

@@ -193,3 +193,9 @@ def test_functor_factory():
     x, y = Ty('x'), Ty('y')
     assert Diagram.functor_factory is Functor
     assert Diagram.functor_factory({x: y}, {})(x.r) == y.r
+
+
+def test_Layer_merge_to_identity():
+    x = Ty('x')
+    with raises(AxiomError):  # a snake is no layer, see #599.
+        Layer(Cap(x, x.l), x).merge(Layer(x, Cup(x.l, x)))

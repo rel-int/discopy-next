@@ -146,11 +146,14 @@ In the category of streams, this is just the identity.
 
 from __future__ import annotations
 
-from discopy import monoidal, braided, markov, hypergraph
-from discopy.abc import FeedbackCategory
+from typing import ClassVar
+
+from discopy import monoidal, braided, markov, hypergraph, messages
+from discopy.abc import FeedbackCategory, MarkovCategory
+from discopy.axioms import FUEL
 from discopy.utils import (
     deprecated_alias,
-    factory, factory_name, assert_isinstance, AxiomError,
+    factory, factory_name, assert_isinstance, AxiomError, from_tree,
 )
 
 
@@ -285,6 +288,9 @@ class TailOb(Wire):
 class Ty(monoidal.Ty):
     """ A feedback type is a monoidal type with `delay`, `head` and `tail`. """
     generator_factory = Wire
+    box_factory = None
+    """ No generator of one colour is named, so there is no canonical
+    instance of a law, see :meth:`discopy.axioms.Axiom.canonical`. """
 
     def delay(self, n_steps=1):
         """ The delay of a feedback type by `n_steps`. """
@@ -334,8 +340,52 @@ class Diagram(markov.Diagram, FeedbackCategory):
     .. image:: /_static/feedback/feedback-random-walk.svg
         :align: center
     """
+    box_factory: ClassVar[type["Box"]]
+    functor_factory: ClassVar[type["Functor"]]
+    swap_factory: ClassVar[type["Swap"]]
+    permutation_factory: ClassVar[type["Permutation"]]
+    discard_factory: ClassVar[type["Discard"]]
+    copy_factory: ClassVar[type["Copy"]]
+    merge_factory: ClassVar[type["Merge"]]
+    feedback_factory: ClassVar[type["Feedback"]]
+    trace_factory: ClassVar[type["Trace"]]
     ob = Ty
     layer_factory = Layer
+
+    @classmethod
+    def sample(cls, *, dom=None, cod=None, fuel=FUEL):
+        """
+        Sample feedback diagrams as the :meth:`feedback` of an acyclic
+        Markov diagram sampled through its hypergraph: a feedback category is
+        not traced, its cycles go through a delayed memory, so the wiring is
+        sampled acyclic, from ``dom @ mem.delay()`` to ``cod @ mem``, with a
+        memory of at most ``fuel`` wires and at most ``fuel + 1`` boxes,
+        besides the one balancing box that may close its boundary, then fed
+        back.
+
+        >>> from hypothesis import find
+        >>> x = Ty('x')
+        >>> loop = find(Diagram.sample(dom=x, cod=x), lambda d: any(
+        ...     isinstance(box, Feedback) for box in d.boxes))
+        >>> assert (loop.dom, loop.cod) == (x, x)
+        """
+        from hypothesis import strategies as st
+        category = hypergraph.Hypergraph[cls]  # ty: ignore[invalid-type-form]
+
+        @st.composite
+        def feedbacks(draw):
+            domain = draw(cls.ob.strategy()) if dom is None else dom
+            codomain = draw(cls.ob.strategy()) if cod is None else cod
+            mem = cls.ob().tensor(*(
+                draw(cls.ob.generators())
+                for _ in range(draw(st.integers(0, fuel)))))
+            graph = draw(category.strategy(
+                dom=domain @ mem.delay(), cod=codomain @ mem,
+                max_leaves=fuel + 1, acyclic=True))
+            return graph.to_diagram().feedback(
+                dom=domain, cod=codomain, mem=mem)
+
+        return feedbacks()
 
     def delay(self, n_steps=1):
         """ The delay of a feedback diagram. """
@@ -344,10 +394,25 @@ class Diagram(markov.Diagram, FeedbackCategory):
         return type(self)(inside, dom, cod, _scan=False)
 
     def feedback(self, dom=None, cod=None, mem=None):
-        """ Syntactic sugar for :class:`Feedback`. """
+        """
+        Syntactic sugar for :class:`Feedback`, feeding back the last wire of
+        a memory ``mem`` of many wires first.
+
+        >>> x, y = Ty('x'), Ty('y')
+        >>> f = Box('f', x @ (x @ y).delay(), x @ x @ y)
+        >>> fb = f.feedback(dom=x, cod=x, mem=x @ y)
+        >>> assert fb == f.feedback(mem=y).feedback(mem=x)
+        >>> assert (fb.dom, fb.cod) == (x, x)
+        """
         if mem is None or len(mem) == 1:
             return self.feedback_factory(self, dom=dom, cod=cod, mem=mem)
-        return self if not mem else self.feedback(mem=mem[:-1]).feedback()
+        if not mem:
+            return self
+        dom = self.dom[:len(self.dom) - len(mem)] if dom is None else dom
+        cod = self.cod[:len(self.cod) - len(mem)] if cod is None else cod
+        return self.feedback(
+            dom=dom @ mem[:-1].delay(), cod=cod @ mem[:-1], mem=mem[-1:]
+        ).feedback(dom=dom, cod=cod, mem=mem[:-1])
 
     @classmethod
     def wait(cls, dom: Ty) -> Diagram:
@@ -393,6 +458,25 @@ class Diagram(markov.Diagram, FeedbackCategory):
 
     d = Wire.d
 
+    dagger_involution = FeedbackCategory.dagger_involution.failing(
+        messages.FEEDBACK_HAS_NO_DAGGER)
+    dagger_involution_markov = FeedbackCategory.dagger_involution.weaken(
+        within=MarkovCategory)
+    dagger_contravariance = FeedbackCategory.dagger_contravariance.failing(
+        messages.FEEDBACK_HAS_NO_DAGGER)
+    dagger_contravariance_markov = FeedbackCategory.dagger_contravariance\
+        .weaken(within=MarkovCategory)
+    dagger_monoidality = FeedbackCategory.dagger_monoidality.failing(
+        messages.FEEDBACK_HAS_NO_DAGGER)
+    dagger_monoidality_markov = FeedbackCategory.dagger_monoidality.weaken(
+        within=MarkovCategory)
+    feedback_tightening = FeedbackCategory.feedback_tightening.failing(
+        messages.FREE_FEEDBACK)
+    feedback_sliding = FeedbackCategory.feedback_sliding.failing(
+        messages.FREE_FEEDBACK)
+    feedback_superposing = FeedbackCategory.feedback_superposing.failing(
+        messages.FREE_FEEDBACK)
+
 
 class Box(markov.Box, Diagram):
     """
@@ -435,6 +519,26 @@ class Box(markov.Box, Diagram):
     def __repr__(self):
         time_step = f", time_step={self.time_step}" if self.time_step else ""
         return super().__repr__()[:-1] + time_step + ")"
+
+    def to_tree(self) -> dict:
+        """
+        Serialise a feedback box, with the number of times it was delayed.
+
+        >>> from discopy.utils import dumps, loads
+        >>> f = Box('f', Ty('x'), Ty('y')).delay()
+        >>> assert loads(dumps(f)) == f
+        """
+        tree = markov.Box.to_tree(self)
+        if self.time_step:
+            tree['time_step'] = self.time_step
+        return tree
+
+    @classmethod
+    def from_tree(cls, tree: dict) -> Box:
+        dom, cod = map(from_tree, (tree['dom'], tree['cod']))
+        return cls(
+            tree['name'], dom, cod, tree.get('time_step', 0),
+            data=tree.get('data', None), is_dagger='is_dagger' in tree)
 
     def setoid(self):
         return markov.Box.setoid(self) + (self.time_step, )
@@ -479,6 +583,27 @@ class Copy(markov.Copy, Box):
         return type(self)(self.dom.delay(n_steps), len(self.cod))
 
 
+class Discard(markov.Discard, Copy):
+    """
+    The discard of an atomic type :code:`x`, a copy with no output.
+
+    Parameters:
+        x : The type to discard.
+
+    >>> x = Ty('x')
+    >>> assert (Diagram.discard(x).dom, Diagram.discard(x).cod) == (x, Ty())
+    """
+    # Copy.__init__ initialises both markov.Copy and the feedback Box.
+    def __init__(  # pylint: disable=super-init-not-called
+            self, x: Ty, n: int = 0):
+        if n:
+            raise ValueError(f"A discard has no copies, got n={n}.")
+        Copy.__init__(self, x, 0)
+
+    def delay(self, n_steps=1):
+        return type(self)(self.dom.delay(n_steps))
+
+
 class Merge(markov.Merge, Box):
     """
     The merge of an atomic type :code:`x` some :code:`n` number of times.
@@ -493,6 +618,24 @@ class Merge(markov.Merge, Box):
 
     def delay(self, n_steps=1):
         return type(self)(self.cod.delay(n_steps), len(self.dom))
+
+
+class Trace(markov.Trace, Box):
+    """
+    The trace of a feedback diagram, whose delay is the trace of the
+    delayed diagram.
+
+    Parameters:
+        arg : The diagram to trace.
+        left : Whether to trace the wires on the left or right.
+
+    >>> x = Ty('x')
+    >>> f = Box('f', x @ x, x @ x)
+    >>> assert isinstance(f.trace() >> f.trace(), Diagram)
+    >>> assert f.trace().delay() == f.delay().trace()
+    """
+    def delay(self, n_steps=1):
+        return self.arg.delay(n_steps).trace(left=self.left)
 
 
 class Head(monoidal.Bubble, Box):
@@ -516,7 +659,9 @@ class Tail(monoidal.Bubble, Box):
     second time step with the identity on the empty type at the first step.
     """
     def __init__(self, arg: Diagram, time_step=0):
-        Head.__init__(self, arg, time_step, _attr="tail")
+        Head.__init__(
+            self,  # ty: ignore[invalid-argument-type]
+            arg, time_step, _attr="tail")
 
     delay, reset, __repr__ = HeadOb.delay, HeadOb.reset, HeadOb.__repr__
     __str__ = Box.__str__
@@ -562,6 +707,38 @@ class Feedback(monoidal.Bubble, Box):
     def __repr__(self):
         arg, mem = map(repr, (self.arg, self.mem))
         return factory_name(type(self)) + f"({arg}, mem={mem})"
+
+    def dagger(self):
+        """
+        Feedback has no dagger: that of ``arg`` goes from ``cod @ mem`` to
+        ``dom @ mem.delay()``, so its memory would be fed back in time.
+
+        >>> x = Ty('x')
+        >>> Box('f', x @ x.delay(), x @ x).feedback().dagger()
+        Traceback (most recent call last):
+        ...
+        discopy.utils.AxiomError: Feedback has no dagger...
+        """
+        raise AxiomError(messages.FEEDBACK_HAS_NO_DAGGER)
+
+    def to_tree(self) -> dict:
+        """
+        Serialise a feedback by its argument and its memory.
+
+        >>> from discopy.utils import dumps, loads
+        >>> x, y = Ty('x'), Ty('y')
+        >>> fb = Box('f', x @ y.delay(), x @ y).feedback()
+        >>> assert loads(dumps(fb)) == fb
+        """
+        return {'factory': factory_name(type(self)),
+                'arg': self.arg.to_tree(), 'dom': self.dom.to_tree(),
+                'cod': self.cod.to_tree(), 'mem': self.mem.to_tree()}
+
+    @classmethod
+    def from_tree(cls, tree: dict) -> Feedback:
+        dom, cod, mem = (
+            from_tree(tree[key]) for key in ('dom', 'cod', 'mem'))
+        return cls(from_tree(tree['arg']), dom=dom, cod=cod, mem=mem)
 
     def to_drawing(self):
         return self.arg.to_drawing().trace()
@@ -659,18 +836,22 @@ class Functor(markov.Functor):
         if isinstance(
                 other, FollowedBy) and hasattr(self.cod, "followed_by"):
             arg = other.dom if other.is_dagger else other.cod
-            return self.cod.followed_by(self(arg))
+            return self.cod.followed_by(  # ty: ignore[call-non-callable]
+                self(arg))
         if isinstance(other, Feedback) and hasattr(self.cod, "feedback"):
             return self(other.arg).feedback(*map(self, (
                 other.dom, other.cod, other.mem)))
         return super().__call__(other)
 
 
+Diagram.box_factory = Box
 Diagram.functor_factory = Functor
 Diagram.swap_factory = Swap
 Diagram.permutation_factory = Permutation
+Diagram.discard_factory = Discard
 Diagram.copy_factory, Diagram.merge_factory = Copy, Merge
 Diagram.feedback_factory, Diagram.followed_by = Feedback, FollowedBy
+Diagram.trace_factory = Trace
 Hypergraph = hypergraph.Hypergraph[Diagram]
 Id = Diagram.id
 

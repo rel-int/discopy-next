@@ -78,3 +78,8 @@ def test_Measure_override_bits_evaluates():
     assert channel.dom == C(Dim(2)) @ Q(Dim(2)) and channel.cod == C(Dim(2))
     assert np.allclose(channel.array, np.tensordot(
         np.ones(2), Channel.measure(Dim(2)).array, 0))
+
+
+def test_CQ_hash():
+    from discopy.tensor import Dim
+    assert {CQ(Dim(2)): 42}[CQ(Dim(2))] == 42

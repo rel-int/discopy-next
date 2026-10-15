@@ -174,7 +174,7 @@ class Channel(Tensor):
         assert_isinstance(dom, CQ)
         return cls(Tensor[cls.dtype].id(dom.to_dim()).array, dom, dom)
 
-    def then(self, other: Channel = None, *others: Channel) -> Channel:
+    def then(self, other: Channel | None = None, *others: Channel) -> Channel:
         if other is None or others:
             return super().then(other, *others)
         assert_isinstance(other, type(self))
@@ -199,7 +199,8 @@ class Channel(Tensor):
         return [len(dim) for cq in (self.dom, self.cod)
                 for dim in (cq.classical, cq.quantum, cq.quantum)]
 
-    def tensor(self, other: Channel = None, *others: Channel) -> Channel:
+    def tensor(
+            self, other: Channel | None = None, *others: Channel) -> Channel:
         if other is None or others:
             return super().tensor(other, *others)
         assert_isinstance(other, type(self))
@@ -356,6 +357,6 @@ class Functor(tensor.Functor):
             dom, cod = self(other.dom).quantum, self(other.cod).quantum
             return self.cod.double(
                 Tensor[self.dtype](other.array, dom, cod))
-        if hasattr(other, "array"):
+        if isinstance(other, tensor.Box):
             return self.cod(other.array, self(other.dom), self(other.cod))
         return frobenius.Functor.__call__(self, other)

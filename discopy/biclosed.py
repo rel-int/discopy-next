@@ -83,8 +83,6 @@ which lands in :class:`CMap` as a biclosed category has no trace.
 
 """
 
-from __future__ import annotations
-
 from abc import abstractmethod
 from dataclasses import dataclass, field, replace
 from inspect import signature
@@ -92,9 +90,11 @@ from itertools import count
 from typing import (
     TYPE_CHECKING, Callable, ClassVar, Iterator, Self, Sequence)
 
-from discopy import cat, monoidal, cmap
-from discopy.abc import BiclosedCategory
-from discopy.axioms import GENERATORS, Equivalence, Testable, axiom
+from discopy import cat, monoidal, cmap, messages
+from discopy.abc import BiclosedCategory, MonoidalCategory
+from discopy.axioms import (
+    GENERATORS, Equation as AbstractEquation, Equivalence, Serialisable,
+    Testable, axiom)
 from discopy.drawing import Drawing
 from discopy.cat import factory
 from discopy.utils import (
@@ -124,19 +124,33 @@ class Ty(monoidal.Ty):
     Applying a biclosed type to a callable yields a :class:`Abstraction`,
     applying it to a string yields a :class:`Constant`.
     """
+    variable_factory: ClassVar[type["Variable"]]
+    constant_factory: ClassVar[type["Constant"]]
+    application_factory: ClassVar[type["Application"]]
+    abstraction_factory: ClassVar[type["Abstraction"]]
+    over_factory: ClassVar[Callable[..., "Exp"]]
+    under_factory: ClassVar[Callable[..., "Exp"]]
+    exp_factory: ClassVar[Callable[..., "Exp"]]
 
-    def __pow__(self, other: Ty) -> Ty:
+    def __pow__(self, other: "Ty | int") -> Self:
         return self.exp(other) if isinstance(other, Ty)\
             else monoidal.Ty.__pow__(self, other)
 
-    def exp(self, other: Ty) -> Ty:
-        return self.ar(self.exp_factory(self, other))
+    def exp(self, other: "Ty") -> Self:
+        """
+        The exponential of a type, which is the type itself when the
+        exponent is the unit, as is any exponential of the unit.
 
-    def over(self, other: Ty) -> Ty:
-        return self.ar(self.over_factory(self, other))
+        >>> x = Ty('x')
+        >>> assert x ** Ty() == x << Ty() == Ty() >> x == x
+        """
+        return self.ar(self.exp_factory(self, other)) if other else self
 
-    def under(self, other: Ty) -> Ty:
-        return self.ar(self.under_factory(self, other))
+    def over(self, other: "Ty") -> "Ty":
+        return self.ar(self.over_factory(self, other)) if other else self
+
+    def under(self, other: "Ty") -> "Ty":
+        return self.ar(self.under_factory(self, other)) if other else self
 
     def __lshift__(self, other):
         return self.over(other)
@@ -163,19 +177,23 @@ class Ty(monoidal.Ty):
         raise ValueError
 
     @classmethod
-    def strategy(cls, *, max_leaves=3):
+    def strategy(cls, *, max_leaves=3, **params):
         """
         Generate atomic types and their exponentials, ``max_leaves`` atoms
-        at most.
+        at most, or with ``params`` the types the search of the free monoid
+        derives within them, e.g. between a given ``dom`` and ``cod``.
         """
         from hypothesis import strategies as st
+
+        if params:
+            return super().strategy(**params)
 
         def exponentials(types):
             return st.builds(lambda x, y: x << y, types, types)\
                 | st.builds(lambda x, y: x >> y, types, types)
 
         return st.recursive(
-            super().strategy(), exponentials, max_leaves=max_leaves)
+            cls.generators(), exponentials, max_leaves=max_leaves)
 
     def __repr__(self):
         return factory_name(type(self))\
@@ -236,7 +254,7 @@ class Wire(monoidal.Wire):
     and right colours always match. Exponentials do not interact meaningfully
     with colours, so for now we assume everything is transparent.
     """
-    def dagger(self) -> Wire:
+    def dagger(self) -> "Wire":
         return self
 
 
@@ -324,10 +342,16 @@ class Diagram(monoidal.Diagram, BiclosedCategory):
         dom (Ty) : The domain of the diagram, i.e. its input.
         cod (Ty) : The codomain of the diagram, i.e. its output.
     """
+    box_factory: ClassVar[type["Box"]]
+    curry_factory: ClassVar[type["Curry"]]
+    eval_factory: ClassVar[type["Eval"]]
+    coeval_factory: ClassVar[type["Coeval"]]
+    sum_factory: ClassVar[type["Sum"]]
+    functor_factory: ClassVar[type["Functor"]]
 
     ob = Ty
 
-    def curry(self, n=1, left=True) -> Diagram:
+    def curry(self, n=1, left=True) -> "Diagram":
         """
         Wrapper around :class:`Curry` called by :class:`Functor`.
 
@@ -335,11 +359,17 @@ class Diagram(monoidal.Diagram, BiclosedCategory):
             n : The number of atomic types to curry.
             left : Whether to curry on the left, i.e. into :class:`Over`,
                 or on the right, i.e. into :class:`Under`.
+
+        Currying no type is the identity, as an exponential of the unit is
+        its base.
+
+        >>> f = Box('f', Ty('x'), Ty('y'))
+        >>> assert f.curry(0) == f
         """
-        return self.curry_factory(self, n, left)
+        return self.curry_factory(self, n, left) if n else self
 
     @classmethod
-    def ev(cls, base: Ty, exponent: Ty, left=True) -> Eval:
+    def ev(cls, base: Ty, exponent: Ty, left=True) -> "Eval":
         """
         Wrapper around :class:`Eval` called by :class:`Functor`.
 
@@ -348,11 +378,15 @@ class Diagram(monoidal.Diagram, BiclosedCategory):
             exponent : The exponent of the exponential type to evaluate.
             left : Whether to evaluate on the left, i.e. from :class:`Over`,
                 or on the right, i.e. from :class:`Under`.
+
+        The evaluation at the unit is the identity.
         """
+        if not exponent:
+            return cls.id(base)
         return cls.eval_factory(
             base << exponent if left else exponent >> base)
 
-    def to_compact(self) -> CMap:
+    def to_compact(self) -> "CMap":
         """
         Bend curry bubbles into coevaluation and feedback, which lands in
         :class:`CMap` as a biclosed category has no trace, see
@@ -369,6 +403,32 @@ class Diagram(monoidal.Diagram, BiclosedCategory):
 
     def to_drawing(self):
         return monoidal.Diagram.to_drawing(self, functor_factory=Functor)
+
+    map_agreement = monoidal.Diagram.map_agreement.failing(
+        messages.MAP_OF_A_CURRY)
+    dagger_involution = BiclosedCategory.dagger_involution.failing(
+        messages.CURRY_HAS_NO_DAGGER)
+    dagger_involution_monoidal = BiclosedCategory.dagger_involution.weaken(
+        within=MonoidalCategory)
+    dagger_contravariance = BiclosedCategory.dagger_contravariance.failing(
+        messages.CURRY_HAS_NO_DAGGER)
+    dagger_contravariance_monoidal = BiclosedCategory.dagger_contravariance\
+        .weaken(within=MonoidalCategory)
+    dagger_monoidality = BiclosedCategory.dagger_monoidality.failing(
+        messages.CURRY_HAS_NO_DAGGER)
+    dagger_monoidality_monoidal = BiclosedCategory.dagger_monoidality.weaken(
+        within=MonoidalCategory).failing(messages.NO_PLANAR_NORMAL_FORM)
+    currying_left = BiclosedCategory.currying_left.failing(messages.FREE_CURRY)
+    currying_right = BiclosedCategory.currying_right.failing(
+        messages.FREE_CURRY)
+    currying_eta_left = BiclosedCategory.currying_eta_left.failing(
+        messages.FREE_CURRY)
+    currying_eta_right = BiclosedCategory.currying_eta_right.failing(
+        messages.FREE_CURRY)
+    currying_naturality_left = BiclosedCategory.currying_naturality_left\
+        .failing(messages.FREE_CURRY)
+    currying_naturality_right = BiclosedCategory.currying_naturality_right\
+        .failing(messages.FREE_CURRY)
 
 
 class Box(monoidal.Box, Diagram):
@@ -409,7 +469,7 @@ class Eval(Box):
     def from_tree(cls, tree):
         return cls(from_tree(tree['x']), left=tree['left'])
 
-    def dagger(self) -> Coeval:
+    def dagger(self) -> "Coeval":
         return self.coeval_factory(self.x, self.left)
 
     @property
@@ -495,11 +555,21 @@ class Curry(monoidal.Bubble, Box):
         return self.name
 
     def to_drawing(self):
-        if self.left:
-            f, e = self.arg, self.coeval_factory(self.cod, left=True)
-            return (f >> e).to_drawing().trace()
-        f, e = self.arg, self.coeval_factory(self.cod)
-        return (f >> e).to_drawing().trace(left=True)
+        f, e = self.arg, self.coeval_factory(self.cod, left=self.left)
+        return (f >> e).to_drawing().trace(self.n, left=not self.left)
+
+    def dagger(self):
+        """
+        A curry has no dagger, which would uncurry an exponential in the
+        domain of a diagram.
+
+        >>> x = Ty('x')
+        >>> Box('f', x @ x, x).curry().dagger()
+        Traceback (most recent call last):
+        ...
+        discopy.utils.AxiomError: A curry has no dagger.
+        """
+        raise AxiomError(messages.CURRY_HAS_NO_DAGGER)
 
 
 class Sum(monoidal.Sum, Box):
@@ -514,6 +584,7 @@ class Sum(monoidal.Sum, Box):
 
 
 Id = Diagram.id
+Diagram.box_factory = Box
 Diagram.curry_factory = Curry
 Diagram.eval_factory = Eval
 Diagram.coeval_factory = Coeval
@@ -577,7 +648,7 @@ class Functor(monoidal.Functor):
                 return self.ob_map[other]
         return super().__call__(other)
 
-    def map_variable(self, variable: Variable, context: dict) -> Variable:
+    def map_variable(self, variable: "Variable", context: dict) -> "Variable":
         """
         The image of a variable, of the image of its type, renamed with
         underscores until it differs from the images already in the context.
@@ -593,7 +664,8 @@ class Functor(monoidal.Functor):
             result = self.cod.ob.variable_factory(name, cod)
         return result
 
-    def map_term(self, term: TermBase, context: dict = None) -> TermBase:
+    def map_term(
+            self, term: "TermBase", context: dict | None = None) -> "TermBase":
         """
         The image of a term, a term in the internal language of the codomain,
         checked to have the image of its type and exactly the images of its
@@ -628,6 +700,85 @@ CMap = cmap.CMap[Diagram]
 
 
 Diagram.functor_factory = Functor
+
+
+class Renamed[factory](Testable, NamedGeneric, tuple):
+    """
+    Alpha-equivalent terms of the ``factory``: one shape generated under two
+    or more namings of its bound variables, see :meth:`TermBase.generate`.
+
+    Example
+    -------
+    >>> from hypothesis import find
+    >>> terms = find(
+    ...     Renamed[TermBase].strategy(), lambda terms: len(terms) == 3)
+    >>> assert terms[0].alpha_eq(*terms[1:])
+    """
+    @classmethod
+    def strategy(cls, **params) -> "st.SearchStrategy[Renamed]":
+        """
+        Generate a shape and at least two namings of it.
+
+        Parameters:
+            params : Passed to :meth:`TermBase.shapes`.
+        """
+        from hypothesis import strategies as st
+
+        category = cls.factory
+        return st.builds(
+            lambda shape, namings: cls(
+                category.generate(*shape, letters) for letters in namings),
+            category.shapes(**params),
+            st.lists(category.namings(), min_size=2, max_size=3))
+
+
+class Canonical[factory](Testable, NamedGeneric, tuple):
+    """
+    Two terms of the ``factory`` followed by their canonical forms: two
+    shapes of one type, the second the first's or another, each generated
+    under its own naming and then under the one naming ``"x"``, which names
+    every bound variable by its level, so that the two terms are
+    alpha-equivalent exactly when their canonical forms are equal. Where
+    :class:`Renamed` draws terms alpha-equivalent by construction, this
+    decides the alpha-equivalence of any pair, see
+    :meth:`TermBase.alpha_completeness`.
+
+    Example
+    -------
+    >>> from hypothesis import find
+    >>> first, second, *canonical = find(
+    ...     Canonical[TermBase].strategy(),
+    ...     lambda terms: terms[0] != terms[1] and terms[2] == terms[3])
+    >>> assert first.alpha_eq(second)
+    """
+    @classmethod
+    def build(cls, shape: tuple, others: list[int] | None,
+              namings: tuple[Sequence[str], Sequence[str]]) -> "Canonical":
+        """
+        The terms of a shape and of another, the same when ``others`` is
+        ``None``, under their namings and then under the canonical one.
+        """
+        cod, choices, types = shape
+        shapes = (choices, choices if others is None else others)
+        return cls(
+            cls.factory.generate(cod, each, types, letters)
+            for each, letters in zip(2 * shapes, (*namings, "x", "x")))
+
+    @classmethod
+    def strategy(cls, **params) -> "st.SearchStrategy[Canonical]":
+        """
+        Generate a shape, its choices again or others, and two namings.
+
+        Parameters:
+            params : Passed to :meth:`TermBase.shapes`.
+        """
+        from hypothesis import strategies as st
+
+        category = cls.factory
+        return st.builds(
+            cls.build, category.shapes(**params),
+            st.none() | category.choices(),
+            st.tuples(category.namings(), category.namings()))
 
 
 class TermBase(Box, Equivalence):
@@ -672,11 +823,11 @@ class TermBase(Box, Equivalence):
     """
     dom: Ty
     cod: Ty
-    freevars: list[Variable]
+    freevars: list["Variable"]
     functor: ClassVar[Functor] = Functor.id(Diagram)
 
     @abstractmethod
-    def eval(functor: Functor = None) -> BiclosedCategory:
+    def eval(self, functor: Functor | None = None) -> BiclosedCategory:
         """
         The evaluation of a :class:`Functor` on a term gives a morphism in its
         codomain. By default, this is the identity functor on the free biclosed
@@ -684,7 +835,7 @@ class TermBase(Box, Equivalence):
         """
 
     @abstractmethod
-    def map(functor: Functor, context: dict) -> Term:
+    def map(self, functor: Functor, context: dict) -> "Term":
         """
         The image of a term under a :class:`Functor` whose codomain objects
         are biclosed types, i.e. a term in the codomain's internal language
@@ -706,7 +857,7 @@ class TermBase(Box, Equivalence):
         args = (other, self, left) if left else (self, other, left)
         return self.cod.application_factory(*args)
 
-    def alpha_eq(self, *others: Term) -> bool:
+    def alpha_eq(self, *others: "Term") -> bool:
         """
         Whether the terms are all alpha-equivalent to this one, i.e. equal up
         to the names of their bound variables, in one pass over the terms.
@@ -732,7 +883,7 @@ class TermBase(Box, Equivalence):
         return self.alpha_eq_under(scopes, list(others))
 
     def alpha_eq_under(  # pylint: disable=unused-argument  # a constant
-            self, scopes: list[dict[Variable, int]], others: list[Term],
+            self, scopes: list[dict["Variable", int]], others: list["Term"],
             depth: int = 0) -> bool:
         """
         Whether the terms, this one and the ``others``, are alpha-equivalent
@@ -801,7 +952,7 @@ class TermBase(Box, Equivalence):
 
     @classmethod
     def generate(cls, cod: Ty, choices: Sequence[int], types: Sequence[Ty],
-                 letters: Sequence[str]) -> Term:
+                 letters: Sequence[str]) -> "Term":
         """
         Build a term of type ``cod`` from a sequence of ``choices``, one per
         node of the term, taking leaves once it runs out; the exponents of
@@ -824,14 +975,14 @@ class TermBase(Box, Equivalence):
         return Sampler(cls, iter(choices), types, letters).term(cod)
 
     @classmethod
-    def choices(cls) -> st.SearchStrategy[list[int]]:
+    def choices(cls) -> "st.SearchStrategy[list[int]]":
         """ Generate the choices of :meth:`generate`, one per node. """
         from hypothesis import strategies as st
 
         return st.lists(st.integers(min_value=0, max_value=11), max_size=12)
 
     @classmethod
-    def shapes(cls, *, types=None, cod=None) -> st.SearchStrategy[tuple]:
+    def shapes(cls, *, types=None, cod=None) -> "st.SearchStrategy[tuple]":
         """
         Generate the arguments of :meth:`generate` but its letters: a type,
         the choices and the types the exponents are drawn from, so that one
@@ -847,14 +998,14 @@ class TermBase(Box, Equivalence):
             st.lists(types, min_size=1, max_size=3))
 
     @classmethod
-    def namings(cls) -> st.SearchStrategy[list[str]]:
+    def namings(cls) -> "st.SearchStrategy[list[str]]":
         """ Generate the letters naming the bound variables, one per level. """
         from hypothesis import strategies as st
 
         return st.lists(st.sampled_from("xyz"), min_size=1, max_size=3)
 
     @classmethod
-    def strategy(cls, **params) -> st.SearchStrategy[Term]:
+    def strategy(cls, **params) -> "st.SearchStrategy[Term]":
         """
         Generate terms, one :meth:`generate` call per shape and naming.
 
@@ -864,11 +1015,12 @@ class TermBase(Box, Equivalence):
         from hypothesis import strategies as st
 
         return st.builds(
-            lambda shape, letters: cls.generate(*shape, letters),
+            lambda shape, letters: cls.generate(
+                shape[0], shape[1], shape[2], letters),
             cls.shapes(**params), cls.namings())
 
     @classmethod
-    def related(cls, **params) -> st.SearchStrategy[tuple]:
+    def related(cls, **params) -> "st.SearchStrategy[tuple]":
         """
         Generate a term, its canonical form and a second term of the same
         type, the first again under another naming or another shape, see
@@ -882,18 +1034,18 @@ class TermBase(Box, Equivalence):
 
         return st.builds(
             lambda terms: (terms[0], terms[2], terms[1]),
-            Canonical[cls].strategy(**params))
+            Canonical[cls].strategy(**params))  # ty: ignore[invalid-type-form]
 
-    serialisation = Testable.serialisation.failing(
+    serialisation = Serialisable.serialisation.failing(
         "A term does not read back from its tree, see #692.")
 
     @axiom
-    def alpha_renaming(cls, terms: Renamed[Self]) -> Equation:
+    def alpha_renaming(cls, terms: Renamed[Self]) -> AbstractEquation:
         """ A term is alpha-equivalent to its renamings, however many. """
         return AlphaEquation(*terms)
 
     @axiom
-    def alpha_application(cls, terms: Renamed[Self]) -> Equation:
+    def alpha_application(cls, terms: Renamed[Self]) -> AbstractEquation:
         """
         Alpha-equivalence is a congruence with respect to application: a
         function applied to alpha-equivalent arguments gives alpha-equivalent
@@ -905,7 +1057,7 @@ class TermBase(Box, Equivalence):
         return AlphaEquation(*(f(term)(a) for term in terms))
 
     @axiom
-    def alpha_abstraction(cls, terms: Renamed[Self]) -> Equation:
+    def alpha_abstraction(cls, terms: Renamed[Self]) -> AbstractEquation:
         """
         Alpha-equivalence is a congruence with respect to abstraction:
         binding a variable in alpha-equivalent bodies gives alpha-equivalent
@@ -918,12 +1070,12 @@ class TermBase(Box, Equivalence):
             for term in terms))
 
     @axiom
-    def alpha_soundness(cls, terms: Renamed[Self]) -> Equation:
+    def alpha_soundness(cls, terms: Renamed[Self]) -> AbstractEquation:
         """ Alpha-equivalent terms evaluate to the same diagram. """
         return Equation(*(term.eval() for term in terms))
 
     @axiom
-    def alpha_completeness(cls, terms: Canonical[Self]) -> Equation:
+    def alpha_completeness(cls, terms: Canonical[Self]) -> AbstractEquation:
         """
         Alpha-equivalence is decided by the canonical naming of the bound
         variables: two terms are alpha-equivalent exactly when their
@@ -1043,7 +1195,7 @@ class Application(TermBase):
         args (Term): The arguments to which the function is applied.
         left (bool): Whether the argument comes in from the left or right.
     """
-    def __init__(self, func: Term, args: Term, left: bool = False):
+    def __init__(self, func: TermBase, args: TermBase, left: bool = False):
         assert_isinstance(func, TermBase)
         assert_isinstance(args, TermBase)
         if not func.cod.is_exp:
@@ -1110,10 +1262,10 @@ class Application(TermBase):
 
 class Abstraction(TermBase):
     var: Variable
-    body: Term
+    body: TermBase
     left: bool = False
 
-    def __init__(self, var: Variable, body: Term, left: bool = False):
+    def __init__(self, var: Variable, body: TermBase, left: bool = False):
         self.var, self.body, self.left = var, body, left
         left_str = ", left=True" if left else ""
         name = f"{var.cod}(lambda {var.name}{left_str}: {body})"
@@ -1138,8 +1290,8 @@ class Abstraction(TermBase):
     def eval(self, functor=None):
         functor = functor or self.functor
         return functor.cod.curry(
-            self.body.eval(functor), len(functor(self.var.cod)),
-            not self.left)
+            self.body.eval(functor),  # ty: ignore[invalid-argument-type]
+            len(functor(self.var.cod)), not self.left)
 
     def map(self, functor, context):
         context = {key: value for key, value in context.items()
@@ -1180,10 +1332,7 @@ class Abstraction(TermBase):
 type Term = Constant | Variable | Application | Abstraction
 
 
-for law in (
-        "unitality", "associativity", "identity_typing",
-        "composition_dom_typing", "composition_cod_typing",
-        "dagger_involution", "dagger_contravariance"):
+for law in sorted(set(Box.axioms) - set(Serialisable.axioms)):
     setattr(TermBase, law, getattr(Box, law).inapplicable(
         "A term is a box: the laws of its category are the diagram's."))
 
@@ -1284,8 +1433,8 @@ class Sampler:
                        for variable in bound if variable.cod == cod]
         return result
 
-    def splits(self, constraints: Constraints
-               ) -> list[tuple[Constraints, Constraints]]:
+    def splits(self, constraints: "Constraints"
+               ) -> list[tuple["Constraints", "Constraints"]]:
         """
         The ways of splitting the constraints between two subterms in
         sequence: at a bound variable of the prefix, among the extras or at
@@ -1308,7 +1457,7 @@ class Sampler:
             for j in range(len(suffix) + 1)]
         return result
 
-    def application(self, cod: Ty, first: Constraints, second: Constraints,
+    def application(self, cod: Ty, first: "Constraints", second: "Constraints",
                     left: bool) -> Application:
         """
         A function applied to an argument of an exponent drawn from the
@@ -1324,19 +1473,19 @@ class Sampler:
         args = self.term(exponent, second)
         return self.category.ob.application_factory(func, args, False)
 
-    def applications(self, cod: Ty, constraints: Constraints
+    def applications(self, cod: Ty, constraints: "Constraints"
                      ) -> list[Callable[[], Term]]:
         """ The applications allowed, one per split and side. """
         return [self.split(cod, first, second, left)
                 for first, second in self.splits(constraints)
                 for left in (False, True)]
 
-    def split(self, cod: Ty, first: Constraints, second: Constraints,
+    def split(self, cod: Ty, first: "Constraints", second: "Constraints",
               left: bool) -> Callable[[], Application]:
         """ The option of an application with its constraints split. """
         return lambda: self.application(cod, first, second, left)
 
-    def abstraction(self, cod: Ty, constraints: Constraints) -> Abstraction:
+    def abstraction(self, cod: Ty, constraints: "Constraints") -> Abstraction:
         """
         The abstraction of the variable bound at this level, first in the
         free variables of the body when the type is a left exponential and
@@ -1351,7 +1500,7 @@ class Sampler:
             level=constraints.level + 1))
         return self.category.ob.abstraction_factory(var, body, left)
 
-    def term(self, cod: Ty, constraints: Constraints = None) -> Term:
+    def term(self, cod: Ty, constraints: "Constraints | None" = None) -> Term:
         """
         A term of a given type under the constraints, none by default: a
         leaf when the choices ran out, or the spine when none fits, else the
@@ -1393,85 +1542,6 @@ class Constraints:
     def variables(self) -> tuple[Variable, ...]:
         """ The bound variables in scope, the prefix then the suffix. """
         return self.prefix + self.suffix
-
-
-class Renamed(Testable, NamedGeneric["factory"], tuple):
-    """
-    Alpha-equivalent terms of the ``factory``: one shape generated under two
-    or more namings of its bound variables, see :meth:`TermBase.generate`.
-
-    Example
-    -------
-    >>> from hypothesis import find
-    >>> terms = find(
-    ...     Renamed[TermBase].strategy(), lambda terms: len(terms) == 3)
-    >>> assert terms[0].alpha_eq(*terms[1:])
-    """
-    @classmethod
-    def strategy(cls, **params) -> st.SearchStrategy[Renamed]:
-        """
-        Generate a shape and at least two namings of it.
-
-        Parameters:
-            params : Passed to :meth:`TermBase.shapes`.
-        """
-        from hypothesis import strategies as st
-
-        category = cls.factory
-        return st.builds(
-            lambda shape, namings: cls(
-                category.generate(*shape, letters) for letters in namings),
-            category.shapes(**params),
-            st.lists(category.namings(), min_size=2, max_size=3))
-
-
-class Canonical(Testable, NamedGeneric["factory"], tuple):
-    """
-    Two terms of the ``factory`` followed by their canonical forms: two
-    shapes of one type, the second the first's or another, each generated
-    under its own naming and then under the one naming ``"x"``, which names
-    every bound variable by its level, so that the two terms are
-    alpha-equivalent exactly when their canonical forms are equal. Where
-    :class:`Renamed` draws terms alpha-equivalent by construction, this
-    decides the alpha-equivalence of any pair, see
-    :meth:`TermBase.alpha_completeness`.
-
-    Example
-    -------
-    >>> from hypothesis import find
-    >>> first, second, *canonical = find(
-    ...     Canonical[TermBase].strategy(),
-    ...     lambda terms: terms[0] != terms[1] and terms[2] == terms[3])
-    >>> assert first.alpha_eq(second)
-    """
-    @classmethod
-    def build(cls, shape: tuple, others: list[int] | None,
-              namings: tuple[Sequence[str], Sequence[str]]) -> Canonical:
-        """
-        The terms of a shape and of another, the same when ``others`` is
-        ``None``, under their namings and then under the canonical one.
-        """
-        cod, choices, types = shape
-        shapes = (choices, choices if others is None else others)
-        return cls(
-            cls.factory.generate(cod, each, types, letters)
-            for each, letters in zip(2 * shapes, (*namings, "x", "x")))
-
-    @classmethod
-    def strategy(cls, **params) -> st.SearchStrategy[Canonical]:
-        """
-        Generate a shape, its choices again or others, and two namings.
-
-        Parameters:
-            params : Passed to :meth:`TermBase.shapes`.
-        """
-        from hypothesis import strategies as st
-
-        category = cls.factory
-        return st.builds(
-            cls.build, category.shapes(**params),
-            st.none() | category.choices(),
-            st.tuples(category.namings(), category.namings()))
 
 
 Ty.variable_factory = Variable
