@@ -545,6 +545,7 @@ class Permutation(Box):
     .. image:: /_static/symmetric/foliation.svg
         :align: center
     """
+    is_strict = True
 
     def __new__(cls, dom: monoidal.Ty | None = None,
                 perm: Sequence[int] | None = None):

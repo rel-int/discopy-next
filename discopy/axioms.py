@@ -569,8 +569,9 @@ class Declaration[**P, T](classmethod):
         sort ``Atom`` from the ``generators`` of ``category.ob`` and of sort
         :class:`Count` a number up to :data:`MAX_COUNT`, then a premise
         ``Hom[C1, A, B]`` from the strategy of the category with its boundary
-        and ``params``, a premise ``Var[T, x]`` the value ``x`` and
-        :data:`typing.Self` a term.
+        and ``params``, a premise ``Var[T, x]`` the value ``x``, a testable
+        shape of ``Self``, e.g. ``Related[Self]``, from its own strategy over
+        the category with ``params``, and :data:`typing.Self` a term.
         """
         from hypothesis import strategies as st
 
@@ -592,7 +593,8 @@ class Declaration[**P, T](classmethod):
                         dom=dom, cod=cod, **params)
                 elif isinstance(kind, type) and issubclass(kind, Testable)\
                         and getattr(kind, "factory", None) is Self:
-                    strategy = kind.__origin__[self.category].strategy()
+                    strategy = kind.__origin__[self.category].strategy(
+                        **params)
                 else:
                     strategy = self.category.strategy()
                 return draw(strategy, label=name)
@@ -707,10 +709,11 @@ class Axiom[**P, T](Declaration[P, T]):
         The law as a schema: its equation with an object named after each
         type parameter, a ``box_factory`` named after each morphism, cast
         into the category when it is a generator rather than a term, e.g.
-        the wire of a type, and two for each number, the equation a law
-        declared broken raises included. A category whose objects take no
-        name, e.g. the shapes of a network, has none and raises
-        ``TypeError``.
+        the wire of a type, the ``canonical`` instance of a testable shape,
+        e.g. :class:`discopy.markov.Square`, and two for each number, the
+        equation a law declared broken raises included. A category whose
+        objects take no name, e.g. the shapes of a network, has none and
+        raises ``TypeError``.
 
         >>> from discopy.cat import Arrow
         >>> print(Arrow.associativity.canonical())
@@ -725,6 +728,9 @@ class Axiom[**P, T](Declaration[P, T]):
         def value(name, kind):
             if get_origin(kind) is Var:
                 return get_args(kind)[1]
+            if isinstance(kind, type) and issubclass(kind, Testable)\
+                    and getattr(kind, "factory", None) is Self:
+                return kind.__origin__[self.category].canonical()
             dom, cod = get_args(kind)[1:] if get_origin(kind) is Hom\
                 else (self.category.ob(name), ) * 2
             box = self.category.box_factory(name, dom=dom, cod=cod)

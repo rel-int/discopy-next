@@ -44,6 +44,24 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   spiders over a category with none raises `AxiomError`, where it raised
   `AttributeError` for want of a `spider_factory`.
 
+- `traced.Diagram.is_strict`, whether the trace is uniform along a map:
+  `h : U -> V` is strict when `f >> B @ h == A @ h >> g` implies
+  `f.trace() == g.trace()`, after Hasegawa (1997) and Simpson and Plotkin
+  (2000), strict maps preserving the least element of a least fixed point.
+  A diagram is strict when its boxes are: a free box is not, a permutation,
+  a copy, a discard and a merge are, and so is the trace of a strict map.
+  `markov.Diagram.trace_uniformity` states uniformity along the copy of a
+  memory, its premise holding by construction of the `markov.Square` it
+  quantifies over, as composability does by construction of the premises
+  of associativity: a template `f` and its image `g` under the functor
+  doubling the memory, each box reading one copy and copying what it
+  writes. It fails in every free category, `NOT_UNIFORM`, on a loop that
+  nothing writes, which a least fixed point makes its least element, and
+  holds once every loop is written, `trace_uniformity_written`. A
+  hypergraph category has no such square, a merge not being natural along
+  a copy, `NO_SQUARE`. A testable premise of a law, e.g. `Related[Self]`
+  or `Square[Self]`, is drawn with the parameters `Axiom.weaken` declares,
+  as a morphism already was.
 - `RigidCategory.rotate_contravariance`, that rotation reverses
   composition, and `adjunction`, that the left and right adjoints of a
   morphism are mutually inverse, which is the class of bug #716; and
@@ -1029,6 +1047,33 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Fixed
 
+- `python.Function.trace` evaluates, and builds for `n > 1`. `fix` seeded
+  its iteration by calling the function without its traced argument, so
+  that the default of a lambda's last parameter was the initial value: the
+  composite that `trace` iterates could not pass it on, since `__call__`
+  rejects the arity before the lambda is reached and a missing argument
+  cannot be routed through a swap, so every trace raised `ValueError` when
+  called; and `trace(n)` took its fixed point over one type whatever `n`,
+  so `trace(2)` raised `AxiomError`. The iteration now starts from the
+  default instance `t()` of each traced type `t`, e.g. `0` for `int`, a
+  value that type checks and flows through any composite, and stops when
+  two iterates are equal; `fix(n)` takes the fixed point over the last `n`
+  types at once and checks that they are the codomain, `trace` checks that
+  it is traceable, and both evaluate through `__call__` rather than around
+  it. The laws of traced categories hold on feedback with a unique fixed
+  point, and the trace is uniform along the copy of a memory, which
+  preserves the seed: the image of a `markov.Square` under a functor into
+  `Function` gives two traces that agree. The golden
+  ratio of the examples notebook and of the `traced.Functor` docstring is
+  the fixed point of `x -> sqrt(1 + x)` from zero, with the type checking on,
+  where both used to read the default `x=1` of a lambda with it switched off,
+  and `traced/golden.svg` is redrawn with the new label. Both refuse an `n`
+  below zero or past the types they have, where the slices wrapped around.
+  `test_trace` never called the trace it named
+  (B87 of [#31](https://github.com/rel-int/discopy-next/issues/31)). Ported
+  from next `main`
+  ([rel-int/discopy-next#73](https://github.com/rel-int/discopy-next/issues/73),
+  [rel-int/discopy-next#91](https://github.com/rel-int/discopy-next/issues/91)).
 - `Diagram.foliation` is idempotent. A diagram records the offsets of its
   states whenever it has one, where it did only when each layer held one
   box, so a foliated diagram with several states in a layer refoliated

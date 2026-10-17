@@ -1,62 +1,36 @@
 # TODO
 
-> nah let's drop that PR for now and open a fresh draft in discopy-next, reuse the property-based testing machinery from daydream's PR as much as possible so you can start by writing down the axioms that ehypergraphs should respect
-
-Context: "that PR" is [discopy#730](https://github.com/discopy/discopy/pull/730), the 1255-line
-`discopy.ehypergraph`; "daydream's PR" is [rel-int/discopy-next#1](https://github.com/rel-int/discopy-next/pull/1),
-which this branch is stacked on. Earlier in the same session it was agreed that an e-hypergraph can be a
-`hypergraph.Hypergraph` with an equivalence relation on its spiders, checked on #730's own example.
-
-- [x] State the axioms of `ehypergraph.EHypergraph` in the sequent DSL of `discopy.axioms`
-- [x] Implement them on top of `Hypergraph`, small enough to be the specification: `merge`, `rebuild`,
-      `sections`, `extract` by brute force, `then`, `tensor`, `dagger`, equality up to isomorphism
-- [x] `EHypergraph.strategy`, so that the symmetric, compact, Markov and Frobenius aliases enrol in the
-      matrix: 101 laws pass, 2 skipped, 10 declared broken with their reasons
-- [x] Settle with the human what `s ~ t` means over a linear category. @toumix, verbatim:
-      > Yeah it doesn't make sense to equate two wires in an existing symmetric diagram but what does make
-      > sense is a ehypergraph which holds a monogamous acyclic hypergraph and then applies a rewrite rule to
-      > equate one subdiagram to a given RHS, adding that RHS to the ehypergraph and declaring equality of its
-      > domain and codomain
-- [x] `rewrite(region, dom, cod, rhs)` records the
-      region and the right-hand side as alternatives; a section chooses a side of each, so that extraction holds
-      over linear categories and `LINEAR_SECTIONS` goes
-
-The linear e-hypergraphs above, their alternatives, `fits` and `Rewrites` (at `a763134`), and everything
-traced (coinduction on feedback loops, `is_strict`, `markov.Square` and uniformity, the #91 port) moved to
-the pull request targeting this one, as round 3 below asks.
-
-## Round 2
-
-> monoidal egraphs go brrr
-
-@toumix's prompt for the session that picked this pull request up from a handoff of the session that opened
-it, whose next steps are the boxes above and below. It worked on a pull request into this branch, #92, which
-@toumix asked to fold back here: "keep only one PR open".
-
-- [x] Fix [#91](https://github.com/rel-int/discopy-next/issues/91), the multiplicative trace raising on any
-      loop: ported from next `main`'s #84, moved with the traced rewrites
-- [x] `extraction_rewrite` over symmetric and compact categories: `rewrite` refuses what does not `fits`,
-      moved with the linear e-hypergraphs
-
-## Round 3
-
 > let's keep traced rewrites for a next PR targeting this one, it's too much theory to guess at once
->
-> let's focus on the case that's known best: cartesian diagrams are equivalent to terms so ehypergraphs over them should correspond precisely to egraphs. use egglog-python as a reference to stress case your implementation, add the example of egraphs from the standard docs (screenshot attached)
->
-> then make a similar example with two primitives for sampling and conditioning that are not copyable and not discardable respectively
 
-The screenshot is egg's: `(a * 2) / 2` under `x * 2 = x << 1`, `(x * y) / z = x * (y / z)`, `x / x = 1` and
-`x * 1 = x`, four e-graphs representing more and more ways to write it, extracting `a`.
+@toumix on [#90](https://github.com/rel-int/discopy-next/pull/90), which this pull request targets, while #90
+turns to cartesian diagrams, whose e-hypergraphs are e-graphs. What moved here from #90 is done but for the
+questions; what is left to design waits for #90's e-hypergraphs over copy-discard diagrams to settle.
 
-- [x] Move the traced rewrites to a pull request targeting this one
-- [WIP] @session_01MY1Vs5CEhXgYwJcDnNwx6i-2026-10-17 18:40 E-hypergraphs over copy-discard diagrams: a box is
-      deterministic and affine unless it says otherwise, as @toumix asked on discopy#730 ("`is_deterministic`
-      for the copy-naturality alone", "shouldn't be a ClassVar"); a section chooses one producer per class,
-      so that over cartesian diagrams the e-hypergraph is an e-graph
-- [WIP] @session_01MY1Vs5CEhXgYwJcDnNwx6i-2026-10-17 18:40 Matching and saturation, the rules of egg's example
-      applied until nothing changes, and extraction at least tree cost, as egg's
-- [WIP] @session_01MY1Vs5CEhXgYwJcDnNwx6i-2026-10-17 18:40 egglog-python as the reference: egg's example, and a
-      differential stress test of the relation and the extracted cost
-- [WIP] @session_01MY1Vs5CEhXgYwJcDnNwx6i-2026-10-17 18:40 The same with `sample`, not deterministic, and
-      `condition`, not affine
+- [x] Mark the maps the trace is uniform along. @toumix, verbatim:
+      > can we add an extra boolean attribute "strict" which characterises for which maps the uniform axiom holds?
+      `is_strict` on traced diagrams and `trace_uniformity` along copy, declared failing on the free
+      categories, `NOT_UNIFORM`
+- [x] State the premise of uniformity as a shape. @toumix, verbatim:
+      > I disagree with “no way to state an implication”, this is what shapes do! eg if f g h are composable then associativity
+      > try to do the same with this uniformity axiom
+
+      `markov.Square[C]` draws commuting squares by construction; `trace_uniformity_written` holds on
+      every free traced Markov category but the hypergraph ones, where no square is drawn, `NO_SQUARE`
+- [x] Fix [#91](https://github.com/rel-int/discopy-next/issues/91), the multiplicative trace raising on any
+      loop: ported from next `main`'s #84, identical; uniformity along copy holds on `python.Function`,
+      checked over `markov.Square` mapped into monotone Boolean functions; it fails along a discard, whose
+      loop need not terminate
+- [ ] Settle with the human whether congruence on a feedback loop should be coinductive
+      (`INDUCTIVE_CONGRUENCE`). @toumix, verbatim:
+      > Using coinduction would be awesome! I expect that the rebuild should work fine as an iterator so you
+      > could unroll a feedback loop as many times as needed. Not sure if it makes sense to use coinduction to
+      > "prove" anything about Python though?
+
+      The API of `bisimulation` to propose before building it
+- [ ] Ask the human what strictness should mean for a merge, which is strict but not natural along a copy
+- [ ] E-hypergraphs over linear and hypergraph categories, as #90 had them at `a763134`: alternatives between
+      regions and right-hand sides, `fits` and `Rewrites`. Found against them, to fix when they come back:
+      `rebuild` merges the outputs of two congruent boxes that coexist, e.g. `a @ a >> m`, so no section is
+      valid; the spiders of a right-hand side on no box leak into the sections that drop it; `fits` accepts a
+      right-hand side that drops a wire the region passes through; and matching needs the region to lie in
+      one section and its alternatives to be nested, which loses overlapping redexes

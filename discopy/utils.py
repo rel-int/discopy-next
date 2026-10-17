@@ -734,6 +734,8 @@ def assert_isatomic(typ: Ty, cls: type | None = None):
 
 def assert_istraceable(arg, n=1, left=False):
     """ Raise :class:`AxiomError` if a diagram is not traceable. """
+    if n < 0 or n > min(len(arg.dom), len(arg.cod)):
+        raise ValueError
     traced_dom, traced_cod = (arg.dom[:n], arg.cod[:n]) if left\
         else (arg.dom[len(arg.dom) - n:], arg.cod[len(arg.cod) - n:])
     if traced_dom != traced_cod:

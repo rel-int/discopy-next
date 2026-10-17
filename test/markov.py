@@ -106,3 +106,27 @@ def test_copy_and_merge_factories():
     assert isinstance(RecipeCopy(x).dagger(), RecipeMerge)
     assert isinstance(RecipeMerge(x).dagger(), RecipeCopy)
     assert isinstance(Recipe.merge(x).boxes[0], RecipeMerge)
+
+
+def test_Square_commutes():
+    from hypothesis import given, settings, strategies as st
+
+    from discopy import closed, feedback
+
+    categories = st.sampled_from([Diagram, closed.Diagram, feedback.Diagram])
+
+    @settings(max_examples=50, deadline=None)
+    @given(st.data(), categories, st.booleans())
+    def check(data, category, written):
+        f, h, g = data.draw(Square[category].strategy(written=written))
+        dom, cod = f.dom[:-len(h.dom)], f.cod[:-len(h.dom)]
+        assert h.is_strict
+        assert category.equation_factory(f >> cod @ h, dom @ h >> g)
+    check()
+
+
+def test_Square_refuses_hypergraph_categories():
+    from discopy import frobenius
+
+    with raises(NotImplementedError):
+        Square[frobenius.Diagram].strategy()

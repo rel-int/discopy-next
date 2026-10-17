@@ -65,7 +65,7 @@ from copy import copy
 from typing import ClassVar, Self
 
 from discopy import (
-    monoidal, rigid, markov, compact, pivotal, cmap, hypergraph)
+    monoidal, rigid, markov, compact, pivotal, cmap, hypergraph, messages)
 from discopy.abc import HypergraphCategory
 from discopy.cat import factory
 from discopy.utils import (
@@ -135,6 +135,11 @@ class Diagram(compact.Diagram, markov.Diagram, HypergraphCategory):
         dom (Ty) : The domain of the diagram, i.e. its input.
         cod (Ty) : The codomain of the diagram, i.e. its output.
     """
+    trace_uniformity = markov.Diagram.trace_uniformity.inapplicable(
+        messages.NO_SQUARE)
+    trace_uniformity_written = markov.Diagram.trace_uniformity_written\
+        .inapplicable(messages.NO_SQUARE)
+
     sum_factory: ClassVar[type["Sum"]]
     box_factory: ClassVar[type["Box"]]
     functor_factory: ClassVar[type["Functor"]]
