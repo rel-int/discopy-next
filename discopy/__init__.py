@@ -21,6 +21,7 @@ from discopy import (
     closed,
     frobenius,
     hypergraph,
+    ehypergraph,
     cmap,
     interaction,
     feedback,

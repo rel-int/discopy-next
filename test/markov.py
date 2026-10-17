@@ -106,3 +106,49 @@ def test_copy_and_merge_factories():
     assert isinstance(RecipeCopy(x).dagger(), RecipeMerge)
     assert isinstance(RecipeMerge(x).dagger(), RecipeCopy)
     assert isinstance(Recipe.merge(x).boxes[0], RecipeMerge)
+
+
+def test_Box_flags():
+    import pickle
+    from discopy.utils import dumps, loads
+    p, x = Ty('p'), Ty('x')
+    sample = Box('sample', p, x, is_deterministic=False)
+    condition = Box('condition', x, Ty(), is_affine=False)
+    assert Box('sample', p, x) != sample
+    assert hash(Box('sample', p, x)) != hash(sample)
+    assert repr(Box('f', p, x)) == "markov.Box('f', monoidal.Ty(cat.Ob('p')), "\
+        "monoidal.Ty(cat.Ob('x')))"
+    for box in (sample, condition, sample.dagger(), sample @ condition):
+        assert eval(repr(box)) == box
+        assert loads(dumps(box)) == box == pickle.loads(pickle.dumps(box))
+    assert not sample.dagger().is_deterministic
+    assert not condition.dagger().dagger().is_affine
+    assert Copy(x).is_cartesian and Swap(x, x).is_cartesian
+    assert Id(x).is_cartesian and Merge(x).is_deterministic
+    assert not Merge(x).is_affine and not Merge(x).is_cartesian
+    assert not (Copy(p) >> sample @ p).is_deterministic
+    assert (Copy(p) >> sample @ p).is_affine
+    assert not (sample >> condition).is_cartesian
+    assert loads(dumps(Box('f', p, x))).is_cartesian
+
+
+def test_Box_flags_cooperate():
+    import numpy as np
+    from discopy import closed, frobenius, grammar, rigid, tensor
+    from discopy.grammar.pregroup import Ty as Grammatical, Word
+    from discopy.utils import dumps, loads
+    x, d = frobenius.Ty('x'), tensor.Dim(2)
+    f, flagged = frobenius.Box('f', x, x), frobenius.Box(
+        'f', x, x, is_affine=False)
+    assert f.r[::-1][::-1] == f.r and f.r.dagger().z == 1
+    assert flagged.r.l == flagged and not flagged.r.dagger().is_affine
+    n, word = Grammatical('n'), Word('w', Grammatical('n'))
+    assert (word.dagger().dom, word.dagger().cod) == (n, Grammatical())
+    sample = Word('w', n, is_deterministic=False)
+    assert eval(repr(sample), {
+        'Word': Word, 'grammar': grammar, 'rigid': rigid}) == sample
+    constant = closed.Constant('c', closed.Ty('x'))
+    assert loads(dumps(constant)) == constant
+    t = tensor.Box('t', d, d, data=[[1, 2j], [3, 4]])
+    assert np.allclose(t.r.dagger().eval().array, t.r.eval().dagger().array)
+    assert t != tensor.Box('t', d, d, data=t.data, is_deterministic=False)

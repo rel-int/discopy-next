@@ -9,6 +9,93 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Added
 
+- `discopy.ehypergraph`, e-graphs of diagrams with sharing: an
+  `EHypergraph` over a copy-discard category is a left-monogamous acyclic
+  `Hypergraph`, whose boxes are the e-nodes, with an equivalence relation on
+  its spiders, whose classes are the e-classes. Over cartesian diagrams,
+  which are terms with sharing, it is an e-graph: `from_diagram` hash-conses
+  a diagram as egg does a term, `rebuild` is the congruence closure of the
+  relation, `add` hash-conses a deterministic box, and `rewrite(region,
+  dom, cod, rhs)` glues the right-hand side of an equation onto the inputs
+  of a region, hash-consing its boxes, then relates the outputs of the
+  region to its own, refusing a region whose boxes cannot fire in some
+  order from the classes of its domain and reach those of its codomain.
+  `matches(lhs)` is egg's e-matching modulo the classes: a pattern is a
+  cartesian diagram with sharing whose boxes produce its codomain, bound
+  box by box from the codomain up to equal boxes, flags included, so that
+  each of its spiders is bound to one class, and a match is `(region, dom,
+  cod)`, `None` for an input the pattern does not read, so that
+  `rewrite(*match, rhs)` applies a rule. `saturate(*rules)` iterates egg's
+  schedule, every match of every rule searched as the round begins, all
+  rewritten, then rebuilt, yielding each round that adds a box or relates
+  two classes and stopping at the first that does neither; a rule is a pair
+  of cartesian diagrams of one type, the right-hand side reading only the
+  inputs the left reads, `AxiomError` otherwise. Egg's own example,
+  `(a * 2) / 2` under its four rules, saturates in three rounds and
+  extracts `a`, and a differential test against egglog-python, skipped
+  without it, compares the classes of every subterm, whether each round
+  changed anything and the cost extracted under egglog's costs, round by
+  round, on random terms and egg's rule sets, through the reference in
+  `test/fixtures/egglog_reference.py`: no disagreement on a thousand
+  random terms nor on five hundred full trees. `pattern` drops the wires
+  that go straight from the domain to the codomain of a hypergraph.
+  A section chooses a producer for each class it needs, those of the
+  codomain and those read by the boxes it keeps, i.e. the boxes it chooses
+  and every box that is not affine, and an acyclic choice decodes to a
+  diagram; `sections` enumerates them, `extract` is one of least tree cost,
+  egg's extraction, by Bellman-Ford relaxation, the cost of a box and of a
+  domain position being parameters, as egg's cost functions, one by default
+  as its `AstSize`. Equal boxes on related inputs have related outputs only
+  when they are deterministic, two samples being independent, an equation
+  is between cartesian diagrams, an effect being context, and the
+  e-hypergraphs over a category form a monoidal category, the relation
+  carried along the pushout, over a category whose boxes carry the flags
+  of `markov.Box`, `AxiomError` otherwise. Their laws are checked by the
+  property matrix over `markov.Diagram`, drawn with some boxes that are
+  not deterministic or not affine but where a law is weakened to cartesian
+  ones: the hypergraph is a strict monoidal functor, merging states an
+  equivalence, `rebuild` is a closure operator relating the outputs of two
+  copies of a diagram on related inputs exactly when they depend on
+  deterministic boxes only, and the closure of the identity relates
+  nothing but the outputs at one position of equal boxes, what is
+  extracted is a section, valid, of least cost and idempotent, every
+  section keeps every effect, once per class of equal deterministic ones
+  on related inputs, rewriting a rebuilt e-hypergraph into its own
+  hypergraph changes nothing and rewriting never raises the cost of what is
+  extracted; matching is complete modulo the classes, binding a pattern to
+  two copies of a diagram on related inputs in turn, and sound, flags
+  included, rewriting a match into its own pattern changing nothing; and a
+  round after saturation changes nothing. A semantic test evaluates every
+  section in random tensors, sampling and conditioning included, as the
+  diagram it comes from, two boxes interpreted alike only when one was
+  rewritten into the other. `hypergraph.relabeling` is how a
+  hypergraph numbers its spiders, factored out of its constructor so that
+  the relation follows them, and decoding a hypergraph that needs spiders
+  over a category with none raises `AxiomError`, where it raised
+  `AttributeError` for want of a `spider_factory`. A premise of a law
+  annotated `Self` is drawn with the parameters `Axiom.weaken` declares, as
+  a morphism already was.
+- `markov.Box` takes the keyword arguments `is_deterministic` and
+  `is_affine`, both `True` by default: a box is deterministic when copying
+  commutes with it and affine when discarding does, e.g. a sample is not
+  deterministic and a condition not affine, and a deterministic box that is
+  not affine is a hard constraint, a soft score not being deterministic.
+  The flags are attributes of each box rather than of its class, as an
+  identity or a swap is a total function whatever its class, take part in
+  equality and hashing, `tensor.Box`'s included, and are written by `repr`
+  and `to_tree` when they are `False`, so that existing representations are
+  unchanged, `pregroup.Word`'s included. `dagger`, `from_tree` and the
+  rotations of a `frobenius.Box` keep them on top of what the class they
+  extend builds, so that the dagger of a rotated box keeps its winding and
+  that of a word its boundary. `markov.Diagram.is_deterministic`,
+  `is_affine` and `is_cartesian`, both, hold when they hold of every box:
+  a copy, a discard, a swap and a permutation are cartesian, a merge is
+  deterministic but not affine, and a formal sum is deterministic when it
+  has at most one term, which is, and affine when it has exactly one,
+  which is. `feedback.Box` initialises itself as a plain box, as it did
+  through `markov.Box`, whose initialiser now cooperates, and has the flags
+  of a total function.
+
 - `RigidCategory.rotate_contravariance`, that rotation reverses
   composition, and `adjunction`, that the left and right adjoints of a
   morphism are mutually inverse, which is the class of bug #716; and

@@ -102,6 +102,23 @@ Mapping from :class:`Spider` to atomic :class:`frobenius.Ty`.
 """
 
 
+def relabeling(flat_wires: Sequence, spiders: Iterable) -> dict:
+    """
+    The label a hypergraph gives each spider: the connected ones in the
+    order they first occur in its flattened wires, then the others in order.
+
+    Parameters:
+        flat_wires : The spider on each port, in the order of the ports.
+        spiders : Every spider, connected or not.
+
+    >>> relabeling(("b", "a", "b"), ["a", "b", "c"])
+    {'b': 0, 'a': 1, 'c': 2}
+    """
+    connected = list(dict.fromkeys(flat_wires))
+    labels = connected + sorted(set(spiders) - set(connected))
+    return {spider: label for label, spider in enumerate(labels)}
+
+
 class Hypergraph[category](
         MonoidalCategory["Ty", "Hypergraph"], NamedGeneric, Serialisable):
     """
@@ -222,7 +239,6 @@ class Hypergraph[category](
 
         flat_wires = dom_wires + tuple(
             chain.from_iterable(x + y for x, y in box_wires)) + cod_wires
-        connected_spiders = set(flat_wires)
 
         if spider_types is None:
             spider_types = {spider: port.obj for spider, port in zip(
@@ -230,15 +246,9 @@ class Hypergraph[category](
         if not isinstance(spider_types, Mapping):
             spider_types = dict(enumerate(spider_types))
 
-        first_occurrence = {}
-        for index, spider in enumerate(flat_wires):
-            first_occurrence.setdefault(spider, index)
-        relabeling = sorted(
-            connected_spiders, key=first_occurrence.__getitem__)
-        relabeling += sorted(set(spider_types.keys()) - connected_spiders)
+        new_index = relabeling(flat_wires, spider_types.keys())
         self.spider_types = tuple(
-            spider_types[s].unwind() for s in relabeling)
-        new_index = {s: i for i, s in enumerate(relabeling)}
+            spider_types[s].unwind() for s in new_index)
         self.flat_wires = tuple(new_index[s] for s in flat_wires)
         self.wires = self.rebracket(self.flat_wires)
         self.dom_wires, self.box_wires, self.cod_wires = self.wires
@@ -1079,8 +1089,8 @@ class Hypergraph[category](
         if not self.is_bijective:
             return self.make_bijective().to_map()
         factory = cmap.CMap[self.category]
-        relabeling = Permutation(self._hypergraph_to_canonical())
-        edges = Permutation(self.bijection).conjugate(relabeling)
+        canonical = Permutation(self._hypergraph_to_canonical())
+        edges = Permutation(self.bijection).conjugate(canonical)
         loops = tuple(self.spider_types[i] for i in self.scalar_spiders)
         return factory(
             self.dom, self.cod, self.boxes, edges, loops=loops)
@@ -1326,6 +1336,9 @@ class Hypergraph[category](
             n_legs = len(input_wires) + len(output_wires)
             if n_legs in [0, 2]:
                 continue
+            if not issubclass(self.category, MarkovCategory):
+                raise AxiomError(messages.NOT_FROBENIUS.format(
+                    factory_name(self.category)))
             if input_wires:
                 node = self.ports[max(input_wires)]
                 depth = 0 if node.kind == "input" else node.depth + 1

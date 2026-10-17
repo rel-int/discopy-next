@@ -24,4 +24,5 @@ DisCoPy's mathematical core: a zoo of diagrams, categories and functors.
     discopy.compact
     discopy.frobenius
     discopy.hypergraph
+    discopy.ehypergraph
     discopy.cmap

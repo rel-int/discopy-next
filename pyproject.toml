@@ -179,9 +179,13 @@ addopts = "--doctest-modules --ignore=test/fixtures -p plugin"
 
 [tool.coverage.run]
 # The skip paths are unreachable unless --skip-extra is passed, and coverage
-# runs the full suite with every extra installed. torch.compile writes Python
-# under torchinductor_* directories, which is not ours to cover.
-omit = ["test/plugin.py", "*/torchinductor_*/*"]
+# runs the full suite with every extra installed. The egglog reference of
+# test/ehypergraph.py runs only where egglog is installed, which the lock does
+# not have. torch.compile writes Python under torchinductor_* directories,
+# which is not ours to cover.
+omit = [
+    "test/plugin.py", "test/fixtures/egglog_reference.py",
+    "*/torchinductor_*/*"]
 
 [tool.coverage.report]
 fail_under = 98

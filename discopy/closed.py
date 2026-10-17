@@ -366,8 +366,7 @@ class Diagram(markov.Diagram, biclosed.Diagram, ClosedCategory):
         graph = Hypergraph.from_diagram(self)
         if not graph.is_causal:
             raise ValueError(f"Expected a causal diagram, got {self}")
-        variables = [self.ob.variable_factory(
-            f"x{i}", typ)  # ty: ignore[invalid-argument-type]
+        variables = [self.ob.variable_factory(f"x{i}", typ)
                      for i, typ in enumerate(graph.spider_types)]
         outputs = [variables[i] for i in graph.cod_wires]
         result = outputs[0] if len(outputs) == 1 else Tuple(*outputs)

@@ -192,13 +192,22 @@ class Diagram(compact.Diagram, markov.Diagram, HypergraphCategory):
 
 class Box(compact.Box, markov.Box, Diagram):
     """
-    A frobenius box is a compact and Markov box in a frobenius diagram.
+    A frobenius box is a compact and Markov box in a frobenius diagram, its
+    rotations keeping its flags as its dagger does.
 
     Parameters:
         name (str) : The name of the box.
         dom (Ty) : The domain of the box, i.e. its input.
         cod (Ty) : The codomain of the box, i.e. its output.
+
+    Example
+    -------
+    >>> x = Ty('x')
+    >>> f = Box('f', x, x, is_affine=False)
+    >>> assert f.r[::-1][::-1] == f.r and f.r.l == f
     """
+    def rotate(self, left=False):
+        return self.flagged(super().rotate(left))
 
 
 class Cup(compact.Cup, Box):

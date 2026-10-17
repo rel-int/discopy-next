@@ -82,3 +82,25 @@ MISSING_BOXES_AND_OFFSETS = (
     "Decoding needs either boxes and offsets, or the two of them zipped.")
 NO_TYPE_PARAMETER = (
     "{} has no type parameter to subscript, declare one as in class C[name].")
+NOT_SHARING = (
+    "{} is not a diagram with sharing, i.e. a left-monogamous acyclic "
+    "hypergraph: a spider has no producer or several, or a box depends on "
+    "itself.")
+NOT_CARTESIAN = (
+    "{} is not cartesian, i.e. deterministic and affine: an effect is "
+    "context, which a rewrite keeps, as a section that chooses a producer "
+    "for each class would decorrelate a stochastic one.")
+NOT_A_BOUNDARY = "{} does not have the types of the spiders {} -> {}."
+NOT_A_REGION = (
+    "The boxes {} do not compute the spiders {} -> {}: they cannot all fire "
+    "in some order from the classes of the domain, or do not reach those of "
+    "the codomain.")
+NOT_A_PATTERN = (
+    "{} is not a pattern, i.e. a cartesian diagram with sharing whose "
+    "codomain is produced by its boxes: a variable alone matches anything.")
+NOT_A_RULE = (
+    "{} = {} is not a rule: its sides are cartesian diagrams of one type, the "
+    "left a pattern and the right reading only the inputs the left reads.")
+SHARING_HAS_NO_DAGGER = (
+    "A diagram with sharing has no dagger: the dagger of a copy is a merge, "
+    "a spider with two producers.")

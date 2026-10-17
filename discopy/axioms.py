@@ -570,7 +570,8 @@ class Declaration[**P, T](classmethod):
         :class:`Count` a number up to :data:`MAX_COUNT`, then a premise
         ``Hom[C1, A, B]`` from the strategy of the category with its boundary
         and ``params``, a premise ``Var[T, x]`` the value ``x`` and
-        :data:`typing.Self` a term.
+        :data:`typing.Self` a term, from the strategy of the category with
+        ``params`` too.
         """
         from hypothesis import strategies as st
 
@@ -594,7 +595,7 @@ class Declaration[**P, T](classmethod):
                         and getattr(kind, "factory", None) is Self:
                     strategy = kind.__origin__[self.category].strategy()
                 else:
-                    strategy = self.category.strategy()
+                    strategy = self.category.strategy(**params)
                 return draw(strategy, label=name)
 
             scope = self.scope(variable, given)
