@@ -71,19 +71,141 @@ Both copy and merge boxes are translated to spiders, thus when they appear
 in the same diagram they automatically satisfy the :mod:`frobenius` axioms.
 """
 
-from __future__ import annotations
 
-from typing import ClassVar
+from typing import TYPE_CHECKING, ClassVar, Self
 
-from discopy import symmetric, monoidal, cmap, hypergraph, messages
-from discopy.abc import MarkovCategory
-from discopy.axioms import FUEL
+from discopy import axioms, symmetric, monoidal, cmap, hypergraph, messages
+from discopy.abc import HypergraphCategory, MarkovCategory
+from discopy.axioms import FUEL, Testable, axiom
 from discopy.cat import factory
 from discopy.monoidal import Ty  # noqa: F401  pylint: disable=unused-import
-from discopy.utils import assert_isatomic, factory_name, from_tree
+from discopy.utils import (
+    NamedGeneric, assert_isatomic, factory_name, from_tree)
+
+if TYPE_CHECKING:
+    from hypothesis import strategies as st
 
 
 Layer = symmetric.Layer
+
+
+class Square[factory](Testable, NamedGeneric, tuple):
+    """
+    A commuting square ``f >> B @ h == A @ h >> g`` of the ``factory``, a
+    traced Markov category that is not a hypergraph one, along a strict map
+    ``h : M -> M ** n``, the ``n``-fold copy of an atomic memory ``M`` not
+    in ``A`` or ``B``, as the triple ``(f, h, g)``, so that the square
+    commutes by construction.
+
+    The template ``f : A @ M -> B @ M`` is drawn acyclic and ``g`` is its
+    :meth:`double`: its image under the functor sending ``M`` to ``M ** n``
+    and each box to itself, reading one copy of each memory wire it reads
+    and copying each memory wire it writes. The square of each box commutes
+    by the counit of the copy, and squares paste. No box or boundary type
+    contains the memory but as one of its wires, as the functor would
+    rewrite it, e.g. inside an exponential.
+
+    Example
+    -------
+    >>> from hypothesis import find
+    >>> f, h, g = find(Square[Diagram].strategy(), lambda s: s[0].boxes)
+    >>> A, B = f.dom[:-1], f.cod[:-1]
+    >>> assert Diagram.equation_factory(f >> B @ h, A @ h >> g)
+    >>> assert h.is_strict
+    """
+    def __new__(cls, square):
+        square = tuple(square)
+        if len(square) != 3:
+            raise ValueError("Expected a morphism, a strict map and another.")
+        return super().__new__(cls, square)
+
+    @classmethod
+    def double(cls, mem: monoidal.Ty, n: int, reads=None):
+        """
+        The functor sending the memory ``mem`` to ``mem ** n`` and each box
+        to itself, reading the copies ``reads[box]`` of the memory wires
+        of its domain, the first by default, and copying the memory wires
+        of its codomain.
+
+        Parameters:
+            mem : The memory, an atomic type.
+            n : The number of copies.
+            reads : The copy each box reads of each wire of its domain.
+        """
+        category, reads = cls.factory, reads or {}
+
+        def read(box):
+            indices = reads.get(box, [0] * len(box.dom))
+            return category.id().tensor(*(
+                category.discard(mem ** i) @ mem
+                @ category.discard(mem ** (n - 1 - i)) if x == mem
+                else category.id(x) for x, i in zip(box.dom, indices)))
+
+        def write(box):
+            return category.id().tensor(*(
+                category.copy(mem, n) if x == mem else category.id(x)
+                for x in box.cod))
+
+        return category.functor_factory(
+            ob_map=lambda x: mem ** n if x == mem else x,
+            ar_map=lambda box: read(box) >> box >> write(box), cod=category)
+
+    @classmethod
+    def canonical(cls) -> "Square":
+        """
+        The square of a box ``f : A @ M -> B @ M`` along ``copy(M)``.
+        """
+        category = cls.factory
+        A, B, M = map(category.ob, "ABM")
+        f = category.box_factory("f", A @ M, B @ M)
+        return cls((f, category.copy(M), cls.double(M, 2)(f)))
+
+    @classmethod
+    def strategy(cls, *, written=False, **params
+                 ) -> "st.SearchStrategy[Square]":
+        """
+        Generate a commuting square along the copy of a memory.
+
+        Parameters:
+            written : Whether the memory ``f`` outputs is written by a box,
+                ``f`` ending with a writer from some wires to the memory, so
+                that every loop of ``f.trace()`` has a producer.
+            params : Passed to :meth:`discopy.hypergraph.Hypergraph.strategy`
+                for the template.
+        """
+        from hypothesis import strategies as st
+
+        category = cls.factory
+        if issubclass(category, HypergraphCategory):
+            raise NotImplementedError(messages.NO_SQUARE)
+
+        @st.composite
+        def squares(draw):
+            mem, n = draw(category.ob.generators()), draw(st.integers(2, 3))
+            reads = {}
+            functor = cls.double(mem, n, reads)
+            types = category.ob.strategy().filter(lambda ty: all(
+                x == mem or functor(x) == x for x in ty))
+            boundaries = types.filter(lambda ty: all(x != mem for x in ty))
+
+            def diagrams(dom, cod):
+                return hypergraph.Hypergraph[category].strategy(
+                    types=types, dom=dom, cod=cod, acyclic=True,
+                    max_scalars=0, **params
+                ).map(lambda graph: graph.to_diagram())
+
+            dom, cod = draw(boundaries), draw(boundaries)
+            if written:
+                wires = draw(boundaries)
+                f = draw(diagrams(dom @ mem, cod @ wires))\
+                    >> cod @ draw(diagrams(wires, mem))
+            else:
+                f = draw(diagrams(dom @ mem, cod @ mem))
+            reads.update({box: draw(st.lists(
+                st.integers(0, n - 1), min_size=len(box.dom),
+                max_size=len(box.dom))) for box in f.boxes})
+            return cls((f, category.copy(mem, n), functor(f)))
+        return squares()
 
 
 @factory
@@ -150,7 +272,7 @@ class Diagram(symmetric.Diagram, MarkovCategory):
             else cls.merge_factory(typ, n_legs_in)
 
     @classmethod
-    def copy(cls, x: monoidal.Ty, n=2) -> Diagram:
+    def copy(cls, x: monoidal.Ty, n=2) -> "Diagram":
         """
         Make :code:`n` copies of a given type :code:`x`.
 
@@ -163,7 +285,7 @@ class Diagram(symmetric.Diagram, MarkovCategory):
             cls, 1, n, x)  # ty: ignore[invalid-argument-type]
 
     @classmethod
-    def merge(cls, x: monoidal.Ty, n=2) -> Diagram:
+    def merge(cls, x: monoidal.Ty, n=2) -> "Diagram":
         """
         Merge :code:`n` copies of a given type :code:`x`.
 
@@ -174,7 +296,7 @@ class Diagram(symmetric.Diagram, MarkovCategory):
         return cls.copy(x, n).dagger()
 
     @classmethod
-    def discard(cls, x: monoidal.Ty) -> Diagram:
+    def discard(cls, x: monoidal.Ty) -> "Diagram":
         """
         The discard of an atomic type :code:`x`.
 
@@ -185,6 +307,21 @@ class Diagram(symmetric.Diagram, MarkovCategory):
 
     map_agreement = monoidal.Diagram.map_agreement.failing(
         messages.MAP_HAS_NO_SPIDERS)
+
+    @axiom
+    def trace_uniformity(cls, square: Square[Self]) -> axioms.Equation:
+        """
+        The trace is uniform along a strict map: if ``f >> B @ h`` equals
+        ``A @ h >> g`` then ``f.trace()`` equals ``g.trace()``, the premise
+        holding by construction of the :class:`Square`, as composability
+        does by construction of the premises of associativity.
+        """
+        f, h, g = square
+        return cls.equation_factory(
+            f.trace(len(h.dom)), g.trace(len(h.cod)))
+
+    trace_uniformity_written = trace_uniformity.weaken(written=True)
+    trace_uniformity = trace_uniformity.failing(messages.NOT_UNIFORM)
 
 
 class Box(symmetric.Box, Diagram):
@@ -240,6 +377,8 @@ class Copy(Box):
         x : The type to copy.
         n : The number of copies.
     """
+    is_strict = True
+
     def __init__(self, x: monoidal.Ty, n: int = 2):
         assert_isatomic(x, monoidal.Ty)
         name = f"Copy({x}" + ("" if n == 2 else f", {n}") + ")"
@@ -254,7 +393,7 @@ class Copy(Box):
         """ The arguments of :meth:`__new__`, which a pickle needs. """
         return self.dom, len(self.cod)
 
-    def dagger(self) -> Merge:
+    def dagger(self) -> "Merge":
         """
         The merge of the same type, in the category of the copy.
 
@@ -281,7 +420,7 @@ class Copy(Box):
                 'x': self.dom.to_tree(), 'n': len(self.cod)}
 
     @classmethod
-    def from_tree(cls, tree: dict) -> Copy:
+    def from_tree(cls, tree: dict) -> "Copy":
         return cls(from_tree(tree['x']), tree['n'])
 
 
@@ -293,13 +432,15 @@ class Merge(Box):
         x : The type of wires to merge.
         n : The number of wires to merge.
     """
+    is_strict = True
+
     def __init__(self, x: monoidal.Ty, n: int = 2):
         assert_isatomic(x, monoidal.Ty)
         name = f"Merge({x}" + ("" if n == 2 else f", {n}") + ")"
         Box.__init__(self, name, dom=x ** n, cod=x,
                      draw_as_spider=True, color="black", drawing_name="")
 
-    def dagger(self) -> Copy:
+    def dagger(self) -> "Copy":
         """ The copy of the same type, in the category of the merge. """
         return self.copy_factory(self.cod, len(self.dom))
 
@@ -313,7 +454,7 @@ class Merge(Box):
                 'x': self.cod.to_tree(), 'n': len(self.dom)}
 
     @classmethod
-    def from_tree(cls, tree: dict) -> Merge:
+    def from_tree(cls, tree: dict) -> "Merge":
         return cls(from_tree(tree['x']), tree['n'])
 
 

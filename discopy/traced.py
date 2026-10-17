@@ -189,6 +189,25 @@ class Diagram(monoidal.Diagram, TracedCategory):
         return self if n == 0\
             else self.trace_factory(self, left).trace(n - 1, left)
 
+    @property
+    def is_strict(self) -> bool:
+        """
+        Whether the diagram is strict, i.e. made of strict boxes only.
+
+        A map ``h : U -> V`` is strict when the trace is uniform along it,
+        i.e. when ``f >> B @ h == A @ h >> g`` implies that ``f.trace()``
+        equals ``g.trace()`` for every ``f : A @ U -> B @ U`` and
+        ``g : A @ V -> B @ V``, after Hasegawa's *Recursion from cyclic
+        sharing* (1997) and Simpson and Plotkin's *Complete axioms for
+        categorical fixed-point operators* (2000), where the trace is a
+        least fixed point and strict maps preserve the least element.
+        Strict maps form a monoidal subcategory, so a diagram is strict
+        when each of its boxes is. A free box is not strict, nothing being
+        known about it, while a permutation, a copy, a discard and a merge
+        are, see :meth:`markov.Diagram.trace_uniformity`.
+        """
+        return all(box.is_strict for box in self.boxes)
+
     def to_drawing(self):
         return monoidal.Diagram.to_drawing(self, functor_factory=Functor)
 
@@ -205,6 +224,7 @@ class Box(monoidal.Box, Diagram):
         dom (monoidal.Ty) : The domain of the box, i.e. its input.
         cod (monoidal.Ty) : The codomain of the box, i.e. its output.
     """
+    is_strict = False
 
 
 class Trace(Box, monoidal.Bubble):
@@ -260,6 +280,11 @@ class Trace(Box, monoidal.Bubble):
     def dagger(self):
         return self.arg.dagger().trace(left=self.left)
 
+    @property
+    def is_strict(self) -> bool:
+        """ The fixed point of a strict map is strict. """
+        return self.arg.is_strict
+
     def to_drawing(self):
         return self.ar.to_drawing(self)
 
@@ -288,21 +313,22 @@ class Functor(monoidal.Functor):
 
     Example
     -------
-    Let's compute the golden ratio by applying a (hacky) traced functor.
+    Let's compute the golden ratio as the trace of a Python function, i.e.
+    the nested radical iterated from ``float()``, see
+    :meth:`python.Function.trace <discopy.python.Function.trace>`.
 
     >>> from math import sqrt
     >>> from discopy import python
     >>> x = Ty('$\\\\mathbb{R}$')
-    >>> f = Box('$\\\\lambda x . (x, 1 + 1 / x)$', x, x @ x)
+    >>> f = Box('$\\\\lambda x . (x, \\\\sqrt{1 + x})$', x, x @ x)
     >>> g = Box('$\\\\frac{1 + \\\\sqrt{5}}{2}$', Ty(), x)
     >>> F = Functor(
-    ...     ob_map={x: (float, )},
+    ...     ob_map={x: float},
     ...     ar_map={
-    ...         f: lambda x=1.: (x, 1 + 1. / x),
+    ...         f: lambda x: (x, sqrt(1 + x)),
     ...         g: lambda: (1 + sqrt(5)) / 2},
     ...     cod=python.Function)
-    >>> with python.Function.no_type_checking:
-    ...     assert F(f.trace())() == F(g)()
+    >>> assert F(f.trace())() == F(g)()
 
     >>> from discopy.monoidal import Equation
     >>> Equation(f.trace(), g).draw(doctest="docs/_static/traced/golden.svg")
