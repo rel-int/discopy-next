@@ -117,6 +117,8 @@ class Square[factory](Testable, NamedGeneric, tuple):
         square = tuple(square)
         if len(square) != 3:
             raise ValueError("Expected a morphism, a strict map and another.")
+        if any(box.is_dagger for box in square[0].boxes):
+            raise ValueError("A template with a dagger box has no double.")
         return super().__new__(cls, square)
 
     @classmethod
@@ -125,7 +127,8 @@ class Square[factory](Testable, NamedGeneric, tuple):
         The functor sending the memory ``mem`` to ``mem ** n`` and each box
         to itself, reading the copies ``reads[box]`` of the memory wires
         of its domain, the first by default, and copying the memory wires
-        of its codomain.
+        of its codomain. A dagger box goes to the dagger of its double,
+        which is not its double, so :class:`Square` refuses one.
 
         Parameters:
             mem : The memory, an atomic type.

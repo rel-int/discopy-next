@@ -143,6 +143,8 @@ def test_Square_keeps_flags():
             assert category.equation_factory(f >> B @ h, A @ h >> g)
             assert category.trace_uniformity_written(
                 square=Square[category]((f, h, g)))
+        with raises(ValueError):
+            Square[category]((sample.dagger(), h, g))
 
 
 def test_Square_refuses_hypergraph_categories():

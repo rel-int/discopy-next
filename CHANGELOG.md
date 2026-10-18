@@ -147,8 +147,8 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   writes. It fails in every free category, `NOT_UNIFORM`, on a loop that
   nothing writes, which a least fixed point makes its least element, and
   holds once every loop is written, `trace_uniformity_written`. A
-  hypergraph category has no such square, a merge not being natural along
-  a copy, `NO_SQUARE`.
+  hypergraph category has no such square by construction, a spider or a
+  cap with no input not being natural along a copy, `NO_SQUARE`.
 - `RigidCategory.rotate_contravariance`, that rotation reverses
   composition, and `adjunction`, that the left and right adjoints of a
   morphism are mutually inverse, which is the class of bug #716; and

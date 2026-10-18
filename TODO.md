@@ -32,13 +32,16 @@ categories.
       The API of `bisimulation`, [asked](https://github.com/rel-int/discopy-next/pull/103#issuecomment-6242891748)
       as options A, B and C
 - [ ] Ask the human what strictness should mean for a merge, which `is_strict` declares strict and #90 flags
-      deterministic but not affine, and for its unit `Merge(x, 0)` and the frobenius spiders, which say they are
-      not strict: [asked](https://github.com/rel-int/discopy-next/pull/103#issuecomment-6242894146) as options A
-      to D, the premise "not natural along a copy" being wrong, as the question says
+      deterministic but not affine; for its unit `Merge(x, 0)`, which says it is strict though #90 flags it
+      neither; and for the frobenius spiders, which say they are not strict:
+      [asked](https://github.com/rel-int/discopy-next/pull/103#issuecomment-6242894146) as options A to D, the
+      premise "not natural along a copy" being wrong, as the question says. Either of A and C stores
+      `is_strict` per box, as #90 stores its flags, rather than on the class
 - [ ] The flags of a trace: `markov.Trace` keeps the defaults of a box, so the trace of a sample says it is
-      deterministic and that of a condition that it is affine. The trace of a non-deterministic or non-affine map
-      is neither, which reading the flags off its argument gives; whether the trace of a total function is
-      total, i.e. affine, is a question for the human, a loop needing not terminate
+      deterministic and that of a condition that it is affine. The trace of a non-deterministic map is not
+      deterministic, nor that of a non-affine map affine, which reading the flags off its argument gives; whether
+      the trace of a total function is affine, a loop needing not terminate:
+      [asked](https://github.com/rel-int/discopy-next/pull/103#issuecomment-6246345485) as options A and B
 - [ ] E-hypergraphs over linear and hypergraph categories, as #90 had them at `a763134`: alternatives between
       regions and right-hand sides, `fits` and `Rewrites`. Found against them, to fix when they come back:
       `rebuild` merges the outputs of two congruent boxes that coexist, e.g. `a @ a >> m`, so no section is
