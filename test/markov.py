@@ -128,6 +128,23 @@ def test_Square_commutes():
     check()
 
 
+def test_Square_keeps_flags():
+    from discopy import closed
+
+    for category in (Diagram, closed.Diagram):
+        A, B, M, W = map(category.ob, "ABMW")
+        box = category.box_factory
+        sample = box('sample', A @ M, B @ W, is_deterministic=False)
+        condition = box('condition', W, W, is_affine=False)
+        f = sample >> B @ condition >> B @ box('write', W, M)
+        for n in (2, 3):
+            h, g = category.copy(M, n), Square[category].double(M, n)(f)
+            assert set(g.boxes) >= {sample, condition}
+            assert category.equation_factory(f >> B @ h, A @ h >> g)
+            assert category.trace_uniformity_written(
+                square=Square[category]((f, h, g)))
+
+
 def test_Square_refuses_hypergraph_categories():
     from discopy import frobenius
 

@@ -4,7 +4,9 @@
 
 @toumix on [#90](https://github.com/rel-int/discopy-next/pull/90), which this pull request targets, while #90
 turns to cartesian diagrams, whose e-hypergraphs are e-graphs. What moved here from #90 is done but for the
-questions; what is left to design waits for #90's e-hypergraphs over copy-discard diagrams to settle.
+questions. #90's e-hypergraphs over copy-discard diagrams are merged in at `71fcecc`: they are acyclic, refusing a
+feedback loop (`NOT_SHARING`), so what is left here is what they need to take traces, and linear or hypergraph
+categories.
 
 - [x] Mark the maps the trace is uniform along. @toumix, verbatim:
       > can we add an extra boolean attribute "strict" which characterises for which maps the uniform axiom holds?
@@ -20,14 +22,23 @@ questions; what is left to design waits for #90's e-hypergraphs over copy-discar
       loop: ported from next `main`'s #84, identical; uniformity along copy holds on `python.Function`,
       checked over `markov.Square` mapped into monotone Boolean functions; it fails along a discard, whose
       loop need not terminate
-- [ ] Settle with the human whether congruence on a feedback loop should be coinductive
-      (`INDUCTIVE_CONGRUENCE`). @toumix, verbatim:
+- [ ] Settle with the human whether congruence on a feedback loop should be coinductive, for e-hypergraphs
+      over traced diagrams: #90's refuse a cycle, and the least fixpoint it declared broken on loops went with
+      its linear e-hypergraphs. @toumix, verbatim:
       > Using coinduction would be awesome! I expect that the rebuild should work fine as an iterator so you
       > could unroll a feedback loop as many times as needed. Not sure if it makes sense to use coinduction to
       > "prove" anything about Python though?
 
-      The API of `bisimulation` to propose before building it
-- [ ] Ask the human what strictness should mean for a merge, which is strict but not natural along a copy
+      The API of `bisimulation`, [asked](https://github.com/rel-int/discopy-next/pull/103#issuecomment-6242891748)
+      as options A, B and C
+- [ ] Ask the human what strictness should mean for a merge, which `is_strict` declares strict and #90 flags
+      deterministic but not affine, and for its unit `Merge(x, 0)` and the frobenius spiders, which say they are
+      not strict: [asked](https://github.com/rel-int/discopy-next/pull/103#issuecomment-6242894146) as options A
+      to D, the premise "not natural along a copy" being wrong, as the question says
+- [ ] The flags of a trace: `markov.Trace` keeps the defaults of a box, so the trace of a sample says it is
+      deterministic and that of a condition that it is affine. The trace of a non-deterministic or non-affine map
+      is neither, which reading the flags off its argument gives; whether the trace of a total function is
+      total, i.e. affine, is a question for the human, a loop needing not terminate
 - [ ] E-hypergraphs over linear and hypergraph categories, as #90 had them at `a763134`: alternatives between
       regions and right-hand sides, `fits` and `Rewrites`. Found against them, to fix when they come back:
       `rebuild` merges the outputs of two congruent boxes that coexist, e.g. `a @ a >> m`, so no section is
