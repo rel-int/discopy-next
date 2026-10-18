@@ -260,7 +260,12 @@ class Swap(Permutation, tensor.Swap[complex], Box):
 
 
 class Spider(tensor.Spider[complex], Box):
-    """ Abstract spider box. """
+    """
+    Abstract spider box, which only the :class:`Z` spiders, those of the
+    computational basis that a tensor copies, have the flags of.
+
+    >>> assert Z(1, 2).is_cartesian and not X(1, 2).is_deterministic
+    """
 
     def __init__(self, n_legs_in, n_legs_out, phase=0):
         super().__init__(
@@ -269,6 +274,8 @@ class Spider(tensor.Spider[complex], Box):
         factory_str = type(self).__name__
         phase_str = f", {self.phase}" if self.phase else ""
         self.name = f"{factory_str}({n_legs_in}, {n_legs_out}{phase_str})"
+        if not isinstance(self, Z):
+            self.deterministic = self.affine = False
 
     def __setstate__(self, state):
         if "_name" in state and state["_name"] == type(self).__name__:
@@ -279,6 +286,8 @@ class Spider(tensor.Spider[complex], Box):
                 f"({state['_dom'].n}, {state['_cod'].n}{phase_str})"
             )
         super().__setstate__(state)
+        if not isinstance(self, Z):
+            self.deterministic = self.affine = False
 
     def __repr__(self):
         return str(self).replace(type(self).__name__, factory_name(type(self)))

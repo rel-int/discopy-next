@@ -664,7 +664,7 @@ class Box(Arrow):
             return getattr(data, "free_symbols", set())
         return recursive_free_symbols(self.data)
 
-    def subs(self, *args) -> Box:
+    def subs(self, *args) -> Self:
         if not any(var in self.free_symbols for var in (
                 {var for var, _ in args[0]} if len(args) == 1 else {args[0]})):
             return self

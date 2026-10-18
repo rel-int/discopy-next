@@ -227,14 +227,19 @@ class NamedGeneric:
                     so that unpickling needs no ``__setstate__``,
                     which the subscripted class does not inherit.
 
+                    A member of a subclass defined by name, e.g. a ZX
+                    spider, is pickled by its own class.
+
                     >>> import pickle
                     >>> from discopy.tensor import Tensor, Dim
                     >>> t = Tensor[int]([1, 0, 0, 1], Dim(2), Dim(2))
                     >>> u = pickle.loads(pickle.dumps(t))
                     >>> assert type(u) is Tensor[int] and u == t
+                    >>> from discopy.quantum.zx import Z
+                    >>> assert pickle.loads(pickle.dumps(Z(1, 2))) == Z(1, 2)
                     """
                     func, args, *rest = super().__reduce__()
-                    if not args or args[0] is not type(self):
+                    if type(self) is not C or not args or args[0] is not C:
                         return (func, args, *rest)
                     return (
                         rebuild_named_generic,

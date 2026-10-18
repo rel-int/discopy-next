@@ -571,7 +571,8 @@ class Declaration[**P, T](classmethod):
         ``Hom[C1, A, B]`` from the strategy of the category with its boundary
         and ``params``, a premise ``Var[T, x]`` the value ``x``, a testable
         shape of ``Self``, e.g. ``Related[Self]``, from its own strategy over
-        the category with ``params``, and :data:`typing.Self` a term.
+        the category with ``params``, and :data:`typing.Self` a term, from
+        the strategy of the category with ``params`` too.
         """
         from hypothesis import strategies as st
 
@@ -596,7 +597,7 @@ class Declaration[**P, T](classmethod):
                     strategy = kind.__origin__[self.category].strategy(
                         **params)
                 else:
-                    strategy = self.category.strategy()
+                    strategy = self.category.strategy(**params)
                 return draw(strategy, label=name)
 
             scope = self.scope(variable, given)

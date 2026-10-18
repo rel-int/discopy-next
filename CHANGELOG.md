@@ -9,40 +9,129 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Added
 
-- `discopy.ehypergraph`, e-hypergraphs: a `Hypergraph` with an equivalence
-  relation on its spiders and alternatives between its boxes. The structure
-  of the category is the wiring of the hypergraph already, so these are all
-  it adds. An equation enters through `rewrite`, which states that a region
-  of boxes equals a right-hand side with the same boundary: it adds the
-  right-hand side, relates its domain and codomain to the boundary of the
-  region and records the two as alternatives, so that over a symmetric
-  category, where a wire has one consumer, an equation replaces a subdiagram
-  rather than relating two wires. The relation holds in every section, so
-  `rewrite` refuses a right-hand side that does not fit the boundary, see `fits`,
-  i.e. that identifies two of its positions the region keeps apart, e.g.
-  by passing a wire through where the region has none, which would relate
-  that input and output in the sections that keep the region too: a
-  rewrite only adds sections. `rebuild` closes the relation under
-  congruence, the later of two congruent boxes an alternative to the
-  first, everywhere but in a Markov category, whose boxes need not be
-  deterministic. E-hypergraphs over a category form a monoidal category of
-  their own, the relation carried along the pushout, and denote the set of
-  their `sections`, one for each choice of a side of every alternative, with
-  the boxes in causal order; `extract` is one of least cost that decodes to
-  a diagram, by brute force for now so that it states what a faster one
-  must return. Their laws are checked by the property matrix over
-  symmetric, compact, Markov and hypergraph categories: that the hypergraph
-  is a strict monoidal functor, that merging states an equivalence
-  relation, that `rebuild` is a closure operator and a congruence, and that
-  extraction is sound, valid, optimal, the identity with no alternative,
-  and the cheaper of the two sides of a rewrite, over the pairs of
-  e-hypergraphs on one hypergraph that `Rewrites` draws, so that one fits
-  the boundary of the other by construction. Congruence on a feedback
-  loop is declared broken, being a least fixpoint. `hypergraph.relabeling`
-  is how a hypergraph numbers its spiders, factored out of its constructor
-  so that the relation follows them, and decoding a hypergraph that needs
-  spiders over a category with none raises `AxiomError`, where it raised
-  `AttributeError` for want of a `spider_factory`.
+- `discopy.ehypergraph`, e-graphs of diagrams with sharing: an
+  `EHypergraph` over a copy-discard category is a left-monogamous acyclic
+  `Hypergraph`, whose boxes are the e-nodes, with an equivalence relation on
+  its spiders, whose classes are the e-classes. Over cartesian diagrams,
+  which are terms with sharing, it is an e-graph: `from_diagram` hash-conses
+  a diagram as egg does a term, `rebuild` is the congruence closure of the
+  relation, `add` hash-conses a deterministic box, and `rewrite(region,
+  dom, cod, rhs)` glues the right-hand side of an equation onto the inputs
+  of a region, hash-consing its boxes, then relates the outputs of the
+  region to its own, refusing a region whose boxes cannot fire in some
+  order from the classes of its domain and reach those of its codomain.
+  `matches(lhs)` is egg's e-matching modulo the classes: a pattern,
+  `is_pattern`, is a cartesian diagram with sharing whose boxes produce its
+  codomain, bound top-down by `bind`, from the codomain up, each box to the
+  equal boxes, flags included, producing the class its output is bound to,
+  so that each of its spiders is bound to one class, and a match is
+  `(region, dom, cod)`, `None` for an input the pattern does not read, so
+  that `rewrite(*match, rhs)` applies a rule. `step` is a round of egg's
+  schedule, every match of every rule searched as the round begins, all
+  rewritten, then rebuilt, and `saturate(*rules)` iterates it, yielding
+  each round that adds a box or relates two classes and stopping at the
+  first that does neither; a rule is a pair of cartesian diagrams of one
+  type, the left a pattern and the right reading only the inputs the left
+  reads, which `saturate` checks as it is called, `AxiomError` otherwise.
+  Egg's own example, `(a * 2) / 2` under its four rules, saturates in three
+  rounds and extracts `a`, and a differential test against egglog-python,
+  skipped without it, compares the classes of every subterm, whether each
+  round changed anything and the cost extracted, round by round, on egg's
+  example, on a term that needs congruence after a rewrite and on random
+  terms and rule sets, through the reference in
+  `test/fixtures/egglog_reference.py`, where multiplication costs two:
+  no disagreement on a thousand random terms nor on five hundred full
+  trees. The same with a `sample`, not deterministic, and a `condition`,
+  not affine: under `x - x = 0`, two samples of `p` stay apart while one
+  sample used twice cancels, then is discarded with `p` unless a condition
+  reads it. A test evaluates every section of two rounds of random
+  programs, their samples shared or not and up to two conditions, under
+  eight rules that hold in the integers modulo three, there, samples
+  random stochastic matrices and conditions random weights of zero or one,
+  and contrasts egglog: its naive encoding, a sample a function and a
+  program its value, cancels two samples and drops a condition registered
+  beside the value, `egglog_trace(extra=...)`, both of which the model
+  tells apart from the program, while the faithful one, an id for each
+  sample and the conditions in the term, extracts at the cost we do except
+  where a condition repeats on related inputs: a hard constraint is
+  idempotent, kept and paid once here where egglog's term pays for each
+  occurrence.
+  `pattern` drops the wires that go straight from the domain to the
+  codomain of a hypergraph and `rewire` reads one input of a box from
+  another spider before it.
+  A section chooses a producer for each class it needs, those of the
+  codomain and those read by the boxes it keeps, i.e. the boxes it chooses
+  and every box that is not affine, and an acyclic choice decodes to a
+  diagram; `sections` enumerates them, `extract` is one of least tree cost,
+  egg's extraction, by Bellman-Ford relaxation, the cost of a box and of a
+  domain position being parameters, as egg's cost functions, one by default
+  as its `AstSize`. Equal boxes on related inputs have related outputs only
+  when they are deterministic, two samples being independent, an equation
+  is between cartesian diagrams, an effect being context, and the
+  e-hypergraphs over a category form a monoidal category, the relation
+  carried along the pushout, over a category whose boxes carry the flags
+  of `markov.Box`, `AxiomError` otherwise. Their laws are checked by the
+  property matrix over `markov.Diagram`, drawn with some boxes that are
+  not deterministic or not affine but where a law is weakened to cartesian
+  ones: the hypergraph is a strict monoidal functor, merging states an
+  equivalence, `rebuild` is a closure operator relating the outputs of two
+  copies of a diagram on related inputs exactly when they depend on
+  deterministic boxes only, and the closure of the identity relates
+  nothing but the outputs at one position of equal boxes, what is
+  extracted is a section, valid, of least cost and idempotent, every
+  section keeps every effect, once per class of equal deterministic ones
+  on related inputs, rewriting a rebuilt e-hypergraph into its own
+  hypergraph changes nothing and rewriting never raises the cost of what is
+  extracted; matching is complete modulo the classes, binding a pattern to
+  two copies of a diagram on related inputs in turn, and sound, flags
+  included, rewriting a match into its own pattern changing nothing, the
+  pattern of a diagram made cartesian, beside the diagram, and that
+  pattern rewired, which a matcher missing a constraint finds where the
+  original is; and saturation stops on a rebuilt e-hypergraph that no
+  match changes, under rules equating the boxes of a type and each box
+  with a fresh one. A semantic test evaluates every
+  section in random tensors, sampling and conditioning included, as the
+  diagram it comes from, two boxes interpreted alike only when one was
+  rewritten into the other. `hypergraph.relabeling` is how a
+  hypergraph numbers its spiders, factored out of its constructor so that
+  the relation follows them, and decoding a hypergraph that needs spiders
+  over a category with none raises `AxiomError`, where it raised
+  `AttributeError` for want of a `spider_factory`; over a Markov category,
+  `make_bijective` merges the inputs of a spider with neither one input nor
+  one output before copying its outputs, as `to_diagram` already did, where
+  it raised a bare `ValueError`. A premise of a law annotated `Self`, or
+  with a testable shape of it such as `Related[Self]`, is drawn with the
+  parameters `Axiom.weaken` declares, as a morphism already was.
+- `markov.Box` takes the keyword arguments `is_deterministic` and
+  `is_affine`, both `True` by default: a box is deterministic when copying
+  commutes with it and affine when discarding does, e.g. a sample is not
+  deterministic and a condition not affine, and a deterministic box that is
+  not affine is a hard constraint, a soft score not being deterministic.
+  The flags are attributes of each box rather than of its class, as an
+  identity or a swap is a total function whatever its class, take part in
+  equality and hashing, `tensor.Box`'s included, and are written by `repr`
+  and `to_tree` when they are `False`, so that existing representations are
+  unchanged, `pregroup.Word`'s included. A box stores the flags it is
+  declared with as `deterministic` and `affine`, which hold of it but not of
+  its dagger nor of its rotations, as the converse or the transpose of a
+  total function need not be one. `dagger`, `subs`, `lambdify`, `from_tree`
+  and the rotations of a `frobenius.Box` or a `pregroup.Box` keep them on
+  top of what the class they extend builds, so that the dagger of a dagger
+  is the box again, the dagger of a rotated box keeps its winding and that
+  of a word its boundary. The flags of a spider are those of its legs and
+  phase, by spider fusion: it is deterministic when it has a leg in and no
+  phase, affine when it has exactly one leg in and no phase, so that a cup
+  is deterministic but not affine and a cap neither, and of the ZX spiders
+  only `Z`, that of the
+  basis a tensor copies, has them. `markov.Diagram.is_deterministic`,
+  `is_affine` and `is_cartesian`, both, hold when they hold of every box:
+  a copy, a discard, printed `Discard(x)` rather than `Copy(x, 0)`, a
+  swap and a permutation are cartesian, a merge is deterministic when it
+  has an input and affine when it has exactly one, as a spider, and a
+  formal sum is deterministic when it has at most one term, which is, and
+  affine when it has exactly one, which is. `feedback.Box` initialises
+  itself as a plain box, as it did through `markov.Box`, whose initialiser
+  now cooperates, and has the flags of a total function.
 
 - `traced.Diagram.is_strict`, whether the trace is uniform along a map:
   `h : U -> V` is strict when `f >> B @ h == A @ h >> g` implies
@@ -1140,8 +1229,9 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 - A member of a subscripted `NamedGeneric`, e.g. `Tensor[int]` or
   `Hypergraph[markov.Diagram]`, unpickled as a member of its origin, since
   the subscripted class never inherited `NamedGeneric.__setstate__`: it is
-  now rebuilt by `NamedGeneric.__reduce__`. `Copy` and `Discard` unpickle,
-  passing their type to `__new__`.
+  now rebuilt by `NamedGeneric.__reduce__`, while a member of a subclass
+  defined by name, e.g. a ZX spider or a circuit box, pickles by its own
+  class. `Copy` and `Discard` unpickle, passing their type to `__new__`.
 - `from_tree` reads back `Trace`, `Twist`, `Spider`, `Copy`, `Merge`,
   `Discard`, `Feedback` and an inverse `Braid`, and the repr of a `Trace`
   evaluates back to it.

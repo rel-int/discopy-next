@@ -1327,6 +1327,14 @@ class Hypergraph[category](
 
         >>> unit = H.spiders(0, 1, Ty('x', 'y')).make_bijective()
         >>> assert unit.boxes == (Spider(0, 1, Ty('y')), Spider(0, 1, Ty('x')))
+
+        Over a Markov category the spiders are copies and merges, so a spider
+        with neither one input nor one output merges its inputs first.
+
+        >>> from discopy import markov
+        >>> x = markov.Ty('x')
+        >>> graph = markov.Hypergraph.spiders(2, 2, x).make_bijective()
+        >>> assert graph.boxes == (markov.Merge(x), markov.Copy(x))
         """
         boxes = list(self.boxes)
         f_wires = list(self.flat_wires)
@@ -1339,6 +1347,9 @@ class Hypergraph[category](
             if not issubclass(self.category, MarkovCategory):
                 raise AxiomError(messages.NOT_FROBENIUS.format(
                     factory_name(self.category)))
+            if 1 not in (len(input_wires), len(output_wires))\
+                    and not issubclass(self.category, HypergraphCategory):
+                return self.make_left_monogamous().make_bijective()
             if input_wires:
                 node = self.ports[max(input_wires)]
                 depth = 0 if node.kind == "input" else node.depth + 1

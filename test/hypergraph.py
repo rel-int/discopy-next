@@ -380,3 +380,11 @@ def test_planar_comparison():
     x, scalar = monoidal.Ty('x'), monoidal.Box('s', monoidal.Ty(), monoidal.Ty())
     assert (scalar @ x).to_hypergraph() == (x @ scalar).to_hypergraph()
     assert not monoidal.Diagram.equation_factory(scalar @ x, x @ scalar)
+
+
+def test_Hypergraph_make_bijective_markov():
+    from discopy.markov import Ty, Copy, Merge
+    x = Ty('x')
+    graph = (Merge(x) >> Copy(x)).to_hypergraph()
+    assert graph.make_bijective().boxes == (Merge(x), Copy(x))
+    assert graph.to_map().to_diagram().to_hypergraph() == graph

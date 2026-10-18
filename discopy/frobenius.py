@@ -197,33 +197,60 @@ class Diagram(compact.Diagram, markov.Diagram, HypergraphCategory):
 
 class Box(compact.Box, markov.Box, Diagram):
     """
-    A frobenius box is a compact and Markov box in a frobenius diagram.
+    A frobenius box is a compact and Markov box in a frobenius diagram, its
+    rotations keeping its flags as its dagger does, which hold of neither,
+    as the transpose of a total function need not be one.
 
     Parameters:
         name (str) : The name of the box.
         dom (Ty) : The domain of the box, i.e. its input.
         cod (Ty) : The codomain of the box, i.e. its output.
+
+    Example
+    -------
+    >>> x = Ty('x')
+    >>> f = Box('f', x, x, is_affine=False)
+    >>> assert f.r[::-1][::-1] == f.r and f.r.l == f
+    >>> assert Box('g', x, x).is_cartesian and not Box('g', x, x).r.is_affine
     """
+    @property
+    def is_deterministic(self) -> bool:
+        return super().is_deterministic and not self.z
+
+    @property
+    def is_affine(self) -> bool:
+        return super().is_affine and not self.z
+
+    def rotate(self, left=False):
+        return self.flagged(super().rotate(left))
 
 
 class Cup(compact.Cup, Box):
     """
-    A frobenius cup is a compact cup in a frobenius diagram.
+    A frobenius cup is a compact cup in a frobenius diagram, i.e. the spider
+    with two legs in, deterministic but not affine.
 
     Parameters:
         left (Ty) : The atomic type.
         right (Ty) : Its adjoint.
     """
+    def __init__(self, left, right):
+        super().__init__(left, right)
+        self.affine = False
 
 
 class Cap(compact.Cap, Box):
     """
-    A frobenius cap is a compact cap in a frobenius diagram.
+    A frobenius cap is a compact cap in a frobenius diagram, i.e. the spider
+    with two legs out, neither deterministic nor affine.
 
     Parameters:
         left (Ty) : The atomic type.
         right (Ty) : Its adjoint.
     """
+    def __init__(self, left, right):
+        super().__init__(left, right)
+        self.deterministic = self.affine = False
 
 
 class Permutation(compact.Permutation, markov.Permutation, Box):
@@ -249,6 +276,10 @@ class Spider(Box):
     The spider with :code:`n_legs_in` and :code:`n_legs_out`
     on a given atomic type, with some optional phase as ``data``.
 
+    Its flags are those of its legs and phase, by spider fusion: it is
+    deterministic when it has a leg in and no phase, affine when it has
+    exactly one leg in and no phase.
+
     Parameters:
         n_legs_in : The number of legs in.
         n_legs_out : The number of legs out.
@@ -260,6 +291,8 @@ class Spider(Box):
     >>> x = Ty('x')
     >>> spider = Spider(1, 2, x)
     >>> assert spider.dom == x and spider.cod == x @ x
+    >>> assert spider.is_cartesian and not spider.r.is_affine
+    >>> assert not Spider(1, 2, x, 0.5).is_deterministic
     """
     draw_as_spider = True
     color = "black"
@@ -272,7 +305,9 @@ class Spider(Box):
         name = type(self).__name__\
             + f"({n_legs_in}, {n_legs_out}, {typ}{str_data})"
         dom, cod = typ ** n_legs_in, typ ** n_legs_out
-        Box.__init__(self, name, dom, cod, data=data, **params)
+        Box.__init__(self, name, dom, cod, data=data,
+                     is_deterministic=n_legs_in > 0 and not data,
+                     is_affine=n_legs_in == 1 and not data, **params)
         self.drawing_name = "" if not data else str(data)
 
     def __setstate__(self, state):
@@ -283,6 +318,9 @@ class Spider(Box):
             state["_name"] = type(self).__name__\
                 + f"({dom.n}, {cod.n}, {state['_typ']}{str_data})"
         super().__setstate__(state)
+        if "affine" not in state:
+            self.deterministic = len(self.dom) > 0 and not self.phase
+            self.affine = len(self.dom) == 1 and not self.phase
 
     @property
     def phase(self):
