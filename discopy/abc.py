@@ -79,8 +79,9 @@ from inspect import signature
 from typing import ClassVar, Self
 
 from discopy import messages
-from discopy.axioms import (
-    ComposablePair, ComposableTriple, Equation, Loop, Testable, axiom)
+from discopy.axioms import (  # noqa: F401  pylint: disable=unused-import
+    ComposablePair, ComposableTriple, Equation, Loop, Serialisable, Testable,
+    axiom)
 from discopy.utils import (  # noqa: F401  pylint: disable=unused-import
     AxiomError, NamedGeneric, classproperty, factory_name)
 

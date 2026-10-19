@@ -696,10 +696,17 @@ class BinaryBoxConstructor:
     """
     Box constructor with attributes ``left`` and ``right`` as input.
 
+    The class declares what serialises it, which
+    :class:`discopy.axioms.Serialisable` reads off whichever box it is mixed
+    into, rather than implementing the interface itself: a binary box
+    constructor is never a term on its own.
+
     Parameters:
         left : Some attribute on the left.
         right : Some attribute on the right.
     """
+    serialised_attrs = ('left', 'right')
+
     def __init__(self, left, right):
         self.left, self.right = left, right
 
@@ -711,20 +718,6 @@ class BinaryBoxConstructor:
                               f"({state['left']}, {state['right']})"
             )
         super().__setstate__(state)
-
-    def __repr__(self):
-        return factory_name(type(self))\
-            + f"({repr(self.left)}, {repr(self.right)})"
-
-    def to_tree(self) -> dict:
-        """ Serialise a binary box constructor. """
-        left, right = self.left.to_tree(), self.right.to_tree()
-        return dict(factory=factory_name(type(self)), left=left, right=right)
-
-    @classmethod
-    def from_tree(cls, tree: dict) -> BinaryBoxConstructor:
-        """ Decode a serialised binary box constructor. """
-        return cls(*map(from_tree, (tree['left'], tree['right'])))
 
 
 @lru_cache(maxsize=1024)

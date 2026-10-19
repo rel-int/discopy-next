@@ -113,6 +113,34 @@ def test_named_generic_pickle_subscript():
         assert vars(loaded) == vars(term)
 
 
+def test_parameterised_pickle_and_deepcopy():
+    from copy import deepcopy
+    from discopy import frobenius, interaction, matrix, symmetric
+    x = frobenius.Ty('x')
+    f = frobenius.Box('f', x, x @ x)
+    for original in (matrix.Matrix[int]([0, 1, 1, 0], 2, 2),
+                     interaction.Ty[symmetric.Ty](symmetric.Ty('a')),
+                     (f >> f @ x).to_hypergraph()):
+        for copy in (pickle.loads(pickle.dumps(original)), deepcopy(original)):
+            assert type(copy) is type(original) and copy == original
+            assert '__class_getitem__values__' not in vars(copy)
+
+
+
+def test_Serialisable_defaults():
+    """ A key equal to its class default is dropped from the tree, and one
+    that is not, an explicit ``False`` or a winding, is read back as such. """
+    from discopy import rigid
+    f = cat.Box('f', Ob('x'), Ob('y'))
+    tree = dict(f.to_tree(), is_dagger=False)
+    assert from_tree(tree) == f and not from_tree(tree).is_dagger
+    x = rigid.Ty('x')
+    g = rigid.Box('g', x, x)
+    for box in (g.r, g.l, g.r.r):
+        assert loads(dumps(box)) == box and loads(dumps(box)).z == box.z
+    assert 'z' not in g.to_tree()
+
+
 def test_deprecated_ob():
     from discopy import (
         biclosed, braided, compact, feedback, frobenius, pivotal, rigid)
