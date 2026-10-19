@@ -545,7 +545,10 @@ class Serialisable[T](Testable[T]):
       machinery.
 
     A subclass with a different constructor declares its keys once
-    instead of reimplementing each method. Each mechanism has the law that
+    instead of reimplementing each method. The ``raw_attrs`` among them hold
+    data rather than terms, e.g. the ``data`` of a box, and pass through
+    the tree as they are, so that a dictionary with a ``'factory'`` key is
+    not read back as an object. Each mechanism has the law that
     it is a roundtrip, stated on :class:`Testable`: :meth:`transparency`,
     :meth:`pickling`, :meth:`copying` and :meth:`serialisation`.
 
@@ -558,18 +561,36 @@ class Serialisable[T](Testable[T]):
     >>> assert Box.from_tree(f.to_tree()) == f
     """
     serialised_attrs: tuple[str, ...] = ()
+    raw_attrs: tuple[str, ...] = ()
 
     def is_default(self, key: str) -> bool:
         """
         Whether the value of an attribute equals its class default,
         in which case :meth:`to_tree` and :meth:`__repr__` drop it.
 
+        A falsy default other than ``None``, e.g. ``is_dagger = False`` or
+        ``z = 0``, is matched by any falsy value, as the trees and reprs
+        written before tested those attributes for truth: a gate whose
+        ``is_dagger`` is ``None`` writes none, rather than a key an older
+        reader takes for a dagger. A default of ``None`` is matched by
+        ``None`` alone, so that a box with ``data=0`` keeps it.
+
         Parameters:
             key : The name of the attribute.
+
+        Example
+        -------
+        >>> from discopy.cat import Box
+        >>> f = Box('f', 'x', 'y', data=0)
+        >>> assert f.is_default('is_dagger') and not f.is_default('data')
         """
         if not hasattr(type(self), key):
             return False
         value, default = getattr(self, key), getattr(type(self), key)
+        if default is None:
+            return value is None
+        if not default:
+            return not value
         return value is default or (
             type(value) is type(default) and value == default)
 
@@ -641,7 +662,9 @@ class Serialisable[T](Testable[T]):
             if self.is_default(key):
                 continue
             value = getattr(self, key)
-            if hasattr(value, 'to_tree'):
+            if key in self.raw_attrs:
+                pass
+            elif hasattr(value, 'to_tree'):
                 value = value.to_tree()
             elif isinstance(value, (list, tuple)) and value and all(
                     hasattr(v, 'to_tree') for v in value):
@@ -673,7 +696,9 @@ class Serialisable[T](Testable[T]):
             if key not in tree:
                 continue
             value = tree[key]
-            if isinstance(value, dict) and 'factory' in value:
+            if key in cls.raw_attrs:
+                pass
+            elif isinstance(value, dict) and 'factory' in value:
                 value = from_tree(value)
             elif isinstance(value, list) and value and all(
                     isinstance(v, dict) and 'factory' in v for v in value):

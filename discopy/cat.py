@@ -507,6 +507,7 @@ class Box(Arrow):
     """
     data, is_dagger = None, False
     serialised_attrs = ('name', 'dom', 'cod', 'is_dagger', 'data')
+    raw_attrs = ('data', )
 
     @classmethod
     def strategy(
@@ -618,6 +619,11 @@ class Sum(Box):
     The sum is non-commutative, i.e. :code:`Sum([f, g]) != Sum([g, f])`.
     """
     serialised_attrs = ('terms', 'dom', 'cod')
+
+    def __setstate__(self, state):
+        if isinstance(state.get('terms'), list):  # Backward compatibility
+            state['terms'] = tuple(state['terms'])
+        super().__setstate__(state)
 
     def __init__(
             self, terms: tuple[Arrow, ...], dom: Ob = None, cod: Ob = None):
