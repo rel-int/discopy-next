@@ -1,18 +1,19 @@
 """Verify the trainer's tensor semantics against optyx.
 
-Two checks tie ``contraction.py`` to the ``optyx.interaction`` protocol:
+Two checks tie ``contraction.py`` to the ``discopy.optyx.interaction``
+protocol:
 
 * The sudoku ``Structure`` is the combinatorial data of a genuine
   ``interaction.CMap``: same ports, pairings, memories and predictions.
 
 * On a two-box map with memory and prediction, the trainer's born-family
   scores match the composition of ``CMap.step`` -- the read, parallel
-  and write permutation sandwich of ``optyx.interaction`` -- threaded
-  over the memory for the same number of ticks, with plus states on the
-  paired ports, zero on the internal memory and uniform effects at the
-  end, evaluated through ``double().to_tensor()`` and
-  ``optyx.core.contract.contract_tensor``: the squared single-copy
-  amplitude of the trainer equals the doubled channel probability.
+  and write permutation sandwich of ``discopy.optyx.interaction`` --
+  threaded over the memory for the same number of ticks, with plus
+  states on the paired ports, zero on the internal memory and uniform
+  effects at the end, evaluated through ``double().to_tensor().eval()``:
+  the squared single-copy amplitude of the trainer equals the doubled
+  channel probability.
   (``CMap.unroll`` itself differs only in its final boundary, which
   discards the memory instead of postselecting it uniformly.)
 
@@ -20,7 +21,8 @@ A third check grounds the stochastic family: a classical channel on bit
 wires doubles to the elementwise square of its kraus array, so the
 non-negative digit tensors of the trainer are optyx classical channels
 with kraus the elementwise square root. (Checked on a square kraus:
-unequal arities hit the ``Channel.double`` bug reported as issue #51.)
+unequal arities hit the ``Channel.double`` bug reported as
+rel-int/optyx#51, now #244.)
 """
 
 import numpy as np
@@ -32,11 +34,11 @@ import contraction as co
 def array_box(name, dom, cod, array):
     """A core box whose ``conjugate`` conjugates the array in place.
 
-    Works around ``optyx.core.diagram.Box.conjugate`` swapping ``dom``
-    and ``cod`` on plain array boxes -- a dagger, not a conjugate --
+    Works around ``discopy.optyx.core.diagram.Box.conjugate`` swapping
+    ``dom`` and ``cod`` on plain array boxes -- a dagger, not a conjugate --
     which breaks ``Channel.double`` (reported upstream).
     """
-    from optyx.core.diagram import Box as CoreBox
+    from discopy.optyx.core.diagram import Box as CoreBox
 
     class ArrayBox(CoreBox):
         def conjugate(self):
@@ -47,14 +49,14 @@ def array_box(name, dom, cod, array):
 
 
 def check_structure():
-    from optyx.channel import qubit
-    from optyx.interaction import Box, CMap
+    from discopy.optyx.channel import qubit
+    from discopy.optyx.interaction import Box, CMap
 
     structure = ex.sudoku_structure()
     dummy_cell = np.zeros((2 ** 4, 2 ** 6))
     dummy_cell[0, 0] = 1
-    from optyx.core.diagram import bit as core_bit
-    from optyx.channel import Channel
+    from discopy.optyx.core.diagram import bit as core_bit
+    from discopy.optyx.channel import Channel
     cell_channel = Channel(
         "cell", array_box("cell", core_bit ** 4, core_bit ** 6,
                           dummy_cell),
@@ -84,10 +86,10 @@ def check_structure():
 def check_born_toy(ticks=2, seed=11):
     import jax
     import jax.numpy as jnp
-    from optyx.channel import Channel, Ty, qubit
-    from optyx.core.diagram import bit as core_bit
-    from optyx.interaction import Box, CMap
-    from optyx.qubits import Ket
+    from discopy.optyx.channel import Channel, Ty, qubit
+    from discopy.optyx.core.diagram import bit as core_bit
+    from discopy.optyx.interaction import Box, CMap
+    from discopy.optyx.qubits import Ket
 
     jax.config.update("jax_enable_x64", True)
     random = np.random.default_rng(seed)
@@ -109,7 +111,7 @@ def check_born_toy(ticks=2, seed=11):
                    memory=qubit, prediction=qubit ** 2)
     constraint_box = Box("B", qubit, Ty(), constraint_channel)
     cmap = CMap([cell_box, constraint_box], [((0, 0), (1, 0))])
-    from optyx.channel import Diagram
+    from discopy.optyx.channel import Diagram
     plus = Ket(0) >> Channel(
         "H", array_box("H", core_bit, core_bit,
                        np.array([[1, 1], [1, -1]]) / 2 ** .5),
@@ -150,7 +152,7 @@ def check_born_toy(ticks=2, seed=11):
         # hand -- read, apply the kraus maps in parallel, write each
         # paired port to its partner -- on the state of the three memory
         # wires. (The end-to-end optyx reference through double() or
-        # get_kraus() is blocked by issue #51 on unequal-arity boxes;
+        # get_kraus() is blocked by #244 on unequal-arity boxes;
         # cmap.step is still what fixes the wiring being simulated.)
         assert [str(box) for box in cmap.boxes] == ["A", "B"]
         kraus_a = cell_isometry.reshape(2, 2, 2, 2, 2, 2)
@@ -180,8 +182,8 @@ def check_born_toy(ticks=2, seed=11):
 
 
 def check_classical_doubling(seed=5):
-    from optyx.channel import Channel, bit
-    from optyx.core.diagram import bit as core_bit
+    from discopy.optyx.channel import Channel, bit
+    from discopy.optyx.core.diagram import bit as core_bit
 
     random = np.random.default_rng(seed)
     kraus = random.normal(size=(4, 4))

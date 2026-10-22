@@ -142,7 +142,7 @@ def sudoku_structure():
     with port ``p`` of its ``s``-th constraint, for the cell at position
     ``p`` of that constraint. Each incidence carries one bidirectional
     digit wire; every port is read and written at every tick as in
-    ``optyx.interaction``."""
+    ``discopy.optyx.interaction``."""
     boxes = tuple(
         [BoxSpec("cell", 3, 1, 1) for _ in range(N_CELLS)]
         + [BoxSpec("constraint", 4, 0, 0) for _ in range(N_CONSTRAINTS)])
