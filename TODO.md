@@ -2,7 +2,7 @@
 
 Copy of rel-int/optyx#89 onto discopy.optyx (#225)
 
-- [ ] merge the parent copy branch optyx-88 (the port of rel-int/optyx#88)
-- [ ] port to discopy.optyx on next main
-- [ ] checks
+- [x] merge the parent copy branch optyx-88 (the port of rel-int/optyx#88)
+- [x] port to discopy.optyx on next main
+- [x] checks
 - [ ] giodefelice-agents decides: own repo or notebook (toumix/desire#163)
