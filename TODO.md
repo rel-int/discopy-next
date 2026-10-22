@@ -2,7 +2,8 @@
 
 Copy of rel-int/optyx#88 onto discopy.optyx (#225)
 
-- [ ] merge the move branch origin/claude/magical-cannon-g1t6ms
-- [ ] port to discopy.optyx on next main
-- [ ] checks
+- [x] merge the move branch origin/claude/magical-cannon-g1t6ms
+- [x] port to discopy.optyx on next main
+- [x] checks
 - [ ] giodefelice-agents decides: own repo or notebook (toumix/desire#163)
+- [ ] `photon_noise.tables` fails on a cold cache: `json.dumps` cannot write the numpy integers of `np.bincount`, found by `test_photon_noise.py`; fix it or file it along with the decision above
