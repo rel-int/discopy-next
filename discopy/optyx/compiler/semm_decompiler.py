@@ -13,8 +13,8 @@ compilation pipelines.
     ValidationError
 """
 
-from optyx.compiler.mbqc import Fusion, FusionNetwork, Measurement
-from optyx.compiler.patterns import (
+from discopy.optyx.compiler.mbqc import Fusion, FusionNetwork, Measurement
+from discopy.optyx.compiler.patterns import (
     FusionOp,
     Instruction,
     MeasureOp,
@@ -151,9 +151,10 @@ def decompile_to_fusion_network(
 
     Example
     -------
-    >>> from optyx.compiler.mbqc import FusionNetwork, Measurement
+    >>> from discopy.optyx.compiler.mbqc import FusionNetwork, Measurement
     >>> from .semm import fn_to_semm
-    >>> from optyx.compiler.semm_decompiler import decompile_to_fusion_network
+    >>> from discopy.optyx.compiler.semm_decompiler import (
+    ...     decompile_to_fusion_network)
     >>> m = {i: Measurement(0.5 * i, "XY") for i in range(3)}
     >>> fn = FusionNetwork([0, 1, 2], m, [Fusion(0, 2, "X")])
     >>>

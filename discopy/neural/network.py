@@ -1,0 +1,393 @@
+# -*- coding: utf-8 -*-
+
+"""
+The traced category of feedforward neural networks: lists of shapes as
+objects, layers as boxes, with copy, discard, merge, noise, swap and trace.
+
+A :class:`Dims` is a list of :class:`Dim`, i.e. a tuple of tensors with one
+shape per leg. A :class:`Box` from ``Dims(a_1, ..., a_m)`` to
+``Dims(b_1, ..., b_n)`` is a layer taking ``m`` tensors and returning ``n``,
+computed by its optional :attr:`Box.module`. A :class:`Network` is a diagram
+of such layers: composition ``>>`` feeds the outputs of one into the inputs
+of the next, tensor ``@`` runs two side by side, :meth:`Network.copy` sends
+an activation to several layers, :meth:`Network.discard` drops one and
+:meth:`Network.trace` feeds an output back into an input, as a recurrent
+network does. Networks form the free traced Markov and comarkov category on
+their boxes, see :mod:`discopy.markov`, :mod:`discopy.comarkov` and
+:mod:`discopy.feedback`. A feedforward network
+compiles to a function on tensors with :meth:`Network.to_function`, which
+:mod:`discopy.neural.torch` wraps as a PyTorch module and ``jax.jit`` takes
+as it is.
+
+Summary
+-------
+
+.. autosummary::
+    :template: class.rst
+    :nosignatures:
+    :toctree:
+
+    Dims
+    Network
+    Box
+    Swap
+    Permutation
+    Copy
+    Merge
+    Discard
+    Noise
+    Feedback
+    Trace
+    FollowedBy
+    Head
+    Tail
+    Functor
+
+Example
+-------
+
+A residual block copies its input, applies a layer to one copy and adds the
+two back together; a recurrent cell feeds one of its outputs back in.
+
+>>> x, h = Dims(4), Dims(8)
+>>> layer, add = Box('layer', x, x), Box('add', x @ x, x)
+>>> residual = Network.copy(x) >> layer @ x >> add
+>>> assert residual.dom == residual.cod == x
+>>> cell = Box('cell', x @ h, x @ h)
+>>> recurrent = cell.trace()
+>>> assert recurrent.dom == recurrent.cod == x
+>>> Equation(residual, recurrent, symbol='').draw(
+...     doctest="docs/_static/neural/residual-and-recurrent.svg")
+
+.. image:: /_static/neural/residual-and-recurrent.svg
+    :align: center
+"""
+
+from __future__ import annotations
+
+from discopy import comarkov, feedback, markov, messages, monoidal, python
+from discopy.cat import factory
+from discopy.monoidal import Dim
+from discopy.utils import (
+    AxiomError, assert_isinstance, factory_name, tuplify, untuplify)
+
+
+@factory
+class Dims(monoidal.Ty):
+    """
+    A list of shapes, i.e. the free monoid over :class:`Dim` with
+    concatenation as tensor ``@`` and the empty list as unit: a tuple of
+    tensors, one per leg.
+
+    Together with the product ``*`` of shapes, which distributes over the
+    concatenation, this is the free rig on the natural numbers: ``Dims()``
+    is the zero and ``Dims(1)`` the one, both operations commutative only
+    up to :class:`Swap`.
+
+    Parameters:
+        inside : The shape of each leg, an integer standing for a vector.
+
+    Example
+    -------
+    >>> assert Dims(2, 3) == Dims(Dim(2), Dim(3)) == Dims(2) @ Dims(3)
+    >>> assert Dims(Dim(2, 3)) != Dims(2, 3) and Dims(1) == Dims(Dim())
+    >>> Dims(2, 3) * Dims(4)
+    Dims(Dim(2, 4), Dim(3, 4))
+    >>> from discopy.utils import dumps, loads
+    >>> assert loads(dumps(Dims(2, Dim(2, 3)))) == Dims(2, Dim(2, 3))
+    """
+    generator_factory = Dim
+
+    def __init__(self, *inside: int | Dim, **kwargs):
+        inside = kwargs.pop('inside', inside)
+        super().__init__(
+            *(Dim(x) if isinstance(x, int) else x for x in inside), **kwargs)
+
+    def __mul__(self, other: Dims) -> Dims:
+        assert_isinstance(other, Dims)
+        return type(self)(*(x @ y for x in self.inside for y in other.inside))
+
+    def __repr__(self):
+        return f"Dims({', '.join(map(repr, self.inside))})"
+
+    __str__ = __repr__
+
+    delay, head, tail = Dim.delay, Dim.head, Dim.tail
+
+    def check(self, *tensors) -> None:
+        """
+        Raise ``AxiomError`` unless there is one tensor per leg with the
+        shape of the leg as its trailing dimensions, whatever comes first.
+
+        Parameters:
+            tensors : One array per leg, with a ``shape``.
+
+        Example
+        -------
+        >>> import numpy as np
+        >>> Dims(2, Dim(2, 3)).check(np.ones((5, 2)), np.ones((5, 2, 3)))
+        >>> Dims(2).check(np.ones((5, 3)))
+        Traceback (most recent call last):
+            ...
+        discopy.utils.AxiomError: Expected a shape ending in (2,), got (5, 3).
+        """
+        if len(tensors) != len(self):
+            raise AxiomError(
+                f"Expected {len(self)} tensors, got {len(tensors)}.")
+        for tensor, dim in zip(tensors, self.inside):
+            shape = tuple(tensor.shape)
+            if shape[len(shape) - len(dim):] != dim.inside:
+                raise AxiomError(
+                    f"Expected a shape ending in {dim.inside}, got {shape}.")
+
+
+@factory
+class Network(markov.Diagram, comarkov.Diagram):
+    """
+    A network is a Markov and comarkov diagram with lists of shapes as
+    objects and :class:`Box` layers inside, together with the trace.
+
+    Parameters:
+        inside (Layer) : The layers of the network.
+        dom (Dims) : The input legs of the network.
+        cod (Dims) : The output legs of the network.
+
+    Note
+    ----
+    Networks can be written as Python functions of their input legs.
+
+    >>> x = Dims(4)
+    >>> layer, add = Box('layer', x, x), Box('add', x @ x, x)
+    >>> @Network.from_callable(x, x)
+    ... def residual(v):
+    ...     return add(layer(v), v)
+    >>> assert residual == Network.copy(x) >> layer @ x >> add
+    """
+    ob = Dims
+
+    @classmethod
+    def spider_factory(cls, n_legs_in, n_legs_out, typ, phase=None):
+        """
+        The spiders of a network are its copies and merges, with one leg in
+        or one leg out: there is no Frobenius law between the two.
+        """
+        if phase is not None or 1 not in (n_legs_in, n_legs_out):
+            raise ValueError(messages.NO_SUCH_SPIDER.format(
+                factory_name(cls), "copies and merges"))
+        return cls.copy_factory(typ, n_legs_out) if n_legs_in == 1\
+            else cls.merge_factory(typ, n_legs_in)
+
+    def to_function(self, tensor: type = object) -> python.Function:
+        """
+        Compile a feedforward network to a function on tensors, one per leg:
+        the functor sending every leg to ``tensor`` and every box to its
+        :meth:`Box.forward`, with the copy, discard and swap of
+        :class:`python.Function`. The function is what ``jax.jit`` compiles
+        and :class:`discopy.neural.torch.Module` runs.
+
+        Parameters:
+            tensor : The type of the tensors on the legs, e.g. ``jax.Array``
+                or ``torch.Tensor``, checked on every wire.
+
+        Example
+        -------
+        >>> import numpy as np
+        >>> x = Dims(2)
+        >>> double = Box('double', x, x, module=lambda v: 2 * v)
+        >>> add = Box('add', x @ x, x, module=lambda v, w: v + w)
+        >>> residual = Network.copy(x) >> double @ x >> add
+        >>> residual.to_function(np.ndarray)(np.array([1, 2]))
+        array([3, 6])
+        >>> (add >> double).trace().to_function()  # doctest: +ELLIPSIS
+        Traceback (most recent call last):
+            ...
+        NotImplementedError: Trace(add >> double) has a trace, only ...
+        """
+        if any(isinstance(box, Trace) for box in self.boxes):
+            raise NotImplementedError(
+                f"{self} has a trace, only feedforward networks compile.")
+        for box in self.boxes:
+            if box.is_dagger:
+                raise NotImplementedError(f"{box} has no adjoint module.")
+
+        def forward(box):
+            if box.module is None:
+                raise ValueError(f"{box} has no module.")
+            return box.forward
+
+        return Functor(ob_map=lambda leg: (tensor, ), ar_map=forward,
+                       cod=python.Function)(self)
+
+
+class Box(markov.Box, Network):
+    """
+    A box is a layer taking one tensor per leg of ``dom`` and returning one
+    per leg of ``cod``, computed by its ``module`` when it has one.
+
+    Parameters:
+        name : The name of the layer.
+        dom : The input legs of the layer.
+        cod : The output legs of the layer.
+        module : The object computing the layer, e.g. a ``torch.nn.Module``.
+
+    Note
+    ----
+    The module is the ``data`` of the box, so boxes compare equal when they
+    have the same name, legs and module, a framework's modules comparing by
+    identity. The repr and the serialisation omit the module, which has no
+    eval-able representation, so ``eval(repr(f)) == f`` and
+    ``loads(dumps(f)) == f`` hold for a box without one and give the shape
+    of one with.
+
+    Example
+    -------
+    >>> f = Box('f', Dims(2), Dims(3, 3), module=lambda x: (x, x))
+    >>> assert f.module is f.data is f.dagger().module
+    >>> f
+    neural.network.Box('f', Dims(Dim(2)), Dims(Dim(3), Dim(3)))
+    """
+    module = None
+
+    def __init__(self, name: str, dom: Dims, cod: Dims,
+                 module: object = None, data=None, **params):
+        self.module = data if module is None else module
+        super().__init__(name, dom, cod, data=self.module, **params)
+
+    def __repr__(self):
+        if self.is_dagger:
+            return repr(self.dagger()) + ".dagger()"
+        return f"{factory_name(type(self))}("\
+            f"{self.name!r}, {self.dom!r}, {self.cod!r})"
+
+    def to_tree(self) -> dict:
+        tree = super().to_tree()
+        tree.pop('data', None)
+        return tree
+
+    def forward(self, *tensors):
+        """
+        Apply the module to one tensor per leg of ``dom`` and return one per
+        leg of ``cod``, each checked against its leg by :meth:`Dims.check`.
+
+        Parameters:
+            tensors : One tensor per input leg.
+
+        Example
+        -------
+        >>> import numpy as np
+        >>> split = Box('split', Dims(4), Dims(2, 2),
+        ...             module=lambda v: (v[:2], v[2:]))
+        >>> split.forward(np.arange(4))
+        (array([0, 1]), array([2, 3]))
+        >>> Box('f', Dims(4), Dims(2), module=lambda v: v).forward(np.ones(4))
+        Traceback (most recent call last):
+            ...
+        discopy.utils.AxiomError: f: Expected a shape ending in (2,), got (4,).
+        """
+        if self.module is None:
+            raise ValueError(f"{self} has no module.")
+        try:
+            self.dom.check(*tensors)
+            outputs = tuplify(self.module(*tensors))
+            self.cod.check(*outputs)
+        except AxiomError as error:
+            raise AxiomError(f"{self}: {error}") from error
+        return untuplify(outputs)
+
+
+class Permutation(markov.Permutation, Box):
+    """
+    A permutation of the legs of a network.
+
+    Parameters:
+        dom (Dims) : The legs to permute.
+        perm : The permutation as a :class:`finset.Permutation` or a list.
+    """
+
+
+class Swap(Permutation, markov.Swap, Box):
+    """
+    The swap of two legs.
+
+    Parameters:
+        left (Dims) : The leg on the top left and bottom right.
+        right (Dims) : The leg on the top right and bottom left.
+    """
+
+
+class Copy(markov.Copy, Box):
+    """
+    The copy of a leg some ``n`` number of times.
+
+    Parameters:
+        x (Dims) : The leg to copy.
+        n : The number of copies.
+    """
+
+
+class Merge(comarkov.Merge, Box):
+    """
+    The merge of ``n`` copies of a leg, the dagger of :class:`Copy`.
+
+    Parameters:
+        x (Dims) : The leg to merge.
+        n : The number of copies.
+    """
+
+
+class Discard(markov.Discard, Copy):
+    """
+    The discard of a leg.
+
+    Parameters:
+        x (Dims) : The leg to discard.
+    """
+
+
+class Noise(comarkov.Noise, Merge):
+    """
+    The noise on a leg, the dagger of :class:`Discard`.
+
+    Parameters:
+        x (Dims) : The leg of the noise.
+    """
+
+
+class Functor(markov.Functor, comarkov.Functor):
+    """
+    A functor from networks to any traced category with the structure the
+    network uses, e.g. an evaluation of the layers as functions.
+
+    Parameters:
+        ob_map (Mapping[Dims, Dims]) :
+            Map from atomic :class:`Dims` to :code:`cod.ob`.
+        ar_map (Mapping[Box, Network]) : Map from :class:`Box` to :code:`cod`.
+        cod (Category) : The codomain, :code:`Network` by default.
+
+    Example
+    -------
+    >>> from discopy import python
+    >>> x = Dims(2)
+    >>> layer, add = Box('layer', x, x), Box('add', x @ x, x)
+    >>> residual = Network.copy(x) >> layer @ x >> add
+    >>> F = Functor(
+    ...     ob_map={x: (list, )},
+    ...     ar_map={layer: lambda v: [2 * i for i in v],
+    ...             add: lambda v, w: [i + j for i, j in zip(v, w)]},
+    ...     cod=python.Function)
+    >>> assert F(residual)([1, 2]) == [3, 6]
+    """
+    dom = cod = Network
+
+
+Id = Network.id
+Equation = markov.Equation
+
+Feedback, Trace, FollowedBy, Head, Tail = feedback.generators(
+    Network, Box)
+Network.box_factory = Box
+Network.functor_factory = Functor
+Network.copy_factory, Network.merge_factory = Copy, Merge
+Network.discard_factory, Network.noise_factory = Discard, Noise
+Network.swap_factory = Swap
+Network.permutation_factory = Permutation

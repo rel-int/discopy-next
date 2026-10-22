@@ -1,0 +1,112 @@
+import os
+import sys
+
+sys.path.insert(0, os.path.abspath('..'))
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.append(os.path.abspath("./_ext"))
+
+
+def get_version():
+    from discopy import __version__
+    return __version__
+
+
+# -- Project information -----------------------------------------------------
+
+project = 'DisCoPy'
+author = 'DisCoPy'
+copyright = '2019, DisCoPy'
+
+# The full version, including alpha/beta/rc tags
+release = get_version()
+
+
+# -- General configuration ---------------------------------------------------
+
+# Add any Sphinx extension module names here, as strings. They can be
+# extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
+# ones.
+extensions = ['sphinx.ext.autodoc',
+              'sphinx.ext.napoleon',
+              'sphinx.ext.autosummary',
+              'sphinx.ext.graphviz',
+              'sphinx.ext.viewcode',
+              'myst_parser',
+              'sphinx.ext.mathjax',
+              'youtube',
+              'bases-fullname',
+              'sphinxcontrib.bibtex',
+              'sphinxcontrib.tikz',
+              'IPython.sphinxext.ipython_console_highlighting'
+              ]
+
+bibtex_bibfiles = ['discopy.bib']
+graphviz_output_format = 'svg'
+
+autosummary_generate = True
+
+autodoc_mock_imports = [
+    "pytket", "pennylane", "torch", "sympy", "cotengra", "quimb", "pyzx"]
+
+autodoc_typehints = "description"
+autodoc_typehints_format = "short"
+autodoc_inherit_docstrings = False
+
+napoleon_use_admonition_for_examples = True
+
+# Add any paths that contain templates here, relative to this directory.
+templates_path = ['_templates']
+
+# List of patterns, relative to source directory, that match files and
+# directories to ignore when looking for source files.
+# This pattern also affects html_images_path and html_extra_path.
+# The marimo notebooks under ``notebooks/`` are plain-text ``.md`` files; they
+# are rendered to HTML by ``export_notebooks.py`` and embedded from the
+# generated ``.rst`` pages, so they must not be parsed as Sphinx source pages.
+# Those of ``discopy.optyx`` are Jupyter notebooks yet to become marimo ones.
+exclude_patterns = [
+    '_build', 'Thumbs.db', '.DS_Store', 'notebooks/*.md', 'notebooks/optyx/**']
+
+
+# -- Options for HTML output -------------------------------------------------
+
+# The theme to use for HTML and HTML Help pages.  See the documentation for
+# a list of builtin themes.
+#
+html_theme = 'sphinx_book_theme'
+
+# Add any paths that contain custom static files (such as style sheets) here,
+# relative to this directory. They are copied after the builtin static files,
+# so a file named "default.css" will overwrite the builtin "default.css".
+html_static_path = ['_static', '_style']
+html_css_files = ["custom.css"]
+html_js_files = ["marimo-theme.js"]
+html_favicon = "_static/logo.svg"
+
+html_title = "DisCoPy"
+
+html_theme_options = {
+    "repository_url": "https://github.com/discopy/discopy",
+    "use_repository_button": True,
+    "path_to_docs": "docs",
+    # "extra_navbar": "",
+}
+myst_enable_extensions = ["attrs_block"]
+myst_url_schemes = {
+    "http": None,
+    "https": None,
+    "doi": "https://doi.org/{{path}}",
+    "arXiv": "https://arxiv.org/abs/{{path}}",
+}
+
+master_doc = 'index'
+
+html_baseurl = os.environ.get(
+    "READTHEDOCS_CANONICAL_URL", "https://docs.discopy.org")
+
+
+def setup(app):
+    # Render the marimo notebooks (docs/notebooks/*.md) to computed HTML and
+    # generate the pages that embed them, before Sphinx reads the sources.
+    import export_notebooks
+    app.connect('builder-inited', lambda _app: export_notebooks.generate())

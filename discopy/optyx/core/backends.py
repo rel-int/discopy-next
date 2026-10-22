@@ -6,7 +6,7 @@ Overview
 Back-end abstraction layer for **Optyx** diagram evaluation.
 
 This module gathers several numerical engines under a single
-interface so that any :class:`optyx.channel.Diagram` can be reduced
+interface so that any :class:`discopy.optyx.channel.Diagram` can be reduced
 to concrete data - amplitudes, density matrices or classical probability
 distributions.
 
@@ -38,13 +38,13 @@ Examples of usage
 
 **Exact tensor-network contraction with Quimb**
 
->>> from optyx.photonic import Create, BS
->>> from optyx.core.backends import QuimbBackend
+>>> from discopy.optyx.photonic import Create, BS
+>>> from discopy.optyx.core.backends import QuimbBackend
 >>> diag = Create(1, 1) >> BS
 >>> backend = QuimbBackend()
 >>> result = diag.eval(backend)
 >>> np.round(result.single_prob((2, 0)), 1)
-0.5
+np.float64(0.5)
 
 **Compressed contraction (hyper-optimiser reused across calls)**
 
@@ -53,21 +53,23 @@ Examples of usage
 >>> backend = QuimbBackend(hyperoptimiser=opt)
 >>> result = diag.eval(backend)
 >>> np.round(result.single_prob((2, 0)), 1)
-0.5
+np.float64(0.5)
 
 **Unitary circuit simulation with Perceval**
 
->>> from optyx.core.backends import PercevalBackend
+>>> from discopy.optyx.core.backends import PercevalBackend
 >>> backend = PercevalBackend()
 >>> result = (Create(1, 1) >> BS).eval(backend)
 >>> np.round(result.single_prob((2, 0)), 1)
-0.5
+np.float64(0.5)
 """
+
+from __future__ import annotations
 
 import warnings
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any, Literal, Sequence
+from typing import Any, Literal, Sequence, TYPE_CHECKING
 from collections import defaultdict
 from enum import Enum
 from cotengra import (
@@ -78,10 +80,11 @@ from cotengra import (
 )
 from discopy import tensor as discopy_tensor
 import numpy as np
-import perceval as pcvl
+if TYPE_CHECKING:
+    import perceval as pcvl
 from quimb.tensor import TensorNetwork
-from optyx.channel import Diagram, Ty, mode, bit
-from optyx.core.path import Matrix
+from discopy.optyx.channel import Diagram, Ty, mode, bit
+from discopy.optyx.core.path import Matrix
 
 
 @dataclass
@@ -398,6 +401,9 @@ class AbstractBackend(ABC):
         """
         Convert a unitary matrix to a Perceval circuit.
         """
+        # pylint: disable=import-outside-toplevel
+        import perceval as pcvl
+
         # pylint: disable=abstract-class-instantiated
         perceval_matrix = pcvl.Matrix(matrix.T)
         return pcvl.components.Unitary(U=perceval_matrix)
@@ -602,6 +608,9 @@ class PercevalBackend(AbstractBackend):
         Args:
             perceval_backend: An optional Perceval backend configuration.
         """
+        # pylint: disable=import-outside-toplevel
+        import perceval as pcvl
+
         if perceval_backend is None:
             self.perceval_backend = pcvl.BackendFactory.get_backend("SLOS")
         else:
@@ -663,6 +672,9 @@ class PercevalBackend(AbstractBackend):
         creations,
         external_perceval_state
     ):
+        # pylint: disable=import-outside-toplevel
+        import perceval as pcvl
+
         return (
             external_perceval_state *
             pcvl.BasicState(creations)
@@ -673,6 +685,9 @@ class PercevalBackend(AbstractBackend):
         selections,
         external_perceval_effect
     ):
+        # pylint: disable=import-outside-toplevel
+        import perceval as pcvl
+
         return (
             external_perceval_effect *
             pcvl.BasicState(selections)
@@ -698,6 +713,9 @@ class PercevalBackend(AbstractBackend):
         return dist
 
     def _process_state(self, perceval_state):
+        # pylint: disable=import-outside-toplevel
+        import perceval as pcvl
+
         if not isinstance(perceval_state, pcvl.BasicState):
             try:
                 perceval_state = pcvl.BasicState(list(perceval_state))
@@ -711,6 +729,9 @@ class PercevalBackend(AbstractBackend):
         return perceval_state
 
     def _process_effect(self, perceval_effect):
+        # pylint: disable=import-outside-toplevel
+        import perceval as pcvl
+
         if perceval_effect is None:
             return None
         if not isinstance(perceval_effect, pcvl.BasicState):
@@ -730,6 +751,9 @@ class PercevalBackend(AbstractBackend):
         matrix,
         perceval_state
     ):
+        # pylint: disable=import-outside-toplevel
+        import perceval as pcvl
+
         warnings.warn(
             "The provided matrix is not unitary. "
             "PercevalBackend expects a unitary matrix. "
@@ -767,6 +791,9 @@ class PercevalBackend(AbstractBackend):
             The processed output effect.
             task (str): The Perceval task to perform.
         """
+        # pylint: disable=import-outside-toplevel
+        import perceval as pcvl
+
         cfg: PercevalEvalConfig = extra.get("config", PercevalEvalConfig())
         task = cfg.task
         state_provided = cfg.state is not None
@@ -785,12 +812,12 @@ class PercevalBackend(AbstractBackend):
         if state_provided:
             external_perceval_state = self._process_state(cfg.state)
 
-            if external_perceval_state.m != matrix.dom:
+            if external_perceval_state.m != len(matrix.dom):
                 raise ValueError(
                     "The provided 'state' does not match the " +
                     "number of input modes of the diagram. " +
                     f"Provided state has {external_perceval_state.m} " +
-                    f"modes but diagram has {matrix.dom} input modes."
+                    f"modes but diagram has {len(matrix.dom)} input modes."
                 )
 
         perceval_state = self._process_state(
@@ -804,16 +831,16 @@ class PercevalBackend(AbstractBackend):
         if effect_provided:
             perceval_effect = self._process_effect(cfg.effect)
 
-            if perceval_effect.m != matrix.cod:
+            if perceval_effect.m != len(matrix.cod):
                 raise ValueError(
                     "The provided 'effect' does not match the number " +
                     "of output modes of the diagram. " +
                     f"Provided effect has {perceval_effect.m} " +
-                    f"modes but diagram has {matrix.cod} output modes."
+                    f"modes but diagram has {len(matrix.cod)} output modes."
                 )
 
         # convert post-selections to pcvl effects and post-selections
-        if matrix.cod == 0:
+        if len(matrix.cod) == 0:
             sel0 = matrix.selections[0]
             m = Matrix(
                 matrix.array.copy(),
@@ -851,11 +878,14 @@ class PercevalBackend(AbstractBackend):
         """
         Prepare the Perceval simulator with the given matrix.
         """
+        # pylint: disable=import-outside-toplevel
+        import perceval as pcvl
+
         selections = matrix.selections
 
         sim = pcvl.Simulator(self.perceval_backend)
         postselect_conditions = [
-            f"{str([i + matrix.cod])} == {s}"
+            f"{str([i + len(matrix.cod)])} == {s}"
             for i, s in enumerate(selections)
         ]
         sim.set_postselection(
@@ -964,6 +994,9 @@ class PercevalBackend(AbstractBackend):
         Args:
             term (discopy.tensor.Diagram): The term to process.
         """
+        # pylint: disable=import-outside-toplevel
+        import perceval as pcvl
+
         matrix = self._get_matrix(term)
 
         perceval_state, perceval_effect, task = self._process_io(
@@ -997,6 +1030,10 @@ class PercevalBackend(AbstractBackend):
             matrix
         )
 
+        if perceval_effect is not None:
+            perceval_effect = perceval_effect * pcvl.BasicState(
+                list(matrix.selections))
+
         result = self._simulate(
             sim,
             perceval_state,
@@ -1007,7 +1044,7 @@ class PercevalBackend(AbstractBackend):
         result = self._post_select_vacuum(
             result,
             len(term.dom),
-            matrix.dom - len(term.dom),
+            len(matrix.dom) - len(term.dom),
             task
         )
 

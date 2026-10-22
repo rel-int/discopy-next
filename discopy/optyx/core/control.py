@@ -27,22 +27,22 @@ We can construct a controlled gate acting on a quantum mode:
 
 >>> f = lambda x: [x * 0.1, x * 0.2]
 >>> box = ControlledPhaseShift(f, n_modes=2)
->>> box.draw(path='docs/_static/controlled_phase.svg')
+>>> box.draw(path='docs/_static/optyx/controlled_phase.svg')
 
 A bit-controlled gate can be composed as:
 
->>> from optyx.core.zw import ZBox
+>>> from discopy.optyx.core.zw import ZBox
 >>> control = BitControlledBox(ZBox(1, 1, lambda x: x))
->>> control.draw(path='docs/_static/binary_control.svg')
+>>> control.draw(path='docs/_static/optyx/binary_control.svg')
 """
 
 from typing import Callable, List, Tuple, Iterable
 from discopy import tensor
 from discopy.frobenius import Dim
 import numpy as np
-from optyx.utils.misc import BasisTransition, is_diagram_LO
+from discopy.optyx.utils.misc import BasisTransition, is_diagram_LO
 
-from optyx.core import diagram, zw
+from discopy.optyx.core import diagram, zw
 
 
 class ControlDiagram(diagram.Diagram):
@@ -71,9 +71,9 @@ class BitControlledBox(ControlBox):
 
     Example
     -------
-    >>> from optyx.photonic import Phase
-    >>> from optyx.core.diagram import PhotonThresholdDetector, Mode
-    >>> from optyx.core.zw import Create, ZBox
+    >>> from discopy.optyx.photonic import Phase
+    >>> from discopy.optyx.core.diagram import PhotonThresholdDetector, Mode
+    >>> from discopy.optyx.core.zw import Create, ZBox
     >>> action = Phase(0.1).get_kraus()
     >>> default = ZBox(1, 1, lambda x: 1)
     >>> action_result = action.to_tensor().eval().array
@@ -124,7 +124,7 @@ class BitControlledBox(ControlBox):
 
     def photon_number_transform(self, dims_in, dims_out):
         if is_diagram_LO(self.action_box) and is_diagram_LO(self.default_box):
-            from optyx.core.zx import Z
+            from discopy.optyx.core.zx import Z
             return Z(1, 0) @ self.default_box if not self.is_dagger else \
                 Z(0, 1) @ self.default_box
         else:
@@ -224,8 +224,8 @@ class ControlledPhaseShift(ControlBox):
 
     Example
     -------
-    >>> from optyx.core.diagram import Id, Mode
-    >>> from optyx.core.zw import Create, ZBox
+    >>> from discopy.optyx.core.diagram import Id, Mode
+    >>> from discopy.optyx.core.zw import Create, ZBox
     >>> f = lambda x: [x[0]*0.1, x[0]*0.2, x[0]*0.3]
     >>> n = len(f([0]))
     >>> controlled_phase = (Create(2) @ Mode(n) >>
@@ -383,8 +383,8 @@ class BinaryMatrixBox(ClassicalBox):
 
     Example
     -------
-    >>> from optyx.core.zx import X
-    >>> from optyx.core.diagram import Scalar
+    >>> from discopy.optyx.core.zx import X
+    >>> from discopy.optyx.core.diagram import Scalar
     >>> xor = X(2, 1) @ Scalar(np.sqrt(2))
     >>> matrix = [[1, 1]]
     >>> m_res = BinaryMatrixBox(matrix).to_tensor().eval().array

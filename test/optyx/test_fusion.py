@@ -1,9 +1,9 @@
-from optyx.photonic import DualRail, FusionTypeI, FusionTypeII, Phase, HadamardBS
-from optyx.qubits import Z, Scalar
-from optyx.channel import qmode, bit
-from optyx.classical import PostselectBit, BitControlledGate
-from optyx.photonic import Id
-from optyx import channel
+from discopy.optyx.photonic import DualRail, FusionTypeI, FusionTypeII, Phase, HadamardBS
+from discopy.optyx.qubits import Z, Scalar
+from discopy.optyx.channel import qmode, bit
+from discopy.optyx.classical import PostselectBit, BitControlledGate
+from discopy.optyx.photonic import Id
+from discopy.optyx import channel
 import numpy as np
 
 def test_fusion_ii():

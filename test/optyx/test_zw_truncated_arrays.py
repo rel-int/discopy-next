@@ -1,9 +1,9 @@
-from optyx.core.zw import *
-from optyx.core.diagram import mode, Swap
+from discopy.optyx.core.zw import *
+from discopy.optyx.core.diagram import mode, Swap
 import numpy as np
 import pytest
-from optyx.photonic import ansatz, MZI, TBS
-from optyx.utils.misc import matrix_to_zw, filter_occupation_numbers
+from discopy.optyx.photonic import ansatz, MZI, TBS
+from discopy.optyx.utils.misc import matrix_to_zw, filter_occupation_numbers
 
 @pytest.mark.skip(reason="Helper function for testing")
 def kron_truncation_swap(input_dims: list[int]) -> np.ndarray[complex]:

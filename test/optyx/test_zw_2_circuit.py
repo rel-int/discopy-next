@@ -1,6 +1,6 @@
-import optyx.core.zw as zw
-from optyx import photonic, classical
-from optyx.utils.misc import tensor_2_amplitudes, calculate_num_creations_selections
+import discopy.optyx.core.zw as zw
+from discopy.optyx import photonic, classical
+from discopy.optyx.utils.misc import tensor_2_amplitudes, calculate_num_creations_selections
 import itertools
 import pytest
 import perceval as pcvl

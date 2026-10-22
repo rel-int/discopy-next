@@ -1,0 +1,212 @@
+[build-system]
+requires = ["setuptools>=80", "setuptools-scm[simple]>=9.2"]
+build-backend = "setuptools.build_meta"
+
+# Pin package discovery to discopy* so top-level dirs (benchmark/, plans/, ...)
+# don't trip setuptools flat-layout "multiple top-level packages" detection.
+[tool.setuptools.packages.find]
+include = ["discopy*"]
+
+[project]
+name = "discopy"
+dynamic = ["version"]
+description = "The Python toolkit for computing with string diagrams."
+readme = "README.md"
+requires-python = ">=3.12"
+license =  {file = "LICENSE"}
+keywords = [
+    "category theory",
+    "string diagrams",
+    "natural language processing",
+    "quantum computing"
+]
+authors = [
+  {name = "DisCoPy"},
+  {email = "contact@discopy.org"}
+]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Scientific/Engineering"
+]
+dependencies = [
+  "numpy",
+  "networkx",
+  "matplotlib",
+  "pillow"
+]
+
+[dependency-groups]
+dev = [
+    "coverage",
+    "hypothesis",
+    "marimo",
+    "pyproject-flake8",
+    "pylint",
+    "pytest",
+    "pytest-benchmark",
+    "polars",
+    "pytest-xdist",
+]
+docs = ["discopy[docs]"]
+notebooks = ["discopy[notebooks]"]
+quantum = ["discopy[quantum]"]
+grammar = ["discopy[grammar]"]
+optyx = ["discopy[optyx]"]
+all = [
+    { include-group = "dev" },
+    { include-group = "docs" },
+    { include-group = "notebooks" },
+    { include-group = "quantum" },
+    { include-group = "grammar" },
+    { include-group = "optyx" },
+]
+
+[project.optional-dependencies]
+quantum = [
+    "pytket",
+    "pyzx == 0.10.7",
+    "sympy",
+    "tensornetwork",
+    "jax",
+    "jaxlib",
+    "torch",
+    "qiskit",
+    "qiskit-aer",
+    "pennylane>=0.45.0",
+    "pennylane-qiskit>=0.45.0",
+    "quimb",
+    "qoolqit",
+]
+grammar = [
+    "nltk",
+    "torch",
+]
+# discopy.optyx, under Apache-2.0: see discopy/optyx/LICENSE
+optyx = [
+    "cotengra",
+    "graphix >= 0.4",
+    "opt_einsum",
+    "perceval-quandela >= 1.3",
+    "pylatexenc >= 2.10",
+    "pytket >= 2.6.0",
+    "pytket-pyzx >= 0.36",
+    "pytket-qiskit[aer] >= 0.68.3",
+    "pyzx == 0.10.7",
+    "quimb",
+    "sympy",
+]
+test = [
+    "discopy[grammar,optyx,quantum]",
+    "coverage",
+    "hypothesis",
+    "marimo",
+    "pyproject-flake8",
+    "pylint",
+    "pytest",
+    "pytest-xdist",
+]
+notebooks = [
+    "IPython",
+    "anywidget",
+    "ipykernel == 6.23.*",
+    "marimo",
+]
+docs  = [
+    "discopy[notebooks]",
+    "jinja2 == 3.1.*",
+    "myst-parser == 2.0.*",
+    # executed by marimo when rendering the notebooks at docs build time
+    "jax",
+    "pytket",
+    "sympy",
+    "torch",
+    "sphinx == 7.4.*",
+    "sphinx-book-theme == 1.1.*",
+    "sphinxcontrib-bibtex == 2.5.*",
+    "sphinxcontrib-tikz == 0.4.*",
+    "sphinxcontrib-youtube == 1.4.*",
+]
+
+[tool.setuptools_scm]
+version_file = "discopy/version.py"
+
+[tool.uv]
+default-groups = ["dev"]
+
+[tool.uv.sources]
+torch = [
+    { index = "pytorch-cpu", marker = "platform_system == 'Linux'" },
+]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[tool.uv.build-backend]
+module-root = ""
+source-exclude = ["discopy/version.py"]
+wheel-exclude = ["discopy/version.py"]
+
+[project.urls]
+Homepage = "https://discopy.org"
+Documentation = "https://docs.discopy.org"
+Repository = "https://github.com/discopy/discopy"
+Issue-Tracker = "https://github.com/discopy/discopy/issues"
+Download = "https://pypi.org/project/discopy"
+
+[tool.flake8]
+extend-ignore = [
+    "E731",
+    "E741",
+    "E743",
+    "F811",
+]
+per-file-ignores = [
+    "__init__.py:F401"
+]
+
+[tool.pytest.ini_options]
+pythonpath = [
+    ".",
+    "test"
+]
+testpaths = [
+    "discopy",
+    "test/*.py",
+    "test/*/*.py",
+    "test/optyx/compiler/*.py",
+]
+norecursedirs = [
+    ".hypothesis",
+    "test/fixtures",
+]
+addopts = "--doctest-modules --ignore=test/fixtures -p plugin"
+
+[tool.coverage.run]
+# The skip paths are unreachable unless --skip-extra is passed, and coverage
+# runs the full suite with every extra installed. The egglog reference of
+# test/ehypergraph.py runs only where egglog is installed, which the lock does
+# not have. torch.compile writes Python under torchinductor_* directories,
+# which is not ours to cover.
+omit = [
+    "test/plugin.py", "test/fixtures/egglog_reference.py",
+    "*/torchinductor_*/*"]
+
+[tool.coverage.report]
+fail_under = 98
+exclude_also = [
+    "if TYPE_CHECKING",
+]
+
+[tool.marimo.display]
+# The docs embed the exported notebooks in iframes, where only the browser's
+# prefers-color-scheme reaches: "system" follows it, "light" ignores it.
+theme = "system"

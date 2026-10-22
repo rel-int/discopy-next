@@ -1,7 +1,12 @@
 import pytest
 
-from optyx.channel import *
-from optyx.core import diagram, zx
+from discopy.optyx.channel import *
+from sympy.abc import x, y
+from discopy.optyx.channel import (
+    CQMap, Channel, Diagram, Encode, Measure, Permutation,
+    bit, mode, qmode, qubit)
+from discopy.optyx import photonic
+from discopy.optyx.core import diagram, zw, zx
 from discopy import tensor
 import numpy as np
 
@@ -86,7 +91,7 @@ def test_CQMap():
 
 
 def test_from_bosonic_op():
-    from optyx.channel import Diagram
+    from discopy.optyx.channel import Diagram
 
     matrix = [
         [0, 1],
@@ -113,3 +118,46 @@ def test_from_bosonic_op():
     sum_2 = np.sign(hamiltonian.eval().tensor.array) # bug in discopy.tensor.Tensor.eval() for Sums (?)
 
     assert np.allclose(sum_2, sum_1)
+
+
+def test_bosonic_operator_indices_are_modes():
+    for index in (-1, 2):
+        with pytest.raises(ValueError, match="out of bounds"):
+            Diagram.from_bosonic_operator(2, [(index, True)])
+
+
+def test_decomposition_is_for_zx_channels():
+    with pytest.raises(NotImplementedError, match="ZX channels"):
+        Channel("create", zw.Create(1)).decomp()
+    with pytest.raises(TypeError, match="ZX channels"):
+        photonic.TBS(.25).to_dual_rail()
+
+
+def test_sums_double_and_differentiate_term_by_term():
+    dims = [2] * 4
+    assert np.allclose(
+        (photonic.BS + photonic.BS).double().to_tensor(dims).eval().array,
+        2 * photonic.BS.double().to_tensor(dims).eval().array)
+    phases = photonic.Phase(x) + photonic.Phase(2 * x)
+    assert phases.grad(y) == Diagram.sum_factory((), qmode, qmode)
+    one_photon = phases.grad(x).subs((x, .1)).eval().tensor.array[1, 1]
+    assert np.isclose(one_photon, 2j * np.pi * (
+        np.exp(.2j * np.pi) + 2 * np.exp(.4j * np.pi)))
+
+
+def test_cq_map_power_is_a_tensor_power():
+    measure = CQMap("measure", diagram.Spider(2, 1, diagram.bit), qubit, bit)
+    assert measure ** 1 == measure
+    assert measure ** 3 == measure @ measure @ measure
+
+
+def test_permutation_dagger_is_its_inverse():
+    perm = Permutation(qmode ** 3, [1, 2, 0])
+    assert (perm.dagger().dom, perm.dagger().cod) == (perm.cod, perm.dom)
+    assert np.allclose((perm >> perm.dagger()).to_path().array, np.eye(3))
+
+
+def test_inflation_only_touches_optical_wires():
+    assert Measure(qubit).inflate(2) == Measure(qubit)
+    assert Encode(bit).inflate(2) == Encode(bit)
+    assert Encode(mode, internal_states=[1, 0]).internal_states == ([1, 0], )

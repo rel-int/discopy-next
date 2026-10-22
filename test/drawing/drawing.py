@@ -1,0 +1,870 @@
+
+import os
+
+from pytest import approx, importorskip, raises
+
+from discopy.utils import AxiomError
+from discopy.config import DRAWING_DEFAULT
+from discopy.compact import *
+from discopy.drawing import *
+from discopy import config, monoidal
+
+TIKZ_FOLDER = 'test/drawing/tikz/'
+
+
+def tikz_and_compare(file, folder=TIKZ_FOLDER, **params):
+    def decorator(func):
+        def wrapper():
+            diagram = func()
+            draw = params.get('draw', type(diagram).draw)
+            true_paths = [os.path.join(folder, file)]
+            test_paths = [os.path.join(folder, '_' + file)]
+            if params.get("use_tikzstyles", DRAWING_DEFAULT['use_tikzstyles']):
+                true_paths.append(
+                    true_paths[0].replace('.tikz', '.tikzstyles'))
+                test_paths.append(
+                    test_paths[0].replace('.tikz', '.tikzstyles'))
+            draw(diagram, path=test_paths[0], **dict(params, to_tikz=True))
+            for true_path, test_path in zip(true_paths, test_paths):
+                if not os.path.exists(true_path):
+                    os.replace(test_path, true_path)
+                    continue
+                with open(true_path, "r") as true:
+                    with open(test_path, "r") as test:
+                        assert true.read() == test.read()
+                os.remove(test_path)
+        return wrapper
+    return decorator
+
+
+def test_draw_baseline(tmp_path, monkeypatch):
+    path = tmp_path / "box.svg"
+    actual_path = tmp_path / "_box.svg"
+    box = Box("f", Ty("x"), Ty("x"))
+
+    box.draw(doctest=path, show=False)
+    box.draw(doctest=path, show=False)
+    assert not actual_path.exists()
+
+    path.write_text("<svg/>")
+    with raises(ValueError, match="Drawing differs"):
+        box.draw(doctest=path, show=False)
+    assert actual_path.exists()
+
+    # Deleting a failing baseline regenerates it on the next draw.
+    path.unlink()
+    box.draw(doctest=path, show=False)
+    assert path.exists()
+
+    monkeypatch.setattr(config, "OVERRIDE_DOCTEST_IMAGES", True)
+    path.write_text("<svg/>")
+    box.draw(doctest=path, show=False)
+    assert path.read_text() != "<svg/>"
+
+    # A plain path just saves the drawing, overwriting silently.
+    monkeypatch.setattr(config, "OVERRIDE_DOCTEST_IMAGES", False)
+    path.write_text("<svg/>")
+    box.draw(path=path, show=False)
+    assert path.read_text() != "<svg/>"
+
+
+def test_svg_equal(tmp_path):
+    expected = tmp_path / "expected.svg"
+    actual = tmp_path / "actual.svg"
+    template = """\
+<svg xmlns="http://www.w3.org/2000/svg" width="{width}">
+  <g id="{name}"><text x="1">f</text></g>
+</svg>"""
+    expected.write_text(template.format(width=1, name="one"))
+
+    # Rounding errors within the tolerance are forgiven.
+    actual.write_text(template.format(width=1.5, name="one"))
+    assert backend.svg_equal(expected, actual)
+
+    # A genuine difference in width, position or text content is preserved.
+    actual.write_text(template.format(width=9, name="one"))
+    assert not backend.svg_equal(expected, actual)
+
+    # A non-numeric difference, e.g. in an identifier, is also preserved.
+    actual.write_text(template.format(width=1, name="two"))
+    assert not backend.svg_equal(expected, actual)
+
+
+def test_compare_drawing_raster_and_bytes(tmp_path):
+    from PIL import Image
+    baseline, actual = tmp_path / "box.png", tmp_path / "_box.png"
+    Image.new("RGB", (8, 8), "white").save(baseline)
+    Image.new("RGB", (8, 8), "white").save(actual)
+    backend.compare_drawing(baseline, actual)
+    assert not actual.exists()
+
+    Image.new("RGB", (8, 8), "black").save(actual)
+    with raises(ValueError, match="Drawing differs"):
+        backend.compare_drawing(baseline, actual)
+
+    baseline, actual = tmp_path / "box.tikz", tmp_path / "_box.tikz"
+    baseline.write_text("tikz")
+    actual.write_text("tikz")
+    backend.compare_drawing(baseline, actual)
+    assert not actual.exists()
+
+
+def test_dark_mode_style(tmp_path):
+    path = tmp_path / "box.svg"
+    Box("f", Ty("x"), Ty("y")).draw(path=path, show=False)
+    text = path.read_text()
+    opening = text.index(">", text.index("<svg")) + 1
+    assert text[opening:].startswith(backend.DARK_MODE_STYLE)
+    assert 'id="dark-stroke-' in text and 'id="dark-fill-' in text
+
+
+def test_dark_mode_style_in_buffer():
+    assert backend.DARK_MODE_STYLE in Box("f", Ty("x"), Ty("y")).to_svg()
+
+
+def test_coloured_wires_keep_static_colours(tmp_path):
+    red, green = map(monoidal.Colour, ("red", "green"))
+    x = monoidal.Ty(monoidal.Wire("x", red, green))
+    path = tmp_path / "box.svg"
+    monoidal.Box("f", x, x).draw(path=path, show=False)
+    assert 'id="dark-' not in path.read_text()
+
+
+def test_transparent_spiders_are_unfilled(tmp_path):
+    def spider_svg(color):
+        path = tmp_path / f"{color}.svg"
+        monoidal.Box(
+            "+", monoidal.Ty(), monoidal.Ty(), draw_as_spider=True,
+            color=color).draw(path=path, show=False)
+        return path.read_text()
+
+    assert 'style="fill: #ffffff' not in spider_svg(config.TRANSPARENT)
+    assert 'style="fill: #ffffff' in spider_svg("white")
+
+
+def test_raster_keeps_white_background(tmp_path):
+    from PIL import Image
+    path = tmp_path / "box.png"
+    Box("f", Ty("x"), Ty("y")).draw(path=path, show=False)
+    assert Image.open(path).convert("RGBA").getpixel((0, 0)) == (
+        255, 255, 255, 255)
+
+
+def test_draw_coloured_regions_and_frame():
+    red, green, blue = map(
+        monoidal.Colour, ("red", "green", "blue"))
+    x = monoidal.Ty(monoidal.Wire("x", red, green))
+    y = monoidal.Ty(monoidal.Wire("y", green, blue))
+    z = monoidal.Ty(monoidal.Wire("z", red, blue))
+    box = monoidal.Box("f", x @ y, z)
+    outer = monoidal.Ty(monoidal.Wire("u", blue, red))
+    # A box fills its three wire regions, with the names in
+    # discopy.config.COLORS resolved to their hexcodes as for boxes.
+    assert {'#e8a5a5', '#d8f8d8', '#776ff3'} <= region_hexes(box)
+    # A frame additionally fills its frame background (lightgrey).
+    frame = box.bubble(dom=outer, cod=outer, draw_as_frame=True)
+    assert {'#e8a5a5', '#d8f8d8', '#776ff3', '#d3d3d3'}\
+        <= region_hexes(frame)
+
+
+def coloured_bubble():
+    """
+    A bubble whose ten planar regions each get a distinct colour: six
+    outside (left, two along the top, right, two along the bottom) and
+    four inside (left, above and below the inner box, right). Every region
+    is enclosed by wires, so all ten colours show only when the bubble's
+    top and bottom boundaries are drawn, see issue #426.
+    """
+    Ty, Wire, Colour = monoidal.Ty, monoidal.Wire, monoidal.Colour
+    ol, o1, o2, o_r, o3, o4 = map(Colour, (
+        "red", "orange", "gold", "green", "blue", "purple"))
+    il, i1, i_r, i2 = map(Colour, ("cyan", "magenta", "brown", "pink"))
+    outer_dom = Ty(Wire("d", ol, o1), Wire("c", o1, o2), Wire("c", o2, o_r))
+    outer_cod = Ty(Wire("b", ol, o3), Wire("a", o3, o4), Wire("a", o4, o_r))
+    inner_dom = Ty(Wire("a", il, i1), Wire("b", i1, i_r))
+    inner_cod = Ty(Wire("c", il, i2), Wire("d", i2, i_r))
+    return monoidal.Box("f", inner_dom, inner_cod).bubble(
+        dom=outer_dom, cod=outer_cod, name="g")
+
+
+def test_bubble_regions_are_distinct():
+    # All ten regions get their own colour only when the bubble's top and
+    # bottom boundaries enclose the four inside regions, see issue #426.
+    assert len(region_hexes(coloured_bubble())) == 10
+
+
+def test_bubble_boundary_is_visible():
+    # A plain bubble opening keeps its horizontal boundary, i.e. its box
+    # node is not a frame side, while the frame sides of a square slot are.
+    x, y, z = map(monoidal.Ty, "xyz")
+    box_node, = Drawing.frame_opening(x, y, z, monoidal.Ty("")).box_nodes
+    assert not Backend.is_frame_boundary(box_node)
+    slot = Drawing.from_box(
+        monoidal.Box("f", x, x)).slot(monoidal.Colour())
+    frame_box_nodes = [n for n in slot.box_nodes if n.box.frame_boundary]
+    assert frame_box_nodes
+    assert all(map(Backend.is_frame_boundary, frame_box_nodes))
+
+
+def region_hexes(diagram, **params):
+    """The set of region facecolours (as hex) drawn for a diagram."""
+    from matplotlib.colors import to_hex
+    from matplotlib import pyplot as plt
+    drawing = diagram.to_drawing()
+    drawing.add_box_corners()
+    backend = Matplotlib(figsize=(2, 2))
+    backend.draw_regions(drawing, **params)
+    hexes = {to_hex(patch.get_facecolor()) for patch in backend.axis.patches}
+    plt.close(backend.axis.figure)
+    return hexes
+
+
+def test_draw_regions_uncoloured_shapes():
+    # Region filling runs for cups, caps, swaps, spiders and many-legged
+    # boxes; with no colours every region is transparent, i.e. the neutral
+    # background, so nothing is painted at all, see issue #521.
+    from discopy.frobenius import Spider, Ty as FTy
+    x = Ty('x')
+    shapes = [
+        Cup(x, x.r), Cap(x.r, x), Swap(x, x),
+        Box('f', x @ x, x @ x @ x), Spider(2, 1, FTy('x')),
+        Cap(x.r, x) >> Swap(x.r, x) >> Cup(x, x.r)]
+    for shape in shapes:
+        assert region_hexes(shape) == set()
+
+
+def test_draw_coloured_cups_and_caps():
+    red, green = map(monoidal.Colour, ("red", "green"))
+    x = Ty(Wire("x", dom=red, cod=green))
+    # A cup and a cap each separate the two boundary regions, with the
+    # names in discopy.config.COLORS resolved to their hexcodes.
+    assert region_hexes(Cup(x, x.r)) == {'#e8a5a5', '#d8f8d8'}
+    assert region_hexes(Cap(x.r, x)) == {'#e8a5a5', '#d8f8d8'}
+
+
+def test_draw_coloured_crossings_are_monochrome():
+    from discopy.frobenius import Spider, Ty as FTy, Wire as FOb
+    red = monoidal.Colour("red")
+    # Wires that cross or merge must be globular, i.e. carry the same colour
+    # on both sides, so their regions are a single colour.
+    assert region_hexes(Swap(
+        Ty(Wire("x", dom=red, cod=red)), Ty(Wire("y", dom=red, cod=red)))
+    ) == {'#e8a5a5'}
+    assert region_hexes(Spider(2, 1, FTy(FOb("x", dom=red, cod=red)))) == {
+        '#e8a5a5'}
+    # A swap of wires separating different regions is not globular.
+    green = monoidal.Colour("green")
+    with raises(AxiomError):
+        Swap(Ty(Wire("x", dom=red, cod=green)), Ty(Wire("y", dom=green, cod=red)))
+
+
+def test_draw_coloured_equation():
+    red, green = map(monoidal.Colour, ("red", "green"))
+    x = Ty(Wire("x", dom=red, cod=green))
+    equation = Equation(Box("f", x, x), Box("g", x, x))
+    colours = region_hexes(equation)
+    # Both term regions show; the transparent slots are not painted.
+    assert {'#e8a5a5', '#d8f8d8'} <= colours
+    assert '#ffffff' not in colours
+
+
+def test_draw_white_regions_are_painted():
+    # White is a colour like any other, see issue #751.
+    white = monoidal.Colour("white")
+    x = Ty(Wire("x", dom=white, cod=white))
+    assert region_hexes(Box("f", x, x)) == {'#ffffff'}
+
+
+def test_draw_region_non_colors_string():
+    # Colours need not be discopy COLORS keys: any Matplotlib colour string
+    # (a CSS name or a hex code) is filled as given.
+    for name, hexcode in [("lightgrey", '#d3d3d3'), ("#abcdef", '#abcdef')]:
+        c = monoidal.Colour(name)
+        box = monoidal.Box("f", monoidal.Ty(monoidal.Wire("x", c, c)),
+                           monoidal.Ty(monoidal.Wire("x", c, c)))
+        assert hexcode in region_hexes(box)
+
+
+def test_draw_legend():
+    from matplotlib.colors import to_hex
+    from matplotlib import pyplot as plt
+    red, green, blue = map(monoidal.Colour, ("red", "green", "blue"))
+    x = monoidal.Ty(monoidal.Wire("x", red, green))
+    y = monoidal.Ty(monoidal.Wire("y", green, blue))
+    z = monoidal.Ty(monoidal.Wire("z", red, blue))
+    drawing = monoidal.Box("f", x @ y, z).to_drawing()
+    drawing.add_box_corners()
+    backend = Matplotlib(figsize=(3, 3))
+    backend.draw_regions(drawing)
+    backend.draw_legend(drawing)
+    legend = backend.axis.get_legend()
+    labels = [text.get_text() for text in legend.get_texts()]
+    assert set(labels) == {"red", "green", "blue"}
+    # Each swatch is filled with its own colour, transparent is left out.
+    swatches = {to_hex(handle.get_facecolor())
+                for handle in legend.legend_handles}
+    assert swatches == {'#e8a5a5', '#d8f8d8', '#776ff3'}
+    plt.close(backend.axis.figure)
+
+
+def test_draw_legend_skipped_without_colours():
+    from matplotlib import pyplot as plt
+    drawing = Box("f", Ty("a"), Ty("a")).to_drawing()
+    drawing.add_box_corners()
+    backend = Matplotlib(figsize=(2, 2))
+    backend.draw_legend(drawing)
+    assert backend.axis.get_legend() is None
+    plt.close(backend.axis.figure)
+
+
+def test_draw_legend_uses_colour_label():
+    from matplotlib.colors import to_hex
+    from matplotlib import pyplot as plt
+    # A label gives the region a name in the legend while filling with its
+    # actual colour.
+    a = monoidal.Colour("cornflowerblue", label="Function")
+    b = monoidal.Colour("palegreen", label="Morphism")
+    x = monoidal.Ty(monoidal.Wire("F", dom=a, cod=b))
+    drawing = monoidal.Box("f", x, x).to_drawing()
+    drawing.add_box_corners()
+    backend = Matplotlib(figsize=(3, 3))
+    backend.draw_regions(drawing)
+    backend.draw_legend(drawing)
+    legend = backend.axis.get_legend()
+    assert [text.get_text() for text in legend.get_texts()] == [
+        "Function", "Morphism"]
+    assert sorted(to_hex(handle.get_facecolor())
+                  for handle in legend.legend_handles) == ['#6495ed', '#98fb98']
+    plt.close(backend.axis.figure)
+
+
+def test_draw_legend_figsize_and_space():
+    import tempfile
+    from matplotlib import image as mpimg
+    red, green = monoidal.Colour("red"), monoidal.Colour("green")
+    x = monoidal.Ty(monoidal.Wire("x", red, green))
+    box = monoidal.Box("f", x, x)
+    with tempfile.TemporaryDirectory() as folder:
+        plain = os.path.join(folder, "plain.png")
+        legend = os.path.join(folder, "legend.png")
+        box.draw(show=False, figsize=(3, 2), path=plain)
+        # With an explicit figsize the figure is widened by legend_space.
+        box.draw(show=False, figsize=(3, 2), legend=True, legend_space=2,
+                 path=legend)
+        assert mpimg.imread(legend).shape[1] > mpimg.imread(plain).shape[1]
+    # legend=True on an uncoloured diagram adds nothing.
+    Box("g", Ty("a"), Ty("a")).draw(show=False, legend=True)
+
+
+def test_region_cells_example():
+    """
+    Concrete example clarifying ``Backend.region_cells``: a coloured cup
+    ``Cup(x, x.r)`` with ``x`` separating red from green, of width 2 and
+    height 1, decomposes into two height bands:
+        * below the cup, from 0 to 0.5: a single red cell spanning the
+          full width, since no separator crosses the band;
+        * above, from 0.5 to 1: red left of the left leg, green inside
+          the cup between the legs, red right of the right leg.
+    Each cell is bounded by quadratic Beziers ``(top, control, bottom)``
+    hugging the wires on *both* sides, restricted to the band, with the
+    sides of the canvas as straight outermost boundaries, see issue #521.
+    """
+    red, green = map(monoidal.Colour, ("red", "green"))
+    x = Ty(Wire("x", dom=red, cod=green))
+    drawing = Cup(x, x.r).to_drawing()
+    drawing.add_box_corners()
+    left_leg = ((0.5, 1), (0.5, 0.5), (1, 0.5))
+    right_leg = ((1.5, 1), (1.5, 0.5), (1, 0.5))
+    assert Backend.region_cells(drawing) == [
+        (((0, 0.5), (0, 0), (0, 0)), ((2, 0.5), (2, 0), (2, 0)), "red"),
+        (((0, 1), (0, 0.5), (0, 0.5)), left_leg, "red"),
+        (left_leg, right_leg, "green"),
+        (right_leg, ((2, 1), (2, 0.5), (2, 0.5)), "red")]
+
+
+def test_region_cells_do_not_overlap():
+    # Each point of the canvas is covered by at most one region cell, so
+    # translucent colours are not painted twice where two regions of the
+    # same colour are adjacent, see issue #521. With every separator a
+    # straight vertical line, the cells are rectangles whose areas add up
+    # to the area of the canvas minus the box, which is a 2-cell rather
+    # than a region, i.e. a hole with nothing painted underneath.
+    translucent = monoidal.Colour("#3a86ff80")
+    x = monoidal.Ty(monoidal.Wire("x", translucent, translucent))
+    y = monoidal.Ty(monoidal.Wire("y", translucent, translucent))
+    drawing = monoidal.Box("f", x @ y, x @ y).to_drawing()
+    drawing.add_box_corners()
+    cells = Backend.region_cells(drawing)
+    assert all(colour == "#3a86ff80" for _, _, colour in cells)
+    area = sum(
+        (right[0].x - left[0].x) * (left[0].y - left[-1].y)
+        for left, right, _ in cells)
+    box_area = 1.5 * 0.5  # the box spans (0.25, 1.75) x (0.25, 0.75)
+    assert area == drawing.width * drawing.height - box_area
+
+
+def test_region_transparent_cells_erase_to_the_background():
+    # A transparent region enclosed by coloured ones is not painted at all
+    # rather than overpainted in opaque white, see issue #521.
+    u = monoidal.Ty(monoidal.Wire("u"))
+    frame = monoidal.Box("f", u, u).bubble(dom=u, cod=u, draw_as_frame=True)
+    colours = region_hexes(frame)
+    assert '#d3d3d3' in colours and '#ffffff' not in colours
+
+
+def test_region_cells_follow_the_strands_of_a_crossing():
+    # The separators of a crossing are its strands, the cubic Beziers of
+    # Backend.braid_strand from each input to the output it is permuted to,
+    # where they used to bend at the box node like the edges of any box: the
+    # painted cells pinched at the centre while the wires crossed diagonally,
+    # visible as soon as the wires inside a permutation carried different
+    # colours, see issue #17 (discopy/discopy#614).
+    from discopy.drawing.backend import bezier
+    from discopy.symmetric import Permutation, Ty as STy, Wire as SWire
+    red, blue = map(monoidal.Colour, ("red", "blue"))
+    x, y, z = (SWire("x", red, blue), SWire("y", blue, red),
+               SWire("z", red, blue))
+    permutation = Permutation(STy(x, y, z), [2, 1, 0])
+    drawing = permutation.to_drawing()
+    drawing.add_box_corners()
+    separators = Backend.region_separators(drawing)
+    assert [tuple(curve) for curve, _ in separators] == [
+        tuple(Backend.braid_strand((0.5 + source, 1), (0.5 + i, 0), 0.5))
+        for i, source in enumerate((2, 1, 0))]
+    assert [colour for _, colour in separators] == ["blue", "red", "blue"]
+    strand = separators[0][0]
+    assert Backend.separator_param(strand, bezier(strand, 0.3).y)\
+        == approx(0.3)
+    # The three strands meet at the middle height, which splits the canvas
+    # in two bands of four cells each, alternating like the boundary does.
+    cells = Backend.region_cells(drawing)
+    assert [left[0].y for left, _, _ in cells] == 4 * [0.5] + 4 * [1]
+    assert [colour for _, _, colour in cells] == 2 * ["red", "blue"] * 2
+    assert len(region_hexes(permutation)) == 2
+
+
+def test_region_cells_split_where_strands_meet():
+    # The strands of a cyclic permutation meet at two heights other than the
+    # middle, where the canvas is subdivided so that no two separators cross
+    # inside a band: the cells of a band chain from one side of the canvas to
+    # the other, each left boundary staying left of the right one. No
+    # colouring of the inner regions of a 3-cycle is consistent, so a cell
+    # takes the colour of its left boundary as everywhere.
+    from discopy.drawing.backend import bezier
+    from discopy.symmetric import Permutation, Ty as STy, Wire as SWire
+    red, blue = map(monoidal.Colour, ("red", "blue"))
+    x, y, z = (SWire("x", red, red), SWire("y", red, blue),
+               SWire("z", blue, red))
+    drawing = Permutation(STy(x, y, z), [1, 2, 0]).to_drawing()
+    drawing.add_box_corners()
+    cells = Backend.region_cells(drawing)
+    tops = sorted({left[0].y for left, _, _ in cells})
+    assert len(tops) == 3 and 0 < tops[0] < 0.5
+    assert tops[0] + tops[1] == approx(1)
+    assert [colour for _, _, colour in cells]\
+        == 2 * ["red", "blue", "red", "red"] + ["red", "red", "blue", "red"]
+    for (left, right, _), (next_left, _, _) in zip(cells, cells[1:]):
+        assert right == next_left or left[0].y != next_left[0].y
+    for left, right, _ in cells:
+        assert left[0].y == right[0].y and left[-1].y == right[-1].y
+        assert all(bezier(left, t).x <= bezier(right, t).x + 1e-9
+                   for t in (0, 0.25, 0.5, 0.75, 1))
+    # The lowest band ends where the strands of x and z meet.
+    (_, z_strand, _), (_, x_strand, _) = cells[1:3]
+    assert tuple(z_strand[0]) == approx(tuple(x_strand[0]))
+
+
+def test_draw_permutation():
+    from matplotlib import pyplot as plt
+    from discopy.monoidal import Box
+    from discopy.symmetric import Ty, Permutation
+
+    x, y, z = map(Ty, "xyz")
+    perm = Permutation(x @ y @ z, [2, 0, 1])
+    drawing = perm.to_drawing()
+    box_node = drawing.box_nodes[0]
+    assert len(list(drawing.graph.predecessors(box_node))) == len(perm.dom)
+    assert len(list(drawing.graph.successors(box_node))) == len(perm.cod)
+    assert drawing.box.draw_as_permutation is True
+    assert drawing.box.permutation_indices == tuple(perm.perm)
+    assert drawing.dagger().box.permutation_indices\
+        == tuple(perm.perm.dagger())
+    assert drawing.dagger() == perm.dagger().to_drawing()
+    assert drawing.dagger().box.drawing_name\
+        == perm.dagger().to_drawing().box.drawing_name
+
+    swap = Permutation(x @ y, [1, 0]).to_drawing()
+    swap.add_box_corners()
+    tikz = TikZ()
+    tikz.draw_wires(swap)
+    assert len(tikz.edgelayer) == 2
+    matplotlib = Matplotlib()
+    matplotlib.draw_wires(swap)
+    assert len(matplotlib.axis.patches) == 2
+    plt.close(matplotlib.axis.figure)
+
+    custom = Box(
+        'custom', x @ y, y @ x, draw_as_wires=True,
+        draw_as_permutation=True, permutation_indices=(1, 0)).to_drawing()
+    assert custom.dagger().dagger() == custom
+    assert custom.dagger().dagger().box.name == 'custom'
+
+
+def test_draw_permutation_in_diagram(tmp_path):
+    from discopy.symmetric import Box, Ty, Permutation
+
+    x, y, z = map(Ty, "xyz")
+    f = Box("f", z @ x @ y, x)
+    diagram = Permutation(x @ y @ z, [2, 0, 1]) >> f
+    drawing = diagram.to_drawing()
+    assert drawing.dom == (x @ y @ z).to_drawing()
+    assert drawing.cod == x.to_drawing()
+    assert drawing.boxes[0].permutation_indices == (2, 0, 1)
+    assert drawing.boxes[1].name == "f"
+    diagram.draw(path=str(tmp_path / "permutation.svg"), show=False)
+    assert (tmp_path / "permutation.svg").exists()
+
+
+def test_readable_foreground():
+    # White and light colours get black text, dark colours get white text.
+    assert Backend.readable_foreground("white") == "black"
+    assert Backend.readable_foreground("black") == "white"
+    assert Backend.readable_foreground("yellow") == "black"
+    assert Backend.readable_foreground("darkblue") == "white"
+    # Unrecognised colours fall back to black rather than raising.
+    assert Backend.readable_foreground("not-a-colour") == "black"
+
+
+def test_draw_box_foreground_on_dark_background():
+    # A box with a dark custom colour gets a white label instead of the
+    # default black, so its name stays legible.
+    from matplotlib import pyplot as plt
+    box = monoidal.Box(
+        "f", monoidal.Ty("x"), monoidal.Ty("x"), color="black")
+    drawing = box.to_drawing()
+    drawing.add_box_corners()
+    backend = Matplotlib(figsize=(2, 2))
+    backend.draw_boxes(drawing)
+    assert backend.axis.texts[-1].get_color() == "white"
+    plt.close(backend.axis.figure)
+
+
+def test_crack_two_eggs_at_once():
+    from discopy.symmetric import Ty, Box, Diagram, Layer
+
+    egg, white, yolk = Ty("egg"), Ty("white"), Ty("yolk")
+    crack = Box("crack", egg, white @ yolk)
+    merge = lambda X: Box("merge", X @ X, X)
+
+    # DisCoPy allows string diagrams to be defined as Python functions
+
+    @Diagram.from_callable(egg @ egg, white @ yolk)
+    def crack_two_eggs(x, y):
+        (a, b), (c, d) = crack(x), crack(y)
+        return (merge(white)(a, c), merge(yolk)(b, d))
+
+    # ... or in point-free style using parallel (@) and sequential (>>)
+    # composition. from_callable returns the foliated diagram directly, so we
+    # foliate the point-free staircase to compare.
+
+    assert crack_two_eggs == (crack @ crack
+        >> white @ Diagram.swap(yolk, white) @ yolk
+        >> merge(white) @ merge(yolk)).foliation()
+
+    assert crack_two_eggs.foliation() == Diagram(
+        dom=egg @ egg, cod=white @ yolk, inside=(
+            Layer(Ty(), crack, Ty(), crack, Ty()),
+            Layer(white, Diagram.swap(yolk, white), yolk),
+            Layer(Ty(), merge(white), Ty(), merge(yolk), Ty())))
+
+
+@tikz_and_compare("spiral.tikz", wire_labels=False, use_tikzstyles=True)
+def test_spiral_to_tikz():
+    return spiral(2)
+
+
+@tikz_and_compare("copy.tikz", use_tikzstyles=True)
+def test_copy_to_tikz():
+    x, y = map(Ty, ("$x$", "$y$"))
+    copy_x, copy_y = Box('COPY', x, x @ x), Box('COPY', y, y @ y)
+    copy_x.draw_as_spider, copy_y.draw_as_spider = True, True
+    copy_x.drawing_name, copy_y.drawing_name = "", ""
+    copy_x.color, copy_y.color = "black", "black"
+    return copy_x @ copy_y >> Id(x) @ Swap(x, y) @ Id(y)
+
+
+@tikz_and_compare("snake-equation.tikz", textpad=(.2, .2), textpad_words=(0, .25))
+def test_snake_equation_to_tikz():
+    from discopy.rigid import Ty, Id
+    x = Ty('x')
+    return Equation(Id(x.r).transpose(left=True), Id(x), Id(x.l).transpose())
+
+
+@tikz_and_compare("who-ansatz.tikz")
+def test_who_ansatz_to_tikz():
+    from discopy.grammar.pregroup import Ty, Cap, Word, Id, Box
+    s, n = Ty('s'), Ty('n')
+    who = Word('who', n.r @ n @ s.l @ n)
+    who_ansatz = Cap(n.r, n)\
+        >> Id(n.r) @ Box('copy', n, n @ n)\
+        >> Id(n.r @ n) @ Cap(s, s.l) @ Id(n)\
+        >> Id(n.r) @ Box('update', n @ s, n) @ Id(s.l @ n)
+    return Equation(who, who_ansatz, symbol="$\\mapsto$")
+
+
+@tikz_and_compare('bialgebra.tikz', use_tikzstyles=True)
+def test_tikz_bialgebra_law():
+    from discopy.quantum.zx import Z, X, Id, SWAP
+    source = X(2, 1) >> Z(1, 2)
+    target = Z(1, 2) @ Z(1, 2) >> Id(1) @ SWAP @ Id(1) >> X(2, 1) @ X(2, 1)
+    return Equation(source, target)
+
+
+@tikz_and_compare('bell-state.tikz', aspect='equal', use_tikzstyles=True)
+def test_tikz_bell_state():
+    from discopy.quantum import qubit, H, sqrt, Bra, Ket, CX, QuantumGate
+    H = QuantumGate(H.name, H.dom, H.cod, H.data,
+                    draw_as_spider=True, color="yellow", drawing_name="")
+    return sqrt(2) >> Ket(0, 0) >> H @ qubit >> CX >> Bra(0) @ qubit
+
+
+def test_tikz_bell_state_keeps_the_gate():
+    """ The test above restyles a copy of ``H``, not the gate itself. """
+    from discopy.quantum import H
+    for attr in ("draw_as_spider", "color", "drawing_name"):
+        assert not hasattr(H, attr)
+
+
+@tikz_and_compare('crack-eggs.tikz')
+def test_tikz_eggs():
+    def merge(x):
+        box = Box('merge', x @ x, x, draw_as_spider=True)
+        return box
+
+    egg, white, yolk = Ty('egg'), Ty('white'), Ty('yolk')
+    crack = Box('crack', egg, white @ yolk)
+    return crack @ crack\
+        >> Id(white) @ Swap(yolk, white) @ Id(yolk)\
+        >> merge(white) @ merge(yolk)
+
+
+@tikz_and_compare('long-controlled.tikz', wire_labels=False)
+def test_tikz_long_controlled():
+    from discopy.quantum import Controlled, CZ, CX
+    return (Controlled(CX.l, distance=3) >> Controlled(
+        Controlled(CZ.l, distance=2), distance=-1))
+
+
+def classical_controlled():
+    # A controlled gate over distinct wires, e.g. a classically-controlled
+    # gate, used to hit a KeyError looking up its nodes with the wrong type.
+    bit, qubit = monoidal.Ty("bit"), monoidal.Ty("qubit")
+    gate = monoidal.Box("F", qubit, qubit)
+    controlled = monoidal.Box(
+        "CF", bit @ qubit, bit @ qubit,
+        draw_as_controlled=True, controlled=gate, distance=1)
+    left_controlled = monoidal.Box(
+        "FC", qubit @ bit, qubit @ bit,
+        draw_as_controlled=True, controlled=gate, distance=-1)
+    return controlled @ left_controlled
+
+
+# The matplotlib rendering of classical_controlled() is exercised as a
+# doctest in the Gallery section of discopy/drawing/drawing.py, alongside
+# long-controlled; this only checks the TikZ backend, whose bending is
+# computed differently from Matplotlib.
+@tikz_and_compare('controlled-classical.tikz')
+def test_tikz_controlled_classical():
+    return classical_controlled()
+
+
+def test_tikz_controlled_node_ids():
+    # Nested controlled gates put several nodes at the same point, which used
+    # to make TikZ output duplicate node ids and misdirected control wires.
+    import re
+    from discopy.quantum import Controlled, X
+    path = os.path.join(TIKZ_FOLDER, '_ccx-node-ids.tikz')
+    Controlled(Controlled(X)).draw(path=path, to_tikz=True)
+    with open(path, "r") as file:
+        lines = file.read().splitlines()
+    os.remove(path)
+    node_ids = [re.search(r"\((\d+)\) at", line).group(1)
+                for line in lines if line.startswith("\\node ")]
+    assert len(node_ids) == len(set(node_ids))
+    wires = [re.findall(r"\((\d+)\.center\)", line)
+             for line in lines if "out=" in line]
+    assert all(source != target for source, target in wires)
+
+
+def test_rich_display():
+    from io import StringIO
+    import matplotlib.pyplot as plt
+    from discopy.monoidal import Ty, Box
+
+    f = Box('f', Ty('x'), Ty('y'))
+    diagram, drawing, equation = f, f.to_drawing(), Equation(f, f)
+    plt.close('all')
+
+    for obj in (diagram, drawing, equation):
+        svg, png = obj._repr_svg_(), obj.to_png()
+        assert svg.startswith('<?xml') and '</svg>\n' in svg
+        assert png.startswith(b'\x89PNG')
+        assert obj._repr_mimebundle_() == {
+            'image/svg+xml': svg, 'image/png': png}
+        assert obj._repr_mimebundle_(include=['image/svg+xml']) == {
+            'image/svg+xml': svg}
+        assert obj._repr_mimebundle_(exclude=['image/svg+xml']) == {
+            'image/png': png}
+        assert obj._repr_mimebundle_(include=['text/html']) == {}
+
+    assert plt.get_fignums() == []
+
+    # Output is deterministic, i.e. the same diagram renders byte-for-byte.
+    assert diagram._repr_svg_() == diagram._repr_svg_()
+    assert diagram.to_png() == diagram.to_png()
+
+    # The format parameter of draw allows rendering to an in-memory buffer.
+    buffer = StringIO()
+    diagram.draw(path=buffer, format='svg', show=False)
+    assert buffer.getvalue() == diagram.to_svg()
+
+    import subprocess
+    import sys
+    script = """
+from discopy.monoidal import Box, Ty
+x = Ty("x")
+boxes = [Box(str(i), x, x, draw_as_spider=True) for i in range(4)]
+for box, color, shape in zip(
+        boxes, ("red", "blue", "green", "yellow"),
+        ("circle", "rectangle", "circle", "rectangle")):
+    box.color, box.shape, box.drawing_name = color, shape, ""
+print((boxes[0] @ boxes[1] @ boxes[2] @ boxes[3]).to_svg())
+"""
+    outputs = [
+        subprocess.check_output(
+            [sys.executable, "-c", script],
+            env=dict(os.environ, PYTHONHASHSEED=str(seed)))
+        for seed in range(3)]
+    assert outputs[0] == outputs[1] == outputs[2]
+
+
+def test_widget():
+    importorskip("anywidget")
+    import pickle
+    from discopy.monoidal import Ty, Box
+    from discopy.drawing.widget import DiagramWidget
+
+    f = Box('f', Ty('x'), Ty('y'))
+    widget = f.to_widget()
+    assert isinstance(widget, DiagramWidget) and widget.svg == f.to_svg()
+    assert set(f._repr_mimebundle_()) == {'image/svg+xml', 'image/png'}
+    assert pickle.loads(pickle.dumps(f)) == f
+
+
+RIBBON_COLOURS = ("red", "green", "blue", "yellow")
+
+
+def auto_colour_ribbons(diagram):
+    """
+    A colour map for nice looking dual rail examples: cycles through
+    ``RIBBON_COLOURS`` assigning one colour per distinct object. An object
+    and its adjoint encode the same wire, hence share the same colour.
+    """
+    obs = list(diagram.dom.inside)
+    for box in diagram.boxes:
+        obs += list(box.dom.inside) + list(box.cod.inside)
+    palette = {name: RIBBON_COLOURS[i % len(RIBBON_COLOURS)]
+               for i, name in enumerate(sorted({ob.name for ob in obs}))}
+    return lambda ob: palette[ob.name]
+
+
+def test_draw_ribbon_colors():
+    # The inside of each ribbon is filled with a colour in the dual rail
+    # drawing of a ribbon diagram, covering the straight rails, the cups, caps
+    # and braids, with the colour and width preserved across the adjoint.
+    from discopy.ribbon import Ty, Braid
+    x = Ty('x')
+    diagram = Braid(x, x).trace(left=False)
+    diagram.to_ribbons(colour=auto_colour_ribbons(diagram)).draw(
+        wire_labels=False, aspect='equal', show=False,
+        doctest="docs/_static/ribbon/ribbon-colors.svg")
+
+
+@tikz_and_compare('ribbon-colors.tikz', wire_labels=False)
+def test_tikz_ribbon_colors():
+    from discopy.ribbon import Ty, Braid
+    x = Ty('x')
+    diagram = Braid(x, x).trace(left=False)
+    return diagram.to_ribbons(colour=auto_colour_ribbons(diagram))
+
+
+def test_draw_twist_colors():
+    # The back of a twisting ribbon, where it turns over, is filled with a
+    # darker shade of the colour filling its front.
+    from discopy.ribbon import Ty, Diagram
+    x = Ty('x')
+    Diagram.twist(x).to_ribbons().draw(
+        wire_labels=False, aspect='equal', show=False,
+        doctest="docs/_static/ribbon/twist-colors.svg")
+
+
+@tikz_and_compare('twist-colors.tikz', wire_labels=False)
+def test_tikz_twist_colors():
+    from discopy.ribbon import Ty, Diagram
+    x = Ty('x')
+    return Diagram.twist(x).to_ribbons()
+
+
+def test_darken():
+    # A darker shade of a colour keeps each RGB channel smaller, and the
+    # darker shades filling the back of a twisting ribbon are precomputed
+    # for every named colour, see discopy.config.COLORS.
+    from discopy.config import COLORS, darken
+    for name in ["red", "green", "blue", "yellow", "gray"]:
+        hexcode, dark_hexcode = COLORS[name], COLORS[f"dark_{name}"]
+        assert darken(hexcode) == dark_hexcode
+        channels = [int(hexcode[i:i + 2], 16) for i in (1, 3, 5)]
+        dark_channels = [int(dark_hexcode[i:i + 2], 16) for i in (1, 3, 5)]
+        assert all(d <= c for d, c in zip(dark_channels, channels))
+        assert any(d < c for d, c in zip(dark_channels, channels))
+
+
+def test_draw_nested_ribbons():
+    # Nested cups and caps stay folds of constant (ribbon) width, i.e. the
+    # inner ribbon is squeezed just like the outer one.
+    from discopy.ribbon import Ty, Diagram
+    x, y = Ty('x'), Ty('y')
+    (Diagram.caps(x @ y, (x @ y).r)
+        >> Diagram.cups(x @ y, (x @ y).r)).to_ribbons().draw(
+        wire_labels=False, aspect='equal', show=False,
+        doctest="docs/_static/ribbon/nested-ribbons.svg")
+
+
+def test_Drawing_validate_attributes():
+    x, y = Ty('x'), Ty('y')
+    drawing = (Box('f', x, y) >> Box('g', y, x)).to_drawing()
+    drawing.validate_attributes()
+    assert drawing == Drawing(
+        drawing.inside, drawing.dom, drawing.cod, drawing.boxes,
+        drawing.width, drawing.height) != 1
+    with raises(ValueError):
+        drawing.box  # Not a layer.
+    z = monoidal.Ty('z')
+    assert Drawing.permutation([0, 1], [z, z]) == Drawing.id(z @ z)
+    h = Box('h', x @ x @ y, x @ x @ y).to_drawing()
+    assert h.trace(2) == h.trace().trace()
+    zero = Drawing.zero(x, y)
+    assert h.add(zero) == h == zero.add(h)
+
+
+def test_Drawing_dagger():
+    """ The reflection lists its nodes by index, whatever order the graph
+    stores them in, and the empty drawing reflects to itself. """
+    x = monoidal.Ty('x')
+    f, g = monoidal.Box('f', x, x), monoidal.Box('g', x, x)
+    drawing = (f >> g).to_drawing()
+    assert [node.box for node in drawing.dagger().box_nodes]\
+        == [g.dagger(), f.dagger()]
+    assert drawing.dagger().dagger() == drawing
+    empty = monoidal.Id(monoidal.Ty()).to_drawing()
+    assert empty.dagger() == empty

@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from optyx.core.diagram import Box, Ty, bit, mode
+from discopy.optyx.core.diagram import Box, Ty, bit, mode
 
 
 def test_array_state_infers_dims_from_array_shape():

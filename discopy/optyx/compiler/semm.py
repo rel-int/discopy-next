@@ -15,7 +15,7 @@ from copy import deepcopy
 
 import networkx as nx
 
-from optyx.compiler.mbqc import (
+from discopy.optyx.compiler.mbqc import (
     Fusion,
     FusionNetwork,
     Measurement,
@@ -25,14 +25,14 @@ from optyx.compiler.mbqc import (
     fn_to_open_graph,
     get_fused_neighbours
 )
-from optyx.compiler.path_cover import find_min_path_cover
-from optyx.compiler.patterns import (
+from discopy.optyx.compiler.path_cover import find_min_path_cover
+from discopy.optyx.compiler.patterns import (
     FusionOp,
     Instruction,
     MeasureOp,
     NextNodeOp
 )
-from optyx.compiler.semm_decompiler import decompile_to_fusion_network
+from discopy.optyx.compiler.semm_decompiler import decompile_to_fusion_network
 
 
 def compile_to_semm(
@@ -44,15 +44,16 @@ def compile_to_semm(
     -------
     >>> import networkx as nx
     >>> g = nx.Graph([(0, 1), (1, 2)])
-    >>> from optyx.compiler.mbqc import OpenGraph, Measurement, FusionNetwork
+    >>> from discopy.optyx.compiler.mbqc import (
+    ...     OpenGraph, Measurement, FusionNetwork)
     >>>
     >>> meas = {i: Measurement(i, "XY") for i in range(2)}
     >>> inputs = [0]
     >>> outputs = [2]
     >>>
     >>> og = OpenGraph(g, meas, inputs, outputs)
-    >>> from optyx.compiler.semm import compile_to_semm
-    >>> from optyx.compiler.patterns import (
+    >>> from discopy.optyx.compiler.semm import compile_to_semm
+    >>> from discopy.optyx.compiler.patterns import (
     ...    FusionOp,
     ...    MeasureOp,
     ...    NextNodeOp,
@@ -91,9 +92,10 @@ def decompile_from_semm(
 
     Example
     -------
-    >>> from optyx.compiler.mbqc import OpenGraph, Measurement, FusionNetwork
-    >>> from optyx.compiler.semm import decompile_from_semm
-    >>> from optyx.compiler.patterns import (
+    >>> from discopy.optyx.compiler.mbqc import (
+    ...     OpenGraph, Measurement, FusionNetwork)
+    >>> from discopy.optyx.compiler.semm import decompile_from_semm
+    >>> from discopy.optyx.compiler.patterns import (
     ...    FusionOp,
     ...    MeasureOp,
     ...    NextNodeOp,

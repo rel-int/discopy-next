@@ -2,9 +2,9 @@ import math
 
 import pytest
 
-from optyx.compiler.mbqc import Fusion, FusionNetwork, Measurement
-from optyx.compiler.patterns import FusionOp, MeasureOp, NextNodeOp
-from optyx.compiler.semm import (
+from discopy.optyx.compiler.mbqc import Fusion, FusionNetwork, Measurement
+from discopy.optyx.compiler.patterns import FusionOp, MeasureOp, NextNodeOp
+from discopy.optyx.compiler.semm import (
     fn_to_semm,
     get_creation_times,
     get_measurement_times

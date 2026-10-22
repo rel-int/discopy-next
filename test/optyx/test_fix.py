@@ -4,11 +4,12 @@ import numpy as np
 import pytest
 from cotengra import HyperCompressedOptimizer
 
-from optyx import channel, classical, photonic, qubits
-from optyx.channel import (
+from discopy.optyx import channel, classical, photonic, qubits
+from discopy.optyx.channel import (
     Diagram, Discard, Scalar, Ty, bit, qmode, qubit,
 )
-from optyx.core.backends import DiscopyBackend, QuimbBackend
+from discopy.optyx.core import diagram as core, zw
+from discopy.optyx.core.backends import DiscopyBackend, QuimbBackend
 
 
 def source(photons=1, effect=None):
@@ -99,6 +100,23 @@ def test_at_time_needs_a_state():
         mem=qubit)
     with pytest.raises(ValueError, match="needs a state"):
         loop.at_time(2)
+
+
+def test_at_time_validates_its_arguments():
+    with pytest.raises(ValueError, match="empty domain"):
+        (Diagram.id(qubit) @ source()).at_time(1)
+    for n_steps in (-1, True, 1.5):
+        with pytest.raises(ValueError, match="non-negative integer"):
+            source().at_time(n_steps)
+
+
+def test_dilate_needs_the_loop_opened():
+    """A feedback loop has no Kraus map until it is opened into one step,
+    whose dilation is its Kraus map since it discards nothing."""
+    with pytest.raises(NotImplementedError, match="one_step"):
+        delay().dilate()
+    step = delay().one_step()
+    assert step.dilate() == step.get_kraus()
 
 
 def test_unroll_boundary_overrides_serve_the_solvers():
@@ -208,6 +226,35 @@ def test_power_fix_normalises_the_contracted_state():
         source().power_fix(tol=1e-2, backend=DiscopyBackend())
 
 
+def test_solvers_refuse_a_zero_state():
+    """A loop scaled to zero has no state to normalise: both contractions
+    raise rather than divide by a vanishing trace."""
+    with pytest.raises(ValueError, match="zero or non-finite trace"):
+        (Scalar(0) @ delay()).fix(tol=1e-2)
+    with pytest.raises(ValueError, match="zero or non-finite trace"):
+        (Scalar(0) @ source()).power_fix(tol=1e-2)
+
+
+def test_power_fix_compares_states_of_growing_support():
+    """Every step of a sampler can add a photon, so successive states have
+    growing shapes and are padded to be compared; the iteration still
+    agrees with the eigensolve on their common support."""
+    power = sampler(loss=.5).power_fix(tol=1e-3, max_chi=None).density_matrix
+    exact = sampler(loss=.5).eigen_fix().density_matrix
+    assert len(power) < len(exact)
+    support = slice(0, len(power))
+    assert np.allclose(power, exact[support, support], atol=1e-2)
+
+
+def test_eigen_fix_refuses_what_it_cannot_justify():
+    """A cutoff too small for the photons the loop holds loses trace, and a
+    loop that is not trace preserving has no stationary state."""
+    with pytest.raises(ValueError, match="No cutoff below 2"):
+        sampler().eigen_fix(max_truncation=2)
+    with pytest.raises(ValueError, match="no stationary state"):
+        (Scalar(.5) @ source()).eigen_fix(tol=2)
+
+
 def test_power_iteration_warns_on_a_periodic_loop():
     """A period-two loop has a stationary state its iterates never reach:
     `fix` falls back on `power_fix`, which returns the state at `max_steps`
@@ -264,7 +311,7 @@ def test_both_solvers_return_the_same_kind_of_result():
     """`fix` and `eigen_fix` produce interchangeable `EvalResult`s: a
     density matrix over the codomain, real when the state is, read the
     same way whichever solver produced it."""
-    from optyx.core.backends import StateType
+    from discopy.optyx.core.backends import StateType
     eigen = source().eigen_fix()
     power = source().fix(tol=1e-2)
     for result in (eigen, power):
@@ -404,6 +451,12 @@ def test_unroll_certificate_stops_when_the_truncation_alone_misses():
             1e-6, max_truncation=0) == 2
 
 
+@pytest.mark.parametrize("max_steps", [1, True, 1.5])
+def test_unroll_certificate_validates_max_steps(max_steps):
+    with pytest.raises(ValueError, match="max_steps"):
+        sampler(.25).unroll_certificate(max_steps=max_steps)
+
+
 @pytest.mark.parametrize("max_truncation", [-1, 1.5, True])
 def test_unroll_certificate_validates_max_truncation(max_truncation):
     """Zero is a valid cutoff on the photons in the loop, unlike a bond
@@ -441,6 +494,23 @@ def test_certificate_refuses_what_it_cannot_certify():
         mem=qmode, state=photonic.Create(0))
     assert outer.certificate_obstruction() \
         == "the loop contains a nested feedback loop"
+
+
+@pytest.mark.parametrize(("step", "obstruction"), [
+    (photonic.Create(1) @ qmode >> qmode @ channel.CQMap(
+        "cq", core.Id(core.mode ** 2), qmode, qmode), "has no Kraus map"),
+    (photonic.Create(1) @ qmode >> qmode @ channel.Channel(
+        "Z", zw.ZBox(1, 1, [1, 2])), "has no path matrix"),
+    (photonic.Create(1, 1) @ qmode >> photonic.Select(1) @ qmode ** 2,
+     "does not split"),
+    (photonic.Create(1) @ qmode >> photonic.Gate(
+        np.array([[1, 1], [0, 1]]), 2, 2, "U"), "not an isometry"),
+])
+def test_certificate_names_the_box_it_cannot_read(step, obstruction):
+    """The bound reads the loop's optical matrix: a box with no Kraus map
+    or path matrix, a postselection or a non-isometry each obstruct it."""
+    loop = step.feedback(mem=qmode, state=photonic.Create(0))
+    assert obstruction in loop.certificate_obstruction()
 
 
 def test_backend_uses_existing_interface():
