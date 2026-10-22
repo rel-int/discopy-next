@@ -1,5 +1,5 @@
-from optyx.classical import *
-from optyx.utils.misc import compare_arrays_of_different_sizes
+from discopy.optyx.classical import *
+from discopy.optyx.utils.misc import compare_arrays_of_different_sizes
 
 def test_addn():
     d_1 = Digit(2, 3) >> Add(2)

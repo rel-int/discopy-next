@@ -1,7 +1,7 @@
 
 import random
 import pytest
-from optyx.utils.postselect_parser import compile_postselect
+from discopy.optyx.utils.postselect_parser import compile_postselect
 
 def run(expr, counts):
     return compile_postselect(expr)(counts)

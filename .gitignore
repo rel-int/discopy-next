@@ -1,0 +1,39 @@
+*.pdf
+*.fdb_latexmk
+*.fls
+*.aux
+*.log
+*.bbl
+*.blg
+*.pag
+*.gz
+.coverage
+.pylintrc
+.pytest_cache
+.mpl-cache/
+.readthedocs.yaml
+.uv-cache
+.venv
+.vscode
+*.out
+*.toc
+*.pyc
+*.nav
+docs/_build/*
+docs/_api/*
+*/__pycache__/*
+*.egg-info
+build/*
+dist/*
+discopy/version.py
+# marimo (session cache, sandbox metadata, editor layouts)
+__marimo__/
+docs/notebooks/layouts/
+# notebook pages rendered at docs build time (see docs/export_notebooks.py)
+docs/notebooks/*.rst
+docs/_static/notebooks/
+# drawings left behind by a failing drawing test (backend.temporary_path)
+docs/_static/*/_*.svg
+benchmark-results/
+plans/
+.style-review/

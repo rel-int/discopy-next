@@ -89,26 +89,26 @@ SWAP                    ``(X(1, 2) @ Id(1)) >> (Id(1) @ Z(2, 1)) >> (X(1, 2) @ I
 A single-qubit phase gate:
 
 >>> rz = Z(1, 1, 0.5)      # Rz(pi)
->>> rz.draw(path='docs/_static/rz.svg')
+>>> rz.draw(path='docs/_static/optyx/rz.svg')
 
-.. image:: /_static/rz.svg
+.. image:: /_static/optyx/rz.svg
    :align: center
 
 
 CNOT expressed in ZX:
 
 >>> cnot_zx = (Id(1) @ Z(1, 2)) >> (X(2, 1) @ Id(1))
->>> cnot_zx.draw(path='docs/_static/cnot_zx.svg', figsize=(4, 2))
+>>> cnot_zx.draw(path='docs/_static/optyx/cnot_zx.svg', figsize=(4, 2))
 
-.. image:: /_static/cnot_zx.svg
+.. image:: /_static/optyx/cnot_zx.svg
    :align: center
 
 CZ gate expressed in ZX:
 
 >>> cz_zx = (Id(1) @ Z(1, 2)) >> Id(1) @ H() @ Id(1) >> (Z(2, 1) @ Id(1))
->>> cz_zx.draw(path='docs/_static/cz_zx.svg', figsize=(4, 2))
+>>> cz_zx.draw(path='docs/_static/optyx/cz_zx.svg', figsize=(4, 2))
 
-.. image:: /_static/cz_zx.svg
+.. image:: /_static/optyx/cz_zx.svg
     :align: center
 
 **Classical-quantum ZX diagrams**
@@ -123,7 +123,7 @@ mixed channels with classical data:
 We can therefore measure a quantum register and perform classical
 operations on the results, such as copying or discarding bits.
 
->>> from optyx.classical import (
+>>> from discopy.optyx.classical import (
 ...    X as XClassical
 ... )
 >>> quantum_state = Ket(0) >> H() >> Z(1, 1, 0.5)
@@ -132,23 +132,23 @@ operations on the results, such as copying or discarding bits.
 
 :code:`XClassical(1, 1, 0.5)` acts as a NOT gate on the classical bit result.
 
->>> classical_state_operation.draw(path='docs/_static/classical_state.svg',
+>>> classical_state_operation.draw(path='docs/_static/optyx/classical_state.svg',
 ... figsize=(3, 5))
 
-.. image:: /_static/classical_state.svg
+.. image:: /_static/optyx/classical_state.svg
     :align: center
 
 **Quantum teleportation**
 
 Quantum teleportation is the canonical example of
 a ZX diagram that uses classical data. In :code:`optyx`,
-we can make use of controlled boxes from :code:`optyx.classical`
+we can make use of controlled boxes from :code:`discopy.optyx.classical`
 to correct the state of the qubit depending on the measurement result.
 
->>> from optyx.classical import (
+>>> from discopy.optyx.classical import (
 ...    BitControlledGate, Id as IdClassical
 ... )
->>> from optyx import bit
+>>> from discopy.optyx import bit
 >>> teleportation = (
 ...     Id(1) @ Z(0, 2) @ Scalar(2**0.5)>>
 ...     Z(1, 2) @ Id(2) >>
@@ -159,10 +159,10 @@ to correct the state of the qubit depending on the measurement result.
 ...     BitControlledGate(Z(1, 1, 0.5))
 ... )
 
->>> teleportation.draw(path='docs/_static/teleportation_qubit.svg',
+>>> teleportation.draw(path='docs/_static/optyx/teleportation_qubit.svg',
 ... figsize=(4, 6))
 
-.. image:: /_static/teleportation_qubit.svg
+.. image:: /_static/optyx/teleportation_qubit.svg
     :align: center
 
 This produces the same protocol as an identity operation:
@@ -193,19 +193,19 @@ GHZ state:
 >>> #ghz_circ = pytket.Circuit(3).H(0).CX(0, 1).CX(1, 2).measure_all()
 >>> #fig = circuit_drawer(tk_to_qiskit(ghz_circ), output="mpl",
 >>>   #interactive=False)
->>> #fig.savefig("docs/_static/ghz_circuit_qiskit.png")
+>>> #fig.savefig("docs/_static/optyx/ghz_circuit_qiskit.png")
 >>> #plt.close(fig)
 
-.. image:: /_static/ghz_circuit_qiskit.png
+.. image:: /_static/optyx/ghz_circuit_qiskit.png
     :align: center
 
 We can explicitly convert it to optyx. The resulting circuit involves
 explicit manipulation of classical data.
 
->>> #Circuit(ghz_circ).draw(path="docs/_static/ghz_circuit_exp.svg",
+>>> #Circuit(ghz_circ).draw(path="docs/_static/optyx/ghz_circuit_exp.svg",
 >>> #figsize=(6, 9))
 
-.. image:: /_static/ghz_circuit_exp.svg
+.. image:: /_static/optyx/ghz_circuit_exp.svg
     :align: center
 
 We can evaluate these two curcuits.
@@ -222,7 +222,7 @@ First, let's evaluate with tket:
 
 Then, let us evaluate with Optyx:
 
->>> #from optyx import classical
+>>> #from discopy.optyx import classical
 >>> #circ = Circuit(ghz_circ)
 >>> #circ = Ket(0)**3 @ classical.Bit(0)**3 >> circ >> Discard(3) @ bit**3
 >>> #res = (circ.double().to_tensor().to_quimb()^...).data
@@ -240,16 +240,16 @@ We can use a circuit from an external package to define a
 graph state, which can then be used for photonic quantum computing.
 Let us use the GHZ state from the example above.
 
->>> #from optyx.classical import DiscardBit, Z as ZClassical
+>>> #from discopy.optyx.classical import DiscardBit, Z as ZClassical
 >>> #circ = Circuit(ghz_circ)
 >>> #circ = Ket(0)**3 @ classical.Bit(0)**3 >> circ >> qubit**3 @ ZClassical(1, 0)**3
 
->>> #from optyx.photonic import DualRail, HadamardBS, XMeasurementDR
+>>> #from discopy.optyx.photonic import DualRail, HadamardBS, XMeasurementDR
 >>> #circ_photonic = circ >> DualRail(3) >> HadamardBS() @ XMeasurementDR(0.5)**2
->>> #circ_photonic.draw(path="docs/_static/ghz_circ_photonic.svg",
+>>> #circ_photonic.draw(path="docs/_static/optyx/ghz_circ_photonic.svg",
 >>> #figsize=(6, 12))
 
-.. image:: /_static/ghz_circ_photonic.svg
+.. image:: /_static/optyx/ghz_circ_photonic.svg
     :align: center
 
 **Direct convertion to dual-rail encoding**
@@ -257,32 +257,32 @@ Let us use the GHZ state from the example above.
 We can create a graph state as follows
 (where we omit the labels):
 
->>> from discopy.drawing import Equation
->>> from optyx.photonic import DualRail
+>>> from discopy.symmetric import Equation
+>>> from discopy.optyx.photonic import DualRail
 >>> graph = (Z(0, 2) >> Id(1) @ H() >> Id(1) @ Z(1, 2) >> \\
 ... Id(2) @ H() >> Id(2) @ Z(1, 2))
 >>> Equation(graph >> DualRail(4), graph.to_dual_rail(), \\
-... symbol="$\\mapsto$").draw(figsize=(15, 20), \\
-... path="docs/_static/graph_dr_qubit.svg", draw_type_labels=False, \\
+... symbol="$\\\\mapsto$").draw(figsize=(15, 20), \\
+... path="docs/_static/optyx/graph_dr_qubit.svg", draw_type_labels=False, \\
 ... draw_box_labels=False)
 
-.. image:: /_static/graph_dr_qubit.svg
+.. image:: /_static/optyx/graph_dr_qubit.svg
     :align: center
 
 We can map ZX diagrams to dual-rail encoding.
 For example, we can create a GHZ state:
 
->>> from discopy.drawing import Equation
->>> from optyx.photonic import DualRail
->>> from optyx.core.diagram import embedding_tensor
+>>> from discopy.symmetric import Equation
+>>> from discopy.optyx.photonic import DualRail
+>>> from discopy.optyx.core.diagram import embedding_tensor
 >>> ghz = Z(0, 3)
 >>> ghz_decom = ghz.decomp()
 >>> ghz_path = ghz_decom.to_dual_rail()
 >>> Equation(ghz >> DualRail(3), ghz_path, \\
-... symbol="$\\mapsto$").draw(figsize=(10, 10), \\
-... path="docs/_static/ghz_dr.svg")
+... symbol="$\\\\mapsto$").draw(figsize=(10, 10), \\
+... path="docs/_static/optyx/ghz_dr.svg")
 
-.. image:: /_static/ghz_dr.svg
+.. image:: /_static/optyx/ghz_dr.svg
     :align: center
 
 We can also create a graph state as follows
@@ -293,11 +293,11 @@ We can also create a graph state as follows
 >>> graph_decom = graph.decomp()
 >>> graph_path = graph_decom.to_dual_rail()
 >>> Equation(graph >> DualRail(4), graph_path, \\
-... symbol="$\\mapsto$").draw(figsize=(10, 14), \\
-... path="docs/_static/graph_dr.svg", draw_type_labels=False, \\
+... symbol="$\\\\mapsto$").draw(figsize=(10, 14), \\
+... path="docs/_static/optyx/graph_dr.svg", draw_type_labels=False, \\
 ... draw_box_labels=False)
 
-.. image:: /_static/graph_dr.svg
+.. image:: /_static/optyx/graph_dr.svg
     :align: center
 
 """  # noqa E501
@@ -305,19 +305,17 @@ We can also create a graph state as follows
 from typing import Literal
 from enum import Enum
 import numpy as np
-from pyzx.graph.base import BaseGraph
-import graphix
 from discopy import quantum as quantum_discopy
 from discopy import symmetric
 from sympy import lambdify
 # from pytket import circuit as tket_circuit
-from optyx.utils.misc import explode_channel
-from optyx import channel
-from optyx.core import (
+from discopy.optyx.utils.misc import explode_channel
+from discopy.optyx import channel
+from discopy.optyx.core import (
     diagram,
     zx
 )
-from optyx.channel import (
+from discopy.optyx.channel import (
     bit,
     qubit,
     Measure as MeasureChannel,
@@ -355,16 +353,19 @@ class Circuit(Diagram):
         """
         Detect the type of the underlying circuit.
         """
+        # pylint: disable=import-outside-toplevel
         if isinstance(underlying_circuit,
                       quantum_discopy.circuit.Circuit):
             return ImportObjectType.DISCOPY
+        if isinstance(underlying_circuit, Diagram):
+            return ImportObjectType.ZX
+        from pyzx.graph.base import BaseGraph
         if isinstance(underlying_circuit, BaseGraph):
             return ImportObjectType.PYZX
         # if isinstance(underlying_circuit, tket_circuit.Circuit):
         #     return ImportObjectType.TKET
-        if isinstance(underlying_circuit, Diagram):
-            return ImportObjectType.ZX
-        if isinstance(underlying_circuit, graphix.pattern.Pattern):
+        from graphix.pattern import Pattern
+        if isinstance(underlying_circuit, Pattern):
             return ImportObjectType.GRAPHIX
         raise TypeError("Unsupported circuit type")  # pragma: no cover
 
@@ -437,19 +438,64 @@ class Circuit(Diagram):
     @classmethod
     def _to_optyx_from_graphix(cls, underlying_circuit):
         """
-        Convert a Graphix measurement pattern to an optyx ZX diagram.
+        Convert a Graphix measurement pattern to an optyx ZX diagram,
+        through the pyzx graph of its open graph.
+        """
+        open_graph = underlying_circuit.to_opengraph().to_bloch()
+        if open_graph.output_cliffords:
+            raise NotImplementedError(
+                "A pattern with Clifford commands on its outputs.")
+        return cls._to_optyx_from_pyzx(cls._to_pyzx_from_graphix(open_graph))
+
+    @staticmethod
+    def _to_pyzx_from_graphix(open_graph):
+        """
+        The pyzx graph of a graphix open graph with Bloch measurements:
+        a Z spider per node, a Hadamard edge per edge, the angle of an XY
+        measurement as the phase of its node and a YZ measurement as a
+        phase gadget. Adapted from ``to_pyzx_graph`` in graphix 0.2's
+        ``graphix.pyzx``, which graphix 0.4 dropped (Apache-2.0,
+        https://github.com/TeamGraphix/graphix).
         """
         # pylint: disable=import-outside-toplevel
-        from graphix import opengraph
-        from graphix import pyzx
+        from graphix.fundamentals import Plane
+        from pyzx import Graph, VertexType, EdgeType
 
-        og = opengraph.OpenGraph.from_pattern(underlying_circuit)
-        pyzx_diagram = pyzx.to_pyzx_graph(og)
-        # pylint: disable=protected-access
-        pyzx_diagram._inputs = tuple(pyzx_diagram._inputs)
-        # pylint: disable=protected-access
-        pyzx_diagram._outputs = tuple(pyzx_diagram._outputs)
-        return cls._to_optyx_from_pyzx(pyzx_diagram)
+        graph = Graph()
+
+        def add_vertices(number, vertex_type):
+            vertices = graph.add_vertices(number)
+            for vertex in vertices:
+                graph.set_type(vertex, vertex_type)
+            return vertices
+
+        inputs = add_vertices(
+            len(open_graph.input_nodes), VertexType.BOUNDARY)
+        graph.set_inputs(tuple(inputs))
+        body = add_vertices(len(open_graph.graph), VertexType.Z)
+        gadgets = [node for node, measurement
+                   in open_graph.measurements.items()
+                   if measurement.plane == Plane.YZ]
+        gadget_vertices = add_vertices(len(gadgets), VertexType.Z)
+        outputs = add_vertices(
+            len(open_graph.output_nodes), VertexType.BOUNDARY)
+        graph.set_outputs(tuple(outputs))
+
+        to_pyzx = dict(zip(open_graph.graph.nodes(), body))
+        for vertex, node in zip(inputs, open_graph.input_nodes):
+            graph.add_edge((vertex, to_pyzx[node]))
+        for vertex, node in zip(outputs, open_graph.output_nodes):
+            graph.add_edge((vertex, to_pyzx[node]))
+        graph.add_edges(
+            ((to_pyzx[a], to_pyzx[b]) for a, b in open_graph.graph.edges()),
+            EdgeType.HADAMARD)
+        for node, measurement in open_graph.measurements.items():
+            if measurement.plane == Plane.XY:
+                graph.set_phase(to_pyzx[node], measurement.angle)
+        for node, vertex in zip(gadgets, gadget_vertices):
+            graph.add_edge((to_pyzx[node], vertex), EdgeType.HADAMARD)
+            graph.set_phase(vertex, open_graph.measurements[node].angle)
+        return graph
 
 
 class QubitChannel(Channel):
@@ -457,7 +503,7 @@ class QubitChannel(Channel):
 
     # def decomp(self):
     #     """Decompose into elementary gates."""
-    #     from optyx.utils.misc import decomp_ar
+    #     from discopy.optyx.utils.misc import decomp_ar
     #     from discopy import symmetric
     #     return symmetric.Functor(
     #         ob=lambda x: qubit**len(x),
@@ -467,8 +513,8 @@ class QubitChannel(Channel):
 
     # def to_dual_rail(self):
     #     """Convert to dual-rail encoding."""
-    #     from optyx.utils.misc import ar_zx2path
-    #     from optyx import qmode
+    #     from discopy.optyx.utils.misc import ar_zx2path
+    #     from discopy.optyx import qmode
     #     from discopy import symmetric
 
     #     return symmetric.Functor(
@@ -493,11 +539,7 @@ class QubitChannel(Channel):
             Ket as Ket_
         )
         from discopy.quantum.gates import Scalar as GatesScalar
-        # from optyx import classical
-
-        # pylint: disable=invalid-name
-        def get_perm(n):
-            return sorted(sorted(list(range(n))), key=lambda i: i % 2)
+        # from discopy.optyx import classical
 
         root2 = Scalar(2**0.5)
         if isinstance(discopy_circuit, (Bra_, Ket_)):
@@ -669,7 +711,7 @@ class Z(Channel):
 
         >>> assert len(Z._make_spiders(6)) == 5
         """
-        from optyx import qubits
+        from discopy.optyx import qubits
 
         spider = qubits.Id(1)
         for k in range(n - 1):
@@ -679,11 +721,11 @@ class Z(Channel):
     def _to_dual_rail(self):
         """Convert to dual-rail encoding."""
 
-        from optyx import (
+        from discopy.optyx import (
             photonic,
             qmode
         )
-        from optyx.core import zw
+        from discopy.optyx.core import zw
         create = photonic.Create(1)
         annil = photonic.Select(1)
         comonoid = Channel("Split", zw.Split(2))
@@ -767,7 +809,7 @@ class X(Channel):
 
     def _to_dual_rail(self):  # pragma: no cover
         """Convert to dual-rail encoding."""
-        from optyx import (
+        from discopy.optyx import (
             photonic
         )
 
@@ -821,7 +863,7 @@ class H(Channel):
 
     def _to_dual_rail(self):
         """Convert to dual-rail encoding."""
-        from optyx import photonic
+        from discopy.optyx import photonic
         return photonic.HadamardBS()
 
     def dagger(self):
@@ -847,7 +889,7 @@ class Scalar(Channel):
 
     def _to_dual_rail(self):
         """Convert to dual-rail encoding."""
-        from optyx import photonic
+        from discopy.optyx import photonic
         return photonic.Scalar(self.data)
 
     def dagger(self):
@@ -899,12 +941,31 @@ class DephasingError(Channel):
         return self
 
 
+def basis_value(
+    value: Literal[0, 1, "+", "-"]
+) -> Literal[0, 1, "+", "-"]:
+    """
+    Read ``"0"``/``"1"`` (the natural string spelling next to ``"+"``/
+    ``"-"``) as the integers ``0``/``1``, and reject anything else.
+
+    >>> assert basis_value("1") == basis_value(1) == 1
+    >>> assert basis_value("+") == "+"
+    """
+    if value in ("0", "1"):
+        return int(value)
+    if value not in (0, 1, "+", "-"):
+        raise ValueError(
+            f"Invalid basis state {value!r}, expected one of 0, 1, '+', '-'")
+    return value
+
+
 class Ket(Channel):
     """Computational basis state for qubits"""
 
     def __init__(
         self, value: Literal[0, 1, "+", "-"], cod: channel.Ty = qubit
     ) -> None:
+        value = basis_value(value)
         spider = zx.X if value in (0, 1) else zx.Z
         phase = 0 if value in (0, "+") else 0.5
         kraus = spider(0, 1, phase) @ diagram.Scalar(1 / np.sqrt(2))
@@ -917,6 +978,7 @@ class Bra(Channel):
     def __init__(
         self, value: Literal[0, 1, "+", "-"], dom: channel.Ty = qubit
     ) -> None:
+        value = basis_value(value)
         spider = zx.X if value in (0, 1) else zx.Z
         phase = 0 if value in (0, "+") else 0.5
         kraus = spider(1, 0, phase) @ diagram.Scalar(1 / np.sqrt(2))

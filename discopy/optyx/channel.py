@@ -29,12 +29,12 @@ A channel doubles into its Kraus map beside the conjugate, with the
 environment bent round and shared:
 
 >>> from discopy.symmetric import Equation
->>> from optyx import photonic
+>>> from discopy.optyx import photonic
 >>> Equation(photonic.PhotonLoss(.5), photonic.PhotonLoss(.5).double(),
-...          symbol="$\\mapsto$").draw(
-...     figsize=(9, 3), path="docs/_static/doubling.png")
+...          symbol="$\\\\mapsto$").draw(
+...     figsize=(9, 3), path="docs/_static/optyx/doubling.png")
 
-.. image:: /_static/doubling.png
+.. image:: /_static/optyx/doubling.png
     :align: center
 
 Stateful channels
@@ -47,9 +47,9 @@ between two steps is the **memory**:
 >>> loop = (photonic.Create(1) @ qmode >> photonic.MZI(.06, 0)).feedback(
 ...     mem=qmode, state=photonic.Create(0))
 >>> assert (loop.dom, loop.cod, loop.mem) == (Ty(), qmode, qmode)
->>> loop.draw(figsize=(4, 3), path="docs/_static/feedback.png")
+>>> loop.draw(figsize=(4, 3), path="docs/_static/optyx/feedback.png")
 
-.. image:: /_static/feedback.png
+.. image:: /_static/optyx/feedback.png
     :align: center
 
 **Stream semantics.** :meth:`Diagram.one_step` opens the loops again into the
@@ -60,10 +60,10 @@ the memory wire only — the inputs and outputs of each tick stay open:
 
 >>> assert (loop.state, loop.effect) == (photonic.Create(0), Discard(qmode))
 >>> assert loop.one_step() == loop.arg
->>> Equation(loop, loop.unroll(2), symbol="$\\mapsto$").draw(
-...     figsize=(11, 4), path="docs/_static/unroll.png")
+>>> Equation(loop, loop.unroll(2), symbol="$\\\\mapsto$").draw(
+...     figsize=(11, 4), path="docs/_static/optyx/unroll.png")
 
-.. image:: /_static/unroll.png
+.. image:: /_static/optyx/unroll.png
     :align: center
 
 The memory is a *delay*, which makes this the feedback of a monoidal stream
@@ -83,9 +83,9 @@ diagonalising the transfer matrix of one step:
 >>> fixed = measured.eigen_fix().prob_dist()
 >>> assert max(abs(settled[k] - v) for k, v in fixed.items()) < 1e-6
 >>> Equation(loop.at_time(2), symbol="").draw(
-...     figsize=(6, 3), path="docs/_static/at_time.png")
+...     figsize=(6, 3), path="docs/_static/optyx/at_time.png")
 
-.. image:: /_static/at_time.png
+.. image:: /_static/optyx/at_time.png
     :align: center
 
 :meth:`Diagram.unroll_certificate` certifies a depth from the loop block of
@@ -128,8 +128,8 @@ Examples
 
 A Channel is initialised by its Kraus map from `dom` to `cod @ env`.
 
->>> from optyx.core import zx, zw, diagram
->>> from optyx import photonic
+>>> from discopy.optyx.core import zx, zw, diagram
+>>> from discopy.optyx import photonic
 >>> circ = (
 ...     photonic.Phase(0.25) @
 ...     photonic.BS @
@@ -181,9 +181,9 @@ We can construct a lossy optical channel and compute its probabilities:
 The :code:`from_bosonic_operator` method
 supports creating :class:`path` diagrams:
 
->>> from optyx.core.zw import Split, Select, Id
->>> from optyx.core.diagram import Mode
->>> from optyx.photonic import Scalar
+>>> from discopy.optyx.core.zw import Split, Select, Id
+>>> from discopy.optyx.core.diagram import Mode
+>>> from discopy.optyx.photonic import Scalar
 >>> d1 = Diagram.from_bosonic_operator(
 ...     n_modes=2,
 ...     operators=((0, False), (1, False), (0, True)),
@@ -203,16 +203,16 @@ supports creating :class:`path` diagrams:
 We can map ZX diagrams to :class:`path` diagrams using
 dual-rail encoding. For example, we can create a GHZ state:
 
->>> from discopy.drawing import Equation
->>> from optyx.qubits import Z
->>> from optyx.photonic import DualRail
+>>> from discopy.symmetric import Equation
+>>> from discopy.optyx.qubits import Z
+>>> from discopy.optyx.photonic import DualRail
 >>> ghz = Z(0, 3)
 >>> ghz_path = ghz.to_dual_rail()
 >>> Equation(ghz >> DualRail(3), ghz_path, \\
-... symbol="$\\mapsto$").draw(figsize=(10, 10), \\
-... path="docs/_static/ghz_dr.svg")
+... symbol="$\\\\mapsto$").draw(figsize=(10, 10), \\
+... path="docs/_static/optyx/ghz_dr.svg")
 
-.. image:: /_static/ghz_dr.svg
+.. image:: /_static/optyx/ghz_dr.svg
     :align: center
 
 """
@@ -220,6 +220,7 @@ dual-rail encoding. For example, we can create a GHZ state:
 from __future__ import annotations
 
 from importlib import import_module
+from itertools import count, repeat
 import warnings
 from numbers import Integral, Real
 
@@ -231,13 +232,12 @@ import numpy as np
 from discopy import tensor
 from discopy import monoidal, symmetric, frobenius, hypergraph
 from discopy.cat import factory
+from discopy.python import finset
 from discopy.utils import AxiomError
-from pytket.extensions.pyzx import pyzx_to_tk
-from pyzx import extract_circuit
-from optyx.core import diagram
+from discopy.optyx.core import diagram
 
 
-class Ob(frobenius.Ob):
+class Ob(frobenius.Wire):
     """Basic object: bit, mode, qubit or qmode"""
 
     _classical = {
@@ -277,6 +277,76 @@ class Ob(frobenius.Ob):
 DEFAULT_MAX_STEPS = 64
 MAX_TRUNCATION = 32
 MAX_BOND_DIMENSION = 8
+
+
+def occupation_tail(correlation, correction: float, cutoff: int) -> float:
+    """
+    A bound on the probability of more than `cutoff` photons in a loop
+    whose one-particle correlation matrix is `correlation`: Markov's
+    inequality on the mean photon number, sharpened for a positive cutoff
+    by the second factorial moment, from which `correction` subtracts the
+    bunching of photons injected through the same mode.
+
+    .. math::
+        p_N \\leq \\min\\left\\{1, \\frac{\\langle n \\rangle}{N + 1},
+            \\frac{\\langle n (n - 1) \\rangle}{N (N + 1)}\\right\\}
+
+    >>> assert occupation_tail(.5 * np.eye(1), 0, 0) == .5
+    >>> assert occupation_tail(np.eye(1), 2, 1) == 0
+    """
+    mean = max(0., float(np.real(np.trace(correlation))))
+    tail = min(1., mean / (cutoff + 1))
+    if not cutoff:
+        return tail
+    moment = max(0., float(np.real(
+        mean ** 2 + np.vdot(correlation, correlation) - correction)))
+    return min(tail, moment / (cutoff * (cutoff + 1)))
+
+
+def truncation_errors(block, injection, creations, max_truncation: int):
+    """
+    The error a cutoff of `max_truncation` photons in a loop adds to
+    :meth:`Diagram.unroll_certificate`, at each burn-in `k = 1, 2, ...`:
+    yields the photon support at `k`, i.e. the most photons the loop can
+    hold then, and the error `2 Delta_N(k)`.
+
+    `block` is the loop-to-loop block `V_ll` of the one-step optical
+    matrix, `injection` its block from the fresh modes into the loop,
+    and `creations` the occupations of the fresh modes. While the support
+    fits below the cutoff the truncation is exact; past it, every step
+    adds the :func:`occupation_tail` of the transient loop state, computed
+    from one-particle matrices only.
+
+    A delay line fed one photon per step holds at most that photon, so a
+    cutoff of one is exact at every step, while a cutoff of zero loses the
+    photon for sure:
+
+    >>> def delay(cutoff):
+    ...     return truncation_errors(
+    ...         np.zeros((1, 1)), np.ones((1, 1)), [1], cutoff)
+    >>> errors = delay(1)
+    >>> assert [next(errors) for _ in range(3)] == [(1, 0.)] * 3
+    >>> assert next(delay(0)) == (1, 2.)
+    """
+    occupations = np.asarray(creations, dtype=float)
+    transfer = block.T
+    pumped = (injection * occupations) @ injection.conjugate().T
+    correlation = np.zeros_like(pumped)
+    surviving, reachable = injection, injection != 0
+    support, correction, tail = 0, 0., 0.
+    while True:
+        correlation = transfer @ correlation @ transfer.conjugate().T \
+            + pumped
+        correction += float(np.sum(
+            occupations * (occupations + 1)
+            * np.sum(abs(surviving) ** 2, axis=0) ** 2))
+        support += int(occupations[np.any(reachable, axis=0)].sum())
+        if support > max_truncation:
+            tail = min(1., tail + occupation_tail(
+                correlation, correction, max_truncation))
+        yield support, 2 * tail
+        surviving = transfer @ surviving
+        reachable = (transfer != 0).astype(int) @ reachable.astype(int) > 0
 
 
 @factory
@@ -364,7 +434,7 @@ class Diagram(frobenius.Diagram):
         :meth:`Feedback.default_effect` is `Discard(mem)` here while
         :meth:`Feedback.default_state` stays the open wire.
 
-        >>> from optyx.photonic import Create
+        >>> from discopy.optyx.photonic import Create
         >>> wait = Diagram.swap(qmode, qmode).feedback(state=Create(0))
         >>> assert wait.dom == wait.cod == qmode
         >>> assert wait.mem == qmode
@@ -402,7 +472,7 @@ class Diagram(frobenius.Diagram):
         A loop that reprepares `Ket(0)` each tick reads out `Ket(0)` at
         every time, whatever its memory started as:
 
-        >>> from optyx.qubits import Ket
+        >>> from discopy.optyx.qubits import Ket
         >>> source = (Discard(qubit) @ Ket(0) @ Ket(0)).feedback(
         ...     mem=qubit, state=Ket(1))
         >>> assert (source.at_time(2).dom, source.at_time(2).cod) \\
@@ -436,7 +506,7 @@ class Diagram(frobenius.Diagram):
         of it are in range. Raises rather than returning, since every
         failure is a mistake in the call.
 
-        >>> from optyx.qubits import Ket
+        >>> from discopy.optyx.qubits import Ket
         >>> try:
         ...     Ket(0).check_fixpoint()
         ... except ValueError as error:
@@ -465,7 +535,7 @@ class Diagram(frobenius.Diagram):
         output. For a state this is its trace, and it is the factor which
         rescales it to a causal one.
 
-        >>> from optyx.qubits import Ket
+        >>> from discopy.optyx.qubits import Ket
         >>> assert np.isclose(Ket(0).normalisation(), 1)
         >>> assert np.isclose((Scalar(.5) @ Ket(0)).normalisation(), .25)
 
@@ -489,8 +559,9 @@ class Diagram(frobenius.Diagram):
     def dilate(self):
         """
         The pure Kraus map of this channel diagram with every environment
-        routed to the end of the codomain: a :class:`optyx.core.diagram`
-        diagram from `dom.single()` to `cod.single() @ env`.
+        routed to the end of the codomain: a
+        :class:`discopy.optyx.core.diagram` diagram from `dom.single()` to
+        `cod.single() @ env`.
 
         This is Stinespring dilation, layer by layer: a lossy channel is an
         isometry into system and environment followed by discarding the
@@ -502,7 +573,7 @@ class Diagram(frobenius.Diagram):
         The dilation of a loss channel is the beam splitter it is: one
         mode in, system and environment out, split by the transmissivity.
 
-        >>> from optyx.photonic import PhotonLoss
+        >>> from discopy.optyx.photonic import PhotonLoss
         >>> assert np.allclose(np.abs(np.asarray(
         ...     PhotonLoss(.8).dilate().to_path().array,
         ...     dtype=complex)) ** 2, [[.8, .2]])
@@ -510,17 +581,14 @@ class Diagram(frobenius.Diagram):
 
         The dilation of a pure diagram is its Kraus map:
 
-        >>> from optyx.photonic import BS
+        >>> from discopy.optyx.photonic import BS
         >>> assert BS.dilate() == BS.get_kraus()
         """
         kraus, env = diagram.Id(self.dom.single()), diagram.Ty()
         for layer in self:
-            left, box, right = layer.inside[0]
+            left, box, right = layer.inside[0].boxes_and_types
             left, right = left.single(), right.single()
-            if isinstance(box, Swap):
-                step, box_env = diagram.Swap(
-                    box.dom.single()[0], box.cod.single()[1]), diagram.Ty()
-            elif isinstance(box, Feedback):
+            if isinstance(box, Feedback):
                 raise NotImplementedError(
                     "dilate is defined for diagrams without feedback "
                     "loops; call one_step first.")
@@ -535,37 +603,117 @@ class Diagram(frobenius.Diagram):
             env = env @ box_env
         return kraus
 
+    def certificate_obstruction(self) -> str | None:
+        """
+        The reason the stationary boson-sampling bound of
+        :meth:`unroll_certificate` does not apply to this diagram, or
+        `None` when it does. Each condition is checked in turn, so the
+        message names the first thing that fails rather than an exception
+        caught along the way: :meth:`unroll_certificate` raises with it
+        and :meth:`fix` warns with it before falling back on
+        :meth:`power_fix`.
+
+        >>> from discopy.optyx import photonic, qubits
+        >>> loop = (photonic.Create(1) @ qmode >> photonic.BS).feedback(
+        ...     mem=qmode, state=photonic.Create(0))
+        >>> assert loop.certificate_obstruction() is None
+        >>> wait = Diagram.swap(qubit, qubit).feedback(
+        ...     state=qubits.Ket(0))
+        >>> print((qubits.Ket(0) >> wait).certificate_obstruction())
+        the diagram is not a single feedback loop over optical modes
+        """
+        loops = [box for box in self.boxes if isinstance(box, Feedback)]
+        if len(loops) != 1 or loops[0].dom or any(
+                ob.inside[0].name != "qmode" for ob in loops[0].mem):
+            return ("the diagram is not a single feedback loop over "
+                    "optical modes")
+        loop = loops[0]
+        if any(isinstance(box, Feedback) for box in loop.arg.boxes):
+            return "the loop contains a nested feedback loop"
+        for box in loop.arg.boxes:
+            if not isinstance(box, Channel):
+                return f"{box} has no Kraus map"
+        dilation = loop.arg.dilate()
+        for box in dilation.boxes:
+            if type(box).to_path is diagram.Box.to_path:
+                return f"{box} has no path matrix"
+        matrix = dilation.to_path()
+        isometry = np.asarray(matrix.array, dtype=complex)
+        memory = len(loop.mem.single())
+        visible = len(loop.cod.single())
+        if len(matrix.dom) != memory \
+                or len(matrix.cod) < visible + memory or matrix.selections:
+            return ("the loop's optical matrix does not split into "
+                    "visible, memory and environment modes")
+        if isometry.shape != (
+                memory + len(matrix.creations), len(matrix.cod)) \
+                or not np.allclose(
+                    isometry @ isometry.conjugate().T,
+                    np.eye(len(isometry))):
+            return "the loop's optical matrix is not an isometry"
+        block = isometry[:memory, visible:visible + memory]
+        if max(abs(np.linalg.eigvals(block)), default=0) >= 1:
+            return ("the loop block does not satisfy rho(V_ll) < 1: "
+                    "nothing ever leaves the loop, so no depth is "
+                    "certified")
+        return None
+
     def unroll_certificate(
-            self, tol: float = 1e-6, max_steps: int = None) -> int | None:
+            self, tol: float = 1e-6, max_steps: int = None,
+            max_truncation: int = None) -> int:
         """
         The smallest number of time steps whose last output is certified
         within `tol`, by the stationary boson-sampling bound of Armand Le
-        Douarec: the first `k` steps are a burn-in certified by
+        Douarec.
+
+        With `tol` alone, the bound is on the depth only: the first `k`
+        steps are a burn-in certified by
 
         .. math::
             \\Gamma(k) = 4 K(\\bar q) \\sum_r \\arcsin^2\\!\\left(
                 \\sigma_r(V_{ll}^k)\\right) \\leq tol,
 
-        with one final step reading the output after the certified memory.
-        Here `V_ll` is the loop-to-loop block of the one-step optical
-        matrix and `qbar` the largest fresh Fock occupation. The
-        calculation is on `len(mem)` square matrices only; it builds no
-        Fock-space state.
+        and one final step reads the output after the certified memory, so
+        the method returns `k + 1`. Here `V_ll` is the loop-to-loop block of
+        the one-step optical matrix and `qbar` the largest fresh Fock
+        occupation. No photon number is truncated, so nothing else enters
+        the error. The calculation is on `len(mem)` square matrices only; it
+        builds no Fock-space state.
 
         Loss is read off the diagram, not passed in: the one-step matrix is
         the path matrix of the loop's :meth:`dilate`, so a
-        :class:`optyx.photonic.PhotonLoss` or any other discarded
+        :class:`discopy.optyx.photonic.PhotonLoss` or any other discarded
         environment in the loop enters `V_ll` as the isometry block it is,
         and shrinks its singular values by the amplitude it leaks.
 
-        Raises `NotImplementedError` when the bound does not apply — a
-        memory that is not all optical modes, more than one loop, boxes
-        with no path matrix, or a lossless loop block with spectral radius
-        one. :meth:`fix` then falls back on :meth:`power_fix`. If
-        `max_steps` is given, `None` means the cap was reached before the
-        bound fell below `tol`.
+        `max_steps` caps the depth. When it is reached before `Gamma(k)`
+        falls below `tol`, the method warns with the tolerance it does
+        certify and returns the best depth it evaluated.
 
-        >>> from optyx import photonic
+        `max_truncation` caps the number `N` of photons the loop may hold,
+        the `N_max` of a simulation that truncates the loop's Fock space.
+        While every photon that can have reached the loop fits below `N`,
+        the truncation is exact. Past it, the error becomes
+
+        .. math::
+            \\Gamma(k) + 2\\Delta_N(k), \\qquad
+            \\Delta_N(k) = \\min\\left\\{1,
+                \\sum_{j=1}^k p_N(j)\\right\\},
+
+        with `p_N(j)` the probability of more than `N` photons in the loop
+        at step `j`, bounded by :func:`truncation_errors`. When that
+        combined error cannot reach `tol`, the method warns with the depth
+        and truncation errors separately and returns the best depth it
+        evaluated. `max_truncation` is not a bond dimension: compression
+        error is outside this certificate.
+
+        Raises `ValueError` with the :meth:`certificate_obstruction` when
+        the bound does not apply — a memory that is not all optical modes,
+        more than one loop, a box with no Kraus map or no path matrix, or
+        a lossless loop block with spectral radius one. :meth:`fix` warns
+        with the same obstruction and falls back on :meth:`power_fix`.
+
+        >>> from discopy.optyx import photonic
         >>> loop = (photonic.Create(1) @ qmode
         ...     >> Diagram.swap(qmode, qmode)).feedback(
         ...         mem=qmode, state=photonic.Create(0))
@@ -580,55 +728,84 @@ class Diagram(frobenius.Diagram):
         ...     mem=qmode, state=photonic.Create(0))
         >>> assert lossless.unroll_certificate(1e-2) == 13
         >>> assert lossy.unroll_certificate(1e-2) == 7
+
+        A depth cap that stops short of `tol` warns with the tolerance it
+        does certify, and returns the best depth it reached:
+
+        >>> import warnings
+        >>> with warnings.catch_warnings(record=True) as caught:
+        ...     warnings.simplefilter("always")
+        ...     assert lossy.unroll_certificate(1e-2, max_steps=5) == 5
+        >>> assert "certified tolerance is 0.139685" in str(
+        ...     caught[0].message)
+
+        A photon cutoff costs nothing while the loop cannot hold more
+        photons than it allows: eight certify the same depth as no cutoff.
+        Four do not, and the warning says how much of the error is the
+        truncation's:
+
+        >>> assert lossy.unroll_certificate(1e-2, max_truncation=8) == 7
+        >>> with warnings.catch_warnings(record=True) as caught:
+        ...     warnings.simplefilter("always")
+        ...     assert lossy.unroll_certificate(
+        ...         1e-2, max_truncation=4) == 7
+        >>> assert "truncation error 0.0177236 for a photon support of 6" \\
+        ...     in str(caught[0].message)
         """
         self.check_fixpoint(tol)
         if max_steps is not None and (
                 not isinstance(max_steps, Integral)
-                or isinstance(max_steps, bool) or max_steps <= 0):
-            raise ValueError("max_steps must be a positive integer.")
-        loops = [box for box in self.boxes if isinstance(box, Feedback)]
-        if len(loops) != 1 or loops[0].dom or any(
-                ob.inside[0].name != "qmode" for ob in loops[0].mem):
-            raise NotImplementedError(
-                "The certificate needs a single feedback loop over "
-                "optical modes.")
-        loop = loops[0]
-        try:
-            matrix = loop.arg.dilate().to_path()
-            isometry = np.asarray(matrix.array, dtype=complex)
-        except (AssertionError, AttributeError, NotImplementedError,
-                TypeError, ValueError) as error:
-            raise NotImplementedError(
-                "The loop has no one-step optical matrix.") from error
+                or isinstance(max_steps, bool) or max_steps < 2):
+            raise ValueError(
+                "max_steps must be at least 2: one burn-in step and one "
+                "readout step.")
+        if max_truncation is not None and (
+                not isinstance(max_truncation, Integral)
+                or isinstance(max_truncation, bool) or max_truncation < 0):
+            raise ValueError(
+                "max_truncation must be a non-negative integer.")
+        obstruction = self.certificate_obstruction()
+        if obstruction is not None:
+            raise ValueError(f"The bound does not apply: {obstruction}.")
+        loop = next(
+            box for box in self.boxes if isinstance(box, Feedback))
+        matrix = loop.arg.dilate().to_path()
+        isometry = np.asarray(matrix.array, dtype=complex)
         memory = len(loop.mem.single())
         visible = len(loop.cod.single())
-        if matrix.dom != memory or matrix.cod < visible + memory \
-                or matrix.selections:
-            raise NotImplementedError(
-                "The loop's optical matrix does not split into visible, "
-                "memory and environment modes.")
-        if isometry.shape != (memory + len(matrix.creations), matrix.cod) \
-                or not np.allclose(
-                    isometry @ isometry.conjugate().T,
-                    np.eye(len(isometry))):
-            raise NotImplementedError(
-                "The loop's optical matrix is not an isometry.")
-        block = isometry[:memory, visible:visible + memory]
-        if max(abs(np.linalg.eigvals(block)), default=0) >= 1:
-            raise NotImplementedError(
-                "The loop block does not satisfy rho(V_ll) < 1: nothing "
-                "ever leaves the loop, so no depth is certified.")
+        loop_modes = slice(visible, visible + memory)
+        block = isometry[:memory, loop_modes]
         qbar = max(matrix.creations, default=0)
         constant = (qbar + 1) * (
             np.sqrt(6 * qbar * (qbar + 1)) + qbar)
-        power, burn_in = np.eye(memory), 0
-        while max_steps is None or burn_in < max_steps - 1:
-            power, burn_in = block @ power, burn_in + 1
+        tails = repeat((0, 0.)) if max_truncation is None \
+            else truncation_errors(
+                block, isometry[memory:, loop_modes].T, matrix.creations,
+                max_truncation)
+        burn_ins = count(1) if max_steps is None else range(1, max_steps)
+        power, best = np.eye(memory), None
+        for burn_in, (support, truncation) in zip(burn_ins, tails):
+            power = block @ power
             singular = np.clip(
                 np.linalg.svd(power, compute_uv=False), 0, 1)
-            if 4 * constant * np.sum(np.arcsin(singular) ** 2) <= tol:
-                return burn_in + 1
-        return None
+            depth = float(4 * constant * np.sum(np.arcsin(singular) ** 2))
+            if best is None or depth + truncation < sum(best[1:3]):
+                best = (burn_in, depth, truncation, support)
+            if depth + truncation <= tol or truncation >= tol:
+                break
+        burn_in, depth, truncation, support = best
+        if depth + truncation > tol:
+            cutoff = "" if max_truncation is None else (
+                f" and the truncation error {truncation:.6g} for a photon"
+                f" support of {support}")
+            warnings.warn(
+                f"tol={tol} is not certified within max_steps={max_steps}"
+                f" and max_truncation={max_truncation}. At the best burn-in"
+                f" k={burn_in}, the depth error is {depth:.6g}{cutoff}, so"
+                " the certified tolerance is"
+                f" {min(2., depth + truncation):.6g}.",
+                UserWarning, stacklevel=2)
+        return burn_in + 1
 
     def truncation_dimensions(self) -> list[int]:
         """
@@ -644,7 +821,7 @@ class Diagram(frobenius.Diagram):
         The budget is *not* uniform, because a photon only reaches the wires
         downstream of where it enters:
 
-        >>> from optyx import photonic
+        >>> from discopy.optyx import photonic
         >>> chain = photonic.Create(1) @ photonic.Create(0) >> photonic.BS
         >>> for _ in range(3):
         ...     tail = photonic.Id(1) @ photonic.Create(1) >> photonic.BS
@@ -678,10 +855,10 @@ class Diagram(frobenius.Diagram):
         certified within `tol` — whenever the bound applies to this diagram.
         Loss is part of the diagram, so a lossy loop is certified through
         the same call with no extra input. Where the certificate does not
-        apply (qubit or classical memories, boxes with no optical matrix),
-        :meth:`power_fix` iterates instead, watching the distance between
-        successive states. Where the transfer matrix fits in memory,
-        :meth:`eigen_fix` is exact with no depth at all.
+        apply, :meth:`power_fix` iterates instead, watching the distance
+        between successive states, with a warning naming the
+        :meth:`certificate_obstruction`. Where the transfer matrix fits in
+        memory, :meth:`eigen_fix` is exact with no depth at all.
 
         Parameters:
             tol : The error the certified depth approximates the fixed point
@@ -694,7 +871,7 @@ class Diagram(frobenius.Diagram):
             max_steps : The maximum number of time steps, including the final
                 readout. The public `DEFAULT_MAX_STEPS` is sixty-four.
             backend : An optional
-                :class:`optyx.core.backends.AbstractBackend` for the
+                :class:`discopy.optyx.core.backends.AbstractBackend` for the
                 certified contraction. DisCoPy evaluates with
                 ``tensor.Functor``; Quimb contracts the same doubled network
                 with an optimised path, compressed to `max_chi`. The
@@ -704,7 +881,7 @@ class Diagram(frobenius.Diagram):
         step; the following step reads its stationary output. With loss on
         the loop, the stationary photon is lost half the time:
 
-        >>> from optyx import photonic
+        >>> from discopy.optyx import photonic
         >>> delay = (photonic.Create(1) @ qmode
         ...     >> Diagram.swap(qmode, qmode)
         ...     >> qmode @ photonic.PhotonLoss(.5)).feedback(
@@ -717,9 +894,11 @@ class Diagram(frobenius.Diagram):
         """
         self.check_fixpoint(tol, max_chi)
         if not isinstance(max_steps, Integral) \
-                or isinstance(max_steps, bool) or max_steps <= 0:
-            raise ValueError("max_steps must be a positive integer.")
-        backends = import_module("optyx.core.backends")
+                or isinstance(max_steps, bool) or max_steps < 2:
+            raise ValueError(
+                "max_steps must be at least 2: one burn-in step and one "
+                "readout step.")
+        backends = import_module("discopy.optyx.core.backends")
         if backend is None:
             backend = backends.QuimbBackend(
                 hyperoptimiser=None if max_chi is None
@@ -728,17 +907,15 @@ class Diagram(frobenius.Diagram):
             raise ValueError(
                 "backend must implement the AbstractBackend interface.")
 
-        try:
-            certified = self.unroll_certificate(tol, max_steps)
-        except NotImplementedError:
+        obstruction = self.certificate_obstruction()
+        if obstruction is not None:
+            warnings.warn(
+                f"falling back on power_fix because {obstruction}: the "
+                "stopping distance is observed rather than certified.",
+                UserWarning, stacklevel=2)
             return self.power_fix(
                 tol, max_steps=max_steps, max_chi=max_chi)
-        depth = max_steps if certified is None else certified
-        if certified is None:
-            warnings.warn(
-                f"max_steps={max_steps} stops before the stationary "
-                f"boson-sampling bound reaches tol={tol}: the result is not "
-                "certified.", UserWarning, stacklevel=2)
+        depth = self.unroll_certificate(tol, max_steps)
         network = self.at_time(depth - 1)
 
         needed = max(network.truncation_dimensions(), default=1)
@@ -801,7 +978,7 @@ class Diagram(frobenius.Diagram):
         There is no backend to choose: every state is contracted with the
         default one.
 
-        >>> from optyx.qubits import Ket, X, Z
+        >>> from discopy.optyx.qubits import Ket, X, Z
         >>> loop = (X(1, 1, .25) >> Z(1, 2)).feedback(
         ...     mem=qubit, state=Ket(0))
         >>> result = loop.power_fix(1e-3)
@@ -815,7 +992,7 @@ class Diagram(frobenius.Diagram):
             if not isinstance(value, Integral) or isinstance(value, bool) \
                     or value <= 0:
                 raise ValueError(f"{name} must be a positive integer.")
-        backends = import_module("optyx.core.backends")
+        backends = import_module("discopy.optyx.core.backends")
         backend = backends.QuimbBackend(
             hyperoptimiser=None if max_chi is None
             else HyperCompressedOptimizer())
@@ -914,8 +1091,8 @@ class Diagram(frobenius.Diagram):
         state it cannot justify, and so does a non-unique stationary memory
         rather than an arbitrary eigenvector.
 
-        >>> from optyx import photonic
-        >>> from optyx.channel import qmode
+        >>> from discopy.optyx import photonic
+        >>> from discopy.optyx.channel import qmode
         >>> delay = (photonic.Create(1) @ qmode
         ...     >> Diagram.swap(qmode, qmode)).feedback(
         ...         mem=qmode, state=photonic.Create(0))
@@ -984,7 +1161,7 @@ class Diagram(frobenius.Diagram):
         memory_state = tensor.Box(
             "Stationary memory", tensor.Dim(1), tensor_readout.dom,
             state / trace)
-        backends = import_module("optyx.core.backends")
+        backends = import_module("discopy.optyx.core.backends")
         return backends.EvalResult(
             tensor.Box(
                 "Result", tensor.Dim(1), tensor_readout.cod, np.real_if_close(
@@ -1032,7 +1209,7 @@ class Diagram(frobenius.Diagram):
         are_layers_pure = []
         are_layers_classical = []
         for layer in self:
-            generator = layer.inside[0][1]
+            generator = layer.inside[0].boxes_and_types[1]
 
             if isinstance(generator, Feedback) and not all(
                 part.is_pure for part in (
@@ -1079,18 +1256,11 @@ class Diagram(frobenius.Diagram):
         assert self.is_pure, "Cannot get a Kraus map of non-pure circuit"
         kraus_maps = [diagram.Id(self.dom.single())]
         for layer in self:
-            left = diagram.Ty().tensor(*[ty.single()
-                                       for ty in layer.inside[0][0]])
-            right = diagram.Ty().tensor(*[ty.single()
-                                        for ty in layer.inside[0][2]])
-            generator = layer.inside[0][1]
+            left, generator, right = layer.inside[0].boxes_and_types
+            left = diagram.Ty().tensor(*[ty.single() for ty in left])
+            right = diagram.Ty().tensor(*[ty.single() for ty in right])
 
-            if isinstance(generator, Swap):
-                kraus_maps.append(
-                    left @ diagram.Swap(generator.dom.single()[0],
-                                        generator.cod.single()[1]) @ right
-                )
-            elif isinstance(generator, Feedback):
+            if isinstance(generator, Feedback):
                 kraus_maps.append(
                     left @ generator.get_kraus() @ right
                 )
@@ -1111,7 +1281,7 @@ class Diagram(frobenius.Diagram):
         In other words, it is the underlying matrix
         representation of a :class:`path` and :class:`photonic` diagrams."""
         # pylint: disable=import-outside-toplevel
-        from optyx.core import path
+        from discopy.optyx.core import path
 
         assert self.is_pure, "Diagram must be pure to convert to path."
 
@@ -1145,13 +1315,15 @@ class Diagram(frobenius.Diagram):
         Convert to tket circuit. The circuit must be a pure circuit.
         """
 
+        # pylint: disable=import-outside-toplevel
+        from pytket.extensions.pyzx import pyzx_to_tk
+        from pyzx import extract_circuit
+
         assert self.is_pure, "Diagram must be pure to convert to tket."
 
         kraus_maps = []
         for layer in self:
-            left = layer.inside[0][0]
-            right = layer.inside[0][2]
-            generator = layer.inside[0][1]
+            left, generator, right = layer.inside[0].boxes_and_types
 
             kraus_maps.append(
                 diagram.Bit(len(left)) @
@@ -1178,21 +1350,21 @@ class Diagram(frobenius.Diagram):
     def from_tket(cls, tket_circuit):
         """Convert from tket circuit."""
         # pylint: disable=import-outside-toplevel
-        from optyx.qubits import Circuit
+        from discopy.optyx.qubits import Circuit
         return Circuit(tket_circuit)
 
     @classmethod
     def from_pyzx(cls, pyzx_circuit):
         """Convert from PyZX circuit."""
         # pylint: disable=import-outside-toplevel
-        from optyx.qubits import Circuit
+        from discopy.optyx.qubits import Circuit
         return Circuit(pyzx_circuit)
 
     @classmethod
     def from_discopy(cls, discopy_circuit):
         """Convert from discopy circuit."""
         # pylint: disable=import-outside-toplevel
-        from optyx.qubits import Circuit
+        from discopy.optyx.qubits import Circuit
         return Circuit(discopy_circuit)
 
     # @classmethod
@@ -1208,8 +1380,8 @@ class Diagram(frobenius.Diagram):
     def from_bosonic_operator(cls, n_modes, operators, scalar=1):
         """Create a :class:`zw` diagram from a bosonic operator."""
         # pylint: disable=import-outside-toplevel
-        from optyx.core import zw
-        from optyx.photonic import Scalar
+        from discopy.optyx.core import zw
+        from discopy.optyx.photonic import Scalar
 
         # pylint: disable=invalid-name
         d = Diagram.id(qmode**n_modes)
@@ -1230,7 +1402,7 @@ class Diagram(frobenius.Diagram):
     def from_graphix(cls, measurement_pattern):
         """Convert from Graphix measurement pattern."""
         # pylint: disable=import-outside-toplevel
-        from optyx.qubits import Circuit
+        from discopy.optyx.qubits import Circuit
         return Circuit(measurement_pattern)
 
     @classmethod
@@ -1244,8 +1416,8 @@ class Diagram(frobenius.Diagram):
         and with symbols.
         """
         # pylint: disable=import-outside-toplevel
-        from optyx import photonic
-        from optyx.utils import perceval_conversion
+        from discopy.optyx import photonic
+        from discopy.optyx.utils import perceval_conversion
         import perceval as pcvl
 
         if isinstance(p, pcvl.Circuit):
@@ -1299,7 +1471,7 @@ class Diagram(frobenius.Diagram):
         circuit >>= perceval_conversion.heralds_diagram(
             heralds, n_modes, circuit, "out"
         )
-        if p.post_select_fn is not None:
+        if p.post_select_fn.has_condition:
             circuit >>= perceval_conversion.postselection(circuit, p)
         return circuit
 
@@ -1315,7 +1487,7 @@ class Diagram(frobenius.Diagram):
         If no backend is specified, it uses the QuimbBackend.
         """
         # pylint: disable=import-outside-toplevel
-        from optyx.core.backends import QuimbBackend
+        from discopy.optyx.core.backends import QuimbBackend
         if backend is None:
             backend = QuimbBackend()
 
@@ -1516,7 +1688,35 @@ class CQMap(Diagram, frobenius.Box):
         return self @ self ** (n - 1)
 
 
-class Swap(frobenius.Swap, Channel):
+class Permutation(frobenius.Permutation, Channel):
+    """
+    Permutation of the wires of a channel diagram: plumbing, with no Kraus
+    map of its own, initialised as a box the way :class:`Swap` is.
+    """
+
+    env = diagram.Ty()
+
+    def __init__(self, dom, perm):
+        self.perm = finset.Permutation(perm, len(dom))
+        cod = dom[:0].tensor(*(dom[i] for i in self.perm))
+        name = f"Permutation({list(self.perm)})"
+        frobenius.Box.__init__(
+            self, name, dom, cod, drawing_name=name, draw_as_wires=True,
+            draw_as_permutation=True, permutation_indices=tuple(self.perm))
+
+    @property
+    def kraus(self):
+        """ The permutation of the single wires, a pure channel. """
+        return diagram.Permutation(self.dom.single(), self.perm)
+
+    def dagger(self):
+        return type(self)(self.cod, self.perm.dagger())
+
+
+class Swap(Permutation, frobenius.Swap, Channel):
+    def __init__(self, left, right):
+        frobenius.Swap.__init__(self, left, right)
+
     def dagger(self):
         return self
 
@@ -1526,8 +1726,8 @@ class Feedback(monoidal.Bubble, Diagram, frobenius.Box):
     A feedback loop connecting the last `mem` outputs of a channel diagram
     back to its last `mem` inputs, one time step later.
 
-    See :class:`optyx.core.diagram.Feedback`; doubling the loop gives the
-    loop of the doubled diagram, so `double` and `unroll` commute.
+    See :class:`discopy.optyx.core.diagram.Feedback`; doubling the loop gives
+    the loop of the doubled diagram, so `double` and `unroll` commute.
 
     The one boundary with a natural default is the effect: discarding is the
     unique causal effect on a channel, so :meth:`default_effect` is
@@ -1539,7 +1739,7 @@ class Feedback(monoidal.Bubble, Diagram, frobenius.Box):
     here with the plus state as initial state and the output memory
     discarded by default; doubling commutes with unrolling on the nose:
 
-    >>> from optyx.qubits import Z, X, Scalar, Ket
+    >>> from discopy.optyx.qubits import Z, X, Scalar, Ket
     >>> cnot = Z(1, 2) @ qubit >> qubit @ X(2, 1) @ Scalar(2 ** 0.5)
     >>> ladder = (cnot >> Diagram.swap(qubit, qubit)).feedback(
     ...     state=Ket("+"))
@@ -1632,7 +1832,7 @@ class Measure(Channel):
     def _measure_wire(self, ob, d):
         """Return the diagram that measures one `ob`."""
         # pylint: disable=import-outside-toplevel
-        from optyx.core.zw import Add
+        from discopy.optyx.core.zw import Add
         if ob.needs_inflation():
             return Measure(ob ** d) >> CQMap(
                 "Gather photons", Add(d), mode ** d, mode
@@ -1697,7 +1897,7 @@ class Encode(Channel):
         `amps_iter` yields the internal‑state vectors for `mode` wires.
         """
         # pylint: disable=import-outside-toplevel
-        from optyx.core.zw import Add, Endo
+        from discopy.optyx.core.zw import Add, Endo
 
         if ob == mode:
             amps = next(amps_iter)
@@ -1767,7 +1967,8 @@ Scalar = lambda s: Channel(  # noqa: E731
 
 Diagram.spider_factory = Spider
 Diagram.hypergraph_factory = Hypergraph
-Diagram.braid_factory = Swap
+Diagram.swap_factory = Swap
+Diagram.permutation_factory = Permutation
 Diagram.sum_factory = Sum
 Diagram.feedback_factory = Feedback
 Diagram.functor_factory = Functor

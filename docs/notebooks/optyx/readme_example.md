@@ -16,7 +16,7 @@ Let us build a diagram to study the HOM effect.
 
 
 ```python
-from optyx.photonic import BBS
+from discopy.optyx.photonic import BBS
 
 # diagram generators:
 # beam-splitter
@@ -32,7 +32,7 @@ beam_splitter.draw()
 
 
 ```python
-from optyx.photonic import Create
+from discopy.optyx.photonic import Create
 
 # diagram composition with monoidal syntax
 # create two single-photon states and send them to a beam-splitter
@@ -61,7 +61,7 @@ Call `diagram.eval()` to evaluate a diagram (Quimb backend by default). It retur
 
 ```python
 # an amplitude (raw result of tensor contraction)
-from optyx.classical import Select
+from discopy.optyx.classical import Select
 (
     hong_ou_mandel >> Select(1, 1)
 ).eval().tensor.array
@@ -96,13 +96,13 @@ https://en.wikipedia.org/wiki/Quantum_teleportation#/media/File:Quantum_teleport
 
 
 ```python
-from optyx import qubit, bit
-from optyx.qubits import Scalar
+from discopy.optyx import qubit, bit
+from discopy.optyx.qubits import Scalar
 
-from optyx import Channel
-from optyx.qubits import Z, X, H, Measure, Scalar, qubit, bit
-from optyx.classical import BitControlledGate
-from optyx.core import zx, diagram
+from discopy.optyx import Channel
+from discopy.optyx.qubits import Z, X, H, Measure, Scalar, qubit, bit
+from discopy.optyx.classical import BitControlledGate
+from discopy.optyx.core import zx, diagram
 ```
 
 ### Define the protocol
@@ -178,7 +178,7 @@ teleportation_monoidal_syntax = (
 
 ```python
 import numpy as np
-from optyx.qubits import Id
+from discopy.optyx.qubits import Id
 
 # both implementations are equivalent
 np.allclose(
@@ -202,7 +202,7 @@ Optyx evaluates diagrams via pluggable backends. By default it compiles a diagra
 ```python
 # backends (Perceval, Discopy, Quimb)
 
-from optyx.core.backends import (
+from discopy.optyx.core.backends import (
     DiscopyBackend,
     QuimbBackend
 )
@@ -612,7 +612,7 @@ $\underline{k} = \underline{s} (\underline{b} + \underline{d}) + \neg \underline
 
 
 ```python
-from optyx.photonic import DualRail
+from discopy.optyx.photonic import DualRail
 
 dual_rail_encoded_bell = (
     bell >>
@@ -622,9 +622,9 @@ dual_rail_encoded_bell = (
 
 
 ```python
-from optyx.classical import PostselectBit, BitControlledGate
-from optyx.photonic import Phase
-from optyx.photonic import HadamardBS, qmode
+from discopy.optyx.classical import PostselectBit, BitControlledGate
+from discopy.optyx.photonic import Phase
+from discopy.optyx.photonic import HadamardBS, qmode
 
 # postselect on fusion success
 fusion_failure_processing = PostselectBit(1)
@@ -639,7 +639,7 @@ correction = BitControlledGate(
 
 
 ```python
-from optyx.photonic import FusionTypeII
+from discopy.optyx.photonic import FusionTypeII
 
 @Channel.from_callable(
     dom=qubit, cod=qmode @ qmode
@@ -655,7 +655,7 @@ def fusion_teleportation(a):
 
 
 ```python
-from optyx.photonic import FusionTypeII
+from discopy.optyx.photonic import FusionTypeII
 
 fusion_teleportation_monoidal_syntax = (
     DualRail(1) @ dual_rail_encoded_bell >>
@@ -678,7 +678,7 @@ fusion_teleportation_monoidal_syntax.foliation().draw(figsize=(8, 8))
 
 ```python
 import numpy as np
-from optyx.photonic import Id
+from discopy.optyx.photonic import Id
 
 array_teleportation = fusion_teleportation_monoidal_syntax.eval().tensor.array
 array_dr = (DualRail(1) @ Scalar(0.5**0.5)).double().to_tensor().eval().array
@@ -778,7 +778,7 @@ Photon loss is when a photon that should arrive simply doesn’t. In Optyx, you 
 
 
 ```python
-from optyx.photonic import FusionTypeII, PhotonLoss
+from discopy.optyx.photonic import FusionTypeII, PhotonLoss
 
 # photo loss is one of the main error sources in photonic quantum computing
 def fusion_teleportation_with_photon_loss(p):
@@ -805,7 +805,7 @@ def fusion_teleportation_with_photon_loss(p):
 
 
 ```python
-from optyx.channel import Spider, Diagram
+from discopy.optyx.channel import Spider, Diagram
 
 def get_perm(n):
     return sorted(sorted(list(range(n))), key=lambda i: i % 2)
@@ -885,10 +885,10 @@ Main, D., Drmota, P., Nadlinger, D.P. et al. Distributed quantum computing acros
 
 
 ```python
-from optyx.qubits import Z, Scalar, Id, Measure
-from optyx.photonic import DualRail
-from optyx.classical import PostselectBit
-from discopy.drawing import Equation
+from discopy.optyx.qubits import Z, Scalar, Id, Measure
+from discopy.optyx.photonic import DualRail
+from discopy.optyx.classical import PostselectBit
+from discopy.symmetric import Equation
 
 bell_state = Z(0, 2) @ Scalar(0.5 ** 0.5)
 
@@ -938,7 +938,7 @@ unit_vectors = list(rotated_unit_vectors(15))
 
 
 ```python
-from optyx.qubits import Discard
+from discopy.optyx.qubits import Discard
 
 inner_product_states = []
 inner_product_bell_states = []
@@ -1012,7 +1012,7 @@ graphix_result = simulator.run().psi.conj()
 
 
 ```python
-from optyx import qubits
+from discopy.optyx import qubits
 
 optyx_zx = qubits.Circuit(pattern)
 
@@ -1077,7 +1077,7 @@ pcvl.pdisplay(p, recursive=True)
 
 
 ```python
-from optyx.qubits import Ket
+from discopy.optyx.qubits import Ket
 
 state = Ket("+") >> Z(1, 1, 0.3)
 state_array = state.eval().tensor.array
@@ -1111,15 +1111,15 @@ result_perceval = p.probs()
 
 
 ```python
-from optyx import Channel
+from discopy.optyx import Channel
 
 optyx_diagram = Channel.from_perceval(p)
 ```
 
 
 ```python
-from optyx.qubits import Scalar, Ket
-from optyx.photonic import DualRail
+from discopy.optyx.qubits import Scalar, Ket
+from discopy.optyx.photonic import DualRail
 
 bell_state = Z(0, 2) @ Scalar(0.5**0.5)
 transmit = Ket("+") >> Z(1, 1, 0.3)
