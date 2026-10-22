@@ -85,7 +85,7 @@ from warnings import warn
 from discopy import messages, utils
 from discopy.abc import Category, DaggerCategory, Nat
 from discopy.axioms import (
-    GENERATORS, Equation as AbstractEquation, Serialisable, Testable)
+    GENERATORS, Equation as AbstractEquation, Serialisable)
 from discopy.utils import (  # noqa: F401
     factory,
     factory_name,
