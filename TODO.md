@@ -6,3 +6,4 @@ Copy of rel-int/optyx#89 onto discopy.optyx (#225)
 - [x] port to discopy.optyx on next main
 - [x] checks
 - [ ] giodefelice-agents decides: own repo or notebook (toumix/desire#163)
+- [ ] from the copy of optyx#88, whose code this branch carries: `photon_noise.tables` fails on a cold cache: `json.dumps` cannot write the numpy integers of `np.bincount`, found by `test_photon_noise.py`; fix it or file it along with the decision above
