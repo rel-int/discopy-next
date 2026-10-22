@@ -48,13 +48,12 @@ from typing import ClassVar
 
 from discopy import biclosed, cmap, messages
 from discopy.abc import ClosedCategory
+from discopy.axioms import Serialisable
 from discopy.cat import factory
 from discopy.grammar import thue
 from discopy.utils import (
     BinaryBoxConstructor,
     AxiomError,
-    factory_name,
-    from_tree,
     get_origin,
 )
 
@@ -280,13 +279,11 @@ class Abstraction(TermBase, biclosed.Abstraction):
 
 class FA(TermBase, biclosed.Application):
     "Application of type ``Y`` with subterms of type ``Y << X`` and ``X``."
+    serialised_attrs = ('func', 'args')
+
     def __init__(self, func, args):
         biclosed.Application.__init__(self, func, args, left=False)
         TermBase.__init__(self, self.name, self.dom, self.cod)
-
-    @classmethod
-    def from_tree(cls, tree):
-        return cls(*map(from_tree, (tree['func'], tree['args'])))
 
     def simplify(self):
         return self.func.simplify()(self.args.simplify())
@@ -294,25 +291,21 @@ class FA(TermBase, biclosed.Application):
 
 class BA(TermBase, biclosed.Application):
     "Application of type ``Y`` with subterms of type ``X`` and ``X >> Y``."
+    serialised_attrs = ('args', 'func')
+
     def __init__(self, args, func):
         biclosed.Application.__init__(self, func, args, left=True)
         TermBase.__init__(self, self.name, self.dom, self.cod)
 
-    @classmethod
-    def from_tree(cls, tree):
-        return cls(*map(from_tree, (tree['args'], tree['func'])))
-
     def simplify(self):
         return self.args.simplify()(self.func.simplify(), left=True)
-
-    def __repr__(self):
-        return factory_name(type(self)) + f"({self.args!r}, {self.func!r})"
 
 
 class TypeRaising(TermBase):
     "Abstract superclass of :class:`FTR` and :class:`BTR`."
     base: Ty
     child: Term
+    serialised_attrs = ('base', 'child')
 
     def __init__(self, base, child, cod):
         name = f"{type(self).__name__}({base}, {child})"
@@ -332,17 +325,6 @@ class TypeRaising(TermBase):
 
     def map(self, functor, context):
         return functor.map_term(self.simplify(), context)
-
-    def __repr__(self):
-        return factory_name(type(self)) + f"({self.base!r}, {self.child!r})"
-
-    def to_tree(self):
-        return dict(factory=factory_name(type(self)), base=self.base.to_tree(),
-                    child=self.child.to_tree())
-
-    @classmethod
-    def from_tree(cls, tree):
-        return cls(*map(from_tree, (tree['base'], tree['child'])))
 
     @property
     def constants(self):
@@ -378,6 +360,8 @@ class BinaryTerm(TermBase):
     "Abstract superclass of :class:`FC`, :class:`BC`, :class:`FX`, :class:`BX`"
     left: Term
     right: Term
+    serialised_attrs = ('left', 'right')
+    __repr__ = Serialisable.__repr__  # Over cat.Arrow's, reading `inside`.
 
     def __post_init__(self):
         if set(self.left.freevars).intersection(self.right.freevars):
@@ -406,17 +390,6 @@ class BinaryTerm(TermBase):
 
     def map(self, functor, context):
         return functor.map_term(self.simplify(), context)
-
-    def __repr__(self):
-        return factory_name(type(self)) + f"({self.left!r}, {self.right!r})"
-
-    def to_tree(self):
-        return dict(factory=factory_name(type(self)), left=self.left.to_tree(),
-                    right=self.right.to_tree())
-
-    @classmethod
-    def from_tree(cls, tree):
-        return cls(*map(from_tree, (tree['left'], tree['right'])))
 
     @property
     def constants(self):

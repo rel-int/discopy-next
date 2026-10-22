@@ -46,10 +46,10 @@ from discopy.abc import BalancedCategory
 from discopy.cat import factory
 from discopy.feedback import Ty
 from discopy.monoidal import Colour
-from discopy.utils import factory_name, assert_isatomic, from_tree
+from discopy.utils import assert_isatomic
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, repr=False)
 class Ribbon(Colour):
     """
     The coloured region between the two rails of a ribbon in the dual rail
@@ -73,25 +73,13 @@ class Ribbon(Colour):
     """
     name: str = "gray"
     width: float = None
+    serialised_attrs = ('name', 'label', 'width')
 
     def __post_init__(self):
         super().__post_init__()
         if self.width is None:
             object.__setattr__(
                 self, "width", config.DRAWING_DEFAULT["ribbon_width"])
-
-    def __repr__(self):
-        label = "" if self.label is None else f", label={self.label!r}"
-        return factory_name(type(self))\
-            + f"({self.name!r}{label}, width={self.width})"
-
-    def to_tree(self):
-        return dict(super().to_tree(), width=self.width)
-
-    @classmethod
-    def from_tree(cls, tree):
-        return cls(tree['name'], label=tree.get('label'),
-                   width=tree['width'])
 
 
 def double_rail(
@@ -219,17 +207,14 @@ class DualRailBraid(braided.Box):
         right : The ribbon on the top right and bottom left.
         is_dagger (bool) : Which ribbon goes over the other.
     """
+    serialised_attrs = ('left', 'right', 'is_dagger')
+
     def __init__(self, left: monoidal.Ty, right: monoidal.Ty, is_dagger=False):
         self.left, self.right = left, right
         name = type(self).__name__ + f"({left}, {right})"
         braided.Box.__init__(
             self, name, left @ right, right @ left,
             is_dagger=is_dagger, draw_as_dual_rail_braid=True)
-
-    def __repr__(self):
-        str_is_dagger = ", is_dagger=True" if self.is_dagger else ""
-        return factory_name(type(self))\
-            + f"({self.left!r}, {self.right!r}{str_is_dagger})"
 
     def dagger(self):
         return type(self)(self.right, self.left, not self.is_dagger)
@@ -244,15 +229,13 @@ class DualRailTwist(braided.Box):
         dom : The ribbon (doubled type) being twisted.
         is_dagger (bool) : Which way the rails twist.
     """
+    serialised_attrs = ('dom', 'is_dagger')
+
     def __init__(self, dom: monoidal.Ty, is_dagger=False):
         name = type(self).__name__ + f"({dom})"
         braided.Box.__init__(
             self, name, dom, dom,
             is_dagger=is_dagger, draw_as_dual_rail_twist=True)
-
-    def __repr__(self):
-        str_is_dagger = ", is_dagger=True" if self.is_dagger else ""
-        return factory_name(type(self)) + f"({self.dom!r}{str_is_dagger})"
 
     def dagger(self):
         return type(self)(self.dom, not self.is_dagger)
@@ -272,16 +255,12 @@ class Twist(Box):
     For complex types, use :meth:`Diagram.twist` instead.
     """
     drawing_name = "Twist"
+    serialised_attrs = ('dom', 'is_dagger')
 
     def __init__(self, dom: monoidal.Ty, is_dagger=False):
         assert_isatomic(dom, monoidal.Ty)
         name = type(self).__name__ + f"({dom})"
         Box.__init__(self, name, dom, dom, is_dagger=is_dagger)
-
-    def __repr__(self):
-        if self.is_dagger:
-            return repr(self.dagger()) + ".dagger()"
-        return factory_name(type(self)) + f"({self.dom!r})"
 
     def dagger(self):
         return type(self)(self.dom, not self.is_dagger)
@@ -290,23 +269,6 @@ class Twist(Box):
         """ The arguments of the constructor, which a pickle and a delay read.
         """
         return self.dom, self.is_dagger
-
-    def to_tree(self) -> dict:
-        """
-        Serialise a twist by its type, keeping whether it is an inverse.
-
-        >>> from discopy.utils import dumps, loads
-        >>> x = Ty('x')
-        >>> assert loads(dumps(Twist(x).dagger())) == Twist(x).dagger()
-        """
-        tree = {'factory': factory_name(type(self)), 'dom': self.dom.to_tree()}
-        if self.is_dagger:
-            tree['is_dagger'] = True
-        return tree
-
-    @classmethod
-    def from_tree(cls, tree: dict) -> Twist:
-        return cls(from_tree(tree['dom']), tree.get('is_dagger', False))
 
 
 class Sum(braided.Sum, Box):

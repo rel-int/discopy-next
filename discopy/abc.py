@@ -338,7 +338,7 @@ class Group[C1: Group](Groupoid[type(None), C1], Monoid[C1]):
 
 
 @dataclass
-class Nat(Testable["Nat"], Monoid["Nat"]):
+class Nat(Serialisable["Nat"], Monoid["Nat"]):
     """
     ``Nat`` is the free monoid on one generator, i.e. the natural numbers
     with addition as tensor. It is also a sequence over its unary encoding:
@@ -349,6 +349,7 @@ class Nat(Testable["Nat"], Monoid["Nat"]):
         n : The natural number.
     """
     n: int = 0
+    serialised_attrs = ('n', )
 
     def tensor(self, *others: Nat) -> Nat:
         if any(not isinstance(other, Nat) for other in others):
@@ -376,15 +377,6 @@ class Nat(Testable["Nat"], Monoid["Nat"]):
         if key >= self.n or key < -self.n:
             raise IndexError
         return type(self)(1)
-
-    def to_tree(self) -> dict:
-        """ The tree of a natural number, see :func:`discopy.utils.dumps`. """
-        return {'factory': factory_name(type(self)), 'n': self.n}
-
-    @classmethod
-    def from_tree(cls, tree: dict) -> Nat:
-        """ The natural number of a tree, see :func:`discopy.utils.loads`. """
-        return cls(tree['n'])
 
     @classmethod
     def strategy(cls, *, max_size=3):

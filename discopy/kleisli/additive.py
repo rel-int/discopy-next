@@ -112,6 +112,7 @@ from __future__ import annotations
 from collections.abc import Callable
 
 from discopy.abc import ComarkovCategory, NamedGeneric, TracedCategory
+from discopy.axioms import Serialisable
 from discopy.kleisli import channel
 from discopy.kleisli.monad import Monad
 from discopy.python import function
@@ -120,7 +121,7 @@ from discopy.utils import (
     assert_isinstance, assert_iscomposable, factory, factory_name)
 
 
-class Tagged:
+class Tagged(Serialisable):
     """
     A value together with the index of the summand it comes from, i.e. an
     element of a disjoint union, see the module docstring for why this
@@ -135,8 +136,14 @@ class Tagged:
     >>> assert Tagged("x", 1) == eval(repr(Tagged("x", 1)))
     >>> assert Tagged("x", 1) != ("x", 1) != Tagged("x", 0)
     """
+    serialised_attrs = ('value', 'tag')
+
     def __init__(self, value, tag: int):
         self.value, self.tag = value, tag
+
+    @classmethod
+    def strategy(cls, **params):
+        raise NotImplementedError
 
     def __eq__(self, other):
         return isinstance(other, Tagged)\
@@ -144,9 +151,6 @@ class Tagged:
 
     def __hash__(self):
         return hash((self.value, self.tag))
-
-    def __repr__(self):
-        return f"Tagged({self.value!r}, {self.tag!r})"
 
 
 def pack(ty: Ty) -> type:

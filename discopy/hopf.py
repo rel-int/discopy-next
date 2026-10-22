@@ -130,13 +130,14 @@ import numpy as np
 from discopy import monoidal, ribbon, tensor, frobenius
 from discopy.tensor import Dim, Box, Id
 from discopy.abc import RibbonCategory, NamedGeneric
+from discopy.axioms import Serialisable
 from discopy.utils import (
     assert_isinstance, classproperty, factory_name, get_origin, product)
 
 Diagram = tensor.Diagram
 
 
-class Algebra:
+class Algebra(Serialisable):
     """
     A finite-dimensional Hopf algebra whose structural generators are
     :class:`.tensor.Diagram`\\ s over one object ``ty``:
@@ -159,12 +160,19 @@ class Algebra:
         unit, counit, mult, comult, antipode : The generators as diagrams.
         R : The R-matrix generator (optional).
     """
+    serialised_attrs = ('unit', 'counit', 'mult', 'comult', 'antipode', 'R')
+    R = None
+
     def __init__(self, unit, counit, mult, comult, antipode, R=None):
         self.unit, self.counit = unit, counit
         self.mult, self.comult, self.antipode = mult, comult, antipode
         self.R = R
         self.ty = mult.cod
         self.dim = product(self.ty.inside)
+
+    @classmethod
+    def strategy(cls, **params):
+        raise NotImplementedError
 
     @property
     def generators(self):
@@ -308,13 +316,6 @@ class Algebra:
         g = self.pivotal_element.eval(dtype=complex).array.reshape(n)
         v = np.einsum('i,j,ijk->k', u, S.T @ g, mult)
         return Box[complex]('v', Dim(1), self.ty, v.tolist())
-
-    def __repr__(self):
-        optional = "" if self.R is None else f", R={self.R!r}"
-        return factory_name(type(self)) + (
-            f"(unit={self.unit!r}, counit={self.counit!r}, "
-            f"mult={self.mult!r}, comult={self.comult!r}, "
-            f"antipode={self.antipode!r}{optional})")
 
     def __str__(self):
         return f"{type(self).__name__}({self.dim})"
@@ -620,6 +621,8 @@ class Double(Algebra):
     >>> D = Double(Algebra.cyclic(2))
     >>> assert D.dim == 4 and D.is_valid()
     """
+    serialised_attrs = ('base', )
+
     def __init__(self, base):
         assert_isinstance(base, Algebra)
         self.base = base
@@ -649,9 +652,6 @@ class Double(Algebra):
             @ (Sinv.r @ base.antipode) @ base.unit
         antipode = prep >> ty @ Diagram.swap(ty, ty) @ ty >> mult
         super().__init__(unit, counit, mult, comult, antipode, R=R)
-
-    def __repr__(self):
-        return factory_name(type(self)) + f"({self.base!r})"
 
 
 class Representation(NamedGeneric["algebra"], frobenius.Dim):

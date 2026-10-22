@@ -74,7 +74,7 @@ from discopy import messages, tensor, frobenius
 from discopy.cat import factory
 from discopy.matrix import backend
 from discopy.tensor import Dim, Tensor
-from discopy.utils import assert_isinstance, deprecated_alias, factory_name
+from discopy.utils import assert_isinstance, deprecated_alias
 
 
 class Wire(frobenius.Wire):
@@ -91,6 +91,9 @@ class Wire(frobenius.Wire):
     :class:`Qudit`, but feel free to open a pull-request if you discover a
     third kind of information unit.
     """
+    serialised_attrs = ('dim', 'z', 'time_step', 'is_constant')
+    z = 0
+
     def __init__(self, name: str, dim=2, z=0, **params):
         assert_isinstance(dim, int)
         assert_isinstance(self, (Digit, Qudit))
@@ -98,18 +101,6 @@ class Wire(frobenius.Wire):
             raise ValueError
         self.dim = dim
         super().__init__(name, z, **params)
-
-    def __repr__(self):
-        return f"{factory_name(type(self))}({self.dim}{self.repr_time_step()})"
-
-    @classmethod
-    def from_tree(cls, tree: dict) -> Wire:
-        dim, z = tree['dim'], tree.get('z', 0)
-        return cls(dim=dim, z=z, time_step=tree.get('time_step', 0),
-                   is_constant=tree.get('is_constant', True))
-
-    def to_tree(self) -> dict:
-        return dict(dim=self.dim, **super().to_tree())
 
 
 class Digit(Wire):

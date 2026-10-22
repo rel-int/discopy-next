@@ -66,6 +66,7 @@ from copy import copy
 
 from discopy import cat, cmap, rigid, feedback
 from discopy.abc import PivotalCategory
+from discopy.axioms import Serialisable
 from discopy.cat import factory
 from discopy.utils import deprecated_alias
 
@@ -88,6 +89,10 @@ class Wire(feedback.Wire, rigid.Wire):
     >>> assert x.l == x.r == Wire('x', 1, time_step=2) and x.l.l == x
     >>> assert eval(repr(x.l)) == x.l and str(x.l) == 'x.r.d.d'
     """
+    serialised_attrs = rigid.Wire.serialised_attrs + (
+        'time_step', 'is_constant')
+    __repr__ = Serialisable.__repr__  # Over feedback.Wire's, earlier in MRO.
+
     @property
     def l(self) -> Wire:
         """ The adjoint of the object, at the same time step. """
@@ -96,9 +101,6 @@ class Wire(feedback.Wire, rigid.Wire):
         return result
 
     r = l
-
-    def __repr__(self):
-        return rigid.Wire.__repr__(self)[:-1] + self.repr_time_step() + ")"
 
     def dagger(self) -> Wire:
         """
@@ -227,15 +229,12 @@ class Box(rigid.Box, feedback.Box, Diagram):
         cod (Ty) : The codomain of the box, i.e. its output.
         time_step (int) : The number of times the box has been delayed.
     """
+    serialised_attrs = rigid.Box.serialised_attrs + ('time_step', )
+    __repr__ = cat.Box.__repr__  # Over feedback.Box's, earlier in MRO.
+
     def __init__(self, name, dom, cod, *args, time_step: int = 0, **params):
         rigid.Box.__init__(self, name, dom, cod, *args, **params)
         self._time_step, self._args, self._params = time_step, args, params
-
-    def __repr__(self):
-        if self.is_dagger:
-            return repr(self.dagger()) + ".dagger()"
-        time_step = f", time_step={self.time_step}" if self.time_step else ""
-        return rigid.Box.__repr__(self)[:-1] + time_step + ")"
 
     def __str__(self):
         return rigid.Box.__str__(self) + feedback.str_delayed(self.time_step)

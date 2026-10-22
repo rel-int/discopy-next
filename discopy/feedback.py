@@ -255,11 +255,12 @@ from typing import ClassVar
 
 from discopy import monoidal, cmap, hypergraph, messages
 from discopy.abc import FeedbackCategory, TracedCategory
+from discopy.axioms import Serialisable
 from discopy.monoidal import (  # noqa: F401  pylint: disable=unused-import
     Equation)
 from discopy.utils import (
     deprecated_alias,
-    factory, factory_name, assert_isinstance, AxiomError, from_tree,
+    factory, assert_isinstance, AxiomError,
 )
 
 
@@ -288,6 +289,8 @@ class Wire(monoidal.Wire):
     >>> assert eval(repr(x.delay(2))) == x.delay(2)
     """
     time_step, is_constant = 0, True
+    serialised_attrs = monoidal.Wire.serialised_attrs + (
+        'time_step', 'is_constant')
 
     def __init__(self, name: str, *args, time_step: int = 0,
                  is_constant: bool = True, **params):
@@ -348,22 +351,8 @@ class Wire(monoidal.Wire):
         is_constant = "" if self.is_constant else ", is_constant=False"
         return time_step + is_constant
 
-    def __repr__(self):
-        colours = "" if self.dom == self.cod == monoidal.transparent\
-            else f", dom={self.dom!r}, cod={self.cod!r}"
-        return factory_name(type(self))\
-            + f"({self.name!r}{colours}{self.repr_time_step()})"
-
     def __str__(self):
         return super().__str__() + str_delayed(self.time_step)
-
-    def to_tree(self):
-        tree = super().to_tree()
-        if self.time_step:
-            tree['time_step'] = self.time_step
-        if not self.is_constant:
-            tree['is_constant'] = False
-        return tree
 
     @classmethod
     def from_tree(cls, tree):
@@ -385,16 +374,15 @@ class HeadOb(Wire):
 
     Note the object `arg: Wire` cannot be itself a `HeadOb` or be delayed.
     """
+    serialised_attrs = ('arg', 'time_step')
+    from_tree = Serialisable.__dict__['from_tree']  # Over Wire's.
+
     def __init__(self, arg: Wire, time_step: int = 0):
         assert_isinstance(arg, Wire)
         if isinstance(arg, HeadOb) or arg.time_step:
             raise ValueError
         self.arg = arg
         super().__init__(f"{arg}.head", time_step=time_step, is_constant=False)
-
-    def __repr__(self):
-        time_step = f", time_step={self.time_step}" if self.time_step else ""
-        return factory_name(type(self)) + f"({repr(self.arg)}{time_step})"
 
     def delay(self, n_steps=1):
         return type(self)(self.arg, self.time_step + n_steps)
@@ -420,23 +408,6 @@ class HeadOb(Wire):
     def tail(self):
         return self.delay(-1) if self.time_step else None
 
-    def to_tree(self) -> dict:
-        """
-        Serialise the head of an object by its argument and its time step.
-
-        >>> from discopy.utils import dumps, loads
-        >>> x = Ty('x')
-        >>> assert loads(dumps(x.head.delay())) == x.head.delay()
-        """
-        tree = {'factory': factory_name(type(self)), 'arg': self.arg.to_tree()}
-        if self.time_step:
-            tree['time_step'] = self.time_step
-        return tree
-
-    @classmethod
-    def from_tree(cls, tree: dict) -> HeadOb:
-        return cls(from_tree(tree['arg']), tree.get('time_step', 0))
-
 
 class TailOb(Wire):
     """
@@ -448,6 +419,9 @@ class TailOb(Wire):
     >>> x = Wire('x', is_constant=False)
     >>> assert x.tail == TailOb(x)
     """
+    serialised_attrs = HeadOb.serialised_attrs
+    from_tree = HeadOb.__dict__['from_tree']
+
     def __init__(self, arg: Wire, time_step: int = 0):
         assert_isinstance(arg, Wire)
         if isinstance(arg, HeadOb) or arg.is_constant or arg.time_step > 0:
@@ -455,8 +429,7 @@ class TailOb(Wire):
         self.arg = arg
         super().__init__(f"{arg}.tail", time_step=time_step, is_constant=False)
 
-    delay, reset, __repr__ = HeadOb.delay, HeadOb.reset, HeadOb.__repr__
-    to_tree, from_tree = HeadOb.to_tree, classmethod(HeadOb.from_tree.__func__)
+    delay, reset = HeadOb.delay, HeadOb.reset
     l, r = HeadOb.l, HeadOb.r
 
 
@@ -757,6 +730,12 @@ class Feedback(Box, monoidal.Bubble):
     >>> from discopy import feedback
     >>> assert str(fb) == "Feedback(f)" and eval(repr(fb)) == fb
     """
+    serialised_attrs = ('arg', 'dom', 'cod', 'mem', 'left')
+    dom = cod = mem = None
+    left = False
+    __repr__, to_tree = Serialisable.__repr__, Serialisable.to_tree
+    from_tree = Serialisable.__dict__['from_tree']  # Over Box's and Bubble's.
+
     def __init__(self, arg: Diagram, dom=None, cod=None, mem=None, left=False):
         assert_isinstance(arg, self.ar)
         dom, cod, mem = arg.split_memory(
@@ -783,34 +762,6 @@ class Feedback(Box, monoidal.Bubble):
 
     def __str__(self):
         return self.name
-
-    def __repr__(self):
-        mem = "" if len(self.mem) == 1 else f", mem={self.mem!r}"
-        left = ", left=True" if self.left else ""
-        return factory_name(type(self)) + f"({self.arg!r}{mem}{left})"
-
-    def to_tree(self) -> dict:
-        """
-        Serialise a feedback by its argument, its memory and its side.
-
-        >>> from discopy.utils import dumps, loads
-        >>> x, y = Ty('x'), Ty('y')
-        >>> fb = Box('f', x @ (x @ y).delay(), x @ x @ y).feedback(mem=x @ y)
-        >>> assert loads(dumps(fb)) == fb
-        """
-        tree = {'factory': factory_name(type(self)),
-                'arg': self.arg.to_tree(), 'dom': self.dom.to_tree(),
-                'cod': self.cod.to_tree(), 'mem': self.mem.to_tree()}
-        if self.left:
-            tree['left'] = True
-        return tree
-
-    @classmethod
-    def from_tree(cls, tree: dict) -> Feedback:
-        arg, dom, cod, mem = (
-            from_tree(tree[key]) if key in tree else None
-            for key in ('arg', 'dom', 'cod', 'mem'))
-        return cls(arg, dom=dom, cod=cod, mem=mem, left='left' in tree)
 
     def to_drawing(self):
         return self.arg.to_drawing().trace(len(self.mem), left=self.left)
@@ -866,6 +817,9 @@ class Head(monoidal.Bubble, Box):
         time_step : The number of times the head has been delayed.
     """
     part = "head"
+    serialised_attrs = ('arg', 'time_step')
+    __repr__, to_tree = Serialisable.__repr__, Serialisable.to_tree
+    from_tree = Serialisable.__dict__['from_tree']  # Over Box's and Bubble's.
 
     def __init__(self, arg: Diagram, time_step=0):
         dom, cod = (
@@ -874,8 +828,7 @@ class Head(monoidal.Bubble, Box):
         Box.__init__(self, f"({arg}).{self.part}", self.dom, self.cod,
                      time_step=time_step)
 
-    delay, reset, __repr__ = HeadOb.delay, HeadOb.reset, HeadOb.__repr__
-    to_tree, from_tree = HeadOb.to_tree, classmethod(HeadOb.from_tree.__func__)
+    delay, reset = HeadOb.delay, HeadOb.reset
     __str__ = Box.__str__
 
 
@@ -889,10 +842,12 @@ class Tail(monoidal.Bubble, Box):
         time_step : The number of times the tail has been delayed.
     """
     part = "tail"
+    serialised_attrs, __repr__, to_tree, from_tree = (
+        Head.serialised_attrs, Head.__repr__, Head.to_tree,
+        Head.__dict__['from_tree'])
 
     __init__ = Head.__init__
-    delay, reset, __repr__ = HeadOb.delay, HeadOb.reset, HeadOb.__repr__
-    to_tree, from_tree = HeadOb.to_tree, classmethod(HeadOb.from_tree.__func__)
+    delay, reset = HeadOb.delay, HeadOb.reset
     __str__ = Box.__str__
 
 
@@ -923,6 +878,10 @@ class FollowedBy(Box):
     >>> eq_up_to_F = lambda f, g: F(f).unroll(2).now == F(g).unroll(2).now
     >>> assert eq_up_to_F(FollowedBy(x), Id(x))
     """
+    serialised_attrs = ('arg', 'is_dagger', 'time_step')
+    __repr__ = Serialisable.__repr__  # Over feedback.Box's, which appends
+    # the time step a second time.
+
     def __init__(self, arg: Ty, is_dagger=False, time_step=0):
         self.arg = arg
         dagger_name = ", is_dagger=True" if is_dagger else ""
@@ -933,12 +892,6 @@ class FollowedBy(Box):
         super().__init__(
             name, dom, cod, time_step=time_step, is_dagger=is_dagger)
 
-    def __repr__(self):
-        is_dagger = ", is_dagger=True" if self.is_dagger else ""
-        time_step = f", time_step={self.time_step}" if self.time_step else ""
-        return factory_name(type(self))\
-            + f"({repr(self.arg)}{is_dagger}{time_step})"
-
     def delay(self, n_steps=1):
         return type(self)(self.arg, self.is_dagger, self.time_step + n_steps)
 
@@ -947,27 +900,6 @@ class FollowedBy(Box):
 
     def dagger(self):
         return type(self)(self.arg, not self.is_dagger, self.time_step)
-
-    def to_tree(self) -> dict:
-        """
-        Serialise by the type, the direction and the time step.
-
-        >>> from discopy.utils import dumps, loads
-        >>> x = Ty(Wire('x', is_constant=False))
-        >>> fby = FollowedBy(x, is_dagger=True).delay()
-        >>> assert loads(dumps(fby)) == fby
-        """
-        tree = {'factory': factory_name(type(self)), 'arg': self.arg.to_tree()}
-        if self.is_dagger:
-            tree['is_dagger'] = True
-        if self.time_step:
-            tree['time_step'] = self.time_step
-        return tree
-
-    @classmethod
-    def from_tree(cls, tree: dict) -> FollowedBy:
-        return cls(from_tree(tree['arg']), 'is_dagger' in tree,
-                   tree.get('time_step', 0))
 
 
 class Sum(monoidal.Sum, Box):

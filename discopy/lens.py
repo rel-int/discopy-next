@@ -71,9 +71,10 @@ from dataclasses import dataclass
 from discopy import interaction, markov, messages, symmetric
 from discopy.abc import (
     MarkovCategory, NamedGeneric, SymmetricCategory, TracedCategory)
+from discopy.axioms import Serialisable
 from discopy.utils import (
     AxiomError, assert_iscomposable, assert_isinstance, classproperty,
-    factory_name, get_origin, unbiased)
+    factory_name, unbiased)
 
 
 class Ty(interaction.Ty):
@@ -107,8 +108,8 @@ def pairs(category) -> type:
     return Ty[category.ob]
 
 
-@dataclass
-class Symmetric(SymmetricCategory, NamedGeneric['category']):
+@dataclass(repr=False)
+class Symmetric(SymmetricCategory, NamedGeneric['category'], Serialisable):
     """
     A lens from `dom` to `cod` over a symmetric `category` is a `residual`
     with a `forward` morphism `dom.positive -> cod.positive @ residual` and
@@ -159,6 +160,8 @@ class Symmetric(SymmetricCategory, NamedGeneric['category']):
     backward: category
     residual: category.ob = None
 
+    serialised_attrs = ('dom', 'cod', 'forward', 'backward', 'residual')
+
     def __post_init__(self):
         if self.residual is None:
             self.residual = self.category.ob()
@@ -175,11 +178,9 @@ class Symmetric(SymmetricCategory, NamedGeneric['category']):
             identity(self.residual @ self.cod.negative), self.backward)
         assert_iscomposable(self.backward, identity(self.dom.negative))
 
-    def __repr__(self):
-        factory, category = map(
-            factory_name, (get_origin(type(self)), self.category))
-        return f"{factory}[{category}]({self.dom!r}, {self.cod!r}, "\
-            f"{self.forward!r}, {self.backward!r}, {self.residual!r})"
+    @classmethod
+    def strategy(cls, **params):
+        raise NotImplementedError
 
     @classmethod
     def lift(cls, forward: category, backward: category = None) -> Symmetric:
@@ -458,6 +459,7 @@ class Markov(Symmetric):
             tensor
     """
     category = markov.Diagram
+    serialised_attrs = ('dom', 'cod', 'get', 'put')
 
     def __init__(self, dom: Ty, cod: Ty, get: category, put: category):
         self.assert_ismarkov()
@@ -469,12 +471,6 @@ class Markov(Symmetric):
         super().__init__(dom, cod, forward, put, dom.positive)
 
     put = property(lambda self: self.backward)
-
-    def __repr__(self):
-        factory, category = map(
-            factory_name, (get_origin(type(self)), self.category))
-        return f"{factory}[{category}]"\
-            f"({self.dom!r}, {self.cod!r}, {self.get!r}, {self.put!r})"
 
     @classmethod
     def assert_ismarkov(cls):

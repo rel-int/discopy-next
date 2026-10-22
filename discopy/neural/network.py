@@ -97,6 +97,7 @@ class Dims(monoidal.Ty):
     >>> assert loads(dumps(Dims(2, Dim(2, 3)))) == Dims(2, Dim(2, 3))
     """
     generator_factory = Dim
+    serialised_attrs, inside = ('inside', ), ()
 
     def __init__(self, *inside: int | Dim, **kwargs):
         inside = kwargs.pop('inside', inside)
@@ -107,10 +108,8 @@ class Dims(monoidal.Ty):
         assert_isinstance(other, Dims)
         return type(self)(*(x @ y for x in self.inside for y in other.inside))
 
-    def __repr__(self):
+    def __str__(self):
         return f"Dims({', '.join(map(repr, self.inside))})"
-
-    __str__ = __repr__
 
     delay, head, tail = Dim.delay, Dim.head, Dim.tail
 
@@ -247,22 +246,12 @@ class Box(markov.Box, Network):
     neural.network.Box('f', Dims(Dim(2)), Dims(Dim(3), Dim(3)))
     """
     module = None
+    serialised_attrs = ('name', 'dom', 'cod', 'is_dagger')
 
     def __init__(self, name: str, dom: Dims, cod: Dims,
                  module: object = None, data=None, **params):
         self.module = data if module is None else module
         super().__init__(name, dom, cod, data=self.module, **params)
-
-    def __repr__(self):
-        if self.is_dagger:
-            return repr(self.dagger()) + ".dagger()"
-        return f"{factory_name(type(self))}("\
-            f"{self.name!r}, {self.dom!r}, {self.cod!r})"
-
-    def to_tree(self) -> dict:
-        tree = super().to_tree()
-        tree.pop('data', None)
-        return tree
 
     def forward(self, *tensors):
         """

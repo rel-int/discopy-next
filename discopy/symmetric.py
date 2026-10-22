@@ -491,6 +491,7 @@ class Permutation(Box):
     .. image:: /_static/symmetric/foliation.svg
         :align: center
     """
+    serialised_attrs = ('dom', 'perm')
 
     def __new__(cls, dom: monoidal.Ty = None,
                 perm: Sequence[int] = None):
@@ -615,9 +616,6 @@ class Permutation(Box):
         perm = finset.Permutation.id(len(other)).tensor(self.perm)
         return self.permutation_factory(other @ self.dom, perm)
 
-    def __repr__(self):
-        return f"{factory_name(type(self))}({self.dom!r}, {list(self.perm)})"
-
     def __str__(self):
         return f"Permutation({self.dom}, {list(self.perm)})"
 
@@ -638,6 +636,8 @@ class Swap(Permutation, balanced.Braid, Box):
     :class:`Swap` is only defined for atomic types (i.e. of length 1).
     For complex types, use :meth:`Diagram.swap` instead.
     """
+    serialised_attrs = ('left', 'right')
+
     def __setstate__(self, state):
         state.setdefault('perm', finset.Permutation([1, 0], 2))
         super().__setstate__(state)
@@ -664,9 +664,6 @@ class Swap(Permutation, balanced.Braid, Box):
 
     def to_drawing(self):
         return Box.to_drawing(self)
-
-    def __repr__(self):
-        return balanced.Braid.__repr__(self)
 
     def __str__(self):
         return self.name

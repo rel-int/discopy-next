@@ -25,6 +25,7 @@ from dataclasses import dataclass
 
 from discopy import messages
 from discopy.abc import Groupoid, MonoidalCategory, PROP, Nat
+from discopy.axioms import Serialisable
 
 
 @dataclass
@@ -150,7 +151,7 @@ type Cycle = Iterable[int]
 type Cycles = Iterable[Cycle]
 
 
-class Permutation(Function, PROP, Groupoid):
+class Permutation(Serialisable, Function, PROP, Groupoid):
     """
     A permutation of a finite set, seen as a bijective finite-set function,
     i.e. an arrow of the groupoid of finite sets and bijections.
@@ -166,6 +167,8 @@ class Permutation(Function, PROP, Groupoid):
     >>> Permutation((1, 0)).is_fixpoint_free_involution()
     True
     """
+    serialised_attrs = ('inside', )
+
     def __init__(self, inside=(), size: int | None = None):
         inside = tuple(inside)
         if size is None:
@@ -190,8 +193,9 @@ class Permutation(Function, PROP, Groupoid):
             return tuple(self)[key]
         return super().__getitem__(key)
 
-    def __repr__(self) -> str:
-        return repr(tuple(self))
+    @classmethod
+    def strategy(cls, **params):
+        raise NotImplementedError
 
     def __eq__(self, other: Any) -> bool:
         if isinstance(other, Permutation):

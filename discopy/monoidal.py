@@ -85,7 +85,7 @@ if TYPE_CHECKING:
     import sympy
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, repr=False)
 class Colour(cat.Ob):
     """
     A 0-cell, drawn using its matplotlib-compatible ``name``, by default
@@ -99,6 +99,7 @@ class Colour(cat.Ob):
 
     name: str = TRANSPARENT
     label: "str | None" = field(default=None, compare=False)
+    serialised_attrs = ('name', 'label')
 
     def __post_init__(self):
         assert_isinstance(self.name, str)
@@ -110,26 +111,15 @@ class Colour(cat.Ob):
         """ The name shown for this colour in a drawing legend. """
         return self.name if self.label is None else self.label
 
-    def __repr__(self):
-        label = "" if self.label is None else f", label={self.label!r}"
-        return f"{factory_name(type(self))}({self.name!r}{label})"
-
-    def to_tree(self):
-        tree = super().to_tree()
-        if self.label is not None:
-            tree['label'] = self.label
-        return tree
-
-    @classmethod
-    def from_tree(cls, tree):
-        return cls(tree['name'], label=tree.get('label'))
-
 
 transparent = Colour(TRANSPARENT)
 
 
 class Wire(cat.Ob):
     """A generating 1-cell with a colour on either side."""
+    dom = cod = transparent
+    is_dagger = False
+    serialised_attrs = ('name', 'dom', 'cod', 'is_dagger')
 
     def __init__(self, name: str, dom: Colour = transparent,
                  cod: Colour = transparent, is_dagger: bool = False):
@@ -156,29 +146,6 @@ class Wire(cat.Ob):
 
     def __hash__(self):
         return hash((type(self), self.name, self.dom, self.cod))
-
-    def __repr__(self):
-        if self.dom == self.cod == transparent:
-            return repr(cat.Ob(self.name))
-        return (f"{factory_name(type(self))}({self.name!r}, "
-                f"dom={self.dom!r}, cod={self.cod!r})")
-
-    def to_tree(self):
-        tree = super().to_tree()
-        tree['factory'] = factory_name(type(self))
-        if self.dom != transparent:
-            tree['dom'] = self.dom.to_tree()
-        if self.cod != transparent:
-            tree['cod'] = self.cod.to_tree()
-        if self.is_dagger:
-            tree['is_dagger'] = True
-        return tree
-
-    @classmethod
-    def from_tree(cls, tree):
-        dom = from_tree(tree['dom']) if 'dom' in tree else transparent
-        cod = from_tree(tree['cod']) if 'cod' in tree else transparent
-        return cls(tree['name'], dom, cod, is_dagger='is_dagger' in tree)
 
 
 class List(Monoid, NamedGeneric['generator_factory']):
@@ -356,6 +323,8 @@ class Ty(cat.Ob, cat.FreeCategory, ColouredMonoid):
     """
     ob = Colour
     generator_factory = Wire
+    inside, dom, cod = (), transparent, transparent
+    serialised_attrs = ('inside', 'dom', 'cod')
 
     def cast_wire(self, x: str | cat.Ob) -> cat.Ob:
         """
@@ -413,12 +382,6 @@ class Ty(cat.Ob, cat.FreeCategory, ColouredMonoid):
 
     def __hash__(self):
         return hash((type(self), self.inside, self.dom, self.cod))
-
-    def __repr__(self):
-        if not self.inside and self.dom != transparent:
-            return f"{factory_name(type(self))}.id({self.dom!r})"
-        return factory_name(type(self))\
-            + f"({', '.join(map(repr, self.inside))})"
 
     @property
     def is_generator(self) -> bool:
@@ -497,31 +460,6 @@ class Ty(cat.Ob, cat.FreeCategory, ColouredMonoid):
         if 'cod' not in state:
             state['cod'] = transparent
         cat.Ob.__setstate__(self, state)
-
-    def to_tree(self):
-        tree = {
-            'factory': factory_name(type(self)),
-            'inside': [x.to_tree() for x in self.inside]}
-        if not self.inside and self.dom != transparent:
-            tree['dom'] = self.dom.to_tree()
-            tree['cod'] = self.cod.to_tree()
-        return tree
-
-    @classmethod
-    def from_tree(cls, tree):
-        if "inside" not in tree:
-            warn("Outdated dumps", DeprecationWarning)
-            return cls(*map(from_tree, tree['objects']))
-        inside = tuple(map(from_tree, tree['inside']))
-        # Old dumps used cat.Ob as the generators of monoidal.Ty.
-        inside = tuple(
-            cls.generator_factory(x.name) if type(x) is cat.Ob else x
-            for x in inside)
-        if inside:
-            return cls(*inside)
-        if 'dom' in tree:
-            return cls(dom=from_tree(tree['dom']), cod=from_tree(tree['cod']))
-        return cls()
 
     def to_drawing(self) -> Ty:
         if not self.inside:
@@ -702,20 +640,10 @@ class Dim(Ty):
             return self.factory(*self.inside[key])
         return self.factory(self.inside[key])
 
-    def __repr__(self):
+    def __str__(self):
         return f"Dim({', '.join(map(repr, self.inside)) or '1'})"
 
-    __str__ = __repr__
-
     delay, head, tail = Nat.delay, Nat.head, Nat.tail
-
-    def to_tree(self) -> dict:
-        return {'factory': factory_name(type(self)),
-                'inside': list(self.inside)}
-
-    @classmethod
-    def from_tree(cls, tree: dict) -> Dim:
-        return cls(*tree['inside'])
 
 
 class Layer(cat.Box, ColouredMonoid):

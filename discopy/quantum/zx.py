@@ -319,10 +319,8 @@ class Permutation(tensor.Permutation[complex], Box):
 
 class Swap(Permutation, tensor.Swap[complex], Box):
     """ Swap in a ZX diagram. """
-    def __repr__(self):
+    def __str__(self):
         return "SWAP"
-
-    __str__ = __repr__
 
 
 class Spider(tensor.Spider[complex], Box):

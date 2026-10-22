@@ -59,7 +59,7 @@ from discopy.matrix import get_backend
 from discopy.quantum.circuit import (
     Circuit, Digit, Ty, bit, qubit, Box, Sum, Id)
 from discopy.tensor import backend
-from discopy.utils import factory_name, assert_isinstance, from_tree
+from discopy.utils import assert_isinstance
 
 
 def format_number(data):
@@ -112,6 +112,7 @@ class Discard(SelfConjugate):
     >>> assert Bra(0).eval(mixed=True) != Discard(1).eval()
     """
     draw_as_discards = True
+    serialised_attrs = ('dom', )
 
     def __init__(self, dom=1):
         if isinstance(dom, int):
@@ -119,10 +120,6 @@ class Discard(SelfConjugate):
         super().__init__(
             f"Discard({dom})", dom, qubit ** 0, is_mixed=True)
         self.n_qubits = len(dom)
-
-    @classmethod
-    def from_tree(cls, tree: dict):
-        return cls(from_tree(tree['dom']))
 
     def dagger(self):
         return MixedState(self.dom)
@@ -137,6 +134,7 @@ class MixedState(SelfConjugate):
     If :code:`cod == bit` then uniform distribution.
     """
     draw_as_discards = True
+    serialised_attrs = ('cod', )
 
     def __init__(self, cod=1):
         if isinstance(cod, int):
@@ -147,10 +145,6 @@ class MixedState(SelfConjugate):
         if cod == bit:
             self.drawing_name = ""
             self.draw_as_spider, self.color = True, "black"
-
-    @classmethod
-    def from_tree(cls, tree: dict):
-        return cls(from_tree(tree['cod']))
 
     def dagger(self):
         return Discard(self.cod)
@@ -173,6 +167,8 @@ class Measure(SelfConjugate):
         Whether to override input bits, this is the standard behaviour of tket.
     """
     draw_as_measures = True
+    serialised_attrs = ('n_qubits', 'destructive', 'override_bits')
+    n_qubits, destructive, override_bits = 1, True, False
 
     def __init__(self, n_qubits=1, destructive=True, override_bits=False):
         dom, cod = qubit ** n_qubits, bit ** n_qubits
@@ -189,15 +185,6 @@ class Measure(SelfConjugate):
         self.destructive, self.override_bits = destructive, override_bits
         self.n_qubits = n_qubits
         self.draw_as_measures = True
-
-    def to_tree(self) -> dict:
-        return dict(n_qubits=self.n_qubits, destructive=self.destructive,
-                    override_bits=self.override_bits, **super().to_tree())
-
-    @classmethod
-    def from_tree(cls, tree: dict):
-        return cls(tree['n_qubits'], tree['destructive'],
-                   tree['override_bits'])
 
     def dagger(self):
         return Encode(self.n_qubits,
@@ -224,6 +211,8 @@ class Encode(SelfConjugate):
         Whether to reset the bits to the uniform distribution.
     """
     draw_as_measures = True
+    serialised_attrs = ('n_bits', 'constructive', 'reset_bits')
+    n_bits, constructive, reset_bits = 1, True, False
 
     def __init__(self, n_bits=1, constructive=True, reset_bits=False):
         dom, cod = bit ** n_bits, qubit ** n_bits
@@ -238,14 +227,6 @@ class Encode(SelfConjugate):
         super().__init__(name, dom, cod, is_mixed=True)
         self.constructive, self.reset_bits = constructive, reset_bits
         self.n_bits = n_bits
-
-    def to_tree(self) -> dict:
-        return dict(n_bits=self.n_bits, constructive=self.constructive,
-                    reset_bits=self.reset_bits, **super().to_tree())
-
-    @classmethod
-    def from_tree(cls, tree: dict):
-        return cls(tree['n_bits'], tree['constructive'], tree['reset_bits'])
 
     def dagger(self):
         return Measure(self.n_bits,
@@ -301,15 +282,12 @@ class ClassicalGate(SelfConjugate):
 
 class Copy(ClassicalGate):
     """ Takes a bit, returns two copies of it. """
+    serialised_attrs = ()
+
     def __init__(self):
         super().__init__("Copy", bit, bit ** 2, [1, 0, 0, 0, 0, 0, 0, 1])
         self.draw_as_spider, self.color = True, "black"
         self.drawing_name = ""
-
-    @classmethod
-    def from_tree(cls, tree: dict):
-        del tree
-        return cls()
 
     def dagger(self):
         return Match()
@@ -317,12 +295,12 @@ class Copy(ClassicalGate):
 
 class Match(ClassicalGate):
     """ Takes two bits in, returns them if they are equal. """
+    serialised_attrs = ()
+
     def __init__(self):
         super().__init__("Match", bit ** 2, bit, [1, 0, 0, 0, 0, 0, 0, 1])
         self.draw_as_spider, self.color = True, "black"
         self.drawing_name = ""
-
-    from_tree = classmethod(Copy.from_tree.__func__)
 
     def dagger(self):
         return Copy()
@@ -496,6 +474,8 @@ class Controlled(QuantumGate):
         :align: center
     """
     draw_as_controlled = True
+    serialised_attrs = ('controlled', 'distance')
+    distance = 1
 
     def __init__(self, controlled, distance=1):
         assert_isinstance(controlled, QuantumGate)
@@ -543,9 +523,6 @@ class Controlled(QuantumGate):
         controlled = self.controlled.subs(*args)
         return type(self)(controlled, distance=self.distance)
 
-    def __repr__(self):
-        return f'Controlled({self.controlled!r}, distance={self.distance!r})'
-
     def __str__(self):
         return self.name + str_delayed(self.time_step) if self.distance == 1\
             else f'Controlled({self.controlled}, distance={self.distance})'
@@ -555,24 +532,6 @@ class Controlled(QuantumGate):
             or isinstance(other, Controlled)\
             and self.distance == other.distance\
             and self.controlled == other.controlled
-
-    def to_tree(self) -> dict:
-        return dict(controlled=self.controlled.to_tree(),
-                    distance=self.distance, **super().to_tree())
-
-    @classmethod
-    def from_tree(cls, tree: dict):
-        """
-        Reads back through :class:`Controlled` rather than through ``cls``: a
-        subclass such as :class:`CRz` takes the phase of the rotation it
-        controls where :class:`Controlled` takes the gate itself, and
-        :meth:`__eq__` compares the gate and the distance rather than the
-        class, so the two are equal.
-
-        >>> assert from_tree(CRz(.25).to_tree()) == CRz(.25)
-        """
-        return Controlled(
-            from_tree(tree['controlled']), distance=tree['distance'])
 
     @property
     def phase(self):
@@ -700,13 +659,12 @@ class Parametrized(Box):
         return f'{self.name}({format_number(self.data)})'\
             + str_delayed(self.time_step)
 
-    def __repr__(self):
-        return factory_name(type(self)) + f"({format_number(self.data)})"
-
 
 class Rotation(Parametrized, QuantumGate):
     """ Abstract class for rotation gates. """
     n_qubits = 1
+    serialised_attrs = ('phase', 'z', 'time_step')
+    raw_attrs = ('phase', )
 
     def __init__(self, phase, z=0, time_step=0):
         name, n_qubits = type(self).__name__, type(self).n_qubits
@@ -714,10 +672,6 @@ class Rotation(Parametrized, QuantumGate):
         QuantumGate.__init__(self, name, dom, cod, z=z, time_step=time_step)
         Parametrized.__init__(self, name, dom, cod, is_mixed=False, data=phase,
                               time_step=time_step)
-
-    @classmethod
-    def from_tree(cls, tree: dict):
-        return cls(tree['data'], tree.get('z', 0), tree.get('time_step', 0))
 
     @property
     def phase(self):
@@ -746,10 +700,6 @@ class Rotation(Parametrized, QuantumGate):
     def lambdify(self, *symbols, **kwargs):
         function = super().lambdify(*symbols, **kwargs)
         return lambda *xs: function(*xs).delay(self.time_step)
-
-    def __repr__(self):
-        time_step = f", time_step={self.time_step}" if self.time_step else ""
-        return super().__repr__()[:-1] + time_step + ")"
 
     def grad(self, var, **params):
         if var not in self.free_symbols:
@@ -816,6 +766,9 @@ class U1(AntiConjugate, Rotation):
 
 class ControlledRotation(Controlled, Rotation):
     """ Controlled rotation gate. """
+    serialised_attrs = ('phase', 'distance', 'time_step')
+    raw_attrs = ('phase', )
+
     def __init__(self, phase, distance=1, time_step=0):
         Controlled.__init__(
             self, self.controlled(phase, time_step=time_step), distance)
@@ -848,6 +801,9 @@ class CRx(ControlledRotation):
 
 class Scalar(Parametrized):
     """ Scalar, i.e. quantum gate with empty domain and codomain. """
+    serialised_attrs = ('data', 'name', 'is_mixed')
+    name = "scalar"
+
     def __init__(self, data, name=None, is_mixed=False):
         self.drawing_name = format_number(data)
         name = "scalar" if name is None else name
@@ -857,10 +813,6 @@ class Scalar(Parametrized):
     def __setstate__(self, state):
         state["_z"] = None
         super().__setstate__(state)
-
-    def __repr__(self):
-        return super().__repr__()[:-1] + (
-            ', is_mixed=True)' if self.is_mixed else ')')
 
     @property
     def array(self):
@@ -875,29 +827,13 @@ class Scalar(Parametrized):
     def dagger(self):
         return Scalar(self.data.conjugate(), self.name, self.is_mixed)
 
-    def to_tree(self) -> dict:
-        return dict(is_mixed=self.is_mixed, **super().to_tree())
-
-    @classmethod
-    def from_tree(cls, tree: dict):
-        """
-        Passes its arguments positionally, as :meth:`dagger` builds one:
-        :meth:`tensor.Box.__new__` reads ``name`` as its own first argument,
-        where a scalar's first argument is its ``data``.
-
-        >>> assert from_tree(Scalar(.5).to_tree()) == Scalar(.5)
-        """
-        return cls(tree['data'], tree['name'], tree['is_mixed'])
-
 
 class MixedScalar(Scalar):
     """ Mixed scalar, i.e. where the Born rule has already been applied. """
+    serialised_attrs = ('data', )
+
     def __init__(self, data):
         super().__init__(data, is_mixed=True)
-
-    @classmethod
-    def from_tree(cls, tree: dict):
-        return cls(tree['data'])
 
 
 class Sqrt(Scalar):
@@ -906,23 +842,14 @@ class Sqrt(Scalar):
     self-adjoint when that root is real, and conjugated by its dagger
     otherwise, e.g. for the square root of a negative number.
     """
+    serialised_attrs = ('data', 'is_dagger')
+
     def __init__(self, data, is_dagger=False):
         super().__init__(data, name="sqrt")
         if is_dagger and self.is_self_adjoint:
             raise ValueError(messages.REAL_SQRT_IS_SELF_ADJOINT)
         self.is_dagger = is_dagger
         self.drawing_name = f"sqrt({format_number(data)})"
-
-    @classmethod
-    def from_tree(cls, tree: dict):
-        """
-        Reads the dagger flag a box's tree keeps, so that the square root of
-        a negative number comes back conjugated when it was.
-
-        >>> root = Sqrt(-1).dagger()
-        >>> assert from_tree(root.to_tree()) == root
-        """
-        return cls(tree['data'], tree.get('is_dagger', False))
 
     def __setstate__(self, state):
         super().__setstate__(state)
@@ -956,9 +883,6 @@ class Sqrt(Scalar):
     def setoid(self):
         """ A square root and its dagger differ only by ``is_dagger``. """
         return super().setoid() + (self.is_dagger, )
-
-    def __repr__(self):
-        return super().__repr__() + ("[::-1]" if self.is_dagger else "")
 
 
 def sqrt(expr):

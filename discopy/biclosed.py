@@ -94,7 +94,8 @@ from typing import (
 
 from discopy import cat, monoidal, cmap, messages
 from discopy.abc import BiclosedCategory
-from discopy.axioms import GENERATORS, Equivalence, Testable, axiom
+from discopy.axioms import (
+    GENERATORS, Equivalence, Serialisable, Testable, axiom)
 from discopy.drawing import Drawing
 from discopy.cat import factory
 from discopy.utils import (
@@ -102,7 +103,6 @@ from discopy.utils import (
     NamedGeneric,
     assert_isinstance,
     deprecated_alias,
-    factory_name,
     from_tree,
     get_origin,
 )
@@ -191,10 +191,6 @@ class Ty(monoidal.Ty):
         return st.recursive(
             super().strategy(), exponentials, max_leaves=max_leaves)
 
-    def __repr__(self):
-        return factory_name(type(self))\
-            + f"({', '.join(map(repr, self.inside))})"
-
     @property
     def is_exp(self):
         """
@@ -264,6 +260,7 @@ class Exp(Wire):
     """
 
     ob = Ty
+    serialised_attrs = ('base', 'exponent')
 
     def __init__(self, base: Ty, exponent: Ty):
         assert_isinstance(base, self.ob)
@@ -280,15 +277,6 @@ class Exp(Wire):
 
     def __str__(self):
         return f"({self.base} ** {self.exponent})"
-
-    def __repr__(self):
-        return factory_name(type(self)) + f"({self.base!r}, {self.exponent!r})"
-
-    def to_tree(self):
-        return {
-            'factory': factory_name(type(self)),
-            'base': self.base.to_tree(),
-            'exponent': self.exponent.to_tree()}
 
     @classmethod
     def from_tree(cls, tree):
@@ -419,6 +407,8 @@ class Eval(Box):
     Parameters:
         x : The exponential type to evaluate.
     """
+    serialised_attrs = ('x', 'left')
+
     def __init__(self, x: Exp, left=None):
         assert x.is_exp
         self.x = x
@@ -427,17 +417,6 @@ class Eval(Box):
         dom, cod = (x @ x.exponent, x.base) if self.left\
             else (x.exponent @ x, x.base)
         super().__init__("Eval" + str(x), dom, cod)
-
-    def __repr__(self):
-        return f"{factory_name(type(self))}({self.x!r}, left={self.left!r})"
-
-    def to_tree(self):
-        return dict(factory=factory_name(type(self)),
-                    x=self.x.to_tree(), left=self.left)
-
-    @classmethod
-    def from_tree(cls, tree):
-        return cls(from_tree(tree['x']), left=tree['left'])
 
     def dagger(self) -> Coeval:
         return self.coeval_factory(self.x, self.left)
@@ -464,10 +443,7 @@ class Coeval(Box):
     :meth:`Curry.to_drawing` and :meth:`Diagram.to_compact`.
     """
     drawing_name = "lambda"
-
-    __repr__ = Eval.__repr__
-    to_tree = Eval.to_tree
-    from_tree = classmethod(Eval.from_tree.__func__)
+    serialised_attrs = ('x', 'left')
 
     def __init__(self, x: Exp, left=None):
         assert x.is_exp
@@ -497,6 +473,11 @@ class Curry(monoidal.Bubble, Box):
     >>> print(Curry(Box('f', x @ y, z)))
     Curry(f, 1, True)
     """
+    serialised_attrs = ('arg', 'n', 'left')
+    n, left = 1, True
+    __repr__, to_tree = Serialisable.__repr__, Serialisable.to_tree
+    from_tree = Serialisable.__dict__['from_tree']  # Over cat.Bubble's.
+
     def __init__(self, arg: Diagram, n=1, left=True):
         self.n, self.left = n, left
         name = f"Curry({arg}, {n}, {left})"
@@ -508,18 +489,6 @@ class Curry(monoidal.Bubble, Box):
         monoidal.Bubble.__init__(
             self, arg, dom=dom, cod=cod, drawing_name="$\\Lambda$")
         Box.__init__(self, name, dom, cod)
-
-    def __repr__(self):
-        return f"{factory_name(type(self))}({self.arg!r}, " \
-            f"n={self.n}, left={self.left!r})"
-
-    def to_tree(self):
-        return dict(factory=factory_name(type(self)), arg=self.arg.to_tree(),
-                    n=self.n, left=self.left)
-
-    @classmethod
-    def from_tree(cls, tree):
-        return cls(from_tree(tree['arg']), n=tree['n'], left=tree['left'])
 
     def __str__(self):
         return self.name
@@ -993,14 +962,11 @@ class Constant(TermBase):
         name (str): The name of the constant.
         cod (Ty): The type of the constant.
     """
+    serialised_attrs = ('name', 'cod', 'is_dagger', 'data')
+
     def __init__(self, name: str, cod: Ty, **kwargs):
         super().__init__(name, dom=self.ob(), cod=cod, **kwargs)
         self.freevars = []
-
-    @classmethod
-    def from_tree(cls, tree):
-        kwargs = {k: tree[k] for k in ('data', 'is_dagger') if k in tree}
-        return cls(tree['name'], from_tree(tree['cod']), **kwargs)
 
     @property
     def constants(self):
@@ -1011,9 +977,6 @@ class Constant(TermBase):
 
     def map(self, functor, context):
         return functor.ar_map[self]
-
-    def __repr__(self):
-        return factory_name(type(self)) + f"({self.name!r}, {self.cod!r})"
 
     def __str__(self):
         return f"{self.cod!s}({self.name!r})"
@@ -1027,13 +990,11 @@ class Variable(TermBase):
         name (str): The name of the variable
         cod (Ty): The type of the variable.
     """
+    serialised_attrs = ('name', 'cod')
+
     def __init__(self, name: str, cod: Ty):
         super().__init__(name, dom=cod, cod=cod)
         self.freevars = [self]
-
-    @classmethod
-    def from_tree(cls, tree):
-        return cls(tree['name'], from_tree(tree['cod']))
 
     def eval(self, functor=None):
         functor = functor or self.functor
@@ -1078,8 +1039,6 @@ class Variable(TermBase):
             name += "_"
         return cls(name, cod)
 
-    __repr__ = Constant.__repr__
-
 
 class Application(TermBase):
     """
@@ -1092,6 +1051,9 @@ class Application(TermBase):
         args (Term): The arguments to which the function is applied.
         left (bool): Whether the argument comes in from the left or right.
     """
+    serialised_attrs = ('func', 'args', 'left')
+    left = False
+
     def __init__(self, func: Term, args: Term, left: bool = False):
         assert_isinstance(func, TermBase)
         assert_isinstance(args, TermBase)
@@ -1128,20 +1090,6 @@ class Application(TermBase):
             functor.map_term(self.func, context),
             functor.map_term(self.args, context), self.left)
 
-    def __repr__(self):
-        func, args = repr(self.func), repr(self.args)
-        left = ", left=True" if self.left else ""
-        return factory_name(type(self)) + f"({func}, {args}{left})"
-
-    def to_tree(self):
-        return dict(factory=factory_name(type(self)), func=self.func.to_tree(),
-                    args=self.args.to_tree(), left=self.left)
-
-    @classmethod
-    def from_tree(cls, tree):
-        return cls(*map(from_tree, (tree['func'], tree['args'])),
-                   left=tree['left'])
-
     def setoid(self):
         """
         Applications are equal when their functions, arguments and sides
@@ -1170,6 +1118,7 @@ class Abstraction(TermBase):
     var: Variable
     body: Term
     left: bool = False
+    serialised_attrs = ('var', 'body', 'left')
 
     def __init__(self, var: Variable, body: Term, left: bool = False):
         self.var, self.body, self.left = var, body, left
@@ -1206,20 +1155,6 @@ class Abstraction(TermBase):
         context[self.var] = variable
         return functor.cod.ob.abstraction_factory(
             variable, functor.map_term(self.body, context), self.left)
-
-    def __repr__(self):
-        var, body = repr(self.var), repr(self.body)
-        left = ", left=True" if self.left else ""
-        return factory_name(type(self)) + f"({var}, {body}{left})"
-
-    def to_tree(self):
-        return dict(factory=factory_name(type(self)), var=self.var.to_tree(),
-                    body=self.body.to_tree(), left=self.left)
-
-    @classmethod
-    def from_tree(cls, tree):
-        return cls(*map(from_tree, (tree['var'], tree['body'])),
-                   left=tree['left'])
 
     def setoid(self):
         """

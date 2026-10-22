@@ -77,7 +77,7 @@ from dataclasses import dataclass
 from typing import ClassVar, Self
 
 from discopy import abc
-from discopy.axioms import Testable
+from discopy.axioms import Serialisable, Testable
 from discopy.python.finset import Permutation
 from discopy.utils import NamedGeneric, assert_ismember, factory_name
 
@@ -107,7 +107,7 @@ def kronecker(left: Permutation, right: Permutation) -> Permutation:
         len(left) * m)
 
 
-class Group(Testable, abc.Group):
+class Group(Serialisable, abc.Group):
     """
     A finite group whose elements are normal forms.
 
@@ -175,9 +175,6 @@ class Group(Testable, abc.Group):
             raise ValueError("A group has a single object, None.")
         return st.randoms(use_true_random=False).map(cls.sample)
 
-    def __repr__(self):
-        return f"{type(self).__name__}({', '.join(map(repr, self.inside))})"
-
     def __eq__(self, other):
         return type(self) is type(other) and self.inside == other.inside
 
@@ -203,6 +200,7 @@ class Cyclic(NamedGeneric["n"], Group):
     (Cyclic[4](1), (0, 0, 0))
     """
     n: ClassVar[int]
+    serialised_attrs = ('k', )
 
     def __init__(self, k: int = 0):
         if self.n is None:
@@ -265,6 +263,7 @@ class Symmetric(NamedGeneric["n"], Group):
     >>> assert g == s1 >> s0 and s0 == Symmetric[3]((1, 0, 2))
     """
     n: ClassVar[int]
+    serialised_attrs = ('inside', )
 
     def __init__(self, inside: tuple[int, ...] = None):
         if self.n is None:
@@ -272,9 +271,6 @@ class Symmetric(NamedGeneric["n"], Group):
                 f"Expected a subscript, e.g. {type(self).__name__}[2].")
         inside = range(self.n) if inside is None else inside
         self.inside = Permutation(inside, self.n)
-
-    def __repr__(self):
-        return f"{type(self).__name__}({self.inside!r})"
 
     def multiply(self, other):
         return type(self)(self.inside.then(other.inside))
@@ -349,6 +345,9 @@ class Product(NamedGeneric["left", "right"], Group):
             raise ValueError("Expected an element of each factor.")
         for element, group in zip(self.inside, (self.left, self.right)):
             assert_ismember(element, group)
+
+    def __repr__(self):
+        return f"{type(self).__name__}({', '.join(map(repr, self.inside))})"
 
     def multiply(self, other):
         return type(self)(*(

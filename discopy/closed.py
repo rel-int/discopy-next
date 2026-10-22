@@ -88,6 +88,7 @@ from typing import Callable, ClassVar, Dict
 from discopy import (
     monoidal, biclosed, markov, feedback, cmap, hypergraph, messages)
 from discopy.abc import ClosedCategory
+from discopy.axioms import Serialisable
 from discopy.cat import factory
 from discopy.drawing import Drawing
 from discopy.utils import (
@@ -184,14 +185,11 @@ class Exp(Wire, biclosed.Exp):
     "An exponential object in a markov category, with a time step."
 
     ob = Ty
+    serialised_attrs = ('base', 'exponent', 'time_step', 'is_constant')
 
     def __str__(self):
         return f"({self.exponent} >> {self.base})"\
             + feedback.str_delayed(self.time_step)
-
-    def __repr__(self):
-        return factory_name(type(self))\
-            + f"({self.base!r}, {self.exponent!r}{self.repr_time_step()})"
 
 
 class Product(Wire):
@@ -272,6 +270,9 @@ class Unitype(Exp):
     >>> assert U == U >> U and U.base == U == U.exponent
     >>> assert U.delay() == (U >> U).delay() != U.delay() >> U.delay()
     """
+    serialised_attrs = ('time_step', 'is_constant')
+    from_tree = Serialisable.__dict__['from_tree']  # Over Exp's.
+
     def __init__(self, time_step: int = 0, is_constant: bool = True):
         monoidal.Wire.__init__(self, "U")
         self.time_step, self.is_constant = time_step, is_constant
@@ -291,17 +292,6 @@ class Unitype(Exp):
 
     def __str__(self):
         return "U" + feedback.str_delayed(self.time_step)
-
-    def __repr__(self):
-        return f"Unitype({self.repr_time_step().removeprefix(', ')})"
-
-    def to_tree(self):
-        return {'factory': factory_name(type(self)),
-                'time_step': self.time_step, 'is_constant': self.is_constant}
-
-    @classmethod
-    def from_tree(cls, tree):
-        return cls(tree.get('time_step', 0), tree.get('is_constant', True))
 
 
 @factory
@@ -460,6 +450,9 @@ class Timed(Box):
     >>> assert ev.dom == (x << y).delay() @ y.delay() and ev.cod == x.d
     >>> assert ev.x == x << y and ev == Eval(x << y, True, time_step=1)
     """
+    __repr__ = Serialisable.__repr__  # Over feedback.Box's, which appends
+    # the time step a second time.
+
     def __init__(self, *args, time_step: int = 0, **params):
         super().__init__(*args, **params)
         if time_step:
@@ -478,23 +471,11 @@ class Timed(Box):
         """ The keyword of the time step, as :meth:`__repr__` reads it. """
         return f", time_step={self.time_step}" if self.time_step else ""
 
-    def __repr__(self):
-        return super().__repr__()[:-1] + self.repr_time_step() + ")"
-
-    def to_tree(self):
-        tree = super().to_tree()
-        if self.time_step:
-            tree['time_step'] = self.time_step
-        return tree
-
-    @classmethod
-    def from_tree(cls, tree):
-        return super().from_tree(tree).delay(tree.get('time_step', 0))
-
 
 class Eval(Timed, biclosed.Eval, Box):
     "The evaluation of an exponential type."
     drawing_name = "__call__"
+    serialised_attrs = ('x', 'left', 'time_step')
 
     def __getnewargs__(self):
         """ The arguments of the constructor, which a delay reads. """
@@ -504,10 +485,12 @@ class Eval(Timed, biclosed.Eval, Box):
 class Coeval(Timed, biclosed.Coeval, Box):
     "The coevaluation of an exponential type, i.e. the dagger of an Eval."
     __getnewargs__ = Eval.__getnewargs__
+    serialised_attrs = Eval.serialised_attrs
 
 
 class Curry(Timed, biclosed.Curry, Box):
     "The currying of a closed diagram, linear when its argument is."
+    serialised_attrs = ('arg', 'n', 'left', 'time_step')
 
     @property
     def is_linear(self):
@@ -1222,6 +1205,8 @@ class Projection(Compound):
     >>> x, y = Variable("x", X), Variable("y", Y)
     >>> assert Projection(Tuple(x, y), 1).cod == Y
     """
+    serialised_attrs = ('arg', 'index')
+
     def __init__(self, arg: Term, index: int):
         assert_isinstance(arg, TermBase)
         assert_isinstance(index, int)
@@ -1271,21 +1256,10 @@ class Projection(Compound):
     def map(self, functor, context):
         return type(self)(functor.map_term(self.arg, context), self.index)
 
-    def __repr__(self):
-        return factory_name(type(self)) + f"({self.arg!r}, {self.index!r})"
-
     @property
     def constants(self):
         "The constants of the term, in order of occurrence."
         return self.arg.constants
-
-    def to_tree(self):
-        return {'factory': factory_name(type(self)),
-                'arg': self.arg.to_tree(), 'index': self.index}
-
-    @classmethod
-    def from_tree(cls, tree):
-        return cls(from_tree(tree['arg']), tree['index'])
 
 
 class Let(Compound):
@@ -1315,6 +1289,8 @@ class Let(Compound):
     let(f(x), lambda y: Tuple(y, y))
     >>> assert term.cod == Y * Y and not term.is_linear
     """
+    serialised_attrs = ('expression', 'variables', 'body')
+
     def __init__(self, expression: Term, variables: tuple[Variable, ...],
                  body: Term):
         assert_isinstance(expression, TermBase)
@@ -1417,28 +1393,10 @@ class Let(Compound):
         return type(self)(expression, tuple(variables),
                           functor.map_term(self.body, context))
 
-    def __repr__(self):
-        return factory_name(type(self)) + f"({self.expression!r}, "\
-            + f"{self.variables!r}, {self.body!r})"
-
     @property
     def constants(self):
         "The constants of the term, in order of occurrence."
         return self.expression.constants + self.body.constants
-
-    def to_tree(self):
-        return {
-            'factory': factory_name(type(self)),
-            'expression': self.expression.to_tree(),
-            'variables': [var.to_tree() for var in self.variables],
-            'body': self.body.to_tree()}
-
-    @classmethod
-    def from_tree(cls, tree):
-        return cls(
-            from_tree(tree['expression']),
-            tuple(map(from_tree, tree['variables'])),
-            from_tree(tree['body']))
 
 
 def let(expression: Term, body: Callable) -> Let:

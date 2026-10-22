@@ -33,7 +33,7 @@ Example
 """
 from discopy import monoidal
 from discopy.monoidal import Ty  # noqa: F401  pylint: disable=unused-import
-from discopy.utils import factory_name
+from discopy.axioms import Serialisable
 
 
 class Rule(monoidal.Box):
@@ -46,14 +46,12 @@ class Rule(monoidal.Box):
         cod : The codomain of the rule, i.e. its output.
         name : The name of the rule, empty by default.
     """
+    serialised_attrs = ('dom', 'cod', 'name', 'is_dagger', 'data')
+
     def __init__(self, dom: monoidal.Ty, cod: monoidal.Ty, name: str = None,
                  **params):
         name = f"Rule({dom}, {cod})" if name is None else name
         monoidal.Box.__init__(self, name, dom, cod, **params)
-
-    def __repr__(self):
-        name = f", name={self.name!r}" if self.name else ""
-        return factory_name(type(self)) + f"({self.dom!r}, {self.cod!r}{name})"
 
 
 class Word(Rule):
@@ -66,12 +64,11 @@ class Word(Rule):
         cod : The grammatical type of the word.
         dom : An optional domain for the word, empty by default.
     """
+    serialised_attrs = ('name', 'cod', 'dom', 'is_dagger', 'data')
+    __repr__ = Serialisable.__repr__  # Over cfg.Tree's, earlier in the MRO
+    # of grammar.cfg.Word.
+
     def __init__(self, name: str, cod: monoidal.Ty, dom: monoidal.Ty = None,
                  **params):
         dom = self.ob() if dom is None else dom
         Rule.__init__(self, dom=dom, cod=cod, name=name, **params)
-
-    def __repr__(self):
-        dom = f", dom={repr(self.dom)}" if self.dom else ""
-        return factory_name(type(self))\
-            + f"({repr(self.name)}, {repr(self.cod)}{dom})"

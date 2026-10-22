@@ -208,15 +208,11 @@ class Word(thue.Word, Box):
     A word is a rigid box with a ``name``, a grammatical type as ``cod`` and
     an optional domain ``dom``.
     """
+    serialised_attrs = thue.Word.serialised_attrs + ('z', )
+
     def __init__(self, name: str, cod: rigid.Ty, dom: rigid.Ty = Ty(),
                  **params):
         Box.__init__(self, name, dom, cod, **params)
-
-    def __repr__(self):
-        extra = f", dom={repr(self.dom)}" if self.dom else ""
-        extra += ", is_dagger=True" if self.is_dagger else ""
-        extra += f", z={self.z}" if self.z != 0 else ""
-        return f"Word({repr(self.name)}, {repr(self.cod)}{extra})"
 
 
 class Functor(frobenius.Functor):

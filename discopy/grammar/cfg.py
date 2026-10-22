@@ -40,6 +40,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from discopy import monoidal
+from discopy.axioms import Serialisable
 from discopy.cat import factory, Functor
 from discopy.grammar import thue
 from discopy.monoidal import Ty
@@ -189,12 +190,12 @@ class Word(thue.Word, Rule):
 
 class Id(Rule):
     """ The identity is a rule that does nothing. """
+    serialised_attrs = ('dom', )
+    __repr__ = Serialisable.__repr__  # Over Tree's, earlier in the MRO.
+
     def __init__(self, dom):
         self.dom, self.cod = dom, dom
         Rule.__init__(self, dom, dom, name=f"Id({dom})")
-
-    def __repr__(self):
-        return f"Id({self.dom})"
 
 
 class Operad:

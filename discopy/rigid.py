@@ -162,7 +162,6 @@ from discopy.utils import (
     AxiomError,
     BinaryBoxConstructor,
     deprecated_alias,
-    factory_name,
 )
 
 
@@ -186,6 +185,8 @@ class Wire(monoidal.Wire):
     >>> a = Wire('a')
     >>> assert a.l.r == a.r.l == a and a != a.l.l != a.r.r
     """
+    z = 0
+    serialised_attrs = ('name', 'z', 'dom', 'cod')
 
     def __setstate__(self, state):
         if '_z' in state:  # Backward compatibility
@@ -226,28 +227,9 @@ class Wire(monoidal.Wire):
     def __hash__(self):
         return hash(repr(self))
 
-    def __repr__(self):
-        cls_name = factory_name(type(self))
-        z_repr = ', z=' + repr(self.z) if self.z else ''
-        if self.dom == self.cod == monoidal.transparent:
-            return f"{cls_name}({self.name!r}{z_repr})"
-        return f"{cls_name}({self.name!r}{z_repr}, " \
-            f"dom={self.dom!r}, cod={self.cod!r})"
-
     def __str__(self):
         return str(self.name) + (
             - self.z * '.l' if self.z < 0 else self.z * '.r')
-
-    def to_tree(self):
-        tree = super().to_tree()
-        if self.z:
-            tree['z'] = self.z
-        return tree
-
-    @classmethod
-    def from_tree(cls, tree):
-        base = monoidal.Wire.from_tree(tree)  # Parses the dom/cod colours.
-        return cls(base.name, tree.get('z', 0), dom=base.dom, cod=base.cod)
 
 
 @factory
@@ -714,25 +696,6 @@ class Box(biclosed.Box, Diagram):
                 box = box.rotate(left=z < 0)
             return box
         return st.builds(rotate, boxes, st.integers(-2, 2))
-
-    def to_tree(self) -> dict:
-        tree = super().to_tree()
-        if self.z:
-            tree['z'] = self.z
-        return tree
-
-    @classmethod
-    def from_tree(cls, tree: dict) -> Box:
-        """
-        Decode a serialised rigid box, with its winding number.
-
-        >>> from discopy.utils import dumps, loads
-        >>> f = Box('f', Ty('x'), Ty('y'))
-        >>> assert loads(dumps(f.r)) == f.r and loads(dumps(f.l.l)) == f.l.l
-        """
-        box = super().from_tree(tree)
-        box.z = tree.get('z', 0)
-        return box
 
     @property
     def is_transpose(self):

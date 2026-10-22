@@ -116,12 +116,12 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 
 from discopy.abc import NamedGeneric
+from discopy.axioms import Serialisable
 from discopy.closed import (
     Abstraction, Application, Constant, TermBase, Variable)
 from discopy.kleisli.additive import Channel, Tagged
 from discopy.kleisli.monad import Monad
 from discopy.python.function import Function
-from discopy.utils import factory_name
 
 
 Value = object
@@ -281,7 +281,7 @@ def posterior(values: frozenset) -> frozenset:
     return frozenset((value, weight / total) for value, weight in values)
 
 
-class Machine(NamedGeneric['monad']):
+class Machine(NamedGeneric['monad'], Serialisable):
     """
     A token machine for the lambda calculus, i.e. an interpretation of the
     constants of a term, from which :attr:`channel` builds one transition
@@ -327,8 +327,14 @@ class Machine(NamedGeneric['monad']):
     """
     monad: Monad
 
+    serialised_attrs = ('constants', )
+
     def __init__(self, constants: Mapping | None = None):
         self.constants = dict(constants or {})
+
+    @classmethod
+    def strategy(cls, **params):
+        raise NotImplementedError
 
     def inject(self, token: Down | Up):
         """
@@ -474,6 +480,3 @@ class Machine(NamedGeneric['monad']):
             term : The term to evaluate.
         """
         return self.channel.trace(len(directions))(Down(term))
-
-    def __repr__(self):
-        return factory_name(type(self)) + f"({self.constants!r})"
