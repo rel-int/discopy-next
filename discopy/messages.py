@@ -103,3 +103,11 @@ NOT_A_PATTERN = (
 NOT_A_RULE = (
     "{} = {} is not a rule: its sides are cartesian diagrams of one type, the "
     "left a pattern and the right reading only the inputs the left reads.")
+NO_SQUARE = (
+    "A spider or a cap on the memory with no input is not natural along a "
+    "copy, so a square along the copy of a memory is not drawn by "
+    "construction in a hypergraph category.")
+NOT_UNIFORM = (
+    "A free trace keeps a loop nothing writes, which a least fixed point "
+    "makes its least element, the one value copying preserves: the trace of "
+    "the identity on a memory is one such loop, on two copies of it two.")

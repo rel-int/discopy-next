@@ -242,6 +242,73 @@ def test_fix_vanishing_and_range():
             f.trace(n)
 
 
+def test_trace_seed():
+    """ The loop of a trace starts from the default instance of its type,
+    not from a default argument of the function inside, and iterates until
+    two iterates are equal, as many times as it takes (#91). """
+    def step(a, y=0):
+        return (y, min(a, y + 1))
+
+    def memory(a, y=7):
+        return (y, y)
+
+    f = Function(step, Ty(int, int), Ty(int, int))
+    assert f.trace()(5) == 5 and f.trace()(5000) == 5000
+    assert Function(memory, Ty(int, int), Ty(int, int)).trace()(5) == 0
+
+
+def test_trace_uniformity():
+    """ The trace is uniform along a map preserving the seed of the loop,
+    e.g. a copy, as the iterates of the double of ``f`` are the copies of
+    those of ``f``, but not along ``h`` with ``h(int()) == 1``. """
+    A = B = M = Ty(int)
+    f = Function(lambda a, m: (m, min(a, m + 1)), A @ M, B @ M)
+    for n in (2, 3):
+        h = Function.copy(M, n)
+        g = A @ M @ Function.discard(M ** (n - 1)) >> f >> B @ h
+        assert all((f >> B @ h)(a, m) == (A @ h >> g)(a, m)
+                   for a, m in itertools.product(range(4), repeat=2))
+        assert all(f.trace()(a) == g.trace(n)(a) for a in range(8))
+    h = Function(lambda m: m + 1, M, M)
+    f = Function(lambda a, m: (m, m), A @ M, B @ M)
+    g = Function(lambda a, m: (m - 1, m), A @ M, B @ M)
+    assert all((f >> B @ h)(a, m) == (A @ h >> g)(a, m)
+               for a, m in itertools.product(range(4), repeat=2))
+    assert f.trace()(0) == 0 != -1 == g.trace()(0)
+
+
+def test_trace_uniformity_Square():
+    """ The image of a commuting square of :class:`markov.Square` under a
+    functor sending each box to a monotone Boolean function, so that the
+    iteration from ``False`` reaches the least fixed point. """
+    from hypothesis import given, settings, strategies as st
+
+    from discopy import markov
+    from discopy.utils import untuplify
+
+    def monotone(box, data):
+        gates = [(data.draw(st.sampled_from([any, all])), data.draw(st.lists(
+            st.booleans(), min_size=len(box.dom), max_size=len(box.dom))))
+            for _ in box.cod]
+        return Function(lambda *xs: untuplify(tuple(
+            gate(x for x, read in zip(xs, mask) if read)
+            for gate, mask in gates)), len(box.dom) * (bool, ),
+            len(box.cod) * (bool, ))
+
+    @settings(max_examples=50, deadline=None)
+    @given(st.data(), st.booleans())
+    def check(data, written):
+        f, h, g = data.draw(
+            markov.Square[markov.Diagram].strategy(written=written))
+        boxes = {box: monotone(box, data) for box in f.boxes}
+        F = markov.Functor(
+            ob_map=lambda _: bool, ar_map=boxes.__getitem__, cod=Function)
+        left, right = F(f).trace(len(h.dom)), F(g).trace(len(h.cod))
+        for xs in itertools.product((False, True), repeat=len(left.dom)):
+            assert left(*xs) == right(*xs)
+    check()
+
+
 def test_trace_takes_the_keyword_form():
     f = Function(lambda x, y: (x + y, 1), (int, int), (int, int))
     assert f.trace()(5) == f.trace(mem=int)(5)\

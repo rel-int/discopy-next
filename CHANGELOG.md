@@ -153,6 +153,25 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   swap and a permutation are cartesian, and a formal sum is deterministic
   when it has at most one term, which is, and affine when it has exactly
   one, which is.
+- `feedback.Diagram.is_strict`, whether the trace is uniform along a map:
+  `h : U -> V` is strict when `f >> B @ h == A @ h >> g` implies
+  `f.trace() == g.trace()`, after Hasegawa (1997) and Simpson and Plotkin
+  (2000), strict maps preserving the least element of a least fixed point.
+  A diagram is strict when its boxes are: a free box is not, a permutation,
+  a copy, a discard and a merge are, and so is the trace of a strict map.
+  `markov.Diagram.trace_uniformity` states uniformity along the copy of a
+  memory, its premise holding by construction of the `markov.Square` it
+  quantifies over, as composability does by construction of the premises
+  of associativity: a template `f` and its image `g` under the functor
+  doubling the memory, each box reading one copy and copying what it
+  writes. It fails in every free category, `NOT_UNIFORM`, on a loop that
+  nothing writes, which a least fixed point makes its least element, and
+  holds once every loop is written, `trace_uniformity_written`. A
+  hypergraph category has no such square by construction, a spider or a
+  cap with no input not being natural along a copy, `NO_SQUARE`. The trace
+  of `python.Function` is uniform along the copy of a memory, which
+  preserves the seed of its loop: the image of a `markov.Square` under a
+  functor into `Function` gives two traces that agree.
 - `hopf.Intertwiner.chart(dom, cod)`, the parametrised intertwiner
   `Dim(r) @ dom -> cod` whose slices are an orthonormal basis of
   `Hom_H(dom, cod)`, solved as one SVD nullspace of the commutant

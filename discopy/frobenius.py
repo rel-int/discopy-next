@@ -73,7 +73,7 @@ from typing import Self
 
 from discopy import (
     monoidal, rigid, markov, comarkov, compact, pivotal, feedback, cmap,
-    hypergraph)
+    hypergraph, messages)
 from discopy.abc import HypergraphCategory
 from discopy.cat import factory
 from discopy.utils import (
@@ -169,6 +169,10 @@ class Diagram(
         dom (Ty) : The domain of the diagram, i.e. its input.
         cod (Ty) : The codomain of the diagram, i.e. its output.
     """
+    trace_uniformity = markov.Diagram.trace_uniformity.inapplicable(
+        messages.NO_SQUARE)
+    trace_uniformity_written = markov.Diagram.trace_uniformity_written\
+        .inapplicable(messages.NO_SQUARE)
 
     ob = Ty
 

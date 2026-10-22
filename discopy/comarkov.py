@@ -148,6 +148,8 @@ class Merge(Box):
         x : The type of wires to merge.
         n : The number of wires to merge.
     """
+    is_strict = True
+
     def __init__(self, x: monoidal.Ty, n: int = 2):
         assert_isatomic(x, monoidal.Ty)
         name = f"Merge({x}" + ("" if n == 2 else f", {n}") + ")"

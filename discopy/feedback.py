@@ -603,6 +603,25 @@ class Diagram(monoidal.Diagram, TracedCategory):
         return self.feedback(dom=dom, cod=cod, mem=mem, left=left)
 
     @property
+    def is_strict(self) -> bool:
+        """
+        Whether the diagram is strict, i.e. made of strict boxes only.
+
+        A map ``h : U -> V`` is strict when the trace is uniform along it,
+        i.e. when ``f >> B @ h == A @ h >> g`` implies that ``f.trace()``
+        equals ``g.trace()`` for every ``f : A @ U -> B @ U`` and
+        ``g : A @ V -> B @ V``, after Hasegawa's *Recursion from cyclic
+        sharing* (1997) and Simpson and Plotkin's *Complete axioms for
+        categorical fixed-point operators* (2000), where the trace is a
+        least fixed point and strict maps preserve the least element.
+        Strict maps form a monoidal subcategory, so a diagram is strict
+        when each of its boxes is. A free box is not strict, nothing being
+        known about it, while a permutation, a copy, a discard and a merge
+        are, see :meth:`markov.Diagram.trace_uniformity`.
+        """
+        return all(box.is_strict for box in self.boxes)
+
+    @property
     def time_step(self) -> int:
         """
         The time step of a diagram is defined only if it is in fact a box.
@@ -649,6 +668,7 @@ class Box(monoidal.Box, Diagram):
         cod (monoidal.Ty) : The codomain of the box, i.e. its output.
         time_step (int) : The number of times the box has been delayed.
     """
+    is_strict = False
 
     _time_step, _args, _params = 0, (), {}
     time_step = property(lambda self: self._time_step)
@@ -851,6 +871,11 @@ class Trace(Feedback):
 
     def dagger(self):
         return self.arg.dagger().trace(len(self.mem), left=self.left)
+
+    @property
+    def is_strict(self) -> bool:
+        """ The fixed point of a strict map is strict. """
+        return self.arg.is_strict
 
     def to_drawing(self):
         return self.ar.to_drawing(self)
