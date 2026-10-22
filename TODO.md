@@ -10,7 +10,7 @@ Copy of rel-int/optyx#44 onto discopy.optyx (#225)
 - [x] merge the move branch `origin/claude/magical-cannon-g1t6ms`
 - [ ] port to `discopy.optyx` on next `main`: blocked. `QuimbBackend.eval` calls
   `tensor.Diagram.eval(contract="quimb", ...)`, which discopy/discopy#533 adds and next `main`
-  does not have. #533 is giodefelice-agents' (head `b76559ca`, +346/−98, `tensor.py`,
+  does not have. discopy/discopy#533 is giodefelice-agents' (head `b76559ca`, +346/−98, `tensor.py`,
   `quantum/circuit.py`, a `tensor` extra), branched from upstream at `a94378cc` before next's
   `tensor.Functor.contract` moved on, so it needs a port of its own. When it lands, its
   `contract_quimb` must also contract a `TensorNetwork` that `contract_compressed` returns, as
