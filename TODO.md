@@ -6,7 +6,7 @@ toumix, 2026-10-22, interactive.
 
 Copy of rel-int/optyx#52 onto discopy.optyx (#225)
 
-- [ ] merge the parent copy branch optyx-16 (the port of rel-int/optyx#16)
-- [ ] port to discopy.optyx on next main
-- [ ] checks
+- [x] merge the parent copy branch optyx-16 (the port of rel-int/optyx#16)
+- [x] port to discopy.optyx on next main
+- [x] checks
 - [ ] giodefelice-agents decides: own repo or notebook (toumix/desire#163)
