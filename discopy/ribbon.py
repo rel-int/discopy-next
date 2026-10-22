@@ -16,6 +16,11 @@ Summary
     Cup
     Cap
     Braid
+    Feedback
+    Trace
+    FollowedBy
+    Head
+    Tail
     Functor
 
 Axioms
@@ -76,9 +81,7 @@ cap becomes a ribbon folding back.
     :align: center
 """
 
-from typing import ClassVar
-
-from discopy import rigid, pivotal, balanced
+from discopy import rigid, pivotal, balanced, feedback
 from discopy.abc import RibbonCategory
 from discopy.cat import factory
 from discopy.pivotal import (  # noqa: F401  pylint: disable=unused-import
@@ -95,15 +98,6 @@ class Diagram(pivotal.Diagram, balanced.Diagram, RibbonCategory):
         dom (pivotal.Ty) : The domain of the diagram, i.e. its input.
         cod (pivotal.Ty) : The codomain of the diagram, i.e. its output.
     """
-    box_factory: ClassVar[type["Box"]]
-    braid_factory: ClassVar[type["Braid"]]
-    functor_factory: ClassVar[type["Functor"]]
-    cup_factory: ClassVar[type["Cup"]]
-    cap_factory: ClassVar[type["Cap"]]
-    twist_factory: ClassVar[type["Twist"]]
-    sum_factory: ClassVar[type["Sum"]]
-    dual_rail_factory: ClassVar[type["DualRail"]]
-
     def trace(self, n=1, left=False):
         """
         The trace of a ribbon diagram.
@@ -139,7 +133,7 @@ class Diagram(pivotal.Diagram, balanced.Diagram, RibbonCategory):
         cup = self.cup_factory(self.cod[y - 1], self.cod[y])
         return self >> self.cod[:y - 1] @ cup @ self.cod[y + 1:]
 
-    def to_ribbons(self, width: float | None = None, colour="gray"):
+    def to_ribbons(self, width: float = None, colour="gray"):
         """
         Doubles every object and sends the twist to the braid, folding cups
         and caps into a single box.
@@ -205,6 +199,8 @@ class Braid(balanced.Braid, Box):
         is_dagger (bool) : Braiding over or under.
     """
 
+    z = 0
+
     def rotate(self, left=False):
         del left
         braid = type(self)(*self.cod.r)
@@ -220,6 +216,8 @@ class DualRailBraid(balanced.DualRailBraid, Box):
     :class:`discopy.balanced.DualRailBraid`
     """
 
+    z = 0
+
     def rotate(self, left=False):
         del left
         return type(self)(self.right, self.left, self.is_dagger)
@@ -233,6 +231,8 @@ class DualRailTwist(balanced.DualRailTwist, Box):
     --------
     :class:`discopy.balanced.DualRailTwist`
     """
+
+    z = 0
 
     def rotate(self, left=False):
         del left
@@ -248,6 +248,8 @@ class DualRailCup(Box):
         left : The ribbon (doubled type) on the outside left.
         right : The ribbon on the outside right.
     """
+    z = 0
+
     def __init__(self, left, right, is_dagger=False):
         self.left, self.right = left, right
         name = type(self).__name__ + f"({left}, {right})"
@@ -268,6 +270,8 @@ class DualRailCap(Box):
     A cap joining two ribbons in the dual rail encoding, see
     :class:`DualRailCup`.
     """
+    z = 0
+
     def __init__(self, left, right, is_dagger=False):
         self.left, self.right = left, right
         name = type(self).__name__ + f"({left}, {right})"
@@ -292,6 +296,8 @@ class Twist(balanced.Twist, Box):
         right (pivotal.Ty) : The type on the top right and bottom left.
         is_dagger (bool) : Braiding over or under.
     """
+
+    z = 0
 
     def rotate(self, left=False):
         del left
@@ -357,6 +363,7 @@ class DualRail(balanced.DualRail, Functor):
         return super().__call__(other)
 
 
+Feedback, Trace, FollowedBy, Head, Tail = feedback.generators(Diagram, Box)
 Diagram.box_factory = Box
 Diagram.braid_factory, Diagram.functor_factory = Braid, Functor
 Diagram.cup_factory, Diagram.cap_factory = Cup, Cap

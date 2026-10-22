@@ -2,9 +2,10 @@
 
 from pytest import raises
 
-from discopy import closed, compact, feedback, frobenius, markov
+from discopy import closed, comarkov, compact, frobenius, markov
 from discopy.para import (
-    Closed, Compact, Feedback, Hypergraph, Markov, Symmetric, Traced)
+    Closed, Comarkov, Compact, Feedback, Hypergraph, Markov, Symmetric,
+    Traced)
 from discopy import python
 from discopy.python import Function
 from discopy.symmetric import Box, Diagram, Ty
@@ -69,12 +70,22 @@ def test_markov():
     assert Markov.copy(X).param == markov.Ty()
 
 
+def test_comarkov():
+    X = comarkov.Ty('x')
+    assert Comarkov.merge(X, 3) == Comarkov.lift(comarkov.Diagram.merge(X, 3))
+    assert Comarkov.noise(X) == Comarkov.lift(comarkov.Noise(X))
+    assert Comarkov.merge(X).param == comarkov.Ty()
+    X = frobenius.Ty('x')
+    assert Hypergraph.merge(X) == Hypergraph.lift(frobenius.Spider(2, 1, X))
+
+
 def test_closed():
     a, b, c, P = map(closed.Ty, "abcP")
     k = Closed(a @ b, c, closed.Box('k', a @ b @ P, c), P)
     assert Closed.ev(c, b).param == closed.Ty()
     left, right = k.curry(left=True), k.curry(left=False)
     assert k.curry() == left
+    assert k.curry(0) == k == k.curry(0, left=False)
     assert (left.dom, left.cod, left.param) == (a, c << b, P)
     assert (right.dom, right.cod, right.param) == (b, a >> c, P)
     assert left.inside\
@@ -82,12 +93,15 @@ def test_closed():
 
 
 def test_feedback():
-    x, y, z, P = map(feedback.Ty, "xyzP")
+    x, y, z, P = map(markov.Ty, "xyzP")
     f = Feedback(x @ y.delay(), z @ y,
-                 feedback.Box('f', x @ y.delay() @ P, z @ y), P)
+                 markov.Box('f', x @ y.delay() @ P, z @ y), P)
     fb = f.feedback()
     assert (fb.dom, fb.cod, fb.param) == (x, z, P)
+    assert fb == f.feedback(1) == f.feedback(mem=y) == f.feedback(cod=z)
     assert f.delay().param == P.delay()
+    with raises(NotImplementedError):
+        f.feedback(left=True)
 
 
 def test_compact():
@@ -141,9 +155,9 @@ def test_copar_trace():
 
 
 def test_copar_feedback():
-    x, y, z, m, P = map(feedback.Ty, "xyzmP")
+    x, y, z, m, P = map(markov.Ty, "xyzmP")
     f = Feedback(x @ y.delay(), z @ y,
-                 feedback.Box('f', x @ y.delay() @ P, z @ y @ m), P, m)
+                 markov.Box('f', x @ y.delay() @ P, z @ y @ m), P, m)
     fb = f.feedback()
     assert (fb.dom, fb.cod, fb.param, fb.copar) == (x, z, P, m)
     assert f.delay().copar == m.delay()

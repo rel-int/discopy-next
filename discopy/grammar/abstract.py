@@ -23,10 +23,13 @@ Summary
     Curry
     Copy
     Discard
-    Merge
     Permutation
     Swap
+    Feedback
     Trace
+    FollowedBy
+    Head
+    Tail
     Sum
     Functor
     Lexicon
@@ -149,7 +152,7 @@ from __future__ import annotations
 
 from typing import ClassVar
 
-from discopy import closed, cmap, hypergraph
+from discopy import closed, feedback, cmap, hypergraph
 from discopy.cat import factory
 from discopy.grammar import categorial
 
@@ -196,18 +199,6 @@ class Diagram(closed.Diagram):
         dom (Ty) : The domain of the diagram, i.e. its input.
         cod (Ty) : The codomain of the diagram, i.e. its output.
     """
-    box_factory: ClassVar[type["Box"]]
-    functor_factory: ClassVar[type["Functor"]]
-    copy_factory: ClassVar[type["Copy"]]
-    merge_factory: ClassVar[type["Merge"]]
-    permutation_factory: ClassVar[type["Permutation"]]
-    swap_factory: ClassVar[type["Swap"]]
-    curry_factory: ClassVar[type["Curry"]]
-    eval_factory: ClassVar[type["Eval"]]
-    coeval_factory: ClassVar[type["Coeval"]]
-    trace_factory: ClassVar[type["Trace"]]
-    discard_factory: ClassVar[type["Discard"]]
-    sum_factory: ClassVar[type["Sum"]]
     ob = Ty
 
     @classmethod
@@ -302,20 +293,12 @@ class Discard(closed.Discard, Copy):
     "The discard of an abstract type, i.e. a copy with zero legs."
 
 
-class Merge(closed.Merge, Box):
-    "The merge of an abstract type, i.e. the dagger of a copy."
-
-
 class Permutation(closed.Permutation, Box):
     "A permutation of abstract types."
 
 
 class Swap(Permutation, closed.Swap, Box):
     "The symmetric swap of two abstract types."
-
-
-class Trace(closed.Trace, Box):
-    "A trace in an abstract categorial grammar."
 
 
 class Sum(closed.Sum, Box):
@@ -394,14 +377,14 @@ class Abstraction(TermBase, closed.Abstraction):
 type Term = Constant | Variable | Application | Abstraction
 
 Id = Diagram.id
+Feedback, Trace, FollowedBy, Head, Tail = feedback.generators(Diagram, Box)
 Diagram.box_factory, Diagram.functor_factory = Box, Functor
-Diagram.copy_factory, Diagram.merge_factory = Copy, Merge
+Diagram.copy_factory = Copy
 Diagram.permutation_factory = Permutation
 Diagram.swap_factory = Swap
 Diagram.curry_factory = Curry
 Diagram.eval_factory = Eval
 Diagram.coeval_factory = Coeval
-Diagram.trace_factory = Trace
 Diagram.discard_factory = Discard
 Diagram.sum_factory = Sum
 Ty.exp_factory = Ty.under_factory = Ty.over_factory = staticmethod(Exp)

@@ -79,14 +79,11 @@ from __future__ import annotations
 
 from functools import total_ordering, cached_property
 from typing import (
-    Any, Callable, ClassVar, Mapping, Iterable, Self, Sequence,
-    TYPE_CHECKING)
-
+    Callable, ClassVar, Mapping, Iterable, TYPE_CHECKING)
 
 from discopy import messages, utils
-from discopy.abc import Category
-from discopy.axioms import (
-    FUEL, GENERATORS, Equation as AbstractEquation, Serialisable)
+from discopy.abc import Category, DaggerCategory, Nat
+from discopy.axioms import GENERATORS, Equation as AbstractEquation, Testable
 from discopy.utils import (  # noqa: F401
     factory,
     factory_name,
@@ -107,7 +104,7 @@ dumps, loads = utils.dumps, utils.loads
 
 
 @total_ordering
-class Ob(Serialisable["Ob"]):
+class Ob(Testable["Ob"]):
     """
     An object with a string as :code:`name`.
 
@@ -196,7 +193,7 @@ class FreeCategory(Category):
     signature without breaking the machinery below.
     """
 
-    generator_factory: type = None  # ty: ignore[invalid-assignment]
+    generator_factory = None
 
     def __init__(self, inside, dom, cod, _scan=True):
         ob = type(self).ob
@@ -233,68 +230,6 @@ class FreeCategory(Category):
             inside, cod = inside + other.inside, other.cod
         return self.ar(inside=inside, dom=dom, cod=cod, _scan=False)
 
-    @classmethod
-    def search(cls, *, dom=None, cod=None, fuel=FUEL, within=None):
-        """
-        Derive the terms of a free category from its rules: a generator, or the
-        conclusion of one of its :attr:`rules` chosen at random, its
-        morphism premises sampled by the :meth:`strategy` of the category
-        with one less unit of ``fuel``, see
-        :meth:`discopy.axioms.Rule.strategy`. Once the fuel runs out, only the
-        rules with no morphism premise are applied. A conclusion that misses
-        ``dom`` or ``cod`` is composed with a generator from or to it, so that
-        both are honoured, with no filtering, whenever the :meth:`generators`
-        read them: those of a type do not, since every generated colour is
-        transparent. Every choice shrinks to a generator.
-
-        Parameters:
-            dom : The domain, sampled if ``None``.
-            cod : The codomain, sampled if ``None``.
-            fuel : How deep the rules nest.
-            within : The class whose rules a term is derived from, e.g.
-                :class:`discopy.abc.MonoidalCategory` for the terms of the
-                underlying monoidal category, the category itself if
-                ``None``.
-
-        Example
-        -------
-        >>> from hypothesis import find
-        >>> x, y = Ob('x'), Ob('y')
-        >>> term = find(Arrow.search(dom=x, cod=y), lambda f: len(f) > 2)
-        >>> assert (term.dom, term.cod) == (x, y)
-        """
-        from hypothesis import strategies as st
-
-        rules = [
-            rule for name, rule in cls.rules.items()
-            if name in (within or cls).rules
-            and (fuel > 0 or not rule.is_recursive)]
-
-        @st.composite
-        def terms(draw):
-            rule = draw(st.sampled_from([None, *rules]))
-            if rule is None:
-                return draw(cls.generators(dom=dom, cod=cod))
-            term = rule(**draw(rule.strategy(
-                dom, cod, fuel=fuel - 1, within=within)))
-            if dom is not None and term.dom != dom:
-                term = draw(cls.generators(dom=dom, cod=term.dom)) >> term
-            if cod is not None and term.cod != cod:
-                term = term >> draw(cls.generators(dom=term.cod, cod=cod))
-            return term
-
-        return terms()
-
-    @classmethod
-    def generators(cls, *, dom=None, cod=None):
-        """
-        Generate the generators of the free category as terms of it, from
-        ``dom`` to ``cod`` when given: a path of one :attr:`generator_factory`.
-        """
-        return cls.generator_factory.strategy(dom=dom, cod=cod).map(
-            lambda generator: cls.ar(
-                inside=(generator, ), dom=generator.dom, cod=generator.cod))
-
     def __iter__(self):
         return iter(self.inside)
 
@@ -327,7 +262,7 @@ class FreeCategory(Category):
 
 
 @factory
-class Arrow(FreeCategory, Serialisable["Arrow"]):
+class Arrow(FreeCategory, DaggerCategory, Testable["Arrow"]):
     """
     An arrow is a tuple of composable boxes :code:`inside` with a pair of
     objects :code:`dom` and :code:`cod` as domain and codomain.
@@ -379,21 +314,34 @@ class Arrow(FreeCategory, Serialisable["Arrow"]):
     ob = Ob
 
     @classmethod
-    def strategy(cls, **params):
+    def strategy(
+            cls, *, types=None, dom=None, cod=None,
+            min_leaves=None, max_leaves=10):
         """
-        The strategy the property matrix samples the terms of a free category
-        from: its :meth:`search`, which a category with a combinatorial
-        representation mixes with the :meth:`sample` of it, e.g.
-        :meth:`discopy.symmetric.Diagram.strategy`.
+        Generate the canonical instantiation: a single identity or a single
+        generator box with the requested (or an arbitrary) boundary.
 
-        Parameters are those of :meth:`search`.
+        Callers bound the number of generators of a composite term with
+        :code:`min_leaves` and :code:`max_leaves`; a canonical
+        instantiation has at most one, so both are ignored.
         """
-        return cls.search(**params)
+        # pylint: disable=unused-argument  # a canonical term has one leaf
+        from hypothesis import strategies as st
 
-    @classmethod
-    def generators(cls, *, dom=None, cod=None):
-        """ Generate the boxes of the category, see :meth:`Box.strategy`. """
-        return cls.box_factory.strategy(dom=dom, cod=cod)
+        types = cls.ob.strategy() if types is None else types
+
+        def generators(dom=None, cod=None):
+            """ Generator boxes between the given boundaries. """
+            return cls.generator_factory.strategy(
+                types=types, dom=dom, cod=cod)
+
+        if dom is not None and cod is not None:
+            if dom == cod:
+                return st.just(cls.id(dom))
+            return generators(dom=dom, cod=cod)
+        if dom is not None or cod is not None:
+            return generators(dom=dom, cod=cod)
+        return st.one_of(types.map(cls.id), generators())
 
     def __setstate__(self, state):
         if '_dom' in state:  # Backward compatibility
@@ -664,7 +612,7 @@ class Box(Arrow):
             return getattr(data, "free_symbols", set())
         return recursive_free_symbols(self.data)
 
-    def subs(self, *args) -> Self:
+    def subs(self, *args) -> Box:
         if not any(var in self.free_symbols for var in (
                 {var for var, _ in args[0]} if len(args) == 1 else {args[0]})):
             return self
@@ -680,7 +628,7 @@ class Box(Arrow):
             self.name, self.dom, self.cod, is_dagger=self.is_dagger,
             data=lambdify(symbols, self.data, **kwargs)(*xs))
 
-    def dagger(self) -> Self:
+    def dagger(self) -> Box:
         return type(self)(
             self.name, self.cod, self.dom,
             data=self.data, is_dagger=not self.is_dagger)
@@ -759,8 +707,7 @@ class Sum(Box):
     The sum is non-commutative, i.e. :code:`Sum([f, g]) != Sum([g, f])`.
     """
     def __init__(
-            self, terms: Sequence[Arrow],
-            dom: Ob | None = None, cod: Ob | None = None):
+            self, terms: tuple[Arrow, ...], dom: Ob = None, cod: Ob = None):
         if not terms and (dom is None or cod is None):
             raise ValueError(messages.MISSING_TYPES_FOR_EMPTY_SUM)
         dom = terms[0].dom if dom is None else dom
@@ -796,8 +743,7 @@ class Sum(Box):
         assert_isparallel(self, other)
         other = other if isinstance(other, Sum)\
             else self.sum_factory((other, ))
-        return self.sum_factory(
-            (*self.terms, *other.terms), self.dom, self.cod)
+        return self.sum_factory(self.terms + other.terms, self.dom, self.cod)
 
     def __iter__(self):
         for arrow in self.terms:
@@ -858,14 +804,34 @@ class Bubble(Box):
         kwargs : Passed to the `__init__` of :class:`Box`.
 
     Raises:
-        ValueError : When dom is None but all the args have the same dom.
+        ValueError : When dom (resp. cod) is None and the args do not all
+            have the same dom (resp. cod).
+
+    Example
+    -------
+    >>> x, y = Ob('x'), Ob('y')
+    >>> Bubble(Box('f', x, x), Box('g', y, x))
+    Traceback (most recent call last):
+    ...
+    ValueError: A bubble needs a dom given when its args do not all share \
+one, they have [cat.Ob('x'), cat.Ob('y')].
     """
-    def __init__(self, *args: Arrow, dom: Ob | None = None,
-                 cod: Ob | None = None, name="", method="bubble", **kwargs):
-        dom, = set(arg.dom for arg in args) if dom is None else (dom, )
-        cod, = set(arg.cod for arg in args) if cod is None else (cod, )
+    def __init__(self, *args: Arrow, dom: Ob = None, cod: Ob = None,
+                 name="", method="bubble", **kwargs):
+        dom, cod = (
+            given if given is not None else self.common(args, attr)
+            for attr, given in [("dom", dom), ("cod", cod)])
         self.args, self.method = args, method
         Box.__init__(self, name, dom, cod, **kwargs)
+
+    @staticmethod
+    def common(args: tuple[Arrow, ...], attr: str) -> Ob:
+        """ The domain or codomain the args all share. """
+        values = list(dict.fromkeys(getattr(arg, attr) for arg in args))
+        if len(values) != 1:
+            raise ValueError(messages.NO_COMMON_BOUNDARY.format(
+                attr, ", ".join(map(repr, values))))
+        return values[0]
 
     @property
     def arg(self):
@@ -912,21 +878,32 @@ class Bubble(Box):
             data=self.data, is_dagger=not self.is_dagger)
 
     def to_tree(self):
-        return {
+        tree = {
             'factory': factory_name(type(self)),
             'args': [f.to_tree() for f in self.args],
             'dom': self.dom.to_tree(),
             'cod': self.cod.to_tree()}
+        if self.is_dagger:
+            tree['is_dagger'] = True
+        if self.data is not None:
+            tree['data'] = self.data
+        if self.name:
+            tree['name'] = self.name
+        if self.method != "bubble":
+            tree['method'] = self.method
+        return tree
 
     @classmethod
     def from_tree(cls, tree):
         args = [tree['arg']] if 'args' not in tree else tree['args']
         dom, cod = map(from_tree, (tree['dom'], tree['cod']))
-        return cls(*map(from_tree, args), dom=dom, cod=cod)
+        kwargs = {k: tree[k] for k in ('data', 'is_dagger', 'name', 'method')
+                  if k in tree}
+        return cls(*map(from_tree, args), dom=dom, cod=cod, **kwargs)
 
 
 @factory
-class Functor(Category[type, "Functor"]):
+class Functor(Category):
     """
     A functor is a pair of maps :code:`ob_map` and :code:`ar_map` and an
     optional codomain category :code:`cod`.
@@ -968,11 +945,10 @@ class Functor(Category[type, "Functor"]):
     >>> assert F(m) == m[::-1]
     """
     ob = type[Category]
-    dom: type[Any] = Arrow
-    cod: type[Any] = Arrow
+    dom = cod = Arrow
 
     @classmethod
-    def id(cls, dom: type | None = None) -> Functor:
+    def id(cls, dom: type = None) -> Functor:
         """
         The identity functor on a given category ``dom``.
 
@@ -981,6 +957,7 @@ class Functor(Category[type, "Functor"]):
         """
         return cls(lambda x: x, lambda f: f, dom=dom, cod=dom)
 
+    @unbiased
     def then(self, other: Functor) -> Functor:
         """
         The composition of functor with another.
@@ -1012,7 +989,7 @@ class Functor(Category[type, "Functor"]):
             self,
             ob_map: Mapping[Ob, Ob] | Callable[[Ob], Ob] | None = None,
             ar_map: Mapping[Box, Arrow] | Callable[[Box], Arrow] | None = None,
-            dom: type | None = None, cod: type | None = None):
+            dom: type = None, cod: type = None):
         self.dom, self.cod = dom or type(self).dom, cod or type(self).cod
         self.ob_map: MappingOrCallable[Ob, Ob] = MappingOrCallable(
             ob_map or {})
@@ -1034,8 +1011,11 @@ class Functor(Category[type, "Functor"]):
         if isinstance(other, Ob):
             result = self.ob_map[other]
             origin = get_origin(self.cod.ob)
-            return result if isinstance(result, origin)\
-                else self.cod.ob(result)
+            if isinstance(result, origin):
+                return result
+            if isinstance(result, tuple) and not issubclass(origin, Nat):
+                return self.cod.ob(*result)
+            return self.cod.ob(result)
         if isinstance(other, Sum):
             return sum(map(self, other.terms),
                        self.cod.zero(self(other.dom), self(other.cod)))
@@ -1061,7 +1041,7 @@ Arrow.generator_factory = Arrow.box_factory = Box
 
 
 @factory
-class Transformation(Category[Functor, "Transformation"]):
+class Transformation(Category):
     """
     A (not necessarily natural) transformation between two parallel functors.
 
@@ -1144,6 +1124,7 @@ class Transformation(Category[Functor, "Transformation"]):
         """
         return cls(lambda x: dom.cod.id(dom(x)), dom, dom)
 
+    @unbiased
     def then(self, other: Transformation) -> Transformation:
         """
         The vertical composition of a transformation with another.
@@ -1169,7 +1150,7 @@ class Transformation(Category[Functor, "Transformation"]):
             f"dom={self.dom!r}, cod={self.cod!r})")
 
 
-class Equation(AbstractEquation):
+class Equation(AbstractEquation[Arrow]):
     """
     An :class:`.axioms.Equation` between arrows, see its docstring for the
     parameters and :meth:`.axioms.Equation.modulo` for quotients.
@@ -1184,8 +1165,7 @@ class Equation(AbstractEquation):
     """
 
 
-Ob.equation_factory = Equation
-Arrow.equation_factory = Equation  # ty: ignore[invalid-assignment]
+Ob.equation_factory = Arrow.equation_factory = Equation
 Arrow.sum_factory = Sum
 Arrow.bubble_factory = Bubble
 Id = Arrow.id

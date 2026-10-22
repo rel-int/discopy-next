@@ -1,7 +1,7 @@
 import sys
 from discopy.biclosed import *
 from discopy import biclosed, cat
-from discopy.axioms import Related
+from discopy.axioms import Related, assert_axioms
 from discopy.utils import dumps, loads
 from pytest import raises
 
@@ -184,6 +184,7 @@ def test_to_rigid():
     f_ = rigid.Box('f', x_, y_)
     assert Diagram.to_rigid(diagram)\
         == rigid.Id(x_ @ y_.l) @ f_ >> rigid.Id(x_) @ rigid.Cup(y_.l, y_)
+    assert Box('f', x, y, data=42).to_rigid().data == 42
 
 
 def test_to_compact():
@@ -297,6 +298,10 @@ def test_deep_terms():
     assert depth == 6000
 
 
+def test_axioms():
+    assert_axioms(TermBase)
+
+
 def test_mapping_preserves_binding_and_lexical_boundaries():
     from discopy import closed
     X, Y, Z = map(closed.Ty, "XYZ")
@@ -323,10 +328,30 @@ def test_mapping_preserves_binding_and_lexical_boundaries():
 def test_transparency():
     x, y = Ty('x'), Ty('y')
     curry = Box('f', x @ y, x).curry
+    v, f, g = Variable('v', x), (y << x)('f'), (x >> y)('g')
     for box in [Eval(x << y), Eval(y >> x, left=False), Coeval(x << y),
-                curry(), curry(left=False), Constant('c', x)]:
+                curry(), curry(left=False), Constant('c', x), v, f(v),
+                v(g, left=True), x(lambda u: f(u)),
+                x(lambda u, left=True: u(g, left=True))]:
         assert eval(repr(box), {"biclosed": biclosed, "cat": cat}) == box
         assert loads(dumps(box)) == box
+
+
+def test_unit_exponential():
+    """ An exponential of the unit is its base, so that currying no wire and
+    evaluating at the unit are the identity, which converts to a map. """
+    x, y = Ty('x'), Ty('y')
+    assert x ** Ty() == x << Ty() == Ty() >> x == x
+    f = Box('f', x, y)
+    assert f.curry(0) == f == f.curry(0, left=False)
+    assert Diagram.ev(x, Ty()) == Id(x) == Diagram.ev(x, Ty(), left=False)
+    assert f.curry(0).to_map().to_diagram() == f
+
+
+def test_Curry_dagger():
+    x = Ty('x')
+    with raises(AxiomError):
+        Box('f', x @ x, x).curry().dagger()
 
 
 def test_Curry_to_drawing():
@@ -338,3 +363,5 @@ def test_Curry_to_drawing():
             drawing = curry.to_drawing()
             assert (len(drawing.dom), len(drawing.cod))\
                 == (len(curry.dom), len(curry.cod))
+    for left in (True, False):  # A curry of no wire, built explicitly.
+        assert Curry(f, 0, left=left).to_drawing() == f.to_drawing()

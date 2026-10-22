@@ -11,6 +11,9 @@ Summary
     :nosignatures:
     :toctree:
 
+    Wire
+    HeadOb
+    TailOb
     Ty
     Exp
     Product
@@ -37,6 +40,11 @@ Summary
     Pack
     Unpack
     Discard
+    Feedback
+    Trace
+    FollowedBy
+    Head
+    Tail
     Sum
     Functor
     CMap
@@ -75,22 +83,40 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from functools import cached_property, reduce
 from inspect import signature
-from typing import Callable, ClassVar, Dict, Self
+from typing import Callable, ClassVar, Dict
 
-from discopy import monoidal, biclosed, markov, cmap, hypergraph, messages
-from discopy.abc import ClosedCategory, MonoidalCategory
-from discopy.axioms import Serialisable
+from discopy import (
+    monoidal, biclosed, markov, feedback, cmap, hypergraph, messages)
+from discopy.abc import ClosedCategory
 from discopy.cat import factory
 from discopy.drawing import Drawing
 from discopy.utils import (
     AxiomError, assert_isinstance, factory_name, from_tree)
 
 
+class Wire(feedback.Wire, biclosed.Wire):
+    """
+    A closed object is a biclosed object with a time step, i.e. a feedback
+    object, as is every wire below :mod:`discopy.feedback`.
+
+    An exponential and a product are closed objects of their own, delayed as
+    a whole, leaving their factors alone: the delay is not a closed functor.
+
+    >>> x, y = Ty('x'), Ty('y')
+    >>> assert (x << y).delay() != x.delay() << y.delay()
+    >>> assert (x * y).delay() != x.delay() * y.delay()
+    """
+
+
+HeadOb, TailOb = feedback.wire_generators(Wire)
+
+
 @factory
-class Ty(biclosed.Ty):
+class Ty(biclosed.Ty, feedback.Ty):
     """
     A closed type is a biclosed type in a symmetric category where left and
-    right exponentials coincide, i.e. `X << Y == X ** Y == Y >> X`.
+    right exponentials coincide, i.e. `X << Y == X ** Y == Y >> X`, and a
+    feedback type with a time step.
 
     Applying a closed type to a function yields an :class:`Term` e.g.
 
@@ -103,6 +129,7 @@ class Ty(biclosed.Ty):
     .. image:: /_static/closed/diagram.svg
         :align: center
     """
+    generator_factory = Wire
     product_factory: ClassVar[type["Product"]]
     variable_factory: ClassVar[type["Variable"]]
     constant_factory: ClassVar[type["Constant"]]
@@ -135,7 +162,7 @@ class Ty(biclosed.Ty):
         return self.inside[0].factors
 
     @classmethod
-    def from_biclosed(cls, old: biclosed.Ty) -> Self:
+    def from_biclosed(cls, old: biclosed.Ty) -> Ty:
         """
         Translate a biclosed type into a closed type, collapsing left and
         right exponentials into a single exponential.
@@ -153,16 +180,21 @@ class Ty(biclosed.Ty):
             cod=cls.constant_factory.functor.cod)(old)
 
 
-class Exp(biclosed.Exp):
-    "An exponential object in a markov category."
+class Exp(Wire, biclosed.Exp):
+    "An exponential object in a markov category, with a time step."
 
     ob = Ty
 
     def __str__(self):
-        return f"({self.exponent} >> {self.base})"
+        return f"({self.exponent} >> {self.base})"\
+            + feedback.str_delayed(self.time_step)
+
+    def __repr__(self):
+        return factory_name(type(self))\
+            + f"({self.base!r}, {self.exponent!r}{self.repr_time_step()})"
 
 
-class Product(biclosed.Wire):
+class Product(Wire):
     """
     The product of a tuple of types, which is not strictly associative,
     called with ``*`` in the binary case.
@@ -182,78 +214,94 @@ class Product(biclosed.Wire):
     """
     ob = Ty
 
-    def __init__(self, *factors: biclosed.Ty):
+    def __init__(self, *factors: Ty, **params):
         for typ in factors:
             assert_isinstance(typ, self.ob)
         self.factors = factors
-        super().__init__(str(self))
+        super().__init__(str(self), **params)
 
     def __eq__(self, other):
         return isinstance(other, type(self))\
-            and self.factors == other.factors
+            and self.factors == other.factors\
+            and (self.time_step, self.is_constant)\
+            == (other.time_step, other.is_constant)
 
     def __hash__(self):
         return hash(repr(self))
 
     def __str__(self):
+        delayed = feedback.str_delayed(self.time_step)
         if len(self.factors) == 2:
             return "(" + " * ".join(
                 str(typ) if len(typ) == 1 else f"({typ})"
-                for typ in self.factors) + ")"
+                for typ in self.factors) + ")" + delayed
         if not self.factors:
-            return f"{type(self).__name__}()"
+            return f"{type(self).__name__}(){delayed}"
         first, *others = self.factors
         first = str(first) if len(first) == 1 else f"({first})"
-        return f"{first}.product({', '.join(map(str, others))})"
+        return f"{first}.product({', '.join(map(str, others))}){delayed}"
 
     def __repr__(self):
-        return factory_name(type(self))\
-            + f"({', '.join(map(repr, self.factors))})"
+        args = ', '.join(map(repr, self.factors)) + self.repr_time_step()
+        return factory_name(type(self)) + f"({args.removeprefix(', ')})"
 
     def to_tree(self):
-        return {
-            'factory': factory_name(type(self)),
+        return feedback.Wire.to_tree(self) | {
             'factors': [typ.to_tree() for typ in self.factors]}
 
     @classmethod
     def from_tree(cls, tree):
-        return cls(*map(from_tree, tree['factors']))
+        return cls(*map(from_tree, tree['factors']),
+                   time_step=tree.get('time_step', 0),
+                   is_constant=tree.get('is_constant', True))
 
 
 class Unitype(Exp):
     """
     The unitype is its own exponential, i.e. ``U == U >> U``: embedding the
     untyped lambda calculus, where every term can be applied to every other.
+    Delayed, it is the delay of that exponential, which is not its own.
+
+    Parameters:
+        time_step : The number of times the unitype has been delayed.
+        is_constant : Whether the unitype is a constant stream.
 
     Example
     -------
     >>> U = Ty(Unitype())
     >>> assert U == U >> U and U.base == U == U.exponent
+    >>> assert U.delay() == (U >> U).delay() != U.delay() >> U.delay()
     """
-    def __init__(self):
+    def __init__(self, time_step: int = 0, is_constant: bool = True):
         monoidal.Wire.__init__(self, "U")
-        self.base = self.exponent = Ty(self)
+        self.time_step, self.is_constant = time_step, is_constant
+        self.base = self.exponent = Ty(
+            Unitype(is_constant=is_constant) if time_step else self)
 
     def __eq__(self, other):
-        return isinstance(other, Unitype) or isinstance(other, Exp)\
-            and (other.base, other.exponent) == (self.base, self.exponent)
+        return isinstance(other, Exp)\
+            and (self.time_step, self.is_constant)\
+            == (other.time_step, other.is_constant)\
+            and (isinstance(other, Unitype) or (
+                other.base, other.exponent) == (self.base, self.exponent))
 
     def __hash__(self):
-        return hash(repr(Exp(self.base, self.exponent)))
+        return hash(Exp(self.base, self.exponent, time_step=self.time_step,
+                        is_constant=self.is_constant))
 
     def __str__(self):
-        return "U"
+        return "U" + feedback.str_delayed(self.time_step)
 
     def __repr__(self):
-        return "Unitype()"
+        return f"Unitype({self.repr_time_step().removeprefix(', ')})"
 
     def to_tree(self):
-        return {'factory': factory_name(type(self))}
+        return {'factory': factory_name(type(self)),
+                'time_step': self.time_step, 'is_constant': self.is_constant}
 
     @classmethod
     def from_tree(cls, tree):
-        # pylint: disable=unused-argument  # the unitype has no parameter
-        return cls()
+        return cls(tree.get('time_step', 0), tree.get('is_constant', True))
 
 
 @factory
@@ -268,7 +316,6 @@ class Diagram(markov.Diagram, biclosed.Diagram, ClosedCategory):
     box_factory: ClassVar[type["Box"]]
     functor_factory: ClassVar[type["Functor"]]
     copy_factory: ClassVar[type["Copy"]]
-    merge_factory: ClassVar[type["Merge"]]
     swap_factory: ClassVar[type["Swap"]]
     permutation_factory: ClassVar[type["Permutation"]]
     curry_factory: ClassVar[type["Curry"]]
@@ -304,6 +351,8 @@ class Diagram(markov.Diagram, biclosed.Diagram, ClosedCategory):
         ...     f >> Coeval(z << y, left=True)).trace()
         """
         def image(box):
+            if box.time_step:
+                return image(box.reset()).delay(box.time_step)
             if isinstance(box, Curry):
                 return (box.arg.to_compact() >> Coeval(
                     box.cod, left=box.left)).trace(
@@ -322,13 +371,6 @@ class Diagram(markov.Diagram, biclosed.Diagram, ClosedCategory):
 
     def to_drawing(self):
         return monoidal.Diagram.to_drawing(self, functor_factory=Functor)
-
-    dagger_monoidality = ClosedCategory.dagger_monoidality.failing(
-        messages.CURRY_HAS_NO_DAGGER)
-    dagger_monoidality_monoidal = ClosedCategory.dagger_monoidality.weaken(
-        within=MonoidalCategory)
-    currying_symmetry = ClosedCategory.currying_symmetry.failing(
-        messages.FREE_CURRY)
 
     def to_term(self) -> Term:
         """
@@ -398,30 +440,107 @@ class Box(markov.Box, biclosed.Box, Diagram):
     is_linear = True
 
 
-class Eval(biclosed.Eval, Box):
+class Timed(Box):
+    """
+    A closed box built from arguments rather than a name and a boundary,
+    with a time step of its own: delayed, it keeps its arguments and delays
+    its boundary, as the delay is not a closed functor. E.g. the delay of
+    the evaluation of ``x << y`` evaluates ``(x << y).delay()`` at
+    ``y.delay()`` into ``x.delay()``, where ``x.delay() << y.delay()`` is
+    another exponential.
+
+    Parameters:
+        args : The arguments of the box at time step zero.
+        time_step : The number of times the box has been delayed.
+
+    Example
+    -------
+    >>> x, y = Ty('x'), Ty('y')
+    >>> ev = Eval(x << y, left=True).delay()
+    >>> assert ev.dom == (x << y).delay() @ y.delay() and ev.cod == x.d
+    >>> assert ev.x == x << y and ev == Eval(x << y, True, time_step=1)
+    """
+    def __init__(self, *args, time_step: int = 0, **params):
+        super().__init__(*args, **params)
+        if time_step:
+            self._time_step = time_step
+            monoidal.Box.__init__(self, self.name, self.dom.delay(time_step),
+                                  self.cod.delay(time_step))
+
+    def delay(self, n_steps=1):
+        return type(self)(
+            *self.__getnewargs__(), time_step=self.time_step + n_steps)
+
+    def dagger(self):
+        return super().dagger().delay(self.time_step)
+
+    def repr_time_step(self) -> str:
+        """ The keyword of the time step, as :meth:`__repr__` reads it. """
+        return f", time_step={self.time_step}" if self.time_step else ""
+
+    def __repr__(self):
+        return super().__repr__()[:-1] + self.repr_time_step() + ")"
+
+    def to_tree(self):
+        tree = super().to_tree()
+        if self.time_step:
+            tree['time_step'] = self.time_step
+        return tree
+
+    @classmethod
+    def from_tree(cls, tree):
+        return super().from_tree(tree).delay(tree.get('time_step', 0))
+
+
+class Eval(Timed, biclosed.Eval, Box):
     "The evaluation of an exponential type."
     drawing_name = "__call__"
 
+    def __getnewargs__(self):
+        """ The arguments of the constructor, which a delay reads. """
+        return self.x, self.left
 
-class Coeval(biclosed.Coeval, Box):
+
+class Coeval(Timed, biclosed.Coeval, Box):
     "The coevaluation of an exponential type, i.e. the dagger of an Eval."
+    __getnewargs__ = Eval.__getnewargs__
 
 
-class Curry(biclosed.Curry, Box):
+class Curry(Timed, biclosed.Curry, Box):
     "The currying of a closed diagram, linear when its argument is."
 
     @property
     def is_linear(self):
         return self.arg.is_linear
 
+    def __getnewargs__(self):
+        """ The arguments of the constructor, which a delay reads. """
+        return self.arg, self.n, self.left
 
-class Pack(Box):
+    def __str__(self):
+        return self.name + feedback.str_delayed(self.time_step)
+
+    def to_drawing(self):
+        """
+        A curry is drawn as in :meth:`biclosed.Curry.to_drawing`, and a
+        delayed curry as the delay of its argument followed by the delay of
+        the coevaluation, traced over the delayed wires it curries.
+        """
+        if not self.time_step:
+            return super().to_drawing()
+        coeval = self.coeval_factory(self.reset().cod, left=self.left)
+        return (self.arg >> coeval).delay(self.time_step).to_drawing()\
+            .trace(self.n, left=not self.left)
+
+
+class Pack(Timed):
     """
     The canonical isomorphism from the tensor of the factors of a
     :class:`Product` type to the product itself.
 
     Parameters:
         cod : The product type to pack into.
+        time_step : The number of times the packing has been delayed.
 
     Example
     -------
@@ -429,34 +548,48 @@ class Pack(Box):
     >>> assert Pack(X * Y).dom == X @ Y and Pack(X * Y).cod == X * Y
     >>> assert Pack(X * Y).dagger() == Unpack(X * Y)
     """
-    def __init__(self, cod: biclosed.Ty):
+    side = "cod"
+
+    def __init__(self, cod: Ty, time_step: int = 0):
         if not cod.is_product:
             raise TypeError(f"Expected {Product}, got {cod!r}")
         dom = self.ob().tensor(*cod.factors)
-        super().__init__(f"Pack({cod})", dom, cod)
+        super().__init__(f"Pack({cod})", dom, cod, time_step=time_step)
+
+    def __getnewargs__(self):
+        """ The product type at time step zero, which a delay reads. """
+        product = getattr(self, self.side)
+        return (product.delay(-self.time_step), )
 
     def dagger(self):
-        return Unpack(self.cod)
+        return Unpack(*self.__getnewargs__(), time_step=self.time_step)
 
     def __repr__(self):
-        return factory_name(type(self)) + f"({self.cod!r})"
+        product, = self.__getnewargs__()
+        return factory_name(type(self))\
+            + f"({product!r}{self.repr_time_step()})"
 
     def to_tree(self):
-        return {'factory': factory_name(type(self)),
-                'cod': self.cod.to_tree()}
+        product, = self.__getnewargs__()
+        tree = {'factory': factory_name(type(self)),
+                self.side: product.to_tree()}
+        if self.time_step:
+            tree['time_step'] = self.time_step
+        return tree
 
     @classmethod
     def from_tree(cls, tree):
-        return cls(from_tree(tree['cod']))
+        return cls(from_tree(tree[cls.side]), tree.get('time_step', 0))
 
 
-class Unpack(Box):
+class Unpack(Timed):
     """
     The canonical isomorphism from a :class:`Product` type to the tensor of
     its factors, i.e. the dagger of :class:`Pack`.
 
     Parameters:
         dom : The product type to unpack.
+        time_step : The number of times the unpacking has been delayed.
 
     Example
     -------
@@ -464,25 +597,19 @@ class Unpack(Box):
     >>> assert Unpack(X * Y).dom == X * Y and Unpack(X * Y).cod == X @ Y
     >>> assert Unpack(X * Y).dagger() == Pack(X * Y)
     """
-    def __init__(self, dom: biclosed.Ty):
+    side = "dom"
+
+    def __init__(self, dom: Ty, time_step: int = 0):
         if not dom.is_product:
             raise TypeError(f"Expected {Product}, got {dom!r}")
         cod = self.ob().tensor(*dom.factors)
-        super().__init__(f"Unpack({dom})", dom, cod)
+        super().__init__(f"Unpack({dom})", dom, cod, time_step=time_step)
 
     def dagger(self):
-        return Pack(self.dom)
+        return Pack(*self.__getnewargs__(), time_step=self.time_step)
 
-    def __repr__(self):
-        return factory_name(type(self)) + f"({self.dom!r})"
-
-    def to_tree(self):
-        return {'factory': factory_name(type(self)),
-                'dom': self.dom.to_tree()}
-
-    @classmethod
-    def from_tree(cls, tree):
-        return cls(from_tree(tree['dom']))
+    __getnewargs__, __repr__ = Pack.__getnewargs__, Pack.__repr__
+    to_tree, from_tree = Pack.to_tree, classmethod(Pack.from_tree.__func__)
 
 
 class Permutation(markov.Permutation, Box):
@@ -493,14 +620,6 @@ class Swap(Permutation, markov.Swap, Box):
     "Symmetric swap in a closed diagram."
 
 
-class Trace(markov.Trace, Box):
-    "A trace in a closed category, linear when its argument is."
-
-    @property
-    def is_linear(self):
-        return self.arg.is_linear
-
-
 class Copy(markov.Copy, Box):
     "A markov copy in a closed category"
 
@@ -509,18 +628,6 @@ class Copy(markov.Copy, Box):
 
 class Discard(markov.Discard, Copy):
     "A markov discard in a closed category."
-
-
-class Merge(markov.Merge, Box):
-    """
-    A markov merge in a closed category, the dagger of a copy.
-
-    >>> x = Ty('x')
-    >>> assert Copy(x).dagger() == Merge(x)
-    >>> assert Diagram.discard(x).dagger().dagger() == Discard(x)
-    """
-
-    is_linear = False
 
 
 class Sum(markov.Sum, biclosed.Sum, Box):
@@ -558,6 +665,8 @@ class Functor(biclosed.Functor, markov.Functor):
     def __call__(self, other):
         if self.cod is Drawing:
             return super().__call__(other)
+        if isinstance(other, (Wire, Box)) and other.time_step:
+            return feedback.Functor.__call__(self, other)
         if isinstance(other, Product):
             if hasattr(self.cod.ob, "product"):
                 return self.cod.ob(self.cod.ob.product_factory(
@@ -577,18 +686,20 @@ class Functor(biclosed.Functor, markov.Functor):
 CMap = cmap.CMap[Diagram]
 
 
-Diagram.box_factory = Box
 Diagram.functor_factory = Functor
 Hypergraph = hypergraph.Hypergraph[Diagram]
-Diagram.copy_factory, Diagram.merge_factory = Copy, Merge
+Diagram.copy_factory = Copy
 Diagram.swap_factory = Swap
 Diagram.permutation_factory = Permutation
+Feedback, Trace, FollowedBy, Head, Tail = feedback.generators(Diagram, Box)
+Feedback.is_linear = Head.is_linear = Tail.is_linear = property(
+    lambda self: self.arg.is_linear)
+Diagram.box_factory = Box
 Diagram.pack_factory = Pack
 Diagram.unpack_factory = Unpack
 Diagram.curry_factory = Curry
 Diagram.eval_factory = Eval
 Diagram.coeval_factory = Coeval
-Diagram.trace_factory = Trace
 Diagram.discard_factory = Discard
 Diagram.sum_factory = Sum
 Ty.exp_factory = Ty.under_factory = Ty.over_factory = staticmethod(Exp)
@@ -625,7 +736,7 @@ class TermBase(Box, biclosed.TermBase):
         args = (other, self) if left else (self, other)
         return self.cod.application_factory(*args)
 
-    def compose(self, *others: Term) -> biclosed.TermBase:
+    def compose(self, *others: Term) -> Term:
         """
         The composition of terms of function types: ``t.compose(u)`` for
         ``t : x >> y`` and ``u : y >> z`` is ``x(lambda v: u(t(v)))``, i.e.
@@ -685,13 +796,12 @@ class TermBase(Box, biclosed.TermBase):
             [context.index(x) for x in self.freevars + unused],
             [functor(x.cod) for x in context])
         if not unused:
-            return permutation  # ty: ignore[invalid-return-type]
+            return permutation
         discard = functor.cod.discard(functor(
             self.ob().tensor(*[x.cod for x in unused])))
         return permutation >> functor.cod.id(functor(self.dom)) @ discard
 
-    def share(self, functor: Functor,
-              *contexts: list[biclosed.Variable]) -> Diagram:
+    def share(self, functor: Functor, *contexts: list[Variable]) -> Diagram:
         """
         The structural morphism from the image of the free variables of the
         term to that of the concatenation of ``contexts``, copying each
@@ -730,8 +840,7 @@ class TermBase(Box, biclosed.TermBase):
         :class:`Unpack`.
         """
         functor = functor or self.functor
-        result = self.eval(
-            functor, context)  # ty: ignore[too-many-positional-arguments]
+        result = self.eval(functor, context)
         return result >> functor(Unpack(self.cod))\
             if self.cod.is_product else result
 
@@ -740,13 +849,13 @@ class TermBase(Box, biclosed.TermBase):
         # pylint: disable=unused-argument  # a constant has no variable
         return 0
 
-    def substitute(self, substitution: Substitution) -> Self:
+    def substitute(self, substitution: Substitution) -> Term:
         "The term with the free variables of a substitution replaced."
         # pylint: disable=unused-argument  # a constant has no variable
         return self
 
     @classmethod
-    def from_biclosed(cls, term: biclosed.TermBase) -> Term:
+    def from_biclosed(cls, term: biclosed.Term) -> Term:
         """
         Translate a biclosed term into a closed term, dropping planarity by
         collapsing left and right exponentials and applications.
@@ -772,17 +881,6 @@ class TermBase(Box, biclosed.TermBase):
             ar_map=lambda c: cls.ob.constant_factory(c.name, functor(c.cod)),
             dom=biclosed.Diagram, cod=cls.functor.cod)
         return functor(term)
-
-    @classmethod
-    def strategy(cls, **params):
-        """
-        Generate closed terms, which need not be linear, see
-        :meth:`generate`.
-
-        Parameters:
-            params : Passed to :meth:`biclosed.TermBase.shapes`.
-        """
-        return super().strategy(**params)
 
     @classmethod
     def generate(cls, cod, choices, types, letters):
@@ -829,7 +927,7 @@ class TermBase(Box, biclosed.TermBase):
         >>> assert two(X(lambda x: x))(x).reduce(budget=1) is None
         """
         return (strategy or self.strategy_factory)(budget)(
-            self, tuple(self.freevars))  # ty: ignore[invalid-argument-type]
+            self, tuple(self.freevars))
 
     def normal_form(self, budget: int | None = None,
                     strategy: type[Strategy] | None = None) -> Term:
@@ -867,6 +965,14 @@ type Term = Constant | Variable | Application | Abstraction\
     | Tuple | Projection | Let
 
 
+for law in ("copy_coassociativity", "copy_cocommutativity",
+            "copy_counitality", "copy_coherence", "vanishing", "joining",
+            "strength", "tightening", "sliding", "yanking",
+            "trace_uniformity", "trace_uniformity_written"):
+    setattr(TermBase, law, getattr(Box, law).inapplicable(
+        messages.TERM_IS_A_BOX))
+
+
 class Constant(TermBase, biclosed.Constant):
     """
     A constant term, evaluated in a context by discarding it. It prints as
@@ -876,6 +982,19 @@ class Constant(TermBase, biclosed.Constant):
     """
     def __str__(self):
         return self.name
+
+    def delay(self, n_steps=1):
+        """
+        The constant of the delayed type, as a constant is a state of its
+        type, e.g. the delay of the evaluation of a constant is the
+        evaluation of the delayed constant.
+
+        >>> x = Ty('x')
+        >>> assert x('a').delay() == x.delay()('a')
+        >>> assert x('a').eval().delay() == x.delay()('a').eval()
+        """
+        return type(self)(self.name, self.cod.delay(n_steps),
+                          data=self.data, is_dagger=self.is_dagger)
 
     def eval(self, functor=None, context=None):
         functor = functor or self.functor
@@ -903,9 +1022,6 @@ class Application(TermBase, biclosed.Application):
         overlap : The variables free in both ``func`` and ``args``, which
             :meth:`eval` copies.
     """
-    func: Term
-    args: Term
-
     def __init__(self, func: Term, args: Term, left: bool = False):
         # pylint: disable=unused-argument  # a closed category is symmetric
         biclosed.Application.__init__(self, func, args)
@@ -944,9 +1060,6 @@ class Abstraction(TermBase, biclosed.Abstraction):
     The abstraction ``var.cod(lambda var: body)`` of a variable in a term,
     which need not occur in it or may occur several times.
     """
-    var: Variable
-    body: Term
-
     def __init__(self, var: Variable, body: Term, left: bool = False):
         # pylint: disable=unused-argument  # a closed category is symmetric
         biclosed.Abstraction.__init__(self, var, body)
@@ -990,7 +1103,7 @@ class Compound(TermBase):
         dom : The domain of the term, i.e. the types of its free variables.
         cod : The codomain of the term.
     """
-    def __init__(self, dom: biclosed.Ty, cod: biclosed.Ty):
+    def __init__(self, dom: Ty, cod: Ty):
         super().__init__(type(self).__name__, dom, cod)
         del self.name
 
@@ -1240,7 +1353,7 @@ class Let(Compound):
         return f"let({self.expression}, lambda{params}: {self.body})"
 
     @property
-    def rest(self) -> list[biclosed.Variable]:
+    def rest(self) -> list[Variable]:
         "The free variables of the body that the statement does not bind."
         return [x for x in self.freevars if x in self.body.freevars]
 
@@ -1517,7 +1630,7 @@ class BohmTree:
             result = result(self[i].to_term(len(self.variables)))
         for var in reversed(self.variables[n:]):
             result = var.cod.abstraction_factory(var, result)
-        return result  # ty: ignore[invalid-return-type]
+        return result
 
     def __repr__(self):
         return factory_name(type(self)) + (
@@ -1543,8 +1656,8 @@ class Strategy:
     """
     budget: int | None = None
 
-    def __call__(self, term: Term, variables: tuple[Variable, ...] = ()
-                 ) -> BohmTree | None:
+    def __call__(self, term: Term,
+                 variables=()) -> BohmTree | None:
         """
         The head normal form of a term in a scope of variables as a
         :class:`BohmTree` with its arguments left lazy, or ``None`` when the
@@ -1555,8 +1668,7 @@ class Strategy:
             variables : The variables in scope, i.e. the free variables of
                 the term followed by the ones bound by its parents.
         """
-        scope: list[Variable] = list(variables)
-        spine = []
+        variables, spine = list(variables), []
         while isinstance(term, (Application, Abstraction)):
             if isinstance(term, Application):
                 spine.append(term.args)
@@ -1566,17 +1678,15 @@ class Strategy:
                     return None
                 term = Substitution({term.var: spine.pop()})(term.body)
             else:
-                scope.append(term.var)
+                variables.append(term.var)
                 term = term.body
         assert_isinstance(term, Variable)
-        index = scope[::-1].index(term)  # ty: ignore[invalid-argument-type]
-        head = len(scope) - 1 - index
+        head = len(variables) - 1 - variables[::-1].index(term)
         cod = term.cod
         for _ in spine:
             cod = cod.base
         return BohmTree(
-            cod,  # ty: ignore[invalid-argument-type]
-            tuple(scope), head, self, tuple(reversed(spine)))
+            cod, tuple(variables), head, self, tuple(reversed(spine)))
 
     def spend(self) -> bool:
         "Take one beta redex from the budget, or return ``False``."
@@ -1648,10 +1758,6 @@ Ty.application_factory = Application
 Ty.abstraction_factory = Abstraction
 Ty.product_factory = Product
 TermBase.strategy_factory = LeftmostOutermost
-
-for law in sorted(set(Box.axioms) - set(Serialisable.axioms)):
-    setattr(TermBase, law, getattr(Box, law).inapplicable(
-        "A term is a box: the laws of its category are the diagram's."))
 
 
 class Equation(markov.Equation):

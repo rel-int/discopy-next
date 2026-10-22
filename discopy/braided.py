@@ -59,9 +59,8 @@ The hexagon equations hold on the nose.
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import ClassVar
 
-from discopy import monoidal, messages
+from discopy import monoidal
 from discopy.abc import BraidedCategory
 from discopy.cat import factory
 from discopy.monoidal import Ty, Match
@@ -91,17 +90,6 @@ class Diagram(monoidal.Diagram, BraidedCategory):
         dom (monoidal.Ty) : The domain of the diagram, i.e. its input.
         cod (monoidal.Ty) : The codomain of the diagram, i.e. its output.
     """
-    braid_naturality = BraidedCategory.braid_naturality.failing(
-        messages.NO_BRAID_GROUP)
-    braid_then_inverse = BraidedCategory.braid_then_inverse.failing(
-        messages.NO_BRAID_GROUP)
-    inverse_then_braid = BraidedCategory.inverse_then_braid.failing(
-        messages.NO_BRAID_GROUP)
-
-    box_factory: ClassVar[type["Box"]]
-    braid_factory: ClassVar[type["Braid"]]
-    functor_factory: ClassVar[type["Functor"]]
-    sum_factory: ClassVar[type["Sum"]]
 
     @classmethod
     def braid(cls, left: monoidal.Ty, right: monoidal.Ty) -> Diagram:
@@ -170,10 +158,7 @@ class Diagram(monoidal.Diagram, BraidedCategory):
                       below=self[i + len(source):] if down else self[i + 1:],
                       left=left_wires[:-1] if left else left_wires,
                       right=right_wires if left else right_wires[1:])
-        return match.substitute(target)  # ty: ignore[invalid-return-type]
-
-    hypergraph_section = monoidal.Diagram.hypergraph_section.failing(
-        messages.SECTION_NEEDS_SWAPS)
+        return match.substitute(target)
 
 
 class Box(monoidal.Box, Diagram):
@@ -210,6 +195,11 @@ class Braid(BinaryBoxConstructor, Box):
         Box.__init__(
             self, name, dom, cod, is_dagger=is_dagger, draw_as_braid=True)
         BinaryBoxConstructor.__init__(self, left, right)
+
+    def __getnewargs__(self):
+        """ The arguments of the constructor, which a pickle and a delay read.
+        """
+        return self.left, self.right, self.is_dagger
 
     def __repr__(self):
         str_is_dagger = ", is_dagger=True" if self.is_dagger else ""

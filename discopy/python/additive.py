@@ -16,19 +16,21 @@ Summary
 
 from __future__ import annotations
 
+from bisect import bisect_right
 from functools import cache
 from itertools import accumulate
 from typing import Self
 
-from discopy.abc import SymmetricCategory
+from discopy.abc import ComarkovCategory, TracedCategory
 from discopy.utils import assert_isinstance
 from discopy.python import finset, function
 from discopy.python.function import Ty
 
 
-class Function(function.Function, SymmetricCategory):
+class Function(function.Function, ComarkovCategory, TracedCategory):
     """
-    Python functions with disjoint union as tensor.
+    Python functions with disjoint union as tensor: a comarkov category,
+    whose merge is the codiagonal and whose noise is the empty function.
 
     Parameters:
         inside : The callable Python object inside the function.
@@ -42,6 +44,8 @@ class Function(function.Function, SymmetricCategory):
             tensor
             swap
             trace
+            merge
+            noise
     """
 
     def __init__(self, inside, dom, cod, is_swap_of=None):
@@ -57,24 +61,32 @@ class Function(function.Function, SymmetricCategory):
             assert_isinstance(obj, self.cod.inside[tag])
         return result
 
-    def tensor(self, other: Function) -> Function:
+    def tensor(self, *others: Function) -> Function:
         """
-        The disjoint union of two functions, called with :code:`@`.
+        The disjoint union of ``n`` functions, called with :code:`@`.
 
         Parameters:
-            other : The other function to compose in sequence.
+            others : The other functions to take the disjoint union with.
+
+        Example
+        -------
+        >>> f = Function(lambda x: -x, (int, ), (int, ))
+        >>> assert f.tensor(f, f)(1, 2) == (-1, 2)
         """
-        dom, cod = self.dom @ other.dom, self.cod @ other.cod
+        if not others:
+            return self
+        factors = (self, ) + others
+        doms = [0, *accumulate(len(factor.dom) for factor in factors)]
+        cods = [0, *accumulate(len(factor.cod) for factor in factors)]
+        dom = self.dom.tensor(*(other.dom for other in others))
+        cod = self.cod.tensor(*(other.cod for other in others))
 
         def inside(obj, tag=0):
-            if tag < len(self.dom):
-                result = self(obj, tag)
-                obj, tag = (result, 0) if len(self.cod) == 1 else result
-            else:
-                result = other(obj, tag - len(self.dom))
-                obj, tag = (result, 0) if len(other.cod) == 1 else result
-                tag += len(self.cod)
-            return obj if len(cod) == 1 else (obj, tag)
+            i = bisect_right(doms, tag) - 1
+            factor = factors[i]
+            result = factor(obj, tag - doms[i])
+            obj, tag = (result, 0) if len(factor.cod) == 1 else result
+            return obj if len(cod) == 1 else (obj, tag + cods[i])
         return Function(inside, dom, cod)
 
     @staticmethod
@@ -164,6 +176,6 @@ class Function(function.Function, SymmetricCategory):
         return Function(inside, x ** n, x)
 
 
-Swap = Function.braid = Function.swap  # ty: ignore[invalid-assignment]
+Swap = Function.braid = Function.swap
 Id = Function.twist = Function.id
-Merge = Function.merge
+Merge, Noise = Function.merge, Function.noise

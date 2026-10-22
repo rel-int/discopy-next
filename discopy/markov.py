@@ -17,6 +17,11 @@ Summary
     Swap
     Permutation
     Copy
+    Feedback
+    Trace
+    FollowedBy
+    Head
+    Tail
     Functor
 
 
@@ -25,21 +30,7 @@ Axioms
 
 >>> x = Ty('x')
 
->>> copy, merge = Copy(x), Merge(x)
->>> unit, delete = Merge(x, n=0), Copy(x, n=0)
-
-Commutative monoid
-==================
-
->>> unitality = Equation(unit @ x >> merge, Id(x), x @ unit >> merge)
->>> associativity = Equation(merge @ x >> merge, x @ merge >> merge)
->>> commutativity = Equation(Swap(x, x) >> merge, merge)
->>> assert unitality and associativity and commutativity
->>> Equation(unitality, associativity, commutativity, symbol='').draw(
-...     doctest="docs/_static/frobenius/monoid.svg")
-
-.. image:: /_static/frobenius/monoid.svg
-    :align: center
+>>> copy, delete = Copy(x), Copy(x, n=0)
 
 Cocommutative comonoid
 ======================
@@ -60,27 +51,30 @@ Coherence
 >>> assert Equation(Diagram.copy(x @ x, n=0), delete @ delete)
 >>> assert Equation(Diagram.copy(x @ x),
 ...     copy @ copy >> x @ Swap(x, x) @ x)
->>> assert Equation(Diagram.merge(x @ x, n=0), unit @ unit)
->>> assert Equation(Diagram.merge(x @ x),
-...     x @ Swap(x, x) @ x >> merge @ merge)
 
 Note
 ----
 Equality of Markov diagrams is computed by translation to hypergraph.
-Both copy and merge boxes are translated to spiders, thus when they appear
-in the same diagram they automatically satisfy the :mod:`frobenius` axioms.
+Copy boxes are translated to spiders, thus when they appear in the same
+diagram as the merge boxes of :mod:`comarkov` they automatically satisfy
+the :mod:`frobenius` axioms.
 """
 
+from __future__ import annotations
 
+import warnings
 from typing import TYPE_CHECKING, Callable, ClassVar, Self
 
-from discopy import axioms, symmetric, monoidal, cmap, hypergraph, messages
-from discopy.abc import HypergraphCategory, MarkovCategory
-from discopy.axioms import FUEL, Testable, axiom
+from discopy import (
+    axioms, symmetric, monoidal, feedback, cmap, hypergraph, messages)
+from discopy.abc import ComarkovCategory, HypergraphCategory, MarkovCategory
+from discopy.axioms import Testable, axiom
 from discopy.cat import factory
-from discopy.monoidal import Ty  # noqa: F401  pylint: disable=unused-import
+from discopy.feedback import (  # noqa: F401  pylint: disable=unused-import
+    Wire, Ty)
 from discopy.utils import (
-    NamedGeneric, assert_isatomic, factory_name, from_tree)
+    AxiomError, NamedGeneric, assert_isatomic, deprecated_alias,
+    factory_name, from_tree)
 
 if TYPE_CHECKING:
     from hypothesis import strategies as st
@@ -89,7 +83,7 @@ if TYPE_CHECKING:
 Layer = symmetric.Layer
 
 
-class Square[factory](Testable, NamedGeneric, tuple):
+class Square(Testable, NamedGeneric["factory"], tuple):
     """
     A commuting square ``f >> B @ h == A @ h >> g`` of the ``factory``, a
     traced Markov category that is not a hypergraph one, along a strict map
@@ -110,7 +104,7 @@ class Square[factory](Testable, NamedGeneric, tuple):
     >>> from hypothesis import find
     >>> f, h, g = find(Square[Diagram].strategy(), lambda s: s[0].boxes)
     >>> A, B = f.dom[:-1], f.cod[:-1]
-    >>> assert Diagram.equation_factory(f >> B @ h, A @ h >> g)
+    >>> assert Equation(f >> B @ h, A @ h >> g)
     >>> assert h.is_strict
     """
     def __new__(cls, square):
@@ -154,18 +148,8 @@ class Square[factory](Testable, NamedGeneric, tuple):
             ar_map=lambda box: read(box) >> box >> write(box), cod=category)
 
     @classmethod
-    def canonical(cls) -> "Square":
-        """
-        The square of a box ``f : A @ M -> B @ M`` along ``copy(M)``.
-        """
-        category = cls.factory
-        A, B, M = map(category.ob, "ABM")
-        f = category.box_factory("f", A @ M, B @ M)
-        return cls((f, category.copy(M), cls.double(M, 2)(f)))
-
-    @classmethod
     def strategy(cls, *, written=False, **params
-                 ) -> "st.SearchStrategy[Square]":
+                 ) -> st.SearchStrategy[Square]:
         """
         Generate a commuting square along the copy of a memory.
 
@@ -184,7 +168,8 @@ class Square[factory](Testable, NamedGeneric, tuple):
 
         @st.composite
         def squares(draw):
-            mem, n = draw(category.ob.generators()), draw(st.integers(2, 3))
+            atoms = category.ob.generator_factory.strategy().map(category.ob)
+            mem, n = draw(atoms), draw(st.integers(2, 3))
             reads = {}
             functor = cls.double(mem, n, reads)
             types = category.ob.strategy().filter(lambda ty: all(
@@ -241,41 +226,35 @@ class Diagram(symmetric.Diagram, MarkovCategory):
     ...     doctest="docs/_static/markov/copy_and_apply.svg")
 
     .. image:: /_static/markov/copy_and_apply.svg
-    """
-    box_factory: ClassVar[type["Box"]]
-    functor_factory: ClassVar[type["Functor"]]
-    copy_factory: ClassVar[type["Copy"]]
-    merge_factory: ClassVar[type["Merge"]]
-    swap_factory: ClassVar[type["Swap"]]
-    permutation_factory: ClassVar[type["Permutation"]]
-    trace_factory: ClassVar[type["Trace"]]
-    discard_factory: ClassVar[type["Discard"]]
-    sum_factory: ClassVar[type["Sum"]]
 
-    @classmethod
-    def sample(cls, *, dom=None, cod=None, fuel=FUEL):
-        """
-        Sample Markov diagrams through their quotient: a hypergraph drawn
-        by :meth:`discopy.hypergraph.Hypergraph.strategy` with at most
-        ``fuel + 1`` boxes, besides the one balancing box that may close its
-        boundary, and the spiders that the category supports, i.e.
-        copies and discards here and every spider in a hypergraph category,
-        downgraded with :meth:`discopy.hypergraph.Hypergraph.to_diagram`.
-        """
-        category = hypergraph.Hypergraph[cls]  # ty: ignore[invalid-type-form]
-        return category.strategy(
-            dom=dom, cod=cod, max_leaves=fuel + 1).map(
-                lambda graph: graph.to_diagram())
+    Note
+    ----
+    A Markov diagram is a feedback diagram whose wires carry a time step, so
+    that it is the syntax of streams, see :mod:`discopy.stream`.
+
+    >>> x = Ty('x')
+    >>> zero = Box('0', Ty(), x.head)
+    >>> rand = Box('rand', Ty(), x)
+    >>> plus = Box('+', x @ x, x)
+    >>> walk = (rand.delay() @ x.delay() >> zero @ plus.delay()
+    ...         >> FollowedBy(x) >> Copy(x)).feedback()
+    >>> walk.draw(doctest="docs/_static/feedback/feedback-random-walk.svg")
+
+    .. image:: /_static/feedback/feedback-random-walk.svg
+        :align: center
+    """
+    copy_factory: ClassVar[type["Copy"]]
+    discard_factory: ClassVar[type["Discard"]]
 
     @classmethod
     def spider_factory(cls, n_legs_in, n_legs_out, typ, phase=None):
-        if phase is not None or 1 not in (n_legs_in, n_legs_out):
-            raise ValueError
-        return cls.copy_factory(typ, n_legs_out) if n_legs_in == 1\
-            else cls.merge_factory(typ, n_legs_in)
+        if phase is not None or n_legs_in != 1:
+            raise ValueError(messages.NO_SUCH_SPIDER.format(
+                factory_name(cls), "copies"))
+        return cls.copy_factory(typ, n_legs_out)
 
     @classmethod
-    def copy(cls, x: monoidal.Ty, n=2) -> "Diagram":
+    def copy(cls, x: monoidal.Ty, n=2) -> Diagram:
         """
         Make :code:`n` copies of a given type :code:`x`.
 
@@ -284,29 +263,37 @@ class Diagram(symmetric.Diagram, MarkovCategory):
             n : The number of copies.
         """
         from discopy import frobenius
-        return frobenius.Diagram.spiders.__func__(
-            cls, 1, n, x)  # ty: ignore[invalid-argument-type]
+        return frobenius.Diagram.spiders.__func__(cls, 1, n, x)
 
     @classmethod
-    def merge(cls, x: monoidal.Ty, n=2) -> "Diagram":
+    def discard(cls, x: monoidal.Ty) -> Diagram:
         """
-        Merge :code:`n` copies of a given type :code:`x`.
-
-        Parameters:
-            x : The type to copy.
-            n : The number of copies.
-        """
-        return cls.copy(x, n).dagger()
-
-    @classmethod
-    def discard(cls, x: monoidal.Ty) -> "Diagram":
-        """
-        The discard of an atomic type :code:`x`.
+        The discard of a type :code:`x`, i.e. no copy of it at all.
 
         Parameters:
             x : The type to discard.
         """
         return cls.copy(x, 0)
+
+    @classmethod
+    def merge(cls, x: monoidal.Ty, n=2) -> Diagram:
+        """
+        Deprecated: a Markov diagram has no merge, see
+        :meth:`discopy.comarkov.Diagram.merge`, which a diagram that is
+        also comarkov, e.g. :class:`discopy.frobenius.Diagram`, inherits.
+
+        Parameters:
+            x : The type to merge.
+            n : The number of copies.
+        """
+        if issubclass(cls, ComarkovCategory):
+            return super().merge(x, n)
+        warnings.warn(
+            f"{factory_name(cls)}.merge is deprecated, "
+            "use discopy.comarkov.Diagram.merge instead.",
+            DeprecationWarning, stacklevel=2)
+        from discopy import comarkov
+        return comarkov.Diagram.merge(x, n)
 
     @property
     def is_deterministic(self) -> bool:
@@ -328,7 +315,9 @@ class Diagram(symmetric.Diagram, MarkovCategory):
         affine, see :class:`Box`.
 
         >>> x = Ty('x')
-        >>> assert Copy(x).is_affine and not Merge(x).is_affine
+        >>> condition = Box('condition', x, Ty(), is_affine=False)
+        >>> assert Copy(x).is_affine
+        >>> assert not (Copy(x) >> condition @ x).is_affine
         """
         return all(box.is_affine for box in self.boxes)
 
@@ -340,21 +329,21 @@ class Diagram(symmetric.Diagram, MarkovCategory):
         """
         return self.is_deterministic and self.is_affine
 
-    map_agreement = monoidal.Diagram.map_agreement.failing(
-        messages.MAP_HAS_NO_SPIDERS)
-
     @axiom
     def trace_uniformity(cls, square: Square[Self]) -> axioms.Equation:
         """
         The trace is uniform along a strict map: if ``f >> B @ h`` equals
         ``A @ h >> g`` then ``f.trace()`` equals ``g.trace()``, the premise
         holding by construction of the :class:`Square`, as composability
-        does by construction of the premises of associativity.
+        does by construction of the premises of associativity. Both sides
+        are compared up to hypergraph, where the trace is wiring.
         """
         f, h, g = square
         return cls.equation_factory(
             f.trace(len(h.dom)), g.trace(len(h.cod)))
 
+    trace_uniformity = trace_uniformity.modulo(
+        symmetric.Diagram.to_hypergraph)
     trace_uniformity_written = trace_uniformity.weaken(written=True)
     trace_uniformity = trace_uniformity.failing(messages.NOT_UNIFORM)
 
@@ -389,8 +378,8 @@ class Box(symmetric.Box, Diagram):
     >>> sample = Box('sample', p, x, is_deterministic=False)
     >>> assert sample != Box('sample', p, x)
     >>> sample
-    markov.Box('sample', monoidal.Ty(cat.Ob('p')), monoidal.Ty(cat.Ob('x')), \
-is_deterministic=False)
+    markov.Box('sample', feedback.Ty(feedback.Wire('p')), \
+feedback.Ty(feedback.Wire('x')), is_deterministic=False)
     >>> assert not sample.dagger().dagger().is_deterministic
 
     >>> f = Box('f', p, x)
@@ -437,7 +426,7 @@ is_deterministic=False)
         """
         return super().setoid() + (self.deterministic, self.affine)
 
-    def flagged(self, other: "Box") -> "Box":
+    def flagged(self, other: Box) -> Box:
         """
         Give a box built from this one the flags declared of this one, as
         :meth:`dagger`, :meth:`subs` and :meth:`lambdify` do on top of those
@@ -447,10 +436,10 @@ is_deterministic=False)
         other.deterministic, other.affine = self.deterministic, self.affine
         return other
 
-    def dagger(self) -> "Box":
+    def dagger(self) -> Box:
         return self.flagged(super().dagger())
 
-    def subs(self, *args) -> "Box":
+    def subs(self, *args) -> Box:
         """
         Substitute a variable in the data of a box, keeping its flags.
 
@@ -505,20 +494,6 @@ class Swap(Permutation, symmetric.Swap, Box):
     """
 
 
-class Trace(symmetric.Trace, Box):
-    """
-    A trace in a Markov category.
-
-    Parameters:
-        arg : The diagram to trace.
-        left : Whether to trace the wires on the left or right.
-
-    See also
-    --------
-    :meth:`Diagram.trace`
-    """
-
-
 class Copy(Box):
     """
     The copy of an atomic type :code:`x` some :code:`n` number of times.
@@ -541,81 +516,39 @@ class Copy(Box):
             cls.discard_factory.__new__(cls.discard_factory, x)
 
     def __getnewargs__(self):
-        """ The arguments of :meth:`__new__`, which a pickle needs. """
+        """
+        The arguments of :meth:`__new__`, which a pickle needs.
+
+        >>> from pickle import dumps, loads
+        >>> x = Ty('x')
+        >>> assert loads(dumps(Copy(x))) == Copy(x)
+        >>> assert loads(dumps(Discard(x))) == Discard(x)
+        """
         return self.dom, len(self.cod)
 
-    def dagger(self) -> "Merge":
+    def dagger(self) -> Diagram:
         """
-        The merge of the same type, in the category of the copy.
+        The merge of the same type, when the category is also comarkov.
 
-        >>> x = Ty('x')
-        >>> assert Copy(x).dagger() == Merge(x)
-        >>> assert Diagram.discard(x).dagger().dagger() == Discard(x)
+        >>> from discopy import closed
+        >>> closed.Copy(closed.Ty('x')).dagger()
+        Traceback (most recent call last):
+            ...
+        discopy.utils.AxiomError: Copy(x) has no dagger: closed.Diagram \
+is not a dagger category.
         """
-        return self.merge_factory(self.dom, len(self.cod))
+        if not issubclass(self.ar, ComarkovCategory):
+            raise AxiomError(messages.NOT_A_DAGGER.format(
+                self, factory_name(self.ar)))
+        return self.ar.merge_factory(self.dom, len(self.cod))
 
     def __repr__(self):
         return (
             factory_name(type(self)) + f"({repr(self.dom)}, {len(self.cod)})")
 
-    def to_tree(self) -> dict:
-        """
-        Serialise a copy by its type and number of copies.
-
-        >>> from discopy.utils import dumps, loads
-        >>> x = Ty('x')
-        >>> for box in (Copy(x), Copy(x, 3), Discard(x), Merge(x)):
-        ...     assert loads(dumps(box)) == box
-        """
-        return {'factory': factory_name(type(self)),
-                'x': self.dom.to_tree(), 'n': len(self.cod)}
-
     @classmethod
-    def from_tree(cls, tree: dict) -> "Copy":
-        return cls(from_tree(tree['x']), tree['n'])
-
-
-class Merge(Box):
-    """
-    The merge of an atomic type :code:`x` some :code:`n` number of times,
-    deterministic when it has an input and affine when it has exactly one.
-
-    Parameters:
-        x : The type of wires to merge.
-        n : The number of wires to merge.
-
-    Example
-    -------
-    >>> x = Ty('x')
-    >>> assert Merge(x).is_deterministic and Merge(x, 1).is_cartesian
-    >>> unit = Merge(x, 0)
-    >>> assert not unit.is_deterministic and not unit.is_affine
-    """
-    is_strict = True
-
-    def __init__(self, x: monoidal.Ty, n: int = 2):
-        assert_isatomic(x, monoidal.Ty)
-        name = f"Merge({x}" + ("" if n == 2 else f", {n}") + ")"
-        Box.__init__(self, name, dom=x ** n, cod=x,
-                     is_deterministic=n > 0, is_affine=n == 1,
-                     draw_as_spider=True, color="black", drawing_name="")
-
-    def dagger(self) -> "Copy":
-        """ The copy of the same type, in the category of the merge. """
-        return self.copy_factory(self.cod, len(self.dom))
-
-    def __repr__(self):
-        return (
-            factory_name(type(self)) + f"({repr(self.cod)}, {len(self.dom)})")
-
-    def to_tree(self) -> dict:
-        """ Serialise a merge by its type and number of wires merged. """
-        return {'factory': factory_name(type(self)),
-                'x': self.cod.to_tree(), 'n': len(self.dom)}
-
-    @classmethod
-    def from_tree(cls, tree: dict) -> "Merge":
-        return cls(from_tree(tree['x']), tree['n'])
+    def from_tree(cls, tree: dict) -> Copy:
+        return cls(from_tree(tree['dom']), len(from_tree(tree['cod'])))
 
 
 class Discard(Copy):
@@ -695,20 +628,18 @@ class Functor(symmetric.Functor):
     def __call__(self, other):
         if isinstance(other, Copy) and hasattr(self.cod, "copy"):
             return self.cod.copy(self(other.dom), len(other.cod))
-        if isinstance(other, Merge) and hasattr(self.cod, "merge"):
-            return self.cod.merge(self(other.cod), len(other.dom))
         return super().__call__(other)
 
 
 CMap = cmap.CMap[Diagram]
 
+Feedback, Trace, FollowedBy, Head, Tail = feedback.generators(Diagram, Box)
 Diagram.box_factory = Box
 Diagram.functor_factory = Functor
 Hypergraph = hypergraph.Hypergraph[Diagram]
-Diagram.copy_factory, Diagram.merge_factory = Copy, Merge
+Diagram.copy_factory = Copy
 Diagram.swap_factory = Swap
 Diagram.permutation_factory = Permutation
-Diagram.trace_factory = Trace
 Diagram.discard_factory = Discard
 Diagram.sum_factory = Sum
 Id = Diagram.id
@@ -717,3 +648,6 @@ Id = Diagram.id
 class Equation(symmetric.Equation):
     """ The :class:`symmetric.Equation` of Markov diagrams. """
     up_to = staticmethod(Diagram.to_hypergraph)
+
+
+__getattr__ = deprecated_alias(__name__, {"Merge": "discopy.comarkov.Merge"})

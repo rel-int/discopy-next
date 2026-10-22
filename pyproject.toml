@@ -53,14 +53,15 @@ dev = [
     "pytest-benchmark",
     "polars",
     "pytest-xdist",
-    "ty == 0.0.69",
 ]
 docs = ["discopy[docs]"]
+notebooks = ["discopy[notebooks]"]
 quantum = ["discopy[quantum]"]
 grammar = ["discopy[grammar]"]
 all = [
     { include-group = "dev" },
     { include-group = "docs" },
+    { include-group = "notebooks" },
     { include-group = "quantum" },
     { include-group = "grammar" },
 ]
@@ -82,6 +83,7 @@ quantum = [
 ]
 grammar = [
     "nltk",
+    "torch",
 ]
 test = [
     "discopy[grammar,quantum]",
@@ -93,15 +95,21 @@ test = [
     "pytest",
     "pytest-xdist",
 ]
-docs  = [
+notebooks = [
     "IPython",
+    "anywidget",
     "ipykernel == 6.23.*",
-    "jinja2 == 3.1.*",
     "marimo",
+]
+docs  = [
+    "discopy[notebooks]",
+    "jinja2 == 3.1.*",
     "myst-parser == 2.0.*",
     # executed by marimo when rendering the notebooks at docs build time
+    "jax",
     "pytket",
     "sympy",
+    "torch",
     "sphinx == 7.4.*",
     "sphinx-book-theme == 1.1.*",
     "sphinxcontrib-bibtex == 2.5.*",
@@ -147,19 +155,6 @@ extend-ignore = [
 per-file-ignores = [
     "__init__.py:F401"
 ]
-
-[tool.ty.src]
-include = ["discopy"]
-
-[tool.ty.environment]
-python-version = "3.14"
-
-# The factory-method pattern narrows the signatures of `then`, `tensor` and
-# their friends down the tower, and attributes are dynamic by design where a
-# downgrade asks the host category for structure it may not have.
-[tool.ty.rules]
-invalid-method-override = "ignore"
-unresolved-attribute = "ignore"
 
 [tool.pytest.ini_options]
 pythonpath = [

@@ -82,3 +82,15 @@ def test_to_hypergraph():
     assert isinstance(round_trip, Diagram)
     assert round_trip.to_hypergraph() == hypergraph
     assert hash(round_trip.to_hypergraph()) == hash(hypergraph)
+
+
+def test_foliation_with_caps():
+    from discopy.tensor import Tensor
+    s, n = Ty('s'), Ty('n')
+    loves = Box('loves', n @ n, s)
+    diagram = Cap(n.r, n) @ Cap(n, n.l) >> n.r @ loves @ n.l
+    foliated = diagram.foliation()
+    assert foliated.boxes == diagram.boxes and len(foliated) == 2
+    assert foliated.to_staircases() == diagram
+    F = Functor(ob_map={s: 1, n: 2}, ar_map={loves: [0, 1, 1, 0]}, cod=Tensor)
+    assert F(foliated) == F(diagram)

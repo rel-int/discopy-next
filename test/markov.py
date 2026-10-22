@@ -1,10 +1,14 @@
 from __future__ import annotations
-from pytest import importorskip, raises
+import warnings
+from random import Random
+
+from pytest import importorskip, raises, warns
 
 from discopy.python import Function
 
 from discopy.markov import *
 from discopy import *
+from discopy.utils import AxiomError
 
 
 def test_Discard_has_no_copies():
@@ -15,12 +19,33 @@ def test_Discard_has_no_copies():
 
 
 def test_spider_factory():
-    with raises(ValueError):
-        Diagram.spider_factory(2, 2, Ty('x'))
+    x = Ty('x')
+    assert Diagram.spider_factory(1, 3, x) == Copy(x, 3)
+    for n_legs_in, n_legs_out, phase in [(2, 2, None), (2, 1, None), (1, 2, .5)]:
+        with raises(ValueError, match="only spiders of markov.Diagram"):
+            Diagram.spider_factory(n_legs_in, n_legs_out, x, phase)
 
 
-def test_Merge_dagger():
-    assert Merge(Ty('x')).dagger() == Copy(Ty('x'))
+def test_Copy_dagger():
+    """ A Markov category is not a dagger category, see #94 on next. """
+    x = Ty('x')
+    for box in (Copy(x), Copy(x, 3), Discard(x)):
+        with raises(AxiomError, match="not a dagger category"):
+            box.dagger()
+
+
+def test_deprecated_merge():
+    x = Ty('x')
+    with warns(DeprecationWarning, match="use discopy.comarkov.Merge"):
+        assert markov.Merge is comarkov.Merge
+    with warns(DeprecationWarning, match="use discopy.comarkov.Diagram.merge"):
+        assert Diagram.merge(x) == comarkov.Merge(x)
+    with raises(AttributeError):
+        markov.Codiagonal
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        frobenius.Diagram.merge(frobenius.Ty('x'))
+        neural.network.Network.merge(neural.network.Dims(2))
 
 
 def test_Discard():
@@ -82,41 +107,188 @@ def test_Permutation():
     assert Equation(perm, perm.to_swaps())
 
 
-def test_copy_and_merge_serialisation():
+def test_copy_serialisation():
     from discopy.utils import dumps, loads
     x = Ty('x')
-    for box in (Copy(x), Copy(x, 3), Merge(x), Merge(x, 0), Discard(x)):
+    for box in (Copy(x), Copy(x, 3), Discard(x)):
         assert loads(dumps(box)) == box
-    assert loads(dumps(Copy(x) >> Merge(x))) == Copy(x) >> Merge(x)
-    assert repr(Merge(x, 3)) == "markov.Merge(monoidal.Ty(cat.Ob('x')), 3)"
+    assert loads(dumps(Copy(x) >> Discard(x) @ x)) == Copy(x) >> Discard(x) @ x
+    assert repr(Copy(x, 3)) == "markov.Copy(feedback.Ty(feedback.Wire('x')), 3)"
+    tree = dumps(comarkov.Merge(x, 3)).replace("comarkov.Merge", "markov.Merge")
+    with warns(DeprecationWarning):
+        assert loads(tree) == comarkov.Merge(x, 3)
 
 
-def test_copy_and_merge_factories():
+def test_copy_factory():
     from discopy.utils import factory
 
     @factory
     class Recipe(Diagram):
-        """ A subclass with its own copies and merges. """
+        """ A subclass with its own copies. """
 
     class RecipeCopy(Copy, Recipe):
         """ The copy of an ingredient. """
 
-    class RecipeMerge(Merge, Recipe):
-        """ The merge of two ingredients. """
+    class RecipeDiscard(Discard, RecipeCopy):
+        """ The discard of an ingredient. """
 
-    Recipe.copy_factory, Recipe.merge_factory = RecipeCopy, RecipeMerge
+    Recipe.copy_factory, Recipe.discard_factory = RecipeCopy, RecipeDiscard
     x = Ty('x')
-    assert isinstance(RecipeCopy(x).dagger(), RecipeMerge)
-    assert isinstance(RecipeMerge(x).dagger(), RecipeCopy)
-    assert isinstance(Recipe.merge(x).boxes[0], RecipeMerge)
+    assert isinstance(Recipe.copy(x).boxes[0], RecipeCopy)
+    assert isinstance(RecipeCopy(x, 0), RecipeDiscard)
+    with raises(AxiomError, match="Recipe is not a dagger category"):
+        RecipeCopy(x).dagger()
+
+
+def test_Copy_pickle():
+    from pickle import dumps, loads
+    x = Ty('x')
+    for box in (Copy(x), Copy(x, 3), Discard(x)):
+        assert loads(dumps(box)) == box
+
+
+def test_hypergraph():
+    x = Ty('x')
+    f, g, h = Box('f', Ty(), x), Box('g', Ty(), x), Box('h', x, x)
+    graph = (f @ g >> x @ Copy(x)).to_hypergraph()
+    assert graph.offsets == (0, 1)
+    assert graph.to_diagram() == Diagram(
+        (Layer(f, g), Layer(x, Copy(x))), Ty(), x @ x @ x)
+    diagram = f @ g >> Copy(x) @ x >> h @ x @ x
+    assert diagram.to_hypergraph().offsets == (0, 1, None)
+    assert diagram.to_hypergraph().to_diagram() == Diagram(
+        (Layer(f, g), Layer(Copy(x), x), Layer(h, x, x)), Ty(), x @ x @ x)
+    diagram = f @ g >> Discard(x) @ x
+    assert diagram.to_hypergraph().to_diagram() == diagram
+    graph = (f >> Copy(x) >> h @ h).to_hypergraph()\
+        >> (x @ x @ g).to_hypergraph()
+    assert graph.offsets == (0, None, None, 2)
+    assert graph.to_diagram() == Diagram(
+        (Layer(f), Layer(Copy(x)), Layer(h, h, g)), Ty(), x @ x @ x)
+
+
+def test_from_callable():
+    x, y = Ty('x'), Ty('y')
+    f = Box('f', x @ x, y)
+
+    @Diagram.from_callable(x @ x, y)
+    def diagram(a, b):
+        f(b, a)
+        return f(a, b)
+
+    swap = Permutation(x @ x @ x @ x, [0, 2, 1, 3])
+    assert diagram == Diagram((
+        Layer(Copy(x), Copy(x)), Layer(swap),
+        Layer(x, f, x), Layer(x, Discard(y), x), Layer(f)), x @ x, y)
+
+
+def test_stream_Diagram_repr():
+    x = Ty('x')
+    plus = Box('plus', x @ x, x)
+    zero = Box('zero', Ty(), x.head)
+    zero, one = Box('zero', Ty(), x.head), Box('one', Ty(), x.head)
+    fib =  ((
+            Copy(x) >> one @ Diagram.wait(x) @ x
+            >> FollowedBy(x) @ x >> plus).delay()
+        >> zero @ x.delay() >> FollowedBy(x) >> Copy(x)).feedback()
+    assert eval(str(fib)) == fib
+    assert eval(repr(fib)) == fib
+
+
+def test_functor_python_stream():
+    x = Ty('x')
+    zero, wait = Box('zero', Ty(), x), Diagram.wait(x)
+    F = Functor(
+        ob_map={x: int},
+        ar_map={zero: lambda: 0},
+        cod=stream.Stream[python.Function])
+    assert F(wait @ zero).unroll(2).now(1, 2, 3) == (0, ) + (1, 0) + (2, 0) + (3, )
+
+
+def test_walk():
+    rng = Random(420)
+    X, fby = Ty('X'), FollowedBy(Ty('X'))
+    zero, rand, plus = Box('0', Ty(), X), Box('rand', Ty(), X), Box('+', X @ X, X)
+
+    @Diagram.feedback
+    @Diagram.from_callable(X.d, X @ X)
+    def walk(x):
+        y = fby(zero.head(), plus.d(rand.d(), x))
+        return (y, y)
+
+    F = Functor(
+        ob_map={X: int},
+        ar_map={zero: lambda: 0,
+            rand: lambda: rng.choice([-1, +1]),
+            plus: lambda x, y: x + y},
+        cod=stream.Stream[python.Function])
+
+    assert F(walk).unroll(9).now()[:10] == (0, -1, 0, 1, 2, 1, 0, -1, 0, 1)
+    assert F(walk).unroll(9).now()[:10] == (0, -1, -2, -1, 0, 1, 0, 1, 2, 1)
+    assert F(walk).unroll(9).now()[:10] == (0, -1, 0, 1, 0, 1, 0, -1, 0, -1)
+
+
+def test_fibonacci():
+    X = Ty('X')
+    fby, wait = FollowedBy(X), Swap(X, X.d).feedback()
+    zero, one = Box('0', Ty(), X), Box('1', Ty(), X)
+    copy, plus = Copy(X), Box('+', X @ X, X)
+
+
+    @Diagram.feedback
+    @Diagram.from_callable(X.d, X @ X)
+    def fib(x):
+        y = fby(zero.head(), plus.d(fby.d(one.head.d(), wait.d(x)), x))
+        return (y, y)
+
+    fib_ = (
+        copy.d >> one.head.d @ wait.d @ X.d
+            >> fby.d @ X.d
+            >> plus.d
+            >> zero.head @ X.d
+            >> fby >> copy).feedback()
+    assert Equation(fib.arg, fib_.arg)
+
+    F = Functor(
+        ob_map={X: (int, )},
+        ar_map={zero: lambda: 0,
+            one: lambda: 1,
+            plus: lambda x, y: x + y},
+        cod=stream.Stream[python.Function])
+
+    assert F(fib).unroll(9).now()[:10] == (0, 1, 1, 2, 3, 5, 8, 13, 21, 34)
+
+
+def test_Permutation_delay():
+    x, y, z = map(Ty, "xyz")
+    perm = Permutation(x @ y @ z, [2, 0, 1])
+    assert perm.delay() == Permutation((x @ y @ z).delay(), [2, 0, 1])
+    assert perm.delay(2) == perm.delay().delay()
+    assert (perm >> Swap(z, x) @ y).delay()\
+        == perm.delay() >> Swap(z, x).delay() @ y.delay()
+
+
+def test_Discard_delay():
+    x = Ty('x')
+    discard = Diagram.copy(x, n=0)
+    assert isinstance(discard, Diagram) and isinstance(discard, Discard)
+    assert (discard >> Diagram.id(Ty())).boxes == [discard]
+    assert discard.delay() == Discard(x.delay())
+
+
+def test_delayed_Copy_pickle():
+    from pickle import dumps, loads
+    x = Ty('x')
+    for box in (Copy(x), Discard(x), Copy(x).delay(), Discard(x).delay()):
+        assert loads(dumps(box)) == box
 
 
 def test_Square_commutes():
     from hypothesis import given, settings, strategies as st
 
-    from discopy import closed, feedback
+    from discopy import closed
 
-    categories = st.sampled_from([Diagram, closed.Diagram, feedback.Diagram])
+    categories = st.sampled_from([Diagram, closed.Diagram])
 
     @settings(max_examples=50, deadline=None)
     @given(st.data(), categories, st.booleans())
@@ -124,7 +296,7 @@ def test_Square_commutes():
         f, h, g = data.draw(Square[category].strategy(written=written))
         dom, cod = f.dom[:-len(h.dom)], f.cod[:-len(h.dom)]
         assert h.is_strict
-        assert category.equation_factory(f >> cod @ h, dom @ h >> g)
+        assert Equation(f >> cod @ h, dom @ h >> g)
     check()
 
 
@@ -140,7 +312,7 @@ def test_Square_keeps_flags():
         for n in (2, 3):
             h, g = category.copy(M, n), Square[category].double(M, n)(f)
             assert set(g.boxes) >= {sample, condition}
-            assert category.equation_factory(f >> B @ h, A @ h >> g)
+            assert Equation(f >> B @ h, A @ h >> g)
             assert category.trace_uniformity_written(
                 square=Square[category]((f, h, g)))
         with raises(ValueError):
@@ -161,19 +333,16 @@ def test_Box_flags():
     sample = Box('sample', p, x, is_deterministic=False)
     condition = Box('condition', x, Ty(), is_affine=False)
     assert Box('sample', p, x) != sample
-    assert hash(Box('sample', p, x)) != hash(sample)
-    assert repr(Box('f', p, x)) == "markov.Box('f', monoidal.Ty(cat.Ob('p')), "\
-        "monoidal.Ty(cat.Ob('x')))"
+    assert hash(sample) == hash(Box('sample', p, x, is_deterministic=False))
+    assert repr(Box('f', p, x)) == "markov.Box('f', "\
+        "feedback.Ty(feedback.Wire('p')), feedback.Ty(feedback.Wire('x')))"
     for box in (sample, condition, sample.dagger(), sample @ condition):
         assert eval(repr(box)) == box
         assert loads(dumps(box)) == box == pickle.loads(pickle.dumps(box))
     assert not sample.dagger().is_deterministic
     assert not condition.dagger().dagger().is_affine
     assert Copy(x).is_cartesian and Swap(x, x).is_cartesian
-    assert Id(x).is_cartesian and Merge(x).is_deterministic
-    assert not Merge(x).is_affine and not Merge(x).is_cartesian
-    assert [(Merge(x, n).is_deterministic, Merge(x, n).is_affine)
-            for n in range(3)] == [(False, False), (True, True), (True, False)]
+    assert Id(x).is_cartesian
     f = Box('f', x, x)
     assert not f.dagger().is_cartesian and f.dagger().dagger() == f
     assert not (Copy(p) >> sample @ p).is_deterministic

@@ -13,11 +13,19 @@ Summary
     :toctree:
 
     Wire
+    HeadOb
+    TailOb
     Ty
+    Layer
     Diagram
     Box
     Cup
     Cap
+    Feedback
+    Trace
+    FollowedBy
+    Head
+    Tail
     Functor
 
 Axioms
@@ -54,25 +62,43 @@ We also have its dagger and its transpose:
 
 from __future__ import annotations
 
-from typing import ClassVar
+from copy import copy
 
-from discopy import cat, cmap, messages, rigid, traced
+from discopy import cat, cmap, rigid, feedback
 from discopy.abc import PivotalCategory
 from discopy.cat import factory
 from discopy.utils import deprecated_alias
 
 
-class Wire(rigid.Wire):
+class Wire(feedback.Wire, rigid.Wire):
     """
-    A pivotal object is a rigid object where left and right adjoints coincide.
+    A pivotal object is a rigid object where left and right adjoints coincide,
+    and a feedback object with a time step.
 
     Parameters:
         name : The name of the object.
         z (bool) : Whether the object is an adjoint or not.
+        time_step : The number of times the object has been delayed.
+        is_constant : Whether the object is a constant stream.
+
+    Example
+    -------
+    >>> from discopy import pivotal
+    >>> x = Wire('x', time_step=2)
+    >>> assert x.l == x.r == Wire('x', 1, time_step=2) and x.l.l == x
+    >>> assert eval(repr(x.l)) == x.l and str(x.l) == 'x.r.d.d'
     """
-    l = r = property(lambda self: type(self)(
-        self.name, (self.z + 1) % 2, dom=self.cod, cod=self.dom))
-    windings = (0, 1)
+    @property
+    def l(self) -> Wire:
+        """ The adjoint of the object, at the same time step. """
+        result = copy(self)
+        result.z, result.dom, result.cod = (self.z + 1) % 2, self.cod, self.dom
+        return result
+
+    r = l
+
+    def __repr__(self):
+        return rigid.Wire.__repr__(self)[:-1] + self.repr_time_step() + ")"
 
     def dagger(self) -> Wire:
         """
@@ -83,18 +109,19 @@ class Wire(rigid.Wire):
         return self.l
 
 
+HeadOb, TailOb = feedback.wire_generators(Wire)
+
+
 @factory
-class Ty(rigid.Ty):
+class Ty(rigid.Ty, feedback.Ty):
     """
-    A pivotal type is a rigid type with pivotal objects inside.
+    A pivotal type is a rigid type with pivotal objects inside, and a
+    feedback type that can be delayed.
 
     Parameters:
         inside (Wire) : The objects inside the type.
     """
     generator_factory = Wire
-
-    dagger_involution = PivotalCategory.dagger_involution
-    dagger_contravariance = PivotalCategory.dagger_contravariance
 
 
 @factory
@@ -111,10 +138,14 @@ class Nat(rigid.Nat, Ty):
     l = r = property(lambda self: self)
 
 
+class Layer(rigid.Layer, feedback.Layer):
+    """ A pivotal layer is a rigid layer that can be delayed. """
+
+
 @factory
-class Diagram(rigid.Diagram, traced.Diagram, PivotalCategory):
+class Diagram(rigid.Diagram, feedback.Diagram, PivotalCategory):
     """
-    A pivotal diagram is a rigid diagram and a traced diagram
+    A pivotal diagram is a rigid diagram and a feedback diagram
     with pivotal types as domain and codomain.
 
     Parameters:
@@ -122,17 +153,8 @@ class Diagram(rigid.Diagram, traced.Diagram, PivotalCategory):
         dom (Ty) : The domain of the diagram, i.e. its input.
         cod (Ty) : The codomain of the diagram, i.e. its output.
     """
-    pivotality = PivotalCategory.pivotality.failing(
-        messages.NO_PLANAR_NORMAL_FORM)
-    trace_superposing_left = PivotalCategory.trace_superposing_left
-    trace_superposing_right = PivotalCategory.trace_superposing_right
-
-    sum_factory: ClassVar[type["Sum"]]
-    box_factory: ClassVar[type["Box"]]
-    functor_factory: ClassVar[type["Functor"]]
-    cup_factory: ClassVar[type["Cup"]]
-    cap_factory: ClassVar[type["Cap"]]
     ob = Ty
+    layer_factory = Layer
 
     def dagger(self):
         """
@@ -194,18 +216,8 @@ class Diagram(rigid.Diagram, traced.Diagram, PivotalCategory):
             >> diagram @ traced_wire.r\
             >> cod @ cls.cup_factory(traced_wire, traced_wire.r)
 
-    # The cups and caps of a pivotal category have a dagger, which needs no
-    # weakening to the diagrams without them.
-    dagger_involution = PivotalCategory.dagger_involution
-    dagger_contravariance = PivotalCategory.dagger_contravariance
-    dagger_monoidality = PivotalCategory.dagger_monoidality.failing(
-        messages.NO_PLANAR_NORMAL_FORM)
-    dagger_involution_monoidal = None
-    dagger_contravariance_monoidal = None
-    dagger_monoidality_monoidal = None
 
-
-class Box(rigid.Box, traced.Box, Diagram):
+class Box(rigid.Box, feedback.Box, Diagram):
     """
     A pivotal box is a rigid box in a pivotal diagram.
 
@@ -213,18 +225,32 @@ class Box(rigid.Box, traced.Box, Diagram):
         name (str) : The name of the box.
         dom (Ty) : The domain of the box, i.e. its input.
         cod (Ty) : The codomain of the box, i.e. its output.
+        time_step (int) : The number of times the box has been delayed.
     """
+    def __init__(self, name, dom, cod, *args, time_step: int = 0, **params):
+        rigid.Box.__init__(self, name, dom, cod, *args, **params)
+        self._time_step, self._args, self._params = time_step, args, params
+
+    def __repr__(self):
+        if self.is_dagger:
+            return repr(self.dagger()) + ".dagger()"
+        time_step = f", time_step={self.time_step}" if self.time_step else ""
+        return rigid.Box.__repr__(self)[:-1] + time_step + ")"
+
+    def __str__(self):
+        return rigid.Box.__str__(self) + feedback.str_delayed(self.time_step)
 
     def rotate(self, left=False):
         del left
         return type(self)(
-            self.name, dom=self.cod.r, cod=self.dom.r,
-            data=self.data, is_dagger=self.is_dagger, z=(self.z + 1) % 2)
+            self.name, dom=self.cod.r, cod=self.dom.r, data=self.data,
+            is_dagger=self.is_dagger, z=(self.z + 1) % 2,
+            time_step=self.time_step)
 
     def dagger(self) -> Box:
         return type(self)(
-            name=self.name, dom=self.cod, cod=self.dom,
-            data=self.data, is_dagger=not self.is_dagger, z=self.z)
+            name=self.name, dom=self.cod, cod=self.dom, data=self.data,
+            is_dagger=not self.is_dagger, z=self.z, time_step=self.time_step)
 
     @property
     def is_conjugate(self):
@@ -265,7 +291,7 @@ class Cap(rigid.Cap, Box):
         return self.cup_factory(self.left, self.right)
 
 
-class Sum(rigid.Sum, traced.Sum, Box):
+class Sum(rigid.Sum, feedback.Sum, Box):
     """
     A pivotal sum is a sum of pivotal diagrams.
 
@@ -276,7 +302,7 @@ class Sum(rigid.Sum, traced.Sum, Box):
     """
 
 
-class Functor(rigid.Functor):
+class Functor(rigid.Functor, feedback.Functor):
     """
     A pivotal functor is a rigid functor on a pivotal category.
 
@@ -289,6 +315,7 @@ class Functor(rigid.Functor):
     dom = cod = Diagram
 
 
+Feedback, Trace, FollowedBy, Head, Tail = feedback.generators(Diagram, Box)
 Diagram.box_factory = Box
 Diagram.functor_factory = Functor
 Diagram.cup_factory, Diagram.cap_factory = Cup, Cap

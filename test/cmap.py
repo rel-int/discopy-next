@@ -3,7 +3,8 @@ import shutil
 import pytest
 from pytest import raises
 
-from discopy import closed, biclosed, compact, symmetric
+from discopy import closed, biclosed, comarkov, compact, symmetric
+from discopy.abc import DaggerCategory
 from discopy.python.finset import Permutation
 from discopy.utils import AxiomError
 
@@ -32,6 +33,7 @@ def test_default_compact_setting():
     f = Box("f", x, y)
     cm = M.from_box(f)
     assert isinstance(f, M.category)
+    assert isinstance(cm, DaggerCategory)
     assert cm.to_hypergraph().category == M.category
 
 
@@ -165,12 +167,12 @@ def test_diagram_to_map_structure_and_errors():
         braided,
         closed,
         compact,
+        feedback,
         frobenius,
         markov,
         monoidal,
         pivotal,
         symmetric,
-        traced,
     )
     from discopy.cmap import Port, PortKind
 
@@ -192,12 +194,13 @@ def test_diagram_to_map_structure_and_errors():
     assert cup.to_map() == compact.CMap.cups(cx, cx.r)
     assert cap.to_map() == compact.CMap.caps(cx.r, cx)
 
-    tx = traced.Ty("x")
-    traced_box = traced.Box("f", tx, tx)
+    tx = feedback.Ty("x")
+    traced_box = feedback.Box("f", tx, tx)
     # A planar trace is a box of the map, which a decoded map's trace is too.
-    assert traced.Trace(traced_box).to_map().boxes == (
-        traced.Trace(traced_box), )
-    assert traced_box.to_map().trace().to_diagram() == traced.Trace(traced_box)
+    assert feedback.Trace(traced_box).to_map().boxes == (
+        feedback.Trace(traced_box), )
+    assert traced_box.to_map().trace().to_diagram()\
+        == feedback.Trace(traced_box)
 
     px, py = map(pivotal.Ty, "xy")
     pbox = pivotal.Box("f", px, py)
@@ -268,7 +271,7 @@ def test_diagram_to_map_structure_and_errors():
     t = monoidal.Box("t", monoidal.Ty(), monoidal.Ty())
     assert monoidal.CMap(
         monoidal.Ty(), monoidal.Ty(), (s, t), ()).to_diagram() == s >> t
-    for module in [closed, traced, symmetric]:
+    for module in [closed, feedback, symmetric]:
         x = module.Ty("x")
         f = module.Box("f", x, x)
         g = module.Box("g", x, x)
@@ -276,11 +279,11 @@ def test_diagram_to_map_structure_and_errors():
             module.Ty(), module.Ty(), (f, g), (3, 2, 1, 0))
         assert not cycle.is_acyclic
 
-    x = traced.Ty("x")
+    x = feedback.Ty("x")
     with raises(TypeError, match="Pregroup"):
-        traced.CMap.cups(x, x)
+        feedback.CMap.cups(x, x)
     with raises(TypeError, match="Pregroup"):
-        traced.CMap.caps(x, x)
+        feedback.CMap.caps(x, x)
     x, y = map(closed.Ty, "xy")
     assert closed.CMap.ev(y, x).boxes == (
         closed.CMap.category.ev(y, x), )
@@ -288,9 +291,12 @@ def test_diagram_to_map_structure_and_errors():
     x = markov.Ty("x")
     assert markov.CMap.copy(x, 2).boxes == (
         markov.CMap.category.copy(x, 2), )
-    assert markov.CMap.merge(x, 2).boxes == (
-        markov.CMap.category.merge(x, 2), )
     assert markov.CMap.discard(x).boxes == (markov.CMap.category.copy(x, 0), )
+    x = comarkov.Ty("x")
+    assert comarkov.CMap.merge(x, 2).boxes == (
+        comarkov.CMap.category.merge(x, 2), )
+    assert comarkov.CMap.noise(x).boxes == (
+        comarkov.CMap.category.merge(x, 0), )
 
     x = frobenius.Ty("x")
     assert frobenius.CMap.spiders(1, 2, x).boxes == (
@@ -320,7 +326,7 @@ def test_rigid_handedness():
 
 
 def test_only_to_diagram_needs_the_structure():
-    from discopy import cmap, monoidal, pivotal, traced
+    from discopy import cmap, feedback, monoidal, pivotal
 
     x = monoidal.Ty("x")
     f = monoidal.Box("f", x, x)
@@ -329,10 +335,10 @@ def test_only_to_diagram_needs_the_structure():
     with raises(AxiomError, match="has no traces"):
         cycle.to_diagram()
 
-    tx = traced.Ty("x")
-    feedback = traced.CMap(
-        tx, tx, (traced.Box("f", tx, tx), ), (3, 2, 1, 0))
-    assert not feedback.is_acyclic
+    tx = feedback.Ty("x")
+    loop = feedback.CMap(
+        tx, tx, (feedback.Box("f", tx, tx), ), (3, 2, 1, 0))
+    assert not loop.is_acyclic
 
     class Planar(symmetric.Diagram):
         """ A category with adjoint types but no cups or caps. """
@@ -492,6 +498,9 @@ def test_trace():
     assert left_trace.dom == y
     assert left_trace.cod == y
     assert left_trace.boxes == f.boxes
+
+    with raises(AxiomError):
+        M.from_box(Box("g", x, y)).trace()
 
     closed_component = M.from_box(Box("h", x, x)).trace()
     assert closed_component.dom == Ty()
@@ -893,6 +902,76 @@ def test_from_glued_loops():
     assert two.loops == (x, y)
 
 
+def test_logical_order():
+    from discopy.compact import CMap as M
+    assert M.logical_order(2, 3) == (0, 1, 4, 3, 2)
+    assert M.logical_order(0, 0) == () and M.logical_order(1, 0) == (0, )
+
+
+def test_from_wiring():
+    from discopy.symmetric import Ty, Box, CMap as M
+    x = Ty("x")
+    f = Box("f", x, x)
+    with raises(TypeError):
+        M.from_wiring(("f", ), [])
+    with raises(ValueError, match="has no port"):
+        M.from_wiring((f, ), [((0, 0), (0, 2))])
+    for box_index in (-1, 1):
+        with raises(ValueError, match="no box"):
+            M.from_wiring((f, ), [((0, 0), (box_index, 1))])
+    with raises(ValueError, match="wired to itself"):
+        M.from_wiring((f, ), [((0, 0), (0, 0))])
+    with raises(ValueError, match="wired twice"):
+        M.from_wiring((f, f), [((0, 0), (0, 1)), ((0, 0), (1, 1))])
+    with raises(ValueError, match="left unwired"):
+        M.from_wiring((f, f), [((0, 0), (0, 1))])
+    with raises(ValueError, match="has no port"):
+        M.from_wiring((f, ), [((0, 0.5), (0, 1))])
+    with raises(ValueError, match="no box"):
+        M.from_wiring((f, ), [((0.0, 0), (0, 1))])
+    closed = M.from_wiring((f, f), [((0, 0), (1, 1)), ((0, 1), (1, 0))])
+    assert closed.n_ports == 4 and closed.is_monogamous
+    assert closed.dom == closed.cod == Ty() and closed.boxes == (f, f)
+    assert closed == (M.from_box(f) >> M.from_box(f)).trace()
+
+
+def test_to_diagram_routes_with_one_permutation():
+    """ Each routing step of the decoder is one :class:`Permutation` layer
+    rather than a staircase of swaps, so a permutation round-trips to itself
+    and the plumbing of a decoded diagram never spans two consecutive layers,
+    see discopy/discopy#539. """
+    from fixtures.diagrams import random_diagram
+
+    x, y, z, w = map(symmetric.Ty, "xyzw")
+    perm = symmetric.Permutation(x @ y @ z, [2, 0, 1])
+    g = symmetric.Box('g', z @ x @ y, w)
+    assert perm.to_swaps().to_map().to_diagram() == perm
+    assert (perm.to_swaps() >> g).to_map().to_diagram() == perm >> g
+
+    for module in (symmetric, compact):
+        for seed in range(10):
+            diagram, functor = random_diagram(module, seed)
+            decoded = diagram.to_map().to_diagram()
+            assert functor(decoded) == functor(diagram)
+            plumbing = [layer.is_plumbing for layer in decoded.inside]
+            assert not any(a and b for a, b in zip(plumbing, plumbing[1:]))
+
+
+def test_to_diagram_of_a_concrete_category_uses_its_permutation():
+    """ A category without a native permutation box routes its wires with
+    its own ``permutation``, through the default
+    :meth:`discopy.abc.SymmetricCategory.from_permutation`. """
+    from discopy import cmap
+    from discopy.abc import Nat
+    from discopy.matrix import Matrix
+    from discopy.tensor import Dim, Tensor
+
+    for category, dom in ((Tensor, Dim(2, 3, 4)), (Matrix[int], Nat(3))):
+        for perm in ([1, 0, 2], [2, 0, 1]):
+            assert cmap.CMap[category].permutation(perm, dom).to_diagram()\
+                == category.permutation(perm, dom)
+
+
 def test_permutation_is_one_involution():
     from discopy.abc import SymmetricCategory
     from discopy.symmetric import Ty, Diagram, Equation, CMap as M
@@ -919,3 +998,40 @@ def test_permutation_is_one_involution():
         == T.permutation([2, 0, 1], dims).eval()
     with raises(ValueError):
         M.permutation([0, 0], [x, y])
+
+
+def test_CMap_to_tree():
+    from discopy.utils import dumps, loads
+    x = compact.Ty('x')
+    f = compact.Box('f', x, x @ x)
+    cmaps = [
+        compact.CMap.caps(x, x.r) >> f.to_map() @ x.r,
+        compact.CMap.id(x).trace(), f.to_map().trace(),
+        symmetric.Swap(*map(symmetric.Ty, "xy")).to_map(),
+        closed.Box('f', closed.Ty('x'), closed.Ty('y')).to_map().curry()]
+    for cmap in cmaps:
+        loaded = loads(dumps(cmap))
+        assert loaded == cmap and type(loaded) is type(cmap)
+        assert loaded.category is cmap.category
+        assert loaded.loops == cmap.loops
+
+
+def test_CMap_to_tree_over_a_parameterised_category():
+    from discopy import tensor, cmap
+    from discopy.tensor import Dim
+    from discopy.utils import dumps, loads
+    swap = cmap.CMap[tensor.Diagram[complex]].swap(Dim(2), Dim(3))
+    loaded = loads(dumps(swap))
+    assert loaded == swap and loaded.category is tensor.Diagram[complex]
+
+
+def test_trace_takes_the_keyword_form():
+    from discopy.compact import Ty, Box, CMap as M
+    x, y = map(Ty, "xy")
+    f = M.from_box(Box("f", x @ y, x @ y))
+    assert f.trace() == f.trace(mem=y) == f.trace(cod=x)
+    assert f.trace(left=True) == f.trace(dom=y, cod=y, mem=x, left=True)
+    with raises(TypeError):
+        f.trace(1, mem=y)
+    with raises(AxiomError):
+        f.trace(mem=x)

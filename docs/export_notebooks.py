@@ -23,14 +23,22 @@ It can also be run as a script::
 from __future__ import annotations
 
 import argparse
+import os
+import re
 import subprocess
 import sys
+from html import escape
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
 DOCS = Path(__file__).resolve().parent
 NOTEBOOKS = DOCS / "notebooks"
 HTML_DIR = DOCS / "_static" / "notebooks"
+REPOSITORY = os.environ.get(
+    "READTHEDOCS_GIT_CLONE_URL", "https://github.com/discopy/discopy")
+SOURCE = "{}/blob/{}".format(
+    REPOSITORY.removesuffix(".git"),
+    os.environ.get("READTHEDOCS_GIT_COMMIT_HASH", "main"))
 
 IFRAME = """\
 .. raw:: html
@@ -59,19 +67,27 @@ FALLBACK = """\
 
     This notebook could not be rendered in this build (a dependency needed to
     execute it may be missing). You can read its source on GitHub:
-    `{name}.md <https://github.com/discopy/discopy/blob/main/docs/notebooks/{name}.md>`_.
+    `{name}.md <{source}/docs/notebooks/{name}.md>`_.
 """
 
 
 def title_of(notebook: Path) -> str:
-    """Read the ``title:`` field from a marimo notebook's YAML front-matter."""
+    """The first level-one heading of ``notebook``, outside of code cells.
+
+    Falls back to the ``title:`` field of the YAML front-matter, which marimo
+    derives from the name of the file, and then to the name of the file.
+    """
     lines = notebook.read_text().splitlines()
-    if lines and lines[0].strip() == "---":
-        for line in lines[1:]:
-            if line.strip() == "---":
-                break
-            if line.startswith("title:"):
-                return line.split(":", 1)[1].strip()
+    closing = [i for i, line in enumerate(lines) if i and line == "---"]
+    end = closing[0] + 1 if lines[:1] == ["---"] and closing else 0
+    front, body, fenced = lines[1:end - 1] if end else [], lines[end:], False
+    for line in body:
+        fenced ^= line.startswith("```")
+        if not fenced and line.startswith("# "):
+            return line[2:].strip()
+    for line in front:
+        if line.startswith("title:"):
+            return line.split(":", 1)[1].strip()
     return notebook.stem
 
 
@@ -87,12 +103,14 @@ def export(notebook: Path, *, check: bool) -> None:
             [sys.executable, "-m", "marimo", "export", "html", notebook.name,
              "-o", str(output), "-f"],
             cwd=NOTEBOOKS, check=True)
-        add_theme_style(output)
+        add_theme_style(output, title_of(notebook))
 
 
-def add_theme_style(output: Path) -> None:
-    """Insert :data:`THEME_STYLE` in the head of an exported notebook."""
-    text = output.read_text()
+def add_theme_style(output: Path, title: str) -> None:
+    """Insert :data:`THEME_STYLE` and ``title`` in an exported notebook."""
+    text = re.sub("<title>.*?</title>",
+                  lambda _: f"<title>{escape(title)}</title>",
+                  output.read_text(), count=1, flags=re.DOTALL)
     output.write_text(text.replace("</head>", THEME_STYLE + "</head>", 1))
 
 
@@ -100,7 +118,7 @@ def write_page(notebook: Path, *, rendered: bool) -> None:
     """Write the reStructuredText page for ``notebook``."""
     title = title_of(notebook)
     body = (IFRAME if rendered else FALLBACK).format(
-        name=notebook.stem, title=title)
+        name=notebook.stem, title=escape(title), source=SOURCE)
     (NOTEBOOKS / f"{notebook.stem}.rst").write_text(
         f"{title}\n{'=' * len(title)}\n\n" + body)
 

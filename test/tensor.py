@@ -4,9 +4,10 @@ pytest.importorskip("tensornetwork")
 
 import numpy as np
 import tensornetwork as tn
+from hypothesis import find
 from pytest import raises
 
-from discopy.utils import AxiomError
+from discopy.utils import AxiomError, dumps, loads
 from discopy.tensor import *
 from discopy import frobenius
 
@@ -37,6 +38,15 @@ def test_Dim():
     assert repr(Dim(1, 2, 3)) == str(dim) == "Dim(2, 3)"
     assert {dim: 42}[dim] == 42
     assert Dim(2, 3, 4).r == Dim(4, 3, 2)
+    assert loads(dumps(dim)) == dim and loads(dumps(Dim())) == Dim() == Dim(1)
+
+
+def test_Dim_unwind():
+    f = Box('f', Dim(2), Dim(2), [1, 0, 0, 1])
+    assert Dim(2).unwind() == Dim(2)
+    assert f.to_hypergraph().to_diagram() == f
+    assert (f @ f).foliation().inside == (Diagram.layer_factory(f, f), )
+    assert (f >> f).simplify() == f >> f
 
 
 def test_Tensor():
@@ -58,6 +68,15 @@ def test_Tensor():
     assert m == m and np.all(m.array == arr)
     m = Tensor([0, 1, 1, 0], Dim(2), Dim(2))
     assert Tensor.id(Dim(2)).then(*(m, m)) == m >> m.dagger()
+
+
+def test_Spider_array():
+    d = Dim(2)
+    assert (Spider(1, 2, d).array == Tensor.spiders(1, 2, d).array).all()
+    with raises(NotImplementedError):
+        Spider(1, 1, d, .5).eval()
+    with raises(NotImplementedError):
+        (Spider(1, 2, d) >> Spider(2, 1, d, .5)).to_tn()
 
 
 def test_Spider_to_tn():
@@ -430,3 +449,153 @@ def test_Functor_bubble():
     assert np.allclose(
         np.asarray(F(men_are_mortal.arg).array, dtype=float),
         np.asarray(men_are_mortal.arg.eval().array, dtype=float))
+
+
+def test_then_promotes_dtype():
+    """ The integer structural tensors compose with floats as units. """
+    g = Tensor([[.5, .5], [.25, .75]], Dim(2), Dim(2))
+    assert Tensor.id(Dim(2)) >> g == g == g >> Tensor.id(Dim(2))
+    assert Tensor.id(Dim(1)) @ g == g
+    assert Tensor.spiders(1, 1, Dim(2)) >> g == g
+    assert Tensor.swap(Dim(2), Dim(2)) >> g @ g\
+        == g @ g >> Tensor.swap(Dim(2), Dim(2))
+    copies = Tensor.copy(Dim(2)) >> g @ g
+    assert copies.dtype == g.dtype and np.allclose(
+        copies.array[0], np.outer(g.array[0], g.array[0]))
+    c = Tensor([[1j, 0], [0, 1]], Dim(2), Dim(2))
+    assert Tensor.id(Dim(2)) >> c == c
+    assert Tensor[float].id(Dim(2)) >> Tensor.id(Dim(2))\
+        == Tensor[float].id(Dim(2))
+
+
+def test_Tensor_is_markov():
+    """ Tensor has copy and discard, so a lens over it needs no discard. """
+    from discopy import lens
+    from discopy.abc import MarkovCategory
+    assert issubclass(Tensor, MarkovCategory)
+    g = Tensor([[.5, .5], [.25, .75]], Dim(2), Dim(2))
+    lifted = lens.Markov[Tensor].lift(g)
+    assert lifted.forward == Tensor.copy(Dim(2)) >> g @ Tensor.id(Dim(2))
+    assert lifted.put == Tensor.discard(Dim(2)) @ Tensor.id(Dim(1))
+    assert lifted.forward.dtype == g.dtype
+
+
+def test_Tensor_then_unbiased():
+    """ Composing several tensors folds Tensor.then, not Matrix.then. """
+    t = Tensor(list(range(16)), Dim(2, 2), Dim(2, 2))
+    assert t.then() == t
+    with raises(TypeError):
+        t.then(None)
+    with raises(TypeError):
+        t.then(None, t)
+    assert t.then(t, t) == t >> t >> t
+    u = Tensor(list(range(36)), Dim(2, 3), Dim(2, 3))
+    assert u.then(u, u) == u >> u >> u
+
+
+def test_Tensor_comonoid():
+    """ The spiders are a commutative comonoid under the Kronecker product. """
+    assert Tensor.copy(Dim(2)) == Tensor(
+        [1, 0, 0, 0, 0, 0, 0, 1], Dim(2), Dim(2, 2))
+    for x in (Dim(1), Dim(2), Dim(3), Dim(2, 2)):
+        assert Tensor.copy_coassociativity(x)
+        assert Tensor.copy_cocommutativity(x)
+        assert Tensor.copy_counitality(x)
+        assert Tensor.copy_coherence(x, Dim(3))
+
+
+def test_Tensor_ar():
+    """ A subscript of Tensor is its own factory, so its swaps keep dtype. """
+    assert Tensor[complex].ar is Tensor[complex]
+    assert Tensor.ar is Tensor and Box[complex].ar is Diagram
+    assert Swap[complex](Dim(2), Dim(3)).eval().dtype == complex
+    x, y = frobenius.Ty('x'), frobenius.Ty('y')
+    F = Functor({x: 2, y: 3}, {}, dtype=complex)
+    swap = frobenius.Swap(x, y)
+    assert F(swap).dtype == F(swap >> swap.dagger()).dtype == complex
+    assert F(frobenius.Permutation(x @ y @ x, [1, 2, 0])).dtype == complex
+
+
+def test_Tensor_strategy():
+    tensor = find(Tensor.strategy(), lambda t: len(t.dom) == 2 and t.cod)
+    assert isinstance(tensor, Tensor[int])
+    assert tensor.array.shape == tensor.dom.inside + tensor.cod.inside
+
+
+def test_delay_is_the_identity():
+    f = Box('f', Dim(2), Dim(2), [1, 0, 0, 1])
+    diagram = f @ Dim(3) >> Spider(1, 2, Dim(2)) @ Dim(3)\
+        >> Dim(2) @ Swap(Dim(2), Dim(3))
+    assert Dim(2).delay() == Dim(2) == Dim(2).head == Dim(2).tail
+    for d in (f, diagram):
+        assert d.delay() == d == d.delay(2) and d.delay().eval() == d.eval()
+
+
+def test_feedback_is_the_trace():
+    array = np.arange(36).reshape(2, 3, 2, 3)
+    f = Box('f', Dim(2, 3), Dim(2, 3), array.flatten())
+    right = np.einsum('aibi->ab', array)
+    for traced in (f.feedback(), f.feedback(1), f.feedback(mem=Dim(3)),
+                   f.feedback(dom=Dim(2), cod=Dim(2), mem=Dim(3)),
+                   f.trace(), f.trace(1), f.trace(mem=Dim(3))):
+        assert isinstance(traced, Diagram)
+        assert np.array_equal(traced.eval().array, right)
+    left = np.einsum('iaib->ab', array)
+    for traced in (f.feedback(left=True), f.trace(mem=Dim(2), left=True)):
+        assert np.array_equal(traced.eval().array, left)
+
+
+def test_spider_with_no_legs_is_the_circle():
+    for d in [Dim(2), Dim(3), Dim(2, 3)]:
+        circle = Tensor.spiders(0, 1, d) >> Tensor.spiders(1, 0, d)
+        assert Tensor.spiders(0, 0, d) == circle
+
+
+def test_Box_dagger_is_not_the_box():
+    t = Box('t', Dim(2), Dim(2), data=[1, 2, 3, 4])
+    assert t.dagger() != t and t.dagger().dagger() == t
+    assert hash(t.dagger()) != hash(t)
+
+
+def test_Tensor_trace():
+    f = Tensor[int](list(range(64)), Dim(2, 2, 2), Dim(2, 2, 2))
+    x, y = Dim(2), Dim(2, 2)
+    feedback = y @ Tensor[int].caps(x, x) >> f @ x >> y @ Tensor[int].cups(x, x)
+    assert f.trace() == f.trace(mem=x) == feedback
+    assert f.trace(0) == f and f.trace(3).dom == f.trace(3).cod == Dim(1)
+    with raises(AxiomError):
+        Tensor[int]([0, 1, 2, 3, 4, 5], Dim(2), Dim(3)).trace()
+    with raises(ValueError):
+        Tensor[int]([0, 1, 2, 3], Dim(2), Dim(2)).trace(2)
+    g = Tensor[int](list(range(8)), Dim(2, 2), Dim(2))
+    assert g.trace() == Tensor[int]([0 + 3, 4 + 7], Dim(2), Dim(1))
+    assert g.trace(left=True) == Tensor[int]([0 + 5, 2 + 7], Dim(2), Dim(1))
+
+
+def test_Tensor_repeat():
+    swap = Tensor[bool].swap(Dim(2), Dim(2))
+    assert swap.repeat() == swap + Tensor[bool].id(Dim(2, 2))
+    with raises(TypeError):
+        Tensor[int].swap(Dim(2), Dim(2)).repeat()
+    with raises(TypeError):
+        Tensor[bool]([1, 0, 0, 1, 1, 0], Dim(2), Dim(3)).repeat()
+
+
+def test_spider_with_no_legs_in_every_dtype():
+    for dtype, circle in [(bool, True), (int, 2), (float, 2.), (complex, 2)]:
+        assert Tensor[dtype].spiders(0, 0, Dim(2)).array == circle
+
+
+def test_to_tn_state_spider():
+    for diagram in [Spider(0, 1, Dim(2)) @ Id(Dim(3)), Spider(0, 2, Dim(2))]:
+        nodes, order = diagram.to_tn()
+        array = tn.contractors.auto(nodes, output_edge_order=order).tensor
+        assert array.tolist() == diagram.eval().array.tolist()
+
+
+def test_Functor_no_dtype_repr_and_algebraic_conjugate():
+    from discopy.quantum.channel import Channel, Q
+    F = Functor({frobenius.Ty('x'): 2}, {}, dtype=None)
+    assert "dtype=None" in repr(F)
+    conjugate = Channel.id(Q(Dim(2))).conjugate(diagrammatic=False)
+    assert isinstance(conjugate, Channel)

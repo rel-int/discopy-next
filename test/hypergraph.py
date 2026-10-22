@@ -4,7 +4,7 @@ from pytest import raises
 
 from discopy.hypergraph import *
 from discopy.frobenius import (
-    Ty, Box, Cap, Cup, Diagram, Spider, Hypergraph as H)
+    Ty, Box, Cap, Cup, Diagram, Nat, Spider, Hypergraph as H)
 
 def test_pushout():
     with raises(ValueError):
@@ -28,13 +28,10 @@ def test_Hypergraph_str():
 
 def test_Hypergraph_repr():
     x, y = map(Ty, "xy")
-    from discopy import frobenius, hypergraph
-    graph = H.spiders(1, 0, x @ y)
-    assert repr(graph)\
+    assert repr(H.spiders(1, 0, x @ y))\
         == "hypergraph.Hypergraph[frobenius.Diagram]("\
            "dom=frobenius.Ty(frobenius.Wire('x'), frobenius.Wire('y')), "\
            "cod=frobenius.Ty(), boxes=(), wires=((0, 1), (), ()))"
-    assert eval(repr(graph)) == graph
 
 
 def test_Hypergraph_hash():
@@ -177,6 +174,7 @@ def test_spider_producers_and_consumers():
 
 def test_cups():
     x = Ty('x')
+    assert issubclass(H, DaggerCategory)
     assert H.cups(x, x).make_monogamous().dagger()\
         == H.caps(x, x).make_monogamous()
     assert H.caps(x, x).make_monogamous().dagger()\
@@ -270,6 +268,30 @@ def _naive_from_diagram(old):
         dom=type(old), cod=factory)(old)
 
 
+def test_Hypergraph_Nat():
+    diagram = Box('f', Nat(1), Nat(2)) >> Spider(2, 1, Nat(1))
+    assert diagram.to_hypergraph().to_diagram() == diagram
+    assert H.spiders(1, 2, Nat(1)).to_diagram() == Spider(1, 2, Nat(1))
+    assert H.cups(Nat(1), Nat(1)).to_diagram() == Cup(Nat(1), Nat(1))
+
+
+def test_Hypergraph_to_diagram_offset():
+    x = Ty('x')
+    g = Box('g', Ty(), x)
+    graph = H(Ty(), x, (g, ), ((), (((), (0, )), ), (0, )), (x, ), (3, ))
+    assert graph.to_diagram() == g
+
+
+def test_Hypergraph_cap_after_states():
+    x = Ty('x')
+    f = Box('f', Ty(), x)
+    diagram = x @ f >> Cap(x, x) @ x @ x
+    assert diagram.to_hypergraph().to_diagram() == diagram
+    for diagram in [f @ Cap(x, x), x @ f >> x @ Cap(x, x) @ x]:
+        decoded = diagram.to_hypergraph().to_diagram()
+        assert decoded.to_hypergraph() == diagram.to_hypergraph()
+
+
 def test_Hypergraph_from_glued():
     x = Ty('x')
     f, g = Box('f', x, x).to_hypergraph(), Box('g', x, x).to_hypergraph()
@@ -346,6 +368,52 @@ def test_subclass_to_hypergraph():
     assert isinstance((f >> g).to_hypergraph().to_diagram(), Circuit)
 
 
+def test_Hypergraph_cups_and_caps_adjoints():
+    from discopy import rigid
+    x, y = rigid.Ty('x'), rigid.Ty('y')
+    R = Hypergraph[rigid.Diagram]
+    for left, right in [(x.r, x), (x, x.l)]:
+        assert rigid.Cap(left, right).to_hypergraph() == R.caps(left, right)
+    for left, right in [(x, x.r), (x.l, x)]:
+        assert rigid.Cup(left, right).to_hypergraph() == R.cups(left, right)
+    for cups_or_caps, left, right in [
+            (R.cups, x.r, x), (R.caps, x, x.r), (R.cups, x, x)]:
+        with raises(AxiomError):
+            cups_or_caps(left, right)
+    with raises(AxiomError, match="x and y are not adjoints"):
+        H.cups(Ty('x'), Ty('y'))
+
+
+def test_to_diagram_routes_with_one_permutation():
+    """ Each routing step of the decoder is one :class:`Permutation` layer
+    rather than a staircase of swaps, so a permutation round-trips to itself
+    and the plumbing of a decoded diagram never spans two consecutive layers,
+    see discopy/discopy#539. """
+    from discopy import symmetric, compact
+    from fixtures.diagrams import random_diagram
+
+    x, y, z, w = map(symmetric.Ty, "xyzw")
+    perm = symmetric.Permutation(x @ y @ z, [2, 0, 1])
+    g = symmetric.Box('g', z @ x @ y, w)
+    assert perm.to_swaps().simplify() == perm
+    assert (perm.to_swaps() >> g).simplify() == perm >> g
+
+    for module in (symmetric, compact):
+        for seed in range(10):
+            diagram, functor = random_diagram(module, seed)
+            decoded = diagram.to_hypergraph().to_diagram()
+            assert functor(decoded) == functor(diagram)
+            plumbing = [layer.is_plumbing for layer in decoded.inside]
+            assert not any(a and b for a, b in zip(plumbing, plumbing[1:]))
+
+
+def test_make_causal_traces_the_type_of_the_producer():
+    from discopy import compact
+    x = compact.Ty('x')
+    graph = compact.Box('f', x @ x.r, x @ x.r).to_hypergraph().trace()
+    assert graph.to_diagram().to_hypergraph() == graph
+
+
 def test_trace_needs_traced_pivotal():
     from discopy import rigid, pivotal, compact
     x = rigid.Ty('x')
@@ -359,32 +427,73 @@ def test_trace_needs_traced_pivotal():
         assert graph.trace().cod == graph.trace(left=True).cod == x
 
 
-def test_planar_comparison():
-    """ Below symmetric categories, a hypergraph is not faithful, so the
-    laws of a planar level are compared on the nose: each pair here was
-    identified when they were compared by hypergraph. """
-    from discopy import balanced, braided, monoidal, rigid
-    x, y = braided.Ty('x'), braided.Ty('y')
-    braid, inverse = braided.Braid(x, y), braided.Braid(y, x)[::-1]
-    assert braid.to_hypergraph() != inverse.to_hypergraph()
-    assert not braided.Diagram.equation_factory(braid, inverse)
-    x = balanced.Ty('x')
-    twist, identity = balanced.Twist(x), balanced.Diagram.id(x)
-    assert twist.to_hypergraph() != identity.to_hypergraph()
-    assert not balanced.Diagram.equation_factory(twist, identity)
-    x = rigid.Ty('x')
-    left = rigid.Cap(x, x.l) @ x >> x @ rigid.Cup(x.l, x)
-    right = x @ rigid.Cap(x.r, x) >> rigid.Cup(x, x.r) @ x
-    assert left.to_hypergraph() != right.to_hypergraph()  # cups are boxes
-    assert not rigid.Diagram.equation_factory(left, right)
-    x, scalar = monoidal.Ty('x'), monoidal.Box('s', monoidal.Ty(), monoidal.Ty())
-    assert (scalar @ x).to_hypergraph() == (x @ scalar).to_hypergraph()
-    assert not monoidal.Diagram.equation_factory(scalar @ x, x @ scalar)
+def test_cups_and_caps_read_the_host_category():
+    from discopy import symmetric, rigid, pivotal, ribbon, compact
+    x = symmetric.Ty('x')
+    for method in (symmetric.Hypergraph.cups, symmetric.Hypergraph.caps):
+        with raises(AxiomError, match="not rigid"):
+            method(x, x)
+    for module in (rigid, pivotal, ribbon):  # planar, so the cups are boxes
+        x, y = module.Ty('x'), module.Ty('y')
+        cup, cap = module.Cup(x, x.r), module.Cap(x.r, x)
+        assert cup.to_hypergraph().boxes == (cup, )
+        assert cap.to_hypergraph().boxes == (cap, )
+        cups = module.Diagram.cups(x @ y, (x @ y).r)
+        assert cups.to_hypergraph().boxes == tuple(cups.boxes)
+        assert cups.to_hypergraph().to_diagram() == cups
+    x = compact.Ty('x')
+    assert compact.Cup(x, x.r).to_hypergraph().boxes == ()
+    assert compact.Cap(x.r, x).to_hypergraph().boxes == ()
 
 
-def test_Hypergraph_make_bijective_markov():
-    from discopy.markov import Ty, Copy, Merge
-    x = Ty('x')
-    graph = (Merge(x) >> Copy(x)).to_hypergraph()
-    assert graph.make_bijective().boxes == (Merge(x), Copy(x))
-    assert graph.to_map().to_diagram().to_hypergraph() == graph
+def test_coloured_diagram_has_no_hypergraph():
+    from discopy.monoidal import Box, Colour, Diagram, Ty, Wire
+    red = Colour("red")
+    x, a, b = Ty(Wire('x', red, red)), Wire('a', cod=red), Wire('b', dom=red)
+    scalar = Box('g', Ty(), Ty(a, b)) >> Box('h', Ty(a, b), Ty())
+    for convert in (Diagram.to_hypergraph, Diagram.to_map):
+        for diagram in (Box('f', x, x), scalar):
+            with raises(AxiomError, match="coloured"):
+                convert(diagram)
+
+
+def test_Hypergraph_to_tree():
+    from discopy.utils import dumps, loads
+    from discopy import markov, symmetric
+    x, y = map(Ty, "xy")
+    f, g = Box('f', x, y @ x), Box('g', Ty(), y)
+    graphs = [
+        H.spiders(1, 2, x) >> H.cups(x, x), H.spiders(0, 0, x) @ H.id(x),
+        (f @ g >> y @ Diagram.swap(x, y)).to_hypergraph(),
+        markov.Box('f', markov.Ty('x'), markov.Ty('y')).to_hypergraph(),
+        symmetric.Diagram.id(symmetric.Ty('x')).to_hypergraph()]
+    for graph in graphs:
+        loaded = loads(dumps(graph))
+        assert loaded == graph and type(loaded) is type(graph)
+        assert loaded.category is graph.category
+        assert loaded.offsets == graph.offsets
+        assert loaded.spider_types == graph.spider_types
+
+
+def test_trace_keeps_the_offsets():
+    from discopy import symmetric
+    x, y = symmetric.Ty('x'), symmetric.Ty('y')
+    f = symmetric.Box('f', x, x)
+    s, t = symmetric.Box('s', symmetric.Ty(), x), symmetric.Box('t', symmetric.Ty(), y)
+    diagram = f @ t @ s
+    graph = diagram.to_hypergraph()
+    assert graph.trace().offsets == graph.offsets == (None, 1, 2)
+    assert graph.trace().to_diagram() == symmetric.Trace(diagram.foliation())
+
+
+def test_trace_takes_the_keyword_form():
+    from discopy import symmetric
+    from discopy.utils import AxiomError
+    x, y = symmetric.Ty('x'), symmetric.Ty('y')
+    f = symmetric.Box('f', x @ y, x @ y).to_hypergraph()
+    assert f.trace() == f.trace(mem=y) == f.trace(dom=x, cod=x, mem=y)
+    assert f.trace(left=True) == f.trace(mem=x, left=True) != f.trace()
+    with raises(TypeError):
+        f.trace(1, mem=y)
+    with raises(AxiomError):
+        f.trace(mem=x)

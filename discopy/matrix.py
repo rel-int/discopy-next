@@ -40,23 +40,27 @@ from contextlib import contextmanager
 from operator import index
 from types import ModuleType
 from collections.abc import Sequence
-from typing import Literal, Callable, TYPE_CHECKING
+from typing import Union, Literal as L, Callable, TYPE_CHECKING
 
-from discopy import monoidal, config, messages
-from discopy.abc import MarkovCategory, NamedGeneric, Nat
+from discopy import config, messages
+from discopy.abc import (
+    ComarkovCategory, DaggerCategory, MarkovCategory, NamedGeneric, Nat)
+from discopy.axioms import Testable
 from discopy.cat import (
     factory,
     assert_iscomposable,
     assert_isparallel,
 )
-from discopy.utils import assert_isinstance, unbiased
+from discopy.utils import (
+    assert_isinstance, factory_name, from_tree, unbiased)
 
 if TYPE_CHECKING:
     import sympy
 
 
 @factory
-class Matrix[dtype](MarkovCategory, NamedGeneric):
+class Matrix(MarkovCategory, ComarkovCategory, DaggerCategory,
+             Testable["Matrix"], NamedGeneric['dtype']):
     """
     A matrix is an ``array`` with natural numbers as ``dom`` and ``cod``.
 
@@ -67,6 +71,7 @@ class Matrix[dtype](MarkovCategory, NamedGeneric):
             id
             then
             tensor
+            promote
             zero
             swap
             transpose
@@ -77,6 +82,7 @@ class Matrix[dtype](MarkovCategory, NamedGeneric):
             copy
             discard
             merge
+            noise
             basis
             repeat
             trace
@@ -100,6 +106,13 @@ class Matrix[dtype](MarkovCategory, NamedGeneric):
     >>> assert Matrix([1, 0], dom=1, cod=2).dtype == np.int64
     >>> assert Matrix([0.5, 0.5], dom=1, cod=2).dtype == np.float64
     >>> assert Matrix([0.5j], dom=1, cod=1).dtype == np.complex128
+
+    Composition promotes the data type as the backend does, see
+    :meth:`promote`, so that the integer identity is a unit for a float
+    matrix rather than casting it to integers.
+
+    >>> m = Matrix([[.5, .5], [.25, .75]], 2, 2)
+    >>> assert Matrix.id(2) >> m == m == m >> Matrix.id(2)
 
     The data type needs to have the structure of a rig (riNg with no negatives)
     i.e. with methods ``__add__`` and ``__mul__`` as well as an ``__init__``
@@ -131,6 +144,33 @@ class Matrix[dtype](MarkovCategory, NamedGeneric):
     """
     ob = Nat
 
+    @classmethod
+    def strategy(cls, *, dom=None, cod=None, max_size=3, max_entry=3):
+        """
+        Generate matrices with entries in ``range(max_entry + 1)`` between
+        the given dimensions, or between dimensions up to ``max_size``:
+        small integers are exact in every ``dtype``, so the laws are checked
+        without rounding. The bare class generates ``Matrix[int]``, which
+        reads back from its representation where the ``int64`` it infers
+        names a type no namespace binds.
+        """
+        from hypothesis import strategies as st
+
+        typed = cls[cls.dtype or int]
+        dims = cls.ob.strategy(max_size=max_size)
+
+        @st.composite
+        def matrices(draw):
+            """ Draw the shape, then one entry per coefficient. """
+            shape = tuple(draw(dims) if x is None else x for x in (dom, cod))
+            size = index(shape[0]) * index(shape[1])
+            entries = st.lists(
+                st.integers(min_value=0, max_value=max_entry),
+                min_size=size, max_size=size)
+            return typed(draw(entries), *shape)
+
+        return matrices()
+
     def cast(self, dtype: type) -> Matrix:
         """
         Cast a matrix to a given ``dtype``.
@@ -144,6 +184,38 @@ class Matrix[dtype](MarkovCategory, NamedGeneric):
         """
         return type(self)[dtype](self.array, self.dom, self.cod)
 
+    def promote(self, *others: Matrix) -> type:
+        """
+        The class of a composite of matrices, i.e. of their product,
+        direct sum or sum: the one with the ``dtype`` the backend promotes
+        their arrays to, read from the operand that already has it so that
+        a declared ``dtype`` survives composition with the integer
+        structural matrices, e.g. ``float`` rather than ``numpy.float64``.
+
+        Parameters:
+            others : The matrices to compose with.
+
+        Example
+        -------
+        >>> m = Matrix([[.5, .5], [.25, .75]], 2, 2)
+        >>> assert Matrix.id(2).promote(m) == m.promote(Matrix.id(2))\\
+        ...     == Matrix[m.dtype]
+        >>> assert Matrix[float].id(2).promote(Matrix.id(2)) == Matrix[float]
+        >>> assert Matrix[bool].id(2).promote(Matrix[bool].id(2))\\
+        ...     == Matrix[bool]
+        """
+        with backend() as np:
+            dtype = self.array.dtype
+            for other in others:
+                dtype = np.result_type(
+                    np.zeros((), dtype=dtype), other.array)
+        if dtype == self.array.dtype:
+            return type(self)
+        for other in others:
+            if dtype == other.array.dtype:
+                return type(self)[other.dtype]
+        return type(self)[getattr(dtype, "type", dtype)]
+
     def __new__(cls, array, *args, **kwargs):
         with backend() as np:
             if cls.dtype is None:
@@ -155,7 +227,7 @@ class Matrix[dtype](MarkovCategory, NamedGeneric):
                 return cls.__new__(cls[dtype], array, *args, **kwargs)
             return object.__new__(cls)
 
-    def __init__(self, array, dom: Nat | int, cod: Nat | int):
+    def __init__(self, array, dom: Nat, cod: Nat):
         dom, cod = (Nat(x) if isinstance(x, int) else x for x in (dom, cod))
         assert_isinstance(dom, Nat)
         assert_isinstance(cod, Nat)
@@ -222,6 +294,52 @@ class Matrix[dtype](MarkovCategory, NamedGeneric):
         return type(self).__name__ + f"({array2string(np_array.reshape(-1))},"\
                                      f" dom={self.dom}, cod={self.cod})"
 
+    def to_tree(self) -> dict:
+        """
+        Serialise a matrix, see :func:`discopy.utils.dumps`.
+
+        The ``dtype`` travels in the factory name, as it does in the
+        ``repr``, so that a matrix comes back with the entries it was
+        written with rather than the ones its array implies.
+
+        Example
+        -------
+        >>> from discopy.utils import dumps, loads
+        >>> m = Matrix[float]([1], 1, 1)
+        >>> m.to_tree()['factory']
+        'matrix.Matrix[float]'
+        >>> assert loads(dumps(m)) == m != Matrix([1], 1, 1)
+        """
+        with backend() as np:
+            array = np.array(self.array).reshape(-1).tolist()
+        return {
+            'factory': factory_name(type(self)),
+            'array': array,
+            'dom': self.dom.to_tree(),
+            'cod': self.cod.to_tree()}
+
+    @classmethod
+    def from_tree(cls, tree: dict) -> Matrix:
+        """
+        Decode a serialised matrix, see :func:`discopy.utils.loads`.
+
+        Parameters:
+            tree : DisCoPy serialisation.
+
+        The class the tree names is the subscripted one, so the pair is
+        read through :func:`discopy.utils.from_tree` rather than off the
+        bare class, which would infer a ``dtype`` from the array instead.
+
+        Example
+        -------
+        >>> from discopy.utils import from_tree
+        >>> m = Matrix[int]([0, 1, 1, 0], 2, 2)
+        >>> assert from_tree(m.to_tree()) == m
+        >>> assert Matrix.from_tree(m.to_tree()).dtype != int
+        """
+        dom, cod = map(from_tree, (tree['dom'], tree['cod']))
+        return cls(tree['array'], dom, cod)
+
     def __iter__(self):
         for i in self.array:
             yield i
@@ -248,33 +366,51 @@ class Matrix[dtype](MarkovCategory, NamedGeneric):
 
     @unbiased
     def then(self, other: Matrix) -> Matrix:
-        assert_isinstance(other, type(self))
+        assert_isinstance(other, self.ar)
         assert_iscomposable(self, other)
         with backend() as np:
             array = np.matmul(self.array, other.array)
-        return type(self)(array, self.dom, other.cod)
+        return self.promote(other)(array, self.dom, other.cod)
 
-    def tensor(self, other: Matrix | None = None, *others: Matrix):
-        if others or other is None:
-            return monoidal.Diagram.tensor(
-                self, other, *others)  # ty: ignore[invalid-argument-type]
-        assert_isinstance(other, type(self))
-        dom, cod = self.dom @ other.dom, self.cod @ other.cod
-        array = self.zero(dom, cod).array
-        array[:self.dom, :self.cod] = self.array
-        array[self.dom:, self.cod:] = other.array
-        return type(self)(array, dom, cod)
+    def tensor(self, *others: Matrix):
+        """
+        The direct sum of ``n`` matrices, i.e. one block-diagonal array with
+        a block for each matrix.
+
+        >>> one, two = Matrix([1], 1, 1), Matrix([2], 1, 1)
+        >>> assert one.tensor(two) == Matrix([1, 0, 0, 2], 2, 2)
+        """
+        if not others:
+            return self
+        for other in others:
+            assert_isinstance(other, self.ar)
+        cls = self.promote(*others)
+        dom = self.dom.tensor(*(other.dom for other in others))
+        cod = self.cod.tensor(*(other.cod for other in others))
+        blocks, width, j = [], index(cod), 0
+        with backend() as np:
+            for factor in (self, ) + others:
+                rows, columns = index(factor.dom), index(factor.cod)
+                left = cls.zero(rows, j).array
+                right = cls.zero(rows, width - j - columns).array
+                blocks.append(np.concatenate([
+                    left, cls(factor.array, factor.dom, factor.cod).array,
+                    right], axis=1))
+                j += columns
+            array = np.concatenate(blocks, axis=0)
+        return cls(array, dom, cod)
 
     def __add__(self, other):
-        assert_isinstance(other, Matrix)
+        assert_isinstance(other, self.ar)
         assert_isparallel(self, other)
-        return type(self)(self.array + other.array, self.dom, self.cod)
+        return self.promote(other)(
+            self.array + other.array, self.dom, self.cod)
 
     def __radd__(self, other):
         return self if other == 0 else self.__add__(other)
 
     @classmethod
-    def zero(cls, dom: Nat | int, cod: Nat | int) -> Matrix:
+    def zero(cls, dom: Nat, cod: Nat) -> Matrix:
         """
         Returns the zero matrix of a given shape.
 
@@ -287,7 +423,7 @@ class Matrix[dtype](MarkovCategory, NamedGeneric):
                 (index(dom), index(cod)), dtype=cls.dtype or int), dom, cod)
 
     @classmethod
-    def swap(cls, left: Nat | int, right: Nat | int) -> Matrix:
+    def swap(cls, left: Nat, right: Nat) -> Matrix:
         """
         The matrix that swaps left and right dimensions.
 
@@ -302,12 +438,7 @@ class Matrix[dtype](MarkovCategory, NamedGeneric):
         >>> Matrix.swap(2,1)
         Matrix[int64]([0, 1, 0, 0, 0, 1, 1, 0, 0], dom=3, cod=3)
         """
-        left, right = index(left), index(right)
-        dom = cod = left + right
-        array = Matrix.zero(dom, cod).array
-        array[:left, right:] = Matrix.id(left).array
-        array[left:, :right] = Matrix.id(right).array
-        return cls(array, dom, cod)
+        return cls.permutation([1, 0], [left, right])
 
     braid = swap
 
@@ -346,7 +477,10 @@ class Matrix[dtype](MarkovCategory, NamedGeneric):
             raise ValueError
         offsets = [sum(doms[:i]) for i in range(len(doms))]
         sources = [offsets[i] + j for i in xs for j in range(doms[i])]
-        array = [[int(i == j) for j in sources] for i in range(len(sources))]
+        with backend() as np:
+            array = np.array([
+                [i == j for j in sources] for i in range(len(sources))],
+                dtype=cls.dtype or int)
         return cls(array, len(sources), len(sources))
 
     def transpose(self) -> Matrix:
@@ -369,26 +503,42 @@ class Matrix[dtype](MarkovCategory, NamedGeneric):
         return type(self)(array, self.dom, self.cod)
 
     @classmethod
-    def copy(cls, x: Nat | int, n: int = 2) -> Matrix:
+    def copy(cls, x: Nat, n: int = 2) -> Matrix:
+        """
+        The diagonal ``x -> n * x`` of the direct sum, i.e. ``n`` identities
+        side by side: ``array[i, j]`` is one iff ``j % x == i``.
+
+        Parameters:
+            x : The dimension to copy.
+            n : The number of copies.
+
+        Example
+        -------
+        >>> Matrix.copy(2)
+        Matrix[int64]([1, 0, 1, 0, 0, 1, 0, 1], dom=2, cod=4)
+        >>> assert Matrix.copy(2) >> Matrix.id(2) @ Matrix.discard(2)\\
+        ...     == Matrix.id(2)
+        """
         x = index(x)
-        array = [[i + int(j % n * x) == j
-                  for j in range(n * x)] for i in range(x)]
+        with backend() as np:
+            array = np.array([
+                [j % x == i for j in range(n * x)] for i in range(x)],
+                dtype=cls.dtype or int)
         return cls(array, x, n * x)
 
     @classmethod
-    def discard(cls, x: Nat | int) -> Matrix:
-        return cls.copy(x, 0)
-
-    @classmethod
-    def merge(cls, x: Nat | int, n: int) -> Matrix:
+    def merge(cls, x: Nat, n: int = 2) -> Matrix:
+        """ The codiagonal ``n * x -> x``, the dagger of :meth:`copy`. """
         return cls.copy(x, n).dagger()
 
     @classmethod
-    def ones(cls, x: Nat | int) -> Matrix:
-        return cls.merge(x, 0)
+    def ones(cls, x: Nat) -> Matrix:
+        """ The unit ``0 -> x`` of the direct sum, an alias of :meth:`noise`.
+        """
+        return cls.noise(x)
 
     @classmethod
-    def basis(cls, x: Nat | int, i: int) -> Matrix:
+    def basis(cls, x: Nat, i: int) -> Matrix:
         """
         The ``i``-th basis vector of dimension ``x``.
 
@@ -465,8 +615,7 @@ def array2string(array, **params):
     """ Numpy array pretty print. """
     import numpy
     numpy.set_printoptions(threshold=config.NUMPY_THRESHOLD)
-    params.pop('separator', None)
-    return numpy.array2string(array, **params, separator=', ')\
+    return numpy.array2string(array, **dict(params, separator=', '))\
         .replace('[ ', '[').replace('  ', ' ')
 
 
@@ -478,7 +627,7 @@ class Backend:
         module : The main module of the backend.
         array : The array class of the backend.
     """
-    def __init__(self, module: ModuleType, array: Callable | None = None):
+    def __init__(self, module: ModuleType, array: type = None):
         self.module, self.array = module, array or module.array
 
     def __getattr__(self, attr):
@@ -509,8 +658,8 @@ class PyTorch(Backend):
 class TensorFlow(Backend):
     """ TensorFlow backend. """
     def __init__(self):
-        import tensorflow.experimental.numpy as tnp  # ty: ignore
-        from tensorflow.python.ops.numpy_ops import np_config  # ty: ignore
+        import tensorflow.experimental.numpy as tnp
+        from tensorflow.python.ops.numpy_ops import np_config
         np_config.enable_numpy_behavior()
         super().__init__(tnp)
 
@@ -522,12 +671,12 @@ BACKENDS = {
     'tensorflow': TensorFlow,
 }
 
-BackendName = Literal["numpy", "jax", "pytorch", "tensorflow"]
+BackendName = Union[tuple(L[x] for x in BACKENDS)]
 
 
 @contextmanager
-def backend(name: BackendName | None = None,
-            _stack: list = [config.DEFAULT_BACKEND], _cache=dict()):
+def backend(name: BackendName = None,
+            _stack=[config.DEFAULT_BACKEND], _cache=dict()):
     """
     Context manager for matrix backend.
 

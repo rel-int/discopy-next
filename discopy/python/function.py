@@ -34,7 +34,7 @@ Ty = List[type]
 
 @factory
 @dataclass(unsafe_hash=True)
-class Function(Category[Ty, "Function"]):
+class Function(Category):
     """
     Python function with sequential composition.
 
@@ -62,7 +62,7 @@ class Function(Category[Ty, "Function"]):
     ob = Ty
     type_checking = True
 
-    def __init__(self, inside: Callable, dom: Ty | type, cod: Ty | type):
+    def __init__(self, inside: Callable, dom: Ty, cod: Ty):
         self.inside, self.dom, self.cod = (
             inside, self.ob.cast(dom), self.ob.cast(cod))
 
@@ -76,17 +76,33 @@ class Function(Category[Ty, "Function"]):
         """
         return cls(lambda *xs: untuplify(xs), dom, dom)
 
-    def then(self, other: Function) -> Function:
+    def then(self, *others: Function) -> Function:
         """
-        The sequential composition of two functions, called with :code:`>>`.
+        The sequential composition of ``n`` functions, called with
+        :code:`>>`.
 
         Parameters:
-            other : The other function to compose in sequence.
+            others : The other functions to compose in sequence.
+
+        Example
+        -------
+        >>> from discopy.python.multiplicative import Function
+        >>> succ = Function(lambda x: x + 1, (int, ), (int, ))
+        >>> assert succ.then(succ, succ)(0) == 3
         """
-        assert_isinstance(other, type(self))
-        assert_iscomposable(self, other)
-        return type(self)(
-            lambda *args: other(*tuplify(self(*args))), self.dom, other.cod)
+        if not others:
+            return self
+        factors = (self, ) + others
+        for factor, other in zip(factors, others):
+            assert_isinstance(other, type(self))
+            assert_iscomposable(factor, other)
+        *before, last = factors
+
+        def inside(*args):
+            for factor in before:
+                args = tuplify(factor(*args), len(factor.cod))
+            return last(*args)
+        return type(self)(inside, self.dom, others[-1].cod)
 
     @classproperty
     @contextmanager
@@ -144,4 +160,4 @@ class EndoFunctor(Functor):
     def __call__(self, other):
         if isinstance(other, Function):
             return self.ar_map[other]
-        return self.ob_map[Ty.cast(other)]  # ty: ignore[invalid-argument-type]
+        return self.ob_map[Ty.cast(other)]

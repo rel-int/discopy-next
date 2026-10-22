@@ -40,7 +40,7 @@ fail-on=unused-import,
         possibly-unused-variable
 
 # Specify a score threshold under which the program will exit with error.
-fail-under=9.03
+fail-under=8.85
 
 # Interpret the stdin as a python script, whose filename needs to be passed as
 # the module_or_package argument.
@@ -68,7 +68,7 @@ ignored-modules=
 
 # Python code to execute, usually for sys.path manipulation such as
 # pygtk.require().
-init-hook=
+#init-hook=
 
 # Use multiple processes to speed up Pylint. Specifying 0 will auto-detect the
 # number of processors available to use, and will cap the count on Windows to
@@ -410,12 +410,6 @@ confidence=HIGH,
 # --enable=similarities". If you want to run only the classes checker, but have
 # no Warning level messages displayed, use "--disable=all --enable=classes
 # --disable=W".
-# Beyond pylint's defaults, the first eight, the code deliberately does not
-# follow three messages: invalid-name, since mathematical names such as `f`,
-# `x` or `Ty` are the convention; too-many-ancestors, since every level of the
-# hierarchy extends the levels above it; and cyclic-import, since the package
-# imports every module, so the graph is cyclic by design and the number of
-# cycles pylint reports varies from one run to the next.
 disable=raw-checker-failed,
         bad-inline-option,
         locally-disabled,

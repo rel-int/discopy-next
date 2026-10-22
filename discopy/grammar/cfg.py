@@ -155,8 +155,7 @@ class Rule(Tree, thue.Rule):
     A rule is a generator of free operads, given by an atomic type ``dom``,
     a type ``cod`` of arbitrary length and an optional ``name``.
     """
-    def __init__(
-            self, dom: monoidal.Ty, cod: monoidal.Ty, name: str | None = None):
+    def __init__(self, dom: monoidal.Ty, cod: monoidal.Ty, name: str = None):
         assert_isinstance(dom, Ty)
         assert_isatomic(cod, Ty)
         thue.Rule.__init__(self, dom=dom, cod=cod, name=name)

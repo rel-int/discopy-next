@@ -2,7 +2,7 @@
 
 """
 The traced category of feedforward neural networks: lists of shapes as
-objects, layers as boxes, with copy, discard, swap and trace.
+objects, layers as boxes, with copy, discard, merge, noise, swap and trace.
 
 A :class:`Dims` is a list of :class:`Dim`, i.e. a tuple of tensors with one
 shape per leg. A :class:`Box` from ``Dims(a_1, ..., a_m)`` to
@@ -12,8 +12,9 @@ of such layers: composition ``>>`` feeds the outputs of one into the inputs
 of the next, tensor ``@`` runs two side by side, :meth:`Network.copy` sends
 an activation to several layers, :meth:`Network.discard` drops one and
 :meth:`Network.trace` feeds an output back into an input, as a recurrent
-network does. Networks form the free traced Markov category on their boxes,
-see :mod:`discopy.markov` and :mod:`discopy.traced`. A feedforward network
+network does. Networks form the free traced Markov and comarkov category on
+their boxes, see :mod:`discopy.markov`, :mod:`discopy.comarkov` and
+:mod:`discopy.feedback`. A feedforward network
 compiles to a function on tensors with :meth:`Network.to_function`, which
 :mod:`discopy.neural.torch` wraps as a PyTorch module and ``jax.jit`` takes
 as it is.
@@ -34,7 +35,12 @@ Summary
     Copy
     Merge
     Discard
+    Noise
+    Feedback
     Trace
+    FollowedBy
+    Head
+    Tail
     Functor
 
 Example
@@ -59,7 +65,7 @@ two back together; a recurrent cell feeds one of its outputs back in.
 
 from __future__ import annotations
 
-from discopy import markov, monoidal, python
+from discopy import comarkov, feedback, markov, messages, monoidal, python
 from discopy.cat import factory
 from discopy.monoidal import Dim
 from discopy.utils import (
@@ -91,9 +97,6 @@ class Dims(monoidal.Ty):
     >>> assert loads(dumps(Dims(2, Dim(2, 3)))) == Dims(2, Dim(2, 3))
     """
     generator_factory = Dim
-    box_factory = None
-    """ No generator of one colour is named, so there is no canonical
-    instance of a law, see :meth:`discopy.axioms.Axiom.canonical`. """
 
     def __init__(self, *inside: int | Dim, **kwargs):
         inside = kwargs.pop('inside', inside)
@@ -108,6 +111,8 @@ class Dims(monoidal.Ty):
         return f"Dims({', '.join(map(repr, self.inside))})"
 
     __str__ = __repr__
+
+    delay, head, tail = Dim.delay, Dim.head, Dim.tail
 
     def check(self, *tensors) -> None:
         """
@@ -137,10 +142,10 @@ class Dims(monoidal.Ty):
 
 
 @factory
-class Network(markov.Diagram):
+class Network(markov.Diagram, comarkov.Diagram):
     """
-    A network is a Markov diagram with lists of shapes as objects and
-    :class:`Box` layers inside, together with the trace.
+    A network is a Markov and comarkov diagram with lists of shapes as
+    objects and :class:`Box` layers inside, together with the trace.
 
     Parameters:
         inside (Layer) : The layers of the network.
@@ -159,6 +164,18 @@ class Network(markov.Diagram):
     >>> assert residual == Network.copy(x) >> layer @ x >> add
     """
     ob = Dims
+
+    @classmethod
+    def spider_factory(cls, n_legs_in, n_legs_out, typ, phase=None):
+        """
+        The spiders of a network are its copies and merges, with one leg in
+        or one leg out: there is no Frobenius law between the two.
+        """
+        if phase is not None or 1 not in (n_legs_in, n_legs_out):
+            raise ValueError(messages.NO_SUCH_SPIDER.format(
+                factory_name(cls), "copies and merges"))
+        return cls.copy_factory(typ, n_legs_out) if n_legs_in == 1\
+            else cls.merge_factory(typ, n_legs_in)
 
     def to_function(self, tensor: type = object) -> python.Function:
         """
@@ -271,8 +288,7 @@ class Box(markov.Box, Network):
             raise ValueError(f"{self} has no module.")
         try:
             self.dom.check(*tensors)
-            outputs = tuplify(
-                self.module(*tensors))  # ty: ignore[call-non-callable]
+            outputs = tuplify(self.module(*tensors))
             self.cod.check(*outputs)
         except AxiomError as error:
             raise AxiomError(f"{self}: {error}") from error
@@ -309,7 +325,7 @@ class Copy(markov.Copy, Box):
     """
 
 
-class Merge(markov.Merge, Box):
+class Merge(comarkov.Merge, Box):
     """
     The merge of ``n`` copies of a leg, the dagger of :class:`Copy`.
 
@@ -328,20 +344,19 @@ class Discard(markov.Discard, Copy):
     """
 
 
-class Trace(markov.Trace, Box):
+class Noise(comarkov.Noise, Merge):
     """
-    A trace feeds an output leg of a network back into an input leg.
+    The noise on a leg, the dagger of :class:`Discard`.
 
     Parameters:
-        arg : The network to trace.
-        left : Whether to trace the leftmost or the rightmost leg.
+        x (Dims) : The leg of the noise.
     """
 
 
-class Functor(markov.Functor):
+class Functor(markov.Functor, comarkov.Functor):
     """
-    A functor from networks to any Markov category with traces, e.g. an
-    evaluation of the layers as functions.
+    A functor from networks to any traced category with the structure the
+    network uses, e.g. an evaluation of the layers as functions.
 
     Parameters:
         ob_map (Mapping[Dims, Dims]) :
@@ -368,10 +383,11 @@ class Functor(markov.Functor):
 Id = Network.id
 Equation = markov.Equation
 
+Feedback, Trace, FollowedBy, Head, Tail = feedback.generators(
+    Network, Box)
 Network.box_factory = Box
 Network.functor_factory = Functor
 Network.copy_factory, Network.merge_factory = Copy, Merge
-Network.discard_factory = Discard
+Network.discard_factory, Network.noise_factory = Discard, Noise
 Network.swap_factory = Swap
 Network.permutation_factory = Permutation
-Network.trace_factory = Trace

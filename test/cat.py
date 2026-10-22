@@ -140,6 +140,9 @@ def test_Arrow_dagger():
     h = Arrow((f, g), x, z)
     assert h.dagger() == g.dagger() >> f.dagger()
     assert h.dagger().dagger() == h
+    assert isinstance(h, DaggerCategory)
+    assert not issubclass(FreeCategory, DaggerCategory)
+    assert not issubclass(Functor, DaggerCategory)
 
 
 def test_Id_init():
@@ -400,9 +403,13 @@ def test_Functor_then_left_unit():
     assert (Functor.id() >> F)(x) == F(x)
 
 
-@pytest.mark.xfail(strict=True, reason="#648: the identity functor is a "
-                   "callable, which compares unequal to a mapping.")
-def test_Functor_left_unitality():
+def test_Bubble_no_common_boundary():
     x, y = Ob('x'), Ob('y')
-    F = Functor({x: y}, {})
-    assert Functor.id() >> F == F
+    f, g = Box('f', x, x), Box('g', y, x)
+    with raises(ValueError, match="needs a dom given"):
+        Bubble(f, g)
+    with raises(ValueError, match="needs a cod given"):
+        Bubble(f, g[::-1], dom=x)
+    assert Bubble(f, g, dom=x).cod == x
+    with raises(ValueError, match=r"they have \[\]"):
+        Bubble()

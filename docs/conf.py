@@ -14,6 +14,7 @@ def get_version():
 # -- Project information -----------------------------------------------------
 
 project = 'DisCoPy'
+author = 'DisCoPy'
 copyright = '2019, DisCoPy'
 
 # The full version, including alpha/beta/rc tags
@@ -97,7 +98,8 @@ myst_url_schemes = {
 
 master_doc = 'index'
 
-html_baseurl = "https://docs.discopy.org"
+html_baseurl = os.environ.get(
+    "READTHEDOCS_CANONICAL_URL", "https://docs.discopy.org")
 
 
 def setup(app):

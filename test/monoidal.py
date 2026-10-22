@@ -7,7 +7,7 @@ from pytest import raises
 from discopy.cat import *
 from discopy.monoidal import *
 from discopy.drawing import spiral
-from discopy.utils import AxiomError, from_tree
+from discopy.utils import AxiomError, dumps, from_tree, loads
 
 
 def test_Ty():
@@ -15,6 +15,8 @@ def test_Ty():
     assert Ty.ob is Colour and Ty.ar is Ty
     assert isinstance(transparent, cat.Ob)
     assert isinstance(x, cat.FreeCategory)
+    assert not isinstance(x, DaggerCategory) and issubclass(
+        Diagram, DaggerCategory)
     assert isinstance(x, cat.Ob) and not isinstance(x, Wire)
     assert x @ y != y @ x
     assert x.then(y) == x @ y  # >> is overridden by closed exponentials.
@@ -170,6 +172,13 @@ def test_Nat_to_tree():
     assert Nat.from_tree(Nat(0).to_tree()) == Nat(0)
 
 
+def test_Dim_to_tree():
+    assert Dim(2, 3).to_tree() == {
+        'factory': 'monoidal.Dim', 'inside': [2, 3]}
+    for dim in (Dim(1), Dim(2), Dim(2, 3, 5)):
+        assert from_tree(dim.to_tree()) == dim
+
+
 def test_Nat_str():
     assert str(Nat(2 * 3 * 7)) == "Nat(42)"
 
@@ -202,6 +211,9 @@ def test_Dim_identity_and_slicing():
     assert Dim(2, 3, 4)[1:] == Dim(3, 4)
     # Reversing reverses the factors.
     assert Dim(2, 3, 4)[::-1] == Dim(4, 3, 2)
+    # The tree of a dimension reads back, the unit included.
+    assert loads(dumps(Dim(2, 3))) == Dim(2, 3)
+    assert loads(dumps(Dim())) == Dim() == Dim(1)
 
 
 def test_Layer_init():
@@ -451,6 +463,18 @@ def test_Bubble_dagger():
     f = Box('f', x, y)
     assert f.bubble().dagger() == f.dagger().bubble()
     assert f.bubble().dagger().dagger() == f.bubble()
+
+
+def test_Bubble_data():
+    f = Box('f', Ty('x'), Ty('y'))
+    bubble = f.bubble(data=42, is_dagger=True)
+    for b in (bubble, from_tree(bubble.to_tree()), loads(dumps(bubble))):
+        assert b == bubble and (b.data, b.is_dagger) == (42, True)
+    assert (bubble.dagger().data, bubble.dagger().is_dagger) == (42, False)
+    named = f.bubble(name="b", method="frame")
+    for b in (from_tree(named.to_tree()), loads(dumps(named))):
+        assert b == named and (b.name, b.method) == ("b", "frame")
+    assert "method" not in bubble.to_tree() and "name" not in bubble.to_tree()
 
 
 def test_Box_globularity():
@@ -763,9 +787,63 @@ def test_List():
         Ty(Wire('x', red, red), Wire('y'))
 
 
-def test_coloured_diagram_has_no_hypergraph():
-    red = Colour("red")
-    x = Ty(Wire('x', red, red))
-    for convert in (Diagram.to_hypergraph, Diagram.to_map):
-        with raises(AxiomError):
-            convert(Box('f', x, x))
+def test_foliation_up_to_interchangers():
+    from discopy import rigid, tensor
+    interchangers = lambda d: d.to_staircases().normal_form(
+        normalize=Diagram.normalize)
+    x, y = Ty('x'), Ty('y')
+    f, g, h = Box('f', x, y), Box('g', y, x), Box('h', x, x)
+    a = rigid.Ty('a')
+    k = rigid.Box('k', a, a)
+    snake = a @ rigid.Cap(a.r, a) >> rigid.Cup(a, a.r) @ a
+    for diagram in [f @ g >> g @ f, f.bubble(name="N") @ h, snake, k @ snake]:
+        foliated = diagram.foliation()
+        assert foliated.boxes == diagram.boxes
+        assert interchangers(foliated) == interchangers(diagram)
+    assert snake.foliation() == snake and len((k @ snake).foliation()) == 2
+    F = tensor.Functor({a: 2}, {k: [1, 2, 3, 4]}, dom=rigid.Diagram)
+    assert F((k @ snake).foliation()) == F(k @ snake)
+
+
+def test_box_factory():
+    """ Every level with boxes of its own binds them, which a stream of boxes
+    reads: the diagrams of the hierarchy, the tensors, the grammars, the
+    circuits and the networks. """
+    from discopy import (
+        cat, monoidal, braided, balanced, symmetric, traced, markov, rigid,
+        pivotal, ribbon, biclosed, closed, compact, frobenius, feedback,
+        tensor)
+    from discopy.grammar import categorial, abstract, pregroup
+    from discopy.quantum import circuit, zx
+    from discopy.neural import network
+    assert cat.Arrow.box_factory is cat.Box
+    assert circuit.Circuit.box_factory is circuit.Box
+    assert network.Network.box_factory is network.Box
+    for module in (
+            monoidal, braided, balanced, symmetric, traced, markov, rigid,
+            pivotal, ribbon, biclosed, closed, compact, frobenius, feedback,
+            tensor, categorial, abstract, pregroup, zx):
+        assert module.Diagram.box_factory is module.Box, module
+
+
+def test_decode_without_boxes_and_offsets():
+    with raises(ValueError):
+        Diagram.decode(Ty('x'))
+
+def test_List_repr():
+    from discopy import cat, monoidal
+    from discopy.python import Ty as PyTy
+
+    assert repr(List[int](2, 3)) == "monoidal.List[int](2, 3)"
+    assert repr(List[type](int, str)) == "monoidal.List[type](int, str)"
+    assert repr(List[type](cat.Ob)) == "monoidal.List[type](cat.Ob)"
+
+    assert PyTy is monoidal.List[type]
+    for x in (List[int](2, 3), List[type](int, str), PyTy(int), PyTy()):
+        assert eval(repr(x)) == x and eval(str(x)) == x
+
+def test_tensor_of_sum_with_diagram():
+    x = Ty('x')
+    f, g = Box('f', x, x), Box('g', x, x)
+    assert f.tensor(g + g, f) == (f @ g @ f) + (f @ g @ f)
+    assert (f + f).tensor(g, f) == (f @ g @ f) + (f @ g @ f)

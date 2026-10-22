@@ -240,9 +240,7 @@ class Tagger(nn.Module):
         hidden, keys, key_mask = (
             x.repeat_interleave(k, 0) for x in words(states, mask))
         n_words, start = len(hidden) // k, len(self.signature)
-        ones = self.arities.new_ones(1)  # ty: ignore[call-non-callable]
-        arities = torch.cat(
-            [self.arities, ones])  # ty: ignore[invalid-argument-type]
+        arities = torch.cat([self.arities, self.arities.new_ones(1)])
         scores = torch.full((n_words, k), -torch.inf, device=states.device)
         scores[:, 0] = 0
         slots = torch.ones_like(scores, dtype=torch.long).flatten()
@@ -347,8 +345,7 @@ class Linker(nn.Module):
         features = torch.tensor([
             (i, self.signature.atoms.index(atom), polarity, j)
             for i, ty, given in owners + [(len(owners), sequent.goal, False)]
-            for j, (atom, polarity) in enumerate(
-                ports(ty, given))],  # ty: ignore[invalid-argument-type]
+            for j, (atom, polarity) in enumerate(ports(ty, given))],
             device=states.device)
         states = torch.cat([states, states.mean(0, keepdim=True)])
         rows, atoms, polarities, indices = features.T

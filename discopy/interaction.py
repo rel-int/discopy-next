@@ -69,23 +69,22 @@ from functools import wraps
 
 from discopy import (
     balanced,
-    traced,
-    rigid,
     pivotal,
     ribbon,
     messages
 )
 from discopy.abc import (
-    NamedGeneric, Pregroup, RibbonCategory, TracedCategory)
+    NamedGeneric, Pregroup, RibbonCategory, SymmetricCategory,
+    TracedCategory)
 from discopy.cat import assert_iscomposable
 from discopy.python import finset
 from discopy.utils import (
-    factory, classproperty, unbiased, assert_isinstance, factory_name,
-    get_origin)
+    AxiomError, factory, classproperty, unbiased, assert_isinstance,
+    factory_name, get_origin)
 
 
 @dataclass
-class Ty[natural](Pregroup, NamedGeneric):
+class Ty(Pregroup, NamedGeneric['natural']):
     """
     An integer type is a pair of :attr:`natural` types.
 
@@ -120,7 +119,7 @@ class Ty[natural](Pregroup, NamedGeneric):
     positive: natural
     negative: natural
 
-    def __init__(self, positive=None, negative=None):
+    def __init__(self, positive: natural = None, negative: natural = None):
         positive, negative = (
             self.natural() if x is None else x for x in (positive, negative))
         positive, negative = (
@@ -133,6 +132,9 @@ class Ty[natural](Pregroup, NamedGeneric):
         yield self.positive
         yield self.negative
 
+    def __bool__(self):
+        return bool(self.positive) or bool(self.negative)
+
     def __repr__(self):
         factory, natural = map(
             factory_name, (get_origin(type(self)), self.natural))
@@ -141,9 +143,8 @@ class Ty[natural](Pregroup, NamedGeneric):
 
     def __str__(self):
         try:
-            negatives = self.negatives(self.negative)
             return " @ ".join(list(map(str, self.positive)) + [
-                f"-{x}" for x in negatives])  # ty: ignore[not-iterable]
+                f"-{x}" for x in self.negatives(self.negative)])
         except TypeError:  # e.g. when Ty.natural == int
             return repr(self)
 
@@ -173,10 +174,46 @@ class Ty[natural](Pregroup, NamedGeneric):
 
     l = r = property(__neg__)
 
+    def split(self, n: int | tuple[int, int] = 1, left: bool = False
+              ) -> tuple[Ty, Ty]:
+        """
+        The pair of types that tensor to ``self``, the second with ``n`` atoms
+        on each half, or the first when ``left``.
+
+        Parameters:
+            n : The number of atoms of each half to split off, or one number
+                per half.
+            left : Whether to split them off the left rather than the right.
+
+        Note
+        ----
+        An integer type is not a sequence of atoms: positive and negative
+        atoms commute, i.e. ``x @ -y == -y @ x``, so there is no slicing.
+        The negative halves of the two factors are tensored in the order of
+        :attr:`negatives`, which is where the negative half is cut.
+
+        >>> from discopy.pivotal import Ty as T
+        >>> x, y = Ty(T("x"), T("x'")), Ty(T("y"), T("y'"))
+        >>> assert (x @ y).split() == (x, y) == (x @ y).split(left=True)
+        >>> assert (x @ y).split((1, 0))\\
+        ...     == (Ty(T("x"), T("y'") @ T("x'")), Ty(T("y")))
+        """
+        positive, negative = self
+        n_pos, n_neg = (n, n) if isinstance(n, int) else n
+        if not 0 <= n_pos <= len(positive) or not 0 <= n_neg <= len(negative):
+            raise ValueError(messages.NOT_SPLITTABLE.format(n, self))
+        i, j = (n_pos, n_neg) if left else (
+            len(positive) - n_pos, len(negative) - n_neg)
+        cut, _ = self.negatives((j, len(negative) - j))
+        first_negative, second_negative = self.negatives(
+            (negative[:cut], negative[cut:]))
+        return (type(self)(positive[:i], first_negative),
+                type(self)(positive[i:], second_negative))
+
 
 @factory
 @dataclass
-class Diagram[natural](RibbonCategory, NamedGeneric):
+class Diagram(RibbonCategory, NamedGeneric['natural']):
     """
     An integer diagram from ``x`` to ``y`` is a :attr:`natural` diagram
     from ``x.positive @ y.negative`` to ``x.negative @ y.positive``.
@@ -189,9 +226,10 @@ class Diagram[natural](RibbonCategory, NamedGeneric):
     Note
     ----
     By default we take ``natural = ribbon.Diagram`` but this can be any class
-    with the methods for a balanced traced category. For example, the category
-    of boolean matrices with the direct sum has a trace given by reflexive
-    transitive closure. We can use it to check the snake equations:
+    with the methods for a balanced traced category, or for a symmetric traced
+    one, see :meth:`is_symmetric`. For example, the category of boolean
+    matrices with the direct sum has a trace given by reflexive transitive
+    closure. We can use it to check the snake equations:
 
     >>> from discopy.abc import Nat
     >>> from discopy.matrix import Matrix
@@ -200,6 +238,17 @@ class Diagram[natural](RibbonCategory, NamedGeneric):
     >>> assert D.id(two).transpose()\\
     ...     == D.id(two)\\
     ...     == D.id(two).transpose(left=True)
+
+    Python functions with tuples as tensor have neither dagger nor twist,
+    their integer diagrams are the lenses of :mod:`discopy.lens`:
+
+    >>> from discopy.python import Function
+    >>> R = Ty[Function.ob]((float, ), (float, ))
+    >>> inside = Function(
+    ...     lambda a, da: (a * a, 2 * a * da), (float, float), (float, float))
+    >>> square = Diagram[Function](inside, R, R)
+    >>> assert (square @ square).inside(2., 3., 1., 1.) == (4., 9., 6., 4.)
+    >>> assert (square >> square).dom == R == (square >> square).cod
     """
     ar = classproperty(lambda cls: cls)
     natural = ribbon.Diagram
@@ -210,7 +259,7 @@ class Diagram[natural](RibbonCategory, NamedGeneric):
     dom: Ty
     cod: Ty
 
-    def __init__(self, inside, dom: Ty, cod: Ty):
+    def __init__(self, inside: natural, dom: Ty, cod: Ty):
         assert_isinstance(inside, self.natural)
         if inside.dom != dom.positive @ cod.negative:
             raise ValueError(messages.WRONG_DOM.format(
@@ -219,6 +268,51 @@ class Diagram[natural](RibbonCategory, NamedGeneric):
             raise ValueError(messages.WRONG_COD.format(
                 cod.positive @ dom.negative, inside.cod))
         self.inside, self.dom, self.cod = inside, dom, cod
+
+    @classmethod
+    def is_symmetric(cls) -> bool:
+        """
+        Whether the integer diagrams are symmetric, i.e. compact rather than
+        ribbon: when the :attr:`natural` category is, in which case its braid
+        is its own inverse and its twist is the identity, so that it need not
+        have a dagger nor a twist.
+        """
+        return issubclass(cls.natural, SymmetricCategory)
+
+    @classmethod
+    def natural_braid(
+            cls, left: natural.ob, right: natural.ob, inverse: bool = False
+            ) -> natural:
+        """
+        The braid of the :attr:`natural` category or its inverse, i.e. the
+        dagger of the braid, or the braid the other way around when
+        :meth:`is_symmetric`.
+
+        Parameters:
+            left : The natural type on the left of the braid.
+            right : The natural type on the right of the braid.
+            inverse : Whether to take the inverse, from ``right @ left``.
+        """
+        if not inverse:
+            return cls.natural.braid(left, right)
+        if cls.is_symmetric():
+            return cls.natural.braid(right, left)
+        return cls.natural.braid(left, right).dagger()
+
+    @classmethod
+    def natural_twist(cls, dom: natural.ob, inverse: bool = False) -> natural:
+        """
+        The twist of the :attr:`natural` category or its inverse, i.e. the
+        dagger of the twist, or the identity when :meth:`is_symmetric`.
+
+        Parameters:
+            dom : The natural type to twist.
+            inverse : Whether to take the inverse twist.
+        """
+        if cls.is_symmetric():
+            return cls.natural.id(dom)
+        twist = cls.natural.twist(dom)
+        return twist.dagger() if inverse else twist
 
     @unbiased
     def then(self, other: Diagram):
@@ -264,18 +358,18 @@ class Diagram[natural](RibbonCategory, NamedGeneric):
         x, u = self.dom
         y, v = self.cod
         z, w = other.cod
-        braid = self.natural.braid
+        braid = self.natural_braid
         dom, cod = type(self.dom)(x, u), type(self.cod)(z, w)
         inside = (
             x @ braid(w, v)
             >> self.inside @ w
-            >> y @ braid(w, u).dagger()
+            >> y @ braid(w, u, inverse=True)
             >> other.inside @ u
             >> z @ braid(v, u)).trace(n=v if isinstance(v, int) else len(v))
         return type(self)(inside, dom, cod)
 
     @classmethod
-    def id(cls, dom: Ty | None = None) -> Diagram:
+    def id(cls, dom: Ty = None) -> Diagram:
         """
         The identity on an integer type.
 
@@ -300,9 +394,9 @@ class Diagram[natural](RibbonCategory, NamedGeneric):
         .. image:: /_static/int/idr.svg
             :align: center
         """
-        dom = cls.ob() if dom is None else dom
+        dom = Ty[cls.natural.ob]() if dom is None else dom
         positive, negative = dom
-        inside = cls.natural.id(positive) @ cls.natural.twist(negative)
+        inside = cls.natural.id(positive) @ cls.natural_twist(negative)
         return cls(inside, dom, dom)
 
     @unbiased
@@ -329,10 +423,10 @@ class Diagram[natural](RibbonCategory, NamedGeneric):
         """
         x, u, y, v = tuple(self.dom) + tuple(self.cod)
         x_, _, _, v_ = tuple(other.dom) + tuple(other.cod)
-        _braid = self.natural.braid
-        inside = _braid(x, x_) @ _braid(v, v_).dagger()\
+        braid = self.natural_braid
+        inside = braid(x, x_) @ braid(v, v_, inverse=True)\
             >> x_ @ self.inside @ v_\
-            >> _braid(y, x_).dagger() @ _braid(v_, u).dagger()\
+            >> braid(y, x_, inverse=True) @ braid(v_, u, inverse=True)\
             >> y @ other.inside @ u
         return type(self)(inside, self.dom @ other.dom, self.cod @ other.cod)
 
@@ -353,12 +447,12 @@ class Diagram[natural](RibbonCategory, NamedGeneric):
             left : The left input of the braid.
             right : The right input of the braid.
         """
-        _braid, _twist = cls.natural.braid, cls.natural.twist
+        braid, twist = cls.natural_braid, cls.natural_twist
         x, u = left
         y, v = right
-        braids = _braid(x, y) @ _braid(v, u).dagger()\
-            >> y @ (_braid(v, x).dagger() >> _braid(x, v).dagger()) @ u
-        twists = y @ x @ _twist(v).dagger() @ _twist(u).dagger()
+        braids = braid(x, y) @ braid(v, u, inverse=True) >> y @ (
+            braid(v, x, inverse=True) >> braid(x, v, inverse=True)) @ u
+        twists = y @ x @ twist(v, inverse=True) @ twist(u, inverse=True)
         return cls(braids >> twists, left @ right, right @ left)
 
     @classmethod
@@ -474,34 +568,223 @@ class Diagram[natural](RibbonCategory, NamedGeneric):
         return type(self)(
             self.inside.naturality(i, left, down, braid), self.dom, self.cod)
 
-    trace = traced.Diagram.trace
-    trace_factory = classmethod(pivotal.Diagram.trace_factory.__func__)
-    transpose = rigid.Diagram.transpose
-    # The remaining ribbon structure is derived from the concrete categories,
-    # following the same idiom as `trace` and `transpose` above.
-    twist = classmethod(balanced.Diagram.twist.__func__)
-    ev = classmethod(rigid.Diagram.ev.__func__)
-    curry = rigid.Diagram.curry
+    def trace(self, n: int | tuple[int, int] = 1, left: bool = False
+              ) -> Diagram:
+        """
+        The trace of an integer diagram over the last ``n`` atoms of each half
+        of its domain and codomain, or the first when ``left``, is the natural
+        trace of its inside over the two halves at once, after the braids that
+        bring them side by side on the right.
+
+        Parameters:
+            n : The number of atoms of each half to trace over, or one number
+                per half.
+            left : Whether to trace the atoms on the left or right.
+
+        Example
+        -------
+        >>> from discopy.compact import Ty as T, Box, Diagram as D
+        >>> a, a_, u, u_, b, b_ = map(T, ["a", "a'", "u", "u'", "b", "b'"])
+        >>> A, U, B = Ty[T](a, a_), Ty[T](u, u_), Ty[T](b, b_)
+        >>> f = Diagram[D](
+        ...     Box('f', a @ u @ u_ @ b_, b @ u @ u_ @ a_), A @ U, B @ U)
+        >>> assert f.trace().dom == A and f.trace().cod == B
+        >>> f.trace().draw(doctest="docs/_static/int/trace.svg")
+
+        .. image:: /_static/int/trace.svg
+            :align: center
+
+        Note
+        ----
+        Integer diagrams are compact, so the trace is also the feedback loop
+        made of cups and caps, up to the axioms of traced categories, which
+        the hypergraph decides when the natural category is symmetric:
+
+        >>> feedback = A @ Diagram[D].caps(U, -U) >> f @ -U\\
+        ...     >> B @ Diagram[D].cups(U, -U)
+        >>> assert f.trace().inside.to_hypergraph()\\
+        ...     == feedback.inside.to_hypergraph()
+        """
+        (dom, traced), (cod, traced_cod) = (
+            x.split(n, left)[::-1] if left else x.split(n, left)
+            for x in (self.dom, self.cod))
+        if traced != traced_cod:
+            raise AxiomError(messages.NOT_TRACEABLE.format(traced, traced_cod))
+        if not traced:
+            return self
+        (a, a_), (b, b_), (u, u_) = dom, cod, traced
+        braid = self.natural_braid
+        inside = braid(a @ b_, u) @ u_ >> self.inside >> braid(u, b @ a_) @ u_\
+            if left else a @ braid(b_, u @ u_) >> self.inside >> b @ braid(
+                u @ u_, a_)
+        return type(self)(inside.trace(len(u @ u_)), dom, cod)
+
+    def split_memory(
+            self, n: int | tuple[int, int] = None, left: bool = False, *,
+            dom: Ty = None, cod: Ty = None, mem: Ty = None
+            ) -> tuple[Ty, Ty, Ty]:
+        """
+        The domain, codomain and memory of a trace, read off either form of
+        :meth:`discopy.abc.FeedbackCategory.feedback` with :meth:`Ty.split`,
+        since an integer type is not a sequence: ``n`` counts the atoms of
+        each half, or one number per half, one by default, and the memory is
+        ``mem``, or what ``cod`` leaves of the codomain.
+
+        Example
+        -------
+        >>> from discopy.compact import Ty as T, Box, Diagram as D
+        >>> a, a_, u, u_ = map(T, ["a", "a'", "u", "u'"])
+        >>> A, U = Ty[T](a, a_), Ty[T](u, u_)
+        >>> box = Box('f', a @ u @ u_ @ a_, a @ u @ u_ @ a_)
+        >>> f = Diagram[D](box, A @ U, A @ U)
+        >>> assert f.split_memory() == f.split_memory(mem=U) == (A, A, U)
+        >>> assert f.trace(mem=U) == f.trace() == f.feedback(cod=A)
+        """
+        if n is not None and (dom, cod, mem) != (None, None, None):
+            raise TypeError(messages.FEEDBACK_FORMS)
+        if mem is not None:
+            n = self.memory_size(mem)
+        elif cod is not None:
+            n = tuple(len(x) - len(y) for x, y in zip(self.cod, cod))
+        (rest_dom, _), (rest_cod, traced) = (
+            x.split(1 if n is None else n, left)[::-1] if left
+            else x.split(1 if n is None else n, left)
+            for x in (self.dom, self.cod))
+        return (rest_dom if dom is None else dom,
+                rest_cod if cod is None else cod,
+                traced if mem is None else mem)
+
+    def memory_size(self, mem: Ty) -> tuple[int, int]:
+        """
+        The number of atoms of each half of a memory, as :meth:`trace`
+        counts them.
+
+        Parameters:
+            mem : The memory.
+        """
+        return tuple(map(len, mem))
+
+    @classmethod
+    def twist(cls, dom: Ty) -> Diagram:
+        """
+        The twist of an integer type is the trace of its braid, as in
+        :mod:`discopy.ribbon`, i.e. the identity when :meth:`is_symmetric`.
+
+        Parameters:
+            dom : The integer type to twist.
+
+        Example
+        -------
+        >>> from discopy import compact
+        >>> x = Ty('x')
+        >>> assert Diagram.twist(x).dom == x == Diagram.twist(x).cod
+        >>> X = Ty[compact.Ty]('x')
+        >>> assert Diagram[compact.Diagram].twist(X)\\
+        ...     == Diagram[compact.Diagram].id(X)
+        """
+        if cls.is_symmetric():
+            return cls.id(dom)
+        return cls.braid(dom, dom).trace(tuple(map(len, dom)))
+
+    def curry(self, n: int | tuple[int, int] = 1, left: bool = True
+              ) -> Diagram:
+        """
+        The currying of an integer diagram is given by caps, as in any rigid
+        category, over the last ``n`` atoms of each half of its domain, or the
+        first when not ``left``.
+
+        Parameters:
+            n : The number of atoms of each half to curry, or one number per
+                half.
+            left : Whether to curry on the left or right.
+
+        Example
+        -------
+        >>> from discopy.compact import Ty as T, Box, Diagram as D
+        >>> x, x_, y, y_ = map(T, ["x", "x'", "y", "y'"])
+        >>> X, Y = Ty[T](x, x_), Ty[T](y, y_)
+        >>> f = Diagram[D](Box('f', x @ y_, y @ x_), X, Y)
+        >>> assert f.curry().dom == Ty[T]() and f.curry().cod == Y @ -X
+        >>> assert f.curry().uncurry().inside.to_hypergraph()\\
+        ...     == f.inside.to_hypergraph()
+        """
+        base, exponent = self.dom.split(n) if left\
+            else self.dom.split(n, left=True)[::-1]
+        if not exponent:
+            return self
+        if left:
+            return base @ self.caps(exponent, -exponent) >> self @ -exponent
+        return self.caps(-exponent, exponent) @ base >> -exponent @ self
+
+    def base_and_exponent(self, n: int | tuple[int, int], left: bool
+                          ) -> tuple[Ty, Ty]:
+        """
+        The base and exponent that :meth:`uncurry` evaluates, read off the
+        codomain where the exponent comes dualised, i.e. with its halves
+        exchanged.
+
+        Parameters:
+            n : The number of atoms of each half of the exponent, or one
+                number per half.
+            left : Whether to uncurry on the left or right.
+        """
+        n = n if isinstance(n, int) else n[::-1]
+        base, exponent = self.cod.split(n) if left\
+            else self.cod.split(n, left=True)[::-1]
+        return base, -exponent
+
+    def uncurry(self, n: int | tuple[int, int] = 1, left: bool = True
+                ) -> Diagram:
+        """
+        The uncurrying of an integer diagram is its evaluation, as in any
+        rigid category, over the exponent at the end of its codomain, or at
+        the start when not ``left``.
+
+        Parameters:
+            n : The number of atoms of each half of the exponent, or one
+                number per half.
+            left : Whether to uncurry on the left or right.
+        """
+        base, exponent = self.base_and_exponent(n, left)
+        if not exponent:
+            return self
+        return self @ exponent >> self.ev(base, exponent, True) if left\
+            else exponent @ self >> self.ev(base, exponent, False)
+
+    def rotate(self, left: bool = False) -> Diagram:
+        """
+        The rotation of an integer diagram is its :meth:`transpose`, since it
+        has no box to rotate.
+
+        Parameters:
+            left : Whether to rotate left or right.
+        """
+        return self.transpose(left)
+
+    l = property(lambda self: self.rotate(left=True))
+    r = property(lambda self: self.rotate(left=False))
     conjugate = pivotal.Diagram.conjugate
     boxes = property(lambda self: self.inside.boxes)
     to_drawing = lambda self: self.inside.to_drawing()
 
 
-def Int(category: type[TracedCategory]) -> type[RibbonCategory]:
+def Int(category: TracedCategory) -> RibbonCategory:
     """
     The Int construction, i.e. the free ribbon category on a given balanced
-    traced `category`, with :class:`interaction.Ty` as objects and
+    traced `category`, or the free compact category on a symmetric traced
+    one, with :class:`interaction.Ty` as objects and
     :class:`interaction.Diagram` as arrows.
 
     Parameters:
-        category : A balanced traced category, i.e. an arrow type.
+        category : A balanced or symmetric traced category, i.e. an arrow
+            type.
 
     Example
     -------
     >>> from discopy.ribbon import Diagram as D
     >>> assert Int(D) == Diagram[D]
     """
-    return Diagram[category]  # ty: ignore[invalid-type-form]
+    return Diagram[category]
 
 
 Id = Diagram.id

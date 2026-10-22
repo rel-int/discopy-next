@@ -46,7 +46,7 @@ Token machines
 --------------
 
 Dal Lago & Hoshino's `Geometry of Bayesian Programming
-<https://arxiv.org/abs/1904.11324>`_ (2019) reads a probabilistic program
+<https://arxiv.org/abs/1904.07425>`_ (2019) reads a probabilistic program
 as a net and its execution as a token walking through it. A machine with
 entry wires ``dom``, exit wires ``cod`` and ``n`` internal wires is a
 channel over the subdistribution monad
@@ -111,7 +111,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
-from discopy.abc import NamedGeneric, TracedCategory
+from discopy.abc import ComarkovCategory, NamedGeneric, TracedCategory
 from discopy.kleisli import channel
 from discopy.kleisli.monad import Monad
 from discopy.python import function
@@ -224,11 +224,12 @@ def injection(offset: int, source: Ty, target: Ty) -> function.Function:
 
 
 @factory
-class Channel[monad](TracedCategory, NamedGeneric):
+class Channel(TracedCategory, ComarkovCategory, NamedGeneric['monad']):
     """
     A channel is a morphism in the Kleisli category of a monad ``M`` with
     disjoint union as tensor, i.e. a Python function from a tagged value of
-    ``dom`` to the packed monadic type ``M(pack(cod))``.
+    ``dom`` to the packed monadic type ``M(pack(cod))``: a comarkov
+    category, whose :meth:`merge` is the codiagonal of the coproduct.
 
     Parameters:
         inside : The underlying function, from ``pack(dom)`` to
@@ -268,8 +269,7 @@ class Channel[monad](TracedCategory, NamedGeneric):
 
     def __init__(self, inside: Callable, dom: Ty, cod: Ty):
         dom, cod = self.ob.cast(dom), self.ob.cast(cod)
-        monad = type(self).monad
-        packed_cls = channel.Channel[monad]  # ty: ignore[invalid-type-form]
+        packed_cls = channel.Channel[type(self).monad]
 
         def call(value):
             value, tag = unpack_value(value)
@@ -288,8 +288,7 @@ class Channel[monad](TracedCategory, NamedGeneric):
             dom : The disjoint union of wire types.
         """
         dom = cls.ob.cast(dom)
-        packed = channel.Channel[cls.monad]  # ty: ignore[invalid-type-form]
-        return cls(packed.id(pack(dom)), dom, dom)
+        return cls(channel.Channel[cls.monad].id(pack(dom)), dom, dom)
 
     def __call__(self, obj, tag: int = 0):
         return self.inside(pack_value(obj, tag, self.dom))
@@ -303,9 +302,7 @@ class Channel[monad](TracedCategory, NamedGeneric):
         """
         assert_isinstance(other, type(self))
         assert_iscomposable(self, other)
-        return type(self)(
-            self.inside >> other.inside,  # ty: ignore[unsupported-operator]
-            self.dom, other.cod)
+        return type(self)(self.inside >> other.inside, self.dom, other.cod)
 
     def tensor(self, other: Channel) -> Channel:
         """
@@ -339,12 +336,11 @@ class Channel[monad](TracedCategory, NamedGeneric):
             y : The disjoint union on the right.
         """
         x, y = cls.ob.cast(x), cls.ob.cast(y)
-        unit = cls.monad.unit(pack(y @ x))  # ty: ignore[invalid-argument-type]
+        unit = cls.monad.unit(pack(y @ x))
 
         def inside(obj, tag=0):
             tag = tag + len(y) if tag < len(x) else tag - len(x)
-            return unit(  # ty: ignore[call-non-callable]
-                pack_value(obj, tag, y @ x))
+            return unit(pack_value(obj, tag, y @ x))
         return cls(inside, x @ y, y @ x)
 
     @classmethod
@@ -358,10 +354,9 @@ class Channel[monad](TracedCategory, NamedGeneric):
             n : The number of copies to merge.
         """
         x = cls.ob.cast(x)
-        unit = cls.monad.unit(pack(x))  # ty: ignore[invalid-argument-type]
+        unit = cls.monad.unit(pack(x))
         return cls(
-            lambda obj, tag=0: unit(  # ty: ignore[call-non-callable]
-                pack_value(obj, tag % len(x), x)),
+            lambda obj, tag=0: unit(pack_value(obj, tag % len(x), x)),
             x ** n, x)
 
     def trace(self, n: int = 1, left: bool = False) -> Channel:

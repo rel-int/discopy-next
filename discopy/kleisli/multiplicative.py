@@ -145,7 +145,7 @@ def unpack_value(value) -> tuple:
 
 
 @factory
-class Channel[monad](Category, NamedGeneric):
+class Channel(Category, NamedGeneric['monad']):
     """
     A channel is a morphism in the Kleisli category of a monad ``M`` with
     tuple as tensor, i.e. a Python function from a tuple of wires ``dom``
@@ -185,8 +185,7 @@ class Channel[monad](Category, NamedGeneric):
 
     def __init__(self, inside: Callable, dom: Ty, cod: Ty):
         dom, cod = self.ob.cast(dom), self.ob.cast(cod)
-        monad = type(self).monad
-        packed_cls = channel.Channel[monad]  # ty: ignore[invalid-type-form]
+        packed_cls = channel.Channel[type(self).monad]
         self.inside = inside if isinstance(inside, packed_cls) else\
             packed_cls(
                 lambda v: inside(*unpack_value(v)), pack(dom), pack(cod))
@@ -202,8 +201,7 @@ class Channel[monad](Category, NamedGeneric):
             dom : The tuple of wire types on which to take the identity.
         """
         dom = cls.ob.cast(dom)
-        packed = channel.Channel[cls.monad]  # ty: ignore[invalid-type-form]
-        return cls(packed.id(pack(dom)), dom, dom)
+        return cls(channel.Channel[cls.monad].id(pack(dom)), dom, dom)
 
     def raw(self, *xs):
         """ Call ``self``, keeping the packed monadic type as is. """
@@ -226,8 +224,7 @@ class Channel[monad](Category, NamedGeneric):
         assert_isinstance(other, type(self))
         assert_iscomposable(self, other)
         return type(self)(
-            self.inside >> other.inside,  # ty: ignore[unsupported-operator]
-            self.dom, other.cod)
+            self.inside >> other.inside, self.dom, other.cod)
 
     def right_whisker(self, Y: Ty) -> Channel:
         """
@@ -294,11 +291,8 @@ class Channel[monad](Category, NamedGeneric):
             n : The number of copies.
         """
         x = cls.ob.cast(x)
-        unit = cls.monad.unit(
-            pack(x ** n))  # ty: ignore[invalid-argument-type]
-        return cls(
-            lambda *xs: unit(  # ty: ignore[call-non-callable]
-                pack_value(n * xs)), x, x ** n)
+        unit = cls.monad.unit(pack(x ** n))
+        return cls(lambda *xs: unit(pack_value(n * xs)), x, x ** n)
 
     @classmethod
     def discard(cls, dom: Ty) -> Channel:

@@ -20,6 +20,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from contextlib import contextmanager
+from itertools import combinations
 from math import sqrt
 import os
 import re
@@ -45,7 +46,7 @@ from discopy.config import (  # noqa: F401  pylint: disable=unused-import
     TRANSPARENT)
 
 if TYPE_CHECKING:
-    from discopy.drawing import Drawing
+    from discopy.drawing import PlaneGraph
 
 
 MATPLOTLIB_RC = {
@@ -79,8 +80,8 @@ def matplotlib_context():
         yield
 
 
-def draw(graph: Drawing, **params):
-    """ Load a :class:`Backend` and draw a :class:`Drawing` on it. """
+def draw(graph: PlaneGraph, **params):
+    """ Load a :class:`Backend` and draw a :class:`PlaneGraph` on it. """
     aspect = params.get('aspect', 'auto' if 'figsize' in params else 'equal')
     if params.get('legend', False) and not params.get('to_tikz', False):
         colours = Backend.region_colours(graph)
@@ -365,11 +366,13 @@ def quadratic_subcurve(points, t0, t1):
             blossom(points, t1, t1))
 
 
+def lerp(a, b, t):
+    """ The point at parameter ``t`` on the segment from ``a`` to ``b``. """
+    return (a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t)
+
+
 def bezier_subcurve(points, t0, t1):
     """ Restrict a cubic Bezier (4 control points) to the range [t0, t1]. """
-    def lerp(a, b, t):
-        return (a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t)
-
     def split(p, t):  # The two halves of a cubic Bezier split at ``t``.
         a, b, c = lerp(p[0], p[1], t), lerp(p[1], p[2], t), lerp(p[2], p[3], t)
         d, e = lerp(a, b, t), lerp(b, c, t)
@@ -378,6 +381,44 @@ def bezier_subcurve(points, t0, t1):
 
     right = split(points, t0)[1]
     return split(right, (t1 - t0) / (1 - t0))[0]
+
+
+def bezier(points, t):
+    """
+    The point at parameter ``t`` of a Bezier curve of any degree, by de
+    Casteljau's algorithm: :func:`lerp` between consecutive control points
+    until one remains.
+    """
+    while len(points) > 1:
+        points = [lerp(a, b, t) for a, b in zip(points, points[1:])]
+    return Point(*points[0])
+
+
+def subcurve(points, t0, t1):
+    """
+    Restrict a quadratic or a cubic Bezier to the range [t0, t1], see
+    :func:`quadratic_subcurve` and :func:`bezier_subcurve`.
+    """
+    restrict = quadratic_subcurve if len(points) == 3 else bezier_subcurve
+    return tuple(Point(*point) for point in restrict(points, t0, t1))
+
+
+def monotone_root(function, low=0., high=1.):
+    """
+    The root in ``[low, high]`` of a monotone ``function`` that changes sign
+    on it, by bisection to double precision.
+    """
+    increasing = function(low) < function(high)
+    for _ in range(64):
+        middle = (low + high) / 2
+        value = function(middle)
+        if value == 0:
+            return middle
+        if (value < 0) == increasing:
+            low = middle
+        else:
+            high = middle
+    return (low + high) / 2
 
 
 class Backend(ABC):
@@ -472,7 +513,8 @@ class Backend(ABC):
         :meth:`draw_braid_strand`, i.e. a strand from ``source`` to ``target``
         crossing the horizontal line at height ``middle``.
         """
-        return [source, (source[0], middle), (target[0], middle), target]
+        return [
+            source, Point(source[0], middle), Point(target[0], middle), target]
 
     @staticmethod
     def half_circle_beziers(left, right, centre, sign, depth=None):
@@ -519,9 +561,7 @@ class Backend(ABC):
         outer = min(radius, RIBBON_FOLD_DEPTH)
         return outer, outer - ribbon
 
-    def fill_strand_band(
-            self, first: tuple[Point, Point], second: tuple[Point, Point],
-            middle, color, gap=0):
+    def fill_strand_band(self, first, second, middle, color, gap=0):
         """
         Fills the band between the two parallel braid strands of a ribbon,
         see :meth:`draw_dual_rail_braid`. A non-zero ``gap`` breaks the band
@@ -616,9 +656,13 @@ class Backend(ABC):
         """
         The boundaries between the regions of a drawing: a quadratic Bezier
         ``(top, control, bottom)`` for each non-horizontal visible edge and
-        for both sides of each box, paired with the name of the colour of
-        the region to its right. The Bezier control point is the one of
-        :meth:`draw_wire`, so a separator hugs the wire drawn over it.
+        for both sides of each box, and a cubic one for each strand of a
+        crossing, paired with the name of the colour of the region to its
+        right. The control points are those of :meth:`draw_wire` and of
+        :meth:`braid_strand`, so a separator hugs the wire drawn over it:
+        the edges of a crossing bend at its box node where its strands go
+        straight from each input to the output it is permuted to, so the
+        strands stand in for them, see :meth:`strand_separators`.
         Horizontal edges bound no region on either side, so they are left
         out, and the left side of a box carries ``None`` since a box is a
         2-cell, i.e. there is no region underneath it.
@@ -626,7 +670,9 @@ class Backend(ABC):
         separators = []
         for source, target in Backend.visible_edges(graph):
             top, bottom = graph.positions[source], graph.positions[target]
-            if top.y == bottom.y:
+            if top.y == bottom.y or any(
+                    n.kind == "box" and n.box.is_crossing
+                    for n in (source, target)):
                 continue
             control = Point(bottom.x, top.y) if source.kind == "box"\
                 else Point(top.x, bottom.y)
@@ -635,6 +681,8 @@ class Backend(ABC):
             typ = getattr(source, 'x', None) or getattr(target, 'x', None)
             separators.append(((top, control, bottom), typ.cod.name))
         for node in graph.box_nodes:
+            if node.box.is_crossing:
+                separators += Backend.strand_separators(graph, node)
             if node.box.draw_as_wires or node.box.draw_as_spider:
                 continue
             for side, colour in [(0, None), (1, node.box.dom.cod.name)]:
@@ -645,14 +693,33 @@ class Backend(ABC):
         return separators
 
     @staticmethod
+    def strand_separators(graph, node):
+        """
+        The separators of a crossing: the cubic Bezier of each of its
+        strands, see :meth:`braid_strand` and :meth:`crossing_wires`, paired
+        with the colour to the right of its wire.
+        """
+        middle = graph.positions[node].y
+        return [
+            (tuple(Backend.braid_strand(
+                graph.positions[dom], graph.positions[cod], middle)),
+             dom.x.cod.name)
+            for dom, cod in Backend.crossing_wires(node)]
+
+    @staticmethod
     def separator_param(curve, y):
         """
         The Bezier parameter at which a separator ``curve`` from top to
         bottom crosses the horizontal line at height ``y``, see
-        :meth:`region_separators`. The control point of a separator is
-        level with one of its endpoints, so its height is monotone and
-        the parameter has a closed form.
+        :meth:`region_separators`. The control point of a quadratic
+        separator is level with one of its endpoints, so its height is
+        monotone and the parameter has a closed form. The two control
+        points of a strand are level with each other in between its
+        endpoints, so its height is monotone too, a cubic inverted with
+        :func:`monotone_root`.
         """
+        if len(curve) == 4:
+            return monotone_root(lambda t: bezier(curve, t).y - y)
         top, control, bottom = (point.y for point in curve)
         if control == top:
             return sqrt(max(0., min(1., (top - y) / (top - bottom))))
@@ -671,14 +738,14 @@ class Backend(ABC):
         for curve, colour in separators:
             if curve[0].y < top or curve[-1].y > bottom:
                 continue
-            first, last = (
-                Backend.separator_param(curve, y) for y in (top, bottom))
-            middle = Backend.separator_param(curve, (top + bottom) / 2)
-            (x0, _), control, (x1, _) = quadratic_subcurve(
-                curve, first, last)
+            first, last, middle = (
+                Backend.separator_param(curve, y)
+                for y in (top, bottom, (top + bottom) / 2))
+            restricted = subcurve(curve, first, last)
             band.append((
-                quadratic_subcurve(curve, middle, middle)[0].x,
-                (Point(x0, top), control, Point(x1, bottom)), colour))
+                subcurve(curve, middle, middle)[0].x,
+                (Point(restricted[0].x, top), *restricted[1:-1],
+                 Point(restricted[-1].x, bottom)), colour))
         return [(curve, colour)
                 for _, curve, colour in sorted(band, key=lambda x: x[0])]
 
@@ -687,7 +754,8 @@ class Backend(ABC):
         """
         The exact extents of the coloured regions of a drawing, computed by
         trapezoidal decomposition: the canvas is subdivided at every height
-        where a separator starts or ends and, inside each of the resulting
+        where a separator starts or ends or two strands of a crossing meet,
+        see :meth:`crossing_height`, and, inside each of the resulting
         bands, each consecutive pair of separators bounds one cell, filled
         with the colour that its left boundary carries -- ``graph.dom.dom``
         for the leftmost cell, with the sides of the canvas as outermost
@@ -696,13 +764,19 @@ class Backend(ABC):
         underneath a box, whose left side carries no colour at all.
 
         Returns the list of cells ``(left, right, colour)`` where ``left``
-        and ``right`` are quadratic Beziers ``(top, control, bottom)``
-        restricted to the band, ordered bottom to top then left to right.
+        and ``right`` are quadratic Beziers ``(top, control, bottom)`` or
+        cubic strands restricted to the band, ordered bottom to top then
+        left to right.
         """
         separators = Backend.region_separators(graph)
-        heights = sorted(set([0, graph.height] + [
-            point.y for curve, _ in separators
-            for point in (curve[0], curve[-1])]))
+        strands = [curve for curve, _ in separators if len(curve) == 4]
+        heights = sorted(set(
+            [0, graph.height]
+            + [point.y for curve, _ in separators
+               for point in (curve[0], curve[-1])]
+            + [Backend.crossing_height(first, second)
+               for first, second in combinations(strands, 2)
+               if Backend.strands_cross(first, second)]))
         cells = []
         for bottom, top in zip(heights, heights[1:]):
             left, colour = (
@@ -719,11 +793,32 @@ class Backend(ABC):
         return [
             cell for cell in cells if cell[-1] not in (None, TRANSPARENT)]
 
+    @staticmethod
+    def strands_cross(first, second):
+        """
+        Whether two strands meet, i.e. they belong to one crossing, so that
+        they are level with each other at every parameter, and swap sides
+        between their top and their bottom.
+        """
+        return [point.y for point in first] == [point.y for point in second]\
+            and (first[0].x - second[0].x) * (first[-1].x - second[-1].x) < 0
+
+    @staticmethod
+    def crossing_height(first, second):
+        """
+        The height at which two strands that :meth:`strands_cross` meet:
+        their horizontal distance is monotone in the parameter they share,
+        see :meth:`braid_strand`, so it vanishes at its :func:`monotone_root`.
+        """
+        param = monotone_root(
+            lambda t: bezier(first, t).x - bezier(second, t).x)
+        return bezier(first, param).y
+
     def draw_region_cell(self, left, right, facecolor):
         """
-        Fill the cell between two quadratic Beziers ``left`` and ``right``
-        given as ``(top, control, bottom)`` triples spanning the same
-        height band, see :meth:`region_cells`.
+        Fill the cell between two Beziers ``left`` and ``right``, quadratic
+        ``(top, control, bottom)`` triples or cubic strands, spanning the
+        same height band, see :meth:`region_cells`.
         """
         # pylint: disable=unused-argument  # the base only measures the width
         self.max_width = max(
@@ -884,19 +979,32 @@ class Backend(ABC):
             self.draw_half_circle(xs[a][0], xs[b][0], end, end, 1, depth,
                                   adaptive=ribbon is None)
 
+    @staticmethod
+    def crossing_wires(node):
+        """
+        The ``box_dom`` and ``box_cod`` nodes joined by each strand of a
+        crossing, in the order of its outputs: a swap or a braid exchanges
+        its two wires and a permutation sends input
+        ``permutation_indices[i]`` to output ``i``, see :meth:`draw_braid`
+        and :meth:`draw_permutation`.
+        """
+        box, j = node.box, node.j
+        indices = box.permutation_indices\
+            if box.draw_as_permutation else (1, 0)
+        return [(Node("box_dom", i=source, j=j, x=box.dom[source]),
+                 Node("box_cod", i=i, j=j, x=box.cod[i]))
+                for i, source in enumerate(indices)]
+
     def draw_braid(self, positions, node):
         """
         Draws a braid or a swap as its two wires crossing diagonally, so that
         they meet at a right angle. A braid (over/under) breaks the wire that
         goes under; a symmetric swap simply crosses both wires.
         """
-        box, j = node.box, node.j
-        dom = [positions[Node("box_dom", i=i, j=j, x=box.dom[i])]
-               for i in range(2)]
-        cod = [positions[Node("box_cod", i=i, j=j, x=box.cod[i])]
-               for i in range(2)]
+        box = node.box
+        right, left = [(positions[dom], positions[cod])
+                       for dom, cod in self.crossing_wires(node)]
         _, middle = positions[node]
-        left, right = (dom[0], cod[1]), (dom[1], cod[0])
         adaptive = self.on_neutral_canvas(box.dom, box.cod)
         if not getattr(box, "draw_as_braid", False):
             self.draw_braid_strand(*left, middle, adaptive=adaptive)
@@ -904,7 +1012,7 @@ class Backend(ABC):
             return
         # Keep the shadow roughly the same height, e.g. for a double braid,
         # by widening the (relative) gap when the braid is short.
-        gap = min(0.3, 0.1 / (dom[0][1] - cod[0][1]))
+        gap = min(0.3, 0.1 / (left[0][1] - left[1][1]))
         # The left wire goes under the right one unless the box is dagger.
         over, under = (left, right) if box.is_dagger else (right, left)
         self.draw_braid_strand(*under, middle, gap=gap, adaptive=adaptive)
@@ -912,14 +1020,11 @@ class Backend(ABC):
 
     def draw_permutation(self, positions, node):
         """ Draw a permutation as a band of crossing wires. """
-        box, j = node.box, node.j
         middle = positions[node][1]
-        adaptive = self.on_neutral_canvas(box.dom, box.cod)
-        for i, source in enumerate(box.permutation_indices):
-            dom = positions[Node(
-                "box_dom", i=source, j=j, x=box.dom[source])]
-            cod = positions[Node("box_cod", i=i, j=j, x=box.cod[i])]
-            self.draw_braid_strand(dom, cod, middle, adaptive=adaptive)
+        adaptive = self.on_neutral_canvas(node.box.dom, node.box.cod)
+        for dom, cod in self.crossing_wires(node):
+            self.draw_braid_strand(
+                positions[dom], positions[cod], middle, adaptive=adaptive)
 
     def draw_boxes(self, graph, **params):
         drawing_methods = [
@@ -1285,9 +1390,8 @@ class TikZ(Backend):
             distance = min(dx, dy)
             looseness = round(distance / length * 2.1, 4)
         if looseness != 1:
-            if style is None:
-                style = ''
-            style += f'looseness={looseness}'
+            style = ', '.join(
+                [style] * bool(style) + [f'looseness={looseness}'])
 
         cmd = (
             "\\draw [in={}, out={}{}] "
@@ -1433,17 +1537,20 @@ class Matplotlib(Backend):
 
     def draw_region_cell(self, left, right, facecolor):
         """
-        Fill the cell between two quadratic Beziers with a single patch:
-        down the ``left`` boundary, straight across the bottom, up the
-        ``right`` boundary and straight back across the top. Antialiasing
-        is disabled so that abutting cells of the same colour do not leave
-        a hairline seam where the background shows through.
+        Fill the cell between two Beziers with a single patch: down the
+        ``left`` boundary, straight across the bottom, up the ``right``
+        boundary and straight back across the top. Antialiasing is
+        disabled so that abutting cells of the same colour do not leave a
+        hairline seam where the background shows through.
         """
+        def codes(curve):
+            return (len(curve) - 1) * [
+                Path.CURVE3 if len(curve) == 3 else Path.CURVE4]
         vertices = list(left) + list(reversed(right)) + [left[0]]
-        codes = [Path.MOVETO] + 2 * [Path.CURVE3]\
-            + [Path.LINETO] + 2 * [Path.CURVE3] + [Path.CLOSEPOLY]
         self.axis.add_patch(PathPatch(
-            Path(vertices, codes), linewidth=0, antialiased=False,
+            Path(vertices, [Path.MOVETO] + codes(left) + [Path.LINETO]
+                 + codes(right) + [Path.CLOSEPOLY]),
+            linewidth=0, antialiased=False,
             facecolor=COLORS.get(facecolor, facecolor), edgecolor='none'))
         super().draw_region_cell(left, right, facecolor)
 
@@ -1548,7 +1655,7 @@ class Matplotlib(Backend):
         plt.margins(*margins)
         plt.subplots_adjust(
             top=1, bottom=0, right=1, left=0, hspace=0, wspace=0)
-        self.axis.set_aspect(params.get("aspect", "auto"))
+        self.axis.set_aspect(params.get("aspect"))
         plt.axis('off')
         if xlim is not None:
             self.axis.set_xlim(*xlim)

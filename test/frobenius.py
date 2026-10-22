@@ -18,6 +18,15 @@ def test_Functor_call():
         F(F)
 
 
+def test_Functor_phased_spider():
+    x = Ty('x')
+    phased, box = Spider(1, 1, x, .5), Box('box', x, x)
+    F = Functor({x: x}, {phased: box})
+    assert F(phased) == box and F(Spider(1, 1, x)) == Spider(1, 1, x)
+    assert Functor.id(Diagram)(phased) == phased
+    assert not Equation(phased, Spider(1, 1, x, .25))
+
+
 def test_Box_hash():
     x, y = Ty('x'), Ty('y')
     f = Box('f', x, y)
@@ -71,3 +80,42 @@ def test_Sum():
     assert isinstance(f + f, Sum) and (f + f).terms == (f, f)
     image = Functor(lambda x: x, {f: f + f})(f)
     assert isinstance(image, Sum) and image.terms == (f, f)
+
+
+def test_Spider_to_tree():
+    from discopy.utils import dumps, loads
+    x = Ty('x')
+    for spider in (Spider(1, 2, x), Spider(2, 0, x, 0.5), Spider(0, 3, x).l,
+                   Spider(1, 2, x, is_dagger=True)):
+        assert loads(dumps(spider)) == spider
+        assert loads(dumps(spider)).phase == spider.phase
+        assert loads(dumps(spider)).is_dagger == spider.is_dagger
+
+
+def test_Spider_repr():
+    from discopy import frobenius
+    x = Ty('x')
+    assert repr(Spider(1, 2, x, 0.5))\
+        == "frobenius.Spider(1, 2, frobenius.Ty(frobenius.Wire('x')), 0.5)"
+    for spider in (Spider(1, 2, x, 0.5), Spider(2, 0, x, is_dagger=True),
+                   Spider(0, 1, x, 0.25, is_dagger=True)):
+        assert eval(repr(spider)) == spider
+
+
+def test_Wire_adjoints():
+    from discopy.monoidal import Colour
+    a, b = Colour('a'), Colour('b')
+    x = Wire('x', dom=a, cod=b)
+    for adjoint in (x.l, x.r):
+        assert (adjoint.name, adjoint.dom, adjoint.cod) == ('x', b, a)
+        assert adjoint.l == adjoint.r == x
+    assert Ty(x).l == Ty(x).r == Ty(x.l) and Ty(x).l.dom == b
+    assert Wire('y').l == Wire('y').r == Wire('y')
+
+
+def test_feedback_is_the_trace():
+    x = Ty('x')
+    f = Box('f', x @ x, x @ x)
+    for traced in (f.feedback(), f.feedback(mem=x), f.trace(mem=x)):
+        assert isinstance(traced, Diagram) and traced == f.trace()
+    assert Equation(f.feedback(2, left=True), f.trace(2, left=True))

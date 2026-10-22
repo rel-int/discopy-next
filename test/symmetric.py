@@ -10,8 +10,8 @@ from discopy.utils import AxiomError, dumps, loads
 
 def test_Swap():
     x, y = Ty('x'), Ty('y')
-    assert repr(Swap(x, y))\
-        == "symmetric.Swap(monoidal.Ty(cat.Ob('x')), monoidal.Ty(cat.Ob('y')))"
+    assert repr(Swap(x, y)) == "symmetric.Swap("\
+        "feedback.Ty(feedback.Wire('x')), feedback.Ty(feedback.Wire('y')))"
     assert Swap(x, y).dagger() == Swap(y, x)
     with raises(ValueError):
         Swap(x ** 2, Ty())
@@ -260,11 +260,11 @@ def test_permutation_factory():
 
 
 def test_inherited_permutation_factory():
-    from discopy import closed, feedback, frobenius, tensor
+    from discopy import closed, markov, frobenius, tensor
 
     cases = [
         (closed, closed.Ty("x"), closed.Ty("y")),
-        (feedback, feedback.Ty("x"), feedback.Ty("y")),
+        (markov, markov.Ty("x"), markov.Ty("y")),
         (frobenius, frobenius.Ty("x"), frobenius.Ty("y")),
         (tensor, tensor.Dim(2), tensor.Dim(3))]
     for module, x, y in cases:
@@ -374,8 +374,9 @@ def test_Permutation_to_drawing():
 
     x, y, z = map(Ty, 'xyz')
     perm = Permutation(x @ y @ z, [1, 0, 2])
-    functor = Functor(
-        ob_map={x: z, y: x, z: y}, ar_map={}, cod=Drawing)
+    functor = Functor(ob_map={
+        x: z.to_drawing(), y: x.to_drawing(), z: y.to_drawing()},
+        ar_map={}, cod=Drawing)
     drawing = functor(perm)
     assert drawing.dom == (z @ x @ y).to_drawing()
     assert drawing.cod == (x @ z @ y).to_drawing()
@@ -397,7 +398,6 @@ def test_abc_permutation():
 
 def test_coloured_Layer_boxes_and_types():
     from discopy import monoidal
-    from discopy.monoidal import Wire
 
     red, green = map(monoidal.Colour, ("red", "green"))
     x = Ty(Wire('x', dom=red, cod=green))
@@ -406,6 +406,26 @@ def test_coloured_Layer_boxes_and_types():
     assert Layer(f).boxes_and_types == (empty_red, f, empty_green)
     assert Layer(empty_red, f, empty_green).boxes_and_types\
         == (empty_red, f, empty_green)
+
+
+def test_foliation_with_traces_and_permutations():
+    from discopy import tensor
+    x, y = Ty('x'), Ty('y')
+    f, g, h = Box('f', x @ x, x @ x), Box('g', y @ x @ x, x), Box('h', x, x)
+    F = tensor.Functor(
+        {x: 2, y: 3},
+        {f: list(range(16)), g: list(range(24)), h: [1, 2, 3, 4]},
+        dom=Diagram)
+    for diagram in [
+            f.trace() @ h,
+            h @ f.trace(left=True) >> Swap(x, x),
+            Permutation(x @ y @ x, [1, 2, 0]) >> g,
+            Swap(x, y) @ x >> y @ f.trace() @ x >> y @ h @ h]:
+        foliated = diagram.foliation()
+        assert foliated.boxes == diagram.boxes
+        assert Equation(foliated, diagram)
+        assert F(foliated) == F(diagram)
+    assert len((f.trace() @ h).foliation()) == 1
 
 
 def test_foliation_idempotence():
@@ -419,3 +439,14 @@ def test_foliation_idempotence():
         foliated = diagram.foliation()
         assert Equation(diagram, foliated)
         assert foliated.foliation() == foliated
+
+def test_tensor_coalesces_plumbing():
+    from functools import reduce
+    x = Ty('x')
+    perm = Permutation(x @ x, [1, 0])
+    assert perm.tensor(x, perm) == Permutation(x ** 5, [1, 0, 2, 4, 3])
+    assert perm.tensor() == perm
+    f = Box('f', x, x)
+    assert perm.tensor(f, perm) == reduce(
+        lambda g, h: g.tensor(h), [perm, f, perm])
+    assert perm.tensor(x, f) == reduce(lambda g, h: g.tensor(h), [perm, x, f])

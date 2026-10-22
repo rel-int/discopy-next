@@ -364,8 +364,7 @@ def from_tk(tk_circuit):
         if name in GATES:
             return GATES[name]
         if name.removesuffix('dg') in GATES:
-            gate = GATES[name.removesuffix('dg')]
-            return gate.dagger()  # ty: ignore[missing-argument]
+            return GATES[name.removesuffix('dg')].dagger()
         raise NotImplementedError
 
     def make_units_adjacent(tk_gate):

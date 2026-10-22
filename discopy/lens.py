@@ -68,7 +68,7 @@ It is well-behaved, i.e. it satisfies the three lens laws:
 from __future__ import annotations
 
 from dataclasses import dataclass
-from discopy import interaction, markov, messages, monoidal, symmetric
+from discopy import interaction, markov, messages, symmetric
 from discopy.abc import (
     MarkovCategory, NamedGeneric, SymmetricCategory, TracedCategory)
 from discopy.utils import (
@@ -98,7 +98,7 @@ class Ty(interaction.Ty):
     >>> assert x @ y == Ty[List[str]](("x", "y"), ("x'", "y'"))
     >>> assert -(x @ y) == -x @ -y
     """
-    natural = monoidal.Ty
+    natural = symmetric.Ty
     negatives = staticmethod(tuple)
 
 
@@ -108,7 +108,7 @@ def pairs(category) -> type:
 
 
 @dataclass
-class Symmetric[category](SymmetricCategory, NamedGeneric):
+class Symmetric(SymmetricCategory, NamedGeneric['category']):
     """
     A lens from `dom` to `cod` over a symmetric `category` is a `residual`
     with a `forward` morphism `dom.positive -> cod.positive @ residual` and
@@ -153,11 +153,11 @@ class Symmetric[category](SymmetricCategory, NamedGeneric):
     category = symmetric.Diagram
     ob = classproperty(lambda cls: pairs(cls.category))
 
-    dom: ob  # ty: ignore[invalid-type-form]
-    cod: ob  # ty: ignore[invalid-type-form]
+    dom: ob
+    cod: ob
     forward: category
     backward: category
-    residual: category.ob = None  # ty: ignore[invalid-assignment]
+    residual: category.ob = None
 
     def __post_init__(self):
         if self.residual is None:
@@ -182,10 +182,7 @@ class Symmetric[category](SymmetricCategory, NamedGeneric):
             f"{self.forward!r}, {self.backward!r}, {self.residual!r})"
 
     @classmethod
-    def lift(
-            cls, forward: category,
-            backward: category = None,  # ty: ignore[invalid-parameter-default]
-    ) -> Symmetric:
+    def lift(cls, forward: category, backward: category = None) -> Symmetric:
         """
         A morphism `x -> y` of the underlying category as a lens from
         `(x, x_)` to `(y, y_)` with empty residual, the backward morphism
@@ -202,7 +199,7 @@ class Symmetric[category](SymmetricCategory, NamedGeneric):
                    cls.ob(forward.cod, backward.dom), forward, backward)
 
     @classmethod
-    def id(cls, dom: ob = None) -> Symmetric:  # ty: ignore[invalid-type-form]
+    def id(cls, dom: ob = None) -> Symmetric:
         """
         The identity lens on `dom`, with empty residual.
 
@@ -302,9 +299,7 @@ class Symmetric[category](SymmetricCategory, NamedGeneric):
                           forward, backward, self.residual @ other.residual)
 
     @classmethod
-    def swap(
-            cls, left: ob,  # ty: ignore[invalid-type-form]
-            right: ob) -> Symmetric:  # ty: ignore[invalid-type-form]
+    def swap(cls, left: ob, right: ob) -> Symmetric:
         """
         The swap of two pairs is the swap of their positive halves forward
         and of their negative halves backward, with empty residual.
@@ -346,9 +341,8 @@ class Symmetric[category](SymmetricCategory, NamedGeneric):
         inside = self.forward @ self.cod.negative\
             >> self.cod.positive @ self.backward
         ob = interaction.Ty[self.ob.natural]
-        diagram = interaction.Diagram[
-            self.category]  # ty: ignore[invalid-type-form]
-        return diagram(inside, ob(*self.dom), ob(*self.cod))
+        return interaction.Diagram[self.category](
+            inside, ob(*self.dom), ob(*self.cod))
 
     def to_markov(self) -> Markov:
         """
@@ -388,27 +382,30 @@ class Traced(Symmetric, TracedCategory):
     ...     == (f.forward >> x @ Diagram.swap(u, m)).trace()
     >>> assert f.trace().backward == f.backward.trace()
     """
-    def trace(self, n: int = 1, left: bool = False) -> Traced:
+    def trace(self, n: int | tuple[int, int] = 1, left: bool = False
+              ) -> Traced:
         """
         The trace of a lens over the last `n` atoms of each half of its
-        domain and codomain, the residual never being traced.
+        domain and codomain, or one number per half, the residual never being
+        traced.
 
         Parameters:
-            n : The number of atoms to trace over on each half.
+            n : The number of atoms to trace over on each half, or one number
+                per half.
             left : Whether to trace on the left, not implemented.
         """
-        if n == 0:
+        (x, (u, u_)), (y, _) = self.dom.split(n), self.cod.split(n)
+        if not u and not u_:
             return self
         if left:
             raise NotImplementedError
-        identity, swap = self.category.id, self.category.swap
-        (x, x_), (y, y_) = (
-            (positive[:-n], negative[:-n])
-            for positive, negative in (self.dom, self.cod))
-        u = self.dom.positive[-n:]
-        forward = self.forward >> identity(y) @ swap(u, self.residual)
-        return type(self)(self.ob(x, x_), self.ob(y, y_), forward.trace(n),
-                          self.backward.trace(n), self.residual)
+        forward = self.forward >> self.category.id(y.positive)\
+            @ self.category.swap(u, self.residual)
+        return type(self)(x, y, forward.trace(len(u)),
+                          self.backward.trace(len(u_)), self.residual)
+
+    split_memory = interaction.Diagram.split_memory
+    memory_size = interaction.Diagram.memory_size
 
 
 class Markov(Symmetric):
@@ -487,10 +484,7 @@ class Markov(Symmetric):
                 factory_name(cls.category)))
 
     @classmethod
-    def lift(
-            cls, get: category,
-            backward: category = None,  # ty: ignore[invalid-parameter-default]
-    ) -> Markov:
+    def lift(cls, get: category, backward: category = None) -> Markov:
         """
         A morphism `x -> y` of the underlying category as a lens from
         `(x, x_)` to `(y, y_)`, with `put` discarding the input and applying

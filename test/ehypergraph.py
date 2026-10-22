@@ -9,11 +9,12 @@ from hypothesis import assume, example, given, settings, strategies as st
 from pytest import raises
 
 from discopy import symmetric
-from discopy.ehypergraph import EHypergraph, Markov, partition
+from discopy.ehypergraph import (
+    EHypergraph, Join, Markov, distribute, partition)
 from discopy.hypergraph import Hypergraph
-from discopy.markov import Ty, Box, Copy, Diagram, Functor, Merge, Swap
+from discopy.markov import Ty, Box, Copy, Diagram, Functor, Swap
 from discopy.tensor import Dim, Tensor
-from discopy.utils import AxiomError
+from discopy.utils import AxiomError, dumps, loads
 
 x = Ty('x')
 f, g, h = Box('f', x, x), Box('g', x, x), Box('h', x, x)
@@ -30,8 +31,9 @@ def test_samples_are_independent():
     graph = Markov.from_diagram(sample)
     assert len(graph.add(sample, (0, ))[0].graph.boxes) == 2
     assert Markov.from_diagram(f).add(f, (0, ))[1] == (1, )
-    unit = Markov.id(Ty()).add(Merge(x, 0), ())[0]
-    assert unit.add(Merge(x, 0), ())[1] == (1, )
+    noise = Box('noise', Ty(), x, is_deterministic=False, is_affine=False)
+    unit = Markov.id(Ty()).add(noise, ())[0]
+    assert unit.add(noise, ())[1] == (1, )
 
 
 def test_category_has_flags():
@@ -74,6 +76,132 @@ def test_rewrite_glues():
     assert len(rewritten.graph.boxes) == 2 and rewritten.classes == (0, 1, 0)
     assert rewritten.extract() == Diagram.id(x).to_hypergraph()
     assert len(rewritten.sections()) == 1
+
+
+def names(graph: EHypergraph) -> list[list[str]]:
+    """ The e-nodes of each class by name, as the dashed boxes of Tiurin et
+    al.'s figures, an input named ``"input"``. """
+    def name(port):
+        box = graph.box_of(port)
+        return "input" if box is None else graph.graph.boxes[box].name
+
+    return sorted(sorted(map(name, ports)) for ports in graph.nodes.values())
+
+
+def joins(diagram: Diagram) -> list[list[str]]:
+    """ The terms of each join of a diagram by the names of their boxes. """
+    return sorted(sorted(str(term) for term in box.args)
+                  for box in diagram.boxes if isinstance(box, Join))
+
+
+def spider(graph: EHypergraph, box: Box) -> int:
+    """ The output of the first occurrence of a box with one output. """
+    output, = graph.graph.box_wires[graph.graph.boxes.index(box)][1]
+    return output
+
+
+def test_join():
+    join = Join(f, g)
+    assert join.dagger().dagger() == join and loads(dumps(join)) == join
+    assert join.is_affine and not join.is_deterministic
+    check = Box('check', x, x, is_affine=False)
+    assert Join(f).is_cartesian and not Join(f, check).is_affine
+    assert distribute(Copy(x) >> join @ join).terms == (
+        Copy(x) >> f @ f, Copy(x) >> f @ g,
+        Copy(x) >> g @ f, Copy(x) >> g @ g)
+    with raises(AxiomError):
+        Join(f, Box('k', x, x @ x), dom=x, cod=x)
+
+
+def test_nodes_hashcons():
+    two, times = Box('2', Ty(), x), Box('*', x @ x, x)
+    graph = Markov.from_diagram(two @ two >> times)
+    assert names(graph) == [['*'], ['2']] and len(graph.graph.boxes) == 3
+    assert graph.sections() == [(two >> Copy(x) >> times).to_hypergraph()]
+    shared = Markov.from_diagram(Copy(x) >> f @ f)
+    assert shared.sections() == Markov.from_diagram(f >> Copy(x)).sections()
+    noisy = Markov.from_diagram(Copy(x) >> sample @ sample)
+    assert names(noisy) == [['input'], ['sample'], ['sample']]
+
+
+def test_translation_chooses_per_class():
+    p, q, r = Box('p', Ty(), x), Box('q', Ty(), x), Box('r', x @ x, x)
+    graph = Markov.from_diagram(p >> Copy(x) >> r)
+    graph = graph.rewrite((0, ), (), (spider(graph, p), ), q.to_hypergraph())
+    diagram = graph.to_diagram()
+    assert joins(diagram) == [['p', 'q']]
+    assert distribute(diagram).terms == (
+        p >> Copy(x) >> r, q >> Copy(x) >> r)
+    assert len(graph.sections()) == 2
+
+
+def test_effects_stay_outside_joins():
+    graph = Markov.from_diagram(sample @ f).merge(
+        spider(Markov.from_diagram(sample @ f), sample),
+        spider(Markov.from_diagram(sample @ f), f))
+    diagram = graph.to_diagram()
+    assert sample in diagram.boxes and joins(diagram) == [
+        ['Discard(x) @ f', 'x @ Discard(x)']]
+    assert len(graph.sections()) == 2
+
+
+def test_figure_1():
+    """ Tiurin et al. (2024), Fig. 1: ``(a * 2) / 2`` under three rules, one
+    at a time, ``a``, ``1`` and ``2`` constants, then the cycle it omits. """
+    a, one, two = (Box(name, Ty(), x) for name in "a12")
+    times, divide, shift = (Box(op, x @ x, x) for op in ("*", "/", "<<"))
+    rules = [(x @ two >> times, x @ one >> shift),
+             (times @ x >> divide, x @ divide >> times),
+             (Copy(x) >> divide, Diagram.discard(x) >> one)]
+    graph = Markov.from_diagram(a @ two @ two >> times @ x >> divide)
+    steps = [graph]
+    for lhs, rhs in rules:
+        steps.append(steps[-1].step([
+            (lhs.to_hypergraph(), rhs.to_hypergraph())]))
+    assert list(map(names, steps)) == [
+        [['*'], ['/'], ['2'], ['a']],
+        [['*', '<<'], ['/'], ['1'], ['2'], ['a']],
+        [['*', '/'], ['*', '<<'], ['/'], ['1'], ['2'], ['a']],
+        [['*', '/'], ['*', '<<'], ['/', '1'], ['2'], ['a']]]
+    assert list(map(len, map(EHypergraph.sections, steps))) == [1, 2, 3, 5]
+    assert list(map(len, (joins(step.to_diagram()) for step in steps))) == [
+        0, 1, 2, 3]
+    assert all(map(Markov.translation, steps))
+    cyclic = steps[-1].step([(
+        (x @ one >> times).to_hypergraph(), Diagram.id(x).to_hypergraph())])
+    assert ['*', '/', 'a'] in names(cyclic)
+    assert cyclic.extract() == a.to_hypergraph()
+    with raises(AxiomError):
+        cyclic.to_diagram()
+    assert Markov.translation(cyclic)
+
+
+def test_figures_26_and_27():
+    """ Tiurin et al. (2024), Figs. 26 and 27: relating ``b`` and ``c`` makes
+    ``f(a, b)`` and ``f(a, c)`` congruent, one e-node, shared by a copy. """
+    a, b, c = (Box(name, Ty(), x) for name in "abc")
+    k, plus = Box('f', x @ x, x), Box('+', x @ x, x)
+    graph = Markov.from_diagram(a @ b @ a @ c >> k @ k >> plus)
+    merged = graph.merge(spider(graph, b), spider(graph, c))
+    rebuilt = merged.rebuild()
+    assert list(map(len, map(set, (
+        g.classes for g in (graph, merged, rebuilt))))) == [6, 5, 4]
+    assert names(rebuilt) == [['+'], ['a'], ['b', 'c'], ['f']]
+    assert rebuilt.to_diagram().to_hypergraph() == (
+        a @ Join(b, c) >> k >> Copy(x) >> plus).to_hypergraph()
+
+
+def test_figure_17():
+    """ Tiurin et al. (2024), Fig. 17 and Appendix G: deleting ``a`` is no
+    rewrite, as no section keeps what nobody reads and is affine. """
+    a = Box('a', Ty(), x)
+    graph = Markov.from_diagram(f @ a >> x @ Diagram.discard(x))
+    graph = graph.rewrite((0, ), (0, ), (spider(graph, f), ),
+                          g.to_hypergraph())
+    deletion = (a >> Diagram.discard(x), Diagram.id(Ty()))
+    assert graph.matches(deletion[0].to_hypergraph())
+    assert not list(graph.saturate(deletion))
+    assert graph.sections() == [f.to_hypergraph(), g.to_hypergraph()]
 
 
 def narrow(diagram: Diagram, bound: int = 12) -> bool:

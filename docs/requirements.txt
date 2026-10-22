@@ -1,0 +1,6 @@
+# Read the Docs installs with pip, which does not read `tool.uv.sources`:
+# torch comes from the CPU index alone, as uv takes it on Linux, rather than
+# whichever of it and PyPI has the higher version. Read the Docs runs one pip
+# per install step, so this index binds this file only.
+--index-url https://download.pytorch.org/whl/cpu
+torch

@@ -11,12 +11,12 @@ DisCoPy's mathematical core: a zoo of diagrams, categories and functors.
     discopy.cat
     discopy.monoidal
     discopy.braided
+    discopy.feedback
     discopy.balanced
     discopy.symmetric
     discopy.markov
+    discopy.comarkov
     discopy.closed
-    discopy.feedback
-    discopy.traced
     discopy.biclosed
     discopy.rigid
     discopy.pivotal

@@ -15,3 +15,9 @@ def test_Sum():
     assert isinstance(f + f, Sum) and (f + f).terms == (f, f)
     image = Functor(lambda x: x, {f: f + f})(f)
     assert isinstance(image, Sum) and image.terms == (f, f)
+
+
+def test_Box_is_traced():
+    from discopy import feedback
+    x = Ty('x')
+    assert isinstance(Box('f', x, x), feedback.Box)

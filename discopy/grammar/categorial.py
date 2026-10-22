@@ -54,6 +54,7 @@ from discopy.utils import (
     BinaryBoxConstructor,
     AxiomError,
     factory_name,
+    from_tree,
     get_origin,
 )
 
@@ -236,6 +237,7 @@ class TermBase(Box, biclosed.TermBase):
     A term in the internal language of a categorial grammar.
     """
     functor = Functor.id(Diagram)
+    freevars = None
 
     def __call__(self, other, left=False):
         return BA(self, other) if left else FA(self, other)
@@ -269,8 +271,7 @@ class Abstraction(TermBase, biclosed.Abstraction):
     left: bool = False
 
     def __init__(self, var: Variable, body: Term, left: bool = False):
-        biclosed.Abstraction.__init__(
-            self, var, body, left)
+        biclosed.Abstraction.__init__(self, var, body, left)
         TermBase.__init__(self, self.name, self.dom, self.cod)
 
     def simplify(self):
@@ -283,6 +284,10 @@ class FA(TermBase, biclosed.Application):
         biclosed.Application.__init__(self, func, args, left=False)
         TermBase.__init__(self, self.name, self.dom, self.cod)
 
+    @classmethod
+    def from_tree(cls, tree):
+        return cls(*map(from_tree, (tree['func'], tree['args'])))
+
     def simplify(self):
         return self.func.simplify()(self.args.simplify())
 
@@ -292,6 +297,10 @@ class BA(TermBase, biclosed.Application):
     def __init__(self, args, func):
         biclosed.Application.__init__(self, func, args, left=True)
         TermBase.__init__(self, self.name, self.dom, self.cod)
+
+    @classmethod
+    def from_tree(cls, tree):
+        return cls(*map(from_tree, (tree['args'], tree['func'])))
 
     def simplify(self):
         return self.args.simplify()(self.func.simplify(), left=True)
@@ -313,9 +322,6 @@ class TypeRaising(TermBase):
     def eval(self, functor=None):
         return self.simplify().eval(functor)
 
-    def map(self, functor, context):
-        return functor.map_term(self.simplify(), context)
-
     def alpha_eq_under(self, scopes, others, depth=0):
         """ Type raisings of one base with alpha-equivalent children. """
         if any(type(other) is not type(self) or other.base != self.base
@@ -324,8 +330,19 @@ class TypeRaising(TermBase):
         return self.child.alpha_eq_under(
             scopes, [other.child for other in others], depth)
 
+    def map(self, functor, context):
+        return functor.map_term(self.simplify(), context)
+
     def __repr__(self):
         return factory_name(type(self)) + f"({self.base!r}, {self.child!r})"
+
+    def to_tree(self):
+        return dict(factory=factory_name(type(self)), base=self.base.to_tree(),
+                    child=self.child.to_tree())
+
+    @classmethod
+    def from_tree(cls, tree):
+        return cls(*map(from_tree, (tree['base'], tree['child'])))
 
     @property
     def constants(self):
@@ -378,9 +395,6 @@ class BinaryTerm(TermBase):
     def eval(self, functor=None):
         return self.simplify().eval(functor)
 
-    def map(self, functor, context):
-        return functor.map_term(self.simplify(), context)
-
     def alpha_eq_under(self, scopes, others, depth=0):
         """ Compositions of one kind with alpha-equivalent sides. """
         if any(type(other) is not type(self) for other in others):
@@ -390,8 +404,19 @@ class BinaryTerm(TermBase):
             and self.right.alpha_eq_under(
                 scopes, [other.right for other in others], depth)
 
+    def map(self, functor, context):
+        return functor.map_term(self.simplify(), context)
+
     def __repr__(self):
         return factory_name(type(self)) + f"({self.left!r}, {self.right!r})"
+
+    def to_tree(self):
+        return dict(factory=factory_name(type(self)), left=self.left.to_tree(),
+                    right=self.right.to_tree())
+
+    @classmethod
+    def from_tree(cls, tree):
+        return cls(*map(from_tree, (tree['left'], tree['right'])))
 
     @property
     def constants(self):
@@ -583,8 +608,8 @@ Diagram.eval_factory, Diagram.coeval_factory = Eval, Coeval
 
 Ty.variable_factory = Variable
 Ty.constant_factory = Constant
-Ty.application_factory = (  # ty: ignore[invalid-assignment]
-    lambda func, args, left=False: BA(args, func) if left else FA(func, args))
+Ty.application_factory =\
+    lambda func, args, left=False: BA(args, func) if left else FA(func, args)
 Ty.abstraction_factory = Abstraction
 
 Ty.over_factory, Ty.under_factory = Over, Under

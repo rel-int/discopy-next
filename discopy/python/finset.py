@@ -24,11 +24,11 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 
 from discopy import messages
-from discopy.abc import MonoidalCategory, PROP, Nat
+from discopy.abc import Groupoid, MonoidalCategory, PROP, Nat
 
 
 @dataclass
-class Function(MonoidalCategory[Nat, "Function"], Sequence):
+class Function(MonoidalCategory, Sequence):
     """
     A function between finite sets encoded as a Python list.
 
@@ -74,26 +74,55 @@ class Function(MonoidalCategory[Nat, "Function"], Sequence):
 
     @staticmethod
     def id(x: int | Nat = 0):
-        n = Nat(int(x))
-        return Function(list(range(n)), n, n)
+        return Function(list(range(x)), x, x)
 
-    def then(self, other: Function) -> Function:
-        inside = [self[other[i]] for i in range(len(other))]
-        return Function(inside, self.dom, other.cod)
+    def then(self, *others: Function) -> Function:
+        """
+        The composite ``self ; others``, read off backwards, i.e. each
+        index of the last codomain walked back through every function.
+        """
+        if not others:
+            return self
+        factors = (self, ) + others
+        inside = factors[-1].inside
+        for factor in reversed(factors[:-1]):
+            image = factor.inside
+            inside = [image[i] for i in inside]
+        return Function(inside, self.dom, factors[-1].cod)
 
-    def tensor(self, other: Function) -> Function:
-        inside = list(self.inside) + [
-            int(self.dom) + other[i] for i in range(len(other))]
+    def tensor(self, *others: Function) -> Function:
+        """
+        The disjoint union of ``n`` functions, i.e. their lists concatenated
+        with each shifted by the domains before it.
+
+        >>> unit = Function([0], 1, 1)
+        >>> assert unit.tensor(unit) == Function([0, 1], 2, 2)
+        """
+        if not others:
+            return self
+        inside, shift = [], 0
+        for factor in (self, ) + others:
+            inside += [shift + i for i in factor.inside]
+            shift += int(factor.dom)
         return Function(
-            inside, self.dom.tensor(other.dom), self.cod.tensor(other.cod))
+            inside,
+            self.dom.tensor(*(other.dom for other in others)),
+            self.cod.tensor(*(other.cod for other in others)))
 
     @staticmethod
     def swap(x: int | Nat, y: int | Nat) -> Function:
-        m, n = int(x), int(y)
-        inside = list(Permutation.swap(m, n))
-        return Function(inside, Nat(m + n), Nat(m + n))
+        """
+        The symmetry of ``x @ y``, which sends each output of ``y @ x`` to
+        the input it reads: the ``y`` that come after the ``m = x`` inputs,
+        then the ``x``.
 
-    def is_swap(self: Function | Sequence[int]) -> bool:
+        >>> assert Function.swap(2, 1) == Function([2, 0, 1], 3, 3)
+        >>> assert Function.swap(2, 1) >> Function.swap(1, 2) == Function.id(3)
+        """
+        m, n = int(x), int(y)
+        return Function(list(range(m, m + n)) + list(range(m)), m + n, m + n)
+
+    def is_swap(self) -> bool:
         """
         Whether this is the permutation ``(1, 0)``, callable on a raw
         sequence as well as on a :class:`Function` with a two-wire domain.
@@ -109,21 +138,22 @@ class Function(MonoidalCategory[Nat, "Function"], Sequence):
         dom = sum(int(d) for d in doms)
         if xs.is_identity:
             return Function.id(dom)
-        return Function(list(Permutation(xs, dom)), Nat(dom), Nat(dom))
+        return Function(list(Permutation(xs, dom)), dom, dom)
 
     @staticmethod
     def copy(x: int | Nat, n=2) -> Function:
         k = int(x)
-        return Function([i % k for i in range(n * k)], Nat(k), Nat(n * k))
+        return Function([i % k for i in range(n * k)], k, n * k)
 
 
 type Cycle = Iterable[int]
 type Cycles = Iterable[Cycle]
 
 
-class Permutation(Function, PROP):
+class Permutation(Function, PROP, Groupoid):
     """
-    A permutation of a finite set, seen as a bijective finite-set function.
+    A permutation of a finite set, seen as a bijective finite-set function,
+    i.e. an arrow of the groupoid of finite sets and bijections.
 
     A permutation is represented by its action on ``range(n)``.
 
@@ -150,12 +180,12 @@ class Permutation(Function, PROP):
             raise ValueError(
                 messages.WRONG_PERMUTATION.format(size, len(inside))
             )
-        super().__init__(list(inside), Nat(size), Nat(size))
+        super().__init__(list(inside), size, size)
 
     def __iter__(self):
         return (self[i] for i in range(len(self)))
 
-    def __getitem__(self, key):
+    def __getitem__(self, key: int) -> int:
         if isinstance(key, slice):
             return tuple(self)[key]
         return super().__getitem__(key)
@@ -218,7 +248,28 @@ class Permutation(Function, PROP):
             result[left], result[right] = right, left
         return cls(result, size)
 
-    def cycles(self) -> tuple[Cycle, ...]:
+    @classmethod
+    def gather(cls, xs: Sequence[int], size: int, offset: int = 0) -> Self:
+        """
+        Gather the inputs ``xs`` at the consecutive outputs from ``offset``,
+        in the order given, the other inputs keeping their order, i.e.
+        ``result[offset + i] == xs[i]``.
+
+        This is the wire routing of
+        :meth:`discopy.hypergraph.Hypergraph.to_diagram` and
+        :meth:`discopy.cmap.CMap.to_diagram`, which gather the domain wires
+        of each box at its offset.
+
+        >>> Permutation.gather([3, 1], 5, offset=1)
+        (0, 3, 1, 2, 4)
+        >>> assert Permutation.gather([], 3) == Permutation.id(3)
+        """
+        if not 0 <= offset <= size - len(xs):
+            raise ValueError
+        rest = [i for i in range(size) if i not in xs]
+        return cls(rest[:offset] + list(xs) + rest[offset:], size)
+
+    def cycles(self) -> Cycles:
         """ Return the cycles of the permutation. """
         result, seen = [], set()
         for i in range(len(self)):
@@ -241,11 +292,16 @@ class Permutation(Function, PROP):
             i = self[i]
         return tuple(cycle)
 
-    def then(self, other: Self) -> Self:
-        """ Return ``self ; other``, i.e. ``result[i] == other[self[i]]``. """
-        other = type(self)(other, len(self))
-        elems = (other[self[i]] for i in range(len(self)))
-        return type(self)(elems, len(self))
+    def then(self, *others: Self) -> Self:
+        """ Return ``self ; others``, i.e. each index pushed through them
+        in turn, ``result[i] == other[self[i]]`` for a single ``other``. """
+        if not others:
+            return self
+        inside = self.inside
+        for other in others:
+            image = type(self)(other, len(self)).inside
+            inside = [image[i] for i in inside]
+        return type(self)(inside, len(self))
 
     def dagger(self) -> Self:
         """ Return the inverse permutation. """
@@ -264,16 +320,21 @@ class Permutation(Function, PROP):
         other = type(self)(other, len(self))
         return other.dagger().then(self).then(other)
 
-    def tensor(self, other=None, *others) -> Self:
-        """ Return the disjoint union of permutations. """
-        if other is None:
+    def tensor(self, *others) -> Self:
+        """
+        The disjoint union of ``n`` permutations.
+
+        >>> swap = Permutation([1, 0])
+        >>> assert swap.tensor(swap) == Permutation([1, 0, 3, 2])
+        """
+        if not others:
             return self
-        other = type(self)(other)
-        shift = len(self)
-        result = type(self)(
-            tuple(self) + tuple(shift + i for i in other),
-            len(self) + len(other))
-        return result.tensor(*others)
+        inside, shift = list(self), len(self)
+        for other in others:
+            other = type(self)(other)
+            inside += [shift + i for i in other]
+            shift += len(other)
+        return type(self)(inside, shift)
 
     def embed(self, injection: Iterable[int], size: int) -> Self:
         """ Embed into ``range(size)`` along ``injection``. """
@@ -283,25 +344,34 @@ class Permutation(Function, PROP):
         embedded = self.tensor(type(self).id(size - len(self)))
         return embedded.conjugate(relabeling)
 
-    def coequalizer(self, other: Self) -> dict[int, int]:
+    def coequalizer(self, *others: Self) -> dict[int, int]:
         """
-        Coequalize two permutations by quotienting generated orbits.
+        Coequalize permutations by quotienting generated orbits.
 
         This computes the quotient of ``range(len(self))`` by the equivalence
-        relation generated by ``i ~ self[i]`` and ``i ~ other[i]``.
+        relation generated by ``i ~ self[i]`` and ``i ~ other[i]`` for each
+        of the ``others``.
 
         Equivalently, it returns the orbits of the subgroup generated by the
-        two permutations. The returned quotient map ``q`` satisfies
+        permutations. The returned quotient map ``q`` satisfies
         ``q[i] == q[self[i]]`` and ``q[i] == q[other[i]]`` for every element
-        ``i``, and is minimal with this property.
+        ``i``, and is minimal with this property. Components are numbered in
+        the order of their least element.
 
         Parameters:
-            other : The second permutation, with the same size as ``self``.
+            others : The other permutations, with the same size as ``self``.
 
         Returns:
             A dictionary mapping each element to its quotient component.
+
+        Example
+        -------
+        >>> Permutation((1, 0, 2, 3)).coequalizer((0, 1, 3, 2))
+        {0: 0, 1: 0, 2: 1, 3: 1}
+        >>> Permutation((1, 2, 0, 3)).coequalizer()
+        {0: 0, 1: 0, 2: 0, 3: 1}
         """
-        other = type(self)(other, len(self))
+        others = [type(self)(other, len(self)) for other in others]
         component_of = {}
         component = 0
         for start in range(len(self)):
@@ -313,7 +383,7 @@ class Permutation(Function, PROP):
                 if i in component_of:
                     continue
                 component_of[i] = component
-                for j in (self[i], other[i]):
+                for j in [self[i]] + [other[i] for other in others]:
                     if j not in component_of:
                         stack.append(j)
             component += 1

@@ -13,6 +13,20 @@ chooses a producer for each class it needs. Two samples are independent and
 every section keeps a condition: equations are between cartesian diagrams,
 effects being context.
 
+Tiurin, Barrett, Ghica and Hu :cite:`TiurinEtAl24` give e-graphs their
+semantics in the free semilattice-enriched Cartesian category, where an
+e-class is the :class:`Join` of its e-nodes, drawn as an e-box, and
+composition and tensor distribute over joins. :meth:`EHypergraph.to_diagram`
+is their translation, and distributing its joins gives the sections, one
+choice per class as the copy after an e-box says, see the law
+:meth:`EHypergraph.translation`. Their e-hypergraphs are hierarchical, with
+nested e-boxes of any arity, so as to represent any symmetric monoidal
+theory, where these are flat with one output per e-box, the image of
+e-graphs: an equation with several outputs is entered as its projections,
+which is sound for cartesian diagrams only. Unlike the paper's, a class may
+depend on itself, as in egg, which :meth:`EHypergraph.to_diagram` refuses, as
+drawing it would need a trace.
+
 Example
 -------
 Egg's example, ``(a * 2) / 2`` with ``a`` an input and each constant a box
@@ -61,6 +75,7 @@ Summary
     :toctree:
 
     EHypergraph
+    Join
 
 .. admonition:: Functions
 
@@ -72,28 +87,30 @@ Summary
         partition
         is_pattern
         ast_size
+        distribute
 """
 
 from collections import Counter
 from collections.abc import Callable, Iterator
-from functools import cached_property
+from functools import cached_property, reduce
 from itertools import accumulate, pairwise, repeat, takewhile
 from math import inf
+from operator import add
 from typing import TYPE_CHECKING, Self
 
 from networkx import DiGraph
 from networkx.algorithms.isomorphism import is_isomorphic
 
-from discopy import markov, messages
+from discopy import markov, messages, monoidal
 from discopy.abc import HypergraphCategory, MonoidalCategory
 from discopy.axioms import (
-    GENERATORS, Count, Equation, Hom, Obj, Serialisable, Var, axiom)
+    GENERATORS, Count, Equation, Hom, Obj, Testable, Var, axiom)
 from discopy.drawing import Node
 from discopy.hypergraph import Hypergraph
 from discopy.monoidal import Ty
 from discopy.utils import (
-    AxiomError, NamedGeneric, classproperty, factory_name, from_tree, pushout,
-    resolve_factory, unbiased)
+    AxiomError, NamedGeneric, assert_isparallel, classproperty, factory_name,
+    from_tree, pushout, resolve_factory, unbiased)
 
 if TYPE_CHECKING:
     from hypothesis import strategies as st
@@ -169,8 +186,58 @@ def ast_size(_box) -> int:
     return 1
 
 
-class EHypergraph[category](
-        MonoidalCategory["Ty", "EHypergraph"], NamedGeneric, Serialisable):
+class Join(monoidal.Bubble, markov.Box):
+    """
+    The join of parallel diagrams, an e-box of the string diagrams of a
+    semilattice-enriched category :cite:`TiurinEtAl24`, drawn as a frame with
+    a slot for each term. It is deterministic when it has one term, which is,
+    and affine when every term is, discarding being idempotent.
+
+    Parameters:
+        terms : The diagrams joined, with the same domain and codomain.
+        params : Passed to :class:`monoidal.Bubble`, e.g. by :meth:`dagger`.
+
+    Example
+    -------
+    >>> from discopy.markov import Ty, Box
+    >>> x = Ty('x')
+    >>> f, g = Box('f', x, x), Box('g', x, x)
+    >>> join = Join(f, g)
+    >>> assert join.is_affine and not join.is_deterministic
+    >>> print(join)
+    Join(f, g)
+    >>> print(distribute(x @ join >> Box('h', x @ x, x)))
+    (x @ f >> h) + (x @ g >> h)
+    """
+    is_id_on_objects = True
+
+    def __init__(self, *terms, **params):
+        params.pop("method", None)
+        super().__init__(*terms, method="join", **params)
+        for term in terms:
+            assert_isparallel(self, term)
+        self.deterministic = len(terms) == 1 and terms[0].is_deterministic
+        self.affine = all(term.is_affine for term in terms)
+
+    def __str__(self):
+        return f"Join({', '.join(map(str, self.args))})"
+
+
+def distribute(diagram: monoidal.Diagram) -> markov.Sum:
+    """
+    The formal sum of the terms of a diagram with joins, composition and
+    tensor distributing over each of them :cite:`TiurinEtAl24` (Fig. 4), see
+    :class:`Join`.
+    """
+    functor = markov.Functor(lambda ob: ob, lambda box: reduce(
+        add, map(functor, box.args)) if isinstance(box, Join) else box)
+    result = functor(diagram)
+    return result if isinstance(result, markov.Sum)\
+        else markov.Sum((result, ))
+
+
+class EHypergraph(
+        MonoidalCategory, NamedGeneric['category'], Testable):
     """
     An e-hypergraph over a copy-discard ``category``, equal to another up to
     renaming its spiders, see :mod:`discopy.ehypergraph`.
@@ -202,7 +269,7 @@ class EHypergraph[category](
             raise AxiomError(messages.NOT_MARKOV.format(factory_name(
                 type(self))))
         if not graph.is_left_monogamous or not graph.is_acyclic:
-            raise AxiomError(messages.NOT_SHARING.format(graph))
+            raise AxiomError(messages.NOT_SHARING.format(repr(graph)))
         n = graph.n_spiders
         classes = tuple(range(n) if classes is None else classes)
         if len(classes) != n or any(
@@ -324,7 +391,7 @@ class EHypergraph[category](
             if not box.is_cartesian:
                 raise AxiomError(messages.NOT_CARTESIAN.format(box))
         if not rhs.is_left_monogamous or not rhs.is_acyclic:
-            raise AxiomError(messages.NOT_SHARING.format(rhs))
+            raise AxiomError(messages.NOT_SHARING.format(repr(rhs)))
         if (len(dom), len(cod)) != (len(rhs.dom), len(rhs.cod)) or not all(
                 not rhs.spider_wires[t][1] if s is None
                 else graph.spider_types[s] == rhs.spider_types[t]
@@ -443,14 +510,36 @@ class EHypergraph[category](
             result.setdefault(self.classes[spider], []).extend(ports)
         return {q: tuple(sorted(ports)) for q, ports in result.items()}
 
+    def occurrence(self, box: int):
+        """ A box up to the classes it reads if it is deterministic, else its
+        index, i.e. its e-node up to the output, as :meth:`key` and
+        :meth:`roots` read it. """
+        return (self.graph.boxes[box], self.inputs(box))\
+            if self.graph.boxes[box].is_deterministic else box
+
+    def key(self, port: int):
+        """ The e-node of a producer port: its :meth:`occurrence` and output
+        for a deterministic box, else the port itself. """
+        box = self.box_of(port)
+        if box is None or not self.graph.boxes[box].is_deterministic:
+            return port
+        return self.occurrence(box) + (self.graph.ports[port].i, )
+
+    @cached_property
+    def nodes(self) -> dict[int, tuple[int, ...]]:
+        """ The e-nodes of each class, as their least producer port: equal
+        deterministic boxes on related inputs are one, egg's hashcons
+        invariant :cite:`WillseyEtAl21`. """
+        return {q: tuple(sorted({self.key(port): port for port in reversed(
+            ports)}.values())) for q, ports in self.producers.items()}
+
     def roots(self) -> tuple[int, ...]:
         """ The boxes every section keeps, not affine, once for equal
         deterministic ones on related inputs: a constraint holds once. """
         found = {}
         for j, box in enumerate(self.graph.boxes):
             if not box.is_affine:
-                key = (box, self.inputs(j)) if box.is_deterministic else j
-                found.setdefault(key, j)
+                found.setdefault(self.occurrence(j), j)
         return tuple(found.values())
 
     def needs(self) -> tuple[int, ...]:
@@ -485,9 +574,10 @@ class EHypergraph[category](
         return result.topological_order()
 
     def sections(self) -> list[Hypergraph]:
-        """ The section of every acyclic choice, per class where egg chooses
-        per occurrence, so that relating classes removes some. """
-        producers, result = self.producers, []
+        """ The section of every acyclic choice of an e-node per class, where
+        the terms of an e-graph choose per occurrence, so that relating
+        classes removes some. """
+        producers, result = self.nodes, []
 
         def extend(choice, todo):
             if not todo:
@@ -540,6 +630,85 @@ class EHypergraph[category](
                 ) -> Hypergraph:
         """ A section of least tree cost, egg's extraction. """
         return self.section(self.relax(box_cost, input_cost)[1])
+
+    def is_inside(self, box: int) -> bool:
+        """ Whether a box is an e-node inside an e-box, being cartesian with
+        one output, rather than context, see :meth:`to_diagram`. """
+        return self.graph.boxes[box].is_cartesian and len(
+            self.graph.boxes[box].cod) == 1
+
+    def to_diagram(self) -> monoidal.Diagram:
+        """
+        The string diagram of the e-hypergraph, the translation of e-graphs
+        :cite:`TiurinEtAl24` (Fig. 3 and Algorithm 1): a class of several
+        e-nodes is their :class:`Join`, each reading the inputs of the class
+        it needs and discarding the others, a class of one e-node is that
+        e-node, and a class read twice is copied. A box that is not cartesian
+        with one output stays outside the joins, once per e-node, as context,
+        an output of it being an input of the joins that may choose it.
+        :class:`AxiomError` if a class depends on itself, as the paper only
+        translates acyclic e-graphs.
+        """
+        graph, category = self.graph, Hypergraph[self.category]
+        types, placed, done, context = dict(enumerate(graph.dom)), [], {}, {}
+        for j in range(len(graph.boxes)):
+            if not self.is_inside(j):
+                context.setdefault(self.occurrence(j), j)
+
+        def place(box, inputs):
+            outputs = tuple(range(len(types), len(types) + len(box.cod)))
+            types.update(zip(outputs, box.cod))
+            placed.append((box, (inputs, outputs)))
+            return outputs
+
+        def enode(port):
+            node = graph.ports[port]
+            if node.kind == "input":
+                return (node.i, ), None
+            if not self.is_inside(node.depth):
+                box = self.occurrence(node.depth)
+                return (emit("box", box)[node.i], ), None
+            return tuple(emit("class", q) for q in self.inputs(
+                node.depth)), graph.boxes[node.depth]
+
+        def term(inputs, reads, box):
+            dom, n = type(graph.dom)().tensor(*map(
+                types.__getitem__, inputs)), len(inputs)
+            wires = tuple(map(inputs.index, reads))
+            if box is None:
+                return category(dom, types[reads[0]], (), (
+                    tuple(range(n)), (), wires)).to_diagram()
+            return category(dom, box.cod, (box, ), (
+                tuple(range(n)), ((wires, (n, )), ), (n, ))).to_diagram()
+
+        def join(q):
+            enodes = list(map(enode, self.nodes[q]))
+            if len(enodes) == 1:
+                (reads, box), = enodes
+                return reads[0] if box is None else place(box, reads)[0]
+            inputs = tuple(dict.fromkeys(
+                spider for reads, _ in enodes for spider in reads))
+            return place(Join(*(
+                term(inputs, *enode) for enode in enodes)), inputs)[0]
+
+        def emit(kind, key):
+            if (kind, key) in done and done[kind, key] is None:
+                raise AxiomError(messages.NOT_ACYCLIC.format(self))
+            if (kind, key) not in done:
+                done[kind, key] = None
+                done[kind, key] = join(key) if kind == "class" else place(
+                    graph.boxes[context[key]], tuple(
+                        emit("class", q) for q in self.inputs(context[key])))
+            return done[kind, key]
+
+        cod_wires = tuple(
+            emit("class", self.classes[s]) for s in graph.cod_wires)
+        for item in [("box", key) for key in context] + [
+                ("class", q) for q in sorted(set(self.classes))]:
+            emit(*item)
+        boxes, box_wires = zip(*placed) if placed else ((), ())
+        return category(graph.dom, graph.cod, boxes, (
+            tuple(range(len(graph.dom))), box_wires, cod_wires)).to_diagram()
 
     def to_graph(self) -> DiGraph:
         """ The labelled graph of the hypergraph, with a node per class. """
@@ -606,12 +775,6 @@ class EHypergraph[category](
             return result
 
         return ehypergraphs()
-
-    dagger_involution, dagger_contravariance, dagger_monoidality = (
-        law.inapplicable(messages.SHARING_HAS_NO_DAGGER) for law in (
-            MonoidalCategory.dagger_involution,
-            MonoidalCategory.dagger_contravariance,
-            MonoidalCategory.dagger_monoidality))
 
     @axiom
     def graph_functoriality[
@@ -689,6 +852,23 @@ class EHypergraph[category](
         """ What is extracted costs :meth:`cost`, no section costs less. """
         return Equation(type(graph)(graph.extract()).cost(), graph.cost(), min(
             type(graph)(section).cost() for section in graph.sections()))
+
+    @axiom
+    def translation(cls, graph: Self) -> Equation[frozenset]:
+        """ Distributing the joins of the translation of an e-hypergraph
+        whose classes do not depend on themselves gives its sections, modulo
+        the naturality of copy and discard, i.e. one choice per class. """
+        try:
+            terms = distribute(graph.to_diagram()).terms
+        except AxiomError:
+            return Equation(frozenset(), frozenset())
+
+        def normal(section: Hypergraph) -> Hypergraph:
+            return type(graph)(section).rebuild().extract()
+
+        return Equation(
+            frozenset(normal(term.to_hypergraph()) for term in terms),
+            frozenset(map(normal, graph.sections())))
 
     @axiom
     def effects_kept(cls, graph: Self) -> Equation[bool]:

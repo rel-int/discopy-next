@@ -4,9 +4,9 @@ from discopy.balanced import *
 def test_repr():
     x = Ty('x')
     assert repr(Twist(Ty('x')))\
-        == "balanced.Twist(monoidal.Ty(cat.Ob('x')))"
+        == "balanced.Twist(feedback.Ty(feedback.Wire('x')))"
     assert repr(Twist(Ty('x')).dagger())\
-        == "balanced.Twist(monoidal.Ty(cat.Ob('x'))).dagger()"
+        == "balanced.Twist(feedback.Ty(feedback.Wire('x'))).dagger()"
 
 
 def test_double_rail():
@@ -87,6 +87,36 @@ def test_to_braided_default_and_zero_width():
     assert twist.to_braided(width=0) == twist
 
 
+def test_to_hypergraph():
+    # A twist is not the identity: it stays a box of the hypergraph and of
+    # the map, where a symmetric category has no twist but the identity.
+    from discopy import symmetric
+    x, y = Ty('x'), Ty('y')
+    for convert in (Diagram.to_hypergraph, Diagram.to_map):
+        assert convert(Twist(x)).boxes == (Twist(x), )
+        assert convert(Diagram.twist(x @ y)).boxes == (
+            Braid(x, y), Twist(y), Twist(x), Braid(y, x))
+    for representation in (Hypergraph, CMap):
+        assert representation.twist(x).boxes == (Twist(x), )
+    assert symmetric.Hypergraph.twist(x) == symmetric.Hypergraph.id(x)
+    assert symmetric.CMap.twist(x) == symmetric.CMap.id(x)
+
+
 def test_functor_twist_dagger():
     twist = Twist(Ty('x')).dagger()
     assert Functor(ob_map=lambda x: x, ar_map=lambda f: f)(twist) == twist
+
+
+def test_Twist_to_tree():
+    from discopy.utils import dumps, loads
+    x = Ty('x')
+    for twist in (Twist(x), Twist(x).dagger()):
+        assert loads(dumps(twist)) == twist
+        assert loads(dumps(twist)).is_dagger == twist.is_dagger
+
+
+def test_dual_rail_keeps_twist_dagger():
+    x = Ty('x')
+    twist = Twist(x)
+    assert twist.dagger().to_braided().boxes[0].is_dagger
+    assert twist.dagger().to_braided() == twist.to_braided().dagger()

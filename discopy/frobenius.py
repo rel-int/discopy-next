@@ -16,6 +16,8 @@ Summary
     :toctree:
 
     Wire
+    HeadOb
+    TailOb
     Ty
     Dim
     Diagram
@@ -25,6 +27,11 @@ Summary
     Swap
     Spider
     Bubble
+    Feedback
+    Trace
+    FollowedBy
+    Head
+    Tail
     Functor
     CMap
 
@@ -62,10 +69,11 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from copy import copy
-from typing import ClassVar, Self
+from typing import Self
 
 from discopy import (
-    monoidal, rigid, markov, compact, pivotal, cmap, hypergraph, messages)
+    monoidal, rigid, markov, comarkov, compact, pivotal, feedback, cmap,
+    hypergraph, messages)
 from discopy.abc import HypergraphCategory
 from discopy.cat import factory
 from discopy.utils import (
@@ -79,6 +87,11 @@ class Wire(pivotal.Wire):
 
     Parameters:
         name : The name of the object.
+
+    >>> from discopy.monoidal import Colour
+    >>> x = Wire('x', dom=Colour('a'), cod=Colour('b'))
+    >>> assert x.l == x.r and (x.l.dom, x.l.cod) == (x.cod, x.dom)
+    >>> assert x.l.l == x and Wire('y').l == Wire('y')
     """
     @property
     def l(self) -> Self:
@@ -89,7 +102,9 @@ class Wire(pivotal.Wire):
         return result
 
     r = l
-    windings = (0, )
+
+
+HeadOb, TailOb = feedback.wire_generators(Wire)
 
 
 @factory
@@ -120,15 +135,30 @@ class Nat(rigid.Nat, Ty):
 
 @factory
 class Dim(monoidal.Dim, Ty):
-    """ A dimension is a tuple of integers greater than one seen as a type. """
+    """
+    A dimension is a tuple of integers greater than one seen as a type. Its
+    adjoints are its reversal and it has no winding, so :meth:`unwind` is
+    the identity.
+
+    Example
+    -------
+    >>> assert Dim(2, 3).l == Dim(2, 3).r == Dim(3, 2)
+    >>> assert Dim(2).unwind() == Dim(2)
+    """
 
     l = r = property(lambda self: self.ar(*self.inside[::-1]))
 
+    def unwind(self) -> Dim:
+        """ The identity: a dimension has no winding. """
+        return self
+
 
 @factory
-class Diagram(compact.Diagram, markov.Diagram, HypergraphCategory):
+class Diagram(
+        compact.Diagram, markov.Diagram, comarkov.Diagram,
+        HypergraphCategory):
     """
-    A frobenius diagram is a compact diagram and a Markov diagram.
+    A frobenius diagram is a compact, Markov and comarkov diagram.
 
     Parameters:
         inside(Layer) : The layers of the diagram.
@@ -139,15 +169,6 @@ class Diagram(compact.Diagram, markov.Diagram, HypergraphCategory):
         messages.NO_SQUARE)
     trace_uniformity_written = markov.Diagram.trace_uniformity_written\
         .inapplicable(messages.NO_SQUARE)
-
-    sum_factory: ClassVar[type["Sum"]]
-    box_factory: ClassVar[type["Box"]]
-    functor_factory: ClassVar[type["Functor"]]
-    cup_factory: ClassVar[type["Cup"]]
-    cap_factory: ClassVar[type["Cap"]]
-    swap_factory: ClassVar[type["Swap"]]
-    permutation_factory: ClassVar[type["Permutation"]]
-    bubble_factory: ClassVar[type["Bubble"]]
 
     ob = Ty
 
@@ -195,11 +216,11 @@ class Diagram(compact.Diagram, markov.Diagram, HypergraphCategory):
         return F(self)
 
 
-class Box(compact.Box, markov.Box, Diagram):
+class Box(compact.Box, markov.Box, comarkov.Box, Diagram):
     """
-    A frobenius box is a compact and Markov box in a frobenius diagram, its
-    rotations keeping its flags as its dagger does, which hold of neither,
-    as the transpose of a total function need not be one.
+    A frobenius box is a compact, Markov and comarkov box in a frobenius
+    diagram, its rotations keeping its flags as its dagger does, which hold
+    of neither, as the transpose of a total function need not be one.
 
     Parameters:
         name (str) : The name of the box.
@@ -253,13 +274,15 @@ class Cap(compact.Cap, Box):
         self.deterministic = self.affine = False
 
 
-class Permutation(compact.Permutation, markov.Permutation, Box):
+class Permutation(
+        compact.Permutation, markov.Permutation, comarkov.Permutation, Box):
     "A permutation in a Frobenius diagram."
 
 
-class Swap(Permutation, compact.Swap, markov.Swap, Box):
+class Swap(Permutation, compact.Swap, markov.Swap, comarkov.Swap, Box):
     """
-    A frobenius swap is a compact and Markov swap in a frobenius diagram.
+    A frobenius swap is a compact, Markov and comarkov swap in a frobenius
+    diagram.
 
     Parameters:
         left (Ty) : The type on the top left and bottom right.
@@ -285,6 +308,7 @@ class Spider(Box):
         n_legs_out : The number of legs out.
         typ : The type of the spider.
         data : The phase of the spider.
+        is_dagger : Whether the spider is marked as a dagger.
 
     Examples
     --------
@@ -298,16 +322,17 @@ class Spider(Box):
     color = "black"
 
     def __init__(self, n_legs_in: int, n_legs_out: int, typ: Ty, data=None,
-                 **params):
+                 is_dagger=False, **params):
         assert_isatomic(typ)
         self.typ = typ
         str_data = "" if data is None else f", {data}"
         name = type(self).__name__\
             + f"({n_legs_in}, {n_legs_out}, {typ}{str_data})"
         dom, cod = typ ** n_legs_in, typ ** n_legs_out
-        Box.__init__(self, name, dom, cod, data=data,
-                     is_deterministic=n_legs_in > 0 and not data,
-                     is_affine=n_legs_in == 1 and not data, **params)
+        Box.__init__(
+            self, name, dom, cod, data=data, is_dagger=is_dagger,
+            is_deterministic=n_legs_in > 0 and not data,
+            is_affine=n_legs_in == 1 and not data, **params)
         self.drawing_name = "" if not data else str(data)
 
     def __setstate__(self, state):
@@ -322,16 +347,25 @@ class Spider(Box):
             self.deterministic = len(self.dom) > 0 and not self.phase
             self.affine = len(self.dom) == 1 and not self.phase
 
+    def __getnewargs__(self):
+        """ The arguments of the constructor, which a pickle and a delay read.
+
+        >>> x = Ty('x')
+        >>> assert Spider(1, 2, x, .5).delay() == Spider(1, 2, x.delay(), .5)
+        """
+        return (
+            len(self.dom), len(self.cod), self.typ, self.phase, self.is_dagger)
+
     @property
     def phase(self):
         """ The phase of the spider. """
         return self.data
 
     def __repr__(self):
-        phase_repr = "" if self.phase is None \
-            else f", phase={repr(self.phase)}"
-        return factory_name(type(self)) + \
-            f"({len(self.dom)}, {len(self.cod)}, {repr(self.typ)}{phase_repr})"
+        phase = "" if self.phase is None else f", {repr(self.phase)}"
+        is_dagger = ", is_dagger=True" if self.is_dagger else ""
+        return factory_name(type(self)) + f"({len(self.dom)}, {len(self.cod)}"\
+            f", {repr(self.typ)}{phase}{is_dagger})"
 
     def dagger(self):
         phase = None if self.phase is None else -self.phase
@@ -350,12 +384,15 @@ class Spider(Box):
                 'typ': self.typ.to_tree()}
         if self.phase is not None:
             tree['phase'] = self.phase
+        if self.is_dagger:
+            tree['is_dagger'] = True
         return tree
 
     @classmethod
     def from_tree(cls, tree: dict) -> Spider:
         return cls(tree['n_legs_in'], tree['n_legs_out'],
-                   from_tree(tree['typ']), tree.get('phase', None))
+                   from_tree(tree['typ']), tree.get('phase', None),
+                   is_dagger='is_dagger' in tree)
 
     def rotate(self, left=False):
         del left
@@ -372,7 +409,7 @@ class Bubble(monoidal.Bubble, Box):
     """
 
 
-class Sum(compact.Sum, markov.Sum, Box):
+class Sum(compact.Sum, markov.Sum, comarkov.Sum, Box):
     """
     A Frobenius sum is a sum of Frobenius diagrams.
 
@@ -383,9 +420,14 @@ class Sum(compact.Sum, markov.Sum, Box):
     """
 
 
-class Functor(compact.Functor, markov.Functor):
+class Functor(compact.Functor, markov.Functor, comarkov.Functor):
     """
     A hypergraph functor is a compact functor that preserves spiders.
+
+    A spider with no phase is the Frobenius structure, mapped to the spiders
+    of the codomain; a spider with a phase is a generator, mapped by
+    ``ar_map`` like any box, e.g. the Z and X spiders of
+    :mod:`discopy.quantum.zx`.
 
     Parameters:
         ob_map (Mapping[Ty, Ty]) :
@@ -397,16 +439,18 @@ class Functor(compact.Functor, markov.Functor):
     dom = cod = Diagram
 
     def __call__(self, other):
-        if isinstance(other, Spider):
+        if isinstance(other, Spider) and other.phase is None:
             return self.cod.spiders(
                 len(other.dom), len(other.cod), self(other.typ))
-        if isinstance(other, (markov.Copy, markov.Merge)):
+        if isinstance(other, markov.Copy):
             return markov.Functor.__call__(self, other)
+        if isinstance(other, comarkov.Merge):
+            return comarkov.Functor.__call__(self, other)
         return compact.Functor.__call__(self, other)
 
 
 def interleaving(cls: type, factory: Callable
-                 ) -> Callable[..., Diagram]:
+                 ) -> Callable[[int, int, Ty], Diagram]:
     """
     Take a ``factory`` for spiders of atomic types and extend it recursively.
 
@@ -435,7 +479,7 @@ def interleaving(cls: type, factory: Callable
 
 
 def coherence(cls: type, factory: Callable
-              ) -> Callable[..., Diagram]:
+              ) -> Callable[[int, int, Ty], Diagram]:
     """
     Take a ``factory`` for spiders with one or three legs of atomic types
     and extend it recursively to arbitrary spiders of atomic types.
@@ -481,11 +525,11 @@ def coherence(cls: type, factory: Callable
 
 CMap = cmap.CMap[Diagram]
 
+Feedback, Trace, FollowedBy, Head, Tail = feedback.generators(Diagram, Box)
 Diagram.box_factory = Box
 Diagram.functor_factory = Functor
 Diagram.cup_factory, Diagram.cap_factory = Cup, Cap
-Diagram.swap_factory = Swap
-Diagram.spider_factory = Spider  # ty: ignore[invalid-assignment]
+Diagram.swap_factory, Diagram.spider_factory = Swap, Spider
 Diagram.permutation_factory = Permutation
 Diagram.bubble_factory = Bubble
 Diagram.sum_factory = Sum

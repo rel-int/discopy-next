@@ -43,7 +43,8 @@ Different dependency groups are available (switch with `uv sync --group <group-n
 - no group: minimal set of dependencies required to work with DisCoPy.
 - `dev`: testing and linting tools.
 - `quantum`: includes quantum computating dependencies
-- `grammar`: natural language processing libraries
+- `grammar`: natural language processing libraries, PyTorch included for the neural parser
+- `notebooks`: marimo, IPython and a Jupyter kernel to run the notebooks, with anywidget to show diagrams as widgets
 - `docs`: for generating the documentation
 Since dependency groups are not standard, we also provide equivalents via optional dependencies.
 
@@ -57,7 +58,6 @@ if you want to run the full test suite involving all extra dependencies.
 uv sync --dev --group all
 uv run pflake8 discopy
 uv run pylint discopy
-uv run ty check
 uv run coverage run -m pytest
 uv run coverage report -m
 ```
@@ -76,12 +76,12 @@ authority on the real suite: claim local green only for the checks you actually 
 `pylint` fails on any unused import, variable or argument, and on a score below the
 `fail-under` of `.pylintrc`, which is the score of `main` when it was last raised: fix the
 finding, or disable the message on that line with the reason, and raise `fail-under` to the
-new score when your change lifts it, so that the score never goes down. `.pylintrc` declares
-the `factory` attribute that subscripting a `NamedGeneric` sets, so that pylint knows it exists,
-and allows `hypothesis.strategies` to be imported inside the methods that build strategies, so
-that importing the package does not import Hypothesis. It also disables, each with its reason,
-the messages the code deliberately does not follow, e.g. `cyclic-import`, since the package
-imports every module.
+new score when your change lifts it, so that the score never goes down. A law stated with
+`@axiom` is an `Axiom`, a `classmethod`, which pylint reads as one with no plugin; `.pylintrc`
+declares the `factory` members a `NamedGeneric` subscript sets and lets `hypothesis.strategies`
+be imported inside a method, where a strategy is built, so that the package never imports it; a
+category of messages the code is not going to follow is disabled there with its reason, as
+`cyclic-import` is: the package imports every module.
 
 ## Run the property tests
 
@@ -105,23 +105,31 @@ shorter, targeted tests.
 
 ```shell
 uv run pytest proptest/ -k unitality -v
-uv run pytest proptest/ -k 'Arrow and not typing'
+uv run pytest proptest/ -k 'Arrow and not dagger'
 ```
 
-A cell is skipped when its axiom declares that the structure does not
-apply, and xfailed when the law is declared broken, strictly so that a law
-that holds again fails the run, each carrying its reason: pass `-rsxX` to
-list the skips, xfails and unexpected passes with their reasons, and `-x`
-to stop at the first genuine failure.
+A law's signature is a sequent, e.g.
+`def unitality[A: Obj[C0], B: Obj[C0]](cls, f: Hom[C1, A, B]) ->
+Equation[Hom[C1, A, B]]`: the cell draws the objects `A` and `B`, then a
+morphism `f` between them from the strategy of the category, and checks
+the equation it returns against its return annotation as well as checking
+that it holds. Under `from __future__ import annotations` the sequent is
+read back from its strings, with the type parameters of the class stating
+it in scope.
 
-`proptest/conftest.py` registers four Hypothesis profiles, selected by
-`HYPOTHESIS_PROFILE`: `dev` by default, `fast` to develop with, derandomized
-and checking each law once, on the category nearest the class declaring it,
-`pr` for the small budget a pull request runs with, under a fixed
-`--hypothesis-seed` so that it draws the same examples every time, and
-`explore` for the large one `main` and the nightly run search with. All but
-`fast` share the `.hypothesis/examples` database that CI downloads before a
-run and uploads after every run but a pull request's, which only reads it.
+A cell is skipped when its axiom declares that the structure does not
+apply, and xfailed when the law is declared broken, each carrying its
+reason: pass `-rsxX` to list the skips, xfails and unexpected passes with
+their reasons, and `-x` to stop at the first genuine failure.
+
+`proptest/conftest.py` registers four Hypothesis profiles over the
+`.hypothesis/examples` database, selected by `HYPOTHESIS_PROFILE`: `dev`
+by default, `pr` for the small budget a pull request runs with, under a
+fixed `--hypothesis-seed` so that it draws the same examples every time,
+and `explore` for the large one `main` and the nightly run search with.
+A fourth, `shared`, is `dev` reading the database CI uploads as a workflow
+artifact, through a `GITHUB_TOKEN`, so a failure found on CI replays on
+your machine before any search; it reaches GitHub only when selected.
 
 ```shell
 HYPOTHESIS_PROFILE=explore uv run pytest proptest/ -n auto -p no:benchmark
@@ -132,10 +140,56 @@ raising `NoSuchExample` when it finds none, which is how a failing cell
 becomes a concrete term to debug in a REPL: call
 `<Category>.<law>.falsify()` on the category that breaks the law, then
 inspect the sides of the `Equation` the axiom returns on the arguments it
-hands back, e.g. `law(**law.falsify())`.
+hands back.
+
+### What the matrix checked
+
+A green cell says the law held on the terms its strategy drew, which is
+weaker than the law holding. Every run of the matrix therefore ends with a section saying
+what it actually checked, and every line of it is a report rather than a
+gate:
+
+- **the cells that cannot fail**, i.e. those that drew fewer distinct terms
+  than the budget allowed. `matrix.Matrix[int].copy_counitality`
+  quantifies over one object and `abc.Nat.strategy` samples the numbers up
+  to three, so it draws four terms under `pr`'s twenty examples and the
+  same four under `explore`'s thousand: it is green about copying zero to
+  three wires and says nothing about the law at four. A finite support is
+  not a bug — knowing which cells have one is what stops a passing cell
+  being read as evidence a fix is right.
+- **the cells a baseline checked and this run did not**, named with
+  `--proptest-baseline`. A law skipped as inapplicable or declared broken is
+  as green as one that held, so a change that stops checking a law reads
+  exactly like one that keeps it. `--proptest-report` writes the report a
+  later run reads:
+
+```shell
+uv run pytest proptest/ --proptest-report=report/proptest-report.json
+uv run pytest proptest/ --proptest-baseline=report/proptest-report.json
+```
+
+Compare whole runs: `-k` and `-m` deselect cells, and a deselected cell is
+one the baseline checked and this run did not, which is true and unhelpful.
+A run that collected no cell at all still reports, as long as a baseline or a
+report was asked for — a matrix that collects nothing is the largest loss
+there is — and a cell that started and never finished is reported as unsettled
+rather than passing, since a passing setup is not a law holding. A baseline that cannot be read is named and skipped rather than
+failing the run that asked for it, since it is an artifact an older run
+uploaded.
+
+A test of the matrix carries `pytest.mark.cell`, which is what the report
+keys on: `proptest/test_report.py` holds the suite's unit tests of its own
+reading, and those are parametrised too.
 
 The `proptest` GitHub workflow runs this suite on pull requests labelled
-`proptest`, on `main`, nightly and on manual dispatch.
+`proptest`, on `main`, nightly and on manual dispatch. It carries the report
+between runs as an artifact, and on narrower terms than the example database:
+a baseline is a claim about what `main` checks rather than a pile of examples
+any run may add to, so it is taken from a **successful** run **of `main`**
+only. A pull request never uploads one, a dispatch on a feature branch that
+legitimately skips a cell cannot become the baseline that cell is missing
+from, and a run that died mid-suite stays available to look at without being
+compared against.
 
 ## Run the benchmarks
 

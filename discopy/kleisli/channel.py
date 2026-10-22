@@ -39,7 +39,7 @@ from discopy.utils import (
 
 
 @factory
-class Channel[monad](Category, NamedGeneric):
+class Channel(Category, NamedGeneric['monad']):
     """
     A channel is a morphism in the Kleisli category of a monad ``M``, i.e. a
     :class:`~discopy.python.function.Function` from ``X`` to ``M(Y)``.
@@ -83,9 +83,7 @@ class Channel[monad](Category, NamedGeneric):
         Parameters:
             dom : The type on which to take the identity.
         """
-        return cls(
-            cls.monad.unit(dom),  # ty: ignore[invalid-argument-type]
-            dom, dom)
+        return cls(cls.monad.unit(dom), dom, dom)
 
     def then(self, other: Channel) -> Channel:
         """

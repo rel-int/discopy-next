@@ -97,7 +97,8 @@ def mismatch(data, run, pull, repository):
     it does."""
     source = (run.get("head_repository") or {}).get("full_name")
     if (pull["base"]["repo"]["full_name"] != repository
-            or pull["head"]["repo"]["full_name"] != source
+            or (pull["head"]["repo"] or {}).get("full_name") != source
+            or source is None
             or pull["head"]["ref"] != run["head_branch"]):
         return "Benchmark metadata does not match its source PR."
     return None
