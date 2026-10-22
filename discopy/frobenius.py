@@ -149,7 +149,11 @@ class Dim(monoidal.Dim, Ty):
     l = r = property(lambda self: self.ar(*self.inside[::-1]))
 
     def unwind(self) -> Dim:
-        """ The identity: a dimension has no winding. """
+        """
+        The identity: a dimension has no winding.
+
+        >>> assert Dim(2).unwind() == Dim(2)
+        """
         return self
 
 
@@ -392,7 +396,7 @@ class Spider(Box):
     def from_tree(cls, tree: dict) -> Spider:
         return cls(tree['n_legs_in'], tree['n_legs_out'],
                    from_tree(tree['typ']), tree.get('phase', None),
-                   is_dagger='is_dagger' in tree)
+                   is_dagger=tree.get('is_dagger', False))
 
     def rotate(self, left=False):
         del left

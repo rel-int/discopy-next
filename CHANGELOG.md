@@ -245,11 +245,11 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   things make that weaker than it reads while changing no pass count, so
   every run now ends with a section naming both. **A cell that cannot
   fail**: one that drew fewer distinct terms than its budget allowed, so a
-  larger budget buys it nothing — `cat.Arrow.identity_typing` quantifies
-  over one object and `Ob.strategy` samples `axioms.GENERATORS`, so it draws
-  five terms under `pr`'s twenty examples and the same five under
-  `explore`'s thousand, and is green about `Ob('a')` through `Ob('e')`
-  rather than about the law. **A cell that stopped being checked**: one a
+  larger budget buys it nothing — `matrix.Matrix[int].copy_counitality`
+  quantifies over one object and `abc.Nat.strategy` samples the numbers up
+  to three, so it draws four terms under `pr`'s twenty examples and the
+  same four under `explore`'s thousand, and is green about copying zero to
+  three wires rather than about the law. **A cell that stopped being checked**: one a
   baseline run passed and this one skips, declares broken, or no longer
   collects, since a law nobody states is as green as one that held —
   learning that one merge had lost no cell cost two full matrix runs
@@ -758,8 +758,7 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   `discopy.utils`, re-exported from `discopy.abc`, so `discopy.axioms`
   can use it — making a subscripted wrapper a class whose
   `strategy(cls, **params)` matches the contract `Testable.strategy` now
-  states, so a subspace annotation like `ComposablePair[C1]`
-  builds; an unbound axiom's `.strategy()` raises the same `TypeError`
+  states, so a subspace annotation builds; an unbound axiom's `.strategy()` raises the same `TypeError`
   as `.falsify` and calling it. The
   search itself is the canonical instantiation only — one atomic object or
   one free/generator box per parameter, no recursive or compound
@@ -889,9 +888,12 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   nothing with the memory fed back, and a time series the stream of state
   preparations `Reservoir.encoding` composed with it: the features are read
   between its slices, and unrolling the composite for as many steps gives
-  the state of the memory they are read from. The readout fits an intercept by default,
-  which the regularisation leaves out, as in Fujii and Nakajima's paper;
-  `bias=False` fits without one.
+  the state of the memory they are read from. A value `x` of the series
+  rotates its input qubit by `x / 2` half-turns, so that every value of the
+  unit interval prepares a state of its own. `fit` returns a `Readout`, the
+  affine map from the features to the targets that `predict` applies, with
+  an intercept by default, which the regularisation leaves out, as in
+  Fujii and Nakajima's paper; `bias=False` fits without one.
 - `discopy.drawing.widget.DiagramWidget`, an
   [anywidget](https://anywidget.dev) showing the SVG of a drawing, built
   on demand by `RichDisplay.to_widget`, for Jupyter, marimo and VS Code.
@@ -950,7 +952,12 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   `recopar` post-composes them, covariantly where `reparam` is
   contravariant ([#572](https://github.com/discopy/discopy/issues/572)).
 - `Rydberg` in `discopy.quantum.ansatze`, the Trotterized time evolution
-  under the Rydberg Hamiltonian of Pasqal's neutral-atom QPU
+  under the Rydberg Hamiltonian of Pasqal's neutral-atom QPU, in the
+  dimensionless units of Pasqal's [qoolqit](https://docs.pasqal.com/qoolqit/),
+  the interaction coefficient being one, with its detuning map modulator:
+  a modulated detuning `dmm`, at most zero, applied to each atom with one
+  of its `weights` in the unit interval, tested against the Hamiltonian
+  qoolqit compiles to Pulser, `qoolqit` joining the `quantum` extra
   ([#586](https://github.com/discopy/discopy/pull/586)).
 - The pivotal structure of `Rep(H)`: `HopfAlgebra.drinfeld_element`,
   `pivotal_element` and `ribbon_element`, cached single tensors named after
@@ -975,8 +982,8 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   expression built with `Tensor`, `Unit`, `L`, `R`, `Delay`, `Over`,
   `Under` and `Repeat`, and its return annotation the type of its output,
   e.g. `Equation[Hom[C1, A, B]]`. `Declaration.sequents` draws the
-  variables, then each premise from the strategy of the category with its
-  boundary, and the property matrix checks every verdict against the type
+  variables, then each morphism premise from the strategy of the category
+  with its boundary, a `Var` premise being the value of its expression, and the property matrix checks every verdict against the type
   its law states with `inhabits`, as well as that it holds. So the typing
   laws `identity_typing`, `composition_dom_typing` and
   `composition_cod_typing` go, every law typing its terms, and so do the
@@ -1094,8 +1101,8 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   `feedback` taking the keyword form `dom`, `cod`, `mem` first and a number
   `n` of objects as fallback, the two exclusive, read by `split_memory`;
   vanishing, joining, strength, tightening and sliding are stated once
-  there with `@axiom`, over the new `axioms.Loop` of a morphism
-  `x @ (m @ n).delay() -> y @ m @ n` and the morphisms it composes with.
+  there with `@axiom`, over a morphism `x @ (m @ n).delay() -> y @ m @ n`
+  and the morphisms it composes with.
   `abc.TracedCategory` extends it, `trace` its hook and its `feedback` the
   trace over the memory; the additive and multiplicative Python functions
   declare it, which they implemented without saying so, and the laws hold
@@ -1553,6 +1560,26 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Fixed
 
+- A tree saying `"is_dagger": false` reads back as no dagger: `cat.Box`,
+  and so every box, `monoidal.Wire`, `frobenius.Spider`,
+  `feedback.FollowedBy` and `quantum.gates.Digits` took the presence of the
+  key for its value, where `braided.Braid` and `balanced.Twist` already read
+  it. No tree written by DisCoPy holds `false`, as it writes the key only
+  when it is true, but one written by hand or another tool does; the one
+  fix of [discopy#744](https://github.com/discopy/discopy/pull/744) that
+  next `main` still lacked.
+
+- Three bugs of `cat`, `monoidal` and `tensor` (B79 of
+  [rel-int/discopy-next#31](https://github.com/rel-int/discopy-next/issues/31)):
+  `Bubble.subs` and `Bubble.lambdify` substitute in the args and data of the
+  bubble, a `tensor.Bubble` keeping its `func`, and return it unchanged when
+  no substituted symbol occurs, where they rebuilt it from a name, a domain
+  and a codomain and always raised; a
+  monoidal functor with a `colour_map` that does not name the transparent
+  colour sends `Ty()` to `Ty()`, as a monoidal functor preserves the unit,
+  where it raised `KeyError` on `Ty()`, `Id(Ty())` and every scalar; and
+  `tensor.Diagram.grad` differentiates a foliated diagram, splitting a layer
+  of more than one box into staircases first, where it raised `ValueError`.
 - `CMap.trace` raises `AxiomError` when the wires it traces have different
   types, as `Hypergraph.trace` and the trace of a diagram do, checking them
   with `utils.assert_istraceable` before it splices them. It used to splice

@@ -178,7 +178,8 @@ class Wire(cat.Ob):
     def from_tree(cls, tree):
         dom = from_tree(tree['dom']) if 'dom' in tree else transparent
         cod = from_tree(tree['cod']) if 'cod' in tree else transparent
-        return cls(tree['name'], dom, cod, is_dagger='is_dagger' in tree)
+        return cls(tree['name'], dom, cod,
+                   is_dagger=tree.get('is_dagger', False))
 
 
 class List(Monoid, NamedGeneric['generator_factory']):
@@ -1848,7 +1849,10 @@ class Functor(cat.Functor):
 
     def __call__(self, other):
         if isinstance(other, Colour):
-            return self.colour_map[other] if self.colour_map else other
+            if not self.colour_map or (
+                    other == transparent and other not in self.colour_map):
+                return other
+            return self.colour_map[other]
         if isinstance(other, Dim) and isinstance(
                 other, self.dom.ob.generator_factory):
             return self.cod.ob.cast(self.ob_map[self.dom.ob(other)])

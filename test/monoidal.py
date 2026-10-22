@@ -654,6 +654,14 @@ def test_coloured_Functor_repr():
     assert "colour_map=" in repr(F)
 
 
+def test_coloured_Functor_unit():
+    red, green = Colour("red"), Colour("green")
+    x, s = Ty('x'), Box('s', Ty(), Ty())
+    F = Functor({x: x}, {s: s}, colour_map={red: green})
+    assert F(Ty()) == Ty() and F(Id(Ty())) == Id(Ty()) and F(s) == s
+    assert F(Ty.id(red)) == Ty.id(green)
+
+
 def test_coloured_Functor_empty_identity():
     green, lime = Colour("green"), Colour("lime")
     # Colour maps preserve the (mapped) colour of an empty identity.

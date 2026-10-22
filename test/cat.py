@@ -368,6 +368,18 @@ def test_sum_lambdify():
     assert empty_sum.subs(phi, 0) == empty_sum
 
 
+def test_Bubble_subs_lambdify():
+    pytest.importorskip("sympy")
+    from sympy.abc import phi, psi
+    f = Box('f', Ob('x'), Ob('x'), data=phi)
+    bubble = Bubble(f, f, name="b", method="m", data=phi)
+    expected = Bubble(f.subs(phi, 1), f.subs(phi, 1),
+                      name="b", method="m", data=1)
+    assert bubble.subs(phi, 1) == bubble.lambdify(phi)(1) == expected
+    assert bubble.subs(phi, 1).data == bubble.lambdify(phi)(1).data == 1
+    assert bubble.subs(psi, 1) == bubble.lambdify(psi)(1) == bubble
+
+
 def test_Sum():
     x, y, z = map(Ob, "xyz")
     f = Box('f', x, y)

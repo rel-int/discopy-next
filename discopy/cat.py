@@ -677,7 +677,7 @@ class Box(Arrow):
     def from_tree(cls, tree: dict) -> Box:
         name = tree['name']
         dom, cod = map(from_tree, (tree['dom'], tree['cod']))
-        data, is_dagger = tree.get('data', None), 'is_dagger' in tree
+        data, is_dagger = tree.get('data', None), tree.get('is_dagger', False)
         return cls(name=name, dom=dom, cod=cod, data=data, is_dagger=is_dagger)
 
 
@@ -870,6 +870,30 @@ one, they have [cat.Ob('x'), cat.Ob('y')].
     @property
     def free_symbols(self):
         return super().free_symbols.union(*[f.free_symbols for f in self.args])
+
+    def subs(self, *args) -> Bubble:
+        variables = {var for var, _ in args[0]} if len(args) == 1 else {
+            args[0]}
+        if not variables & self.free_symbols:
+            return self
+        data = rsubs(self.data, *args) if variables & super().free_symbols\
+            else self.data
+        return type(self)(
+            *(arg.subs(*args) for arg in self.args),
+            dom=self.dom, cod=self.cod, name=self.name, method=self.method,
+            data=data, is_dagger=self.is_dagger)
+
+    def lambdify(self, *symbols: "sympy.Symbol", **kwargs) -> Callable:
+        if not set(symbols) & self.free_symbols:
+            return lambda *xs: self
+        from sympy import lambdify
+        args = [arg.lambdify(*symbols, **kwargs) for arg in self.args]
+        data = lambdify(symbols, self.data, **kwargs)\
+            if set(symbols) & super().free_symbols else lambda *_: self.data
+        return lambda *xs: type(self)(
+            *(f(*xs) for f in args),
+            dom=self.dom, cod=self.cod, name=self.name, method=self.method,
+            data=data(*xs), is_dagger=self.is_dagger)
 
     def dagger(self) -> Bubble:
         return type(self)(

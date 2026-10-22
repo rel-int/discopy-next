@@ -599,3 +599,25 @@ def test_Functor_no_dtype_repr_and_algebraic_conjugate():
     assert "dtype=None" in repr(F)
     conjugate = Channel.id(Q(Dim(2))).conjugate(diagrammatic=False)
     assert isinstance(conjugate, Channel)
+
+
+def test_grad_foliated():
+    pytest.importorskip("sympy")
+    from sympy.abc import phi
+    f = Box('f', Dim(2), Dim(2), data=[phi, 0, 0, phi ** 2])
+    diagram = f @ f >> f @ f
+    expected = diagram.grad(phi).eval().subs(phi, 2).array
+    result = diagram.foliation().grad(phi).eval().subs(phi, 2).array
+    assert np.allclose(result.astype(float), expected.astype(float))
+
+
+def test_Bubble_subs_lambdify():
+    pytest.importorskip("sympy")
+    from sympy.abc import phi
+    f = Box('f', Dim(2), Dim(2), data=[phi, 0, 0, 1])
+    bubble = f.bubble(func=lambda x: x ** 2)
+    expected = Box('f', Dim(2), Dim(2), data=[3, 0, 0, 1]).bubble(
+        func=lambda x: x ** 2).eval().array
+    for result in (bubble.subs(phi, 3), bubble.lambdify(phi)(3)):
+        assert result.func is bubble.func
+        assert np.allclose(result.eval().array, expected)

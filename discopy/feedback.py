@@ -991,7 +991,7 @@ class FollowedBy(Box):
 
     @classmethod
     def from_tree(cls, tree: dict) -> FollowedBy:
-        return cls(from_tree(tree['arg']), 'is_dagger' in tree,
+        return cls(from_tree(tree['arg']), tree.get('is_dagger', False),
                    tree.get('time_step', 0))
 
 

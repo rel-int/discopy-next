@@ -323,7 +323,11 @@ class Nat(monoidal.Nat, Ty):
     l = r = property(lambda self: self)
 
     def unwind(self) -> Nat:
-        """ The identity: a natural number has no winding. """
+        """
+        The identity: a natural number has no winding.
+
+        >>> assert Nat(1).unwind() == Nat(1)
+        """
         return self
 
 

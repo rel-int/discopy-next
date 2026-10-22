@@ -360,7 +360,7 @@ class Digits(ClassicalGate):
     @classmethod
     def from_tree(cls, tree: dict):
         return cls(*tree['digits'], dim=tree['dim'],
-                   is_dagger='is_dagger' in tree)
+                   is_dagger=tree.get('is_dagger', False))
 
     @property
     def dim(self):
