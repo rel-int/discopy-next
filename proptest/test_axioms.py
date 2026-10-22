@@ -1,0 +1,54 @@
+""" Property tests for DisCoPy's principal categorical data structures. """
+
+import pytest
+from hypothesis import given, note
+from hypothesis import strategies as st
+
+from discopy.axioms import inhabits
+from discopy.utils import factory_name
+
+from proptest.categories import CATEGORIES
+
+
+def axiom_parameters():
+    """
+    Translate every axiom of every category to a pytest parameter.
+
+    An axiom taking no argument states its verdict without one, so we ask it
+    here: :obj:`NotImplemented` means the structure does not apply and the
+    test is skipped rather than generating arguments it could not satisfy.
+    A category need not state laws at all: one enrolled for the ad-hoc
+    properties only, such as a type of wires, has no ``axioms``.
+    """
+    for category in CATEGORIES:
+        for axiom in category.axioms.values():
+            if not axiom.parameters and axiom() is NotImplemented:
+                marks = pytest.mark.skip(reason=axiom.__doc__.strip())
+            elif axiom.broken:
+                marks = pytest.mark.xfail(reason=axiom.__doc__.strip())
+            else:
+                marks = ()
+            yield pytest.param(
+                axiom, marks=marks,
+                id=f"{factory_name(category)}.{axiom.name}")
+
+
+@pytest.mark.cell
+@pytest.mark.parametrize("axiom", axiom_parameters())
+@given(data=st.data())
+def test_axiom(axiom, drawn, data):
+    """
+    Check an axiom of a category against generated arguments, and the
+    equation it states against the type of its output, evaluated in the
+    scope its arguments were drawn in, recording the distinct terms it was
+    checked on: a cell whose strategy draws the same handful however long
+    the search runs is green about those terms rather than about the law,
+    see :mod:`proptest.report`.
+    """
+    scope, arguments = data.draw(
+        axiom.sequents(**axiom.params), label=axiom.name)
+    drawn.add(repr(arguments))
+    verdict = axiom(**arguments)
+    note(verdict)
+    assert inhabits(verdict, axiom.output(scope))
+    assert verdict

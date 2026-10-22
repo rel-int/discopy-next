@@ -2,8 +2,8 @@ import math
 
 import pytest
 
-from optyx.compiler.mbqc import Measurement
-from optyx.compiler.semm_decompiler import SemmDecompiler
+from discopy.optyx.compiler.mbqc import Measurement
+from discopy.optyx.compiler.semm_decompiler import SemmDecompiler
 
 
 # Returns a list of unique measurements, all with different angles.

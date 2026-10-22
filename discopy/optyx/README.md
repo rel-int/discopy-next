@@ -12,8 +12,8 @@ In monoidal syntax, `>>` denotes sequential composition and `@` denotes parallel
 For example, you can build the CNOT gate from the **Z** and **X** generators of the **ZX caluclus** (don't forget the scalar!).
 
 ```python
-from optyx import qubit
-from optyx.qubits import Z, X, Scalar
+from discopy.optyx import qubit
+from discopy.optyx.qubits import Z, X, Scalar
 
 cnot = Z(1, 2) @ qubit >> qubit @ X(2, 1) @ Scalar(2 ** 0.5)
 cnot.draw()
@@ -41,16 +41,16 @@ Quantum teleportation transfers an unknown qubit state from sender (Alice) to re
 
 https://en.wikipedia.org/wiki/Quantum_teleportation#/media/File:Quantum_teleportation_circuit.svg :
 
-<img src="./docs/notebooks/teleport.svg" alt="Teleportation Protocol" width="800" style="max-width:100%;">
+<img src="../../docs/notebooks/optyx/teleport.svg" alt="Teleportation Protocol" width="800" style="max-width:100%;">
 
 ### Define the protocol
 
 Write the protocol using function syntax:
 
 ```python
-from optyx import bit
-from optyx.qubits import Measure
-from optyx.classical import CtrlX, CtrlZ
+from discopy.optyx import bit
+from discopy.optyx.qubits import Measure
+from discopy.optyx.classical import CtrlX, CtrlZ
 
 bell = Scalar(0.5 ** 0.5) @ Z(0, 2)
 
@@ -84,7 +84,7 @@ teleportation_monoidal_syntax = (
 
 ```python
 import numpy as np
-from optyx.qubits import Id
+from discopy.optyx.qubits import Id
 
 np.allclose(
     teleportation.eval().tensor.array,
@@ -96,7 +96,7 @@ np.allclose(
 Optyx evaluates diagrams via pluggable backends. By default it compiles a diagram to a tensor network, optimizes a contraction path with **cotengra**, and contracts it with **quimb** (CPU/GPU; dense/sparse). For linear-optical circuits, Optyx also exposes a **Perceval** backend using permanent-based algorithms, and a tensor-network-based **DisCoPy** backend; you can choose among these depending on the task.
 
 ```python
-from optyx.core.backends import (
+from discopy.optyx.core.backends import (
     DiscopyBackend,
     QuimbBackend
 )
@@ -119,7 +119,7 @@ teleportation_monoidal_syntax.double().draw(figsize=(8, 8))
 
 
 
-![svg](./docs/notebooks/readme_example_files/readme_example_25_0.svg)
+![svg](../../docs/notebooks/optyx/readme_example_files/readme_example_25_0.svg)
 
 
 
@@ -134,7 +134,7 @@ pyzx_graph.normalize()
 pyzx.draw(pyzx_graph)
 ```
 
-![png](./docs/notebooks/readme_example_files/pyzx_identity.png)
+![png](../../docs/notebooks/optyx/readme_example_files/pyzx_identity.png)
 
 The diagram (a doubled identity) is the identity CPTP map as expected.
 
@@ -146,7 +146,7 @@ he Hong–Ou–Mandel (HOM) effect is a two-photon interference phenomenon where
 ### Noiseless setting
 
 ```python
-from optyx.photonic import BS, Create
+from discopy.optyx.photonic import BS, Create
 
 beam_splitter = BS
 beam_splitter.draw()
@@ -170,8 +170,8 @@ HOM.eval().prob_dist()
 We model photon loss in optyx using the `PhotonLoss` generator. We can check that the HOM circuit gives a non-zero probability of detecting one photon, in the presence of loss.
 
 ```python
-from optyx.photonic import Id, PhotonLoss, NumberResolvingMeasurement
-from optyx.classical import AddN
+from discopy.optyx.photonic import Id, PhotonLoss, NumberResolvingMeasurement
+from discopy.optyx.classical import AddN
 
 lossy_HOM = Create(1, 1) >> PhotonLoss(0.8) @ Id(1) >> BS 
 lossy_HOM = lossy_HOM >> NumberResolvingMeasurement(2) >> AddN(2)
@@ -186,7 +186,7 @@ The overlap between internal states defines the pairwise distinguishability of t
 
 ```python
 import numpy as np
-from optyx.photonic import BS
+from discopy.optyx.photonic import BS
 
 internal_state_1 = [1, 0]
 internal_state_2 = [np.sqrt(0.9), np.sqrt(0.1)]
@@ -211,7 +211,7 @@ Distributed entanglement generation links two distant quantum nodes (A and B) by
 
 Main, D., Drmota, P., Nadlinger, D.P. et al. Distributed quantum computing across an optical network link. Nature 638, 383–388 (2025). https://doi.org/10.1038/s41586-024-08404-x~ :
 
-![Distributed entanglement](./docs/notebooks/distributed_entanglement.png "An example of distributed entanglement generation")
+![Distributed entanglement](../../docs/notebooks/optyx/distributed_entanglement.png "An example of distributed entanglement generation")
 
 
 ### Define the protocol
@@ -222,10 +222,10 @@ This is modeled in optyx by assigning internal states to the `DualRail` boxes th
 
 
 ```python
-from optyx.qubits import Z, Scalar, Id, Measure
-from optyx.photonic import DualRail
-from optyx.classical import PostselectBit
-from discopy.drawing import Equation
+from discopy.optyx.qubits import Z, Scalar, Id, Measure
+from discopy.optyx.photonic import DualRail
+from discopy.optyx.classical import PostselectBit
+from discopy.symmetric import Equation
 
 bell_state = Z(0, 2) @ Scalar(0.5 ** 0.5)
 
@@ -246,7 +246,7 @@ measure = Measure(2)
 Equation(protocol >> measure, bell_state >> measure).draw(figsize=(8, 8))
 ```
 
-![svg](./docs/notebooks/readme_example_files/readme_example_54_0.svg)
+![svg](../../docs/notebooks/optyx/readme_example_files/readme_example_54_0.svg)
 
 
 #### Test the protocol for different internal states
@@ -255,7 +255,7 @@ We test how partial photon distinguishability affects the heralded entanglement 
 
 ```python
 import math
-from optyx.qubits import Discard
+from discopy.optyx.qubits import Discard
 
 def rotated_unit_vectors(n: int = 10):
     for i in range(n):
@@ -293,7 +293,7 @@ plt.grid(True)
 plt.show()
 ```
 
-![svg](./docs/notebooks/readme_example_files/readme_example_59_0.svg)
+![svg](../../docs/notebooks/optyx/readme_example_files/readme_example_59_0.svg)
 
 
 ## Interfaces with external libraries
@@ -317,7 +317,7 @@ graphix_result = simulator.run().psi.conj()
 
 
 ```python
-from optyx.qubits import Circuit, Ket
+from discopy.optyx.qubits import Circuit, Ket
 
 optyx_zx = Circuit(pattern)
 
@@ -371,7 +371,7 @@ pcvl.pdisplay(p, recursive=True)
 
 
 
-![svg](./docs/notebooks/readme_example_files/readme_example_68_0.svg)
+![svg](../../docs/notebooks/optyx/readme_example_files/readme_example_68_0.svg)
 
 
 

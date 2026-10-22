@@ -1,7 +1,7 @@
 import pytest
 import math
-from optyx.core.zw import *
-from optyx.photonic import (
+from discopy.optyx.core.zw import *
+from discopy.optyx.photonic import (
     BS as BS_,
 	BBS as BBS_,
 	Phase as Phase_,
@@ -9,13 +9,13 @@ from optyx.photonic import (
     ansatz
 )
 from perceval.components.unitary_components import BS as BS_p
-from optyx.core.diagram import Mode, Diagram
+from discopy.optyx.core.diagram import Mode, Diagram
 import numpy as np
 import perceval as pcvl
 from perceval import catalog
-from optyx.qubits import Z, Scalar, Ket
-from optyx.photonic import DualRail
-from optyx import Channel
+from discopy.optyx.qubits import Z, Scalar, Ket
+from discopy.optyx.photonic import DualRail
+from discopy.optyx import Channel
 import random
 from perceval.backends import SLOSBackend
 from perceval.simulators import Simulator
@@ -248,8 +248,8 @@ def test_cnot():
 	)
 
 def test_unitaries():
-	from optyx import Diagram
-	from optyx.photonic import Create
+	from discopy.optyx import Diagram
+	from discopy.optyx.photonic import Create
 
 	def chip_mzi(w, l):
 		ansatz_ = ansatz(w, l)

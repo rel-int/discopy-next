@@ -6,11 +6,11 @@ from typing import Dict, Tuple
 
 import numpy as np
 import pytest
-from optyx.channel import Channel, qmode, Measure
-from optyx.photonic import BS
-from optyx.core.zw import Create
-from optyx.core.diagram import DualRail, Scalar
-from optyx.core.zx import Z, X
+from discopy.optyx.channel import Channel, qmode, Measure
+from discopy.optyx.photonic import BS
+from discopy.optyx.core.zw import Create
+from discopy.optyx.core.diagram import DualRail, Scalar
+from discopy.optyx.core.zx import Z, X
 
 
 RNG = np.random.default_rng(seed=2025)
@@ -115,7 +115,7 @@ def test_encode_n_qubits() -> None:
     Test for Encode: three logical qubits in two photonic modes.
     Ensures the overall probability mass remains 1.
     """
-    from optyx.channel import CQMap, mode, Encode
+    from discopy.optyx.channel import CQMap, mode, Encode
 
     create = CQMap(
         "create",
@@ -138,7 +138,7 @@ def test_encode_n_qubits() -> None:
 
 
 def test_photon_threshold_detector():
-    from optyx.core.diagram import PhotonThresholdDetector
+    from discopy.optyx.core.diagram import PhotonThresholdDetector
 
     d_1 = Create(1, internal_states=([1, 0])) >> PhotonThresholdDetector()
     d_2 = X(1, 0, 0.5) @ Scalar(0.5**0.5)
@@ -150,7 +150,7 @@ def test_photon_threshold_detector():
 
 
 def test_select_distinguishable():
-    from optyx.core import zw
+    from discopy.optyx.core import zw
     select = zw.Select(1, 1, internal_states=([1, 0], [1, 0]))
 
     d = select.dagger() >> select

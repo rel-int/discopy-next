@@ -1,5 +1,5 @@
-from optyx.core.zx import *
-from optyx.core.diagram import Scalar
+from discopy.optyx.core.zx import *
+from discopy.optyx.core.diagram import Scalar
 import itertools
 import pytest
 

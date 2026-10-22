@@ -1,10 +1,11 @@
+import pytest
 import pyzx
-from optyx import qubits
+from discopy.optyx import qubits
 from pytket import Circuit
 from pytket.extensions.qiskit import AerBackend
 from pytket.utils import probs_from_counts
-from optyx import channel
-from optyx.core import zx
+from discopy.optyx import channel
+from discopy.optyx.core import zx
 import numpy as np
 
 def _extract(graph):
@@ -45,13 +46,21 @@ def test_graphix():
         optyx_res = (qubits.Ket("+")**2 >> qubits.Circuit(pattern)).eval().amplitudes()
 
         simulator = PatternSimulator(pattern, backend="statevector")
-        graphix_result = simulator.run().psi.conj()
+        simulator.run()
+        state = simulator.backend.state
+        graphix_result = state.psi.reshape((2, ) * state.nqubit).conj()
+        # an open graph defines its state up to a scalar, and graphix 0.4
+        # absorbs Cliffords into measurements, so compare up to a phase
+        largest = max(optyx_res, key=lambda keys: abs(optyx_res[keys]))
+        phase = graphix_result[largest] / optyx_res[largest]
+        assert np.isclose(abs(phase), 1, atol=1e-6)
         for keys in optyx_res.keys():
-            assert np.isclose(optyx_res[keys], graphix_result[keys], atol=1e-6)
+            assert np.isclose(
+                phase * optyx_res[keys], graphix_result[keys], atol=1e-6)
 
 
 # def test_tket_discopy():
-#     from optyx import classical, bit
+#     from discopy.optyx import classical, bit
 #     ghz_circ = Circuit(3)
 #     ghz_circ.H(0)
 #     ghz_circ.CX(0, 1)
@@ -122,7 +131,7 @@ def test_dephasingerror():
     assert np.allclose(a,  np.array([[-.14, 1.], [1, -0.14]]))
 
 def test_ket():
-    from optyx.core import diagram
+    from discopy.optyx.core import diagram
     a = (qubits.Ket(1).get_kraus().to_tensor().to_quimb() ^ ...).data
     b = zx.X(0, 1, 0.5) @ diagram.Scalar(1 / np.sqrt(2))
 
@@ -130,11 +139,25 @@ def test_ket():
     assert np.allclose(a, b)
 
 def test_bra():
-    from optyx.core import diagram
+    from discopy.optyx.core import diagram
     a = (qubits.Bra(1).get_kraus().to_tensor().to_quimb() ^ ...).data
     b = zx.X(1, 0, 0.5) @ diagram.Scalar(1 / np.sqrt(2))
     b = (b.to_tensor().to_quimb() ^ ...).data
     assert np.allclose(a, b)
+
+
+def test_ket_bra_accept_string_digits():
+    assert qubits.Ket("0") == qubits.Ket(0)
+    assert qubits.Ket("1") == qubits.Ket(1)
+    assert qubits.Bra("0") == qubits.Bra(0)
+    assert qubits.Bra("1") == qubits.Bra(1)
+
+
+def test_ket_bra_reject_invalid_value():
+    with pytest.raises(ValueError):
+        qubits.Ket("2")
+    with pytest.raises(ValueError):
+        qubits.Bra("2")
 
 # def test_to_tket():
 #     circ = qubits.X(1, 2) @ channel.qubit >> channel.qubit @ qubits.Z(2, 1) @ qubits.Scalar(2**0.5)

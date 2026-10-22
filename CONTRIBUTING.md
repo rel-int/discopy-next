@@ -1,0 +1,355 @@
+# Contributing
+
+~~Let no one enter who does not know geometry.~~
+*Let everyone enter and teach them category theory.*
+
+Thank you for considering contributing to DisCoPy, we're so excited to have you here! If you got this far, you are already part of a new generation of engineers, scientists and mathematicians making equations and programs free of the one-dimensional cave in which they are being chained.
+
+This is an open source project which started as part of [two PhD theses](https://docs.discopy.org/en/main/extra/papers.html#phd-theses) i.e. we come from academia and we are always enthusiastic about sharing ideas and their implementations.
+
+Please read the [STYLE.md](STYLE.md) for guidelines which encapsulate some our coding philosophy.
+
+## Make a first contribution
+
+Every bit of contribution will be cherished however big or small, in particular you can:
+
+- [Report bugs](#report-bugs)
+- [Add documentation](#add-documentation)
+- [Request features](#request-features)
+- [Review pull requests](#review-pull-requests)
+
+If you're unsure where to begin, we suggest you start with one of our tutorial notebooks e.g. [What is a diagram?](https://docs.discopy.org/en/main/notebooks/diagrams.html)
+If you're looking for some inspiration on potential applications of string diagrams and category theory, you could try reading:
+
+- the publications of the [Compositionality](https://compositionality.episciences.org/browse/volumes) journal
+- the Applied Category Theory proceedings e.g. [dblp:eptcs429](https://dblp.org/db/series/eptcs/eptcs429.html)
+- this list of papers at the intersection of [Category Theory ∩ Machine Learning](https://github.com/bgavran/Category_Theory_Machine_Learning)
+
+If you want any guidance whatsoever, don't hesitate to reach out on [Discord](https://discopy.org/discord) or [open an issue](https://github.com/discopy/discopy/issues/new) even if it's to ask a simple question.
+
+## Get started
+
+DisCoPy uses [uv](https://docs.astral.sh/uv/).
+
+The first step is to clone DisCoPy and install the default development environment:
+
+```shell
+git clone https://github.com/discopy/discopy.git
+cd discopy
+uv sync
+```
+
+Different dependency groups are available (switch with `uv sync --group <group-name>`):
+- no group: minimal set of dependencies required to work with DisCoPy.
+- `dev`: testing and linting tools.
+- `quantum`: includes quantum computating dependencies
+- `grammar`: natural language processing libraries, PyTorch included for the neural parser
+- `notebooks`: marimo, IPython and a Jupyter kernel to run the notebooks, with anywidget to show diagrams as widgets
+- `docs`: for generating the documentation
+Since dependency groups are not standard, we also provide equivalents via optional dependencies.
+
+## Run the unit tests
+
+After cloning the repository, you should check you haven't broken anything by running the test suite.
+Use `uv sync --dev` before running any part of the test suite, and `uv sync --dev --group all`
+if you want to run the full test suite involving all extra dependencies.
+
+```shell
+uv sync --dev --group all
+uv run pflake8 discopy
+uv run pylint discopy
+uv run coverage run -m pytest
+uv run coverage report -m
+```
+
+Without the extras installed, run `uv run pytest --skip-extra` to skip what needs them.
+
+A sandboxed environment can block some of the extras outright (e.g. no network access to fetch
+the `torch`/`pytket` wheels, no `graphviz` binary), so `--skip-extra` may still leave a fixed set
+of environment-only failures that look identical to a real regression. Diff the failure set
+against the same command run on the merge base rather than guessing: what's new is a regression
+candidate to investigate — your change, a flake, or the environment — and what was already failing
+there is pre-existing, not introduced by your change, though whether either one's cause is the
+sandbox or a latent bug is a separate question to chase down. CI on the pushed branch is the
+authority on the real suite: claim local green only for the checks you actually ran locally.
+
+`pylint` fails on any unused import, variable or argument, and on a score below the
+`fail-under` of `.pylintrc`, which is the score of `main` when it was last raised: fix the
+finding, or disable the message on that line with the reason, and raise `fail-under` to the
+new score when your change lifts it, so that the score never goes down. A law stated with
+`@axiom` is an `Axiom`, a `classmethod`, which pylint reads as one with no plugin; `.pylintrc`
+declares the `factory` members a `NamedGeneric` subscript sets and lets `hypothesis.strategies`
+be imported inside a method, where a strategy is built, so that the package never imports it; a
+category of messages the code is not going to follow is disabled there with its reason, as
+`cyclic-import` is: the package imports every module.
+
+## Run the property tests
+
+The Hypothesis property matrix lives in `proptest/`, outside
+pytest's default `testpaths`. Run them explicitly:
+
+```shell
+uv sync --group dev
+uv run pytest proptest/ -n auto -p no:benchmark -v
+```
+
+The cells of the matrix are independent, so `-n auto`
+([pytest-xdist](https://pytest-xdist.readthedocs.io)) runs them on all
+cores, with `-p no:benchmark` unloading the benchmark plugin that is
+incompatible with it; drop both to run serially, e.g. when debugging a
+single cell.
+
+Every cell of the matrix is one axiom of one category, named
+`<module>.<Category>.<law>`, so pytest's own `-k` selects cells for
+shorter, targeted tests.
+
+```shell
+uv run pytest proptest/ -k unitality -v
+uv run pytest proptest/ -k 'Arrow and not dagger'
+```
+
+A law's signature is a sequent, e.g.
+`def unitality[A: Obj[C0], B: Obj[C0]](cls, f: Hom[C1, A, B]) ->
+Equation[Hom[C1, A, B]]`: the cell draws the objects `A` and `B`, then a
+morphism `f` between them from the strategy of the category, and checks
+the equation it returns against its return annotation as well as checking
+that it holds. Under `from __future__ import annotations` the sequent is
+read back from its strings, with the type parameters of the class stating
+it in scope.
+
+A cell is skipped when its axiom declares that the structure does not
+apply, and xfailed when the law is declared broken, each carrying its
+reason: pass `-rsxX` to list the skips, xfails and unexpected passes with
+their reasons, and `-x` to stop at the first genuine failure.
+
+`proptest/conftest.py` registers four Hypothesis profiles over the
+`.hypothesis/examples` database, selected by `HYPOTHESIS_PROFILE`: `dev`
+by default, `pr` for the small budget a pull request runs with, under a
+fixed `--hypothesis-seed` so that it draws the same examples every time,
+and `explore` for the large one `main` and the nightly run search with.
+A fourth, `shared`, is `dev` reading the database CI uploads as a workflow
+artifact, through a `GITHUB_TOKEN`, so a failure found on CI replays on
+your machine before any search; it reaches GitHub only when selected.
+
+```shell
+HYPOTHESIS_PROFILE=explore uv run pytest proptest/ -n auto -p no:benchmark
+```
+
+`Axiom.falsify` searches for a shrunk counterexample to a law on demand,
+raising `NoSuchExample` when it finds none, which is how a failing cell
+becomes a concrete term to debug in a REPL: call
+`<Category>.<law>.falsify()` on the category that breaks the law, then
+inspect the sides of the `Equation` the axiom returns on the arguments it
+hands back.
+
+### What the matrix checked
+
+A green cell says the law held on the terms its strategy drew, which is
+weaker than the law holding. Every run of the matrix therefore ends with a section saying
+what it actually checked, and every line of it is a report rather than a
+gate:
+
+- **the cells that cannot fail**, i.e. those that drew fewer distinct terms
+  than the budget allowed. `matrix.Matrix[int].copy_counitality`
+  quantifies over one object and `abc.Nat.strategy` samples the numbers up
+  to three, so it draws four terms under `pr`'s twenty examples and the
+  same four under `explore`'s thousand: it is green about copying zero to
+  three wires and says nothing about the law at four. A finite support is
+  not a bug — knowing which cells have one is what stops a passing cell
+  being read as evidence a fix is right.
+- **the cells a baseline checked and this run did not**, named with
+  `--proptest-baseline`. A law skipped as inapplicable or declared broken is
+  as green as one that held, so a change that stops checking a law reads
+  exactly like one that keeps it. `--proptest-report` writes the report a
+  later run reads:
+
+```shell
+uv run pytest proptest/ --proptest-report=report/proptest-report.json
+uv run pytest proptest/ --proptest-baseline=report/proptest-report.json
+```
+
+Compare whole runs: `-k` and `-m` deselect cells, and a deselected cell is
+one the baseline checked and this run did not, which is true and unhelpful.
+A run that collected no cell at all still reports, as long as a baseline or a
+report was asked for — a matrix that collects nothing is the largest loss
+there is — and a cell that started and never finished is reported as unsettled
+rather than passing, since a passing setup is not a law holding. A baseline that cannot be read is named and skipped rather than
+failing the run that asked for it, since it is an artifact an older run
+uploaded.
+
+A test of the matrix carries `pytest.mark.cell`, which is what the report
+keys on: `proptest/test_report.py` holds the suite's unit tests of its own
+reading, and those are parametrised too.
+
+The `proptest` GitHub workflow runs this suite on pull requests labelled
+`proptest`, on `main`, nightly and on manual dispatch. It carries the report
+between runs as an artifact, and on narrower terms than the example database:
+a baseline is a claim about what `main` checks rather than a pile of examples
+any run may add to, so it is taken from a **successful** run **of `main`**
+only. A pull request never uploads one, a dispatch on a feature branch that
+legitimately skips a cell cannot become the baseline that cell is missing
+from, and a run that died mid-suite stays available to look at without being
+compared against.
+
+## Run the benchmarks
+
+`benchmark/test_composition.py` reproduces the scaling experiments of
+arXiv:2105.09257 for `Diagram` and `Hypergraph`, with analogous `CMap` cases;
+`benchmark/test_conversion.py` covers conversions between all three. They live
+outside `testpaths`, so run them explicitly. Results are keyed by suite
+(`composition` or `conversion`), family (representation or conversion), case
+(workload) and size `n`. Each data point is a declarative
+[`pytest-benchmark`](https://pytest-benchmark.readthedocs.io) test; the fixture
+owns timing (CPU clock and GC disabled) and automatically calibrates rounds
+and iterations for each workload.
+
+```shell
+uv sync --group dev
+# small/medium sizes (the default); add BENCH_FLAGS=bench:full for the heavy tail
+uv run pytest benchmark/ -v --benchmark-json=benchmark-results/bench.json
+# render the scaling tables + log-log plots (polars + matplotlib)
+uv run python benchmark/report.py benchmark-results/bench.json
+```
+
+`report.py` writes `NAME-results.md` and `NAME-scaling.svg` for each
+`benchmark/test_NAME.py`. To compare two runs made sequentially on the same
+machine, pass the base run when rendering the head:
+
+```shell
+uv run python benchmark/report.py benchmark-results/head.json \
+    --base benchmark-results/base.json --threshold 0.25
+```
+
+It joins the runs on `(suite, family, case, size)` and computes the raw change
+`head / base - 1`. It writes `comparison.md`, listing the regressions and
+speedups larger than the threshold. A regression is reported, never fatal: the
+exit code is non-zero only when the comparison itself fails, e.g. when the two
+runs share no measurement. Both runs must use the same benchmark sizes and
+machine; there is no cross-machine normalisation. The report counts the
+measurements present in only one of the two runs.
+
+The `benchmark` GitHub workflow benchmarks two commits on the same runner and
+compares them: on `main` the commit pushed against the branch as it was before
+the push, on a pull request labelled `benchmark` the head commit against the
+base. `main` runs the full size tail, a pull request the default sizes; a
+manual dispatch has nothing to compare against and only measures its own
+commit. Every run uploads the report of its head commit -- the raw
+`bench.json`, the Markdown tables and the SVG plots -- writes the comparison to
+the job summary, and raises a warning annotation, never a failure, when a
+measurement regresses. A pull request run also posts or updates a comment with
+the important regressions and speedups.
+
+## Build the docs
+
+You can build the documentation locally with [sphinx](https://www.sphinx-doc.org/en/master/):
+You'll need to install [pandoc](https://pandoc.org/) and [graphviz](https://graphviz.org/) as external dependencies not managed by `uv`.
+
+```shell
+uv sync --group docs
+uv run sphinx-build docs docs/_build/html
+```
+
+## Build without uv
+
+The project uses the `uv_build` PEP 517 build backend, so package builds still work from standard Python tooling.
+If you do not use `uv`, create a virtual environment and install the relevant extras manually:
+
+```shell
+python -m venv .venv
+. .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install -e '.[test]'
+python -m pip install coverage pyproject-flake8 pytest marimo
+```
+
+Then run:
+
+```shell
+pflake8 discopy
+pylint discopy
+coverage run -m pytest
+coverage report -m
+```
+
+To build distributions without uv:
+
+```shell
+python -m pip install build
+python -m build
+```
+
+## Release a version
+
+Before tagging, rename the `[Unreleased]` section of [CHANGELOG.md](CHANGELOG.md) to the new
+version and date, and commit it.
+
+New versions (tag with 'X.X.X') of the package are released on [PyPI](https://pypi.org/project/discopy/) using `uv publish`.
+You should run the following commands from a clean clone of the repo:
+
+```shell
+git tag X.X.X
+git push origin --tags
+uv build
+uv publish
+```
+
+Finally, [create a release](https://docs.github.com/en/repositories/releasing-projects-on-github/managing-releases-in-a-repository#creating-a-release) for the newly created tag, using the
+matching section of [CHANGELOG.md](CHANGELOG.md) as its description.
+
+## Report bugs
+
+We try our best to keep DisCoPy as close as possible to the mathematics but as any Python package it mostly likely contains bugs.
+If you happen to find one, please [open an issue](https://github.com/discopy/discopy/issues/new) with your best attempt at describing what the problem is and how to reproduce it.
+
+## Add documentation
+
+We would be thrilled to welcome contributions in the form of examples, tests, notebooks, etc.
+We are also keen to hear if you spot any part of the documentation that you suspect is broken, outdated or plain wrong.
+
+We use the following convention so that documentation images are generated and compared against a baseline when running doctests:
+
+```
+Example
+-------
+>>> x, y, z, w = Ty('x'), Ty('y'), Ty('z'), Ty('w')
+>>> f0, f1 = Box('f0', x, y), Box('f1', z, w)
+>>> (f0 @ f1).draw(doctest='docs/_static/monoidal/tensor-example.svg')
+
+.. image:: /_static/monoidal/tensor-example.svg
+    :align: center
+```
+
+If the image already exists, drawing the example checks it against the
+committed baseline and raises an error when they differ. To update an image,
+delete its baseline so the next run regenerates it, or set
+`discopy.config.OVERRIDE_DOCTEST_IMAGES = True` before running the tests, in
+which case `doctest=` behaves like `path=` and just overrides the images.
+Commit the regenerated images just like any other test change, otherwise
+the CI won't pass. A plain `draw(path=...)` just saves the drawing,
+overwriting any existing file.
+
+## Request features
+
+DisCoPy has the ambition to cover all of applied category theory.
+If you are unsure what that can mean you could read [What is applied category theory?](https://www.appliedcategorytheory.org/what-is-applied-category-theory/) or [From quantum foundations via natural language meaning to a theory of everything](https://arxiv.org/abs/1602.07618).
+
+If there's a particular feature needed for your application, we can probably guide you through how to implement it.
+If your request is for some general abstract nonsense that can be used throughout many applications, we're also keen to hear about it.
+
+## Review pull requests
+
+We take our pull request reviews to the same level of rigour and courtesy as our academic peer reviews.
+That is, we do our best to make sure that critical parts of the reasoning / implementation are correct but we also know there can be a next PR / paper fixing our mistakes.
+
+## LLM guidelines
+
+We accept contributions from large language models so long as they are explicitly indicated as such and authored under a GitHub handle separate from the human who prompted them, so that authorship stays traceable.
+Each LLM handle is clearly linked to the one human who runs it, and that human must never publish under their own personal handle what should go through it instead: this way, a human can review their own agent's pull requests directly on GitHub without it looking like they are talking to themselves.
+The resulting pull request needs to be approved by at least one human other than that prompter, in addition to any other review it requires.
+The [RULES.md](RULES.md) bind every agent working on a branch or pull request in this repo; they define the checkbox mutex and append-only shared-branch protocol.
+Use our [AGENTS.md](AGENTS.md) in your prompts so that the model has enough context to give quality results.
+
+LLMs have shifted the bottleneck of software development from writing code to reviewing it, please ensure that your AI assistants save more human time than they require to supervise them.
+In particular, AI contributions should be small (a thousand lines is a red line not to cross lightly) and well-planned (delegate the execution not the design).
+
+One specific guideline for PR descriptions: it's fine to have the detailed list of changes LLM-generated but the high-level description should be either a) written by a human, b) linking to a human-written prompt or c) quoting a human's prompt verbatim.

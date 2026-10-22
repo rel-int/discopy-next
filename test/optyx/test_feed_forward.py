@@ -2,15 +2,15 @@ import pytest
 import numpy as np
 import copy as cp
 
-from optyx.core.control import *
-from optyx.core.zw import Create, W, ZBox
-from optyx.core.diagram import PhotonThresholdDetector, Mode, Swap, Bit, Id
-from optyx.photonic import Phase, BS, MZI
-from optyx.utils.misc import matrix_to_zw
-from optyx.classical import BitControlledGate, BitControlledPhaseShift
-from optyx.channel import Channel, qmode
-from optyx import photonic
-from optyx import classical
+from discopy.optyx.core.control import *
+from discopy.optyx.core.zw import Create, W, ZBox
+from discopy.optyx.core.diagram import PhotonThresholdDetector, Mode, Swap, Bit, Id
+from discopy.optyx.photonic import Phase, BS, MZI
+from discopy.optyx.utils.misc import matrix_to_zw
+from discopy.optyx.classical import BitControlledGate, BitControlledPhaseShift
+from discopy.optyx.channel import Channel, qmode
+from discopy.optyx import photonic
+from discopy.optyx import classical
 
 # Helper Functions and Data
 

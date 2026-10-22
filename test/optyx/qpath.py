@@ -1,5 +1,5 @@
-from optyx.core.zw import *
-from optyx.core.diagram import Diagram, Mode, Id, Scalar
+from discopy.optyx.core.zw import *
+from discopy.optyx.core.diagram import Diagram, Mode, Id, Scalar
 
 
 def test_num_op():
@@ -23,7 +23,7 @@ def test_dilate():
         unitary = matrix.dilate()
         assert np.allclose(
             (unitary.umatrix >> unitary.umatrix.dagger()).array,
-            np.eye(unitary.umatrix.dom))
+            np.eye(len(unitary.umatrix.dom)))
         assert np.allclose(unitary.eval(3).array, matrix.eval(3).array)
 
 

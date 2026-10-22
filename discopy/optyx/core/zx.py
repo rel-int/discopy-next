@@ -58,7 +58,7 @@ from discopy import cat
 from discopy.utils import factory_name
 from discopy.frobenius import Dim
 from discopy import tensor
-from optyx.core import diagram, zw
+from discopy.optyx.core import diagram, zw
 
 pyzx.settings.strict_phase_types = False
 
@@ -74,7 +74,7 @@ class ZXDiagram(diagram.Diagram):
         Examples
         --------
 
-        >>> import optyx.core.zx as zx
+        >>> import discopy.optyx.core.zx as zx
         >>> bialgebra = Z(1, 2, .25) @ Z(1, 2, .75) >> \\
         ...    Id(diagram.Bit(1)) @ SWAP @ Id(diagram.Bit(1)) >> \\
         ...    X(2, 1, .5) @ X(2, 1, .5)
@@ -210,7 +210,7 @@ class ZXDiagram(diagram.Diagram):
         """
         Returns a :class:`pyzx.Graph`.
 
-        >>> import optyx.core.zx as zx
+        >>> import discopy.optyx.core.zx as zx
         >>> bialgebra = Z(1, 2, .25) @ Z(1, 2, .75) >> Id(diagram.Bit(1)) @ \\
         ...   SWAP @ Id(diagram.Bit(1)) >> X(2, 1, .5) @ X(2, 1, .5)
         >>> graph = bialgebra.to_pyzx()
@@ -262,11 +262,12 @@ class ZXDiagram(diagram.Diagram):
                     + len(box.cod) * [(node, False)]
                     + scan[offset + len(box.dom):]
                 )
-            elif isinstance(box, diagram.Swap):
+            elif isinstance(box, diagram.Permutation):
+                segment = scan[offset:offset + len(box.dom)]
                 scan = (
                     scan[:offset]
-                    + [scan[offset + 1], scan[offset]]
-                    + scan[offset + 2:]
+                    + [segment[i] for i in box.perm]
+                    + scan[offset + len(box.dom):]
                 )
             elif isinstance(box, diagram.Scalar):
                 graph.scalar.add_float(box.data)
@@ -349,6 +350,7 @@ class Spider(diagram.Spider, ZXBox):
 
     def grad(self, var, **params):
         """Gradient with respect to a variable."""
+        # pylint: disable=unused-argument  # the signature of Diagram.grad
 
         if var not in self.free_symbols:
             return diagram.Sum((), self.dom, self.cod)
@@ -408,7 +410,7 @@ class X(Spider):
 
     def truncation(self, input_dims=None, output_dims=None) -> tensor.Box:
         in_hadamards = tensor.Id(1)
-        for i in range(self.n_legs_in):
+        for _ in range(self.n_legs_in):
             in_hadamards @= H.truncation()
 
         out_hadamards = tensor.Id(1)
