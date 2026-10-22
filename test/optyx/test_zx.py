@@ -1,13 +1,16 @@
 import random
 
 import numpy as np
+from pyzx import VertexType
 from pytest import raises, fixture
 
 from discopy.quantum.gates import CRz, CRx, CU1, Ket, Rx, H
 from discopy import quantum
-from optyx.core.zx import *
-from optyx import qubits
-from optyx.core.diagram import Diagram, Bit
+from discopy.optyx.core.zx import *
+from discopy.optyx.core.zx import And, H, Or, Spider, X, Z, ZXBox
+from discopy.optyx.core import diagram
+from discopy.optyx import qubits
+from discopy.optyx.core.diagram import Diagram, Bit
 
 @fixture
 def random_had_cnot_diagram():
@@ -32,7 +35,8 @@ def random_had_cnot_diagram():
 def test_Diagram():
     bialgebra = Z(1, 2) @ Z(1, 2) >> Bit(1) @ SWAP @ Bit(1) >> X(2, 1) @ X(2, 1)
     assert str(bialgebra) == "Z(1, 2) @ bit >> bit @ bit @ Z(1, 2) " \
-                             ">> bit @ Swap(bit, bit) @ bit " \
+                             ">> Permutation(bit @ bit @ bit @ bit, " \
+                             "[0, 2, 1, 3]) " \
                              ">> X(2, 1) @ bit @ bit >> bit @ X(2, 1)"
 
 
@@ -148,3 +152,29 @@ def test_circuit2zx():
                 boxes_and_offsets=zip(
                     [SWAP, Z(1, 2), X(2, 1), scalar(2 ** 0.5), SWAP],
                     [1, 0, 1, 2, 1])))
+
+
+def test_to_pyzx_reads_any_spider_as_a_z_vertex():
+    graph = diagram.Spider(1, 2, diagram.bit).to_pyzx()
+    boundary = graph.inputs() + graph.outputs()
+    spiders = [v for v in graph.vertices() if v not in boundary]
+    assert [graph.type(v) for v in spiders] == [VertexType.Z]
+    assert len(graph.neighbors(spiders[0])) == 3
+    with raises(NotImplementedError):
+        diagram.Box("f", diagram.bit, diagram.bit).to_pyzx()
+
+
+def test_spiders_rotate_and_inflate_to_themselves():
+    assert Z(1, 2, .25).rotate() == Z(2, 1, .25)
+    assert X(2, 0, .5).rotate(left=True) == X(0, 2, .5)
+    assert Z(1, 2, .25).inflate(3) == Z(1, 2, .25)
+    assert H.inflate(3) == H
+    with raises(NotImplementedError):
+        Spider(1, 1).truncation()
+
+
+def test_classical_gates_are_real():
+    assert And().conjugate() == And()
+    assert Or(3).conjugate() == Or(3)
+    with raises(NotImplementedError):
+        ZXBox("f", 1, 1).conjugate()

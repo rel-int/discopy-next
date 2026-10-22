@@ -29,14 +29,38 @@ copies, and the exact rule of the draft.
   sampler at any brightness; exact moments of the linear models by Wick's
   theorem; the paper's batch-permutation protocol with profile and type
   features; BREC's test on sampled copies; and the GPU jobs and tables.
+- `photon_noise.py`, `test_photon_noise.py`, `noise_app.py`, `launch_noise.py`,
+  `report_noise.py`: the exact noise of every source at any brightness. The
+  variance of an order-N coincidence is a sum of normally ordered moments of
+  up to 2N photons on the multiset of detectors, each a sum over set
+  partitions and permutations of products of Gram sums over the slots; the
+  enumeration is done once per multiplicity pattern (4140 partitions times
+  40320 permutations for eight photons, 118,053 distinct products) and
+  cached in `noise_tables/`, which the GPU job combines with the source's
+  coefficients: single photons, Fock states, coherent and thermal light
+  share the tables. Checked against brute-force sums of permanents up to
+  eight photons and against the coherent Monte Carlo.
 - `write_page.py`: fills the wiki page from the aggregated results.
 
-`results/` holds the per-pair result files of each run, gzipped (`raw.json.gz`:
-the pilot's relabelled copies and loss sweep, `raw_full.json.gz`: full BREC on
-the GPU with BREC's test from the profiles), and the tables built from them;
-`report.py tables` and `report_full.py tables` regenerate the tables from a
-decompressed copy without Modal. The profiles and noise moments behind them,
-tens of gigabytes, stay on the volume.
+`results/` holds the per-pair result files of each run, gzipped, and the
+tables built from them: `raw.json.gz` (the pilot's relabelled copies and loss
+sweep, `tables_pilot.md`), `raw_full.json.gz` (full BREC on the GPU with
+BREC's test from the profiles, `tables_full.md`), `raw_gnn_v4_subset_partial.json.gz`
+(the sampling comparison with the probabilistic networks on 43 of the 49
+subset pairs, stopped before the six Distance_regular pairs,
+`tables_gnn_v4_subset_partial.md`) and `raw_ideal_full.json.gz` (the exact
+Wick profiles and ideal sample counts of the two linear networks on all 400
+pairs, `tables_ideal.md`), `raw_gnn_hotelling.json.gz` (BREC's test on those
+profiles) and `raw_noise.json.gz` (the exact noise of every source at eleven
+brightnesses and three Fock states on all 400 pairs, four cells, order 4 up
+to 63 vertices, 3 up to 110 and 2 above, `tables_noise.md`; 60 GPU-hours). `report.py tables`, `report_full.py tables`,
+`report_gnn.py tables` and `report_ideal.py` regenerate the tables from
+decompressed copies without Modal. The profiles and noise moments behind
+them, tens of gigabytes, stay on the volume. `diag_protocol.py` and
+`diag_sorting.py` are the local diagnoses of the protocol's sample
+efficiency against the ideal count on synthetic batches: the loss is the
+order-statistics bias of sorting noisy estimates at high orders, and neither
+a studentised nor a split-sample profile recovers it.
 
 The BREC data is read from a clone of `GraphPKU/BREC` at
 `/home/user/graphpku/brec/customize/Data/raw`; results live on the Modal

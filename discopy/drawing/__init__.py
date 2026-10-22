@@ -1,0 +1,166 @@
+""" DisCoPy's drawing modules. """
+
+import os
+from base64 import b64encode
+from PIL import Image
+from tempfile import TemporaryDirectory
+
+from discopy.utils import Node, Point
+from discopy.drawing import backend, drawing
+from discopy.drawing.backend import (
+    Backend,
+    TikZ,
+    Matplotlib,
+    ATTRIBUTES,
+    DEFAULT,
+    COLORS,
+    SHAPES,
+)
+from discopy.drawing.drawing import (
+    Point,
+    PlaneGraph,
+    Drawing,
+)
+
+
+def __getattr__(name):
+    if name == "Equation":
+        import warnings
+        from discopy.monoidal import Equation
+        warnings.warn(
+            "discopy.drawing.Equation is deprecated, use the Equation of the "
+            "relevant module instead, e.g. discopy.symmetric.Equation or "
+            "discopy.monoidal.Equation.", DeprecationWarning, stacklevel=2)
+        return Equation
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
+def draw(diagram, **params):
+    """
+    Draws a diagram using networkx and matplotlib.
+
+    Parameters
+    ----------
+    draw_as_nodes : bool, optional
+        Whether to draw boxes as nodes, default is :code:`False`.
+    color : string, optional
+        Color of the box or node, default is white (:code:`'#ffffff'`) for
+        boxes and red (:code:`'#ff0000'`) for nodes.
+    textpad : pair of floats, optional
+        Padding between text and wires, default is :code:`(0.1, 0.1)`.
+    wire_labels : bool, optional
+        Whether to draw type labels, default is :code:`False`.
+    draw_box_labels : bool, optional
+        Whether to draw box labels, default is :code:`True`.
+    aspect : string, optional
+        Aspect ratio, one of :code:`['auto', 'equal']`.
+    margins : tuple, optional
+        Margins, default is :code:`(0.05, 0.05)`.
+    nodesize : float, optional
+        Node size for spiders and controlled gates.
+    fontsize : int, optional
+        Font size for the boxes, default is :code:`12`.
+    fontsize_types : int, optional
+        Font size for the types, default is :code:`12`.
+    figsize : tuple, optional
+        Figure size.
+    path : str, optional
+        Where to save the image, if `None` we call :code:`plt.show()`.
+    format : str, optional
+        Format of the saved image, taken from the extension of :code:`path`
+        when it is a file name, required when it is an in-memory buffer.
+    doctest : str, optional
+        Path to a documentation image used as a drawing baseline: the
+        image is created if missing and compared against otherwise, see
+        :code:`config.OVERRIDE_DOCTEST_IMAGES`.
+    tol : float, optional
+        Comparison tolerance for raster images, default is :code:`20`.
+    to_tikz : bool, optional
+        Whether to output tikz code instead of matplotlib.
+    asymmetry : float, optional
+        Make a box and its dagger mirror images, default is
+        :code:`.25 * any(box.is_dagger for box in diagram.boxes)`.
+    """
+    return diagram.to_drawing().draw(**params)
+
+
+def to_gif(diagram, *diagrams, **params):  # pragma: no cover
+    """
+    Builds a gif with the normalisation steps.
+
+    The gif is embedded in the :code:`<img>` tag that gets returned, so that
+    it displays wherever the notebook gets rendered rather than only
+    relative to the working directory.
+
+    Parameters
+    ----------
+    diagrams : :class:`Diagram`, optional
+        Sequence of diagrams to draw.
+    path : str
+        Where to save the image, if :code:`None` the gif is only embedded.
+    timestep : int, optional
+        Time step in milliseconds, default is :code:`500`.
+    loop : bool, optional
+        Whether to loop, default is :code:`False`
+    params : any, optional
+        Passed to :meth:`Diagram.draw`.
+    """
+    path, compare = backend.doctest_or_path(
+        params.pop("path", None), params.pop("doctest", None))
+    timestep = params.get("timestep", 500)
+    loop = params.get("loop", False)
+    steps, frames = [d.to_drawing() for d in (diagram, ) + diagrams], []
+    if 'figsize' not in params:
+        params['figsize'] = tuple(
+            max(getattr(step, attr) for step in steps)
+            for attr in ("width", "height"))
+    with TemporaryDirectory() as directory:
+        for i, _diagram in enumerate(steps):
+            tmp_path = os.path.join(directory, f'{i}.png')
+            _diagram.draw(path=tmp_path, **dict(params, show=False))
+            frames.append(Image.open(tmp_path))
+        if loop:
+            frames = frames + frames[::-1]
+
+        def save(actual_path):
+            frames[0].save(
+                actual_path, format='GIF', append_images=frames[1:],
+                save_all=True, duration=timestep,
+                **{'loop': 0} if loop else {})
+
+        path = path or os.path.join(directory, 'tmp.gif')
+        if compare:
+            backend.save_and_compare(
+                path, save, tol=params.get("tol", backend.DEFAULT['plt_tol']))
+        else:
+            save(path)
+        with open(path, 'rb') as file:
+            source = b64encode(file.read()).decode()
+    image = ('<img alt="animated diagram" '
+             f'src="data:image/gif;base64,{source}">')
+    try:
+        from IPython.display import HTML
+        return HTML(image)
+    except ImportError:
+        return image
+
+
+def spiral(n_cups):
+    """
+    Implements the asymptotic worst-case for normal_form, see arXiv:1804.07832.
+    """
+    from discopy.monoidal import Ty, Box, Id
+    x = Ty('x')
+    unit, counit = Box('unit', Ty(), x), Box('counit', x, Ty())
+    cup, cap = Box('cup', x @ x, Ty()), Box('cap', Ty(), x @ x)
+    for box in [unit, counit, cup, cap]:
+        box.draw_as_spider, box.drawing_name = True, ""
+        box.shape, box.color = "circle", "black"
+    result = unit
+    for i in range(n_cups):
+        result = result >> Id(x ** i) @ cap @ Id(x ** (i + 1))
+    result = result >> Id(x ** n_cups) @ counit @ Id(x ** n_cups)
+    for i in range(n_cups):
+        result = result >>\
+            Id(x ** (n_cups - i - 1)) @ cup @ Id(x ** (n_cups - i - 1))
+    return result

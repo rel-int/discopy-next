@@ -23,9 +23,9 @@ takes them in turn:
 import numpy as np
 
 from discopy.symmetric import Equation
-from optyx import photonic
-from optyx.channel import Channel, Discard, bit, qmode
-from optyx.core import diagram
+from discopy.optyx import photonic
+from discopy.optyx.channel import Channel, Discard, bit, qmode
+from discopy.optyx.core import diagram
 
 import warnings
 

@@ -3,12 +3,12 @@ import pytest
 
 from discopy.utils import AxiomError
 
-from optyx import photonic
-from optyx import classical, qubits
-from optyx.channel import (
+from discopy.optyx import photonic
+from discopy.optyx import classical, qubits
+from discopy.optyx.channel import (
     Diagram, Discard, Feedback, Functor, bit, qmode, qubit
 )
-from optyx.core import diagram as core, path, zw, zx
+from discopy.optyx.core import diagram as core, path, zw, zx
 
 
 def delay(state=None, effect=None):
@@ -105,7 +105,9 @@ def test_evaluation_raises_on_feedback():
 
 def test_double_unroll_commute():
     wait = delay(state=photonic.Create(0))
-    assert wait.unroll(1).double() == wait.double().unroll(1)
+    # equal up to composing adjacent permutations, see #301
+    assert wait.unroll(1).double().merge_layers()\
+        == wait.double().unroll(1).merge_layers()
     lhs = wait.unroll(1).double().to_tensor().eval().array
     rhs = wait.double().unroll(1).to_tensor().eval().array
     assert np.allclose(lhs, rhs)
@@ -250,7 +252,9 @@ def test_qubit_delay_line():
         >> qubits.Bra(0) @ qubits.Bra(1)
     ).double().to_tensor().eval().array
     assert np.isclose(probability, 1)
-    assert wait.unroll(1).double() == wait.double().unroll(1)
+    # equal up to composing adjacent permutations, see #301
+    assert wait.unroll(1).double().merge_layers()\
+        == wait.double().unroll(1).merge_layers()
 
 
 def test_bit_delay_line():
@@ -275,14 +279,15 @@ def test_simplify_picks_the_diagram_with_fewest_swaps():
     simplified = unrolled.simplify()
 
     def n_swaps(diagram):
-        return sum(isinstance(box, core.Swap) for box in diagram.boxes)
+        return sum(box.crossings for box in diagram.boxes
+                   if isinstance(box, core.Permutation))
 
     assert n_swaps(simplified) < n_swaps(unrolled)
     assert sorted(
         box.name for box in simplified.boxes
-        if not isinstance(box, core.Swap)) == sorted(
+        if not isinstance(box, core.Permutation)) == sorted(
         box.name for box in unrolled.boxes
-        if not isinstance(box, core.Swap))
+        if not isinstance(box, core.Permutation))
     assert np.allclose(
         simplified.to_tensor().eval().array,
         unrolled.to_tensor().eval().array)

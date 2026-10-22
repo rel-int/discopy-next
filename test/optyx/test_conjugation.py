@@ -1,8 +1,8 @@
 import math
 
-from optyx.channel import *
-from optyx.core import zx
-from optyx import photonic
+from discopy.optyx.channel import *
+from discopy.optyx.core import zx
+from discopy.optyx import photonic
 import pytest
 import numpy as np
 

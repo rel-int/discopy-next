@@ -1,7 +1,7 @@
 import pytest
-from optyx import photonic, qubits, classical, mode, qubit, qmode, bit
+from discopy.optyx import photonic, qubits, classical, mode, qubit, qmode, bit
 from cotengra import ReusableHyperCompressedOptimizer
-from optyx.core.backends import (
+from discopy.optyx.core.backends import (
     QuimbBackend,
     PercevalBackend,
     DiscopyBackend,
@@ -750,3 +750,60 @@ def test_sums():
             rel_tol=1e-9,
             abs_tol=1e-12
         )
+
+
+def test_eval_result_guards_and_raw_amplitudes():
+    result = (photonic.Create(1, 0) >> photonic.BS).eval()
+    raw = result.amplitudes(normalise=False)
+    assert np.isclose(sum(abs(value) ** 2 for value in raw.values()), 1)
+    assert result.single_amplitude((1, 0)) == raw[(1, 0)]
+    assert result.single_amplitude((2, 0)) == 0
+    with pytest.raises(ValueError, match="no inputs"):
+        photonic.BS.eval().amplitudes()
+    dim = discopy_tensor.Dim
+    single = EvalResult(discopy_tensor.Box("r", dim(1), dim(1), [.5]),
+                        None, StateType.SINGLE_PROB)
+    with pytest.raises(ValueError, match="Unsupported state_type"):
+        single.prob_dist()
+    zero = EvalResult(discopy_tensor.Box("r", dim(1), dim(2), [0, 0]),
+                      None, StateType.PROB)
+    with pytest.raises(ValueError, match="sums to zero"):
+        zero.prob_dist()
+
+
+def test_quimb_backend_rejects_unknown_hyperoptimisers():
+    with pytest.raises(ValueError, match="Unsupported hyperoptimiser"):
+        (photonic.Create(1, 0) >> photonic.BS).eval(
+            QuimbBackend(hyperoptimiser=object()))
+
+
+@pytest.mark.parametrize("backend", [PercevalBackend, PermanentBackend])
+def test_matrix_backends_need_linear_optics(backend):
+    with pytest.raises(NotImplementedError, match="not linear optical"):
+        (qubits.Ket(0) >> qubits.H()).eval(backend())
+
+
+def test_perceval_backend_takes_occupation_lists():
+    """A state or an effect can be a list of occupation numbers, and any
+    perceval backend can run them."""
+    expected = photonic.BS.eval(PercevalBackend(), config=PercevalEvalConfig(
+        state=pcvl.BasicState([1, 1]))).prob_dist()
+    naive = PercevalBackend(pcvl.BackendFactory.get_backend("Naive"))
+    assert dict_allclose(photonic.BS.eval(naive, config=PercevalEvalConfig(
+        state=[1, 1])).prob_dist(), expected)
+    single = photonic.BS.eval(PercevalBackend(), config=PercevalEvalConfig(
+        state=[1, 1], effect=[2, 0], task="single_prob"))
+    assert np.isclose(single.single_prob((2, 0)), expected[(2, 0)])
+
+
+@pytest.mark.parametrize("config, error", [
+    (PercevalEvalConfig(state=[1, -1]), TypeError),
+    (PercevalEvalConfig(state=[1, 1, 0]), ValueError),
+    (PercevalEvalConfig(
+        state=[1, 1], effect=[2, 0, 0], task="single_prob"), ValueError),
+    (PercevalEvalConfig(state=[1, 1], effect=[2, 0]), ValueError),
+    (PercevalEvalConfig(state=[1, 1], task="all"), ValueError),
+])
+def test_perceval_backend_validates_its_config(config, error):
+    with pytest.raises(error):
+        photonic.BS.eval(PercevalBackend(), config=config)

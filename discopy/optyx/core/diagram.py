@@ -86,30 +86,31 @@ We can create and draw Optyx diagrams using the syntax of
 the Discopy package [FTC21]_. Sequential composition of
 boxes is done using the :code:`<<` operator:
 
->>> from optyx.core.zw import Create, W
+>>> from discopy.optyx.core.zw import Create, W
 >>> split_photon = Create(1) >> W(2)
->>> split_photon.draw(path="docs/_static/seq_comp_example.svg")
+>>> split_photon.draw(path="docs/_static/optyx/seq_comp_example.svg")
 
-.. image:: /_static/seq_comp_example.svg
+.. image:: /_static/optyx/seq_comp_example.svg
     :align: center
 
 We can also compose boxes in parallel (tensor) using the :code:`@` operator :
 
->>> from optyx.photonic import BS, Phase
+>>> from discopy.optyx.photonic import BS, Phase
 >>> beam_splitter_phase = (BS @ Phase(0.5)).get_kraus()
->>> beam_splitter_phase.draw(path="docs/_static/parallel_comp_example.svg")
+>>> beam_splitter_phase.draw(
+...     path="docs/_static/optyx/parallel_comp_example.svg")
 
-.. image:: /_static/parallel_comp_example.svg
+.. image:: /_static/optyx/parallel_comp_example.svg
     :align: center
 
 A beam-splitter from the :class:`photonic` calculus can be
 expressed using the :class:`zw` calculus:
 
->>> from optyx.photonic import BS
+>>> from discopy.optyx.photonic import BS
 >>> beam_splitter = BS.get_kraus()
->>> beam_splitter.draw(path="docs/_static/bs_zw.svg")
+>>> beam_splitter.draw(path="docs/_static/optyx/bs_zw.svg")
 
-.. image:: /_static/bs_zw.svg
+.. image:: /_static/optyx/bs_zw.svg
     :align: center
 
 Optyx diagrams can combine the generators from
@@ -121,8 +122,8 @@ We can check their equivalence as tensors.
 
 Let's check the branching law from [FC23]_.
 
->>> from optyx.core.zw import Create, W
->>> from optyx.utils.misc import compare_arrays_of_different_sizes
+>>> from discopy.optyx.core.zw import Create, W
+>>> from discopy.optyx.utils.misc import compare_arrays_of_different_sizes
 >>> branching_l = Create(1) >> W(2)
 >>> branching_r = Create(1) @ Create(0) + Create(0) @ Create(1)
 
@@ -136,7 +137,7 @@ Let's check the branching law from [FC23]_.
 The :code:`to_tensor` method supports evaluation of
 diagrams like the Hong-Ou-Mandel effect:
 
->>> from optyx.core.zw import ZBox, SWAP, W, Select, Id
+>>> from discopy.optyx.core.zw import ZBox, SWAP, W, Select, Id
 >>> Zb_i = ZBox(1,1,np.array([1, 1j/(np.sqrt(2))]))
 >>> Zb_1 = ZBox(1,1,np.array([1, 1/(np.sqrt(2))]))
 >>> beam_splitter = W(2) @ W(2) >> \\
@@ -155,7 +156,7 @@ diagrams like the Hong-Ou-Mandel effect:
 The :code:`to_path` method supports evaluation by
 calculating a permanent of an underlying matrix:
 
->>> from optyx.core.zw import Create, W
+>>> from discopy.optyx.core.zw import Create, W
 >>> counit_l = W(2) >> Select(0) @ Id(Mode(1))
 >>> counit_r = W(2) >> Id(Mode(1)) @ Select(0)
 >>> assert counit_l.to_path().eval(2) == counit_r.to_path().eval(2)
@@ -210,7 +211,7 @@ from discopy.frobenius import Dim
 from discopy.utils import AxiomError
 from discopy.quantum.gates import format_number
 from enum import Enum
-from optyx.utils.misc import (
+from discopy.optyx.utils.misc import (
     BasisTransition,
     calculate_right_offset,
     get_max_dim_for_box
@@ -240,7 +241,7 @@ class PhotonNumberPreservation(Enum):
     QUBIT = "qubit"
 
 
-class Ob(frobenius.Ob):
+class Ob(frobenius.Wire):
     """Basic object in an optyx Diagram: bit or mode"""
 
 
@@ -308,7 +309,7 @@ class Diagram(frobenius.Diagram):
         diagram to be unrolled first.
         """
         # pylint: disable=import-outside-toplevel
-        from optyx.core import path
+        from discopy.optyx.core import path
 
         return symmetric.Functor(
             ob_map=len,
@@ -335,7 +336,8 @@ class Diagram(frobenius.Diagram):
             effect : The boundary plugged in the output memory after the last
                 time step, a diagram with `dom == mem`. `None` gives
                 :meth:`Feedback.default_effect`, the identity on `mem` here
-                and :class:`optyx.channel.Discard` for a channel diagram.
+                and :class:`discopy.optyx.channel.Discard` for a channel
+                diagram.
 
         The boundaries are set here and read back by :meth:`boundary`:
         :meth:`unroll` plugs them by default and can override them per
@@ -355,7 +357,7 @@ class Diagram(frobenius.Diagram):
         Give it a state and an effect and unrolling plugs them, closing the
         memory: the loop becomes a delay line emitting `Create(1)` first.
 
-        >>> from optyx.core.zw import Create, Select
+        >>> from discopy.optyx.core.zw import Create, Select
         >>> delay = Diagram.swap(mode, mode).feedback(
         ...     state=Create(1), effect=Select(0))
         >>> assert delay.unroll(1).dom == delay.unroll(1).cod == mode ** 2
@@ -378,7 +380,7 @@ class Diagram(frobenius.Diagram):
         before its nested loops', layers left to right. A diagram with no
         loop has the empty boundary.
 
-        >>> from optyx.core.zw import Create, Select
+        >>> from discopy.optyx.core.zw import Create, Select
         >>> delay = Diagram.swap(mode, mode).feedback(
         ...     state=Create(1), effect=Select(0))
         >>> assert delay.boundary() == (Create(1), Select(0))
@@ -430,7 +432,7 @@ class Diagram(frobenius.Diagram):
         `state` at the first time step, then its previous input.
 
         >>> import numpy as np
-        >>> from optyx.core.zw import Create, Select
+        >>> from discopy.optyx.core.zw import Create, Select
         >>> wait = Diagram.swap(mode, mode).feedback(
         ...     state=Create(1), effect=Select(0))
         >>> assert wait.unroll(1).dom == wait.unroll(1).cod == mode ** 2
@@ -482,7 +484,7 @@ class Diagram(frobenius.Diagram):
         >>> step = Diagram.swap(mode, mode)
         >>> wait = step.feedback()
         >>> assert wait.one_step() == step
-        >>> from optyx.core.zw import Create
+        >>> from discopy.optyx.core.zw import Create
         >>> assert wait.feedback_factory(step, state=Create(1)).one_step()\\
         ...     == step
         """
@@ -503,8 +505,8 @@ class Diagram(frobenius.Diagram):
         >>> assert swaps.simplify() == Diagram.id(bit @ bit)
         """
         def n_swaps(diagram):
-            return sum(
-                isinstance(box, self.braid_factory) for box in diagram.boxes)
+            return sum(box.crossings for box in diagram.boxes
+                       if isinstance(box, Permutation))
 
         graph = self.hypergraph_factory[self.factory]
         candidates = [self, graph.from_diagram(self).to_diagram()]
@@ -520,8 +522,8 @@ class Diagram(frobenius.Diagram):
         self, input_dims: list = None
     ) -> tensor.Diagram:
         """Returns a :class:`tensor.Diagram` for evaluation"""
-        from optyx.core import zw
-        from optyx.utils.misc import is_identity
+        from discopy.optyx.core import zw
+        from discopy.optyx.utils.misc import is_identity
 
         if input_dims is None:
             input_dims = [2 for _ in range(len(self.dom))]
@@ -601,7 +603,7 @@ class Diagram(frobenius.Diagram):
     ):  # pragma: no cover
         """Create a :class:`zw` diagram from a bosonic operator."""
         # pylint: disable=import-outside-toplevel
-        from optyx.core import zw
+        from discopy.optyx.core import zw
 
         # pylint: disable=invalid-name
         d = cls.id(Mode(n_modes))
@@ -620,7 +622,7 @@ class Diagram(frobenius.Diagram):
 
     def to_pyzx(self):
         # pylint: disable=import-outside-toplevel
-        from optyx.core import zx
+        from discopy.optyx.core import zx
 
         try:
             zx_diagram = zx.ZXDiagram(
@@ -680,7 +682,7 @@ class Box(frobenius.Box, Diagram):
             return [self]
         elif self.photon_preservation_behaviour == \
                 PhotonNumberPreservation.NON_LO:
-            from optyx.core.zw import Create, Select
+            from discopy.optyx.core.zw import Create, Select
 
             return_list = []
             if len(dims_in) > 0:
@@ -992,7 +994,7 @@ class Sum(symmetric.Sum, Box):
         # this is only a temporary solution, so that the grad tests pass
         if permanent is None:
             # pylint: disable=import-outside-toplevel
-            from optyx.core.path import npperm
+            from discopy.optyx.core.path import npperm
 
             permanent = npperm
         return sum(
@@ -1037,17 +1039,71 @@ class Sum(symmetric.Sum, Box):
         return sum(term.grad(var, **params) for term in self.terms)
 
 
-class Swap(frobenius.Swap, Box):
-    """Swap in optyx diagram"""
+class Permutation(frobenius.Permutation, Box):
+    """
+    Permutation of the wires of an optyx diagram, the plumbing that a layer
+    makes of swaps and the identity wires around them.
 
-    photon_preservation_behaviour = PhotonNumberPreservation.LO
+    Example
+    -------
+    >>> perm = mode @ Swap(mode, bit)
+    >>> assert isinstance(perm, Permutation) and list(perm.perm) == [0, 2, 1]
+    >>> assert perm.determine_output_dimensions([2, 3, 4]) == [2, 4, 3]
+    """
+
+    def __init__(self, dom, perm):
+        super().__init__(dom, perm)
+        self.photon_preservation_behaviour = PhotonNumberPreservation.LO
+
+    @property
+    def crossings(self) -> int:
+        """
+        The number of pairs of wires that cross, i.e. of swaps the
+        permutation decomposes into.
+
+        >>> assert Swap(bit, bit).crossings == 1
+        >>> assert Permutation(bit ** 3, [2, 0, 1]).crossings == 2
+        """
+        size = len(self.perm)
+        return sum(self.perm[i] > self.perm[j]
+                   for i in range(size) for j in range(i + 1, size))
 
     def conjugate(self):
         return self
 
     def to_path(self, dtype: type = complex):
         # pylint: disable=import-outside-toplevel
-        from optyx.core.path import Matrix
+        from discopy.optyx.core.path import Matrix
+
+        size = len(self.dom)
+        return Matrix([int(self.perm[j] == i)
+                       for i in range(size) for j in range(size)], size, size)
+
+    def determine_output_dimensions(self, input_dims: list[int]) -> list[int]:
+        """Determine the output dimensions based on the input dimensions."""
+        return [input_dims[i] for i in self.perm]
+
+    def truncation(
+        self, input_dims: list[int] = None, output_dims: list[int] = None
+    ) -> tensor.Box:
+        return tensor.Permutation(
+            Dim(*[int(dim) for dim in input_dims]), self.perm)
+
+
+class Swap(Permutation, frobenius.Swap, Box):
+    """Swap in optyx diagram"""
+
+    photon_preservation_behaviour = PhotonNumberPreservation.LO
+
+    def __init__(self, left, right):
+        frobenius.Swap.__init__(self, left, right)
+
+    def conjugate(self):
+        return self
+
+    def to_path(self, dtype: type = complex):
+        # pylint: disable=import-outside-toplevel
+        from discopy.optyx.core.path import Matrix
 
         return Matrix([0, 1, 1, 0], 2, 2)
 
@@ -1067,9 +1123,9 @@ class Scalar(Box):
 
     Example
     -------
-    >>> from optyx.core.path import Matrix
-    >>> from optyx.core.zw import Create, Select
-    >>> from optyx.photonic import BS
+    >>> from discopy.optyx.core.path import Matrix
+    >>> from discopy.optyx.core.zw import Create, Select
+    >>> from discopy.optyx.photonic import BS
     >>> assert Scalar(0.45).to_path() == Matrix(
     ...     [], dom=0, cod=0,
     ...     creations=(), selections=(),
@@ -1097,7 +1153,7 @@ class Scalar(Box):
 
     def to_path(self, dtype: type = complex):
         # pylint: disable=import-outside-toplevel
-        from optyx.core.path import Matrix
+        from discopy.optyx.core.path import Matrix
 
         return Matrix[dtype]([], 0, 0, scalar=self.scalar)
 
@@ -1110,6 +1166,7 @@ class Scalar(Box):
 
     def grad(self, var, **params):
         """Gradient with respect to :code:`var`."""
+        # pylint: disable=unused-argument  # the signature of Diagram.grad
         if var not in self.free_symbols:
             return Sum((), self.dom, self.cod)
         return Scalar(self.scalar.diff(var))
@@ -1151,8 +1208,8 @@ class DualRail(Box):
             PhotonNumberPreservation.CUSTOM
 
     def photon_number_transform(self, dims_in, dims_out):
-        from optyx.core.zw import Create
-        from optyx.core.zx import Z
+        from discopy.optyx.core.zw import Create
+        from discopy.optyx.core.zx import Z
         from copy import deepcopy
 
         prev_layers = []
@@ -1187,7 +1244,7 @@ class DualRail(Box):
 
     def inflate(self, d):
         # pylint: disable=import-outside-toplevel
-        from optyx.core.zw import W, Endo
+        from discopy.optyx.core.zw import W, Endo
 
         assert self.internal_state is not None, \
             "Internal state must be provided"
@@ -1226,8 +1283,8 @@ class PhotonThresholdDetector(Box):
             PhotonNumberPreservation.CUSTOM
 
     def photon_number_transform(self, dims_in, dims_out):
-        from optyx.core.zw import Create, Select
-        from optyx.core.zx import Z
+        from discopy.optyx.core.zw import Create, Select
+        from discopy.optyx.core.zx import Z
 
         prev_layers = []
         if self.is_dagger:
@@ -1261,7 +1318,7 @@ class PhotonThresholdDetector(Box):
 
     def inflate(self, d):
         # pylint: disable=import-outside-toplevel
-        from optyx.core.zw import Add
+        from discopy.optyx.core.zw import Add
         dgrm = Add(d) >> PhotonThresholdDetector()
         if self.is_dagger:
             return dgrm.dagger()
@@ -1300,11 +1357,11 @@ def dual_rail(n, internal_states=None):
 
     if internal_states is None:
         d = DualRail()
-        for i in range(n - 1):
+        for _ in range(n - 1):
             d @= DualRail()
     else:
         d = DualRail(internal_state=internal_states[0])
-        for i, state in enumerate(internal_states[1:]):
+        for state in internal_states[1:]:
             d @= DualRail(internal_state=state)
     return d
 
@@ -1314,7 +1371,7 @@ def embedding_tensor(n, dim):
     Obtain 2->dim embedding tensors on n wires.
     """
     d = EmbeddingTensor(2, dim)
-    for i in range(n - 1):
+    for _ in range(n - 1):
         d @= EmbeddingTensor(2, dim)
     return d
 
@@ -1363,15 +1420,15 @@ class Feedback(monoidal.Bubble, Box):
     The feedback of `CNOT >> SWAP` unrolls to a ladder of CNOT gates,
     here with the plus state as initial state and an open output memory:
 
-    >>> from discopy.drawing import Equation
-    >>> from optyx.core.zx import Z, X
+    >>> from discopy.symmetric import Equation
+    >>> from discopy.optyx.core.zx import Z, X
     >>> cnot = Z(1, 2) @ bit >> bit @ X(2, 1) @ Scalar(2 ** 0.5)
     >>> plus = Scalar(0.5 ** 0.5) @ Z(0, 1)
     >>> ladder = (cnot >> Diagram.swap(bit, bit)).feedback(state=plus)
     >>> Equation(ladder, ladder.unroll(2).simplify(), symbol="$\\\\mapsto$"
-    ...     ).draw(path="docs/_static/cnot_ladder.svg")
+    ...     ).draw(path="docs/_static/optyx/cnot_ladder.svg")
 
-    .. image:: /_static/cnot_ladder.svg
+    .. image:: /_static/optyx/cnot_ladder.svg
         :align: center
     """
     __ambiguous_inheritance__ = (monoidal.Bubble,)
@@ -1491,8 +1548,8 @@ class Functor(frobenius.Functor):
 class Hypergraph(hypergraph.Hypergraph):
     """
     A hypergraph whose functor keeps spiders as boxes: `bit` carries two
-    frobenius structures — :class:`optyx.core.zx.Z` and
-    :class:`optyx.core.zx.X` — so neither can dissolve into the wiring,
+    frobenius structures — :class:`discopy.optyx.core.zx.Z` and
+    :class:`discopy.optyx.core.zx.X` — so neither can dissolve into the wiring,
     only the symmetric structure of the swaps does.
     """
     functor = symmetric.Functor
@@ -1502,7 +1559,8 @@ bit = Bit(1)
 mode = Mode(1)
 
 Diagram.hypergraph_factory = Hypergraph
-Diagram.braid_factory, Diagram.spider_factory = Swap, Spider
+Diagram.swap_factory, Diagram.spider_factory = Swap, Spider
+Diagram.permutation_factory = Permutation
 Diagram.ob = Ty
 Diagram.sum_factory = Sum
 Diagram.feedback_factory = Feedback

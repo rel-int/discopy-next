@@ -15,8 +15,9 @@ import modal
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import brecphot as bp  # noqa: E402
-from gnn_app import BREC_RAW, BUDGETS, HOTELLING_BUDGET  # noqa: E402
+from gnn_app import BREC_RAW, BUDGETS, HOTELLING_BUDGET, SYNTHETIC_BUDGETS  # noqa: E402
 from launch import pairs_of  # noqa: E402
+from launch_full_test import pilot_noise  # noqa: E402
 
 MODELS = ("step-lin", "step-tanh", "init-lin", "init-tanh", "coherent-100")
 FP_PAIRS = ("Basic_0", "Extension_0", "Strongly_regular_0", "CFI_12",
@@ -66,8 +67,13 @@ def main():
                  if names is None or f"{c}_{i}" in names}
     else:
         pairs = pairs_of(names)
-    compare = modal.Function.from_name("brec-gnn-v4", "compare_job")
-    fp = modal.Function.from_name("brec-gnn-v4", "false_positive_job")
+    compare = modal.Function.from_name("brec-gnn-v5", "compare_job")
+    ideal = modal.Function.from_name("brec-gnn-v5", "ideal_job")
+    synthetic = modal.Function.from_name("brec-gnn-v5", "synthetic_job")
+    retest = modal.Function.from_name("brec-gnn-v5", "retest_job")
+    fp = modal.Function.from_name("brec-gnn-v5", "false_positive_job")
+    hotelling_exact = modal.Function.from_name("brec-gnn-v5", "gnn_hotelling_job")
+    noise = pilot_noise() if args.command == "hotelling-exact" else None
     count = 0
     for pair, (g, h) in pairs.items():
         for seed in seeds:
@@ -76,6 +82,28 @@ def main():
                                args.exact_nmax, args.hotelling, args.experiment)
                 if args.command == "compare":
                     compare.spawn(spec)
+                elif args.command == "retest":
+                    retest.spawn(spec)
+                elif args.command == "synthetic":
+                    if spec["model"] in ("step-lin", "init-lin", "coherent"):
+                        spec["samples"] = 200000 if spec["model"] != "coherent" else 20000
+                        spec["runs"] = args.runs
+                        spec["budgets"] = list(SYNTHETIC_BUDGETS)
+                        synthetic.spawn(spec)
+                    else:
+                        continue
+                elif args.command == "hotelling-exact":
+                    if spec["model"] in ("step-lin", "init-lin"):
+                        spec["noise"] = noise
+                        hotelling_exact.spawn(spec)
+                    else:
+                        continue
+                elif args.command == "ideal":
+                    if spec["model"] in ("step-lin", "init-lin"):
+                        spec["samples"] = 1000000
+                        ideal.spawn(spec)
+                    else:
+                        continue
                 else:
                     spec["runs"] = args.runs
                     spec["budgets"] = [b for b in budgets if b <= 1000000]

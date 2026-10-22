@@ -1,0 +1,395 @@
+# -*- coding: utf-8 -*-
+
+"""
+The free balanced category, i.e. diagrams with braids and a twist.
+
+Summary
+-------
+
+.. autosummary::
+    :template: class.rst
+    :nosignatures:
+    :toctree:
+
+    Diagram
+    Box
+    Braid
+    Twist
+    Feedback
+    Trace
+    FollowedBy
+    Head
+    Tail
+    Sum
+    Functor
+
+Axioms
+------
+The axiom for the twist holds on the nose.
+
+>>> x, y = Ty('x'), Ty('y')
+>>> assert Diagram.twist(x @ y) == (Braid(x, y)
+...     >> Twist(y) @ Twist(x) >> Braid(y, x))
+>>> Diagram.twist(x @ y).draw(doctest="docs/_static/balanced/twist.svg")
+
+.. image:: /_static/balanced/twist.svg
+"""
+
+from __future__ import annotations
+
+from copy import copy
+from dataclasses import dataclass
+
+from discopy import (
+    config, monoidal, braided, feedback, cmap, hypergraph, messages)
+from discopy.abc import BalancedCategory
+from discopy.cat import factory
+from discopy.feedback import Ty
+from discopy.monoidal import Colour
+from discopy.utils import factory_name, assert_isatomic, from_tree
+
+
+@dataclass(frozen=True)
+class Ribbon(Colour):
+    """
+    The coloured region between the two rails of a ribbon in the dual rail
+    drawing of a balanced or ribbon diagram, see :func:`double_rail`. Like
+    any :class:`discopy.monoidal.Colour` it fills the region between the two
+    wires on either side of it; it also carries the ``width`` of the ribbon,
+    i.e. how far apart its two rails are drawn. Taking the adjoint of a
+    doubled type swaps the sides of each object, so the two rails stay one
+    colour region when their order is reversed.
+
+    Parameters:
+        name : The colour filling the inside of the ribbon, ``"gray"`` by
+            default with the back of a twisting ribbon filled dark gray.
+        label : An optional label for the drawing legend.
+        width : The gap between the two rails, defaults to the
+            ``ribbon_width`` in :data:`discopy.config.DRAWING_DEFAULT`.
+
+    Example
+    -------
+    >>> assert Ribbon() == Ribbon("gray", width=0.25)
+    """
+    name: str = "gray"
+    width: float = None
+
+    def __post_init__(self):
+        super().__post_init__()
+        if self.width is None:
+            object.__setattr__(
+                self, "width", config.DRAWING_DEFAULT["ribbon_width"])
+
+    def __repr__(self):
+        label = "" if self.label is None else f", label={self.label!r}"
+        return factory_name(type(self))\
+            + f"({self.name!r}{label}, width={self.width})"
+
+    def to_tree(self):
+        return dict(super().to_tree(), width=self.width)
+
+    @classmethod
+    def from_tree(cls, tree):
+        return cls(tree['name'], label=tree.get('label'),
+                   width=tree['width'])
+
+
+def double_rail(
+        typ: monoidal.Ty, width: float = None, colour="gray") -> monoidal.Ty:
+    """
+    Doubles every object of a type into the two rails of a ribbon, i.e. two
+    copies of the object with a shared :class:`Ribbon` as the colour region
+    between them, carrying the colour and the width of the ribbon.
+
+    Parameters:
+        typ : The type to double.
+        width : The gap between the two rails, defaults to the ``ribbon_width``
+            in :data:`discopy.config.DRAWING_DEFAULT`.
+        colour : The name of the colour filling the inside of each ribbon,
+            or a function from object to colour name.
+    """
+    rails = []
+    for ob in typ.inside:
+        left, right = copy(ob), copy(ob)
+        left.cod = right.dom = Ribbon(
+            colour(ob) if callable(colour) else colour, width=width)
+        rails += [left, right]
+    return type(typ)(*rails)
+
+
+@factory
+class Diagram(braided.Diagram, feedback.Diagram, BalancedCategory):
+    """
+    A balanced diagram is a braided diagram with :class:`Twist`, and a
+    feedback diagram whose wires carry a time step.
+
+    Parameters:
+        inside(Layer) : The layers inside the diagram.
+        dom (Ty) : The domain of the diagram, i.e. its input.
+        cod (Ty) : The codomain of the diagram, i.e. its output.
+
+    Note
+    ----
+    By default, our balanced diagrams are traced. Although not every balanced
+    category embeds faithfully into a traced one (see the `nLab`_), the free
+    balanced category does have the desired cancellation property and it does
+    in fact embed faithfully into the free balanced traced category.
+
+    .. _nLab: https://ncatlab.org/nlab/show/traced+monoidal+category)
+    """
+    ob = Ty
+    yanking = BalancedCategory.yanking.failing(messages.FREE_YANKING)
+
+    @classmethod
+    def twist(cls, dom: monoidal.Ty) -> Diagram:
+        """
+        The twist on an object.
+
+        Parameters:
+            dom : The domain of the twist.
+
+        Note
+        ----
+        This calls :attr:`twist_factory`.
+        """
+        if len(dom) == 0:
+            return cls.id()
+        return cls.braid(dom[0], dom[1:])\
+            >> cls.twist(dom[1:]) @ cls.twist_factory(dom[0])\
+            >> cls.braid(dom[1:], dom[0])
+
+    def to_braided(self, width: float = None, colour="gray"):
+        """
+        Doubles every object and sends the twist to the braid.
+
+        Parameters:
+            width : The width of a ribbon, i.e. the gap between the two wires
+                encoding each object, defaults to the ``ribbon_width`` in
+                :data:`discopy.config.DRAWING_DEFAULT`. Set to ``0`` to return
+                the diagram as is, i.e. without doubling it into dual rails.
+            colour : The name of the colour filling the inside of each ribbon
+                (or a function from object to colour name), passed on to
+                :func:`double_rail`.
+
+        Example
+        -------
+
+        >>> x = Ty('x')
+        >>> braided_twist = Diagram.twist(x).to_braided()
+
+        >>> Equation(Twist(x), braided_twist, symbol='$\\\\mapsto$').draw(
+        ...     wire_labels=False,
+        ...     doctest="docs/_static/balanced/twist_dual_rail.svg")
+
+        .. image:: /_static/balanced/twist_dual_rail.svg
+        """
+        width = config.DRAWING_DEFAULT["ribbon_width"]\
+            if width is None else width
+        return self if not width\
+            else self.dual_rail_factory(width, colour)(self)
+
+
+class Box(braided.Box, feedback.Box, Diagram):
+    """
+    A braided box is a monoidal box in a braided diagram.
+
+    Parameters:
+        name (str) : The name of the box.
+        dom (monoidal.Ty) : The domain of the box, i.e. its input.
+        cod (monoidal.Ty) : The codomain of the box, i.e. its output.
+    """
+
+
+class Braid(braided.Braid, Box):
+    """
+    Braid in a balanced category.
+    """
+
+
+class DualRailBraid(braided.Box):
+    """
+    The crossing of two ribbons in the dual rail encoding of a swap.
+
+    Unlike the braid of the doubled types (which decomposes into four wire
+    crossings via the hexagon equation), this box is drawn as the two ribbons
+    crossing as a whole. It is only used by :meth:`Diagram.to_braided`.
+
+    Parameters:
+        left : The ribbon (doubled type) on the top left and bottom right.
+        right : The ribbon on the top right and bottom left.
+        is_dagger (bool) : Which ribbon goes over the other.
+    """
+    def __init__(self, left: monoidal.Ty, right: monoidal.Ty, is_dagger=False):
+        self.left, self.right = left, right
+        name = type(self).__name__ + f"({left}, {right})"
+        braided.Box.__init__(
+            self, name, left @ right, right @ left,
+            is_dagger=is_dagger, draw_as_dual_rail_braid=True)
+
+    def __repr__(self):
+        str_is_dagger = ", is_dagger=True" if self.is_dagger else ""
+        return factory_name(type(self))\
+            + f"({self.left!r}, {self.right!r}{str_is_dagger})"
+
+    def dagger(self):
+        return type(self)(self.right, self.left, not self.is_dagger)
+
+
+class DualRailTwist(braided.Box):
+    """
+    The twist of a ribbon in the dual rail encoding, i.e. its two rails
+    crossing each other twice. It is only used by :meth:`Diagram.to_braided`.
+
+    Parameters:
+        dom : The ribbon (doubled type) being twisted.
+        is_dagger (bool) : Which way the rails twist.
+    """
+    def __init__(self, dom: monoidal.Ty, is_dagger=False):
+        name = type(self).__name__ + f"({dom})"
+        braided.Box.__init__(
+            self, name, dom, dom,
+            is_dagger=is_dagger, draw_as_dual_rail_twist=True)
+
+    def __repr__(self):
+        str_is_dagger = ", is_dagger=True" if self.is_dagger else ""
+        return factory_name(type(self)) + f"({self.dom!r}{str_is_dagger})"
+
+    def dagger(self):
+        return type(self)(self.dom, not self.is_dagger)
+
+
+class Twist(Box):
+    """
+    The twist on atomic type :code:`dom`.
+
+    Parameters:
+        dom : the domain of the twist.
+        phase: the phase of the twist in integer multiples of ``2 * pi``.
+
+    Important
+    ---------
+    :class:`Twist` is only defined for atomic types (i.e. of length 1).
+    For complex types, use :meth:`Diagram.twist` instead.
+    """
+    drawing_name = "Twist"
+
+    def __init__(self, dom: monoidal.Ty, is_dagger=False):
+        assert_isatomic(dom, monoidal.Ty)
+        name = type(self).__name__ + f"({dom})"
+        Box.__init__(self, name, dom, dom, is_dagger=is_dagger)
+
+    def __repr__(self):
+        if self.is_dagger:
+            return repr(self.dagger()) + ".dagger()"
+        return factory_name(type(self)) + f"({self.dom!r})"
+
+    def dagger(self):
+        return type(self)(self.dom, not self.is_dagger)
+
+    def __getnewargs__(self):
+        """ The arguments of the constructor, which a pickle and a delay read.
+        """
+        return self.dom, self.is_dagger
+
+    def to_tree(self) -> dict:
+        """
+        Serialise a twist by its type, keeping whether it is an inverse.
+
+        >>> from discopy.utils import dumps, loads
+        >>> x = Ty('x')
+        >>> assert loads(dumps(Twist(x).dagger())) == Twist(x).dagger()
+        """
+        tree = {'factory': factory_name(type(self)), 'dom': self.dom.to_tree()}
+        if self.is_dagger:
+            tree['is_dagger'] = True
+        return tree
+
+    @classmethod
+    def from_tree(cls, tree: dict) -> Twist:
+        return cls(from_tree(tree['dom']), tree.get('is_dagger', False))
+
+
+class Sum(braided.Sum, Box):
+    """
+    A balanced sum is a braided sum and a balanced box.
+
+    Parameters:
+        terms (tuple[Diagram, ...]) : The terms of the formal sum.
+        dom (Ty) : The domain of the formal sum.
+        cod (Ty) : The codomain of the formal sum.
+    """
+
+
+class Functor(braided.Functor, feedback.Functor):
+    """
+    A balanced functor is a braided functor that twists.
+
+    Parameters:
+        ob_map (Mapping[monoidal.Ty, monoidal.Ty]) :
+            Map from :class:`monoidal.Ty` to :code:`cod.ob`.
+        ar_map (Mapping[Box, Diagram]) : Map from :class:`Box` to :code:`cod`.
+        cod (Category) :
+            The codomain, :code:`Diagram` by default.
+    """
+    dom = cod = Diagram
+
+    def __call__(self, other):
+        if isinstance(other, Twist) and not other.is_dagger\
+                and hasattr(self.cod, "twist"):
+            return self.cod.twist(self(other.dom))
+        return super().__call__(other)
+
+
+class DualRail(Functor):
+    """
+    The functor sending a balanced diagram to its dual rail encoding in
+    :class:`discopy.braided.Diagram`, i.e. doubling every object into the two
+    rails of a ribbon and sending every :class:`Twist` and :class:`Braid` to
+    a single box crossing the two ribbons of a wire as a whole.
+
+    Parameters:
+        width : The gap between the two rails of each ribbon, defaults to the
+            ``ribbon_width`` in :data:`discopy.config.DRAWING_DEFAULT`.
+        colour : The name of the colour filling the inside of each ribbon (or
+            a function from object to colour name), see :func:`double_rail`.
+
+    See also
+    --------
+    :meth:`Diagram.to_braided`
+    """
+    cod = braided.Diagram
+    dual_rail_twist_factory = DualRailTwist
+    dual_rail_braid_factory = DualRailBraid
+
+    def __init__(self, width: float = None, colour="gray"):
+        self.width = config.DRAWING_DEFAULT["ribbon_width"]\
+            if width is None else width
+        self.colour = colour
+        super().__init__(
+            ob_map=lambda x: double_rail(x, self.width, self.colour),
+            ar_map=lambda f: f.name)
+
+    def __call__(self, other):
+        if isinstance(other, Twist):
+            return self.dual_rail_twist_factory(
+                self(other.dom), other.is_dagger)
+        if isinstance(other, Braid):
+            return self.dual_rail_braid_factory(
+                self(other.left), self(other.right), other.is_dagger)
+        return super().__call__(other)
+
+
+Feedback, Trace, FollowedBy, Head, Tail = feedback.generators(Diagram, Box)
+Diagram.box_factory = Box
+Diagram.functor_factory = Functor
+CMap = cmap.CMap[Diagram]
+Hypergraph = hypergraph.Hypergraph[Diagram]
+Diagram.braid_factory = Braid
+Diagram.twist_factory = Twist
+Diagram.sum_factory = Sum
+Diagram.dual_rail_factory = DualRail
+Id = Diagram.id
+
+
+class Equation(braided.Equation):
+    """ The :class:`braided.Equation` of balanced diagrams. """

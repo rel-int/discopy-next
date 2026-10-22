@@ -1,10 +1,12 @@
 import math
 
-from optyx.core.zw import *
-from optyx.core.diagram import mode, DualRail, EmbeddingTensor, Swap, Diagram, Mode, Spider, Scalar
-from optyx.utils.misc import compare_arrays_of_different_sizes, calculate_num_creations_selections
-import optyx.core.zx as zx
-from optyx import photonic
+from discopy.optyx.core.zw import *
+from discopy.optyx.core.zw import (
+    Add, Create, Divide, Endo, Mod2, Multiply, Select, W, ZBox)
+from discopy.optyx.core.diagram import mode, DualRail, EmbeddingTensor, Swap, Diagram, Mode, Spider, Scalar
+from discopy.optyx.utils.misc import compare_arrays_of_different_sizes, calculate_num_creations_selections
+import discopy.optyx.core.zx as zx
+from discopy.optyx import photonic
 import itertools
 import pytest
 import numpy as np
@@ -473,3 +475,63 @@ def test_DR_phase_shift(phase):
     left = DualRail() >> Mode(1) @ photonic.Phase(phase).get_kraus()
     right = zx.Z(1, 1, phase=phase) >> DualRail()
     assert np.allclose(right.to_tensor().eval().array, left.to_tensor().eval().array)
+
+
+def test_w_dagger_to_path():
+    assert W(2).dagger().to_path() == W(2).to_path().dagger()
+    assert W(2) != ZBox(1, 2, [1, 1])
+
+
+@pytest.mark.parametrize("amplitudes", [
+    np.array([1, 1j]), lambda i: 1j ** i])
+def test_zbox_conjugate(amplitudes):
+    box = ZBox(1, 1, amplitudes)
+    assert np.allclose(
+        box.conjugate().truncation([3]).eval().array,
+        box.truncation([3]).eval().array.conjugate())
+
+
+def test_zbox_truncation():
+    """Amplitudes past the ones given are zero, and a spider with inputs
+    needs their dimensions to be truncated."""
+    assert np.allclose(
+        ZBox(1, 1, [1, 2]).truncation([4]).eval().array,
+        np.diag([1, 2, 0, 0]))
+    with pytest.raises(ValueError, match="Input dimensions"):
+        ZBox(1, 1, [1, 2]).truncation()
+
+
+def test_zbox_repr_and_equality():
+    assert repr(ZBox(1, 1, [1, 2])) == "Z(1, 2)"
+    assert repr(ZBox(1, 1, lambda i: i + 1)) == "Z(1, 2, ...)"
+    assert ZBox(1, 1, [1, 2]) != ZBox(1, 2, [1, 2])
+
+
+@pytest.mark.parametrize("state, overlap", [([1, 0], 1), ([0, 1], 0)])
+def test_select_a_photon_by_its_internal_state(state, overlap):
+    """A single internal state needs no tuple, and selecting a photon in
+    an orthogonal internal state has amplitude zero."""
+    select = Select(1, internal_states=state)
+    assert select.internal_states == (state, )
+    created = Create(1, internal_states=[1, 0])
+    assert np.isclose(
+        (created.inflate(2) >> select.inflate(2)).to_tensor().eval().array,
+        overlap)
+
+
+def test_endo_gradient_of_a_constant():
+    from sympy.abc import x
+    assert Endo(2).grad(x) == Diagram.sum_factory((), Mode(1), Mode(1))
+
+
+def test_arithmetic_boxes_are_real():
+    for box in (Add(2), Multiply(), Divide(), Mod2()):
+        assert box.conjugate() == box
+
+
+def test_mod2_dagger_reaches_modes_of_its_parity():
+    assert Mod2().dagger().dagger() == Mod2()
+    array = Mod2().dagger().to_tensor(input_dims=[2]).eval().array
+    assert array.any()
+    for (parity, photons), value in np.ndenumerate(array):
+        assert not value or photons % 2 == parity

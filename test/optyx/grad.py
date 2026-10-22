@@ -1,6 +1,6 @@
-from optyx.core.zw import Id
-from optyx.photonic import Phase, BS, TBS, MZI
-from optyx.channel import qmode, Diagram
+from discopy.optyx.core.zw import Id
+from discopy.optyx.photonic import Phase, BS, TBS, MZI
+from discopy.optyx.channel import qmode, Diagram
 from sympy.abc import psi, theta
 import numpy as np
 

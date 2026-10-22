@@ -2,7 +2,7 @@ import math
 
 import numpy as np
 
-from optyx.utils.misc import multinomial
+from discopy.optyx.utils.misc import multinomial
 
 
 def test_multinomial_does_not_overflow_on_numpy_integers():

@@ -1,16 +1,14 @@
 """Contains the fundamental classes requirement to define MBQC patterns"""
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Callable, Optional
 
-import graphix as gx
-import graphix.opengraph
 import networkx as nx
-from graphix.pauli import Plane
 
 
 @dataclass(frozen=True)
-class Measurement(gx.opengraph.Measurement):
+class Measurement:
     """An MBQC measurement.
 
     :param angle: the angle of the measurement. Should be between [0, 2pi)
@@ -19,6 +17,24 @@ class Measurement(gx.opengraph.Measurement):
 
     angle: float
     plane: str
+
+    def to_graphix(self):
+        """The measurement as a graphix ``BlochMeasurement``.
+
+        Example
+        -------
+        >>> Measurement(0.5, "YZ").to_graphix().plane.name
+        'YZ'
+        """
+        # pylint: disable=import-outside-toplevel
+        from graphix.measurements import Measurement as GraphixMeasurement
+
+        if self.plane not in ("XY", "YZ", "XZ"):
+            raise ValueError(
+                f"unexpected measurement plane {self.plane}, "
+                + "expected: 'XY', 'YZ', or 'XZ'"
+            )
+        return getattr(GraphixMeasurement, self.plane)(self.angle)
 
 
 @dataclass
@@ -116,7 +132,7 @@ class GFlow:
 
 
 @dataclass(frozen=True)
-class OpenGraph(gx.opengraph.OpenGraph):
+class OpenGraph:
     """Open graph contains the graph, measurement, and input and output
     nodes. This is the graph we wish to implement deterministically
 
@@ -147,6 +163,37 @@ class OpenGraph(gx.opengraph.OpenGraph):
     inputs: set[int]
     outputs: set[int]
 
+    def to_graphix(self):
+        """The open graph as a graphix ``OpenGraph``, whose inputs and
+        outputs are sequences: a set of them is read in sorted order.
+
+        Example
+        -------
+        >>> g = nx.Graph([(0, 1), (1, 2)])
+        >>> og = OpenGraph(g, {0: Measurement(0, "XY"),
+        ...                    1: Measurement(0, "XY")}, {0}, {2})
+        >>> og.to_graphix().output_nodes
+        [2]
+        """
+        # pylint: disable=import-outside-toplevel
+        from graphix.opengraph import OpenGraph as GraphixOpenGraph
+
+        def ordered(nodes):
+            return list(nodes) if isinstance(nodes, Sequence)\
+                else sorted(nodes)
+
+        return GraphixOpenGraph(
+            self.inside, ordered(self.inputs), ordered(self.outputs),
+            {node: measurement.to_graphix()
+             for node, measurement in self.measurements.items()})
+
+    def isclose(self, other: "OpenGraph", rel_tol: float = 1e-09,
+                abs_tol: float = 0.0) -> bool:
+        """Whether two open graphs have the same graph, inputs and outputs
+        and close measurements, see graphix's ``OpenGraph.isclose``."""
+        return self.to_graphix().isclose(
+            other.to_graphix(), rel_tol=rel_tol, abs_tol=abs_tol)
+
     def find_gflow(self) -> Optional[GFlow]:
         """Finds gflow of the open graph.
 
@@ -163,32 +210,15 @@ class OpenGraph(gx.opengraph.OpenGraph):
         >>> og = OpenGraph(g, meas, [0], [3])
         >>> og.find_gflow()
         """
-
-        def to_graphix_plane(plane: str) -> Plane:
-            if plane == "XY":
-                return Plane.XY
-            if plane == "YZ":
-                return Plane.YZ
-            if plane == "XZ":
-                return Plane.XZ
-            raise ValueError(
-                f"unexpected measurement plane {plane}, "
-                + "expected: 'XY', 'YZ', or 'XZ'"
-            )
-
-        meas_planes = {}
-        for node_id, m in self.measurements.items():
-            plane = to_graphix_plane(m.plane)
-            meas_planes[node_id] = plane
-
-        g, layers = graphix.gflow.find_gflow(
-            self.inside, set(self.inputs), set(self.outputs), meas_planes
-        )
-
-        if g is None or layers is None:
+        flow = self.to_graphix().to_gflow_or_none()
+        if flow is None:
             return None
-
-        return GFlow(g, layers)
+        return GFlow(
+            {node: set(nodes)
+             for node, nodes in flow.correction_function.items()},
+            {node: layer
+             for layer, nodes in enumerate(flow.partial_order_layers)
+             for node in nodes})
 
 
 def add_fusion_order(
