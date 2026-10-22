@@ -14,7 +14,7 @@ def test_FinSet():
     assert p[-1] == 2
     assert p >> p.dagger() == finset.Permutation.id(5)
     assert p @ finset.Permutation((1, 0)) == (3, 4, 0, 1, 2, 6, 5)
-    assert finset.Function.swap(2, 3).inside == list(p)
+    assert finset.Function.swap(2, 3).inside == list(p.dagger())
     assert finset.Permutation((1, 0, 3, 2)).cycles() == ((0, 1), (2, 3))
     assert finset.Permutation.from_cycles([(0, 1), (2, 3)], 4)\
         == (1, 0, 3, 2)
@@ -81,3 +81,18 @@ def test_gather():
         finset.Permutation.gather([0, 0], 2)
     with raises(ValueError):
         finset.Permutation.gather([1], 3, offset=3)
+
+
+def test_Function_swap_is_symmetric():
+    from itertools import product
+    from discopy.python.finset import Function
+    for x, y, z in product(range(4), repeat=3):
+        assert Function.swap(x, y + z) == (
+            Function.swap(x, y) @ Function.id(z)
+            >> Function.id(y) @ Function.swap(x, z))
+        assert Function.swap(x, y) >> Function.swap(y, x)\
+            == Function.id(x + y)
+    f, g = Function([1, 0], 3, 2), Function([0, 0], 1, 2)
+    for a, b in [(f, g), (g, f)]:
+        assert a @ b >> Function.swap(a.cod, b.cod)\
+            == Function.swap(a.dom, b.dom) >> b @ a

@@ -282,6 +282,16 @@ def test_Hypergraph_to_diagram_offset():
     assert graph.to_diagram() == g
 
 
+def test_Hypergraph_cap_after_states():
+    x = Ty('x')
+    f = Box('f', Ty(), x)
+    diagram = x @ f >> Cap(x, x) @ x @ x
+    assert diagram.to_hypergraph().to_diagram() == diagram
+    for diagram in [f @ Cap(x, x), x @ f >> x @ Cap(x, x) @ x]:
+        decoded = diagram.to_hypergraph().to_diagram()
+        assert decoded.to_hypergraph() == diagram.to_hypergraph()
+
+
 def test_Hypergraph_from_glued():
     x = Ty('x')
     f, g = Box('f', x, x).to_hypergraph(), Box('g', x, x).to_hypergraph()

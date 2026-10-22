@@ -276,3 +276,35 @@ def test_named_generic_setstate_reads_an_old_pickle():
     box.__setstate__(state)
     assert type(box) is Box[float] and box.dtype is float
     assert "__class_getitem__values__" not in box.__dict__
+
+def test_resolve_factory_dtype():
+    import numpy as np
+    from discopy import cat, tensor
+    assert resolve_factory('discopy.cat.Box') == cat.Box
+    assert resolve_factory('float') == float
+    assert resolve_factory('float64') == np.float64
+    assert resolve_factory('tensor.Box[float]') == tensor.Box[float]
+    assert resolve_factory('tensor.Box[float64]') == tensor.Box[np.float64]
+    with pytest.raises(AttributeError):
+        resolve_factory('tensor.Box[NotAType]')
+    with pytest.raises(AttributeError):
+        resolve_factory('pi')
+
+
+def test_tensor_tree_roundtrip():
+    # No tensor box round-tripped through its tree, see #781.
+    from discopy.tensor import Dim
+    box = Box('f', Dim(2), Dim(3), [[1., 2., 3.], [4., 5., 6.]])
+    for x in (box, box >> box.dagger(), Box('g', Dim(1), Dim(1), [2.])):
+        assert loads(dumps(x)) == x
+    # A dtype asked for explicitly is not the one the array implies.
+    subscripted = Box[complex]('f', Dim(1), Dim(1), [1.])
+    assert loads(dumps(subscripted)) == subscripted\
+        != Box('f', Dim(1), Dim(1), [1.])
+def test_unbiased_keyword_operand():
+    """ An operand passed by keyword is composed, not dropped. """
+    from discopy.cat import Functor
+    x, y, z = Ob('x'), Ob('y'), Ob('z')
+    F, G = Functor({x: y}, {}), Functor({y: z}, {})
+    assert F.then(other=G)(x) == F.then(G)(x) == z
+    assert F.then() == F

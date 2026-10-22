@@ -42,7 +42,7 @@ from types import ModuleType
 from collections.abc import Sequence
 from typing import Union, Literal as L, Callable, TYPE_CHECKING
 
-from discopy import monoidal, config, messages
+from discopy import config, messages
 from discopy.abc import (
     ComarkovCategory, DaggerCategory, MarkovCategory, NamedGeneric, Nat)
 from discopy.axioms import Testable
@@ -51,7 +51,8 @@ from discopy.cat import (
     assert_iscomposable,
     assert_isparallel,
 )
-from discopy.utils import assert_isinstance, unbiased
+from discopy.utils import (
+    assert_isinstance, factory_name, from_tree, unbiased)
 
 if TYPE_CHECKING:
     import sympy
@@ -170,8 +171,6 @@ class Matrix(MarkovCategory, ComarkovCategory, DaggerCategory,
 
         return matrices()
 
-    serialisation = Testable.serialisation.inapplicable(messages.NO_SYNTAX)
-
     def cast(self, dtype: type) -> Matrix:
         """
         Cast a matrix to a given ``dtype``.
@@ -185,16 +184,16 @@ class Matrix(MarkovCategory, ComarkovCategory, DaggerCategory,
         """
         return type(self)[dtype](self.array, self.dom, self.cod)
 
-    def promote(self, other: Matrix) -> type:
+    def promote(self, *others: Matrix) -> type:
         """
-        The class of a composite of two matrices, i.e. of their product,
+        The class of a composite of matrices, i.e. of their product,
         direct sum or sum: the one with the ``dtype`` the backend promotes
         their arrays to, read from the operand that already has it so that
         a declared ``dtype`` survives composition with the integer
         structural matrices, e.g. ``float`` rather than ``numpy.float64``.
 
         Parameters:
-            other : The matrix to compose with.
+            others : The matrices to compose with.
 
         Example
         -------
@@ -206,11 +205,15 @@ class Matrix(MarkovCategory, ComarkovCategory, DaggerCategory,
         ...     == Matrix[bool]
         """
         with backend() as np:
-            dtype = np.result_type(self.array, other.array)
+            dtype = self.array.dtype
+            for other in others:
+                dtype = np.result_type(
+                    np.zeros((), dtype=dtype), other.array)
         if dtype == self.array.dtype:
             return type(self)
-        if dtype == other.array.dtype:
-            return type(self)[other.dtype]
+        for other in others:
+            if dtype == other.array.dtype:
+                return type(self)[other.dtype]
         return type(self)[getattr(dtype, "type", dtype)]
 
     def __new__(cls, array, *args, **kwargs):
@@ -291,6 +294,52 @@ class Matrix(MarkovCategory, ComarkovCategory, DaggerCategory,
         return type(self).__name__ + f"({array2string(np_array.reshape(-1))},"\
                                      f" dom={self.dom}, cod={self.cod})"
 
+    def to_tree(self) -> dict:
+        """
+        Serialise a matrix, see :func:`discopy.utils.dumps`.
+
+        The ``dtype`` travels in the factory name, as it does in the
+        ``repr``, so that a matrix comes back with the entries it was
+        written with rather than the ones its array implies.
+
+        Example
+        -------
+        >>> from discopy.utils import dumps, loads
+        >>> m = Matrix[float]([1], 1, 1)
+        >>> m.to_tree()['factory']
+        'matrix.Matrix[float]'
+        >>> assert loads(dumps(m)) == m != Matrix([1], 1, 1)
+        """
+        with backend() as np:
+            array = np.array(self.array).reshape(-1).tolist()
+        return {
+            'factory': factory_name(type(self)),
+            'array': array,
+            'dom': self.dom.to_tree(),
+            'cod': self.cod.to_tree()}
+
+    @classmethod
+    def from_tree(cls, tree: dict) -> Matrix:
+        """
+        Decode a serialised matrix, see :func:`discopy.utils.loads`.
+
+        Parameters:
+            tree : DisCoPy serialisation.
+
+        The class the tree names is the subscripted one, so the pair is
+        read through :func:`discopy.utils.from_tree` rather than off the
+        bare class, which would infer a ``dtype`` from the array instead.
+
+        Example
+        -------
+        >>> from discopy.utils import from_tree
+        >>> m = Matrix[int]([0, 1, 1, 0], 2, 2)
+        >>> assert from_tree(m.to_tree()) == m
+        >>> assert Matrix.from_tree(m.to_tree()).dtype != int
+        """
+        dom, cod = map(from_tree, (tree['dom'], tree['cod']))
+        return cls(tree['array'], dom, cod)
+
     def __iter__(self):
         for i in self.array:
             yield i
@@ -323,15 +372,32 @@ class Matrix(MarkovCategory, ComarkovCategory, DaggerCategory,
             array = np.matmul(self.array, other.array)
         return self.promote(other)(array, self.dom, other.cod)
 
-    def tensor(self, other: Matrix = None, *others: Matrix):
-        if others or other is None:
-            return monoidal.Diagram.tensor(self, other, *others)
-        assert_isinstance(other, self.ar)
-        cls = self.promote(other)
-        dom, cod = self.dom @ other.dom, self.cod @ other.cod
-        array = cls.zero(dom, cod).array
-        array[:self.dom, :self.cod] = self.array
-        array[self.dom:, self.cod:] = other.array
+    def tensor(self, *others: Matrix):
+        """
+        The direct sum of ``n`` matrices, i.e. one block-diagonal array with
+        a block for each matrix.
+
+        >>> one, two = Matrix([1], 1, 1), Matrix([2], 1, 1)
+        >>> assert one.tensor(two) == Matrix([1, 0, 0, 2], 2, 2)
+        """
+        if not others:
+            return self
+        for other in others:
+            assert_isinstance(other, self.ar)
+        cls = self.promote(*others)
+        dom = self.dom.tensor(*(other.dom for other in others))
+        cod = self.cod.tensor(*(other.cod for other in others))
+        blocks, width, j = [], index(cod), 0
+        with backend() as np:
+            for factor in (self, ) + others:
+                rows, columns = index(factor.dom), index(factor.cod)
+                left = cls.zero(rows, j).array
+                right = cls.zero(rows, width - j - columns).array
+                blocks.append(np.concatenate([
+                    left, cls(factor.array, factor.dom, factor.cod).array,
+                    right], axis=1))
+                j += columns
+            array = np.concatenate(blocks, axis=0)
         return cls(array, dom, cod)
 
     def __add__(self, other):

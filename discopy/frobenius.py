@@ -149,7 +149,11 @@ class Dim(monoidal.Dim, Ty):
     l = r = property(lambda self: self.ar(*self.inside[::-1]))
 
     def unwind(self) -> Dim:
-        """ The identity: a dimension has no winding. """
+        """
+        The identity: a dimension has no winding.
+
+        >>> assert Dim(2).unwind() == Dim(2)
+        """
         return self
 
 

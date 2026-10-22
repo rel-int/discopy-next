@@ -64,3 +64,42 @@ def test_trace_takes_the_keyword_form():
         f.trace(1, mem=int)
     with raises(AxiomError):
         f.trace(mem=str)
+
+
+def test_Hypergraph_pass_token():
+    from pytest import raises
+    from discopy.comarkov import Ty, Box, Diagram
+    from discopy.hypergraph import Functor, Hypergraph
+    from discopy.python.additive import Function
+    from discopy.utils import AxiomError
+
+    x, X = Ty('x'), Function.ob(int)
+    f, g = Box('f', x @ x, x @ x), Box('g', x, x)
+    seen = []
+
+    def step(n, tag):
+        seen.append((n, tag))
+        return (n, 0) if n == 1 else (3 * n + 1 if n % 2 else n // 2, 1)
+
+    F = Functor({x: int}, {
+        f: Function(step, X @ X, X @ X),
+        g: Function(lambda n: n + 1, X, X)}, cod=Function)
+
+    # The trace is absorbed into the wiring, run as a while loop.
+    loop = F(f.trace().to_hypergraph())
+    assert len(loop.boxes) == 1 and not loop.is_causal
+    assert loop(6) == F(f).trace()(6) == 1
+    assert seen[:9] == [(6, 0), (3, 1), (10, 1), (5, 1), (16, 1),
+                        (8, 1), (4, 1), (2, 1), (1, 1)]
+
+    # The merge of two branches, either of which the token takes.
+    merged = F((g @ x >> Diagram.merge(x)).to_hypergraph())
+    assert merged(1, 0) == 2 and merged(1, 1) == 1
+
+    # The domain is a disjoint union: one token, one wire.
+    assert F((g @ g).to_hypergraph())(1, 1) == (2, 1)
+
+    # A wire consumed twice is a copy, which a disjoint union does not have.
+    copy = Hypergraph[Function](X, X @ X, (), ((0, ), (), (0, 0)))
+    with raises(AxiomError, match="is not right-monogamous"):
+        copy(1)

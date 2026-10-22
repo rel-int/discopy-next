@@ -135,3 +135,11 @@ def test_ours_takes_the_newest_of_several(benchmark_comment):
         {"id": 9, "user": bot, "body": marker, "created_at": "2026-08-27"},
         {"id": 5, "user": bot, "body": marker, "created_at": "2026-08-10"}]
     assert benchmark_comment.ours(comments)["id"] == 9
+
+
+def test_mismatch_rejects_a_deleted_head_repository(
+        benchmark_comment, data, run, pull):
+    pull["head"]["repo"] = None
+    run["head_repository"] = None
+    assert benchmark_comment.mismatch(data, run, pull, "discopy/discopy") == (
+        "Benchmark metadata does not match its source PR.")

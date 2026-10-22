@@ -72,3 +72,13 @@ def test_Sum():
     assert isinstance(f + f, Sum) and (f + f).terms == (f, f)
     image = Functor(lambda x: x, {f: f + f})(f)
     assert isinstance(image, Sum) and image.terms == (f, f)
+
+
+def test_feedback_is_the_trace():
+    x = Ty('x')
+    f = Box('f', x @ x, x @ x)
+    for traced in (f.feedback(), f.feedback(1), f.feedback(mem=x),
+                   f.trace(), f.trace(1), f.trace(mem=x)):
+        assert isinstance(traced, Diagram) and traced == f.trace()
+    assert f.feedback(left=True) == f.trace(left=True)
+    assert Equation(f.feedback(2), f.trace(2), f.trace(mem=x @ x))

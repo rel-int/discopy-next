@@ -113,3 +113,10 @@ def test_Twist_to_tree():
     for twist in (Twist(x), Twist(x).dagger()):
         assert loads(dumps(twist)) == twist
         assert loads(dumps(twist)).is_dagger == twist.is_dagger
+
+
+def test_dual_rail_keeps_twist_dagger():
+    x = Ty('x')
+    twist = Twist(x)
+    assert twist.dagger().to_braided().boxes[0].is_dagger
+    assert twist.dagger().to_braided() == twist.to_braided().dagger()

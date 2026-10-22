@@ -172,6 +172,13 @@ def test_Nat_to_tree():
     assert Nat.from_tree(Nat(0).to_tree()) == Nat(0)
 
 
+def test_Dim_to_tree():
+    assert Dim(2, 3).to_tree() == {
+        'factory': 'monoidal.Dim', 'inside': [2, 3]}
+    for dim in (Dim(1), Dim(2), Dim(2, 3, 5)):
+        assert from_tree(dim.to_tree()) == dim
+
+
 def test_Nat_str():
     assert str(Nat(2 * 3 * 7)) == "Nat(42)"
 
@@ -647,6 +654,14 @@ def test_coloured_Functor_repr():
     assert "colour_map=" in repr(F)
 
 
+def test_coloured_Functor_unit():
+    red, green = Colour("red"), Colour("green")
+    x, s = Ty('x'), Box('s', Ty(), Ty())
+    F = Functor({x: x}, {s: s}, colour_map={red: green})
+    assert F(Ty()) == Ty() and F(Id(Ty())) == Id(Ty()) and F(s) == s
+    assert F(Ty.id(red)) == Ty.id(green)
+
+
 def test_coloured_Functor_empty_identity():
     green, lime = Colour("green"), Colour("lime")
     # Colour maps preserve the (mapped) colour of an empty identity.
@@ -834,3 +849,9 @@ def test_List_repr():
     assert PyTy is monoidal.List[type]
     for x in (List[int](2, 3), List[type](int, str), PyTy(int), PyTy()):
         assert eval(repr(x)) == x and eval(str(x)) == x
+
+def test_tensor_of_sum_with_diagram():
+    x = Ty('x')
+    f, g = Box('f', x, x), Box('g', x, x)
+    assert f.tensor(g + g, f) == (f @ g @ f) + (f @ g @ f)
+    assert (f + f).tensor(g, f) == (f @ g @ f) + (f @ g @ f)

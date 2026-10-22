@@ -227,6 +227,35 @@ assert in_time(unrolled).param == P ** 4
 in_time(unrolled).reparam(Diagram.copy(P, 4)).inside.simplify()
 ```
 
+That ties the weights of a finite prefix, chosen after unrolling.
+To tie them across every time step, the parameter becomes a constant stream: read once at time zero, then followed by its own copy, i.e. [`FollowedBy`](https://docs.discopy.org/en/main/_api/discopy.feedback.FollowedBy.html) from `P.head @ P.delay()` to `P` and a `copy` fed back.
+The cell reads it at every step like any other input:
+
+```python {.marimo}
+from discopy.markov import FollowedBy
+
+always = (FollowedBy(P) >> Diagram.copy(P)).feedback(
+    dom=P.head, cod=P, mem=P)
+weighted = Box("mealy", I @ P @ S.delay(), O @ S)
+tied_in_time = I @ always >> weighted.feedback(dom=I @ P, cod=O, mem=S)
+tied_in_time
+```
+
+Over streams, `P` is a constant stream of types, and unrolling gives a network with one parameter, copied to every step:
+
+```python {.marimo}
+P_always = stream.Ty(symmetric.Ty("P"))
+to_streams = markov.Functor(
+    ob_map=sequences | {P: P_always},
+    ar_map={weighted: stream.Stream[Diagram].sequence(
+        "mealy", sequences[I] @ P_always @ sequences[S].delay(),
+        sequences[O] @ sequences[S])},
+    cod=stream.Stream[Diagram])
+everywhere = to_streams(tied_in_time).unroll(2).now
+assert [str(x) for x in everywhere.dom] == ["I0", "P", "I1", "I2"]
+everywhere.foliation()
+```
+
 ## Figure 1, five cells
 
 Each architecture of Figure 1 is a (co)algebra of a polynomial endofunctor, and each is a handful of boxes: a map out of a sum is one box per summand, and a map into an exponential $I \to -$ takes $I$ as one more input.
@@ -253,8 +282,7 @@ Equation(unfold, moore, symbol=",")
 ## What is missing
 
 Everything above runs on today's DisCoPy.
-Writing it hit three gaps:
+Writing it hit two gaps:
 
 * **Equivariant layers as boxes.** The weight tying above is computed by hand: a box whose module is the matrix tied on orbitals, or better factorised along the construction of the group, is slice 3 of [#121](https://github.com/rel-int/discopy-next/issues/121).
 * **A module holding the parameters.** A network in `para.Markov[Network]` compiles to a pure function of its inputs and parameters, as JAX wants it, but [`neural.torch.Module`](https://docs.discopy.org/en/main/_api/discopy.neural.torch.html) takes every wire as an input: nothing yet turns a copied parameter wire into one `torch.nn.Parameter` ([#124](https://github.com/rel-int/discopy-next/issues/124)).
-* **Weights tied across all time.** Tying after unrolling covers any finite prefix of a stream, but a parameter shared by every step of an infinite one is a constant stream, which [`discopy.stream`](https://docs.discopy.org/en/main/_api/discopy.stream.html) does not have: as memory it would have to cross from `P.d` to `P`, which no morphism does ([#125](https://github.com/rel-int/discopy-next/issues/125)).

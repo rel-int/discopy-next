@@ -829,3 +829,54 @@ def test_compound_name_is_lazy():
 def test_ev_at_the_unit():
     x = Ty('x')
     assert Diagram.ev(x, Ty()) == Id(x) and Ty() >> x == x ** Ty() == x
+
+
+def test_delay_types():
+    x, y = Ty('x'), Ty('y')
+    for typ in (x, x << y, y >> x, x ** y, x * y, x.product(y, x),
+                Ty(Product()), U):
+        delayed = typ.delay()
+        assert delayed != typ and delayed.delay(-1) == typ == delayed.tail
+        assert delayed.delay(2) == typ.delay(3) and delayed.head == Ty()
+        assert typ.head.delay().head == Ty() and typ.d.d == typ.delay(2)
+        assert eval(repr(delayed), Ty.environment()) == delayed
+        assert loads(dumps(delayed)) == delayed
+        assert hash(delayed) == hash(typ.delay().delay(-1).delay())
+    assert U.delay() == (U >> U).delay() != U.delay() >> U.delay()
+    assert (x << y).delay() != x.delay() << y.delay()
+    assert (y >> x).delay() != y.delay() >> x.delay()
+    assert (x ** y).delay() != x.delay() ** y.delay()
+    assert (x * y).delay() != x.delay() * y.delay()
+    assert (x << y).delay().inside[0].base == x
+    assert str((x << y).delay()) == "(y >> x).d"
+    assert str((x * y).delay(4)) == "(x * y).delay(4)"
+
+
+def test_delay_diagrams():
+    x, y, z = Ty('x'), Ty('y'), Ty('z')
+    f = Box('f', x @ y, z)
+    X, Y = Ty('X'), Ty('Y')
+    g, h = (X >> Y)('g'), (X >> (X >> Y))('h')
+    diagrams = [
+        f.curry(), f.curry(left=False), Diagram.ev(z, y),
+        Diagram.ev(z, y, left=False), Diagram.ev(z, y).dagger(),
+        Pack(x * y), Unpack(x * y), Copy(x) >> x @ Discard(x),
+        X(lambda v: g(v)).eval(), X(lambda v: h(v)(v)).eval(),
+        Tuple(X('a'), Y('b')).eval()]
+    for diagram in diagrams:
+        delayed = diagram.delay()
+        assert (delayed.dom, delayed.cod) == (
+            diagram.dom.delay(), diagram.cod.delay())
+        assert Diagram(delayed.inside, delayed.dom, delayed.cod) == delayed
+        assert delayed != diagram and delayed.delay(-1) == diagram
+        assert delayed.delay(2) == diagram.delay(3)
+        assert loads(dumps(delayed)) == delayed
+        assert Functor.id(Diagram)(delayed) == delayed
+        assert delayed.to_compact() == diagram.to_compact().delay()
+        assert delayed.to_drawing().dom == Drawing.id(delayed.dom).dom
+        for box in delayed.boxes:
+            assert eval(repr(box), Diagram.environment()) == box
+    assert Diagram.ev(z, y).delay().dagger()\
+        == Diagram.ev(z, y).dagger().delay()
+    assert f.curry().delay().cod == (z << y).delay() != z.d << y.d
+    assert f.curry().delay().arg == f

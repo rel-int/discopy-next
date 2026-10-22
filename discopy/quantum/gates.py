@@ -53,6 +53,7 @@ from collections.abc import Sized
 from math import e, pi
 
 from discopy import messages
+from discopy.feedback import str_delayed
 from discopy.cat import rsubs
 from discopy.matrix import get_backend
 from discopy.quantum.circuit import (
@@ -502,9 +503,20 @@ class Controlled(QuantumGate):
             raise ValueError(messages.ZERO_DISTANCE_CONTROLLED)
         self.controlled, self.distance = controlled, distance
         n_qubits = len(controlled.dom) + abs(distance)
-        name = f'C{controlled}'
-        dom = cod = qubit ** n_qubits
-        QuantumGate.__init__(self, name, dom, cod, data=controlled.data)
+        name = f'C{controlled.reset()}'
+        time_step = controlled.time_step
+        dom = cod = qubit.delay(time_step) ** n_qubits
+        QuantumGate.__init__(self, name, dom, cod, data=controlled.data,
+                             time_step=time_step)
+
+    def __getnewargs__(self):
+        """
+        The arguments of the constructor, which a delay reads: a controlled
+        gate is at the time step of the gate it controls.
+
+        >>> assert CX.delay() == Controlled(X.delay())
+        """
+        return self.controlled, self.distance
 
     def with_distance(self, distance) -> "Controlled":
         """
@@ -535,7 +547,7 @@ class Controlled(QuantumGate):
         return f'Controlled({self.controlled!r}, distance={self.distance!r})'
 
     def __str__(self):
-        return self.name if self.distance == 1\
+        return self.name + str_delayed(self.time_step) if self.distance == 1\
             else f'Controlled({self.controlled}, distance={self.distance})'
 
     def __eq__(self, other):
@@ -570,6 +582,9 @@ class Controlled(QuantumGate):
     l = r = property(conjugate)
 
     def _decompose_grad(self):
+        if self.time_step:
+            return Controlled._decompose_grad(self.reset()).delay(
+                self.time_step)
         controlled, distance = self.controlled, self.distance
         if isinstance(controlled, (Rx, Rz)):
             phase = self.phase
@@ -599,9 +614,9 @@ class Controlled(QuantumGate):
         else:
             pattern = [n_qubits - 1, *range(n_qubits - 1)]
 
-        perm = Circuit.permutation(pattern)
+        perm = Circuit.permutation(pattern, self.dom)
         diagram = (perm
-                   >> self.with_distance(1) @ Id(skipped_qbs)
+                   >> self.with_distance(1) @ self.dom[:skipped_qbs]
                    >> perm[::-1])
 
         return diagram
@@ -682,7 +697,8 @@ class Parametrized(Box):
         if isinstance(self, Controlled):
             # Ensure `Controlled(Rx(0.5))` and `CRx(0.5)` are printed the same.
             return Controlled.__str__(self)
-        return f'{self.name}({format_number(self.data)})'
+        return f'{self.name}({format_number(self.data)})'\
+            + str_delayed(self.time_step)
 
     def __repr__(self):
         return factory_name(type(self)) + f"({format_number(self.data)})"
@@ -692,27 +708,48 @@ class Rotation(Parametrized, QuantumGate):
     """ Abstract class for rotation gates. """
     n_qubits = 1
 
-    def __init__(self, phase, z=0):
+    def __init__(self, phase, z=0, time_step=0):
         name, n_qubits = type(self).__name__, type(self).n_qubits
-        dom = cod = qubit ** n_qubits
-        QuantumGate.__init__(self, name, dom, cod, z=z)
-        Parametrized.__init__(self, name, dom, cod, is_mixed=False, data=phase)
+        dom = cod = qubit.delay(time_step) ** n_qubits
+        QuantumGate.__init__(self, name, dom, cod, z=z, time_step=time_step)
+        Parametrized.__init__(self, name, dom, cod, is_mixed=False, data=phase,
+                              time_step=time_step)
 
     @classmethod
     def from_tree(cls, tree: dict):
-        return cls(tree['data'], tree.get('z', 0))
+        return cls(tree['data'], tree.get('z', 0), tree.get('time_step', 0))
 
     @property
     def phase(self):
         """ The phase of a rotation gate. """
         return self.data
 
+    def delay(self, n_steps=1):
+        """
+        The rotation by the same phase, one more time step on.
+
+        >>> assert Rz(.5).delay().dom == qubit.delay()
+        """
+        return type(self)(self.phase, self.z, self.time_step + n_steps)
+
     def dagger(self):
-        return type(self)(-self.phase)
+        return type(self)(-self.phase, time_step=self.time_step)
 
     def rotate(self, left=False):
         del left
-        return type(self)(self.phase, z=int(not self.z))
+        return type(self)(
+            self.phase, z=int(not self.z), time_step=self.time_step)
+
+    def subs(self, *args):
+        return super().subs(*args).delay(self.time_step)
+
+    def lambdify(self, *symbols, **kwargs):
+        function = super().lambdify(*symbols, **kwargs)
+        return lambda *xs: function(*xs).delay(self.time_step)
+
+    def __repr__(self):
+        time_step = f", time_step={self.time_step}" if self.time_step else ""
+        return super().__repr__()[:-1] + time_step + ")"
 
     def grad(self, var, **params):
         if var not in self.free_symbols:
@@ -725,11 +762,12 @@ class Rotation(Parametrized, QuantumGate):
                 if len(self.dom) != 1:
                     raise NotImplementedError
                 s = scalar(np.pi * gradient, is_mixed=True)
-                t1 = type(self)(self.phase + .25)
-                t2 = type(self)(self.phase - .25)
+                t1 = type(self)(self.phase + .25).delay(self.time_step)
+                t2 = type(self)(self.phase - .25).delay(self.time_step)
                 return s @ (t1 + scalar(-1, is_mixed=True) @ t2)
 
-            return scalar(np.pi * gradient) @ type(self)(self.phase + .5)
+            return scalar(np.pi * gradient)\
+                @ type(self)(self.phase + .5).delay(self.time_step)
 
 
 class Rx(AntiConjugate, Rotation):
@@ -778,11 +816,16 @@ class U1(AntiConjugate, Rotation):
 
 class ControlledRotation(Controlled, Rotation):
     """ Controlled rotation gate. """
-    def __init__(self, phase, distance=1):
-        Controlled.__init__(self, self.controlled(phase), distance)
+    def __init__(self, phase, distance=1, time_step=0):
+        Controlled.__init__(
+            self, self.controlled(phase, time_step=time_step), distance)
+
+    def delay(self, n_steps=1):
+        return type(self)(
+            self.phase, self.distance, self.time_step + n_steps)
 
     def with_distance(self, distance) -> "ControlledRotation":
-        return type(self)(self.phase, distance=distance)
+        return type(self)(self.phase, distance, self.time_step)
 
     lambdify = Rotation.lambdify
     subs = Rotation.subs
@@ -827,7 +870,7 @@ class Scalar(Parametrized):
     def grad(self, var, **params):
         if var not in self.free_symbols:
             return Sum([], self.dom, self.cod)
-        return Scalar(self.data.diff(var))
+        return Scalar(self.data.diff(var), is_mixed=self.is_mixed)
 
     def dagger(self):
         return Scalar(self.data.conjugate(), self.name, self.is_mixed)

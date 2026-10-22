@@ -108,3 +108,10 @@ def test_Scalar_tree_carries_is_mixed():
     assert Scalar(.5, is_mixed=True).to_tree()["is_mixed"] is True
     assert from_tree(Scalar(.5, is_mixed=True).to_tree()).is_mixed is True
     assert from_tree(Scalar(.5).to_tree()).is_mixed is False
+
+
+def test_Scalar_grad_keeps_is_mixed():
+    phi = importorskip("sympy").Symbol("phi")
+    derivative = Scalar(2 * phi, is_mixed=True).grad(phi)
+    assert derivative.is_mixed
+    assert numpy.isclose(derivative.eval(mixed=True).array, 2)

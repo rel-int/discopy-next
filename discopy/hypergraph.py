@@ -412,19 +412,38 @@ class Hypergraph(
             right[i]: t for i, t in enumerate(other.spider_types)})
         return type(self)(dom, cod, boxes, wires, spider_types, offsets)
 
-    @unbiased
-    def tensor(self, other: Hypergraph):
-        """ Tensor of two hypergraph diagrams, i.e. their disjoint union. """
-        dom, cod = self.dom @ other.dom, self.cod @ other.cod
-        boxes, offsets = self.boxes + other.boxes, self.offsets + other.offsets
-        shift = lambda w: tuple(self.n_spiders + i for i in w)
-        dom_wires = self.dom_wires + shift(other.dom_wires)
-        box_wires = self.box_wires + tuple(
-            (shift(x), shift(y)) for x, y in other.box_wires)
-        cod_wires = self.cod_wires + shift(other.cod_wires)
-        wires = dom_wires, box_wires, cod_wires
-        spiders = self.spider_types + other.spider_types
-        return type(self)(dom, cod, boxes, wires, spiders, offsets)
+    def tensor(self, *others: Hypergraph):
+        """
+        Tensor of ``n`` hypergraph diagrams, i.e. their disjoint union,
+        with the spiders of every factor relabeled apart.
+
+        >>> from discopy.frobenius import Ty, Box, Hypergraph as H
+        >>> x = Ty('x')
+        >>> f, g, h = (Box(name, x, x).to_hypergraph() for name in "fgh")
+        >>> assert f.tensor(g, h) == f @ g @ h
+        """
+        if not others:
+            return self
+
+        def shifted(wires, shift):
+            return tuple(shift + spider for spider in wires)
+
+        boxes, offsets, spiders, shift = [], [], [], 0
+        dom_wires, box_wires, cod_wires = [], [], []
+        for factor in (self, ) + others:
+            boxes += factor.boxes
+            offsets += factor.offsets
+            spiders += factor.spider_types
+            dom_wires += shifted(factor.dom_wires, shift)
+            cod_wires += shifted(factor.cod_wires, shift)
+            box_wires += [(shifted(x, shift), shifted(y, shift))
+                          for x, y in factor.box_wires]
+            shift += factor.n_spiders
+        wires = tuple(dom_wires), tuple(box_wires), tuple(cod_wires)
+        return type(self)(
+            self.dom.tensor(*(other.dom for other in others)),
+            self.cod.tensor(*(other.cod for other in others)),
+            tuple(boxes), wires, tuple(spiders), tuple(offsets))
 
     def dagger(self):
         """
@@ -1366,13 +1385,22 @@ class Hypergraph(
         codomain the same way: one value when it has one wire, a tuple of
         them otherwise.
 
+        Over a category with merges and no copies, i.e. a
+        :class:`ComarkovCategory` that is not a :class:`MarkovCategory`
+        such as :class:`discopy.python.additive.Function`, the tensor is a
+        disjoint union and the hypergraph is evaluated by
+        :meth:`pass_token` instead.
+
         Parameters:
-            xs : One value for each wire in :attr:`dom_wires`.
+            xs : One value for each wire in :attr:`dom_wires`, or the
+                value of a token and the domain wire it enters on, as
+                :meth:`pass_token` reads them.
 
         Raises
         ------
             AxiomError :
-                If the hypergraph is not left-monogamous or not causal.
+                If the hypergraph is not left-monogamous or not causal, or
+                not right-monogamous when it passes a token.
             ValueError :
                 If there is not one value for each domain wire, or a box
                 returns a different number of values than it has codomain
@@ -1391,6 +1419,9 @@ class Hypergraph(
         ...     wires=((0, 1), (((1, 0), (2, )), ), (2, 0)))
         >>> assert f(2, 3) == (5, 2)
         """
+        if issubclass(self.category, ComarkovCategory)\
+                and not issubclass(self.category, MarkovCategory):
+            return self.pass_token(*xs)
         if not self.is_left_monogamous:
             raise AxiomError(messages.NOT_LEFT_MONOGAMOUS.format(
                 factory_name(type(self))))
@@ -1403,12 +1434,77 @@ class Hypergraph(
         values = dict(zip(self.dom_wires, xs))
         for box, (box_dom, box_cod) in zip(self.boxes, self.box_wires):
             result = box(*(values[spider] for spider in box_dom))
-            ys = (result, ) if len(box_cod) == 1 else tuplify(result)
+            ys = tuplify(result, len(box_cod))
             if len(ys) != len(box_cod):
                 raise ValueError(messages.WRONG_NUMBER_OF_WIRES.format(
                     len(box_cod), box.cod, len(ys)))
             values.update(zip(box_cod, ys))
         return untuplify(tuple(values[spider] for spider in self.cod_wires))
+
+    def pass_token(self, obj, tag=0):
+        """
+        Evaluate a right-monogamous hypergraph by passing a token through it,
+        i.e. as a token machine of the geometry of interaction: the token
+        ``(obj, tag)`` enters on the domain wire ``tag``, each wire has one
+        consumer which the token goes to next, and each box it reaches moves
+        it from one of its domain wires to one of its codomain wires, until
+        it leaves on a codomain wire. A wire may have any number of
+        producers, i.e. the token may reach it from several places, and a
+        directed cycle is a while loop, as in the trace of
+        :class:`discopy.python.additive.Function`.
+
+        Parameters:
+            obj : The value carried by the token.
+            tag : The domain wire on which the token enters.
+
+        Returns:
+            The value of the token when it leaves, tagged with the codomain
+            wire it leaves on unless there is only one.
+
+        Raises
+        ------
+            AxiomError : If the hypergraph is not right-monogamous.
+
+        Example
+        -------
+        The trace of a box, i.e. its second output wired back to its second
+        input, is a while loop: here one step of the Collatz map.
+
+        >>> from discopy.comarkov import Ty, Box
+        >>> from discopy.python.additive import Function
+        >>> x = Ty('x')
+        >>> f = Box('f', x @ x, x @ x)
+        >>> collatz_step = lambda n, tag: (n, 0) if n == 1 else (
+        ...     3 * n + 1 if n % 2 else n // 2, 1)
+        >>> step = Function(collatz_step, (int, int), (int, int))
+        >>> F = Functor({x: int}, {f: step}, cod=Function)
+        >>> collatz = F(f.trace().to_hypergraph())
+        >>> assert collatz(27) == step.trace()(27) == 1
+
+        The disjoint union of two boxes takes the branch the token enters:
+
+        >>> g, h = Box('g', x, x), Box('h', x, x)
+        >>> G = Functor({x: int}, {g: Function(lambda n: n + 1, int, int),
+        ...                        h: Function(lambda n: 10 * n, int, int)},
+        ...             cod=Function)
+        >>> both = G((g @ h).to_hypergraph())
+        >>> assert both(5, 0) == (6, 0) and both(5, 1) == (50, 1)
+        """
+        if not self.is_right_monogamous:
+            raise AxiomError(messages.NOT_RIGHT_MONOGAMOUS.format(
+                factory_name(type(self))))
+        consumers = {
+            spider: (i, port) for i, (box_dom, _) in enumerate(self.box_wires)
+            for port, spider in enumerate(box_dom)}
+        exits = {spider: j for j, spider in enumerate(self.cod_wires)}
+        spider = self.dom_wires[tag]
+        while spider not in exits:
+            i, port = consumers[spider]
+            box = self.boxes[i]
+            result = box(obj, port)
+            obj, port = (result, 0) if len(box.cod) == 1 else result
+            spider = self.box_wires[i][1][port]
+        return obj if len(self.cod_wires) == 1 else (obj, exits[spider])
 
     def make_bijective(self) -> Hypergraph:
         """
@@ -1525,11 +1621,17 @@ class Hypergraph(
                         fwires = fwires[:len(fwires) - len(self.cod)] + [
                             left, right] + fwires[len(fwires) - len(self.cod):]
                     else:
-                        boxes = (self.category.cap_factory(
-                            source_obj, target_obj), ) + self.boxes
-                        offsets = (None, ) + self.offsets
-                        fwires = fwires[:len(self.dom)] + [
-                            left, right] + fwires[len(self.dom):]
+                        depth = getattr(
+                            self.ports[source], "depth", len(self.boxes))
+                        boxes = self.boxes[:depth] + (
+                            self.category.cap_factory(
+                                source_obj, target_obj), ) + self.boxes[depth:]
+                        offsets = self.offsets[:depth] + (None, )\
+                            + self.offsets[depth:]
+                        i = len(self.dom) + len(sum(
+                            [sum(ports, ()) for ports
+                             in self.box_wires[:depth]], ()))
+                        fwires = fwires[:i] + [left, right] + fwires[i:]
                     wires = self.rebracket(fwires, boxes=boxes)
                     spider_types[left] = spider_types[right] = typ
                     del spider_types[spider]

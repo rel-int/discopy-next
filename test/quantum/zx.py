@@ -7,7 +7,7 @@ from pytest import raises, fixture
 
 from discopy.quantum.gates import CRz, CRx, CU1, Controlled, Rz, Rx
 from discopy.quantum.zx import *
-from discopy import frobenius
+from discopy import frobenius, tensor
 from discopy.tensor import Dim, Tensor
 
 
@@ -74,6 +74,14 @@ def test_Functor():
     assert F(f + f) == Z(1, 1) + Z(1, 1)
 
 
+def test_to_hypergraph_keeps_colour_and_phase():
+    assert Z(1, 1, 0).to_hypergraph() != X(1, 1, 0).to_hypergraph()
+    assert Z(1, 1, 0).to_hypergraph() != Z(1, 1, .5).to_hypergraph()
+    assert Z(1, 2, .5).to_hypergraph().to_diagram() == Z(1, 2, .5)
+    assert tensor.Equation(
+        Z(1, 1, .25) @ X(1, 1, .5) >> SWAP, SWAP >> X(1, 1, .5) @ Z(1, 1, .25))
+
+
 def test_subs():
     pytest.importorskip("pyzx")
     from sympy.abc import phi, psi
@@ -137,6 +145,17 @@ def test_to_pyzx_parallel_wires():
         assert np.allclose(matrix(diagram), diagram.to_pyzx().to_matrix())
 
 
+def test_pyzx_scalars():
+    pytest.importorskip("pyzx")
+    for diagram in [
+            scalar(2) @ Nat(1), X(1, 2, .75) >> Z(2, 1, 1 / 3),
+            Z(0, 0, .3), X(0, 2) >> Z(2, 0, .5), X(0, 2, .25) >> Z(2, 0, 1 / 3),
+            Z(1, 1, .25) @ (X(0, 1) >> Z(1, 0, .5))]:
+        graph = diagram.to_pyzx()
+        assert np.allclose(matrix(diagram), graph.to_matrix())
+        assert Diagram.from_pyzx(graph).eval().is_close(diagram.eval())
+
+
 def test_to_pyzx_Y():
     pytest.importorskip("pyzx")
     for diagram in [
@@ -188,7 +207,7 @@ def test_backnforth_pyzx_2(random_had_cnot_diagram):
     diagram = circuit2zx(c)
     new_diagram = backnforth(diagram)
     assert compare_tensors(
-        new_diagram.to_pyzx(), diagram.to_pyzx(), preserve_scalar=False
+        new_diagram.to_pyzx(), diagram.to_pyzx(), preserve_scalar=True
     )
 
 
@@ -369,3 +388,19 @@ def test_Spider_to_tree():
 def test_delay_is_the_identity():
     for diagram in (Z(1, 1, .5), H, SWAP, Z(1, 2) >> X(2, 1, .25) >> H):
         assert diagram.delay() == diagram == diagram.delay(2)
+
+
+def test_feedback_is_the_trace():
+    f = Z(2, 2, .25)
+    assert f.feedback() == f.trace() == f.feedback(mem=Nat(1))
+    assert f.feedback(left=True) == f.trace(left=True)
+
+
+def test_functor_into_zx_rebuilds_spiders():
+    x = frobenius.Ty('x')
+    F = frobenius.Functor(ob_map={x: Nat(1)}, ar_map={}, cod=Diagram)
+    assert F(frobenius.Spider(1, 2, x)) == Z(1, 2)
+    assert F(frobenius.Diagram.spiders(2, 1, x @ x)).eval().is_close(
+        Diagram.spiders(2, 1, Nat(2)).eval())
+    with raises(ValueError):
+        Diagram.spider_factory(1, 1, Nat(2))

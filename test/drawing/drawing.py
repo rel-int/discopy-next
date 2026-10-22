@@ -1,7 +1,7 @@
 
 import os
 
-from pytest import approx, raises
+from pytest import approx, importorskip, raises
 
 from discopy.utils import AxiomError
 from discopy.config import DRAWING_DEFAULT
@@ -746,6 +746,19 @@ print((boxes[0] @ boxes[1] @ boxes[2] @ boxes[3]).to_svg())
             env=dict(os.environ, PYTHONHASHSEED=str(seed)))
         for seed in range(3)]
     assert outputs[0] == outputs[1] == outputs[2]
+
+
+def test_widget():
+    importorskip("anywidget")
+    import pickle
+    from discopy.monoidal import Ty, Box
+    from discopy.drawing.widget import DiagramWidget
+
+    f = Box('f', Ty('x'), Ty('y'))
+    widget = f.to_widget()
+    assert isinstance(widget, DiagramWidget) and widget.svg == f.to_svg()
+    assert set(f._repr_mimebundle_()) == {'image/svg+xml', 'image/png'}
+    assert pickle.loads(pickle.dumps(f)) == f
 
 
 RIBBON_COLOURS = ("red", "green", "blue", "yellow")

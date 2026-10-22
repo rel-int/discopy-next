@@ -2,7 +2,7 @@ from random import Random
 
 from pytest import raises
 
-from discopy import cat, grammar
+from discopy import cat, closed, grammar
 from discopy.grammar import categorial
 from discopy.grammar.abstract import *
 from discopy.python import Function
@@ -66,7 +66,8 @@ def test_Term():
     assert type(x(lambda v: f(v))) is Abstraction
     assert x(lambda v: f(v)).cod == x >> y and a(f, left=True) == f(a)
     assert eval(str(f(a)), dict(locals())) == f(a)
-    assert eval(repr(f(a)), {"grammar": grammar, "cat": cat}) == f(a)
+    scope = {"grammar": grammar, "cat": cat, "closed": closed}
+    assert eval(repr(f(a)), scope) == f(a)
     assert f(a).eval() == f @ a >> Diagram.fa(y, x)
 
 

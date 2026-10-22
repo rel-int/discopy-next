@@ -86,27 +86,35 @@ class Function(function.Function, ClosedCategory, TracedCategory):
             if len(self.cod) != 1 and (
                     not isinstance(ys, tuple) or len(self.cod) != len(ys)):
                 raise RuntimeError
-            for (y, t) in zip(tuplify(ys), self.cod.inside):
+            for (y, t) in zip(tuplify(ys, len(self.cod)), self.cod.inside):
                 callable(y) or assert_isinstance(y, t)
         return ys
 
-    def tensor(self, other: Function = None, *others: Function) -> Function:
+    def tensor(self, *others: Function) -> Function:
         """
-        The parallel composition of two functions, called with :code:`@`.
+        The parallel composition of ``n`` functions, called with :code:`@`.
 
         Parameters:
-            other : The other function to compose in parallel.
-            others : Any further functions to compose in parallel.
+            others : The other functions to compose in parallel.
+
+        Example
+        -------
+        >>> add = Function(lambda x, y: x + y, (int, int), (int, ))
+        >>> assert add.tensor(add, add)(1, 2, 3, 4, 5, 6) == (3, 7, 11)
         """
-        if others:
-            return self.tensor(other).tensor(*others)
-        if other is None:
+        if not others:
             return self
+        factors = (self, ) + others
+        offsets = [0, *accumulate(len(factor.dom) for factor in factors)]
 
         def inside(*xs):
-            left, right = xs[:len(self.dom)], xs[len(self.dom):]
-            return untuplify(tuplify(self(*left)) + tuplify(other(*right)))
-        return Function(inside, self.dom @ other.dom, self.cod @ other.cod)
+            return untuplify(sum((
+                tuplify(
+                    factor(*xs[offsets[i]:offsets[i + 1]]), len(factor.cod))
+                for i, factor in enumerate(factors)), ()))
+        dom = self.dom.tensor(*(other.dom for other in others))
+        cod = self.cod.tensor(*(other.cod for other in others))
+        return Function(inside, dom, cod)
 
     @staticmethod
     def swap(x: Ty, y: Ty) -> Function:
@@ -120,7 +128,7 @@ class Function(function.Function, ClosedCategory, TracedCategory):
         x, y = map(Ty.cast, (x, y))
 
         def inside(*xs):
-            return untuplify(tuplify(xs)[len(x):] + tuplify(xs)[:len(x)])
+            return untuplify(xs[len(x):] + xs[:len(x)])
         return Function(inside, dom=x @ y, cod=y @ x)
 
     @classmethod
@@ -244,7 +252,7 @@ class Function(function.Function, ClosedCategory, TracedCategory):
 
         def inside(*xs):
             ys = tuple(t() for t in traced.inside)
-            while (zs := tuplify(self(*xs, *ys))) != ys:
+            while (zs := tuplify(self(*xs, *ys), n)) != ys:
                 ys = zs
             return untuplify(ys)
         return Function(inside, self.dom[:len(self.dom) - n], self.cod)

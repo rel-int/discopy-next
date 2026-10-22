@@ -439,3 +439,14 @@ def test_foliation_idempotence():
         foliated = diagram.foliation()
         assert Equation(diagram, foliated)
         assert foliated.foliation() == foliated
+
+def test_tensor_coalesces_plumbing():
+    from functools import reduce
+    x = Ty('x')
+    perm = Permutation(x @ x, [1, 0])
+    assert perm.tensor(x, perm) == Permutation(x ** 5, [1, 0, 2, 4, 3])
+    assert perm.tensor() == perm
+    f = Box('f', x, x)
+    assert perm.tensor(f, perm) == reduce(
+        lambda g, h: g.tensor(h), [perm, f, perm])
+    assert perm.tensor(x, f) == reduce(lambda g, h: g.tensor(h), [perm, x, f])

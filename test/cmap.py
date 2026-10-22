@@ -499,6 +499,9 @@ def test_trace():
     assert left_trace.cod == y
     assert left_trace.boxes == f.boxes
 
+    with raises(AxiomError):
+        M.from_box(Box("g", x, y)).trace()
+
     closed_component = M.from_box(Box("h", x, x)).trace()
     assert closed_component.dom == Ty()
     assert closed_component.cod == Ty()

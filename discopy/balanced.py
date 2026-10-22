@@ -371,7 +371,8 @@ class DualRail(Functor):
 
     def __call__(self, other):
         if isinstance(other, Twist):
-            return self.dual_rail_twist_factory(self(other.dom))
+            return self.dual_rail_twist_factory(
+                self(other.dom), other.is_dagger)
         if isinstance(other, Braid):
             return self.dual_rail_braid_factory(
                 self(other.left), self(other.right), other.is_dagger)

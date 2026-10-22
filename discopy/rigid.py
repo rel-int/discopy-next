@@ -323,7 +323,11 @@ class Nat(monoidal.Nat, Ty):
     l = r = property(lambda self: self)
 
     def unwind(self) -> Nat:
-        """ The identity: a natural number has no winding. """
+        """
+        The identity: a natural number has no winding.
+
+        >>> assert Nat(1).unwind() == Nat(1)
+        """
         return self
 
 
@@ -692,6 +696,44 @@ class Box(biclosed.Box, Diagram):
         return type(self)(self.name, dom=dom, cod=cod,
                           data=self.data, is_dagger=self.is_dagger, z=z)
 
+    @classmethod
+    def strategy(cls, **params):
+        """
+        Generate free boxes as :meth:`cat.Box.strategy` does, rotated up to
+        twice either way when their boundaries are free, so that the laws
+        of a rigid category see boxes with a winding number.
+        """
+        from hypothesis import strategies as st
+
+        boxes = super().strategy(**params)
+        if params.get("dom") is not None or params.get("cod") is not None:
+            return boxes
+
+        def rotate(box, z):
+            for _ in range(abs(z)):
+                box = box.rotate(left=z < 0)
+            return box
+        return st.builds(rotate, boxes, st.integers(-2, 2))
+
+    def to_tree(self) -> dict:
+        tree = super().to_tree()
+        if self.z:
+            tree['z'] = self.z
+        return tree
+
+    @classmethod
+    def from_tree(cls, tree: dict) -> Box:
+        """
+        Decode a serialised rigid box, with its winding number.
+
+        >>> from discopy.utils import dumps, loads
+        >>> f = Box('f', Ty('x'), Ty('y'))
+        >>> assert loads(dumps(f.r)) == f.r and loads(dumps(f.l.l)) == f.l.l
+        """
+        box = super().from_tree(tree)
+        box.z = tree.get('z', 0)
+        return box
+
     @property
     def is_transpose(self):
         """ Whether the box is an odd rotation of a generator. """
@@ -884,7 +926,8 @@ def nesting(cls: type, factory: Callable) -> Callable[[Ty, Ty], Diagram]:
 def to_rigid(self):
     return biclosed.Functor(
         ob_map=lambda x: Ty(x.inside[0].name),
-        ar_map=lambda f: Box(f.name, to_rigid(f.dom), to_rigid(f.cod)),
+        ar_map=lambda f: Box(
+            f.name, to_rigid(f.dom), to_rigid(f.cod), data=f.data),
         cod=Diagram)(self)
 
 

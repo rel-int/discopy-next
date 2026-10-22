@@ -98,7 +98,8 @@ myst_url_schemes = {
 
 master_doc = 'index'
 
-html_baseurl = "https://docs.discopy.org"
+html_baseurl = os.environ.get(
+    "READTHEDOCS_CANONICAL_URL", "https://docs.discopy.org")
 
 
 def setup(app):

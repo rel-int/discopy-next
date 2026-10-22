@@ -91,21 +91,22 @@ class Wire(frobenius.Wire):
     :class:`Qudit`, but feel free to open a pull-request if you discover a
     third kind of information unit.
     """
-    def __init__(self, name: str, dim=2, z=0):
+    def __init__(self, name: str, dim=2, z=0, **params):
         assert_isinstance(dim, int)
         assert_isinstance(self, (Digit, Qudit))
         if dim < 2:
             raise ValueError
         self.dim = dim
-        super().__init__(name, z)
+        super().__init__(name, z, **params)
 
     def __repr__(self):
-        return f"{factory_name(type(self))}({self.dim})"
+        return f"{factory_name(type(self))}({self.dim}{self.repr_time_step()})"
 
     @classmethod
     def from_tree(cls, tree: dict) -> Wire:
         dim, z = tree['dim'], tree.get('z', 0)
-        return cls(dim=dim, z=z)
+        return cls(dim=dim, z=z, time_step=tree.get('time_step', 0),
+                   is_constant=tree.get('is_constant', True))
 
     def to_tree(self) -> dict:
         return dict(dim=self.dim, **super().to_tree())
@@ -122,9 +123,9 @@ class Digit(Wire):
     --------
     >>> assert bit.inside == (Digit(2),)
     """
-    def __init__(self, dim: int, z=0):
+    def __init__(self, dim: int, z=0, **params):
         name = "bit" if dim == 2 else f"Digit({dim})"
-        super().__init__(name, dim)
+        super().__init__(name, dim, **params)
 
     def __setstate__(self, state):
         if "_dim" in state:
@@ -144,9 +145,9 @@ class Qudit(Wire):
     --------
     >>> assert qubit.inside == (Qudit(2),)
     """
-    def __init__(self, dim, z=0):
+    def __init__(self, dim, z=0, **params):
         name = "qubit" if dim == 2 else f"Qudit({dim})"
-        super().__init__(name, dim)
+        super().__init__(name, dim, **params)
 
     __setstate__ = Digit.__setstate__
 
@@ -792,6 +793,11 @@ class Circuit(tensor.Diagram[complex]):
         raise ValueError
 
     @staticmethod
+    def cap_factory(left, right):
+        """ The cap of a circuit, the dagger of its cup. """
+        return Circuit.cup_factory(left, right).dagger()
+
+    @staticmethod
     def spider_factory(n_legs_in, n_legs_out, typ, phase=None):
         if phase is not None:
             raise NotImplementedError
@@ -843,6 +849,7 @@ class Box(tensor.Box[complex], Circuit):
         data : The array inside the box.
         is_mixed : Whether the box is mixed.
     """
+    eval = Circuit.eval
 
     def __init__(self, name: str, dom: Ty, cod: Ty,
                  data=None, is_mixed=True, **params):

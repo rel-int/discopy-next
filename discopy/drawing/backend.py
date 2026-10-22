@@ -1390,9 +1390,8 @@ class TikZ(Backend):
             distance = min(dx, dy)
             looseness = round(distance / length * 2.1, 4)
         if looseness != 1:
-            if style is None:
-                style = ''
-            style += f'looseness={looseness}'
+            style = ', '.join(
+                [style] * bool(style) + [f'looseness={looseness}'])
 
         cmd = (
             "\\draw [in={}, out={}{}] "

@@ -184,6 +184,7 @@ def test_to_rigid():
     f_ = rigid.Box('f', x_, y_)
     assert Diagram.to_rigid(diagram)\
         == rigid.Id(x_ @ y_.l) @ f_ >> rigid.Id(x_) @ rigid.Cup(y_.l, y_)
+    assert Box('f', x, y, data=42).to_rigid().data == 42
 
 
 def test_to_compact():

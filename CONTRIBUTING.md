@@ -44,6 +44,7 @@ Different dependency groups are available (switch with `uv sync --group <group-n
 - `dev`: testing and linting tools.
 - `quantum`: includes quantum computating dependencies
 - `grammar`: natural language processing libraries, PyTorch included for the neural parser
+- `notebooks`: marimo, IPython and a Jupyter kernel to run the notebooks, with anywidget to show diagrams as widgets
 - `docs`: for generating the documentation
 Since dependency groups are not standard, we also provide equivalents via optional dependencies.
 
