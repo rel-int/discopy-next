@@ -18,7 +18,7 @@ from discopy.quantum.gates import (
     Discard, MixedState, Measure, Encode,
     SWAP, ClassicalGate, QuantumGate,
     Controlled, Ket, Bra, Bits, Copy, Match,
-    Rx, Ry, Rz, CU1, CRz, CRx, CZ, CX,
+    Rx, Ry, Rz, CU1, CRz, CRx, CX, CY, CZ,
     X, Y, Z, H, S, T, scalar, sqrt,
 )
 

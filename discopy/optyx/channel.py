@@ -1737,14 +1737,16 @@ class Feedback(monoidal.Bubble, Diagram, frobenius.Box):
     -------
     The feedback of `CNOT >> SWAP` unrolls to a ladder of CNOT gates,
     here with the plus state as initial state and the output memory
-    discarded by default; doubling commutes with unrolling on the nose:
+    discarded by default; doubling commutes with unrolling, up to composing
+    adjacent permutations (rel-int/discopy-next#301):
 
     >>> from discopy.optyx.qubits import Z, X, Scalar, Ket
     >>> cnot = Z(1, 2) @ qubit >> qubit @ X(2, 1) @ Scalar(2 ** 0.5)
     >>> ladder = (cnot >> Diagram.swap(qubit, qubit)).feedback(
     ...     state=Ket("+"))
     >>> assert ladder.effect == Discard(qubit)
-    >>> assert ladder.unroll(1).double() == ladder.double().unroll(1)
+    >>> assert ladder.unroll(1).double().merge_layers()\\
+    ...     == ladder.double().unroll(1).merge_layers()
     """
     __ambiguous_inheritance__ = (monoidal.Bubble, frobenius.Box)
 

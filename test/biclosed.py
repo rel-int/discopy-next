@@ -154,6 +154,12 @@ def test_Application_freevars_order():
         assert term.freevars == [a, b]
 
 
+def test_Application_of_a_non_function():
+    v, w = Variable('v', Ty('x')), Variable('w', Ty('y'))
+    with raises(TypeError, match="Expected v to have an exponential type"):
+        Application(v, w)
+
+
 def test_Abstraction_well_typed():
     """Abstraction agrees with eval on both dom and cod, nesting included."""
     x, y, z = Ty('x'), Ty('y'), Ty('z')
@@ -337,6 +343,14 @@ def test_transparency():
         assert loads(dumps(box)) == box
 
 
+def test_Eval_on_the_wrong_side():
+    x, y = Ty('x'), Ty('y')
+    for box in (Eval, Coeval):
+        for exp, left in ((x << y, False), (y >> x, True)):
+            with raises(AxiomError):
+                box(exp, left=left)
+
+
 def test_unit_exponential():
     """ An exponential of the unit is its base, so that currying no wire and
     evaluating at the unit are the identity, which converts to a map. """
@@ -352,6 +366,14 @@ def test_Curry_dagger():
     x = Ty('x')
     with raises(AxiomError):
         Box('f', x @ x, x).curry().dagger()
+
+
+def test_Curry_too_many_wires():
+    x, z = Ty('x'), Ty('z')
+    for n in (-1, 2):
+        for left in (True, False):
+            with raises(AxiomError):
+                Curry(Box('f', x, z), n, left)
 
 
 def test_Curry_to_drawing():

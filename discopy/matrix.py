@@ -550,8 +550,12 @@ class Matrix(MarkovCategory, ComarkovCategory, DaggerCategory,
         -------
         >>> Matrix.basis(4, 2)
         Matrix[int64]([0, 0, 1, 0], dom=1, cod=4)
+        >>> assert Matrix.basis(0, 0).dtype == Matrix.id(0).dtype
         """
-        return cls([[int(i == j) for j in range(index(x))]], 1, x)
+        with backend() as np:
+            array = np.array([[int(i == j) for j in range(index(x))]],
+                             dtype=cls.dtype or int)
+        return cls(array, 1, x)
 
     def repeat(self) -> Matrix:
         """
@@ -612,9 +616,18 @@ class Matrix(MarkovCategory, ComarkovCategory, DaggerCategory,
 
 
 def array2string(array, **params):
-    """ Numpy array pretty print. """
+    """
+    Numpy array pretty print, eliding past ``config.NUMPY_THRESHOLD`` entries
+    without touching numpy's global print options.
+
+    >>> import numpy
+    >>> threshold = numpy.get_printoptions()['threshold']
+    >>> array2string(numpy.arange(3))
+    '[0, 1, 2]'
+    >>> assert numpy.get_printoptions()['threshold'] == threshold
+    """
     import numpy
-    numpy.set_printoptions(threshold=config.NUMPY_THRESHOLD)
+    params = dict({'threshold': config.NUMPY_THRESHOLD}, **params)
     return numpy.array2string(array, **dict(params, separator=', '))\
         .replace('[ ', '[').replace('  ', ' ')
 

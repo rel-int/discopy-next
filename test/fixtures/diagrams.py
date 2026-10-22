@@ -1,23 +1,25 @@
 """
-Random symmetric and compact diagrams with a functor evaluating them as
-tensors, shared by the tests of the decoders of :mod:`discopy.hypergraph` and
-:mod:`discopy.cmap`.
+Random diagrams with a functor evaluating them as tensors, shared by the tests
+of the decoders of :mod:`discopy.hypergraph` and :mod:`discopy.cmap`.
 """
 
 from math import prod
 from random import Random
 
-from discopy import compact, tensor
+from discopy import tensor
+from discopy.abc import RigidCategory, SymmetricCategory
 from discopy.tensor import Dim
 
 
 def random_diagram(module, seed: int, n_layers: int = 8):
     """
-    A random diagram of ``module``, i.e. :mod:`discopy.symmetric` or
-    :mod:`discopy.compact`, built layer by layer from random boxes and
-    permutations and, in the compact case, cups and caps, with a
-    :class:`tensor.Functor` sending each box to a random array.
+    A random diagram of ``module``, e.g. :mod:`discopy.monoidal` or
+    :mod:`discopy.compact`, built layer by layer from random boxes,
+    permutations when it is symmetric and cups and caps when it is rigid,
+    with a :class:`tensor.Functor` sending each box to a random array.
     """
+    symmetric = issubclass(module.Diagram, SymmetricCategory)
+    rigid = issubclass(module.Diagram, RigidCategory)
     rng = Random(seed)
     atoms = {module.Ty(name): Dim(dim) for name, dim in zip("xyz", (2, 3, 2))}
     types, ar_map = list(atoms), {}
@@ -35,14 +37,14 @@ def random_diagram(module, seed: int, n_layers: int = 8):
     for _ in range(n_layers):
         cod, choice = diagram.cod, rng.random()
         cups = [i for i in range(len(cod) - 1) if cod[i + 1] == cod[i].r]\
-            if module is compact else []
-        if choice < .3 and len(cod) > 1:
+            if rigid else []
+        if choice < .3 and len(cod) > 1 and symmetric:
             perm = rng.sample(range(len(cod)), len(cod))
             diagram >>= module.Diagram.permutation(perm, cod)
         elif choice < .5 and cups:
             i = rng.choice(cups)
             diagram >>= cod[:i] @ module.Cup(cod[i], cod[i + 1]) @ cod[i + 2:]
-        elif choice < .6 and module is compact:
+        elif choice < .6 and rigid:
             i, typ = rng.randint(0, len(cod)), rng.choice(types)
             diagram >>= cod[:i] @ module.Cap(typ.r, typ) @ cod[i:]
         else:

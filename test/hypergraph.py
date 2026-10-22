@@ -309,13 +309,26 @@ def test_Hypergraph_to_diagram_offset():
 
 
 def test_Hypergraph_cap_after_states():
-    x = Ty('x')
-    f = Box('f', Ty(), x)
-    diagram = x @ f >> Cap(x, x) @ x @ x
-    assert diagram.to_hypergraph().to_diagram() == diagram
-    for diagram in [f @ Cap(x, x), x @ f >> x @ Cap(x, x) @ x]:
+    """ A cap goes beside the wire its first reader reads next to it, see
+    #108 and #187. """
+    x, y = Ty('x'), Ty('y')
+    f, g = Box('f', Ty(), x), Box('g', y @ x, x)
+    for diagram in [
+            x @ f >> Cap(x, x) @ x @ x, f @ Cap(x, x),
+            x @ f >> x @ Cap(x, x) @ x, y @ Cap(x, x) >> g @ x]:
         decoded = diagram.to_hypergraph().to_diagram()
-        assert decoded.to_hypergraph() == diagram.to_hypergraph()
+        assert decoded in (diagram, diagram.foliation())
+
+
+def test_Hypergraph_make_causal_without_spiders():
+    """ A category with cups and caps but no merges bends its wires instead,
+    e.g. to compute the depth of a transpose. """
+    from discopy import compact
+    x = compact.Ty('x')
+    cup = compact.Cup(x, x.r)
+    assert cup.to_hypergraph().make_causal().boxes == (cup, )
+    transpose = compact.Box('f', x, x).transpose().to_hypergraph()
+    assert transpose.make_causal().is_causal
 
 
 def test_Hypergraph_from_glued():

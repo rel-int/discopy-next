@@ -244,9 +244,11 @@ def test_Layer_legacy_serialisation():
 
     legacy = Layer(f)
     legacy.boxes_or_types = (Ty(), f, Ty())
+    assert legacy.name == "Ty() @ f @ Ty()"
     restored = pickle.loads(pickle.dumps(legacy))
     assert restored == Layer(f)
     assert restored.boxes_or_types == (f, )
+    assert restored.name == Layer(f).name == "f"
 
 
 def test_Layer_coloured_units():
@@ -456,6 +458,13 @@ def test_Diagram_size():
     diagram = (
         Box('f', a, b) @ Box('g', c, d)).foliation()
     assert len(diagram) == 1 and diagram.size == 2
+
+
+def test_Diagram_width():
+    x = Ty('x')
+    f = Box('f', x, x @ x)
+    assert Id().width == 0 and Id(x @ x).width == 2
+    assert f.width == (f >> f.dagger()).width == 2
 
 
 def test_Bubble_dagger():
@@ -759,6 +768,11 @@ def test_Diagram_from_callable():
         @Diagram.from_callable(x, y)
         def diagram(wire):
             return f(x)
+    with raises(RuntimeError):
+        @Diagram.from_callable(x, y)
+        def diagram(wire):
+            raise RuntimeError
+    assert "__call__" not in vars(Diagram)
 
 
 def test_List():

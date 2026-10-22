@@ -23,6 +23,7 @@ FEEDBACK_FORMS = (
     "Feed back either a number of objects n or a memory dom, cod, mem.")
 NOT_SPLITTABLE = "Cannot split {} atoms off {}."
 NOT_ADJOINT = "{} and {} are not adjoints."
+NOT_EXPONENTIAL = "Expected {} to have an exponential type, got {}."
 NOT_MAPPING_OR_CALLABLE = "Expected a Mapping or a Callable, got {!r}."
 NOT_RIGID_ADJOINT = "{} is not the left adjoint of {}, maybe you meant to use"\
                     " a pivotal type rather than a rigid one?"
@@ -35,6 +36,7 @@ LAYERS_MUST_HAVE_A_BOX = "Layers must have at least one box."
 NOT_MERGEABLE = "Layers {} and {} cannot be merged."
 INTERCHANGER_ERROR = "Boxes {} and {} do not commute."
 WRONG_PERMUTATION = "Expected a permutation of length {}, got {}."
+NOT_A_PERMUTATION = "Expected a permutation of range({}), got {}."
 ZERO_DISTANCE_CONTROLLED = "Zero-distance controlled gates are ill-defined."
 REAL_SQRT_IS_SELF_ADJOINT = "The dagger of a real square root is itself."
 HAS_NO_ATTRIBUTE = "{!r} object has no attribute {!r}"
@@ -78,6 +80,7 @@ NO_TYPE_PARAMETER = (
     "{} has no type parameter to subscript, declare one as in "
     "class C(NamedGeneric['name']).")
 CURRY_HAS_NO_DAGGER = "A curry has no dagger."
+WRONG_SIDE = "Expected left={} for {}, got left={} instead."
 NOT_JSON_SERIALISABLE = "Object of type {} is not JSON serialisable."
 NO_SUCH_TYPE = "No type named {!r} in builtins or numpy, so the name of the "\
                "class it parameterises cannot be resolved."

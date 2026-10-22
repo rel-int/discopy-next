@@ -862,6 +862,7 @@ class Box(tensor.Box[complex], Circuit):
                 raise ValueError(messages.BOX_IS_MIXED)
         self._is_mixed = is_mixed
         tensor.Box[complex].__init__(self, name, dom, cod, data, **params)
+        self._params = dict(self._params, is_mixed=is_mixed)
 
     def __setstate__(self, state):
         if "_is_mixed" not in state:
@@ -887,10 +888,27 @@ class Box(tensor.Box[complex], Circuit):
         return self._is_mixed
 
     def dagger(self):
-        return self if self.is_dagger is None else super().dagger()
+        """
+        The dagger of a box, pure when the box is, as its rotation and its
+        delay are.
+
+        >>> f = Box('f', bit, bit, data=[1, 2, 3, 4], is_mixed=False)
+        >>> assert not f.dagger().is_mixed and not f.rotate().is_mixed
+        >>> assert f.dagger().eval() == f.eval().dagger()
+        """
+        if self.is_dagger is None:
+            return self
+        return type(self)(
+            self.name, self.cod, self.dom, self.data, is_mixed=self.is_mixed,
+            is_dagger=not self.is_dagger, z=self.z, time_step=self.time_step)
 
     def rotate(self, left=False):
-        return self if self.z is None else super().rotate(left)
+        if self.z is None:
+            return self
+        return type(self)(
+            self.name, self.cod.r, self.dom.r, self.data,
+            is_mixed=self.is_mixed, is_dagger=self.is_dagger,
+            z=(self.z + 1) % 2, time_step=self.time_step)
 
 
 class Sum(tensor.Sum[complex], Box):

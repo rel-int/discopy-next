@@ -1576,6 +1576,16 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Fixed
 
+- The identity functor is the identity on a `Permutation`:
+  `symmetric.Functor` sends one into a codomain with a
+  `permutation_factory` to its `from_permutation`, each wire moving the
+  block of its image, where it built the staircase of swaps of
+  `permutation`, so `Functor.id(Diagram)(p) != p` in `symmetric`, `markov`,
+  `compact` and `frobenius` alike. A functor with non-atomic images gives
+  one permutation box instead of a staircase, equal to it up to `Equation`;
+  concrete codomains such as `Matrix` and `Tensor` keep their `permutation`
+  (B60 of
+  [rel-int/discopy-next#31](https://github.com/rel-int/discopy-next/issues/31)).
 - A tree saying `"is_dagger": false` reads back as no dagger: `cat.Box`,
   and so every box, `monoidal.Wire`, `frobenius.Spider`,
   `feedback.FollowedBy` and `quantum.gates.Digits` took the presence of the
@@ -1750,6 +1760,41 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   inherited by `python.multiplicative.Function` and
   `python.additive.Function`; a chain built with `>>` still nests, since
   that operator is binary.
+- Controlled gates evaluate and rotate as the gate they control is: the
+  array of a controlled gate ignored the dagger and the rotation of its
+  gate, so that `Controlled(S).dagger()` was `Controlled(S)` numerically
+  (B10), and its `l` and `r` were its conjugate, so that rotating
+  `CRz(.3)` negated its phase and `CRz(.5).rotate()` raised (B54): a
+  controlled gate now rotates as its gate, with its qubits reversed, so
+  that rotation commutes with evaluation. A pure `circuit.Box` stays pure
+  through its dagger, rotation and delay, where it was rebuilt mixed, so
+  that the dagger of a quantum box could not be evaluated and the one of
+  a classical box was not transposed (B55). `subs` and `lambdify` keep the
+  distance of a controlled rotation and the mixedness of a scalar (B11),
+  which also makes the default, mixed derivative of a rotation evaluate
+  to its finite difference, and the pure derivative of `U1` is the
+  difference of its shifts by a quarter turn, where it was its shift by
+  half a turn, the derivative of `Rz` (B12). `QuantumGate` takes a 2-D
+  array or a list with free symbols as `data`, as `circuit.Box` does,
+  where it raised (B82), and `Ket`, `Bra` and `Digits` read a boolean as
+  an integer, where `Ket(True)` was `|0> + |1>` and a bitstring of numpy
+  booleans the zero vector, `Digits` raising on a digit that is no integer
+  below its dimension (B68)
+  ([rel-int/discopy-next#31](https://github.com/rel-int/discopy-next/issues/31)).
+- Every gate with a constructor of its own delays, where `Ket(0).delay()`,
+  `Measure().delay()`, `scalar(2).delay()` and the rest raised
+  `TypeError`: `Discard` and `MixedState` through the type they take, as
+  `Controlled` does, and `Ket`, `Bra`, `Measure`, `Encode`, `Copy`,
+  `Match`, `Digits`, `Bits`, `Scalar`, `MixedScalar` and `Sqrt` through a
+  `time_step`, as the rotations do, kept by their dagger, decomposition,
+  tree, `subs`, `lambdify` and `grad`; a delayed scalar is unequal to the
+  scalar. The decomposition of `Discard` and `MixedState` keeps their
+  types, where it discarded or prepared a qubit for every wire, bits
+  included. `Controlled`, `Digits` and `Bits` print their constructor call
+  with its module, where they printed `Controlled(...)` and their name, so
+  that `eval(repr(x)) == x` in the environment of a circuit
+  ([rel-int/discopy-next#176](https://github.com/rel-int/discopy-next/issues/176),
+  [rel-int/discopy-next#168](https://github.com/rel-int/discopy-next/issues/168)).
 - A delayed qubit or bit prints and serialises with its time step,
   `Qudit(2, time_step=1)`, where both dropped it, so that
   `eval(repr(x)) == x` and `loads(dumps(x)) == x` failed on it. A
@@ -1763,9 +1808,7 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   and a controlled rotation take a `time_step`, kept by their delay,
   dagger, rotation, `subs`, `lambdify`, `grad`, `repr` and tree, and a
   controlled gate at a distance decomposes on its own qubits, so that a
-  delayed one evaluates. The other gates with a constructor of their own
-  still do not delay
-  ([rel-int/discopy-next#176](https://github.com/rel-int/discopy-next/issues/176))
+  delayed one evaluates
   ([rel-int/discopy-next#130](https://github.com/rel-int/discopy-next/issues/130)).
 - Closed types carry a time step, as every wire below `feedback` does, so
   that a closed diagram delays box by box, where
@@ -1892,6 +1935,25 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   name. A value that is a subscripted class is pickled as its
   `utils.Subscript`, its origin and its values, recursively
   ([rel-int/discopy-next#121](https://github.com/rel-int/discopy-next/issues/121)).
+- `CMap.to_diagram` applies a box with no domain, a state or a cap, in the
+  gap of the scan its face reaches rather than on the right of the open
+  wires: `(s @ x).to_map().to_diagram()` raised `NOT_SYMMETRIC` in
+  `monoidal`, `rigid` and `pivotal` and was `x @ s >> Swap` in `symmetric`,
+  and most random planar diagrams could not be decoded. Walking its face
+  back to the wire on its left, or on to the wire on its right, turns by
+  half a turn when that wire is its neighbour, and when the two walks
+  disagree it goes beside the wire its first reader reads next to it.
+  `CMap.make_causal` cuts only the wires that close a cycle, as it says,
+  where a scalar loop beside merely unordered boxes cut those too
+  ([rel-int/discopy-next#31](https://github.com/rel-int/discopy-next/issues/31)).
+- `Hypergraph.to_diagram` puts a cap with no offset, e.g. one of
+  `make_monogamous`, beside the wire that its first reader reads next to
+  it rather than on the left: `(f @ Cap(x, x)).to_hypergraph().to_diagram()`
+  had a permutation that `f @ Cap(x, x)` does not have
+  ([rel-int/discopy-next#187](https://github.com/rel-int/discopy-next/issues/187)).
+  `Hypergraph.make_causal` bends a wire with cups and caps in a category
+  with no merges, where it asked for a `spider_factory`:
+  `compact.Box('g', x, x).transpose().depth()` raised `AttributeError`.
 - `frobenius.Dim.unwind`, and so `tensor.Dim.unwind`, is the identity, like
   its `l` and `r` and like `rigid.Nat.unwind`: it inherited
   `rigid.Ty.unwind`, which asks the atom of a type for its winding, and the
@@ -2053,6 +2115,27 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   loses a guard on an attribute no layer has, which raised a message that
   did not exist
   ([rel-int/discopy-next#1](https://github.com/rel-int/discopy-next/pull/1)).
+- `finset.Function.permutation(xs, doms)` permutes blocks of the sizes
+  `doms`, the `i`-th block of its codomain being the `xs[i]`-th of its
+  domain as in `Matrix.permutation`, where it raised unless every block had
+  size one; `tensor.Box` compares and hashes an array of any backend or a
+  list of lists as data by its flattened entries, where `==` raised `The
+  truth value of an array is ambiguous` and nested lists were unhashable;
+  and
+  `multiplicative.Function.curry(n)` raises `ValueError` when `n` is
+  negative or more than the domain has, where it silently curried all of it
+  ([rel-int/discopy-next#31](https://github.com/rel-int/discopy-next/issues/31)).
+- `Matrix.__repr__` leaves numpy's global print options alone: it passes
+  `config.NUMPY_THRESHOLD` to `numpy.array2string`, where it set it for
+  every array printed afterwards. `Matrix.basis` builds its array in the
+  `dtype` of its carrier like `copy`, so that `basis(0, i)` is `int64` like
+  `id(0)` rather than `float64`
+  ([rel-int/discopy-next#31](https://github.com/rel-int/discopy-next/issues/31),
+  [rel-int/discopy-next#88](https://github.com/rel-int/discopy-next/issues/88)).
+- `tensor.Functor` maps a `Dim` with its `ob_map`, atom by atom like any
+  other type, where it returned it untouched, so that on tensor diagrams,
+  whose objects are dimensions, the object mapping was never read
+  ([rel-int/discopy-next#31](https://github.com/rel-int/discopy-next/issues/31)).
 - `Matrix.copy(x, n)` is the diagonal of the direct sum, `n` identities
   side by side, i.e. `array[i, j]` iff `j % x == i`, where it was the
   Kronecker diagonal, the copy of the tensor product: under the direct sum
@@ -2159,6 +2242,40 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   arXiv:1904.11324, which is not their paper; the geometry of Bayesian
   programming is arXiv:1904.07425
   ([#639](https://github.com/discopy/discopy/pull/639)).
+- The dagger of a rigid box keeps its winding number `z`, where it reset
+  it to zero, so that `f.r[::-1]` was a box with no winding on the rotated
+  types, `f.r[::-1][::-1] != f.r` and `f.r[::-1] != f[::-1].r`: the dagger
+  of a rotation is the rotation of the dagger, as in a dagger pivotal
+  category, which `pivotal.Box` already did
+  ([rel-int/discopy-next#31](https://github.com/rel-int/discopy-next/issues/31)).
+- `Diagram.width` of an identity is the number of its wires, where
+  `Id(x).width` raised `ValueError` on the `max` of no layers
+  ([rel-int/discopy-next#31](https://github.com/rel-int/discopy-next/issues/31)).
+- `rigid.Diagram.cups` and `caps`, and `tensor.Tensor.cups`, raise
+  `AxiomError` on two types of different lengths, which are no adjoints,
+  where `cups(Ty(), n)` returned the identity on `Ty()` and
+  `cups(n, Ty())` raised `IndexError`: `rigid.nesting` never compared the
+  lengths
+  ([rel-int/discopy-next#31](https://github.com/rel-int/discopy-next/issues/31)).
+- `Diagram.from_callable` removes the `__call__` it sets on the diagram
+  class for its boxes to record their inputs even when the function it
+  reads raises, where it stayed there, so that every box of that level was
+  callable from then on
+  ([rel-int/discopy-next#31](https://github.com/rel-int/discopy-next/issues/31)).
+- An unpickled `monoidal.Layer` recomputes its `name`, `dom` and `cod`
+  from the boxes and types it normalises, where it restored the values
+  cached before normalisation, so that a layer pickled with empty plumbing
+  came back named `Ty() @ f @ Ty()`, and one from a 0.6 or 1.2 pickle
+  named `Layer`
+  ([rel-int/discopy-next#168](https://github.com/rel-int/discopy-next/issues/168)).
+- A trace over more objects than the boundary has, or a negative number of
+  them, raises `ValueError` in the positional form as it did in the keyword
+  form, where `ribbon`, `compact` and `frobenius` diagrams, drawings and
+  additive Python functions traced what their slicing made of it, e.g.
+  `trace(5)` of a box on two wires as `trace(2)` and `trace(-1)` as
+  `trace(1)`, and a matrix raised a NumPy error: `abc.keyword_form` splits
+  the boundary for both forms
+  ([rel-int/discopy-next#31](https://github.com/rel-int/discopy-next/issues/31)).
 - `interaction.Diagram.trace` traces an integer diagram, where it raised
   `TypeError` on every input: it was borrowed from `traced.Diagram` through
   a `trace_factory` slicing the type, and an integer type is a pair of
@@ -2293,6 +2410,26 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   extra. `import discopy.grammar` still imports no framework, which a test
   pins the way `test/neural/network.py` does for `discopy.neural`
   ([rel-int/discopy-next#52](https://github.com/rel-int/discopy-next/issues/52)).
+- A symmetric functor maps a whiskered swap, which is a `Permutation`, into
+  a codomain with no `permutation`: it is sent to the images of the swaps of
+  `Permutation.to_swaps`, where it used to fall through to the `ar_map` and
+  raise `KeyError`. So `(Swap(x, y) @ z).to_braided()` is one dual rail
+  braid, through a new `symmetric.DualRail` and `compact.DualRail`, where it
+  raised `TypeError` (and drew an opaque box in `compact`). A permutation of
+  a `Nat` is sent to the `permutation` of one block per wire, like any
+  other, so `Functor({Nat(1): x @ y})` maps a swap of `Nat(1)`, where it
+  raised `Expected a permutation of length 6, got 3`
+  ([rel-int/discopy-next#31](https://github.com/rel-int/discopy-next/issues/31)).
+- `braided.Diagram.simplify` on a foliated diagram splits its layers of more
+  than one box into staircases first, as `tensor.Diagram.grad` does, where
+  it unpacked every layer as one box and raised `ValueError`
+  ([rel-int/discopy-next#31](https://github.com/rel-int/discopy-next/issues/31)).
+- `symmetric.Diagram.foliation` drops two layers of plumbing that compose
+  to the identity, as it did for `Swap(x, y) >> Swap(y, x)` before a swap
+  became a `Permutation`: `Layer.merge` refuses such a pair, since the
+  identity is no layer, so `p >> p[::-1] >> p` stayed three layers instead
+  of one. `merge_layers` drops the pair
+  ([rel-int/discopy-next#31](https://github.com/rel-int/discopy-next/issues/31)).
 - `Matrix.then`, `tensor` and `__add__`, and `Tensor.then` and `tensor`,
   built their result as `type(self)(...)`, casting it to the dtype of the
   left operand: the unparametrised structural matrices -- `id`, `swap`,
@@ -2375,6 +2512,23 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   bare `Curry(box)` curried the opposite side of `box.curry()`, and
   `grammar.categorial.Diagram.bc` passed `n` without `left`, so backward
   composition curried on the wrong side by the same drift.
+- `biclosed.Eval` and `Coeval` evaluate an exponential that is neither
+  `Over` nor `Under` on the left by default, so that `closed.Eval(X >> Y)`
+  is `closed.Diagram.ev(Y, X)`, left since discopy/discopy#560, rather than
+  its mirror image. They raise `AxiomError` on the side an `Over` or an
+  `Under` does not have, e.g. `Eval(x << y, left=False)`, which the identity
+  functor rebuilt as `Eval(y >> x)`. `biclosed.Curry(f, n)` raises unless
+  `0 <= n <= len(f.dom)`: `Curry(f, 5)` of a box with one input curried it
+  whole and named itself `Curry(f, 5, True)`
+  ([rel-int/discopy-next#31](https://github.com/rel-int/discopy-next/issues/31)).
+- `to_hypergraph` and `foliation` of a closed diagram with a constant, e.g.
+  `g(X('a')).eval()`, raised `AxiomError: Expected a term for g, got g.`:
+  `biclosed.Functor` sent its constants to `map_term`, since the objects of
+  a hypergraph of closed diagrams are biclosed types, and a hypergraph,
+  which has no terms, is now exempt from that as a `CMap` already was. A
+  term itself, e.g. `g(X('a'))`, goes to a hypergraph as its diagram does,
+  since a hypergraph has no `ev` to evaluate it with
+  ([rel-int/discopy-next#177](https://github.com/rel-int/discopy-next/issues/177)).
 - A variable of a composite type, e.g. `Variable("v", x @ y)`, is bound
   whole. The abstraction machinery indexed contexts and free variables by
   variable, counting on that index to coincide with a wire index, so such
@@ -2448,6 +2602,29 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 - `rigid.Diagram.functor_factory` is `rigid.Functor`: it inherited
   `biclosed.Functor`, which does not rotate, so a box mapped through
   it lost the rotation of its boundary.
+- Drawing a `Drawing` leaves it as it was: `draw` adds the box corners and
+  frames the dual rail folds on a copy, where it did both in place, so that
+  a drawing compared unequal to itself once drawn (B37 of
+  [discopy#606](https://github.com/discopy/discopy/issues/606)) and the
+  n-th draw of a dual rail drawing was framed n times, a margin taller each
+  time. `Drawing.then` and `Drawing.tensor` with an identity or empty side
+  return a new drawing, where they returned the other side itself, so that
+  changing the result changed that side; and a drawing neither saved nor
+  shown closes its figure, where every `draw(show=False)` without a path
+  left one open (B85 of
+  [rel-int/discopy-next#31](https://github.com/rel-int/discopy-next/issues/31)).
+- A spider, a ribbon and a twist draw in any colour a box draws in:
+  `TikZ.format_color` gives the RGB values of a named colour or of a
+  hexcode in any form matplotlib reads, and passes any other colour
+  through, as a TikZ box does, where it indexed `COLORS` and raised
+  `KeyError`, so that a ribbon in TikZ and a spider or a box with
+  `use_tikzstyles` could only take the seven named colours; a TikZ box or
+  spider in a hexcode writes its RGB values, where it wrote `fill={#336699}`,
+  which TikZ rejects; and the back of a twist is filled with
+  `config.darken` of its colour, which keeps its alpha, where it looked up
+  `f"dark_{color}"` and raised on any other colour in both backends, a
+  transparent twist keeping a transparent back (B83 of
+  [rel-int/discopy-next#31](https://github.com/rel-int/discopy-next/issues/31)).
 - Region painting computes the exact extents of each coloured region —
   polygons bounded by the wires on both sides, subdivided per height band —
   instead of overpainting everything to the right of each wire up to the
@@ -2500,6 +2677,13 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   run when the branch has already moved past the event it is handling,
   rather than drafting a head that no longer exists behind its back
   ([#640](https://github.com/discopy/discopy/issues/640)).
+- Two error messages say what went wrong: `python.finset.Permutation`
+  of a sequence of the right length that is not a permutation said
+  `Expected a permutation of length 2, got 2.` and now says `Expected a
+  permutation of range(2), got (0, 0).`, and `biclosed.Application` of a
+  term whose type is not an exponential names the term and its type
+  rather than two classes. `discopy.quantum` exports `CY` beside `CX` and
+  `CZ` ([rel-int/discopy-next#31](https://github.com/rel-int/discopy-next/issues/31)).
 - `no-todo-on-main.yml`'s guard says why it fails: each of its calls
   that can fail -- reading a tree, reading the pull request, either
   mutation -- raises an `::error::` annotation naming itself, and a
@@ -2854,6 +3038,28 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   [#471](https://github.com/discopy/discopy/pull/471),
   [#477](https://github.com/discopy/discopy/pull/477),
   [#481](https://github.com/discopy/discopy/pull/481)).
+- The suite keeps the `--skip-extra` contract of `test/plugin.py`: the
+  torch and jax tests of `test/tensor.py` and the pennylane, pytorch and
+  quimb tests of `test/quantum/circuit.py` skip without their extra,
+  rather than failing or, for `circuit.py`, skipping the whole file with
+  torch absent, and the pyzx tests skip below the version
+  `pyproject.toml` pins ([rel-int/discopy-next#31](https://github.com/rel-int/discopy-next/issues/31)).
+- Tests that could not fail now can: `test/cat.py` asserted `str(a == b)`,
+  `test/markov.py`'s equations asserted nothing and are checked in the
+  integers, `test/readme.py` skipped a README block that did not compile,
+  `test/quantum/circuit.py` compared the int `0` an empty sum evaluates
+  to with `0`, or only checked that it was falsy, and left numpy's print
+  options changed. `config`,
+  `messages`, `python.function`, `grammar.cfg` and `grammar.thue` get the
+  test file `AGENTS.md` says each module has ([rel-int/discopy-next#31](https://github.com/rel-int/discopy-next/issues/31)).
+- `CONTRIBUTING.md` names `setuptools` as the build backend, which it is,
+  and `pyproject.toml` drops the `[tool.uv.build-backend]` table only
+  `uv_build` reads; the checkouts of `build.yml` set
+  `persist-credentials: false` as every other checkout does;
+  `docs/conf.py` mocks only `pennylane`, the one import the `docs` extra
+  does not install; and the stray `readme.py` at the root, which raised,
+  and the two gifs tracked inside `discopy/`, which nothing reads, are
+  deleted ([rel-int/discopy-next#31](https://github.com/rel-int/discopy-next/issues/31)).
 
 ## [1.2.2] - 2025-12-19
 

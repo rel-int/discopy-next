@@ -19,6 +19,7 @@ Summary
 from __future__ import annotations
 from discopy.utils import assert_isinstance
 from typing import Iterable, Self, Any
+from itertools import accumulate
 from collections.abc import Sequence
 
 from dataclasses import dataclass
@@ -134,11 +135,22 @@ class Function(MonoidalCategory, Sequence):
     @classmethod
     def permutation(
             cls, xs: Sequence[int], doms: Sequence[int | Nat]) -> Function:
-        xs = Permutation(xs)
-        dom = sum(int(d) for d in doms)
-        if xs.is_identity:
-            return Function.id(dom)
-        return Function(list(Permutation(xs, dom)), dom, dom)
+        """
+        The function that permutes blocks of elements, the ``i``-th block of
+        its codomain being the ``xs[i]``-th block of its domain, of size
+        ``doms[xs[i]]``.
+
+        Parameters:
+            xs : The permutation of the blocks.
+            doms : The size of each block.
+
+        >>> assert Function.permutation([1, 0], [2, 3]) == Function.swap(2, 3)
+        """
+        sizes = [int(d) for d in doms]
+        xs = Permutation(xs, len(sizes))
+        offsets = [0, *accumulate(sizes)]
+        inside = [offsets[i] + j for i in xs for j in range(sizes[i])]
+        return Function(inside, offsets[-1], offsets[-1])
 
     @staticmethod
     def copy(x: int | Nat, n=2) -> Function:
@@ -177,9 +189,7 @@ class Permutation(Function, PROP, Groupoid):
                 messages.WRONG_PERMUTATION.format(size, len(inside))
             )
         if sorted(inside) != list(range(size)):
-            raise ValueError(
-                messages.WRONG_PERMUTATION.format(size, len(inside))
-            )
+            raise ValueError(messages.NOT_A_PERMUTATION.format(size, inside))
         super().__init__(list(inside), size, size)
 
     def __iter__(self):

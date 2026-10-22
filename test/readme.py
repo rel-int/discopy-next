@@ -21,9 +21,5 @@ def test_readme(monkeypatch):
     for match in blocks:
         # Pad with newlines so tracebacks point at the actual README lines.
         source = "\n" * text.count("\n", 0, match.start(1)) + match.group(1)
-        try:
-            code = compile(source, str(README), "exec")
-        except SyntaxError:
-            continue  # pseudo-code block, e.g. `f @ g = ... != ...`
-        exec(code, namespace)
+        exec(compile(source, str(README), "exec"), namespace)
         plt.close("all")

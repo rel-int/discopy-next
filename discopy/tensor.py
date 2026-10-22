@@ -508,8 +508,6 @@ class Functor(frobenius.Functor):
             + f"dtype={dtype}{optimize}{params})"
 
     def __call__(self, other):
-        if isinstance(other, Dim):
-            return other
         if isinstance(other, Bubble):
             return self(other.arg).map(other.func)
         if isinstance(other, (
@@ -873,11 +871,26 @@ class Box(frobenius.Box, Diagram):
             drawing_name=f"$\\partial {var}$")
 
     def setoid(self):
-        """ Compare boxes by turning their internal `data` into tuples. """
-        data = () if self.data is None else\
-            tuple(self.data) if isinstance(self.data, list) else (self.data, )
+        """
+        Compare boxes by turning their internal ``data`` into the tuple of its
+        entries: a list as it is, an array of any backend through its
+        ``tolist`` and a list of lists flattened.
+
+        >>> import numpy as np
+        >>> f = Box('f', Dim(2), Dim(2), np.array([[0, 1], [1, 0]]))
+        >>> assert f == Box('f', Dim(2), Dim(2), [[0, 1], [1, 0]])\\
+        ...     == Box('f', Dim(2), Dim(2), [0, 1, 1, 0])
+        >>> assert f != Box('f', Dim(2), Dim(2), [0, 1, 1, 1])
+        >>> assert len({f, f.dagger().dagger()}) == 1
+        """
+        data = getattr(self.data, "tolist", lambda: self.data)()
+        if isinstance(data, list) and any(isinstance(x, list) for x in data):
+            with backend('numpy') as np:
+                data = np.array(data).reshape(-1).tolist()
+        entries = () if data is None\
+            else tuple(data) if isinstance(data, list) else (data, )
         return (self.name, self.dom, self.cod, self.dtype, self.is_dagger,
-                self.deterministic, self.affine) + data
+                self.deterministic, self.affine) + entries
 
 
 class Cup(frobenius.Cup, Box):

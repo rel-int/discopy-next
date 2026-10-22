@@ -18,6 +18,13 @@ def test_simplify():
         == (Diagram.braid(y @ z, x)[::-1] >> Diagram.braid(y @ z, x)).simplify()
 
 
+def test_simplify_foliated():
+    g = Box('g', x, x)
+    diagram = (f @ g >> Braid(b, x) >> Braid(b, x)[::-1]).foliation()
+    assert len(diagram.inside[0].boxes) == 2
+    assert diagram.simplify() == f @ x >> b @ g
+
+
 def test_to_hypergraph():
     # A braid is not a swap: it stays a box of the hypergraph and of the map.
     from discopy import hypergraph, cmap

@@ -74,6 +74,20 @@ def test_trace_error():
         Box('f', 'x', 'y').trace()
 
 
+def test_trace_out_of_range():
+    from discopy import compact
+    from discopy.matrix import Matrix
+    from discopy.python import additive
+    x = compact.Ty('x')
+    f = compact.Box('f', x @ x, x @ x)
+    g = additive.Function(lambda i, tag=0: (i, tag), (int, int), (int, int))
+    for traced in (Box('f', 'x', 'x'), f, f.to_hypergraph(), f.to_drawing(),
+                   Matrix[bool].swap(1, 1), g):
+        for n in (3, -1):
+            with raises(ValueError):
+                traced.trace(n)
+
+
 def test_trace_dagger():
     f = Box('f', 'x', 'x')
     assert f.trace().dagger() == f.dagger().trace()

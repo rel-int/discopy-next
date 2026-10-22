@@ -107,7 +107,19 @@ class Diagram(monoidal.Diagram, BraidedCategory):
         return hexagon(cls, cls.braid_factory)(left, right)
 
     def simplify(self) -> Diagram:
-        """ Remove braids followed by their dagger. """
+        """
+        Remove braids followed by their dagger, splitting the layers of more
+        than one box into staircases first, see :meth:`to_staircases`.
+
+        Example
+        -------
+        >>> x, y = map(Ty, "xy")
+        >>> f, g = Box('f', x, x), Box('g', y, y)
+        >>> diagram = (f @ g >> Braid(x, y) >> Braid(x, y)[::-1]).foliation()
+        >>> assert diagram.simplify() == f @ y >> x @ g
+        """
+        if any(len(layer.boxes) > 1 for layer in self.inside):
+            return self.to_staircases().simplify()
         layers = [layer.boxes_and_types for layer in self.inside]
         for i, ((x, f, _), (y, g, _)) in enumerate(
                 zip(layers, layers[1:])):

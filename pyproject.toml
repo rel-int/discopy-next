@@ -150,11 +150,6 @@ name = "pytorch-cpu"
 url = "https://download.pytorch.org/whl/cpu"
 explicit = true
 
-[tool.uv.build-backend]
-module-root = ""
-source-exclude = ["discopy/version.py"]
-wheel-exclude = ["discopy/version.py"]
-
 [project.urls]
 Homepage = "https://discopy.org"
 Documentation = "https://docs.discopy.org"

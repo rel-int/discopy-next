@@ -604,9 +604,11 @@ def keyword_form(trace: Callable) -> Callable:
     The domain is checked on the result, since the boundary takes in the
     delay of the memory when the trace is the
     :meth:`TracedCategory.feedback` of a category that labels the two apart,
-    e.g. a :class:`discopy.drawing.Drawing`. A method that takes ``mem``
-    already is returned as it is, so that a class wraps the trace it defines
-    once, whichever trace that one calls.
+    e.g. a :class:`discopy.drawing.Drawing`. The positional form is split
+    too, so that an ``n`` the boundary cannot spare raises ``ValueError`` in
+    either form. A method that takes ``mem`` already is returned as it is,
+    so that a class wraps the trace it defines once, whichever trace that
+    one calls.
 
     Parameters:
         trace : The method in its positional form.
@@ -617,6 +619,10 @@ def keyword_form(trace: Callable) -> Callable:
     >>> f = Matrix[bool]([[1, 1], [0, 0]], 2, 2)
     >>> assert f.trace(mem=1) == f.trace() != f.trace(mem=1, left=True)
     >>> assert keyword_form(Matrix.trace) is Matrix.trace
+    >>> f.trace(3)
+    Traceback (most recent call last):
+        ...
+    ValueError: Cannot split 3 atoms off 2.
     """
     if "mem" in signature(trace).parameters:
         return trace
@@ -625,6 +631,7 @@ def keyword_form(trace: Callable) -> Callable:
     def method(self, n: int = None, left: bool = False, *,
                dom=None, cod=None, mem=None):
         if (dom, cod, mem) == (None, None, None):
+            self.split_memory(n, left)
             return trace(self, left=left) if n is None\
                 else trace(self, n, left)
         dom, cod, mem = self.split_memory(

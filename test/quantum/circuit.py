@@ -2,12 +2,11 @@
 
 import pytest
 
-for backend in ("sympy", "torch", "tensornetwork"):
+for backend in ("sympy", "tensornetwork"):
     pytest.importorskip(backend)
 
 import numpy as np
 import sympy
-import torch
 import tensornetwork as tn
 from pytest import raises
 
@@ -107,6 +106,18 @@ def test_pure_Box():
         Box('f', bit, qubit, is_mixed=False)
 
 
+def test_pure_Box_stays_pure():
+    quantum = Box('f', qubit ** 2, qubit, data=list(range(8)), is_mixed=False)
+    classical = Box('g', bit, bit, data=[1, 2, 3, 4], is_mixed=False)
+    for box in (quantum, classical):
+        for rebuilt in (box.dagger(), box.rotate(), box.delay()):
+            assert not rebuilt.is_mixed
+        assert box.dagger().eval().is_close(box.eval().dagger())
+        assert box.rotate().eval().is_close(box.eval().r)
+        assert box.rotate(left=True) == box.rotate()
+        assert box.rotate(left=True).rotate() == box
+
+
 def test_gate_hash():
     """
     Quantum gates carry their matrix as data, which numpy makes unhashable.
@@ -154,7 +165,7 @@ def test_Digits():
 
 
 def test_Bits():
-    assert repr(Bits(0).dagger()) == "Bits(0).dagger()"
+    assert repr(Bits(0).dagger()) == "quantum.gates.Bits(0).dagger()"
     assert Bits(0).dagger().dagger() == Bits(0)
 
 
@@ -184,7 +195,8 @@ def test_CRx():
 
 
 def test_Sum():
-    assert not Sum([], qubit, qubit).eval()
+    zero, one = Sum((), qubit, qubit), Id(qubit)
+    assert zero.eval() + one.eval() == (zero + one).eval() == one.eval()
     assert Sum([Id()]).get_counts() == Id().get_counts()
     assert (Id() + Id()).get_counts()[()] == 2
     assert (Id() + Id()).eval() == Id().eval() + Id().eval()
@@ -214,16 +226,14 @@ def _to_square_mat(m):
 
 def test_grad_basic():
     from sympy.abc import phi
-    assert Rz(0).grad(phi).eval() == 0
-    assert CU1(1).grad(phi).eval() == 0
-    assert CRz(0).grad(phi).eval() == 0
-    assert CRx(1).grad(phi).eval() == 0
+    for constant in (Rz(0), CU1(1), CRz(0), CRx(1), scalar(1.23), Measure()):
+        zero = constant.grad(phi)
+        assert isinstance(zero, Sum) and not zero.terms
+        assert (zero.dom, zero.cod) == (constant.dom, constant.cod)
 
     assert scalar(2 * phi).grad(phi).eval().array == 2
-    assert scalar(1.23).grad(phi).eval() == 0
     assert (scalar(2 * phi) + scalar(3 * phi)).grad(phi).eval().array == 5
 
-    assert Measure().grad(phi).eval() == 0
     with raises(NotImplementedError):
         Box("dummy box", qubit, qubit, data=phi).grad(phi)
 
@@ -417,14 +427,12 @@ def test_CCX_decompose(x, y, z):
     # take transpose because tensor axes follow diagrammatic order
     out = Id(n).CCX(x, y, z).eval().array.reshape(N, N).T
 
-    np.set_printoptions(threshold=3000)
-
-    print(unitary_mat.real)
-
     assert (out == unitary_mat).all()
 
 
 def test_circuit_to_pennylane(capsys):
+    pytest.importorskip("discopy.quantum.pennylane")
+    import torch
     bell_state = Circuit.caps(qubit, qubit)
     bell_effect = bell_state[::-1]
     snake = (bell_state @ Id(1) >> Bra(0) @ bell_effect)[::-1]
@@ -503,6 +511,7 @@ def test_circuit_to_pennylane(capsys):
 
 
 def test_pennylane_circuit_mixed_error():
+    pytest.importorskip("discopy.quantum.pennylane")
     bell_state = Circuit.caps(qubit, qubit)
     bell_effect = bell_state[::-1]
     snake = (bell_state @ Id(1) >> Bra(0) @ bell_effect)[::-1]
@@ -512,6 +521,7 @@ def test_pennylane_circuit_mixed_error():
 
 
 def test_pennylane_circuit_draw(capsys):
+    pytest.importorskip("discopy.quantum.pennylane")
     bell_state = Circuit.caps(qubit, qubit)
     bell_effect = bell_state[::-1]
     snake = (bell_state @ Id(1) >> Bra(0) @ bell_effect)[::-1]
@@ -526,6 +536,7 @@ def test_pennylane_circuit_draw(capsys):
 
 
 def test_pennylane_ops():
+    pytest.importorskip("discopy.quantum.pennylane")
     ops = [X, Y, Z, S, T, H, CX, CZ]
 
     for op in ops:
@@ -536,6 +547,7 @@ def test_pennylane_ops():
 
 
 def test_pennylane_parameterized_ops():
+    pytest.importorskip("discopy.quantum.pennylane")
     ops = [Rx, Ry, Rz, CRx, CRz]
 
     for op in ops:
@@ -571,6 +583,7 @@ def test_pennylane_device_honeywell(snake_circuit):
 
 
 def test_pennylane_device_aer(snake_circuit):
+    pytest.importorskip("discopy.quantum.pennylane")
     aer_backend = {'backend': 'qiskit.aer',
                    'device': 'aer_simulator_statevector'}
     aer_circ = snake_circuit.to_pennylane(backend_config=aer_backend)
@@ -583,6 +596,7 @@ def test_pennylane_device_aer(snake_circuit):
 
 
 def test_pennylane_uninitialized():
+    pytest.importorskip("discopy.quantum.pennylane")
     x, y, z = sympy.symbols('x y z')
     var_circ = Circuit.decode(
         dom=qubit ** 0, boxes_and_offsets=zip(
@@ -601,6 +615,8 @@ def test_pennylane_uninitialized():
 
 
 def test_pennylane_parameter_reference():
+    pytest.importorskip("discopy.quantum.pennylane")
+    import torch
     x = sympy.symbols('x')
     p = torch.nn.Parameter(torch.tensor(1.))
     symbol_weight_map = {x: p}
@@ -621,6 +637,8 @@ def test_pennylane_parameter_reference():
 
 
 def test_pennylane_gradient_methods():
+    pytest.importorskip("discopy.quantum.pennylane")
+    import torch
     x, y, z = sympy.symbols('x y z')
     symbols = [x, y, z]
 
@@ -714,18 +732,21 @@ def test_consistent_eval(c):
 
 @pytest.mark.parametrize('c', mixed_circuits)
 def test_pytorch_mixed_eval(c):
+    pytest.importorskip("torch")
     with tn.DefaultBackend('pytorch'):
         assert is_close_smallno(c.eval(contractor=contractor), c.eval())
 
 
 @pytest.mark.parametrize('c', pure_circuits)
 def test_pytorch_pure_eval(c):
+    pytest.importorskip("torch")
     with tn.DefaultBackend('pytorch'):
         assert is_close_smallno(c.eval(contractor=contractor), c.eval())
 
 
 @pytest.mark.parametrize('c', pure_circuits)
 def test_pytorch_consistent_eval(c):
+    pytest.importorskip("torch")
     with tn.DefaultBackend('pytorch'):
         pure_result = c.eval(mixed=False, contractor=contractor)
         mixed_result = c.eval(mixed=True, contractor=contractor)
@@ -738,6 +759,7 @@ def test_pytorch_consistent_eval(c):
 
 @pytest.mark.parametrize('c', pure_circuits)
 def test_quimb_pure_eval(c):
+    pytest.importorskip("quimb")
     t = c.to_quimb().contract()
     t = t.data.transpose(*np.argsort(t.inds))
 

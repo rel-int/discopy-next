@@ -111,8 +111,8 @@ def test_Arrow_repr():
 def test_Arrow_str():
     x, y, z = Ob('x'), Ob('y'), Ob('z')
     f, g = Box('f', x, y), Box('g', y, z)
-    assert str(Arrow((), x, x) == "Id(x)")
-    assert str(Arrow((f, ), x, y) == "f")
+    assert str(Arrow((), x, x)) == "Id(x)"
+    assert str(Arrow((f, ), x, y)) == "f"
     assert str(Arrow((f, g), x, z)) == "f >> g"
 
 

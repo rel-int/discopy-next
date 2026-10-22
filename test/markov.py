@@ -57,19 +57,26 @@ def test_Discard():
 
 
 def test_equations():
+    """ The laws of an abelian group in a Markov category, in the integers. """
     x = Ty('x')
     copy, discard = Copy(x), Copy(x, 0)
     add, minus, zero = Box('+', x @ x, x), Box('-', x, x), Box('0', Ty(), x)
+    F = Functor({x: int}, {
+        add: lambda a, b: a + b, minus: lambda a: -a, zero: lambda: 0},
+        cod=Function)
 
-    add >> copy, copy @ copy >> x @ Swap(x, x) @ x >> add @ add
-    add >> discard, discard @ discard
-    zero >> discard, Diagram.id(Ty())
-    copy >> minus @ x >> add, discard >> zero, copy >> x @ minus >> add
-
-    Diagram.id(x)
-    x @ zero >> x @ copy >> add @ x >> discard @ x
-    x @ zero @ zero >> discard @ discard @ x
-    discard >> zero
+    for sides in [
+            (add >> copy, copy @ copy >> x @ Swap(x, x) @ x >> add @ add),
+            (add >> discard, discard @ discard),
+            (zero >> discard, Diagram.id(Ty())),
+            (copy >> minus @ x >> add, discard >> zero,
+             copy >> x @ minus >> add),
+            (x @ zero >> x @ copy >> add @ x >> discard @ x,
+             x @ zero @ zero >> discard @ discard @ x,
+             discard >> zero)]:
+        for xs in [(3, 5), (-2, 7)]:
+            xs = xs[:len(sides[0].dom)]
+            assert len({F(side)(*xs) for side in sides}) == 1
 
 
 def test_neural_network():

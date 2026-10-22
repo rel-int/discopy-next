@@ -741,6 +741,9 @@ class Layer(cat.Box, ColouredMonoid):
         state['boxes_or_types'] = type(self).normalise(
             state['boxes_or_types'])
         super().__setstate__(state)
+        for key in [key for key in vars(self) if isinstance(
+                getattr(type(self), key, None), cached_property)]:
+            delattr(self, key)
 
     def __init__(self, *inside: Ty | Box, normalise: bool = True):
         if normalise:
@@ -1192,9 +1195,11 @@ class Diagram(cat.Arrow, MonoidalCategory, RichDisplay):
         >>> x = Ty('x')
         >>> f = Box('f', x, x ** 4)
         >>> diagram = f @ x ** 2 >> x ** 2 @ f.dagger()
-        >>> assert diagram.width == 6
+        >>> assert diagram.width == 6 and Diagram.id(x ** 2).width == 2
         """
-        return max(len(self.dom), max(len(layer.cod) for layer in self))
+        return max(
+            len(self.dom),
+            max((len(layer.cod) for layer in self), default=0))
 
     def encode(self) -> tuple[Ty, list[tuple[Box, int]]]:
         """

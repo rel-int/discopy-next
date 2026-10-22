@@ -92,7 +92,7 @@ from itertools import count
 from typing import (
     TYPE_CHECKING, Callable, ClassVar, Iterator, Self, Sequence)
 
-from discopy import cat, monoidal, cmap, messages
+from discopy import cat, monoidal, cmap, hypergraph, messages
 from discopy.abc import BiclosedCategory
 from discopy.axioms import (
     GENERATORS, Equation as AbstractEquation, Equivalence, Testable, axiom)
@@ -419,12 +419,20 @@ class Eval(Box):
 
     Parameters:
         x : The exponential type to evaluate.
+        left : Whether to evaluate ``x @ x.exponent`` on the left or
+            ``x.exponent @ x`` on the right, by default the right for an
+            :class:`Under` and the left otherwise, as :meth:`Diagram.ev`.
+            An :class:`Over` is evaluated on the left only and an
+            :class:`Under` on the right only.
     """
     def __init__(self, x: Exp, left=None):
         assert x.is_exp
         self.x = x
         exp = x.inside[0]
-        self.left = isinstance(exp, Over) if left is None else left
+        self.left = not isinstance(exp, Under) if left is None else left
+        if isinstance(exp, Under if self.left else Over):
+            raise AxiomError(messages.WRONG_SIDE.format(
+                not self.left, x, self.left))
         dom, cod = (x @ x.exponent, x.base) if self.left\
             else (x.exponent @ x, x.base)
         super().__init__("Eval" + str(x), dom, cod)
@@ -454,6 +462,7 @@ class Coeval(Box):
 
     Parameters:
         x : The exponential type to coevaluate.
+        left : Whether to coevaluate on the left or right, as :class:`Eval`.
 
     Note
     ----
@@ -474,7 +483,10 @@ class Coeval(Box):
         assert x.is_exp
         self.x = x
         exp = x.inside[0]
-        self.left = isinstance(exp, Over) if left is None else left
+        self.left = not isinstance(exp, Under) if left is None else left
+        if isinstance(exp, Under if self.left else Over):
+            raise AxiomError(messages.WRONG_SIDE.format(
+                not self.left, x, self.left))
         cod, dom = (x @ x.exponent, x.base) if self.left\
             else (x.exponent @ x, x.base)
         super().__init__("Coeval" + str(x), dom, cod)
@@ -489,7 +501,7 @@ class Curry(monoidal.Bubble, Box):
 
     Parameters:
         arg : The diagram to curry.
-        n : The number of atomic types to curry.
+        n : The number of atomic types to curry, at most ``len(arg.dom)``.
         left : Whether to curry on the left or right, default is ``True``.
 
     Example
@@ -499,6 +511,8 @@ class Curry(monoidal.Bubble, Box):
     Curry(f, 1, True)
     """
     def __init__(self, arg: Diagram, n=1, left=True):
+        if not 0 <= n <= len(arg.dom):
+            raise AxiomError(messages.NOT_SPLITTABLE.format(n, arg.dom))
         self.n, self.left = n, left
         name = f"Curry({arg}, {n}, {left})"
         if left:
@@ -591,6 +605,12 @@ class Functor(monoidal.Functor):
     ...             ar_map={f: (Ty("B") << Ty("A"))("g"), x: Ty("A")("a")})
     >>> assert F(f(x)) == F(f)(F(x))
 
+    A :class:`CMap` has no terms, so a term is evaluated into it. Nor has a
+    :class:`discopy.hypergraph.Hypergraph`, nor even :meth:`Diagram.ev`, so a
+    term is sent there as the image of its diagram:
+
+    >>> assert f(x).to_hypergraph() == f(x).eval().to_hypergraph()
+
     The image of a term is checked to have the image of its type:
 
     >>> Functor(ob_map={X: Ty("A"), Y: Ty("B")}, ar_map={f: Ty("A")("a")})(f)
@@ -602,8 +622,11 @@ class Functor(monoidal.Functor):
 
     def __call__(self, other):
         if isinstance(other, TermBase):
-            if issubclass(get_origin(self.cod.ob), Ty) \
-                    and not issubclass(get_origin(self.cod), cmap.CMap):
+            if issubclass(get_origin(self.cod), hypergraph.Hypergraph)\
+                    and not isinstance(other, Constant):
+                return self(other.eval())
+            if issubclass(get_origin(self.cod.ob), Ty) and not issubclass(
+                    get_origin(self.cod), (cmap.CMap, hypergraph.Hypergraph)):
                 return self.map_term(other)
             return other.eval(self)
         for cls, attr in [(Over, "over"), (Under, "under"), (Exp, "exp")]:
@@ -1097,7 +1120,7 @@ class Application(TermBase):
         assert_isinstance(func, TermBase)
         assert_isinstance(args, TermBase)
         if not func.cod.is_exp:
-            raise TypeError(f"Expected {Exp}, got {type(func.cod)}")
+            raise TypeError(messages.NOT_EXPONENTIAL.format(func, func.cod))
         self.func, self.args, self.left = func, args, left
         if self.func.cod.exponent != self.args.cod:
             raise ValueError(

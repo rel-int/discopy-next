@@ -153,7 +153,7 @@ from collections.abc import Callable
 
 from typing import ClassVar, Iterator
 
-from discopy import cat, monoidal, biclosed
+from discopy import cat, monoidal, biclosed, messages
 from discopy.abc import Pregroup, RigidCategory
 from discopy.cat import factory
 from discopy.utils import (
@@ -699,6 +699,22 @@ class Box(biclosed.Box, Diagram):
         return type(self)(self.name, dom=dom, cod=cod,
                           data=self.data, is_dagger=self.is_dagger, z=z)
 
+    def dagger(self) -> Box:
+        """
+        The dagger of a rigid box keeps its winding number, i.e. the dagger
+        of a rotation is the rotation of the dagger, as in a dagger pivotal
+        category, see :meth:`discopy.pivotal.Diagram.conjugate`.
+
+        Example
+        -------
+        >>> f = Box('f', Ty('a'), Ty('b'))
+        >>> assert f.r[::-1] == f[::-1].r and f.r[::-1].z == 1
+        >>> assert f.r[::-1][::-1] == f.r and f.l.l[::-1][::-1] == f.l.l
+        """
+        return type(self)(self.name, dom=self.cod, cod=self.dom,
+                          data=self.data, is_dagger=not self.is_dagger,
+                          z=self.z)
+
     @classmethod
     def strategy(cls, **params):
         """
@@ -908,14 +924,24 @@ class Functor(biclosed.Functor):
 def nesting(cls: type, factory: Callable) -> Callable[[Ty, Ty], Diagram]:
     """
     Take a :code:`factory` for cups or caps of atomic types
-    and extends it recursively.
+    and extends it recursively, to types of the same length.
 
     Parameters:
         cls : A diagram factory, e.g. :class:`Diagram`.
         factory :
             A factory for cups (or caps) of atomic types, e.g. :class:`Cup`.
+
+    Example
+    -------
+    >>> x = Ty('x')
+    >>> Diagram.cups(x @ x, x.r)
+    Traceback (most recent call last):
+        ...
+    discopy.utils.AxiomError: x @ x and x.r are not adjoints.
     """
     def method(left: Ty, right: Ty) -> Diagram:
+        if len(left) != len(right):
+            raise AxiomError(messages.NOT_ADJOINT.format(left, right))
         if len(left) == 0:
             return cls.id(left[:0])
         head, tail = factory(left[0], right[-1]), method(left[1:], right[:-1])

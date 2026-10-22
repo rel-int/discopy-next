@@ -253,10 +253,46 @@ def test_permutation_factory():
     assert Diagram.permutation_factory is Permutation
     perm = Permutation(x @ y @ z, [2, 0, 1])
     functor = Functor(ob_map={x: y, y: z, z: x}, ar_map={})
-    assert Equation(
-        functor(perm), Permutation(y @ z @ x, [2, 0, 1]))
+    assert functor(perm) == Permutation(y @ z @ x, [2, 0, 1])
     assert Equation(perm, perm.to_swaps())
     assert Equation(functor(perm), functor(perm.to_swaps()))
+
+
+def test_Functor_on_whiskered_Swap():
+    from discopy import balanced
+    from discopy.matrix import Matrix
+    x, y, z = Ty('x'), Ty('y'), Ty('z')
+    braided = Functor({x: x, y: y, z: z}, {}, cod=balanced.Diagram)
+    assert braided(Swap(x, y) @ z) == balanced.Braid(x, y) @ z
+    assert braided(Permutation(x @ y @ z, [2, 0, 1]))\
+        == x @ balanced.Braid(y, z) >> balanced.Braid(x, z) @ y
+    assert braided(Permutation(x @ y, [0, 1])) == balanced.Diagram.id(x @ y)
+    assert [type(box) for box in (Swap(x, y) @ z).to_braided().boxes]\
+        == [balanced.DualRailBraid]
+    widen = Functor({Nat(1): x @ y}, {})
+    assert Equation(
+        widen(Diagram.swap(Nat(1), Nat(1)) @ Nat(1)),
+        Diagram.swap(x @ y, x @ y) @ (x @ y))
+    assert Functor({Nat(1): 2}, {}, cod=Matrix)(Permutation(
+        Nat(3), [1, 0, 2])) == Matrix.permutation([1, 0, 2], [2, 2, 2])
+    perm = Permutation(Nat(3), [2, 0, 1])
+    assert Functor({Nat(1): Nat(1)}, {})(perm) == perm
+
+
+def test_Functor_id_on_Permutation():
+    from discopy import symmetric, markov, compact, frobenius
+    from discopy.matrix import Matrix
+    for module in (symmetric, markov, compact, frobenius):
+        x, y, z, w = map(module.Ty, "xyzw")
+        perm = module.Permutation(x @ y @ z, [1, 2, 0])
+        assert module.Functor.id(module.Diagram)(perm) == perm
+        F = module.Functor({x: y @ z, y: w, z: x @ x}, {})
+        staircase = module.Diagram.permutation(perm.perm, [y @ z, w, x @ x])
+        assert F(perm) == module.Permutation(
+            y @ z @ w @ x @ x, [2, 3, 4, 0, 1])
+        assert module.Equation(F(perm), staircase)
+        G = module.Functor({x: 2, y: 3, z: 1, w: 2}, {}, cod=Matrix)
+        assert G(F(perm)) == G(staircase)
 
 
 def test_inherited_permutation_factory():
@@ -348,7 +384,9 @@ def test_Permutation_foliation():
     with raises(AxiomError):
         foliated.inside[0].merge(foliated.inside[1])
     inverse = reverse.dagger() >> reverse
-    assert inverse.foliation() == inverse
+    assert inverse.foliation() == Id(inverse.dom)
+    assert (inverse >> reverse.dagger()).foliation() == reverse.dagger()
+    assert (Swap(x, y) >> Swap(y, x)).foliation() == Id(x @ y)
     with raises(AxiomError):
         inverse.inside[0].merge(inverse.inside[1])
 

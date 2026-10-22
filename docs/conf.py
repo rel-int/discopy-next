@@ -45,8 +45,8 @@ graphviz_output_format = 'svg'
 
 autosummary_generate = True
 
-autodoc_mock_imports = [
-    "pytket", "pennylane", "torch", "sympy", "cotengra", "quimb", "pyzx"]
+# discopy.optyx imports these, which the docs extra does not install.
+autodoc_mock_imports = ["pennylane", "cotengra", "quimb", "pyzx"]
 
 autodoc_typehints = "description"
 autodoc_typehints_format = "short"

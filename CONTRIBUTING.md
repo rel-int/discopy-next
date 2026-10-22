@@ -251,7 +251,7 @@ uv run sphinx-build docs docs/_build/html
 
 ## Build without uv
 
-The project uses the `uv_build` PEP 517 build backend, so package builds still work from standard Python tooling.
+The project uses the `setuptools` PEP 517 build backend, with its version read from git by `setuptools-scm`, so package builds work from standard Python tooling.
 If you do not use `uv`, create a virtual environment and install the relevant extras manually:
 
 ```shell
