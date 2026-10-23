@@ -9,7 +9,7 @@ from discopy.abc import DaggerCategory, Nat
 from discopy.matrix import Matrix, backend
 from discopy.symmetric import Ty, Permutation, Swap, Functor
 from discopy.tensor import Tensor, Dim
-from discopy.utils import AxiomError, dumps, loads
+from discopy.utils import AxiomError, Subscript, dumps, loads
 
 
 def test_Matrix_trace_left():
@@ -53,8 +53,8 @@ def test_repeat():
 def test_autotyping():
     pytest.importorskip("jax")
     torch = pytest.importorskip("torch")
-    assert Matrix([0.5, 0.5], dom=1, cod=2).dtype == np.float64
-    assert Matrix([0.5j], dom=1, cod=1).dtype == np.complex128
+    assert Matrix([0.5, 0.5], dom=1, cod=2).dtype == float
+    assert Matrix([0.5j], dom=1, cod=1).dtype == complex
     with backend('jax'):
         assert Matrix([0.5, 0.5], dom=1, cod=2).dtype == np.float32
     with backend('pytorch'):
@@ -186,9 +186,38 @@ def test_Matrix_strategy():
     assert type(find(Matrix[bool].strategy(), lambda _: True)) is Matrix[bool]
 
 
+@pytest.mark.parametrize('cls', [Matrix, Tensor])
+def test_strategy_max_entries_on_pytorch(cls):
+    """ Entries are counted from the dimensions: a torch ``size`` is a
+    method. """
+    torch = pytest.importorskip("torch")
+    from hypothesis import find
+    strategy = cls.strategy(max_entries=4)
+    with backend('pytorch'):
+        drawn = find(strategy, lambda x: x.array.numel() > 3)
+    assert type(drawn.array) is torch.Tensor and drawn.array.numel() == 4
+
+
 def test_Matrix_axioms():
-    """ A dry run of the property matrix on the carrier it enrols. """
-    axioms.assert_axioms(Matrix[int])
+    """ A dry run of the property matrix on the carriers it enrols. """
+    axioms.assert_axioms(Matrix, Matrix[int])
+
+
+def test_Matrix_dtype_is_the_ring_of_entries():
+    """ numpy's default precisions are the Python types they stand for, so
+    the class a matrix infers is the one a user names, see #88. """
+    for dtype in (bool, int, float, complex):
+        assert Matrix[np.dtype(dtype).type] is Matrix[dtype]
+        assert Tensor[np.dtype(dtype).type] is Tensor[dtype]
+    assert Matrix[np.float32] is not Matrix[float]
+    assert Matrix[int].id(2) == Matrix.id(2)
+    assert type(Matrix.id(2) >> Matrix[int].id(2)) is Matrix[int]
+    m = Matrix([1, 2], 1, 2)
+    assert eval(repr(m), {"Matrix": Matrix}) == m
+    assert loads('{"factory": "matrix.Matrix[int64]", "array": [1, 2], '
+                 '"dom": {"factory": "abc.Nat", "n": 1}, '
+                 '"cod": {"factory": "abc.Nat", "n": 2}}') == m
+    assert Subscript.decode(Subscript(Matrix, (np.int64, ))) is Matrix[int]
 
 
 def test_Matrix_copy():
@@ -274,6 +303,16 @@ def test_repr_leaves_numpy_printoptions_alone():
         repr(Matrix(list(range(25)), 5, 5))
         assert np.get_printoptions()['threshold'] == 1000
     assert np.get_printoptions()['threshold'] == threshold
+
+
+def test_Matrix_map_widens():
+    """ A map with no dtype widens to its entries, see B9 of #31. """
+    m = Matrix([1, 2], 1, 2)
+    assert m.map(lambda x: x + 0.5) == Matrix[float]([1.5, 2.5], 1, 2)
+    assert m.map(lambda x: 2 * x) == Matrix([2, 4], 1, 2)
+    assert m.map(lambda x: x + 0.5, dtype=int) == m
+    assert Matrix[complex]([1j], 1, 1).map(abs).dtype == complex
+    assert Matrix.zero(0, 0).map(float) == Matrix.zero(0, 0)
 
 
 def test_Matrix_basis_dtype():

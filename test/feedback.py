@@ -295,6 +295,8 @@ def test_delayed_dagger():
     assert f.delay().dagger().dagger() == f.delay()
     for box in (f.delay().dagger(), f.dagger().delay(2)):
         assert eval(repr(box)) == box
+    wire = Wire('x').delay().dagger()
+    assert eval(repr(wire), {'feedback': feedback}).to_tree() == wire.to_tree()
 
 
 def test_traced_wildcard_import():

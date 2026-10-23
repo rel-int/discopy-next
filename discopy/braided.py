@@ -60,8 +60,8 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
-from discopy import monoidal
-from discopy.abc import BraidedCategory
+from discopy import monoidal, messages
+from discopy.abc import BraidedCategory, SpacialCategory
 from discopy.cat import factory
 from discopy.monoidal import Ty, Match
 from discopy.utils import (
@@ -90,6 +90,8 @@ class Diagram(monoidal.Diagram, BraidedCategory):
         dom (monoidal.Ty) : The domain of the diagram, i.e. its input.
         cod (monoidal.Ty) : The codomain of the diagram, i.e. its output.
     """
+    scalar_sliding = SpacialCategory.scalar_sliding.failing(
+        messages.FREE_SCALAR)
 
     @classmethod
     def braid(cls, left: monoidal.Ty, right: monoidal.Ty) -> Diagram:
@@ -120,10 +122,10 @@ class Diagram(monoidal.Diagram, BraidedCategory):
         """
         if any(len(layer.boxes) > 1 for layer in self.inside):
             return self.to_staircases().simplify()
-        layers = [layer.boxes_and_types for layer in self.inside]
-        for i, ((x, f, _), (y, g, _)) in enumerate(
-                zip(layers, layers[1:])):
-            if x == y and isinstance(f, Braid) and f == g[::-1]:
+        boxes, offsets = self.boxes, self.offsets
+        for i, (f, g) in enumerate(zip(boxes, boxes[1:])):
+            if offsets[i] == offsets[i + 1]\
+                    and isinstance(f, Braid) and f == g[::-1]:
                 inside = self.inside[:i] + self.inside[i + 2:]
                 return self.ar(
                     inside, self.dom, self.cod, _scan=False).simplify()
@@ -139,6 +141,9 @@ class Diagram(monoidal.Diagram, BraidedCategory):
             down : Whether to slide down or up.
             braid : The braiding method to be used.
 
+        A diagram with more than one box in a layer is split into staircases
+        first, see :meth:`to_staircases`, so that box ``i`` is layer ``i``.
+
         Examples
         --------
         >>> x, y, z = map(Ty, "xyz")
@@ -152,8 +157,11 @@ class Diagram(monoidal.Diagram, BraidedCategory):
         >>> assert bot_right.naturality(1, down=False) == top_left
         >>> assert bot_left.naturality(1, left=False, down=False) == top_right
         """
+        if any(len(layer.boxes) > 1 for layer in self.inside):
+            return self.to_staircases().naturality(i, left, down, braid)
         braid = braid or self.braid
-        left_wires, box, right_wires = self.inside[i].boxes_and_types
+        box, offset, dom = self.boxes[i], self.offsets[i], self.inside[i].dom
+        left_wires, right_wires = dom[:offset], dom[offset + len(box.dom):]
         if left and down:
             source = left_wires[-1] @ box >> braid(left_wires[-1], box.cod)
             target = braid(left_wires[-1], box.dom) >> box @ left_wires[-1]

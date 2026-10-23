@@ -179,6 +179,24 @@ def test_MappingOrCallable():
         MappingOrCallable([10, 20])
 
 
+def test_value_errors_have_messages():
+    from discopy import closed, lens, symmetric
+    x, y = closed.Ty('x'), closed.Ty('y')
+    for function, message in [
+            (lambda: rigid.Box('f', 'x', 'y').curry(2), "split 2"),
+            (lambda: closed.Box('f', x, y).uncurry(), "exponential"),
+            (lambda: closed.Box('f', x, y << x @ x).uncurry(1), "uncurry 1"),
+            (lambda: closed.Box('f', x, y << x).uncurry(-1), "split -1"),
+            (lambda: lens.Symmetric[symmetric.Diagram].permutation(
+                [0, 0], [x, x]), "permutation"),
+            (lambda: pushout(2, 3, [1], [0, 1]), "equal length"),
+            (lambda: assert_istraceable(symmetric.Box('f', 'x', 'x'), 2),
+             "split 2"),
+            (lambda: inductive(lambda n: n)(0, -1), "non-negative")]:
+        with pytest.raises(ValueError, match=message):
+            function()
+
+
 def test_NamedGeneric_without_type_parameter():
     class X(NamedGeneric):
         """ A class that declares no type parameter. """

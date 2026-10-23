@@ -90,7 +90,7 @@ jobs:
     - name: Benchmark the previous commit
       if: steps.previous.outputs.sha != ''
       run:
-        uv run pytest benchmark/ -v
+        uv run --with "pyzx==0.10.7" pytest benchmark/ -v
           --benchmark-json="$RUNNER_TEMP/previous.json"
     - name: Checkout the head commit
       if: steps.previous.outputs.sha != ''
@@ -106,7 +106,7 @@ jobs:
     - name: Benchmark the head commit
       run: |
         mkdir -p benchmark-results
-        uv run pytest benchmark/ -v \
+        uv run --with "pyzx==0.10.7" pytest benchmark/ -v \
           --benchmark-json=benchmark-results/bench.json
     - name: Render the report for the head commit
       env:

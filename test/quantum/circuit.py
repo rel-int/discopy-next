@@ -88,6 +88,7 @@ def test_Circuit_conjugate():
 def test_Circuit_measure():
     assert Id().measure() == 1
     assert all(Bits(0).measure(mixed=True) == np.array([1, 0]))
+    assert np.allclose(Copy().measure(), [[1, 0], [0, 0]])
     circuit = Ket(0, 0, 0) >> H @ H @ H
     assert np.allclose(circuit.measure(), np.ones((2, 2, 2)) / 8)
     assert np.allclose(
@@ -139,12 +140,20 @@ def test_Swap():
 def test_Discard():
     assert Discard().dagger() == MixedState()
     assert MixedState().dagger() == Discard()
+    import discopy
+    for box in [Discard(), Discard(bit @ qubit), MixedState(bit)]:
+        assert eval(repr(box), {'quantum': discopy.quantum}) == box
 
 
 def test_Measure():
     assert Measure(destructive=False, override_bits=True).dagger()\
         == Encode(constructive=False, reset_bits=True)
     assert Encode().dagger() == Measure()
+    import discopy
+    for box in [Measure(), Measure(2, destructive=False, override_bits=True),
+                Encode(), Encode(2, constructive=False, reset_bits=True),
+                Measure(2).delay(), Encode(reset_bits=True).delay(2)]:
+        assert eval(repr(box), {'quantum': discopy.quantum}) == box
 
 
 def test_ClassicalGate():
@@ -537,7 +546,7 @@ def test_pennylane_circuit_draw(capsys):
 
 def test_pennylane_ops():
     pytest.importorskip("discopy.quantum.pennylane")
-    ops = [X, Y, Z, S, T, H, CX, CZ]
+    ops = [X, Y, Z, S, T, S.dagger(), T.dagger(), H, CX, CZ]
 
     for op in ops:
         disco = (Id().tensor(*([Ket(0)] * len(op.dom))) >> op).eval().array
@@ -556,6 +565,13 @@ def test_pennylane_parameterized_ops():
         plane = p_op.to_pennylane().eval().numpy()
 
         assert np.allclose(disco, plane, atol=10e-5)
+
+
+def test_pennylane_complex_scalar_probabilities():
+    pytest.importorskip("discopy.quantum.pennylane")
+    circuit = scalar(2j) @ Ket(0) >> H
+    plane = circuit.to_pennylane(probabilities=True).eval().numpy()
+    assert np.allclose(plane, (circuit >> Measure()).eval().array)
 
 
 @pytest.fixture
@@ -695,7 +711,11 @@ mixed_circuits = [
         >> qubit @ CX @ qubit >> qubit ** 3 @ H >> Measure(4)),
     Ket(0, 0, 0, 0) >> Discard(2) @ Measure(2) @ sqrt(2),
     Circuit.swap(bit, bit) @ (MixedState(2) >> SWAP),
-    Measure() >> Copy() >> Match() >> Encode()
+    Measure() >> Copy() >> Match() >> Encode(),
+    Bits(1, 0) >> Discard(bit) @ bit >> MixedState(bit) @ bit,
+    H @ Ry(0.3) >> Measure(2, destructive=False),
+    Ket(0) @ Bits(1) >> Measure(override_bits=True),
+    Encode(2, constructive=False, reset_bits=True)
 ]
 
 pure_circuits = [
@@ -728,6 +748,14 @@ def test_consistent_eval(c):
     doubled_result = (pure_result
                       @ pure_result.conjugate(diagrammatic=False))
     assert is_close_smallno(doubled_result, mixed_result.to_tensor())
+
+
+def test_mixed_eval_foliated():
+    circuit = Ket(0, 0, 1) >> H @ X @ X >> Measure() @ Discard(qubit ** 2)
+    assert [len(layer.boxes) for layer in circuit.foliation().inside]\
+        == [1, 3, 2]
+    assert circuit.foliation().eval(mixed=True, contractor=contractor)\
+        .is_close(circuit.eval(mixed=True))
 
 
 @pytest.mark.parametrize('c', mixed_circuits)

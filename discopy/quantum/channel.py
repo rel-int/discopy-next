@@ -51,7 +51,8 @@ from discopy.quantum.circuit import (
     Digit, Qudit)
 from discopy.quantum.gates import Discard, Measure, MixedState, Encode, Scalar
 from discopy.tensor import Dim, Tensor
-from discopy.utils import assert_isinstance, unbiased
+from discopy.utils import (
+    assert_isinstance, assert_iscomposable, factory_name, unbiased)
 
 
 class CQ:
@@ -66,7 +67,7 @@ class CQ:
     Example
     -------
     >>> CQ(Dim(2), Dim(3)) @ CQ(Dim(4), Dim(5))
-    CQ(classical=Dim(2, 4), quantum=Dim(3, 5))
+    quantum.channel.CQ(classical=Dim(2, 4), quantum=Dim(3, 5))
     """
     def __init__(self, classical=Dim(1), quantum=Dim(1)):
         self.classical, self.quantum = classical, quantum
@@ -91,7 +92,8 @@ class CQ:
         return hash(repr(self))
 
     def __repr__(self):
-        return f"CQ(classical={self.classical}, quantum={self.quantum})"
+        return factory_name(type(self))\
+            + f"(classical={self.classical!r}, quantum={self.quantum!r})"
 
     def __str__(self):
         return "CQ()" if not self.classical and not self.quantum\
@@ -179,6 +181,7 @@ class Channel(Tensor):
             return super().then(*others)
         other, = others
         assert_isinstance(other, type(self))
+        assert_iscomposable(self, other)
         array = (self.to_tensor() >> other.to_tensor()).array
         return type(self)(array, self.dom, other.cod)
 

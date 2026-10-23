@@ -102,6 +102,10 @@ class Wire(frobenius.Wire):
     def __repr__(self):
         return f"{factory_name(type(self))}({self.dim}{self.repr_time_step()})"
 
+    def atoms(self) -> list:
+        """ A circuit object names no atom, its module binds it: qubit. """
+        return []
+
     @classmethod
     def from_tree(cls, tree: dict) -> Wire:
         dim, z = tree['dim'], tree.get('z', 0)
@@ -327,7 +331,8 @@ class Circuit(tensor.Diagram[complex]):
             for bitstring, count in counts[i].items():
                 result.array[bitstring] = count
             if circuit.post_processing:
-                result = result >> circuit.post_processing.eval().cast(float)
+                post_processing = circuit.post_processing.eval(mixed=True)
+                result = result >> post_processing.to_tensor().cast(float)
             results.append(result)
         return results if len(results) > 1 else results[0]
 
@@ -391,14 +396,21 @@ class Circuit(tensor.Diagram[complex]):
         Parameters
         ----------
         mixed : Whether to apply a :class:`tensor.Functor`
-                or a :class:`channel.Functor`.
+                or a :class:`channel.Functor`, which a mixed circuit
+                or one with bits always does.
 
         Returns
         -------
         array : numpy.ndarray
+
+        Example
+        -------
+        >>> from discopy.quantum import Copy, H, Ket
+        >>> assert (Ket(0) >> H).measure().round(2).tolist() == [.5, .5]
+        >>> assert Copy().measure().tolist() == [[1, 0], [0, 0]]
         """
         from discopy.quantum.gates import Ket
-        if mixed or self.is_mixed:
+        if mixed or self.is_mixed or bit in self.dom @ self.cod:
             return self.init_and_discard().eval(mixed=True).array.real
         state = (Ket(*(len(self.dom) * [0])) >> self).eval()
         with backend() as np:
@@ -421,9 +433,14 @@ class Circuit(tensor.Diagram[complex]):
 
         output_edge_order : list of :class:`tensornetwork.Edge`
             Output edges of the network.
+
+        A mixed circuit with more than one box in a layer is split into
+        staircases first, see :meth:`to_staircases`.
         """
         if not mixed and not self.is_mixed:
             return super().to_tn(dtype=complex)
+        if any(len(layer.boxes) > 1 for layer in self.inside):
+            return self.to_staircases().to_tn(mixed=mixed)
 
         import tensornetwork as tn
         from discopy.quantum.gates import (
@@ -436,11 +453,12 @@ class Circuit(tensor.Diagram[complex]):
         # try to decompose some gates
         diag = Id(self.dom)
         last_i = 0
-        for i, box in enumerate(self.boxes):
+        for i, (box, offset) in enumerate(zip(self.boxes, self.offsets)):
             if hasattr(box, '_decompose'):
                 decomp = box._decompose()
                 diag >>= self[last_i:i]
-                left, _, right = self.inside[i].boxes_and_types
+                dom = self.inside[i].dom
+                left, right = dom[:offset], dom[offset + len(box.dom):]
                 diag >>= Id(left) @ decomp @ Id(right)
                 last_i = i + 1
         diag >>= self[last_i:]
@@ -459,7 +477,8 @@ class Circuit(tensor.Diagram[complex]):
         q_scan2 = [n[1] for n in q_nodes2]
         nodes = c_nodes + q_nodes1 + q_nodes2
         for layer in self.inside:
-            left, box, right = layer.boxes_and_types
+            (box, offset), = layer.boxes_and_offsets
+            left, right = layer.dom[:offset], layer.dom[offset + len(box.dom):]
             c_offset = left.count(bit)
             q_offset = left.count(qubit)
             if box == Circuit.swap(bit, bit):
@@ -489,23 +508,31 @@ class Circuit(tensor.Diagram[complex]):
                            if typ == qubit]
                 q_scan2 = [edges[1] for typ, edges in zip(cod, scan)
                            if typ == qubit]
+            elif isinstance(box, Discard) and box.dom == bit:
+                node = tn.CopyNode(1, 2, 'c_discard', dtype=complex)
+                tn.connect(c_scan[c_offset], node[0])
+                del c_scan[c_offset]
+                nodes.append(node)
             elif isinstance(box, Discard):
                 assert box.n_qubits == 1
                 tn.connect(q_scan1[q_offset], q_scan2[q_offset])
                 del q_scan1[q_offset]
                 del q_scan2[q_offset]
             elif box.is_mixed or isinstance(box, ClassicalGate):
-                if isinstance(box, (Copy, Match, Measure, Encode)):
-                    assert len(box.dom) == 1 or len(box.cod) == 1
-                    node = tn.CopyNode(3, 2, 'cq_' + str(box), dtype=complex)
-                else:
-                    # only unoptimised gate is MixedState()
-                    array = box.eval(mixed=True).array
-                    node = tn.Node(array + 0j, 'cq_' + str(box))
                 c_dom = box.dom.count(bit)
                 q_dom = box.dom.count(qubit)
                 c_cod = box.cod.count(bit)
                 q_cod = box.cod.count(qubit)
+                if isinstance(box, (Copy, Match))\
+                        or isinstance(box, Measure) and not box.override_bits\
+                        or isinstance(box, Encode) and not box.reset_bits:
+                    assert len(box.dom) == 1 or len(box.cod) == 1
+                    rank = c_dom + 2 * q_dom + c_cod + 2 * q_cod
+                    node = tn.CopyNode(
+                        rank, 2, 'cq_' + str(box), dtype=complex)
+                else:
+                    array = box.eval(mixed=True).array
+                    node = tn.Node(array + 0j, 'cq_' + str(box))
                 for i in range(c_dom):
                     tn.connect(c_scan[c_offset + i], node[i])
                 for i in range(q_dom):

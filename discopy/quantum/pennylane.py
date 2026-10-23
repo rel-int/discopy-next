@@ -65,9 +65,9 @@ OP_MAP = {
     OpType.Y: qml.PauliY,
     OpType.Z: qml.PauliZ,
     OpType.S: qml.S,
-    OpType.Sdg: lambda wires: qml.S(wires=wires).inv(),
+    OpType.Sdg: lambda wires: qml.adjoint(qml.S(wires=wires)),
     OpType.T: qml.T,
-    OpType.Tdg: lambda wires: qml.T(wires=wires).inv(),
+    OpType.Tdg: lambda wires: qml.adjoint(qml.T(wires=wires)),
     OpType.H: qml.Hadamard,
     OpType.Rx: qml.RX,
     OpType.Ry: qml.RY,
@@ -426,7 +426,7 @@ class PennyLaneCircuit:
 
         open_wires = self._n_qubits - len(self._post_selection)
         post_selected_states = states[self._valid_states]
-        post_selected_states *= (self._scale ** 2 if self._probabilities
+        post_selected_states *= (abs(self._scale) ** 2 if self._probabilities
                                  else self._scale)
 
         if post_selected_states.shape[0] == 1:

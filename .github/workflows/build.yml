@@ -87,7 +87,7 @@ jobs:
         uv run python docs/export_notebooks.py --check
   docs:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25   # backstop: green builds take ~15 min since discopy.optyx's API pages (#276)
     strategy:
       matrix:
         python-version: [ "3.14" ]

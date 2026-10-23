@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 from pytest import raises
 
-from discopy import compact, quantum
+from discopy import frobenius, compact, quantum
 from discopy.quantum import Discard, Id, Ket, Measure
 from discopy.quantum.reservoir import Reservoir
 
@@ -40,8 +40,8 @@ def test_Reservoir_random_depth():
 
 def test_Reservoir_repr():
     reservoir = Reservoir.random(memory=1, inputs=1, seed=5)
-    scope = {"Reservoir": Reservoir,
-             "quantum": quantum, "compact": compact,
+    scope = {"Reservoir": Reservoir, "quantum": quantum,
+             "compact": compact, "frobenius": frobenius,
              **vars(quantum.gates)}
     assert eval(repr(reservoir), scope) == reservoir
     assert reservoir == Reservoir.random(memory=1, inputs=1, seed=5)

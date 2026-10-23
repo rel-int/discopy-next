@@ -53,3 +53,19 @@ def random_diagram(module, seed: int, n_layers: int = 8):
             new = module.Ty().tensor(*rng.choices(types, k=rng.randint(0, 2)))
             diagram >>= cod[:i] @ box(cod[i:j], new) @ cod[j:]
     return diagram, tensor.Functor(atoms, ar_map, dom=module.Diagram)
+
+
+def bent_wires():
+    """
+    Diagrams of :mod:`discopy.compact` with one cup or cap, its legs read or
+    written by a box on either side, which decode with no swap, see #139.
+    """
+    from discopy.compact import Ty, Box, Cup, Cap
+    x, y = Ty('x'), Ty('y')
+    g, h, k = Box('g', x, y), Box('h', x.r, y), Box('k', x, x)
+    f, e = Box('f', y @ x.r, y), Box('e', x @ y, y)
+    return [
+        Cap(x.r, x) >> x.r @ g, Cap(x, x.r) >> g @ x.r,
+        Cap(x.r, x) >> h @ x, Cap(x, x.r) >> x @ h,
+        y @ Cap(x.r, x) >> f @ x, Cap(x.r, x) @ y >> x.r @ e,
+        x.r @ k >> Cup(x.r, x), k @ x.r >> Cup(x, x.r)]

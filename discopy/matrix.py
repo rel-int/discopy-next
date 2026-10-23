@@ -59,8 +59,8 @@ if TYPE_CHECKING:
 
 
 @factory
-class Matrix(MarkovCategory, ComarkovCategory, DaggerCategory,
-             Testable["Matrix"], NamedGeneric['dtype']):
+class Matrix(NamedGeneric['dtype'], MarkovCategory, ComarkovCategory,
+             DaggerCategory, Testable["Matrix"]):
     """
     A matrix is an ``array`` with natural numbers as ``dom`` and ``cod``.
 
@@ -101,11 +101,22 @@ class Matrix(MarkovCategory, ComarkovCategory, DaggerCategory,
 
     The default data type is determined by underlying array datastructure of
     the backend used. An array is initialised with ``array`` as parameter and
-    the dtype of the ``Matrix`` object is the data type of this array.
+    the dtype of the ``Matrix`` object is the data type of this array. A
+    ``dtype`` names the ring of entries, so the scalar type numpy gives each
+    of ``bool``, ``int``, ``float`` and ``complex`` is that Python type and
+    the class a matrix infers is the one a user names.
+
     >>> import numpy as np
-    >>> assert Matrix([1, 0], dom=1, cod=2).dtype == np.int64
-    >>> assert Matrix([0.5, 0.5], dom=1, cod=2).dtype == np.float64
-    >>> assert Matrix([0.5j], dom=1, cod=1).dtype == np.complex128
+    >>> assert Matrix[np.int64] is Matrix[int]
+    >>> assert Matrix([1, 0], dom=1, cod=2).dtype == int
+    >>> assert Matrix([0.5, 0.5], dom=1, cod=2).dtype == float
+    >>> assert Matrix([0.5j], dom=1, cod=1).dtype == complex
+    >>> assert Matrix[int].id(2) == Matrix.id(2)
+
+    Other precisions keep numpy's names.
+
+    >>> Matrix([1, 2], 1, 2).cast(np.float32)
+    Matrix[float32]([1., 2.], dom=1, cod=2)
 
     Composition promotes the data type as the backend does, see
     :meth:`promote`, so that the integer identity is a unit for a float
@@ -123,9 +134,9 @@ class Matrix(MarkovCategory, ComarkovCategory, DaggerCategory,
     >>> m = Matrix([0, 1, 1, 0], 2, 2)
     >>> v = Matrix([0, 1], 1, 2)
     >>> v >> m >> v.dagger()
-    Matrix[int64]([0], dom=1, cod=1)
+    Matrix[int]([0], dom=1, cod=1)
     >>> m + m
-    Matrix[int64]([0, 2, 2, 0], dom=2, cod=2)
+    Matrix[int]([0, 2, 2, 0], dom=2, cod=2)
     >>> assert m.then(m, m, m, m) == m >> m >> m >> m >> m
 
     The monoidal product for :py:class:`.Matrix` is the direct sum:
@@ -135,24 +146,37 @@ class Matrix(MarkovCategory, ComarkovCategory, DaggerCategory,
     array([[2],
            [4]])
     >>> x @ x
-    Matrix[int64]([2, 0, 4, 0, 0, 2, 0, 4], dom=4, cod=2)
+    Matrix[int]([2, 0, 4, 0, 0, 2, 0, 4], dom=4, cod=2)
     >>> (x @ x).array
     array([[2, 0],
            [4, 0],
            [0, 2],
            [0, 4]])
+
+    A matrix reads back from its representation up to the rounding of its
+    entries and only up to ``config.NUMPY_THRESHOLD`` of them, past which
+    NumPy elides the array, so that :meth:`transparency` is weakened to
+    those:
+
+    >>> Matrix[int]([0] * 24, 4, 6)
+    Matrix[int]([0, 0, 0, ..., 0, 0, 0], dom=4, cod=6)
     """
     ob = Nat
 
+    transparency = Testable.transparency.weaken(
+        max_entries=config.NUMPY_THRESHOLD)
+
     @classmethod
-    def strategy(cls, *, dom=None, cod=None, max_size=3, max_entry=3):
+    def strategy(cls, *, dom=None, cod=None, max_size=3, max_entry=3,
+                 max_entries=None):
         """
         Generate matrices with entries in ``range(max_entry + 1)`` between
-        the given dimensions, or between dimensions up to ``max_size``:
-        small integers are exact in every ``dtype``, so the laws are checked
-        without rounding. The bare class generates ``Matrix[int]``, which
-        reads back from its representation where the ``int64`` it infers
-        names a type no namespace binds.
+        the given dimensions, or between dimensions up to ``max_size``, and
+        with at most ``max_entries`` entries if given: small integers are
+        exact in every ``dtype``, so the laws are checked without rounding.
+        The bare class generates ``Matrix[int]``, the class it infers from
+        integer entries, even for an empty matrix, whose array numpy reads
+        as floats.
         """
         from hypothesis import strategies as st
 
@@ -169,7 +193,9 @@ class Matrix(MarkovCategory, ComarkovCategory, DaggerCategory,
                 min_size=size, max_size=size)
             return typed(draw(entries), *shape)
 
-        return matrices()
+        return matrices() if max_entries is None else matrices().filter(
+            lambda matrix: index(matrix.dom) * index(matrix.cod)
+            <= max_entries)
 
     def cast(self, dtype: type) -> Matrix:
         """
@@ -190,7 +216,8 @@ class Matrix(MarkovCategory, ComarkovCategory, DaggerCategory,
         direct sum or sum: the one with the ``dtype`` the backend promotes
         their arrays to, read from the operand that already has it so that
         a declared ``dtype`` survives composition with the integer
-        structural matrices, e.g. ``float`` rather than ``numpy.float64``.
+        structural matrices, e.g. sympy's ``Expr`` rather than the
+        ``numpy.object_`` of its array.
 
         Parameters:
             others : The matrices to compose with.
@@ -215,6 +242,14 @@ class Matrix(MarkovCategory, ComarkovCategory, DaggerCategory,
             if dtype == other.array.dtype:
                 return type(self)[other.dtype]
         return type(self)[getattr(dtype, "type", dtype)]
+
+    def __class_getitem__(cls, values):
+        dtype, = values if isinstance(values, tuple) else (values, )
+        if getattr(dtype, "__module__", None) == "numpy":
+            with backend('numpy') as np:
+                dtype = next((python for python in (bool, int, float, complex)
+                              if np.dtype(python).type is dtype), dtype)
+        return super().__class_getitem__(dtype)
 
     def __new__(cls, array, *args, **kwargs):
         with backend() as np:
@@ -332,10 +367,11 @@ class Matrix(MarkovCategory, ComarkovCategory, DaggerCategory,
 
         Example
         -------
+        >>> import numpy as np
         >>> from discopy.utils import from_tree
-        >>> m = Matrix[int]([0, 1, 1, 0], 2, 2)
+        >>> m = Matrix[np.float32]([0, 1, 1, 0], 2, 2)
         >>> assert from_tree(m.to_tree()) == m
-        >>> assert Matrix.from_tree(m.to_tree()).dtype != int
+        >>> assert Matrix.from_tree(m.to_tree()).dtype == float
         """
         dom, cod = map(from_tree, (tree['dom'], tree['cod']))
         return cls(tree['array'], dom, cod)
@@ -434,9 +470,9 @@ class Matrix(MarkovCategory, ComarkovCategory, DaggerCategory,
         Example
         -------
         >>> Matrix.swap(1, 1)
-        Matrix[int64]([0, 1, 1, 0], dom=2, cod=2)
+        Matrix[int]([0, 1, 1, 0], dom=2, cod=2)
         >>> Matrix.swap(2,1)
-        Matrix[int64]([0, 1, 0, 0, 0, 1, 1, 0, 0], dom=3, cod=3)
+        Matrix[int]([0, 1, 0, 0, 0, 1, 1, 0, 0], dom=3, cod=3)
         """
         return cls.permutation([1, 0], [left, right])
 
@@ -463,7 +499,7 @@ class Matrix(MarkovCategory, ComarkovCategory, DaggerCategory,
         -------
         >>> assert Matrix.permutation([1, 0]) == Matrix.swap(1, 1)
         >>> Matrix.permutation([1, 2, 0])
-        Matrix[int64]([0, 0, 1, 1, 0, 0, 0, 1, 0], dom=3, cod=3)
+        Matrix[int]([0, 0, 1, 1, 0, 0, 0, 1, 0], dom=3, cod=3)
         >>> ones = Matrix.permutation([1, 2, 0], [1, 1, 1])
         >>> assert ones == Matrix.permutation([1, 2, 0])
 
@@ -493,7 +529,25 @@ class Matrix(MarkovCategory, ComarkovCategory, DaggerCategory,
         return self.conjugate().transpose()
 
     def map(self, func: Callable, dtype: type | None = None) -> Matrix:
+        """
+        Apply a function to each entry of a matrix.
+
+        Parameters:
+            func : The function to apply.
+            dtype : The ``dtype`` of the result, by default the one
+                :meth:`promote` gives for the matrix and the entries
+                computed, so that a map widens and never truncates.
+
+        Example
+        -------
+        >>> Matrix([1, 2], 1, 2).map(lambda x: x + 0.5)
+        Matrix[float]([1.5, 2.5], dom=1, cod=2)
+        >>> Matrix([1, 2], 1, 2).map(lambda x: x + 0.5, dtype=int)
+        Matrix[int]([1, 2], dom=1, cod=2)
+        """
         array = list(map(func, self.array.reshape(-1)))
+        if dtype is None and array:
+            dtype = self.promote(Matrix(array, 1, len(array))).dtype
         return type(self)[dtype or self.dtype](array, self.dom, self.cod)
 
     def round(self, decimals=0) -> Matrix:
@@ -515,7 +569,7 @@ class Matrix(MarkovCategory, ComarkovCategory, DaggerCategory,
         Example
         -------
         >>> Matrix.copy(2)
-        Matrix[int64]([1, 0, 1, 0, 0, 1, 0, 1], dom=2, cod=4)
+        Matrix[int]([1, 0, 1, 0, 0, 1, 0, 1], dom=2, cod=4)
         >>> assert Matrix.copy(2) >> Matrix.id(2) @ Matrix.discard(2)\\
         ...     == Matrix.id(2)
         """
@@ -549,7 +603,7 @@ class Matrix(MarkovCategory, ComarkovCategory, DaggerCategory,
         Example
         -------
         >>> Matrix.basis(4, 2)
-        Matrix[int64]([0, 0, 1, 0], dom=1, cod=4)
+        Matrix[int]([0, 0, 1, 0], dom=1, cod=4)
         >>> assert Matrix.basis(0, 0).dtype == Matrix.id(0).dtype
         """
         with backend() as np:

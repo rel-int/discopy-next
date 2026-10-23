@@ -14,6 +14,7 @@ Summary
     Function
     Cycles
     Permutation
+    Cospan
 """
 
 from __future__ import annotations
@@ -25,13 +26,18 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 
 from discopy import messages
-from discopy.abc import Groupoid, MonoidalCategory, PROP, Nat
+from discopy.abc import (
+    Groupoid, HypergraphCategory, MarkovCategory, PROP, Nat)
+from discopy.axioms import Testable
+from discopy.utils import AxiomError, unbiased
 
 
 @dataclass
-class Function(MonoidalCategory, Sequence):
+class Function(MarkovCategory, Sequence):
     """
-    A function between finite sets encoded as a Python list.
+    A function between finite sets encoded as a Python list, read backwards
+    as an arrow from ``dom`` to ``cod``, i.e. an arrow of the free Markov
+    category on one object: output ``i`` is a copy of input ``inside[i]``.
 
     Functions implement the standard Python sequence protocol.
 
@@ -50,6 +56,7 @@ class Function(MonoidalCategory, Sequence):
             swap
             is_swap
             copy
+            factorise
     """
     inside: list[int]
     dom: Nat
@@ -65,6 +72,8 @@ class Function(MonoidalCategory, Sequence):
         else:
             self.inside = list(self.inside)
         if len(self.inside) != len(self.cod):
+            raise ValueError
+        if any(not 0 <= i < len(self.dom) for i in self.inside):
             raise ValueError
 
     def __getitem__(self, key):
@@ -156,6 +165,27 @@ class Function(MonoidalCategory, Sequence):
     def copy(x: int | Nat, n=2) -> Function:
         k = int(x)
         return Function([i % k for i in range(n * k)], k, n * k)
+
+    def factorise(self) -> tuple[list[int], Permutation]:
+        """
+        The copies then the permutation that the function factors as, i.e.
+        how many outputs read each input and the permutation that puts each
+        of its copies in their place, the inputs copied in order.
+
+        >>> f = Function([1, 0, 1], 2, 3)
+        >>> counts, perm = f.factorise()
+        >>> counts, perm
+        ([1, 2], (1, 0, 2))
+        >>> copies = [Function.copy(1, n) for n in counts]
+        >>> assert copies[0].tensor(*copies[1:]) >> perm == f
+        """
+        counts = [self.inside.count(j) for j in range(len(self.dom))]
+        offsets = [sum(counts[:j]) for j in range(len(self.dom))]
+        perm = []
+        for i in self.inside:
+            perm.append(offsets[i])
+            offsets[i] += 1
+        return counts, Permutation(perm, len(self))
 
 
 type Cycle = Iterable[int]
@@ -414,3 +444,211 @@ class Permutation(Function, PROP, Groupoid):
         """ Whether this is a product of disjoint 2-cycles. """
         return all(self[i] != i and self[self[i]] == i
                    for i in range(len(self)))
+
+
+@dataclass
+class Cospan(HypergraphCategory, Testable["Cospan"]):
+    """
+    A cospan of finite sets ``dom -> apex <- cod``, i.e. an arrow of the free
+    hypergraph category on one object, the PROP of special commutative
+    Frobenius algebras, see :cite:t:`Lack04`. Its composition is the pushout,
+    its tensor the disjoint union.
+
+    The lists ``left`` and ``right`` send each element of the domain and of
+    the codomain to a point of the apex, i.e. to a spider with these legs. The
+    points are numbered in the order the legs first reach them, the domain
+    then the codomain, and those no leg reaches, the spiders with no legs,
+    come last: two cospans are equal exactly when they are isomorphic.
+
+    Parameters:
+        left : The point of each element of the domain.
+        right : The point of each element of the codomain.
+        apex : The number of points, by default those the legs reach.
+
+    Example
+    -------
+    >>> Cospan.copy(1)
+    Cospan(left=[0], right=[0, 0], apex=1)
+    >>> assert Cospan.copy(1) >> Cospan.merge(1) == Cospan.id(1)
+    >>> circle = Cospan.caps(1, 1) >> Cospan.cups(1, 1)
+    >>> assert circle == Cospan([], [], 1) != Cospan.id(0)
+    """
+    left: list[int]
+    right: list[int]
+    apex: int | None = None
+
+    ob = Nat
+
+    def __post_init__(self):
+        left, right = list(self.left), list(self.right)
+        apex = max(left + right, default=-1) + 1 if self.apex is None\
+            else int(self.apex)
+        if apex < 0 or any(not 0 <= i < apex for i in left + right):
+            raise ValueError(f"Expected points in range({apex}).")
+        order = {k: n for n, k in enumerate(self.order(left, right, apex))}
+        self.left, self.right = [order[i] for i in left], [
+            order[j] for j in right]
+        self.apex = apex
+
+    @staticmethod
+    def order(left: list[int], right: list[int], apex: int) -> list[int]:
+        """
+        The points of an apex in the order the legs first reach them, the
+        domain then the codomain, those no leg reaches last.
+
+        >>> Cospan.order([2, 2], [0], 4)
+        [2, 0, 1, 3]
+        """
+        return list(dict.fromkeys([*left, *right, *range(apex)]))
+
+    @property
+    def dom(self) -> Nat:
+        """ The size of the domain, i.e. of the left leg. """
+        return Nat(len(self.left))
+
+    @property
+    def cod(self) -> Nat:
+        """ The size of the codomain, i.e. of the right leg. """
+        return Nat(len(self.right))
+
+    @classmethod
+    def id(cls, dom: int | Nat = 0) -> Cospan:
+        return cls(list(range(int(dom))), list(range(int(dom))), int(dom))
+
+    def pushout(self, other: Cospan) -> tuple[Cospan, list[int]]:
+        """
+        The composite with ``other`` and the point of the composite that each
+        point of the two apexes goes to, the points of ``self`` first: the
+        points that the codomain of ``self`` and the domain of ``other`` share
+        are glued together.
+
+        Parameters:
+            other : The cospan to compose with.
+
+        >>> merge, copy = Cospan.merge(1), Cospan.copy(1)
+        >>> merge.pushout(copy)
+        (Cospan(left=[0, 0], right=[0, 0], apex=1), [0, 0])
+        """
+        if self.cod != other.dom:
+            raise AxiomError(messages.NOT_COMPOSABLE.format(
+                self, other, self.cod, other.dom))
+        parent = list(range(self.apex + other.apex))
+
+        def find(i):
+            while parent[i] != i:
+                parent[i] = i = parent[parent[i]]
+            return i
+        for i, j in zip(self.right, other.left):
+            parent[find(i)] = find(self.apex + j)
+        roots = list(map(find, range(len(parent))))
+        left = [roots[i] for i in self.left]
+        right = [roots[self.apex + j] for j in other.right]
+        order = {k: n for n, k in enumerate(
+            dict.fromkeys(left + right + roots))}
+        return type(self)(
+            [order[k] for k in left], [order[k] for k in right], len(order)
+        ), [order[k] for k in roots]
+
+    @unbiased
+    def then(self, other: Cospan) -> Cospan:
+        return self.pushout(other)[0]
+
+    def tensor(self, *others: Cospan) -> Cospan:
+        """
+        The disjoint union of cospans.
+
+        >>> assert Cospan.copy(1).tensor(Cospan.id(1)) == Cospan.copy(1) @ 1
+        """
+        left, right, apex = list(self.left), list(self.right), self.apex
+        for other in others:
+            left += [apex + i for i in other.left]
+            right += [apex + j for j in other.right]
+            apex += other.apex
+        return type(self)(left, right, apex)
+
+    @classmethod
+    def swap(cls, left: int | Nat, right: int | Nat) -> Cospan:
+        m, n = int(left), int(right)
+        return cls(
+            list(range(m + n)), list(range(m, m + n)) + list(range(m)), m + n)
+
+    @classmethod
+    def spiders(cls, n_legs_in: int, n_legs_out: int, typ: int | Nat
+                ) -> Cospan:
+        """
+        One spider on each element of ``typ``, with ``n_legs_in`` legs in and
+        ``n_legs_out`` out, interleaved as ``typ ** n``.
+
+        >>> Cospan.spiders(2, 0, 2)
+        Cospan(left=[0, 1, 0, 1], right=[], apex=2)
+        """
+        k = int(typ)
+        return cls([i % k for i in range(n_legs_in * k)],
+                   [j % k for j in range(n_legs_out * k)], k)
+
+    @classmethod
+    def copy(cls, x: int | Nat, n: int = 2) -> Cospan:
+        """ The spiders with one leg in and ``n`` out on ``x``. """
+        return cls.spiders(1, n, x)
+
+    @classmethod
+    def merge(cls, x: int | Nat, n: int = 2) -> Cospan:
+        """ The spiders with ``n`` legs in and one out on ``x``. """
+        return cls.spiders(n, 1, x)
+
+    @classmethod
+    def cups(cls, left: int | Nat, right: int | Nat) -> Cospan:
+        """
+        The nested cups of ``left`` and ``right``, of the same size.
+
+        >>> Cospan.cups(2, 2)
+        Cospan(left=[0, 1, 1, 0], right=[], apex=2)
+        """
+        if int(left) != int(right):
+            raise AxiomError(messages.NOT_ADJOINT.format(left, right))
+        k = int(left)
+        return cls(list(range(k)) + list(reversed(range(k))), [], k)
+
+    @classmethod
+    def caps(cls, left: int | Nat, right: int | Nat) -> Cospan:
+        return cls.cups(left, right).dagger()
+
+    def dagger(self) -> Cospan:
+        """ The cospan the other way round, i.e. its legs swapped. """
+        return type(self)(self.right, self.left, self.apex)
+
+    def trace(self, n: int = 1, left: bool = False) -> Cospan:
+        """
+        Glue the last ``n`` elements of the domain to the last ``n`` of the
+        codomain, the first ``n`` if ``left``, with caps and cups.
+
+        >>> assert Cospan.swap(1, 1).trace() == Cospan.id(1)
+        >>> assert Cospan.id(1).trace() == Cospan([], [], 1)
+        """
+        x, dom, cod = Nat(n), self.dom[:len(self.dom) - n], self.cod[
+            :len(self.cod) - n]
+        if left:
+            return self.caps(x, x) @ dom >> x @ self >> self.cups(x, x) @ cod
+        return dom @ self.caps(x, x) >> self @ x >> cod @ self.cups(x, x)
+
+    @classmethod
+    def strategy(cls, *, dom=None, cod=None, max_size=3):
+        """
+        Generate cospans between the given sizes, or sizes up to
+        ``max_size``, with an apex of up to ``max_size`` points.
+        """
+        from hypothesis import strategies as st
+        sizes = Nat.strategy(max_size=max_size)
+
+        @st.composite
+        def cospans(draw):
+            m, n = (int(draw(sizes) if x is None else x) for x in (dom, cod))
+            least = 1 if m or n else 0
+            apex = draw(st.integers(least, max(max_size, least)))
+            points = st.integers(0, max(apex - 1, 0))
+            return cls(draw(st.lists(points, min_size=m, max_size=m)),
+                       draw(st.lists(points, min_size=n, max_size=n)), apex)
+        return cospans()
+
+    serialisation = Testable.serialisation.inapplicable(
+        "A cospan of finite sets has no tree.")

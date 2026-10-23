@@ -251,6 +251,9 @@ def test_Functor():
 def test_Functor_eq():
     x, y = Ob('x'), Ob('y')
     assert Functor({x: y, y: x}, {}) == Functor({y: x, x: y}, {})
+    F, G = Functor({}, {}), Functor({}, {}, dom=Box)
+    assert F != G
+    assert repr(G) == "cat.Functor(ob_map={}, ar_map={}, dom=cat.Box)"
 
 
 def test_Functor_repr():
@@ -339,6 +342,15 @@ def test_Bubble():
     assert repr((f).bubble())\
         == "cat.Bubble(cat.Box('f', cat.Ob('x'), cat.Ob('y')))"
     assert str(f.bubble()) == "(f).bubble()"
+    named = f.bubble(name="N", method="m")
+    assert repr(named) == "cat.Bubble(cat.Box('f', cat.Ob('x'), cat.Ob('y')),"\
+        " name='N', method='m')"
+    assert eval(repr(named), {"cat": __import__("discopy").cat}) == named
+    assert Functor.id()(f.bubble(name="N")) == f.bubble(name="N")
+    image = Functor.id()(f.bubble(data=42, is_dagger=True))
+    assert (image.data, image.is_dagger) == (42, True)
+    empty = Bubble(dom=Ob('x'), cod=Ob('y'))
+    assert Functor.id()(empty) == empty
 
 
 def test_Box_call():
@@ -380,6 +392,41 @@ def test_Bubble_subs_lambdify():
     assert bubble.subs(psi, 1) == bubble.lambdify(psi)(1) == bubble
 
 
+def test_subs_forms_and_data():
+    pytest.importorskip("sympy")
+    import numpy as np
+    from sympy.abc import phi, psi
+    x, y = Ob('x'), Ob('y')
+    f = Box('f', x, y, data=phi + psi)
+    expected = Box('f', x, y, data=3)
+    assert f.subs(phi, 1).data == f.subs([(phi, 1)]).data\
+        == f.subs((phi, 1)).data == psi + 1
+    for args in [([(phi, 1), (psi, 2)], ), ({phi: 1, psi: 2}, ),
+                 ((phi, 1), (psi, 2))]:
+        assert f.subs(*args) == expected
+    g = Box('g', x, y, data=["phi", {"phase": phi}])
+    assert g.free_symbols == {phi}
+    assert Box('h', x, y, data="h").free_symbols == set()
+    assert g.subs(phi, 1).data == g.lambdify(phi)(1).data\
+        == ["phi", {"phase": 1}]
+    h = Box('h', x, y, data=np.array([[phi, 1], [psi, 2]], dtype=object))
+    assert np.array_equal(h.subs(psi, 4).subs(phi, 3).data, [[3, 1], [4, 2]])
+    import sympy
+    for data in (h.data, sympy.Matrix(h.data), sympy.Array(h.data)):
+        h = Box('h', x, y, data=data)
+        for result in (h.subs([(phi, 3), (psi, 4)]), h.lambdify(phi, psi)(3, 4)):
+            assert np.array_equal(np.array(result.data), [[3, 1], [4, 2]])
+    empty = Box('e', x, y, data=np.zeros((0, 3))).subs(phi, 1).data
+    assert empty.shape == (0, 3)
+    lam = sympy.Symbol("lambda")
+    for data in (sympy.sin(phi) + sympy.sin(psi), phi + lam):
+        assert Box('p', x, y, data=data).subs(phi, 1).data == data.subs(phi, 1)
+    from discopy.utils import rsubs
+    data = [sympy.sin(phi) + psi, phi, sympy.Matrix([[sympy.sin(phi)]])]
+    assert rsubs(data, sympy.sin(phi), 0) == rsubs(data, {sympy.sin(phi): 0})\
+        == [psi, phi, sympy.Matrix([[0]])]
+
+
 def test_Sum():
     x, y, z = map(Ob, "xyz")
     f = Box('f', x, y)
@@ -395,24 +442,38 @@ def test_Sum():
     assert hash(Sum((), x, y)) == hash(Sum((), x, y))
     assert repr(Sum((), x, y))\
         == "cat.Sum(terms=(), dom=cat.Ob('x'), cod=cat.Ob('y'))"
+    lazy = Sum((f, f))
+    assert "name" not in vars(lazy) and lazy.name == repr(lazy)\
+        == f"cat.Sum(terms=({f!r}, {f!r}))"
     assert list(Sum((f, ), x, y)) == [f]
     assert len(Sum((), x, y)) == 0
     assert Sum((), x, x).then(f, g) == Sum((), x, z)
     assert Sum((), x, y).dagger() == Sum((), y, x)
 
 
-def test_Functor_then_left_unit():
-    """
-    Composition is unital only on the left up to equality of functors
-    (#648): the identity functor is a pair of functions, so composing it on
-    the left of a functor given by dictionaries yields a pair of functions
-    that acts the same but compares unequal.
-    """
+def test_Functor_then_unit():
+    """ An identity is dropped on either side of a composite (#142). """
     x, y = Ob('x'), Ob('y')
-    F = Functor({x: y, y: x}, {})
-    assert F >> Functor.id() == F
-    assert Functor.id() >> F != F
-    assert (Functor.id() >> F)(x) == F(x)
+    F, G = Functor({x: y, y: x}, {}), Functor(lambda x: x, lambda f: f[::-1])
+    for H in (F, G):
+        assert Functor.id() >> H == H == H >> Functor.id()
+    assert Functor.id() == Functor.id() >> Functor.id()
+    assert G >> G != G >> G
+    alpha, beta = (Transformation.id(Functor.id()) for _ in range(2))
+    assert (alpha >> beta)(x) == Arrow.id(x)
+
+    class Strict:
+        """ A map whose equality assumes its own type. """
+        key = 0
+
+        def __call__(self, x):
+            return x
+
+        def __eq__(self, other):
+            return self.key == other.key
+
+    H = Functor(Strict(), Strict())
+    assert (H >> F)(x) == F(x) == (F >> H)(x)
 
 
 def test_Bubble_no_common_boundary():

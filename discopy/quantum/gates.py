@@ -133,6 +133,9 @@ class Discard(SelfConjugate):
     def from_tree(cls, tree: dict):
         return cls(from_tree(tree['dom']))
 
+    def __repr__(self):
+        return f"{factory_name(type(self))}({self.dom!r})"
+
     def dagger(self):
         return MixedState(self.dom)
 
@@ -163,6 +166,9 @@ class MixedState(SelfConjugate):
     @classmethod
     def from_tree(cls, tree: dict):
         return cls(from_tree(tree['cod']))
+
+    def __repr__(self):
+        return f"{factory_name(type(self))}({self.cod!r})"
 
     def dagger(self):
         return Discard(self.cod)
@@ -224,6 +230,12 @@ class Measure(SelfConjugate):
         return cls(tree['n_qubits'], tree['destructive'],
                    tree['override_bits'], tree.get('time_step', 0))
 
+    def __repr__(self):
+        args = self.name[self.name.index("(") + 1:-1]
+        time_step = f"time_step={self.time_step}" if self.time_step else ""
+        args = ", ".join(arg for arg in (args, time_step) if arg)
+        return f"{factory_name(type(self))}({args})"
+
     def dagger(self):
         return Encode(self.n_qubits,
                       constructive=self.destructive,
@@ -231,10 +243,16 @@ class Measure(SelfConjugate):
                       time_step=self.time_step)
 
     def _decompose(self):
-        return Id().tensor(*[
+        n = self.n_qubits
+        interleave = [i + j * n for i in range(n) for j in (0, 1)]
+        dom = Circuit.permutation(interleave, self.dom)\
+            if self.override_bits else Id(self.dom)
+        cod = Id(self.cod) if self.destructive\
+            else Circuit.permutation(interleave, self.cod)[::-1]
+        return dom >> Id().tensor(*n * [
             Measure(destructive=self.destructive,
                     override_bits=self.override_bits,
-                    time_step=self.time_step)] * self.n_qubits)
+                    time_step=self.time_step)]) >> cod
 
 
 class Encode(SelfConjugate):
@@ -283,6 +301,8 @@ class Encode(SelfConjugate):
         return cls(tree['n_bits'], tree['constructive'], tree['reset_bits'],
                    tree.get('time_step', 0))
 
+    __repr__ = Measure.__repr__
+
     def dagger(self):
         return Measure(self.n_bits,
                        destructive=self.constructive,
@@ -290,10 +310,7 @@ class Encode(SelfConjugate):
                        time_step=self.time_step)
 
     def _decompose(self):
-        return Id().tensor(*[
-            Encode(constructive=self.constructive,
-                   reset_bits=self.reset_bits,
-                   time_step=self.time_step)] * self.n_bits)
+        return self.dagger()._decompose().dagger()
 
 
 class QuantumGate(Box):

@@ -159,7 +159,7 @@ class Function(function.Function, ClosedCategory, TracedCategory):
             n : The number of copies.
         """
         x = Ty.cast(x)
-        return Function(lambda *xs: n * xs, dom=x, cod=x ** n)
+        return Function(lambda *xs: untuplify(n * xs), dom=x, cod=x ** n)
 
     @staticmethod
     def discard(dom: Ty) -> Function:
