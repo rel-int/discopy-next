@@ -2,7 +2,6 @@ import pytest
 import pyzx
 from discopy.optyx import qubits
 from pytket import Circuit
-from pytket.extensions.qiskit import AerBackend
 from pytket.utils import probs_from_counts
 from discopy.optyx import channel
 from discopy.optyx.core import zx

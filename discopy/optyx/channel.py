@@ -234,19 +234,19 @@ from discopy import monoidal, symmetric, frobenius, hypergraph
 from discopy.cat import factory
 from discopy.python import finset
 from discopy.utils import AxiomError
-from discopy.optyx.core import diagram
+from discopy.optyx.core import diagram, path, zw
 
 
 class Ob(frobenius.Wire):
     """Basic object: bit, mode, qubit or qmode"""
 
-    _classical = {
+    classical = {
         "bit": "bit",
         "mode": "mode",
         "qubit": "bit",
         "qmode": "mode",
     }
-    _quantum = {
+    quantum = {
         "bit": "qubit",
         "mode": "qmode",
         "qubit": "qubit",
@@ -262,7 +262,7 @@ class Ob(frobenius.Wire):
     def single(self):
         """Maps :code:`qubit` to :code:`diagram.bit`
         and :code:`qmode` to :code:`diagram.mode`."""
-        return diagram.Ty(self._classical[self.name])
+        return diagram.Ty(self.classical[self.name])
 
     @property
     def double(self):
@@ -270,7 +270,7 @@ class Ob(frobenius.Wire):
         and :code:`qmode` to :code:`diagram.mode @ diagram.mode`."""
         if self.is_classical:
             return diagram.Ty(self.name)
-        name = self._classical[self.name]
+        name = self.classical[self.name]
         return diagram.Ty(name, name)
 
 
@@ -367,14 +367,12 @@ class Ty(frobenius.Ty):
         return diagram.Ty().tensor(*[ob.double for ob in self.inside])
 
     @staticmethod
-    # pylint: disable=invalid-name
     def from_optyx(ty):
         """
         Get quantum types from core/diagram.Ty.
         """
         assert isinstance(ty, diagram.Ty)
-        # pylint: disable=protected-access
-        return Ty(*[Ob._quantum[ob.name] for ob in ty.inside])
+        return Ty(*[Ob.quantum[ob.name] for ob in ty.inside])
 
     def needs_inflation(self) -> bool:
         """
@@ -382,7 +380,6 @@ class Ty(frobenius.Ty):
         """
         return any(ob.name == "qmode" for ob in self.inside)
 
-    # pylint: disable=invalid-name
     def inflate(self, d) -> Ty:
         """
         Inflate the type.
@@ -1177,7 +1174,6 @@ class Diagram(frobenius.Diagram):
         """
         return self.dom.needs_inflation() or self.cod.needs_inflation()
 
-    # pylint: disable=invalid-name
     def inflate(self, d):
         r"""Translates from an indistinguishable setting
         to a distinguishable one. For a map on :math:`F(\mathbb{C})`,
@@ -1284,9 +1280,6 @@ class Diagram(frobenius.Diagram):
         of a :class:`Diagram`.
         In other words, it is the underlying matrix
         representation of a :class:`path` and :class:`photonic` diagrams."""
-        # pylint: disable=import-outside-toplevel
-        from discopy.optyx.core import path
-
         assert self.is_pure, "Diagram must be pure to convert to path."
 
         return frobenius.Functor(
@@ -1296,10 +1289,10 @@ class Diagram(frobenius.Diagram):
         )(self)
 
     def decomp(self):
-        # pylint: disable=protected-access
+        """Decompose into the elementary generators of the ZX calculus."""
         return frobenius.Functor(
             ob_map=lambda x: qubit**len(x),
-            ar_map=lambda arr: arr._decomp(),
+            ar_map=lambda arr: arr.decomp(),
             cod=Diagram,
         )(self)
 
@@ -1310,7 +1303,7 @@ class Diagram(frobenius.Diagram):
 
         return frobenius.Functor(
             ob_map=lambda x: qmode**(2*len(x)),
-            ar_map=lambda arr: arr._to_dual_rail(),
+            ar_map=lambda arr: arr.dual_rail(),
             cod=Diagram,
         )(self.decomp())
 
@@ -1355,21 +1348,18 @@ class Diagram(frobenius.Diagram):
     @classmethod
     def from_tket(cls, tket_circuit):
         """Convert from tket circuit."""
-        # pylint: disable=import-outside-toplevel
         from discopy.optyx.qubits import Circuit
         return Circuit(tket_circuit)
 
     @classmethod
     def from_pyzx(cls, pyzx_circuit):
         """Convert from PyZX circuit."""
-        # pylint: disable=import-outside-toplevel
         from discopy.optyx.qubits import Circuit
         return Circuit(pyzx_circuit)
 
     @classmethod
     def from_discopy(cls, discopy_circuit):
         """Convert from discopy circuit."""
-        # pylint: disable=import-outside-toplevel
         from discopy.optyx.qubits import Circuit
         return Circuit(discopy_circuit)
 
@@ -1385,11 +1375,8 @@ class Diagram(frobenius.Diagram):
     @classmethod
     def from_bosonic_operator(cls, n_modes, operators, scalar=1):
         """Create a :class:`zw` diagram from a bosonic operator."""
-        # pylint: disable=import-outside-toplevel
-        from discopy.optyx.core import zw
         from discopy.optyx.photonic import Scalar
 
-        # pylint: disable=invalid-name
         d = Diagram.id(qmode**n_modes)
         annil = Channel("annil", zw.Split(2) >> zw.Select(1) @ zw.Id(1))
         create = annil.dagger()
@@ -1400,14 +1387,12 @@ class Diagram(frobenius.Diagram):
             d = d >> qmode**idx @ box @ qmode**(n_modes - idx - 1)
 
         if scalar != 1:
-            # pylint: disable=invalid-name
             d = Scalar(scalar) @ d
         return d
 
     @classmethod
     def from_graphix(cls, measurement_pattern):
         """Convert from Graphix measurement pattern."""
-        # pylint: disable=import-outside-toplevel
         from discopy.optyx.qubits import Circuit
         return Circuit(measurement_pattern)
 
@@ -1421,7 +1406,6 @@ class Diagram(frobenius.Diagram):
         acting on polarisation modes, time delays,
         and with symbols.
         """
-        # pylint: disable=import-outside-toplevel
         from discopy.optyx import photonic
         from discopy.optyx.utils import perceval_conversion
         import perceval as pcvl
@@ -1481,7 +1465,6 @@ class Diagram(frobenius.Diagram):
             circuit >>= perceval_conversion.postselection(circuit, p)
         return circuit
 
-    # pylint: disable=invalid-name
     def __pow__(self, n):
         if n == 1:
             return self
@@ -1492,7 +1475,6 @@ class Diagram(frobenius.Diagram):
         Evaluate the diagram using the specified backend.
         If no backend is specified, it uses the QuimbBackend.
         """
-        # pylint: disable=import-outside-toplevel
         from discopy.optyx.core.backends import QuimbBackend
         if backend is None:
             backend = QuimbBackend()
@@ -1531,7 +1513,6 @@ class Channel(Diagram, frobenius.Box):
 
         def get_spiders(dom):
             spiders = diagram.Id()
-            # pylint: disable=invalid-name
             for ob in dom.inside:
                 if ob.is_classical:
                     box = diagram.Spider(1, 2, ob.single)
@@ -1540,7 +1521,6 @@ class Channel(Diagram, frobenius.Box):
                 spiders @= box
             return spiders
 
-        # pylint: disable=invalid-name
         def get_perm(n):
             return sorted(sorted(list(range(n))), key=lambda i: i % 2)
 
@@ -1574,13 +1554,14 @@ class Channel(Diagram, frobenius.Box):
             cod=self.dom,
         )
 
-    def _decomp(self):
-        # pylint: disable=import-outside-toplevel
+    def decomp(self):
+        """Image of a generator under :meth:`Diagram.decomp`."""
         raise NotImplementedError(
             "Decomposition is only implemented for ZX channels."
         )
 
-    def _to_dual_rail(self):
+    def dual_rail(self):
+        """Image of a generator under :meth:`Diagram.to_dual_rail`."""
         raise TypeError(
             "Only ZX channels can be converted to dual rail."
             )
@@ -1687,7 +1668,6 @@ class CQMap(Diagram, frobenius.Box):
             cod=self.cod.inflate(d)
         )
 
-    # pylint: disable=invalid-name
     def __pow__(self, n):
         if n == 1:
             return self
@@ -1822,7 +1802,7 @@ class Measure(Channel):
     draw_as_measures = True
 
     def __init__(self, dom):
-        cod = Ty(*[Ob._classical[ob.name] for ob in dom.inside])
+        cod = Ty(*[Ob.classical[ob.name] for ob in dom.inside])
         kraus = diagram.Id(dom.single())
         super().__init__(name="Measure", kraus=kraus, dom=dom, cod=cod)
 
@@ -1832,20 +1812,11 @@ class Measure(Channel):
         the number of photons in the modes. Only qmodes are inflated.
         The bit, qubit and mode are not inflated.
         """
-
-        diagrams = [self._measure_wire(ob, d) for ob in self.dom]
-        return diagram.Diagram.tensor(*diagrams)
-
-    # pylint: disable=invalid-name
-    def _measure_wire(self, ob, d):
-        """Return the diagram that measures one `ob`."""
-        # pylint: disable=import-outside-toplevel
-        from discopy.optyx.core.zw import Add
-        if ob.needs_inflation():
-            return Measure(ob ** d) >> CQMap(
-                "Gather photons", Add(d), mode ** d, mode
-            )
-        return Measure(ob)
+        gather = CQMap("Gather photons", zw.Add(d), mode ** d, mode)
+        return diagram.Diagram.tensor(*[
+            Measure(ob ** d) >> gather if ob.needs_inflation()
+            else Measure(ob) for ob in self.dom
+        ])
 
 
 class Encode(Channel):
@@ -1860,7 +1831,7 @@ class Encode(Channel):
     def __init__(self,
                  dom,
                  internal_states: tuple[list[int]] = None):
-        cod = Ty(*[Ob._quantum[ob.name] for ob in dom.inside])
+        cod = Ty(*[Ob.quantum[ob.name] for ob in dom.inside])
         kraus = diagram.Id(dom.single())
         if internal_states is not None:
             if not isinstance(internal_states, tuple):
@@ -1883,6 +1854,8 @@ class Encode(Channel):
         the Measure channel with the difference
         that instead of discarding becoming a maximally mixed state,
         we apply the encoding of the internal states.
+        The internal-state vectors are consumed in the order the
+        :code:`mode` wires appear in the domain.
         """
 
         if any(
@@ -1895,29 +1868,15 @@ class Encode(Channel):
                 internal_state in self.internal_states
             ), "All internal states must have length d"
 
-        amps_iter = iter(self.internal_states or [])
-        diagrams = [self._encode_wire(ob, d, amps_iter) for ob in self.dom]
-        return diagram.Diagram.tensor(*diagrams)
-
-    def _encode_wire(self, ob, d, amps_iter):
-        """Return the diagram that encodes *one* object `ob`.
-
-        `amps_iter` yields the internal‑state vectors for `mode` wires.
-        """
-        # pylint: disable=import-outside-toplevel
-        from discopy.optyx.core.zw import Add, Endo
-
-        if ob == mode:
-            amps = next(amps_iter)
-            amp_layer = diagram.Diagram.tensor(*[Endo(a) for a in amps])
-            return (
-                CQMap("Add†", Add(d).dagger(), mode, mode ** d)
-                >> Encode(mode ** d)
-                >> Channel("Amplitudes", amp_layer)
-            )
-        if ob == qmode:
-            return Encode(qmode ** d)
-        return Encode(ob)
+        amps = iter(self.internal_states or [])
+        return diagram.Diagram.tensor(*[
+            CQMap("Add†", zw.Add(d).dagger(), mode, mode ** d)
+            >> Encode(mode ** d)
+            >> Channel("Amplitudes", diagram.Diagram.tensor(
+                *[zw.Endo(a) for a in next(amps)]))
+            if ob == mode else Encode(ob ** d) if ob == qmode
+            else Encode(ob) for ob in self.dom
+        ])
 
 
 class Discard(Channel):
