@@ -105,7 +105,9 @@ def test_evaluation_raises_on_feedback():
 
 def test_double_unroll_commute():
     wait = delay(state=photonic.Create(0))
-    assert wait.unroll(1).double() == wait.double().unroll(1)
+    # equal up to composing adjacent permutations, see #301
+    assert wait.unroll(1).double().merge_layers()\
+        == wait.double().unroll(1).merge_layers()
     lhs = wait.unroll(1).double().to_tensor().eval().array
     rhs = wait.double().unroll(1).to_tensor().eval().array
     assert np.allclose(lhs, rhs)
@@ -250,7 +252,9 @@ def test_qubit_delay_line():
         >> qubits.Bra(0) @ qubits.Bra(1)
     ).double().to_tensor().eval().array
     assert np.isclose(probability, 1)
-    assert wait.unroll(1).double() == wait.double().unroll(1)
+    # equal up to composing adjacent permutations, see #301
+    assert wait.unroll(1).double().merge_layers()\
+        == wait.double().unroll(1).merge_layers()
 
 
 def test_bit_delay_line():

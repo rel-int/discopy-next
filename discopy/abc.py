@@ -40,6 +40,7 @@ Summary
     Group
     Nat
     MonoidalCategory
+    SpacialCategory
     PRO
     FeedbackCategory
     TracedCategory
@@ -83,7 +84,7 @@ from typing import ClassVar
 
 from discopy import messages
 from discopy.axioms import (
-    Delay, Equation, Hom, Obj, Tensor, Testable, Var, axiom)
+    Delay, Equation, Hom, Obj, Tensor, Testable, Unit, Var, axiom)
 from discopy.utils import (  # noqa: F401  pylint: disable=unused-import
     AxiomError, NamedGeneric, classproperty, factory_name)
 
@@ -411,14 +412,20 @@ class MonoidalCategory[C0: ColouredMonoid, C1: MonoidalCategory](
         if "trace" in vars(cls):
             cls.trace = keyword_form(vars(cls)["trace"])
 
-    @classmethod
     @abstractmethod
-    def tensor(cls, *morphisms: C1) -> C1:
+    def tensor(self, *others: C1) -> C1:
         """
-        Parallel composition of ``n >= 0`` morphisms, to be instantiated.
+        Parallel composition with ``n >= 0`` other morphisms, to be
+        instantiated.
 
         Parameters:
-            other : The other morphism to compose in parallel.
+            others : The other morphisms to compose in parallel.
+
+        Example
+        -------
+        >>> from discopy.monoidal import Ty, Box
+        >>> f, g = Box('f', Ty('x'), Ty('y')), Box('g', Ty('y'), Ty('z'))
+        >>> assert f.tensor() == f and f.tensor(g, f) == f @ g @ f
         """
 
     @classmethod
@@ -488,6 +495,23 @@ class MonoidalCategory[C0: ColouredMonoid, C1: MonoidalCategory](
             mem : The memory.
         """
         return len(mem)
+
+
+class SpacialCategory[C0, C1](MonoidalCategory[C0, C1]):
+    """
+    A spacial category is a :class:`MonoidalCategory` where scalars slide:
+    a scalar ``s : I -> I`` on the left of any morphism is the same scalar on
+    its right, see :cite:t:`Selinger10`. Its diagrams are planar up to the
+    face each scalar lies in, i.e. a component that touches nothing else can
+    be lifted out of the plane and put down anywhere, see
+    :meth:`discopy.cmap.CMap.match`.
+    """
+    @axiom
+    def scalar_sliding[A: Obj[C0], B: Obj[C0]](
+            cls, scalar: Hom[C1, Unit[C0], Unit[C0]], f: Hom[C1, A, B])\
+            -> Equation[Hom[C1, A, B]]:
+        """ A scalar on the left of a morphism is a scalar on its right. """
+        return cls.equation_factory(scalar @ f, f @ scalar)
 
 
 class PRO[C1: PRO](MonoidalCategory[Nat, C1]):
@@ -604,9 +628,11 @@ def keyword_form(trace: Callable) -> Callable:
     The domain is checked on the result, since the boundary takes in the
     delay of the memory when the trace is the
     :meth:`TracedCategory.feedback` of a category that labels the two apart,
-    e.g. a :class:`discopy.drawing.Drawing`. A method that takes ``mem``
-    already is returned as it is, so that a class wraps the trace it defines
-    once, whichever trace that one calls.
+    e.g. a :class:`discopy.drawing.Drawing`. The positional form is split
+    too, so that an ``n`` the boundary cannot spare raises ``ValueError`` in
+    either form. A method that takes ``mem`` already is returned as it is,
+    so that a class wraps the trace it defines once, whichever trace that
+    one calls.
 
     Parameters:
         trace : The method in its positional form.
@@ -617,6 +643,10 @@ def keyword_form(trace: Callable) -> Callable:
     >>> f = Matrix[bool]([[1, 1], [0, 0]], 2, 2)
     >>> assert f.trace(mem=1) == f.trace() != f.trace(mem=1, left=True)
     >>> assert keyword_form(Matrix.trace) is Matrix.trace
+    >>> f.trace(3)
+    Traceback (most recent call last):
+        ...
+    ValueError: Cannot split 3 atoms off 2.
     """
     if "mem" in signature(trace).parameters:
         return trace
@@ -625,6 +655,7 @@ def keyword_form(trace: Callable) -> Callable:
     def method(self, n: int = None, left: bool = False, *,
                dom=None, cod=None, mem=None):
         if (dom, cod, mem) == (None, None, None):
+            self.split_memory(n, left)
             return trace(self, left=left) if n is None\
                 else trace(self, n, left)
         dom, cod, mem = self.split_memory(
@@ -753,10 +784,11 @@ class BiclosedCategory[
         """
         # pylint: disable=unused-argument  # the exponential says the side
         if not self.cod.is_exp:
-            raise ValueError
+            raise ValueError(messages.NOT_EXPONENTIAL.format(self, self.cod))
         base, exponent = self.cod.base, self.cod.exponent
         if n < len(exponent):
-            raise ValueError
+            raise ValueError(messages.NOT_UNCURRIABLE.format(
+                n, len(exponent), self.cod))
         return base, exponent
 
     def uncurry(self, n: int = 1, left: bool = True) -> C1:
@@ -770,7 +802,7 @@ class BiclosedCategory[
             left : Whether to uncurry on the left or right.
         """
         if n < 0:
-            raise ValueError
+            raise ValueError(messages.NOT_SPLITTABLE.format(n, self.cod))
         if not n:
             return self
         base, exponent = self.base_and_exponent(n, left)
@@ -870,7 +902,7 @@ class RigidCategory[C0: Pregroup, C1: RigidCategory](BiclosedCategory[C0, C1]):
             left : Whether to curry on the left or right.
         """
         if n < 0 or n > len(self.dom):
-            raise ValueError
+            raise ValueError(messages.NOT_SPLITTABLE.format(n, self.dom))
         if not n:
             return self
         if left:
@@ -890,7 +922,7 @@ class RigidCategory[C0: Pregroup, C1: RigidCategory](BiclosedCategory[C0, C1]):
             left : Whether to uncurry on the left or right.
         """
         if n > len(self.cod):
-            raise ValueError
+            raise ValueError(messages.NOT_SPLITTABLE.format(n, self.cod))
         return (self.cod[:-n], self.cod[-n:].r) if left\
             else (self.cod[n:], self.cod[:n].l)
 
@@ -932,10 +964,11 @@ class PivotalCategory[C0, C1](RigidCategory[C0, C1], TracedCategory[C0, C1]):
         messages.PLANAR_YANKING)
 
 
-class BraidedCategory[C0, C1](MonoidalCategory[C0, C1]):
+class BraidedCategory[C0, C1](SpacialCategory[C0, C1]):
     """
     A braided category is a :class:`MonoidalCategory` with a method
-    :code:`braid` for the natural isomorphism :code:`x @ y -> y @ x`.
+    :code:`braid` for the natural isomorphism :code:`x @ y -> y @ x`. It is
+    a :class:`SpacialCategory`: a scalar slides along the braid of the unit.
     """
     @classmethod
     @abstractmethod
@@ -977,7 +1010,7 @@ class SymmetricCategory[C0, C1](BraidedCategory[C0, C1]):
         """ Compose swaps to permute the atomic objects in ``dom``. """
         xs, doms = list(xs), list(doms)
         if list(range(len(doms))) != sorted(xs):
-            raise ValueError
+            raise ValueError(messages.WRONG_PERMUTATION.format(len(doms), xs))
         tensor = lambda objects: cls.ob().tensor(*objects)
         result, done = cls.id(tensor(doms)), cls.ob()
         while xs != list(range(len(xs))):
@@ -1039,6 +1072,35 @@ class MarkovCategory[C0, C1](SymmetricCategory[C0, C1]):
             x : The object to discard.
         """
         return cls.copy(x, 0)
+
+    @classmethod
+    def function(cls, xs: Sequence[int], doms: Sequence[C0]) -> C1:
+        """
+        Copy, discard and permute the objects in ``doms`` so that output
+        ``i`` is a copy of ``doms[xs[i]]``: the copies of each object, as
+        many as the outputs that read it, then the permutation that puts
+        each copy in its place, see
+        :meth:`discopy.python.finset.Function.factorise`.
+
+        Parameters:
+            xs : The object of ``doms`` that each output reads.
+            doms : The objects to copy, discard and permute.
+        """
+        from discopy.python.finset import Function
+        doms = list(doms)
+        counts, perm = Function(xs, len(doms), len(xs)).factorise()
+        copies = list(map(cls.copy, doms, counts)) or [cls.id(cls.ob())]
+        return copies[0].tensor(*copies[1:]) >> cls.permutation(
+            perm, [dom for dom, n in zip(doms, counts) for _ in range(n)])
+
+    @classmethod
+    def from_function(cls, func: Sequence[int], dom: C0) -> C1:
+        """
+        The function on the atomic objects of ``dom`` by :meth:`function`;
+        a free category overrides it with a native box, see
+        :meth:`discopy.markov.Diagram.from_function`.
+        """
+        return cls.function(func, [dom[i:i + 1] for i in range(len(dom))])
 
     @axiom
     def copy_coassociativity[X: Obj[C0]](
@@ -1110,6 +1172,35 @@ class ComarkovCategory[C0, C1](SymmetricCategory[C0, C1]):
             x : The object of the noise.
         """
         return cls.merge(x, 0)
+
+    @classmethod
+    def cofunction(cls, xs: Sequence[int], cods: Sequence[C0]) -> C1:
+        """
+        Permute, merge and add noise to the objects in ``cods`` so that
+        input ``i`` goes to ``cods[xs[i]]``, the dual of
+        :meth:`MarkovCategory.function`: the permutation that puts the
+        inputs in place then the merges of each object, as many as the
+        inputs that go to it.
+
+        Parameters:
+            xs : The object of ``cods`` that each input goes to.
+            cods : The objects to merge into.
+        """
+        from discopy.python.finset import Function
+        cods = list(cods)
+        counts, perm = Function(xs, len(cods), len(xs)).factorise()
+        merges = list(map(cls.merge, cods, counts)) or [cls.id(cls.ob())]
+        return cls.permutation(perm.dagger(), [cods[i] for i in xs])\
+            >> merges[0].tensor(*merges[1:])
+
+    @classmethod
+    def from_cofunction(cls, cofunc: Sequence[int], cod: C0) -> C1:
+        """
+        The cofunction on the atomic objects of ``cod`` by
+        :meth:`cofunction`; a free category overrides it with a native box,
+        see :meth:`discopy.comarkov.Diagram.from_cofunction`.
+        """
+        return cls.cofunction(cofunc, [cod[i:i + 1] for i in range(len(cod))])
 
     @axiom
     def merge_associativity[X: Obj[C0]](
@@ -1233,3 +1324,39 @@ class HypergraphCategory[C0, C1](
             n_legs_out : The number of legs out for each spider.
             typ : The type of the spiders.
         """
+
+    @classmethod
+    def cospan(cls, left: Sequence[int], right: Sequence[int],
+               apexes: Sequence[C0]) -> C1:
+        """
+        Merge the inputs into the ``apexes`` then copy them out, so that
+        input ``i`` goes to ``apexes[left[i]]`` and output ``j`` reads
+        ``apexes[right[j]]``, see :class:`discopy.python.finset.Cospan`: the
+        permutation that gathers the inputs of each object, one spider on
+        each object, then the permutation that scatters its outputs.
+
+        Parameters:
+            left : The object of ``apexes`` that each input goes to.
+            right : The object of ``apexes`` that each output reads.
+            apexes : The objects of the apex.
+        """
+        from discopy.python.finset import Function
+        apexes = list(apexes)
+        ins, gather = Function(left, len(apexes), len(left)).factorise()
+        outs, scatter = Function(right, len(apexes), len(right)).factorise()
+        spiders = list(map(cls.spiders, ins, outs, apexes))\
+            or [cls.id(cls.ob())]
+        return cls.permutation(gather.dagger(), [apexes[k] for k in left])\
+            >> spiders[0].tensor(*spiders[1:]) >> cls.permutation(
+                scatter, [x for x, n in zip(apexes, outs) for _ in range(n)])
+
+    @classmethod
+    def from_cospan(cls, apex: C0, left: Sequence[int], right: Sequence[int]
+                    ) -> C1:
+        """
+        The cospan on the atomic objects of ``apex`` by :meth:`cospan`; a
+        free category overrides it with a native box, see
+        :meth:`discopy.frobenius.Diagram.from_cospan`.
+        """
+        return cls.cospan(
+            left, right, [apex[i:i + 1] for i in range(len(apex))])

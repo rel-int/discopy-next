@@ -60,6 +60,10 @@ def test_rewrite_refusals():
     with raises(AxiomError):
         cyclic.rewrite((0, ), (), (1, ), Box('c', Ty(), x).to_hypergraph())
     for region, dom, cod, rhs in [
+            ((2, ), (0, ), (1, ), f.to_hypergraph()),
+            ((-1, ), (0, ), (1, ), f.to_hypergraph()),
+            ((1, ), (3, ), (2, ), sample.to_hypergraph()),
+            ((1, ), (1, ), (-1, ), sample.to_hypergraph()),
             ((0, ), (0, ), (1, ), f.to_hypergraph()),
             ((1, ), (1, ), (2, ), sample.to_hypergraph()),
             ((1, ), (0, ), (2, ), g.to_hypergraph()),
@@ -141,7 +145,7 @@ def test_effects_stay_outside_joins():
         spider(Markov.from_diagram(sample @ f), f))
     diagram = graph.to_diagram()
     assert sample in diagram.boxes and joins(diagram) == [
-        ['Discard(x) @ f', 'x @ Discard(x)']]
+        ['Discard(x) @ f', 'Function(x @ x, [0])']]
     assert len(graph.sections()) == 2
 
 

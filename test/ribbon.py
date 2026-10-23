@@ -90,8 +90,11 @@ def test_Kauffman():
 
 
 def test_rotate():
-    x = Ty('x')
+    x, y = Ty('x'), Ty('y')
     assert Twist(x).r == Twist(x)
+    assert Braid(x, y).dagger().r == Braid(x.r, y.r).dagger()
+    rotated = (Box('f', Ty(), y @ x) >> Braid(x, y).dagger()).r
+    assert Diagram(rotated.inside, rotated.dom, rotated.cod) == rotated
 
 
 def test_to_hypergraph():
@@ -111,3 +114,9 @@ def test_sum_factory():
     x = Ty('x')
     f = Box('f', x, x)
     assert Diagram.sum_factory is Sum and type(f + f) is Sum
+
+
+def test_dual_rail_delay():
+    x = Ty('x')
+    for diagram in [Cup(x, x.r), Cap(x, x.l), Twist(x), Braid(x, x)]:
+        assert diagram.delay().to_ribbons() == diagram.to_ribbons().delay()

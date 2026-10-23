@@ -30,6 +30,8 @@ Summary
     Dims
     Network
     Box
+    Function
+    Cofunction
     Swap
     Permutation
     Copy
@@ -295,6 +297,16 @@ class Box(markov.Box, Network):
         return untuplify(outputs)
 
 
+class Function(markov.Function, Box):
+    """
+    The copies, discards and permutations of the legs of a network.
+
+    Parameters:
+        dom (Dims) : The legs to copy, discard and permute.
+        func : The leg each output reads.
+    """
+
+
 class Permutation(markov.Permutation, Box):
     """
     A permutation of the legs of a network.
@@ -303,6 +315,20 @@ class Permutation(markov.Permutation, Box):
         dom (Dims) : The legs to permute.
         perm : The permutation as a :class:`finset.Permutation` or a list.
     """
+
+
+class Cofunction(comarkov.Cofunction, Box):
+    """
+    The permutations, merges and noise of the legs of a network.
+
+    Parameters:
+        cod (Dims) : The legs to merge into.
+        cofunc : The leg each input goes to.
+    """
+
+
+Function.register(Permutation)
+Cofunction.register(Permutation)
 
 
 class Swap(Permutation, markov.Swap, Box):
@@ -315,7 +341,7 @@ class Swap(Permutation, markov.Swap, Box):
     """
 
 
-class Copy(markov.Copy, Box):
+class Copy(markov.Copy, Function):
     """
     The copy of a leg some ``n`` number of times.
 
@@ -325,7 +351,7 @@ class Copy(markov.Copy, Box):
     """
 
 
-class Merge(comarkov.Merge, Box):
+class Merge(comarkov.Merge, Cofunction):
     """
     The merge of ``n`` copies of a leg, the dagger of :class:`Copy`.
 
@@ -388,6 +414,8 @@ Feedback, Trace, FollowedBy, Head, Tail = feedback.generators(
 Network.box_factory = Box
 Network.functor_factory = Functor
 Network.copy_factory, Network.merge_factory = Copy, Merge
+Network.function_factory = Function
+Network.cofunction_factory = Cofunction
 Network.discard_factory, Network.noise_factory = Discard, Noise
 Network.swap_factory = Swap
 Network.permutation_factory = Permutation

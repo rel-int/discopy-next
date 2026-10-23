@@ -1,8 +1,11 @@
 import pytest
 import numpy as np
 import copy as cp
+import itertools
 
 from discopy.optyx.core.control import *
+from discopy.optyx.core.control import BinaryMatrixBox, ClassicalFunctionBox
+from discopy.optyx.core.diagram import MAX_DIM
 from discopy.optyx.core.zw import Create, W, ZBox
 from discopy.optyx.core.diagram import PhotonThresholdDetector, Mode, Swap, Bit, Id
 from discopy.optyx.photonic import Phase, BS, MZI
@@ -335,3 +338,29 @@ class TestMatrixToZW:
 
         assert np.allclose(diagram1.to_tensor().eval().array,
                            diagram2.to_tensor().eval().array)
+
+
+def test_classical_function_keeps_the_outputs_it_can_reach():
+    """No transition leaves an input the function sends to `None`, or to a
+    value past the truncation; the dagger is the transposed relation."""
+    def add(x):
+        return None if x[0] == x[1] == 1 else x[0] + x[1]
+
+    box = ClassicalFunctionBox(add, Mode(2), Mode(1))
+    assert box.determine_output_dimensions([3, 3]) == [MAX_DIM]
+    expected = np.zeros((3, 3, 3))
+    for a, b in itertools.product(range(3), repeat=2):
+        if (a, b) != (1, 1) and a + b < 3:
+            expected[a, b, a + b] = 1
+    array = box.truncation([3, 3], [3]).eval().array
+    assert np.allclose(array, expected)
+    assert np.allclose(box.dagger().truncation([3], [3, 3]).eval().array,
+                       np.transpose(array, (2, 0, 1)))
+    assert box.conjugate() == box
+
+
+def test_binary_matrix_from_a_row():
+    row = BinaryMatrixBox([1, 1])
+    assert np.allclose(row.to_tensor().eval().array,
+                       BinaryMatrixBox([[1, 1]]).to_tensor().eval().array)
+    assert row.conjugate() == row

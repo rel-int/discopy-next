@@ -9,10 +9,13 @@ from pytest import raises
 
 from discopy.utils import AxiomError, dumps, loads
 from discopy.tensor import *
-from discopy import frobenius
+from discopy import compact, frobenius, pivotal, rigid
+from discopy.grammar import pregroup
 
 
 def test_backend():
+    pytest.importorskip("jax")
+    pytest.importorskip("torch")
     import jax.numpy
     import torch
     assert isinstance(Tensor.id().array, np.ndarray)
@@ -53,7 +56,7 @@ def test_Tensor():
     assert Tensor([1], Dim(1), Dim(1))
     m = Tensor([0, 1, 1, 0], Dim(2), Dim(2))
     assert repr(m) == str(m)\
-        == "Tensor[int64]([0, 1, 1, 0], dom=Dim(2), cod=Dim(2))"
+        == "Tensor[int]([0, 1, 1, 0], dom=Dim(2), cod=Dim(2))"
     u = Tensor([1, 0, 0, 0], Dim(2), Dim(2))
     v = Tensor([0, 0, 0, 1], Dim(2), Dim(2))
     assert u + v == Tensor.id(Dim(2))
@@ -87,6 +90,7 @@ def test_Spider_to_tn():
 
 
 def test_Spider_to_tn_pytorch():
+    pytest.importorskip("torch")
     try:
         with backend('pytorch') as np:
             tn.set_default_backend('pytorch')
@@ -112,6 +116,14 @@ def test_Tensor_cups():
         Tensor.cups(2, Dim(2))
     with raises(AxiomError):
         Tensor.cups(Dim(3), Dim(2))
+
+
+def test_Tensor_cup_factory_nests_compound_dims():
+    x = Dim(2, 3)
+    nested = np.einsum("ad,bc->abcd", np.identity(2), np.identity(3))
+    assert np.all(Tensor.cup_factory(x, x.r).array == nested)
+    assert Tensor.cup_factory(x, x.r) == Tensor.cups(x, x.r)
+    assert np.all(Tensor.caps(x, x.l).array == nested)
 
 
 def test_Tensor_caps():
@@ -180,6 +192,53 @@ def test_Functor_call():
     with raises(TypeError):
         F("Alice")
     assert Functor(ob_map={x: Dim(2, 3)}, ar_map=None)(x) == Dim(2, 3)
+
+
+@pytest.mark.parametrize(
+    "module", [rigid, pivotal, compact, frobenius, pregroup],
+    ids=lambda module: module.__name__)
+def test_Functor_bends_a_compound_image_as_a_diagram_does(module):
+    n, s = module.Ty('n'), module.Ty('s')
+    Alice, Bob = module.Box('Alice', s[:0], n), module.Box('Bob', s[:0], n)
+    loves = module.Box('loves', s[:0], n.r @ s @ n.l)
+    F = Functor({n: Dim(2, 3), s: Dim(1)}, {
+        Alice: list(range(6)), loves: list(range(36)),
+        Bob: list(range(6, 0, -1))}, dom=module.Diagram, dtype=int)
+    cup, cap = module.Cup(n, n.r), module.Cap(n, n.l)
+    pairing = Tensor[int].spiders(2, 0, F(n)) if n.r == n\
+        else Tensor[int].cups(F(n), F(n.r))
+    assert F(cup) == F(module.Id(n @ n.r) >> cup) == pairing
+    assert F(cap) == F(cap >> module.Id(n @ n.l))
+    sentence = Alice @ loves @ Bob >> cup @ s @ module.Cup(n.l, n)
+    assert F(sentence) == F(Alice) @ F(loves) @ F(Bob)\
+        >> F(cup) @ F(s) @ F(module.Cup(n.l, n))
+
+
+@pytest.mark.parametrize(
+    "module", [rigid, pivotal, compact, frobenius, pregroup],
+    ids=lambda module: module.__name__)
+@pytest.mark.parametrize("image", [Dim(2, 3), Dim(2, 2)], ids=repr)
+def test_Functor_rotates_a_compound_image_as_a_diagram_does(module, image):
+    n, m = module.Ty('n'), module.Ty('m')
+    g = module.Box('g', n, n @ m)
+    size = int(np.prod(image.inside))
+    F = Functor({n: image, m: Dim(2)}, {g: list(range(2 * size * size))},
+                dom=module.Diagram, dtype=int)
+    for left in (False, True):
+        rotation = g.l if left else g.r
+        assert (F(rotation).dom, F(rotation).cod)\
+            == (F(rotation.dom), F(rotation.cod))
+        assert F(rotation) == F(module.Id(rotation.dom) >> rotation)\
+            == F(g.transpose(left=left))
+
+
+def test_Functor_maps_Dim_with_its_ob_map():
+    f = Box('f', Dim(2), Dim(2), [0, 1, 1, 0])
+    F = Functor({Dim(2): Dim(3)}, {f: list(range(9))}, dom=Diagram)
+    assert F(Dim(2)) == Dim(3) and F(Dim(2, 2)) == Dim(3, 3)
+    assert F(Dim(1)) == Dim(1)
+    assert F(f) == F(f >> Diagram.id(Dim(2)))\
+        == Tensor[float](list(range(9)), Dim(3), Dim(3))
 
 
 def test_Functor_call_opt_einsum_missing(monkeypatch):
@@ -276,6 +335,23 @@ def test_Box():
     assert {f: 42}[f] == 42
 
 
+def test_Box_with_array_data_compares_and_hashes():
+    a = Box('h', Dim(2), Dim(2), np.array([0, 1, 1, 0]))
+    b = Box('h', Dim(2), Dim(2), np.array([0, 1, 1, 1]))
+    c = Box('h', Dim(2), Dim(2), [[0, 1], [1, 0]])
+    assert a != b and a == c == Box('h', Dim(2), Dim(2), [0, 1, 1, 0])
+    assert len({a, b, c, a @ b}) == 3
+
+
+@pytest.mark.parametrize("module", ["torch", "jax.numpy"])
+def test_Box_with_backend_array_data_compares_and_hashes(module):
+    array = pytest.importorskip(module).asarray
+    a = Box('h', Dim(2), Dim(2), array([[0, 1], [1, 0]]))
+    b = Box('h', Dim(2), Dim(2), array([[0, 1], [1, 1]]))
+    assert a == Box('h', Dim(2), Dim(2), array([0, 1, 1, 0])) != b
+    assert len({a, b, Box('h', Dim(2), Dim(2), array([0, 1, 1, 0]))}) == 2
+
+
 def test_Spider():
     assert repr(Spider(1, 2, Dim(3))) == "tensor.Spider(1, 2, Dim(3))"
     assert Spider(1, 2, Dim(2)).dagger() == Spider(2, 1, Dim(2))
@@ -318,9 +394,35 @@ def test_Tensor_dtype_inference():
     assert Box("X", Dim(1), Dim(1), data=[0]) == Box[np.int64]("X", Dim(1), Dim(1), data=[0])
     assert Box("Y", Dim(1), Dim(1), data=[1.]) == Box[np.float64]("Y", Dim(1), Dim(1), data=[1.])
     assert Box("Y", Dim(1), Dim(1), data=[1]) != Box("Y", Dim(1), Dim(1), data=[1.])
+    assert type(Box("Y", Dim(1), Dim(1), data=[1.])) is Box[float]
+    assert Box[np.int64] is Box[int] and Spider[np.complex128] is Spider[complex]
+
+
+def test_eval_infers_dtype_from_boxes():
+    """ The dtype of an evaluation is promoted across the boxes, see B9 of
+    #31, and a structural box takes the dtype of the others. """
+    f = Box('f', Dim(2), Dim(2), [1, 0, 0, 1])
+    g = Box('g', Dim(2), Dim(2), [.5, 0, 0, 1])
+    h = Box('h', Dim(2), Dim(2), [True, False, False, True])
+    assert (f >> f).eval().dtype == f.eval().dtype == int
+    assert (f >> g).eval() == (g >> f).to_map().eval() == g.eval()
+    assert (h @ h >> Swap(Dim(2), Dim(2))).eval().dtype == bool
+    assert (f >> f).eval(dtype=float).dtype == float
+    assert h.bubble().eval(dtype=bool) == Tensor[bool]([0, 1, 1, 0], Dim(2), Dim(2))
+    assert (f >> g.bubble(func=lambda x: x)).eval() == g.eval()
+    assert ((f >> f) + (f >> f)).eval() == Tensor([2, 0, 0, 2], Dim(2), Dim(2))
+
+
+def test_Box_pickled_before_dtype_inference():
+    """ A box pickled with its data alone gets the dtype of its class. """
+    import pickle
+    with open("test/fixtures/pickles/0.6/tensor.Box.pickle", "rb") as f:
+        box = pickle.load(f).boxes[0]
+    assert type(box) is Box[int] and box.dtype is int
 
 
 def test_non_numpy_eval():
+    pytest.importorskip("torch")
     reference = Swap(Dim(2), Dim(2)).eval()
     with backend('pytorch'):
         result = Swap(Dim(2), Dim(2)).eval()
@@ -337,6 +439,7 @@ def test_eval_over_52_indices():
     diagram = g
     for _ in range(60):
         diagram = diagram >> g
+    pytest.importorskip("torch")
     with backend('pytorch'):
         result = diagram.eval()
     assert np.allclose(np.asarray(result.array), np.eye(2))
@@ -372,7 +475,7 @@ def test_CMap_eval():
 
 
 def test_CMap_eval_jax():
-    import jax
+    jax = pytest.importorskip("jax")
     import jax.numpy as jnp
     with backend('jax'):
         b = lambda x: Box[float]('v', Dim(1), Dim(2), x * jnp.ones(2))
@@ -382,6 +485,7 @@ def test_CMap_eval_jax():
 
 
 def test_Functor_backend():
+    pytest.importorskip("jax")
     x = frobenius.Ty('x')
     f = frobenius.Box('f', x, x @ x)
     diagram = f >> frobenius.Spider(1, 1, x) @ x >> f.dagger()
@@ -402,7 +506,7 @@ def test_Functor_markov_copy():
 
 
 def test_Functor_pytorch():
-    import torch
+    torch = pytest.importorskip("torch")
     from torch import float64
     x = frobenius.Ty('x')
     v = frobenius.Box('v', frobenius.Ty(), x)
@@ -415,7 +519,7 @@ def test_Functor_pytorch():
 
 
 def test_spider_eval_pytorch():
-    import torch
+    torch = pytest.importorskip("torch")
     with backend('pytorch'):
         result = (Spider(0, 1, Dim(2)) >> Spider(1, 0, Dim(2))).eval()
         assert isinstance(result.array, torch.Tensor)
@@ -522,6 +626,18 @@ def test_Tensor_strategy():
     assert tensor.array.shape == tensor.dom.inside + tensor.cod.inside
 
 
+def test_Tensor_transparency_up_to_elision():
+    from hypothesis import settings
+    from hypothesis.errors import NoSuchExample
+    from discopy import config
+    law = Tensor[int].transparency
+    assert law.params == {"max_entries": config.NUMPY_THRESHOLD}
+    assert law(Tensor[int]([0] * 16, Dim(2, 2), Dim(2, 2)))
+    assert "..." in repr(Tensor[int]([0] * 24, Dim(2, 2), Dim(2, 3)))
+    with raises(NoSuchExample):
+        law.falsify(settings=settings(max_examples=50, database=None))
+
+
 def test_delay_is_the_identity():
     f = Box('f', Dim(2), Dim(2), [1, 0, 0, 1])
     diagram = f @ Dim(3) >> Spider(1, 2, Dim(2)) @ Dim(3)\
@@ -621,3 +737,9 @@ def test_Bubble_subs_lambdify():
     for result in (bubble.subs(phi, 3), bubble.lambdify(phi)(3)):
         assert result.func is bubble.func
         assert np.allclose(result.eval().array, expected)
+
+
+def test_Bubble_name():
+    bubble = Box('f', Dim(2), Dim(2), [1, 0, 0, 1]).bubble(name="g")
+    assert bubble.dagger().dagger() == bubble
+    assert frobenius.Functor.id(Diagram)(bubble) == bubble

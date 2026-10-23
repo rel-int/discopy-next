@@ -38,11 +38,12 @@ Summary
 
         cat2ty
         tree2diagram
+        combine
+        parse
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 import re
 from typing import ClassVar
 
@@ -373,21 +374,18 @@ class BTR(TypeRaising):
         return Abstraction(f, f(child), left=True)
 
 
-@dataclass(frozen=True, repr=False)
 class BinaryTerm(TermBase):
     "Abstract superclass of :class:`FC`, :class:`BC`, :class:`FX`, :class:`BX`"
     left: Term
     right: Term
 
-    def __post_init__(self):
-        if set(self.left.freevars).intersection(self.right.freevars):
+    def __init__(self, left, right, cod):
+        if set(left.freevars).intersection(right.freevars):
             raise ValueError("Expected disjoint free variables.")
-        object.__setattr__(
-            self, "freevars", self.left.freevars + self.right.freevars)
-        object.__setattr__(self, "dom", self.left.dom @ self.right.dom)
-
-    def __str__(self):
-        return f"{type(self).__name__}({self.left}, {self.right})"
+        name = f"{type(self).__name__}({left}, {right})"
+        self.left, self.right = left, right
+        self.freevars = left.freevars + right.freevars
+        super().__init__(name, left.dom @ right.dom, cod)
 
     def simplify(self):
         return type(self)(self.left.simplify(), self.right.simplify())
@@ -407,6 +405,13 @@ class BinaryTerm(TermBase):
     def map(self, functor, context):
         return functor.map_term(self.simplify(), context)
 
+    def setoid(self):
+        """
+        Binary terms are equal when their kinds and sides are, see
+        :meth:`discopy.biclosed.Application.setoid`.
+        """
+        return type(self), self.left, self.right
+
     def __repr__(self):
         return factory_name(type(self)) + f"({self.left!r}, {self.right!r})"
 
@@ -423,21 +428,15 @@ class BinaryTerm(TermBase):
         return self.left.constants + self.right.constants
 
 
-@dataclass(frozen=True, repr=False)
 class FC(BinaryTerm):
     "Forward composition ``A << C`` with subterms ``A << B`` and ``B << C``. "
-    def __post_init__(self):
-        super().__post_init__()
-        assert self.left.cod.is_over
-        assert self.right.cod.is_over
-        if self.right.cod.base != self.left.cod.exponent:
+    def __init__(self, left, right):
+        assert left.cod.is_over
+        assert right.cod.is_over
+        if right.cod.base != left.cod.exponent:
             raise AxiomError(messages.NOT_COMPOSABLE.format(
-                self.left.cod, self.right.cod,
-                self.left.cod.exponent, self.right.cod.base))
-
-    @property
-    def cod(self):
-        return self.left.cod.base << self.right.cod.exponent
+                left.cod, right.cod, left.cod.exponent, right.cod.base))
+        super().__init__(left, right, left.cod.base << right.cod.exponent)
 
     def simplify(self):
         f, g = self.left.simplify(), self.right.simplify()
@@ -446,21 +445,15 @@ class FC(BinaryTerm):
         return Abstraction(x, f(g(x)))
 
 
-@dataclass(frozen=True, repr=False)
 class BC(BinaryTerm):
     "Backward composition ``A >> C`` with subterms ``A >> B`` and ``B >> C``."
-    def __post_init__(self):
-        super().__post_init__()
-        assert self.left.cod.is_under
-        assert self.right.cod.is_under
-        if self.left.cod.base != self.right.cod.exponent:
+    def __init__(self, left, right):
+        assert left.cod.is_under
+        assert right.cod.is_under
+        if left.cod.base != right.cod.exponent:
             raise AxiomError(messages.NOT_COMPOSABLE.format(
-                self.left.cod, self.right.cod,
-                self.left.cod.base, self.right.cod.exponent))
-
-    @property
-    def cod(self):
-        return self.left.cod.exponent >> self.right.cod.base
+                left.cod, right.cod, left.cod.base, right.cod.exponent))
+        super().__init__(left, right, left.cod.exponent >> right.cod.base)
 
     def simplify(self):
         f, g = self.left.simplify(), self.right.simplify()
@@ -469,16 +462,11 @@ class BC(BinaryTerm):
         return Abstraction(x, x(f, left=True)(g, left=True), left=True)
 
 
-@dataclass(frozen=True, repr=False)
 class FX(BinaryTerm):
     "Forward crossing ``A >> C`` with subterms ``B << A`` and ``B >> C``."
-    def __post_init__(self):
-        super().__post_init__()
-        ForwardCrossedComposition(self.left.cod, self.right.cod)
-
-    @property
-    def cod(self):
-        return self.right.cod.exponent >> self.left.cod.base
+    def __init__(self, left, right):
+        rule = ForwardCrossedComposition(left.cod, right.cod)
+        super().__init__(left, right, rule.cod)
 
     def eval(self, functor=None):
         functor, X = functor or self.functor, self.left.cod.base
@@ -498,16 +486,11 @@ class FX(BinaryTerm):
         return ob.abstraction_factory(var, f(g(var)))
 
 
-@dataclass(frozen=True, repr=False)
 class BX(BinaryTerm):
     "Backward crossing ``A << C`` with subterms ``A << B`` and ``C >> B``."
-    def __post_init__(self):
-        super().__post_init__()
-        BackwardCrossedComposition(self.left.cod, self.right.cod)
-
-    @property
-    def cod(self):
-        return self.right.cod.base << self.left.cod.exponent
+    def __init__(self, left, right):
+        rule = BackwardCrossedComposition(left.cod, right.cod)
+        super().__init__(left, right, rule.cod)
 
     def eval(self, functor=None):
         functor, Z = functor or self.functor, self.right.cod.base
@@ -599,6 +582,94 @@ def tree2diagram(tree: dict, dom=Ty()) -> Diagram:
     else:
         rule = Box(tree['type'], dom, cod)
     return Id().tensor(*children) >> rule
+
+
+def combine(left: Term, right: Term) -> list[Term]:
+    """
+    The terms of two adjacent terms by forward and backward application and
+    composition, in Eisner's normal form: a composition is not the functor
+    of the next rule in its direction (Eisner, `Efficient normal-form
+    parsing for combinatory categorial grammar (1996)
+    <https://aclanthology.org/P96-1011/>`_), so that the terms of one
+    meaning are combined once.
+
+    Parameters:
+        left : The term on the left.
+        right : The term on the right.
+
+    Example
+    -------
+    >>> x, y, z = map(Ty, "xyz")
+    >>> f, g, a = (x << y)("f"), (y << z)("g"), z("a")
+    >>> print(*combine(f, g))
+    FC((x << y)('f'), (y << z)('g'))
+    >>> assert combine(combine(f, g)[0], a) == []
+    """
+    x, y, result = left.cod, right.cod, []
+    if x.is_over and not isinstance(left, FC):
+        if x.exponent == y:
+            result.append(FA(left, right))
+        if y.is_over and x.exponent == y.base:
+            result.append(FC(left, right))
+    if y.is_under and not isinstance(right, BC):
+        if y.exponent == x:
+            result.append(BA(left, right))
+        if x.is_under and x.base == y.exponent:
+            result.append(BC(left, right))
+    return result
+
+
+def parse(sentence, k: int = 1, goal: Ty | None = None
+          ) -> list[tuple[Term, float]]:
+    """
+    The ``k`` best terms of a sentence with their score, the sum of the
+    scores of their words, by the CKY algorithm over the rules of
+    :func:`combine`: the chart keeps the ``k`` best terms of each type
+    for each span of words (Lewis and Steedman, `A* CCG parsing with a
+    supertag-factored model (2014) <https://aclanthology.org/D14-1107/>`_).
+
+    Parameters:
+        sentence : The candidate constants of each word with their score,
+            e.g. the log-probabilities of a supertagger.
+        k : The number of terms.
+        goal : The type of the terms, any type by default.
+
+    Example
+    -------
+    >>> n, s = Ty("n"), Ty("s")
+    >>> Alice, Bob = n("Alice"), n("Bob")
+    >>> loves, lovely = ((n >> s) << n)("loves"), (n << n)("loves")
+    >>> sentence = [[(Alice, 0.)], [(lovely, -.5), (loves, -1.)], [(Bob, 0.)]]
+    >>> for term, score in parse(sentence, k=2):
+    ...     print(term.cod, score)
+    s -1.0
+    >>> (term, _), = parse(sentence, goal=s)
+    >>> assert term == Alice(loves(Bob), left=True)
+    """
+    def best(items):
+        return sorted(items, key=lambda item: -item[1])[:k]
+
+    def cell(items):
+        result = {}
+        for term, score in items:
+            result.setdefault(term.cod, []).append((term, score))
+        return {cod: best(terms) for cod, terms in result.items()}
+
+    chart = {(i, i + 1): cell(candidates)
+             for i, candidates in enumerate(sentence)}
+    for width in range(2, len(sentence) + 1):
+        for i in range(len(sentence) - width + 1):
+            chart[i, i + width] = cell(
+                (term, a + b)
+                for middle in range(i + 1, i + width)
+                for lefts in chart[i, middle].values()
+                for left, a in lefts
+                for rights in chart[middle, i + width].values()
+                for right, b in rights
+                for term in combine(left, right))
+    return best(
+        item for cod, items in chart.get((0, len(sentence)), {}).items()
+        if goal is None or cod == goal for item in items)
 
 
 Id = Diagram.id

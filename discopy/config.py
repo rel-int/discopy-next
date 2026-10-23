@@ -118,14 +118,15 @@ COLORS = {
 
 
 def darken(hexcode, factor=0.6):
-    """ A darker shade of a hexcode, keeping ``factor`` of each RGB channel.
+    """ A darker shade of a hexcode, keeping ``factor`` of each RGB channel
+    and the alpha channel, if any.
 
     Used to fill the back of a twisting ribbon with a darker shade of the
     colour filling its front, see
     :meth:`discopy.drawing.backend.Backend.draw_dual_rail_twist`.
     """
     return '#' + ''.join(f'{round(int(hexcode[i:i + 2], 16) * factor):02x}'
-                         for i in (1, 3, 5))
+                         for i in (1, 3, 5)) + hexcode[7:]
 
 
 # A key ``f"dark_{name}"`` for every named colour, mapping to a darker shade

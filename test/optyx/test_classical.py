@@ -1,4 +1,11 @@
+import numpy as np
+import pytest
+
+from discopy.optyx import qubits
+from discopy.optyx.channel import bit, qubit
 from discopy.optyx.classical import *
+from discopy.optyx.classical import (
+    Bit, BitControlledGate, Id, PostselectBit, PostselectDigit)
 from discopy.optyx.utils.misc import compare_arrays_of_different_sizes
 
 def test_addn():
@@ -112,3 +119,26 @@ def test_zxh():
 
     assert compare_arrays_of_different_sizes(d_1.double().to_tensor().eval().array,
                             d_2.double().to_tensor().eval().array)
+
+
+def test_bit_controlled_diagram():
+    """Copying and merging the target are applied whatever the bit, the
+    phase between them only when the bit is one."""
+    phase = qubits.Z(1, 2) >> qubits.Z(1, 1, .25) @ qubit >> qubits.Z(2, 1)
+    controlled = BitControlledGate(phase)
+    for value, expected in [(0, qubits.Z(1, 1)), (1, qubits.Z(1, 1, .25))]:
+        assert np.allclose(
+            (Bit(value) @ qubits.Ket("+") >> controlled).double()
+            .to_tensor().eval().array,
+            (qubits.Ket("+") >> expected).double().to_tensor().eval().array)
+    assert BitControlledGate(phase, is_dagger=True) == controlled.dagger()
+
+
+def test_classical_guards():
+    with pytest.raises(ValueError, match="0s and 1s"):
+        PostselectBit(2)
+    with pytest.raises(ValueError, match="integers"):
+        PostselectDigit(1.5)
+    with pytest.raises(TypeError, match="channel.Ty"):
+        Id(2)
+    assert Bit(1) >> Id(bit) == Bit(1)

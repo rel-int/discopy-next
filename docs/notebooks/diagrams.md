@@ -465,7 +465,7 @@ Such a tensor expression is called a **layer**.
 DisCoPy can also fuse independent boxes into one layer, for example $f \otimes g$.
 This is implemented by `Layer`, a subclass of `cat.Box` whose `boxes_or_types` attribute is a compact tensor word of boxes and non-empty types.
 It contains at least one box, drops empty types, and tensors adjacent types together.
-The compatibility view `boxes_and_types` inserts empty types again to recover the traditional alternating representation.
+Its `boxes_and_offsets` lists each box with its offset, i.e. the number of wires on its left once the boxes before it are applied.
 
 ```python {.marimo}
 from discopy.monoidal import Layer

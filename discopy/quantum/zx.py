@@ -319,11 +319,14 @@ class Permutation(tensor.Permutation[complex], Box):
 
 
 class Swap(Permutation, tensor.Swap[complex], Box):
-    """ Swap in a ZX diagram. """
-    def __repr__(self):
-        return "SWAP"
+    """
+    Swap in a ZX diagram.
 
-    __str__ = __repr__
+    >>> assert repr(SWAP) == "quantum.zx.Swap(rigid.Nat(1), rigid.Nat(1))"
+    >>> assert str(SWAP) == "SWAP"
+    """
+    def __str__(self):
+        return "SWAP"
 
 
 class Spider(tensor.Spider[complex], Box):

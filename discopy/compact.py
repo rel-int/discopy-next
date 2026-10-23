@@ -172,6 +172,20 @@ class Functor(symmetric.Functor, ribbon.Functor):
         return ribbon.Functor.__call__(self, other)
 
 
+class DualRail(symmetric.DualRail, ribbon.DualRail):
+    """
+    The functor sending a compact diagram to its dual rail encoding, i.e.
+    :class:`discopy.symmetric.DualRail` sending a :class:`Permutation` to the
+    dual rail braids of its swaps, and :class:`discopy.ribbon.DualRail`
+    otherwise.
+
+    >>> x, y, z = map(Ty, "xyz")
+    >>> diagram = (Swap(x, y) @ z).to_braided()
+    >>> assert [type(box) for box in diagram.boxes] == [ribbon.DualRailBraid]
+    """
+    dom = Diagram
+
+
 CMap = cmap.CMap[Diagram]
 
 Id = Diagram.id
@@ -180,6 +194,7 @@ Feedback, Trace, FollowedBy, Head, Tail = feedback.generators(Diagram, Box)
 Diagram.box_factory = Box
 Diagram.swap_factory = Swap
 Diagram.functor_factory = Functor
+Diagram.dual_rail_factory = DualRail
 Diagram.permutation_factory = Permutation
 Hypergraph = hypergraph.Hypergraph[Diagram]
 Diagram.cup_factory, Diagram.cap_factory = Cup, Cap

@@ -868,3 +868,62 @@ def test_Drawing_dagger():
     assert drawing.dagger().dagger() == drawing
     empty = monoidal.Id(monoidal.Ty()).to_drawing()
     assert empty.dagger() == empty
+
+
+def test_draw_is_pure(tmp_path):
+    from matplotlib import pyplot as plt
+    from discopy import ribbon
+    x, y = monoidal.Ty('x'), monoidal.Ty('y')
+    f, g = monoidal.Box('f', x, y), monoidal.Box('g', y, x)
+    drawing = (f >> g).to_drawing()
+    drawing.draw(path=tmp_path / "drawing.svg", show=False)
+    assert drawing == (f >> g).to_drawing()
+    X = ribbon.Ty('x')
+    dual_rail = ribbon.Braid(X, X).trace().to_ribbons().to_drawing()
+    snapshot = dual_rail.relabel_nodes()
+    assert dual_rail.to_svg() == dual_rail.to_svg()
+    assert dual_rail == snapshot and dual_rail.height == snapshot.height
+    plt.close('all')
+    f.draw(show=False)
+    assert plt.get_fignums() == []
+
+
+def test_Drawing_then_and_tensor_return_new_drawings():
+    x = monoidal.Ty('x')
+    f = monoidal.Box('f', x, x).to_drawing()
+    for result in (Drawing.id(x) >> f, f >> Drawing.id(x),
+                   Drawing.id() @ f, f @ Drawing.id()):
+        assert result == f and result is not f
+
+
+def test_draw_any_colour_a_box_draws_in(tmp_path):
+    from matplotlib.colors import to_hex
+    from discopy import ribbon
+    x, X = monoidal.Ty('x'), ribbon.Ty('x')
+    front, back = 'lightgrey', config.darken(to_hex('lightgrey'))
+    spider = monoidal.Box('f', x, x, draw_as_spider=True, color='lightgrey')
+    cup, twist = (diagram.to_ribbons(colour='lightgrey') for diagram in (
+        ribbon.Diagram.cups(X, X.r), ribbon.Diagram.twist(X)))
+    for name, diagram, fills in [
+            ("spider", spider, [front]), ("cup", cup, [front]),
+            ("twist", twist, [front, back])]:
+        svg, tikz = tmp_path / f"{name}.svg", tmp_path / f"{name}.tikz"
+        diagram.draw(path=svg, show=False)
+        diagram.draw(path=str(tikz), to_tikz=True, use_tikzstyles=True)
+        tikz_code = tikz.read_text() + tikz.with_suffix(".tikzstyles")\
+            .read_text()
+        for fill in fills:
+            assert f"fill: {to_hex(fill)}" in svg.read_text()
+            assert TikZ.format_color(fill) in tikz_code
+    svg = tmp_path / "translucent.svg"
+    ribbon.Diagram.twist(X).to_ribbons(colour='#abcdef80').draw(
+        path=svg, show=False)
+    assert f"fill: {config.darken('#abcdef')}; fill-opacity: 0.5"\
+        in svg.read_text()
+    ribbon.Diagram.twist(X).to_ribbons(colour=config.TRANSPARENT).draw(
+        path=svg, show=False)
+    tikz = tmp_path / "hexcode.tikz"
+    for diagram in (monoidal.Box('f', x, x, color='#abc'), monoidal.Box(
+            'f', x, x, draw_as_spider=True, color='#abc')):
+        diagram.draw(path=str(tikz), to_tikz=True)
+        assert TikZ.format_color('#aabbcc') in tikz.read_text()

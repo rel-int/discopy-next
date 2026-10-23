@@ -37,8 +37,9 @@ def find_root(doc):
 
 
 def doc2tree(root):
-    if not root.children:
+    children = list(root.children)
+    if not children:
         return Word(root.text, Ty(root.dep_))
-    dom = Ty().tensor(*[Ty(child.dep_) for child in root.children])
+    dom = Ty().tensor(*[Ty(child.dep_) for child in children])
     box = Rule(dom, Ty(root.dep_), name=root.text)
-    return box(*[doc2tree(child) for child in root.children])
+    return box(*map(doc2tree, children))

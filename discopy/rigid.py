@@ -153,7 +153,7 @@ from collections.abc import Callable
 
 from typing import ClassVar, Iterator
 
-from discopy import cat, monoidal, biclosed
+from discopy import cat, monoidal, biclosed, messages
 from discopy.abc import Pregroup, RigidCategory
 from discopy.cat import factory
 from discopy.utils import (
@@ -163,6 +163,7 @@ from discopy.utils import (
     BinaryBoxConstructor,
     deprecated_alias,
     factory_name,
+    rsubs,
 )
 
 
@@ -486,21 +487,23 @@ class Diagram(biclosed.Diagram, RigidCategory):
 
         .. image:: /_static/rigid/transpose_box.svg
         """
-        box = self.inside[i].boxes_and_types[2 * j + 1]
-        transposed_box = (box.r if left else box.l).transpose(left)
+        layer = self.inside[i]
+        k = [position for position, x in enumerate(layer)
+             if isinstance(x, monoidal.Box)][j]
+        transposed_box = (layer[k].r if left else layer[k].l).transpose(left)
         top, bottom = self[:i], self[i + 1:]
-        boxes_and_types = list(self.inside[i].boxes_and_types)
-        left_boxes_and_types = boxes_and_types[:2 * j + 1]
-        right_boxes_and_types = boxes_and_types[2 * j + 2:]
         left_layer, right_layer = [
-            self.id().tensor(
-                *(x if k % 2 else self.id(x) for k, x in enumerate(xs)))
-            for xs in [left_boxes_and_types, right_boxes_and_types]]
+            self.id().tensor(*(
+                x if isinstance(x, monoidal.Box) else self.id(x) for x in xs))
+            for xs in [layer[:k], layer[k + 1:]]]
         return top >> left_layer @ transposed_box @ right_layer >> bottom
 
     def snake_removal(self, left=False) -> Iterator[Diagram]:
         """
-        Return a generator which yields normalization steps.
+        Return a generator which yields normalization steps, yanking snakes
+        before it interchanges boxes with
+        :meth:`discopy.monoidal.Diagram.normalize`, whose note says where
+        these planar rewrites apply.
 
         Parameters:
             left : Passed to :meth:`discopy.monoidal.Diagram.normalize`.
@@ -516,6 +519,14 @@ class Diagram(biclosed.Diagram, RigidCategory):
         g >> f[::-1] >> n @ Cap(n.r, n) >> n @ n.r @ f >> Cup(n, n.r) @ n >> h
         g >> f[::-1] >> n @ Cap(n.r, n) >> Cup(n, n.r) @ n >> f >> h
         g >> f[::-1] >> f >> h
+
+        A diagram with more than one box in a layer is split into staircases
+        first, see :meth:`discopy.monoidal.Diagram.to_staircases`, and that
+        is the first step.
+
+        >>> snake = n @ cap >> cup @ n
+        >>> *_, normal_form = (f @ snake).foliation().normalize()
+        >>> assert normal_form == f @ n
         """
         from discopy import monoidal
         from discopy.rigid import Cup, Cap
@@ -604,6 +615,9 @@ class Diagram(biclosed.Diagram, RigidCategory):
                 inside, diagram.dom, diagram.cod, _scan=False)
 
         diagram = self
+        if any(len(layer.boxes) > 1 for layer in self.inside):
+            diagram = self.to_staircases()
+            yield diagram
         while True:
             yankable = find_snake(diagram)
             if yankable is None:
@@ -698,6 +712,36 @@ class Box(biclosed.Box, Diagram):
         z = self.z + (-1 if left else 1)
         return type(self)(self.name, dom=dom, cod=cod,
                           data=self.data, is_dagger=self.is_dagger, z=z)
+
+    def dagger(self) -> Box:
+        """
+        The dagger of a rigid box keeps its winding number, i.e. the dagger
+        of a rotation is the rotation of the dagger, as in a dagger pivotal
+        category, see :meth:`discopy.pivotal.Diagram.conjugate`.
+
+        Example
+        -------
+        >>> f = Box('f', Ty('a'), Ty('b'))
+        >>> assert f.r[::-1] == f[::-1].r and f.r[::-1].z == 1
+        >>> assert f.r[::-1][::-1] == f.r and f.l.l[::-1][::-1] == f.l.l
+        """
+        return type(self)(self.name, dom=self.cod, cod=self.dom,
+                          data=self.data, is_dagger=not self.is_dagger,
+                          z=self.z)
+
+    def lambdify(self, *symbols, **kwargs) -> Callable:
+        """
+        Lambdify a rigid box, keeping its winding number.
+
+        >>> from sympy.abc import phi  # doctest: +EXTRA
+        >>> f = Box('f', Ty('x'), Ty('y'), data=phi)
+        >>> assert f.r.subs(phi, 1) == f.subs(phi, 1).r
+        """
+        if not self.free_symbols & set(symbols):
+            return lambda *xs: self
+        return lambda *xs: type(self)(
+            self.name, dom=self.dom, cod=self.cod, is_dagger=self.is_dagger,
+            data=rsubs(self.data, dict(zip(symbols, xs)), **kwargs), z=self.z)
 
     @classmethod
     def strategy(cls, **params):
@@ -908,14 +952,24 @@ class Functor(biclosed.Functor):
 def nesting(cls: type, factory: Callable) -> Callable[[Ty, Ty], Diagram]:
     """
     Take a :code:`factory` for cups or caps of atomic types
-    and extends it recursively.
+    and extends it recursively, to types of the same length.
 
     Parameters:
         cls : A diagram factory, e.g. :class:`Diagram`.
         factory :
             A factory for cups (or caps) of atomic types, e.g. :class:`Cup`.
+
+    Example
+    -------
+    >>> x = Ty('x')
+    >>> Diagram.cups(x @ x, x.r)
+    Traceback (most recent call last):
+        ...
+    discopy.utils.AxiomError: x @ x and x.r are not adjoints.
     """
     def method(left: Ty, right: Ty) -> Diagram:
+        if len(left) != len(right):
+            raise AxiomError(messages.NOT_ADJOINT.format(left, right))
         if len(left) == 0:
             return cls.id(left[:0])
         head, tail = factory(left[0], right[-1]), method(left[1:], right[:-1])

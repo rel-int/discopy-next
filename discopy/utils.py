@@ -14,6 +14,7 @@ from typing import (
     Generic,
     Mapping,
     Iterable,
+    Iterator,
     TypeVar,
     Any,
     Collection,
@@ -561,28 +562,86 @@ def loads(raw):
 
 def rmap(func, data):
     """
-    Apply :code:`func` recursively to :code:`data`.
+    Apply :code:`func` recursively to :code:`data`, i.e. to the leaves of its
+    mappings, iterables and numpy arrays, where a string is a leaf.
 
     Example
     -------
     >>> data = {'A': [0, 1, 2], 'B': ({'C': 3, 'D': [4, 5, 6]}, {7, 8, 9})}
     >>> rmap(lambda x: x + 1, data)
     {'A': [1, 2, 3], 'B': ({'C': 4, 'D': [5, 6, 7]}, {8, 9, 10})}
+    >>> rmap(str.upper, ["ab", ("c", )])
+    ['AB', ('C',)]
+    >>> import numpy
+    >>> rmap(lambda x: x / 2, numpy.array([[0, 1], [2, 3]]))
+    array([[0. , 0.5],
+           [1. , 1.5]])
     """
+    import numpy
     if isinstance(data, Mapping):
         return {key: rmap(func, value) for key, value in data.items()}
-    if isinstance(data, Iterable):
+    if isinstance(data, numpy.ndarray):
+        return numpy.array(rmap(func, data.tolist())) if data.size\
+            else data.copy()
+    if isinstance(data, Iterable) and not isinstance(data, str):
         return type(data)([rmap(func, elem) for elem in data])
     return func(data)
 
 
-def rsubs(data, *args):
-    """ Substitute recursively along nested data. """
-    from sympy import lambdify
-    if isinstance(args, Iterable) and not isinstance(args[0], Iterable):
-        args = (args, )
-    keys, values = zip(*args)
-    return rmap(lambda x: lambdify(keys, x)(*values), data)
+def rsubs(data, *args, **kwargs):
+    """
+    Substitute recursively along nested data, see :func:`rmap`.
+
+    Parameters:
+        data : The data in which to substitute.
+        args : A variable and an expression or the pair of them, or for
+            multiple substitution, a list or a mapping of them, as in
+            :code:`sympy.subs`, or the pairs themselves.
+        kwargs : Passed to :code:`sympy.lambdify`.
+
+    Example
+    -------
+    >>> from sympy.abc import phi, psi  # doctest: +EXTRA
+    >>> data = {"name": "phi", "phases": [phi, phi + psi]}
+    >>> rsubs(data, phi, 1)
+    {'name': 'phi', 'phases': [1, psi + 1]}
+    >>> rsubs(data, [(phi, 1), (psi, 2)])
+    {'name': 'phi', 'phases': [1, 3]}
+    >>> assert rsubs(data, [(phi, 1), (psi, 2)])\\
+    ...     == rsubs(data, {phi: 1, psi: 2}) == rsubs(data, (phi, 1), (psi, 2))
+    >>> assert rsubs(data, (phi, 1)) == rsubs(data, phi, 1)
+
+    A leaf that keeps a free symbol is substituted symbolically:
+
+    >>> from sympy import sin
+    >>> rsubs(sin(phi) + sin(psi), phi, 1)
+    sin(psi) + sin(1)
+
+    A key that is not a symbol is substituted as in :code:`sympy.subs`:
+
+    >>> rsubs(data, phi + psi, 0)
+    {'name': 'phi', 'phases': [phi, 0]}
+    """
+    from sympy import Basic, MatrixBase, Symbol, lambdify
+    pairs = args[0] if len(args) == 1 else args
+    if not isinstance(pairs, Mapping):
+        pairs = tuple(pairs)
+        if pairs and not isinstance(pairs[0], Iterable):
+            pairs = (pairs, )
+    substitution = dict(pairs)
+    compound = not all(isinstance(key, Symbol) for key in substitution)
+
+    def substitute(leaf):
+        if compound and isinstance(leaf, (Basic, MatrixBase)):
+            return leaf.subs(substitution, simultaneous=True)
+        symbols = tuple(getattr(leaf, "free_symbols", ()))
+        if not substitution.keys() & set(symbols):
+            return leaf
+        values = tuple(substitution.get(x, x) for x in symbols)
+        if any(isinstance(value, Basic) for value in values):
+            return leaf.subs(dict(zip(symbols, values)), simultaneous=True)
+        return lambdify(symbols, leaf, **kwargs)(*values)
+    return rmap(substitute, data)
 
 
 def load_corpus(url):
@@ -656,7 +715,7 @@ def inductive(induction_step):
     def method(self, n_steps=1):
         assert_isinstance(n_steps, int)
         if n_steps < 0:
-            raise ValueError
+            raise ValueError(messages.NEGATIVE_STEPS.format(n_steps))
         if n_steps == 0:
             return self
         return method(induction_step(self), n_steps - 1)
@@ -684,7 +743,8 @@ def pushout(
     >>> assert pushout(2, 3, [1], [0]) == ({0: 0, 1: 1}, {0: 1, 1: 2, 2: 3})
     """
     if len(left_boundary) != len(right_boundary):
-        raise ValueError
+        raise ValueError(messages.UNEQUAL_BOUNDARIES.format(
+            left_boundary, right_boundary))
     components, left_pushout, right_pushout = set(), {}, {}
     left_proper = sorted(set(range(left)) - set(left_boundary))
     left_pushout.update({j: i for i, j in enumerate(left_proper)})
@@ -703,6 +763,28 @@ def pushout(
         j: len(left_proper) + len(components) + i
         for i, j in enumerate(right_proper)})
     return left_pushout, right_pushout
+
+
+def set_partitions(items: list) -> Iterator[list[list]]:
+    """
+    The partitions of a list into non-empty blocks, all singletons first
+    and one block last.
+
+    >>> for blocks in set_partitions([0, 1, 2]): print(blocks)
+    [[0], [1], [2]]
+    [[0, 1], [2]]
+    [[1], [0, 2]]
+    [[0], [1, 2]]
+    [[0, 1, 2]]
+    """
+    if not items:
+        yield []
+        return
+    first, rest = items[0], items[1:]
+    for blocks in set_partitions(rest):
+        yield [[first]] + blocks
+        for i, block in enumerate(blocks):
+            yield blocks[:i] + [[first] + block] + blocks[i + 1:]
 
 
 class BinaryBoxConstructor:
@@ -880,7 +962,7 @@ def assert_isatomic(typ: Ty, cls: type = None):
 def assert_istraceable(arg: Diagram, n=1, left=False):
     """ Raise :class:`AxiomError` if a diagram is not traceable. """
     if n < 0 or n > min(len(arg.dom), len(arg.cod)):
-        raise ValueError
+        raise ValueError(messages.NOT_SPLITTABLE.format(n, arg))
     traced_dom, traced_cod = (arg.dom[:n], arg.cod[:n]) if left\
         else (arg.dom[len(arg.dom) - n:], arg.cod[len(arg.cod) - n:])
     if traced_dom != traced_cod:
