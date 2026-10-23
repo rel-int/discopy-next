@@ -53,6 +53,8 @@ dev = [
     "pytest-benchmark",
     "polars",
     "pytest-xdist",
+    "ruff == 0.14.0",
+    "ty == 0.0.69",
 ]
 docs = ["discopy[docs]"]
 notebooks = ["discopy[notebooks]"]
@@ -153,6 +155,76 @@ extend-ignore = [
 per-file-ignores = [
     "__init__.py:F401"
 ]
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "B", "PLE", "PLW", "RUF"]
+# The first four are flake8's; the rest are rules `main` breaks today, each
+# removed from this list by the pull request that fixes its last instance.
+ignore = [
+    "E731",
+    "E741",
+    "E743",
+    "F811",
+    "B006",
+    "B008",
+    "B023",
+    "B027",
+    "B028",
+    "B904",
+    "B905",
+    "E714",
+    "PLW0642",
+    "PLW1641",
+    "PLW2901",
+    "PLW3301",
+    "RUF001",
+    "RUF005",
+    "RUF007",
+    "RUF010",
+    "RUF012",
+    "RUF013",
+    "RUF017",
+    "RUF021",
+    "RUF022",
+    "RUF100",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401"]
+
+[tool.ty.src]
+include = ["discopy"]
+
+[tool.ty.environment]
+python-version = "3.12"
+
+# The factory-method pattern narrows the signatures of `then`, `tensor` and
+# their friends down the tower, and attributes are dynamic by design where a
+# downgrade asks the host category for structure it may not have.
+[tool.ty.rules]
+invalid-method-override = "ignore"
+unresolved-attribute = "ignore"
+# The rules `main` breaks today, each set back to "error" by the pull request
+# that fixes its last instance.
+call-non-callable = "warn"
+inconsistent-mro = "warn"
+invalid-argument-type = "warn"
+invalid-assignment = "warn"
+invalid-generic-class = "warn"
+invalid-legacy-type-variable = "warn"
+invalid-parameter-default = "warn"
+invalid-return-type = "warn"
+invalid-type-arguments = "warn"
+invalid-type-form = "warn"
+invalid-yield = "warn"
+missing-argument = "warn"
+no-matching-overload = "warn"
+not-iterable = "warn"
+not-subscriptable = "warn"
+too-many-positional-arguments = "warn"
+unknown-argument = "warn"
+unresolved-import = "warn"
+unsupported-operator = "warn"
 
 [tool.pytest.ini_options]
 pythonpath = [

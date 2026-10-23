@@ -58,6 +58,8 @@ if you want to run the full test suite involving all extra dependencies.
 uv sync --dev --group all
 uv run pflake8 discopy
 uv run pylint discopy
+uv run ruff check discopy
+uv run ty check --exit-zero-on-warning
 uv run coverage run -m pytest
 uv run coverage report -m
 ```
@@ -82,6 +84,11 @@ declares the `factory` members a `NamedGeneric` subscript sets and lets `hypothe
 be imported inside a method, where a strategy is built, so that the package never imports it; a
 category of messages the code is not going to follow is disabled there with its reason, as
 `cyclic-import` is: the package imports every module.
+
+`ruff check` and `ty check` gate on every rule `main` passes. The rules `main` still breaks are
+listed in `pyproject.toml`, ruff's under `ignore` and ty's as `"warn"`, which ty prints without
+failing under `--exit-zero-on-warning`: the pull request that fixes the last instance of one removes it from the list, so that
+the list only shrinks, as `fail-under` only rises.
 
 ## Run the property tests
 

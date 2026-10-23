@@ -53,6 +53,7 @@ jobs:
     - uses: ./.github/actions/setup
       with:
         python-version: ${{ matrix.python-version }}
+        groups: dev all
     - name: Check for errors
       run:
         # stop the build if there are Python syntax errors or undefined names
@@ -60,6 +61,12 @@ jobs:
     - name: pylint
       run:
         uv run pylint discopy
+    - name: ruff
+      run:
+        uv run ruff check discopy
+    - name: ty
+      run:
+        uv run ty check --exit-zero-on-warning
   test:
     runs-on: ubuntu-latest
     timeout-minutes: 15

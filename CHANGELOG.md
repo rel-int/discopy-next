@@ -90,6 +90,10 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   Lafont's maps, linear maps and Boolean functions as double-pushout
   rewriting ([next#310], [next#316]).
 
+- `ruff check` and `ty check` in the lint job beside `pylint`, each gating on
+  every rule `main` passes, with the rules it still breaks listed in
+  `pyproject.toml` to be removed one by one.
+
 ### Changed
 
 - DisCoPy requires Python 3.12 and is packaged with uv ([#311]).
