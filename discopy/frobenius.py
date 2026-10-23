@@ -20,8 +20,10 @@ Summary
     TailOb
     Ty
     Dim
+    Layer
     Diagram
     Box
+    Cospan
     Cup
     Cap
     Swap
@@ -73,11 +75,13 @@ from typing import Self
 
 from discopy import (
     monoidal, rigid, markov, comarkov, compact, pivotal, feedback, cmap,
-    hypergraph)
+    hypergraph, symmetric)
 from discopy.abc import HypergraphCategory
 from discopy.cat import factory
+from discopy.python import finset
 from discopy.utils import (
-    assert_isatomic, deprecated_alias, factory_name, from_tree)
+    assert_isatomic, assert_iscomposable, deprecated_alias, factory_name,
+    from_tree)
 
 
 class Wire(pivotal.Wire):
@@ -157,6 +161,40 @@ class Dim(monoidal.Dim, Ty):
         return self
 
 
+class Layer(compact.Layer):
+    """
+    A tensor product of generators and non-empty plumbing, where plumbing is
+    a type when it is the identity and a :class:`Cospan` otherwise, i.e.
+    permutations, phase-free spiders and the cups and caps of a self-dual
+    wire. Plumbing components are coalesced, so that the layer alternates
+    between cospans and generators.
+
+    A category below frobenius whose spiders are not its own cospans, e.g.
+    :mod:`discopy.tensor`, keeps them as generators, and only its
+    permutations as plumbing.
+
+    Parameters:
+        inside : Generators and plumbing, with at least one generator or one
+                 cospan other than the identity.
+
+    Example
+    -------
+    >>> x, y = Ty('x'), Ty('y')
+    >>> f = Box('f', x, y)
+    >>> assert Layer(Spider(1, 2, x), y, f).boxes_or_types == (
+    ...     Cospan(x @ y, [0, 1], [0, 0, 1]), f)
+    """
+    @classmethod
+    def is_plumbing_box(cls, value: Ty | Box) -> bool:
+        """
+        Whether a component is a permutation, or a cospan of a category that
+        has its own, see :attr:`Diagram.cospan_factory`.
+        """
+        return isinstance(value, symmetric.Permutation)\
+            or getattr(value, "legs", None) is not None\
+            and value.ar.cospan_factory.ar is value.ar
+
+
 @factory
 class Diagram(
         compact.Diagram, markov.Diagram, comarkov.Diagram,
@@ -171,6 +209,60 @@ class Diagram(
     """
 
     ob = Ty
+    layer_factory = Layer
+
+    @classmethod
+    def from_cospan(cls, apex: Ty, left, right) -> Diagram:
+        """
+        A native :class:`Cospan` box when the category has a matching
+        cospan factory, its decomposition by
+        :meth:`discopy.abc.HypergraphCategory.cospan` otherwise. A bijection
+        becomes :meth:`from_permutation`, the identity the identity diagram.
+
+        Parameters:
+            apex : The type of each point of the apex.
+            left : The point of each input.
+            right : The point of each output.
+
+        Example
+        -------
+        >>> x, y = Ty('x'), Ty('y')
+        >>> assert Diagram.from_cospan(x @ y, [1, 0], [0, 1]) == Swap(y, x)
+        """
+        left, right = list(left), list(right)
+        dom = apex[:0].tensor(*(apex[k:k + 1] for k in left))
+        if len(left) == len(right) == len(apex)\
+                and sorted(left) == sorted(right) == list(range(len(apex))):
+            return cls.from_permutation([left.index(k) for k in right], dom)
+        if cls.cospan_factory.ar is cls:
+            return cls.cospan_factory(apex, left, right)
+        return super().from_cospan(apex, left, right)
+
+    @classmethod
+    def from_function(cls, func, dom: Ty) -> Diagram:
+        """
+        The cospan of a function, i.e. with the identity as left leg.
+
+        >>> x, y = Ty('x'), Ty('y')
+        >>> assert Diagram.from_function([1, 0, 0], x @ y)\\
+        ...     == Cospan(x @ y, [0, 1], [1, 0, 0])
+        """
+        if cls.cospan_factory.ar is not cls:
+            return super().from_function(func, dom)
+        return cls.from_cospan(dom, range(len(dom)), func)
+
+    @classmethod
+    def from_cofunction(cls, cofunc, cod: Ty) -> Diagram:
+        """
+        The cospan of a cofunction, i.e. with the identity as right leg.
+
+        >>> x, y = Ty('x'), Ty('y')
+        >>> assert Diagram.from_cofunction([1, 0, 0], x @ y)\\
+        ...     == Cospan(x @ y, [1, 0, 0], [0, 1])
+        """
+        if cls.cospan_factory.ar is not cls:
+            return super().from_cofunction(cofunc, cod)
+        return cls.from_cospan(cod, cofunc, range(len(cod)))
 
     @classmethod
     def caps(cls, left, right):
@@ -189,6 +281,11 @@ class Diagram(
             typ : The type of the spiders.
             phases : The phase for each spider.
         """
+        if phases is None and len(typ) != 1\
+                and getattr(cls, "cospan_factory", None)\
+                and cls.cospan_factory.ar is cls:
+            spiders = finset.Cospan.spiders(n_legs_in, n_legs_out, len(typ))
+            return cls.from_cospan(typ, spiders.left, spiders.right)
         return interleaving(cls, cls.spider_factory)(
             n_legs_in, n_legs_out, typ, phases)
 
@@ -246,6 +343,240 @@ class Box(compact.Box, markov.Box, comarkov.Box, Diagram):
         return self.flagged(super().rotate(left))
 
 
+class Cospan(Box):
+    """
+    A cospan of finite sets as plumbing: input ``i`` and output ``j`` are
+    legs of the spiders ``left[i]`` and ``right[j]`` of the apex, i.e.
+    ``dom[i] == apex[left[i]]`` and ``cod[j] == apex[right[j]]``, so that a
+    cospan holds a :class:`finset.Cospan <discopy.python.finset.Cospan>`, an
+    arrow of the free hypergraph category on one object, see
+    :cite:t:`Lack04`. A point that no leg reaches is a spider with no legs.
+
+    It is the :class:`discopy.comarkov.Cofunction` ``left`` into its apex
+    then the :class:`discopy.markov.Function` ``right`` out of it, i.e. its
+    merges then its copies. A :class:`Layer` stores it as plumbing. A
+    bijection constructs a :class:`Permutation`, a cospan with one point a
+    :class:`Spider`, see :meth:`Diagram.from_cospan`, and the points are
+    numbered as :class:`finset.Cospan <discopy.python.finset.Cospan>` does.
+
+    Parameters:
+        apex : The type of each point of the apex.
+        left : The point of each input.
+        right : The point of each output.
+
+    Examples
+    --------
+    >>> x, y = Ty('x'), Ty('y')
+    >>> f = Cospan(x @ y, [0, 1, 0], [1, 1])
+    >>> assert f.dom == x @ y @ x and f.cod == y @ y
+    >>> assert Equation(f, x @ Swap(y, x) >> Spider(2, 0, x) @ Spider(1, 2, y))
+    >>> assert Cospan(x, [0], [0, 0]) == Spider(1, 2, x)
+    >>> assert Cospan(x @ y, [0, 1], [1, 0]) == Swap(x, y)
+
+    Tensoring cospans gives one cospan, and so does a cup or a spider:
+
+    >>> assert Spider(2, 0, x) @ Spider(1, 2, y) @ x\\
+    ...     == Cospan(x @ y @ x, [0, 0, 1, 2], [1, 1, 2])
+    >>> f.draw(doctest='docs/_static/frobenius/cospan.svg')
+
+    .. image:: /_static/frobenius/cospan.svg
+        :align: center
+    """
+    def __new__(cls, apex: Ty = None, left=None, right=None):
+        if apex is None or cls is not cls.ar.cospan_factory:
+            return super().__new__(cls)
+        left, right = list(left), list(right)
+        if len(apex) == 1 and not any(left + right)\
+                and not len(left) == len(right) == 1:
+            factory = {(2, 0): cls.ar.cup_factory, (0, 2): cls.ar.cap_factory
+                       }.get((len(left), len(right)))
+            return factory(apex, apex) if factory\
+                else cls.ar.spider_factory(len(left), len(right), apex)
+        if len(left) == len(right) == len(apex)\
+                and sorted(left) == sorted(right) == list(range(len(apex))):
+            return cls.ar.from_cospan(apex, left, right)
+        return super().__new__(cls)
+
+    def __init__(self, apex: Ty, left, right):
+        order = finset.Cospan.order(left, right, len(apex))
+        self.apex = apex[:0].tensor(*(apex[k:k + 1] for k in order))
+        self.legs = finset.Cospan(left, right, len(apex))
+        dom, cod = (self.apex[:0].tensor(*(
+            self.apex[k:k + 1] for k in leg))
+            for leg in (self.legs.left, self.legs.right))
+        ins = [self.legs.left.count(k) for k in range(self.legs.apex)]
+        Box.__init__(
+            self, f"Cospan({self.legs.left}, {self.legs.right})", dom,
+            cod, is_deterministic=all(ins), is_affine=set(ins) <= {1})
+
+    def __getnewargs__(self):
+        """
+        The arguments of :meth:`__new__`, which a pickle and a delay read.
+
+        >>> x, y = map(Ty, "xy")
+        >>> f = Cospan(x @ y, [0, 1, 0], [1, 1])
+        >>> assert f.delay() == Cospan((x @ y).delay(), [0, 1, 0], [1, 1])
+        """
+        return self.apex, self.legs.left, self.legs.right
+
+    @property
+    def is_identity(self) -> bool:
+        """ Whether the underlying cospan is the identity. """
+        return self.legs == finset.Cospan.id(len(self.dom))
+
+    @property
+    def size(self) -> int:
+        """
+        The number of spiders the cospan fuses, i.e. of the points of its
+        apex without exactly one leg in and one out, so that a permutation
+        counts zero and a cup or a cap one, as their boxes do.
+
+        >>> x, y = Ty('x'), Ty('y')
+        >>> assert Diagram.spiders(2, 1, x @ y).size == 2
+        >>> assert Cospan(x @ y, [0, 1], [1, 0]).size == 0
+        """
+        left, right = self.legs.left, self.legs.right
+        return sum((left.count(k), right.count(k)) != (1, 1)
+                   for k in range(self.legs.apex))
+
+    def setoid(self):
+        if self.is_identity:
+            return (), self.dom, self.cod
+        return type(self), self.apex, tuple(self.legs.left), tuple(
+            self.legs.right)
+
+    def to_spiders(self) -> Diagram:
+        """
+        The same cospan as the permutation that gathers the inputs of each
+        point, its spider, then the permutation that scatters its outputs, a
+        point with one leg on each side being a wire and one with two legs on
+        the same side a cup or a cap. It is how a cospan is drawn and how a
+        functor sends it, as each of these boxes.
+
+        >>> x, y = Ty('x'), Ty('y')
+        >>> print(Cospan(x @ y, [0, 1, 0], [1, 1]).to_spiders())
+        Permutation(x @ y @ x, [0, 2, 1]) >> Cup(x, x) @ Spider(1, 2, y)
+        """
+        ins, gather = finset.Function(
+            self.legs.left, self.legs.apex, len(self.dom)).factorise()
+        outs, scatter = finset.Function(
+            self.legs.right, self.legs.apex, len(self.cod)).factorise()
+        points = [self.apex[k:k + 1] for k in range(len(self.apex))]
+        spiders = []
+        for x, m, n in zip(points, ins, outs):
+            spider = x if (m, n) == (1, 1) else Cup(x, x) if (m, n) == (2, 0)\
+                else Cap(x, x) if (m, n) == (0, 2) else Spider(m, n, x)
+            if spiders and isinstance(spider, Ty)\
+                    and isinstance(spiders[-1], Ty):
+                spiders[-1] = spiders[-1] @ spider
+            else:
+                spiders.append(spider)
+        middle = self.layer_factory(*spiders, normalise=False)
+        return self.ar.from_permutation(gather.dagger(), self.dom)\
+            >> self.ar((middle, ), middle.dom, middle.cod)\
+            >> self.ar.from_permutation(scatter, middle.cod)
+
+    def to_drawing(self):
+        """ Draw the cospan as its spiders, see :meth:`to_spiders`. """
+        return self.to_spiders().to_drawing()
+
+    def to_tree(self) -> dict:
+        """
+        Serialise a cospan, see :func:`discopy.utils.dumps`.
+
+        >>> from discopy.utils import dumps, loads
+        >>> x, y = Ty('x'), Ty('y')
+        >>> f = Cospan(x @ y, [0, 1, 0], [1, 1])
+        >>> assert loads(dumps(f)) == f
+        """
+        return dict(factory=factory_name(type(self)),
+                    apex=self.apex.to_tree(), left=self.legs.left,
+                    right=self.legs.right)
+
+    @classmethod
+    def from_tree(cls, tree: dict) -> Cospan:
+        return cls(from_tree(tree['apex']), tree['left'], tree['right'])
+
+    def dagger(self) -> Diagram:
+        """ The cospan the other way round, i.e. its legs swapped. """
+        return self.ar.from_cospan(
+            self.apex, self.legs.right, self.legs.left)
+
+    def rotate(self, left=False):
+        """ The cospan with each leg reversed and swapped with the other. """
+        del left
+        return self.ar.from_cospan(
+            self.apex, self.legs.right[::-1], self.legs.left[::-1])
+
+    def fuse(self, other: Cospan) -> Diagram:
+        """
+        The composite with another cospan as one cospan, i.e. their pushout,
+        the identity diagram when it is the identity.
+
+        Parameters:
+            other : The cospan to compose with.
+
+        >>> x = Ty('x')
+        >>> assert Spider(1, 2, x).fuse(Spider(2, 1, x)) == Id(x)
+        >>> assert Cap(x, x).fuse(Cup(x, x)) == Spider(0, 0, x)
+        """
+        assert_iscomposable(self, other)
+        cospan, points = self.legs.pushout(other.legs)
+        apex = [None] * cospan.apex
+        for k, x in zip(points, self.apex @ other.apex):
+            apex[k] = x
+        return self.ar.from_cospan(
+            self.apex[:0].tensor(*apex), cospan.left, cospan.right)
+
+    def tensor(self, *others):
+        """
+        Tensoring plumbing with plumbing gives one wider cospan, a run of
+        cospans and types coalescing into the disjoint union of their
+        apexes, from which point the layers are those of an ordinary
+        :meth:`discopy.monoidal.Diagram.tensor`.
+
+        >>> x, y = Ty('x'), Ty('y')
+        >>> assert Spider(1, 0, x).tensor(y, Cup(x, x))\\
+        ...     == Cospan(x @ y @ x, [0, 1, 2, 2], [1])
+        """
+        if not self.ar.layer_factory.is_plumbing_box(self):
+            return self.ar.tensor(self, *others)
+        left, right, apex = self.legs.left, self.legs.right, self.apex
+        plumbing = 0
+        while plumbing < len(others) and (
+                isinstance(others[plumbing], Ty)
+                or self.ar.layer_factory.is_plumbing_box(others[plumbing])
+                or isinstance(others[plumbing], Diagram)
+                and not others[plumbing].inside):
+            other, plumbing = others[plumbing], plumbing + 1
+            typ = other if isinstance(other, Ty) else other.dom
+            ins, outs = 2 * (range(len(typ)), ) if isinstance(other, Ty)\
+                or not other.inside else (other.legs.left, other.legs.right)
+            left = left + [len(apex) + i for i in ins]
+            right = right + [len(apex) + j for j in outs]
+            apex = apex @ (typ if isinstance(other, Ty) or not other.inside
+                           else other.apex)
+        result = self.ar.from_cospan(apex, left, right) if plumbing\
+            else self
+        rest = others[plumbing:]
+        return result if not rest else result.ar.tensor(result, *rest)
+
+    def __rmatmul__(self, other):
+        if not isinstance(other, Ty)\
+                or not self.ar.layer_factory.is_plumbing_box(self):
+            return super(Box, self).__rmatmul__(other)
+        cospan = finset.Cospan.id(len(other)) @ self.legs
+        return self.ar.from_cospan(
+            other @ self.apex, cospan.left, cospan.right)
+
+    def __repr__(self):
+        return f"{factory_name(type(self))}({self.apex!r}, "\
+            f"{self.legs.left}, {self.legs.right})"
+
+    def __str__(self):
+        return f"Cospan({self.apex}, {self.legs.left}, {self.legs.right})"
+
+
 class Cup(compact.Cup, Box):
     """
     A frobenius cup is a compact cup in a frobenius diagram, i.e. the spider
@@ -255,6 +586,11 @@ class Cup(compact.Cup, Box):
         left (Ty) : The atomic type.
         right (Ty) : Its adjoint.
     """
+    apex = property(lambda self: self.left)
+    legs = property(lambda self: finset.Cospan.cups(1, 1)
+                    if self.left == self.right else None)
+    tensor, __rmatmul__, fuse = Cospan.tensor, Cospan.__rmatmul__, Cospan.fuse
+
     def __init__(self, left, right):
         super().__init__(left, right)
         self.affine = False
@@ -269,6 +605,11 @@ class Cap(compact.Cap, Box):
         left (Ty) : The atomic type.
         right (Ty) : Its adjoint.
     """
+    apex = Cup.apex
+    legs = property(lambda self: finset.Cospan.caps(1, 1)
+                    if self.left == self.right else None)
+    tensor, __rmatmul__, fuse = Cospan.tensor, Cospan.__rmatmul__, Cospan.fuse
+
     def __init__(self, left, right):
         super().__init__(left, right)
         self.deterministic = self.affine = False
@@ -276,7 +617,17 @@ class Cap(compact.Cap, Box):
 
 class Permutation(
         compact.Permutation, markov.Permutation, comarkov.Permutation, Box):
-    "A permutation in a Frobenius diagram."
+    """
+    A permutation in a Frobenius diagram, i.e. a bijective :class:`Cospan`.
+
+    >>> x, y = Ty('x'), Ty('y')
+    >>> assert isinstance(Swap(x, y), Cospan)
+    >>> assert Swap(x, y).legs == finset.Cospan([0, 1], [1, 0])
+    """
+    apex = property(lambda self: self.dom)
+    legs = property(lambda self: finset.Cospan(
+        range(len(self.dom)), list(self.perm), len(self.dom)))
+    tensor, fuse = Cospan.tensor, Cospan.fuse
 
 
 class Swap(Permutation, compact.Swap, markov.Swap, comarkov.Swap, Box):
@@ -320,6 +671,10 @@ class Spider(Box):
     """
     draw_as_spider = True
     color = "black"
+    apex = property(lambda self: self.typ)
+    legs = property(lambda self: finset.Cospan.spiders(
+        len(self.dom), len(self.cod), 1) if self.phase is None else None)
+    tensor, __rmatmul__, fuse = Cospan.tensor, Cospan.__rmatmul__, Cospan.fuse
 
     def __init__(self, n_legs_in: int, n_legs_out: int, typ: Ty, data=None,
                  is_dagger=False, **params):
@@ -442,6 +797,9 @@ class Functor(compact.Functor, markov.Functor, comarkov.Functor):
         if isinstance(other, Spider) and other.phase is None:
             return self.cod.spiders(
                 len(other.dom), len(other.cod), self(other.typ))
+        if isinstance(other, Cospan)\
+                and not isinstance(other, symmetric.Permutation):
+            return self(other.to_spiders())
         if isinstance(other, markov.Copy):
             return markov.Functor.__call__(self, other)
         if isinstance(other, comarkov.Merge):
@@ -531,7 +889,10 @@ Diagram.functor_factory = Functor
 Diagram.cup_factory, Diagram.cap_factory = Cup, Cap
 Diagram.swap_factory, Diagram.spider_factory = Swap, Spider
 Diagram.permutation_factory = Permutation
+Diagram.cospan_factory = Cospan
 Diagram.bubble_factory = Bubble
+Layer.plumbing = (Ty, Cospan)
+Cospan.register(Permutation)
 Diagram.sum_factory = Sum
 Hypergraph = hypergraph.Hypergraph[Diagram]
 Id = Diagram.id

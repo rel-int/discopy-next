@@ -1,4 +1,5 @@
 import subprocess
+from collections import Counter
 import sys
 from itertools import permutations
 from random import Random
@@ -106,3 +107,31 @@ def test_out_of_scope():
     net = ProofNet(Sequent((g, u, v), e), [(1, 3), (4, 0), (5, 2), (7, 6)])
     with raises(AxiomError, match="out of scope"):
         net.to_term()
+
+
+def test_switchings():
+    f = (a >> a)("f")
+    identity = Sequent((f, ), a >> a)
+    with raises(AxiomError, match="not connected to the goal"):
+        ProofNet(identity, [(0, 1), (3, 2)]).to_term()
+    with raises(AxiomError, match="out of scope"):
+        ProofNet(Sequent((((a >> a) >> a)("g"), ), a),
+                 [(1, 2), (3, 0)]).to_term()
+    x = Variable("x1", a)
+    assert ProofNet(identity, [(0, 2), (3, 1)]).to_term()\
+        == Abstraction(x, f(x))
+
+
+def test_count():
+    assert count(a) == {a: 1} and count(a, polarity=False) == {a: -1}
+    assert count((a >> b) >> c) == {a: 1, b: -1, c: 1}
+    assert count(a >> a) == Counter()
+
+
+def test_infer():
+    assert Sequent.infer((Alice, loves, Bob)).goal == s
+    assert Sequent.infer((loves, Bob)).goal == n >> s
+    assert Sequent.infer(iter((Alice, loves))).words == (Alice, loves)
+    for words in [(Alice, Bob), (loves, ), ()]:
+        with raises(AxiomError, match="No smallest goal"):
+            Sequent.infer(words)

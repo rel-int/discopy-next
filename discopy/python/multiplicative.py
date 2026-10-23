@@ -159,7 +159,7 @@ class Function(function.Function, ClosedCategory, TracedCategory):
             n : The number of copies.
         """
         x = Ty.cast(x)
-        return Function(lambda *xs: n * xs, dom=x, cod=x ** n)
+        return Function(lambda *xs: untuplify(n * xs), dom=x, cod=x ** n)
 
     @staticmethod
     def discard(dom: Ty) -> Function:
@@ -196,7 +196,12 @@ class Function(function.Function, ClosedCategory, TracedCategory):
         Parameters:
             n : The number of types to curry.
             left : Whether to curry on the left or right.
+
+        Raises:
+            ValueError : When ``n`` is negative or more than the domain has.
         """
+        if n < 0 or n > len(self.dom):
+            raise ValueError(messages.NOT_SPLITTABLE.format(n, self.dom))
         if left:
             dom = self.dom[:len(self.dom) - n]
             cod = Function.exp(self.cod, self.dom[len(self.dom) - n:])

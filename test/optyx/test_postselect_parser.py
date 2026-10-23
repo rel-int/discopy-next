@@ -165,3 +165,15 @@ def test_randomized(seed):
         counts = [random.randint(0, 3) for _ in range(max_mode+1)]
         expr = random_expression(max_mode)
         assert run(expr, counts) == eval_reference(expr, counts)
+
+
+@pytest.mark.parametrize("expr, message", [
+    ("[0]=1", "Unexpected operator"),
+    ("[0]==-1", "Unexpected character"),
+    ("[0]==", "Expected INT"),
+    ("[0]==1)", "trailing input"),
+    ("==1", "Expected condition"),
+])
+def test_malformed_expressions_are_rejected(expr, message):
+    with pytest.raises(ValueError, match=message):
+        compile_postselect(expr)

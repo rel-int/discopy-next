@@ -1,8 +1,10 @@
 from itertools import permutations
 
 import numpy as np
+from pytest import raises
 
-from discopy import ribbon, tensor
+from discopy import rigid, ribbon, tensor
+from discopy.utils import dumps, loads
 from discopy.tensor import Dim, Box
 from discopy.hopf import (
     Algebra, Double, Representation, Intertwiner, Functor)
@@ -20,6 +22,7 @@ def double_and_module():
 
 
 taft = Algebra.taft(3)
+taft_double = Double(taft)
 sweedler_double = Double(Algebra.sweedler())
 
 
@@ -149,7 +152,8 @@ def test_representation_is_a_dim():
     trivial = Representation[D](Dim(2))
     assert trivial == Dim(2) and trivial.is_module()
     assert hash(trivial) == hash(Dim(2))
-    from discopy import hopf, compact, tensor  # noqa: F401  (used by eval)
+    from discopy import (  # noqa: F401  (used by eval)
+        hopf, compact, frobenius, tensor)
     assert eval(repr(trivial)) == trivial
 
 
@@ -189,6 +193,51 @@ def test_repr_is_transparent():
     assert eval(repr(D)) == D
     V = Representation[H].regular()
     assert eval(repr(V)) == V and eval(repr(V)).action == V.action
+
+
+def test_intertwiner_is_a_network_between_modules():
+    """#145: an intertwiner is its own factory, holding the tensor network
+    between the spaces of its modules, and its trees carry the generators of
+    its algebra and the action of each module."""
+    from discopy import hopf, tensor, frobenius  # noqa: F401  (used by eval)
+    D, V = double_and_module()
+    braid = Intertwiner[D].braid(V, V)
+    for composite in [braid >> braid, braid @ braid, braid.dagger(),
+                      Intertwiner[D].id(V), braid.r]:
+        assert type(composite) is Intertwiner[D]
+        assert isinstance(composite.inside, tensor.Diagram)
+    assert (braid @ braid).eval(dtype=complex).is_close(
+        (braid.inside @ braid.inside).eval(dtype=complex))
+    anyon = Representation[D].anyon(1, 1)
+    for x in [anyon, braid, D, taft, Intertwiner.caps(V, V.r)]:
+        assert loads(dumps(x)) == x
+    assert loads(dumps(anyon)).action == anyon.action
+    assert eval(repr(braid)) == braid
+    V = Representation[taft].regular()
+    cup = Intertwiner[taft].cups(V, V.r)
+    assert cup.inside.to_hypergraph().to_diagram().eval(
+        dtype=complex).is_close(cup.eval(dtype=complex))
+
+
+def test_intertwiner_refuses_a_module_over_another_algebra():
+    D, W = double_and_module()
+    V = Representation[taft].regular()
+    f, g = Intertwiner[D].id(W), Intertwiner[taft].id(V)
+    with raises(ValueError):
+        Intertwiner[D](tensor.Id(Dim(*V.inside)), V, V)
+    for composite in [lambda: f @ g, lambda: g @ f, lambda: f >> g,
+                      lambda: Intertwiner.id(W) >> f]:
+        with raises(ValueError):
+            composite()
+    plain = Intertwiner.id(Dim(*W.inside))
+    assert (f >> plain).algebra == (f @ plain).algebra == D
+
+
+def test_intertwiner_trace_zero_is_identity():
+    D, V = double_and_module()
+    braid = Intertwiner[D].braid(V, V)
+    assert braid.trace(0) == braid
+    assert braid.trace(0).dom.action == braid.dom.action
 
 
 def test_representation_is_module():
@@ -272,21 +321,46 @@ def test_functor_maps_winding_to_dual():
     assert F(x.r).action == V.r.action != V.action
 
 
-def test_twist_from_braid():
-    """The twist is the trace of the braid: the identity on e (+) m, minus
-    one on the fermion, one on the vacuum."""
-    D = Double(Algebra.cyclic(2))
+def test_twist_is_the_trace_of_the_braid():
+    """The twist of the D(Z/3) anyon of flux f and charge omega is
+    omega ** f, the trace of the braid on either side: neither is its own
+    inverse, as every twist of D(Z/2) is, e.g. minus one on the fermion,
+    and on their direct sum it is diagonal."""
+    omega = np.exp(2j * np.pi / 3)
+    D2, D3 = Double(Algebra.cyclic(2)), Double(Algebra.cyclic(3))
+    x = ribbon.Ty('x')
+    for D, flux, charge, theta in [
+            (D3, 1, omega, omega), (D3, 2, omega, omega ** 2), (D2, 1, -1, -1)]:
+        V = Representation[D].anyon(flux, charge)
+        F = Functor(ob_map={x: V}, ar_map={}, cod=Intertwiner[D])
+        for diagram in [ribbon.Twist(x), ribbon.Braid(x, x).trace(),
+                        ribbon.Braid(x, x).trace(left=True)]:
+            assert np.isclose(complex(F(diagram).eval(dtype=complex)), theta)
+    V = Representation[D3].direct_sum([
+        Representation[D3].anyon(flux, omega) for flux in (1, 2)])
+    F = Functor(ob_map={x: V}, ar_map={}, cod=Intertwiner[D3])
+    for diagram in [ribbon.Twist(x), ribbon.Braid(x, x).trace(),
+                    ribbon.Braid(x, x).trace(left=True)]:
+        assert np.allclose(F(diagram).eval(dtype=complex).array,
+                           np.diag([omega, omega ** 2]))
 
-    def theta(rep):
-        return complex(
-            Intertwiner[D].twist(rep).eval(dtype=complex).array)
 
-    Vem = Representation[D].direct_sum(
-        [Representation[D].anyon(0, -1), Representation[D].anyon(1, 1)])
-    assert np.allclose(
-        Intertwiner[D].twist(Vem).eval(dtype=complex).array, np.eye(2))
-    assert np.isclose(theta(Representation[D].anyon(1, -1)), -1)
-    assert np.isclose(theta(Representation[D].anyon(0, 1)), 1)
+def test_twist_dagger_is_its_inverse():
+    """B51 of #31: over the double of the Taft algebra, which is not
+    unitary, the dagger of the twist is its inverse, the action of the
+    ribbon element, not the conjugate transpose which is no intertwiner."""
+    D = taft_double
+    V = Representation[D].regular()
+    x = ribbon.Ty('x')
+    F = Functor(ob_map={x: V}, ar_map={}, cod=Intertwiner[D])
+    twist = ribbon.Twist(x)
+    identity = F(ribbon.Id(x)).eval(dtype=complex)
+    for diagram in [twist >> twist.dagger(), twist.dagger() >> twist]:
+        assert F(diagram).eval(dtype=complex).is_close(identity)
+    untwist = F(twist.dagger())
+    lhs = V.action >> untwist.inside
+    rhs = D.ty @ untwist.inside >> V.action
+    assert lhs.eval(dtype=complex).is_close(rhs.eval(dtype=complex))
 
 
 def test_is_module_rejects_non_module():
@@ -315,7 +389,9 @@ def test_nontrivial_link_invariant():
     F = Functor(ob_map={x: V}, ar_map={}, cod=Intertwiner[D])
     unknot = ribbon.Braid(x, x).trace(n=2)
     networks = [F(d) for d in [circle(x), unlink(x), hopf_link(x), unknot]]
-    assert all(isinstance(network, tensor.Diagram) for network in networks)
+    assert all(isinstance(network, Intertwiner[D])
+               and isinstance(network.inside, tensor.Diagram)
+               for network in networks)
     values = [complex(network.eval(dtype=complex)) for network in networks]
     assert np.allclose(values, [2, 4, 0, 2])
 
@@ -356,16 +432,30 @@ def test_functor_on_type():
 
 
 def test_twist_in_diagram():
-    """A group algebra has a trivial twist, mapped through the functor."""
-    Z2 = Algebra.cyclic(2)
-    V = Representation[Z2].regular()
-    x = ribbon.Ty('x')
-    F = Functor(ob_map={x: V}, ar_map={}, cod=Intertwiner[Z2])
-    twist = ribbon.Twist(x)
-    assert np.allclose(
-        F(twist).eval(dtype=complex).array, np.eye(2))
-    assert np.allclose(
-        F(twist.dagger()).eval(dtype=complex).array, np.eye(2))
+    """The functor reads the twist of a product of D(Z/3) anyons off the
+    twist of each and their double braiding, which is not an involution:
+    it is the twist of the product module."""
+    D = Double(Algebra.cyclic(3))
+    omega = np.exp(2j * np.pi / 3)
+    a, b = Representation[D].anyon(1, omega), Representation[D].anyon(0, omega)
+    x, y = ribbon.Ty('x'), ribbon.Ty('y')
+    F = Functor(ob_map={x: a, y: b}, ar_map={}, cod=Intertwiner[D])
+    twist = F(ribbon.Diagram.twist(x @ y)).eval(dtype=complex)
+    assert twist.is_close(Intertwiner[D].twist(a @ b).eval(dtype=complex))
+    assert np.isclose(complex(twist), omega ** 2)
+
+
+def test_rotated_braid_is_transposed_braid():
+    """The half-turn rotation of either crossing is its transpose, which
+    keeps the same strand over."""
+    D = Double(Algebra.cyclic(3))
+    omega = np.exp(2j * np.pi / 3)
+    a, b = Representation[D].anyon(1, omega), Representation[D].anyon(2, omega)
+    x, y = ribbon.Ty('x'), ribbon.Ty('y')
+    F = Functor(ob_map={x: a, y: b}, ar_map={}, cod=Intertwiner[D])
+    for braid in [ribbon.Braid(x, y), ribbon.Braid(x, y).dagger()]:
+        assert F(braid.r).eval(dtype=complex).is_close(
+            F(braid.transpose()).eval(dtype=complex))
 
 
 def test_taft_algebra():
@@ -411,9 +501,9 @@ def test_chart_fusion_dimensions():
 def test_chart_slices_intertwine_and_span():
     D, _, V = double_and_four_anyons()
     Q = Intertwiner[D].chart(V @ V, V)
-    lhs = tensor.Id(D.ty) @ Q >> V.action
+    lhs = tensor.Id(D.ty) @ Q.inside >> V.action
     rhs = tensor.Diagram.swap(D.ty, Dim(16)) @ tensor.Id(Dim(4, 4)) \
-        >> tensor.Id(Dim(16)) @ (V @ V).action >> Q
+        >> tensor.Id(Dim(16)) @ (V @ V).action >> Q.inside
     assert lhs.eval(dtype=complex).is_close(rhs.eval(dtype=complex))
     basis = Q.eval(dtype=complex).array.reshape(16, -1)
     assert np.allclose(basis @ basis.conj().T, np.eye(16))
@@ -469,7 +559,7 @@ def test_ribbon_element_criterion():
     """The double of an odd Taft algebra is ribbon, of an even one is not,
     by Kauffman-Radford: accessing the ribbon element validates centrality,
     S(v) = v and v^2 = uS(u), raising when they fail."""
-    assert Double(taft).ribbon_element is not None
+    assert taft_double.ribbon_element is not None
     try:
         sweedler_double.ribbon_element
         assert False
@@ -506,6 +596,25 @@ def test_pivotal_pairings_are_intertwiners():
         assert np.allclose(lhs, rhs, atol=1e-6)
 
 
+def test_left_dual_pairings_are_intertwiners():
+    """A rigid functor sends the cups and caps of both adjoints to pivotal
+    pairings, which commute with the actions over the Taft algebra."""
+    V = Representation[taft].regular()
+    x = rigid.Ty('x')
+    F = rigid.Functor(ob_map={x: V}, ar_map={}, cod=Intertwiner[taft])
+    for cup in [rigid.Cup(x.l, x), rigid.Cup(x, x.r)]:
+        lhs = F(cup.dom).action >> F(cup).inside
+        rhs = taft.counit @ F(cup).inside
+        assert lhs.eval(dtype=complex).is_close(rhs.eval(dtype=complex))
+    for cap in [rigid.Cap(x, x.l), rigid.Cap(x.r, x)]:
+        lhs = taft.ty @ F(cap).inside >> F(cap.cod).action
+        rhs = taft.counit @ F(cap).inside
+        assert lhs.eval(dtype=complex).is_close(rhs.eval(dtype=complex))
+    snake = rigid.Cap(x, x.l) @ x >> x @ rigid.Cup(x.l, x)
+    assert F(snake).eval(dtype=complex).is_close(
+        F(rigid.Id(x)).eval(dtype=complex))
+
+
 def test_snake_equations_with_pivot():
     """The pivotal pairings satisfy the snake equations over the Taft
     algebra, where the plain ones would not be intertwiners."""
@@ -527,9 +636,9 @@ def test_chart_needs_no_semisimplicity():
     W = Representation[H].regular()
     Q = Intertwiner[H].chart(W, W)
     assert Q.dom == Dim(4, 4)
-    lhs = tensor.Id(H.ty) @ Q >> W.action
+    lhs = tensor.Id(H.ty) @ Q.inside >> W.action
     rhs = tensor.Diagram.swap(H.ty, Dim(4)) @ tensor.Id(Dim(4)) \
-        >> tensor.Id(Dim(4)) @ W.action >> Q
+        >> tensor.Id(Dim(4)) @ W.action >> Q.inside
     assert lhs.eval(dtype=complex).is_close(rhs.eval(dtype=complex))
 
 

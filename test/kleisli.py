@@ -463,6 +463,23 @@ def test_additive_Channel_tensor():
     assert (increment @ (str, )).dom == Ty(int, str)
 
 
+def test_additive_Channel_tensor_is_nary():
+    from discopy.monoidal import Ty as T, Box, Layer, Functor
+
+    Safe = additive.Channel[Maybe]
+    half = Safe(lambda x: x // 2 if x % 2 == 0 else None, int, int)
+    increment = Safe(lambda x: x + 1, int, int)
+    assert half.tensor() is half
+    assert half.tensor(increment, half)(4, 2) == Tagged(2, 2)
+
+    # A functor maps a layer with one n-ary tensor.
+    x = T('x')
+    f = Box('f', x, x)
+    F = Functor({x: int}, {f: increment}, cod=Safe)
+    assert [F(Layer(f, x, f))(1, tag) for tag in range(3)]\
+        == [Tagged(2, 0), Tagged(1, 1), Tagged(2, 2)]
+
+
 def test_additive_tensor_is_a_bifunctor():
     """
     Only one side of a disjoint union ever runs, so unlike the tuple tensor

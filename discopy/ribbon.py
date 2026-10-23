@@ -202,9 +202,17 @@ class Braid(balanced.Braid, Box):
     z = 0
 
     def rotate(self, left=False):
+        """
+        The half-turn rotation of a braid is the braid of the adjoints, from
+        ``cod.r`` to ``dom.r``, with the same strand over.
+
+        >>> x, y = Ty('x'), Ty('y')
+        >>> for braid in [Braid(x, y), Braid(x, y).dagger()]:
+        ...     assert (braid.r.dom, braid.r.cod) == (braid.cod.r, braid.dom.r)
+        ...     assert braid.r.is_dagger == braid.is_dagger
+        """
         del left
-        braid = type(self)(*self.cod.r)
-        return braid.dagger() if self.is_dagger else braid
+        return type(self)(*self.cod.r, is_dagger=self.is_dagger)
 
 
 class DualRailBraid(balanced.DualRailBraid, Box):
@@ -257,6 +265,11 @@ class DualRailCup(Box):
             self, name, left @ right, type(left)(),
             is_dagger=is_dagger, draw_as_dual_rail_cup=True)
 
+    def __getnewargs__(self):
+        """ The arguments of the constructor, which a pickle and a delay read.
+        """
+        return self.left, self.right, self.is_dagger
+
     def rotate(self, left=False):
         del left
         return DualRailCap(self.left.r, self.right.r)
@@ -278,6 +291,8 @@ class DualRailCap(Box):
         Box.__init__(
             self, name, type(left)(), left @ right,
             is_dagger=is_dagger, draw_as_dual_rail_cap=True)
+
+    __getnewargs__ = DualRailCup.__getnewargs__
 
     def rotate(self, left=False):
         del left

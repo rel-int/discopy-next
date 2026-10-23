@@ -111,8 +111,8 @@ def test_Arrow_repr():
 def test_Arrow_str():
     x, y, z = Ob('x'), Ob('y'), Ob('z')
     f, g = Box('f', x, y), Box('g', y, z)
-    assert str(Arrow((), x, x) == "Id(x)")
-    assert str(Arrow((f, ), x, y) == "f")
+    assert str(Arrow((), x, x)) == "Id(x)"
+    assert str(Arrow((f, ), x, y)) == "f"
     assert str(Arrow((f, g), x, z)) == "f >> g"
 
 
@@ -251,6 +251,9 @@ def test_Functor():
 def test_Functor_eq():
     x, y = Ob('x'), Ob('y')
     assert Functor({x: y, y: x}, {}) == Functor({y: x, x: y}, {})
+    F, G = Functor({}, {}), Functor({}, {}, dom=Box)
+    assert F != G
+    assert repr(G) == "cat.Functor(ob_map={}, ar_map={}, dom=cat.Box)"
 
 
 def test_Functor_repr():
@@ -339,6 +342,15 @@ def test_Bubble():
     assert repr((f).bubble())\
         == "cat.Bubble(cat.Box('f', cat.Ob('x'), cat.Ob('y')))"
     assert str(f.bubble()) == "(f).bubble()"
+    named = f.bubble(name="N", method="m")
+    assert repr(named) == "cat.Bubble(cat.Box('f', cat.Ob('x'), cat.Ob('y')),"\
+        " name='N', method='m')"
+    assert eval(repr(named), {"cat": __import__("discopy").cat}) == named
+    assert Functor.id()(f.bubble(name="N")) == f.bubble(name="N")
+    image = Functor.id()(f.bubble(data=42, is_dagger=True))
+    assert (image.data, image.is_dagger) == (42, True)
+    empty = Bubble(dom=Ob('x'), cod=Ob('y'))
+    assert Functor.id()(empty) == empty
 
 
 def test_Box_call():
@@ -380,6 +392,41 @@ def test_Bubble_subs_lambdify():
     assert bubble.subs(psi, 1) == bubble.lambdify(psi)(1) == bubble
 
 
+def test_subs_forms_and_data():
+    pytest.importorskip("sympy")
+    import numpy as np
+    from sympy.abc import phi, psi
+    x, y = Ob('x'), Ob('y')
+    f = Box('f', x, y, data=phi + psi)
+    expected = Box('f', x, y, data=3)
+    assert f.subs(phi, 1).data == f.subs([(phi, 1)]).data\
+        == f.subs((phi, 1)).data == psi + 1
+    for args in [([(phi, 1), (psi, 2)], ), ({phi: 1, psi: 2}, ),
+                 ((phi, 1), (psi, 2))]:
+        assert f.subs(*args) == expected
+    g = Box('g', x, y, data=["phi", {"phase": phi}])
+    assert g.free_symbols == {phi}
+    assert Box('h', x, y, data="h").free_symbols == set()
+    assert g.subs(phi, 1).data == g.lambdify(phi)(1).data\
+        == ["phi", {"phase": 1}]
+    h = Box('h', x, y, data=np.array([[phi, 1], [psi, 2]], dtype=object))
+    assert np.array_equal(h.subs(psi, 4).subs(phi, 3).data, [[3, 1], [4, 2]])
+    import sympy
+    for data in (h.data, sympy.Matrix(h.data), sympy.Array(h.data)):
+        h = Box('h', x, y, data=data)
+        for result in (h.subs([(phi, 3), (psi, 4)]), h.lambdify(phi, psi)(3, 4)):
+            assert np.array_equal(np.array(result.data), [[3, 1], [4, 2]])
+    empty = Box('e', x, y, data=np.zeros((0, 3))).subs(phi, 1).data
+    assert empty.shape == (0, 3)
+    lam = sympy.Symbol("lambda")
+    for data in (sympy.sin(phi) + sympy.sin(psi), phi + lam):
+        assert Box('p', x, y, data=data).subs(phi, 1).data == data.subs(phi, 1)
+    from discopy.utils import rsubs
+    data = [sympy.sin(phi) + psi, phi, sympy.Matrix([[sympy.sin(phi)]])]
+    assert rsubs(data, sympy.sin(phi), 0) == rsubs(data, {sympy.sin(phi): 0})\
+        == [psi, phi, sympy.Matrix([[0]])]
+
+
 def test_Sum():
     x, y, z = map(Ob, "xyz")
     f = Box('f', x, y)
@@ -395,6 +442,9 @@ def test_Sum():
     assert hash(Sum((), x, y)) == hash(Sum((), x, y))
     assert repr(Sum((), x, y))\
         == "cat.Sum(terms=(), dom=cat.Ob('x'), cod=cat.Ob('y'))"
+    lazy = Sum((f, f))
+    assert "name" not in vars(lazy) and lazy.name == repr(lazy)\
+        == f"cat.Sum(terms=({f!r}, {f!r}))"
     assert list(Sum((f, ), x, y)) == [f]
     assert len(Sum((), x, y)) == 0
     assert Sum((), x, x).then(f, g) == Sum((), x, z)

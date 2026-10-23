@@ -250,7 +250,7 @@ from abc import abstractmethod, ABC
 from collections.abc import Iterable
 import numpy as np
 import sympy as sp
-from sympy import Expr, lambdify, Symbol, Mul
+from sympy import Expr, lambdify
 from discopy.cat import rsubs
 
 from discopy.optyx import channel
@@ -298,10 +298,9 @@ class Scalar(Channel):
     Scalar with a complex value.
     """
     def __init__(self, value):
-        if not isinstance(value, (Symbol, Mul)):
-            self.scalar = complex(value)
-        else:
-            self.scalar = value
+        if not getattr(value, "free_symbols", None):
+            value = complex(value)
+        self.scalar = value
         super().__init__(
             f"{value}",
             diagram.Scalar(value)

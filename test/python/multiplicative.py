@@ -24,6 +24,13 @@ def test_Function():
     assert g.curry(left=False).uncurry(left=False)(1j, True) == g(1j, True)
 
 
+def test_curry_out_of_range():
+    f = Function(lambda a: a, (int, ), (int, ))
+    for n, left in itertools.product((-1, 2), (True, False)):
+        with raises(ValueError, match="Cannot split"):
+            f.curry(n, left=left)
+
+
 def test_tensor_unit_is_empty():
     """ The unit of `tensor` is the empty argument list, so no operand can
     swallow the ones that follow it. """

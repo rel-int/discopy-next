@@ -1,8 +1,8 @@
 from __future__ import annotations
 from pytest import raises
 
-from discopy import cat, comarkov, feedback, frobenius, monoidal
-from discopy.python import additive
+from discopy import cat, comarkov, feedback, frobenius, monoidal, op
+from discopy.python import additive, finset
 from discopy.comarkov import *
 from discopy.matrix import Matrix
 from discopy.utils import AxiomError, dumps, loads
@@ -140,3 +140,49 @@ def test_CMap():
     assert CMap.merge(x, 3).boxes == (Merge(x, 3), )
     assert CMap.noise(x).boxes == (Noise(x), )
     assert Merge(x).to_map().to_diagram() == Merge(x)
+
+
+def test_Cofunction():
+    x, y = Ty('x'), Ty('y')
+    f = Cofunction(x @ y, [1, 0, 0])
+    assert f.dom == y @ x @ x and f.size == 1
+    assert Cofunction(x, [0, 0, 0]) == Merge(x, 3)
+    with raises(ValueError):
+        Cofunction(x, [1])
+    assert isinstance(Swap(x, y), Cofunction)
+    assert isinstance(Merge(x), Cofunction)
+    assert Diagram.merge(x @ y, 0) == Noise(x) @ Noise(y)
+    assert Equation(f, y @ Merge(x) >> Swap(y, x))
+    assert f.cofunc == op.Comarkov(finset.Function([1, 0, 0], 2, 3))
+    for box in (f, Merge(x), Swap(x, y)):
+        assert eval(repr(box), dict(
+            comarkov=comarkov, feedback=feedback)) == box
+        assert loads(dumps(box)) == box
+
+
+def test_Cofunction_Functor():
+    x, y = Ty('x'), Ty('y')
+    f = Cofunction(x @ y, [1, 0, 0])
+    F = Functor({x: int, y: str}, {}, cod=additive.Function)
+    assert F(f)("a", 0) == ("a", 1)
+    assert F(f)(7, 1) == F(f)(7, 2) == (7, 0)
+    diagram = f >> Box('g', x @ y, x)
+    assert diagram.to_hypergraph().to_diagram() == diagram
+
+
+def test_Layer():
+    x, y = Ty('x'), Ty('y')
+    assert Layer(Merge(x), Merge(y)).boxes_or_types == (
+        Cofunction(x @ y, [0, 0, 1, 1]), )
+    diagram = Noise(x) @ y @ x >> x @ Swap(y, x) >> Merge(x) @ y
+    assert diagram.foliation() == Swap(y, x)
+
+
+def test_dagger():
+    from discopy import frobenius, markov
+    from discopy.neural.network import Cofunction as C, Dims, Function as F
+    x, y = Dims(2), Dims(3)
+    assert F(x @ y, [1, 0, 0]).dagger() == C(x @ y, [1, 0, 0])
+    assert C(x @ y, [1, 0, 0]).dagger() == F(x @ y, [1, 0, 0])
+    with raises(AxiomError):
+        Cofunction(Ty('x') @ Ty('y'), [1, 0, 0]).dagger()

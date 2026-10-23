@@ -36,7 +36,7 @@ def test_Permutation():
     assert Equation(perm >> perm.dagger(), Id(x @ y @ z))
     assert isinstance(perm.inside[0], Layer)
     assert Box('f', x, y).inside[0].boxes_or_types == (Box('f', x, y), )
-    assert type(perm.inside[0].boxes_and_types[1]) is Permutation
+    assert type(perm.inside[0].boxes[0]) is Permutation
     assert Permutation(x @ y, [1, 0]) == Swap(x, y)
     assert issubclass(Swap, Permutation)
     assert Equation(perm, perm.to_swaps())
@@ -57,13 +57,11 @@ def test_mixed_Layer_rotation_and_transpose():
     layer = Layer(permutation, f, Ty())
     assert layer.r.r == layer
     assert layer.r.boxes_or_types == (f.r, permutation.r)
-    assert layer.r.boxes_and_types == (
-        Ty(), f.r, Ty(), permutation.r, Ty())
     assert type(layer.r.boxes_or_types[-1]) is Swap
     diagram = Diagram((layer,), layer.dom, layer.cod)
     assert diagram.transpose_box(0, 0).boxes[-1] == f
     assert f.r in diagram.transpose_box(0, 1).boxes
-    assert list(diagram.snake_removal()) == []
+    assert list(diagram.snake_removal()) == [diagram.to_staircases()]
 
 
 def test_Sum():
