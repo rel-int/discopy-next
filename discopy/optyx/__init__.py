@@ -7,9 +7,10 @@ tensor networks or with permanents.
 :mod:`discopy.optyx.channel` is the category of channels these diagrams live
 in, with qubits in :mod:`discopy.optyx.qubits`, photons in
 :mod:`discopy.optyx.photonic` and bits in :mod:`discopy.optyx.classical`, on
-top of the calculi of :mod:`discopy.optyx.core`, and
-:mod:`discopy.optyx.compiler` compiles measurement-based patterns to
-single-emitter photonic hardware.
+top of the calculi of :mod:`discopy.optyx.core`.
+:mod:`discopy.optyx.contextuality` computes the contextual fraction of the
+empirical models they give, and :mod:`discopy.optyx.compiler` compiles
+measurement-based patterns to single-emitter photonic hardware.
 
 .. autosummary::
     :template: module.rst
@@ -19,6 +20,7 @@ single-emitter photonic hardware.
     discopy.optyx.qubits
     discopy.optyx.photonic
     discopy.optyx.classical
+    discopy.optyx.contextuality
     discopy.optyx.core
     discopy.optyx.compiler
 

@@ -101,6 +101,7 @@ optyx = [
     "pytket-qiskit[aer] >= 0.68.3",
     "pyzx == 0.10.7",
     "quimb",
+    "scipy",
     "sympy",
 ]
 test = [

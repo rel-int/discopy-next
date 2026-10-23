@@ -881,6 +881,7 @@ optyx = [
     { name = "pytket-qiskit", extra = ["aer"] },
     { name = "pyzx" },
     { name = "quimb" },
+    { name = "scipy" },
     { name = "sympy" },
 ]
 quantum = [
@@ -1019,6 +1020,7 @@ requires-dist = [
     { name = "quimb", marker = "extra == 'optyx'" },
     { name = "quimb", marker = "extra == 'quantum'" },
     { name = "scipy", marker = "extra == 'docs'" },
+    { name = "scipy", marker = "extra == 'optyx'" },
     { name = "scipy", marker = "extra == 'quantum'" },
     { name = "sphinx", marker = "extra == 'docs'", specifier = "==7.4.*" },
     { name = "sphinx-book-theme", marker = "extra == 'docs'", specifier = "==1.1.*" },

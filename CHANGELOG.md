@@ -83,6 +83,9 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   a compiler to photonic hardware, under the Apache License 2.0 in its own
   `LICENSE` and `NOTICE`, behind the new `optyx` extra ([next#225],
   [next#276]).
+- `discopy.optyx.contextuality`, the contextual fraction of an empirical
+  model as a linear program, the Bell inequality its dual reads off, and
+  the empirical model of a diagram ([optyx#87]).
 - `hopf.Intertwiner.chart` and `hopf.Algebra.symmetric(n)` ([#408]).
 - `copying`, a law of `Testable` beside `pickling` ([next#1]), and the
   generators of each level as typed class variables ([next#1]).
@@ -495,6 +498,7 @@ for the changelog of `1.2.1` and earlier.
 [next#310]: https://github.com/rel-int/discopy-next/pull/310
 [next#316]: https://github.com/rel-int/discopy-next/pull/316
 [next#320]: https://github.com/rel-int/discopy-next/pull/320
+[optyx#87]: https://github.com/rel-int/optyx/pull/87
 [lambek#2]: https://github.com/rel-int/lambek/pull/2
 [lambek#8]: https://github.com/rel-int/lambek/pull/8
 [lambek#12]: https://github.com/rel-int/lambek/pull/12
