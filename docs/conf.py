@@ -60,12 +60,13 @@ templates_path = ['_templates']
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
 # This pattern also affects html_images_path and html_extra_path.
-# The marimo notebooks under ``notebooks/`` are plain-text ``.md`` files; they
-# are rendered to HTML by ``export_notebooks.py`` and embedded from the
-# generated ``.rst`` pages, so they must not be parsed as Sphinx source pages.
-# Those of ``discopy.optyx`` are Jupyter notebooks yet to become marimo ones.
+# The marimo notebooks under ``notebooks/`` and ``notebooks/optyx/`` are
+# plain-text ``.md`` files; they are rendered to HTML by
+# ``export_notebooks.py`` and embedded from the generated ``.rst`` pages, so
+# they must not be parsed as Sphinx source pages.
 exclude_patterns = [
-    '_build', 'Thumbs.db', '.DS_Store', 'notebooks/*.md', 'notebooks/optyx/**']
+    '_build', 'Thumbs.db', '.DS_Store', 'notebooks/*.md',
+    'notebooks/optyx/*.md']
 
 
 # -- Options for HTML output -------------------------------------------------
@@ -106,7 +107,8 @@ html_baseurl = os.environ.get(
 
 
 def setup(app):
-    # Render the marimo notebooks (docs/notebooks/*.md) to computed HTML and
+    # Render the marimo notebooks (docs/notebooks/*.md and
+    # docs/notebooks/optyx/*.md) to computed HTML and
     # generate the pages that embed them, before Sphinx reads the sources.
     import export_notebooks
     app.connect('builder-inited', lambda _app: export_notebooks.generate())

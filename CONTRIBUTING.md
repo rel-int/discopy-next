@@ -64,6 +64,9 @@ uv run coverage report -m
 
 Without the extras installed, run `uv run pytest --skip-extra` to skip what needs them.
 
+`coverage report` fails below the `fail_under` of `pyproject.toml`, measured on `discopy/`
+alone: without the extras the local number is lower, and CI's `Coverage` step is the gate.
+
 A sandboxed environment can block some of the extras outright (e.g. no network access to fetch
 the `torch`/`pytket` wheels, no `graphviz` binary), so `--skip-extra` may still leave a fixed set
 of environment-only failures that look identical to a real regression. Diff the failure set

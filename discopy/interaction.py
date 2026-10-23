@@ -113,6 +113,7 @@ class Ty(Pregroup, NamedGeneric['natural']):
     >>> x, y = Ty(T("x"), T("x'")), Ty(T("y"), T("y'"))
     >>> assert x @ y == Ty(T("x") @ T("y"), T("y'") @ T("x'"))
     """
+    ob = type(None)
     natural = pivotal.Ty
     negatives = staticmethod(reversed)
 

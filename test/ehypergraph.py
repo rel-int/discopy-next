@@ -306,6 +306,133 @@ def test_saturate_stops_and_rebuilds():
     assert last.classes[first] == last.classes[second]
 
 
+def test_then_and_tensor_carry_the_classes():
+    either = Markov.from_diagram(f).rewrite(
+        (0, ), (0, ), (1, ), g.to_hypergraph())
+    after = Markov.from_diagram(h)
+    assert (either >> after).graph == either.graph >> after.graph
+    assert (either >> after).sections() == [
+        (f >> h).to_hypergraph(), (g >> h).to_hypergraph()]
+    assert (either @ after).graph == either.graph @ after.graph
+    assert (either @ after).sections() == [
+        (f @ h).to_hypergraph(), (g @ h).to_hypergraph()]
+    assert Markov.id(x) >> either == either == either >> Markov.id(x)
+    assert Markov.id() @ either == either == either @ Markov.id()
+    with raises(AxiomError):
+        either >> Markov.from_diagram(Box('k', Ty('y'), x))
+
+
+def test_equal_up_to_renaming_spiders():
+    """ The spider 1 is the output of ``f`` on the left, of ``g`` on the
+    right, so relating it to the input is not the same relation. """
+    left, right = (Markov(Hypergraph[Diagram](x, x @ x, boxes, (
+        (0, ), (((0, ), (1, )), ((0, ), (2, ))), cod_wires)))
+        for boxes, cod_wires in [((f, g), (1, 2)), ((g, f), (2, 1))])
+    assert left == right and hash(left) == hash(right)
+    assert left.merge(0, 1) == right.merge(0, 2)
+    assert hash(left.merge(0, 1)) == hash(right.merge(0, 2))
+    assert left.merge(0, 1) != right.merge(0, 1)
+
+
+def test_sharing_and_classes_are_checked():
+    two_producers = Hypergraph[Diagram](x @ x, x, (), ((0, 0), (), (0, )))
+    loop = Hypergraph[Diagram](Ty(), Ty(), (f, ), ((), (((0, ), (0, )), ), ()))
+    for graph in (two_producers, loop):
+        with raises(AxiomError, match="sharing"):
+            Markov(graph)
+    k = Box('k', x, Ty('y'))
+    for graph, classes in [(f.to_hypergraph(), (0, )),
+                           (k.to_hypergraph(), (0, 0))]:
+        with raises(AxiomError, match="a class of one type"):
+            Markov(graph, classes)
+    with raises(AxiomError, match="a class of one type"):
+        Markov.from_diagram(k).merge(0, 1)
+
+
+def test_to_tree():
+    graph = Markov.from_diagram(Copy(x) >> f @ sample).merge(1, 2)
+    tree = graph.to_tree()
+    assert (tree['factory'], tree['category']) == (
+        'ehypergraph.EHypergraph', 'markov.Diagram')
+    assert Markov.from_tree(tree) == graph
+    assert Markov.serialisation(graph) and Markov.transparency(graph)
+
+
+def test_strategy_needs_a_copy_discard_category():
+    from discopy import frobenius
+    for category in (symmetric.Diagram, frobenius.Diagram):
+        with raises(NotImplementedError):
+            EHypergraph[category].strategy()
+
+
+@settings(max_examples=20, deadline=None)
+@given(Markov.strategy(effects=False, max_merges=2))
+def test_strategy(graph):
+    from discopy.axioms import GENERATORS
+    names = {ob.name for ty in graph.graph.spider_types for ob in ty.inside}
+    assert names | {box.name for box in graph.graph.boxes} <= set(
+        GENERATORS[:2])
+    assert all(box.is_cartesian for box in graph.graph.boxes)
+    assert len(set(graph.classes)) >= graph.graph.n_spiders - 2
+
+
+@pytest.fixture(scope="module")
+def examples() -> list[EHypergraph]:
+    """ Egg's example of :mod:`discopy.ehypergraph`, ``f`` rewritten into
+    ``g``, a sample read by a condition, ``f`` and ``g``, then with the
+    outputs of ``f`` and ``g`` related, and the empty one. """
+    two, times, divide = (
+        Box('2', Ty(), x), Box('*', x @ x, x), Box('/', x @ x, x))
+    egg = Markov.from_diagram(x @ two @ two >> times @ x >> divide)
+    either = Markov.from_diagram(f).rewrite(
+        (0, ), (0, ), (1, ), g.to_hypergraph())
+    noisy = Markov.from_diagram(sample >> Copy(x, 3) >> condition @ f @ g)
+    related = noisy.merge(spider(noisy, f), spider(noisy, g))
+    return [egg, either, noisy, related, Markov.id()]
+
+
+@pytest.mark.parametrize("law", [
+    "rebuild_minimality", "extraction_soundness", "extraction_optimality",
+    "translation", "effects_kept", "rewrite_identity", "saturation"])
+def test_laws_of_one_graph(law, examples):
+    """ A law weakened to cartesian e-hypergraphs holds on those, any other
+    law on every example. """
+    law = getattr(Markov, law)
+    for graph in examples:
+        if law.params.get("effects", True) or all(
+                box.is_cartesian for box in graph.graph.boxes):
+            assert law(graph)
+
+
+@pytest.mark.parametrize("i, j, k", [(0, 0, 0), (0, 1, 2), (3, 2, 1)])
+def test_merge_and_rebuild_laws(i, j, k, examples):
+    for graph in examples:
+        assert Markov.merge_equivalence(graph, i, j, k)
+        assert Markov.rebuild_closure(graph, i, j)
+
+
+def test_laws_of_several_graphs():
+    """ Two copies of ``f`` on related inputs have related outputs, two
+    samples do not, and matching is sound for a pattern rewired to read one
+    input twice. """
+    lone, effects = Markov.from_diagram(f), Markov.from_diagram(
+        Copy(x) >> f @ sample)
+    assert len(set(lone.twice().classes)) == 2
+    assert len(set(Markov.from_diagram(sample).twice().classes)) == 3
+    assert Markov.congruence(lone, effects).terms == (
+        (True, False), (True, False))
+    assert Markov.graph_functoriality(
+        lone, effects, Markov.from_diagram(condition))
+    assert Markov.extraction_rewrite(
+        Markov.from_diagram(f >> g), Markov.from_diagram(h))
+    assert Markov.matching_completeness(
+        lone, Markov.from_diagram(Copy(x) >> g @ h))
+    pair = Markov.from_diagram(Box('m', x @ x, x))
+    for first, second in [(lone, lone), (effects, pair)]:
+        for i, j in [(0, 0), (1, 2)]:
+            assert Markov.matching_soundness(first, second, i, j)
+
+
 def to_diagram(term, names) -> Diagram:
     """ The diagram of a term of :mod:`fixtures.egglog_reference` on inputs
     ``names``, a box for each subterm, e.g. ``("sample", p, id)`` and

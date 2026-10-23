@@ -776,9 +776,10 @@ class Box(frobenius.Box, Diagram):
             int(np.prod(dom_dims, dtype=int))
             * int(np.prod(cod_dims, dtype=int))
         )
-        if np.asarray(self.array).size != expected_size:
+        size = int(np.prod(np.shape(self.array), dtype=int))
+        if size != expected_size:
             raise ValueError(
-                f"{self.name}: array of size {np.asarray(self.array).size}"
+                f"{self.name}: array of size {size}"
                 f" does not match dom={Dim(*dom_dims)}, cod={Dim(*cod_dims)}."
             )
         return tensor.Box(

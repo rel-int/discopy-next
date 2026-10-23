@@ -87,6 +87,10 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   a compiler to photonic hardware, under the Apache License 2.0 in its own
   `LICENSE` and `NOTICE`, behind the new `optyx` extra ([next#225],
   [next#276]).
+- `discopy.optyx.sampling`: `channel.Diagram.sample` runs a diagram with
+  feedback loops tick by tick, closed or fed by a `source`, its burn-in
+  certified when it is passive, and `channel.Observable` is the effect of a
+  normal operator or of a function of the outcomes ([optyx#76]).
 - `optyx.interaction`, combinatorial maps of recurrent channels, each box
   with a private memory and a prediction, unrolled or run to an approximate
   fixed point ([optyx#16]).
@@ -159,6 +163,10 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 - `discopy.optyx` keeps no private members in `channel` and `core.diagram`:
   `decomp`, `dual_rail`, `Ob.classical`, `Ob.quantum` and `Box.array` are
   public, and the imports that make no cycle are at the top ([optyx#29]).
+- The notebooks of `discopy.optyx` are marimo, rendered and checked by
+  `docs/export_notebooks.py` along with DisCoPy's notebooks, four at a time
+  on CI with `--jobs 4`, and the `notebooks` extra takes the pandas, seaborn
+  and tqdm they import ([optyx#67]).
 
 ### Deprecated
 
@@ -173,6 +181,8 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Fixed
 
+- `Category.parameters` reads `ob` with no fallback: a monoid's objects are
+  `NoneType`, so `Nat.parameters()` no longer gives `(Nat, Nat)` ([next#214]).
 - `Hypergraph`: its hash, `simplify`, `rotate`, and `to_diagram` on
   non-self-dual, `Nat` and `Dim` types ([#324], [#387], [#393], [#622],
   [#719]).
@@ -254,6 +264,11 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 - `zx`: `eval` is the standard interpretation ([#587], [#625]),
   `spider_factory` ([next#149]), `grad` ([next#75]), and the pyzx round trip
   keeps scalars and parallel wires ([next#74], [next#82]).
+- `optyx.sampling.twomode` is unitary at any number of photons, as the
+  exponential of the lift of `sampling.generator`, a logarithm of the
+  two-mode unitary, where expanding the products cancelled ([optyx#84]).
+- An array-backed `discopy.optyx` box reads its size off the array's shape,
+  so the array can be a PyTorch tensor that requires grad ([optyx#56]).
 - `hopf.Intertwiner`: `cups`, `caps` and `twist` ([next#31]).
 - `hopf.Functor` sends the dagger of a twist to its inverse, `to_braided`
   takes traces and generators, and commutes with `delay` ([next#31]).
@@ -302,6 +317,8 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   as the C tracer on 3.12 and 3.13, and the docs job has 25 minutes, the
   API pages of `discopy.optyx` taking its build to about fifteen
   ([next#276]).
+- Coverage's 98% gate reads `discopy/` alone, new tests bring `ehypergraph` to
+  100%, and pytest imports by path, so `test/abc.py` is collected ([next#31]).
 
 ## [1.2.2] - 2025-12-19
 
@@ -502,6 +519,7 @@ for the changelog of `1.2.1` and earlier.
 [next#177]: https://github.com/rel-int/discopy-next/issues/177
 [next#187]: https://github.com/rel-int/discopy-next/issues/187
 [next#201]: https://github.com/rel-int/discopy-next/issues/201
+[next#214]: https://github.com/rel-int/discopy-next/pull/214
 [next#225]: https://github.com/rel-int/discopy-next/issues/225
 [next#276]: https://github.com/rel-int/discopy-next/pull/276
 [next#283]: https://github.com/rel-int/discopy-next/pull/283
@@ -511,6 +529,10 @@ for the changelog of `1.2.1` and earlier.
 [next#320]: https://github.com/rel-int/discopy-next/pull/320
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
+[optyx#56]: https://github.com/rel-int/optyx/pull/56
+[optyx#67]: https://github.com/rel-int/optyx/pull/67
+[optyx#76]: https://github.com/rel-int/optyx/pull/76
+[optyx#84]: https://github.com/rel-int/optyx/pull/84
 [lambek#2]: https://github.com/rel-int/lambek/pull/2
 [lambek#8]: https://github.com/rel-int/lambek/pull/8
 [lambek#12]: https://github.com/rel-int/lambek/pull/12

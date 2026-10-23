@@ -218,7 +218,7 @@ class Box:
             f", memory={repr(self.memory)}"
             f", prediction={repr(self.prediction)}")
         return (f"Box({repr(self.name)}, {repr(self.dom)}, "
-                f"{repr(self.cod)}{extra})")
+                f"{repr(self.cod)}, {repr(self.channel)}{extra})")
 
     def __str__(self):
         return self.name
@@ -278,6 +278,8 @@ class CMap:
             tuple(edge) for edge in edges]
         self.partner = {}
         for source, target in self.edges:
+            if source == target:
+                raise AxiomError(f"{source} is paired with itself.")
             for port in (source, target):
                 if port not in self.ports:
                     raise AxiomError(f"{port} is not a port.")

@@ -125,8 +125,9 @@ class Category[C0, C1: Category](ABC):
 
         >>> from discopy.monoidal import Ty, Diagram
         >>> assert Diagram.parameters() == (Ty, Diagram)
+        >>> assert Nat.parameters() == (NoneType, Nat)
         """
-        return getattr(cls, "ob", cls), cls.ar
+        return cls.ob, cls.ar
 
     @classmethod
     def equation_factory(cls, *terms) -> Equation:
@@ -297,6 +298,7 @@ class ColouredMonoid[C0, C1: ColouredMonoid](Category[C0, C1]):
 
 class Monoid[C1: Monoid](ColouredMonoid[type(None), C1]):
     """ A monoid is a coloured monoid with a single, trivial colour. """
+    ob = NoneType
 
 
 class Groupoid[C0, C1: Groupoid](DaggerCategory[C0, C1]):
@@ -324,11 +326,6 @@ class Group[C1: Group](Groupoid[type(None), C1], Monoid[C1]):
     a single object :obj:`None`, which every element goes from and to.
     """
     dom = cod = None
-
-    @classmethod
-    def parameters(cls) -> tuple[type, type]:
-        """ The objects of a group are the one :obj:`None`. """
-        return NoneType, cls
 
 
 @dataclass

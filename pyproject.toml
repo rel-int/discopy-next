@@ -118,6 +118,10 @@ notebooks = [
     "anywidget",
     "ipykernel == 6.23.*",
     "marimo",
+    # imported by the notebooks in docs/notebooks/optyx
+    "pandas",
+    "seaborn",
+    "tqdm",
 ]
 docs  = [
     "discopy[notebooks]",
@@ -185,20 +189,15 @@ norecursedirs = [
     ".hypothesis",
     "test/fixtures",
 ]
-addopts = "--doctest-modules --ignore=test/fixtures -p plugin"
+addopts = "--doctest-modules --ignore=test/fixtures -p plugin --import-mode=importlib"
 
 [tool.coverage.run]
 # sys.monitoring, the default from Python 3.14 on, measures the same lines
 # at half the cost of the C tracer that 3.12 and 3.13 would otherwise use.
 core = "sysmon"
-# The skip paths are unreachable unless --skip-extra is passed, and coverage
-# runs the full suite with every extra installed. The egglog reference of
-# test/ehypergraph.py runs only where egglog is installed, which the lock does
-# not have. torch.compile writes Python under torchinductor_* directories,
-# which is not ours to cover.
-omit = [
-    "test/plugin.py", "test/fixtures/egglog_reference.py",
-    "*/torchinductor_*/*"]
+# The gate measures the package, not the tests that exercise it: a test file
+# counted alongside is all but fully covered by construction.
+source = ["discopy"]
 
 [tool.coverage.report]
 fail_under = 98
