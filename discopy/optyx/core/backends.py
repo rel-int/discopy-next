@@ -82,7 +82,6 @@ from discopy import tensor as discopy_tensor
 import numpy as np
 if TYPE_CHECKING:
     import perceval as pcvl
-from quimb.tensor import TensorNetwork
 from discopy.optyx.channel import Diagram, Ty, mode, bit
 from discopy.optyx.core.path import Matrix
 
@@ -386,15 +385,6 @@ class AbstractBackend(ABC):
                 "It is not linear optical."
             ) from error
 
-    def _get_quimb_tensor(
-        self,
-        diagram: Diagram
-    ) -> TensorNetwork:
-        """
-        Get the Quimb tensor representation of the diagram.
-        """
-        return self._get_discopy_tensor(diagram).to_quimb()
-
     def _umatrix_to_perceval_circuit(
             self,
             matrix: np.ndarray) -> pcvl.Circuit:
@@ -464,7 +454,7 @@ class QuimbBackend(AbstractBackend):
             diagram: Diagram,
             **extra: Any) -> EvalResult:
         """
-        Evaluate the diagram using Quimb.
+        Evaluate the diagram using discopy's quimb contraction engine.
 
         Args:
             diagram (Diagram): The diagram to evaluate.
@@ -475,94 +465,18 @@ class QuimbBackend(AbstractBackend):
         Returns:
             The result of the evaluation.
         """
-
-        tensor_diagram = self._get_discopy_tensor(diagram)
-        params = {**self.contraction_params, **extra}
-
-        if hasattr(tensor_diagram, 'terms'):
-            results = sum(
-                self.process_term(term, params)
-                for term in tensor_diagram.terms
-            )
-        else:
-            results = self.process_term(tensor_diagram, params)
-
-        if diagram.is_pure:
-            state_type = StateType.AMP
-        else:
-            state_type = StateType.DM
-
+        params = dict(self.contraction_params, **extra)
+        if self.hyperoptimiser is not None:
+            params["optimize"] = self.hyperoptimiser
+        result = self._get_discopy_tensor(diagram).eval(
+            contract="quimb", **params)
+        state_type = StateType.AMP if diagram.is_pure else StateType.DM
         return EvalResult(
-            discopy_tensor.Box(
-                "Result",
-                tensor_diagram.dom,
-                tensor_diagram.cod,
-                results
-            ),
+            discopy_tensor.Box("Result", result.dom, result.cod,
+                               result.array),
             output_types=diagram.cod,
             state_type=state_type
         )
-
-    def process_term(
-            self, term: discopy_tensor.Diagram,
-            params: dict = None) -> np.ndarray:
-        """
-        Process a term in a sum of diagrams.
-
-        Args:
-            term (discopy.tensor.Diagram): The term to process.
-            params (dict): Contraction parameters, :attr:`contraction_params`
-                by default.
-
-        Returns:
-            np.ndarray: The processed term as a numpy array.
-        """
-        params = self.contraction_params if params is None else params
-        quimb_tn = term.to_quimb()
-
-        for t in quimb_tn:
-            dt = t.data.dtype
-            if dt.kind in {'i', 'u', 'b'}:
-                t.modify(data=t.data.astype(np.complex128, copy=False))
-
-        if self.hyperoptimiser is None:
-            result = quimb_tn ^ ...
-        else:
-            is_approx = isinstance(
-                self.hyperoptimiser,
-                (ReusableHyperCompressedOptimizer, HyperCompressedOptimizer)
-            )
-
-            is_exact = isinstance(
-                self.hyperoptimiser,
-                (ReusableHyperOptimizer, HyperOptimizer)
-            )
-
-            if not is_approx and not is_exact:
-                raise ValueError(
-                    "Unsupported hyperoptimiser type. " +
-                    "Use ReusableHyperOptimizer, HyperOptimizer, " +
-                    "ReusableHyperCompressedOptimizer, or " +
-                    "HyperCompressedOptimizer. " +
-                    f"Got: {type(self.hyperoptimiser)}"
-
-                )
-
-            contract = quimb_tn.contract_compressed if \
-                is_approx else quimb_tn.contract
-            result = contract(
-                optimize=self.hyperoptimiser,
-                output_inds=sorted(quimb_tn.outer_inds()),
-                **params
-            )
-
-        if isinstance(result, TensorNetwork):
-            result = result.contract(
-                output_inds=sorted(result.outer_inds()))
-        if not isinstance(result, (complex, float, int)):
-            result = result.data
-
-        return result
 
 
 # pylint: disable=too-few-public-methods
@@ -577,11 +491,13 @@ class DiscopyBackend(AbstractBackend):
 
         Args:
             diagram (Diagram): The diagram to evaluate.
+            **extra: Additional parameters for discopy's ``eval``,
+                e.g. ``contract`` and ``optimize``.
 
         Returns:
             The result of the evaluation.
         """
-        tensor_diagram = self._get_discopy_tensor(diagram).eval()
+        tensor_diagram = self._get_discopy_tensor(diagram).eval(**extra)
 
         if diagram.is_pure:
             state_type = StateType.AMP
