@@ -147,6 +147,9 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   `finset.Permutation.then` ([#763]).
 - A functor maps a layer with one `n`-ary `tensor` rather than a fold of
   `@`, with one `tensor` call per layer ([next#161]).
+- `discopy.optyx`: `QuimbBackend` contracts through discopy's
+  `eval(contract="quimb")`, and `DiscopyBackend` passes its parameters on to
+  `eval` ([optyx#44]).
 
 ### Deprecated
 
@@ -495,6 +498,7 @@ for the changelog of `1.2.1` and earlier.
 [next#310]: https://github.com/rel-int/discopy-next/pull/310
 [next#316]: https://github.com/rel-int/discopy-next/pull/316
 [next#320]: https://github.com/rel-int/discopy-next/pull/320
+[optyx#44]: https://github.com/rel-int/optyx/pull/44
 [lambek#2]: https://github.com/rel-int/lambek/pull/2
 [lambek#8]: https://github.com/rel-int/lambek/pull/8
 [lambek#12]: https://github.com/rel-int/lambek/pull/12
