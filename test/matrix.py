@@ -226,6 +226,7 @@ def test_Matrix_copy():
         [[1, 0, 0, 1, 0, 0],
          [0, 1, 0, 0, 1, 0],
          [0, 0, 1, 0, 0, 1]], 3, 6)
+    assert Matrix.copy(3, Nat(2)) == Matrix.copy(3, 2)
     for x in range(4):
         for n in range(4):
             copy = Matrix.copy(x, n)

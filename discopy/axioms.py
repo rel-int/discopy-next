@@ -34,7 +34,6 @@ Summary
     Declaration
     Axiom
     AxiomFailure
-    Count
     Tensor
     Unit
     L
@@ -100,9 +99,6 @@ They are finitely many and shared, so a generated functor can name every one
 of them: composing two functors keeps only the keys of the left-hand map, so
 a functor that named just a few would compose to one defined nowhere else.
 """
-
-MAX_COUNT = 3
-""" The largest number a declaration quantifying over ``int`` is given. """
 
 
 class Equation(NamedGeneric["ar"]):
@@ -198,7 +194,7 @@ type Var[Coarse, Value] = Annotated[Coarse, Value]
 """
 The premise standing for the value of an expression over the variables of a
 declaration, e.g. ``x: Var[C0, X]`` for ``X: Obj[C0]``, ``mem: Var[C0,
-Tensor[M, X]]`` or ``n: Var[int, N]`` for ``N: Count``. A typechecker reads
+Tensor[M, X]]`` or ``n: Var[Nat, N]`` for ``N: Nat``. A typechecker reads
 it as ``Coarse``.
 """
 
@@ -207,14 +203,6 @@ type Hom[Coarse, Dom, Cod] = Annotated[Coarse, Dom, Cod]
 The morphisms of type ``Coarse`` from ``Dom`` to ``Cod``, as a premise to
 sample, e.g. ``f: Hom[C1, A, B]``. A typechecker reads it as ``Coarse``.
 """
-
-
-class Count(int):
-    """
-    The sort of the numbers up to :data:`MAX_COUNT`, as the bound of a
-    variable ``N: Count`` of a declaration, e.g. the number of copies of an
-    object.
-    """
 
 
 def is_open(annotation) -> bool:
@@ -445,9 +433,9 @@ class Declaration[**P, T](classmethod):
     Its function is a classmethod of it, implicitly: its first parameter is
     the category and the others are its arguments, sampled in order. Its
     signature is a sequent: each type parameter is a variable of the sort
-    its bound states, ``A: Obj[C0]`` an object and ``N: Count`` a number,
-    each parameter a premise, ``f: Hom[C1, A, B]`` a morphism from ``A`` to
-    ``B``, ``x: Var[C0, X]`` the value of an
+    its bound states, ``A: Obj[C0]`` an object and ``N: Nat`` a number, see
+    :class:`discopy.abc.Nat`, each parameter a premise, ``f: Hom[C1, A, B]``
+    a morphism from ``A`` to ``B``, ``x: Var[C0, X]`` the value of an
     object expression and :data:`typing.Self` a term, and the return
     annotation the type of its output, see :meth:`output`. Object
     expressions are built by :class:`Tensor`, :class:`Unit`, :class:`L`,
@@ -583,8 +571,8 @@ class Declaration[**P, T](classmethod):
         Generate the scope and the arguments of the bound declaration: a
         variable of sort ``Obj`` from the strategy of the objects
         :meth:`discopy.abc.Category.parameters` names, :obj:`None` for those
-        of a group, and of sort
-        :class:`Count` a number up to :data:`MAX_COUNT`, then a premise
+        of a group, and of a testable sort, e.g. ``N: Nat``, from its own
+        strategy, see :meth:`discopy.abc.Nat.strategy`, then a premise
         ``Hom[C1, A, B]`` from the strategy of the category with its boundary
         and ``params``, a premise ``Var[T, x]`` the value ``x``, a testable
         shape of ``Self``, e.g. ``Related[Self]``, from its own strategy over
@@ -596,8 +584,8 @@ class Declaration[**P, T](classmethod):
         @st.composite
         def sequents(draw):
             def variable(name, sort):
-                if sort is Count:
-                    return draw(st.integers(0, MAX_COUNT), label=name)
+                if isinstance(sort, type) and issubclass(sort, Testable):
+                    return draw(sort.strategy(), label=name)
                 ob = self.category.parameters()[0]
                 return draw(st.just(None) if ob is NoneType
                             else ob.strategy(), label=name)

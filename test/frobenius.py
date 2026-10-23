@@ -65,6 +65,15 @@ def test_spider_factory():
                     assert all(map(ob.__eq__, s.cod[k::len(t)]))
 
 
+def test_spiders_take_index():
+    from discopy import abc
+    x, y = Ty('x'), Ty('y')
+    assert Spider(abc.Nat(2), abc.Nat(1), x) == Spider(2, 1, x)
+    for typ in (x, x @ y):
+        assert Diagram.spiders(abc.Nat(2), abc.Nat(0), typ)\
+            == Diagram.spiders(2, 0, typ)
+
+
 def test_spider_decomposition():
     n = Ty('n')
 

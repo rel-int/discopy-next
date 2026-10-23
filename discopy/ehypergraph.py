@@ -96,15 +96,15 @@ from functools import cached_property, reduce
 from itertools import accumulate, pairwise, repeat, takewhile
 from math import inf
 from operator import add, index
-from typing import TYPE_CHECKING, Self
+from typing import TYPE_CHECKING, Self, SupportsIndex
 
 from networkx import DiGraph
 from networkx.algorithms.isomorphism import is_isomorphic
 
 from discopy import markov, messages, monoidal
-from discopy.abc import HypergraphCategory, MonoidalCategory
+from discopy.abc import HypergraphCategory, MonoidalCategory, Nat
 from discopy.axioms import (
-    GENERATORS, Count, Equation, Hom, Obj, Testable, Var, axiom)
+    GENERATORS, Equation, Hom, Obj, Testable, Var, axiom)
 from discopy.drawing import Node
 from discopy.hypergraph import Hypergraph
 from discopy.monoidal import Ty
@@ -162,7 +162,8 @@ def pattern(graph: Hypergraph) -> Hypergraph:
         graph.boxes, (dom_wires, box_wires, tuple(cod_wires[k] for k in kept)))
 
 
-def rewire(graph: Hypergraph, i: int, j: int) -> Hypergraph:
+def rewire(
+        graph: Hypergraph, i: SupportsIndex, j: SupportsIndex) -> Hypergraph:
     """
     A hypergraph in a topological order with the ``i``-th input of its boxes
     read from the ``j``-th other spider of its type before it, which a matcher
@@ -171,12 +172,12 @@ def rewire(graph: Hypergraph, i: int, j: int) -> Hypergraph:
     graph = graph.topological_order()
     wires, types = list(graph.flat_wires), graph.spider_types
     inputs = [p for p, node in enumerate(graph.ports) if node.kind == "dom"]
-    port = inputs[i % len(inputs)] if inputs else 0
+    port = inputs[index(i) % len(inputs)] if inputs else 0
     others = [s for s in dict.fromkeys(wires[:port])
               if s != wires[port] and types[s] == types[wires[port]]]
     if not others:
         return graph
-    wires[port] = others[j % len(others)]
+    wires[port] = others[index(j) % len(others)]
     return type(graph)(
         graph.dom, graph.cod, graph.boxes, graph.rebracket(wires))
 
@@ -326,13 +327,13 @@ class EHypergraph(
         pairs = list(enumerate(self.classes)) + list(zip(spiders, spiders[1:]))
         return type(self)(self.graph, partition(self.graph.n_spiders, pairs))
 
-    def pair(self, i: int, j: int) -> tuple[int, ...]:
+    def pair(self, i: SupportsIndex, j: SupportsIndex) -> tuple[int, ...]:
         """ The ``i``-th spider and the ``j``-th of its type, for the laws. """
-        types = self.graph.spider_types
+        types, i = self.graph.spider_types, index(i)
         if not types:
             return ()
         same = [s for s, t in enumerate(types) if t == types[i % len(types)]]
-        return i % len(types), same[j % len(same)]
+        return i % len(types), same[index(j) % len(same)]
 
     def twice(self) -> Self:
         """ Two copies side by side on related inputs, rebuilt. """
@@ -791,9 +792,9 @@ class EHypergraph(
         return Equation(((f >> g) @ h).graph, (f.graph >> g.graph) @ h.graph)
 
     @axiom
-    def merge_equivalence[I: Count, J: Count, K: Count](
-            cls, graph: Self, i: Var[int, I], j: Var[int, J],
-            k: Var[int, K]) -> Equation[tuple[Self, ...]]:
+    def merge_equivalence[I: Nat, J: Nat, K: Nat](
+            cls, graph: Self, i: Var[Nat, I], j: Var[Nat, J],
+            k: Var[Nat, K]) -> Equation[tuple[Self, ...]]:
         """ Merging is reflexive, symmetric and transitive. """
         if not graph.graph.n_spiders:
             return Equation((), ())
@@ -804,8 +805,8 @@ class EHypergraph(
             (graph, graph.merge(t, s), chained))
 
     @axiom
-    def rebuild_closure[I: Count, J: Count](
-            cls, graph: Self, i: Var[int, I], j: Var[int, J]
+    def rebuild_closure[I: Nat, J: Nat](
+            cls, graph: Self, i: Var[Nat, I], j: Var[Nat, J]
     ) -> Equation[Self]:
         """ Rebuilding is idempotent, extensive and confluent. """
         pair = graph.pair(i, j)
@@ -930,10 +931,10 @@ class EHypergraph(
         return Equation(match in twice.matches(lhs), True)
 
     @axiom
-    def matching_soundness[A: Obj[Ty], B: Obj[Ty], C: Obj[Ty], I: Count,
-                           J: Count](
-            cls, f: Hom[Self, A, B], g: Hom[Self, B, C], i: Var[int, I],
-            j: Var[int, J]) -> Equation[bool]:
+    def matching_soundness[A: Obj[Ty], B: Obj[Ty], C: Obj[Ty], I: Nat,
+                           J: Nat](
+            cls, f: Hom[Self, A, B], g: Hom[Self, B, C], i: Var[Nat, I],
+            j: Var[Nat, J]) -> Equation[bool]:
         """ Matching is sound, flags included: in ``(f >> c) @ g``, ``c`` the
         boxes of ``g`` made cartesian, rewriting a match into its pattern
         changes nothing, for the pattern of ``c`` and for it rewired. """

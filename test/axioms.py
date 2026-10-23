@@ -8,9 +8,9 @@ from hypothesis.errors import NoSuchExample
 from pytest import raises
 
 from discopy import cat, feedback, rigid
-from discopy.abc import Category, Monoid
+from discopy.abc import Category, Monoid, Nat
 from discopy.axioms import (
-    L, R, Axiom, AxiomFailure, Count, Delay, Equation, Equivalence,
+    L, R, Axiom, AxiomFailure, Delay, Equation, Equivalence,
     Hom, Obj, Over, Related, Repeat, Tensor, Testable, Under, Unit, Var,
     assert_axioms, axiom, inhabits, is_open, position, substitute)
 from discopy.cat import Arrow, Box, Functor, Id, Ob
@@ -94,14 +94,15 @@ def test_strategy():
 
 def test_sequents():
     @axiom
-    def law[X: Obj[Ob], Y: Obj[Ob], N: Count](
+    def law[X: Obj[Ob], Y: Obj[Ob], N: Nat](
             cls, x: Var[Ob, X], f: Hom[Self, X, Y], term: Self,
-            n: Var[int, N]
+            n: Var[Nat, N]
     ) -> Equation[tuple[Var[Ob, X], bool, bool]]:
         """ Quantify over an object, a morphism out of it, a term and a
         number. """
         return Equation(
-            (f.dom, isinstance(term, cls), n <= 3), (x, True, True))
+            (f.dom, isinstance(term, cls), isinstance(n, Nat) and n.n <= 3),
+            (x, True, True))
 
     bound = law.bind(Arrow)
     scope, arguments = find(bound.sequents(), lambda _: True)
@@ -109,6 +110,7 @@ def test_sequents():
     assert inhabits(bound(**arguments), bound.output(scope))
     _, given = find(bound.sequents(given={"Y": Ob('y')}), lambda _: True)
     assert given["f"].cod == Ob('y')
+    assert find(bound.arguments(), lambda xs: xs["n"].n == 3)["n"] == Nat(3)
 
 
 def test_constructors():

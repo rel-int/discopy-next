@@ -159,6 +159,21 @@ def test_Ty_pow():
         Ty('x') ** Ty('y')
 
 
+def test_pow_takes_index():
+    from discopy import abc
+    two = abc.Nat(2)
+    assert Ty('x') ** two == Ty('x', 'x') and Nat(3) ** two == Nat(6)
+    assert List[int](2, 3) ** two == List[int](2, 3, 2, 3)
+    for power in (2.0, "2"):
+        with raises(TypeError):
+            Ty('x') ** power
+
+
+def test_abc_Nat_hash():
+    from discopy import abc
+    assert {abc.Nat(2), abc.Nat(2), abc.Nat(3)} == {abc.Nat(2), abc.Nat(3)}
+
+
 def test_Nat_init():
     assert list(Nat(0)) == []
     assert all(len(Nat(n)) == n for n in range(5))

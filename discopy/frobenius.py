@@ -71,6 +71,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from copy import copy
+from operator import index
 from typing import Self
 
 from discopy import (
@@ -281,6 +282,7 @@ class Diagram(
             typ : The type of the spiders.
             phases : The phase for each spider.
         """
+        n_legs_in, n_legs_out = index(n_legs_in), index(n_legs_out)
         if phases is None and len(typ) != 1\
                 and getattr(cls, "cospan_factory", None)\
                 and cls.cospan_factory.ar is cls:
@@ -679,6 +681,7 @@ class Spider(Box):
     def __init__(self, n_legs_in: int, n_legs_out: int, typ: Ty, data=None,
                  is_dagger=False, **params):
         assert_isatomic(typ)
+        n_legs_in, n_legs_out = index(n_legs_in), index(n_legs_out)
         self.typ = typ
         str_data = "" if data is None else f", {data}"
         name = type(self).__name__\

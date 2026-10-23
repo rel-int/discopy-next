@@ -5,7 +5,7 @@ from pyzx import VertexType
 from pytest import raises, fixture
 
 from discopy.quantum.gates import CRz, CRx, CU1, Ket, Rx, H
-from discopy import quantum
+from discopy import abc, quantum
 from discopy.optyx.core.zx import *
 from discopy.optyx.core.zx import And, H, Or, Spider, X, Z, ZXBox
 from discopy.optyx.core import diagram
@@ -46,6 +46,7 @@ def test_Spider():
     for spider in [Z, X]:
         assert spider(1, 2, 3).phase == 3
         assert spider(1, 2, 3j).dagger() == spider(2, 1, -3j)
+        assert spider(abc.Nat(2), 1, .5).conjugate() == spider(2, 1, -.5)
 
 
 def test_H():

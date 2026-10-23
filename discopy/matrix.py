@@ -573,7 +573,7 @@ class Matrix(NamedGeneric['dtype'], MarkovCategory, ComarkovCategory,
         >>> assert Matrix.copy(2) >> Matrix.id(2) @ Matrix.discard(2)\\
         ...     == Matrix.id(2)
         """
-        x = index(x)
+        x, n = index(x), index(n)
         with backend() as np:
             array = np.array([
                 [j % x == i for j in range(n * x)] for i in range(x)],

@@ -108,6 +108,13 @@ def test_Function_permutation_moves_blocks():
     assert Function.permutation([0, 1], [2, 3]) == Function.id(5)
 
 
+def test_counts_take_index():
+    from discopy.abc import Nat
+    from discopy.python.finset import Cospan, Function
+    assert Function.copy(2, Nat(3)) == Function.copy(2, 3)
+    assert Cospan.spiders(Nat(2), Nat(1), 2) == Cospan.spiders(2, 1, 2)
+
+
 def test_Cospan():
     from hypothesis import given
     from discopy.python.finset import Cospan

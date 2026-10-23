@@ -22,6 +22,7 @@ from discopy.utils import assert_isinstance
 from typing import Iterable, Self, Any
 from itertools import accumulate
 from collections.abc import Sequence
+from operator import index
 
 from dataclasses import dataclass
 
@@ -163,7 +164,7 @@ class Function(MarkovCategory, Sequence):
 
     @staticmethod
     def copy(x: int | Nat, n=2) -> Function:
-        k = int(x)
+        k, n = int(x), index(n)
         return Function([i % k for i in range(n * k)], k, n * k)
 
     def factorise(self) -> tuple[list[int], Permutation]:
@@ -583,6 +584,7 @@ class Cospan(HypergraphCategory, Testable["Cospan"]):
         Cospan(left=[0, 1, 0, 1], right=[], apex=2)
         """
         k = int(typ)
+        n_legs_in, n_legs_out = index(n_legs_in), index(n_legs_out)
         return cls([i % k for i in range(n_legs_in * k)],
                    [j % k for j in range(n_legs_out * k)], k)
 

@@ -51,6 +51,8 @@ def test_Spider():
     for spider in [Z, Y, X]:
         assert spider(1, 2, 3).phase == 3
         assert spider(1, 2, 3j).dagger() == spider(2, 1, -3j)
+        assert spider(Nat(2), 1, .5) == spider(2, 1, .5)
+        assert spider(Nat(2), 1, .5).dagger().dagger() == spider(2, 1, .5)
 
 
 def test_H():

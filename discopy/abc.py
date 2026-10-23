@@ -339,6 +339,11 @@ class Nat(Testable["Nat"], Monoid["Nat"]):
     :meth:`__len__` gives back the natural number itself and slicing reads
     it off as a sequence of ``1``'s, e.g. ``Nat(3)[:1] == Nat(1)``.
 
+    It is the sort of a law's number variable ``N: Nat`` too, see
+    :class:`discopy.axioms.Declaration`, and :meth:`__index__` lets it stand
+    wherever a number of copies or legs does, e.g. ``x ** Nat(2) == x @ x``
+    and ``spiders(Nat(2), 1, x)``.
+
     Parameters:
         n : The natural number.
     """
@@ -354,6 +359,9 @@ class Nat(Testable["Nat"], Monoid["Nat"]):
 
     def __index__(self) -> int:
         return self.n
+
+    def __hash__(self) -> int:
+        return hash(self.n)
 
     def __str__(self) -> str:
         return str(self.n)
@@ -384,8 +392,9 @@ class Nat(Testable["Nat"], Monoid["Nat"]):
     def strategy(cls, *, max_size=3):
         """
         Generate natural numbers up to ``max_size``, so that a category
-        whose objects they are, e.g. :class:`discopy.matrix.Matrix`,
-        quantifies over them like any other :class:`discopy.axioms.Testable`.
+        whose objects they are, e.g. :class:`discopy.matrix.Matrix`, and a
+        law with a number variable ``N: Nat`` quantify over them like any
+        other :class:`discopy.axioms.Testable`.
         """
         from hypothesis import strategies as st
 
