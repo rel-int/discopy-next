@@ -1,8 +1,8 @@
 import networkx as nx
 import pytest
 
-from optyx.compiler.mbqc import Measurement, OpenGraph
-from optyx.compiler.semm import compile_to_semm, decompile_from_semm
+from discopy.optyx.compiler.mbqc import Measurement, OpenGraph
+from discopy.optyx.compiler.semm import compile_to_semm, decompile_from_semm
 
 
 # Generate many random graphs and confirm all of them can be compiled and
@@ -13,7 +13,7 @@ from optyx.compiler.semm import compile_to_semm, decompile_from_semm
 # datastructure
 @pytest.mark.parametrize("num_vertices", range(2, 5))
 def test_fuzz_semm_compiler(num_vertices: int):
-    with open(f"test/graph_data/graph{num_vertices}c.g6", "rb") as f:
+    with open(f"test/optyx/graph_data/graph{num_vertices}c.g6", "rb") as f:
         lines = f.readlines()
 
     graphs = nx.read_graph6(lines)

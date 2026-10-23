@@ -6,15 +6,15 @@ Combinatorial maps of recurrent channels.
 
 A :class:`CMap` is a combinatorial map: a list of :class:`Box` carrying
 channels, together with edges pairing their ports. Its semantics is the
-recurrent protocol :meth:`CMap.protocol`, a :class:`optyx.channel.Diagram`
-with a feedback loop on the paired ports. It has finite stream semantics
-through :meth:`CMap.unroll` and stationary semantics through
-:meth:`CMap.fix`.
+recurrent protocol :meth:`CMap.protocol`, a
+:class:`discopy.optyx.channel.Diagram` with a feedback loop on the paired
+ports. It has finite stream semantics through :meth:`CMap.unroll` and
+stationary semantics through :meth:`CMap.fix`.
 
 This is the Int (geometry of interaction) construction of Joyal, Street
 and Verity applied to the feedback category of channels:
-:meth:`optyx.channel.Diagram.feedback` plays the role of a delayed trace,
-so the structure is compact closed up to time shifts.
+:meth:`discopy.optyx.channel.Diagram.feedback` plays the role of a delayed
+trace, so the structure is compact closed up to time shifts.
 
 Every port of a box is both read and written at each time step, so a box
 :code:`x -> y` carries a channel from :code:`x @ y` to :code:`x @ y` and an
@@ -23,8 +23,8 @@ memory read by its partner at the next time step; an unpaired port reads
 from the domain and writes to the codomain, so :code:`dom == cod` is the
 tensor of the unpaired port types.
 
->>> from optyx.channel import qubit
->>> from optyx.qubits import Z, X, Scalar
+>>> from discopy.optyx.channel import qubit
+>>> from discopy.optyx.qubits import Z, X, Scalar
 >>> cnot = Z(1, 2) @ qubit >> qubit @ X(2, 1) @ Scalar(2 ** 0.5)
 >>> box = Box("f", qubit, qubit, cnot)
 >>> cmap = CMap([box, box], [((0, 1), (1, 0))])
@@ -53,6 +53,22 @@ A :class:`CMap` turns into a tensor network in two orthogonal directions:
 *space* — its boxes and edges — and *time* — the unrolled ticks. Each stage
 of the construction is a diagram the user can inspect and draw.
 
+The running example is the smallest map that is purely quantum and uses
+every kind of wire: three cells connected in a triangle, each carrying an
+internal memory and a prediction output. A cell is a single Z spider,
+the channel that constrains all its wires to agree in the computational
+basis: at every tick it reads its two message ports and its memory,
+writes them back and predicts its memory.
+
+>>> from discopy.optyx.channel import qubit
+>>> from discopy.optyx.qubits import Z
+>>> cell = Box("cell", qubit, qubit, Z(3, 4),
+...     memory=qubit, prediction=qubit)
+>>> triangle = CMap([cell, cell, cell],
+...     [((0, 1), (1, 0)), ((1, 1), (2, 0)), ((2, 1), (0, 0))])
+>>> assert triangle.dom == Ty() and triangle.prediction == qubit ** 3
+>>> assert triangle.memory == qubit ** 9
+
 **One tick is a channel diagram.** :attr:`CMap.step` composes three
 diagrams: :attr:`CMap.read`, a permutation routing :code:`dom @ memory`
 onto the inputs of the boxes, then :attr:`CMap.parallel`, the tensor
@@ -62,69 +78,79 @@ port to the memory read by its partner at the next tick, each internal
 memory back to its own box. The permutations carry no data: all the
 computation sits in the boxes, as in a premonoidal normal form.
 
->>> wait = Box("wait", Ty(), qubit,
-...     Diagram.swap(qubit, qubit), memory=qubit)
->>> delay = CMap([wait], [])
->>> assert delay.step \\
-...     == delay.read >> delay.parallel >> delay.write
+>>> assert triangle.step \\
+...     == triangle.read >> triangle.parallel >> triangle.write
+>>> triangle.step.draw(figsize=(8, 5), wire_labels=False,
+...     path="docs/_static/optyx/interaction_step.png")
+
+.. image:: /_static/optyx/interaction_step.png
+    :align: center
 
 **Feedback closes the time loop.** :attr:`CMap.protocol` applies
-:meth:`optyx.channel.Diagram.feedback` to the step, closing
+:meth:`discopy.optyx.channel.Diagram.feedback` to the step, closing
 :attr:`CMap.memory` — the paired ports followed by the internal memories —
 onto itself with a one-tick delay. The memory is a *delay*, which makes
 the protocol the feedback of a monoidal stream (Di Lavore, de Felice and
 Román, LICS 2022) rather than a trace: nothing is computed yet, the loop
 is syntax.
 
->>> delay.protocol.draw(figsize=(3, 3),
-...     path="docs/_static/interaction_protocol.png")
+>>> triangle.protocol.draw(figsize=(8, 5), wire_labels=False,
+...     path="docs/_static/optyx/interaction_protocol.png")
 
-.. image:: /_static/interaction_protocol.png
+.. image:: /_static/optyx/interaction_protocol.png
     :align: center
 
 **Unrolling gives a finite diagram.** :meth:`CMap.unroll` composes
 :code:`n_steps + 1` copies of the step, threading the memory from each
-tick to the next; the result is an ordinary
-:class:`optyx.channel.Diagram` whose width is the memory cut and whose
+tick to the next — below, two ticks of the triangle with the memory left
+open; :meth:`CMap.unroll` itself also prepares the initial memory and
+discards the final one. The result is an ordinary
+:class:`discopy.optyx.channel.Diagram` whose width is the memory cut and whose
 depth is the number of ticks.
 
->>> delay.unroll(1).draw(figsize=(4, 4),
-...     path="docs/_static/interaction_unroll.png")
+>>> two_ticks = triangle.step \\
+...     >> Diagram.id(triangle.prediction) @ triangle.step
+>>> assert two_ticks.cod == triangle.unroll(1).cod @ triangle.memory
+>>> two_ticks.draw(figsize=(8, 10), wire_labels=False,
+...     path="docs/_static/optyx/interaction_unroll.png")
 
-.. image:: /_static/interaction_unroll.png
+.. image:: /_static/optyx/interaction_unroll.png
     :align: center
 
 **Doubling gives the tensors.** From here the standard optyx pipeline
-applies. :meth:`optyx.channel.Diagram.double` maps the unrolled channel
+applies. :meth:`discopy.optyx.channel.Diagram.double` maps the unrolled channel
 diagram to its Kraus map beside the conjugate, and :code:`to_tensor()`
 translates it to a :class:`discopy.tensor.Diagram` whose wires carry
-dimensions and whose boxes carry arrays. Its :code:`to_map()` is again a
-combinatorial map — this time :class:`discopy.tensor.CMap`, boxes and
-port pairings at the array level — mirroring in space the structure this
-module describes in time, without materialising the global permutations
-of :attr:`CMap.read` and :attr:`CMap.write` as explicit swap layers.
-
-**Contraction is a functor away.** The network is evaluated by
-:func:`optyx.core.contract.contract_tensor`: exactly with NumPy or Quimb,
-differentiably with JAX or PyTorch arrays, with any Cotengra path
-optimizer, and approximately through compressed contraction with
-:code:`max_bond`. The cost is controlled by the three sizes fixed above:
-the number of ticks, the local dimension of the wires and the bond
-dimension of the contraction.
+dimensions and whose boxes carry arrays — the recurrent tensor network.
+DisCoPy contracts it: exactly with :code:`eval`, or through Quimb with
+:code:`to_quimb`. The cost is controlled by the number of ticks, the
+local dimension of the wires and the width of the memory cut.
 
 >>> import numpy as np
->>> from optyx.qubits import Ket
->>> from optyx.core.contract import contract_tensor
+>>> from discopy.optyx.qubits import Ket
 >>> unrolled = Ket(1) >> CMap([readout], []).unroll(1)
 >>> network = unrolled.double().to_tensor()
->>> result = contract_tensor(network.to_map(), backend="numpy")
->>> expected = (Ket(1) @ Ket(1)).double().to_tensor().eval()
->>> assert np.allclose(
-...     np.asarray(result.array).flatten(), expected.array.flatten())
+>>> expected = (Ket(1) @ Ket(1)).double().to_tensor()
+>>> assert np.allclose(network.eval().array.flatten(),
+...     expected.eval().array.flatten())
 
-The stationary semantics :meth:`CMap.fix` closes the time direction the
-other way, by an approximate fixed point instead of a finite unrolling;
-see :doc:`/notebooks/fixpoints` for the certificates behind it.
+**The fixpoint is computed through contraction.** :meth:`CMap.fix`
+closes the time direction the other way: following
+:meth:`discopy.optyx.channel.Diagram.fix`, it contracts ever longer unrollings
+of the doubled network until the output stops changing — see
+:doc:`/notebooks/optyx/fixpoints` for the certificates behind it. For the
+triangle, spider fusion makes every memory agree with its neighbours:
+started from uniform superpositions, the cells synchronise and the
+stationary prediction is the GHZ mixture, perfectly correlated and
+uniform.
+
+>>> from discopy.optyx.qubits import H
+>>> plus = Ket(0) >> H()
+>>> fixed = triangle.fix(
+...     initial_state=Diagram.id().tensor(*[plus] * 9),
+...     max_steps=4, max_chi=None)
+>>> assert np.allclose(fixed.density_matrix.reshape(8, 8),
+...     np.diag([.5, 0, 0, 0, 0, 0, 0, .5]))
 
 Types and diagrams
 ------------------
@@ -142,7 +168,7 @@ from __future__ import annotations
 
 from discopy.utils import AxiomError
 
-from optyx.channel import Diagram, Ty
+from discopy.optyx.channel import Diagram, Ty
 
 __all__ = ["Box", "CMap", "Ty"]
 
@@ -155,7 +181,7 @@ class Box:
         name : The name of the box.
         dom : The input ports.
         cod : The output ports.
-        channel : A :class:`optyx.channel.Diagram` from
+        channel : A :class:`discopy.optyx.channel.Diagram` from
             :code:`dom @ cod @ memory` to
             :code:`dom @ cod @ memory @ prediction`, reading and writing
             every port, updating the memory and writing the prediction.
@@ -164,8 +190,8 @@ class Box:
         prediction : The type written to the environment at every time
             step but never read, empty by default.
 
-    >>> from optyx.channel import qubit
-    >>> from optyx.qubits import H, Z
+    >>> from discopy.optyx.channel import qubit
+    >>> from discopy.optyx.qubits import H, Z
     >>> assert Box("h", Ty(), qubit, H()).ports == qubit
     >>> mem = Box("m", Ty(), Ty(), Z(1, 2), memory=qubit, prediction=qubit)
     >>> assert mem.ports == Ty()
@@ -216,15 +242,16 @@ class CMap:
     A port is a pair :code:`(box, port)` of indices, the second indexing
     :attr:`Box.ports`. An edge is a pair of distinct ports of equal type,
     and every port belongs to at most one edge. The memory and prediction
-    of a box are not ports: they cannot be paired, and neither can the
-    cups and caps of :meth:`glue` touch them.
+    of a box are not ports: they cannot be paired. An edge between two
+    ports of the same box is a cup or a cap, so the maps carry the compact
+    closed structure of the Int-construction.
 
     Parameters:
         boxes : The boxes of the map.
         edges : The pairs of ports glued by the map.
 
-    >>> from optyx.channel import qubit
-    >>> from optyx.qubits import Z, X, Scalar
+    >>> from discopy.optyx.channel import qubit
+    >>> from discopy.optyx.qubits import Z, X, Scalar
     >>> cnot = Z(1, 2) @ qubit >> qubit @ X(2, 1) @ Scalar(2 ** 0.5)
     >>> box = Box("f", qubit, qubit, cnot)
     >>> cmap = CMap([box, box], [((0, 1), (1, 0))])
@@ -234,8 +261,8 @@ class CMap:
     Both ports of an edge must have the same type, and a port cannot be
     paired twice:
 
-    >>> from optyx.channel import qmode
-    >>> from optyx.photonic import BS
+    >>> from discopy.optyx.channel import qmode
+    >>> from discopy.optyx.photonic import BS
     >>> CMap([box, Box("g", qmode, qmode, BS)], [((0, 0), (1, 0))])
     Traceback (most recent call last):
     ...
@@ -394,8 +421,8 @@ class CMap:
         parallel, permuted by the edges and fed back on the paired ports
         and internal memories, with the predictions after the boundary.
 
-        >>> from optyx.channel import qubit
-        >>> from optyx.qubits import Z, X, Scalar
+        >>> from discopy.optyx.channel import qubit
+        >>> from discopy.optyx.qubits import Z, X, Scalar
         >>> cnot = Z(1, 2) @ qubit >> qubit @ X(2, 1) @ Scalar(2 ** 0.5)
         >>> cmap = CMap([Box("f", qubit, qubit, cnot)], [((0, 0), (0, 1))])
         >>> assert cmap.protocol.dom == cmap.dom
@@ -407,18 +434,18 @@ class CMap:
     def unroll(self, n_steps: int = 1) -> Diagram:
         """
         The protocol unrolled over :code:`n_steps + 1` time steps — as in
-        :meth:`optyx.channel.Diagram.unroll`, :code:`n_steps` counts
+        :meth:`discopy.optyx.channel.Diagram.unroll`, :code:`n_steps` counts
         unrollings — a channel diagram evaluated as a tensor network by
         the existing backends.
 
-        >>> from optyx.channel import qubit
-        >>> from optyx.qubits import Z, X, Scalar
+        >>> from discopy.optyx.channel import qubit
+        >>> from discopy.optyx.qubits import Z, X, Scalar
         >>> cnot = Z(1, 2) @ qubit >> qubit @ X(2, 1) @ Scalar(2 ** 0.5)
 
         The memory starts open at the end of the domain and is discarded
         after the last step, the default boundaries of
-        :meth:`optyx.channel.Diagram.feedback`; :meth:`fix` is where other
-        boundaries are chosen.
+        :meth:`discopy.optyx.channel.Diagram.feedback`; :meth:`fix` is where
+        other boundaries are chosen.
 
         >>> cmap = CMap([Box("f", qubit, qubit, cnot)], [((0, 0), (0, 1))])
         >>> assert cmap.unroll(2).dom == cmap.memory
@@ -433,19 +460,19 @@ class CMap:
 
         ``input_state`` prepares the boundary input afresh at every time
         step, inside the loop so that the stationary certificates of
-        :meth:`optyx.channel.Diagram.fix` can apply. It is required when
-        the map has unpaired ports. ``initial_state`` prepares the feedback
-        memory, the paired ports followed by the internal memories, before
-        the first time step. Remaining parameters are those of
-        :meth:`optyx.channel.Diagram.fix`.
+        :meth:`discopy.optyx.channel.Diagram.fix` can apply. It is required
+        when the map has unpaired ports. ``initial_state`` prepares the
+        feedback memory, the paired ports followed by the internal memories,
+        before the first time step. Remaining parameters are those of
+        :meth:`discopy.optyx.channel.Diagram.fix`.
 
         A box that swaps its output port with its internal memory is a
         delay line: fed a photon at every step, its stationary output is
         that photon.
 
         >>> import numpy as np
-        >>> from optyx.channel import qmode
-        >>> from optyx.photonic import Create
+        >>> from discopy.optyx.channel import qmode
+        >>> from discopy.optyx.photonic import Create
         >>> wait = Box("wait", Ty(), qmode,
         ...     Diagram.swap(qmode, qmode), memory=qmode)
         >>> fixed = CMap([wait], []).fix(Create(1), Create(0), max_chi=None)
@@ -476,8 +503,8 @@ class CMap:
         """
         The disjoint union of two maps, reindexing the ports of the second.
 
-        >>> from optyx.channel import qubit
-        >>> from optyx.qubits import Z, X, Scalar
+        >>> from discopy.optyx.channel import qubit
+        >>> from discopy.optyx.qubits import Z, X, Scalar
         >>> cnot = Z(1, 2) @ qubit >> qubit @ X(2, 1) @ Scalar(2 ** 0.5)
         >>> cmap = CMap([Box("f", qubit, qubit, cnot)], [((0, 0), (0, 1))])
         >>> assert (cmap @ cmap).memory == cmap.memory ** 2
@@ -486,21 +513,6 @@ class CMap:
         return CMap(self.boxes + other.boxes, self.edges + [
             ((i + shift, j), (k + shift, ll))
             for (i, j), (k, ll) in other.edges])
-
-    def glue(self, *edges) -> CMap:
-        """
-        The map with extra edges, gluing boundary ports together: this is
-        composition in the compact closed structure, and a single edge
-        between two boundary ports of the same map is a cup or a cap.
-
-        >>> from optyx.channel import qubit
-        >>> from optyx.qubits import Z, X, Scalar
-        >>> cnot = Z(1, 2) @ qubit >> qubit @ X(2, 1) @ Scalar(2 ** 0.5)
-        >>> box = Box("f", qubit, qubit, cnot)
-        >>> cmap = CMap([box, box], []).glue(((0, 1), (1, 0)))
-        >>> assert cmap.memory == qubit ** 2
-        """
-        return CMap(self.boxes, self.edges + list(edges))
 
     def __repr__(self):
         return f"CMap({repr(self.boxes)}, {repr(self.edges)})"

@@ -1,0 +1,13 @@
+optyx
+Copyright 2023, Quantinuum Ltd.
+
+This module is optyx, ZX-based software for networked quantum computing,
+developed at https://github.com/CQCL/optyx and forked as
+https://github.com/rel-int/optyx, where it was licensed under the Apache
+License, Version 2.0, a copy of which is in LICENSE next to this file. It
+moved into DisCoPy as discopy.optyx in 2026 with its full git history, and
+remains under the Apache License, Version 2.0, while the rest of DisCoPy is
+under the BSD 3-Clause License.
+
+The copyright line above is the one optyx's documentation carried, in its
+docs/conf.py, which stayed behind in the move.

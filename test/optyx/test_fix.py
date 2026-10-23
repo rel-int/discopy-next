@@ -4,11 +4,11 @@ import numpy as np
 import pytest
 from cotengra import HyperCompressedOptimizer
 
-from optyx import channel, classical, photonic, qubits
-from optyx.channel import (
+from discopy.optyx import channel, classical, photonic, qubits
+from discopy.optyx.channel import (
     Diagram, Discard, Scalar, Ty, bit, qmode, qubit,
 )
-from optyx.core.backends import DiscopyBackend, QuimbBackend
+from discopy.optyx.core.backends import DiscopyBackend, QuimbBackend
 
 
 def source(photons=1, effect=None):
@@ -148,7 +148,7 @@ def test_loss_is_not_a_solver_input():
             getattr(source(), solver)(loss=.5)
 
 
-@pytest.mark.parametrize("max_steps", [0, -1, 1.5, True])
+@pytest.mark.parametrize("max_steps", [0, 1, -1, 1.5, True])
 def test_fix_validates_max_steps(max_steps):
     with pytest.raises(ValueError, match="max_steps"):
         source().fix(max_steps=max_steps)
@@ -220,13 +220,12 @@ def test_power_iteration_warns_on_a_periodic_loop():
 
 def test_power_fix_converges_to_eigen():
     """The fallback iteration agrees with the eigensolve on a mixing
-    qubit loop, and `fix` reaches it silently when the certificate does
-    not apply."""
+    qubit loop, and `fix` warns with the obstruction when it falls back,
+    so an uncertified result is never silent."""
     exact = rotation(0.25).eigen_fix().density_matrix
     assert np.linalg.norm(
         rotation(0.25).power_fix(1e-3).density_matrix - exact) < 1e-2
-    with warnings.catch_warnings():
-        warnings.simplefilter("error")
+    with pytest.warns(UserWarning, match="falling back on power_fix"):
         by_fix = rotation(0.25).fix(tol=1e-3).density_matrix
     assert np.linalg.norm(by_fix - exact) < 1e-2
 
@@ -245,7 +244,7 @@ def test_fixpoint_of_a_closed_loop():
     assert closed.one_step() == Diagram.id(qmode)
     with pytest.raises(ValueError, match="not unique"):
         closed.eigen_fix()
-    with pytest.raises(NotImplementedError, match="rho"):
+    with pytest.raises(ValueError, match="rho"):
         closed.unroll_certificate()
     result = closed.power_fix(tol=1e-2, max_steps=3)
     assert result.density_matrix.shape == ()
@@ -265,7 +264,7 @@ def test_both_solvers_return_the_same_kind_of_result():
     """`fix` and `eigen_fix` produce interchangeable `EvalResult`s: a
     density matrix over the codomain, real when the state is, read the
     same way whichever solver produced it."""
-    from optyx.core.backends import StateType
+    from discopy.optyx.core.backends import StateType
     eigen = source().eigen_fix()
     power = source().fix(tol=1e-2)
     for result in (eigen, power):
@@ -338,10 +337,12 @@ def test_certification_and_truncation_warn_separately():
     own warning and both can fire on one call."""
     with pytest.warns(UserWarning) as caught:
         sampler(loss=.9).fix(tol=1e-4, max_chi=2, max_steps=2)
-    messages = sorted(str(warning.message)[:20] for warning in caught)
+    messages = [str(warning.message) for warning in caught]
     assert len(messages) == 2
-    assert messages[0].startswith("max_steps=2 stops be")
-    assert messages[1].startswith("the contraction need")
+    assert any("not certified within max_steps=2" in message
+               for message in messages)
+    assert any(message.startswith("the contraction needs")
+               for message in messages)
 
 
 def test_the_certificate_reads_the_depth_off_the_diagram():
@@ -349,8 +350,66 @@ def test_the_certificate_reads_the_depth_off_the_diagram():
     non-symmetric loop block catches the tempting trailing-block mistake."""
     loop = asymmetric_sampler() >> photonic.NumberResolvingMeasurement(1)
     assert loop.unroll_certificate(1e-6) == 3
-    assert loop.unroll_certificate(1e-6, max_steps=2) is None
     assert sampler(.25).unroll_certificate(1e-2) == 13
+
+
+def test_unroll_certificate_reports_both_resource_errors():
+    """The best depth is returned even when its certified tolerance misses
+    the request; the warning reports both contributions and their sum."""
+    with pytest.warns(UserWarning) as caught:
+        assert sampler(loss=.9).unroll_certificate(
+            .1, max_steps=2, max_truncation=100) == 2
+    message = str(caught[0].message)
+    assert "depth error is 0.125541" in message
+    assert "truncation error 0 for a photon support of 1" in message
+    assert "certified tolerance is 0.125541" in message
+
+    assert sampler(loss=.9).unroll_certificate(
+        .001, max_steps=3, max_truncation=1) == 3
+    with pytest.warns(UserWarning) as caught:
+        assert sampler(loss=.9).unroll_certificate(
+            .0005, max_steps=3, max_truncation=1) == 3
+    message = str(caught[0].message)
+    assert "truncation error 0.000130757 for a photon support of 2" \
+        in message
+    assert "certified tolerance is 0.00057104" in message
+
+
+def test_unroll_certificate_returns_best_depth_without_cutoff():
+    """A finite depth budget returns what it evaluated even when Gamma
+    misses the request; the warning states the tolerance actually proved."""
+    with pytest.warns(UserWarning) as caught:
+        assert sampler(loss=.9).unroll_certificate(
+            1e-4, max_steps=2) == 2
+    message = str(caught[0].message)
+    assert "not certified within max_steps=2" in message
+    assert "certified tolerance is 0.125541" in message
+
+
+def test_unroll_certificate_compares_errors_before_clipping():
+    """Every early burn-in of a lossless loop has an error past the trace
+    distance's maximum of two, so the best depth is chosen before that
+    clip: otherwise the first step ties with the deepest one and wins."""
+    step = photonic.Create(1) @ qmode >> photonic.BS
+    loop = step.feedback(mem=qmode, state=photonic.Create(0))
+    with pytest.warns(UserWarning, match="best burn-in k=4"):
+        assert loop.unroll_certificate(1e-2, max_steps=5) == 5
+
+
+def test_unroll_certificate_stops_when_the_truncation_alone_misses():
+    """Once the truncation error passes `tol` no depth can recover, so the
+    search stops rather than running to `max_steps`."""
+    with pytest.warns(UserWarning, match="max_truncation=0"):
+        assert sampler(.25).unroll_certificate(
+            1e-6, max_truncation=0) == 2
+
+
+@pytest.mark.parametrize("max_truncation", [-1, 1.5, True])
+def test_unroll_certificate_validates_max_truncation(max_truncation):
+    """Zero is a valid cutoff on the photons in the loop, unlike a bond
+    dimension; anything that is not a natural number is not."""
+    with pytest.raises(ValueError, match="max_truncation"):
+        sampler(.25).unroll_certificate(max_truncation=max_truncation)
 
 
 def test_loss_in_the_diagram_shortens_the_certificate():
@@ -368,13 +427,20 @@ def test_loss_in_the_diagram_shortens_the_certificate():
 
 
 def test_certificate_refuses_what_it_cannot_certify():
-    """Qubit memories, several loops and undamped loop blocks all raise
-    `NotImplementedError`, which is what sends `fix` to `power_fix`."""
-    with pytest.raises(NotImplementedError, match="optical modes"):
+    """Each obstruction is pinned down and named: qubit memories, nested
+    loops and undamped loop blocks raise `ValueError` with the reason,
+    the same message `fix` warns with before falling back on
+    `power_fix`."""
+    with pytest.raises(ValueError, match="optical modes"):
         source().unroll_certificate()
-    with pytest.raises(NotImplementedError, match="rho"):
+    with pytest.raises(ValueError, match="rho"):
         Diagram.id(qmode).feedback(
             state=photonic.Create(0)).unroll_certificate()
+    inner = Diagram.swap(qmode, qmode).feedback(state=photonic.Create(0))
+    outer = ((photonic.Create(1) >> inner) @ qmode).feedback(
+        mem=qmode, state=photonic.Create(0))
+    assert outer.certificate_obstruction() \
+        == "the loop contains a nested feedback loop"
 
 
 def test_backend_uses_existing_interface():

@@ -1,8 +1,8 @@
-# Learning to solve 4x4 sudoku with `optyx.interaction`
+# Learning to solve 4x4 sudoku with `discopy.optyx.interaction`
 
 The experiment of the removed reference notebook of
-[#16](https://github.com/rel-int/optyx/pull/16), scaled up on Modal
-GPUs. The point of comparison is the CMap GNN of
+[rel-int/optyx#16](https://github.com/rel-int/optyx/pull/16), scaled up
+on Modal GPUs. The point of comparison is the CMap GNN of
 [discopy#416](https://github.com/discopy/discopy/pull/416): 12,980
 parameters, 0.993 held-out cell accuracy, 0.936 valid grids. The goal
 is to reach a good accuracy with **fewer parameters**, keeping the same
@@ -30,8 +30,9 @@ contained in the quantum family.
 
 ## Architecture
 
-The `interaction.CMap` of #16: 16 cell boxes and 12 constraint boxes,
-one bidirectional dimension-four digit wire pairing each cell with each
+The `interaction.CMap` of rel-int/optyx#16: 16 cell boxes and 12
+constraint boxes, one bidirectional dimension-four digit wire pairing
+each cell with each
 of its three constraints (48 edges), every port read and written at
 every tick. Cells carry a private memory and write a prediction to the
 environment at every tick; clue predictions are postselected on their
@@ -163,5 +164,6 @@ below 50%: the square link is what trains.
   raw metric histories of the reported runs.
 
 Found and reported along the way:
-[#51](https://github.com/rel-int/optyx/issues/51), `Channel.double()`
-broken for plain array kraus boxes.
+[rel-int/optyx#51](https://github.com/rel-int/optyx/issues/51), now
+[#244](https://github.com/rel-int/discopy-next/issues/244),
+`Channel.double()` broken for plain array kraus boxes.

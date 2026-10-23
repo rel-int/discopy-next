@@ -47,16 +47,16 @@ Examples of usage
 We can check the Hong-Ou-Mandel effect by
 evaluating the permanent of the underlying matrix:
 
->>> from optyx.core.zw import Create, Select, Split, Merge, Id
->>> from optyx.photonic import BS
+>>> from discopy.optyx.core.zw import Create, Select, Split, Merge, Id
+>>> from discopy.optyx.photonic import BS
 >>> HOM = Create(1, 1) >> BS.get_kraus()
 >>> assert np.allclose(HOM.to_path().eval().array,\\
 ... Amplitudes([0.+0.70710678j, -0.+0.j    , 0.+0.70710678j],\\
 ... dom=1, cod=3).array)
 
->>> assert(HOM.to_path().prob().array, \\
+>>> assert np.allclose(HOM.to_path().prob().array, \\
 ... Probabilities[complex]([0.5+0.j, 0. +0.j, 0.5+0.j], \\
-... dom=1, cod=3))
+... dom=1, cod=3).array)
 >>> left = Create(1, 1) >> BS.get_kraus() >> Select(2, 0)
 >>> left.to_path().prob()
 Probabilities[complex]([0.5+0.j], dom=1, cod=1)
@@ -64,20 +64,20 @@ Probabilities[complex]([0.5+0.j], dom=1, cod=1)
 We can also show the Hong-Ou-Mandel effect by
 using the rules of the :class:`path` calculus:
 
->>> from optyx.core.zw import W, Endo, SWAP, Create, Select
+>>> from discopy.optyx.core.zw import W, Endo, SWAP, Create, Select
 >>> left_hs = (Create(1, 1) >> \\
 ... W(2) @ W(2) >> \\
 ... Endo(1j) @ Id(1) @ Id(1) @ Endo(1j) >> \\
 ... Id(1) @ SWAP @ Id(1) >> \\
 ... W(2).dagger() @ W(2).dagger() >> \\
 ... Select(1, 1))
->>> left_hs.draw(path="docs/_static/left_hs.png")
+>>> left_hs.draw(path="docs/_static/optyx/left_hs.png")
 
-.. image:: /_static/left_hs.png
+.. image:: /_static/optyx/left_hs.png
     :align: center
 
 >>> left_hs.to_path().prob_with_perceval().array[0, 0]
-0j
+np.complex128(0j)
 
 According to the rewrite rules of the :class:`path` calculus,
 this should be equal to:
@@ -88,14 +88,14 @@ this should be equal to:
 ... (Create(1, 1) >> \\
 ... SWAP >> \\
 ... Select(1, 1)))
->>> right_hs.draw(path="docs/_static/right_hs.png")
+>>> right_hs.draw(path="docs/_static/optyx/right_hs.png")
 
-.. image:: /_static/right_hs.png
+.. image:: /_static/optyx/right_hs.png
 
 Let us now evaluate this using :code:`DisCoPy` tensor:
 
 >>> right_hs.to_tensor().eval().array
-array(0)
+array(0.+0.j)
 
 **Bell state**
 
@@ -127,15 +127,19 @@ We can define the number operator and compute its expectation.
 from __future__ import annotations
 
 from math import factorial
+from typing import TYPE_CHECKING
+from operator import index
 
 import numpy as np
-import perceval as pcvl
+if TYPE_CHECKING:
+    import perceval as pcvl
 
+from discopy.abc import Nat
 from discopy.cat import assert_iscomposable
-from discopy.utils import unbiased
+from discopy.utils import factory, unbiased
 import discopy.matrix as underlying
 from discopy.tensor import Tensor
-from optyx.utils.misc import occupation_numbers, amplitudes_2_tensor
+from discopy.optyx.utils.misc import occupation_numbers, amplitudes_2_tensor
 
 
 def npperm(matrix):
@@ -163,6 +167,7 @@ def npperm(matrix):
     return p / 2 ** (n - 1)
 
 
+@factory
 class Matrix(underlying.Matrix):
     """
     Matrix with photon creations and post-selections,
@@ -170,8 +175,8 @@ class Matrix(underlying.Matrix):
 
     Parameters:
         array : underlying array
-        dom : int
-        cod : int
+        dom : number of modes in, an int or a :class:`Nat`
+        cod : number of modes out, an int or a :class:`Nat`
         creations : list of occupation numbers
         selections : list of occupation numbers
         normalisation : normalisation factor dependent on number of photons.
@@ -179,7 +184,7 @@ class Matrix(underlying.Matrix):
 
     Example
     -------
-    >>> from optyx.core.zw import Split, Select, Create, Merge, Id
+    >>> from discopy.optyx.core.zw import Split, Select, Create, Merge, Id
     >>> array = np.array([[1, 1], [1, 0]])
     >>> matrix = Matrix(array, 1, 1, creations=(1,), selections=(1,))
     >>> matrix.eval(3)
@@ -206,16 +211,17 @@ class Matrix(underlying.Matrix):
     def __init__(
         self,
         array,
-        dom: int,
-        cod: int,
+        dom: int | Nat,
+        cod: int | Nat,
         creations: tuple[int, ...] = (),
         selections: tuple[int, ...] = (),
         normalisation=1,
         scalar=1,
     ):
+        dom, cod = index(dom), index(cod)
         self.udom, self.ucod = dom + len(creations), cod + len(selections)
         super().__init__(array, self.udom, self.ucod)
-        self.dom, self.cod = dom, cod
+        self.dom, self.cod = Nat(dom), Nat(cod)
         self.creations, self.selections = creations, selections
         self.normalisation = normalisation
         self.scalar = scalar
@@ -264,7 +270,7 @@ class Matrix(underlying.Matrix):
             >> self.umatrix @ other.umatrix
             >> self.cod @ M.swap(c, other.cod) @ d
         )
-        dom, cod = self.dom + other.dom, self.cod + other.cod
+        dom, cod = self.dom @ other.dom, self.cod @ other.cod
         creations = self.creations + other.creations
         selections = self.selections + other.selections
         normalisation = self.normalisation * other.normalisation
@@ -307,7 +313,7 @@ class Matrix(underlying.Matrix):
 
         Example
         -------
-        >>> from optyx.core.zw import Split, Select, Create, Merge, Id
+        >>> from discopy.optyx.core.zw import Split, Select, Create, Merge, Id
         >>> num_op = Split(2) >> Select() @ Id(1) \\
         ...           >> Create() @ Id(1) >> Merge(2)
         >>> U = num_op.to_path().dilate()
@@ -320,18 +326,20 @@ class Matrix(underlying.Matrix):
         U, S, Vh = np.linalg.svd(A)
         s = max(S) if max(S) > 1 else 1
         defect0 = np.concatenate(
-            [np.sqrt(1 - (S / s) ** 2), [1 for _ in range(dom - len(S))]]
+            [np.sqrt(1 - (S / s) ** 2),
+             [1 for _ in range(index(dom) - len(S))]]
         )
         defect1 = np.concatenate(
-            [np.sqrt(1 - (S / s) ** 2), [1 for _ in range(cod - len(S))]]
+            [np.sqrt(1 - (S / s) ** 2),
+             [1 for _ in range(index(cod) - len(S))]]
         )
         defect_left = U.dot(np.diag(defect0)).dot(U.conj().T)
         defect_right = (Vh.conj().T).dot(np.diag(defect1)).dot(Vh)
         unitary = np.block(
             [[A / s, defect_left], [defect_right, -A.conj().T / s]]
         )
-        creations = self.creations + cod * (0,)
-        selections = self.selections + dom * (0,)
+        creations = self.creations + index(cod) * (0,)
+        selections = self.selections + index(dom) * (0,)
 
         return Matrix(
             unitary,
@@ -346,11 +354,11 @@ class Matrix(underlying.Matrix):
         self, n_photons=0, permanent=npperm, as_tensor=False
     ) -> Amplitudes:
         """Evaluates the :class:`Amplitudes` of a the QPath matrix"""
-        dom_basis = occupation_numbers(n_photons, self.dom)
+        dom_basis = occupation_numbers(n_photons, index(self.dom))
         n_photons_out = n_photons - sum(self.selections) + sum(self.creations)
         if n_photons_out < 0:
             raise ValueError("Expected a positive number of photons out.")
-        cod_basis = occupation_numbers(n_photons_out, self.cod)
+        cod_basis = occupation_numbers(n_photons_out, index(self.cod))
 
         result = Amplitudes[self.dtype].zero(len(dom_basis), len(cod_basis))
         normalisation = self.normalisation ** (n_photons + sum(self.creations))
@@ -416,7 +424,7 @@ class Matrix(underlying.Matrix):
         Example
         -------
         >>> import numpy as np
-        >>> from optyx.core.zw import (
+        >>> from discopy.optyx.core.zw import (
         ...   Split, Select, Create,
         ...   Merge, Id, Endo, SWAP
         ... )
@@ -434,6 +442,9 @@ class Matrix(underlying.Matrix):
         ...               (n_photons=1).round(1)== Probabilities[complex](
         ...         [0.9+0.j, 0.1+0.j, 0.1+0.j, 0.9+0.j], dom=2, cod=2)
         """
+        # pylint: disable=import-outside-toplevel
+        import perceval as pcvl
+
         if not self._umatrix_is_unitary():
             self = self.dilate()
 
@@ -444,10 +455,10 @@ class Matrix(underlying.Matrix):
         proc.set_circuit(circ)
         proc.set_postselection(post)
 
-        input_occ = occupation_numbers(n_photons, self.dom)
+        input_occ = occupation_numbers(n_photons, index(self.dom))
         output_occ = occupation_numbers(
             sum(self.creations) + n_photons,
-            len(self.creations) + self.dom,
+            len(self.creations) + index(self.dom),
         )
 
         states = [pcvl.BasicState(o + self.creations) for o in input_occ]
@@ -470,11 +481,18 @@ class Matrix(underlying.Matrix):
     def _umatrix_to_perceval_circuit(self) -> pcvl.components.Unitary:
         """The unitary as a single perceval component, simulated as it is
         rather than synthesised into beam splitters and phase shifters."""
+        # pylint: disable=import-outside-toplevel
+        import perceval as pcvl
+
         return pcvl.components.Unitary(pcvl.Matrix(self.array.T.conj()))
 
     def _to_perceval_post_select(self) -> pcvl.PostSelect:
+        # pylint: disable=import-outside-toplevel
+        import perceval as pcvl
+
         post_str = [
-            f"[{self.cod + i}] == {p}" for i, p in enumerate(self.selections)
+            f"[{index(self.cod) + i}] == {p}"
+            for i, p in enumerate(self.selections)
         ]
         return pcvl.PostSelect(" & ".join(post_str))
 
@@ -489,8 +507,8 @@ class Amplitudes(underlying.Matrix):
 
     Example
     -------
-    >>> from optyx.core.zw import Select, Id
-    >>> from optyx.photonic import BS
+    >>> from discopy.optyx.core.zw import Select, Id
+    >>> from discopy.optyx.photonic import BS
     >>> BS.get_kraus().to_path().eval(1)
     Amplitudes([0.    +0.70710678j, 0.70710678+0.j    , 0.70710678+0.j    ,
      0.    +0.70710678j], dom=2, cod=2)
@@ -513,8 +531,8 @@ class Probabilities(underlying.Matrix):
 
     Example
     -------
-    >>> from optyx.core.zw import Create
-    >>> from optyx.photonic import BS
+    >>> from discopy.optyx.core.zw import Create
+    >>> from discopy.optyx.photonic import BS
     >>> BS.get_kraus().to_path().prob(1).round(1)
     Probabilities[complex]([0.5+0.j, 0.5+0.j, 0.5+0.j, 0.5+0.j], dom=2, cod=2)
     >>> (Create(1, 1) >> BS.get_kraus()).to_path().prob().round(1)

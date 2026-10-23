@@ -1,0 +1,733 @@
+"""
+The category of matrices with the direct sum as monoidal product.
+
+Summary
+-------
+
+.. autosummary::
+    :template: class.rst
+    :nosignatures:
+    :toctree:
+
+    Matrix
+    Backend
+    NumPy
+    JAX
+    PyTorch
+    TensorFlow
+
+.. admonition:: Functions
+
+    .. autosummary::
+        :template: function.rst
+        :nosignatures:
+        :toctree:
+
+        backend
+        set_backend
+        get_backend
+
+See also
+--------
+
+* :class:`discopy.tensor.Tensor` is a subclass of :class:`Matrix` with the
+  Kronecker product as tensor.
+
+"""
+from __future__ import annotations
+
+from contextlib import contextmanager
+from operator import index
+from types import ModuleType
+from collections.abc import Sequence
+from typing import Union, Literal as L, Callable, TYPE_CHECKING
+
+from discopy import config, messages
+from discopy.abc import (
+    ComarkovCategory, DaggerCategory, MarkovCategory, NamedGeneric, Nat)
+from discopy.axioms import Testable
+from discopy.cat import (
+    factory,
+    assert_iscomposable,
+    assert_isparallel,
+)
+from discopy.utils import (
+    assert_isinstance, factory_name, from_tree, unbiased)
+
+if TYPE_CHECKING:
+    import sympy
+
+
+@factory
+class Matrix(MarkovCategory, ComarkovCategory, DaggerCategory,
+             Testable["Matrix"], NamedGeneric['dtype']):
+    """
+    A matrix is an ``array`` with natural numbers as ``dom`` and ``cod``.
+
+    .. admonition:: Summary
+
+        .. autosummary::
+
+            id
+            then
+            tensor
+            promote
+            zero
+            swap
+            transpose
+            conjugate
+            dagger
+            map
+            round
+            copy
+            discard
+            merge
+            noise
+            basis
+            repeat
+            trace
+            lambdify
+            subs
+            grad
+
+    Note
+    ----
+    The class ``Matrix[dtype]`` has arrays with entries in any given ``dtype``.
+    For example:
+
+    >>> Matrix[complex].id(1)
+    Matrix[complex]([1.+0.j], dom=1, cod=1)
+    >>> assert Matrix[complex].id(1) != Matrix[float].id(1)
+
+    The default data type is determined by underlying array datastructure of
+    the backend used. An array is initialised with ``array`` as parameter and
+    the dtype of the ``Matrix`` object is the data type of this array.
+    >>> import numpy as np
+    >>> assert Matrix([1, 0], dom=1, cod=2).dtype == np.int64
+    >>> assert Matrix([0.5, 0.5], dom=1, cod=2).dtype == np.float64
+    >>> assert Matrix([0.5j], dom=1, cod=1).dtype == np.complex128
+
+    Composition promotes the data type as the backend does, see
+    :meth:`promote`, so that the integer identity is a unit for a float
+    matrix rather than casting it to integers.
+
+    >>> m = Matrix([[.5, .5], [.25, .75]], 2, 2)
+    >>> assert Matrix.id(2) >> m == m == m >> Matrix.id(2)
+
+    The data type needs to have the structure of a rig (riNg with no negatives)
+    i.e. with methods ``__add__`` and ``__mul__`` as well as an ``__init__``
+    that can accept both ``0`` and ``1`` as input.
+
+    Examples
+    --------
+    >>> m = Matrix([0, 1, 1, 0], 2, 2)
+    >>> v = Matrix([0, 1], 1, 2)
+    >>> v >> m >> v.dagger()
+    Matrix[int64]([0], dom=1, cod=1)
+    >>> m + m
+    Matrix[int64]([0, 2, 2, 0], dom=2, cod=2)
+    >>> assert m.then(m, m, m, m) == m >> m >> m >> m >> m
+
+    The monoidal product for :py:class:`.Matrix` is the direct sum:
+
+    >>> x = Matrix([2, 4], 2, 1)
+    >>> x.array
+    array([[2],
+           [4]])
+    >>> x @ x
+    Matrix[int64]([2, 0, 4, 0, 0, 2, 0, 4], dom=4, cod=2)
+    >>> (x @ x).array
+    array([[2, 0],
+           [4, 0],
+           [0, 2],
+           [0, 4]])
+    """
+    ob = Nat
+
+    @classmethod
+    def strategy(cls, *, dom=None, cod=None, max_size=3, max_entry=3):
+        """
+        Generate matrices with entries in ``range(max_entry + 1)`` between
+        the given dimensions, or between dimensions up to ``max_size``:
+        small integers are exact in every ``dtype``, so the laws are checked
+        without rounding. The bare class generates ``Matrix[int]``, which
+        reads back from its representation where the ``int64`` it infers
+        names a type no namespace binds.
+        """
+        from hypothesis import strategies as st
+
+        typed = cls[cls.dtype or int]
+        dims = cls.ob.strategy(max_size=max_size)
+
+        @st.composite
+        def matrices(draw):
+            """ Draw the shape, then one entry per coefficient. """
+            shape = tuple(draw(dims) if x is None else x for x in (dom, cod))
+            size = index(shape[0]) * index(shape[1])
+            entries = st.lists(
+                st.integers(min_value=0, max_value=max_entry),
+                min_size=size, max_size=size)
+            return typed(draw(entries), *shape)
+
+        return matrices()
+
+    def cast(self, dtype: type) -> Matrix:
+        """
+        Cast a matrix to a given ``dtype``.
+
+        Parameters:
+            dtype : The target datatype.
+
+        Example
+        -------
+        >>> assert Matrix.id().cast(bool) == Matrix[bool].id()
+        """
+        return type(self)[dtype](self.array, self.dom, self.cod)
+
+    def promote(self, *others: Matrix) -> type:
+        """
+        The class of a composite of matrices, i.e. of their product,
+        direct sum or sum: the one with the ``dtype`` the backend promotes
+        their arrays to, read from the operand that already has it so that
+        a declared ``dtype`` survives composition with the integer
+        structural matrices, e.g. ``float`` rather than ``numpy.float64``.
+
+        Parameters:
+            others : The matrices to compose with.
+
+        Example
+        -------
+        >>> m = Matrix([[.5, .5], [.25, .75]], 2, 2)
+        >>> assert Matrix.id(2).promote(m) == m.promote(Matrix.id(2))\\
+        ...     == Matrix[m.dtype]
+        >>> assert Matrix[float].id(2).promote(Matrix.id(2)) == Matrix[float]
+        >>> assert Matrix[bool].id(2).promote(Matrix[bool].id(2))\\
+        ...     == Matrix[bool]
+        """
+        with backend() as np:
+            dtype = self.array.dtype
+            for other in others:
+                dtype = np.result_type(
+                    np.zeros((), dtype=dtype), other.array)
+        if dtype == self.array.dtype:
+            return type(self)
+        for other in others:
+            if dtype == other.array.dtype:
+                return type(self)[other.dtype]
+        return type(self)[getattr(dtype, "type", dtype)]
+
+    def __new__(cls, array, *args, **kwargs):
+        with backend() as np:
+            if cls.dtype is None:
+                _array = np.array(array)
+                # The dtype of an np.arrays is a class that contains a type
+                # attribute that is the actual type. However, other backends
+                # have different structures, so this is the easiest option:
+                dtype = getattr(_array.dtype, "type", _array.dtype)
+                return cls.__new__(cls[dtype], array, *args, **kwargs)
+            return object.__new__(cls)
+
+    def __init__(self, array, dom: Nat, cod: Nat):
+        dom, cod = (Nat(x) if isinstance(x, int) else x for x in (dom, cod))
+        assert_isinstance(dom, Nat)
+        assert_isinstance(cod, Nat)
+        self.dom, self.cod = dom, cod
+        with backend() as np:
+            self.array = np.array(array, dtype=self.dtype).reshape(
+                (index(dom), index(cod)))
+
+    def __eq__(self, other):
+        return isinstance(other, self.ar)\
+            and self.dtype == other.dtype\
+            and (self.dom, self.cod) == (other.dom, other.cod)\
+            and (self.array == other.array).all()
+
+    def is_close(self, other: Matrix, rtol: float = 1.e-8, atol: float = 1.e-8
+                 ) -> bool:
+        """
+        Whether a matrix is numerically close to an ``other``.
+
+        Parameters:
+            other : The other matrix with which to check closeness.
+            rtol:
+                The relative tolerance parameter (see Notes).
+                Default value for results of order unity is 1.e-5
+            atol :
+                The absolute tolerance parameter (see Notes).
+                Default value for results of order unity is 1.e-8
+
+        Notes:
+        (taken from np.isclose documentation)
+
+            For finite values, isclose uses the following equation to
+            test whether two floating point values are equivalent.
+
+            absolute(`a` - `b`) <= (`atol` + `rtol` * absolute(`b`))
+
+            Unlike the built-in `math.isclose`, the above equation is not
+            symmetric in `a` and `b` -- it assumes `b` is the reference
+            value -- so that `isclose(a, b)` might be different from
+            `isclose(b, a)`.
+
+            Furthermore, the default value of atol is not zero, and is used
+            to determine what small values should be considered close to zero.
+            The default value is appropriate for expected values of order
+            unity: if the expected values are significantly smaller than one,
+            it can result in false positives.
+
+            `atol` should be carefully selected for the use case at hand.
+            A zero value for `atol` will result in `False` if either `a`
+            or `b` is zero.
+
+            `isclose` is not defined for non-numeric data types.
+            `bool` is considered a numeric data-type for this purpose
+
+        """
+        assert_isinstance(other, type(self))
+        assert_isinstance(self, type(other))
+        assert_isparallel(self, other)
+        with backend() as np:
+            return np.isclose(self.array, other.array, rtol, atol).all()
+
+    def __repr__(self):
+        np_array = getattr(self.array, 'numpy', lambda: self.array)()
+        return type(self).__name__ + f"({array2string(np_array.reshape(-1))},"\
+                                     f" dom={self.dom}, cod={self.cod})"
+
+    def to_tree(self) -> dict:
+        """
+        Serialise a matrix, see :func:`discopy.utils.dumps`.
+
+        The ``dtype`` travels in the factory name, as it does in the
+        ``repr``, so that a matrix comes back with the entries it was
+        written with rather than the ones its array implies.
+
+        Example
+        -------
+        >>> from discopy.utils import dumps, loads
+        >>> m = Matrix[float]([1], 1, 1)
+        >>> m.to_tree()['factory']
+        'matrix.Matrix[float]'
+        >>> assert loads(dumps(m)) == m != Matrix([1], 1, 1)
+        """
+        with backend() as np:
+            array = np.array(self.array).reshape(-1).tolist()
+        return {
+            'factory': factory_name(type(self)),
+            'array': array,
+            'dom': self.dom.to_tree(),
+            'cod': self.cod.to_tree()}
+
+    @classmethod
+    def from_tree(cls, tree: dict) -> Matrix:
+        """
+        Decode a serialised matrix, see :func:`discopy.utils.loads`.
+
+        Parameters:
+            tree : DisCoPy serialisation.
+
+        The class the tree names is the subscripted one, so the pair is
+        read through :func:`discopy.utils.from_tree` rather than off the
+        bare class, which would infer a ``dtype`` from the array instead.
+
+        Example
+        -------
+        >>> from discopy.utils import from_tree
+        >>> m = Matrix[int]([0, 1, 1, 0], 2, 2)
+        >>> assert from_tree(m.to_tree()) == m
+        >>> assert Matrix.from_tree(m.to_tree()).dtype != int
+        """
+        dom, cod = map(from_tree, (tree['dom'], tree['cod']))
+        return cls(tree['array'], dom, cod)
+
+    def __iter__(self):
+        for i in self.array:
+            yield i
+
+    def __bool__(self):
+        return bool(self.array)
+
+    def __int__(self):
+        return int(self.array)
+
+    def __float__(self):
+        return float(self.array)
+
+    def __complex__(self):
+        return complex(self.array)
+
+    @classmethod
+    def id(cls, dom=0) -> Matrix:
+        with backend('numpy') as np:
+            array = np.identity(index(dom), dtype=cls.dtype or int)
+        return cls(array, dom, dom)
+
+    twist = id
+
+    @unbiased
+    def then(self, other: Matrix) -> Matrix:
+        assert_isinstance(other, self.ar)
+        assert_iscomposable(self, other)
+        with backend() as np:
+            array = np.matmul(self.array, other.array)
+        return self.promote(other)(array, self.dom, other.cod)
+
+    def tensor(self, *others: Matrix):
+        """
+        The direct sum of ``n`` matrices, i.e. one block-diagonal array with
+        a block for each matrix.
+
+        >>> one, two = Matrix([1], 1, 1), Matrix([2], 1, 1)
+        >>> assert one.tensor(two) == Matrix([1, 0, 0, 2], 2, 2)
+        """
+        if not others:
+            return self
+        for other in others:
+            assert_isinstance(other, self.ar)
+        cls = self.promote(*others)
+        dom = self.dom.tensor(*(other.dom for other in others))
+        cod = self.cod.tensor(*(other.cod for other in others))
+        blocks, width, j = [], index(cod), 0
+        with backend() as np:
+            for factor in (self, ) + others:
+                rows, columns = index(factor.dom), index(factor.cod)
+                left = cls.zero(rows, j).array
+                right = cls.zero(rows, width - j - columns).array
+                blocks.append(np.concatenate([
+                    left, cls(factor.array, factor.dom, factor.cod).array,
+                    right], axis=1))
+                j += columns
+            array = np.concatenate(blocks, axis=0)
+        return cls(array, dom, cod)
+
+    def __add__(self, other):
+        assert_isinstance(other, self.ar)
+        assert_isparallel(self, other)
+        return self.promote(other)(
+            self.array + other.array, self.dom, self.cod)
+
+    def __radd__(self, other):
+        return self if other == 0 else self.__add__(other)
+
+    @classmethod
+    def zero(cls, dom: Nat, cod: Nat) -> Matrix:
+        """
+        Returns the zero matrix of a given shape.
+
+        Examples
+        --------
+        >>> assert Matrix.zero(2, 2) == Matrix([0, 0, 0, 0], 2, 2)
+        """
+        with backend() as np:
+            return cls(np.zeros(
+                (index(dom), index(cod)), dtype=cls.dtype or int), dom, cod)
+
+    @classmethod
+    def swap(cls, left: Nat, right: Nat) -> Matrix:
+        """
+        The matrix that swaps left and right dimensions.
+
+        Parameters:
+            left : The left dimension.
+            right : The right dimension.
+
+        Example
+        -------
+        >>> Matrix.swap(1, 1)
+        Matrix[int64]([0, 1, 1, 0], dom=2, cod=2)
+        >>> Matrix.swap(2,1)
+        Matrix[int64]([0, 1, 0, 0, 0, 1, 1, 0, 0], dom=3, cod=3)
+        """
+        return cls.permutation([1, 0], [left, right])
+
+    braid = swap
+
+    @classmethod
+    def permutation(
+            cls, xs: Sequence[int],
+            doms: Sequence[int] | None = None) -> Matrix:
+        """
+        The matrix that permutes blocks of dimensions.
+
+        Overrides the default of :class:`discopy.abc.SymmetricCategory`, which
+        composes ``len(xs)`` swaps, by writing each block in one pass.
+
+        Parameters:
+            xs : The permutation, as a list of indices.
+            doms : The dimension of each block, one by default.
+
+        When every block is a single dimension, the matrix is the permutation
+        matrix itself, i.e. ``array[i][j]`` iff ``xs[j] == i``.
+
+        Example
+        -------
+        >>> assert Matrix.permutation([1, 0]) == Matrix.swap(1, 1)
+        >>> Matrix.permutation([1, 2, 0])
+        Matrix[int64]([0, 0, 1, 1, 0, 0, 0, 1, 0], dom=3, cod=3)
+        >>> ones = Matrix.permutation([1, 2, 0], [1, 1, 1])
+        >>> assert ones == Matrix.permutation([1, 2, 0])
+
+        Blocks of more than one dimension move as a whole.
+
+        >>> assert Matrix.permutation([1, 0], [1, 2]) == Matrix.swap(1, 2)
+        """
+        xs = list(xs)
+        doms = len(xs) * [1] if doms is None else list(map(index, doms))
+        if list(range(len(doms))) != sorted(xs) or min(doms, default=0) < 0:
+            raise ValueError
+        offsets = [sum(doms[:i]) for i in range(len(doms))]
+        sources = [offsets[i] + j for i in xs for j in range(doms[i])]
+        with backend() as np:
+            array = np.array([
+                [i == j for j in sources] for i in range(len(sources))],
+                dtype=cls.dtype or int)
+        return cls(array, len(sources), len(sources))
+
+    def transpose(self) -> Matrix:
+        return type(self)(self.array.transpose(), self.cod, self.dom)
+
+    def conjugate(self) -> Matrix:
+        return type(self)(self.array.conjugate(), self.dom, self.cod)
+
+    def dagger(self) -> Matrix:
+        return self.conjugate().transpose()
+
+    def map(self, func: Callable, dtype: type | None = None) -> Matrix:
+        array = list(map(func, self.array.reshape(-1)))
+        return type(self)[dtype or self.dtype](array, self.dom, self.cod)
+
+    def round(self, decimals=0) -> Matrix:
+        """ Rounds the entries of a matrix up to a number of decimals. """
+        with backend() as np:
+            array = np.around(self.array, decimals=decimals)
+        return type(self)(array, self.dom, self.cod)
+
+    @classmethod
+    def copy(cls, x: Nat, n: int = 2) -> Matrix:
+        """
+        The diagonal ``x -> n * x`` of the direct sum, i.e. ``n`` identities
+        side by side: ``array[i, j]`` is one iff ``j % x == i``.
+
+        Parameters:
+            x : The dimension to copy.
+            n : The number of copies.
+
+        Example
+        -------
+        >>> Matrix.copy(2)
+        Matrix[int64]([1, 0, 1, 0, 0, 1, 0, 1], dom=2, cod=4)
+        >>> assert Matrix.copy(2) >> Matrix.id(2) @ Matrix.discard(2)\\
+        ...     == Matrix.id(2)
+        """
+        x = index(x)
+        with backend() as np:
+            array = np.array([
+                [j % x == i for j in range(n * x)] for i in range(x)],
+                dtype=cls.dtype or int)
+        return cls(array, x, n * x)
+
+    @classmethod
+    def merge(cls, x: Nat, n: int = 2) -> Matrix:
+        """ The codiagonal ``n * x -> x``, the dagger of :meth:`copy`. """
+        return cls.copy(x, n).dagger()
+
+    @classmethod
+    def ones(cls, x: Nat) -> Matrix:
+        """ The unit ``0 -> x`` of the direct sum, an alias of :meth:`noise`.
+        """
+        return cls.noise(x)
+
+    @classmethod
+    def basis(cls, x: Nat, i: int) -> Matrix:
+        """
+        The ``i``-th basis vector of dimension ``x``.
+
+        Parameters:
+            x : The dimension of the basis vector.
+            i : The index of the basis vector.
+
+        Example
+        -------
+        >>> Matrix.basis(4, 2)
+        Matrix[int64]([0, 0, 1, 0], dom=1, cod=4)
+        """
+        return cls([[int(i == j) for j in range(index(x))]], 1, x)
+
+    def repeat(self) -> Matrix:
+        """
+        The reflexive transitive closure of a boolean matrix.
+
+        Example
+        -------
+        >>> Matrix[bool]([0, 1, 1, 0], 2, 2).repeat()
+        Matrix[bool]([True, True, True, True], dom=2, cod=2)
+        """
+        if self.dtype != bool or self.dom != self.cod:
+            raise TypeError(messages.MATRIX_REPEAT_ERROR)
+        return sum(self.id(self.dom).then(*n * [self])
+                   for n in range(index(self.dom) + 1))
+
+    def trace(self, n=1, left=False) -> Matrix:
+        """
+        The trace of a Boolean matrix, computed with :meth:`Matrix.repeat`.
+
+        Parameters:
+            n : The number of dimensions to trace.
+            left : Whether to trace the first ``n`` dimensions rather than
+                the last, by conjugating with swaps.
+
+        Example
+        -------
+        >>> assert Matrix[bool].swap(1, 1).trace() == Matrix[bool].id(1)
+        >>> f = Matrix[bool]([[1, 1], [0, 0]], 2, 2)
+        >>> assert f.trace() == Matrix[bool]([[1]], 1, 1)
+        >>> assert f.trace(left=True) == Matrix[bool]([[0]], 1, 1)
+        """
+        dom, cod = index(self.dom) - n, index(self.cod) - n
+        if left:
+            return (self.swap(dom, n) >> self >> self.swap(n, cod)).trace(n)
+        A, B, C, D = (row >> self >> column
+                      for row in [self.id(dom) @ self.ones(n),
+                                  self.ones(dom) @ self.id(n)]
+                      for column in [self.id(cod) @ self.discard(n),
+                                     self.discard(cod) @ self.id(n)])
+        return A + (B >> D.repeat() >> C)
+
+    def lambdify(
+            self, *symbols: "sympy.Symbol", dtype=None, **kwargs) -> Callable:
+        from sympy import lambdify
+        with backend() as np:
+            array = lambdify(
+                symbols, self.array.tolist(), modules=np.module, **kwargs)
+        dtype = dtype or self.dtype
+        return lambda *xs: type(self)[dtype](array(*xs), self.dom, self.cod)
+
+    def subs(self, *args) -> Matrix:
+        return self.map(lambda x: getattr(x, "subs", lambda y, *_: y)(*args))
+
+    def grad(self, var, **params) -> Matrix:
+        """ Gradient with respect to variables. """
+        return self.map(lambda x:
+                        getattr(x, "diff", lambda _: 0)(var, **params))
+
+
+def array2string(array, **params):
+    """ Numpy array pretty print. """
+    import numpy
+    numpy.set_printoptions(threshold=config.NUMPY_THRESHOLD)
+    return numpy.array2string(array, **dict(params, separator=', '))\
+        .replace('[ ', '[').replace('  ', ' ')
+
+
+class Backend:
+    """
+    A matrix backend.
+
+    Parameters:
+        module : The main module of the backend.
+        array : The array class of the backend.
+    """
+    def __init__(self, module: ModuleType, array: type = None):
+        self.module, self.array = module, array or module.array
+
+    def __getattr__(self, attr):
+        return getattr(self.module, attr)
+
+
+class NumPy(Backend):
+    """ NumPy backend. """
+    def __init__(self):
+        import numpy
+        super().__init__(numpy)
+
+
+class JAX(Backend):
+    """ JAX backend. """
+    def __init__(self):
+        import jax
+        super().__init__(jax.numpy)
+
+
+class PyTorch(Backend):
+    """ PyTorch backend. """
+    def __init__(self):
+        import torch
+        super().__init__(torch, array=torch.as_tensor)
+
+
+class TensorFlow(Backend):
+    """ TensorFlow backend. """
+    def __init__(self):
+        import tensorflow.experimental.numpy as tnp
+        from tensorflow.python.ops.numpy_ops import np_config
+        np_config.enable_numpy_behavior()
+        super().__init__(tnp)
+
+
+BACKENDS = {
+    'numpy': NumPy,
+    'jax': JAX,
+    'pytorch': PyTorch,
+    'tensorflow': TensorFlow,
+}
+
+BackendName = Union[tuple(L[x] for x in BACKENDS)]
+
+
+@contextmanager
+def backend(name: BackendName = None,
+            _stack=[config.DEFAULT_BACKEND], _cache=dict()):
+    """
+    Context manager for matrix backend.
+
+    Parameters:
+        name : The name of the backend, default is ``"numpy"``.
+
+    Example
+    -------
+    >>> with backend('jax'):  # doctest: +EXTRA
+    ...     assert type(Matrix([0, 1, 1, 0], 2, 2).array).__module__\\
+    ...         == 'jaxlib._jax'
+    """
+    name = name or _stack[-1]
+    _stack.append(name)
+    try:
+        if name not in _cache:
+            _cache[name] = BACKENDS[name]()
+        yield _cache[name]
+    finally:
+        _stack.pop()
+
+
+def set_backend(name: BackendName) -> None:
+    """
+    Override the default backend.
+
+    Parameters:
+        name : The name of the backend.
+
+    Example
+    -------
+    >>> set_backend('jax')
+    >>> assert type(Matrix([0, 1, 1, 0], 2, 2).array).__module__\\
+    ...     == 'jaxlib._jax'  # doctest: +EXTRA
+    >>> set_backend('numpy')
+    >>> assert type(Matrix([0, 1, 1, 0], 2, 2).array).__module__\\
+    ...     == 'numpy'
+    """
+    backend.__wrapped__.__defaults__[1][-1] = name
+
+
+def get_backend() -> Backend:
+    """
+    Get the current backend.
+
+    Example
+    -------
+    >>> set_backend('jax')
+    >>> assert isinstance(get_backend(), JAX)  # doctest: +EXTRA
+    >>> set_backend('numpy')
+    >>> assert isinstance(get_backend(), NumPy)
+    """
+    with backend() as result:
+        return result
