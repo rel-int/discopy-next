@@ -72,6 +72,7 @@ from discopy.utils import (
     factory,
     factory_name,
     from_tree,
+    identity,
     assert_isinstance,
     assert_iscomposable,
     AxiomError,
@@ -1915,14 +1916,16 @@ class Functor(cat.Functor):
         super().__init__(ob_map, ar_map, dom=dom, cod=cod)
         self.colour_map = MappingOrCallable(colour_map or {})
 
-    @classmethod
-    def id(cls, dom=None):
-        return cls(lambda x: x, lambda f: f, dom=dom, cod=dom)
-
     @unbiased
     def then(self, other):
         assert_isinstance(other, Functor)
         assert_iscomposable(self, other)
+        if self.ob_map.mapping is self.ar_map.mapping is identity\
+                and self == self.id(self.dom):
+            return other
+        if other.ob_map.mapping is other.ar_map.mapping is identity\
+                and other == other.id(other.dom):
+            return self
         return type(self)(
             self.ob_map.then(other), self.ar_map.then(other),
             colour_map=self.colour_map.then(other) if self.colour_map

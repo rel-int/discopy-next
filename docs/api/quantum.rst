@@ -14,5 +14,6 @@ quantum
     reservoir
     contextuality
     zx
+    graphlike
     tk
     pennylane

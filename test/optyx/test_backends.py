@@ -87,6 +87,19 @@ def dict_allclose(d1: dict, d2: dict, *, rel_tol=1e-05, abs_tol=1e-10) -> bool:
             return False
     return True
 
+def test_compressed_contraction_is_deterministic():
+    # Regression test for #232 (optyx#19): the compressed contraction used
+    # to perturb rank-deficient tensors with noise from the global unseeded
+    # RNG, so two calls on the same rank-deficient tensor could return
+    # different, non-reproducible data.
+    rank_deficient = np.array([[1.0, 2.0], [2.0, 4.0]])
+    term = discopy_tensor.Box(
+        "A", discopy_tensor.Dim(2), discopy_tensor.Dim(2), rank_deficient)
+    backend = QuimbBackend(ReusableHyperCompressedOptimizer(max_repeats=32))
+
+    assert np.array_equal(
+        backend.process_term(term), backend.process_term(term))
+
 class TestQuimbBackend:
     # compare exact and approx backends
     @pytest.mark.parametrize("circuit", PURE_CIRCUITS_TO_TEST)

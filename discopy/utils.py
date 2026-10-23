@@ -120,6 +120,18 @@ class MappingOrCallable(Mapping[KT, VT]):
         return MappingOrCallable(lambda key: other[self[key]])
 
 
+def identity(x: KT) -> KT:
+    """
+    The identity function, which every identity functor is built from so that
+    it can be recognised, see :meth:`discopy.cat.Functor.then`.
+
+    Example
+    -------
+    >>> assert identity(42) == 42
+    """
+    return x
+
+
 def get_origin(typ):
     """
     Get origin of a parameterized generic type, leaving a union type

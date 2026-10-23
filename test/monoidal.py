@@ -709,6 +709,7 @@ def test_coloured_Functor():
     assert Functor.id()(x @ y) == x @ y
     # Composing the identity with a coloured functor keeps its colours.
     assert (Functor.id() >> F)(red) == pink == (F >> Functor.id())(red)
+    assert Functor.id() >> F == F == F >> Functor.id()
 
     red2, purple, blue2 = map(
         Colour, ("salmon", "purple", "navy"))
@@ -723,6 +724,14 @@ def test_coloured_Functor():
     bad = Functor({x: Y}, {}, colour_map={red: pink, green: lime})
     with raises(AxiomError):
         bad(x)
+
+
+def test_Functor_then_unit():
+    """ The identity of a subclass is a unit too (#142). """
+    from discopy import symmetric
+    F = Functor(lambda x: x, lambda f: f[::-1])
+    unit = symmetric.Functor.id(Diagram)
+    assert unit >> F == F == F >> unit
 
 
 def test_coloured_Functor_repr():

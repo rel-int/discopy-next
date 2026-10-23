@@ -57,6 +57,10 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   `CMap.sweep` and `CMap.match`.
 - `hypergraph.Rewriter`, double-pushout rewriting in place with left-linear
   rules, each step in the size of the rule rather than of the host.
+- `quantum.graphlike`, graph-like ZX diagrams as hypergraphs with one box for
+  Hadamard, simplified up to a scalar by the rules of PyZX's `full_reduce` on
+  a `hypergraph.Rewriter`, raced against PyZX in `benchmark/test_zx.py`
+  ([next#302]).
 - `discopy.ehypergraph`, e-graphs of diagrams with sharing, with congruence
   closure, rewriting and e-matching.
 - `Hypergraph.pass_token`, evaluation over a disjoint-union tensor ([#363],
@@ -150,6 +154,11 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   `finset.Permutation.then` ([#763]).
 - A functor maps a layer with one `n`-ary `tensor` rather than a fold of
   `@`, with one `tensor` call per layer ([next#161]).
+- `Functor.id` is built from `utils.identity`, and `then` drops an identity
+  on either side, so that composing functors is unital ([next#142]).
+- `discopy.optyx` keeps no private members in `channel` and `core.diagram`:
+  `decomp`, `dual_rail`, `Ob.classical`, `Ob.quantum` and `Box.array` are
+  public, and the imports that make no cycle are at the top ([optyx#29]).
 
 ### Deprecated
 
@@ -479,6 +488,7 @@ for the changelog of `1.2.1` and earlier.
 [next#134]: https://github.com/rel-int/discopy-next/issues/134
 [next#139]: https://github.com/rel-int/discopy-next/issues/139
 [next#140]: https://github.com/rel-int/discopy-next/issues/140
+[next#142]: https://github.com/rel-int/discopy-next/issues/142
 [next#145]: https://github.com/rel-int/discopy-next/issues/145
 [next#147]: https://github.com/rel-int/discopy-next/issues/147
 [next#149]: https://github.com/rel-int/discopy-next/issues/149
@@ -495,10 +505,12 @@ for the changelog of `1.2.1` and earlier.
 [next#225]: https://github.com/rel-int/discopy-next/issues/225
 [next#276]: https://github.com/rel-int/discopy-next/pull/276
 [next#283]: https://github.com/rel-int/discopy-next/pull/283
+[next#302]: https://github.com/rel-int/discopy-next/pull/302
 [next#310]: https://github.com/rel-int/discopy-next/pull/310
 [next#316]: https://github.com/rel-int/discopy-next/pull/316
 [next#320]: https://github.com/rel-int/discopy-next/pull/320
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
+[optyx#29]: https://github.com/rel-int/optyx/pull/29
 [lambek#2]: https://github.com/rel-int/lambek/pull/2
 [lambek#8]: https://github.com/rel-int/lambek/pull/8
 [lambek#12]: https://github.com/rel-int/lambek/pull/12

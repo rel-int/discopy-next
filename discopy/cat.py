@@ -95,6 +95,7 @@ from discopy.utils import (  # noqa: F401
     assert_iscomposable,
     assert_isparallel,
     get_origin,
+    identity,
 )
 
 if TYPE_CHECKING:
@@ -1003,12 +1004,17 @@ class Functor(Category):
     @classmethod
     def id(cls, dom: type = None) -> Functor:
         """
-        The identity functor on a given category ``dom``.
+        The identity functor on a given category ``dom``, with the shared
+        :func:`discopy.utils.identity` as both of its maps.
 
         Parameters:
             dom : The domain of the functor.
+
+        Example
+        -------
+        >>> assert Functor.id() == Functor.id()
         """
-        return cls(lambda x: x, lambda f: f, dom=dom, cod=dom)
+        return cls(identity, identity, dom=dom, cod=dom)
 
     @unbiased
     def then(self, other: Functor) -> Functor:
@@ -1020,8 +1026,9 @@ class Functor(Category):
 
         Note
         ----
-        Functor composition is unital only on the left. Indeed, we cannot check
-        equality of functors defined with functions instead of dictionaries.
+        An identity functor, see :meth:`id`, is dropped on either side so that
+        composition is unital. Otherwise functors given by functions compare
+        as functions, e.g. their composition is associative only in action.
 
         Example
         -------
@@ -1029,12 +1036,16 @@ class Functor(Category):
         >>> F, G = Functor({x: y}, {}), Functor({y: x}, {})
         >>> print(F >> G)
         cat.Functor(ob_map={cat.Ob('x'): cat.Ob('x')}, ar_map={})
-        >>> assert F >> Functor.id() == F != Functor.id() >> F
-        >>> print(Functor.id() >> F)  # doctest: +ELLIPSIS
-        cat.Functor(ob_map=<function ...>, ar_map=...)
+        >>> assert Functor.id() >> F == F == F >> Functor.id()
         """
         assert_isinstance(other, Functor)
         assert_iscomposable(self, other)
+        if self.ob_map.mapping is self.ar_map.mapping is identity\
+                and self == self.id(self.dom):
+            return other
+        if other.ob_map.mapping is other.ar_map.mapping is identity\
+                and other == other.id(other.dom):
+            return self
         ob_map, ar_map = self.ob_map.then(other), self.ar_map.then(other)
         return type(self)(ob_map, ar_map, dom=self.dom, cod=other.cod)
 

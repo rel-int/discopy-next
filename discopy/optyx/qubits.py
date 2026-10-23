@@ -695,7 +695,8 @@ class Z(Channel):
             lambdify(symbols, self.phase, **kwargs)(*xs)
         )
 
-    def _decomp(self):
+    def decomp(self):
+        """Decompose the spider into elementary ZX generators."""
         n, m = len(self.dom), len(self.cod)
         phase = self.phase
         rot = Id(1) if phase == 0 else Z(1, 1, phase)
@@ -718,7 +719,7 @@ class Z(Channel):
             spider = spider >> qubits.Z(1, 2) @ qubits.Id(k)
         return spider
 
-    def _to_dual_rail(self):
+    def dual_rail(self):
         """Convert to dual-rail encoding."""
 
         from discopy.optyx import (
@@ -795,7 +796,8 @@ class X(Channel):
             lambdify(symbols, self.phase, **kwargs)(*xs),
         )
 
-    def _decomp(self):
+    def decomp(self):
+        """Decompose the spider into elementary ZX generators."""
         n, m = len(self.dom), len(self.cod)
         phase = self.phase
         if (n, m) in ((1, 0), (0, 1)):
@@ -807,7 +809,7 @@ class X(Channel):
         )
         return box.decomp()
 
-    def _to_dual_rail(self):  # pragma: no cover
+    def dual_rail(self):  # pragma: no cover
         """Convert to dual-rail encoding."""
         from discopy.optyx import (
             photonic
@@ -858,10 +860,11 @@ class H(Channel):
             qubit,
         )
 
-    def _decomp(self):
+    def decomp(self):
+        """Hadamard is already an elementary generator."""
         return H()
 
-    def _to_dual_rail(self):
+    def dual_rail(self):
         """Convert to dual-rail encoding."""
         from discopy.optyx import photonic
         return photonic.HadamardBS()
@@ -884,10 +887,11 @@ class Scalar(Channel):
         )
         self.data = value
 
-    def _decomp(self):
+    def decomp(self):
+        """A scalar is already an elementary generator."""
         return Scalar(self.data)
 
-    def _to_dual_rail(self):
+    def dual_rail(self):
         """Convert to dual-rail encoding."""
         from discopy.optyx import photonic
         return photonic.Scalar(self.data)
