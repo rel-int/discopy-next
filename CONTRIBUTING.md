@@ -195,10 +195,13 @@ compared against.
 
 `benchmark/test_composition.py` reproduces the scaling experiments of
 arXiv:2105.09257 for `Diagram` and `Hypergraph`, with analogous `CMap` cases;
-`benchmark/test_conversion.py` covers conversions between all three. They live
-outside `testpaths`, so run them explicitly. Results are keyed by suite
-(`composition` or `conversion`), family (representation or conversion), case
-(workload) and size `n`. Each data point is a declarative
+`benchmark/test_conversion.py` covers conversions between all three, and
+`benchmark/test_zx.py` races `quantum.graphlike.full_reduce` against PyZX's,
+skipped without PyZX: run it with `uv run --with "pyzx==0.10.7"`, as the
+workflow does. They live outside `testpaths`, so run them explicitly. Results
+are keyed by suite (`composition`, `conversion` or `zx`), family
+(representation, conversion or implementation), case (workload) and size
+`n`. Each data point is a declarative
 [`pytest-benchmark`](https://pytest-benchmark.readthedocs.io) test; the fixture
 owns timing (CPU clock and GC disabled) and automatically calibrates rounds
 and iterations for each workload.
@@ -249,9 +252,17 @@ uv sync --group docs
 uv run sphinx-build docs docs/_build/html
 ```
 
+You do not need to build them to see what a pull request changes: Read the Docs
+builds every pull request, the marimo notebooks included, and its check on the
+pull request links to the preview, at
+`https://discopy--<number>.org.readthedocs.build/en/<number>/`.
+The `docs` artifact of the `build` workflow is the same build, to download, but
+its notebooks do not show when opened from disk
+([#526](https://github.com/discopy/discopy/issues/526)).
+
 ## Build without uv
 
-The project uses the `uv_build` PEP 517 build backend, so package builds still work from standard Python tooling.
+The project uses the `setuptools` PEP 517 build backend, with its version read from git by `setuptools-scm`, so package builds work from standard Python tooling.
 If you do not use `uv`, create a virtual environment and install the relevant extras manually:
 
 ```shell

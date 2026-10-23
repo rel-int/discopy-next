@@ -277,3 +277,31 @@ def test_unitaries():
 	non_zero_dict_perceval = {idx: val for idx, val in rounded_result_perceval.items() if val != 0}
 
 	assert dict_allclose(non_zero_dict_optyx, non_zero_dict_perceval, rel_tol=1e-03)
+
+
+@pytest.mark.parametrize("state", [[2, 1, 0], [0, 1, 0]])
+def test_threshold_detector_feeds_forward(state):
+    """A threshold detector clicks once however many photons it sees, and
+    its click swaps the two modes after it, as in perceval."""
+    from discopy.optyx.photonic import NumberResolvingMeasurement
+    p = pcvl.Processor("SLOS", 3)
+    p.add(0, pcvl.Detector.threshold())
+    swap = pcvl.FFCircuitProvider(1, 0, pcvl.Circuit(2))
+    swap.add_configuration([1], pcvl.PERM([1, 0]))
+    p.add(0, swap)
+    p.with_input(pcvl.BasicState(state))
+    expected = {tuple(k): v for k, v in p.probs()["results"].items()}
+    circuit = Channel.from_perceval(p)
+    measured = circuit >> circuit.cod[:1] @ NumberResolvingMeasurement(2)
+    check_dict_agreement(
+        expected, (Create_(*state) >> measured).eval().prob_dist())
+
+
+def test_conversion_guards():
+    from discopy.optyx.photonic import Id as Id_
+    from discopy.optyx.utils.perceval_conversion import (
+        detector, heralds_diagram)
+    with pytest.raises(ValueError, match="detector type"):
+        detector(pcvl.Detector.ppnr(2), (0, ))
+    with pytest.raises(ValueError, match="in_out"):
+        heralds_diagram(None, 1, Id_(1), "both")

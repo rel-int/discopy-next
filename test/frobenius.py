@@ -13,7 +13,8 @@ def test_Functor_call():
     assert F(cap) == Id(x.r) @ cap @ Id(x) << cap
     assert F(box1) == box2
     assert F(box1.l) == box2.l and F(box1.r) == box2.r
-    assert F(spider) == spider @ spider >> Id(x) @ Swap(x, x) @ Id(x)
+    assert F(spider) == Cospan(x @ x, [], [0, 1, 0, 1])
+    assert Equation(F(spider), spider @ spider >> Id(x) @ Swap(x, x) @ Id(x))
     with raises(TypeError):
         F(F)
 
@@ -123,3 +124,69 @@ def test_feedback_is_the_trace():
     for traced in (f.feedback(), f.feedback(mem=x), f.trace(mem=x)):
         assert isinstance(traced, Diagram) and traced == f.trace()
     assert Equation(f.feedback(2, left=True), f.trace(2, left=True))
+
+
+def test_Cospan():
+    from pickle import dumps as pickle_dumps, loads as pickle_loads
+    from discopy import frobenius
+    from discopy.python import finset
+    from discopy.utils import dumps, loads
+    x, y = Ty('x'), Ty('y')
+    f = Cospan(x @ y, [0, 1, 0], [1, 1])
+    assert f.dom == x @ y @ x and f.cod == y @ y and f.size == 2
+    assert f.legs == finset.Cospan([0, 1, 0], [1, 1])
+    assert Cospan(x, [0], [0, 0]) == Spider(1, 2, x)
+    assert Cospan(x, [0, 0], []) == Cup(x, x)
+    assert Cospan(x, [], [0, 0]) == Cap(x, x)
+    assert Cospan(x @ y, [0, 1], [1, 0]) == Swap(x, y)
+    assert Cospan(y @ x, [1, 0], [1, 0]) == Id(x @ y)
+    assert Cospan(y @ x, [1, 1], [1]) == Cospan(x @ y, [0, 0], [0])
+    with raises(ValueError):
+        Cospan(x, [1], [])
+    assert f.dagger() == Cospan(y @ x, [0, 0], [1, 0, 1])
+    assert Equation(f, f.to_spiders()) and Equation(f.dagger(), f[::-1])
+    assert f.is_deterministic and not f.is_affine
+    assert not Cospan(x, [], [0]).is_deterministic
+    for box in (f, Cospan(x @ y, [], [], )):
+        assert eval(repr(box), dict(frobenius=frobenius)) == box
+        assert loads(dumps(box)) == box == pickle_loads(pickle_dumps(box))
+
+
+def test_Cospan_fuse():
+    x, y = Ty('x'), Ty('y')
+    snake = x @ Cap(x, x) >> Cup(x, x) @ x
+    assert snake.foliation() == Id(x)
+    frobenius_law = Spider(1, 2, x) @ x >> x @ Spider(2, 1, x)
+    assert frobenius_law.foliation() == Spider(2, 2, x)
+    loop = Cap(x, x) >> Cup(x, x)
+    assert loop.foliation() == Spider(0, 0, x) != Spider(0, 0, y)
+    f, g = Cospan(x @ y, [0, 1, 0], [1, 1]), Cospan(y @ x, [0, 0], [1, 1, 0])
+    assert Equation((f >> g).foliation(), f >> g)
+    assert (f >> g).foliation().inside[0].generator == f.fuse(g)
+
+
+def test_Layer_with_Cospan():
+    from discopy import tensor
+    x, y = Ty('x'), Ty('y')
+    box = Box('f', x, y)
+    assert Layer(Spider(1, 2, x), y, box).boxes_or_types == (
+        Cospan(x @ y, [0, 1], [0, 0, 1]), box)
+    assert Diagram.spiders(1, 2, x @ y) == Cospan(x @ y, [0, 1], [0, 1, 0, 1])
+    assert Diagram.copy(x @ y) == Diagram.spiders(1, 2, x @ y)
+    assert Diagram.from_function([1, 0, 0], x @ y)\
+        == Cospan(x @ y, [0, 1], [1, 0, 0])
+    d = tensor.Dim(2)
+    assert not tensor.Diagram.layer_factory.is_plumbing_box(
+        tensor.Spider(1, 2, d))
+    assert tensor.Diagram.layer_factory.is_plumbing_box(tensor.Swap(d, d))
+    assert not Layer.is_plumbing_box(Spider(1, 1, x, .5))
+
+
+def test_Cospan_Functor():
+    from discopy import tensor
+    x, y = Ty('x'), Ty('y')
+    F = Functor({x: tensor.Dim(2), y: tensor.Dim(3)}, {}, cod=tensor.Diagram)
+    f, g = Cospan(x @ y, [0, 1, 0], [1, 1]), Cospan(y @ x, [0, 0], [1, 1, 0])
+    assert F(f).eval() == F(x @ Swap(y, x)).eval()\
+        >> F(Spider(2, 0, x) @ Spider(1, 2, y)).eval()
+    assert (F(f) >> F(g)).eval() == F(f.fuse(g)).eval()

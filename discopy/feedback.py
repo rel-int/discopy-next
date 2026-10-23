@@ -349,10 +349,7 @@ class Wire(monoidal.Wire):
         return time_step + is_constant
 
     def __repr__(self):
-        colours = "" if self.dom == self.cod == monoidal.transparent\
-            else f", dom={self.dom!r}, cod={self.cod!r}"
-        return factory_name(type(self))\
-            + f"({self.name!r}{colours}{self.repr_time_step()})"
+        return monoidal.Wire.__repr__(self)[:-1] + self.repr_time_step() + ")"
 
     def __str__(self):
         return super().__str__() + str_delayed(self.time_step)
@@ -697,6 +694,22 @@ class Box(monoidal.Box, Diagram):
         result._time_step = self.time_step  # pylint: disable=protected-access
         return result
 
+    def lambdify(self, *symbols, **kwargs):
+        """
+        Lambdify a feedback box, keeping its time step.
+
+        >>> from sympy.abc import phi  # doctest: +EXTRA
+        >>> f = Box('f', Ty('x'), Ty('y'), data=phi)
+        >>> assert f.delay().subs(phi, 1) == f.subs(phi, 1).delay()
+        """
+        function = super().lambdify(*symbols, **kwargs)
+
+        def delayed(*xs):
+            box = function(*xs)
+            box._time_step = self.time_step  # pylint: disable=protected-access
+            return box
+        return delayed
+
     def __str__(self):
         return super().__str__() + str_delayed(self.time_step)
 
@@ -780,6 +793,24 @@ class Feedback(Box, monoidal.Bubble):
     def delay(self, n_steps=1):
         return type(self)(self.arg.delay(n_steps), mem=self.mem.delay(n_steps),
                           left=self.left)
+
+    def lambdify(self, *symbols, **kwargs):
+        """
+        Lambdify the argument of a feedback.
+
+        >>> from sympy.abc import phi  # doctest: +EXTRA
+        >>> x, y = Ty('x'), Ty('y')
+        >>> f = Box('f', x @ y.delay(), x @ y, data=phi)
+        >>> assert f.feedback().subs(phi, 1) == f.subs(phi, 1).feedback()
+        >>> g = Box('g', x @ y, x @ y, data=phi)
+        >>> assert g.trace().subs(phi, 1) == g.subs(phi, 1).trace()
+        """
+        if not set(symbols) & self.free_symbols:
+            return lambda *xs: self
+        function = self.arg.lambdify(*symbols, **kwargs)
+        return lambda *xs: type(self)(
+            function(*xs), dom=self.dom, cod=self.cod, mem=self.mem,
+            left=self.left)
 
     def __str__(self):
         return self.name
@@ -874,6 +905,20 @@ class Head(monoidal.Bubble, Box):
         Box.__init__(self, f"({arg}).{self.part}", self.dom, self.cod,
                      time_step=time_step)
 
+    def lambdify(self, *symbols, **kwargs):
+        """
+        Lambdify the argument of a head or a tail.
+
+        >>> from sympy.abc import phi  # doctest: +EXTRA
+        >>> f = Box('f', Ty('x'), Ty('y'), data=phi)
+        >>> assert Head(f).subs(phi, 1) == Head(f.subs(phi, 1))
+        >>> assert Tail(f).delay().subs(phi, 1) == Tail(f.subs(phi, 1)).delay()
+        """
+        if not set(symbols) & self.free_symbols:
+            return lambda *xs: self
+        function = self.arg.lambdify(*symbols, **kwargs)
+        return lambda *xs: type(self)(function(*xs), self.time_step)
+
     delay, reset, __repr__ = HeadOb.delay, HeadOb.reset, HeadOb.__repr__
     to_tree, from_tree = HeadOb.to_tree, classmethod(HeadOb.from_tree.__func__)
     __str__ = Box.__str__
@@ -890,7 +935,7 @@ class Tail(monoidal.Bubble, Box):
     """
     part = "tail"
 
-    __init__ = Head.__init__
+    __init__, lambdify = Head.__init__, Head.lambdify
     delay, reset, __repr__ = HeadOb.delay, HeadOb.reset, HeadOb.__repr__
     to_tree, from_tree = HeadOb.to_tree, classmethod(HeadOb.from_tree.__func__)
     __str__ = Box.__str__

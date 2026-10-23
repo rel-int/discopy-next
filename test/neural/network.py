@@ -7,8 +7,8 @@ from pytest import importorskip, raises
 
 from discopy import neural, python
 from discopy.neural.network import (
-    Box, Copy, Dim, Dims, Discard, Equation, Functor, Id, Merge, Network,
-    Noise, Permutation, Swap, Trace)
+    Box, Cofunction, Copy, Dim, Dims, Discard, Equation, Function, Functor,
+    Id, Merge, Network, Noise, Permutation, Swap, Trace)
 from discopy.utils import AxiomError, dumps, loads
 
 
@@ -76,11 +76,15 @@ def test_structure():
     assert Network.from_permutation([2, 0, 1], x @ y @ x)\
         == Permutation(x @ y @ x, [2, 0, 1])
     assert Network.copy(x) == Copy(x) and Network.copy(x, 0) == Discard(x)
-    assert Network.copy(x @ y) == Copy(x) @ Copy(y) >> x @ Swap(x, y) @ y
+    assert Network.copy(x @ y) == Function(x @ y, [0, 1, 0, 1])
+    assert Equation(
+        Network.copy(x @ y), Copy(x) @ Copy(y) >> x @ Swap(x, y) @ y)
     assert Network.merge(x) == Merge(x) == Copy(x).dagger()
     assert Merge(x).dagger() == Copy(x) and Discard(x).dagger() == Noise(x)
     assert Network.noise(x) == Noise(x) == Merge(x, 0) == Discard(x).dagger()
-    assert Network.merge(x @ y) == x @ Swap(y, x) @ y >> Merge(x) @ Merge(y)
+    assert Network.merge(x @ y) == Cofunction(x @ y, [0, 1, 0, 1])
+    assert Equation(
+        Network.merge(x @ y), x @ Swap(y, x) @ y >> Merge(x) @ Merge(y))
     assert isinstance(Network.discard(x).boxes[0], Discard)
     assert isinstance(Network.merge(x).boxes[0], Merge)
     assert isinstance(Network.noise(x).boxes[0], Noise)

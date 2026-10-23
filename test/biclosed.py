@@ -1,6 +1,6 @@
 import sys
 from discopy.biclosed import *
-from discopy import biclosed, cat
+from discopy import biclosed, cat, monoidal
 from discopy.axioms import Related, assert_axioms
 from discopy.utils import dumps, loads
 from pytest import raises
@@ -17,7 +17,8 @@ def test_Over():
     assert not isinstance((x << y).inside[0], Ty)
     assert (x << y).inside == (Over(x, y), )
     assert repr(Over(x, y))\
-        == "biclosed.Over(biclosed.Ty(cat.Ob('x')), biclosed.Ty(cat.Ob('y')))"
+        == "biclosed.Over(biclosed.Ty(monoidal.Wire('x')), "\
+           "biclosed.Ty(monoidal.Wire('y')))"
     assert {Over(x, y): 42}[Over(x, y)] == 42
     assert Over(x, y) != Under(x, y)
 
@@ -31,7 +32,8 @@ def test_Under():
     assert not isinstance((x >> y).inside[0], Ty)
     assert (x >> y).inside == (Under(y, x), )
     assert repr(Under(x, y))\
-        == "biclosed.Under(biclosed.Ty(cat.Ob('x')), biclosed.Ty(cat.Ob('y')))"
+        == "biclosed.Under(biclosed.Ty(monoidal.Wire('x')), "\
+           "biclosed.Ty(monoidal.Wire('y')))"
     assert {Under(x, y): 42}[Under(x, y)] == 42
     assert Under(x, y) != Over(x, y)
 
@@ -152,6 +154,12 @@ def test_Application_freevars_order():
     for term in [func(b), a(under, left=True)]:
         assert term.dom == Ty().tensor(*[var.cod for var in term.freevars])
         assert term.freevars == [a, b]
+
+
+def test_Application_of_a_non_function():
+    v, w = Variable('v', Ty('x')), Variable('w', Ty('y'))
+    with raises(TypeError, match="Expected v to have an exponential type"):
+        Application(v, w)
 
 
 def test_Abstraction_well_typed():
@@ -333,8 +341,17 @@ def test_transparency():
                 curry(), curry(left=False), Constant('c', x), v, f(v),
                 v(g, left=True), x(lambda u: f(u)),
                 x(lambda u, left=True: u(g, left=True))]:
-        assert eval(repr(box), {"biclosed": biclosed, "cat": cat}) == box
+        assert eval(repr(box), {"biclosed": biclosed, "monoidal": monoidal})\
+            == box
         assert loads(dumps(box)) == box
+
+
+def test_Eval_on_the_wrong_side():
+    x, y = Ty('x'), Ty('y')
+    for box in (Eval, Coeval):
+        for exp, left in ((x << y, False), (y >> x, True)):
+            with raises(AxiomError):
+                box(exp, left=left)
 
 
 def test_unit_exponential():
@@ -352,6 +369,14 @@ def test_Curry_dagger():
     x = Ty('x')
     with raises(AxiomError):
         Box('f', x @ x, x).curry().dagger()
+
+
+def test_Curry_too_many_wires():
+    x, z = Ty('x'), Ty('z')
+    for n in (-1, 2):
+        for left in (True, False):
+            with raises(AxiomError):
+                Curry(Box('f', x, z), n, left)
 
 
 def test_Curry_to_drawing():

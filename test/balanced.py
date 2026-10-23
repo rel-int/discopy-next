@@ -1,3 +1,4 @@
+from discopy import balanced, symmetric
 from discopy.balanced import *
 
 
@@ -120,3 +121,23 @@ def test_dual_rail_keeps_twist_dagger():
     twist = Twist(x)
     assert twist.dagger().to_braided().boxes[0].is_dagger
     assert twist.dagger().to_braided() == twist.to_braided().dagger()
+
+
+def test_trace_to_braided():
+    """B78 of #31: the dual rail of a trace is the trace of the doubled
+    wires, a balanced diagram with no twist, at the symmetric level too."""
+    for module in (balanced, symmetric):
+        z = module.Ty('z')
+        g = module.Box('g', z @ z, z @ z)
+        rails = double_rail(z @ z)
+        image = g.trace().to_braided()
+        assert isinstance(image, balanced.Diagram)
+        assert image == Box('g', rails, rails).trace(n=2)
+
+
+def test_dual_rail_delay():
+    """The dual rail of a delay is the delay of the dual rail, its boxes
+    being built from their arguments, as for twists and braids."""
+    x, y = Ty('x'), Ty('y')
+    for diagram in [Twist(x).dagger(), Braid(x, y) >> Twist(y) @ x]:
+        assert diagram.delay().to_braided() == diagram.to_braided().delay()

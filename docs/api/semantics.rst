@@ -15,6 +15,7 @@ DisCoPy's computational core: categories of functions, matrices and tensors.
     discopy.tensor
     discopy.hopf
     discopy.stream
+    discopy.op
     discopy.para
     discopy.lens
     discopy.interaction

@@ -211,7 +211,9 @@ class BitControlledGate(Channel):
         boxes = []
         for i in range(len(diag)):
             layer = diag[i]
-            left, box, right = layer.inside[0].boxes_and_types
+            (box, offset), = layer.inside[0].boxes_and_offsets
+            left = layer.dom[:offset]
+            right = layer.dom[offset + len(box.dom):]
             if box.cod == box.dom:
                 copy = Z(1, 2)
 
@@ -618,10 +620,10 @@ class ClassicalFunction(ControlChannel):
             box.name,
             box,
             channel.Ty(
-                *[channel.Ob._classical[ob.name] for ob in box.dom.inside]
+                *[channel.Ob.classical[ob.name] for ob in box.dom.inside]
             ),
             channel.Ty(
-                *[channel.Ob._classical[ob.name] for ob in box.cod.inside]
+                *[channel.Ob.classical[ob.name] for ob in box.cod.inside]
             ),
         )
 
@@ -647,10 +649,10 @@ class BinaryMatrix(ControlChannel):
             box.name,
             box,
             channel.Ty(
-                *[channel.Ob._classical[ob.name] for ob in box.dom.inside]
+                *[channel.Ob.classical[ob.name] for ob in box.dom.inside]
             ),
             channel.Ty(
-                *[channel.Ob._classical[ob.name] for ob in box.cod.inside]
+                *[channel.Ob.classical[ob.name] for ob in box.cod.inside]
             ),
         )
 

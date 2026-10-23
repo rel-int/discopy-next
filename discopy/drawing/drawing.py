@@ -375,14 +375,25 @@ class Drawing(TracedCategory, RichDisplay):
 
     @backend.matplotlib_context()
     def draw(self, **params):
-        """ Call :meth:`add_box_corners` then :func:`backend.draw`. """
+        """
+        Call :meth:`add_box_corners` and :meth:`frame_dual_rail` on a copy,
+        then :func:`backend.draw`, so that drawing never changes the drawing
+        and draws it the same every time.
+
+        >>> from discopy import ribbon
+        >>> x = ribbon.Ty('x')
+        >>> drawing = ribbon.Braid(x, x).trace().to_ribbons().to_drawing()
+        >>> svg = drawing.to_svg()
+        >>> assert drawing.to_svg() == svg
+        """
         asymmetry = params.pop("asymmetry", 0.125 * any(
             box.is_conjugate or box.is_transpose or (
                 box.is_dagger and not box.draw_as_braid)
             for box in self.boxes))
-        self.add_box_corners()
-        self.frame_dual_rail()
-        return backend.draw(self, asymmetry=asymmetry, **params)
+        result = self.relabel_nodes()
+        result.add_box_corners()
+        result.frame_dual_rail()
+        return backend.draw(result, asymmetry=asymmetry, **params)
 
     def frame_dual_rail(self, margin=0.5):
         """
@@ -825,9 +836,9 @@ class Drawing(TracedCategory, RichDisplay):
         """
         assert_iscomposable(self, other)
         if self.is_identity and self.height <= 1:
-            return other
+            return other.relabel_nodes()
         if other.is_identity and other.height <= 1:
-            return self
+            return self.relabel_nodes()
         dom, cod = self.dom, other.cod
 
         tmp_cod = [Node("tmp_cod", i=i) for i, n in enumerate(self.cod_nodes)]
@@ -920,9 +931,9 @@ class Drawing(TracedCategory, RichDisplay):
             :align: center
         """
         if self.is_empty:
-            return other
+            return other.relabel_nodes()
         if other.is_empty:
-            return self
+            return self.relabel_nodes()
         mapping = {
             n: n.shift_j(len(self.boxes))
             for n in other.nodes if "box" in n.kind}

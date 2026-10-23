@@ -38,6 +38,8 @@ DisCoPy documentation
     notebooks/categorical-deep-learning
     notebooks/neural-church
     notebooks/equivalence-hypergraphs
+    notebooks/contextual-fraction
+    notebooks/boolean-circuits
 
 
 .. toctree::

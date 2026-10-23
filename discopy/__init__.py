@@ -28,6 +28,7 @@ from discopy import (
     stream,
     para,
     lens,
+    op,
     neural,
     python,
     matrix,
@@ -49,5 +50,5 @@ from discopy.version import (
 
 # A docstring example that needs an optional backend says so with `+EXTRA`.
 # Registering the name keeps those docstrings parseable by plain doctest;
-# acting on it is the job of `--skip-extra`, see discopy/pytest_plugin.py.
+# acting on it is the job of `--skip-extra`, see test/plugin.py.
 doctest.register_optionflag("EXTRA")

@@ -70,6 +70,64 @@ def test_Circuit_from_tk():
     assert c == back_n_forth(c)
 
 
+def test_controlled_gates_to_tk():
+    gates = [CY, CCX, U1(.25), CU1(.25), Controlled(Ry(.25))]
+    for gate in gates:
+        assert Circuit.from_tk(gate.to_tk()) == gate.init_and_discard()
+    gates += [
+        Controlled(CX, distance=-1),
+        Controlled(Controlled(X, distance=-1), distance=2)]
+    for gate in gates:
+        unitary = gate.to_tk().get_unitary()
+        assert np.allclose(unitary, gate.eval().array.reshape(unitary.shape).T)
+    with raises(NotImplementedError):
+        CCZ.to_tk()
+
+
+def test_tk_round_trip_is_numerical():
+    circuits = [
+        Ket(0, 0) >> Ry(.2) @ Rx(.7) >> CRz(.3) >> CRx(.4) >> H @ U1(.1)
+        >> CU1(.6) >> H @ H >> Measure(2),
+        Ket(0, 0, 0) >> Ry(.2) @ Rx(.7) @ H >> Circuit.permutation([2, 0, 1])
+        >> Controlled(Ry(.4), distance=2) >> qubit @ CU1(.3, distance=-1)
+        >> H @ H @ H >> Measure(3)]
+    for circuit in circuits:
+        assert np.allclose(
+            Circuit.from_tk(circuit.to_tk()).eval().array,
+            circuit.eval().array)
+
+
+def test_mixed_permutation_to_tk():
+    measure = Ket(1, 0, 0) >> Measure() @ qubit @ Measure()
+    swap_bits = Circuit.permutation([2, 1, 0], bit @ qubit @ bit)
+    swap_qubits = Circuit.permutation([2, 1, 0], qubit @ bit @ qubit)
+    assert repr(measure.to_tk())\
+        == "tk.Circuit(3, 2).Measure(2, 1).X(0).Measure(0, 0)"
+    assert repr((measure >> swap_bits).to_tk())\
+        == "tk.Circuit(3, 2).Measure(2, 0).X(0).Measure(0, 1)"
+    assert repr((Ket(1, 0, 0) >> qubit @ Measure() @ qubit >> swap_qubits
+                 >> X @ bit @ qubit).to_tk())\
+        == "tk.Circuit(3, 1).Measure(1, 0).X(0).X(2)"
+    post = ClassicalGate('post', bit ** 2, bit ** 2, np.eye(4).flatten())
+    circuit = Ket(0, 0, 0) >> H @ qubit ** 2 >> Measure(2) @ qubit\
+        >> post @ qubit >> Swap(bit, bit) @ qubit
+    backend = tk.mockBackend({(0, 0): 512, (1, 0): 512})
+    assert np.allclose(
+        circuit.eval(backend=backend).array,
+        circuit.init_and_discard().eval().array.real)
+
+
+def test_Discard_bit_to_tk():
+    circuit = Ket(1, 0) >> Measure(2) >> Discard(bit) @ bit
+    assert circuit.to_tk().post_processing == Discard(bit) @ bit
+    backend = tk.mockBackend({(1, 0): 1024})
+    assert circuit.eval(backend=backend)\
+        == Tensor[float]([1, 0], Dim(1), Dim(2))
+    backend = tk.mockBackend({(1, 0): 1024})
+    assert (circuit >> Bits(0).dagger()).eval(backend=backend)\
+        == Tensor[float]([1], Dim(1), Dim(1))
+
+
 def test_ClassicalGate_to_tk():
     post = ClassicalGate('post', bit ** 2, bit ** 0, data=[0, 0, 0, 1])
     assert (post[::-1] >> Swap(bit, bit)).to_tk().post_processing\

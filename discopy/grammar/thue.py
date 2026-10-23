@@ -31,6 +31,8 @@ Example
 .. image:: /_static/grammar/cfg-example.svg
     :align: center
 """
+from __future__ import annotations
+
 from discopy import monoidal
 from discopy.monoidal import Ty  # noqa: F401  pylint: disable=unused-import
 from discopy.utils import factory_name
@@ -45,6 +47,13 @@ class Rule(monoidal.Box):
         dom : The domain of the rule, i.e. its input.
         cod : The codomain of the rule, i.e. its output.
         name : The name of the rule, empty by default.
+
+    Example
+    -------
+    >>> n, s = Ty('n'), Ty('s')
+    >>> r = Rule(n @ n, s, name='r')
+    >>> assert (r[::-1].dom, r[::-1].cod) == (s, n @ n)
+    >>> assert r[::-1][::-1] == r
     """
     def __init__(self, dom: monoidal.Ty, cod: monoidal.Ty, name: str = None,
                  **params):
@@ -52,8 +61,17 @@ class Rule(monoidal.Box):
         monoidal.Box.__init__(self, name, dom, cod, **params)
 
     def __repr__(self):
+        if self.is_dagger:
+            return repr(self.dagger()) + ".dagger()"
         name = f", name={self.name!r}" if self.name else ""
-        return factory_name(type(self)) + f"({self.dom!r}, {self.cod!r}{name})"
+        data = "" if self.data is None else f", data={self.data!r}"
+        return factory_name(type(self))\
+            + f"({self.dom!r}, {self.cod!r}{name}{data})"
+
+    def dagger(self) -> Rule:
+        return type(self)(
+            name=self.name, dom=self.cod, cod=self.dom,
+            data=self.data, is_dagger=not self.is_dagger)
 
 
 class Word(Rule):
@@ -65,6 +83,11 @@ class Word(Rule):
         name : The name of the word.
         cod : The grammatical type of the word.
         dom : An optional domain for the word, empty by default.
+
+    Example
+    -------
+    >>> Alice = Word('Alice', Ty('n'))
+    >>> assert (Alice >> Alice[::-1]).cod == Ty()
     """
     def __init__(self, name: str, cod: monoidal.Ty, dom: monoidal.Ty = None,
                  **params):
@@ -72,6 +95,9 @@ class Word(Rule):
         Rule.__init__(self, dom=dom, cod=cod, name=name, **params)
 
     def __repr__(self):
-        dom = f", dom={repr(self.dom)}" if self.dom else ""
+        if self.is_dagger:
+            return repr(self.dagger()) + ".dagger()"
+        dom = f", dom={self.dom!r}" if self.dom else ""
+        data = "" if self.data is None else f", data={self.data!r}"
         return factory_name(type(self))\
-            + f"({repr(self.name)}, {repr(self.cod)}{dom})"
+            + f"({self.name!r}, {self.cod!r}{dom}{data})"

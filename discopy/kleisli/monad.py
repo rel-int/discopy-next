@@ -49,7 +49,8 @@ from collections.abc import Callable, Iterable
 
 from discopy.cat import Transformation
 from discopy.python.function import EndoFunctor, Function, Ty
-from discopy.utils import assert_isinstance, assert_iscomposable, factory_name
+from discopy.utils import (
+    assert_isinstance, assert_iscomposable, factory_name, identity, unbiased)
 
 
 class Monad(EndoFunctor):
@@ -127,18 +128,22 @@ class Monad(EndoFunctor):
             lambda X: mult_map(unwrap(X)), self.then(self), self)
         self.iterate = iterate
 
+    @unbiased
     def then(self, other: EndoFunctor) -> EndoFunctor:
         """
         The composition of the monad's underlying endofunctor with another,
         i.e. plain functor composition: the composite is not itself
         required to be a monad, so it is an :class:`EndoFunctor` rather
-        than a :class:`Monad`.
+        than a :class:`Monad`, except with the identity, which is dropped.
 
         Parameters:
             other : The other endofunctor to compose with.
         """
         assert_isinstance(other, EndoFunctor)
         assert_iscomposable(self, other)
+        if other.ob_map.mapping is other.ar_map.mapping is identity\
+                and other == other.id(other.dom):
+            return self
         return EndoFunctor(
             self.ob_map.then(other), self.ar_map.then(other),
             dom=self.dom, cod=other.cod)

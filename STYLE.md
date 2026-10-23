@@ -4,7 +4,7 @@
 
 **DisCoPy is deterministic.** Even in their internal representation, data structures should not depend on sources of non-determinism (e.g. hashing).
 
-**DisCoPy is transparent.** `eval(repr(x)) == x` should always be true and `eval(str(x)) == x` should be true assuming the obvious variable naming convention e.g. `x, y = Ob("x"), Ob("y")` and `f = Box("f", x, y)`. This `str(x)` should be as close as possible to what a mathematician would write on the board.
+**DisCoPy is transparent.** `eval(repr(x)) == x` should always be true, up to elision and rounding when `x` holds an array, and `eval(str(x)) == x` should be true assuming the obvious variable naming convention e.g. `x, y = Ob("x"), Ob("y")` and `f = Box("f", x, y)`. This `str(x)` should be as close as possible to what a mathematician would write on the board.
 
 **DisCoPy has no secrets.** We avoid using private or semiprivate attributes and let the user see the internals of each data structure. We expose the interface of every subprocedure as methods that can be tested and reused.
 

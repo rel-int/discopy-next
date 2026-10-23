@@ -34,8 +34,8 @@ from discopy.quantum.circuit import (
     Functor, Id, Permutation, bit, qubit, Circuit as Diagram)
 from discopy.quantum.gates import (
     ClassicalGate, Controlled, QuantumGate, Bits, Bra, Digits, Ket,
-    Scalar, MixedScalar, GATES, X, Rx, Ry, Rz, CRx,
-    CRz, format_number, Discard, Measure)
+    Scalar, MixedScalar, GATES, X, Ry, Rotation,
+    format_number, Discard, Measure)
 from discopy.utils import assert_isinstance
 
 OPTYPE_MAP = {"H": OpType.H,
@@ -47,10 +47,15 @@ OPTYPE_MAP = {"H": OpType.H,
               "Rx": OpType.Rx,
               "Ry": OpType.Ry,
               "Rz": OpType.Rz,
+              "U1": OpType.U1,
               "CX": OpType.CX,
+              "CY": OpType.CY,
               "CZ": OpType.CZ,
+              "CCX": OpType.CCX,
               "CRx": OpType.CRx,
+              "CRy": OpType.CRy,
               "CRz": OpType.CRz,
+              "CU1": OpType.CU1,
               "SWAP": OpType.SWAP,
               }
 
@@ -253,39 +258,50 @@ def to_tk(circuit):
         tk_circ.rename_units({new: old})
         tk_circ.rename_units({tmp: new})
 
+    def permute(box, left, typ):
+        positions = [i for i, x in enumerate(box.dom) if x == typ]
+        perm = [positions.index(i) for i in box.perm if box.dom[i] == typ]
+        offset = left.count(typ)
+        if perm == sorted(perm):
+            return
+        if typ == bit and tk_circ.post_processing:
+            right = Id(tk_circ.post_processing.cod[offset + len(perm):])
+            tk_circ.post_process(
+                Id(bit ** offset)
+                @ Diagram.permutation(perm, bit ** len(perm)) @ right)
+            return
+        units, unit_factory = (qubits, Qubit) if typ == qubit else (bits, Bit)
+        current, position = list(range(len(perm))), list(range(len(perm)))
+        for i, source in enumerate(perm):
+            j = position[source]
+            if i != j:
+                swap(units[offset + i], units[offset + j],
+                     unit_factory=unit_factory)
+                current[i], current[j] = current[j], current[i]
+                position[current[j]], position[source] = j, i
+
     def add_gate(qubits, box, offset):
-        i_qubits = [qubits[offset + j] for j in range(len(box.dom))]
-
-        if isinstance(box, (Rx, Ry, Rz)):
-            op = Op.create(OPTYPE_MAP[box.name[:2]], 2 * box.phase)
-        elif isinstance(box, Controlled):
-            i_qubits = []
-            idx = offset if box.distance > 0 else offset - box.distance
-            curr_box = box
-            while isinstance(curr_box, Controlled):
-                i_qubits.append(qubits[idx])
-                idx += curr_box.distance
-                curr_box = curr_box.controlled
-            i_qubits.append(qubits[idx])
-
-            name = box.name.split('(')[0]
-            if box.name in ('CX', 'CZ', 'CCX'):
-                op = Op.create(OPTYPE_MAP[name])
-            elif name in ('CRx', 'CRz'):
-                op = Op.create(OPTYPE_MAP[name], 2 * box.phase)
-        elif box.name in OPTYPE_MAP:
-            op = Op.create(OPTYPE_MAP[box.name])
-        else:
+        controls = []
+        while isinstance(box, Controlled):
+            width, distance = len(box.controlled.dom), box.distance
+            controls.append(qubits[
+                offset if distance > 0 else offset + width - distance - 1])
+            offset, box = offset + max(distance, 0), box.controlled
+        name = len(controls) * "C"\
+            + (type(box).__name__ if isinstance(box, Rotation) else box.name)
+        if name not in OPTYPE_MAP:
             raise NotImplementedError
-
+        params = [2 * box.phase] if isinstance(box, Rotation) else []
+        op = Op.create(OPTYPE_MAP[name], params)
         if box.is_dagger:
             op = op.dagger
-
-        tk_circ.add_gate(op, i_qubits)
+        tk_circ.add_gate(op, controls + [
+            qubits[offset + j] for j in range(len(box.dom))])
 
     circuit = Functor(ob_map=lambda x: x, ar_map=remove_ket1)(circuit)
     for layer in circuit.inside:
-        left, box, _ = layer.boxes_and_types
+        (box, offset), = layer.boxes_and_offsets
+        left = layer.dom[:offset]
         if isinstance(box, Ket):
             qubits = prepare_qubits(qubits, box, left.count(qubit))
         elif isinstance(box, Digits) and box._dim == 2 and not box.is_dagger:
@@ -296,33 +312,18 @@ def to_tk(circuit):
             bits, qubits = measure_qubits(
                 qubits, bits, box, left.count(bit), left.count(qubit))
         elif isinstance(box, Discard):
+            if box.dom.count(bit):
+                off, n_bits = left.count(bit), box.dom.count(bit)
+                right = Id(tk_circ.post_processing.cod[off + n_bits:])
+                tk_circ.post_process(
+                    Id(bit ** off) @ Discard(bit ** n_bits) @ right)
             bits = bits[:left.count(bit)]\
                 + bits[left.count(bit) + box.dom.count(bit):]
             qubits = qubits[:left.count(qubit)]\
                 + qubits[left.count(qubit) + box.dom.count(qubit):]
         elif isinstance(box, Permutation):
-            if all(typ == qubit for typ in box.dom):
-                units, offset, unit_factory = qubits, left.count(qubit), Qubit
-            elif all(typ == bit for typ in box.dom):
-                offset = left.count(bit)
-                if tk_circ.post_processing:
-                    right = Id(tk_circ.post_processing.cod[
-                        offset + len(box.dom):])
-                    tk_circ.post_process(
-                        Id(bit ** offset) @ box @ right)
-                    continue
-                units, unit_factory = bits, Bit
-            else:  # pragma: no cover
-                continue  # bits and qubits live in different registers.
-            current = list(range(len(box.dom)))
-            position = list(range(len(box.dom)))
-            for i, source in enumerate(box.perm):
-                j = position[source]
-                if i != j:
-                    swap(units[offset + i], units[offset + j],
-                         unit_factory=unit_factory)
-                    current[i], current[j] = current[j], current[i]
-                    position[current[j]], position[source] = j, i
+            permute(box, left, qubit)
+            permute(box, left, bit)
         elif isinstance(box, Scalar):
             tk_circ.scale(
                 box.array if box.is_mixed else abs(box.array) ** 2)
@@ -351,16 +352,11 @@ def from_tk(tk_circuit):
 
     def box_from_tk(tk_gate):
         name = tk_gate.op.type.name
-        if name == 'Rx':
-            return Rx(tk_gate.op.params[0] / 2)
-        if name == 'Ry':
-            return Ry(tk_gate.op.params[0] / 2)
-        if name == 'Rz':
-            return Rz(tk_gate.op.params[0] / 2)
-        if name == 'CRx':
-            return CRx(tk_gate.op.params[0] / 2)
-        if name == 'CRz':
-            return CRz(tk_gate.op.params[0] / 2)
+        phases = [param / 2 for param in tk_gate.op.params]
+        if name == 'CRy':
+            return Controlled(Ry(*phases))
+        if name in GATES and phases:
+            return GATES[name](*phases)
         if name in GATES:
             return GATES[name]
         if name.removesuffix('dg') in GATES:
