@@ -12,6 +12,8 @@ quantum
     gates
     ansatze
     reservoir
+    contextuality
     zx
+    graphlike
     tk
     pennylane

@@ -1,6 +1,6 @@
 import sys
 from discopy.biclosed import *
-from discopy import biclosed, cat
+from discopy import biclosed, cat, monoidal
 from discopy.axioms import Related, assert_axioms
 from discopy.utils import dumps, loads
 from pytest import raises
@@ -17,7 +17,8 @@ def test_Over():
     assert not isinstance((x << y).inside[0], Ty)
     assert (x << y).inside == (Over(x, y), )
     assert repr(Over(x, y))\
-        == "biclosed.Over(biclosed.Ty(cat.Ob('x')), biclosed.Ty(cat.Ob('y')))"
+        == "biclosed.Over(biclosed.Ty(monoidal.Wire('x')), "\
+           "biclosed.Ty(monoidal.Wire('y')))"
     assert {Over(x, y): 42}[Over(x, y)] == 42
     assert Over(x, y) != Under(x, y)
 
@@ -31,7 +32,8 @@ def test_Under():
     assert not isinstance((x >> y).inside[0], Ty)
     assert (x >> y).inside == (Under(y, x), )
     assert repr(Under(x, y))\
-        == "biclosed.Under(biclosed.Ty(cat.Ob('x')), biclosed.Ty(cat.Ob('y')))"
+        == "biclosed.Under(biclosed.Ty(monoidal.Wire('x')), "\
+           "biclosed.Ty(monoidal.Wire('y')))"
     assert {Under(x, y): 42}[Under(x, y)] == 42
     assert Under(x, y) != Over(x, y)
 
@@ -339,7 +341,8 @@ def test_transparency():
                 curry(), curry(left=False), Constant('c', x), v, f(v),
                 v(g, left=True), x(lambda u: f(u)),
                 x(lambda u, left=True: u(g, left=True))]:
-        assert eval(repr(box), {"biclosed": biclosed, "cat": cat}) == box
+        assert eval(repr(box), {"biclosed": biclosed, "monoidal": monoidal})\
+            == box
         assert loads(dumps(box)) == box
 
 

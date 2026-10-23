@@ -99,7 +99,7 @@ from collections.abc import Sequence
 from typing import ClassVar
 
 from discopy import monoidal, feedback, balanced, hypergraph, cmap, messages
-from discopy.abc import BalancedCategory, SymmetricCategory
+from discopy.abc import BalancedCategory, SpacialCategory, SymmetricCategory
 from discopy.cat import factory
 from discopy.feedback import (  # noqa: F401  pylint: disable=unused-import
     Wire, Ty, Nat)
@@ -136,26 +136,24 @@ class Layer(feedback.Layer):
     >>> assert Layer(x, perm, y) == Layer(Permutation(x @ x @ y @ y,
     ...     [0, 2, 1, 3]))
 
-    Forgetting the distinction between plumbing and generators gives the
-    ordinary alternating view of a :class:`discopy.monoidal.Layer`, which is
-    what :attr:`boxes`, :attr:`boxes_and_offsets` and the rewrites indexed by
-    them are computed from.
+    Forgetting the distinction between plumbing and generators, a
+    permutation is one more box of the layer: :attr:`boxes`,
+    :attr:`boxes_and_offsets` and the rewrites indexed by them count it as
+    one.
 
-    >>> assert Layer(x, f, perm).boxes_and_types == (
-    ...     x, f, Ty(), perm, Ty())
     >>> assert Layer(x, f, perm).boxes_and_offsets == [(f, 1), (perm, 2)]
     """
     @classmethod
     def normalise(cls, inside):
         """
-        Normalise identity permutations to their underlying types, so a
-        layer whose only component is an identity permutation raises the
-        same :class:`ValueError` as a layer without a box.
+        Normalise identity plumbing to its underlying type, so a layer whose
+        only component is an identity permutation raises the same
+        :class:`ValueError` as a layer without a box. A box being unpickled
+        has no data yet, hence is not an identity.
         """
         return super().normalise(
-            value.dom
-            if isinstance(value, Permutation) and hasattr(value, 'perm')
-            and value.is_identity else value
+            value.dom if cls.is_plumbing_box(value)
+            and getattr(value, 'is_identity', False) else value
             for value in inside)
 
     @property
@@ -168,12 +166,13 @@ class Layer(feedback.Layer):
         >>> assert Layer(Permutation(x @ y, [1, 0])).is_plumbing
         >>> assert not Layer(x, Box('f', x, y), y).is_plumbing
         """
-        return any(isinstance(value, Permutation) for value in self)
+        return any(map(self.is_plumbing_box, self))
 
     def merge(self, other: Layer) -> Layer:
         """
-        Merge two layers of pure plumbing by composing their permutations,
-        otherwise fall back to :meth:`discopy.monoidal.Layer.merge`.
+        Merge two layers of pure plumbing by fusing their boxes, see
+        :meth:`Permutation.fuse`, otherwise fall back to
+        :meth:`discopy.monoidal.Layer.merge`.
 
         Parameters:
             other : The other layer with which to merge.
@@ -188,12 +187,10 @@ class Layer(feedback.Layer):
         """
         if len(self.boxes_or_types) == 1 == len(other.boxes_or_types)\
                 and self.is_plumbing and other.is_plumbing:
-            assert_iscomposable(self, other)
-            first, second = self.boxes_or_types[0], other.boxes_or_types[0]
-            perm = [first.perm[i] for i in second.perm]
-            if perm == sorted(perm):
+            result = self.boxes_or_types[0].fuse(other.boxes_or_types[0])
+            if not result.inside:
                 raise AxiomError(messages.NOT_MERGEABLE.format(self, other))
-            return type(self)(first.permutation_factory(self.dom, perm))
+            return type(self)(result)
         return super().merge(other)
 
 
@@ -410,7 +407,8 @@ class Diagram(balanced.Diagram, SymmetricCategory):
         Merge independent generators, keeping native plumbing compact.
 
         A hypergraph forgets that plumbing is native, so a diagram with a
-        :class:`Permutation` is foliated by merging its layers instead.
+        :class:`Permutation` is foliated by merging its layers instead, see
+        :meth:`merge_layers`.
 
         >>> x, y = Ty('x'), Ty('y')
         >>> perm = Permutation(x @ y, [1, 0])
@@ -423,8 +421,9 @@ class Diagram(balanced.Diagram, SymmetricCategory):
     def merge_layers(self):
         """
         Merge layers as :meth:`discopy.monoidal.Diagram.merge_layers` does,
-        dropping two layers of plumbing that compose to the identity, which
-        is the empty diagram rather than a layer.
+        dropping two layers of plumbing alone that compose to the identity,
+        which is the empty diagram rather than a layer, see
+        :meth:`Permutation.fuse`.
 
         >>> x, y, z = Ty('x'), Ty('y'), Ty('z')
         >>> perm = Permutation(x @ y @ z, [1, 2, 0])
@@ -433,8 +432,9 @@ class Diagram(balanced.Diagram, SymmetricCategory):
         diagram = super().merge_layers()
         for i, (first, second) in enumerate(
                 zip(diagram.inside, diagram.inside[1:])):
-            if len(first.boxes_or_types) == 1 and first.is_plumbing\
-                    and second == first.dagger():
+            if all(layer.is_generator and layer.is_plumbing
+                   for layer in (first, second))\
+                    and not first.generator.fuse(second.generator).inside:
                 inside = diagram.inside[:i] + diagram.inside[i + 2:]
                 return self.ar(inside, self.dom, self.cod).merge_layers()
         return diagram
@@ -595,6 +595,21 @@ class Permutation(Box):
 
     def dagger(self) -> Permutation:
         return type(self)(self.cod, self.perm.dagger())
+
+    def fuse(self, other: Permutation) -> Diagram:
+        """
+        The composite with another permutation as one permutation, i.e. the
+        identity diagram when they are inverse.
+
+        Parameters:
+            other : The permutation to compose with.
+
+        >>> x, y = Ty('x'), Ty('y')
+        >>> assert Swap(x, y).fuse(Swap(y, x)) == Id(x @ y)
+        """
+        assert_iscomposable(self, other)
+        return self.ar.from_permutation(
+            [self.perm[i] for i in other.perm], self.dom)
 
     def tensor(self, *others):
         """
@@ -797,3 +812,5 @@ class Equation(monoidal.Equation):
 
 
 Diagram.yanking = BalancedCategory.yanking.modulo(Diagram.to_hypergraph)
+Diagram.scalar_sliding = SpacialCategory.scalar_sliding.modulo(
+    Diagram.to_hypergraph)

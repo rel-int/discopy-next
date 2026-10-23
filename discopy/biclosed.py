@@ -282,6 +282,10 @@ class Exp(Wire):
     def __str__(self):
         return f"({self.base} ** {self.exponent})"
 
+    def atoms(self) -> list[Ty]:
+        """ The atoms of an exponential: those of its base and exponent. """
+        return self.base.atoms() + self.exponent.atoms()
+
     def __repr__(self):
         return factory_name(type(self)) + f"({self.base!r}, {self.exponent!r})"
 
@@ -1030,6 +1034,10 @@ class Constant(TermBase):
     def constants(self):
         return [self]
 
+    def atoms(self) -> list[Ty]:
+        """ A constant prints as its type called on its name: its atoms. """
+        return self.cod.atoms()
+
     def eval(self, functor=None):
         return cat.Functor.__call__(functor or self.functor, self)
 
@@ -1069,6 +1077,10 @@ class Variable(TermBase):
     @property
     def constants(self):
         return []
+
+    def atoms(self) -> list[Variable]:
+        """ A variable prints as its bare name, it is its own atom. """
+        return [self]
 
     def alpha_eq_under(  # pylint: disable=unused-argument  # depth: binders
             self, scopes, others, depth=0):
@@ -1179,6 +1191,10 @@ class Application(TermBase):
         return self.args.constants + self.func.constants if self.left\
             else self.func.constants + self.args.constants
 
+    def atoms(self) -> list:
+        """ The atoms of an application: those of its function and args. """
+        return self.func.atoms() + self.args.atoms()
+
     def alpha_eq_under(self, scopes, others, depth=0):
         """ Applications on one side, functions and arguments alike. """
         if any(type(other) is not type(self) or other.left != self.left
@@ -1255,6 +1271,14 @@ class Abstraction(TermBase):
     @property
     def constants(self):
         return self.body.constants
+
+    def atoms(self) -> list:
+        """
+        The atoms of an abstraction: those of the type of its variable and
+        of its body but the variable, which the lambda it prints binds.
+        """
+        return self.var.cod.atoms() + [
+            atom for atom in self.body.atoms() if atom != self.var]
 
     def alpha_eq_under(self, scopes, others, depth=0):
         """ Binders of one type on one side, bodies alike one level down. """

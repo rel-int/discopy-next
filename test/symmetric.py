@@ -130,7 +130,7 @@ def test_Layer():
     f = Box('f', x, y)
     swap, permutation = Swap(x, y), Permutation(x @ y, [1, 0])
     layer = Layer(x, f, y)
-    assert layer.boxes_or_types == (x, f, y) == layer.boxes_and_types
+    assert layer.boxes_or_types == (x, f, y)
     assert not layer.is_plumbing
     assert layer.boxes == [f]
     assert Layer(f) == Layer(Ty(), f, Ty())
@@ -139,17 +139,16 @@ def test_Layer():
         x @ x @ y @ z, [0, 2, 1, 3])]
     assert permutation == swap
     assert layer.dagger().dagger() == layer
-    assert (z @ layer).boxes_and_types == (z @ x, f, y)
-    assert (layer @ z).boxes_and_types == (x, f, y @ z)
+    assert (z @ layer).boxes_or_types == (z @ x, f, y)
+    assert (layer @ z).boxes_or_types == (x, f, y @ z)
 
     plumbed = Layer(x, f, permutation)
     assert plumbed.is_plumbing
     assert plumbed.boxes_or_types == (x, f, permutation)
-    assert plumbed.boxes_and_types == (x, f, Ty(), permutation, Ty())
+    assert plumbed.boxes_and_offsets == [(f, 1), (permutation, 2)]
     assert plumbed.boxes == [f, permutation]
     assert plumbed.dagger() == Layer(x, f.dagger(), permutation.dagger())
     assert Layer(x, f).boxes_or_types == (x, f)
-    assert Layer(x, f).boxes_and_types == (x, f, Ty())
     with raises(ValueError):
         Layer(x)
 
@@ -198,10 +197,10 @@ def test_Layer_factory_ownership():
         x, y = module.Ty('x'), module.Ty('y')
         permutation = module.Permutation(x @ y, [1, 0])
         layer = module.Layer(permutation)
-        assert type(layer.boxes_and_types[1]) is module.Swap
+        assert type(layer.boxes[0]) is module.Swap
         assert issubclass(module.Swap, module.Permutation)
         assert type(x @ permutation) is module.Permutation
-    assert markov.Layer is symmetric.Layer
+    assert issubclass(markov.Layer, symmetric.Layer)
     assert not hasattr(symmetric.Layer, 'permutation_factory')
 
 
@@ -210,7 +209,6 @@ def test_Layer_tensor():
     f, g = Box('f', x, y), Box('g', y, z)
     left, right = Layer(x, f, y), Layer(z, g, x)
     result = left @ right
-    assert result.boxes_and_types == (x, f, y @ z, g, x)
     assert result.boxes == [f, g]
     assert result.boxes_or_types == (x, f, y @ z, g, x)
     assert (left @ right).dagger() == left.dagger() @ right.dagger()
@@ -336,12 +334,10 @@ def test_mixed_Layer_plumbing():
     assert diagram.to_drawing().dom == diagram.dom.to_drawing()
     assert loads(dumps(diagram)) == diagram
     assert pickle.loads(pickle.dumps(diagram)) == diagram
-    assert layer.boxes_and_types == (
-        Ty(), permutation, Ty(), f, Ty())
     assert layer.boxes_and_offsets == [(permutation, 0), (f, 2)]
     assert diagram.boxes == [permutation, f]
     assert diagram.offsets == [0, 2]
-    assert list(diagram.normalize()) == []
+    assert list(diagram.normalize()) == [diagram.to_staircases()]
     # A permutation is a box, so this layer holds two and cannot interchange.
     with raises(NotImplementedError):
         diagram.interchange(0, 0)
@@ -360,8 +356,7 @@ def test_unequal_arity_offsets():
     layer = Layer(Ty(), f, permutation, g, x)
     assert layer.dom == x @ z @ x @ z @ x
     assert layer.cod == y @ y @ x @ z @ x
-    assert layer.boxes_and_types == (
-        Ty(), f, Ty(), permutation, Ty(), g, x)
+    assert layer.boxes_or_types == (f, permutation, g, x)
     assert layer.boxes_and_offsets == [(f, 0), (permutation, 2), (g, 4)]
     diagram = Diagram((layer,), layer.dom, layer.cod)
     assert diagram.offsets == [0, 2, 4]
@@ -434,16 +429,16 @@ def test_abc_permutation():
         abc_permutation(Diagram, [0, 0], [Ty('a'), Ty('b')])
 
 
-def test_coloured_Layer_boxes_and_types():
+def test_coloured_Layer_merge():
     from discopy import monoidal
 
     red, green = map(monoidal.Colour, ("red", "green"))
     x = Ty(Wire('x', dom=red, cod=green))
-    f = Box('f', x, x)
+    y = Ty(Wire('y', dom=green, cod=red))
+    f, g = Box('f', x, x), Box('g', y, y)
     empty_red, empty_green = x[:0], x[len(x):]
-    assert Layer(f).boxes_and_types == (empty_red, f, empty_green)
-    assert Layer(empty_red, f, empty_green).boxes_and_types\
-        == (empty_red, f, empty_green)
+    assert Layer(empty_red, f, empty_green) == Layer(f)
+    assert Layer(f, y).merge(Layer(x, g)).boxes_or_types == (f, g)
 
 
 def test_foliation_with_traces_and_permutations():

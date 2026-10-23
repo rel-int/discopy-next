@@ -25,6 +25,13 @@ def test_simplify_foliated():
     assert diagram.simplify() == f @ x >> b @ g
 
 
+def test_naturality_foliated():
+    g = Box('g', z, z)
+    diagram = g @ z @ f >> z @ Braid(z, b)
+    assert diagram.foliation().naturality(1) == diagram.naturality(1)\
+        == g @ Braid(z, a) >> z @ f @ z
+
+
 def test_to_hypergraph():
     # A braid is not a swap: it stays a box of the hypergraph and of the map.
     from discopy import hypergraph, cmap

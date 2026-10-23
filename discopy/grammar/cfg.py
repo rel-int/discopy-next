@@ -41,6 +41,7 @@ from typing import TYPE_CHECKING
 
 from discopy import monoidal
 from discopy.cat import factory, Functor
+from discopy.config import BOX_DRAWING_ATTRIBUTES
 from discopy.grammar import thue
 from discopy.monoidal import Ty
 from discopy.utils import (
@@ -53,7 +54,8 @@ if TYPE_CHECKING:
 @factory
 class Tree:
     """
-    A tree is a rule for the ``root`` and a list of trees called ``branches``.
+    A tree is a rule for the ``root`` and a list of trees called ``branches``,
+    its ``dom`` is the tensor of theirs, as composition in the free operad.
 
     Example
     -------
@@ -78,15 +80,15 @@ class Tree:
                 *[branch.cod for branch in branches]):
             raise AxiomError
         self.cod, self.root, self.branches = root.cod, root, branches
+        if not isinstance(self, Rule):
+            self.dom = Ty().tensor(*[branch.dom for branch in branches])
 
     def __repr__(self):
-        return factory_name(type(self)) + f"({self.root}, *{self.branches})"
+        return factory_name(type(self))\
+            + f"({', '.join(map(repr, (self.root, ) + self.branches))})"
 
     def __str__(self):
-        if isinstance(self, Rule):
-            return self.name
-        return self.root.name\
-            + f"({', '.join(map(Tree.__str__, self.branches))})"
+        return f"{self.root}({', '.join(map(str, self.branches))})"
 
     def __call__(self, *others):
         if not others or all([isinstance(other, Id) for other in others]):
@@ -108,7 +110,12 @@ class Tree:
         return Id(dom)
 
     def __eq__(self, other):
-        return self.root == other.root and self.branches == other.branches
+        return isinstance(other, Tree)\
+            and (self.root, self.branches) == (other.root, other.branches)
+
+    def __hash__(self):
+        return hash((self.root, self.branches)) if self.branches\
+            else hash(self.root)
 
     def to_diagram(self) -> monoidal.Diagram:
         """
@@ -136,40 +143,63 @@ class Tree:
         >>> print(Tree.from_nltk(t))
         S(I, VP(saw, him))
         >>> Tree.from_nltk(t).branches[0]
-        grammar.cfg.Word('I', monoidal.Ty(cat.Ob('NP')))
+        grammar.cfg.Word('I', monoidal.Ty(monoidal.Wire('NP')))
+
+        A word is typed by the label of the tree it sits in.
+
+        >>> print(Tree.from_nltk(nltk.Tree.fromstring("(NP the big dog)")))
+        NP(the, big, dog)
         """
-        branches = []
-        for branch in tree:
-            if isinstance(branch, str):
-                return Word(branch, Ty(tree.label()))
-            else:
-                branches += [Tree.from_nltk(branch)]
         label = tree.label()
-        dom = Ty().tensor(*[Ty(branch.label()) for branch in tree])
-        root = Rule(dom, Ty(label), name=label)
-        return root(*branches)
+        if len(tree) == 1 and isinstance(tree[0], str):
+            return Word(tree[0], Ty(label))
+        branches = [
+            Word(branch, Ty(label)) if isinstance(branch, str)
+            else Tree.from_nltk(branch) for branch in tree]
+        dom = Ty().tensor(*[branch.cod for branch in branches])
+        return Rule(dom, Ty(label), name=label)(*branches)
 
 
 class Rule(Tree, thue.Rule):
     """
-    A rule is a generator of free operads, given by an atomic type ``dom``,
-    a type ``cod`` of arbitrary length and an optional ``name``.
+    A rule is a generator of free operads, given by a type ``dom`` of
+    arbitrary length, an atomic type ``cod`` and an optional ``name``.
+
+    Its dagger is a rule with an atomic ``dom`` instead.
+
+    Parameters:
+        dom : The domain of the rule, i.e. its input.
+        cod : The codomain of the rule, i.e. its output.
+        name : The name of the rule.
+
+    Example
+    -------
+    >>> x, y = Ty('x'), Ty('y')
+    >>> f = Rule(x @ y, x, name='f')
+    >>> assert (f[::-1].dom, f[::-1].cod) == (x, x @ y)
+    >>> assert f[::-1][::-1] == f != f[::-1]
     """
-    def __init__(self, dom: monoidal.Ty, cod: monoidal.Ty, name: str = None):
+    def __init__(self, dom: monoidal.Ty, cod: monoidal.Ty, name: str = None,
+                 **params):
         assert_isinstance(dom, Ty)
-        assert_isatomic(cod, Ty)
-        thue.Rule.__init__(self, dom=dom, cod=cod, name=name)
+        assert_isatomic(dom if params.get('is_dagger', False) else cod, Ty)
+        thue.Rule.__init__(self, dom=dom, cod=cod, name=name, **params)
         Tree.__init__(self, root=self)
 
     def __eq__(self, other):
         if isinstance(other, Rule):
-            return self.dom == other.dom and self.cod == other.cod \
-                and self.name == other.name
-        if isinstance(other, Tree):
-            return other.root == self and other.branches == []
+            return thue.Rule.__eq__(self, other)
+        return isinstance(other, Tree)\
+            and other.root == self and not other.branches
+
+    __hash__, __str__ = thue.Rule.__hash__, thue.Rule.__str__
+    __repr__ = thue.Rule.__repr__
 
     def to_diagram(self) -> monoidal.Box:
-        return monoidal.Box(self.name, self.dom, self.cod)
+        drawing = {attr: getattr(self, attr)
+                   for attr in BOX_DRAWING_ATTRIBUTES if hasattr(self, attr)}
+        return monoidal.Box(self.name, self.dom, self.cod, data=self.data,
+                            is_dagger=self.is_dagger, **drawing)
 
 
 class Word(thue.Word, Rule):
@@ -190,11 +220,13 @@ class Word(thue.Word, Rule):
 class Id(Rule):
     """ The identity is a rule that does nothing. """
     def __init__(self, dom):
-        self.dom, self.cod = dom, dom
         Rule.__init__(self, dom, dom, name=f"Id({dom})")
 
     def __repr__(self):
-        return f"Id({self.dom})"
+        return factory_name(type(self)) + f"({self.dom!r})"
+
+    def dagger(self) -> Id:
+        return self
 
 
 class Operad:

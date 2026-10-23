@@ -34,7 +34,7 @@ from typing import ClassVar
 
 from discopy import rigid, frobenius, messages
 from discopy.cat import factory
-from discopy.utils import AxiomError, deprecated_alias
+from discopy.utils import AxiomError, deprecated_alias, factory_name
 from discopy.grammar import thue
 from discopy.rigid import Wire  # noqa: F401  pylint: disable=unused-import
 
@@ -49,14 +49,20 @@ class Ty(rigid.Ty):
 
     Note
     ----
-    In order to define more general DisCoCat diagrams, pregroup types do not
-    raise any AxiomError if you build cups and caps with the wrong adjoints.
+    In order to define more general DisCoCat diagrams, pregroup types accept
+    cups and caps with the adjoint on the wrong side, but still raise an
+    ``AxiomError`` for types that are not adjoints at all.
 
     Example
     -------
     >>> n = Ty('n')
     >>> n.assert_isadjoint(n.l)
     >>> n.assert_isadjoint(n.r)
+    >>> assert Cup(n, n.l).dom == n @ n.l
+    >>> Cup(n, n)
+    Traceback (most recent call last):
+    ...
+    discopy.utils.AxiomError: n and n are not adjoints.
     """
     def assert_isadjoint(self, other):
         """
@@ -111,12 +117,25 @@ class Diagram(frobenius.Diagram):
         Applies normal form to a pregroup diagram of the form
         ``word @ ... @ word >> wires`` by normalising words and wires
         seperately before combining them, so it can be drawn with :meth:`draw`.
+
+        A foliated diagram is split into staircases first.
+
+        Example
+        -------
+        >>> s, n = Ty('s'), Ty('n')
+        >>> Alice, Bob = Word('Alice', n), Word('Bob', n)
+        >>> loves = Word('loves', n.r @ s @ n.l)
+        >>> sentence = Alice @ loves @ Bob >> Cup(n, n.r) @ s @ Cup(n.l, n)
+        >>> assert sentence.foliation().normal_form() == sentence.normal_form()
         """
+        if any(len(layer.boxes) > 1 for layer in self.inside):
+            return self.to_staircases().normal_form(**params)
         words, is_pregroup = self.id(), True
         for layer in self.inside:
-            _, box, right = layer.boxes_and_types
+            (box, offset), = layer.boxes_and_offsets
+            left, right = layer.dom[:offset], layer.dom[offset + len(box.dom):]
             if isinstance(box, Word):
-                if right:  # word boxes should be tensored left to right.
+                if left != words.cod or right:
                     is_pregroup = False
                     break
                 words = words @ box
@@ -213,12 +232,16 @@ class Word(thue.Word, Box):
                  **params):
         Box.__init__(self, name, dom, cod, **params)
 
+    dagger = Box.dagger
+
     def __repr__(self):
         extra = f", dom={repr(self.dom)}" if self.dom else ""
         extra += ", is_dagger=True" if self.is_dagger else ""
         extra += f", z={self.z}" if self.z != 0 else ""
+        extra += "" if self.data is None else f", data={self.data!r}"
         extra += "".join(f", {name}=False" for name in self.flags())
-        return f"Word({repr(self.name)}, {repr(self.cod)}{extra})"
+        return factory_name(type(self))\
+            + f"({self.name!r}, {self.cod!r}{extra})"
 
 
 class Functor(frobenius.Functor):

@@ -117,7 +117,7 @@ from discopy.kleisli.monad import Monad
 from discopy.python import function
 from discopy.python.additive import Ty
 from discopy.utils import (
-    assert_isinstance, assert_iscomposable, factory, factory_name)
+    assert_isinstance, assert_iscomposable, factory, factory_name, unbiased)
 
 
 class Tagged:
@@ -304,6 +304,7 @@ class Channel(TracedCategory, ComarkovCategory, NamedGeneric['monad']):
         assert_iscomposable(self, other)
         return type(self)(self.inside >> other.inside, self.dom, other.cod)
 
+    @unbiased
     def tensor(self, other: Channel) -> Channel:
         """
         The disjoint union of two channels, called with :code:`@`: the

@@ -713,7 +713,7 @@ def test_plug_input():
         f.plug_input(-1, Box("lambda", x, y @ z), y)
     with raises(ValueError, match="range"):
         f.plug_input(0, Box("lambda", x, y @ z), y, root_index=2)
-    with raises(ValueError, match="Cannot plug"):
+    with raises(ValueError, match="expected a box"):
         f.plug_input(0, Box("bad", Ty(), y @ z), y)
 
 
@@ -980,6 +980,14 @@ def test_from_wiring():
     assert closed == (M.from_box(f) >> M.from_box(f)).trace()
 
 
+def test_cups_and_caps_decode_with_their_legs_in_scan_order():
+    """ A cup's or cap's legs go in the order their readers sit in the scan,
+    so decoding adds no swap the diagram did not have, see #139. """
+    from fixtures.diagrams import bent_wires
+    for diagram in bent_wires():
+        assert diagram.to_map().to_diagram() == diagram
+
+
 def test_to_diagram_routes_with_one_permutation():
     """ Each routing step of the decoder is one :class:`Permutation` layer
     rather than a staircase of swaps, so a permutation round-trips to itself
@@ -1080,3 +1088,142 @@ def test_trace_takes_the_keyword_form():
         f.trace(1, mem=y)
     with raises(AxiomError):
         f.trace(mem=x)
+
+
+def random_planar(rng, size):
+    from discopy.monoidal import Ty, Box, Diagram
+    x = Ty('x')
+    diagram = Diagram.id(x ** rng.randint(0, 2))
+    for i in range(size):
+        width, arity = len(diagram.cod), rng.randint(0, 2)
+        arity = min(arity, width)
+        coarity = rng.randint(0 if arity else 1, 2)
+        offset = rng.randint(0, width - arity)
+        box = Box(f"b{i}", x ** arity, x ** coarity)
+        diagram >>= x ** offset @ box @ x ** (width - arity - offset)
+    return diagram
+
+
+def test_sweep_decodes_planar_maps():
+    import random
+    rng = random.Random(0)
+    for _ in range(300):
+        diagram = random_planar(rng, rng.randint(0, 6))
+        cmap = diagram.to_map()
+        order = list(range(len(cmap.boxes)))
+        rng.shuffle(order)
+        decoded = cmap.reorder(order).to_diagram().to_map()
+        assert decoded.reorder(
+            decoded.boxes.index(box) for box in diagram.boxes) == cmap
+        if len(cmap.connected_components) <= 1:
+            assert decoded.to_diagram().normal_form()\
+                == diagram.normal_form()
+
+
+def every_layering(dom, vertices, cod, cut=None, placed=frozenset()):
+    cut = list(dom) if cut is None else cut
+    if len(placed) == len(vertices):
+        return cut == list(cod)
+    for vertex, (inputs, outputs) in enumerate(vertices):
+        if vertex in placed:
+            continue
+        offsets = [i for i in range(len(cut) + 1 - len(inputs))
+                   if tuple(cut[i:i + len(inputs)]) == inputs]
+        for i in offsets if inputs else range(len(cut) + 1):
+            if every_layering(
+                    dom, vertices, cod, cut[:i] + list(outputs)
+                    + cut[i + len(inputs):], placed | {vertex}):
+                return True
+    return False
+
+
+def test_sweep_meets_a_map_iff_some_layering_does():
+    import random
+    from discopy.monoidal import CMap
+    rng = random.Random(1)
+    for _ in range(1000):
+        shapes = [(rng.randint(0, 2), rng.randint(0, 2)) for _ in range(4)]
+        starts = [("dom", i) for i in range(rng.randint(0, 2))] + [
+            (v, j) for v, (_, b) in enumerate(shapes) for j in range(b)]
+        n_cod = len(starts) - sum(a for a, _ in shapes)
+        if n_cod < 0:
+            continue
+        ends = [(v, i) for v, (a, _) in enumerate(shapes)
+                for i in range(a)] + [("cod", j) for j in range(n_cod)]
+        rng.shuffle(ends)
+        wire = dict(zip(ends, starts))
+        vertices = [(tuple(wire[v, i] for i in range(a)),
+                     tuple((v, j) for j in range(b)))
+                    for v, (a, b) in enumerate(shapes)]
+        dom = tuple(start for start in starts if start[0] == "dom")
+        cod = tuple(wire["cod", j] for j in range(n_cod))
+        try:
+            CMap.sweep(dom, vertices, cod)
+            swept = True
+        except AxiomError:
+            swept = False
+        assert swept == every_layering(dom, vertices, cod)
+
+
+def test_states_go_in_the_right_gap():
+    from discopy.monoidal import Ty, Box
+    x, y = Ty('x'), Ty('y')
+    cap, u = Box('cap', Ty(), x @ x), Box('u', Ty(), y)
+    g = Box('g', x @ y @ x, Ty())
+    for diagram in [u @ x, x @ u, cap >> x @ u @ x >> g,
+                    u @ cap >> y @ x @ u @ x >> y @ g]:
+        assert diagram.to_map().to_diagram() == diagram
+
+
+def spiral_rules(reverse=False):
+    from discopy.drawing import spiral
+    from discopy.monoidal import Ty, Id
+    x = Ty('x')
+    unit, cap, counit, cup = spiral(1).boxes
+    rules = [((cap >> x @ counit).to_map(), unit.to_map()),
+             ((unit @ x >> cup).to_map(), counit.to_map()),
+             ((unit >> counit).to_map(), Id().to_map())]
+    return rules[::-1] if reverse else rules
+
+
+def test_spiral_unwinds():
+    from discopy.drawing import spiral
+    from discopy.monoidal import Id
+    for n in range(1, 5):
+        for diagram in [spiral(n), spiral(n).normal_form()]:
+            for reverse in [False, True]:
+                steps = list(diagram.to_map().normalize(
+                    *spiral_rules(reverse)))
+                assert len(steps) == 2 * n + 1
+                assert steps[-1] == Id().to_map()
+                assert all(len(step.connected_components) <= 1
+                           for step in steps)
+    assert spiral(3).to_map().normal_form(*spiral_rules()) == Id().to_map()
+
+
+def test_a_match_does_not_cross_wires():
+    from discopy.monoidal import Ty, Box
+    x, y = Ty('x'), Ty('y')
+    f, g, h = Box('f', x, x), Box('g', y, y), Box('h', x, x)
+    for host, pattern, n_matches in [
+            (f @ g, f @ g, 1), (g @ f, f @ g, 0),
+            (f >> h >> f, f @ f, 0), (f >> h >> f, f >> h, 1),
+            (f @ y, f @ y, 1), (y @ f, f @ y, 0), (x @ f, f @ x, 0)]:
+        host, pattern = host.to_map(), pattern.to_map()
+        assert list(host.homomorphisms(pattern))
+        matches = list(host.match(pattern))
+        assert len(matches) == n_matches
+        assert all(match.substitute(pattern.to_diagram()).normal_form()
+                   == host.to_diagram().normal_form() for match in matches)
+
+
+def test_match_needs_a_connected_map():
+    from discopy.monoidal import Ty, Box
+    x = Ty('x')
+    f, s = Box('f', x, x), Box('s', Ty(), Ty())
+    with raises(AxiomError):
+        next((f @ s).to_map().match(f.to_map()))
+    with raises(AxiomError):
+        next(f.to_map().rewrite((f.to_map(), s.to_map())))
+    with raises(AxiomError):
+        compact.CMap.cups(compact.Ty('x'), compact.Ty('x').r).wiring()

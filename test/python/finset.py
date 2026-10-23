@@ -106,3 +106,15 @@ def test_Function_permutation_moves_blocks():
     assert Function.permutation([1, 2, 0], [1, 1, 1])\
         == Function(list(Permutation([1, 2, 0])), 3, 3)
     assert Function.permutation([0, 1], [2, 3]) == Function.id(5)
+
+
+def test_Cospan():
+    from hypothesis import given
+    from discopy.python.finset import Cospan
+    with raises(ValueError):
+        Cospan([], [], -1)
+
+    @given(Cospan.strategy(dom=0, cod=0, max_size=0))
+    def at_most_max_size(cospan):
+        assert cospan == Cospan([], [], 0)
+    at_most_max_size()

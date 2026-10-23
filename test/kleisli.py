@@ -30,6 +30,8 @@ def test_EndoFunctor():
     assert listing(int) == Ty(list[int])
     assert listing(increment)([1, 2, 3]) == [2, 3, 4]
     assert listing.then(listing)(int) == listing(listing(int))
+    assert EndoFunctor.id() >> Maybe == Maybe == Maybe >> EndoFunctor.id()
+    assert (EndoFunctor.id() >> Maybe).then(Maybe, Maybe)(int) == Maybe(int)
 
 
 def test_Monad_repr():
@@ -461,6 +463,23 @@ def test_additive_Channel_tensor():
     # Whiskering on either side comes from `MonoidalCategory`.
     assert ((str, ) @ increment).dom == Ty(str, int)
     assert (increment @ (str, )).dom == Ty(int, str)
+
+
+def test_additive_Channel_tensor_is_nary():
+    from discopy.monoidal import Ty as T, Box, Layer, Functor
+
+    Safe = additive.Channel[Maybe]
+    half = Safe(lambda x: x // 2 if x % 2 == 0 else None, int, int)
+    increment = Safe(lambda x: x + 1, int, int)
+    assert half.tensor() is half
+    assert half.tensor(increment, half)(4, 2) == Tagged(2, 2)
+
+    # A functor maps a layer with one n-ary tensor.
+    x = T('x')
+    f = Box('f', x, x)
+    F = Functor({x: int}, {f: increment}, cod=Safe)
+    assert [F(Layer(f, x, f))(1, tag) for tag in range(3)]\
+        == [Tagged(2, 0), Tagged(1, 1), Tagged(2, 2)]
 
 
 def test_additive_tensor_is_a_bifunctor():

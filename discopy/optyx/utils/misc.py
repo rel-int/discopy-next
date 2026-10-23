@@ -234,7 +234,9 @@ def explode_channel(
 
     arrows = []
     for layer in kraus:
-        left, generator, right = layer.inside[0].boxes_and_types
+        (generator, offset), = layer.inside[0].boxes_and_offsets
+        left = layer.dom[:offset]
+        right = layer.dom[offset + len(generator.dom):]
         channel = channel_class(
             generator.name,
             generator,

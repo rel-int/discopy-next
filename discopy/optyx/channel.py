@@ -586,7 +586,9 @@ class Diagram(frobenius.Diagram):
         """
         kraus, env = diagram.Id(self.dom.single()), diagram.Ty()
         for layer in self:
-            left, box, right = layer.inside[0].boxes_and_types
+            (box, offset), = layer.inside[0].boxes_and_offsets
+            left = layer.dom[:offset]
+            right = layer.dom[offset + len(box.dom):]
             left, right = left.single(), right.single()
             if isinstance(box, Feedback):
                 raise NotImplementedError(
@@ -1209,7 +1211,7 @@ class Diagram(frobenius.Diagram):
         are_layers_pure = []
         are_layers_classical = []
         for layer in self:
-            generator = layer.inside[0].boxes_and_types[1]
+            generator, _ = layer.inside[0].boxes_and_offsets[0]
 
             if isinstance(generator, Feedback) and not all(
                 part.is_pure for part in (
@@ -1256,7 +1258,9 @@ class Diagram(frobenius.Diagram):
         assert self.is_pure, "Cannot get a Kraus map of non-pure circuit"
         kraus_maps = [diagram.Id(self.dom.single())]
         for layer in self:
-            left, generator, right = layer.inside[0].boxes_and_types
+            (generator, offset), = layer.inside[0].boxes_and_offsets
+            left = layer.dom[:offset]
+            right = layer.dom[offset + len(generator.dom):]
             left = diagram.Ty().tensor(*[ty.single() for ty in left])
             right = diagram.Ty().tensor(*[ty.single() for ty in right])
 
@@ -1323,7 +1327,9 @@ class Diagram(frobenius.Diagram):
 
         kraus_maps = []
         for layer in self:
-            left, generator, right = layer.inside[0].boxes_and_types
+            (generator, offset), = layer.inside[0].boxes_and_offsets
+            left = layer.dom[:offset]
+            right = layer.dom[offset + len(generator.dom):]
 
             kraus_maps.append(
                 diagram.Bit(len(left)) @

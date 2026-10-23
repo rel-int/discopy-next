@@ -1,6 +1,6 @@
 from pytest import raises
 
-from discopy import cat, grammar, biclosed
+from discopy import cat, grammar, biclosed, monoidal
 from discopy.utils import dumps, from_tree, loads
 from discopy.grammar.categorial import *
 
@@ -218,6 +218,20 @@ def test_FC_BC_FX_BX():
         >> BackwardCrossedComposition(Y << X, Y >> Z)
 
 
+def test_binary_term_is_a_box():
+    X, Y, Z, W = map(Ty, "XYZW")
+    for term in (FC((Z << Y)("g"), (Y << X)("f")),
+                 BC((X >> Y)("f"), (Y >> Z)("g")),
+                 FX((Z << Y)("g"), (X >> Y)("f")),
+                 BX((Y << X)("f"), (Y >> Z)("g"))):
+        assert term >> Id(term.cod) == term == Id(term.dom) >> term
+        assert (term @ X).cod == term.cod @ X
+        assert term.to_drawing().boxes
+        assert eval(repr(term)) == term
+        assert hash(eval(repr(term))) == hash(term)
+    assert FC((Z << Y)("g"), (Y << X)("f")) != FC((Z << W)("g"), (W << X)("f"))
+
+
 def test_Functor():
     x, y, z = Ty('x'), Ty('y'), Ty('z')
     f = Box('f', x, y)
@@ -348,3 +362,81 @@ def test_Coeval():
     coeval = Eval(x << y).dagger()
     assert isinstance(coeval, Coeval) and coeval.dagger() == Eval(x << y)
     assert Diagram.box_factory is Box and Diagram.coeval_factory is Coeval
+
+
+def tokens(string):
+    "The words of a string term, read by interpreting positions as lists."
+    from discopy.grammar import abstract
+    from discopy.python import Function
+    python = abstract.Functor(
+        {abstract.Position: list},
+        lambda word: lambda: lambda xs: xs + [word.name], cod=Function)
+    return python(string)()([])
+
+
+def test_parse():
+    from discopy.grammar.abstract import Diagram as Abstract, String
+    n, np, s = Ty("n"), Ty("np"), Ty("s")
+    vp = np >> s
+    I, Mary, man = np("I"), np("Mary"), n("man")
+    saw, the = (vp << np)("saw"), (np << n)("the")
+    nominal, adverbial = ((n >> n) << np)("with"), ((vp >> vp) << np)("with")
+    sentence = [[(I, 0.)], [(saw, 0.)], [(the, 0.)], [(man, 0.)],
+                [(nominal, -1.), (adverbial, -2.)], [(Mary, 0.)]]
+    parses = parse(sentence, k=10, goal=s)
+    assert [score for _, score in parses] == [-1., -2.]
+    assert parses[0][0] == I(saw(the(man(nominal(Mary), left=True))), left=True)
+
+    def word(text):
+        return String(text)
+    strings = Functor(ob_map={n: String, np: String, s: String}, ar_map={
+        I: word("I"), Mary: word("Mary"), man: word("man"),
+        saw: String(lambda o: String(lambda x: x.compose(word("saw"), o))),
+        the: String(lambda x: word("the").compose(x)),
+        nominal: String(lambda o: String(
+            lambda x: x.compose(word("with"), o))),
+        adverbial: String(lambda o: (String >> String)(lambda v: String(
+            lambda x: v(x).compose(word("with"), o))))}, cod=Abstract)
+    for term, _ in parses:
+        assert tokens(strings(term)) == "I saw the man with Mary".split()
+    assert parse(sentence[:3], goal=s) == [] and parse([]) == []
+
+
+def test_parse_normal_form():
+    x, y, z = map(Ty, "xyz")
+    f, g, a = (x << y)("f"), (y << z)("g"), z("a")
+    assert parse([[(f, 0.)], [(g, 0.)], [(a, 0.)]], k=10)\
+        == [(f(g(a)), 0.)]
+    b, h, k = z("b"), (z >> y)("h"), (y >> x)("k")
+    assert parse([[(b, 0.)], [(h, 0.)], [(k, 0.)]], k=10)\
+        == [(b(h, left=True)(k, left=True), 0.)]
+    assert parse([[(f, 0.)], [(g, 0.)]]) == [(FC(f, g), 0.)]
+
+
+def test_parse_k_best():
+    from random import Random
+    random, x, y = Random(0), Ty("x"), Ty("y")
+    types = [x, y, x << y, y << x, x >> y, y >> x, (x << y) << y, y >> (x >> x)]
+
+    def every(sentence, i, j):
+        return list(sentence[i]) if j == i + 1 else [
+            (term, a + b) for middle in range(i + 1, j)
+            for left, a in every(sentence, i, middle)
+            for right, b in every(sentence, middle, j)
+            for term in combine(left, right)]
+    for _ in range(30):
+        sentence = [[(ty(f"w{i}"), float(random.randint(-9, 0)))
+                     for ty in random.sample(types, 3)]
+                    for i in range(random.randint(1, 5))]
+        for k in (1, 3):
+            expected = sorted(
+                (score for _, score in every(sentence, 0, len(sentence))),
+                reverse=True)[:k]
+            assert [score for _, score in parse(sentence, k)] == expected
+
+
+def test_Word_dagger():
+    n = Ty('n')
+    Bob = Word('Bob', n)
+    assert (Bob[::-1].dom, Bob[::-1].cod) == (n, Ty())
+    assert (Bob >> Bob[::-1]).cod == Ty() and Bob[::-1][::-1] == Bob

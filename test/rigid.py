@@ -118,6 +118,8 @@ def test_Diagram_normal_form():
     diagram = f\
         .transpose(left=True).transpose(left=True).transpose().transpose()
     assert diagram.normal_form() == f
+    snake = x @ Cap(x.r, x) >> Cup(x, x.r) @ x
+    assert (f @ snake).foliation().normal_form() == f @ x
 
     Eckmann_Hilton = Box('s0', Ty(), Ty()) @ Box('s1', Ty(), Ty())
     with raises(NotImplementedError) as err:
