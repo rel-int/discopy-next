@@ -161,3 +161,19 @@ def test_inflation_only_touches_optical_wires():
     assert Measure(qubit).inflate(2) == Measure(qubit)
     assert Encode(bit).inflate(2) == Encode(bit)
     assert Encode(mode, internal_states=[1, 0]).internal_states == ([1, 0], )
+
+
+def test_measure_inflate_mixed_types():
+    dom = qubit @ bit @ qmode @ mode
+    assert Measure(dom).inflate(2).dom == dom.inflate(2)
+
+
+def test_encode_inflate_mixed_types():
+    dom = qubit @ bit @ qmode @ mode
+    encode = Encode(dom, internal_states=([1, 0],))
+    assert encode.inflate(2).dom == dom.inflate(2)
+
+
+def test_dual_rail_only_for_zx_channels():
+    with pytest.raises(TypeError, match="Only ZX channels"):
+        Channel("id", diagram.Id(diagram.mode)).dual_rail()
