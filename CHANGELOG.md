@@ -521,8 +521,8 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   symmetry group an equivariance check runs a module against, and
   `leg_generators` the same generators as permutations of legs, before
   they act on ports. `from_incidence` draws the bipartite incidence graph
-  of nodes and relations, with non-uniform degrees and a name and a
-  signature per relation; `from_relation` draws the graph of a symmetric
+  of nodes and factors, with non-uniform degrees and a name and a
+  signature per factor; `from_relation` draws the graph of a symmetric
   irreflexive binary relation. Both close the traced loops and draw in
   `frobenius`: every box they wire has an empty domain, so every wire
   joins two codomain ports, which a map accepts only between self-dual

@@ -22,7 +22,7 @@ CLUE, ANSWER = Ty("clue"), Ty("answer")
 
 def cell(degree: int = 3) -> Signature:
     """
-    A cell of a factor graph: one message port per unit it belongs to, plus
+    A cell of a factor graph: one message port per factor it belongs to, plus
     a state, a clue and an answer loop.
     """
     return Signature((
@@ -60,7 +60,7 @@ def test_positions_and_loops():
 
 def test_both_builders_draw_frobenius_maps():
     """
-    A triangle from a relation and a square with two units from an
+    A triangle from a relation and a square with two factors from an
     incidence are closed maps in ``frobenius``, the one category where a
     wire between two codomain ports type checks, with every port wired
     exactly once; each is the map of a frobenius diagram, its wires the cups
@@ -69,22 +69,22 @@ def test_both_builders_draw_frobenius_maps():
     node = Signature((Orbit(PEER, 2, Sym.PERM), Orbit(STATE, traced=True)))
     triangle = from_relation(((1, 2), (0, 2), (0, 1)), node)
     assert [len(box.cod) for box in triangle.boxes] == [4, 4, 4]
-    unit = Signature((Orbit(PEER, 3, Sym.PERM), ))
-    square = from_incidence(((0, 1), ) * 4, node, unit)
+    factor = Signature((Orbit(PEER, 3, Sym.PERM), ))
+    square = from_incidence(((0, 1), ) * 4, node, factor)
     assert [len(box.cod) for box in square.boxes] == [4] * 6
-    assert [box.name for box in square.boxes] == ["cell"] * 4 + ["unit"] * 2
+    assert [box.name for box in square.boxes] == ["cell"] * 4 + ["factor"] * 2
     for shape, n_ports in ((triangle, 12), (square, 24)):
         assert isinstance(shape, frobenius.CMap)
         assert shape.n_ports == n_ports
         assert not len(shape.dom) and not len(shape.cod)
         assert shape.edges.is_fixpoint_free_involution()
         assert shape.to_diagram().to_map() == shape
-    assert isinstance(unit.box("unit"), frobenius.Box)
+    assert isinstance(factor.box("factor"), frobenius.Box)
 
 
 def test_the_relation_must_be_symmetric_irreflexive_and_in_range():
     node = Signature((Orbit(PEER, 1), Orbit(STATE, traced=True)))
-    unit = Signature((Orbit(PEER, 1), ))
+    factor = Signature((Orbit(PEER, 1), ))
     with raises(ValueError, match="not symmetric"):
         from_relation(((1, ), (0, ), (0, )), node)
     with raises(ValueError, match="related to itself"):
@@ -96,26 +96,26 @@ def test_the_relation_must_be_symmetric_irreflexive_and_in_range():
             from_relation(relation, node)
     for incidence in (((0, -1), ), ((0.0, ), )):
         with raises(ValueError, match="does not exist"):
-            from_incidence(incidence, node, unit)
+            from_incidence(incidence, node, factor)
 
 
 def test_incidence_names_and_signatures():
     """
-    Relations may carry one signature each, under one name each; the names
-    must be one per relation; and a relation nobody belongs to is a box
+    Factors may carry one signature each, under one name each; the names
+    must be one per factor; and a factor nobody belongs to is a box
     with no ports, a scalar of the map.
     """
     node = Signature((Orbit(MESSAGE, 2, Sym.PERM), Orbit(STATE, traced=True)))
-    unit = Signature((Orbit(MESSAGE, 3, Sym.PERM), ))
+    factor = Signature((Orbit(MESSAGE, 3, Sym.PERM), ))
     readout = Signature((Orbit(MESSAGE, 1), Orbit(CLUE, traced=True)))
     shape = from_incidence(
-        ((0, 1), (0, 1)), node, {"unit": unit, "readout": readout},
-        relation_name=("unit", "readout"))
+        ((0, 1), (0, 1)), node, {"factor": factor, "readout": readout},
+        factor_name=("factor", "readout"))
     assert [(box.name, len(box.cod)) for box in shape.boxes] \
-        == [("cell", 4), ("cell", 4), ("unit", 2), ("readout", 4)]
-    with raises(ValueError, match="2 names for 1 relations"):
-        from_incidence(((0, ), ), node, unit, relation_name=("a", "b"))
-    memberless = from_incidence(((1, ), ), node, unit)
+        == [("cell", 4), ("cell", 4), ("factor", 2), ("readout", 4)]
+    with raises(ValueError, match="2 names for 1 factors"):
+        from_incidence(((0, ), ), node, factor, factor_name=("a", "b"))
+    memberless = from_incidence(((1, ), ), node, factor)
     assert [len(box.cod) for box in memberless.boxes] == [3, 0, 1]
 
 
@@ -147,14 +147,14 @@ def test_resize_and_what_an_orbit_refuses():
 def test_the_builders_resize_the_first_orbit_only():
     """
     A node of degree ``d`` gets its first orbit resized to ``d`` and no
-    other, even one playing the same role, as does a relation of ``m``
+    other, even one playing the same role, as does a factor of ``m``
     members.
     """
     node = Signature((Orbit(MESSAGE, 2, Sym.PERM), Orbit(MESSAGE, traced=True)))
     path = from_relation(((1, ), (0, 2), (1, )), node)
     assert [len(box.cod) for box in path.boxes] == [3, 4, 3]
-    unit = Signature((Orbit(MESSAGE, 3, Sym.PERM), Orbit(MESSAGE, traced=True)))
-    star = from_incidence(((0, ), ) * 4, node, unit)
+    factor = Signature((Orbit(MESSAGE, 3, Sym.PERM), Orbit(MESSAGE, traced=True)))
+    star = from_incidence(((0, ), ) * 4, node, factor)
     assert [len(box.cod) for box in star.boxes] == [3] * 4 + [6]
 
 

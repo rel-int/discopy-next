@@ -85,8 +85,8 @@ from discopy.utils import assert_isatomic
 NODE = "cell"
 """ The name the node boxes of a generated wiring get by default. """
 
-RELATION = "unit"
-""" The name the relation boxes of a generated wiring get by default. """
+FACTOR = "factor"
+""" The name the factor boxes of a generated wiring get by default. """
 
 
 class Sym(StrEnum):
@@ -213,10 +213,10 @@ class Signature:
         Example
         -------
         >>> from discopy.frobenius import Ty
-        >>> unit = Signature((Orbit(Ty("message"), 3, Sym.PERM), ))
-        >>> print(unit.box("unit"))
-        unit
-        >>> print(unit.box("unit").cod)
+        >>> factor = Signature((Orbit(Ty("message"), 3, Sym.PERM), ))
+        >>> print(factor.box("factor"))
+        factor
+        >>> print(factor.box("factor").cod)
         message @ message @ message
         """
         return frobenius.Box(name, frobenius.Ty(), self.cod)
@@ -361,20 +361,20 @@ def leg_generators(sym: Sym, arity: int) -> list[tuple[int, ...]]:
 
 
 def from_incidence(incidence: tuple, node: Signature,
-                   relation: Signature | Mapping[str, Signature],
+                   factor: Signature | Mapping[str, Signature],
                    node_name: str = NODE,
-                   relation_name: str | tuple[str, ...] = RELATION
+                   factor_name: str | tuple[str, ...] = FACTOR
                    ) -> frobenius.CMap:
     """
-    The bipartite incidence graph of a family of nodes and the relations
+    The bipartite incidence graph of a family of nodes and the factors
     they belong to, as a closed map in :mod:`discopy.frobenius`: one node
-    box per node with one incidence port per relation it belongs to plus
-    its traced loops, one relation box per relation with one port per
-    member, and a wire from each node to each of its relations.
+    box per node with one incidence port per factor it belongs to plus
+    its traced loops, one factor box per factor with one port per
+    member, and a wire from each node to each of its factors.
 
     Neither the degrees nor the sizes need to be uniform: a node of degree
     ``d`` gets the node signature with its first orbit resized to ``d``,
-    and likewise a relation of ``m`` members -- one shared module still
+    and likewise a factor of ``m`` members -- one shared module still
     fills every site of a name. A module shared across degrees must answer
     any number of legs alike, reading its degree off the tensors it is
     handed, since a layer built for one degree fails on another; one that
@@ -382,25 +382,25 @@ def from_incidence(incidence: tuple, node: Signature,
     degree.
 
     Parameters:
-        incidence : Per node, the indices of the relations it belongs to;
-                    relations are numbered from ``0``.
+        incidence : Per node, the indices of the factors it belongs to;
+                    factors are numbered from ``0``.
         node : The signature of a node box, whose first orbit is the
                incidence orbit; its declared arity is a default, resized
                per node.
-        relation : The signature of a relation box, whose first orbit is
-                   the membership orbit, resized per relation; or a
-                   mapping from relation name to signature when the
-                   relations do not all share one.
+        factor : The signature of a factor box, whose first orbit is the
+                 membership orbit, resized per factor; or a mapping from
+                 factor name to signature when the factors do not all
+                 share one.
         node_name : The name every node box carries.
-        relation_name : The name every relation box carries, or one name
-                        per relation -- boxes of one name share one
-                        module, so a relation playing a different part,
-                        e.g. a graph-level readout wired to every node,
-                        is a relation with a name of its own.
+        factor_name : The name every factor box carries, or one name per
+                      factor -- boxes of one name share one module, so a
+                      factor playing a different part, e.g. a graph-level
+                      readout wired to every node, is a factor with a
+                      name of its own.
 
     Raises:
-        ValueError : If a node belongs to a relation that does not exist, or
-                     if the names are not one per relation.
+        ValueError : If a node belongs to a factor that does not exist, or
+                     if the names are not one per factor.
 
     Example
     -------
@@ -408,52 +408,52 @@ def from_incidence(incidence: tuple, node: Signature,
     >>> message, given = Ty("message"), Ty("given")
     >>> node = Signature((Orbit(message, 2, Sym.PERM),
     ...                   Orbit(given, traced=True)))
-    >>> unit = Signature((Orbit(message, 3, Sym.PERM), ))
-    >>> square = from_incidence(((0, 1), (0, 1), (0, 1)), node, unit)
+    >>> factor = Signature((Orbit(message, 3, Sym.PERM), ))
+    >>> square = from_incidence(((0, 1), (0, 1), (0, 1)), node, factor)
     >>> len(square.boxes), square.n_ports // 2
     (5, 9)
 
-    A graph-level readout is one more relation every node belongs to,
+    A graph-level readout is one more factor every node belongs to,
     under its own name -- a generator, not a feature of the model:
 
     >>> shape = from_incidence(
-    ...     ((0, 1), (0, 1), (1, )), node, unit,
-    ...     relation_name=("unit", "readout"))
+    ...     ((0, 1), (0, 1), (1, )), node, factor,
+    ...     factor_name=("factor", "readout"))
     >>> [box.name for box in shape.boxes]
-    ['cell', 'cell', 'cell', 'unit', 'readout']
+    ['cell', 'cell', 'cell', 'factor', 'readout']
     """
     n_nodes = len(incidence)
-    for index, relations in enumerate(incidence):
-        for other in relations:
+    for index, incident in enumerate(incidence):
+        for other in incident:
             if not isinstance(other, int) or other < 0:
-                raise ValueError(f"node {index} belongs to relation {other}, "
+                raise ValueError(f"node {index} belongs to factor {other}, "
                                  "which does not exist")
-    size = Counter(other for relations in incidence for other in relations)
-    n_relations = 1 + max(size, default=-1)
-    names = (relation_name, ) * n_relations \
-        if isinstance(relation_name, str) else tuple(relation_name)
-    if len(names) != n_relations:
-        raise ValueError(f"{len(names)} names for {n_relations} relations")
-    relations_of = dict.fromkeys(names, relation) \
-        if isinstance(relation, Signature) else dict(relation)
+    size = Counter(other for incident in incidence for other in incident)
+    n_factors = 1 + max(size, default=-1)
+    names = (factor_name, ) * n_factors \
+        if isinstance(factor_name, str) else tuple(factor_name)
+    if len(names) != n_factors:
+        raise ValueError(f"{len(names)} names for {n_factors} factors")
+    signature_of = dict.fromkeys(names, factor) \
+        if isinstance(factor, Signature) else dict(factor)
 
-    nodes = [node.resize(0, len(relations)) for relations in incidence]
-    units = [relations_of[names[index]].resize(0, size[index])
-             for index in range(n_relations)]
+    nodes = [node.resize(0, len(incident)) for incident in incidence]
+    factors = [signature_of[names[index]].resize(0, size[index])
+               for index in range(n_factors)]
 
-    free = [0] * n_relations
+    free = [0] * n_factors
     wires: list = []
-    for index, relations in enumerate(incidence):
-        for position, other in enumerate(relations):
+    for index, incident in enumerate(incidence):
+        for position, other in enumerate(incident):
             wires.append(
                 ((index, position), (n_nodes + other, free[other])))
             free[other] += 1
         wires += nodes[index].loop_wires(index)
-    for other in range(n_relations):
-        wires += units[other].loop_wires(n_nodes + other)
+    for other in range(n_factors):
+        wires += factors[other].loop_wires(n_nodes + other)
 
     boxes = tuple(sig.box(node_name) for sig in nodes) + tuple(
-        sig.box(names[index]) for index, sig in enumerate(units))
+        sig.box(names[index]) for index, sig in enumerate(factors))
     return frobenius.CMap.from_wiring(boxes, wires)
 
 
