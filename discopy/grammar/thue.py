@@ -55,8 +55,8 @@ class Rule(monoidal.Box):
     >>> assert (r[::-1].dom, r[::-1].cod) == (s, n @ n)
     >>> assert r[::-1][::-1] == r
     """
-    def __init__(self, dom: monoidal.Ty, cod: monoidal.Ty, name: str = None,
-                 **params):
+    def __init__(self, dom: monoidal.Ty, cod: monoidal.Ty,
+                 name: str | None = None, **params):
         name = f"Rule({dom}, {cod})" if name is None else name
         monoidal.Box.__init__(self, name, dom, cod, **params)
 
@@ -89,8 +89,8 @@ class Word(Rule):
     >>> Alice = Word('Alice', Ty('n'))
     >>> assert (Alice >> Alice[::-1]).cod == Ty()
     """
-    def __init__(self, name: str, cod: monoidal.Ty, dom: monoidal.Ty = None,
-                 **params):
+    def __init__(self, name: str, cod: monoidal.Ty,
+                 dom: monoidal.Ty | None = None, **params):
         dom = self.ob() if dom is None else dom
         Rule.__init__(self, dom=dom, cod=cod, name=name, **params)
 

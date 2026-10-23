@@ -199,6 +199,17 @@ class Diagram(closed.Diagram):
         dom (Ty) : The domain of the diagram, i.e. its input.
         cod (Ty) : The codomain of the diagram, i.e. its output.
     """
+    box_factory: ClassVar[type["Box"]]
+    functor_factory: ClassVar[type["Functor"]]
+    copy_factory: ClassVar[type["Copy"]]
+    permutation_factory: ClassVar[type["Permutation"]]
+    swap_factory: ClassVar[type["Swap"]]
+    curry_factory: ClassVar[type["Curry"]]
+    eval_factory: ClassVar[type["Eval"]]
+    coeval_factory: ClassVar[type["Coeval"]]
+    trace_factory: ClassVar[type["Trace"]]  # ty: ignore[invalid-type-form]
+    discard_factory: ClassVar[type["Discard"]]
+    sum_factory: ClassVar[type["Sum"]]
     ob = Ty
 
     @classmethod
@@ -293,8 +304,22 @@ class Discard(closed.Discard, Copy):
     "The discard of an abstract type, i.e. a copy with zero legs."
 
 
+class Function(closed.Function, Box):
+    """
+    A markov function in an abstract diagram, which copies or discards, so
+    that plumbing tensors into a function of this level rather than of
+    :mod:`discopy.closed`.
+
+    >>> x = Ty('x')
+    >>> assert (Diagram.discard(x) @ Id(x)).dom == x @ x
+    """
+
+
 class Permutation(closed.Permutation, Box):
     "A permutation of abstract types."
+
+
+Function.register(Permutation)
 
 
 class Swap(Permutation, closed.Swap, Box):
@@ -353,6 +378,7 @@ CMap = cmap.CMap[Diagram]
 class TermBase(Box, closed.TermBase):
     "A term in the internal language of an abstract categorial grammar."
     functor = Functor.id(Diagram)
+    strategy = classmethod(closed.TermBase.strategy.__func__)
 
 
 class Constant(TermBase, closed.Constant):
@@ -380,6 +406,7 @@ Id = Diagram.id
 Feedback, Trace, FollowedBy, Head, Tail = feedback.generators(Diagram, Box)
 Diagram.box_factory, Diagram.functor_factory = Box, Functor
 Diagram.copy_factory = Copy
+Diagram.function_factory = Function
 Diagram.permutation_factory = Permutation
 Diagram.swap_factory = Swap
 Diagram.curry_factory = Curry

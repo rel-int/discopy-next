@@ -69,7 +69,8 @@ import warnings
 from typing import Callable, ClassVar
 
 from discopy import symmetric, monoidal, feedback, cmap, hypergraph, messages
-from discopy.abc import ComarkovCategory, MarkovCategory
+from discopy.abc import ComarkovCategory, MarkovCategory, Nat
+from discopy.axioms import FUEL
 from discopy.cat import factory
 from discopy.feedback import (  # noqa: F401  pylint: disable=unused-import
     Wire, Ty)
@@ -154,6 +155,21 @@ class Diagram(symmetric.Diagram, MarkovCategory):
     layer_factory = Layer
 
     @classmethod
+    def sample(cls, *, dom=None, cod=None, fuel=FUEL):
+        """
+        Sample Markov diagrams through their quotient: a hypergraph drawn
+        by :meth:`discopy.hypergraph.Hypergraph.strategy` with at most
+        ``fuel + 1`` boxes, besides the one balancing box that may close its
+        boundary, and the spiders that the category supports, i.e.
+        copies and discards here and every spider in a hypergraph category,
+        downgraded with :meth:`discopy.hypergraph.Hypergraph.to_diagram`.
+        """
+        category = hypergraph.Hypergraph[cls]  # ty: ignore[invalid-type-form]
+        return category.strategy(
+            dom=dom, cod=cod, max_leaves=fuel + 1).map(
+                lambda graph: graph.to_diagram())
+
+    @classmethod
     def spider_factory(cls, n_legs_in, n_legs_out, typ, phase=None):
         if phase is not None or n_legs_in != 1:
             raise ValueError(messages.NO_SUCH_SPIDER.format(
@@ -180,7 +196,8 @@ class Diagram(symmetric.Diagram, MarkovCategory):
         if cls.function_factory.ar is cls:
             return cls.from_function(finset.Function.copy(len(x), n), x)
         from discopy import frobenius
-        return frobenius.Diagram.spiders.__func__(cls, 1, n, x)
+        return frobenius.Diagram.spiders.__func__(
+            cls, 1, n, x)  # ty: ignore[invalid-argument-type]
 
     @classmethod
     def discard(cls, x: monoidal.Ty) -> Diagram:
@@ -191,6 +208,11 @@ class Diagram(symmetric.Diagram, MarkovCategory):
             x : The type to discard.
         """
         return cls.copy(x, 0)
+
+    map_agreement = monoidal.Diagram.map_agreement.failing(
+        messages.MAP_HAS_NO_SPIDERS)
+    str_transparency = monoidal.Diagram.str_transparency.failing(
+        messages.STR_SPLITS_LAYERS)
 
     @classmethod
     def from_function(cls, func, dom: monoidal.Ty) -> Diagram:
@@ -214,7 +236,8 @@ class Diagram(symmetric.Diagram, MarkovCategory):
         """
         func = list(func)
         if sorted(func) == list(range(len(dom))):
-            return cls.from_permutation(func, dom)
+            return cls.from_permutation(
+                func, dom)  # ty: ignore[invalid-return-type]
         if cls.function_factory.ar is cls:
             return cls.function_factory(dom, func)
         return super().from_function(func, dom)
@@ -237,7 +260,7 @@ class Diagram(symmetric.Diagram, MarkovCategory):
             "use discopy.comarkov.Diagram.merge instead.",
             DeprecationWarning, stacklevel=2)
         from discopy import comarkov
-        return comarkov.Diagram.merge(x, n)
+        return comarkov.Diagram.merge(x, n)  # ty: ignore[invalid-return-type]
 
     @property
     def is_deterministic(self) -> bool:
@@ -375,7 +398,8 @@ feedback.Ty(feedback.Wire('x')), is_deterministic=False)
         >>> assert not sample.subs(phi, 1).is_deterministic
         >>> assert not sample.lambdify(phi)(1).is_deterministic
         """
-        return self.flagged(super().subs(*args))
+        return self.flagged(
+            super().subs(*args))  # ty: ignore[invalid-argument-type]
 
     def lambdify(self, *symbols, **kwargs) -> Callable:
         function = super().lambdify(*symbols, **kwargs)
@@ -441,10 +465,10 @@ class Function(Box):
     .. image:: /_static/markov/function.svg
         :align: center
     """
-    def __new__(cls, dom: monoidal.Ty = None, func=None):
+    def __new__(cls, dom: monoidal.Ty | None = None, func=None):
         if dom is None or cls is not cls.ar.function_factory:
             return super().__new__(cls)
-        func = list(func)
+        func = list(func)  # ty: ignore[invalid-argument-type]
         if sorted(func) == list(range(len(dom))):
             return cls.ar.permutation_factory(dom, func)
         if len(dom) == 1 and not any(func):
@@ -452,7 +476,7 @@ class Function(Box):
         return super().__new__(cls)
 
     def __init__(self, dom: monoidal.Ty, func):
-        self.func = finset.Function(list(func), len(dom), len(func))
+        self.func = finset.Function(list(func), Nat(len(dom)), Nat(len(func)))
         cod = dom[:0].tensor(*(dom[i] for i in self.func))
         Box.__init__(self, f"Function({list(self.func)})", dom, cod)
 
@@ -611,7 +635,7 @@ class Permutation(symmetric.Permutation, Box):
     >>> assert Swap(x, y) @ Copy(x) == Function(x @ y @ x, [1, 0, 2, 2])
     """
     func = property(lambda self: finset.Function(
-        list(self.perm), len(self.dom), len(self.cod)))
+        list(self.perm), Nat(len(self.dom)), Nat(len(self.cod))))
     fuse, tensor = Function.fuse, Function.tensor
 
 
@@ -762,7 +786,8 @@ class Functor(symmetric.Functor):
                 and not isinstance(other, symmetric.Permutation):
             function = getattr(self.cod, "function", None)\
                 or MarkovCategory.function.__func__.__get__(self.cod)
-            return function(other.func, list(map(self, other.dom)))
+            return function(  # ty: ignore[invalid-argument-type]
+                other.func, list(map(self, other.dom)))
         return super().__call__(other)
 
 

@@ -11,7 +11,7 @@ from math import ceil
 from pathlib import Path
 from typing import (
     Callable,
-    Generic,
+    ClassVar,
     Mapping,
     Iterable,
     Iterator,
@@ -19,6 +19,7 @@ from typing import (
     Any,
     Collection,
     NamedTuple,
+    Sequence,
     Union,
     TYPE_CHECKING,
 )
@@ -31,7 +32,7 @@ from networkx import Graph, connected_components
 import discopy.messages as messages
 
 if TYPE_CHECKING:
-    from discopy.monoidal import Ty, Diagram
+    from discopy.monoidal import Ty
     from discopy.abc import Category
 
 KT = TypeVar('KT')
@@ -56,11 +57,13 @@ class MappingOrCallable(Mapping[KT, VT]):
     assert len(g) == 1
     assert list(g) == [0]
     """
-    def __class_getitem__(_, args: tuple[type, type]) -> type:
+    def __class_getitem__(_, args: tuple[type, type]):
         source, target = args
-        return Mapping[source, target] | Callable[[source], target]
+        return (
+            Mapping[source, target]  # ty: ignore[invalid-type-form]
+            | Callable[[source], target])  # ty: ignore[invalid-type-form]
 
-    def __init__(self, mapping: MappingOrCallable[KT, VT]) -> None:
+    def __init__(self, mapping) -> None:
         while isinstance(mapping, MappingOrCallable):
             mapping = mapping.mapping
         if not isinstance(mapping, Mapping) and not callable(mapping):
@@ -102,7 +105,7 @@ class MappingOrCallable(Mapping[KT, VT]):
     def __repr__(self):
         return repr(self.mapping)
 
-    def then(self, other: MappingOrCallable[VT, V2T]
+    def then(self, other: Mapping[VT, V2T] | Callable[[VT], V2T]
              ) -> MappingOrCallable[KT, V2T]:
         """
         Returns the composition of the object with a dict or a Callable.
@@ -146,138 +149,22 @@ def get_origin(typ):
     return typ if origin is Union else origin
 
 
-class NamedGeneric(Generic[TypeVar('T')]):
+def rebuild_named_generic(func, origin, values, args):
     """
-    A ``NamedGeneric`` is a ``Generic`` where the type parameter has a name.
-
-    Parameters:
-        attributes : The names of the type parameters.
-
-    Note
-    ----
-    In a standard ``Generic`` class, the type parameter disappears when the
-    member of the class is instantiated, e.g.
-
-    >>> assert list[int]([1, 2, 3])\\
-    ...     == list[float]([1, 2, 3])\\
-    ...     == [1, 2, 3]
-
-    In a ``NamedGeneric``, the type parameter is attached to the members of the
-    class so that we have access to it.
-
-    Example
-    -------
-
-    >>> from dataclasses import dataclass
-    >>> @dataclass
-    ... class L(NamedGeneric["dtype"]):
-    ...     inside: list
-    >>> assert L[int]([1, 2, 3]).dtype == int
-    >>> assert L[int]([1, 2, 3]) != L[float]([1, 2, 3])
-
-    A subscript of a class that is its own :func:`factory`, i.e. the arrows
-    of a category, is its own factory in turn, so that the structural arrows
-    it builds through ``cls.ar`` carry the parameter.
-
-    >>> from discopy.abc import Category
-    >>> @factory
-    ... class C(Category, NamedGeneric["dtype"]):
-    ...     pass
-    >>> assert C[int].factory is C[int] is C[int].ar
-
-    A DisCoPy class is named by its module, since every level of the
-    hierarchy has a ``Diagram`` of its own:
-
-    >>> from discopy import frobenius
-    >>> frobenius.Hypergraph.__name__
-    'Hypergraph[frobenius.Diagram]'
+    Unpickle a member of a subscripted :class:`NamedGeneric` by calling the
+    reconstructor ``func`` of its pickle on the subscripted class itself,
+    which is found by subscripting its ``origin`` again with its ``values``,
+    each decoded from its :class:`Subscript`.
     """
-    _cache = dict()
-
-    def __class_getitem__(_, attributes):
-        if not isinstance(attributes, tuple):
-            attributes = (attributes,)
-        if not all(isinstance(attribute, str) for attribute in attributes):
-            raise TypeError(messages.NO_TYPE_PARAMETER.format(_))
-
-        G = Generic.__class_getitem__(tuple(map(TypeVar, attributes)))
-
-        class Result(G):
-            def __class_getitem__(cls, values):
-                if hasattr(cls, "__is_named_generic__"):
-                    cls = cls.__bases__[0]
-                values = values if isinstance(values, tuple) else (values,)
-                cls_values = tuple(
-                    getattr(cls, attr, None) for attr in attributes)
-                if cls not in NamedGeneric._cache:
-                    NamedGeneric._cache[cls] = {cls_values: cls}
-                if values not in NamedGeneric._cache[cls]:
-                    origin = get_origin(cls)
-
-                    class C(origin):
-                        __is_named_generic__ = True
-
-                        def __reduce__(self):
-                            """
-                            Pickle a member of the subscripted class as a
-                            member of its origin carrying the values, since
-                            a class created inside a function cannot be
-                            found by name, see `how can I pickle a
-                            dynamically created nested class
-                            <https://stackoverflow.com/questions/1947904>`_.
-                            """
-                            func, args, data = super().__reduce__()
-                            if '[' in args[0].__name__:
-                                args = (origin, ) + args[1:]
-                                data = dict(
-                                    data, __class_getitem__values__=tuple(
-                                        map(Subscript.encode, values)))
-                            return func, args, data
-
-                    C.__module__ = origin.__module__
-                    names = [
-                        factory_name(v) if is_discopy_class(v)
-                        else getattr(v, "__name__", str(v)) for v in values]
-                    C.__name__ = C.__qualname__ = origin.__name__\
-                        + f"[{', '.join(names)}]"
-                    C.__origin__, C.__values__ = cls, values
-                    for attr, value in zip(attributes, values):
-                        setattr(C, attr, value)
-                    if getattr(origin, "factory", None) is origin:
-                        C.factory = C
-                    NamedGeneric._cache[cls][values] = C
-                return NamedGeneric._cache[cls][values]
-
-            def __setstate__(self, state):
-                """
-                Unpickle a member of the origin as a member of the class
-                subscripted by the values its state carries, see
-                ``__reduce__`` above, then restore the rest of the state.
-                """
-                if "__class_getitem__values__" in state:
-                    state = dict(state)
-                    self.__class__ = type(self)[tuple(map(
-                        Subscript.decode,
-                        state.pop("__class_getitem__values__")))]
-                if hasattr(super(), "__setstate__"):
-                    super().__setstate__(state)
-                else:
-                    self.__dict__.update(state)
-
-            __name__ = __qualname__\
-                = f"NamedGeneric[{', '.join(map(repr, attributes))}]"
-
-        for attr in attributes:
-            setattr(Result, attr, getattr(Result, attr, None))
-        return Result
+    return func(origin[tuple(map(Subscript.decode, values))], *args)
 
 
 class Subscript:
     """
     A class subscripted by :class:`NamedGeneric`, as its origin and its
     values. Such a class is created on the fly, so it cannot be pickled by
-    name: a value that is one, e.g. the ``Matrix[int]`` of
-    ``Equation[Matrix[int]]``, is pickled as its subscript instead.
+    name: a value that is one, e.g. the ``Cyclic[2]`` of
+    ``Product[Cyclic[2], Symmetric[3]]``, is pickled as its subscript.
 
     Parameters:
         origin : The class subscripted.
@@ -310,7 +197,147 @@ class Subscript:
         return value
 
 
-def product(xs: list, unit=1):
+class NamedGeneric:
+    """
+    A ``NamedGeneric`` is a class whose type parameters are attached by name
+    to its members.
+
+    Note
+    ----
+    In a standard ``Generic`` class, the type parameter disappears when the
+    member of the class is instantiated, e.g.
+
+    >>> assert list[int]([1, 2, 3])\\
+    ...     == list[float]([1, 2, 3])\\
+    ...     == [1, 2, 3]
+
+    In a ``NamedGeneric``, the type parameter is attached to the members of the
+    class so that we have access to it.
+
+    Example
+    -------
+
+    >>> from dataclasses import dataclass
+    >>> @dataclass
+    ... class L[dtype](NamedGeneric):
+    ...     inside: list
+    >>> assert L[int]([1, 2, 3]).dtype == int
+    >>> assert L[int]([1, 2, 3]) != L[float]([1, 2, 3])
+
+    A subscript of a class that is its own :func:`factory`, i.e. the arrows
+    of a category, is its own factory in turn, so that the structural arrows
+    it builds through ``cls.ar`` carry the parameter.
+
+    >>> from discopy.abc import Category
+    >>> from discopy.axioms import TestableGeneric
+    >>> @factory
+    ... class C[dtype](Category, TestableGeneric):
+    ...     checked_params = classmethod(lambda cls: ())
+    >>> assert C[int].factory is C[int] is C[int].ar
+
+    A DisCoPy class is named by its module, since every level of the
+    hierarchy has a ``Diagram`` of its own:
+
+    >>> from discopy import frobenius
+    >>> frobenius.Hypergraph.__name__
+    'Hypergraph[frobenius.Diagram]'
+    """
+    if TYPE_CHECKING:
+        #: The names of the type parameters in DisCoPy, declared so that
+        #: reading them typechecks: subscripting attaches their values.
+        dtype: ClassVar[Any]
+        category: ClassVar[Any]
+        base: ClassVar[Any]
+        natural: ClassVar[Any]
+        algebra: ClassVar[Any]
+        generator_factory: ClassVar[Any]
+
+    _cache = dict()
+
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)
+        for param in cls.__type_params__:
+            if not hasattr(cls, param.__name__):
+                setattr(cls, param.__name__, None)
+
+    def __class_getitem__(cls, values):
+        """
+        Subscripting with values builds a subclass carrying them, while
+        subscripting with the type parameters of the class syntax, e.g.
+        ``class Box[dtype](Diagram[dtype])``, declares a plain subclass.
+        """
+        values = values if isinstance(values, tuple) else (values,)
+        if any(isinstance(value, TypeVar) and value.__infer_variance__
+               for value in values):
+            return super().__class_getitem__(
+                values[0] if len(values) == 1 else values)
+        if hasattr(cls, "__is_named_generic__"):
+            cls = cls.__bases__[0]
+        attributes = next((
+            [param.__name__ for param in c.__type_params__]
+            for c in cls.__mro__ if c.__type_params__), None)
+        if attributes is None:
+            raise TypeError(messages.NO_TYPE_PARAMETER.format(cls))
+        cls_values = tuple(getattr(cls, attr, None) for attr in attributes)
+        if cls not in NamedGeneric._cache:
+            NamedGeneric._cache[cls] = {cls_values: cls}
+        if values not in NamedGeneric._cache[cls]:
+            origin = get_origin(cls)
+
+            class C(origin):
+                __is_named_generic__ = True
+
+                def __reduce__(self):
+                    """
+                    Pickle a member of the subscripted class by its
+                    origin and values, since a class created inside
+                    a function cannot be found by name, see `how can
+                    I pickle a dynamically created nested class
+                    <https://stackoverflow.com/questions/1947904>`_.
+                    The class is rebuilt before the state is set,
+                    so that unpickling needs no ``__setstate__``,
+                    which the subscripted class does not inherit.
+
+                    >>> import pickle
+                    >>> from discopy.tensor import Tensor, Dim
+                    >>> t = Tensor[int]([1, 0, 0, 1], Dim(2), Dim(2))
+                    >>> u = pickle.loads(pickle.dumps(t))
+                    >>> assert type(u) is Tensor[int] and u == t
+                    """
+                    func, args, *rest = super().__reduce__()
+                    if not args or args[0] is not C:
+                        return (func, args, *rest)
+                    return (
+                        rebuild_named_generic,
+                        (func, origin, tuple(map(Subscript.encode, values)),
+                         args[1:]), *rest)
+
+            C.__module__ = origin.__module__
+            names = [
+                factory_name(v) if is_discopy_class(v)
+                else getattr(v, "__name__", str(v)) for v in values]
+            C.__name__ = C.__qualname__ = origin.__name__\
+                + f"[{', '.join(names)}]"
+            C.__origin__, C.__values__ = cls, values
+            for attr, value in zip(attributes, values):
+                setattr(C, attr, value)
+            if getattr(origin, "factory", None) is origin:
+                C.factory = C
+            NamedGeneric._cache[cls][values] = C
+        return NamedGeneric._cache[cls][values]
+
+    def __setstate__(self, state):
+        if "__class_getitem__values__" in state:
+            self.__class__ = self.__class__[
+                state.pop("__class_getitem__values__")]
+        setstate = getattr(super(), "__setstate__", None)
+        if setstate is None:
+            self.__dict__.update(state)
+        else:
+            setstate(state)
+
+
+def product(xs: Sequence, unit=1):
     """
     The left-fold product of a ``unit`` with list of ``xs``.
 
@@ -440,9 +467,10 @@ def resolve_factory(name: str) -> type:
     """
     if name.endswith(']'):
         origin, parameter = name[:-1].split('[', 1)
-        return resolve_factory(origin)[resolve_factory(parameter)]
+        return resolve_factory(origin)[
+            resolve_factory(parameter)]  # ty: ignore[not-subscriptable]
     *modules, factory = name.removeprefix('discopy.').split('.')
-    import discopy
+    import discopy  # pylint: disable=import-outside-toplevel
     module = discopy
     for attr in modules:
         module = getattr(module, attr)
@@ -853,7 +881,7 @@ def text_width(text: str, fontsize=12, points_per_inch=72., grid=16):
     return ceil(width / points_per_inch * grid) / grid
 
 
-def tuplify(stuff: any, n: int | None = None) -> tuple:
+def tuplify(stuff: Any, n: int | None = None) -> tuple:
     """
     Turns anything into a tuple, do nothing if it is already.
 
@@ -870,7 +898,7 @@ def tuplify(stuff: any, n: int | None = None) -> tuple:
     return stuff if n != 1 and isinstance(stuff, tuple) else (stuff, )
 
 
-def untuplify(stuff: tuple) -> any:
+def untuplify(stuff: tuple | list) -> Any:
     """
     Takes the element out of a tuple if it has length 1, otherwise do nothing.
 
@@ -962,7 +990,7 @@ def assert_isparallel(left: Category, right: Category):
         raise AxiomError(messages.NOT_PARALLEL.format(left, right))
 
 
-def assert_isatomic(typ: Ty, cls: type = None):
+def assert_isatomic(typ: Ty, cls: type | None = None):
     """ Raise :class:`AxiomError` if a type does not have length one. """
     cls = cls or type(typ)
     assert_isinstance(typ, cls)
@@ -971,7 +999,7 @@ def assert_isatomic(typ: Ty, cls: type = None):
             factory_name(cls), len(typ)))
 
 
-def assert_istraceable(arg: Diagram, n=1, left=False):
+def assert_istraceable(arg, n=1, left=False):
     """ Raise :class:`AxiomError` if a diagram is not traceable. """
     if n < 0 or n > min(len(arg.dom), len(arg.cod)):
         raise ValueError(messages.NOT_SPLITTABLE.format(n, arg))

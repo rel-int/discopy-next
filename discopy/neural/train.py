@@ -419,7 +419,7 @@ def clip_rows(k: float, *rows: torch.Tensor, ref: torch.Tensor,
     work = torch.float64 if rows[0].dtype == torch.float64 else torch.float32
     squares = sum(r.detach().reshape(b, -1).to(work).pow(2).sum(1)
                   for r in rows)
-    norms = torch.sqrt(squares)
+    norms = torch.sqrt(squares)  # ty: ignore[invalid-argument-type]
     scale = scales(norms, k, ref, reference)
     return (tuple(rescale(r, scale) for r in rows),
             statistics(norms, ref, scale))
@@ -494,7 +494,7 @@ def per_board_backward(net: nn.Module, board_loss, batched: tuple, k: float,
     """
     # pylint: disable=too-many-arguments,too-many-positional-arguments
     # pylint: disable=too-many-locals
-    k = positive(k)
+    k = positive(k)  # ty: ignore[invalid-assignment]
     bound = Bound(net, board_loss)
     params = {name: p.detach() for name, p in bound.named_parameters()
               if p.requires_grad}
@@ -510,8 +510,9 @@ def per_board_backward(net: nn.Module, board_loss, batched: tuple, k: float,
 
     in_dims = (None, ) + (0, ) * len(batched)
     b = batched[0].shape[0]
-    rows, aux = vmap(grad(one, has_aux=True), in_dims=in_dims,
-                     randomness="same")(params, *batched)
+    gradient = grad(one, has_aux=True)
+    rows, aux = vmap(
+        gradient, in_dims=in_dims, randomness="same")(params, *batched)
     rows = {name: row.detach() for name, row in rows.items()}
     aux = tuple(a.detach() for a in aux)
     losses, aux = aux[0], aux[1:]

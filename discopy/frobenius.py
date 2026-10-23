@@ -71,7 +71,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from copy import copy
-from typing import Self
+from typing import ClassVar, Self
 
 from discopy import (
     monoidal, rigid, markov, comarkov, compact, pivotal, feedback, cmap,
@@ -106,6 +106,7 @@ class Wire(pivotal.Wire):
         return result
 
     r = l
+    windings = (0, )
 
 
 HeadOb, TailOb = feedback.wire_generators(Wire)
@@ -207,9 +208,18 @@ class Diagram(
         dom (Ty) : The domain of the diagram, i.e. its input.
         cod (Ty) : The codomain of the diagram, i.e. its output.
     """
+    sum_factory: ClassVar[type["Sum"]]
+    box_factory: ClassVar[type["Box"]]
+    functor_factory: ClassVar[type["Functor"]]
+    cup_factory: ClassVar[type["Cup"]]
+    cap_factory: ClassVar[type["Cap"]]
+    swap_factory: ClassVar[type["Swap"]]
+    permutation_factory: ClassVar[type["Permutation"]]
+    bubble_factory: ClassVar[type["Bubble"]]
 
     ob = Ty
     layer_factory = Layer
+    str_transparency = compact.Diagram.str_transparency
 
     @classmethod
     def from_cospan(cls, apex: Ty, left, right) -> Diagram:
@@ -233,7 +243,9 @@ class Diagram(
         dom = apex[:0].tensor(*(apex[k:k + 1] for k in left))
         if len(left) == len(right) == len(apex)\
                 and sorted(left) == sorted(right) == list(range(len(apex))):
-            return cls.from_permutation([left.index(k) for k in right], dom)
+            perm = [left.index(k) for k in right]
+            result = cls.from_permutation(perm, dom)
+            return result  # ty: ignore[invalid-return-type]
         if cls.cospan_factory.ar is cls:
             return cls.cospan_factory(apex, left, right)
         return super().from_cospan(apex, left, right)
@@ -248,7 +260,8 @@ class Diagram(
         ...     == Cospan(x @ y, [0, 1], [1, 0, 0])
         """
         if cls.cospan_factory.ar is not cls:
-            return super().from_function(func, dom)
+            return super().from_function(
+                func, dom)  # ty: ignore[invalid-return-type]
         return cls.from_cospan(dom, range(len(dom)), func)
 
     @classmethod
@@ -261,7 +274,8 @@ class Diagram(
         ...     == Cospan(x @ y, [1, 0, 0], [0, 1])
         """
         if cls.cospan_factory.ar is not cls:
-            return super().from_cofunction(cofunc, cod)
+            return super().from_cofunction(
+                cofunc, cod)  # ty: ignore[invalid-return-type]
         return cls.from_cospan(cod, cofunc, range(len(cod)))
 
     @classmethod
@@ -382,10 +396,11 @@ class Cospan(Box):
     .. image:: /_static/frobenius/cospan.svg
         :align: center
     """
-    def __new__(cls, apex: Ty = None, left=None, right=None):
+    def __new__(cls, apex: Ty | None = None, left=None, right=None):
         if apex is None or cls is not cls.ar.cospan_factory:
             return super().__new__(cls)
-        left, right = list(left), list(right)
+        left, right = list(
+            left), list(right)  # ty: ignore[invalid-argument-type]
         if len(apex) == 1 and not any(left + right)\
                 and not len(left) == len(right) == 1:
             factory = {(2, 0): cls.ar.cup_factory, (0, 2): cls.ar.cap_factory
@@ -457,10 +472,12 @@ class Cospan(Box):
         >>> print(Cospan(x @ y, [0, 1, 0], [1, 1]).to_spiders())
         Permutation(x @ y @ x, [0, 2, 1]) >> Cup(x, x) @ Spider(1, 2, y)
         """
+        left, right, apex = self.legs.left, self.legs.right, self.legs.apex
+        m, n = len(self.dom), len(self.cod)
         ins, gather = finset.Function(
-            self.legs.left, self.legs.apex, len(self.dom)).factorise()
+            left, apex, m).factorise()  # ty: ignore[invalid-argument-type]
         outs, scatter = finset.Function(
-            self.legs.right, self.legs.apex, len(self.cod)).factorise()
+            right, apex, n).factorise()  # ty: ignore[invalid-argument-type]
         points = [self.apex[k:k + 1] for k in range(len(self.apex))]
         spiders = []
         for x, m, n in zip(points, ins, outs):
@@ -626,7 +643,7 @@ class Permutation(
     """
     apex = property(lambda self: self.dom)
     legs = property(lambda self: finset.Cospan(
-        range(len(self.dom)), list(self.perm), len(self.dom)))
+        list(range(len(self.dom))), list(self.perm), len(self.dom)))
     tensor, fuse = Cospan.tensor, Cospan.fuse
 
 
@@ -808,7 +825,7 @@ class Functor(compact.Functor, markov.Functor, comarkov.Functor):
 
 
 def interleaving(cls: type, factory: Callable
-                 ) -> Callable[[int, int, Ty], Diagram]:
+                 ) -> Callable[..., Diagram]:
     """
     Take a ``factory`` for spiders of atomic types and extend it recursively.
 
@@ -837,7 +854,7 @@ def interleaving(cls: type, factory: Callable
 
 
 def coherence(cls: type, factory: Callable
-              ) -> Callable[[int, int, Ty], Diagram]:
+              ) -> Callable[..., Diagram]:
     """
     Take a ``factory`` for spiders with one or three legs of atomic types
     and extend it recursively to arbitrary spiders of atomic types.
@@ -887,7 +904,8 @@ Feedback, Trace, FollowedBy, Head, Tail = feedback.generators(Diagram, Box)
 Diagram.box_factory = Box
 Diagram.functor_factory = Functor
 Diagram.cup_factory, Diagram.cap_factory = Cup, Cap
-Diagram.swap_factory, Diagram.spider_factory = Swap, Spider
+Diagram.swap_factory = Swap
+Diagram.spider_factory = Spider  # ty: ignore[invalid-assignment]
 Diagram.permutation_factory = Permutation
 Diagram.cospan_factory = Cospan
 Diagram.bubble_factory = Bubble

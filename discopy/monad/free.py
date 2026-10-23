@@ -41,7 +41,8 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
-from discopy.abc import Category, NamedGeneric
+from discopy.abc import Category
+from discopy.axioms import TestableGeneric
 from discopy.kleisli.channel import Channel
 from discopy.kleisli.monad import Monad
 from discopy.python.function import Function
@@ -50,7 +51,7 @@ from discopy.utils import (
 
 
 @factory
-class Homomorphism(Category, NamedGeneric['monad']):
+class Homomorphism[monad](Category, TestableGeneric):
     """
     A homomorphism between the free algebras of a monad ``M`` on two types
     ``X`` and ``Y``, i.e. a function from ``M(X)`` to ``M(Y)`` commuting
@@ -86,6 +87,11 @@ class Homomorphism(Category, NamedGeneric['monad']):
     ...     == (neighbours >> neighbours)(0) == frozenset({-2, 0, 2})
     >>> assert step.to_channel()(0) == neighbours(0)
     """
+    @classmethod
+    def checked_params(cls) -> tuple:
+        """ None, a homomorphism of free algebras having no strategy yet. """
+        return ()
+
     ob = type
     monad: Monad
 
@@ -128,7 +134,8 @@ class Homomorphism(Category, NamedGeneric['monad']):
             channel : The channel to extend.
         """
         monad = cls.monad
-        assert_ismember(channel, Channel[monad])
+        assert_ismember(
+            channel, Channel[monad])  # ty: ignore[invalid-type-form]
         return cls(
             monad(channel.inside) >> monad.mult(channel.cod),
             channel.dom, channel.cod)
@@ -139,7 +146,7 @@ class Homomorphism(Category, NamedGeneric['monad']):
         unit, inverse to :meth:`from_channel`.
         """
         monad = type(self).monad
-        return Channel[monad](
+        return Channel[monad](  # ty: ignore[invalid-type-form]
             monad.unit(self.dom) >> self.inside, self.dom, self.cod)
 
     def __call__(self, m):

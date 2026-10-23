@@ -741,7 +741,7 @@ def solve(model, puzzles, solutions, cfg: SolveConfig, grade=exact,
         x[rows], x0[rows], given[rows] = puzzles[p], puzzles[p], given_all[p]
         chain_done[rows] = False
         if label is not None:
-            chain_label[rows] = label[p]
+            chain_label[rows] = label[p]  # ty: ignore[invalid-assignment]
         slot_puzzle[slot], slot_round[slot] = p, 0
         slot_start[slot] = total_calls
 

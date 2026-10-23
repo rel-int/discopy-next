@@ -151,10 +151,11 @@ import copy
 
 from collections.abc import Callable
 
-from typing import ClassVar, Iterator
+from typing import Iterator, Self, ClassVar
 
 from discopy import cat, monoidal, biclosed, messages
-from discopy.abc import Pregroup, RigidCategory
+from discopy.abc import DaggerCategory, Pregroup, RigidCategory
+from discopy.axioms import GENERATORS
 from discopy.cat import factory
 from discopy.utils import (
     assert_isatomic,
@@ -202,15 +203,27 @@ class Wire(monoidal.Wire):
         super().__init__(name, dom, cod)
 
     def dagger(self) -> Wire:
-        raise AxiomError("Rigid types have no dagger, use pivotal instead.")
+        raise AxiomError(messages.RIGID_TYPE_HAS_NO_DAGGER)
+
+    def atoms(self) -> list[Wire]:
+        """
+        The wire with no winding, which the string of an adjoint rotates,
+        e.g. ``x.r``.
+
+        >>> x = Wire('x')
+        >>> assert x.r.atoms() == x.l.atoms() == [x]
+        """
+        dom, cod = (self.dom, self.cod) if self.z % 2 == 0\
+            else (self.cod, self.dom)
+        return [type(self)(self.name, dom=dom, cod=cod)]
 
     @property
-    def l(self) -> Wire:
+    def l(self) -> Self:
         """ The left adjoint of the object. """
         return type(self)(self.name, self.z - 1, dom=self.cod, cod=self.dom)
 
     @property
-    def r(self) -> Wire:
+    def r(self) -> Self:
         """ The right adjoint of the object. """
         return type(self)(self.name, self.z + 1, dom=self.cod, cod=self.dom)
 
@@ -219,6 +232,19 @@ class Wire(monoidal.Wire):
         result = copy.copy(self)
         result.z = 0
         return result
+
+    windings = (0, 1, -1)
+    """ The winding numbers :meth:`strategy` draws from, simplest first. """
+
+    @classmethod
+    def strategy(cls):
+        """ Generate named objects with a winding number in
+        :attr:`windings`. """
+        from hypothesis import strategies as st
+
+        return st.tuples(
+            st.sampled_from(GENERATORS), st.sampled_from(cls.windings),
+        ).map(lambda args: cls(args[0], z=args[1]))
 
     def __eq__(self, other):
         return monoidal.Wire.__eq__(self, other)\
@@ -273,12 +299,12 @@ class Ty(Pregroup, biclosed.Ty):
         super().__setstate__(state)
 
     @property
-    def l(self) -> Ty:
+    def l(self) -> Self:
         """ The left adjoint of the type. """
         return self.ar(*[x.l for x in self.inside[::-1]])
 
     @property
-    def r(self) -> Ty:
+    def r(self) -> Self:
         """ The right adjoint of the type. """
         return self.ar(*[x.r for x in self.inside[::-1]])
 
@@ -323,7 +349,7 @@ class Nat(monoidal.Nat, Ty):
     """
     l = r = property(lambda self: self)
 
-    def unwind(self) -> Nat:
+    def unwind(self) -> "Nat":
         """
         The identity: a natural number has no winding.
 
@@ -626,7 +652,7 @@ class Diagram(biclosed.Diagram, RigidCategory):
                 yield _diagram
                 diagram = _diagram
         for _diagram in monoidal.Diagram.normalize(diagram, left=left):
-            yield _diagram
+            yield _diagram  # ty: ignore[invalid-yield]
 
     normalize = snake_removal
 
@@ -656,6 +682,35 @@ class Diagram(biclosed.Diagram, RigidCategory):
         >>> assert double_snake == two_snakes_nf
         """
         return super().normal_form(**params)
+
+    hypergraph_section = monoidal.Diagram.hypergraph_section.failing(
+        messages.SECTION_NEEDS_SWAPS)
+    dagger_involution = DaggerCategory.dagger_involution.failing(
+        messages.RIGID_HAS_NO_DAGGER)
+    dagger_contravariance = DaggerCategory.dagger_contravariance.failing(
+        messages.RIGID_HAS_NO_DAGGER)
+    dagger_monoidality = DaggerCategory.dagger_monoidality.failing(
+        messages.RIGID_HAS_NO_DAGGER)
+
+    # The curry of a rigid diagram is made of caps, which a map and a
+    # hypergraph both read as wiring, so the two agree.
+    map_agreement = monoidal.Diagram.map_agreement
+    currying_left = RigidCategory.currying_left.failing(
+        messages.NO_PLANAR_NORMAL_FORM)
+    currying_right = RigidCategory.currying_right.failing(
+        messages.NO_PLANAR_NORMAL_FORM)
+    currying_eta_left = RigidCategory.currying_eta_left.failing(
+        messages.NO_PLANAR_NORMAL_FORM)
+    currying_eta_right = RigidCategory.currying_eta_right.failing(
+        messages.NO_PLANAR_NORMAL_FORM)
+    currying_naturality_left = RigidCategory.currying_naturality_left\
+        .failing(messages.NO_PLANAR_NORMAL_FORM)
+    currying_naturality_right = RigidCategory.currying_naturality_right\
+        .failing(messages.NO_PLANAR_NORMAL_FORM)
+    snake_equations = RigidCategory.snake_equations.failing(
+        messages.NO_PLANAR_NORMAL_FORM)
+    transpose_contravariance = RigidCategory.transpose_contravariance.failing(
+        messages.NO_PLANAR_NORMAL_FORM)
 
 
 class Box(biclosed.Box, Diagram):
@@ -779,7 +834,7 @@ class Box(biclosed.Box, Diagram):
         """
         box = super().from_tree(tree)
         box.z = tree.get('z', 0)
-        return box
+        return box  # ty: ignore[invalid-return-type]
 
     @property
     def is_transpose(self):
@@ -949,7 +1004,7 @@ class Functor(biclosed.Functor):
         return super().__call__(other)
 
 
-def nesting(cls: type, factory: Callable) -> Callable[[Ty, Ty], Diagram]:
+def nesting[T](cls: type[T], factory: Callable) -> Callable[[Ty, Ty], T]:
     """
     Take a :code:`factory` for cups or caps of atomic types
     and extends it recursively, to types of the same length.
@@ -977,7 +1032,7 @@ def nesting(cls: type, factory: Callable) -> Callable[[Ty, Ty], Diagram]:
             return left[0] @ tail @ right[-1] >> head
         return head >> left[0] @ tail @ right[-1]
 
-    return method
+    return method  # ty: ignore[invalid-return-type]
 
 
 def to_rigid(self):
@@ -993,6 +1048,7 @@ biclosed.Diagram.to_rigid = to_rigid
 Diagram.box_factory = Box
 Diagram.cup_factory, Diagram.cap_factory, Diagram.sum_factory = Cup, Cap, Sum
 Diagram.functor_factory = Functor
+
 
 Id = Diagram.id
 

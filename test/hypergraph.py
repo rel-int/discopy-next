@@ -27,10 +27,13 @@ def test_Hypergraph_str():
 
 def test_Hypergraph_repr():
     x, y = map(Ty, "xy")
-    assert repr(H.spiders(1, 0, x @ y))\
+    from discopy import frobenius, hypergraph
+    graph = H.spiders(1, 0, x @ y)
+    assert repr(graph)\
         == "hypergraph.Hypergraph[frobenius.Diagram]("\
            "dom=frobenius.Ty(frobenius.Wire('x'), frobenius.Wire('y')), "\
            "cod=frobenius.Ty(), boxes=(), wires=((0, 1), (), ()))"
+    assert eval(repr(graph)) == graph
 
 
 def test_Hypergraph_hash():
@@ -190,6 +193,32 @@ def test_cups_and_caps_are_checked_in_port_order():
     for dom, cod in [(rigid.Ty(), x.l @ x), (x @ x.l, rigid.Ty())]:
         with raises(AxiomError, match="x is not the left adjoint of x.l"):
             K(dom, cod, (), ((0, 0) if dom else (), (), (0, 0) if cod else ()))
+
+
+def test_traced_copy_of_a_wire_with_a_dagger():
+    """ A traced copy reads a spider twice and writes it nowhere, a cap of a
+    wire and itself, which a category with no adjoints accepts whatever the
+    dagger of the wire: a shape reversed by ``Dim.dagger`` was refused. """
+    from discopy.neural.network import Network, Box, Dims
+    from discopy.tensor import Dim
+    x, y = Dims(Dim(2, 3)), Dims(2)
+    f = Box('f', x @ x, y)
+    loop = (Network.copy(x, 3) >> f @ x >> Network.discard(y) @ x).trace(
+        left=True)
+    assert loop.to_hypergraph().to_diagram().to_hypergraph()\
+        == loop.to_hypergraph()
+
+
+def test_str_transparency():
+    """ A hypergraph prints as the diagram it decodes to, which reads back in
+    the environment of its category, and to the hypergraph. """
+    from discopy import symmetric
+    from discopy.hypergraph import Hypergraph
+    x = symmetric.Ty('x')
+    graph = (symmetric.Box('f', x, x) @ x >> symmetric.Swap(x, x)
+             ).to_hypergraph()
+    assert str(graph) == "f @ x >> Swap(x, x)"
+    assert Hypergraph[symmetric.Diagram].str_transparency(term=graph)
 
 
 def test_rotation_is_the_transpose():
@@ -525,6 +554,29 @@ def test_trace_needs_traced_pivotal():
         x = module.Ty('x')
         graph = module.Box('f', x @ x, x @ x).to_hypergraph()
         assert graph.trace().cod == graph.trace(left=True).cod == x
+
+
+def test_planar_comparison():
+    """ Below symmetric categories, a hypergraph is not faithful, so the
+    laws of a planar level are compared on the nose: each pair here was
+    identified when they were compared by hypergraph. """
+    from discopy import balanced, braided, monoidal, rigid
+    x, y = braided.Ty('x'), braided.Ty('y')
+    braid, inverse = braided.Braid(x, y), braided.Braid(y, x)[::-1]
+    assert braid.to_hypergraph() != inverse.to_hypergraph()
+    assert not braided.Diagram.equation_factory(braid, inverse)
+    x = balanced.Ty('x')
+    twist, identity = balanced.Twist(x), balanced.Diagram.id(x)
+    assert twist.to_hypergraph() != identity.to_hypergraph()
+    assert not balanced.Diagram.equation_factory(twist, identity)
+    x = rigid.Ty('x')
+    left = rigid.Cap(x, x.l) @ x >> x @ rigid.Cup(x.l, x)
+    right = x @ rigid.Cap(x.r, x) >> rigid.Cup(x, x.r) @ x
+    assert left.to_hypergraph() != right.to_hypergraph()  # cups are boxes
+    assert not rigid.Diagram.equation_factory(left, right)
+    x, scalar = monoidal.Ty('x'), monoidal.Box('s', monoidal.Ty(), monoidal.Ty())
+    assert (scalar @ x).to_hypergraph() == (x @ scalar).to_hypergraph()
+    assert not monoidal.Diagram.equation_factory(scalar @ x, x @ scalar)
 
 
 def test_cups_and_caps_read_the_host_category():

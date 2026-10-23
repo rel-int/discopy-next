@@ -9,6 +9,42 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Added
 
+- `axioms.Rule` and `@rule`, inference rules stated like laws on each
+  structure of `abc`, and `FreeCategory.search`, the terms of a free
+  category derived from its rules, which the property matrix draws:
+  `Testable.enrolled` and `Testable.matrix` say what it checks,
+  `proptest/test_rules.py` types every rule and the `fast` profile checks
+  each law once ([next#1]).
+- `axioms.Serialisable`, the roundtrips of a term as laws, and the sorts
+  `Atom`, `Count`, `Perm` and `Objs` ([next#1]).
+- The laws of traced and feedback categories: the vanishing, iteration,
+  superposing, naturality and dinaturality of the trace, `delay_unit`,
+  `delay_composition`, and `sliding` with a memory that changes type
+  ([next#1]).
+- The laws of monoidal, braided, symmetric, balanced, Markov and hypergraph
+  categories: bifunctoriality, the hexagons, the braid, twist and yanking,
+  `permutation_*`, copying and the spiders, compared up to hypergraph from
+  symmetric categories on ([next#1]).
+- The laws of rigid, pivotal, compact and closed categories: the snakes,
+  cups and caps, transposes, adjunction, pivotality, the Reidemeister moves
+  and currying, a planar level comparing them on the nose; `Axiom.canonical`
+  and `Axiom.draw` state a law as a schema ([next#1]).
+- `Hypergraph.strategy` and `CMap.strategy`, which sample the symmetric
+  levels and above, and the laws of the conversions they rely on:
+  `to_hypergraph` is a strict monoidal functor, decoding is its section,
+  maps agree with hypergraphs, foliation is idempotent, and maps and
+  hypergraphs read back from their diagrams and their strings; a sampled
+  Markov diagram reads back from its string only up to interchange
+  ([next#1]).
+- Lenses, parametric maps and integer diagrams in the property matrix,
+  compared up to the equation of their category by `axioms.quotient`
+  ([next#1]).
+- Kleisli channels, monad homomorphisms and `python.Function` in the
+  property matrix, compared extensionally by `axioms.Extensional` on
+  `axioms.values` ([next#1]).
+- Lambda terms in the property matrix with the laws of beta reduction,
+  `biclosed.Normalising`, and proof nets with `sequentialisation`
+  ([next#1]).
 - `discopy.abc`, the abstract base classes of the hierarchy, from `Category`
   to `PROP`, `Monoid` and `Pregroup` ([#326], [#331], [#727]).
 - `discopy.axioms`, laws stated once on `abc` and checked by the Hypothesis
@@ -103,6 +139,10 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Changed
 
+- `NamedGeneric` takes the parameters of PEP 695, `class Matrix[dtype](...,
+  NamedGeneric)`, the abstract base classes bound theirs, and the package
+  typechecks with `ty`, pinned in the `dev` group and run by the `lint` job
+  ([next#1]).
 - DisCoPy requires Python 3.12 and is packaged with uv ([#311]).
 - `closed` is the closed *symmetric* monoidal category; the planar one, with
   `Over` and `Under`, is `biclosed` ([#322]).
@@ -170,6 +210,14 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Fixed
 
+- What the property matrix found, each with its test ([next#1]): delaying a
+  `feedback.Box` built with keywords and resetting a structural one,
+  `Feedback.dagger` and `rotate`, `Layer.merge` on a snake, a bubble rebuilt
+  from its `keywords`, `para.Compact.curry`, the copies and discards of
+  abstract diagrams, a layer holding `Spider(1, 1, x)`, the hypergraph of a
+  traced copy of a wire whose dagger is not itself, e.g. a `Dims(Dim(2, 3))`,
+  and the strings of delayed boxes, structural boxes and adjoint wires,
+  which read back once their `atoms` are the generators they name.
 - `Hypergraph`: its hash, `simplify`, `rotate`, and `to_diagram` on
   non-self-dual, `Nat` and `Dim` types ([#324], [#387], [#393], [#622],
   [#719]).

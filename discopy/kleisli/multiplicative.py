@@ -71,13 +71,13 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
-from discopy.abc import Category, NamedGeneric
+from discopy.abc import Category
+from discopy.axioms import Equation, TestableGeneric
 from discopy.kleisli import channel
-from discopy.kleisli.monad import Monad
+from discopy.kleisli.monad import Maybe, Monad, Powerset, Seed, Subdistribution
 from discopy.python import function
-from discopy.python.multiplicative import Ty
-from discopy.utils import (
-    assert_isinstance, assert_iscomposable, factory, factory_name)
+from discopy.python.multiplicative import Function, Ty
+from discopy.utils import assert_isinstance, assert_iscomposable, factory_name
 
 
 class Row:
@@ -144,8 +144,7 @@ def unpack_value(value) -> tuple:
     return value.values if isinstance(value, Row) else (value, )
 
 
-@factory
-class Channel(Category, NamedGeneric['monad']):
+class Channel[monad](Category, TestableGeneric):
     """
     A channel is a morphism in the Kleisli category of a monad ``M`` with
     tuple as tensor, i.e. a Python function from a tuple of wires ``dom``
@@ -180,12 +179,56 @@ class Channel(Category, NamedGeneric['monad']):
     >>> discard = Nondet.discard((int, ))
     >>> assert discard(3) == frozenset({()})
     """
+    @classmethod
+    def checked_params(cls) -> tuple:
+        """
+        The named monads.
+        """
+        return (Maybe, Powerset, Subdistribution, Seed)
+
     ob = Ty
     monad: Monad
 
+    @classmethod
+    def equation_factory(cls, *terms: Channel) -> Equation:
+        """
+        The equation of a law, compared by the boundary of its terms and
+        what the monad observes of their outputs on the arguments of
+        :meth:`discopy.python.multiplicative.Function.arguments`, so that
+        the unit and associativity of composition are those of the monad.
+        """
+        return Equation(*terms, up_to=lambda term: (
+            term.dom, term.cod, tuple(
+                cls.monad.observe(term.raw(*args))
+                for args in Function.arguments(term.dom))))
+
+    @classmethod
+    def strategy(cls, *, dom=None, cod=None, **_):
+        """
+        Generate channels: a table from each argument of the domain to a
+        monadic value over the arguments of the codomain, drawn by the
+        :attr:`~discopy.kleisli.monad.Monad.generate` of the monad.
+        """
+        from hypothesis import strategies as st
+        generate = None if cls.monad is None else cls.monad.generate
+        if generate is None:
+            raise NotImplementedError
+
+        @st.composite
+        def channels(draw, generate: Callable):
+            source = draw(cls.ob.strategy()) if dom is None else dom
+            target = draw(cls.ob.strategy()) if cod is None else cod
+            outcomes = tuple(map(pack_value, Function.arguments(target)))
+            table = draw(st.fixed_dictionaries({
+                args: generate(outcomes)
+                for args in Function.arguments(source)}))
+            return cls(lambda *xs: table[xs], source, target)
+        return channels(generate)
+
     def __init__(self, inside: Callable, dom: Ty, cod: Ty):
         dom, cod = self.ob.cast(dom), self.ob.cast(cod)
-        packed_cls = channel.Channel[type(self).monad]
+        monad = type(self).monad
+        packed_cls = channel.Channel[monad]  # ty: ignore[invalid-type-form]
         self.inside = inside if isinstance(inside, packed_cls) else\
             packed_cls(
                 lambda v: inside(*unpack_value(v)), pack(dom), pack(cod))
@@ -201,7 +244,8 @@ class Channel(Category, NamedGeneric['monad']):
             dom : The tuple of wire types on which to take the identity.
         """
         dom = cls.ob.cast(dom)
-        return cls(channel.Channel[cls.monad].id(pack(dom)), dom, dom)
+        packed = channel.Channel[cls.monad]  # ty: ignore[invalid-type-form]
+        return cls(packed.id(pack(dom)), dom, dom)
 
     def raw(self, *xs):
         """ Call ``self``, keeping the packed monadic type as is. """
@@ -224,7 +268,8 @@ class Channel(Category, NamedGeneric['monad']):
         assert_isinstance(other, type(self))
         assert_iscomposable(self, other)
         return type(self)(
-            self.inside >> other.inside, self.dom, other.cod)
+            self.inside >> other.inside,  # ty: ignore[unsupported-operator]
+            self.dom, other.cod)
 
     def right_whisker(self, Y: Ty) -> Channel:
         """
@@ -291,8 +336,11 @@ class Channel(Category, NamedGeneric['monad']):
             n : The number of copies.
         """
         x = cls.ob.cast(x)
-        unit = cls.monad.unit(pack(x ** n))
-        return cls(lambda *xs: unit(pack_value(n * xs)), x, x ** n)
+        unit = cls.monad.unit(
+            pack(x ** n))  # ty: ignore[invalid-argument-type]
+        return cls(
+            lambda *xs: unit(  # ty: ignore[call-non-callable]
+                pack_value(n * xs)), x, x ** n)
 
     @classmethod
     def discard(cls, dom: Ty) -> Channel:

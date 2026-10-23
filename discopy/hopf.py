@@ -130,7 +130,8 @@ import numpy as np
 
 from discopy import monoidal, ribbon, tensor, frobenius, messages
 from discopy.tensor import Dim, Box, Id
-from discopy.abc import RibbonCategory, NamedGeneric
+from discopy.abc import RibbonCategory
+from discopy.axioms import TestableGeneric
 from discopy.utils import (
     assert_isinstance, assert_iscomposable, classproperty, factory,
     factory_name, from_tree, get_origin, product, unbiased)
@@ -685,7 +686,7 @@ class Double(Algebra):
         return cls(from_tree(tree['base']))
 
 
-class Representation(NamedGeneric["algebra"], frobenius.Dim):
+class Representation[algebra](TestableGeneric, frobenius.Dim):
     """
     A finite-dimensional (left) module over the class parameter ``algebra``:
     given a :class:`Algebra` ``H``, the class ``Representation[H]`` is
@@ -728,6 +729,11 @@ class Representation(NamedGeneric["algebra"], frobenius.Dim):
     .. graphviz:: /_static/hopf/module.dot
         :align: center
     """
+    @classmethod
+    def checked_params(cls) -> tuple:
+        """ None, a representation drawing no algebra. """
+        return ()
+
     def __init__(self, dim=None, action=None):
         if self.algebra is None:
             raise ValueError(
@@ -945,7 +951,7 @@ class Representation(NamedGeneric["algebra"], frobenius.Dim):
 
 
 @factory
-class Intertwiner(NamedGeneric["algebra"], RibbonCategory):
+class Intertwiner[algebra](TestableGeneric, RibbonCategory):
     """
     The ribbon category :math:`\\mathrm{Rep}(H)` of representations of the
     class parameter ``algebra``: given a :class:`Algebra` ``H``, an
@@ -1009,6 +1015,11 @@ class Intertwiner(NamedGeneric["algebra"], RibbonCategory):
     ob = classproperty(
         lambda cls: frobenius.Dim if cls.algebra is None
         else Representation[cls.algebra])
+
+    @classmethod
+    def checked_params(cls) -> tuple:
+        """ None, an intertwiner drawing no algebra. """
+        return ()
 
     def __init__(self, inside, dom, cod):
         for x in (dom, cod):

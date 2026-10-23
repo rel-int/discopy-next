@@ -159,7 +159,7 @@ class Simplifier(Rewriter):
     def add_spider(self, typ) -> int:
         for index, empty in ((self.edges, {}), (self.loops, []),
                              (self.phases, []), (self.others, 0)):
-            index.append(empty)
+            index.append(empty)  # ty: ignore[invalid-argument-type]
         return super().add_spider(typ)
 
     def add_box(self, box, dom, cod, offset=None) -> int:
@@ -211,7 +211,7 @@ def is_boundary(rewriter: Simplifier, spider: int) -> bool:
 
 
 def step(rewriter: Simplifier, interface: list[int], inner: list[int],
-         boxes: list[int], new: list[tuple], glue: dict = None) -> Step:
+         boxes: list[int], new: list[tuple], glue: dict | None = None) -> Step:
     """
     The rule that deletes ``boxes`` and the ``inner`` spiders, keeps the
     ``interface`` spiders and adds the ``new`` boxes, each given with its
@@ -323,7 +323,8 @@ def add_phases(locals_: dict[int, Local], shift: dict[int, Fraction]
 
 
 def classes(locals_: dict[int, Local], u: int, v: int,
-            skip: set[int] = frozenset()) -> tuple[list[int], ...]:
+            skip: set[int] | frozenset[int] = frozenset()
+            ) -> tuple[list[int], ...]:
     """
     The neighbours of ``u`` alone, of ``v`` alone and of both, other than
     ``u``, ``v`` and the spiders to skip, in a reproducible order.
@@ -343,7 +344,8 @@ def across(*groups: list[int]) -> list[tuple[int, int]]:
 
 
 def neighbourhood(rewriter: Simplifier, *spiders: int,
-                  known: dict[int, Local] = None) -> dict[int, Local]:
+                  known: dict[int, Local] | None = None
+                  ) -> dict[int, Local]:
     """
     The :class:`Local` neighbourhoods of spiders and their neighbours, adding
     to those already ``known``.
@@ -638,7 +640,9 @@ def fuse_gadgets(rewriter: Simplifier, spider: int) -> Step | None:
                       and len(rewriter.incidence[t]) - len(key) in (1, 2)}
             group = [hub] + [t for t, found in others.items()
                              if found is not None and found[1] == key]
-            leaves = [leaf] + [others[t][0] for t in group[1:]]
+            leaves = [leaf] + [
+                others[t][0]  # ty: ignore[not-subscriptable]
+                for t in group[1:]]
         phases = {t: rewriter.local(t).phase for t in group + leaves}
         if len(group) == 1 and not phases[hub]:
             continue
@@ -724,7 +728,7 @@ def supplement(rewriter: Simplifier, spider: int) -> Step | None:
     return None
 
 
-Rule = Callable[[Rewriter, int], Step | None]
+Rule = Callable[[Simplifier, int], Step | None]
 """ A rule tried at a spider, giving the step to take or ``None``. """
 
 RULES: list[tuple[list[Rule], Callable | None]] = [
@@ -797,11 +801,12 @@ def reduce(rewriter: Simplifier, rules=None) -> int:
         if level is None:
             return steps
         if stale[level]:
-            todo[level].update(rules[level][1](rewriter))
+            todo[level].update(
+                rules[level][1](rewriter))  # ty: ignore[call-non-callable]
             stale[level] = False
             continue
         spider = todo[level].pop()
-        if rewriter.spider_types[spider] is None:
+        if spider is None or rewriter.spider_types[spider] is None:
             continue
         for rule in rules[level][0]:
             result = rule(rewriter, spider)
@@ -977,8 +982,8 @@ def to_pyzx(graph: Hypergraph):
                 VertexType.BOUNDARY, qubit=qubit_, row=row))
             result.add_edge(
                 result.edge(ends[-1], spiders[spider]), EdgeType.SIMPLE)
-    result.set_inputs(inputs)
-    result.set_outputs(outputs)
+    result.set_inputs(tuple(inputs))
+    result.set_outputs(tuple(outputs))
     return result
 
 

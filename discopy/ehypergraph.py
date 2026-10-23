@@ -104,12 +104,13 @@ from networkx.algorithms.isomorphism import is_isomorphic
 from discopy import markov, messages, monoidal
 from discopy.abc import HypergraphCategory, MonoidalCategory
 from discopy.axioms import (
-    GENERATORS, Count, Equation, Hom, Obj, Testable, Var, axiom)
+    GENERATORS, Count, Equation, Hom, Obj, Serialisable, TestableGeneric, Var,
+    axiom)
 from discopy.drawing import Node
 from discopy.hypergraph import Hypergraph
 from discopy.monoidal import Ty
 from discopy.utils import (
-    AxiomError, NamedGeneric, assert_isparallel, classproperty, factory_name,
+    AxiomError, assert_isparallel, classproperty, factory_name,
     from_tree, pushout, resolve_factory, unbiased)
 
 if TYPE_CHECKING:
@@ -236,8 +237,8 @@ def distribute(diagram: monoidal.Diagram) -> markov.Sum:
         else markov.Sum((result, ))
 
 
-class EHypergraph(
-        MonoidalCategory, NamedGeneric['category'], Testable):
+class EHypergraph[category](
+        MonoidalCategory, TestableGeneric, Serialisable):
     """
     An e-hypergraph over a copy-discard ``category``, equal to another up to
     renaming its spiders, see :mod:`discopy.ehypergraph`.
@@ -262,6 +263,11 @@ class EHypergraph(
     f g
     """
     ob = classproperty(lambda cls: cls.category.ob)
+
+    @classmethod
+    def checked_params(cls) -> tuple:
+        """ The free Markov category, whose diagrams it shares. """
+        return (markov.Diagram, )
 
     def __init__(
             self, graph: Hypergraph, classes: tuple[int, ...] | None = None):

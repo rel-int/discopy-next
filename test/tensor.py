@@ -630,9 +630,9 @@ def test_Tensor_transparency_up_to_elision():
     from hypothesis import settings
     from hypothesis.errors import NoSuchExample
     from discopy import config
-    law = Tensor[int].transparency
+    law = Tensor[int].repr_transparency
     assert law.params == {"max_entries": config.NUMPY_THRESHOLD}
-    assert law(Tensor[int]([0] * 16, Dim(2, 2), Dim(2, 2)))
+    assert law(term=Tensor[int]([0] * 16, Dim(2, 2), Dim(2, 2)))
     assert "..." in repr(Tensor[int]([0] * 24, Dim(2, 2), Dim(2, 3)))
     with raises(NoSuchExample):
         law.falsify(settings=settings(max_examples=50, database=None))

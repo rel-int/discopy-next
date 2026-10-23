@@ -33,6 +33,7 @@ Summary
 from typing import ClassVar
 
 from discopy import rigid, frobenius, messages
+from discopy.axioms import no_strategy
 from discopy.cat import factory
 from discopy.utils import AxiomError, deprecated_alias, factory_name
 from discopy.grammar import thue
@@ -180,6 +181,12 @@ class Diagram(frobenius.Diagram):
     cups = classmethod(rigid.Diagram.cups.__func__)
     caps = classmethod(rigid.Diagram.caps.__func__)
 
+    # A pregroup diagram is a frobenius diagram over rigid wires, which wind
+    # where a frobenius wire is self-dual, so that the hypergraph its
+    # equations are compared by refuses even a single cap: it stays out of
+    # the matrix.
+    strategy = no_strategy
+
 
 class Box(frobenius.Box, Diagram):
     """
@@ -288,6 +295,7 @@ Diagram.box_factory = Box
 Diagram.swap_factory, Diagram.spider_factory = Swap, Spider
 Diagram.permutation_factory = Permutation
 Diagram.cup_factory, Diagram.cap_factory = Cup, Cap
+
 
 Id = Diagram.id
 

@@ -410,6 +410,18 @@ confidence=HIGH,
 # --enable=similarities". If you want to run only the classes checker, but have
 # no Warning level messages displayed, use "--disable=all --enable=classes
 # --disable=W".
+# Beyond pylint's defaults, the first eight, the code deliberately does not
+# follow three messages: invalid-name, since mathematical names such as `f`,
+# `x` or `Ty` are the convention; too-many-ancestors, since every level of the
+# hierarchy extends the levels above it; and cyclic-import, since the package
+# imports every module, so the graph is cyclic by design and the number of
+# cycles pylint reports varies from one run to the next. It also disables
+# abstract-class-instantiated, which pylint reads wrongly: astroid gives up
+# on a class whose type parameter is bounded by itself, e.g.
+# `class Groupoid[C0, C1: Groupoid]`, when it meets one deep in an inference,
+# so that depending on the order it reads the modules in it drops the bases
+# that implement e.g. the braid of `python.finset.Permutation` and reports
+# every permutation built as an abstract class instantiated.
 disable=raw-checker-failed,
         bad-inline-option,
         locally-disabled,
@@ -419,7 +431,8 @@ disable=raw-checker-failed,
         deprecated-pragma,
         use-symbolic-message-instead,
         invalid-name,too-many-ancestors,
-        cyclic-import
+        cyclic-import,
+        abstract-class-instantiated
 
 # Enable the message, report, category or checker with the given id(s). You can
 # either give multiple identifier separated by comma (,) or put this option

@@ -4,7 +4,6 @@ from functools import reduce
 
 from pytest import mark, raises
 
-from discopy.axioms import assert_axioms
 from discopy.group import (
     Action, Cyclic, Product, Symmetric, Wreath, kronecker)
 from discopy.python.finset import Permutation
@@ -61,11 +60,6 @@ def test_functoriality(action):
 def test_sample(G):
     rng = random.Random(42)
     assert all(isinstance(G.sample(rng), G) for _ in range(10))
-
-
-@mark.parametrize("G", GROUPS)
-def test_axioms(G):
-    assert_axioms(G)
 
 
 @mark.parametrize("G", GROUPS)

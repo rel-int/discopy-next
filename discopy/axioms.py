@@ -8,19 +8,24 @@ sequent: its type parameters are variables, e.g. objects ``A: Obj[C0]``, its
 parameters premises, e.g. a morphism ``f: Hom[C1, A, B]`` from ``A`` to
 ``B``, and its return annotation the type of its output, e.g. an equation
 ``Equation[Hom[C1, A, B]]``, which every value can be checked against, see
-:func:`inhabits`. A law a category breaks is declared :meth:`Axiom.failing`
-where it breaks, one that does not apply :meth:`Axiom.inapplicable`, and one
+:func:`inhabits`. A :class:`Rule` is stated the same way, an operation of
+the structure with a morphism as conclusion:
+the terms of a free category are those its rules derive from boxes, see
+:meth:`discopy.cat.Arrow.search`, and from symmetric categories on also
+those of the combinatorial representation their equations compare by, see
+:meth:`discopy.symmetric.Diagram.strategy`. Every strategy of a free category
+honours any boundary it is asked for.
+
+A law a category breaks is declared :meth:`Declaration.failing` where it
+breaks, one that does not apply :meth:`Declaration.inapplicable`, and one
 that holds up to a quotient or on a subspace :meth:`Axiom.modulo` and
 :meth:`Axiom.weaken`.
-
-A :class:`Testable` category generates its own objects and arrows, and
-states the laws every type that does so obeys: a term reads back from its
-representation, its string, its pickle, its deep copy and its tree. An
-:class:`Equivalence` is a testable type with an equivalence relation besides
-equality, and states the laws of one once: reflexivity, symmetry and
-transitivity. The matrix in ``proptest/`` checks every axiom of every
-category against generated arguments, one cell per pair; CONTRIBUTING.md
-says how to run it.
+A :class:`Testable` category generates its own terms and
+:meth:`Testable.matrix` lists every law of every such category, which the
+suite in ``proptest/`` checks; CONTRIBUTING.md says how to run it. A
+:class:`Serialisable` type states the laws of writing a term down and
+reading it back, and an :class:`Equivalence` those of an equivalence
+relation besides equality: reflexivity, symmetry and transitivity.
 
 Summary
 -------
@@ -33,6 +38,7 @@ Summary
     Equation
     Declaration
     Axiom
+    Rule
     AxiomFailure
     Count
     Tensor
@@ -44,6 +50,7 @@ Summary
     Under
     Repeat
     Testable
+    Serialisable
     Equivalence
     Related
 
@@ -55,9 +62,9 @@ Summary
         :toctree:
 
         axiom
+        rule
         inhabits
         substitute
-        assert_axioms
 """
 
 from __future__ import annotations
@@ -70,12 +77,14 @@ from abc import ABC, abstractmethod
 from collections.abc import Callable
 from copy import deepcopy
 from dataclasses import KW_ONLY, dataclass, replace
-from functools import reduce, wraps
+from functools import cached_property, reduce, wraps
 from operator import matmul
-from types import GenericAlias, NoneType
+from types import GenericAlias, NoneType, UnionType
 from typing import (
     TYPE_CHECKING, Annotated, Any, ClassVar, Concatenate, ParamSpec, Self,
-    TypeVar, TypeVarTuple, get_args, get_origin)
+    TypeVar,
+    TypeVarTuple,
+    get_args, get_origin)
 
 from discopy import messages
 from discopy.utils import (
@@ -94,7 +103,7 @@ if TYPE_CHECKING:
 
 GENERATORS = tuple("abcde")
 """
-The names the generators of a free category are drawn from.
+The names the generators of a free category are sampled from.
 
 They are finitely many and shared, so a generated functor can name every one
 of them: composing two functors keeps only the keys of the left-hand map, so
@@ -104,8 +113,11 @@ a functor that named just a few would compose to one defined nowhere else.
 MAX_COUNT = 3
 """ The largest number a declaration quantifying over ``int`` is given. """
 
+FUEL = 3
+""" How deep the rules nest in a term of a free category, by default. """
 
-class Equation(NamedGeneric["ar"]):
+
+class Equation[T]:
     """
     An equation is a list of ``terms`` to be compared up to a function
     ``up_to``, the identity by default.  Casting it to ``bool`` checks
@@ -145,7 +157,7 @@ class Equation(NamedGeneric["ar"]):
         if up_to is not None:
             self.up_to = up_to
 
-    def modulo(self, up_to: Callable) -> Equation:
+    def modulo(self, up_to: Callable) -> Equation[T]:
         """
         The same equation compared up to the given function, rebinding
         :attr:`up_to`, whose name the attribute already takes.
@@ -175,6 +187,77 @@ class Equation(NamedGeneric["ar"]):
         return all(term == terms[0] for term in terms)
 
 
+def quotient(category, term):
+    """
+    A term up to the equation of its category, i.e. its image under the
+    ``up_to`` of :meth:`discopy.abc.Category.equation_factory`, the term
+    itself when the category compares on the nose, so that a construction
+    over any category, e.g. a parametric map or a lens, compares its parts
+    as that category does.
+
+    >>> from discopy import symmetric
+    >>> from discopy.matrix import Matrix
+    >>> x = symmetric.Ty('x')
+    >>> f = symmetric.Box('f', x, x)
+    >>> assert quotient(symmetric.Diagram, f) == f.to_hypergraph()
+    >>> m = Matrix[int].id(2)
+    >>> assert quotient(Matrix[int], m) is m
+    """
+    up_to = category.equation_factory(term).up_to
+    return term if up_to is None else up_to(term)
+
+
+def values(typ: type) -> tuple:
+    """
+    A finite sample of the values of a Python type, the same every time, so
+    that the two sides of an :class:`Extensional` equation are called on the
+    same arguments: a few of each base type, the union of the samples of a
+    union type, and ``TypeError`` for a type with no sample.
+
+    Parameters:
+        typ : The type to sample, e.g. ``int`` or ``int | None``.
+
+    >>> assert values(bool) == (False, True)
+    >>> assert values(int | None) == values(int) + (None, )
+    """
+    if typ is type(None):
+        return (None, )
+    if isinstance(typ, UnionType):
+        return tuple(value for arg in get_args(typ) for value in values(arg))
+    if typ not in VALUES:
+        raise TypeError(messages.NO_VALUES.format(typ))
+    return VALUES[typ]
+
+
+VALUES: dict[type, tuple] = {
+    bool: (False, True),
+    int: (0, 1, -1, 2),
+    float: (0., 1.5, -1.),
+    str: ("", "a", "ab"),
+}
+""" The sample :func:`values` gives each base type. """
+
+
+class Extensional[T](Equation[T]):
+    """
+    An equation of functions, compared by their graphs on a finite sample of
+    their domain rather than by their insides, which are callables compared
+    by identity: each term is called on every argument that the
+    ``arguments`` of its category gives for its domain, see :func:`values`.
+
+    >>> from discopy.python import Function
+    >>> f = Function(lambda x: x + 1, int, int)
+    >>> g = Function(lambda x: 1 + x, int, int)
+    >>> assert f != g and Extensional(f, g)
+    >>> assert not Extensional(f, Function(lambda x: x, int, int))
+    """
+    @staticmethod
+    def up_to(term):
+        """ The graph of a term on the arguments of its domain. """
+        return tuple(
+            (args, term(*args)) for args in type(term).arguments(term.dom))
+
+
 class AxiomFailure(AxiomError):
     """
     A law declared broken, raised when the bound axiom is called: the
@@ -194,6 +277,9 @@ The sort of the objects of type ``Coarse``, as the bound of a variable
 ``A: Obj[C0]`` of a declaration. A typechecker reads it as ``Coarse``.
 """
 
+type Atom[Coarse] = Annotated[Coarse, "atom"]
+""" The sort of the atomic objects, i.e. a single wire, ``X: Atom[C0]``. """
+
 type Var[Coarse, Value] = Annotated[Coarse, Value]
 """
 The premise standing for the value of an expression over the variables of a
@@ -205,16 +291,34 @@ it as ``Coarse``.
 type Hom[Coarse, Dom, Cod] = Annotated[Coarse, Dom, Cod]
 """
 The morphisms of type ``Coarse`` from ``Dom`` to ``Cod``, as a premise to
-sample, e.g. ``f: Hom[C1, A, B]``. A typechecker reads it as ``Coarse``.
+sample, e.g. ``f: Hom[C1, A, B]``, or the conclusion of a rule. A typechecker
+reads it as ``Coarse``.
+"""
+
+
+type Perm[N] = Annotated[tuple[int, ...], N]
+"""
+The premise standing for a permutation of ``range(N)`` for ``N: Count``,
+as the list of where each position comes from, e.g. ``xs: Perm[N]`` in
+``permutation(xs, doms)``. A typechecker reads it as a tuple of integers.
+"""
+
+type Objs[Coarse, N] = Annotated[tuple[Coarse, ...], N]
+"""
+The premise standing for ``N`` atomic objects of type ``Coarse``, e.g.
+``doms: Objs[C0, N]``, drawn as ``N`` generators of ``category.ob``. A
+typechecker reads it as a tuple of them.
 """
 
 
 class Count(int):
     """
     The sort of the numbers up to :data:`MAX_COUNT`, as the bound of a
-    variable ``N: Count`` of a declaration, e.g. the number of copies of an
-    object.
+    variable ``N: Count`` of a declaration, e.g. the legs of a spider, two
+    in the canonical instance of a law, the least that is neither the unit
+    nor a single wire.
     """
+    canonical = 2
 
 
 def is_open(annotation) -> bool:
@@ -240,17 +344,10 @@ def substitute(annotation, scope: dict):
     >>> A, B = TypeVar("A"), TypeVar("B")
     >>> x, y = Ty('x'), Ty('y')
     >>> assert substitute(Tensor[A, B], {A: x, B: y}) == x @ y
-    >>> assert get_args(substitute(Equation[Var[Ty, A]], {A: x})) == (
-    ...     Var[Ty, x], )
     """
-    try:
-        if annotation in scope:
-            return scope[annotation]
-    except TypeError:
-        return annotation
-    if isinstance(annotation, type) and issubclass(annotation, Equation)\
-            and annotation.ar is not None:
-        return GenericAlias(Equation, (substitute(annotation.ar, scope), ))
+    if isinstance(annotation, TypeVar | TypeVarTuple | ParamSpec)\
+            or annotation is Self:
+        return scope.get(annotation, annotation)
     origin, args = get_origin(annotation), get_args(annotation)
     if origin is None or not args:
         return annotation
@@ -263,7 +360,15 @@ class Constructor:
     A constructor of object expressions in a signature, e.g.
     ``Tensor[A, B]``: a type for a typechecker, an expression while a
     variable is left in it, see :func:`is_open`, and the object
-    :meth:`form` builds once there is none.
+    :meth:`form` builds once there is none. Subscripting a constructor is
+    therefore not always a type: once every variable is substituted, see
+    :func:`substitute`, ``Tensor[x, y]`` *is* the object ``x @ y``, which is
+    how an annotation becomes the boundary a premise is drawn with.
+
+    >>> from discopy.monoidal import Ty
+    >>> A = TypeVar("A")
+    >>> assert isinstance(Tensor[A, Ty('y')], GenericAlias)
+    >>> assert Tensor[Ty('x'), Ty('y')] == Ty('x', 'y')
     """
     def __class_getitem__(cls, args):
         args = args if isinstance(args, tuple) else (args, )
@@ -417,9 +522,6 @@ def inhabits(value, kind) -> bool:
             and (value.dom, value.cod) == args[1:]
     if origin is Var:
         return value == args[1]
-    if isinstance(kind, type) and issubclass(kind, Equation):
-        return isinstance(value, Equation) and (kind.ar is None or inhabits(
-            value, GenericAlias(Equation, (kind.ar, ))))
     if origin is Equation:
         return isinstance(value, Equation) and all(
             inhabits(term, args[0]) for term in value.terms)
@@ -438,16 +540,17 @@ def inhabits(value, kind) -> bool:
 class Declaration[**P, T](classmethod):
     """
     A declaration of a category, stated once on an abstract base class and
-    inherited by every category below it, e.g. an :class:`Axiom`.
+    inherited by every category below it: an :class:`Axiom` or a
+    :class:`Rule`.
 
     The category is the class the declaration is bound to, e.g.
     :class:`discopy.cat.Arrow` for those of :class:`discopy.abc.Category`.
     Its function is a classmethod of it, implicitly: its first parameter is
     the category and the others are its arguments, sampled in order. Its
     signature is a sequent: each type parameter is a variable of the sort
-    its bound states, ``A: Obj[C0]`` an object and ``N: Count`` a number,
-    each parameter a premise, ``f: Hom[C1, A, B]`` a morphism from ``A`` to
-    ``B``, ``x: Var[C0, X]`` the value of an
+    its bound states, ``A: Obj[C0]`` an object, ``X: Atom[C0]`` an atomic
+    one and ``N: Count`` a number, each parameter a premise, ``f: Hom[C1, A,
+    B]`` a morphism from ``A`` to ``B``, ``x: Var[C0, X]`` the value of an
     object expression and :data:`typing.Self` a term, and the return
     annotation the type of its output, see :meth:`output`. Object
     expressions are built by :class:`Tensor`, :class:`Unit`, :class:`L`,
@@ -468,19 +571,56 @@ class Declaration[**P, T](classmethod):
             function by default.
         params : The parameters passed to the strategy of every morphism the
             declaration quantifies over, see :meth:`Axiom.weaken`.
+        broken : Whether the declaration is declared broken by
+            :meth:`failing`.
+        applicable : Whether the structure applies at all, ``False`` once
+            declared :meth:`inapplicable`.
     """
 
     function: Callable[Concatenate[Any, P], T]
     _: KW_ONLY
-    category: type = None
-    name: str = None
-    params: dict[str, Any] = None
+    category: type = None  # ty: ignore[invalid-assignment]
+    name: str = None  # ty: ignore[invalid-assignment]
+    params: dict[str, Any] = None  # ty: ignore[invalid-assignment]
+    broken: bool = False
+    applicable: bool = True
 
     def __post_init__(self):
         classmethod.__init__(self, self.function)
         self.name = self.name or self.function.__name__
         self.params = dict(self.params or {})
         self.__doc__ = self.function.__doc__
+
+    def failing(self, reason: str) -> Self:
+        """
+        The same declaration declared broken: calling it raises an
+        :class:`AxiomFailure` with the reason as message and what it
+        evaluates to on the arguments, or the error raised when the
+        implementation refuses to build it, e.g. ``braid_naturality =
+        BraidedCategory.braid_naturality.failing("A free braid is a box.")``.
+        """
+        @wraps(self.function)
+        def equation(*args, **kwargs):
+            try:
+                evaluated = self.function(*args, **kwargs)
+            except Exception as error:
+                raise AxiomFailure(reason, error) from error
+            raise AxiomFailure(reason, evaluated)
+        equation.__doc__ = reason
+        return replace(self, function=equation, broken=True)
+
+    def inapplicable(self, reason: str) -> Self:
+        """
+        The same declaration declared not to apply to the category: it
+        takes no argument and returns :obj:`NotImplemented`, with the reason
+        as its documentation, e.g. ``trace_vanishing =
+        TracedCategory.trace_vanishing.inapplicable("No trace.")``.
+        """
+        def law(_category):
+            return NotImplemented
+        law.__doc__ = reason
+        return replace(
+            self, function=law, params={}, broken=False, applicable=False)
 
     def __repr__(self):
         """
@@ -582,14 +722,16 @@ class Declaration[**P, T](classmethod):
         """
         Generate the scope and the arguments of the bound declaration: a
         variable of sort ``Obj`` from the strategy of the objects
-        :meth:`discopy.abc.Category.parameters` names, :obj:`None` for those
-        of a group, and of sort
-        :class:`Count` a number up to :data:`MAX_COUNT`, then a premise
+        :meth:`discopy.abc.Category.parameters` names, :obj:`None` for the
+        single object of a monoid, of sort ``Atom`` from their
+        ``generators`` and of sort :class:`Count` a number up to
+        :data:`MAX_COUNT`, then a premise
         ``Hom[C1, A, B]`` from the strategy of the category with its boundary
-        and ``params``, a premise ``Var[T, x]`` the value ``x``, a testable
-        shape of ``Self``, e.g. ``Related[Self]``, from its own strategy over
-        the category with ``params``, and :data:`typing.Self` a term, from
-        the strategy of the category with ``params`` too.
+        and ``params``, a premise ``Var[T, x]`` the value ``x``, a premise
+        ``Perm[N]`` a permutation, ``Objs[C0, N]`` that many atomic objects,
+        a testable shape of ``Self``, e.g. ``Related[Self]``, from its own
+        strategy over the category with ``params``, and :data:`typing.Self`
+        a term, from the strategy of the category with ``params`` too.
         """
         from hypothesis import strategies as st
 
@@ -599,13 +741,23 @@ class Declaration[**P, T](classmethod):
                 if sort is Count:
                     return draw(st.integers(0, MAX_COUNT), label=name)
                 ob = self.category.parameters()[0]
-                return draw(st.just(None) if ob is NoneType
+                if ob is NoneType:
+                    return None
+                return draw(ob.generators() if get_origin(sort) is Atom
                             else ob.strategy(), label=name)
 
             def value(name, kind):
                 if get_origin(kind) is Var:
                     return get_args(kind)[1]
-                if get_origin(kind) is Hom:
+                if get_origin(kind) is Perm:
+                    n, = get_args(kind)
+                    strategy = st.permutations(range(n)).map(tuple)
+                elif get_origin(kind) is Objs:
+                    n = get_args(kind)[1]
+                    strategy = st.lists(
+                        self.category.ob.generators(),
+                        min_size=n, max_size=n).map(tuple)
+                elif get_origin(kind) is Hom:
                     _, dom, cod = get_args(kind)
                     strategy = self.category.strategy(
                         dom=dom, cod=cod, **params)
@@ -651,13 +803,7 @@ class Axiom[**P, T](Declaration[P, T]):
     so :attr:`broken` is declared by :meth:`failing` before any argument is
     generated — the property matrix marks such an axiom as an expected
     failure and lets the search find the counterexample.
-
-    Parameters:
-        broken : Whether the law is declared broken by :meth:`failing`.
     """
-
-    _: KW_ONLY
-    broken: bool = False
 
     __hash__ = Declaration.__hash__
 
@@ -673,44 +819,15 @@ class Axiom[**P, T](Declaration[P, T]):
             return self.function(*args, **kwargs).modulo(up_to)
         return replace(self, function=equation)
 
-    def failing(self, reason: str) -> Axiom[P, T]:
-        """
-        The same law declared broken: calling it raises an
-        :class:`AxiomFailure` with the reason as message and the equation
-        evaluated on the arguments, or the error raised when the
-        implementation refuses to build its terms, e.g. ``braid_naturality =
-        BraidedCategory.braid_naturality.failing("A free braid is a box.")``.
-        """
-        @wraps(self.function)
-        def equation(*args, **kwargs):
-            try:
-                evaluated = self.function(*args, **kwargs)
-            except Exception as error:
-                raise AxiomFailure(reason, error) from error
-            raise AxiomFailure(reason, evaluated)
-        equation.__doc__ = reason
-        return replace(self, function=equation, broken=True)
-
-    def inapplicable(self, reason: str) -> Axiom[P, T]:
-        """
-        The same law declared not to apply to the category: it takes no
-        argument and returns :obj:`NotImplemented`, with the reason as its
-        documentation, e.g. ``trace_vanishing =
-        TracedCategory.trace_vanishing.inapplicable("No trace.")``.
-        """
-        def law(_category):
-            return NotImplemented
-        law.__doc__ = reason
-        return replace(self, function=law, params={}, broken=False)
-
     def weaken(self, **params) -> Axiom[P, T]:
         """
-        The same law quantified over the terms the strategy of the category
-        generates with the given parameters, e.g. ``unitality_of_boxes =
-        Category.unitality.weaken(max_leaves=1)``, see
-        :meth:`Declaration.sequents`. Assigned to its own attribute beside a
-        ``.failing`` declaration, it shows the matrix one expected failure
-        and one green cell instead of one blanket expected failure.
+        The same law quantified over the morphisms the strategy of the
+        category generates with the given parameters, e.g. the rigid
+        diagrams of the underlying monoidal category
+        ``RigidCategory.dagger_involution.weaken(within=MonoidalCategory)``,
+        see :meth:`discopy.cat.Arrow.search`. Assigned to its own attribute
+        beside a ``.failing`` declaration, it shows the matrix one expected
+        failure and one green cell instead of one blanket expected failure.
         """
         return replace(self, params=dict(self.params, **params))
 
@@ -720,6 +837,74 @@ class Axiom[**P, T](Declaration[P, T]):
         :meth:`weaken` declared, see :meth:`Declaration.arguments`.
         """
         return self.arguments(**self.params)
+
+    def canonical(self) -> Equation:
+        """
+        The law as a schema: its equation with an object named after each
+        type parameter, a ``box_factory`` named after each morphism, cast
+        into the category when it is a generator rather than a term, e.g.
+        the wire of a type, and two for each number, the equation a law
+        declared broken raises included, and ``NotImplemented`` for a law
+        that assumes its instance away, e.g. :meth:`str_transparency`, whose
+        box and objects share the name of their variable. A category whose
+        objects take no name, e.g. the shapes of a network, has none and
+        raises ``TypeError``.
+
+        >>> from discopy.cat import Arrow
+        >>> print(Arrow.associativity.canonical())
+        Equation(f >> g >> h, f >> g >> h)
+        """
+        try:
+            self.category.ob("A")
+        except TypeError as error:
+            raise TypeError(f"{self} has no canonical instance: the objects "
+                            f"of {self.category} take no name.") from error
+
+        def value(name, kind):
+            if get_origin(kind) is Var:
+                return get_args(kind)[1]
+            if get_origin(kind) is Perm:
+                return tuple(reversed(range(get_args(kind)[0])))
+            if get_origin(kind) is Objs:
+                return tuple(self.category.ob(f"{name}{i}")
+                             for i in range(get_args(kind)[1]))
+            dom, cod = get_args(kind)[1:] if get_origin(kind) is Hom\
+                else (self.category.ob(name), ) * 2
+            box = self.category.box_factory(name, dom=dom, cod=cod)
+            return box if isinstance(box, self.category)\
+                else self.category.cast(box)
+
+        scope = self.scope(lambda name, sort: Count.canonical if sort is Count
+                           else self.category.ob(name))
+        arguments = self.instantiate(scope, value)
+        # pylint: disable-next=import-outside-toplevel  # off the package
+        from hypothesis.errors import UnsatisfiedAssumption
+        try:
+            return self(**arguments)  # ty: ignore[invalid-return-type]
+        except AxiomFailure as failure:
+            return failure.equation
+        except UnsatisfiedAssumption:
+            return NotImplemented
+
+    def draw(self, **params):
+        """
+        Draw the :meth:`canonical` equation of the law, the parameters those
+        of :meth:`discopy.monoidal.Equation.draw`.
+
+        >>> from discopy import rigid
+        >>> rigid.Diagram.snake_equations.draw(
+        ...     doctest="docs/_static/rigid/snake-equations-law.svg")
+
+        .. image:: /_static/rigid/snake-equations-law.svg
+            :align: center
+        """
+        equation = self.canonical()
+        if equation is NotImplemented:
+            raise TypeError(f"{self} does not apply, so has nothing to draw.")
+        draw = getattr(equation, "draw", None)
+        if draw is None:
+            raise TypeError(f"{self} is not an equation of diagrams.")
+        return draw(**params)
 
     def falsify(self, **params) -> dict:
         """
@@ -749,6 +934,87 @@ class Axiom[**P, T](Declaration[P, T]):
         return find(self.strategy(), refutes, **params)
 
 
+@dataclass(repr=False)
+class Rule[**P, T](Declaration[P, T]):
+    """
+    An inference rule of a category: a :class:`Declaration` whose function
+    concludes a morphism from its premises, the objects and morphisms it
+    quantifies over, forwarding to the method that implements the operation,
+    e.g. the cut ``def cut[A: Obj[C0], B: Obj[C0], C: Obj[C0]](cls, f:
+    Hom[C1, A, B], g: Hom[C1, B, C]) -> Hom[C1, A, C]`` composes. Its return
+    annotation ``Hom[C1, dom, cod]`` is the
+    boundary of its conclusion, read by :meth:`strategy`, and never
+    evaluated.
+
+    >>> from discopy.cat import Arrow, Ob, Box
+    >>> sorted(Arrow.rules)
+    ['ax', 'cut']
+    >>> f, g = Box('f', Ob('x'), Ob('y')), Box('g', Ob('y'), Ob('z'))
+    >>> assert Arrow.cut(f, g) == f >> g
+    """
+
+    __hash__ = Declaration.__hash__
+
+    @cached_property
+    def conclusion(self) -> tuple[str | None, ...]:
+        """
+        The type parameter each side of the conclusion is, or :obj:`None`
+        for a side that is not a variable.
+
+        >>> from discopy.abc import MonoidalCategory
+        >>> MonoidalCategory.cut.conclusion
+        ('A', 'C')
+        >>> MonoidalCategory.mix.conclusion
+        (None, None)
+        """
+        function = inspect.unwrap(self.function)
+        sides = get_args(self.annotations()["return"])[1:]
+        return tuple(
+            side.__name__ if side in function.__type_params__ else None
+            for side in sides)
+
+    @cached_property
+    def is_recursive(self) -> bool:
+        """
+        Whether the rule has a morphism among its premises, i.e. a parameter
+        annotated with ``Hom``.
+        """
+        annotations = self.annotations()
+        return any(
+            get_origin(annotations[parameter.name]) is Hom
+            for parameter in self.parameters)
+
+    def given(self, dom=None, cod=None) -> dict:
+        """
+        The variables a goal from ``dom`` to ``cod`` binds: each side of the
+        conclusion that is a variable takes the side of the goal, unless the
+        variable is an :class:`Atom` and the side is not.
+
+        >>> from discopy.abc import Category
+        >>> from discopy.cat import Ob
+        >>> Category.cut.given(Ob('x'), Ob('y'))
+        {'A': cat.Ob('x'), 'C': cat.Ob('y')}
+        """
+        variables = {
+            variable.__name__: variable
+            for variable in inspect.unwrap(self.function).__type_params__}
+        return {
+            name: side for name, side in zip(self.conclusion, (dom, cod))
+            if name is not None and side is not None
+            and (get_origin(variables[name].__bound__) is not Atom
+                 or side.is_atomic)}
+
+    def strategy(
+            self, dom=None, cod=None, **params) -> "st.SearchStrategy[dict]":
+        """
+        Generate the premises of the rule for a conclusion from ``dom`` to
+        ``cod``, see :meth:`Declaration.arguments`, the variables it binds
+        :meth:`given` and the others sampled. The conclusion need not meet the
+        goal on a side that is not a variable.
+        """
+        return self.arguments(self.given(dom, cod), **params)
+
+
 def axiom[**P, T](
         equation: Callable[Concatenate[Any, P], Equation[T]]
 ) -> Axiom[P, Equation[T]]:
@@ -759,29 +1025,195 @@ def axiom[**P, T](
     return Axiom(equation)
 
 
+def rule[**P, T](
+        function: Callable[Concatenate[Any, P], T]) -> Rule[P, T]:
+    """
+    Decorate an operation as an inference rule: a classmethod of its
+    category, implicitly, from its premises to its conclusion.
+    """
+    return Rule(function)
+
+
 class Testable[T](ABC):
     """
-    A type that comes with a `search strategy
-    <https://hypothesis.readthedocs.io/en/latest/data.html>`_ generating
-    its instances, and the laws every such type obeys: a term reads back
-    from its representation, its string, its pickle, its deep copy and its
-    tree.
+    A testable class states axioms, which its subclasses inherit along with
+    the structure they axiomatise, and says how to generate the terms those
+    axioms quantify over with :meth:`strategy`.
+
+    A :class:`discopy.abc.Category` states the laws of a categorical
+    structure, a :class:`Serialisable` those of writing a term down and
+    reading it back, which is why the two meet here rather than in either.
     """
 
     @classmethod
-    @abstractmethod
     def strategy(cls, **params) -> st.SearchStrategy[T]:
         """
-        Build a strategy for instances of ``cls``.
+        Build a `search strategy
+        <https://hypothesis.readthedocs.io/en/latest/data.html>`_ for the
+        instances of ``cls``: implementing it is how a category enrols in
+        the property matrix, see :meth:`enrolled`.
 
         An override that delegates to another strategy accepts
         ``**params``, pops the parameters it consumes and forwards the
-        rest, so that a caller's bounds pass through unchanged and a
-        subclass overrides what a base popped just by passing it. A
-        terminal strategy instead declares exactly the parameters it
-        implements: a constraint it cannot honour fails loudly as an
-        unexpected keyword rather than being silently dropped.
+        rest, so that a caller's bounds pass through unchanged. A terminal
+        strategy instead declares exactly the parameters it implements: a
+        constraint it cannot honour fails loudly as an unexpected keyword
+        rather than being silently dropped.
+
+        The default raises, deliberately not as an
+        :func:`abc.abstractmethod`, which would make every category that has
+        not implemented one uninstantiable rather than merely unchecked.
+
+        >>> from discopy.abc import Category
+        >>> Category.strategy()
+        Traceback (most recent call last):
+         ...
+        NotImplementedError: No strategy implemented for abc.Category.
         """
+        raise NotImplementedError(
+            f"No strategy implemented for {factory_name(cls)}.")
+
+    @classmethod
+    def declared[D: Declaration](cls, kind: type[D]) -> dict[str, D]:
+        """
+        The declarations of a kind inherited by ``cls``, by name, subclasses
+        overriding bases, bound to ``cls``.
+
+        Names are collected before they are filtered, so that assigning
+        anything that is not a declaration over an inherited one drops it
+        altogether, rather than restating it. Each declaration is named after
+        the attribute it is stored under, so that a law weakened beside its
+        failing declaration, e.g. ``dagger_involution_monoidal``, is a
+        cell of its own in the matrix.
+        """
+        visible = {
+            name: value
+            for base in reversed(cls.__mro__)
+            for name, value in base.__dict__.items()}
+        return {name: replace(value.bind(cls), name=name)
+                for name, value in visible.items()
+                if isinstance(value, kind)}
+
+    axioms = classproperty(lambda cls: cls.declared(Axiom))
+    """ The axioms inherited by ``cls``, see :meth:`declared`. """
+
+    rules = classproperty(lambda cls: cls.declared(Rule))
+    """ The rules inherited by ``cls``, see :meth:`declared`. """
+
+    @classmethod
+    def subclasses(cls) -> tuple[type[Self], ...]:
+        """
+        Every transitive subclass of ``cls``, ``cls`` itself included, once,
+        in the order a breadth-first walk of the subclass graph meets it.
+
+        >>> from discopy.cat import Arrow, Box
+        >>> assert Arrow.subclasses()[0] is Arrow
+        >>> assert Box in Arrow.subclasses()
+        """
+        found, queue = {cls: None}, [cls]
+        while queue:
+            for subclass in queue.pop(0).__subclasses__():
+                if subclass not in found:
+                    found[subclass] = None
+                    queue.append(subclass)
+        return tuple(found)
+
+    @classmethod
+    def enrolled(cls) -> "tuple[type[Testable], ...]":
+        """
+        The categories the property matrix checks, by name: those that state
+        laws, generate their terms and are their own ``ar``. A box inherits
+        the strategy of the category it lives in, whose terms it is part of,
+        rather than being a category of its own, while a type is a category
+        of its own, the free coloured monoid on its wires. A box that is not
+        the generator of its category but defines a strategy of its own,
+        e.g. a lambda term, is checked on the terms that strategy generates,
+        and so is a testable that is no category at all, e.g. a proof net.
+        A :class:`TestableGeneric` is checked on the subscripts by the
+        parameters its ``checked_params`` names, and on no other.
+
+        >>> from discopy.cat import Arrow, Box
+        >>> from discopy.monoidal import Ty
+        >>> from discopy.biclosed import TermBase
+        >>> assert Arrow in Testable.enrolled() and Ty in Testable.enrolled()
+        >>> assert Box not in Testable.enrolled()
+        >>> from discopy.grammar.proofnet import ProofNet
+        >>> assert TermBase in Testable.enrolled()
+        >>> assert ProofNet in Testable.enrolled()
+        """
+        def generates(testable):
+            try:
+                testable.strategy()
+            except NotImplementedError:
+                return False
+            return True
+
+        def own_terms(testable):
+            ar = getattr(testable, "ar", None)
+            return ar is testable or (ar is None or isinstance(ar, type))\
+                and "strategy" in vars(testable)\
+                and getattr(testable, "box_factory", None) is not testable
+
+        checked = {
+            generic[param] for generic in TestableGeneric.subclasses()[1:]
+            if "__is_named_generic__" not in vars(generic)
+            for param in generic.checked_params()}
+        return tuple(sorted((
+            testable for testable in cls.subclasses()
+            if (testable in checked
+                or not issubclass(testable, TestableGeneric))
+            and own_terms(testable)
+            and testable.axioms and generates(testable)), key=factory_name))
+
+    @classmethod
+    def matrix(cls, once: bool = False,
+               kind: type[Declaration] = Axiom) -> list[Declaration]:
+        """
+        Every law of every :meth:`enrolled` category, or every declaration
+        of another ``kind``, e.g. its rules, bound to it, or only ``once``
+        per declaration: bound to the enrolled category nearest the class
+        declaring it, rather than to every category inheriting it. A
+        category restating a law, broken, weakened or modulo a quotient,
+        declares it anew and is the nearest to that.
+
+        >>> from discopy.abc import Category
+        >>> for law in (Category.unitality, Category.cut):
+        ...     assert len([cell for cell in Testable.matrix(True, type(law))
+        ...                 if cell.function is law.function]) == 1
+        """
+        cells = [
+            law for testable in cls.enrolled()
+            for law in testable.declared(kind).values()]
+        if not once:
+            return cells
+        nearest = {}
+        for law in cells:
+            distance, declaring = next(
+                (i, base) for i, base in enumerate(law.category.__mro__)
+                if law.name in vars(base))
+            key = (declaring, law.name)
+            if key not in nearest or distance < nearest[key][0]:
+                nearest[key] = (distance, law)
+        return sorted(
+            (law for _, law in nearest.values()),
+            key=lambda law: (factory_name(law.category), law.name))
+
+
+no_strategy = Testable.__dict__["strategy"]
+"""
+The default :meth:`Testable.strategy`, under a name that can be assigned: a
+category that would inherit a strategy for terms it cannot read back, e.g.
+a pregroup diagram, declares ``strategy = no_strategy`` to stay out of the
+matrix until it implements its own.
+"""
+
+
+class Serialisable[T](Testable[T]):
+    """
+    A type whose terms are written down and read back: by their
+    representation, their string, their pickle, their deep copy and their
+    tree, each with the law that it is a roundtrip.
+    """
 
     @classmethod
     def environment(cls) -> dict:
@@ -790,7 +1222,7 @@ class Testable[T](ABC):
         public names of the package, as ``from discopy import *`` binds
         them, so that a representation qualified by module such as
         ``cat.Box('f', cat.Ob('x'), cat.Ob('y'))`` evaluates, and then
-        those of the module the category is defined in, so that one
+        those of the module the type is defined in, so that one
         printing bare names such as ``Tensor[int]([0], dom=Dim(1),
         cod=Dim(1))`` evaluates too. The module comes second because a
         term prints the names its own module binds: ``Dim`` in
@@ -860,7 +1292,7 @@ class Testable[T](ABC):
         return environment
 
     @axiom
-    def transparency(cls, term: Self) -> Equation:
+    def repr_transparency(cls, term: Self) -> Equation[Self]:
         """
         The representation of a term evaluates back to it, in the
         :meth:`environment` of its type.
@@ -868,7 +1300,7 @@ class Testable[T](ABC):
         return Equation(eval(repr(term), cls.environment()), term)
 
     @axiom
-    def str_transparency(cls, term: Self) -> Equation:
+    def str_transparency(cls, term: Self) -> Equation[Self]:
         """
         The string of a term evaluates back to it, in its
         :meth:`str_environment`, if its generators are named apart by
@@ -887,7 +1319,7 @@ class Testable[T](ABC):
         return Equation(eval(str(term), environment), term)
 
     @axiom
-    def pickling(cls, term: Self) -> Equation:
+    def pickling(cls, term: Self) -> Equation[tuple[type[Self], Self]]:
         """
         A term loads back from its pickle, of the same class: the equation
         is between the pairs of a class and a term, since a subscript of a
@@ -897,7 +1329,7 @@ class Testable[T](ABC):
         return Equation((type(loaded), loaded), (type(term), term))
 
     @axiom
-    def copying(cls, term: Self) -> Equation:
+    def copying(cls, term: Self) -> Equation[tuple[type[Self], Self]]:
         """
         A term is equal to its deep copy, of the same class. Copying goes
         through the same protocol as :meth:`pickling` without the bytes, so
@@ -908,7 +1340,7 @@ class Testable[T](ABC):
         return Equation((type(copied), copied), (type(term), term))
 
     @axiom
-    def serialisation(cls, term: Self) -> Equation:
+    def serialisation(cls, term: Self) -> Equation[Self]:
         """
         A term decodes back from its tree and from the JSON of its tree.
         A type without a tree declares the law inapplicable.
@@ -916,7 +1348,24 @@ class Testable[T](ABC):
         return Equation(from_tree(term.to_tree()), loads(dumps(term)), term)
 
 
-class Related(Testable, NamedGeneric["factory"], tuple):
+class TestableGeneric(NamedGeneric, Testable):
+    """
+    A testable class with type parameters, e.g. ``Hypergraph[C]``, which
+    names the parameters of the subscripts the property matrix checks, see
+    :meth:`Testable.enrolled`: a subscript is a class of its own, built on
+    demand, so the matrix cannot find it by walking the subclasses, and not
+    every subscript generates terms whose laws hold up to its equation.
+    """
+    @classmethod
+    @abstractmethod
+    def checked_params(cls) -> tuple:
+        """
+        The parameters of the subscripts of the class the property matrix
+        checks, its default parameter for the class itself.
+        """
+
+
+class Related[factory](TestableGeneric, tuple):
     """
     Three instances of the ``factory``, an :class:`Equivalence`: two related
     by construction and a third that may be or not, see
@@ -927,6 +1376,11 @@ class Related(Testable, NamedGeneric["factory"], tuple):
         if len(terms) != 3:
             raise ValueError("Expected three terms.")
         return super().__new__(cls, terms)
+
+    @classmethod
+    def checked_params(cls) -> tuple:
+        """ None, a sort of premises being drawn over a category. """
+        return ()
 
     @classmethod
     def strategy(cls, **params) -> st.SearchStrategy[Related]:
@@ -997,34 +1451,3 @@ class Equivalence(Testable):
         first, second, third = terms
         return Equation(
             cls.equivalent(first, third), cls.equivalent(second, third))
-
-
-def assert_axioms(*categories) -> None:
-    """
-    Check every axiom of each category on a single generated example, a dry
-    run of the property tests in ``proptest/``.
-
-    An axiom that does not apply is skipped, a broken one is only required
-    to raise its :class:`discopy.utils.AxiomError` — one example need not
-    be a counterexample — and any other law must hold, of the type its
-    signature states, see :func:`inhabits`.
-    """
-    from hypothesis import Phase, find, settings
-
-    single_shot = settings(
-        max_examples=1, phases=(Phase.generate, ), database=None)
-    for category in categories:
-        for axiom in category.axioms.values():
-            if not axiom.parameters and axiom() is NotImplemented:
-                continue
-            scope, arguments = find(
-                axiom.sequents(**axiom.params), lambda _: True,
-                settings=single_shot)
-            try:
-                verdict = axiom(**arguments)
-            except AxiomError:
-                assert axiom.broken, axiom
-            else:
-                assert verdict is NotImplemented or verdict, axiom
-                assert verdict is NotImplemented\
-                    or inhabits(verdict, axiom.output(scope)), axiom

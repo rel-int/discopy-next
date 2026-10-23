@@ -254,7 +254,8 @@ from copy import copy
 from typing import ClassVar
 
 from discopy import monoidal, cmap, hypergraph, messages
-from discopy.abc import FeedbackCategory, TracedCategory
+from discopy.abc import (
+    DaggerCategory, FeedbackCategory, MonoidalCategory, TracedCategory)
 from discopy.monoidal import (  # noqa: F401  pylint: disable=unused-import
     Equation)
 from discopy.utils import (
@@ -464,6 +465,9 @@ Wire.head_factory, Wire.tail_factory = HeadOb, TailOb
 class Ty(monoidal.Ty):
     """ A feedback type is a monoidal type with `delay`, `head` and `tail`. """
     generator_factory = Wire
+    box_factory = None
+    """ No generator of one colour is named, so there is no canonical
+    instance of a law, see :meth:`discopy.axioms.Axiom.canonical`. """
 
     def delay(self, n_steps=1):
         """ The delay of a feedback type by `n_steps`. """
@@ -519,6 +523,8 @@ class Diagram(monoidal.Diagram, TracedCategory):
     ob = Ty
     layer_factory = Layer
 
+    box_factory: ClassVar[type["Box"]]
+    functor_factory: ClassVar[type["Functor"]]
     feedback_factory: ClassVar[type["Feedback"]]
     trace_factory: ClassVar[type["Trace"]]
     head_factory: ClassVar[type["Head"]]
@@ -635,6 +641,37 @@ class Diagram(monoidal.Diagram, TracedCategory):
 
     d = Wire.d
 
+    trace_naturality_left = TracedCategory.trace_naturality_left.failing(
+        messages.NO_PLANAR_NORMAL_FORM)
+    trace_naturality_right = TracedCategory.trace_naturality_right.failing(
+        messages.NO_PLANAR_NORMAL_FORM)
+    trace_dinaturality_left = TracedCategory.trace_dinaturality_left.failing(
+        messages.NO_PLANAR_NORMAL_FORM)
+    trace_dinaturality_right = TracedCategory.trace_dinaturality_right.failing(
+        messages.NO_PLANAR_NORMAL_FORM)
+    trace_superposing_left = TracedCategory.trace_superposing_left.failing(
+        messages.NO_PLANAR_NORMAL_FORM)
+    trace_superposing_right = TracedCategory.trace_superposing_right.failing(
+        messages.NO_PLANAR_NORMAL_FORM)
+    hypergraph_section = monoidal.Diagram.hypergraph_section.failing(
+        messages.SECTION_NEEDS_SWAPS)
+    dagger_involution = DaggerCategory.dagger_involution.failing(
+        messages.FEEDBACK_HAS_NO_DAGGER)
+    dagger_involution_traced = DaggerCategory.dagger_involution.weaken(
+        within=MonoidalCategory)
+    dagger_contravariance = DaggerCategory.dagger_contravariance.failing(
+        messages.FEEDBACK_HAS_NO_DAGGER)
+    dagger_contravariance_traced = DaggerCategory.dagger_contravariance\
+        .weaken(within=MonoidalCategory)
+    dagger_monoidality = DaggerCategory.dagger_monoidality.failing(
+        messages.FEEDBACK_HAS_NO_DAGGER)
+    tightening = FeedbackCategory.tightening.failing(
+        messages.FREE_FEEDBACK)
+    sliding = FeedbackCategory.sliding.failing(
+        messages.FREE_FEEDBACK)
+    strength = FeedbackCategory.strength.failing(
+        messages.FREE_FEEDBACK)
+
 
 class Box(monoidal.Box, Diagram):
     """
@@ -651,7 +688,10 @@ class Box(monoidal.Box, Diagram):
     time_step = property(lambda self: self._time_step)
 
     def __init__(self, *args, time_step: int = 0, **params):
-        self._time_step, self._args, self._params = time_step, args[3:], params
+        self._time_step, self._args = time_step, args[3:]
+        self._params = {
+            key: value for key, value in params.items()
+            if key not in ("name", "dom", "cod")}
         super().__init__(*args, **params)
 
     def to_drawing(self):
@@ -686,13 +726,39 @@ class Box(monoidal.Box, Diagram):
             **self._params)
 
     def reset(self):
-        """ Reset a box to time step zero, used in :class:`Functor`. """
-        return self.delay(-self.time_step)
+        """
+        Reset a box to time step zero, used in :class:`Functor`: a box by its
+        time step, a structural box, whose delay lives in its types, see
+        :meth:`delay`, by that of the earliest of its wires.
+
+        >>> from discopy.markov import Swap
+        >>> x, y = Ty('x'), Ty('y')
+        >>> assert Swap(x, y).delay(2).reset() == Swap(x, y)
+        >>> assert Box('f', x, y).delay().reset() == Box('f', x, y)
+        """
+        if not issubclass(self.ob.generator_factory, monoidal.Wire):
+            return self
+        if getattr(self, "__getnewargs__", None) is None:
+            return self.delay(-self.time_step)
+        return self.delay(-min(
+            (wire.time_step for wire in (self.dom @ self.cod).inside),
+            default=0))
 
     def dagger(self):
         result = super().dagger()
         result._time_step = self.time_step  # pylint: disable=protected-access
         return result
+
+    def atoms(self) -> list:
+        """
+        The atoms of a box, each at time step zero, which the string of a
+        delayed box delays, e.g. ``f.d``.
+
+        >>> x = Ty('x')
+        >>> assert Box('f', x, x).delay().atoms() == [Box('f', x, x), x, x]
+        """
+        return [atom.reset() if isinstance(atom, Box) and atom.time_step
+                else atom for atom in super().atoms()]
 
     def lambdify(self, *symbols, **kwargs):
         """
@@ -737,7 +803,7 @@ class Box(monoidal.Box, Diagram):
         result = super().from_tree(tree)
         result._time_step = tree.get(  # pylint: disable=protected-access
             'time_step', 0)
-        return result
+        return result  # ty: ignore[invalid-return-type]
 
     def setoid(self):
         return super().setoid() + (self.time_step, )
@@ -841,7 +907,26 @@ class Feedback(Box, monoidal.Bubble):
         arg, dom, cod, mem = (
             from_tree(tree[key]) if key in tree else None
             for key in ('arg', 'dom', 'cod', 'mem'))
-        return cls(arg, dom=dom, cod=cod, mem=mem, left='left' in tree)
+        return cls(
+            arg,  # ty: ignore[invalid-argument-type]
+            dom=dom, cod=cod, mem=mem, left='left' in tree)
+
+    def dagger(self):
+        """
+        Feedback has no dagger: that of ``arg`` goes from ``cod @ mem`` to
+        ``dom @ mem.delay()``, so its memory would be fed back in time.
+
+        >>> x = Ty('x')
+        >>> Box('f', x @ x.delay(), x @ x).feedback().dagger()
+        Traceback (most recent call last):
+        ...
+        discopy.utils.AxiomError: Feedback has no dagger...
+        """
+        raise AxiomError(messages.FEEDBACK_HAS_NO_DAGGER)
+
+    def rotate(self, left=False):
+        """ Feedback has no rotation, for the same reason as its dagger. """
+        raise AxiomError(messages.FEEDBACK_HAS_NO_DAGGER)
 
     def to_drawing(self):
         return self.arg.to_drawing().trace(len(self.mem), left=self.left)
@@ -1095,8 +1180,11 @@ class Functor(monoidal.Functor):
         if isinstance(
                 other, FollowedBy) and hasattr(self.cod, "followed_by"):
             arg = other.dom if other.is_dagger else other.cod
-            return self.cod.followed_by(self(arg))
-        if isinstance(other, Feedback) and hasattr(self.cod, "feedback"):
+            return self.cod.followed_by(
+                self(arg))
+        if isinstance(other, Feedback)\
+                and issubclass(self.cod, FeedbackCategory)\
+                and self.cod.delay is not FeedbackCategory.delay:
             left = {"left": True} if other.left else {}
             return self(other.arg).feedback(
                 dom=self(other.dom), cod=self(other.cod),
@@ -1132,10 +1220,10 @@ def subclass(name: str, bases: list[type], module: str, doc: str) -> type:
     base subclasses, so that it prints, pickles and reads back from its tree
     as a class written in that module would.
     """
-    bases = tuple(dict.fromkeys(
+    bases = tuple(dict.fromkeys(  # ty: ignore[invalid-assignment]
         base for base in bases if not any(
             other is not base and issubclass(other, base) for other in bases)))
-    return type(name, bases, {
+    return type(name, bases, {  # ty: ignore[invalid-argument-type]
         "__module__": module, "__qualname__": name, "__doc__": doc})
 
 

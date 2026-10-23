@@ -241,9 +241,11 @@ class Recursion(nn.Module):
         kwargs = {**self.compile_options, **kwargs}
         if unroll:
             kwargs.setdefault("fullgraph", True)
-            self.unroller = torch.compile(self.unroll, **kwargs)
+            self.unroller = torch.compile(  # ty: ignore[no-matching-overload]
+                self.unroll, **kwargs)
         else:
-            self.cycler = torch.compile(self.cycle, **kwargs)
+            self.cycler = torch.compile(  # ty: ignore[no-matching-overload]
+                self.cycle, **kwargs)
         return self
 
     def initial(self, x):
@@ -574,7 +576,8 @@ class FactorNet(Recursion):
             reply = getattr(self, self.factor)(s.units)
             units = belief[:, self.to_units].view(rows, self.n_units,
                                                   self.arity, dim)
-        cells = reply.reshape(rows, self.n_units * self.arity, dim)[
+        replies = reply.reshape(rows, self.n_units * self.arity, dim)
+        cells = replies[  # ty: ignore[invalid-argument-type]
             :, self.to_cells].view(rows, self.n_cells, self.degree, dim)
         return PortState(cells, units, state, s.clue, s.answer)
 

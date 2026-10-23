@@ -167,6 +167,7 @@ from dataclasses import dataclass
 
 from discopy import messages, symmetric
 from discopy.abc import FeedbackCategory, NamedGeneric
+from discopy.axioms import TestableGeneric
 from discopy.python import finset
 from discopy.utils import (
     AxiomError,
@@ -174,7 +175,7 @@ from discopy.utils import (
 
 
 @dataclass
-class Ty(NamedGeneric['base']):
+class Ty[base](NamedGeneric):
     """
     A stream of types from some underlying class `base`.
 
@@ -185,13 +186,14 @@ class Ty(NamedGeneric['base']):
     """
     base = symmetric.Ty  # The underlying class of types.
 
-    now: base = None
-    _later: Callable[[], Ty[base]] = None
+    now: base
+    _later: Callable[[], Ty[base]] | None = None
 
     ob = classproperty(lambda cls: cls)
 
     def __init__(
-            self, now: base = None, _later: Callable[[], Ty[base]] = None):
+            self, now: base | None = None,
+            _later: Callable[[], Ty[base]] | None = None):
         self.now = self.base() if now is None else self.base.cast(now)
         self._later = _later
 
@@ -200,9 +202,9 @@ class Ty(NamedGeneric['base']):
         return factory_name(type(self)) + f"({repr(self.now)}{_later})"
 
     @property
-    def later(self) -> Ty:
+    def later(self):
         """ The tail of a stream, or `self` if :meth:`is_constant`. """
-        return self if self.is_constant else self._later()
+        return self if self._later is None else self._later()
 
     @property
     def head(self) -> Ty:
@@ -327,7 +329,7 @@ class Ty(NamedGeneric['base']):
 
 
 @dataclass
-class Stream(FeedbackCategory, NamedGeneric['category']):
+class Stream[category](FeedbackCategory, TestableGeneric):
     """
     Monoidal streams over an underlying `category`.
 
@@ -365,37 +367,44 @@ class Stream(FeedbackCategory, NamedGeneric['category']):
     >>> assert cod.later.now == later.cod.now
     >>> assert mem.later.now == later.mem.now
     """
+    @classmethod
+    def checked_params(cls) -> tuple:
+        """ None, a stream drawing no terms yet. """
+        return ()
+
     category = symmetric.Diagram
     ob = classproperty(lambda cls: Ty[cls.category.ob])
 
     now: category
-    dom: ob = None
-    cod: ob = None
-    mem: ob = None
-    _later: Callable[[], Stream[category]] = None
+    dom: Ty
+    cod: Ty
+    mem: Ty
+    _later: Callable[[], Stream[category]] | None = None
 
     later, is_constant = Ty.later, Ty.is_constant
     head, tail = Ty.head, Ty.tail
-    sliding = FeedbackCategory.sliding.failing(messages.STREAM_SLIDING)
+    sliding = FeedbackCategory.sliding.failing(
+        messages.STREAM_SLIDING)
 
     def __init__(
             self, now: category,
-            dom: ob = None,
-            cod: ob = None,
-            mem: ob = None,
-            _later: Callable[[], Stream[category]] = None):
+            dom: Ty | None = None,
+            cod: Ty | None = None,
+            mem: Ty | None = None,
+            _later: Callable[[], Stream[category]] | None = None):
         if dom is None or cod is None:
             if mem is not None or _later is not None:
                 raise ValueError(
                     "Cannot have mem or _later if dom or cod is None.")
-        dom = Ty[self.category.ob](now.dom) if dom is None else dom
-        cod = Ty[self.category.ob](now.cod) if cod is None else cod
-        mem = Ty[self.category.ob]() if mem is None else mem
+        dom = self.ob(now.dom) if dom is None else dom
+        cod = self.ob(now.cod) if cod is None else cod
+        mem = self.ob() if mem is None else mem
         for typ in (dom, cod, mem):
             assert_isinstance(typ, Ty)
         if not isinstance(now, self.category):
             now = self.category(
-                now, dom.now @ mem.now, cod.now @ mem.later.now)
+                now,  # ty: ignore[invalid-argument-type]
+                dom.now @ mem.now, cod.now @ mem.later.now)
         if now.dom != dom.now @ mem.now:
             raise AxiomError(f"{dom.now @ mem.now} != {now.dom}")
         if now.cod != cod.now @ mem.later.now:
@@ -423,13 +432,13 @@ class Stream(FeedbackCategory, NamedGeneric['category']):
         """
         Construct the stream with a given arrow now and the empty stream later.
         """
-        dom, cod = map(
-            Ty[cls.category.ob].singleton, (arg.dom, arg.cod))
+        dom, cod = map(cls.ob.singleton, (arg.dom, arg.cod))
         return cls(arg, dom, cod, _later=lambda: cls.id())
 
     @classmethod
     def sequence(
-            cls, name: str, dom: Ty, cod: Ty, mem: Ty = None, n_steps: int = 0,
+            cls, name: str, dom: Ty, cod: Ty, mem: Ty | None = None,
+            n_steps: int = 0,
             box_factory=None) -> Stream:
         """
         Produce a stream of boxes indexed by a time step.
@@ -444,7 +453,8 @@ class Stream(FeedbackCategory, NamedGeneric['category']):
         f1 : x1 @ m0 -> y1 @ m1
         f2 : x2 @ m1 -> y2 @ m2
         """
-        mem = Ty[cls.category.ob]() if mem is None else mem
+        if mem is None:
+            mem = Ty[cls.category.ob]()  # ty: ignore[invalid-type-form]
         if box_factory is None:
             box_factory = cls.category.box_factory
         now = box_factory(
@@ -479,8 +489,7 @@ class Stream(FeedbackCategory, NamedGeneric['category']):
         """
         later = self.later
         dom, cod = self.dom.unroll(), self.cod.unroll()
-        mem = Ty[self.category.ob](
-            self.mem.now, lambda: self.mem.later.later)
+        mem = self.ob(self.mem.now, lambda: self.mem.later.later)
         now = self.dom.now @ self.category.swap(later.dom.now, self.mem_dom)
         now >>= self.now @ later.dom.now
         now >>= self.cod.now @ self.category.swap(
@@ -498,7 +507,7 @@ class Stream(FeedbackCategory, NamedGeneric['category']):
         >>> print(id_x.now, id_x.later.now, id_x.later.later.now)
         Id(x0) Id(x1) Id(x2)
         """
-        x = Ty[cls.category.ob]() if x is None else x
+        x = cls.ob() if x is None else x
         assert_isinstance(x, Ty)
         now, dom, cod = cls.category.id(x.now), x, x
         _later = None if x.is_constant else lambda: cls.id(x.later)
@@ -585,11 +594,12 @@ class Stream(FeedbackCategory, NamedGeneric['category']):
         """ Construct a stream of diagonal morphisms. """
         now, cod = cls.category.copy(dom.now, n), dom ** n
         _later = None if dom.is_constant else lambda: cls.copy(dom.later, n)
-        return cls(now, dom, cod, _later=_later)
+        return cls(now, dom, cod,
+                   _later=_later)
 
     def split_memory(
-            self, n: int = None, left: bool = False, *,
-            dom: Ty = None, cod: Ty = None, mem: Ty = None
+            self, n: int | None = None, left: bool = False, *,
+            dom: Ty | None = None, cod: Ty | None = None, mem: Ty | None = None
             ) -> tuple[Ty, Ty, Ty]:
         """
         The domain, codomain and memory of a feedback of a stream, at every
@@ -607,8 +617,9 @@ class Stream(FeedbackCategory, NamedGeneric['category']):
         return dom, cod, mem
 
     def feedback(
-            self, n: int = None, left: bool = False, *,
-            dom: Ty = None, cod: Ty = None, mem: Ty = None) -> Stream:
+            self, n: int | None = None, left: bool = False, *,
+            dom: Ty | None = None, cod: Ty | None = None,
+            mem: Ty | None = None) -> Stream:
         """
         The delayed feedback of a monoidal stream, in either form of
         :meth:`discopy.abc.FeedbackCategory.feedback`, on the right only.

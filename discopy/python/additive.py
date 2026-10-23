@@ -22,6 +22,7 @@ from itertools import accumulate
 from typing import Self
 
 from discopy.abc import ComarkovCategory, TracedCategory
+from discopy.axioms import values
 from discopy.utils import assert_isinstance
 from discopy.python import finset, function
 from discopy.python.function import Ty
@@ -51,6 +52,19 @@ class Function(function.Function, ComarkovCategory, TracedCategory):
     def __init__(self, inside, dom, cod, is_swap_of=None):
         self.is_swap_of = is_swap_of
         super().__init__(inside, dom, cod)
+
+    @classmethod
+    def arguments(cls, dom: Ty) -> tuple[tuple, ...]:
+        """
+        The arguments a function on ``dom`` is called with by an
+        extensional equation: a value of one of its types, with its tag.
+
+        >>> assert Function.arguments(Ty(bool, type(None))) == (
+        ...     (False, 0), (True, 0), (None, 1))
+        """
+        return tuple(
+            (value, tag) for tag, typ in enumerate(dom.inside)
+            for value in values(typ))
 
     def __call__(self, obj, tag=0):
         if self.type_checking:
@@ -176,6 +190,6 @@ class Function(function.Function, ComarkovCategory, TracedCategory):
         return Function(inside, x ** n, x)
 
 
-Swap = Function.braid = Function.swap
+Swap = Function.braid = Function.swap  # ty: ignore[invalid-assignment]
 Id = Function.twist = Function.id
 Merge, Noise = Function.merge, Function.noise

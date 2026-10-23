@@ -198,11 +198,6 @@ def test_strategy_max_entries_on_pytorch(cls):
     assert type(drawn.array) is torch.Tensor and drawn.array.numel() == 4
 
 
-def test_Matrix_axioms():
-    """ A dry run of the property matrix on the carriers it enrols. """
-    axioms.assert_axioms(Matrix, Matrix[int])
-
-
 def test_Matrix_dtype_is_the_ring_of_entries():
     """ numpy's default precisions are the Python types they stand for, so
     the class a matrix infers is the one a user names, see #88. """

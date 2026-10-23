@@ -111,11 +111,13 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
-from discopy.abc import ComarkovCategory, NamedGeneric, TracedCategory
+from discopy import messages
+from discopy.abc import ComarkovCategory, TracedCategory
+from discopy.axioms import Equation, TestableGeneric
 from discopy.kleisli import channel
-from discopy.kleisli.monad import Monad
+from discopy.kleisli.monad import Monad, Powerset, Subdistribution
 from discopy.python import function
-from discopy.python.additive import Ty
+from discopy.python.additive import Function, Ty
 from discopy.utils import (
     assert_isinstance, assert_iscomposable, factory, factory_name, unbiased)
 
@@ -224,7 +226,7 @@ def injection(offset: int, source: Ty, target: Ty) -> function.Function:
 
 
 @factory
-class Channel(TracedCategory, ComarkovCategory, NamedGeneric['monad']):
+class Channel[monad](TracedCategory, ComarkovCategory, TestableGeneric):
     """
     A channel is a morphism in the Kleisli category of a monad ``M`` with
     disjoint union as tensor, i.e. a Python function from a tagged value of
@@ -264,12 +266,72 @@ class Channel(TracedCategory, ComarkovCategory, NamedGeneric['monad']):
     ...     Tagged(x, 0), Tagged(-x, 1)}), (int, ), (int, int))
     >>> assert both(1) == frozenset({Tagged(1, 0), Tagged(-1, 1)})
     """
+    @classmethod
+    def checked_params(cls) -> tuple:
+        """
+        The Elgot monads whose iteration terminates on every channel their
+        strategy draws: the iteration of
+        :attr:`~discopy.kleisli.monad.Maybe` is a ``while`` loop, which a
+        drawn channel can make cycle forever.
+        """
+        return (Powerset, Subdistribution)
+
     ob = Ty
     monad: Monad
 
+    trace_dinaturality_left = TracedCategory.trace_dinaturality_left\
+        .inapplicable(messages.CHANNEL_TRACES_RIGHT)
+    trace_iteration_left = TracedCategory.trace_iteration_left.inapplicable(
+        messages.CHANNEL_TRACES_RIGHT)
+    trace_naturality_left = TracedCategory.trace_naturality_left\
+        .inapplicable(messages.CHANNEL_TRACES_RIGHT)
+    trace_superposing_left = TracedCategory.trace_superposing_left\
+        .inapplicable(messages.CHANNEL_TRACES_RIGHT)
+    trace_left = TracedCategory.trace_left.inapplicable(
+        messages.CHANNEL_TRACES_RIGHT)
+
+    @classmethod
+    def equation_factory(cls, *terms: Channel) -> Equation:
+        """
+        The equation of a law, compared by the boundary of its terms and
+        what the monad observes of their outputs on the arguments of
+        :meth:`discopy.python.additive.Function.arguments`.
+        """
+        return Equation(*terms, up_to=lambda term: (
+            term.dom, term.cod, tuple(
+                cls.monad.observe(term(*args))
+                for args in Function.arguments(term.dom))))
+
+    @classmethod
+    def strategy(cls, *, dom=None, cod=None, **_):
+        """
+        Generate channels: a table from each argument of the domain to a
+        monadic value over the arguments of the codomain, drawn by the
+        :attr:`~discopy.kleisli.monad.Monad.generate` of the monad.
+        """
+        from hypothesis import strategies as st
+        generate = None if cls.monad is None else cls.monad.generate
+        if generate is None:
+            raise NotImplementedError
+
+        @st.composite
+        def channels(draw, generate: Callable):
+            source = draw(cls.ob.strategy()) if dom is None else dom
+            target = draw(cls.ob.strategy()) if cod is None else cod
+            outcomes = tuple(
+                pack_value(value, tag, target)
+                for value, tag in Function.arguments(target))
+            table = draw(st.fixed_dictionaries({
+                args: generate(outcomes)
+                for args in Function.arguments(source)}))
+            return cls(
+                lambda obj, tag=0: table[obj, tag], source, target)
+        return channels(generate)
+
     def __init__(self, inside: Callable, dom: Ty, cod: Ty):
         dom, cod = self.ob.cast(dom), self.ob.cast(cod)
-        packed_cls = channel.Channel[type(self).monad]
+        monad = type(self).monad
+        packed_cls = channel.Channel[monad]  # ty: ignore[invalid-type-form]
 
         def call(value):
             value, tag = unpack_value(value)
@@ -288,7 +350,8 @@ class Channel(TracedCategory, ComarkovCategory, NamedGeneric['monad']):
             dom : The disjoint union of wire types.
         """
         dom = cls.ob.cast(dom)
-        return cls(channel.Channel[cls.monad].id(pack(dom)), dom, dom)
+        packed = channel.Channel[cls.monad]  # ty: ignore[invalid-type-form]
+        return cls(packed.id(pack(dom)), dom, dom)
 
     def __call__(self, obj, tag: int = 0):
         return self.inside(pack_value(obj, tag, self.dom))
@@ -302,7 +365,9 @@ class Channel(TracedCategory, ComarkovCategory, NamedGeneric['monad']):
         """
         assert_isinstance(other, type(self))
         assert_iscomposable(self, other)
-        return type(self)(self.inside >> other.inside, self.dom, other.cod)
+        return type(self)(
+            self.inside >> other.inside,  # ty: ignore[unsupported-operator]
+            self.dom, other.cod)
 
     @unbiased
     def tensor(self, other: Channel) -> Channel:
@@ -337,11 +402,12 @@ class Channel(TracedCategory, ComarkovCategory, NamedGeneric['monad']):
             y : The disjoint union on the right.
         """
         x, y = cls.ob.cast(x), cls.ob.cast(y)
-        unit = cls.monad.unit(pack(y @ x))
+        unit = cls.monad.unit(pack(y @ x))  # ty: ignore[invalid-argument-type]
 
         def inside(obj, tag=0):
             tag = tag + len(y) if tag < len(x) else tag - len(x)
-            return unit(pack_value(obj, tag, y @ x))
+            return unit(  # ty: ignore[call-non-callable]
+                pack_value(obj, tag, y @ x))
         return cls(inside, x @ y, y @ x)
 
     @classmethod
@@ -355,9 +421,10 @@ class Channel(TracedCategory, ComarkovCategory, NamedGeneric['monad']):
             n : The number of copies to merge.
         """
         x = cls.ob.cast(x)
-        unit = cls.monad.unit(pack(x))
+        unit = cls.monad.unit(pack(x))  # ty: ignore[invalid-argument-type]
         return cls(
-            lambda obj, tag=0: unit(pack_value(obj, tag % len(x), x)),
+            lambda obj, tag=0: unit(  # ty: ignore[call-non-callable]
+                pack_value(obj, tag % len(x), x)),
             x ** n, x)
 
     def trace(self, n: int = 1, left: bool = False) -> Channel:

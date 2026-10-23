@@ -80,7 +80,7 @@ from __future__ import annotations
 from collections.abc import Callable
 
 from discopy.abc import Category, NamedGeneric
-from discopy.axioms import Equation
+from discopy.axioms import Equation, TestableGeneric
 from discopy.kleisli.monad import Monad
 from discopy.monad import free
 from discopy.python.function import Function
@@ -88,7 +88,7 @@ from discopy.utils import (
     assert_iscomposable, assert_ismember, factory, factory_name)
 
 
-class Algebra(NamedGeneric['monad']):
+class Algebra[monad](NamedGeneric):
     """
     An algebra of a monad ``M``, i.e. a carrier type ``A`` with a structure
     function from ``M(A)`` to ``A``.
@@ -144,7 +144,8 @@ class Algebra(NamedGeneric['monad']):
         """
         monad = cls.monad
         return cls(
-            "free", monad(generators).inside[0], monad.mult(generators))
+            "free", monad(generators).inside[0],
+            monad.mult(generators))  # ty: ignore[invalid-argument-type]
 
     def unitality(self, value) -> Equation:
         """
@@ -154,7 +155,8 @@ class Algebra(NamedGeneric['monad']):
         Parameters:
             value : The value ``x`` of the carrier.
         """
-        unit = type(self).monad.unit(self.carrier)
+        unit = type(self).monad.unit(
+            self.carrier)  # ty: ignore[invalid-argument-type]
         return Equation((unit >> self.structure)(value), value)
 
     def associativity(self, value) -> Equation:
@@ -167,7 +169,9 @@ class Algebra(NamedGeneric['monad']):
         """
         monad = type(self).monad
         return Equation(
-            (monad.mult(self.carrier) >> self.structure)(value),
+            (monad.mult(
+                self.carrier)  # ty: ignore[invalid-argument-type]
+             >> self.structure)(value),
             (monad(self.structure) >> self.structure)(value))
 
     def __call__(self, value):
@@ -190,7 +194,7 @@ class Algebra(NamedGeneric['monad']):
 
 
 @factory
-class Homomorphism(Category, NamedGeneric['monad']):
+class Homomorphism[monad](Category, TestableGeneric):
     """
     A homomorphism between two algebras of a monad ``M``, i.e. a function
     between their carriers preserving their structure.
@@ -226,13 +230,18 @@ class Homomorphism(Category, NamedGeneric['monad']):
     ...     lambda x: x, disjunction, conjunction)
     >>> assert not identity.preservation(frozenset({False, True}))
     """
+    @classmethod
+    def checked_params(cls) -> tuple:
+        """ None, a homomorphism of algebras having no strategy yet. """
+        return ()
+
     ob = Algebra
     monad: Monad
 
     def __init__(self, inside: Callable, dom: Algebra, cod: Algebra):
         monad = type(self).monad
-        assert_ismember(dom, Algebra[monad])
-        assert_ismember(cod, Algebra[monad])
+        assert_ismember(dom, Algebra[monad])  # ty: ignore[invalid-type-form]
+        assert_ismember(cod, Algebra[monad])  # ty: ignore[invalid-type-form]
         self.inside = inside if isinstance(inside, Function)\
             else Function(inside, dom.carrier, cod.carrier)
         self.dom, self.cod = dom, cod
@@ -283,11 +292,14 @@ class Homomorphism(Category, NamedGeneric['monad']):
         ...     frozenset({0}), frozenset({0, 10})}))
         """
         monad = cls.monad
-        assert_ismember(homomorphism, free.Homomorphism[monad])
+        homomorphisms = free.Homomorphism[
+            monad]  # ty: ignore[invalid-type-form]
+        algebras = Algebra[monad]  # ty: ignore[invalid-type-form]
+        assert_ismember(homomorphism, homomorphisms)
         return cls(
             homomorphism.inside,
-            Algebra[monad].free(homomorphism.dom),
-            Algebra[monad].free(homomorphism.cod))
+            algebras.free(homomorphism.dom),
+            algebras.free(homomorphism.cod))
 
     def preservation(self, value) -> Equation:
         """

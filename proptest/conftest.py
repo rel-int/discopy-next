@@ -1,7 +1,11 @@
 """
 Hypothesis profiles, example databases and the run's own report for the
 property suite, see the documentation of :mod:`discopy.axioms` and of
-:mod:`proptest.report`.
+:mod:`proptest.report`. The profiles are selected by
+``HYPOTHESIS_PROFILE``: ``dev`` by default, ``fast`` to develop with —
+derandomized, one cell per declaration of a law — ``pr`` for the small
+budget of a pull request and ``explore`` for the large one of ``main``
+and the nightly run.
 
 Under ``CI`` a registered profile inherits Hypothesis's ``ci`` defaults,
 ``derandomize=True`` and hence ``database=None``, so both are explicit.
@@ -41,6 +45,8 @@ PROFILE = os.environ.get("HYPOTHESIS_PROFILE", "dev")
 settings.register_profile("pr", max_examples=20, **COMMON)
 settings.register_profile("explore", max_examples=1000, **COMMON)
 settings.register_profile("dev", max_examples=100, **COMMON)
+settings.register_profile("fast", max_examples=100, **dict(
+    COMMON, derandomize=True, database=None))
 if PROFILE != "shared":
     settings.load_profile(PROFILE)
 
@@ -106,9 +112,9 @@ DISTINCT, BUDGET = "proptest-distinct", "proptest-budget"
 def cell_name(nodeid):
     """
     The name of the cell a node id belongs to, i.e. the parameter pytest
-    prints in brackets, which :func:`proptest.categories.category_parameters`
-    and ``test_axioms.axiom_parameters`` build out of the category and the
-    law. A node with no parameter is not a cell and has no name.
+    prints in brackets, which ``test_axioms.cells`` and ``test_rules.cells``
+    build out of the category and the law. A node with no parameter is not
+    a cell and has no name.
 
     >>> cell_name("proptest/test_axioms.py::test_axiom[cat.Arrow.unitality]")
     'cat.Arrow.unitality'
