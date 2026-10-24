@@ -110,3 +110,23 @@ def test_feedback_laws():
     assert not FeedbackCategory.sliding.bind(Stream).modulo(up_to)(**sliding)
     with raises(AxiomFailure):
         Stream.sliding(**sliding)
+
+
+def test_no_tree():
+    from discopy.utils import dumps
+    x = Ty(symmetric.Ty('x'))
+    for stream in (Stream.sequence('f', x, x),
+                   Stream(symmetric.Box('f', x.now, x.now))):
+        with raises(TypeError, match="A stream has no tree"):
+            dumps(stream)
+    assert Stream.serialisation() is NotImplemented
+
+
+def test_no_hash():
+    """ Streams and their types stay unhashable, with the ``__hash__ = None``
+    of a dataclass: their equality compares every field, the thunk
+    ``_later`` by identity. """
+    x = Ty(symmetric.Ty('x'))
+    for unhashable in (Stream.sequence('f', x, x), x):
+        with raises(TypeError, match="unhashable"):
+            hash(unhashable)

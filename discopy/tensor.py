@@ -524,6 +524,40 @@ class Functor(frobenius.Functor):
             + f"dom={factory_name(self.dom)}, "\
             + f"dtype={dtype}{optimize}{params})"
 
+    def to_tree(self) -> dict:
+        """
+        Serialise a tensor functor, its dtype in the name of its codomain,
+        see :meth:`discopy.cat.Functor.to_tree`, unless it has ``params``.
+
+        >>> from discopy.utils import dumps, loads
+        >>> x = frobenius.Ty('x')
+        >>> f = frobenius.Box('f', x, x)
+        >>> F = Functor({x: 2}, {f: [[0, 1], [1, 0]]}, dtype=int)
+        >>> assert loads(dumps(F)) == F and loads(dumps(F)).dtype is int
+        >>> dumps(Functor({x: 2}, {}, order='C'))
+        Traceback (most recent call last):
+        ...
+        TypeError: A tensor functor with params has no tree: they go to the \
+einsum of a backend verbatim, which a file should not reach.
+        """
+        if self.params:
+            raise TypeError(messages.NO_TREE_PARAMS)
+        return super().to_tree() | (
+            {} if self.optimize == "greedy" else {'optimize': self.optimize})
+
+    @classmethod
+    def from_tree(cls, tree: dict) -> Functor:
+        """
+        Decode a tensor functor, which takes its codomain's dtype, and an
+        ``optimize`` of the types its backend reads, a string, a boolean or
+        an explicit path.
+        """
+        functor = cat.Functor.from_tree(tree)
+        optimize = tree.get('optimize', "greedy")
+        assert_isinstance(optimize, (str, bool, list))
+        return cls(functor.ob_map, functor.ar_map, dom=functor.dom,
+                   dtype=functor.cod.dtype, optimize=optimize)
+
     def __call__(self, other):
         """
         The image of an object, a box or a diagram, see :meth:`contract`.

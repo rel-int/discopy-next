@@ -3,6 +3,8 @@ from os import listdir
 import pickle
 import re
 
+import numpy as np
+
 import pytest
 from pytest import warns
 
@@ -239,6 +241,161 @@ def test_dumps_complex_gate():
     from discopy.quantum.gates import H, X, Y, Z, S, T
     for gate in (H, X, Y, Z, S, T, H >> X, H @ X):
         assert loads(dumps(gate)) == gate
+
+
+def test_trees_written_by_main_keep_their_bytes():
+    """ Each line is a tree as `main` wrote it before tuples, arrays, numpy
+    scalars and sympy had nodes: it loads, and dumps back to the same bytes
+    (rel-int/discopy-next#168). """
+    with open("test/fixtures/trees.jsonl") as file:
+        for raw in file.read().splitlines():
+            assert dumps(loads(raw)) == raw
+
+
+@pytest.mark.parametrize('data', [
+    (1, 2), ((1, (2, )), [3, (4, 5j)]), {'key': (), 'other': [()]},
+    np.int64(3), np.int8(-1), np.bool_(True), np.float32(0.5),
+    np.complex64(1j)])
+def test_dumps_tuple_and_numpy_scalar_data(data):
+    box = cat.Box('f', Ob('x'), Ob('y'), data=data)
+    loaded = loads(dumps(box))
+    assert loaded == box and repr(loaded.data) == repr(data)
+    assert type(loaded.data) is type(data)
+
+
+def test_dumps_numpy_float64_as_a_float():
+    """ A float64 is a Python float, which JSON writes as it always has. """
+    box = cat.Box('f', Ob('x'), Ob('y'), data=np.float64(0.25))
+    assert dumps(box) == dumps(cat.Box('f', Ob('x'), Ob('y'), data=0.25))
+    assert loads(dumps(box)) == box
+
+
+@pytest.mark.parametrize('array', [
+    np.eye(2), np.array([[1, 2j], [3, 4]]), np.arange(6).reshape(1, 2, 3),
+    np.zeros((0, 2), dtype=bool), np.array(7), np.array([1, 2], np.uint8)])
+def test_dumps_ndarray_data(array):
+    loaded = loads(dumps(cat.Box('f', Ob('x'), Ob('y'), data=array))).data
+    assert isinstance(loaded, np.ndarray) and loaded.dtype == array.dtype
+    assert loaded.shape == array.shape and (loaded == array).all()
+
+
+def test_dumps_tensor_box():
+    from discopy.tensor import Dim
+    f = Box('f', Dim(2), Dim(2), np.eye(2))
+    assert loads(dumps(f)) == f
+    assert isinstance(loads(dumps(f)).data, np.ndarray)
+
+
+def test_dumps_unknown_data():
+    """ What `loads` would not read back, `dumps` refuses, unless it is
+    given a `default` or a `cls` of its own for it. """
+    import json
+    ragged = np.empty(2, dtype=object)
+    ragged[:] = [[1], [2, 3]]
+    for data in ({1, 2}, np.longdouble(1), np.array([1], dtype=np.longdouble),
+                 np.array(['a', 'bc']), np.array([(1, 2.)], 'i4, f8'),
+                 np.ma.array([1, 2], mask=[0, 1]), ragged,
+                 np.array([1], '>i4')):
+        box = cat.Box('f', Ob('x'), Ob('y'), data=data)
+        with pytest.raises(TypeError, match="not JSON serialisable"):
+            dumps(box)
+    box = cat.Box('f', Ob('x'), Ob('y'), data={'set': {2, 1}})
+    encoder = type("Encoder", (json.JSONEncoder, ), {
+        'default': lambda self, obj: sorted(obj)})
+    for kwargs in [{'default': sorted}, {'cls': encoder}]:
+        assert loads(dumps(box, **kwargs)).data == {'set': [1, 2]}
+
+
+def test_dumps_sympy_data():
+    sympy = pytest.importorskip("sympy")
+    from discopy.quantum import Rz, zx
+    phi = sympy.Symbol('phi')
+    theta = sympy.Symbol('theta', real=True, positive=True)
+    for data in (
+            phi, theta, phi / 2 + sympy.pi, sympy.Rational(1, 3),
+            sympy.Integer(-5), sympy.Float(0.1) + sympy.Float(0.2) * phi,
+            sympy.Float('1.5', precision=100), sympy.Float(0),
+            sympy.Float(0, precision=200) * phi,
+            sympy.exp(sympy.I * sympy.pi * phi) * sympy.sqrt(2),
+            sympy.sin(theta) ** 2 + sympy.atan2(phi, theta),
+            sympy.Max(phi, 1) + sympy.Abs(sympy.conjugate(phi)),
+            (phi, (theta, 1)), sympy.oo, sympy.nan, sympy.E):
+        box = cat.Box('f', Ob('x'), Ob('y'), data=data)
+        assert loads(dumps(box)) == box
+        assert hash(loads(dumps(box))) == hash(box)
+        assert repr(loads(dumps(box))) == repr(box)
+    for diagram in (Rz(phi), Rz(phi) >> Rz(-phi / 2),
+                    zx.Z(1, 1, phi), zx.X(2, 1, theta / 4)):
+        assert loads(dumps(diagram)) == diagram
+
+
+def test_dumps_sympy_outside_the_whitelist():
+    sympy = pytest.importorskip("sympy")
+    x, y = sympy.symbols('x y')
+    for data in (sympy.Dummy('x'), sympy.Matrix([[1]]),
+                 sympy.Function('f')(x), sympy.Symbol('x[0]'),
+                 x + sympy.Function('sin')(x),
+                 x * sympy.Function('Add')(x, y)):
+        with pytest.raises(TypeError, match="not JSON serialisable"):
+            dumps(cat.Box('f', Ob('x'), Ob('y'), data=data))
+
+
+def test_loads_runs_no_code_from_a_file():
+    """ `sympify` evaluates its string with `eval`, which a file should
+    never reach: a node holding a string where sympy wants an expression,
+    or a list where it wants an integer, is left as it is. """
+    sympy = pytest.importorskip("sympy")
+    import json
+    import os
+    flag = "DISCOPY_LOADS_RAN_CODE"
+    payload = f"__import__('os').environ.setdefault({flag!r}, '1')"
+    sympy.sympify(payload)
+    assert os.environ.pop(flag) == '1'
+    for node in (
+            {'factory': 'sympy.sin', 'args': [payload]},
+            {'factory': 'sympy.Add', 'args': [payload, payload]},
+            {'factory': 'sympy.Rational', 'p': [payload], 'q': 1},
+            {'factory': 'sympy.Integer', 'p': payload},
+            {'factory': 'sympy.Float', 'num': [payload], 'precision': 53},
+            {'factory': 'sympy.Symbol', 'name': 'x',
+             'assumptions': {'real': payload}},
+            {'factory': 'sympy.Pi', 'args': [payload]},
+            {'factory': 'sympy.Function', 'args': [payload]},
+            {'factory': 'numpy.ndarray', 'dtype': [payload],
+             'shape': [1], 'flat': [payload]},
+            {'factory': 'numpy.sum', 'item': [payload]},
+            {'factory': 'numpy.void', 'item': 10 ** 12},
+            {'factory': 'numpy.int64', 'item': '42'},
+            {'factory': 'sympy.Float', 'num': '0.1', 'precision': 10 ** 12},
+            {'factory': 'sympy.Float', 'num': '0', 'precision': 10 ** 7},
+            {'factory': 'sympy.Symbol', 'name': 'x',
+             'assumptions': {'name': True}},
+            {'factory': 'sympy.Symbol', 'name': 'x',
+             'assumptions': {'positive': True, 'negative': True}},
+            {'factory': 'numpy.int8', 'item': 1000},
+            {'factory': 'numpy.ndarray', 'dtype': 'uint8',
+             'shape': [1], 'flat': [-1]},
+            {'factory': 'numpy.ndarray', 'dtype': 'int64',
+             'shape': [10 ** 12], 'flat': [1]},
+            {'factory': 'numpy.ndarray', 'dtype': 'U500000000',
+             'shape': [1], 'flat': ['a']},
+            {'factory': 'numpy.ndarray', 'dtype': 'O',
+             'shape': [1], 'flat': [payload]},
+            {'factory': 'sympy.Symbol', 'name': payload}):
+        box = cat.Box('f', Ob('x'), Ob('y'), data=node)
+        raw = json.dumps(box.to_tree())
+        assert loads(raw).data == node
+    assert flag not in os.environ
+
+
+def test_resolve_factory_reads_classes_of_discopy_only():
+    """ A file names classes of DisCoPy, and types of builtins and numpy as
+    their parameters, never what a module of DisCoPy imports. """
+    for name in ("utils.json.loads", "utils.builtins.eval", "cat",
+                 "cat.Box.from_tree", "f2py", "tensor.Tensor[utils.Path]"):
+        with pytest.raises(AttributeError):
+            resolve_factory(name)
+
 
 def test_named_generic_pickle_roundtrip():
     from discopy.frobenius import Diagram, Ty

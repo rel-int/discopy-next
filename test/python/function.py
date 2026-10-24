@@ -29,3 +29,10 @@ def test_Function_type_checking():
             assert Function(str, int, int)(1) == "1"
             1 / 0
     assert Function.type_checking
+
+
+def test_no_tree():
+    from discopy.utils import dumps
+    with raises(TypeError, match="A function has no tree"):
+        dumps(Function(abs, int, int))
+    assert Function.serialisation() is NotImplemented

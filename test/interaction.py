@@ -256,3 +256,31 @@ def test_yanking():
     X = Ty[compact.Ty](compact.Ty('x'), compact.Ty("x'", "y'"))
     assert Diagram[compact.Diagram].yanking.modulo(
         lambda diagram: diagram.inside.to_hypergraph())(X)
+
+
+def compact_terms():
+    from discopy import compact
+    T, D = Ty[compact.Ty], Diagram[compact.Diagram]
+    x, y = T(compact.Ty('x'), compact.Ty("x'")), T(compact.Ty('y'))
+    f, g = (D(compact.Box(name, compact.Ty('x'), compact.Ty('y', "x'")), x, y)
+            for name in "fg")
+    return x, y, f, g, (x, x @ -y, Ty(), f, f @ g, D.caps(x, -x))
+
+
+def test_tree():
+    from discopy.abc import Nat
+    from discopy.matrix import Matrix
+    from discopy.utils import dumps, loads
+    two = Ty[Nat](Nat(2), Nat(2))
+    for term in compact_terms()[-1] + (
+            two, Diagram[Matrix[bool]].id(two), Ty[int](1, 2),
+            Ty[tuple]((1, ), ())):
+        loaded = loads(dumps(term))
+        assert type(loaded) is type(term) and loaded == term
+
+
+def test_hash():
+    x, y, f, g, terms = compact_terms()
+    for term in terms:
+        assert hash(term) == hash(type(term)(*vars(term).values()))
+    assert len({f, type(f)(f.inside, x, y), g}) == 2

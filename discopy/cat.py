@@ -88,6 +88,7 @@ from discopy.utils import (  # noqa: F401
     factory,
     factory_name,
     from_tree,
+    resolve_factory,
     rsubs,
     unbiased,
     MappingOrCallable,
@@ -1073,6 +1074,64 @@ class Functor(Category):
         return factory_name(type(self))\
             + f"(ob_map={self.ob_map}, ar_map={self.ar_map}{dom_cod_repr})"
 
+    def to_tree(self) -> dict:
+        """
+        Serialise a functor whose maps are dictionaries, each as the list of
+        its pairs, with the names of its domain and codomain, which are
+        classes of DisCoPy. A map that is a Python callable has no tree.
+
+        Example
+        -------
+        >>> from discopy.utils import dumps, loads
+        >>> x, y = Ob('x'), Ob('y')
+        >>> f = Box('f', x, y)
+        >>> F = Functor({x: y, y: x}, {f: f[::-1]})
+        >>> assert loads(dumps(F)) == F
+        >>> dumps(Functor(lambda x: x, {}))
+        Traceback (most recent call last):
+        ...
+        TypeError: A functor has no tree: its ob_map is a Python callable, \
+which JSON cannot hold.
+        """
+        for category in (self.dom, self.cod):
+            if not utils.is_discopy_class(category):
+                raise TypeError(messages.NOT_JSON_SERIALISABLE.format(
+                    type(category).__name__))
+        tree = {'factory': factory_name(type(self))}
+        for attr in ("ob_map", "ar_map"):
+            mapping = getattr(self, attr).mapping
+            if not isinstance(mapping, Mapping):
+                raise TypeError(messages.NO_TREE_CALLABLE.format(
+                    "A functor", attr))
+            for key in mapping:
+                if not hasattr(key, 'to_tree'):
+                    raise TypeError(messages.NOT_JSON_SERIALISABLE.format(
+                        type(key).__name__))
+            tree[attr] = [[key.to_tree(), value.to_tree()
+                           if hasattr(value, 'to_tree') else value]
+                          for key, value in mapping.items()]
+        return tree | {
+            'dom': factory_name(self.dom), 'cod': factory_name(self.cod)}
+
+    @classmethod
+    def from_tree(cls, tree: dict) -> Functor:
+        """
+        Decode a serialised functor, see :meth:`to_tree`, where a value that
+        is not a tree, i.e. has no factory, is the value itself, e.g. the
+        array of a box.
+        """
+        ob_map, ar_map = ({
+            from_tree(key): from_tree(value)
+            if isinstance(value, dict) and 'factory' in value
+            else value for key, value in tree[attr]}
+            for attr in ("ob_map", "ar_map"))
+        dom, cod = map(resolve_factory, (tree['dom'], tree['cod']))
+        for category in (dom, cod):
+            if not utils.is_discopy_class(category):
+                raise AttributeError(messages.NO_SUCH_CLASS.format(
+                    factory_name(category)))
+        return cls(ob_map, ar_map, dom=dom, cod=cod)
+
     def __call__(self, other):
         if isinstance(other, Ob):
             result = self.ob_map[other]
@@ -1233,6 +1292,36 @@ class Equation(AbstractEquation[Arrow]):
     >>> assert not Equation(f, f >> g >> g)
     >>> assert Equation(f, f >> g >> g, up_to=parity)
     """
+    def to_tree(self) -> dict:
+        """
+        Serialise an equation by its terms and symbols, unless it compares
+        them up to a function given to it, which has no tree.
+
+        Example
+        -------
+        >>> from discopy.utils import dumps, loads
+        >>> x = Ob('x')
+        >>> equation = loads(dumps(Equation(Box('f', x, x), Id(x))))
+        >>> assert equation.terms == (Box('f', x, x), Id(x))
+        >>> dumps(Equation(Id(x), up_to=len))
+        Traceback (most recent call last):
+        ...
+        TypeError: An equation has no tree: its up_to is a Python callable, \
+which JSON cannot hold.
+        """
+        if 'up_to' in vars(self):
+            raise TypeError(messages.NO_TREE_CALLABLE.format(
+                "An equation", "up_to"))
+        return {'factory': factory_name(type(self)),
+                'terms': [term.to_tree() for term in self.terms],
+                'symbols': list(self.symbols)}
+
+    @classmethod
+    def from_tree(cls, tree: dict) -> Equation:
+        """ Decode a serialised equation, see :meth:`to_tree`. """
+        for symbol in tree['symbols']:
+            assert_isinstance(symbol, str)
+        return cls(*map(from_tree, tree['terms']), symbols=tree['symbols'])
 
 
 Ob.equation_factory = Arrow.equation_factory = Equation

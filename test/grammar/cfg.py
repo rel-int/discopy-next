@@ -2,7 +2,7 @@ from pytest import importorskip, raises
 
 from discopy import cat, grammar, monoidal
 from discopy.grammar.cfg import Tree, Rule, Word, Id, Ty
-from discopy.utils import AxiomError
+from discopy.utils import AxiomError, dumps
 
 x = Ty('x')
 f, w = Rule(x @ x, x, name='f'), Word('w', x)
@@ -69,3 +69,9 @@ def test_Tree_to_diagram():
     assert f(g(a, b), a).to_diagram()\
         == (leaf_a @ leaf_b >> box('g', x @ y, x)) @ leaf_a\
         >> box('f', x @ x, x)
+
+
+def test_Algebra_no_tree():
+    from discopy.grammar.cfg import Algebra
+    with raises(TypeError, match="Object of type Operad is not JSON"):
+        dumps(Algebra({Ty('s'): Ty('s')}, {}))

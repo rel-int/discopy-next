@@ -769,3 +769,25 @@ def test_Bubble_name():
     bubble = Box('f', Dim(2), Dim(2), [1, 0, 0, 1]).bubble(name="g")
     assert bubble.dagger().dagger() == bubble
     assert frobenius.Functor.id(Diagram)(bubble) == bubble
+
+
+def test_Functor_tree():
+    from discopy.grammar.pregroup import Cup, Functor as Pregroup, Ty, Word
+    s, n = Ty('s'), Ty('n')
+    Alice, loves = Word('Alice', n), Word('loves', n.r @ s)
+    sentence = Alice @ loves >> Cup(n, n.r) @ s
+    for F in (
+            Pregroup({s: 1, n: 2}, {Alice: [1, 0], loves: [0, 1]},
+                     cod=Tensor),
+            Functor({n: 2, s: 1}, {Alice: np.array([1, 0]),
+                                   loves: np.array([1j, 1])},
+                    dom=Pregroup.dom, dtype=complex, optimize="optimal")):
+        G = loads(dumps(F))
+        assert type(G) is type(F) and G.cod == F.cod
+        assert G(sentence) == F(sentence)
+    assert G.optimize == "optimal" and G.dtype is complex
+    with raises(TypeError, match="with params has no tree"):
+        dumps(Functor({n: 2}, {}, backend="os"))
+    for optimize in ({'not': 'a path'}, 5):
+        with raises(TypeError, match=r"Expected str \| bool \| list"):
+            Functor.from_tree(G.to_tree() | {'optimize': optimize})

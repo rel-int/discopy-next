@@ -221,6 +221,7 @@ from discopy import messages
 from discopy.drawing import backend, Node, Point
 from discopy.config import BOX_DRAWING_ATTRIBUTES, TRANSPARENT
 from discopy.abc import TracedCategory
+from discopy.axioms import Testable
 from discopy.python import finset
 from discopy.utils import (
     assert_isinstance, assert_iscomposable, unbiased, factory, RichDisplay)
@@ -285,6 +286,23 @@ class Drawing(TracedCategory, RichDisplay):
 
     yanking = TracedCategory.yanking.inapplicable(
         messages.PLANAR_YANKING)
+    serialisation = Testable.serialisation.inapplicable(
+        messages.NO_TREE_DRAWING)
+
+    def to_tree(self) -> dict:
+        """
+        A drawing has no tree, see :func:`discopy.utils.dumps`: serialise the
+        diagram it is the drawing of instead.
+
+        >>> from discopy.monoidal import Box
+        >>> from discopy.utils import dumps
+        >>> dumps(Box('f', 'x', 'y').to_drawing())
+        Traceback (most recent call last):
+        ...
+        TypeError: A drawing has no tree: it is the layout of a diagram, \
+which to_drawing recomputes.
+        """
+        raise TypeError(messages.NO_TREE_DRAWING)
 
     def nodes_of_kind(self, kind):
         """

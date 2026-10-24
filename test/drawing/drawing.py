@@ -946,3 +946,10 @@ def test_draw_any_colour_a_box_draws_in(tmp_path):
             'f', x, x, draw_as_spider=True, color='#abc')):
         diagram.draw(path=str(tikz), to_tikz=True)
         assert TikZ.format_color('#aabbcc') in tikz.read_text()
+
+
+def test_no_tree():
+    from discopy.utils import dumps
+    with raises(TypeError, match="A drawing has no tree"):
+        dumps(Box('f', Ty('x'), Ty('y')).to_drawing())
+    assert Drawing.serialisation() is NotImplemented

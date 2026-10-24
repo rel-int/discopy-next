@@ -170,3 +170,25 @@ def test_copar_python():
     network = cell >> cell
     assert network.param == network.copar == f ** 2
     assert network.inside(2., 1., 10.) == (13., 2., 3.)
+
+
+def terms():
+    m, X = Ty('m'), frobenius.Ty('x')
+    a, b, c, P = map(closed.Ty, "abcP")
+    return (f, f >> g, f @ g, Symmetric.id(x),
+            Symmetric(x, y, Box('t', x @ p, y @ m), p, m),
+            Hypergraph.spiders(1, 2, X),
+            Closed(a @ b, c, closed.Box('k', a @ b @ P, c), P))
+
+
+def test_tree():
+    from discopy.utils import dumps, loads
+    for term in terms():
+        loaded = loads(dumps(term))
+        assert type(loaded) is type(term) and loaded == term
+
+
+def test_hash():
+    for term in terms():
+        assert hash(term) == hash(type(term)(*vars(term).values()))
+    assert len({f, Symmetric(x, y, Box('f', x @ p, y), p), g}) == 2

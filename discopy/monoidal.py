@@ -58,7 +58,8 @@ from __future__ import annotations
 import itertools
 from dataclasses import dataclass, field
 from functools import cached_property
-from typing import Iterator, Callable, ClassVar, Self, TYPE_CHECKING
+from typing import (
+    Iterator, Callable, ClassVar, Mapping, Self, TYPE_CHECKING)
 from warnings import warn
 
 from discopy import abc, cat, drawing, hypergraph, cmap, messages
@@ -1991,6 +1992,32 @@ class Functor(cat.Functor):
         return result[:-len(suffix) if suffix else None] + (
             f", colour_map={self.colour_map!r}{suffix}")
 
+    def to_tree(self) -> dict:
+        """
+        Serialise a functor whose maps are dictionaries, its colour map
+        included, see :meth:`discopy.cat.Functor.to_tree`.
+
+        >>> from discopy.utils import dumps, loads
+        >>> x, y, red, blue = Ty('x'), Ty('y'), Colour('red'), Colour('blue')
+        >>> F = Functor({x: y @ y}, {}, colour_map={red: blue})
+        >>> assert loads(dumps(F)) == F
+        """
+        tree, colour_map = super().to_tree(), self.colour_map.mapping
+        if not isinstance(colour_map, Mapping):
+            raise TypeError(messages.NO_TREE_CALLABLE.format(
+                "A functor", "colour_map"))
+        return tree | ({'colour_map': [
+            [key.to_tree(), value.to_tree()]
+            for key, value in colour_map.items()]} if colour_map else {})
+
+    @classmethod
+    def from_tree(cls, tree: dict) -> Functor:
+        functor = super().from_tree(tree)
+        functor.colour_map = MappingOrCallable({
+            from_tree(key): from_tree(value)
+            for key, value in tree.get('colour_map', [])})
+        return functor
+
     def __call__(self, other):
         if isinstance(other, Colour):
             if not self.colour_map or (
@@ -2103,6 +2130,28 @@ class Equation(cat.Equation, RichDisplay):
                  up_to=None):
         super().__init__(*terms, symbol=symbol, symbols=symbols, up_to=up_to)
         self.space = space
+
+    def to_tree(self) -> dict:
+        """
+        Serialise an equation of diagrams, with the space between its terms,
+        see :meth:`discopy.cat.Equation.to_tree`.
+
+        >>> from discopy.utils import dumps, loads
+        >>> x = Ty('x')
+        >>> equation = Equation(Box('f', x, x), Id(x), symbol="->", space=2)
+        >>> loaded = loads(dumps(equation))
+        >>> assert (loaded.terms, loaded.symbols, loaded.space)\\
+        ...     == ((Box('f', x, x), Id(x)), ("->", ), 2)
+        """
+        return super().to_tree() | ({} if self.space == 1 else {
+            'space': self.space})
+
+    @classmethod
+    def from_tree(cls, tree: dict) -> Equation:
+        equation = super().from_tree(tree)
+        equation.space = tree.get('space', 1)
+        assert_isinstance(equation.space, (int, float))
+        return equation
 
     def to_drawing(self):
         result = self.terms[0].to_drawing()

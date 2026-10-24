@@ -182,6 +182,8 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   and tqdm they import ([optyx#67]).
 - `Layer >> Layer` raises, plumbing has `time_step` `None`, a permutation
   reprs with its class, nan data equals itself ([next#31], [next#168]).
+- `dumps` writes tuples, numpy, sympy, `interaction`, `para`, `CQ`, `Equation`
+  and dict functors ([next#168]); `para` and `interaction` hash ([next#31]).
 
 ### Deprecated
 

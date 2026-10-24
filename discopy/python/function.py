@@ -20,7 +20,9 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from contextlib import contextmanager
 
+from discopy import messages
 from discopy.abc import Category
+from discopy.axioms import Testable
 from discopy.cat import Functor
 from discopy.monoidal import List
 from discopy.utils import (
@@ -30,6 +32,8 @@ from discopy.utils import (
 
 Ty = List[type]
 """ Lists of Python types, i.e. the free monoid on ``type``. """
+
+NO_TREE = messages.NO_TREE_CALLABLE.format("A function", "inside")
 
 
 @factory
@@ -120,6 +124,21 @@ class Function(Category):
         if self.type_checking:
             assert_isinstance(result, self.cod.inside)
         return result
+
+    def to_tree(self) -> dict:
+        """
+        A function has no tree, see :func:`discopy.utils.dumps`.
+
+        >>> from discopy.utils import dumps
+        >>> dumps(Function(abs, int, int))
+        Traceback (most recent call last):
+        ...
+        TypeError: A function has no tree: its inside is a Python callable, \
+which JSON cannot hold.
+        """
+        raise TypeError(NO_TREE)
+
+    serialisation = Testable.serialisation.inapplicable(NO_TREE)
 
 
 @factory

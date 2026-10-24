@@ -52,7 +52,8 @@ from discopy.quantum.circuit import (
 from discopy.quantum.gates import Discard, Measure, MixedState, Encode, Scalar
 from discopy.tensor import Dim, Tensor
 from discopy.utils import (
-    assert_isinstance, assert_iscomposable, factory_name, unbiased)
+    assert_isinstance, assert_iscomposable, factory_name, from_tree,
+    unbiased)
 
 
 class CQ:
@@ -94,6 +95,28 @@ class CQ:
     def __repr__(self):
         return factory_name(type(self))\
             + f"(classical={self.classical!r}, quantum={self.quantum!r})"
+
+    def to_tree(self) -> dict:
+        """
+        Serialise a classical-quantum dimension, and with it a channel.
+
+        >>> from discopy.utils import dumps, loads
+        >>> assert loads(dumps(C(Dim(2)) @ Q(Dim(3)))) == C(Dim(2)) @ Q(Dim(3))
+        >>> channel = Channel.id(C(Dim(2)) @ Q(Dim(2)))
+        >>> assert loads(dumps(channel)) == channel
+        """
+        return {'factory': factory_name(type(self)),
+                'classical': self.classical.to_tree(),
+                'quantum': self.quantum.to_tree()}
+
+    @classmethod
+    def from_tree(cls, tree: dict) -> CQ:
+        """ Decode a serialised classical-quantum dimension. """
+        classical, quantum = map(from_tree, (
+            tree['classical'], tree['quantum']))
+        assert_isinstance(classical, Dim)
+        assert_isinstance(quantum, Dim)
+        return cls(classical, quantum)
 
     def __str__(self):
         return "CQ()" if not self.classical and not self.quantum\

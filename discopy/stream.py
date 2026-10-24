@@ -167,6 +167,7 @@ from dataclasses import dataclass
 
 from discopy import messages, symmetric
 from discopy.abc import FeedbackCategory, NamedGeneric
+from discopy.axioms import Testable
 from discopy.python import finset
 from discopy.utils import (
     AxiomError,
@@ -326,6 +327,9 @@ class Ty(NamedGeneric['base']):
     __pow__ = symmetric.Ty.__pow__
 
 
+NO_TREE = messages.NO_TREE_STREAM
+
+
 @dataclass
 class Stream(FeedbackCategory, NamedGeneric['category']):
     """
@@ -377,6 +381,7 @@ class Stream(FeedbackCategory, NamedGeneric['category']):
     later, is_constant = Ty.later, Ty.is_constant
     head, tail = Ty.head, Ty.tail
     sliding = FeedbackCategory.sliding.failing(messages.STREAM_SLIDING)
+    serialisation = Testable.serialisation.inapplicable(NO_TREE)
 
     def __init__(
             self, now: category,
@@ -406,6 +411,19 @@ class Stream(FeedbackCategory, NamedGeneric['category']):
                     "Constant streams should have constant dom, cod and mem")
         self.dom, self.cod, self.mem = dom, cod, mem
         self.now, self._later = now, _later
+
+    def to_tree(self) -> dict:
+        """
+        A stream has no tree, see :func:`discopy.utils.dumps`.
+
+        >>> from discopy.utils import dumps
+        >>> dumps(Stream.sequence("f", Ty('x'), Ty('x')))
+        Traceback (most recent call last):
+        ...
+        TypeError: A stream has no tree: its later is what a Python \
+callable returns or, for a constant stream, itself, which JSON cannot hold.
+        """
+        raise TypeError(NO_TREE)
 
     def check_later(self):
         """ Check that later has consistent domain, codomain and memory. """

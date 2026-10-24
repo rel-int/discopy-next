@@ -167,10 +167,11 @@ from discopy.abc import (
     HypergraphCategory, MarkovCategory, NamedGeneric, SymmetricCategory,
     TracedCategory)
 from discopy.utils import (
-    assert_iscomposable, assert_isinstance, classproperty, unbiased)
+    assert_iscomposable, assert_isinstance, classproperty, factory_name,
+    from_tree, get_origin, resolve_factory, unbiased)
 
 
-@dataclass
+@dataclass(unsafe_hash=True)
 class Symmetric(SymmetricCategory, NamedGeneric['category']):
     """
     A parametric map from `dom` to `cod` with parameter space `param` is a
@@ -218,6 +219,32 @@ class Symmetric(SymmetricCategory, NamedGeneric['category']):
             self.category.id(self.dom @ self.param), self.inside)
         assert_iscomposable(
             self.inside, self.category.id(self.cod @ self.copar))
+
+    def to_tree(self) -> dict:
+        """
+        Serialise a parametric map, with the name of its category.
+
+        >>> from discopy.utils import dumps, loads
+        >>> from discopy.symmetric import Ty, Box
+        >>> x, y, p = map(Ty, "xyp")
+        >>> f = Symmetric(x, y, Box('f', x @ p, y), p)
+        >>> assert loads(dumps(f)) == f
+        """
+        return {
+            'factory': factory_name(get_origin(type(self))),
+            'category': factory_name(self.category),
+            'dom': self.dom.to_tree(),
+            'cod': self.cod.to_tree(),
+            'inside': self.inside.to_tree(),
+            'param': self.param.to_tree(),
+            'copar': self.copar.to_tree()}
+
+    @classmethod
+    def from_tree(cls, tree: dict) -> Symmetric:
+        """ Decode a serialised parametric map, see :meth:`to_tree`. """
+        factory = cls[resolve_factory(tree['category'])]
+        return factory(*map(from_tree, (
+            tree[key] for key in ('dom', 'cod', 'inside', 'param', 'copar'))))
 
     @classmethod
     def lift(cls, inside: category) -> Symmetric:

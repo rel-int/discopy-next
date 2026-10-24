@@ -486,3 +486,40 @@ def test_Bubble_no_common_boundary():
     assert Bubble(f, g, dom=x).cod == x
     with raises(ValueError, match=r"they have \[\]"):
         Bubble()
+
+
+def test_Functor_tree():
+    from discopy.utils import dumps, loads
+    x, y = Ob('x'), Ob('y')
+    f = Box('f', x, y, data=(1, 2))
+    for F in (Functor(), Functor({x: y, y: x}, {f: f[::-1] >> f}),
+              Functor({x: x}, {f: f}, dom=Arrow, cod=Arrow),
+              Functor({x: y}, {f: {'array': (1, 2)}})):
+        assert loads(dumps(F)) == F
+    for ob_map, ar_map, attr in [
+            (lambda x: x, {}, "ob_map"), ({}, lambda f: f, "ar_map")]:
+        with raises(TypeError, match=f"its {attr} is a Python callable"):
+            dumps(Functor(ob_map, ar_map))
+    with raises(TypeError, match="A functor has no tree"):
+        dumps(Functor.id())
+    for F in (Functor({}, {}, cod=int), Functor({int: x}, {})):
+        with raises(TypeError, match="not JSON serialisable"):
+            dumps(F)
+    tree = Functor().to_tree()
+    for name in ("int", "ndarray"):
+        with raises(AttributeError, match="No class of DisCoPy"):
+            Functor.from_tree(tree | {'cod': name})
+
+
+def test_Equation_tree():
+    from discopy.utils import dumps, loads
+    x = Ob('x')
+    f = Box('f', x, x)
+    equation = Equation(f >> f, f, Id(x), symbols=("=", "->"))
+    loaded = loads(dumps(equation))
+    assert type(loaded) is Equation and bool(loaded) is bool(equation)
+    assert (loaded.terms, loaded.symbols) == (equation.terms, ("=", "->"))
+    with raises(TypeError, match="its up_to is a Python callable"):
+        dumps(Equation(f, f >> f, up_to=len))
+    with raises(TypeError, match="Expected str"):
+        Equation.from_tree(Equation(f, f).to_tree() | {'symbols': [[1]]})
