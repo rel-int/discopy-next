@@ -500,6 +500,24 @@ def test_Bubble_dagger():
     assert f.bubble().dagger().dagger() == f.bubble()
 
 
+def test_Bubble_every_level():
+    from discopy import (
+        spacial, feedback, braided, balanced, symmetric, markov, comarkov,
+        biclosed, closed, rigid, pivotal, ribbon, compact, frobenius)
+    from discopy.grammar import pregroup, categorial, abstract
+    for module in (
+            spacial, feedback, braided, balanced, symmetric, markov,
+            comarkov, biclosed, closed, rigid, pivotal, ribbon, compact,
+            frobenius, pregroup, categorial, abstract):
+        assert module.Diagram.bubble_factory is module.Bubble, module
+        x, y = module.Ty('x'), module.Ty('y')
+        bubble = module.Box('f', x, y).bubble(name="N")
+        diagram = bubble >> module.Box('h', y, y)
+        assert isinstance(diagram, module.Diagram) and diagram.cod == y
+        assert module.Functor.id(module.Diagram)(diagram) == diagram
+        assert loads(dumps(diagram)) == diagram
+
+
 def test_Bubble_data():
     f = Box('f', Ty('x'), Ty('y'))
     bubble = f.bubble(data=42, is_dagger=True)
@@ -510,6 +528,8 @@ def test_Bubble_data():
     for b in (from_tree(named.to_tree()), loads(dumps(named))):
         assert b == named and (b.name, b.method) == ("b", "frame")
     assert "method" not in bubble.to_tree() and "name" not in bubble.to_tree()
+    from discopy import monoidal
+    assert (eval(repr(bubble)).data, eval(repr(bubble)).is_dagger) == (42, True)
 
 
 def test_Bubble_identity_Functor():

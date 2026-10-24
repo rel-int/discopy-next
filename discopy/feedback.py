@@ -38,6 +38,7 @@ Summary
     Head
     Tail
     Sum
+    Bubble
     Functor
 
 .. admonition:: Functions
@@ -1057,6 +1058,12 @@ class Sum(monoidal.Sum, Box):
     """
 
 
+class Bubble(monoidal.Bubble, Box):
+    """
+    A feedback bubble is a monoidal bubble and a feedback box.
+    """
+
+
 class Functor(monoidal.Functor):
     """
     A feedback functor is a monoidal functor that preserves delay, feedback
@@ -1144,6 +1151,7 @@ Diagram.trace_factory = Trace
 Diagram.head_factory, Diagram.tail_factory = Head, Tail
 Diagram.followed_by_factory = FollowedBy
 Diagram.sum_factory = Sum
+Diagram.bubble_factory = Bubble
 Hypergraph = hypergraph.Hypergraph[Diagram]
 Id = Diagram.id
 

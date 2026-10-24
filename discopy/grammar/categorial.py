@@ -26,6 +26,7 @@ Summary
     Word
     ForwardCrossedComposition
     BackwardCrossedComposition
+    Bubble
     Functor
     CMap
 
@@ -172,6 +173,15 @@ class Coeval(biclosed.Coeval, Box):
 class Curry(biclosed.Curry, Box):
     """
     The currying of a categorial diagram.
+    """
+
+
+class Bubble(biclosed.Bubble, Box):
+    """
+    A categorial bubble is a biclosed bubble and a categorial box.
+
+    >>> N = Ty('N')
+    >>> assert (Box('f', N, N).bubble() >> Box('g', N, N)).cod == N
     """
 
 
@@ -675,6 +685,7 @@ def parse(sentence, k: int = 1, goal: Ty | None = None
 Id = Diagram.id
 Diagram.box_factory, Diagram.functor_factory = Box, Functor
 Diagram.curry_factory = Curry
+Diagram.bubble_factory = Bubble
 Diagram.eval_factory, Diagram.coeval_factory = Eval, Coeval
 
 Ty.variable_factory = Variable

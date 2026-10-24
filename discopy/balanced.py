@@ -21,6 +21,7 @@ Summary
     Head
     Tail
     Sum
+    Bubble
     Functor
 
 Axioms
@@ -333,6 +334,12 @@ class Sum(braided.Sum, Box):
     """
 
 
+class Bubble(braided.Bubble, feedback.Bubble, Box):
+    """
+    A balanced bubble is a braided and feedback bubble and a balanced box.
+    """
+
+
 class Functor(braided.Functor, feedback.Functor):
     """
     A balanced functor is a braided functor that twists.
@@ -404,6 +411,7 @@ Hypergraph = hypergraph.Hypergraph[Diagram]
 Diagram.braid_factory = Braid
 Diagram.twist_factory = Twist
 Diagram.sum_factory = Sum
+Diagram.bubble_factory = Bubble
 Diagram.dual_rail_factory = DualRail
 Id = Diagram.id
 

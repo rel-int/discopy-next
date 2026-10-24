@@ -897,3 +897,11 @@ def test_delay_diagrams():
         == Diagram.ev(z, y).dagger().delay()
     assert f.curry().delay().cod == (z << y).delay() != z.d << y.d
     assert f.curry().delay().arg == f
+
+
+def test_Bubble_is_linear_and_has_no_term():
+    x = Ty('x')
+    f, g = Box('f', x, x), Box('g', x, x)
+    assert f.bubble().is_linear and Diagram.copy(x).bubble(cod=x).is_linear
+    with raises(AxiomError):
+        (f.bubble() >> g).to_term()

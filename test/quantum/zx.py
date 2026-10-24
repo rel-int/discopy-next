@@ -427,3 +427,10 @@ def test_functor_into_zx_rebuilds_spiders():
         Diagram.spiders(2, 1, Nat(2)).eval())
     with raises(ValueError):
         Diagram.spider_factory(1, 1, Nat(2))
+
+
+def test_Bubble_grad():
+    from sympy.abc import phi
+    bubble = Z(1, 1, phi).bubble()
+    assert bubble.grad(phi).arg == bubble
+    assert not Z(1, 1).bubble().grad(phi).eval().array.any()

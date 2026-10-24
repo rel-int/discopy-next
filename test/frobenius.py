@@ -32,6 +32,37 @@ def test_Functor_phased_spider():
     assert spider.to_hypergraph().boxes == (spider, )
 
 
+def test_Spider_dagger():
+    from discopy.grammar import pregroup
+    x = Ty('x')
+    phased, box = Spider(1, 1, x, .5), Box('box', x, x)
+    F = Functor({x: x}, {phased: box})
+    assert F(phased.dagger()) == F(phased).dagger() == box.dagger()
+    for spider in (phased, Spider(2, 3, x, "$\\phi$")):
+        dagger = spider.dagger()
+        assert dagger.is_dagger and dagger.phase == spider.phase
+        assert dagger.dagger() == spider and dagger.r == spider.r.dagger()
+        assert dagger.unfuse() == spider.unfuse().dagger()
+    assert eval(str(phased.dagger())) == phased.dagger()
+    n = pregroup.Ty('n')
+    word = pregroup.Spider(1, 2, n, "a")
+    assert word.dagger().r == word.r.dagger()
+    for spider in (Spider(1, 1, x, 0), Spider(1, 2, x, is_dagger=True)):
+        assert not spider.is_dagger and spider.dagger().dagger() == spider
+    assert Spider(1, 1, x, 0).dagger().is_cartesian
+    assert Spider(1, 3, x, is_dagger=True).unfuse() == Spider(1, 3, x).unfuse()
+    assert Spider(3, 1, x, 0).dagger().unfuse()\
+        == Spider(1, 1, x, 0) >> Spider(1, 3, x).unfuse()
+
+
+def test_Bubble_flags_rotate():
+    x = Ty('x')
+    f, g = Box('f', x, x), Box('g', x, x)
+    noisy = f.bubble(is_affine=False).r
+    assert not noisy.l.affine and Functor({x: x}, {f: g})(noisy) == (
+        g.bubble(is_affine=False).r)
+
+
 def test_Box_hash():
     x, y = Ty('x'), Ty('y')
     f = Box('f', x, y)

@@ -46,6 +46,7 @@ Summary
     Head
     Tail
     Sum
+    Bubble
     Functor
     CMap
 
@@ -438,6 +439,8 @@ class Diagram(markov.Diagram, biclosed.Diagram, ClosedCategory):
     @classmethod
     def box_to_term(cls, box, args):
         "The application of a box as a constant to variables for its inputs."
+        if isinstance(box, Bubble):
+            raise AxiomError(f"{box} is a bubble, it has no term reading.")
         if not box.dom:
             return box.cod(box.name)
         factors = [box.dom[i:i + 1] for i in range(len(box.dom))]
@@ -666,6 +669,18 @@ class Sum(markov.Sum, biclosed.Sum, Box):
         return all(term.is_linear for term in self.terms)
 
 
+class Bubble(markov.Bubble, biclosed.Bubble, Box):
+    """
+    A closed bubble is a markov and biclosed bubble and a closed box, linear
+    as a closed box is, whatever its args. It has no term reading.
+
+    Example
+    -------
+    >>> x = Ty('x')
+    >>> assert Diagram.copy(x).bubble(cod=x).is_linear
+    """
+
+
 class Functor(biclosed.Functor, markov.Functor):
     """
     A closed functor is a markov functor that preserves evaluation, currying
@@ -724,6 +739,7 @@ Diagram.eval_factory = Eval
 Diagram.coeval_factory = Coeval
 Diagram.discard_factory = Discard
 Diagram.sum_factory = Sum
+Diagram.bubble_factory = Bubble
 Ty.under_factory = Ty.over_factory = staticmethod(Exp)
 
 Id = Diagram.id

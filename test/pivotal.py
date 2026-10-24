@@ -33,3 +33,9 @@ def test_subs_keeps_winding_number_and_time_step():
     n, s = P('n'), P('s')
     word = Word('w', n @ s, dom=n.r, data=phi)
     assert word.l.subs(phi, 1) == Word('w', n @ s, dom=n.r, data=1).l
+
+
+def test_Bubble_rotate():
+    x, y = Ty('x'), Ty('y')
+    bubble = Box('f', x, y).bubble()
+    assert bubble.r.z == bubble.l.z == 1 and bubble.r.r == bubble

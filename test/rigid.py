@@ -239,3 +239,25 @@ def test_rotated_box_serialisation():
     def round_trip(box):
         assert loads(dumps(box)) == box
     round_trip()
+
+
+def test_Bubble_rotate():
+    from sympy.abc import phi
+    from discopy import rigid
+    from discopy.utils import dumps, loads
+    x, y = Ty('x'), Ty('y')
+    f, g = Box('f', x, y), Box('g', y, x)
+    bubble = f.bubble(name="N")
+    assert (bubble.r.dom, bubble.r.cod, bubble.r.z) == (y.r, x.r, 1)
+    assert bubble.r.args == (f, ) and bubble.r != f.r.bubble(name="N")
+    assert bubble.r.l == bubble == bubble.l.r and bubble.r.r != bubble
+    for rotated in (bubble.r, bubble.l.l):
+        assert eval(repr(rotated)) == rotated == loads(dumps(rotated))
+        assert rotated[::-1][::-1] == rotated
+        assert eval(repr(rotated[::-1])).is_dagger
+    assert str(bubble.l.l) == "(f).bubble().l.l"
+    assert bubble.r[::-1] == bubble[::-1].r
+    F = Functor({x: y, y: x}, {f: g})
+    assert F(bubble.r) == F(bubble).r == g.bubble(name="N").r
+    symbolic = Box('f', x, y, data=phi).bubble()
+    assert symbolic.r.subs(phi, 1) == symbolic.subs(phi, 1).r

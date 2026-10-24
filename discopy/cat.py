@@ -909,6 +909,8 @@ one, they have [cat.Ob('x'), cat.Ob('y')].
         repr_kwargs += f", name={repr(self.name)}" if self.name else ""
         repr_kwargs += "" if self.method == "bubble"\
             else f", method={repr(self.method)}"
+        repr_kwargs += "" if self.data is None else f", data={self.data!r}"
+        repr_kwargs += ", is_dagger=True" if self.is_dagger else ""
         return factory_name(type(self)) + (f"({repr_args}{repr_kwargs})")
 
     @property

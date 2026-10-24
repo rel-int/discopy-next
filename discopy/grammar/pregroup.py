@@ -17,6 +17,7 @@ Summary
     Cap
     Swap
     Word
+    Bubble
     Functor
 
 .. admonition:: Functions
@@ -220,7 +221,8 @@ class Spider(frobenius.Spider, Box):
     """
     def rotate(self, left=False):
         typ = self.typ.l if left else self.typ.r
-        return type(self)(len(self.cod), len(self.dom), typ, self.phase)
+        return type(self)(len(self.cod), len(self.dom), typ, self.phase,
+                          is_dagger=self.is_dagger)
 
 
 class Word(thue.Word, Box):
@@ -242,6 +244,21 @@ class Word(thue.Word, Box):
         extra += "".join(f", {name}=False" for name in self.flags())
         return factory_name(type(self))\
             + f"({self.name!r}, {self.cod!r}{extra})"
+
+
+class Bubble(frobenius.Bubble, Box):
+    """
+    A pregroup bubble is a frobenius bubble and a pregroup box.
+
+    It keeps its full winding number as it rotates, as a pregroup box does.
+
+    >>> n = Ty('n')
+    >>> word = Box('w', n, n)
+    >>> assert (word >> word.bubble()).cod == n and word.bubble().r.l.z == 0
+    >>> assert word.bubble().l.l.z == -2
+    """
+    def rotate(self, left=False):
+        return self.flagged(rigid.Bubble.rotate(self, left))
 
 
 class Functor(frobenius.Functor):
@@ -288,6 +305,7 @@ Diagram.box_factory = Box
 Diagram.swap_factory, Diagram.spider_factory = Swap, Spider
 Diagram.permutation_factory = Permutation
 Diagram.cup_factory, Diagram.cap_factory = Cup, Cap
+Diagram.bubble_factory = Bubble
 
 Id = Diagram.id
 

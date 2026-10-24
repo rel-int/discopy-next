@@ -722,6 +722,58 @@ class Sum(symmetric.Sum, Box):
         self.affine = len(self.terms) == 1 and self.terms[0].is_affine
 
 
+class Bubble(symmetric.Bubble, Box):
+    """
+    A markov bubble is a symmetric bubble and a markov box: a total function
+    unless it says otherwise, whatever its args, and it keeps what it says
+    through dagger, substitution, rotation and markov functors.
+
+    Parameters:
+        args (Diagram) : The diagrams inside the bubble.
+        is_deterministic : Whether copying commutes with the bubble.
+        is_affine : Whether discarding commutes with the bubble.
+        kwargs : Passed to :class:`symmetric.Bubble`.
+
+    Example
+    -------
+    >>> x = Ty('x')
+    >>> sample = Box('sample', x, x, is_deterministic=False)
+    >>> noisy = sample.bubble(is_deterministic=False)
+    >>> assert sample.bubble().is_deterministic and not noisy.is_deterministic
+    >>> assert noisy != sample.bubble() and noisy[::-1][::-1] == noisy
+    >>> assert Functor.id(Diagram)(noisy) == noisy
+    """
+    def __init__(self, *args: Diagram, is_deterministic=True, is_affine=True,
+                 **kwargs):
+        super().__init__(*args, **kwargs)
+        self.deterministic, self.affine = is_deterministic, is_affine
+
+    def __repr__(self):
+        flags = "".join(f", {name}=False" for name in self.flags())
+        return super().__repr__()[:-1] + flags + ")" if flags\
+            else super().__repr__()
+
+    def setoid(self):
+        return super().setoid() + (self.deterministic, self.affine)
+
+    def dagger(self) -> Bubble:
+        return self.flagged(super().dagger())
+
+    def lambdify(self, *symbols, **kwargs) -> Callable:
+        function = super().lambdify(*symbols, **kwargs)
+        return lambda *xs: self.flagged(function(*xs))
+
+    def to_tree(self) -> dict:
+        return {**super().to_tree(), **self.flags()}
+
+    @classmethod
+    def from_tree(cls, tree: dict) -> Bubble:
+        result = super().from_tree(tree)
+        result.deterministic = tree.get("is_deterministic", True)
+        result.affine = tree.get("is_affine", True)
+        return result
+
+
 class Functor(symmetric.Functor):
     """
     A Markov functor is a symmetric functor that preserves copies.
@@ -763,7 +815,10 @@ class Functor(symmetric.Functor):
             function = getattr(self.cod, "function", None)\
                 or MarkovCategory.function.__func__.__get__(self.cod)
             return function(other.func, list(map(self, other.dom)))
-        return super().__call__(other)
+        result = super().__call__(other)
+        if isinstance(other, Bubble) and isinstance(result, Bubble):
+            return other.flagged(result)
+        return result
 
 
 CMap = cmap.CMap[Diagram]
@@ -778,6 +833,7 @@ Diagram.swap_factory = Swap
 Diagram.permutation_factory = Permutation
 Diagram.discard_factory = Discard
 Diagram.sum_factory = Sum
+Diagram.bubble_factory = Bubble
 Id = Diagram.id
 
 

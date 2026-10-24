@@ -120,3 +120,9 @@ def test_dual_rail_delay():
     x = Ty('x')
     for diagram in [Cup(x, x.r), Cap(x, x.l), Twist(x), Braid(x, x)]:
         assert diagram.delay().to_ribbons() == diagram.to_ribbons().delay()
+
+
+def test_Bubble_to_ribbons():
+    x = Ty('x')
+    f = Box('f', x, x)
+    assert f.bubble(name="N").to_ribbons() == f.to_ribbons().bubble(name="N")

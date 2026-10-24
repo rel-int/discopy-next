@@ -13,6 +13,7 @@ Summary
 
     Diagram
     Box
+    Bubble
     Swap
     Spider
     Z
@@ -314,6 +315,17 @@ class Sum(tensor.Sum[complex], Box):
     """
 
 
+class Bubble(tensor.Bubble[complex], Box):
+    """
+    A ZX bubble is a tensor bubble in a ZX diagram, which differentiates as
+    a ZX box does.
+
+    >>> bubble = Z(1, 1).bubble()
+    >>> assert (bubble >> Z(1, 1)).eval() == bubble.eval()
+    """
+    grad = Box.grad
+
+
 class Permutation(tensor.Permutation[complex], Box):
     "A permutation in a ZX diagram."
 
@@ -556,5 +568,6 @@ H.color, H.shape = "yellow", "rectangle"
 SWAP = Swap(Nat(1), Nat(1))
 Diagram.box_factory = Box
 Diagram.swap_factory, Diagram.sum_factory = Swap, Sum
+Diagram.bubble_factory = Bubble
 Diagram.permutation_factory = Permutation
 Id = Diagram.id

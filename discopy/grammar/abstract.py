@@ -31,6 +31,7 @@ Summary
     Head
     Tail
     Sum
+    Bubble
     Functor
     Lexicon
     TermBase
@@ -305,6 +306,15 @@ class Sum(closed.Sum, Box):
     "A formal sum of abstract diagrams."
 
 
+class Bubble(closed.Bubble, Box):
+    """
+    An abstract bubble is a closed bubble and an abstract box.
+
+    >>> A = Ty('A')
+    >>> assert (Box('f', A, A).bubble() >> Box('g', A, A)).cod == A
+    """
+
+
 class Functor(closed.Functor):
     """
     An abstract functor is a closed functor with abstract diagrams as domain.
@@ -387,6 +397,7 @@ Diagram.eval_factory = Eval
 Diagram.coeval_factory = Coeval
 Diagram.discard_factory = Discard
 Diagram.sum_factory = Sum
+Diagram.bubble_factory = Bubble
 Ty.under_factory = Ty.over_factory = staticmethod(Exp)
 Ty.variable_factory = Variable
 Ty.constant_factory = Constant

@@ -595,3 +595,11 @@ def test_delay():
     circuit = CX >> Rz(.5) @ H
     assert np.allclose(
         circuit.delay().eval().array, circuit.eval().array)
+
+
+def test_Bubble_is_mixed_and_grad():
+    phi = sympy.Symbol('phi')
+    assert X.bubble(cod=bit).is_mixed and not X.bubble().is_mixed
+    assert X.bubble().grad(phi) == Sum((), qubit, qubit)
+    with raises(NotImplementedError):
+        Rx(phi).bubble().grad(phi)

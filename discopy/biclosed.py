@@ -22,6 +22,7 @@ Summary
     Coeval
     Curry
     Sum
+    Bubble
     Functor
     CMap
     TermBase
@@ -624,12 +625,19 @@ class Sum(monoidal.Sum, Box):
     """
 
 
+class Bubble(monoidal.Bubble, Box):
+    """
+    A biclosed bubble is a monoidal bubble and a biclosed box.
+    """
+
+
 Id = Diagram.id
 Diagram.box_factory = Box
 Diagram.curry_factory = Curry
 Diagram.eval_factory = Eval
 Diagram.coeval_factory = Coeval
 Diagram.sum_factory = Sum
+Diagram.bubble_factory = Bubble
 
 
 class Functor(monoidal.Functor):

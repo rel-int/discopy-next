@@ -102,3 +102,10 @@ def test_foliation_with_caps():
     assert foliated.to_staircases() == diagram
     F = Functor(ob_map={s: 1, n: 2}, ar_map={loves: [0, 1, 1, 0]}, cod=Tensor)
     assert F(foliated) == F(diagram)
+
+
+def test_Bubble_winding():
+    n, s = Ty('n'), Ty('s')
+    word = Box('w', n, s)
+    assert word.bubble().l.l.z == -2 and word.bubble().l.l.r.r == word.bubble()
+    assert word.bubble().l.l != Bubble(word, dom=n.l.l, cod=s.l.l)

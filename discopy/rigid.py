@@ -19,6 +19,7 @@ Summary
     Cup
     Cap
     Sum
+    Bubble
     Functor
 
 Axioms
@@ -810,6 +811,104 @@ class Sum(biclosed.Sum, Box):
             tuple(term.r for term in self.terms), self.cod.r, self.dom.r)
 
 
+class Bubble(biclosed.Bubble, Box):
+    """
+    A rigid bubble is a biclosed bubble and a rigid box, which rotates as a
+    box does: its winding number turns, its args stay as they are inside.
+
+    Parameters:
+        args (Diagram) : The diagrams inside the bubble.
+        z (int) : The winding number of the bubble.
+        kwargs : Passed to :class:`biclosed.Bubble`.
+
+    Example
+    -------
+    >>> x, y = Ty('x'), Ty('y')
+    >>> f = Box('f', x, y)
+    >>> bubble = f.bubble()
+    >>> assert bubble.r.z == 1 and bubble.r.args == (f, )
+    >>> assert (bubble.r.dom, bubble.r.cod) == (y.r, x.r)
+    >>> assert bubble.r.l == bubble == bubble.l.r and bubble.l.l != bubble
+    >>> assert bubble.r != f.r.bubble()
+    >>> print(bubble.l)
+    (f).bubble().l
+    """
+    def __init__(self, *args: Diagram, z: int = 0, **kwargs):
+        self.z = z
+        biclosed.Bubble.__init__(self, *args, **kwargs)
+
+    def __str__(self):
+        if not self.z:
+            return super().__str__()
+        return str(self.r) + '.l' if self.z < 0 else str(self.l) + '.r'
+
+    def __repr__(self):
+        if not self.z:
+            return super().__repr__()
+        return super().__repr__()[:-1] + f', z={self.z})'
+
+    def setoid(self):
+        return super().setoid() + (self.z, )
+
+    def rotate(self, left=False) -> Bubble:
+        dom, cod = (
+            getattr(x, 'l' if left else 'r') for x in (self.cod, self.dom))
+        return type(self)(
+            *self.args, dom=dom, cod=cod, name=self.name, method=self.method,
+            data=self.data, is_dagger=self.is_dagger,
+            z=self.z + (-1 if left else 1), drawing_name=self.drawing_name,
+            draw_as_frame=self.draw_as_frame,
+            draw_as_square=self.draw_as_square,
+            draw_vertically=self.draw_vertically)
+
+    def dagger(self) -> Bubble:
+        """
+        The dagger of a rigid bubble keeps its winding number, as that of a
+        rigid box does, see :meth:`Box.dagger`.
+
+        >>> f = Box('f', Ty('x'), Ty('y')).bubble()
+        >>> assert f.r[::-1] == f[::-1].r and f.r[::-1][::-1] == f.r
+        """
+        result = super().dagger()
+        result.z = self.z
+        return result
+
+    def lambdify(self, *symbols, **kwargs) -> Callable:
+        """
+        Lambdify a rigid bubble, keeping its winding number.
+
+        >>> from sympy.abc import phi  # doctest: +EXTRA
+        >>> f = Box('f', Ty('x'), Ty('y'), data=phi).bubble()
+        >>> assert f.r.subs(phi, 1) == f.subs(phi, 1).r
+        """
+        function = super().lambdify(*symbols, **kwargs)
+
+        def wound(*xs):
+            bubble = function(*xs)
+            bubble.z = self.z
+            return bubble
+        return wound
+
+    def to_tree(self) -> dict:
+        """
+        Serialise a rigid bubble, with its winding number.
+
+        >>> from discopy.utils import dumps, loads
+        >>> f = Box('f', Ty('x'), Ty('y')).bubble()
+        >>> assert loads(dumps(f.r)) == f.r and loads(dumps(f.l.l)) == f.l.l
+        """
+        tree = super().to_tree()
+        if self.z:
+            tree['z'] = self.z
+        return tree
+
+    @classmethod
+    def from_tree(cls, tree: dict) -> Bubble:
+        bubble = super().from_tree(tree)
+        bubble.z = tree.get('z', 0)
+        return bubble
+
+
 class Cup(BinaryBoxConstructor, Box):
     """
     The counit of the adjunction for an atomic type.
@@ -992,6 +1091,7 @@ biclosed.Diagram.to_rigid = to_rigid
 
 Diagram.box_factory = Box
 Diagram.cup_factory, Diagram.cap_factory, Diagram.sum_factory = Cup, Cap, Sum
+Diagram.bubble_factory = Bubble
 Diagram.functor_factory = Functor
 
 Id = Diagram.id

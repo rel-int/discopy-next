@@ -310,6 +310,23 @@ class Sum(rigid.Sum, feedback.Sum, Box):
     """
 
 
+class Bubble(rigid.Bubble, feedback.Bubble, Box):
+    """
+    A pivotal bubble is a rigid and feedback bubble and a pivotal box, whose
+    winding number is that of a pivotal box, i.e. a half-turn mod 2.
+
+    Example
+    -------
+    >>> x, y = Ty('x'), Ty('y')
+    >>> bubble = Box('f', x, y).bubble()
+    >>> assert bubble.r.r == bubble == bubble.l.l and bubble.r == bubble.l
+    """
+    def rotate(self, left=False) -> Bubble:
+        result = super().rotate(left)
+        result.z %= 2
+        return result
+
+
 class Functor(rigid.Functor, feedback.Functor):
     """
     A pivotal functor is a rigid functor on a pivotal category.
@@ -328,6 +345,7 @@ Diagram.box_factory = Box
 Diagram.functor_factory = Functor
 Diagram.cup_factory, Diagram.cap_factory = Cup, Cap
 Diagram.sum_factory = Sum
+Diagram.bubble_factory = Bubble
 CMap = cmap.CMap[Diagram]
 Id = Diagram.id
 

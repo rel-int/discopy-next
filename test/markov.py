@@ -409,3 +409,25 @@ def test_Box_flags_subs():
     assert not any(diagram.is_deterministic for diagram in samples)
     assert not any(diagram.is_affine for diagram in conditions)
     assert condition.subs(phi, 1).flags() == {'is_affine': False}
+
+
+def test_Bubble_flags():
+    importorskip("sympy")
+    from sympy.abc import phi
+    from discopy.ehypergraph import Markov
+    from discopy.utils import dumps, loads
+    x = Ty('x')
+    sample = Box('sample', x, x, data=phi, is_deterministic=False)
+    noisy = sample.bubble(is_deterministic=False, is_affine=False)
+    assert not noisy.subs(phi, 1).is_deterministic
+    assert not noisy.lambdify(phi)(1).affine and noisy[::-1].affine is False
+    plain = Box('sample', x, x, is_deterministic=False).bubble(is_affine=False)
+    assert loads(dumps(plain)) == plain == eval(repr(plain))
+    assert eval(repr(plain[::-1])).is_dagger
+    assert plain != plain.arg.bubble()
+    minus, zero = Box('-', x @ x, x), Box('0', Ty(), x)
+    program = Diagram.copy(x) >> noisy @ noisy >> minus
+    graph = Markov.from_diagram(program)
+    *_, last = graph, *graph.saturate(
+        (Diagram.copy(x) >> minus, Diagram.discard(x) >> zero))
+    assert last.extract().to_diagram() == program.foliation()

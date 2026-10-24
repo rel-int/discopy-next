@@ -16,6 +16,7 @@ Summary
     Box
     Braid
     Sum
+    Bubble
     Functor
 
 .. admonition:: Functions
@@ -283,6 +284,12 @@ class Sum(monoidal.Sum, Box):
     """
 
 
+class Bubble(monoidal.Bubble, Box):
+    """
+    A braided bubble is a monoidal bubble and a braided box.
+    """
+
+
 class Functor(monoidal.Functor):
     """
     A braided functor is a monoidal functor that preserves braids.
@@ -306,6 +313,7 @@ class Functor(monoidal.Functor):
 Diagram.box_factory = Box
 Diagram.braid_factory, Diagram.functor_factory = Braid, Functor
 Diagram.sum_factory = Sum
+Diagram.bubble_factory = Bubble
 Id = Diagram.id
 
 
