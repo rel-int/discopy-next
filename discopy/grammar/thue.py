@@ -55,6 +55,8 @@ class Rule(monoidal.Box):
     >>> assert (r[::-1].dom, r[::-1].cod) == (s, n @ n)
     >>> assert r[::-1][::-1] == r
     """
+    serialised_attrs = ("dom", "cod", "name", "*", "is_dagger", "data")
+
     def __init__(self, dom: monoidal.Ty, cod: monoidal.Ty, name: str = None,
                  **params):
         name = f"Rule({dom}, {cod})" if name is None else name
@@ -67,11 +69,6 @@ class Rule(monoidal.Box):
         data = "" if self.data is None else f", data={self.data!r}"
         return factory_name(type(self))\
             + f"({self.dom!r}, {self.cod!r}{name}{data})"
-
-    def dagger(self) -> Rule:
-        return type(self)(
-            name=self.name, dom=self.cod, cod=self.dom,
-            data=self.data, is_dagger=not self.is_dagger)
 
 
 class Word(Rule):
@@ -89,6 +86,8 @@ class Word(Rule):
     >>> Alice = Word('Alice', Ty('n'))
     >>> assert (Alice >> Alice[::-1]).cod == Ty()
     """
+    serialised_attrs = ("name", "cod", "dom", "*", "is_dagger", "data")
+
     def __init__(self, name: str, cod: monoidal.Ty, dom: monoidal.Ty = None,
                  **params):
         dom = self.ob() if dom is None else dom

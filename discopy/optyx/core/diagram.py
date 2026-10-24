@@ -1398,6 +1398,7 @@ class Feedback(monoidal.Bubble, Box):
         :align: center
     """
     __ambiguous_inheritance__ = (monoidal.Bubble,)
+    serialised_attrs = ("*args", "dom", "cod", "mem", "state", "effect")
 
     @classmethod
     def default_state(cls, mem) -> Diagram:

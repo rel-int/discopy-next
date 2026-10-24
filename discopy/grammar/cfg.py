@@ -219,6 +219,8 @@ class Word(thue.Word, Rule):
 
 class Id(Rule):
     """ The identity is a rule that does nothing. """
+    serialised_attrs = ("dom", )
+
     def __init__(self, dom):
         Rule.__init__(self, dom, dom, name=f"Id({dom})")
 

@@ -876,6 +876,7 @@ class Box(tensor.Box[complex], Circuit):
         data : The array inside the box.
         is_mixed : Whether the box is mixed.
     """
+    serialised_attrs = tensor.Box.serialised_attrs + ("is_mixed", )
     eval = Circuit.eval
 
     def __init__(self, name: str, dom: Ty, cod: Ty,
@@ -923,19 +924,10 @@ class Box(tensor.Box[complex], Circuit):
         >>> assert not f.dagger().is_mixed and not f.rotate().is_mixed
         >>> assert f.dagger().eval() == f.eval().dagger()
         """
-        if self.is_dagger is None:
-            return self
-        return type(self)(
-            self.name, self.cod, self.dom, self.data, is_mixed=self.is_mixed,
-            is_dagger=not self.is_dagger, z=self.z, time_step=self.time_step)
+        return self if self.is_dagger is None else super().dagger()
 
     def rotate(self, left=False):
-        if self.z is None:
-            return self
-        return type(self)(
-            self.name, self.cod.r, self.dom.r, self.data,
-            is_mixed=self.is_mixed, is_dagger=self.is_dagger,
-            z=(self.z + 1) % 2, time_step=self.time_step)
+        return self if self.z is None else super().rotate(left)
 
 
 class Sum(tensor.Sum[complex], Box):

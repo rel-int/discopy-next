@@ -66,7 +66,7 @@ the :mod:`frobenius` axioms.
 from __future__ import annotations
 
 import warnings
-from typing import Callable, ClassVar
+from typing import ClassVar
 
 from discopy import symmetric, monoidal, feedback, cmap, hypergraph, messages
 from discopy.abc import ComarkovCategory, MarkovCategory
@@ -312,6 +312,8 @@ feedback.Ty(feedback.Wire('x')), is_deterministic=False)
     >>> assert f.is_cartesian and not f.dagger().is_cartesian
     >>> assert f.dagger().dagger() == f and f.dagger().deterministic
     """
+    serialised_attrs = symmetric.Box.serialised_attrs + (
+        "is_deterministic", "is_affine")
     deterministic = affine = True
 
     def __init__(self, *args, is_deterministic=True, is_affine=True,
@@ -321,13 +323,27 @@ feedback.Ty(feedback.Wire('x')), is_deterministic=False)
 
     @property
     def is_deterministic(self) -> bool:
-        """ Whether the box is declared deterministic and is no dagger. """
+        """
+        Whether the box is declared deterministic and is no dagger: setting it
+        declares it, as the constructor does.
+        """
         return self.deterministic and not self.is_dagger
+
+    @is_deterministic.setter
+    def is_deterministic(self, value: bool):
+        self.deterministic = value
 
     @property
     def is_affine(self) -> bool:
-        """ Whether the box is declared affine and is no dagger. """
+        """
+        Whether the box is declared affine and is no dagger: setting it
+        declares it, as the constructor does.
+        """
         return self.affine and not self.is_dagger
+
+    @is_affine.setter
+    def is_affine(self, value: bool):
+        self.affine = value
 
     def flags(self) -> dict[str, bool]:
         """
@@ -354,32 +370,31 @@ feedback.Ty(feedback.Wire('x')), is_deterministic=False)
 
     def flagged(self, other: Box) -> Box:
         """
-        Give a box built from this one the flags declared of this one, as
-        :meth:`dagger`, :meth:`subs` and :meth:`lambdify` do on top of those
-        of the class they extend, e.g. one that keeps a winding number, and so
-        do the rotations of a :class:`discopy.frobenius.Box`.
+        Give a box built from this one the flags declared of this one, as the
+        rotations of a :class:`discopy.frobenius.Box` do.
         """
         other.deterministic, other.affine = self.deterministic, self.affine
         return other
 
-    def dagger(self) -> Box:
-        return self.flagged(super().dagger())
-
-    def subs(self, *args) -> Box:
+    def rebuild(self, **changes) -> Box:
         """
-        Substitute a variable in the data of a box, keeping its flags.
+        Rebuild a box with the flags declared of it, when its constructor
+        takes them, else with those it computes, e.g. from its terms.
 
         >>> from sympy.abc import phi  # doctest: +EXTRA
-        >>> sample = Box('sample', Ty('x'), Ty('x'), data=phi,
-        ...              is_deterministic=False)
+        >>> x = Ty('x')
+        >>> sample = Box('sample', x, x, data=phi, is_deterministic=False)
         >>> assert not sample.subs(phi, 1).is_deterministic
         >>> assert not sample.lambdify(phi)(1).is_deterministic
+        >>> assert sample.rebuild(is_deterministic=True).is_deterministic
+        >>> f = Box('f', x, x)
+        >>> assert not Sum((f, )).rebuild(terms=(f, f)).is_deterministic
         """
-        return self.flagged(super().subs(*args))
-
-    def lambdify(self, *symbols, **kwargs) -> Callable:
-        function = super().lambdify(*symbols, **kwargs)
-        return lambda *xs: self.flagged(function(*xs))
+        declared = {"is_deterministic": self.deterministic,
+                    "is_affine": self.affine}
+        return super().rebuild(**{
+            name: value for name, value in declared.items()
+            if name in self.serialised_attrs} | changes)
 
     def to_tree(self) -> dict:
         """
@@ -441,6 +456,8 @@ class Function(Box):
     .. image:: /_static/markov/function.svg
         :align: center
     """
+    serialised_attrs = ("dom", "func")
+
     def __new__(cls, dom: monoidal.Ty = None, func=None):
         if dom is None or cls is not cls.ar.function_factory:
             return super().__new__(cls)

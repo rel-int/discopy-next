@@ -1880,6 +1880,7 @@ class Feedback(monoidal.Bubble, Diagram, frobenius.Box):
     ...     == ladder.double().unroll(1).merge_layers()
     """
     __ambiguous_inheritance__ = (monoidal.Bubble, frobenius.Box)
+    serialised_attrs = ("*args", "dom", "cod", "mem", "state", "effect")
 
     @classmethod
     def default_state(cls, mem) -> Diagram:

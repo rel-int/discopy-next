@@ -1860,6 +1860,8 @@ class Bubble(cat.Bubble, Box):
         :align: center
 
     """
+    serialised_attrs = cat.Bubble.serialised_attrs + (
+        "drawing_name", "draw_as_frame", "draw_as_square", "draw_vertically")
 
     def __init__(
             self, *args: Diagram,

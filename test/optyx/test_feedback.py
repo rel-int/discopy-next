@@ -292,3 +292,15 @@ def test_simplify_picks_the_diagram_with_fewest_swaps():
         simplified.to_tensor().eval().array,
         unrolled.to_tensor().eval().array)
     assert ladder.simplify() == ladder
+
+
+def test_feedback_subs():
+    pytest.importorskip("sympy")
+    from sympy.abc import phi
+
+    def loop(phase):
+        cnot = qubits.Z(1, 2, phase) @ qubit >> qubit @ qubits.X(2, 1)
+        swap = Diagram.swap(qubit, qubit)
+        return (cnot >> swap).feedback(state=qubits.Ket("+"))
+    assert loop(phi).subs((phi, 0.5)) == loop(0.5)
+    assert loop(phi).lambdify(phi)(0.5) == loop(0.5)

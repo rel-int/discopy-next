@@ -511,6 +511,7 @@ class Permutation(Box):
     .. image:: /_static/symmetric/foliation.svg
         :align: center
     """
+    serialised_attrs = ("dom", "perm")
 
     def __new__(cls, dom: monoidal.Ty = None,
                 perm: Sequence[int] = None):
@@ -673,6 +674,8 @@ class Swap(Permutation, balanced.Braid, Box):
     :class:`Swap` is only defined for atomic types (i.e. of length 1).
     For complex types, use :meth:`Diagram.swap` instead.
     """
+    serialised_attrs = ("left", "right")
+
     def __setstate__(self, state):
         state.setdefault('perm', finset.Permutation([1, 0], 2))
         super().__setstate__(state)

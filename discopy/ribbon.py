@@ -256,6 +256,7 @@ class DualRailCup(Box):
         left : The ribbon (doubled type) on the outside left.
         right : The ribbon on the outside right.
     """
+    serialised_attrs = ("left", "right", "is_dagger")
     z = 0
 
     def __init__(self, left, right, is_dagger=False):
@@ -283,6 +284,7 @@ class DualRailCap(Box):
     A cap joining two ribbons in the dual rail encoding, see
     :class:`DualRailCup`.
     """
+    serialised_attrs = ("left", "right", "is_dagger")
     z = 0
 
     def __init__(self, left, right, is_dagger=False):

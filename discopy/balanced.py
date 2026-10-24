@@ -222,6 +222,8 @@ class DualRailBraid(Box):
         right : The ribbon on the top right and bottom left.
         is_dagger (bool) : Which ribbon goes over the other.
     """
+    serialised_attrs = ("left", "right", "is_dagger")
+
     def __init__(self, left: monoidal.Ty, right: monoidal.Ty, is_dagger=False):
         self.left, self.right = left, right
         name = type(self).__name__ + f"({left}, {right})"
@@ -252,6 +254,8 @@ class DualRailTwist(Box):
         dom : The ribbon (doubled type) being twisted.
         is_dagger (bool) : Which way the rails twist.
     """
+    serialised_attrs = ("dom", "is_dagger")
+
     def __init__(self, dom: monoidal.Ty, is_dagger=False):
         name = type(self).__name__ + f"({dom})"
         Box.__init__(
@@ -284,6 +288,7 @@ class Twist(Box):
     :class:`Twist` is only defined for atomic types (i.e. of length 1).
     For complex types, use :meth:`Diagram.twist` instead.
     """
+    serialised_attrs = ("dom", "is_dagger")
     drawing_name = "Twist"
 
     def __init__(self, dom: monoidal.Ty, is_dagger=False):

@@ -465,6 +465,8 @@ class Eval(Box):
             An :class:`Over` is evaluated on the left only and an
             :class:`Under` on the right only.
     """
+    serialised_attrs = ("x", "left")
+
     def __init__(self, x: Exp, left=None):
         assert x.is_exp
         self.x = x
@@ -518,6 +520,7 @@ class Coeval(Box):
     (2016) <https://arxiv.org/abs/1512.06751>`_. It is used by
     :meth:`Curry.to_drawing` and :meth:`Diagram.to_compact`.
     """
+    serialised_attrs = ("x", "left")
     drawing_name = "lambda"
 
     __repr__ = Eval.__repr__
@@ -559,6 +562,8 @@ class Curry(monoidal.Bubble, Box):
     >>> print(Curry(Box('f', x @ y, z)))
     Curry(f, 1, True)
     """
+    serialised_attrs = ("*args", "n", "left")
+
     def __init__(self, arg: Diagram, n=1, left=True):
         if not 0 <= n <= len(arg.dom):
             raise AxiomError(messages.NOT_SPLITTABLE.format(n, arg.dom))
@@ -1076,6 +1081,8 @@ class Constant(TermBase):
         name (str): The name of the constant.
         cod (Ty): The type of the constant.
     """
+    serialised_attrs = ("name", "cod", "*", "is_dagger", "data")
+
     def __init__(self, name: str, cod: Ty, **kwargs):
         super().__init__(name, dom=self.ob(), cod=cod, **kwargs)
         self.freevars = []
@@ -1114,6 +1121,8 @@ class Variable(TermBase):
         name (str): The name of the variable
         cod (Ty): The type of the variable.
     """
+    serialised_attrs = ("name", "cod")
+
     def __init__(self, name: str, cod: Ty):
         super().__init__(name, dom=cod, cod=cod)
         self.freevars = [self]
@@ -1183,6 +1192,8 @@ class Application(TermBase):
         args (Term): The arguments to which the function is applied.
         left (bool): Whether the argument comes in from the left or right.
     """
+    serialised_attrs = ("func", "args", "left")
+
     def __init__(self, func: Term, args: Term, left: bool = False):
         assert_isinstance(func, TermBase)
         assert_isinstance(args, TermBase)
@@ -1262,6 +1273,7 @@ class Application(TermBase):
 
 
 class Abstraction(TermBase):
+    serialised_attrs = ("var", "body", "left")
     var: Variable
     body: Term
     left: bool = False

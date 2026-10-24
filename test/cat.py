@@ -1,5 +1,9 @@
 # -*- coding: utf-8 -*-
 
+import inspect
+import sys
+from functools import cache
+
 import pytest
 from pytest import raises
 
@@ -180,6 +184,14 @@ def test_Box_dagger():
     f = Box('f', Ob('x'), Ob('y'), data=[42, {0: 1}])
     assert f.dom == f.dagger().cod and f.cod == f.dagger().dom
     assert f == f.dagger().dagger()
+
+
+def test_Box_subclass_rebuild():
+    class Gate(Box):
+        def __init__(self, label, source, target, **params):
+            super().__init__(label, source, target, **params)
+    gate = Gate('g', Ob('x'), Ob('y'), data=42)
+    assert gate.dagger().dagger() == gate and gate.rebuild(data=1).data == 1
 
 
 def test_Bubble_dagger():
@@ -486,3 +498,286 @@ def test_Bubble_no_common_boundary():
     assert Bubble(f, g, dom=x).cod == x
     with raises(ValueError, match=r"they have \[\]"):
         Bubble()
+
+
+ABSTRACT = ("Timed", "ControlledRotation", "BinaryTerm", "Parametrized")
+
+
+@cache
+def box_classes():
+    """
+    Every class of box that the package defines, see #169, but for those of
+    :mod:`discopy.optyx`, vendored with constructors of its own.
+    """
+    import importlib
+    import pkgutil
+    import discopy
+    classes = {}
+    for info in pkgutil.walk_packages(discopy.__path__, "discopy."):
+        if info.name.startswith("discopy.optyx"):
+            continue
+        try:
+            module = importlib.import_module(info.name)
+        except ImportError:  # it needs an extra, see test/plugin.py
+            continue
+        for value in vars(module).values():
+            if isinstance(value, type) and issubclass(value, Box)\
+                    and value.__module__ == info.name:
+                classes[value] = None
+    return list(classes)
+
+
+EXAMPLES = {  # a box of each constructor, from a class c, types x, y, data v
+    "cat.Box": 'c("f", x, y, data=v, is_dagger=True)',
+    "{cat,markov}.Sum": "c((box(c, x, y, v), ))",
+    "cat.Bubble": "c(box(c, x, y, v), dom=y, data=v)",
+    "{monoidal,neural.network}.Box": 'c("f", x, y, data=v)',
+    "monoidal.Bubble": 'c(box(c, x, y, v), name="b", drawing_name="B")',
+    "monoidal.Layer":
+    'c(x, sys.modules[c.__module__].Box("f", x, y, data=v), y)',
+    "braided.Braid {balanced,ribbon}.DualRailBraid ribbon.DualRailC{u,a}p":
+    "c(x, y, is_dagger=True)",
+    "balanced.{Twist,DualRailTwist}": "c(x, is_dagger=True)",
+    "symmetric.Swap": "c(x, y)",
+    "symmetric.Permutation": "c(x @ y @ x, [2, 0, 1])",
+    "feedback.Box": 'c("f", x, y, data=v).delay()',
+    "feedback.Feedback": "c(box(c, x @ y.delay(), x @ y, v))",
+    "feedback.Trace": "c(box(c, y @ x, y @ x, v), left=True)",
+    "feedback.{Head,Tail}": "c(box(c, x, y, v), 1)",
+    "feedback.FollowedBy": "c(x, True, 1)",
+    "markov.Box": 'c("f", x, y, data=v, is_deterministic=False).delay()',
+    "markov.Copy comarkov.Merge": "c(x, 3)",
+    "markov.Discard comarkov.Noise quantum.gates.{Discard,MixedState} "
+    "grammar.cfg.Id": "c(x)",
+    "markov.Function comarkov.Cofunction": "c(x @ y, [1, 0, 0])",
+    "rigid.Box": 'c("f", x, y, data=v).r',
+    "{rigid,frobenius}.Cup": "c(x, x.r)",
+    "{rigid,frobenius}.Cap": "c(x, x.l)",
+    "pivotal.Box": 'c("f", x, y, data=v).delay().r',
+    "grammar.pregroup.Box": 'c("f", x, y, data=v, is_deterministic=False).r',
+    "tensor.Box": 'c("f", x, y, [v] + [0] * 5)',
+    "frobenius.Spider": "c(1, 2, x, data=v)",
+    "frobenius.Cospan": "c(x @ y, [0, 0, 1], [1])",
+    "biclosed.{Eval,Coeval}": "c(x << y)",
+    "closed.{Eval,Coeval}": "c(x << y, time_step=1)",
+    "{biclosed,closed}.Curry": "c(box(c, x @ y, x, v), 1, False)",
+    "biclosed.Constant": 'c("c", x, data=v)',
+    "{closed,grammar.categorial}.Constant {biclosed,closed}.Variable":
+    'c("c", x)',
+    "{biclosed,closed}.Application grammar.categorial.FA": "c(f, a)",
+    "{biclosed,closed,grammar.categorial}.Abstraction": "c(u, f(u))",
+    "closed.{Pack,Unpack}": "c(x * y, 1)",
+    "closed.Tuple": "c(a, u)",
+    "closed.Projection": "c(closed.Tuple(a, u), 1)",
+    "closed.Let": "c(closed.Tuple(a), [u], u)",
+    "grammar.categorial.BA": 'c(a, cg.Constant("f", y >> x))',
+    "grammar.categorial.{FTR,BTR}": "c(y, a)",
+    "grammar.categorial.TypeRaising": "c(y, a, y << (x >> y))",
+    "grammar.categorial.FC": 'c(f, cg.Constant("g", y << x))',
+    "grammar.categorial.BC":
+    'c(cg.Constant("f", x >> y), cg.Constant("g", y >> x))',
+    "grammar.categorial.{FX,BX}": 'c(f, cg.Constant("g", x >> y))',
+    "grammar.categorial.ForwardCrossedComposition": "c(x << y, x >> y)",
+    "grammar.categorial.BackwardCrossedComposition": "c(y << x, y >> x)",
+    "grammar.thue.Rule": 'c(x @ y, x, "r", data=v)',
+    "grammar.thue.Word": 'c("w", x @ y, y, data=v)',
+    "grammar.cfg.Rule": 'c(x @ y, x, "r")',
+    "grammar.cfg.Word": 'c("w", x, y)',
+    "grammar.pregroup.Word": 'c("w", x @ y, data=v)',
+    "tensor.Bubble":
+    'c(box(c, x, x, [v, 0, 0, 1]), func=abs, drawing_name="B")',
+    "ehypergraph.Join": "c(box(c, x, y, v), box(c, x, y, v))",
+    "quantum.circuit.Box": 'c("f", x, y, data=[v, 0, 0, 1], is_mixed=False)',
+    "quantum.gates.QuantumGate": 'c("g", x, x, [v, 0, 0, 1])',
+    "quantum.gates.{Ket,Bra}": "c(1, 0, time_step=1)",
+    "quantum.gates.Digits": "c(1, 2, dim=3, is_dagger=True, time_step=1)",
+    "quantum.gates.{Measure,Encode}": "c(2, False, True, 1)",
+    "quantum.gates.{Copy,Match}": "c(1)",
+    "quantum.gates.Controlled": "c(gates.Rz(v), -2)",
+    "quantum.gates.ControlledRotation": "c(v, -2, 1)",
+    "quantum.gates.Rotation": "c(v, 1, 1)",
+    "quantum.gates.Scalar": 'c(v, "s", True, 1)',
+    "quantum.gates.MixedScalar": "c(v, 1)",
+    "quantum.gates.Sqrt": "c(v, False, 1)",
+    "quantum.zx.Spider": "c(1, 2, v)",
+    "quantum.zx.Scalar": "c(v)",
+}
+
+
+def example(cls, value):
+    """ The box of a class that :data:`EXAMPLES` builds, with some data. """
+    from discopy import closed, monoidal, tensor
+    from discopy.grammar import categorial as cg
+    from discopy.neural.network import Dims
+    from discopy.quantum import circuit, gates
+    from discopy.rigid import Nat
+    from discopy.utils import factory_name
+    if inspect.isabstract(cls) or cls.__name__ in ABSTRACT:
+        return None
+    templates = {name: template for key, template in EXAMPLES.items()
+                 for name in globs(key)}
+    owner = next(c for c in cls.__mro__ if "__init__" in vars(c))
+    base = next(c for c in cls.__mro__ if factory_name(c) in templates)
+    assert issubclass(base, owner), f"{owner} needs an example"
+    ob = sys.modules[cls.__module__].Ty\
+        if issubclass(cls, monoidal.Layer) else cls.ob
+    x, y = (tensor.Dim(2), tensor.Dim(3)) if issubclass(cls, tensor.Box)\
+        else (Dims(2), Dims(3)) if ob is Dims\
+        else (Nat(1), Nat(1)) if ob is Nat else (ob('x'), ob('y'))
+    if issubclass(cls, circuit.Box):
+        x, y = circuit.qubit, circuit.qubit
+    terms = getattr(ob, "constant_factory", None) and (
+        ob.constant_factory("f", x << y), ob.constant_factory("a", y),
+        ob.variable_factory("u", y))
+    f, a, u = terms or (None, None, None)
+    return eval(templates[factory_name(base)], dict(
+        c=cls, x=x, y=y, v=value, f=f, a=a, u=u, sys=sys, closed=closed,
+        cg=cg, gates=gates, box=lambda c, x, y, v: c.ar.box_factory(
+            "f", x, y, data=v)))
+
+
+def holds(law, cls):
+    """ Whether a law of #169 holds of the example of a class. """
+    from discopy.utils import dumps, loads
+    box = example(cls, 1)
+    if law == "dagger":
+        try:
+            return box.dagger().dagger() == box
+        except AxiomError:  # the box has no dagger
+            return True
+    if law == "rotation":
+        return not hasattr(box, "rotate") or box.r.l == box == box.l.r
+    if law == "rebuild":
+        result, expected = box.rebuild(), box
+    elif law == "subs":
+        from sympy import S
+        from sympy.abc import phi
+        symbolic, expected = example(cls, phi), example(cls, S.One)
+        for result in (symbolic.subs(phi, 1), symbolic.subs([(phi, 1)]),
+                       symbolic.lambdify(phi)(1)):
+            assert type(result) is type(expected) and result == expected
+        return True
+    else:
+        tree = type(box).from_tree(box.to_tree())
+        assert type(tree) is type(box) and tree == box
+        result, expected = loads(dumps(box)), box
+    return type(result) is type(expected) and result == expected
+
+
+def globs(patterns: str) -> list[str]:
+    """ The globs a pattern stands for, e.g. ``*.{Cup,Cap}``. """
+    import itertools
+    import re
+    result = []
+    for pattern in patterns.split():
+        parts = re.split(r"\{([^}]*)\}", pattern)
+        result += map("".join, itertools.product(*(
+            part.split(",") if i % 2 else [part]
+            for i, part in enumerate(parts))))
+    return result
+
+
+PIVOTALS = "{pivotal,ribbon,compact,frobenius}"
+BROKEN = {
+    "rebuild": {
+        "*.Layer": "a layer keeps its *inside as boxes_or_types",
+        "*.Merge *.Noise": "it keeps neither x nor n",
+        "*.Cofunction": "it keeps its cofunc in an op",
+        "*.Cospan": "it keeps left and right as legs",
+        "*.Spider quantum.zx.[XYZ]": "it keeps no n_legs_in or n_legs_out",
+        "closed.{Pack,Unpack}": "it keeps its type delayed",
+    },
+    "dagger": {
+        "*.{Constant,Variable,Abstraction,Application} "
+        "closed.{Tuple,Projection,Let} grammar.categorial.{FA,BA,*TR,"
+        "TypeRaising,[FB][CX]}": "a term has no stated dagger",
+        "grammar.categorial.*Composition": "a crossed composition has none",
+        "*.{Feedback,Head,Tail}": "it has no stated dagger",
+        PIVOTALS + ".Trace": "its dagger is drawn with cups and caps",
+    },
+    "rotation": {
+        PIVOTALS + ".{Feedback,Trace,Head,Tail,FollowedBy} "
+        "{frobenius,tensor}.Bubble": "it has no stated rotation",
+        "{tensor,quantum.circuit,quantum.zx}.Sum": "it rotates as a box",
+        "ribbon.DualRailC[ua]p": "its rotation drops is_dagger",
+        "quantum.zx.Scalar": "it takes no dom, cod or z",
+    },
+    "subs": {
+        "*.Spider quantum.zx.[XYZ]": "it keeps no n_legs_in or n_legs_out",
+    },
+    "tree": {
+        "*.DualRail* grammar.cfg.Id quantum.zx.Scalar":
+        "it has no from_tree of its own",
+        "quantum.gates.C[RU]*": "its tree is that of a controlled gate",
+        "grammar.categorial.TypeRaising": "its tree drops its cod",
+        "neural.network.{Box,Feedback,Trace,Head,Tail}": "a module has none",
+        "tensor.Bubble": "its tree drops its func, which == compares",
+    },
+}
+
+
+@pytest.mark.parametrize("law", BROKEN)
+def test_every_box(law):
+    """
+    The conformance test of #169: every class of box rebuilds from its
+    fields, and so does its dagger, its rotations, its substitutions and its
+    tree, but for the breakages each law lists with their reasons.
+    """
+    if law == "subs":
+        pytest.importorskip("sympy")
+    from fnmatch import fnmatch
+    from discopy.utils import factory_name
+    patterns = [glob for key in BROKEN[law] for glob in globs(key)]
+    unexpected, fixed = {}, []
+    for cls in box_classes():
+        if example(cls, 1) is None:
+            continue
+        name = factory_name(cls)
+        try:
+            failure = None if holds(law, cls) else "not equal"
+        except Exception as error:  # pylint: disable=broad-except
+            failure = repr(error)
+        if any(fnmatch(name, glob) for glob in patterns):
+            fixed += [] if failure else [name]
+        elif failure:
+            unexpected[name] = failure
+    assert not unexpected and not fixed, (unexpected, fixed)
+
+
+@pytest.mark.parametrize(
+    "module", ["symmetric", "feedback", "markov", "frobenius"])
+def test_rebuild_strict_init(module):
+    """ A box whose constructor takes only some fields gets the others set,
+    as main did, see #169. """
+    pytest.importorskip("sympy")
+    import importlib
+    from sympy.abc import phi
+    m = importlib.import_module(f"discopy.{module}")
+
+    class Gate(m.Box):
+        def __init__(self, name, dom, cod, data=None, is_dagger=False):
+            super().__init__(name, dom, cod, data=data, is_dagger=is_dagger)
+
+    x, y = m.Ty('x'), m.Ty('y')
+    gate = Gate("g", x, y, data=phi)
+    gate.time_step, gate.is_deterministic = 2, False
+
+    def fields(box):
+        return (type(box), box.name, box.dom, box.cod, box.data, box.is_dagger,
+                box.time_step, getattr(box, "deterministic", False))
+    assert fields(gate.dagger()) == (Gate, "g", y, x, phi, True, 2, False)
+    assert fields(gate.subs(phi, 1)) == fields(gate.lambdify(phi)(1))\
+        == (Gate, "g", x, y, 1, False, 2, False)
+    assert gate.dagger().dagger() == gate
+
+
+def test_rebuild_other_constructor():
+    """ A constructor that does not take the fields of a box raises, as on
+    main, rather than rebuild from the wrong arguments. """
+    from discopy import rigid
+
+    class Digits(rigid.Box):
+        def __init__(self, *digits):
+            super().__init__(f"Digits{digits}", rigid.Ty(), rigid.Ty("x"))
+    with raises(TypeError):
+        Digits(1).r

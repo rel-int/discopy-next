@@ -659,3 +659,8 @@ def test_egglog_naive_sampling():
             functor(to_diagram(extracted, ["p"])).array, expected)
         assert np.allclose(functor(saturated(
             program, rules).extract().to_diagram()).array, expected)
+
+
+def test_Join_dagger_flags():
+    assert not Join(f, is_dagger=True).dagger().is_deterministic
+    assert loads(dumps(Join(f, g).dagger())).dagger().is_affine

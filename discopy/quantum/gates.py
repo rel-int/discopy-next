@@ -111,6 +111,7 @@ class Discard(SelfConjugate):
 
     >>> assert Bra(0).eval(mixed=True) != Discard(1).eval()
     """
+    serialised_attrs = ("dom", )
     draw_as_discards = True
 
     def __init__(self, dom=1):
@@ -148,6 +149,7 @@ class MixedState(SelfConjugate):
     Maximally-mixed state on n qubits.
     If :code:`cod == bit` then uniform distribution.
     """
+    serialised_attrs = ("cod", )
     draw_as_discards = True
 
     def __init__(self, cod=1):
@@ -192,6 +194,8 @@ class Measure(SelfConjugate):
     time_step : int, optional
         The number of times the measurement has been delayed.
     """
+    serialised_attrs = (
+        "n_qubits", "destructive", "override_bits", "time_step")
     draw_as_measures = True
 
     def __init__(self, n_qubits=1, destructive=True, override_bits=False,
@@ -270,6 +274,7 @@ class Encode(SelfConjugate):
     time_step : int, optional
         The number of times the encoding has been delayed.
     """
+    serialised_attrs = ("n_bits", "constructive", "reset_bits", "time_step")
     draw_as_measures = True
 
     def __init__(self, n_bits=1, constructive=True, reset_bits=False,
@@ -369,6 +374,8 @@ class ClassicalGate(SelfConjugate):
 
 class Copy(ClassicalGate):
     """ Takes a bit, returns two copies of it. """
+    serialised_attrs = ("time_step", )
+
     def __init__(self, time_step=0):
         dom = bit.delay(time_step)
         super().__init__("Copy", dom, dom ** 2, [1, 0, 0, 0, 0, 0, 0, 1],
@@ -394,6 +401,8 @@ class Copy(ClassicalGate):
 
 class Match(ClassicalGate):
     """ Takes two bits in, returns them if they are equal. """
+    serialised_attrs = ("time_step", )
+
     def __init__(self, time_step=0):
         cod = bit.delay(time_step)
         super().__init__("Match", cod ** 2, cod, [1, 0, 0, 0, 0, 0, 0, 1],
@@ -418,6 +427,7 @@ class Digits(ClassicalGate):
     >>> assert Digits(2, dim=4).eval()\\
     ...     == Tensor[complex](dom=Dim(1), cod=Dim(4), array=[0, 0, 1, 0])
     """
+    serialised_attrs = ("*digits", "dim", "is_dagger", "time_step")
     draw_as_brakets = True
 
     def __init__(self, *digits, dim=None, is_dagger=False, time_step=0):
@@ -514,6 +524,7 @@ class Ket(SelfConjugate, QuantumGate):
     >>> assert Ket(1, 0).eval()\\
     ...     == Tensor[complex](dom=Dim(1), cod=Dim(2, 2), array=[0, 0, 1, 0])
     """
+    serialised_attrs = ("*bitstring", "time_step")
     to_drawing = Digits.to_drawing
     array = Digits.array
 
@@ -563,6 +574,7 @@ class Bra(SelfConjugate, QuantumGate):
     >>> assert Bra(1, 0).eval()\\
     ...     == Tensor[complex](dom=Dim(2, 2), cod=Dim(1), array=[0, 0, 1, 0])
     """
+    serialised_attrs = ("*bitstring", "time_step")
     to_drawing = Digits.to_drawing
     array = Digits.array
 
@@ -612,6 +624,7 @@ class Controlled(QuantumGate):
     .. image:: /_static/quantum/long-controlled.svg
         :align: center
     """
+    serialised_attrs = ("controlled", "distance")
     draw_as_controlled = True
 
     def __init__(self, controlled, distance=1):
@@ -855,6 +868,7 @@ class Parametrized(Box):
 
 class Rotation(Parametrized, QuantumGate):
     """ Abstract class for rotation gates. """
+    serialised_attrs = ("phase", "z", "time_step")
     n_qubits = 1
 
     def __init__(self, phase, z=0, time_step=0):
@@ -988,6 +1002,8 @@ class U1(AntiConjugate, Rotation):
 
 class ControlledRotation(Controlled, Rotation):
     """ Controlled rotation gate. """
+    serialised_attrs = ("phase", "distance", "time_step")
+
     def __init__(self, phase, distance=1, time_step=0):
         Controlled.__init__(
             self, self.controlled(phase, time_step=time_step), distance)
@@ -1032,6 +1048,8 @@ class CRx(ControlledRotation):
 
 class Scalar(Parametrized):
     """ Scalar, i.e. quantum gate with empty domain and codomain. """
+    serialised_attrs = ("data", "name", "is_mixed", "time_step")
+
     def __init__(self, data, name=None, is_mixed=False, time_step=0):
         self.drawing_name = format_number(data)
         name = "scalar" if name is None else name
@@ -1110,6 +1128,8 @@ class Scalar(Parametrized):
 
 class MixedScalar(Scalar):
     """ Mixed scalar, i.e. where the Born rule has already been applied. """
+    serialised_attrs = ("data", "time_step")
+
     def __init__(self, data, time_step=0):
         super().__init__(data, is_mixed=True, time_step=time_step)
 
@@ -1139,6 +1159,8 @@ class Sqrt(Scalar):
     self-adjoint when that root is real, and conjugated by its dagger
     otherwise, e.g. for the square root of a negative number.
     """
+    serialised_attrs = ("data", "is_dagger", "time_step")
+
     def __init__(self, data, is_dagger=False, time_step=0):
         super().__init__(data, name="sqrt", time_step=time_step)
         if is_dagger and self.is_self_adjoint:

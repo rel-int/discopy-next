@@ -479,6 +479,8 @@ class X(Spider):
 
 class Scalar(Box):
     """ Scalar in a ZX diagram. """
+    serialised_attrs = ("data", )
+
     def __init__(self, data):
         super().__init__("scalar", Nat(0), Nat(0), data=data)
         self.drawing_name = format_number(data)

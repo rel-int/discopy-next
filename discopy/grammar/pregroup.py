@@ -228,6 +228,9 @@ class Word(thue.Word, Box):
     A word is a rigid box with a ``name``, a grammatical type as ``cod`` and
     an optional domain ``dom``.
     """
+    serialised_attrs = thue.Word.serialised_attrs + (
+        "z", "time_step", "is_deterministic", "is_affine")
+
     def __init__(self, name: str, cod: rigid.Ty, dom: rigid.Ty = Ty(),
                  **params):
         Box.__init__(self, name, dom, cod, **params)

@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import builtins
+import inspect
 import json
 from functools import lru_cache, wraps
 from math import ceil
@@ -144,6 +145,24 @@ def get_origin(typ):
     """
     origin = getattr(typ, "__origin__", typ)
     return typ if origin is Union else origin
+
+
+@lru_cache(maxsize=None)
+def keywords(function: Callable) -> frozenset[str] | None:
+    """
+    The names a function takes by keyword, ``None`` when it takes any, i.e.
+    when it has ``**kwargs``, read from its signature once per function.
+
+    Example
+    -------
+    >>> assert keywords(lambda x, /, y, *, z: x) == {"y", "z"}
+    >>> assert keywords(lambda x, **kwargs: x) is None
+    """
+    parameters = inspect.signature(function).parameters.values()
+    if any(param.kind == param.VAR_KEYWORD for param in parameters):
+        return None
+    return frozenset(param.name for param in parameters if param.kind in (
+        param.POSITIONAL_OR_KEYWORD, param.KEYWORD_ONLY))
 
 
 class NamedGeneric(Generic[TypeVar('T')]):

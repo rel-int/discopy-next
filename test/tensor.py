@@ -769,3 +769,25 @@ def test_Bubble_name():
     bubble = Box('f', Dim(2), Dim(2), [1, 0, 0, 1]).bubble(name="g")
     assert bubble.dagger().dagger() == bubble
     assert frobenius.Functor.id(Diagram)(bubble) == bubble
+
+
+def test_Bubble_func_dagger():
+    f = Box('f', Dim(2), Dim(2), [1, 2, 3, 4])
+    bubble = f.bubble(func=abs, drawing_name="B")
+    assert bubble.dagger().func is abs and bubble.dagger().dagger() == bubble
+    assert bubble.dagger().drawing_name == "B"
+    assert bubble != f.bubble() != f.bubble().dagger()
+    assert repr(f.bubble().dagger()) == repr(f.bubble()) + ".dagger()"
+    from discopy import tensor
+    assert repr(bubble).endswith(", func=abs)") and eval(repr(bubble)) == bubble
+
+
+def test_grad_equal():
+    pytest.importorskip("sympy")
+    from sympy.abc import x, y
+    f = Box('f', Dim(2), Dim(2), [x, 0, 0, y])
+    square = f.bubble(func=lambda z: z ** 2)
+    for diagram in (f, square, f >> square):
+        assert diagram.grad(x) == diagram.grad(x) != diagram.grad(y)
+        assert len({diagram.grad(x), diagram.grad(x)}) == 1
+    assert square.grad(x) != f.bubble(func=lambda z: z ** 3).grad(x)

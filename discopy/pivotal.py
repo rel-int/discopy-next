@@ -67,7 +67,7 @@ from copy import copy
 from discopy import cat, cmap, rigid, feedback
 from discopy.abc import PivotalCategory
 from discopy.cat import factory
-from discopy.utils import deprecated_alias, rsubs
+from discopy.utils import deprecated_alias
 
 
 class Wire(feedback.Wire, rigid.Wire):
@@ -227,6 +227,8 @@ class Box(rigid.Box, feedback.Box, Diagram):
         cod (Ty) : The codomain of the box, i.e. its output.
         time_step (int) : The number of times the box has been delayed.
     """
+    serialised_attrs = rigid.Box.serialised_attrs + ("time_step", )
+
     def __init__(self, name, dom, cod, *args, time_step: int = 0, **params):
         rigid.Box.__init__(self, name, dom, cod, *args, **params)
         self._time_step, self._args, self._params = time_step, args, params
@@ -242,23 +244,8 @@ class Box(rigid.Box, feedback.Box, Diagram):
 
     def rotate(self, left=False):
         del left
-        return type(self)(
-            self.name, dom=self.cod.r, cod=self.dom.r, data=self.data,
-            is_dagger=self.is_dagger, z=(self.z + 1) % 2,
-            time_step=self.time_step)
-
-    def dagger(self) -> Box:
-        return type(self)(
-            name=self.name, dom=self.cod, cod=self.dom, data=self.data,
-            is_dagger=not self.is_dagger, z=self.z, time_step=self.time_step)
-
-    def lambdify(self, *symbols, **kwargs):
-        if not self.free_symbols & set(symbols):
-            return lambda *xs: self
-        return lambda *xs: type(self)(
-            name=self.name, dom=self.dom, cod=self.cod,
-            data=rsubs(self.data, dict(zip(symbols, xs)), **kwargs),
-            is_dagger=self.is_dagger, z=self.z, time_step=self.time_step)
+        return self.rebuild(
+            dom=self.cod.r, cod=self.dom.r, z=(self.z + 1) % 2)
 
     @property
     def is_conjugate(self):
