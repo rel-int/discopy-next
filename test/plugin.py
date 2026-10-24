@@ -14,6 +14,7 @@ from _pytest.doctest import DoctestItem
 UNIMPORTABLE = (
     "discopy/quantum/pennylane.py", "discopy/quantum/tk.py",
     "discopy/grammar/neural.py", "discopy/neural/torch.py",
+    "discopy/neural/geometric.py",
     "discopy/neural/cell.py", "discopy/neural/recursion.py",
     "discopy/neural/lattice.py", "discopy/neural/act.py", "discopy/neural/train.py",
     "discopy/drawing/widget.py")

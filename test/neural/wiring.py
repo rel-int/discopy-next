@@ -99,3 +99,47 @@ def test_from_map():
     factor = Box("unit", Ty(), MESSAGE)
     with raises(ValueError, match="box 0 is wired to a box that is not"):
         from_map(CMap.from_wiring((factor, factor), [((0, 0), (1, 0))]))
+
+
+def test_blocks_of_a_group():
+    from discopy.group import Cyclic, Product, Symmetric, Wreath
+    from discopy.neural.wiring import (
+        Block, chains, decompose, depths, families, orbitals, unravel)
+    lines = Wreath[Symmetric[2], Symmetric[2]]
+    layout = chains(Product[lines, lines])
+    assert layout == ((2, 2), (2, 2)) == chains(Product[
+        Wreath[Symmetric[2], Cyclic[2]], lines])
+    assert len(orbitals(layout)) == 9 and unravel(13, (2, 2, 2, 2)) == (
+        1, 1, 0, 1)
+    assert depths(0, 0, layout) == (2, 2) and depths(0, 15, layout) == (0, 0)
+    units = sudoku()
+    assert [b.keep for b in families(units, layout)] == [
+        (0, 1), (2, 3), (0, 2)]
+    terms = decompose(primal(units), layout)
+    for v, related in enumerate(primal(units)):
+        for w in range(16):
+            total = sum(c for c, b in terms if any(
+                v in m and w in m for m in b.members()))
+            assert total == (w in related)
+    assert Block((2, 3), ()).members() == (tuple(range(6)), )
+    with raises(TypeError, match="Cyclic.* has more than two orbitals"):
+        chains(Cyclic[3])
+    with raises(ValueError, match="splits the orbital"):
+        decompose(((1, ), (0, ), (), ()), ((2, 2), ))
+    with raises(ValueError, match="fewer than two members"):
+        families(((0, ), ), layout)
+    with raises(ValueError, match="does not start a family"):
+        families(units[1:], layout)
+
+
+def test_blocks_errors():
+    from discopy.group import Product, Symmetric, Wreath
+    from discopy.neural.wiring import chains, decompose, families
+    with raises(TypeError, match="product inside a wreath"):
+        chains(Wreath[Product[Symmetric[2], Symmetric[2]], Symmetric[2]])
+    with raises(TypeError, match="product inside a wreath"):
+        chains(Wreath[Symmetric[2], Product[Symmetric[2], Symmetric[2]]])
+    with raises(ValueError, match="3 points for a layout of 4"):
+        decompose(((1, ), (0, ), ()), ((2, 2), ))
+    with raises(ValueError, match="off the 4 points"):
+        families(((0, 4), ), ((2, 2), ))

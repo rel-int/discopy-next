@@ -16,7 +16,11 @@ route messages along it is a table of indices:
 * :func:`from_map` reads a factor table back out of the closed map that
   :func:`~discopy.neural.signature.from_incidence` or
   :func:`~discopy.neural.signature.from_relation` draws, so a wiring drawn
-  with DisCoPy compiles to the same tables.
+  with DisCoPy compiles to the same tables;
+* :func:`decompose` and :func:`families` read a wiring invariant under a
+  group of symmetries as signed sums of :class:`Block`, the partitions the
+  group's orbitals are made of, which :mod:`discopy.neural.geometric` sums
+  over by reductions rather than gathers.
 
 The tables are tuples of integers, so this module imports no tensor
 framework: a network turns them into index tensors once, when it is built.
@@ -30,6 +34,7 @@ Summary
     :toctree:
 
     Routing
+    Block
 
 .. admonition:: Functions
 
@@ -43,6 +48,12 @@ Summary
         primal
         routing
         from_map
+        chains
+        unravel
+        depths
+        orbitals
+        decompose
+        families
 
 Example
 -------
@@ -55,10 +66,14 @@ Example
 
 from __future__ import annotations
 
+import itertools
+import math
 from typing import NamedTuple
 
+from discopy import group as groups
 from discopy.frobenius import CMap
 from discopy.neural.signature import NODE
+from discopy.utils import factory_name
 
 
 def table_of(factors) -> tuple[tuple[int, ...], ...]:
@@ -308,3 +323,298 @@ def from_map(cmap: CMap, node_name: str = NODE
                 f"box {index} is wired to a box that is not a node")
         table.append(tuple(nodes[other] for other in others))
     return tuple(table)
+
+
+def chains(group) -> tuple[tuple[int, ...], ...]:
+    """
+    The axes of the natural action of a group, grouped into chains, outer
+    factor first: ``(n, )`` for a symmetric group, the top's axis followed
+    by the base's chain for an imprimitive wreath product and the chains of
+    both factors for a direct product.
+
+    A chain of wreath products of symmetric groups acts on its points
+    numbered row-major, outer factor first, and a product of chains on the
+    tensor of their axes: two points of a chain *agree to depth* ``d`` when
+    their first ``d`` coordinates along it are equal, and the orbitals of
+    the group, its orbits on pairs of points, are the tuples of depths, one
+    per chain, see :func:`orbitals`.
+
+    Parameters:
+        group : A group built from symmetric groups, and cyclic groups of
+                order at most two, by :class:`~discopy.group.Product` and
+                :class:`~discopy.group.Wreath`.
+
+    Only the imprimitive action of a wreath product is read, on the ``k``
+    blocks of ``n`` points, not its power action on ``n ** k`` tuples.
+
+    Raises:
+        TypeError : If a factor has more than two orbitals on pairs of its
+                    points, e.g. a cyclic group of order three, or a wreath
+                    product holds a direct product.
+
+    Example
+    -------
+    >>> from discopy.group import Product, Symmetric, Wreath
+    >>> lines = Wreath[Symmetric[3], Symmetric[3]]
+    >>> chains(Product[lines, lines])
+    ((3, 3), (3, 3))
+    """
+    if issubclass(group, groups.Product):
+        return chains(group.left) + chains(group.right)
+    if issubclass(group, groups.Wreath):
+        base, top = chains(group.base), chains(group.top)
+        if len(base) != 1 or len(top) != 1:
+            raise TypeError(f"{factory_name(group)} has a product inside a "
+                            "wreath: its orbitals are not agreements")
+        return (top[0] + base[0], )
+    if issubclass(group, groups.Symmetric) or (
+            issubclass(group, groups.Cyclic) and group.n <= 2):
+        return ((group.n, ), )
+    raise TypeError(f"{factory_name(group)} has more than two orbitals on "
+                    "pairs: its orbitals are not agreements")
+
+
+class Block(NamedTuple):
+    """
+    The partition of the points of a tensor of shape ``shape`` by their
+    coordinates along the axes ``keep``: one block per value of the kept
+    coordinates, numbered row-major, each running over the other axes.
+
+    Parameters:
+        shape : The shape of the points.
+        keep : The axes the points of a block agree on, increasing.
+
+    Example
+    -------
+    The rows, the columns and the boxes of a four by four sudoku, its cells
+    laid out as ``(band, row, stack, column)``:
+
+    >>> rows, boxes = Block((2, 2, 2, 2), (0, 1)), Block((2, 2, 2, 2), (0, 2))
+    >>> rows.members()[1], boxes.members()[1]
+    ((4, 5, 6, 7), (2, 3, 6, 7))
+    >>> rows.count, rows.size, rows.free
+    (4, 4, (2, 3))
+    """
+    shape: tuple[int, ...]
+    keep: tuple[int, ...]
+
+    @property
+    def free(self) -> tuple[int, ...]:
+        """ The axes a block runs over. """
+        return tuple(a for a in range(len(self.shape)) if a not in self.keep)
+
+    @property
+    def order(self) -> tuple[int, ...]:
+        """ The kept axes followed by the free ones. """
+        return self.keep + self.free
+
+    @property
+    def size(self) -> int:
+        """ The number of points in each block. """
+        return math.prod(self.shape[a] for a in self.free)
+
+    @property
+    def count(self) -> int:
+        """ The number of blocks. """
+        return math.prod(self.shape[a] for a in self.keep)
+
+    def members(self) -> tuple[tuple[int, ...], ...]:
+        """ Every block, as the increasing tuple of its points. """
+        found: dict = {}
+        for point in range(math.prod(self.shape)):
+            coordinates = unravel(point, self.shape)
+            found.setdefault(tuple(coordinates[a] for a in self.keep),
+                             []).append(point)
+        return tuple(tuple(found[key]) for key in sorted(found))
+
+    @classmethod
+    def of(cls, layout, depth: tuple[int, ...]) -> Block:
+        """
+        The block of the points agreeing to ``depth`` or deeper along the
+        chains of ``layout``.
+
+        Parameters:
+            layout : The chains, see :func:`chains`.
+            depth : One depth per chain.
+
+        Example
+        -------
+        >>> Block.of(((3, 3), (3, 3)), (1, 1))
+        Block(shape=(3, 3, 3, 3), keep=(0, 2))
+        """
+        keep, start = [], 0
+        for chain, agreed in zip(layout, depth):
+            keep += range(start, start + agreed)
+            start += len(chain)
+        return cls(sum(layout, ()), tuple(keep))
+
+
+def unravel(point: int, shape) -> tuple[int, ...]:
+    """
+    The coordinates of a point numbered row-major in ``shape``.
+
+    Parameters:
+        point : The number of the point.
+        shape : The shape of the points.
+
+    Example
+    -------
+    >>> unravel(5, (2, 3))
+    (1, 2)
+    """
+    coordinates = []
+    for n in reversed(shape):
+        point, x = divmod(point, n)
+        coordinates.append(x)
+    return tuple(reversed(coordinates))
+
+
+def depths(v: int, w: int, layout) -> tuple[int, ...]:
+    """
+    How deep two points agree along each chain, i.e. the orbital of the
+    pair.
+
+    Parameters:
+        v : A point.
+        w : Another point.
+        layout : The chains, see :func:`chains`.
+
+    Example
+    -------
+    Two cells of a sudoku in the same row and the same box:
+
+    >>> depths(0, 1, ((3, 3), (3, 3)))
+    (2, 1)
+    """
+    shape = sum(layout, ())
+    first, second = unravel(v, shape), unravel(w, shape)
+    result, start = [], 0
+    for chain in layout:
+        agreed = 0
+        while agreed < len(chain) \
+                and first[start + agreed] == second[start + agreed]:
+            agreed += 1
+        result.append(agreed)
+        start += len(chain)
+    return tuple(result)
+
+
+def orbitals(layout) -> tuple[tuple[int, ...], ...]:
+    """
+    The orbitals of the group, one depth per chain.
+
+    Parameters:
+        layout : The chains, see :func:`chains`.
+
+    Example
+    -------
+    >>> len(orbitals(((3, 3), (3, 3))))
+    9
+    """
+    return tuple(itertools.product(*(range(len(c) + 1) for c in layout)))
+
+
+def decompose(relation, layout) -> tuple[tuple[int, Block], ...]:
+    """
+    A relation invariant under the group as a signed sum of blocks:
+    ``(coefficient, block)`` pairs such that ``w`` is related to ``v`` iff
+    the coefficients of the blocks of ``v`` that hold ``w`` add up to one.
+
+    The relation is a union of orbitals, and the orbital of the pairs that
+    agree to depths *exactly* ``d`` is, by Möbius inversion along each
+    chain, the alternating sum of the blocks agreeing to ``d`` plus zero or
+    one more axis along each chain.
+
+    Parameters:
+        relation : Per point, the points it is related to.
+        layout : The chains of a group the relation is invariant under.
+
+    Raises:
+        ValueError : If the relation is not on the points of the layout,
+                     relates a point to one twice, or splits an orbital.
+
+    Example
+    -------
+    The peers of a sudoku cell are its row, its column and its box, less
+    the three cells of its row in its box, the three of its column and
+    itself:
+
+    >>> from discopy.neural.wiring import primal
+    >>> sudoku = ((3, 3), (3, 3))
+    >>> units = [b.members() for b in (Block.of(sudoku, (2, 0)),
+    ...     Block.of(sudoku, (0, 2)), Block.of(sudoku, (1, 1)))]
+    >>> peers = primal(sum(units, ()))
+    >>> for coefficient, block in decompose(peers, sudoku):
+    ...     print(coefficient, block.keep)
+    1 (2, 3)
+    1 (0, 2)
+    -1 (0, 2, 3)
+    1 (0, 1)
+    -1 (0, 1, 2)
+    -1 (0, 1, 2, 3)
+    """
+    size = math.prod(sum(layout, ()))
+    if len(relation) != size:
+        raise ValueError(
+            f"{len(relation)} points for a layout of {size} points")
+    inside: dict = {}
+    for v, related in enumerate(relation):
+        if len(set(related)) != len(related) \
+                or not all(0 <= w < size for w in related):
+            raise ValueError(f"point {v} is related to {tuple(related)}, "
+                             f"not to distinct points of {size}")
+        related = set(related)
+        for w in range(len(relation)):
+            orbital = depths(v, w, layout)
+            if inside.setdefault(orbital, w in related) != (w in related):
+                raise ValueError(f"the relation splits the orbital {orbital}")
+    coefficients: dict = {}
+    for orbital in (o for o, held in inside.items() if held):
+        for bump in itertools.product((0, 1), repeat=len(layout)):
+            deeper = tuple(d + b for d, b in zip(orbital, bump))
+            if all(d <= len(c) for d, c in zip(deeper, layout)):
+                coefficients[deeper] = coefficients.get(deeper, 0)\
+                    + (-1) ** sum(bump)
+    return tuple((c, Block.of(layout, d))
+                 for d, c in sorted(coefficients.items()) if c)
+
+
+def families(factors, layout) -> tuple[Block, ...]:
+    """
+    A factor table as families of blocks, in the order the table lists
+    them: every factor is a block, and the factors of a family come
+    together, every block of it in order.
+
+    Parameters:
+        factors : The factor table.
+        layout : The chains, see :func:`chains`.
+
+    Raises:
+        ValueError : If a factor holds a point off the layout, or does not
+                     start a family of blocks.
+
+    Example
+    -------
+    >>> sudoku = ((3, 3), (3, 3))
+    >>> units = [b.members() for b in (Block.of(sudoku, (2, 0)),
+    ...     Block.of(sudoku, (0, 2)), Block.of(sudoku, (1, 1)))]
+    >>> [b.keep for b in families(sum(units, ()), sudoku)]
+    [(0, 1), (2, 3), (0, 2)]
+    """
+    found, cursor, table = [], 0, table_of(factors)
+    size = math.prod(sum(layout, ()))
+    if any(point >= size for factor in table for point in factor):
+        raise ValueError(f"a factor holds a point off the {size} points")
+    while cursor < len(table):
+        first = table[cursor]
+        if len(first) < 2:
+            raise ValueError(f"factor {cursor} has fewer than two members")
+        family = Block.of(layout, tuple(min(agreed) for agreed in zip(*(
+            depths(first[0], w, layout) for w in first[1:]))))
+        members = family.members()
+        if table[cursor:cursor + len(members)] != members:
+            raise ValueError(
+                f"factor {cursor} does not start a family of blocks")
+        found.append(family)
+        cursor += len(members)
+    return tuple(found)

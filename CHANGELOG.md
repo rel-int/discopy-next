@@ -74,6 +74,8 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   `neural.signature` ([#739]), and `neural.wiring`, `cell`, `recursion`,
   `lattice`, `act` and `train`, the networks and trainers of Tiny Recursive
   Message Passing ([Recursive_GNNs#1]).
+- `neural.geometric`, the same networks run along the blocks of their
+  symmetry group, reductions in place of gathers ([Recursive_GNNs#1]).
 - `grammar.proofnet`, parses as proof nets read back to normal terms, and
   `grammar.neural`, a PyTorch parser into them ([lambek#8]).
 - `categorial.parse`, the `k` best terms of a sentence by CKY ([lambek#2]).
