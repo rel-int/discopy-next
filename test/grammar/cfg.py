@@ -1,8 +1,8 @@
 from pytest import importorskip, raises
 
-from discopy import cat, grammar, monoidal
+from discopy import cat, grammar, monoidal, rigid
 from discopy.grammar.cfg import Tree, Rule, Word, Id, Ty
-from discopy.utils import AxiomError
+from discopy.utils import AxiomError, dumps, loads
 
 x = Ty('x')
 f, w = Rule(x @ x, x, name='f'), Word('w', x)
@@ -49,8 +49,12 @@ def test_Tree():
     tree = f(g(a, b), a)
     assert str(tree) == "f(g(a, b), a)" and tree.cod == x
     assert (tree.root, tree.branches) == (f, (g(a, b), a))
-    with raises(AxiomError):
+    with raises(AxiomError, match=r"f does not compose with \(a\): x @ x"):
         Tree(f, a)
+    with raises(AxiomError, match=r"with \(a, b\): x @ x != x @ y"):
+        f(a, b)
+    with raises(AxiomError, match=r"rigid.Ty\(.*\) != monoidal.Ty\("):
+        Rule(rigid.Ty('x') @ rigid.Ty('x'), x, name='r')(a, a)
 
 
 def test_Tree_dom():
@@ -69,3 +73,18 @@ def test_Tree_to_diagram():
     assert f(g(a, b), a).to_diagram()\
         == (leaf_a @ leaf_b >> box('g', x @ y, x)) @ leaf_a\
         >> box('f', x @ x, x)
+
+
+def test_to_tree():
+    x, y = Ty('x'), Ty('y')
+    f, g = Rule(x @ x, x, name='f'), Rule(x @ y, x, name='g')
+    a, b = Word('a', x), Word('b', y, data=3)
+    for tree in (f(g(a, b), a), Tree(a), Tree(g[::-1], a), f, g[::-1], b,
+                 Id(x), f(g, Id(x)), Tree(Id(x), a)):
+        assert loads(dumps(tree)) == tree
+        assert type(loads(dumps(tree))) is type(tree)
+    raw = '{"factory": "grammar.cfg.Word", "name": "a", '\
+        '"dom": {"factory": "monoidal.Ty", "inside": []}, '\
+        '"cod": {"factory": "monoidal.Ty", "inside": '\
+        '[{"factory": "monoidal.Wire", "name": "x"}]}}'
+    assert loads(raw) == a and dumps(a) == raw

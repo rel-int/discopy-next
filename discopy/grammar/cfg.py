@@ -39,13 +39,13 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from discopy import monoidal
+from discopy import messages, monoidal
 from discopy.cat import factory, Functor
 from discopy.config import BOX_DRAWING_ATTRIBUTES
 from discopy.grammar import thue
 from discopy.monoidal import Ty
 from discopy.utils import (
-    assert_isinstance, factory_name, assert_isatomic, AxiomError)
+    assert_isinstance, factory_name, assert_isatomic, AxiomError, from_tree)
 
 if TYPE_CHECKING:
     import nltk
@@ -76,12 +76,16 @@ class Tree:
         assert_isinstance(root, Rule)
         for branch in branches:
             assert_isinstance(branch, Tree)
-        if not isinstance(self, Rule) and not root.dom == Ty().tensor(
-                *[branch.cod for branch in branches]):
-            raise AxiomError
         self.cod, self.root, self.branches = root.cod, root, branches
-        if not isinstance(self, Rule):
-            self.dom = Ty().tensor(*[branch.dom for branch in branches])
+        if isinstance(self, Rule):
+            return
+        cods = Ty().tensor(*[branch.cod for branch in branches])
+        if root.dom != cods:
+            show = str if str(root.dom) != str(cods) else repr
+            raise AxiomError(messages.NOT_COMPOSABLE.format(
+                root, f"({', '.join(map(str, branches))})",
+                show(root.dom), show(cods)))
+        self.dom = Ty().tensor(*[branch.dom for branch in branches])
 
     def __repr__(self):
         return factory_name(type(self))\
@@ -116,6 +120,27 @@ class Tree:
     def __hash__(self):
         return hash((self.root, self.branches)) if self.branches\
             else hash(self.root)
+
+    def to_tree(self) -> dict:
+        """
+        Serialise a tree as its ``root`` and its ``branches``, see
+        :func:`discopy.utils.dumps`, while a rule is serialised as a box.
+
+        Example
+        -------
+        >>> from discopy.utils import dumps, loads
+        >>> x = Ty('x')
+        >>> f, a = Rule(x @ x, x, name='f'), Word('a', x)
+        >>> assert loads(dumps(f(f(a, a), a))) == f(f(a, a), a)
+        """
+        return {'factory': factory_name(type(self)),
+                'root': self.root.to_tree(),
+                'branches': [branch.to_tree() for branch in self.branches]}
+
+    @classmethod
+    def from_tree(cls, tree: dict) -> Tree:
+        """ Decode a serialised tree, see :meth:`to_tree`. """
+        return cls(*map(from_tree, [tree['root']] + tree['branches']))
 
     def to_diagram(self) -> monoidal.Diagram:
         """
@@ -194,6 +219,8 @@ class Rule(Tree, thue.Rule):
 
     __hash__, __str__ = thue.Rule.__hash__, thue.Rule.__str__
     __repr__ = thue.Rule.__repr__
+    to_tree = thue.Rule.to_tree
+    from_tree = classmethod(thue.Rule.from_tree.__func__)
 
     def to_diagram(self) -> monoidal.Box:
         drawing = {attr: getattr(self, attr)
@@ -224,6 +251,10 @@ class Id(Rule):
 
     def __repr__(self):
         return factory_name(type(self)) + f"({self.dom!r})"
+
+    @classmethod
+    def from_tree(cls, tree: dict) -> Id:
+        return cls(from_tree(tree['dom']))
 
     def dagger(self) -> Id:
         return self
