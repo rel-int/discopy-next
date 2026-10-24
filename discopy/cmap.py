@@ -898,12 +898,12 @@ class CMap[C0: Pregroup, C1: CMap](
         ...     (CMap.caps(x.r, x), 0), (CMap.cups(x.r, x), 0)]).loops == (x, )
         True
         """
-        wires, ends, objects = [], [], []
+        wires, ends, origins = [], [], []
 
-        def fresh(obj):
+        def fresh(origin=None):
             wires.append(len(wires))
             ends.append([])
-            objects.append(obj)
+            origins.append(origin)
             return len(wires) - 1
 
         def find(wire):
@@ -919,17 +919,16 @@ class CMap[C0: Pregroup, C1: CMap](
                 wires[target] = source
 
         scan = []
-        for i, obj in enumerate(dom):
-            scan.append(fresh(obj))
+        for i in range(len(dom)):
+            scan.append(fresh())
             ends[scan[i]].append(i)
         boxes, loops, start = (), (), len(dom)
         for image, offset in images:
             arity, coarity = len(image.dom), len(image.cod)
-            local, image_ports = {}, image.ports
+            local = {}
             for source, target in enumerate(image.edges):
                 if source <= target:
-                    local[source] = local[target] = fresh(
-                        image_ports[source].obj)
+                    local[source] = local[target] = fresh((image, source))
             for port in range(arity, image.n_ports - coarity):
                 ends[find(local[port])].append(start + port - arity)
             for i in range(arity):
@@ -944,7 +943,8 @@ class CMap[C0: Pregroup, C1: CMap](
         edges = list(range(start + len(cod)))
         for wire in {find(wire) for wire in range(len(wires))}:
             if not ends[wire]:
-                loop = objects[wire]
+                image, source = origins[wire]
+                loop = image.ports[source].obj
                 loop = loop if isinstance(loop, cls.category.ob)\
                     else cls.ob(loop)
                 loops = loops + (
@@ -1028,7 +1028,10 @@ class CMap[C0: Pregroup, C1: CMap](
 
         The image of each box is computed by the functor into ``cls``, then
         the images are glued in a single pass with :meth:`from_glued`. The
-        trace of a planar traced category is a box, as for
+        image of a permutation is its :meth:`permutation`, read from its
+        ``perm`` rather than by mapping it wire by wire, when the functor is
+        symmetric: a map pinned below symmetric keeps it as a box. The trace
+        of a planar traced category is a box, as for
         :meth:`Hypergraph.from_diagram`.
 
         >>> from discopy.braided import Ty, Braid
@@ -1052,9 +1055,21 @@ class CMap[C0: Pregroup, C1: CMap](
         trace = getattr(category, "trace_factory", ())
         if not isclass(trace) or issubclass(category, SymmetricCategory):
             trace = ()
+        permutation = getattr(category, "permutation_factory", ())
+        if not issubclass(cls.category or category, SymmetricCategory):
+            permutation = ()
+
+        def image(box):
+            if isinstance(box, trace):
+                return factory.from_box(box)
+            if isinstance(box, permutation):
+                edges = Permutation.from_transpositions(
+                    ((i, len(box.dom) + j) for j, i in enumerate(box.perm)),
+                    2 * len(box.dom))
+                return factory(box.dom, box.cod, (), edges, check=False)
+            return functor(box)
         return factory.from_glued(old.dom, old.cod, [
-            (factory.from_box(box) if isinstance(box, trace)
-             else functor(box), offset)
+            (image(box), offset)
             for layer in old.inside
             for box, offset in layer.boxes_and_offsets])
 
@@ -1151,8 +1166,8 @@ class CMap[C0: Pregroup, C1: CMap](
         if sorted(xs) != list(range(len(doms))):
             raise ValueError(
                 f"{xs} is not a permutation of {len(doms)} objects")
-        dom = cls.ob().tensor(*doms)
-        cod = cls.ob().tensor(*(doms[x] for x in xs))
+        dom = cls.ob.tensor(*doms) if doms else cls.ob()
+        cod = cls.ob.tensor(*(doms[x] for x in xs)) if doms else cls.ob()
         starts = [0, *accumulate(len(objects) for objects in doms)]
         inputs = [
             starts[x] + offset for x in xs for offset in range(len(doms[x]))]

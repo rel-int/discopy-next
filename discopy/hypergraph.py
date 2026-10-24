@@ -2926,9 +2926,11 @@ class Hypergraph(
         The image of each box is computed by the functor into ``cls``, then
         the images are glued in a single pass with :meth:`from_glued`,
         rather than folding them one at a time with :meth:`then`, which
-        relabels the whole hypergraph built so far at every box. The trace
-        of a planar traced category, which a hypergraph cannot wire, is a box
-        of its own, as decoding its argument would need swaps.
+        relabels the whole hypergraph built so far at every box. The image
+        of a permutation is its :meth:`permutation`, read from its ``perm``
+        rather than by mapping it wire by wire. The trace of a planar traced
+        category, which a hypergraph cannot wire, is a box of its own, as
+        decoding its argument would need swaps.
 
         Example
         -------
@@ -2951,9 +2953,18 @@ class Hypergraph(
         trace = getattr(category, "trace_factory", ())
         if not isclass(trace) or issubclass(category, SymmetricCategory):
             trace = ()
+        permutation = getattr(category, "permutation_factory", ())
+
+        def image(box):
+            if isinstance(box, trace):
+                return factory.from_box(box)
+            if isinstance(box, permutation):
+                wires = tuple(range(len(box.dom))), (), tuple(box.perm)
+                return factory(
+                    box.dom, box.cod, (), wires, tuple(box.dom), _scan=False)
+            return functor(box)
         return factory.from_glued(old.dom, old.cod, [
-            (factory.from_box(box) if isinstance(box, trace)
-             else functor(box), offset)
+            (image(box), offset)
             for layer in old.inside
             for box, offset in layer.boxes_and_offsets])
 
