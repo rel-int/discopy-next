@@ -1412,7 +1412,8 @@ class Diagram(cat.Arrow, MonoidalCategory, RichDisplay):
         >>> assert c @ x != x @ c
         >>> assert (c @ x).to_hypergraph() == (x @ c).to_hypergraph()
         """
-        graph = hypergraph.Hypergraph[type(self).ar].from_diagram(self)
+        graph = getattr(self, "hypergraph_factory", hypergraph.Hypergraph)[
+            type(self).ar].from_diagram(self)
         if all(box.dom for box in self.boxes):
             return graph
         offsets = []
@@ -1423,7 +1424,7 @@ class Diagram(cat.Arrow, MonoidalCategory, RichDisplay):
         offsets += (len(graph.boxes) - len(offsets)) * [None]
         return type(graph)(
             graph.dom, graph.cod, graph.boxes, graph.wires,
-            graph.spider_types, tuple(offsets))
+            graph.spider_types, tuple(offsets), graph.phases)
 
     def foliation(self):
         """

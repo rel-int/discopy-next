@@ -20,15 +20,25 @@ Summary
     Y
     X
     Scalar
+    Hypergraph
+    Rewriter
 """
 
+from __future__ import annotations
+
 import cmath
+from collections import Counter
+from collections.abc import Callable
 from fractions import Fraction
 from functools import reduce
+from heapq import heappop, heappush
+from itertools import combinations
 from math import pi
 from operator import index
+from typing import NamedTuple
 
-from discopy import cat, frobenius, rigid, tensor, quantum
+from discopy import (
+    cat, frobenius, hypergraph, messages, rigid, tensor, quantum)
 from discopy.cat import factory
 from discopy.quantum.circuit import qubit, Circuit
 from discopy.quantum.gates import (
@@ -569,3 +579,916 @@ Diagram.swap_factory, Diagram.sum_factory = Swap, Sum
 Diagram.bubble_factory = Bubble
 Diagram.permutation_factory = Permutation
 Id = Diagram.id
+
+
+class Hypergraph(hypergraph.Hypergraph):
+    """
+    A ZX diagram as a hypergraph, graph-like in the sense of
+    :cite:t:`DuncanEtAl20`: its spiders are the green spiders, each with its
+    phase in turns, and its only boxes are the Hadamard :data:`H` and the
+    scalars, a red spider being a green one with a Hadamard on each leg.
+
+    Composition is the pushout of :class:`discopy.hypergraph.Hypergraph`,
+    i.e. it fuses spiders and adds their phases, which this hypergraph keeps
+    modulo a turn. Green spiders are special, so that this is a faithful
+    encoding: :meth:`to_diagram` is :meth:`from_diagram` undone, up to the
+    axioms of ZX diagrams.
+
+    Example
+    -------
+    >>> quarter = Z(1, 1, .25).to_hypergraph()
+    >>> assert quarter >> quarter == Z(1, 1, .5).to_hypergraph()
+    >>> assert quarter[::-1] == Z(1, 1, .75).to_hypergraph()
+    >>> assert X(1, 1, .5).to_hypergraph() == (H >> Z(1, 1, .5) >> H
+    ...                                        ).to_hypergraph()
+
+    The phases of the hypergraph go back to spiders:
+
+    >>> print((Z(1, 2, .25) >> Z(2, 1, .25)).to_hypergraph())
+    Z(1, 1, 0.5)
+    """
+    category = Diagram
+
+    @staticmethod
+    def reduce_phase(phase):
+        """ A phase modulo a turn, unless it is symbolic. """
+        return phase if getattr(phase, "free_symbols", None) else phase % 1
+
+    @classmethod
+    def from_box(cls, box: Box) -> Hypergraph:
+        """
+        A :class:`Z` spider is a spider with its phase, an :class:`X` spider
+        one behind a Hadamard on each leg, a :class:`Y` spider its
+        :meth:`Y.to_x` and any other box is itself.
+
+        >>> graph = Hypergraph.from_box(X(1, 2, .5))
+        >>> assert graph.boxes == 3 * (H, ) and graph.phases == (0, .5, 0, 0)
+        """
+        if isinstance(box, Y):
+            return cls.from_diagram(box.to_x())
+        if not isinstance(box, (Z, X)):
+            return super().from_box(box)
+        n_legs_in, n_legs_out = len(box.dom), len(box.cod)
+        if isinstance(box, Z):
+            return cls.spiders(n_legs_in, n_legs_out, Nat(1), [box.phase])
+        legs = tuple(range(1, n_legs_in + n_legs_out + 1))
+        box_wires = tuple(((leg, ), (0, )) for leg in legs[:n_legs_in])\
+            + tuple(((0, ), (leg, )) for leg in legs[n_legs_in:])
+        return cls(
+            box.dom, box.cod, len(legs) * (H, ),
+            (legs[:n_legs_in], box_wires, legs[n_legs_in:]),
+            (len(legs) + 1) * [Nat(1)], phases={0: box.phase})
+
+    @classmethod
+    def from_pyzx(cls, graph) -> Hypergraph:
+        """
+        A hypergraph from a PyZX graph: its green spiders joined by plain
+        edges are one spider, with the sum of their phases, a red spider is
+        green with its edges toggled between plain and Hadamard, and a
+        boundary behind a Hadamard edge is a spider of its own. The scalar
+        of the graph is dropped.
+
+        Parameters:
+            graph : A PyZX graph with boundaries, green and red spiders.
+
+        >>> bialgebra = Z(1, 2, .25) @ Z(1, 2, .75)\\
+        ...     >> Id(1) @ SWAP @ Id(1) >> X(2, 1, .5) @ X(2, 1, .5)
+        >>> graph = bialgebra.to_pyzx()  # doctest: +EXTRA
+        >>> assert Hypergraph.from_pyzx(graph) == bialgebra.to_hypergraph()
+        """
+        from pyzx import VertexType, EdgeType
+        red = {v for v in graph.vertices()
+               if graph.type(v) == VertexType.X}  # noqa: E721
+        parent = {v: v for v in graph.vertices()}
+
+        def find(v):
+            while parent[v] != v:
+                parent[v] = parent[parent[v]]
+                v = parent[v]
+            return v
+
+        hadamards = []
+        for edge in graph.edges():
+            a, b = graph.edge_st(edge)
+            plain = (graph.edge_type(edge) == EdgeType.SIMPLE) == (
+                (a in red) == (b in red))
+            if plain:
+                parent[find(a)] = find(b)
+            else:
+                hadamards.append((a, b))
+        spiders = list(dict.fromkeys(find(v) for v in graph.vertices()))
+        label = {s: i for i, s in enumerate(spiders)}
+        phases = hypergraph.add_phases(
+            (label[find(v)], Fraction(graph.phase(v)) / 2)
+            for v in graph.vertices())
+        dom_wires = tuple(label[find(v)] for v in graph.inputs())
+        cod_wires = tuple(label[find(v)] for v in graph.outputs())
+        box_wires = tuple(
+            ((label[find(a)], ), (label[find(b)], )) for a, b in hadamards)
+        return cls(
+            Nat(len(dom_wires)), Nat(len(cod_wires)), len(hadamards) * (H, ),
+            (dom_wires, box_wires, cod_wires), len(spiders) * [Nat(1)],
+            phases=phases)
+
+    def to_pyzx(self):
+        """
+        The PyZX graph of a graph-like hypergraph, with a green spider for
+        each spider and a boundary on a plain edge for each port, see
+        :meth:`from_pyzx`. PyZX graphs are simple, so parallel Hadamard
+        edges cancel in pairs.
+
+        >>> graph = (Z(1, 1, .25) >> H >> X(1, 2, .5)).to_hypergraph()
+        >>> pyzx_graph = graph.to_pyzx()  # doctest: +EXTRA
+        >>> assert Hypergraph.from_pyzx(pyzx_graph) == graph
+        """
+        from pyzx import Graph, VertexType, EdgeType
+        result = Graph()
+        spiders = [result.add_vertex(VertexType.Z, qubit=i, row=1)
+                   for i, _ in enumerate(self.spider_types)]
+        for spider, phase in zip(spiders, self.phases):
+            if phase:
+                result.add_to_phase(spider, Fraction(phase) * 2)
+        table = {}
+        for box, (dom, cod) in zip(self.boxes, self.box_wires):
+            if box == H and dom[0] == cod[0]:
+                result.add_to_phase(spiders[dom[0]], 1)
+            elif box == H:
+                key = result.edge(spiders[dom[0]], spiders[cod[0]])
+                table.setdefault(key, [0, 0])[1] += 1
+            elif isinstance(box, Scalar):
+                result.scalar.add_float(box.data)
+            else:
+                raise ValueError(messages.NOT_GRAPHLIKE.format(box))
+        result.add_edge_table(table)
+        inputs, outputs = [], []
+        for row, wires, ends in (
+                (0, self.dom_wires, inputs), (2, self.cod_wires, outputs)):
+            for i, spider in enumerate(wires):
+                ends.append(result.add_vertex(
+                    VertexType.BOUNDARY, qubit=i, row=row))
+                result.add_edge(
+                    result.edge(ends[-1], spiders[spider]), EdgeType.SIMPLE)
+        result.set_inputs(inputs)
+        result.set_outputs(outputs)
+        return result
+
+    def full_reduce(self) -> Hypergraph:
+        """
+        Simplify by the rules of the ``full_reduce`` of
+        :cite:t:`KissingerWetering20`, see :class:`Rewriter`, up to a scalar.
+
+        >>> diagram = Z(1, 1, .125) >> H >> H >> Z(1, 1, .125)
+        >>> print(diagram.to_hypergraph().full_reduce())
+        Z(1, 1, 1/4)
+        """
+        rewriter = Rewriter(self)
+        rewriter.reduce()
+        return rewriter.to_hypergraph()
+
+    def size(self) -> tuple[int, int, int]:
+        """
+        The number of spiders, of Hadamard edges between them and of spiders
+        whose phase is not Clifford, the T-count, counting a boundary behind
+        a Hadamard edge as no spider, as PyZX does.
+
+        Two spiders are joined by an edge when an odd number of Hadamards lie
+        between them, again as PyZX has it: a Hadamard self-loop is a
+        half-turn phase rather than an edge, and two parallel Hadamards
+        cancel.
+
+        >>> assert (Z(1, 1, .125) >> H >> Z(1, 1, .5)).to_hypergraph().size()\\
+        ...     == (2, 1, 1)
+        """
+        rewriter = Rewriter(self)
+        spiders = [s for s in range(self.n_spiders)
+                   if not rewriter.is_boundary(s) and (
+                       rewriter.ports[s] < 2 or rewriter.incidence[s]
+                       or rewriter.phases[s])]
+        inside = set(spiders)
+        hadamards = Counter(
+            frozenset({dom[0], cod[0]})
+            for box, (dom, cod) in zip(self.boxes, self.box_wires)
+            if box == H and {dom[0], cod[0]} <= inside)
+        edges = sum(1 for pair, number in hadamards.items()
+                    if len(pair) == 2 and number % 2)
+        tcount = sum(
+            1 for s in spiders if not is_clifford(rewriter.phases[s]))
+        return len(spiders), edges, tcount
+
+
+Step = tuple[Hypergraph, Hypergraph, hypergraph.Match]
+""" A rule for one match: its left and right sides, and the match. """
+
+
+def is_pauli(phase: Fraction) -> bool:
+    """ Whether a phase in turns, in ``[0, 1)``, is a half-turn or none. """
+    return phase.denominator <= 2
+
+
+def is_clifford(phase: Fraction) -> bool:
+    """ Whether a phase in turns, in ``[0, 1)``, is a quarter-turn. """
+    return phase.denominator in (1, 2, 4)
+
+
+class Local(NamedTuple):
+    """
+    The neighbourhood of a spider: its phase, its Hadamard boxes to each
+    other spider and to itself, its boundary ports and whether it has any
+    other box, in which case no rule applies there.
+    """
+    phase: Fraction
+    edges: dict[int, list[int]]
+    loops: list[int]
+    ports: int
+    other: bool
+
+    @property
+    def degree(self) -> int:
+        """ The number of neighbours, a boundary port being one. """
+        return self.ports + len(self.edges)
+
+
+def toggle(locals_: dict[int, Local],
+           pairs: list[tuple[int, int]]) -> tuple[list[int], list[tuple]]:
+    """
+    The Hadamard edges between each pair of spiders to delete, and those to
+    add where there was none: the edges are toggled.
+    """
+    old, new = [], []
+    for a, b in pairs:
+        edges = locals_[a].edges.get(b, [])
+        old += edges
+        if not edges:
+            new.append((H, [a], [b]))
+    return old, new
+
+
+def classes(locals_: dict[int, Local], u: int, v: int,
+            skip: set[int] = frozenset()) -> tuple[list[int], ...]:
+    """
+    The neighbours of ``u`` alone, of ``v`` alone and of both, other than
+    ``u``, ``v`` and the spiders to skip, in a reproducible order.
+    """
+    near_u = [t for t in locals_[u].edges if t not in skip | {v}]
+    near_v = [t for t in locals_[v].edges if t not in skip | {u}]
+    both = set(near_u) & set(near_v)
+    return ([t for t in near_u if t not in both],
+            [t for t in near_v if t not in both],
+            [t for t in near_u if t in both])
+
+
+def across(*groups: list[int]) -> list[tuple[int, int]]:
+    """ The pairs of spiders in different groups. """
+    return [(a, b) for i, group in enumerate(groups)
+            for other in groups[i + 1:] for a in group for b in other]
+
+
+def spider_like(near: list[int]) -> list[tuple]:
+    """
+    The Hadamard edges to ``near`` of a new spider, labelled ``"kept"``,
+    standing for a spider that PyZX keeps: the rule deletes the old one so
+    that it is an equation on its own, the old one being inside the
+    neighbourhood the equation rewrites.
+    """
+    return [(H, ["kept"], [t]) for t in near]
+
+
+def edges_of(locals_: dict[int, Local], u: int, v: int) -> list[int]:
+    """ The Hadamard edges of ``u`` and ``v``, each once. """
+    return [j for t in (u, v) for target, js in locals_[t].edges.items()
+            if t == u or target != u for j in js]
+
+
+class Rewriter(hypergraph.Rewriter):  # pylint: disable=too-many-public-methods
+    """
+    A :class:`discopy.hypergraph.Rewriter` of a graph-like hypergraph with
+    the rules of the ``full_reduce`` of :cite:t:`KissingerWetering20`, one
+    method each: each step is a pair of hypergraphs built for its match, the
+    left side the neighbourhood it rewrites and the right side what replaces
+    it, applied in place. Their left sides are left-linear, so each match has
+    one pushout complement, and each step is a sound equation of the ZX
+    calculus up to a scalar, which is dropped.
+
+    The rewriter keeps an index of its boxes by spider: the Hadamard edges to
+    each other spider, the loops and the number of other boxes, updated with
+    each box added, removed or moved by a merge, and the spiders merged so
+    far. Its phases are fractions of a turn.
+
+    Parameters:
+        graph : The hypergraph to simplify, with rational phases.
+
+    Example
+    -------
+    Two Hadamards between two spiders with a phase of an eighth of a turn
+    cancel, and the spiders fuse into one with a quarter-turn:
+
+    >>> rewriter = Rewriter(
+    ...     (Z(1, 1, .125) >> H >> H >> Z(1, 1, .125)).to_hypergraph())
+    >>> rewriter.reduce()
+    1
+    >>> assert rewriter.to_hypergraph() == Z(1, 1, .25).to_hypergraph()
+    """
+    def __init__(self, graph: Hypergraph):
+        super().__init__(graph)
+        self.phases = [Fraction(phase) % 1 for phase in self.phases]
+        self.edges = [{} for _ in self.spider_types]
+        self.loops = [[] for _ in self.spider_types]
+        self.others = [0 for _ in self.spider_types]
+        self.merged = set()
+        for j, _ in enumerate(self.boxes):
+            self.index(j)
+
+    def index(self, j: int, remove: bool = False) -> None:
+        """ Add a box to the index, or remove it from there. """
+        box, (dom, cod) = self.boxes[j], self.box_wires[j]
+        if box != H:
+            for spider in set(dom + cod):
+                self.others[spider] += -1 if remove else 1
+            return
+        groups = [self.loops[dom[0]]] if dom[0] == cod[0] else [
+            self.edges[dom[0]].setdefault(cod[0], []),
+            self.edges[cod[0]].setdefault(dom[0], [])]
+        for group in groups:
+            if remove:
+                group.remove(j)
+            else:
+                group.append(j)
+        if remove and dom[0] != cod[0] and not self.edges[dom[0]][cod[0]]:
+            del self.edges[dom[0]][cod[0]], self.edges[cod[0]][dom[0]]
+
+    def add_spider(self, typ, phase=0) -> int:
+        for spiders, empty in ((self.edges, {}), (self.loops, []),
+                               (self.others, 0)):
+            spiders.append(empty)
+        return super().add_spider(typ, phase)
+
+    def add_box(self, box, dom, cod, offset=None) -> int:
+        j = super().add_box(box, dom, cod, offset)
+        self.index(j)
+        return j
+
+    def remove_box(self, j: int) -> None:
+        self.index(j, remove=True)
+        super().remove_box(j)
+
+    def merge(self, spider: int, other: int) -> int:
+        if spider == other:
+            return spider
+        moved = list(dict.fromkeys(j for j, *_ in self.incidence[spider]))
+        moved += [j for j in dict.fromkeys(
+            j for j, *_ in self.incidence[other]) if j not in moved]
+        for j in moved:
+            self.index(j, remove=True)
+        kept = super().merge(spider, other)
+        for j in moved:
+            self.index(j)
+        self.merged.add(kept)
+        return kept
+
+    def local(self, spider: int) -> Local:
+        """
+        The :class:`Local` neighbourhood of a spider, read off the index: it
+        shares its lists, so it holds until the next step.
+        """
+        return Local(self.phases[spider], self.edges[spider],
+                     self.loops[spider], self.ports[spider],
+                     bool(self.others[spider]))
+
+    def neighbourhood(self, *spiders: int, known: dict[int, Local] = None
+                      ) -> dict[int, Local]:
+        """
+        The :class:`Local` neighbourhoods of spiders and their neighbours,
+        adding to those already ``known``.
+        """
+        result = dict(known or {})
+        result.update((spider, self.local(spider)) for spider in spiders
+                      if spider not in result)
+        for spider in spiders:
+            for target in result[spider].edges:
+                if target not in result:
+                    result[target] = self.local(target)
+        return result
+
+    def is_boundary(self, spider: int) -> bool:
+        """
+        Whether a spider is a boundary behind a Hadamard edge, i.e. a
+        phase-free spider with one port and one Hadamard box to another
+        spider.
+        """
+        if self.phases[spider] or self.ports[spider] != 1\
+                or len(self.incidence[spider]) != 1:
+            return False
+        (j, side, _), = self.incidence[spider]
+        return self.boxes[j] == H\
+            and self.box_wires[j][1 - side][0] != spider
+
+    def is_interior(self, spider: int, here: Local) -> bool:
+        """ Whether a spider is a green spider away from the boundary. """
+        return not here.ports and not here.other and not here.loops\
+            and not self.is_boundary(spider)
+
+    def boundaries(self, here: Local) -> list:
+        """
+        The boundaries of a spider: its ports, and the boundary spiders it
+        has a Hadamard edge to.
+        """
+        return here.ports * [None] + [
+            t for t in here.edges if self.is_boundary(t)]
+
+    def near_boundary(self) -> list[int]:
+        """
+        The spiders with a boundary, i.e. those with a port that are not a
+        boundary themselves, and those with a Hadamard edge to a boundary.
+        """
+        result = []
+        for spider in self.dom_wires + self.cod_wires:
+            if self.is_boundary(spider):
+                (j, side, _), = self.incidence[spider]
+                result.append(self.box_wires[j][1 - side][0])
+            else:
+                result.append(spider)
+        return list(dict.fromkeys(result))
+
+    def step(  # pylint: disable=too-many-arguments  # one per part of a rule
+            self, interface: list[int], inner: list[int], boxes: list[int],
+            new: list[tuple], glue: dict = None, phases: dict = None
+            ) -> Step:
+        """
+        The rule that deletes ``boxes`` and the ``inner`` spiders, with their
+        phases, keeps the ``interface`` spiders and adds the ``new`` boxes,
+        each given with its domain and codomain spiders: host spiders of the
+        interface, or labels of new spiders. Each spider in ``phases``, of
+        either kind, gains that phase, and gluing an interface spider to
+        another, as ``glue`` says, fuses them. Both sides are built with
+        ``_scan=False``.
+        """
+        glue = glue or {}
+        phases = {s: phase for s, phase in (phases or {}).items() if phase}
+        dom = Nat(len(interface))
+        types = dict.fromkeys(interface + inner, Nat(1))
+        left = Hypergraph(
+            dom, Nat(0), tuple(self.boxes[j] for j in boxes),
+            (tuple(interface), tuple(self.box_wires[j] for j in boxes), ()),
+            types, phases={s: self.phases[s] for s in inner}, _scan=False)
+        flat = interface + [s for j in boxes for wires in self.box_wires[j]
+                            for s in wires]
+        labels = dict(zip(left.flat_wires, flat))
+        labels.update(enumerate(
+            sorted(set(types) - set(flat)), len(set(flat))))
+        boundary = tuple(glue.get(s, s) for s in interface)
+        right_types = dict.fromkeys(boundary, Nat(1))
+        right_types.update((s, Nat(1)) for _, *wires in new
+                           for side in wires for s in side)
+        right_types.update(dict.fromkeys(phases, Nat(1)))
+        right = Hypergraph(
+            dom, Nat(0), tuple(box for box, *_ in new),
+            (boundary, tuple(tuple(map(tuple, wires)) for _, *wires in new),
+             ()), right_types, phases=phases, _scan=False)
+        return left, right, (
+            tuple(labels[i] for i in range(left.n_spiders)), tuple(boxes))
+
+    def tidy(self, spider: int) -> Step | None:
+        """
+        Keep the graph simple: turn a Hadamard loop into a half-turn, cancel
+        parallel Hadamard edges in pairs by the Hopf law, and drop a spider,
+        or a pair of them, cut off from the boundary.
+        """
+        here = self.local(spider)
+        if here.other:
+            return None
+        if not here.ports and not here.edges:
+            return self.step([], [spider], here.loops, [])
+        if not here.ports and len(here.edges) == 1:
+            (target, hadamards), = here.edges.items()
+            there = self.local(target)
+            if len(hadamards) == 1 and not there.ports and not there.other\
+                    and list(there.edges) == [spider]:
+                return self.step([], [spider, target],
+                                 here.loops + hadamards + there.loops, [])
+        parallel = {t: js for t, js in here.edges.items() if len(js) > 1}
+        if not here.loops and not parallel:
+            return None
+        new = [(H, [spider], [t]) for t, js in parallel.items() if len(js) % 2]
+        return self.step(
+            [spider] + list(parallel), [],
+            here.loops + [j for js in parallel.values() for j in js], new,
+            phases={spider: Fraction(len(here.loops), 2)})
+
+    def remove_identity(self, spider: int) -> Step | None:
+        """
+        Remove a phase-free spider between two Hadamard edges, fusing its two
+        neighbours, as ``H >> H`` is the identity.
+        """
+        here = self.local(spider)
+        if here.ports or here.phase or here.other or here.loops\
+                or len(here.edges) != 2:
+            return None
+        (left, (first, )), (right, (second, )) = here.edges.items()
+        return self.step([left, right], [spider], [first, second], [],
+                         glue={right: left})
+
+    def complement(self, spider: int) -> Step | None:
+        """
+        Local complementation: remove an interior spider with a quarter-turn
+        phase, toggling the edges between its neighbours and subtracting its
+        phase from theirs.
+        """
+        here = self.local(spider)
+        if not self.is_interior(spider, here)\
+                or not is_clifford(here.phase) or is_pauli(here.phase):
+            return None
+        locals_ = self.neighbourhood(spider)
+        near = list(here.edges)
+        if any(locals_[t].other or self.is_boundary(t) for t in near):
+            return None
+        old_edges, new_edges = toggle(locals_, list(combinations(near, 2)))
+        return self.step(
+            near, [spider], [js[0] for js in here.edges.values()] + old_edges,
+            new_edges, phases=dict.fromkeys(near, -here.phase))
+
+    def pivot(self, spider: int) -> Step | None:
+        """
+        Pivot along a Hadamard edge between two spiders with Pauli phases and
+        at most one boundary between them, which goes to the spider that
+        stays.
+        """
+        here = self.local(spider)
+        if here.other or here.loops or not is_pauli(here.phase)\
+                or self.is_boundary(spider):
+            return None
+        bound = self.boundaries(here)
+        if len(bound) > 1:
+            return None
+        for other in here.edges:
+            if other in bound:
+                continue
+            there = self.local(other)
+            if there.other or there.loops or not is_pauli(there.phase)\
+                    or len(bound) + len(self.boundaries(there)) > 1:
+                continue
+            result = self.pivot_along(spider, other)
+            if result is not None:
+                return result
+        return None
+
+    def pivot_along(self, u: int, v: int) -> Step | None:
+        """ The pivot along the edge from ``u`` to ``v``, see :meth:`pivot`.
+        """
+        locals_ = self.neighbourhood(u, v)
+        there = locals_[v]
+        if there.other or there.loops or not is_pauli(there.phase)\
+                or self.is_boundary(v):
+            return None
+        bound_u = self.boundaries(locals_[u])
+        bound_v = self.boundaries(there)
+        if len(bound_u) + len(bound_v) > 1:
+            return None
+        if bound_v:
+            u, v, bound_u, bound_v = v, u, bound_v, bound_u
+        skip = {t for t in bound_u if t is not None}
+        near_u, near_v, both = classes(locals_, u, v, skip)
+        if any(locals_[t].other for t in near_u + near_v + both):
+            return None
+        a_u, a_v = locals_[u].phase, locals_[v].phase
+        old_edges, new_edges = toggle(locals_, across(near_u, near_v, both))
+        shift = dict.fromkeys(near_u, a_v)
+        shift.update(dict.fromkeys(near_v, a_u))
+        shift.update(dict.fromkeys(both, a_u + a_v + Fraction(1, 2)))
+        interface = near_u + near_v + both
+        deleted = edges_of(locals_, u, v) + old_edges
+        if not bound_u:
+            return self.step(interface, [u, v], deleted, new_edges,
+                             phases=shift)
+        new = new_edges + spider_like(near_v + both)
+        shift["kept"] = a_v
+        if bound_u[0] is None:
+            shift[u] = -a_u
+            return self.step(interface + [u], [v], deleted,
+                             new + [(H, [u], ["kept"])], phases=shift)
+        boundary, = bound_u
+        return self.step(interface + [boundary], [u, v], deleted, new,
+                         glue={boundary: "kept"}, phases=shift)
+
+    def pivot_gadget(self, spider: int) -> Step | None:
+        """
+        Pivot along an edge from a Pauli spider ``u`` to a spider ``w`` with
+        any other phase, which goes to a new leaf on ``u``: ``u`` becomes the
+        hub of a phase gadget.
+        """
+        here = self.local(spider)
+        if not self.is_interior(spider, here) or not is_pauli(here.phase):
+            return None
+        locals_ = self.neighbourhood(spider, known={spider: here})
+        if any(locals_[t].other or locals_[t].loops or locals_[t].degree == 1
+               or self.is_boundary(t) for t in here.edges):
+            return None
+        for w in here.edges:
+            if not is_pauli(locals_[w].phase) and not locals_[w].ports:
+                result = self.pivot_gadget_along(spider, w, locals_)
+                if result is not None:
+                    return result
+        return None
+
+    def pivot_gadget_along(self, u: int, w: int, locals_: dict[int, Local]
+                           ) -> Step | None:
+        """ The pivot of :meth:`pivot_gadget` from ``u`` to ``w``. """
+        locals_ = self.neighbourhood(w, known=locals_)
+        if any(locals_[t].other or self.is_boundary(t)
+               for t in locals_[w].edges):
+            return None
+        near_u, near_w, both = classes(locals_, u, w)
+        a_u, a_w = locals_[u].phase, locals_[w].phase
+        old_edges, new_edges = toggle(locals_, across(near_u, near_w, both))
+        shift = dict.fromkeys(near_w, a_u)
+        shift.update(dict.fromkeys(both, a_u + Fraction(1, 2)))
+        shift.update({"leaf": a_w, "kept": a_u})
+        return self.step(
+            near_u + near_w + both, [u, w],
+            edges_of(locals_, w, u) + old_edges,
+            new_edges + [(H, ["kept"], ["leaf"])]
+            + spider_like(near_u + both), phases=shift)
+
+    def pivot_boundary(self, spider: int) -> Step | None:
+        """
+        Pivot along an edge from an interior Pauli spider ``v`` to a spider
+        ``w`` with one boundary, after unfusing the phase of ``w`` into a new
+        phase gadget: the boundary goes to ``v``.
+        """
+        here = self.local(spider)
+        if here.other or len(self.boundaries(here)) != 1:
+            return None
+        for v in here.edges:
+            there = self.local(v)
+            if self.is_interior(v, there) and is_pauli(there.phase):
+                result = self.pivot_boundary_from(v, there)
+                if result is not None:
+                    return result
+        return None
+
+    def pivot_boundary_from(self, v: int, here: Local) -> Step | None:
+        """ The :meth:`pivot_boundary` from an interior spider ``v``. """
+        locals_ = self.neighbourhood(v, known={v: here})
+        if not self.is_interior(v, here) or not is_pauli(here.phase) or any(
+                locals_[t].other or self.is_boundary(t)
+                or locals_[t].degree == 1 for t in here.edges):
+            return None
+        eligible = [t for t in here.edges if len(self.boundaries(
+            locals_[t])) == 1 and not locals_[t].loops]
+        if not eligible:
+            return None
+        quarter = [t for t in eligible if not is_pauli(locals_[t].phase)
+                   and is_clifford(locals_[t].phase)]
+        w = quarter[-1] if quarter else eligible[0]
+        locals_.update(self.neighbourhood(w))
+        bound, = self.boundaries(locals_[w])
+        near_v, near_w, both = classes(
+            locals_, v, w, set() if bound is None else {bound})
+        if any(locals_[t].other for t in near_w):
+            return None
+        a_v, a_w = here.phase, locals_[w].phase
+        old_edges, new_edges = toggle(locals_, across(near_v, near_w, both))
+        shift = dict.fromkeys(near_w, a_v)
+        shift.update(dict.fromkeys(both, a_v + Fraction(1, 2)))
+        shift.update({"leaf": a_w, "hub": a_v, "kept": a_v})
+        new = new_edges + [(H, ["hub"], ["leaf"])] + [
+            (H, ["hub"], [t]) for t in near_v + both] + spider_like(
+            near_v + both)
+        interface = near_v + near_w + both
+        deleted = edges_of(locals_, w, v) + old_edges
+        if bound is None:
+            shift[w] = -a_w
+            return self.step(interface + [w], [v], deleted,
+                             new + [(H, [w], ["kept"])], phases=shift)
+        return self.step(interface + [bound], [v, w], deleted, new,
+                         glue={bound: "kept"}, phases=shift)
+
+    def gadget(self, hub: int) -> tuple[int, frozenset] | None:
+        """
+        The leaf of a phase gadget, i.e. the first neighbour of a Pauli
+        spider with no other neighbour and a phase that is not Clifford, and
+        the other neighbours of the hub.
+        """
+        here = self.local(hub)
+        if here.other or here.loops or self.is_boundary(hub)\
+                or not is_pauli(here.phase):
+            return None
+        for leaf in here.edges:
+            if self.ports[leaf] or len(self.incidence[leaf]) > 1:
+                continue
+            if not is_clifford(self.phases[leaf]):
+                return leaf, frozenset(here.edges) - {leaf}
+        return None
+
+    def fuse_gadgets(self, spider: int) -> Step | None:
+        """
+        Fuse the phase gadgets with the same neighbours into one, adding
+        their phases, negated for a hub with a half-turn, and move the
+        half-turn of a lone hub into its leaf.
+        """
+        here = self.local(spider)
+        hubs = [spider] if self.gadget(spider) else []
+        hubs += [t for t in here.edges
+                 if len(here.edges) == 1 and not here.ports]
+        for hub in hubs:
+            found = self.gadget(hub)
+            if found is None:
+                continue
+            leaf, key = found
+            if not key or self.ports[hub]:
+                group, leaves = [hub], [leaf]
+            else:
+                nearest = min(key, key=lambda t: len(self.incidence[t]))
+                others = {t: self.gadget(t) for t in self.edges[nearest]
+                          if t != hub and not self.ports[t]
+                          and len(self.incidence[t]) - len(key) == 1}
+                group = [hub] + [t for t, found in others.items()
+                                 if found is not None and found[1] == key]
+                leaves = [leaf] + [others[t][0] for t in group[1:]]
+            phases = {t: self.phases[t] for t in group + leaves}
+            if len(group) == 1 and not phases[hub]:
+                continue
+            total = sum(phases[l] if not phases[h] else -phases[l]
+                        for h, l in zip(group, leaves)) % 1
+            deleted = list(dict.fromkeys(
+                j for t in group + leaves for j, *_ in self.incidence[t]))
+            if self.ports[hub]:
+                new = [(H, [hub], ["leaf"])]
+                new += [(H, [hub], [t]) for t in sorted(key)]
+                return self.step(sorted(key) + [hub], [leaf], deleted, new,
+                                 phases={"leaf": total, hub: -phases[hub]})
+            new = [(H, ["hub"], ["leaf"])] + [
+                (H, ["hub"], [t]) for t in sorted(key)]
+            return self.step(sorted(key), group + leaves, deleted, new,
+                             phases={"leaf": total})
+        return None
+
+    def copy(self, spider: int) -> Step | None:
+        """
+        Copy a Pauli state through its neighbour: a spider with no phase or a
+        half-turn and one Hadamard edge, to an interior spider, goes with
+        that neighbour, whose other neighbours each gain its phase.
+        """
+        here = self.local(spider)
+        if here.ports or here.other or here.loops or len(here.edges) != 1\
+                or not is_pauli(here.phase):
+            return None
+        (target, hadamards), = here.edges.items()
+        there = self.local(target)
+        if len(hadamards) != 1 or not self.is_interior(target, there):
+            return None
+        near = [t for t in there.edges if t != spider]
+        return self.step(
+            near, [spider, target],
+            [j for js in there.edges.values() for j in js], [],
+            phases=dict.fromkeys(near, here.phase))
+
+    def supplement(self, spider: int) -> Step | None:
+        """
+        Supplementarity: remove two interior spiders whose phases are not
+        Clifford and add up to a half-turn or differ by one, with the same
+        neighbours, the one aside, adding a half-turn to the neighbours when
+        the phases are negated.
+        """
+        here = self.local(spider)
+        if not self.is_interior(spider, here) or is_clifford(here.phase)\
+                or not here.edges:
+            return None
+        near = set(here.edges)
+        nearest = min(near, key=lambda t: len(self.incidence[t]))
+        for other in dict.fromkeys(list(self.edges[nearest]) + list(near)):
+            there = self.local(other)
+            if other == spider or is_clifford(there.phase)\
+                    or not self.is_interior(other, there):
+                continue
+            plus = (here.phase + there.phase) % 1
+            minus = (here.phase - there.phase) % 1
+            if other not in near and set(there.edges) == near\
+                    and Fraction(1, 2) in (plus, minus):
+                negate = plus == Fraction(1, 2)
+            elif other in near\
+                    and set(there.edges) - {spider} == near - {other}\
+                    and (not plus or minus == Fraction(1, 2)):
+                negate = not plus
+            else:
+                continue
+            interface = sorted(near - {other})
+            if negate and any(self.is_boundary(t) for t in interface):
+                continue
+            deleted = list(dict.fromkeys(
+                j for t in (spider, other) for j, *_ in self.incidence[t]))
+            return self.step(interface, [spider, other], deleted, [],
+                             phases=dict.fromkeys(
+                                 interface, Fraction(1, 2) * negate))
+        return None
+
+    def reduce(self, rules=None) -> int:
+        """
+        Rewrite until no rule applies, returning the number of steps: each
+        spider is tried once for each level of rules, the sparsest first, see
+        :class:`Agenda`, and again whenever a step touches it or a
+        neighbour.
+
+        Parameters:
+            rules : The rules by priority, :data:`RULES` by default.
+        """
+        rules = RULES if rules is None else rules
+        alive = [s for s, typ in enumerate(self.spider_types) if typ]
+        todo = [Agenda(self, alive) for _ in rules]
+        stale = [anchors is not None for _, anchors in rules]
+        steps = 0
+        while True:
+            level = next((i for i, agenda in enumerate(todo)
+                          if agenda or stale[i]), None)
+            if level is None:
+                return steps
+            if stale[level]:
+                todo[level].update(rules[level][1](self))
+                stale[level] = False
+                continue
+            spider = todo[level].pop()
+            if self.spider_types[spider] is None:
+                continue
+            for rule in rules[level][0]:
+                result = rule(self, spider)
+                if result is None:
+                    continue
+                left, right, match = result
+                touched = match[0][:len(left.dom)]
+                new = self.substitute(left, right, match)
+                region = dict.fromkeys(self.find(s) for s in touched)
+                region.update(dict.fromkeys(
+                    s for j in new for wires in self.box_wires[j]
+                    for s in wires))
+                region.update(dict.fromkeys(
+                    self.find(s) for s in self.merged))
+                self.merged.clear()
+                todo[0].update(region)
+                region.update(dict.fromkeys(
+                    t for s in list(region) for t in self.edges[s]))
+                for i, (_, anchors) in enumerate(rules[1:], 1):
+                    if anchors is None:
+                        todo[i].update(region)
+                    else:
+                        stale[i] = True
+                steps += 1
+                break
+
+
+Rule = Callable[[Rewriter, int], Step | None]
+""" A rule tried at a spider, giving the step to take or ``None``. """
+
+RULES: list[tuple[list[Rule], Callable | None]] = [
+    ([Rewriter.tidy], None),
+    ([Rewriter.remove_identity, Rewriter.pivot, Rewriter.complement], None),
+    ([Rewriter.pivot_boundary], Rewriter.near_boundary),
+    ([Rewriter.fuse_gadgets], None),
+    ([Rewriter.copy, Rewriter.supplement], None),
+    ([Rewriter.pivot_gadget], None)]
+"""
+The rules of :meth:`Hypergraph.full_reduce` by priority, each level with the
+spiders to try them at: those a step touched, or those that a function of the
+rewriter gives, e.g. :meth:`Rewriter.near_boundary`. A rule is tried only
+when no rule before it applies anywhere.
+"""
+
+
+class Agenda:
+    """
+    The spiders to try the rules of a level at, the one of least degree
+    first, i.e. with fewest boxes, a phase counting as one: pivots and local
+    complementations eliminate spiders the way Gaussian elimination does
+    variables, and taking the sparsest first is what keeps the edges they
+    add, the fill-in, low. A spider queued again moves to its current
+    degree.
+
+    Parameters:
+        rewriter : The rewriter whose spiders these are.
+        spiders : The spiders to try first.
+    """
+    def __init__(self, rewriter: Rewriter, spiders=()):
+        self.rewriter, self.spiders, self.heap = rewriter, {}, []
+        self.update(spiders)
+
+    def update(self, spiders) -> None:
+        """ Add spiders to try, or try them again, at their current degree. """
+        for spider in spiders:
+            degree = len(self.rewriter.incidence[spider])\
+                + bool(self.rewriter.phases[spider])
+            if self.spiders.get(spider) != degree:
+                self.spiders[spider] = degree
+                heappush(self.heap, (degree, spider))
+
+    def pop(self) -> int | None:
+        """ The next spider to try, ``None`` if there is none. """
+        while self.heap:
+            degree, spider = heappop(self.heap)
+            if self.spiders.get(spider) == degree:
+                del self.spiders[spider]
+                return spider
+        return None
+
+    def __bool__(self):
+        return bool(self.spiders)
+
+
+Diagram.hypergraph_factory = Hypergraph
