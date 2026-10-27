@@ -6,10 +6,10 @@ and differentiate the same sum with respect to each input using the
 symmetric block relation, without atomic gradient accumulation.
 
 - [x] Implement an opt-in fused Peers kernel and portable fallback.
-- [WIP] @codex-kernel-2026-10-27 Check values, gradients, layouts and compiled network integration.
-- [WIP] @codex-kernel-2026-10-27 Benchmark against the PyTorch geometry and TRMP specialised kernel;
+- [WIP] @codex-h100-2026-10-27 10:44 Check values, gradients, layouts and compiled network integration.
+- [WIP] @codex-h100-2026-10-27 10:44 Benchmark against the PyTorch geometry and TRMP specialised kernel;
       document measured performance and remaining limitations.
-- [WIP] @codex-kernel-2026-10-27 Run repository checks and prepare the change for review.
+- [WIP] @codex-h100-2026-10-27 10:44 Run repository checks and prepare the change for review.
 
 Local checks: 2181 passed with --skip-extra; focused CPU checks, pflake8,
 pylint, ruff and ty pass. Eight offline H100 compilations and 32 Triton
