@@ -142,7 +142,13 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   the angles maximising the contextual fraction from the most contextual of
   a few random starts. A source node sending half of a fresh Bell pair down
   its edge at every tick reaches the Tsirelson bound on qubits and on
-  dual-rail photons alike ([optyx#87]).
+  dual-rail photons alike ([optyx#87]). The notebook
+  `docs/notebooks/optyx/contextuality.md` shows the calls on a diagram, on
+  a network and on two photons meeting at a beam splitter, where counting
+  every event halves the fraction conditioned on a coincidence: the bunched
+  events are non-contextual and the fraction of the mixture is the
+  probability of a coincidence times the conditioned fraction, at every
+  bias of the source.
 - `hopf.Intertwiner.chart` and `hopf.Algebra.symmetric(n)` ([#408]).
 - `copying`, a law of `Testable` beside `pickling` ([next#1]), and the
   generators of each level as typed class variables ([next#1]).
