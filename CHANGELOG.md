@@ -266,13 +266,14 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Fixed
 
-- What the property matrix found, each with its test ([next#1]): delaying a
-  `feedback.Box` built with keywords, `Feedback.dagger` and `rotate`,
-  `Layer.merge` on a snake, `para.Compact.curry`, the copies and discards of
-  abstract diagrams, a layer holding `Spider(1, 1, x)`, the hypergraph of a
-  traced copy of a wire whose dagger is not itself, e.g. a `Dims(Dim(2, 3))`,
-  and the strings of delayed boxes, structural boxes and adjoint wires,
-  which read back once their `atoms` are the generators they name.
+- What the property matrix of [next#1] found, each with its test:
+  `Feedback.dagger` and `rotate`, `Layer.merge` on a snake, the curry of
+  `para.Compact` and of `para.Closed` with coparameters, the copies and
+  discards of abstract diagrams, a layer holding `Spider(1, 1, x)`, the
+  hypergraph of a traced copy of a wire whose dagger is not itself, e.g. a
+  `Dims(Dim(2, 3))`, and the strings of delayed boxes, structural boxes and
+  adjoint wires, which read back once their `atoms` are the generators they
+  name.
 - `Category.typeparams` reads `ob` with no fallback: a monoid's objects are
   `NoneType`, so `Nat.typeparams()` no longer gives `(Nat, Nat)` ([next#214]).
 - `quantum.zx.Diagram.from_pyzx`, and its copy in `optyx.core.zx`, wires a
