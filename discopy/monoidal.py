@@ -1185,9 +1185,6 @@ class Layer(cat.Box, ColouredMonoid):
                 staircases, normalize=Diagram.normalize)
         except NotImplementedError as exception:  # Eckmann-Hilton argument.
             diagram = exception.last_step
-        if not diagram.inside:  # The layers compose to the identity,
-            raise AxiomError(  # which is not a layer, see #599.
-                messages.NOT_MERGEABLE.format(self, other))
         boxes_or_types, offset = [self.dom[:0]], 0
         for layer, box, box_offset in zip(
                 diagram.inside, diagram.boxes, diagram.offsets):

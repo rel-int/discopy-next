@@ -240,6 +240,7 @@ def test_identity_spider_in_a_layer():
     diagram = x @ (f >> Spider(1, 1, x)) @ f
     assert diagram.dom == diagram.cod == x @ x @ x
     assert all(isinstance(component, (Ty, Box))
+               and not isinstance(component, Spider)
                for layer in diagram.inside for component in layer)
 
 
