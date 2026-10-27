@@ -76,3 +76,16 @@ Read AGENTS.md and the cloud-environment skill, inspect the existing branch, the
 Fix GPU failures, measure accuracy and performance against the existing compiled geometric implementation and TRMP’s specialised kernel using identical weights, and tune where justified. Update the PR, benchmark documentation and TODO.md with actual results. Keep performance claims grounded in measured GPU results; the current documentation explicitly records validation as pending.
 
 Use UV_CACHE_DIR=/workspace/.uv-cache for local uv commands. Never print credentials.
+
+Experiment request (verbatim):
+
+let's go with another round of experiments!
+
+Dense-map design: Y = X W^T + b, dX = dY W, dW = dY^T X and
+db = sum_rows dY. Evaluate the products with three TF32 tensor-core
+products and fp32 accumulation, retaining the fp32 fallback and checking
+full recurrent values and gradients. Compare against the peer-only kernel
+with identical weights; profile batch 64 before choosing further fusion.
+
+- [ ] Experiment with tensor-core dense maps and gradients, profile small
+      batches, and record measured decisions and results.
