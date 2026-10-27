@@ -412,7 +412,7 @@ class Block(NamedTuple):
     @property
     def size(self) -> int:
         """ The number of points in each block. """
-        return math.prod(self.shape[a] for a in self.free)
+        return math.prod([self.shape[a] for a in self.free])
 
     @property
     def count(self) -> int:
