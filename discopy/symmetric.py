@@ -397,7 +397,9 @@ class Diagram(balanced.Diagram, SymmetricCategory):
         return cls.braid(left, right)  # ty: ignore[invalid-return-type]
 
     @classmethod
-    def permutation(cls, xs: Sequence[int], doms=None) -> Diagram:
+    def permutation(
+            cls, xs: Sequence[int],
+            doms: Sequence[monoidal.Ty] | Nat | None = None) -> Diagram:
         """
         The diagram that encodes a given permutation as a composition of
         swaps.
@@ -409,24 +411,24 @@ class Diagram(balanced.Diagram, SymmetricCategory):
                   default is :code:`Nat(len(xs))`.
         """
 
-        doms = Nat(len(xs)) if doms is None else doms
-        size = len(doms)
-        nat = doms if isinstance(doms, Nat) else next(iter(doms), None)
+        types = Nat(len(xs)) if doms is None else doms
+        size = len(types)
+        nat = types if isinstance(types, Nat) else next(iter(types), None)
         unit = type(nat)() if isinstance(nat, Nat) else cls.ob()
         tensor = lambda tys: unit.tensor(*tys)
-        dom = tensor(doms)
+        dom = tensor(types)
 
         xs = finset.Permutation(xs, size)
         if xs.is_identity:
             return cls.id(dom)
         i = xs[0]
         left, head, right = (
-            doms[slice]
+            types[slice]
             for slice in (
                 slice(0, i), i, slice(i + 1, None)
             )
         )
-        rest = (left @ right if isinstance(doms, monoidal.Ty)
+        rest = (left @ right if isinstance(types, monoidal.Ty)
                 else left + right)  # ty: ignore[unsupported-operator]
         return cls.swap(
             tensor(left), head  # ty: ignore[invalid-argument-type]

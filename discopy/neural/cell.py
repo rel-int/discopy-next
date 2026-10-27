@@ -587,4 +587,6 @@ def widths_for(budget: int, build,
             best, best_size = widths, size
         if size > 2 * budget:
             break
-    return best  # ty: ignore[invalid-return-type]
+    if best is None:
+        raise ValueError(f"No width to try from {low} to {high}.")
+    return best

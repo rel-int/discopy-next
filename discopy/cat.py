@@ -79,8 +79,7 @@ from __future__ import annotations
 
 from functools import total_ordering, cached_property
 from typing import (
-    Any, Callable, ClassVar, Mapping, Iterable, Self, Sequence,
-    TYPE_CHECKING)
+    Any, Callable, ClassVar, Mapping, Iterable, Self, TYPE_CHECKING)
 
 
 from discopy import messages, utils
@@ -837,7 +836,7 @@ class Sum(Box):
     serialised_attrs = ("terms", "dom", "cod")
 
     def __init__(
-            self, terms: Sequence[Arrow],
+            self, terms: tuple[Arrow, ...],
             dom: Ob | None = None, cod: Ob | None = None):
         if not terms and (dom is None or cod is None):
             raise ValueError(messages.MISSING_TYPES_FOR_EMPTY_SUM)
@@ -1418,7 +1417,7 @@ class Transformation(Category[Functor, "Transformation"]):
             f"dom={self.dom!r}, cod={self.cod!r})")
 
 
-class Equation(AbstractEquation):
+class Equation(AbstractEquation[Arrow]):
     """
     An :class:`.axioms.Equation` between arrows, see its docstring for the
     parameters and :meth:`.axioms.Equation.modulo` for quotients.

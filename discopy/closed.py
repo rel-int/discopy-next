@@ -789,7 +789,7 @@ class TermBase(Box, biclosed.TermBase, biclosed.Normalising):
         args = (other, self) if left else (self, other)
         return self.cod.application_factory(*args)
 
-    def compose(self, *others: Term) -> biclosed.TermBase:
+    def compose(self, *others: Term) -> Term:
         """
         The composition of terms of function types: ``t.compose(u)`` for
         ``t : x >> y`` and ``u : y >> z`` is ``x(lambda v: u(t(v)))``, i.e.

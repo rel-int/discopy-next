@@ -19,7 +19,7 @@ Summary
 
 from __future__ import annotations
 from discopy.utils import assert_isinstance
-from typing import Iterable, Self, Any
+from typing import Any, Iterable, Self, overload
 from itertools import accumulate
 from collections.abc import Sequence
 from operator import index
@@ -85,8 +85,7 @@ class Function(MarkovCategory[Nat, "Function"], Sequence):
 
     @staticmethod
     def id(x: int | Nat = 0):
-        n = Nat(int(x))
-        return Function(list(range(n)), n, n)
+        return Function(list(range(x)), x, x)
 
     def then(self, *others: Function) -> Function:
         """
@@ -235,7 +234,13 @@ class Permutation(Function, PROP, Groupoid):
     def __iter__(self):
         return (self[i] for i in range(len(self)))
 
-    def __getitem__(self, key):
+    @overload
+    def __getitem__(self, key: int) -> int: ...
+
+    @overload
+    def __getitem__(self, key: slice) -> tuple[int, ...]: ...
+
+    def __getitem__(self, key: int | slice) -> int | tuple[int, ...]:
         if isinstance(key, slice):
             return tuple(self)[key]
         return super().__getitem__(key)
@@ -488,7 +493,7 @@ class Cospan(HypergraphCategory, Serialisable["Cospan"]):
     """
     left: list[int]
     right: list[int]
-    apex: int = None  # ty: ignore[invalid-assignment]
+    apex: int | None = None
 
     ob = Nat
 

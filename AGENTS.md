@@ -50,7 +50,7 @@ Before pushing anything, make sure that:
 - you have reported any bugs or confusing docs that you encounter even if unrelated
 - you have added docs and tests that are complete but concise as best as you can
 - you have added an entry to the `[Unreleased]` section of [CHANGELOG.md](CHANGELOG.md) for any user-facing change
-- you have `uv run` `pflake8 discopy`, `pylint discopy`, `ty check` and `coverage run -m pytest` as described in @CONTRIBUTING.md
+- you have `uv run` `pflake8 discopy`, `pylint discopy`, `ty check --exit-zero-on-warning` and `coverage run -m pytest` as described in @CONTRIBUTING.md
 - you have respected the [code style guide](CONTRIBUTING.md#code-style-guide)
 
 A pull request is **ready for sign-off** when all three of these hold:

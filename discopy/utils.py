@@ -351,8 +351,9 @@ class NamedGeneric:
 
     def __setstate__(self, state):
         if "__class_getitem__values__" in state:
-            self.__class__ = self.__class__[
-                state.pop("__class_getitem__values__")]
+            state = dict(state)
+            self.__class__ = self.__class__[tuple(map(
+                Subscript.decode, state.pop("__class_getitem__values__")))]
         setstate = getattr(super(), "__setstate__", None)
         if setstate is None:
             self.__dict__.update(state)

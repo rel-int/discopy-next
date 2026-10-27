@@ -363,7 +363,7 @@ class Diagram[natural](RibbonCategory, TestableGeneric):
             return cls(inside, source, target)
         return diagrams()
 
-    def __init__(self, inside, dom: Ty, cod: Ty):
+    def __init__(self, inside: natural, dom: Ty, cod: Ty):
         assert_isinstance(inside, self.natural)
         if inside.dom != dom.positive @ cod.negative:
             raise ValueError(messages.WRONG_DOM.format(

@@ -484,6 +484,7 @@ class Matrix(underlying.Matrix):
         # pylint: disable=import-outside-toplevel
         import perceval as pcvl
 
+        # pylint: disable-next=abstract-class-instantiated  # perceval's
         return pcvl.components.Unitary(pcvl.Matrix(self.array.T.conj()))
 
     def _to_perceval_post_select(self) -> pcvl.PostSelect:
