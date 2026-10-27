@@ -483,16 +483,14 @@ def circuit_matrix(layers: list[Diagram]) -> np.ndarray:
 def contract(graph: Hypergraph) -> np.ndarray:
     """
     The tensor of a graph-like hypergraph, an index for each spider with its
-    phase: a Hadamard is a matrix on two, a scalar a number, and a boundary
-    port an identity to a fresh index.
+    phase: a Hadamard is a matrix on two, a boundary port an identity to a
+    fresh index, times the scalar.
     """
     spiders = graph.n_spiders
-    operands = [np.ones(()), []]
+    operands = [np.array(complex(graph.scalar)), []]
     for box, (dom, cod) in zip(graph.boxes, graph.box_wires):
-        if box == H:
-            operands += [np.array([[1, 1], [1, -1]]), list(dom + cod)]
-        else:
-            operands += [np.array(box.data), []]
+        assert box == H
+        operands += [np.array([[1, 1], [1, -1]]) / 2 ** .5, list(dom + cod)]
     ports = graph.dom_wires + graph.cod_wires
     for i, spider in enumerate(ports):
         operands += [np.eye(2), [spider, spiders + i]]
@@ -503,11 +501,9 @@ def contract(graph: Hypergraph) -> np.ndarray:
                      optimize=True)
 
 
-def proportional(left, right) -> bool:
-    left, right = (np.asarray(x).flatten() for x in (left, right))
-    k = np.argmax(abs(left))
-    return abs(right[k]) > 1e-9 and np.allclose(
-        left / left[k], right / right[k])
+def same(left, right) -> bool:
+    """ Whether two tensors are equal, read as flat arrays. """
+    return np.allclose(np.asarray(left).flatten(), np.asarray(right).flatten())
 
 
 def checked(rules):
@@ -527,7 +523,7 @@ def checked(rules):
                     spiders[s] for s in wires)
                     for wires in left.box_wires[i])
             if len(left.dom) <= 12:
-                assert proportional(contract(left), contract(right))
+                assert same(contract(left), contract(right)), rule.__name__
             return found
         return result
     return [([wrap(rule) for rule in level], anchors)
@@ -590,22 +586,21 @@ def test_Hypergraph_eval():
                     Z(0, 0, .125) @ scalar(2) @ X(1, 0)):
         graph = diagram.to_hypergraph()
         assert graph.to_diagram().eval().is_close(diagram.eval())
-        assert proportional(contract(graph), diagram.eval().array)
+        assert same(contract(graph), diagram.eval().array)
 
 
 @pytest.mark.parametrize("seed", range(24))
 def test_full_reduce_is_sound(seed):
     layers = layers_of(2 + seed % 3, 8 + seed, seed)
     graph = Diagram.id(len(layers[0].dom)).then(*layers).to_hypergraph()
-    assert proportional(contract(graph), circuit_matrix(layers))
-    assert proportional(contract(reduced(graph)), circuit_matrix(layers))
+    assert same(contract(graph), circuit_matrix(layers))
+    assert same(contract(reduced(graph)), circuit_matrix(layers))
 
 
 @pytest.mark.parametrize("seed", range(24))
 def test_full_reduce_reaches_fixpoint(seed):
     graph = random_graph(seed)
-    result, expected = contract(reduced(graph)), contract(graph)
-    assert np.allclose(expected, 0) or proportional(result, expected)
+    assert same(contract(reduced(graph)), contract(graph))
 
 
 def test_full_reduce_example():
@@ -617,7 +612,7 @@ def test_scalar_spiders_size():
     for spider in (Z(0, 0, .125), X(0, 0, .125)):
         graph = spider.to_hypergraph()
         assert graph.size() == (1, 0, 1)
-        assert proportional(contract(graph), spider.eval().array)
+        assert same(contract(graph), spider.eval().array)
 
 
 def test_size_counts_hadamard_edges():
@@ -651,9 +646,9 @@ def test_full_reduce_against_pyzx(seed):
     random.seed(seed)
     graph = zx.generate.CNOT_HAD_PHASE_circuit(4, 60).to_graph()
     ours = Hypergraph.from_pyzx(graph)
-    assert zx.compare_tensors(ours.to_pyzx(), graph, preserve_scalar=False)
+    assert zx.compare_tensors(ours.to_pyzx(), graph, preserve_scalar=True)
     result = ours.full_reduce()
-    assert zx.compare_tensors(result.to_pyzx(), graph, False)
+    assert zx.compare_tensors(result.to_pyzx(), graph, preserve_scalar=True)
     zx.full_reduce(graph)
     assert result.size()[2] == Hypergraph.from_pyzx(graph).size()[2]
     again = result.to_pyzx()
@@ -682,4 +677,4 @@ def test_copy_and_supplement():
             for level, anchors in RULES]))
         result = rewriter.to_hypergraph()
         assert fired == [name] and result.size() == (2, 0, 0)
-        assert proportional(contract(result), contract(graph))
+        assert same(contract(result), contract(graph))

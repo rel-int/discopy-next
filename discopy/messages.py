@@ -60,6 +60,7 @@ COLOURED_QUOTIENT = (
     "ill-typed across 0-cells, so it would lose its colours.")
 NO_SUMS = "{} has no sums, it encodes a single diagram."
 NO_PHASES = "{} is not a hypergraph category, its spiders have no phases."
+NOT_INVERTIBLE = "{} has no inverse, it is not sqrt(2) ** n times a phase."
 NOT_SYMMETRIC = "{} has no swaps to downgrade this map."
 NOT_MARKOV = "{} has no copy or discard."
 NOT_A_DAGGER = "{} has no dagger: {} is not a dagger category."

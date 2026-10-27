@@ -69,10 +69,10 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 - `Hypergraph.phases`, a phase on each spider of a hypergraph category, added
   by the fusion of spiders and negated by the dagger ([next#375]).
 - `quantum.zx.Hypergraph`, ZX diagrams as graph-like hypergraphs: green
-  spiders with their phase, Hadamard boxes and scalars, a red spider being
-  green behind Hadamards, simplified up to a scalar by the rules of PyZX's
-  `full_reduce` on a `quantum.zx.Rewriter`, raced against PyZX in
-  `benchmark/test_zx.py` ([next#302], [next#375]).
+  spiders with their phase, Hadamard boxes and an exact scalar, a
+  `quantum.zx.Number`, a red spider being green behind Hadamards, simplified
+  on the nose by the rules of PyZX's `full_reduce` on a `quantum.zx.Rewriter`,
+  raced against PyZX in `benchmark/test_zx.py` ([next#302], [next#375]).
 - `discopy.ehypergraph`, e-graphs of diagrams with sharing, with congruence
   closure, rewriting and e-matching.
 - `Hypergraph.pass_token`, evaluation over a disjoint-union tensor ([#363],

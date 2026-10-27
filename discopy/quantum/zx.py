@@ -20,6 +20,7 @@ Summary
     Y
     X
     Scalar
+    Number
     Hypergraph
     Rewriter
 """
@@ -46,7 +47,7 @@ from discopy.quantum.gates import (
 from discopy.quantum.gates import Scalar as GatesScalar
 from discopy.rigid import Sum, Nat
 from discopy.tensor import Dim, backend
-from discopy.utils import assert_isatomic, factory_name
+from discopy.utils import assert_isatomic, factory_name, unbiased
 
 
 @factory
@@ -122,6 +123,28 @@ class Diagram(tensor.Diagram[complex]):
         ...     + scalar(-1j * pi) @ Z(1, 1, phi + .5)
         """
         return super().grad(var, **params)
+
+    def split_scalar(self) -> tuple[Number, Diagram]:
+        """
+        The product of the :class:`Scalar` boxes, as an exact :class:`Number`,
+        and the diagram without them.
+
+        >>> diagram = Z(1, 1) @ scalar(2 ** .5) @ scalar(-1)
+        >>> number, rest = diagram.split_scalar()
+        >>> assert number == Number(1, Fraction(1, 2)) and rest == Z(1, 1)
+        """
+        numbers = [Number.from_complex(box.data)
+                   for box in self.boxes if isinstance(box, Scalar)]
+        if not numbers:
+            return ONE, self
+        return reduce(lambda x, y: x * y, numbers), frobenius.Functor(
+            ob_map=lambda typ: typ, dom=Diagram, cod=Diagram,
+            ar_map=lambda box: Id() if isinstance(box, Scalar) else box)(self)
+
+    def to_hypergraph(self) -> Hypergraph:
+        """ The :class:`Hypergraph` of a ZX diagram, with its scalar. """
+        number, rest = self.split_scalar()
+        return super(Diagram, rest).to_hypergraph().scaled(number)
 
     def to_pyzx(self):
         """
@@ -587,18 +610,234 @@ Diagram.permutation_factory = Permutation
 Id = Diagram.id
 
 
+def turn(phase) -> complex:
+    """ The root of unity ``exp(2j * pi * phase)`` of a phase in turns. """
+    return cmath.exp(2j * pi * phase)
+
+
+class Number:
+    """
+    An exact complex number, the scalar of a :class:`Hypergraph`: the
+    product of ``sqrt(2) ** power2``, of the root of unity ``turn(phase)``,
+    of a sum ``c_1 turn(psi_1) + ... + c_n turn(psi_n)`` with integer
+    coefficients for each of ``sums``, and of a complex ``factor``, one
+    unless the number came in as one, e.g. the data of a :class:`Scalar`.
+    These are the scalars of :cite:t:`KissingerWetering20`, so that the
+    rules of :class:`Rewriter` are equations on the nose.
+
+    A number is kept in normal form: phases are fractions of a turn in
+    ``[0, 1)``, each sum has no two terms half a turn apart and starts with
+    a positive coefficient at phase zero, a sum with one term is folded
+    into the rest, and so is ``1 + turn(1/4) = sqrt(2) turn(1/8)``. Two
+    numbers are equal when they are written the same in normal form.
+
+    Parameters:
+        power2 : The power of ``sqrt(2)``.
+        phase : The phase, in turns.
+        sums : The sums, each a tuple of ``(phase, coefficient)`` pairs.
+        factor : A complex number, ``0`` for zero.
+
+    Example
+    -------
+    >>> one, root2 = Number(), Number(power2=1)
+    >>> assert root2 * root2 == Number(power2=2) and complex(one) == 1
+    >>> assert Number.sum((0, 1), (Fraction(1, 2), 1)) == Number(factor=0)
+    >>> assert Number.sum((0, 1), (Fraction(1, 4), 1))\\
+    ...     == Number(power2=1, phase=Fraction(1, 8))
+    >>> node = Number.sum((0, 1), (Fraction(1, 8), 1))
+    >>> print(node * node.conjugate())
+    (1 + e(1/8)) · (1 - e(3/8))
+    >>> assert abs(complex(node * node.conjugate())
+    ...            - abs(complex(node)) ** 2) < 1e-12
+    """
+    def __init__(self, power2: int = 0, phase=0, sums=(), factor=1):
+        if not factor:
+            power2, phase, sums = 0, 0, ()
+        self.power2, self.phase = power2, Fraction(phase) % 1
+        self.sums, self.factor = tuple(sorted(sums)), factor
+
+    @classmethod
+    def sum(cls, *terms: tuple[Fraction, int]) -> Number:
+        """
+        The number ``c_1 turn(psi_1) + ... + c_n turn(psi_n)`` in normal form,
+        for terms ``(psi_i, c_i)`` with integer coefficients.
+        """
+        merged = {}
+        for phase, coefficient in terms:
+            phase = Fraction(phase) % 1
+            if phase >= Fraction(1, 2):
+                phase, coefficient = phase - Fraction(1, 2), -coefficient
+            merged[phase] = merged.get(phase, 0) + coefficient
+        terms = sorted((phase, c) for phase, c in merged.items() if c)
+        if not terms:
+            return cls(factor=0)
+        (first, coefficient), *rest = terms
+        phase = first + (Fraction(1, 2) if coefficient < 0 else 0)
+        sign = 1 if coefficient > 0 else -1
+        terms = ((0, abs(coefficient)), ) + tuple(
+            (psi - first, sign * c) for psi, c in rest)
+        if not rest:
+            return cls(phase=phase) * cls.integer(abs(coefficient))
+        quarter, sign = Fraction(1, 4), terms[1][1]
+        if terms == ((0, 1), (quarter, sign)):
+            return cls(power2=1, phase=phase + sign * quarter / 2)
+        return cls(phase=phase, sums=(terms, ))
+
+    @classmethod
+    def integer(cls, n: int) -> Number:
+        """ A natural number, a power of ``sqrt(2)`` when it is one of two. """
+        if n > 0 and n & (n - 1) == 0:
+            return cls(power2=2 * (n.bit_length() - 1))
+        return cls(factor=n)
+
+    @classmethod
+    def from_complex(cls, number: complex) -> Number:
+        """
+        A complex number, as a power of ``sqrt(2)`` times a power of ``1j``
+        when it is the float of one, e.g. ``2 ** .5`` or ``-1j / 2``.
+
+        >>> assert Number.from_complex(2 ** -.5) == Number(power2=-1)
+        >>> assert Number.from_complex(-1j) == Number(phase=Fraction(3, 4))
+        >>> assert Number.from_complex(.3).factor == .3
+        """
+        for quarter, unit in enumerate((1, 1j, -1, -1j)):
+            modulus = complex(number) / unit
+            if modulus.imag == 0 and modulus.real > 0:
+                for power2 in range(-64, 65):
+                    if modulus.real == 2 ** (power2 / 2):
+                        return cls(power2, Fraction(quarter, 4))
+        return cls(factor=number)
+
+    def __mul__(self, other: Number) -> Number:
+        return Number(
+            self.power2 + other.power2, self.phase + other.phase,
+            self.sums + other.sums, self.factor * other.factor)
+
+    def __truediv__(self, other: Number) -> Number:
+        if other.sums or not other.factor:
+            raise ZeroDivisionError(messages.NOT_INVERTIBLE.format(other))
+        return Number(
+            self.power2 - other.power2, self.phase - other.phase,
+            self.sums, self.factor / other.factor)
+
+    def conjugate(self) -> Number:
+        """ The complex conjugate, with each phase negated. """
+        result = Number(self.power2, -self.phase, factor=complex(
+            self.factor).conjugate() if isinstance(self.factor, complex)
+            else self.factor)
+        for terms in self.sums:
+            result *= Number.sum(*((-psi, c) for psi, c in terms))
+        return result
+
+    def __complex__(self):
+        result = 2 ** (self.power2 / 2) * turn(self.phase) * self.factor
+        for terms in self.sums:
+            result *= sum(c * turn(psi) for psi, c in terms)
+        return complex(result)
+
+    def __eq__(self, other):
+        return isinstance(other, Number) and (
+            self.power2, self.phase, self.sums, self.factor) == (
+            other.power2, other.phase, other.sums, other.factor)
+
+    def __hash__(self):
+        return hash((self.power2, self.phase, self.sums, self.factor))
+
+    def __repr__(self):
+        fields = [f"{name}={value!r}" for name, value, default in (
+            ("power2", self.power2, 0), ("phase", self.phase, 0),
+            ("sums", self.sums, ()), ("factor", self.factor, 1))
+            if value != default]
+        return f"{factory_name(Number)}({', '.join(fields)})"
+
+    def __str__(self):
+        if not self.factor:
+            return "0"
+        parts = [f"√2^{self.power2}"] * bool(self.power2)
+        parts += [f"e({self.phase})"] * bool(self.phase)
+        parts += ["(" + "".join(
+            (" - " if c < 0 else " + ") * bool(i) + f"{abs(c)} " * (
+                abs(c) != 1 and bool(psi)) + (f"e({psi})" if psi else str(c))
+            for i, (psi, c) in enumerate(terms)) + ")" for terms in self.sums]
+        parts += [format_number(self.factor)] * (self.factor != 1)
+        return " · ".join(parts) or "1"
+
+    def to_tree(self) -> dict:
+        """
+        Serialise a number by its fields.
+
+        >>> from discopy.utils import dumps, loads
+        >>> number = Number.sum((0, 1), (Fraction(1, 8), 1))\\
+        ...     * Number(factor=-3)
+        >>> assert loads(dumps(number)) == number
+        """
+        return {'factory': factory_name(Number), 'power2': self.power2,
+                'phase': self.phase, 'factor': self.factor, 'sums': [
+                    [list(term) for term in terms] for terms in self.sums]}
+
+    @classmethod
+    def from_tree(cls, tree: dict) -> Number:
+        """ Decode a serialised number, see :meth:`to_tree`. """
+        return cls(tree['power2'], tree['phase'], tuple(
+            tuple(tuple(term) for term in terms) for terms in tree['sums']),
+            tree['factor'])
+
+    def to_pyzx(self):
+        """
+        The :class:`pyzx.graph.scalar.Scalar` of a number, whose phases are
+        in half-turns: a sum ``1 + turn(psi)`` is one of its phase nodes, the
+        first other sum is its sum of phases and the rest is its float
+        factor.
+        """
+        from pyzx.graph.scalar import Scalar as PyZXScalar
+        result = PyZXScalar()
+        result.is_zero = not self.factor
+        result.power2, result.phase = self.power2, 2 * self.phase
+        result.floatfactor = complex(self.factor)
+        for terms in self.sums:
+            if len(terms) == 2 and terms[0] == (0, 1) and terms[1][1] == 1:
+                result.phasenodes.append(2 * terms[1][0])
+            elif not result.sum_of_phases:
+                result.sum_of_phases = {2 * psi: c for psi, c in terms}
+            else:
+                result.floatfactor *= complex(Number(sums=(terms, )))
+        return result
+
+    @classmethod
+    def from_pyzx(cls, number) -> Number:
+        """ The number of a :class:`pyzx.graph.scalar.Scalar`. """
+        if number.is_zero:
+            return cls(factor=0)
+        result = cls(number.power2, Fraction(number.phase) / 2) * (
+            cls.from_complex(number.floatfactor))
+        for node in number.phasenodes:
+            result *= cls.sum((0, 1), (Fraction(node) / 2, 1))
+        if number.sum_of_phases:
+            result *= cls.sum(*((Fraction(psi) / 2, c)
+                                for psi, c in number.sum_of_phases.items()))
+        return result
+
+
+ONE = Number()
+
+
 class Hypergraph(hypergraph.Hypergraph):
     """
     A ZX diagram as a hypergraph, graph-like in the sense of
     :cite:t:`DuncanEtAl20`: its spiders are the green spiders, each with its
-    phase in turns, and its only boxes are the Hadamard :data:`H` and the
-    scalars, a red spider being a green one with a Hadamard on each leg.
+    phase in turns, its only boxes are the Hadamard :data:`H`, a red spider
+    being a green one with a Hadamard on each leg, and its scalar is an
+    exact :class:`Number`.
 
     Composition is the pushout of :class:`discopy.hypergraph.Hypergraph`,
     i.e. it fuses spiders and adds their phases, which this hypergraph keeps
-    modulo a turn. Green spiders are special, so that this is a faithful
-    encoding: :meth:`to_diagram` is :meth:`from_diagram` undone, up to the
-    axioms of ZX diagrams.
+    modulo a turn, and multiplies the scalars, as the tensor does, while the
+    dagger conjugates the scalar. Green spiders are special, so that this is
+    a faithful encoding: :meth:`to_diagram` is :meth:`from_diagram` undone,
+    up to the axioms of ZX diagrams.
+
+    Parameters:
+        scalar : The scalar, one by default.
 
     Example
     -------
@@ -612,8 +851,114 @@ class Hypergraph(hypergraph.Hypergraph):
 
     >>> print((Z(1, 2, .25) >> Z(2, 1, .25)).to_hypergraph())
     Z(1, 1, 0.5)
+
+    The :class:`Scalar` boxes of a diagram are its scalar:
+
+    >>> graph = (Z(1, 1) @ scalar(2 ** .5) @ scalar(1j)).to_hypergraph()
+    >>> assert not graph.boxes and graph.scalar == Number(1, Fraction(1, 4))
+    >>> assert (graph >> graph[::-1]).scalar == Number(power2=2)
     """
     category = Diagram
+
+    # pylint: disable=too-many-arguments,too-many-positional-arguments
+    # pylint: disable=redefined-outer-name
+    def __init__(
+            self, dom, cod, boxes, wires, spider_types=None, offsets=None,
+            phases=None, scalar: Number = None, _scan: bool = True):
+        super().__init__(
+            dom, cod, boxes, wires, spider_types, offsets, phases, _scan=_scan)
+        self.scalar = ONE if scalar is None else scalar
+    # pylint: enable=too-many-arguments,too-many-positional-arguments
+    # pylint: enable=redefined-outer-name
+
+    def scaled(self, number: Number) -> Hypergraph:
+        """ The same hypergraph with its scalar multiplied by a number. """
+        if number == ONE:
+            return self
+        return type(self)(
+            self.dom, self.cod, self.boxes, self.wires, self.spider_types,
+            self.offsets, self.phases, self.scalar * number, _scan=False)
+
+    def keeps_scalar(self, result: Hypergraph) -> Hypergraph:
+        """
+        A hypergraph built from this one by a method of
+        :class:`discopy.hypergraph.Hypergraph`, which knows no scalar, with
+        the scalar of this one.
+        """
+        return result if result is self else result.scaled(self.scalar)
+
+    @unbiased
+    def then(self, other: Hypergraph) -> Hypergraph:
+        return super().then(other).scaled(
+            self.scalar * getattr(other, "scalar", ONE))
+
+    def tensor(self, *others: Hypergraph) -> Hypergraph:
+        return super().tensor(*others).scaled(reduce(
+            lambda x, y: x * y,
+            (getattr(other, "scalar", ONE) for other in others), self.scalar))
+
+    def dagger(self) -> Hypergraph:
+        return super().dagger().scaled(self.scalar.conjugate())
+
+    def trace(self, n=1, left=False) -> Hypergraph:
+        return self.keeps_scalar(super().trace(n, left))
+
+    def interchange(self, i: int, j: int) -> Hypergraph:
+        return self.keeps_scalar(super().interchange(i, j))
+
+    def topological_order(self) -> Hypergraph:
+        return self.keeps_scalar(super().topological_order())
+
+    def complements(self, pattern, match):
+        for context in super().complements(pattern, match):
+            yield self.keeps_scalar(context)
+
+    def __eq__(self, other):
+        return super().__eq__(other)\
+            and self.scalar == getattr(other, "scalar", ONE)
+
+    def __hash__(self):
+        return hash((super().__hash__(), self.scalar))
+
+    def __repr__(self):
+        result = super().__repr__()
+        return result if self.scalar == ONE\
+            else result[:-1] + f", scalar={self.scalar!r})"
+
+    def to_tree(self) -> dict:
+        """
+        Serialise a hypergraph with its scalar.
+
+        >>> from discopy.utils import dumps, loads
+        >>> graph = (Z(1, 2, .25) >> X(2, 1) @ scalar(3)).to_hypergraph()
+        >>> assert loads(dumps(graph)) == graph
+        """
+        return super().to_tree() | (
+            {} if self.scalar == ONE else {'scalar': self.scalar.to_tree()})
+
+    @classmethod
+    def from_tree(cls, tree: dict) -> Hypergraph:
+        result = super().from_tree(tree)
+        return result.scaled(Number.from_tree(tree['scalar']))\
+            if 'scalar' in tree else result
+
+    @classmethod
+    def from_diagram(cls, old: Diagram) -> Hypergraph:
+        """ A diagram as a hypergraph, see :meth:`Diagram.split_scalar`. """
+        number, rest = old.split_scalar()
+        return super().from_diagram(rest).scaled(number)
+
+    def to_diagram(self) -> Diagram:
+        """
+        A diagram, with a :class:`Scalar` box for the scalar when it is not
+        one.
+
+        >>> print((H >> H @ scalar(2)).to_hypergraph().to_diagram())
+        H >> H >> Nat(1) @ scalar(2)
+        """
+        result, number = super().to_diagram(), complex(self.scalar)
+        return result if self.scalar == ONE\
+            else result @ Scalar(number.real if not number.imag else number)
 
     @staticmethod
     def reduce_phase(phase):
@@ -651,8 +996,8 @@ class Hypergraph(hypergraph.Hypergraph):
         A hypergraph from a PyZX graph: its green spiders joined by plain
         edges are one spider, with the sum of their phases, a red spider is
         green with its edges toggled between plain and Hadamard, and a
-        boundary behind a Hadamard edge is a spider of its own. The scalar
-        of the graph is dropped.
+        boundary behind a Hadamard edge is a spider of its own, and the
+        scalar of the graph is its scalar.
 
         Parameters:
             graph : A PyZX graph with boundaries, green and red spiders.
@@ -694,14 +1039,15 @@ class Hypergraph(hypergraph.Hypergraph):
         return cls(
             Nat(len(dom_wires)), Nat(len(cod_wires)), len(hadamards) * (H, ),
             (dom_wires, box_wires, cod_wires), len(spiders) * [Nat(1)],
-            phases=phases)
+            phases=phases, scalar=Number.from_pyzx(graph.scalar))
 
     def to_pyzx(self):
         """
         The PyZX graph of a graph-like hypergraph, with a green spider for
         each spider and a boundary on a plain edge for each port, see
-        :meth:`from_pyzx`. PyZX graphs are simple, so parallel Hadamard
-        edges cancel in pairs.
+        :meth:`from_pyzx`, with the scalar of the hypergraph. PyZX graphs are
+        simple, so parallel Hadamard edges cancel in pairs, and a Hadamard
+        loop is a half-turn, each with its scalar.
 
         >>> graph = (Z(1, 1, .25) >> H >> X(1, 2, .5)).to_hypergraph()
         >>> pyzx_graph = graph.to_pyzx()  # doctest: +EXTRA
@@ -709,6 +1055,7 @@ class Hypergraph(hypergraph.Hypergraph):
         """
         from pyzx import Graph, VertexType, EdgeType
         result = Graph()
+        result.scalar = self.scalar.to_pyzx()
         spiders = [result.add_vertex(VertexType.Z, qubit=i, row=1)
                    for i, _ in enumerate(self.spider_types)]
         for spider, phase in zip(spiders, self.phases):
@@ -718,11 +1065,10 @@ class Hypergraph(hypergraph.Hypergraph):
         for box, (dom, cod) in zip(self.boxes, self.box_wires):
             if is_hadamard(box) and dom[0] == cod[0]:
                 result.add_to_phase(spiders[dom[0]], 1)
+                result.scalar.add_power(-1)
             elif is_hadamard(box):
                 key = result.edge(spiders[dom[0]], spiders[cod[0]])
                 table.setdefault(key, [0, 0])[1] += 1
-            elif isinstance(box, Scalar):
-                result.scalar.add_float(box.data)
             else:
                 raise ValueError(messages.NOT_GRAPHLIKE.format(box))
         result.add_edge_table(table)
@@ -741,11 +1087,14 @@ class Hypergraph(hypergraph.Hypergraph):
     def full_reduce(self) -> Hypergraph:
         """
         Simplify by the rules of the ``full_reduce`` of
-        :cite:t:`KissingerWetering20`, see :class:`Rewriter`, up to a scalar.
+        :cite:t:`KissingerWetering20`, see :class:`Rewriter`, each an
+        equation on the nose, so that the result has the scalar it needs.
 
         >>> diagram = Z(1, 1, .125) >> H >> H >> Z(1, 1, .125)
         >>> print(diagram.to_hypergraph().full_reduce())
         Z(1, 1, 1/4)
+        >>> print((Z(0, 1, .5) >> Z(1, 0)).to_hypergraph().full_reduce())
+        scalar(0)
         """
         rewriter = Rewriter(self)
         rewriter.reduce()
@@ -877,8 +1226,9 @@ class Rewriter(hypergraph.Rewriter):  # pylint: disable=too-many-public-methods
     method each: each step is a pair of hypergraphs built for its match, the
     left side the neighbourhood it rewrites and the right side what replaces
     it, applied in place. Their left sides are left-linear, so each match has
-    one pushout complement, and each step is a sound equation of the ZX
-    calculus up to a scalar, which is dropped.
+    one pushout complement, and each step is an equation of the ZX calculus
+    on the nose: its right side carries the scalar, which the rewriter
+    multiplies into its own.
 
     The rewriter keeps an index of its boxes by spider: the Hadamard edges to
     each other spider, the loops and the number of other boxes, updated with
@@ -901,6 +1251,7 @@ class Rewriter(hypergraph.Rewriter):  # pylint: disable=too-many-public-methods
     """
     def __init__(self, graph: Hypergraph):
         super().__init__(graph)
+        self.scalar = graph.scalar
         self.phases = [Fraction(phase) % 1 for phase in self.phases]
         self.edges = [{} for _ in self.spider_types]
         self.loops = [[] for _ in self.spider_types]
@@ -908,6 +1259,20 @@ class Rewriter(hypergraph.Rewriter):  # pylint: disable=too-many-public-methods
         self.merged = set()
         for j, _ in enumerate(self.boxes):
             self.index(j)
+
+    def substitute(self, left: Hypergraph, right: Hypergraph,
+                   match: hypergraph.Match) -> list[int]:
+        """
+        Rewrite a match in place, see
+        :meth:`discopy.hypergraph.Rewriter.substitute`, multiplying the scalar
+        by that of ``right`` over that of ``left``.
+        """
+        self.scalar = self.scalar * right.scalar / left.scalar
+        return super().substitute(left, right, match)
+
+    def to_hypergraph(self) -> Hypergraph:
+        """ The hypergraph rewritten so far, with its scalar. """
+        return super().to_hypergraph().scaled(self.scalar)
 
     def index(self, j: int, remove: bool = False) -> None:
         """ Add a box to the index, or remove it from there. """
@@ -1022,8 +1387,8 @@ class Rewriter(hypergraph.Rewriter):  # pylint: disable=too-many-public-methods
 
     def step(  # pylint: disable=too-many-arguments  # one per part of a rule
             self, interface: list[int], inner: list[int], boxes: list[int],
-            new: list[tuple], glue: dict = None, phases: dict = None
-            ) -> Step:
+            new: list[tuple], *, glue: dict = None, phases: dict = None,
+            core: Number = ONE) -> Step:
         """
         The rule that deletes ``boxes`` and the ``inner`` spiders, with their
         phases, keeps the ``interface`` spiders and adds the ``new`` boxes,
@@ -1032,6 +1397,10 @@ class Rewriter(hypergraph.Rewriter):  # pylint: disable=too-many-public-methods
         either kind, gains that phase, and gluing an interface spider to
         another, as ``glue`` says, fuses them. Both sides are built with
         ``_scan=False``.
+
+        The scalar of the right side is the ``core`` of the rule, i.e. its
+        scalar were each Hadamard the matrix ``[[1, 1], [1, -1]]``, times
+        ``sqrt(2)`` for each Hadamard it adds and over each it deletes.
         """
         glue = glue or {}
         phases = {s: phase for s, phase in (phases or {}).items() if phase}
@@ -1054,7 +1423,8 @@ class Rewriter(hypergraph.Rewriter):  # pylint: disable=too-many-public-methods
         right = Hypergraph(
             dom, Nat(0), tuple(box for box, *_ in new),
             (boundary, tuple(tuple(map(tuple, wires)) for _, *wires in new),
-             ()), right_types, phases=phases, _scan=False)
+             ()), right_types, phases=phases,
+            scalar=core * Number(power2=len(new) - len(boxes)), _scan=False)
         return left, right, (
             tuple(labels[i] for i in range(left.n_spiders)), tuple(boxes))
 
@@ -1067,15 +1437,21 @@ class Rewriter(hypergraph.Rewriter):  # pylint: disable=too-many-public-methods
         here = self.local(spider)
         if here.other:
             return None
+        alpha = here.phase + Fraction(len(here.loops), 2)
         if not here.ports and not here.edges:
-            return self.step([], [spider], here.loops, [])
+            return self.step([], [spider], here.loops, [],
+                             core=Number.sum((0, 1), (alpha, 1)))
         if not here.ports and len(here.edges) == 1:
             (target, hadamards), = here.edges.items()
             there = self.local(target)
+            beta = there.phase + Fraction(len(there.loops), 2)
             if len(hadamards) == 1 and not there.ports and not there.other\
                     and list(there.edges) == [spider]:
-                return self.step([], [spider, target],
-                                 here.loops + hadamards + there.loops, [])
+                return self.step(
+                    [], [spider, target],
+                    here.loops + hadamards + there.loops, [],
+                    core=Number.sum((0, 1), (alpha, 1), (beta, 1),
+                                    (alpha + beta, -1)))
         parallel = {t: js for t, js in here.edges.items() if len(js) > 1}
         if not here.loops and not parallel:
             return None
@@ -1096,7 +1472,7 @@ class Rewriter(hypergraph.Rewriter):  # pylint: disable=too-many-public-methods
             return None
         (left, (first, )), (right, (second, )) = here.edges.items()
         return self.step([left, right], [spider], [first, second], [],
-                         glue={right: left})
+                         glue={right: left}, core=Number(power2=2))
 
     def complement(self, spider: int) -> Step | None:
         """
@@ -1115,7 +1491,9 @@ class Rewriter(hypergraph.Rewriter):  # pylint: disable=too-many-public-methods
         old_edges, new_edges = toggle(locals_, list(combinations(near, 2)))
         return self.step(
             near, [spider], [js[0] for js in here.edges.values()] + old_edges,
-            new_edges, phases=dict.fromkeys(near, -here.phase))
+            new_edges, phases=dict.fromkeys(near, -here.phase),
+            core=Number(1, Fraction(
+                1 if here.phase == Fraction(1, 4) else -1, 8)))
 
     def pivot(self, spider: int) -> Step | None:
         """
@@ -1167,18 +1545,20 @@ class Rewriter(hypergraph.Rewriter):  # pylint: disable=too-many-public-methods
         shift.update(dict.fromkeys(both, a_u + a_v + Fraction(1, 2)))
         interface = near_u + near_v + both
         deleted = edges_of(locals_, u, v) + old_edges
+        core = Number(2, 2 * a_u * a_v)
         if not bound_u:
             return self.step(interface, [u, v], deleted, new_edges,
-                             phases=shift)
+                             phases=shift, core=core)
         new = new_edges + spider_like(near_v + both)
         shift["kept"] = a_v
         if bound_u[0] is None:
             shift[u] = -a_u
             return self.step(interface + [u], [v], deleted,
-                             new + [(H, [u], ["kept"])], phases=shift)
+                             new + [(H, [u], ["kept"])], phases=shift,
+                             core=core / Number(power2=2))
         boundary, = bound_u
         return self.step(interface + [boundary], [u, v], deleted, new,
-                         glue={boundary: "kept"}, phases=shift)
+                         glue={boundary: "kept"}, phases=shift, core=core)
 
     def pivot_gadget(self, spider: int) -> Step | None:
         """
@@ -1269,7 +1649,8 @@ class Rewriter(hypergraph.Rewriter):  # pylint: disable=too-many-public-methods
         if bound is None:
             shift[w] = -a_w
             return self.step(interface + [w], [v], deleted,
-                             new + [(H, [w], ["kept"])], phases=shift)
+                             new + [(H, [w], ["kept"])], phases=shift,
+                             core=Number(power2=-2))
         return self.step(interface + [bound], [v, w], deleted, new,
                          glue={bound: "kept"}, phases=shift)
 
@@ -1326,11 +1707,15 @@ class Rewriter(hypergraph.Rewriter):  # pylint: disable=too-many-public-methods
                 new = [(H, [hub], ["leaf"])]
                 new += [(H, [hub], [t]) for t in sorted(key)]
                 return self.step(sorted(key) + [hub], [leaf], deleted, new,
-                                 phases={"leaf": total, hub: -phases[hub]})
+                                 phases={"leaf": total, hub: -phases[hub]},
+                                 core=Number(phase=phases[leaf]))
             new = [(H, ["hub"], ["leaf"])] + [
                 (H, ["hub"], [t]) for t in sorted(key)]
-            return self.step(sorted(key), group + leaves, deleted, new,
-                             phases={"leaf": total})
+            return self.step(
+                sorted(key), group + leaves, deleted, new,
+                phases={"leaf": total}, core=Number(
+                    2 * len(group) - 2, sum(phases[l] for h, l in zip(
+                        group, leaves) if phases[h])))
         return None
 
     def copy(self, spider: int) -> Step | None:
@@ -1351,7 +1736,8 @@ class Rewriter(hypergraph.Rewriter):  # pylint: disable=too-many-public-methods
         return self.step(
             near, [spider, target],
             [j for js in there.edges.values() for j in js], [],
-            phases=dict.fromkeys(near, here.phase))
+            phases=dict.fromkeys(near, here.phase),
+            core=Number(2, 2 * here.phase * there.phase))
 
     def supplement(self, spider: int) -> Step | None:
         """
@@ -1387,9 +1773,13 @@ class Rewriter(hypergraph.Rewriter):  # pylint: disable=too-many-public-methods
                 continue
             deleted = list(dict.fromkeys(
                 j for t in (spider, other) for j, *_ in self.incidence[t]))
+            alpha, sign = here.phase, -1 if other in near else 1
+            core = Number.sum((alpha, 1), (-alpha, -sign)) if negate\
+                else Number.sum((0, 1), (2 * alpha, -sign))
             return self.step(interface, [spider, other], deleted, [],
                              phases=dict.fromkeys(
-                                 interface, Fraction(1, 2) * negate))
+                                 interface, Fraction(1, 2) * negate),
+                             core=core)
         return None
 
     def reduce(self, rules=None) -> int:
