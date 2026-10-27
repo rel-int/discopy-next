@@ -158,7 +158,8 @@ def encode(terms):
 
 
 def decode(terms):
-    """ Recover constant block descriptors from a flat operator argument. """
+    """ Specialize the geometry before nesting its compile-time constants. """
+    terms = [int(value) for value in terms]
     descriptors = []
     while terms:
         coefficient, count = terms[:2]
