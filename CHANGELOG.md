@@ -199,9 +199,8 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 ### Changed
 
 - `NamedGeneric` takes the parameters of PEP 695, `class Matrix[dtype](...,
-  NamedGeneric)`, the abstract base classes bound theirs, and the package
-  typechecks with `ty`, pinned in the `dev` group and run by the `lint` job
-  ([next#1]).
+  NamedGeneric)`, and the abstract base classes bound theirs; `ty` errors on
+  all but the six rules main still breaks, which stay `"warn"` ([next#1]).
 - `Category.parameters` is renamed `Category.typeparams` ([next#214]).
 - DisCoPy requires Python 3.12 and is packaged with uv ([#311]).
 - `closed` is the closed *symmetric* monoidal category; the planar one, with
