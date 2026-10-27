@@ -181,7 +181,7 @@ class Diagram(symmetric.Diagram, MarkovCategory):
         >>> x = Ty('x')
         >>> assert Diagram.spider_factory(0, 1, x) == Copy(x).trace(left=True)
         """
-        if phase is not None or n_legs_in > 1:
+        if phase is not None or n_legs_in not in (0, 1):
             raise ValueError(messages.NO_SUCH_SPIDER.format(
                 factory_name(cls), "copies"))
         if not n_legs_in:
