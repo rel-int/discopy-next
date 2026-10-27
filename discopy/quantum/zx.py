@@ -710,9 +710,9 @@ class Hypergraph(hypergraph.Hypergraph):
                 result.add_to_phase(spider, Fraction(phase) * 2)
         table = {}
         for box, (dom, cod) in zip(self.boxes, self.box_wires):
-            if box == H and dom[0] == cod[0]:
+            if is_hadamard(box) and dom[0] == cod[0]:
                 result.add_to_phase(spiders[dom[0]], 1)
-            elif box == H:
+            elif is_hadamard(box):
                 key = result.edge(spiders[dom[0]], spiders[cod[0]])
                 table.setdefault(key, [0, 0])[1] += 1
             elif isinstance(box, Scalar):
@@ -768,12 +768,17 @@ class Hypergraph(hypergraph.Hypergraph):
         hadamards = Counter(
             frozenset({dom[0], cod[0]})
             for box, (dom, cod) in zip(self.boxes, self.box_wires)
-            if box == H and {dom[0], cod[0]} <= inside)
+            if is_hadamard(box) and {dom[0], cod[0]} <= inside)
         edges = sum(1 for pair, number in hadamards.items()
                     if len(pair) == 2 and number % 2)
         tcount = sum(
             1 for s in spiders if not is_clifford(rewriter.phases[s]))
         return len(spiders), edges, tcount
+
+
+def is_hadamard(box) -> bool:
+    """ Whether a box is :data:`H`, by identity first as equality is slow. """
+    return box is H or box == H
 
 
 Step = tuple[Hypergraph, Hypergraph, hypergraph.Match]
@@ -901,7 +906,7 @@ class Rewriter(hypergraph.Rewriter):  # pylint: disable=too-many-public-methods
     def index(self, j: int, remove: bool = False) -> None:
         """ Add a box to the index, or remove it from there. """
         box, (dom, cod) = self.boxes[j], self.box_wires[j]
-        if box != H:
+        if not is_hadamard(box):
             for spider in set(dom + cod):
                 self.others[spider] += -1 if remove else 1
             return
@@ -979,7 +984,7 @@ class Rewriter(hypergraph.Rewriter):  # pylint: disable=too-many-public-methods
                 or len(self.incidence[spider]) != 1:
             return False
         (j, side, _), = self.incidence[spider]
-        return self.boxes[j] == H\
+        return is_hadamard(self.boxes[j])\
             and self.box_wires[j][1 - side][0] != spider
 
     def is_interior(self, spider: int, here: Local) -> bool:
