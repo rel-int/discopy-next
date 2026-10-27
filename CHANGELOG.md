@@ -66,10 +66,13 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   `CMap.sweep` and `CMap.match`.
 - `hypergraph.Rewriter`, double-pushout rewriting in place with left-linear
   rules, each step in the size of the rule rather than of the host.
-- `quantum.graphlike`, graph-like ZX diagrams as hypergraphs with one box for
-  Hadamard, simplified up to a scalar by the rules of PyZX's `full_reduce` on
-  a `hypergraph.Rewriter`, raced against PyZX in `benchmark/test_zx.py`
-  ([next#302]).
+- `Hypergraph.phases`, a phase on each spider of a hypergraph category, added
+  by the fusion of spiders and negated by the dagger ([next#375]).
+- `quantum.zx.Hypergraph`, ZX diagrams as graph-like hypergraphs: green
+  spiders with their phase, Hadamard boxes and an exact scalar, a
+  `quantum.zx.Number`, a red spider being green behind Hadamards, simplified
+  on the nose by the rules of PyZX's `full_reduce` on a `quantum.zx.Rewriter`,
+  raced against PyZX in `benchmark/test_zx.py` ([next#302], [next#375]).
 - `discopy.ehypergraph`, e-graphs of diagrams with sharing, with congruence
   closure, rewriting and e-matching.
 - `Hypergraph.pass_token`, evaluation over a disjoint-union tensor ([#363],
@@ -232,7 +235,7 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   spider with several outputs to the outputs it is joined to: it used to move
   the leg already placed at an earlier output, so the tensor differed from
   PyZX's ([next#313]).
-- `quantum.graphlike.size` counts two spiders as joined when an odd number of
+- `quantum.zx.Hypergraph.size` counts two spiders as joined when an odd number of
   Hadamards lie between them, as `to_pyzx` does: a Hadamard self-loop is a
   phase and two parallel Hadamards cancel ([next#349]).
 - `optyx.core.zx.And` and `Or`: the dagger keeps the number of bits instead of
@@ -673,6 +676,7 @@ for the changelog of `1.2.1` and earlier.
 [next#350]: https://github.com/rel-int/discopy-next/issues/350
 [next#351]: https://github.com/rel-int/discopy-next/issues/351
 [next#359]: https://github.com/rel-int/discopy-next/issues/359
+[next#375]: https://github.com/rel-int/discopy-next/pull/375
 [next#376]: https://github.com/rel-int/discopy-next/issues/376
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29

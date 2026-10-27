@@ -388,8 +388,10 @@ def test_eval_circuit2zx(random_had_cnot_diagram):
 
 def test_to_hypergraph():
     diagram = Z(1, 2, .25) >> X(2, 1)
-    assert diagram.to_hypergraph().to_diagram() == diagram
-    assert diagram.simplify() == diagram
+    graph = diagram.to_hypergraph()
+    assert str(graph.to_diagram()) == "Z(1, 2, 0.25) >> H @ H >> Z(2, 1) >> H"
+    assert graph.to_diagram().to_hypergraph() == graph
+    assert graph.to_diagram().eval().is_close(diagram.eval())
     left = Z(1, 1, .25) @ X(1, 1, .5)
     right = Nat(1) @ X(1, 1, .5) >> Z(1, 1, .25) @ Nat(1)
     assert left != right and frobenius.Equation(left, right)
@@ -444,3 +446,235 @@ def test_Bubble_grad():
     bubble = Z(1, 1, phi).bubble()
     assert bubble.grad(phi).arg == bubble
     assert not Z(1, 1).bubble().grad(phi).eval().array.any()
+
+
+def layers_of(qubits: int, depth: int, seed: int) -> list[Diagram]:
+    """ The layers of a random circuit of Hadamards, CNOTs and phases. """
+    rng = random.Random(seed)
+    layers = []
+    for _ in range(depth):
+        i = rng.randrange(qubits)
+        gate = rng.choice(["H", "phase", "CNOT"]) if qubits > 1\
+            else rng.choice(["H", "phase"])
+        if gate == "H":
+            layer = Diagram.id(i) @ H @ Diagram.id(qubits - i - 1)
+        elif gate == "phase":
+            phase = rng.randrange(1, 8) / 8
+            layer = Diagram.id(i) @ Z(1, 1, phase)\
+                @ Diagram.id(qubits - i - 1)
+        else:
+            i = rng.randrange(qubits - 1)
+            layer = Diagram.id(i) @ (Z(1, 2) @ Diagram.id(1)
+                                     >> Diagram.id(1) @ X(2, 1))\
+                @ Diagram.id(qubits - i - 2)
+        layers.append(layer)
+    return layers
+
+
+def circuit_matrix(layers: list[Diagram]) -> np.ndarray:
+    """ The matrix of a circuit, the product of those of its layers. """
+    size = 2 ** len(layers[0].dom)
+    result = np.eye(size)
+    for layer in layers:
+        result = result @ np.asarray(layer.eval().array).reshape(size, size)
+    return result
+
+
+def contract(graph: Hypergraph) -> np.ndarray:
+    """
+    The tensor of a graph-like hypergraph, an index for each spider with its
+    phase: a Hadamard is a matrix on two, a boundary port an identity to a
+    fresh index, times the scalar.
+    """
+    spiders = graph.n_spiders
+    operands = [np.array(complex(graph.scalar)), []]
+    for box, (dom, cod) in zip(graph.boxes, graph.box_wires):
+        assert box == H
+        operands += [np.array([[1, 1], [1, -1]]) / 2 ** .5, list(dom + cod)]
+    ports = graph.dom_wires + graph.cod_wires
+    for i, spider in enumerate(ports):
+        operands += [np.eye(2), [spider, spiders + i]]
+    for spider, phase in enumerate(graph.phases):
+        operands += [np.array([1, np.exp(2j * np.pi * float(phase))]),
+                     [spider]]
+    return np.einsum(*operands, list(range(spiders, spiders + len(ports))),
+                     optimize=True)
+
+
+def same(left, right) -> bool:
+    """ Whether two tensors are equal, read as flat arrays. """
+    return np.allclose(np.asarray(left).flatten(), np.asarray(right).flatten())
+
+
+def checked(rules):
+    """ The rules, each step checked as a match and as an equation. """
+    def wrap(rule):
+        def result(rewriter, spider):
+            found = rule(rewriter, spider)
+            if found is None:
+                return None
+            left, right, match = found
+            spiders, boxes = match
+            assert left.is_parallel(right)
+            assert rewriter.glues(left, match)
+            for i, j in enumerate(boxes):
+                assert rewriter.boxes[j] == left.boxes[i]
+                assert rewriter.box_wires[j] == tuple(tuple(
+                    spiders[s] for s in wires)
+                    for wires in left.box_wires[i])
+            if len(left.dom) <= 12:
+                assert same(contract(left), contract(right)), rule.__name__
+            return found
+        return result
+    return [([wrap(rule) for rule in level], anchors)
+            for level, anchors in rules]
+
+
+def random_graph(seed: int) -> Hypergraph:
+    """ A random graph-like hypergraph: Hadamard edges, phases and ports. """
+    rng = random.Random(seed)
+    n = rng.randint(2, 7)
+    edges = [(a, b) for a in range(n) for b in range(a + 1, n)
+             if rng.random() < .35]
+    phases = [Fraction(rng.choice([0, 0, 4, 2, 1, 3]), 8) for _ in range(n)]
+    ports = rng.sample(range(n), rng.randint(0, min(3, n)))
+    dom, cod = ports[:len(ports) // 2], ports[len(ports) // 2:]
+    return Hypergraph(
+        Nat(len(dom)), Nat(len(cod)), len(edges) * (H, ),
+        (tuple(dom), tuple(((a, ), (b, )) for a, b in edges), tuple(cod)),
+        n * [Nat(1)], phases=phases)
+
+
+def reduced(graph: Hypergraph) -> Hypergraph:
+    """ The checked reduction of a graph, where no rule applies anymore. """
+    rewriter = Rewriter(graph)
+    rewriter.reduce(checked(RULES))
+    result = rewriter.to_hypergraph()
+    rewriter = Rewriter(result)
+    for level, _ in RULES:
+        for rule in level:
+            for spider in range(result.n_spiders):
+                assert rule(rewriter, spider) is None
+    return result
+
+
+def test_Hypergraph_phases():
+    graph = Z(1, 2, .25).to_hypergraph() >> Z(2, 1, .75).to_hypergraph()
+    assert graph.phases == (0, ) and not graph.boxes
+    assert graph == Diagram.id(1).to_hypergraph()
+    assert Z(0, 0, .5).to_hypergraph().phases == (.5, )
+    assert Y(1, 1, .5).to_hypergraph() == Y(1, 1, .5).to_x().to_hypergraph()
+    assert X(1, 1, .5).to_hypergraph().boxes == (H, H)
+    assert Hypergraph.reduce_phase(1.25) == .25
+
+
+def test_Hypergraph_phases_symbolic():
+    sympy = pytest.importorskip("sympy")
+    phi = sympy.Symbol("phi")
+    graph = Z(1, 1, phi).to_hypergraph() >> Z(1, 1, phi).to_hypergraph()
+    assert graph == Z(1, 1, 2 * phi).to_hypergraph()
+
+
+def test_Hypergraph_to_tree():
+    from discopy.utils import dumps, loads
+    graph = (Z(1, 2, .25) >> X(2, 1, .5)).to_hypergraph()
+    assert loads(dumps(graph)) == graph
+
+
+def test_Hypergraph_eval():
+    for diagram in (Z(1, 2, .25) >> X(2, 1, .5), Y(2, 1, .3) @ H,
+                    Z(0, 0, .125) @ scalar(2) @ X(1, 0)):
+        graph = diagram.to_hypergraph()
+        assert graph.to_diagram().eval().is_close(diagram.eval())
+        assert same(contract(graph), diagram.eval().array)
+
+
+@pytest.mark.parametrize("seed", range(24))
+def test_full_reduce_is_sound(seed):
+    layers = layers_of(2 + seed % 3, 8 + seed, seed)
+    graph = Diagram.id(len(layers[0].dom)).then(*layers).to_hypergraph()
+    assert same(contract(graph), circuit_matrix(layers))
+    assert same(contract(reduced(graph)), circuit_matrix(layers))
+
+
+@pytest.mark.parametrize("seed", range(24))
+def test_full_reduce_reaches_fixpoint(seed):
+    graph = random_graph(seed)
+    assert same(contract(reduced(graph)), contract(graph))
+
+
+def test_full_reduce_example():
+    diagram = Z(1, 1, .125) >> H >> H >> Z(1, 1, .125)
+    assert str(diagram.to_hypergraph().full_reduce()) == "Z(1, 1, 1/4)"
+
+
+def test_scalar_spiders_size():
+    for spider in (Z(0, 0, .125), X(0, 0, .125)):
+        graph = spider.to_hypergraph()
+        assert graph.size() == (1, 0, 1)
+        assert same(contract(graph), spider.eval().array)
+
+
+def test_size_counts_hadamard_edges():
+    zx = pytest.importorskip("pyzx", minversion=PYZX)
+    graph = zx.Graph()
+    a, b, c = (graph.add_vertex(zx.VertexType.Z) for _ in range(3))
+    graph.add_edge(graph.edge(a, b), zx.EdgeType.SIMPLE)
+    graph.add_edge(graph.edge(b, c), zx.EdgeType.HADAMARD)
+    assert Hypergraph.from_pyzx(graph).size() == (2, 1, 0)
+
+
+def test_size_hadamard_loops_and_parallel_edges():
+    loop = (Z(1, 3) >> Nat(1) @ H @ Nat(1) >> Nat(1) @ Z(2, 0)
+            ).to_hypergraph()
+    parallel = (Z(1, 2) >> H @ H >> Z(2, 1)).to_hypergraph()
+    assert loop.size() == (1, 0, 0) and parallel.size() == (2, 0, 0)
+    pytest.importorskip("pyzx", minversion=PYZX)
+    for graph in (loop, parallel):
+        assert Hypergraph.from_pyzx(graph.to_pyzx()).size() == graph.size()
+
+
+def test_Hypergraph_to_pyzx_errors():
+    pytest.importorskip("pyzx", minversion=PYZX)
+    with raises(ValueError):
+        Box('f', Nat(1), Nat(1)).to_hypergraph().to_pyzx()
+
+
+@pytest.mark.parametrize("seed", range(6))
+def test_full_reduce_against_pyzx(seed):
+    zx = pytest.importorskip("pyzx", minversion=PYZX)
+    random.seed(seed)
+    graph = zx.generate.CNOT_HAD_PHASE_circuit(4, 60).to_graph()
+    ours = Hypergraph.from_pyzx(graph)
+    assert zx.compare_tensors(ours.to_pyzx(), graph, preserve_scalar=True)
+    result = ours.full_reduce()
+    assert zx.compare_tensors(result.to_pyzx(), graph, preserve_scalar=True)
+    zx.full_reduce(graph)
+    assert result.size()[2] == Hypergraph.from_pyzx(graph).size()[2]
+    again = result.to_pyzx()
+    zx.full_reduce(again)
+    assert Hypergraph.from_pyzx(again).size() == result.size()
+
+
+def test_copy_and_supplement():
+    legs = Z(1, 3) @ Z(1, 3) >> Diagram.permutation([0, 3, 1, 4, 2, 5], Nat(6))
+    examples = {
+        "copy": (Z(0, 1) >> H) @ H >> Z(2, 1, .125) >> H,
+        "supplement": legs >> Nat(2) @ H @ H @ H @ H
+        >> Nat(2) @ Z(2, 0, .125) @ Z(2, 0, .375)}
+    for name, diagram in examples.items():
+        graph, fired = diagram.to_hypergraph(), []
+
+        def counted(rule):
+            def result(rewriter, spider):
+                found = rule(rewriter, spider)
+                fired.extend([rule.__name__] if found else [])
+                return found
+            return result
+        rewriter = Rewriter(graph)
+        rewriter.reduce(checked([
+            ([counted(rule) for rule in level], anchors)
+            for level, anchors in RULES]))
+        result = rewriter.to_hypergraph()
+        assert fired == [name] and result.size() == (2, 0, 0)
+        assert same(contract(result), contract(graph))
