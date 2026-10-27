@@ -249,6 +249,8 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Fixed
 
+- Preserve block free axes under dynamic `torch.compile` in
+  `neural.wiring` (rel-int/discopy-next#377).
 - `Category.typeparams` reads `ob` with no fallback: a monoid's objects are
   `NoneType`, so `Nat.typeparams()` no longer gives `(Nat, Nat)` ([next#214]).
 - `quantum.zx.Diagram.from_pyzx`, and its copy in `optyx.core.zx`, wires a

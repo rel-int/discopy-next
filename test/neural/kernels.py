@@ -199,19 +199,20 @@ def test_offline_compile(backward, tmp_path, monkeypatch):
     peers = geometry("sudoku")
     s, x = tensors(torch, peers, 35, "cpu", torch.float32, strided=True)
     terms = decode(encode(peers.terms))
+    tile, warps = (256, 2) if backward else (1024, 4)
     source = ASTSource(
         reduction(), signature={
             **dict.fromkeys(("S", "X", "G", "Y", "DX"), "*fp32"),
             "LENGTH": "i32"},
         constexprs={"N": s.shape[1], "H": s.shape[2],
                     "TERMS": terms, "DEGREE": peers.degree,
-                    "BACKWARD": backward, "TILE": 256,
+                    "BACKWARD": backward, "TILE": tile,
                     **{f"{prefix}{i}": stride
                        for prefix, t in (("SS", s), ("XS", x))
                        for i, stride in enumerate(t.stride())}})
     compiled = triton.compile(
         source, target=GPUTarget("cuda", 90, 32),
-        options={"num_warps": 2, "enable_fp_fusion": False})
+        options={"num_warps": warps, "enable_fp_fusion": False})
     assert compiled.asm["cubin"]
 
 

@@ -90,14 +90,15 @@ def launch(s, x, terms, degree, grad=None):
     descriptors = decode(terms)
     out = torch.empty_like(s, memory_format=torch.contiguous_format)
     dx = torch.empty_like(out) if grad is not None else out
+    tile, warps = (256, 2) if grad is not None else (1024, 4)
     if s.numel():
         with torch.cuda.device(s.device):
             torch.library.wrap_triton(reduction())[
-                ((s.numel() + 255) // 256,)](
+                ((s.numel() + tile - 1) // tile,)](
                 s, x, grad if grad is not None else s, out, dx,
                 s.shape[1], s.shape[2], s.numel(), descriptors, degree,
-                grad is not None, 256, *s.stride(), *x.stride(),
-                num_warps=2, enable_fp_fusion=False)
+                grad is not None, tile, *s.stride(), *x.stride(),
+                num_warps=warps, enable_fp_fusion=False)
     return out, dx
 
 

@@ -189,6 +189,7 @@ def run(mode: str, batches: str, repeat: int, source: dict):
     if mode in ("tests", "all"):
         tests = [str(p) for p in Path("/repo/test/neural").glob("*kernel*.py")]
         tests.append("/repo/test/neural/geometric.py")
+        tests.append("/repo/test/neural/wiring.py::test_dynamic_block_axes")
         subprocess.run([sys.executable, "-m", "pytest", "-c", "/dev/null",
                         "--import-mode=importlib", "-q", *tests], check=True)
     if mode in ("bench", "all"):
@@ -220,6 +221,7 @@ def main(mode: str = "bench", batches: str = "64,512", repeat: int = 10,
         str(path.relative_to(ROOT)):
         hashlib.sha256(path.read_bytes()).hexdigest()
         for path in (ROOT / "discopy/neural/kernels.py",
-                     ROOT / "discopy/neural/geometric.py", Path(__file__))}
+                     ROOT / "discopy/neural/geometric.py",
+                     ROOT / "discopy/neural/wiring.py", Path(__file__))}
     result = run.remote(mode, batches, repeat, source)
     Path(out).write_text(json.dumps(result, indent=2, allow_nan=False) + "\n")
