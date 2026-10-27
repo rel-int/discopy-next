@@ -25,7 +25,12 @@ Summary
         :nosignatures:
         :toctree:
 
+        solve
         maximise
+        sensitivity
+        ascend
+        attempt
+        derivative
 
 Note
 ----
@@ -60,6 +65,16 @@ Quantum empirical models arise from local measurements on a state: the
 with a classical input choosing the measurement of each party and a classical
 output giving its outcome, see :meth:`Model.from_diagram`.
 
+The contextual fraction is differentiable through the linear program: its
+value is piecewise linear in :math:`v^e` and its gradient, wherever it is
+differentiable, is the solution of the dual program, which the solver
+returns as the shadow prices of the constraints :math:`M b \\leq v^e`, see
+:meth:`Model.gradient`. The gradient is zero on the non-contextual polytope
+and a subgradient on its boundary, where the dual solution is not unique.
+Composed with the derivatives of a parametrised model, this is the gradient
+ascent of :func:`ascend`, finding the parameters of a setup that maximise
+its contextual fraction from a contextual starting point.
+
 Example
 -------
 The Popescu-Rohrlich box is strongly contextual, the Bell-CHSH model of
@@ -88,7 +103,7 @@ Bell state is a quarter contextual.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from itertools import combinations, product
 
 import numpy as np
@@ -97,13 +112,14 @@ from discopy.quantum.channel import Channel
 from discopy.quantum.circuit import Circuit
 
 
-def maximise(objective: np.ndarray, matrix: np.ndarray, vector: np.ndarray,
-             bounds: tuple) -> np.ndarray:
+def solve(objective: np.ndarray, matrix: np.ndarray, vector: np.ndarray,
+          bounds: tuple):
     """
-    An optimal solution :math:`x` of the linear program maximising
+    The result of solving the linear program maximising
     :math:`\\mathrm{objective} \\cdot x` subject to
     :math:`\\mathrm{matrix} \\, x \\leq \\mathrm{vector}` and ``bounds`` on
-    each component of :math:`x`, raising ``ValueError`` when there is none.
+    each component of :math:`x`, raising ``ValueError`` when there is no
+    solution.
     """
     # pylint: disable=import-outside-toplevel
     # scipy is an optional dependency, in the quantum extra.
@@ -111,7 +127,115 @@ def maximise(objective: np.ndarray, matrix: np.ndarray, vector: np.ndarray,
     result = linprog(-objective, A_ub=matrix, b_ub=vector, bounds=bounds)
     if not result.success:
         raise ValueError(result.message)
-    return result.x
+    return result
+
+
+def maximise(objective: np.ndarray, matrix: np.ndarray, vector: np.ndarray,
+             bounds: tuple) -> np.ndarray:
+    """ An optimal solution :math:`x` of the linear program of :func:`solve`.
+    """
+    return solve(objective, matrix, vector, bounds).x
+
+
+def sensitivity(objective: np.ndarray, matrix: np.ndarray,
+                vector: np.ndarray, bounds: tuple) -> np.ndarray:
+    """
+    The gradient of the value of the linear program of :func:`solve` with
+    respect to ``vector``: the value is piecewise linear in it and its
+    gradient is the solution of the dual program, which the solver returns
+    as the shadow prices of the constraints, a subgradient where the dual
+    solution is not unique.
+    """
+    return -solve(objective, matrix, vector, bounds).ineqlin.marginals
+
+
+def ascend(model: Callable[[np.ndarray], Model],
+           params: Sequence[float] | np.ndarray,
+           steps: int = 10, learning_rate: float = .05,
+           difference: float = 1e-3) -> tuple[np.ndarray, Model]:
+    """
+    Gradient ascent on the contextual fraction of a parametrised model,
+    returning the parameters and the model it stops at.
+
+    Parameters:
+        model : A function from an array of parameters to a model, raising
+            ``ValueError`` outside the parameters it is defined on.
+        params : The starting parameters.
+        steps : The number of gradients computed.
+        learning_rate : The initial step size, doubled after a step that
+            improves the fraction and halved, up to eight times, after one
+            that does not or that leaves the empirical models.
+        difference : The step of the finite differences approximating the
+            derivatives of the table with respect to the parameters.
+
+    The gradient of the fraction with respect to the table is
+    :meth:`Model.gradient`, exact, and the chain rule contracts it with the
+    derivatives of the table with respect to the parameters, the only
+    approximation. The fraction is piecewise linear in the table, so a fixed
+    step overshoots its kinks, which the backtracking is for; it is zero on
+    the non-contextual polytope, so the ascent only moves from a contextual
+    starting point.
+
+    Example
+    -------
+    Mixing the Popescu-Rohrlich box with white noise, the ascent on the
+    weight of the box from a contextual start approaches the box itself:
+    the mixture is not defined beyond a weight of one, so every step past
+    it is halved until it lands below.
+
+    >>> PR = Model(Scenario.bell(2), [[1/2, 0, 0, 1/2]] * 3 + [
+    ...     [0, 1/2, 1/2, 0]])
+    >>> noise = Model(Scenario.bell(2), [[1/4] * 4] * 4)
+    >>> isotropic = lambda params: PR.mix(noise, params[0])
+    >>> weight, box = ascend(isotropic, [.75])  # doctest: +EXTRA
+    >>> assert .99 < weight[0] <= 1 and box.contextual_fraction() > .98
+    """
+    params = np.array(params, dtype=float)
+    current = model(params)
+    for _ in range(steps):
+        gradient = current.gradient().vector
+        jacobian = np.array([
+            derivative(model, params, current, difference * direction)
+            for direction in np.eye(len(params))])
+        direction = jacobian @ gradient
+        for _ in range(8):
+            candidate = attempt(model, params + learning_rate * direction)
+            if candidate is not None and candidate.contextual_fraction()\
+                    > current.contextual_fraction():
+                params, current = params + learning_rate * direction, candidate
+                learning_rate = 2 * learning_rate
+                break
+            learning_rate = learning_rate / 2
+    return params, current
+
+
+def attempt(model: Callable[[np.ndarray], Model], params: np.ndarray
+            ) -> Model | None:
+    """
+    The model at some parameters, or ``None`` where the setup raises
+    ``ValueError`` or its table is not an empirical model, which
+    :func:`ascend` steps over rather than stopping at.
+    """
+    try:
+        candidate = model(params)
+        candidate.assert_compatible()
+    except ValueError:
+        return None
+    return candidate
+
+
+def derivative(model: Callable[[np.ndarray], Model], params: np.ndarray,
+               current: Model, step: np.ndarray) -> np.ndarray:
+    """
+    The derivative of the table of a parametrised model along a step, by a
+    forward difference from the ``current`` model at ``params``, or a
+    backward one where the forward step leaves the setup.
+    """
+    forward = attempt(model, params + step)
+    if forward is not None:
+        return (forward.vector - current.vector) / np.linalg.norm(step)
+    backward = model(params - step)
+    return (current.vector - backward.vector) / np.linalg.norm(step)
 
 
 class Scenario:
@@ -382,6 +506,56 @@ class Model(Table):
         """ The contextual fraction :math:`\\mathsf{CF}(e)`. """
         return 1 - self.non_contextual_fraction()
 
+    def gradient(self) -> Table:
+        """
+        The gradient of the contextual fraction with respect to the table,
+        the :func:`sensitivity` of the linear program of
+        :meth:`global_subdistribution` negated: a subgradient on the
+        boundary of the non-contextual polytope, and constant on each
+        context inside it, where the fraction is zero.
+
+        Example
+        -------
+        The gradient sums to the fraction minus one against the model, and
+        to at most minus one against any deterministic model.
+
+        >>> CHSH = Model(Scenario.bell(2), [[1/2, 0, 0, 1/2]] + 2 * [
+        ...     [3/8, 1/8, 1/8, 3/8]] + [[1/8, 3/8, 3/8, 1/8]])
+        >>> gradient = CHSH.gradient()  # doctest: +EXTRA
+        >>> round(float(gradient.vector @ CHSH.vector), 6)
+        -0.75
+        >>> assert all(gradient.vector @ Model.deterministic(
+        ...     CHSH.scenario, g).vector <= -1 + 1e-9
+        ...     for g in CHSH.scenario.assignments)
+        """
+        self.assert_compatible()
+        incidence = self.scenario.incidence()
+        return Table(self.scenario, self.scenario.rows(-sensitivity(
+            np.ones(incidence.shape[1]), incidence, self.vector, (0, None))))
+
+    def normalise(self, atol: float = 1e-9) -> Model:
+        """
+        The model conditioned on the success of a postselection, each row
+        divided by its sum, which must be the same in every context up to
+        ``atol``, raising ``ValueError`` otherwise or when the result is
+        not an empirical model, e.g. when the postselection signals.
+
+        Example
+        -------
+        >>> half = Model(Scenario.bell(2), [[1/4, 0, 0, 1/4]] * 3 + [
+        ...     [0, 1/4, 1/4, 0]])
+        >>> half.normalise().table[0]
+        (0.5, 0.0, 0.0, 0.5)
+        """
+        sums = [sum(row) for row in self.table]
+        if min(sums) <= 0 or max(sums) - min(sums) > atol:
+            raise ValueError(
+                f"The rows of {self} do not sum to the same probability.")
+        result = Model(self.scenario, [
+            [x / total for x in row] for row, total in zip(self.table, sums)])
+        result.assert_compatible()
+        return result
+
     def decompose(self) -> tuple[float, Model | None, Model | None]:
         """
         The decomposition :math:`e = \\mathsf{NCF}(e) e^{NC}
@@ -528,25 +702,33 @@ class Model(Table):
                                   repeat=len(measurements))])
 
     @classmethod
+    # pylint: disable=too-many-arguments,too-many-positional-arguments
+    # The parties, their settings, outcomes and outputs, and the backend.
     def from_diagram(cls, diagram, settings: int | Sequence[int] = 2,
-                     outcomes: int | None = None, backend=None) -> Model:
+                     outcomes: int | None = None, backend=None,
+                     outputs: int | Sequence[int] = 1) -> Model:
         """
         The empirical model on a Bell scenario of an optyx diagram with one
-        classical input and one classical output for each party, the input
-        choosing the measurement of the party and the output its outcome,
+        classical input and some classical outputs for each party, the input
+        choosing the measurement of the party and the outputs its outcome,
         evaluated by :func:`discopy.optyx.contextuality.distributions`.
 
         Parameters:
             diagram : A :class:`discopy.optyx.channel.Diagram` with classical
-                domain and codomain of the same length.
+                domain and codomain.
             settings : The number of measurements of each party, or one
                 number for every party.
-            outcomes : The number of outcomes of each measurement, by default
+            outcomes : The number of outcomes of each output wire, by default
                 one more than the largest outcome of non-zero probability.
             backend : The backend evaluating the diagram.
+            outputs : The number of output wires of each party, or one
+                number for every party, the outcome of a party being the
+                tuple of the values of its wires in lexicographic order, so
+                that a measurement has ``outcomes ** outputs`` outcomes.
 
         The probabilities are not normalised: a diagram that is not a channel,
-        e.g. a postselected one, does not give an empirical model.
+        e.g. a postselected one, does not give an empirical model unless it
+        is conditioned on its success with :meth:`normalise`.
         """
         # pylint: disable=import-outside-toplevel
         # discopy.optyx is an optional dependency, in the optyx extra.
@@ -554,19 +736,26 @@ class Model(Table):
         parties = len(diagram.dom.inside)
         settings = parties * (settings, ) if isinstance(settings, int)\
             else tuple(settings)
-        rows = distributions(diagram, settings, backend)
+        outputs = parties * (outputs, ) if isinstance(outputs, int)\
+            else tuple(outputs)
+        if len(outputs) != parties or len(set(outputs)) > 1:
+            raise ValueError(f"The {parties} parties need the same number "
+                             f"of outputs, got {outputs}.")
+        rows = distributions(diagram, settings, backend, outputs)
         if outcomes is None:
             outcomes = 1 + max(
                 max(section, default=0) for row in rows for section in row)
-        table = np.zeros((len(rows), outcomes ** parties))
+        wires = sum(outputs)
+        table = np.zeros((len(rows), outcomes ** wires))
         for row, distribution in zip(table, rows):
             for section, probability in distribution.items():
                 if max(section, default=0) >= outcomes:
                     raise ValueError(
                         f"The outcomes {section} are not in {outcomes}.")
                 row[np.ravel_multi_index(
-                    section, parties * (outcomes, ))] = probability
-        return cls(Scenario.bell(parties, settings, outcomes), table)
+                    section, wires * (outcomes, ))] = probability
+        return cls(Scenario.bell(
+            parties, settings, outcomes ** outputs[0]), table)
 
 
 class Inequality(Table):

@@ -6,7 +6,8 @@ import numpy as np
 from pytest import approx, importorskip, mark, raises
 
 from discopy.quantum import CX, H, Ket, Measure, Rz, qubit
-from discopy.quantum.contextuality import Inequality, Model, Scenario, maximise
+from discopy.quantum.contextuality import (
+    Inequality, Model, Scenario, ascend, attempt, maximise, sensitivity)
 
 importorskip("scipy")
 
@@ -232,3 +233,47 @@ def test_specker():
     assert inequality.non_contextual_bound == approx(0, abs=1e-9)
     assert inequality.violation(specker) == approx(1)
 
+
+@mark.parametrize("model", [CHSH, PR.mix(noise, .9), equatorial(3, 1, 2)])
+def test_gradient(model):
+    gradient = model.gradient()
+    assert gradient.scenario == model.scenario
+    assert gradient.vector @ model.vector == approx(
+        model.contextual_fraction() - 1)
+    for assignment in model.scenario.assignments:
+        deterministic = Model.deterministic(model.scenario, assignment)
+        assert gradient.vector @ deterministic.vector <= -1 + 1e-9
+    incidence = model.scenario.incidence()
+    assert np.allclose(gradient.vector, -sensitivity(
+        np.ones(incidence.shape[1]), incidence, model.vector, (0, None)))
+    with raises(ValueError):
+        Model(bell, [[1, 0, 0, 0], [0, 0, 1, 0]] + [[1 / 4] * 4] * 2
+              ).gradient()
+
+
+def test_ascend():
+    isotropic = lambda params: PR.mix(noise, min(1., max(0., params[0])))
+    weight, box = ascend(isotropic, [.75], steps=5)
+    assert box.is_close(PR) and weight[0] >= 1
+    weight, model = ascend(isotropic, [.25], steps=2)
+    assert weight[0] == approx(.25) and model.is_close(isotropic([.25]))
+    unclamped = lambda params: PR.mix(noise, params[0])
+    weight, box = ascend(unclamped, [.75], steps=5)
+    assert .99 < weight[0] <= 1 and box.contextual_fraction() > .98
+    assert attempt(unclamped, np.array([1.5])) is None
+    assert attempt(lambda params: Model(bell, [[1, 0, 0, 0], [0, 0, 1, 0]]
+                   + [[1 / 4] * 4] * 2), np.zeros(1)) is None
+
+
+def test_normalise():
+    half = Model(bell, [[1 / 4, 0, 0, 1 / 4]] * 3 + [[0, 1 / 4, 1 / 4, 0]])
+    assert half.normalise().is_close(PR)
+    with raises(ValueError):
+        Model(bell, [[1 / 4, 0, 0, 1 / 4]] * 3 + [[0, 1, 1, 0]]).normalise()
+    with raises(ValueError):
+        Model(bell, [[0] * 4] * 4).normalise()
+    rare = Model(bell, [[1e-12, 0, 0, 1e-12]] * 3 + [[0, 1e-12, 1e-12, 0]])
+    assert rare.normalise().is_close(PR)
+    with raises(ValueError):
+        Model(bell, [[1 / 2, 0, 0, 0], [0, 0, 1 / 2, 0]]
+              + [[1 / 8] * 4] * 2).normalise()
