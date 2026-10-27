@@ -141,8 +141,6 @@ class Diagram(braided.Diagram, feedback.Diagram, BalancedCategory):
     """
     twist_naturality = BalancedCategory.twist_naturality.failing(
         messages.NO_PLANAR_NORMAL_FORM)
-    yanking = BalancedCategory.yanking.failing(
-        messages.NO_PLANAR_NORMAL_FORM)
 
     ob = Ty
     yanking = BalancedCategory.yanking.failing(messages.FREE_YANKING)

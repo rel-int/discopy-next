@@ -164,7 +164,7 @@ class Group(Serialisable, abc.Group):
         """ The action of the group on a set of its own. """
 
     @classmethod
-    def strategy(cls, dom=None, cod=None, **_):
+    def strategy(cls, dom=None, cod=None):
         """
         Generate elements by :meth:`sample`, from a random generator under
         the control of Hypothesis. The only object, :obj:`None`, is the

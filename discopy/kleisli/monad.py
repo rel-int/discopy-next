@@ -501,6 +501,8 @@ def make_state(S: type) -> Monad:
 
     def generate(outcomes):
         from hypothesis import strategies as st
+        if not outcomes:
+            return st.nothing()
         return st.fixed_dictionaries({
             state: st.tuples(
                 st.sampled_from(outcomes), st.sampled_from(values(S)))

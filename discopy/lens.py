@@ -549,7 +549,7 @@ class Markov(Symmetric):
     unitality = Symmetric.unitality.failing(messages.LENS_NATURALITY)
     associativity = Symmetric.associativity.failing(messages.LENS_NATURALITY)
     braid_naturality = Symmetric.braid_naturality.failing(
-        messages.LENS_NATURALITY)
+        messages.LENS_BRAID_NATURALITY)
 
     @classmethod
     def strategy(cls, *, dom=None, cod=None, **params):

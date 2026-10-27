@@ -61,8 +61,7 @@ Coherence
 
 from typing import ClassVar
 
-from discopy import (
-    symmetric, ribbon, pivotal, feedback, cmap, hypergraph, monoidal)
+from discopy import symmetric, ribbon, pivotal, feedback, cmap, hypergraph
 from discopy.abc import CompactCategory
 from discopy.cat import factory
 from discopy.utils import deprecated_alias
@@ -105,9 +104,6 @@ class Diagram(symmetric.Diagram, ribbon.Diagram, CompactCategory):
     ob = Ty
     layer_factory = Layer
     trace_factory = classmethod(pivotal.Diagram.trace_factory.__func__)
-
-    foliation_idempotence = symmetric.Diagram.foliation_idempotence.modulo(
-        monoidal.Diagram.to_map)
 
 
 class Box(symmetric.Box, ribbon.Box, Diagram):

@@ -325,7 +325,7 @@ class List[generator_factory](Monoid["List"], TestableGeneric):
             + f"({', '.join(map(self.generator_repr, self.inside))})"
 
     @classmethod
-    def generators(cls, **_):
+    def generators(cls):
         """
         Generate the lists of one Python type, one of those
         :func:`axioms.values` samples, the free monoid on any other
@@ -340,9 +340,14 @@ class List[generator_factory](Monoid["List"], TestableGeneric):
         return st.sampled_from(tuple(axioms.VALUES)).map(cls)
 
     @classmethod
-    def strategy(cls, **_):
-        """ Generate lists of at most three generators. """
+    def strategy(cls, dom=None, cod=None):
+        """
+        Generate lists of at most three generators, each from the only
+        object :obj:`None` to itself.
+        """
         from hypothesis import strategies as st
+        if (dom, cod) != (None, None):
+            raise ValueError("A list has a single object, None.")
         return st.lists(cls.generators(), max_size=3).map(
             lambda xs: cls().tensor(*xs))
 

@@ -393,7 +393,7 @@ class Arrow(FreeCategory, DaggerCategory, Serialisable["Arrow"]):
         """
         The strategy the property matrix samples the terms of a free category
         from: its :meth:`search`, which a category with a combinatorial
-        representation mixes with the :meth:`sample` of it, e.g.
+        representation mixes with the :meth:`quotient_strategy` of it, e.g.
         :meth:`discopy.symmetric.Diagram.strategy`.
 
         Parameters are those of :meth:`search`.

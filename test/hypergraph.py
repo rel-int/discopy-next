@@ -991,3 +991,13 @@ def test_decoder():
     assert (CMap[Tensor].id(Dim(3)) @ CMap[Tensor].from_box(t)
             >> CMap[Tensor].swap(Dim(3), Dim(3))).to_diagram()\
         == Dim(3) @ t >> Tensor.swap(Dim(3), Dim(3))
+
+
+def test_atoms():
+    x, y = Ty('x'), Ty('y')
+    f = Box('f', x, y)
+    graph = f.to_hypergraph()
+    assert graph.atoms() == graph.to_diagram().atoms()
+    assert f in graph.atoms()
+    assert eval(str(graph), Diagram.str_environment(f)).to_hypergraph()\
+        == graph

@@ -696,21 +696,20 @@ class Diagram(biclosed.Diagram, RigidCategory):
     # hypergraph both read as wiring, so the two agree.
     map_agreement = monoidal.Diagram.map_agreement
     currying_left = RigidCategory.currying_left.failing(
-        messages.NO_PLANAR_NORMAL_FORM)
+        messages.NOT_BOUNDARY_CONNECTED)
     currying_right = RigidCategory.currying_right.failing(
-        messages.NO_PLANAR_NORMAL_FORM)
+        messages.NOT_BOUNDARY_CONNECTED)
     currying_eta_left = RigidCategory.currying_eta_left.failing(
-        messages.NO_PLANAR_NORMAL_FORM)
+        messages.NOT_BOUNDARY_CONNECTED)
     currying_eta_right = RigidCategory.currying_eta_right.failing(
-        messages.NO_PLANAR_NORMAL_FORM)
+        messages.NOT_BOUNDARY_CONNECTED)
     currying_naturality_left = RigidCategory.currying_naturality_left\
-        .failing(messages.NO_PLANAR_NORMAL_FORM)
+        .failing(messages.NOT_BOUNDARY_CONNECTED)
     currying_naturality_right = RigidCategory.currying_naturality_right\
-        .failing(messages.NO_PLANAR_NORMAL_FORM)
-    snake_equations = RigidCategory.snake_equations.failing(
-        messages.NO_PLANAR_NORMAL_FORM)
+        .failing(messages.NOT_BOUNDARY_CONNECTED)
+    snake_equations = RigidCategory.snake_equations.modulo(normal_form)
     transpose_contravariance = RigidCategory.transpose_contravariance.failing(
-        messages.NO_PLANAR_NORMAL_FORM)
+        messages.NOT_BOUNDARY_CONNECTED)
 
 
 class Box(biclosed.Box, Diagram):

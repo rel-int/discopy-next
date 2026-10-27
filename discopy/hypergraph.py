@@ -1724,6 +1724,10 @@ class Hypergraph[category](
     def __str__(self):
         return str(self.to_diagram())
 
+    def atoms(self) -> list:
+        """ The generators the string of the diagram it decodes to names. """
+        return self.to_diagram().atoms()
+
     @property
     def bijection(self):
         """

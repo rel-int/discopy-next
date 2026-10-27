@@ -300,7 +300,8 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   a traced copy of a wire whose dagger is not itself, e.g. a
   `Dims(Dim(2, 3))`, is built; and the strings of delayed boxes, structural
   boxes and adjoint wires read back, their `atoms` being the generators they
-  name.
+  name, as do those of a hypergraph; a Markov hypergraph whose spider has no
+  input, i.e. a copy traced back into itself, decodes to that trace.
 - `Category.typeparams` reads `ob` with no fallback: a monoid's objects are
   `NoneType`, so `Nat.typeparams()` no longer gives `(Nat, Nat)` ([next#214]).
 - `quantum.zx.Diagram.from_pyzx`, and its copy in `optyx.core.zx`, wires a

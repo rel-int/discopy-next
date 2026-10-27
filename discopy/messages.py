@@ -55,6 +55,9 @@ NO_PLANAR_NORMAL_FORM = (
     "A planar law is compared on the nose: a hypergraph is faithful only "
     "from symmetric categories on, and there is no normal form for this "
     "doctrine yet.")
+NOT_BOUNDARY_CONNECTED = (
+    "A rigid law is compared on the nose: its sides have a normal form only "
+    "when they are boundary-connected, which they need not be.")
 COLOURED_QUOTIENT = (
     "{} is coloured: a hypergraph or a map is symmetric, and a swap is "
     "ill-typed across 0-cells, so it would lose its colours.")
@@ -84,6 +87,10 @@ PARA_CURRY_COPAR = (
 LENS_NATURALITY = (
     "A Markov lens is a unit and associative only up to the naturality of "
     "copy and discard, which a hypergraph does not decide.")
+LENS_BRAID_NATURALITY = (
+    "A Markov braid copies its input for its put, so a Markov lens is "
+    "natural in it only up to the naturality of copy, which a hypergraph "
+    "does not decide.")
 NO_SWAP = "{} is not symmetric, it has no swaps."
 NO_BRAID = "{} is not braided, it has no braids."
 NO_TWIST = "{} is not balanced, it has no twists."

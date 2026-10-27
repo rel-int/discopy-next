@@ -173,9 +173,19 @@ class Diagram(symmetric.Diagram, MarkovCategory):
 
     @classmethod
     def spider_factory(cls, n_legs_in, n_legs_out, typ, phase=None):
-        if phase is not None or n_legs_in != 1:
+        """
+        The spiders of a Markov category: the copies, with one leg in, and
+        the traces of copies, with none, i.e. what tracing a copy back into
+        its own input encodes to as a hypergraph.
+
+        >>> x = Ty('x')
+        >>> assert Diagram.spider_factory(0, 1, x) == Copy(x).trace(left=True)
+        """
+        if phase is not None or n_legs_in > 1:
             raise ValueError(messages.NO_SUCH_SPIDER.format(
                 factory_name(cls), "copies"))
+        if not n_legs_in:
+            return cls.copy(typ, n_legs_out + 1).trace(left=True)
         return cls.copy_factory(typ, n_legs_out)
 
     @classmethod

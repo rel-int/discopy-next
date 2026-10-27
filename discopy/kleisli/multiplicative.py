@@ -77,7 +77,8 @@ from discopy.kleisli import channel
 from discopy.kleisli.monad import Maybe, Monad, Powerset, Seed, Subdistribution
 from discopy.python import function
 from discopy.python.multiplicative import Function, Ty
-from discopy.utils import assert_isinstance, assert_iscomposable, factory_name
+from discopy.utils import (
+    assert_isinstance, assert_iscomposable, factory, factory_name)
 
 
 class Row:
@@ -144,6 +145,7 @@ def unpack_value(value) -> tuple:
     return value.values if isinstance(value, Row) else (value, )
 
 
+@factory
 class Channel[monad](Category, TestableGeneric):
     """
     A channel is a morphism in the Kleisli category of a monad ``M`` with

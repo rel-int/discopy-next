@@ -133,7 +133,7 @@ that holds again fails the run, each carrying its reason: pass `-rsxX` to
 list the skips, xfails and unexpected passes with their reasons, and `-x`
 to stop at the first genuine failure.
 
-`proptest/conftest.py` registers four Hypothesis profiles, selected by
+`proptest/conftest.py` registers five Hypothesis profiles, selected by
 `HYPOTHESIS_PROFILE`: `dev` by default, `fast` to develop with, derandomized
 and checking each law once, on the category nearest the class declaring it,
 `pr` for the small budget a pull request runs with, under a fixed
@@ -141,6 +141,9 @@ and checking each law once, on the category nearest the class declaring it,
 `explore` for the large one `main` and the nightly run search with. All but
 `fast` share the `.hypothesis/examples` database that CI downloads before a
 run and uploads after every run but a pull request's, which only reads it.
+The fifth, `shared`, is `dev` reading the database CI uploads as a workflow
+artifact, through a `GITHUB_TOKEN`, so a failure found on CI replays on
+your machine before any search; it reaches GitHub only when selected.
 
 ```shell
 HYPOTHESIS_PROFILE=explore uv run pytest proptest/ -n auto -p no:benchmark

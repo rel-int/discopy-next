@@ -86,11 +86,12 @@ class Category[category](
 
     @classmethod
     def checked_params(cls) -> tuple:
-        """ Integer matrices, a category with every structure an opposite
-        reads, copies and merges included. """
+        """ The default category, for the class itself, and integer matrices,
+        a category with every structure an opposite reads, copies and merges
+        included. """
         # pylint: disable-next=import-outside-toplevel  # it imports this
         from discopy.matrix import Matrix
-        return (Matrix[int], )
+        return (cls.category, Matrix[int])
 
     inside: category
 
@@ -162,6 +163,14 @@ class Monoidal(Category, MonoidalCategory):
         inside (category) : The arrow of the category, the other way round.
     """
     category = monoidal.Diagram
+
+    @classmethod
+    def checked_params(cls) -> tuple:
+        """ Integer matrices only: free diagrams are compared on the nose,
+        where their opposite does not interchange. """
+        # pylint: disable-next=import-outside-toplevel  # it imports this
+        from discopy.matrix import Matrix
+        return (Matrix[int], )
 
     @unbiased
     def tensor(self, other: Monoidal) -> Monoidal:
