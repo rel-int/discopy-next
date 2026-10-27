@@ -7,29 +7,37 @@ symmetric block relation, without atomic gradient accumulation.
 
 - [x] Implement an opt-in fused Peers kernel and portable fallback.
 - [x] Check values, gradients, layouts and compiled network integration.
-- [WIP] @codex-h100-2026-10-27 10:44 Benchmark against the PyTorch geometry and TRMP specialised kernel;
+- [x] Benchmark against the PyTorch geometry and TRMP specialised kernel;
       document measured performance and remaining limitations.
 - [WIP] @codex-h100-2026-10-27 10:44 Run repository checks and prepare the change for review.
 
 Local checks: 2181 passed with --skip-extra; focused CPU checks, pflake8,
 pylint, ruff and ty pass. Eight offline H100 compilations and 32 Triton
 interpreter comparisons pass (forward/backward atol=1e-6, rtol=0).
-Resumed H100 work (2026-10-27): both Modal endpoints are reachable.
-All 35 tests passed on H100 at 6be1f9dd, including dynamic layouts.
-Two sweeps checked 136 configurations across shapes/layouts/directions;
-forward uses TILE=1024/warps=4, backward TILE=256/warps=2. Traceable
-launches, scalar strides and concrete geometry constants fix compilation;
-Block.free now preserves symbolic axis membership. Large indices fallback.
+Completed H100 run: https://modal.com/apps/rel-int/main/ap-AubmqVh3RdkqQF4epJeUqs
+Clean source 0821d13f; TRMP a768520; both Modal endpoints reachable.
+35 tests passed on H100. Both geometric backends pass accuracy gates.
+Forward uses TILE=1024/warps=4, backward TILE=256/warps=2, after two
+measured sweeps. Dynamic layout/geometry tracing and large-index fallback
+are validated; Block.free preserves symbolic axis membership.
 
-Measured lattice b512 (ms inference / training): geometric 32.38 / 38.80,
-fused 11.74 / 14.67, specialised 6.36 / 8.77. Fused ACT b512 is
-16.44 / 28.74 versus geometric 51.29 / 80.03. Both library backends pass
-accuracy gates. Specialised ACT has three outliers (max 7.07e-4 vs eager);
-fused max is 9.69e-5. On the worst board, fused max error vs fp64 is
-1.46e-5 versus specialised 6.25e-4. Keep the library gate unchanged.
-The runner records all backend statuses and saves data before gating.
-Local suite: 2185 passed, 195 skipped; required lint/type gates passed.
-Final result-file capture and CI remain; latest target branch is merged.
+Batch 512, inference / training ms:
+- Lattice: geometric 32.20 / 38.78, fused 11.74 / 14.58,
+  specialised 6.38 / 8.73.
+- ACT: geometric 51.17 / 79.77, fused 16.51 / 28.90,
+  specialised 9.40 / 17.33.
+Fused is 2.66–3.10x faster than geometric but 1.67–1.84x slower than
+specialised. Batch 64 is mixed: lattice regresses about 21%; ACT improves.
+Fused max readout error 9.69e-5, gradient 2.86e-6. Specialised ACT has
+three readout outliers (max 7.07e-4); its independent status is recorded.
+The worst-board fp64 probe finds fused max error 1.46e-5 vs specialised
+6.25e-4. Full results are documented in benchmark/geometric.md and saved
+at /workspace/discopy-artifacts/geometric-results.json with source hashes.
+
+Local suite: 2,185 passed, 195 skipped; lint/type gates passed (pylint 9.18).
+The latest target branch is merged. CI lint, unit tests and coverage pass;
+documentation/notebook jobs and final-head CI remain. Keep the PR draft
+until CI and review gates finish.
 
 Continuation request (verbatim):
 

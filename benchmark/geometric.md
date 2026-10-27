@@ -84,6 +84,39 @@ UV_CACHE_DIR=/workspace/.uv-cache uv run --group grammar pytest \
     test/neural/kernels.py test/neural/geometric.py
 ```
 
+## Measured network performance
+
+The [complete H100 run](https://modal.com/apps/rel-int/main/ap-AubmqVh3RdkqQF4epJeUqs)
+on 2026-10-27 used clean commit `0821d13f` and TRMP `a768520`.
+Median milliseconds per call, inference / training, with ten repetitions:
+
+| Recipe | Batch | Compiled geometric | Fused Triton | Specialised TRMP |
+|---|---:|---:|---:|---:|
+| Lattice | 64 | 6.67 / 9.48 | 8.08 / 11.45 | 2.47 / 3.75 |
+| ACT | 64 | 10.95 / 17.48 | 10.37 / 14.35 | 3.05 / 5.40 |
+| Lattice | 512 | 32.20 / 38.78 | 11.74 / 14.58 | 6.38 / 8.73 |
+| ACT | 512 | 51.17 / 79.77 | 16.51 / 28.90 | 9.40 / 17.33 |
+
+At batch 512, fused geometric is 2.66–3.10 times faster than compiled
+geometric, and still 1.67–1.84 times slower than the specialised kernel.
+Batch 64 is mixed: lattice regresses by about 21%, while ACT improves.
+The kernel remains opt-in; these measurements do not establish parity or
+an improvement for every workload. Folded-layout peer reduction alone at
+batch 512 takes 0.106 / 0.365 ms versus PyTorch's 0.491 / 1.415 ms.
+
+Both geometric implementations pass the declared accuracy gates. Across
+these four cases, fused maximum absolute readout/gradient errors are
+`9.69e-5` / `2.86e-6`, and maximum relative L2 errors are `1.69e-6` /
+`2.18e-7`. The specialised ACT baseline fails three readout elements at
+batch 512 (`7.07e-4` maximum absolute, `5.20e-6` relative L2 error);
+its gradients pass. The JSON reports this failure independently, without
+relaxing the library gate.
+
+A [float64 diagnostic](https://modal.com/apps/rel-int/main/ap-o8LjZpieQWHZC8wUlwxSQd)
+on the worst board (299) found maximum errors of `8.23e-5` for eager fp32,
+`1.60e-4` for compiled geometric, `1.46e-5` for fused, and `6.25e-4` for
+specialised. This checks one sensitive board, not the entire input domain.
+
 ## H100 validation and tuning
 
 CPU checks cover an independent dense relation, signed overlapping blocks,
@@ -93,7 +126,7 @@ compilation, custom-operator registration contracts and nonfinite inputs.
 
 The final configuration uses `TILE=1024, num_warps=4` for forward and
 `TILE=256, num_warps=2` for backward. The H100 correctness run at clean commit
-`6be1f9dd` passed all 35 tests, including explicit dynamic-layout compilation
+`0821d13f` passed all 35 tests, including explicit dynamic-layout compilation
 and the CPU block-axes regression. Both Modal hosts were reachable.
 
 The [first sweep](https://modal.com/apps/rel-int/main/ap-R8WK7c72LKe3GIcML7pTQ7)
@@ -128,6 +161,5 @@ measured 10.87 ms of device work for lattice inference at batch 512:
 in peer reductions. Matrix products and GRU/normalization account for 76%
 of that device time; TRMP's specialised whole-segment implementation took
 5.51 ms of device work. The profile identifies work beyond peer reduction
-that remains to close the gap. Full-network measurements of the final
-configuration are still running; these microbenchmarks do not establish
-parity with the specialised kernel.
+that remains to close the gap; the final timings above measure the whole
+call separately.
