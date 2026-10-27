@@ -165,7 +165,7 @@ def add_phases(pairs: Iterable[tuple[Spider, Any]]) -> dict[Spider, Any]:
 
 def assert_transparent(diagram: Diagram) -> None:
     """
-    Raise ``AxiomError`` unless every wire of ``diagram`` is transparent: a
+    Raise ``AxiomError`` unless no wire of ``diagram`` has a colour: a
     hypergraph and a map are symmetric, and a swap is ill-typed across
     0-cells, so a coloured diagram has neither rather than losing its
     colours.
@@ -178,12 +178,12 @@ def assert_transparent(diagram: Diagram) -> None:
     ...
     discopy.utils.AxiomError: x is coloured: a hypergraph or a map is ...
     """
-    from discopy.monoidal import Wire, transparent
+    from discopy.monoidal import Wire
     for typ in (diagram.dom, diagram.cod, *(
             obj for box in diagram.boxes for obj in (box.dom, box.cod))):
-        if typ.dom != transparent or typ.cod != transparent or any(
+        if typ.dom is not None or typ.cod is not None or any(
                 isinstance(wire, Wire) and (
-                    wire.dom != transparent or wire.cod != transparent)
+                    wire.dom is not None or wire.cod is not None)
                 for wire in typ.inside):
             raise AxiomError(messages.COLOURED_QUOTIENT.format(typ))
 

@@ -49,6 +49,7 @@ Summary
         scalar
 """
 import copy
+import math
 from collections.abc import Sized
 from math import e, pi
 
@@ -355,6 +356,28 @@ class QuantumGate(Box):
         """ Avoid checking for equality of matrices when comparing gates. """
         return (repr(self), )
 
+    @property
+    def is_deterministic(self) -> bool:
+        """
+        Whether the gate commutes with the copy of the computational basis,
+        i.e. its array sends each basis state to a basis state or to zero.
+
+        >>> assert CX.is_deterministic and Bra(0).is_deterministic
+        >>> assert not H.is_deterministic and not CRz(.25).is_deterministic
+        >>> assert Rz(0).is_deterministic and not Rz(.25).is_deterministic
+        """
+        if not super().is_deterministic or self.free_symbols:
+            return False
+        with backend('numpy') as np:
+            array = np.array(self.array, dtype=complex)
+            rows = array.reshape(math.prod(array.shape[:len(self.dom)]), -1)
+            return bool(np.isin(rows, (0, 1)).all()
+                        and (rows.sum(axis=1) <= 1).all())
+
+    @is_deterministic.setter
+    def is_deterministic(self, value: bool):
+        self.deterministic = value
+
 
 class ClassicalGate(SelfConjugate):
     """
@@ -400,13 +423,18 @@ class Copy(ClassicalGate):
 
 
 class Match(ClassicalGate):
-    """ Takes two bits in, returns them if they are equal. """
+    """
+    Takes two bits in, returns them if they are equal, i.e. the merge, which
+    is deterministic but not affine.
+
+    >>> assert Match().is_deterministic and not Match().is_affine
+    """
     serialised_attrs = ("time_step", )
 
     def __init__(self, time_step=0):
         cod = bit.delay(time_step)
         super().__init__("Match", cod ** 2, cod, [1, 0, 0, 0, 0, 0, 0, 1],
-                         time_step=time_step)
+                         time_step=time_step, is_affine=False)
         self.draw_as_spider, self.color = True, "black"
         self.drawing_name = ""
 
@@ -567,12 +595,14 @@ class Ket(SelfConjugate, QuantumGate):
 
 class Bra(SelfConjugate, QuantumGate):
     """
-    Implements qubit post-selection for a given bitstring.
+    Implements qubit post-selection for a given bitstring, which is
+    deterministic but not affine, i.e. a partial function.
 
     >>> from discopy.tensor import Dim, Tensor
     >>> assert Bra(1, 0).dom == qubit ** 2
     >>> assert Bra(1, 0).eval()\\
     ...     == Tensor[complex](dom=Dim(2, 2), cod=Dim(1), array=[0, 0, 1, 0])
+    >>> assert Bra(1, 0).is_deterministic and not Bra(1, 0).is_affine
     """
     serialised_attrs = ("*bitstring", "time_step")
     to_drawing = Digits.to_drawing
@@ -586,6 +616,7 @@ class Bra(SelfConjugate, QuantumGate):
         dom, cod = qubit.delay(time_step) ** len(bitstring), qubit ** 0
         super().__init__(name, dom, cod, time_step=time_step)
         self._digits, self._dim, self.draw_as_brakets = bitstring, 2, True
+        self.affine = False
 
     delay, to_tree = Ket.delay, Ket.to_tree
     from_tree = classmethod(Ket.from_tree.__func__)

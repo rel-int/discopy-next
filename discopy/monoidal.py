@@ -91,8 +91,8 @@ if TYPE_CHECKING:
 @dataclass(frozen=True)
 class Colour(cat.Ob):
     """
-    A 0-cell, drawn using its matplotlib-compatible ``name``, by default
-    :data:`discopy.config.TRANSPARENT` so that the page shows through.
+    A 0-cell, drawn using its matplotlib-compatible ``name``. A region with
+    no colour is ``None``, drawn as the page.
 
     An optional ``label`` gives the region a human-readable name for the
     drawing legend (e.g. a category) while still filling with ``name``. It
@@ -100,7 +100,7 @@ class Colour(cat.Ob):
     colour still merge.
     """
 
-    name: str = TRANSPARENT
+    name: str
     label: "str | None" = field(default=None, compare=False)
 
     def __post_init__(self):
@@ -128,23 +128,33 @@ class Colour(cat.Ob):
         return cls(tree['name'], label=tree.get('label'))
 
 
-transparent = Colour(TRANSPARENT)
+def uncolour_state(state: dict) -> dict:
+    """
+    The pickled ``state`` of a wire or a type, with no colour as ``None``:
+    a pickle from before ``None`` stood for no colour holds a
+    :class:`Colour` named :data:`discopy.config.TRANSPARENT` instead.
+    """
+    for key in ('dom', 'cod'):
+        colour = state.get(key)
+        if isinstance(colour, Colour) and colour.name == TRANSPARENT:
+            state[key] = None
+        state.setdefault(key, None)
+    return state
 
 
 class Wire(cat.Ob):
     """A generating 1-cell with a colour on either side."""
 
-    def __init__(self, name: str, dom: Colour = transparent,
-                 cod: Colour = transparent, is_dagger: bool = False):
-        assert_isinstance(dom, Colour)
-        assert_isinstance(cod, Colour)
+    def __init__(self, name: str, dom: Colour | None = None,
+                 cod: Colour | None = None, is_dagger: bool = False):
+        assert_isinstance(dom, (Colour, type(None)))
+        assert_isinstance(cod, (Colour, type(None)))
         self.is_dagger = is_dagger
         self.dom, self.cod = dom, cod
         super().__init__(name)
 
     def __setstate__(self, state):
-        state.setdefault('dom', transparent)
-        state.setdefault('cod', transparent)
+        uncolour_state(state)
         state.setdefault('is_dagger', False)
         super().__setstate__(state)
 
@@ -161,7 +171,7 @@ class Wire(cat.Ob):
         return hash((type(self), self.name, self.dom, self.cod))
 
     def __repr__(self):
-        colours = "" if self.dom == self.cod == transparent\
+        colours = "" if self.dom is None and self.cod is None\
             else f", dom={self.dom!r}, cod={self.cod!r}"
         dagger = ", is_dagger=True" if self.is_dagger else ""
         return f"{factory_name(type(self))}({self.name!r}{colours}{dagger})"
@@ -169,9 +179,9 @@ class Wire(cat.Ob):
     def to_tree(self):
         tree = super().to_tree()
         tree['factory'] = factory_name(type(self))
-        if self.dom != transparent:
+        if self.dom is not None:
             tree['dom'] = self.dom.to_tree()
-        if self.cod != transparent:
+        if self.cod is not None:
             tree['cod'] = self.cod.to_tree()
         if self.is_dagger:
             tree['is_dagger'] = True
@@ -179,8 +189,8 @@ class Wire(cat.Ob):
 
     @classmethod
     def from_tree(cls, tree):
-        dom = from_tree(tree['dom']) if 'dom' in tree else transparent
-        cod = from_tree(tree['cod']) if 'cod' in tree else transparent
+        dom = from_tree(tree['dom']) if 'dom' in tree else None
+        cod = from_tree(tree['cod']) if 'cod' in tree else None
         return cls(tree['name'], dom, cod,
                    is_dagger=tree.get('is_dagger', False))
 
@@ -388,12 +398,22 @@ class Ty(cat.Ob, cat.FreeCategory, ColouredMonoid):
             assert_isinstance(obj, (str, self.generator_factory) + (
                 (cat.Ob, ) if self.generator_factory is Wire else ()))
         inside = tuple(map(self.cast_wire, inside))
-        if dom is None:
-            dom = inside[0].dom if inside else transparent
-        if cod is None:
-            cod = inside[-1].cod if inside else transparent
+        if dom is None and inside:
+            dom = inside[0].dom
+        if cod is None and inside:
+            cod = inside[-1].cod
         cat.FreeCategory.__init__(self, inside, dom, cod, _scan)
         cat.Ob.__init__(self, type(self).__name__)
+
+    @classmethod
+    def cast_ob(cls, x: Colour | str | None) -> Colour | None:
+        """ No colour is ``None``, any other boundary a :class:`Colour`. """
+        return None if x is None else super().cast_ob(x)
+
+    @classmethod
+    def id(cls, dom: Colour | None = None) -> Ty:
+        """ The empty type on a colour, with no colour by default. """
+        return cls.ar(inside=(), dom=dom, cod=dom, _scan=False)
 
     def tensor(self, *others: Ty) -> Ty:
         if any(not isinstance(other, self.factory) for other in others):
@@ -419,7 +439,7 @@ class Ty(cat.Ob, cat.FreeCategory, ColouredMonoid):
         return hash((type(self), self.inside, self.dom, self.cod))
 
     def __repr__(self):
-        if not self.inside and self.dom != transparent:
+        if not self.inside and self.dom is not None:
             return f"{factory_name(type(self))}.id({self.dom!r})"
         return factory_name(type(self))\
             + f"({', '.join(map(repr, self.inside))})"
@@ -469,7 +489,7 @@ class Ty(cat.Ob, cat.FreeCategory, ColouredMonoid):
     def __str__(self):
         name = type(self).__name__
         if not self.inside:
-            if self.dom == transparent:
+            if self.dom is None:
                 return f"{name}()"
             return f"{name}.id({self.dom})"
         parts = []
@@ -509,17 +529,13 @@ class Ty(cat.Ob, cat.FreeCategory, ColouredMonoid):
         if 'inside' not in state and "_objects" in state:
             state["inside"] = state['_objects']
             del state['_objects']
-        if 'dom' not in state:
-            state['dom'] = transparent
-        if 'cod' not in state:
-            state['cod'] = transparent
-        cat.Ob.__setstate__(self, state)
+        cat.Ob.__setstate__(self, uncolour_state(state))
 
     def to_tree(self):
         tree = {
             'factory': factory_name(type(self)),
             'inside': [x.to_tree() for x in self.inside]}
-        if not self.inside and self.dom != transparent:
+        if not self.inside and self.dom is not None:
             tree['dom'] = self.dom.to_tree()
             tree['cod'] = self.cod.to_tree()
         return tree
@@ -544,8 +560,8 @@ class Ty(cat.Ob, cat.FreeCategory, ColouredMonoid):
         if not self.inside:
             return Ty.id(self.dom)
         result = Ty(*(
-            Wire(str(x), getattr(x, 'dom', transparent),
-                 getattr(x, 'cod', transparent)) for x in self.inside))
+            Wire(str(x), getattr(x, 'dom', None), getattr(x, 'cod', None))
+            for x in self.inside))
         for new, old in zip(result.inside, self.inside):
             if getattr(old, "frame_boundary", False):
                 new.frame_boundary = True
@@ -617,16 +633,15 @@ class Nat(abc.Nat, Ty):
 
     def __init__(self, inside: int | tuple = 0, dom: Colour = None,
                  cod: Colour = None, _scan: bool = True):
-        # pylint: disable=unused-argument  # a Nat has one colour
+        # pylint: disable=unused-argument  # a Nat has no colour
         self.n = inside if isinstance(inside, int) else len(inside)
-        self.dom = self.cod = transparent
+        self.dom = self.cod = None
         cat.Ob.__init__(self, type(self).__name__)
 
     def __setstate__(self, state):
         if "n" not in state:
             state = {"n": len(state["_objects"])}
-        state.setdefault("dom", transparent)
-        state.setdefault("cod", transparent)
+        uncolour_state(state)
         state.setdefault("name", type(self).__name__)
         cat.Ob.__setstate__(self, state)
 
@@ -709,9 +724,7 @@ class Dim(Ty):
             if dim < 1:
                 raise ValueError
         inside = tuple(dim for dim in inside if dim > 1)
-        cat.FreeCategory.__init__(
-            self, inside, transparent if dom is None else dom,
-            transparent if cod is None else cod, _scan=False)
+        cat.FreeCategory.__init__(self, inside, dom, cod, _scan=False)
         cat.Ob.__init__(self, type(self).__name__)
 
     def __getitem__(self, key: int | slice) -> Dim:
@@ -2023,9 +2036,9 @@ class Functor(cat.Functor):
         return functor
 
     def __call__(self, other):
-        if isinstance(other, Colour):
+        if other is None or isinstance(other, Colour):
             if not self.colour_map or (
-                    other == transparent and other not in self.colour_map):
+                    other is None and other not in self.colour_map):
                 return other
             return self.colour_map[other]
         if isinstance(other, Dim) and isinstance(

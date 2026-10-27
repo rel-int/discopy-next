@@ -608,6 +608,21 @@ class Cup(compact.Cup, Box):
         super().__init__(left, right)
         self.affine = False
 
+    def __setstate__(self, state):
+        """
+        Load a cup with its flags, which a pickle from before them lacks.
+
+        >>> x = Ty('x')
+        >>> cup, state = Cup(x, x.r), dict(Cup(x, x.r).__dict__)
+        >>> del state["affine"]
+        >>> old = Cup.__new__(Cup)
+        >>> old.__setstate__(state)
+        >>> assert old == cup and not old.is_affine
+        """
+        super().__setstate__(state)
+        if "affine" not in state:
+            self.affine = False
+
 
 class Cap(compact.Cap, Box):
     """
@@ -626,6 +641,11 @@ class Cap(compact.Cap, Box):
     def __init__(self, left, right):
         super().__init__(left, right)
         self.deterministic = self.affine = False
+
+    def __setstate__(self, state):
+        super().__setstate__(state)
+        if "affine" not in state:
+            self.deterministic = self.affine = False
 
 
 class Permutation(

@@ -234,7 +234,7 @@ from discopy import tensor
 from discopy import monoidal, symmetric, frobenius, hypergraph
 from discopy.cat import factory
 from discopy.python import finset
-from discopy.utils import AxiomError
+from discopy.utils import AxiomError, factory_name
 from discopy.optyx.core import diagram, control, path, zw
 from discopy.optyx.sampling import Interferometer, Unravelling
 
@@ -1111,7 +1111,9 @@ class Diagram(frobenius.Diagram):
             max_steps : The depth at which it gives up and warns.
             max_chi : The largest bond dimension each contraction keeps,
                 as in :meth:`fix`; a bond past it is truncated down to
-                `max_chi` with a warning, once. `None` contracts exactly.
+                `max_chi` with a warning, once, at the first depth that
+                truncates. Each depth is contracted with a fresh optimiser.
+                `None` contracts exactly.
                 Note a truncated contraction biases the very distances
                 being watched, which is one more reason the criterion is
                 not a certificate.
@@ -1134,21 +1136,22 @@ class Diagram(frobenius.Diagram):
                     or value <= 0:
                 raise ValueError(f"{name} must be a positive integer.")
         backends = import_module("discopy.optyx.core.backends")
-        backend = backends.QuimbBackend(
-            hyperoptimiser=None if max_chi is None
-            else HyperCompressedOptimizer())
-        budgets = []
+        warned = False
 
         def state_at(depth):
+            nonlocal warned
             network = self.at_time(depth)
-            budgets.append(max(network.truncation_dimensions(), default=1))
-            if max_chi is not None and len(budgets) == 1 \
-                    and budgets[0] > max_chi:
+            needed = max(network.truncation_dimensions(), default=1)
+            if max_chi is not None and needed > max_chi and not warned:
+                warned = True
                 warnings.warn(
-                    f"the contraction needs dimension {budgets[0]} but "
+                    f"the contraction needs dimension {needed} but "
                     f"max_chi={max_chi}: the result is an approximation "
                     "with those bonds truncated down to max_chi.",
                     UserWarning, stacklevel=3)
+            backend = backends.QuimbBackend(
+                hyperoptimiser=None if max_chi is None
+                else HyperCompressedOptimizer())
             result = network.eval(backend, **(
                 {"max_bond": max_chi} if max_chi is not None else {}))
             state = np.asarray(result.density_matrix)
@@ -1600,6 +1603,11 @@ class Diagram(frobenius.Diagram):
 
             circuit >>= (left @ box @ right)
 
+        for m, component in enumerate(p.detectors):
+            if component is not None and circuit.cod[m] == qmode:
+                box = perceval_conversion.detector(component, (m, ))
+                circuit >>= circuit.cod[:m] @ box @ circuit.cod[m + 1:]
+
         circuit >>= perceval_conversion.heralds_diagram(
             heralds, n_modes, circuit, "out"
         )
@@ -1646,6 +1654,11 @@ class Channel(Diagram, frobenius.Box):
         self.kraus = kraus
         self.env = env
         super().__init__(name, dom, cod)
+
+    def __repr__(self):
+        env = "" if not self.env else f", env={self.env!r}"
+        return f"{factory_name(type(self))}({self.name!r}, {self.kraus!r}, "\
+            f"{self.dom!r}, {self.cod!r}{env})"
 
     def double(self):
         """
@@ -1784,6 +1797,10 @@ class CQMap(Diagram, frobenius.Box):
 
         self.density_matrix = density_matrix
         super().__init__(name, dom, cod)
+
+    def __repr__(self):
+        return f"{factory_name(type(self))}({self.name!r}, "\
+            f"{self.density_matrix!r}, {self.dom!r}, {self.cod!r})"
 
     def double(self):
         return self.density_matrix
@@ -1950,6 +1967,9 @@ class Measure(Channel):
         kraus = diagram.Id(dom.single())
         super().__init__(name="Measure", kraus=kraus, dom=dom, cod=cod)
 
+    def __repr__(self):
+        return f"{factory_name(type(self))}({self.dom!r})"
+
     def inflate(self, d):
         r""" A specific choice of inflation for the Measure channel.
         The diagram discards the internal states and measures
@@ -1988,6 +2008,11 @@ class Encode(Channel):
 
         super().__init__(name="Encode", kraus=kraus, dom=dom, cod=cod)
         self.internal_states = internal_states
+
+    def __repr__(self):
+        states = "" if self.internal_states is None else \
+            f", internal_states={self.internal_states!r}"
+        return f"{factory_name(type(self))}({self.dom!r}{states})"
 
     def inflate(self, d):
         r"""
@@ -2035,6 +2060,9 @@ class Discard(Channel):
         env = dom.single()
         kraus = diagram.Id(dom.single())
         super().__init__("Discard", kraus, dom=dom, cod=Ty(), env=env)
+
+    def __repr__(self):
+        return f"{factory_name(type(self))}({self.dom!r})"
 
     def inflate(self, d):
         """
@@ -2109,6 +2137,12 @@ class Observable(CQMap):
             density = merge >> control.Weight(function, dom.single())
         self.operator, self.function = operator, function
         super().__init__(name or "Observable", density, dom, Ty())
+
+    def __repr__(self):
+        given = f"operator={self.operator!r}" if self.function is None else \
+            f"function={self.function!r}, dom={self.dom!r}"
+        name = "" if self.name == "Observable" else f", name={self.name!r}"
+        return f"{factory_name(type(self))}({given}{name})"
 
     def expectation(self, state: Diagram) -> complex:
         """

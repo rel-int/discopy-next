@@ -252,6 +252,7 @@ import numpy as np
 import sympy as sp
 from sympy import Expr, lambdify
 from discopy.cat import rsubs
+from discopy.utils import factory_name
 
 from discopy.optyx import channel
 from discopy.optyx.core import (
@@ -275,6 +276,20 @@ from discopy.optyx.channel import (
 )
 
 
+def listed(internal_states):
+    """
+    The internal states as lists of numbers, which is what their
+    representation reads back: they are declared as lists and used as
+    arrays, and `STYLE.md` reads a representation holding an array up to
+    elision.
+
+    >>> listed((np.array([1, 0]), [0, 1]))
+    '([1, 0], [0, 1])'
+    """
+    states = ", ".join(repr(np.asarray(s).tolist()) for s in internal_states)
+    return f"({states},)" if len(internal_states) == 1 else f"({states})"
+
+
 class Select(Channel):
     """
     Post-select on an occupation number.
@@ -285,6 +300,10 @@ class Select(Channel):
             f"Select({photons})",
             zw.Select(*photons)
         )
+
+    def __repr__(self):
+        args = ", ".join(map(repr, self.photons))
+        return f"{factory_name(type(self))}({args})"
 
     def to_path(self, dtype=complex) -> path.Matrix:
         array = np.eye(len(self.photons))
@@ -306,6 +325,9 @@ class Scalar(Channel):
             diagram.Scalar(value)
         )
         self.data = value
+
+    def __repr__(self):
+        return f"{factory_name(type(self))}({self.scalar!r})"
 
     def subs(self, *args):
         data = rsubs(self.scalar, *args)
@@ -331,6 +353,9 @@ class Encode(EncodeChannel):
     def __init__(self, n):
         super().__init__(mode**n)  # pragma: no cover
 
+    def __repr__(self):
+        return f"{factory_name(type(self))}({len(self.dom)})"
+
 
 class Discard(DiscardChannel):
     """
@@ -339,6 +364,9 @@ class Discard(DiscardChannel):
 
     def __init__(self, n):
         super().__init__(qmode**n)  # pragma: no cover
+
+    def __repr__(self):
+        return f"{factory_name(type(self))}({len(self.dom)})"
 
 
 class PhotonThresholdMeasurement(Channel):
@@ -355,6 +383,10 @@ class PhotonThresholdMeasurement(Channel):
             cod=bit**n
         )
 
+    def __repr__(self):
+        n = "" if len(self.cod) == 1 else repr(len(self.cod))
+        return f"{factory_name(type(self))}({n})"
+
 
 class NumberResolvingMeasurement(Measure):
     """
@@ -364,6 +396,9 @@ class NumberResolvingMeasurement(Measure):
     def __init__(self, n):
         super().__init__(qmode**n)  # pragma: no cover
 
+    def __repr__(self):
+        return f"{factory_name(type(self))}({len(self.dom)})"
+
 
 class Create(Channel):
     """
@@ -372,10 +407,17 @@ class Create(Channel):
     def __init__(self, *photons: int,
                  internal_states: tuple[list[int]] = None):
         self.photons = photons
+        self.internal_states = internal_states
         super().__init__(
             f"Create({photons})",
             zw.Create(*photons, internal_states=internal_states)
         )
+
+    def __repr__(self):
+        args = ", ".join(map(repr, self.photons))
+        if self.internal_states is not None:
+            args += f", internal_states={listed(self.internal_states)}"
+        return f"{factory_name(type(self))}({args})"
 
 
 class AbstractGate(Channel, ABC):
@@ -453,6 +495,11 @@ class Gate(AbstractGate):
     def _compute_array(self):
         return self._matrix
 
+    def __repr__(self):
+        data = "" if self.data is None else f", data={self.data!r}"
+        return f"{factory_name(type(self))}({self.array.tolist()}, "\
+            f"{len(self.dom)}, {len(self.cod)}, {self.name!r}{data})"
+
     def dagger(self):
         return Gate(
             np.conjugate(self.array.T),
@@ -498,6 +545,9 @@ class Phase(AbstractGate):
             data=angle
         )
 
+    def __repr__(self):
+        return f"{factory_name(type(self))}({self.angle!r})"
+
     def _compute_array(self):
         backend = sp if self.dtype is Expr else np
         return [backend.exp(2 * np.pi * 1j * self.angle)]
@@ -538,6 +588,9 @@ class NumOp(Channel):
                 zw.Merge(2)
             )
         )
+
+    def __repr__(self):
+        return f"{factory_name(type(self))}()"
 
 
 class BBS(AbstractGate):
@@ -597,6 +650,10 @@ class BBS(AbstractGate):
             f"BBS({bias})",
             data=bias
         )
+
+    def __repr__(self):
+        is_conj = ", is_conj=True" if self.is_conj else ""
+        return f"{factory_name(type(self))}({self.bias!r}{is_conj})"
 
     def _compute_array(self):
         backend = sp if self.dtype is Expr else np
@@ -669,6 +726,12 @@ class TBS(AbstractGate):
             f"TBS({theta})",
             data=theta
         )
+
+    def __repr__(self):
+        flags = "".join(f", {flag}=True" for flag, value in [
+            ("is_gate_dagger", self.is_gate_dagger),
+            ("is_conj", self.is_conj)] if value)
+        return f"{factory_name(type(self))}({self.theta!r}{flags})"
 
     @cached_property
     def global_phase(self):
@@ -775,6 +838,13 @@ class MZI(AbstractGate):
             f"MZI({theta}, {phi})",
             data=(theta, phi)
         )
+
+    def __repr__(self):
+        flags = "".join(f", {flag}=True" for flag, value in [
+            ("is_gate_dagger", self.is_gate_dagger),
+            ("is_conj", self.is_conj)] if value)
+        return f"{factory_name(type(self))}"\
+            f"({self.theta!r}, {self.phi!r}{flags})"
 
     @cached_property
     def global_phase(self):
@@ -883,6 +953,9 @@ class HadamardBS(Gate):
             matrix, 2, 2, "HadamardBS"
         )
 
+    def __repr__(self):
+        return f"{factory_name(type(self))}()"
+
 
 class DualRail(Channel):
     """
@@ -890,10 +963,17 @@ class DualRail(Channel):
     encoding a specified number of qubit registers.
     """
     def __init__(self, n_qubits, internal_states=None):
+        self.internal_states = internal_states
         super().__init__(
             f"DualRail({n_qubits})",
             diagram.dual_rail(n_qubits, internal_states=internal_states)
         )
+
+    def __repr__(self):
+        args = str(len(self.dom))
+        if self.internal_states is not None:
+            args += f", internal_states={listed(self.internal_states)}"
+        return f"{factory_name(type(self))}({args})"
 
 
 class PhaseShiftDR(Channel):
@@ -902,10 +982,14 @@ class PhaseShiftDR(Channel):
     """
 
     def __init__(self, phase):
+        self.phase = phase
         super().__init__(
             f"PhaseShift({phase})",
             diagram.Mode(1) @ Phase(phase).get_kraus()
         )
+
+    def __repr__(self):
+        return f"{factory_name(type(self))}({self.phase!r})"
 
 
 class ZMeasurementDR(Diagram):
@@ -1023,6 +1107,10 @@ class Swap(channel.Swap):
     def __init__(self, left, right):
         super().__init__(qmode**left, qmode**right)
 
+    def __repr__(self):
+        return f"{factory_name(type(self))}"\
+            f"({len(self.left)}, {len(self.right)})"
+
 
 class PhotonLoss(Channel):
     """
@@ -1070,6 +1158,9 @@ class PhotonLoss(Channel):
             qmode @ channel.Ty(),
             env=qmode.single()
         )
+
+    def __repr__(self):
+        return f"{factory_name(type(self))}({self.p_survive!r})"
 
 
 class FusionTypeII(Diagram):

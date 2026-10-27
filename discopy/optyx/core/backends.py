@@ -100,10 +100,11 @@ class PercevalEvalConfig:
         Either the creations for all input ports are specified
         by the diagram (`Create(...)`) or the user must provide
         the `state` argument covering all input ports.
-    - effect: Required if task is "single_amp" or "single_prob".
-        A sequence of non-negative integers (occupation numbers)
-        specifying the output configuration for which to compute
-        the amplitude or probability.
+    - effect: Required if task is "single_amp" or "single_prob"
+        and the diagram has output modes, a closed diagram being
+        conditioned on its selections. A sequence of non-negative
+        integers (occupation numbers) specifying the output
+        configuration for which to compute the amplitude or probability.
     """
     task: Literal[
         "probs", "amps", "single_amp", "single_prob"
@@ -845,28 +846,15 @@ class PercevalBackend(AbstractBackend):
                     f"modes but diagram has {len(matrix.cod)} output modes."
                 )
 
-        # convert post-selections to pcvl effects and post-selections
-        if len(matrix.cod) == 0:
-            sel0 = matrix.selections[0]
-            m = Matrix(
-                matrix.array.copy(),
-                matrix.dom,
-                1,
-                creations=list(matrix.creations),
-                selections=list(matrix.selections[1:])
-            )
-            perceval_effect = pcvl.BasicState([sel0])
-            matrix = m
-
-        if (
-            perceval_effect is not None and
-            task in ("amps", "probs")
-        ):
+        if effect_provided and task in ("amps", "probs"):
             raise ValueError(
                 f"An 'effect' was provided but task='{task}'. "
                 "Use task='single_amp' or task='single_prob' " +
                 "when conditioning on an effect."
             )
+
+        if len(matrix.cod) == 0:
+            perceval_effect = pcvl.BasicState([])
 
         if task in ("single_amp", "single_prob"):
             if perceval_effect is None:
@@ -986,7 +974,7 @@ class PercevalBackend(AbstractBackend):
             array[tuple(configs.T)] = coeffs
 
         else:
-            array[0] = result
+            array[...] = result
         return array
 
     def process_term(
@@ -1040,18 +1028,21 @@ class PercevalBackend(AbstractBackend):
             perceval_effect = perceval_effect * pcvl.BasicState(
                 list(matrix.selections))
 
+        sim_task = task if perceval_effect is None else {
+            "probs": "single_prob", "amps": "single_amp"}.get(task, task)
+
         result = self._simulate(
             sim,
             perceval_state,
             perceval_effect,
-            task
+            sim_task
         )
 
         result = self._post_select_vacuum(
             result,
             len(term.dom),
             len(matrix.dom) - len(term.dom),
-            task
+            sim_task
         )
 
         output_shape, output_types = self._get_output_params(
@@ -1062,7 +1053,7 @@ class PercevalBackend(AbstractBackend):
         array = self._get_array_from_result(
             result,
             output_shape,
-            task
+            sim_task
         )
 
         return array, output_types, return_type

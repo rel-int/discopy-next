@@ -820,3 +820,14 @@ def test_perceval_backend_takes_occupation_lists():
 def test_perceval_backend_validates_its_config(config, error):
     with pytest.raises(error):
         photonic.BS.eval(PercevalBackend(), config=config)
+
+
+@pytest.mark.parametrize("task", ["probs", "amps", "single_prob", "single_amp"])
+def test_perceval_backend_closed_diagram(task):
+    """A closed diagram evaluates to the amplitude of its selected outcome,
+    or its probability, as the default backend says."""
+    hom = photonic.Create(1, 1) >> photonic.BS >> photonic.Select(2, 0)
+    amp = complex(hom.eval().tensor.array)
+    expected = amp if "amp" in task else abs(amp) ** 2
+    result = hom.eval(PercevalBackend(), config=PercevalEvalConfig(task=task))
+    assert np.isclose(np.ravel(result.tensor.array)[0], expected)

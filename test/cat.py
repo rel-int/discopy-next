@@ -65,6 +65,8 @@ def test_Arrow_init():
         Arrow((), Ob('x'), 1)
     with raises(TypeError) as err:
         Arrow((Ob('x'), ), Ob('x'), Ob('x'))
+    with raises(TypeError):
+        Arrow((), None, None)  # Only a type has None, i.e. no colour.
 
 
 def test_Arrow_len():
@@ -715,7 +717,6 @@ BROKEN = {
         PIVOTALS + ".{Feedback,Trace,Head,Tail,FollowedBy} "
         "{tensor,quantum.circuit,quantum.zx}.Bubble":
         "it has no stated rotation",
-        "{tensor,quantum.circuit,quantum.zx}.Sum": "it rotates as a box",
         "ribbon.DualRailC[ua]p": "its rotation drops is_dagger",
         "quantum.zx.Scalar": "it takes no dom, cod or z",
     },

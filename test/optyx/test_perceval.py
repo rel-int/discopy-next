@@ -305,3 +305,39 @@ def test_conversion_guards():
         detector(pcvl.Detector.ppnr(2), (0, ))
     with pytest.raises(ValueError, match="in_out"):
         heralds_diagram(None, 1, Id_(1), "both")
+
+
+@pytest.mark.parametrize("n, offset, state", [
+    (3, -1, [1, 0, 1]), (4, -1, [1, 0, 0, 1]), (4, -2, [1, 0, 0, 1]),
+    (5, -3, [1, 0, 0, 0, 1]), (4, 1, [1, 0, 1, 0])])
+def test_feed_forward_offset(n, offset, state):
+    """A negative offset ``k`` leaves ``-k - 1`` modes between the circuit
+    and the measured mode, a non-negative one leaves ``k``, as in perceval."""
+    p = pcvl.Processor("SLOS", n)
+    measured = 0 if offset >= 0 else n - 1
+    p.add(measured, pcvl.Detector.pnr())
+    swap = pcvl.FFCircuitProvider(1, offset, pcvl.Circuit(2))
+    swap.add_configuration([1], pcvl.PERM([1, 0]))
+    p.add(measured, swap)
+    for m in range(n):
+        if p.detectors[m] is None:
+            p.add(m, pcvl.Detector.pnr())
+    p.with_input(pcvl.BasicState(state))
+    expected = {tuple(k): v for k, v in p.probs()["results"].items()}
+    check_dict_agreement(expected, (
+        Create_(*state) >> Channel.from_perceval(p)).eval().prob_dist())
+
+
+def test_trailing_detector():
+    """A detector with nothing after it, which perceval keeps in
+    ``p.detectors`` only, is converted as the others are."""
+    from discopy.optyx.photonic import NumberResolvingMeasurement
+    p = pcvl.Processor("SLOS", 2)
+    p.add(0, pcvl.BS())
+    p.add(0, pcvl.Detector.threshold())
+    p.with_input(pcvl.BasicState([1, 1]))
+    expected = {tuple(k): v for k, v in p.probs()["results"].items()}
+    circuit = Channel.from_perceval(p)
+    measured = circuit >> circuit.cod[:1] @ NumberResolvingMeasurement(1)
+    check_dict_agreement(
+        expected, (Create_(1, 1) >> measured).eval().prob_dist())

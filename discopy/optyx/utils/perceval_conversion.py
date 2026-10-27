@@ -29,12 +29,10 @@ def _rewire_and_context(*, component, wires, circuit,
     """Compute (input_perm, output_perm, left, right)
     based on component._offset sign."""
     if component._offset < 0:
-        # classical wires after action+offset
+        # offset and classical wires before action
         p_input = (
-            list(range(n_action + n_offset,
-                       n_action + n_offset + n_classical)) +
-            list(range(0, n_action)) +
-            list(range(n_action, n_action + n_offset))
+            list(range(n_action, n_action + n_offset + n_classical)) +
+            list(range(0, n_action))
         )
         input_perm = Diagram.permutation(p_input, perm_dom_neg)
         output_perm = Diagram.permutation(invert_perm(p_input), input_perm.cod)
@@ -98,7 +96,7 @@ def _feedforward_common(*, component, wires, circuit,
 
     n_classical = len(next(iter(map_iter.keys())))
     n_action = len(default_action.dom)
-    n_offset = abs(component._offset)
+    n_offset = max(component._offset, -component._offset - 1)
 
     # build permutation domains for input permutation
     # if use_provider_dom:

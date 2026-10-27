@@ -142,3 +142,11 @@ def test_classical_guards():
     with pytest.raises(TypeError, match="channel.Ty"):
         Id(2)
     assert Bit(1) >> Id(bit) == Bit(1)
+
+
+def test_bit_controlled_phase_shift_keeps_its_modes_quantum():
+    from discopy.optyx.channel import qmode
+    from discopy.optyx.photonic import Phase
+    gate = BitControlledPhaseShift(lambda bits: [0.5 * bits[0]])
+    assert gate.cod == qmode
+    assert (gate >> Phase(0.25)).cod == qmode

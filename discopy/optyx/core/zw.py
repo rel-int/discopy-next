@@ -293,7 +293,7 @@ class ZBox(diagram.Spider, ZWBox):
             diagram.PhotonNumberPreservation.NON_LO
 
     def conjugate(self):
-        return ZBox(self.legs_in, self.legs_out, self.amplitudes.conjugate())
+        return ZBox(self.legs_in, self.legs_out, np.conj(self.amplitudes))
 
     def truncation(
         self, input_dims: list[int] = None, output_dims: list[int] = None

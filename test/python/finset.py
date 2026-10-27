@@ -121,6 +121,19 @@ def test_Function_permutation_moves_blocks():
     assert Function.permutation([0, 1], [2, 3]) == Function.id(5)
 
 
+def test_Function_then_checks_composability():
+    from discopy.utils import AxiomError
+    from discopy.python.finset import Function
+    f, g, h = Function([0, 1, 0], 2, 3), Function([4, 0], 5, 2),\
+        Function([1, 0], 2, 2)
+    for left, right in [(f, g), (f, h)]:
+        with raises(AxiomError):
+            left.then(right)
+    with raises(AxiomError):
+        h.then(h, f, h)
+    assert h.then(h, h) == h
+
+
 def test_counts_take_index():
     from discopy.abc import Nat
     from discopy.python.finset import Cospan, Function

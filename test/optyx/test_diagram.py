@@ -70,6 +70,12 @@ def test_scalar_lambdify():
     assert Scalar(x).lambdify(x)(3) == Scalar(3)
 
 
+def test_scalar_of_any_symbolic_expression():
+    for expr in (x ** 2, x + 1, x + y):
+        assert Scalar(expr).scalar == expr
+    assert Scalar(x - x + 2).scalar == 2
+
+
 def test_inflation_commutes_with_dagger():
     rail = DualRail(internal_state=[1, 0])
     assert rail.dagger().inflate(2) == rail.inflate(2).dagger()

@@ -226,6 +226,34 @@ def test_power_fix_normalises_the_contracted_state():
         source().power_fix(tol=1e-2, backend=DiscopyBackend())
 
 
+def test_power_fix_contracts_each_depth_with_a_fresh_optimiser(
+        monkeypatch):
+    """Each depth is a bigger network, so it gets its own optimiser: one
+    reused across depths loses the trace once `max_chi` truncates (#289).
+    The warning comes once, from the first depth that truncates, here the
+    second of three."""
+    optimisers, contract = [], QuimbBackend.eval
+
+    def spy(backend, diagram_, **extra):
+        optimisers.append(backend.hyperoptimiser)
+        return contract(backend, diagram_, **extra)
+
+    monkeypatch.setattr(QuimbBackend, "eval", spy)
+    loop = (photonic.Create(1) @ qmode >> photonic.MZI(.06, 0)
+            >> qmode @ photonic.PhotonLoss(.1)).feedback(
+        mem=qmode, state=photonic.Create(0))
+    with pytest.warns(UserWarning) as record:
+        density_matrix = loop.power_fix(
+            tol=1e-9, max_chi=2, n_steps=1, max_steps=2).density_matrix
+    truncations = [str(warning.message) for warning in record
+                   if "needs dimension" in str(warning.message)]
+    assert len(truncations) == 1 and "dimension 3" in truncations[0]
+    assert np.isclose(np.trace(density_matrix), 1)
+    assert len(optimisers) == 3
+    assert len({id(optimiser) for optimiser in optimisers}) \
+        == len(optimisers)
+
+
 def test_solvers_refuse_a_zero_state():
     """A loop scaled to zero has no state to normalise: both contractions
     raise rather than divide by a vanishing trace."""

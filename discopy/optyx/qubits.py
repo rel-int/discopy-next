@@ -309,6 +309,7 @@ from discopy import quantum as quantum_discopy
 from discopy import symmetric
 from sympy import lambdify
 # from pytket import circuit as tket_circuit
+from discopy.utils import factory_name
 from discopy.optyx.utils.misc import explode_channel
 from discopy.optyx import channel
 from discopy.optyx.core import (
@@ -646,6 +647,9 @@ class Measure(MeasureChannel):
             qubit**n
         )
 
+    def __repr__(self):
+        return f"{factory_name(type(self))}({len(self.dom)})"
+
 
 class Discard(DiscardChannel):
     """
@@ -657,6 +661,9 @@ class Discard(DiscardChannel):
             qubit**n
         )
 
+    def __repr__(self):
+        return f"{factory_name(type(self))}({len(self.dom)})"
+
 
 class Encode(EncodeChannel):
     """
@@ -667,6 +674,9 @@ class Encode(EncodeChannel):
         super().__init__(
             bit**n
         )
+
+    def __repr__(self):
+        return f"{factory_name(type(self))}({len(self.dom)})"
 
 
 # pylint: disable=invalid-name
@@ -687,6 +697,10 @@ class Z(Channel):
         )
         self.data = phase
         self.phase = phase
+
+    def __repr__(self):
+        return f"{factory_name(type(self))}({len(self.dom)}, "\
+            f"{len(self.cod)}, {self.phase!r})"
 
     def lambdify(self, *symbols, **kwargs):
         return lambda *xs: type(self)(
@@ -789,6 +803,10 @@ class X(Channel):
         self.data = phase
         self.phase = phase
 
+    def __repr__(self):
+        return f"{factory_name(type(self))}({len(self.dom)}, "\
+            f"{len(self.cod)}, {self.phase!r})"
+
     def lambdify(self, *symbols, **kwargs):
         return lambda *xs: type(self)(
             len(self.dom),
@@ -860,6 +878,9 @@ class H(Channel):
             qubit,
         )
 
+    def __repr__(self):
+        return f"{factory_name(type(self))}()"
+
     def decomp(self):
         """Hadamard is already an elementary generator."""
         return H()
@@ -887,6 +908,9 @@ class Scalar(Channel):
         )
         self.data = value
 
+    def __repr__(self):
+        return f"{factory_name(type(self))}({self.data!r})"
+
     def decomp(self):
         """A scalar is already an elementary generator."""
         return Scalar(self.data)
@@ -906,6 +930,7 @@ class BitFlipError(Channel):
     """
 
     def __init__(self, prob):
+        self.prob = prob
         x_error = zx.X(1, 2) >> zx.Id(1) @ zx.ZBox(
             1, 1, np.sqrt((1 - prob) / prob)
         ) @ zx.scalar(np.sqrt(prob * 2))
@@ -917,6 +942,9 @@ class BitFlipError(Channel):
             env=diagram.Bit(1),
         )
 
+    def __repr__(self):
+        return f"{factory_name(type(self))}({self.prob!r})"
+
     def dagger(self):
         return self
 
@@ -926,6 +954,7 @@ class DephasingError(Channel):
     Represents a quantum dephasing error channel.
     """
     def __init__(self, prob):
+        self.prob = prob
         z_error = (
             zx.H
             >> zx.X(1, 2)
@@ -940,6 +969,9 @@ class DephasingError(Channel):
             cod=qubit,
             env=diagram.Bit(1),
         )
+
+    def __repr__(self):
+        return f"{factory_name(type(self))}({self.prob!r})"
 
     def dagger(self):
         return self
@@ -970,10 +1002,15 @@ class Ket(Channel):
         self, value: Literal[0, 1, "+", "-"], cod: channel.Ty = qubit
     ) -> None:
         value = basis_value(value)
+        self.value = value
         spider = zx.X if value in (0, 1) else zx.Z
         phase = 0 if value in (0, "+") else 0.5
         kraus = spider(0, 1, phase) @ diagram.Scalar(1 / np.sqrt(2))
         super().__init__(f"|{value}>", kraus, cod=cod)
+
+    def __repr__(self):
+        cod = "" if self.cod == qubit else f", {self.cod!r}"
+        return f"{factory_name(type(self))}({self.value!r}{cod})"
 
 
 class Bra(Channel):
@@ -983,10 +1020,15 @@ class Bra(Channel):
         self, value: Literal[0, 1, "+", "-"], dom: channel.Ty = qubit
     ) -> None:
         value = basis_value(value)
+        self.value = value
         spider = zx.X if value in (0, 1) else zx.Z
         phase = 0 if value in (0, "+") else 0.5
         kraus = spider(1, 0, phase) @ diagram.Scalar(1 / np.sqrt(2))
         super().__init__(f"<{value}|", kraus, dom=dom)
+
+    def __repr__(self):
+        dom = "" if self.dom == qubit else f", {self.dom!r}"
+        return f"{factory_name(type(self))}({self.value!r}{dom})"
 
 
 def Id(n):

@@ -8,6 +8,7 @@ import builtins
 import inspect
 import json
 import sys
+from fractions import Fraction
 from functools import lru_cache, wraps
 from math import ceil, prod
 from pathlib import Path
@@ -505,7 +506,8 @@ def encode(tree: Any) -> Any:
     A tree as JSON can write it, with a node tagged by its factory for each
     value that JSON has no notation for, or one it would read back as
     something else: a tuple, which it writes as a list, a complex number, see
-    :func:`encode_complex`, a numpy array or scalar, see :func:`encode_numpy`,
+    :func:`encode_complex`, a fraction, see :func:`encode_fraction`, a numpy
+    array or scalar, see :func:`encode_numpy`,
     and a sympy expression, see :func:`encode_sympy`. Every other value is
     left as it is, so a tree without tuples keeps the bytes JSON gives it, as
     is one that these refuse, for the ``default`` of ``json.dumps``.
@@ -529,6 +531,8 @@ def encode(tree: Any) -> Any:
         return tree
     if isinstance(tree, complex):
         return encode_complex(tree)
+    if isinstance(tree, Fraction):
+        return encode_fraction(tree)
     package = (type(tree).__module__ or "").partition('.')[0]
     encoder = {"numpy": encode_numpy, "sympy": encode_sympy}.get(package)
     try:
@@ -562,6 +566,8 @@ def decode(tree: dict) -> Any:
         return decode_numpy(tree)
     if isinstance(name, str) and name.startswith("sympy."):
         return decode_sympy(tree)
+    if name == factory_name(Fraction):
+        return decode_fraction(tree)
     return decode_complex(tree)
 
 
@@ -813,6 +819,44 @@ def decode_complex(tree: dict) -> Any:
     if tree.keys() == {'factory', 're', 'im'} \
             and tree['factory'] == factory_name(complex):
         return complex(tree['re'], tree['im'])
+    return tree
+
+
+def encode_fraction(number: Fraction) -> dict:
+    """
+    A fraction as a node of a tree, since JSON has only integers and floats:
+    its ``numerator`` and ``denominator`` in lowest terms, tagged with its
+    factory like every other node, see :func:`encode`.
+
+    Example
+    -------
+    >>> encode_fraction(Fraction(2, 8))
+    {'factory': 'fractions.Fraction', 'numerator': 1, 'denominator': 4}
+    """
+    return {'factory': factory_name(Fraction),
+            'numerator': number.numerator, 'denominator': number.denominator}
+
+
+def decode_fraction(tree: dict) -> Any:
+    """
+    Read back what :func:`encode_fraction` wrote, leaving other nodes alone,
+    see :func:`decode`: exactly its three keys, with an integer numerator
+    and a positive integer denominator.
+
+    Example
+    -------
+    >>> assert decode_fraction(encode_fraction(Fraction(-1, 4)))\\
+    ...     == Fraction(-1, 4)
+    >>> tree = {'factory': 'fractions.Fraction',
+    ...         'numerator': 1, 'denominator': 0}
+    >>> assert decode_fraction(tree) == tree
+    """
+    if tree.keys() == {'factory', 'numerator', 'denominator'}\
+            and tree['factory'] == factory_name(Fraction)\
+            and type(tree['numerator']) is int\
+            and type(tree['denominator']) is int\
+            and tree['denominator'] > 0:
+        return Fraction(tree['numerator'], tree['denominator'])
     return tree
 
 

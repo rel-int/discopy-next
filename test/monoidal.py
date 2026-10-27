@@ -13,7 +13,6 @@ from discopy.utils import AxiomError, dumps, from_tree, loads
 def test_Ty():
     x, y, z = Ty('x'), Ty('y'), Ty('z')
     assert Ty.ob is Colour and Ty.ar is Ty
-    assert isinstance(transparent, cat.Ob)
     assert isinstance(x, cat.FreeCategory)
     assert not isinstance(x, DaggerCategory) and issubclass(
         Diagram, DaggerCategory)
@@ -30,7 +29,9 @@ def test_coloured_Ty():
     y = Ty(Wire("y", green, blue))
     path = x @ y
 
-    assert Ty() == Ty.id(transparent) == Ty.id(Colour())
+    assert Ty() == Ty.id() == Ty.id(None) and Ty().dom is None
+    with raises(TypeError):
+        Colour()
     assert path.dom == red and path.cod == blue
     assert Ty.id(red) >> path == path == path >> Ty.id(blue)
     assert path[:0] == Ty.id(red)

@@ -63,6 +63,11 @@ class Diagram(tensor.Diagram[complex]):
     ...     tensor.Tensor[complex]([1, 0, 0, -1], Dim(2), Dim(2)))
     >>> assert (H >> H).eval().is_close(tensor.Tensor[complex].id(Dim(2)))
     >>> assert X(1, 1, .25).eval().is_close((H >> Z(1, 1, .25) >> H).eval())
+
+    The copy and discard are the Z spiders, which :code:`H` commutes with
+    neither:
+
+    >>> assert not H.is_deterministic and not H.is_affine
     """
     ob = Nat
 
@@ -567,7 +572,8 @@ circuit2zx = quantum.circuit.Functor(
     ob_map={qubit: Nat(1)}, ar_map=gate2zx,
     dom=Circuit, cod=Diagram)
 
-H = Box('H', Nat(1), Nat(1), data=[x / 2 ** .5 for x in (1, 1, 1, -1)])
+H = Box('H', Nat(1), Nat(1), data=[x / 2 ** .5 for x in (1, 1, 1, -1)],
+        is_deterministic=False, is_affine=False)
 H.dagger = lambda: H
 H.draw_as_spider = True
 H.drawing_name, H.tikzstyle_name, = '', 'H'

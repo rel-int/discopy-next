@@ -225,6 +225,30 @@ def test_decode_complex():
         assert decode_complex(tree) == tree
 
 
+def test_decode_fraction():
+    from fractions import Fraction
+    assert decode_fraction(encode_fraction(Fraction(3, -6))) == Fraction(-1, 2)
+    for tree in ({'factory': 'fractions.Fraction', 'numerator': 1},
+                 {'factory': 'fractions.Fraction',
+                  'numerator': 1, 'denominator': -2},
+                 {'factory': 'fractions.Fraction',
+                  'numerator': 1.5, 'denominator': 2},
+                 {'factory': 'fractions.Fraction',
+                  'numerator': True, 'denominator': 2}):
+        assert decode_fraction(tree) == tree
+
+
+def test_dumps_fraction_phase():
+    """ A spider with a rational phase serialises (rel-int/discopy-next#376).
+    """
+    from fractions import Fraction
+    from discopy.quantum import zx
+    diagram = zx.Z(1, 1, Fraction(1, 4)) >> zx.X(1, 2, Fraction(-1, 3))
+    assert loads(dumps(diagram)) == diagram
+    phase = loads(dumps(diagram)).inside[0].boxes[0].phase
+    assert type(phase) is Fraction
+
+
 @pytest.mark.parametrize('data', [
     1j, [1, 1j], [[1j, 2], {'key': 3j}], {'re': 'a', 'im': 'b'},
     {'factory': 'cat.Ob', 'name': 'x'}])

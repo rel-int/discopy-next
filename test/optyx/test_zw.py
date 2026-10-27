@@ -535,3 +535,16 @@ def test_mod2_dagger_reaches_modes_of_its_parity():
     assert array.any()
     for (parity, photons), value in np.ndenumerate(array):
         assert not value or photons % 2 == parity
+
+
+def test_zbox_conjugate_of_a_list():
+    box = ZBox(1, 0, [1, 1j])
+    assert np.allclose(box.conjugate().amplitudes, [1, -1j])
+    assert np.allclose(
+        box.conjugate().to_tensor(input_dims=[2]).eval().array,
+        box.to_tensor(input_dims=[2]).eval().array.conjugate())
+
+
+def test_endo_grad_of_a_symbol():
+    from sympy.abc import x
+    assert Endo(x).grad(x).free_symbols == {x}

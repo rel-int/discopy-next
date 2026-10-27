@@ -213,7 +213,7 @@ from discopy import (
 from discopy import stream as monoidal_stream
 from discopy.cat import factory, rsubs
 from discopy.frobenius import Dim
-from discopy.utils import AxiomError
+from discopy.utils import AxiomError, factory_name
 from discopy.quantum.gates import format_number
 from discopy.optyx.core import path
 from discopy.optyx.utils.misc import (
@@ -276,6 +276,9 @@ class Mode(Ty):
         self.n = n
         super().__init__(*["mode" for _ in range(n)])
 
+    def __repr__(self):
+        return f"{factory_name(type(self))}({self.n})"
+
 
 class Bit(Ty):
     """Qubit type interpreted as the two dimensional complext vector space"""
@@ -283,6 +286,9 @@ class Bit(Ty):
     def __init__(self, n=0):
         self.n = n
         super().__init__(*["bit" for _ in range(n)])
+
+    def __repr__(self):
+        return f"{factory_name(type(self))}({self.n})"
 
 
 @factory

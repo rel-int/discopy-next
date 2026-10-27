@@ -91,10 +91,17 @@ class Function(MarkovCategory, Sequence):
         """
         The composite ``self ; others``, read off backwards, i.e. each
         index of the last codomain walked back through every function.
+
+        Raises:
+            AxiomError : When two adjacent functions do not compose.
         """
         if not others:
             return self
         factors = (self, ) + others
+        for left, right in zip(factors, factors[1:]):
+            if left.cod.n != right.dom.n:
+                raise AxiomError(messages.NOT_COMPOSABLE.format(
+                    left, right, left.cod, right.dom))
         inside = factors[-1].inside
         for factor in reversed(factors[:-1]):
             image = factor.inside
