@@ -29,9 +29,10 @@ on CUDA float32 tensors, including their backward pass. This uses the same
 signed blocks for every geometry, without an edge activation tensor or
 atomic gradient accumulation. Strided slices of the folded maps are read
 directly. Other devices and dtypes use the PyTorch path; factor geometries
-are unchanged. The default ``kernel="torch"`` supports higher derivatives,
+are unchanged. Layouts requiring 64-bit indexing also use PyTorch.
+The default ``kernel="torch"`` supports higher derivatives,
 whereas the fused path supports first derivatives only. Triton is needed
-only when the CUDA path is used, and no global precision flags are changed.
+only for the fused path, and no global precision flags are changed.
 
 Summary
 -------
@@ -295,9 +296,11 @@ class Peers(NamedTuple):
         The mean of ``relu(s[v] + x[w])`` over the signed block relation.
 
         ``kernel="triton"`` fuses all terms and their first derivatives on
-        CUDA float32 tensors. Other devices and dtypes use PyTorch; the
+        CUDA float32 tensors with fewer than ``2**31`` elements and input
+        element offsets below ``2**31`` relative to each data pointer.
+        Larger layouts, other devices and other dtypes use PyTorch; the
         default ``"torch"`` also supports higher derivatives. Triton is
-        required only for CUDA float32 calls. No precision settings change.
+        required only for the fused path. No precision settings change.
 
         Parameters:
             s : The receivers' half, ``(B, N, h)``.
@@ -315,7 +318,11 @@ class Peers(NamedTuple):
             raise ValueError("peer inputs need matching (B, N, h) layouts")
         if not s.numel():
             return s + x
-        if kernel == "triton" and s.is_cuda and s.dtype == torch.float32:
+        if kernel == "triton" and s.is_cuda and s.dtype == torch.float32 \
+                and s.numel() < 2**31 and all(
+                    sum((size - 1) * stride
+                        for size, stride in zip(t.shape, t.stride())) < 2**31
+                    for t in (s, x)):
             # pylint: disable=import-outside-toplevel  # CUDA-only dependency
             from discopy.neural.kernels import encode, peer_pairs
             return peer_pairs(s, x, encode(self.terms), self.degree)

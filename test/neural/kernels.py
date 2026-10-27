@@ -47,16 +47,17 @@ def tensors(torch, peers, width, device, dtype, exact=False, strided=False):
     return tuple(v.requires_grad_() for v in values)
 
 
-def check(torch, peers, s, x, compiled=False):
+def check(torch, peers, s, x, compiled=False, cotangent=None, dynamic=None):
     reference = dense(torch, peers, s, x)
     call = lambda s, x: peers(s, x, kernel="triton")
     if compiled:
-        call = torch.compile(call, fullgraph=True)
+        call = torch.compile(call, fullgraph=True, dynamic=dynamic)
     actual = call(s, x)
     tolerance = 1e-12 if s.dtype == torch.float64 else 1e-6
     torch.testing.assert_close(actual, reference, rtol=0, atol=tolerance)
-    cotangent = torch.linspace(-2, 3, actual.numel(), device=s.device,
-                               dtype=s.dtype).reshape_as(actual)
+    if cotangent is None:
+        cotangent = torch.linspace(-2, 3, actual.numel(), device=s.device,
+                                   dtype=s.dtype).reshape_as(actual)
     expected_grad = torch.autograd.grad(reference, (s, x), cotangent)
     actual_grad = torch.autograd.grad(actual, (s, x), cotangent)
     for found, expected in zip(actual_grad, expected_grad):
@@ -98,6 +99,19 @@ def test_cuda_compile():
     torch, peers = cuda(), geometry("sudoku")
     s, x = tensors(torch, peers, 35, "cuda", torch.float32, strided=True)
     check(torch, peers, s, x, compiled=True)
+
+
+def test_cuda_folded_layout():
+    """Symbolic sliced-map strides and a noncontiguous cotangent."""
+    torch, peers = cuda(), geometry("sudoku")
+    generator = torch.Generator(device="cuda").manual_seed(718)
+    s, x = [torch.randn(3, 81, width, device="cuda", generator=generator)
+            for width in (76 + 3 * 39 + 15, 76)]
+    s, x = s[..., :76].requires_grad_(), x.requires_grad_()
+    cotangent = torch.randn(3, 76, 81, device="cuda", generator=generator)
+    cotangent = cotangent.transpose(1, 2)
+    assert s.stride() != x.stride() and not cotangent.is_contiguous()
+    check(torch, peers, s, x, compiled=True, cotangent=cotangent, dynamic=True)
 
 
 def test_cuda_double_fallback():
@@ -179,22 +193,25 @@ def test_offline_compile(backward, tmp_path, monkeypatch):
     torch, triton = importorskip("torch"), importorskip("triton")
     from triton.backends.compiler import GPUTarget
     from triton.compiler import ASTSource
-    from discopy.neural.kernels import encode, reduction
+    from discopy.neural.kernels import decode, encode, reduction
 
     monkeypatch.setenv("TRITON_CACHE_DIR", str(tmp_path))
     peers = geometry("sudoku")
     s, x = tensors(torch, peers, 35, "cpu", torch.float32, strided=True)
-    terms = tuple((t[0], prod(t[2::2]), *t[1:]) for t in encode(peers.terms))
+    terms = decode(encode(peers.terms))
     source = ASTSource(
-        reduction(), signature=dict.fromkeys(("S", "X", "G", "Y", "DX"),
-                                             "*fp32"),
-        constexprs={"N": s.shape[1], "H": s.shape[2], "LENGTH": s.numel(),
+        reduction(), signature={
+            **dict.fromkeys(("S", "X", "G", "Y", "DX"), "*fp32"),
+            "LENGTH": "i32"},
+        constexprs={"N": s.shape[1], "H": s.shape[2],
                     "TERMS": terms, "DEGREE": peers.degree,
-                    "BACKWARD": backward, "TILE": 128,
-                    "SS": s.stride(), "XS": x.stride()})
+                    "BACKWARD": backward, "TILE": 256,
+                    **{f"{prefix}{i}": stride
+                       for prefix, t in (("SS", s), ("XS", x))
+                       for i, stride in enumerate(t.stride())}})
     compiled = triton.compile(
         source, target=GPUTarget("cuda", 90, 32),
-        options={"num_warps": 4, "enable_fp_fusion": False})
+        options={"num_warps": 2, "enable_fp_fusion": False})
     assert compiled.asm["cubin"]
 
 

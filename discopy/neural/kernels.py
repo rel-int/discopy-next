@@ -9,8 +9,8 @@ products reduce over the same blocks, with the arguments exchanged for
 the sender gradient. Each output has one writer: no scatter or atomics.
 The activation mask is recomputed, so no edge activations are stored.
 
-The PyTorch custom operators keep these reductions opaque to
-``torch.compile``. Triton is imported and compiled only on a CUDA call.
+The Triton operators expose their launches to ``torch.compile`` so compiled
+networks avoid Python dispatch per round. Triton kernels are compiled lazily.
 Only float32 and first derivatives are supported; use the geometric
 PyTorch implementation for other dtypes and higher derivatives.
 """
@@ -29,17 +29,18 @@ def reduction():
 
     @triton.jit
     def run(S, X, G, Y, DX, N: tl.constexpr, H: tl.constexpr,
-            LENGTH: tl.constexpr, TERMS: tl.constexpr, DEGREE: tl.constexpr,
+            LENGTH, TERMS: tl.constexpr, DEGREE: tl.constexpr,
             BACKWARD: tl.constexpr, TILE: tl.constexpr,
-            SS: tl.constexpr, XS: tl.constexpr):
+            SS0: tl.constexpr, SS1: tl.constexpr, SS2: tl.constexpr,
+            XS0: tl.constexpr, XS1: tl.constexpr, XS2: tl.constexpr):
         # pylint: disable=invalid-name,too-many-locals
         offset = tl.program_id(0) * TILE + tl.arange(0, TILE)
         valid = offset < LENGTH
         v = offset // H % N
         batch = offset // (N * H)
         channel = offset % H
-        s_address = batch * SS[0] + v * SS[1] + channel * SS[2]
-        x_address = batch * XS[0] + v * XS[1] + channel * XS[2]
+        s_address = batch * SS0 + v * SS1 + channel * SS2
+        x_address = batch * XS0 + v * XS1 + channel * XS2
         s = tl.load(S + s_address, valid, other=0)
         total = tl.full((TILE,), 0, tl.float32)
         if BACKWARD:
@@ -60,14 +61,14 @@ def reduction():
                          - v[None, :] // stride % extent) * stride
                 divisor *= extent
             mask = valid[None, :] & (member < size)
-            address = (batch[None, :] * XS[0] + w * XS[1]
-                       + channel[None, :] * XS[2])
+            address = (batch[None, :] * XS0 + w * XS1
+                       + channel[None, :] * XS2)
             other = tl.load(X + address, mask, other=0)
             value = s[None, :] + other
             if BACKWARD:
                 active = tl.where(mask & ~(value <= 0), grad[None, :], 0)
-                address = (batch[None, :] * SS[0] + w * SS[1]
-                           + channel[None, :] * SS[2])
+                address = (batch[None, :] * SS0 + w * SS1
+                           + channel[None, :] * SS2)
                 other_s = tl.load(S + address, mask, other=0)
                 address = (batch[None, :] * N + w) * H + channel[None, :]
                 other_grad = tl.load(G + address, mask, other=0)
@@ -86,26 +87,23 @@ def reduction():
 
 def launch(s, x, terms, degree, grad=None):
     """ Reduce strided inputs using encoded block axes. """
-    descriptors = tuple((term[0], prod(term[2::2]), *term[1:])
-                        for term in terms)
+    descriptors = decode(terms)
     out = torch.empty_like(s, memory_format=torch.contiguous_format)
     dx = torch.empty_like(out) if grad is not None else out
     if s.numel():
         with torch.cuda.device(s.device):
-            reduction()[((s.numel() + 127) // 128,)](
+            torch.library.wrap_triton(reduction())[
+                ((s.numel() + 255) // 256,)](
                 s, x, grad if grad is not None else s, out, dx,
                 s.shape[1], s.shape[2], s.numel(), descriptors, degree,
-                grad is not None, 128, s.stride(), x.stride(),
-                num_warps=4, enable_fp_fusion=False)
+                grad is not None, 256, *s.stride(), *x.stride(),
+                num_warps=2, enable_fp_fusion=False)
     return out, dx
 
 
-@torch.library.custom_op("discopy::peer_pairs", mutates_args=(),
-                         device_types="cuda", schema=(
-                             "(Tensor s, Tensor x, int[][] terms, int degree)"
-                             " -> Tensor"))
+@torch.library.triton_op("discopy::peer_pairs", mutates_args=())
 def peer_pairs(s: torch.Tensor, x: torch.Tensor,
-               terms: list[list[int]], degree: int) -> torch.Tensor:
+               terms: list[int], degree: int) -> torch.Tensor:
     """ The fused mean over a signed block relation. """
     return launch(s, x, terms, degree)[0]
 
@@ -117,12 +115,9 @@ def fake_pairs(s, x, terms, degree):
     return torch.empty_like(s, memory_format=torch.contiguous_format)
 
 
-@torch.library.custom_op("discopy::peer_pairs_backward", mutates_args=(),
-                         device_types="cuda", schema=(
-                             "(Tensor s, Tensor x, Tensor grad, int[][] terms,"
-                             " int degree) -> (Tensor, Tensor)"))
+@torch.library.triton_op("discopy::peer_pairs_backward", mutates_args=())
 def peer_pairs_backward(s: torch.Tensor, x: torch.Tensor, grad: torch.Tensor,
-                        terms: list[list[int]], degree: int
+                        terms: list[int], degree: int
                         ) -> tuple[torch.Tensor, torch.Tensor]:
     """ Both vector-Jacobian products, without atomic accumulation. """
     return launch(s, x, terms, degree, grad.contiguous())
@@ -154,7 +149,20 @@ peer_pairs.register_autograd(backward, setup_context=setup_context)
 
 
 def encode(terms):
-    """ Encode each block by its coefficient and free-axis strides/sizes. """
-    return [[coefficient, *(value for axis in reversed(block.free)
-             for value in (prod(block.shape[axis + 1:]), block.shape[axis]))]
-            for coefficient, block in terms]
+    """ Encode each block by coefficient, axis count and strides/sizes. """
+    return [value for coefficient, block in terms
+            for value in (coefficient, len(block.free),
+                          *(value for axis in reversed(block.free)
+                            for value in (prod(block.shape[axis + 1:]),
+                                          block.shape[axis])))]
+
+
+def decode(terms):
+    """ Recover constant block descriptors from a flat operator argument. """
+    descriptors = []
+    while terms:
+        coefficient, count = terms[:2]
+        axes = terms[2:2 + 2 * count]
+        descriptors.append((coefficient, prod(axes[1::2]), *axes))
+        terms = terms[2 + len(axes):]
+    return tuple(descriptors)
