@@ -10,8 +10,9 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 ### Added
 
 - Opt-in Triton forward and backward kernels for signed block peer
-  reductions in `neural.geometric`, with a PyTorch CPU/dtype fallback
-  and support for `torch.compile` (rel-int/discopy-next#377).
+  reductions in `neural.geometric`, with PyTorch fallbacks for unsupported
+  devices, dtypes and large blocks, and support for `torch.compile`
+  (rel-int/discopy-next#377).
 - `discopy.abc`, the abstract base classes of the hierarchy, from `Category`
   to `PROP`, `Monoid` and `Pregroup` ([#326], [#331], [#727]).
 - `discopy.axioms`, laws stated once on `abc` and checked by the Hypothesis

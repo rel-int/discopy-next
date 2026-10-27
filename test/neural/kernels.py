@@ -120,6 +120,22 @@ def test_cuda_double_fallback():
     check(torch, peers, s, x)
 
 
+def test_cuda_large_block_fallback(monkeypatch):
+    """A valid large block must not exceed Triton's static tensor limit."""
+    torch = cuda()
+    from discopy.neural import kernels
+    from discopy.neural.geometric import Peers
+    from discopy.neural.wiring import Block
+
+    def unexpected(*args, **kwargs):
+        raise AssertionError("large block reached Triton")
+
+    monkeypatch.setattr(kernels, "peer_pairs", unexpected)
+    peers = Peers(((1, Block((1025,), ())),), 1025)
+    s, x = tensors(torch, peers, 1, "cuda", torch.float32)
+    check(torch, peers, s, x)
+
+
 @mark.parametrize("device", ["cpu", "cuda"])
 def test_network(device):
     torch = cuda() if device == "cuda" else importorskip("torch")

@@ -29,7 +29,8 @@ on CUDA float32 tensors, including their backward pass. This uses the same
 signed blocks for every geometry, without an edge activation tensor or
 atomic gradient accumulation. Strided slices of the folded maps are read
 directly. Other devices and dtypes use the PyTorch path; factor geometries
-are unchanged. Layouts requiring 64-bit indexing also use PyTorch.
+are unchanged. Blocks larger than 1024 points and layouts requiring
+64-bit indexing also use PyTorch.
 The default ``kernel="torch"`` supports higher derivatives,
 whereas the fused path supports first derivatives only. Triton is needed
 only for the fused path, and no global precision flags are changed.
@@ -296,9 +297,10 @@ class Peers(NamedTuple):
         The mean of ``relu(s[v] + x[w])`` over the signed block relation.
 
         ``kernel="triton"`` fuses all terms and their first derivatives on
-        CUDA float32 tensors with fewer than ``2**31`` elements and input
-        element offsets below ``2**31`` relative to each data pointer.
-        Larger layouts, other devices and other dtypes use PyTorch; the
+        CUDA float32 tensors with blocks of at most 1024 points, fewer
+        than ``2**31`` elements and input element offsets below ``2**31``
+        relative to each data pointer. Larger blocks or layouts, other
+        devices and other dtypes use PyTorch; the
         default ``"torch"`` also supports higher derivatives. Triton is
         required only for the fused path. No precision settings change.
 
@@ -319,7 +321,9 @@ class Peers(NamedTuple):
         if not s.numel():
             return s + x
         if kernel == "triton" and s.is_cuda and s.dtype == torch.float32 \
-                and s.numel() < 2**31 and all(
+                and s.numel() < 2**31 \
+                and all(block.size <= 1024 for _, block in self.terms) \
+                and all(
                     sum((size - 1) * stride
                         for size, stride in zip(t.shape, t.stride())) < 2**31
                     for t in (s, x)):

@@ -24,8 +24,10 @@ are passed directly, including slices of the folded matrix products.
 The six input strides cross this boundary as separate scalar arguments;
 tuple-valued strides failed when tracing symbolic layouts.
 
-CUDA float32 inputs use Triton; other devices, dtypes and layouts requiring
-64-bit indices use PyTorch.
+CUDA float32 inputs with blocks of at most 1024 points use Triton; other
+devices, dtypes, larger blocks and layouts requiring 64-bit indices use
+PyTorch. The block limit keeps each forward tile within Triton's
+1,048,576-element tensor limit.
 The fused operator supports first derivatives. Use `kernel="torch"` for
 higher derivatives. The implementation changes neither matrix multiplication
 precision nor the carried state's dtype. It does not fuse whole rounds or
