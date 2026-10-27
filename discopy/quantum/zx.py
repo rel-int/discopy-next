@@ -910,8 +910,21 @@ class Hypergraph(hypergraph.Hypergraph):
         return self.keeps_scalar(super().topological_order())
 
     def complements(self, pattern, match):
+        """
+        The pushout complements of a match, each with the scalar of this
+        hypergraph over that of the pattern, so that plugging the pattern
+        back gives this hypergraph, see
+        :meth:`discopy.hypergraph.Hypergraph.complements`.
+
+        >>> host = (H @ scalar(2)).to_hypergraph()
+        >>> pattern = (H @ scalar(2 ** .5)).to_hypergraph()
+        >>> match, = host.match(pattern)
+        >>> assert all(context.plug(pattern) == host
+        ...            for context in host.complements(pattern, match))
+        """
+        number = self.scalar / getattr(pattern, "scalar", ONE)
         for context in super().complements(pattern, match):
-            yield self.keeps_scalar(context)
+            yield context.scaled(number)
 
     def __eq__(self, other):
         return super().__eq__(other)\
@@ -951,7 +964,10 @@ class Hypergraph(hypergraph.Hypergraph):
     def to_diagram(self) -> Diagram:
         """
         A diagram, with a :class:`Scalar` box for the scalar when it is not
-        one.
+        one. Its data is the complex value of the :class:`Number`, as a
+        diagram is evaluated numerically: :meth:`from_diagram` reads a power
+        of ``sqrt(2)`` times one of ``1j`` back exactly, any other scalar to
+        within floating point, so that it is :attr:`scalar` that keeps it.
 
         >>> print((H >> H @ scalar(2)).to_hypergraph().to_diagram())
         H >> H >> Nat(1) @ scalar(2)
