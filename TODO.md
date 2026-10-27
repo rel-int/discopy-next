@@ -5,8 +5,8 @@ M(v) = sum_w A(v,w) relu(s(v) + x(w)) / degree. Fuse block reductions,
 and differentiate the same sum with respect to each input using the
 symmetric block relation, without atomic gradient accumulation.
 
-- [ ] Implement an opt-in fused Peers kernel and portable fallback.
-- [ ] Check values, gradients, layouts and compiled network integration.
-- [ ] Benchmark against the PyTorch geometry and TRMP specialised kernel;
+- [WIP] @codex-kernel-2026-10-27 Implement an opt-in fused Peers kernel and portable fallback.
+- [WIP] @codex-kernel-2026-10-27 Check values, gradients, layouts and compiled network integration.
+- [WIP] @codex-kernel-2026-10-27 Benchmark against the PyTorch geometry and TRMP specialised kernel;
       document measured performance and remaining limitations.
-- [ ] Run repository checks and prepare the change for review.
+- [WIP] @codex-kernel-2026-10-27 Run repository checks and prepare the change for review.
