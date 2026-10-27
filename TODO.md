@@ -87,5 +87,5 @@ products and fp32 accumulation, retaining the fp32 fallback and checking
 full recurrent values and gradients. Compare against the peer-only kernel
 with identical weights; profile batch 64 before choosing further fusion.
 
-- [ ] Experiment with tensor-core dense maps and gradients, profile small
+- [WIP] @codex-dense-2026-10-27 13:48 Experiment with tensor-core dense maps and gradients, profile small
       batches, and record measured decisions and results.
