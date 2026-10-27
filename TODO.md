@@ -11,7 +11,7 @@ symmetric block relation, without atomic gradient accumulation.
       document measured performance and remaining limitations.
 - [WIP] @codex-h100-2026-10-27 10:44 Run repository checks and prepare the change for review.
 
-Local checks: 2181 passed with --skip-extra; focused CPU checks, pflake8,
+Previous round: 2181 passed with --skip-extra; focused CPU checks, pflake8,
 pylint, ruff and ty pass. Eight offline H100 compilations and 32 Triton
 interpreter comparisons pass (forward/backward atol=1e-6, rtol=0).
 Completed H100 run: https://modal.com/apps/rel-int/main/ap-AubmqVh3RdkqQF4epJeUqs
@@ -87,5 +87,38 @@ products and fp32 accumulation, retaining the fp32 fallback and checking
 full recurrent values and gradients. Compare against the peer-only kernel
 with identical weights; profile batch 64 before choosing further fusion.
 
-- [WIP] @codex-dense-2026-10-27 13:48 Experiment with tensor-core dense maps and gradients, profile small
+- [x] Experiment with tensor-core dense maps and gradients, profile small
       batches, and record measured decisions and results.
+
+Follow-up measurements use clean e529754c and TRMP a768520. Whole-call
+graphs improve peer-only batch 64 execution 2.56–3.19x, but both captured
+backends still differ by 1.39–1.50x. Batch 512 gains only 1.08–1.12x;
+its fair captured gap is 1.67–2.02x. Changing inputs and a matrix weight,
+retained outputs and stable/nonaccumulating gradients are checked.
+
+All-map tf32x3 regresses batch 512 and fails ACT readout at 3.32e-4.
+The 216-case tile sweep and 24 standalone checks pass. Selective state/gate
+forward maps with PyTorch backward pass current full-network gates and
+are 1.05–1.12x faster at batch 512, while regressing batch 64. FP64 probes retain
+their larger rounding error. Prototypes remain experimental; no global
+precision change or default-backend change is made.
+
+The final combined graph run passes all 24 checks on the same H100:
+https://modal.com/apps/rel-int/main/ap-s4eSqWD4YVLiJtvzLecOYF
+Selective maps add 1.06–1.15x over captured peer-only execution; remaining
+captured-specialised gaps are 1.34–1.40x at batch 64 and 1.56–1.76x at
+batch 512. Warmup/capture share a stream; uncaptured training is timed on
+an identical control model to avoid stale autograd stream references.
+
+Production review found a Triton tensor-size limit for blocks >1024.
+The fallback and symbolic Block.size fix are committed and pushed.
+Final checks: 36 passed on H100; 2,185 local passed / 196 skipped;
+repository lint/type gates pass. Previous head 5ec4e850 CI passed;
+final-head CI remains to be verified. Review found no other actionable
+issue and no GitHub review thread awaits an agent. Keep the draft until
+the remaining review/CI gate above completes.
+
+Raw results and experiment sources are in /workspace/discopy-artifacts;
+the notebook and archive preserve reproduction commands and source hashes.
+The repository-directed wiki checkout was rejected by automatic approval
+review as outside this task's scope, so prototype artifacts remain local.

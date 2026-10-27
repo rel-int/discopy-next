@@ -165,3 +165,127 @@ of that device time; TRMP's specialised whole-segment implementation took
 5.51 ms of device work. The profile identifies work beyond peer reduction
 that remains to close the gap; the final timings above measure the whole
 call separately.
+
+## Follow-up experiments: dense maps and whole-call capture
+
+The next round used clean source `e529754c`, the same H100/Torch/CUDA
+versions, TRMP revision, seed, weights and benchmark shapes. The later
+large-block fallback does not affect these Sudoku shapes. These experiments
+do not change the installed backend or global precision settings.
+
+### Whole-call CUDA graphs
+
+Capturing the complete inference or forward/backward call removes much of
+the small-batch host overhead. Inference timings include an input device
+copy, replay and an output clone; training includes the input copy and
+forward/backward replay. Both include synchronization and exclude capture,
+compilation and optimizer execution. Both backends are captured, with
+networks still in training mode and specialised weight packing inside the
+graph. Median milliseconds over ten calls, inference / training:
+
+| Recipe | Batch | Peer kernel, uncaptured | Peer kernel, captured | Specialised, captured |
+|---|---:|---:|---:|---:|
+| Lattice | 64 | 7.402 / 9.986 | 2.342 / 3.130 | 1.569 / 2.244 |
+| ACT | 64 | 8.619 / 16.260 | 3.326 / 6.361 | 2.239 / 4.253 |
+| Lattice | 512 | 11.770 / 14.990 | 10.908 / 13.379 | 5.399 / 7.519 |
+| ACT | 512 | 16.671 / 29.247 | 15.453 / 26.481 | 8.185 / 15.902 |
+
+The [batch-64 run](https://modal.com/apps/rel-int/main/ap-z6A0jTf7YQRfhvVvVuuZnB)
+improves peer execution by 2.56–3.19x, while leaving a fair captured-to-captured
+gap of 1.39–1.50x. The
+[batch-512 run](https://modal.com/apps/rel-int/main/ap-6YdYPU1vUvA9U6b8jPuxuD)
+improves peer execution by only 1.08–1.12x; its remaining gap is 1.67–2.02x.
+All batch-512 backends used the same recorded GPU UUID. Wall-clock latency
+varies across runs, so these speedups compare measurements within each run.
+
+All sixteen graph cases passed exact comparisons with their own uncaptured
+backend, including alternating inputs and nonuniform changes to
+`cell.encode.0.weight`. Retained inference outputs stayed unchanged, and
+gradient storage stayed stable without accumulation across replay. This
+checks capture equivalence; the independent numerical gates above still
+apply. The prototype assumes fixed shapes and storage. External
+`zero_grad(set_to_none=True)` and optimizer integration are not validated.
+
+A [batch-64 profile](https://modal.com/apps/rel-int/main/ap-KUHd7JsRiKVDSBmAt60zQv)
+measured peer inference at 9.196 ms wall / 2.296 ms summed device time for
+lattice, and 10.668 / 3.283 ms for ACT. Captured inference approaches those
+device sums. This supports addressing host launches at small batches;
+large batches still need less device work.
+
+### Tensor-core affine maps
+
+The prototype evaluates `Y = X W.T + b` with Triton's `tf32x3` products and
+FP32 accumulation. Its first version also computes `dX` and deterministic
+split-K `dW` with tensor cores. A separate profile confirmed that AOTAutograd
+actually executes those custom gradient kernels. Twenty-four standalone
+checks passed, including FP64 comparisons, sliced/transposed inputs,
+static/dynamic compilation, long gradient reductions and fallbacks.
+
+The [first full-network run](https://modal.com/apps/rel-int/main/ap-8A9zim63RbLiWvs48z0KVw)
+nevertheless regressed batch-512 inference/training: lattice increased from
+11.763 / 14.711 to 12.708 / 15.595 ms, and ACT from 16.562 / 28.750 to
+19.006 / 31.229 ms. ACT readout failed the unchanged gate at `3.32e-4`;
+gradients passed. A
+[FP64 probe](https://modal.com/apps/rel-int/main/ap-MKQCyto4FZ89fEGdN1zdoP)
+on its worst board (299) found `2.50e-4` maximum error for the dense
+prototype versus `8.23e-5` for eager FP32. This version is not adopted.
+
+A [tile sweep](https://modal.com/apps/rel-int/main/ap-tkhB8hhKTfehj3qeeOgSNn)
+checked 216 combinations: eight Triton tiles plus PyTorch, four maps,
+forward/input-gradient/weight-gradient, and two batches. Each device timing
+is the median of three rotated 100 ms CUDA-graph samples. At batch 512,
+the best state projection improved from 34.49 to 27.12 microseconds
+(`64/64/64`, four warps), and the gate projection from 30.99 to 25.21
+(`128/64/32`, four warps). Most custom input gradients were slower than
+PyTorch. These isolated gains justify testing selective forward maps with
+PyTorch backward; they do not establish an end-to-end improvement.
+
+The [selective follow-up](https://modal.com/apps/rel-int/main/ap-SrGFE14IakKhwJja9JAHKZ)
+uses tensor cores only for the state and gate projections, with PyTorch
+backward. The state tile is `64/64/64`; the gate tile is `64/32/32` at
+batch 64 and `128/64/32` at batch 512, all with four warps. These choices
+come from the timing sweep, not the readout errors. All four network
+readouts and parameter gradients pass the unchanged gates. Timings:
+
+| Recipe | Batch | Peer kernel | Selective dense maps |
+|---|---:|---:|---:|
+| Lattice | 64 | 5.122 / 7.455 | 5.607 / 7.724 |
+| ACT | 64 | 6.318 / 11.965 | 6.727 / 13.402 |
+| Lattice | 512 | 11.637 / 14.534 | 10.400 / 13.388 |
+| ACT | 512 | 16.421 / 28.558 | 15.307 / 27.189 |
+
+The selective candidate is 1.05–1.12x faster at batch 512 and regresses
+batch-64 latency by 4–12%. Its maximum readout/gradient errors are
+`2.37e-4` / `3.81e-6`. On board 299, its maximum error against FP64 is
+`1.55e-4`, versus `1.46e-5` for the peer-only kernel. This is one diagnostic
+board and one full-network seed, not a general accuracy bound. Together
+with the shape-specific tile policy and mixed latency results, this keeps
+the dense-map implementation experimental. Whole-round fusion remains the
+main opportunity for reducing large-batch device work.
+
+The [combined comparison](https://modal.com/apps/rel-int/main/ap-s4eSqWD4YVLiJtvzLecOYF)
+captures all three backends on the same recorded H100. Median milliseconds,
+with the same input-copy/output-ownership scopes above:
+
+| Recipe | Batch | Captured peer kernel | Captured selective maps | Captured specialised |
+|---|---:|---:|---:|---:|
+| Lattice | 64 | 2.341 / 3.142 | 2.165 / 2.976 | 1.571 / 2.227 |
+| ACT | 64 | 3.336 / 6.376 | 3.029 / 5.994 | 2.226 / 4.272 |
+| Lattice | 512 | 10.953 / 13.443 | 9.537 / 12.016 | 5.426 / 7.543 |
+| ACT | 512 | 15.557 / 26.637 | 14.176 / 25.001 | 8.204 / 15.983 |
+
+Selective maps add 1.06–1.15x over captured peer-only execution. The gap
+to captured specialised execution is now 1.34–1.40x at batch 64 and
+1.56–1.76x at batch 512. All 24 capture checks pass exactly against their
+own uncaptured backend, and source hashes match. Two preceding attempts
+retain failed checks for stale autograd stream references. The final helper
+warms and captures on one explicit stream and measures uncaptured training
+on an identical control model, so the captured model never runs backward
+on the default stream first. It does not suppress PyTorch's stream check.
+
+The production change from this round is the large-block fallback described
+above, including traceable symbolic block sizes. It passed 36 H100 checks
+and the local suite of 2,185 tests (196 skips), with repository lint/type
+gates passing. Prototype sources, notebook and raw results are preserved in
+the workspace's experiment artifact bundle; neither graph capture nor the
+dense prototype is enabled by the library's `kernel="triton"` option.
