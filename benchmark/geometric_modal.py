@@ -17,6 +17,8 @@ timings are wall-clock medians after two warm-ups, including synchronising
 CUDA, with compilation excluded. No reduced-precision global flags are set.
 As in TRMP's benchmark, nets remain in training mode during inference;
 the specialised kernel therefore includes weight packing on every call.
+Accuracy gates apply to both geometric implementations; the specialised
+baseline's errors and pass/fail status are reported independently.
 """
 
 from __future__ import annotations
@@ -60,15 +62,17 @@ image = (
                    ignore=[".git", "**/__pycache__/**", ".venv"]))
 
 
-def accuracy(actual, expected, kind):
-    """Require finite, close values; report absolute and relative L2 errors."""
+def accuracy(actual, expected, kind, strict=True):
+    """Require finite values; retain errors and failed comparisons."""
     import torch
     assert torch.isfinite(expected).all(), f"nonfinite {kind} reference"
     assert torch.isfinite(actual).all(), f"nonfinite {kind} result"
-    torch.testing.assert_close(actual, expected, **TOLERANCES[kind])
+    passed = torch.allclose(actual, expected, **TOLERANCES[kind])
+    if strict:
+        torch.testing.assert_close(actual, expected, **TOLERANCES[kind])
     delta = actual.double() - expected.double()
     scale = torch.linalg.vector_norm(expected.double()).item()
-    return {"max_abs": delta.abs().max().item(),
+    return {"passed": passed, "max_abs": delta.abs().max().item(),
             "relative_l2": torch.linalg.vector_norm(delta).item() / scale
             if scale else None}
 
@@ -108,14 +112,15 @@ def compare(case, batch, repeat):
         if name != "specialised":
             net.compile(unroll=False, fullgraph=True)
         inference, training = calls(net, x)
-        errors = {"readout": accuracy(inference(), expected, "readout")}
+        errors = {"readout": accuracy(inference(), expected, "readout", False)}
         training()
         actual = {k: p.grad for k, p in net.named_parameters()
                   if p.grad is not None}
         assert actual.keys() == gradients.keys(), "gradient presence differs"
         errors["gradient"] = accuracy(
             torch.cat([actual[k].reshape(-1) for k in gradients]),
-            torch.cat([g.reshape(-1) for g in gradients.values()]), "gradient")
+            torch.cat([g.reshape(-1) for g in gradients.values()]),
+            "gradient", False)
         row = {"inference_ms": 1000 * clock(inference, repeat, device),
                "training_ms": 1000 * clock(training, repeat, device),
                **{f"{kind}_{metric}": value for kind, metrics in errors.items()
@@ -199,6 +204,12 @@ def run(mode: str, batches: str, repeat: int, source: dict):
                          **{case: compare(case, batch, repeat)
                             for case in ("peer", "peer-act")}}
             for batch in map(int, batches.split(","))}
+        info["accuracy_passed"] = {
+            name: all(batch[case][name]["readout_passed"]
+                      and batch[case][name]["gradient_passed"]
+                      for batch in info["results"].values()
+                      for case in ("peer", "peer-act"))
+            for name in ("geometric", "triton", "specialised")}
     elif mode not in ("smoke", "tests"):
         raise ValueError("mode must be smoke, tests, bench or all")
     cache.commit()
@@ -225,3 +236,7 @@ def main(mode: str = "bench", batches: str = "64,512", repeat: int = 10,
                      ROOT / "discopy/neural/wiring.py", Path(__file__))}
     result = run.remote(mode, batches, repeat, source)
     Path(out).write_text(json.dumps(result, indent=2, allow_nan=False) + "\n")
+    if not all(result.get("accuracy_passed", {}).get(name, True)
+               for name in ("geometric", "triton")):
+        raise ValueError(
+            f"geometric accuracy gate failed; results saved to {out}")

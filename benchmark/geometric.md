@@ -59,8 +59,11 @@ As in issue #377, networks remain in training mode during inference, so
 TRMP repacks weights on each call. These are not `.eval()` inference timings
 with cached weights.
 
-Before timing, outputs and parameter gradients must be finite, gradient
-presence must match, and values must pass `torch.testing.assert_close`.
+Before timing, outputs and parameter gradients must be finite and gradient
+presence must match. Full-network errors and tolerance checks are recorded
+for every backend, including failed comparisons. Results are saved before
+the command fails if either geometric implementation misses a tolerance.
+The specialised baseline's status is reported independently.
 The readout gate is `atol=3e-4, rtol=1e-4`, the parameter-gradient gate is
 `atol=1e-5, rtol=1e-3`, and isolated pairs use `atol=1e-6, rtol=1e-6`.
 The relative pairs allowance covers a measured Triton gradient discrepancy
@@ -68,7 +71,7 @@ of `1.19e-6` at magnitude `2.88`; the readout allowance covers the compiled
 PyTorch ACT baseline's `2.42e-4` discrepancy from eager at batch 512.
 The JSON records maximum absolute and relative L2 errors, tolerances,
 hardware/software versions, both repositories' revisions and dirty flags,
-and SHA-256 hashes of the kernel, geometric implementation and runner.
+and SHA-256 hashes of the kernel, geometric implementation, wiring and runner.
 Source identity is captured before launch, and a TRMP revision other than
 `a768520` is rejected. Timing alone is not a parity check.
 
@@ -88,30 +91,43 @@ gradients, ReLU boundaries, noncontiguous tensors, empty tensors and full
 network/checkpoint compatibility. CUDA tests additionally cover full-graph
 compilation, custom-operator registration contracts and nonfinite inputs.
 
-The latest H100 correctness run passed all 34 tests with scalar stride
-arguments and the selected launch configuration. Both Modal hosts were
-reachable. Earlier offline compilation and 32 Triton interpreter comparisons
-also passed; GPU execution is now validated directly.
+The final configuration uses `TILE=1024, num_warps=4` for forward and
+`TILE=256, num_warps=2` for backward. The H100 correctness run at clean commit
+`6be1f9dd` passed all 35 tests, including explicit dynamic-layout compilation
+and the CPU block-axes regression. Both Modal hosts were reachable.
 
-The fixed configuration is `TILE=256, num_warps=2`, selected after measuring
-tiles 64, 128 and 256 with 2, 4 and 8 warps, at batches 64 and 512, for
-both layouts and both forward and backward. All 72 combinations passed the
-finite-value and PyTorch accuracy checks; `256/2` was fastest in every case.
-The [completed Modal sweep](https://modal.com/apps/rel-int/main/ap-R8WK7c72LKe3GIcML7pTQ7)
-used the final scalar-stride signature on an H100 80GB, Torch 2.13.0/CUDA 13.0
-and Triton 3.7.1. Each result is the median of three 100 ms CUDA-graph
-measurements, rotating configuration order between measurements.
+The [first sweep](https://modal.com/apps/rel-int/main/ap-R8WK7c72LKe3GIcML7pTQ7)
+compared tiles 64, 128 and 256 with 2, 4 and 8 warps, at batches 64 and 512,
+for both layouts and both forward and backward. All 72 combinations passed
+the finite-value and PyTorch accuracy checks; `256/2` won that grid.
+Both sweeps used an H100 80GB, Torch 2.13.0/CUDA 13.0 and Triton 3.7.1.
+Each result is the median of three 100 ms CUDA-graph measurements, rotating
+configuration order between measurements.
 `triton.testing.do_bench_cudagraph` excludes Python dispatch and allocation;
 these device timings cannot establish whole-network speedup.
 
-Folded-layout kernel times in microseconds, comparing the original `128/4`
-launch with the selected `256/2`:
+First-stage folded-layout kernel times in microseconds, comparing the original
+`128/4` launch with `256/2`:
 
 | Batch | Forward 128/4 | Forward 256/2 | Backward 128/4 | Backward 256/2 |
 |---|---:|---:|---:|---:|
 | 64 | 42.17 | 6.52 | 86.34 | 11.91 |
 | 512 | 318.98 | 40.71 | 660.85 | 84.34 |
 
-These results establish a launch-configuration improvement for the measured
-reduction. They do not establish parity with TRMP's specialised whole-segment
-kernel; full-network measurements are still running.
+The [extended sweep](https://modal.com/apps/rel-int/main/ap-ceXbmtg1lsScjqqwMuIbZg)
+validated another 64 combinations with the same protocol. Forward `1024/4`
+won both layouts at both batches, reducing folded-layout time from 6.53 to
+5.18 microseconds at batch 64 and from 40.82 to 30.87 at batch 512.
+Backward retains `256/2`: `512/4` improved only about 3–5%, while the
+folded-layout winner `1024/8` regressed contiguous inputs.
+
+A separate [profile](https://modal.com/apps/rel-int/main/ap-9o01nf4MgzoOHDoJRCkR3M)
+of intermediate `256/2` commit `878da558`, before the final forward tuning,
+measured 10.87 ms of device work for lattice inference at batch 512:
+5.91 ms in matrix products, 2.36 ms in fused GRU/normalization, and 2.44 ms
+in peer reductions. Matrix products and GRU/normalization account for 76%
+of that device time; TRMP's specialised whole-segment implementation took
+5.51 ms of device work. The profile identifies work beyond peer reduction
+that remains to close the gap. Full-network measurements of the final
+configuration are still running; these microbenchmarks do not establish
+parity with the specialised kernel.

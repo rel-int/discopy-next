@@ -6,7 +6,7 @@ and differentiate the same sum with respect to each input using the
 symmetric block relation, without atomic gradient accumulation.
 
 - [x] Implement an opt-in fused Peers kernel and portable fallback.
-- [WIP] @codex-h100-2026-10-27 10:44 Check values, gradients, layouts and compiled network integration.
+- [x] Check values, gradients, layouts and compiled network integration.
 - [WIP] @codex-h100-2026-10-27 10:44 Benchmark against the PyTorch geometry and TRMP specialised kernel;
       document measured performance and remaining limitations.
 - [WIP] @codex-h100-2026-10-27 10:44 Run repository checks and prepare the change for review.
@@ -15,19 +15,21 @@ Local checks: 2181 passed with --skip-extra; focused CPU checks, pflake8,
 pylint, ruff and ty pass. Eight offline H100 compilations and 32 Triton
 interpreter comparisons pass (forward/backward atol=1e-6, rtol=0).
 Resumed H100 work (2026-10-27): both Modal endpoints are reachable.
-The 34 GPU tests passed, including the real folded-map layout. All 72
-launch configurations passed accuracy checks; TILE=256/num_warps=2 was
-fastest for both batches, layouts and directions. Traceable triton_op
-launches replace opaque dispatch; scalar stride arguments fix symbolic
-layout compilation. Oversized indices fall back to PyTorch.
+All 35 tests passed on H100 at 6be1f9dd, including dynamic layouts.
+Two sweeps checked 136 configurations across shapes/layouts/directions;
+forward uses TILE=1024/warps=4, backward TILE=256/warps=2. Traceable
+launches, scalar strides and concrete geometry constants fix compilation;
+Block.free now preserves symbolic axis membership. Large indices fallback.
 
-Measured lattice at batch 512 (ms inference / training): geometric
-32.45 / 38.90, fused 11.81 / 14.75, specialised 6.56 / 9.01. Batch 64
-is close to the compiled baseline. Full ACT b512 validation is pending:
-the compiled PyTorch baseline differs from eager by 2.42e-4, so the
-readout gate is now atol=3e-4, rtol=1e-4; actual errors remain recorded.
-Local suite: 2184 passed, 195 skipped; required lint/type gates passed.
-Final committed-source GPU execution and CI remain to be checked.
+Measured lattice b512 (ms inference / training): geometric 32.38 / 38.80,
+fused 11.74 / 14.67, specialised 6.36 / 8.77. Fused ACT b512 is
+16.44 / 28.74 versus geometric 51.29 / 80.03. Both library backends pass
+accuracy gates. Specialised ACT has three outliers (max 7.07e-4 vs eager);
+fused max is 9.69e-5. On the worst board, fused max error vs fp64 is
+1.46e-5 versus specialised 6.25e-4. Keep the library gate unchanged.
+The runner records all backend statuses and saves data before gating.
+Local suite: 2185 passed, 195 skipped; required lint/type gates passed.
+Final result-file capture and CI remain; latest target branch is merged.
 
 Continuation request (verbatim):
 
