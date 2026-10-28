@@ -39,3 +39,5 @@ docs/_static/*/_*.svg
 benchmark-results/
 plans/
 .style-review/
+# orb portal metadata is specific to each running machine
+.amp/portals/*

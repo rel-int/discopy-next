@@ -48,6 +48,14 @@ Different dependency groups are available (switch with `uv sync --group <group-n
 - `docs`: for generating the documentation
 Since dependency groups are not standard, we also provide equivalents via optional dependencies.
 
+### Amp orbs
+
+`.agents/setup` prepares Python 3.14, all locked dependency groups, Graphviz and
+Pandoc for the orb snapshot. It is safe to rerun after dependency changes.
+Use `uv run` for development commands; the cached `.venv` uses Python 3.14.
+`.agents/resume` checks that the cached package imports without installing
+dependencies. No credentials or background services are required.
+
 ## Run the unit tests
 
 After cloning the repository, you should check you haven't broken anything by running the test suite.

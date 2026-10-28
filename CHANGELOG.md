@@ -9,6 +9,8 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Added
 
+- Orb lifecycle scripts that cache Python 3.14, locked development dependencies,
+  Graphviz and Pandoc for fresh agent environments.
 - `discopy.abc`, the abstract base classes of the hierarchy, from `Category`
   to `PROP`, `Monoid` and `Pregroup` ([#326], [#331], [#727]).
 - `discopy.testable`, laws stated once on `abc` and checked by the Hypothesis

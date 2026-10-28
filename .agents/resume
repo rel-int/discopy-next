@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cd "$(dirname "${BASH_SOURCE[0]}")/.."
+echo 'Checking cached DisCoPy environment (no dependency installation)'
+.venv/bin/python -c 'import sys; import discopy; print(sys.version.split()[0], discopy.__version__)'
