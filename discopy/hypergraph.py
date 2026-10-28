@@ -627,11 +627,22 @@ class Hypergraph(
         Raise ``AxiomError`` unless ``right`` is the right adjoint of
         ``left``, asked of the objects when they know, as
         :class:`discopy.rigid.Ty` does, otherwise the adjoint of a type is
-        its reversal.
+        its wires in reverse order, each its own adjoint: a type with no
+        adjoints has no dagger to take of them either, which ``left[::-1]``
+        would, e.g. turning the shape of a :class:`discopy.tensor.Dim`.
+
+        >>> from discopy.neural.network import Dims
+        >>> from discopy.tensor import Dim
+        >>> Hypergraph.assert_isadjoint(Dims(Dim(2, 3)), Dims(Dim(2, 3)))
+        >>> Hypergraph.assert_isadjoint(Dims(2, 3), Dims(2, 3))
+        Traceback (most recent call last):
+        ...
+        discopy.utils.AxiomError: Dims(Dim(2), Dim(3)) and ...
         """
         if hasattr(left, "assert_isadjoint"):
             left.assert_isadjoint(right)
-        elif (left.r if hasattr(left, "r") else left[::-1]) != right:
+        elif not (left.r == right if hasattr(left, "r")
+                  else tuple(left)[::-1] == tuple(right)):
             raise AxiomError(messages.NOT_ADJOINT.format(left, right))
 
     @classmethod
@@ -1614,6 +1625,16 @@ class Hypergraph(
         return type(self)(self.dom, self.cod, boxes, wires, spider_types)
 
     def __repr__(self):
+        """
+        The representation of a hypergraph names the category it is
+        parameterised by, so that it evaluates back to it.
+
+        >>> from discopy.markov import Ty, Box, Diagram
+        >>> graph = Box('f', Ty('x'), Ty('y')).to_hypergraph()
+        >>> from discopy import hypergraph, markov, monoidal, feedback, cat
+        >>> assert eval(repr(graph)) == graph
+        >>> assert type(eval(repr(graph))) is Hypergraph[Diagram]
+        """
         spider_types = f", spider_types={self.spider_types!r}"\
             if self.scalar_spiders else ""
         return factory_name(type(self))\

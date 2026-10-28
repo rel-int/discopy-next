@@ -51,6 +51,9 @@ NOT_FROBENIUS = \
     "{} has no spiders, cups or caps to downgrade this hypergraph."
 NOT_RIGID = "{} has no cups or caps for the wiring of this map."
 NOT_TRACED = "{} has no traces for the cycles of this map."
+PARA_CURRY_COPAR = (
+    "A closed category cannot curry a map with coparameters {}, as its "
+    "exponential would swallow them.")
 NO_SWAP = "{} is not symmetric, it has no swaps."
 NO_BRAID = "{} is not braided, it has no braids."
 NO_TWIST = "{} is not balanced, it has no twists."
@@ -64,6 +67,10 @@ NOT_MARKOV = "{} has no copy or discard."
 NOT_A_DAGGER = "{} has no dagger: {} is not a dagger category."
 NO_SUCH_SPIDER = "The only spiders of {} are its {}."
 NOT_ACYCLIC = "{} has a directed cycle, its boxes cannot be ordered."
+
+FEEDBACK_HAS_NO_DAGGER = (
+    "Feedback has no dagger and no rotation, "
+    "either would feed its memory back in time.")
 NOT_PROGRESSIVE = "No line sweeps the map down meeting each box with its "\
     "inputs side by side, past the cut {}."
 NOT_DOWNWARD = "{} has cups, caps or loops: its wires do not all go down."

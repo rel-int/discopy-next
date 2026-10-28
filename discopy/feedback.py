@@ -728,6 +728,17 @@ class Box(monoidal.Box, Diagram):
             return self
         return self.delay(-self.time_step)
 
+    def atoms(self) -> list:
+        """
+        The atoms of a box, each at time step zero, which the string of a
+        delayed box delays, e.g. ``f.d``.
+
+        >>> x = Ty('x')
+        >>> assert Box('f', x, x).delay().atoms() == [Box('f', x, x), x, x]
+        """
+        return [atom.reset() if isinstance(atom, Box) and atom.time_step
+                else atom for atom in super().atoms()]
+
     def __str__(self):
         return super().__str__() + str_delayed(self.time_step)
 
@@ -844,6 +855,23 @@ class Feedback(Box, monoidal.Bubble):
             from_tree(tree[key]) if key in tree else None
             for key in ('arg', 'dom', 'cod', 'mem'))
         return cls(arg, dom=dom, cod=cod, mem=mem, left='left' in tree)
+
+    def dagger(self):
+        """
+        Feedback has no dagger: that of ``arg`` goes from ``cod @ mem`` to
+        ``dom @ mem.delay()``, so its memory would be fed back in time.
+
+        >>> x = Ty('x')
+        >>> Box('f', x @ x.delay(), x @ x).feedback().dagger()
+        Traceback (most recent call last):
+        ...
+        discopy.utils.AxiomError: Feedback has no dagger...
+        """
+        raise AxiomError(messages.FEEDBACK_HAS_NO_DAGGER)
+
+    def rotate(self, left=False):
+        """ Feedback has no rotation, for the same reason as its dagger. """
+        raise AxiomError(messages.FEEDBACK_HAS_NO_DAGGER)
 
     def to_drawing(self):
         return self.arg.to_drawing().trace(len(self.mem), left=self.left)

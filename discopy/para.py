@@ -161,7 +161,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from discopy import (
-    symmetric, markov, comarkov, closed, compact, frobenius)
+    symmetric, markov, comarkov, closed, compact, frobenius, messages)
 from discopy.abc import (
     ClosedCategory, ComarkovCategory, CompactCategory, FeedbackCategory,
     HypergraphCategory, MarkovCategory, NamedGeneric, SymmetricCategory,
@@ -461,6 +461,8 @@ class Closed(Markov, ClosedCategory):
         """
         if not n:
             return self
+        if self.copar:
+            raise ValueError(messages.PARA_CURRY_COPAR.format(self.copar))
         if not left:
             inside = self.inside.curry(n, left=False)
             return type(self)(self.dom[n:], inside.cod, inside, self.param)
@@ -546,7 +548,6 @@ class Compact(Traced, CompactCategory):
         return cls.lift(cls.category.caps(left, right))
 
     ev = classmethod(Closed.ev.__func__)
-    curry = Closed.curry
 
 
 class Hypergraph(Compact, Markov, Comarkov, HypergraphCategory):

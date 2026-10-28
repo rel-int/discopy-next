@@ -204,6 +204,18 @@ class Wire(monoidal.Wire):
     def dagger(self) -> Wire:
         raise AxiomError("Rigid types have no dagger, use pivotal instead.")
 
+    def atoms(self) -> list[Wire]:
+        """
+        The wire with no winding, which the string of an adjoint rotates,
+        e.g. ``x.r``.
+
+        >>> x = Wire('x')
+        >>> assert x.r.atoms() == x.l.atoms() == [x]
+        """
+        dom, cod = (self.dom, self.cod) if self.z % 2 == 0\
+            else (self.cod, self.dom)
+        return [type(self)(self.name, dom=dom, cod=cod)]
+
     @property
     def l(self) -> Wire:
         """ The left adjoint of the object. """

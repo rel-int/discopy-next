@@ -939,15 +939,25 @@ class Layer(cat.Box, ColouredMonoid):
 
     @classmethod
     def normalise(cls, inside):
-        """ The canonical word of boxes and non-empty plumbing: either we
-        append or we tensor with the last element. """
+        """
+        The canonical word of boxes and non-empty plumbing: either we
+        append or we tensor with the last element. Plumbing that tensors
+        into an identity, e.g. a spider with one leg on each side, leaves
+        its type behind, and any other diagram leaves the two apart.
+        """
         result = []
         for value in (x for x in inside if not isinstance(x, Ty) or x):
             if not result or not cls.is_plumbing_component(value)\
                     or not cls.is_plumbing_component(result[-1]):
                 result.append(value)
+                continue
+            merged = result[-1] @ value
+            if isinstance(merged, (Ty, Box)):
+                result[-1] = merged
+            elif not merged.inside:
+                result[-1] = merged.dom
             else:
-                result[-1] = result[-1] @ value
+                result.append(value)
         return tuple(result)
 
     def __iter__(self):

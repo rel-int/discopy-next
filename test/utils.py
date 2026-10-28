@@ -140,6 +140,13 @@ def test_wire_tree_roundtrip():
             == frobenius.Wire('x')
 
 
+def test_MappingOrCallable():
+    from discopy.utils import MappingOrCallable
+    assert MappingOrCallable({0: 1})[0] == MappingOrCallable(lambda x: 1)[0]
+    with pytest.raises(TypeError):
+        MappingOrCallable([10, 20])
+
+
 def test_NamedGeneric_factory():
     """ A subscript of a factory is its own; the others keep ar as itself. """
     from discopy import symmetric

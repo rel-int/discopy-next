@@ -294,8 +294,22 @@ class Discard(closed.Discard, Copy):
     "The discard of an abstract type, i.e. a copy with zero legs."
 
 
+class Function(closed.Function, Box):
+    """
+    A markov function in an abstract diagram, which copies or discards, so
+    that plumbing tensors into a function of this level rather than of
+    :mod:`discopy.closed`.
+
+    >>> x = Ty('x')
+    >>> assert (Diagram.discard(x) @ Id(x)).dom == x @ x
+    """
+
+
 class Permutation(closed.Permutation, Box):
     "A permutation of abstract types."
+
+
+Function.register(Permutation)
 
 
 class Swap(Permutation, closed.Swap, Box):
@@ -390,6 +404,7 @@ Id = Diagram.id
 Feedback, Trace, FollowedBy, Head, Tail = feedback.generators(Diagram, Box)
 Diagram.box_factory, Diagram.functor_factory = Box, Functor
 Diagram.copy_factory = Copy
+Diagram.function_factory = Function
 Diagram.permutation_factory = Permutation
 Diagram.swap_factory = Swap
 Diagram.curry_factory = Curry

@@ -230,3 +230,24 @@ def test_Cospan_Functor():
     assert F(f).eval() == F(x @ Swap(y, x)).eval()\
         >> F(Spider(2, 0, x) @ Spider(1, 2, y)).eval()
     assert (F(f) >> F(g)).eval() == F(f.fuse(g)).eval()
+
+
+def test_identity_spider_in_a_layer():
+    """ A spider with one leg on each side merges into the plumbing of its
+    layer as the identity it is, rather than as a diagram. """
+    x = Ty('x')
+    f = Box('f', x, x)
+    diagram = x @ (f >> Spider(1, 1, x)) @ f
+    assert diagram.dom == diagram.cod == x @ x @ x
+    assert all(isinstance(component, (Ty, Box))
+               and not isinstance(component, Spider)
+               for layer in diagram.inside for component in layer)
+
+
+def test_str_transparency_of_a_spider():
+    """ A spider names no generator of its own, its string is a call on its
+    type, so a spider reads back from its string. """
+    x = Ty('x')
+    spider = Spider(0, 0, x)
+    assert spider.atoms() == [x]
+    assert eval(str(spider), Diagram.str_environment(spider)) == spider

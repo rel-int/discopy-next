@@ -90,6 +90,8 @@ def test_closed():
     assert (right.dom, right.cod, right.param) == (b, a >> c, P)
     assert left.inside\
         == (a @ closed.Diagram.swap(P, b) >> k.inside).curry(left=True)
+    with raises(ValueError):
+        Closed(a @ b, c, closed.Box('k', a @ b, c @ P), copar=P).curry()
 
 
 def test_feedback():
@@ -112,6 +114,9 @@ def test_compact():
                 compact.Box('k', x @ y @ compact.Ty('P'), x),
                 compact.Ty('P'))
     assert k.curry(left=True).cod == x << y
+    P = compact.Ty('P')
+    h = Compact(x @ y, x, compact.Box('h', x @ y, x @ P), copar=P)
+    assert (h.curry().cod, h.curry().copar) == (x << y, P)
 
 
 def test_hypergraph():

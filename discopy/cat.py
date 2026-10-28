@@ -711,7 +711,15 @@ class Box(Arrow):
         return str(self.name) + ("[::-1]" if self.is_dagger else '')
 
     def atoms(self) -> list:
-        """ The atoms of a box: itself undaggered, and its boundary's. """
+        """
+        The atoms of a box: itself undaggered, and its boundary's. A box
+        built from its arguments, e.g. a swap or a spider, names no
+        generator of its own: its string is a call on those arguments.
+        """
+        arguments = getattr(self, "__getnewargs__", None)
+        if callable(arguments):
+            return [atom for arg in arguments()
+                    if isinstance(arg, Ob) for atom in arg.atoms()]
         return [self.dagger() if self.is_dagger else self]\
             + self.dom.atoms() + self.cod.atoms()
 
