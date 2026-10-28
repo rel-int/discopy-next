@@ -291,6 +291,8 @@ class EvalResult:
         nz_flat = np.flatnonzero(array)
         if nz_flat.size == 0:
             return {}
+        if array.ndim == 0:
+            return {(): array[()]}
 
         nz_vals = array.flat[nz_flat]
         nz_multi = np.vstack(np.unravel_index(nz_flat, array.shape)).T
@@ -318,9 +320,9 @@ class EvalResult:
         This method computes the probability distribution by aggregating
         occupation configurations based on the output types of the tensor.
 
-        Assumes the output types contain at least one 'bit' or 'mode'
-        These will be treated as measured registers while 'qubit' and 'qmode'
-        are treated as unmeasured and traced out.
+        Assumes the output types are empty or contain at least one 'bit' or
+        'mode'. These will be treated as measured registers while 'qubit'
+        and 'qmode' are treated as unmeasured and traced out.
 
         Args:
             round_digits: Optional number of
@@ -330,7 +332,8 @@ class EvalResult:
             occupation configurations to probabilities.
         """
 
-        if not any(t in {bit, mode} for t in self.output_types):
+        if self.output_types and not any(
+                t in {bit, mode} for t in self.output_types):
             raise ValueError(
                 "Output types must contain at least one 'bit' or 'mode'." +
                 "These will be treated as measured registers. " +
@@ -338,9 +341,8 @@ class EvalResult:
             )
 
         values = self._convert_array_to_dict(self.tensor.array)
-        mask_flat = np.concatenate(
-            [[1] if t in {bit, mode} else [0, 0] for t in self.output_types]
-        )
+        mask_flat = [m for t in self.output_types
+                     for m in ([1] if t in {bit, mode} else [0, 0])]
 
         probs = defaultdict(float)
         all_measured = set()

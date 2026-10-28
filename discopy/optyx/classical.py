@@ -521,7 +521,7 @@ class Xor(ClassicalBox):
 class And(ClassicalBox):
     """
     Classical AND gate.
-    The domain of the map is 2 bits.
+    The domain of the map is n bits.
     The codomain of the map is a bit.
     The map will perform AND on the basis states.
     """
@@ -530,7 +530,7 @@ class And(ClassicalBox):
         super().__init__(
             "AndBit",
             zx.And(n),
-            bit**2,
+            bit**n,
             bit
         )
 

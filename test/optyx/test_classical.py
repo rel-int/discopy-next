@@ -92,6 +92,13 @@ def test_andbit():
     assert compare_arrays_of_different_sizes(d_1.double().to_tensor().eval().array,
                             d_2.double().to_tensor().eval().array)
 
+@pytest.mark.parametrize("bits", [(1, 1, 1), (1, 0, 1), (0, 0, 0)])
+def test_and_n(bits):
+    d_1 = Bit(*bits) >> And(3)
+    d_2 = Bit(int(all(bits)))
+    assert compare_arrays_of_different_sizes(d_1.double().to_tensor().eval().array,
+                            d_2.double().to_tensor().eval().array)
+
 def test_copybit():
     d_1 = Bit(1) >> CopyBit(3)
     d_2 = Bit(1, 1, 1)
