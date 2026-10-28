@@ -28,13 +28,13 @@ We can construct a controlled gate acting on a quantum mode:
 
 >>> f = lambda x: [x * 0.1, x * 0.2]
 >>> box = ControlledPhaseShift(f, n_modes=2)
->>> box.draw(path='docs/_static/optyx/controlled_phase.svg')
+>>> box.draw(doctest='docs/_static/optyx/controlled_phase.svg')
 
 A bit-controlled gate can be composed as:
 
 >>> from discopy.optyx.core.zw import ZBox
 >>> control = BitControlledBox(ZBox(1, 1, lambda x: x))
->>> control.draw(path='docs/_static/optyx/binary_control.svg')
+>>> control.draw(doctest='docs/_static/optyx/binary_control.svg')
 """
 
 from typing import Callable, List, Tuple, Iterable

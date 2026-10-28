@@ -88,7 +88,7 @@ boxes is done using the :code:`<<` operator:
 
 >>> from discopy.optyx.core.zw import Create, W
 >>> split_photon = Create(1) >> W(2)
->>> split_photon.draw(path="docs/_static/optyx/seq_comp_example.svg")
+>>> split_photon.draw(doctest="docs/_static/optyx/seq_comp_example.svg")
 
 .. image:: /_static/optyx/seq_comp_example.svg
     :align: center
@@ -98,7 +98,7 @@ We can also compose boxes in parallel (tensor) using the :code:`@` operator :
 >>> from discopy.optyx.photonic import BS, Phase
 >>> beam_splitter_phase = (BS @ Phase(0.5)).get_kraus()
 >>> beam_splitter_phase.draw(
-...     path="docs/_static/optyx/parallel_comp_example.svg")
+...     doctest="docs/_static/optyx/parallel_comp_example.svg")
 
 .. image:: /_static/optyx/parallel_comp_example.svg
     :align: center
@@ -108,7 +108,7 @@ expressed using the :class:`zw` calculus:
 
 >>> from discopy.optyx.photonic import BS
 >>> beam_splitter = BS.get_kraus()
->>> beam_splitter.draw(path="docs/_static/optyx/bs_zw.svg")
+>>> beam_splitter.draw(doctest="docs/_static/optyx/bs_zw.svg")
 
 .. image:: /_static/optyx/bs_zw.svg
     :align: center
@@ -1411,7 +1411,7 @@ class Feedback(monoidal.Bubble, Box):
     >>> plus = Scalar(0.5 ** 0.5) @ Z(0, 1)
     >>> ladder = (cnot >> Diagram.swap(bit, bit)).feedback(state=plus)
     >>> Equation(ladder, ladder.unroll(2).simplify(), symbol="$\\\\mapsto$"
-    ...     ).draw(path="docs/_static/optyx/cnot_ladder.svg")
+    ...     ).draw(doctest="docs/_static/optyx/cnot_ladder.svg")
 
     .. image:: /_static/optyx/cnot_ladder.svg
         :align: center

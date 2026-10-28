@@ -1,5 +1,6 @@
 from __future__ import annotations
 import warnings
+from inspect import Parameter, signature
 from random import Random
 
 from pytest import importorskip, raises, warns
@@ -452,3 +453,15 @@ def test_Bubble_flags_subs():
     noisy = sample.bubble(is_deterministic=False, is_affine=False)
     assert not noisy.subs(phi, 1).is_deterministic
     assert not noisy.lambdify(phi)(1).affine
+
+
+def test_Box_signature():
+    sig = signature(Box)
+    assert list(sig.parameters) == [
+        "name", "dom", "cod", "data", "is_dagger", "time_step",
+        "is_deterministic", "is_affine"]
+    x = Ty('x')
+    box = Box('f', x, x, **{
+        name: param.default for name, param in sig.parameters.items()
+        if param.default is not Parameter.empty})
+    assert box == Box('f', x, x)

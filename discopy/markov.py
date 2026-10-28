@@ -67,10 +67,12 @@ from __future__ import annotations
 
 import warnings
 from collections.abc import Sized
+from inspect import Parameter, Signature, signature
 from operator import index
 from typing import ClassVar
 
-from discopy import symmetric, monoidal, feedback, cmap, hypergraph, messages
+from discopy import (
+    cat, symmetric, monoidal, feedback, cmap, hypergraph, messages)
 from discopy.abc import ComarkovCategory, MarkovCategory, Nat
 from discopy.axioms import FUEL
 from discopy.cat import factory
@@ -873,6 +875,13 @@ class Functor(symmetric.Functor):
             return other.flagged(result)
         return result
 
+
+Box.__init__.__signature__ = Signature([
+    *list(signature(monoidal.Box.__init__).parameters.values())[:-1], *(
+        param.replace(kind=Parameter.KEYWORD_ONLY) for init in (
+            cat.Box.__init__, feedback.Box.__init__, Box.__init__)
+        for param in signature(init).parameters.values()
+        if param.default is not Parameter.empty)])
 
 CMap = cmap.CMap[Diagram]
 

@@ -32,7 +32,7 @@ environment bent round and shared:
 >>> from discopy.optyx import photonic
 >>> Equation(photonic.PhotonLoss(.5), photonic.PhotonLoss(.5).double(),
 ...          symbol="$\\\\mapsto$").draw(
-...     figsize=(9, 3), path="docs/_static/optyx/doubling.png")
+...     figsize=(9, 3), doctest="docs/_static/optyx/doubling.png")
 
 .. image:: /_static/optyx/doubling.png
     :align: center
@@ -47,7 +47,7 @@ between two steps is the **memory**:
 >>> loop = (photonic.Create(1) @ qmode >> photonic.MZI(.06, 0)).feedback(
 ...     mem=qmode, state=photonic.Create(0))
 >>> assert (loop.dom, loop.cod, loop.mem) == (Ty(), qmode, qmode)
->>> loop.draw(figsize=(4, 3), path="docs/_static/optyx/feedback.png")
+>>> loop.draw(figsize=(4, 3), doctest="docs/_static/optyx/feedback.png")
 
 .. image:: /_static/optyx/feedback.png
     :align: center
@@ -61,7 +61,7 @@ the memory wire only — the inputs and outputs of each tick stay open:
 >>> assert (loop.state, loop.effect) == (photonic.Create(0), Discard(qmode))
 >>> assert loop.one_step() == loop.arg
 >>> Equation(loop, loop.unroll(2), symbol="$\\\\mapsto$").draw(
-...     figsize=(11, 4), path="docs/_static/optyx/unroll.png")
+...     figsize=(11, 4), doctest="docs/_static/optyx/unroll.png")
 
 .. image:: /_static/optyx/unroll.png
     :align: center
@@ -83,7 +83,7 @@ diagonalising the transfer matrix of one step:
 >>> fixed = measured.eigen_fix().prob_dist()
 >>> assert max(abs(settled[k] - v) for k, v in fixed.items()) < 1e-6
 >>> Equation(loop.at_time(2), symbol="").draw(
-...     figsize=(6, 3), path="docs/_static/optyx/at_time.png")
+...     figsize=(6, 3), doctest="docs/_static/optyx/at_time.png")
 
 .. image:: /_static/optyx/at_time.png
     :align: center
@@ -211,7 +211,7 @@ dual-rail encoding. For example, we can create a GHZ state:
 >>> ghz_path = ghz.to_dual_rail()
 >>> Equation(ghz >> DualRail(3), ghz_path, \\
 ... symbol="$\\\\mapsto$").draw(figsize=(10, 10), \\
-... path="docs/_static/optyx/ghz_dr.svg")
+... doctest="docs/_static/optyx/ghz_dr.svg")
 
 .. image:: /_static/optyx/ghz_dr.svg
     :align: center

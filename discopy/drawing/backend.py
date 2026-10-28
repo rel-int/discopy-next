@@ -34,6 +34,7 @@ import numpy as np
 
 from matplotlib.colors import is_color_like, to_hex, to_rgb
 from matplotlib.testing.compare import compare_images
+from matplotlib.testing.exceptions import ImageComparisonFailure
 from matplotlib.patches import PathPatch, Patch
 from matplotlib.path import Path
 from PIL import Image, ImageSequence
@@ -223,7 +224,10 @@ def compare_drawing(path, actual_path, tol=DEFAULT['plt_tol']):
         equal = svg_equal(path, actual_path)
         difference = None
     elif extension in [".png", ".jpg", ".jpeg", ".tif", ".tiff"]:
-        difference = compare_images(path, actual_path, tol)
+        try:
+            difference = compare_images(path, actual_path, tol)
+        except ImageComparisonFailure as error:
+            difference = str(error)
         equal = difference is None
     elif extension == ".gif":
         def gif_data(gif_path):

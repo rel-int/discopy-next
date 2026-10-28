@@ -81,7 +81,7 @@ computation sits in the boxes, as in a premonoidal normal form.
 >>> assert triangle.step \\
 ...     == triangle.read >> triangle.parallel >> triangle.write
 >>> triangle.step.draw(figsize=(8, 5), wire_labels=False,
-...     path="docs/_static/optyx/interaction_step.png")
+...     doctest="docs/_static/optyx/interaction_step.png")
 
 .. image:: /_static/optyx/interaction_step.png
     :align: center
@@ -95,7 +95,7 @@ Román, LICS 2022) rather than a trace: nothing is computed yet, the loop
 is syntax.
 
 >>> triangle.protocol.draw(figsize=(8, 5), wire_labels=False,
-...     path="docs/_static/optyx/interaction_protocol.png")
+...     doctest="docs/_static/optyx/interaction_protocol.png")
 
 .. image:: /_static/optyx/interaction_protocol.png
     :align: center
@@ -112,7 +112,7 @@ depth is the number of ticks.
 ...     >> Diagram.id(triangle.prediction) @ triangle.step
 >>> assert two_ticks.cod == triangle.unroll(1).cod @ triangle.memory
 >>> two_ticks.draw(figsize=(8, 10), wire_labels=False,
-...     path="docs/_static/optyx/interaction_unroll.png")
+...     doctest="docs/_static/optyx/interaction_unroll.png")
 
 .. image:: /_static/optyx/interaction_unroll.png
     :align: center

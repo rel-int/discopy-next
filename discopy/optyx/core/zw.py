@@ -47,7 +47,7 @@ or using :code:`quimb` (with :code:`tensor.to_quimb()`).
 ...             (bSym_l.to_tensor().to_quimb()^...).data,\\
 ...             bSym_r.to_tensor().eval().array)
 >>> Equation(bSym_l, bSym_r, symbol="$=$").draw(\\
-... path="docs/_static/optyx/zw_commutativity.svg")
+... doctest="docs/_static/optyx/zw_commutativity.svg")
 
 .. image:: /_static/optyx/zw_commutativity.svg
     :align: center
@@ -60,7 +60,7 @@ or using :code:`quimb` (with :code:`tensor.to_quimb()`).
 ...             bAso_l.to_tensor().eval().array,\\
 ...             bAso_r.to_tensor().eval().array)
 >>> Equation(bAso_l, bAso_r, symbol="$=$").draw(\\
-... path="docs/_static/optyx/zw_associativity.svg")
+... doctest="docs/_static/optyx/zw_associativity.svg")
 
 .. image:: /_static/optyx/zw_associativity.svg
     :align: center
@@ -73,7 +73,7 @@ or using :code:`quimb` (with :code:`tensor.to_quimb()`).
 ...             bId_l.to_tensor().eval().array,\\
 ...             bId_r.to_tensor().eval().array)
 >>> Equation(bId_l, bId_r, symbol="$=$").draw(\\
-... path="docs/_static/optyx/zw_unit.svg")
+... doctest="docs/_static/optyx/zw_unit.svg")
 
 .. image:: /_static/optyx/zw_unit.svg
     :align: center
@@ -88,7 +88,7 @@ or using :code:`quimb` (with :code:`tensor.to_quimb()`).
 ...             bBa_l.to_tensor().eval().array,\\
 ...             bBa_r.to_tensor().eval().array)
 >>> Equation(bBa_l, bBa_r, symbol="$=$").draw(\\
-... path="docs/_static/optyx/zw_bialgebra.svg")
+... doctest="docs/_static/optyx/zw_bialgebra.svg")
 
 .. image:: /_static/optyx/zw_bialgebra.svg
     :align: center
@@ -107,7 +107,7 @@ or using :code:`quimb` (with :code:`tensor.to_quimb()`).
 ...             bZBA_l.to_tensor().eval().array,\\
 ...             bZBA_r.to_tensor().eval().array)
 >>> Equation(bZBA_l, bZBA_r, symbol="$=$").draw(\\
-... path="docs/_static/optyx/zw_zw_bialgebra.svg")
+... doctest="docs/_static/optyx/zw_zw_bialgebra.svg")
 
 .. image:: /_static/optyx/zw_zw_bialgebra.svg
     :align: center
@@ -121,7 +121,7 @@ or using :code:`quimb` (with :code:`tensor.to_quimb()`).
 ...             K0_infty_l.to_tensor().eval().array,\\
 ...             K0_infty_r.to_tensor().eval().array)
 >>> Equation(K0_infty_l, K0_infty_r, symbol="$=$").draw(\\
-... path="docs/_static/optyx/zw_z_copies.svg")
+... doctest="docs/_static/optyx/zw_z_copies.svg")
 
 .. image:: /_static/optyx/zw_z_copies.svg
     :align: center
@@ -139,7 +139,7 @@ or using :code:`quimb` (with :code:`tensor.to_quimb()`).
 ...             lemma_B7_l.to_tensor().eval().array,\\
 ...             lemma_B7_r.to_tensor().eval().array)
 >>> Equation(lemma_B7_l, lemma_B7_r, symbol="$=$").draw(\\
-... path="docs/_static/optyx/zw_lemma_B7.svg")
+... doctest="docs/_static/optyx/zw_lemma_B7.svg")
 
 .. image:: /_static/optyx/zw_lemma_B7.svg
     :align: center

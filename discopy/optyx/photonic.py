@@ -101,7 +101,7 @@ Let's use the beam-splitter to experiment with the Hong-Ou-Mandel effect.
 Beam-splitter is just a box in the diagram, which we can draw:
 
 >>> BS = BBS(0)
->>> BS.draw(path='docs/_static/optyx/BS.png')
+>>> BS.draw(doctest='docs/_static/optyx/BS.png')
 
 .. image:: /_static/optyx/BS.png
     :align: center
@@ -114,7 +114,7 @@ construct the tensor network for evaluation.
 >>> BS = BBS(0)
 >>> double_BS = BS.get_kraus()
 >>> Equation(BS, double_BS, symbol="$\\\\mapsto$").draw(\\
-... path="docs/_static/optyx/double_BS.png")
+... doctest="docs/_static/optyx/double_BS.png")
 
 .. image:: /_static/optyx/double_BS.png
     :align: center
@@ -129,7 +129,8 @@ photons on two output modes using postselection.
 
 >>> from discopy.optyx.photonic import Select
 >>> diagram_qpath = Create(1, 1) >> BS >> Select(1, 1)
->>> diagram_qpath.draw(path='docs/_static/optyx/BS_hom_2.png', figsize=(3, 3))
+>>> diagram_qpath.draw(
+...     doctest='docs/_static/optyx/BS_hom_2.png', figsize=(3, 3))
 
 .. image:: /_static/optyx/BS_hom_2.png
     :align: center
@@ -168,7 +169,8 @@ probability.
 ...     BS >>
 ...     Select(1, 0)
 ... )
->>> diagram_qpath.draw(path='docs/_static/optyx/BS_loss.png', figsize=(3, 3))
+>>> diagram_qpath.draw(
+...     doctest='docs/_static/optyx/BS_loss.png', figsize=(3, 3))
 
 .. image:: /_static/optyx/BS_loss.png
     :align: center
@@ -212,7 +214,7 @@ The two internal states are random:
 ...     BS >> NumberResolvingMeasurement(2)
 ... )
 
->>> channel_HOM.draw(path='docs/_static/optyx/BS_hom_distinguishable.png',
+>>> channel_HOM.draw(doctest='docs/_static/optyx/BS_hom_distinguishable.png',
 ... figsize=(3, 3))
 
 .. image:: /_static/optyx/BS_hom_distinguishable.png
@@ -915,8 +917,8 @@ def ansatz(width, depth):
 
     Example
     -------
-    >>> ansatz(6, 4).draw(path='docs/_static/optyx/ansatz6_4.png')
-    >>> ansatz(5, 4).draw(path='docs/_static/optyx/ansatz5_4.png')
+    >>> ansatz(6, 4).draw(doctest='docs/_static/optyx/ansatz6_4.png')
+    >>> ansatz(5, 4).draw(doctest='docs/_static/optyx/ansatz5_4.png')
 
     .. image:: /_static/optyx/ansatz6_4.png
         :align: center
@@ -1049,7 +1051,7 @@ class FusionTypeI(Diagram):
     --------
     >>> from discopy.optyx.photonic import Create, FusionTypeI
     >>> circuit = Create(1, 0, 1, 0) >> FusionTypeI()
-    >>> circuit.draw(path="docs/_static/optyx/fusioni.svg")
+    >>> circuit.draw(doctest="docs/_static/optyx/fusioni.svg")
 
     .. image:: /_static/optyx/fusioni.svg
         :align: center
@@ -1205,7 +1207,7 @@ class FusionTypeII(Diagram):
     --------
     >>> from discopy.optyx.photonic import Create, FusionTypeII
     >>> circuit = Create(1, 0, 1, 0) >> FusionTypeII()
-    >>> circuit.draw(path="docs/_static/optyx/fusionii.svg")
+    >>> circuit.draw(doctest="docs/_static/optyx/fusionii.svg")
 
     .. image:: /_static/optyx/fusionii.svg
         :align: center
