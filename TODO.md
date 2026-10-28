@@ -2,4 +2,4 @@ Optimize this repository for orbs (remote machines where Amp agents work) so fre
 
 Load the `orb-setup` skill and follow it end to end.
 
-- [ ] Implement and verify idempotent orb setup with the repository's toolchain and dependencies.
+- [WIP] @T-01a18207-66fa-754f-8dbe-180c3c9ef7bd-2026-10-28 10:31 Implement and verify idempotent orb setup with the repository's toolchain and dependencies.
