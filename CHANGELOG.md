@@ -12,7 +12,7 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 - Opt-in Triton forward and backward kernels for signed block peer
   reductions in `neural.geometric`, with PyTorch fallbacks for unsupported
   devices, dtypes and large blocks, and support for `torch.compile`
-  (rel-int/discopy-next#377).
+  ([next#377]).
 - `discopy.abc`, the abstract base classes of the hierarchy, from `Category`
   to `PROP`, `Monoid` and `Pregroup` ([#326], [#331], [#727]).
 - `discopy.axioms`, laws stated once on `abc` and checked by the Hypothesis
@@ -257,7 +257,7 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 ### Fixed
 
 - Preserve block free axes under dynamic `torch.compile` in
-  `neural.wiring` (rel-int/discopy-next#377).
+  `neural.wiring` ([next#377]).
 - What the property matrix of [next#1] found, each with its test:
   `Feedback.dagger` and `rotate` raise `AxiomError`, as either would feed
   the memory back in time; `para.Compact.curry` keeps the coparameters and
@@ -716,6 +716,7 @@ for the changelog of `1.2.1` and earlier.
 [next#351]: https://github.com/rel-int/discopy-next/issues/351
 [next#359]: https://github.com/rel-int/discopy-next/issues/359
 [next#376]: https://github.com/rel-int/discopy-next/issues/376
+[next#377]: https://github.com/rel-int/discopy-next/issues/377
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#56]: https://github.com/rel-int/optyx/pull/56

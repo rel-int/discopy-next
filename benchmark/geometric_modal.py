@@ -165,10 +165,10 @@ def pairs_benchmark(batch, repeat, folded=False):
         def backward():
             torch.autograd.grad(apply(s, x), (s, x), dy)
 
-        output_error = accuracy(forward(), expected, "pairs")
+        output_error = accuracy(forward(), expected, "pairs", False)
         actual = torch.autograd.grad(apply(s, x), (s, x), dy)
         gradient_error = accuracy(torch.stack(actual), torch.stack(gradients),
-                                  "pairs")
+                                  "pairs", False)
         results[kernel] = {
             "inference_ms": 1000 * clock(forward, repeat, device),
             "training_ms": 1000 * clock(backward, repeat, device),
@@ -210,6 +210,12 @@ def run(mode: str, batches: str, repeat: int, source: dict):
                       for batch in info["results"].values()
                       for case in ("peer", "peer-act"))
             for name in ("geometric", "triton", "specialised")}
+        info["accuracy_passed"]["pairs"] = all(
+            batch[case][kernel][error]["passed"]
+            for batch in info["results"].values()
+            for case in ("pairs", "pairs_folded")
+            for kernel in ("torch", "triton")
+            for error in ("output_error", "gradient_error"))
     elif mode not in ("smoke", "tests"):
         raise ValueError("mode must be smoke, tests, bench or all")
     cache.commit()
@@ -237,6 +243,6 @@ def main(mode: str = "bench", batches: str = "64,512", repeat: int = 10,
     result = run.remote(mode, batches, repeat, source)
     Path(out).write_text(json.dumps(result, indent=2, allow_nan=False) + "\n")
     if not all(result.get("accuracy_passed", {}).get(name, True)
-               for name in ("geometric", "triton")):
+               for name in ("geometric", "triton", "pairs")):
         raise ValueError(
             f"geometric accuracy gate failed; results saved to {out}")
