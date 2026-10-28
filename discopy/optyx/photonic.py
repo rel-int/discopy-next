@@ -667,11 +667,11 @@ class BBS(AbstractGate):
 
     def lambdify(self, *symbols, **kwargs):
         return lambda *xs: type(self)(
-            lambdify(symbols, self.bias, **kwargs)(*xs)
+            lambdify(symbols, self.bias, **kwargs)(*xs), self.is_conj
         )
 
     def dagger(self):
-        return BBS(0.5 - self.bias)
+        return BBS(0.5 - self.bias, self.is_conj)
 
     def conjugate(self):
         """
@@ -1100,12 +1100,22 @@ class FusionTypeI(Diagram):
         )
 
 
-class Swap(channel.Swap):
+class Swap(channel.Permutation):
     """
-    Swap channel for qmodes.
+    Swap channel of ``left`` qmodes past ``right`` qmodes.
+
+    Example
+    -------
+    >>> assert Swap(2, 1).cod == Swap(1, 2).dom == qmode ** 3
+    >>> assert Swap(2, 1) >> Swap(1, 2) == Swap(2, 1) >> Swap(2, 1).dagger()
     """
-    def __init__(self, left, right):
-        super().__init__(qmode**left, qmode**right)
+    def __init__(self, left=1, right=1):
+        self.left, self.right = qmode**left, qmode**right
+        super().__init__(self.left @ self.right, [
+            *range(left, left + right), *range(left)])
+
+    def dagger(self):
+        return type(self)(len(self.right), len(self.left))
 
     def __repr__(self):
         return f"{factory_name(type(self))}"\

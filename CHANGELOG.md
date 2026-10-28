@@ -441,6 +441,11 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 - `zx.H`, quantum gates that do not send basis states to basis states,
   `gates.Bra`, `gates.Match` and `tensor.Sum` no longer claim to be cartesian
   ([next#115]).
+- optyx: `photonic.Swap(left, right)` swaps any numbers of modes
+  ([next#300]), `prob_dist` of a closed diagram is the probability of the
+  empty outcome ([next#382]), `classical.And(n)` takes `n` bits
+  ([next#387]), and `BBS.dagger` and `BBS.lambdify` keep `is_conj`
+  ([next#386]).
 - Docstrings of `para` and two others ([#494], [#683], [#693]), a citation
   in `kleisli.additive` ([#639]), and notebook titles in the docs ([#526]).
 
@@ -704,6 +709,7 @@ for the changelog of `1.2.1` and earlier.
 [next#295]: https://github.com/rel-int/discopy-next/issues/295
 [next#297]: https://github.com/rel-int/discopy-next/issues/297
 [next#299]: https://github.com/rel-int/discopy-next/issues/299
+[next#300]: https://github.com/rel-int/discopy-next/issues/300
 [next#301]: https://github.com/rel-int/discopy-next/issues/301
 [next#302]: https://github.com/rel-int/discopy-next/pull/302
 [next#310]: https://github.com/rel-int/discopy-next/pull/310
@@ -717,6 +723,9 @@ for the changelog of `1.2.1` and earlier.
 [next#359]: https://github.com/rel-int/discopy-next/issues/359
 [next#376]: https://github.com/rel-int/discopy-next/issues/376
 [next#377]: https://github.com/rel-int/discopy-next/issues/377
+[next#382]: https://github.com/rel-int/discopy-next/issues/382
+[next#386]: https://github.com/rel-int/discopy-next/issues/386
+[next#387]: https://github.com/rel-int/discopy-next/issues/387
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#56]: https://github.com/rel-int/optyx/pull/56
