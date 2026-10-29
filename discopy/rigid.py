@@ -156,7 +156,7 @@ from typing import Iterator, Self, ClassVar
 
 from discopy import cat, monoidal, biclosed, messages
 from discopy.abc import DaggerCategory, Pregroup, RigidCategory
-from discopy.axioms import GENERATORS
+from discopy.testable import GENERATORS
 from discopy.cat import factory
 from discopy.utils import (
     assert_isatomic,

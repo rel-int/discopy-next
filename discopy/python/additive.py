@@ -22,7 +22,7 @@ from itertools import accumulate
 from typing import Self
 
 from discopy.abc import ComarkovCategory, TracedCategory
-from discopy.axioms import values
+from discopy.testable import values
 from discopy.utils import assert_isinstance
 from discopy.python import finset, function
 from discopy.python.function import Ty

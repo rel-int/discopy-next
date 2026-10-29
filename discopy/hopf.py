@@ -131,7 +131,7 @@ import numpy as np
 from discopy import monoidal, ribbon, tensor, frobenius, messages
 from discopy.tensor import Dim, Box, Id
 from discopy.abc import RibbonCategory
-from discopy.axioms import TestableGeneric
+from discopy.testable import TestableGeneric
 from discopy.utils import (
     assert_isinstance, assert_iscomposable, classproperty, factory,
     factory_name, from_tree, get_origin, product, unbiased)

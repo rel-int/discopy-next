@@ -1,5 +1,5 @@
 """
-The transparency law of STYLE.md, i.e. :meth:`discopy.axioms.transparency`,
+The transparency law of STYLE.md, i.e. :meth:`discopy.testable.transparency`,
 on every box of :mod:`discopy.optyx`.
 
 A cell of :func:`test_transparency` is only as strong as the equality it is

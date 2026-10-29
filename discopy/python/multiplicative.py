@@ -31,7 +31,7 @@ from typing import Self
 
 from discopy import messages
 from discopy.abc import ClosedCategory, TracedCategory
-from discopy.axioms import values
+from discopy.testable import values
 from discopy.utils import (
     AxiomError, assert_isinstance, assert_istraceable, tuplify, untuplify,
     factory)

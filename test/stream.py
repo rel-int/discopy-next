@@ -101,7 +101,7 @@ def test_last_and_without():
 def test_feedback_laws():
     from pytest import raises
     from discopy.abc import FeedbackCategory
-    from discopy.axioms import AxiomFailure
+    from discopy.testable import AxiomFailure
     x, y, m, n, w, z = (Ty.sequence(symmetric.Ty(name)) for name in "xymnwz")
     f = Stream.sequence('f', x @ (m @ n).delay(), y @ m @ n)
     g, h, k, e = (Stream.sequence(name, dom, cod) for name, (dom, cod) in zip(

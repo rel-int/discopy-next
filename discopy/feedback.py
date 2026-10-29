@@ -470,7 +470,7 @@ class Ty(monoidal.Ty):
     generator_factory = Wire
     box_factory = None
     """ No generator of one colour is named, so there is no canonical
-    instance of a law, see :meth:`discopy.axioms.Axiom.canonical`. """
+    instance of a law, see :meth:`discopy.testable.Axiom.canonical`. """
 
     def delay(self, n_steps=1):
         """ The delay of a feedback type by `n_steps`. """

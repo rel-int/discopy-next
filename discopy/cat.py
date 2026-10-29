@@ -84,7 +84,7 @@ from typing import (
 
 from discopy import messages, utils
 from discopy.abc import Category, DaggerCategory, Nat
-from discopy.axioms import (
+from discopy.testable import (
     FUEL, GENERATORS, Equation as AbstractEquation, Serialisable)
 from discopy.utils import (  # noqa: F401
     factory,
@@ -245,15 +245,14 @@ class FreeCategory(Category):
     def search(cls, *, dom=None, cod=None, fuel=FUEL, within=None):
         """
         Derive the terms of a free category from its rules: a generator, or the
-        conclusion of one of its :attr:`rules` chosen at random, its
-        morphism premises sampled by the :meth:`strategy` of the category
-        with one less unit of ``fuel``, see
-        :meth:`discopy.axioms.Rule.strategy`. Once the fuel runs out, only the
-        rules with no morphism premise are applied. A conclusion that misses
-        ``dom`` or ``cod`` is composed with a generator from or to it, so that
-        both are honoured, with no filtering, whenever the :meth:`generators`
-        read them: those of a type do not, since every generated colour is
-        transparent. Every choice shrinks to a generator.
+        conclusion of one of its :attr:`rules` chosen at random, its morphism
+        premises sampled by the :meth:`strategy` of the category with one less
+        unit of ``fuel``, see :meth:`discopy.testable.Rule.strategy`. Once the
+        fuel runs out, only the rules with no morphism premise are applied. A
+        conclusion that misses ``dom`` or ``cod`` is composed with a generator
+        from or to it, so that both are honoured, with no filtering, whenever
+        the :meth:`generators` read them: those of a type do not, since every
+        generated colour is transparent. Every choice shrinks to a generator.
 
         Parameters:
             dom : The domain, sampled if ``None``.
@@ -1419,8 +1418,8 @@ class Transformation(Category[Functor, "Transformation"]):
 
 class Equation(AbstractEquation[Arrow]):
     """
-    An :class:`.axioms.Equation` between arrows, see its docstring for the
-    parameters and :meth:`.axioms.Equation.modulo` for quotients.
+    An :class:`.testable.Equation` between arrows, see its docstring for the
+    parameters and :meth:`.testable.Equation.modulo` for quotients.
 
     Example
     -------

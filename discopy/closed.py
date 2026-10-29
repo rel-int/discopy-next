@@ -89,7 +89,7 @@ from typing import Callable, ClassVar, Dict, Self
 from discopy import (
     monoidal, biclosed, markov, feedback, cmap, hypergraph, messages)
 from discopy.abc import ClosedCategory, DaggerCategory, MonoidalCategory
-from discopy.axioms import Serialisable
+from discopy.testable import Serialisable
 from discopy.cat import factory
 from discopy.drawing import Drawing
 from discopy.utils import (

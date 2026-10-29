@@ -121,12 +121,19 @@ class GFlow:
     layers: dict[int, int]
 
     def partial_order(self) -> PartialOrder:
-        """Returns a function representing the partial order of the flow"""
+        """Returns a function representing the partial order of the flow,
+        i.e. the nodes measured no later than the given one, itself included.
+
+        The layers are a foliation, so two nodes of the same layer are
+        incomparable: each would otherwise be in the past of the other, and
+        a measurement time is computed by recursion over the past.
+        """
 
         def order(n: int):
             l = self.layers[n]
 
-            return [i for i, layer in self.layers.items() if layer >= l]
+            return [n] + [
+                i for i, layer in self.layers.items() if layer > l]
 
         return order
 
@@ -238,22 +245,26 @@ def add_fusion_order(
     """
 
     def fusion_with_node_order(node: int) -> list[int]:
-        past = order(node)
+        # The past of a node is closed under the fusions of its own past, and
+        # a node can be fused to something in that past: so the nodes whose
+        # past is still to be added are kept in a list and each is expanded
+        # once, rather than recursing, which would not come back.
+        past_set: set[int] = {node}
+        to_expand = [el for el in order(node) if el != node]
+        expanded: set[int] = set()
 
-        # We temporarily remove the node itself since we don't want to add the
-        # past of the nodes it itself is fused to. We will add it back at the
-        # end
-        past.remove(node)
+        while to_expand:
+            el = to_expand.pop()
+            if el in expanded:
+                continue
+            expanded.add(el)
 
-        past_set: set[int] = set()
-        for el in past:
             fused_nbrs = _get_all_connected_fusions(fusions, el)
-            for nbr in fused_nbrs:
-                past_set = past_set.union(set(fusion_with_node_order(nbr)))
             past_set = past_set.union(set(fused_nbrs))
+            for nbr in fused_nbrs:
+                to_expand += [past for past in order(nbr) if past != nbr]
 
-        past_set.add(node)
-        return list(past_set)
+        return sorted(past_set)
 
     return fusion_with_node_order
 

@@ -818,6 +818,53 @@ def test_is_convex_walks_every_consumer():
                 for match in graph.homomorphisms(f >> k)] == [False]
 
 
+def test_is_convex_stops_at_the_last_writer():
+    # next#286: the walk used to visit every box downstream of the match, so
+    # it cost the size of the host and matching over it cost its square.
+    from discopy import symmetric
+
+    class Counted(list):
+        """A list of the box wires that counts what reads it."""
+        def __init__(self, wires):
+            super().__init__(wires)
+            self.reads = 0
+
+        def __getitem__(self, box):
+            self.reads += 1
+            return super().__getitem__(box)
+
+    class Host:
+        """A host that borrows the method, as a Rewriter does."""
+        is_convex = H.is_convex
+
+        def __init__(self, graph):
+            self.boxes, self.incidence = graph.boxes, graph.incidence
+            self.box_wires = Counted(graph.box_wires)
+            self.is_topologically_ordered = graph.is_topologically_ordered
+
+    x = symmetric.Ty('x')
+    f = symmetric.Box('f', x, x).to_hypergraph()
+    reads = []
+    for n in (8, 64):
+        chain = symmetric.Hypergraph.id(x).then(*n * [f])
+        assert chain.is_topologically_ordered
+        host = Host(chain)
+        assert host.is_convex(((0, 1), (0, )))
+        reads.append(host.box_wires.reads)
+    assert reads[0] == reads[1]  # it was n - 1 of them
+
+
+def test_is_convex_walks_a_long_way_back():
+    # The bound is the last box that writes into the image, so a path that
+    # leaves the image and comes back several boxes later is still found.
+    x = Ty('x')
+    f, g, h, k = (Box(name, x, x).to_hypergraph() for name in "fghk")
+    host = f >> g >> h >> k
+    assert not host.is_convex(((0, 1, 2, 3, 4), (0, 3)))
+    assert host.is_convex(((0, 1), (0, )))
+    assert host.is_convex(((2, 3, 4), (2, 3)))
+
+
 def test_rewrite_symmetric_reads_back_without_trace():
     from discopy import symmetric
     x = symmetric.Ty('x')

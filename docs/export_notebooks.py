@@ -59,7 +59,6 @@ KNOWN_BROKEN = {
     "optyx/photon_distinguishability": ISSUES + "247",
     "optyx/readme_example": ISSUES + "247",
     "optyx/test_light_cones": ISSUES + "249",
-    "optyx/zw_examples": ISSUES + "249",
 }
 
 IFRAME = """\

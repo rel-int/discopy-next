@@ -47,7 +47,7 @@ from __future__ import annotations
 import random
 from collections.abc import Callable, Iterable
 
-from discopy.axioms import values
+from discopy.testable import values
 from discopy.cat import Transformation
 from discopy.python.function import EndoFunctor, Function, Ty
 from discopy.utils import (
@@ -470,7 +470,7 @@ def make_state(S: type) -> Monad:
     The state monad for a type ``S`` of states, sending a type ``X`` to the
     type ``S -> (X, S)`` of computations reading a state and returning a
     value together with the next state. Two computations are compared by
-    what they do on the states :func:`~discopy.axioms.values` samples.
+    what they do on the states :func:`~discopy.testable.values` samples.
 
     Parameters:
         S : The type of states.

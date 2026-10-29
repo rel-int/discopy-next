@@ -167,7 +167,7 @@ from dataclasses import dataclass
 
 from discopy import messages, symmetric
 from discopy.abc import FeedbackCategory, NamedGeneric
-from discopy.axioms import TestableGeneric
+from discopy.testable import TestableGeneric
 from discopy.python import finset
 from discopy.utils import (
     AxiomError,

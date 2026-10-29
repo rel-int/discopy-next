@@ -103,7 +103,7 @@ from networkx.algorithms.isomorphism import is_isomorphic
 
 from discopy import markov, messages, monoidal
 from discopy.abc import HypergraphCategory, MonoidalCategory, Nat
-from discopy.axioms import (
+from discopy.testable import (
     GENERATORS, Equation, Hom, Obj, Serialisable, TestableGeneric, Var,
     axiom)
 from discopy.drawing import Node

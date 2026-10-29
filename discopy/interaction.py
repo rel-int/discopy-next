@@ -76,7 +76,7 @@ from discopy import (
 from discopy.abc import (
     Pregroup, RibbonCategory, SymmetricCategory,
     TracedCategory)
-from discopy.axioms import Equation, TestableGeneric, quotient
+from discopy.testable import Equation, TestableGeneric, quotient
 from discopy.cat import assert_iscomposable
 from discopy.python import finset
 from discopy.utils import (

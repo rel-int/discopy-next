@@ -104,7 +104,7 @@ from discopy.abc import (
     BalancedCategory, BiclosedCategory, CompactCategory, DaggerCategory,
     PivotalCategory, RigidCategory, SpacialCategory, SymmetricCategory,
     TracedCategory)
-from discopy.axioms import FUEL, Axiom, Rule
+from discopy.testable import FUEL, Axiom, Rule
 from discopy.cat import factory
 from discopy.feedback import (  # noqa: F401  pylint: disable=unused-import
     Wire, Ty, Nat)

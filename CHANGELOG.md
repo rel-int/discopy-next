@@ -9,13 +9,13 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Added
 
-- `axioms.Rule` and `@rule`, inference rules stated like laws on each
+- `testable.Rule` and `@rule`, inference rules stated like laws on each
   structure of `abc`, and `FreeCategory.search`, the terms of a free
   category derived from its rules, which the property matrix draws:
   `Testable.enrolled` and `Testable.matrix` say what it checks,
   `proptest/test_rules.py` types every rule and the `fast` profile checks
   each law once ([next#1]).
-- `axioms.Serialisable`, the roundtrips of a term as laws, and the sorts
+- `testable.Serialisable`, the roundtrips of a term as laws, and the sorts
   `Atom`, `Perm` and `Objs` ([next#1]).
 - The laws of traced and feedback categories: the vanishing, iteration,
   superposing, naturality and dinaturality of the trace, `delay_unit`,
@@ -37,18 +37,18 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   Markov diagram reads back from its string only up to interchange
   ([next#1]).
 - Lenses, parametric maps and integer diagrams in the property matrix,
-  compared up to the equation of their category by `axioms.quotient`
+  compared up to the equation of their category by `testable.quotient`
   ([next#1]).
 - Kleisli channels, monad homomorphisms and `python.Function` in the
-  property matrix, compared extensionally by `axioms.Extensional` on
-  `axioms.values` ([next#1]).
+  property matrix, compared extensionally by `testable.Extensional` on
+  `testable.values` ([next#1]).
 - Lambda terms in the property matrix with the laws of beta reduction,
   `biclosed.Normalising`, and proof nets with `sequentialisation`
   ([next#1]).
 - `discopy.abc`, the abstract base classes of the hierarchy, from `Category`
   to `PROP`, `Monoid` and `Pregroup` ([#326], [#331], [#727]).
-- `discopy.axioms`, laws stated once on `abc` and checked by the Hypothesis
-  matrix in `proptest/`, so far on `cat.Arrow` ([#658]).
+- `discopy.testable`, laws stated once on `abc` and checked by the Hypothesis
+  matrix in `proptest/`, so far on `cat.Arrow` ([#658], [#829]).
 - `discopy.cmap`, combinatorial maps for diagrams in compact categories, with
   `genus`, `is_planar` and `to_compact` ([#338], [#532], [#690]).
 - `discopy.para`, parametric and coparametric maps over any symmetric
@@ -319,8 +319,10 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 - `docs/notebooks/optyx/channel_error.ipynb`, a 0-byte file that is not valid
   JSON and so not a notebook, is removed: it was added empty by `0e6c24bd`
   ([optyx#136]) and never had content to restore ([next#250]).
+- `docs/notebooks/optyx/zw_examples.md` runs on the current `photonic` API
+  instead of the removed `qpath` and `circuit` modules (part of [next#249]).
 - Every box of `discopy.optyx` prints the call that built it, so that
-  `eval(repr(x)) == x` holds for it as STYLE.md asks and `axioms.transparency`
+  `eval(repr(x)) == x` holds for it as STYLE.md asks and `testable.transparency`
   states: the boxes of `channel`, `qubits`, `photonic` and `classical` narrow
   `__init__` and used to print `cat.Box`'s `(name, dom, cod, data=...)`, which
   their own constructor cannot take. `core.diagram.Mode` and `Bit` print their
@@ -342,6 +344,8 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 - `closed.TermBase.normal_form` and `reduce` take a constant as the head of a
   spine, e.g. on the terms of `grammar.abstract` ([next#278]).
 - `optyx.channel.Swap.dagger` is the swap the other way round ([next#290]).
+- `optyx.channel.Diagram.eval` evaluates a diagram of classical boxes, which
+  `is_pure` called pure though a `CQMap` has no Kraus map ([next#260]).
 - `optyx.core.zw.ZBox.conjugate` takes amplitudes given as a list, as
   `dagger` does ([next#254]).
 - `optyx.classical.BitControlledPhaseShift` leaves its modes quantum, its
@@ -482,6 +486,23 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   empty outcome ([next#382]), `classical.And(n)` takes `n` bits
   ([next#387]), and `BBS.dagger` and `BBS.lambdify` keep `is_conj`
   ([next#386]).
+- `Hypergraph.is_convex` stops at the last box that writes into the image
+  instead of walking every box downstream of the match, wherever the boxes of
+  the host are topologically ordered, which `is_topologically_ordered` now
+  caches and a `Rewriter` declares false: matching a pattern over a host used
+  to cost the size of the host on every homomorphism ([next#286]).
+- The SEMM compiler of `discopy.optyx` on a path cover of more than one path,
+  which used to recurse forever: `compiler.mbqc.add_fusion_order` closes the
+  past of a node without recursion, so a node fused to something in its own
+  past comes back; `GFlow.partial_order` leaves two nodes of one layer
+  incomparable, as a foliation does, rather than each in the other's past;
+  `compile_to_semm` extends the order to the breaks that join the paths,
+  which are nodes of the resource state and not of the graph; and
+  `get_creation_times` and `get_measurement_times` are keyed by node ID
+  rather than by position in the path, counting no measurement photon for an
+  output, so that the fusion photons pair up. What the instructions should
+  say about a break, so that a decompile reads the graph back, is open
+  ([next#298]).
 - A doctest image of another size than its baseline raises "Drawing differs"
   like any other mismatch ([next#399]).
 - Docstrings of `para` and two others ([#494], [#683], [#693]), a citation
@@ -667,6 +688,7 @@ for the changelog of `1.2.1` and earlier.
 [#812]: https://github.com/discopy/discopy/pull/812
 [#824]: https://github.com/discopy/discopy/pull/824
 [#825]: https://github.com/discopy/discopy/pull/825
+[#829]: https://github.com/discopy/discopy/pull/829
 [#830]: https://github.com/discopy/discopy/pull/830
 [next#1]: https://github.com/rel-int/discopy-next/pull/1
 [next#9]: https://github.com/rel-int/discopy-next/issues/9
@@ -733,13 +755,16 @@ for the changelog of `1.2.1` and earlier.
 [next#214]: https://github.com/rel-int/discopy-next/pull/214
 [next#225]: https://github.com/rel-int/discopy-next/issues/225
 [next#236]: https://github.com/rel-int/discopy-next/issues/236
+[next#249]: https://github.com/rel-int/discopy-next/issues/249
 [next#250]: https://github.com/rel-int/discopy-next/issues/250
 [next#254]: https://github.com/rel-int/discopy-next/issues/254
 [next#258]: https://github.com/rel-int/discopy-next/issues/258
+[next#260]: https://github.com/rel-int/discopy-next/issues/260
 [next#263]: https://github.com/rel-int/discopy-next/pull/263
 [next#276]: https://github.com/rel-int/discopy-next/pull/276
 [next#278]: https://github.com/rel-int/discopy-next/issues/278
 [next#283]: https://github.com/rel-int/discopy-next/pull/283
+[next#286]: https://github.com/rel-int/discopy-next/issues/286
 [next#289]: https://github.com/rel-int/discopy-next/issues/289
 [next#290]: https://github.com/rel-int/discopy-next/issues/290
 [next#291]: https://github.com/rel-int/discopy-next/issues/291
@@ -748,6 +773,7 @@ for the changelog of `1.2.1` and earlier.
 [next#294]: https://github.com/rel-int/discopy-next/issues/294
 [next#295]: https://github.com/rel-int/discopy-next/issues/295
 [next#297]: https://github.com/rel-int/discopy-next/issues/297
+[next#298]: https://github.com/rel-int/discopy-next/issues/298
 [next#299]: https://github.com/rel-int/discopy-next/issues/299
 [next#300]: https://github.com/rel-int/discopy-next/issues/300
 [next#301]: https://github.com/rel-int/discopy-next/issues/301

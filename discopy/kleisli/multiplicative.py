@@ -72,7 +72,7 @@ from __future__ import annotations
 from collections.abc import Callable
 
 from discopy.abc import Category
-from discopy.axioms import Equation, TestableGeneric
+from discopy.testable import Equation, TestableGeneric
 from discopy.kleisli import channel
 from discopy.kleisli.monad import Maybe, Monad, Powerset, Seed, Subdistribution
 from discopy.python import function

@@ -127,7 +127,7 @@ from typing import Self
 import numpy as np
 
 from discopy import biclosed
-from discopy.axioms import Equation, Testable, axiom
+from discopy.testable import Equation, Testable, axiom
 from discopy.grammar.abstract import (
     Ty, Constant, Variable, Application, Abstraction, Term, TermBase)
 from discopy.utils import AxiomError

@@ -64,10 +64,10 @@ from typing import (
     Iterable, Iterator, Callable, ClassVar, Mapping, Self, TYPE_CHECKING)
 from warnings import warn
 
-from discopy import abc, axioms, cat, drawing, hypergraph, cmap, messages
+from discopy import abc, cat, drawing, hypergraph, cmap, messages, testable
 from discopy.abc import (
     ColouredMonoid, DaggerCategory, Monoid, MonoidalCategory)
-from discopy.axioms import Hom, Obj, TestableGeneric, Var, axiom
+from discopy.testable import Hom, Obj, TestableGeneric, Var, axiom
 from discopy.drawing import Drawing
 from discopy.config import (
     BOX_DRAWING_ATTRIBUTES, WIRE_DRAWING_ATTRIBUTES,
@@ -328,16 +328,16 @@ class List[generator_factory](Monoid["List"], TestableGeneric):
     def generators(cls):
         """
         Generate the lists of one Python type, one of those
-        :func:`axioms.values` samples, the free monoid on any other
+        :func:`testable.values` samples, the free monoid on any other
         generator having no strategy yet.
 
         >>> from discopy.python import Ty
-        >>> assert Ty.generators().example() in map(Ty, axioms.VALUES)
+        >>> assert Ty.generators().example() in map(Ty, testable.VALUES)
         """
         from hypothesis import strategies as st
         if cls.generator_factory is not type:
             raise NotImplementedError
-        return st.sampled_from(tuple(axioms.VALUES)).map(cls)
+        return st.sampled_from(tuple(testable.VALUES)).map(cls)
 
     @classmethod
     def strategy(cls, dom=None, cod=None):
@@ -701,7 +701,7 @@ class Nat(abc.Nat, Ty):  # ty: ignore[invalid-generic-class]
     generator_factory = int
     box_factory = None
     """ No generator of one colour is named, so there is no canonical
-    instance of a law, see :meth:`discopy.axioms.Axiom.canonical`. """
+    instance of a law, see :meth:`discopy.testable.Axiom.canonical`. """
 
     @classmethod
     def generators(cls, *, dom=None, cod=None):
@@ -796,7 +796,7 @@ class Dim(Ty):
     generator_factory = int
     box_factory = None
     """ No generator of one colour is named, so there is no canonical
-    instance of a law, see :meth:`discopy.axioms.Axiom.canonical`. """
+    instance of a law, see :meth:`discopy.testable.Axiom.canonical`. """
 
     @classmethod
     def generators(cls, *, dom=None, cod=None):
@@ -1498,7 +1498,7 @@ class Diagram(cat.Arrow, MonoidalCategory, RichDisplay):
 
     @axiom
     def hypergraph_identity[X: Obj[Ty]](
-            cls, x: Var[Ty, X]) -> axioms.Equation[hypergraph.Hypergraph]:
+            cls, x: Var[Ty, X]) -> testable.Equation[hypergraph.Hypergraph]:
         """ The hypergraph of an identity is the identity hypergraph. """
         return cat.Equation(
             cls.id(x).to_hypergraph(), hypergraph.Hypergraph[cls].id(x))
@@ -1506,7 +1506,7 @@ class Diagram(cat.Arrow, MonoidalCategory, RichDisplay):
     @axiom
     def hypergraph_composition[A: Obj[Ty], B: Obj[Ty], C: Obj[Ty]](
             cls, f: Hom[Self, A, B], g: Hom[Self, B, C]
-    ) -> axioms.Equation[hypergraph.Hypergraph]:
+    ) -> testable.Equation[hypergraph.Hypergraph]:
         """ The hypergraph of a composite composes the hypergraphs. """
         return cat.Equation(
             (f >> g).to_hypergraph(), f.to_hypergraph() >> g.to_hypergraph())
@@ -1514,34 +1514,36 @@ class Diagram(cat.Arrow, MonoidalCategory, RichDisplay):
     @axiom
     def hypergraph_tensor[A: Obj[Ty], B: Obj[Ty], C: Obj[Ty], D: Obj[Ty]](
             cls, f: Hom[Self, A, B], g: Hom[Self, C, D]
-    ) -> axioms.Equation[hypergraph.Hypergraph]:
+    ) -> testable.Equation[hypergraph.Hypergraph]:
         """ The hypergraph of a tensor tensors the hypergraphs. """
         return cat.Equation(
             (f @ g).to_hypergraph(), f.to_hypergraph() @ g.to_hypergraph())
 
     @axiom
     def hypergraph_section[A: Obj[Ty], B: Obj[Ty]](
-            cls, f: Hom[Self, A, B]) -> axioms.Equation[hypergraph.Hypergraph]:
+            cls, f: Hom[Self, A, B]
+    ) -> testable.Equation[hypergraph.Hypergraph]:
         """ Decoding a hypergraph gives a diagram that encodes back to it. """
         graph = f.to_hypergraph()
         return cat.Equation(graph.to_diagram().to_hypergraph(), graph)
 
     @axiom
     def map_agreement[A: Obj[Ty], B: Obj[Ty]](
-            cls, f: Hom[Self, A, B]) -> axioms.Equation[hypergraph.Hypergraph]:
+            cls, f: Hom[Self, A, B]
+    ) -> testable.Equation[hypergraph.Hypergraph]:
         """ Encoding through a map or directly gives the same hypergraph. """
         return cat.Equation(f.to_map().to_hypergraph(), f.to_hypergraph())
 
     @axiom
     def drawing_dagger_involution[A: Obj[Ty], B: Obj[Ty]](
-            cls, f: Hom[Self, A, B]) -> axioms.Equation[Drawing]:
+            cls, f: Hom[Self, A, B]) -> testable.Equation[Drawing]:
         """ Reflecting the drawing of a diagram twice gives it back. """
         drawing = f.to_drawing()
         return cat.Equation(drawing.dagger().dagger(), drawing)
 
     @axiom
     def foliation_idempotence[A: Obj[Ty], B: Obj[Ty]](
-            cls, f: Hom[Self, A, B]) -> axioms.Equation[Hom[Self, A, B]]:
+            cls, f: Hom[Self, A, B]) -> testable.Equation[Hom[Self, A, B]]:
         """ A foliation is its own foliation, on the nose. """
         foliated = f.foliation()
         return cat.Equation(foliated.foliation(), foliated)

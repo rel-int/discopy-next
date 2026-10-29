@@ -78,7 +78,7 @@ from dataclasses import dataclass
 from typing import ClassVar, Self
 
 from discopy import abc
-from discopy.axioms import Serialisable, TestableGeneric
+from discopy.testable import Serialisable, TestableGeneric
 from discopy.python.finset import Permutation
 from discopy.utils import assert_ismember, factory_name
 

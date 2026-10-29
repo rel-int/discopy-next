@@ -40,7 +40,7 @@ other algebras depend on the monad:
 Python functions cannot be compared, so the laws are checked at a point:
 :meth:`Algebra.unitality`, :meth:`Algebra.associativity` and
 :meth:`Homomorphism.preservation` return an
-:class:`~discopy.axioms.Equation` between two values, which holds when the
+:class:`~discopy.testable.Equation` between two values, which holds when the
 law does at that point.
 
 Example
@@ -80,7 +80,7 @@ from __future__ import annotations
 from collections.abc import Callable
 
 from discopy.abc import Category, NamedGeneric
-from discopy.axioms import Equation, TestableGeneric
+from discopy.testable import Equation, TestableGeneric
 from discopy.kleisli.monad import Monad
 from discopy.monad import free
 from discopy.python.function import Function

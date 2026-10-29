@@ -19,7 +19,7 @@ DisCoPy documentation
     api/optyx
     api/grammar
     api/drawing
-    api/axioms
+    api/testable
 
 .. toctree::
     :caption: Notebooks

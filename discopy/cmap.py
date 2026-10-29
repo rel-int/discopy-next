@@ -69,7 +69,7 @@ from discopy.abc import (
     SymmetricCategory,
     TracedCategory,
 )
-from discopy.axioms import Equation, Serialisable, TestableGeneric, axiom
+from discopy.testable import Equation, Serialisable, TestableGeneric, axiom
 from discopy.cat import Ob, Sum
 from discopy.python.finset import Permutation
 from discopy.utils import (

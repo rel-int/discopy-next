@@ -1,13 +1,13 @@
 """
 The property matrix: every law of every enrolled category, see
-:meth:`discopy.axioms.Testable.matrix`.
+:meth:`discopy.testable.Testable.matrix`.
 """
 
 import pytest
 from hypothesis import Phase, given, note, settings
 from hypothesis import strategies as st
 
-from discopy.axioms import Testable, inhabits, position
+from discopy.testable import Testable, inhabits, position
 from discopy.utils import factory_name
 
 from proptest.conftest import PROFILE
@@ -34,7 +34,7 @@ def cells():
 def test_axiom(law, drawn):
     """
     Check a law against generated arguments, a broken one up to its first
-    counterexample, which :meth:`discopy.axioms.Axiom.falsify` shrinks on
+    counterexample, which :meth:`discopy.testable.Axiom.falsify` shrinks on
     demand, and the equation it states against the type of its output,
     evaluated in the scope its arguments were drawn in.
     """

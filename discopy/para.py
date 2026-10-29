@@ -163,7 +163,7 @@ from typing import Self
 
 from discopy import (
     symmetric, markov, comarkov, closed, compact, frobenius, messages)
-from discopy.axioms import Equation, TestableGeneric, quotient
+from discopy.testable import Equation, TestableGeneric, quotient
 from discopy.abc import (
     ClosedCategory, ComarkovCategory, CompactCategory, FeedbackCategory,
     HypergraphCategory, MarkovCategory, SymmetricCategory, TracedCategory)

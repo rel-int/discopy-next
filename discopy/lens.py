@@ -71,7 +71,7 @@ from dataclasses import dataclass
 from discopy import interaction, markov, messages, symmetric
 from discopy.abc import (
     MarkovCategory, SymmetricCategory, TracedCategory)
-from discopy.axioms import Equation, TestableGeneric, quotient
+from discopy.testable import Equation, TestableGeneric, quotient
 from discopy.utils import (
     AxiomError, assert_iscomposable, assert_isinstance, classproperty,
     factory_name, get_origin, unbiased)

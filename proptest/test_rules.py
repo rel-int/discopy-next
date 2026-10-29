@@ -1,13 +1,13 @@
 """
 The rules of every enrolled category, see
-:meth:`discopy.axioms.Testable.matrix`.
+:meth:`discopy.testable.Testable.matrix`.
 """
 
 import pytest
 from hypothesis import Phase, given, note, settings
 from hypothesis import strategies as st
 
-from discopy.axioms import Rule, Testable, inhabits
+from discopy.testable import Rule, Testable, inhabits
 
 from proptest.conftest import PROFILE
 

@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 from pytest import raises
 
-from discopy import axioms
+from discopy import testable
 from discopy.abc import DaggerCategory, Nat
 from discopy.matrix import Matrix, backend
 from discopy.symmetric import Ty, Permutation, Swap, Functor

@@ -74,9 +74,18 @@ def compile_to_semm(
     if gflow is None:
         raise ValueError("Graph does not have gflow")
 
+    # The breaks that join the paths of the cover into one resource state are
+    # no nodes of the graph, so the gflow orders nothing about them: each is
+    # measured out to cut the state, with no node of the graph in its past.
+    gflow_order = gflow.partial_order()
+    breaks = set(sfn.path) - set(gflow.layers)
+
+    def order(node: int) -> list[int]:
+        return [node] if node in breaks else gflow_order(node)
+
     # Add the fusion ordering (induced by the corrections needing to be
     # performed from the fusions) to the partial order induced by gflow
-    order_with_fusions = add_fusion_order(sfn.fusions, gflow.partial_order())
+    order_with_fusions = add_fusion_order(sfn.fusions, order)
 
     ins = fn_to_semm(sfn, order_with_fusions)
     return ins
@@ -134,7 +143,7 @@ def fn_to_semm(fn: FusionNetwork, order: PartialOrder) -> list[Instruction]:
 
     c = get_creation_times(fn)
     m = get_measurement_times(fn, order, c)
-    f = _get_fusion_photons(fn.fusions, fn.path, c)
+    f = _get_fusion_photons(fn)
 
     ins: list[Instruction] = []
 
@@ -172,28 +181,25 @@ def fn_to_semm(fn: FusionNetwork, order: PartialOrder) -> list[Instruction]:
 #
 # If photon 1 fuses with photon 5, then there will be two entries in the
 # returned dictionary. 1: 5, and 5: 1
-def _get_fusion_photons(
-    fusions: list[Fusion], path: list[int], c: list[int]
-) -> dict[int, int]:
-    seen: dict[int, int] = {}
-    fusion_photons: dict[int, int] = {}
+#
+# The photons are numbered by the same walk over the path as `fn_to_semm`,
+# rather than computed from the creation times: the machine emits one photon
+# per fusion of a node and then one to measure it, which an output has not.
+def _get_fusion_photons(fn: FusionNetwork) -> dict[int, int]:
+    photon = 0
+    photons: dict[tuple[int, int], list[int]] = {}
 
-    reverse_list = {v: i for i, v in enumerate(path)}
+    for node in fn.path:
+        for nbr in get_fused_neighbours(fn.fusions, node):
+            photon += 1
+            photons.setdefault((node, nbr), []).append(photon)
+        photon += node in fn.measurements
 
-    for fusion in fusions:
-        photon_num1 = seen.get(fusion.node1, 0) + 1
-        photon_num2 = seen.get(fusion.node2, 0) + 1
-
-        seen[fusion.node1] = photon_num1
-        seen[fusion.node2] = photon_num2
-
-        photon_index1 = c[reverse_list[fusion.node1]] - photon_num1
-        photon_index2 = c[reverse_list[fusion.node2]] - photon_num2
-
-        fusion_photons[photon_index1] = photon_index2
-        fusion_photons[photon_index2] = photon_index1
-
-    return fusion_photons
+    # Two nodes may be fused more than once, so the photons of a pair are
+    # paired up by occurrence: both sides list them in the order of `fusions`.
+    return {one: other
+            for (node, nbr), ones in photons.items()
+            for one, other in zip(ones, photons[nbr, node])}
 
 
 # Returns the number of fusion edges a node has
@@ -201,30 +207,35 @@ def _num_fusions(fusions: list[Fusion], node: int) -> int:
     return sum(fusion.contains(node) for fusion in fusions)
 
 
-def get_creation_times(fn: FusionNetwork) -> list[int]:
-    """Returns a list containing the creation times of the measurement photon
-    of every node"""
+def get_creation_times(fn: FusionNetwork) -> dict[int, int]:
+    """Returns the creation time of the measurement photon of every node,
+    keyed by node ID: the path of a fusion network is a list of node IDs in
+    the order the resource state emits them, which is not the order of the
+    IDs themselves as soon as its paths are joined."""
     acc = 0
-    c = []
+    c = {}
     for node in fn.path:
-        # One photon for each fusion, and one measurement photon
-        acc += _num_fusions(fn.fusions, node) + 1
-        c.append(acc)
+        # One photon for each fusion, and one measurement photon, which an
+        # output has not: it is not measured, so the machine emits nothing
+        # for it and the next node's photons come straight after.
+        acc += _num_fusions(fn.fusions, node)\
+            + (node in fn.measurements)
+        c[node] = acc
 
     return c
 
 
 def get_measurement_times(
-    fn: FusionNetwork, order: PartialOrder, c: list[int]
-) -> list[int]:
-    """Returns a list containing the time the measurement photon of a given
-    node can be measured"""
+    fn: FusionNetwork, order: PartialOrder, c: dict[int, int]
+) -> dict[int, int]:
+    """Returns the time the measurement photon of a given node can be
+    measured, keyed by node ID as :func:`get_creation_times` is"""
 
-    m = [-1] * len(fn.path)
+    m: dict[int, int] = {}
 
     # Recursively evaluate all the measurement times
     def get_measurement(node: int) -> int:
-        if m[node] != -1:
+        if node in m:
             return m[node]
 
         past = order(node)

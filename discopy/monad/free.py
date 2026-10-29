@@ -42,7 +42,7 @@ from __future__ import annotations
 from collections.abc import Callable
 
 from discopy.abc import Category
-from discopy.axioms import TestableGeneric
+from discopy.testable import TestableGeneric
 from discopy.kleisli.channel import Channel
 from discopy.kleisli.monad import Monad
 from discopy.python.function import Function

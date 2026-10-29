@@ -95,7 +95,7 @@ from typing import (
 
 from discopy import cat, monoidal, cmap, hypergraph, messages
 from discopy.abc import BiclosedCategory, DaggerCategory, MonoidalCategory
-from discopy.axioms import (
+from discopy.testable import (
     GENERATORS, Equation as AbstractEquation, Equivalence, Serialisable,
     Testable, TestableGeneric, axiom)
 from discopy.drawing import Drawing
@@ -954,7 +954,7 @@ class Normalising(Testable):
 class TermBase(Box, Equivalence):
     """
     A term in the internal language of biclosed categories, an
-    :class:`discopy.axioms.Equivalence` up to the names of its bound
+    :class:`discopy.testable.Equivalence` up to the names of its bound
     variables, see :meth:`alpha_eq`.
 
     Attributes:

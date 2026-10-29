@@ -9,7 +9,7 @@ of a planar diagram otherwise. These tests check that each strategy meets
 its contract, that the boundaries it is asked for are honoured and the
 structure it claims is there. That a generated quotient reads back to
 itself through the diagram it downgrades to is a law of its category,
-:meth:`discopy.axioms.Decodable.decoding`, and that a rule concludes what
+:meth:`discopy.testable.Decodable.decoding`, and that a rule concludes what
 its signature states is checked by ``test_rules.py``.
 """
 

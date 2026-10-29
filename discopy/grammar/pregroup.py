@@ -34,7 +34,7 @@ Summary
 from typing import ClassVar
 
 from discopy import rigid, frobenius, messages
-from discopy.axioms import no_strategy
+from discopy.testable import no_strategy
 from discopy.cat import factory
 from discopy.utils import AxiomError, deprecated_alias, factory_name
 from discopy.grammar import thue

@@ -1347,12 +1347,15 @@ class Diagram(frobenius.Diagram):
         """
         Check if the diagram is pure, i.e. it does not
         contain any discards or measures acting on quantum types,
-        and does not prepare quantum types from classical types.
+        does not prepare quantum types from classical types,
+        and has no :class:`CQMap`, which is given by its density matrix
+        rather than a Kraus map.
         """
         are_layers_pure = []
         are_layers_classical = []
-        for layer in self:
-            generator, _ = layer.inside[0].boxes_and_offsets[0]
+        for generator in self.boxes:
+            if isinstance(generator, CQMap):
+                return False
 
             if isinstance(generator, Feedback) and not all(
                 part.is_pure for part in (
@@ -1384,7 +1387,6 @@ class Diagram(frobenius.Diagram):
                 isinstance(generator, Discard)
             )
 
-            # assume all classical maps are pure
             are_layers_classical.append(
                 all(ty.is_classical for ty in generator.cod.inside) and
                 all(ty.is_classical for ty in generator.dom.inside)

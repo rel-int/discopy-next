@@ -113,7 +113,7 @@ from collections.abc import Callable
 
 from discopy import messages
 from discopy.abc import ComarkovCategory, TracedCategory
-from discopy.axioms import Equation, TestableGeneric
+from discopy.testable import Equation, TestableGeneric
 from discopy.kleisli import channel
 from discopy.kleisli.monad import Monad, Powerset, Subdistribution
 from discopy.python import function

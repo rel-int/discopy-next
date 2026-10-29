@@ -9,7 +9,7 @@ from pytest import raises
 
 from discopy import braided, cat, monoidal, rigid
 from discopy.abc import Category, ColouredMonoid, Group, MonoidalCategory, Nat
-from discopy.axioms import (
+from discopy.testable import (
     L, R, Atom, Axiom, AxiomFailure, Equation, Equivalence, Hom, Obj, Over,
     Related, Repeat, Tensor, Testable, TestableGeneric, Under, Unit, Var,
     axiom, inhabits, position, substitute)
@@ -124,7 +124,7 @@ def test_string_annotations():
     """ A law whose annotations are strings reads them as objects. """
     namespace = {}
     exec("from __future__ import annotations\n"
-         "from discopy.axioms import Equation, Hom, Obj\n"
+         "from discopy.testable import Equation, Hom, Obj\n"
          "def deferred[A: Obj[int]](cls, f: Hom[int, A, A])"
          " -> Equation[Hom[int, A, A]]: return NotImplemented", namespace)
     law = axiom(namespace["deferred"]).bind(Arrow)
@@ -295,7 +295,7 @@ def test_canonical_instances():
 
 
 def test_extensional():
-    from discopy.axioms import Extensional, values
+    from discopy.testable import Extensional, values
     from discopy.python import Function
     f, g = (Function(lambda x, k=k: x + k, int, int) for k in (1, 1))
     assert f != g and Extensional(f, g)

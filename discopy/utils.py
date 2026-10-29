@@ -252,7 +252,7 @@ class NamedGeneric:
     it builds through ``cls.ar`` carry the parameter.
 
     >>> from discopy.abc import Category
-    >>> from discopy.axioms import TestableGeneric
+    >>> from discopy.testable import TestableGeneric
     >>> @factory
     ... class C[dtype](Category, TestableGeneric):
     ...     checked_params = classmethod(lambda cls: ())

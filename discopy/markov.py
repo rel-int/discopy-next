@@ -74,7 +74,7 @@ from typing import ClassVar
 from discopy import (
     cat, symmetric, monoidal, feedback, cmap, hypergraph, messages)
 from discopy.abc import ComarkovCategory, MarkovCategory, Nat
-from discopy.axioms import FUEL
+from discopy.testable import FUEL
 from discopy.cat import factory
 from discopy.feedback import (  # noqa: F401  pylint: disable=unused-import
     Wire, Ty)

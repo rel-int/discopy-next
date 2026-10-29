@@ -56,7 +56,7 @@ from discopy.frobenius import Dim, Cup
 from discopy.matrix import (  # noqa: F401  pylint: disable=unused-import
     Matrix, backend, set_backend, get_backend,
     NumPy, JAX, PyTorch, TensorFlow)
-from discopy.axioms import TestableGeneric, no_strategy
+from discopy.testable import TestableGeneric, no_strategy
 from discopy.python import finset
 from discopy.utils import (
     factory_name, assert_isinstance, product, assert_isatomic,

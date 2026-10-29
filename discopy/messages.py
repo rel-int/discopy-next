@@ -61,7 +61,7 @@ NOT_BOUNDARY_CONNECTED = (
 COLOURED_QUOTIENT = (
     "{} is coloured: a hypergraph or a map is symmetric, and a swap is "
     "ill-typed across 0-cells, so it would lose its colours.")
-NO_VALUES = "{} has no sample of values, see axioms.values."
+NO_VALUES = "{} has no sample of values, see testable.values."
 NO_DAGGER = "There is no dagger here, so the dagger laws do not apply."
 NO_TENSOR = "An arrow of a category has no tensor for its dagger to "\
     "distribute over."

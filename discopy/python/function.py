@@ -22,7 +22,7 @@ from contextlib import contextmanager
 
 from discopy import messages
 from discopy.abc import Category
-from discopy.axioms import Extensional, values
+from discopy.testable import Extensional, values
 from discopy.cat import Functor
 from discopy.monoidal import List
 from discopy.utils import (
@@ -70,7 +70,7 @@ class Function(Category[Ty, "Function"]):
     def equation_factory(cls, *terms: "Function") -> Extensional:
         """
         The equation of a law, compared by the graphs of its terms on the
-        :meth:`arguments` of their domain, see :class:`axioms.Extensional`.
+        :meth:`arguments` of their domain, see :class:`testable.Extensional`.
         """
         return Extensional(*terms)
 
