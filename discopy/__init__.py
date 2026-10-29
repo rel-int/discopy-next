@@ -31,6 +31,7 @@ from discopy import (
     op,
     neural,
     python,
+    kleisli,
     matrix,
     tensor,
     hopf,

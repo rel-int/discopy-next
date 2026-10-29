@@ -152,10 +152,11 @@ import copy
 
 from collections.abc import Callable
 
-from typing import ClassVar, Iterator, Self
+from typing import Iterator, Self, ClassVar
 
 from discopy import cat, monoidal, biclosed, messages
-from discopy.abc import Pregroup, RigidCategory
+from discopy.abc import DaggerCategory, Pregroup, RigidCategory
+from discopy.testable import GENERATORS
 from discopy.cat import factory
 from discopy.utils import (
     assert_isatomic,
@@ -231,6 +232,19 @@ class Wire(monoidal.Wire):
         result = copy.copy(self)
         result.z = 0
         return result
+
+    windings = (0, 1, -1)
+    """ The winding numbers :meth:`strategy` draws from, simplest first. """
+
+    @classmethod
+    def strategy(cls):
+        """ Generate named objects with a winding number in
+        :attr:`windings`. """
+        from hypothesis import strategies as st
+
+        return st.tuples(
+            st.sampled_from(GENERATORS), st.sampled_from(cls.windings),
+        ).map(lambda args: cls(args[0], z=args[1]))
 
     def __eq__(self, other):
         return monoidal.Wire.__eq__(self, other)\
@@ -668,6 +682,34 @@ class Diagram(biclosed.Diagram, RigidCategory):
         >>> assert double_snake == two_snakes_nf
         """
         return super().normal_form(**params)
+
+    hypergraph_section = monoidal.Diagram.hypergraph_section.failing(
+        messages.SECTION_NEEDS_SWAPS)
+    dagger_involution = DaggerCategory.dagger_involution.failing(
+        messages.RIGID_HAS_NO_DAGGER)
+    dagger_contravariance = DaggerCategory.dagger_contravariance.failing(
+        messages.RIGID_HAS_NO_DAGGER)
+    dagger_monoidality = DaggerCategory.dagger_monoidality.failing(
+        messages.RIGID_HAS_NO_DAGGER)
+
+    # The curry of a rigid diagram is made of caps, which a map and a
+    # hypergraph both read as wiring, so the two agree.
+    map_agreement = monoidal.Diagram.map_agreement
+    currying_left = RigidCategory.currying_left.failing(
+        messages.NOT_BOUNDARY_CONNECTED)
+    currying_right = RigidCategory.currying_right.failing(
+        messages.NOT_BOUNDARY_CONNECTED)
+    currying_eta_left = RigidCategory.currying_eta_left.failing(
+        messages.NOT_BOUNDARY_CONNECTED)
+    currying_eta_right = RigidCategory.currying_eta_right.failing(
+        messages.NOT_BOUNDARY_CONNECTED)
+    currying_naturality_left = RigidCategory.currying_naturality_left\
+        .failing(messages.NOT_BOUNDARY_CONNECTED)
+    currying_naturality_right = RigidCategory.currying_naturality_right\
+        .failing(messages.NOT_BOUNDARY_CONNECTED)
+    snake_equations = RigidCategory.snake_equations.modulo(normal_form)
+    transpose_contravariance = RigidCategory.transpose_contravariance.failing(
+        messages.NOT_BOUNDARY_CONNECTED)
 
 
 class Box(biclosed.Box, Diagram):

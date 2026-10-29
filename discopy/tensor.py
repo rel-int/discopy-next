@@ -56,7 +56,7 @@ from discopy.frobenius import Dim, Cup
 from discopy.matrix import (  # noqa: F401  pylint: disable=unused-import
     Matrix, backend, set_backend, get_backend,
     NumPy, JAX, PyTorch, TensorFlow)
-from discopy.abc import NamedGeneric
+from discopy.testable import TestableGeneric, no_strategy
 from discopy.python import finset
 from discopy.utils import (
     factory_name, assert_isinstance, product, assert_isatomic,
@@ -129,6 +129,15 @@ class Tensor(Matrix):
     ...     assert jax.grad(f)(1., 2.) == 2.
     """
     ob = Dim
+
+    @classmethod
+    def checked_params(cls) -> tuple:
+        """
+        None, the Kronecker product of the dimensions a law draws growing
+        exponentially in their number, where the direct sum of a matrix
+        grows linearly.
+        """
+        return ()
 
     def __init__(self, array, dom: Dim, cod: Dim):
         assert_isinstance(dom, Dim)
@@ -694,7 +703,7 @@ einsum of a backend verbatim, which a file should not reach.
 
 
 @factory
-class Diagram[dtype](NamedGeneric, frobenius.Diagram):
+class Diagram[dtype](TestableGeneric, frobenius.Diagram):
     """
     A tensor diagram is a frobenius diagram with tensor boxes.
 
@@ -714,6 +723,11 @@ class Diagram[dtype](NamedGeneric, frobenius.Diagram):
     >>> Box('f', Dim(1), Dim(1), [0.5])
     tensor.Box[float]('f', Dim(1), Dim(1), data=[0.5])
     """
+    @classmethod
+    def checked_params(cls) -> tuple:
+        """ None, a tensor diagram drawing no arrays. """
+        return ()
+
     sum_factory: ClassVar[type["Sum"]]
     swap_factory: ClassVar[type["Swap"]]
     permutation_factory: ClassVar[type["Permutation"]]
@@ -945,6 +959,11 @@ class Diagram[dtype](NamedGeneric, frobenius.Diagram):
             result += Box(str(var), Dim(1), dim, onehot.array)\
                 @ self.grad(var, **params)
         return result
+
+    # A tensor box carries an array, which the strategy of a free category
+    # does not draw: tensor diagrams, circuits and ZX diagrams stay out of
+    # the matrix.
+    strategy = no_strategy
 
 
 CMap = cmap.CMap[Diagram]

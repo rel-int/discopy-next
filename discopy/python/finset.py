@@ -29,7 +29,7 @@ from dataclasses import dataclass
 from discopy import messages
 from discopy.abc import (
     Groupoid, HypergraphCategory, MarkovCategory, PROP, Nat)
-from discopy.testable import Testable
+from discopy.testable import Serialisable
 from discopy.utils import AxiomError, factory_name, unbiased
 
 
@@ -465,7 +465,7 @@ class Permutation(Function, PROP, Groupoid):
 
 
 @dataclass
-class Cospan(HypergraphCategory, Testable["Cospan"]):
+class Cospan(HypergraphCategory, Serialisable["Cospan"]):
     """
     A cospan of finite sets ``dom -> apex <- cod``, i.e. an arrow of the free
     hypergraph category on one object, the PROP of special commutative
@@ -670,5 +670,17 @@ class Cospan(HypergraphCategory, Testable["Cospan"]):
                        draw(st.lists(points, min_size=n, max_size=n)), apex)
         return cospans()
 
-    serialisation = Testable.serialisation.inapplicable(
+    serialisation = Serialisable.serialisation.inapplicable(
         "A cospan of finite sets has no tree.")
+
+
+for name in (
+        "snake_equations", "caps_coherence", "cups_coherence",
+        "transpose_contravariance", "rotate_contravariance", "adjunction",
+        "self_dual", "pivotality", "reidemeister_1_cap", "reidemeister_1_cup",
+        "currying_left", "currying_right", "currying_eta_left",
+        "currying_eta_right", "currying_naturality_left",
+        "currying_naturality_right", "counit", "unit", "curry_left",
+        "curry_right", "ev_left", "ev_right"):
+    setattr(Cospan, name, getattr(Cospan, name).inapplicable(
+        messages.NAT_HAS_NO_ADJOINTS))

@@ -26,11 +26,12 @@ Summary
 from __future__ import annotations
 
 from collections.abc import Callable
-from itertools import accumulate
+from itertools import accumulate, product
 from typing import Self
 
 from discopy import messages
 from discopy.abc import ClosedCategory, TracedCategory
+from discopy.testable import values
 from discopy.utils import (
     AxiomError, assert_isinstance, assert_istraceable, tuplify, untuplify,
     factory)
@@ -49,7 +50,7 @@ def exp(base: Ty, exponent: Ty) -> Ty:
     base, exponent = map(Ty.cast, (base, exponent))
     return Ty(Callable[
         list(exponent.inside),  # ty: ignore[invalid-type-form]
-        tuple[base.inside]])
+        tuple[base.inside]])  # ty: ignore[invalid-type-form]
 
 
 @factory
@@ -76,6 +77,16 @@ class Function(function.Function, ClosedCategory, TracedCategory):
             fix
             trace
     """
+
+    @classmethod
+    def arguments(cls, dom: Ty) -> tuple[tuple, ...]:
+        """
+        The arguments a function on ``dom`` is called with by an
+        extensional equation: a value of each of its types.
+
+        >>> assert len(Function.arguments(Ty(bool, bool))) == 4
+        """
+        return tuple(product(*map(values, dom.inside)))
 
     def __call__(self, *xs):
         if self.type_checking:

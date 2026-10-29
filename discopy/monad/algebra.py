@@ -80,7 +80,7 @@ from __future__ import annotations
 from collections.abc import Callable
 
 from discopy.abc import Category, NamedGeneric
-from discopy.testable import Equation
+from discopy.testable import Equation, TestableGeneric
 from discopy.kleisli.monad import Monad
 from discopy.monad import free
 from discopy.python.function import Function
@@ -194,7 +194,7 @@ class Algebra[monad](NamedGeneric):
 
 
 @factory
-class Homomorphism[monad](Category, NamedGeneric):
+class Homomorphism[monad](Category, TestableGeneric):
     """
     A homomorphism between two algebras of a monad ``M``, i.e. a function
     between their carriers preserving their structure.
@@ -230,6 +230,11 @@ class Homomorphism[monad](Category, NamedGeneric):
     ...     lambda x: x, disjunction, conjunction)
     >>> assert not identity.preservation(frozenset({False, True}))
     """
+    @classmethod
+    def checked_params(cls) -> tuple:
+        """ None, a homomorphism of algebras having no strategy yet. """
+        return ()
+
     ob = Algebra
     monad: Monad
 

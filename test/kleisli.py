@@ -643,6 +643,14 @@ def test_additive_Channel_repr():
     assert repr(half).startswith("kleisli.additive.Channel[Maybe](")
 
 
+def test_observe():
+    assert Subdistribution.observe(frozenset({(0, .1 + .2)}))\
+        == Subdistribution.observe(frozenset({(0, .3)}))
+    tick = lambda s: (s, s + 1)
+    assert Seed.observe(tick) == ((0, 1), (1, 2), (-1, 0), (2, 3))
+    assert Maybe.observe(None) is None
+
+
 def token_machine(constants):
     """
     A probabilistic token machine, i.e. the one of the module docstring of

@@ -209,6 +209,17 @@ def test_traced_copy_of_a_wire_with_a_dagger():
         == loop.to_hypergraph()
 
 
+def test_str_transparency():
+    """ A hypergraph prints as the diagram it decodes to, which reads back in
+    the environment of its category, and to the hypergraph. """
+    from discopy import symmetric
+    from discopy.hypergraph import Hypergraph
+    x = symmetric.Ty('x')
+    graph = (symmetric.Box('f', x, x) @ x >> symmetric.Swap(x, x)
+             ).to_hypergraph()
+    assert str(graph) == "f @ x >> Swap(x, x)"
+    assert Hypergraph[symmetric.Diagram].str_transparency(term=graph)
+
 
 def test_rotation_is_the_transpose():
     """ Decision 7 of #56: a rotated box has the hypergraph of its
@@ -564,6 +575,29 @@ def test_trace_needs_traced_pivotal():
         x = module.Ty('x')
         graph = module.Box('f', x @ x, x @ x).to_hypergraph()
         assert graph.trace().cod == graph.trace(left=True).cod == x
+
+
+def test_planar_comparison():
+    """ Below symmetric categories, a hypergraph is not faithful, so the
+    laws of a planar level are compared on the nose: each pair here was
+    identified when they were compared by hypergraph. """
+    from discopy import balanced, braided, monoidal, rigid
+    x, y = braided.Ty('x'), braided.Ty('y')
+    braid, inverse = braided.Braid(x, y), braided.Braid(y, x)[::-1]
+    assert braid.to_hypergraph() != inverse.to_hypergraph()
+    assert not braided.Diagram.equation_factory(braid, inverse)
+    x = balanced.Ty('x')
+    twist, identity = balanced.Twist(x), balanced.Diagram.id(x)
+    assert twist.to_hypergraph() != identity.to_hypergraph()
+    assert not balanced.Diagram.equation_factory(twist, identity)
+    x = rigid.Ty('x')
+    left = rigid.Cap(x, x.l) @ x >> x @ rigid.Cup(x.l, x)
+    right = x @ rigid.Cap(x.r, x) >> rigid.Cup(x, x.r) @ x
+    assert left.to_hypergraph() != right.to_hypergraph()  # cups are boxes
+    assert not rigid.Diagram.equation_factory(left, right)
+    x, scalar = monoidal.Ty('x'), monoidal.Box('s', monoidal.Ty(), monoidal.Ty())
+    assert (scalar @ x).to_hypergraph() == (x @ scalar).to_hypergraph()
+    assert not monoidal.Diagram.equation_factory(scalar @ x, x @ scalar)
 
 
 def test_cups_and_caps_read_the_host_category():
@@ -1004,3 +1038,13 @@ def test_decoder():
     assert (CMap[Tensor].id(Dim(3)) @ CMap[Tensor].from_box(t)
             >> CMap[Tensor].swap(Dim(3), Dim(3))).to_diagram()\
         == Dim(3) @ t >> Tensor.swap(Dim(3), Dim(3))
+
+
+def test_atoms():
+    x, y = Ty('x'), Ty('y')
+    f = Box('f', x, y)
+    graph = f.to_hypergraph()
+    assert graph.atoms() == graph.to_diagram().atoms()
+    assert f in graph.atoms()
+    assert eval(str(graph), Diagram.str_environment(f)).to_hypergraph()\
+        == graph

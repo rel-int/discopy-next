@@ -388,6 +388,7 @@ CMap = cmap.CMap[Diagram]
 class TermBase(Box, closed.TermBase):
     "A term in the internal language of an abstract categorial grammar."
     functor = Functor.id(Diagram)
+    strategy = classmethod(closed.TermBase.strategy.__func__)
 
 
 class Constant(TermBase, closed.Constant):

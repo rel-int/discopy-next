@@ -59,13 +59,15 @@ import itertools
 from dataclasses import dataclass, field
 from functools import cached_property
 from operator import index
+from types import NoneType
 from typing import (
-    Iterator, Callable, ClassVar, Mapping, Self, TYPE_CHECKING, Iterable)
+    Iterable, Iterator, Callable, ClassVar, Mapping, Self, TYPE_CHECKING)
 from warnings import warn
 
-from discopy import abc, cat, drawing, hypergraph, cmap, messages
+from discopy import abc, cat, drawing, hypergraph, cmap, messages, testable
 from discopy.abc import (
-    ColouredMonoid, Monoid, MonoidalCategory, NamedGeneric)
+    ColouredMonoid, DaggerCategory, Monoid, MonoidalCategory)
+from discopy.testable import Hom, Obj, TestableGeneric, Var, axiom
 from discopy.drawing import Drawing
 from discopy.config import (
     BOX_DRAWING_ATTRIBUTES, WIRE_DRAWING_ATTRIBUTES,
@@ -78,6 +80,7 @@ from discopy.utils import (
     assert_isinstance,
     assert_iscomposable,
     AxiomError,
+    classproperty,
     deprecated_alias,
     MappingOrCallable,
     RichDisplay,
@@ -102,6 +105,13 @@ class Colour(cat.Ob):
 
     name: str
     label: "str | None" = field(default=None, compare=False)
+
+    @classmethod
+    def strategy(cls):
+        """ Generate the colours of a few regions, by their names. """
+        from hypothesis import strategies as st
+
+        return st.sampled_from(("red", "green", "blue")).map(cls)
 
     def __post_init__(self):
         assert_isinstance(self.name, str)
@@ -195,7 +205,7 @@ class Wire(cat.Ob):
                    is_dagger=tree.get('is_dagger', False))
 
 
-class List[generator_factory](Monoid, NamedGeneric):
+class List[generator_factory](Monoid["List"], TestableGeneric):
     """
     The free monoid on a ``generator_factory``, i.e. lists of its instances
     with concatenation as :meth:`tensor` and the empty list as unit.
@@ -235,8 +245,12 @@ class List[generator_factory](Monoid, NamedGeneric):
     >>> assert repr(x) == "monoidal.List[type](int, str)"
     >>> assert eval(repr(x)) == x
     """
-    ob = type(None)
-    dom = cod = None
+    @classmethod
+    def checked_params(cls) -> tuple:
+        """
+        Python types, the only generators :meth:`generators` draws.
+        """
+        return (type, )
 
     def __init__(self, *inside):
         self.inside = inside
@@ -310,6 +324,33 @@ class List[generator_factory](Monoid, NamedGeneric):
         return factory_name(type(self))\
             + f"({', '.join(map(self.generator_repr, self.inside))})"
 
+    @classmethod
+    def generators(cls):
+        """
+        Generate the lists of one Python type, one of those
+        :func:`testable.values` samples, the free monoid on any other
+        generator having no strategy yet.
+
+        >>> from discopy.python import Ty
+        >>> assert Ty.generators().example() in map(Ty, testable.VALUES)
+        """
+        from hypothesis import strategies as st
+        if cls.generator_factory is not type:
+            raise NotImplementedError
+        return st.sampled_from(tuple(testable.VALUES)).map(cls)
+
+    @classmethod
+    def strategy(cls, dom=None, cod=None):
+        """
+        Generate lists of at most three generators, each from the only
+        object :obj:`None` to itself.
+        """
+        from hypothesis import strategies as st
+        if (dom, cod) != (None, None):
+            raise ValueError("A list has a single object, None.")
+        return st.lists(cls.generators(), max_size=3).map(
+            lambda xs: cls().tensor(*xs))
+
 
 @factory
 class Ty(cat.Ob, cat.FreeCategory, ColouredMonoid):
@@ -361,6 +402,47 @@ class Ty(cat.Ob, cat.FreeCategory, ColouredMonoid):
     """
     ob = Colour
     generator_factory = Wire
+    box_factory = classproperty(lambda cls: cls.generator_factory)
+    """
+    The generators of a type as a free category, i.e. its wires, a
+    :class:`cat.Ob` that :meth:`cast` embeds as a type of length one.
+    """
+
+    @classmethod
+    def typeparams(cls) -> tuple[type, type]:
+        """
+        The objects of types as a category are their colours, which a law
+        quantifies over as ``None``, the colour of every type generated:
+        no coloured type is generated yet.
+
+        >>> assert Ty.typeparams() == (NoneType, Ty)
+        """
+        return NoneType, cls
+
+    @classmethod
+    def strategy(cls, **params):
+        """
+        Generate types by the :meth:`search` of the free monoid, i.e. from
+        the identity and the composition of its rules with a wire as the
+        generator, with less fuel than a diagram since its types are the
+        boundaries of one.
+
+        Parameters are those of :meth:`search`.
+
+        >>> from hypothesis import find
+        >>> assert len(find(Ty.strategy(), lambda x: len(x) > 1)) == 2
+        """
+        return cls.search(**{"fuel": 1, **params})
+
+    @classmethod
+    def generators(cls, *, dom=None, cod=None):
+        """
+        Generate the types of one wire, with no colour, as those of
+        :meth:`typeparams` are: a coloured type is not generated yet, so
+        the boundary is not read.
+        """
+        # pylint: disable=unused-argument  # no type generated is coloured
+        return cls.generator_factory.strategy().map(cls)
 
     def cast_wire(self, x: str | cat.Ob) -> cat.Ob:
         """
@@ -615,7 +697,19 @@ class Nat(abc.Nat, Ty):  # ty: ignore[invalid-generic-class]
 
     >>> assert CX @ 2 >> 2 @ CX == CX @ CX
     """
+    ob = Colour
     generator_factory = int
+    box_factory = None
+    """ No generator of one colour is named, so there is no canonical
+    instance of a law, see :meth:`discopy.testable.Axiom.canonical`. """
+
+    @classmethod
+    def generators(cls, *, dom=None, cod=None):
+        """ Generate the one generator of the free monoid, ``Nat(1)``. """
+        # pylint: disable=unused-argument  # a Nat has no colour
+        from hypothesis import strategies as st
+
+        return st.just(cls(1))
 
     def __init__(self, inside: int | tuple = 0, dom: Colour | None = None,
                  cod: Colour | None = None, _scan: bool = True):
@@ -700,6 +794,17 @@ class Dim(Ty):
     >>> assert loads(dumps(Dim(2, 3))) == Dim(2, 3)
     """
     generator_factory = int
+    box_factory = None
+    """ No generator of one colour is named, so there is no canonical
+    instance of a law, see :meth:`discopy.testable.Axiom.canonical`. """
+
+    @classmethod
+    def generators(cls, *, dom=None, cod=None):
+        """ Generate the dimensions of one wire, two or three. """
+        # pylint: disable=unused-argument  # a Dim has one colour
+        from hypothesis import strategies as st
+
+        return st.integers(2, 3).map(cls)
 
     def __init__(self, *inside: int, dom=None, cod=None, _scan=True, **kwargs):
         inside = kwargs.pop('inside', inside)
@@ -1135,6 +1240,11 @@ class Diagram(cat.Arrow, MonoidalCategory, RichDisplay):
             normalize
             normal_form
     """
+    bifunctoriality = MonoidalCategory.bifunctoriality.failing(
+        messages.NO_PLANAR_NORMAL_FORM)
+    dagger_monoidality = DaggerCategory.dagger_monoidality.failing(
+        messages.NO_PLANAR_NORMAL_FORM)
+
     box_factory: ClassVar[type["Box"]]
     sum_factory: ClassVar[type["Sum"]]
     bubble_factory: ClassVar[type["Bubble"]]
@@ -1385,6 +1495,76 @@ class Diagram(cat.Arrow, MonoidalCategory, RichDisplay):
         f0 @ y >> y @ f1
         """
         return self.ar.decode(*self.encode())
+
+    @axiom
+    def hypergraph_identity[X: Obj[Ty]](
+            cls, x: Var[Ty, X]) -> testable.Equation[hypergraph.Hypergraph]:
+        """ The hypergraph of an identity is the identity hypergraph. """
+        return cat.Equation(
+            cls.id(x).to_hypergraph(), hypergraph.Hypergraph[cls].id(x))
+
+    @axiom
+    def hypergraph_composition[A: Obj[Ty], B: Obj[Ty], C: Obj[Ty]](
+            cls, f: Hom[Self, A, B], g: Hom[Self, B, C]
+    ) -> testable.Equation[hypergraph.Hypergraph]:
+        """ The hypergraph of a composite composes the hypergraphs. """
+        return cat.Equation(
+            (f >> g).to_hypergraph(), f.to_hypergraph() >> g.to_hypergraph())
+
+    @axiom
+    def hypergraph_tensor[A: Obj[Ty], B: Obj[Ty], C: Obj[Ty], D: Obj[Ty]](
+            cls, f: Hom[Self, A, B], g: Hom[Self, C, D]
+    ) -> testable.Equation[hypergraph.Hypergraph]:
+        """ The hypergraph of a tensor tensors the hypergraphs. """
+        return cat.Equation(
+            (f @ g).to_hypergraph(), f.to_hypergraph() @ g.to_hypergraph())
+
+    @axiom
+    def hypergraph_section[A: Obj[Ty], B: Obj[Ty]](
+            cls, f: Hom[Self, A, B]
+    ) -> testable.Equation[hypergraph.Hypergraph]:
+        """ Decoding a hypergraph gives a diagram that encodes back to it. """
+        graph = f.to_hypergraph()
+        return cat.Equation(graph.to_diagram().to_hypergraph(), graph)
+
+    @axiom
+    def map_agreement[A: Obj[Ty], B: Obj[Ty]](
+            cls, f: Hom[Self, A, B]
+    ) -> testable.Equation[hypergraph.Hypergraph]:
+        """ Encoding through a map or directly gives the same hypergraph. """
+        return cat.Equation(f.to_map().to_hypergraph(), f.to_hypergraph())
+
+    @axiom
+    def drawing_dagger_involution[A: Obj[Ty], B: Obj[Ty]](
+            cls, f: Hom[Self, A, B]) -> testable.Equation[Drawing]:
+        """ Reflecting the drawing of a diagram twice gives it back. """
+        drawing = f.to_drawing()
+        return cat.Equation(drawing.dagger().dagger(), drawing)
+
+    @axiom
+    def foliation_idempotence[A: Obj[Ty], B: Obj[Ty]](
+            cls, f: Hom[Self, A, B]) -> testable.Equation[Hom[Self, A, B]]:
+        """ A foliation is its own foliation, on the nose. """
+        foliated = f.foliation()
+        return cat.Equation(foliated.foliation(), foliated)
+
+    @classmethod
+    def equation_factory(cls, *terms: "Diagram") -> "Equation":
+        """
+        The equation of a law, compared on the nose. A hypergraph is faithful
+        only from :class:`discopy.symmetric.Diagram` on, whose
+        ``equation_factory`` compares up to it: below, it is a quotient that
+        forgets the regions of a planar diagram and the side of its scalars,
+        identifies a braid with its inverse, a twist with the identity and
+        the adjoints of a type, so a planar law is compared syntactically
+        until each doctrine has a normal form of its own.
+
+        >>> x = Ty('x')
+        >>> f, g = Box('f', Ty(), x), Box('g', x, Ty())
+        >>> assert not Diagram.equation_factory(f @ g, g >> f)
+        >>> assert Diagram.equation_factory(f @ g, f @ g)
+        """
+        return Equation(*terms)
 
     def to_hypergraph(self) -> "Hypergraph":
         """

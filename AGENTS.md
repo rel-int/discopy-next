@@ -34,7 +34,7 @@ Each human's agents move their own open work from upstream, never somebody else'
 
 - [discopy](discopy/) contains the code with a lot of modules and a few submodules
 - [discopy.abc](discopy/abc.py) contains abstract base classes for each level of the hierarchy
-- [discopy.testable](discopy/testable.py) contains the property-testing module: `Axiom` states a law once on an abstract base class, `Testable` generates the terms it quantifies over, and the matrix in `proptest/` checks every cell. Read it before adding a category or an axiom.
+- [discopy.testable](discopy/testable.py) contains the property-testing module: `Axiom` states a law once on an abstract base class, `Rule` an operation the terms of a free category are derived by, `Testable` generates the terms a law quantifies over, and the matrix in `proptest/` checks every cell. Read it before adding a category, a rule or an axiom.
 - [test](test/) is flat with one file for each module, mirroring `discopy/`; submodules (`grammar`, `quantum`, `drawing`, `python`) keep their own directory with one file per submodule, and shared test code and data live in `fixtures`: pytest imports test files by path (`--import-mode=importlib`), not by basename, so `test/abc.py` does not clash with the standard `abc` already loaded, and no test file imports another
 - [docs](docs/) contains notebooks and pictures generated automatically when running the tests
 

@@ -107,6 +107,7 @@ class Wire(pivotal.Wire):
         return result
 
     r = l
+    windings = (0, )
 
 
 HeadOb, TailOb = feedback.wire_generators(Wire)
@@ -219,6 +220,7 @@ class Diagram(
 
     ob = Ty
     layer_factory = Layer
+    str_transparency = compact.Diagram.str_transparency
 
     @classmethod
     def from_cospan(cls, apex: Ty, left, right) -> Diagram:

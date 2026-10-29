@@ -84,7 +84,8 @@ from typing import (
 
 from discopy import messages, utils
 from discopy.abc import Category, DaggerCategory, Nat
-from discopy.testable import GENERATORS, Equation as AbstractEquation, Testable
+from discopy.testable import (
+    FUEL, GENERATORS, Equation as AbstractEquation, Serialisable)
 from discopy.utils import (  # noqa: F401
     factory,
     factory_name,
@@ -107,7 +108,7 @@ dumps, loads = utils.dumps, utils.loads
 
 
 @total_ordering
-class Ob(Testable["Ob"]):
+class Ob(Serialisable["Ob"]):
     """
     An object with a string as :code:`name`.
 
@@ -240,6 +241,67 @@ class FreeCategory(Category):
             inside, cod = inside + other.inside, other.cod
         return self.ar(inside=inside, dom=dom, cod=cod, _scan=False)
 
+    @classmethod
+    def search(cls, *, dom=None, cod=None, fuel=FUEL, within=None):
+        """
+        Derive the terms of a free category from its rules: a generator, or the
+        conclusion of one of its :attr:`rules` chosen at random, its morphism
+        premises sampled by the :meth:`strategy` of the category with one less
+        unit of ``fuel``, see :meth:`discopy.testable.Rule.strategy`. Once the
+        fuel runs out, only the rules with no morphism premise are applied. A
+        conclusion that misses ``dom`` or ``cod`` is composed with a generator
+        from or to it, so that both are honoured, with no filtering, whenever
+        the :meth:`generators` read them: those of a type do not, since every
+        generated colour is transparent. Every choice shrinks to a generator.
+
+        Parameters:
+            dom : The domain, sampled if ``None``.
+            cod : The codomain, sampled if ``None``.
+            fuel : How deep the rules nest.
+            within : The class whose rules a term is derived from, e.g.
+                :class:`discopy.abc.MonoidalCategory` for the terms of the
+                underlying monoidal category, the category itself if
+                ``None``.
+
+        Example
+        -------
+        >>> from hypothesis import find
+        >>> x, y = Ob('x'), Ob('y')
+        >>> term = find(Arrow.search(dom=x, cod=y), lambda f: len(f) > 2)
+        >>> assert (term.dom, term.cod) == (x, y)
+        """
+        from hypothesis import strategies as st
+
+        rules = [
+            rule for name, rule in cls.rules.items()
+            if rule.applicable and name in (within or cls).rules
+            and (fuel > 0 or not rule.is_recursive)]
+
+        @st.composite
+        def terms(draw):
+            rule = draw(st.sampled_from([None, *rules]))
+            if rule is None:
+                return draw(cls.generators(dom=dom, cod=cod))
+            term = rule(**draw(rule.strategy(
+                dom, cod, fuel=fuel - 1, within=within)))
+            if dom is not None and term.dom != dom:
+                term = draw(cls.generators(dom=dom, cod=term.dom)) >> term
+            if cod is not None and term.cod != cod:
+                term = term >> draw(cls.generators(dom=term.cod, cod=cod))
+            return term
+
+        return terms()
+
+    @classmethod
+    def generators(cls, *, dom=None, cod=None):
+        """
+        Generate the generators of the free category as terms of it, from
+        ``dom`` to ``cod`` when given: a path of one :attr:`generator_factory`.
+        """
+        return cls.generator_factory.strategy(dom=dom, cod=cod).map(
+            lambda generator: cls.ar(
+                inside=(generator, ), dom=generator.dom, cod=generator.cod))
+
     def __iter__(self):
         return iter(self.inside)
 
@@ -272,7 +334,7 @@ class FreeCategory(Category):
 
 
 @factory
-class Arrow(FreeCategory, DaggerCategory, Testable["Arrow"]):
+class Arrow(FreeCategory, DaggerCategory, Serialisable["Arrow"]):
     """
     An arrow is a tuple of composable boxes :code:`inside` with a pair of
     objects :code:`dom` and :code:`cod` as domain and codomain.
@@ -318,40 +380,29 @@ class Arrow(FreeCategory, DaggerCategory, Testable["Arrow"]):
     automatically cast. This means one can use e.g. ``int`` instead of ``Ob``,
     see :class:`monoidal.Nat`.
     """
+    dagger_monoidality = DaggerCategory.dagger_monoidality.inapplicable(
+        messages.NO_TENSOR)
     box_factory: ClassVar[type["Box"]]
     sum_factory: ClassVar[type["Sum"]]
     bubble_factory: ClassVar[type["Bubble"]]
     ob = Ob
 
     @classmethod
-    def strategy(
-            cls, *, types=None, dom=None, cod=None,
-            min_leaves=None, max_leaves=10):
+    def strategy(cls, **params):
         """
-        Generate the canonical instantiation: a single identity or a single
-        generator box with the requested (or an arbitrary) boundary.
+        The strategy the property matrix samples the terms of a free category
+        from: its :meth:`search`, which a category with a combinatorial
+        representation mixes with the :meth:`quotient_strategy` of it, e.g.
+        :meth:`discopy.symmetric.Diagram.strategy`.
 
-        Callers bound the number of generators of a composite term with
-        :code:`min_leaves` and :code:`max_leaves`; a canonical
-        instantiation has at most one, so both are ignored.
+        Parameters are those of :meth:`search`.
         """
-        # pylint: disable=unused-argument  # a canonical term has one leaf
-        from hypothesis import strategies as st
+        return cls.search(**params)
 
-        types = cls.ob.strategy() if types is None else types
-
-        def generators(dom=None, cod=None):
-            """ Generator boxes between the given boundaries. """
-            return cls.generator_factory.strategy(
-                types=types, dom=dom, cod=cod)
-
-        if dom is not None and cod is not None:
-            if dom == cod:
-                return st.just(cls.id(dom))
-            return generators(dom=dom, cod=cod)
-        if dom is not None or cod is not None:
-            return generators(dom=dom, cod=cod)
-        return st.one_of(types.map(cls.id), generators())
+    @classmethod
+    def generators(cls, *, dom=None, cod=None):
+        """ Generate the boxes of the category, see :meth:`Box.strategy`. """
+        return cls.box_factory.strategy(dom=dom, cod=cod)
 
     def __setstate__(self, state):
         if '_dom' in state:  # Backward compatibility

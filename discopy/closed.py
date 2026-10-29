@@ -88,7 +88,8 @@ from typing import Callable, ClassVar, Dict, Self
 
 from discopy import (
     monoidal, biclosed, markov, feedback, cmap, hypergraph, messages)
-from discopy.abc import ClosedCategory
+from discopy.abc import ClosedCategory, DaggerCategory, MonoidalCategory
+from discopy.testable import Serialisable
 from discopy.cat import factory
 from discopy.drawing import Drawing
 from discopy.utils import (
@@ -386,6 +387,13 @@ class Diagram(markov.Diagram, biclosed.Diagram, ClosedCategory):
 
     def to_drawing(self):
         return monoidal.Diagram.to_drawing(self, functor_factory=Functor)
+
+    dagger_monoidality = DaggerCategory.dagger_monoidality.failing(
+        messages.CURRY_HAS_NO_DAGGER)
+    dagger_monoidality_monoidal = DaggerCategory.dagger_monoidality.weaken(
+        within=MonoidalCategory)
+    currying_symmetry = ClosedCategory.currying_symmetry.failing(
+        messages.FREE_CURRY)
 
     def to_term(self) -> Term:
         """
@@ -751,7 +759,7 @@ Ty.under_factory = Ty.over_factory = staticmethod(Exp)
 Id = Diagram.id
 
 
-class TermBase(Box, biclosed.TermBase):
+class TermBase(Box, biclosed.TermBase, biclosed.Normalising):
     """
     A term in the internal language of a closed category, i.e. a lambda term
     which need not be linear: this module implements closed markov categories
@@ -775,6 +783,7 @@ class TermBase(Box, biclosed.TermBase):
     >>> assert x(f, left=True) == f(x)
     """
     functor = Functor.id(Diagram)
+    str_transparency = Serialisable.str_transparency
 
     def __call__(self, other, left=False):
         args = (other, self) if left else (self, other)
@@ -931,7 +940,20 @@ class TermBase(Box, biclosed.TermBase):
         return functor(term)
 
     @classmethod
-    def generate(cls, cod, choices, types, letters):
+    def strategy(cls, **params):
+        """
+        Generate closed terms, which need not be linear, see
+        :meth:`generate`.
+
+        Parameters:
+            params : Passed to :meth:`biclosed.TermBase.shapes`.
+        """
+        return super().strategy(**params)
+
+    @classmethod
+    # pylint: disable-next=too-many-arguments,too-many-positional-arguments
+    def generate(  # a shape, a naming and whether it takes constants
+            cls, cod, choices, types, letters, constants=True):
         """
         Build a term as :meth:`biclosed.TermBase.generate` does, except
         that a closed term need not be linear: its :class:`biclosed.Sampler`
@@ -947,7 +969,8 @@ class TermBase(Box, biclosed.TermBase):
         X(lambda x0: c0)
         """
         return biclosed.Sampler(
-            cls, iter(choices), types, letters, linear=False).term(cod)
+            cls, iter(choices), types, letters, linear=False,
+            constants=constants).term(cod)
 
     def reduce(self, budget: int | None = None,
                strategy: type[Strategy] | None = None) -> BohmTree | None:
@@ -1024,13 +1047,6 @@ X(lambda x: x)(x).
 
 type Term = Constant | Variable | Application | Abstraction\
     | Tuple | Projection | Let
-
-
-for law in ("copy_coassociativity", "copy_cocommutativity",
-            "copy_counitality", "copy_coherence", "vanishing", "joining",
-            "strength", "tightening", "sliding", "yanking", "scalar_sliding"):
-    setattr(TermBase, law, getattr(Box, law).inapplicable(
-        messages.TERM_IS_A_BOX))
 
 
 class Constant(TermBase, biclosed.Constant):
@@ -1856,6 +1872,12 @@ Ty.application_factory = Application
 Ty.abstraction_factory = Abstraction
 Ty.product_factory = Product
 TermBase.strategy_factory = LeftmostOutermost
+TermBase.reduction_strategies = (LeftmostOutermost, RightmostFirst)
+
+for law in sorted(
+        set(Box.axioms) - set(Serialisable.axioms) | set(Box.rules)):
+    setattr(TermBase, law, getattr(Box, law).inapplicable(
+        messages.TERM_IS_A_BOX))
 
 
 class Equation(markov.Equation):

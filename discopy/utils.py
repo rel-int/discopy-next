@@ -252,9 +252,10 @@ class NamedGeneric:
     it builds through ``cls.ar`` carry the parameter.
 
     >>> from discopy.abc import Category
+    >>> from discopy.testable import TestableGeneric
     >>> @factory
-    ... class C[dtype](Category, NamedGeneric):
-    ...     pass
+    ... class C[dtype](Category, TestableGeneric):
+    ...     checked_params = classmethod(lambda cls: ())
     >>> assert C[int].factory is C[int] is C[int].ar
 
     A DisCoPy class is named by its module, since every level of the

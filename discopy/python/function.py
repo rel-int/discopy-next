@@ -22,7 +22,7 @@ from contextlib import contextmanager
 
 from discopy import messages
 from discopy.abc import Category
-from discopy.testable import Testable
+from discopy.testable import Extensional, values
 from discopy.cat import Functor
 from discopy.monoidal import List
 from discopy.utils import (
@@ -65,6 +65,24 @@ class Function(Category[Ty, "Function"]):
 
     ob = Ty
     type_checking = True
+
+    @classmethod
+    def equation_factory(cls, *terms: "Function") -> Extensional:
+        """
+        The equation of a law, compared by the graphs of its terms on the
+        :meth:`arguments` of their domain, see :class:`testable.Extensional`.
+        """
+        return Extensional(*terms)
+
+    @classmethod
+    def arguments(cls, dom: Ty) -> tuple[tuple, ...]:
+        """
+        The arguments a function on ``dom`` is called with by an
+        extensional equation: one value of one of its types.
+
+        >>> assert Function.arguments(Ty(bool)) == ((False, ), (True, ))
+        """
+        return tuple((value, ) for typ in dom.inside for value in values(typ))
 
     def __init__(self, inside: Callable, dom: Ty | type | tuple[type, ...],
                  cod: Ty | type | tuple[type, ...]):
@@ -139,8 +157,6 @@ which JSON cannot hold.
         """
         raise TypeError(NO_TREE)
 
-    serialisation = Testable.serialisation.inapplicable(NO_TREE)
-
 
 @factory
 class EndoFunctor(Functor):
@@ -180,4 +196,4 @@ class EndoFunctor(Functor):
     def __call__(self, other):
         if isinstance(other, Function):
             return self.ar_map[other]
-        return self.ob_map[Ty.cast(other)]
+        return self.ob_map[Ty.cast(other)]  # ty: ignore[invalid-argument-type]

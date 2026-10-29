@@ -70,7 +70,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from discopy import interaction, markov, messages, symmetric
 from discopy.abc import (
-    MarkovCategory, NamedGeneric, SymmetricCategory, TracedCategory)
+    MarkovCategory, SymmetricCategory, TracedCategory)
+from discopy.testable import Equation, TestableGeneric, quotient
 from discopy.utils import (
     AxiomError, assert_iscomposable, assert_isinstance, classproperty,
     factory_name, get_origin, unbiased)
@@ -108,7 +109,7 @@ def pairs(category) -> type:
 
 
 @dataclass
-class Symmetric[category](SymmetricCategory, NamedGeneric):
+class Symmetric[category](SymmetricCategory, TestableGeneric):
     """
     A lens from `dom` to `cod` over a symmetric `category` is a `residual`
     with a `forward` morphism `dom.positive -> cod.positive @ residual` and
@@ -150,6 +151,11 @@ class Symmetric[category](SymmetricCategory, NamedGeneric):
             to_int
             to_markov
     """
+    @classmethod
+    def checked_params(cls) -> tuple:
+        """ The default underlying category, for the class itself. """
+        return (cls.category, )
+
     category = symmetric.Diagram
     ob = classproperty(lambda cls: pairs(cls.category))
 
@@ -158,6 +164,41 @@ class Symmetric[category](SymmetricCategory, NamedGeneric):
     forward: category
     backward: category
     residual: category.ob = None  # ty: ignore[invalid-assignment]
+
+    @classmethod
+    def equation_factory(cls, *terms: Symmetric) -> Equation:
+        """
+        The equation of a law, compared by the boundary of its terms and the
+        inside of their :meth:`to_int` up to the equation of the underlying
+        category, e.g. its hypergraph, so that two lenses are equal when they
+        wire the same legs, whatever their residual.
+        """
+        return Equation(*terms, up_to=lambda lens: (
+            lens.dom, lens.cod, quotient(cls.category, lens.to_int().inside)))
+
+    @classmethod
+    def strategy(cls, *, dom=None, cod=None, **params):
+        """
+        Generate lenses: a residual, then a forward and a backward leg from
+        the strategy of the underlying category, with the boundary they
+        need, the parameters passed to both.
+        """
+        from hypothesis import strategies as st
+
+        @st.composite
+        def lenses(draw):
+            source = draw(cls.ob.strategy()) if dom is None else dom
+            target = draw(cls.ob.strategy()) if cod is None else cod
+            residual = draw(cls.category.ob.strategy())
+            forward = draw(cls.category.strategy(
+                dom=source.positive, cod=target.positive @ residual,
+                **params))
+            backward = draw(cls.category.strategy(
+                dom=residual @ target.negative, cod=source.negative,
+                **params))
+            return cls(source, target, forward, backward, residual)
+
+        return lenses()
 
     def __post_init__(self):
         if self.residual is None:
@@ -388,6 +429,35 @@ class Traced(Symmetric, TracedCategory):
     ...     == (f.forward >> x @ Diagram.swap(u, m)).trace()
     >>> assert f.trace().backward == f.backward.trace()
     """
+    trace_iteration_left = TracedCategory.trace_iteration_left.inapplicable(
+        messages.LENS_TRACES_RIGHT)
+    trace_superposing_left = TracedCategory.trace_superposing_left\
+        .inapplicable(messages.LENS_TRACES_RIGHT)
+    trace_naturality_left = TracedCategory.trace_naturality_left.inapplicable(
+        messages.LENS_TRACES_RIGHT)
+    trace_dinaturality_left = TracedCategory.trace_dinaturality_left\
+        .inapplicable(messages.LENS_TRACES_RIGHT)
+
+    trace_iteration_right = TracedCategory.trace_iteration_right.inapplicable(
+        messages.PAIR_LENGTH)
+    trace_naturality_right = TracedCategory.trace_naturality_right\
+        .inapplicable(messages.PAIR_LENGTH)
+    trace_dinaturality_right = TracedCategory.trace_dinaturality_right\
+        .inapplicable(messages.PAIR_LENGTH)
+    trace_left = TracedCategory.trace_left.inapplicable(
+        messages.LENS_TRACES_RIGHT)
+    trace_right = TracedCategory.trace_right.inapplicable(
+        messages.PAIR_LENGTH)
+    joining = TracedCategory.joining.inapplicable(
+        messages.PAIR_LENGTH)
+    tightening = TracedCategory.tightening.inapplicable(
+        messages.PAIR_LENGTH)
+    sliding = TracedCategory.sliding.inapplicable(
+        messages.PAIR_LENGTH)
+    strength = TracedCategory.strength.inapplicable(
+        messages.PAIR_LENGTH)
+    feedback_right = TracedCategory.feedback_right.inapplicable(
+        messages.PAIR_LENGTH)
     def trace(self, n: int | tuple[int, int] = 1, left: bool = False
               ) -> Traced:
         """
@@ -475,6 +545,32 @@ class Markov(Symmetric):
         super().__init__(dom, cod, forward, put, dom.positive)
 
     put = property(lambda self: self.backward)
+
+    unitality = Symmetric.unitality.failing(messages.LENS_NATURALITY)
+    associativity = Symmetric.associativity.failing(messages.LENS_NATURALITY)
+    braid_naturality = Symmetric.braid_naturality.failing(
+        messages.LENS_BRAID_NATURALITY)
+
+    @classmethod
+    def strategy(cls, *, dom=None, cod=None, **params):
+        """
+        Generate Markov lenses: a `get` and a `put` from the strategy of the
+        underlying category, with the boundary they need.
+        """
+        from hypothesis import strategies as st
+
+        @st.composite
+        def lenses(draw):
+            source = draw(cls.ob.strategy()) if dom is None else dom
+            target = draw(cls.ob.strategy()) if cod is None else cod
+            get = draw(cls.category.strategy(
+                dom=source.positive, cod=target.positive, **params))
+            put = draw(cls.category.strategy(
+                dom=source.positive @ target.negative, cod=source.negative,
+                **params))
+            return cls(source, target, get, put)
+
+        return lenses()
 
     def __repr__(self):
         factory, category = map(

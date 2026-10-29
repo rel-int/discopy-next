@@ -74,8 +74,9 @@ from discopy import (
     messages
 )
 from discopy.abc import (
-    NamedGeneric, Pregroup, RibbonCategory, SymmetricCategory,
+    Pregroup, RibbonCategory, SymmetricCategory,
     TracedCategory)
+from discopy.testable import Equation, TestableGeneric, quotient
 from discopy.cat import assert_iscomposable
 from discopy.python import finset
 from discopy.utils import (
@@ -84,7 +85,7 @@ from discopy.utils import (
 
 
 @dataclass(unsafe_hash=True)
-class Ty[natural](Pregroup, NamedGeneric):
+class Ty[natural](Pregroup, TestableGeneric):
     """
     An integer type is a pair of :attr:`natural` types.
 
@@ -114,8 +115,36 @@ class Ty[natural](Pregroup, NamedGeneric):
     >>> assert x @ y == Ty(T("x") @ T("y"), T("y'") @ T("x'"))
     """
     ob = type(None)
+
+    @classmethod
+    def checked_params(cls) -> tuple:
+        """ The default :attr:`natural` types, for the class itself. """
+        return (cls.natural, )
+
     natural = pivotal.Ty
     negatives = staticmethod(reversed)
+
+    unitality = Pregroup.unitality.inapplicable(messages.PAIR_TYPES)
+    associativity = Pregroup.associativity.inapplicable(messages.PAIR_TYPES)
+    ax = Pregroup.ax.inapplicable(messages.PAIR_TYPES)
+    cut = Pregroup.cut.inapplicable(messages.PAIR_TYPES)
+
+    @classmethod
+    def strategy(cls, **params):
+        """ Generate pairs of :attr:`natural` types. """
+        from hypothesis import strategies as st
+
+        types = cls.natural.strategy(**params)
+        return st.tuples(types, types).map(lambda pair: cls(*pair))
+
+    @classmethod
+    def generators(cls, *, dom=None, cod=None):
+        """ Generate pairs of atomic :attr:`natural` types. """
+        # pylint: disable=unused-argument  # a pair has one colour
+        from hypothesis import strategies as st
+
+        atoms = cls.natural.generators()
+        return st.tuples(atoms, atoms).map(lambda pair: cls(*pair))
 
     positive: natural
     negative: natural
@@ -202,6 +231,11 @@ class Ty[natural](Pregroup, NamedGeneric):
 
     l = r = property(__neg__)
 
+    @property
+    def is_atomic(self) -> bool:
+        """ Whether a pair of types is a generator, i.e. of atomic halves. """
+        return self.positive.is_atomic and self.negative.is_atomic
+
     def split(self, n: int | tuple[int, int] = 1, left: bool = False
               ) -> tuple[Ty, Ty]:
         """
@@ -241,7 +275,7 @@ class Ty[natural](Pregroup, NamedGeneric):
 
 @factory
 @dataclass(unsafe_hash=True)
-class Diagram[natural](RibbonCategory, NamedGeneric):
+class Diagram[natural](RibbonCategory, TestableGeneric):
     """
     An integer diagram from ``x`` to ``y`` is a :attr:`natural` diagram
     from ``x.positive @ y.negative`` to ``x.negative @ y.positive``.
@@ -278,6 +312,17 @@ class Diagram[natural](RibbonCategory, NamedGeneric):
     >>> assert (square @ square).inside(2., 3., 1., 1.) == (4., 9., 6., 4.)
     >>> assert (square >> square).dom == R == (square >> square).cod
     """
+    @classmethod
+    def checked_params(cls) -> tuple:
+        """
+        The free traced symmetric and compact categories: the planar ones
+        have no normal form to compare the insides of their integer
+        diagrams by yet.
+        """
+        # pylint: disable-next=import-outside-toplevel  # they import this
+        from discopy import compact, symmetric
+        return (symmetric.Diagram, compact.Diagram)
+
     ar = classproperty(lambda cls: cls)
     natural = ribbon.Diagram
 
@@ -286,6 +331,37 @@ class Diagram[natural](RibbonCategory, NamedGeneric):
     inside: natural
     dom: Ty
     cod: Ty
+
+    @classmethod
+    def equation_factory(cls, *terms: Diagram) -> Equation:
+        """
+        The equation of a law, compared by the boundaries of its terms and
+        by the equation of the :attr:`natural` category on their insides.
+        """
+        return Equation(*terms, up_to=lambda diagram: (
+            diagram.dom, diagram.cod, quotient(cls.natural, diagram.inside)))
+
+    @classmethod
+    def strategy(cls, *, dom=None, cod=None, **params):
+        """
+        Generate integer diagrams, their insides drawn by the strategy of
+        the :attr:`natural` category with the boundary they need, when it
+        is symmetric, the planar categories having no normal form to
+        compare their insides by yet.
+        """
+        from hypothesis import strategies as st
+        if not issubclass(cls.natural, SymmetricCategory):
+            raise NotImplementedError
+
+        @st.composite
+        def diagrams(draw):
+            source = draw(cls.ob.strategy()) if dom is None else dom
+            target = draw(cls.ob.strategy()) if cod is None else cod
+            inside = draw(cls.natural.strategy(
+                dom=source.positive @ target.negative,
+                cod=target.positive @ source.negative, **params))
+            return cls(inside, source, target)
+        return diagrams()
 
     def __init__(self, inside: natural, dom: Ty, cod: Ty):
         assert_isinstance(inside, self.natural)
@@ -847,3 +923,15 @@ def Int(category: type[TracedCategory]) -> type[RibbonCategory]:
 
 
 Id = Diagram.id
+
+for name in (
+        "trace_dinaturality_left", "trace_dinaturality_right",
+        "trace_iteration_left", "trace_iteration_right",
+        "trace_naturality_left", "trace_naturality_right",
+        "currying_eta_left", "currying_eta_right",
+        "currying_naturality_left", "currying_naturality_right",
+        "joining", "tightening", "sliding",
+        "strength", "feedback_right", "trace_left",
+        "trace_right", "curry_left", "curry_right"):
+    setattr(Diagram, name, getattr(RibbonCategory, name).inapplicable(
+        messages.PAIR_LENGTH))

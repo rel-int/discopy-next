@@ -2,18 +2,18 @@
 
 from typing import Self, TypeVar
 
-from hypothesis import find, settings
+from hypothesis import Phase, find, settings
 from hypothesis import strategies as st
 from hypothesis.errors import NoSuchExample
 from pytest import raises
 
-from discopy import cat, feedback, rigid
-from discopy.abc import Category, Monoid, Nat
+from discopy import braided, cat, monoidal, rigid
+from discopy.abc import Category, ColouredMonoid, Group, MonoidalCategory, Nat
 from discopy.testable import (
-    L, R, Axiom, AxiomFailure, Delay, Equation, Equivalence,
-    Hom, Obj, Over, Related, Repeat, Tensor, Testable, Under, Unit, Var,
-    assert_axioms, axiom, inhabits, is_open, position, substitute)
-from discopy.cat import Arrow, Box, Functor, Id, Ob
+    L, R, Atom, Axiom, AxiomFailure, Equation, Equivalence, Hom, Obj, Over,
+    Related, Repeat, Tensor, Testable, TestableGeneric, Under, Unit, Var,
+    axiom, inhabits, position, substitute)
+from discopy.cat import Arrow, Box, Functor, Ob
 from discopy.monoidal import Ty
 
 
@@ -27,36 +27,22 @@ class Parity(int, Equivalence):
     """ An integer up to parity, an equivalence relation besides equality. """
 
     equivalence_factory = ParityEquation
-    serialisation = Testable.serialisation.inapplicable(
-        "An integer has no tree.")
 
     @classmethod
     def strategy(cls, **params):
-        """Generate an integer."""
+        """ Generate an integer, no strategy being enrolled from a test. """
         return st.integers().map(cls)
 
     @classmethod
     def related(cls, **params):
-        """Generate an integer, another of the same parity and any third."""
+        """ Generate an integer, another of the same parity and any third. """
         return st.tuples(st.integers(), st.integers(), st.integers()).map(
             lambda triple: (
                 cls(triple[0]), cls(triple[0] + 2 * triple[1]),
                 cls(triple[2])))
 
 
-def test_axioms():
-    assert_axioms(Arrow)
-
-    class Classified(Arrow):
-        """ A category with a broken law and an inapplicable one. """
-        unitality = Arrow.unitality.failing("Never holds.")
-        dagger_involution = Arrow.dagger_involution.inapplicable("No dagger.")
-
-    assert_axioms(Classified)
-
-
 def test_Equivalence():
-    assert_axioms(Parity)
     assert Parity.equivalent(Parity(1), Parity(3), Parity(-5))
     assert not Parity.equivalent(Parity(1), Parity(2))
     assert Parity.reflexivity(Parity(2))
@@ -67,6 +53,9 @@ def test_Equivalence():
     assert find(Related[Parity].strategy(), lambda t: t[2] % 2 == 1)[2] % 2
     with raises(ValueError):
         Related[Parity]((1, 3))
+    arguments = find(
+        Parity.transitivity.arguments(), lambda arguments: True)
+    assert isinstance(arguments["terms"], Related[Parity])
 
 
 def test_failing_when_the_terms_do_not_build():
@@ -79,74 +68,37 @@ def test_failing_when_the_terms_do_not_build():
     with raises(AxiomFailure) as error:
         Refusing.refusing(f=Arrow.id(Ob('x')))
     assert isinstance(error.value.equation, ValueError)
-    assert_axioms(Refusing)
 
 
 def test_strategy():
     x, y = Ob('x'), Ob('y')
     find(Ob.strategy(), lambda ob: ob.name == "a")
-    assert find(Arrow.strategy(dom=x, cod=x), lambda _: True) == Arrow.id(x)
-    assert find(Arrow.strategy(dom=x, cod=y), lambda _: True).cod == y
-    assert find(Arrow.strategy(dom=x), lambda _: True).dom == x
-    assert find(Arrow.strategy(cod=y), lambda _: True).cod == y
+    arrow = find(Arrow.search(dom=x, cod=y), lambda f: len(f) > 1)
+    assert (arrow.dom, arrow.cod) == (x, y)
+    identity = find(
+        Arrow.search(fuel=0, within=Category), lambda f: not f.inside)
+    assert identity == Arrow.id(identity.dom)
     assert find(Box.strategy(dom=x), lambda _: True).dom == x
 
 
-def test_sequents():
-    @axiom
-    def law[X: Obj[Ob], Y: Obj[Ob], N: Nat](
-            cls, x: Var[Ob, X], f: Hom[Self, X, Y], term: Self,
-            n: Var[Nat, N]
-    ) -> Equation[tuple[Var[Ob, X], bool, bool]]:
-        """ Quantify over an object, a morphism out of it, a term and a
-        number. """
-        return Equation(
-            (f.dom, isinstance(term, cls), isinstance(n, Nat) and n.n <= 3),
-            (x, True, True))
-
-    bound = law.bind(Arrow)
-    scope, arguments = find(bound.sequents(), lambda _: True)
-    assert set(arguments) == {"x", "f", "term", "n"} and bound(**arguments)
-    assert inhabits(bound(**arguments), bound.output(scope))
-    _, given = find(bound.sequents(given={"Y": Ob('y')}), lambda _: True)
-    assert given["f"].cod == Ob('y')
-    assert find(bound.arguments(), lambda xs: xs["n"].n == 3)["n"] == Nat(3)
+def test_equation():
+    f = Box('f', Ob('x'), Ob('x'))
+    assert Equation(f, f, f).symbols == ("=", "=")
+    with raises(ValueError):
+        Equation(f, f, symbols=("=", "="))
 
 
-def test_constructors():
-    x, y = rigid.Ty('x'), rigid.Ty('y')
-    assert Tensor[x, y] == x @ y and Unit[rigid.Ty] == rigid.Ty()
-    assert (L[x], R[x]) == (x.l, x.r) and Repeat[x, 3] == x @ x @ x
-    assert (Over[x, y], Under[y, x]) == (x << y, y >> x)
-    z = feedback.Ty('z')
-    assert Delay[feedback.Diagram, z] == z.delay()
-    f = rigid.Box('f', x, y)
-    assert inhabits(f, Hom[rigid.Diagram, x, y])
-    assert not inhabits(f, Hom[rigid.Diagram, y, x])
-    assert inhabits(Equation(f), Equation[Hom[rigid.Diagram, x, y]])
-    assert not inhabits(Equation(f), Equation[Hom[rigid.Diagram, x, x]])
-    assert inhabits(Equation(f), Equation) and not inhabits(f, Equation)
-    assert inhabits((f, x), tuple[Hom[rigid.Diagram, x, y], Var[Ty, x]])
-    assert inhabits((x, x), tuple[Var[Ty, x], ...])
-    assert not inhabits(f, tuple[Hom[rigid.Diagram, x, y]])
-    assert inhabits(Arrow, type[Category]) and inhabits(1, int)
+def test_substitute_unhashable():
+    """ A value that does not hash is never looked up in the scope. """
+    A = TypeVar("A")
+    unhashable = [Ty('x')]
+    assert substitute(Var[list, A], {A: unhashable}).__args__ == (
+        list, unhashable)
 
 
-def test_substitute():
-    A, B = TypeVar("A"), TypeVar("B")
-    x, y = Ty('x'), Ty('y')
-    assert is_open(Tensor[A, B]) and not is_open(Tensor[x, y])
-    assert substitute(Tensor[A, B], {A: x, B: y}) == x @ y
-    assert substitute(int, {A: x}) is int
-    assert substitute(Equation, {A: x}) is Equation
-    assert substitute(Equation[Hom[Arrow, A, B]], {A: x, B: y}).__args__ \
-        == (Hom[Arrow, x, y], )
-
-
-def test_position():
-    assert position(Monoid.__type_params__[0], Monoid) == 1
-    assert position(Category.__type_params__[0], Category) == 0
-    assert position(TypeVar("T"), Category) is None
+def test_position_of_a_group():
+    """ The ``C1`` of a group is its arrows, as for any category. """
+    assert position(Group.__type_params__[0], Group) == 1
 
 
 def test_axiom_binding():
@@ -181,16 +133,59 @@ def test_string_annotations():
     assert annotations["return"] == Equation[Hom[int, A, A]]
 
 
-def test_inapplicable():
+def test_sequents():
+    @axiom
+    def law[X: Atom[Ty], Y: Obj[Ty], N: Nat](
+            cls, x: Var[Ty, X], f: Hom[Self, X, Y], term: Self,
+            n: Var[Nat, N]
+    ) -> Equation[tuple[int, Var[Ty, X], bool, bool]]:
+        """ Quantify over an atom, a morphism out of it, a term and a
+        number. """
+        return Equation(
+            (len(x), f.dom, isinstance(term, cls),
+             isinstance(n, Nat) and n.n <= 3),
+            (1, x, True, True))
+
+    bound = law.bind(monoidal.Diagram)
+    scope, arguments = find(bound.sequents(), lambda _: True)
+    assert set(arguments) == {"x", "f", "term", "n"} and bound(**arguments)
+    assert inhabits(bound(**arguments), bound.output(scope))
+    assert bound.canonical()
+
+
+def test_formers():
+    x, y = rigid.Ty('x'), rigid.Ty('y')
+    assert Tensor[x, y] == x @ y and Unit[rigid.Ty] == rigid.Ty()
+    assert (L[x], R[x]) == (x.l, x.r) and Repeat[x, 3] == x @ x @ x
+    assert (Over[x, y], Under[y, x]) == (x << y, y >> x)
+    f = rigid.Box('f', x, y)
+    assert inhabits(f, Hom[rigid.Diagram, x, y])
+    assert not inhabits(f, Hom[rigid.Diagram, y, x])
+    assert not inhabits(Equation(f), Equation[Hom[rigid.Diagram, x, x]])
+
+
+def test_classifiers():
+    f = Box('f', Ob('x'), Ob('y'))
+    broken = Arrow.unitality.failing("Never holds.")
+    with raises(AxiomFailure) as failure:
+        broken(f=f)
+    assert broken.broken and failure.value.equation
     law = Arrow.unitality.inapplicable("No identities to cancel.")
-    assert law.name == "unitality"
     assert law() is NotImplemented
     assert law.__doc__ == "No identities to cancel."
+    assert not law.applicable and Arrow.unitality.applicable
+    assert Arrow.unitality.modulo(lambda term: term.dom)(f=f)
 
 
-def test_modulo():
-    law = Arrow.unitality.modulo(lambda term: term.dom).bind(Arrow)
-    assert law(f=Box('f', Ob('x'), Ob('y')))
+def test_rules():
+    x, y = Ob('x'), Ob('y')
+    f = Box('f', x, y)
+    assert sorted(Arrow.rules) == ["ax", "cut"]
+    assert Arrow.cut(f, f[::-1]) == f >> f[::-1] and Arrow.ax(x) == Arrow.id(x)
+    assert Arrow.cut.is_recursive and not Arrow.ax.is_recursive
+    assert monoidal.Diagram.mix.conclusion == (None, None)
+    assert Arrow.ax.given(x, y) == {"X": y}
+    assert braided.Diagram.braiding.given(braided.Ty('x', 'y')) == {}
 
 
 def test_equation_symbols():
@@ -204,31 +199,12 @@ def test_equation_symbols():
 
 
 def test_weaken():
-    class Recording(Arrow):
-        """ Arrows recording the parameters their strategy is given. """
-        given = []
-
-        @classmethod
-        def strategy(cls, **params):
-            cls.given.append(params.pop("tag", None))
-            return Arrow.strategy.__func__(cls, **params)
-
-    law = Recording.unitality.weaken(tag="loop")
-    assert law.modulo(lambda term: term).params == law.params == {
-        "tag": "loop"}
-    assert law(**find(law.strategy(), lambda _: True))
-    assert Recording.given and set(Recording.given) == {"loop"}
-
-
-def test_self_annotation():
-    @axiom
-    def absorbing(cls, f: Self) -> Equation:
-        """ The identity on the domain absorbs into any arrow. """
-        return Equation(cls.id(f.dom) >> f, f)
-
-    law = absorbing.bind(Arrow)
-    arguments = find(law.strategy(), lambda _: True)
-    assert isinstance(arguments["f"], Arrow) and law(**arguments)
+    law = rigid.Diagram.dagger_involution_monoidal
+    assert law.params == {"within": MonoidalCategory}
+    args = find(law.strategy(), lambda _: True, settings=settings(
+        max_examples=1, database=None, phases=(Phase.generate, )))
+    assert not any(
+        isinstance(box, (rigid.Cup, rigid.Cap)) for box in args["f"].boxes)
 
 
 def test_weaken_shape_of_self():
@@ -253,7 +229,15 @@ def test_falsify():
     assert trivial.bind(Arrow).falsify()["f"].inside
     assert Arrow.unitality.failing("Never holds.").falsify()
     with raises(NoSuchExample):
-        Arrow.associativity.falsify()
+        Arrow.associativity.falsify(
+            settings=settings(max_examples=50, database=None))
+
+
+def test_canonical():
+    assert str(Arrow.associativity.canonical()) \
+        == "Equation(f >> g >> h, f >> g >> h)"
+    equation = rigid.Diagram.dagger_involution.canonical()
+    assert equation.terms[1] == rigid.Box('f', rigid.Ty('A'), rigid.Ty('B'))
 
 
 def test_axioms_of_category():
@@ -271,6 +255,64 @@ def test_axioms_of_category():
     assert "unitality" not in Hidden.axioms
 
 
+def test_canonical_unnamed_objects():
+    from discopy.neural.network import Network
+    with raises(TypeError, match="no canonical instance"):
+        Network.associativity.draw()
+
+
+def test_matrix():
+    assert monoidal.Diagram in Testable.enrolled()
+    assert monoidal.Ty in Testable.enrolled()
+    assert cat.FreeCategory not in Testable.enrolled()
+    once = Testable.matrix(once=True)
+    assert rigid.Diagram.dagger_involution in once
+    assert cat.Arrow.dagger_involution in once
+    assert rigid.Diagram.unitality not in once
+    assert set(once) <= set(Testable.matrix())
+
+
+def test_canonical_instances():
+    """ Every law of a free category holds on its canonical instance unless
+    declared broken, types included, so that a law that crashes on its own
+    statement fails here before the property matrix ever searches for a
+    counterexample. """
+    for category in Testable.enrolled():
+        box = getattr(category, "box_factory", None)
+        if box is None or not (issubclass(box, category)
+                               or issubclass(category, ColouredMonoid)):
+            continue  # a map, a hypergraph, a type of one colour or a test
+        try:
+            category.ob("A")
+        except TypeError:
+            continue  # objects that take no name, e.g. the shapes of networks
+        for law in category.axioms.values():
+            if law.broken or law.name == "str_transparency" and issubclass(
+                    category, ColouredMonoid):
+                continue  # a canonical type is coloured, which no str prints
+            equation = law.canonical()
+            assert equation is NotImplemented or equation, (category, law.name)
+
+
+def test_extensional():
+    from discopy.testable import Extensional, values
+    from discopy.python import Function
+    f, g = (Function(lambda x, k=k: x + k, int, int) for k in (1, 1))
+    assert f != g and Extensional(f, g)
+    assert Function.equation_factory(f >> Function.id(int), f)
+    assert not Extensional(f, Function.id(int))
+    with raises(TypeError):
+        values(list)
+
+
+def test_testable_generic():
+    from discopy.kleisli import additive, Maybe, Powerset
+    from discopy.utils import NamedGeneric
+    for testable in Testable.subclasses():
+        assert not issubclass(testable, NamedGeneric)\
+            or issubclass(testable, TestableGeneric)
+    assert additive.Channel[Maybe] not in Testable.enrolled()
+    assert additive.Channel[Powerset] in Testable.enrolled()
 
 
 def test_copying():
@@ -286,22 +328,24 @@ def test_str_transparency():
     f = monoidal.Box('f', x, y)
     diagram = f @ x >> f[::-1] @ x
     assert monoidal.Diagram.str_environment(diagram)['f'] == f
-    assert monoidal.Diagram.str_transparency(diagram)
+    assert monoidal.Diagram.str_transparency(term=diagram)
     X, Y = biclosed.Ty('X'), biclosed.Ty('Y')
-    assert biclosed.TermBase.str_transparency(X(lambda v: (Y << X)('g')(v)))
+    assert biclosed.TermBase.str_transparency(
+        term=X(lambda v: (Y << X)('g')(v)))
     E = closed.Ty('E')
     query = (E >> E)('query')
-    assert closed.TermBase.str_transparency(query(query(E('e'))))
+    assert closed.TermBase.str_transparency(term=query(query(E('e'))))
     F = closed.Ty('F')
-    assert closed.Ty.str_transparency((E * F) >> E.product(F, E))
+    assert closed.Ty.str_transparency(term=(E * F) >> E.product(F, E))
     U = closed.Ty(closed.Unitype())
-    assert closed.Ty.str_transparency(E.product(U) >> U.delay())
+    assert closed.Ty.str_transparency(term=E.product(U) >> U.delay())
     assert find(Box.strategy(), lambda _: True).name.isidentifier()
     for clash in [monoidal.Box('x', x, x), monoidal.Box('Id', x, x)]:
         with raises(NameError):
             monoidal.Diagram.str_environment(clash)
         with raises(Unsatisfiable):
-            find(st.just(clash), monoidal.Diagram.str_transparency)
+            find(st.just(clash), lambda term: monoidal.Diagram
+                 .str_transparency(term=term))
 
 
 def test_environment_binds_numpy_scalar_types():

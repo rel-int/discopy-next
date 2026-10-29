@@ -42,7 +42,8 @@ from inspect import isclass
 from itertools import chain, product
 
 import random
-from typing import Any, Iterable, Iterator, Union, TYPE_CHECKING, Sequence
+from typing import (
+    Any, Iterable, Iterator, Union, TYPE_CHECKING, Self, Sequence)
 
 import matplotlib.pyplot as plt
 
@@ -60,8 +61,8 @@ from discopy import cat, cmap, messages
 from discopy.abc import (
     BalancedCategory, BraidedCategory, ColouredMonoid, ComarkovCategory,
     CompactCategory, DaggerCategory, HypergraphCategory, MarkovCategory,
-    MonoidalCategory, NamedGeneric, RigidCategory, SymmetricCategory,
-    TracedCategory)
+    MonoidalCategory, RigidCategory, SymmetricCategory, TracedCategory)
+from discopy.testable import Equation, Serialisable, TestableGeneric, axiom
 from discopy.drawing import Node, backend
 from discopy.python.finset import Permutation
 from discopy.utils import (
@@ -164,7 +165,8 @@ def assert_transparent(diagram: "Diagram") -> None:
 
 
 class Hypergraph[category](
-        MonoidalCategory["Ty", "Hypergraph"], DaggerCategory, NamedGeneric):
+        MonoidalCategory["Ty", "Hypergraph"], DaggerCategory, TestableGeneric,
+        Serialisable):
     """
     A hypergraph is given by:
 
@@ -252,12 +254,49 @@ class Hypergraph[category](
     >>> assert (f @ g).n_spiders == 4
     >>> assert (f @ g).wires == ((0, 1), (((0,), (2,)), ((1,), (3,))), (2, 3))
     """
+    @classmethod
+    def checked_params(cls) -> tuple:
+        """
+        The free categories whose wiring a hypergraph samples, from
+        symmetric categories on.
+        """
+        # pylint: disable=import-outside-toplevel  # they import this
+        from discopy import (
+            closed, compact, feedback, frobenius, markov, symmetric)
+        from discopy.grammar import abstract
+        return tuple(category.Diagram for category in (
+            symmetric, markov, compact, frobenius, closed, feedback,
+            abstract))
+
+    MAX_ARITY = 3
+    """ The largest number of ports :meth:`strategy` samples for a box. """
 
     MAX_ARITY = 3
     """ The largest number of ports :meth:`strategy` samples for a box. """
 
     functor = classproperty(lambda cls: cls.category.functor_factory)
     ob = classproperty(lambda cls: cls.category.ob)
+
+    @axiom
+    def str_transparency(cls, term: Self) -> Equation[Self]:
+        """
+        The string of a hypergraph is that of the diagram it decodes to,
+        which reads back in the environment of its category, and to the
+        hypergraph through :meth:`from_diagram`.
+        """
+        diagram = term.to_diagram()
+        try:
+            environment = cls.category.str_environment(diagram)
+        except NameError:
+            # pylint: disable-next=import-outside-toplevel  # off the domain
+            from hypothesis import reject
+            return reject()
+        return Equation(eval(str(term), environment).to_hypergraph(), term)
+
+    @axiom
+    def hypergraph_roundtrip(cls, graph: Self) -> Equation[Self]:
+        """ A hypergraph reads back from the diagram it decodes to. """
+        return Equation(graph.to_diagram().to_hypergraph(), graph)
 
     def __init__(
             self, dom: "Ty", cod: "Ty", boxes: "tuple[Box, ...]",
@@ -1695,6 +1734,10 @@ class Hypergraph[category](
 
     def __str__(self):
         return str(self.to_diagram())
+
+    def atoms(self) -> list:
+        """ The generators the string of the diagram it decodes to names. """
+        return self.to_diagram().atoms()
 
     @property
     def bijection(self):

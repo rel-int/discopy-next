@@ -956,4 +956,4 @@ def test_no_tree():
     from discopy.utils import dumps
     with raises(TypeError, match="A drawing has no tree"):
         dumps(Box('f', Ty('x'), Ty('y')).to_drawing())
-    assert Drawing.serialisation() is NotImplemented
+    assert "serialisation" not in Drawing.axioms

@@ -47,6 +47,7 @@ from __future__ import annotations
 import random
 from collections.abc import Callable, Iterable
 
+from discopy.testable import values
 from discopy.cat import Transformation
 from discopy.python.function import EndoFunctor, Function, Ty
 from discopy.utils import (
@@ -70,6 +71,10 @@ class Monad(EndoFunctor):
         mult_map : Mapping from a type ``X`` to the function
             ``mu_X : M(M(X)) -> M(X)``.
         iterate : The optional iteration operator, see :attr:`iterate`.
+        generate : Mapping from a tuple of outcomes to a Hypothesis
+            strategy for the monadic values over them.
+        observe : Mapping from a monadic value to what two of them are
+            compared by, the value itself by default.
 
     Example
     -------
@@ -117,7 +122,9 @@ class Monad(EndoFunctor):
     def __init__(  # a monad is a name and five maps
             self, name: str, ob_map: Callable, lift: Callable,
             unit_map: Callable, mult_map: Callable,
-            iterate: Callable | None = None):
+            iterate: Callable | None = None,
+            generate: Callable | None = None,
+            observe: Callable = lambda value: value):
         def unwrap(X):
             return Ty.cast(X).inside[0]
 
@@ -129,7 +136,8 @@ class Monad(EndoFunctor):
             lambda X: unit_map(unwrap(X)), EndoFunctor.id(), self)
         self.mult = Transformation(
             lambda X: mult_map(unwrap(X)), self.then(self), self)
-        self.iterate = iterate
+        self.iterate, self.observe = iterate, observe
+        self.generate = generate
 
     @unbiased
     def then(self, other: EndoFunctor) -> EndoFunctor:
@@ -230,6 +238,31 @@ def iterate_powerset[T](
     return inside
 
 
+def generate_maybe(outcomes: tuple):
+    """
+    The values of the :attr:`Maybe` monad over some ``outcomes``: one of
+    them or ``None``.
+
+    Parameters:
+        outcomes : The outcomes to draw from.
+    """
+    from hypothesis import strategies as st
+    return st.none() | st.sampled_from(outcomes) if outcomes else st.none()
+
+
+def generate_powerset(outcomes: tuple):
+    """
+    The values of the :attr:`Powerset` monad over some ``outcomes``: a set
+    of at most three of them.
+
+    Parameters:
+        outcomes : The outcomes to draw from.
+    """
+    from hypothesis import strategies as st
+    return st.frozensets(st.sampled_from(outcomes), max_size=3) if outcomes\
+        else st.just(frozenset())
+
+
 Maybe = Monad(
     "Maybe",
     ob_map=lambda X: X | None,
@@ -238,7 +271,8 @@ Maybe = Monad(
         f.dom.inside[0] | None, f.cod.inside[0] | None),
     unit_map=lambda X: Function(lambda x: x, X, X | None),
     mult_map=lambda X: Function(lambda x: x, (X | None) | None, X | None),
-    iterate=iterate_maybe)
+    iterate=iterate_maybe,
+    generate=generate_maybe)
 """
 The maybe monad, sending a type ``X`` to ``X | None``: the unit and the
 multiplication are both the identity, since Python's native optional type
@@ -256,7 +290,8 @@ Powerset = Monad(
     mult_map=lambda X: Function(
         lambda xss: frozenset().union(*xss),
         frozenset[frozenset[X]], frozenset[X]),
-    iterate=iterate_powerset)
+    iterate=iterate_powerset,
+    generate=generate_powerset)
 """
 The powerset monad, sending a type ``X`` to ``frozenset[X]``: the unit takes
 a singleton and the multiplication takes a union.
@@ -350,6 +385,34 @@ def iterate_subdistribution[T](
     return inside
 
 
+def generate_subdistribution(outcomes: tuple):
+    """
+    The values of the :attr:`Subdistribution` monad over some ``outcomes``:
+    at most three of them, with a mass of at most ``.9``, so that a loop
+    loses mass at every step and its trace terminates.
+
+    Parameters:
+        outcomes : The outcomes to draw from.
+    """
+    from hypothesis import strategies as st
+    weights = st.dictionaries(
+        st.sampled_from(outcomes), st.floats(.1, 1.), max_size=3)\
+        if outcomes else st.just({})
+    return weights.map(lambda ws: frozenset(
+        (x, .9 * p / max(1., sum(ws.values()))) for x, p in ws.items()))
+
+
+def observe_subdistribution(d: frozenset) -> frozenset:
+    """
+    A subdistribution up to the rounding of its weights, as the order in
+    which they are multiplied and summed moves their last digits.
+
+    Parameters:
+        d : The subdistribution to observe.
+    """
+    return frozenset((x, round(p, 6)) for x, p in d if round(p, 6))
+
+
 Subdistribution = Monad(
     "Subdistribution",
     ob_map=dist,
@@ -362,7 +425,9 @@ Subdistribution = Monad(
         lambda dd: merge(
             (x, p_out * p_in) for d, p_out in dd for x, p_in in d),
         dist(dist(X)), dist(X)),
-    iterate=iterate_subdistribution)
+    iterate=iterate_subdistribution,
+    generate=generate_subdistribution,
+    observe=observe_subdistribution)
 """
 The subdistribution monad, sending a type ``X`` to finite subprobability
 distributions over ``X``: the unit is the Dirac distribution and the
@@ -404,7 +469,8 @@ def make_state(S: type) -> Monad:
     """
     The state monad for a type ``S`` of states, sending a type ``X`` to the
     type ``S -> (X, S)`` of computations reading a state and returning a
-    value together with the next state.
+    value together with the next state. Two computations are compared by
+    what they do on the states :func:`~discopy.testable.values` samples.
 
     Parameters:
         S : The type of states.
@@ -432,6 +498,15 @@ def make_state(S: type) -> Monad:
     """
     def ob_map(X):
         return Callable[[S], tuple[X, S]]  # ty: ignore[invalid-type-form]
+
+    def generate(outcomes):
+        from hypothesis import strategies as st
+        if not outcomes:
+            return st.nothing()
+        return st.fixed_dictionaries({
+            state: st.tuples(
+                st.sampled_from(outcomes), st.sampled_from(values(S)))
+            for state in values(S)}).map(lambda table: table.__getitem__)
     return Monad(
         f"State[{factory_name(S)}]",
         ob_map=ob_map,
@@ -441,7 +516,9 @@ def make_state(S: type) -> Monad:
         unit_map=lambda X: Function(
             lambda x: lambda state: (x, state), X, ob_map(X)),
         mult_map=lambda X: Function(
-            state_join, ob_map(ob_map(X)), ob_map(X)))
+            state_join, ob_map(ob_map(X)), ob_map(X)),
+        generate=generate,
+        observe=lambda m: tuple(m(state) for state in values(S)))
 
 
 Seed = make_state(int)

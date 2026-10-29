@@ -158,22 +158,23 @@ Parametric maps compose like layers of a neural network, e.g. over
 
 from __future__ import annotations
 
-from typing import Self
 from dataclasses import dataclass
+from typing import Self
 
 from discopy import (
     symmetric, markov, comarkov, closed, compact, frobenius, messages)
+from discopy.testable import Equation, TestableGeneric, quotient
 from discopy.abc import (
     ClosedCategory, ComarkovCategory, CompactCategory, FeedbackCategory,
-    HypergraphCategory, MarkovCategory, NamedGeneric, SymmetricCategory,
-    TracedCategory)
+    HypergraphCategory, MarkovCategory, SymmetricCategory, TracedCategory)
 from discopy.utils import (
     assert_iscomposable, assert_isinstance, classproperty, factory_name,
     from_tree, get_origin, resolve_factory, unbiased)
 
 
 @dataclass(unsafe_hash=True)
-class Symmetric[category](SymmetricCategory, NamedGeneric):
+class Symmetric[category](
+        SymmetricCategory[symmetric.Ty, "Symmetric"], TestableGeneric):
     """
     A parametric map from `dom` to `cod` with parameter space `param` is a
     morphism `inside : dom @ param -> cod` in an underlying `category`,
@@ -199,6 +200,11 @@ class Symmetric[category](SymmetricCategory, NamedGeneric):
             reparam
             recopar
     """
+    @classmethod
+    def checked_params(cls) -> tuple:
+        """ The default underlying category, for the class itself. """
+        return (cls.category, )
+
     category = symmetric.Diagram
     ob = classproperty(lambda cls: cls.category.ob)
 
@@ -207,6 +213,45 @@ class Symmetric[category](SymmetricCategory, NamedGeneric):
     inside: category
     param: ob = None  # ty: ignore[invalid-type-form]
     copar: ob = None  # ty: ignore[invalid-type-form]
+
+    bifunctoriality = SymmetricCategory.bifunctoriality.failing(
+        messages.PARA_REPARAM)
+    scalar_sliding = SymmetricCategory.scalar_sliding.failing(
+        messages.PARA_REPARAM)
+    braid_naturality = SymmetricCategory.braid_naturality.failing(
+        messages.PARA_REPARAM)
+
+    @classmethod
+    def equation_factory(cls, *terms: Symmetric) -> Equation:
+        """
+        The equation of a law, compared by the boundary and the hidden spaces
+        of its terms and their inside up to the equation of the underlying
+        category, e.g. its hypergraph, the parameters and coparameters being
+        plain wires of it.
+        """
+        return Equation(*terms, up_to=lambda para: (
+            para.dom, para.cod, para.param, para.copar,
+            quotient(cls.category, para.inside)))
+
+    @classmethod
+    def strategy(cls, *, dom=None, cod=None, **params):
+        """
+        Generate parametric maps: a parameter and a coparameter space, then
+        an inside from the strategy of the underlying category, with the
+        boundary it needs, the parameters passed to it.
+        """
+        from hypothesis import strategies as st
+
+        @st.composite
+        def maps(draw):
+            source = draw(cls.ob.strategy()) if dom is None else dom
+            target = draw(cls.ob.strategy()) if cod is None else cod
+            param, copar = (draw(cls.ob.strategy()) for _ in range(2))
+            inside = draw(cls.category.strategy(
+                dom=source @ param, cod=target @ copar, **params))
+            return cls(source, target, inside, param, copar)
+
+        return maps()
 
     def __post_init__(self):
         if self.param is None:
@@ -363,6 +408,13 @@ class Traced(Symmetric, TracedCategory):
     Parametric maps over a traced symmetric underlying `category` form a
     traced category, with the parameters swapped out of the way.
     """
+    trace_dinaturality_left = TracedCategory.trace_dinaturality_left.failing(
+        messages.PARA_REPARAM)
+    trace_dinaturality_right = TracedCategory.trace_dinaturality_right.failing(
+        messages.PARA_REPARAM)
+    sliding = TracedCategory.sliding.failing(
+        messages.PARA_REPARAM)
+
     def trace(self, n: int = 1, left: bool = False) -> Traced:
         """
         The trace of a parametric map is the trace of the underlying
@@ -428,6 +480,20 @@ class Closed(Markov, ClosedCategory):
     Parametric maps over a closed underlying `category` form a closed
     category, currying with the parameters swapped out of the way.
     """
+    curry_left = ClosedCategory.curry_left.failing(messages.PARA_CURRY)
+    curry_right = ClosedCategory.curry_right.failing(messages.PARA_CURRY)
+    currying_left = ClosedCategory.currying_left.failing(messages.FREE_CURRY)
+    currying_right = ClosedCategory.currying_right.failing(messages.FREE_CURRY)
+    currying_eta_left = ClosedCategory.currying_eta_left.failing(
+        messages.FREE_CURRY)
+    currying_eta_right = ClosedCategory.currying_eta_right.failing(
+        messages.FREE_CURRY)
+    currying_naturality_left = ClosedCategory.currying_naturality_left.failing(
+        messages.FREE_CURRY)
+    currying_naturality_right = ClosedCategory.currying_naturality_right\
+        .failing(messages.FREE_CURRY)
+    currying_symmetry = ClosedCategory.currying_symmetry.failing(
+        messages.FREE_CURRY)
     category = closed.Diagram
 
     @classmethod
@@ -478,6 +544,14 @@ class Feedback(Markov, FeedbackCategory):
     Parametric maps over a feedback underlying `category` form a feedback
     category, with :meth:`delay` applied to all five components.
     """
+    joining = FeedbackCategory.joining.failing(
+        messages.FREE_FEEDBACK)
+    sliding = FeedbackCategory.sliding.failing(
+        messages.FREE_FEEDBACK)
+    strength = FeedbackCategory.strength.failing(
+        messages.FREE_FEEDBACK)
+    tightening = FeedbackCategory.tightening.failing(
+        messages.FREE_FEEDBACK)
     category = markov.Diagram
 
     def delay(self, n_steps: int = 1) -> Feedback:
@@ -524,6 +598,14 @@ class Compact(Traced, CompactCategory):
     Parametric maps over a compact underlying `category` form a compact
     category, with the cups and caps of the underlying category.
     """
+    adjunction = CompactCategory.adjunction.inapplicable(
+        messages.NO_ROTATION)
+    rotate_contravariance = CompactCategory.rotate_contravariance\
+        .inapplicable(messages.NO_ROTATION)
+    transpose_contravariance = CompactCategory.transpose_contravariance\
+        .failing(messages.PARA_REPARAM)
+    inverse_twisting = CompactCategory.inverse_twisting.inapplicable(
+        messages.NO_DAGGER)
     category = compact.Diagram
 
     @classmethod

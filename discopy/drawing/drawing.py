@@ -221,7 +221,6 @@ from discopy import messages
 from discopy.drawing import backend, Node, Point
 from discopy.config import BOX_DRAWING_ATTRIBUTES, TRANSPARENT
 from discopy.abc import TracedCategory
-from discopy.testable import Testable
 from discopy.python import finset
 from discopy.utils import (
     assert_isinstance, assert_iscomposable, unbiased, factory, RichDisplay)
@@ -286,8 +285,6 @@ class Drawing(TracedCategory["monoidal.Ty", "Drawing"], RichDisplay):
 
     yanking = TracedCategory.yanking.inapplicable(
         messages.PLANAR_YANKING)
-    serialisation = Testable.serialisation.inapplicable(
-        messages.NO_TREE_DRAWING)
 
     def to_tree(self) -> dict:
         """

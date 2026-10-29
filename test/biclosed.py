@@ -1,7 +1,7 @@
 import sys
 from discopy.biclosed import *
 from discopy import biclosed, cat, monoidal
-from discopy.testable import Related, assert_axioms
+from discopy.testable import Related
 from discopy.utils import dumps, loads
 from pytest import raises
 
@@ -304,10 +304,6 @@ def test_deep_terms():
     while isinstance(term, Application):
         depth, term = depth + 1, term.args
     assert depth == 6000
-
-
-def test_axioms():
-    assert_axioms(TermBase)
 
 
 def test_mapping_preserves_binding_and_lexical_boundaries():

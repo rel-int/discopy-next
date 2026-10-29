@@ -355,7 +355,8 @@ def test_to_tree():
     assert (tree['factory'], tree['category']) == (
         'ehypergraph.EHypergraph', 'markov.Diagram')
     assert Markov.from_tree(tree) == graph
-    assert Markov.serialisation(graph) and Markov.transparency(graph)
+    assert Markov.serialisation(term=graph)\
+        and Markov.repr_transparency(term=graph)
 
 
 def test_strategy_needs_a_copy_discard_category():

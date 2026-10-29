@@ -9,6 +9,42 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Added
 
+- `testable.Rule` and `@rule`, inference rules stated like laws on each
+  structure of `abc`, and `FreeCategory.search`, the terms of a free
+  category derived from its rules, which the property matrix draws:
+  `Testable.enrolled` and `Testable.matrix` say what it checks,
+  `proptest/test_rules.py` types every rule and the `fast` profile checks
+  each law once ([next#1]).
+- `testable.Serialisable`, the roundtrips of a term as laws, and the sorts
+  `Atom`, `Perm` and `Objs` ([next#1]).
+- The laws of traced and feedback categories: the vanishing, iteration,
+  superposing, naturality and dinaturality of the trace, `delay_unit`,
+  `delay_composition`, and `sliding` with a memory that changes type
+  ([next#1]).
+- The laws of monoidal, braided, symmetric, balanced, Markov and hypergraph
+  categories: bifunctoriality, the hexagons, the braid, twist and yanking,
+  `permutation_*`, copying and the spiders, compared up to hypergraph from
+  symmetric categories on ([next#1]).
+- The laws of rigid, pivotal, compact and closed categories: the snakes,
+  cups and caps, transposes, adjunction, pivotality, the Reidemeister moves
+  and currying, a planar level comparing them on the nose; `Axiom.canonical`
+  and `Axiom.draw` state a law as a schema ([next#1]).
+- `Hypergraph.strategy` and `CMap.strategy`, which sample the symmetric
+  levels and above, and the laws of the conversions they rely on:
+  `to_hypergraph` is a strict monoidal functor, decoding is its section,
+  maps agree with hypergraphs, foliation is idempotent, and maps and
+  hypergraphs read back from their diagrams and their strings; a sampled
+  Markov diagram reads back from its string only up to interchange
+  ([next#1]).
+- Lenses, parametric maps and integer diagrams in the property matrix,
+  compared up to the equation of their category by `testable.quotient`
+  ([next#1]).
+- Kleisli channels, monad homomorphisms and `python.Function` in the
+  property matrix, compared extensionally by `testable.Extensional` on
+  `testable.values` ([next#1]).
+- Lambda terms in the property matrix with the laws of beta reduction,
+  `biclosed.Normalising`, and proof nets with `sequentialisation`
+  ([next#1]).
 - `discopy.abc`, the abstract base classes of the hierarchy, from `Category`
   to `PROP`, `Monoid` and `Pregroup` ([#326], [#331], [#727]).
 - `discopy.testable`, laws stated once on `abc` and checked by the Hypothesis
@@ -264,7 +300,8 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   a traced copy of a wire whose dagger is not itself, e.g. a
   `Dims(Dim(2, 3))`, is built; and the strings of delayed boxes, structural
   boxes and adjoint wires read back, their `atoms` being the generators they
-  name.
+  name, as do those of a hypergraph; a Markov hypergraph whose spider has no
+  input, i.e. a copy traced back into itself, decodes to that trace.
 - `Category.typeparams` reads `ob` with no fallback: a monoid's objects are
   `NoneType`, so `Nat.typeparams()` no longer gives `(Nat, Nat)` ([next#214]).
 - `quantum.zx.Diagram.from_pyzx`, and its copy in `optyx.core.zx`, wires a

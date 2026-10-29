@@ -62,18 +62,28 @@ from discopy.abc import (
     BraidedCategory,
     CompactCategory,
     DaggerCategory,
+    MarkovCategory,
     Pregroup,
     RigidCategory,
     SpacialCategory,
     SymmetricCategory,
     TracedCategory,
 )
+from discopy.testable import Equation, Serialisable, TestableGeneric, axiom
 from discopy.cat import Ob, Sum
 from discopy.python.finset import Permutation
 from discopy.utils import (
-    AxiomError, assert_isatomic, assert_istraceable, assert_isinstance,
-    classproperty, factory_name, from_tree, resolve_factory, get_origin,
-    unbiased, NamedGeneric)
+    AxiomError,
+    assert_isatomic,
+    assert_istraceable,
+    assert_isinstance,
+    classproperty,
+    factory_name,
+    from_tree,
+    resolve_factory,
+    get_origin,
+    unbiased,
+)
 
 if TYPE_CHECKING:
     from discopy.monoidal import Box, Diagram, Match, Ty
@@ -133,7 +143,7 @@ class Port:
 
 
 class CMap[category](
-        CompactCategory, DaggerCategory, NamedGeneric):
+        CompactCategory, DaggerCategory, TestableGeneric, Serialisable):
     r"""
     An open combinatorial map, i.e. a diagram represented as a bijection
     between its ports.
@@ -228,6 +238,16 @@ class CMap[category](
         :align: center
     """
 
+    @classmethod
+    def checked_params(cls) -> tuple:
+        """
+        The free symmetric and compact categories, the ones a map is the
+        coherence theorem of.
+        """
+        # pylint: disable-next=import-outside-toplevel  # they import this
+        from discopy import compact, symmetric
+        return (symmetric.Diagram, compact.Diagram)
+
     functor = classproperty(lambda cls: cls.category.functor_factory)
     ob = classproperty(lambda cls: cls.category.ob)
 
@@ -235,6 +255,14 @@ class CMap[category](
     cod: "Ty"
     loops: "tuple[Ty, ...]"
     edges: Permutation
+
+    @axiom
+    def cmap_roundtrip(cls, term: Self) -> Equation[Self]:
+        """
+        A map reads back from the diagram it decodes to, up to the order of
+        its boxes, i.e. as a hypergraph, see :meth:`equation_factory`.
+        """
+        return cls.equation_factory(term.to_diagram().to_map(), term)
 
     def __init__(
             self, dom: "Ty", cod: "Ty", boxes: "tuple[Box, ...]",
@@ -839,6 +867,21 @@ class CMap[category](
             loops=tuple(map(from_tree, tree['loops'])))
 
     @classmethod
+    def equation_factory(cls, *terms: "CMap") -> Equation:
+        """
+        The equation of a law, compared up to isomorphism by the hypergraphs
+        of its terms: equality of maps compares their boxes and loops in the
+        order they are listed, which composition and tensor permute.
+
+        >>> from discopy.symmetric import Ty, Box, CMap
+        >>> x = Ty('x')
+        >>> f, g = (Box(name, Ty(), x).to_map() for name in "fg")
+        >>> assert f @ g != g @ f >> CMap.swap(x, x)
+        >>> assert CMap.equation_factory(f @ g, g @ f >> CMap.swap(x, x))
+        """
+        return Equation(*terms, up_to=cls.to_hypergraph)
+
+    @classmethod
     def id(cls, dom=None) -> "CMap":
         """ The identity map, with each input wired to its output. """
         dom = cls.ob() if dom is None else dom
@@ -846,6 +889,53 @@ class CMap[category](
         edge = Permutation.from_transpositions(
             ((i, i + len(dom)) for i in range(len(dom))), n_ports)
         return cls(dom, dom, (), edge, check=False)
+
+    @classmethod
+    def strategy(  # pylint: disable=too-many-arguments  # keyword-only bounds
+            cls, *, types=None, dom=None, cod=None, min_leaves=None,
+            max_leaves=4, max_loops=None):
+        """
+        Generate maps of :attr:`category` by drawing their edge involution,
+        which pairs ports of different kinds with equal types, and ports of
+        the same kind with adjoint types when the category is compact: this
+        is the wiring :meth:`Hypergraph.strategy` samples for a symmetric or a
+        compact category, which the map reads off with
+        :meth:`Hypergraph.to_map`.
+
+        A map is how the coherence theorem of a symmetric or compact category
+        is sampled: a planar diagram has an orientation that a map does not
+        record, and a Markov or hypergraph category has spiders that a map
+        cannot draw, so their maps are not generated.
+
+        Parameters:
+            types : A strategy for the types of boxes and boundaries.
+            dom : The domain, sampled from ``types`` if ``None``.
+            cod : The codomain, sampled from ``types`` if ``None``.
+            min_leaves : The minimum number of boxes.
+            max_leaves : The maximum number of boxes, not counting the
+                balancing box of :meth:`Hypergraph.strategy`.
+            max_loops : The maximum number of scalar loops, see
+                ``max_scalars`` in :meth:`Hypergraph.strategy`.
+
+        Example
+        -------
+        >>> from hypothesis import find
+        >>> from discopy.compact import Ty, Diagram
+        >>> x = Ty('x')
+        >>> cmap = find(
+        ...     CMap[Diagram].strategy(dom=x, cod=x),
+        ...     lambda m: not m.is_monogamous)
+        >>> assert (cmap.dom, cmap.cod) == (x, x)
+        """
+        if cls.category is None\
+                or not issubclass(cls.category, SymmetricCategory)\
+                or issubclass(cls.category, MarkovCategory):
+            raise NotImplementedError(
+                f"No strategy implemented for {factory_name(cls)}.")
+        graphs = hypergraph.Hypergraph[cls.category].strategy(
+            types=types, dom=dom, cod=cod, min_leaves=min_leaves,
+            max_leaves=max_leaves, max_scalars=max_loops)
+        return graphs.map(lambda graph: graph.to_map())
 
     @classmethod
     def from_box(cls, box: "Box") -> "CMap":

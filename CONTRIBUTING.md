@@ -128,16 +128,20 @@ read back from its strings, with the type parameters of the class stating
 it in scope.
 
 A cell is skipped when its axiom declares that the structure does not
-apply, and xfailed when the law is declared broken, each carrying its
-reason: pass `-rsxX` to list the skips, xfails and unexpected passes with
-their reasons, and `-x` to stop at the first genuine failure.
+apply, and xfailed when the law is declared broken, strictly so that a law
+that holds again fails the run, each carrying its reason: pass `-rsxX` to
+list the skips, xfails and unexpected passes with their reasons, and `-x`
+to stop at the first genuine failure.
 
-`proptest/conftest.py` registers four Hypothesis profiles over the
-`.hypothesis/examples` database, selected by `HYPOTHESIS_PROFILE`: `dev`
-by default, `pr` for the small budget a pull request runs with, under a
-fixed `--hypothesis-seed` so that it draws the same examples every time,
-and `explore` for the large one `main` and the nightly run search with.
-A fourth, `shared`, is `dev` reading the database CI uploads as a workflow
+`proptest/conftest.py` registers five Hypothesis profiles, selected by
+`HYPOTHESIS_PROFILE`: `dev` by default, `fast` to develop with, derandomized
+and checking each law once, on the category nearest the class declaring it,
+`pr` for the small budget a pull request runs with, under a fixed
+`--hypothesis-seed` so that it draws the same examples every time, and
+`explore` for the large one `main` and the nightly run search with. All but
+`fast` share the `.hypothesis/examples` database that CI downloads before a
+run and uploads after every run but a pull request's, which only reads it.
+The fifth, `shared`, is `dev` reading the database CI uploads as a workflow
 artifact, through a `GITHUB_TOKEN`, so a failure found on CI replays on
 your machine before any search; it reaches GitHub only when selected.
 

@@ -258,25 +258,6 @@ def test_types_without_wires_are_their_own_delay():
     assert f.delay().dom == f.dom and f.delay().time_step == 1
 
 
-def test_feedback_laws_on_a_traced_category():
-    from discopy import compact
-    from discopy.abc import FeedbackCategory
-    C = compact.CMap
-    x, y, m, n, w, z = map(compact.Ty, "xymnwz")
-    box = lambda name, dom, cod: compact.Box(name, dom, cod).to_map()
-    f = box('f', x @ m @ n, y @ m @ n)
-    g, h, k, e = box('g', w, x), box('h', y, z), box(
-        'k', m @ n, m @ n), box('e', w, z)
-    for law, arguments in (
-            ("vanishing", dict(f=f)),
-            ("joining", dict(f=f, x=x, y=y, m=m, n=n)),
-            ("strength", dict(e=e, f=f, x=x, y=y, m=m @ n)),
-            ("tightening", dict(f=f, g=g, h=h, x=x, y=y, m=m @ n)),
-            ("sliding", dict(f=f, k=k, x=x, y=y, m=m @ n))):
-        axiom = getattr(FeedbackCategory, law).bind(C)
-        assert axiom.modulo(C.to_hypergraph)(**arguments)
-
-
 def test_split_memory_bounds():
     x, y = Ty('x'), Ty('y')
     f = Box('f', x, x)
