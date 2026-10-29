@@ -24,6 +24,17 @@ are one product and so are the maps reading the beliefs, and the clue and
 answer gates are computed once per cycle. Everything else -- the detached
 prefix, the heads, the halting, the trainers -- is the network's own.
 
+Pass ``kernel="triton"`` to a geometric network to fuse its peer reductions
+on CUDA float32 tensors, including their backward pass. This uses the same
+signed blocks for every geometry, without an edge activation tensor or
+atomic gradient accumulation. Strided slices of the folded maps are read
+directly. Other devices and dtypes use the PyTorch path; factor geometries
+are unchanged. Blocks larger than 1024 points and layouts requiring
+64-bit indexing also use PyTorch.
+The default ``kernel="torch"`` supports higher derivatives,
+whereas the fused path supports first derivatives only. Triton is needed
+only for the fused path, and no global precision flags are changed.
+
 Summary
 -------
 
@@ -84,6 +95,7 @@ peer network does.
 
 from __future__ import annotations
 
+from math import prod
 from typing import NamedTuple
 
 import torch
@@ -278,6 +290,52 @@ class Peers(NamedTuple):
     """
     terms: tuple
     degree: int
+
+    def __call__(self, s: torch.Tensor, x: torch.Tensor,
+                 kernel: str = "torch") -> torch.Tensor:
+        """
+        The mean of ``relu(s[v] + x[w])`` over the signed block relation.
+
+        ``kernel="triton"`` fuses all terms and their first derivatives on
+        CUDA float32 tensors with blocks of at most 1024 points, fewer
+        than ``2**31`` elements and input element offsets below ``2**31``
+        relative to each data pointer. Larger blocks or layouts, other
+        devices and other dtypes use PyTorch; the
+        default ``"torch"`` also supports higher derivatives. Triton is
+        required only for the fused path. No precision settings change.
+
+        Parameters:
+            s : The receivers' half, ``(B, N, h)``.
+            x : The senders' half, with the same shape, dtype and device.
+            kernel : ``"torch"`` or ``"triton"``.
+        """
+        if kernel not in ("torch", "triton"):
+            raise ValueError(f"unknown peer kernel: {kernel!r}")
+        if not self.terms or self.degree <= 0:
+            raise ValueError("peer reduction needs terms and positive degree")
+        if s.ndim != 3 or s.shape != x.shape or s.dtype != x.dtype \
+                or s.device != x.device or any(
+                    prod(block.shape) != s.shape[1]
+                    for _, block in self.terms):
+            raise ValueError("peer inputs need matching (B, N, h) layouts")
+        if not s.numel():
+            return s + x
+        if kernel == "triton" and s.is_cuda and s.dtype == torch.float32 \
+                and s.numel() < 2**31 \
+                and all(block.size <= 1024 for _, block in self.terms) \
+                and all(
+                    sum((size - 1) * stride
+                        for size, stride in zip(t.shape, t.stride())) < 2**31
+                    for t in (s, x)):
+            # pylint: disable=import-outside-toplevel  # CUDA-only dependency
+            from discopy.neural.kernels import encode, peer_pairs
+            return peer_pairs(s, x, encode(self.terms), self.degree)
+        total = None
+        for coefficient, block in self.terms:
+            term = pairs(block, s, x)
+            term = term if coefficient == 1 else coefficient * term
+            total = term if total is None else total + term
+        return total / self.degree
 
     @classmethod
     def of(cls, relation, group) -> Peers:
@@ -511,8 +569,16 @@ class Geometric:
     split: bool = True
     """ The layout of a factor network: the beliefs as emitted. """
 
-    def __init__(self, *args, **kwargs):
+    peer_kernel: str = "torch"
+    """ Peer reduction implementation: ``"torch"`` or ``"triton"``.
+    Selected by the constructor's ``kernel`` keyword. Factor geometries keep
+    their PyTorch implementation. See :meth:`Peers.__call__`. """
+
+    def __init__(self, *args, kernel: str = "torch", **kwargs):
+        if kernel not in ("torch", "triton"):
+            raise ValueError(f"unknown peer kernel: {kernel!r}")
         super().__init__(*args, **kwargs)
+        self.peer_kernel = kernel
         if self.group is not None:
             self.geometry = self.derive()
         elif self.geometry is None:
@@ -666,17 +732,14 @@ class Geometric:
             s : The carried state.
             const : The clue and answer gates of the cycle.
         """
+        assert isinstance(self.geometry, Peers)
         state, carried = s.state, s.units
         for _ in range(self.rounds):
             shared, gh, emitted = self.on_state(maps, state)
             per_cell, _ = self.read(
                 maps, emitted if carried is None else carried)
-            total = None
-            for coefficient, block in self.geometry.terms:
-                term = pairs(block, shared, per_cell)
-                term = term if coefficient == 1 else coefficient * term
-                total = term if total is None else total + term
-            state = self.update(maps, state, total / self.geometry.degree,
+            pooled = self.geometry(shared, per_cell, kernel=self.peer_kernel)
+            state = self.update(maps, state, pooled,
                                 const, gh)
             carried = None
         return state, self.emit(maps, state)
