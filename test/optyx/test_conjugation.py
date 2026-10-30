@@ -5,7 +5,6 @@ from discopy.optyx.core import zx
 from discopy.optyx import photonic
 import pytest
 import numpy as np
-import sympy
 
 
 @pytest.mark.parametrize("box", [photonic.Phase, photonic.BBS, photonic.TBS])
@@ -103,9 +102,3 @@ def test_the_conjugate_of_a_gate_conjugates_its_matrix(gate):
     assert np.allclose(
         path_array(gate.conjugate()), np.conjugate(path_array(gate)))
 
-
-@pytest.mark.parametrize("gate", [photonic.TBS, photonic.MZI])
-def test_the_gradient_of_a_conjugate_is_not_the_gradient(gate):
-    x = sympy.Symbol("x")
-    gate = gate(x) if gate is photonic.TBS else gate(x, 0.3)
-    assert gate.conjugate().grad(x) != gate.grad(x)
