@@ -141,6 +141,26 @@ def test_bit_controlled_diagram():
     assert BitControlledGate(phase, is_dagger=True) == controlled.dagger()
 
 
+
+@pytest.mark.parametrize("n", [1, 2, 3, 4])
+def test_xor_n_is_a_parity(n):
+    """The truth table of `Xor(n)` sends each input to the parity of its
+    bits, with probability one."""
+    array = Xor(n).double().to_tensor().eval().array
+    parity = [[int(bin(i).count("1") % 2 == out) for out in (0, 1)]
+              for i in range(2 ** n)]
+    assert np.allclose(array.reshape(2 ** n, 2), parity)
+
+
+def test_bit_controlled_identity_discards_the_bit():
+    controlled = BitControlledGate(qubits.Id(qubit))
+    assert (controlled.dom, controlled.cod) == (bit @ qubit, qubit)
+    for value in (0, 1):
+        assert np.allclose(
+            (Bit(value) @ qubits.Ket("+") >> controlled).double()
+            .to_tensor().eval().array,
+            qubits.Ket("+").double().to_tensor().eval().array)
+
 def test_classical_guards():
     with pytest.raises(ValueError, match="0s and 1s"):
         PostselectBit(2)

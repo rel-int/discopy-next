@@ -333,6 +333,9 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   `optyx.utils.misc.matrix_to_zw` takes a rectangular matrix, a symbolic one
   with zeros and one with a zero row or column, and
   `basis_vector_from_kets` rejects a negative index (part of [next#314]).
+- `optyx.classical.Xor(n)` is a parity for every `n`, its scalar
+  `sqrt(2 ** (n - 1))`, and `BitControlledGate` of a diagram with no boxes
+  discards its bit (part of [next#314]).
 - `Hypergraph`: its hash, `simplify`, `rotate`, and `to_diagram` on
   non-self-dual, `Nat` and `Dim` types ([#324], [#387], [#393], [#622],
   [#719]).
