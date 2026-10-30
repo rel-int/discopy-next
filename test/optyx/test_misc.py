@@ -3,6 +3,7 @@ import pytest
 
 from discopy.optyx.channel import Channel
 from discopy.optyx.core import diagram, zw, zx
+from discopy.optyx.core.path import Matrix
 from discopy.optyx.utils.misc import (
     basis_vector_from_kets, explode_channel, filter_occupation_numbers,
     matrix_to_zw, occupation_numbers, tensor_2_amplitudes)
@@ -45,6 +46,22 @@ def test_explode_channel_keeps_the_kraus_map():
 def test_matrix_to_zw_of_a_rectangular_matrix(array):
     array = np.array(array, dtype=complex)
     assert np.allclose(matrix_to_zw(array).to_path().array, array)
+
+
+@pytest.mark.parametrize("array", [
+    [[1, 0], [0, 0]],
+    [[0, 2], [0, 1j]],
+    [[1, 1], [0, 0], [1, -1]],
+])
+def test_matrix_to_zw_keeps_a_zero_row_or_column(array):
+    array = np.array(array, dtype=complex)
+    rows, cols = array.shape
+    diagram = matrix_to_zw(array)
+    assert (len(diagram.dom), len(diagram.cod)) == (rows, cols)
+    for n_photons in range(3):
+        assert np.allclose(
+            diagram.to_path().eval(n_photons).array,
+            Matrix(array, rows, cols).eval(n_photons).array)
 
 
 def test_matrix_to_zw_of_a_symbolic_matrix_with_zeros():

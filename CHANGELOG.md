@@ -328,9 +328,10 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   modes in between ([next#295]) and keeps a detector with nothing after it
   ([next#299]).
 - `optyx.core.path.Matrix`: `dagger` conjugates `scalar`, `dilate` keeps
-  `scalar` and `normalisation`, and `eval` with no photons to route reads the
-  empty permanent, 1, as `npperm` now does; `optyx.utils.misc.matrix_to_zw`
-  takes a rectangular matrix and a symbolic one with zeros, and
+  `scalar` and multiplies `normalisation` in, and `eval` with no photons to
+  route reads the empty permanent, 1, as `npperm` now does;
+  `optyx.utils.misc.matrix_to_zw` takes a rectangular matrix, a symbolic one
+  with zeros and one with a zero row or column, and
   `basis_vector_from_kets` rejects a negative index (part of [next#314]).
 - `Hypergraph`: its hash, `simplify`, `rotate`, and `to_diagram` on
   non-self-dual, `Nat` and `Dim` types ([#324], [#387], [#393], [#622],

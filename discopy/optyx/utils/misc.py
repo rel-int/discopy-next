@@ -27,6 +27,8 @@ def _build_w_layer(n_nonzero_counts, dagger=False):
             layer @= w_gate.dagger() if dagger else w_gate
         elif count == 1:
             layer @= zw.Id(1)
+        else:
+            layer @= zw.Create(0) if dagger else zw.Select(0)
     return layer
 
 
