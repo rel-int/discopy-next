@@ -144,10 +144,12 @@ def test_bit_controlled_diagram():
 
 @pytest.mark.parametrize("n", [1, 2, 3, 4])
 def test_xor_n_is_a_parity(n):
-    """Every row of the truth table of `Xor(n)` holds a single one."""
+    """The truth table of `Xor(n)` sends each input to the parity of its
+    bits, with probability one."""
     array = Xor(n).double().to_tensor().eval().array
-    assert np.allclose(np.sort(np.abs(array.reshape(2 ** n, 2)), axis=1),
-                       [[0, 1]] * 2 ** n)
+    parity = [[int(bin(i).count("1") % 2 == out) for out in (0, 1)]
+              for i in range(2 ** n)]
+    assert np.allclose(array.reshape(2 ** n, 2), parity)
 
 
 def test_bit_controlled_identity_discards_the_bit():
