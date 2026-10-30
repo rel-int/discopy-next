@@ -88,7 +88,7 @@ We can implement classical functions:
 
 1. Using a :code:`ClassicalFunction` with a Python function.
 2. Using a :code:`BinaryMatrix` to define the transformation.
-3. Using primitives such as :code:`XorBit`, :code:`AddN`, etc.
+3. Using primitives such as :code:`Xor`, :code:`Add`, etc.
 
 >>> xor_gate = Xor(2)
 >>>
@@ -233,7 +233,7 @@ class BitControlledGate(Channel):
             else:
                 boxes.append(bit @ layer)
 
-        boxes.append(Z(1, 0) @ layer.cod)
+        boxes.append(Z(1, 0) @ diag.cod)
         if is_dagger:
             return channel.Diagram.then(*boxes).dagger()
         return channel.Diagram.then(*boxes)
@@ -508,7 +508,7 @@ class Xor(ClassicalBox):
     def __init__(self, n=2):
         super().__init__(
             f"Xor({n})",
-            zx.X(n, 1) @ diagram.Scalar(np.sqrt(n)),
+            zx.X(n, 1) @ diagram.Scalar(np.sqrt(2 ** (n - 1))),
             bit**n,
             bit
         )

@@ -327,6 +327,9 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   `Diagram.from_perceval` reads a negative feed-forward offset `k` as `-k - 1`
   modes in between ([next#295]) and keeps a detector with nothing after it
   ([next#299]).
+- `optyx.classical.Xor(n)` is a parity for every `n`, its scalar
+  `sqrt(2 ** (n - 1))`, and `BitControlledGate` of a diagram with no boxes
+  discards its bit (part of [next#314]).
 - `Hypergraph`: its hash, `simplify`, `rotate`, and `to_diagram` on
   non-self-dual, `Nat` and `Dim` types ([#324], [#387], [#393], [#622],
   [#719]).
@@ -743,6 +746,7 @@ for the changelog of `1.2.1` and earlier.
 [next#302]: https://github.com/rel-int/discopy-next/pull/302
 [next#310]: https://github.com/rel-int/discopy-next/pull/310
 [next#313]: https://github.com/rel-int/discopy-next/issues/313
+[next#314]: https://github.com/rel-int/discopy-next/issues/314
 [next#316]: https://github.com/rel-int/discopy-next/pull/316
 [next#320]: https://github.com/rel-int/discopy-next/pull/320
 [next#323]: https://github.com/rel-int/discopy-next/issues/323
