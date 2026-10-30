@@ -51,6 +51,9 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 - `abc.DaggerCategory`, where the dagger laws are stated ([#731]), and
   `abc.Groupoid` and `abc.Group` with `discopy.group`, finite groups and
   their actions ([next#121]).
+- `hopf.GroupAlgebra` of a `discopy.group`, for the tables of
+  `hopf.Algebra.group_algebra`, and `hopf.Representation.permutation` of its
+  actions ([next#414]).
 - Plumbing: `finset.Cospan` and `frobenius.Cospan`, `markov.Function` and
   `comarkov.Cofunction` ([#472]).
 - `markov.Box(is_deterministic=, is_affine=)`, flags of each box rather than
@@ -146,7 +149,7 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   events are non-contextual and the fraction of the mixture is the
   probability of a coincidence times the conditioned fraction, at every
   bias of the source.
-- `hopf.Intertwiner.chart` and `hopf.Algebra.symmetric(n)` ([#408]).
+- `hopf.Intertwiner.chart` ([#408]).
 - `copying`, a law of `Testable` beside `pickling` ([next#1]), and the
   generators of each level as typed class variables ([next#1]).
 - `str_transparency`, a law of `Testable` beside `transparency`: `str(x)`
@@ -781,6 +784,7 @@ for the changelog of `1.2.1` and earlier.
 [next#387]: https://github.com/rel-int/discopy-next/issues/387
 [next#388]: https://github.com/rel-int/discopy-next/issues/388
 [next#399]: https://github.com/rel-int/discopy-next/issues/399
+[next#414]: https://github.com/rel-int/discopy-next/issues/414
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#56]: https://github.com/rel-int/optyx/pull/56
