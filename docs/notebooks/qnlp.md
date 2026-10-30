@@ -337,11 +337,11 @@ print(f.r.eval())
 # %timeit f.eval()
 ```
 
-**Exercise:** Check out the `Diagram.snake_removal` method in the [docs](https://docs.discopy.org/en/main/_api/discopy.rigid.Diagram.html#discopy.rigid.Diagram.snake_removal). This can greatly speed up the evaluation of tensor diagrams!
+**Exercise:** Check out the `Diagram.snake_removal` method in the [docs](../../_api/discopy.rigid.Diagram.html#discopy.rigid.Diagram.snake_removal). This can greatly speed up the evaluation of tensor diagrams!
 
 **Exercise:** Define a function that takes a number `n` and returns the diagram for a [matrix product state](https://en.wikipedia.org/wiki/Matrix_product_state) (MPS) with `n` particles and random entries. Check how the evaluation time scales with the size of the diagram.
 
-**Exercise:** Install the [tensornetwork](https://pypi.org/project/tensornetwork/) library and use it to contract the MPS diagrams more efficiently by passing a contract to the `eval` method, see the [docs](https://docs.discopy.org/en/main/_api/discopy.tensor.Diagram.html#discopy.tensor.Diagram.eval).
+**Exercise:** Install the [tensornetwork](https://pypi.org/project/tensornetwork/) library and use it to contract the MPS diagrams more efficiently by passing a contract to the `eval` method, see the [docs](../../_api/discopy.tensor.Diagram.html#discopy.tensor.Diagram.eval).
 <!---->
 ## Quantum circuits
 
@@ -435,7 +435,7 @@ circuit.to_tk()
 (SWAP >> circuit >> SWAP).to_tk()
 ```
 
-We can execute our circuit on a $\mathrm{t|ket\rangle}$ backend (simulator or hardware) by passing it as a parameter to `eval`, see the [docs](https://docs.discopy.org/en/main/_api/discopy.quantum.circuit.Circuit.html#discopy.quantum.circuit.Circuit.eval).
+We can execute our circuit on a $\mathrm{t|ket\rangle}$ backend (simulator or hardware) by passing it as a parameter to `eval`, see the [docs](../../_api/discopy.quantum.circuit.Circuit.html#discopy.quantum.circuit.Circuit.eval).
 <!---->
 **Exercise:** Run your own Bell experiment on quantum hardware! You can use IBMQ machines for free, if you're ready to wait.
 
