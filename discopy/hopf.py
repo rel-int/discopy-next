@@ -12,6 +12,7 @@ Summary
     :toctree:
 
     Algebra
+    GroupAlgebra
     Double
     Representation
     Intertwiner
@@ -43,9 +44,10 @@ The Drinfeld double of the group algebra of :math:`\\mathbb{Z}/2` gives a
 non-trivial link invariant: it separates the Hopf link from the two-component
 unlink.
 
+>>> from discopy.group import Cyclic
 >>> import numpy as np
 >>> from discopy import ribbon
->>> H = Double(Algebra.cyclic(2))
+>>> H = Double(GroupAlgebra(Cyclic[2]))
 >>> assert H.is_valid() and H.dim == 4
 >>> e = Representation[H].anyon(0, -1)
 >>> m = Representation[H].anyon(1, 1)
@@ -74,7 +76,7 @@ each axiom.
 
 >>> from discopy.tensor import Equation
 >>> from discopy.tensor import Diagram
->>> H = Algebra.cyclic(2)
+>>> H = GroupAlgebra(Cyclic[2])
 >>> ty = H.ty
 >>> assert H.is_valid()
 
@@ -114,7 +116,7 @@ and cups/caps — never materialised. Here is its multiplication, the coadjoint
 product of :math:`D(H) = H \\otimes H^*`, drawn as a :class:`.tensor.CMap` (the
 tensor network that gets contracted):
 
->>> Double(Algebra.cyclic(2)).mult.to_map().draw(  # doctest: +EXTRA
+>>> Double(GroupAlgebra(Cyclic[2])).mult.to_map().draw(  # doctest: +EXTRA
 ...     doctest='docs/_static/hopf/double-mult.dot')
 
 .. graphviz:: /_static/hopf/double-mult.dot
@@ -124,13 +126,13 @@ tensor network that gets contracted):
 from __future__ import annotations
 
 from functools import cached_property
-from itertools import permutations
 
 import numpy as np
 
 from discopy import monoidal, ribbon, tensor, frobenius, messages
 from discopy.tensor import Dim, Box, Id
 from discopy.abc import RibbonCategory, NamedGeneric
+from discopy.group import Group, Action
 from discopy.utils import (
     assert_isinstance, assert_iscomposable, classproperty, factory,
     factory_name, from_tree, get_origin, product, unbiased)
@@ -471,62 +473,6 @@ class Algebra:
             and (self.R is None or self.is_quasitriangular())
 
     @classmethod
-    def group_algebra(cls, table):
-        """
-        The group algebra :math:`k[G]` from a group multiplication ``table``,
-        with ``table[i][j]`` the index of :math:`g_i g_j` and ``g_0`` the unit.
-
-        >>> Z2 = Algebra.group_algebra([[0, 1], [1, 0]])
-        >>> assert Z2.is_valid()
-        """
-        table = [list(row) for row in table]
-        n = len(table)
-        inverse = [next(j for j in range(n) if table[i][j] == 0)
-                   for i in range(n)]
-        unit = np.zeros(n)
-        unit[0] = 1
-        counit = np.ones(n)
-        mult = np.zeros((n, n, n))
-        comult = np.zeros((n, n, n))
-        antipode = np.zeros((n, n))
-        for i in range(n):
-            comult[i, i, i] = 1
-            antipode[i, inverse[i]] = 1
-            for j in range(n):
-                mult[i, j, table[i][j]] = 1
-        R = np.zeros((n, n))
-        R[0, 0] = 1
-        return cls.from_arrays(unit, counit, mult, comult, antipode, R)
-
-    @classmethod
-    def cyclic(cls, n):
-        """
-        The group algebra of the cyclic group :math:`\\mathbb{Z}/n`.
-
-        >>> assert Algebra.cyclic(3).is_valid()
-        """
-        table = [[(i + j) % n for j in range(n)] for i in range(n)]
-        return cls.group_algebra(table)
-
-    @classmethod
-    def symmetric(cls, n):
-        """
-        The group algebra of the symmetric group :math:`S_n`, with elements
-        the permutations of ``range(n)`` in lexicographic order — so that
-        ``g_0`` is the identity — and :math:`g_i g_j` the permutation
-        applying :math:`g_j` first.
-
-        >>> S3 = Algebra.symmetric(3)
-        >>> assert S3.is_valid() and S3.dim == 6
-        >>> assert not S3.is_commutative()
-        """
-        perms = sorted(permutations(range(n)))
-        index = {p: i for i, p in enumerate(perms)}
-        table = [[index[tuple(p[x] for x in q)] for q in perms]
-                 for p in perms]
-        return cls.group_algebra(table)
-
-    @classmethod
     def sweedler(cls):
         """
         Sweedler's four-dimensional Hopf algebra, the smallest one that is
@@ -616,6 +562,57 @@ class Algebra:
         return cls.from_arrays(unit, counit, mult, comult, antipode)
 
 
+class GroupAlgebra(Algebra):
+    """
+    The group algebra :math:`k[G]` of a finite :class:`.group.Group`, with
+    basis the :meth:`.group.Group.elements`: the product of two of them is
+    their composition, :math:`e_g e_h = e_{h \\gg g}` i.e. :math:`h` first,
+    so that a :class:`.group.Action` is a left module (see
+    :meth:`Representation.permutation`). Each element is grouplike,
+    :math:`\\Delta(e_g) = e_g \\otimes e_g`, the antipode is the inverse
+    and the R-matrix is trivial, :math:`R = e_1 \\otimes e_1`.
+
+    Parameters:
+        group : The group.
+
+    >>> from discopy.group import Symmetric
+    >>> H = GroupAlgebra(Symmetric[3])
+    >>> assert H.is_valid() and H.dim == 6 and not H.is_commutative()
+    >>> H
+    hopf.GroupAlgebra(group.Symmetric[3])
+    """
+    def __init__(self, group: type[Group]):
+        self.group, self.elements = group, tuple(group.elements())
+        self.index = {g: i for i, g in enumerate(self.elements)}
+        n = len(self.elements)
+        unit, counit = np.zeros(n), np.ones(n)
+        unit[self.index[group()]] = 1
+        mult, comult = np.zeros((n, n, n)), np.zeros((n, n, n))
+        antipode = np.zeros((n, n))
+        for i, g in enumerate(self.elements):
+            comult[i, i, i] = 1
+            antipode[i, self.index[g.dagger()]] = 1
+            mult[i, range(n), [self.index[h >> g] for h in self.elements]] = 1
+        super().__init__(*Algebra.from_arrays(
+            unit, counit, mult, comult, antipode, np.outer(unit, unit)
+        ).generators)
+
+    def __repr__(self):
+        return factory_name(type(self)) + f"({factory_name(self.group)})"
+
+    def to_tree(self) -> dict:
+        """
+        A group has no tree, so a group algebra is saved as the
+        :class:`Algebra` of its generators, which it is equal to.
+
+        >>> from discopy.utils import dumps, loads
+        >>> from discopy.group import Cyclic
+        >>> H = GroupAlgebra(Cyclic[2])
+        >>> assert loads(dumps(H)) == H
+        """
+        return Algebra(*self.generators).to_tree()
+
+
 class Double(Algebra):
     """
     The Drinfeld quantum double :math:`D(H) = H \\otimes H^*` of a
@@ -639,7 +636,8 @@ class Double(Algebra):
     is the anti-homomorphism :math:`(\\epsilon \\otimes S) \\circ
     ((S^{-1})^* \\otimes 1)` composed with that same multiplication.
 
-    >>> D = Double(Algebra.cyclic(2))
+    >>> from discopy.group import Cyclic
+    >>> D = Double(GroupAlgebra(Cyclic[2]))
     >>> assert D.dim == 4 and D.is_valid()
     """
     def __init__(self, base):
@@ -715,7 +713,8 @@ class Representation[algebra](NamedGeneric, frobenius.Dim):
     two anyon modules of :math:`D(\\mathbb{Z}/2)`, with the left-hand side
     drawn as the :class:`.tensor.CMap` it contracts to:
 
-    >>> D = Double(Algebra.cyclic(2))
+    >>> from discopy.group import Cyclic
+    >>> D = Double(GroupAlgebra(Cyclic[2]))
     >>> e = Representation[D].anyon(0, -1)
     >>> m = Representation[D].anyon(1, 1)
     >>> V = Representation[D].direct_sum([e, m])
@@ -763,8 +762,9 @@ class Representation[algebra](NamedGeneric, frobenius.Dim):
         Serialise a module with the tree of its algebra and of its action, so
         that it loads as a member of the class subscripted by its algebra.
 
+        >>> from discopy.group import Cyclic
         >>> from discopy.utils import dumps, loads
-        >>> D = Double(Algebra.cyclic(2))
+        >>> D = Double(GroupAlgebra(Cyclic[2]))
         >>> V = Representation[D].anyon(1, 1)
         >>> assert loads(dumps(V)) == V and loads(dumps(V)).action == V.action
         """
@@ -786,7 +786,8 @@ class Representation[algebra](NamedGeneric, frobenius.Dim):
         \\rho_W) (\\Delta \\otimes 1_{V \\otimes W})`. A plain
         :class:`.tensor.Dim` factor is taken as the trivial representation.
 
-        >>> D = Double(Algebra.cyclic(2))
+        >>> from discopy.group import Cyclic
+        >>> D = Double(GroupAlgebra(Cyclic[2]))
         >>> e = Representation[D].anyon(0, -1)
         >>> m = Representation[D].anyon(1, 1)
         >>> assert (e @ m).is_module() and (e @ Dim(2)).is_module()
@@ -877,7 +878,8 @@ class Representation[algebra](NamedGeneric, frobenius.Dim):
         """
         An irreducible anyon module of the quantum double of a group algebra,
         labelled by the conjugacy class of the group element ``flux`` and an
-        irrep of its centraliser ``charge``: a mapping from the indices of the
+        irrep of its centraliser ``charge``, each element given by its index in
+        :attr:`GroupAlgebra.elements`: ``charge`` maps the indices of the
         centraliser elements to unitary matrices, or a scalar ``q`` for the
         cyclic character ``e_a -> q ** a``. The basis is one copy of the
         charge space per element of the class: :math:`\\delta_f \\otimes h`
@@ -886,16 +888,20 @@ class Representation[algebra](NamedGeneric, frobenius.Dim):
         h q_c)`, for :math:`q_c` a transversal conjugating ``flux`` to
         :math:`c`.
 
-        >>> D = Double(Algebra.symmetric(3))
+        >>> from discopy.group import Symmetric
+        >>> D = Double(GroupAlgebra(Symmetric[3]))
         >>> sigma = Representation[D].anyon(1, {0: 1, 1: -1})
         >>> assert sigma == Dim(3) and sigma.is_module()
         """
-        if not isinstance(cls.algebra, Double):
-            raise ValueError(f"an anyon needs a Double, got {cls.algebra}")
-        double, n = cls.algebra, cls.algebra.base.dim
-        mult = double.base.mult.eval(dtype=complex).array.reshape(n, n, n)
-        table = np.argmax(mult.real, axis=2)
-        inverse = np.argmax(mult.real[:, :, 0], axis=1)
+        double = cls.algebra
+        if not isinstance(double, Double) \
+                or not isinstance(double.base, GroupAlgebra):
+            raise ValueError(
+                f"an anyon needs the Double of a GroupAlgebra, got {double}")
+        base, n = double.base, double.base.dim
+        table = np.array([[base.index[h >> g] for h in base.elements]
+                          for g in base.elements])
+        inverse = np.array([base.index[g.dagger()] for g in base.elements])
         conjugate = table[table, inverse[:, None]]
         orbit = sorted({int(c) for c in conjugate[:, flux]})
         transversal = {
@@ -918,11 +924,41 @@ class Representation[algebra](NamedGeneric, frobenius.Dim):
         return cls(Dim(dim), action)
 
     @classmethod
+    def permutation(cls, action: Action) -> Representation:
+        """
+        The permutation representation of a :class:`.group.Action`, i.e. the
+        action followed by the functor sending each permutation to its
+        matrix: :math:`e_g` sends the basis vector :math:`v_x` to
+        :math:`v_{g(x)}`. The :meth:`.group.Action.tensor` of actions is
+        the :meth:`tensor` of their permutation representations.
+
+        Parameters:
+            action : An action of the group of a :class:`GroupAlgebra`.
+
+        >>> from discopy.group import Cyclic
+        >>> H, a = GroupAlgebra(Cyclic[3]), Cyclic[3].action()
+        >>> V = Representation[H].permutation(a)
+        >>> assert V.is_module() and V == Dim(3)
+        >>> W = Representation[H].permutation(a.tensor(a))
+        >>> assert np.allclose(*(
+        ...     U.action.eval().array.reshape(-1) for U in (V @ V, W)))
+        """
+        H, n = cls.algebra, action.size
+        if not isinstance(H, GroupAlgebra) or H.group is not action.group:
+            raise TypeError(f"expected an action of the group of {H}")
+        array = np.zeros((H.dim, n, n))
+        for i, g in enumerate(H.elements):
+            array[i, range(n), list(action(g))] = 1
+        return cls(Dim(n), Box[complex](
+            'ρ', H.ty @ Dim(n), Dim(n), array.reshape(-1).tolist()))
+
+    @classmethod
     def direct_sum(cls, reps):
         """
         The direct sum of modules over one algebra, acting block-diagonally.
 
-        >>> D = Double(Algebra.cyclic(2))
+        >>> from discopy.group import Cyclic
+        >>> D = Double(GroupAlgebra(Cyclic[2]))
         >>> e = Representation[D].anyon(0, -1)
         >>> m = Representation[D].anyon(1, 1)
         >>> V = Representation[D].direct_sum([e, m])
@@ -984,8 +1020,9 @@ class Intertwiner[algebra](NamedGeneric, RibbonCategory):
     (see :meth:`Representation.tensor`), and draw the left-hand side as the
     :class:`.tensor.CMap` it contracts to:
 
+    >>> from discopy.group import Cyclic
     >>> import numpy as np
-    >>> D = Double(Algebra.cyclic(2))
+    >>> D = Double(GroupAlgebra(Cyclic[2]))
     >>> e = Representation[D].anyon(0, -1)
     >>> m = Representation[D].anyon(1, 1)
     >>> V = Representation[D].direct_sum([e, m])
@@ -1048,8 +1085,9 @@ class Intertwiner[algebra](NamedGeneric, RibbonCategory):
         trees of its modules, see :meth:`Representation.to_tree`. An
         unsubscripted intertwiner has no algebra in its tree.
 
+        >>> from discopy.group import Cyclic
         >>> from discopy.utils import dumps, loads
-        >>> D = Double(Algebra.cyclic(2))
+        >>> D = Double(GroupAlgebra(Cyclic[2]))
         >>> V = Representation[D].anyon(1, -1)
         >>> braid = Intertwiner[D].braid(V, V)
         >>> assert loads(dumps(braid)) == braid
@@ -1175,7 +1213,8 @@ class Intertwiner[algebra](NamedGeneric, RibbonCategory):
         :attr:`Algebra.ribbon_element` (its inverse, the action of :math:`v`,
         when ``is_dagger``), as twists have their dagger as inverse.
 
-        >>> D = Double(Algebra.cyclic(3))
+        >>> from discopy.group import Cyclic
+        >>> D = Double(GroupAlgebra(Cyclic[3]))
         >>> omega = np.exp(2j * np.pi / 3)
         >>> V = Representation[D].anyon(1, omega)
         >>> braid, cups, caps = (
@@ -1292,7 +1331,8 @@ class Intertwiner[algebra](NamedGeneric, RibbonCategory):
         fuses to a unique third, so :math:`\\mathrm{Hom}(V \\otimes V, V)`
         has dimension :math:`16`.
 
-        >>> D = Double(Algebra.cyclic(2))
+        >>> from discopy.group import Cyclic
+        >>> D = Double(GroupAlgebra(Cyclic[2]))
         >>> V = Representation[D].direct_sum(
         ...     [Representation[D].anyon(f, c) for f in (0, 1)
         ...      for c in (1, -1)])
@@ -1359,8 +1399,9 @@ class Functor(ribbon.Functor):
     acting through the module and closed by the pivotal cups and caps,
     which contracts to the same matrix — drawn as the :class:`.tensor.CMap`:
 
+    >>> from discopy.group import Cyclic
     >>> import numpy as np
-    >>> D = Double(Algebra.cyclic(2))
+    >>> D = Double(GroupAlgebra(Cyclic[2]))
     >>> e = Representation[D].anyon(0, -1)
     >>> m = Representation[D].anyon(1, 1)
     >>> V = Representation[D].direct_sum([e, m])

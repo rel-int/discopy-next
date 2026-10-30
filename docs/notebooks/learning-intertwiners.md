@@ -35,7 +35,8 @@ say something precise about quantum error correction.
 ```python {.marimo}
 import numpy as np
 from discopy.tensor import Dim, Id, Diagram
-from discopy.hopf import Algebra, Double, Representation, Intertwiner
+from discopy.group import Cyclic, Symmetric
+from discopy.hopf import GroupAlgebra, Double, Representation, Intertwiner
 ```
 
 ## The toric code and its four anyons
@@ -46,7 +47,7 @@ $m$ and their composite $\psi$ — are the four irreducible representations of
 $D(k[\mathbb{Z}/2])$, labelled by a flux sector and a character.
 
 ```python {.marimo}
-D2 = Double(Algebra.cyclic(2))
+D2 = Double(GroupAlgebra(Cyclic[2]))
 toric = [Representation[D2].anyon(f, c)
          for f, c in [(0, 1), (0, -1), (1, 1), (1, -1)]]
 toric_labels = ["1", "e", "m", "ψ"]
@@ -191,7 +192,7 @@ three-cycle flux with centraliser $\mathbb{Z}/3$. Their dimensions
 $1, 1, 2, 3, 3, 2, 2, 2$ square-sum to $|D(k[S_3])| = 36$.
 
 ```python {.marimo}
-D3 = Double(Algebra.symmetric(3))
+D3 = Double(GroupAlgebra(Symmetric[3]))
 permutation_matrices = {
     i: np.eye(3)[list(p)].T for i, p in enumerate(
         sorted(__import__('itertools').permutations(range(3))))}
