@@ -327,6 +327,12 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   `Diagram.from_perceval` reads a negative feed-forward offset `k` as `-k - 1`
   modes in between ([next#295]) and keeps a detector with nothing after it
   ([next#299]).
+- `optyx.core.path.Matrix`: `dagger` conjugates `scalar`, `dilate` keeps
+  `scalar` and multiplies `normalisation` in, and `eval` with no photons to
+  route reads the empty permanent, 1, as `npperm` now does;
+  `optyx.utils.misc.matrix_to_zw` takes a rectangular matrix, a symbolic one
+  with zeros and one with a zero row or column, and
+  `basis_vector_from_kets` rejects a negative index (part of [next#314]).
 - `optyx.classical.Xor(n)` is a parity for every `n`, its scalar
   `sqrt(2 ** (n - 1))`, and `BitControlledGate` of a diagram with no boxes
   discards its bit (part of [next#314]).
