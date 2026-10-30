@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 
 from discopy.optyx.core import zw
-from discopy.optyx.core.path import Matrix
+from discopy.optyx.core.path import Matrix, npperm
 
 
 def beam_splitter():
@@ -30,3 +30,25 @@ def test_probabilities_as_a_tensor(with_perceval):
     probabilities = matrix.prob(1, with_perceval=with_perceval, as_tensor=True)
     amplitudes = matrix.eval(1, as_tensor=True)
     assert np.allclose(probabilities.array, np.abs(amplitudes.array) ** 2)
+
+
+def test_permanent_of_the_empty_matrix_is_one():
+    assert npperm(np.zeros((0, 0))) == 1
+
+
+def test_identity_with_no_photons_evaluates():
+    assert np.allclose(zw.Id(1).to_path().eval().array, [[1]])
+
+
+def test_dagger_conjugates_the_scalar():
+    matrix = Matrix(np.eye(1), 1, 1, normalisation=2j, scalar=1j)
+    dagger = matrix.dagger()
+    assert (dagger.normalisation, dagger.scalar) == (-2j, -1j)
+    assert np.allclose(dagger.eval(1).array, matrix.eval(1).array.conj().T)
+
+
+def test_dilate_keeps_the_scalar_and_normalisation():
+    matrix = Matrix(beam_splitter().array, 2, 2, normalisation=2, scalar=1j)
+    for n_photons in range(3):
+        assert np.allclose(matrix.dilate().eval(n_photons).array,
+                           matrix.eval(n_photons).array)
