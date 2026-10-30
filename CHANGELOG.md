@@ -255,6 +255,10 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Fixed
 
+- Docs: the architecture diagram shows the new syntax modules, the menu names
+  `spacial`, `kleisli` and `monad` without their prefix, `feedback` states each
+  law once with its trace under it, and the notebooks link the API docs
+  relatively ([next#411]).
 - `optyx.compiler`: a `Fusion` compared to anything but a fusion is unequal
   rather than an `AttributeError`; `path_cover.find_min_path_cover` covers a
   graph with one node, an edgeless graph and the empty graph, searching up to
