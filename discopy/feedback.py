@@ -89,10 +89,11 @@ and a left trace with ``left=True``:
 
 The laws are stated once on :class:`discopy.abc.FeedbackCategory`, those of
 a traced category being the same laws with the delay the identity, plus
-yanking from :class:`discopy.abc.TracedCategory`. Each law below is drawn
-for feedback, where it holds up to a functor into streams, then checked on
-the nose for the trace of symmetric diagrams: equality of planar traced
-diagrams is not implemented.
+yanking from :class:`discopy.abc.TracedCategory`. Under each law, feedback
+comes first, checked on the nose where it can be and otherwise drawn and
+checked up to a functor into streams, then the trace, checked on the nose
+for symmetric diagrams: equality of planar traced diagrams is not
+implemented.
 
 >>> from discopy import stream, symmetric
 >>> F0 = Functor(
