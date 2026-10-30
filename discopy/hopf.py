@@ -608,7 +608,7 @@ class GroupAlgebra(Algebra):
         >>> from discopy.utils import dumps, loads
         >>> from discopy.group import Cyclic
         >>> H = GroupAlgebra(Cyclic[2])
-        >>> assert loads(dumps(H)) == H
+        >>> assert loads(dumps(H)) == H and type(loads(dumps(H))) is Algebra
         """
         return Algebra(*self.generators).to_tree()
 
