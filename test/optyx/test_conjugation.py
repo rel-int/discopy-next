@@ -101,4 +101,3 @@ def test_a_gate_undoes_its_dagger(gate):
 def test_the_conjugate_of_a_gate_conjugates_its_matrix(gate):
     assert np.allclose(
         path_array(gate.conjugate()), np.conjugate(path_array(gate)))
-
