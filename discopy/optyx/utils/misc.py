@@ -33,56 +33,30 @@ def _build_w_layer(n_nonzero_counts, dagger=False):
 def matrix_to_zw(U):
     # pylint: disable=import-outside-toplevel
     from discopy.optyx.core import zw
-    from sympy import Expr
 
-    n = U.shape[0]
-    diagram = zw.Id(0)
-
-    # initial W layer
-    if isinstance(U[0, 0], Expr):
-        n_cols_nonzero = [U.shape[1]]*n
-    else:
-        n_cols_nonzero = (U != 0).sum(axis=1)
-    diagram @= _build_w_layer(n_cols_nonzero, dagger=False)
+    nonzero = np.asarray(U != 0, dtype=bool)
+    diagram = _build_w_layer(nonzero.sum(axis=1), dagger=False)
 
     # endomorphism layer
     endo_layer = zw.Id(0)
-    rows, cols = np.nonzero(U)
+    rows, cols = np.nonzero(nonzero)
     for r, c in zip(rows, cols):
         endo_layer @= zw.Endo(U[r, c])
 
     diagram >>= endo_layer
 
-    # permutation
-    nonzero_indices = np.nonzero(U)
-    row_indices = nonzero_indices[0]
-    col_indices = nonzero_indices[1]
-    sorted_indices = np.lexsort((row_indices, col_indices))
-    sorted_rows = row_indices[sorted_indices]
-    sorted_cols = col_indices[sorted_indices]
+    # permutation: the position of each nonzero entry, read row by row,
+    # sent to its position read column by column
+    sorted_indices = np.lexsort((rows, cols))
+    flat = U.shape[1] * rows[sorted_indices] + cols[sorted_indices]
+    nonzero_before = np.concatenate([[0], np.cumsum(nonzero.flatten())])
+    permutation = [int(nonzero_before[i]) for i in flat]
 
-    swap_list = []
-    for r, c in zip(sorted_rows, sorted_cols):
-        swap_list.append(int(n * r + c))
-
-    if not isinstance(U[0, 0], Expr):
-        n_s_output_flat = (U != 0).flatten().astype(int)
-        adjusted_swap_list = []
-        for idx in swap_list:
-            sum_missing = np.abs(np.array(n_s_output_flat)[:idx] - 1).sum()
-            adjusted_swap_list.append(int(idx - sum_missing))
-    else:
-        adjusted_swap_list = swap_list
-
-    if adjusted_swap_list:
-        diagram = diagram.permute(*adjusted_swap_list)
+    if permutation:
+        diagram = diagram.permute(*permutation)
 
     # W-dagger layer
-    if isinstance(U[0, 0], Expr):
-        n_rows_nonzero = [U.shape[0]]*U.shape[1]
-    else:
-        n_rows_nonzero = (U != 0).sum(axis=0)
-    diagram >>= _build_w_layer(n_rows_nonzero, dagger=True)
+    diagram >>= _build_w_layer(nonzero.sum(axis=0), dagger=True)
 
     return diagram
 
@@ -145,9 +119,9 @@ def basis_vector_from_kets(
     - max_index_sizes specifies the maximum index size (not the maximum index)
     """
 
-    if any(i >= j for i, j in zip(indices, max_index_sizes)):
+    if any(not 0 <= i < j for i, j in zip(indices, max_index_sizes)):
         raise ValueError(
-            "Each index must be smaller than "
+            "Each index must be non-negative and smaller than "
             "the corresponding max index size"
         )
 

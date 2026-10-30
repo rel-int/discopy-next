@@ -148,6 +148,8 @@ def npperm(matrix):
     from https://github.com/scipy/scipy/issues/7151.
     """
     n = matrix.shape[0]
+    if not n:
+        return 1
     d = np.ones(n)
     j = 0
     s = 1
@@ -295,7 +297,7 @@ class Matrix(underlying.Matrix):
             self.selections,
             self.creations,
             self.normalisation.conjugate(),
-            self.scalar,
+            self.scalar.conjugate(),
         )
 
     def __repr__(self):
@@ -347,7 +349,8 @@ class Matrix(underlying.Matrix):
             self.cod,
             creations,
             selections,
-            normalisation=s,
+            normalisation=s * self.normalisation,
+            scalar=self.scalar,
         )
 
     def eval(
@@ -366,22 +369,9 @@ class Matrix(underlying.Matrix):
             for j, open_selections in enumerate(cod_basis):
                 creations = open_creations + self.creations
                 selections = open_selections + self.selections
-                matrix = np.stack(
-                    [
-                        self.array[:, m]
-                        for m, n in enumerate(selections)
-                        for _ in range(n)
-                    ],
-                    axis=1,
-                )
-                matrix = np.stack(
-                    [
-                        matrix[m]
-                        for m, n in enumerate(creations)
-                        for _ in range(n)
-                    ],
-                    axis=0,
-                )
+                matrix = self.array[np.ix_(
+                    [m for m, n in enumerate(creations) for _ in range(n)],
+                    [m for m, n in enumerate(selections) for _ in range(n)])]
                 divisor = np.sqrt(
                     np.prod([factorial(n) for n in creations + selections])
                 )

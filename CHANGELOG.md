@@ -327,6 +327,11 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   `Diagram.from_perceval` reads a negative feed-forward offset `k` as `-k - 1`
   modes in between ([next#295]) and keeps a detector with nothing after it
   ([next#299]).
+- `optyx.core.path.Matrix`: `dagger` conjugates `scalar`, `dilate` keeps
+  `scalar` and `normalisation`, and `eval` with no photons to route reads the
+  empty permanent, 1, as `npperm` now does; `optyx.utils.misc.matrix_to_zw`
+  takes a rectangular matrix and a symbolic one with zeros, and
+  `basis_vector_from_kets` rejects a negative index (part of [next#314]).
 - `Hypergraph`: its hash, `simplify`, `rotate`, and `to_diagram` on
   non-self-dual, `Nat` and `Dim` types ([#324], [#387], [#393], [#622],
   [#719]).
@@ -743,6 +748,7 @@ for the changelog of `1.2.1` and earlier.
 [next#302]: https://github.com/rel-int/discopy-next/pull/302
 [next#310]: https://github.com/rel-int/discopy-next/pull/310
 [next#313]: https://github.com/rel-int/discopy-next/issues/313
+[next#314]: https://github.com/rel-int/discopy-next/issues/314
 [next#316]: https://github.com/rel-int/discopy-next/pull/316
 [next#320]: https://github.com/rel-int/discopy-next/pull/320
 [next#323]: https://github.com/rel-int/discopy-next/issues/323
