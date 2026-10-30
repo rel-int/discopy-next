@@ -65,24 +65,36 @@ of the following shape:
 .. image:: /_static/feedback/feedback-operator.svg
     :align: center
 
-The laws are stated once on :class:`discopy.abc.FeedbackCategory`:
+A trace is a feedback whose memory is not delayed, i.e. a feedback in a
+category whose delay is the identity. It is a right trace by default:
 
-Vanishing
-=========
+>>> z = Ty('z')
+>>> g = Box("g", x @ z, y @ z)
+>>> assert g.trace() == g.feedback() == g.feedback(mem=z) == Trace(g)
+>>> assert str(g.trace()) == "Trace(g)"
+>>> Equation(g, g.trace(), symbol="$\\\\mapsto$").draw(
+...     doctest='docs/_static/traced/right-trace.svg')
 
->>> assert Box('f', x, y).feedback(mem=Ty()) == Box('f', x, y)
+.. image:: /_static/traced/right-trace.svg
+    :align: center
 
-Joining
-=======
+and a left trace with ``left=True``:
 
->>> f = Box('f', x @ (m @ m).delay(), y @ m @ m)
->>> assert f.feedback(mem=m @ m) == f.feedback().feedback()
+>>> h = Box("h", z @ x, z @ y)
+>>> Equation(h, h.trace(left=True), symbol="$\\\\mapsto$").draw(
+...     doctest='docs/_static/traced/left-trace.svg')
 
-Strength
-========
-This can only be checked up to a functor into streams.
+.. image:: /_static/traced/left-trace.svg
+    :align: center
 
->>> from discopy import stream
+The laws are stated once on :class:`discopy.abc.FeedbackCategory`, those of
+a traced category being the same laws with the delay the identity, plus
+yanking from :class:`discopy.abc.TracedCategory`. Each law below is drawn
+for feedback, where it holds up to a functor into streams, then checked on
+the nose for the trace of symmetric diagrams: equality of planar traced
+diagrams is not implemented.
+
+>>> from discopy import stream, symmetric
 >>> F0 = Functor(
 ...     lambda x: stream.Ty.sequence(x.generator.name), cod=stream.Stream)
 >>> F = Functor(
@@ -90,6 +102,30 @@ This can only be checked up to a functor into streams.
 ...     cod=stream.Stream)
 >>> all_eq = lambda xs: len(set(xs)) == 1
 >>> eq_up_to_F = lambda *fs, n=2: all_eq(F(f).unroll(2).now for f in fs)
+
+>>> s = symmetric.Ty('s')
+>>> t, k = symmetric.Box('t', s @ s, s @ s), symmetric.Box('k', s, s)
+
+Vanishing
+=========
+Feeding back the unit does nothing.
+
+>>> assert Box('f', x, y).feedback(mem=Ty()) == Box('f', x, y)
+>>> assert t.trace(n=0) == t == t.trace(n=0, left=True)
+
+Joining
+=======
+Feeding back a tensor is feeding back its factors in turn.
+
+>>> f = Box('f', x @ (m @ m).delay(), y @ m @ m)
+>>> assert f.feedback(mem=m @ m) == f.feedback().feedback()
+>>> assert t.trace(n=2) == t.trace().trace()
+>>> assert t.trace(n=2, left=True) == t.trace(left=True).trace(left=True)
+
+Strength
+========
+Feedback commutes with tensoring a morphism on the side, also called
+superposing.
 
 >>> f, g = Box('f', x @ m.delay(), y @ m), Box('g', x, y)
 >>> strength = Equation(g @ f.feedback(), (g @ f).feedback())
@@ -100,11 +136,40 @@ This can only be checked up to a functor into streams.
 .. image:: /_static/feedback/strength.svg
     :align: center
 
+>>> assert symmetric.Equation((s @ t).trace(), s @ t.trace())
+>>> assert symmetric.Equation(
+...     (t @ s).trace(left=True), t.trace(left=True) @ s)
+
+Tightening
+==========
+Feedback is natural in its domain and its codomain.
+
+>>> tightening_left = symmetric.Equation(
+...     (s @ k >> t >> s @ k).trace(left=True),
+...     k >> t.trace(left=True) >> k)
+>>> tightening_left.draw(
+...     doctest='docs/_static/traced/tightening-left.svg', wire_labels=False)
+
+.. image:: /_static/traced/tightening-left.svg
+    :align: center
+
+>>> tightening_right = symmetric.Equation(
+...     (k @ s >> t >> k @ s).trace(),
+...     k >> t.trace() >> k)
+>>> tightening_right.draw(
+...     doctest='docs/_static/traced/tightening-right.svg',
+...     wire_labels=False)
+
+.. image:: /_static/traced/tightening-right.svg
+    :align: center
+
+>>> assert tightening_left and tightening_right
+
 Sliding
 =======
-This can only be checked up to extensional equivalence of streams.
+A morphism on the memory slides along the feedback, delayed. For feedback,
+this can only be checked up to extensional equivalence of streams.
 
->>> from discopy import symmetric
 >>> n = Ty("n")
 >>> h = Box('h', m, n)  # assume h is an isomorphism
 >>> f = Box('f', x @ n.d, y @ m)
@@ -128,54 +193,37 @@ This can only be checked up to extensional equivalence of streams.
 .. image:: /_static/feedback/slide-unroll.svg
     :align: center
 
-Traces
-------
+For a trace, the delay is the identity and the morphism slides on the nose:
 
-A monoidal category is right-traced when it comes with an operator of shape:
+>>> sliding_left = symmetric.Equation(
+...     (t >> k @ s).trace(left=True),
+...     (k @ s >> t).trace(left=True))
+>>> sliding_left.draw(
+...     doctest='docs/_static/traced/sliding-left.svg', wire_labels=False)
 
->>> x, y, z = map(Ty, "xyz")
->>> f = Box("f", x @ z, y @ z)
->>> Equation(f, f.trace(), symbol="$\\\\mapsto$").draw(
-...     doctest='docs/_static/traced/right-trace.svg')
+.. image:: /_static/traced/sliding-left.svg
+    :align: center
 
-It is left-traced when it comes with an operator of the following shape:
+>>> sliding_right = symmetric.Equation(
+...     (t >> s @ k).trace(),
+...     (s @ k >> t).trace())
+>>> sliding_right.draw(
+...     doctest='docs/_static/traced/sliding-right.svg', wire_labels=False)
 
->>> g = Box("g", z @ x, z @ y)
->>> Equation(g, g.trace(left=True), symbol="$\\\\mapsto$").draw(
-...     doctest='docs/_static/traced/left-trace.svg')
+.. image:: /_static/traced/sliding-right.svg
+    :align: center
 
-A trace is a feedback whose memory is not delayed, i.e. a feedback in a
-category whose delay is the identity:
-
->>> assert f.trace() == f.feedback() == f.feedback(mem=z) == Trace(f)
->>> assert str(f.trace()) == "Trace(f)"
-
-These are subjects to the axioms of feedback with yanking on top, the laws of
-a traced category when it is braided. Note however that at the moment
-equality of planar traced diagrams is not implemented, only symmetric traced.
-
->>> from discopy.symmetric import Ty, Box, Swap, Id, Equation
->>> x = Ty('x')
->>> f, g = Box('f', x @ x, x @ x), Box('g', x, x)
-
-Vanishing
-=========
-
->>> assert f.trace(n=0) == f == f.trace(n=0, left=True)
->>> assert f.trace(n=2) == f.trace().trace()
->>> assert f.trace(n=2, left=True) == f.trace(left=True).trace(left=True)
-
-Superposing
-===========
-
->>> assert Equation((x @ f).trace(), x @ f.trace())
->>> assert Equation((f @ x).trace(left=True), f.trace(left=True) @ x)
+>>> assert sliding_left and sliding_right
 
 Yanking
 =======
+The one law of a traced category on top of feedback: the trace of the swap
+of an object with itself is its identity.
 
->>> yanking = Equation(
-...     Swap(x, x).trace(left=True), Id(x), Swap(x, x).trace())
+>>> yanking = symmetric.Equation(
+...     symmetric.Swap(s, s).trace(left=True),
+...     symmetric.Id(s),
+...     symmetric.Swap(s, s).trace())
 >>> yanking.draw(
 ...     doctest='docs/_static/traced/yanking.svg',
 ...     wire_labels=False, figsize=(4, 1))
@@ -185,53 +233,6 @@ Yanking
 
 >>> assert yanking
 
-Naturality
-==========
-
->>> tightening_left = Equation(
-...     (x @ g >> f >> x @ g).trace(left=True),
-...     g >> f.trace(left=True) >> g)
->>> tightening_left.draw(
-...     doctest='docs/_static/traced/tightening-left.svg', wire_labels=False)
-
-.. image:: /_static/traced/tightening-left.svg
-    :align: center
-
->>> tightening_right = Equation(
-...     (g @ x >> f >> g @ x).trace(),
-...     g >> f.trace() >> g)
->>> tightening_right.draw(
-...     doctest='docs/_static/traced/tightening-right.svg',
-...     wire_labels=False)
-
-.. image:: /_static/traced/tightening-right.svg
-    :align: center
-
->>> assert tightening_left and tightening_right
-
-Dinaturality
-============
-
->>> sliding_left = Equation(
-...     (f >> g @ x).trace(left=True),
-...     (g @ x >> f).trace(left=True))
->>> sliding_left.draw(
-...     doctest='docs/_static/traced/sliding-left.svg', wire_labels=False)
-
-.. image:: /_static/traced/sliding-left.svg
-    :align: center
-
->>> sliding_right = Equation(
-...     (f >> x @ g).trace(),
-...     (x @ g >> f).trace())
->>> sliding_right.draw(
-...     doctest='docs/_static/traced/sliding-right.svg', wire_labels=False)
-
-.. image:: /_static/traced/sliding-right.svg
-    :align: center
-
->>> assert sliding_left and sliding_right
-
 Note
 ----
 We also implement endofunctors :class:`Head` and :class:`Tail` together with an
@@ -239,8 +240,6 @@ isomorphism :class:`FollowedBy` between `x` and `x.head @ x.tail.delay()`.
 
 This satisfies the following equations:
 
->>> from discopy.feedback import Ty
->>> x = Ty('x')
 >>> assert x.head.head == x.head
 >>> assert x.head.tail == Ty()
 >>> assert x.delay().head == Ty()
