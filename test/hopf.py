@@ -6,8 +6,9 @@ from pytest import raises
 from discopy import rigid, ribbon, tensor
 from discopy.utils import dumps, loads
 from discopy.tensor import Dim, Box
+from discopy.group import Cyclic, Symmetric, Product, Wreath
 from discopy.hopf import (
-    Algebra, Double, Representation, Intertwiner, Functor)
+    Algebra, GroupAlgebra, Double, Representation, Intertwiner, Functor)
 
 
 circle = lambda x: ribbon.Cap(x, x.r) >> ribbon.Cup(x, x.r)
@@ -16,7 +17,7 @@ hopf_link = lambda x: (ribbon.Braid(x, x) >> ribbon.Braid(x, x)).trace(n=2)
 
 
 def double_and_module():
-    D = Double(Algebra.cyclic(2))
+    D = Double(GroupAlgebra(Cyclic[2]))
     e, m = Representation[D].anyon(0, -1), Representation[D].anyon(1, 1)
     return D, Representation[D].direct_sum([e, m])
 
@@ -28,21 +29,23 @@ sweedler_double = Double(Algebra.sweedler())
 
 def test_group_algebra_is_valid():
     for n in [1, 2, 3, 5]:
-        assert Algebra.cyclic(n).is_valid()
-    table = [[0, 1, 2, 3], [1, 0, 3, 2], [2, 3, 0, 1], [3, 2, 1, 0]]
-    assert Algebra.group_algebra(table).is_valid()
+        assert GroupAlgebra(Cyclic[n]).is_valid()
+    klein = Product[Cyclic[2], Cyclic[2]]
+    cube = Wreath[Cyclic[2], Symmetric[2]]
+    assert GroupAlgebra(klein).is_valid() and GroupAlgebra(cube).is_valid()
+    assert not GroupAlgebra(cube).is_commutative()
 
 
 def test_double_is_quasitriangular_hopf_algebra():
     """is_valid checks quasitriangularity whenever there is an R-matrix."""
-    D = Double(Algebra.cyclic(2))
+    D = Double(GroupAlgebra(Cyclic[2]))
     assert D.dim == 4
     assert D.is_valid()
 
 
 def test_commutativity_properties():
     """D(Z/2) is commutative and cocommutative, Sweedler's H4 is neither."""
-    D = Double(Algebra.cyclic(2))
+    D = Double(GroupAlgebra(Cyclic[2]))
     assert D.is_commutative() and D.is_cocommutative()
     H4 = Algebra.sweedler()
     assert not H4.is_commutative() and not H4.is_cocommutative()
@@ -73,7 +76,7 @@ def test_double_antipode_inverse():
     """S^-1 = u^-1 S(x) u for the Drinfeld element u = S(R'')R', with
     u^-1 = R''S^2(R'), also when S^2 != id, assembled from the generator
     matrices."""
-    for base in [Algebra.cyclic(2), Algebra.sweedler()]:
+    for base in [GroupAlgebra(Cyclic[2]), Algebra.sweedler()]:
         D, n = Double(base), base.dim ** 2
         S = D.antipode.eval(dtype=complex).array.reshape(n, n)
         R = D.R.eval(dtype=complex).array.reshape(n, n)
@@ -88,14 +91,14 @@ def test_double_antipode_inverse():
 def test_double_is_fine_grained():
     """Every box in the double's generators acts on the base object, so no
     structure tensor of the doubled dimension is ever materialised."""
-    D = Double(Algebra.cyclic(2))
+    D = Double(GroupAlgebra(Cyclic[2]))
     for gen in D.generators:
         for box in gen.boxes:
             assert set(box.dom.inside) <= {2} and set(box.cod.inside) <= {2}
 
 
 def test_no_r_matrix_paths():
-    Z2 = Algebra.cyclic(2)
+    Z2 = GroupAlgebra(Cyclic[2])
     noR = Algebra(
         Z2.unit, Z2.counit, Z2.mult, Z2.comult, Z2.antipode)
     assert noR.R is None
@@ -122,7 +125,7 @@ def test_no_r_matrix_paths():
 
 
 def test_non_invertible_antipode_is_flagged():
-    Z2 = Algebra.cyclic(2)
+    Z2 = GroupAlgebra(Cyclic[2])
     zero = Box('S', Z2.ty, Z2.ty, np.zeros((2, 2)))
     H = Algebra(Z2.unit, Z2.counit, Z2.mult, Z2.comult, zero)
     try:
@@ -134,8 +137,8 @@ def test_non_invertible_antipode_is_flagged():
 
 def test_class_generic_over_the_algebra():
     """The algebra lives on the class, parametrisation caches by equality."""
-    D = Double(Algebra.cyclic(2))
-    assert Representation[D] is Representation[Double(Algebra.cyclic(2))]
+    D = Double(GroupAlgebra(Cyclic[2]))
+    assert Representation[D] is Representation[Double(GroupAlgebra(Cyclic[2]))]
     assert Representation[D].algebra == D
     V = Representation[D].regular()
     assert V.algebra == D
@@ -153,7 +156,7 @@ def test_representation_is_a_dim():
     assert trivial == Dim(2) and trivial.is_module()
     assert hash(trivial) == hash(Dim(2))
     from discopy import (  # noqa: F401  (used by eval)
-        hopf, compact, frobenius, tensor)
+        group, hopf, compact, frobenius, tensor)
     assert eval(repr(trivial)) == trivial
 
 
@@ -177,7 +180,7 @@ def test_representation_init_checks():
 
 
 def test_anyon_needs_a_double():
-    Z2 = Algebra.cyclic(2)
+    Z2 = GroupAlgebra(Cyclic[2])
     try:
         Representation[Z2].anyon(0, 1)
         assert False
@@ -186,8 +189,8 @@ def test_anyon_needs_a_double():
 
 
 def test_repr_is_transparent():
-    from discopy import hopf, tensor  # noqa: F401  (used by eval)
-    H = Algebra.cyclic(2)
+    from discopy import group, hopf, tensor  # noqa: F401  (used by eval)
+    H = GroupAlgebra(Cyclic[2])
     assert eval(repr(H)) == H
     D = Double(H)
     assert eval(repr(D)) == D
@@ -199,7 +202,8 @@ def test_intertwiner_is_a_network_between_modules():
     """#145: an intertwiner is its own factory, holding the tensor network
     between the spaces of its modules, and its trees carry the generators of
     its algebra and the action of each module."""
-    from discopy import hopf, tensor, frobenius  # noqa: F401  (used by eval)
+    from discopy import (  # noqa: F401  (used by eval)
+        group, hopf, tensor, frobenius)
     D, V = double_and_module()
     braid = Intertwiner[D].braid(V, V)
     for composite in [braid >> braid, braid @ braid, braid.dagger(),
@@ -307,7 +311,7 @@ def test_left_and_right_duals_differ():
     left = W.l.action.eval(dtype=complex).array
     right = W.r.action.eval(dtype=complex).array
     assert not np.allclose(left, right)
-    Z2 = Algebra.cyclic(2)
+    Z2 = GroupAlgebra(Cyclic[2])
     U = Representation[Z2].regular()
     assert np.allclose(U.l.action.eval(dtype=complex).array,
                        U.r.action.eval(dtype=complex).array)
@@ -327,7 +331,7 @@ def test_twist_is_the_trace_of_the_braid():
     inverse, as every twist of D(Z/2) is, e.g. minus one on the fermion,
     and on their direct sum it is diagonal."""
     omega = np.exp(2j * np.pi / 3)
-    D2, D3 = Double(Algebra.cyclic(2)), Double(Algebra.cyclic(3))
+    D2, D3 = Double(GroupAlgebra(Cyclic[2])), Double(GroupAlgebra(Cyclic[3]))
     x = ribbon.Ty('x')
     for D, flux, charge, theta in [
             (D3, 1, omega, omega), (D3, 2, omega, omega ** 2), (D2, 1, -1, -1)]:
@@ -364,7 +368,7 @@ def test_twist_dagger_is_its_inverse():
 
 
 def test_is_module_rejects_non_module():
-    Z2 = Algebra.cyclic(2)
+    Z2 = GroupAlgebra(Cyclic[2])
     zero = Box('bad', Z2.ty @ Dim(2), Dim(2), np.zeros((2, 2, 2)))
     assert not Representation[Z2](Dim(2), zero).is_module()
 
@@ -398,7 +402,7 @@ def test_nontrivial_link_invariant():
 
 def test_two_colour_mutual_braiding():
     """The e and m anyons of the toric code have mutual statistics -1."""
-    D = Double(Algebra.cyclic(2))
+    D = Double(GroupAlgebra(Cyclic[2]))
     e = Representation[D].anyon(0, -1)
     m = Representation[D].anyon(1, 1)
     xe, xm = ribbon.Ty('e'), ribbon.Ty('m')
@@ -435,7 +439,7 @@ def test_twist_in_diagram():
     """The functor reads the twist of a product of D(Z/3) anyons off the
     twist of each and their double braiding, which is not an involution:
     it is the twist of the product module."""
-    D = Double(Algebra.cyclic(3))
+    D = Double(GroupAlgebra(Cyclic[3]))
     omega = np.exp(2j * np.pi / 3)
     a, b = Representation[D].anyon(1, omega), Representation[D].anyon(0, omega)
     x, y = ribbon.Ty('x'), ribbon.Ty('y')
@@ -448,7 +452,7 @@ def test_twist_in_diagram():
 def test_rotated_braid_is_transposed_braid():
     """The half-turn rotation of either crossing is its transpose, which
     keeps the same strand over."""
-    D = Double(Algebra.cyclic(3))
+    D = Double(GroupAlgebra(Cyclic[3]))
     omega = np.exp(2j * np.pi / 3)
     a, b = Representation[D].anyon(1, omega), Representation[D].anyon(2, omega)
     x, y = ribbon.Ty('x'), ribbon.Ty('y')
@@ -467,14 +471,14 @@ def test_taft_algebra():
 
 def test_drinfeld_element():
     """u = m(S (x) 1)R_21 conjugates the square of the antipode."""
-    D = Double(Algebra.cyclic(2))
+    D = Double(GroupAlgebra(Cyclic[2]))
     n = D.dim
     u = D.drinfeld_element.eval(dtype=complex).array.reshape(n)
     S = D.antipode.eval(dtype=complex).array.reshape(n, n)
     mult = D.mult.eval(dtype=complex).array.reshape(n, n, n)
     assert np.allclose(np.einsum('xw,g,wgz->xz', S @ S, u, mult),
                        np.einsum('g,gxz->xz', u, mult), atol=1e-6)
-    Z2 = Algebra.cyclic(2)
+    Z2 = GroupAlgebra(Cyclic[2])
     noR = Algebra(Z2.unit, Z2.counit, Z2.mult, Z2.comult, Z2.antipode)
     try:
         noR.drinfeld_element
@@ -484,7 +488,7 @@ def test_drinfeld_element():
 
 
 def double_and_four_anyons():
-    D = Double(Algebra.cyclic(2))
+    D = Double(GroupAlgebra(Cyclic[2]))
     anyons = [Representation[D].anyon(f, c) for f in (0, 1) for c in (1, -1)]
     return D, anyons, Representation[D].direct_sum(anyons)
 
@@ -529,7 +533,7 @@ def test_chart_zero_and_no_algebra():
 def test_pivotal_element():
     """The pivot is grouplike and conjugates the square of the antipode;
     it is the unit exactly when S^2 = 1."""
-    Z2 = Algebra.cyclic(2)
+    Z2 = GroupAlgebra(Cyclic[2])
     assert Z2.pivotal_element == Z2.unit
     assert Double(Z2).pivotal_element == Double(Z2).unit
     for H in [Algebra.sweedler(), taft, sweedler_double]:
@@ -545,7 +549,7 @@ def test_pivotal_element():
         assert np.allclose(np.einsum('i,ipq->pq', g, comult),
                            np.outer(g, g), atol=1e-6)
         assert np.isclose(counit @ g, 1)
-    Z2 = Algebra.cyclic(2)
+    Z2 = GroupAlgebra(Cyclic[2])
     scale = Box('S', Z2.ty, Z2.ty, np.diag([1, 2]))
     doctored = Algebra(Z2.unit, Z2.counit, Z2.mult, Z2.comult, scale)
     try:
@@ -658,7 +662,7 @@ def test_chart_braid_action():
 
 
 def double_of_s3_and_anyons():
-    D = Double(Algebra.symmetric(3))
+    D = Double(GroupAlgebra(Symmetric[3]))
     perms = sorted(permutations(range(3)))
     matrices = {i: np.eye(3)[list(p)].T for i, p in enumerate(perms)}
     omega = np.exp(2j * np.pi / 3)
@@ -676,8 +680,36 @@ def double_of_s3_and_anyons():
     return D, anyons
 
 
+def test_anyon_needs_the_double_of_a_group_algebra():
+    with raises(ValueError):
+        Representation[sweedler_double].anyon(0, 1)
+
+
+def test_permutation_representation():
+    H, G = GroupAlgebra(Symmetric[3]), Wreath[Cyclic[2], Symmetric[2]]
+    with raises(TypeError):
+        Representation[H].permutation(G.action())
+    with raises(TypeError):
+        Representation[Algebra.sweedler()].permutation(G.action())
+    a = Symmetric[3].action()
+    V = Representation[H].permutation(a)
+    assert V.is_module() and (V @ V @ V).is_module()
+
+
+def test_burnside_lemma():
+    """The number of orbits of an action is the average trace of the
+    permutation matrices, i.e. the trace of the projection on invariants."""
+    G = Wreath[Cyclic[2], Symmetric[2]]
+    H, a = GroupAlgebra(G), G.action()
+    for action in [a, a.tensor(a), G.action(power=True)]:
+        V = Representation[H].permutation(action)
+        rho = V.action.eval().array.reshape(H.dim, action.size, action.size)
+        traces = np.einsum('gxx->g', rho)
+        assert np.isclose(traces.sum() / G.order(), len(action.orbits()))
+
+
 def test_symmetric_group_algebra():
-    S3 = Algebra.symmetric(3)
+    S3 = GroupAlgebra(Symmetric[3])
     assert S3.is_valid() and S3.dim == 6 and not S3.is_commutative()
 
 
