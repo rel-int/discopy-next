@@ -27,16 +27,30 @@ def find_min_path_cover(g: nx.Graph) -> list[list[int]]:
     >>> g = nx.Graph([(0, 1), (1, 2), (1, 4), (4, 3), (4, 5)])
     >>> paths = find_min_path_cover(g)
     >>> assert len(paths) == 2
+
+    # One path per vertex when there is no edge to follow
+    >>> g = nx.Graph()
+    >>> g.add_nodes_from([0, 1, 2])
+    >>> assert find_min_path_cover(g) == [[0], [1], [2]]
+
+    # A graph with one node is covered by one path, the empty graph by none
+    >>> g = nx.Graph()
+    >>> g.add_node(0)
+    >>> assert find_min_path_cover(g) == [[0]]
+    >>> assert find_min_path_cover(nx.Graph()) == []
     """
-    for i in range(1, g.number_of_nodes()):
+    if not g.number_of_nodes():
+        return []
+
+    # In the worst case each path covers a single vertex, so a cover with as
+    # many paths as the graph has nodes always exists.
+    for i in range(1, g.number_of_nodes() + 1):
         paths: list[list[int]] = []
 
         path_cover = find_path_cover(g, paths, i)
         if path_cover is not None:
             return path_cover
 
-    # This part is unreachable since in the worst case, we will return the
-    # path cover where each path covers only a single vertex.
     raise ValueError("unreachable!")
 
 

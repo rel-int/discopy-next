@@ -62,32 +62,41 @@ class SemmDecompiler:
         self.delayed_fusions = {}
         self.fusions = []
 
+    def current_node(self) -> int:
+        """The node the machine is operating on, i.e. the one the last
+        ``next_node`` progressed to"""
+        if not self.path:
+            raise ValidationError(
+                "no node to operate on, the machine is at no node yet"
+            )
+
+        return self.path[-1]
+
     def measure(self, m: Measurement):
         """Measures the incoming photon"""
+        node = self.current_node()
         self.time += 1
 
-        if self.__node_has_been_measured(self.path[-1]):
-            raise ValidationError(f"already measured node {self.path[-1]}")
-
-        self.__record_measurement(self.time, self.path[-1], m)
+        self.__record_measurement(self.time, node, m)
 
     def __record_measurement(self, time: int, node: int, m: Measurement):
+        if self.__node_has_been_measured(node):
+            raise ValidationError(f"already measured node {node}")
+
         measurements = self.measurements.get(time, [])
         measurements.append((node, m))
         self.measurements[time] = measurements
 
+    # A measurement is recorded at the time its photon is measured, which a
+    # delay puts in the future, so every time is read and not only the past.
     def __node_has_been_measured(self, node: int):
-        for t in reversed(range(1, self.time + 1)):
-            if t not in self.measurements:
-                continue
-
-            for measurement in self.measurements[t]:
-                if measurement[0] == node:
-                    return True
-        return False
+        return any(measured == node
+                   for measurements in self.measurements.values()
+                   for measured, _ in measurements)
 
     def fuse(self, fusion_type: str):
         """Fuses the incoming node with an incoming delayed photon"""
+        node = self.current_node()
         self.time += 1
 
         if self.time not in self.delayed_fusions:
@@ -95,32 +104,33 @@ class SemmDecompiler:
                 f"no photon exiting delay loop at time {self.time}"
             )
 
-        # The node the delayed photon belongs to
-        fusion_node = self.delayed_fusions[self.time]
+        # The node the delayed photon belongs to, which leaves the loop here
+        fusion_node = self.delayed_fusions.pop(self.time)
 
-        self.fusions.append(Fusion(self.path[-1], fusion_node, fusion_type))
+        self.fusions.append(Fusion(node, fusion_node, fusion_type))
 
     def delay_then_fuse(self, delay: int):
         """Applies a unitary to the incoming photon and measures it with a
         particular angle"""
+        node = self.current_node()
         self.time += 1
 
         delay_until = self.time + delay
 
         if delay_until in self.delayed_fusions:
             raise ValidationError(
-                f"can't fuse node {self.path[-1]} at time {delay_until} as"
+                f"can't fuse node {node} at time {delay_until} as"
                 + f" node {self.delayed_fusions[delay_until]} will be fused"
             )
 
-        self.delayed_fusions[delay_until] = self.path[-1]
+        self.delayed_fusions[delay_until] = node
 
     def delay_then_measure(self, delay: int, m: Measurement):
         """Delays the photon then measures it"""
+        node = self.current_node()
         self.time += 1
 
-        delay_until = self.time + delay
-        self.__record_measurement(delay_until, self.path[-1], m)
+        self.__record_measurement(self.time + delay, node, m)
 
     def next_node(self, node_id: int):
         """Progresses to the next node.
@@ -132,6 +142,14 @@ class SemmDecompiler:
 
     def fusion_network(self) -> FusionNetwork:
         """Outputs the Fusion pattern implemented by the operations"""
+
+        if self.delayed_fusions:
+            pending = ", ".join(
+                f"node {node} at time {time}"
+                for time, node in sorted(self.delayed_fusions.items()))
+            raise ValidationError(
+                f"no photon exits the delay loop to fuse {pending}"
+            )
 
         measurements: list[tuple[int, Measurement]] = []
         chronological_order = sorted(self.measurements.keys())
