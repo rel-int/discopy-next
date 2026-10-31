@@ -286,6 +286,22 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   codomain and gave a state on one qubit, the legs in and the legs out now
   read independently; so is `qubits.X(0, 0).decomp()`, which goes through it
   ([next#314]).
+- `optyx.core.control.ControlledPhaseShift` applies the phase its function
+  reads off two or more control modes: it indexed its array along the first
+  axis only, with `array[i, :]` for a whole control configuration `i`, so the
+  per-configuration cell had the wrong shape and the reshape raised
+  ([next#314]).
+- `optyx.core.zw.ZBox` compares two amplitude lists of different lengths
+  instead of raising on the broadcast, with
+  `misc.compare_arrays_of_different_sizes`, which is what equality of two
+  truncations of the same infinite list is in this module. NaN amplitudes are
+  unequal: that comparison reads `abs(x - y) > tol`, which is False for a NaN
+  difference, so `zw.has_nan` rejects them first ([next#314]).
+- `optyx.core.zw.W` has a `__hash__` of its own: Python used to set it to
+  `None`, as it does on any class overriding `__eq__`, so `hash(W(2))` raised
+  and a `Functor` could not look the box up in a dict `ar_map`. `ZBox` stays
+  unhashable: comparing amplitudes by prefix is not transitive, so no hash
+  keeps equal boxes hashing equal ([next#314]).
 - `optyx.compiler`: a `Fusion` compared to anything but a fusion is unequal
   rather than an `AttributeError`; `path_cover.find_min_path_cover` covers a
   graph with one node, an edgeless graph and the empty graph, searching up to
