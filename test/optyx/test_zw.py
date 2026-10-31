@@ -561,20 +561,41 @@ def test_zbox_equality_of_truncations_of_different_lengths():
     assert ZBox(1, 1, [1, 2]) != W(2)
 
 
-def test_w_and_zbox_hash_agrees_with_eq():
-    """`W` and `ZBox` override `__eq__`, so they need a `__hash__` of their
-    own or Python sets it to None and the boxes cannot be dict keys. The
-    hash of a ZBox is its legs only: equal amplitudes are equal up to
-    truncation and up to a tolerance, which a hash cannot respect."""
+def test_w_hash_agrees_with_eq():
+    """`W` overrides `__eq__`, so it needs a `__hash__` of its own or Python
+    sets it to None and the box cannot be a dict key. `W` compares on its
+    legs and its dagger flag, which is an equivalence, so it has one."""
     assert hash(W(2)) == hash(W(2))
     assert hash(W(2, is_dagger=True)) == hash(W(2).dagger())
     assert hash(W(2)) != hash(W(3))
-    assert hash(ZBox(1, 1, [1])) == hash(ZBox(1, 1, [1, 2, 3]))
-    for one, other in [(W(2), W(2)), (W(2).dagger(), W(2).dagger()),
-                       (ZBox(1, 1, [1, 2]), ZBox(1, 1, [1, 2, 3])),
-                       (ZBox(2, 0, lambda i: 1), ZBox(2, 0, lambda i: 1))]:
+    for one, other in [(W(2), W(2)), (W(2).dagger(), W(2).dagger())]:
         assert one == other and hash(one) == hash(other)
     assert {W(2), W(2), W(3)} == {W(2), W(3)}
+
+
+def test_zbox_is_unhashable():
+    """A `ZBox` compares amplitudes by prefix, so its equality is not
+    transitive — `[1, 2]` equals both `[1, 2, 3]` and `[1, 2, 4]`, which are
+    unequal — and no hash can keep equal objects hashing equal. It is
+    unhashable rather than order-dependent as a dict key."""
+    assert ZBox(1, 1, [1, 2]) == ZBox(1, 1, [1, 2, 3])
+    assert ZBox(1, 1, [1, 2]) == ZBox(1, 1, [1, 2, 4])
+    assert ZBox(1, 1, [1, 2, 3]) != ZBox(1, 1, [1, 2, 4])
+    assert ZBox.__hash__ is None
+    with pytest.raises(TypeError):
+        hash(ZBox(1, 1, [1, 2]))
+
+
+def test_zbox_equality_rejects_nan_amplitudes():
+    """`compare_arrays_of_different_sizes` reads `abs(x - y) > tol`, which is
+    False whenever the difference is NaN, so a NaN amplitude would compare
+    equal to anything. `ZBox.__eq__` rejects one first."""
+    nan = float("nan")
+    assert compare_arrays_of_different_sizes([1, nan], [1, 2])
+    assert has_nan([1, nan]) and not has_nan([1, 2])
+    assert ZBox(1, 1, [1, nan]) != ZBox(1, 1, [1, nan])
+    assert ZBox(1, 1, [1, nan]) != ZBox(1, 1, [1, 2])
+    assert ZBox(1, 1, [1, 2]) != ZBox(1, 1, [1, nan])
 
 
 def test_functor_with_a_dict_ar_map_on_w():
