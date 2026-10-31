@@ -87,8 +87,7 @@ def _assemble_controlled_box(
 
 
 def _feedforward_common(*, component, wires, circuit,
-                        map_iter, action_from_item,
-                        use_provider_dom: bool):
+                        map_iter, action_from_item):
     """
     Shared implementation for both FFCircuitProvider and FFConfigurator.
     """
@@ -98,12 +97,7 @@ def _feedforward_common(*, component, wires, circuit,
     n_action = len(default_action.dom)
     n_offset = max(component._offset, -component._offset - 1)
 
-    # build permutation domains for input permutation
-    # if use_provider_dom:
-    #    perm_dom_neg = qmode**(n_action + n_offset) @ mode**n_classical
-    #    perm_dom_pos = mode**n_classical @ qmode**(n_action + n_offset)
-    # else:
-    # configurator: the dom is a slice of the current circuit wires
+    # the domains of the input permutation are slices of the circuit wires
     perm_dom_neg = circuit.cod[min(wires) - n_offset -
                                n_action: max(wires) + 1]
     perm_dom_pos = circuit.cod[min(wires): max(wires) +
@@ -149,7 +143,6 @@ def ff_circuit_provider(component, wires, circuit):
         circuit=circuit,
         map_iter=component._map,
         action_from_item=action_from_item,
-        use_provider_dom=True,
     )
     return box, left, right
 
@@ -158,10 +151,16 @@ def ff_configurator(component, wires, circuit):
     free_symbols = component._controlled.U.free_symbols
 
     def action_from_item(symbol_values):
-        # substitute symbol values and convert to ZW
-        subs_map = {s: v for s, v in zip(free_symbols, symbol_values.values())}
+        missing = sorted(str(s) for s in free_symbols
+                         if str(s) not in symbol_values)
+        if missing:
+            raise ValueError(
+                f"A configuration of {component.name} gives no value for "
+                f"the symbols {', '.join(missing)}.")
         action_U = np.array(
-            component._controlled.U.subs(subs_map).evalf().T,
+            component._controlled.U.subs(
+                {s: symbol_values[str(s)] for s in free_symbols}
+            ).evalf().T,
             dtype=np.complex128
         )
         return matrix_to_zw(action_U)
@@ -172,7 +171,6 @@ def ff_configurator(component, wires, circuit):
         circuit=circuit,
         map_iter=component._configs,
         action_from_item=action_from_item,
-        use_provider_dom=False,
     )
     return box, left, right
 
