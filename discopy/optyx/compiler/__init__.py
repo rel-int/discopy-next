@@ -33,10 +33,16 @@ emitter and a single measurement device. This functionality is contained in the
     FusionNetwork
     Instruction
 
-    compile_to_semm
-    decompile_from_semm
+.. admonition:: Functions
 
-    pattern_satisfies_order
+    .. autosummary::
+        :template: function.rst
+        :nosignatures:
+        :toctree:
+
+        compile_to_semm
+        decompile_from_semm
+        pattern_satisfies_order
 
 ----------
 Submodules
