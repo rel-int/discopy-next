@@ -224,6 +224,19 @@ def test_effect_decomposition():
         effect.double().to_tensor().eval().array)
 
 
+@pytest.mark.parametrize("spider", [qubits.Z, qubits.X])
+@pytest.mark.parametrize("phase", [0, .25])
+def test_scalar_spider_decomposition(spider, phase):
+    """A spider with no legs is a scalar, and so is its decomposition:
+    by fusion it is the state on one wire followed by the effect on it."""
+    decomp = spider(0, 0, phase).decomp()
+    assert decomp.dom == decomp.cod == qubits.qubit ** 0
+    assert np.allclose(
+        decomp.double().to_tensor().eval().array,
+        (spider(0, 1, phase) >> spider(1, 0)
+         ).double().to_tensor().eval().array)
+
+
 def probabilities(diagram):
     return {key: value for key, value in diagram.eval().prob_dist().items()
             if not np.isclose(value, 0)}

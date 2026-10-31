@@ -255,6 +255,19 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Fixed
 
+- `optyx.photonic.Select()` and `Create()` default to one photon on one mode,
+  as the `zw` boxes they wrap do, so that their `photons` and the path matrix
+  they build agree with the `qmode` they are typed on ([next#314]).
+- `optyx.classical.PostselectDigit()` and `Digit()` declare the one mode
+  their `zw` kraus defaults to rather than none, where they used to fail an
+  assertion ([next#314]).
+- `optyx.classical.PostselectBit()` on no bit is the empty product, the
+  scalar one on `bit ** 0`, where reading the first bit raised an
+  `IndexError` ([next#314]).
+- `optyx.qubits.Z(0, 0).decomp()` is a scalar, where it dropped the empty
+  codomain and gave a state on one qubit, the legs in and the legs out now
+  read independently; so is `qubits.X(0, 0).decomp()`, which goes through it
+  ([next#314]).
 - `optyx.compiler`: a `Fusion` compared to anything but a fusion is unequal
   rather than an `AttributeError`; `path_cover.find_min_path_cover` covers a
   graph with one node, an edgeless graph and the empty graph, searching up to
