@@ -266,9 +266,9 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 - `optyx.compiler`'s summary renders `compile_to_semm`, `decompile_from_semm`
   and `pattern_satisfies_order` as the functions they are, with their own
   autosummary block, where `class.rst` used to document all three as classes;
-  so do the summaries of `compiler.semm` and `compiler.semm_decompiler`, which
-  listed the same functions, and `decompile_to_fusion_network`, the same way
-  ([next#314]).
+  so do the summaries of `compiler.semm`, which listed `compile_to_semm` and
+  `decompile_from_semm` the same way, and `compiler.semm_decompiler`, which
+  listed `decompile_to_fusion_network` ([next#314]).
 - Every code block of `discopy/optyx/README.md` runs, and `test/optyx/readme.py`
   checks that it does, the way `test/readme.py` checks the root README: the
   snippets import `Channel`, `qubits.H` and `photonic.FusionTypeII`, call
@@ -277,7 +277,8 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   graphix's statevector off the backend as graphix 0.4 leaves it, and give
   `np.isclose` and `np.allclose` no third positional argument, so that the
   teleportation and distinguishability assertions check what the prose around
-  them claims rather than passing on a tolerance of 3 ([next#314]).
+  them claims: `np.isclose` was reading a `3` as a 300% relative tolerance, and
+  `np.allclose` a doubled identity channel as one ([next#314]).
 - What the property matrix of [next#1] found, each with its test:
   `Feedback.dagger` and `rotate` raise `AxiomError`, as either would feed
   the memory back in time; `para.Compact.curry` keeps the coparameters and
