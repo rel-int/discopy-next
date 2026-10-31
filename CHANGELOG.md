@@ -279,6 +279,12 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   axis only, with `array[i, :]` for a whole control configuration `i`, so the
   per-configuration cell had the wrong shape and the reshape raised
   ([next#314]).
+- `optyx.core.control.ControlledPhaseShift.conjugate` negates its phases: it
+  returned a box built from the arguments of `self`, so the conjugate *was*
+  `self` and its truncation equalled the original's. Complex conjugation sends
+  `exp(2*pi*1j*y)` to `exp(-2*pi*1j*y)`, so the conjugate is the same box with
+  every value of its function negated, and `conjugate` now commutes with
+  `dagger` and is an involution ([next#314]).
 - `optyx.core.zw.ZBox` compares two amplitude lists of different lengths
   instead of raising on the broadcast, with
   `misc.compare_arrays_of_different_sizes`, which is what equality of two

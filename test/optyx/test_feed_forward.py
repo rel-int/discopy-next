@@ -387,3 +387,48 @@ def test_controlled_phase_shift_two_control_modes(controls):
     assert_allclose_with_shape_mismatch(
         zbox.dagger().to_tensor().eval().array,
         diag.dagger().to_tensor().eval().array)
+
+
+@pytest.mark.parametrize("n_control_modes, controls", [
+    (1, (0,)), (1, (2,)), (1, (3,)),
+    (2, (0, 0)), (2, (1, 2)), (2, (3, 1)),
+])
+def test_controlled_phase_shift_conjugate_negates_the_phases(
+        n_control_modes, controls):
+    """
+    `conjugate()` used to be given the arguments of `self`, so the conjugate
+    was `self`. Complex conjugation sends `exp(2*pi*1j*y)` to
+    `exp(-2*pi*1j*y)`, so the oracle is the class docstring's own with every
+    phase negated: the product of `ZBox(1, 1, exp(-2*pi*1j*y) ** i)` over
+    `y in function(controls)`. Each function has a constant term, so no
+    configuration leaves the phases at zero where the conjugate would be the
+    original for a second reason.
+    """
+    f = lambda xs: [0.23 * sum(xs) + 0.1, 0.876 * xs[-1] + 0.3]
+    n = len(f(list(controls)))
+    box = ControlledPhaseShift(f, n, n_control_modes=n_control_modes)
+    state = Create(*controls) @ Mode(n)
+    original = (state >> box).to_tensor().eval().array
+    conjugate = (state >> box.conjugate()).to_tensor().eval().array
+
+    zbox = Id(Mode(0))
+    for y in f(list(controls)):
+        zbox @= ZBox(1, 1, lambda i, y=y: np.exp(-2 * np.pi * 1j * y) ** i)
+    assert_allclose_with_shape_mismatch(
+        zbox.to_tensor().eval().array, conjugate)
+
+    # The oracle is not the original: a test that only reads the two as
+    # different passes for a wrong answer.
+    assert not np.allclose(original, conjugate)
+    assert_allclose_with_shape_mismatch(np.conjugate(original), conjugate)
+
+    # Conjugation is an involution, it keeps the boundary, and the dagger of
+    # the conjugate is still the dagger of its truncation.
+    assert_allclose_with_shape_mismatch(
+        original,
+        (state >> box.conjugate().conjugate()).to_tensor().eval().array)
+    assert (box.conjugate().dom, box.conjugate().cod,
+            box.conjugate().is_dagger) == (box.dom, box.cod, box.is_dagger)
+    assert_allclose_with_shape_mismatch(
+        (state >> box.conjugate()).to_tensor().dagger().eval().array,
+        (state >> box.conjugate()).dagger().to_tensor().eval().array)

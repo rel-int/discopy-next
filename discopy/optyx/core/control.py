@@ -237,6 +237,17 @@ class ControlledPhaseShift(ControlBox):
     ...         lambda i, y=y: np.exp(2 * np.pi * 1j * y) ** i)
     >>> assert np.allclose(controlled_phase.to_tensor().eval().array,
     ...                    zbox.to_tensor().eval().array)
+
+    Conjugation negates every phase, i.e. it sends :math:`e^{2 i \\pi y}` to
+    :math:`e^{-2 i \\pi y}`, so the truncation of the conjugate is the
+    complex conjugate of the truncation:
+
+    >>> box = ControlledPhaseShift(f, n_modes=n)
+    >>> dims = [3] * (n + 1)
+    >>> truncate = lambda b: b.truncation(
+    ...     dims, b.determine_output_dimensions(dims)).array
+    >>> assert np.allclose(truncate(box.conjugate()),
+    ...                    np.conjugate(truncate(box)))
     """
 
     def __init__(
@@ -311,8 +322,10 @@ class ControlledPhaseShift(ControlBox):
         )
 
     def conjugate(self):
+        function = self.function
         return ControlledPhaseShift(
-            self.function, self.n_modes, self.n_control_modes, self.is_dagger
+            lambda xs: [-y for y in function(xs)],
+            self.n_modes, self.n_control_modes, self.is_dagger
         )
 
 
