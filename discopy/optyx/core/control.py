@@ -275,6 +275,7 @@ class ControlledPhaseShift(ControlBox):
         ).T.reshape(-1, len(input_dims[:self.n_control_modes]))
 
         for i in input_combinations:
+            cell = tuple(i)
             fx = self.function(i)
             zbox = diagram.Id(diagram.Mode(0))
             for y in fx:
@@ -283,11 +284,11 @@ class ControlledPhaseShift(ControlBox):
                 )
 
             zbox = zbox.to_tensor(input_dims[self.n_control_modes:])
-            array[i, :] = (
+            array[cell] = (
                 (zbox >> diagram.truncation_tensor(zbox.cod.inside,
                                                    output_dims))
                 .eval()
-                .array.reshape(array[i, :].shape)
+                .array.reshape(array[cell].shape)
             )
 
         if self.is_dagger:

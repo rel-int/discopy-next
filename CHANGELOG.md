@@ -255,6 +255,20 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Fixed
 
+- `optyx.core.control.ControlledPhaseShift` applies the phase its function
+  reads off two or more control modes: it indexed its array along the first
+  axis only, with `array[i, :]` for a whole control configuration `i`, so the
+  per-configuration cell had the wrong shape and the reshape raised
+  ([next#314]).
+- `optyx.core.zw.ZBox` compares two amplitude lists of different lengths
+  instead of raising on the broadcast, with
+  `misc.compare_arrays_of_different_sizes`, which is what equality of two
+  truncations of the same infinite list is in this module ([next#314]).
+- `optyx.core.zw.W` and `ZBox` have a `__hash__` of their own, which Python
+  sets to `None` on a class overriding `__eq__`, so `hash(W(2))` raised and a
+  `Functor` could not look either box up in a dict `ar_map`. A `ZBox` hashes
+  on its legs alone, its amplitudes being equal up to truncation and up to a
+  tolerance, neither of which a hash can respect ([next#314]).
 - `optyx.compiler`: a `Fusion` compared to anything but a fusion is unequal
   rather than an `AttributeError`; `path_cover.find_min_path_cover` covers a
   graph with one node, an edgeless graph and the empty graph, searching up to

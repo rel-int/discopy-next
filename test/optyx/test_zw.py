@@ -3,7 +3,7 @@ import math
 from discopy.optyx.core.zw import *
 from discopy.optyx.core.zw import (
     Add, Create, Divide, Endo, Mod2, Multiply, Select, W, ZBox)
-from discopy.optyx.core.diagram import mode, DualRail, EmbeddingTensor, Swap, Diagram, Mode, Spider, Scalar
+from discopy.optyx.core.diagram import mode, DualRail, EmbeddingTensor, Swap, Diagram, Mode, Spider, Scalar, Functor
 from discopy.optyx.utils.misc import compare_arrays_of_different_sizes, calculate_num_creations_selections
 import discopy.optyx.core.zx as zx
 from discopy.optyx import photonic
@@ -548,3 +548,43 @@ def test_zbox_conjugate_of_a_list():
 def test_endo_grad_of_a_symbol():
     from sympy.abc import x
     assert Endo(x).grad(x).free_symbols == {x}
+
+
+def test_zbox_equality_of_truncations_of_different_lengths():
+    """Two amplitude lists of different lengths are two truncations of the
+    same infinite list, which is what `compare_arrays_of_different_sizes`
+    says equality of ZW diagrams is: they used to raise on the broadcast."""
+    assert ZBox(1, 1, [1, 2]) == ZBox(1, 1, [1, 2, 3])
+    assert ZBox(1, 1, [1, 2, 3]) == ZBox(1, 1, [1, 2])
+    assert ZBox(1, 1, [1, 2]) != ZBox(1, 1, [1, 3, 3])
+    assert ZBox(1, 1, [1, 2]) != ZBox(1, 2, [1, 2])
+    assert ZBox(1, 1, [1, 2]) != W(2)
+
+
+def test_w_and_zbox_hash_agrees_with_eq():
+    """`W` and `ZBox` override `__eq__`, so they need a `__hash__` of their
+    own or Python sets it to None and the boxes cannot be dict keys. The
+    hash of a ZBox is its legs only: equal amplitudes are equal up to
+    truncation and up to a tolerance, which a hash cannot respect."""
+    assert hash(W(2)) == hash(W(2))
+    assert hash(W(2, is_dagger=True)) == hash(W(2).dagger())
+    assert hash(W(2)) != hash(W(3))
+    assert hash(ZBox(1, 1, [1])) == hash(ZBox(1, 1, [1, 2, 3]))
+    for one, other in [(W(2), W(2)), (W(2).dagger(), W(2).dagger()),
+                       (ZBox(1, 1, [1, 2]), ZBox(1, 1, [1, 2, 3])),
+                       (ZBox(2, 0, lambda i: 1), ZBox(2, 0, lambda i: 1))]:
+        assert one == other and hash(one) == hash(other)
+    assert {W(2), W(2), W(3)} == {W(2), W(3)}
+
+
+def test_functor_with_a_dict_ar_map_on_w():
+    """The `Functor` of a diagram with a `W` in a dict `ar_map` looks the box
+    up by hash, so an unhashable `W` used to raise rather than map."""
+    image = W(2) >> Swap(mode, mode)
+    functor = Functor(ob_map={mode: mode}, ar_map={W(2): image},
+                      cod=Diagram)
+    assert functor(W(2)) == image
+    assert functor(W(2) >> Id(2)) == image
+    assert compare_arrays_of_different_sizes(
+        functor(W(2)).to_tensor().eval().array,
+        W(2).to_tensor().eval().array)
