@@ -284,7 +284,9 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   `self` and its truncation equalled the original's. Complex conjugation sends
   `exp(2*pi*1j*y)` to `exp(-2*pi*1j*y)`, so the conjugate is the same box with
   every value of its function negated, and `conjugate` now commutes with
-  `dagger` and is an involution ([next#314]).
+  `dagger` and is an involution. The negation is `partial(negate_phases,
+  function)`, a function of the module rather than a closure, so a conjugated
+  box pickles whenever the box it is the conjugate of does ([next#314]).
 - `optyx.core.zw.ZBox` compares two amplitude lists of different lengths
   instead of raising on the broadcast, with
   `misc.compare_arrays_of_different_sizes`, which is what equality of two

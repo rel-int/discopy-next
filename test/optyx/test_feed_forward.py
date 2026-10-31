@@ -2,6 +2,7 @@ import pytest
 import numpy as np
 import copy as cp
 import itertools
+import pickle
 
 from discopy.optyx.core.control import *
 from discopy.optyx.core.control import BinaryMatrixBox, ClassicalFunctionBox
@@ -389,6 +390,17 @@ def test_controlled_phase_shift_two_control_modes(controls):
         diag.dagger().to_tensor().eval().array)
 
 
+def control_phases(xs):
+    """
+    The phases a `ControlledPhaseShift` applies for a control configuration,
+    as a function of the module so that a box built from it pickles, which a
+    box built from a lambda does not. Every value has a constant term, so no
+    configuration leaves a phase at zero, where conjugation would be the
+    identity for a second reason.
+    """
+    return [0.23 * sum(xs) + 0.1, 0.876 * xs[-1] + 0.3]
+
+
 @pytest.mark.parametrize("n_control_modes, controls", [
     (1, (0,)), (1, (2,)), (1, (3,)),
     (2, (0, 0)), (2, (1, 2)), (2, (3, 1)),
@@ -404,7 +416,7 @@ def test_controlled_phase_shift_conjugate_negates_the_phases(
     configuration leaves the phases at zero where the conjugate would be the
     original for a second reason.
     """
-    f = lambda xs: [0.23 * sum(xs) + 0.1, 0.876 * xs[-1] + 0.3]
+    f = control_phases
     n = len(f(list(controls)))
     box = ControlledPhaseShift(f, n, n_control_modes=n_control_modes)
     state = Create(*controls) @ Mode(n)
@@ -432,3 +444,33 @@ def test_controlled_phase_shift_conjugate_negates_the_phases(
     assert_allclose_with_shape_mismatch(
         (state >> box.conjugate()).to_tensor().dagger().eval().array,
         (state >> box.conjugate()).dagger().to_tensor().eval().array)
+
+
+@pytest.mark.parametrize("n_control_modes, controls", [(1, (2,)), (2, (1, 2))])
+def test_controlled_phase_shift_conjugate_pickles(n_control_modes, controls):
+    """
+    `conjugate()` wrapped `function` in a local lambda, which has no
+    qualified name to pickle by, so the conjugate of a box built from a
+    picklable function was itself unpicklable where the box was not. It
+    wraps with `partial(negate_phases, ...)` now, which pickles as deeply as
+    it is nested.
+    """
+    n = len(control_phases(list(controls)))
+    box = ControlledPhaseShift(
+        control_phases, n, n_control_modes=n_control_modes)
+    state = Create(*controls) @ Mode(n)
+    pickle.loads(pickle.dumps(box))
+
+    for conjugated in (box.conjugate(), box.conjugate().conjugate()):
+        back = pickle.loads(pickle.dumps(conjugated))
+        assert_allclose_with_shape_mismatch(
+            (state >> back).to_tensor().eval().array,
+            (state >> conjugated).to_tensor().eval().array)
+
+    zbox = Id(Mode(0))
+    for y in control_phases(list(controls)):
+        zbox @= ZBox(1, 1, lambda i, y=y: np.exp(-2 * np.pi * 1j * y) ** i)
+    unpickled = pickle.loads(pickle.dumps(box.conjugate()))
+    assert_allclose_with_shape_mismatch(
+        zbox.to_tensor().eval().array,
+        (state >> unpickled).to_tensor().eval().array)

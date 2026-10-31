@@ -37,6 +37,7 @@ A bit-controlled gate can be composed as:
 >>> control.draw(doctest='docs/_static/optyx/binary_control.svg')
 """
 
+from functools import partial
 from typing import Callable, List, Tuple, Iterable
 from discopy import tensor
 from discopy.frobenius import Dim
@@ -214,6 +215,20 @@ class BitControlledBox(ControlBox):
         )
 
 
+def negate_phases(function: Callable[[List[int]], List[int]],
+                  configuration: List[int]) -> List[int]:
+    """
+    The phases `function` gives a control `configuration`, negated: the data
+    of the conjugate of a :class:`ControlledPhaseShift`. It is a function of
+    the module rather than a closure so that a conjugated box pickles
+    whenever the box it is the conjugate of does.
+
+    >>> negate_phases(lambda xs: [0.25 * xs[0], 0.5], [2])
+    [-0.5, -0.5]
+    """
+    return [-y for y in function(configuration)]
+
+
 class ControlledPhaseShift(ControlBox):
     """
     A controlled phase shift on modes, where the control
@@ -322,9 +337,8 @@ class ControlledPhaseShift(ControlBox):
         )
 
     def conjugate(self):
-        function = self.function
         return ControlledPhaseShift(
-            lambda xs: [-y for y in function(xs)],
+            partial(negate_phases, self.function),
             self.n_modes, self.n_control_modes, self.is_dagger
         )
 
