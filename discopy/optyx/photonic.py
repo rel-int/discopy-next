@@ -295,12 +295,16 @@ def listed(internal_states):
 class Select(Channel):
     """
     Post-select on an occupation number.
+
+    Example
+    -------
+    >>> assert Select() == Select(1)
     """
     def __init__(self, *photons: int):
-        self.photons = photons
+        self.photons = photons or (1,)
         super().__init__(
-            f"Select({photons})",
-            zw.Select(*photons)
+            f"Select({self.photons})",
+            zw.Select(*self.photons)
         )
 
     def __repr__(self):
@@ -405,14 +409,18 @@ class NumberResolvingMeasurement(Measure):
 class Create(Channel):
     """
     Fock basis states (occupation numbers).
+
+    Example
+    -------
+    >>> assert Create() == Create(1)
     """
     def __init__(self, *photons: int,
                  internal_states: tuple[list[int]] = None):
-        self.photons = photons
+        self.photons = photons or (1,)
         self.internal_states = internal_states
         super().__init__(
-            f"Create({photons})",
-            zw.Create(*photons, internal_states=internal_states)
+            f"Create({self.photons})",
+            zw.Create(*self.photons, internal_states=internal_states)
         )
 
     def __repr__(self):
