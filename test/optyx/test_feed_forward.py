@@ -364,3 +364,26 @@ def test_binary_matrix_from_a_row():
     assert np.allclose(row.to_tensor().eval().array,
                        BinaryMatrixBox([[1, 1]]).to_tensor().eval().array)
     assert row.conjugate() == row
+
+
+@pytest.mark.parametrize("controls", list(itertools.product(range(3), repeat=2)))
+def test_controlled_phase_shift_two_control_modes(controls):
+    """
+    With two or more control modes the phase is the one the function reads off
+    the whole control configuration: the box used to index its array along the
+    first axis only, so the per-configuration cell was the wrong shape.
+    """
+    f = lambda xs: [0.23 * xs[0] + 0.456 * xs[1], 0.876 * xs[1]]
+    n = len(f([0, 0]))
+    diag = (Create(*controls) @ Mode(n)
+            >> ControlledPhaseShift(f, n, n_control_modes=2))
+
+    zbox = Id(Mode(0))
+    for y in f(list(controls)):
+        zbox @= ZBox(1, 1, lambda i, y=y: np.exp(2 * np.pi * 1j * y) ** i)
+
+    assert_allclose_with_shape_mismatch(
+        zbox.to_tensor().eval().array, diag.to_tensor().eval().array)
+    assert_allclose_with_shape_mismatch(
+        zbox.dagger().to_tensor().eval().array,
+        diag.dagger().to_tensor().eval().array)
