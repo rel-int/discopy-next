@@ -105,12 +105,29 @@ def compare_arrays_of_different_sizes(
 ) -> bool:
     """ZW diagrams which are equal in infinite dimensions
     might be intrepreted as arrays of different dimensions
-    if we truncate them to a finite number of dimensions"""
+    if we truncate them to a finite number of dimensions.
+
+    The comparison is :code:`np.allclose`'s with an absolute tolerance only,
+    so a NaN is unequal to everything, itself included, while two matching
+    infinities are equal.
+
+    >>> inf, nan = float("inf"), float("nan")
+    >>> compare_arrays_of_different_sizes([1, 2], [1, 2, 3])
+    True
+    >>> compare_arrays_of_different_sizes([1, nan], [1, 2])
+    False
+    >>> compare_arrays_of_different_sizes([1, nan], [1, nan])
+    False
+    >>> compare_arrays_of_different_sizes([inf], [inf])
+    True
+    >>> compare_arrays_of_different_sizes([inf], [-inf])
+    False
+    """
 
     # See https://stackoverflow.com/questions/46042469/compare-two-arrays-with-different-size-python-numpy  # noqa: E501
     a, b = np.array(array_1).flatten(), np.array(array_2).flatten()
     n = min(len(a), len(b))
-    return np.flatnonzero(np.abs(a[:n] - b[:n]) > tol).size == 0
+    return bool(np.allclose(a[:n], b[:n], rtol=0, atol=tol, equal_nan=False))
 
 
 def basis_vector_from_kets(

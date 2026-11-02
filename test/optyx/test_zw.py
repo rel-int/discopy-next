@@ -3,7 +3,7 @@ import math
 from discopy.optyx.core.zw import *
 from discopy.optyx.core.zw import (
     Add, Create, Divide, Endo, Mod2, Multiply, Select, W, ZBox)
-from discopy.optyx.core.diagram import mode, DualRail, EmbeddingTensor, Swap, Diagram, Mode, Spider, Scalar
+from discopy.optyx.core.diagram import mode, DualRail, EmbeddingTensor, Swap, Diagram, Mode, Spider, Scalar, Functor
 from discopy.optyx.utils.misc import compare_arrays_of_different_sizes, calculate_num_creations_selections
 import discopy.optyx.core.zx as zx
 from discopy.optyx import photonic
@@ -548,3 +548,83 @@ def test_zbox_conjugate_of_a_list():
 def test_endo_grad_of_a_symbol():
     from sympy.abc import x
     assert Endo(x).grad(x).free_symbols == {x}
+
+
+def test_zbox_equality_of_truncations_of_different_lengths():
+    """Two amplitude lists of different lengths are two truncations of the
+    same infinite list, which is what `compare_arrays_of_different_sizes`
+    says equality of ZW diagrams is: they used to raise on the broadcast."""
+    assert ZBox(1, 1, [1, 2]) == ZBox(1, 1, [1, 2, 3])
+    assert ZBox(1, 1, [1, 2, 3]) == ZBox(1, 1, [1, 2])
+    assert ZBox(1, 1, [1, 2]) != ZBox(1, 1, [1, 3, 3])
+    assert ZBox(1, 1, [1, 2]) != ZBox(1, 2, [1, 2])
+    assert ZBox(1, 1, [1, 2]) != W(2)
+
+
+def test_w_hash_agrees_with_eq():
+    """`W` overrides `__eq__`, so it needs a `__hash__` of its own or Python
+    sets it to None and the box cannot be a dict key. `W` compares on its
+    legs and its dagger flag, which is an equivalence, so it has one."""
+    assert hash(W(2)) == hash(W(2))
+    assert hash(W(2, is_dagger=True)) == hash(W(2).dagger())
+    assert hash(W(2)) != hash(W(3))
+    for one, other in [(W(2), W(2)), (W(2).dagger(), W(2).dagger())]:
+        assert one == other and hash(one) == hash(other)
+    assert {W(2), W(2), W(3)} == {W(2), W(3)}
+
+
+def test_zbox_is_unhashable():
+    """A `ZBox` compares amplitudes by prefix, so its equality is not
+    transitive — `[1, 2]` equals both `[1, 2, 3]` and `[1, 2, 4]`, which are
+    unequal — and no hash can keep equal objects hashing equal. It is
+    unhashable rather than order-dependent as a dict key."""
+    assert ZBox(1, 1, [1, 2]) == ZBox(1, 1, [1, 2, 3])
+    assert ZBox(1, 1, [1, 2]) == ZBox(1, 1, [1, 2, 4])
+    assert ZBox(1, 1, [1, 2, 3]) != ZBox(1, 1, [1, 2, 4])
+    assert ZBox.__hash__ is None
+    with pytest.raises(TypeError):
+        hash(ZBox(1, 1, [1, 2]))
+
+
+def test_zbox_equality_rejects_nan_amplitudes():
+    """`compare_arrays_of_different_sizes` reads `abs(x - y) <= tol`, which is
+    False whenever the difference is NaN, so a NaN amplitude is unequal to
+    everything, itself included, as it is for `np.allclose`."""
+    inf, nan = float("inf"), float("nan")
+    assert not compare_arrays_of_different_sizes([1, nan], [1, 2])
+    assert not compare_arrays_of_different_sizes([1, nan], [1, nan])
+    assert ZBox(1, 1, [1, nan]) != ZBox(1, 1, [1, nan])
+    assert ZBox(1, 1, [1, nan]) != ZBox(1, 1, [1, 2])
+    assert ZBox(1, 1, [1, 2]) != ZBox(1, 1, [1, nan])
+    assert compare_arrays_of_different_sizes([1, inf], [1, inf])
+    assert not compare_arrays_of_different_sizes([1, inf], [1, -inf])
+    assert ZBox(1, 1, [1, inf]) == ZBox(1, 1, [1, inf])
+
+
+def test_functor_with_a_dict_ar_map_on_w():
+    """The `Functor` of a diagram with a `W` in a dict `ar_map` looks the box
+    up by hash, so an unhashable `W` used to raise rather than map."""
+    image = W(2) >> Swap(mode, mode)
+    functor = Functor(ob_map={mode: mode}, ar_map={W(2): image},
+                      cod=Diagram)
+    assert functor(W(2)) == image
+    assert functor(W(2) >> Id(2)) == image
+    assert compare_arrays_of_different_sizes(
+        functor(W(2)).to_tensor().eval().array,
+        W(2).to_tensor().eval().array)
+
+
+def test_legless_zbox_reads_its_first_amplitude():
+    """A `ZBox` with no legs has no index to carry its amplitudes, so it is
+    the first of them, which is how `zw`'s axioms write a scalar — see
+    `test_scalar` and `test_lemma_B6` — and the only reading total on an
+    infinite amplitude list. The list branch of the truncation was missing
+    that index, `np.array([amplitudes])` holding one entry only when the
+    amplitudes are a bare number, so `ZBox(0, 0, [1, 1])` raised `cannot
+    reshape array of size 2 into shape ()`."""
+    for amplitudes, value in [(5, 5), ([2], 2), ([1, 1], 1), ([0, 2], 0)]:
+        array = ZBox(0, 0, amplitudes).to_tensor().eval().array
+        assert array.shape == ()
+        assert np.allclose(array, value)
+    assert np.allclose(
+        ZBox(0, 0, lambda i: i + 1).to_tensor().eval().array, 1)

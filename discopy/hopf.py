@@ -132,7 +132,7 @@ import numpy as np
 from discopy import monoidal, ribbon, tensor, frobenius, messages
 from discopy.tensor import Dim, Box, Id
 from discopy.abc import RibbonCategory, NamedGeneric
-from discopy.group import Group, Action
+from discopy.group import FiniteGroup, Action
 from discopy.utils import (
     assert_isinstance, assert_iscomposable, classproperty, factory,
     factory_name, from_tree, get_origin, product, unbiased)
@@ -564,10 +564,10 @@ class Algebra:
 
 class GroupAlgebra(Algebra):
     """
-    The group algebra :math:`k[G]` of a finite :class:`.group.Group`, with
-    basis the :meth:`.group.Group.elements`: the product of two of them is
-    their composition, :math:`e_g e_h = e_{h \\gg g}` i.e. :math:`h` first,
-    so that a :class:`.group.Action` is a left module (see
+    The group algebra :math:`k[G]` of a :class:`.group.FiniteGroup`, with
+    basis the :meth:`.group.FiniteGroup.elements`: the product of two of
+    them is their composition, :math:`e_g e_h = e_{h \\gg g}` i.e.
+    :math:`h` first, so that a :class:`.group.Action` is a left module (see
     :meth:`Representation.permutation`). Each element is grouplike,
     :math:`\\Delta(e_g) = e_g \\otimes e_g`, the antipode is the inverse
     and the R-matrix is trivial, :math:`R = e_1 \\otimes e_1`.
@@ -581,7 +581,7 @@ class GroupAlgebra(Algebra):
     >>> H
     hopf.GroupAlgebra(group.Symmetric[3])
     """
-    def __init__(self, group: type[Group]):
+    def __init__(self, group: type[FiniteGroup]):
         self.group, self.elements = group, tuple(group.elements())
         self.index = {g: i for i, g in enumerate(self.elements)}
         n = len(self.elements)

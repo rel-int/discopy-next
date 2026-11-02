@@ -710,15 +710,17 @@ class Z(Channel):
         )
 
     def decomp(self):
-        """Decompose the spider into elementary ZX generators."""
+        """Decompose the spider into elementary ZX generators.
+
+        >>> assert Z(0, 0).decomp().dom == Z(0, 0).decomp().cod == qubit ** 0
+        """
         n, m = len(self.dom), len(self.cod)
         phase = self.phase
         rot = Id(1) if phase == 0 else Z(1, 1, phase)
-        if n == 0:
-            return X(0, 1) >> H() >> rot >> self._make_spiders(m)
-        if m == 0:
-            return X(1, 0) << H() << rot << self._make_spiders(n).dagger()
-        return self._make_spiders(n).dagger() >> rot >> self._make_spiders(m)
+        legs_in = X(0, 1) >> H() if n == 0 \
+            else self._make_spiders(n).dagger()
+        legs_out = H() >> X(1, 0) if m == 0 else self._make_spiders(m)
+        return legs_in >> rot >> legs_out
 
     @staticmethod
     def _make_spiders(n):

@@ -9,8 +9,16 @@ compilation pipelines.
     :nosignatures:
     :toctree:
 
-    decompile_to_fusion_network
     ValidationError
+
+.. admonition:: Functions
+
+    .. autosummary::
+        :template: function.rst
+        :nosignatures:
+        :toctree:
+
+        decompile_to_fusion_network
 """
 
 from discopy.optyx.compiler.mbqc import Fusion, FusionNetwork, Measurement

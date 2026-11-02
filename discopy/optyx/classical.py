@@ -435,15 +435,19 @@ class PostselectBit(ClassicalBox):
     """
     Postselect on a bit result.
     The domain of the map is a bit.
+
+    Postselecting on no bit is the empty product, the scalar one.
+
+    >>> assert PostselectBit().dom == PostselectBit().cod == bit ** 0
     """
     def __init__(self, *bits):
 
         if not all(bit in (0, 1) for bit in bits):
             raise ValueError("Bits must be a list of 0s and 1s.")
         self.bits = bits
-        kraus = zx.X(1, 0, 0.5**bits[0])
+        kraus = zx.Id(0)
         # pylint: disable=invalid-name
-        for b in bits[1:]:
+        for b in bits:
             kraus = kraus @ zx.X(1, 0, 0.5**b)
         kraus = kraus @ diagram.Scalar(1 / np.sqrt(2**len(bits)))
         super().__init__(
@@ -462,15 +466,17 @@ class PostselectDigit(ClassicalBox):
     """
     Postselect on a digit result.
     The domain of the map is a digit.
+
+    >>> assert PostselectDigit() == PostselectDigit(1)
     """
     def __init__(self, *digits):
         if not all(isinstance(digit, int) for digit in digits):
             raise ValueError("Digits must be a list of integers.")
-        self.digits = digits
+        self.digits = digits or (1,)
         super().__init__(
-            f"PostselectDigit({digits})",
-            zw.Select(*digits),
-            mode**len(digits),
+            f"PostselectDigit({self.digits})",
+            zw.Select(*self.digits),
+            mode**len(self.digits),
             mode**0
         )
 
@@ -748,14 +754,16 @@ class Digit(ClassicalBox):
     """
     Create a classical state with
     a natural number.
+
+    >>> assert Digit() == Digit(1)
     """
     def __init__(self, *photons: int):
-        self.photons = photons
+        self.photons = photons or (1,)
         super().__init__(
-            f"Digit({photons})",
-            zw.Create(*photons),
+            f"Digit({self.photons})",
+            zw.Create(*self.photons),
             mode**0,
-            mode**len(photons)
+            mode**len(self.photons)
         )
 
     def __repr__(self):

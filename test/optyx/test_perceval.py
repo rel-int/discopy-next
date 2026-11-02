@@ -341,3 +341,58 @@ def test_trailing_detector():
     measured = circuit >> circuit.cod[:1] @ NumberResolvingMeasurement(1)
     check_dict_agreement(
         expected, (Create_(1, 1) >> measured).eval().prob_dist())
+
+
+CONFIGURATOR_VALUES = {"alpha": 0.3, "beta": 1.1}
+
+
+def configurator_processor(order):
+    """A processor whose measured mode feeds a configurator over the two
+    modes after it, its controlled circuit depending on both symbols and
+    its configuration dict built in the given order of names."""
+    alpha, beta = pcvl.P("alpha"), pcvl.P("beta")
+    controlled = (pcvl.Circuit(2)
+                  .add(0, pcvl.BS(theta=alpha))
+                  .add(0, pcvl.PS(beta))
+                  .add(0, pcvl.BS()))
+    p = pcvl.Processor("SLOS", 3)
+    p.add(0, pcvl.Detector.pnr())
+    configurator = pcvl.FFConfigurator(
+        1, 0, controlled, {name: 0. for name in CONFIGURATOR_VALUES})
+    configurator.add_configuration(
+        [1], {name: CONFIGURATOR_VALUES[name] for name in order})
+    p.add(0, configurator)
+    for m in range(3):
+        if p.detectors[m] is None:
+            p.add(m, pcvl.Detector.pnr())
+    return p
+
+
+@pytest.mark.parametrize("order", [("alpha", "beta"), ("beta", "alpha")])
+def test_configurator_substitutes_by_name(order):
+    """A configurator gives each symbol the value its own name is given,
+    so that both orders of the same configuration dict convert to the same
+    diagram, as they give perceval the same circuit. Both orders are
+    needed: the pairing used to come from zipping ``U.free_symbols``, a
+    set, with the values of the dict, and whichever way that set happens
+    to iterate under ``PYTHONHASHSEED``, exactly one of the two orders
+    silently gave each symbol the other one's value."""
+    state = [1, 1, 0]
+    p = configurator_processor(order)
+    p.with_input(pcvl.BasicState(state))
+    expected = {tuple(k): v for k, v in p.probs()["results"].items()}
+    check_dict_agreement(expected, (
+        Create_(*state) >> Channel.from_perceval(
+            configurator_processor(order))).eval().prob_dist())
+
+
+def test_configurator_rejects_missing_symbol():
+    """A configuration that gives no value for a symbol of the controlled
+    circuit is an error, not a symbol paired with another's value."""
+    p = configurator_processor(("alpha", "beta"))
+    configurator, = [component for _, component in p.components
+                     if isinstance(component, pcvl.FFConfigurator)]
+    configurator._configs = {
+        pcvl.BasicState([1]): {"alpha": CONFIGURATOR_VALUES["alpha"]}}
+    with pytest.raises(ValueError, match="no value for the symbols beta"):
+        Channel.from_perceval(p)

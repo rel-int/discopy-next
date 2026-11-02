@@ -12,7 +12,7 @@ In monoidal syntax, `>>` denotes sequential composition and `@` denotes parallel
 For example, you can build the CNOT gate from the **Z** and **X** generators of the **ZX caluclus** (don't forget the scalar!).
 
 ```python
-from discopy.optyx import qubit
+from discopy.optyx import Channel, qubit
 from discopy.optyx.qubits import Z, X, Scalar
 
 cnot = Z(1, 2) @ qubit >> qubit @ X(2, 1) @ Scalar(2 ** 0.5)
@@ -49,7 +49,7 @@ Write the protocol using function syntax:
 
 ```python
 from discopy.optyx import bit
-from discopy.optyx.qubits import Measure
+from discopy.optyx.qubits import H, Measure
 from discopy.optyx.classical import CtrlX, CtrlZ
 
 bell = Scalar(0.5 ** 0.5) @ Z(0, 2)
@@ -86,9 +86,12 @@ teleportation_monoidal_syntax = (
 import numpy as np
 from discopy.optyx.qubits import Id
 
-np.allclose(
+assert np.allclose(
     teleportation.eval().tensor.array,
-    teleportation_monoidal_syntax.eval().tensor.array,
+    teleportation_monoidal_syntax.eval().tensor.array
+)
+assert np.allclose(
+    teleportation.eval().tensor.array,
     Id(1).double().to_tensor().eval().array
 )
 ```
@@ -101,7 +104,7 @@ from discopy.optyx.core.backends import (
     QuimbBackend
 )
 
-np.allclose(
+assert np.allclose(
     teleportation.eval(DiscopyBackend()).tensor.array,
     teleportation.eval(QuimbBackend()).tensor.array
 )
@@ -171,10 +174,10 @@ We model photon loss in optyx using the `PhotonLoss` generator. We can check tha
 
 ```python
 from discopy.optyx.photonic import Id, PhotonLoss, NumberResolvingMeasurement
-from discopy.optyx.classical import AddN
+from discopy.optyx.classical import Add
 
 lossy_HOM = Create(1, 1) >> PhotonLoss(0.8) @ Id(1) >> BS 
-lossy_HOM = lossy_HOM >> NumberResolvingMeasurement(2) >> AddN(2)
+lossy_HOM = lossy_HOM >> NumberResolvingMeasurement(2) >> Add(2)
 assert np.isclose(lossy_HOM.eval().prob_dist()[(1,)], 0.2)
 ```
 
@@ -201,7 +204,7 @@ result = distinguishable_HOM.inflate(
 theoretical_result = 0.5 - 0.5 * np.abs(
     np.array(internal_state_1).dot(
         np.array(internal_state_2).conjugate()))**2
-assert np.isclose(result[(1, 1)], theoretical_result, 3)
+assert np.isclose(result[(1, 1)], theoretical_result)
 ```
 
  
@@ -223,7 +226,7 @@ This is modeled in optyx by assigning internal states to the `DualRail` boxes th
 
 ```python
 from discopy.optyx.qubits import Z, Scalar, Id, Measure
-from discopy.optyx.photonic import DualRail
+from discopy.optyx.photonic import DualRail, FusionTypeII
 from discopy.optyx.classical import PostselectBit
 from discopy.symmetric import Equation
 
@@ -312,7 +315,9 @@ circuit.cnot(0, 1)
 pattern = circuit.transpile().pattern
 
 simulator = graphix.simulator.PatternSimulator(pattern, backend="statevector")
-graphix_result = simulator.run().psi.conj()
+simulator.run()
+state = simulator.backend.state
+graphix_result = state.psi.reshape((2, ) * state.nqubit).conj()
 ```
 
 
@@ -322,11 +327,17 @@ from discopy.optyx.qubits import Circuit, Ket
 optyx_zx = Circuit(pattern)
 
 optyx_res = (
-    qubits.Ket("+")**2 >> optyx_zx
+    Ket("+")**2 >> optyx_zx
 ).eval().amplitudes()
 
+# an open graph defines its state up to a scalar, and graphix 0.4
+# absorbs Cliffords into measurements, so compare up to a phase
+largest = max(optyx_res, key=lambda keys: abs(optyx_res[keys]))
+phase = graphix_result[largest] / optyx_res[largest]
+assert np.isclose(abs(phase), 1, atol=1e-6)
 for keys in optyx_res.keys():
-    assert np.isclose(optyx_res[keys], graphix_result[keys], atol=1e-6)
+    assert np.isclose(
+        phase * optyx_res[keys], graphix_result[keys], atol=1e-6)
 ```
 
 ### Perceval circuits and processors
@@ -380,6 +391,8 @@ pcvl.pdisplay(p, recursive=True)
 Evaluate the protocol in Perceval.
 
 ```python
+state_array = (Ket("+") >> Z(1, 1, 0.3)).eval().tensor.array
+state_array = state_array / np.linalg.norm(state_array)
 
 to_transmit = (complex(state_array[0])*pcvl.BasicState([1, 0]) +
                complex(state_array[1])*pcvl.BasicState([0, 1]))
