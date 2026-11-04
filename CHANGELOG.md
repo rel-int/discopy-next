@@ -277,6 +277,8 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   reprs with its class, nan data equals itself ([next#31], [next#168]).
 - `dumps` writes tuples, numpy, sympy, `interaction`, `para`, `CQ`, `Equation`
   and dict functors ([next#168]); `para` and `interaction` hash ([next#31]).
+- A `Matrix` with no dtype reads it off its array without copying it, so it
+  copies once, as a `Matrix[dtype]` does ([next#8]).
 
 ### Deprecated
 
@@ -291,6 +293,150 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Fixed
 
+- `docs/notebooks/optyx/photon_distinguishability.md` composes its photonic
+  circuits from `optyx.photonic`, where it used to take `Create` from
+  `optyx.core.zw` and `DualRail` from `optyx.core.diagram` and compose those
+  core boxes with channel-level gates: `Create(1, 1, internal_states=...) >>
+  BS` raised `TypeError: Expected optyx.core.diagram.Diagram, got
+  optyx.photonic.BBS`, so the notebook never reached the Hong-Ou-Mandel effect
+  its prose describes. `photonic`'s own module docstring states the
+  composition, and `photonic.DualRail(n, internal_states=...)` is the class
+  whose signature the notebook was already calling. The two cells that do
+  demonstrate the core boxes keep them, module-qualified ([next#435]).
+- `docs/export_notebooks.py` exempts from `--check` only the notebooks an
+  **open** issue tracks. Three of its four entries named [next#247], closed as
+  completed on 2026-10-26: `optyx/feed_forward_example` executes clean and is
+  dropped, `optyx/photon_distinguishability` is fixed above, and
+  `optyx/readme_example` fails on [next#251]'s cotengra process pool, which it
+  now names. `--check` prints nothing for an exemption that has stopped being
+  needed, so the list could only grow ([next#435]).
+- `optyx.core.path.Matrix.prob_with_perceval` computes the Born rule of the
+  amplitudes, as its docstring and `prob`'s other branch say, where it used to
+  answer a probability conditional on the selections: two photons bunching
+  into one arm of a balanced beam splitter read `1` instead of `0.5`.
+  Perceval's own post-selection renormalises over the outcomes that survive
+  it, so the selections now pick out those outcomes instead, and the
+  `normalisation` that `dilate` leaves outside the unitary is put back on the
+  probabilities. It read right exactly where the selections carry all of the
+  mass or none of it, which both of its doctests did. As a tensor it also
+  raised `IndexError` for every diagram with a selection, giving
+  `amplitudes_2_tensor` one basis state per mode of the circuit where the
+  matrix has one column per *selected* outcome; the codomain is now the
+  occupations of the modes the selections leave open, as `eval` builds it, and
+  a selection of more photons than there are raises the same
+  `ValueError` as `eval` where it used to enumerate a negative photon count
+  ([next#229]).
+- `optyx.core.backends.PercevalBackend` evaluates a term as amplitudes and
+  applies the Born rule once, to their sum, so a sum of diagrams interferes:
+  `Create(1) + Create(1) @ Scalar(-1)` is zero where the probabilities of the
+  two terms added to two. It also carries the two factors that a `path.Matrix`
+  keeps outside its array and the simulator's circuit therefore cannot: the
+  global `scalar`, so that the amplitude of `Create(1) @ Scalar(1j)` is `1j`
+  and not `1`, and the `normalisation` that `dilate` raises to the number of
+  photons, so that the number operator on two photons is `2` and not the unit
+  a renormalised state vector reports ([next#314]).
+- A selection that no photon number can satisfy is an amplitude of zero, where
+  `PercevalBackend` used to raise `TypeError` from the SLOS backend for an
+  effect outside the Fock space it enumerates: `Create(1) >> Select(2)` and
+  `Create(1, 0) >> BS >> Select(2, 0)` are zero, as every other backend says,
+  rather than a crash on `amps` and `1.0` and `0.5` on `probs` ([next#314]).
+- A feed-forward component converted from perceval applies its default
+  circuit **once**, when the measured state is in none of its configurations,
+  where each configuration that did not match used to apply it: with a
+  `PERM([1, 0])` default and two configurations, one of which matched, the
+  swap was applied anyway. An even number of non-matching entries composes a
+  swap default into the identity, which is why a single configuration and
+  three of them — none and two non-matching entries — both read right
+  ([next#314]).
+- `optyx.utils.perceval_conversion.ff_configurator` gives each symbol of a
+  configurator's controlled circuit the value its own name is given in the
+  configuration: it used to zip `U.free_symbols`, a set, with the values of
+  the configuration dict, so which symbol got which value depended on
+  `PYTHONHASHSEED` and the circuit a feed-forward configuration converted to
+  was silently another configuration's. A configuration that gives no value
+  for a symbol now raises `ValueError` rather than pairing that symbol with
+  whatever came next. The dead `use_provider_dom` flag goes with it: a
+  parameter threaded through `_feedforward_common` that nothing read, its
+  branch commented out, so the signature promised a provider domain the code
+  never computed ([next#314]).
+- `optyx`: `d ** n` is the tensor power the hierarchy already states in
+  `monoidal.Ty.__pow__`, i.e. the identity for `n <= 0` on an endomorphism and
+  an assertion on anything else, where three copies of the same `__pow__` —
+  on `optyx.core.diagram.Box`, on `channel.Diagram` and a verbatim duplicate
+  of the latter on `channel.CQMap` — recursed without a floor for every
+  `n <= 0`, e.g. `zw.W(2) ** 0` and `photonic.BS ** 0`. A composite
+  `optyx.core.diagram.Diagram` has a power too, where only its boxes had one
+- `optyx.photonic.Select()` and `Create()` default to one photon on one mode,
+  as the `zw` boxes they wrap do, so that their `photons` and the path matrix
+  they build agree with the `qmode` they are typed on ([next#314]).
+- `optyx.classical.PostselectDigit()` and `Digit()` declare the one mode
+  their `zw` kraus defaults to rather than none, where they used to fail an
+  assertion ([next#314]).
+- `optyx.classical.PostselectBit()` on no bit is the empty product, the
+  scalar one on `bit ** 0`, where reading the first bit raised an
+  `IndexError` ([next#314]).
+- `optyx.qubits.Z(0, 0).decomp()` is a scalar, where it dropped the empty
+  codomain and gave a state on one qubit, the legs in and the legs out now
+  read independently; so is `qubits.X(0, 0).decomp()`, which goes through it
+  ([next#314]).
+- `optyx.core.control.ControlledPhaseShift` applies the phase its function
+  reads off two or more control modes: it indexed its array along the first
+  axis only, with `array[i, :]` for a whole control configuration `i`, so the
+  per-configuration cell had the wrong shape and the reshape raised
+  ([next#314]).
+- `optyx.core.control.ControlledPhaseShift.conjugate` negates its phases: it
+  returned a box built from the arguments of `self`, so the conjugate *was*
+  `self` and its truncation equalled the original's. Complex conjugation sends
+  `exp(2*pi*1j*y)` to `exp(-2*pi*1j*y)`, so the conjugate is the same box with
+  every value of its function negated, and `conjugate` now commutes with
+  `dagger` and is an involution. The negation is `partial(negate_phases,
+  function)`, a function of the module rather than a closure, so a conjugated
+  box pickles whenever the box it is the conjugate of does ([next#314]).
+- `optyx.core.zw.ZBox` compares two amplitude lists of different lengths
+  instead of raising on the broadcast, with
+  `misc.compare_arrays_of_different_sizes`, which is what equality of two
+  truncations of the same infinite list is in this module ([next#314]).
+- `optyx.utils.misc.compare_arrays_of_different_sizes` counts a NaN as a
+  difference, as `np.allclose` does with its default `equal_nan=False`: it
+  read `abs(x - y) > tol`, False whenever the difference is a NaN, so a NaN
+  amplitude compared equal to anything with a matching prefix and an
+  `optyx.core.zw` axiom stated with the helper could not fail on one. It is
+  `np.allclose` with an absolute tolerance only instead, so two matching
+  infinities stay equal, which makes the `zw.has_nan` guard on `ZBox.__eq__`
+  redundant and both go ([next#422]).
+- `optyx.core.zw.W` has a `__hash__` of its own: Python used to set it to
+  `None`, as it does on any class overriding `__eq__`, so `hash(W(2))` raised
+  and a `Functor` could not look the box up in a dict `ar_map`. `ZBox` stays
+  unhashable: comparing amplitudes by prefix is not transitive, so no hash
+  keeps equal boxes hashing equal ([next#314]).
+- Docs: the architecture diagram shows the new syntax modules, the menu names
+  `spacial`, `kleisli` and `monad` without their prefix, `feedback` states each
+  law once with its trace under it, and the notebooks link the API docs
+  relatively ([next#411]).
+- `optyx.compiler`: a `Fusion` compared to anything but a fusion is unequal
+  rather than an `AttributeError`; `path_cover.find_min_path_cover` covers a
+  graph with one node, an edgeless graph and the empty graph, searching up to
+  as many paths as the graph has nodes rather than one fewer; and the SEMM
+  decompiler refuses three invalid instruction streams it used to accept — an
+  instruction before the first `next_node`, a node measured twice when a delay
+  records one of the two in the future, and a delayed fusion no photon comes
+  back for ([next#314]).
+- `optyx.compiler`'s summary renders `compile_to_semm`, `decompile_from_semm`
+  and `pattern_satisfies_order` as the functions they are, with their own
+  autosummary block, where `class.rst` used to document all three as classes;
+  so do the summaries of `compiler.semm`, which listed `compile_to_semm` and
+  `decompile_from_semm` the same way, and `compiler.semm_decompiler`, which
+  listed `decompile_to_fusion_network` ([next#314]).
+- Every code block of `discopy/optyx/README.md` runs, and `test/optyx/readme.py`
+  checks that it does, the way `test/readme.py` checks the root README: the
+  snippets import `Channel`, `qubits.H` and `photonic.FusionTypeII`, call
+  `classical.Add` where `AddN` does not exist, call `Ket` as they import it,
+  define the `state_array` they send through the perceval processor, read
+  graphix's statevector off the backend as graphix 0.4 leaves it, and give
+  `np.isclose` and `np.allclose` no third positional argument, so that the
+  teleportation and distinguishability assertions check what the prose around
+  them claims: `np.isclose` was reading a `3` as a 300% relative tolerance, and
+  `np.allclose` a doubled identity channel as one ([next#314]).
 - What the property matrix of [next#1] found, each with its test:
   `Feedback.dagger` and `rotate` raise `AxiomError`, as either would feed
   the memory back in time; `para.Compact.curry` keeps the coparameters and
@@ -302,6 +448,13 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   boxes and adjoint wires read back, their `atoms` being the generators they
   name, as do those of a hypergraph; a Markov hypergraph whose spider has no
   input, i.e. a copy traced back into itself, decodes to that trace.
+- `optyx.photonic.TBS` and `MZI` are the matrix they say they are once
+  conjugated: the global phase **XORs** `is_gate_dagger` and `is_conj` where it
+  ORed them, so a conjugated gate carried the daggered gate's phase and
+  `g >> g.dagger()` was not the identity; and `decomp` conjugates the beam
+  splitters and phase shifters it decomposes into, where it dropped `is_conj`
+  altogether, so the gradient of a conjugate — which is the gradient of the
+  decomposition — was the gradient ([next#314]).
 - `Category.typeparams` reads `ob` with no fallback: a monoid's objects are
   `NoneType`, so `Nat.typeparams()` no longer gives `(Nat, Nat)` ([next#214]).
 - `quantum.zx.Diagram.from_pyzx`, and its copy in `optyx.core.zx`, wires a
@@ -364,6 +517,15 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   `Diagram.from_perceval` reads a negative feed-forward offset `k` as `-k - 1`
   modes in between ([next#295]) and keeps a detector with nothing after it
   ([next#299]).
+- `optyx.core.path.Matrix`: `dagger` conjugates `scalar`, `dilate` keeps
+  `scalar` and multiplies `normalisation` in, and `eval` with no photons to
+  route reads the empty permanent, 1, as `npperm` now does;
+  `optyx.utils.misc.matrix_to_zw` takes a rectangular matrix, a symbolic one
+  with zeros and one with a zero row or column, and
+  `basis_vector_from_kets` rejects a negative index (part of [next#314]).
+- `optyx.classical.Xor(n)` is a parity for every `n`, its scalar
+  `sqrt(2 ** (n - 1))`, and `BitControlledGate` of a diagram with no boxes
+  discards its bit (part of [next#314]).
 - `Hypergraph`: its hash, `simplify`, `rotate`, and `to_diagram` on
   non-self-dual, `Nat` and `Dim` types ([#324], [#387], [#393], [#622],
   [#719]).
@@ -509,6 +671,26 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   in `kleisli.additive` ([#639]), and notebook titles in the docs ([#526]).
 - optyx's docstrings draw with `doctest=`, so their images are checked against
   the committed ones ([next#388]).
+- `optyx.core.zx.Z(0, 0, phase)` is the scalar `1 + exp(2i pi phase)`, the sum
+  of its amplitudes, which is what a spider with no index left to carry them
+  is and what pyzx gives: it used to be a legless `zw.ZBox` carrying both
+  amplitudes, so `qubits.Z(0, 0)`, `qubits.X(0, 0)` and `Z(0, 0, .25)` raised
+  `cannot reshape array of size 2 into shape ()` rather than evaluating
+  ([next#421]).
+- `optyx.core.zx.Spider.grad` is `1j * pi * phase'` times the difference
+  between the spider and the spider shifted by half a turn, which is the
+  formula `quantum.zx.Spider.grad` next door already had. The optyx copy
+  returned the shifted spider alone, so a spider with legs had a spurious
+  value on the all-zero entry of its gradient, where the derivative has none,
+  and a legless one had the wrong value outright. `optyx.core.zx.ZBox`
+  overrides it: its parameter is an amplitude rather than an angle, its array
+  is linear in it, and its gradient is the difference between the box at one
+  and the box at zero ([next#426]).
+- `optyx.core.zw.ZBox(0, 0, amplitudes)` reads the first of its amplitudes,
+  as its truncation already did for an infinite amplitude list and as `zw`'s
+  own axioms write a scalar: the list branch was missing that index, and a
+  legless box carrying more than one amplitude raised on the reshape
+  ([next#421]).
 
 ### Project
 
@@ -739,6 +921,7 @@ for the changelog of `1.2.1` and earlier.
 [next#145]: https://github.com/rel-int/discopy-next/issues/145
 [next#147]: https://github.com/rel-int/discopy-next/issues/147
 [next#149]: https://github.com/rel-int/discopy-next/issues/149
+[next#8]: https://github.com/rel-int/discopy-next/issues/8
 [next#156]: https://github.com/rel-int/discopy-next/issues/156
 [next#161]: https://github.com/rel-int/discopy-next/issues/161
 [next#162]: https://github.com/rel-int/discopy-next/issues/162
@@ -780,6 +963,7 @@ for the changelog of `1.2.1` and earlier.
 [next#302]: https://github.com/rel-int/discopy-next/pull/302
 [next#310]: https://github.com/rel-int/discopy-next/pull/310
 [next#313]: https://github.com/rel-int/discopy-next/issues/313
+[next#314]: https://github.com/rel-int/discopy-next/issues/314
 [next#316]: https://github.com/rel-int/discopy-next/pull/316
 [next#320]: https://github.com/rel-int/discopy-next/pull/320
 [next#323]: https://github.com/rel-int/discopy-next/issues/323
@@ -793,6 +977,14 @@ for the changelog of `1.2.1` and earlier.
 [next#387]: https://github.com/rel-int/discopy-next/issues/387
 [next#388]: https://github.com/rel-int/discopy-next/issues/388
 [next#399]: https://github.com/rel-int/discopy-next/issues/399
+[next#229]: https://github.com/rel-int/discopy-next/issues/229
+[next#435]: https://github.com/rel-int/discopy-next/issues/435
+[next#247]: https://github.com/rel-int/discopy-next/issues/247
+[next#251]: https://github.com/rel-int/discopy-next/issues/251
+[next#421]: https://github.com/rel-int/discopy-next/issues/421
+[next#422]: https://github.com/rel-int/discopy-next/issues/422
+[next#426]: https://github.com/rel-int/discopy-next/issues/426
+[next#411]: https://github.com/rel-int/discopy-next/pull/411
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#56]: https://github.com/rel-int/optyx/pull/56

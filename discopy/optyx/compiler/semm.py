@@ -2,7 +2,7 @@
 single emitter multiple measure (SEMM) machine
 
 .. autosummary::
-    :template: class.rst
+    :template: function.rst
     :nosignatures:
     :toctree:
 

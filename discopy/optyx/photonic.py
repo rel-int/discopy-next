@@ -295,12 +295,16 @@ def listed(internal_states):
 class Select(Channel):
     """
     Post-select on an occupation number.
+
+    Example
+    -------
+    >>> assert Select() == Select(1)
     """
     def __init__(self, *photons: int):
-        self.photons = photons
+        self.photons = photons or (1,)
         super().__init__(
-            f"Select({photons})",
-            zw.Select(*photons)
+            f"Select({self.photons})",
+            zw.Select(*self.photons)
         )
 
     def __repr__(self):
@@ -405,14 +409,18 @@ class NumberResolvingMeasurement(Measure):
 class Create(Channel):
     """
     Fock basis states (occupation numbers).
+
+    Example
+    -------
+    >>> assert Create() == Create(1)
     """
     def __init__(self, *photons: int,
                  internal_states: tuple[list[int]] = None):
-        self.photons = photons
+        self.photons = photons or (1,)
         self.internal_states = internal_states
         super().__init__(
-            f"Create({photons})",
-            zw.Create(*photons, internal_states=internal_states)
+            f"Create({self.photons})",
+            zw.Create(*self.photons, internal_states=internal_states)
         )
 
     def __repr__(self):
@@ -743,7 +751,7 @@ class TBS(AbstractGate):
         backend = sp if self.dtype is Expr else np
         return (
             -1j * backend.exp(-1j * self.theta * backend.pi)
-            if self.is_gate_dagger or self.is_conj
+            if self.is_gate_dagger != self.is_conj
             else 1j * backend.exp(1j * self.theta * backend.pi)
         )
 
@@ -767,7 +775,9 @@ class TBS(AbstractGate):
 
     def decomp(self):
         """Decompose into beam splitters and phase shifters."""
-        d = BS >> qmode @ Phase(self.theta) >> BS
+        bs, phase = (BS, Phase(self.theta)) if not self.is_conj else (
+            BS.conjugate(), Phase(self.theta).conjugate())
+        d = bs >> qmode @ phase >> bs
         return d.dagger() if self.is_gate_dagger else d
 
     def grad(self, var):
@@ -856,7 +866,7 @@ class MZI(AbstractGate):
         backend = sp if self.dtype is Expr else np
         return (
             -1j * backend.exp(-1j * self.theta * backend.pi)
-            if self.is_gate_dagger or self.is_conj
+            if self.is_gate_dagger != self.is_conj
             else 1j * backend.exp(1j * self.theta * backend.pi)
         )
 
@@ -881,8 +891,10 @@ class MZI(AbstractGate):
 
     def decomp(self):
         """Decompose into beam splitters and phase shifters."""
-        x, y = self.theta, self.phi
-        d = BS >> qmode @ Phase(x) >> BS >> Phase(y) @ qmode
+        bs, x, y = BS, Phase(self.theta), Phase(self.phi)
+        if self.is_conj:
+            bs, x, y = bs.conjugate(), x.conjugate(), y.conjugate()
+        d = bs >> qmode @ x >> bs >> y @ qmode
         return d.dagger() if self.is_gate_dagger else d
 
     def grad(self, var):

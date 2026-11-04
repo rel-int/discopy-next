@@ -20,7 +20,7 @@ The paper draws two kinds of diagram, and they turn into code differently:
 ## Constraints are solved: equivariance
 
 A group $G$ acting on a set $X$ is an algebra of the monad $G \times -$, and a map between two such algebras that makes the square commute is an equivariant map: $f(g \cdot x) = g \cdot f(x)$.
-For a linear map between permutation representations, the square says that the matrix is constant on the orbits of $G$ acting on pairs of points, i.e. on the orbits of the tensor of the two actions, which [`discopy.group`](https://docs.discopy.org/en/main/_api/discopy.group.html) computes from the generators alone.
+For a linear map between permutation representations, the square says that the matrix is constant on the orbits of $G$ acting on pairs of points, i.e. on the orbits of the tensor of the two actions, which [`discopy.group`](../../_api/discopy.group.html) computes from the generators alone.
 Here is the weight tying of Examples H.1 and H.3, the cyclic group of order two swapping two pixels, with the swap or the trivial action on the output:
 
 ```python {.marimo}
@@ -82,7 +82,7 @@ edge to node: {tying(nodes, edges).max() + 1} weights
 ## Architectures are parametric maps
 
 In the 2-category $\mathbf{Para}$, a map $A \to B$ is a pair of a parameter object $P$ and a map $P \times A \to B$, drawn with $P$ as one more wire.
-[`discopy.para`](https://docs.discopy.org/en/main/_api/discopy.para.html) implements it over any symmetric category, here the free Markov category of [`discopy.markov`](https://docs.discopy.org/en/main/_api/discopy.markov.html).
+[`discopy.para`](../../_api/discopy.para.html) implements it over any symmetric category, here the free Markov category of [`discopy.markov`](../../_api/discopy.markov.html).
 Composition puts the parameters side by side (Figure 4):
 
 ```python {.marimo}
@@ -189,7 +189,7 @@ Equation(tree, recursive(tree).reparam(Diagram.copy(P, 5)).inside.simplify(),
 ## Unfolds are feedback
 
 Coalgebras go the other way, from a state to what it produces.
-A Mealy machine, a coalgebra of $I \to O \times -$, is a cell from an input and the previous state to an output and the next state, and the recurrent network it defines is its feedback in the category of [`discopy.feedback`](https://docs.discopy.org/en/main/_api/discopy.feedback.html), where the state comes back delayed:
+A Mealy machine, a coalgebra of $I \to O \times -$, is a cell from an input and the previous state to an output and the next state, and the recurrent network it defines is its feedback in the category of [`discopy.feedback`](../../_api/discopy.feedback.html), where the state comes back delayed:
 
 ```python {.marimo}
 I, O = Ty("I"), Ty("O")
@@ -198,7 +198,7 @@ recurrent = mealy.feedback(dom=I, cod=O, mem=S)
 recurrent
 ```
 
-Its semantics are [monoidal streams](https://docs.discopy.org/en/main/_api/discopy.stream.html), the final coalgebra: a functor sends it to a stream of boxes, one per time step, and unrolling the stream gives the first steps as a finite diagram (Figure 13):
+Its semantics are [monoidal streams](../../_api/discopy.stream.html), the final coalgebra: a functor sends it to a stream of boxes, one per time step, and unrolling the stream gives the first steps as a finite diagram (Figure 13):
 
 ```python {.marimo}
 from discopy import stream, symmetric
@@ -228,7 +228,7 @@ in_time(unrolled).reparam(Diagram.copy(P, 4)).inside.simplify()
 ```
 
 That ties the weights of a finite prefix, chosen after unrolling.
-To tie them across every time step, the parameter becomes a constant stream: read once at time zero, then followed by its own copy, i.e. [`FollowedBy`](https://docs.discopy.org/en/main/_api/discopy.feedback.FollowedBy.html) from `P.head @ P.delay()` to `P` and a `copy` fed back.
+To tie them across every time step, the parameter becomes a constant stream: read once at time zero, then followed by its own copy, i.e. [`FollowedBy`](../../_api/discopy.feedback.FollowedBy.html) from `P.head @ P.delay()` to `P` and a `copy` fed back.
 The cell reads it at every step like any other input:
 
 ```python {.marimo}
@@ -285,4 +285,4 @@ Everything above runs on today's DisCoPy.
 Writing it hit two gaps:
 
 * **Equivariant layers as boxes.** The weight tying above is computed by hand: a box whose module is the matrix tied on orbitals, or better factorised along the construction of the group, is slice 3 of [#121](https://github.com/rel-int/discopy-next/issues/121).
-* **A module holding the parameters.** A network in `para.Markov[Network]` compiles to a pure function of its inputs and parameters, as JAX wants it, but [`neural.torch.Module`](https://docs.discopy.org/en/main/_api/discopy.neural.torch.html) takes every wire as an input: nothing yet turns a copied parameter wire into one `torch.nn.Parameter` ([#124](https://github.com/rel-int/discopy-next/issues/124)).
+* **A module holding the parameters.** A network in `para.Markov[Network]` compiles to a pure function of its inputs and parameters, as JAX wants it, but [`neural.torch.Module`](../../_api/discopy.neural.torch.html) takes every wire as an input: nothing yet turns a copied parameter wire into one `torch.nn.Parameter` ([#124](https://github.com/rel-int/discopy-next/issues/124)).

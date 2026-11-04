@@ -63,7 +63,12 @@ class Fusion:
         False
         >>> Fusion(0, 2, "X") == Fusion(0, 1, "X")
         False
+        >>> Fusion(0, 1, "X") == None
+        False
         """
+        if not isinstance(other, Fusion):
+            return False
+
         if self.fusion_type != other.fusion_type:
             return False
 

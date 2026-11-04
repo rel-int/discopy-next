@@ -298,6 +298,7 @@ class Diagram(frobenius.Diagram):
     :class:`lo` calculi."""
 
     grad = tensor.Diagram.grad
+    __pow__ = monoidal.Ty.__pow__
 
     def conjugate(self) -> Diagram:
         """Conjugates every box in the diagram"""
@@ -903,11 +904,6 @@ class Box(frobenius.Box, Diagram):
         max_output_dims: Tuple[int, ...] = None
     ) -> Iterable[BasisTransition]:
         pass
-
-    def __pow__(self, n):
-        if n == 1:
-            return self
-        return self @ self ** (n - 1)
 
 
 class Spider(frobenius.Spider, Box):

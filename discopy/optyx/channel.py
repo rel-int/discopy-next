@@ -406,6 +406,7 @@ class Diagram(frobenius.Diagram):
     boundary = diagram.Diagram.boundary
     unroll = diagram.Diagram.unroll
     one_step = diagram.Diagram.one_step
+    __pow__ = monoidal.Ty.__pow__
 
     def feedback(self, dom=None, cod=None, mem=None,
                  state=None, effect=None) -> Diagram:
@@ -1617,11 +1618,6 @@ class Diagram(frobenius.Diagram):
             circuit >>= perceval_conversion.postselection(circuit, p)
         return circuit
 
-    def __pow__(self, n):
-        if n == 1:
-            return self
-        return self @ self ** (n - 1)
-
     def eval(self, backend=None, **kwargs):
         """
         Evaluate the diagram using the specified backend.
@@ -1830,11 +1826,6 @@ class CQMap(Diagram, frobenius.Box):
             dom=self.dom.inflate(d),
             cod=self.cod.inflate(d)
         )
-
-    def __pow__(self, n):
-        if n == 1:
-            return self
-        return self @ self ** (n - 1)
 
 
 class Permutation(frobenius.Permutation, Channel):

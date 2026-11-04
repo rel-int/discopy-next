@@ -58,3 +58,12 @@ def test_BBS_dagger_and_lambdify_keep_is_conj(is_conj):
     box = BBS(0.3, is_conj=is_conj)
     assert np.allclose(box.dagger().array, box.array.conj().T)
     assert BBS(x, is_conj=is_conj).lambdify(x)(0.3).is_conj == is_conj
+
+
+def test_select_and_create_default_to_one_photon():
+    """Both default to one photon on one mode, like the ZW boxes they
+    wrap, rather than to no mode at all."""
+    assert Select() == Select(1) and Create() == Create(1)
+    assert Select().photons == Create().photons == (1,)
+    assert Select().to_path() == zw.Select().to_path()
+    assert outcomes(Create() >> Select()) == {(): 1}
