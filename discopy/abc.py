@@ -12,12 +12,12 @@ the characteristic generator of its categorical structure as an
 Software dependencies between modules go top-to-bottom, left-to-right and
 forgetful functors between categories go the other way.
 
-Each class also declares its :func:`discopy.axioms.axiom` equations, which
+Each class also declares its :func:`discopy.testable.axiom` equations, which
 every free category inherits along with the structure they axiomatise:
 :class:`Category` states the unitality and associativity of composition; a
 law quantifies over the type parameters of its signature, objects of the
 category, and over morphisms between them, see
-:class:`discopy.axioms.Declaration`; a :class:`DaggerCategory`
+:class:`discopy.testable.Declaration`; a :class:`DaggerCategory`
 adds the involution and contravariance of its dagger; a
 :class:`ColouredMonoid` inherits the first two as the unitality and
 associativity of its product, its composition; a :class:`Groupoid` is a
@@ -80,10 +80,10 @@ from dataclasses import dataclass
 from functools import wraps
 from inspect import signature
 from types import NoneType
-from typing import ClassVar
+from typing import TYPE_CHECKING, ClassVar
 
 from discopy import messages
-from discopy.axioms import (
+from discopy.testable import (
     Delay, Equation, Hom, Obj, Tensor, Testable, Unit, Var, axiom)
 from discopy.utils import (  # noqa: F401  pylint: disable=unused-import
     AxiomError, NamedGeneric, classproperty, factory_name)
@@ -105,14 +105,15 @@ class Category[C0, C1: Category](ABC):
     ...         return self + other
     >>> assert List([1, 2]) >> List([3]) == List([1, 2, 3])
     >>> assert List([3]) << List([1, 2]) == List([1, 2, 3])
+
+    The class variable ``ar`` is a backward-compatible alias for
+    ``factory``, since types are themselves the objects of diagrams.
     """
-    ob: ClassVar[type[C0]]
-    factory: ClassVar[type[C1]]
+    ob: ClassVar[type]
+    factory: ClassVar[type]
     dom: C0
     cod: C0
 
-    #: Backward-compatible alias for :attr:`factory`, since types are
-    #: themselves the objects of diagrams.
     ar = classproperty(lambda cls: getattr(cls, "factory", cls))
 
     @classmethod
@@ -121,7 +122,7 @@ class Category[C0, C1: Category](ABC):
         What the type parameters of the category stand for, in order: its
         objects ``C0`` and its arrows ``C1``, so that a sequent stated with
         them reads as one of the category it is bound to, see
-        :func:`discopy.axioms.position`.
+        :func:`discopy.testable.position`.
 
         >>> from discopy.monoidal import Ty, Diagram
         >>> assert Diagram.typeparams() == (Ty, Diagram)
@@ -137,7 +138,7 @@ class Category[C0, C1: Category](ABC):
         A class that quotients its equations overrides this, e.g. by
         hypergraph isomorphism from symmetric categories on, so an axiom
         built with it is checked up to whatever quotient the category
-        defines — and :meth:`discopy.axioms.Axiom.modulo` weakens it
+        defines — and :meth:`discopy.testable.Axiom.modulo` weakens it
         further.
         """
         return Equation(*terms)
@@ -240,13 +241,30 @@ class ColouredMonoid[C0, C1: ColouredMonoid](Category[C0, C1]):
     colour, i.e. :class:`type(None)`. We do not enforce this so
     that e.g. :class:`monoidal.Ty` can take colours as objects.
     """
+    if TYPE_CHECKING:
+        def __len__(self) -> int:
+            """ The number of generating objects inside, assumed free. """
+
+        def __getitem__(self, key) -> C1:
+            """ The slices of a free monoid, assumed to stay inside it. """
+
+    @property
+    def is_atomic(self) -> bool:
+        """
+        Whether an element is atomic, i.e. a generator: by default, one of
+        length 1.
+
+        >>> assert Nat(1).is_atomic and not Nat(2).is_atomic
+        """
+        return len(self) == 1
+
     @classmethod
-    def id(cls, dom: C0 = None) -> C1:
+    def id(cls: type[C1], dom: C0 | None = None) -> C1:
         """The monoidal unit, i.e. the empty tensor ``cls()``."""
         return cls()
 
     @classmethod
-    def unit(cls, colour: C0 = None) -> C0 | C1:
+    def unit(cls: type[C1], colour: C0 | None = None) -> C0 | C1:
         """
         The unit at a colour, i.e. the identity on it.
 
@@ -265,7 +283,7 @@ class ColouredMonoid[C0, C1: ColouredMonoid](Category[C0, C1]):
         return self.tensor(*others)
 
     @classmethod
-    def cast(cls, atoms) -> C1:
+    def cast(cls: type[C1], atoms) -> C1:
         """
         The element of a tuple of atoms, or of a single atom; an element of
         the monoid is unchanged.
@@ -277,10 +295,12 @@ class ColouredMonoid[C0, C1: ColouredMonoid](Category[C0, C1]):
         """
         if isinstance(atoms, cls):
             return atoms
-        return cls(*atoms) if isinstance(atoms, tuple) else cls(atoms)
+        if isinstance(atoms, tuple):
+            return cls(*atoms)
+        return cls(atoms)  # ty: ignore[too-many-positional-arguments]
 
     @classmethod
-    def whisker(cls, other: C0 | C1) -> C1:
+    def whisker(cls: type[C1], other: C0 | C1) -> C1:
         """
         Do nothing if ``other`` is already a morphism else apply :meth:`id`.
 
@@ -292,11 +312,12 @@ class ColouredMonoid[C0, C1: ColouredMonoid](Category[C0, C1]):
     def __matmul__(self, other):
         return self.tensor(other)
 
-    def __rmatmul__(self, other):
+    def __rmatmul__(self: C1, other):
         return self.whisker(other).tensor(self)
 
 
-class Monoid[C1: Monoid](ColouredMonoid[type(None), C1]):
+class Monoid[C1: Monoid](
+        ColouredMonoid[type(None), C1]):  # ty: ignore[invalid-type-form]
     """ A monoid is a coloured monoid with a single, trivial colour. """
     ob = NoneType
 
@@ -320,7 +341,9 @@ class Groupoid[C0, C1: Groupoid](DaggerCategory[C0, C1]):
             (cls.id(f.dom), cls.id(f.cod)))
 
 
-class Group[C1: Group](Groupoid[type(None), C1], Monoid[C1]):
+class Group[C1: Group](
+        Groupoid[type(None), C1],  # ty: ignore[invalid-type-form]
+        Monoid[C1]):
     """
     A group is a monoid whose elements are invertible, i.e. a groupoid with
     a single object :obj:`None`, which every element goes from and to.
@@ -337,7 +360,7 @@ class Nat(Testable["Nat"], Monoid["Nat"]):
     it off as a sequence of ``1``'s, e.g. ``Nat(3)[:1] == Nat(1)``.
 
     It is the sort of a law's number variable ``N: Nat`` too, see
-    :class:`discopy.axioms.Declaration`, and :meth:`__index__` lets it stand
+    :class:`discopy.testable.Declaration`, and :meth:`__index__` lets it stand
     wherever a number of copies or legs does, e.g. ``x ** Nat(2) == x @ x``
     and ``spiders(Nat(2), 1, x)``.
 
@@ -391,7 +414,7 @@ class Nat(Testable["Nat"], Monoid["Nat"]):
         Generate natural numbers up to ``max_size``, so that a category
         whose objects they are, e.g. :class:`discopy.matrix.Matrix`, and a
         law with a number variable ``N: Nat`` quantify over them like any
-        other :class:`discopy.axioms.Testable`.
+        other :class:`discopy.testable.Testable`.
         """
         from hypothesis import strategies as st
 
@@ -442,17 +465,19 @@ class MonoidalCategory[C0: ColouredMonoid, C1: MonoidalCategory](
         Parameters:
             other : The object or morphism to be tensored on the left or right.
         """
-        return other if isinstance(other, MonoidalCategory) else cls.id(other)
+        return (
+            other  # ty: ignore[invalid-return-type]
+            if isinstance(other, MonoidalCategory) else cls.id(other))
 
     def __matmul__(self, other):
         return self.tensor(self.whisker(other))
 
-    def __rmatmul__(self, other):
+    def __rmatmul__(self: C1, other):
         return self.whisker(other).tensor(self)
 
     def split_memory(
-            self, n: int = None, left: bool = False, *,
-            dom: C0 = None, cod: C0 = None, mem: C0 = None
+            self, n: int | None = None, left: bool = False, *,
+            dom: C0 | None = None, cod: C0 | None = None, mem: C0 | None = None
             ) -> tuple[C0, C0, C0]:
         """
         The domain, codomain and memory of a feedback or a trace, read off
@@ -503,7 +528,8 @@ class MonoidalCategory[C0: ColouredMonoid, C1: MonoidalCategory](
         return len(mem)
 
 
-class SpacialCategory[C0, C1](MonoidalCategory[C0, C1]):
+class SpacialCategory[
+        C0: ColouredMonoid, C1: SpacialCategory](MonoidalCategory[C0, C1]):
     """
     A spacial category is a :class:`MonoidalCategory` where scalars slide:
     a scalar ``s : I -> I`` on the left of any morphism is the same scalar on
@@ -527,7 +553,8 @@ class PRO[C1: PRO](MonoidalCategory[Nat, C1]):
     """
 
 
-class FeedbackCategory[C0, C1](MonoidalCategory[C0, C1]):
+class FeedbackCategory[
+        C0: ColouredMonoid, C1: FeedbackCategory](MonoidalCategory[C0, C1]):
     """
     A feedback category is a :class:`MonoidalCategory` with a monoidal
     endofunctor :meth:`delay` and an operator :meth:`feedback` from
@@ -546,12 +573,13 @@ class FeedbackCategory[C0, C1](MonoidalCategory[C0, C1]):
             n_steps : The number of time steps to delay.
         """
         del n_steps
-        return self
+        return self  # ty: ignore[invalid-return-type]
 
     @abstractmethod
     def feedback(
-            self, n: int = None, left: bool = False, *,
-            dom: C0 = None, cod: C0 = None, mem: C0 = None) -> C1:
+            self, n: int | None = None, left: bool = False, *,
+            dom: C0 | None = None, cod: C0 | None = None,
+            mem: C0 | None = None) -> C1:
         """
         The feedback operator on a morphism ``dom @ mem.delay() -> cod @ mem``
         giving a morphism ``dom -> cod``, to be instantiated.
@@ -658,7 +686,7 @@ def keyword_form(trace: Callable) -> Callable:
         return trace
 
     @wraps(trace)
-    def method(self, n: int = None, left: bool = False, *,
+    def method(self, n: int | None = None, left: bool = False, *,
                dom=None, cod=None, mem=None):
         if (dom, cod, mem) == (None, None, None):
             self.split_memory(n, left)
@@ -676,7 +704,8 @@ def keyword_form(trace: Callable) -> Callable:
     return method
 
 
-class TracedCategory[C0, C1](FeedbackCategory[C0, C1]):
+class TracedCategory[
+        C0: ColouredMonoid, C1: TracedCategory](FeedbackCategory[C0, C1]):
     """
     A traced category is a feedback category with the identity as delay plus
     the yanking axiom: its :meth:`feedback` is its :meth:`trace`, the partial
@@ -706,14 +735,20 @@ class TracedCategory[C0, C1](FeedbackCategory[C0, C1]):
         """
 
     def feedback(
-            self, n: int = None, left: bool = False, *,
-            dom: C0 = None, cod: C0 = None, mem: C0 = None) -> C1:
+            self, n: int | None = None, left: bool = False, *,
+            dom: C0 | None = None, cod: C0 | None = None,
+            mem: C0 | None = None) -> C1:
         """
         The feedback of a traced category is its :meth:`trace` over the
         memory, whose delay is itself, in either form.
         """
         # pylint: disable-next=unexpected-keyword-arg  # see keyword_form
-        return self.trace(n, left, dom=dom, cod=cod, mem=mem)
+        return self.trace(
+            n,  # ty: ignore[invalid-argument-type]
+            left,
+            dom=dom,  # ty: ignore[unknown-argument]
+            cod=cod,  # ty: ignore[unknown-argument]
+            mem=mem)  # ty: ignore[unknown-argument]
 
     @axiom
     def yanking[X: Obj[C0]](
@@ -770,7 +805,7 @@ class BiclosedCategory[
         """
 
     @abstractmethod
-    def curry(self, n: int = 1, left: bool = True) -> C1:
+    def curry(self: C1, n: int = 1, left: bool = True) -> C1:
         """
         The currying of a morphism, to be instantiated.
 
@@ -797,7 +832,7 @@ class BiclosedCategory[
                 n, len(exponent), self.cod))
         return base, exponent
 
-    def uncurry(self, n: int = 1, left: bool = True) -> C1:
+    def uncurry(self: C1, n: int = 1, left: bool = True) -> C1:
         """
         Uncurry a morphism by composing it with :meth:`ev`, assuming its
         codomain is an exponential object. If the exponent has less than
@@ -899,7 +934,7 @@ class RigidCategory[C0: Pregroup, C1: RigidCategory](BiclosedCategory[C0, C1]):
         return base @ cls.cups(exponent.l, exponent) if left\
             else cls.cups(exponent, exponent.r) @ base
 
-    def curry(self, n: int = 1, left: bool = True) -> C1:
+    def curry(self: C1, n: int = 1, left: bool = True) -> C1:
         """
         The curry of a rigid morphism is obtained using caps.
 
@@ -960,7 +995,9 @@ class RigidCategory[C0: Pregroup, C1: RigidCategory](BiclosedCategory[C0, C1]):
             >> self.dom.r @ self.cups(self.cod, self.cod.r)
 
 
-class PivotalCategory[C0, C1](RigidCategory[C0, C1], TracedCategory[C0, C1]):
+class PivotalCategory[
+        C0: Pregroup, C1: PivotalCategory](
+            RigidCategory[C0, C1], TracedCategory[C0, C1]):
     """
     A pivotal category is a :class:`RigidCategory` where the left and right
     adjoints coincide, hence it is also a :class:`TracedCategory`, a planar
@@ -970,7 +1007,8 @@ class PivotalCategory[C0, C1](RigidCategory[C0, C1], TracedCategory[C0, C1]):
         messages.PLANAR_YANKING)
 
 
-class BraidedCategory[C0, C1](SpacialCategory[C0, C1]):
+class BraidedCategory[
+        C0: ColouredMonoid, C1: BraidedCategory](SpacialCategory[C0, C1]):
     """
     A braided category is a :class:`MonoidalCategory` with a method
     :code:`braid` for the natural isomorphism :code:`x @ y -> y @ x`. It is
@@ -995,7 +1033,8 @@ class PROB[C1: PROB](PRO[C1], BraidedCategory[Nat, C1]):
     """
 
 
-class SymmetricCategory[C0, C1](BraidedCategory[C0, C1]):
+class SymmetricCategory[
+        C0: ColouredMonoid, C1: SymmetricCategory](BraidedCategory[C0, C1]):
     """
     A symmetric category is a :class:`BraidedCategory` where the braid is its
     own inverse called :code:`swap` for the symmetry :code:`x @ y -> y @ x`.
@@ -1035,7 +1074,7 @@ class SymmetricCategory[C0, C1](BraidedCategory[C0, C1]):
         writes it directly; a free category overrides it with a native box,
         see :meth:`discopy.symmetric.Diagram.from_permutation`.
         """
-        return cls.permutation(perm, dom)
+        return cls.permutation(perm, dom)  # ty: ignore[invalid-argument-type]
 
     @classmethod
     def braid(cls, left: C0, right: C0) -> C1:
@@ -1049,7 +1088,8 @@ class PROP[C1: PROP](PROB[C1], SymmetricCategory[Nat, C1]):
     """
 
 
-class MarkovCategory[C0, C1](SymmetricCategory[C0, C1]):
+class MarkovCategory[
+        C0: ColouredMonoid, C1: MarkovCategory](SymmetricCategory[C0, C1]):
     """
     A Markov category is a :class:`SymmetricCategory` with a method
     :code:`copy` for the supply of commutative comonoids: ``copy(x, n)`` is
@@ -1094,7 +1134,8 @@ class MarkovCategory[C0, C1](SymmetricCategory[C0, C1]):
         """
         from discopy.python.finset import Function
         doms = list(doms)
-        counts, perm = Function(xs, len(doms), len(xs)).factorise()
+        counts, perm = Function(
+            list(xs), Nat(len(doms)), Nat(len(xs))).factorise()
         copies = list(map(cls.copy, doms, counts)) or [cls.id(cls.ob())]
         return copies[0].tensor(*copies[1:]) >> cls.permutation(
             perm, [dom for dom, n in zip(doms, counts) for _ in range(n)])
@@ -1147,7 +1188,8 @@ class MarkovCategory[C0, C1](SymmetricCategory[C0, C1]):
             >> cls.id(x) @ cls.swap(x, y) @ cls.id(y))
 
 
-class ComarkovCategory[C0, C1](SymmetricCategory[C0, C1]):
+class ComarkovCategory[
+        C0: ColouredMonoid, C1: ComarkovCategory](SymmetricCategory[C0, C1]):
     """
     A comarkov category is a :class:`SymmetricCategory` with a method
     :code:`merge` for the supply of commutative monoids: ``merge(x, n)`` is
@@ -1194,7 +1236,8 @@ class ComarkovCategory[C0, C1](SymmetricCategory[C0, C1]):
         """
         from discopy.python.finset import Function
         cods = list(cods)
-        counts, perm = Function(xs, len(cods), len(xs)).factorise()
+        counts, perm = Function(
+            list(xs), Nat(len(cods)), Nat(len(xs))).factorise()
         merges = list(map(cls.merge, cods, counts)) or [cls.id(cls.ob())]
         return cls.permutation(perm.dagger(), [cods[i] for i in xs])\
             >> merges[0].tensor(*merges[1:])
@@ -1248,14 +1291,16 @@ class ComarkovCategory[C0, C1](SymmetricCategory[C0, C1]):
             >> cls.merge(x) @ cls.merge(y))
 
 
-class ClosedCategory[C0, C1](BiclosedCategory[C0, C1], MarkovCategory[C0, C1]):
+class ClosedCategory[
+        C0: ResiduatedMonoid, C1: ClosedCategory](
+            BiclosedCategory[C0, C1], MarkovCategory[C0, C1]):
     """
     A closed category is a symmetric :class:`BiclosedCategory`. We also assume
     it comes with copy and discard so it is also a :class:`MarkovCategory`.
     """
 
 
-class BalancedCategory[C0, C1](
+class BalancedCategory[C0: ColouredMonoid, C1: BalancedCategory](
         BraidedCategory[C0, C1], TracedCategory[C0, C1]):
     """
     A balanced category is a :class:`BraidedCategory` and a
@@ -1282,10 +1327,11 @@ class BalancedCategory[C0, C1](
         swap.
         """
         return cls.equation_factory(
-            cls.braid(x, x).trace(mem=x), cls.twist(x))
+            cls.braid(x, x).trace(
+                mem=x), cls.twist(x))  # ty: ignore[unknown-argument]
 
 
-class RibbonCategory[C0, C1](
+class RibbonCategory[C0: Pregroup, C1: RibbonCategory](
         PivotalCategory[C0, C1], BalancedCategory[C0, C1]):
     """
     A ribbon category is a :class:`PivotalCategory` which is also a
@@ -1296,7 +1342,7 @@ class RibbonCategory[C0, C1](
     yanking = BalancedCategory.yanking
 
 
-class CompactCategory[C0, C1](
+class CompactCategory[C0: Pregroup, C1: CompactCategory](
         RibbonCategory[C0, C1], SymmetricCategory[C0, C1]):
     """
     A compact category is a :class:`RibbonCategory` which is also a
@@ -1308,7 +1354,7 @@ class CompactCategory[C0, C1](
         return cls.id(dom)
 
 
-class HypergraphCategory[C0, C1](
+class HypergraphCategory[C0: Pregroup, C1: HypergraphCategory](
         CompactCategory[C0, C1], MarkovCategory[C0, C1],
         ComarkovCategory[C0, C1]):
     """
@@ -1348,8 +1394,11 @@ class HypergraphCategory[C0, C1](
         """
         from discopy.python.finset import Function
         apexes = list(apexes)
-        ins, gather = Function(left, len(apexes), len(left)).factorise()
-        outs, scatter = Function(right, len(apexes), len(right)).factorise()
+        n = Nat(len(apexes))
+        ins, gather = Function(
+            list(left), n, Nat(len(left))).factorise()
+        outs, scatter = Function(
+            list(right), n, Nat(len(right))).factorise()
         spiders = list(map(cls.spiders, ins, outs, apexes))\
             or [cls.id(cls.ob())]
         return cls.permutation(gather.dagger(), [apexes[k] for k in left])\

@@ -192,7 +192,7 @@ class Layer(feedback.Layer):
             if not result.inside:
                 raise AxiomError(messages.NOT_MERGEABLE.format(self, other))
             return type(self)(result)
-        return super().merge(other)
+        return super().merge(other)  # ty: ignore[invalid-return-type]
 
 
 @factory
@@ -273,8 +273,9 @@ class Diagram(balanced.Diagram, SymmetricCategory):
     functor_factory: ClassVar[type["Functor"]]
     swap_factory: ClassVar[type["Swap"]]
     permutation_factory: ClassVar[type["Permutation"]]
-    feedback_factory: ClassVar[type["Feedback"]]
-    trace_factory: ClassVar[type["Trace"]]
+    feedback_factory: ClassVar[
+        type["Feedback"]]  # ty: ignore[invalid-type-form]
+    trace_factory: ClassVar[type["Trace"]]  # ty: ignore[invalid-type-form]
     sum_factory: ClassVar[type["Sum"]]
     braid_factory = classproperty(lambda cls: cls.swap_factory)
     layer_factory = Layer
@@ -314,11 +315,12 @@ class Diagram(balanced.Diagram, SymmetricCategory):
         ----
         This calls :func:`balanced.hexagon` and :attr:`swap_factory`.
         """
-        return cls.braid(left, right)
+        return cls.braid(left, right)  # ty: ignore[invalid-return-type]
 
     @classmethod
-    def permutation(cls, xs: Sequence[int],
-                    doms: Sequence[monoidal.Ty] | None = None) -> Diagram:
+    def permutation(
+            cls, xs: Sequence[int],
+            doms: Sequence[monoidal.Ty] | Nat | None = None) -> Diagram:
         """
         The diagram that encodes a given permutation as a composition of
         swaps.
@@ -330,31 +332,34 @@ class Diagram(balanced.Diagram, SymmetricCategory):
                   default is :code:`Nat(len(xs))`.
         """
 
-        doms = Nat(len(xs)) if doms is None else doms
-        size = len(doms)
-        nat = doms if isinstance(doms, Nat) else next(iter(doms), None)
+        types = Nat(len(xs)) if doms is None else doms
+        size = len(types)
+        nat = types if isinstance(types, Nat) else next(iter(types), None)
         unit = type(nat)() if isinstance(nat, Nat) else cls.ob()
         tensor = lambda tys: unit.tensor(*tys)
-        dom = tensor(doms)
+        dom = tensor(types)
 
         xs = finset.Permutation(xs, size)
         if xs.is_identity:
             return cls.id(dom)
         i = xs[0]
         left, head, right = (
-            doms[slice]
+            types[slice]
             for slice in (
                 slice(0, i), i, slice(i + 1, None)
             )
         )
-        rest = left @ right if isinstance(doms, monoidal.Ty) else left + right
-        return cls.swap(tensor(left), head) @ tensor(right)\
-            >> head @ cls.permutation(
-                [x - 1 if x > i else x for x in xs[1:]], rest)
+        rest = (left @ right if isinstance(types, monoidal.Ty)
+                else left + right)  # ty: ignore[unsupported-operator]
+        return cls.swap(
+            tensor(left), head  # ty: ignore[invalid-argument-type]
+        ) @ tensor(right) >> head @ cls.permutation(
+            [x - 1 if x > i else x for x in xs[1:]], rest)
 
     @classmethod
-    def from_permutation(cls, perm: Sequence[int], dom: monoidal.Ty = None
-                         ) -> Diagram:
+    def from_permutation(
+            cls, perm: Sequence[int], dom: monoidal.Ty | None = None
+    ) -> Diagram:
         """
         Encode a permutation natively when the category has a matching
         :class:`Permutation` factory. Descendant categories without one use
@@ -514,8 +519,8 @@ class Permutation(Box):
     """
     serialised_attrs = ("dom", "perm")
 
-    def __new__(cls, dom: monoidal.Ty = None,
-                perm: Sequence[int] = None):
+    def __new__(cls, dom: monoidal.Ty | None = None,
+                perm: Sequence[int] | None = None):
         if dom is None or cls is cls.ar.swap_factory:
             return super().__new__(cls)
         factory = cls.ar.swap_factory\

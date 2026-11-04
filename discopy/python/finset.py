@@ -19,7 +19,7 @@ Summary
 
 from __future__ import annotations
 from discopy.utils import assert_isinstance
-from typing import Iterable, Self, Any
+from typing import Any, Iterable, Self, overload
 from itertools import accumulate
 from collections.abc import Sequence
 from operator import index
@@ -29,12 +29,12 @@ from dataclasses import dataclass
 from discopy import messages
 from discopy.abc import (
     Groupoid, HypergraphCategory, MarkovCategory, PROP, Nat)
-from discopy.axioms import Testable
+from discopy.testable import Testable
 from discopy.utils import AxiomError, factory_name, unbiased
 
 
 @dataclass
-class Function(MarkovCategory, Sequence):
+class Function(MarkovCategory[Nat, "Function"], Sequence):
     """
     A function between finite sets encoded as a Python list, read backwards
     as an arrow from ``dom`` to ``cod``, i.e. an arrow of the free Markov
@@ -138,9 +138,10 @@ class Function(MarkovCategory, Sequence):
         >>> assert Function.swap(2, 1) >> Function.swap(1, 2) == Function.id(3)
         """
         m, n = int(x), int(y)
-        return Function(list(range(m, m + n)) + list(range(m)), m + n, m + n)
+        return Function(
+            list(range(m, m + n)) + list(range(m)), Nat(m + n), Nat(m + n))
 
-    def is_swap(self) -> bool:
+    def is_swap(self: Function | Sequence[int]) -> bool:
         """
         Whether this is the permutation ``(1, 0)``, callable on a raw
         sequence as well as on a :class:`Function` with a two-wire domain.
@@ -167,12 +168,12 @@ class Function(MarkovCategory, Sequence):
         xs = Permutation(xs, len(sizes))
         offsets = [0, *accumulate(sizes)]
         inside = [offsets[i] + j for i in xs for j in range(sizes[i])]
-        return Function(inside, offsets[-1], offsets[-1])
+        return Function(inside, Nat(offsets[-1]), Nat(offsets[-1]))
 
     @staticmethod
     def copy(x: int | Nat, n=2) -> Function:
         k, n = int(x), index(n)
-        return Function([i % k for i in range(n * k)], k, n * k)
+        return Function([i % k for i in range(n * k)], Nat(k), Nat(n * k))
 
     def factorise(self) -> tuple[list[int], Permutation]:
         """
@@ -228,12 +229,18 @@ class Permutation(Function, PROP, Groupoid):
             )
         if sorted(inside) != list(range(size)):
             raise ValueError(messages.NOT_A_PERMUTATION.format(size, inside))
-        super().__init__(list(inside), size, size)
+        super().__init__(list(inside), Nat(size), Nat(size))
 
     def __iter__(self):
         return (self[i] for i in range(len(self)))
 
-    def __getitem__(self, key: int) -> int:
+    @overload
+    def __getitem__(self, key: int) -> int: ...
+
+    @overload
+    def __getitem__(self, key: slice) -> tuple[int, ...]: ...
+
+    def __getitem__(self, key: int | slice) -> int | tuple[int, ...]:
         if isinstance(key, slice):
             return tuple(self)[key]
         return super().__getitem__(key)
@@ -422,7 +429,7 @@ class Permutation(Function, PROP, Groupoid):
         >>> Permutation((1, 2, 0, 3)).coequalizer()
         {0: 0, 1: 0, 2: 0, 3: 1}
         """
-        others = [type(self)(other, len(self)) for other in others]
+        others = tuple(type(self)(other, len(self)) for other in others)
         component_of = {}
         component = 0
         for start in range(len(self)):
@@ -543,7 +550,8 @@ class Cospan(HypergraphCategory, Testable["Cospan"]):
         if self.cod != other.dom:
             raise AxiomError(messages.NOT_COMPOSABLE.format(
                 self, other, self.cod, other.dom))
-        parent = list(range(self.apex + other.apex))
+        parent = list(
+            range(self.apex + other.apex))
 
         def find(i):
             while parent[i] != i:

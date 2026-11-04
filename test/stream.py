@@ -48,6 +48,14 @@ def test_sequence_box_of_its_category():
     assert type(box) is tensor.Box is tensor.Diagram.box_factory
 
 
+def test_feedback_errors():
+    x = Ty.sequence(symmetric.Ty('x'))
+    with raises(ValueError):  # A constant stream needs constant types.
+        Stream(symmetric.Box('g', x.now, x.now), dom=x, cod=x)
+    assert Stream.permutation([0, 1], [x, x]).now\
+        == symmetric.Id(x.now @ x.now)
+
+
 def test_feedback_forms():
     from pytest import raises
     x, y, m = (Ty.sequence(symmetric.Ty(name)) for name in "xym")
@@ -93,7 +101,7 @@ def test_last_and_without():
 def test_feedback_laws():
     from pytest import raises
     from discopy.abc import FeedbackCategory
-    from discopy.axioms import AxiomFailure
+    from discopy.testable import AxiomFailure
     x, y, m, n, w, z = (Ty.sequence(symmetric.Ty(name)) for name in "xymnwz")
     f = Stream.sequence('f', x @ (m @ n).delay(), y @ m @ n)
     g, h, k, e = (Stream.sequence(name, dom, cod) for name, (dom, cod) in zip(

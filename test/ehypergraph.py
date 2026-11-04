@@ -368,7 +368,7 @@ def test_strategy_needs_a_copy_discard_category():
 @settings(max_examples=20, deadline=None)
 @given(Markov.strategy(effects=False, max_merges=2))
 def test_strategy(graph):
-    from discopy.axioms import GENERATORS
+    from discopy.testable import GENERATORS
     names = {ob.name for ty in graph.graph.spider_types for ob in ty.inside}
     assert names | {box.name for box in graph.graph.boxes} <= set(
         GENERATORS[:2])

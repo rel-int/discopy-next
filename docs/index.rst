@@ -19,7 +19,7 @@ DisCoPy documentation
     api/optyx
     api/grammar
     api/drawing
-    api/axioms
+    api/testable
 
 .. toctree::
     :caption: Notebooks
@@ -52,6 +52,7 @@ DisCoPy documentation
     notebooks/optyx/optyx-vqe-experiment
     notebooks/optyx/bosonic-vqe-2
     notebooks/optyx/photon_distinguishability
+    notebooks/optyx/contextuality
 
 .. toctree::
     :caption: Extra

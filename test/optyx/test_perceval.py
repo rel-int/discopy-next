@@ -44,9 +44,69 @@ non_unitary_circuits = [
 @pytest.mark.parametrize("circuit", unitary_circuits + non_unitary_circuits)
 @pytest.mark.parametrize("n_photons", range(1,2))
 def test_perceval_probs_equivalence(circuit: Diagram, n_photons: int):
-	qpath_probs = circuit.to_path().prob(n_photons).normalise()
+	"""The two branches of :meth:`prob` compute the same quantity, so they
+	agree as they are: normalising one of them hid both the renormalisation
+	perceval's post-selection applies and the dilation factor that used to be
+	dropped, each of which is a global factor on a row."""
+	qpath_probs = circuit.to_path().prob(n_photons)
 	perceval_probs = circuit.to_path().prob(n_photons, with_perceval=True)
 	assert np.isclose(qpath_probs.array, perceval_probs.array).all()
+
+
+selected_circuits = [
+	(Create(1, 1) >> BBS(0) >> Select(2, 0), 0.5),
+	(Create(1, 1) >> BBS(0) >> Select(0, 2), 0.5),
+	(Create(1, 1) >> BBS(0) >> Select(1, 1), 0),
+	(Create(1, 1) >> BBS(0.3) >> Select(2, 0), None),
+	(Create(2, 0) >> BBS(0) >> Select(1, 1), 0.5),
+	(Create(1) >> Endo(0.5) >> Select(1), 0.25),
+]
+
+
+@pytest.mark.parametrize("circuit, expected", selected_circuits)
+def test_perceval_probs_are_not_conditional(circuit: Diagram, expected):
+	"""A selection gets the probability of what it selects, not that
+	probability given that the selection happened. Perceval's own
+	post-selection renormalises over the outcomes that survive it, which reads
+	right exactly when they carry all of the mass or none of it -- as both
+	doctests of :meth:`prob_with_perceval` used to, and as the Hong-Ou-Mandel
+	cell below still does."""
+	qpath_probs = circuit.to_path().prob()
+	perceval_probs = circuit.to_path().prob(with_perceval=True)
+	assert np.isclose(qpath_probs.array, perceval_probs.array).all()
+	if expected is not None:
+		assert np.isclose(perceval_probs.array, expected).all()
+
+
+@pytest.mark.parametrize("circuit, _", selected_circuits)
+@pytest.mark.parametrize("n_photons", [0])
+def test_perceval_probs_as_a_tensor_of_the_open_modes(
+		circuit: Diagram, _, n_photons: int):
+	"""As a tensor the two branches agree on their dimensions as well as
+	their entries. The codomain is the occupations of the modes a selection
+	leaves open, which is what `eval` builds: it used to be the occupations of
+	every mode, one per column of a matrix that had one column per *selected*
+	outcome, so every selected diagram raised `IndexError` here."""
+	qpath = circuit.to_path().prob(n_photons, as_tensor=True)
+	perceval = circuit.to_path().prob(
+		n_photons, with_perceval=True, as_tensor=True)
+	assert (qpath.dom, qpath.cod) == (perceval.dom, perceval.cod)
+	assert np.isclose(qpath.array, perceval.array).all()
+
+
+@pytest.mark.parametrize("circuit", [
+	Select(2), Select(2) @ Id(2), Select(3) @ Id(1)])
+def test_both_branches_reject_an_impossible_photon_count(circuit: Diagram):
+	"""Two backends for one quantity agree on what is impossible too. The
+	perceval branch used to enumerate a negative photon count instead, and
+	how that read depended on how many modes the selections leave open:
+	`occupation_numbers(-2, 2)` is empty, so a matrix with no columns;
+	`occupation_numbers(-2, 1)` is `[(-2, )]`, a negative occupation; and with
+	none open it reached perceval's own "Can't put -2 photons in zero modes!"
+	rather than the library's error."""
+	for with_perceval in (False, True):
+		with pytest.raises(ValueError, match="positive number of photons"):
+			circuit.to_path().prob(1, with_perceval=with_perceval)
 
 @pytest.mark.skip(reason="Helper function for testing")
 def dict_allclose(d1: dict, d2: dict, *, rel_tol=1e-05, abs_tol=1e-10) -> bool:
@@ -341,3 +401,99 @@ def test_trailing_detector():
     measured = circuit >> circuit.cod[:1] @ NumberResolvingMeasurement(1)
     check_dict_agreement(
         expected, (Create_(1, 1) >> measured).eval().prob_dist())
+
+
+CONFIGURATOR_VALUES = {"alpha": 0.3, "beta": 1.1}
+
+
+def configurator_processor(order):
+    """A processor whose measured mode feeds a configurator over the two
+    modes after it, its controlled circuit depending on both symbols and
+    its configuration dict built in the given order of names."""
+    alpha, beta = pcvl.P("alpha"), pcvl.P("beta")
+    controlled = (pcvl.Circuit(2)
+                  .add(0, pcvl.BS(theta=alpha))
+                  .add(0, pcvl.PS(beta))
+                  .add(0, pcvl.BS()))
+    p = pcvl.Processor("SLOS", 3)
+    p.add(0, pcvl.Detector.pnr())
+    configurator = pcvl.FFConfigurator(
+        1, 0, controlled, {name: 0. for name in CONFIGURATOR_VALUES})
+    configurator.add_configuration(
+        [1], {name: CONFIGURATOR_VALUES[name] for name in order})
+    p.add(0, configurator)
+    for m in range(3):
+        if p.detectors[m] is None:
+            p.add(m, pcvl.Detector.pnr())
+    return p
+
+
+@pytest.mark.parametrize("order", [("alpha", "beta"), ("beta", "alpha")])
+def test_configurator_substitutes_by_name(order):
+    """A configurator gives each symbol the value its own name is given,
+    so that both orders of the same configuration dict convert to the same
+    diagram, as they give perceval the same circuit. Both orders are
+    needed: the pairing used to come from zipping ``U.free_symbols``, a
+    set, with the values of the dict, and whichever way that set happens
+    to iterate under ``PYTHONHASHSEED``, exactly one of the two orders
+    silently gave each symbol the other one's value."""
+    state = [1, 1, 0]
+    p = configurator_processor(order)
+    p.with_input(pcvl.BasicState(state))
+    expected = {tuple(k): v for k, v in p.probs()["results"].items()}
+    check_dict_agreement(expected, (
+        Create_(*state) >> Channel.from_perceval(
+            configurator_processor(order))).eval().prob_dist())
+
+
+def test_configurator_rejects_missing_symbol():
+    """A configuration that gives no value for a symbol of the controlled
+    circuit is an error, not a symbol paired with another's value."""
+    p = configurator_processor(("alpha", "beta"))
+    configurator, = [component for _, component in p.components
+                     if isinstance(component, pcvl.FFConfigurator)]
+    configurator._configs = {
+        pcvl.BasicState([1]): {"alpha": CONFIGURATOR_VALUES["alpha"]}}
+    with pytest.raises(ValueError, match="no value for the symbols beta"):
+        Channel.from_perceval(p)
+
+
+@pytest.mark.parametrize("configurations", [
+    [1], [1, 2], [1, 2, 3], [2], [2, 3], [2, 3, 4]])
+def test_feed_forward_default_applies_once(configurations):
+    """A configuration that does not match does not act: the default
+    circuit applies once, when no configuration matches, as in perceval.
+    The number of configurations is what is varied because a swap default
+    applied once per non-matching entry composes to the identity whenever
+    the number of those entries is even, so a single configuration and
+    three of them — none and two non-matching entries — both read right
+    while two of them do not."""
+    state = [1, 1, 0]
+    p = pcvl.Processor("SLOS", 3)
+    p.add(0, pcvl.Detector.pnr())
+    provider = pcvl.FFCircuitProvider(1, 0, pcvl.PERM([1, 0]))
+    for measured in configurations:
+        provider.add_configuration([measured], pcvl.Circuit(2))
+    p.add(0, provider)
+    for m in range(3):
+        if p.detectors[m] is None:
+            p.add(m, pcvl.Detector.pnr())
+    p.with_input(pcvl.BasicState(state))
+    expected = {tuple(k): v for k, v in p.probs()["results"].items()}
+    check_dict_agreement(expected, (
+        Create_(*state) >> Channel.from_perceval(p)).eval().prob_dist())
+
+
+def test_configurator_default_applies_once():
+    """A configurator too applies its default values only when the measured
+    state is in none of its configurations, so a second configuration that
+    does not match leaves the first one's circuit as it is."""
+    state = [1, 1, 0]
+    p = configurator_processor(("alpha", "beta"))
+    configurator, = [component for _, component in p.components
+                     if isinstance(component, pcvl.FFConfigurator)]
+    configurator.add_configuration([2], dict(CONFIGURATOR_VALUES))
+    p.with_input(pcvl.BasicState(state))
+    expected = {tuple(k): v for k, v in p.probs()["results"].items()}
+    check_dict_agreement(expected, (
+        Create_(*state) >> Channel.from_perceval(p)).eval().prob_dist())

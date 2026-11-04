@@ -4,7 +4,7 @@ from pytest import raises
 
 from discopy import biclosed
 from discopy.closed import *
-from discopy.axioms import assert_axioms
+from discopy.testable import assert_axioms
 from discopy.biclosed import Constraints, Sampler
 from discopy.utils import dumps, loads
 

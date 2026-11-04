@@ -286,6 +286,11 @@ def test_circuit2zx():
                     [1, 0, 1, 2, 1])))
 
 
+def test_repr_and_rotate():
+    assert str(Scalar(2)) == "scalar(2)"
+    assert Z(1, 2, .5).rotate() == Z(2, 1, .5)
+
+
 def matrix(diagram):
     """ The matrix of a diagram with outputs as rows, as pyzx has it. """
     n, m = len(diagram.dom), len(diagram.cod)

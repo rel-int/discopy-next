@@ -101,7 +101,7 @@ a functor that named just a few would compose to one defined nowhere else.
 """
 
 
-class Equation(NamedGeneric["ar"]):
+class Equation[ar](NamedGeneric):
     """
     An equation is a list of ``terms`` to be compared up to a function
     ``up_to``, the identity by default.  Casting it to ``bool`` checks
@@ -460,9 +460,9 @@ class Declaration[**P, T](classmethod):
 
     function: Callable[Concatenate[Any, P], T]
     _: KW_ONLY
-    category: type = None
-    name: str = None
-    params: dict[str, Any] = None
+    category: type = None  # ty: ignore[invalid-assignment]
+    name: str = None  # ty: ignore[invalid-assignment]
+    params: dict[str, Any] = None  # ty: ignore[invalid-assignment]
 
     def __post_init__(self):
         classmethod.__init__(self, self.function)
@@ -904,7 +904,7 @@ class Testable[T](ABC):
         return Equation(from_tree(term.to_tree()), loads(dumps(term)), term)
 
 
-class Related(Testable, NamedGeneric["factory"], tuple):
+class Related[factory](Testable, NamedGeneric, tuple):
     """
     Three instances of the ``factory``, an :class:`Equivalence`: two related
     by construction and a third that may be or not, see

@@ -1,7 +1,7 @@
 import sys
 from discopy.biclosed import *
 from discopy import biclosed, cat, monoidal
-from discopy.axioms import Related, assert_axioms
+from discopy.testable import Related, assert_axioms
 from discopy.utils import dumps, loads
 from pytest import raises
 

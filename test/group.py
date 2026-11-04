@@ -4,7 +4,7 @@ from functools import reduce
 
 from pytest import mark, raises
 
-from discopy.axioms import assert_axioms
+from discopy.testable import assert_axioms
 from discopy.group import (
     Action, Cyclic, Product, Symmetric, Wreath, kronecker)
 from discopy.python.finset import Permutation

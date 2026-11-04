@@ -22,7 +22,7 @@ from contextlib import contextmanager
 
 from discopy import messages
 from discopy.abc import Category
-from discopy.axioms import Testable
+from discopy.testable import Testable
 from discopy.cat import Functor
 from discopy.monoidal import List
 from discopy.utils import (
@@ -38,7 +38,7 @@ NO_TREE = messages.NO_TREE_CALLABLE.format("A function", "inside")
 
 @factory
 @dataclass(unsafe_hash=True)
-class Function(Category):
+class Function(Category[Ty, "Function"]):
     """
     Python function with sequential composition.
 
@@ -66,7 +66,8 @@ class Function(Category):
     ob = Ty
     type_checking = True
 
-    def __init__(self, inside: Callable, dom: Ty, cod: Ty):
+    def __init__(self, inside: Callable, dom: Ty | type | tuple[type, ...],
+                 cod: Ty | type | tuple[type, ...]):
         self.inside, self.dom, self.cod = (
             inside, self.ob.cast(dom), self.ob.cast(cod))
 

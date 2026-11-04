@@ -36,7 +36,7 @@ from heapq import heappop, heappush
 from itertools import combinations
 from math import pi
 from operator import index
-from typing import NamedTuple
+from typing import ClassVar, NamedTuple
 
 from discopy import (
     cat, frobenius, hypergraph, messages, rigid, tensor, quantum)
@@ -70,6 +70,9 @@ class Diagram(tensor.Diagram[complex]):
 
     >>> assert not H.is_deterministic and not H.is_affine
     """
+    swap_factory: ClassVar[type["Swap"]]
+    sum_factory: ClassVar[type["Sum"]]
+    permutation_factory: ClassVar[type["Permutation"]]
     ob = Nat
 
     @classmethod
@@ -217,7 +220,8 @@ class Diagram(tensor.Diagram[complex]):
                 scan[offset:offset + len(box.dom)] = [
                     segment[i] for i in box.perm]
             elif isinstance(box, Scalar):
-                graph.scalar.add_float(box.data)
+                graph.scalar.add_float(
+                    box.data)
             elif box == H:
                 node, hadamard = scan[offset]
                 scan[offset] = (node, not hadamard)
@@ -403,7 +407,9 @@ class Spider(tensor.Spider[complex], Box):
 
     def __init__(self, n_legs_in, n_legs_out, phase=0):
         n_legs_in, n_legs_out = index(n_legs_in), index(n_legs_out)
-        super().__init__(n_legs_in, n_legs_out, Nat(1), phase)
+        super().__init__(
+            n_legs_in, n_legs_out,
+            Nat(1), phase)  # ty: ignore[invalid-argument-type]
         factory_str = type(self).__name__
         phase_str = f", {self.phase}" if self.phase else ""
         self.name = f"{factory_str}({n_legs_in}, {n_legs_out}{phase_str})"
@@ -597,12 +603,12 @@ circuit2zx = quantum.circuit.Functor(
 
 H = Box('H', Nat(1), Nat(1), data=[x / 2 ** .5 for x in (1, 1, 1, -1)],
         is_deterministic=False, is_affine=False)
-H.dagger = lambda: H
+H.dagger = lambda: H  # ty: ignore[invalid-assignment]
 H.draw_as_spider = True
 H.drawing_name, H.tikzstyle_name, = '', 'H'
 H.color, H.shape = "yellow", "rectangle"
 
-SWAP = Swap(Nat(1), Nat(1))
+SWAP = Swap(Nat(1), Nat(1))  # ty: ignore[invalid-argument-type]
 Diagram.box_factory = Box
 Diagram.swap_factory, Diagram.sum_factory = Swap, Sum
 Diagram.bubble_factory = Bubble
@@ -668,20 +674,20 @@ class Number:
             if phase >= Fraction(1, 2):
                 phase, coefficient = phase - Fraction(1, 2), -coefficient
             merged[phase] = merged.get(phase, 0) + coefficient
-        terms = sorted((phase, c) for phase, c in merged.items() if c)
-        if not terms:
+        ordered = sorted((phase, c) for phase, c in merged.items() if c)
+        if not ordered:
             return cls(factor=0)
-        (first, coefficient), *rest = terms
+        (first, coefficient), *rest = ordered
         phase = first + (Fraction(1, 2) if coefficient < 0 else 0)
         sign = 1 if coefficient > 0 else -1
-        terms = ((0, abs(coefficient)), ) + tuple(
+        normal = ((0, abs(coefficient)), ) + tuple(
             (psi - first, sign * c) for psi, c in rest)
         if not rest:
             return cls(phase=phase) * cls.integer(abs(coefficient))
-        quarter, sign = Fraction(1, 4), terms[1][1]
-        if terms == ((0, 1), (quarter, sign)):
+        quarter, sign = Fraction(1, 4), normal[1][1]
+        if normal == ((0, 1), (quarter, sign)):
             return cls(power2=1, phase=phase + sign * quarter / 2)
-        return cls(phase=phase, sums=(terms, ))
+        return cls(phase=phase, sums=(normal, ))
 
     @classmethod
     def integer(cls, n: int) -> Number:
@@ -1096,8 +1102,8 @@ class Hypergraph(hypergraph.Hypergraph):
                     VertexType.BOUNDARY, qubit=i, row=row))
                 result.add_edge(
                     result.edge(ends[-1], spiders[spider]), EdgeType.SIMPLE)
-        result.set_inputs(inputs)
-        result.set_outputs(outputs)
+        result.set_inputs(tuple(inputs))
+        result.set_outputs(tuple(outputs))
         return result
 
     def full_reduce(self) -> Hypergraph:
@@ -1200,7 +1206,8 @@ def toggle(locals_: dict[int, Local],
 
 
 def classes(locals_: dict[int, Local], u: int, v: int,
-            skip: set[int] = frozenset()) -> tuple[list[int], ...]:
+            skip: set[int] | frozenset[int] = frozenset()
+            ) -> tuple[list[int], ...]:
     """
     The neighbours of ``u`` alone, of ``v`` alone and of both, other than
     ``u``, ``v`` and the spiders to skip, in a reproducible order.
@@ -1311,7 +1318,7 @@ class Rewriter(hypergraph.Rewriter):  # pylint: disable=too-many-public-methods
     def add_spider(self, typ, phase=0) -> int:
         for spiders, empty in ((self.edges, {}), (self.loops, []),
                                (self.others, 0)):
-            spiders.append(empty)
+            spiders.append(empty)  # ty: ignore[invalid-argument-type]
         return super().add_spider(typ, phase)
 
     def add_box(self, box, dom, cod, offset=None) -> int:
@@ -1346,7 +1353,8 @@ class Rewriter(hypergraph.Rewriter):  # pylint: disable=too-many-public-methods
                      self.loops[spider], self.ports[spider],
                      bool(self.others[spider]))
 
-    def neighbourhood(self, *spiders: int, known: dict[int, Local] = None
+    def neighbourhood(self, *spiders: int,
+                      known: dict[int, Local] | None = None
                       ) -> dict[int, Local]:
         """
         The :class:`Local` neighbourhoods of spiders and their neighbours,
@@ -1403,7 +1411,8 @@ class Rewriter(hypergraph.Rewriter):  # pylint: disable=too-many-public-methods
 
     def step(  # pylint: disable=too-many-arguments  # one per part of a rule
             self, interface: list[int], inner: list[int], boxes: list[int],
-            new: list[tuple], *, glue: dict = None, phases: dict = None,
+            new: list[tuple], *, glue: dict | None = None,
+            phases: dict | None = None,
             core: Number = ONE) -> Step:
         """
         The rule that deletes ``boxes`` and the ``inner`` spiders, with their
@@ -1556,7 +1565,7 @@ class Rewriter(hypergraph.Rewriter):  # pylint: disable=too-many-public-methods
             return None
         a_u, a_v = locals_[u].phase, locals_[v].phase
         old_edges, new_edges = toggle(locals_, across(near_u, near_v, both))
-        shift = dict.fromkeys(near_u, a_v)
+        shift: dict[int | str, Fraction] = dict.fromkeys(near_u, a_v)
         shift.update(dict.fromkeys(near_v, a_u))
         shift.update(dict.fromkeys(both, a_u + a_v + Fraction(1, 2)))
         interface = near_u + near_v + both
@@ -1711,7 +1720,9 @@ class Rewriter(hypergraph.Rewriter):  # pylint: disable=too-many-public-methods
                           and len(self.incidence[t]) - len(key) == 1}
                 group = [hub] + [t for t, found in others.items()
                                  if found is not None and found[1] == key]
-                leaves = [leaf] + [others[t][0] for t in group[1:]]
+                leaves = [leaf] + [
+                    others[t][0]  # ty: ignore[not-subscriptable]
+                    for t in group[1:]]
             phases = {t: self.phases[t] for t in group + leaves}
             if len(group) == 1 and not phases[hub]:
                 continue
@@ -1819,11 +1830,12 @@ class Rewriter(hypergraph.Rewriter):  # pylint: disable=too-many-public-methods
             if level is None:
                 return steps
             if stale[level]:
-                todo[level].update(rules[level][1](self))
+                todo[level].update(
+                    rules[level][1](self))  # ty: ignore[call-non-callable]
                 stale[level] = False
                 continue
             spider = todo[level].pop()
-            if self.spider_types[spider] is None:
+            if spider is None or self.spider_types[spider] is None:
                 continue
             for rule in rules[level][0]:
                 result = rule(self, spider)

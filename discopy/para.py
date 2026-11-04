@@ -158,10 +158,11 @@ Parametric maps compose like layers of a neural network, e.g. over
 
 from __future__ import annotations
 
+from typing import Self
 from dataclasses import dataclass
 
 from discopy import (
-    symmetric, markov, comarkov, closed, compact, frobenius)
+    symmetric, markov, comarkov, closed, compact, frobenius, messages)
 from discopy.abc import (
     ClosedCategory, ComarkovCategory, CompactCategory, FeedbackCategory,
     HypergraphCategory, MarkovCategory, NamedGeneric, SymmetricCategory,
@@ -172,7 +173,7 @@ from discopy.utils import (
 
 
 @dataclass(unsafe_hash=True)
-class Symmetric(SymmetricCategory, NamedGeneric['category']):
+class Symmetric[category](SymmetricCategory, NamedGeneric):
     """
     A parametric map from `dom` to `cod` with parameter space `param` is a
     morphism `inside : dom @ param -> cod` in an underlying `category`,
@@ -201,11 +202,11 @@ class Symmetric(SymmetricCategory, NamedGeneric['category']):
     category = symmetric.Diagram
     ob = classproperty(lambda cls: cls.category.ob)
 
-    dom: ob
-    cod: ob
+    dom: ob  # ty: ignore[invalid-type-form]
+    cod: ob  # ty: ignore[invalid-type-form]
     inside: category
-    param: ob = None
-    copar: ob = None
+    param: ob = None  # ty: ignore[invalid-type-form]
+    copar: ob = None  # ty: ignore[invalid-type-form]
 
     def __post_init__(self):
         if self.param is None:
@@ -247,7 +248,7 @@ class Symmetric(SymmetricCategory, NamedGeneric['category']):
             tree[key] for key in ('dom', 'cod', 'inside', 'param', 'copar'))))
 
     @classmethod
-    def lift(cls, inside: category) -> Symmetric:
+    def lift(cls, inside) -> Self:
         """
         A morphism of the underlying category as a parametric map with the
         empty parameter space, i.e. the injection functor from a category
@@ -259,7 +260,7 @@ class Symmetric(SymmetricCategory, NamedGeneric['category']):
         return cls(inside.dom, inside.cod, inside)
 
     @classmethod
-    def id(cls, dom: ob = None) -> Symmetric:
+    def id(cls, dom=None) -> Symmetric:
         """
         The identity parametric map on `dom`, with empty parameter space.
 
@@ -308,7 +309,7 @@ class Symmetric(SymmetricCategory, NamedGeneric['category']):
                           self.copar @ other.copar)
 
     @classmethod
-    def swap(cls, left: ob, right: ob) -> Symmetric:
+    def swap(cls, left, right) -> Symmetric:
         """
         The swap of the underlying category, with empty parameter space.
 
@@ -461,6 +462,8 @@ class Closed(Markov, ClosedCategory):
         """
         if not n:
             return self
+        if self.copar:
+            raise ValueError(messages.PARA_CURRY_COPAR.format(self.copar))
         if not left:
             inside = self.inside.curry(n, left=False)
             return type(self)(self.dom[n:], inside.cod, inside, self.param)
@@ -488,7 +491,7 @@ class Feedback(Markov, FeedbackCategory):
         return type(self)(*(x.delay(n_steps) for x in (
             self.dom, self.cod, self.inside, self.param, self.copar)))
 
-    def feedback(self, n: int = None, left: bool = False, *,
+    def feedback(self, n: int | None = None, left: bool = False, *,
                  dom: Symmetric.ob = None, cod: Symmetric.ob = None,
                  mem: Symmetric.ob = None) -> Feedback:
         """
@@ -546,7 +549,6 @@ class Compact(Traced, CompactCategory):
         return cls.lift(cls.category.caps(left, right))
 
     ev = classmethod(Closed.ev.__func__)
-    curry = Closed.curry
 
 
 class Hypergraph(Compact, Markov, Comarkov, HypergraphCategory):

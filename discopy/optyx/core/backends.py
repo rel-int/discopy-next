@@ -291,6 +291,8 @@ class EvalResult:
         nz_flat = np.flatnonzero(array)
         if nz_flat.size == 0:
             return {}
+        if array.ndim == 0:
+            return {(): array[()]}
 
         nz_vals = array.flat[nz_flat]
         nz_multi = np.vstack(np.unravel_index(nz_flat, array.shape)).T
@@ -318,9 +320,9 @@ class EvalResult:
         This method computes the probability distribution by aggregating
         occupation configurations based on the output types of the tensor.
 
-        Assumes the output types contain at least one 'bit' or 'mode'
-        These will be treated as measured registers while 'qubit' and 'qmode'
-        are treated as unmeasured and traced out.
+        Assumes the output types are empty or contain at least one 'bit' or
+        'mode'. These will be treated as measured registers while 'qubit'
+        and 'qmode' are treated as unmeasured and traced out.
 
         Args:
             round_digits: Optional number of
@@ -330,7 +332,8 @@ class EvalResult:
             occupation configurations to probabilities.
         """
 
-        if not any(t in {bit, mode} for t in self.output_types):
+        if self.output_types and not any(
+                t in {bit, mode} for t in self.output_types):
             raise ValueError(
                 "Output types must contain at least one 'bit' or 'mode'." +
                 "These will be treated as measured registers. " +
@@ -338,9 +341,8 @@ class EvalResult:
             )
 
         values = self._convert_array_to_dict(self.tensor.array)
-        mask_flat = np.concatenate(
-            [[1] if t in {bit, mode} else [0, 0] for t in self.output_types]
-        )
+        mask_flat = [m for t in self.output_types
+                     for m in ([1] if t in {bit, mode} else [0, 0])]
 
         probs = defaultdict(float)
         all_measured = set()
@@ -631,6 +633,9 @@ class PercevalBackend(AbstractBackend):
         Evaluate the diagram using Perceval.
         Works only for unitary operations.
 
+        A term is evaluated as amplitudes, so a sum of diagrams is a sum of
+        amplitudes and a probability is the Born rule applied to it once.
+
         Args:
             diagram (Diagram): The diagram to evaluate.
             **extra: Additional arguments for the evaluation:
@@ -641,22 +646,15 @@ class PercevalBackend(AbstractBackend):
             The result of the evaluation (EvalResult).
         """
 
-        if hasattr(
-            diagram,
-            "terms"
-        ):
-            array = 0
-            for term in diagram.terms:
-                arr, output_types, return_type = \
-                    self.process_term(
-                        term, extra
-                    )
-                array += arr
-        else:
-            array, output_types, return_type = \
-                self.process_term(
-                    diagram, extra
-                )
+        terms = diagram.terms if hasattr(diagram, "terms") else (diagram, )
+
+        array = 0
+        for term in terms:
+            arr, output_types, return_type = self.process_term(term, extra)
+            array += arr
+
+        if return_type in (StateType.PROB, StateType.SINGLE_PROB):
+            array = np.abs(array) ** 2
 
         if array.shape == (1,):
             cod = discopy_tensor.Dim(1)
@@ -896,26 +894,43 @@ class PercevalBackend(AbstractBackend):
         perceval_effect,
         task
     ):
+        """The amplitudes of one term, as Perceval gives them.
+
+        Perceval renormalises the state vector it evolves once a
+        postselection is set, where :meth:`prob_amplitude` does not, so one
+        entry of that vector recovers the factor all of them lost.
+        """
+        # pylint: disable=import-outside-toplevel
+        import perceval as pcvl
 
         if task in ("single_amp", "single_prob"):
-            if task == "single_prob":
-                result = float(
-                    sim.probability(perceval_state, perceval_effect)
-                )
+            return self._amplitude(sim, perceval_state, perceval_effect)
 
-            else:
-                result = complex(
-                    sim.prob_amplitude(perceval_state, perceval_effect)
-                )
-        else:
-            if task == "probs":
-                result = sim.probs(perceval_state)
-                result = {tuple(k): float(v) for k, v in result.items()}
-            else:
-                sv = sim.evolve(perceval_state)
-                result = {tuple(k): complex(v) for k, v in sv}
+        result = {tuple(k): complex(v) for k, v in sim.evolve(perceval_state)}
+        if not result:
+            return result
 
-        return result
+        witness = max(result, key=lambda key: abs(result[key]))
+        if not result[witness]:
+            return {key: 0j for key in result}
+
+        factor = self._amplitude(
+            sim, perceval_state, pcvl.BasicState(list(witness))
+        ) / result[witness]
+        return {key: value * factor for key, value in result.items()}
+
+    @staticmethod
+    def _amplitude(sim, perceval_state, perceval_effect):
+        """One amplitude of the simulated circuit, not renormalised.
+
+        A circuit of linear optics conserves the number of photons, so an
+        effect that counts a different number from the state has amplitude
+        zero: the Fock space the backend enumerates is the state's, and
+        asking it for an effect outside that space is asking for nothing.
+        """
+        if perceval_effect.n != perceval_state.n:
+            return 0j
+        return complex(sim.prob_amplitude(perceval_state, perceval_effect))
 
     def _get_output_params(
         self,
@@ -953,10 +968,7 @@ class PercevalBackend(AbstractBackend):
         Returns:
             np.ndarray: The output array.
         """
-        array = np.zeros(
-            output_shape,
-            dtype=float if task in ("single_prob", "probs") else complex
-        )
+        array = np.zeros(output_shape, dtype=complex)
 
         if task in ("probs", "amps"):
             configs = np.fromiter(
@@ -967,7 +979,7 @@ class PercevalBackend(AbstractBackend):
 
             coeffs = np.fromiter(
                 result.values(),
-                dtype=float if task == "probs" else complex,
+                dtype=complex,
                 count=len(result)
             )
 
@@ -983,7 +995,9 @@ class PercevalBackend(AbstractBackend):
             extra
     ):
         """
-        Process a term in a sum of diagrams.
+        The amplitudes of one term of a sum of diagrams, whichever task is
+        asked for: a probability is the Born rule applied to their sum, by
+        :meth:`eval`.
 
         Args:
             term (discopy.tensor.Diagram): The term to process.
@@ -1056,7 +1070,21 @@ class PercevalBackend(AbstractBackend):
             sim_task
         )
 
-        return array, output_types, return_type
+        return (
+            array * self._factor(matrix, perceval_state),
+            output_types,
+            return_type
+        )
+
+    def _factor(self, matrix, perceval_state):
+        """The global factor a :class:`path.Matrix` keeps outside its array.
+
+        :meth:`path.Matrix.eval` multiplies every amplitude by ``scalar`` and
+        by ``normalisation`` raised to the number of photons that enter, the
+        latter being what :meth:`path.Matrix.dilate` divides the unitary by.
+        Neither reaches the circuit the simulator is given.
+        """
+        return matrix.scalar * matrix.normalisation ** perceval_state.n
 
 
 class PermanentBackend(AbstractBackend):

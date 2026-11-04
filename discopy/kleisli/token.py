@@ -281,7 +281,7 @@ def posterior(values: frozenset) -> frozenset:
     return frozenset((value, weight / total) for value, weight in values)
 
 
-class Machine(NamedGeneric['monad']):
+class Machine[monad](NamedGeneric):
     """
     A token machine for the lambda calculus, i.e. an interpretation of the
     constants of a term, from which :attr:`channel` builds one transition
@@ -338,8 +338,10 @@ class Machine(NamedGeneric['monad']):
         Parameters:
             token : The token, going either down or up.
         """
-        unit = type(self).monad.unit(Tagged)
-        return unit(Tagged(token, directions[type(token)]))
+        unit = type(self).monad.unit(
+            Tagged)  # ty: ignore[invalid-argument-type]
+        tag = directions[type(token)]  # ty: ignore[invalid-argument-type]
+        return unit(Tagged(token, tag))  # ty: ignore[call-non-callable]
 
     def leave(self, value: Value):
         """
@@ -355,7 +357,9 @@ class Machine(NamedGeneric['monad']):
         direction, so that a value which happens to be a token, e.g. the
         interpretation of a constant, cannot re-enter the trace.
         """
-        return type(self).monad.unit(Tagged)(Tagged(value, 0))
+        unit = type(self).monad.unit(
+            Tagged)  # ty: ignore[invalid-argument-type]
+        return unit(Tagged(value, 0))  # ty: ignore[call-non-callable]
 
     def bind(self, values, resume: Callable):
         """
@@ -369,7 +373,8 @@ class Machine(NamedGeneric['monad']):
         """
         monad = type(self).monad
         lift = monad(Function(resume, Value, monad(Tagged)))
-        return monad.mult(Tagged)(lift(values))
+        mult = monad.mult(Tagged)  # ty: ignore[invalid-argument-type]
+        return mult(lift(values))  # ty: ignore[call-non-callable]
 
     def descend(self, token: Down):
         """
@@ -460,9 +465,10 @@ class Machine(NamedGeneric['monad']):
         of the token to an exit plus the two directions.
         """
         summands = tuple(directions)
-        return Channel[type(self).monad](
+        return Channel[type(self).monad](  # ty: ignore[invalid-type-form]
             lambda state, tag=0: self.step(state),
-            (Down, ) + summands, (Value, ) + summands)
+            (Down, ) + summands,  # ty: ignore[invalid-argument-type]
+            (Value, ) + summands)  # ty: ignore[invalid-argument-type]
 
     def __call__(self, term: TermBase):
         """

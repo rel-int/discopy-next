@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 from pytest import raises
 
-from discopy import axioms
+from discopy import testable
 from discopy.abc import DaggerCategory, Nat
 from discopy.matrix import Matrix, backend
 from discopy.symmetric import Ty, Permutation, Swap, Functor
@@ -200,7 +200,7 @@ def test_strategy_max_entries_on_pytorch(cls):
 
 def test_Matrix_axioms():
     """ A dry run of the property matrix on the carriers it enrols. """
-    axioms.assert_axioms(Matrix, Matrix[int])
+    testable.assert_axioms(Matrix, Matrix[int])
 
 
 def test_Matrix_dtype_is_the_ring_of_entries():

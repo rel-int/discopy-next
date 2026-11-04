@@ -381,14 +381,17 @@ class Sequent:
     @cached_property
     def ports(self) -> list[Port]:
         "The ports of the words, given, then those of the goal, wanted."
-        return sum([ports(word.cod) for word in self.words], [])\
-            + ports(self.goal, False)
+        given = [
+            ports(word.cod)  # ty: ignore[invalid-argument-type]
+            for word in self.words]
+        return sum(given, []) + ports(self.goal, False)
 
     @cached_property
     def offsets(self) -> list[int]:
         "The index of the first port of each word, then of the goal."
         return list(itertools.accumulate(
-            [len(ports(word.cod)) for word in self.words], initial=0))
+            [len(ports(word.cod))  # ty: ignore[invalid-argument-type]
+             for word in self.words], initial=0))
 
     @cached_property
     def blocks(self) -> dict[Ty, tuple[list[int], list[int]]]:
@@ -529,7 +532,7 @@ class ProofNet:
                     f"Cannot link port {negative} to port {positive}.")
 
     @classmethod
-    def from_term(cls, term: Term, words=None) -> ProofNet:
+    def from_term(cls, term: Term, words=None) -> "ProofNet":
         """
         The axiom linking of a closed linear term, read through the wires of
         its variables.
@@ -572,7 +575,10 @@ class ProofNet:
 
         edges.extend(zip(
             visit(term, {}), (("goal", i) for i in itertools.count())))
-        sequent = Sequent(constants if words is None else words, term.cod)
+        given = constants if words is None else words
+        sequent = Sequent(
+            given,  # ty: ignore[invalid-argument-type]
+            term.cod)  # ty: ignore[invalid-argument-type]
         unused, position = list(range(len(sequent.words))), []
         for constant in constants:
             match = [i for i in unused if sequent.words[i] == constant]
@@ -601,7 +607,8 @@ class ProofNet:
 
         links = [(index(end), follow(end, neighbours[end][0]))
                  for end in neighbours if end[0] != "wire"]
-        return cls(sequent, [(i, j) for i, j in links if sequent.ports[j][1]])
+        kept = [(i, j) for i, j in links if sequent.ports[j][1]]
+        return cls(sequent, kept)  # ty: ignore[invalid-argument-type]
 
     @property
     def is_correct(self) -> bool:

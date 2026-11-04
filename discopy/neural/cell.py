@@ -293,8 +293,14 @@ class Site(nn.Module):
         if split:
             first, relu, second = self.encode
             state_dim = carried.shape[-1]
-            shared = F.linear(carried, first.weight[:, :state_dim], first.bias)
-            per_port = F.linear(message, first.weight[:, state_dim:], None)
+            shared = F.linear(
+                carried,
+                first.weight[:, :state_dim],  # ty: ignore[not-subscriptable]
+                first.bias)  # ty: ignore[invalid-argument-type]
+            per_port = F.linear(
+                message,
+                first.weight[:, state_dim:],  # ty: ignore[not-subscriptable]
+                None)
             pooled = second(self.pool(relu(shared.unsqueeze(1) + per_port),
                                       rows, sites, valid, degree))
         else:
@@ -372,9 +378,14 @@ class PeerSite(Site):
         first, _, second = self.encode
         carried = state.reshape(rows * sites, -1)
         state_dim = carried.shape[-1]
-        shared = F.linear(carried, first.weight[:, :state_dim], first.bias)
-        per_cell = F.linear(units.reshape(rows * sites, dim),
-                            first.weight[:, state_dim:], None)
+        shared = F.linear(
+            carried,
+            first.weight[:, :state_dim],  # ty: ignore[not-subscriptable]
+            first.bias)  # ty: ignore[invalid-argument-type]
+        per_cell = F.linear(
+            units.reshape(rows * sites, dim),
+            first.weight[:, state_dim:],  # ty: ignore[not-subscriptable]
+            None)
         hidden = per_cell.shape[-1]
         ports = F.relu(shared.view(rows, sites, 1, hidden)
                        + per_cell.view(rows, sites, hidden)[:, peers])
@@ -447,10 +458,13 @@ class DeepSet(nn.Module):
             flat : The beliefs, ``(n, dim)``.
         """
         dim, hidden = self.phi[0].in_features, self.phi[0].out_features
+        weights = [self.rho[0].weight[  # ty: ignore[not-subscriptable]
+            :, :dim], self.phi[0].weight]
+        biases = [self.rho[0].bias, self.phi[0].bias]
         both = F.linear(
             flat,
-            torch.cat([self.rho[0].weight[:, :dim], self.phi[0].weight], 0),
-            torch.cat([self.rho[0].bias, self.phi[0].bias], 0))
+            torch.cat(weights, 0),  # ty: ignore[invalid-argument-type]
+            torch.cat(biases, 0))  # ty: ignore[invalid-argument-type]
         return F.relu(both[:, hidden:]), both[:, :hidden]
 
     def pool(self, pooled) -> torch.Tensor:
@@ -462,7 +476,9 @@ class DeepSet(nn.Module):
             pooled : The reduced embeddings, ``(n, hidden)``.
         """
         dim = self.phi[0].in_features
-        return F.linear(pooled, self.rho[0].weight[:, dim:], None)
+        weight = self.rho[0].weight
+        return F.linear(
+            pooled, weight[:, dim:], None)  # ty: ignore[not-subscriptable]
 
 
 class Refresh(nn.Module):
@@ -571,4 +587,6 @@ def widths_for(budget: int, build,
             best, best_size = widths, size
         if size > 2 * budget:
             break
+    if best is None:
+        raise ValueError(f"No width to try from {low} to {high}.")
     return best

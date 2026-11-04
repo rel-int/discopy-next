@@ -102,6 +102,10 @@ def test_compare_drawing_raster_and_bytes(tmp_path):
     with raises(ValueError, match="Drawing differs"):
         backend.compare_drawing(baseline, actual)
 
+    Image.new("RGB", (8, 9), "white").save(actual)
+    with raises(ValueError, match="Drawing differs"):
+        backend.compare_drawing(baseline, actual)
+
     baseline, actual = tmp_path / "box.tikz", tmp_path / "_box.tikz"
     baseline.write_text("tikz")
     actual.write_text("tikz")

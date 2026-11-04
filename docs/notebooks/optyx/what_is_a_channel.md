@@ -714,7 +714,7 @@ whatever photonic experiment you have in mind, it is an instance.
 To go further: see the
 [stateful channels notebook](fixpoints.md) for stream and fixed-point
 semantics in depth, and the module documentation of
-[`discopy.optyx.photonic`](../_api/optyx.photonic.html),
-[`discopy.optyx.classical`](../_api/optyx.classical.html) and
-[`discopy.optyx.qubits`](../_api/optyx.qubits.html) for the full library of
+[`discopy.optyx.photonic`](../../../_api/discopy.optyx.photonic.html),
+[`discopy.optyx.classical`](../../../_api/discopy.optyx.classical.html) and
+[`discopy.optyx.qubits`](../../../_api/discopy.optyx.qubits.html) for the full library of
 gates, states and measurements.

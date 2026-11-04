@@ -176,6 +176,6 @@ class Function(function.Function, ComarkovCategory, TracedCategory):
         return Function(inside, x ** n, x)
 
 
-Swap = Function.braid = Function.swap
+Swap = Function.braid = Function.swap  # ty: ignore[invalid-assignment]
 Id = Function.twist = Function.id
 Merge, Noise = Function.merge, Function.noise

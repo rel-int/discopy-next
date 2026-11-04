@@ -4,7 +4,7 @@ import pytest
 from hypothesis import given, note
 from hypothesis import strategies as st
 
-from discopy.axioms import inhabits
+from discopy.testable import inhabits
 from discopy.utils import factory_name
 
 from proptest.categories import CATEGORIES

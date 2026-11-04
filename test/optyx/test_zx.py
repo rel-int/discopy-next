@@ -2,12 +2,12 @@ import random
 
 import numpy as np
 from pyzx import VertexType
-from pytest import raises, fixture
+from pytest import mark, raises, fixture
 
 from discopy.quantum.gates import CRz, CRx, CU1, Ket, Rx, H
 from discopy import abc, quantum
 from discopy.optyx.core.zx import *
-from discopy.optyx.core.zx import And, H, Or, Spider, X, Z, ZXBox
+from discopy.optyx.core.zx import And, H, Or, Spider, X, Z, ZBox, ZXBox
 from discopy.optyx.core import diagram
 from discopy.optyx import qubits
 from discopy.optyx.core.diagram import Diagram, Bit
@@ -73,10 +73,10 @@ def test_grad():
     from math import pi
     assert not scalar(phi).grad(psi) and scalar(phi).grad(phi) == scalar(1)
     assert not Z(1, 1, phi).grad(psi)
-    assert Z(1, 1, phi).grad(phi) == scalar(pi) @ Z(1, 1, phi + .5)
-    assert (Z(1, 1, phi / 2) >> Z(1, 1, phi + 1)).grad(phi)\
-        == (scalar(pi / 2) @ Z(1, 1, phi / 2 + .5) >> Z(1, 1, phi + 1))\
-           + (Z(1, 1, phi / 2) >> scalar(pi) @ Bit(1) >> Z(1, 1, phi + 1.5))
+    assert Z(1, 1, phi).grad(phi) == scalar(1j * pi) @ Z(1, 1, phi)\
+        + scalar(-1j * pi) @ Z(1, 1, phi + .5)
+    composite = Z(1, 1, phi / 2) >> Z(1, 1, phi + 1)
+    assert len((composite.grad(phi)).terms) == 4  # two per spider
 
 
 def test_ZXBox_equals_its_diagram():
@@ -216,3 +216,65 @@ def test_SWAP_evaluates():
     assert np.allclose(
         SWAP.to_tensor().eval().array.reshape(4, 4),
         [[1, 0, 0, 0], [0, 0, 1, 0], [0, 1, 0, 0], [0, 0, 0, 1]])
+
+
+@mark.parametrize("spider", [Z, X])
+@mark.parametrize("phase", [0, .25, .5])
+def test_legless_spider_is_the_sum_of_its_amplitudes(spider, phase):
+    """A spider with no legs has no index left to carry its amplitudes, so it
+    is their sum `1 + exp(2i pi phase)`. pyzx is the oracle this module's
+    docstring names for the array of a `Z` or an `X`; spider fusion is the
+    other, and both agree."""
+    box = spider(0, 0, phase)
+    value = box.to_tensor().eval().array
+    assert value.shape == ()
+    assert np.allclose(value, 1 + np.exp(2j * np.pi * phase))
+    assert np.allclose(value, box.to_pyzx().to_tensor())
+    assert np.allclose(value, (
+        spider(0, 1, phase) >> spider(1, 0)).to_tensor().eval().array)
+
+
+@mark.parametrize("spider", [Z, X, ZBox])
+@mark.parametrize("legs", [(1, 1), (1, 0), (0, 1), (2, 1), (0, 0)])
+def test_grad_matches_central_differences(spider, legs):
+    """A structural assertion cannot tell a right gradient formula from a
+    wrong one, so the gradient is checked against the difference quotient of
+    the spider's own array, as `test/optyx/grad.py` checks the photonic
+    gates. `Spider.grad` used to return the half-turn shift alone, which
+    carries a spurious value on the all-zero entry of a spider with legs, and
+    a `ZBox`'s parameter is an amplitude rather than an angle, so the two
+    gradients are not the same formula."""
+    from sympy.abc import phi
+    n_legs_in, n_legs_out = legs
+    step, dims = 1e-6, [2] * n_legs_in
+
+    def array(box):
+        return np.asarray(
+            box.to_tensor(input_dims=dims).eval().array, dtype=complex
+        ).reshape(-1)
+
+    for value in [0., .123, .25, .5]:
+        gradient = array(spider(*legs, phi).grad(phi).subs((phi, value)))
+        quotient = (array(spider(*legs, value + step))
+                    - array(spider(*legs, value - step))) / (2 * step)
+        assert np.allclose(gradient, quotient, atol=1e-4)
+
+
+def test_grad_of_a_composite_matches_central_differences():
+    """The product rule over the corrected gradient, against the difference
+    quotient of the composite's own array."""
+    from sympy.abc import phi
+    step = 1e-6
+
+    def composite(phase):
+        return Z(1, 1, phase / 2) >> Z(1, 1, phase + 1)
+
+    def array(box):
+        return np.asarray(box.to_tensor(input_dims=[2]).eval().array,
+                          dtype=complex).reshape(-1)
+
+    for value in [0., .123, .25]:
+        gradient = array(composite(phi).grad(phi).subs((phi, value)))
+        quotient = (array(composite(value + step))
+                    - array(composite(value - step))) / (2 * step)
+        assert np.allclose(gradient, quotient, atol=1e-4)

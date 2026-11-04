@@ -71,7 +71,7 @@ using the rules of the :class:`path` calculus:
 ... Id(1) @ SWAP @ Id(1) >> \\
 ... W(2).dagger() @ W(2).dagger() >> \\
 ... Select(1, 1))
->>> left_hs.draw(path="docs/_static/optyx/left_hs.png")
+>>> left_hs.draw(doctest="docs/_static/optyx/left_hs.png")
 
 .. image:: /_static/optyx/left_hs.png
     :align: center
@@ -88,7 +88,7 @@ this should be equal to:
 ... (Create(1, 1) >> \\
 ... SWAP >> \\
 ... Select(1, 1)))
->>> right_hs.draw(path="docs/_static/optyx/right_hs.png")
+>>> right_hs.draw(doctest="docs/_static/optyx/right_hs.png")
 
 .. image:: /_static/optyx/right_hs.png
 
@@ -148,6 +148,8 @@ def npperm(matrix):
     from https://github.com/scipy/scipy/issues/7151.
     """
     n = matrix.shape[0]
+    if not n:
+        return 1
     d = np.ones(n)
     j = 0
     s = 1
@@ -295,7 +297,7 @@ class Matrix(underlying.Matrix):
             self.selections,
             self.creations,
             self.normalisation.conjugate(),
-            self.scalar,
+            self.scalar.conjugate(),
         )
 
     def __repr__(self):
@@ -347,7 +349,8 @@ class Matrix(underlying.Matrix):
             self.cod,
             creations,
             selections,
-            normalisation=s,
+            normalisation=s * self.normalisation,
+            scalar=self.scalar,
         )
 
     def eval(
@@ -366,22 +369,9 @@ class Matrix(underlying.Matrix):
             for j, open_selections in enumerate(cod_basis):
                 creations = open_creations + self.creations
                 selections = open_selections + self.selections
-                matrix = np.stack(
-                    [
-                        self.array[:, m]
-                        for m, n in enumerate(selections)
-                        for _ in range(n)
-                    ],
-                    axis=1,
-                )
-                matrix = np.stack(
-                    [
-                        matrix[m]
-                        for m, n in enumerate(creations)
-                        for _ in range(n)
-                    ],
-                    axis=0,
-                )
+                matrix = self.array[np.ix_(
+                    [m for m, n in enumerate(creations) for _ in range(n)],
+                    [m for m, n in enumerate(selections) for _ in range(n)])]
                 divisor = np.sqrt(
                     np.prod([factorial(n) for n in creations + selections])
                 )
@@ -419,7 +409,11 @@ class Matrix(underlying.Matrix):
         Note
         ----
         If the :class:`Matrix` is non-unitary, first :meth:`dilate` is called
-        to create a unitary.
+        to create a unitary, whose normalisation is then put back on the
+        probabilities. The selections pick out the outcomes that satisfy them
+        rather than being given to perceval as a post-selection, which
+        renormalises over the outcomes that survive it and so answers a
+        conditional probability.
 
         Example
         -------
@@ -439,8 +433,18 @@ class Matrix(underlying.Matrix):
         ...         [0.5+0.j, 0.5+0.j, 0.5+0.j, 0.5+0.j], dom=2, cod=2)
         >>> z_spider = optyx_bs >> Endo(2) @ Id(1) >> optyx_bs
         >>> assert z_spider.to_path().prob_with_perceval\\
-        ...               (n_photons=1).round(1)== Probabilities[complex](
-        ...         [0.9+0.j, 0.1+0.j, 0.1+0.j, 0.9+0.j], dom=2, cod=2)
+        ...               (n_photons=1).round(2)== Probabilities[complex](
+        ...         [2.25+0.j, 0.25+0.j, 0.25+0.j, 2.25+0.j], dom=2, cod=2)
+
+        A selection gets the probability of what it selects, not the
+        probability of it given that it happened: two photons bunching into
+        one arm of a balanced beam splitter is one of two equally likely
+        outcomes, so it reads a half, as the Born rule on the amplitudes does.
+
+        >>> bunching = Create(1, 1) >> optyx_bs >> Select(2, 0)
+        >>> assert bunching.to_path().prob_with_perceval().round(2) \\
+        ...     == bunching.to_path().prob().round(2) \\
+        ...     == Probabilities[complex]([0.5+0.j], dom=1, cod=1)
         """
         # pylint: disable=import-outside-toplevel
         import perceval as pcvl
@@ -449,33 +453,37 @@ class Matrix(underlying.Matrix):
             self = self.dilate()
 
         circ = self._umatrix_to_perceval_circuit()
-        post = self._to_perceval_post_select()
 
         proc = pcvl.Processor(simulator)
         proc.set_circuit(circ)
-        proc.set_postselection(post)
 
         input_occ = occupation_numbers(n_photons, index(self.dom))
-        output_occ = occupation_numbers(
-            sum(self.creations) + n_photons,
-            len(self.creations) + index(self.dom),
-        )
+        n_photons_out = (
+            n_photons + sum(self.creations) - sum(self.selections))
+        if n_photons_out < 0:
+            raise ValueError("Expected a positive number of photons out.")
+        output_occ = occupation_numbers(n_photons_out, index(self.cod))
 
         states = [pcvl.BasicState(o + self.creations) for o in input_occ]
-        analyzer = pcvl.algorithm.Analyzer(proc, states, "*")
+        selected = [
+            pcvl.BasicState(o + self.selections) for o in output_occ]
 
-        permutation = [
-            analyzer.col(pcvl.BasicState(o))
-            for o in output_occ
-            if post(pcvl.BasicState(o))
-        ]
-        result = analyzer.distribution[:, permutation]
+        born = abs(
+            self.scalar
+            * self.normalisation ** (n_photons + sum(self.creations))
+        ) ** 2
+
+        result = np.zeros((len(states), len(selected)))
+        for i, state in enumerate(states):
+            proc.with_input(state)
+            distribution = proc.probs()["results"]
+            result[i] = [born * distribution[o] for o in selected]
         if as_tensor:
             return amplitudes_2_tensor(result, input_occ, output_occ)
         return Probabilities[self.dtype](
             result,
             dom=len(states),
-            cod=len(permutation),
+            cod=len(selected),
         )
 
     def _umatrix_to_perceval_circuit(self) -> pcvl.components.Unitary:
@@ -484,17 +492,8 @@ class Matrix(underlying.Matrix):
         # pylint: disable=import-outside-toplevel
         import perceval as pcvl
 
+        # pylint: disable-next=abstract-class-instantiated  # perceval's
         return pcvl.components.Unitary(pcvl.Matrix(self.array.T.conj()))
-
-    def _to_perceval_post_select(self) -> pcvl.PostSelect:
-        # pylint: disable=import-outside-toplevel
-        import perceval as pcvl
-
-        post_str = [
-            f"[{index(self.cod) + i}] == {p}"
-            for i, p in enumerate(self.selections)
-        ]
-        return pcvl.PostSelect(" & ".join(post_str))
 
     def _umatrix_is_unitary(self) -> bool:
         m = self.umatrix.array
