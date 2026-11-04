@@ -73,7 +73,7 @@ class Ribbon(Colour):
     >>> assert Ribbon() == Ribbon("gray", width=0.25)
     """
     name: str = "gray"
-    width: float = None
+    width: float | None = None
 
     def __post_init__(self):
         super().__post_init__()
@@ -96,7 +96,8 @@ class Ribbon(Colour):
 
 
 def double_rail(
-        typ: monoidal.Ty, width: float = None, colour="gray") -> monoidal.Ty:
+        typ: monoidal.Ty, width: float | None = None, colour="gray"
+) -> monoidal.Ty:
     """
     Doubles every object of a type into the two rails of a ribbon, i.e. two
     copies of the object with a shared :class:`Ribbon` as the colour region
@@ -159,7 +160,7 @@ class Diagram(braided.Diagram, feedback.Diagram, BalancedCategory):
             >> cls.twist(dom[1:]) @ cls.twist_factory(dom[0])\
             >> cls.braid(dom[1:], dom[0])
 
-    def to_braided(self, width: float = None, colour="gray"):
+    def to_braided(self, width: float | None = None, colour="gray"):
         """
         The dual rail encoding of a diagram, see :class:`DualRail`: it doubles
         every object and sends the twist to its two rails crossing twice. It
@@ -389,7 +390,7 @@ class DualRail(Functor):
     dual_rail_twist_factory = DualRailTwist
     dual_rail_braid_factory = DualRailBraid
 
-    def __init__(self, width: float = None, colour="gray"):
+    def __init__(self, width: float | None = None, colour="gray"):
         self.width = config.DRAWING_DEFAULT["ribbon_width"]\
             if width is None else width
         self.colour = colour

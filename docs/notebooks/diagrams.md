@@ -17,7 +17,7 @@ This notebook spells out what this means in detail, and doing so it gives an ove
 
 ### Categories
 
-Let us start at the bottom of DisCoPy's architecture: the module [discopy.cat](../_api/discopy.cat.rst) which implements [free categories](https://en.wikipedia.org/wiki/Free_category).
+Let us start at the bottom of DisCoPy's architecture: the module [discopy.cat](../../_api/discopy.cat.html) which implements [free categories](https://en.wikipedia.org/wiki/Free_category).
 First, a **category** $\mathbf{C}$ is a class of systems $\mathbf{C}_0$ and a class of processes $\mathbf{C}_1$, also called **objects** and **arrows** such that:
 
 * each process $f : x \to y \in \mathbf{C}_1$ comes with input and output systems $\mathtt{dom}(f) = x \in \mathbf{C}_0$ and $\mathtt{cod}(f) = y \in \mathbf{C}_0$, also called the **domain** and **codomain**,
@@ -29,11 +29,11 @@ First, a **category** $\mathbf{C}$ is a class of systems $\mathbf{C}_0$ and a cl
 We call $\mathbf{C}(x, y) = \{ f \in \mathbf{C}_1 \ \vert \ \mathtt{dom}(f) = x, \ \mathtt{cod}(f) = y \}$ the **homset** from $x$ to $y$ in $\mathbf{C}$.
 <!---->
 **Example:** We can define a category $\mathbf{Pyth}$ with Python types as objects and Python functions as arrows.
-Since Python functions do not necessarily come with designated inputs and outputs, we need to add this information explicitly, this is what the module [discopy.python](../_api/discopy.python.rst) implements.
+Since Python functions do not necessarily come with designated inputs and outputs, we need to add this information explicitly, this is what the module [discopy.python](../../_api/discopy.python.html) implements.
 
 **Example:** Given a class $\mathbb{S}$ of numbers with addition and multiplication satisfying the axioms of a [rig](https://en.wikipedia.org/wiki/Rig_(mathematics)), we can define a category $\mathbf{Mat}_\mathbb{S}$ with natural numbers as objects, matrices with entries in $\mathbb{S}$ as arrows, i.e. $\mathbf{Mat}_\mathbb{S}(m, n) = \mathbb{S}^{m \times n}$.
 Sequential composition is given by matrix multiplication with the identity matrix as unit.
-This is implemented in [discopy.matrix](../_api/discopy.matrix.rst).
+This is implemented in [discopy.matrix](../../_api/discopy.matrix.html).
 <!---->
 Now a **free category** $\mathbf{C}_G$ is one where the objects are nodes and the arrows are paths in a directed (multi) graph $G = (G_0, G_1, \mathtt{dom}, \mathtt{cod})$ which we call the **signature**.
 The sequential composition is given by concatenation of paths with the empty path as unit.
@@ -101,7 +101,7 @@ class Step(Box, Recipe):
     """ A step is just a box in a recipe. """
 ```
 
-**Remark:** In order for the identity and the composition of recipes to return a recipe rather than an arrow, we use the [factory](../_api/discopy.cat.factory.rst) decorator.
+**Remark:** In order for the identity and the composition of recipes to return a recipe rather than an arrow, we use the [factory](../../_api/discopy.cat.factory.html) decorator.
 
 ```python {.marimo}
 white = Ingredient('white')
@@ -205,7 +205,7 @@ assert H(whisk >> bake)(recipe)("white")\
 ```
 
 **Example:** Going from cooking and general abstract nonsense (the nickname of category theory) to quantum computing, we can define the simulation of quantum circuits as a functor $\mathtt{eval} : \mathbf{Circ} \to \mathbf{Mat}_\mathbb{C}$ where $\mathbf{Circ}$ is a free category with quantum gates as boxes.
-This is a simplified version of the [discopy.quantum.circuit](../_api/discopy.quantum.circuit.rst) module.
+This is a simplified version of the [discopy.quantum.circuit](../../_api/discopy.quantum.circuit.html) module.
 
 ```python {.marimo}
 from discopy.matrix import Matrix
@@ -311,7 +311,7 @@ The free category with bubbles can be defined by induction over the level of nes
 This is implemented by the class `Bubble`, a subclass of `Box` with an attribute `arg: Arrow` and optional arguments `dom` and `cod`.
 
 Examples include the exponential of square matrices (used e.g. in the [Schrödinger equation](https://en.wikipedia.org/wiki/Schr%C3%B6dinger_equation)) and the element-wise application of a non-linear operator (used e.g. as [activation function](https://en.wikipedia.org/wiki/Activation_function) in neural networks).
-Another example is the gradient of a parameterised matrix, check out the [diagrammatic differentiation](https://docs.discopy.org/en/main/notebooks/diag-diff.html) notebook!
+Another example is the gradient of a parameterised matrix, check out the [diagrammatic differentiation](../../notebooks/diag-diff.html) notebook!
 
 Historically, bubbles first appeared in the [existential graphs](https://en.wikipedia.org/wiki/Existential_graph#Alpha) of C.S. Peirce, a diagrammatic axiomatisation of first-order logic where bubbles are called **cuts**, they allow to encode **negation**.
 Formulae are evaluated by applying a functor into the category of finite sets and binary relations, which is equivalent to Boolean matrices.
@@ -374,8 +374,8 @@ for p in [True, False]:
 
 ## A data structure for diagrams
 
-The main limitation of the [discopy.cat](../_api/discopy.cat.rst) module is that arrows can only have one input and one output.
-With [discopy.monoidal](../_api/discopy.monoidal.rst), we can implement processes where domain and codomain are lists of systems, together with a method for **parallel composition**.
+The main limitation of the [discopy.cat](../../_api/discopy.cat.html) module is that arrows can only have one input and one output.
+With [discopy.monoidal](../../_api/discopy.monoidal.html), we can implement processes where domain and codomain are lists of systems, together with a method for **parallel composition**.
 
 Formally, a (strict) **monoidal category** $\mathbf{C}$ comes equipped with a two-argument functor called **tensor** $\otimes : \mathbf{C} \times \mathbf{C} \to \mathbf{C}$ which is associative with unit $1 \in \mathbf{C}$.
 A two-argument functor, also called a [bifunctor](https://en.wikipedia.org/wiki/Bifunctor), is simply a functor from a [product category](https://en.wikipedia.org/wiki/Product_category), i.e. where objects and arrows are pairs.

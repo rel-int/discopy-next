@@ -47,7 +47,9 @@ def exp(base: Ty, exponent: Ty) -> Ty:
         exponent : The exponent types.
     """
     base, exponent = map(Ty.cast, (base, exponent))
-    return Ty(Callable[list(exponent.inside), tuple[base.inside]])
+    return Ty(Callable[
+        list(exponent.inside),  # ty: ignore[invalid-type-form]
+        tuple[base.inside]])
 
 
 @factory

@@ -330,16 +330,26 @@ class Spider(diagram.Spider, ZXBox):
         return type(self)(len(self.dom), len(self.cod), phase=phase)
 
     def grad(self, var, **params):
-        """Gradient with respect to a variable."""
+        """
+        The gradient of a spider is a formal sum, see arXiv:2103.07960: the
+        all-zero entry of its array is constant and the derivative of the
+        all-one entry is :code:`2j * pi * phase'` times itself, i.e.
+        :code:`1j * pi * phase'` times the difference between the spider and
+        the spider shifted by half a turn, which negates that entry and fixes
+        the other. This is :code:`discopy.quantum.zx.Spider.grad`;
+        :class:`ZBox`, whose parameter is an amplitude, overrides it.
+        """
         # pylint: disable=unused-argument  # the signature of Diagram.grad
 
         if var not in self.free_symbols:
             return diagram.Sum((), self.dom, self.cod)
         gradient = self.phase.diff(var)
         gradient = complex(gradient) if not gradient.free_symbols else gradient
-        return diagram.Scalar(pi * gradient) @ type(self)(
-            len(self.dom), len(self.cod), self.phase + 0.5
-        )
+        n_legs_in, n_legs_out = len(self.dom), len(self.cod)
+        return diagram.Scalar(1j * pi * gradient) \
+            @ type(self)(n_legs_in, n_legs_out, self.phase) \
+            + diagram.Scalar(-1j * pi * gradient) \
+            @ type(self)(n_legs_in, n_legs_out, self.phase + .5)
 
     def dagger(self):
         return type(self)(len(self.cod), len(self.dom), -self.phase)
@@ -361,9 +371,31 @@ class Spider(diagram.Spider, ZXBox):
 
 
 class ZBox(Spider):
-    """Z box."""
+    """Z box.
+
+    Its parameter is an amplitude rather than an angle, so its array is
+    :math:`P_0 + w P_1` and :meth:`grad` is not :meth:`Spider.grad`.
+    """
 
     tikzstyle_name = "ZBox"
+
+    def grad(self, var, **params):
+        """
+        The array is linear in the amplitude, so the gradient is
+        :code:`w'` times :math:`P_1`, i.e. the difference between the box at
+        one and the box at zero.
+        """
+        # pylint: disable=unused-argument  # the signature of Diagram.grad
+
+        if var not in self.free_symbols:
+            return diagram.Sum((), self.dom, self.cod)
+        gradient = self.phase.diff(var)
+        gradient = complex(gradient) if not gradient.free_symbols else gradient
+        n_legs_in, n_legs_out = len(self.dom), len(self.cod)
+        return diagram.Scalar(gradient) \
+            @ type(self)(n_legs_in, n_legs_out, 1) \
+            + diagram.Scalar(-gradient) \
+            @ type(self)(n_legs_in, n_legs_out, 0)
 
     def truncation(self, input_dims=None, output_dims=None) -> tensor.Box:
         return zw.ZBox(
@@ -372,14 +404,28 @@ class ZBox(Spider):
 
 
 class Z(Spider):
-    """Z spider."""
+    """Z spider.
+
+    A spider with no legs is the scalar :math:`1 + e^{2i\\pi\\theta}`, i.e.
+    the sum of its amplitudes, which is what the spider's own definition
+    gives: it has no index left to carry them. A legless :class:`zw.ZBox`
+    reads its first amplitude instead, so this one is not one.
+
+    >>> for phase in [0, .25, .5]:
+    ...     assert np.allclose(
+    ...         Z(0, 0, phase).to_tensor().eval().array,
+    ...         Z(0, 0, phase).to_pyzx().to_tensor())
+    """
 
     tikzstyle_name = "Z"
 
     def truncation(self, input_dims=None, output_dims=None) -> tensor.Box:
+        amplitudes = [1, np.exp(1j * self.phase * 2 * np.pi)]
+        if not self.n_legs_in and not self.n_legs_out:
+            return tensor.Box(
+                self.name, Dim(1), Dim(1), [sum(amplitudes)])
         return zw.ZBox(
-            self.n_legs_in, self.n_legs_out,
-            [1, np.exp(1j * self.phase * 2 * np.pi)]
+            self.n_legs_in, self.n_legs_out, amplitudes
         ).truncation([2] * self.n_legs_in)
 
 

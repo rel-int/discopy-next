@@ -95,7 +95,7 @@ from typing import (
 
 from discopy import cat, monoidal, cmap, hypergraph, messages
 from discopy.abc import BiclosedCategory
-from discopy.axioms import (
+from discopy.testable import (
     GENERATORS, Equation as AbstractEquation, Equivalence, Testable, axiom)
 from discopy.drawing import Drawing
 from discopy.cat import factory
@@ -128,16 +128,16 @@ class Ty(monoidal.Ty):
     """
     variable_factory: ClassVar[type["Variable"]]
     constant_factory: ClassVar[type["Constant"]]
-    application_factory: ClassVar[type["Application"]]
+    application_factory: ClassVar[Callable[..., "Application"]]
     abstraction_factory: ClassVar[type["Abstraction"]]
     over_factory: ClassVar[Callable[..., "Exp"]]
     under_factory: ClassVar[Callable[..., "Exp"]]
 
-    def __pow__(self, other: Ty) -> Ty:
+    def __pow__(self, other: "Ty | int") -> Self:
         return self.exp(other) if isinstance(other, Ty)\
             else monoidal.Ty.__pow__(self, other)
 
-    def exp(self, other: Ty) -> Ty:
+    def exp(self, other: "Ty") -> Self:
         """
         The exponential of a type, called with ``**``, is its :meth:`over`,
         the default one of the two: the type itself when the exponent is the
@@ -319,7 +319,7 @@ class Exp(Wire):
     def __str__(self):
         return f"({self.base} ** {self.exponent})"
 
-    def atoms(self) -> list[Ty]:
+    def atoms(self) -> list:
         """ The atoms of an exponential: those of its base and exponent. """
         return self.base.atoms() + self.exponent.atoms()
 
@@ -734,7 +734,8 @@ class Functor(monoidal.Functor):
             result = self.cod.ob.variable_factory(name, cod)
         return result
 
-    def map_term(self, term: TermBase, context: dict = None) -> TermBase:
+    def map_term(
+            self, term: "TermBase", context: dict | None = None) -> "TermBase":
         """
         The image of a term, a term in the internal language of the codomain,
         checked to have the image of its type and exactly the images of its
@@ -774,7 +775,7 @@ Diagram.functor_factory = Functor
 class TermBase(Box, Equivalence):
     """
     A term in the internal language of biclosed categories, an
-    :class:`discopy.axioms.Equivalence` up to the names of its bound
+    :class:`discopy.testable.Equivalence` up to the names of its bound
     variables, see :meth:`alpha_eq`.
 
     Attributes:
@@ -817,7 +818,7 @@ class TermBase(Box, Equivalence):
     functor: ClassVar[Functor] = Functor.id(Diagram)
 
     @abstractmethod
-    def eval(functor: Functor = None) -> BiclosedCategory:
+    def eval(self, functor: Functor | None = None) -> BiclosedCategory:
         """
         The evaluation of a :class:`Functor` on a term gives a morphism in its
         codomain. By default, this is the identity functor on the free biclosed
@@ -825,7 +826,7 @@ class TermBase(Box, Equivalence):
         """
 
     @abstractmethod
-    def map(functor: Functor, context: dict) -> Term:
+    def map(self, functor: Functor, context: dict) -> "Term":
         """
         The image of a term under a :class:`Functor` whose codomain objects
         are biclosed types, i.e. a term in the codomain's internal language
@@ -1008,7 +1009,8 @@ class TermBase(Box, Equivalence):
         from hypothesis import strategies as st
 
         return st.builds(
-            lambda shape, letters: cls.generate(*shape, letters),
+            lambda shape, letters: cls.generate(
+                shape[0], shape[1], shape[2], letters),
             cls.shapes(**params), cls.namings())
 
     @classmethod
@@ -1026,7 +1028,7 @@ class TermBase(Box, Equivalence):
 
         return st.builds(
             lambda terms: (terms[0], terms[2], terms[1]),
-            Canonical[cls].strategy(**params))
+            Canonical[cls].strategy(**params))  # ty: ignore[invalid-type-form]
 
     @axiom
     def alpha_renaming(cls, terms: Renamed[Self]) -> AbstractEquation:
@@ -1104,7 +1106,7 @@ class Constant(TermBase):
     def constants(self):
         return [self]
 
-    def atoms(self) -> list[Ty]:
+    def atoms(self) -> list:
         """ A constant prints as its type called on its name: its atoms. """
         return self.cod.atoms()
 
@@ -1202,7 +1204,7 @@ class Application(TermBase):
     """
     serialised_attrs = ("func", "args", "left")
 
-    def __init__(self, func: Term, args: Term, left: bool = False):
+    def __init__(self, func: TermBase, args: TermBase, left: bool = False):
         assert_isinstance(func, TermBase)
         assert_isinstance(args, TermBase)
         if not func.cod.is_exp:
@@ -1283,10 +1285,10 @@ class Application(TermBase):
 class Abstraction(TermBase):
     serialised_attrs = ("var", "body", "left")
     var: Variable
-    body: Term
+    body: TermBase
     left: bool = False
 
-    def __init__(self, var: Variable, body: Term, left: bool = False):
+    def __init__(self, var: Variable, body: TermBase, left: bool = False):
         self.var, self.body, self.left = var, body, left
         left_str = ", left=True" if left else ""
         name = f"{var.cod}(lambda {var.name}{left_str}: {body})"
@@ -1311,8 +1313,8 @@ class Abstraction(TermBase):
     def eval(self, functor=None):
         functor = functor or self.functor
         return functor.cod.curry(
-            self.body.eval(functor), len(functor(self.var.cod)),
-            not self.left)
+            self.body.eval(functor),  # ty: ignore[invalid-argument-type]
+            len(functor(self.var.cod)), not self.left)
 
     def map(self, functor, context):
         context = {key: value for key, value in context.items()
@@ -1540,7 +1542,7 @@ class Sampler:
             level=constraints.level + 1))
         return self.category.ob.abstraction_factory(var, body, left)
 
-    def term(self, cod: Ty, constraints: Constraints = None) -> Term:
+    def term(self, cod: Ty, constraints: "Constraints | None" = None) -> Term:
         """
         A term of a given type under the constraints, none by default: a
         leaf when the choices ran out, or the spine when none fits, else the
@@ -1584,7 +1586,7 @@ class Constraints:
         return self.prefix + self.suffix
 
 
-class Renamed(Testable, NamedGeneric["factory"], tuple):
+class Renamed[factory](Testable, NamedGeneric, tuple):
     """
     Alpha-equivalent terms of the ``factory``: one shape generated under two
     or more namings of its bound variables, see :meth:`TermBase.generate`.
@@ -1614,7 +1616,7 @@ class Renamed(Testable, NamedGeneric["factory"], tuple):
             st.lists(category.namings(), min_size=2, max_size=3))
 
 
-class Canonical(Testable, NamedGeneric["factory"], tuple):
+class Canonical[factory](Testable, NamedGeneric, tuple):
     """
     Two terms of the ``factory`` followed by their canonical forms: two
     shapes of one type, the second the first's or another, each generated

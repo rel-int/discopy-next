@@ -40,12 +40,12 @@ from contextlib import contextmanager
 from operator import index
 from types import ModuleType
 from collections.abc import Sequence
-from typing import Union, Literal as L, Callable, TYPE_CHECKING
+from typing import Callable, TYPE_CHECKING, Literal
 
 from discopy import config, messages
 from discopy.abc import (
     ComarkovCategory, DaggerCategory, MarkovCategory, NamedGeneric, Nat)
-from discopy.axioms import Testable
+from discopy.testable import Testable
 from discopy.cat import (
     factory,
     assert_iscomposable,
@@ -59,8 +59,8 @@ if TYPE_CHECKING:
 
 
 @factory
-class Matrix(NamedGeneric['dtype'], MarkovCategory, ComarkovCategory,
-             DaggerCategory, Testable["Matrix"]):
+class Matrix[dtype](NamedGeneric, MarkovCategory, ComarkovCategory,
+                    DaggerCategory, Testable["Matrix"]):
     """
     A matrix is an ``array`` with natural numbers as ``dom`` and ``cod``.
 
@@ -254,7 +254,7 @@ class Matrix(NamedGeneric['dtype'], MarkovCategory, ComarkovCategory,
     def __new__(cls, array, *args, **kwargs):
         with backend() as np:
             if cls.dtype is None:
-                _array = np.array(array)
+                _array = np.asarray(array)
                 # The dtype of an np.arrays is a class that contains a type
                 # attribute that is the actual type. However, other backends
                 # have different structures, so this is the easiest option:
@@ -262,7 +262,7 @@ class Matrix(NamedGeneric['dtype'], MarkovCategory, ComarkovCategory,
                 return cls.__new__(cls[dtype], array, *args, **kwargs)
             return object.__new__(cls)
 
-    def __init__(self, array, dom: Nat, cod: Nat):
+    def __init__(self, array, dom: Nat | int, cod: Nat | int):
         dom, cod = (Nat(x) if isinstance(x, int) else x for x in (dom, cod))
         assert_isinstance(dom, Nat)
         assert_isinstance(cod, Nat)
@@ -446,7 +446,7 @@ class Matrix(NamedGeneric['dtype'], MarkovCategory, ComarkovCategory,
         return self if other == 0 else self.__add__(other)
 
     @classmethod
-    def zero(cls, dom: Nat, cod: Nat) -> Matrix:
+    def zero(cls, dom: Nat | int, cod: Nat | int) -> Matrix:
         """
         Returns the zero matrix of a given shape.
 
@@ -459,7 +459,7 @@ class Matrix(NamedGeneric['dtype'], MarkovCategory, ComarkovCategory,
                 (index(dom), index(cod)), dtype=cls.dtype or int), dom, cod)
 
     @classmethod
-    def swap(cls, left: Nat, right: Nat) -> Matrix:
+    def swap(cls, left: Nat | int, right: Nat | int) -> Matrix:
         """
         The matrix that swaps left and right dimensions.
 
@@ -481,7 +481,7 @@ class Matrix(NamedGeneric['dtype'], MarkovCategory, ComarkovCategory,
     @classmethod
     def permutation(
             cls, xs: Sequence[int],
-            doms: Sequence[int] | None = None) -> Matrix:
+            doms: Sequence[Nat | int] | None = None) -> Matrix:
         """
         The matrix that permutes blocks of dimensions.
 
@@ -573,12 +573,12 @@ class Matrix(NamedGeneric['dtype'], MarkovCategory, ComarkovCategory,
         >>> assert Matrix.copy(2) >> Matrix.id(2) @ Matrix.discard(2)\\
         ...     == Matrix.id(2)
         """
-        x, n = index(x), index(n)
+        dim, n = index(x), index(n)
         with backend() as np:
             array = np.array([
-                [j % x == i for j in range(n * x)] for i in range(x)],
+                [j % dim == i for j in range(n * dim)] for i in range(dim)],
                 dtype=cls.dtype or int)
-        return cls(array, x, n * x)
+        return cls(array, dim, n * dim)
 
     @classmethod
     def merge(cls, x: Nat, n: int = 2) -> Matrix:
@@ -586,13 +586,13 @@ class Matrix(NamedGeneric['dtype'], MarkovCategory, ComarkovCategory,
         return cls.copy(x, n).dagger()
 
     @classmethod
-    def ones(cls, x: Nat) -> Matrix:
+    def ones(cls, x: Nat | int) -> Matrix:
         """ The unit ``0 -> x`` of the direct sum, an alias of :meth:`noise`.
         """
         return cls.noise(x)
 
     @classmethod
-    def basis(cls, x: Nat, i: int) -> Matrix:
+    def basis(cls, x: Nat | int, i: int) -> Matrix:
         """
         The ``i``-th basis vector of dimension ``x``.
 
@@ -682,8 +682,10 @@ def array2string(array, **params):
     """
     import numpy
     params = dict({'threshold': config.NUMPY_THRESHOLD}, **params)
-    return numpy.array2string(array, **dict(params, separator=', '))\
-        .replace('[ ', '[').replace('  ', ' ')
+    string = numpy.array2string(
+        array, **dict(
+            params, separator=', '))  # ty: ignore[invalid-argument-type]
+    return string.replace('[ ', '[').replace('  ', ' ')
 
 
 class Backend:
@@ -694,7 +696,7 @@ class Backend:
         module : The main module of the backend.
         array : The array class of the backend.
     """
-    def __init__(self, module: ModuleType, array: type = None):
+    def __init__(self, module: ModuleType, array: Callable | None = None):
         self.module, self.array = module, array or module.array
 
     def __getattr__(self, attr):
@@ -725,8 +727,8 @@ class PyTorch(Backend):
 class TensorFlow(Backend):
     """ TensorFlow backend. """
     def __init__(self):
-        import tensorflow.experimental.numpy as tnp
-        from tensorflow.python.ops.numpy_ops import np_config
+        import tensorflow.experimental.numpy as tnp  # ty: ignore
+        from tensorflow.python.ops.numpy_ops import np_config  # ty: ignore
         np_config.enable_numpy_behavior()
         super().__init__(tnp)
 
@@ -738,12 +740,12 @@ BACKENDS = {
     'tensorflow': TensorFlow,
 }
 
-BackendName = Union[tuple(L[x] for x in BACKENDS)]
+BackendName = Literal["numpy", "jax", "pytorch", "tensorflow"]
 
 
 @contextmanager
-def backend(name: BackendName = None,
-            _stack=[config.DEFAULT_BACKEND], _cache=dict()):
+def backend(name: BackendName | None = None,
+            _stack: list = [config.DEFAULT_BACKEND], _cache=dict()):
     """
     Context manager for matrix backend.
 

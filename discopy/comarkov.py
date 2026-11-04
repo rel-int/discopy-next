@@ -70,7 +70,7 @@ from typing import ClassVar
 
 from discopy import (
     symmetric, monoidal, feedback, cmap, hypergraph, messages, op)
-from discopy.abc import ComarkovCategory, MarkovCategory
+from discopy.abc import ComarkovCategory, MarkovCategory, Nat
 from discopy.cat import factory
 from discopy.feedback import (  # noqa: F401  pylint: disable=unused-import
     Wire, Ty)
@@ -141,7 +141,8 @@ class Diagram(symmetric.Diagram, ComarkovCategory):
         if cls.cofunction_factory.ar is cls:
             return cls.from_cofunction(finset.Function.copy(len(x), n), x)
         from discopy import frobenius
-        return frobenius.Diagram.spiders.__func__(cls, n, 1, x)
+        return frobenius.Diagram.spiders.__func__(
+            cls, n, 1, x)  # ty: ignore[invalid-argument-type]
 
     @classmethod
     def from_cofunction(cls, cofunc, cod: monoidal.Ty) -> Diagram:
@@ -167,7 +168,7 @@ class Diagram(symmetric.Diagram, ComarkovCategory):
         cofunc = list(cofunc)
         if sorted(cofunc) == list(range(len(cod))):
             dom = cod[:0].tensor(*(cod[i] for i in cofunc))
-            return cls.from_permutation(
+            return cls.from_permutation(  # ty: ignore[invalid-return-type]
                 finset.Permutation(cofunc).dagger(), dom)
         if cls.cofunction_factory.ar is cls:
             return cls.cofunction_factory(cod, cofunc)
@@ -223,10 +224,10 @@ class Cofunction(Box):
     .. image:: /_static/comarkov/cofunction.svg
         :align: center
     """
-    def __new__(cls, cod: monoidal.Ty = None, cofunc=None):
+    def __new__(cls, cod: monoidal.Ty | None = None, cofunc=None):
         if cod is None or cls is not cls.ar.cofunction_factory:
             return super().__new__(cls)
-        cofunc = list(cofunc)
+        cofunc = list(cofunc)  # ty: ignore[invalid-argument-type]
         if sorted(cofunc) == list(range(len(cod))):
             return cls.ar.from_cofunction(cofunc, cod)
         if len(cod) == 1 and not any(cofunc):
@@ -234,8 +235,8 @@ class Cofunction(Box):
         return super().__new__(cls)
 
     def __init__(self, cod: monoidal.Ty, cofunc):
-        self.cofunc = op.Comarkov(
-            finset.Function(list(cofunc), len(cod), len(cofunc)))
+        func = finset.Function(list(cofunc), Nat(len(cod)), Nat(len(cofunc)))
+        self.cofunc = op.Comarkov(func)  # ty: ignore[invalid-argument-type]
         dom = cod[:0].tensor(*(cod[i] for i in cofunc))
         Box.__init__(self, f"Cofunction({list(cofunc)})", dom, cod)
 
@@ -348,8 +349,10 @@ is not a dagger category.
                 and not others[plumbing].inside):
             other, plumbing = others[plumbing], plumbing + 1
             typ = other if isinstance(other, monoidal.Ty) else other.cod
-            cofuncs.append(other.cofunc if isinstance(other, Cofunction)
-                           else op.Comarkov.id(len(typ)))
+            cofuncs.append(
+                other.cofunc  # ty: ignore[invalid-argument-type]
+                if isinstance(other, Cofunction)
+                else op.Comarkov.id(len(typ)))
             cod = cod @ typ
         result = self if len(cofuncs) == 1 else self.ar.from_cofunction(
             cofuncs[0].tensor(*cofuncs[1:]).inside, cod)
@@ -390,8 +393,9 @@ class Permutation(symmetric.Permutation, Box):
     >>> assert isinstance(Swap(x, y), Cofunction)
     >>> assert Swap(x, y) @ Merge(x) == Cofunction(y @ x @ x, [1, 0, 2, 2])
     """
-    cofunc = property(lambda self: op.Comarkov(finset.Function(
-        list(self.perm.dagger()), len(self.cod), len(self.dom))))
+    cofunc = property(lambda self: op.Comarkov(
+        finset.Function(  # ty: ignore[invalid-argument-type]
+            list(self.perm.dagger()), Nat(len(self.cod)), Nat(len(self.dom)))))
     fuse, tensor = Cofunction.fuse, Cofunction.tensor
 
 
@@ -444,7 +448,8 @@ class Merge(Cofunction):
         return self.cod, len(self.dom)
 
     cofunc = property(lambda self: op.Comarkov(
-        finset.Function.copy(1, len(self.dom))))
+        finset.Function.copy(
+            1, len(self.dom))))  # ty: ignore[invalid-argument-type]
 
     def to_drawing(self):
         return super(Cofunction, self).to_drawing()
@@ -533,7 +538,7 @@ class Functor(symmetric.Functor):
                 and not isinstance(other, symmetric.Permutation):
             cofunction = getattr(self.cod, "cofunction", None)\
                 or ComarkovCategory.cofunction.__func__.__get__(self.cod)
-            return cofunction(
+            return cofunction(  # ty: ignore[invalid-argument-type]
                 list(other.cofunc.inside), list(map(self, other.cod)))
         return super().__call__(other)
 

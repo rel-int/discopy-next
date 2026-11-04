@@ -417,7 +417,8 @@ class BinaryTerm(TermBase):
         super().__init__(name, left.dom @ right.dom, cod)
 
     def simplify(self):
-        return type(self)(self.left.simplify(), self.right.simplify())
+        return type(self)(  # ty: ignore[missing-argument]
+            self.left.simplify(), self.right.simplify())
 
     def eval(self, functor=None):
         return self.simplify().eval(functor)

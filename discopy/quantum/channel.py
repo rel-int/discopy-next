@@ -201,7 +201,7 @@ class Channel(Tensor):
 
     def then(self, *others: Channel) -> Channel:
         if len(others) != 1:
-            return super().then(*others)
+            return super().then(*others)  # ty: ignore[invalid-return-type]
         other, = others
         assert_isinstance(other, type(self))
         assert_iscomposable(self, other)

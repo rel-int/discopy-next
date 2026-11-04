@@ -9,7 +9,7 @@ from pytest import raises
 
 from discopy import cat, feedback, rigid
 from discopy.abc import Category, Monoid, Nat
-from discopy.axioms import (
+from discopy.testable import (
     L, R, Axiom, AxiomFailure, Delay, Equation, Equivalence,
     Hom, Obj, Over, Related, Repeat, Tensor, Testable, Under, Unit, Var,
     assert_axioms, axiom, inhabits, is_open, position, substitute)
@@ -172,7 +172,7 @@ def test_string_annotations():
     """ A law whose annotations are strings reads them as objects. """
     namespace = {}
     exec("from __future__ import annotations\n"
-         "from discopy.axioms import Equation, Hom, Obj\n"
+         "from discopy.testable import Equation, Hom, Obj\n"
          "def deferred[A: Obj[int]](cls, f: Hom[int, A, A])"
          " -> Equation[Hom[int, A, A]]: return NotImplemented", namespace)
     law = axiom(namespace["deferred"]).bind(Arrow)
@@ -184,8 +184,8 @@ def test_string_annotations():
 def test_inapplicable():
     law = Arrow.unitality.inapplicable("No identities to cancel.")
     assert law.name == "unitality"
-    assert law.__doc__ == "No identities to cancel."
     assert law() is NotImplemented
+    assert law.__doc__ == "No identities to cancel."
 
 
 def test_modulo():
@@ -269,6 +269,8 @@ def test_axioms_of_category():
         unitality = None
 
     assert "unitality" not in Hidden.axioms
+
+
 
 
 def test_copying():

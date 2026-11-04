@@ -59,6 +59,8 @@ Coherence
 ...     Cap(x, x.r) @ Cap(y, y.r) >> x @ Diagram.swap(x.r, y @ y.r))
 """
 
+from typing import ClassVar
+
 from discopy import symmetric, ribbon, pivotal, feedback, cmap, hypergraph
 from discopy.abc import CompactCategory
 from discopy.cat import factory
@@ -81,6 +83,13 @@ class Diagram(symmetric.Diagram, ribbon.Diagram, CompactCategory):
         dom (pivotal.Ty) : The domain of the diagram, i.e. its input.
         cod (pivotal.Ty) : The codomain of the diagram, i.e. its output.
     """
+    sum_factory: ClassVar[type["Sum"]]
+    cup_factory: ClassVar[type["Cup"]]
+    cap_factory: ClassVar[type["Cap"]]
+    box_factory: ClassVar[type["Box"]]
+    swap_factory: ClassVar[type["Swap"]]
+    functor_factory: ClassVar[type["Functor"]]
+    permutation_factory: ClassVar[type["Permutation"]]
     ob = Ty
     layer_factory = Layer
     trace_factory = classmethod(pivotal.Diagram.trace_factory.__func__)

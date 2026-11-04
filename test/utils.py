@@ -104,11 +104,10 @@ def test_named_generic_pickle():
 def test_named_generic_pickle_subscript():
     """ A class subscripted by a subscripted class pickles too. """
     from discopy import tensor
-    from discopy.axioms import Equation
+    from discopy.group import Cyclic, Product, Symmetric
     from discopy.hypergraph import Hypergraph
-    from discopy.matrix import Matrix
-    m = Matrix[int].id(2)
-    for term in (Equation[Matrix[int]](m, m),
+    G = Product[Cyclic[2], Symmetric[3]]
+    for term in (G(Cyclic[2](1), Symmetric[3]((1, 2, 0))),
                  Hypergraph[tensor.Diagram[complex]].id(tensor.Dim(2))):
         loaded = pickle.loads(pickle.dumps(term))
         assert type(loaded) is type(term)
@@ -156,13 +155,13 @@ def test_NamedGeneric_factory():
     from discopy.utils import NamedGeneric, factory
 
     @factory
-    class F(Category, NamedGeneric["dtype"]):
+    class F[dtype](Category, NamedGeneric):
         """ The arrows of a category parameterised by a dtype. """
 
     class G(F):
         """ A box of F, which is not a factory. """
 
-    class H(Category, NamedGeneric["dtype"]):
+    class H[dtype](Category, NamedGeneric):
         """ A category that is not a factory, like Hypergraph. """
 
     assert F[int].factory is F[int] is F[int].ar

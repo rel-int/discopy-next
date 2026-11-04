@@ -84,7 +84,7 @@ from discopy.utils import (
 
 
 @dataclass(unsafe_hash=True)
-class Ty(Pregroup, NamedGeneric['natural']):
+class Ty[natural](Pregroup, NamedGeneric):
     """
     An integer type is a pair of :attr:`natural` types.
 
@@ -120,7 +120,7 @@ class Ty(Pregroup, NamedGeneric['natural']):
     positive: natural
     negative: natural
 
-    def __init__(self, positive: natural = None, negative: natural = None):
+    def __init__(self, positive=None, negative=None):
         positive, negative = (
             self.natural() if x is None else x for x in (positive, negative))
         positive, negative = (
@@ -170,8 +170,9 @@ class Ty(Pregroup, NamedGeneric['natural']):
 
     def __str__(self):
         try:
+            negatives = self.negatives(self.negative)
             return " @ ".join(list(map(str, self.positive)) + [
-                f"-{x}" for x in self.negatives(self.negative)])
+                f"-{x}" for x in negatives])  # ty: ignore[not-iterable]
         except TypeError:  # e.g. when Ty.natural == int
             return repr(self)
 
@@ -240,7 +241,7 @@ class Ty(Pregroup, NamedGeneric['natural']):
 
 @factory
 @dataclass(unsafe_hash=True)
-class Diagram(RibbonCategory, NamedGeneric['natural']):
+class Diagram[natural](RibbonCategory, NamedGeneric):
     """
     An integer diagram from ``x`` to ``y`` is a :attr:`natural` diagram
     from ``x.positive @ y.negative`` to ``x.negative @ y.positive``.
@@ -345,9 +346,11 @@ class Diagram(RibbonCategory, NamedGeneric['natural']):
             inverse : Whether to take the inverse, from ``right @ left``.
         """
         if not inverse:
-            return cls.natural.braid(left, right)
+            return cls.natural.braid(
+                left, right)  # ty: ignore[invalid-return-type]
         if cls.is_symmetric():
-            return cls.natural.braid(right, left)
+            return cls.natural.braid(
+                right, left)  # ty: ignore[invalid-return-type]
         return cls.natural.braid(left, right).dagger()
 
     @classmethod
@@ -363,7 +366,9 @@ class Diagram(RibbonCategory, NamedGeneric['natural']):
         if cls.is_symmetric():
             return cls.natural.id(dom)
         twist = cls.natural.twist(dom)
-        return twist.dagger() if inverse else twist
+        if inverse:
+            twist = twist.dagger()
+        return twist  # ty: ignore[invalid-return-type]
 
     @unbiased
     def then(self, other: Diagram):
@@ -420,7 +425,7 @@ class Diagram(RibbonCategory, NamedGeneric['natural']):
         return type(self)(inside, dom, cod)
 
     @classmethod
-    def id(cls, dom: Ty = None) -> Diagram:
+    def id(cls, dom: Ty | None = None) -> Diagram:
         """
         The identity on an integer type.
 
@@ -445,7 +450,7 @@ class Diagram(RibbonCategory, NamedGeneric['natural']):
         .. image:: /_static/int/idr.svg
             :align: center
         """
-        dom = Ty[cls.natural.ob]() if dom is None else dom
+        dom = cls.ob() if dom is None else dom
         positive, negative = dom
         inside = cls.natural.id(positive) @ cls.natural_twist(negative)
         return cls(inside, dom, dom)
@@ -671,8 +676,9 @@ class Diagram(RibbonCategory, NamedGeneric['natural']):
         return type(self)(inside.trace(len(u @ u_)), dom, cod)
 
     def split_memory(
-            self, n: int | tuple[int, int] = None, left: bool = False, *,
-            dom: Ty = None, cod: Ty = None, mem: Ty = None
+            self, n: int | tuple[int, int] | None = None,
+            left: bool = False, *,
+            dom: Ty | None = None, cod: Ty | None = None, mem: Ty | None = None
             ) -> tuple[Ty, Ty, Ty]:
         """
         The domain, codomain and memory of a trace, read off either form of
@@ -696,7 +702,8 @@ class Diagram(RibbonCategory, NamedGeneric['natural']):
         if mem is not None:
             n = self.memory_size(mem)
         elif cod is not None:
-            n = tuple(len(x) - len(y) for x, y in zip(self.cod, cod))
+            n = tuple(  # ty: ignore[invalid-assignment]
+                len(x) - len(y) for x, y in zip(self.cod, cod))
         (rest_dom, _), (rest_cod, traced) = (
             x.split(1 if n is None else n, left)[::-1] if left
             else x.split(1 if n is None else n, left)
@@ -713,7 +720,7 @@ class Diagram(RibbonCategory, NamedGeneric['natural']):
         Parameters:
             mem : The memory.
         """
-        return tuple(map(len, mem))
+        return tuple(map(len, mem))  # ty: ignore[invalid-return-type]
 
     @classmethod
     def twist(cls, dom: Ty) -> Diagram:
@@ -735,7 +742,8 @@ class Diagram(RibbonCategory, NamedGeneric['natural']):
         """
         if cls.is_symmetric():
             return cls.id(dom)
-        return cls.braid(dom, dom).trace(tuple(map(len, dom)))
+        return cls.braid(dom, dom).trace(
+            tuple(map(len, dom)))  # ty: ignore[invalid-argument-type]
 
     def curry(self, n: int | tuple[int, int] = 1, left: bool = True
               ) -> Diagram:
@@ -819,7 +827,7 @@ class Diagram(RibbonCategory, NamedGeneric['natural']):
     to_drawing = lambda self: self.inside.to_drawing()
 
 
-def Int(category: TracedCategory) -> RibbonCategory:
+def Int(category: type[TracedCategory]) -> type[RibbonCategory]:
     """
     The Int construction, i.e. the free ribbon category on a given balanced
     traced `category`, or the free compact category on a symmetric traced
@@ -835,7 +843,7 @@ def Int(category: TracedCategory) -> RibbonCategory:
     >>> from discopy.ribbon import Diagram as D
     >>> assert Int(D) == Diagram[D]
     """
-    return Diagram[category]
+    return Diagram[category]  # ty: ignore[invalid-type-form]
 
 
 Id = Diagram.id

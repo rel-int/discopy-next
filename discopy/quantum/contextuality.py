@@ -149,7 +149,8 @@ def sensitivity(objective: np.ndarray, matrix: np.ndarray,
     return -solve(objective, matrix, vector, bounds).ineqlin.marginals
 
 
-def ascend(model: Callable[[np.ndarray], Model], params: Sequence[float],
+def ascend(model: Callable[[np.ndarray], Model],
+           params: Sequence[float] | np.ndarray,
            steps: int = 10, learning_rate: float = .05,
            difference: float = 1e-3) -> tuple[np.ndarray, Model]:
     """
@@ -375,7 +376,7 @@ class Scenario:
         if len(settings) != parties:
             raise ValueError(f"{settings} are not the settings of {parties} "
                              "parties.")
-        return cls(product(*(
+        return cls(product(*(  # ty: ignore[invalid-argument-type]
             [f"{chr(ord('a') + i)}{j + 1}" for j in range(n)]
             for i, n in enumerate(settings))), outcomes)
 
@@ -579,11 +580,13 @@ class Model(Table):
         local = self.scenario.incidence() @ subdistribution
         non_contextual = None if np.isclose(
             weight, 0, rtol=0, atol=1e-9) else Model(
-                self.scenario, self.scenario.rows(local / weight))
+                self.scenario, self.scenario.rows(
+                    local / weight))  # ty: ignore[invalid-argument-type]
         strongly_contextual = None if np.isclose(
             weight, 1, rtol=0, atol=1e-9) else Model(
             self.scenario,
-            self.scenario.rows((self.vector - local) / (1 - weight)))
+            self.scenario.rows(  # ty: ignore[invalid-argument-type]
+                (self.vector - local) / (1 - weight)))
         return weight, non_contextual, strongly_contextual
 
     def bell_inequality(self) -> Inequality:
@@ -607,7 +610,10 @@ class Model(Table):
         coefficients = maximise(
             self.vector, incidence.T, np.zeros(incidence.shape[1]),
             (None, 1 / len(self.scenario.contexts)))
-        return Inequality(self.scenario, self.scenario.rows(coefficients))
+        rows = self.scenario.rows(
+            coefficients)  # ty: ignore[invalid-argument-type]
+        return Inequality(
+            self.scenario, rows)  # ty: ignore[invalid-argument-type]
 
     @classmethod
     def deterministic(cls, scenario: Scenario, assignment: Sequence[int]
@@ -637,8 +643,10 @@ class Model(Table):
             raise ValueError(f"{self.scenario} != {other.scenario}.")
         if not 0 <= weight <= 1:
             raise ValueError(f"{weight} is not in the unit interval.")
-        return Model(self.scenario, self.scenario.rows(
-            weight * self.vector + (1 - weight) * other.vector))
+        return Model(
+            self.scenario,
+            self.scenario.rows(  # ty: ignore[invalid-argument-type]
+                weight * self.vector + (1 - weight) * other.vector))
 
     def relabel(self, mapping: dict) -> Model:
         """ Rename the measurements, the ones not in ``mapping`` stay. """
@@ -656,9 +664,11 @@ class Model(Table):
         The product :math:`e \\otimes e'` of two models, called with ``@``,
         where both are measured independently.
         """
-        return Model(self.scenario @ other.scenario, [
-            np.outer(left, right).flatten()
-            for left in self.table for right in other.table])
+        table = [np.outer(left, right).flatten()
+                 for left in self.table for right in other.table]
+        return Model(
+            self.scenario @ other.scenario,
+            table)  # ty: ignore[invalid-argument-type]
 
     __and__, __matmul__ = choice, tensor
 

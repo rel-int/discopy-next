@@ -685,7 +685,7 @@ class Double(Algebra):
         return cls(from_tree(tree['base']))
 
 
-class Representation(NamedGeneric["algebra"], frobenius.Dim):
+class Representation[algebra](NamedGeneric, frobenius.Dim):
     """
     A finite-dimensional (left) module over the class parameter ``algebra``:
     given a :class:`Algebra` ``H``, the class ``Representation[H]`` is
@@ -945,7 +945,7 @@ class Representation(NamedGeneric["algebra"], frobenius.Dim):
 
 
 @factory
-class Intertwiner(NamedGeneric["algebra"], RibbonCategory):
+class Intertwiner[algebra](NamedGeneric, RibbonCategory):
     """
     The ribbon category :math:`\\mathrm{Rep}(H)` of representations of the
     class parameter ``algebra``: given a :class:`Algebra` ``H``, an

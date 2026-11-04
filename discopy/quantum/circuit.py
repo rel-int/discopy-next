@@ -70,6 +70,7 @@ Examples
 from __future__ import annotations
 
 from collections.abc import Mapping
+from typing import ClassVar
 
 from discopy import messages, tensor, frobenius
 from discopy.cat import factory
@@ -110,8 +111,9 @@ class Wire(frobenius.Wire):
     @classmethod
     def from_tree(cls, tree: dict) -> Wire:
         dim, z = tree['dim'], tree.get('z', 0)
-        return cls(dim=dim, z=z, time_step=tree.get('time_step', 0),
-                   is_constant=tree.get('is_constant', True))
+        return cls(  # ty: ignore[missing-argument]
+            dim=dim, z=z, time_step=tree.get('time_step', 0),
+            is_constant=tree.get('is_constant', True))
 
     def to_tree(self) -> dict:
         return dict(dim=self.dim, **super().to_tree())
@@ -190,10 +192,13 @@ class Circuit(tensor.Diagram[complex]):
         dom (quantum.circuit.Ty) : The domain of the circuit diagram.
         cod (quantum.circuit.Ty) : The codomain of the circuit diagram.
     """
+    swap_factory: ClassVar[type["Swap"]]
+    sum_factory: ClassVar[type["Sum"]]
+    permutation_factory: ClassVar[type["Permutation"]]
     ob = Ty
 
     @classmethod
-    def id(cls, dom: int | Ty = None):
+    def id(cls, dom: int | Ty | None = None):
         """
         The identity circuit on a given domain.
 
@@ -456,7 +461,7 @@ class Circuit(tensor.Diagram[complex]):
         last_i = 0
         for i, (box, offset) in enumerate(zip(self.boxes, self.offsets)):
             if hasattr(box, '_decompose'):
-                decomp = box._decompose()
+                decomp = box._decompose()  # ty: ignore[call-non-callable]
                 diag >>= self[last_i:i]
                 dom = self.inside[i].dom
                 left, right = dom[:offset], dom[offset + len(box.dom):]
@@ -465,18 +470,24 @@ class Circuit(tensor.Diagram[complex]):
         diag >>= self[last_i:]
         self = diag
 
-        c_nodes = [tn.CopyNode(2, 2, f'c_input_{i}', dtype=complex)
-                   for i in range(self.dom.count(bit))]
-        q_nodes1 = [tn.CopyNode(2, 2, f'q1_input_{i}', dtype=complex)
-                    for i in range(self.dom.count(qubit))]
-        q_nodes2 = [tn.CopyNode(2, 2, f'q2_input_{i}', dtype=complex)
-                    for i in range(self.dom.count(qubit))]
+        c_nodes = [tn.CopyNode(
+            2, 2, f'c_input_{i}',
+            dtype=complex)  # ty: ignore[invalid-argument-type]
+            for i in range(self.dom.count(bit))]
+        q_nodes1 = [tn.CopyNode(
+            2, 2, f'q1_input_{i}',
+            dtype=complex)  # ty: ignore[invalid-argument-type]
+            for i in range(self.dom.count(qubit))]
+        q_nodes2 = [tn.CopyNode(
+            2, 2, f'q2_input_{i}',
+            dtype=complex)  # ty: ignore[invalid-argument-type]
+            for i in range(self.dom.count(qubit))]
 
         inputs = [n[0] for n in c_nodes + q_nodes1 + q_nodes2]
         c_scan = [n[1] for n in c_nodes]
         q_scan1 = [n[1] for n in q_nodes1]
         q_scan2 = [n[1] for n in q_nodes2]
-        nodes = c_nodes + q_nodes1 + q_nodes2
+        nodes: list[tn.AbstractNode] = [*c_nodes, *q_nodes1, *q_nodes2]
         for layer in self.inside:
             (box, offset), = layer.boxes_and_offsets
             left, right = layer.dom[:offset], layer.dom[offset + len(box.dom):]
@@ -510,7 +521,9 @@ class Circuit(tensor.Diagram[complex]):
                 q_scan2 = [edges[1] for typ, edges in zip(cod, scan)
                            if typ == qubit]
             elif isinstance(box, Discard) and box.dom == bit:
-                node = tn.CopyNode(1, 2, 'c_discard', dtype=complex)
+                node = tn.CopyNode(
+                    1, 2, 'c_discard',
+                    dtype=complex)  # ty: ignore[invalid-argument-type]
                 tn.connect(c_scan[c_offset], node[0])
                 del c_scan[c_offset]
                 nodes.append(node)
@@ -530,7 +543,8 @@ class Circuit(tensor.Diagram[complex]):
                     assert len(box.dom) == 1 or len(box.cod) == 1
                     rank = c_dom + 2 * q_dom + c_cod + 2 * q_cod
                     node = tn.CopyNode(
-                        rank, 2, 'cq_' + str(box), dtype=complex)
+                        rank, 2, 'cq_' + str(box),
+                        dtype=complex)  # ty: ignore[invalid-argument-type]
                 else:
                     array = box.eval(mixed=True).array
                     node = tn.Node(array + 0j, 'cq_' + str(box))
@@ -942,7 +956,9 @@ class Sum(tensor.Sum[complex], Box):
             return {}
         if len(self.terms) == 1:
             return self.terms[0].get_counts(backend=backend, **params)
-        counts = Circuit.get_counts(*self.terms, backend=backend, **params)
+        counts = Circuit.get_counts(
+            *self.terms,  # ty: ignore[invalid-argument-type]
+            backend=backend, **params)
         result = {}
         for circuit_counts in counts:
             for bitstring, count in circuit_counts.items():
@@ -956,7 +972,9 @@ class Sum(tensor.Sum[complex], Box):
         if len(self.terms) == 1:
             return self.terms[0].eval(backend=backend, mixed=mixed, **params)
         return sum(
-            Circuit.eval(*self.terms, backend=backend, mixed=mixed, **params))
+            Circuit.eval(
+                *self.terms,  # ty: ignore[invalid-argument-type]
+                backend=backend, mixed=mixed, **params))
 
     def grad(self, var, **params):
         return sum(circuit.grad(var, **params) for circuit in self.terms)

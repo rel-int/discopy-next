@@ -230,7 +230,7 @@ def test_yanking():
     from discopy import balanced, compact, lens, para, pivotal, symmetric
     from discopy.abc import Nat, PivotalCategory
     from discopy.matrix import Matrix
-    from discopy.axioms import AxiomFailure
+    from discopy.testable import AxiomFailure
     from discopy.drawing import Drawing
     from discopy.python import Function, Ty as PythonTy
     x, y = symmetric.Ty('x'), compact.Ty('y')

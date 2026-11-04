@@ -410,6 +410,12 @@ confidence=HIGH,
 # --enable=similarities". If you want to run only the classes checker, but have
 # no Warning level messages displayed, use "--disable=all --enable=classes
 # --disable=W".
+# The first eight messages below are pylint's defaults. Beyond them, the code
+# deliberately does not follow three: invalid-name, since mathematical names
+# such as `f`, `x` or `Ty` are the convention; too-many-ancestors, since every
+# level of the hierarchy extends the levels above it; and cyclic-import, since
+# the package imports every module, so the graph is cyclic by design and the
+# number of cycles pylint reports varies from one run to the next.
 disable=raw-checker-failed,
         bad-inline-option,
         locally-disabled,

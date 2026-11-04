@@ -62,6 +62,7 @@ We also have its dagger and its transpose:
 
 from __future__ import annotations
 
+from typing import ClassVar
 from copy import copy
 
 from discopy import cat, cmap, rigid, feedback
@@ -153,6 +154,11 @@ class Diagram(rigid.Diagram, feedback.Diagram, PivotalCategory):
         dom (Ty) : The domain of the diagram, i.e. its input.
         cod (Ty) : The codomain of the diagram, i.e. its output.
     """
+    sum_factory: ClassVar[type["Sum"]]
+    box_factory: ClassVar[type["Box"]]
+    functor_factory: ClassVar[type["Functor"]]
+    cup_factory: ClassVar[type["Cup"]]
+    cap_factory: ClassVar[type["Cap"]]
     ob = Ty
     layer_factory = Layer
 

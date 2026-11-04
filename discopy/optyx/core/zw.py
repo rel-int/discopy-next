@@ -47,7 +47,7 @@ or using :code:`quimb` (with :code:`tensor.to_quimb()`).
 ...             (bSym_l.to_tensor().to_quimb()^...).data,\\
 ...             bSym_r.to_tensor().eval().array)
 >>> Equation(bSym_l, bSym_r, symbol="$=$").draw(\\
-... path="docs/_static/optyx/zw_commutativity.svg")
+... doctest="docs/_static/optyx/zw_commutativity.svg")
 
 .. image:: /_static/optyx/zw_commutativity.svg
     :align: center
@@ -60,7 +60,7 @@ or using :code:`quimb` (with :code:`tensor.to_quimb()`).
 ...             bAso_l.to_tensor().eval().array,\\
 ...             bAso_r.to_tensor().eval().array)
 >>> Equation(bAso_l, bAso_r, symbol="$=$").draw(\\
-... path="docs/_static/optyx/zw_associativity.svg")
+... doctest="docs/_static/optyx/zw_associativity.svg")
 
 .. image:: /_static/optyx/zw_associativity.svg
     :align: center
@@ -73,7 +73,7 @@ or using :code:`quimb` (with :code:`tensor.to_quimb()`).
 ...             bId_l.to_tensor().eval().array,\\
 ...             bId_r.to_tensor().eval().array)
 >>> Equation(bId_l, bId_r, symbol="$=$").draw(\\
-... path="docs/_static/optyx/zw_unit.svg")
+... doctest="docs/_static/optyx/zw_unit.svg")
 
 .. image:: /_static/optyx/zw_unit.svg
     :align: center
@@ -88,7 +88,7 @@ or using :code:`quimb` (with :code:`tensor.to_quimb()`).
 ...             bBa_l.to_tensor().eval().array,\\
 ...             bBa_r.to_tensor().eval().array)
 >>> Equation(bBa_l, bBa_r, symbol="$=$").draw(\\
-... path="docs/_static/optyx/zw_bialgebra.svg")
+... doctest="docs/_static/optyx/zw_bialgebra.svg")
 
 .. image:: /_static/optyx/zw_bialgebra.svg
     :align: center
@@ -107,7 +107,7 @@ or using :code:`quimb` (with :code:`tensor.to_quimb()`).
 ...             bZBA_l.to_tensor().eval().array,\\
 ...             bZBA_r.to_tensor().eval().array)
 >>> Equation(bZBA_l, bZBA_r, symbol="$=$").draw(\\
-... path="docs/_static/optyx/zw_zw_bialgebra.svg")
+... doctest="docs/_static/optyx/zw_zw_bialgebra.svg")
 
 .. image:: /_static/optyx/zw_zw_bialgebra.svg
     :align: center
@@ -121,7 +121,7 @@ or using :code:`quimb` (with :code:`tensor.to_quimb()`).
 ...             K0_infty_l.to_tensor().eval().array,\\
 ...             K0_infty_r.to_tensor().eval().array)
 >>> Equation(K0_infty_l, K0_infty_r, symbol="$=$").draw(\\
-... path="docs/_static/optyx/zw_z_copies.svg")
+... doctest="docs/_static/optyx/zw_z_copies.svg")
 
 .. image:: /_static/optyx/zw_z_copies.svg
     :align: center
@@ -139,7 +139,7 @@ or using :code:`quimb` (with :code:`tensor.to_quimb()`).
 ...             lemma_B7_l.to_tensor().eval().array,\\
 ...             lemma_B7_r.to_tensor().eval().array)
 >>> Equation(lemma_B7_l, lemma_B7_r, symbol="$=$").draw(\\
-... path="docs/_static/optyx/zw_lemma_B7.svg")
+... doctest="docs/_static/optyx/zw_lemma_B7.svg")
 
 .. image:: /_static/optyx/zw_lemma_B7.svg
     :align: center
@@ -153,7 +153,8 @@ from discopy.optyx.core import diagram
 from discopy.optyx.utils.misc import (
     occupation_numbers,
     multinomial,
-    BasisTransition
+    BasisTransition,
+    compare_arrays_of_different_sizes
 )
 from discopy.optyx.core.path import Matrix
 
@@ -267,10 +268,27 @@ class W(ZWBox):
             other.is_dagger,
         )
 
+    def __hash__(self) -> int:
+        return hash((W, self.n_legs, self.is_dagger))
+
 
 class ZBox(diagram.Spider, ZWBox):
     """
     Z spider from the ZW calculus.
+
+    A box with no legs is a scalar, and it is the **first** of its
+    amplitudes: an amplitude list is read at the index its legs carry, and a
+    box with no legs has no index to carry, which is how :code:`zw`'s axioms
+    write a scalar — see :code:`test_scalar` and :code:`test_lemma_B6`, where
+    a one-entry list is the value of a diagram fused down to a scalar. Fuse
+    before you truncate: it is :code:`ZBox(0, 1, f) >> ZBox(1, 0, g)` that
+    sums :code:`f(i)g(i)` over the legs it has, not the legless box. The
+    reading is also the only one total on an infinite amplitude list.
+
+    >>> ZBox(0, 0, [2]).to_tensor().eval()
+    Tensor[complex]([2.+0.j], dom=Dim(1), cod=Dim(1))
+    >>> ZBox(0, 0, lambda i: i + 1).to_tensor().eval()
+    Tensor[complex]([1.+0.j], dom=Dim(1), cod=Dim(1))
     """
 
     def __init__(
@@ -302,14 +320,17 @@ class ZBox(diagram.Spider, ZWBox):
         if input_dims is None:
             raise ValueError("Input dimensions must be provided.")
 
-        # if a scalar
+        # a spider with no legs is the scalar its first amplitude carries
         if self.legs_out == 0 and self.legs_in == 0:
             amplitudes = (
-                np.array([self.amplitudes], dtype=complex)
-                if not isinstance(self.amplitudes, IndexableAmplitudes)
-                else np.array([self.amplitudes[0]], dtype=complex)
+                self.amplitudes
+                if isinstance(self.amplitudes, IndexableAmplitudes)
+                else np.asarray(self.amplitudes).flatten()
             )
-            return tensor.Box(self.name, Dim(1), Dim(1), amplitudes)
+            return tensor.Box(
+                self.name, Dim(1), Dim(1),
+                np.array([amplitudes[0]], dtype=complex),
+            )
 
         spider_dim = min(input_dims) if self.legs_in > 0 else 2
 
@@ -385,7 +406,9 @@ class ZBox(diagram.Spider, ZWBox):
             return False
         if isinstance(self.amplitudes, IndexableAmplitudes):
             return self.amplitudes == other.amplitudes
-        return np.allclose(self.amplitudes, other.amplitudes)
+        return compare_arrays_of_different_sizes(
+            self.amplitudes, other.amplitudes
+        )
 
     def dagger(self) -> diagram.Diagram:
         return ZBox(self.legs_out, self.legs_in, np.conj(self.amplitudes))

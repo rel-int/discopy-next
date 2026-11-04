@@ -152,7 +152,7 @@ import copy
 
 from collections.abc import Callable
 
-from typing import ClassVar, Iterator
+from typing import ClassVar, Iterator, Self
 
 from discopy import cat, monoidal, biclosed, messages
 from discopy.abc import Pregroup, RigidCategory
@@ -202,7 +202,7 @@ class Wire(monoidal.Wire):
         super().__init__(name, dom, cod)
 
     def dagger(self) -> Wire:
-        raise AxiomError("Rigid types have no dagger, use pivotal instead.")
+        raise AxiomError(messages.RIGID_TYPE_HAS_NO_DAGGER)
 
     def atoms(self) -> list[Wire]:
         """
@@ -217,12 +217,12 @@ class Wire(monoidal.Wire):
         return [type(self)(self.name, dom=dom, cod=cod)]
 
     @property
-    def l(self) -> Wire:
+    def l(self) -> Self:
         """ The left adjoint of the object. """
         return type(self)(self.name, self.z - 1, dom=self.cod, cod=self.dom)
 
     @property
-    def r(self) -> Wire:
+    def r(self) -> Self:
         """ The right adjoint of the object. """
         return type(self)(self.name, self.z + 1, dom=self.cod, cod=self.dom)
 
@@ -285,12 +285,12 @@ class Ty(Pregroup, biclosed.Ty):
         super().__setstate__(state)
 
     @property
-    def l(self) -> Ty:
+    def l(self) -> Self:
         """ The left adjoint of the type. """
         return self.ar(*[x.l for x in self.inside[::-1]])
 
     @property
-    def r(self) -> Ty:
+    def r(self) -> Self:
         """ The right adjoint of the type. """
         return self.ar(*[x.r for x in self.inside[::-1]])
 
@@ -335,7 +335,7 @@ class Nat(monoidal.Nat, Ty):
     """
     l = r = property(lambda self: self)
 
-    def unwind(self) -> Nat:
+    def unwind(self) -> "Nat":
         """
         The identity: a natural number has no winding.
 
@@ -638,7 +638,7 @@ class Diagram(biclosed.Diagram, RigidCategory):
                 yield _diagram
                 diagram = _diagram
         for _diagram in monoidal.Diagram.normalize(diagram, left=left):
-            yield _diagram
+            yield _diagram  # ty: ignore[invalid-yield]
 
     normalize = snake_removal
 
@@ -767,7 +767,7 @@ class Box(biclosed.Box, Diagram):
         """
         box = super().from_tree(tree)
         box.z = tree.get('z', 0)
-        return box
+        return box  # ty: ignore[invalid-return-type]
 
     @property
     def is_transpose(self):
@@ -1012,7 +1012,7 @@ class Functor(biclosed.Functor):
         return super().__call__(other)
 
 
-def nesting(cls: type, factory: Callable) -> Callable[[Ty, Ty], Diagram]:
+def nesting[T](cls: type[T], factory: Callable) -> Callable[[Ty, Ty], T]:
     """
     Take a :code:`factory` for cups or caps of atomic types
     and extends it recursively, to types of the same length.
@@ -1040,7 +1040,7 @@ def nesting(cls: type, factory: Callable) -> Callable[[Ty, Ty], Diagram]:
             return left[0] @ tail @ right[-1] >> head
         return head >> left[0] @ tail @ right[-1]
 
-    return method
+    return method  # ty: ignore[invalid-return-type]
 
 
 def to_rigid(self):
@@ -1057,6 +1057,7 @@ Diagram.box_factory = Box
 Diagram.cup_factory, Diagram.cap_factory, Diagram.sum_factory = Cup, Cap, Sum
 Diagram.bubble_factory = Bubble
 Diagram.functor_factory = Functor
+
 
 Id = Diagram.id
 

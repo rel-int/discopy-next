@@ -51,6 +51,9 @@ NOT_FROBENIUS = \
     "{} has no spiders, cups or caps to downgrade this hypergraph."
 NOT_RIGID = "{} has no cups or caps for the wiring of this map."
 NOT_TRACED = "{} has no traces for the cycles of this map."
+COLOURED_QUOTIENT = (
+    "{} is coloured: a hypergraph or a map is symmetric, and a swap is "
+    "ill-typed across 0-cells, so it would lose its colours.")
 PARA_CURRY_COPAR = (
     "A closed category cannot curry a map with coparameters {}, as its "
     "exponential would swallow them.")
@@ -58,9 +61,6 @@ NO_SWAP = "{} is not symmetric, it has no swaps."
 NO_BRAID = "{} is not braided, it has no braids."
 NO_TWIST = "{} is not balanced, it has no twists."
 NO_CUPS = "{} is not rigid, it has no cups or caps."
-COLOURED_QUOTIENT = (
-    "{} is coloured: a hypergraph or a map is symmetric, and a swap is "
-    "ill-typed across 0-cells, so it would lose its colours.")
 NO_SUMS = "{} has no sums, it encodes a single diagram."
 NOT_SYMMETRIC = "{} has no swaps to downgrade this map."
 NOT_MARKOV = "{} has no copy or discard."
@@ -68,9 +68,12 @@ NOT_A_DAGGER = "{} has no dagger: {} is not a dagger category."
 NO_SUCH_SPIDER = "The only spiders of {} are its {}."
 NOT_ACYCLIC = "{} has a directed cycle, its boxes cannot be ordered."
 
+RIGID_TYPE_HAS_NO_DAGGER = "Rigid types have no dagger, use pivotal instead."
 FEEDBACK_HAS_NO_DAGGER = (
     "Feedback has no dagger and no rotation, "
     "either would feed its memory back in time.")
+NO_TYPE_PARAMETER = (
+    "{} has no type parameter to subscript, declare one as in class C[name].")
 NOT_PROGRESSIVE = "No line sweeps the map down meeting each box with its "\
     "inputs side by side, past the cut {}."
 NOT_DOWNWARD = "{} has cups, caps or loops: its wires do not all go down."
@@ -92,9 +95,6 @@ TERM_IS_A_BOX = \
     "A term is a box: the laws of its category are the diagram's."
 MISSING_BOXES_AND_OFFSETS = (
     "Decoding needs either boxes and offsets, or the two of them zipped.")
-NO_TYPE_PARAMETER = (
-    "{} has no type parameter to subscript, declare one as in "
-    "class C(NamedGeneric['name']).")
 CURRY_HAS_NO_DAGGER = "A curry has no dagger."
 NAME_CLASH = "{!r} names two things in the string of {}."
 WRONG_SIDE = "Expected left={} for {}, got left={} instead."

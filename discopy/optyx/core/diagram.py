@@ -88,7 +88,7 @@ boxes is done using the :code:`<<` operator:
 
 >>> from discopy.optyx.core.zw import Create, W
 >>> split_photon = Create(1) >> W(2)
->>> split_photon.draw(path="docs/_static/optyx/seq_comp_example.svg")
+>>> split_photon.draw(doctest="docs/_static/optyx/seq_comp_example.svg")
 
 .. image:: /_static/optyx/seq_comp_example.svg
     :align: center
@@ -98,7 +98,7 @@ We can also compose boxes in parallel (tensor) using the :code:`@` operator :
 >>> from discopy.optyx.photonic import BS, Phase
 >>> beam_splitter_phase = (BS @ Phase(0.5)).get_kraus()
 >>> beam_splitter_phase.draw(
-...     path="docs/_static/optyx/parallel_comp_example.svg")
+...     doctest="docs/_static/optyx/parallel_comp_example.svg")
 
 .. image:: /_static/optyx/parallel_comp_example.svg
     :align: center
@@ -108,7 +108,7 @@ expressed using the :class:`zw` calculus:
 
 >>> from discopy.optyx.photonic import BS
 >>> beam_splitter = BS.get_kraus()
->>> beam_splitter.draw(path="docs/_static/optyx/bs_zw.svg")
+>>> beam_splitter.draw(doctest="docs/_static/optyx/bs_zw.svg")
 
 .. image:: /_static/optyx/bs_zw.svg
     :align: center
@@ -298,6 +298,7 @@ class Diagram(frobenius.Diagram):
     :class:`lo` calculi."""
 
     grad = tensor.Diagram.grad
+    __pow__ = monoidal.Ty.__pow__
 
     def conjugate(self) -> Diagram:
         """Conjugates every box in the diagram"""
@@ -904,11 +905,6 @@ class Box(frobenius.Box, Diagram):
     ) -> Iterable[BasisTransition]:
         pass
 
-    def __pow__(self, n):
-        if n == 1:
-            return self
-        return self @ self ** (n - 1)
-
 
 class Spider(frobenius.Spider, Box):
     """Abstract spider (dagger-SCFA)
@@ -1068,6 +1064,7 @@ class Permutation(frobenius.Permutation, Box):
     def conjugate(self):
         return self
 
+    # pylint: disable-next=unused-argument  # overrides Box.to_path
     def to_path(self, dtype: type = complex):
         size = len(self.dom)
         return path.Matrix([int(self.perm[j] == i)
@@ -1079,6 +1076,7 @@ class Permutation(frobenius.Permutation, Box):
         return [input_dims[i] for i in self.perm]
 
     def truncation(
+        # pylint: disable-next=unused-argument  # overrides Box.truncation
         self, input_dims: list[int] = None, output_dims: list[int] = None
     ) -> tensor.Box:
         return tensor.Permutation(
@@ -1409,7 +1407,7 @@ class Feedback(monoidal.Bubble, Box):
     >>> plus = Scalar(0.5 ** 0.5) @ Z(0, 1)
     >>> ladder = (cnot >> Diagram.swap(bit, bit)).feedback(state=plus)
     >>> Equation(ladder, ladder.unroll(2).simplify(), symbol="$\\\\mapsto$"
-    ...     ).draw(path="docs/_static/optyx/cnot_ladder.svg")
+    ...     ).draw(doctest="docs/_static/optyx/cnot_ladder.svg")
 
     .. image:: /_static/optyx/cnot_ladder.svg
         :align: center

@@ -79,11 +79,12 @@ from __future__ import annotations
 
 from functools import total_ordering, cached_property
 from typing import (
-    Callable, ClassVar, Mapping, Iterable, TYPE_CHECKING)
+    Any, Callable, ClassVar, Mapping, Iterable, Self, TYPE_CHECKING)
+
 
 from discopy import messages, utils
 from discopy.abc import Category, DaggerCategory, Nat
-from discopy.axioms import GENERATORS, Equation as AbstractEquation, Testable
+from discopy.testable import GENERATORS, Equation as AbstractEquation, Testable
 from discopy.utils import (  # noqa: F401
     factory,
     factory_name,
@@ -199,7 +200,7 @@ class FreeCategory(Category):
     signature without breaking the machinery below.
     """
 
-    generator_factory = None
+    generator_factory: type = None  # ty: ignore[invalid-assignment]
 
     def __init__(self, inside, dom, cod, _scan=True):
         dom, cod = map(self.cast_ob, (dom, cod))
@@ -783,14 +784,15 @@ class Sum(Box):
     serialised_attrs = ("terms", "dom", "cod")
 
     def __init__(
-            self, terms: tuple[Arrow, ...], dom: Ob = None, cod: Ob = None):
+            self, terms: tuple[Arrow, ...],
+            dom: Ob | None = None, cod: Ob | None = None):
         if not terms and (dom is None or cod is None):
             raise ValueError(messages.MISSING_TYPES_FOR_EMPTY_SUM)
         dom = terms[0].dom if dom is None else dom
         cod = terms[0].cod if cod is None else cod
         unit = Sum((), dom, cod) if terms else None
         for arrow in terms:
-            assert_isparallel(unit, arrow)
+            assert_isparallel(unit, arrow)  # ty: ignore[invalid-argument-type]
         self.terms = terms
         super().__init__("", dom, cod)
         del self.name
@@ -832,7 +834,8 @@ class Sum(Box):
         assert_isparallel(self, other)
         other = other if isinstance(other, Sum)\
             else self.sum_factory((other, ))
-        return self.sum_factory(self.terms + other.terms, self.dom, self.cod)
+        return self.sum_factory(
+            (*self.terms, *other.terms), self.dom, self.cod)
 
     def __iter__(self):
         for arrow in self.terms:
@@ -908,8 +911,9 @@ one, they have [cat.Ob('x'), cat.Ob('y')].
     serialised_attrs = (
         "*args", "dom", "cod", "name", "method", "is_dagger", "data")
 
-    def __init__(self, *args: Arrow, dom: Ob = None, cod: Ob = None,
-                 name="", method="bubble", **kwargs):
+    def __init__(
+            self, *args: Arrow, dom: Ob | None = None,
+            cod: Ob | None = None, name="", method="bubble", **kwargs):
         dom, cod = (
             given if given is not None else self.common(args, attr)
             for attr, given in [("dom", dom), ("cod", cod)])
@@ -1017,7 +1021,7 @@ one, they have [cat.Ob('x'), cat.Ob('y')].
 
 
 @factory
-class Functor(Category):
+class Functor(Category[type, "Functor"]):
     """
     A functor is a pair of maps :code:`ob_map` and :code:`ar_map` and an
     optional codomain category :code:`cod`.
@@ -1080,10 +1084,11 @@ class Functor(Category):
     >>> assert F(f)(1) == 2 and F(f[::-1])(1) == 0
     """
     ob = type[Category]
-    dom = cod = Arrow
+    dom: type[Any] = Arrow
+    cod: type[Any] = Arrow
 
     @classmethod
-    def id(cls, dom: type = None) -> Functor:
+    def id(cls, dom: type | None = None) -> Self:
         """
         The identity functor on a given category ``dom``, with the shared
         :func:`discopy.utils.identity` as both of its maps.
@@ -1134,7 +1139,7 @@ class Functor(Category):
             self,
             ob_map: Mapping[Ob, Ob] | Callable[[Ob], Ob] | None = None,
             ar_map: Mapping[Box, Arrow] | Callable[[Box], Arrow] | None = None,
-            dom: type = None, cod: type = None):
+            dom: type | None = None, cod: type | None = None):
         self.dom, self.cod = dom or type(self).dom, cod or type(self).cod
         self.ob_map: MappingOrCallable[Ob, Ob] = MappingOrCallable(
             ob_map or {})
@@ -1251,7 +1256,7 @@ Arrow.generator_factory = Arrow.box_factory = Box
 
 
 @factory
-class Transformation(Category):
+class Transformation(Category[Functor, "Transformation"]):
     """
     A (not necessarily natural) transformation between two parallel functors.
 
@@ -1362,8 +1367,8 @@ class Transformation(Category):
 
 class Equation(AbstractEquation[Arrow]):
     """
-    An :class:`.axioms.Equation` between arrows, see its docstring for the
-    parameters and :meth:`.axioms.Equation.modulo` for quotients.
+    An :class:`.testable.Equation` between arrows, see its docstring for the
+    parameters and :meth:`.testable.Equation.modulo` for quotients.
 
     Example
     -------
@@ -1412,7 +1417,8 @@ which JSON cannot hold.
         return cls(*map(from_tree, tree['terms']), symbols=tree['symbols'])
 
 
-Ob.equation_factory = Arrow.equation_factory = Equation
+Ob.equation_factory = Equation
+Arrow.equation_factory = Equation  # ty: ignore[invalid-assignment]
 Arrow.sum_factory = Sum
 Arrow.bubble_factory = Bubble
 Id = Arrow.id

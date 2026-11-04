@@ -1,6 +1,6 @@
 """
 Hypothesis profiles, example databases and the run's own report for the
-property suite, see the documentation of :mod:`discopy.axioms` and of
+property suite, see the documentation of :mod:`discopy.testable` and of
 :mod:`proptest.report`.
 
 Under ``CI`` a registered profile inherits Hypothesis's ``ci`` defaults,

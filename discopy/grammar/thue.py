@@ -57,8 +57,8 @@ class Rule(monoidal.Box):
     """
     serialised_attrs = ("dom", "cod", "name", "*", "is_dagger", "data")
 
-    def __init__(self, dom: monoidal.Ty, cod: monoidal.Ty, name: str = None,
-                 **params):
+    def __init__(self, dom: monoidal.Ty, cod: monoidal.Ty,
+                 name: str | None = None, **params):
         name = f"Rule({dom}, {cod})" if name is None else name
         monoidal.Box.__init__(self, name, dom, cod, **params)
 
@@ -88,8 +88,8 @@ class Word(Rule):
     """
     serialised_attrs = ("name", "cod", "dom", "*", "is_dagger", "data")
 
-    def __init__(self, name: str, cod: monoidal.Ty, dom: monoidal.Ty = None,
-                 **params):
+    def __init__(self, name: str, cod: monoidal.Ty,
+                 dom: monoidal.Ty | None = None, **params):
         dom = self.ob() if dom is None else dom
         Rule.__init__(self, dom=dom, cod=cod, name=name, **params)
 

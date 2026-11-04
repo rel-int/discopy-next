@@ -56,7 +56,7 @@ from discopy import abc, cat, monoidal, symmetric
 from discopy.abc import (
     ComarkovCategory, MarkovCategory, MonoidalCategory, NamedGeneric,
     SymmetricCategory)
-from discopy.axioms import Testable
+from discopy.testable import Testable
 from discopy.python import finset
 from discopy.utils import (
     assert_isinstance, classproperty, factory_name, get_origin, unbiased)
@@ -66,7 +66,7 @@ NO_TREE = "The opposite of a category has no tree: it reads back from the "\
 
 
 @dataclass
-class Category(abc.Category, Testable["Category"], NamedGeneric['category']):
+class Category[category](abc.Category, Testable["Category"], NamedGeneric):
     """
     An arrow of the opposite of ``category``, i.e. an arrow ``inside`` of the
     category read from its codomain to its domain.
@@ -164,7 +164,8 @@ class Monoidal(Category, MonoidalCategory):
             other : The arrow to tensor with.
         """
         assert_isinstance(other, type(self))
-        return type(self)(self.inside @ other.inside)
+        inside = self.inside @ other.inside  # ty: ignore[unsupported-operator]
+        return type(self)(inside)
 
 
 class Symmetric(Monoidal, SymmetricCategory):
@@ -211,7 +212,8 @@ class Comarkov(Symmetric, ComarkovCategory):
             x : The object to merge.
             n : The number of copies.
         """
-        return cls(cls.category.copy(x, n))
+        return cls(
+            cls.category.copy(x, n))  # ty: ignore[invalid-argument-type]
 
 
 class Markov(Symmetric, MarkovCategory):

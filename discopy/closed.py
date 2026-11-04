@@ -84,7 +84,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from functools import cached_property, reduce
 from inspect import signature
-from typing import Callable, ClassVar, Dict
+from typing import Callable, ClassVar, Dict, Self
 
 from discopy import (
     monoidal, biclosed, markov, feedback, cmap, hypergraph, messages)
@@ -134,7 +134,7 @@ class Ty(biclosed.Ty, feedback.Ty):
     product_factory: ClassVar[type["Product"]]
     variable_factory: ClassVar[type["Variable"]]
     constant_factory: ClassVar[type["Constant"]]
-    application_factory: ClassVar[type["Application"]]
+    application_factory: ClassVar[Callable[..., "Application"]]
     abstraction_factory: ClassVar[type["Abstraction"]]
 
     def __mul__(self, other: Ty) -> Ty:
@@ -163,7 +163,7 @@ class Ty(biclosed.Ty, feedback.Ty):
         return self.inside[0].factors
 
     @classmethod
-    def from_biclosed(cls, old: biclosed.Ty) -> Ty:
+    def from_biclosed(cls, old: biclosed.Ty) -> Self:
         """
         Translate a biclosed type into a closed type, collapsing left and
         right exponentials into a single exponential.
@@ -245,7 +245,7 @@ class Product(Wire):
         first = str(first) if len(first) == 1 else f"({first})"
         return f"{first}.product({', '.join(map(str, others))}){delayed}"
 
-    def atoms(self) -> list[Ty]:
+    def atoms(self) -> list:
         """ The atoms of a product: those of its factors. """
         return [atom for typ in self.factors for atom in typ.atoms()]
 
@@ -294,13 +294,15 @@ class Unitype(Exp):
                 other.base, other.exponent) == (self.base, self.exponent))
 
     def __hash__(self):
-        return hash(Exp(self.base, self.exponent, time_step=self.time_step,
-                        is_constant=self.is_constant))
+        return hash(Exp(
+            self.base,  # ty: ignore[invalid-argument-type]
+            self.exponent, time_step=self.time_step,
+            is_constant=self.is_constant))
 
     def __str__(self):
         return "U" + feedback.str_delayed(self.time_step)
 
-    def atoms(self) -> list[Ty]:
+    def atoms(self) -> list:
         """ The unitype names itself undelayed, i.e. its base. """
         return [self.base]
 
@@ -334,7 +336,7 @@ class Diagram(markov.Diagram, biclosed.Diagram, ClosedCategory):
     curry_factory: ClassVar[type["Curry"]]
     eval_factory: ClassVar[type["Eval"]]
     coeval_factory: ClassVar[type["Coeval"]]
-    trace_factory: ClassVar[type["Trace"]]
+    trace_factory: ClassVar[type["Trace"]]  # ty: ignore[invalid-type-form]
     discard_factory: ClassVar[type["Discard"]]
     sum_factory: ClassVar[type["Sum"]]
     ob = Ty
@@ -421,7 +423,8 @@ class Diagram(markov.Diagram, biclosed.Diagram, ClosedCategory):
         graph = Hypergraph.from_diagram(self)
         if not graph.is_causal:
             raise ValueError(f"Expected a causal diagram, got {self}")
-        variables = [self.ob.variable_factory(f"x{i}", typ)
+        variables = [self.ob.variable_factory(
+            f"x{i}", typ)
                      for i, typ in enumerate(graph.spider_types)]
         outputs = [variables[i] for i in graph.cod_wires]
         result = outputs[0] if len(outputs) == 1 else Tuple(*outputs)
@@ -837,12 +840,13 @@ class TermBase(Box, biclosed.TermBase):
             [context.index(x) for x in self.freevars + unused],
             [functor(x.cod) for x in context])
         if not unused:
-            return permutation
+            return permutation  # ty: ignore[invalid-return-type]
         discard = functor.cod.discard(functor(
             self.ob().tensor(*[x.cod for x in unused])))
         return permutation >> functor.cod.id(functor(self.dom)) @ discard
 
-    def share(self, functor: Functor, *contexts: list[Variable]) -> Diagram:
+    def share(self, functor: Functor,
+              *contexts: list[biclosed.Variable]) -> Diagram:
         """
         The structural morphism from the image of the free variables of the
         term to that of the concatenation of ``contexts``, copying each
@@ -881,22 +885,25 @@ class TermBase(Box, biclosed.TermBase):
         :class:`Unpack`.
         """
         functor = functor or self.functor
-        result = self.eval(functor, context)
-        return result >> functor(Unpack(self.cod))\
-            if self.cod.is_product else result
+        result = self.eval(
+            functor, context)  # ty: ignore[too-many-positional-arguments]
+        if not self.cod.is_product:
+            return result
+        return result >> functor(
+            Unpack(self.cod))  # ty: ignore[invalid-argument-type]
 
     def occurrences(self, variable: Variable) -> int:
         "The number of free occurrences of a variable in the term."
         # pylint: disable=unused-argument  # a constant has no variable
         return 0
 
-    def substitute(self, substitution: Substitution) -> Term:
+    def substitute(self, substitution: Substitution) -> Self:
         "The term with the free variables of a substitution replaced."
         # pylint: disable=unused-argument  # a constant has no variable
         return self
 
     @classmethod
-    def from_biclosed(cls, term: biclosed.Term) -> Term:
+    def from_biclosed(cls, term: biclosed.TermBase) -> Term:
         """
         Translate a biclosed term into a closed term, dropping planarity by
         collapsing left and right exponentials and applications.
@@ -978,7 +985,8 @@ class TermBase(Box, biclosed.TermBase):
             if constant not in constants:
                 constants.append(constant)
         return (strategy or self.strategy_factory)(budget)(
-            self, tuple(self.freevars) + tuple(constants))
+            self, tuple(self.freevars)  # ty: ignore[invalid-argument-type]
+            + tuple(constants))
 
     def normal_form(self, budget: int | None = None,
                     strategy: type[Strategy] | None = None) -> Term:
@@ -1083,6 +1091,8 @@ class Application(TermBase, biclosed.Application):
             :meth:`eval` copies.
     """
     serialised_attrs = biclosed.Application.serialised_attrs
+    func: Term
+    args: Term
 
     def __init__(self, func: Term, args: Term, left: bool = False):
         # pylint: disable=unused-argument  # a closed category is symmetric
@@ -1123,6 +1133,8 @@ class Abstraction(TermBase, biclosed.Abstraction):
     which need not occur in it or may occur several times.
     """
     serialised_attrs = biclosed.Abstraction.serialised_attrs
+    var: Variable
+    body: Term
 
     def __init__(self, var: Variable, body: Term, left: bool = False):
         # pylint: disable=unused-argument  # a closed category is symmetric
@@ -1167,7 +1179,7 @@ class Compound(TermBase):
         dom : The domain of the term, i.e. the types of its free variables.
         cod : The codomain of the term.
     """
-    def __init__(self, dom: Ty, cod: Ty):
+    def __init__(self, dom: biclosed.Ty, cod: biclosed.Ty):
         super().__init__(type(self).__name__, dom, cod)
         del self.name
 
@@ -1206,8 +1218,11 @@ class Tuple(Compound):
         self.freevars = list(dict.fromkeys(
             sum([term.freevars for term in terms], [])))
         dom = self.ob().tensor(*[x.cod for x in self.freevars])
-        cod = self.ob(self.ob.product_factory(*[t.cod for t in terms]))\
-            if terms else self.ob()
+        cod = self.ob()
+        if terms:
+            product = self.ob.product_factory(
+                *[t.cod for t in terms])  # ty: ignore[invalid-argument-type]
+            cod = self.ob(product)
         super().__init__(dom, cod)
 
     @property
@@ -1230,8 +1245,10 @@ class Tuple(Compound):
             >> self.share(functor, *[term.freevars for term in self.terms])\
             >> functor.cod.id(functor(self.ob())).tensor(
                 *[term.eval(functor) for term in self.terms])
-        return result >> functor(Pack(self.cod))\
-            if pack and self.terms else result
+        if not (pack and self.terms):
+            return result
+        return result >> functor(
+            Pack(self.cod))  # ty: ignore[invalid-argument-type]
 
     def eval_unpacked(self, functor=None, context=None):
         return self.eval(functor, context, pack=False)
@@ -1423,7 +1440,7 @@ class Let(Compound):
         return f"let({self.expression}, lambda{params}: {self.body})"
 
     @property
-    def rest(self) -> list[Variable]:
+    def rest(self) -> list[biclosed.Variable]:
         "The free variables of the body that the statement does not bind."
         return [x for x in self.freevars if x in self.body.freevars]
 
@@ -1705,7 +1722,7 @@ class BohmTree:
         for var in reversed(self.variables[n:]):
             if not isinstance(var, Constant):
                 result = var.cod.abstraction_factory(var, result)
-        return result
+        return result  # ty: ignore[invalid-return-type]
 
     def __repr__(self):
         return factory_name(type(self)) + (
@@ -1731,8 +1748,10 @@ class Strategy:
     """
     budget: int | None = None
 
-    def __call__(self, term: Term,
-                 variables=()) -> BohmTree | None:
+    def __call__(
+            self, term: Term,
+            variables: tuple[Variable | Constant, ...] = ()
+    ) -> BohmTree | None:
         """
         The head normal form of a term in a scope of variables as a
         :class:`BohmTree` with its arguments left lazy, or ``None`` when the
@@ -1744,7 +1763,8 @@ class Strategy:
                 constants of the term followed by the ones bound by its
                 parents.
         """
-        variables, spine = list(variables), []
+        scope: list[Variable | Constant] = list(variables)
+        spine = []
         while isinstance(term, (Application, Abstraction)):
             if isinstance(term, Application):
                 spine.append(term.args)
@@ -1754,15 +1774,17 @@ class Strategy:
                     return None
                 term = Substitution({term.var: spine.pop()})(term.body)
             else:
-                variables.append(term.var)
+                scope.append(term.var)
                 term = term.body
         assert_isinstance(term, (Variable, Constant))
-        head = len(variables) - 1 - variables[::-1].index(term)
+        index = scope[::-1].index(term)  # ty: ignore[invalid-argument-type]
+        head = len(scope) - 1 - index
         cod = term.cod
         for _ in spine:
             cod = cod.base
         return BohmTree(
-            cod, tuple(variables), head, self, tuple(reversed(spine)))
+            cod,  # ty: ignore[invalid-argument-type]
+            tuple(scope), head, self, tuple(reversed(spine)))
 
     def spend(self) -> bool:
         "Take one beta redex from the budget, or return ``False``."

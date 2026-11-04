@@ -216,11 +216,14 @@ ignore = [
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401"]
 
+# optyx moved in with its own history (#276) and is typed apart from the
+# rest of the package, which typechecks.
 [tool.ty.src]
 include = ["discopy"]
+exclude = ["discopy/optyx"]
 
 [tool.ty.environment]
-python-version = "3.12"
+python-version = "3.14"
 
 # The factory-method pattern narrows the signatures of `then`, `tensor` and
 # their friends down the tower, and attributes are dynamic by design where a
@@ -230,25 +233,11 @@ invalid-method-override = "ignore"
 unresolved-attribute = "ignore"
 # The rules `main` breaks today, each set back to "error" by the pull request
 # that fixes its last instance.
-call-non-callable = "warn"
-empty-body = "warn"
-inconsistent-mro = "warn"
 invalid-argument-type = "warn"
-invalid-assignment = "warn"
-invalid-generic-class = "warn"
-invalid-legacy-type-variable = "warn"
 invalid-parameter-default = "warn"
 invalid-return-type = "warn"
-invalid-type-arguments = "warn"
-invalid-type-form = "warn"
-invalid-yield = "warn"
-missing-argument = "warn"
 no-matching-overload = "warn"
-not-iterable = "warn"
-not-subscriptable = "warn"
 too-many-positional-arguments = "warn"
-unknown-argument = "warn"
-unresolved-import = "warn"
 unsupported-operator = "warn"
 
 [tool.pytest.ini_options]

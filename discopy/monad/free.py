@@ -50,7 +50,7 @@ from discopy.utils import (
 
 
 @factory
-class Homomorphism(Category, NamedGeneric['monad']):
+class Homomorphism[monad](Category, NamedGeneric):
     """
     A homomorphism between the free algebras of a monad ``M`` on two types
     ``X`` and ``Y``, i.e. a function from ``M(X)`` to ``M(Y)`` commuting
@@ -128,7 +128,8 @@ class Homomorphism(Category, NamedGeneric['monad']):
             channel : The channel to extend.
         """
         monad = cls.monad
-        assert_ismember(channel, Channel[monad])
+        assert_ismember(
+            channel, Channel[monad])  # ty: ignore[invalid-type-form]
         return cls(
             monad(channel.inside) >> monad.mult(channel.cod),
             channel.dom, channel.cod)
@@ -139,7 +140,7 @@ class Homomorphism(Category, NamedGeneric['monad']):
         unit, inverse to :meth:`from_channel`.
         """
         monad = type(self).monad
-        return Channel[monad](
+        return Channel[monad](  # ty: ignore[invalid-type-form]
             monad.unit(self.dom) >> self.inside, self.dom, self.cod)
 
     def __call__(self, m):

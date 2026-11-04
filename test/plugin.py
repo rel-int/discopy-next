@@ -5,10 +5,18 @@ Everything that can say for itself that it needs an optional backend does:
 a test with ``pytest.importorskip``, a doctest with a ``+EXTRA`` directive.
 What is left cannot -- a module whose import is the thing that fails -- so
 it is named here.
+
+``discopy`` is imported here, before anything is collected: under
+``--import-mode=importlib`` a module collected for its doctests while its
+package is not yet imported is executed twice, once by the package's own
+import and once by pytest, so a doctest of ``discopy/feedback.py`` run alone
+reads a ``Ty`` that ``markov`` does not know.
 """
 
 import pytest
 from _pytest.doctest import DoctestItem
+
+import discopy  # noqa: F401  pylint: disable=unused-import
 
 
 UNIMPORTABLE = (

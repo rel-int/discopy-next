@@ -67,11 +67,13 @@ from __future__ import annotations
 
 import warnings
 from collections.abc import Sized
+from inspect import Parameter, Signature, signature
 from operator import index
 from typing import ClassVar
 
-from discopy import symmetric, monoidal, feedback, cmap, hypergraph, messages
-from discopy.abc import ComarkovCategory, MarkovCategory
+from discopy import (
+    cat, symmetric, monoidal, feedback, cmap, hypergraph, messages)
+from discopy.abc import ComarkovCategory, MarkovCategory, Nat
 from discopy.cat import factory
 from discopy.feedback import (  # noqa: F401  pylint: disable=unused-import
     Wire, Ty)
@@ -182,7 +184,8 @@ class Diagram(symmetric.Diagram, MarkovCategory):
         if cls.function_factory.ar is cls:
             return cls.from_function(finset.Function.copy(len(x), n), x)
         from discopy import frobenius
-        return frobenius.Diagram.spiders.__func__(cls, 1, n, x)
+        return frobenius.Diagram.spiders.__func__(
+            cls, 1, n, x)  # ty: ignore[invalid-argument-type]
 
     @classmethod
     def discard(cls, x: monoidal.Ty) -> Diagram:
@@ -216,7 +219,8 @@ class Diagram(symmetric.Diagram, MarkovCategory):
         """
         func = list(func)
         if sorted(func) == list(range(len(dom))):
-            return cls.from_permutation(func, dom)
+            return cls.from_permutation(
+                func, dom)  # ty: ignore[invalid-return-type]
         if cls.function_factory.ar is cls:
             return cls.function_factory(dom, func)
         return super().from_function(func, dom)
@@ -239,7 +243,7 @@ class Diagram(symmetric.Diagram, MarkovCategory):
             "use discopy.comarkov.Diagram.merge instead.",
             DeprecationWarning, stacklevel=2)
         from discopy import comarkov
-        return comarkov.Diagram.merge(x, n)
+        return comarkov.Diagram.merge(x, n)  # ty: ignore[invalid-return-type]
 
     @property
     def is_deterministic(self) -> bool:
@@ -460,10 +464,10 @@ class Function(Box):
     """
     serialised_attrs = ("dom", "func")
 
-    def __new__(cls, dom: monoidal.Ty = None, func=None):
+    def __new__(cls, dom: monoidal.Ty | None = None, func=None):
         if dom is None or cls is not cls.ar.function_factory:
             return super().__new__(cls)
-        func = list(func)
+        func = list(func)  # ty: ignore[invalid-argument-type]
         if sorted(func) == list(range(len(dom))):
             return cls.ar.permutation_factory(dom, func)
         if len(dom) == 1 and not any(func):
@@ -471,7 +475,7 @@ class Function(Box):
         return super().__new__(cls)
 
     def __init__(self, dom: monoidal.Ty, func):
-        self.func = finset.Function(list(func), len(dom), len(func))
+        self.func = finset.Function(list(func), Nat(len(dom)), Nat(len(func)))
         cod = dom[:0].tensor(*(dom[i] for i in self.func))
         Box.__init__(self, f"Function({list(self.func)})", dom, cod)
 
@@ -630,7 +634,7 @@ class Permutation(symmetric.Permutation, Box):
     >>> assert Swap(x, y) @ Copy(x) == Function(x @ y @ x, [1, 0, 2, 2])
     """
     func = property(lambda self: finset.Function(
-        list(self.perm), len(self.dom), len(self.cod)))
+        list(self.perm), Nat(len(self.dom)), Nat(len(self.cod))))
     fuse, tensor = Function.fuse, Function.tensor
 
 
@@ -833,12 +837,20 @@ class Functor(symmetric.Functor):
                 and not isinstance(other, symmetric.Permutation):
             function = getattr(self.cod, "function", None)\
                 or MarkovCategory.function.__func__.__get__(self.cod)
-            return function(other.func, list(map(self, other.dom)))
+            return function(  # ty: ignore[invalid-argument-type]
+                other.func, list(map(self, other.dom)))
         result = super().__call__(other)
         if isinstance(other, Bubble) and isinstance(result, Bubble):
             return other.flagged(result)
         return result
 
+
+Box.__init__.__signature__ = Signature([
+    *list(signature(monoidal.Box.__init__).parameters.values())[:-1], *(
+        param.replace(kind=Parameter.KEYWORD_ONLY) for init in (
+            cat.Box.__init__, feedback.Box.__init__, Box.__init__)
+        for param in signature(init).parameters.values()
+        if param.default is not Parameter.empty)])
 
 CMap = cmap.CMap[Diagram]
 

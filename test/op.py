@@ -2,7 +2,7 @@ from pytest import raises
 
 from discopy import op
 from discopy.abc import Nat
-from discopy.axioms import assert_axioms
+from discopy.testable import assert_axioms
 from discopy.matrix import Matrix
 from discopy.python.finset import Function
 

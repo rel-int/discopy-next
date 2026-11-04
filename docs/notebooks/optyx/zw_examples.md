@@ -9,102 +9,77 @@ import marimo as mo
 
 # Evaluating photonic circuits using the permanent method and tensor networks
 <!---->
-By representing the circuits in $\bf{ZW}_\infty$, we can treat them as a tensor networks which can be contracted using different methods. Here, we simply use the tensor class from DisCoPy, but tools such as Quimb could be used.
+By representing the circuits in $\bf{ZW}_\infty$, we can treat them as tensor networks which can be contracted using different methods: the permanent of the unitary, Perceval's simulator, or a tensor network contracted by DisCoPy or Quimb.
 
 ```python {.marimo}
-import sys
-sys.path.append('..')
-
-from discopy.optyx import circuit
-from discopy.optyx import qpath
-from discopy.optyx import zw
 import numpy as np
+
+from discopy.optyx import photonic
+from discopy.optyx.core.backends import (
+    DiscopyBackend, PercevalBackend, PermanentBackend, QuimbBackend)
 ```
 
 ## Hong-Ou-Mandel effect
 <!---->
-We can define the optical circuit to represent the Hong-Ou-Mandel effect in QPath, then translate the circuit to $\bf{ZW}_\infty$:
+We can define the optical circuit for the Hong-Ou-Mandel effect as a photonic diagram:
 
 ```python {.marimo}
-hom = qpath.Create(1, 1) >> circuit.BBS(0) >> qpath.Select(1, 1)
+hom = photonic.Create(1, 1) >> photonic.BS >> photonic.Select(1, 1)
 ```
 
 ```python {.marimo}
 hom.draw()
 ```
 
-Convert the QPath diagram to a $\bf{ZW}_\infty$ diagram:
+Its Kraus map is a $\bf{ZW}_\infty$ diagram:
 
 ```python {.marimo}
-hom.to_zw().draw()
+hom.get_kraus().draw()
 ```
 
-Evaluating the permanent:
+Evaluating the permanent, and with Perceval, which gives the probability rather than the amplitude:
 
 ```python {.marimo}
-hom.to_path().prob_with_perceval().array
+hom.eval(PermanentBackend()).tensor.array
 ```
 
 ```python {.marimo}
-hom.to_path().prob().array
+hom.eval(PercevalBackend()).tensor.array
 ```
 
 Evaluating the tensor network:
 
 ```python {.marimo}
-hom.to_zw().to_tensor().eval().array
+hom.eval(DiscopyBackend()).tensor.array
 ```
 
 # Number operator
 
 ```python {.marimo}
-number_operator = (qpath.Split() >> 
-                   qpath.Select(1) @ qpath.Id(1) >> 
-                   qpath.Create(1) @ qpath.Id(1) >> 
-                   qpath.Merge())
+number_operator = photonic.NumOp()
+number_operator.get_kraus().draw()
 ```
 
-```python {.marimo}
-number_operator.draw()
-```
+On $n$ photons, the number operator gives the amplitude $n$:
 
 ```python {.marimo}
-# Create a 2-photon state
-two_p = qpath.Create(2) >> number_operator >> qpath.Select(2)
-np.sqrt(two_p.prob().array)
-```
+def number(n):
+    return photonic.Create(n) >> number_operator >> photonic.Select(n)
 
-```python {.marimo}
-two_p.to_zw().to_tensor().eval().array
-```
+for _n in (2, 3, 12):
+    assert np.isclose(number(_n).eval(PermanentBackend()).tensor.array, _n)
+    assert np.isclose(number(_n).eval(DiscopyBackend()).tensor.array, _n)
 
-```python {.marimo}
-# Create a 3-photon state
-three_p = qpath.Create(3) >> number_operator >> qpath.Select(3)
-np.sqrt(three_p.prob().array)
-```
-
-```python {.marimo}
-three_p.to_zw().to_tensor().eval().array
-```
-
-```python {.marimo}
-# Create a 12-photon state
-n_p = qpath.Create(12) >> number_operator >> qpath.Select(12)
-np.sqrt(n_p.prob().array)
-```
-
-```python {.marimo}
-n_p.to_zw().to_tensor().eval().array
+number(12).eval(DiscopyBackend()).tensor.array
 ```
 
 ## More complicated circuit
 
 ```python {.marimo}
 circ = (
-    qpath.Create(1, 1, 1, 1) >> 
-    circuit.BBS(0.3) @ circuit.MZI(0.34, 0.10) >>
-    circuit.Phase(np.pi/2) @ qpath.Id(1) @ qpath.Id(1) @ circuit.Phase(np.pi/4)
+    photonic.Create(1, 1, 1, 1)
+    >> photonic.BBS(0.3) @ photonic.MZI(0.34, 0.10)
+    >> photonic.Phase(1 / 4) @ photonic.Id(2) @ photonic.Phase(1 / 8)
 )
 ```
 
@@ -113,18 +88,21 @@ circ.draw()
 ```
 
 ```python {.marimo}
-circ.to_zw().draw()
+circ.get_kraus().draw()
 ```
 
+The four methods give the same distribution over the output occupations:
+
 ```python {.marimo}
-diagram_qpath = circ
-diagram_zw = diagram_qpath.to_zw()
+distributions = [
+    circ.eval(backend).prob_dist()
+    for backend in (
+        PercevalBackend(), PermanentBackend(), DiscopyBackend(), QuimbBackend())]
+occupations = set().union(*distributions)
 
-prob_zw_ = np.abs(diagram_zw.to_tensor().eval().array).flatten() ** 2
-prob_zw = zw.tn_output_2_perceval_output(prob_zw_, diagram_zw)
+assert all(
+    np.isclose(distribution.get(key, 0), distributions[0].get(key, 0))
+    for distribution in distributions for key in occupations)
 
-prob_perceval = diagram_qpath.to_path().prob_with_perceval().array
-prob_eval = diagram_qpath.to_path().prob().array
-
-assert np.allclose(prob_zw, prob_perceval)
+dict(sorted(distributions[0].items()))
 ```

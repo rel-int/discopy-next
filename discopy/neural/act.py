@@ -471,8 +471,10 @@ class ActPool:
             x : The puzzle lattices.
             labels : The rest of :meth:`targets`.
         """
-        return terms(every, halt, every[-1], x, *labels,
-                     self.cfg.halt_weight, self.cfg.halt_board_weight)
+        weights = self.cfg.halt_weight, self.cfg.halt_board_weight
+        return terms(
+            every, halt, every[-1], x,
+            *labels, *weights)  # ty: ignore[too-many-positional-arguments]
 
     def board_loss(self, net, *args) -> tuple:
         """

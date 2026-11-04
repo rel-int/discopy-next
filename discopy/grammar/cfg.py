@@ -204,8 +204,9 @@ class Rule(Tree, thue.Rule):
     >>> assert (f[::-1].dom, f[::-1].cod) == (x, x @ y)
     >>> assert f[::-1][::-1] == f != f[::-1]
     """
-    def __init__(self, dom: monoidal.Ty, cod: monoidal.Ty, name: str = None,
-                 **params):
+    def __init__(
+            self, dom: monoidal.Ty, cod: monoidal.Ty, name: str | None = None,
+            **params):
         assert_isinstance(dom, Ty)
         assert_isatomic(dom if params.get('is_dagger', False) else cod, Ty)
         thue.Rule.__init__(self, dom=dom, cod=cod, name=name, **params)

@@ -5,10 +5,11 @@
 import doctest
 
 from discopy import (
-    axioms,
+    testable,
     abc,
     cat,
     monoidal,
+    spacial,
     braided,
     symmetric,
     biclosed,
@@ -31,6 +32,8 @@ from discopy import (
     op,
     neural,
     python,
+    kleisli,
+    monad,
     matrix,
     tensor,
     hopf,
