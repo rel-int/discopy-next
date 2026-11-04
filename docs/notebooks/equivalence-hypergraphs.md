@@ -12,7 +12,7 @@ import marimo as mo
 [Tiurin, Barrett, Ghica and Hu (2024)](https://arxiv.org/abs/2406.15882) give e-graphs a categorical semantics: an acyclic e-graph is a string diagram of the free semilattice-enriched Cartesian category, where an e-class is the join of its e-nodes, drawn as an *e-box*.
 Their e-hypergraphs are the combinatorial representation of such diagrams, with double-pushout rewriting, and since only the monoidal structure is needed they extend e-graphs from algebraic theories to monoidal ones.
 
-[`discopy.ehypergraph`](https://docs.discopy.org/en/main/_api/discopy.ehypergraph.html) arrived at the e-graph case independently: an `EHypergraph` over a copy-discard category is a diagram with sharing and an equivalence on its wires, whose classes are the e-classes.
+[`discopy.ehypergraph`](../../_api/discopy.ehypergraph.html) arrived at the e-graph case independently: an `EHypergraph` over a copy-discard category is a diagram with sharing and an equivalence on its wires, whose classes are the e-classes.
 This notebook checks it against the paper and reproduces its examples.
 
 ## Joins

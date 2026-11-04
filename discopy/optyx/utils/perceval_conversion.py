@@ -23,6 +23,16 @@ def _state_predicate(state, ty):
     return ClassicalFunction(f, ty**len(state), bit)
 
 
+def _default_predicate(states, ty):
+    """Return ClassicalFunction that outputs 1 iff input equals no state of
+    'states', which is when a feed-forward component acts by default."""
+    def f(x):
+        return [0 if any(
+            all(s == a for s, a in zip(state, x)) for state in states
+        ) else 1]
+    return ClassicalFunction(f, ty**len(states[0]), bit)
+
+
 def _rewire_and_context(*, component, wires, circuit,
                         n_classical, n_action, n_offset,
                         perm_dom_neg, perm_dom_pos):
@@ -60,28 +70,38 @@ def _assemble_controlled_box(
     """
     Build the feed-forward controlled box from (state, action_box) pairs.
     action_box must already be a ZW diagram (matrix_to_zw applied).
+
+    Exactly one action applies: the one whose configuration the control
+    bits select, or the default action when they select none. Every
+    configuration gets the identity for its own default, so that one
+    configuration not matching does not act.
     """
-    box = None
+    map_items = list(map_items)
+    states = [state for state, _ in map_items]
+    n_classical = len(states[0])
     n_action = len(default_action.dom)
-    for i, (state, action) in enumerate(map_items):
-        if i == 0:
-            box = input_wires[:len(state)] @ photonic.Id(n_action)
-        # duplicate classical control and compute predicate
-        copy = Spider(1, 2, input_wires[0])**len(state)
-        permutation = Diagram.permutation(
-            list(range(0, 2*len(state), 2)) + list(range(1, 2*len(state), 2)),
-            input_wires[0]**(2*len(state))
-        )
-        func = _state_predicate(list(state), input_wires[0])
+    identity = photonic.Id(n_action)
+    q_wires = qmode**n_action
 
-        ctrl_box = BitControlledGate(action, default_action)
-        q_wires = qmode**n_action
+    # duplicate classical control and compute predicate
+    copy = Spider(1, 2, input_wires[0])**n_classical
+    permutation = Diagram.permutation(
+        list(range(0, 2*n_classical, 2)) + list(range(1, 2*n_classical, 2)),
+        input_wires[0]**(2*n_classical)
+    )
+    actions = [
+        (_state_predicate(list(state), input_wires[0]), action)
+        for state, action in map_items
+    ] + [(_default_predicate(states, input_wires[0]), default_action)]
 
+    box = input_wires[:n_classical] @ identity
+    for func, action in actions:
         box >>= (
             copy @ q_wires >>
             permutation @ q_wires >>
-            Diagram.id(input_wires[:len(state)]) @ func @ q_wires >>
-            Diagram.id(input_wires[:len(state)]) @ ctrl_box
+            Diagram.id(input_wires[:n_classical]) @ func @ q_wires >>
+            Diagram.id(input_wires[:n_classical]) @
+            BitControlledGate(action, identity)
         )
     return box
 

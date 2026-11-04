@@ -244,6 +244,8 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   reprs with its class, nan data equals itself ([next#31], [next#168]).
 - `dumps` writes tuples, numpy, sympy, `interaction`, `para`, `CQ`, `Equation`
   and dict functors ([next#168]); `para` and `interaction` hash ([next#31]).
+- A `Matrix` with no dtype reads it off its array without copying it, so it
+  copies once, as a `Matrix[dtype]` does ([next#8]).
 
 ### Deprecated
 
@@ -258,6 +260,44 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Fixed
 
+- `optyx.core.path.Matrix.prob_with_perceval` computes the Born rule of the
+  amplitudes, as its docstring and `prob`'s other branch say, where it used to
+  answer a probability conditional on the selections: two photons bunching
+  into one arm of a balanced beam splitter read `1` instead of `0.5`.
+  Perceval's own post-selection renormalises over the outcomes that survive
+  it, so the selections now pick out those outcomes instead, and the
+  `normalisation` that `dilate` leaves outside the unitary is put back on the
+  probabilities. It read right exactly where the selections carry all of the
+  mass or none of it, which both of its doctests did. As a tensor it also
+  raised `IndexError` for every diagram with a selection, giving
+  `amplitudes_2_tensor` one basis state per mode of the circuit where the
+  matrix has one column per *selected* outcome; the codomain is now the
+  occupations of the modes the selections leave open, as `eval` builds it, and
+  a selection of more photons than there are raises the same
+  `ValueError` as `eval` where it used to enumerate a negative photon count
+  ([next#229]).
+- `optyx.core.backends.PercevalBackend` evaluates a term as amplitudes and
+  applies the Born rule once, to their sum, so a sum of diagrams interferes:
+  `Create(1) + Create(1) @ Scalar(-1)` is zero where the probabilities of the
+  two terms added to two. It also carries the two factors that a `path.Matrix`
+  keeps outside its array and the simulator's circuit therefore cannot: the
+  global `scalar`, so that the amplitude of `Create(1) @ Scalar(1j)` is `1j`
+  and not `1`, and the `normalisation` that `dilate` raises to the number of
+  photons, so that the number operator on two photons is `2` and not the unit
+  a renormalised state vector reports ([next#314]).
+- A selection that no photon number can satisfy is an amplitude of zero, where
+  `PercevalBackend` used to raise `TypeError` from the SLOS backend for an
+  effect outside the Fock space it enumerates: `Create(1) >> Select(2)` and
+  `Create(1, 0) >> BS >> Select(2, 0)` are zero, as every other backend says,
+  rather than a crash on `amps` and `1.0` and `0.5` on `probs` ([next#314]).
+- A feed-forward component converted from perceval applies its default
+  circuit **once**, when the measured state is in none of its configurations,
+  where each configuration that did not match used to apply it: with a
+  `PERM([1, 0])` default and two configurations, one of which matched, the
+  swap was applied anyway. An even number of non-matching entries composes a
+  swap default into the identity, which is why a single configuration and
+  three of them — none and two non-matching entries — both read right
+  ([next#314]).
 - `optyx.utils.perceval_conversion.ff_configurator` gives each symbol of a
   configurator's controlled circuit the value its own name is given in the
   configuration: it used to zip `U.free_symbols`, a set, with the values of
@@ -319,6 +359,10 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   and a `Functor` could not look the box up in a dict `ar_map`. `ZBox` stays
   unhashable: comparing amplitudes by prefix is not transitive, so no hash
   keeps equal boxes hashing equal ([next#314]).
+- Docs: the architecture diagram shows the new syntax modules, the menu names
+  `spacial`, `kleisli` and `monad` without their prefix, `feedback` states each
+  law once with its trace under it, and the notebooks link the API docs
+  relatively ([next#411]).
 - `optyx.compiler`: a `Fusion` compared to anything but a fusion is unequal
   rather than an `AttributeError`; `path_cover.find_min_path_cover` covers a
   graph with one node, an edgeless graph and the empty graph, searching up to
@@ -826,6 +870,7 @@ for the changelog of `1.2.1` and earlier.
 [next#145]: https://github.com/rel-int/discopy-next/issues/145
 [next#147]: https://github.com/rel-int/discopy-next/issues/147
 [next#149]: https://github.com/rel-int/discopy-next/issues/149
+[next#8]: https://github.com/rel-int/discopy-next/issues/8
 [next#156]: https://github.com/rel-int/discopy-next/issues/156
 [next#161]: https://github.com/rel-int/discopy-next/issues/161
 [next#162]: https://github.com/rel-int/discopy-next/issues/162
@@ -881,9 +926,11 @@ for the changelog of `1.2.1` and earlier.
 [next#387]: https://github.com/rel-int/discopy-next/issues/387
 [next#388]: https://github.com/rel-int/discopy-next/issues/388
 [next#399]: https://github.com/rel-int/discopy-next/issues/399
+[next#229]: https://github.com/rel-int/discopy-next/issues/229
 [next#421]: https://github.com/rel-int/discopy-next/issues/421
 [next#422]: https://github.com/rel-int/discopy-next/issues/422
 [next#426]: https://github.com/rel-int/discopy-next/issues/426
+[next#411]: https://github.com/rel-int/discopy-next/pull/411
 [next#414]: https://github.com/rel-int/discopy-next/issues/414
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29

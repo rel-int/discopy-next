@@ -254,7 +254,7 @@ class Matrix[dtype](NamedGeneric, MarkovCategory, ComarkovCategory,
     def __new__(cls, array, *args, **kwargs):
         with backend() as np:
             if cls.dtype is None:
-                _array = np.array(array)
+                _array = np.asarray(array)
                 # The dtype of an np.arrays is a class that contains a type
                 # attribute that is the actual type. However, other backends
                 # have different structures, so this is the easiest option:
