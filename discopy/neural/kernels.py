@@ -24,8 +24,8 @@ import torch
 @cache
 def reduction():
     """ The lazily compiled forward and backward reduction. """
-    import triton  # pylint: disable=import-outside-toplevel
-    import triton.language as tl  # pylint: disable=import-outside-toplevel
+    import triton  # ty: ignore  # pylint: disable=import-outside-toplevel
+    import triton.language as tl  # ty: ignore  # noqa: E501  pylint: disable=import-outside-toplevel
 
     @triton.jit
     def run(S, X, G, Y, DX, N: tl.constexpr, H: tl.constexpr,
