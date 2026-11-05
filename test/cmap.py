@@ -354,6 +354,30 @@ def test_rigid_handedness():
         == compact.Cap(cx, cx.r)
 
 
+def test_cup_on_outputs_reads_them_left_to_right():
+    """ A cup wired onto two outputs of a box reads them left to right, as
+    a hypergraph does, though the map stores a box's outputs clockwise. """
+    from discopy import cmap, pivotal, rigid
+    from discopy.hypergraph import Hypergraph
+
+    M, H = cmap.CMap[rigid.Diagram], Hypergraph[rigid.Diagram]
+    x, unit = rigid.Ty("x"), rigid.Ty()
+    f, g = rigid.Box("f", unit, x @ x.r), rigid.Box("g", unit, x.r @ x)
+    cup = f >> rigid.Cup(x, x.r)
+    assert M(unit, unit, (f, ), (1, 0)).to_diagram() == cup
+    assert (H.from_box(f) >> H.cups(x, x.r)).to_map().to_diagram() == cup
+    with raises(AxiomError, match="pivotal"):
+        M(unit, unit, (g, ), (1, 0))
+
+    M = cmap.CMap[pivotal.Diagram]
+    x, unit = pivotal.Ty("x"), pivotal.Ty()
+    f, g = pivotal.Box("f", unit, x @ x.r), pivotal.Box("g", unit, x.r @ x)
+    assert M(unit, unit, (f, ), (1, 0)).to_diagram()\
+        == f >> pivotal.Cup(x, x.r)
+    assert M(unit, unit, (g, ), (1, 0)).to_diagram()\
+        == g >> pivotal.Cup(x.r, x)
+
+
 def test_only_to_diagram_needs_the_structure():
     from discopy import cmap, feedback, monoidal, pivotal
 

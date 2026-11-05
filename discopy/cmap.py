@@ -600,9 +600,10 @@ class CMap[category](
     def validate_adjoint_types(cls, source: Port, target: Port):
         """
         Validate a wire between adjoint types, i.e. a cup or a cap, its ends
-        in port order as :meth:`make_monogamous` reads them: the right end
-        of a cup is the right adjoint of its left end, the left end of a cap
-        is the right adjoint of its right end.
+        in logical order as :meth:`make_monogamous` reads them, a box's
+        outputs left to right: the right end of a cup is the right adjoint
+        of its left end, the left end of a cap is the right adjoint of its
+        right end.
 
         >>> from discopy.rigid import Ty, Diagram
         >>> x = Ty('x')
@@ -613,6 +614,8 @@ class CMap[category](
         ...
         discopy.utils.AxiomError: x is not the left adjoint of x.l, ...
         """
+        source, target = sorted(
+            (source, target), key=lambda port: (port.depth, port.i))
         left, right = (source.obj, target.obj) if source.kind.is_positive\
             else (target.obj, source.obj)
         if not hasattr(left, "r"):
@@ -1590,15 +1593,14 @@ class CMap[category](
         >>> print(cmap.to_diagram())
         Cap(x.r, x) >> x.r @ g
         """
-        if not issubclass(self.category, SymmetricCategory):
-            return legs
-
         def logical(port):
             for box, ports in zip(self.boxes, self._box_port_indices):
                 if port in ports:
                     return ports[0] + self.logical_order(
                         len(box.dom), len(box.cod))[port - ports[0]]
             return port
+        if not issubclass(self.category, SymmetricCategory):
+            return tuple(sorted(legs, key=logical))
         logicals = [logical(leg) for leg in legs]
         return tuple(legs[logicals.index(port)] for port in (
             self.to_hypergraph().leg_order(*sorted(logicals))))
