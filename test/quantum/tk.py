@@ -51,6 +51,8 @@ def test_tk_err():
     with raises(NotImplementedError):
         Bits(1).to_tk()
     with raises(NotImplementedError):
+        (qubit @ H).delay().to_tk()
+    with raises(NotImplementedError):
         Circuit.from_tk(tk.Circuit(3).CSWAP(0, 1, 2))
 
 

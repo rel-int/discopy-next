@@ -195,6 +195,9 @@ def to_tk(circuit):
     # len(bits) == circuit[:i].cod.count(bit) and same for qubits
     tk_circ, bits, qubits = Circuit(), [], []
     circuit = circuit.init_and_discard()
+    if any(x.time_step for box in circuit.boxes
+           for x in (box.dom @ box.cod).inside):
+        raise NotImplementedError
 
     def remove_ket1(box):
         if not isinstance(box, Ket):
