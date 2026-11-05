@@ -638,7 +638,7 @@ class Box(Arrow):
         self.name, self.data, self.is_dagger = name, data, is_dagger
         Arrow.__init__(self, (self, ), dom, cod, _scan=False)
 
-    @cached_property
+    @property
     def free_symbols(self) -> "set[sympy.Symbol]":
         def recursive_free_symbols(data):
             if isinstance(data, Mapping):

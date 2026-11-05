@@ -487,6 +487,16 @@ def test_free_symbols_of_numeric_array_read_from_dtype():
     assert Box('f', Ob('x'), Ob('x'), data=data).free_symbols == set()
 
 
+def test_free_symbols_follow_mutable_data():
+    pytest.importorskip("sympy")
+    from sympy.abc import psi
+    f = Box('f', Ob('x'), Ob('x'), data=[0])
+    assert f.free_symbols == set()
+    f.data.append(psi)
+    assert f.free_symbols == {psi}
+    assert f.subs(psi, 1).data == f.lambdify(psi)(1).data == [0, 1]
+
+
 def test_Sum():
     x, y, z = map(Ob, "xyz")
     f = Box('f', x, y)
