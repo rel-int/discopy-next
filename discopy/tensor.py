@@ -883,9 +883,9 @@ class Diagram[dtype](NamedGeneric, frobenius.Diagram):
                 outputs[offset:offset + len(box.dom)] = [
                     segment[i] for i in box.perm]
                 continue
-            if isinstance(box, Cup)\
-                    or isinstance(box, Spider) and box.phase is None:
-                dims = (len(box.dom), len(box.cod))
+            dims = (len(box.dom), len(box.cod))
+            if isinstance(box, Cup) or isinstance(box, Spider)\
+                    and box.phase is None and dims != (0, 0):
                 if dims == (1, 1):  # identity
                     continue
                 elif dims == (2, 0):  # cup

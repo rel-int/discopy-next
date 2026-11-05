@@ -767,7 +767,9 @@ def test_spider_with_no_legs_in_every_dtype():
 
 
 def test_to_tn_state_spider():
-    for diagram in [Spider(0, 1, Dim(2)) @ Id(Dim(3)), Spider(0, 2, Dim(2))]:
+    for diagram in [Spider(0, 1, Dim(2)) @ Id(Dim(3)), Spider(0, 2, Dim(2)),
+                    Spider(0, 0, Dim(3)),
+                    Spider(0, 0, Dim(2)) @ Box('s', Dim(1), Dim(2), [1, 1])]:
         nodes, order = diagram.to_tn()
         array = tn.contractors.auto(nodes, output_edge_order=order).tensor
         assert array.tolist() == diagram.eval().array.tolist()
