@@ -1142,7 +1142,8 @@ class Scalar(Parametrized):
         super().__setstate__(state)
 
     def __repr__(self):
-        name = "" if self.name == "scalar" else f", {self.name!r}"
+        name = f", {self.name!r}" if "name" in self.serialised_attrs\
+            and self.name != "scalar" else ""
         time_step = f", time_step={self.time_step}" if self.time_step else ""
         return super().__repr__()[:-1] + name + (
             ', is_mixed=True' if self.is_mixed else '') + time_step + ')'
@@ -1324,8 +1325,7 @@ class Sqrt(Scalar):
         return super().setoid() + (self.is_dagger, )
 
     def __repr__(self):
-        return MixedScalar.__repr__(self) + (
-            "[::-1]" if self.is_dagger else "")
+        return super().__repr__() + ("[::-1]" if self.is_dagger else "")
 
 
 def sqrt(expr):
