@@ -106,9 +106,22 @@ Summary
     Down
     Up
     Machine
-    lookup
-    evidence
-    posterior
+
+.. admonition:: Functions
+
+    .. autosummary::
+        :template: function.rst
+        :nosignatures:
+        :toctree:
+
+        lookup
+        evidence
+        posterior
+
+.. admonition:: Data
+
+    .. autodata:: Value
+        :no-value:
 """
 from __future__ import annotations
 
@@ -126,9 +139,10 @@ from discopy.utils import factory_name
 
 Value = object
 """
-What a token carries when it travels :class:`Up`, i.e. any Python object: a
-:class:`Closure` for an abstraction, the constant itself for a constant the
-:class:`Machine` does not interpret, else whatever payload its
+What a token carries when it travels :class:`Up`, i.e. any Python object.
+
+It is a :class:`Closure` for an abstraction, the constant itself for a
+constant the :class:`Machine` does not interpret, else whatever payload its
 interpretation gives, e.g. a float.
 """
 
