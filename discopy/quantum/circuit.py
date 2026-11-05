@@ -563,7 +563,7 @@ class Circuit(tensor.Diagram[complex]):
                 nodes.append(node)
             else:
                 q_offset = left.count(qubit)
-                utensor = box.array
+                utensor = box.eval().array
                 node1 = tn.Node(utensor + 0j, 'q1_' + str(box))
                 with backend() as np:
                     node2 = tn.Node(np.conj(utensor) + 0j, 'q2_' + str(box))

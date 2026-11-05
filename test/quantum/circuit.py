@@ -492,6 +492,18 @@ def test_consistent_eval(c):
     assert is_close_smallno(doubled_result, mixed_result.to_tensor())
 
 
+def test_mixed_eval_of_dagger_and_transpose_is_doubled():
+    U = QuantumGate('U', qubit, qubit, [1, 2j, 3, 4j])
+    f = ClassicalGate('f', bit, bit, [1, 2, 3, 4])
+    for g in (S.dagger(), T.dagger(), U.dagger(), U.r, f.dagger()):
+        doubled = (Channel.single if g.is_classical else Channel.double)(
+            g.eval())
+        assert g.eval(mixed=True).is_close(doubled)
+        assert g.eval(mixed=True, contractor=contractor).is_close(doubled)
+    circuit = Ket(0) >> H >> S >> S.dagger() >> H >> Measure()
+    assert np.allclose(circuit.eval().array, [1, 0])
+
+
 def test_mixed_eval_foliated():
     circuit = Ket(0, 0, 1) >> H @ X @ X >> Measure() @ Discard(qubit ** 2)
     assert [len(layer.boxes) for layer in circuit.foliation().inside]\
