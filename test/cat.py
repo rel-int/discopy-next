@@ -69,6 +69,16 @@ def test_Arrow_init():
         Arrow((), None, None)  # Only a type has None, i.e. no colour.
 
 
+def test_Arrow_init_iterator():
+    x, y = Ob('x'), Ob('y')
+    f, g = Box('f', x, x), Box('g', y, y)
+    assert Arrow(iter([f, f]), x, x) == f >> f
+    with raises(AxiomError):
+        Arrow(iter([f, g]), x, x)
+    with raises(TypeError):
+        Arrow(iter([x]), x, x)
+
+
 def test_Arrow_len():
     assert len(Arrow((), Ob('x'), Ob('x'))) == 0
 

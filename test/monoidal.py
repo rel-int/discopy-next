@@ -116,6 +116,14 @@ def test_Ty_init():
     assert list(Ty('x', 'y', 'z')) == [Ty('x'), Ty('y'), Ty('z')]
 
 
+def test_init_iterator():
+    x = Ty('x')
+    h = Box('h', x, x)
+    assert Diagram(iter(h.inside * 2), x, x) == h >> h
+    assert Ty(inside=iter(['x', 'y'])) == Ty('x', 'y')
+    assert Dim(inside=iter([2, 3])) == Dim(2, 3)
+
+
 def test_Ty_eq():
     assert Ty('x') != 'x'
 

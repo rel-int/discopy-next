@@ -206,10 +206,10 @@ class FreeCategory(Category):
         dom, cod = map(self.cast_ob, (dom, cod))
         self.dom, self.cod, self.inside = dom, cod, tuple(inside)
         if _scan:
-            for generator in inside:
+            for generator in self.inside:
                 assert_isinstance(generator, self.generator_factory)
             previous = dom
-            for generator in inside:
+            for generator in self.inside:
                 if previous != generator.dom:
                     raise utils.AxiomError(messages.NOT_COMPOSABLE.format(
                         previous, generator, previous, generator.dom))

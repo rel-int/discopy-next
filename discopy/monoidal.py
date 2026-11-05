@@ -381,7 +381,7 @@ class Ty(cat.Ob, cat.FreeCategory, ColouredMonoid):
     def __init__(self, *inside: str | cat.Ob,
                  dom: Colour | None = None, cod: Colour | None = None,
                  _scan: bool = True, **kwargs):
-        inside = kwargs.pop('inside', inside)
+        inside = tuple(kwargs.pop('inside', inside))
         if kwargs:
             raise TypeError(f"Unexpected keyword arguments: {list(kwargs)}.")
         for obj in inside:
@@ -701,7 +701,7 @@ class Dim(Ty):
     generator_factory = int
 
     def __init__(self, *inside: int, dom=None, cod=None, _scan=True, **kwargs):
-        inside = kwargs.pop('inside', inside)
+        inside = tuple(kwargs.pop('inside', inside))
         if kwargs:
             raise TypeError(f"Unexpected keyword arguments: {list(kwargs)}.")
         for dim in inside:
@@ -1150,6 +1150,7 @@ class Diagram(cat.Arrow, MonoidalCategory, RichDisplay):
 
     def __init__(
             self, inside: tuple[Layer, ...], dom: Ty, cod: Ty, _scan=True):
+        inside = tuple(inside)
         if _scan:
             for layer in inside:
                 assert_isinstance(layer, Layer)
