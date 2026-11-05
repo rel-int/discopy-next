@@ -41,13 +41,8 @@ def draw(diagram, **params):
 
     Parameters
     ----------
-    draw_as_nodes : bool, optional
-        Whether to draw boxes as nodes, default is :code:`False`.
-    color : string, optional
-        Color of the box or node, default is white (:code:`'#ffffff'`) for
-        boxes and red (:code:`'#ff0000'`) for nodes.
     textpad : pair of floats, optional
-        Padding between text and wires, default is :code:`(0.1, 0.1)`.
+        Padding between text and wires, default is :code:`(2**-4, 2**-4)`.
     wire_labels : bool, optional
         Whether to draw type labels, default is :code:`False`.
     draw_box_labels : bool, optional
@@ -55,7 +50,7 @@ def draw(diagram, **params):
     aspect : string, optional
         Aspect ratio, one of :code:`['auto', 'equal']`.
     margins : tuple, optional
-        Margins, default is :code:`(0.05, 0.05)`.
+        Margins, default is :code:`(0, 0)`.
     nodesize : float, optional
         Node size for spiders and controlled gates.
     fontsize : int, optional
@@ -78,8 +73,9 @@ def draw(diagram, **params):
     to_tikz : bool, optional
         Whether to output tikz code instead of matplotlib.
     asymmetry : float, optional
-        Make a box and its dagger mirror images, default is
-        :code:`.25 * any(box.is_dagger for box in diagram.boxes)`.
+        Make a box and its dagger mirror images, default is :code:`.125`
+        when a box is conjugate, transposed or a dagger not drawn as a
+        braid, :code:`0` otherwise.
     """
     return diagram.to_drawing().draw(**params)
 
