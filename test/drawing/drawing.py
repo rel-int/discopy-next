@@ -1,5 +1,6 @@
 
 import os
+import tomllib
 
 from pytest import approx, importorskip, raises
 
@@ -774,6 +775,16 @@ def test_widget():
     assert isinstance(widget, DiagramWidget) and widget.svg == f.to_svg()
     assert set(f._repr_mimebundle_()) == {'image/svg+xml', 'image/png'}
     assert pickle.loads(pickle.dumps(f)) == f
+
+
+def test_the_test_extra_installs_the_widget():
+    with open("pyproject.toml", "rb") as file:
+        extras = tomllib.load(file)["project"]["optional-dependencies"]
+    test = extras["test"]
+    included, = (requirement[len("discopy["):-1].split(",")
+                 for requirement in test if requirement.startswith("discopy["))
+    assert "anywidget" in test + [
+        requirement for extra in included for requirement in extras[extra]]
 
 
 RIBBON_COLOURS = ("red", "green", "blue", "yellow")
