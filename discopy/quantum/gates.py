@@ -744,7 +744,7 @@ class Controlled(QuantumGate):
             self.controlled.rotate(left), distance=-self.distance)
 
     def lambdify(self, *symbols, **kwargs):
-        c_fn = self.controlled.lambdify(*symbols)
+        c_fn = self.controlled.lambdify(*symbols, **kwargs)
         return lambda *xs: type(self)(c_fn(*xs), distance=self.distance)
 
     def subs(self, *args):
@@ -918,7 +918,7 @@ class Parametrized(Box):
     def lambdify(self, *symbols, **kwargs):
         from sympy import lambdify
         with backend() as np:
-            data = lambdify(symbols, self.data, dict(kwargs, modules=np))
+            data = lambdify(symbols, self.data, modules=np.module, **kwargs)
         return lambda *xs: type(self)(
             data(*xs))  # ty: ignore[missing-argument]
 

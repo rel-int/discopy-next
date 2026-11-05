@@ -162,6 +162,17 @@ def test_subs_and_lambdify_keep_distance_and_is_mixed():
         - Rz(.3 - step).eval(mixed=True).array) / (2 * step), atol=1e-4)
 
 
+def test_lambdify_evaluates_in_the_backend():
+    sympy, torch = importorskip("sympy"), importorskip("torch")
+    from discopy.tensor import backend
+    phi = sympy.Symbol("phi")
+    with backend('pytorch'):
+        for gate in (Rx(sympy.sin(phi)), Scalar(sympy.exp(phi)),
+                     MixedScalar(sympy.cos(phi)), Sqrt(sympy.exp(phi))):
+            x = torch.tensor(.3, requires_grad=True)
+            assert gate.lambdify(phi)(x).eval().array.requires_grad
+
+
 @mark.parametrize("mixed", [False, True])
 @mark.parametrize("rotation", [Rx, Ry, Rz, U1])
 def test_rotation_grad_is_the_finite_difference(rotation, mixed):

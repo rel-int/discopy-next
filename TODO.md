@@ -14,7 +14,7 @@ The fixes of rel-int/discopy-next#445 in `quantum` and `grammar`: bugs the revie
 - [x] **S10-9** Scalar.grad ignores `mixed`, so under the default mixed=True a parametrised pure scalar's gradient evaluates to |s'|^2 where it should be d|s|^2 = 2 …
 - [x] **S10-13** eval(repr(x)) fails for Ket, Bra, Copy, Match and MixedScalar, so no circuit that prepares, post-selects, copies or matches round-trips its repr;
 - [x] **S10-14** Circuit.eval(*others, contractor=...) evaluates self alone and drops the others, so Sum.eval(contractor=...) silently returns a wrong bare array or …
-- [WIP] @session_01MEJxy43YMF4nTF8NEcP8Je-2026-11-05 19:42 **S10-15** Parametrized.lambdify passes dict(kwargs, modules=np) as sympy's positional `modules`, so the backend never reaches sympy:
+- [x] **S10-15** Parametrized.lambdify passes dict(kwargs, modules=np) as sympy's positional `modules`, so the backend never reaches sympy:
 - [WIP] @session_01MEJxy43YMF4nTF8NEcP8Je-2026-11-05 19:42 **S10-16** Circuit.measure's channel branch discards open qubits instead of measuring them:
 - [WIP] @session_01MEJxy43YMF4nTF8NEcP8Je-2026-11-05 19:42 **S10-17** A pure circuit Bubble has no is_classical, so the mixed evaluation of any circuit containing one raises AttributeError;
 - [WIP] @session_01MEJxy43YMF4nTF8NEcP8Je-2026-11-05 19:42 **S10-18** to_pennylane raises KeyError on U1 and CCX, which to_tk emits, so every Rydberg ansatz (built from U1 and CU1) fails to convert
