@@ -717,7 +717,6 @@ BROKEN = {
         PIVOTALS + ".{Feedback,Trace,Head,Tail,FollowedBy} "
         "{tensor,quantum.circuit,quantum.zx}.Bubble":
         "it has no stated rotation",
-        "ribbon.DualRailC[ua]p": "its rotation drops is_dagger",
         "*.{Feedback,Trace}": "it raises for a rotation, as for a dagger",
         "quantum.zx.Scalar": "it takes no dom, cod or z",
     },
