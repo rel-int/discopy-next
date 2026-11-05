@@ -6,4 +6,4 @@
 - [x] `discopy.drawing.bracketing.Bracketed[free]`: the terms of a free category with their bracketed drawings, generators delegating to it, `dagger` as a bracket labelled †, `trace` and `feedback` as a loop; `equation(axiom)` draws an axiom in the most general free category that states it
 - [x] Sphinx extension in `docs/_ext/` appending an "Axioms" section with each axiom's docstring and its SVG, generated at build time, to each abc class page and to the page of its free category
 - [x] Tests: doctest baselines for associativity, dagger contravariance and copy coassociativity, a parametrised test that every stated axiom draws, a CHANGELOG line
-- [ ] Checks: pflake8, pylint, ruff, ty, pytest, Sphinx build of the touched pages
+- [x] Checks: pflake8, pylint, ruff, ty, pytest, Sphinx build of the touched pages
