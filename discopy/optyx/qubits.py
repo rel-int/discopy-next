@@ -913,6 +913,10 @@ class Scalar(Channel):
     def __repr__(self):
         return f"{factory_name(type(self))}({self.data!r})"
 
+    def lambdify(self, *symbols, **kwargs):
+        return lambda *xs: type(self)(
+            lambdify(symbols, self.data, **kwargs)(*xs))
+
     def decomp(self):
         """A scalar is already an elementary generator."""
         return Scalar(self.data)

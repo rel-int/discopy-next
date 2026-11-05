@@ -192,6 +192,22 @@ def test_a_box_without_a_gradient_refuses_to_differentiate():
             box.grad(x)
 
 
+def test_subs_substitutes_the_parameter_of_every_symbolic_box():
+    import sympy as sp
+    from discopy.optyx import classical, qubits
+    gate = photonic.Gate(sp.Matrix([[sp.cos(x), sp.sin(x)], [
+        -sp.sin(x), sp.cos(x)]]), 2, 2, "R", data=x)
+    for box in (qubits.Scalar(x), photonic.PhaseShiftDR(x),
+                photonic.PhotonLoss(x), classical.Z(1, 1, x),
+                classical.X(1, 1, x), gate, gate.dagger(), gate.conjugate()):
+        assert box.free_symbols == {x}
+        assert not box.subs((x, .25)).double().free_symbols
+        with pytest.raises(NotImplementedError, match="does not support"):
+            box.grad(x)
+    assert photonic.PhotonLoss(x).subs((x, .25)) == photonic.PhotonLoss(.25)
+    assert classical.Z(1, 1, x).subs((x, .25)) == classical.Z(1, 1, .25)
+
+
 def test_cq_map_power_is_a_tensor_power():
     measure = CQMap("measure", diagram.Spider(2, 1, diagram.bit), qubit, bit)
     assert measure ** 1 == measure

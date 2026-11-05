@@ -510,12 +510,21 @@ class Gate(AbstractGate):
         return f"{factory_name(type(self))}({self.array.tolist()}, "\
             f"{len(self.dom)}, {len(self.cod)}, {self.name!r}{data})"
 
+    def lambdify(self, *symbols, **kwargs):
+        if not self.free_symbols & set(symbols):
+            return lambda *xs: self
+        matrix, data = (lambdify(symbols, value, **kwargs)
+                        for value in (self.array.tolist(), self.data))
+        return lambda *xs: Gate(
+            matrix(*xs), len(self.dom), len(self.cod), self.name, data(*xs))
+
     def dagger(self):
         return Gate(
             np.conjugate(self.array.T),
             len(self.cod),
             len(self.dom),
-            self.name
+            self.name,
+            self.data
         )
 
     def conjugate(self):
@@ -526,7 +535,8 @@ class Gate(AbstractGate):
             np.conjugate(self.array),
             len(self.dom),
             len(self.cod),
-            self.name
+            self.name,
+            self.data
         )  # pragma: no cover
 
 
@@ -1001,9 +1011,14 @@ class PhaseShiftDR(Channel):
             f"PhaseShift({phase})",
             diagram.Mode(1) @ Phase(phase).get_kraus()
         )
+        self.data = phase
 
     def __repr__(self):
         return f"{factory_name(type(self))}({self.phase!r})"
+
+    def lambdify(self, *symbols, **kwargs):
+        return lambda *xs: type(self)(
+            lambdify(symbols, self.phase, **kwargs)(*xs))
 
 
 class ZMeasurementDR(Diagram):
@@ -1182,9 +1197,14 @@ class PhotonLoss(Channel):
             qmode @ channel.Ty(),
             env=qmode.single()
         )
+        self.data = p_survive
 
     def __repr__(self):
         return f"{factory_name(type(self))}({self.p_survive!r})"
+
+    def lambdify(self, *symbols, **kwargs):
+        return lambda *xs: type(self)(
+            lambdify(symbols, self.p_survive, **kwargs)(*xs))
 
 
 class FusionTypeII(Diagram):
