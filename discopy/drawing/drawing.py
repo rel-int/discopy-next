@@ -1032,7 +1032,7 @@ which to_drawing recomputes.
             n: Node("cod", i=i, x=n.x) for i, n in enumerate(self.dom_nodes)})
         mapping.update({
             n: Node("dom", i=i, x=n.x) for i, n in enumerate(self.cod_nodes)})
-        graph = nx.relabel_nodes(self.graph, mapping).reverse(copy=False)
+        graph = nx.relabel_nodes(self.graph, mapping).reverse()
         inside = PlaneGraph(graph, positions={
             mapping[n]: Point(x, self.height - y)
             for n, (x, y) in self.positions.items()})

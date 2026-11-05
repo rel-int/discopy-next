@@ -896,6 +896,15 @@ def test_Drawing_dagger_reflects_bubbles():
         assert drawing.dagger().dagger() == drawing
 
 
+def test_Drawing_dagger_is_mutable():
+    from discopy.drawing import Node
+    x = monoidal.Ty('x')
+    f, g = monoidal.Box('f', x, x), monoidal.Box('g', x, x)
+    drawing = (f >> g).to_drawing().dagger()
+    drawing.add_box_corners()
+    assert Node("box-corner-00", j=0) in drawing.graph
+
+
 def test_draw_is_pure(tmp_path):
     from matplotlib import pyplot as plt
     from discopy import ribbon
