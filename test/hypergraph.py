@@ -427,6 +427,20 @@ def test_Hypergraph_from_glued():
     assert H.from_glued(x, x, [(f, 0), (g, 0)]) == f >> g
 
 
+def test_Hypergraph_from_callable_restores_the_call_of_its_category():
+    from discopy.python import Function, Ty as T
+    add = Function(lambda x, y: x + y, (int, int), int)
+    graph = Hypergraph[Function].from_callable(T(int, int), T(int))(add)
+    assert add(2, 3) == graph(2, 3) == 5
+    x = Ty('x')
+    f = Box('f', x, x)
+
+    def outer(wire):
+        H.from_callable(x, x)(f)
+        return f(wire)
+    assert H.from_callable(x, x)(outer) == f.to_hypergraph()
+
+
 def test_Hypergraph_from_diagram_closed_loop():
     """ A cap glued directly onto a cup leaves a closed loop: it must
     survive gluing as a scalar spider rather than vanish because it is

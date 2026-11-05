@@ -3139,11 +3139,15 @@ class Hypergraph[category](
                 input_spider = Node("spider", obj=obj, i=i)
                 spider_nodes.append(input_spider)
                 graph.add_edge(input_node, input_spider)
+            previous = vars(cls.category).get("__call__")
             cls.category.__call__ = apply
             try:
                 outputs = tuplify(func(*spider_nodes))
             finally:
-                del cls.category.__call__
+                if previous is None:
+                    del cls.category.__call__
+                else:
+                    cls.category.__call__ = previous
             for i, spider in enumerate(outputs):
                 assert_isinstance(spider, Node)
                 node = Node("output", obj=spider.obj, i=i)
