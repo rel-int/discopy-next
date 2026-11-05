@@ -1117,7 +1117,9 @@ class Constant(TermBase):
         return functor.ar_map[self]
 
     def __repr__(self):
-        return factory_name(type(self)) + f"({self.name!r}, {self.cod!r})"
+        data = "" if self.data is None else f", data={self.data!r}"
+        return factory_name(type(self))\
+            + f"({self.name!r}, {self.cod!r}{data})"
 
     def __str__(self):
         return f"{self.cod!s}({self.name!r})"

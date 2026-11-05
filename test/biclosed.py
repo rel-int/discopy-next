@@ -358,6 +358,16 @@ def test_transparency():
         assert loads(dumps(box)) == box
 
 
+def test_repr_of_constants_keeps_their_data():
+    from discopy import closed
+    env = {"biclosed": biclosed, "closed": closed}
+    for mod in (biclosed, closed):
+        x = mod.Ty('x')
+        f, c = mod.Constant('f', x << x, data=1), mod.Constant('c', x, data=3)
+        for term in (c, f(c)):
+            assert eval(repr(term), env) == term
+
+
 def test_Wire_reads_back_main():
     """ The objects of a biclosed type are biclosed wires, and the plain
     monoidal ones of dumps, pickles and printed text from before read back as
