@@ -318,6 +318,28 @@ def test_Tensor_subs():
     assert s.subs(x, 1).array == 1
 
 
+def test_symbolic_eval_is_functorial():
+    sympy = pytest.importorskip("sympy")
+    from sympy.abc import x, y
+    f = Box('f', Dim(2), Dim(2), [x, 0, 0, y])
+    F = lambda diagram: diagram.eval(dtype=sympy.Expr)
+    assert F(f >> f) == F(f) >> F(f)
+    n = compact.Ty('n')
+    G = Functor({n: Dim(2)}, {}, dom=compact.Diagram, dtype=sympy.Expr)
+    loop = compact.Cap(n, n.r) >> compact.Cup(n, n.r)
+    assert G(loop) == Tensor[sympy.Expr]([2], Dim(1), Dim(1))
+
+
+def test_Functor_pytorch_keeps_float32():
+    torch = pytest.importorskip("torch")
+    x = frobenius.Ty('x')
+    g = frobenius.Box('g', x, x)
+    with backend('pytorch'):
+        F = Functor(
+            {x: 2}, {g: torch.ones(2, 2, dtype=torch.float32)}, dtype=None)
+        assert F(g >> g).array.dtype == torch.float32
+
+
 def test_Diagram_cups_and_caps():
     with raises(AxiomError):
         Diagram.cups(Dim(2), Dim(3))

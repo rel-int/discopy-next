@@ -642,7 +642,9 @@ einsum of a backend verbatim, which a file should not reach.
             factor for port in boundary for factor in wires[port]]
         arrays, indices, output = [], [], []
         with backend() as np:
-            eye = lambda dim: np.array(np.eye(dim), dtype=self.dtype)
+            eye = lambda dim: np.array(np.eye(dim) if self.dtype is None
+                                       else np.eye(dim, dtype=int),
+                                       dtype=self.dtype)
             for wire, dim in factors(range(len(other.dom))):
                 label = next(fresh)
                 arrays.append(eye(dim))
@@ -935,7 +937,7 @@ class Diagram[dtype](NamedGeneric, frobenius.Diagram):
         >>> from sympy.abc import x, y, z
         >>> vector = Box("v", Dim(1), Dim(2), [x ** 2, y * z])
         >>> vector.jacobian([x, y, z]).eval(dtype=Expr)
-        Tensor[Expr]([2.0*x, 0, 0, 1.0*z, 0, 1.0*y], dom=Dim(1), cod=Dim(3, 2))
+        Tensor[Expr]([2*x, 0, 0, z, 0, y], dom=Dim(1), cod=Dim(3, 2))
         """
         dim = Dim(len(variables) or 1)
         result = Sum((), self.dom, dim @ self.cod)

@@ -5,7 +5,7 @@
 The fixes of rel-int/discopy-next#445 in `tensor`, `matrix`, `hopf`, `interaction`, `feedback`, `stream`, `para`, `lens`, `monad`, `kleisli`: bugs the review confirmed that need no design decision, one commit and one regression test each.
 
 - [x] **S7-2** tensor.Box.setoid drops the winding number z that rigid.Box.setoid adds.
-- [WIP] @session_01MEJxy43YMF4nTF8NEcP8Je-2026-11-05 19:42 **S7-3** Functor.contract builds its boundary and loop identities from float np.eye, so dtype=Expr evaluation picks up Float coefficients and is not functorial:
+- [x] **S7-3** Functor.contract builds its boundary and loop identities from float np.eye, so dtype=Expr evaluation picks up Float coefficients and is not functorial:
 - [WIP] @session_01MEJxy43YMF4nTF8NEcP8Je-2026-11-05 19:42 **S7-4** Representation.qdim builds its loop in the unsubscripted Intertwiner (Vect), so it returns dim V instead of the pivotal trace in Rep(H):
 - [WIP] @session_01MEJxy43YMF4nTF8NEcP8Je-2026-11-05 19:42 **S7-5** Under backend('pytorch'), Matrix.transpose/conjugate/dagger/merge, Matrix.round, Tensor.transpose/.l/.r and Tensor.round raise, because they call the …
 - [WIP] @session_01MEJxy43YMF4nTF8NEcP8Je-2026-11-05 19:42 **S7-6** tensor.Bubble.grad raises ValueError on every bubble whose dom or cod is not exactly one atom (states, effects, scalars, compound Dims), because it …
