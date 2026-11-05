@@ -30,6 +30,6 @@ The fixes of rel-int/discopy-next#445 in `quantum` and `grammar`: bugs the revie
 - [x] **S11-7** categorial.FX and BX docstrings name subterm types that do not compose (the documented pairs raise AxiomError)
 - [x] **S11-8** pregroup.Diagram.normal_form drops its params on every input:
 - [x] **S11-9** contextuality module Note says the gradient is zero on the non-contextual polytope (with a non-unique dual only on its boundary);
-- [WIP] @session_01MEJxy43YMF4nTF8NEcP8Je-2026-11-05 19:42 **S11-10** reservoir.Readout compares by identity (dataclass eq=False), so eval(repr(r)) != r even with `array` bound, and two identical fits compare unequal;
+- [x] **S11-10** reservoir.Readout compares by identity (dataclass eq=False), so eval(repr(r)) != r even with `array` bound, and two identical fits compare unequal;
 - [WIP] @session_01MEJxy43YMF4nTF8NEcP8Je-2026-11-05 19:42 full suite and lint gates on the branch
 - [WIP] @session_01MEJxy43YMF4nTF8NEcP8Je-2026-11-05 19:42 one `CHANGELOG.md` line per user-facing fix

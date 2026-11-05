@@ -343,5 +343,11 @@ class Readout:
     weights: object
     intercept: object
 
+    def __eq__(self, other):
+        return isinstance(other, Readout) and all(
+            x.shape == y.shape and bool((x == y).all()) for x, y in zip(
+                (self.weights, self.intercept),
+                (other.weights, other.intercept)))
+
     def __call__(self, features):
         return features @ self.weights + self.intercept
