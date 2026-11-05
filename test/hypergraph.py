@@ -52,6 +52,17 @@ def test_Hypergraph_eq_sees_the_type_of_a_scalar_spider():
     assert not Equation(Spider(0, 0, x) @ f, Spider(0, 0, y) @ f)
 
 
+def test_Hypergraph_to_graph_attaches_an_adjoint_boundary_to_its_spider():
+    from discopy import compact
+    x = compact.Ty('x')
+    f, g = compact.Box('f', x.r, x.r), compact.Box('g', x.r, x.r)
+    cap = compact.Cap(x, x.r)
+    assert (f @ g @ cap).to_hypergraph() != (g @ f @ cap).to_hypergraph()
+    cup = compact.Cup(x.r, x).to_hypergraph()
+    assert hash(cup) == hash(compact.Cup(x.r, x).to_hypergraph())
+    assert type(cup).from_graph(cup.to_graph()) == cup
+
+
 def test_Hypergraph_then():
     x, y = map(Ty, "xy")
     with raises(AxiomError, match="Expected y, got x"):
