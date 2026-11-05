@@ -1126,7 +1126,9 @@ class Functor(monoidal.Functor):
         if isinstance(
                 other, FollowedBy) and hasattr(self.cod, "followed_by"):
             arg = other.dom if other.is_dagger else other.cod
-            return self.cod.followed_by(self(arg))
+            result = self.cod.followed_by(self(arg))
+            return result.dagger() if other.is_dagger\
+                and hasattr(self.cod, "dagger") else result
         if isinstance(other, Feedback) and hasattr(self.cod, "feedback"):
             left = {"left": True} if other.left else {}
             return self(other.arg).feedback(
