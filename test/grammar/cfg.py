@@ -92,6 +92,7 @@ def test_Algebra():
     g = Rule(y, x, name='g')
     identity = Algebra(lambda ob: ob, lambda ar: ar, cod=Operad())
     assert identity(f(g, g)) == f(g, g)
+    assert identity(Id(x)) == Id(x) and identity(f(w, Id(x))) == f(w, Id(x))
     with raises(TypeError):
         identity(42)
 
