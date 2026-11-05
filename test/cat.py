@@ -476,6 +476,17 @@ def test_subs_key_not_a_symbol():
     assert bubble == Bubble(f.subs(sin, 0)) and bubble.data == 0
 
 
+def test_free_symbols_of_numeric_array_read_from_dtype():
+    import numpy as np
+
+    class Opaque(np.ndarray):
+        def __iter__(self):
+            raise AssertionError("a numeric array was iterated")
+
+    data = np.ones((2, 2)).view(Opaque)
+    assert Box('f', Ob('x'), Ob('x'), data=data).free_symbols == set()
+
+
 def test_Sum():
     x, y, z = map(Ob, "xyz")
     f = Box('f', x, y)
