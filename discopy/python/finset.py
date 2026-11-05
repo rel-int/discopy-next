@@ -1,7 +1,9 @@
 # -*- coding: utf-8 -*-
 
 """
-The category of finite sets implemented as Python lists.
+Functions between finite sets as Python lists, read backwards: the free
+Markov category on one object, i.e. the opposite of the category of finite
+sets (see :mod:`discopy.op`), with cycles, permutations and cospans.
 
 Summary
 -------
@@ -12,7 +14,6 @@ Summary
     :toctree:
 
     Function
-    Cycles
     Permutation
     Cospan
 """
@@ -276,7 +277,11 @@ class Permutation(Function, PROP, Groupoid):
 
     @classmethod
     def from_cycles(cls, cycles: Cycles, size: int) -> Self:
-        """ Build a permutation from cycles. """
+        """
+        Build a permutation of ``range(size)`` from disjoint cycles, each an
+        iterable of indices ``(i0, i1, ..., ik)`` with ``result[i0] == i1``,
+        ..., ``result[ik] == i0``, as :meth:`cycles` reads them back.
+        """
         result = list(range(size))
         seen = set()
         for cycle in map(tuple, cycles):
@@ -292,7 +297,7 @@ class Permutation(Function, PROP, Groupoid):
 
     @classmethod
     def from_transpositions(cls, transpositions: Cycles, size: int) -> Self:
-        """ Build a permutation from disjoint 2-cycles. """
+        """ Build a permutation from disjoint 2-cycles ``(i, j)``. """
         result = list(range(size))
         seen = set()
         for left, right in transpositions:

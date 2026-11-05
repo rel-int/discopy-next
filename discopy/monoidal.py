@@ -23,7 +23,17 @@ Summary
     Sum
     Bubble
     Functor
+    Match
     Equation
+
+.. admonition:: Functions
+
+    .. autosummary::
+        :template: function.rst
+        :nosignatures:
+        :toctree:
+
+        uncolour_state
 
 Axioms
 ------

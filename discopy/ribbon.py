@@ -16,12 +16,21 @@ Summary
     Cup
     Cap
     Braid
+    Twist
     Feedback
     Trace
     FollowedBy
     Head
     Tail
+    Sum
+    Bubble
     Functor
+    DualRail
+    DualRailBraid
+    DualRailTwist
+    DualRailCup
+    DualRailCap
+    Equation
 
 Axioms
 ------
@@ -75,7 +84,7 @@ cap becomes a ribbon folding back.
 ...     >> Braid(z, x) @ y
 ...     >> x @ Braid(z, y)).trace(left=False)
 >>> diagram.to_ribbons().draw(
-...     wire_labels=False, path='docs/_static/ribbon/dual_rail.svg')
+...     wire_labels=False, doctest='docs/_static/ribbon/dual_rail.svg')
 
 .. image:: /_static/ribbon/dual_rail.svg
     :align: center

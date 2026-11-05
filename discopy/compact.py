@@ -11,6 +11,7 @@ Summary
     :nosignatures:
     :toctree:
 
+    Layer
     Diagram
     Box
     Cup
@@ -22,7 +23,11 @@ Summary
     FollowedBy
     Head
     Tail
+    Sum
+    Bubble
     Functor
+    DualRail
+    Equation
 
 Axioms
 ------

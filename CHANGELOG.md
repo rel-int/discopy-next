@@ -257,6 +257,10 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Fixed
 
+- The documentation says what the code does: the README, CONTRIBUTING.md,
+  AGENTS.md and the module summaries no longer name modules, classes or
+  notebooks that are gone, list the public ones they missed, and state each
+  fact in one place.
 - `docs/notebooks/optyx/photon_distinguishability.md` composes its photonic
   circuits from `optyx.photonic`, where it used to take `Create` from
   `optyx.core.zw` and `DualRail` from `optyx.core.diagram` and compose those

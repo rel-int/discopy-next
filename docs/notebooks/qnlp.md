@@ -13,12 +13,12 @@ We go through the basics of DisCoPy and [quantum natural language processing](ht
 
 On the menu:
 
-1. [Drawing cooking recipes](#Drawing-cooking-recipes)
-2. [Tensors as boxes](#Tensors-as-boxes)
-3. [Quantum circuits](#Quantum-circuits)
-4. [DisCoCat](#DisCoCat)
-5. [Putting it all together](#Putting-it-all-together)
-6. [References](#References)
+1. [Drawing cooking recipes](#drawing-cooking-recipes)
+2. [Tensors as boxes](#tensors-as-boxes)
+3. [Quantum circuits](#quantum-circuits)
+4. [DisCoCat](#discocat)
+5. [Putting it all together](#putting-it-all-together)
+6. [References](#references)
 <!---->
 ## Drawing cooking recipes
 
@@ -165,11 +165,13 @@ english2french(crack_then_beat)
 Functors compose just like Python functions, e.g.
 
 ```python {.marimo}
-echanger = lambda x, y: Box("échanger", x @ y, y @ x, draw_as_wires=True)
 melanger = lambda x: Box("mélanger", x @ x, x)
 
 for x in [white, yolk]:
     english2french.ar_map[merge(x)] = melanger(english2french(x))
+
+assert (open_crack2 >> english2french)(crack2_then_beat)\
+    == english2french(open_crack2(crack2_then_beat))
 
 english2french(open_crack2(crack2_then_beat))
 ```
@@ -180,9 +182,9 @@ english2french(open_crack2(crack2_then_beat))
 <!---->
 ## Tensors as boxes
 
-Sadly, Python is not very good at cooking, it doesn't even have a proper `coffee` module. There is one thing that Python's `numpy` package is good at though: computing with multi-dimensional arrays, a.k.a. **tensors**. We can interpret tensors as cooking steps with the dimensions of their axes as ingredients, i.e. **tensors are boxes**.
+Sadly, Python is not very good at cooking, it doesn't even have a proper `coffee` module. There is one thing that Python's `numpy` package is good at though: computing with multi-dimensional arrays, a.k.a. **tensors**. We can interpret tensors as cooking steps with the dimensions of their axes as ingredients, i.e. boxes can be interpreted as tensors.
 
-`Dim` (dimension) is a subclass of `Ty` where the objects are integers greater than 1, with multiplication as tensor and the unit dimension `Dim(1)`. `Tensor` is a subclass of `Box` defined by a pair of dimensions `dom, cod` and an `array` with shape `dom @ cod`.
+`Dim` (dimension) is a subclass of `Ty` where the objects are integers greater than 1, with multiplication as tensor and the unit dimension `Dim(1)`. `Tensor` is the arrow of a concrete category, a subclass of `Matrix` defined by a pair of dimensions `dom, cod` and an `array` of shape `dom.inside + cod.inside`; `tensor.Box`, introduced below, is the box that a functor sends to a `Tensor`.
 
 ```python {.marimo}
 from discopy.tensor import Dim, Tensor
@@ -328,20 +330,17 @@ print(f.r.eval())
 ```
 
 ```python {.marimo}
-# magic command not supported in marimo; please file an issue to add support
-# %timeit f.transpose().transpose().eval()
-```
+import timeit
 
-```python {.marimo}
-# magic command not supported in marimo; please file an issue to add support
-# %timeit f.eval()
+mo.md(f"transpose twice: {timeit.timeit(lambda: f.transpose().transpose().eval(), number=100):.3f}s, "
+      f"f itself: {timeit.timeit(f.eval, number=100):.3f}s for 100 runs")
 ```
 
 **Exercise:** Check out the `Diagram.snake_removal` method in the [docs](../../_api/discopy.rigid.Diagram.html#discopy.rigid.Diagram.snake_removal). This can greatly speed up the evaluation of tensor diagrams!
 
 **Exercise:** Define a function that takes a number `n` and returns the diagram for a [matrix product state](https://en.wikipedia.org/wiki/Matrix_product_state) (MPS) with `n` particles and random entries. Check how the evaluation time scales with the size of the diagram.
 
-**Exercise:** Install the [tensornetwork](https://pypi.org/project/tensornetwork/) library and use it to contract the MPS diagrams more efficiently by passing a contract to the `eval` method, see the [docs](../../_api/discopy.tensor.Diagram.html#discopy.tensor.Diagram.eval).
+**Exercise:** Install the [tensornetwork](https://pypi.org/project/tensornetwork/) library and convert the MPS diagrams with [`to_tn`](../../_api/discopy.tensor.Diagram.html#discopy.tensor.Diagram.to_tn) to contract them more efficiently, or pass a contraction path as `optimize` to [`eval`](../../_api/discopy.tensor.Diagram.html#discopy.tensor.Diagram.eval).
 <!---->
 ## Quantum circuits
 
@@ -405,7 +404,7 @@ If we want to get the probability distribution over bitstrings, we need to leave
 The `Measure` box has `dom=qubit` and `cod=bit`.
 Another example of a mixed box is `Discard` which computes a partial trace over a qubit.
 Mixed circuits cannot be evaluated as a unitary matrix anymore.
-Instead whenever the circuit is mixed, `circuit.eval()` outputs a `Channel`: a `numpy.ndarray` with axes for the classical and quantum dimensions of the circuit.
+Instead whenever the circuit is mixed, `circuit.eval()` outputs a `Channel`: a `Tensor` whose `array` has axes for the classical and quantum dimensions of the circuit.
 
 ```python {.marimo}
 from discopy.quantum import Measure, Discard

@@ -16,11 +16,11 @@ minimum (:func:`halt_logit`).
   correctness of the final readout (:func:`halt_terms`), with one target
   or the nearest of several admissible ones.
 * :class:`ActPool` -- ``batch_size`` persistent slots, one segment and one
-  optimizer step per iteration; a slot whose board halt logit turns
-  positive, or which reaches ``n_sup`` segments, gets a fresh puzzle. Every
-  board's gradient passes the per-board clip of
-  :func:`~discopy.neural.train.per_board_backward`, then one global norm
-  clip, a spike watchdog and the optimizer.
+  optimizer step per iteration; a slot whose board halt logit exceeds
+  ``halt_threshold`` (zero by default), or which reaches ``n_sup``
+  segments, gets a fresh puzzle. Every board's gradient passes the
+  per-board clip of :func:`~discopy.neural.train.per_board_backward`, then
+  one global norm clip, a spike watchdog and the optimizer.
 * :func:`rollout` -- the evaluation: one trajectory of segments, read at
   every cap as the fixed-compute answer, the ACT depth and the most
   confident answer so far.
