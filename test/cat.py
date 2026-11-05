@@ -399,6 +399,14 @@ def test_Bubble():
     assert Functor.id()(empty) == empty
 
 
+def test_Bubble_str():
+    x, y = Ob('x'), Ob('y')
+    f = Box('f', x, y)
+    for bubble in (f.bubble(name="N"), f.bubble(method="m"),
+                   f.bubble(dom=y, cod=x, name="N", method="m")):
+        assert eval(str(bubble)) == bubble
+
+
 def test_Box_call():
     f = Box('f', Ob('x'), Ob('y'))
     with raises(TypeError):

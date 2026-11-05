@@ -956,9 +956,12 @@ one, they have [cat.Ob('x'), cat.Ob('y')].
 
     def __str__(self):
         str_args = ",".join(map(str, self.args))
-        str_dom_cod = '' if self.is_id_on_objects else (
-            f'dom={self.dom}, cod={self.cod}')
-        return f"({str_args}).bubble({str_dom_cod})"
+        str_kwargs = [] if self.is_id_on_objects else [
+            f"dom={self.dom}", f"cod={self.cod}"]
+        str_kwargs += [f"name={self.name!r}"] if self.name else []
+        str_kwargs += [] if self.method == "bubble"\
+            else [f"method={self.method!r}"]
+        return f"({str_args}).bubble({', '.join(str_kwargs)})"
 
     def atoms(self) -> list:
         """ The atoms of a bubble: those of its boundary and arguments. """
