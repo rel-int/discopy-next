@@ -31,6 +31,19 @@ def test_Function_type_checking():
     assert Function.type_checking
 
 
+def test_Function_no_type_checking_of_a_subclass_is_scoped():
+    from discopy.python import multiplicative
+    bad = multiplicative.Function(str, int, int)
+    with Function.no_type_checking:
+        with multiplicative.Function.no_type_checking:
+            assert bad(1) == "1"
+    with raises(TypeError):
+        bad(1)
+    with Function.no_type_checking:
+        assert bad(1) == "1"
+    assert "type_checking" not in vars(multiplicative.Function)
+
+
 def test_no_tree():
     from discopy.utils import dumps
     with raises(TypeError, match="A function has no tree"):

@@ -14,7 +14,7 @@ The fixes of rel-int/discopy-next#445 in `python` and `drawing`: bugs the review
 - [x] **S9-11** Drawing.bubble with non-drawing types (symmetric, rigid, compact, frobenius) whose dom or cod length matches the inside's adds nodes with no …
 - [x] **S9-12** Drawing.__eq__ ignores the edges of the plane graph, so drawings with the same nodes and positions but different wiring compare equal;
 - [x] **S9-13** additive.Function.braid called on an instance raises TypeError:
-- [WIP] @session_01MEJxy43YMF4nTF8NEcP8Je-2026-11-05 19:42 **S9-15** Function.no_type_checking on a subclass writes a permanent type_checking attribute into it:
+- [x] **S9-15** Function.no_type_checking on a subclass writes a permanent type_checking attribute into it:
 - [WIP] @session_01MEJxy43YMF4nTF8NEcP8Je-2026-11-05 19:42 **S9-16** The Matplotlib backend draws the label of a TRANSPARENT box or braket white, with no dark-mode tag:
 - [WIP] @session_01MEJxy43YMF4nTF8NEcP8Je-2026-11-05 19:42 full suite and lint gates on the branch
 - [WIP] @session_01MEJxy43YMF4nTF8NEcP8Je-2026-11-05 19:42 one `CHANGELOG.md` line per user-facing fix
