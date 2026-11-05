@@ -1161,8 +1161,8 @@ which to_drawing recomputes.
         .. image:: /_static/drawing/bubble-drawing.svg
             :align: center
         """
-        dom = self.dom if dom is None else dom
-        cod = self.cod if cod is None else cod
+        dom = self.dom if dom is None else dom.to_drawing()
+        cod = self.cod if cod is None else cod.to_drawing()
         arg_dom, arg_cod = self.dom, self.cod
         from discopy.monoidal import Wire, Ty
         left = Ty(Wire(name or "", dom.dom, arg_dom.dom))

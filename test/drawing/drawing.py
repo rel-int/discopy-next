@@ -977,3 +977,12 @@ def test_no_tree():
     with raises(TypeError, match="A drawing has no tree"):
         dumps(Box('f', Ty('x'), Ty('y')).to_drawing())
     assert Drawing.serialisation() is NotImplemented
+
+
+def test_Drawing_bubble_of_plain_types_places_every_node():
+    a, b, c, d = map(Ty, "abcd")
+    f = Box('f', a @ b, c @ d).to_drawing()
+    for dom, cod in [(c @ d, a @ b), (c @ d, a), (c, a @ b)]:
+        bubble = f.bubble(dom, cod, name="g")
+        assert set(bubble.nodes) == set(bubble.positions)
+        assert bubble == f.bubble(dom.to_drawing(), cod.to_drawing(), name="g")
