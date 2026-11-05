@@ -26,6 +26,6 @@ The fixes of rel-int/discopy-next#445 in the syntax core and the law machinery (
 - [x] **S2-7** Equation.modulo rebuilds the equation from its terms and symbols only, so monoidal.Equation.space (the only extra attribute any subclass sets) resets …
 - [x] **S2-8** str(AxiomFailure) is the repr of the tuple (reason, equation), not the reason its docstring calls the message
 - [x] **S2-9** Axiom.modulo/failing/inapplicable docstrings cite laws not on main (two exist only on PR #1's branch, CompactCategory.dagger_contravariance nowhere);
-- [WIP] @session_01MEJxy43YMF4nTF8NEcP8Je-2026-11-05 19:42 **S2-10** Three messages (MATRIX_TWO_DTYPES, HAS_NO_ATTRIBUTE, COMPLEX_TYPE_HAS_NO_ATTR) are dead, as they are upstream.
+- [x] **S2-10** Three messages (MATRIX_TWO_DTYPES, HAS_NO_ATTRIBUTE, COMPLEX_TYPE_HAS_NO_ATTR) are dead, as they are upstream.
 - [WIP] @session_01MEJxy43YMF4nTF8NEcP8Je-2026-11-05 19:42 full suite and lint gates on the branch
 - [WIP] @session_01MEJxy43YMF4nTF8NEcP8Je-2026-11-05 19:42 one `CHANGELOG.md` line per user-facing fix
