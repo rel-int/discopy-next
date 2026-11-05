@@ -91,10 +91,24 @@ def test_Kauffman():
 
 def test_rotate():
     x, y = Ty('x'), Ty('y')
-    assert Twist(x).r == Twist(x)
+    assert Twist(x).r == Twist(x.r)
     assert Braid(x, y).dagger().r == Braid(x.r, y.r).dagger()
     rotated = (Box('f', Ty(), y @ x) >> Braid(x, y).dagger()).r
     assert Diagram(rotated.inside, rotated.dom, rotated.cod) == rotated
+
+
+def test_rotation_is_well_typed():
+    x, y = Ty('x'), Ty('y')
+    f = Box('f', x @ y, x @ y)
+    snake = Cap(x, x.r) @ x >> x @ Cup(x.r, x)
+    for diagram in (f >> Braid(x, y), snake, f >> Twist(x) @ y,
+                    f >> Twist(x)[::-1] @ y):
+        for rotated in (diagram.r, diagram.l,
+                        diagram.to_ribbons().r, diagram.to_ribbons().l):
+            assert Diagram(rotated.inside, rotated.dom, rotated.cod)\
+                == rotated
+    assert DualRailCup(x @ x, y @ y, is_dagger=True).r\
+        == DualRailCap(y.r @ y.r, x.r @ x.r, is_dagger=True)
 
 
 def test_to_hypergraph():

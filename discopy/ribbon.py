@@ -235,7 +235,7 @@ class DualRailBraid(balanced.DualRailBraid, Box):
 
     def rotate(self, left=False):
         del left
-        return type(self)(self.right, self.left, self.is_dagger)
+        return type(self)(self.left.r, self.right.r, self.is_dagger)
 
 
 class DualRailTwist(balanced.DualRailTwist, Box):
@@ -249,7 +249,7 @@ class DualRailTwist(balanced.DualRailTwist, Box):
 
     def rotate(self, left=False):
         del left
-        return self
+        return type(self)(self.dom.r, self.is_dagger)
 
 
 class DualRailCup(Box):
@@ -278,7 +278,7 @@ class DualRailCup(Box):
 
     def rotate(self, left=False):
         del left
-        return DualRailCap(self.left.r, self.right.r)
+        return DualRailCap(self.right.r, self.left.r, self.is_dagger)
 
     def dagger(self):
         return DualRailCap(self.left, self.right, not self.is_dagger)
@@ -303,7 +303,7 @@ class DualRailCap(Box):
 
     def rotate(self, left=False):
         del left
-        return DualRailCup(self.left.r, self.right.r)
+        return DualRailCup(self.right.r, self.left.r, self.is_dagger)
 
     def dagger(self):
         return DualRailCup(self.left, self.right, not self.is_dagger)
@@ -321,7 +321,7 @@ class Twist(balanced.Twist, Box):
 
     def rotate(self, left=False):
         del left
-        return self
+        return type(self)(self.dom.r, self.is_dagger)
 
 
 class Sum(rigid.Sum, Box):
