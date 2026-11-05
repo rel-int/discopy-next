@@ -538,7 +538,8 @@ def encode(tree: Any) -> Any:
     array or scalar, see :func:`encode_numpy`,
     and a sympy expression, see :func:`encode_sympy`. Every other value is
     left as it is, so a tree without tuples keeps the bytes JSON gives it, as
-    is one that these refuse, for the ``default`` of ``json.dumps``.
+    is one that these refuse, for the ``default`` of ``json.dumps``. A key
+    that is not a string, which JSON would write as one, raises.
     This is what :func:`dumps` writes and :func:`decode` reads back.
 
     Example
@@ -548,8 +549,16 @@ def encode(tree: Any) -> Any:
 [1, {'factory': 'complex', 're': 0.0, 'im': 2.0}]}}
     >>> encode({'data': {1, 2}})
     {'data': {1, 2}}
+    >>> encode({'data': {1: 'a'}})
+    Traceback (most recent call last):
+    ...
+    TypeError: Object of type dict with int keys is not JSON serialisable.
     """
     if isinstance(tree, dict):
+        keys = [key for key in tree if not isinstance(key, str)]
+        if keys:
+            raise TypeError(messages.NOT_JSON_SERIALISABLE.format(
+                f"dict with {type(keys[0]).__name__} keys"))
         return {key: encode(value) for key, value in tree.items()}
     if isinstance(tree, list | tuple):
         inside = list(map(encode, tree))
