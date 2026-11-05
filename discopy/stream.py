@@ -476,7 +476,8 @@ callable returns or, for a constant stream, itself, which JSON cannot hold.
     @inductive
     def delay(self) -> Stream:
         """ Delay a stream by one time step, shortened to `self.d`. """
-        dom, cod, mem = [x.delay() for x in (self.dom, self.cod, self.mem)]
+        dom, cod = self.dom.delay(), self.cod.delay()
+        mem = self.ob(self.mem.now, lambda: self.mem)
         now, _later = self.category.id(self.mem.now), lambda: self
         return type(self)(now, dom, cod, mem, _later)
 
