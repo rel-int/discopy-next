@@ -669,8 +669,6 @@ class Box(frobenius.Box, Diagram):
     zx boxes (Bit) with tensors with dims of 2.
     """
 
-    __ambiguous_inheritance__ = (frobenius.Box,)
-
     array = None
 
     def __init__(self, name, dom, cod, array=None, **params):
@@ -964,8 +962,6 @@ class Sum(symmetric.Sum, Box):
     """
     Formal sum of optyx diagrams
     """
-
-    __ambiguous_inheritance__ = (symmetric.Sum,)
 
     def conjugate(self):
         return sum(term.conjugate() for term in self.terms)
@@ -1412,7 +1408,6 @@ class Feedback(monoidal.Bubble, Box):
     .. image:: /_static/optyx/cnot_ladder.svg
         :align: center
     """
-    __ambiguous_inheritance__ = (monoidal.Bubble,)
     serialised_attrs = ("*args", "dom", "cod", "mem", "state", "effect")
 
     @classmethod

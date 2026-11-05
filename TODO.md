@@ -16,6 +16,6 @@ The fixes of rel-int/discopy-next#445 in `.github`, the docs build, the test har
 - [x] **S17-7** benchmark/report.py's NAME-results.md formats medians with .4f:
 - [x] **S17-8** export_notebooks.py runs each notebook with cwd=docs/notebooks and no PYTHONPATH, so --check (and generate) from a worktree or copy imports the …
 - [x] **S17-12** export_notebooks.py drops a notebook name that matches nothing whenever another name matches, and exits 0, so a misspelt `--check` reads as a passed …
-- [WIP] @session_01MEJxy43YMF4nTF8NEcP8Je-2026-11-05 19:42 **S17-15** docs/_ext/bases-fullname.py's docstring still says to set `__ambiguous_inheritance__:
+- [x] **S17-15** docs/_ext/bases-fullname.py's docstring still says to set `__ambiguous_inheritance__:
 - [WIP] @session_01MEJxy43YMF4nTF8NEcP8Je-2026-11-05 19:42 full suite and lint gates on the branch
 - [WIP] @session_01MEJxy43YMF4nTF8NEcP8Je-2026-11-05 19:42 one `CHANGELOG.md` line per user-facing fix

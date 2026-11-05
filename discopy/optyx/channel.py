@@ -1764,8 +1764,6 @@ class Sum(symmetric.Sum, Diagram):
     Formal sum of optyx channel diagrams
     """
 
-    __ambiguous_inheritance__ = (symmetric.Sum,)
-
     def double(self):
         return diagram.Diagram.sum_factory(
             [term.double() for term in self.terms],
@@ -1887,7 +1885,6 @@ class Feedback(monoidal.Bubble, Diagram, frobenius.Box):
     >>> assert ladder.unroll(1).double().merge_layers()\\
     ...     == ladder.double().unroll(1).merge_layers()
     """
-    __ambiguous_inheritance__ = (monoidal.Bubble, frobenius.Box)
     serialised_attrs = ("*args", "dom", "cod", "mem", "state", "effect")
 
     @classmethod
