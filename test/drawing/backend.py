@@ -1,4 +1,6 @@
-from pytest import raises
+from io import BytesIO
+
+from pytest import mark, raises
 
 from discopy.drawing.backend import TikZ
 from discopy.monoidal import Ty, Box
@@ -80,3 +82,17 @@ def test_tikzstyles_sit_beside_their_drawing(tmp_path):
     assert sorted(file.name for file in tmp_path.iterdir()) == ["dir.v2"]
     assert sorted(file.name for file in folder.iterdir())\
         == ["diagram", "diagram.tikz", "diagram.tikzstyles"]
+
+
+@mark.parametrize("mode", ["w", "wb"])
+def test_svg_to_an_open_file_has_the_dark_mode_style(tmp_path, mode):
+    f, path = Box('f', Ty('x'), Ty('y')), tmp_path / "box.svg"
+    with open(path, mode) as file:
+        f.draw(path=file, format="svg", show=False)
+    assert path.read_text(encoding="utf-8") == f.to_svg()
+
+
+def test_svg_to_a_bytes_buffer_has_the_dark_mode_style():
+    f, buffer = Box('f', Ty('x'), Ty('y')), BytesIO()
+    f.draw(path=buffer, format="svg", show=False)
+    assert buffer.getvalue().decode("utf-8") == f.to_svg()
