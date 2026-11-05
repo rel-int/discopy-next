@@ -1247,11 +1247,11 @@ class Bubble(monoidal.Bubble, Box):
         """
         from sympy import Symbol
         name = "$\\frac{{\\partial {}}}{{\\partial {}}}$"
-        return Spider(1, 2, self.dom)\
+        return Diagram.spiders(1, 2, self.dom)\
             >> self.arg.bubble(
                 func=Diff(Symbol("tmp"), self.func),
                 drawing_name=name.format(self.drawing_name, var))\
-            @ self.arg.grad(var) >> Spider(2, 1, self.cod)
+            @ self.arg.grad(var) >> Diagram.spiders(2, 1, self.cod)
 
 
 class Diff:

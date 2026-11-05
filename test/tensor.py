@@ -834,6 +834,20 @@ def test_grad_equal():
     assert square.grad(x) != f.bubble(func=lambda z: z ** 3).grad(x)
 
 
+def test_bubble_grad_is_the_chain_rule_on_any_boundary():
+    sympy = pytest.importorskip("sympy")
+    from sympy.abc import x
+    for dom, cod in [(Dim(1), Dim(2)), (Dim(2, 2), Dim(1)),
+                     (Dim(2, 3), Dim(3, 2))]:
+        size = np.prod((dom @ cod).inside, dtype=int)
+        data = [k * x ** k for k in range(1, size + 1)]
+        bubble = Box('g', dom, cod, data).bubble(func=lambda z: z ** 2)
+        result = bubble.grad(x).eval(dtype=sympy.Expr)
+        assert result == Box.grad(bubble, x).eval(dtype=sympy.Expr)
+        assert list(result.array.flatten()) == [
+            sympy.diff(entry ** 2, x) for entry in data]
+
+
 def test_grad_of_named_bubble_reads_back():
     pytest.importorskip("sympy")
     from sympy import Symbol
