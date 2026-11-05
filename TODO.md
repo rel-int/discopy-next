@@ -10,7 +10,7 @@ The fixes of rel-int/discopy-next#445 in `optyx`: bugs the review confirmed that
 - [x] **S13-4** PermanentBackend sums the arrays of terms with different photon totals by numpy broadcasting:
 - [x] **S13-5** ZXDiagram.to_pyzx exports zx.ZBox(n, m, w) as an X spider of phase 2w:
 - [x] **S13-6** path.Matrix inherits matrix.Matrix.__eq__, which ignores creations, selections, normalisation and scalar:
-- [WIP] @session_01MEJxy43YMF4nTF8NEcP8Je-2026-11-05 19:42 **S13-8** A zw.ZBox with no inputs truncates a finite amplitude list at dimension 2.
+- [x] **S13-8** A zw.ZBox with no inputs truncates a finite amplitude list at dimension 2.
 - [WIP] @session_01MEJxy43YMF4nTF8NEcP8Je-2026-11-05 19:42 **S13-9** Since cfc59baa (#87), Matrix.permutation and Matrix.copy fill a Matrix[Expr] with Python bools, so a symbolic path matrix crashes whenever …
 - [WIP] @session_01MEJxy43YMF4nTF8NEcP8Je-2026-11-05 19:42 **S13-11** eval(repr(x)) == x fails for 14 discopy.optyx.core box classes (zw.W daggered or composed, zw.ZBox, Create, Select, Endo, Add, Multiply, Divide, …
 - [WIP] @session_01MEJxy43YMF4nTF8NEcP8Je-2026-11-05 19:42 **S13-12** diagram.Scalar and diagram.Sum fall through to Box.inflate's d-fold tensor power:
