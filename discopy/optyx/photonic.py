@@ -1023,8 +1023,20 @@ class PhaseShiftDR(Channel):
 
 class ZMeasurementDR(Diagram):
     """
-    ZMeasurement circuit that performs a measurement in the Z basis
-    after applying a phase shift of alpha.
+    Measurement of a dual-rail qubit with the Z spider of phase alpha:
+    a phase shift of alpha on the second rail, a :class:`HadamardBS` and
+    number-resolving detection, keeping the photon count of the second rail.
+
+    Outcome 0 projects onto :code:`|0> + exp(-2 pi i alpha) |1>` and
+    outcome 1 onto :code:`|0> - exp(-2 pi i alpha) |1>`, i.e. it measures
+    the X basis when alpha is 0.
+
+    Example
+    -------
+    >>> from discopy.optyx import qubits
+    >>> state = qubits.Ket("-") >> qubits.Z(1, 1, -.1) >> DualRail(1)
+    >>> dist = (state >> ZMeasurementDR(.1)).eval().prob_dist()
+    >>> assert np.isclose(dist[(1, )], 1)
     """
     def __new__(cls, alpha):
         return (
@@ -1037,8 +1049,9 @@ class ZMeasurementDR(Diagram):
 
 class XMeasurementDR(Diagram):
     """
-    XMeasurement circuit that performs a measurement in the X basis
-    after applying a Hadamard beam splitter.
+    Measurement of a dual-rail qubit with the X spider of phase alpha:
+    a :class:`HadamardBS` then :class:`ZMeasurementDR` of alpha, i.e. it
+    measures the Z basis when alpha is 0.
     """
     def __new__(cls, alpha):
         return (
