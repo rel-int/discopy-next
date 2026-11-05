@@ -8,7 +8,7 @@ The fixes of rel-int/discopy-next#445 in the syntax core and the law machinery (
 - [x] **S1-2** Sum.then never checks that the two sides compose, so a zero (empty Sum) composes with any arrow on either side and returns an ill-typed zero.
 - [x] **S1-3** dumps silently turns int, float, bool and None dict keys in box data into strings, so loads(dumps(f)) != f, breaking the serialisation law.
 - [x] **S1-4** Functor composition (cat and monoidal then) applies G to F's raw map values before F's cast, so F >> G crashes (or, with callable maps, the composite …
-- [WIP] @session_01MEJxy43YMF4nTF8NEcP8Je-2026-11-05 19:42 **S1-5** monoidal.Functor.then passes colour_map to type(self), so composing two quantum.circuit.Functors raises TypeError;
+- [x] **S1-5** deferred to #445: already fixed by 1b31981a (S1-4); DualRail composites are a separate pick
 - [WIP] @session_01MEJxy43YMF4nTF8NEcP8Je-2026-11-05 19:42 **S1-8** Box.subs (and so Bubble, diagram and Layer subs) ignores a key that is not a bare symbol, e.g.
 - [WIP] @session_01MEJxy43YMF4nTF8NEcP8Je-2026-11-05 19:42 **S1-9** A one-shot iterator passed as inside skips the composability and type checks in FreeCategory, and is silently consumed into an empty path by monoidal …
 - [WIP] @session_01MEJxy43YMF4nTF8NEcP8Je-2026-11-05 19:42 **S1-10** Sum stores a list of terms as given, so Sum([f, g]) != Sum((f, g)) == f + g and is unhashable;
