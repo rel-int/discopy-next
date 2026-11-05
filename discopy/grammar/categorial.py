@@ -493,7 +493,7 @@ class BC(BinaryTerm):
 
 
 class FX(BinaryTerm):
-    "Forward crossing ``A >> C`` with subterms ``B << A`` and ``B >> C``."
+    "Forward crossing ``A >> C`` with subterms ``C << B`` and ``A >> B``."
     def __init__(self, left, right):
         rule = ForwardCrossedComposition(left.cod, right.cod)
         super().__init__(left, right, rule.cod)
@@ -517,7 +517,7 @@ class FX(BinaryTerm):
 
 
 class BX(BinaryTerm):
-    "Backward crossing ``A << C`` with subterms ``A << B`` and ``C >> B``."
+    "Backward crossing ``A << C`` with subterms ``B << C`` and ``B >> A``."
     def __init__(self, left, right):
         rule = BackwardCrossedComposition(left.cod, right.cod)
         super().__init__(left, right, rule.cod)
