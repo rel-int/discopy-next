@@ -699,6 +699,12 @@ def test_Box_dagger_is_not_the_box():
     assert hash(t.dagger()) != hash(t)
 
 
+def test_rotated_Box_is_not_the_box():
+    f = Box('f', Dim(2), Dim(2), data=[1, 2, 3, 4])
+    assert f.r != f and len({f, f.r}) == 2
+    assert f.r.r == f and f.l == f.r
+
+
 def test_Tensor_trace():
     f = Tensor[int](list(range(64)), Dim(2, 2, 2), Dim(2, 2, 2))
     x, y = Dim(2), Dim(2, 2)

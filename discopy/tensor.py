@@ -1015,7 +1015,8 @@ class Box[dtype](frobenius.Box, Diagram[dtype]):
         and inside tuples too, and a complex one with a non-zero imaginary
         part the pair of its parts, so that a box holding nan equals itself
         and its hash is stable: the data labels a generator, it is not a
-        number being compared.
+        number being compared. The winding number ``z`` is compared too, as
+        in :meth:`discopy.rigid.Box.setoid`.
 
         >>> import numpy as np
         >>> f = Box('f', Dim(2), Dim(2), np.array([[0, 1], [1, 0]]))
@@ -1043,7 +1044,7 @@ class Box[dtype](frobenius.Box, Diagram[dtype]):
         entries = () if data is None\
             else tuple(data) if isinstance(data, list) else (data, )
         return (self.name, self.dom, self.cod, self.dtype, self.is_dagger,
-                self.deterministic, self.affine)\
+                self.z, self.deterministic, self.affine)\
             + tuple(map(canonical, entries))
 
 
