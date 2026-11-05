@@ -256,6 +256,17 @@ def test_falsify():
         Arrow.associativity.falsify()
 
 
+def test_falsify_refusal():
+    @axiom
+    def refusing(cls, f: Self) -> Equation[Self]:
+        """ The terms build on an identity only, which a box refutes. """
+        if f.inside:
+            raise ValueError("Cannot build the terms.")
+        return Equation(f, cls.id(f.dom))
+
+    assert refusing.bind(Arrow).falsify()["f"].inside
+
+
 def test_axioms_of_category():
     class Broken(Arrow):
         """ A category declaring an inherited law broken. """

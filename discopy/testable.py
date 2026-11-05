@@ -725,12 +725,14 @@ class Axiom[**P, T](Declaration[P, T]):
          ...
         hypothesis.errors.NoSuchExample: No examples found of condition ...
         """
-        from hypothesis import find
+        from hypothesis import errors, find
 
         def refutes(arguments):
             try:
                 verdict = self(**arguments)
-            except AxiomFailure:
+            except errors.UnsatisfiedAssumption:
+                raise
+            except Exception:  # pylint: disable=broad-exception-caught
                 return True
             return verdict is not NotImplemented and not verdict
 
