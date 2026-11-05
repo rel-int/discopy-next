@@ -656,12 +656,11 @@ class Diagram(biclosed.Diagram, RigidCategory):
         False
         >>> *_, two_snakes_nf = monoidal.Diagram.normalize(two_snakes)
         >>> assert double_snake == two_snakes_nf
-        >>> f = Box('f', a, b)
 
         >>> a, b = Ty('a'), Ty('b')
         >>> double_snake = Id(a @ b).transpose(left=True)
         >>> snakes = Id(b).transpose(left=True) @ Id(a).transpose(left=True)
-        >>> double_snake == two_snakes
+        >>> double_snake == snakes
         False
         >>> *_, two_snakes_nf = monoidal.Diagram.normalize(
         ...     snakes, left=True)
