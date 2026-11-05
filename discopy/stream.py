@@ -259,6 +259,7 @@ class Ty[base](NamedGeneric):
         x1 @ y1
         x2 @ y2
         """
+        x = cls.base.cast(x)
         now = cls.base().tensor(*(cls.base(f"{obj}{n_steps}") for obj in x))
         return cls(now, _later=lambda: cls.sequence(x, n_steps + 1))
 

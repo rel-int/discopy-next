@@ -48,6 +48,12 @@ def test_sequence_box_of_its_category():
     assert type(box) is tensor.Box is tensor.Diagram.box_factory
 
 
+def test_sequence_of_a_name_is_one_wire():
+    mem = Ty.sequence('mem')
+    assert mem.now == Ty.sequence(symmetric.Ty('mem')).now
+    assert mem.now @ mem.later.now == symmetric.Ty('mem0', 'mem1')
+
+
 def test_feedback_errors():
     x = Ty.sequence(symmetric.Ty('x'))
     with raises(ValueError):  # A constant stream needs constant types.
