@@ -184,6 +184,14 @@ def test_Cofunction_Functor():
     assert diagram.to_hypergraph().to_diagram() == diagram
 
 
+def test_Functor_sends_a_Cofunction_to_one_Cofunction():
+    x, y = Ty('x'), Ty('y')
+    f = Cofunction(x @ y, [1, 0, 0])
+    assert Functor.id(Diagram)(f) == f
+    G = Functor({x: x @ y, y: x}, {})
+    assert G(f) == Cofunction(x @ y @ x, [2, 0, 1, 0, 1])
+
+
 def test_Layer():
     x, y = Ty('x'), Ty('y')
     assert Layer(Merge(x), Merge(y)).boxes_or_types == (

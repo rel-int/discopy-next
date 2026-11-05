@@ -332,10 +332,16 @@ def test_Function_Functor():
     f = Function(x @ y, [1, 0, 0])
     F = Functor({x: int, y: str}, {}, cod=python.Function)
     assert F(f)(1, "a") == ("a", 1, 1)
-    G = Functor({x: x @ y, y: x}, {})
-    assert Equation(G(f), Function(x @ y @ x, [2, 0, 1, 0, 1]))
     assert (f >> Box('g', y @ x @ x, x)).to_hypergraph().to_diagram()\
         == f >> Box('g', y @ x @ x, x)
+
+
+def test_Functor_sends_a_Function_to_one_Function():
+    x, y = Ty('x'), Ty('y')
+    f = Function(x @ y, [1, 0, 0])
+    assert Functor.id(Diagram)(f) == f
+    G = Functor({x: x @ y, y: x}, {})
+    assert G(f) == Function(x @ y @ x, [2, 0, 1, 0, 1])
 
 
 def test_Layer():

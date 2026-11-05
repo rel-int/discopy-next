@@ -534,6 +534,12 @@ class Functor(symmetric.Functor):
     def __call__(self, other):
         if isinstance(other, Merge) and hasattr(self.cod, "merge"):
             return self.cod.merge(self(other.cod), len(other.dom))
+        if isinstance(other, Cofunction) and hasattr(
+                self.cod.ar, "cofunction_factory")\
+                and not isinstance(other, symmetric.Permutation):
+            sizes = [len(self(x)) for x in other.cod]
+            return self.cod.ar.from_cofunction(finset.Function.function(
+                other.cofunc.inside, sizes).inside, self(other.cod))
         if isinstance(other, Cofunction) and hasattr(self.cod, "merge")\
                 and not isinstance(other, symmetric.Permutation):
             cofunction = getattr(self.cod, "cofunction", None)\
