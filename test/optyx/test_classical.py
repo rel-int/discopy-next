@@ -179,6 +179,22 @@ def test_bit_controlled_phase_shift_keeps_its_modes_quantum():
     assert (gate >> Phase(0.25)).cod == qmode
 
 
+def test_bit_controlled_phase_shift_is_controlled_by_its_classical_mode():
+    """The control is the `mode` declared after the `qmode`, so the photons
+    on the `qmode` stay there, and half a turn on one arm of a Mach-Zehnder
+    swaps its outputs."""
+    from discopy.optyx.channel import Measure, qmode
+    from discopy.optyx.photonic import BS, Create
+    gate = BitControlledPhaseShift(lambda control: [0.25 * control[0]])
+    for photons, control in [(1, 2), (2, 1), (0, 3)]:
+        kept = Create(photons) @ Digit(control) >> gate >> Measure(qmode)
+        assert kept.eval().prob_dist()[photons, ] == pytest.approx(1)
+    for control, outcome in [(0, (0, 1)), (2, (1, 0))]:
+        mzi = Create(1, 0) @ Digit(control) >> BS @ mode >> qmode @ gate
+        mzi >>= BS >> Measure(qmode ** 2)
+        assert mzi.eval().prob_dist()[outcome] == pytest.approx(1)
+
+
 def test_classical_diagram_eval():
     diagram = Digit(2) >> Mod2()
     assert not diagram.is_pure

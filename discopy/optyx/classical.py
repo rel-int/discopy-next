@@ -251,9 +251,11 @@ class BitControlledPhaseShift(Channel):
                  n_modes: int = 1,
                  n_control_modes: int = 1):
         self.function = function
-        kraus = control.ControlledPhaseShift(function,
-                                             n_modes,
-                                             n_control_modes)
+        kraus = diagram.Diagram.swap(
+            diagram.Mode(n_modes), diagram.Mode(n_control_modes)
+        ) >> control.ControlledPhaseShift(function,
+                                          n_modes,
+                                          n_control_modes)
         super().__init__(
             "BitControlledPhaseShift",
             kraus,
