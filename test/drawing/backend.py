@@ -13,6 +13,21 @@ def test_draw_raises_on_relabeled_box(tmp_path):
         Box('g', x, y).draw(doctest=path, show=False)
 
 
+def test_tikz_doctest_compares_against_its_baselines(tmp_path):
+    f, path = Box('f', Ty('x'), Ty('y')), tmp_path / "box.tikz"
+    params = dict(doctest=str(path), to_tikz=True, use_tikzstyles=True)
+    f.draw(**params)
+    f.draw(**params)
+    assert sorted(file.name for file in tmp_path.iterdir())\
+        == ["box.tikz", "box.tikzstyles"]
+    for baseline in [path, path.with_suffix(".tikzstyles")]:
+        expected = baseline.read_text()
+        baseline.write_text("not tikz\n")
+        with raises(ValueError, match="Drawing differs"):
+            f.draw(**params)
+        baseline.write_text(expected)
+
+
 def test_draw_discard_grounds_every_wire(tmp_path):
     """ A `Discard` on several objects draws one ground per wire, as the
     tensor of single-wire discards does, see rel-int/discopy-next#239. """

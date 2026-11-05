@@ -20,6 +20,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from contextlib import contextmanager
+from functools import partial
 from itertools import combinations
 from math import sqrt
 import os
@@ -1496,14 +1497,23 @@ class TikZ(Backend):
         edges = ["\\begin{pgfonlayer}{edgelayer}\n"] + self.edgelayer\
             + ["\\end{pgfonlayer}\n"]
         end = ["\\end{tikzpicture}\n"]
+
+        def write(lines, actual_path):
+            with open(actual_path, 'w+') as file:
+                file.writelines(lines)
+
+        def save(file_path, lines):
+            if params.get("compare", False):
+                save_and_compare(file_path, partial(write, lines))
+            else:
+                write(lines, file_path)
+
         if path is not None:
             if output_tikzstyle:
                 style_path = '.'.join(path.split('.')[:-1]) + '.tikzstyles'
-                with open(style_path, 'w+') as file:
-                    file.writelines(["% Node styles\n"] + self.node_styles)
-                    file.writelines(["% Edge styles\n"] + self.edge_styles)
-            with open(path, 'w+') as file:
-                file.writelines(begin + nodes + edges + end)
+                save(style_path, ["% Node styles\n"] + self.node_styles
+                     + ["% Edge styles\n"] + self.edge_styles)
+            save(path, begin + nodes + edges + end)
         elif show:  # pragma: no cover
             if output_tikzstyle:
                 print(''.join(self.node_styles + self.edge_styles))
