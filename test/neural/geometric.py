@@ -86,6 +86,11 @@ def test_peer_and_factor():
                 assert (p.grad is None) == (q.grad is None)
                 assert p.grad is None or torch.allclose(
                     p.grad, q.grad, rtol=0, atol=1e-12)
+        ref = reference(WIDTHS, wiring, 4, 0, 4, 2).double()
+        geo = geometric(WIDTHS, wiring, 4, 0, 4, 2).double()
+        geo.load_state_dict(ref.state_dict())
+        ref.split = True
+        same(torch, ref.cycle(ref.initial(x)), geo.cycle(geo.initial(x)))
     geo = GeometricFactorNet(WIDTHS, units, 4, 2, 4, 2).double()
     s = geo.initial(x)
     assert torch.equal(FactorNet.round(geo, s).units, geo.round(s).units)

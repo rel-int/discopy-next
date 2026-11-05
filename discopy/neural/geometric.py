@@ -645,6 +645,8 @@ class Geometric:
             s : The carried state.
         """
         maps = self.maps()
+        if not self.rounds:
+            return s._replace(answer=self.close(maps, s.state, s.answer))
         const = linear(s.clue, maps.clue) + linear(
             s.answer, maps.answer, maps.gate[1])
         if isinstance(self.geometry, Peers):
