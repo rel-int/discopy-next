@@ -973,6 +973,9 @@ class Sum(symmetric.Sum, Box):
     def to_path(self, dtype: type = complex):
         return sum(term.to_path(dtype) for term in self.terms)
 
+    def inflate(self, d):
+        return Diagram.inflate(self, d)
+
     def eval(self, n_photons=0, permanent=None, dtype=complex):
         """Evaluate the sum of diagrams."""
         # we need to implement the proper sums of qpath diagrams
@@ -1145,6 +1148,9 @@ class Scalar(Box):
 
     def dagger(self) -> Diagram:
         return Scalar(self.scalar.conjugate())
+
+    def inflate(self, d):
+        return self
 
     def subs(self, *args):
         data = rsubs(self.scalar, *args)

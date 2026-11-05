@@ -95,6 +95,15 @@ def test_inflation_commutes_with_dagger():
     assert detector.dagger().inflate(2) == detector.inflate(2).dagger()
 
 
+def test_inflation_fixes_scalars():
+    assert Scalar(2).inflate(3) == Scalar(2)
+
+
+def test_inflation_is_linear():
+    terms = zw.Endo(2) + zw.Endo(3)
+    assert terms.inflate(2) == zw.Endo(2).inflate(2) + zw.Endo(3).inflate(2)
+
+
 def test_dual_rail_with_internal_states():
     assert dual_rail(2, internal_states=[[1, 0], [0, 1]]) \
         == DualRail(internal_state=[1, 0]) @ DualRail(internal_state=[0, 1])

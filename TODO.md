@@ -13,7 +13,7 @@ The fixes of rel-int/discopy-next#445 in `optyx`: bugs the review confirmed that
 - [x] **S13-8** A zw.ZBox with no inputs truncates a finite amplitude list at dimension 2.
 - [x] **S13-9** Since cfc59baa (#87), Matrix.permutation and Matrix.copy fill a Matrix[Expr] with Python bools, so a symbolic path matrix crashes whenever …
 - [x] **S13-11** deferred to #445: needs a repr on 14 classes in three files, past 40 lines
-- [WIP] @session_01MEJxy43YMF4nTF8NEcP8Je-2026-11-05 19:42 **S13-12** diagram.Scalar and diagram.Sum fall through to Box.inflate's d-fold tensor power:
+- [x] **S13-12** diagram.Scalar and diagram.Sum fall through to Box.inflate's d-fold tensor power:
 - [WIP] @session_01MEJxy43YMF4nTF8NEcP8Je-2026-11-05 19:42 **S13-14** zx.ZBox(0, 0, w) evaluates to 1 instead of 1 + w (its own P_0 + w P_1, pyzx's legless Z_BOX and spider fusion all give 1 + w):
 - [WIP] @session_01MEJxy43YMF4nTF8NEcP8Je-2026-11-05 19:42 **S13-15** BitControlledBox.photon_number_transform sets self.photon_preservation_behaviour = NON_LO during to_tensor, so evaluating a diagram permanently …
 - [WIP] @session_01MEJxy43YMF4nTF8NEcP8Je-2026-11-05 19:42 **S13-16** zx's autosummary lists zx_to_path, decomp and zx2path, all deleted in optyx#137, so Sphinx warns that it failed to import each one;
