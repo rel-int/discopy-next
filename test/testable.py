@@ -1,5 +1,6 @@
 """ DisCoPy's property-testing module in action. """
 
+import pickle
 from typing import Self, TypeVar
 
 from hypothesis import find, settings
@@ -80,6 +81,15 @@ def test_failing_when_the_terms_do_not_build():
         Refusing.refusing(f=Arrow.id(Ob('x')))
     assert isinstance(error.value.equation, ValueError)
     assert_axioms(Refusing)
+
+
+def test_axiom_failure_message_is_the_reason():
+    f = Box('f', Ob('x'), Ob('x'))
+    with raises(AxiomFailure) as error:
+        Arrow.unitality.failing("Never holds.")(f=f)
+    restored = pickle.loads(pickle.dumps(error.value))
+    assert str(error.value) == str(restored) == "Never holds."
+    assert restored.equation.terms == error.value.equation.terms
 
 
 def test_strategy():

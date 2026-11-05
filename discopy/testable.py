@@ -187,6 +187,9 @@ class AxiomFailure(AxiomError):
         super().__init__(reason, equation)
         self.equation = equation
 
+    def __str__(self):
+        return str(self.args[0])
+
 
 type Obj[Coarse] = Annotated[Coarse, "object"]
 """
