@@ -403,6 +403,23 @@ def test_trailing_detector():
         expected, (Create_(1, 1) >> measured).eval().prob_dist())
 
 
+@pytest.mark.parametrize("herald, condition", [
+    (0, "[1]==1"), (0, "[2]==1"), (1, "[2]==1"), (2, "[1]==1"),
+    (0, "[0,2]==1")])
+def test_postselection_reads_processor_modes(herald, condition):
+    """A postselection names the modes of the processor, heralded ones
+    included, as in perceval."""
+    p = pcvl.Processor("SLOS", 3)
+    p.add(0, pcvl.BS())
+    p.add(1, pcvl.BS())
+    p.add_herald(herald, 0)
+    p.set_postselection(pcvl.PostSelect(condition))
+    p.with_input(pcvl.BasicState([1, 0]))
+    expected = {tuple(k): v for k, v in p.probs()["results"].items()}
+    check_dict_agreement(expected, (
+        Create_(1, 0) >> Channel.from_perceval(p)).eval().prob_dist())
+
+
 CONFIGURATOR_VALUES = {"alpha": 0.3, "beta": 1.1}
 
 
