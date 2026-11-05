@@ -52,6 +52,15 @@ def test_operators():
     assert not right(x).view(2, 2, 3, 4, 3)[..., :2, :].any()
 
 
+def test_shift_past_the_grid_reads_zero():
+    torch = importorskip("torch")
+    from discopy.neural.geometric import Shift
+    x = torch.rand(2, 24, 3, dtype=torch.float64)
+    for axis, step in ((0, 3), (0, -3), (1, 4), (2, -6)):
+        assert torch.equal(Shift((2, 3, 4), axis, step)(x),
+                           torch.zeros_like(x))
+
+
 def test_peer_and_factor():
     torch = importorskip("torch")
     from discopy.neural.geometric import Factors, Geometric, Peers

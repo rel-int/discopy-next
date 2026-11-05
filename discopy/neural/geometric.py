@@ -225,7 +225,8 @@ class Shift(NamedTuple):
 
     def __call__(self, x: torch.Tensor) -> torch.Tensor:
         rows, width = x.shape[0], x.shape[-1]
-        n, step = self.shape[self.axis], self.step
+        n = self.shape[self.axis]
+        step = max(-n, min(self.step, n))
         moved = x.reshape(rows, *self.shape, width).narrow(
             self.axis + 1, max(step, 0), n - abs(step))
         padding = [0, 0] * (len(self.shape) - self.axis) + [
