@@ -84,6 +84,8 @@ def test_Tree_to_diagram():
     assert f(g(a, b), a).to_diagram()\
         == (leaf_a @ leaf_b >> box('g', x @ y, x)) @ leaf_a\
         >> box('f', x @ x, x)
+    assert Id(x).to_diagram() == monoidal.Id(x)
+    assert Tree(f, Id(x), a).to_diagram() == x @ leaf_a >> box('f', x @ x, x)
 
 
 def test_Algebra():

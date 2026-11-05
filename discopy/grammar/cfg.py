@@ -272,6 +272,9 @@ class Id(Rule):
     def dagger(self) -> Id:
         return self
 
+    def to_diagram(self) -> monoidal.Diagram:
+        return monoidal.Id(self.dom)
+
 
 class Operad:
     """
