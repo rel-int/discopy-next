@@ -564,6 +564,24 @@ def test_draw_box_foreground_on_dark_background():
     plt.close(backend.axis.figure)
 
 
+def test_draw_transparent_box_labels_on_the_page():
+    from matplotlib import pyplot as plt
+    from discopy.quantum import Ket
+    box = monoidal.Box(
+        "f", monoidal.Ty("x"), monoidal.Ty("x"), color=config.TRANSPARENT)
+    ket = Ket(0)
+    ket.color = config.TRANSPARENT
+    for diagram in (box, ket):
+        drawing = diagram.to_drawing()
+        drawing.add_box_corners()
+        backend = Matplotlib(figsize=(2, 2))
+        backend.draw_boxes(drawing)
+        label = backend.axis.texts[-1]
+        assert label.get_color() == "black"
+        assert label.get_gid().startswith("dark-fill")
+        plt.close(backend.axis.figure)
+
+
 def test_crack_two_eggs_at_once():
     from discopy.symmetric import Ty, Box, Diagram, Layer
 

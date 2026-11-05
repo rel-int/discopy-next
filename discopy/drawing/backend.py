@@ -1061,10 +1061,13 @@ class Backend(ABC):
         points[i] = points[i].shift(x=asymmetry)
         self.draw_polygon(*points, facecolor=box.color)
         if params.get('draw_box_labels', True):
+            adaptive = box.color == TRANSPARENT
             self.draw_text(box.drawing_name, *positions[node],
                            ha='center', va='center',
-                           color=self.readable_foreground(box.color),
-                           fontsize=params.get('fontsize', None))
+                           color=self.readable_foreground(
+                               "white" if adaptive else box.color),
+                           fontsize=params.get('fontsize', None),
+                           adaptive=adaptive)
 
     def draw_discard(self, positions, node, **params):
         """ Draws a :class:`discopy.quantum.circuit.Discard` box. """
@@ -1199,7 +1202,7 @@ class Backend(ABC):
     def draw_brakets(self, positions, node, **params):
         """ Draws a :class:`discopy.quantum.gates.Ket` box. """
         box, j = node.box, node.j
-        is_bra = len(box.dom) > 0
+        is_bra, adaptive = len(box.dom) > 0, box.color == TRANSPARENT
         for i, bit in enumerate(box._digits):
             kind = "box_dom" if is_bra else "box_cod"
             x = box.dom[i] if is_bra else box.cod[i]
@@ -1214,8 +1217,9 @@ class Backend(ABC):
             self.draw_text(
                 bit, middle[0], middle[1] + (-.25 if is_bra else .2),
                 ha='center', va='center',
-                color=self.readable_foreground(box.color),
-                fontsize=params.get('fontsize', None))
+                color=self.readable_foreground(
+                    "white" if adaptive else box.color),
+                fontsize=params.get('fontsize', None), adaptive=adaptive)
 
     def draw_controlled_gate(self, positions, node, **params):
         """ Draws a :class:`discopy.quantum.gates.Controlled` gate. """
