@@ -1,6 +1,8 @@
 from discopy.optyx.core.zx import *
+from discopy.optyx.core.zx import ZBox
 from discopy.optyx.core.diagram import Scalar
 import itertools
+import numpy as np
 import pytest
 
 n_legs_in = list(range(1, 3))
@@ -39,3 +41,15 @@ scalar = [0, 0.5, 1]
 def test_scalar(scalar):
     s = Scalar(scalar)
     assert np.allclose(s.to_tensor().eval().array.flatten(), s.to_pyzx().to_tensor().flatten())
+
+
+amplitudes = [0, 0.5, 3, -1j]
+legs = [legs for legs in itertools.product(range(3), repeat=2) if any(legs)]
+
+
+@pytest.mark.parametrize("legs", legs)
+@pytest.mark.parametrize("amplitude", amplitudes)
+def test_ZBox_is_a_pyzx_z_box(legs, amplitude):
+    box = ZBox(*legs, amplitude)
+    assert np.allclose(box.to_tensor().eval().array.flatten(),
+                       box.to_pyzx().to_tensor().flatten())

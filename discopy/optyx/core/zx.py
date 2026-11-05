@@ -230,7 +230,10 @@ class ZXDiagram(diagram.Diagram):
             graph.set_position(node, i, 0)
         for row, (box, offset) in enumerate(zip(self.boxes, self.offsets)):
             if isinstance(box, diagram.Spider):
-                if isinstance(box, Spider):
+                if isinstance(box, ZBox):
+                    node = graph.add_vertex(VertexType.Z_BOX)
+                    pyzx.utils.set_z_box_label(graph, node, box.phase)
+                elif isinstance(box, Spider):
                     node = graph.add_vertex(
                         (VertexType.Z if isinstance(box, Z) else VertexType.X),
                         phase=box.phase * 2 if box.phase else None,
