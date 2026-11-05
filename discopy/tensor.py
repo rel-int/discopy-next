@@ -929,9 +929,11 @@ class Diagram[dtype](NamedGeneric, frobenius.Diagram):
 
         Returns
         -------
-        tensor : Tensor
-            with :code:`tensor.dom == self.dom`
-            and :code:`tensor.cod == Dim(len(variables)) @ self.cod`.
+        diagram : Sum
+            with :code:`diagram.dom == self.dom`
+            and :code:`diagram.cod == Dim(len(variables)) @ self.cod`,
+            whose :meth:`eval` is the :meth:`Tensor.jacobian` of
+            :code:`self.eval()`.
 
         Examples
         --------

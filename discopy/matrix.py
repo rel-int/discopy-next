@@ -286,10 +286,10 @@ class Matrix[dtype](NamedGeneric, MarkovCategory, ComarkovCategory,
             other : The other matrix with which to check closeness.
             rtol:
                 The relative tolerance parameter (see Notes).
-                Default value for results of order unity is 1.e-5
+                Default value is 1.e-8
             atol :
                 The absolute tolerance parameter (see Notes).
-                Default value for results of order unity is 1.e-8
+                Default value is 1.e-8
 
         Notes:
         (taken from np.isclose documentation)
