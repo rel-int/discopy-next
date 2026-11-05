@@ -234,6 +234,19 @@ def test_legless_spider_is_the_sum_of_its_amplitudes(spider, phase):
         spider(0, 1, phase) >> spider(1, 0)).to_tensor().eval().array)
 
 
+@mark.parametrize("amplitude", [0, .5, 2])
+def test_legless_zbox_is_the_sum_of_its_amplitudes(amplitude):
+    """The array of a `ZBox` is `P_0 + w P_1`, so with no legs it is `1 + w`,
+    as pyzx and fusion with the box of amplitude one both give."""
+    box = ZBox(0, 0, amplitude)
+    value = box.to_tensor().eval().array
+    assert value.shape == ()
+    assert np.allclose(value, 1 + amplitude)
+    assert np.allclose(value, box.to_pyzx().to_tensor())
+    assert np.allclose(value, (
+        ZBox(0, 1, amplitude) >> ZBox(1, 0, 1)).to_tensor().eval().array)
+
+
 @mark.parametrize("spider", [Z, X, ZBox])
 @mark.parametrize("legs", [(1, 1), (1, 0), (0, 1), (2, 1), (0, 0)])
 def test_grad_matches_central_differences(spider, legs):
