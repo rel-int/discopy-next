@@ -364,10 +364,9 @@ class Permutation(Function, PROP, Groupoid):
             return self
         inside = self.inside
         for other in others:
-            size = len(getattr(other, "dom", other))
-            if size != len(self):
+            if isinstance(other, Function) and other.dom != self.cod:
                 raise AxiomError(messages.NOT_COMPOSABLE.format(
-                    self, other, len(self), size))
+                    self, other, self.cod, other.dom))
             image = type(self)(other, len(self)).inside
             inside = [image[i] for i in inside]
         return type(self)(inside, len(self))

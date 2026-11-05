@@ -152,6 +152,7 @@ def test_Permutation_takes_only_bijections():
         with raises(ValueError):
             Permutation.id(1) @ function
     assert Permutation.id(2) >> Function([1, 0], 2, 2) == (1, 0)
+    assert Permutation.id(2).then(iter((1, 0))) == (1, 0)
 
 
 def test_counts_take_index():
