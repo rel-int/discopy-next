@@ -1117,6 +1117,9 @@ class Scalar(Parametrized):
     """ Scalar, i.e. quantum gate with empty domain and codomain. """
     serialised_attrs = ("data", "name", "is_mixed", "time_step")
 
+    def __new__(cls, *args, **kwargs):
+        return object.__new__(cls)
+
     def __init__(self, data, name=None, is_mixed=False, time_step=0):
         self.drawing_name = format_number(data)
         name = "scalar" if name is None else name
@@ -1198,13 +1201,6 @@ class Scalar(Parametrized):
 
     @classmethod
     def from_tree(cls, tree: dict):
-        """
-        Passes its arguments positionally, as :meth:`dagger` builds one:
-        :meth:`tensor.Box.__new__` reads ``name`` as its own first argument,
-        where a scalar's first argument is its ``data``.
-
-        >>> assert from_tree(Scalar(.5).to_tree()) == Scalar(.5)
-        """
         return cls(tree['data'], tree['name'], tree['is_mixed'],
                    tree.get('time_step', 0))
 
