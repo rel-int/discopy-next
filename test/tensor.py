@@ -334,10 +334,10 @@ def test_symbolic_eval_is_functorial():
     f = Box('f', Dim(2), Dim(2), [x, 0, 0, y])
     F = lambda diagram: diagram.eval(dtype=sympy.Expr)
     assert F(f >> f) == F(f) >> F(f)
-    n = compact.Ty('n')
-    G = Functor({n: Dim(2)}, {}, dom=compact.Diagram, dtype=sympy.Expr)
+    n, s = compact.Ty('n'), compact.Box('s', compact.Ty(), compact.Ty())
+    G = Functor({n: Dim(2)}, {s: [x]}, dom=compact.Diagram, dtype=sympy.Expr)
     loop = compact.Cap(n, n.r) >> compact.Cup(n, n.r)
-    assert G(loop) == Tensor[sympy.Expr]([2], Dim(1), Dim(1))
+    assert G(loop @ s) == Tensor[sympy.Expr]([2 * x], Dim(1), Dim(1))
 
 
 def test_Functor_pytorch_keeps_float32():
