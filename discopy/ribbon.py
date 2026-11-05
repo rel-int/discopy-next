@@ -86,7 +86,6 @@ from typing import ClassVar
 from discopy import rigid, pivotal, balanced, feedback
 from discopy.abc import RibbonCategory
 from discopy.cat import factory
-from discopy.utils import factory_name
 from discopy.pivotal import (  # noqa: F401  pylint: disable=unused-import
     Ty, Nat)
 
@@ -280,10 +279,7 @@ class DualRailCup(Box):
         """
         return self.left, self.right, self.is_dagger
 
-    def __repr__(self):
-        str_is_dagger = ", is_dagger=True" if self.is_dagger else ""
-        return factory_name(type(self))\
-            + f"({self.left!r}, {self.right!r}{str_is_dagger})"
+    __repr__ = balanced.DualRailBraid.__repr__
 
     def rotate(self, left=False):
         del left
