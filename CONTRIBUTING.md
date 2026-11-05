@@ -218,8 +218,8 @@ and iterations for each workload.
 
 ```shell
 uv sync --group dev
-# small/medium sizes (the default); add BENCH_FLAGS=bench:full for the heavy tail
 mkdir -p benchmark-results
+# small/medium sizes (the default); add BENCH_FLAGS=bench:full for the heavy tail
 uv run --with "pyzx==0.10.7" pytest benchmark/ -v \
     --benchmark-json=benchmark-results/bench.json
 # render the scaling tables + log-log plots (polars + matplotlib)
