@@ -140,3 +140,13 @@ def test_Bubble_to_ribbons():
     x = Ty('x')
     f = Box('f', x, x)
     assert f.bubble(name="N").to_ribbons() == f.to_ribbons().bubble(name="N")
+
+
+def test_feedback_to_ribbons_is_built_from_its_argument():
+    x = Ty('x')
+    g = Box('g', x @ x, x @ x)
+    rails = g.to_ribbons()
+    assert Trace(g).to_ribbons() == rails.trace(n=2)
+    assert Head(g).to_ribbons() == rails.head
+    assert Tail(g).to_ribbons() == rails.tail
+    assert g.delay().to_ribbons() == rails.delay()

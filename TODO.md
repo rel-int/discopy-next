@@ -8,7 +8,7 @@ The fixes of rel-int/discopy-next#445 in the symmetric tower and the closed leve
 - [x] **S3-2** ribbon.Twist, DualRailTwist, DualRailBraid, DualRailCup and DualRailCap rotate to boxes on the wrong objects, so .r/.l of any ribbon diagram with a …
 - [x] **S3-3** braided.Diagram.naturality never checks that the layers next to box i are the braid it slides through, so it silently deletes whatever is there:
 - [x] **S3-4** The identity markov (comarkov) functor does not return a Function (Cofunction) unchanged:
-- [WIP] @session_01MEJxy43YMF4nTF8NEcP8Je-2026-11-05 19:42 **S3-7** ribbon.DualRail rebuilds every non-Sum, non-Bubble box as a fresh Box:
+- [x] **S3-7** ribbon.DualRail rebuilds every non-Sum, non-Bubble box as a fresh Box:
 - [WIP] @session_01MEJxy43YMF4nTF8NEcP8Je-2026-11-05 19:42 **S3-8** symmetric.Permutation, markov.Function and comarkov.Cofunction raise a bare TypeError on numpy integer entries (Function even on the identity …
 - [WIP] @session_01MEJxy43YMF4nTF8NEcP8Je-2026-11-05 19:42 **S3-9** eval(repr(x)) raises for ribbon.DualRailCup and DualRailCap:
 - [WIP] @session_01MEJxy43YMF4nTF8NEcP8Je-2026-11-05 19:42 **S3-10** ribbon.Diagram.cup(i, i) (and so compact's) cups wire i-1 with wire i instead of raising;
