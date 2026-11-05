@@ -69,8 +69,10 @@ The contextual fraction is differentiable through the linear program: its
 value is piecewise linear in :math:`v^e` and its gradient, wherever it is
 differentiable, is the solution of the dual program, which the solver
 returns as the shadow prices of the constraints :math:`M b \\leq v^e`, see
-:meth:`Model.gradient`. The gradient is zero on the non-contextual polytope
-and a subgradient on its boundary, where the dual solution is not unique.
+:meth:`Model.gradient`. On the non-contextual polytope the dual solution is
+not unique: inside it, the one returned is constant on each context, so it is
+zero along any change of empirical model, and on its boundary it is a
+subgradient.
 Composed with the derivatives of a parametrised model, this is the gradient
 ascent of :func:`ascend`, finding the parameters of a setup that maximise
 its contextual fraction from a contextual starting point.
@@ -527,6 +529,15 @@ class Model(Table):
         >>> assert all(gradient.vector @ Model.deterministic(
         ...     CHSH.scenario, g).vector <= -1 + 1e-9
         ...     for g in CHSH.scenario.assignments)
+
+        On white noise, which is non-contextual, it is not zero but constant
+        on each context, the constants summing to minus one.
+
+        >>> noise = Model(CHSH.scenario, [[1/4] * 4] * 4)
+        >>> rows = noise.gradient().table  # doctest: +EXTRA
+        >>> assert all(len(set(row)) == 1 for row in rows)
+        >>> round(sum(row[0] for row in rows), 6)
+        -1.0
         """
         self.assert_compatible()
         incidence = self.scenario.incidence()
