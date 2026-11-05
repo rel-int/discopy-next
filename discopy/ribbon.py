@@ -116,6 +116,7 @@ class Diagram(pivotal.Diagram, balanced.Diagram, RibbonCategory):
 
         Parameters:
             n : The number of wires to trace.
+            left : Whether to trace the wires on the left or right.
         """
         if not n:
             return self
@@ -129,12 +130,12 @@ class Diagram(pivotal.Diagram, balanced.Diagram, RibbonCategory):
 
     def cup(self, x, y):
         """
-        Post-compose a ribbon diagram with a cup between wires ``i`` and ``j``
+        Post-compose a ribbon diagram with a cup between wires ``x`` and ``y``
         by introducing braids.
 
         Parameters:
-            i : The wire on the left of the cup.
-            j : The wire on the right of the cup.
+            x : The wire on the left of the cup.
+            y : The wire on the right of the cup.
         """
         if min(x, y) < 0 or max(x, y) >= len(self.cod):
             raise ValueError(f'Indices {x, y} are out of range.')
@@ -323,9 +324,8 @@ class Twist(balanced.Twist, Box):
     Balanced twist in a ribbon category.
 
     Parameters:
-        left (pivotal.Ty) : The type on the top left and bottom right.
-        right (pivotal.Ty) : The type on the top right and bottom left.
-        is_dagger (bool) : Braiding over or under.
+        dom (pivotal.Ty) : The domain of the twist.
+        is_dagger (bool) : Whether this is the inverse twist.
     """
 
     def rotate(self, left=False):

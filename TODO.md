@@ -13,7 +13,7 @@ The fixes of rel-int/discopy-next#445 in the symmetric tower and the closed leve
 - [x] **S3-9** eval(repr(x)) raises for ribbon.DualRailCup and DualRailCap:
 - [x] **S3-10** ribbon.Diagram.cup(i, i) (and so compact's) cups wire i-1 with wire i instead of raising;
 - [x] **S3-11** Slice tests: test_functor_twist_dagger is defined twice (the 10-27 copy shadows the 10-17 one), test_Diagram_permutation and test_Kauffman leave …
-- [WIP] @session_01MEJxy43YMF4nTF8NEcP8Je-2026-11-05 19:42 **S3-12** Docstrings in the slice contradict the code:
+- [x] **S3-12** Docstrings in the slice contradict the code:
 - [WIP] @session_01MEJxy43YMF4nTF8NEcP8Je-2026-11-05 19:42 **S3-13** Swap.__init__ reads any length-2 `left` as a (dom, perm) pair, so Swap(x @ y, z) reports a 'permutation of length 2' instead of NOT_ATOMIC;
 - [WIP] @session_01MEJxy43YMF4nTF8NEcP8Je-2026-11-05 19:42 **S4-1** biclosed.Functor sends terms to map_term whenever cod.ob subclasses biclosed.Ty, so any functor into rigid, pivotal, pregroup or Tensor raises …
 - [WIP] @session_01MEJxy43YMF4nTF8NEcP8Je-2026-11-05 19:42 **S4-2** Every closed functor recurses forever on the unitype U, the identity functor included, because the Exp branch maps U.base == U first.

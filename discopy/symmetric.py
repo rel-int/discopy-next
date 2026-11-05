@@ -255,7 +255,8 @@ class Diagram(balanced.Diagram, SymmetricCategory):
     Note
     ----
     As for :class:`discopy.balanced.Diagram`, our symmetric diagrams are traced
-    by default. However now we have that the axioms for trace hold on the nose.
+    by default. However now the axioms for trace hold, up to the hypergraph of
+    each side: see :class:`Equation`.
 
     Note
     ----
@@ -328,8 +329,8 @@ class Diagram(balanced.Diagram, SymmetricCategory):
         Parameters:
             xs : A permutation, as a sequence of integers or a
                  :class:`finset.Permutation`.
-            dom : A type of the same length as :code:`xs`,
-                  default is :code:`Nat(len(xs))`.
+            doms : A sequence of types of the same length as :code:`xs`,
+                   default is :code:`Nat(len(xs))`.
         """
 
         types = Nat(len(xs)) if doms is None else doms

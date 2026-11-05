@@ -137,7 +137,7 @@ class Diagram(braided.Diagram, feedback.Diagram, BalancedCategory):
     balanced category does have the desired cancellation property and it does
     in fact embed faithfully into the free balanced traced category.
 
-    .. _nLab: https://ncatlab.org/nlab/show/traced+monoidal+category)
+    .. _nLab: https://ncatlab.org/nlab/show/traced+monoidal+category
     """
     ob = Ty
     yanking = BalancedCategory.yanking.failing(messages.FREE_YANKING)
@@ -196,7 +196,7 @@ class Diagram(braided.Diagram, feedback.Diagram, BalancedCategory):
 
 class Box(braided.Box, feedback.Box, Diagram):
     """
-    A braided box is a monoidal box in a braided diagram.
+    A balanced box is a braided box and a feedback box in a balanced diagram.
 
     Parameters:
         name (str) : The name of the box.
@@ -283,7 +283,7 @@ class Twist(Box):
 
     Parameters:
         dom : the domain of the twist.
-        phase: the phase of the twist in integer multiples of ``2 * pi``.
+        is_dagger (bool) : Whether this is the inverse twist.
 
     Important
     ---------
