@@ -426,6 +426,10 @@ class Copy(ClassicalGate):
     def from_tree(cls, tree: dict):
         return cls(tree.get('time_step', 0))
 
+    def __repr__(self):
+        time_step = f"time_step={self.time_step}" if self.time_step else ""
+        return f"{factory_name(type(self))}({time_step})"
+
     def dagger(self):
         return Match(self.time_step)
 
@@ -446,7 +450,7 @@ class Match(ClassicalGate):
         self.draw_as_spider, self.color = True, "black"
         self.drawing_name = ""
 
-    delay = Copy.delay
+    delay, __repr__ = Copy.delay, Copy.__repr__
     from_tree = classmethod(Copy.from_tree.__func__)
 
     def dagger(self):
@@ -593,6 +597,12 @@ class Ket(SelfConjugate, QuantumGate):
     def from_tree(cls, tree: dict):
         return cls(*tree['bitstring'], time_step=tree.get('time_step', 0))
 
+    def __repr__(self):
+        args = ', '.join(map(repr, self.bitstring))
+        time_step = f"time_step={self.time_step}" if self.time_step else ""
+        args = ", ".join(arg for arg in (args, time_step) if arg)
+        return f"{factory_name(type(self))}({args})"
+
     @property
     def bitstring(self):
         """ The bitstring of a Ket. """
@@ -643,6 +653,7 @@ class Bra(SelfConjugate, QuantumGate):
         self.affine = False
 
     delay, to_tree, rotate = Ket.delay, Ket.to_tree, Ket.rotate
+    __repr__ = Ket.__repr__
     from_tree = classmethod(Ket.from_tree.__func__)
 
     @property
@@ -1118,8 +1129,9 @@ class Scalar(Parametrized):
         super().__setstate__(state)
 
     def __repr__(self):
+        name = "" if self.name == "scalar" else f", {self.name!r}"
         time_step = f", time_step={self.time_step}" if self.time_step else ""
-        return super().__repr__()[:-1] + (
+        return super().__repr__()[:-1] + name + (
             ', is_mixed=True' if self.is_mixed else '') + time_step + ')'
 
     def setoid(self):
@@ -1207,6 +1219,10 @@ class MixedScalar(Scalar):
     @classmethod
     def from_tree(cls, tree: dict):
         return cls(tree['data'], tree.get('time_step', 0))
+
+    def __repr__(self):
+        time_step = f", time_step={self.time_step}" if self.time_step else ""
+        return Parametrized.__repr__(self)[:-1] + time_step + ")"
 
     def delay(self, n_steps=1):
         """
@@ -1302,7 +1318,8 @@ class Sqrt(Scalar):
         return super().setoid() + (self.is_dagger, )
 
     def __repr__(self):
-        return super().__repr__() + ("[::-1]" if self.is_dagger else "")
+        return MixedScalar.__repr__(self) + (
+            "[::-1]" if self.is_dagger else "")
 
 
 def sqrt(expr):

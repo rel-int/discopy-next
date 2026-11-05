@@ -234,7 +234,11 @@ def test_delay(gate):
 @mark.parametrize("gate", [
     CX, CCX, CRz(.5, distance=2), Controlled(H, distance=-2), CRx(.25).delay(),
     Bits(1, 0), Bits(1, 0).dagger(), Bits(1).delay(), Digits(2, dim=4),
-    Scalar(.5).delay(), Sqrt(-1).dagger().delay()], ids=str)
+    Scalar(.5).delay(), Sqrt(-1).dagger().delay(), Ket(1, 0), Bra(0),
+    Ket(0).delay(), Bra(1, 1).delay(2), Ket(0, 1) >> CX, Copy(),
+    Match().delay(), Copy() >> Match(), MixedScalar(.5),
+    MixedScalar(.5).delay(), Scalar(.5, 's'), Scalar(.5, 's', True, 1)],
+    ids=str)
 def test_eval_repr(gate):
     from discopy.quantum.circuit import Circuit
     assert eval(repr(gate), Circuit.environment()) == gate
