@@ -69,3 +69,14 @@ def test_tikzstyle_of_a_hexcode_has_no_hash(tmp_path):
     assert "style=336699_box" in tikz
     assert "\\tikzstyle{336699_box}" in styles
     assert "#" not in tikz + styles
+
+
+def test_tikzstyles_sit_beside_their_drawing(tmp_path):
+    folder = tmp_path / "dir.v2"
+    folder.mkdir()
+    for name in ["diagram.tikz", "diagram"]:
+        Box('f', Ty('x'), Ty('y')).draw(
+            path=folder / name, to_tikz=True, use_tikzstyles=True)
+    assert sorted(file.name for file in tmp_path.iterdir()) == ["dir.v2"]
+    assert sorted(file.name for file in folder.iterdir())\
+        == ["diagram", "diagram.tikz", "diagram.tikzstyles"]

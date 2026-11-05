@@ -1510,7 +1510,8 @@ class TikZ(Backend):
 
         if path is not None:
             if output_tikzstyle:
-                style_path = '.'.join(path.split('.')[:-1]) + '.tikzstyles'
+                style_path = os.path.splitext(os.fspath(path))[0]\
+                    + '.tikzstyles'
                 save(style_path, ["% Node styles\n"] + self.node_styles
                      + ["% Edge styles\n"] + self.edge_styles)
             save(path, begin + nodes + edges + end)
