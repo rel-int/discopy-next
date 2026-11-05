@@ -28,7 +28,7 @@ The fixes of rel-int/discopy-next#445 in `quantum` and `grammar`: bugs the revie
 - [x] **S11-5** categorial.tree2diagram gives `dom` only to a tree that is a single word:
 - [x] **S11-6** thue.Rule.__repr__ (reused by cfg.Rule) drops an empty name, so eval(repr(Rule(n, s, name=''))) rebuilds the default name 'Rule(n, s)' and compares …
 - [x] **S11-7** categorial.FX and BX docstrings name subterm types that do not compose (the documented pairs raise AxiomError)
-- [WIP] @session_01MEJxy43YMF4nTF8NEcP8Je-2026-11-05 19:42 **S11-8** pregroup.Diagram.normal_form drops its params on every input:
+- [x] **S11-8** pregroup.Diagram.normal_form drops its params on every input:
 - [WIP] @session_01MEJxy43YMF4nTF8NEcP8Je-2026-11-05 19:42 **S11-9** contextuality module Note says the gradient is zero on the non-contextual polytope (with a non-unique dual only on its boundary);
 - [WIP] @session_01MEJxy43YMF4nTF8NEcP8Je-2026-11-05 19:42 **S11-10** reservoir.Readout compares by identity (dataclass eq=False), so eval(repr(r)) != r even with `array` bound, and two identical fits compare unequal;
 - [WIP] @session_01MEJxy43YMF4nTF8NEcP8Je-2026-11-05 19:42 full suite and lint gates on the branch
