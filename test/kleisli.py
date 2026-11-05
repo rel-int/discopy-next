@@ -161,9 +161,19 @@ def test_pack():
     assert multiplicative.pack_value(()) == Row()
     assert multiplicative.pack_value((1, )) == 1
     assert multiplicative.pack_value((1, 2)) == Row(1, 2)
-    assert multiplicative.unpack_value(Row()) == ()
-    assert multiplicative.unpack_value(1) == (1, )
-    assert multiplicative.unpack_value(Row(1, 2)) == (1, 2)
+    assert multiplicative.unpack_value(Row(), ()) == ()
+    assert multiplicative.unpack_value(1, (int, )) == (1, )
+    assert multiplicative.unpack_value(Row(1, 2), (int, int)) == (1, 2)
+    assert multiplicative.unpack_value(Row(1, 2), (Row, )) == (Row(1, 2), )
+
+
+def test_multiplicative_one_wire_carries_a_Row_whole():
+    Safe = multiplicative.Channel[Maybe]
+    size = Safe(lambda row: len(row.values), (Row, ), (int, ))
+    pair = Safe(lambda n: Row(n, n), (int, ), (Row, ))
+    assert size(Row(1, 2)) == 2 == (pair >> size)(1)
+    assert (pair @ (int, ))(3, 4) == (Row(3, 3), 4)
+    assert ((int, ) @ pair)(4, 3) == (4, Row(3, 3))
 
 
 def test_multiplicative_Channel_tensor():
@@ -424,8 +434,18 @@ def test_additive_pack():
     assert additive.pack((int, str)) is Tagged
     assert additive.pack_value("x", 0, (str, )) == "x"
     assert additive.pack_value("x", 1, (int, str)) == Tagged("x", 1)
-    assert additive.unpack_value("x") == ("x", 0)
-    assert additive.unpack_value(Tagged("x", 1)) == ("x", 1)
+    assert additive.unpack_value("x", (str, )) == ("x", 0)
+    assert additive.unpack_value(Tagged("x", 1), (int, str)) == ("x", 1)
+
+
+def test_additive_one_wire_carries_a_Tagged_whole():
+    Safe = additive.Channel[Maybe]
+    tag = Safe(lambda tagged: tagged.tag, (Tagged, ), (int, ))
+    wrap = Safe(lambda n: Tagged(n, 1), (int, ), (Tagged, ))
+    assert tag(Tagged("x", 1)) == 1 == (wrap >> tag)(5)
+    assert (wrap @ wrap)(5) == Tagged(Tagged(5, 1), 0)
+    assert additive.injection(0, (Tagged, ), (Tagged, int))(
+        Tagged("x", 1)) == Tagged(Tagged("x", 1), 0)
 
 
 def test_additive_injection():

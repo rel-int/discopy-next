@@ -185,21 +185,24 @@ def pack_value(value, tag: int, ty: Ty):
     return value if len(Ty.cast(ty)) == 1 else Tagged(value, tag)
 
 
-def unpack_value(value) -> tuple:
+def unpack_value(value, ty: Ty) -> tuple:
     """
-    Turn a value of a packed type back into a pair of a value and its tag,
-    inverse to :func:`pack_value`.
+    Turn a value of :func:`pack` of ``ty`` back into a pair of a value and
+    its tag, inverse to :func:`pack_value`.
 
     Parameters:
         value : The value to unpack.
+        ty : The disjoint union of wire types.
 
     Example
     -------
-    >>> assert unpack_value(Tagged("x", 1)) == ("x", 1)
-    >>> assert unpack_value("x") == ("x", 0)
+    >>> assert unpack_value(Tagged("x", 1), (int, str)) == ("x", 1)
+    >>> assert unpack_value("x", (str, )) == ("x", 0)
+    >>> assert unpack_value(Tagged("x", 1), (Tagged, )) == (Tagged("x", 1), 0)
     """
-    return (value.value, value.tag) if isinstance(value, Tagged)\
-        else (value, 0)
+    if len(Ty.cast(ty)) == 1 or not isinstance(value, Tagged):
+        return value, 0
+    return value.value, value.tag
 
 
 def injection(offset: int, source: Ty, target: Ty) -> function.Function:
@@ -218,7 +221,7 @@ def injection(offset: int, source: Ty, target: Ty) -> function.Function:
     >>> assert injection(0, (int, str), (int, ))(Tagged(42, 0)) == 42
     """
     def inside(value):
-        value, tag = unpack_value(value)
+        value, tag = unpack_value(value, source)
         return pack_value(value, tag + offset, target)
     return function.Function(inside, pack(source), pack(target))
 
@@ -273,7 +276,7 @@ class Channel[monad](TracedCategory, ComarkovCategory, NamedGeneric):
         packed_cls = channel.Channel[monad]  # ty: ignore[invalid-type-form]
 
         def call(value):
-            value, tag = unpack_value(value)
+            value, tag = unpack_value(value, dom)
             return inside(value) if len(dom) == 1 else inside(value, tag)
         self.inside = inside if isinstance(inside, packed_cls) else\
             packed_cls(call, pack(dom), pack(cod))
@@ -412,10 +415,10 @@ class Channel[monad](TracedCategory, ComarkovCategory, NamedGeneric):
         dom, cod = self.dom[:-n], self.cod[:-n]
 
         def step(value):
-            value, tag = unpack_value(value)
+            value, tag = unpack_value(value, self.cod)
             return self(value, tag - len(cod) + len(dom))
         resolve = monad.iterate(
-            step, lambda value: unpack_value(value)[1] < len(cod))
+            step, lambda value: unpack_value(value, self.cod)[1] < len(cod))
         exit_ = monad(injection(0, self.cod, cod))
         return type(self)(
             lambda obj, tag=0: exit_(resolve(self(obj, tag))), dom, cod)
