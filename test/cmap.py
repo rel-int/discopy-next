@@ -316,6 +316,22 @@ def test_diagram_to_map_structure_and_errors():
         frobenius.Diagram.spiders(1, 2, x), )
 
 
+def test_copy_is_the_map_of_the_copy_of_its_category():
+    from discopy import markov, tensor
+    M, D = markov.CMap, markov.Diagram
+    x, y = map(markov.Ty, "xy")
+    assert M.copy(x, 1) == M.id(x)
+    assert M.copy(x @ y) == D.copy(x @ y).to_map()
+    assert M.discard(x @ y).boxes == (D.discard(x), D.discard(y))
+    diagram = markov.Box("f", x, x) @ y >> D.copy(x @ y)
+    assert len(diagram.to_map().to_diagram().to_map().boxes) == 3
+    x, y = map(comarkov.Ty, "xy")
+    assert comarkov.CMap.merge(x @ y)\
+        == comarkov.Diagram.merge(x @ y).to_map()
+    spiders = tensor.CMap.spiders(1, 2, tensor.Dim(2, 3))
+    assert {type(box) for box in spiders.boxes} == {tensor.Spider}
+
+
 def test_rigid_handedness():
     from discopy import cmap, rigid
 

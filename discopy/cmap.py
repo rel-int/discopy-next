@@ -56,7 +56,7 @@ from itertools import accumulate, product
 from math import inf, lcm
 from typing import TYPE_CHECKING, Literal, Self
 
-from discopy import hypergraph, messages
+from discopy import cat, hypergraph, messages
 from discopy.abc import (
     BalancedCategory,
     BraidedCategory,
@@ -1220,22 +1220,32 @@ class CMap[category](
 
     @classmethod
     def copy(cls, typ: "Ty", n: int = 2) -> "CMap":
-        """ Copy is kept as a box: one input cannot wire to many outputs. """
-        return cls.from_box(cls.category.copy(typ, n))
+        """
+        The map of the copy of the host category, where the copy of an
+        atomic object is kept as a box: one input cannot wire to many outputs.
+        """
+        copy = cls.category.copy(typ, n)
+        return cls.from_box(copy) if len(typ) == 1\
+            and isinstance(copy, cat.Box) else cls.from_diagram(copy)
 
     @classmethod
     def merge(cls, typ: "Ty", n: int = 2) -> "CMap":
-        """ Merge is kept as a box: many inputs cannot wire to one output. """
-        return cls.from_box(cls.category.merge(typ, n))
+        """
+        The map of the merge of the host category, where the merge of an
+        atomic object is kept as a box: many inputs cannot wire to one output.
+        """
+        merge = cls.category.merge(typ, n)
+        return cls.from_box(merge) if len(typ) == 1\
+            and isinstance(merge, cat.Box) else cls.from_diagram(merge)
 
     @classmethod
     def discard(cls, typ: "Ty") -> "CMap":
-        """ Discard is kept as a box. """
+        """ Discard keeps a box per atomic object, see :meth:`copy`. """
         return cls.copy(typ, 0)
 
     @classmethod
     def noise(cls, typ: "Ty") -> "CMap":
-        """ Noise is kept as a box. """
+        """ Noise keeps a box per atomic object, see :meth:`merge`. """
         return cls.merge(typ, 0)
 
     @classmethod
@@ -1322,7 +1332,8 @@ class CMap[category](
             cls, n_legs_in: int, n_legs_out: int,
             typ: "Ty", phases=None) -> "CMap":
         """
-        Spiders are kept as boxes, including their phase data.
+        Spiders are kept as boxes on each atomic object, including their
+        phase data.
 
         Example
         -------
@@ -1330,8 +1341,9 @@ class CMap[category](
         >>> assert CMap.spiders(1, 2, Dim(2, 3)).eval().is_close(
         ...     Tensor.spiders(1, 2, Dim(2, 3)))
         """
-        return cls.from_box(cls.category.spiders(
-            n_legs_in, n_legs_out, typ, phases))
+        spiders = cls.category.spiders(n_legs_in, n_legs_out, typ, phases)
+        return cls.from_box(spiders) if len(typ) == 1\
+            and isinstance(spiders, cat.Box) else cls.from_diagram(spiders)
 
     @unbiased
     def then(self, other: "CMap") -> "CMap":
