@@ -73,7 +73,6 @@ Bits, digits, & selection
     PostselectDigit
     DiscardBit
     DiscardMode
-    Select
     Digit
     Bit
     Id
@@ -122,8 +121,8 @@ and feed the result into a controlled quantum gate.
 **3. Arithmetic on natural-number modes**
 
 >>> num = Digit(3, 2)
->>> add = Add(2)                     # (x,y,z) => x+y+z
->>> parity = add >> Mod2()            # outputs (x+y+z) mod 2 as a bit
+>>> add = Add(2)                     # (x, y) => x + y
+>>> parity = add >> Mod2()            # outputs (x + y) mod 2 as a bit
 >>> post = PostselectBit(1)
 >>> assert np.allclose(
 ...     (num >> parity >> post).double().to_tensor().eval().array, 1
