@@ -138,6 +138,8 @@ class Diagram(pivotal.Diagram, balanced.Diagram, RibbonCategory):
         """
         if min(x, y) < 0 or max(x, y) >= len(self.cod):
             raise ValueError(f'Indices {x, y} are out of range.')
+        if x == y:
+            raise ValueError(f'A cup joins two distinct wires, got {x, y}.')
         x, y = min(x, y), max(x, y)
         for i in range(x, y - 1):
             braid = self.braid_factory(self.cod[i], self.cod[i + 1])

@@ -118,6 +118,14 @@ def test_rotation_is_well_typed():
         == DualRailCap(y.r @ y.r, x.r @ x.r, is_dagger=True)
 
 
+def test_cup_joins_two_distinct_wires():
+    from pytest import raises
+    n = Ty('n')
+    for i in range(2):
+        with raises(ValueError, match="distinct"):
+            Id(n @ n.r).cup(i, i)
+
+
 def test_to_hypergraph():
     # A twist is not the identity: it stays a box of the hypergraph.
     x = Ty('x')
