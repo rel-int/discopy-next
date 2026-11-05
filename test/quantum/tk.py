@@ -78,7 +78,8 @@ def test_controlled_gates_to_tk():
     gates += [
         Controlled(CX, distance=-1),
         Controlled(Controlled(X, distance=-1), distance=2),
-        Controlled(X, distance=3)]
+        Controlled(X, distance=3),
+        CY.l, CY.r, Controlled(Y, distance=2).l]
     for gate in gates:
         unitary = gate.to_tk().get_unitary()
         assert np.allclose(unitary, gate.eval().array.reshape(unitary.shape).T)
@@ -86,6 +87,7 @@ def test_controlled_gates_to_tk():
         assert np.allclose(
             Circuit.from_tk(gate.to_tk())[n:-n].eval().array,
             gate.eval().array)
+    assert np.allclose(Y.r.to_tk().get_unitary(), Y.r.eval().array.T)
     with raises(NotImplementedError):
         CCZ.to_tk()
 

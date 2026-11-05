@@ -5,7 +5,7 @@
 The fixes of rel-int/discopy-next#445 in `quantum` and `grammar`: bugs the review confirmed that need no design decision, one commit and one regression test each.
 
 - [x] **S10-1** channel.Functor doubles a pure box's raw array, ignoring is_dagger and z.
-- [WIP] @session_01MEJxy43YMF4nTF8NEcP8Je-2026-11-05 19:42 **S10-3** to_tk ignores box.z: a transposed Y (Y.r == -Y) is emitted as Y.
+- [x] **S10-3** to_tk ignores box.z: a transposed Y (Y.r == -Y) is emitted as Y.
 - [WIP] @session_01MEJxy43YMF4nTF8NEcP8Je-2026-11-05 19:42 **S10-4** SelfConjugate.rotate is the dagger and SelfConjugate.conjugate is self, and neither reverses the wires.
 - [WIP] @session_01MEJxy43YMF4nTF8NEcP8Je-2026-11-05 19:42 **S10-5** to_tk measures Measure(override_bits=True) into a tket bit that classical post-processing reads afterwards.
 - [WIP] @session_01MEJxy43YMF4nTF8NEcP8Je-2026-11-05 19:42 **S10-6** Circuit.eval(backend=..., measure_all=True), which the eval docstring recommends for unitary circuits, raises IndexError on any real backend.

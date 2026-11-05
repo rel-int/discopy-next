@@ -296,6 +296,10 @@ def to_tk(circuit):
             op = op.dagger
         tk_circ.add_gate(op, controls + [
             qubits[offset + j] for j in range(len(box.dom))])
+        if box.z and box.name == "Y" and controls:
+            tk_circ.Z(*controls)
+        elif box.z and box.name == "Y":
+            tk_circ.add_phase(1)
 
     circuit = Functor(ob_map=lambda x: x, ar_map=remove_ket1)(circuit)
     for layer in circuit.inside:
