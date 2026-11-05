@@ -255,9 +255,9 @@ def test_circuit2zx():
     gadget = [Z(1, 2), Z(1, 2), X(2, 1), Z(1, 0), scalar(2 ** 0.5)]
     assert circuit2zx(circuit) == Diagram.decode(
         dom=Nat(0), boxes_and_offsets=zip(
-            [X(0, 1), X(0, 1), scalar(0.5), H, X(1, 1)]
+            [X(0, 1), X(0, 1), scalar(0.5), H, X(1, 1), scalar(1)]
             + gadget + [H] + gadget + [H] + gadget,
-            [0, 1, 2, 0, 1]
+            [0, 1, 2, 0, 1, 2]
             + [0, 2, 1, 1, 2] + [1] + [0, 2, 1, 1, 2] + [1] + [0, 2, 1, 1, 2]))
 
     # Verify XYZ=iI
@@ -382,15 +382,13 @@ def test_eval_circuit2zx(random_had_cnot_diagram):
         quantum.gates.Sqrt(-1).dagger(), Circuit.cups(qubit, qubit),
         Circuit.spiders(0, 1, qubit), CU1(.3).dagger(), CRz(.3).dagger(),
         CRx(.3).dagger(), Controlled(quantum.X, distance=-2),
-        Controlled(quantum.Z, distance=2), random_had_cnot_diagram(3, 20)]
+        Controlled(quantum.Z, distance=2), random_had_cnot_diagram(3, 20),
+        Rz(.3), Rx(.3), Rz(.3) + Rz(-.3), Rx(.3) + Rx(-.3)]
     for gate in controlled + gates:
         diagram = circuit2zx(gate)
         assert (diagram.dom, diagram.cod)\
             == (Nat(len(gate.dom)), Nat(len(gate.cod)))
         assert diagram.eval().is_close(gate.eval())
-    for rotation in (Rz(.3), Rx(.3)):
-        assert proportional(circuit2zx(rotation).eval().array,
-                            rotation.eval().array)
 
 
 def test_to_hypergraph():
