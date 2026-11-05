@@ -454,6 +454,18 @@ def test_subs_forms_and_data():
         == [psi, phi, sympy.Matrix([[0]])]
 
 
+def test_subs_key_not_a_symbol():
+    sympy = pytest.importorskip("sympy")
+    from sympy.abc import phi, psi
+    x, sin = Ob('x'), sympy.sin(phi)
+    f, g = Box('f', x, x, data=sin + psi), Box('g', x, x, data=phi + psi)
+    assert f.subs(sin, 0).data == psi and g.subs(phi + psi, 0).data == 0
+    assert f.subs({sin: 0, psi: 1}).data == 1
+    assert (f >> g).subs(sin, 0) == f.subs(sin, 0) >> g
+    bubble = Bubble(f, data=sin).subs(sin, 0)
+    assert bubble == Bubble(f.subs(sin, 0)) and bubble.data == 0
+
+
 def test_Sum():
     x, y, z = map(Ob, "xyz")
     f = Box('f', x, y)

@@ -651,11 +651,9 @@ class Box(Arrow):
         return recursive_free_symbols(self.data)
 
     def subs(self, *args) -> Box:
-        variables = tuple(self.free_symbols)
-        values = rsubs(variables, *args)
-        if all(x is y for x, y in zip(values, variables)):
+        if not self.free_symbols:
             return self
-        return self.lambdify(*variables)(*values)
+        return self.rebuild(data=rsubs(self.data, *args))
 
     def lambdify(self, *symbols: "sympy.Symbol", **kwargs) -> Callable:
         if not self.free_symbols & set(symbols):
@@ -977,6 +975,14 @@ one, they have [cat.Ob('x'), cat.Ob('y')].
     @property
     def free_symbols(self):
         return super().free_symbols.union(*[f.free_symbols for f in self.args])
+
+    def subs(self, *args) -> Bubble:
+        if not self.free_symbols:
+            return self
+        changes = {"args": tuple(arg.subs(*args) for arg in self.args)}
+        if self.data is not None:
+            changes["data"] = rsubs(self.data, *args)
+        return self.rebuild(**changes)
 
     def lambdify(self, *symbols: "sympy.Symbol", **kwargs) -> Callable:
         if not set(symbols) & self.free_symbols:
