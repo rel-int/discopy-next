@@ -69,6 +69,7 @@ exchanges.
 
 from __future__ import annotations
 
+import functools
 import itertools
 import math
 import random
@@ -244,6 +245,7 @@ class Cyclic[n](NamedGeneric, FiniteGroup):
         return cls(rng.randrange(cls.n))
 
     @classmethod
+    @functools.cache
     def action(cls):
         rotation = Permutation(((i + 1) % cls.n for i in range(cls.n)), cls.n)
         return Action(cls, cls.n, (rotation, ))
@@ -320,6 +322,7 @@ class Symmetric[n](NamedGeneric, FiniteGroup):
         return cls(rng.sample(range(cls.n), cls.n))
 
     @classmethod
+    @functools.cache
     def action(cls):
         return Action(cls, cls.n, tuple(g.inside for g in cls.generators()))
 
@@ -386,6 +389,7 @@ class Product[left, right](NamedGeneric, FiniteGroup):
         return cls(cls.left.sample(rng), cls.right.sample(rng))
 
     @classmethod
+    @functools.cache
     def action(cls, left: Action | None = None,
                right: Action | None = None) -> Action:
         """
@@ -508,6 +512,7 @@ class Wreath[base, top](NamedGeneric, FiniteGroup):
                    cls.top.sample(rng))
 
     @classmethod
+    @functools.cache
     def action(cls, base: Action | None = None, power: bool = False) -> Action:
         """
         An action of the wreath product given an action of ``base`` on
