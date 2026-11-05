@@ -69,7 +69,7 @@ jobs:
         uv run ty check --exit-zero-on-warning
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 25   # backstop: ~12 min on 3.14, ~18 on 3.12 and 3.13 since the optyx notebooks (#338)
+    timeout-minutes: 40   # backstop: green runs take 13-25 min on 3.12 and 3.13, the runner alone varying ~2x (#439)
     strategy:
       matrix:
         python-version: [ "3.12", "3.13", "3.14" ]
