@@ -133,13 +133,13 @@ def _std_basis_v(*c):
 
 def test_circuit2zx():
     circuit = Ket(0, 0) >> quantum.H @ Rx(0) >> CRz(0) >> CRx(0) >> CU1(0)
+    gadget = [Z(1, 2), Z(1, 2), X(2, 1), Z(1, 0), scalar(2 ** 0.5)]
     assert qubits.Circuit(circuit).get_kraus() == Diagram.decode(
-        dom=Bit(0), boxes_and_offsets=zip([
-            X(0, 1), X(0, 1), scalar(0.5), H, X(1, 1),
-            Z(1, 2), Z(1, 2), X(2, 1), Z(1, 0), scalar(2 ** 0.5),
-            X(1, 2), X(1, 2), Z(2, 1), X(1, 0), scalar(2 ** 0.5),
-            Z(1, 2), Z(1, 2), X(2, 1), Z(1, 0)],
-            [0, 1, 2, 0, 1, 0, 2, 1, 1, 2, 0, 2, 1, 1, 2, 0, 2, 1, 1]))
+        dom=Bit(0), boxes_and_offsets=zip(
+            [X(0, 1), X(0, 1), scalar(0.5), H, X(1, 1)]
+            + gadget + [H] + gadget + [H] + gadget,
+            [0, 1, 2, 0, 1]
+            + [0, 2, 1, 1, 2] + [1] + [0, 2, 1, 1, 2] + [1] + [0, 2, 1, 1, 2]))
 
     # Verify XYZ=iI
     circuit = quantum.Z >> quantum.Y >> quantum.X
@@ -152,8 +152,8 @@ def test_circuit2zx():
     t = qubits.Circuit(circuit).to_pyzx().to_matrix()
     assert np.isclose(np.linalg.norm(t - 1j * np.eye(2)), 0)
 
-    # with raises(NotImplementedError):
-    #     circuit2zx(quantum.scalar(1, is_mixed=True))
+    with raises(NotImplementedError):
+        qubits.Circuit(quantum.scalar(1, is_mixed=True))
 
     circuit = Ket(0)
     t = qubits.Circuit(circuit).to_pyzx().to_matrix() - _std_basis_v(0)

@@ -532,7 +532,7 @@ class QubitChannel(Channel):
         """Turns gates into ZX diagrams."""
         # pylint: disable=import-outside-toplevel
         from discopy.quantum.gates import (
-            Rz, Rx,
+            Rz, Rx, U1,
             CX, CZ, Controlled  # , Digits
         )
         from discopy.quantum.gates import (
@@ -554,21 +554,19 @@ class QubitChannel(Channel):
             return (Z if isinstance(discopy_circuit, Rz)
                     else X)(1, 1, discopy_circuit.phase)
         if isinstance(discopy_circuit,
-                      Controlled) and discopy_circuit.name.startswith("CRz"):
-            return (
+                      Controlled) and discopy_circuit.distance != 1:
+            # pylint: disable=protected-access
+            return Circuit(discopy_circuit._decompose())
+        if isinstance(discopy_circuit, Controlled) and isinstance(
+                discopy_circuit.controlled, (Rz, Rx)):
+            gadget = (
                 Z(1, 2) @ Z(1, 2, discopy_circuit.phase / 2)
                 >> Id(1) @
                 (X(2, 1) >> Z(1, 0, -discopy_circuit.phase / 2)) @
                 Id(1) @ root2
             )
-        if isinstance(discopy_circuit,
-                      Controlled) and discopy_circuit.name.startswith("CRx"):
-            return (
-                X(1, 2) @ X(1, 2, discopy_circuit.phase / 2)
-                >> Id(1) @
-                (Z(2, 1) >> X(1, 0, -discopy_circuit.phase / 2)) @
-                Id(1) @ root2
-            )
+            return gadget if isinstance(discopy_circuit.controlled, Rz)\
+                else Id(1) @ H() >> gadget >> Id(1) @ H()
         # if isinstance(discopy_circuit, Digits):
         #     dgrm = Diagram.id(bit**0)
         #     # pylint: disable=invalid-name
@@ -579,20 +577,21 @@ class QubitChannel(Channel):
         #             )
         #      dgrm @= classical.X(0, 1, 0.5**d) @ classical.Scalar(0.5**0.5)
         #     return dgrm
-        if isinstance(discopy_circuit, quantum_discopy.CU1):
+        if isinstance(discopy_circuit, Controlled) and isinstance(
+                discopy_circuit.controlled, U1):
             return (
-                Z(1, 2, discopy_circuit.phase) @
-                Z(1, 2, discopy_circuit.phase) >>
+                Z(1, 2, discopy_circuit.phase / 2) @
+                Z(1, 2, discopy_circuit.phase / 2) >>
                 Id(1) @
-                (X(2, 1) >> Z(1, 0, -discopy_circuit.phase)) @
-                Id(1)
+                (X(2, 1) >> Z(1, 0, -discopy_circuit.phase / 2)) @
+                Id(1) @ root2
             )
         if isinstance(discopy_circuit, GatesScalar):
+            if discopy_circuit.is_mixed:
+                raise NotImplementedError(
+                    "Converting a mixed scalar to QubitChannel "
+                    "is not implemented.")
             return Scalar(discopy_circuit.data)
-        if isinstance(discopy_circuit,
-                      Controlled) and discopy_circuit.distance != 1:
-            # pylint: disable=protected-access
-            return Circuit(discopy_circuit._decompose())
         # if isinstance(discopy_circuit, quantum_discopy.Discard):
         #     return Discard(len(discopy_circuit.dom))
         # if isinstance(discopy_circuit, quantum_discopy.Measure):
@@ -617,6 +616,7 @@ class QubitChannel(Channel):
                 "Converting Encode to QubitChannel is not implemented."
             )
         standard_gates = {
+            quantum_discopy.SWAP: Diagram.swap(qubit, qubit),
             quantum_discopy.H: H(),
             quantum_discopy.Z: Z(1, 1, 0.5),
             quantum_discopy.X: X(1, 1, 0.5),

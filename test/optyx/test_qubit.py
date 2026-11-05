@@ -5,6 +5,8 @@ from pytket import Circuit
 from pytket.utils import probs_from_counts
 from discopy.optyx import channel
 from discopy.optyx.core import zx
+from discopy.quantum.gates import (
+    CRx, CRz, CU1, CX, CZ, SWAP, U1, Controlled, Rx, Rz)
 import numpy as np
 
 def _extract(graph):
@@ -198,6 +200,22 @@ def test_discopy_circuits_with_bits():
         qubits.Circuit(circuit.Id(circuit.Ty(circuit.Qudit(3))))
     with pytest.raises(NotImplementedError, match="Encode"):
         qubits.Circuit(circuit.Encode())
+
+
+@pytest.mark.parametrize("gate", [
+    CX, CZ, SWAP, Rz(.3), Rx(.3), CRz(.3), CRx(.3), CU1(.3),
+    CRz(.3, distance=-1), CRx(.3, distance=-1), CU1(.3, distance=-1),
+    CRz(.3, distance=2), CU1(.3, distance=2), Controlled(U1(.3), distance=2),
+], ids=str)
+def test_discopy_gates_keep_their_unitary_up_to_a_global_phase(gate):
+    n = 2 ** len(gate.dom)
+    expected = np.asarray(gate.eval().array, dtype=complex).reshape(n, n)
+    actual = np.asarray(
+        qubits.Circuit(gate).get_kraus().to_tensor().eval().array,
+        dtype=complex).reshape(n, n)
+    phase = np.vdot(actual, expected) / n
+    assert np.isclose(abs(phase), 1)
+    assert np.allclose(phase * actual, expected)
 
 
 def test_encode_is_the_ket_of_its_bit():
