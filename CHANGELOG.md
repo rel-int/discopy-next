@@ -688,7 +688,8 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 - Coverage's 98% gate reads `discopy/` alone, new tests bring `ehypergraph` to
   100%, and pytest imports by path, so `test/abc.py` is collected ([next#31]).
 - `ruff check` and `ty check` lint beside `pylint`, each failing on every rule
-  `main` passes, the rules it breaks listed in `pyproject.toml` ([next#263]).
+  `main` passes, the rules it breaks listed in `pyproject.toml` ([next#263]),
+  and `E714` and `RUF022` leave that list ([next#438]).
 
 ## [1.2.2] - 2025-12-19
 
@@ -948,6 +949,7 @@ for the changelog of `1.2.1` and earlier.
 [next#422]: https://github.com/rel-int/discopy-next/issues/422
 [next#426]: https://github.com/rel-int/discopy-next/issues/426
 [next#411]: https://github.com/rel-int/discopy-next/pull/411
+[next#438]: https://github.com/rel-int/discopy-next/issues/438
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#56]: https://github.com/rel-int/optyx/pull/56
