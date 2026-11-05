@@ -1818,11 +1818,20 @@ class CQMap(Diagram, frobenius.Box):
         :math:`F(\mathbb{C}^d)`,
         obtain a map on :math:`F(\mathbb{C})^{\widetilde{\otimes} d}`.
         """
+        def interleave(ty, inflated):
+            perm = []
+            for ob in ty:
+                n = len(perm)
+                perm += [n + i + j * d for i in range(d) for j in (0, 1)]\
+                    if ob.needs_inflation() else range(n, n + len(ob.double()))
+            return diagram.Diagram.permutation(perm, inflated)
 
+        density_matrix = self.density_matrix.inflate(d)\
+            if self.needs_inflation() else self.density_matrix
         return CQMap(
             name=self.name + f"^{d}",
-            density_matrix=self.density_matrix.inflate(d) if
-            self.needs_inflation() else self.density_matrix,
+            density_matrix=interleave(self.dom, density_matrix.dom).dagger()
+            >> density_matrix >> interleave(self.cod, density_matrix.cod),
             dom=self.dom.inflate(d),
             cod=self.cod.inflate(d)
         )

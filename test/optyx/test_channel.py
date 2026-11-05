@@ -3,7 +3,7 @@ import pytest
 from discopy.optyx.channel import *
 from sympy.abc import x, y
 from discopy.optyx.channel import (
-    CQMap, Channel, Diagram, Encode, Measure, Permutation,
+    CQMap, Channel, Diagram, Encode, Measure, Observable, Permutation,
     bit, mode, qmode, qubit)
 from discopy.optyx import photonic
 from discopy.optyx.core import diagram, zw, zx
@@ -123,7 +123,8 @@ def test_from_bosonic_op():
 def test_observables_agree_with_their_samples():
     from discopy.optyx.channel import Observable, Discard, Diagram, qmode, qubit
     from discopy.optyx import photonic, qubits
-    hom = photonic.Create(1, 1) >> photonic.BS
+    hom = photonic.Create(
+        1, 1, internal_states=([1, 0], [1, 0])) >> photonic.BS
     number = Observable(Diagram.from_bosonic_operator(
         2, ((0, False), (0, True))))
     counted = Observable(function=lambda n: n[0], dom=qmode @ qmode)
@@ -245,6 +246,24 @@ def test_inflate_keeps_the_environment():
     distribution = lossy.inflate(2).eval().prob_dist()
     for key, value in expected.items():
         assert np.isclose(distribution[key], value)
+
+
+def test_cq_map_inflates_as_the_channel_of_its_density_matrix():
+    from discopy.optyx import qubits
+    create = qubits.Ket(0) @ photonic.Create(
+        1, 1, internal_states=([1, 0], [0, 1]))
+    circuit = qubits.H() @ (photonic.Phase(.2) @ qmode >> photonic.BS)
+    measure = qubits.Measure(1) @ photonic.NumberResolvingMeasurement(2)
+    cq_map = CQMap("cq", circuit.double(), circuit.dom, circuit.cod)
+    expected = (create >> circuit >> measure).inflate(2).eval().prob_dist()
+    actual = (create >> cq_map >> measure).inflate(2).eval().prob_dist()
+    for key, value in expected.items():
+        assert np.isclose(actual[key], value)
+    hom = photonic.Create(
+        1, 1, internal_states=([1, 0], [1, 0])) >> photonic.BS
+    trace = Observable(function=lambda n: 1, dom=qmode @ qmode)
+    assert np.isclose(
+        (hom >> trace).inflate(2).double().to_tensor().eval().array, 1)
 
 
 def test_from_callable_calls_a_channel_diagram():
