@@ -334,12 +334,14 @@ def test_Hypergraph_eq_fast_path_trace():
     fast canonical-form path rather than falling back to VF2. """
     x, y, z = map(Ty, "xyz")
     g = Box('g', x @ z, y @ z).to_hypergraph()
-    trace = g.trace()
+    h = Box('h', y @ z, x @ z).to_hypergraph()
+    trace = (g >> h).trace()
 
     assert trace.is_acyclic is False
     assert trace.is_fast_eligible
 
-    shuffled = trace.interchange(0, min(1, len(trace.boxes) - 1))
+    shuffled = trace.interchange(0, 1)
+    assert shuffled.boxes != trace.boxes
     assert trace == shuffled
     assert hash(trace) == hash(shuffled)
 
@@ -347,14 +349,13 @@ def test_Hypergraph_eq_fast_path_trace():
 def test_Hypergraph_eq_fallback_scalars_and_empty_boundary():
     """ Hypergraphs that are not boundary-connected (scalars, closed
     diagrams) must still compare correctly via the VF2 fallback. """
-    scalar_a = Box('s', Ty(), Ty()).to_hypergraph()
-    scalar_b = Box('s', Ty(), Ty()).to_hypergraph()
-    assert not (scalar_a @ scalar_b).is_fast_eligible
-    assert scalar_a @ scalar_b == scalar_b @ scalar_a
+    s, t, u = (Box(name, Ty(), Ty()).to_hypergraph() for name in "stu")
+    assert not (s @ t).is_fast_eligible
+    assert s @ t == t @ s and s @ t != s @ u
 
     x = Ty('x')
-    f = Box('f', x, x).to_hypergraph()
-    assert f.trace() == f.trace()
+    f, g = (Box(name, x, x).to_hypergraph() for name in "fg")
+    assert f.trace() == f.trace() and f.trace() != g.trace()
 
 
 def test_Hypergraph_simplify_two_wires():
