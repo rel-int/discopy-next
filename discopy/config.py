@@ -1,7 +1,14 @@
 # -*- coding: utf-8 -*-
 
 """
-DisCoPy configuration, i.e. module-level settings read at call time.
+DisCoPy configuration, i.e. module-level settings.
+
+Only ``OVERRIDE_DOCTEST_IMAGES`` and ``MAX_EINSUM_INDICES`` are always read
+at call time. ``DEFAULT_BACKEND``, ``TRANSPARENT`` and ``RIBBON_FOLD_DEPTH``,
+some uses of ``NUMPY_THRESHOLD`` and ``DRAWING_DEFAULT``, and the dicts, are
+bound when the modules that use them are imported: mutate the dicts in place
+rather than rebinding them, and change the backend with
+:func:`discopy.matrix.set_backend`.
 
 * ``DEFAULT_BACKEND``: the array backend of :class:`discopy.matrix.Matrix`
   and :class:`discopy.tensor.Tensor`.

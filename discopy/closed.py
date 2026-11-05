@@ -3,8 +3,8 @@
 The free closed markov category, i.e. with copy, discard, exponentials and
 products that are not strictly associative.
 
-Its morphisms are also written as lambda terms, see :class:`TermBase`, with
-tuples, projections and ``let``, and reduced to Böhm trees by a
+Its causal diagrams are also written as lambda terms, see :class:`TermBase`,
+with tuples, projections and ``let``, and reduced to Böhm trees by a
 :class:`Strategy`. Diagrams map to combinatorial maps, i.e.
 :class:`discopy.cmap.CMap`, with :meth:`discopy.monoidal.Diagram.to_map`.
 

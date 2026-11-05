@@ -19,8 +19,10 @@ minimum (:func:`halt_logit`).
   optimizer step per iteration; a slot whose board halt logit exceeds
   ``halt_threshold`` (zero by default), or which reaches ``n_sup``
   segments, gets a fresh puzzle. Every board's gradient passes the
-  per-board clip of :func:`~discopy.neural.train.per_board_backward`, then
-  one global norm clip, a spike watchdog and the optimizer.
+  per-board clip of :func:`~discopy.neural.train.per_board_backward`
+  unless ``slot_clip`` is ``None``, then one global norm clip and the
+  optimizer, the step skipped when its pre-clip norm exceeds
+  ``skip_spike``.
 * :func:`rollout` -- the evaluation: one trajectory of segments, read at
   every cap as the fixed-compute answer, the ACT depth and the most
   confident answer so far.

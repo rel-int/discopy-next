@@ -81,10 +81,11 @@ def draw(diagram, **params):
     to_tikz : bool, optional
         Whether to output tikz code instead of matplotlib.
     asymmetry : float, optional
-        Shift one corner of each box so that a box, its dagger, its transpose
-        and its conjugate are told apart, default is :code:`0.125` when some
-        box is a conjugate, a transpose or a dagger not drawn as a braid,
-        :code:`0` otherwise.
+        Shift one corner of each box drawn as a plain polygon (not spiders,
+        wires, braids or other special shapes) so that a box, its dagger, its
+        transpose and its conjugate are told apart, default is :code:`0.125`
+        when some box is a conjugate, a transpose or a dagger not drawn as a
+        braid, :code:`0` otherwise.
     """
     return diagram.to_drawing().draw(**params)
 

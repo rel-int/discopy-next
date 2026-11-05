@@ -31,9 +31,9 @@ single monadic value holds both the outcomes that leave the loop and those
 that go around again, and ``(functor, unit, mult)`` cannot tell them apart.
 The trace is therefore defined exactly when the monad supplies an
 :attr:`~discopy.kleisli.monad.Monad.iterate` operator, i.e. when it is an
-Elgot monad: :class:`~discopy.kleisli.monad.Maybe`,
-:class:`~discopy.kleisli.monad.Powerset` and
-:class:`~discopy.kleisli.monad.Subdistribution` are; a monad without one
+Elgot monad: :data:`~discopy.kleisli.monad.Maybe`,
+:data:`~discopy.kleisli.monad.Powerset` and
+:data:`~discopy.kleisli.monad.Subdistribution` are; a monad without one
 raises rather than returning a wrong answer.
 
 Token machines
