@@ -1098,3 +1098,10 @@ def test_Functor_and_Equation_tree():
         Equation.from_tree(equation.to_tree() | {'space': 'x'})
     with raises(TypeError, match=r"Expected int \| float"):
         dumps(Equation(f, f, space="x"))
+
+
+def test_Equation_modulo_keeps_space():
+    f = Box('f', Ty('x'), Ty('x'))
+    equation = Equation(f, f, symbol="->", space=3).modulo(len)
+    assert equation.space == 3 and equation.symbols == ("->", )
+    assert loads(dumps(equation.modulo(None))).space == 3

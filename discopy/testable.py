@@ -67,7 +67,7 @@ import pickle
 import sys
 from abc import ABC, abstractmethod
 from collections.abc import Callable
-from copy import deepcopy
+from copy import copy, deepcopy
 from dataclasses import KW_ONLY, dataclass, replace
 from functools import reduce, wraps
 from operator import matmul
@@ -151,7 +151,11 @@ class Equation[ar](NamedGeneric):
         >>> f, g = Box('f', x, x), Box('g', x, x)
         >>> assert Equation(f >> g, g >> f).modulo(lambda _: True)
         """
-        return type(self)(*self.terms, symbols=self.symbols, up_to=up_to)
+        result = copy(self)
+        vars(result).pop("up_to", None)
+        if up_to is not None:
+            result.up_to = up_to
+        return result
 
     def __repr__(self):
         """
