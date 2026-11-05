@@ -4,7 +4,7 @@
 
 The fixes of rel-int/discopy-next#445 in the syntax core and the law machinery (`cat`, `monoidal`, `utils`, `abc`, `testable`, `op`): bugs the review confirmed that need no design decision, one commit and one regression test each.
 
-- [WIP] @session_01MEJxy43YMF4nTF8NEcP8Je-2026-11-05 19:42 **S1-1** monoidal.Diagram.foliation (and so depth) computes the hypergraph before checking for a symmetric category.
+- [x] **S1-1** monoidal.Diagram.foliation (and so depth) computes the hypergraph before checking for a symmetric category.
 - [WIP] @session_01MEJxy43YMF4nTF8NEcP8Je-2026-11-05 19:42 **S1-2** Sum.then never checks that the two sides compose, so a zero (empty Sum) composes with any arrow on either side and returns an ill-typed zero.
 - [WIP] @session_01MEJxy43YMF4nTF8NEcP8Je-2026-11-05 19:42 **S1-3** dumps silently turns int, float, bool and None dict keys in box data into strings, so loads(dumps(f)) != f, breaking the serialisation law.
 - [WIP] @session_01MEJxy43YMF4nTF8NEcP8Je-2026-11-05 19:42 **S1-4** Functor composition (cat and monoidal then) applies G to F's raw map values before F's cast, so F >> G crashes (or, with callable maps, the composite …

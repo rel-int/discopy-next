@@ -1467,9 +1467,11 @@ class Diagram(cat.Arrow, MonoidalCategory, RichDisplay):
         left and right adjoints of an object differ. Otherwise this scans top
         to bottom and merges layers eagerly.
         """
+        if not isinstance(self, abc.SymmetricCategory):
+            return self.merge_layers()
         graph = self.to_hypergraph()
-        if isinstance(self, abc.SymmetricCategory) and graph.is_monogamous\
-                and graph.is_causal and graph.is_boundary_connected and all(
+        if graph.is_monogamous and graph.is_causal\
+                and graph.is_boundary_connected and all(
                     not isinstance(obj, abc.Pregroup) or obj.l == obj.r
                     for obj in graph.spider_types):
             return graph.to_diagram().merge_layers()

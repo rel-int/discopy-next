@@ -956,6 +956,14 @@ def test_coloured_diagram_has_no_hypergraph():
             convert(Box('f', x, x))
 
 
+def test_coloured_diagram_foliates():
+    red = Colour("red")
+    x = Ty(Wire('x', red, red))
+    f, g = Box('f', x, x), Box('g', x, x)
+    assert (f @ g).foliation().inside == (Layer(f, g), )
+    assert (f @ g).depth() == 1 and Diagram.id(x).depth() == 0
+
+
 def test_foliation_up_to_interchangers():
     from discopy import rigid, tensor
     interchangers = lambda d: d.to_staircases().normal_form(
