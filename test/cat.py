@@ -505,6 +505,13 @@ def test_Sum():
         h >> Sum((), y, z)
 
 
+def test_Sum_terms_is_a_tuple():
+    x, y = Ob('x'), Ob('y')
+    f, g = Box('f', x, y), Box('g', x, y)
+    assert Sum([f, g]) == Sum(iter([f, g])) == Sum((f, g)) == f + g
+    assert hash(Sum([], x, y)) == hash(Sum((), x, y))
+
+
 def test_Functor_then_unit():
     """ An identity is dropped on either side of a composite (#142). """
     x, y = Ob('x'), Ob('y')

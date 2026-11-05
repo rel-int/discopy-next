@@ -784,6 +784,7 @@ class Sum(Box):
     def __init__(
             self, terms: tuple[Arrow, ...],
             dom: Ob | None = None, cod: Ob | None = None):
+        terms = tuple(terms)
         if not terms and (dom is None or cod is None):
             raise ValueError(messages.MISSING_TYPES_FOR_EMPTY_SUM)
         dom = terms[0].dom if dom is None else dom

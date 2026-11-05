@@ -11,7 +11,7 @@ The fixes of rel-int/discopy-next#445 in the syntax core and the law machinery (
 - [x] **S1-5** deferred to #445: already fixed by 1b31981a (S1-4); DualRail composites are a separate pick
 - [x] **S1-8** Box.subs (and so Bubble, diagram and Layer subs) ignores a key that is not a bare symbol, e.g.
 - [x] **S1-9** A one-shot iterator passed as inside skips the composability and type checks in FreeCategory, and is silently consumed into an empty path by monoidal …
-- [WIP] @session_01MEJxy43YMF4nTF8NEcP8Je-2026-11-05 19:42 **S1-10** Sum stores a list of terms as given, so Sum([f, g]) != Sum((f, g)) == f + g and is unhashable;
+- [x] **S1-10** Sum stores a list of terms as given, so Sum([f, g]) != Sum((f, g)) == f + g and is unhashable;
 - [WIP] @session_01MEJxy43YMF4nTF8NEcP8Je-2026-11-05 19:42 **S1-12** Box.free_symbols is a cached_property, so after an in-place change to Box.data (a use the Functor docstring documents) subs and lambdify use stale …
 - [WIP] @session_01MEJxy43YMF4nTF8NEcP8Je-2026-11-05 19:42 **S1-13** Box.free_symbols visits every scalar of a numeric array in Python:
 - [WIP] @session_01MEJxy43YMF4nTF8NEcP8Je-2026-11-05 19:42 **S1-14** Diagram.normalize rebuilds the whole diagram's boxes and offsets lists on every pair it checks, and Diagram.boxes concatenates with a quadratic sum():
