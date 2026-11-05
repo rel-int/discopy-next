@@ -21,7 +21,7 @@ The fixes of rel-int/discopy-next#445 in `hypergraph`, `frobenius`, `cmap`, `ehy
 - [x] **S6-3** CMap.match runs complement on every one of the n^k straight-wire assignments that homomorphisms enumerates, so it is exponential in the pattern's …
 - [x] **S6-4** CMap.leg_order hands Hypergraph.leg_order the legs in CMap port order, where a box's outputs are reversed.
 - [x] **S6-5** Wreath rebuilds top.action() in degree() and permutation() on every element construction, multiply and dagger.
-- [WIP] @session_01MEJxy43YMF4nTF8NEcP8Je-2026-11-05 19:42 **S6-6** CMap.eval drops the dtype of its category.
+- [x] **S6-6** CMap.eval drops the dtype of its category.
 - [WIP] @session_01MEJxy43YMF4nTF8NEcP8Je-2026-11-05 19:42 **S6-7** CMap in a planar host reads a cup or cap between two outputs of one box in its clockwise port order (right to left).
 - [WIP] @session_01MEJxy43YMF4nTF8NEcP8Je-2026-11-05 19:42 **S6-8** test/cmap.py:924: the cup entry of test_from_glued_agrees_with_folding is dead.
 - [WIP] @session_01MEJxy43YMF4nTF8NEcP8Je-2026-11-05 19:42 full suite and lint gates on the branch
