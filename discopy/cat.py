@@ -846,6 +846,7 @@ class Sum(Box):
 
     @unbiased
     def then(self, other):
+        assert_iscomposable(self, other)
         other = other if isinstance(other, Sum)\
             else self.sum_factory((other, ))
         terms = tuple(f.then(g) for f in self.terms for g in other.terms)

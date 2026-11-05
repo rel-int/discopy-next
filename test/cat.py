@@ -476,6 +476,11 @@ def test_Sum():
     assert len(Sum((), x, y)) == 0
     assert Sum((), x, x).then(f, g) == Sum((), x, z)
     assert Sum((), x, y).dagger() == Sum((), y, x)
+    h = Box('h', z, x)
+    with raises(AxiomError):
+        Sum((), x, y) >> h
+    with raises(AxiomError):
+        h >> Sum((), y, z)
 
 
 def test_Functor_then_unit():
