@@ -33,7 +33,7 @@ from discopy import cat, frobenius, rigid, tensor, quantum
 from discopy.cat import factory
 from discopy.quantum.circuit import qubit, Circuit
 from discopy.quantum.gates import (
-    Bra, Ket, Rz, Rx, U1, CX, CZ, Controlled, format_number)
+    Bra, Ket, Rz, Rx, U1, CX, CZ, Controlled, Sqrt, format_number)
 from discopy.quantum.gates import Scalar as GatesScalar
 from discopy.rigid import Sum, Nat
 from discopy.tensor import Dim, backend
@@ -547,6 +547,9 @@ def gate2zx(box):
     if isinstance(box, Controlled) and isinstance(box.controlled, U1):
         return Z(1, 2, box.phase / 2) @ Z(1, 2, box.phase / 2)\
             >> Id(1) @ (X(2, 1) >> Z(1, 0, -box.phase / 2)) @ Id(1) @ root2
+    if isinstance(box, Sqrt):
+        root = scalar(box.data ** .5)
+        return root.dagger() if box.is_dagger else root
     if isinstance(box, GatesScalar):
         if box.is_mixed:
             raise NotImplementedError

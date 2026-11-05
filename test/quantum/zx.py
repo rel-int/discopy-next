@@ -378,7 +378,9 @@ def test_eval_circuit2zx(random_had_cnot_diagram):
     gates = [
         quantum.H, quantum.X, quantum.Y, quantum.Z, quantum.S, quantum.T,
         quantum.CX, quantum.CZ, quantum.SWAP, Ket(0, 1), Bra(1, 0),
-        quantum.scalar(1j), CU1(.3).dagger(), CRz(.3).dagger(),
+        quantum.scalar(1j), quantum.sqrt(2), quantum.gates.Sqrt(-1),
+        quantum.gates.Sqrt(-1).dagger(), Circuit.cups(qubit, qubit),
+        Circuit.spiders(0, 1, qubit), CU1(.3).dagger(), CRz(.3).dagger(),
         CRx(.3).dagger(), Controlled(quantum.X, distance=-2),
         Controlled(quantum.Z, distance=2), random_had_cnot_diagram(3, 20)]
     for gate in controlled + gates:
