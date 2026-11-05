@@ -285,6 +285,15 @@ def test_quantum_dimension():
     assert np.isclose(V.qdim(), 2)
 
 
+def test_quantum_dimension_is_the_pivotal_trace():
+    x = ribbon.Ty('x')
+    for H in [Algebra.sweedler(), Algebra.taft(3)]:
+        V = Representation[H].regular()
+        F = Functor(ob_map={x: V}, ar_map={}, cod=Intertwiner[H])
+        loop = complex(F(circle(x)).eval(dtype=complex))
+        assert np.isclose(loop, 0) and np.isclose(V.qdim(), loop)
+
+
 def test_dual_representation():
     """The right dual carries the twisted action rho(S h)^T, also when
     S^2 != id and on structured types."""
