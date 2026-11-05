@@ -626,8 +626,10 @@ class Matrix[dtype](NamedGeneric, MarkovCategory, ComarkovCategory,
         """
         if self.dtype != bool or self.dom != self.cod:
             raise TypeError(messages.MATRIX_REPEAT_ERROR)
-        return sum(self.id(self.dom).then(*n * [self])
-                   for n in range(index(self.dom) + 1))
+        result, length = self.id(self.dom) + self, 1
+        while length < index(self.dom):
+            result, length = result >> result, 2 * length
+        return result
 
     def trace(self, n=1, left=False) -> Matrix:
         """

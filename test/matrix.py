@@ -50,6 +50,18 @@ def test_repeat():
         Matrix[int](0, 1, 1, 0).repeat()
 
 
+def test_repeat_takes_logarithmically_many_products(monkeypatch):
+    products, then = [], Matrix.then
+    monkeypatch.setattr(Matrix, "then", lambda self, *others: (
+        products.append(others), then(self, *others))[1])
+    for n in (64, 3, 2, 1, 0):
+        path = Matrix[bool](np.eye(n, k=1, dtype=bool), n, n)
+        closure = Matrix[bool](np.triu(np.ones((n, n), dtype=bool)), n, n)
+        products.clear()
+        assert path.repeat() == closure
+        assert len(products) <= n.bit_length()
+
+
 def test_autotyping():
     pytest.importorskip("jax")
     torch = pytest.importorskip("torch")
