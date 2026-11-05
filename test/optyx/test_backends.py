@@ -1,6 +1,6 @@
 import pytest
 from discopy.optyx import photonic, qubits, classical, mode, qubit, qmode, bit
-from cotengra import ReusableHyperCompressedOptimizer
+from cotengra import ReusableHyperCompressedOptimizer, ReusableHyperOptimizer
 from discopy.optyx.core.backends import (
     QuimbBackend,
     PercevalBackend,
@@ -914,3 +914,14 @@ def test_perceval_backend_labels_outcomes_by_output_modes(diagram, task):
     result = diagram.eval(
         PercevalBackend(), config=PercevalEvalConfig(task=task))
     assert np.allclose(np.ravel(result.tensor.array), expected)
+
+
+@pytest.mark.parametrize("optimiser", [
+    ReusableHyperOptimizer, ReusableHyperCompressedOptimizer])
+def test_quimb_hyperoptimiser_keeps_the_wire_order(optimiser):
+    """The axes of a result follow its wires, even past the tenth one,
+    whose index name sorts before the third's as a string."""
+    diagram = photonic.Create(0, 0, 1, *8 * [0])
+    backend = QuimbBackend(hyperoptimiser=optimiser(max_repeats=4))
+    assert np.allclose(
+        diagram.eval(backend).tensor.array, diagram.eval().tensor.array)

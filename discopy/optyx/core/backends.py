@@ -528,6 +528,8 @@ class QuimbBackend(AbstractBackend):
         """
         params = self.contraction_params if params is None else params
         quimb_tn = term.to_quimb()
+        output_inds = [f"inp{i}" for i in range(len(term.dom))] + [
+            f"out{i}" for i in range(len(term.cod))]
 
         for t in quimb_tn:
             dt = t.data.dtype
@@ -561,13 +563,12 @@ class QuimbBackend(AbstractBackend):
                 is_approx else quimb_tn.contract
             result = contract(
                 optimize=self.hyperoptimiser,
-                output_inds=sorted(quimb_tn.outer_inds()),
+                output_inds=output_inds,
                 **params
             )
 
         if isinstance(result, TensorNetwork):
-            result = result.contract(
-                output_inds=sorted(result.outer_inds()))
+            result = result.contract(output_inds=output_inds)
         if not isinstance(result, (complex, float, int)):
             result = result.data
 
