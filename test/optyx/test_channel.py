@@ -123,8 +123,7 @@ def test_from_bosonic_op():
 def test_observables_agree_with_their_samples():
     from discopy.optyx.channel import Observable, Discard, Diagram, qmode, qubit
     from discopy.optyx import photonic, qubits
-    hom = photonic.Create(
-        1, 1, internal_states=([1, 0], [1, 0])) >> photonic.BS
+    hom = photonic.Create(1, 1) >> photonic.BS
     number = Observable(Diagram.from_bosonic_operator(
         2, ((0, False), (0, True))))
     counted = Observable(function=lambda n: n[0], dom=qmode @ qmode)
