@@ -157,6 +157,20 @@ def test_tensor_of_many_on_backend(name):
         [1, 0, 0, 0], [0, 2, 2, 0], [0, 0, 0, 1]])
 
 
+@pytest.mark.parametrize('name', ['pytorch', 'jax'])
+def test_dagger_and_round_on_backend(name):
+    """ Transposing, conjugating and rounding call the functions of the
+    active backend, whose arrays need not have the methods numpy's have. """
+    pytest.importorskip({'pytorch': 'torch'}.get(name, name))
+    m = lambda: Matrix([1j, 2, 3, 4, 5, 6], 2, 3)
+    run = lambda: [f.array.tolist() for f in (
+        m().transpose(), m().conjugate(), m().dagger(), Matrix.merge(2),
+        Matrix([1.2, 2.7], 1, 2).round())]
+    expected = run()
+    with backend(name):
+        assert run() == expected
+
+
 def test_tensor_of_many_promotes_dtype():
     """ The tensor of ``n`` matrices is built in the class the ``dtype`` of
     all of them promotes to, wherever the float one comes. """

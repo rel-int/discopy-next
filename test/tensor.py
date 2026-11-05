@@ -141,6 +141,16 @@ def test_Tensor_transpose():
         == Tensor.cups(Dim(2), Dim(2))
 
 
+@pytest.mark.parametrize("name", ["pytorch", "jax"])
+def test_Tensor_transpose_on_backend(name):
+    pytest.importorskip({"pytorch": "torch"}.get(name, name))
+    t = lambda: Tensor(list(range(12)), Dim(2, 3), Dim(2))
+    run = lambda: [t().r.array.tolist(), t().l.array.tolist()]
+    expected = run()
+    with backend(name):
+        assert run() == expected
+
+
 def test_Tensor_conjugate():
     assert Tensor[complex]([1j], Dim(1), Dim(1)).conjugate().array == -1j
 

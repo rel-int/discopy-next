@@ -388,8 +388,10 @@ class Tensor(Matrix):
         This is *not* the same as the algebraic transpose for non-atomic dims.
         """
         # pylint: disable=unused-argument  # Dim is self-dual: one transpose
-        return type(self)(
-            self.array.transpose(), self.cod[::-1], self.dom[::-1])
+        axes = list(range(len(self.dom @ self.cod)))
+        with backend() as np:
+            array = np.moveaxis(self.array, axes, axes[::-1])
+        return type(self)(array, self.cod[::-1], self.dom[::-1])
 
     l = r = property(transpose)
 
