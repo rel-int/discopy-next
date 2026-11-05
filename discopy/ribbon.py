@@ -16,12 +16,21 @@ Summary
     Cup
     Cap
     Braid
+    Twist
     Feedback
     Trace
     FollowedBy
     Head
     Tail
+    Sum
+    Bubble
     Functor
+    DualRail
+    DualRailBraid
+    DualRailTwist
+    DualRailCup
+    DualRailCap
+    Equation
 
 Axioms
 ------

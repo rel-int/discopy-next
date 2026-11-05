@@ -15,6 +15,9 @@ Summary
     Box
     Braid
     Twist
+    Ribbon
+    DualRailBraid
+    DualRailTwist
     Feedback
     Trace
     FollowedBy
@@ -23,6 +26,21 @@ Summary
     Sum
     Bubble
     Functor
+    DualRail
+    Equation
+
+.. admonition:: Functions
+
+    .. autosummary::
+        :template: function.rst
+        :nosignatures:
+        :toctree:
+
+        double_rail
+
+The dual rail encoding :meth:`Diagram.to_braided` doubles every wire of a
+balanced diagram into its two rails, see :class:`DualRail` and
+:func:`double_rail`.
 
 Axioms
 ------

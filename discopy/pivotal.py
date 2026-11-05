@@ -16,6 +16,7 @@ Summary
     HeadOb
     TailOb
     Ty
+    Nat
     Layer
     Diagram
     Box
@@ -26,6 +27,9 @@ Summary
     FollowedBy
     Head
     Tail
+    Sum
+    Bubble
+    Equation
     Functor
 
 Axioms

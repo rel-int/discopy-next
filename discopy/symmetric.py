@@ -24,6 +24,8 @@ Summary
     Sum
     Bubble
     Functor
+    DualRail
+    Equation
 
 Axioms
 ------

@@ -18,6 +18,7 @@ Summary
     Sum
     Bubble
     Functor
+    Equation
 
 .. admonition:: Functions
 

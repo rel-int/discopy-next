@@ -1,7 +1,7 @@
 <!--
 Thank you for contributing to DisCoPy!
-Make sure to either link to an issue or quote a human prompt verbatim.
-See CONTRIBUTING.md for our philosophy, code style guide and LLM guidelines.
+Make sure the high-level description is written by a human, links to a human-written prompt (e.g. an issue) or quotes a human prompt verbatim.
+See STYLE.md for our coding philosophy and code style guide, and CONTRIBUTING.md for our LLM guidelines.
 -->
 
 ## Why

@@ -7,14 +7,16 @@ the free traced category as the case where the loop is not delayed.
 We follow the definition of :cite:t:`DiLavoreEtAl22` with some extra structure
 for the head and tail of streams with the :class:`FollowedBy` generator.
 A traced category is a feedback category whose delay is the identity, so
-every level of the hierarchy below this one, from :mod:`balanced` and
-:mod:`pivotal` down, is a feedback category: its wires carry a time step,
-a :class:`Trace` is a :class:`Feedback` whose memory is not delayed.
+every level of the hierarchy below this one, from :mod:`~discopy.balanced`
+and :mod:`~discopy.pivotal` down, is a feedback category: its wires carry a
+time step, a :class:`Trace` is a :class:`Feedback` whose memory is not
+delayed.
 
-Note that these diagrams are planar, so that e.g. :mod:`pivotal` diagrams are
-traced in this sense. See :mod:`symmetric` for the usual notion of trace,
-:mod:`markov` for the syntax of streams and :mod:`discopy.stream` for its
-interpretation, the main example of a feedback category.
+Note that these diagrams are planar, so that e.g. :mod:`~discopy.pivotal`
+diagrams are traced in this sense. See :mod:`~discopy.symmetric` for the usual
+notion of trace, :mod:`~discopy.markov` for the syntax of streams and
+:mod:`discopy.stream` for its interpretation, the main example of a feedback
+category.
 
 Summary
 -------
@@ -65,8 +67,7 @@ of the following shape:
 .. image:: /_static/feedback/feedback-operator.svg
     :align: center
 
-A trace is a feedback whose memory is not delayed, i.e. a feedback in a
-category whose delay is the identity. It is a right trace by default:
+The :class:`Trace` is a right trace by default:
 
 >>> z = Ty('z')
 >>> g = Box("g", x @ z, y @ z)
@@ -91,9 +92,10 @@ The laws are stated once on :class:`discopy.abc.FeedbackCategory`, those of
 a traced category being the same laws with the delay the identity, plus
 yanking from :class:`discopy.abc.TracedCategory`. Under each law, feedback
 comes first, checked on the nose where it can be and otherwise drawn and
-checked up to a functor into streams, then the trace, checked up to the
-hypergraph for symmetric diagrams: equality of planar traced diagrams is not
-implemented.
+checked up to a functor into streams, then the trace on symmetric diagrams,
+checked on the nose for vanishing and joining and otherwise with
+:class:`discopy.symmetric.Equation`, i.e. up to hypergraph isomorphism:
+equality of planar traced diagrams is not implemented.
 
 >>> from discopy import stream, symmetric
 >>> F0 = Functor(
@@ -102,7 +104,7 @@ implemented.
 ...     F0, lambda f: stream.Stream.sequence(f.name, F0(f.dom), F0(f.cod)),
 ...     cod=stream.Stream)
 >>> all_eq = lambda xs: len(set(xs)) == 1
->>> eq_up_to_F = lambda *fs, n=2: all_eq(F(f).unroll(2).now for f in fs)
+>>> eq_up_to_F = lambda *fs, n=2: all_eq(F(f).unroll(n).now for f in fs)
 
 >>> s = symmetric.Ty('s')
 >>> t, k = symmetric.Box('t', s @ s, s @ s), symmetric.Box('k', s, s)
@@ -194,7 +196,8 @@ this can only be checked up to extensional equivalence of streams.
 .. image:: /_static/feedback/slide-unroll.svg
     :align: center
 
-For a trace, the delay is the identity and the morphism slides on the nose:
+For a trace, the delay is the identity and the morphism slides without
+delay, up to the hypergraph isomorphism of :class:`discopy.symmetric.Equation`:
 
 >>> sliding_left = symmetric.Equation(
 ...     (t >> k @ s).trace(left=True),
