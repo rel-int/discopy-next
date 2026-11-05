@@ -143,6 +143,16 @@ def test_class_generic_over_the_algebra():
     assert Intertwiner[D].algebra == D and braid.algebra == D
 
 
+def test_equal_algebras_hash_equal():
+    H = Algebra.sweedler()
+    unit, counit, mult, comult, S, R = H.arrays
+    S = np.where(S == 0, -0., S)
+    K = Algebra.from_arrays(unit, counit, mult, comult, S, R)
+    assert K == H and hash(K) == hash(H)
+    assert Representation[K] is Representation[H]
+    assert Intertwiner[H].id(Representation[K].regular()).algebra == H
+
+
 def test_representation_is_a_dim():
     D, V = double_and_module()
     assert isinstance(V, Dim) and V == Dim(2)

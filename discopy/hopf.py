@@ -326,7 +326,7 @@ class Algebra:
             and self.generators == other.generators
 
     def __hash__(self):
-        return hash(repr(self.generators))
+        return hash(self.generators)
 
     def to_tree(self) -> dict:
         """
