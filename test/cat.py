@@ -264,6 +264,15 @@ def test_Sum_generator_hash():
     assert {f: 42}[singleton] == 42
 
 
+def test_Sum_generator_is_its_only_term():
+    x, y = Ob('x'), Ob('y')
+    f, g = Box('f', x, y), Box('g', x, y)
+    singleton = Sum((f, ))
+    assert singleton.is_generator and singleton.generator is f
+    assert singleton.generator.setoid() == singleton.setoid()
+    assert (f + g).generator is None and Sum((), x, y).generator is None
+
+
 def test_Functor():
     x, y, z = Ob('x'), Ob('y'), Ob('z')
     f, g = Box('f', x, y), Box('g', y, z)

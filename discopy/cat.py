@@ -810,6 +810,7 @@ class Sum(Box):
     def is_generator(self):
         return len(self.terms) == 1 and self.terms[0].is_generator
 
+    @property
     def generator(self):
         return self.terms[0].generator if self.is_generator else None
 
