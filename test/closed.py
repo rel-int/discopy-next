@@ -947,6 +947,17 @@ def test_delay_diagrams():
     assert f.curry().delay().arg == f
 
 
+def test_Curry_of_no_wire_maps_as_its_argument():
+    x, y, z = Ty('x'), Ty('y'), Ty('z')
+    f = Box('f', x @ y, z)
+    for left in (True, False):
+        for curry, arg in [(Curry(f, 0, left), f),
+                           (Curry(f, 0, left).delay(), f.delay())]:
+            assert Functor.id(Diagram)(curry) == arg
+            assert curry.to_compact() == arg.to_compact()
+            assert curry.to_drawing() == arg.to_drawing()
+
+
 def test_Bubble_is_linear_and_has_no_term():
     x = Ty('x')
     f, g = Box('f', x, x), Box('g', x, x)

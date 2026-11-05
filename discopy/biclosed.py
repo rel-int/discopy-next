@@ -706,8 +706,8 @@ class Functor(monoidal.Functor):
                 if hasattr(self.cod, attr):
                     return getattr(self.cod, attr)(base, exponent)
         if isinstance(other, Curry) and hasattr(self.cod, "curry"):
-            return self.cod.curry(
-                self(other.arg), len(self(other.cod.exponent)), other.left)
+            n = len(self(other.cod.exponent)) if other.n else 0
+            return self.cod.curry(self(other.arg), n, other.left)
         if isinstance(other, (Eval, Coeval)) and hasattr(self.cod, "ev"):
             base, exponent, left = other.x.base, other.x.exponent, other.left
             result = self.cod.ev(self(base), self(exponent), left)

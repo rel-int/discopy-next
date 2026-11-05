@@ -502,6 +502,15 @@ def test_Curry_to_drawing():
         assert Curry(f, 0, left=left).to_drawing() == f.to_drawing()
 
 
+def test_Curry_of_no_wire_maps_as_its_argument():
+    x, y, z = map(Ty, "xyz")
+    f = Box('f', x @ y, z)
+    for left in (True, False):
+        curry = Curry(f, 0, left=left)
+        assert Functor.id(Diagram)(curry) == f
+        assert curry.to_map() == f.to_map()
+
+
 def test_term_inside_a_diagram_is_drawn_as_one_box():
     from discopy import closed
     for module in (biclosed, closed):

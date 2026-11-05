@@ -368,6 +368,8 @@ class Diagram(markov.Diagram, biclosed.Diagram, ClosedCategory):
         def image(box):
             if box.time_step:
                 return image(box.reset()).delay(box.time_step)
+            if isinstance(box, Curry) and not box.n:
+                return box.arg.to_compact()
             if isinstance(box, Curry):
                 return (box.arg.to_compact() >> Coeval(
                     box.cod, left=box.left)).trace(
@@ -551,6 +553,8 @@ class Curry(Timed, biclosed.Curry, Box):
         """
         if not self.time_step:
             return super().to_drawing()
+        if not self.n:
+            return self.arg.delay(self.time_step).to_drawing()
         coeval = self.coeval_factory(self.reset().cod, left=self.left)
         return (self.arg >> coeval).delay(self.time_step).to_drawing()\
             .trace(self.n, left=not self.left)
