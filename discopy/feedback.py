@@ -569,6 +569,9 @@ class Diagram(monoidal.Diagram, TracedCategory):
                 dom=dom @ fed[:-1], cod=cod @ mem[:-1], mem=mem[-1:]
             ).feedback(dom=dom, cod=cod, mem=mem[:-1])
         if fed == mem or not isinstance(mem, Ty):
+            if (self.dom, self.cod) != ((fed @ dom, mem @ cod) if left
+                                        else (dom @ fed, cod @ mem)):
+                raise AxiomError(messages.NOT_TRACEABLE.format(self, mem))
             return self.trace_factory(self, left)
         return self.feedback_factory(
             self, dom=dom, cod=cod, mem=mem, left=left)
