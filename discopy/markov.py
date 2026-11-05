@@ -836,7 +836,7 @@ class Functor(symmetric.Functor):
         if isinstance(other, Function) and hasattr(
                 self.cod.ar, "function_factory")\
                 and not isinstance(other, symmetric.Permutation):
-            sizes = [len(self(x)) for x in other.dom]
+            sizes = [Nat(len(self(x))) for x in other.dom]
             return self.cod.ar.from_function(finset.Function.function(
                 other.func, sizes).inside, self(other.dom))
         if isinstance(other, Function) and hasattr(self.cod, "copy")\
