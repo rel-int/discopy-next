@@ -157,6 +157,18 @@ def test_Spider_repr():
         assert eval(repr(spider)) == spider
 
 
+def test_Spider_loads_a_legacy_state_with_its_legs_and_type():
+    x = Ty('x')
+    for n_legs_in, n_legs_out in [(2, 1), (0, 3)]:
+        old = Spider.__new__(Spider)
+        old.__setstate__({
+            '_name': 'Spider', '_data': None, '_dagger': False,
+            '_dom': Nat(n_legs_in), '_cod': Nat(n_legs_out), '_boxes': [],
+            '_layers': [], '_z': 0, '_typ': x})
+        spider = Spider(n_legs_in, n_legs_out, x)
+        assert old.name == spider.name and repr(old) == repr(spider)
+
+
 def test_Wire_adjoints():
     from discopy.monoidal import Colour
     a, b = Colour('a'), Colour('b')
