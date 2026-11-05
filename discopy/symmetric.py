@@ -688,10 +688,10 @@ class Swap(Permutation, balanced.Braid, Box):
         super().__setstate__(state)
 
     def __init__(self, left, right):
-        if len(left) == 2:
+        if not isinstance(right, monoidal.Ty) and len(left) == 2:
             perm = finset.Permutation(right, len(left))
             if not perm.is_swap():
-                raise ValueError
+                raise ValueError(messages.NOT_A_SWAP.format(list(perm)))
             left, right = left[:1], left[1:]
         self.perm = finset.Permutation([1, 0], 2)
         balanced.Braid.__init__(self, left, right)

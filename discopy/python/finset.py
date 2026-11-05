@@ -72,9 +72,11 @@ class Function(MarkovCategory[Nat, "Function"], Sequence):
             self.inside = [self.inside[i] for i in range(len(self.cod))]
         self.inside = [index(i) for i in self.inside]
         if len(self.inside) != len(self.cod):
-            raise ValueError
+            raise ValueError(messages.WRONG_FUNCTION.format(
+                len(self.cod), len(self.inside)))
         if any(not 0 <= i < len(self.dom) for i in self.inside):
-            raise ValueError
+            raise ValueError(messages.NOT_A_FUNCTION.format(
+                len(self.dom), self.inside))
 
     def __getitem__(self, key):
         return self.inside[key]

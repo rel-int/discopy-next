@@ -17,6 +17,14 @@ def test_Swap():
         Swap(x ** 2, Ty())
 
 
+def test_Swap_says_what_is_wrong():
+    x, y, z = Ty('x'), Ty('y'), Ty('z')
+    with raises(ValueError, match="of length 1, got length 2"):
+        Swap(x @ y, z)
+    with raises(ValueError, match=r"the swap \[1, 0\], got \[0, 1\]"):
+        Swap(x @ y, [0, 1])
+
+
 def test_Box_hash():
     x, y = Ty('x'), Ty('y')
     f = Box('f', x, y)
