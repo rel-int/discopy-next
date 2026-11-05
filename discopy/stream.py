@@ -115,12 +115,14 @@ Note that we can only check equality of streams up to a finite number of steps.
 >>> g = Stream.sequence('g', y, z, n)
 >>> h = Stream.sequence('h', z, w, o)
 
-* Unitality and associativity hold on the nose:
+* Unitality holds on the nose, associativity as hypergraphs, i.e. up to the
+  axioms of symmetric categories:
 
 >>> _id = Stream.id
 >>> assert eq_up_to_n(f @ _id(), f, _id() @ f)
 >>> assert eq_up_to_n(f >> _id(f.cod), f, _id(f.dom) >> f)
->>> assert eq_up_to_n((f >> g) >> h), (f >> (g >> h))
+>>> assert all_eq(x.unroll(3).now.to_hypergraph()
+...               for x in ((f >> g) >> h, f >> (g >> h)))
 >>> ((f >> g) >> h).now.draw(
 ...     doctest="docs/_static/stream/feedback-associativity.svg")
 
