@@ -625,6 +625,18 @@ def test_normalize_reads_each_layer_once_per_sweep(monkeypatch):
     assert diagram.normal_form() == diagram and len(reads) == len(diagram)
 
 
+def test_merge_layers_tries_each_pair_of_layers_once(monkeypatch):
+    x, n = Ty('x'), 4
+    fs = Id(x).then(*(Box(f'f{i}', x, x) for i in range(n)))
+    gs = Id(Ty()).tensor(*(Box(f'g{i}', x, x) for i in range(n)))
+    diagram = fs @ x ** n >> x @ gs
+    pairs, merge = [], Layer.merge
+    monkeypatch.setattr(Layer, "merge", lambda layer, other: pairs.append(
+        (layer, other)) or merge(layer, other))
+    assert len(diagram.merge_layers()) == n
+    assert len(set(pairs)) == len(pairs)
+
+
 def test_AxiomError():
     inside = (Layer(Box('f', Ty('x'), Ty('y'))), )
     with raises(AxiomError) as err:

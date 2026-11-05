@@ -1478,21 +1478,16 @@ class Diagram(cat.Arrow, MonoidalCategory, RichDisplay):
         return self.merge_layers()
 
     def merge_layers(self):
-        diagram = self
-        while len(diagram) > 1:
-            keep_on_going = False
-            for i, (first, second) in enumerate(zip(
-                    diagram.inside, diagram.inside[1:])):
-                try:
-                    inside = diagram.inside[:i] + (first.merge(second), )\
-                        + diagram.inside[i + 2:]
-                    diagram = diagram.ar(inside, diagram.dom, diagram.cod)
-                    keep_on_going = True
-                    break
-                except AxiomError:
-                    continue
-            if not keep_on_going:
-                break
+        diagram, i = self, 0
+        while i < len(diagram) - 1:
+            try:
+                merged = diagram.inside[i].merge(diagram.inside[i + 1])
+            except AxiomError:
+                i += 1
+                continue
+            inside = diagram.inside[:i] + (merged, ) + diagram.inside[i + 2:]
+            diagram = diagram.ar(inside, diagram.dom, diagram.cod)
+            i = max(i - 1, 0)
         return diagram
 
     def depth(self):

@@ -15,7 +15,7 @@ The fixes of rel-int/discopy-next#445 in the syntax core and the law machinery (
 - [x] **S1-12** Box.free_symbols is a cached_property, so after an in-place change to Box.data (a use the Functor docstring documents) subs and lambdify use stale …
 - [x] **S1-13** Box.free_symbols visits every scalar of a numeric array in Python:
 - [x] **S1-14** Diagram.normalize rebuilds the whole diagram's boxes and offsets lists on every pair it checks, and Diagram.boxes concatenates with a quadratic sum():
-- [WIP] @session_01MEJxy43YMF4nTF8NEcP8Je-2026-11-05 19:42 **S1-15** monoidal.Diagram.merge_layers restarts at pair 0 after every merge, re-running Layer.merge on pairs already known not to merge:
+- [x] **S1-15** monoidal.Diagram.merge_layers restarts at pair 0 after every merge, re-running Layer.merge on pairs already known not to merge:
 - [WIP] @session_01MEJxy43YMF4nTF8NEcP8Je-2026-11-05 19:42 **S1-16** cat.Sum.generator lacks @property, so a sum's generator is always a truthy bound method, never the box or None
 - [WIP] @session_01MEJxy43YMF4nTF8NEcP8Je-2026-11-05 19:42 **S1-17** str of a one-argument cat.Bubble drops a non-default name and method, so eval(str(b)) != b and the str_transparency law fails on a named bubble …
 - [WIP] @session_01MEJxy43YMF4nTF8NEcP8Je-2026-11-05 19:42 **S1-20** monoidal.Nat (and abc.Nat) accept negative numbers, giving a 'natural number' unequal to Nat(0) that cancels Nat(1) and whose len raises;
