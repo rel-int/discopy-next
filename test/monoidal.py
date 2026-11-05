@@ -616,6 +616,15 @@ def test_Diagram_normal_form_foliated():
         == diagram.normal_form(left=True)
 
 
+def test_normalize_reads_each_layer_once_per_sweep(monkeypatch):
+    x = Ty('x')
+    diagram = Id(x).then(*(10 * [Box('f', x, x)]))
+    reads, boxes_and_offsets = [], Layer.boxes_and_offsets.fget
+    monkeypatch.setattr(Layer, "boxes_and_offsets", property(
+        lambda layer: reads.append(layer) or boxes_and_offsets(layer)))
+    assert diagram.normal_form() == diagram and len(reads) == len(diagram)
+
+
 def test_AxiomError():
     inside = (Layer(Box('f', Ty('x'), Ty('y'))), )
     with raises(AxiomError) as err:

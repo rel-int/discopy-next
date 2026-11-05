@@ -1257,7 +1257,7 @@ class Diagram(cat.Arrow, MonoidalCategory, RichDisplay):
     @property
     def boxes(self) -> "list[Box]":
         """ The boxes in each layer of the diagram. """
-        return sum([layer.boxes for layer in self.inside], [])
+        return [box for layer in self.inside for box in layer.boxes]
 
     @property
     def offsets(self) -> list[int]:
@@ -1649,12 +1649,14 @@ class Diagram(cat.Arrow, MonoidalCategory, RichDisplay):
             yield diagram
         while True:
             no_more_moves = True
+            boxes, offsets = diagram.boxes, diagram.offsets
             for i in range(len(diagram) - 1):
-                box0, box1 = diagram.boxes[i], diagram.boxes[i + 1]
-                off0, off1 = diagram.offsets[i], diagram.offsets[i + 1]
+                box0, box1 = boxes[i], boxes[i + 1]
+                off0, off1 = offsets[i], offsets[i + 1]
                 if left and off1 >= off0 + len(box0.cod)\
                         or not left and off0 >= off1 + len(box1.dom):
                     diagram = diagram.interchange(i, i + 1, left=left)
+                    boxes, offsets = diagram.boxes, diagram.offsets
                     yield diagram
                     no_more_moves = False
             if no_more_moves:
