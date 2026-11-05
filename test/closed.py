@@ -333,6 +333,14 @@ def test_church_exponentiation():
     assert exp(three)(two).normal_form() == church(9, U)
 
 
+def test_untyped_terms_evaluate_draw_and_map():
+    two, F = church(2, U), Functor.id(Diagram)
+    assert F(U) == U and F(U.delay()) == U.delay()
+    assert F(two.eval()) == two.eval()
+    assert len(two.eval().to_drawing().cod) == 1
+    assert two.to_map() == two.eval().to_map()
+
+
 def test_normal_form_idempotent():
     two, three = church(2, U), church(3, U)
     exp = two.cod(lambda m: two.cod(lambda n: n(m)))

@@ -16,7 +16,7 @@ The fixes of rel-int/discopy-next#445 in the symmetric tower and the closed leve
 - [x] **S3-12** Docstrings in the slice contradict the code:
 - [x] **S3-13** Swap.__init__ reads any length-2 `left` as a (dom, perm) pair, so Swap(x @ y, z) reports a 'permutation of length 2' instead of NOT_ATOMIC;
 - [x] **S4-1** biclosed.Functor sends terms to map_term whenever cod.ob subclasses biclosed.Ty, so any functor into rigid, pivotal, pregroup or Tensor raises …
-- [WIP] @session_01MEJxy43YMF4nTF8NEcP8Je-2026-11-05 19:42 **S4-2** Every closed functor recurses forever on the unitype U, the identity functor included, because the Exp branch maps U.base == U first.
+- [x] **S4-2** Every closed functor recurses forever on the unitype U, the identity functor included, because the Exp branch maps U.base == U first.
 - [WIP] @session_01MEJxy43YMF4nTF8NEcP8Je-2026-11-05 19:42 **S4-3** to_rigid on a rigid diagram is not the identity:
 - [WIP] @session_01MEJxy43YMF4nTF8NEcP8Je-2026-11-05 19:42 **S4-5** closed.TermBase.from_biclosed (and so biclosed TermBase.to_closed) drops each constant's data, so biclosed terms that differ only in constant data …
 - [WIP] @session_01MEJxy43YMF4nTF8NEcP8Je-2026-11-05 19:42 **S4-6** biclosed.Constant.__repr__ (inherited by closed.Constant) omits data, so eval(repr(c)) != c for a constant with data, and for every term built on one

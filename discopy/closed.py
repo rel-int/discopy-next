@@ -705,6 +705,8 @@ class Functor(biclosed.Functor, markov.Functor):
     dom = cod = Diagram
 
     def __call__(self, other):
+        if isinstance(other, Unitype) and not other.time_step:
+            return monoidal.Functor.__call__(self, other)
         if self.cod is Drawing:
             return super().__call__(other)
         if isinstance(other, (Wire, Box)) and other.time_step:
