@@ -660,8 +660,8 @@ class Axiom[**P, T](Declaration[P, T]):
         """
         The same law with its equation compared up to a function, so that a
         category weakens an inherited axiom in one statement, e.g.
-        ``CMap.dagger_contravariance = CompactCategory.dagger_contravariance
-        .modulo(CMap.to_hypergraph)``.
+        ``Diagram.yanking = BalancedCategory.yanking.modulo(
+        Diagram.to_hypergraph)`` in :mod:`discopy.symmetric`.
         """
         @wraps(self.function)
         def equation(*args, **kwargs):
@@ -673,8 +673,8 @@ class Axiom[**P, T](Declaration[P, T]):
         The same law declared broken: calling it raises an
         :class:`AxiomFailure` with the reason as message and the equation
         evaluated on the arguments, or the error raised when the
-        implementation refuses to build its terms, e.g. ``braid_naturality =
-        BraidedCategory.braid_naturality.failing("A free braid is a box.")``.
+        implementation refuses to build its terms, e.g. ``scalar_sliding =
+        SpacialCategory.scalar_sliding.failing(messages.FREE_SCALAR)``.
         """
         @wraps(self.function)
         def equation(*args, **kwargs):
@@ -690,8 +690,8 @@ class Axiom[**P, T](Declaration[P, T]):
         """
         The same law declared not to apply to the category: it takes no
         argument and returns :obj:`NotImplemented`, with the reason as its
-        documentation, e.g. ``trace_vanishing =
-        TracedCategory.trace_vanishing.inapplicable("No trace.")``.
+        documentation, e.g. ``yanking =
+        TracedCategory.yanking.inapplicable(messages.PLANAR_YANKING)``.
         """
         def law(_category):
             return NotImplemented
