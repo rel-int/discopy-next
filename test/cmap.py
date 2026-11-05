@@ -961,7 +961,7 @@ def test_from_glued_agrees_with_folding():
         h >> Swap(y, y) >> g,
         Diagram.id(x) @ Cap(x.r, x) >> Cup(x, x.r) @ Diagram.id(x),
         Cap(x.r, x) >> Cup(x.r, x),
-        h >> Cup(y, y.r) if y.r == y else h >> g,
+        Box("k", x, y @ y.r) >> Cup(y, y.r),
     ]
     for diagram in diagrams:
         folded = M.functor(
