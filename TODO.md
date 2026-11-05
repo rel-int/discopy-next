@@ -6,7 +6,7 @@ The fixes of rel-int/discopy-next#445 in `quantum` and `grammar`: bugs the revie
 
 - [x] **S10-1** channel.Functor doubles a pure box's raw array, ignoring is_dagger and z.
 - [x] **S10-3** to_tk ignores box.z: a transposed Y (Y.r == -Y) is emitted as Y.
-- [WIP] @session_01MEJxy43YMF4nTF8NEcP8Je-2026-11-05 19:42 **S10-4** SelfConjugate.rotate is the dagger and SelfConjugate.conjugate is self, and neither reverses the wires.
+- [x] **S10-4** SelfConjugate.rotate is the dagger and SelfConjugate.conjugate is self, and neither reverses the wires.
 - [WIP] @session_01MEJxy43YMF4nTF8NEcP8Je-2026-11-05 19:42 **S10-5** to_tk measures Measure(override_bits=True) into a tket bit that classical post-processing reads afterwards.
 - [WIP] @session_01MEJxy43YMF4nTF8NEcP8Je-2026-11-05 19:42 **S10-6** Circuit.eval(backend=..., measure_all=True), which the eval docstring recommends for unitary circuits, raises IndexError on any real backend.
 - [WIP] @session_01MEJxy43YMF4nTF8NEcP8Je-2026-11-05 19:42 **S10-7** circuit2zx maps Sqrt(x) to scalar(x): gate2zx reads Sqrt.data (the radicand) instead of its root, so sqrt(2), Sqrt(-1).dagger() and the images of …

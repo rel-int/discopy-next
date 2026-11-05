@@ -72,10 +72,10 @@ def format_number(data):
 
 
 class SelfConjugate(Box):
-    """ A self-conjugate box, i.e. where the transpose is the dagger. """
-    def conjugate(self):
-        return self
-
+    """
+    A self-conjugate box, i.e. where the transpose is the dagger, up to the
+    order of the wires.
+    """
     def rotate(self, left=False):
         del left
         return self.dagger()
@@ -141,6 +141,10 @@ class Discard(SelfConjugate):
     def dagger(self):
         return MixedState(self.dom)
 
+    def rotate(self, left=False):
+        del left
+        return MixedState(self.dom.r)
+
     def _decompose(self):
         return Id().tensor(*map(Discard, self.dom))
 
@@ -175,6 +179,10 @@ class MixedState(SelfConjugate):
 
     def dagger(self):
         return Discard(self.cod)
+
+    def rotate(self, left=False):
+        del left
+        return Discard(self.cod.r)
 
     def _decompose(self):
         return Id().tensor(*map(MixedState, self.cod))
@@ -532,6 +540,11 @@ class Digits(ClassicalGate):
         return Digits(*self.digits, dim=self.dim, is_dagger=not self.is_dagger,
                       time_step=self.time_step)
 
+    def rotate(self, left=False):
+        del left
+        return Digits(*self.digits[::-1], dim=self.dim,
+                      is_dagger=not self.is_dagger, time_step=self.time_step)
+
     def to_drawing(self):
         result = QuantumGate.to_drawing(self)
         result.draw_as_brakets, result._digits = True, self._digits
@@ -588,6 +601,17 @@ class Ket(SelfConjugate, QuantumGate):
     def dagger(self):
         return Bra(*self.bitstring, time_step=self.time_step)
 
+    def rotate(self, left=False):
+        """
+        The transpose of a preparation or a post-selection, i.e. the dagger
+        of the one on the reversed bitstring.
+
+        >>> assert Ket(1, 0).r == Bra(0, 1) and Bra(0, 1).l == Ket(1, 0)
+        """
+        del left
+        return type(self)(
+            *self.bitstring[::-1], time_step=self.time_step).dagger()
+
     def _decompose(self):
         return Id().tensor(*[
             Ket(b, time_step=self.time_step) for b in self.bitstring])
@@ -618,7 +642,7 @@ class Bra(SelfConjugate, QuantumGate):
         self._digits, self._dim, self.draw_as_brakets = bitstring, 2, True
         self.affine = False
 
-    delay, to_tree = Ket.delay, Ket.to_tree
+    delay, to_tree, rotate = Ket.delay, Ket.to_tree, Ket.rotate
     from_tree = classmethod(Ket.from_tree.__func__)
 
     @property

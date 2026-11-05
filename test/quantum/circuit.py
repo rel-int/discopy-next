@@ -328,7 +328,8 @@ def test_adjoint():
     gates = [
         Bra(0), Ket(0, 0), Rx(0.1), Ry(0.2), Rz(0.3),
         CU1(0.4), CRx(0.5), CRz(0.7), Scalar(1 + 2j), CX,
-        Swap(bit, qubit), Copy(), Match()
+        Swap(bit, qubit), Copy(), Match(),
+        Ket(1, 0), Bra(0, 1), Bits(1, 0), Discard(bit @ qubit)
     ]
 
     gates_conj = [
@@ -338,11 +339,21 @@ def test_adjoint():
         Controlled(Rz(-0.7), distance=-1),
         Scalar(1 - 2j),
         Controlled(X, distance=-1),
-        Swap(qubit, bit), Copy(), Match()
+        Swap(qubit, bit), Copy(), Match(),
+        Ket(0, 1), Bra(1, 0), Bits(0, 1), Discard(qubit @ bit)
     ]
 
     for g, g_conj in zip(gates, gates_conj):
         assert g.conjugate() == g_conj
+
+
+def test_rotation_reverses_the_wires():
+    for state in (Ket(1, 0), Bra(0, 1), Bits(1, 0), Digits(2, 0, dim=3)):
+        assert state.r.eval().is_close(state.eval().r)
+        assert state.conjugate().eval().is_close(state.eval().conjugate())
+    assert Ket(1, 0).r == Bra(0, 1) and Bits(1, 0).l == Bits(0, 1).dagger()
+    assert Discard(bit @ qubit).r == MixedState(qubit @ bit)
+    assert MixedState(qubit @ bit).l == Discard(bit @ qubit)
 
 
 def test_causal_cx():
