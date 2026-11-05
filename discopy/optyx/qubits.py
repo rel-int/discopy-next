@@ -150,10 +150,10 @@ to correct the state of the qubit depending on the measurement result.
 ... )
 >>> from discopy.optyx import bit
 >>> teleportation = (
-...     Id(1) @ Z(0, 2) @ Scalar(2**0.5)>>
+...     Id(1) @ Z(0, 2) @ Scalar(2**-0.5) >>
 ...     Z(1, 2) @ Id(2) >>
-...     Id(1) @ Z(2, 1) @ Id(1) >>
-...     Id(1) @ H() @ Id(1) >>
+...     Id(1) @ X(2, 1) @ Id(1) @ Scalar(2**0.5) >>
+...     H() @ Id(2) >>
 ...     Measure(1)**2 @ Id(1) >>
 ...     IdClassical(bit) @ BitControlledGate(X(1, 1, 0.5)) >>
 ...     BitControlledGate(Z(1, 1, 0.5))
@@ -167,16 +167,10 @@ to correct the state of the qubit depending on the measurement result.
 
 This produces the same protocol as an identity operation:
 
->>> assert np.allclose(  # doctest: +SKIP
+>>> assert np.allclose(
 ...     (teleportation.double().to_tensor().to_quimb()^...).data,
 ...     (Id(1).double().to_tensor().to_quimb()^...).data
 ... )
-
-.. note::
-
-    The assertion above is skipped: this example does not currently evaluate
-    to the identity channel, see the refactor roadmap
-    (`#5 <https://github.com/rel-int/optyx/issues/5>`_).
 
 **Interfacing with external tools**
 
