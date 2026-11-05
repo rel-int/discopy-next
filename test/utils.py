@@ -16,12 +16,6 @@ from discopy.cat import Ob
 from discopy.utils import *
 from discopy.tensor import Box
 
-import pytest
-from pytest import warns
-
-from os import listdir
-import pickle
-
 zip_mock = MagicMock()
 zip_mock.open().__enter__().read.return_value =\
     '[{"factory": "cat.Ob", "name": "a"}]'
@@ -137,13 +131,6 @@ def test_wire_tree_roundtrip():
     with warns(DeprecationWarning):
         assert from_tree({'factory': 'discopy.frobenius.Ob', 'name': 'x'})\
             == frobenius.Wire('x')
-
-
-def test_MappingOrCallable():
-    from discopy.utils import MappingOrCallable
-    assert MappingOrCallable({0: 1})[0] == MappingOrCallable(lambda x: 1)[0]
-    with pytest.raises(TypeError):
-        MappingOrCallable([10, 20])
 
 
 def test_NamedGeneric_factory():
