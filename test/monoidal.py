@@ -795,6 +795,14 @@ def test_Functor_then_unit():
     assert unit >> F == F == F >> unit
 
 
+def test_Functor_then_applies_the_first_functor():
+    x, y = Ty('x'), Ty('y')
+    f = Box('f', x, y)
+    F = Functor({x: 'y', y: 'x'}, {f: f[::-1]})
+    G = Functor({x: x, y: y}, {f: f})
+    assert (F >> G)(f @ x) == G(F(f @ x))
+
+
 def test_coloured_Functor_repr():
     red, green = Colour("red"), Colour("green")
     x = Ty(Wire("x", red, green))

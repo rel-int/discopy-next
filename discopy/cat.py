@@ -1133,7 +1133,10 @@ class Functor(Category[type, "Functor"]):
         if other.ob_map.mapping is other.ar_map.mapping is identity\
                 and other == other.id(other.dom):
             return self
-        ob_map, ar_map = self.ob_map.then(other), self.ar_map.then(other)
+        ob_map, ar_map = (
+            {key: other(self(key)) for key in mapping}
+            if isinstance(mapping, Mapping) else (lambda key: other(self(key)))
+            for mapping in (self.ob_map.mapping, self.ar_map.mapping))
         return type(self)(ob_map, ar_map, dom=self.dom, cod=other.cod)
 
     def __init__(

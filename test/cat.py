@@ -508,6 +508,15 @@ def test_Functor_then_unit():
     assert (H >> F)(x) == F(x) == (F >> H)(x)
 
 
+def test_Functor_then_applies_the_first_functor():
+    x, y = Ob('x'), Ob('y')
+    f = Box('f', x, y)
+    G = Functor({x: x, y: y}, {f: f})
+    for F in (Functor({x: 'y', y: 'x'}, {f: (f[::-1], )}),
+              Functor(lambda ob: ob.name, lambda box: (box, ))):
+        assert (F >> G)(x) == G(F(x)) and (F >> G)(f) == G(F(f))
+
+
 def test_Bubble_no_common_boundary():
     x, y = Ob('x'), Ob('y')
     f, g = Box('f', x, x), Box('g', y, x)
