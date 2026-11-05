@@ -1141,9 +1141,24 @@ class Scalar(Parametrized):
             return np.array(self.data)
 
     def grad(self, var, **params):
+        """
+        The derivative of a scalar :math:`s`, or under mixed evaluation, where
+        a pure scalar is :math:`|s|^2`, the mixed scalar
+        :math:`2 \\mathrm{Re}(\\bar{s} s')` written as the polarisation
+        :math:`(|s + s'|^2 - |s - s'|^2) / 2`.
+
+        >>> from sympy.abc import phi  # doctest: +EXTRA
+        >>> assert scalar(phi).grad(phi).subs(phi, .5)\\
+        ...     == scalar(1, is_mixed=True)
+        """
         if var not in self.free_symbols:
             return Sum([], self.dom, self.cod)
-        return Scalar(self.data.diff(var), is_mixed=self.is_mixed,
+        data, derivative = self.data, self.data.diff(var)
+        if params.get('mixed', True) and not self.is_mixed:
+            return Scalar((abs(data + derivative) ** 2
+                           - abs(data - derivative) ** 2) / 2,
+                          is_mixed=True, time_step=self.time_step)
+        return Scalar(derivative, is_mixed=self.is_mixed,
                       time_step=self.time_step)
 
     def dagger(self):
@@ -1257,6 +1272,18 @@ class Sqrt(Scalar):
     def dagger(self):
         return self if self.is_self_adjoint\
             else Sqrt(self.data, not self.is_dagger, self.time_step)
+
+    def grad(self, var, **params):
+        """
+        The derivative of the root, i.e. of the scalar it evaluates to.
+
+        >>> from sympy.abc import phi  # doctest: +EXTRA
+        >>> assert sqrt(phi).grad(phi, mixed=False) == scalar(.5 * phi ** -.5)
+        """
+        root = Scalar(self.data ** .5,  # ty: ignore[unsupported-operator]
+                      time_step=self.time_step)
+        gradient = root.grad(var, **params)
+        return gradient.dagger() if self.is_dagger else gradient
 
     def delay(self, n_steps=1):
         return Sqrt(self.data, self.is_dagger, self.time_step + n_steps)

@@ -240,8 +240,9 @@ def test_grad_basic():
         assert isinstance(zero, Sum) and not zero.terms
         assert (zero.dom, zero.cod) == (constant.dom, constant.cod)
 
-    assert scalar(2 * phi).grad(phi).eval().array == 2
-    assert (scalar(2 * phi) + scalar(3 * phi)).grad(phi).eval().array == 5
+    assert scalar(2 * phi).grad(phi, mixed=False).eval().array == 2
+    assert (scalar(2 * phi) + scalar(3 * phi)).grad(
+        phi, mixed=False).eval().array == 5
 
     with raises(NotImplementedError):
         Box("dummy box", qubit, qubit, data=phi).grad(phi)

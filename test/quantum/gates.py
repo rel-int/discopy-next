@@ -174,6 +174,19 @@ def test_rotation_grad_is_the_finite_difference(rotation, mixed):
         atol=1e-4)
 
 
+@mark.parametrize("mixed", [False, True])
+def test_scalar_grad_is_the_finite_difference(mixed):
+    phi = importorskip("sympy").Symbol("phi")
+    step = 1e-6
+    for gate in (Scalar(phi), Sqrt(phi), Sqrt(2 * phi + 1),
+                 Sqrt(-phi - 1).dagger()):
+        gradient = gate.grad(phi, mixed=mixed).subs(phi, .3)
+        assert numpy.allclose(gradient.eval(mixed=mixed).array, (
+            gate.subs(phi, .3 + step).eval(mixed=mixed).array
+            - gate.subs(phi, .3 - step).eval(mixed=mixed).array) / (2 * step),
+            atol=1e-4)
+
+
 def test_QuantumGate_takes_what_a_circuit_box_takes():
     phi = importorskip("sympy").Symbol("phi")
     gate = QuantumGate('U', qubit, qubit, data=numpy.eye(2))
