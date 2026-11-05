@@ -1064,12 +1064,11 @@ class Permutation(frobenius.Permutation, Box):
     def conjugate(self):
         return self
 
-    # pylint: disable-next=unused-argument  # overrides Box.to_path
     def to_path(self, dtype: type = complex):
         size = len(self.dom)
-        return path.Matrix([int(self.perm[j] == i)
-                            for i in range(size) for j in range(size)],
-                           size, size)
+        return path.Matrix[dtype]([int(self.perm[j] == i)
+                                   for i in range(size) for j in range(size)],
+                                  size, size)
 
     def determine_output_dimensions(self, input_dims: list[int]) -> list[int]:
         """Determine the output dimensions based on the input dimensions."""
@@ -1095,7 +1094,7 @@ class Swap(Permutation, frobenius.Swap, Box):
         return self
 
     def to_path(self, dtype: type = complex):
-        return path.Matrix([0, 1, 1, 0], 2, 2)
+        return path.Matrix[dtype]([0, 1, 1, 0], 2, 2)
 
     def determine_output_dimensions(self, input_dims: list[int]) -> list[int]:
         """Determine the output dimensions based on the input dimensions."""

@@ -1,5 +1,6 @@
 import numpy as np
 import pytest
+from sympy import Expr
 from sympy.abc import x, y
 
 from discopy.optyx.core import zw
@@ -64,6 +65,17 @@ def test_permutations_to_path():
         Permutation(mode ** 3, [1, 2, 0]).to_path().array,
         [[0, 0, 1], [1, 0, 0], [0, 1, 0]])
     assert np.allclose(Swap(mode, mode).to_path().array, [[0, 1], [1, 0]])
+
+
+def test_symbolic_path_through_a_swap():
+    """A path matrix of expressions composes with the swap blocks that
+    creations, selections and swaps bring in, and a permutation's path
+    matrix has the dtype it is asked for."""
+    circuit = zw.Create(1, 0) >> zw.Endo(x) @ zw.Id(1) \
+        >> zw.SWAP >> zw.Select(0, 1)
+    assert float(circuit.to_path(Expr).eval().array.item().subs(x, 2)) == 2
+    for permutation in (Swap(mode, mode), Permutation(mode ** 3, [1, 2, 0])):
+        assert permutation.to_path(Expr).dtype is Expr
 
 
 def test_scalar_lambdify():
