@@ -1480,7 +1480,7 @@ class Diagram(cat.Arrow, MonoidalCategory, RichDisplay):
 
     def merge_layers(self):
         diagram, i = self, 0
-        while i < len(diagram) - 1:
+        while i < len(diagram.inside) - 1:
             try:
                 merged = diagram.inside[i].merge(diagram.inside[i + 1])
             except AxiomError:

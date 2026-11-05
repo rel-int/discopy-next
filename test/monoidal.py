@@ -655,6 +655,12 @@ def test_merge_layers_tries_each_pair_of_layers_once(monkeypatch):
     assert len(set(pairs)) == len(pairs)
 
 
+def test_sum_foliates():
+    x = Ty('x')
+    f, g = Box('f', x, x), Box('g', x, x)
+    assert (f + g).foliation() == (f + g).merge_layers() == f + g
+
+
 def test_AxiomError():
     inside = (Layer(Box('f', Ty('x'), Ty('y'))), )
     with raises(AxiomError) as err:
