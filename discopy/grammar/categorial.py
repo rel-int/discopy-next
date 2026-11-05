@@ -597,7 +597,7 @@ def tree2diagram(tree: dict, dom=Ty()) -> Diagram:
     """
     if 'word' in tree:
         return Word(tree['word'], cat2ty(tree['cat']), dom=dom)
-    children = list(map(tree2diagram, tree['children']))
+    children = [tree2diagram(child, dom) for child in tree['children']]
     dom = Ty().tensor(*[child.cod for child in children])
     cod = cat2ty(tree['cat'])
     if tree['type'] == 'ba':

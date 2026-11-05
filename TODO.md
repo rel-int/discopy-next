@@ -25,7 +25,7 @@ The fixes of rel-int/discopy-next#445 in `quantum` and `grammar`: bugs the revie
 - [x] **S11-2** cfg.Algebra raises AttributeError on Id and on any tree with an Id branch:
 - [x] **S11-3** cfg.Id.to_diagram() is a box named 'Id(x)', not monoidal.Id(x), so Tree.to_diagram breaks compositionality:
 - [x] **S11-4** graphlike.size counts no phase-free spider with three or more ports and no boxes (e.g.
-- [WIP] @session_01MEJxy43YMF4nTF8NEcP8Je-2026-11-05 19:42 **S11-5** categorial.tree2diagram gives `dom` only to a tree that is a single word:
+- [x] **S11-5** categorial.tree2diagram gives `dom` only to a tree that is a single word:
 - [WIP] @session_01MEJxy43YMF4nTF8NEcP8Je-2026-11-05 19:42 **S11-6** thue.Rule.__repr__ (reused by cfg.Rule) drops an empty name, so eval(repr(Rule(n, s, name=''))) rebuilds the default name 'Rule(n, s)' and compares …
 - [WIP] @session_01MEJxy43YMF4nTF8NEcP8Je-2026-11-05 19:42 **S11-7** categorial.FX and BX docstrings name subterm types that do not compose (the documented pairs raise AxiomError)
 - [WIP] @session_01MEJxy43YMF4nTF8NEcP8Je-2026-11-05 19:42 **S11-8** pregroup.Diagram.normal_form drops its params on every input:
