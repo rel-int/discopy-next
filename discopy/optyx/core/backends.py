@@ -698,25 +698,6 @@ class PercevalBackend(AbstractBackend):
             pcvl.BasicState(selections)
         )
 
-    def _post_select_vacuum(
-        self,
-        dist,
-        m_orig,
-        k_extra,
-        task
-    ):
-        """Keep only entries where extra (ancilla)
-        modes are all 0, then drop them."""
-        if task in ("probs", "amps"):
-            if k_extra <= 0:
-                return dist
-            return {
-                k[:m_orig]: v
-                for k, v in dist.items()
-                if all(x == 0 for x in k[m_orig:])
-            }
-        return dist
-
     def _process_state(self, perceval_state):
         # pylint: disable=import-outside-toplevel
         import perceval as pcvl
@@ -1052,12 +1033,8 @@ class PercevalBackend(AbstractBackend):
             sim_task
         )
 
-        result = self._post_select_vacuum(
-            result,
-            len(term.dom),
-            len(matrix.dom) - len(term.dom),
-            sim_task
-        )
+        if sim_task in ("probs", "amps"):
+            result = {k[:len(matrix.cod)]: v for k, v in result.items()}
 
         output_shape, output_types = self._get_output_params(
             term,

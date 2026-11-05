@@ -895,3 +895,22 @@ def test_perceval_backend_impossible_selection(diagram, task):
     result = diagram.eval(
         PercevalBackend(), config=PercevalEvalConfig(task=task))
     assert np.allclose(np.ravel(result.tensor.array), 0)
+
+
+@pytest.mark.parametrize("task", ["amps", "probs"])
+@pytest.mark.parametrize("diagram", [
+    photonic.Create(1, 1, 0) >> photonic.BS @ qmode >> qmode @ photonic.BS
+    >> qmode @ photonic.Select(0) @ qmode,
+    photonic.Create(1, 1, 1) >> photonic.BS @ qmode >> qmode @ photonic.BS
+    >> qmode @ photonic.Select(1) @ qmode,
+    photonic.Create(2, 0) >> photonic.BS >> photonic.NumOp() @ qmode])
+def test_perceval_backend_labels_outcomes_by_output_modes(diagram, task):
+    """Perceval's outcomes list the selected modes and the ancillas of a
+    dilation after the outputs: with more than one outcome, reading them
+    as outputs moves amplitudes onto the wrong labels."""
+    expected = np.ravel(diagram.eval().tensor.array)
+    if task == "probs":
+        expected = np.abs(expected) ** 2
+    result = diagram.eval(
+        PercevalBackend(), config=PercevalEvalConfig(task=task))
+    assert np.allclose(np.ravel(result.tensor.array), expected)

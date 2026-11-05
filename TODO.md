@@ -4,7 +4,7 @@
 
 The fixes of rel-int/discopy-next#445 in `optyx`: bugs the review confirmed that need no design decision, one commit and one regression test each.
 
-- [WIP] @session_01MEJxy43YMF4nTF8NEcP8Je-2026-11-05 19:42 **S13-1** PercevalBackend gives the wrong outcome labels for any diagram with a Select or a dilation once more than one outcome is non-zero:
+- [x] **S13-1** PercevalBackend gives the wrong outcome labels for any diagram with a Select or a dilation once more than one outcome is non-zero:
 - [WIP] @session_01MEJxy43YMF4nTF8NEcP8Je-2026-11-05 19:42 **S13-2** QuimbBackend with a hyperoptimiser sorts output index names as strings (out10 before out2), so a result with 11 or more input or output wires has its …
 - [WIP] @session_01MEJxy43YMF4nTF8NEcP8Je-2026-11-05 19:42 **S13-3** classical.BitControlledPhaseShift declares its classical control wires last, but its Kraus box reads the first wires as control:
 - [WIP] @session_01MEJxy43YMF4nTF8NEcP8Je-2026-11-05 19:42 **S13-4** PermanentBackend sums the arrays of terms with different photon totals by numpy broadcasting:
