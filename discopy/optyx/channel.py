@@ -1005,11 +1005,11 @@ class Diagram(frobenius.Diagram):
         Parameters:
             tol : The error the certified depth approximates the fixed point
                 within, and the stopping distance of the fallback iteration.
-            max_chi : The largest bond dimension the contraction keeps: a
-                bond past it is truncated down to `max_chi`, with a warning.
-                The public `MAX_BOND_DIMENSION` of eight by default — what a
-                laptop contracts in seconds. `None` contracts exactly,
-                whatever that costs.
+            max_chi : The largest bond dimension a compressed contraction
+                keeps: a bond past it is truncated down to `max_chi`, with a
+                warning. The public `MAX_BOND_DIMENSION` of eight by default
+                — what a laptop contracts in seconds. `None` contracts
+                exactly, whatever that costs.
             max_steps : The maximum number of time steps, including the final
                 readout. The public `DEFAULT_MAX_STEPS` is sixty-four.
             backend : An optional
@@ -1060,16 +1060,16 @@ class Diagram(frobenius.Diagram):
         depth = self.unroll_certificate(tol, max_steps)
         network = self.at_time(depth - 1)
 
+        compressible = max_chi is not None and isinstance(
+            getattr(backend, "hyperoptimiser", None),
+            (ReusableHyperCompressedOptimizer, HyperCompressedOptimizer))
         needed = max(network.truncation_dimensions(), default=1)
-        if max_chi is not None and needed > max_chi:
+        if compressible and needed > max_chi:
             warnings.warn(
                 f"the contraction needs dimension {needed} but "
                 f"max_chi={max_chi}: the result is an approximation with "
                 "those bonds truncated down to max_chi.",
                 UserWarning, stacklevel=2)
-        compressible = max_chi is not None and isinstance(
-            getattr(backend, "hyperoptimiser", None),
-            (ReusableHyperCompressedOptimizer, HyperCompressedOptimizer))
         result = network.eval(
             backend, **({"max_bond": max_chi} if compressible else {}))
 
