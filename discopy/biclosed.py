@@ -88,6 +88,7 @@ from __future__ import annotations
 
 from abc import abstractmethod
 from dataclasses import dataclass, field, replace
+from functools import cached_property
 from inspect import signature
 from itertools import count
 from typing import (
@@ -307,7 +308,13 @@ class Exp(Wire):
         assert_isinstance(base, self.ob)
         assert_isinstance(exponent, self.ob)
         self.base, self.exponent = base, exponent
-        super().__init__(str(self))
+        super().__init__("")
+        del self.name
+
+    @cached_property
+    def name(self):  # pylint: disable=method-hidden  # deleted by __init__
+        "The name of an exponential is its print, computed when first read."
+        return str(self)
 
     def __eq__(self, other):
         return isinstance(other, type(self))\

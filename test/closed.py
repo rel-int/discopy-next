@@ -43,6 +43,18 @@ def test_product():
         Unpack(X @ Y)
 
 
+def test_product_and_exponential_names_are_lazy():
+    X, Y = Ty("X"), Ty("Y")
+    for typ in (X * Y, X >> Y):
+        ob, = typ.inside
+        assert "name" not in vars(ob)
+        delayed = ob.delay()
+        assert ob.name == str(ob) == delayed.name == ob.delay().name
+    nested = Variable("x", X)
+    for _ in range(1000):
+        nested = Tuple(nested, Variable("x", X))
+
+
 def test_product_str_round_trip():
     X, Y, Z = Ty("X"), Ty("Y"), Ty("Z")
     for typ in (X.product(Y, Z), X.product(), (X @ Y).product(Z, X)):

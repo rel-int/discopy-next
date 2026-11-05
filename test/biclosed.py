@@ -23,6 +23,12 @@ def test_Over():
     assert Over(x, y) != Under(x, y)
 
 
+def test_exponential_name_is_lazy():
+    x, y = Ty('x'), Ty('y')
+    for exp in (Over(x, y), Under(x, y)):
+        assert "name" not in vars(exp) and exp.name == str(exp)
+
+
 def test_Under():
     x, y = Ty('x'), Ty('y')
     assert isinstance(y.under_factory(y, x), cat.Ob)

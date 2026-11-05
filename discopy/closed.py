@@ -189,6 +189,11 @@ class Exp(Wire, biclosed.Exp):
 
     ob = Ty
 
+    @cached_property
+    def name(self):  # pylint: disable=method-hidden  # deleted by __init__
+        "The name of an exponential is its undelayed print, read when needed."
+        return str(self.reset())
+
     def __str__(self):
         return f"({self.exponent} >> {self.base})"\
             + feedback.str_delayed(self.time_step)
@@ -222,7 +227,13 @@ class Product(Wire):
         for typ in factors:
             assert_isinstance(typ, self.ob)
         self.factors = factors
-        super().__init__(str(self), **params)
+        super().__init__("", **params)
+        del self.name
+
+    @cached_property
+    def name(self):  # pylint: disable=method-hidden  # deleted by __init__
+        "The name of a product is its undelayed print, read when needed."
+        return str(self.reset())
 
     def __eq__(self, other):
         return isinstance(other, type(self))\
