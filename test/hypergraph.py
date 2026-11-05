@@ -92,6 +92,16 @@ def test_Hypergraph_tensor():
     assert Id().tensor(Id(), Id()) == Id().tensor() == Id()
 
 
+def test_Hypergraph_tensor_shifts_the_offsets():
+    from discopy import monoidal
+    x, y = monoidal.Ty('x'), monoidal.Ty('y')
+    f, s = monoidal.Box('f', x, y), monoidal.Box('s', monoidal.Ty(), y)
+    graph = f.to_hypergraph() @ (x @ s).to_hypergraph()
+    assert graph.offsets == (f @ x @ s).to_hypergraph().offsets == (None, 2)
+    assert graph.to_diagram() == (f @ x @ s).foliation()
+    assert (x @ s.to_hypergraph()).to_diagram() == x @ s
+
+
 def test_Hypergraph_getitem():
     with raises(NotImplementedError):
         H.spiders(1, 2, Ty('x'))[0]

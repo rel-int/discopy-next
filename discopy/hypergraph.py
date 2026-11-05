@@ -468,7 +468,8 @@ class Hypergraph[category](
     def tensor(self, *others: "Hypergraph"):
         """
         Tensor of ``n`` hypergraph diagrams, i.e. their disjoint union,
-        with the spiders of every factor relabeled apart.
+        with the spiders of every factor relabeled apart and its offsets
+        shifted past the codomains of the factors before it.
 
         >>> from discopy.frobenius import Ty, Box, Hypergraph as H
         >>> x = Ty('x')
@@ -485,7 +486,8 @@ class Hypergraph[category](
         dom_wires, box_wires, cod_wires = [], [], []
         for factor in (self, ) + others:
             boxes += factor.boxes
-            offsets += factor.offsets
+            offsets += [None if offset is None else len(cod_wires) + offset
+                        for offset in factor.offsets]
             spiders += factor.spider_types
             dom_wires += shifted(factor.dom_wires, shift)
             cod_wires += shifted(factor.cod_wires, shift)
