@@ -885,6 +885,17 @@ def test_Drawing_dagger():
     assert empty.dagger() == empty
 
 
+def test_Drawing_dagger_reflects_bubbles():
+    x = monoidal.Ty('x')
+    red, blue = monoidal.Colour('red'), monoidal.Colour('blue')
+    y = monoidal.Ty(monoidal.Wire('y', red, blue))
+    f, g = monoidal.Box('f', x, x), monoidal.Box('g', y, y)
+    for diagram in [
+            f.bubble(), f.bubble(draw_as_frame=True), monoidal.Equation(g, g)]:
+        drawing = diagram.to_drawing()
+        assert drawing.dagger().dagger() == drawing
+
+
 def test_draw_is_pure(tmp_path):
     from matplotlib import pyplot as plt
     from discopy import ribbon

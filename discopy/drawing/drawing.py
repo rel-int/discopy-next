@@ -1038,7 +1038,8 @@ which to_drawing recomputes.
             for n, (x, y) in self.positions.items()})
         dom, cod = self.cod, self.dom
         boxes = tuple(map(box_dagger, self.boxes[::-1]))
-        return Drawing(inside, dom, cod, boxes, self.width, self.height)
+        return Drawing(
+            inside, dom, cod, boxes, self.width, self.height, _check=False)
 
     @staticmethod
     def bubble_opening(dom, arg_dom, left, right, frame_boundary=False):
