@@ -101,6 +101,16 @@ def test_measure_measures_every_open_qubit():
     assert np.allclose(((Ket(0) >> X) @ Bits(1)).measure(), [[0, 0], [0, 1]])
 
 
+def test_delayed_circuit_measures_as_the_circuit():
+    for circuit in (H, CX, Measure(), H @ qubit >> CX >> Measure(2),
+                    H @ qubit.delay(), Copy()):
+        delayed = circuit.delay()
+        for mixed in (False, True):
+            assert np.allclose(
+                delayed.measure(mixed=mixed), circuit.measure(mixed=mixed))
+        assert delayed.get_counts() == circuit.get_counts()
+
+
 def test_Box():
     with raises(TypeError):
         Box('f', rigid.Ty('x'), bit)

@@ -229,12 +229,13 @@ class Circuit(tensor.Diagram[complex]):
         circuit = self
         if circuit.dom:
             init = Id().tensor(*(
-                Bits(0) if x == bit else Ket(0) for x in circuit.dom))
+                (Bits(0) if isinstance(x, Digit) else Ket(0)).delay(
+                    x.time_step) for x in circuit.dom.inside))
             circuit = init >> circuit
         if circuit.cod != bit ** len(circuit.cod):
             discards = Id().tensor(*(
-                Discard() if x == qubit
-                else Id(bit) for x in circuit.cod))
+                Discard().delay(x.time_step) if isinstance(x, Qudit)
+                else Id(Ty(x)) for x in circuit.cod.inside))
             circuit = circuit >> discards
         return circuit
 
@@ -427,11 +428,15 @@ class Circuit(tensor.Diagram[complex]):
         >>> assert Copy().measure().tolist() == [[1, 0], [0, 0]]
         """
         from discopy.quantum import gates
-        if mixed or self.is_mixed or bit in self.dom @ self.cod:
+        if mixed or self.is_mixed or any(
+                isinstance(x, Digit) for x in (self.dom @ self.cod).inside):
             circuit = self >> Id().tensor(*(
-                gates.Measure() if x == qubit else Id(x) for x in self.cod))
+                gates.Measure().delay(x.time_step) if isinstance(x, Qudit)
+                else Id(Ty(x)) for x in self.cod.inside))
             return circuit.init_and_discard().eval(mixed=True).array.real
-        state = (gates.Ket(*(len(self.dom) * [0])) >> self).eval()
+        state = (Id().tensor(*(
+            gates.Ket(0).delay(x.time_step) for x in self.dom.inside))
+            >> self).eval()
         with backend() as np:
             return np.absolute(state.array) ** 2
 
