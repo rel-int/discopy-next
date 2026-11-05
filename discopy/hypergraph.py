@@ -1828,12 +1828,14 @@ class Hypergraph[category](
     @property
     def is_monogamous(self) -> bool:
         """
-        Checks monogamy, i.e. each input connects to exactly one output,
-        formally whether :code:`self.wires` induces a bijection::
+        Checks monogamy, i.e. each spider that is not a scalar has exactly one
+        input wire, from the domain or the output of a box, and exactly one
+        output wire, to the input of a box or the codomain. Counting the wires
+        on each side, it follows that::
 
-            len(self.dom) + sum(len(box.dom) for box in boxes)
+            len(self.dom) + sum(len(box.cod) for box in self.boxes)
             == self.n_spiders - len(self.scalar_spiders)
-            == sum(len(box.cod) for box in boxes) + len(self.dom)
+            == sum(len(box.dom) for box in self.boxes) + len(self.cod)
 
         In that case, the diagram actually lives in a traced category.
 
@@ -1846,6 +1848,11 @@ class Hypergraph[category](
 
         >>> assert f.is_monogamous
         >>> assert (f >> f[::-1]).is_monogamous
+
+        >>> g = Box('g', x, x @ y).to_hypergraph()
+        >>> inputs = len(g.dom) + sum(len(box.cod) for box in g.boxes)
+        >>> outputs = sum(len(box.dom) for box in g.boxes) + len(g.cod)
+        >>> assert g.is_monogamous and inputs == g.n_spiders == outputs
 
         >>> assert H.spiders(0, 0, x).is_monogamous
 
