@@ -12,7 +12,7 @@ permissions:
 # run that proves it green: cancelling those leaves main with commits nothing
 # ever built, as it did on 112b6036.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
