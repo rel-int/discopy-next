@@ -328,7 +328,13 @@ class Circuit(tensor.Diagram[complex]):
                 lambda f: f.array,
                 dom=Circuit,
                 dtype=complex)(self)
-        circuits = [circuit.to_tk() for circuit in (self, ) + others]
+        circuits = (self, ) + others
+        if params.pop("measure_all", False):
+            from discopy.quantum.gates import Measure
+            circuits = tuple(circuit >> Id().tensor(*(
+                Measure() if x == qubit else Id(x) for x in circuit.cod))
+                for circuit in circuits)
+        circuits = [circuit.to_tk() for circuit in circuits]
         results, counts = [], circuits[0].get_counts(
             *circuits[1:], backend=backend, **params)
         for i, circuit in enumerate(circuits):
@@ -391,6 +397,11 @@ class Circuit(tensor.Diagram[complex]):
                 if result.array[bits]:
                     counts[bits] = result.array[bits].real
             return counts
+        if params.pop("measure_all", False):
+            from discopy.quantum.gates import Measure
+            return Circuit.get_counts(*(circuit >> Id().tensor(*(
+                Measure() if x == qubit else Id(x) for x in circuit.cod))
+                for circuit in (self, ) + others), backend=backend, **params)
         counts = self.to_tk().get_counts(
             *(other.to_tk() for other in others), backend=backend, **params)
         return counts if len(counts) > 1 else counts[0]

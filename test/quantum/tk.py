@@ -175,12 +175,23 @@ def test_Circuit_get_counts_snake():
     compilation = Mock()
     compilation.apply = lambda x: x
     backend = tk.mockBackend({
-        (0, 0): 240, (0, 1): 242, (1, 0): 271, (1, 1): 271})
+        (0, 0, 0): 240, (0, 1, 1): 242, (1, 0, 0): 271, (1, 1, 1): 271})
     scaled_bell = Circuit.caps(qubit, qubit)
     snake = scaled_bell @ qubit >> qubit @ scaled_bell[::-1]
     result = np.round(snake.eval(
         backend=backend, compilation=compilation, measure_all=True).array)
-    assert result == 1
+    assert result.tolist() == [1, 0]
+
+
+def test_measure_all_measures_the_open_qubits():
+    backend = tk.mockBackend({(0, ): 512, (1, ): 512})
+    assert (Ket(0) >> H).eval(backend=backend, measure_all=True)\
+        == Tensor[float]([.5, .5], Dim(1), Dim(2))
+    circuit = Ket(0, 0) >> X @ qubit >> qubit @ Bra(0)
+    backend = tk.mockBackend({(0, 1): 1024})
+    assert circuit.get_counts(backend=backend, measure_all=True) == {(1, ): 1}
+    tk_circuit, = backend.process_circuits.call_args.args[0]
+    assert tk_circuit == (circuit >> Measure()).to_tk()
 
 
 def test_Circuit_get_counts_empty():
