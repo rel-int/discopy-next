@@ -823,7 +823,7 @@ class X(Channel):
         )
         return box.decomp()
 
-    def dual_rail(self):  # pragma: no cover
+    def dual_rail(self):
         """Convert to dual-rail encoding."""
         from discopy.optyx import (
             photonic
@@ -846,9 +846,9 @@ class X(Channel):
         if (n, m, phase) == (1, 0, 0.5):
             return counit @ annil @ root2
         if (n, m, phase) == (1, 1, 0.25):
-            return BS.dagger()
-        if (n, m, phase) == (1, 1, -0.25):
-            return BS
+            return BS @ photonic.Scalar(np.exp(-1j * np.pi / 4))
+        if (n, m, phase) == (1, 1, 0.75):
+            return BS.dagger() @ photonic.Scalar(np.exp(1j * np.pi / 4))
         raise NotImplementedError(f"No translation of {self} in QPath.")
 
     def dagger(self):

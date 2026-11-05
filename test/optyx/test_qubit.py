@@ -289,6 +289,20 @@ def test_spiders_to_dual_rail():
             == probabilities(state >> qubits.Z(2, 1) >> DualRail(1))
 
 
+@pytest.mark.parametrize("n, m, phase", [
+    (0, 1, 0), (0, 1, .5), (1, 0, 0), (1, 0, -.5),
+    (1, 1, .25), (1, 1, .75), (1, 1, -.25)])
+def test_x_dual_rail_commutes_with_the_encoding(n, m, phase):
+    """Encoding then applying the dual-rail translation of an X spider is
+    applying the spider then encoding, scalars included."""
+    from discopy.optyx.photonic import DualRail
+    spider = qubits.X(n, m, phase)
+    left = DualRail(n) >> spider.dual_rail() if n else spider.dual_rail()
+    right = spider >> DualRail(m) if m else spider
+    assert np.allclose(left.get_kraus().to_tensor().eval().array,
+                       right.get_kraus().to_tensor().eval().array)
+
+
 def test_scalar():
     from discopy.optyx import photonic
     assert qubits.Scalar(2).decomp() == qubits.Scalar(2)
