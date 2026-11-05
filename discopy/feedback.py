@@ -256,6 +256,7 @@ from typing import ClassVar
 
 from discopy import monoidal, cmap, hypergraph, messages
 from discopy.abc import FeedbackCategory, TracedCategory
+from discopy.config import BOX_DRAWING_ATTRIBUTES
 from discopy.monoidal import (  # noqa: F401  pylint: disable=unused-import
     Equation)
 from discopy.utils import (
@@ -654,7 +655,7 @@ class Box(monoidal.Box, Diagram):
     """
     serialised_attrs = monoidal.Box.serialised_attrs + ("time_step", )
 
-    _time_step, _args, _params = 0, (), {}
+    _time_step = 0
 
     @property
     def time_step(self) -> int | None:
@@ -694,7 +695,8 @@ class Box(monoidal.Box, Diagram):
         objects are; a structural box, one whose ``__getnewargs__`` gives the
         arguments it is built from, e.g. a swap, a copy or a controlled gate,
         is built from their delays, those of its types and its diagrams; any
-        other box from its delayed boundary, one more time step on.
+        other box from its delayed boundary, one more time step on, drawn as
+        it is.
 
         Parameters:
             n_steps : The number of time steps to delay.
@@ -706,9 +708,13 @@ class Box(monoidal.Box, Diagram):
             return type(self)(*(
                 x.delay(n_steps) if isinstance(x, (Ty, Diagram)) else x
                 for x in arguments()))
-        return self.rebuild(
+        box = self.rebuild(
             dom=self.dom.delay(n_steps), cod=self.cod.delay(n_steps),
             time_step=self.time_step + n_steps)
+        vars(box).update(
+            (attr, value) for attr, value in vars(self).items()
+            if attr in BOX_DRAWING_ATTRIBUTES)
+        return box
 
     def reset(self):
         """

@@ -51,6 +51,8 @@ def test_delay_keeps_the_attributes_of_a_box():
     assert F(sample.delay()) == F(sample).delay()
     f = frobenius.Box('f', frobenius.Ty('x'), frobenius.Ty('y'))
     assert f.r.delay() == f.delay().r
+    drawn = Box('f', Ty('x'), Ty('y'), color='red', drawing_name='F')
+    assert (drawn.delay().color, drawn.delay().drawing_name) == ('red', 'F')
 
 
 def test_Feedback_to_tree():
