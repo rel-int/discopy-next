@@ -57,6 +57,17 @@ def test_Tree():
         Rule(rigid.Ty('x') @ rigid.Ty('x'), x, name='r')(a, a)
 
 
+def test_Tree_call_typechecks():
+    y, a, b = Ty('y'), Word('a', x), Word('b', Ty('y'))
+    for tree, others in [(Id(x), (b, )), (Id(x), (a, a)), (f, (Id(y), Id(y))),
+                         (f, (Id(x), )), (f(a, a), (a, a))]:
+        with raises(AxiomError, match="does not compose with"):
+            tree(*others)
+    with raises(AxiomError, match=r"f\(Id\(x\), f\) does not compose with "
+                                  r"\(a, b, a\): x @ x @ x != x @ y @ x"):
+        f(Id(x), f)(a, b, a)
+
+
 def test_Tree_dom():
     a = Word('a', x)
     assert f(f, w).dom == x @ x and f(w, w).dom == Ty()
