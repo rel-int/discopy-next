@@ -725,7 +725,7 @@ class Diagram(frobenius.Diagram):
         >>> assert BS.dilate() == BS.get_kraus()
         """
         kraus, env = diagram.Id(self.dom.single()), diagram.Ty()
-        for layer in self:
+        for layer in self.to_staircases():
             (box, offset), = layer.inside[0].boxes_and_offsets
             left = layer.dom[:offset]
             right = layer.dom[offset + len(box.dom):]
@@ -1401,7 +1401,7 @@ class Diagram(frobenius.Diagram):
         """
         assert self.is_pure, "Cannot get a Kraus map of non-pure circuit"
         kraus_maps = [diagram.Id(self.dom.single())]
-        for layer in self:
+        for layer in self.to_staircases():
             (generator, offset), = layer.inside[0].boxes_and_offsets
             left = layer.dom[:offset]
             right = layer.dom[offset + len(generator.dom):]
@@ -1467,7 +1467,7 @@ class Diagram(frobenius.Diagram):
         assert self.is_pure, "Diagram must be pure to convert to tket."
 
         kraus_maps = []
-        for layer in self:
+        for layer in self.to_staircases():
             (generator, offset), = layer.inside[0].boxes_and_offsets
             left = layer.dom[:offset]
             right = layer.dom[offset + len(generator.dom):]

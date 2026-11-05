@@ -310,3 +310,24 @@ def test_from_callable_calls_a_channel_diagram():
 
     assert measure_beside_bell == (
         bell @ Measure(qubit) >> qubit @ Diagram.swap(qubit, bit))
+
+
+def test_readings_do_not_depend_on_foliation():
+    from discopy.optyx import classical, qubits
+    from discopy.optyx.utils.misc import explode_channel
+    state = photonic.Create(0) @ photonic.Create(1)
+    step = (photonic.Create(1) @ qmode @ qmode >> photonic.BS @ qmode
+            >> photonic.NumberResolvingMeasurement(1) @ qmode @ qmode
+            >> classical.CopyN(1) @ photonic.BS)
+
+    def sample(state):
+        return step.feedback(mem=qmode @ qmode, state=state).sample(
+            3, burn_in=0, seed=0)
+
+    for reading, term in [
+            (Diagram.dilate, state), (sample, state),
+            (Diagram.get_kraus, qubits.Z(1, 1, .2) @ qubits.X(1, 1, .3)),
+            (explode_channel, zx.Z(1, 1, .2) @ zx.X(1, 1, .3)),
+            (classical.BitControlledGate,
+             photonic.Phase(.3) @ photonic.Phase(.4))]:
+        assert reading(term.foliation()) == reading(term), reading

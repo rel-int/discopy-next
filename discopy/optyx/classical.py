@@ -209,9 +209,9 @@ class BitControlledGate(Channel):
                     classical=classical
                 )
 
-        boxes = []
-        for i in range(len(diag)):
-            layer = diag[i]
+        boxes, staircases = [], diag.to_staircases()
+        for i in range(len(staircases)):
+            layer = staircases[i]
             (box, offset), = layer.inside[0].boxes_and_offsets
             left = layer.dom[:offset]
             right = layer.dom[offset + len(box.dom):]

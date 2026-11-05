@@ -1626,8 +1626,7 @@ class Unravelling:
         spider does until the scalar that normalises it, but a run that
         does not end with weight one is a postselection.
         """
-        for layer in diagram:
-            (box, offset), = layer.inside[0].boxes_and_offsets
+        for box, offset in zip(diagram.boxes, diagram.offsets):
             state = self.apply(state, offset, box, rng)
         if not np.isclose(state.weight, 1, atol=1e-6):
             raise NotImplementedError(
