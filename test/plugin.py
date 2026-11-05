@@ -41,7 +41,7 @@ UNIMPORTABLE_PACKAGES = ("discopy/optyx/", "test/optyx/")
 def pytest_addoption(parser):
     parser.addoption("--skip-extra", action="store_true", help=(
         "Skip what needs a dependency outside `uv sync --dev`, rather than "
-        "fail. Nothing is skipped once the extras are installed."))
+        "fail, whether or not that dependency is installed."))
 
 
 def needs_extra(path):
