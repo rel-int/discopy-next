@@ -202,8 +202,11 @@ def main() -> int:
     names = set(args.notebooks)
     selected = [nb for nb in notebooks()
                 if not names or {nb.stem, name_of(nb)} & names]
-    if not selected:
-        print("no matching notebooks found", file=sys.stderr)
+    unmatched = names.difference(
+        *({nb.stem, name_of(nb)} for nb in selected))
+    if not selected or unmatched:
+        print("no matching notebooks found:", *sorted(unmatched),
+              file=sys.stderr)
         return 1
 
     with ThreadPoolExecutor(args.jobs) as pool:

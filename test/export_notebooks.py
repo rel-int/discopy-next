@@ -1,4 +1,5 @@
-"""Check that docs/export_notebooks.py runs the notebooks of its own tree."""
+"""Check that docs/export_notebooks.py runs the notebooks it is asked for,
+on the discopy of its own tree."""
 
 from pathlib import Path
 
@@ -20,3 +21,12 @@ def test_notebook_imports_the_discopy_of_its_tree(tmp_path, monkeypatch):
     notebook.write_text(PROBE.format(root=str(ROOT / "discopy")))
 
     export_notebooks.export(notebook, check=True)
+
+
+def test_every_name_must_match_a_notebook(monkeypatch, capsys):
+    monkeypatch.setattr(export_notebooks, "render", lambda *_, **__: True)
+    monkeypatch.setattr("sys.argv", [
+        "export_notebooks.py", "--check", "examples", "fixpoint"])
+
+    assert export_notebooks.main() == 1
+    assert "fixpoint" in capsys.readouterr().err
