@@ -237,6 +237,12 @@ def test_encode_inflate_mixed_types():
     assert encode.inflate(2).dom == dom.inflate(2)
 
 
+def test_encoding_classical_types_is_not_pure():
+    for dom in (bit, mode, bit @ qmode):
+        assert not Encode(dom).is_pure
+    assert Encode(qubit @ qmode).is_pure
+
+
 def test_dual_rail_only_for_zx_channels():
     with pytest.raises(TypeError, match="Only ZX channels"):
         Channel("id", diagram.Id(diagram.mode)).dual_rail()

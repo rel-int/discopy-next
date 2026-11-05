@@ -1377,7 +1377,7 @@ class Diagram(frobenius.Diagram):
             # if we prepare quantum from classical types, it's not pure
             if (
                 isinstance(generator, Encode) and
-                any(ty.is_classical for ty in generator.cod.inside)
+                any(ty.is_classical for ty in generator.dom.inside)
             ):
                 return False
 

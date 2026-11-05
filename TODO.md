@@ -28,7 +28,7 @@ The fixes of rel-int/discopy-next#445 in `optyx`: bugs the review confirmed that
 - [x] **S14-12** BBS's docstring matrix is the array with its columns swapped, left stale when optyx redefined BS (8ee5a9ac).
 - [x] **S14-15** qubits.X.dual_rail maps X(1,1,.25) to BS.dagger(), which is not even proportional to it.
 - [x] **S14-16** classical's autosummary lists `Select`, a name the module does not define, so Sphinx cannot import it;
-- [WIP] @session_01MEJxy43YMF4nTF8NEcP8Je-2026-11-05 19:42 **S14-17** Diagram.is_pure's Encode branch tests the codomain for classical types, which an Encode never has, so it never fires.
+- [x] **S14-17** Diagram.is_pure's Encode branch tests the codomain for classical types, which an Encode never has, so it never fires.
 - [WIP] @session_01MEJxy43YMF4nTF8NEcP8Je-2026-11-05 19:42 **S15-2** Diagram.from_perceval applies a PostSelect condition to the wrong modes when a herald precedes them:
 - [WIP] @session_01MEJxy43YMF4nTF8NEcP8Je-2026-11-05 19:42 **S15-3** compile_postselect cannot tokenise '!=', so Diagram.from_perceval raises on a processor whose PostSelect uses '!=':
 - [WIP] @session_01MEJxy43YMF4nTF8NEcP8Je-2026-11-05 19:42 **S15-4** Diagram.from_perceval creates the input side from p.heralds (perceval's output heralds) instead of p.in_heralds, so an OUTPUT-only or INPUT-only …
