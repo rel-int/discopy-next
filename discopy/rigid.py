@@ -1044,11 +1044,11 @@ def nesting[T](cls: type[T], factory: Callable) -> Callable[[Ty, Ty], T]:
 
 
 def to_rigid(self):
-    return biclosed.Functor(
+    return Functor(
         ob_map=lambda x: Ty(x.inside[0].name),
         ar_map=lambda f: Box(
             f.name, to_rigid(f.dom), to_rigid(f.cod), data=f.data),
-        cod=Diagram)(self)
+        dom=biclosed.Diagram, cod=Diagram)(self)
 
 
 biclosed.Diagram.to_rigid = to_rigid
