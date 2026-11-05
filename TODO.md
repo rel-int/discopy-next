@@ -25,7 +25,7 @@ The fixes of rel-int/discopy-next#445 in `optyx`: bugs the review confirmed that
 - [x] **S14-8** Diagram.fix warns that the result is an approximation truncated to max_chi even when the backend never compresses (DiscopyBackend, or QuimbBackend …
 - [x] **S14-10** The qubits module's teleportation doctest is skipped as if the library were at fault, but its circuit is wrong:
 - [x] **S14-11** ZMeasurementDR's docstring says 'Z basis after a phase shift' but leaves out the HadamardBS:
-- [WIP] @session_01MEJxy43YMF4nTF8NEcP8Je-2026-11-05 19:42 **S14-12** BBS's docstring matrix is the array with its columns swapped, left stale when optyx redefined BS (8ee5a9ac).
+- [x] **S14-12** BBS's docstring matrix is the array with its columns swapped, left stale when optyx redefined BS (8ee5a9ac).
 - [WIP] @session_01MEJxy43YMF4nTF8NEcP8Je-2026-11-05 19:42 **S14-15** qubits.X.dual_rail maps X(1,1,.25) to BS.dagger(), which is not even proportional to it.
 - [WIP] @session_01MEJxy43YMF4nTF8NEcP8Je-2026-11-05 19:42 **S14-16** classical's autosummary lists `Select`, a name the module does not define, so Sphinx cannot import it;
 - [WIP] @session_01MEJxy43YMF4nTF8NEcP8Je-2026-11-05 19:42 **S14-17** Diagram.is_pure's Encode branch tests the codomain for classical types, which an Encode never has, so it never fires.

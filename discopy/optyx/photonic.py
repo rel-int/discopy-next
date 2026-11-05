@@ -619,10 +619,10 @@ class BBS(AbstractGate):
 
     Corresponds to :py:class:`Matrix`
     :math:`\\begin{pmatrix}
-    \\tt{sin}((0.25 + bias)\\pi)
-    & i \\tt{cos}((0.25 + bias)\\pi) \\\\
     i \\tt{cos}((0.25 + bias)\\pi)
-    & \\tt{sin}((0.25 + bias)\\pi) \\end{pmatrix}`.
+    & \\tt{sin}((0.25 + bias)\\pi) \\\\
+    \\tt{sin}((0.25 + bias)\\pi)
+    & i \\tt{cos}((0.25 + bias)\\pi) \\end{pmatrix}`.
 
     Parameters
     ----------
@@ -631,6 +631,9 @@ class BBS(AbstractGate):
 
     Example
     -------
+    >>> sin, cos = np.sin(.35 * np.pi), np.cos(.35 * np.pi)
+    >>> assert np.allclose(BBS(.1).array, [[1j * cos, sin], [sin, 1j * cos]])
+
     The standard beam splitter is:
 
     >>> BS = BBS(0)
@@ -709,7 +712,8 @@ class TBS(AbstractGate):
     \\tt{sin}(\\theta \\, \\pi)
     & \\tt{cos}(\\theta \\, \\pi) \\\\
     \\tt{cos}(\\theta \\, \\pi) & - \\tt{sin}(\\theta \\, \\pi)
-    \\end{pmatrix}`.
+    \\end{pmatrix}`
+    times its :code:`global_phase`.
 
     Parameters
     ----------
@@ -816,7 +820,8 @@ class MZI(AbstractGate):
     e^{2\\pi i \\phi} \\tt{sin}(\\theta \\, \\pi)
     & \\tt{cos}(\\theta \\, \\pi) \\\\
     e^{2\\pi i \\phi} \\tt{cos}(\\theta \\, \\pi)
-    & - \\tt{sin}(\\theta \\, \\pi) \\end{pmatrix}`.
+    & - \\tt{sin}(\\theta \\, \\pi) \\end{pmatrix}`
+    times its :code:`global_phase`.
 
     Parameters
     ----------
