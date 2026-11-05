@@ -68,9 +68,9 @@ def test_Functor_keys_boxes_by_syntax():
     assert F(f >> g) == g >> f
 
 
-def test_Diagram_permutation():
+def test_Diagram_permutation(monkeypatch):
     x = Nat(1)
-    tmp, Diagram.ob = Diagram.ob, Nat
+    monkeypatch.setattr(Diagram, "ob", Nat)
     assert Diagram.swap(x, x ** 2)\
         == Diagram.swap(x, x) @ Id(x) >> Id(x) @ Diagram.swap(x, x)\
         == Diagram.permutation([1, 2, 0])\
@@ -79,7 +79,6 @@ def test_Diagram_permutation():
         Diagram.permutation([2, 0])
     with raises(ValueError):
         Diagram.permutation([2, 0, 1], x ** 2)
-    Diagram.ob = tmp
 
 
 def test_bad_permute():
