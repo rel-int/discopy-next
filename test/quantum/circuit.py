@@ -524,6 +524,13 @@ def test_mixed_eval_foliated():
         .is_close(circuit.eval(mixed=True))
 
 
+def test_contractor_eval_batches_others():
+    batch = H.eval(X, contractor=contractor)
+    assert len(batch) == 2 and all(map(is_close_smallno, batch, H.eval(X)))
+    for c in (X + Z, (Ket(0) >> H >> Measure()) + (Ket(1) >> Measure())):
+        assert is_close_smallno(c.eval(contractor=contractor), c.eval())
+
+
 @pytest.mark.parametrize('c', mixed_circuits)
 def test_pytorch_mixed_eval(c):
     pytest.importorskip("torch")

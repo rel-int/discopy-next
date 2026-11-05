@@ -305,6 +305,9 @@ class Circuit(tensor.Diagram[complex]):
         on a ``pytket.Backend`` one should set ``measure_all=True``.
         """
         from discopy.quantum import channel
+        if others and backend is None:
+            return [circuit.eval(mixed=mixed, contractor=contractor, **params)
+                    for circuit in (self, ) + others]
         if contractor is not None:
             array = contractor(*self.to_tn(mixed=mixed)).tensor
             if self.is_mixed or mixed:
@@ -317,9 +320,6 @@ class Circuit(tensor.Diagram[complex]):
 
         from discopy.quantum import channel
         if backend is None:
-            if others:
-                return [circuit.eval(mixed=mixed, **params)
-                        for circuit in (self, ) + others]
             if mixed or self.is_mixed:
                 return channel.Functor(
                     {}, {}, dom=Circuit, dtype=complex)(self)
