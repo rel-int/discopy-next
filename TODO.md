@@ -4,7 +4,7 @@
 
 The fixes of rel-int/discopy-next#445 in the symmetric tower and the closed levels (`symmetric` to `ribbon`, `rigid`, `closed`, `biclosed`): bugs the review confirmed that need no design decision, one commit and one regression test each.
 
-- [WIP] @session_01MEJxy43YMF4nTF8NEcP8Je-2026-11-05 19:42 **S3-1** feedback.Box.delay rebuilds from _args/_params, which never hold a markov box's flags or a rigid box's winding z.
+- [x] **S3-1** feedback.Box.delay rebuilds from _args/_params, which never hold a markov box's flags or a rigid box's winding z.
 - [WIP] @session_01MEJxy43YMF4nTF8NEcP8Je-2026-11-05 19:42 **S3-2** ribbon.Twist, DualRailTwist, DualRailBraid, DualRailCup and DualRailCap rotate to boxes on the wrong objects, so .r/.l of any ribbon diagram with a …
 - [WIP] @session_01MEJxy43YMF4nTF8NEcP8Je-2026-11-05 19:42 **S3-3** braided.Diagram.naturality never checks that the layers next to box i are the braid it slides through, so it silently deletes whatever is there:
 - [WIP] @session_01MEJxy43YMF4nTF8NEcP8Je-2026-11-05 19:42 **S3-4** The identity markov (comarkov) functor does not return a Function (Cofunction) unchanged:

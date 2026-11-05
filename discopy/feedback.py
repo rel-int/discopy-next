@@ -674,10 +674,7 @@ class Box(monoidal.Box, Diagram):
         return None if hasattr(self, "__getnewargs__") else self._time_step
 
     def __init__(self, *args, time_step: int = 0, **params):
-        self._time_step, self._args = time_step, args[3:]
-        self._params = {
-            key: value for key, value in params.items()
-            if key not in ("name", "dom", "cod")}
+        self._time_step = time_step
         super().__init__(*args, **params)
 
     @time_step.setter
@@ -709,11 +706,9 @@ class Box(monoidal.Box, Diagram):
             return type(self)(*(
                 x.delay(n_steps) if isinstance(x, (Ty, Diagram)) else x
                 for x in arguments()))
-        dom, cod = self.dom.delay(n_steps), self.cod.delay(n_steps)
-        time_step = self.time_step + n_steps
-        return type(self)(
-            self.name, dom, cod, *self._args, time_step=time_step,
-            **self._params)
+        return self.rebuild(
+            dom=self.dom.delay(n_steps), cod=self.cod.delay(n_steps),
+            time_step=self.time_step + n_steps)
 
     def reset(self):
         """
