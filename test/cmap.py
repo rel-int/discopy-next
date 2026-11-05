@@ -1262,6 +1262,25 @@ def test_a_match_does_not_cross_wires():
                    == host.to_diagram().normal_form() for match in matches)
 
 
+def test_match_sends_straight_wires_beside_the_image(monkeypatch):
+    from discopy import cmap
+    from discopy.monoidal import Ty, Box
+    x = Ty('x')
+    f, g, h, k = (Box(name, x, x) for name in "fghk")
+    calls, complement = [], cmap.CMap.complement
+
+    def recorded(self, pattern, homomorphism):
+        calls.append(homomorphism)
+        return complement(self, pattern, homomorphism)
+    monkeypatch.setattr(cmap.CMap, "complement", recorded)
+    column = x ** 3 @ f >> x ** 3 @ g
+    host, pattern = (column >> column).to_map(), (x ** 3 @ f).to_map()
+    assert len(list(host.match(pattern))) == 2
+    assert len(calls) <= 2 * 3 ** 3
+    for host, n_matches in [(h @ x >> x @ f, 2), (k @ x >> h @ x >> x @ f, 3)]:
+        assert len(list(host.to_map().match((x @ f).to_map()))) == n_matches
+
+
 def test_match_needs_a_connected_map():
     from discopy.monoidal import Ty, Box
     x = Ty('x')
