@@ -389,7 +389,8 @@ which to_drawing recomputes.
     def __eq__(self, other):
         if not isinstance(other, Drawing):
             return False
-        return self.is_parallel(other) and self.positions == other.positions
+        return self.is_parallel(other) and self.positions == other.positions\
+            and set(self.edges) == set(other.edges)
 
     @backend.matplotlib_context()
     def draw(self, **params):

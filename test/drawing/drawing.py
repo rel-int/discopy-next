@@ -986,3 +986,17 @@ def test_Drawing_bubble_of_plain_types_places_every_node():
         bubble = f.bubble(dom, cod, name="g")
         assert set(bubble.nodes) == set(bubble.positions)
         assert bubble == f.bubble(dom.to_drawing(), cod.to_drawing(), name="g")
+
+
+def test_Drawing_equality_compares_wires():
+    x = monoidal.Ty('x')
+    wires = Drawing.id(x @ x)
+    (a, b), (c, d) = wires.dom_nodes, wires.cod_nodes
+    graph = wires.graph.copy()
+    graph.remove_edges_from([(a, c), (b, d)])
+    graph.add_edges_from([(a, d), (b, c)])
+    crossed = Drawing(
+        PlaneGraph(graph, wires.positions), wires.dom, wires.cod, (),
+        wires.width, wires.height)
+    crossed.validate_attributes()
+    assert crossed != wires
