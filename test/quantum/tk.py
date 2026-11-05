@@ -143,6 +143,21 @@ def test_Discard_bit_to_tk():
         == Tensor[float]([1], Dim(1), Dim(1))
 
 
+def test_override_bits_after_post_processing_to_tk():
+    NOT = ClassicalGate('NOT', bit, bit, [0, 1, 1, 0])
+    circuits = [
+        Ket(0, 1) >> qubit @ Measure() >> qubit @ NOT
+        >> Measure(override_bits=True),
+        Ket(0, 1) >> qubit @ Measure() >> qubit @ NOT
+        >> Measure(destructive=False, override_bits=True) >> X @ bit,
+        Ket(1, 0) >> qubit @ Measure() >> qubit @ Copy()
+        >> qubit @ Discard(bit) @ bit >> Measure(override_bits=True)]
+    for circuit in circuits:
+        assert np.allclose(
+            Circuit.from_tk(circuit.to_tk()).eval().array,
+            circuit.init_and_discard().eval().array)
+
+
 def test_ClassicalGate_to_tk():
     post = ClassicalGate('post', bit ** 2, bit ** 0, data=[0, 0, 0, 1])
     assert (post[::-1] >> Swap(bit, bit)).to_tk().post_processing\
