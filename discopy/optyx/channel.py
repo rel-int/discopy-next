@@ -1727,6 +1727,17 @@ class Channel(Diagram, frobenius.Box):
         syms, exprs = zip(*args)
         return self.lambdify(*syms)(*exprs)
 
+    def grad(self, var, **params):
+        """
+        Gradient with respect to :code:`var`, zero for a box that does not
+        depend on it: a box that does needs a gradient of its own.
+        """
+        # pylint: disable=unused-argument  # the signature of Diagram.grad
+        if var not in self.free_symbols:
+            return self.sum_factory((), self.dom, self.cod)
+        raise NotImplementedError(
+            f"{type(self).__name__} does not support grad")
+
     def inflate(self, d):
         r"""Translates from an indistinguishable setting
         to a distinguishable one. For a map on :math:`F(\mathbb{C})`,
@@ -1799,6 +1810,8 @@ class CQMap(Diagram, frobenius.Box):
     def __repr__(self):
         return f"{factory_name(type(self))}({self.name!r}, "\
             f"{self.density_matrix!r}, {self.dom!r}, {self.cod!r})"
+
+    grad = Channel.grad
 
     def double(self):
         return self.density_matrix
@@ -1934,6 +1947,7 @@ class Feedback(monoidal.Bubble, Diagram, frobenius.Box):
     __repr__ = diagram.Feedback.__repr__
     dagger = diagram.Feedback.dagger
     to_drawing = diagram.Feedback.to_drawing
+    grad = Channel.grad
 
     def double(self):
         """The feedback loop of the doubled diagram."""

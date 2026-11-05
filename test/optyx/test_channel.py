@@ -180,6 +180,18 @@ def test_sums_double_and_differentiate_term_by_term():
         np.exp(.2j * np.pi) + 2 * np.exp(.4j * np.pi)))
 
 
+def test_a_box_without_a_gradient_refuses_to_differentiate():
+    from discopy.optyx import qubits
+    loop = (photonic.Create(1) @ qmode >> photonic.BS
+            >> qmode @ photonic.Phase(x)).feedback(
+        mem=qmode, state=photonic.Create(0))
+    for box in (qubits.Z(1, 1, x), qubits.Scalar(x), photonic.BBS(x),
+                qubits.Ket(0) >> qubits.X(1, 1, x), loop):
+        assert box.grad(y) == Diagram.sum_factory((), box.dom, box.cod)
+        with pytest.raises(NotImplementedError, match="does not support"):
+            box.grad(x)
+
+
 def test_cq_map_power_is_a_tensor_power():
     measure = CQMap("measure", diagram.Spider(2, 1, diagram.bit), qubit, bit)
     assert measure ** 1 == measure
