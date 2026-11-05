@@ -117,7 +117,7 @@ from discopy.kleisli.monad import Monad
 from discopy.python import function
 from discopy.python.additive import Ty
 from discopy.utils import (
-    assert_isinstance, assert_iscomposable, factory, factory_name, unbiased)
+    assert_iscomposable, assert_ismember, factory, factory_name, unbiased)
 
 
 class Tagged:
@@ -305,7 +305,7 @@ class Channel[monad](TracedCategory, ComarkovCategory, NamedGeneric):
         Parameters:
             other : The other channel to compose in sequence.
         """
-        assert_isinstance(other, type(self))
+        assert_ismember(other, type(self))
         assert_iscomposable(self, other)
         return type(self)(
             self.inside >> other.inside,  # ty: ignore[unsupported-operator]
@@ -322,7 +322,7 @@ class Channel[monad](TracedCategory, ComarkovCategory, NamedGeneric):
         Parameters:
             other : The other channel to tensor in parallel.
         """
-        assert_isinstance(other, type(self))
+        assert_ismember(other, type(self))
         monad = type(self).monad
         dom, cod = self.dom @ other.dom, self.cod @ other.cod
         left = monad(injection(0, self.cod, cod))

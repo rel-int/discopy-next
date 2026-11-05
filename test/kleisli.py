@@ -118,8 +118,19 @@ def test_Channel_maybe():
 
     Nondet = Channel[Powerset]
     other = Nondet(lambda x: frozenset({x}), int, int)
-    with raises(AxiomError):  # Mismatched monads, caught at Function level.
+    with raises(TypeError):
         half.then(other)
+
+
+def test_channels_of_different_monads_do_not_compose():
+    for module in (kleisli.channel, additive, multiplicative):
+        safe = module.Channel[Maybe](lambda x: x, int, int)
+        nondet = module.Channel[Powerset](lambda x: frozenset({x}), int, int)
+        with raises(TypeError):
+            safe >> nondet
+        if module is not kleisli.channel:
+            with raises(TypeError):
+                safe @ nondet
 
 
 def test_Channel_powerset():

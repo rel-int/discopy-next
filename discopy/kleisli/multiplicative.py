@@ -77,7 +77,7 @@ from discopy.kleisli.monad import Monad
 from discopy.python import function
 from discopy.python.multiplicative import Ty
 from discopy.utils import (
-    assert_isinstance, assert_iscomposable, factory, factory_name)
+    assert_iscomposable, assert_ismember, factory, factory_name)
 
 
 class Row:
@@ -227,7 +227,7 @@ class Channel[monad](Category, NamedGeneric):
         Parameters:
             other : The other channel to compose in sequence.
         """
-        assert_isinstance(other, type(self))
+        assert_ismember(other, type(self))
         assert_iscomposable(self, other)
         return type(self)(
             self.inside >> other.inside,  # ty: ignore[unsupported-operator]
@@ -276,7 +276,7 @@ class Channel[monad](Category, NamedGeneric):
         Parameters:
             other : The other channel to tensor in parallel.
         """
-        assert_isinstance(other, type(self))
+        assert_ismember(other, type(self))
         return self.right_whisker(other.dom).then(
             other.left_whisker(self.cod))
 
