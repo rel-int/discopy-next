@@ -1101,45 +1101,26 @@ class PermanentBackend(AbstractBackend):
                     "n_photons must be greater than 0."
                 )
 
-        if hasattr(
-            diagram,
-            "terms"
-        ):
-            result = 0
-            dims = []
-            for term in diagram.terms:
-                matrix = self._get_matrix(term)
-                check_creations(matrix)
-                result_matrix = matrix.eval(
-                    n_photons=n_photons,
-                    as_tensor=True
-                )
-                result += result_matrix.array
-                dims.append(
-                    (
-                        result_matrix.dom.inside,  # list
-                        result_matrix.cod.inside  # list
-                    )
-                )
-        else:
-            matrix = self._get_matrix(diagram)
+        terms = diagram.terms if hasattr(diagram, "terms") else (diagram, )
+        dom = (n_photons + 1, ) * len(diagram.dom)
+        arrays = []
+        for term in terms:
+            matrix = self._get_matrix(term)
             check_creations(matrix)
-            result_matrix = matrix.eval(n_photons=n_photons, as_tensor=True)
-            result = result_matrix.array
-            dims = [(result_matrix.dom.inside, result_matrix.cod.inside)]
-
-        norm = lambda x: list(x) if isinstance(  # noqa: E731
-            x, (list, tuple)
-        ) else [x]
-        dom_lists, cod_lists = zip(*((norm(d), norm(c)) for d, c in dims))
-        max_dom_dims = [max(vals) for vals in zip(*dom_lists)]
-        max_cod_dims = [max(vals) for vals in zip(*cod_lists)]
+            n_out = n_photons - sum(matrix.selections) + sum(matrix.creations)
+            cod = (n_out + 1, ) * len(diagram.cod)
+            arrays.append(np.reshape(matrix.eval(
+                n_photons=n_photons, as_tensor=True).array, dom + cod))
+        shape = tuple(map(max, zip(*(array.shape for array in arrays))))
+        result = np.zeros(shape, dtype=complex)
+        for array in arrays:
+            result[tuple(map(slice, array.shape))] += array
 
         return EvalResult(
             discopy_tensor.Box(
                 "Result",
-                discopy_tensor.Dim(*tuple(max_dom_dims)),
-                discopy_tensor.Dim(*tuple(max_cod_dims)),
+                discopy_tensor.Dim(*dom),
+                discopy_tensor.Dim(*shape[len(dom):]),
                 result
             ),
             output_types=diagram.cod,

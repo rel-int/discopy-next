@@ -925,3 +925,16 @@ def test_quimb_hyperoptimiser_keeps_the_wire_order(optimiser):
     backend = QuimbBackend(hyperoptimiser=optimiser(max_repeats=4))
     assert np.allclose(
         diagram.eval(backend).tensor.array, diagram.eval().tensor.array)
+
+
+@pytest.mark.parametrize("diagram", [
+    photonic.Create(1) + photonic.Create(0),
+    photonic.Create(2, 0) + photonic.Create(1, 0),
+    (photonic.Create(1, 0) >> photonic.BS)
+    + (photonic.Create(2, 0) >> photonic.BS)])
+def test_permanent_backend_sums_terms_of_different_photon_numbers(diagram):
+    """Each term's amplitudes live on its own photon numbers, so a sum pads
+    them with zeros to the largest before adding them."""
+    result = diagram.eval(PermanentBackend())
+    assert dict_allclose(result.amplitudes(normalise=False),
+                         diagram.eval().amplitudes(normalise=False))
