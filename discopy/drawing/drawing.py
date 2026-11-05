@@ -270,6 +270,7 @@ class Drawing(TracedCategory["monoidal.Ty", "Drawing"], RichDisplay):
             tensor
             dagger
             bubble
+            bracket
             frame
     """
     inside: PlaneGraph
@@ -1232,17 +1233,17 @@ which to_drawing recomputes.
         Draw a dotted square around a drawing, the bracket that says it is
         one operand, labelled with ``name`` on the top left if given.
 
+        It is a :meth:`bubble` drawn as a square whose top and bottom are
+        squeezed onto those of the drawing inside, so that a bracket adds
+        half a unit of height, and a wire that crosses it is labelled on one
+        side only.
+
         Parameters:
             name (str) : The label of the bracket, drawn on the top left.
             dom (monoidal.Ty) : The wires coming into the bracket, those
                 coming into the drawing by default.
             cod (monoidal.Ty) : The wires coming out of the bracket, those
                 coming out of the drawing by default.
-
-        It is a :meth:`bubble` drawn as a square whose top and bottom are
-        squeezed onto those of the drawing inside, so that a bracket adds
-        half a unit of height, and a wire that crosses it is labelled on one
-        side only.
 
         >>> from discopy.monoidal import Ty, Box
         >>> x, y, z = map(Ty, "xyz")

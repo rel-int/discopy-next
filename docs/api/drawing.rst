@@ -8,5 +8,6 @@ drawing
     :toctree: ../_api
 
     drawing
+    bracketing
     backend
     widget

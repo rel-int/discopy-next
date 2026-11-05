@@ -154,6 +154,9 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 - The property matrix reports the cells that cannot fail and those a
   baseline checked and this run did not ([#773], [#775]).
 - `drawing.widget.DiagramWidget`, an opt-in anywidget ([#466]).
+- `drawing.bracketing`, terms drawn with a dotted `Drawing.bracket` around
+  each compound operand, so that each axiom of `abc` draws itself in the docs
+  from its `Declaration.generic` instance.
 - Notebooks: *Minimality of the pure qubit ZX calculus* ([#626], [#688]),
   *Categorical deep learning* ([next#124], [next#125]), *Neural Church
   arithmetic* ([#677]), *Parsing arithmetic* and *Boolean circuits*,
