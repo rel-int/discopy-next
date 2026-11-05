@@ -160,6 +160,15 @@ def test_Copy_takes_index():
         assert isinstance(box, Discard) and box == Discard(x)
 
 
+def test_Function_takes_index():
+    from numpy import int64
+    x, y, z = Ty('x'), Ty('y'), Ty('z')
+    assert Function(x @ y, int64([1, 0, 0])) == Function(x @ y, [1, 0, 0])
+    assert Function(x, int64([0])) == Function(x, [0])
+    assert Permutation(x @ y @ z, int64([2, 0, 1]))\
+        == Permutation(x @ y @ z, [2, 0, 1])
+
+
 def test_Copy_pickle():
     from pickle import dumps, loads
     x = Ty('x')

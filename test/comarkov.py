@@ -36,6 +36,12 @@ def test_Merge_takes_index():
         assert isinstance(box, Noise) and box == Noise(x)
 
 
+def test_Cofunction_takes_index():
+    from numpy import int64
+    x, y = Ty('x'), Ty('y')
+    assert Cofunction(x @ y, int64([1, 0, 0])) == Cofunction(x @ y, [1, 0, 0])
+
+
 def test_Noise():
     x = Ty('x')
     assert Merge(x, 0) == Noise(x) == Noise(x, 0)

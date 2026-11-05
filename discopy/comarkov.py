@@ -237,8 +237,8 @@ class Cofunction(Box):
     def __init__(self, cod: monoidal.Ty, cofunc):
         func = finset.Function(list(cofunc), Nat(len(cod)), Nat(len(cofunc)))
         self.cofunc = op.Comarkov(func)  # ty: ignore[invalid-argument-type]
-        dom = cod[:0].tensor(*(cod[i] for i in cofunc))
-        Box.__init__(self, f"Cofunction({list(cofunc)})", dom, cod)
+        dom = cod[:0].tensor(*(cod[i] for i in func))
+        Box.__init__(self, f"Cofunction({list(func)})", dom, cod)
 
     def __getnewargs__(self):
         """
