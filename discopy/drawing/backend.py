@@ -896,6 +896,33 @@ class Backend(ABC):
         return typ is not None and getattr(
             typ.inside[0], "frame_boundary", False)
 
+    @staticmethod
+    def is_bracket(node):
+        """ Whether a node belongs to the dotted frame of a bracket, i.e. it
+        is the opening or closing of one or a port of its sides, which carry
+        the ``draw_as_bracket`` flag set by :meth:`Drawing.bracket`. """
+        box = getattr(node, "box", None)
+        typ = getattr(node, "x", None)
+        return getattr(box, "draw_as_bracket", False) or typ is not None\
+            and getattr(typ.inside[0], "draw_as_bracket", False)
+
+    @staticmethod
+    def is_labelled(graph, source, target):
+        """ Whether the wire from a source to a target gets a label, at its
+        source: a wire that crosses the frame of a bracket is labelled
+        outside it only, above it when it comes in and below it when it
+        goes out. """
+        def bracket(node, side):
+            box = graph.boxes[node.j] if node.kind != "dom" else None
+            return getattr(box, "draw_as_bracket", False)\
+                and getattr(box, side) and not Backend.is_bracket(node)
+        if source.kind == "dom":
+            return True
+        return source.kind == "box_cod" and not bracket(
+            source, "bubble_opening") and not (
+                target.kind == "box_dom" and bracket(
+                    target, "bubble_closing"))
+
     def draw_wires(self, graph, **params):
         # Braids, swaps and permutations are drawn as their own smooth curves.
         for node in graph.nodes:
@@ -911,7 +938,7 @@ class Backend(ABC):
             # The sides of a frame are drawn with zero width.
             is_frame_boundary = self.is_frame_boundary(source)\
                 or self.is_frame_boundary(target)
-            if source.kind in ["dom", "box_cod"]:
+            if self.is_labelled(graph, source, target):
                 self.draw_wire_label(source.x, *source_position, **params)
             if source_position == target_position:
                 continue
@@ -920,8 +947,10 @@ class Backend(ABC):
                 continue  # crossings are drawn on their own
             bend_out, bend_in = source.kind == "box", target.kind == "box"
             typ = getattr(source, 'x', None) or getattr(target, 'x', None)
+            is_bracket = self.is_bracket(source) or self.is_bracket(target)
             self.draw_wire(
                 source_position, target_position, bend_out, bend_in,
+                style=("dotted" if is_bracket else None),
                 linewidth=(0 if is_frame_boundary else None),
                 adaptive=self.on_neutral_canvas(typ))
 
@@ -1618,6 +1647,7 @@ class Matplotlib(Backend):
                         [Path.MOVETO, Path.CURVE3, Path.CURVE3])
             self.axis.add_patch(PathPatch(
                 path, facecolor='none', linewidth=linewidth,
+                linestyle=(':' if style == "dotted" else '-'),
                 gid=self.dark_gid("stroke")
                 if adaptive and linewidth else None))
         super().draw_wire(source, target, bend_out=bend_out, bend_in=bend_in)
