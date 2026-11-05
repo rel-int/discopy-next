@@ -342,9 +342,9 @@ class Stream[category](FeedbackCategory, NamedGeneric):
     Parameters:
         now (category) : The value of the stream at time step zero.
         dom (Optional[Ty[category.ob]]) :
-            The domain of the stream, constant `now.dom` if `_later is None`.
+            The domain of the stream, the constant `now.dom` when not given.
         cod (Optional[Ty[category.ob]]) :
-            The codomain of the stream, constant `now.dom` if `_later is None`.
+            The codomain of the stream, the constant `now.cod` when not given.
         mem (Optional[Ty[category.ob]]) :
             The memory of the stream, the constant empty type by default.
         _later (Optional[Callable[[], Stream[category]]]) :
@@ -361,6 +361,7 @@ class Stream[category](FeedbackCategory, NamedGeneric):
     >>> f = S(now, dom, cod, mem, lambda: later)
     >>> f.unroll(2).now(1, 2, 3)
     (True, False, True, '1 2 3')
+    >>> assert (S(now).dom, S(now).cod) == (T(now.dom), T(now.cod))
 
     Note
     ----
