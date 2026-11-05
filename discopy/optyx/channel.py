@@ -1569,10 +1569,9 @@ class Diagram(frobenius.Diagram):
 
         n_modes = p.circuit_size
         circuit = photonic.Id(n_modes)
-        heralds = p.heralds
 
         circuit = perceval_conversion.heralds_diagram(
-            heralds, n_modes, circuit, "in"
+            p.in_heralds, n_modes, circuit, "in"
         ) >> circuit
 
         for wires, component in p.components:
@@ -1612,7 +1611,7 @@ class Diagram(frobenius.Diagram):
                 circuit >>= circuit.cod[:m] @ box @ circuit.cod[m + 1:]
 
         circuit >>= perceval_conversion.heralds_diagram(
-            heralds, n_modes, circuit, "out"
+            p.heralds, n_modes, circuit, "out"
         )
         if p.post_select_fn.has_condition:
             circuit >>= perceval_conversion.postselection(circuit, p)

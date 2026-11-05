@@ -420,6 +420,21 @@ def test_postselection_reads_processor_modes(herald, condition):
         Create_(1, 0) >> Channel.from_perceval(p)).eval().prob_dist())
 
 
+@pytest.mark.parametrize("location, state", [
+    (pcvl.PortLocation.INPUT, [0]), (pcvl.PortLocation.OUTPUT, [1, 0]),
+    (pcvl.PortLocation.IN_OUT, [0])])
+def test_heralds_act_at_their_location(location, state):
+    """A herald creates its photons on the input, selects them on the
+    output, or both, as its location says in perceval."""
+    p = pcvl.Processor("SLOS", 2)
+    p.add(0, pcvl.BS())
+    p.add_herald(0, 1, location=location)
+    p.with_input(pcvl.BasicState(state))
+    expected = {tuple(k): v for k, v in p.probs()["results"].items()}
+    check_dict_agreement(expected, (
+        Create_(*state) >> Channel.from_perceval(p)).eval().prob_dist())
+
+
 CONFIGURATOR_VALUES = {"alpha": 0.3, "beta": 1.1}
 
 
