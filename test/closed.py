@@ -783,6 +783,14 @@ def test_from_biclosed():
         == X(lambda v: Constant("g", X >> Y)(v))
 
 
+def test_from_biclosed_keeps_the_data_of_constants():
+    x, y, X, Y = biclosed.Ty("x"), biclosed.Ty("y"), Ty("x"), Ty("y")
+    g1, g2 = (biclosed.Constant("g", y << x, data=d) for d in (1, 2))
+    a = x("a")
+    assert g1(a).to_closed() != g2(a).to_closed()
+    assert g1(a).to_closed() == Constant("g", X >> Y, data=1)(X("a"))
+
+
 def test_Substitution():
     X, Y = Ty("X"), Ty("Y")
     f, a = (X >> Y)("f"), X("a")

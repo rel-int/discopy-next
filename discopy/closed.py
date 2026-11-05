@@ -928,7 +928,8 @@ class TermBase(Box, biclosed.TermBase):
         """
         functor = biclosed.Functor(
             ob_map=lambda x: cls.ob(x.inside[0].name),
-            ar_map=lambda c: cls.ob.constant_factory(c.name, functor(c.cod)),
+            ar_map=lambda c: cls.ob.constant_factory(
+                c.name, functor(c.cod), data=c.data),
             dom=biclosed.Diagram, cod=cls.functor.cod)
         return functor(term)
 
