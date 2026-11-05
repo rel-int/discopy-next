@@ -426,10 +426,12 @@ class Circuit(tensor.Diagram[complex]):
         >>> assert (Ket(0) >> H).measure().round(2).tolist() == [.5, .5]
         >>> assert Copy().measure().tolist() == [[1, 0], [0, 0]]
         """
-        from discopy.quantum.gates import Ket
+        from discopy.quantum import gates
         if mixed or self.is_mixed or bit in self.dom @ self.cod:
-            return self.init_and_discard().eval(mixed=True).array.real
-        state = (Ket(*(len(self.dom) * [0])) >> self).eval()
+            circuit = self >> Id().tensor(*(
+                gates.Measure() if x == qubit else Id(x) for x in self.cod))
+            return circuit.init_and_discard().eval(mixed=True).array.real
+        state = (gates.Ket(*(len(self.dom) * [0])) >> self).eval()
         with backend() as np:
             return np.absolute(state.array) ** 2
 

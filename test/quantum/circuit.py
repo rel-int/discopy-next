@@ -95,6 +95,12 @@ def test_Circuit_measure():
         circuit.measure(), np.absolute(circuit.eval().array) ** 2)
 
 
+def test_measure_measures_every_open_qubit():
+    for circuit in (Ket(0) >> H, H @ X >> CX):
+        assert np.allclose(circuit.measure(mixed=True), circuit.measure())
+    assert np.allclose(((Ket(0) >> X) @ Bits(1)).measure(), [[0, 0], [0, 1]])
+
+
 def test_Box():
     with raises(TypeError):
         Box('f', rigid.Ty('x'), bit)
