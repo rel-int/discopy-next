@@ -43,7 +43,7 @@ If you want to see DisCoPy in action, you can check out the following notebooks:
 
 - [What is a diagram?](https://docs.discopy.org/en/main/notebooks/diagrams.html)
 - [QNLP Tutorial](https://docs.discopy.org/en/main/notebooks/qnlp.html)
-- [Geometry of Chatbot Interaction](docs/notebooks/chatbot-interaction.md)
+- [Geometry of Chatbot Interaction](#a-geometry-of-chatbot-interaction)
 
 Or you can keep scrolling down, skip the theory and go straight to the examples on [cooking](#example-cooking), [natural language](#example-alice-loves-bob) and [a geometry of chatbot interaction](#a-geometry-of-chatbot-interaction).
 
@@ -166,7 +166,7 @@ These come with methods for converting back and forth to diagrams which allow to
 They can also come with methods for evaluating them directly in a concrete category, e.g. a `CMap` with a `Tensor` on each node can be compiled directly to an Einstein notation without translating it to a list of layers.
 
 Note that while `Functor` implements only functors with free categories as domain, DisCoPy also implements instances of 2-functors i.e. with categories of categories as domain.
-For instance, the `Int`-construction takes traced categories to compact categories and `Stream` takes monoidal categories to feedback categories, see [](#geom)
+For instance, the `Int`-construction takes traced categories to compact categories and `Stream` takes monoidal categories to feedback categories, see [a geometry of chatbot interaction](#a-geometry-of-chatbot-interaction).
 
 ## Example: Alice loves Bob
 
