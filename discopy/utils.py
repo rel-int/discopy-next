@@ -1,6 +1,46 @@
 # -*- coding: utf-8 -*-
 
-""" DisCoPy utility functions. """
+"""
+DisCoPy utility functions: factories, serialisation, assertions and display.
+
+:func:`discopy.cat.factory` and :func:`discopy.hypergraph.pushout` live here
+too, documented where they are used.
+
+Summary
+-------
+
+.. autosummary::
+    :template: class.rst
+    :nosignatures:
+    :toctree:
+
+    NamedGeneric
+    MappingOrCallable
+    AxiomError
+    RichDisplay
+
+.. admonition:: Functions
+
+    .. autosummary::
+        :template: function.rst
+        :nosignatures:
+        :toctree:
+
+        factory_name
+        from_tree
+        dumps
+        loads
+        rmap
+        rsubs
+        assert_isinstance
+        unbiased
+        inductive
+        tuplify
+        untuplify
+        assert_iscomposable
+        assert_isparallel
+        assert_isatomic
+"""
 
 from __future__ import annotations
 
@@ -1098,16 +1138,15 @@ def assert_ismember(object_, cls: type):
 
 def unbiased(binary_method):
     """
-    Turn a biased method with signature (self, other) to an unbiased one, i.e.
-    with signature (self, *others), see the `nLab`_.
+    Turn a biased method with signature ``(self, other)`` into an unbiased
+    one with signature ``(self, *others)``, see the
+    `nLab <https://ncatlab.org/nlab/show/biased+definition>`__.
 
     One argument is the base case, more are folded by calling the method by
     its name on the running result, so that a subclass overriding the binary
     case has its own folded rather than the one decorated. An operand passed
     by keyword, e.g. ``f.then(other=g)``, goes to the binary method as it is,
     rather than being dropped as if there were none.
-
-    .. _nLab: https://ncatlab.org/nlab/show/biased+definition
     """
     @wraps(binary_method)
     def method(self, *others, **params):

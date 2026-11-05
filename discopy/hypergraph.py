@@ -1,7 +1,18 @@
 # -*- coding: utf-8 -*-
 
-"""
+r"""
 The free hypergraph category with cospans of labeled hypergraphs as arrows.
+
+A :class:`Hypergraph` is a :class:`Wiring` of boxes to spiders, i.e. a cospan
+of its input and output :class:`Wires` into the spiders with the
+:class:`Boundary` of each box, and composition is the pushout over the wires
+the codomain of one shares with the domain of the other, see
+:cite:t:`BonchiEtAl22`.
+Rewriting is double-pushout: a :class:`Rule` is a pair of parallel hypergraphs
+``left, right``, a :class:`Match` is a homomorphism of ``left`` into a host
+found by :meth:`Hypergraph.match`, and :meth:`Hypergraph.rewrite`,
+:meth:`Hypergraph.normalize` and :meth:`Hypergraph.normal_form` apply rules,
+as :class:`Rewriter` does in place.
 
 Summary
 -------
@@ -30,7 +41,18 @@ Summary
         :nosignatures:
         :toctree:
 
+        assert_transparent
         pushout
+        relabeling
+
+Example
+-------
+>>> from discopy.frobenius import Ty, Box, Spider
+>>> x = Ty('x')
+>>> f = Box('f', x, x)
+>>> assert (Spider(1, 2, x) >> Spider(2, 1, x)).to_hypergraph()\
+...     == Spider(1, 1, x).to_hypergraph()
+>>> assert (f >> f).to_hypergraph() == f.to_hypergraph() >> f.to_hypergraph()
 """
 
 from __future__ import annotations

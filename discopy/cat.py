@@ -54,11 +54,10 @@ We can create dagger functors from the free category to itself:
 >>> F = Functor(ob, ar)
 >>> assert F(arrow) == (h >> f >> g)[::-1]
 
-We can check the axioms of dagger (i.e. a contravariant involutive
-identity-on-objects endofunctor):
+The dagger is a contravariant involutive identity-on-objects endofunctor,
+see :meth:`discopy.abc.DaggerCategory.dagger_involution` and
+:meth:`discopy.abc.DaggerCategory.dagger_contravariance`:
 
->>> x, y, z = Ob('x'), Ob('y'), Ob('z')
->>> f, g = Box('f', x, y), Box('g', y, z)
 >>> assert f[::-1][::-1] == f
 >>> assert Id(x)[::-1] == Id(x)
 >>> assert (f >> g)[::-1] == g[::-1] >> f[::-1]

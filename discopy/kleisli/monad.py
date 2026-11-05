@@ -33,14 +33,35 @@ Summary
     :toctree:
 
     Monad
-    Maybe
-    Powerset
-    Subdistribution
-    Seed
-    make_state
-    iterate_maybe
-    iterate_powerset
-    iterate_subdistribution
+
+.. admonition:: Data
+
+    .. autosummary::
+        :nosignatures:
+        :toctree:
+
+        Maybe
+        Powerset
+        Subdistribution
+        Seed
+
+.. admonition:: Functions
+
+    .. autosummary::
+        :template: function.rst
+        :nosignatures:
+        :toctree:
+
+        make_state
+        iterate_maybe
+        iterate_powerset
+        iterate_subdistribution
+        merge
+        dist
+        state_map
+        state_join
+        uniform
+        sample
 """
 from __future__ import annotations
 
@@ -111,6 +132,10 @@ class Monad(EndoFunctor):
     :meth:`discopy.kleisli.additive.Channel.trace` defined exactly for the
     monads that supply one, see :func:`iterate_maybe`,
     :func:`iterate_powerset` and :func:`iterate_subdistribution`.
+
+    See Adámek, Milius & Velebil, `Elgot theories: a new perspective of the
+    equational properties of iteration <https://arxiv.org/abs/1006.0918>`_
+    (2010).
     """
 
     # pylint: disable-next=too-many-arguments,too-many-positional-arguments
@@ -240,9 +265,10 @@ Maybe = Monad(
     mult_map=lambda X: Function(lambda x: x, (X | None) | None, X | None),
     iterate=iterate_maybe)
 """
-The maybe monad, sending a type ``X`` to ``X | None``: the unit and the
-multiplication are both the identity, since Python's native optional type
-does not distinguish ``None`` from a doubly-wrapped ``None``.
+The maybe monad, sending a type ``X`` to ``X | None``.
+
+Its unit and multiplication are both the identity, since Python's native
+optional type does not distinguish ``None`` from a doubly-wrapped ``None``.
 """
 
 Powerset = Monad(
@@ -258,8 +284,9 @@ Powerset = Monad(
         frozenset[frozenset[X]], frozenset[X]),
     iterate=iterate_powerset)
 """
-The powerset monad, sending a type ``X`` to ``frozenset[X]``: the unit takes
-a singleton and the multiplication takes a union.
+The powerset monad, sending a type ``X`` to ``frozenset[X]``.
+
+Its unit takes a singleton and its multiplication takes a union.
 """
 
 
@@ -446,8 +473,9 @@ def make_state(S: type) -> Monad:
 
 Seed = make_state(int)
 """
-The state monad on integer seeds, i.e. the monad of seeded randomness: a
-random computation is the pure function sending a seed to a sample and the
+The state monad on integer seeds, i.e. the monad of seeded randomness.
+
+A random computation is the pure function sending a seed to a sample and the
 seed for the next sample, see :func:`uniform` and :func:`sample`.
 """
 
