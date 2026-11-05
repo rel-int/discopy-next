@@ -831,7 +831,9 @@ class Hypergraph[category](
     def simplify(self) -> "Hypergraph":
         """
         Simplify by applying interchangers eagerly until the length of the
-        diagram is minimal, takes quadratic time.
+        diagram is minimal: each pass decodes the interchange of every pair of
+        boxes, i.e. it takes cubic time, and starts again after each one that
+        shortens the diagram.
 
         Example
         -------
@@ -844,7 +846,7 @@ class Hypergraph[category](
 
         size = self.to_diagram().size
         for i in range(len(self.boxes)):
-            for j in range(len(self.boxes)):
+            for j in range(i + 1, len(self.boxes)):
                 result = self.interchange(i, j)
                 if result.to_diagram().size < size:
                     return result.simplify()

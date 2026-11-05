@@ -367,6 +367,21 @@ def test_Hypergraph_simplify_two_wires():
     assert interchanged.simplify().to_diagram() == (f >> g).to_diagram()
 
 
+def test_Hypergraph_simplify_tries_each_pair_of_boxes_once(monkeypatch):
+    from itertools import combinations
+    x = Ty('x')
+    chain = H.id(x).then(*(
+        Box(f'f{i}', x, x).to_hypergraph() for i in range(4)))
+    pairs, interchange = [], H.interchange
+
+    def recorded(self, i, j):
+        pairs.append((i, j))
+        return interchange(self, i, j)
+    monkeypatch.setattr(H, "interchange", recorded)
+    assert chain.simplify() == chain
+    assert pairs == list(combinations(range(4), 2))
+
+
 def test_simplify():
     from discopy.markov import Box, Ty, Copy, Swap, Trace, Equation
     C, T, P = map(Ty, "CTP")
