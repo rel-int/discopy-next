@@ -102,6 +102,14 @@ def test_Hypergraph_tensor_shifts_the_offsets():
     assert (x @ s.to_hypergraph()).to_diagram() == x @ s
 
 
+def test_Hypergraph_permutation_moves_each_type_as_a_block():
+    x, y, z = map(Ty, "xyz")
+    for xs, doms in [([1, 0], [x @ y, z]), ([1, 0], [x @ x, Ty()]),
+                     ([0, 2, 1], [x @ x, x, Ty()])]:
+        assert H.permutation(xs, doms)\
+            == Diagram.permutation(xs, doms).to_hypergraph()
+
+
 def test_Hypergraph_getitem():
     with raises(NotImplementedError):
         H.spiders(1, 2, Ty('x'))[0]

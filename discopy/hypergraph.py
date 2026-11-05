@@ -63,7 +63,7 @@ from discopy.abc import (
     MonoidalCategory, NamedGeneric, RigidCategory, SymmetricCategory,
     TracedCategory)
 from discopy.drawing import Node, backend
-from discopy.python.finset import Permutation
+from discopy.python.finset import Function, Permutation
 from discopy.utils import (
     factory_name,
     from_tree,
@@ -590,7 +590,7 @@ class Hypergraph[category](
 
         Parameters:
             xs : A list of integers representing a permutation.
-            dom : A list of types of the same length as ``xs``.
+            doms : A list of types of the same length as ``xs``.
         """
         xs = Permutation(xs, len(doms))
         dom = cls.ob.tensor(*doms) if doms else\
@@ -599,7 +599,8 @@ class Hypergraph[category](
             return cls.id(dom)
         cod = cls.ob.tensor(*(doms[i] for i in xs)) if dom else cls.ob.unit()
         boxes = ()
-        dom_wires, cod_wires = tuple(range(len(dom))), tuple(xs)
+        dom_wires = tuple(range(len(dom)))
+        cod_wires = tuple(Function.permutation(xs, [len(typ) for typ in doms]))
         return cls(dom, cod, boxes, (dom_wires, (), cod_wires))
 
     @classmethod
