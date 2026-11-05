@@ -1651,10 +1651,12 @@ class Hypergraph[category](
         """
         spider_types = f", spider_types={self.spider_types!r}"\
             if self.scalar_spiders else ""
+        offsets = f", offsets={self.offsets!r}" if any(
+            offset is not None for offset in self.offsets) else ""
         return factory_name(type(self))\
             + f"(dom={repr(self.dom)}, cod={repr(self.cod)}, " \
               f"boxes={repr(self.boxes)}, " \
-              f"wires={repr(self.wires)}{spider_types})"
+              f"wires={repr(self.wires)}{spider_types}{offsets})"
 
     def to_tree(self) -> dict:
         """

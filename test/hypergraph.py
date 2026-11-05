@@ -36,6 +36,16 @@ def test_Hypergraph_repr():
     assert eval(repr(graph)) == graph
 
 
+def test_Hypergraph_repr_keeps_the_offsets():
+    from discopy import hypergraph, monoidal
+    x, y = monoidal.Ty('x'), monoidal.Ty('y')
+    s = monoidal.Box('s', monoidal.Ty(), y)
+    graph = (x @ s).to_hypergraph()
+    loaded = eval(repr(graph), dict(hypergraph=hypergraph, monoidal=monoidal))
+    assert loaded.offsets == graph.offsets == (1, )
+    assert loaded.to_diagram() == x @ s
+
+
 def test_Hypergraph_hash():
     x, y = map(Ty, "xy")
     assert hash(H.id(x @ y)) == hash(H.id(x) @ H.id(y))

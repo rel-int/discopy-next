@@ -9,7 +9,7 @@ The fixes of rel-int/discopy-next#445 in `hypergraph`, `frobenius`, `cmap`, `ehy
 - [x] **S5-4** frobenius.Diagram.unfuse leaves the Cospan plumbing fused:
 - [x] **S5-5** Hypergraph.from_callable deletes the category's own __call__ in its finally, e.g.
 - [x] **S5-7** deferred to #445: needs a one-pass rewrite of five methods, past 40 lines
-- [WIP] @session_01MEJxy43YMF4nTF8NEcP8Je-2026-11-05 19:42 **S5-10** Hypergraph.__repr__ drops the offsets that to_tree keeps:
+- [x] **S5-10** Hypergraph.__repr__ drops the offsets that to_tree keeps:
 - [WIP] @session_01MEJxy43YMF4nTF8NEcP8Je-2026-11-05 19:42 **S5-11** Hypergraph.tensor copies each factor's offsets unshifted, so even x @ s.to_hypergraph() cannot be decoded in a category without swaps, though (x @ …
 - [WIP] @session_01MEJxy43YMF4nTF8NEcP8Je-2026-11-05 19:42 **S5-12** Hypergraph.permutation wires a list of compound types as if each were one wire:
 - [WIP] @session_01MEJxy43YMF4nTF8NEcP8Je-2026-11-05 19:42 **S5-14** Hypergraph.simplify's docstring says it takes quadratic time, but each pass decodes all n^2 interchanges (Omega(n^3), 31 s for an already minimal …
