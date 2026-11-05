@@ -20,7 +20,8 @@ def test_eq_and_hash():
 
 def test_repr():
     namespace = dict(cat=cat, monoidal=monoidal, grammar=grammar)
-    for tree in (f, f[::-1], w, Id(x), f(w, w), f(f(w, w), w)):
+    for tree in (f, f[::-1], w, Id(x), f(w, w), f(f(w, w), w),
+                 Rule(x @ x, x, name='')(w, w)):
         assert eval(repr(tree), dict(namespace)) == tree
 
 
