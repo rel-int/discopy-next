@@ -658,8 +658,8 @@ class Functor(monoidal.Functor):
 
     Note
     ----
-    When the codomain objects are biclosed types, the functor sends terms to
-    terms rather than evaluating them to morphisms:
+    When the codomain has terms, i.e. its constants are its arrows, the functor
+    sends terms to terms rather than evaluating them to morphisms:
 
     >>> X, Y = Ty("X"), Ty("Y")
     >>> f, x = (Y << X)("f"), X("x")
@@ -694,8 +694,8 @@ class Functor(monoidal.Functor):
             if issubclass(get_origin(self.cod), hypergraph.Hypergraph)\
                     and not isinstance(other, Constant):
                 return self(other.eval())
-            if issubclass(get_origin(self.cod.ob), Ty) and not issubclass(
-                    get_origin(self.cod), (cmap.CMap, hypergraph.Hypergraph)):
+            if issubclass(get_origin(self.cod.ob), Ty) and issubclass(
+                    self.cod.ob.constant_factory, get_origin(self.cod)):
                 return self.map_term(other)
             return other.eval(self)
         for cls, attr in [(Over, "over"), (Under, "under"), (Exp, "exp")]:

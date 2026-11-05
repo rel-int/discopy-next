@@ -195,6 +195,18 @@ def test_to_rigid():
     assert Box('f', x, y, data=42).to_rigid().data == 42
 
 
+def test_to_rigid_evaluates_terms():
+    from discopy import rigid
+
+    x, y = Ty('x'), Ty('y')
+    f, a = (y << x)('f'), x('a')
+    x_, y_ = rigid.Ty('x'), rigid.Ty('y')
+    f_ = rigid.Box('f', rigid.Ty(), y_ @ x_.l)
+    a_ = rigid.Box('a', rigid.Ty(), x_)
+    assert f(a).to_rigid() == f(a).eval().to_rigid()\
+        == f_ >> y_ @ x_.l @ a_ >> y_ @ rigid.Cup(x_.l, x_)
+
+
 def test_to_compact():
     x, y, z = map(Ty, "xyz")
     f = Box("f", x @ y, z)
