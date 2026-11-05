@@ -41,6 +41,14 @@ def test_Hypergraph_hash():
     assert hash(H.id(x @ y)) == hash(H.id(x) @ H.id(y))
 
 
+def test_Hypergraph_hash_agrees_with_the_equality_of_boxes():
+    x = Ty('x')
+    left = Box('f', x, x, data=1).to_hypergraph()
+    right = Box('f', x, x, data=1.0).to_hypergraph()
+    assert left.is_fast_eligible and left == right
+    assert hash(left) == hash(right)
+
+
 def test_Hypergraph_eq_sees_the_type_of_a_scalar_spider():
     from discopy.frobenius import Equation
     x, y = map(Ty, "xy")

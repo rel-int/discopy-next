@@ -1469,7 +1469,7 @@ class Hypergraph[category](
         if self.is_fast_eligible:
             return hash((
                 self.dom, self.cod, len(self.boxes), self.n_spiders,
-                tuple(sorted(repr(box) for box in self.boxes)),
+                tuple(sorted(map(hash, self.boxes))),
                 tuple(sorted(map(repr, self.spider_types)))))
         return hash((self.dom, self.cod, weisfeiler_lehman_graph_hash(
             self.to_graph(), node_attr="box"),
