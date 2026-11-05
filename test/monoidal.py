@@ -46,6 +46,12 @@ def test_coloured_Ty():
         Ty(Wire("x", red, green), Wire("z", blue, red))
 
 
+def test_Ty_of_a_colour_is_a_type_error():
+    with raises(TypeError, match="Expected monoidal.Wire, got monoidal."
+                                 "Colour instead."):
+        Ty(Colour("red"))
+
+
 def test_Colour_label():
     plain = Colour("cornflowerblue")
     labelled = Colour("cornflowerblue", label="Function")

@@ -1362,7 +1362,10 @@ def assert_isparallel(left: Category, right: Category):
 
 
 def assert_isatomic(typ: Ty, cls: type | None = None):
-    """ Raise :class:`AxiomError` if a type does not have length one. """
+    """
+    Raise ``TypeError`` if a type is not a ``cls`` and ``ValueError`` if it
+    does not have length one.
+    """
     cls = cls or type(typ)
     assert_isinstance(typ, cls)
     if not typ.is_atomic:
@@ -1371,7 +1374,10 @@ def assert_isatomic(typ: Ty, cls: type | None = None):
 
 
 def assert_istraceable(arg, n=1, left=False):
-    """ Raise :class:`AxiomError` if a diagram is not traceable. """
+    """
+    Raise ``ValueError`` if ``n`` atoms cannot be split off a diagram and
+    :class:`AxiomError` if the traced types differ.
+    """
     if n < 0 or n > min(len(arg.dom), len(arg.cod)):
         raise ValueError(messages.NOT_SPLITTABLE.format(n, arg))
     traced_dom, traced_cod = (arg.dom[:n], arg.cod[:n]) if left\

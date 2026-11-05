@@ -375,8 +375,8 @@ class Ty(cat.Ob, cat.FreeCategory, ColouredMonoid):
             return self.generator_factory(x)
         if self.generator_factory is Wire and type(x) is cat.Ob:
             return self.generator_factory(x.name)
-        raise AxiomError(
-            messages.TYPE_ERROR.format(self.generator_factory, type(x)))
+        raise TypeError(messages.TYPE_ERROR.format(
+            factory_name(self.generator_factory), factory_name(type(x))))
 
     def __init__(self, *inside: str | cat.Ob,
                  dom: Colour | None = None, cod: Colour | None = None,
