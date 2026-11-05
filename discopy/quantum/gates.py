@@ -197,11 +197,15 @@ class Measure(SelfConjugate):
     n_qubits : int
         Number of qubits to measure.
     destructive : bool, optional
-        Whether to do a non-destructive measurement instead.
+        Whether the measurement consumes the qubits, default is :code:`True`,
+        otherwise they are kept beside the bits.
     override_bits : bool, optional
         Whether to override input bits, this is the standard behaviour of tket.
     time_step : int, optional
         The number of times the measurement has been delayed.
+
+    >>> assert Measure().cod == bit
+    >>> assert Measure(destructive=False).cod == qubit @ bit
     """
     serialised_attrs = (
         "n_qubits", "destructive", "override_bits", "time_step")
@@ -277,11 +281,16 @@ class Encode(SelfConjugate):
     n_bits : int
         Number of bits to encode.
     constructive : bool, optional
-        Whether to do a classically-controlled correction instead.
+        Whether the encoding prepares fresh qubits, default is :code:`True`,
+        otherwise it applies a classically-controlled correction to given
+        qubits.
     reset_bits : bool, optional
         Whether to reset the bits to the uniform distribution.
     time_step : int, optional
         The number of times the encoding has been delayed.
+
+    >>> assert Encode().dom == bit
+    >>> assert Encode(constructive=False).dom == qubit @ bit
     """
     serialised_attrs = ("n_bits", "constructive", "reset_bits", "time_step")
     draw_as_measures = True
@@ -678,8 +687,9 @@ class Controlled(QuantumGate):
     controlled : QuantumGate
         Gate to control, e.g. :code:`CX = Controlled(X)`.
     distance : int, optional
-        Number of qubits from the control to the target, default is :code:`0`.
-        If negative, the control is on the right of the target.
+        Number of qubits from the control to the target, default is :code:`1`.
+        If negative, the control is on the right of the target, zero raises
+        :code:`ValueError`.
 
     >>> circuit = (Controlled(CX.l, distance=3)
     ...            >> Controlled(Controlled(CZ.l, distance=2), distance=-1))

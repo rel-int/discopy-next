@@ -714,7 +714,8 @@ class Circuit(tensor.Diagram[complex]):
         Note
         ----
         * :meth:`Circuit.init_and_discard` is applied beforehand.
-        * SWAP gates are introduced when applying gates to non-adjacent qubits.
+        * Logical swaps, i.e. plumbing, are introduced when applying gates to
+          non-adjacent qubits.
 
         Examples
         --------

@@ -342,14 +342,9 @@ class PennyLaneCircuit:
     def draw(self):
         """
         Print a string representation of the circuit
-        similar to `qml.draw`, but including post-selection.
-
-        Parameters
-        ----------
-        symbols : list of :class:`sympy.core.symbol.Symbol`, default: None
-            The symbols from the original DisCoPy circuit.
-        weights : list of :class:`torch.FloatTensor`, default: None
-            The weights to substitute for the symbols.
+        similar to `qml.draw`, but including post-selection, with its
+        concrete parameters, which a symbolic circuit gets from
+        :meth:`initialise_concrete_params`.
         """
         if self._concrete_params is None:
             raise ValueError('Cannot draw circuit with symbolic parameters. '
@@ -465,16 +460,8 @@ class PennyLaneCircuit:
 
     def eval(self):
         """
-        Evaluate the circuit. The symbols should be those
-        from the original DisCoPy diagram, which will be substituted
-        for the concrete parameters in weights.
-
-        Parameters
-        ----------
-        symbols : list of :class:`sympy.core.symbol.Symbol`, default: None
-            The symbols from the original DisCoPy circuit.
-        weights : list of :class:`torch.FloatTensor`, default: None
-            The weights to substitute for the symbols.
+        Evaluate the circuit with its concrete parameters, which a symbolic
+        circuit gets from :meth:`initialise_concrete_params`.
 
         Returns
         -------
