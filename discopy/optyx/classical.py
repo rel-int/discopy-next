@@ -327,9 +327,9 @@ class Sub(ClassicalBox):
         super().__init__(
             "SubInt",
             (
-                zw.Add(2).dagger() @ diagram.Id(diagram.Mode(1)) >>
-                diagram.Id(diagram.Mode(1)) @ diagram.Spider(2, 0,
-                                                             diagram.Mode(1))
+                diagram.Id(diagram.Mode(1)) @ zw.Add(2).dagger() >>
+                diagram.Spider(2, 0, diagram.Mode(1)) @
+                diagram.Id(diagram.Mode(1))
             ),
             mode**2,
             mode

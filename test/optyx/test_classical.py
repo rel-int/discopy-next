@@ -15,12 +15,12 @@ def test_addn():
     assert compare_arrays_of_different_sizes(d_1.double().to_tensor().eval().array,
                        d_2.double().to_tensor().eval().array)
 
-def test_subn():
-    d_1 = Digit(2, 5) >> Sub()
-    d_2 = Digit(3)
-
-    assert compare_arrays_of_different_sizes(d_1.double().to_tensor().eval().array,
-                       d_2.double().to_tensor().eval().array)
+def test_sub_subtracts_the_first_number_from_the_second():
+    for x, y in [(2, 5), (0, 4), (3, 3), (5, 2), (4, 0)]:
+        array = (Digit(x, y) >> Sub()).double().to_tensor().eval().array
+        support = np.flatnonzero(array)
+        assert support.tolist() == ([y - x] if y >= x else [])
+        assert np.allclose(array.flat[support], 1)
 
 def test_multiplyn():
     d_1 = Digit(2, 3) >> Multiply()
