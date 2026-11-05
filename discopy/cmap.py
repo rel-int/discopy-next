@@ -1601,7 +1601,7 @@ class CMap[category](
             return port
         logicals = [logical(leg) for leg in legs]
         return tuple(legs[logicals.index(port)] for port in (
-            self.to_hypergraph().leg_order(*logicals)))
+            self.to_hypergraph().leg_order(*sorted(logicals))))
 
     def make_monogamous(self) -> "CMap":
         """

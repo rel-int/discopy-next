@@ -19,7 +19,7 @@ The fixes of rel-int/discopy-next#445 in `hypergraph`, `frobenius`, `cmap`, `ehy
 - [x] **S5-18** relabeling sorts the labels of scalar (portless) spiders, so Hypergraph.__init__ raises TypeError when two scalar spiders have labels of incomparable …
 - [x] **S6-1** CMap.copy/merge/spiders wrap whatever the category returns with from_box.
 - [x] **S6-3** CMap.match runs complement on every one of the n^k straight-wire assignments that homomorphisms enumerates, so it is exponential in the pattern's …
-- [WIP] @session_01MEJxy43YMF4nTF8NEcP8Je-2026-11-05 19:42 **S6-4** CMap.leg_order hands Hypergraph.leg_order the legs in CMap port order, where a box's outputs are reversed.
+- [x] **S6-4** CMap.leg_order hands Hypergraph.leg_order the legs in CMap port order, where a box's outputs are reversed.
 - [WIP] @session_01MEJxy43YMF4nTF8NEcP8Je-2026-11-05 19:42 **S6-5** Wreath rebuilds top.action() in degree() and permutation() on every element construction, multiply and dagger.
 - [WIP] @session_01MEJxy43YMF4nTF8NEcP8Je-2026-11-05 19:42 **S6-6** CMap.eval drops the dtype of its category.
 - [WIP] @session_01MEJxy43YMF4nTF8NEcP8Je-2026-11-05 19:42 **S6-7** CMap in a planar host reads a cup or cap between two outputs of one box in its clockwise port order (right to left).
