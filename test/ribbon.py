@@ -60,6 +60,13 @@ def test_to_ribbons_gadgets():
     assert isinstance(cup.dagger(), DualRailCap)
 
 
+def test_to_ribbons_gadgets_eval_repr():
+    x = Ty('x')
+    boxes = Braid(x, x).trace(left=True).to_ribbons().boxes
+    for box in boxes + [box.dagger() for box in boxes]:
+        assert eval(repr(box), Diagram.environment()) == box
+
+
 def test_to_ribbons_box():
     from discopy.balanced import double_rail
     x, y = Ty('x'), Ty('y')
