@@ -124,7 +124,8 @@ are the boundary wires of each side.
 def relabeling(flat_wires: Sequence, spiders: Iterable) -> dict:
     """
     The label a hypergraph gives each spider: the connected ones in the
-    order they first occur in its flattened wires, then the others in order.
+    order they first occur in its flattened wires, then the others sorted, or
+    in the order listed when their labels do not compare.
 
     Parameters:
         flat_wires : The spider on each port, in the order of the ports.
@@ -132,10 +133,18 @@ def relabeling(flat_wires: Sequence, spiders: Iterable) -> dict:
 
     >>> relabeling(("b", "a", "b"), ["a", "b", "c"])
     {'b': 0, 'a': 1, 'c': 2}
+    >>> relabeling((), ["a", 0])
+    {'a': 0, 0: 1}
     """
-    connected = list(dict.fromkeys(flat_wires))
-    labels = connected + sorted(set(spiders) - set(connected))
-    return {spider: label for label, spider in enumerate(labels)}
+    connected = dict.fromkeys(flat_wires)
+    others = [spider for spider in dict.fromkeys(spiders)
+              if spider not in connected]
+    try:
+        others = sorted(others)
+    except TypeError:
+        pass
+    return {spider: label for label, spider in enumerate([
+        *connected, *others])}
 
 
 def assert_transparent(diagram: "Diagram") -> None:

@@ -19,6 +19,14 @@ def test_Hypergraph_init():
         H(x, y, (), ((0,), (), (0,)))
 
 
+def test_Hypergraph_scalar_spiders_take_labels_of_any_type():
+    x, y = map(Ty, "xy")
+    graph = H(Ty(), Ty(), (), ((), (), ()), {'a': x, 0: y})
+    assert graph.spider_types == (x, y)
+    assert graph == H.spiders(0, 0, x @ y)
+    assert H(Ty(), Ty(), (), ((), (), ()), {object(): x, object(): y})
+
+
 def test_Hypergraph_str():
     x, y = map(Ty, "xy")
     assert str(H.swap(x, y)) == "Swap(x, y)"
