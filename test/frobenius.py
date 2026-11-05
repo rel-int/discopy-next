@@ -119,6 +119,16 @@ def test_spider_decomposition():
                                            >> Spider(2, 1, n))
 
 
+def test_unfuse_unfuses_the_spiders_of_a_cospan():
+    x, y = Ty('x'), Ty('y')
+    for diagram in (Spider(1, 4, x) @ y, Spider(1, 3, x) @ Spider(1, 3, y),
+                    Diagram.spiders(1, 4, x @ y)):
+        unfused = diagram.unfuse()
+        assert Equation(diagram, unfused)
+        assert all(box.legs.left.count(k) + box.legs.right.count(k) <= 3
+                   for box in unfused.boxes for k in range(box.legs.apex))
+
+
 def test_Sum():
     f = Box('f', 'x', 'x')
     assert Sum([f]) == f

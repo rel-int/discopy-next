@@ -6,7 +6,7 @@ The fixes of rel-int/discopy-next#445 in `hypergraph`, `frobenius`, `cmap`, `ehy
 
 - [x] **S5-1** Hypergraph.to_graph keys each boundary edge's spider node by the boundary object (e.g.
 - [x] **S5-2** Hypergraph.__hash__'s fast path hashes repr(box), so equal hypergraphs whose boxes are equal but print differently (data=1 vs data=1.0, 0.5 vs …
-- [WIP] @session_01MEJxy43YMF4nTF8NEcP8Je-2026-11-05 19:42 **S5-4** frobenius.Diagram.unfuse leaves the Cospan plumbing fused:
+- [x] **S5-4** frobenius.Diagram.unfuse leaves the Cospan plumbing fused:
 - [WIP] @session_01MEJxy43YMF4nTF8NEcP8Je-2026-11-05 19:42 **S5-5** Hypergraph.from_callable deletes the category's own __call__ in its finally, e.g.
 - [WIP] @session_01MEJxy43YMF4nTF8NEcP8Je-2026-11-05 19:42 **S5-7** make_bijective, make_monogamous, make_left_monogamous, make_right_monogamous and trace_backward_wires fix one spider (or wire), rebuild the …
 - [WIP] @session_01MEJxy43YMF4nTF8NEcP8Je-2026-11-05 19:42 **S5-10** Hypergraph.__repr__ drops the offsets that to_tree keeps:

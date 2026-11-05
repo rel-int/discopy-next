@@ -322,7 +322,8 @@ class Diagram(
         """
         F = compact.Functor(
             ob_map=lambda x: x, ar_map=lambda f:
-                f.unfuse() if isinstance(f, Spider) else f,
+                f.unfuse() if isinstance(f, Spider)
+                else f.to_spiders().unfuse() if isinstance(f, Cospan) else f,
             dom=Diagram, cod=Diagram)
         return F(self)
 
