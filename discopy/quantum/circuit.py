@@ -909,13 +909,10 @@ class Box(tensor.Box[complex], Circuit):
 
     def __init__(self, name: str, dom: Ty, cod: Ty,
                  data=None, is_mixed=True, **params):
-        if not is_mixed:
-            if all(isinstance(x, Digit) for x in (dom @ cod).inside):
-                self.is_classical = True
-            elif all(isinstance(x, Qudit) for x in (dom @ cod).inside):
-                self.is_classical = False
-            else:
-                raise ValueError(messages.BOX_IS_MIXED)
+        if not is_mixed and not any(
+                all(isinstance(x, kind) for x in (dom @ cod).inside)
+                for kind in (Digit, Qudit)):
+            raise ValueError(messages.BOX_IS_MIXED)
         self._is_mixed = is_mixed
         tensor.Box[complex].__init__(self, name, dom, cod, data, **params)
         self._params = dict(self._params, is_mixed=is_mixed)
@@ -942,6 +939,12 @@ class Box(tensor.Box[complex], Circuit):
     @property
     def is_mixed(self):
         return self._is_mixed
+
+    @property
+    def is_classical(self):
+        """ Whether the box is pure with only digits on its boundary. """
+        return not self.is_mixed and all(
+            isinstance(x, Digit) for x in (self.dom @ self.cod).inside)
 
     def dagger(self):
         """
@@ -1023,11 +1026,6 @@ class Permutation(tensor.Permutation[complex], Box):
     def is_mixed(self):
         return any(type(left.inside[0]) is not type(right.inside[0])
                    for left, right in zip(self.dom, self.cod))
-
-    @property
-    def is_classical(self):
-        return not self.is_mixed\
-            and all(isinstance(x.inside[0], Digit) for x in self.dom)
 
 
 class Swap(Permutation, tensor.Swap, Box):

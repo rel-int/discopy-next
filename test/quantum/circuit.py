@@ -640,3 +640,13 @@ def test_Bubble_is_mixed_and_grad():
     assert X.bubble().grad(phi) == Sum((), qubit, qubit)
     with raises(NotImplementedError):
         Rx(phi).bubble().grad(phi)
+
+
+def test_pure_Bubble_mixed_eval_is_doubled():
+    f = ClassicalGate('f', bit, bit, [0, 1, 1, 0])
+    for bubble in (X.bubble(), Ry(.3).bubble(func=np.conjugate), f.bubble()):
+        doubled = (Channel.single if bubble.is_classical else Channel.double)(
+            bubble.eval())
+        assert bubble.eval(mixed=True).is_close(doubled)
+    assert np.allclose((Ket(0) >> X.bubble() >> Measure()).eval().array,
+                       [1, 0])

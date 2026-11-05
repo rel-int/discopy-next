@@ -16,7 +16,7 @@ The fixes of rel-int/discopy-next#445 in `quantum` and `grammar`: bugs the revie
 - [x] **S10-14** Circuit.eval(*others, contractor=...) evaluates self alone and drops the others, so Sum.eval(contractor=...) silently returns a wrong bare array or …
 - [x] **S10-15** Parametrized.lambdify passes dict(kwargs, modules=np) as sympy's positional `modules`, so the backend never reaches sympy:
 - [x] **S10-16** Circuit.measure's channel branch discards open qubits instead of measuring them:
-- [WIP] @session_01MEJxy43YMF4nTF8NEcP8Je-2026-11-05 19:42 **S10-17** A pure circuit Bubble has no is_classical, so the mixed evaluation of any circuit containing one raises AttributeError;
+- [x] **S10-17** A pure circuit Bubble has no is_classical, so the mixed evaluation of any circuit containing one raises AttributeError;
 - [WIP] @session_01MEJxy43YMF4nTF8NEcP8Je-2026-11-05 19:42 **S10-18** to_pennylane raises KeyError on U1 and CCX, which to_tk emits, so every Rydberg ansatz (built from U1 and CU1) fails to convert
 - [WIP] @session_01MEJxy43YMF4nTF8NEcP8Je-2026-11-05 19:42 **S10-19** Scalar(data, name=...) raises TypeError: tensor.Box.__new__ binds the scalar's first positional argument (data) to `name`, so the keyword `name` …
 - [WIP] @session_01MEJxy43YMF4nTF8NEcP8Je-2026-11-05 19:42 **S10-20** measure, get_counts and to_tk raise AxiomError on a delayed circuit that eval accepts:
