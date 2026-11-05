@@ -5,7 +5,7 @@
 The fixes of rel-int/discopy-next#445 in `neural`: bugs the review confirmed that need no design decision, one commit and one regression test each.
 
 - [x] **S12-1** neural.torch.Module keeps a compiled python.Function whose closures capture the original boxes' bound forward methods.
-- [WIP] @session_01MEJxy43YMF4nTF8NEcP8Je-2026-11-05 19:42 **S12-2** per_board_backward adds the excluded (halt.) rows of a board whose r_b is not finite unmasked, so with the default exclude a NaN board poisons …
+- [x] **S12-2** per_board_backward adds the excluded (halt.) rows of a board whose r_b is not finite unmasked, so with the default exclude a NaN board poisons …
 - [WIP] @session_01MEJxy43YMF4nTF8NEcP8Je-2026-11-05 19:42 **S12-3** neural.act's losses cast with .float() / .to(torch.float32), which narrows a float64 network's cross-entropy, board BCE and board losses to float32.
 - [WIP] @session_01MEJxy43YMF4nTF8NEcP8Je-2026-11-05 19:42 **S12-5** Geometric.cycle with rounds=0 differs from Recursion.cycle:
 - [WIP] @session_01MEJxy43YMF4nTF8NEcP8Je-2026-11-05 19:42 **S12-6** Shift with |step| > shape[axis] raises RuntimeError in narrow() instead of returning the all-zero translation its docstring defines

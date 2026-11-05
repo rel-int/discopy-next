@@ -464,7 +464,8 @@ def per_board_backward(net: nn.Module, board_loss, batched: tuple, k: float,
     ``board_loss(net, *args) -> (loss, aux)`` is ONE board's loss, every
     tensor in ``args`` with a leading batch axis of one; ``batched`` holds
     them ``(B, ...)``. Parameters under the ``exclude`` prefixes are left
-    out of the norm and summed unscaled; a parameter the loss never touches
+    out of the norm and summed unscaled, a board whose ``r_b`` is not finite
+    contributing nothing to them either; a parameter the loss never touches
     keeps ``.grad`` ``None``, as autograd would leave it (``torch.func``
     reports zeros there, and AdamW decays a zero gradient but skips a
     missing one), and so does a frozen one, ``requires_grad=False``. The
@@ -523,14 +524,14 @@ def per_board_backward(net: nn.Module, board_loss, batched: tuple, k: float,
     norms = torch.sqrt(squares)
     losses = losses.to(work)
     scale = scales(norms, k, losses, reference)
+    finite = torch.isfinite(ratios(norms, losses)).to(scale.dtype)
     stats = statistics(norms, losses, scale)
     with torch.no_grad():
         for name, p in bound.named_parameters():
             row = rows.get(name)
             if row is None or not bool(row.any()):
                 continue
-            if name in counted:
-                row = rescale(row, scale)
+            row = rescale(row, scale if name in counted else finite)
             total = row.sum(0) / b
             p.grad = total if p.grad is None else p.grad + total
     return aux, stats
