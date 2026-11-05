@@ -619,7 +619,8 @@ class Nat(abc.Nat, Ty):  # ty: ignore[invalid-generic-class]
     def __init__(self, inside: int | tuple = 0, dom: Colour | None = None,
                  cod: Colour | None = None, _scan: bool = True):
         # pylint: disable=unused-argument  # a Nat has no colour
-        self.n = inside if isinstance(inside, int) else len(inside)
+        abc.Nat.__init__(
+            self, inside if isinstance(inside, int) else len(inside))
         self.dom = self.cod = None
         cat.Ob.__init__(self, type(self).__name__)
 
@@ -707,7 +708,7 @@ class Dim(Ty):
         for dim in inside:
             assert_isinstance(dim, int)
             if dim < 1:
-                raise ValueError
+                raise ValueError(f"Expected a positive dimension, got {dim}.")
         inside = tuple(dim for dim in inside if dim > 1)
         cat.FreeCategory.__init__(self, inside, dom, cod, _scan=False)
         cat.Ob.__init__(self, type(self).__name__)

@@ -188,6 +188,18 @@ def test_Nat_init():
     assert all(len(Nat(n)) == n for n in range(5))
 
 
+def test_Nat_is_natural():
+    from discopy import abc
+    for natural in (abc.Nat, Nat):
+        with raises(ValueError, match="natural number, got -1"):
+            natural(-1)
+
+
+def test_Dim_is_positive():
+    with raises(ValueError, match="positive dimension, got 0"):
+        Dim(2, 0)
+
+
 def test_Nat_tensor():
     assert Nat(2) @ Nat(3) @ Nat(7) == Nat(12) == Nat(2).tensor(Nat(3), Nat(7))
     with raises(TypeError) as err:
