@@ -7,28 +7,28 @@ Optyx diagrams combine three diagrammatic calculi:
 
 - :class:`zw` calculus: for infinite-dimensional systems (Mode type), \
 with generators :class:`zw.Z`, :class:`zw.W`, creations and selections.
-- :class:`lo` calculus: for linear optics (Mode type), with generators \
-:class:`lo.BS` and :class:`lo.Phase`, or other .
+- :class:`photonic` calculus: for linear optics (Mode type), with generators \
+:class:`photonic.BS` and :class:`photonic.Phase`, or other .
 - :class:`zx` calculus: for qubit systems (Bit type), with generators \
 :class:`zx.Z` and :class:`zx.X`.
 
 Mode and Bit types can moreover be combined using :class:`DualRail`
-or other instances of :class:`diagram.core.Box`.
+or other instances of :class:`Box`.
 Note that the permanent method is only defined for a subclass
-of :class:`zw` diagrams, including :class:`lo` circuits.
+of :class:`zw` diagrams, including :class:`photonic` circuits.
 These are also known as QPath diagrams [FC23]_,
 or matrices with creations and annihilation.
 They are implemented in the :class:`path.Matrix` class,
-with an interface :class:`to_perceval`
+with an interface :class:`backends.PercevalBackend`
 or the internal evaluation method :class:`eval`.
 The DisCoPy class :class:`tensor.Diagram` is used as an
 implementation of tensor networks,
 with dimensions as types and tensors as boxes,
-with an interface :class:`to_quimb`
+with an interface :class:`backends.QuimbBackend`
 or the internal evaluation method :class:`eval`.
-Linear optical circuits, built from the generators of :class:`lo`,
-can be evaluated as tensor networks
-by first applying the method :class:`to_zw`.
+Linear optical circuits, built from the generators of :class:`photonic`,
+can be evaluated as tensor networks,
+since the Kraus map of each gate is a :class:`zw` diagram.
 
 
 Types
@@ -295,7 +295,7 @@ class Bit(Ty):
 class Diagram(frobenius.Diagram):
     """Optyx diagram combining :class:`zw`,
     :class:`zx` and
-    :class:`lo` calculi."""
+    :class:`photonic` calculi."""
 
     grad = tensor.Diagram.grad
     __pow__ = monoidal.Ty.__pow__
@@ -313,7 +313,7 @@ class Diagram(frobenius.Diagram):
         """Returns the :class:`Matrix` normal form
         of a :class:`Diagram`.
         In other words, it is the underlying matrix
-        representation of a :class:`path` and :class:`lo` diagrams.
+        representation of a :class:`path` and :class:`photonic` diagrams.
 
         Feedback loops have no path semantics: they raise, asking for the
         diagram to be unrolled first.

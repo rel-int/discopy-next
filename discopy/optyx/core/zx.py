@@ -3,9 +3,7 @@ Overview
 --------
 
 ZX diagrams, to and from conversions with :code:`pyzx`,
-evaluation with to_tensor via :code:`quimb`,
-mapping to post-selected linear
-optical circuits :code:`zx_to_path`.
+evaluation with to_tensor via :code:`quimb`.
 
 
 Generators
@@ -19,18 +17,6 @@ Generators
     Spider
     Z
     X
-
-Functions
-----------
-.. autosummary::
-    :template: function.rst
-    :nosignatures:
-    :toctree:
-
-    zx_to_path
-    decomp
-    zx2path
-
 
 Examples of usage
 ------------------
