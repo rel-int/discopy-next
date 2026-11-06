@@ -34,6 +34,12 @@ def test_Function_type_checking():
 def test_Function_no_type_checking_of_a_subclass_is_scoped():
     from discopy.python import multiplicative
     bad = multiplicative.Function(str, int, int)
+    with multiplicative.Function.no_type_checking:
+        assert bad(1) == "1"
+        with raises(TypeError):
+            Function(str, int, int)(1)
+    with raises(TypeError):
+        bad(1)
     with Function.no_type_checking:
         with multiplicative.Function.no_type_checking:
             assert bad(1) == "1"
