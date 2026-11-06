@@ -1,6 +1,31 @@
 # -*- coding: utf-8 -*-
 
-""" Discopy configuration. """
+"""
+DisCoPy configuration, i.e. module-level settings.
+
+Only ``OVERRIDE_DOCTEST_IMAGES`` and ``MAX_EINSUM_INDICES`` are always read
+at call time. ``DEFAULT_BACKEND``, ``TRANSPARENT`` and ``RIBBON_FOLD_DEPTH``,
+some uses of ``NUMPY_THRESHOLD`` and ``DRAWING_DEFAULT``, and the dicts, are
+bound when the modules that use them are imported: mutate the dicts in place
+rather than rebinding them, and change the backend with
+:func:`discopy.matrix.set_backend`.
+
+* ``DEFAULT_BACKEND``: the array backend of :class:`discopy.matrix.Matrix`
+  and :class:`discopy.tensor.Tensor`.
+* ``OVERRIDE_DOCTEST_IMAGES``: when ``True``, ``draw(doctest=...)``
+  overwrites the baseline image instead of comparing against it.
+* ``NUMPY_THRESHOLD``: the number of array entries printed before a ``repr``
+  elides.
+* ``MAX_EINSUM_INDICES``: the number of indices one ``einsum`` call in
+  :mod:`discopy.tensor` can take.
+* ``BOX_DRAWING_ATTRIBUTES``, ``WIRE_DRAWING_ATTRIBUTES`` and
+  ``COLOUR_DRAWING_ATTRIBUTES``: the default drawing attributes of each box,
+  wire and coloured region.
+* ``DRAWING_DEFAULT``: the default parameters of ``draw``.
+* ``TRANSPARENT``, ``COLORS``, ``SHAPES`` and ``RIBBON_FOLD_DEPTH``: the
+  colours, shapes and ribbon folds of drawings, with ``darken`` for the
+  back of a twisting ribbon.
+"""
 
 from typing import Any, Callable
 
@@ -15,7 +40,7 @@ IGNORE_WARNINGS = [
     "Casting complex values to real discards the imaginary part"]
 
 
-# Mapping from attribute to function from box to default value.
+#: Mapping from attribute to function from box to default value.
 BOX_DRAWING_ATTRIBUTES: dict[str, Callable[[Any], Any]] = {
     "height": lambda _: 1,
     "is_conjugate": lambda _: False,
@@ -69,19 +94,19 @@ WIRE_DRAWING_ATTRIBUTES = {
     "right_margin": lambda ob: text_width(str(ob)),
 }
 
-# Mapping from attribute to function from object to default value, for the
-# coloured region on either side of a wire: ``min_right_margin`` adds extra
-# space to the right of a wire, e.g. to make room for a long label, while
-# ``ribbon`` is the region to the right of a wire whenever it carries a
-# ``width``, i.e. the inside of a :class:`discopy.balanced.Ribbon` whose
-# two rails are ``width`` apart, see :meth:`monoidal.Ty.wire_offsets`.
+#: Mapping from attribute to function from object to default value, for the
+#: coloured region on either side of a wire: ``min_right_margin`` adds extra
+#: space to the right of a wire, e.g. to make room for a long label, while
+#: ``ribbon`` is the region to the right of a wire whenever it carries a
+#: ``width``, i.e. the inside of a :class:`discopy.balanced.Ribbon` whose
+#: two rails are ``width`` apart, see :meth:`monoidal.Ty.wire_offsets`.
 COLOUR_DRAWING_ATTRIBUTES = {
     "min_right_margin": lambda _: 0,
     "ribbon": lambda ob:
         ob.cod if hasattr(getattr(ob, "cod", None), "width") else None,
 }
 
-# Default drawing parameters.
+#: Default drawing parameters.
 DRAWING_DEFAULT: dict[str, Any] = {
     "fontsize": 12,
     "margins": (0, 0),
@@ -104,10 +129,10 @@ DRAWING_DEFAULT: dict[str, Any] = {
     "svg_tol": 1,
 }
 
-# Both matplotlib and TikZ spell transparency this way.
+#: Both matplotlib and TikZ spell transparency this way.
 TRANSPARENT = "none"
 
-# Mapping from tikz colors to hexcodes.
+#: Mapping from tikz colors to hexcodes.
 COLORS = {
     "white": '#ffffff',
     "red": '#e8a5a5',
@@ -136,12 +161,12 @@ def darken(hexcode, factor=0.6):
 COLORS.update({f"dark_{name}": darken(hexcode)
                for name, hexcode in COLORS.items()})
 
-# The maximum depth of a ribbon cup or cap fold in the dual rail drawing. It
-# caps the depth of the fold's half circle, so that a wide cup flattens into
-# an ellipse rather than a deep semicircle and the drawing stays compact.
+#: The maximum depth of a ribbon cup or cap fold in the dual rail drawing. It
+#: caps the depth of the fold's half circle, so that a wide cup flattens into
+#: an ellipse rather than a deep semicircle and the drawing stays compact.
 RIBBON_FOLD_DEPTH = 1.0
 
-# Mapping from tikz shapes to matplotlib shapes.
+#: Mapping from tikz shapes to matplotlib shapes.
 SHAPES = {
     "rectangle": 's',
     "triangle_up": '^',

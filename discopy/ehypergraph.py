@@ -27,11 +27,39 @@ which is sound for cartesian diagrams only. Unlike the paper's, a class may
 depend on itself, as in egg, which :meth:`EHypergraph.to_diagram` refuses, as
 drawing it would need a trace.
 
+Summary
+-------
+
+.. autosummary::
+    :template: class.rst
+    :nosignatures:
+    :toctree:
+
+    EHypergraph
+    Join
+
+.. admonition:: Functions
+
+    .. autosummary::
+        :template: function.rst
+        :nosignatures:
+        :toctree:
+
+        partition
+        relabel
+        is_pattern
+        pattern
+        rewire
+        ast_size
+        distribute
+
 Example
 -------
-Egg's example, ``(a * 2) / 2`` with ``a`` an input and each constant a box
-with no input, the two ``2`` one class from the start as egg hash-conses
-them, saturates in three rounds with egg's classes and extracts ``a``:
+``Markov`` is ``EHypergraph[markov.Diagram]``, the e-hypergraphs over
+Markov diagrams. Egg's example, ``(a * 2) / 2`` with ``a`` an input and each
+constant a box with no input, the two ``2`` one class from the start as egg
+hash-conses them, saturates in three rounds with egg's classes and extracts
+``a``:
 
 >>> from discopy.markov import Ty, Box, Diagram
 >>> x = Ty('x')
@@ -65,29 +93,6 @@ shared cancels, then is discarded with ``p`` unless a condition reads it:
 Copy(x) >> sample @ sample >> -
 Discard(x) @ 0
 sample >> 0 @ condition
-
-Summary
--------
-
-.. autosummary::
-    :template: class.rst
-    :nosignatures:
-    :toctree:
-
-    EHypergraph
-    Join
-
-.. admonition:: Functions
-
-    .. autosummary::
-        :template: function.rst
-        :nosignatures:
-        :toctree:
-
-        partition
-        is_pattern
-        ast_size
-        distribute
 """
 
 from collections import Counter

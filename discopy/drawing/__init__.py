@@ -1,4 +1,10 @@
-""" DisCoPy's drawing modules. """
+"""
+DisCoPy's drawing modules: :mod:`discopy.drawing.drawing` is the category of
+drawings, i.e. labeled graphs embedded in the plane, onto which every diagram
+is sent by a functor; :mod:`discopy.drawing.backend` renders them with
+matplotlib or TikZ; :mod:`discopy.drawing.widget` shows them as interactive
+anywidget widgets in notebooks.
+"""
 
 import os
 from base64 import b64encode
@@ -37,7 +43,8 @@ def __getattr__(name):
 
 def draw(diagram, **params):
     """
-    Draws a diagram using networkx and matplotlib.
+    Draws a diagram with matplotlib, or as TikZ code with ``to_tikz=True``,
+    see :func:`discopy.drawing.backend.draw`.
 
     Parameters
     ----------
@@ -66,15 +73,18 @@ def draw(diagram, **params):
         when it is a file name, required when it is an in-memory buffer.
     doctest : str, optional
         Path to a documentation image used as a drawing baseline: the
-        image is created if missing and compared against otherwise, see
-        :code:`config.OVERRIDE_DOCTEST_IMAGES`.
+        image is created if missing and compared against otherwise, or
+        overwritten when :code:`discopy.config.OVERRIDE_DOCTEST_IMAGES`
+        is :code:`True`.
     tol : float, optional
         Comparison tolerance for raster images, default is :code:`20`.
     to_tikz : bool, optional
         Whether to output tikz code instead of matplotlib.
     asymmetry : float, optional
-        Make a box and its dagger mirror images, default is :code:`.125`
-        when a box is conjugate, transposed or a dagger not drawn as a
+        Shift one corner of each box drawn as a plain polygon (not spiders,
+        wires, braids or other special shapes) so that a box, its dagger, its
+        transpose and its conjugate are told apart, default is :code:`0.125`
+        when some box is a conjugate, a transpose or a dagger not drawn as a
         braid, :code:`0` otherwise.
     """
     return diagram.to_drawing().draw(**params)

@@ -23,15 +23,39 @@ Summary
 -------
 
 .. autosummary::
-    :template: function.rst
+    :template: class.rst
     :nosignatures:
     :toctree:
 
-    from_diagram
-    from_pyzx
-    to_pyzx
-    size
-    full_reduce
+    Simplifier
+    Agenda
+
+.. admonition:: Functions
+
+    .. autosummary::
+        :template: function.rst
+        :nosignatures:
+        :toctree:
+
+        from_diagram
+        from_pyzx
+        to_pyzx
+        size
+        full_reduce
+        reduce
+        normalize
+        remove_identity
+        pivot
+        complement
+        pivot_boundary
+        near_boundary
+        fuse_gadgets
+        copy
+        supplement
+        pivot_gadget
+
+.. autodata:: RULES
+    :no-value:
 
 Example
 -------

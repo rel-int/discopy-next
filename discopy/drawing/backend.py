@@ -10,10 +10,18 @@ Summary
     :nosignatures:
     :toctree:
 
-    draw
     Backend
     TikZ
     Matplotlib
+
+.. admonition:: Functions
+
+    .. autosummary::
+        :template: function.rst
+        :nosignatures:
+        :toctree:
+
+        draw
 """
 
 from __future__ import annotations

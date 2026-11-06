@@ -14,6 +14,7 @@ Summary
     Wire
     Ty
     Nat
+    Layer
     Diagram
     Box
     Cup
@@ -21,6 +22,16 @@ Summary
     Sum
     Bubble
     Functor
+    Equation
+
+.. admonition:: Functions
+
+    .. autosummary::
+        :template: function.rst
+        :nosignatures:
+        :toctree:
+
+        nesting
 
 Axioms
 ------
