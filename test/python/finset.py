@@ -155,6 +155,14 @@ def test_Permutation_takes_only_bijections():
     assert Permutation.id(2).then(iter((1, 0))) == (1, 0)
 
 
+def test_Function_says_what_is_wrong():
+    from discopy.python.finset import Function
+    with raises(ValueError, match="function of length 2, got 1"):
+        Function([0], 1, 2)
+    with raises(ValueError, match=r"function to range\(2\), got \[0, 2\]"):
+        Function([0, 2], 2, 2)
+
+
 def test_counts_take_index():
     from discopy.abc import Nat
     from discopy.python.finset import Cospan, Function

@@ -286,6 +286,8 @@ class Drawing(TracedCategory["monoidal.Ty", "Drawing"], RichDisplay):
 
     yanking = TracedCategory.yanking.inapplicable(
         messages.PLANAR_YANKING)
+    yanking_left = TracedCategory.yanking_left.inapplicable(
+        messages.PLANAR_YANKING)
     serialisation = Testable.serialisation.inapplicable(
         messages.NO_TREE_DRAWING)
 

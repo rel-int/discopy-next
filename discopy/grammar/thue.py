@@ -46,7 +46,7 @@ class Rule(monoidal.Box):
     Parameters:
         dom : The domain of the rule, i.e. its input.
         cod : The codomain of the rule, i.e. its output.
-        name : The name of the rule, empty by default.
+        name : The name of the rule, ``Rule(dom, cod)`` by default.
 
     Example
     -------
@@ -65,7 +65,7 @@ class Rule(monoidal.Box):
     def __repr__(self):
         if self.is_dagger:
             return repr(self.dagger()) + ".dagger()"
-        name = f", name={self.name!r}" if self.name else ""
+        name = f", name={self.name!r}"
         data = "" if self.data is None else f", data={self.data!r}"
         return factory_name(type(self))\
             + f"({self.dom!r}, {self.cod!r}{name}{data})"

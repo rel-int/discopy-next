@@ -3,7 +3,7 @@ import pytest
 from discopy.optyx.channel import *
 from sympy.abc import x, y
 from discopy.optyx.channel import (
-    CQMap, Channel, Diagram, Encode, Measure, Permutation,
+    CQMap, Channel, Diagram, Encode, Measure, Observable, Permutation,
     bit, mode, qmode, qubit)
 from discopy.optyx import photonic
 from discopy.optyx.core import diagram, zw, zx
@@ -180,6 +180,52 @@ def test_sums_double_and_differentiate_term_by_term():
         np.exp(.2j * np.pi) + 2 * np.exp(.4j * np.pi)))
 
 
+def test_a_box_without_a_gradient_refuses_to_differentiate():
+    from discopy.optyx import qubits
+    loop = (photonic.Create(1) @ qmode >> photonic.BS
+            >> qmode @ photonic.Phase(x)).feedback(
+        mem=qmode, state=photonic.Create(0))
+    for box in (qubits.Z(1, 1, x), qubits.Scalar(x), photonic.BBS(x),
+                qubits.Ket(0) >> qubits.X(1, 1, x), loop):
+        assert box.grad(y) == Diagram.sum_factory((), box.dom, box.cod)
+        with pytest.raises(NotImplementedError, match="does not support"):
+            box.grad(x)
+
+
+def test_a_box_depends_on_the_symbols_of_its_kraus_map():
+    channel = Channel("z", zx.Z(1, 1, x))
+    cq_map = CQMap("z", channel.double(), qubit, qubit)
+    for box in (channel, cq_map, channel >> cq_map):
+        assert box.free_symbols == {x}
+        assert box.grad(y) == Diagram.sum_factory((), box.dom, box.cod)
+        with pytest.raises(NotImplementedError, match="does not support"):
+            box.grad(x)
+
+
+def test_subs_substitutes_the_parameter_of_every_symbolic_box():
+    import sympy as sp
+    from discopy.optyx import classical, qubits
+    gate = photonic.Gate(sp.Matrix([[sp.cos(x), sp.sin(x)], [
+        -sp.sin(x), sp.cos(x)]]), 2, 2, "R", data=x)
+    for box in (qubits.Scalar(x), photonic.PhaseShiftDR(x),
+                photonic.PhotonLoss(x), classical.Z(1, 1, x),
+                classical.X(1, 1, x), gate, gate.dagger(), gate.conjugate(),
+                photonic.Gate(gate.array, 2, 2, "R")):
+        assert box.free_symbols == {x}
+        assert not box.subs((x, .25)).double().free_symbols
+        with pytest.raises(NotImplementedError, match="does not support"):
+            box.grad(x)
+    assert photonic.PhotonLoss(x).subs((x, .25)) == photonic.PhotonLoss(.25)
+    assert classical.Z(1, 1, x).subs((x, .25)) == classical.Z(1, 1, .25)
+
+
+def test_classical_spiders_substitute_their_phase():
+    from discopy.optyx import classical
+    for spider in (classical.Z, classical.X):
+        assert spider(1, 2, x + 1).subs(x + 1, y) == spider(1, 2, y)
+        assert spider(1, 2, x).subs({x: .25}) == spider(1, 2, .25)
+
+
 def test_cq_map_power_is_a_tensor_power():
     measure = CQMap("measure", diagram.Spider(2, 1, diagram.bit), qubit, bit)
     assert measure ** 1 == measure
@@ -207,6 +253,12 @@ def test_encode_inflate_mixed_types():
     dom = qubit @ bit @ qmode @ mode
     encode = Encode(dom, internal_states=([1, 0],))
     assert encode.inflate(2).dom == dom.inflate(2)
+
+
+def test_encoding_classical_types_is_not_pure():
+    for dom in (bit, mode, bit @ qmode):
+        assert not Encode(dom).is_pure
+    assert Encode(qubit @ qmode).is_pure
 
 
 def test_dual_rail_only_for_zx_channels():
@@ -247,6 +299,24 @@ def test_inflate_keeps_the_environment():
         assert np.isclose(distribution[key], value)
 
 
+def test_cq_map_inflates_as_the_channel_of_its_density_matrix():
+    from discopy.optyx import qubits
+    create = qubits.Ket(0) @ photonic.Create(
+        1, 1, internal_states=([1, 0], [0, 1]))
+    circuit = qubits.H() @ (photonic.Phase(.2) @ qmode >> photonic.BS)
+    measure = qubits.Measure(1) @ photonic.NumberResolvingMeasurement(2)
+    cq_map = CQMap("cq", circuit.double(), circuit.dom, circuit.cod)
+    expected = (create >> circuit >> measure).inflate(2).eval().prob_dist()
+    actual = (create >> cq_map >> measure).inflate(2).eval().prob_dist()
+    for key in expected.keys() | actual.keys():
+        assert np.isclose(actual.get(key, 0), expected.get(key, 0)), key
+    hom = photonic.Create(
+        1, 1, internal_states=([1, 0], [1, 0])) >> photonic.BS
+    trace = Observable(function=lambda n: 1, dom=qmode @ qmode)
+    assert np.isclose(
+        (hom >> trace).inflate(2).double().to_tensor().eval().array, 1)
+
+
 def test_from_callable_calls_a_channel_diagram():
     from discopy.optyx.qubits import Z, Scalar
     bell = Scalar(.5 ** .5) @ Z(0, 2)
@@ -258,3 +328,24 @@ def test_from_callable_calls_a_channel_diagram():
 
     assert measure_beside_bell == (
         bell @ Measure(qubit) >> qubit @ Diagram.swap(qubit, bit))
+
+
+def test_readings_do_not_depend_on_foliation():
+    from discopy.optyx import classical, qubits
+    from discopy.optyx.utils.misc import explode_channel
+    state = photonic.Create(0) @ photonic.Create(1)
+    step = (photonic.Create(1) @ qmode @ qmode >> photonic.BS @ qmode
+            >> photonic.NumberResolvingMeasurement(1) @ qmode @ qmode
+            >> classical.CopyN(1) @ photonic.BS)
+
+    def sample(state):
+        return step.feedback(mem=qmode @ qmode, state=state).sample(
+            3, burn_in=0, seed=0)
+
+    for reading, term in [
+            (Diagram.dilate, state), (sample, state),
+            (Diagram.get_kraus, qubits.Z(1, 1, .2) @ qubits.X(1, 1, .3)),
+            (explode_channel, zx.Z(1, 1, .2) @ zx.X(1, 1, .3)),
+            (classical.BitControlledGate,
+             photonic.Phase(.3) @ photonic.Phase(.4))]:
+        assert reading(term.foliation()) == reading(term), reading

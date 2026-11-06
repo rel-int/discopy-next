@@ -114,7 +114,7 @@ class Wire(feedback.Wire, rigid.Wire):
         return self.l
 
 
-HeadOb, TailOb = feedback.wire_generators(Wire)
+HeadOb, TailOb = feedback.structural_wires(Wire)
 
 
 @factory
@@ -241,7 +241,7 @@ class Box(rigid.Box, feedback.Box, Diagram):
 
     def __init__(self, name, dom, cod, *args, time_step: int = 0, **params):
         rigid.Box.__init__(self, name, dom, cod, *args, **params)
-        self._time_step, self._args, self._params = time_step, args, params
+        self._time_step = time_step
 
     def __repr__(self):
         if self.is_dagger:
@@ -337,7 +337,8 @@ class Functor(rigid.Functor, feedback.Functor):
     dom = cod = Diagram
 
 
-Feedback, Trace, FollowedBy, Head, Tail = feedback.generators(Diagram, Box)
+Feedback, Trace, FollowedBy, Head, Tail = feedback.structural_boxes(
+    Diagram, Box)
 Diagram.box_factory = Box
 Diagram.functor_factory = Functor
 Diagram.cup_factory, Diagram.cap_factory = Cup, Cap

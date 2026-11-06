@@ -120,7 +120,7 @@ class Wire(feedback.Wire, biclosed.Wire):
     """
 
 
-HeadOb, TailOb = feedback.wire_generators(Wire)
+HeadOb, TailOb = feedback.structural_wires(Wire)
 
 
 @factory
@@ -200,6 +200,11 @@ class Exp(Wire, biclosed.Exp):
 
     ob = Ty
 
+    @cached_property
+    def name(self):  # pylint: disable=method-hidden  # deleted by __init__
+        "The name of an exponential is its undelayed print, read when needed."
+        return str(self.reset())
+
     def __str__(self):
         return f"({self.exponent} >> {self.base})"\
             + feedback.str_delayed(self.time_step)
@@ -233,7 +238,13 @@ class Product(Wire):
         for typ in factors:
             assert_isinstance(typ, self.ob)
         self.factors = factors
-        super().__init__(str(self), **params)
+        super().__init__("", **params)
+        del self.name
+
+    @cached_property
+    def name(self):  # pylint: disable=method-hidden  # deleted by __init__
+        "The name of a product is its undelayed print, read when needed."
+        return str(self.reset())
 
     def __eq__(self, other):
         return isinstance(other, type(self))\
@@ -379,6 +390,8 @@ class Diagram(markov.Diagram, biclosed.Diagram, ClosedCategory):
         def image(box):
             if box.time_step:
                 return image(box.reset()).delay(box.time_step)
+            if isinstance(box, Curry) and not box.n:
+                return box.arg.to_compact()
             if isinstance(box, Curry):
                 return (box.arg.to_compact() >> Coeval(
                     box.cod, left=box.left)).trace(
@@ -562,6 +575,8 @@ class Curry(Timed, biclosed.Curry, Box):
         """
         if not self.time_step:
             return super().to_drawing()
+        if not self.n:
+            return self.arg.delay(self.time_step).to_drawing()
         coeval = self.coeval_factory(self.reset().cod, left=self.left)
         return (self.arg >> coeval).delay(self.time_step).to_drawing()\
             .trace(self.n, left=not self.left)
@@ -716,6 +731,8 @@ class Functor(biclosed.Functor, markov.Functor):
     dom = cod = Diagram
 
     def __call__(self, other):
+        if isinstance(other, Unitype) and not other.time_step:
+            return monoidal.Functor.__call__(self, other)
         if self.cod is Drawing:
             return super().__call__(other)
         if isinstance(other, (Wire, Box)) and other.time_step:
@@ -745,7 +762,8 @@ Diagram.copy_factory = Copy
 Diagram.function_factory = Function
 Diagram.swap_factory = Swap
 Diagram.permutation_factory = Permutation
-Feedback, Trace, FollowedBy, Head, Tail = feedback.generators(Diagram, Box)
+Feedback, Trace, FollowedBy, Head, Tail = feedback.structural_boxes(
+    Diagram, Box)
 Feedback.is_linear = Head.is_linear = Tail.is_linear = property(
     lambda self: self.arg.is_linear)
 Diagram.box_factory = Box
@@ -937,7 +955,8 @@ class TermBase(Box, biclosed.TermBase):
         """
         functor = biclosed.Functor(
             ob_map=lambda x: cls.ob(x.inside[0].name),
-            ar_map=lambda c: cls.ob.constant_factory(c.name, functor(c.cod)),
+            ar_map=lambda c: cls.ob.constant_factory(
+                c.name, functor(c.cod), data=c.data),
             dom=biclosed.Diagram, cod=cls.functor.cod)
         return functor(term)
 
@@ -1039,7 +1058,8 @@ type Term = Constant | Variable | Application | Abstraction\
 
 for law in ("copy_coassociativity", "copy_cocommutativity",
             "copy_counitality", "copy_coherence", "vanishing", "joining",
-            "strength", "tightening", "sliding", "yanking", "scalar_sliding"):
+            "strength", "tightening", "sliding", "yanking", "yanking_left",
+            "scalar_sliding"):
     setattr(TermBase, law, getattr(Box, law).inapplicable(
         messages.TERM_IS_A_BOX))
 
