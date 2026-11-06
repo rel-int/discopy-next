@@ -66,6 +66,13 @@ def test_permutation():
     assert f.trace(0) is f
 
 
+def test_braid_of_an_instance_is_the_swap():
+    from discopy.python.additive import Function
+
+    X = Function.ob(int)
+    assert Function.id(X).braid(X, X) == Function.swap(X, X)
+
+
 def test_trace_takes_the_keyword_form():
     from pytest import raises
     from discopy.python.additive import Function

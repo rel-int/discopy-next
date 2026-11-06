@@ -112,11 +112,15 @@ class Function(Category[Ty, "Function"]):
     @classproperty
     @contextmanager
     def no_type_checking(cls):
+        had = "type_checking" in vars(cls)
         tmp, cls.type_checking = cls.type_checking, False
         try:
             yield
         finally:
-            cls.type_checking = tmp
+            if had:
+                cls.type_checking = tmp
+            else:
+                del cls.type_checking
 
     def __call__(self, arg):
         if self.type_checking:

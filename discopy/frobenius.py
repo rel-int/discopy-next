@@ -122,7 +122,7 @@ class Wire(pivotal.Wire):
     r = l
 
 
-HeadOb, TailOb = feedback.wire_generators(Wire)
+HeadOb, TailOb = feedback.structural_wires(Wire)
 
 
 @factory
@@ -977,7 +977,8 @@ def coherence(cls: type, factory: Callable
 
 CMap = cmap.CMap[Diagram]
 
-Feedback, Trace, FollowedBy, Head, Tail = feedback.generators(Diagram, Box)
+Feedback, Trace, FollowedBy, Head, Tail = feedback.structural_boxes(
+    Diagram, Box)
 Diagram.box_factory = Box
 Diagram.functor_factory = Functor
 Diagram.cup_factory, Diagram.cap_factory = Cup, Cap

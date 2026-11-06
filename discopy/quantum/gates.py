@@ -74,10 +74,10 @@ def format_number(data):
 
 
 class SelfConjugate(Box):
-    """ A self-conjugate box, i.e. where the transpose is the dagger. """
-    def conjugate(self):
-        return self
-
+    """
+    A self-conjugate box, i.e. where the transpose is the dagger, up to the
+    order of the wires.
+    """
     def rotate(self, left=False):
         del left
         return self.dagger()
@@ -143,6 +143,10 @@ class Discard(SelfConjugate):
     def dagger(self):
         return MixedState(self.dom)
 
+    def rotate(self, left=False):
+        del left
+        return MixedState(self.dom.r)
+
     def _decompose(self):
         return Id().tensor(*map(Discard, self.dom))
 
@@ -178,6 +182,10 @@ class MixedState(SelfConjugate):
     def dagger(self):
         return Discard(self.cod)
 
+    def rotate(self, left=False):
+        del left
+        return Discard(self.cod.r)
+
     def _decompose(self):
         return Id().tensor(*map(MixedState, self.cod))
 
@@ -191,11 +199,15 @@ class Measure(SelfConjugate):
     n_qubits : int
         Number of qubits to measure.
     destructive : bool, optional
-        Whether to do a non-destructive measurement instead.
+        Whether the measurement consumes the qubits, default is :code:`True`,
+        otherwise they are kept beside the bits.
     override_bits : bool, optional
         Whether to override input bits, this is the standard behaviour of tket.
     time_step : int, optional
         The number of times the measurement has been delayed.
+
+    >>> assert Measure().cod == bit
+    >>> assert Measure(destructive=False).cod == qubit @ bit
     """
     serialised_attrs = (
         "n_qubits", "destructive", "override_bits", "time_step")
@@ -271,11 +283,16 @@ class Encode(SelfConjugate):
     n_bits : int
         Number of bits to encode.
     constructive : bool, optional
-        Whether to do a classically-controlled correction instead.
+        Whether the encoding prepares fresh qubits, default is :code:`True`,
+        otherwise it applies a classically-controlled correction to given
+        qubits.
     reset_bits : bool, optional
         Whether to reset the bits to the uniform distribution.
     time_step : int, optional
         The number of times the encoding has been delayed.
+
+    >>> assert Encode().dom == bit
+    >>> assert Encode(constructive=False).dom == qubit @ bit
     """
     serialised_attrs = ("n_bits", "constructive", "reset_bits", "time_step")
     draw_as_measures = True
@@ -420,6 +437,10 @@ class Copy(ClassicalGate):
     def from_tree(cls, tree: dict):
         return cls(tree.get('time_step', 0))
 
+    def __repr__(self):
+        time_step = f"time_step={self.time_step}" if self.time_step else ""
+        return f"{factory_name(type(self))}({time_step})"
+
     def dagger(self):
         return Match(self.time_step)
 
@@ -440,7 +461,7 @@ class Match(ClassicalGate):
         self.draw_as_spider, self.color = True, "black"
         self.drawing_name = ""
 
-    delay = Copy.delay
+    delay, __repr__ = Copy.delay, Copy.__repr__
     from_tree = classmethod(Copy.from_tree.__func__)
 
     def dagger(self):
@@ -534,6 +555,11 @@ class Digits(ClassicalGate):
         return Digits(*self.digits, dim=self.dim, is_dagger=not self.is_dagger,
                       time_step=self.time_step)
 
+    def rotate(self, left=False):
+        del left
+        return Digits(*self.digits[::-1], dim=self.dim,
+                      is_dagger=not self.is_dagger, time_step=self.time_step)
+
     def to_drawing(self):
         result = QuantumGate.to_drawing(self)
         result.draw_as_brakets, result._digits = True, self._digits
@@ -582,6 +608,12 @@ class Ket(SelfConjugate, QuantumGate):
     def from_tree(cls, tree: dict):
         return cls(*tree['bitstring'], time_step=tree.get('time_step', 0))
 
+    def __repr__(self):
+        args = ', '.join(map(repr, self.bitstring))
+        time_step = f"time_step={self.time_step}" if self.time_step else ""
+        args = ", ".join(arg for arg in (args, time_step) if arg)
+        return f"{factory_name(type(self))}({args})"
+
     @property
     def bitstring(self):
         """ The bitstring of a Ket. """
@@ -589,6 +621,17 @@ class Ket(SelfConjugate, QuantumGate):
 
     def dagger(self):
         return Bra(*self.bitstring, time_step=self.time_step)
+
+    def rotate(self, left=False):
+        """
+        The transpose of a preparation or a post-selection, i.e. the dagger
+        of the one on the reversed bitstring.
+
+        >>> assert Ket(1, 0).r == Bra(0, 1) and Bra(0, 1).l == Ket(1, 0)
+        """
+        del left
+        return type(self)(
+            *self.bitstring[::-1], time_step=self.time_step).dagger()
 
     def _decompose(self):
         return Id().tensor(*[
@@ -620,7 +663,8 @@ class Bra(SelfConjugate, QuantumGate):
         self._digits, self._dim, self.draw_as_brakets = bitstring, 2, True
         self.affine = False
 
-    delay, to_tree = Ket.delay, Ket.to_tree
+    delay, to_tree, rotate = Ket.delay, Ket.to_tree, Ket.rotate
+    __repr__ = Ket.__repr__
     from_tree = classmethod(Ket.from_tree.__func__)
 
     @property
@@ -646,7 +690,8 @@ class Controlled(QuantumGate):
         Gate to control, e.g. :code:`CX = Controlled(X)`.
     distance : int, optional
         Number of qubits from the control to the target, default is :code:`1`.
-        If negative, the control is on the right of the target.
+        If negative, the control is on the right of the target, zero raises
+        :code:`ValueError`.
 
     Example
     -------
@@ -713,7 +758,7 @@ class Controlled(QuantumGate):
             self.controlled.rotate(left), distance=-self.distance)
 
     def lambdify(self, *symbols, **kwargs):
-        c_fn = self.controlled.lambdify(*symbols)
+        c_fn = self.controlled.lambdify(*symbols, **kwargs)
         return lambda *xs: type(self)(c_fn(*xs), distance=self.distance)
 
     def subs(self, *args):
@@ -885,9 +930,15 @@ class Parametrized(Box):
         return type(self)(data)  # ty: ignore[missing-argument]
 
     def lambdify(self, *symbols, **kwargs):
+        """
+        The function from values of ``symbols`` to gates, with the data
+        evaluated in the module of the current backend whatever ``modules``
+        it is given, its other ``kwargs`` passed to :code:`sympy.lambdify`.
+        """
         from sympy import lambdify
         with backend() as np:
-            data = lambdify(symbols, self.data, dict(kwargs, modules=np))
+            data = lambdify(
+                symbols, self.data, **dict(kwargs, modules=np.module))
         return lambda *xs: type(self)(
             data(*xs))  # ty: ignore[missing-argument]
 
@@ -1086,6 +1137,9 @@ class Scalar(Parametrized):
     """ Scalar, i.e. quantum gate with empty domain and codomain. """
     serialised_attrs = ("data", "name", "is_mixed", "time_step")
 
+    def __new__(cls, *args, **kwargs):
+        return object.__new__(cls)
+
     def __init__(self, data, name=None, is_mixed=False, time_step=0):
         self.drawing_name = format_number(data)
         name = "scalar" if name is None else name
@@ -1098,8 +1152,10 @@ class Scalar(Parametrized):
         super().__setstate__(state)
 
     def __repr__(self):
+        name = f", {self.name!r}" if "name" in self.serialised_attrs\
+            and self.name != "scalar" else ""
         time_step = f", time_step={self.time_step}" if self.time_step else ""
-        return super().__repr__()[:-1] + (
+        return super().__repr__()[:-1] + name + (
             ', is_mixed=True' if self.is_mixed else '') + time_step + ')'
 
     def setoid(self):
@@ -1121,9 +1177,24 @@ class Scalar(Parametrized):
             return np.array(self.data)
 
     def grad(self, var, **params):
+        """
+        The derivative of a scalar :math:`s`, or under mixed evaluation, where
+        a pure scalar is :math:`|s|^2`, the mixed scalar
+        :math:`2 \\mathrm{Re}(\\bar{s} s')` written as the polarisation
+        :math:`(|s + s'|^2 - |s - s'|^2) / 2`.
+
+        >>> from sympy.abc import phi  # doctest: +EXTRA
+        >>> assert scalar(phi).grad(phi).subs(phi, .5)\\
+        ...     == scalar(1, is_mixed=True)
+        """
         if var not in self.free_symbols:
             return Sum([], self.dom, self.cod)
-        return Scalar(self.data.diff(var), is_mixed=self.is_mixed,
+        data, derivative = self.data, self.data.diff(var)
+        if params.get('mixed', True) and not self.is_mixed:
+            return Scalar((abs(data + derivative) ** 2
+                           - abs(data - derivative) ** 2) / 2,
+                          is_mixed=True, time_step=self.time_step)
+        return Scalar(derivative, is_mixed=self.is_mixed,
                       time_step=self.time_step)
 
     def dagger(self):
@@ -1151,13 +1222,6 @@ class Scalar(Parametrized):
 
     @classmethod
     def from_tree(cls, tree: dict):
-        """
-        Passes its arguments positionally, as :meth:`dagger` builds one:
-        :meth:`tensor.Box.__new__` reads ``name`` as its own first argument,
-        where a scalar's first argument is its ``data``.
-
-        >>> assert from_tree(Scalar(.5).to_tree()) == Scalar(.5)
-        """
         return cls(tree['data'], tree['name'], tree['is_mixed'],
                    tree.get('time_step', 0))
 
@@ -1172,6 +1236,10 @@ class MixedScalar(Scalar):
     @classmethod
     def from_tree(cls, tree: dict):
         return cls(tree['data'], tree.get('time_step', 0))
+
+    def __repr__(self):
+        time_step = f", time_step={self.time_step}" if self.time_step else ""
+        return Parametrized.__repr__(self)[:-1] + time_step + ")"
 
     def delay(self, n_steps=1):
         """
@@ -1237,6 +1305,18 @@ class Sqrt(Scalar):
     def dagger(self):
         return self if self.is_self_adjoint\
             else Sqrt(self.data, not self.is_dagger, self.time_step)
+
+    def grad(self, var, **params):
+        """
+        The derivative of the root, i.e. of the scalar it evaluates to.
+
+        >>> from sympy.abc import phi  # doctest: +EXTRA
+        >>> assert sqrt(phi).grad(phi, mixed=False) == scalar(.5 * phi ** -.5)
+        """
+        root = Scalar(self.data ** .5,  # ty: ignore[unsupported-operator]
+                      time_step=self.time_step)
+        gradient = root.grad(var, **params)
+        return gradient.dagger() if self.is_dagger else gradient
 
     def delay(self, n_steps=1):
         return Sqrt(self.data, self.is_dagger, self.time_step + n_steps)

@@ -159,6 +159,8 @@ class Diagram(braided.Diagram, feedback.Diagram, BalancedCategory):
     """
     ob = Ty
     yanking = BalancedCategory.yanking.failing(messages.FREE_YANKING)
+    yanking_left = BalancedCategory.yanking_left.failing(
+        messages.FREE_YANKING)
 
     @classmethod
     def twist(cls, dom: monoidal.Ty) -> Diagram:
@@ -444,7 +446,8 @@ class DualRail(Functor):
         return super().__call__(other)
 
 
-Feedback, Trace, FollowedBy, Head, Tail = feedback.generators(Diagram, Box)
+Feedback, Trace, FollowedBy, Head, Tail = feedback.structural_boxes(
+    Diagram, Box)
 Diagram.box_factory = Box
 Diagram.functor_factory = Functor
 CMap = cmap.CMap[Diagram]

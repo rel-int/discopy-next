@@ -120,7 +120,7 @@ class Wire(feedback.Wire, biclosed.Wire):
     """
 
 
-HeadOb, TailOb = feedback.wire_generators(Wire)
+HeadOb, TailOb = feedback.structural_wires(Wire)
 
 
 @factory
@@ -762,7 +762,8 @@ Diagram.copy_factory = Copy
 Diagram.function_factory = Function
 Diagram.swap_factory = Swap
 Diagram.permutation_factory = Permutation
-Feedback, Trace, FollowedBy, Head, Tail = feedback.generators(Diagram, Box)
+Feedback, Trace, FollowedBy, Head, Tail = feedback.structural_boxes(
+    Diagram, Box)
 Feedback.is_linear = Head.is_linear = Tail.is_linear = property(
     lambda self: self.arg.is_linear)
 Diagram.box_factory = Box
@@ -1057,7 +1058,8 @@ type Term = Constant | Variable | Application | Abstraction\
 
 for law in ("copy_coassociativity", "copy_cocommutativity",
             "copy_counitality", "copy_coherence", "vanishing", "joining",
-            "strength", "tightening", "sliding", "yanking", "scalar_sliding"):
+            "strength", "tightening", "sliding", "yanking", "yanking_left",
+            "scalar_sliding"):
     setattr(TermBase, law, getattr(Box, law).inapplicable(
         messages.TERM_IS_A_BOX))
 

@@ -396,6 +396,18 @@ def test_fix_truncates_a_growing_photon_budget():
         sampler(loss=.9).fix(tol=.5, max_chi=4)
 
 
+def test_only_a_compressing_backend_warns_of_truncation():
+    """A backend that contracts exactly ignores `max_chi` and returns the
+    exact state, so it has no truncation to warn about."""
+    exact = sampler(loss=.5).fix(tol=1e-3, max_chi=None).density_matrix
+    for backend in (DiscopyBackend(), QuimbBackend()):
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            result = sampler(loss=.5).fix(
+                tol=1e-3, max_chi=2, backend=backend)
+        assert np.allclose(result.density_matrix, exact)
+
+
 def test_chi_defaults_to_a_laptop_sized_budget():
     """`fix` truncates bonds past `MAX_BOND_DIMENSION` unless told
     otherwise, so a deep unrolling cannot exhaust memory by default; `None`

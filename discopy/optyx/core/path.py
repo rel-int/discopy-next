@@ -228,6 +228,13 @@ class Matrix(underlying.Matrix):
         self.normalisation = normalisation
         self.scalar = scalar
 
+    def __eq__(self, other):
+        def fields(matrix):
+            return (tuple(matrix.creations), tuple(matrix.selections),
+                    matrix.normalisation, matrix.scalar)
+        return isinstance(other, self.ar) \
+            and fields(self) == fields(other) and super().__eq__(other)
+
     @property
     def umatrix(self) -> underlying.Matrix:
         """
