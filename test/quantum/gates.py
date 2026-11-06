@@ -175,8 +175,13 @@ def test_lambdify_evaluates_in_the_backend():
     with backend('pytorch'):
         for gate in (Rx(sympy.sin(phi)), Scalar(sympy.exp(phi)),
                      MixedScalar(sympy.cos(phi)), Sqrt(sympy.exp(phi))):
-            x = torch.tensor(.3, requires_grad=True)
-            assert gate.lambdify(phi)(x).eval().array.requires_grad
+            for kwargs in ({}, {"modules": "math"}):
+                x = torch.tensor(.3, requires_grad=True)
+                assert gate.lambdify(phi, **kwargs)(
+                    x).eval().array.requires_grad
+    circuit = Ket(0, 0) >> Rz(phi) @ qubit >> Controlled(Rx(sympy.sin(phi)))
+    assert circuit.lambdify(phi, modules="sympy")(.25)\
+        == circuit.lambdify(phi)(.25)
 
 
 @mark.parametrize("mixed", [False, True])

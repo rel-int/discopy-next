@@ -695,8 +695,9 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   so `Sum.eval(contractor=...)` returns the sum of its terms instead of one
   term's array summed along its first axis ([next#445]).
 - `lambdify` on a parametrised quantum gate or scalar evaluates its phase in
-  the current backend, so torch gradients flow through nonlinear phases and
-  `jax.grad` works through them ([next#445]).
+  the current backend, whatever `modules` it is given, and passes its other
+  keyword arguments to `sympy.lambdify`, so torch gradients flow through
+  nonlinear phases and `jax.grad` works through them ([next#445]).
 - `Circuit.measure` measures every open qubit when it evaluates as a channel,
   instead of discarding it, so `(Ket(0) >> H).measure(mixed=True)` is
   `[.5, .5]` and `((Ket(0) >> X) @ Bits(1)).measure()` is the joint

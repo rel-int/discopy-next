@@ -930,9 +930,15 @@ class Parametrized(Box):
         return type(self)(data)  # ty: ignore[missing-argument]
 
     def lambdify(self, *symbols, **kwargs):
+        """
+        The function from values of ``symbols`` to gates, with the data
+        evaluated in the module of the current backend whatever ``modules``
+        it is given, its other ``kwargs`` passed to :code:`sympy.lambdify`.
+        """
         from sympy import lambdify
         with backend() as np:
-            data = lambdify(symbols, self.data, modules=np.module, **kwargs)
+            data = lambdify(
+                symbols, self.data, **dict(kwargs, modules=np.module))
         return lambda *xs: type(self)(
             data(*xs))  # ty: ignore[missing-argument]
 
