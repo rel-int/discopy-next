@@ -76,7 +76,7 @@
 
 - [x] .claude/skills/next-checks/SKILL.md:18 This line says pylint fails only on new findings, but the pylint gate also fails on a score below `fail-under…
 - [x] .claude/skills/merge-main/replay.py:163 This `DRIVER.merge` call is unguarded, unlike the conflicted branch, which wraps it and counts `crashed`.
-- [WIP] @session_01MEJxy43kWBLATXt6UT6mUn-2026-11-06 13:01 .claude/skills/merge-main/rename-check.py:153 `still_there` treats any directory named after a removed module as proof that the module still exists.
+- [x] .claude/skills/merge-main/rename-check.py:153 `still_there` treats any directory named after a removed module as proof that the module still exists.
 - [WIP] @session_01MEJxy43kWBLATXt6UT6mUn-2026-11-06 13:01 .claude/skills/cubic-round/threads.py:287 When the ccr route fails, every thread has unknown resolution, but `--todo` still treats them all as open.
 - [WIP] @session_01MEJxy43kWBLATXt6UT6mUn-2026-11-06 13:01 .claude/skills/cubic-round/threads.py:68 The summary group `(.*?)</summary>` can run past the outer `</summary>` when a `<details>` block contains a n…
 - [WIP] @session_01MEJxy43kWBLATXt6UT6mUn-2026-11-06 13:01 .claude/skills/checkboxes/boxes.py:556 `done` can tick an unclaimed `[ ]` box, bypassing the required mutex claim and its pushed lock.
