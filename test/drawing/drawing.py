@@ -892,13 +892,19 @@ def test_Drawing_validate_attributes():
 
 def test_Drawing_dagger():
     """ The reflection lists its nodes by index, whatever order the graph
-    stores them in, and the empty drawing reflects to itself. """
+    stores them in, reflects a valid drawing to a valid one, and the empty
+    drawing to itself. """
+    from discopy import symmetric
     x = monoidal.Ty('x')
     f, g = monoidal.Box('f', x, x), monoidal.Box('g', x, x)
     drawing = (f >> g).to_drawing()
     assert [node.box for node in drawing.dagger().box_nodes]\
         == [g.dagger(), f.dagger()]
     assert drawing.dagger().dagger() == drawing
+    x, y = symmetric.Ty('x'), symmetric.Ty('y')
+    h = symmetric.Box('h', x, y)
+    for diagram in [f >> g, h @ x >> symmetric.Swap(y, x) >> x @ h[::-1]]:
+        diagram.to_drawing().dagger().validate_attributes()
     empty = monoidal.Id(monoidal.Ty()).to_drawing()
     assert empty.dagger() == empty
 
