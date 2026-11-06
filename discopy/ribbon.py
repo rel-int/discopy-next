@@ -338,7 +338,7 @@ class Twist(balanced.Twist, Box):
         return type(self)(self.dom.r, self.is_dagger)
 
 
-class Sum(rigid.Sum, Box):
+class Sum(rigid.Sum, feedback.Sum, Box):
     """
     A ribbon sum is a sum of ribbon diagrams.
 

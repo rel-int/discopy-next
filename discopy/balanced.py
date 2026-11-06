@@ -347,9 +347,9 @@ class Twist(Box):
         return cls(from_tree(tree['dom']), tree.get('is_dagger', False))
 
 
-class Sum(braided.Sum, Box):
+class Sum(braided.Sum, feedback.Sum, Box):
     """
-    A balanced sum is a braided sum and a balanced box.
+    A balanced sum is a braided and feedback sum and a balanced box.
 
     Parameters:
         terms (tuple[Diagram, ...]) : The terms of the formal sum.

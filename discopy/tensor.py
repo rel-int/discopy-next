@@ -52,7 +52,7 @@ from itertools import count
 from typing import TYPE_CHECKING, Callable, ClassVar, Sequence, TypeVar
 
 from discopy import (
-    cat, monoidal, rigid, frobenius, cmap, config, messages)
+    cat, monoidal, rigid, feedback, frobenius, cmap, config, messages)
 from discopy.cat import factory, assert_iscomposable
 from discopy.frobenius import Dim, Cup
 from discopy.matrix import (  # noqa: F401  pylint: disable=unused-import
@@ -1161,9 +1161,10 @@ def func_repr(func: Callable) -> str:
         else f"{func.__module__}.{name}".removeprefix("builtins.")
 
 
-class Bubble(monoidal.Bubble, Box):
+class Bubble(feedback.Bubble, Box):
     """
-    Bubble in a tensor diagram, applies a function elementwise.
+    Bubble in a tensor diagram, applies a function elementwise. It is a
+    feedback bubble, so that a circuit bubble delays as one.
 
     Parameters
     ----------
@@ -1206,7 +1207,7 @@ class Bubble(monoidal.Bubble, Box):
     .. image:: /_static/tensor/product-rule.svg
         :align: center
     """
-    serialised_attrs = monoidal.Bubble.serialised_attrs + ("func", )
+    serialised_attrs = feedback.Bubble.serialised_attrs + ("func", )
     func = staticmethod(lambda x: int(not x))
 
     def __new__(cls, *args, data=None, **kwargs):
