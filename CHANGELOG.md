@@ -717,7 +717,7 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   of raising `AxiomError` ([next#445]).
 - `quantum.Measure`'s `destructive` and `Encode`'s `constructive` are
   documented the right way round, `Circuit.from_tk` says it adds logical swaps
-  rather than SWAP gates, and `Controlled` that a zero distance raises
+  rather than SWAP gates, and `Controlled` says that a zero distance raises
   `ValueError` ([next#445]).
 - Calling a `grammar.cfg.Tree` on arguments whose types do not tensor to its
   `dom` (all identities, an `Id` root, too many or too few arguments) raises
