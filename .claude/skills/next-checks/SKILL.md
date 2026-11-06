@@ -30,9 +30,9 @@ exit 1 on any FAIL. What the lines do not say:
   It names any of base's lines the branch removes, since a bad merge drops main's bullets.
 - SKIP is not PASS: say which gates skipped when you report.
 
-Cost: pylint takes ~5 min, serially, whenever `discopy/` changed since its last run (results
-are cached under `~/.cache/next-checks/` by content). While iterating, use
-`--only flake8,ruff,ty,tests`; run everything once before pushing.
+Cost: pylint takes ~5 min, serially, whenever `discopy/`, `.pylintrc`, `pyproject.toml` or
+`uv.lock` changed since its last run (results are cached under `~/.cache/next-checks/` by
+content). While iterating, use `--only flake8,ruff,ty,tests`; run everything once before pushing.
 
 On FAIL the line names the first finding. For more, grep the log, never cat it:
 `grep -n -m 20 '^FAILED\|^ERROR' <dir>/tests.log`, or grep `<dir>/pylint-head.json` for a
