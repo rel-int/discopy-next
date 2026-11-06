@@ -1,5 +1,6 @@
 from pytest import raises
 
+from discopy.abc import Nat
 from discopy.symmetric import Diagram, Equation, Ty
 
 
@@ -28,3 +29,9 @@ def test_Monoid_refuses_non_elements_on_either_side():
                 other @ element
             with raises(TypeError):
                 element @ other
+
+
+def test_Nat_str_transparency():
+    assert str(Nat(2)) == "Nat(2)"
+    for n in range(4):
+        assert Nat.str_transparency(Nat(n))

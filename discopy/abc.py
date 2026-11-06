@@ -408,7 +408,7 @@ class Nat(Testable["Nat"], Monoid["Nat"]):
         return hash(self.n)
 
     def __str__(self) -> str:
-        return str(self.n)
+        return f"Nat({self.n})"
 
     def __getitem__(self, key: int | slice) -> Nat:
         """
@@ -704,7 +704,7 @@ def keyword_form(trace: Callable) -> Callable:
     >>> f.trace(3)
     Traceback (most recent call last):
         ...
-    ValueError: Cannot split 3 atoms off 2.
+    ValueError: Cannot split 3 atoms off Nat(2).
     """
     if "mem" in signature(trace).parameters:
         return trace

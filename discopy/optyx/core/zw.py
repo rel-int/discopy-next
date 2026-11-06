@@ -425,7 +425,7 @@ class Create(ZWBox):
     -------
     >>> assert Create() == Create(1)
     >>> Create(1).to_path().eval()
-    Amplitudes([1.+0.j], dom=1, cod=1)
+    Amplitudes([1.+0.j], dom=Nat(1), cod=Nat(1))
     """
 
     draw_as_spider = True

@@ -691,9 +691,6 @@ class Nat(abc.Nat, Ty):  # ty: ignore[invalid-generic-class]
     def __repr__(self):
         return factory_name(type(self)) + f"({self.n})"
 
-    def __str__(self):
-        return f"Nat({self.n})"
-
     def __eq__(self, other):
         return isinstance(other, self.factory) and self.n == other.n
 

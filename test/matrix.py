@@ -213,7 +213,7 @@ def test_Matrix_dtype_is_the_ring_of_entries():
     assert Matrix[int].id(2) == Matrix.id(2)
     assert type(Matrix.id(2) >> Matrix[int].id(2)) is Matrix[int]
     m = Matrix([1, 2], 1, 2)
-    assert eval(repr(m), {"Matrix": Matrix}) == m
+    assert eval(repr(m), {"Matrix": Matrix, "Nat": Nat}) == m
     assert loads('{"factory": "matrix.Matrix[int64]", "array": [1, 2], '
                  '"dom": {"factory": "abc.Nat", "n": 1}, '
                  '"cod": {"factory": "abc.Nat", "n": 2}}') == m
