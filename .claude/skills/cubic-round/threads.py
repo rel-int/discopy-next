@@ -32,8 +32,6 @@ def context():
         path = os.environ.get(name)
         if path and os.path.exists(path):
             return ssl.create_default_context(cafile=path)
-    if os.path.exists("/root/.ccr/ca-bundle.crt"):
-        return ssl.create_default_context(cafile="/root/.ccr/ca-bundle.crt")
     return ssl.create_default_context()
 
 

@@ -29,7 +29,8 @@ in full, resolved too; `--reviews` adds the review summaries.
 
 1. Nitpicks need no TODO.md: fix, push, reply, resolve. Otherwise start one (RULES.md 2):
    ```bash
-   f=$(mktemp); mapfile -t b < <(python3 -I .claude/skills/cubic-round/threads.py <pr> --todo "$f") &&
+   f=$(mktemp) && out=$(python3 -I .claude/skills/cubic-round/threads.py <pr> --todo "$f") &&
+   mapfile -t b <<< "$out" &&
    python3 -I .claude/skills/checkboxes/boxes.py start --round --from-file "$f" "${b[@]/#/--box=}"
    ```
    `--todo` writes the quoted feedback to the file and prints one `path:line <gist>` per thread
