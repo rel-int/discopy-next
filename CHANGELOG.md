@@ -1015,6 +1015,131 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 - Optyx reads a foliated diagram one box at a time: `Diagram.sample`, `dilate`,
   `get_kraus`, `explode_channel` and `BitControlledGate` no longer raise
   `ValueError` on a layer that holds several boxes ([next#445]).
+- Mixed evaluation of a daggered or transposed pure box, e.g. `S.dagger()` or
+  `U.r`, is the doubled pure evaluation, by `channel.Functor` and by
+  `Circuit.eval(mixed=True, contractor=...)`, so circuits with a measurement
+  give the right probabilities ([next#445]).
+- `to_tk` emits a transposed `Y` with its sign, since `Y.r == -Y`: `CY.l` and
+  `CY.r` go to tket as `CY` followed by `Z` on the control, so tket samples the
+  same outcomes as `eval` ([next#445]).
+- Rotating or conjugating a `Ket`, `Bra`, `Bits`, `Digits`, `Discard` or
+  `MixedState` reverses its wires: `Ket(1, 0).r == Bra(0, 1)`,
+  `Ket(1, 0).conjugate() == Ket(0, 1)` and
+  `Discard(bit @ qubit).r == MixedState(qubit @ bit)` ([next#445]).
+- `to_tk` translates `Measure(override_bits=True)` after classical
+  post-processing correctly: it discards the old bits in post-processing and
+  measures into fresh ones, where before the post-processing read the new value
+  and a `Copy` before it raised `IndexError` ([next#445]).
+- `Circuit.eval(backend=..., measure_all=True)` and `Circuit.get_counts`
+  measure each open qubit into a fresh bit, so `eval` no longer raises
+  `IndexError` and a circuit with a `Bra` no longer post-selects on the wrong
+  qubit ([next#445]).
+- `circuit2zx` maps `sqrt(x)` to the scalar of its root, conjugated for its
+  dagger, so the images of `Circuit.cups`, `caps` and 0-input spiders are no
+  longer off by sqrt(2) ([next#445]).
+- `circuit2zx` maps `Rz(a)` and `Rx(a)` to their spiders times `exp(-i pi a)`,
+  so the image of every rotation, and of a sum or gradient of them, equals the
+  circuit exactly ([next#445]).
+- `Scalar.grad` is the derivative of the scalar's evaluation in each mode
+  (`2 Re(conj(s) s')` under mixed evaluation), and `Sqrt.grad` differentiates
+  the root instead of the radicand ([next#445]).
+- `eval(repr(x)) == x` now holds for `Ket`, `Bra`, `Copy`, `Match` and
+  `MixedScalar` (delayed too), and for a `Scalar` with a custom name, so
+  circuits that prepare, post-select, copy or match round-trip their repr
+  ([next#445]).
+- `Circuit.eval(*others, contractor=...)` evaluates every circuit it is given,
+  so `Sum.eval(contractor=...)` returns the sum of its terms instead of one
+  term's array summed along its first axis ([next#445]).
+- `lambdify` on a parametrised quantum gate or scalar evaluates its phase in
+  the current backend, whatever `modules` it is given, and passes its other
+  keyword arguments to `sympy.lambdify`, so torch gradients flow through
+  nonlinear phases and `jax.grad` works through them ([next#445]).
+- `Circuit.measure` measures every open qubit when it evaluates as a channel,
+  instead of discarding it, so `(Ket(0) >> H).measure(mixed=True)` is
+  `[.5, .5]` and `((Ket(0) >> X) @ Bits(1)).measure()` is the joint
+  distribution `[[0, 0], [0, 1]]` ([next#445]).
+- A pure circuit `Bubble` evaluates under `mixed=True` as the doubling of its
+  pure evaluation (single for a classical one), instead of raising
+  `AttributeError` on `is_classical` ([next#445]).
+- `to_pennylane` converts `U1` and `CCX` (and so every `Rydberg` ansatz)
+  instead of raising `KeyError` ([next#445]).
+- `Scalar(data, name=...)` and the other keyword forms of its constructor build
+  the scalar instead of raising `TypeError` ([next#445]).
+- `Circuit.measure` and `get_counts` without a backend accept a delayed circuit
+  and agree with the undelayed one, instead of raising `AxiomError`; `to_tk`
+  raises `NotImplementedError` on one, as on anything else it cannot translate
+  ([next#445]).
+- `Circuit.measure` and `init_and_discard` prepare a digit of any dimension in
+  `Digits(0, dim=...)`, so a classical circuit on `Digit(4)` measures instead
+  of raising `AxiomError` ([next#445]).
+- `quantum.Measure`'s `destructive` and `Encode`'s `constructive` are
+  documented the right way round, `Circuit.from_tk` says it adds logical swaps
+  rather than SWAP gates, and `Controlled` says that a zero distance raises
+  `ValueError` ([next#445]).
+- Calling a `grammar.cfg.Tree` on arguments whose types do not tensor to its
+  `dom` (all identities, an `Id` root, too many or too few arguments) raises
+  `AxiomError`, where it used to return an ill-typed or truncated tree
+  ([next#445]).
+- `grammar.cfg.Algebra` maps `Id` and any tree with an `Id` branch to the
+  identity of its codomain operad, where it used to raise `AttributeError`
+  ([next#445]).
+- `grammar.cfg.Id(x).to_diagram()` is `monoidal.Id(x)`, so the diagram of a
+  tree with an identity branch has no spurious `Id(x)` box ([next#445]).
+- `quantum.graphlike.size` counts a phase-free spider with three or more ports
+  and no box (e.g. a reduced `Z(1, 2)`), as PyZX does after its own
+  `full_reduce`; only a bare wire, cup or cap counts as no spider ([next#445]).
+- `grammar.categorial.tree2diagram(tree, dom=...)` gives `dom` to every word of
+  the tree, not only to a tree that is a single word ([next#445]).
+- `eval(repr(r)) == r` for a `grammar.thue.Rule` or `grammar.cfg.Rule` with an
+  empty name, e.g. the root of `cfg.Tree.from_nltk` on an unlabelled tree
+  ([next#445]).
+- `grammar.categorial.FX` and `BX` name subterms that compose, `C << B` with
+  `A >> B` and `B << C` with `B >> A`, where the pairs they documented raised
+  `AxiomError` ([next#445]).
+- `pregroup.Diagram.normal_form` passes `normalize` and its other params on to
+  `rigid.Diagram.normal_form`, where it used to drop them on every input
+  ([next#445]).
+- The `quantum.contextuality` module docs say the gradient is constant on each
+  context on the non-contextual polytope, not zero, and that the dual solution
+  is not unique anywhere on it when the scenario has more than one context
+  ([next#445]).
+- `reservoir.Readout` compares by value: `eval(repr(r)) == r` (with `array` in
+  scope), and two identical fits compare equal ([next#445]).
+- `python.finset.Permutation` refuses a `Function` whose domain is not its
+  codomain, so that `then` and `tensor` with a discard or a projection raise
+  rather than return a permutation of the wrong size, and `Permutation.then`
+  raises `AxiomError` on a `Function` that does not compose with it, as
+  `Function.then` does ([next#445]).
+- `Drawing.dagger` reflects a drawing with a bubble, a frame or a slot, e.g. an
+  `Equation` of coloured terms, where it used to raise a bare `AssertionError`
+  ([next#445]).
+- The dagger of a drawing with two or more boxes has a graph of its own, not a
+  frozen networkx view, so that `add_nodes`, `add_edges` and `add_box_corners`
+  work on it ([next#445]).
+- `draw(doctest=..., to_tikz=True)` compares the drawing against its `.tikz`
+  and `.tikzstyles` baselines and raises when they differ, where it used to
+  overwrite them ([next#445]).
+- TikZ output with `use_tikzstyles=True` writes its `.tikzstyles` beside the
+  `.tikz` file for any path, a `pathlib.Path`, a dotted folder or a name with
+  no extension among them ([next#445]).
+- An SVG drawn to a `BytesIO` or to an open file, text or binary, carries the
+  dark-mode style, where it used to crash after Matplotlib had written it
+  ([next#445]).
+- `Drawing.bubble` takes a `dom` and a `cod` of plain types, e.g. symmetric,
+  rigid, compact or frobenius ones, casting them with `to_drawing`: it used to
+  leave nodes with no position when their length matched the inside's, so that
+  drawing raised `KeyError` ([next#445]).
+- `Drawing.__eq__` compares the edges of the plane graph, so that drawings with
+  the same nodes and positions but different wiring are not equal ([next#445]).
+- `python.additive.Function.braid` works on an instance as well as on the
+  class, where it used to raise `TypeError` ([next#445]).
+- `Function.no_type_checking` on a subclass of `python.function.Function`
+  leaves the subclass as it found it, so that the switch on the base class
+  still reaches it and nesting the two no longer turns its type checking off
+  for good ([next#445]).
+- The label of a box or a braket coloured `config.TRANSPARENT` is drawn black
+  and turns white on a dark page, where it used to be drawn white, invisible on
+  a light one ([next#445]).
 
 ### Project
 

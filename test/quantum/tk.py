@@ -51,6 +51,8 @@ def test_tk_err():
     with raises(NotImplementedError):
         Bits(1).to_tk()
     with raises(NotImplementedError):
+        (qubit @ H).delay().to_tk()
+    with raises(NotImplementedError):
         Circuit.from_tk(tk.Circuit(3).CSWAP(0, 1, 2))
 
 
@@ -78,7 +80,8 @@ def test_controlled_gates_to_tk():
     gates += [
         Controlled(CX, distance=-1),
         Controlled(Controlled(X, distance=-1), distance=2),
-        Controlled(X, distance=3)]
+        Controlled(X, distance=3),
+        CY.l, CY.r, Controlled(Y, distance=2).l]
     for gate in gates:
         unitary = gate.to_tk().get_unitary()
         assert np.allclose(unitary, gate.eval().array.reshape(unitary.shape).T)
@@ -86,6 +89,7 @@ def test_controlled_gates_to_tk():
         assert np.allclose(
             Circuit.from_tk(gate.to_tk())[n:-n].eval().array,
             gate.eval().array)
+    assert np.allclose(Y.r.to_tk().get_unitary(), Y.r.eval().array.T)
     with raises(NotImplementedError):
         CCZ.to_tk()
 
@@ -141,6 +145,21 @@ def test_Discard_bit_to_tk():
         == Tensor[float]([1], Dim(1), Dim(1))
 
 
+def test_override_bits_after_post_processing_to_tk():
+    NOT = ClassicalGate('NOT', bit, bit, [0, 1, 1, 0])
+    circuits = [
+        Ket(0, 1) >> qubit @ Measure() >> qubit @ NOT
+        >> Measure(override_bits=True),
+        Ket(0, 1) >> qubit @ Measure() >> qubit @ NOT
+        >> Measure(destructive=False, override_bits=True) >> X @ bit,
+        Ket(1, 0) >> qubit @ Measure() >> qubit @ Copy()
+        >> qubit @ Discard(bit) @ bit >> Measure(override_bits=True)]
+    for circuit in circuits:
+        assert np.allclose(
+            Circuit.from_tk(circuit.to_tk()).eval().array,
+            circuit.init_and_discard().eval().array)
+
+
 def test_ClassicalGate_to_tk():
     post = ClassicalGate('post', bit ** 2, bit ** 0, data=[0, 0, 0, 1])
     assert (post[::-1] >> Swap(bit, bit)).to_tk().post_processing\
@@ -158,12 +177,23 @@ def test_Circuit_get_counts_snake():
     compilation = Mock()
     compilation.apply = lambda x: x
     backend = tk.mockBackend({
-        (0, 0): 240, (0, 1): 242, (1, 0): 271, (1, 1): 271})
+        (0, 0, 0): 240, (0, 1, 1): 242, (1, 0, 0): 271, (1, 1, 1): 271})
     scaled_bell = Circuit.caps(qubit, qubit)
     snake = scaled_bell @ qubit >> qubit @ scaled_bell[::-1]
     result = np.round(snake.eval(
         backend=backend, compilation=compilation, measure_all=True).array)
-    assert result == 1
+    assert result.tolist() == [1, 0]
+
+
+def test_measure_all_measures_the_open_qubits():
+    backend = tk.mockBackend({(0, ): 512, (1, ): 512})
+    assert (Ket(0) >> H).eval(backend=backend, measure_all=True)\
+        == Tensor[float]([.5, .5], Dim(1), Dim(2))
+    circuit = Ket(0, 0) >> X @ qubit >> qubit @ Bra(0)
+    backend = tk.mockBackend({(0, 1): 1024})
+    assert circuit.get_counts(backend=backend, measure_all=True) == {(1, ): 1}
+    tk_circuit, = backend.process_circuits.call_args.args[0]
+    assert tk_circuit == (circuit >> Measure()).to_tk()
 
 
 def test_Circuit_get_counts_empty():

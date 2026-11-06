@@ -143,6 +143,18 @@ def test_Function_then_checks_composability():
     assert h.then(h, h) == h
 
 
+def test_Permutation_takes_only_bijections():
+    from discopy.utils import AxiomError
+    from discopy.python.finset import Function, Permutation
+    with raises(AxiomError):
+        Permutation.id(2) >> Function([1, 0], 3, 2)
+    for function in [Function([], 1, 0), Function([0], 2, 1)]:
+        with raises(ValueError):
+            Permutation.id(1) @ function
+    assert Permutation.id(2) >> Function([1, 0], 2, 2) == (1, 0)
+    assert Permutation.id(2).then(iter((1, 0))) == (1, 0)
+
+
 def test_Function_says_what_is_wrong():
     from discopy.python.finset import Function
     with raises(ValueError, match="function of length 2, got 1"):
