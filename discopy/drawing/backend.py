@@ -1549,7 +1549,8 @@ class Matplotlib(Backend):
         super().draw_boundary(graph, boundary_color=boundary_color, **params)
 
     def draw_text(self, text, i, j, **params):
-        params['fontsize'] = params.get('fontsize', DEFAULT['fontsize'])
+        if params.get('fontsize') is None:
+            params['fontsize'] = DEFAULT['fontsize']
         if params.pop('adaptive', False):
             params['gid'] = self.dark_gid("fill")
         self.axis.text(i, j, text, **params)
@@ -1671,7 +1672,8 @@ class Matplotlib(Backend):
         dark page: black spiders lie on the neutral canvas so they turn
         white, coloured ones keep their colour. A transparent spider is just
         its label, e.g. the symbol of an :class:`discopy.monoidal.Equation`,
-        which leaves no patch on a coloured page.
+        which leaves no patch on a coloured page. The labels are drawn at
+        ``DRAWING_DEFAULT["fontsize_spiders"]``, whatever the ``fontsize``.
         """
         import networkx as nx
         nodes = [node for node in graph.nodes
@@ -1693,6 +1695,7 @@ class Matplotlib(Backend):
                     self.draw_text(
                         node.box.drawing_name, *graph.positions[node],
                         ha='center', va='center',
+                        fontsize=DEFAULT['fontsize_spiders'],
                         adaptive=node.box.color == TRANSPARENT)
         super().draw_spiders(graph, draw_box_labels)
 
