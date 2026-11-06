@@ -152,7 +152,19 @@ def uncolour_state(state: dict) -> dict:
 
 
 class Wire(cat.Ob):
-    """A generating 1-cell with a colour on either side."""
+    """
+    A generating 1-cell with a colour on either side.
+
+    Its :meth:`dagger` is a generator of its own, the colours swapped and
+    printed with ``[::-1]``, as a daggered box is: equality and hashing count
+    ``is_dagger``, so that a functor, which sends the dagger of a wire to the
+    dagger of its image, sends equal wires to equal images.
+
+    >>> red, green = Colour('red'), Colour('green')
+    >>> x = Wire('x', red, green)
+    >>> assert x.dagger() != Wire('x', green, red) and x.dagger().dagger() == x
+    >>> assert str(x.dagger()) == "x[::-1]" and str(x) == "x"
+    """
 
     def __init__(self, name: str, dom: Colour | None = None,
                  cod: Colour | None = None, is_dagger: bool = False):
@@ -173,17 +185,33 @@ class Wire(cat.Ob):
 
     def __eq__(self, other):
         return type(self) is type(other) and (
-            self.name, self.dom, self.cod) == (
-                other.name, other.dom, other.cod)
+            self.name, self.dom, self.cod, self.is_dagger) == (
+                other.name, other.dom, other.cod, other.is_dagger)
 
     def __hash__(self):
-        return hash((type(self), self.name, self.dom, self.cod))
+        return hash(
+            (type(self), self.name, self.dom, self.cod, self.is_dagger))
+
+    def __lt__(self, other):
+        """
+        Wires are ordered by name, then by ``repr``, which tells apart two
+        unequal wires of one name, e.g. a wire and its dagger: of two unequal
+        wires, exactly one is less than the other.
+
+        >>> x = Wire('x')
+        >>> assert Wire('w') < x < x.dagger() and not x.dagger() < x
+        >>> assert x.dagger() > x and not x > x.dagger() and not x < x
+        """
+        return self != other\
+            and (self.name, repr(self)) < (other.name, repr(other))
 
     def __repr__(self):
         colours = "" if self.dom is None and self.cod is None\
             else f", dom={self.dom!r}, cod={self.cod!r}"
         dagger = ", is_dagger=True" if self.is_dagger else ""
         return f"{factory_name(type(self))}({self.name!r}{colours}{dagger})"
+
+    __str__ = cat.Box.__str__
 
     def to_tree(self):
         tree = super().to_tree()
@@ -508,17 +536,22 @@ class Ty(cat.Ob, cat.FreeCategory, ColouredMonoid):
 
     def __lt__(self, other):
         """
-        Types are totally ordered by length first, then lexicographically on
-        the objects inside, e.g. ``Ty('a') < Ty('b') < Ty('a', 'b')``. The
-        remaining comparisons are filled in by :func:`functools.total_ordering`
-        on the :class:`cat.Ob` base class.
+        Types are ordered by length first, then lexicographically on the
+        objects inside, e.g. ``Ty('a') < Ty('b') < Ty('a', 'b')``, then by
+        ``repr``, which tells apart the empty types of two colours: of two
+        unequal types, exactly one is less than the other. The remaining
+        comparisons are filled in by :func:`functools.total_ordering` on the
+        :class:`cat.Ob` base class.
 
         >>> x, y, z = map(Ty, "xyz")
         >>> assert sorted([z, x @ y, x, y]) == [x, y, z, x @ y]
+        >>> assert x < x[::-1] and x[::-1] > x and not x > x[::-1]
+        >>> assert Ty.id(Colour('green')) < Ty.id(Colour('red'))
         """
         assert_isinstance(other, Ty)
-        return (len(self.inside), self.inside)\
-            < (len(other.inside), other.inside)
+        return self != other\
+            and (len(self.inside), self.inside, repr(self))\
+            < (len(other.inside), other.inside, repr(other))
 
     def __setstate__(self, state):
         if 'inside' not in state and "_objects" in state:

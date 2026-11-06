@@ -398,6 +398,22 @@ def test_generated_boxes_at_every_level():
         is pivotal.Diagram.__dict__['trace_factory'].__func__
 
 
+def test_Functor_sends_equal_heads_to_equal_images():
+    """ The head and tail of a daggered wire are named after its string,
+    which shows the dagger, so that they are not those of the wire it
+    daggers, which a functor sends elsewhere (next#445). """
+    x, y, z = map(Ty, "xyz")
+    w = Ty(Wire('w', is_constant=False))
+    F = Functor({x: y @ z, w: Ty(Wire('v', is_constant=False))}, {})
+    types = [x.head, x[::-1].head, w.tail, w[::-1].tail, w.head]
+    assert len(set(types)) == len(types)
+    assert F(x.head) == (y @ z).head != (z[::-1] @ y[::-1]).head\
+        == F(x[::-1]).head == F(x[::-1].head)
+    assert F(w[::-1].tail) == F(w[::-1]).tail
+    for term in types:
+        assert eval(str(term), {'x': x, 'w': w}) == term
+
+
 def test_heads_of_pivotal_types():
     import pickle
     from discopy import compact, frobenius, pivotal
