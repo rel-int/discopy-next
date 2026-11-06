@@ -46,7 +46,8 @@ graphviz_output_format = 'svg'
 
 autosummary_generate = True
 
-# discopy.optyx imports these, which the docs extra does not install.
+# discopy.quantum.pennylane imports pennylane and discopy.optyx imports
+# cotengra, quimb and pyzx, none of which the docs extra installs.
 autodoc_mock_imports = ["pennylane", "cotengra", "quimb", "pyzx"]
 
 autodoc_typehints = "description"
@@ -94,6 +95,7 @@ html_theme_options = {
     # "extra_navbar": "",
 }
 myst_enable_extensions = ["attrs_block"]
+myst_heading_anchors = 3
 myst_url_schemes = {
     "http": None,
     "https": None,

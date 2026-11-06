@@ -260,6 +260,11 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Fixed
 
+- The documentation says what the code does: the README, CONTRIBUTING.md,
+  AGENTS.md and the module summaries no longer name modules, classes or
+  notebooks that are gone, list the public ones they missed, and state each
+  fact in one place; the API reference gains `discopy.utils` and
+  `discopy.config`, the toctree five optyx notebooks it left out.
 - `docs/notebooks/optyx/photon_distinguishability.md` composes its photonic
   circuits from `optyx.photonic`, where it used to take `Create` from
   `optyx.core.zw` and `DualRail` from `optyx.core.diagram` and compose those
@@ -693,6 +698,12 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 - `ruff check` and `ty check` lint beside `pylint`, each failing on every rule
   `main` passes, the rules it breaks listed in `pyproject.toml` ([next#263]),
   and `E714` and `RUF022` leave that list ([next#438]).
+- `stream.Ty.singleton` and `stream.Stream.singleton` pass the callee itself as
+  `_later` instead of a lambda wrapping it, which takes two of the three
+  `PLW0108` instances off `discopy/` before the rule graduates out of ruff's
+  preview, the third being left with [next#443]. Equality still compares
+  `_later` by identity, so those two now compare equal to a twin built the same
+  way, where every other non-constant stream does not ([next#457]).
 
 ## [1.2.2] - 2025-12-19
 
@@ -953,6 +964,8 @@ for the changelog of `1.2.1` and earlier.
 [next#426]: https://github.com/rel-int/discopy-next/issues/426
 [next#411]: https://github.com/rel-int/discopy-next/pull/411
 [next#438]: https://github.com/rel-int/discopy-next/issues/438
+[next#443]: https://github.com/rel-int/discopy-next/issues/443
+[next#457]: https://github.com/rel-int/discopy-next/issues/457
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#56]: https://github.com/rel-int/optyx/pull/56

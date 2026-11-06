@@ -19,8 +19,9 @@ representation, its string, its pickle, its deep copy and its tree. An
 :class:`Equivalence` is a testable type with an equivalence relation besides
 equality, and states the laws of one once: reflexivity, symmetry and
 transitivity. The matrix in ``proptest/`` checks every axiom of every
-category against generated arguments, one cell per pair; CONTRIBUTING.md
-says how to run it.
+category against generated arguments, one cell per pair: how to run it,
+select cells and falsify a law is in `Run the property tests
+<https://github.com/rel-int/discopy-next/blob/main/CONTRIBUTING.md#run-the-property-tests>`_.
 
 Summary
 -------
@@ -34,6 +35,7 @@ Summary
     Declaration
     Axiom
     AxiomFailure
+    Constructor
     Tensor
     Unit
     L
@@ -56,6 +58,8 @@ Summary
         axiom
         inhabits
         substitute
+        is_open
+        position
         assert_axioms
 """
 

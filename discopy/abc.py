@@ -3,7 +3,7 @@ The abstract base classes for categories.
 
 These mirror the concrete hierarchy of :mod:`discopy` modules: each class adds
 the characteristic generator of its categorical structure as an
-:func:`abc.abstractmethod`, e.g. :class:`BraidedCategory` is a
+``abc.abstractmethod``, e.g. :class:`BraidedCategory` is a
 :class:`MonoidalCategory` with an abstract :meth:`BraidedCategory.braid`.
 
 .. raw:: html
@@ -75,7 +75,6 @@ Summary
     RibbonCategory
     CompactCategory
     HypergraphCategory
-    NamedGeneric
 
 .. admonition:: Functions
 
