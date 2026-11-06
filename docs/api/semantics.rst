@@ -1,7 +1,10 @@
 semantics
 =========
 
-DisCoPy's computational core: categories of functions, matrices and tensors.
+DisCoPy's computational core: concrete categories (functions, matrices,
+tensors, neural networks, finite groups, representations of Hopf algebras)
+and constructions on categories (opposites, Kleisli categories of monads,
+streams, parametric maps, lenses, the Int-construction).
 
 .. autosummary::
     :template: module.rst

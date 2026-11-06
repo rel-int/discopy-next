@@ -14,6 +14,7 @@ Summary
     Wire
     Ty
     Nat
+    Layer
     Diagram
     Box
     Cup
@@ -21,6 +22,16 @@ Summary
     Sum
     Bubble
     Functor
+    Equation
+
+.. admonition:: Functions
+
+    .. autosummary::
+        :template: function.rst
+        :nosignatures:
+        :toctree:
+
+        nesting
 
 Axioms
 ------
@@ -670,12 +681,11 @@ class Diagram(biclosed.Diagram, RigidCategory):
         False
         >>> *_, two_snakes_nf = monoidal.Diagram.normalize(two_snakes)
         >>> assert double_snake == two_snakes_nf
-        >>> f = Box('f', a, b)
 
         >>> a, b = Ty('a'), Ty('b')
         >>> double_snake = Id(a @ b).transpose(left=True)
         >>> snakes = Id(b).transpose(left=True) @ Id(a).transpose(left=True)
-        >>> double_snake == two_snakes
+        >>> double_snake == snakes
         False
         >>> *_, two_snakes_nf = monoidal.Diagram.normalize(
         ...     snakes, left=True)
@@ -1086,11 +1096,11 @@ def nesting[T](cls: type[T], factory: Callable) -> Callable[[Ty, Ty], T]:
 
 
 def to_rigid(self):
-    return biclosed.Functor(
+    return Functor(
         ob_map=lambda x: Ty(x.inside[0].name),
         ar_map=lambda f: Box(
             f.name, to_rigid(f.dom), to_rigid(f.cod), data=f.data),
-        cod=Diagram)(self)
+        dom=biclosed.Diagram, cod=Diagram)(self)
 
 
 biclosed.Diagram.to_rigid = to_rigid

@@ -130,6 +130,20 @@ def test_no_tree():
     assert "serialisation" not in Stream.axioms
 
 
+def test_singleton_equality_compares_the_callee():
+    """ `_later` is still compared by identity, as :func:`test_no_hash` says,
+    but the two ``singleton``s put the callee itself there rather than a fresh
+    lambda, so two built the same way hold the *same* object and compare equal.
+    Every other non-constant stream closes over its arguments and so compares
+    by closure identity, which is rel-int/discopy-next#457. """
+    x, y = symmetric.Ty('x'), symmetric.Ty('y')
+    assert Ty.singleton(x) == Ty.singleton(x)
+    assert Ty.singleton(x) != Ty.singleton(y)
+    f = Stream.singleton(symmetric.Box('f', x, y))
+    assert f == Stream.singleton(symmetric.Box('f', x, y))
+    assert f.later == Stream.id() and f.now == symmetric.Box('f', x, y)
+
+
 def test_no_hash():
     """ Streams and their types stay unhashable, with the ``__hash__ = None``
     of a dataclass: their equality compares every field, the thunk

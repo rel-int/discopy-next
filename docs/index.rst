@@ -53,6 +53,11 @@ DisCoPy documentation
     notebooks/optyx/bosonic-vqe-2
     notebooks/optyx/photon_distinguishability
     notebooks/optyx/contextuality
+    notebooks/optyx/zw_examples
+    notebooks/optyx/bose_hubbard
+    notebooks/optyx/Compiler
+    notebooks/optyx/distributed-412-code
+    notebooks/optyx/distributed-422-code
 
 .. toctree::
     :caption: Extra

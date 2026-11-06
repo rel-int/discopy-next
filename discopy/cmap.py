@@ -56,7 +56,7 @@ from itertools import accumulate, product
 from math import inf, lcm
 from typing import TYPE_CHECKING, Literal, Self
 
-from discopy import hypergraph, messages
+from discopy import cat, hypergraph, messages
 from discopy.abc import (
     BalancedCategory,
     BraidedCategory,
@@ -628,9 +628,10 @@ class CMap[category](
     def validate_adjoint_types(cls, source: Port, target: Port):
         """
         Validate a wire between adjoint types, i.e. a cup or a cap, its ends
-        in port order as :meth:`make_monogamous` reads them: the right end
-        of a cup is the right adjoint of its left end, the left end of a cap
-        is the right adjoint of its right end.
+        in logical order as :meth:`make_monogamous` reads them, a box's
+        outputs left to right: the right end of a cup is the right adjoint
+        of its left end, the left end of a cap is the right adjoint of its
+        right end.
 
         >>> from discopy.rigid import Ty, Diagram
         >>> x = Ty('x')
@@ -641,6 +642,8 @@ class CMap[category](
         ...
         discopy.utils.AxiomError: x is not the left adjoint of x.l, ...
         """
+        source, target = sorted(
+            (source, target), key=lambda port: (port.depth, port.i))
         left, right = (source.obj, target.obj) if source.kind.is_positive\
             else (target.obj, source.obj)
         if not hasattr(left, "r"):
@@ -1310,22 +1313,32 @@ class CMap[category](
 
     @classmethod
     def copy(cls, typ: "Ty", n: int = 2) -> "CMap":
-        """ Copy is kept as a box: one input cannot wire to many outputs. """
-        return cls.from_box(cls.category.copy(typ, n))
+        """
+        The map of the copy of the host category, where the copy of an
+        atomic object is kept as a box: one input cannot wire to many outputs.
+        """
+        copy = cls.category.copy(typ, n)
+        return cls.from_box(copy) if len(typ) == 1\
+            and isinstance(copy, cat.Box) else cls.from_diagram(copy)
 
     @classmethod
     def merge(cls, typ: "Ty", n: int = 2) -> "CMap":
-        """ Merge is kept as a box: many inputs cannot wire to one output. """
-        return cls.from_box(cls.category.merge(typ, n))
+        """
+        The map of the merge of the host category, where the merge of an
+        atomic object is kept as a box: many inputs cannot wire to one output.
+        """
+        merge = cls.category.merge(typ, n)
+        return cls.from_box(merge) if len(typ) == 1\
+            and isinstance(merge, cat.Box) else cls.from_diagram(merge)
 
     @classmethod
     def discard(cls, typ: "Ty") -> "CMap":
-        """ Discard is kept as a box. """
+        """ Discard keeps a box per atomic object, see :meth:`copy`. """
         return cls.copy(typ, 0)
 
     @classmethod
     def noise(cls, typ: "Ty") -> "CMap":
-        """ Noise is kept as a box. """
+        """ Noise keeps a box per atomic object, see :meth:`merge`. """
         return cls.merge(typ, 0)
 
     @classmethod
@@ -1412,7 +1425,8 @@ class CMap[category](
             cls, n_legs_in: int, n_legs_out: int,
             typ: "Ty", phases=None) -> "CMap":
         """
-        Spiders are kept as boxes, including their phase data.
+        Spiders are kept as boxes on each atomic object, including their
+        phase data.
 
         Example
         -------
@@ -1420,8 +1434,9 @@ class CMap[category](
         >>> assert CMap.spiders(1, 2, Dim(2, 3)).eval().is_close(
         ...     Tensor.spiders(1, 2, Dim(2, 3)))
         """
-        return cls.from_box(cls.category.spiders(
-            n_legs_in, n_legs_out, typ, phases))
+        spiders = cls.category.spiders(n_legs_in, n_legs_out, typ, phases)
+        return cls.from_box(spiders) if len(typ) == 1\
+            and isinstance(spiders, cat.Box) else cls.from_diagram(spiders)
 
     @unbiased
     def then(self, other: "CMap") -> "CMap":
@@ -1668,18 +1683,17 @@ class CMap[category](
         >>> print(cmap.to_diagram())
         Cap(x.r, x) >> x.r @ g
         """
-        if not issubclass(self.category, SymmetricCategory):
-            return legs
-
         def logical(port):
             for box, ports in zip(self.boxes, self._box_port_indices):
                 if port in ports:
                     return ports[0] + self.logical_order(
                         len(box.dom), len(box.cod))[port - ports[0]]
             return port
+        if not issubclass(self.category, SymmetricCategory):
+            return tuple(sorted(legs, key=logical))
         logicals = [logical(leg) for leg in legs]
         return tuple(legs[logicals.index(port)] for port in (
-            self.to_hypergraph().leg_order(*logicals)))
+            self.to_hypergraph().leg_order(*sorted(logicals))))
 
     def make_monogamous(self) -> "CMap":
         """
@@ -2304,7 +2318,8 @@ cycles of this map.
 
     def homomorphisms(
             self, pattern: "CMap", boxes: dict[
-                int, int] = None  # ty: ignore[invalid-parameter-default]
+                int, int] = None,  # ty: ignore[invalid-parameter-default]
+            beside: bool = False
             ) -> Iterator[tuple[tuple[int, ...], tuple[int, ...]]]:
         """
         The homomorphisms of maps from a pattern, injective on boxes: each
@@ -2318,6 +2333,8 @@ cycles of this map.
         Parameters:
             pattern : The map to match.
             boxes : A partial map on boxes to extend, empty by default.
+            beside : Whether to send straight wires only to those
+                :meth:`beside` the image, as a :meth:`complement` needs.
 
         Returns:
             The image of each box, and of each straight wire as the port it
@@ -2334,19 +2351,43 @@ cycles of this map.
         boxes = {} if boxes is None else boxes
         todo = [i for i in range(len(pattern.boxes)) if i not in boxes]
         if not todo:
+            image = tuple(boxes[i] for i in range(len(pattern.boxes)))
+            ports = self.beside(image) if beside else range(self.n_ports)
             straight = [i for i in range(len(pattern.dom))
                         if pattern.edges[i] not in pattern.owners]
             for wires in product(*(
-                    [w for w, port in enumerate(self.ports)
-                     if port.kind.is_positive
-                     and port.obj == pattern.ports[i].obj]
+                    [w for w in ports if self.ports[w].kind.is_positive
+                     and self.ports[w].obj == pattern.ports[i].obj]
                     for i in straight)):
-                yield tuple(boxes[i] for i in range(len(pattern.boxes))), wires
+                yield image, wires
             return
         box, images = self.candidates(pattern, todo, boxes)
         for image in images:
             if self.preserves(pattern, box, boxes | {box: image}):
-                yield from self.homomorphisms(pattern, boxes | {box: image})
+                yield from self.homomorphisms(
+                    pattern, boxes | {box: image}, beside)
+
+    def beside(self, boxes: Iterable[int]) -> list[int]:
+        """
+        The wires of an acyclic map that start neither at some boxes nor
+        below them and end neither at them nor above them, named by the port
+        they start at: the wires that can run beside the boxes.
+        """
+        def owner(port):
+            return self.owners.get(port, (None, ))[0]
+        ranks, below = self.box_ranks or (), set(boxes)
+        above = set(below)
+        edges = sorted(self.box_edges, key=lambda edge: ranks[owner(edge[0])])
+        for source, target in edges:
+            if owner(source) in below:
+                below.add(owner(target))
+        for source, target in reversed(edges):
+            if owner(target) in above:
+                above.add(owner(source))
+        return [port for port in range(self.n_ports)
+                if self.ports[port].kind.is_positive
+                and owner(port) not in below
+                and owner(self.edges[port]) not in above]
 
     def hole(
             self, pattern: CMap, homomorphism: tuple
@@ -2493,7 +2534,7 @@ cycles of this map.
             raise AxiomError(messages.NOT_CONNECTED.format(self))
         self.assert_isprogressive()
         pattern.assert_isprogressive()
-        for homomorphism in self.homomorphisms(pattern):
+        for homomorphism in self.homomorphisms(pattern, beside=True):
             context = self.complement(pattern, homomorphism)
             if context is not None:
                 yield context

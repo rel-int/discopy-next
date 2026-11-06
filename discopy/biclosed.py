@@ -88,6 +88,7 @@ from __future__ import annotations
 
 from abc import abstractmethod
 from dataclasses import dataclass, field, replace
+from functools import cached_property
 from inspect import signature
 from itertools import count
 from typing import (
@@ -311,7 +312,13 @@ class Exp(Wire):
         assert_isinstance(base, self.ob)
         assert_isinstance(exponent, self.ob)
         self.base, self.exponent = base, exponent
-        super().__init__(str(self))
+        super().__init__("")
+        del self.name
+
+    @cached_property
+    def name(self):  # pylint: disable=method-hidden  # deleted by __init__
+        "The name of an exponential is its print, computed when first read."
+        return str(self)
 
     def __eq__(self, other):
         return isinstance(other, type(self))\
@@ -688,8 +695,8 @@ class Functor(monoidal.Functor):
 
     Note
     ----
-    When the codomain objects are biclosed types, the functor sends terms to
-    terms rather than evaluating them to morphisms:
+    When the codomain has terms, i.e. its constants are its arrows, the functor
+    sends terms to terms rather than evaluating them to morphisms:
 
     >>> X, Y = Ty("X"), Ty("Y")
     >>> f, x = (Y << X)("f"), X("x")
@@ -724,8 +731,8 @@ class Functor(monoidal.Functor):
             if issubclass(get_origin(self.cod), hypergraph.Hypergraph)\
                     and not isinstance(other, Constant):
                 return self(other.eval())
-            if issubclass(get_origin(self.cod.ob), Ty) and not issubclass(
-                    get_origin(self.cod), (cmap.CMap, hypergraph.Hypergraph)):
+            if issubclass(get_origin(self.cod.ob), Ty) and issubclass(
+                    self.cod.ob.constant_factory, get_origin(self.cod)):
                 return self.map_term(other)
             return other.eval(self)
         for cls, attr in [(Over, "over"), (Under, "under"), (Exp, "exp")]:
@@ -736,8 +743,8 @@ class Functor(monoidal.Functor):
                 if hasattr(self.cod, attr):
                     return getattr(self.cod, attr)(base, exponent)
         if isinstance(other, Curry) and hasattr(self.cod, "curry"):
-            return self.cod.curry(
-                self(other.arg), len(self(other.cod.exponent)), other.left)
+            n = len(self(other.cod.exponent)) if other.n else 0
+            return self.cod.curry(self(other.arg), n, other.left)
         if isinstance(other, (Eval, Coeval)) and hasattr(self.cod, "ev"):
             base, exponent, left = other.x.base, other.x.exponent, other.left
             result = self.cod.ev(self(base), self(exponent), left)
@@ -1303,7 +1310,9 @@ class Constant(TermBase):
         return functor.ar_map[self]
 
     def __repr__(self):
-        return factory_name(type(self)) + f"({self.name!r}, {self.cod!r})"
+        data = "" if self.data is None else f", data={self.data!r}"
+        return factory_name(type(self))\
+            + f"({self.name!r}, {self.cod!r}{data})"
 
     def __str__(self):
         return f"{self.cod!s}({self.name!r})"

@@ -1,5 +1,6 @@
 """ DisCoPy's property-testing module in action. """
 
+import pickle
 from typing import Self, TypeVar
 
 from hypothesis import Phase, find, settings
@@ -68,6 +69,15 @@ def test_failing_when_the_terms_do_not_build():
     with raises(AxiomFailure) as error:
         Refusing.refusing(f=Arrow.id(Ob('x')))
     assert isinstance(error.value.equation, ValueError)
+
+
+def test_axiom_failure_message_is_the_reason():
+    f = Box('f', Ob('x'), Ob('x'))
+    with raises(AxiomFailure) as error:
+        Arrow.unitality.failing("Never holds.")(f=f)
+    restored = pickle.loads(pickle.dumps(error.value))
+    assert str(error.value) == str(restored) == "Never holds."
+    assert restored.equation.terms == error.value.equation.terms
 
 
 def test_strategy():
@@ -238,6 +248,17 @@ def test_canonical():
         == "Equation(f >> g >> h, f >> g >> h)"
     equation = rigid.Diagram.dagger_involution.canonical()
     assert equation.terms[1] == rigid.Box('f', rigid.Ty('A'), rigid.Ty('B'))
+
+
+def test_falsify_refusal():
+    @axiom
+    def refusing(cls, f: Self) -> Equation[Self]:
+        """ The terms build on an identity only, which a box refutes. """
+        if f.inside:
+            raise ValueError("Cannot build the terms.")
+        return Equation(f, cls.id(f.dom))
+
+    assert refusing.bind(Arrow).falsify()["f"].inside
 
 
 def test_axioms_of_category():

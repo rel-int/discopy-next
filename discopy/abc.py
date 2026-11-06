@@ -3,7 +3,7 @@ The abstract base classes for categories.
 
 These mirror the concrete hierarchy of :mod:`discopy` modules: each class adds
 the characteristic generator of its categorical structure as an
-:func:`abc.abstractmethod`, e.g. :class:`BraidedCategory` is a
+``abc.abstractmethod``, e.g. :class:`BraidedCategory` is a
 :class:`MonoidalCategory` with an abstract :meth:`BraidedCategory.braid`.
 
 .. raw:: html
@@ -60,7 +60,6 @@ Summary
     RibbonCategory
     CompactCategory
     HypergraphCategory
-    NamedGeneric
 
 .. admonition:: Functions
 
@@ -391,6 +390,10 @@ class Nat(Monoid["Nat"]):
         n : The natural number.
     """
     n: int = 0
+
+    def __post_init__(self):
+        if index(self.n) < 0:
+            raise ValueError(f"Expected a natural number, got {self.n}.")
 
     def tensor(self, *others: Nat) -> Nat:
         if any(not isinstance(other, Nat) for other in others):
@@ -851,13 +854,19 @@ class TracedCategory[
     def yanking[X: Atom[C0]](
             cls, x: Var[C0, X]) -> Equation[Hom[C1, X, X]]:
         """
-        Tracing the swap of an object with itself gives its identity, the
-        yanking axiom of a symmetric traced category: a braided one states it
-        with its twist, see :meth:`BalancedCategory.yanking`, and a planar
-        one, which has no swap, declares it inapplicable.
+        Tracing the swap of an object with itself gives its identity, on
+        either side, the yanking axiom of a symmetric traced category: on a
+        compact category it is Reidemeister move 1 for either trace. A
+        braided one states it with its twist, see
+        :meth:`BalancedCategory.yanking`, and a planar one, which has no
+        swap, declares it inapplicable.
         """
         # pylint: disable-next=no-member  # stated where there is a swap
-        return cls.equation_factory(cls.swap(x, x).trace(mem=x), cls.id(x))
+        swap = cls.swap(x, x)
+        return cls.equation_factory(
+            swap.trace(mem=x, left=True),  # ty: ignore[unknown-argument]
+            cls.id(x),
+            swap.trace(mem=x))  # ty: ignore[unknown-argument]
 
     @axiom
     def trace_vanishing[A: Obj[C0], B: Obj[C0]](
@@ -1551,6 +1560,18 @@ class SymmetricCategory[
         messages.SWAP_INVOLUTION)
     inverse_then_braid = BraidedCategory.inverse_then_braid.inapplicable(
         messages.SWAP_INVOLUTION)
+
+    def left_trace(self, n: int = 1) -> C1:
+        """
+        The trace over the first ``n`` objects, as the trace over the last
+        ``n`` between swaps: the left trace of a symmetric category that only
+        implements the right one, see :meth:`TracedCategory.trace`.
+
+        Parameters:
+            n : The number of objects to trace over.
+        """
+        mem, dom, cod = self.dom[:n], self.dom[n:], self.cod[n:]
+        return (self.swap(dom, mem) >> self >> self.swap(mem, cod)).trace(n)
 
 
 class PROP[C1: PROP](PROB[C1], SymmetricCategory[Nat, C1]):

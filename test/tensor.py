@@ -500,6 +500,14 @@ def test_CMap_eval():
             np.asarray(reference.array, dtype=float))
 
 
+def test_CMap_eval_keeps_dtype():
+    """ A map with no box evaluates in the dtype of its category. """
+    for D in (Diagram[complex], Diagram[int]):
+        x = Dim(2)
+        for diagram in (D.id(x), D.cups(x, x), D.caps(x, x) >> D.cups(x, x)):
+            assert diagram.to_map().eval() == diagram.eval()
+
+
 def test_CMap_eval_jax():
     jax = pytest.importorskip("jax")
     import jax.numpy as jnp

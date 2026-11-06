@@ -42,6 +42,19 @@ def test_delayed_Box_to_tree():
             assert loads(dumps(delayed)).time_step == delayed.time_step
 
 
+def test_delay_keeps_the_attributes_of_a_box():
+    from discopy import frobenius, markov
+    x = markov.Ty('x')
+    sample = markov.Box('sample', x, x, is_deterministic=False)
+    F = markov.Functor({x: x}, {sample: markov.Box('g', x, x)})
+    assert not sample.delay().is_deterministic
+    assert F(sample.delay()) == F(sample).delay()
+    f = frobenius.Box('f', frobenius.Ty('x'), frobenius.Ty('y'))
+    assert f.r.delay() == f.delay().r
+    drawn = Box('f', Ty('x'), Ty('y'), color='red', drawing_name='F')
+    assert (drawn.delay().color, drawn.delay().drawing_name) == ('red', 'F')
+
+
 def test_Feedback_to_tree():
     from discopy.utils import dumps, loads
     x, y, z = Ty('x'), Ty('y'), Ty('z')
@@ -233,11 +246,15 @@ def test_yanking():
     from discopy.testable import AxiomFailure
     from discopy.drawing import Drawing
     from discopy.python import Function, Ty as PythonTy
+    from discopy.python.additive import Function as Additive
+    from discopy.kleisli.additive import Channel
+    from discopy.kleisli.monad import Powerset
     x, y = symmetric.Ty('x'), compact.Ty('y')
     assert symmetric.Diagram.yanking(x) and compact.Diagram.yanking(y)
     assert compact.CMap.yanking(y)
-    yanked, identity = Function.yanking(PythonTy(int)).terms
-    assert yanked(42) == identity(42) == 42
+    for function in (Function, Additive, Channel[Powerset]):
+        left, identity, right = function.yanking(PythonTy(int)).terms
+        assert left(42) == identity(42) == right(42)
     assert para.Traced[Matrix[bool]].yanking(Nat(2))
     assert lens.Traced[Matrix[bool]].yanking(lens.Ty[Nat](Nat(1), Nat(2)))
     for planar in (Diagram, pivotal.Diagram, Drawing, PivotalCategory):

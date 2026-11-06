@@ -23,7 +23,17 @@ Summary
     Sum
     Bubble
     Functor
+    Match
     Equation
+
+.. admonition:: Functions
+
+    .. autosummary::
+        :template: function.rst
+        :nosignatures:
+        :toctree:
+
+        uncolour_state
 
 Axioms
 ------
@@ -76,7 +86,6 @@ from discopy.utils import (
     factory,
     factory_name,
     from_tree,
-    identity,
     assert_isinstance,
     assert_iscomposable,
     AxiomError,
@@ -458,13 +467,13 @@ class Ty(cat.Ob, cat.FreeCategory, ColouredMonoid):
             return self.generator_factory(x)
         if self.generator_factory is Wire and type(x) is cat.Ob:
             return self.generator_factory(x.name)
-        raise AxiomError(
-            messages.TYPE_ERROR.format(self.generator_factory, type(x)))
+        raise TypeError(messages.TYPE_ERROR.format(
+            factory_name(self.generator_factory), factory_name(type(x))))
 
     def __init__(self, *inside: str | cat.Ob,
                  dom: Colour | None = None, cod: Colour | None = None,
                  _scan: bool = True, **kwargs):
-        inside = kwargs.pop('inside', inside)
+        inside = tuple(kwargs.pop('inside', inside))
         if kwargs:
             raise TypeError(f"Unexpected keyword arguments: {list(kwargs)}.")
         for obj in inside:
@@ -714,7 +723,8 @@ class Nat(abc.Nat, Ty):  # ty: ignore[invalid-generic-class]
     def __init__(self, inside: int | tuple = 0, dom: Colour | None = None,
                  cod: Colour | None = None, _scan: bool = True):
         # pylint: disable=unused-argument  # a Nat has no colour
-        self.n = inside if isinstance(inside, int) else len(inside)
+        abc.Nat.__init__(
+            self, inside if isinstance(inside, int) else len(inside))
         self.dom = self.cod = None
         cat.Ob.__init__(self, type(self).__name__)
 
@@ -807,13 +817,13 @@ class Dim(Ty):
         return st.integers(2, 3).map(cls)
 
     def __init__(self, *inside: int, dom=None, cod=None, _scan=True, **kwargs):
-        inside = kwargs.pop('inside', inside)
+        inside = tuple(kwargs.pop('inside', inside))
         if kwargs:
             raise TypeError(f"Unexpected keyword arguments: {list(kwargs)}.")
         for dim in inside:
             assert_isinstance(dim, int)
             if dim < 1:
-                raise ValueError
+                raise ValueError(f"Expected a positive dimension, got {dim}.")
         inside = tuple(dim for dim in inside if dim > 1)
         cat.FreeCategory.__init__(self, inside, dom, cod, _scan=False)
         cat.Ob.__init__(self, type(self).__name__)
@@ -1261,6 +1271,7 @@ class Diagram(cat.Arrow, MonoidalCategory, RichDisplay):
 
     def __init__(
             self, inside: tuple[Layer, ...], dom: Ty, cod: Ty, _scan=True):
+        inside = tuple(inside)
         if _scan:
             for layer in inside:
                 assert_isinstance(layer, Layer)
@@ -1367,7 +1378,7 @@ class Diagram(cat.Arrow, MonoidalCategory, RichDisplay):
     @property
     def boxes(self) -> "list[Box]":
         """ The boxes in each layer of the diagram. """
-        return sum([layer.boxes for layer in self.inside], [])
+        return [box for layer in self.inside for box in layer.boxes]
 
     @property
     def offsets(self) -> list[int]:
@@ -1647,30 +1658,27 @@ class Diagram(cat.Arrow, MonoidalCategory, RichDisplay):
         left and right adjoints of an object differ. Otherwise this scans top
         to bottom and merges layers eagerly.
         """
+        if not isinstance(self, abc.SymmetricCategory):
+            return self.merge_layers()
         graph = self.to_hypergraph()
-        if isinstance(self, abc.SymmetricCategory) and graph.is_monogamous\
-                and graph.is_causal and graph.is_boundary_connected and all(
+        if graph.is_monogamous and graph.is_causal\
+                and graph.is_boundary_connected and all(
                     not isinstance(obj, abc.Pregroup) or obj.l == obj.r
                     for obj in graph.spider_types):
             return graph.to_diagram().merge_layers()
         return self.merge_layers()
 
     def merge_layers(self):
-        diagram = self
-        while len(diagram) > 1:
-            keep_on_going = False
-            for i, (first, second) in enumerate(zip(
-                    diagram.inside, diagram.inside[1:])):
-                try:
-                    inside = diagram.inside[:i] + (first.merge(second), )\
-                        + diagram.inside[i + 2:]
-                    diagram = diagram.ar(inside, diagram.dom, diagram.cod)
-                    keep_on_going = True
-                    break
-                except AxiomError:
-                    continue
-            if not keep_on_going:
-                break
+        diagram, i = self, 0
+        while i < len(diagram.inside) - 1:
+            try:
+                merged = diagram.inside[i].merge(diagram.inside[i + 1])
+            except AxiomError:
+                i += 1
+                continue
+            inside = diagram.inside[:i] + (merged, ) + diagram.inside[i + 2:]
+            diagram = diagram.ar(inside, diagram.dom, diagram.cod)
+            i = max(i - 1, 0)
         return diagram
 
     def depth(self):
@@ -1827,12 +1835,14 @@ class Diagram(cat.Arrow, MonoidalCategory, RichDisplay):
             yield diagram
         while True:
             no_more_moves = True
+            boxes, offsets = diagram.boxes, diagram.offsets
             for i in range(len(diagram) - 1):
-                box0, box1 = diagram.boxes[i], diagram.boxes[i + 1]
-                off0, off1 = diagram.offsets[i], diagram.offsets[i + 1]
+                box0, box1 = boxes[i], boxes[i + 1]
+                off0, off1 = offsets[i], offsets[i + 1]
                 if left and off1 >= off0 + len(box0.cod)\
                         or not left and off0 >= off1 + len(box1.dom):
                     diagram = diagram.interchange(i, i + 1, left=left)
+                    boxes, offsets = diagram.boxes, diagram.offsets
                     yield diagram
                     no_more_moves = False
             if no_more_moves:
@@ -2163,18 +2173,13 @@ class Functor(cat.Functor):
     @unbiased
     def then(self, other):
         assert_isinstance(other, Functor)
-        assert_iscomposable(self, other)
-        if self.ob_map.mapping is self.ar_map.mapping is identity\
-                and self == self.id(self.dom):
-            return other
-        if other.ob_map.mapping is other.ar_map.mapping is identity\
-                and other == other.id(other.dom):
-            return self
-        return type(self)(
-            self.ob_map.then(other), self.ar_map.then(other),
-            colour_map=self.colour_map.then(other) if self.colour_map
-            else other.colour_map,
-            dom=self.dom, cod=other.cod)
+        result = super().then(other)
+        if result is self or result is other:
+            return result
+        result.colour_map = MappingOrCallable(
+            self.colour_map.then(other) if self.colour_map
+            else other.colour_map)
+        return result
 
     def __eq__(self, other):
         return super().__eq__(other) and self.colour_map == other.colour_map

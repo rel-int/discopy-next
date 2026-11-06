@@ -69,6 +69,7 @@ exchanges.
 
 from __future__ import annotations
 
+import functools
 import itertools
 import math
 import random
@@ -253,6 +254,7 @@ class Cyclic[n](FiniteGroup, TestableGeneric):
         return cls(rng.randrange(cls.n))
 
     @classmethod
+    @functools.cache
     def action(cls):
         rotation = Permutation(((i + 1) % cls.n for i in range(cls.n)), cls.n)
         return Action(cls, cls.n, (rotation, ))
@@ -334,6 +336,7 @@ class Symmetric[n](FiniteGroup, TestableGeneric):
         return cls(rng.sample(range(cls.n), cls.n))
 
     @classmethod
+    @functools.cache
     def action(cls):
         return Action(cls, cls.n, tuple(g.inside for g in cls.generators()))
 
@@ -405,6 +408,7 @@ class Product[left, right](FiniteGroup, TestableGeneric):
         return cls(cls.left.sample(rng), cls.right.sample(rng))
 
     @classmethod
+    @functools.cache
     def action(cls, left: Action | None = None,
                right: Action | None = None) -> Action:
         """
@@ -532,6 +536,7 @@ class Wreath[base, top](FiniteGroup, TestableGeneric):
                    cls.top.sample(rng))
 
     @classmethod
+    @functools.cache
     def action(cls, base: Action | None = None, power: bool = False) -> Action:
         """
         An action of the wreath product given an action of ``base`` on
@@ -586,7 +591,7 @@ class Wreath[base, top](FiniteGroup, TestableGeneric):
                       tuple(map(image, cls.generators())))
 
 
-@dataclass(unsafe_hash=True)
+@dataclass(frozen=True)
 class Action:
     """
     An action of a group on ``range(size)``, i.e. a functor from the group
@@ -615,7 +620,8 @@ class Action:
     images: tuple[Permutation, ...]
 
     def __post_init__(self):
-        self.images = tuple(Permutation(p, self.size) for p in self.images)
+        object.__setattr__(self, "images", tuple(
+            Permutation(p, self.size) for p in self.images))
         if len(self.images) != len(self.group.generators()):
             raise ValueError(
                 f"Expected an image for each generator of {self.group}.")

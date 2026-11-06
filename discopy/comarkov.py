@@ -240,8 +240,8 @@ class Cofunction(Box):
     def __init__(self, cod: monoidal.Ty, cofunc):
         func = finset.Function(list(cofunc), Nat(len(cod)), Nat(len(cofunc)))
         self.cofunc = op.Comarkov(func)  # ty: ignore[invalid-argument-type]
-        dom = cod[:0].tensor(*(cod[i] for i in cofunc))
-        Box.__init__(self, f"Cofunction({list(cofunc)})", dom, cod)
+        dom = cod[:0].tensor(*(cod[i] for i in func))
+        Box.__init__(self, f"Cofunction({list(func)})", dom, cod)
 
     def __getnewargs__(self):
         """
@@ -537,6 +537,12 @@ class Functor(symmetric.Functor):
     def __call__(self, other):
         if isinstance(other, Merge) and hasattr(self.cod, "merge"):
             return self.cod.merge(self(other.cod), len(other.dom))
+        if isinstance(other, Cofunction) and hasattr(
+                self.cod.ar, "cofunction_factory")\
+                and not isinstance(other, symmetric.Permutation):
+            sizes = [Nat(len(self(x))) for x in other.cod]
+            return self.cod.ar.from_cofunction(finset.Function.function(
+                other.cofunc.inside, sizes).inside, self(other.cod))
         if isinstance(other, Cofunction) and hasattr(self.cod, "merge")\
                 and not isinstance(other, symmetric.Permutation):
             cofunction = getattr(self.cod, "cofunction", None)\

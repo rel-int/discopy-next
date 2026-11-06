@@ -11,11 +11,14 @@ Summary
     :nosignatures:
     :toctree:
 
+    Ty
     Diagram
     Box
     Cup
     Cap
+    Permutation
     Swap
+    Spider
     Word
     Bubble
     Functor

@@ -1,8 +1,11 @@
 # -*- coding: utf-8 -*-
 
 """
-The free Markov category, i.e. a semicartesian category with a supply of
-commutative comonoid, see :cite:t:`FritzLiang23`.
+The free Markov category, i.e. a symmetric category with a supply of
+commutative comonoids, see :cite:t:`FritzLiang23`. Discard is not natural on
+these diagrams (``f >> Discard(y)`` and ``Discard(x)`` are not equal), so they
+form what Fritz and Liang call the free gs-monoidal category rather than a
+semicartesian one.
 
 Summary
 -------
@@ -25,7 +28,10 @@ Summary
     FollowedBy
     Head
     Tail
+    Sum
+    Bubble
     Functor
+    Equation
 
 
 Axioms
@@ -57,10 +63,11 @@ Coherence
 
 Note
 ----
-Equality of Markov diagrams is computed by translation to hypergraph.
-Copy boxes are translated to spiders, thus when they appear in the same
-diagram as the merge boxes of :mod:`comarkov` they automatically satisfy
-the :mod:`frobenius` axioms.
+A Markov :class:`Equation` is checked by translation to hypergraph, where
+copy boxes become spiders, while ``==`` is equality on the nose. Copy boxes
+cannot be composed with the merge boxes of :mod:`~discopy.comarkov`: the two
+meet only in :mod:`~discopy.frobenius`, where both are spiders and satisfy
+the Frobenius axioms.
 """
 
 from __future__ import annotations
@@ -864,6 +871,12 @@ class Functor(symmetric.Functor):
     def __call__(self, other):
         if isinstance(other, Copy) and hasattr(self.cod, "copy"):
             return self.cod.copy(self(other.dom), len(other.cod))
+        if isinstance(other, Function) and hasattr(
+                self.cod.ar, "function_factory")\
+                and not isinstance(other, symmetric.Permutation):
+            sizes = [Nat(len(self(x))) for x in other.dom]
+            return self.cod.ar.from_function(finset.Function.function(
+                other.func, sizes).inside, self(other.dom))
         if isinstance(other, Function) and hasattr(self.cod, "copy")\
                 and not isinstance(other, symmetric.Permutation):
             function = getattr(self.cod, "function", None)\

@@ -23,6 +23,12 @@ def test_Over():
     assert Over(x, y) != Under(x, y)
 
 
+def test_exponential_name_is_lazy():
+    x, y = Ty('x'), Ty('y')
+    for exp in (Over(x, y), Under(x, y)):
+        assert "name" not in vars(exp) and exp.name == str(exp)
+
+
 def test_Under():
     x, y = Ty('x'), Ty('y')
     assert isinstance(y.under_factory(y, x), cat.Ob)
@@ -195,6 +201,18 @@ def test_to_rigid():
     assert Box('f', x, y, data=42).to_rigid().data == 42
 
 
+def test_to_rigid_evaluates_terms():
+    from discopy import rigid
+
+    x, y = Ty('x'), Ty('y')
+    f, a = (y << x)('f'), x('a')
+    x_, y_ = rigid.Ty('x'), rigid.Ty('y')
+    f_ = rigid.Box('f', rigid.Ty(), y_ @ x_.l)
+    a_ = rigid.Box('a', rigid.Ty(), x_)
+    assert f(a).to_rigid() == f(a).eval().to_rigid()\
+        == f_ >> y_ @ x_.l @ a_ >> y_ @ rigid.Cup(x_.l, x_)
+
+
 def test_to_compact():
     x, y, z = map(Ty, "xyz")
     f = Box("f", x @ y, z)
@@ -342,6 +360,16 @@ def test_transparency():
         assert loads(dumps(box)) == box
 
 
+def test_repr_of_constants_keeps_their_data():
+    from discopy import closed
+    env = {"biclosed": biclosed, "closed": closed}
+    for mod in (biclosed, closed):
+        x = mod.Ty('x')
+        f, c = mod.Constant('f', x << x, data=1), mod.Constant('c', x, data=3)
+        for term in (c, f(c)):
+            assert eval(repr(term), env) == term
+
+
 def test_Wire_reads_back_main():
     """ The objects of a biclosed type are biclosed wires, and the plain
     monoidal ones of dumps, pickles and printed text from before read back as
@@ -474,6 +502,15 @@ def test_Curry_to_drawing():
                 == (len(curry.dom), len(curry.cod))
     for left in (True, False):  # A curry of no wire, built explicitly.
         assert Curry(f, 0, left=left).to_drawing() == f.to_drawing()
+
+
+def test_Curry_of_no_wire_maps_as_its_argument():
+    x, y, z = map(Ty, "xyz")
+    f = Box('f', x @ y, z)
+    for left in (True, False):
+        curry = Curry(f, 0, left=left)
+        assert Functor.id(Diagram)(curry) == f
+        assert curry.to_map() == f.to_map()
 
 
 def test_term_inside_a_diagram_is_drawn_as_one_box():

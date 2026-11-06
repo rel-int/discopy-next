@@ -50,6 +50,7 @@ Composition is that of the underlying category in the other order:
 
 from __future__ import annotations
 
+import sys
 from dataclasses import dataclass
 
 from discopy import abc, cat, monoidal, symmetric
@@ -146,10 +147,15 @@ class Category[category](
     def environment(cls) -> dict:
         """
         The namespace of :class:`Testable`, with that of the category on top
-        so that the representation of ``inside`` reads back too.
+        so that the representation of ``inside`` reads back too: its own
+        environment, or the public names of its module when it has none.
         """
+        module = vars(sys.modules[cls.category.__module__])
+        public = {
+            name: value for name, value in module.items()
+            if not name.startswith("_")}
         return dict(super().environment(), **getattr(
-            cls.category, "environment", dict)())
+            cls.category, "environment", lambda: public)())
 
     serialisation = Serialisable.serialisation.inapplicable(NO_TREE)
 

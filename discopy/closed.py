@@ -3,6 +3,11 @@
 The free closed markov category, i.e. with copy, discard, exponentials and
 products that are not strictly associative.
 
+Its causal diagrams are also written as lambda terms, see :class:`TermBase`,
+with tuples, projections and ``let``, and reduced to Böhm trees by a
+:class:`Strategy`. Diagrams map to combinatorial maps, i.e.
+:class:`discopy.cmap.CMap`, with :meth:`discopy.monoidal.Diagram.to_map`.
+
 Summary
 -------
 
@@ -34,11 +39,16 @@ Summary
     RightmostFirst
     Diagram
     Box
+    Timed
     Eval
     Coeval
     Curry
     Pack
     Unpack
+    Function
+    Swap
+    Permutation
+    Copy
     Discard
     Feedback
     Trace
@@ -48,7 +58,7 @@ Summary
     Sum
     Bubble
     Functor
-    CMap
+    Equation
 
 .. admonition:: Functions
 
@@ -62,7 +72,8 @@ Summary
 Axioms
 ------
 
-:meth:`Diagram.curry` and :meth:`Diagram.uncurry` are inverses.
+:meth:`discopy.biclosed.Diagram.curry` and
+:meth:`discopy.abc.BiclosedCategory.uncurry` are inverses.
 
 >>> x, y, z = map(Ty, "xyz")
 >>> f, g = Box('f', x, z << y), Box('g', x @ y, z)
@@ -190,6 +201,11 @@ class Exp(Wire, biclosed.Exp):
 
     ob = Ty
 
+    @cached_property
+    def name(self):  # pylint: disable=method-hidden  # deleted by __init__
+        "The name of an exponential is its undelayed print, read when needed."
+        return str(self.reset())
+
     def __str__(self):
         return f"({self.exponent} >> {self.base})"\
             + feedback.str_delayed(self.time_step)
@@ -223,7 +239,13 @@ class Product(Wire):
         for typ in factors:
             assert_isinstance(typ, self.ob)
         self.factors = factors
-        super().__init__(str(self), **params)
+        super().__init__("", **params)
+        del self.name
+
+    @cached_property
+    def name(self):  # pylint: disable=method-hidden  # deleted by __init__
+        "The name of a product is its undelayed print, read when needed."
+        return str(self.reset())
 
     def __eq__(self, other):
         return isinstance(other, type(self))\
@@ -369,6 +391,8 @@ class Diagram(markov.Diagram, biclosed.Diagram, ClosedCategory):
         def image(box):
             if box.time_step:
                 return image(box.reset()).delay(box.time_step)
+            if isinstance(box, Curry) and not box.n:
+                return box.arg.to_compact()
             if isinstance(box, Curry):
                 return (box.arg.to_compact() >> Coeval(
                     box.cod, left=box.left)).trace(
@@ -559,6 +583,8 @@ class Curry(Timed, biclosed.Curry, Box):
         """
         if not self.time_step:
             return super().to_drawing()
+        if not self.n:
+            return self.arg.delay(self.time_step).to_drawing()
         coeval = self.coeval_factory(self.reset().cod, left=self.left)
         return (self.arg >> coeval).delay(self.time_step).to_drawing()\
             .trace(self.n, left=not self.left)
@@ -713,6 +739,8 @@ class Functor(biclosed.Functor, markov.Functor):
     dom = cod = Diagram
 
     def __call__(self, other):
+        if isinstance(other, Unitype) and not other.time_step:
+            return monoidal.Functor.__call__(self, other)
         if self.cod is Drawing:
             return super().__call__(other)
         if isinstance(other, (Wire, Box)) and other.time_step:
@@ -935,7 +963,8 @@ class TermBase(Box, biclosed.TermBase, biclosed.Normalising):
         """
         functor = biclosed.Functor(
             ob_map=lambda x: cls.ob(x.inside[0].name),
-            ar_map=lambda c: cls.ob.constant_factory(c.name, functor(c.cod)),
+            ar_map=lambda c: cls.ob.constant_factory(
+                c.name, functor(c.cod), data=c.data),
             dom=biclosed.Diagram, cod=cls.functor.cod)
         return functor(term)
 

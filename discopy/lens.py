@@ -42,9 +42,9 @@ Summary
 Example
 -------
 
-Lenses over :class:`Function <discopy.python.Function>` are the accessors of
-functional programming: `get` reads a part of a structure and `put` writes
-it back. The lens on the first component of a pair:
+Lenses over :class:`Function <discopy.python.multiplicative.Function>` are
+the accessors of functional programming: `get` reads a part of a structure
+and `put` writes it back. The lens on the first component of a pair:
 
 >>> from discopy import python
 >>> from discopy.python import Function
@@ -468,13 +468,16 @@ class Traced(Symmetric, TracedCategory):
         Parameters:
             n : The number of atoms to trace over on each half, or one number
                 per half.
-            left : Whether to trace on the left, not implemented.
+            left : Whether to trace the first atoms instead, i.e. the trace
+                of the lens between swaps.
         """
+        if left:
+            (mem, x), (_, y) = (
+                typ.split(n, left=True) for typ in (self.dom, self.cod))
+            return (self.swap(x, mem) >> self >> self.swap(mem, y)).trace(n)
         (x, (u, u_)), (y, _) = self.dom.split(n), self.cod.split(n)
         if not u and not u_:
             return self
-        if left:
-            raise NotImplementedError
         forward = self.forward >> self.category.id(y.positive)\
             @ self.category.swap(u, self.residual)
         return type(self)(x, y, forward.trace(len(u)),
@@ -614,10 +617,11 @@ class Markov(Symmetric):
         reads it with `self.get`, writes with `other.put` then `self.put`,
         so that the residual stays the input rather than accumulating as in
         :meth:`Symmetric.then`. This is why lenses over
-        :class:`Function <discopy.python.Function>` are the semantics of
-        reverse-mode differentiation :cite:p:`CruttwellEtAl22`: the reverse
-        derivative of a function `f` is the lens with `get` its value and
-        `put` its Jacobian transposed, applied to the incoming gradient.
+        :class:`Function <discopy.python.multiplicative.Function>` are the
+        semantics of reverse-mode differentiation :cite:p:`CruttwellEtAl22`:
+        the reverse derivative of a function `f` is the lens with `get` its
+        value and `put` its Jacobian transposed, applied to the incoming
+        gradient.
 
         Parameters:
             other : The lens to compose with.

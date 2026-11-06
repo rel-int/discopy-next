@@ -20,12 +20,18 @@ A law a category breaks is declared :meth:`Declaration.failing` where it
 breaks, one that does not apply :meth:`Declaration.inapplicable`, and one
 that holds up to a quotient or on a subspace :meth:`Axiom.modulo` and
 :meth:`Axiom.weaken`.
-A :class:`Testable` category generates its own terms and
-:meth:`Testable.matrix` lists every law of every such category, which the
-suite in ``proptest/`` checks; CONTRIBUTING.md says how to run it. A
+
+A :class:`Testable` category generates its own objects and arrows, and
+:meth:`Testable.matrix` lists every law of every such category. A
 :class:`Serialisable` type states the laws of writing a term down and
-reading it back, and an :class:`Equivalence` those of an equivalence
-relation besides equality: reflexivity, symmetry and transitivity.
+reading it back: from its representation, its string, its pickle, its deep
+copy and its tree. An :class:`Equivalence` is a testable type with an
+equivalence relation besides equality, and states the laws of one once:
+reflexivity, symmetry and transitivity. The matrix in ``proptest/`` checks
+every axiom of every category against generated arguments, one cell per
+pair: how to run it, select cells and falsify a law is in `Run the property
+tests
+<https://github.com/rel-int/discopy-next/blob/main/CONTRIBUTING.md#run-the-property-tests>`_.
 
 Summary
 -------
@@ -40,6 +46,7 @@ Summary
     Axiom
     Rule
     AxiomFailure
+    Constructor
     Tensor
     Unit
     L
@@ -64,6 +71,8 @@ Summary
         rule
         inhabits
         substitute
+        is_open
+        position
 """
 
 from __future__ import annotations
@@ -74,7 +83,7 @@ import pickle
 import sys
 from abc import ABC, abstractmethod
 from collections.abc import Callable
-from copy import deepcopy
+from copy import copy, deepcopy
 from dataclasses import KW_ONLY, dataclass, replace
 from functools import cached_property, reduce, wraps
 from operator import index, matmul
@@ -163,7 +172,11 @@ class Equation[T]:
         >>> f, g = Box('f', x, x), Box('g', x, x)
         >>> assert Equation(f >> g, g >> f).modulo(lambda _: True)
         """
-        return type(self)(*self.terms, symbols=self.symbols, up_to=up_to)
+        result = copy(self)
+        vars(result).pop("up_to", None)
+        if up_to is not None:
+            result.up_to = up_to
+        return result
 
     def __repr__(self):
         """
@@ -265,6 +278,9 @@ class AxiomFailure(AxiomError):
     def __init__(self, reason: str, equation):
         super().__init__(reason, equation)
         self.equation = equation
+
+    def __str__(self):
+        return str(self.args[0])
 
 
 type Obj[Coarse] = Annotated[Coarse, "object"]
@@ -798,8 +814,8 @@ class Axiom[**P, T](Declaration[P, T]):
         """
         The same law with its equation compared up to a function, so that a
         category weakens an inherited axiom in one statement, e.g.
-        ``CMap.dagger_contravariance = CompactCategory.dagger_contravariance
-        .modulo(CMap.to_hypergraph)``.
+        ``Diagram.yanking = BalancedCategory.yanking.modulo(
+        Diagram.to_hypergraph)`` in :mod:`discopy.symmetric`.
         """
         @wraps(self.function)
         def equation(*args, **kwargs):
@@ -909,12 +925,14 @@ class Axiom[**P, T](Declaration[P, T]):
          ...
         hypothesis.errors.NoSuchExample: No examples found of condition ...
         """
-        from hypothesis import find
+        from hypothesis import errors, find
 
         def refutes(arguments):
             try:
                 verdict = self(**arguments)
-            except AxiomFailure:
+            except errors.UnsatisfiedAssumption:
+                raise
+            except Exception:  # pylint: disable=broad-exception-caught
                 return True
             return verdict is not NotImplemented and not verdict
 

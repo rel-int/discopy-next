@@ -66,6 +66,17 @@ Summary
 
     Row
     Channel
+
+.. admonition:: Functions
+
+    .. autosummary::
+        :template: function.rst
+        :nosignatures:
+        :toctree:
+
+        pack
+        pack_value
+        unpack_value
 """
 from __future__ import annotations
 

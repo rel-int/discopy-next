@@ -30,17 +30,11 @@ formula*. Once channels are monadic this is more than a ``while`` loop: a
 single monadic value holds both the outcomes that leave the loop and those
 that go around again, and ``(functor, unit, mult)`` cannot tell them apart.
 The trace is therefore defined exactly when the monad supplies an
-:attr:`~discopy.kleisli.monad.Monad.iterate` operator
-
-.. math::
-    (-)^\\dagger : (U \\to M(Y + U)) \\to (U \\to M(Y))
-
-i.e. when it is an `Elgot monad
-<https://ncatlab.org/nlab/show/Elgot+monad>`_, see Adámek, Milius & Velebil,
-`Elgot theories: a new perspective of the equational properties of iteration
-<https://arxiv.org/abs/1006.0918>`_ (2010). The maybe, powerset and
-subdistribution monads all are; a monad without one raises rather than
-returning a wrong answer.
+:attr:`~discopy.kleisli.monad.Monad.iterate` operator, i.e. when it is an
+Elgot monad: :data:`~discopy.kleisli.monad.Maybe`,
+:data:`~discopy.kleisli.monad.Powerset` and
+:data:`~discopy.kleisli.monad.Subdistribution` are; a monad without one
+raises rather than returning a wrong answer.
 
 Token machines
 --------------
@@ -102,10 +96,18 @@ Summary
 
     Tagged
     Channel
-    pack
-    pack_value
-    unpack_value
-    injection
+
+.. admonition:: Functions
+
+    .. autosummary::
+        :template: function.rst
+        :nosignatures:
+        :toctree:
+
+        pack
+        pack_value
+        unpack_value
+        injection
 """
 from __future__ import annotations
 
@@ -436,7 +438,7 @@ class Channel[monad](TracedCategory, ComarkovCategory, TestableGeneric):
         Parameters:
             n : The number of summands to trace over.
             left : Whether to trace the first rather than the last
-                summands, not implemented.
+                summands, see :meth:`discopy.abc.SymmetricCategory.left_trace`.
 
         Raises:
             ValueError : If the monad has no
@@ -464,7 +466,7 @@ class Channel[monad](TracedCategory, ComarkovCategory, TestableGeneric):
         if n == 0:
             return self
         if left:
-            raise NotImplementedError
+            return self.left_trace(n)
         monad = type(self).monad
         if monad.iterate is None:
             raise ValueError(

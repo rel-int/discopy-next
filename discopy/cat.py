@@ -54,11 +54,10 @@ We can create dagger functors from the free category to itself:
 >>> F = Functor(ob, ar)
 >>> assert F(arrow) == (h >> f >> g)[::-1]
 
-We can check the axioms of dagger (i.e. a contravariant involutive
-identity-on-objects endofunctor):
+The dagger is a contravariant involutive identity-on-objects endofunctor,
+see :meth:`discopy.abc.DaggerCategory.dagger_involution` and
+:meth:`discopy.abc.DaggerCategory.dagger_contravariance`:
 
->>> x, y, z = Ob('x'), Ob('y'), Ob('z')
->>> f, g = Box('f', x, y), Box('g', y, z)
 >>> assert f[::-1][::-1] == f
 >>> assert Id(x)[::-1] == Id(x)
 >>> assert (f >> g)[::-1] == g[::-1] >> f[::-1]
@@ -207,10 +206,10 @@ class FreeCategory(Category):
         dom, cod = map(self.cast_ob, (dom, cod))
         self.dom, self.cod, self.inside = dom, cod, tuple(inside)
         if _scan:
-            for generator in inside:
+            for generator in self.inside:
                 assert_isinstance(generator, self.generator_factory)
             previous = dom
-            for generator in inside:
+            for generator in self.inside:
                 if previous != generator.dom:
                     raise utils.AxiomError(messages.NOT_COMPOSABLE.format(
                         previous, generator, previous, generator.dom))
@@ -689,11 +688,13 @@ class Box(Arrow):
         self.name, self.data, self.is_dagger = name, data, is_dagger
         Arrow.__init__(self, (self, ), dom, cod, _scan=False)
 
-    @cached_property
+    @property
     def free_symbols(self) -> "set[sympy.Symbol]":
         def recursive_free_symbols(data):
             if isinstance(data, Mapping):
                 data = data.values()
+            if not getattr(getattr(data, "dtype", None), "hasobject", True):
+                return set()
             if isinstance(data, Iterable) and not isinstance(data, str):
                 # Handles numpy 0-d arrays, which are actually not iterable.
                 if not hasattr(data, "shape") or data.shape != ():
@@ -702,11 +703,9 @@ class Box(Arrow):
         return recursive_free_symbols(self.data)
 
     def subs(self, *args) -> Box:
-        variables = tuple(self.free_symbols)
-        values = rsubs(variables, *args)
-        if all(x is y for x, y in zip(values, variables)):
+        if not self.free_symbols:
             return self
-        return self.lambdify(*variables)(*values)
+        return self.rebuild(data=rsubs(self.data, *args))
 
     def lambdify(self, *symbols: "sympy.Symbol", **kwargs) -> Callable:
         if not self.free_symbols & set(symbols):
@@ -837,6 +836,7 @@ class Sum(Box):
     def __init__(
             self, terms: tuple[Arrow, ...],
             dom: Ob | None = None, cod: Ob | None = None):
+        terms = tuple(terms)
         if not terms and (dom is None or cod is None):
             raise ValueError(messages.MISSING_TYPES_FOR_EMPTY_SUM)
         dom = terms[0].dom if dom is None else dom
@@ -860,6 +860,7 @@ class Sum(Box):
     def is_generator(self):
         return len(self.terms) == 1 and self.terms[0].is_generator
 
+    @property
     def generator(self):
         return self.terms[0].generator if self.is_generator else None
 
@@ -897,6 +898,7 @@ class Sum(Box):
 
     @unbiased
     def then(self, other):
+        assert_iscomposable(self, other)
         other = other if isinstance(other, Sum)\
             else self.sum_factory((other, ))
         terms = tuple(f.then(g) for f in self.terms for g in other.terms)
@@ -1004,9 +1006,12 @@ one, they have [cat.Ob('x'), cat.Ob('y')].
 
     def __str__(self):
         str_args = ",".join(map(str, self.args))
-        str_dom_cod = '' if self.is_id_on_objects else (
-            f'dom={self.dom}, cod={self.cod}')
-        return f"({str_args}).bubble({str_dom_cod})"
+        str_kwargs = [] if self.is_id_on_objects else [
+            f"dom={self.dom}", f"cod={self.cod}"]
+        str_kwargs += [f"name={self.name!r}"] if self.name else []
+        str_kwargs += [] if self.method == "bubble"\
+            else [f"method={self.method!r}"]
+        return f"({str_args}).bubble({', '.join(str_kwargs)})"
 
     def atoms(self) -> list:
         """ The atoms of a bubble: those of its boundary and arguments. """
@@ -1027,6 +1032,14 @@ one, they have [cat.Ob('x'), cat.Ob('y')].
     @property
     def free_symbols(self):
         return super().free_symbols.union(*[f.free_symbols for f in self.args])
+
+    def subs(self, *args) -> Bubble:
+        if not self.free_symbols:
+            return self
+        changes = {"args": tuple(arg.subs(*args) for arg in self.args)}
+        if self.data is not None:
+            changes["data"] = rsubs(self.data, *args)
+        return self.rebuild(**changes)
 
     def lambdify(self, *symbols: "sympy.Symbol", **kwargs) -> Callable:
         if not set(symbols) & self.free_symbols:
@@ -1183,7 +1196,10 @@ class Functor(Category[type, "Functor"]):
         if other.ob_map.mapping is other.ar_map.mapping is identity\
                 and other == other.id(other.dom):
             return self
-        ob_map, ar_map = self.ob_map.then(other), self.ar_map.then(other)
+        ob_map, ar_map = (
+            {key: other(self(key)) for key in mapping}
+            if isinstance(mapping, Mapping) else (lambda key: other(self(key)))
+            for mapping in (self.ob_map.mapping, self.ar_map.mapping))
         return type(self)(ob_map, ar_map, dom=self.dom, cod=other.cod)
 
     def __init__(

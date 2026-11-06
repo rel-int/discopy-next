@@ -16,6 +16,7 @@ Summary
     HeadOb
     TailOb
     Ty
+    Nat
     Layer
     Diagram
     Box
@@ -26,6 +27,9 @@ Summary
     FollowedBy
     Head
     Tail
+    Sum
+    Bubble
+    Equation
     Functor
 
 Axioms
@@ -264,7 +268,7 @@ class Box(rigid.Box, feedback.Box, Diagram):
 
     def __init__(self, name, dom, cod, *args, time_step: int = 0, **params):
         rigid.Box.__init__(self, name, dom, cod, *args, **params)
-        self._time_step, self._args, self._params = time_step, args, params
+        self._time_step = time_step
 
     def __repr__(self):
         if self.is_dagger:

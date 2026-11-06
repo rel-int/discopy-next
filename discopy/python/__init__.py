@@ -3,6 +3,10 @@
 """
 Categories of Python functions.
 
+``discopy.python.Function``, ``Ty`` and ``exp`` are those of
+:mod:`discopy.python.multiplicative`, i.e. Python functions with tuples as
+monoidal product, imported on first use.
+
 .. autosummary::
     :template: module.rst
     :toctree: ../_api
