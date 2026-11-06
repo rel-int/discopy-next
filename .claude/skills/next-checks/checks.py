@@ -135,10 +135,13 @@ class Context:
         common = pathlib.Path(git("rev-parse", "--path-format=absolute",
                                   "--git-common-dir", cwd=self.root))
         venv = common.parent / ".venv" / "bin"
-        version = subprocess.run(
-            [str(venv / "python"), "-c",
-             "import sys; print('%d.%d' % sys.version_info[:2])"],
-            capture_output=True, text=True, check=False).stdout.strip()
+        try:
+            version = subprocess.run(
+                [str(venv / "python"), "-c",
+                 "import sys; print('%d.%d' % sys.version_info[:2])"],
+                capture_output=True, text=True, check=False).stdout.strip()
+        except FileNotFoundError:
+            version = ""
         return venv, version or "unknown", first_line(text, "error")[:80]
 
     def working_tree(self):
@@ -192,11 +195,16 @@ class Context:
 
 def cached(directory, name, measure):
     path = directory / name
-    if path.exists():
+    try:
         return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        pass
     value = measure()
     if not (isinstance(value, dict) and value.get("interrupted")):
-        path.write_text(json.dumps(value), encoding="utf-8")
+        fd, temporary = tempfile.mkstemp(dir=directory)
+        with os.fdopen(fd, "w", encoding="utf-8") as file:
+            json.dump(value, file)
+        os.replace(temporary, path)
     return value
 
 
