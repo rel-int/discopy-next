@@ -701,8 +701,8 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 - The shared setup action runs setup-uv 10.2.0 and setup-python 7.0.0, the
   versions `benchmark.yml` runs, and Dependabot now scans `.github/actions/*`
   so they keep moving together ([next#445]).
-- pylint's `fail-under` is raised from 9.09 to 9.34, main's score, so the score
-  can no longer drop 0.25 without lint failing ([next#445]).
+- pylint's `fail-under` is raised from 9.09 to 9.33, main's score rounded
+  down, so the score can no longer drop 0.25 without lint failing ([next#445]).
 - The `test` extra includes `notebooks`, so `pip install -e '.[test]'` brings
   anywidget and the "Build without uv" recipe's `coverage run -m pytest` no
   longer stops at collection on `discopy/drawing/widget.py` ([next#445]).
