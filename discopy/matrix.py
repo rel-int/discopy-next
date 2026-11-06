@@ -40,12 +40,12 @@ from contextlib import contextmanager
 from operator import index
 from types import ModuleType
 from collections.abc import Sequence
-from typing import Callable, TYPE_CHECKING, Literal
+from typing import Literal, Callable, TYPE_CHECKING
 
 from discopy import config, messages
 from discopy.abc import (
-    ComarkovCategory, DaggerCategory, MarkovCategory, NamedGeneric, Nat)
-from discopy.testable import Testable
+    ComarkovCategory, DaggerCategory, MarkovCategory, Nat)
+from discopy.testable import Serialisable, TestableGeneric
 from discopy.cat import (
     factory,
     assert_iscomposable,
@@ -59,8 +59,9 @@ if TYPE_CHECKING:
 
 
 @factory
-class Matrix[dtype](NamedGeneric, MarkovCategory, ComarkovCategory,
-                    DaggerCategory, Testable["Matrix"]):
+class Matrix[dtype](
+        MarkovCategory, ComarkovCategory, DaggerCategory, TestableGeneric,
+        Serialisable):
     """
     A matrix is an ``array`` with natural numbers as ``dom`` and ``cod``.
 
@@ -155,15 +156,20 @@ class Matrix[dtype](NamedGeneric, MarkovCategory, ComarkovCategory,
 
     A matrix reads back from its representation up to the rounding of its
     entries and only up to ``config.NUMPY_THRESHOLD`` of them, past which
-    NumPy elides the array, so that :meth:`transparency` is weakened to
+    NumPy elides the array, so that :meth:`repr_transparency` is weakened to
     those:
 
     >>> Matrix[int]([0] * 24, 4, 6)
     Matrix[int]([0, 0, 0, ..., 0, 0, 0], dom=4, cod=6)
     """
+    @classmethod
+    def checked_params(cls) -> tuple:
+        """ Integer matrices, whose entries every ``dtype`` reads exactly. """
+        return (int, )
+
     ob = Nat
 
-    transparency = Testable.transparency.weaken(
+    repr_transparency = Serialisable.repr_transparency.weaken(
         max_entries=config.NUMPY_THRESHOLD)
 
     @classmethod

@@ -1,7 +1,7 @@
 import sys
 from discopy.biclosed import *
 from discopy import biclosed, cat, monoidal
-from discopy.testable import Related, assert_axioms
+from discopy.testable import Related
 from discopy.utils import dumps, loads
 from pytest import raises
 
@@ -324,10 +324,6 @@ def test_deep_terms():
     assert depth == 6000
 
 
-def test_axioms():
-    assert_axioms(TermBase)
-
-
 def test_mapping_preserves_binding_and_lexical_boundaries():
     from discopy import closed
     X, Y, Z = map(closed.Ty, "XYZ")
@@ -526,3 +522,8 @@ def test_term_inside_a_diagram_is_drawn_as_one_box():
             for diagram in (term @ X, term >> module.Id(term.cod)):
                 assert [box.name for box in diagram.to_drawing().boxes]\
                     == [str(term)]
+
+
+def test_structural_boxes():
+    from discopy.testable import assert_structural_boxes
+    assert_structural_boxes(Diagram)

@@ -274,3 +274,8 @@ def test_Bubble_rotate_subs():
     x, y = Ty('x'), Ty('y')
     symbolic = Box('f', x, y, data=phi).bubble()
     assert symbolic.r.subs(phi, 1) == symbolic.subs(phi, 1).r
+
+
+def test_structural_boxes():
+    from discopy.testable import assert_structural_boxes
+    assert_structural_boxes(Diagram)

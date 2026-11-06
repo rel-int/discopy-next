@@ -4,7 +4,6 @@ from pytest import raises
 
 from discopy import biclosed
 from discopy.closed import *
-from discopy.testable import assert_axioms
 from discopy.biclosed import Constraints, Sampler
 from discopy.utils import dumps, loads
 
@@ -776,10 +775,6 @@ def test_Sampler_nonlinear():
     assert str(term) == "X(lambda x0: c0(x0)(x0))"
 
 
-def test_axioms():
-    assert_axioms(TermBase)
-
-
 def test_from_biclosed():
     x, y = biclosed.Ty("x"), biclosed.Ty("y")
     X, Y = Ty("x"), Ty("y")
@@ -976,3 +971,8 @@ def test_Bubble_is_linear_and_has_no_term():
     assert f.bubble().is_linear and Diagram.copy(x).bubble(cod=x).is_linear
     with raises(AxiomError):
         (f.bubble() >> g).to_term()
+
+
+def test_structural_boxes():
+    from discopy.testable import assert_structural_boxes
+    assert_structural_boxes(Diagram)

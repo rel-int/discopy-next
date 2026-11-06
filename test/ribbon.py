@@ -163,3 +163,8 @@ def test_feedback_to_ribbons_is_built_from_its_argument():
     assert Head(g).to_ribbons() == rails.head
     assert Tail(g).to_ribbons() == rails.tail
     assert g.delay().to_ribbons() == rails.delay()
+
+
+def test_structural_boxes():
+    from discopy.testable import assert_structural_boxes
+    assert_structural_boxes(Diagram)

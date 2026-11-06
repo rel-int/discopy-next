@@ -480,3 +480,8 @@ def test_Box_signature():
         name: param.default for name, param in sig.parameters.items()
         if param.default is not Parameter.empty})
     assert box == Box('f', x, x)
+
+
+def test_structural_boxes():
+    from discopy.testable import assert_structural_boxes
+    assert_structural_boxes(Diagram)

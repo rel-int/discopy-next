@@ -102,7 +102,11 @@ from collections.abc import Sequence
 from typing import ClassVar
 
 from discopy import monoidal, feedback, balanced, hypergraph, cmap, messages
-from discopy.abc import BalancedCategory, SpacialCategory, SymmetricCategory
+from discopy.abc import (
+    BalancedCategory, BiclosedCategory, CompactCategory, DaggerCategory,
+    PivotalCategory, RigidCategory, SpacialCategory, SymmetricCategory,
+    TracedCategory)
+from discopy.testable import FUEL, Axiom, Rule
 from discopy.cat import factory
 from discopy.feedback import (  # noqa: F401  pylint: disable=unused-import
     Wire, Ty, Nat)
@@ -272,6 +276,25 @@ class Diagram(balanced.Diagram, SymmetricCategory):
     >>> Permutation.swap_factory = Transposition
     >>> assert Permutation.braid_factory is Transposition
     """
+    # A hypergraph is faithful from symmetric categories on.
+    bifunctoriality = SymmetricCategory.bifunctoriality
+    dagger_monoidality = DaggerCategory.dagger_monoidality.failing(
+        messages.FEEDBACK_HAS_NO_DAGGER)
+    dagger_monoidality_symmetric = DaggerCategory.dagger_monoidality\
+        .weaken(within=SymmetricCategory)
+    braid_naturality = SymmetricCategory.braid_naturality
+    braid_then_inverse = SymmetricCategory.braid_then_inverse
+    inverse_then_braid = SymmetricCategory.inverse_then_braid
+    inverse_braiding = SymmetricCategory.inverse_braiding
+    twist_naturality = BalancedCategory.twist_naturality
+    yanking = BalancedCategory.yanking
+    trace_naturality_left = TracedCategory.trace_naturality_left
+    trace_naturality_right = TracedCategory.trace_naturality_right
+    trace_dinaturality_left = TracedCategory.trace_dinaturality_left
+    trace_dinaturality_right = TracedCategory.trace_dinaturality_right
+    trace_superposing_left = TracedCategory.trace_superposing_left
+    trace_superposing_right = TracedCategory.trace_superposing_right
+
     box_factory: ClassVar[type["Box"]]
     functor_factory: ClassVar[type["Functor"]]
     swap_factory: ClassVar[type["Swap"]]
@@ -283,6 +306,62 @@ class Diagram(balanced.Diagram, SymmetricCategory):
     braid_factory = classproperty(lambda cls: cls.swap_factory)
     layer_factory = Layer
     twist_factory = classmethod(lambda cls, dom: cls.id(dom))
+
+    @classmethod
+    def equation_factory(cls, *terms: Diagram) -> Equation:
+        """
+        The equation of a law, compared up to the isomorphism of the
+        hypergraphs of its terms, the coherence theorem of symmetric
+        categories: sliding boxes past each other and composing swaps is
+        absorbed, while a free trace, curry or feedback is a box of the
+        hypergraph like any other.
+
+        >>> x = Ty('x')
+        >>> f, g = Box('f', Ty(), x), Box('g', x, Ty())
+        >>> assert Diagram.equation_factory(f @ g, g >> f)
+        """
+        return Equation(*terms)
+
+    @classmethod
+    def strategy(cls, *, dom=None, cod=None, fuel=FUEL, within=None):
+        """
+        Draw a diagram by one of two ways: :meth:`search`, the derivation from
+        the rules of the category, or :meth:`quotient_strategy`, the downgrade
+        of its combinatorial representation, which draws larger diagrams in
+        one go.
+        A morphism premise of the search is drawn by this strategy in turn,
+        so a derived diagram can contain a sampled one. A search ``within``
+        the rules of a weaker structure is not mixed with the sample, which
+        has all the structure of the category.
+
+        Parameters are those of :meth:`search`.
+
+        >>> from hypothesis import find
+        >>> x = Ty('x')
+        >>> diagram = find(Diagram.strategy(dom=x, cod=x),
+        ...                lambda d: len(d.boxes) > 1)
+        >>> assert (diagram.dom, diagram.cod) == (x, x)
+        """
+        from hypothesis import strategies as st
+
+        derivations = cls.search(dom=dom, cod=cod, fuel=fuel, within=within)
+        if within is not None:
+            return derivations
+        return st.one_of(derivations, cls.quotient_strategy(
+            dom=dom, cod=cod, fuel=fuel))
+
+    @classmethod
+    def quotient_strategy(cls, *, dom=None, cod=None, fuel=FUEL):
+        """
+        Sample symmetric diagrams through their quotient: a combinatorial map
+        drawn by :meth:`discopy.cmap.CMap.strategy` with at most ``fuel + 1``
+        boxes, monogamous unless the category has cups and caps, downgraded
+        with :meth:`discopy.cmap.CMap.to_diagram`, which makes its cycles
+        explicit as traces and its crossings as swaps.
+        """
+        return cmap.CMap[cls].strategy(  # ty: ignore[invalid-type-form]
+            dom=dom, cod=cod, max_leaves=fuel + 1).map(
+                lambda graph: graph.to_diagram())
 
     @classmethod
     def wait(cls, dom: Ty) -> Diagram:
@@ -463,6 +542,8 @@ class Diagram(balanced.Diagram, SymmetricCategory):
         """
         return self.to_hypergraph().depth()
 
+    hypergraph_section = monoidal.Diagram.hypergraph_section
+
 
 class Box(balanced.Box, Diagram):
     """
@@ -539,6 +620,27 @@ class Permutation(Box):
             name, dom, cod, drawing_name=name,
             draw_as_wires=True, draw_as_permutation=True,
             permutation_indices=tuple(self.perm))
+
+    @classmethod
+    # pylint: disable-next=arguments-differ  # drawn with no boundary
+    def strategy(cls, *, types=None):
+        """
+        Generate a permutation of two or three atomic types, other than the
+        identity, which is no box.
+
+        Parameters:
+            types : The strategy to draw the types from, see
+                :meth:`atomic_strategy`.
+        """
+        from hypothesis import strategies as st
+
+        def permutations(dom):
+            return st.permutations(range(len(dom))).map(
+                lambda perm: cls(dom, perm))
+
+        atoms = st.lists(cls.atomic_strategy(types), min_size=2, max_size=3)
+        return atoms.map(lambda xs: xs[0].tensor(*xs[1:])).flatmap(
+            permutations).filter(lambda perm: not perm.is_identity)
 
     def __getnewargs__(self):
         """
@@ -700,6 +802,21 @@ class Swap(Permutation, balanced.Braid, Box):
         Box.__init__(self, self.name, self.dom, self.cod,
                      draw_as_wires=True, draw_as_braid=False)
 
+    @classmethod
+    # pylint: disable-next=arguments-differ  # drawn with no boundary
+    def strategy(cls, *, types=None):
+        """
+        Generate the swap of two atomic types.
+
+        Parameters:
+            types : The strategy to draw the types from, see
+                :meth:`atomic_strategy`.
+        """
+        from hypothesis import strategies as st
+
+        atoms = cls.atomic_strategy(types)
+        return st.builds(cls, atoms, atoms)
+
     def dagger(self):
         return type(self)(self.right, self.left)
 
@@ -812,6 +929,12 @@ class DualRail(balanced.DualRail, Functor):
 
 CMap = cmap.CMap[Diagram]
 
+for level in (
+        BiclosedCategory, RigidCategory, PivotalCategory, CompactCategory):
+    for name, law in vars(level).items():
+        if isinstance(law, (Axiom, Rule)):
+            setattr(CMap, name, law.inapplicable(messages.MAP_HAS_NO_ADJOINTS))
+
 Feedback, Trace, FollowedBy, Head, Tail = feedback.structural_boxes(
     Diagram, Box)
 Diagram.box_factory = Box
@@ -839,7 +962,5 @@ class Equation(monoidal.Equation):
 
 
 Diagram.yanking = BalancedCategory.yanking.modulo(Diagram.to_hypergraph)
-Diagram.yanking_left = BalancedCategory.yanking_left.modulo(
-    Diagram.to_hypergraph)
 Diagram.scalar_sliding = SpacialCategory.scalar_sliding.modulo(
     Diagram.to_hypergraph)

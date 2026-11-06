@@ -120,6 +120,7 @@ class Wire(pivotal.Wire):
         return result
 
     r = l
+    windings = (0, )
 
 
 HeadOb, TailOb = feedback.structural_wires(Wire)
@@ -232,6 +233,7 @@ class Diagram(
 
     ob = Ty
     layer_factory = Layer
+    str_transparency = compact.Diagram.str_transparency
 
     @classmethod
     def from_cospan(cls, apex: Ty, left, right) -> Diagram:
@@ -777,6 +779,25 @@ class Spider(Box):
         """
         return (
             len(self.dom), len(self.cod), self.typ, self.phase, self.is_dagger)
+
+    @classmethod
+    # pylint: disable-next=arguments-differ  # drawn with no boundary
+    def strategy(cls, *, types=None):
+        """
+        Generate a spider on an atomic type with up to two legs a side,
+        with or without a phase, and a phased one marked as a dagger or not.
+
+        Parameters:
+            types : The strategy to draw the types from, see
+                :meth:`atomic_strategy`.
+        """
+        from hypothesis import strategies as st
+
+        legs = st.sampled_from(((0, 1), (1, 0), (1, 2), (2, 1), (2, 2)))
+        phases = st.sampled_from((None, 0.25, 0.5))
+        return st.tuples(
+            legs, cls.atomic_strategy(types), phases, st.booleans()).map(
+                lambda args: cls(*args[0], *args[1:3], is_dagger=args[3]))
 
     @property
     def phase(self):

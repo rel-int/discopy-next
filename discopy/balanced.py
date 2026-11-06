@@ -157,10 +157,11 @@ class Diagram(braided.Diagram, feedback.Diagram, BalancedCategory):
 
     .. _nLab: https://ncatlab.org/nlab/show/traced+monoidal+category
     """
+    twist_naturality = BalancedCategory.twist_naturality.failing(
+        messages.FREE_TWIST)
+
     ob = Ty
     yanking = BalancedCategory.yanking.failing(messages.FREE_YANKING)
-    yanking_left = BalancedCategory.yanking_left.failing(
-        messages.FREE_YANKING)
 
     @classmethod
     def twist(cls, dom: monoidal.Ty) -> Diagram:
@@ -322,6 +323,20 @@ class Twist(Box):
         if self.is_dagger:
             return repr(self.dagger()) + ".dagger()"
         return factory_name(type(self)) + f"({self.dom!r})"
+
+    @classmethod
+    # pylint: disable-next=arguments-differ  # drawn with no boundary
+    def strategy(cls, *, types=None):
+        """
+        Generate the twist of an atomic type, or its inverse.
+
+        Parameters:
+            types : The strategy to draw the types from, see
+                :meth:`atomic_strategy`.
+        """
+        from hypothesis import strategies as st
+
+        return st.builds(cls, cls.atomic_strategy(types), st.booleans())
 
     def dagger(self):
         return type(self)(self.dom, not self.is_dagger)

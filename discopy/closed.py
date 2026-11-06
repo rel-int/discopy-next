@@ -99,7 +99,8 @@ from typing import Callable, ClassVar, Dict, Self
 
 from discopy import (
     monoidal, biclosed, markov, feedback, cmap, hypergraph, messages)
-from discopy.abc import ClosedCategory
+from discopy.abc import ClosedCategory, DaggerCategory, MonoidalCategory
+from discopy.testable import Serialisable
 from discopy.cat import factory
 from discopy.drawing import Drawing
 from discopy.utils import (
@@ -411,6 +412,13 @@ class Diagram(markov.Diagram, biclosed.Diagram, ClosedCategory):
     def to_drawing(self):
         return monoidal.Diagram.to_drawing(self, functor_factory=Functor)
 
+    dagger_monoidality = DaggerCategory.dagger_monoidality.failing(
+        messages.CURRY_HAS_NO_DAGGER)
+    dagger_monoidality_monoidal = DaggerCategory.dagger_monoidality.weaken(
+        within=MonoidalCategory)
+    currying_symmetry = ClosedCategory.currying_symmetry.failing(
+        messages.FREE_CURRY)
+
     def to_term(self) -> Term:
         """
         Read a causal diagram as a term in fine-grain call-by-value style:
@@ -545,11 +553,25 @@ class Eval(Timed, biclosed.Eval, Box):
         """ The arguments of the constructor, which a delay reads. """
         return self.x, self.left
 
+    def __str__(self):
+        """
+        The name of the evaluation, with its side when it is on the right:
+        an exponential of a closed category is on either side, so its type
+        alone does not say which.
+
+        >>> x, y = Ty('x'), Ty('y')
+        >>> print(Eval(x << y, left=False).delay())
+        Eval(y >> x, left=False).d
+        """
+        name = self.name if self.left else self.name[:-1] + ", left=False)"
+        return name + feedback.str_delayed(self.time_step)
+
 
 class Coeval(Timed, biclosed.Coeval, Box):
     "The coevaluation of an exponential type, i.e. the dagger of an Eval."
     serialised_attrs = biclosed.Coeval.serialised_attrs + ("*", "time_step")
     __getnewargs__ = Eval.__getnewargs__
+    __str__ = Eval.__str__
 
 
 class Curry(Timed, biclosed.Curry, Box):
@@ -780,7 +802,7 @@ Ty.under_factory = Ty.over_factory = staticmethod(Exp)
 Id = Diagram.id
 
 
-class TermBase(Box, biclosed.TermBase):
+class TermBase(Box, biclosed.TermBase, biclosed.Normalising):
     """
     A term in the internal language of a closed category, i.e. a lambda term
     which need not be linear: this module implements closed markov categories
@@ -804,6 +826,7 @@ class TermBase(Box, biclosed.TermBase):
     >>> assert x(f, left=True) == f(x)
     """
     functor = Functor.id(Diagram)
+    str_transparency = Serialisable.str_transparency
 
     def __call__(self, other, left=False):
         args = (other, self) if left else (self, other)
@@ -961,7 +984,20 @@ class TermBase(Box, biclosed.TermBase):
         return functor(term)
 
     @classmethod
-    def generate(cls, cod, choices, types, letters):
+    def strategy(cls, **params):
+        """
+        Generate closed terms, which need not be linear, see
+        :meth:`generate`.
+
+        Parameters:
+            params : Passed to :meth:`biclosed.TermBase.shapes`.
+        """
+        return super().strategy(**params)
+
+    @classmethod
+    # pylint: disable-next=too-many-arguments,too-many-positional-arguments
+    def generate(  # a shape, a naming and whether it takes constants
+            cls, cod, choices, types, letters, constants=True):
         """
         Build a term as :meth:`biclosed.TermBase.generate` does, except
         that a closed term need not be linear: its :class:`biclosed.Sampler`
@@ -977,7 +1013,8 @@ class TermBase(Box, biclosed.TermBase):
         X(lambda x0: c0)
         """
         return biclosed.Sampler(
-            cls, iter(choices), types, letters, linear=False).term(cod)
+            cls, iter(choices), types, letters, linear=False,
+            constants=constants).term(cod)
 
     def reduce(self, budget: int | None = None,
                strategy: type[Strategy] | None = None) -> BohmTree | None:
@@ -1054,14 +1091,6 @@ X(lambda x: x)(x).
 
 type Term = Constant | Variable | Application | Abstraction\
     | Tuple | Projection | Let
-
-
-for law in ("copy_coassociativity", "copy_cocommutativity",
-            "copy_counitality", "copy_coherence", "vanishing", "joining",
-            "strength", "tightening", "sliding", "yanking", "yanking_left",
-            "scalar_sliding"):
-    setattr(TermBase, law, getattr(Box, law).inapplicable(
-        messages.TERM_IS_A_BOX))
 
 
 class Constant(TermBase, biclosed.Constant):
@@ -1887,6 +1916,12 @@ Ty.application_factory = Application
 Ty.abstraction_factory = Abstraction
 Ty.product_factory = Product
 TermBase.strategy_factory = LeftmostOutermost
+TermBase.reduction_strategies = (LeftmostOutermost, RightmostFirst)
+
+for law in sorted(
+        set(Box.axioms) - set(Serialisable.axioms) | set(Box.rules)):
+    setattr(TermBase, law, getattr(Box, law).inapplicable(
+        messages.TERM_IS_A_BOX))
 
 
 class Equation(markov.Equation):

@@ -54,4 +54,4 @@ def test_no_tree():
     from discopy.utils import dumps
     with raises(TypeError, match="A function has no tree"):
         dumps(Function(abs, int, int))
-    assert Function.serialisation() is NotImplemented
+    assert "serialisation" not in Function.axioms

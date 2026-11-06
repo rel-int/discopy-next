@@ -266,21 +266,18 @@ def test_yanking():
     from discopy.kleisli.additive import Channel
     from discopy.kleisli.monad import Powerset
     x, y = symmetric.Ty('x'), compact.Ty('y')
-    for law in ("yanking", "yanking_left"):
-        assert getattr(symmetric.Diagram, law)(x)
-        assert getattr(compact.Diagram, law)(y)
-        assert getattr(compact.CMap, law)(y)
-        for function in (Function, Additive, Channel[Powerset]):
-            yanked, identity = getattr(function, law)(PythonTy(int)).terms
-            assert yanked(42) == identity(42)
-        assert getattr(para.Traced[Matrix[bool]], law)(Nat(2))
-        assert getattr(lens.Traced[Matrix[bool]], law)(
-            lens.Ty[Nat](Nat(1), Nat(2)))
-        for planar in (Diagram, pivotal.Diagram, Drawing, PivotalCategory):
-            assert getattr(planar, law)() is NotImplemented
-            assert "planar" in getattr(planar, law).__doc__
-        with raises(AxiomFailure):
-            getattr(balanced.Diagram, law)(balanced.Ty('x'))
+    assert symmetric.Diagram.yanking(x) and compact.Diagram.yanking(y)
+    assert compact.CMap.yanking(y)
+    for function in (Function, Additive, Channel[Powerset]):
+        left, identity, right = function.yanking(PythonTy(int)).terms
+        assert left(42) == identity(42) == right(42)
+    assert para.Traced[Matrix[bool]].yanking(Nat(2))
+    assert lens.Traced[Matrix[bool]].yanking(lens.Ty[Nat](Nat(1), Nat(2)))
+    for planar in (Diagram, pivotal.Diagram, Drawing, PivotalCategory):
+        assert planar.yanking() is NotImplemented
+        assert "planar" in planar.yanking.__doc__
+    with raises(AxiomFailure):
+        balanced.Diagram.yanking(balanced.Ty('x'))
 
 
 def test_types_without_wires_are_their_own_delay():
@@ -292,25 +289,6 @@ def test_types_without_wires_are_their_own_delay():
         assert x.delay() == x.delay(2) == x.head == x.tail == x
     f = frobenius.Box('f', frobenius.Nat(1), frobenius.Nat(1))
     assert f.delay().dom == f.dom and f.delay().time_step == 1
-
-
-def test_feedback_laws_on_a_traced_category():
-    from discopy import compact
-    from discopy.abc import FeedbackCategory
-    C = compact.CMap
-    x, y, m, n, w, z = map(compact.Ty, "xymnwz")
-    box = lambda name, dom, cod: compact.Box(name, dom, cod).to_map()
-    f = box('f', x @ m @ n, y @ m @ n)
-    g, h, k, e = box('g', w, x), box('h', y, z), box(
-        'k', m @ n, m @ n), box('e', w, z)
-    for law, arguments in (
-            ("vanishing", dict(f=f)),
-            ("joining", dict(f=f, x=x, y=y, m=m, n=n)),
-            ("strength", dict(e=e, f=f, x=x, y=y, m=m @ n)),
-            ("tightening", dict(f=f, g=g, h=h, x=x, y=y, m=m @ n)),
-            ("sliding", dict(f=f, k=k, x=x, y=y, m=m @ n))):
-        axiom = getattr(FeedbackCategory, law).bind(C)
-        assert axiom.modulo(C.to_hypergraph)(**arguments)
 
 
 def test_split_memory_bounds():
@@ -484,6 +462,11 @@ def test_structural_boxes_delay_through_their_arguments():
             1, 2, w.d, .5, is_dagger=is_dagger)
         assert spider.delay().delay(-1) == spider
         assert pickle.loads(pickle.dumps(spider)) == spider
+
+
+def test_structural_boxes():
+    from discopy.testable import assert_structural_boxes
+    assert_structural_boxes(Diagram)
 
 
 def test_functor_preserves_the_boundary_of_FollowedBy():

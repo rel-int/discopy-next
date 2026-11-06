@@ -141,3 +141,8 @@ def test_dual_rail_delay():
     x, y = Ty('x'), Ty('y')
     for diagram in [Twist(x).dagger(), Braid(x, y) >> Twist(y) @ x]:
         assert diagram.delay().to_braided() == diagram.to_braided().delay()
+
+
+def test_structural_boxes():
+    from discopy.testable import assert_structural_boxes
+    assert_structural_boxes(Diagram)

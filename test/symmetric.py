@@ -489,3 +489,8 @@ def test_tensor_coalesces_plumbing():
     assert perm.tensor(f, perm) == reduce(
         lambda g, h: g.tensor(h), [perm, f, perm])
     assert perm.tensor(x, f) == reduce(lambda g, h: g.tensor(h), [perm, x, f])
+
+
+def test_structural_boxes():
+    from discopy.testable import assert_structural_boxes
+    assert_structural_boxes(Diagram)

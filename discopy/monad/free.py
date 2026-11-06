@@ -41,7 +41,8 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
-from discopy.abc import Category, NamedGeneric
+from discopy.abc import Category
+from discopy.testable import TestableGeneric
 from discopy.kleisli.channel import Channel
 from discopy.kleisli.monad import Monad
 from discopy.python.function import Function
@@ -50,7 +51,7 @@ from discopy.utils import (
 
 
 @factory
-class Homomorphism[monad](Category, NamedGeneric):
+class Homomorphism[monad](Category, TestableGeneric):
     """
     A homomorphism between the free algebras of a monad ``M`` on two types
     ``X`` and ``Y``, i.e. a function from ``M(X)`` to ``M(Y)`` commuting
@@ -86,6 +87,11 @@ class Homomorphism[monad](Category, NamedGeneric):
     ...     == (neighbours >> neighbours)(0) == frozenset({-2, 0, 2})
     >>> assert step.to_channel()(0) == neighbours(0)
     """
+    @classmethod
+    def checked_params(cls) -> tuple:
+        """ None, a homomorphism of free algebras having no strategy yet. """
+        return ()
+
     ob = type
     monad: Monad
 

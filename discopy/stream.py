@@ -172,7 +172,7 @@ from dataclasses import dataclass
 
 from discopy import messages, symmetric
 from discopy.abc import FeedbackCategory, NamedGeneric
-from discopy.testable import Testable
+from discopy.testable import TestableGeneric
 from discopy.python import finset
 from discopy.utils import (
     AxiomError,
@@ -338,7 +338,7 @@ NO_TREE = messages.NO_TREE_STREAM
 
 
 @dataclass
-class Stream[category](FeedbackCategory, NamedGeneric):
+class Stream[category](FeedbackCategory, TestableGeneric):
     """
     Monoidal streams over an underlying `category`.
 
@@ -377,6 +377,11 @@ class Stream[category](FeedbackCategory, NamedGeneric):
     >>> assert cod.later.now == later.cod.now
     >>> assert mem.later.now == later.mem.now
     """
+    @classmethod
+    def checked_params(cls) -> tuple:
+        """ None, a stream drawing no terms yet. """
+        return ()
+
     category = symmetric.Diagram
     ob = classproperty(lambda cls: Ty[cls.category.ob])
 
@@ -389,7 +394,6 @@ class Stream[category](FeedbackCategory, NamedGeneric):
     later, is_constant = Ty.later, Ty.is_constant
     head, tail = Ty.head, Ty.tail
     sliding = FeedbackCategory.sliding.failing(messages.STREAM_SLIDING)
-    serialisation = Testable.serialisation.inapplicable(NO_TREE)
 
     def __init__(
             self, now: category,
