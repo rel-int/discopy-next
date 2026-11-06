@@ -223,10 +223,10 @@ class Equation[ar](NamedGeneric):
 
 class AxiomFailure(AxiomError):
     """
-    A law declared broken, raised when the bound axiom is called: the
-    reason is the message and :attr:`equation` is the law evaluated on the
-    arguments, whose sides say how it failed, or the error raised when its
-    terms could not be built.
+    A law declared broken, raised when the bound axiom is called on a
+    counterexample: the reason is the message and :attr:`equation` is the
+    law evaluated on the arguments, whose sides say how it failed, or the
+    error raised when its terms could not be built.
     """
 
     def __init__(self, reason: str, equation):
@@ -686,12 +686,14 @@ class Axiom[**P, T](Declaration[P, T]):
     Calling a bound axiom returns its own verdict: :obj:`NotImplemented`
     when the structure does not apply to the category, and the equation
     itself otherwise; a law declared broken raises an
-    :class:`AxiomFailure` carrying that equation instead of returning it.
+    :class:`AxiomFailure` carrying that equation instead of returning it
+    when it is false.
 
     A law is broken when *some* argument is a counterexample, not every one,
     so :attr:`broken` is declared by :meth:`failing` before any argument is
     generated — the property matrix marks such an axiom as an expected
-    failure and lets the search find the counterexample.
+    failure and lets the search find the counterexample, so that a law
+    which holds after all passes unexpectedly.
 
     Parameters:
         broken : Whether the law is declared broken by :meth:`failing`.
@@ -716,10 +718,11 @@ class Axiom[**P, T](Declaration[P, T]):
 
     def failing(self, reason: str) -> Axiom[P, T]:
         """
-        The same law declared broken: calling it raises an
-        :class:`AxiomFailure` with the reason as message and the equation
-        evaluated on the arguments, or the error raised when the
-        implementation refuses to build its terms, e.g. ``scalar_sliding =
+        The same law declared broken: calling it returns the equation
+        evaluated on the arguments when it holds on them, and otherwise
+        raises an :class:`AxiomFailure` with the reason as message and the
+        false equation, or the error raised when the implementation refuses
+        to build its terms, e.g. ``scalar_sliding =
         SpacialCategory.scalar_sliding.failing(messages.FREE_SCALAR)``.
         """
         @wraps(self.function)
@@ -728,6 +731,8 @@ class Axiom[**P, T](Declaration[P, T]):
                 evaluated = self.function(*args, **kwargs)
             except Exception as error:
                 raise AxiomFailure(reason, error) from error
+            if evaluated is NotImplemented or evaluated:
+                return evaluated
             raise AxiomFailure(reason, evaluated)
         equation.__doc__ = reason
         return replace(self, function=equation, broken=True)
@@ -1047,10 +1052,10 @@ def assert_axioms(*categories) -> None:
     Check every axiom of each category on a single generated example, a dry
     run of the property tests in ``proptest/``.
 
-    An axiom that does not apply is skipped, a broken one is only required
-    to raise its :class:`discopy.utils.AxiomError` — one example need not
-    be a counterexample — and any other law must hold, of the type its
-    signature states, see :func:`inhabits`.
+    An axiom that does not apply is skipped, a broken one may raise its
+    :class:`discopy.utils.AxiomError` — one example need not be a
+    counterexample — and any law that does not raise must hold, of the type
+    its signature states, see :func:`inhabits`.
     """
     from hypothesis import Phase, find, settings
 

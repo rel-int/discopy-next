@@ -45,6 +45,13 @@ class Parity(int, Equivalence):
                 cls(triple[2])))
 
 
+@axiom
+def trivial[A: Obj[Ob], B: Obj[Ob]](
+        cls, f: Hom[Self, A, B]) -> Equation[Self]:
+    """ Every arrow is an identity, which a box refutes. """
+    return Equation(f, cls.id(f.dom))
+
+
 def test_axioms():
     assert_axioms(Arrow)
 
@@ -86,9 +93,9 @@ def test_failing_when_the_terms_do_not_build():
 def test_axiom_failure_message_is_the_reason():
     f = Box('f', Ob('x'), Ob('x'))
     with raises(AxiomFailure) as error:
-        Arrow.unitality.failing("Never holds.")(f=f)
+        trivial.bind(Arrow).failing("A box is no identity.")(f=f)
     restored = pickle.loads(pickle.dumps(error.value))
-    assert str(error.value) == str(restored) == "Never holds."
+    assert str(error.value) == str(restored) == "A box is no identity."
     assert restored.equation.terms == error.value.equation.terms
 
 
@@ -171,11 +178,9 @@ def test_axiom_binding():
     assert axiom(lambda cls: NotImplemented).bind(Arrow)() is NotImplemented
     box = Box('f', Ob('x'), Ob('y'))
     assert Arrow.unitality(f=box)
-    broken = Arrow.unitality.weaken(max_leaves=1).failing("Never holds.")
+    broken = Arrow.unitality.weaken(max_leaves=1).failing("Declared broken.")
     assert broken.params == {"max_leaves": 1}
-    with raises(AxiomFailure) as failure:
-        broken(f=box)
-    assert failure.value.equation
+    assert broken(f=box)
 
 
 def test_string_annotations():
@@ -267,16 +272,23 @@ def test_weaken_shape_of_self():
 
 
 def test_falsify():
-    @axiom
-    def trivial[A: Obj[Ob], B: Obj[Ob]](
-            cls, f: Hom[Self, A, B]) -> Equation[Self]:
-        """ Every arrow is an identity, which a box refutes. """
-        return Equation(f, cls.id(f.dom))
-
     assert trivial.bind(Arrow).falsify()["f"].inside
-    assert Arrow.unitality.failing("Never holds.").falsify()
-    with raises(NoSuchExample):
-        Arrow.associativity.falsify()
+    for law in (Arrow.unitality.failing("Declared broken."),
+                Arrow.associativity):
+        with raises(NoSuchExample):
+            law.falsify()
+
+
+def test_failing_raises_only_on_a_counterexample():
+    x = Ob('x')
+    law = trivial.bind(Arrow)
+    broken = law.failing("A box is no identity.")
+    assert broken(f=Arrow.id(x))
+    with raises(AxiomFailure) as failure:
+        broken(f=Box('f', x, x))
+    assert not failure.value.equation
+    assert not law(**broken.falsify())
+    assert Arrow.unitality.failing("Declared broken.")(f=Box('f', x, x))
 
 
 def test_falsify_refusal():
