@@ -257,7 +257,7 @@ class List[generator_factory](Monoid["List"], TestableGeneric):
     @classmethod
     def checked_params(cls) -> tuple:
         """
-        Python types, the only generators :meth:`generators` draws.
+        Python types, the only generators :meth:`generator_strategy` draws.
         """
         return (type, )
 
@@ -334,14 +334,15 @@ class List[generator_factory](Monoid["List"], TestableGeneric):
             + f"({', '.join(map(self.generator_repr, self.inside))})"
 
     @classmethod
-    def generators(cls):
+    def generator_strategy(cls):
         """
         Generate the lists of one Python type, one of those
         :func:`testable.values` samples, the free monoid on any other
         generator having no strategy yet.
 
         >>> from discopy.python import Ty
-        >>> assert Ty.generators().example() in map(Ty, testable.VALUES)
+        >>> generator = Ty.generator_strategy().example()
+        >>> assert generator in map(Ty, testable.VALUES)
         """
         from hypothesis import strategies as st
         if cls.generator_factory is not type:
@@ -357,7 +358,7 @@ class List[generator_factory](Monoid["List"], TestableGeneric):
         from hypothesis import strategies as st
         if (dom, cod) != (None, None):
             raise ValueError("A list has a single object, None.")
-        return st.lists(cls.generators(), max_size=3).map(
+        return st.lists(cls.generator_strategy(), max_size=3).map(
             lambda xs: cls().tensor(*xs))
 
 
@@ -444,7 +445,7 @@ class Ty(cat.Ob, cat.FreeCategory, ColouredMonoid):
         return cls.search(**{"fuel": 1, **params})
 
     @classmethod
-    def generators(cls, *, dom=None, cod=None):
+    def generator_strategy(cls, *, dom=None, cod=None):
         """
         Generate the types of one wire, with no colour, as those of
         :meth:`typeparams` are: a coloured type is not generated yet, so
@@ -713,7 +714,7 @@ class Nat(abc.Nat, Ty):  # ty: ignore[invalid-generic-class]
     instance of a law, see :meth:`discopy.testable.Axiom.canonical`. """
 
     @classmethod
-    def generators(cls, *, dom=None, cod=None):
+    def generator_strategy(cls, *, dom=None, cod=None):
         """ Generate the one generator of the free monoid, ``Nat(1)``. """
         # pylint: disable=unused-argument  # a Nat has no colour
         from hypothesis import strategies as st
@@ -809,7 +810,7 @@ class Dim(Ty):
     instance of a law, see :meth:`discopy.testable.Axiom.canonical`. """
 
     @classmethod
-    def generators(cls, *, dom=None, cod=None):
+    def generator_strategy(cls, *, dom=None, cod=None):
         """ Generate the dimensions of one wire, two or three. """
         # pylint: disable=unused-argument  # a Dim has one colour
         from hypothesis import strategies as st

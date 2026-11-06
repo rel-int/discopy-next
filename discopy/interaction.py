@@ -137,12 +137,12 @@ class Ty[natural](Pregroup, TestableGeneric):
         return st.tuples(types, types).map(lambda pair: cls(*pair))
 
     @classmethod
-    def generators(cls, *, dom=None, cod=None):
+    def generator_strategy(cls, *, dom=None, cod=None):
         """ Generate pairs of atomic :attr:`natural` types. """
         # pylint: disable=unused-argument  # a pair has one colour
         from hypothesis import strategies as st
 
-        atoms = cls.natural.generators()
+        atoms = cls.natural.generator_strategy()
         return st.tuples(atoms, atoms).map(lambda pair: cls(*pair))
 
     positive: natural

@@ -185,7 +185,7 @@ class Ty(frobenius.Ty):
     instance of a law, see :meth:`discopy.testable.Axiom.canonical`. """
 
     @classmethod
-    def generators(cls, *, dom=None, cod=None):
+    def generator_strategy(cls, *, dom=None, cod=None):
         """ Generate a bit or a qubit, see :class:`frobenius.Ty`. """
         # pylint: disable=unused-argument  # a circuit type has one colour
         from hypothesis import strategies as st

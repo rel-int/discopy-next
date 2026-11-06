@@ -454,7 +454,7 @@ class Nat(Monoid["Nat"]):
         return st.integers(min_value=0, max_value=max_size).map(cls)
 
     @classmethod
-    def generators(cls, **_):
+    def generator_strategy(cls, **_):
         """ Generate the one generator, ``Nat(1)``. """
         from hypothesis import strategies as st
 

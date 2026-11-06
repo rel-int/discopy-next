@@ -727,8 +727,8 @@ class Declaration[**P, T](classmethod):
         variable of sort ``Obj`` from the strategy of the objects
         :meth:`discopy.abc.Category.typeparams` names, :obj:`None` for the
         single object of a monoid, of sort ``Atom`` from their
-        ``generators`` and of a testable sort, e.g. ``N: Nat``, from its own
-        strategy, see :meth:`discopy.abc.Nat.strategy`, then a premise
+        ``generator_strategy`` and of a testable sort, e.g. ``N: Nat``, from
+        its own strategy, see :meth:`discopy.abc.Nat.strategy`, then a premise
         ``Hom[C1, A, B]`` from the strategy of the category with its boundary
         and ``params``, a premise ``Var[T, x]`` the value ``x``, a premise
         ``Perm[N]`` a permutation, ``Objs[C0, N]`` that many atomic objects,
@@ -746,7 +746,7 @@ class Declaration[**P, T](classmethod):
                 ob = self.category.typeparams()[0]
                 if ob is NoneType:
                     return None
-                return draw(ob.generators() if get_origin(sort) is Atom
+                return draw(ob.generator_strategy() if get_origin(sort) is Atom
                             else ob.strategy(), label=name)
 
             def value(name, kind):
@@ -758,7 +758,7 @@ class Declaration[**P, T](classmethod):
                 elif get_origin(kind) is Objs:
                     n = index(get_args(kind)[1])
                     strategy = st.lists(
-                        self.category.ob.generators(),
+                        self.category.ob.generator_strategy(),
                         min_size=n, max_size=n).map(tuple)
                 elif get_origin(kind) is Hom:
                     _, dom, cod = get_args(kind)

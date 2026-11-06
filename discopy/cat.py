@@ -250,8 +250,9 @@ class FreeCategory(Category):
         fuel runs out, only the rules with no morphism premise are applied. A
         conclusion that misses ``dom`` or ``cod`` is composed with a generator
         from or to it, so that both are honoured, with no filtering, whenever
-        the :meth:`generators` read them: those of a type do not, since every
-        generated colour is transparent. Every choice shrinks to a generator.
+        the :meth:`generator_strategy` reads them: that of a type does not,
+        since every generated colour is transparent. Every choice shrinks to
+        a generator.
 
         Parameters:
             dom : The domain, sampled if ``None``.
@@ -280,19 +281,21 @@ class FreeCategory(Category):
         def terms(draw):
             rule = draw(st.sampled_from([None, *rules]))
             if rule is None:
-                return draw(cls.generators(dom=dom, cod=cod))
+                return draw(cls.generator_strategy(dom=dom, cod=cod))
             term = rule(**draw(rule.strategy(
                 dom, cod, fuel=fuel - 1, within=within)))
             if dom is not None and term.dom != dom:
-                term = draw(cls.generators(dom=dom, cod=term.dom)) >> term
+                term = draw(cls.generator_strategy(
+                    dom=dom, cod=term.dom)) >> term
             if cod is not None and term.cod != cod:
-                term = term >> draw(cls.generators(dom=term.cod, cod=cod))
+                term = term >> draw(cls.generator_strategy(
+                    dom=term.cod, cod=cod))
             return term
 
         return terms()
 
     @classmethod
-    def generators(cls, *, dom=None, cod=None):
+    def generator_strategy(cls, *, dom=None, cod=None):
         """
         Generate the generators of the free category as terms of it, from
         ``dom`` to ``cod`` when given: a path of one :attr:`generator_factory`.
@@ -399,7 +402,7 @@ class Arrow(FreeCategory, DaggerCategory, Serialisable["Arrow"]):
         return cls.search(**params)
 
     @classmethod
-    def generators(cls, *, dom=None, cod=None):
+    def generator_strategy(cls, *, dom=None, cod=None):
         """ Generate the boxes of the category, see :meth:`Box.strategy`. """
         return cls.box_factory.strategy(dom=dom, cod=cod)
 

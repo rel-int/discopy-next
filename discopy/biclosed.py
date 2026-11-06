@@ -197,7 +197,7 @@ class Ty(monoidal.Ty):
                 | st.builds(lambda x, y: x >> y, types, types)
 
         return st.recursive(
-            cls.generators(), exponentials, max_leaves=max_leaves)
+            cls.generator_strategy(), exponentials, max_leaves=max_leaves)
 
     def __repr__(self):
         return factory_name(type(self))\
