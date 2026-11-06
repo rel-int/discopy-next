@@ -515,7 +515,7 @@ class Matrix[dtype](NamedGeneric, MarkovCategory, ComarkovCategory,
         sources = [offsets[i] + j for i in xs for j in range(doms[i])]
         with backend() as np:
             array = np.array([
-                [i == j for j in sources] for i in range(len(sources))],
+                [int(i == j) for j in sources] for i in range(len(sources))],
                 dtype=cls.dtype or int)
         return cls(array, len(sources), len(sources))
 
@@ -580,7 +580,8 @@ class Matrix[dtype](NamedGeneric, MarkovCategory, ComarkovCategory,
         dim, n = index(x), index(n)
         with backend() as np:
             array = np.array([
-                [j % dim == i for j in range(n * dim)] for i in range(dim)],
+                [int(j % dim == i) for j in range(n * dim)]
+                for i in range(dim)],
                 dtype=cls.dtype or int)
         return cls(array, dim, n * dim)
 

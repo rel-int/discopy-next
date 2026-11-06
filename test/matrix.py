@@ -341,3 +341,16 @@ def test_Matrix_basis_dtype():
         assert Matrix.basis(x, 0).dtype == Matrix.id(x).dtype
     for dtype in (bool, int, float, complex):
         assert Matrix[dtype].basis(0, 0).dtype == dtype
+
+
+def test_symbolic_matrix_composes_with_permutations_and_copies():
+    """ Permutations and copies hold the integers zero and one, as id does:
+    sympy does not multiply an expression by a boolean. """
+    pytest.importorskip("sympy")
+    from sympy import Expr
+    from sympy.abc import psi
+    M = Matrix[Expr]
+    f, swap = M([psi], 1, 1), M.swap(1, 1)
+    assert f @ M.id(1) >> swap == swap >> M.id(1) @ f
+    assert f >> M.permutation([0]) == f
+    assert f >> M.copy(1) == M([psi, psi], 1, 2)

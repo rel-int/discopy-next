@@ -121,8 +121,8 @@ and feed the result into a controlled quantum gate.
 **3. Arithmetic on natural-number modes**
 
 >>> num = Digit(3, 2)
->>> add = Add(2)                     # (x,y,z) => x+y+z
->>> parity = add >> Mod2()            # outputs (x+y+z) mod 2 as a bit
+>>> add = Add(2)                     # (x, y) => x + y
+>>> parity = add >> Mod2()            # outputs (x + y) mod 2 as a bit
 >>> post = PostselectBit(1)
 >>> assert np.allclose(
 ...     (num >> parity >> post).double().to_tensor().eval().array, 1
@@ -132,7 +132,8 @@ and feed the result into a controlled quantum gate.
 
 from typing import Callable, List
 import numpy as np
-from discopy.utils import factory_name
+from sympy import lambdify
+from discopy.utils import factory_name, rsubs
 from discopy.optyx import channel
 from discopy.optyx.core import (
     control,
@@ -208,9 +209,9 @@ class BitControlledGate(Channel):
                     classical=classical
                 )
 
-        boxes = []
-        for i in range(len(diag)):
-            layer = diag[i]
+        boxes, staircases = [], diag.to_staircases()
+        for i in range(len(staircases)):
+            layer = staircases[i]
             (box, offset), = layer.inside[0].boxes_and_offsets
             left = layer.dom[:offset]
             right = layer.dom[offset + len(box.dom):]
@@ -250,9 +251,11 @@ class BitControlledPhaseShift(Channel):
                  n_modes: int = 1,
                  n_control_modes: int = 1):
         self.function = function
-        kraus = control.ControlledPhaseShift(function,
-                                             n_modes,
-                                             n_control_modes)
+        kraus = diagram.Diagram.swap(
+            diagram.Mode(n_modes), diagram.Mode(n_control_modes)
+        ) >> control.ControlledPhaseShift(function,
+                                          n_modes,
+                                          n_control_modes)
         super().__init__(
             "BitControlledPhaseShift",
             kraus,
@@ -324,9 +327,9 @@ class Sub(ClassicalBox):
         super().__init__(
             "SubInt",
             (
-                zw.Add(2).dagger() @ diagram.Id(diagram.Mode(1)) >>
-                diagram.Id(diagram.Mode(1)) @ diagram.Spider(2, 0,
-                                                             diagram.Mode(1))
+                diagram.Id(diagram.Mode(1)) @ zw.Add(2).dagger() >>
+                diagram.Spider(2, 0, diagram.Mode(1)) @
+                diagram.Id(diagram.Mode(1))
             ),
             mode**2,
             mode
@@ -618,10 +621,19 @@ class Z(ClassicalBox):
             bit**n_legs_in,
             bit**n_legs_out,
         )
+        self.data = phase
 
     def __repr__(self):
         return f"{factory_name(type(self))}({len(self.dom)}, "\
             f"{len(self.cod)}, {self.phase!r})"
+
+    def lambdify(self, *symbols, **kwargs):
+        return lambda *xs: type(self)(len(self.dom), len(self.cod), lambdify(
+            symbols, self.phase, **kwargs)(*xs))
+
+    def subs(self, *args):
+        return type(self)(
+            len(self.dom), len(self.cod), rsubs(self.phase, *args))
 
 
 # pylint: disable=invalid-name
@@ -640,10 +652,13 @@ class X(ClassicalBox):
             bit**n_legs_in,
             bit**n_legs_out,
         )
+        self.data = phase
 
     def __repr__(self):
         return f"{factory_name(type(self))}({len(self.dom)}, "\
             f"{len(self.cod)}, {self.phase!r})"
+
+    lambdify, subs = Z.lambdify, Z.subs
 
 
 # pylint: disable=invalid-name
