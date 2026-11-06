@@ -947,11 +947,19 @@ one, they have [cat.Ob('x'), cat.Ob('y')].
     def setoid(self):
         """
         Ensure that bubbles are equal if they have the same type, their `args`
-        are equal as well as their attributes `dom, cod, name, method`.
+        are equal as well as their attributes `dom, cod, name, method` and
+        `data`, as for a :class:`Box`: if the `data` is not hashable then
+        neither is the bubble. Its string prints the `data`, so that it reads
+        back.
+
+        >>> f = Box('f', Ob('x'), Ob('y'))
+        >>> assert f.bubble(data=1) != f.bubble(data=2)
+        >>> print(f.bubble(data=1))
+        (f).bubble(data=1)
         """
         args_data = tuple(f.setoid() for f in self.args)
         return (type(self), ) + args_data + tuple(getattr(self, x) for x in (
-            "dom", "cod", "name", "method"))
+            "dom", "cod", "name", "method", "data"))
 
     def __str__(self):
         str_args = ",".join(map(str, self.args))
@@ -960,6 +968,7 @@ one, they have [cat.Ob('x'), cat.Ob('y')].
         str_kwargs += [f"name={self.name!r}"] if self.name else []
         str_kwargs += [] if self.method == "bubble"\
             else [f"method={self.method!r}"]
+        str_kwargs += [] if self.data is None else [f"data={self.data!r}"]
         return f"({str_args}).bubble({', '.join(str_kwargs)})"
 
     def atoms(self) -> list:

@@ -213,6 +213,12 @@ def test_Bubble_dagger():
     assert b.dagger().dagger() == b
 
 
+def test_Bubble_data_eq():
+    f = Box('f', Ob('x'), Ob('y'))
+    one, two = f.bubble(data=1), f.bubble(data=2)
+    assert one != two and len({one, two, f.bubble(data=1)}) == 2
+
+
 def test_Box_repr():
     f = Box('f', Ob('x'), Ob('y'), data=42)
     assert repr(f) == "cat.Box('f', cat.Ob('x'), cat.Ob('y'), data=42)"
@@ -403,7 +409,8 @@ def test_Bubble_str():
     x, y = Ob('x'), Ob('y')
     f = Box('f', x, y)
     for bubble in (f.bubble(name="N"), f.bubble(method="m"),
-                   f.bubble(dom=y, cod=x, name="N", method="m")):
+                   f.bubble(dom=y, cod=x, name="N", method="m"),
+                   f.bubble(data=1), f.bubble(name="N", data=[1, 2])):
         assert eval(str(bubble)) == bubble
 
 
@@ -490,7 +497,7 @@ def test_subs_key_not_a_symbol():
     assert f.subs({sin: 0, psi: 1}).data == 1
     assert (f >> g).subs(sin, 0) == f.subs(sin, 0) >> g
     bubble = Bubble(f, data=sin).subs(sin, 0)
-    assert bubble == Bubble(f.subs(sin, 0)) and bubble.data == 0
+    assert bubble == Bubble(f.subs(sin, 0), data=0) and bubble.data == 0
 
 
 def test_free_symbols_of_numeric_array_read_from_dtype():

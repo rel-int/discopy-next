@@ -779,6 +779,14 @@ def test_Bubble_name():
     assert frobenius.Functor.id(Diagram)(bubble) == bubble
 
 
+def test_Bubble_data():
+    f = Box('f', Dim(2), Dim(2), [1, 0, 0, 1])
+    array = np.array([1, 2])
+    one, two = f.bubble(data=[1, 2]), f.bubble(data=[2, 1])
+    assert f.bubble(data=array) == f.bubble(data=array.copy()) == one != two
+    assert len({one, f.bubble(data=[1, 2]), f.bubble()}) == 2
+
+
 def test_Bubble_func_dagger():
     f = Box('f', Dim(2), Dim(2), [1, 2, 3, 4])
     bubble = f.bubble(func=abs, drawing_name="B")

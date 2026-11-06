@@ -1218,8 +1218,18 @@ class Bubble(monoidal.Bubble, Box):
         super().__init__(inside, **params)
 
     def setoid(self):
-        """ Tensor bubbles are equal when their funcs and daggers are too. """
-        return super().setoid() + (self.func, self.is_dagger)
+        """
+        Tensor bubbles are equal when their args, methods and funcs are, and
+        they are equal as tensor boxes: their daggers too, and their data by
+        its entries, so that a bubble holding a list hashes as a box does.
+
+        >>> import numpy as np
+        >>> f = Box('f', Dim(2), Dim(2), [1, 0, 0, 1])
+        >>> assert f.bubble(data=np.array([1, 2])) == f.bubble(data=[1, 2])
+        >>> assert len({f.bubble(data=[1, 2]), f.bubble(data=[1, 3])}) == 2
+        """
+        args = tuple(f.setoid() for f in self.args)
+        return (type(self), self.method, self.func) + args + Box.setoid(self)
 
     def __repr__(self):
         if self.is_dagger:
