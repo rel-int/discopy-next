@@ -43,6 +43,18 @@ def test_product():
         Unpack(X @ Y)
 
 
+def test_product_and_exponential_names_are_lazy():
+    X, Y = Ty("X"), Ty("Y")
+    for typ in (X * Y, X >> Y):
+        ob, = typ.inside
+        assert "name" not in vars(ob)
+        delayed = ob.delay()
+        assert ob.name == str(ob) == delayed.name == ob.delay().name
+    nested = Variable("x", X)
+    for _ in range(1000):
+        nested = Tuple(nested, Variable("x", X))
+
+
 def test_product_str_round_trip():
     X, Y, Z = Ty("X"), Ty("Y"), Ty("Z")
     for typ in (X.product(Y, Z), X.product(), (X @ Y).product(Z, X)):
@@ -331,6 +343,14 @@ def test_church_exponentiation():
     exp = N(lambda m: N(lambda n: (U >> U)(lambda f: n(m)(f))))
     assert exp(two)(three).normal_form() == church(8, U)
     assert exp(three)(two).normal_form() == church(9, U)
+
+
+def test_untyped_terms_evaluate_draw_and_map():
+    two, F = church(2, U), Functor.id(Diagram)
+    assert F(U) == U and F(U.delay()) == U.delay()
+    assert F(two.eval()) == two.eval()
+    assert len(two.eval().to_drawing().cod) == 1
+    assert two.to_map() == two.eval().to_map()
 
 
 def test_normal_form_idempotent():
@@ -775,6 +795,14 @@ def test_from_biclosed():
         == X(lambda v: Constant("g", X >> Y)(v))
 
 
+def test_from_biclosed_keeps_the_data_of_constants():
+    x, y, X, Y = biclosed.Ty("x"), biclosed.Ty("y"), Ty("x"), Ty("y")
+    g1, g2 = (biclosed.Constant("g", y << x, data=d) for d in (1, 2))
+    a = x("a")
+    assert g1(a).to_closed() != g2(a).to_closed()
+    assert g1(a).to_closed() == Constant("g", X >> Y, data=1)(X("a"))
+
+
 def test_Substitution():
     X, Y = Ty("X"), Ty("Y")
     f, a = (X >> Y)("f"), X("a")
@@ -929,6 +957,17 @@ def test_delay_diagrams():
         == Diagram.ev(z, y).dagger().delay()
     assert f.curry().delay().cod == (z << y).delay() != z.d << y.d
     assert f.curry().delay().arg == f
+
+
+def test_Curry_of_no_wire_maps_as_its_argument():
+    x, y, z = Ty('x'), Ty('y'), Ty('z')
+    f = Box('f', x @ y, z)
+    for left in (True, False):
+        for curry, arg in [(Curry(f, 0, left), f),
+                           (Curry(f, 0, left).delay(), f.delay())]:
+            assert Functor.id(Diagram)(curry) == arg
+            assert curry.to_compact() == arg.to_compact()
+            assert curry.to_drawing() == arg.to_drawing()
 
 
 def test_Bubble_is_linear_and_has_no_term():

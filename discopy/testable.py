@@ -71,7 +71,7 @@ import pickle
 import sys
 from abc import ABC, abstractmethod
 from collections.abc import Callable
-from copy import deepcopy
+from copy import copy, deepcopy
 from dataclasses import KW_ONLY, dataclass, replace
 from functools import reduce, wraps
 from operator import matmul
@@ -155,7 +155,11 @@ class Equation[ar](NamedGeneric):
         >>> f, g = Box('f', x, x), Box('g', x, x)
         >>> assert Equation(f >> g, g >> f).modulo(lambda _: True)
         """
-        return type(self)(*self.terms, symbols=self.symbols, up_to=up_to)
+        result = copy(self)
+        vars(result).pop("up_to", None)
+        if up_to is not None:
+            result.up_to = up_to
+        return result
 
     def __repr__(self):
         """
@@ -186,6 +190,9 @@ class AxiomFailure(AxiomError):
     def __init__(self, reason: str, equation):
         super().__init__(reason, equation)
         self.equation = equation
+
+    def __str__(self):
+        return str(self.args[0])
 
 
 type Obj[Coarse] = Annotated[Coarse, "object"]
@@ -657,8 +664,8 @@ class Axiom[**P, T](Declaration[P, T]):
         """
         The same law with its equation compared up to a function, so that a
         category weakens an inherited axiom in one statement, e.g.
-        ``CMap.dagger_contravariance = CompactCategory.dagger_contravariance
-        .modulo(CMap.to_hypergraph)``.
+        ``Diagram.yanking = BalancedCategory.yanking.modulo(
+        Diagram.to_hypergraph)`` in :mod:`discopy.symmetric`.
         """
         @wraps(self.function)
         def equation(*args, **kwargs):
@@ -670,8 +677,8 @@ class Axiom[**P, T](Declaration[P, T]):
         The same law declared broken: calling it raises an
         :class:`AxiomFailure` with the reason as message and the equation
         evaluated on the arguments, or the error raised when the
-        implementation refuses to build its terms, e.g. ``braid_naturality =
-        BraidedCategory.braid_naturality.failing("A free braid is a box.")``.
+        implementation refuses to build its terms, e.g. ``scalar_sliding =
+        SpacialCategory.scalar_sliding.failing(messages.FREE_SCALAR)``.
         """
         @wraps(self.function)
         def equation(*args, **kwargs):
@@ -687,8 +694,8 @@ class Axiom[**P, T](Declaration[P, T]):
         """
         The same law declared not to apply to the category: it takes no
         argument and returns :obj:`NotImplemented`, with the reason as its
-        documentation, e.g. ``trace_vanishing =
-        TracedCategory.trace_vanishing.inapplicable("No trace.")``.
+        documentation, e.g. ``yanking =
+        TracedCategory.yanking.inapplicable(messages.PLANAR_YANKING)``.
         """
         def law(_category):
             return NotImplemented
@@ -729,12 +736,14 @@ class Axiom[**P, T](Declaration[P, T]):
          ...
         hypothesis.errors.NoSuchExample: No examples found of condition ...
         """
-        from hypothesis import find
+        from hypothesis import errors, find
 
         def refutes(arguments):
             try:
                 verdict = self(**arguments)
-            except AxiomFailure:
+            except errors.UnsatisfiedAssumption:
+                raise
+            except Exception:  # pylint: disable=broad-exception-caught
                 return True
             return verdict is not NotImplemented and not verdict
 

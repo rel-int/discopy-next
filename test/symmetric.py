@@ -17,6 +17,14 @@ def test_Swap():
         Swap(x ** 2, Ty())
 
 
+def test_Swap_says_what_is_wrong():
+    x, y, z = Ty('x'), Ty('y'), Ty('z')
+    with raises(ValueError, match="of length 1, got length 2"):
+        Swap(x @ y, z)
+    with raises(ValueError, match=r"the swap \[1, 0\], got \[0, 1\]"):
+        Swap(x @ y, [0, 1])
+
+
 def test_Box_hash():
     x, y = Ty('x'), Ty('y')
     f = Box('f', x, y)
@@ -68,9 +76,9 @@ def test_Functor_keys_boxes_by_syntax():
     assert F(f >> g) == g >> f
 
 
-def test_Diagram_permutation():
+def test_Diagram_permutation(monkeypatch):
     x = Nat(1)
-    tmp, Diagram.ob = Diagram.ob, Nat
+    monkeypatch.setattr(Diagram, "ob", Nat)
     assert Diagram.swap(x, x ** 2)\
         == Diagram.swap(x, x) @ Id(x) >> Id(x) @ Diagram.swap(x, x)\
         == Diagram.permutation([1, 2, 0])\
@@ -79,7 +87,6 @@ def test_Diagram_permutation():
         Diagram.permutation([2, 0])
     with raises(ValueError):
         Diagram.permutation([2, 0, 1], x ** 2)
-    Diagram.ob = tmp
 
 
 def test_bad_permute():
