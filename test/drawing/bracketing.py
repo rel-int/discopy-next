@@ -75,7 +75,6 @@ def test_trace_operand_is_bracketed():
     assert (traced.dom, traced.cod) == (x, x)
 
 
-
 def test_whiskering_unbracketed():
     x = monoidal.Ty('x')
     f, g = (Bracketed[monoidal.Diagram](monoidal.Box(n, x, x)) for n in "fg")

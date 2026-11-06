@@ -189,7 +189,8 @@ class Bracketed[free](NamedGeneric, DaggerCategory, TracedCategory):
             return self.compound(
                 value, self.drawing.tensor(other.drawing))
         drawing = self.plain().tensor(other.plain()).relabel_nodes()
-        drawing.bracketing = self.drawing.bracketing or other.drawing.bracketing
+        drawing.bracketing = (
+            self.drawing.bracketing or other.drawing.bracketing)
         return type(self)(value, drawing)
 
     def plain(self) -> Drawing:
