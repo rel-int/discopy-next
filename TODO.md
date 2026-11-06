@@ -8,7 +8,7 @@ conflicted merges of `main` into a branch conflicted on `CHANGELOG.md` alone.
 - [x] `merge-main`: a `CHANGELOG.md` merge driver (main's file plus the branch's own lines, links
   in number order), registered by the session-start hook, and a rename check of what `main`
   removed since the branch point; replayed on the 142 historical conflicts
-- [ ] `next-checks`: every gate on the merged tree, one line per gate, ruff/ty diffed against
+- [x] `next-checks`: every gate on the merged tree, one line per gate, ruff/ty diffed against
   `main`, pylint's raw score on 3.14, failures diffed against the merge base
 - [ ] `cubic-round`: unresolved threads compactly, a round's `TODO.md`, replies and resolves
 - [ ] `checkboxes`: start, claim, done and finish of `TODO.md` boxes as one pushed commit each, finish
