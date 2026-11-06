@@ -58,6 +58,10 @@ def test_trace():
     assert g.trace(2).dom == Ty(int) == g.trace(2).cod and g.trace(2)(7) == 7
     h = Function(lambda y, x: (1, x + y), (int, int), (int, int))
     assert h.trace(left=True)(5) == 6
+    assert h.trace(left=True).dom == Ty(int) == h.trace(left=True).cod
+    with raises(AxiomError):
+        Function(lambda x, y: ("y", x), (int, int), (str, int)
+                 ).trace(left=True)
     with raises(AxiomError):
         Function(lambda x, y: (x, "y"), (int, int), (int, str)).trace()
 
