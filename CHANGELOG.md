@@ -247,6 +247,9 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   and dict functors ([next#168]); `para` and `interaction` hash ([next#31]).
 - A `Matrix` with no dtype reads it off its array without copying it, so it
   copies once, as a `Matrix[dtype]` does ([next#8]).
+- `feedback.generators` is `feedback.structural_boxes`, and
+  `feedback.wire_generators` `feedback.structural_wires`: a feedback, trace,
+  head or tail is a structural box, not a generator ([next#459]).
 
 ### Deprecated
 
@@ -1276,6 +1279,7 @@ for the changelog of `1.2.1` and earlier.
 [next#443]: https://github.com/rel-int/discopy-next/issues/443
 [next#457]: https://github.com/rel-int/discopy-next/issues/457
 [next#458]: https://github.com/rel-int/discopy-next/pull/458
+[next#459]: https://github.com/rel-int/discopy-next/pull/459
 [next#445]: https://github.com/rel-int/discopy-next/issues/445
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29

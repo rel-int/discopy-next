@@ -429,7 +429,8 @@ class DualRail(Functor):
         return super().__call__(other)
 
 
-Feedback, Trace, FollowedBy, Head, Tail = feedback.generators(Diagram, Box)
+Feedback, Trace, FollowedBy, Head, Tail = feedback.structural_boxes(
+    Diagram, Box)
 Diagram.box_factory = Box
 Diagram.functor_factory = Functor
 CMap = cmap.CMap[Diagram]
