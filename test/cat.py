@@ -352,6 +352,25 @@ def test_Transformation_then():
     assert (alpha >> beta).dom == F and (alpha >> beta).cod == G
 
 
+def test_Transformation_laws():
+    """ The identity is shared and dropped on either side, and dictionaries
+    compose into dictionaries, so the laws of a category hold up to ==. """
+    x, y = Ob('x'), Ob('y')
+    f = Box('f', x, y)
+    F, G = Functor.id(), Functor({x: y, y: x}, {})
+    alpha = Transformation({x: f, y: f[::-1]}, F, G)
+    beta = Transformation({x: f[::-1], y: f}, G, F)
+    gamma = Transformation(lambda z: f if z == x else f[::-1], F, G)
+    idF, idG = Transformation.id(F), Transformation.id(G)
+    assert idF == Transformation.id(F)
+    for delta in (alpha, gamma):
+        assert idF >> delta == delta == delta >> idG
+    assert alpha >> beta == alpha >> beta
+    assert (alpha >> beta).components == {x: f >> f[::-1], y: f[::-1] >> f}
+    assert (alpha >> beta) >> alpha == alpha >> (beta >> alpha)
+    assert gamma >> beta != gamma >> beta
+
+
 def test_Transformation_eq():
     x, y = Ob('x'), Ob('y')
     f = Box('f', x, y)

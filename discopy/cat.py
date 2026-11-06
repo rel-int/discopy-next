@@ -1303,7 +1303,9 @@ class Transformation(Category[Functor, "Transformation"]):
     Parameters:
         components :
             A mapping from objects ``x`` in the domain category to arrows
-            ``components[x] : dom(x) -> cod(x)`` in the codomain category.
+            ``components[x] : dom(x) -> cod(x)`` in the codomain category,
+            or :func:`discopy.utils.identity` for the identity, see
+            :meth:`id`.
         dom : The domain functor.
         cod : The codomain functor.
 
@@ -1351,7 +1353,8 @@ class Transformation(Category[Functor, "Transformation"]):
         cat.Box('f', cat.Ob('x'), cat.Ob('y'))
         >>> assert alpha(x).dom == F(x) and alpha(x).cod == G(x)
         """
-        component = self.components[x]
+        component = self.dom.cod.id(self.dom(x))\
+            if self.components.mapping is identity else self.components[x]
         if component.dom != self.dom(x) or component.cod != self.cod(x):
             raise utils.AxiomError(
                 f"The component at {x} must be an arrow "
@@ -1363,7 +1366,8 @@ class Transformation(Category[Functor, "Transformation"]):
         """
         The identity transformation on a given functor ``dom``, i.e. the
         transformation whose component at each object ``x`` is the
-        identity arrow on ``dom(x)``.
+        identity arrow on ``dom(x)``, with the shared
+        :func:`discopy.utils.identity` as its components.
 
         Parameters:
             dom : The functor on which to take the identity transformation.
@@ -1376,8 +1380,9 @@ class Transformation(Category[Functor, "Transformation"]):
         >>> alpha(x)
         cat.Arrow.id(cat.Ob('y'))
         >>> assert alpha(x) == F.cod.id(F(x))
+        >>> assert Transformation.id(F) == Transformation.id(F)
         """
-        return cls(lambda x: dom.cod.id(dom(x)), dom, dom)
+        return cls(identity, dom, dom)
 
     @unbiased
     def then(self, other: Transformation) -> Transformation:
@@ -1386,12 +1391,40 @@ class Transformation(Category[Functor, "Transformation"]):
 
         Parameters:
             other : The other transformation with which to compose.
+
+        Note
+        ----
+        An identity transformation, see :meth:`id`, is dropped on either side
+        so that composition is unital, and components given by a dictionary
+        compose into a dictionary over the same objects, so that composition
+        is associative. Otherwise transformations given by functions compare
+        as functions, e.g. their composition is associative only in action.
+
+        Example
+        -------
+        >>> x, y = Ob('x'), Ob('y')
+        >>> f = Box('f', x, y)
+        >>> F, G = Functor.id(), Functor({x: y, y: x}, {})
+        >>> alpha = Transformation({x: f, y: f[::-1]}, F, G)
+        >>> beta = Transformation({x: f[::-1], y: f}, G, F)
+        >>> assert (alpha >> beta).components == {
+        ...     x: f >> f[::-1], y: f[::-1] >> f}
+        >>> idF, idG = Transformation.id(F), Transformation.id(G)
+        >>> assert idF >> alpha == alpha == alpha >> idG
+        >>> assert (alpha >> beta) >> alpha == alpha >> (beta >> alpha)
         """
         assert_isinstance(other, Transformation)
         if self.cod != other.dom:
             raise utils.AxiomError(messages.NOT_COMPOSABLE.format(
                 self, other, self.cod, other.dom))
-        components = lambda x: self(x) >> other(x)
+        if self.components.mapping is identity and self == self.id(self.dom):
+            return other
+        if other.components.mapping is identity\
+                and other == other.id(other.dom):
+            return self
+        mapping = self.components.mapping
+        components = {x: self(x) >> other(x) for x in mapping}\
+            if isinstance(mapping, Mapping) else lambda x: self(x) >> other(x)
         return type(self)(components, self.dom, other.cod)
 
     def __eq__(self, other):
