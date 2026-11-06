@@ -2215,6 +2215,10 @@ class Hypergraph[category](
         became wiring, and the first consumer of a spider reads a wire out of
         one.
 
+        Raise ``AxiomError`` when a spider has one leg or more than two and
+        the category has no spiders, i.e. is neither a Markov nor a Comarkov
+        category.
+
         Example
         -------
         >>> from discopy.frobenius import Ty, Spider, Hypergraph as H

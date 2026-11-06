@@ -78,6 +78,7 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from functools import wraps
 from inspect import signature
+from operator import index
 from types import NoneType
 from typing import TYPE_CHECKING, ClassVar
 
@@ -369,7 +370,7 @@ class Nat(Testable["Nat"], Monoid["Nat"]):
     n: int = 0
 
     def __post_init__(self):
-        if self.n < 0:
+        if index(self.n) < 0:
             raise ValueError(f"Expected a natural number, got {self.n}.")
 
     def tensor(self, *others: Nat) -> Nat:

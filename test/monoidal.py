@@ -2,6 +2,8 @@
 
 import pickle
 
+import numpy as np
+
 from pytest import raises
 
 from discopy.cat import *
@@ -199,6 +201,9 @@ def test_Nat_is_natural():
     for natural in (abc.Nat, Nat):
         with raises(ValueError, match="natural number, got -1"):
             natural(-1)
+    with raises(TypeError):
+        abc.Nat(1.5)
+    assert abc.Nat(np.int64(2)) == abc.Nat(2)
 
 
 def test_Dim_is_positive():
