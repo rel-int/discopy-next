@@ -234,7 +234,7 @@ class Ty[base](NamedGeneric):
         Ty()
         Ty()
         """
-        return cls(now=x, _later=lambda: cls())
+        return cls(now=x, _later=cls)
 
     @inductive
     def delay(self) -> Ty:
@@ -451,7 +451,7 @@ callable returns or, for a constant stream, itself, which JSON cannot hold.
         Construct the stream with a given arrow now and the empty stream later.
         """
         dom, cod = map(cls.ob.singleton, (arg.dom, arg.cod))
-        return cls(arg, dom, cod, _later=lambda: cls.id())
+        return cls(arg, dom, cod, _later=cls.id)
 
     @classmethod
     def sequence(
