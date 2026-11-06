@@ -97,6 +97,12 @@ def test_to_pyzx():
     assert hash(ZXDiagram.from_pyzx(Z(0, 2).to_pyzx())) == hash(Z(0, 2))
 
 
+@mark.parametrize("dgrm", [
+    ZBox(0, 2, -1j), ZBox(2, 0), Z(1, 1, .25) >> ZBox(1, 1, 3) >> H])
+def test_from_pyzx_reads_a_z_box_with_its_label(dgrm):
+    assert ZXDiagram.from_pyzx(dgrm.to_pyzx()) == dgrm
+
+
 def test_to_pyzx_scalar():
     # Test that a scalar is translated to the corresponding pyzx object.
     k = np.exp(np.pi / 4 * 1j)

@@ -2,7 +2,7 @@
 
 cubic's review of #452 at e9fa8fa8:
 
-- [ ] **C1** discopy/optyx/core/zx.py:220 (P2): This branch emits a `Z_BOX`, but `ZXDiagram.from_pyzx` still rejects every vertex except `Z` and `X`; exporting a `ZBox` therefore makes the documented to/from conversion fail. Add `Z_BOX` decoding, including its label, or keep the exporter within the vertex types the importer supports.
+- [x] **C1** discopy/optyx/core/zx.py:220 (P2): This branch emits a `Z_BOX`, but `ZXDiagram.from_pyzx` still rejects every vertex except `Z` and `X`; exporting a `ZBox` therefore makes the documented to/from conversion fail. Add `Z_BOX` decoding, including its label, or keep the exporter within the vertex types the importer supports.
 - [ ] **C2** discopy/optyx/core/zw.py:393 (P2): `np.size` counts every axis, but the following truncation logic treats amplitudes as a one-dimensional sequence. A multidimensional accepted `np.ndarray` therefore derives an invalid spider dimension and can fail while building the diagonal; normalize amplitudes to one dimension or reject non-1D inputs before deriving this dimension.
 - [ ] **C3** test/optyx/test_channel.py:293 (P3): This assertion can pass while inflation emits extra, incorrect outcomes with nonzero probability. Assert that `actual` and `expected` have identical keys before comparing their values.
 - [ ] **C4** test/optyx/test_zx_arrays.py:54 (P3): This test does not verify that `to_pyzx()` creates a `VertexType.Z_BOX`, despite the test name. Inspect the internal vertex type as well as its tensor.

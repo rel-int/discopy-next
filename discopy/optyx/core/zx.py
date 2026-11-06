@@ -79,6 +79,9 @@ class ZXDiagram(diagram.Diagram):
         from pyzx import VertexType, EdgeType
 
         def node2box(node, n_legs_in, n_legs_out):
+            if graph.type(node) is VertexType.Z_BOX:
+                return ZBox(n_legs_in, n_legs_out,
+                            pyzx.utils.get_z_box_label(graph, node))
             if graph.type(node) not in {VertexType.Z, VertexType.X}:
                 raise NotImplementedError  # pragma: no cover
             return (
