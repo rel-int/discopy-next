@@ -292,7 +292,7 @@ You'll need [graphviz](https://graphviz.org/) installed as an external dependenc
 
 ```shell
 uv sync --group docs
-uv run sphinx-build docs docs/_build/html
+uv run sphinx-build -j auto docs docs/_build/html
 ```
 
 You do not need to build them to see what a pull request changes: the `docs`

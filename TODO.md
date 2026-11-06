@@ -3,7 +3,7 @@
 - [x] measure where the time goes: on #448's `main` run, `test` is ~7 min of pytest and ~5.5 min of notebooks, `docs` 20 min; locally the tests of 1 s or more take 418 of 573 s
 - [x] run the suite on one xdist worker per core, coverage following them with `patch = ["subprocess"]`
 - [x] run the notebooks on `main` only, and the `docs` build of a pull request without them
-- [x] build the docs in parallel
+- [x] build the docs in parallel: 13 min 47 s → 5 min 38 s locally without the notebooks
 - [x] run the property matrix on every pull request, and delete the unit tests that repeat its laws
 - [x] trim the slowest test
 - [ ] changelog entry
