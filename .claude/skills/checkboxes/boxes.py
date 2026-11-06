@@ -578,6 +578,10 @@ def cmd_done(args):
         b = todo.box(args.n)
         if b["state"] == "x":
             raise Refused(f"box {args.n} is already [x]")
+        if b["state"] == " " and not (filed or args.force):
+            raise Refused(
+                f"box {args.n} is unclaimed: claim it first, or --force"
+            )
         other = held_by_other(b, sid, args.force)
         if other:
             raise Refused(

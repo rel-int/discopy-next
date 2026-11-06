@@ -27,7 +27,7 @@ next-coordinator's `new-worktree.sh` does it) plus `--trailer LINE`; the session
 - A non-fast-forward push is undone, the remote branch merged (RULES.md 4), the step redone
   and pushed once more; any other push or commit failure is undone and reported.
 - A claim older than 12 h is stale and reclaimable; one with no date needs `--force`, as does
-  `done` on someone's fresh claim.
+  `done` on someone's fresh claim or on an unclaimed box (`--filed` needs no claim).
 - `finish` needs a new bullet under `## [Unreleased]` in HEAD's CHANGELOG.md since the merge
   base with `--base` (default `origin/main`), a definition for each ref it cites, new
   definitions in number order. `--no-changelog` (no user-facing change) only warns.
