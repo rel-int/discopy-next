@@ -173,10 +173,9 @@ def int_trace(lens_, U):
 
 def test_traced():
     assert traced().trace(0) == traced()
-    with raises(NotImplementedError):
-        traced().trace(left=True)
-    with raises(AxiomError):
-        traced().trace()
+    for left in (False, True):
+        with raises(AxiomError):
+            traced().trace(left=left)
     with raises(TypeError):
         traced() >> g
 

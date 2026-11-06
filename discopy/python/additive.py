@@ -139,11 +139,13 @@ class Function(function.Function, ComarkovCategory, TracedCategory):
 
         Parameters:
             n : The number of types to trace over.
+            left : Whether to trace the first ``n`` types instead, see
+                :meth:`discopy.abc.SymmetricCategory.left_trace`.
         """
         if n == 0:
             return self
         if left:
-            raise NotImplementedError
+            return self.left_trace(n)
         dom, cod = self.dom[:-n], self.cod[:-n]
 
         def inside(obj, tag=0):

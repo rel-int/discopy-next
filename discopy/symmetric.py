@@ -837,5 +837,7 @@ class Equation(monoidal.Equation):
 
 
 Diagram.yanking = BalancedCategory.yanking.modulo(Diagram.to_hypergraph)
+Diagram.yanking_left = BalancedCategory.yanking_left.modulo(
+    Diagram.to_hypergraph)
 Diagram.scalar_sliding = SpacialCategory.scalar_sliding.modulo(
     Diagram.to_hypergraph)

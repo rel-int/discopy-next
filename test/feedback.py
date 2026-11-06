@@ -233,18 +233,25 @@ def test_yanking():
     from discopy.testable import AxiomFailure
     from discopy.drawing import Drawing
     from discopy.python import Function, Ty as PythonTy
+    from discopy.python.additive import Function as Additive
+    from discopy.kleisli.additive import Channel
+    from discopy.kleisli.monad import Powerset
     x, y = symmetric.Ty('x'), compact.Ty('y')
-    assert symmetric.Diagram.yanking(x) and compact.Diagram.yanking(y)
-    assert compact.CMap.yanking(y)
-    yanked, identity = Function.yanking(PythonTy(int)).terms
-    assert yanked(42) == identity(42) == 42
-    assert para.Traced[Matrix[bool]].yanking(Nat(2))
-    assert lens.Traced[Matrix[bool]].yanking(lens.Ty[Nat](Nat(1), Nat(2)))
-    for planar in (Diagram, pivotal.Diagram, Drawing, PivotalCategory):
-        assert planar.yanking() is NotImplemented
-        assert "planar" in planar.yanking.__doc__
-    with raises(AxiomFailure):
-        balanced.Diagram.yanking(balanced.Ty('x'))
+    for law in ("yanking", "yanking_left"):
+        assert getattr(symmetric.Diagram, law)(x)
+        assert getattr(compact.Diagram, law)(y)
+        assert getattr(compact.CMap, law)(y)
+        for function in (Function, Additive, Channel[Powerset]):
+            yanked, identity = getattr(function, law)(PythonTy(int)).terms
+            assert yanked(42) == identity(42)
+        assert getattr(para.Traced[Matrix[bool]], law)(Nat(2))
+        assert getattr(lens.Traced[Matrix[bool]], law)(
+            lens.Ty[Nat](Nat(1), Nat(2)))
+        for planar in (Diagram, pivotal.Diagram, Drawing, PivotalCategory):
+            assert getattr(planar, law)() is NotImplemented
+            assert "planar" in getattr(planar, law).__doc__
+        with raises(AxiomFailure):
+            getattr(balanced.Diagram, law)(balanced.Ty('x'))
 
 
 def test_types_without_wires_are_their_own_delay():

@@ -597,14 +597,10 @@ def test_additive_trace_needs_an_iteration_operator():
     stateful = additive.Channel[Seed](
         lambda x, tag=0: lambda s: (Tagged(x, 0), s),
         (int, int), (int, int))
-    with raises(ValueError):
-        stateful.trace()
-
+    for left in (False, True):
+        with raises(ValueError):
+            stateful.trace(left=left)
     assert Seed.iterate is None and Maybe.iterate is not None
-    with raises(NotImplementedError):
-        additive.Channel[Maybe](
-            lambda x, tag=0: Tagged(x, 0), (int, int), (int, int)
-        ).trace(left=True)
 
 
 def test_additive_token_machine_computes_the_posterior():
