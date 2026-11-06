@@ -22,7 +22,8 @@ exit 1 on any FAIL. What the lines do not say:
   `3.14 sync failed` means another interpreter: the score may differ from CI's by ~0.02.
   `FAIL lock` means `uv.lock` is stale, which CI rejects: run `uv lock`.
 - `tests` runs each changed module's test file and doctests; it names modules with no test file.
-  A nonzero pytest exit with no `FAILED` or `ERROR` line to diff is a FAIL.
+  A nonzero pytest exit with no `FAILED` or `ERROR` line to diff is a FAIL; exit 5 (no test
+  collected) is a SKIP.
   A change to `test/plugin.py`, `test/fixtures/` or a conftest only gets a collection check:
   run `--full` (~10 min locally, the whole suite under coverage, failures diffed with base).
 - `changelog` SKIPs when no bullet was added, even if other lines changed: add one if the

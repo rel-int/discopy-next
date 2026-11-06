@@ -437,6 +437,8 @@ def gate_tests(ctx):
         return "FAIL", f"pytest exited {code}: {last_error(out)}" + tail
     if "Interrupted:" in out:
         return "FAIL", fact + "; interrupted, not every file ran" + tail
+    if code == 5:
+        return "SKIP", fact + "; pytest collected no test" + tail
     if not failed:
         return "PASS", fact + tail
     base_failed = set()
