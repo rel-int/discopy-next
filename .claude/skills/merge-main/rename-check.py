@@ -50,6 +50,9 @@ def module_of(path):
     return ".".join(parts[:-1] if parts[-1] == "__init__" else parts)
 
 
+TYPE_PARAMS = ("TypeVar", "ParamSpec", "TypeVarTuple")
+
+
 def top_names(source):
     """The names a module defines or imports at its top level."""
     try:
@@ -59,22 +62,24 @@ def top_names(source):
     names, todo = set(), list(tree.body)
     while todo:
         node = todo.pop()
-        if isinstance(node, (ast.If, ast.Try)):
-            todo.extend(node.body + node.orelse + getattr(
-                node, "finalbody", []) + [n for h in getattr(
-                    node, "handlers", []) for n in h.body])
-        elif isinstance(node, (ast.ClassDef, ast.FunctionDef,
-                               ast.AsyncFunctionDef)):
+        if isinstance(node, (ast.ClassDef, ast.FunctionDef,
+                             ast.AsyncFunctionDef)):
             names.add(node.name)
         elif isinstance(node, (ast.Import, ast.ImportFrom)):
             names.update((a.asname or a.name).split(".")[0]
                          for a in node.names)
-        elif isinstance(node, (ast.Assign, ast.AnnAssign, ast.AugAssign)):
-            targets = node.targets if isinstance(node, ast.Assign) \
-                else [node.target]
-            for target in targets:
-                names.update(n.id for n in ast.walk(target)
-                             if isinstance(n, ast.Name))
+        elif isinstance(node, ast.Name) and isinstance(node.ctx, ast.Store):
+            names.add(node.id)
+        elif type(node).__name__ in TYPE_PARAMS:
+            continue
+        elif isinstance(node, ast.ExceptHandler):
+            todo.extend(node.body)
+        elif not isinstance(node, (ast.Lambda, ast.ListComp, ast.SetComp,
+                                   ast.DictComp, ast.GeneratorExp)):
+            names.update(n for n in (getattr(node, "name", None),
+                                     getattr(node, "rest", None))
+                         if isinstance(n, str))
+            todo.extend(ast.iter_child_nodes(node))
     return {name for name in names if not name.startswith("__")}
 
 
