@@ -50,6 +50,11 @@ legs = [legs for legs in itertools.product(range(3), repeat=2) if any(legs)]
 @pytest.mark.parametrize("legs", legs)
 @pytest.mark.parametrize("amplitude", amplitudes)
 def test_ZBox_is_a_pyzx_z_box(legs, amplitude):
+    from pyzx import VertexType
     box = ZBox(*legs, amplitude)
+    graph = box.to_pyzx()
+    boundary = graph.inputs() + graph.outputs()
+    assert [graph.type(v) for v in graph.vertices() if v not in boundary] \
+        == [VertexType.Z_BOX]
     assert np.allclose(box.to_tensor().eval().array.flatten(),
-                       box.to_pyzx().to_tensor().flatten())
+                       graph.to_tensor().flatten())
