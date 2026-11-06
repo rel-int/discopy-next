@@ -205,11 +205,12 @@ def held_by_other(b, sid, force):
 
 
 def read_todo(required=True):
-    if not os.path.exists(TODO):
+    dirty = git("status", "--porcelain", "--", TODO).stdout.strip()
+    if not os.path.exists(TODO) and not dirty:
         if required:
             raise Refused("no TODO.md here: start one with `boxes.py start`")
         return None
-    if git("status", "--porcelain", "--", TODO).stdout.strip():
+    if dirty:
         raise Refused(
             "TODO.md has uncommitted changes: commit or restore them first"
         )
@@ -488,7 +489,7 @@ def cmd_start(args):
     lines = source.splitlines(keepends=True)
     first = next(
         (i for i, line in enumerate(lines) if BOX.match(line)), len(lines)
-    )
+    ) if args.from_file else len(lines)
     prompt = "".join(lines[:first])
     file_boxes = [line for line in lines[first:] if line.strip()]
     parsed = Todo("".join(file_boxes))
