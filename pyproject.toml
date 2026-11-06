@@ -254,6 +254,9 @@ norecursedirs = [
     "test/fixtures",
 ]
 addopts = "--doctest-modules --ignore=test/fixtures -p plugin --import-mode=importlib"
+markers = [
+    "slow: takes four seconds or more; CI runs it on main, not on a pull request",
+]
 
 [tool.coverage.run]
 # sys.monitoring, the default from Python 3.14 on, measures the same lines

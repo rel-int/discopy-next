@@ -69,10 +69,11 @@ jobs:
         uv run ty check --exit-zero-on-warning
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 20   # backstop: the suite takes ~4 min on four workers, the notebooks ~6 more on main
+    timeout-minutes: 20   # backstop: a pull request takes ~3 min, main ~6 for the slow tests and the notebooks ~6 more
     strategy:
       matrix:
-        python-version: [ "3.12", "3.13", "3.14" ]
+        # A pull request tests the version CI lints on; main tests every one.
+        python-version: ${{ fromJSON(github.event_name == 'pull_request' && '["3.14"]' || '["3.12", "3.13", "3.14"]') }}
     steps:
     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       with:
@@ -83,9 +84,12 @@ jobs:
         groups: dev all
         graphviz: 'true'
     - name: Test
+      env:
+        # A pull request leaves the tests marked slow to main.
+        MARKS: ${{ github.event_name == 'pull_request' && 'not slow' || '' }}
       run:
         # One worker per core; coverage follows them with `patch = subprocess`.
-        uv run coverage run -m pytest -n auto --dist worksteal
+        uv run coverage run -m pytest -n auto --dist worksteal -m "$MARKS"
     - name: Coverage
       run: |
         uv run coverage combine

@@ -7,4 +7,11 @@
 - [x] run the property matrix on every pull request, and delete the unit tests that repeat its laws
 - [x] trim the slowest test
 - [x] changelog entry
+- [x] CI on the PR: build wall 21 → 7 min, test 3.13 still 7:16, docs 7:01, lint 6:01
+
+> yes go with all three suggestions
+
+- [x] a pull request tests on 3.14 only, `main` on 3.12, 3.13 and 3.14
+- [x] pylint in parallel: not taken, `--jobs=4` scores 9.319 against serial 9.348 on the same tree (14 false `inconsistent-mro`), under #456's 9.33
+- [x] the 26 tests of 4 s or more marked `slow`, run on `main` only: the rest takes 1:58 locally, coverage 98.187%
 - [ ] CI under 5 min on the pull request

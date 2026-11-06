@@ -1001,8 +1001,9 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 - Coverage's 98% gate reads `discopy/` alone, new tests bring `ehypergraph` to
   100%, and pytest imports by path, so `test/abc.py` is collected ([next#31]).
 - CI runs the suite on one worker per core and the docs on every core, the
-  notebooks on `main` only and the property matrix on every pull request,
-  whose laws the unit tests stop repeating ([next#460]).
+  notebooks, the tests marked `slow` and Python 3.12 and 3.13 on `main` only,
+  and the property matrix on every pull request, whose laws the unit tests
+  stop repeating ([next#460]).
 - `ruff check` and `ty check` lint beside `pylint`, each failing on every rule
   `main` passes, the rules it breaks listed in `pyproject.toml` ([next#263]),
   and `E714` and `RUF022` leave that list ([next#438]).

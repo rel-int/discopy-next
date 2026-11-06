@@ -137,6 +137,7 @@ def test_trajectory_photon_numbers():
     assert photons == list(injected - detected)
 
 
+@pytest.mark.slow
 def test_occupation_matches_mean_loop_photons():
     unitary = unitary_group.rvs(3, random_state=5)
     network = Interferometer(unitary, 2, (1, ), .7)
@@ -586,6 +587,7 @@ def test_swaps_and_their_wires_are_one_permutation():
             if isinstance(box, Permutation)] == [[0, 2, 1], [1, 0, 2]]
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize("diagram, ticks", [
     (feedforward, 2), (qubit_loop, 3), (adder, 2), (internal_states, 2),
     (kerr, 2), (lossy_diagram, 2), (coalesced, 2)])
@@ -703,6 +705,7 @@ def test_twomodes_and_turn_match_numpy():
     (2, (0, 1, 1), 1., 1., 1),
     (2, (1, ), .9, .6, 2),
 ])
+@pytest.mark.slow
 def test_kernel_distribution_matches_numpy(
         loop, inputs, transmissivity, efficiency, ticks):
     unitary = unitary_group.rvs(loop + len(inputs), random_state=loop + ticks)
@@ -714,6 +717,7 @@ def test_kernel_distribution_matches_numpy(
                   in kernel.distribution(ticks).items()}, exact)
 
 
+@pytest.mark.slow
 @requires_jax
 def test_kernel_gradients_match_finite_differences():
     from jax import numpy as jnp
@@ -744,6 +748,7 @@ def test_kernel_gradients_match_finite_differences():
                           atol=1e-6)
 
 
+@pytest.mark.slow
 @requires_jax
 def test_kernel_samples_partially_distinguishable_photons():
     from collections import Counter
@@ -762,6 +767,7 @@ def test_kernel_samples_partially_distinguishable_photons():
         assert abs(counts[history] - reference[history]) / 1000 < .04
 
 
+@pytest.mark.slow
 @requires_jax
 def test_kernel_of_a_diagram_and_its_errors():
     kernel = Interferometer.from_diagram(lossy_diagram()).kernel()
@@ -777,6 +783,7 @@ def test_kernel_of_a_diagram_and_its_errors():
                        ).kernel().distribution(1)
 
 
+@pytest.mark.slow
 @requires_jax
 def test_kernel_at_the_endpoints_of_its_parameters():
     from jax import numpy as jnp
