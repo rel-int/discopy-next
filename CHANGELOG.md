@@ -659,6 +659,65 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   own axioms write a scalar: the list branch was missing that index, and a
   legless box carrying more than one amplitude raised on the reshape
   ([next#421]).
+- `Hypergraph.to_graph` attaches each input and output to the spider it is
+  wired to, so `==` sees where an adjoint boundary attaches
+  (`f @ g @ Cap(x, x.r)` no longer equals `g @ f @ Cap(x, x.r)` as compact
+  hypergraphs), `hash` no longer raises `KeyError` and
+  `from_graph(to_graph(h))` gains no spider ([next#445]).
+- Equal hypergraphs hash equal when their boxes are equal but print
+  differently (`data=1` and `data=1.0`): the fast path of
+  `Hypergraph.__hash__` hashes the boxes, not their `repr`, so a box with
+  unhashable data makes its hypergraph unhashable, as it does its diagram
+  ([next#445]).
+- `frobenius.Diagram.unfuse` unfuses the spiders a `Cospan` holds, so
+  `(Spider(1, 4, x) @ y).unfuse()` and `Diagram.spiders(1, 4, x @ y).unfuse()`
+  have no point with more than three legs, as upstream ([next#445]).
+- `Hypergraph.from_callable` restores its category's own `__call__` and no
+  longer deletes it, so `Hypergraph[python.Function].from_callable` leaves
+  `Function` callable and a `from_callable` nested in another works
+  ([next#445]).
+- `Hypergraph.__repr__` writes `offsets` when any is set, as `to_tree` does,
+  so a planar hypergraph read back from its repr decodes without swaps
+  ([next#445]).
+- `Hypergraph.tensor` shifts each factor's offsets past the codomains of the
+  factors before it, so `x @ s.to_hypergraph()` decodes in a category without
+  swaps, like `(x @ s).to_hypergraph()` ([next#445]).
+- `Hypergraph.permutation` moves each type of a list of compound types as a
+  block, as `symmetric.Diagram.permutation` does, instead of raising or
+  wiring it as if each type were one wire ([next#445]).
+- `Hypergraph.simplify` tries each pair of boxes once, not every ordered
+  pair, and its docstring gives its real cost, cubic per pass, instead of
+  quadratic ([next#445]).
+- A legacy pickled `frobenius.Spider` loads with its legs in the right order
+  in its name and with its `typ` set, so its `repr` no longer raises
+  ([next#445]).
+- The docstring of `Hypergraph.is_monogamous` counts the wires correctly and
+  says what each spider must satisfy ([next#445]).
+- `Hypergraph` spiders with no port can take labels of any type: two of them
+  with incomparable labels, e.g. `'a'` and `0`, no longer raise `TypeError`
+  ([next#445]).
+- `CMap.copy`, `merge`, `discard`, `noise` and `spiders` are the maps of the
+  host category's own: `copy(x, 1)` is the identity, a composite type gets
+  one box per atomic object, and Markov maps no longer gain identity boxes
+  over round trips ([next#445]).
+- `CMap.match` sends a pattern's straight wires only to the wires
+  `CMap.beside` its image, so matching a box with a few wires beside it no
+  longer takes time exponential in their number (about 35 s down to 0.2 s at
+  five wires), with the same matches ([next#445]).
+- A cup on two outputs of a state, e.g.
+  `Box('s', Ty(), x @ x.r) >> Cup(x, x.r)`, decodes from its `CMap` with no
+  swap ([next#445]).
+- `group.Cyclic`, `Symmetric`, `Product` and `Wreath` compute each action
+  once and return the same `Action` every time, so a wreath whose top is
+  itself a wreath costs about as much as its factors (one multiply at nesting
+  4 went from about 1 s to 0.3 ms) ([next#445]).
+- `CMap.eval` on a map with no boxes (an identity, cup, cap or loop) uses its
+  category's dtype, e.g. `tensor.Diagram[complex]`, instead of falling back
+  to float, so it agrees with `Diagram.eval` ([next#445]).
+- In rigid and pivotal maps, a cup wired between two outputs of one box reads
+  them left to right, as `Hypergraph` does: rigid accepts the map of a cup on
+  a box onto `x @ x.r` and refuses one onto `x.r @ x`, and pivotal decodes
+  both ([next#445]).
 
 ### Project
 
@@ -955,6 +1014,7 @@ for the changelog of `1.2.1` and earlier.
 [next#426]: https://github.com/rel-int/discopy-next/issues/426
 [next#411]: https://github.com/rel-int/discopy-next/pull/411
 [next#438]: https://github.com/rel-int/discopy-next/issues/438
+[next#445]: https://github.com/rel-int/discopy-next/issues/445
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#56]: https://github.com/rel-int/optyx/pull/56
