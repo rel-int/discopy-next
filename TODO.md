@@ -10,8 +10,8 @@ decide nothing and are taken here; the third,
 waits on the 🚀 of
 [the comment on #443](https://github.com/rel-int/discopy-next/issues/443#issuecomment-6650397574).
 
-- [ ] `discopy/stream.py` `Ty.singleton`: `_later=lambda: cls()` → `_later=cls`
-- [ ] `discopy/stream.py` `Stream.singleton`: `_later=lambda: cls.id()` → `_later=cls.id`
-- [ ] `CHANGELOG.md` entry under `Project`
-- [ ] `ruff check discopy` at 0.16.9 passes, pinned `ruff`, `pflake8`, `pylint` and `ty` still pass
-- [ ] `pytest test/stream.py test/python/ discopy/stream.py discopy/python/ --skip-extra` green
+- [x] `discopy/stream.py` `Ty.singleton`: `_later=lambda: cls()` → `_later=cls`
+- [x] `discopy/stream.py` `Stream.singleton`: `_later=lambda: cls.id()` → `_later=cls.id`
+- [x] `CHANGELOG.md` entry under `Project`
+- [x] `ruff check discopy` at 0.16.9 passes, pinned `ruff`, `pflake8`, `pylint` and `ty` still pass
+- [x] `pytest test/stream.py test/python/ discopy/stream.py discopy/python/ --skip-extra` green
