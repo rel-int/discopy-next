@@ -119,6 +119,9 @@ jobs:
       env:
         # A pull request links to each notebook instead of running it.
         DISCOPY_SKIP_NOTEBOOKS: ${{ github.event_name == 'pull_request' && '1' || '' }}
+        # The link pages point at this repository at the commit being built.
+        READTHEDOCS_GIT_CLONE_URL: ${{ github.server_url }}/${{ github.repository }}
+        READTHEDOCS_GIT_COMMIT_HASH: ${{ github.event.pull_request.head.sha || github.sha }}
       run: |
         uv run sphinx-build -j auto docs docs/_build/html
     - name: Upload

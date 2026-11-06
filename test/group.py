@@ -55,6 +55,7 @@ def test_sample(G):
 
 @mark.parametrize("G", (
     Cyclic[1], Symmetric[0], Symmetric[1],
+    Wreath[Cyclic[2], Symmetric[3]],
     Wreath[Product[Cyclic[2], Cyclic[2]], Cyclic[2]]))
 def test_axioms(G):
     """ The groups of :data:`GROUPS` that the property matrix does not enrol:

@@ -75,9 +75,9 @@ uv run coverage report -m
 per core, as CI does, and `patch = ["subprocess"]` in `pyproject.toml` lets coverage follow
 the workers, so `coverage combine` merges their data before the report; drop `-n auto` to
 debug a test serially. A test that takes four seconds or more is marked `slow`, and a pull
-request runs `-m "not slow"`: CI runs the slow tests on `main`, with the notebooks and Python
-3.12 and 3.13, a pull request being tested on 3.14 alone. A law of a category that the property matrix enrols is checked there,
-on every pull request: a unit test does not repeat it.
+request runs `-m "not slow"`. CI runs the slow tests, the notebooks and Python 3.12 and 3.13
+on `main`; a pull request is tested on 3.14 alone. The property matrix checks the laws of every
+category it enrols on every pull request, so a unit test does not repeat them.
 
 Without the extras installed, run `uv run pytest --skip-extra` to skip what needs them.
 A test that needs an extra says so with `pytest.importorskip`. A doctest that needs one marks
