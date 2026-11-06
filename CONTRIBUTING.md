@@ -161,13 +161,17 @@ runs under `--hypothesis-seed=0` so that it draws the same examples every
 time (the profile does not fix the seed itself: pass the flag locally too,
 and the database it replays still differs from CI's), and `explore` for
 the large one `main` and the nightly run search with. A fourth, `shared`,
-is `dev` reading the example database that discopy/discopy's CI uploads as
-a workflow artifact, through a `GITHUB_TOKEN`, so a failure found on
-upstream's CI replays on your machine before any search; it reaches GitHub
-only when selected, and does not read this repo's own CI artifact.
+is `dev` reading the example database that the CI of the repository named
+by `HYPOTHESIS_GITHUB_REPOSITORY` uploads as a workflow artifact, through a
+`GITHUB_TOKEN`, so a failure found on that CI replays on your machine before
+any search; it reaches GitHub only when selected. The variable defaults to
+`discopy/discopy`; this repo's CI sets it to `rel-int/discopy-next`, and a
+local run sets it the same way to replay what this repo's CI found:
 
 ```shell
 HYPOTHESIS_PROFILE=explore uv run pytest proptest/ -n auto -p no:benchmark
+HYPOTHESIS_PROFILE=shared HYPOTHESIS_GITHUB_REPOSITORY=rel-int/discopy-next \
+    uv run pytest proptest/
 ```
 
 `Axiom.falsify` searches for a shrunk counterexample to a law on demand,
