@@ -16,5 +16,5 @@
 >             pathlib.Path(temporary).unlink(missing_ok=True)
 > ```
 
-- [ ] .claude/skills/next-checks/checks.py:138 `venv()` calls the fallback `.venv/bin/python` without handling a missing file.
+- [WIP] @session_01MEJxy43kWBLATXt6UT6mUn-2026-11-06 14:14 .claude/skills/next-checks/checks.py:138 `venv()` calls the fallback `.venv/bin/python` without handling a missing file.
 - [ ] .claude/skills/next-checks/checks.py:199 Write cache entries atomically; a partial write can make every subsequent run fail with an uncaught `JSONDeco…
