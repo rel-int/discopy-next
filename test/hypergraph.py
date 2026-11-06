@@ -19,6 +19,14 @@ def test_Hypergraph_init():
         H(x, y, (), ((0,), (), (0,)))
 
 
+def test_Hypergraph_scalar_spiders_take_labels_of_any_type():
+    x, y = map(Ty, "xy")
+    graph = H(Ty(), Ty(), (), ((), (), ()), {'a': x, 0: y})
+    assert graph.spider_types == (x, y)
+    assert graph == H.spiders(0, 0, x @ y)
+    assert H(Ty(), Ty(), (), ((), (), ()), {object(): x, object(): y})
+
+
 def test_Hypergraph_str():
     x, y = map(Ty, "xy")
     assert str(H.swap(x, y)) == "Swap(x, y)"
@@ -36,9 +44,27 @@ def test_Hypergraph_repr():
     assert eval(repr(graph)) == graph
 
 
+def test_Hypergraph_repr_keeps_the_offsets():
+    from discopy import hypergraph, monoidal
+    x, y = monoidal.Ty('x'), monoidal.Ty('y')
+    s = monoidal.Box('s', monoidal.Ty(), y)
+    graph = (x @ s).to_hypergraph()
+    loaded = eval(repr(graph), dict(hypergraph=hypergraph, monoidal=monoidal))
+    assert loaded.offsets == graph.offsets == (1, )
+    assert loaded.to_diagram() == x @ s
+
+
 def test_Hypergraph_hash():
     x, y = map(Ty, "xy")
     assert hash(H.id(x @ y)) == hash(H.id(x) @ H.id(y))
+
+
+def test_Hypergraph_hash_agrees_with_the_equality_of_boxes():
+    x = Ty('x')
+    left = Box('f', x, x, data=1).to_hypergraph()
+    right = Box('f', x, x, data=1.0).to_hypergraph()
+    assert left.is_fast_eligible and left == right
+    assert hash(left) == hash(right)
 
 
 def test_Hypergraph_eq_sees_the_type_of_a_scalar_spider():
@@ -52,6 +78,17 @@ def test_Hypergraph_eq_sees_the_type_of_a_scalar_spider():
     assert not Equation(Spider(0, 0, x) @ f, Spider(0, 0, y) @ f)
 
 
+def test_Hypergraph_to_graph_attaches_an_adjoint_boundary_to_its_spider():
+    from discopy import compact
+    x = compact.Ty('x')
+    f, g = compact.Box('f', x.r, x.r), compact.Box('g', x.r, x.r)
+    cap = compact.Cap(x, x.r)
+    assert (f @ g @ cap).to_hypergraph() != (g @ f @ cap).to_hypergraph()
+    cup = compact.Cup(x.r, x).to_hypergraph()
+    assert hash(cup) == hash(compact.Cup(x.r, x).to_hypergraph())
+    assert type(cup).from_graph(cup.to_graph()) == cup
+
+
 def test_Hypergraph_then():
     x, y = map(Ty, "xy")
     with raises(AxiomError, match="Expected y, got x"):
@@ -61,6 +98,24 @@ def test_Hypergraph_then():
 def test_Hypergraph_tensor():
     Id = H.id
     assert Id().tensor(Id(), Id()) == Id().tensor() == Id()
+
+
+def test_Hypergraph_tensor_shifts_the_offsets():
+    from discopy import monoidal
+    x, y = monoidal.Ty('x'), monoidal.Ty('y')
+    f, s = monoidal.Box('f', x, y), monoidal.Box('s', monoidal.Ty(), y)
+    graph = f.to_hypergraph() @ (x @ s).to_hypergraph()
+    assert graph.offsets == (f @ x @ s).to_hypergraph().offsets == (None, 2)
+    assert graph.to_diagram() == (f @ x @ s).foliation()
+    assert (x @ s.to_hypergraph()).to_diagram() == x @ s
+
+
+def test_Hypergraph_permutation_moves_each_type_as_a_block():
+    x, y, z = map(Ty, "xyz")
+    for xs, doms in [([1, 0], [x @ y, z]), ([1, 0], [x @ x, Ty()]),
+                     ([0, 2, 1], [x @ x, x, Ty()])]:
+        assert H.permutation(xs, doms)\
+            == Diagram.permutation(xs, doms).to_hypergraph()
 
 
 def test_Hypergraph_getitem():
@@ -287,12 +342,14 @@ def test_Hypergraph_eq_fast_path_trace():
     fast canonical-form path rather than falling back to VF2. """
     x, y, z = map(Ty, "xyz")
     g = Box('g', x @ z, y @ z).to_hypergraph()
-    trace = g.trace()
+    h = Box('h', y @ z, x @ z).to_hypergraph()
+    trace = (g >> h).trace()
 
     assert trace.is_acyclic is False
     assert trace.is_fast_eligible
 
-    shuffled = trace.interchange(0, min(1, len(trace.boxes) - 1))
+    shuffled = trace.interchange(0, 1)
+    assert shuffled.boxes != trace.boxes
     assert trace == shuffled
     assert hash(trace) == hash(shuffled)
 
@@ -300,14 +357,13 @@ def test_Hypergraph_eq_fast_path_trace():
 def test_Hypergraph_eq_fallback_scalars_and_empty_boundary():
     """ Hypergraphs that are not boundary-connected (scalars, closed
     diagrams) must still compare correctly via the VF2 fallback. """
-    scalar_a = Box('s', Ty(), Ty()).to_hypergraph()
-    scalar_b = Box('s', Ty(), Ty()).to_hypergraph()
-    assert not (scalar_a @ scalar_b).is_fast_eligible
-    assert scalar_a @ scalar_b == scalar_b @ scalar_a
+    s, t, u = (Box(name, Ty(), Ty()).to_hypergraph() for name in "stu")
+    assert not (s @ t).is_fast_eligible
+    assert s @ t == t @ s and s @ t != s @ u
 
     x = Ty('x')
-    f = Box('f', x, x).to_hypergraph()
-    assert f.trace() == f.trace()
+    f, g = (Box(name, x, x).to_hypergraph() for name in "fg")
+    assert f.trace() == f.trace() and f.trace() != g.trace()
 
 
 def test_Hypergraph_simplify_two_wires():
@@ -318,6 +374,21 @@ def test_Hypergraph_simplify_two_wires():
 
     assert interchanged.to_diagram().size > (f >> g).to_diagram().size
     assert interchanged.simplify().to_diagram() == (f >> g).to_diagram()
+
+
+def test_Hypergraph_simplify_tries_each_pair_of_boxes_once(monkeypatch):
+    from itertools import combinations
+    x = Ty('x')
+    chain = H.id(x).then(*(
+        Box(f'f{i}', x, x).to_hypergraph() for i in range(4)))
+    pairs, interchange = [], H.interchange
+
+    def recorded(self, i, j):
+        pairs.append((i, j))
+        return interchange(self, i, j)
+    monkeypatch.setattr(H, "interchange", recorded)
+    assert chain.simplify() == chain
+    assert pairs == list(combinations(range(4), 2))
 
 
 def test_simplify():
@@ -406,6 +477,20 @@ def test_Hypergraph_from_glued():
     x = Ty('x')
     f, g = Box('f', x, x).to_hypergraph(), Box('g', x, x).to_hypergraph()
     assert H.from_glued(x, x, [(f, 0), (g, 0)]) == f >> g
+
+
+def test_Hypergraph_from_callable_restores_the_call_of_its_category():
+    from discopy.python import Function, Ty as T
+    add = Function(lambda x, y: x + y, (int, int), int)
+    graph = Hypergraph[Function].from_callable(T(int, int), T(int))(add)
+    assert add(2, 3) == graph(2, 3) == 5
+    x = Ty('x')
+    f = Box('f', x, x)
+
+    def outer(wire):
+        H.from_callable(x, x)(f)
+        return f(wire)
+    assert H.from_callable(x, x)(outer) == f.to_hypergraph()
 
 
 def test_Hypergraph_from_diagram_closed_loop():

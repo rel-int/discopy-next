@@ -776,7 +776,8 @@ class Diagram[dtype](NamedGeneric, frobenius.Diagram):
         Tensor[float]([0. , 0.5], dom=Dim(1), cod=Dim(2))
         """
         category = self.category if isinstance(self, cmap.CMap) else self.ar
-        dtype = dtype or getattr(self, "dtype", None)
+        dtype = dtype or getattr(self, "dtype", None)\
+            or getattr(category, "dtype", None)
         boxes = list(self.boxes) if dtype is None else []
         for box in boxes:
             inside = box.terms if isinstance(box, Sum)\

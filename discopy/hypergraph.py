@@ -85,7 +85,7 @@ from discopy.abc import (
     MonoidalCategory, NamedGeneric, RigidCategory, SymmetricCategory,
     TracedCategory)
 from discopy.drawing import Node, backend
-from discopy.python.finset import Permutation
+from discopy.python.finset import Function, Permutation
 from discopy.utils import (
     factory_name,
     from_tree,
@@ -146,7 +146,8 @@ are the boundary wires of each side.
 def relabeling(flat_wires: Sequence, spiders: Iterable) -> dict:
     """
     The label a hypergraph gives each spider: the connected ones in the
-    order they first occur in its flattened wires, then the others in order.
+    order they first occur in its flattened wires, then the others sorted, or
+    in the order listed when their labels do not compare.
 
     Parameters:
         flat_wires : The spider on each port, in the order of the ports.
@@ -154,10 +155,18 @@ def relabeling(flat_wires: Sequence, spiders: Iterable) -> dict:
 
     >>> relabeling(("b", "a", "b"), ["a", "b", "c"])
     {'b': 0, 'a': 1, 'c': 2}
+    >>> relabeling((), ["a", 0])
+    {'a': 0, 0: 1}
     """
-    connected = list(dict.fromkeys(flat_wires))
-    labels = connected + sorted(set(spiders) - set(connected))
-    return {spider: label for label, spider in enumerate(labels)}
+    connected = dict.fromkeys(flat_wires)
+    others = [spider for spider in dict.fromkeys(spiders)
+              if spider not in connected]
+    try:
+        others = sorted(others)
+    except TypeError:
+        pass
+    return {spider: label for label, spider in enumerate([
+        *connected, *others])}
 
 
 def assert_transparent(diagram: "Diagram") -> None:
@@ -490,7 +499,8 @@ class Hypergraph[category](
     def tensor(self, *others: "Hypergraph"):
         """
         Tensor of ``n`` hypergraph diagrams, i.e. their disjoint union,
-        with the spiders of every factor relabeled apart.
+        with the spiders of every factor relabeled apart and its offsets
+        shifted past the codomains of the factors before it.
 
         >>> from discopy.frobenius import Ty, Box, Hypergraph as H
         >>> x = Ty('x')
@@ -507,7 +517,8 @@ class Hypergraph[category](
         dom_wires, box_wires, cod_wires = [], [], []
         for factor in (self, ) + others:
             boxes += factor.boxes
-            offsets += factor.offsets
+            offsets += [None if offset is None else len(cod_wires) + offset
+                        for offset in factor.offsets]
             spiders += factor.spider_types
             dom_wires += shifted(factor.dom_wires, shift)
             cod_wires += shifted(factor.cod_wires, shift)
@@ -610,7 +621,7 @@ class Hypergraph[category](
 
         Parameters:
             xs : A list of integers representing a permutation.
-            dom : A list of types of the same length as ``xs``.
+            doms : A list of types of the same length as ``xs``.
         """
         xs = Permutation(xs, len(doms))
         dom = cls.ob.tensor(*doms) if doms else\
@@ -619,7 +630,8 @@ class Hypergraph[category](
             return cls.id(dom)
         cod = cls.ob.tensor(*(doms[i] for i in xs)) if dom else cls.ob.unit()
         boxes = ()
-        dom_wires, cod_wires = tuple(range(len(dom))), tuple(xs)
+        dom_wires = tuple(range(len(dom)))
+        cod_wires = tuple(Function.permutation(xs, [len(typ) for typ in doms]))
         return cls(dom, cod, boxes, (dom_wires, (), cod_wires))
 
     @classmethod
@@ -850,7 +862,9 @@ class Hypergraph[category](
     def simplify(self) -> "Hypergraph":
         """
         Simplify by applying interchangers eagerly until the length of the
-        diagram is minimal, takes quadratic time.
+        diagram is minimal: each pass decodes the interchange of every pair of
+        boxes, i.e. it takes cubic time, and starts again after each one that
+        shortens the diagram.
 
         Example
         -------
@@ -863,7 +877,7 @@ class Hypergraph[category](
 
         size = self.to_diagram().size
         for i in range(len(self.boxes)):
-            for j in range(len(self.boxes)):
+            for j in range(i + 1, len(self.boxes)):
                 result = self.interchange(i, j)
                 if result.to_diagram().size < size:
                     return result.simplify()
@@ -1491,7 +1505,7 @@ class Hypergraph[category](
         if self.is_fast_eligible:
             return hash((
                 self.dom, self.cod, len(self.boxes), self.n_spiders,
-                tuple(sorted(repr(box) for box in self.boxes)),
+                tuple(sorted(map(hash, self.boxes))),
                 tuple(sorted(map(repr, self.spider_types)))))
         return hash((self.dom, self.cod, weisfeiler_lehman_graph_hash(
             self.to_graph(), node_attr="box"),
@@ -1673,10 +1687,12 @@ class Hypergraph[category](
         """
         spider_types = f", spider_types={self.spider_types!r}"\
             if self.scalar_spiders else ""
+        offsets = f", offsets={self.offsets!r}" if any(
+            offset is not None for offset in self.offsets) else ""
         return factory_name(type(self))\
             + f"(dom={repr(self.dom)}, cod={repr(self.cod)}, " \
               f"boxes={repr(self.boxes)}, " \
-              f"wires={repr(self.wires)}{spider_types})"
+              f"wires={repr(self.wires)}{spider_types}{offsets})"
 
     def to_tree(self) -> dict:
         """
@@ -1843,12 +1859,14 @@ class Hypergraph[category](
     @property
     def is_monogamous(self) -> bool:
         """
-        Checks monogamy, i.e. each input connects to exactly one output,
-        formally whether :code:`self.wires` induces a bijection::
+        Checks monogamy, i.e. each spider that is not a scalar has exactly one
+        input wire, from the domain or the output of a box, and exactly one
+        output wire, to the input of a box or the codomain. Counting the wires
+        on each side, it follows that::
 
-            len(self.dom) + sum(len(box.dom) for box in boxes)
+            len(self.dom) + sum(len(box.cod) for box in self.boxes)
             == self.n_spiders - len(self.scalar_spiders)
-            == sum(len(box.cod) for box in boxes) + len(self.dom)
+            == sum(len(box.dom) for box in self.boxes) + len(self.cod)
 
         In that case, the diagram actually lives in a traced category.
 
@@ -1861,6 +1879,11 @@ class Hypergraph[category](
 
         >>> assert f.is_monogamous
         >>> assert (f >> f[::-1]).is_monogamous
+
+        >>> g = Box('g', x, x @ y).to_hypergraph()
+        >>> inputs = len(g.dom) + sum(len(box.cod) for box in g.boxes)
+        >>> outputs = sum(len(box.dom) for box in g.boxes) + len(g.cod)
+        >>> assert g.is_monogamous and inputs == g.n_spiders == outputs
 
         >>> assert H.spiders(0, 0, x).is_monogamous
 
@@ -3169,11 +3192,15 @@ class Hypergraph[category](
                 input_spider = Node("spider", obj=obj, i=i)
                 spider_nodes.append(input_spider)
                 graph.add_edge(input_node, input_spider)
+            previous = vars(cls.category).get("__call__")
             cls.category.__call__ = apply
             try:
                 outputs = tuplify(func(*spider_nodes))
             finally:
-                del cls.category.__call__
+                if previous is None:
+                    del cls.category.__call__
+                else:
+                    cls.category.__call__ = previous
             for i, spider in enumerate(outputs):
                 assert_isinstance(spider, Node)
                 node = Node("output", obj=spider.obj, i=i)
@@ -3235,7 +3262,8 @@ class Hypergraph[category](
             (Node("input", i=i, obj=obj), {"i": i, "box": None})
             for i, obj in enumerate(self.dom))
         graph.add_edges_from(
-            (Node("input", i=i, obj=obj), Node("spider", i=j, obj=obj))
+            (Node("input", i=i, obj=obj),
+             Node("spider", i=j, obj=self.spider_types[j]))
             for i, (j, obj) in enumerate(
                 zip(self.dom_wires, self.dom)))
         for i, (box, (dom_wires, cod_wires)) in enumerate(
@@ -3258,7 +3286,8 @@ class Hypergraph[category](
             (Node("output", i=i, obj=obj), {"i": i, "box": None})
             for i, obj in enumerate(self.cod))
         graph.add_edges_from(
-            (Node("spider", i=j, obj=obj), Node("output", i=i, obj=obj))
+            (Node("spider", i=j, obj=self.spider_types[j]),
+             Node("output", i=i, obj=obj))
             for i, (j, obj) in enumerate(zip(self.cod_wires, self.cod)))
         return graph
 
