@@ -7,13 +7,13 @@ marimo-version: 0.24.0
 import marimo as mo
 ```
 
-## Teleportation using Fusion measurements and feed-forward
+# Teleportation using fusion measurements and feed-forward
 
 In this notebook, we are going to implement a teleportation protocol using a fusion measurement implementing a Bell-basis measurement in the dual rail encoding.
 
 This will showcase how to use the classical control and controlled gates to implement a feed-forward protocol.
 <!---->
-### Building blocks
+## Building blocks
 <!---->
 We would like to implement quantum teleportation. In ZX-calculus, we have:
 
@@ -28,7 +28,7 @@ Therefore, we need:
 - a correction of a Pauli error based on the classical protocol
 - an entangled Bell pair
 <!---->
-### Fusion measurement
+## Fusion measurement
 <!---->
 Graphically, the fusion measurement we would like to use, takes the following form:
 
@@ -57,7 +57,7 @@ def fusion(*a):
     return c1, c2, d1, d2
 ```
 
-### Classical processing of fusion measurement results
+## Classical processing of fusion measurement results
 
 ```python {.marimo}
 from discopy.optyx.classical import ClassicalFunction
@@ -78,7 +78,7 @@ def fusion_function(x):
 classical_function = ClassicalFunction(fusion_function, mode ** 4, bit ** 2)
 ```
 
-### Corrections
+## Corrections
 <!---->
 We would like to ignore the failure case (which is a simplification). We will simply postselect on the case of success.
 
@@ -106,7 +106,7 @@ correction = BitControlledGate(
 )
 ```
 
-### Putting it all together
+## Putting it all together
 
 We simplify the overall protocol by assuming we have an access to a dual-rail encoded Bell pair available to both parties partaking in the protocol:
 

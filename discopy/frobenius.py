@@ -5,7 +5,7 @@ The free symmetric category with a supply of spiders, also known as special
 commutative Frobenius algebras.
 
 Diagrams in the free hypergraph category are faithfully encoded as
-:class:`Hypergraph`, see :cite:t:`BonchiEtAl22`.
+:class:`discopy.hypergraph.Hypergraph`, see :cite:t:`BonchiEtAl22`.
 
 Summary
 -------
@@ -19,6 +19,7 @@ Summary
     HeadOb
     TailOb
     Ty
+    Nat
     Dim
     Layer
     Diagram
@@ -26,16 +27,28 @@ Summary
     Cospan
     Cup
     Cap
+    Permutation
     Swap
     Spider
     Bubble
+    Sum
     Feedback
     Trace
     FollowedBy
     Head
     Tail
     Functor
-    CMap
+    Equation
+
+.. admonition:: Functions
+
+    .. autosummary::
+        :template: function.rst
+        :nosignatures:
+        :toctree:
+
+        interleaving
+        coherence
 
 Axioms
 ------

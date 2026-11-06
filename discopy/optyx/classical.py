@@ -62,7 +62,7 @@ Control & routing
     BinaryMatrix
 
 Bits, digits, & selection
-------------------------
+-------------------------
 
 .. autosummary::
     :template: class.rst
@@ -73,7 +73,6 @@ Bits, digits, & selection
     PostselectDigit
     DiscardBit
     DiscardMode
-    Select
     Digit
     Bit
     Id

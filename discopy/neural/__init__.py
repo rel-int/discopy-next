@@ -27,16 +27,16 @@ symmetry group rather than along its tables.
     :template: module.rst
     :toctree: ../_api
 
-    discopy.neural.network
-    discopy.neural.signature
-    discopy.neural.torch
-    discopy.neural.wiring
-    discopy.neural.cell
-    discopy.neural.recursion
-    discopy.neural.lattice
-    discopy.neural.act
-    discopy.neural.train
-    discopy.neural.geometric
+    network
+    signature
+    torch
+    wiring
+    cell
+    recursion
+    lattice
+    act
+    train
+    geometric
 
 Note
 ----
