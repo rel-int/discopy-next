@@ -2,6 +2,7 @@
 import os
 import tomllib
 
+from packaging.requirements import Requirement
 from pytest import approx, importorskip, raises
 
 from discopy.utils import AxiomError
@@ -777,14 +778,28 @@ def test_widget():
     assert pickle.loads(pickle.dumps(f)) == f
 
 
+def installs(extras, extra):
+    """The names an extra installs, with those of the extras it includes."""
+    names = set()
+    for requirement in map(Requirement, extras[extra]):
+        if requirement.name == "discopy":
+            names = names.union(
+                *(installs(extras, name) for name in requirement.extras))
+        else:
+            names.add(requirement.name)
+    return names
+
+
 def test_the_test_extra_installs_the_widget():
     with open("pyproject.toml", "rb") as file:
         extras = tomllib.load(file)["project"]["optional-dependencies"]
-    test = extras["test"]
-    included, = (requirement[len("discopy["):-1].split(",")
-                 for requirement in test if requirement.startswith("discopy["))
-    assert "anywidget" in test + [
-        requirement for extra in included for requirement in extras[extra]]
+    assert "anywidget" in installs(extras, "test")
+
+
+def test_installs_reads_any_spelling_of_a_requirement():
+    extras = {"test": ["discopy[a, b]", "pytest"],
+              "a": ["anywidget >= 0.9"], "b": []}
+    assert installs(extras, "test") == {"anywidget", "pytest"}
 
 
 RIBBON_COLOURS = ("red", "green", "blue", "yellow")
