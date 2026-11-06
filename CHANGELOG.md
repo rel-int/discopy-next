@@ -695,6 +695,37 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 - `ruff check` and `ty check` lint beside `pylint`, each failing on every rule
   `main` passes, the rules it breaks listed in `pyproject.toml` ([next#263]),
   and `E714` and `RUF022` leave that list ([next#438]).
+- Every push to `main` gets its own `build` and `benchmark` run, since a
+  concurrency group per ref let a newly queued push cancel the pending one
+  ([next#445]).
+- The shared setup action runs setup-uv 10.2.0 and setup-python 7.0.0, the
+  versions `benchmark.yml` runs, and Dependabot now scans `.github/actions/*`
+  so they keep moving together ([next#445]).
+- pylint's `fail-under` is raised from 9.09 to 9.34, main's score, so the score
+  can no longer drop 0.25 without lint failing ([next#445]).
+- The `test` extra includes `notebooks`, so `pip install -e '.[test]'` brings
+  anywidget and the "Build without uv" recipe's `coverage run -m pytest` no
+  longer stops at collection on `discopy/drawing/widget.py` ([next#445]).
+- The benchmark commands in `CONTRIBUTING.md` and
+  `benchmark/test_composition.py` create `benchmark-results/` first, so they
+  run on a fresh clone ([next#445]).
+- `test/readme.py` checks every relative link and anchor of the README, so a
+  link to a deleted notebook or to a heading no section defines fails the suite
+  ([next#445]).
+- `pytest --skip-extra <file>` skips a module that needs an extra instead of
+  failing at collection, for every module `--skip-extra` covers, not only
+  `discopy.optyx` ([next#445]).
+- `pytest --help` no longer says `--skip-extra` skips nothing once the extras
+  are installed: the flag skips its fixed list whether or not they import
+  ([next#445]).
+- `benchmark/report.py`'s `NAME-results.md` writes medians with 3 significant
+  figures, so microsecond-scale cases no longer read 0.0000 ([next#445]).
+- `docs/export_notebooks.py` runs each notebook on the discopy of its own tree,
+  so `--check` from a worktree no longer tests the editable install's code
+  ([next#445]).
+- `docs/export_notebooks.py` fails when any named notebook matches nothing,
+  naming it, instead of silently checking only the names that match
+  ([next#445]).
 
 ## [1.2.2] - 2025-12-19
 
@@ -955,6 +986,7 @@ for the changelog of `1.2.1` and earlier.
 [next#426]: https://github.com/rel-int/discopy-next/issues/426
 [next#411]: https://github.com/rel-int/discopy-next/pull/411
 [next#438]: https://github.com/rel-int/discopy-next/issues/438
+[next#445]: https://github.com/rel-int/discopy-next/issues/445
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#56]: https://github.com/rel-int/optyx/pull/56
