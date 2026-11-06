@@ -69,10 +69,11 @@ jobs:
         uv run ty check --exit-zero-on-warning
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 40   # backstop: green runs take 13-25 min on 3.12 and 3.13, the runner alone varying ~2x (#439)
+    timeout-minutes: 20   # backstop: a pull request takes ~3 min, main ~6 for the slow tests and the notebooks ~6 more
     strategy:
       matrix:
-        python-version: [ "3.12", "3.13", "3.14" ]
+        # A pull request tests the version CI lints on; main tests every one.
+        python-version: ${{ fromJSON(github.event_name == 'pull_request' && '["3.14"]' || '["3.12", "3.13", "3.14"]') }}
     steps:
     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       with:
@@ -83,18 +84,25 @@ jobs:
         groups: dev all
         graphviz: 'true'
     - name: Test
+      env:
+        # A pull request leaves the tests marked slow to main.
+        MARKS: ${{ github.event_name == 'pull_request' && 'not slow' || '' }}
       run:
-        uv run coverage run -m pytest
+        # One worker per core; coverage follows them with `patch = subprocess`.
+        uv run coverage run -m pytest -n auto --dist worksteal -m "$MARKS"
     - name: Coverage
-      run:
+      run: |
+        uv run coverage combine
         uv run coverage report --show-missing
     - name: Test notebooks
+      # Execute every marimo notebook and fail if any cell errors, on each
+      # commit of main: a pull request is checked by its merge commit.
+      if: github.event_name != 'pull_request'
       run:
-        # Execute every marimo notebook and fail if any cell errors.
         uv run python docs/export_notebooks.py --check --jobs 4
   docs:
     runs-on: ubuntu-latest
-    timeout-minutes: 25   # backstop: green builds take ~15 min since discopy.optyx's API pages (#276)
+    timeout-minutes: 30   # backstop: a pull request's build takes ~5 min on four processes, main's longer for running every notebook
     strategy:
       matrix:
         python-version: [ "3.14" ]
@@ -108,8 +116,14 @@ jobs:
         groups: docs
         graphviz: 'true'
     - name: Build
+      env:
+        # A pull request links to each notebook instead of running it.
+        DISCOPY_SKIP_NOTEBOOKS: ${{ github.event_name == 'pull_request' && '1' || '' }}
+        # The link pages point at this repository at the commit being built.
+        READTHEDOCS_GIT_CLONE_URL: ${{ github.server_url }}/${{ github.repository }}
+        READTHEDOCS_GIT_COMMIT_HASH: ${{ github.event.pull_request.head.sha || github.sha }}
       run: |
-        uv run sphinx-build docs docs/_build/html
+        uv run sphinx-build -j auto docs docs/_build/html
     - name: Upload
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
       with:

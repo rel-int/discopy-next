@@ -127,6 +127,7 @@ def test_Reservoir_empty_sequence():
     assert Reservoir.random(memory=1).run([]) == []
 
 
+@pytest.mark.slow
 def test_Reservoir_fit_on_jax():
     from discopy.matrix import backend
     pytest.importorskip("jax")

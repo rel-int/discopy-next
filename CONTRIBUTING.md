@@ -66,9 +66,18 @@ uv run pflake8 discopy
 uv run pylint discopy
 uv run ruff check discopy
 uv run ty check --exit-zero-on-warning
-uv run coverage run -m pytest
+uv run coverage run -m pytest -n auto
+uv run coverage combine
 uv run coverage report -m
 ```
+
+`-n auto` runs the suite on one [pytest-xdist](https://pytest-xdist.readthedocs.io) worker
+per core, as CI does, and `patch = ["subprocess"]` in `pyproject.toml` lets coverage follow
+the workers, so `coverage combine` merges their data before the report; drop `-n auto` to
+debug a test serially. A test that takes four seconds or more is marked `slow`, and a pull
+request runs `-m "not slow"`. CI runs the slow tests, the notebooks and Python 3.12 and 3.13
+on `main`; a pull request is tested on 3.14 alone. The property matrix checks the laws of every
+category it enrols on every pull request, so a unit test does not repeat them.
 
 Without the extras installed, run `uv run pytest --skip-extra` to skip what needs them.
 A test that needs an extra says so with `pytest.importorskip`. A doctest that needs one marks
@@ -77,7 +86,9 @@ an example `# doctest: +EXTRA`, usually its import line, e.g.
 docstring. A module whose import itself needs an extra goes in `UNIMPORTABLE` in
 `test/plugin.py`, and a package goes in `UNIMPORTABLE_PACKAGES`.
 
-CI also runs every marimo notebook in `docs/notebooks/` and fails if a cell errors. With the
+CI also runs every marimo notebook in `docs/notebooks/` on each commit of `main`, not on a
+pull request, and fails if a cell errors; a pull request's `docs` build links to each notebook
+instead of running it, as `DISCOPY_SKIP_NOTEBOOKS=1` does locally. With the
 `all` group synced, run `uv run python docs/export_notebooks.py --check`, adding notebook names
 (e.g. `qnlp` or `optyx/bose_hubbard`) to check only those and `--jobs N` to run N at a time.
 A notebook that a tracked bug breaks is listed in `KNOWN_BROKEN` in that script with its issue,
@@ -215,8 +226,8 @@ A test of the matrix carries `pytest.mark.cell`, which is what the report
 keys on: `proptest/test_report.py` holds the suite's unit tests of its own
 reading, and those are parametrised too.
 
-The `proptest` GitHub workflow runs this suite on pull requests labelled
-`proptest`, on `main`, nightly and on manual dispatch. It carries the report
+The `proptest` GitHub workflow runs this suite on every pull request, on
+`main`, nightly and on manual dispatch. It carries the report
 between runs as an artifact, and on narrower terms than the example database:
 a baseline is a claim about what `main` checks rather than a pile of examples
 any run may add to, so it is taken from a **successful** run **of `main`**
@@ -283,7 +294,7 @@ You'll need [graphviz](https://graphviz.org/) installed as an external dependenc
 
 ```shell
 uv sync --group docs
-uv run sphinx-build docs docs/_build/html
+uv run sphinx-build -j auto docs docs/_build/html
 ```
 
 You do not need to build them to see what a pull request changes: the `docs`
