@@ -20,6 +20,7 @@ Exit codes: 0 done, 1 refused or failed, 2 the box was claimed by someone else m
 """
 
 import argparse
+import collections
 import datetime
 import difflib
 import os
@@ -152,7 +153,8 @@ class Todo:
 
 
 def edited(text, todo):
-    if Todo(todo.text()).header != Todo(text).header:
+    old, new = Todo(text).header, Todo(todo.text()).header
+    if new.rstrip("\r\n") != old.rstrip("\r\n"):
         raise Refused(
             "this step would alter the text above the first box (RULES.md 1)"
         )
@@ -272,13 +274,15 @@ def check_changelog(base, need_bullet):
                 problems.append(
                     f"[{ref}] has no link definition (e.g. `[{ref}]: https://…`)"
                 )
-    old_names = {d[0] for old in olds for d in DEF.findall(old)}
-    seen = set()
+    old_counts = [collections.Counter(d[0] for d in DEF.findall(old))
+                  for old in olds]
+    old_names = {name for counts in old_counts for name in counts}
+    counts = collections.Counter(d[0] for d in defs)
+    for name, count in counts.items():
+        if count > max(1, *(c[name] for c in old_counts)):
+            problems.append(f"[{name}] is defined twice")
     by_kind = {}
     for name, kind, number in defs:
-        if name in seen and name not in old_names:
-            problems.append(f"[{name}] is defined twice")
-        seen.add(name)
         by_kind.setdefault(kind, []).append((int(number), name))
     for kind, items in by_kind.items():
         numbers = [n for n, _ in items]
@@ -476,6 +480,14 @@ def cmd_start(args):
     )
     prompt = "".join(lines[:first])
     file_boxes = [line for line in lines[first:] if line.strip()]
+    parsed = Todo("".join(file_boxes))
+    covered = {i for start, end in parsed.boxes for i in range(start, end)}
+    stray = [line for i, line in enumerate(parsed.lines) if i not in covered]
+    if stray:
+        raise Refused(
+            "--from-file: not a box or its indented continuation: "
+            + short(stray[0])
+        )
     if not prompt.strip().strip(">").strip():
         raise Refused(
             "the prompt is empty: RULES.md 1 starts TODO.md with it verbatim"
@@ -558,6 +570,8 @@ def cmd_done(args):
     filed = None
     if args.filed:
         filed = args.filed if "#" in args.filed else "#" + args.filed
+        if not FILED.search(", filed as " + filed):
+            raise Refused(f"--filed {args.filed}: not an issue, e.g. 471")
 
     def step(text):
         todo = Todo(text)

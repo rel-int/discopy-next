@@ -16,8 +16,9 @@ python3 -I $T add "<point>" [--claim]
 python3 -I $T finish [--no-changelog]  # RULES.md 2: git rm TODO.md once every box is [x]
 ```
 
-Prints `boxes: <sha> <subject>; pushed`. Exit 1 is a refusal, nothing committed; exit 2 means
-another session holds the box (or started a TODO.md): pick another. `--dry-run` prints the
+Prints `boxes: <sha> <subject>; pushed`. Exit 1 is a refusal and nothing is pushed; exit 2 means
+another session holds the box (or started a TODO.md): pick another. After a rejected push,
+either exit can leave the merge of the remote branch local and unpushed. `--dry-run` prints the
 commit and diff. Trailers come from `git config --get-all next.trailer` (set once per session,
 next-coordinator's `new-worktree.sh` does it) plus `--trailer LINE`; the session id is
 `$CLAUDE_CODE_REMOTE_SESSION_ID` (`cse_` read as `session_`) or `--session ID`.
