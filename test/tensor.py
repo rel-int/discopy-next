@@ -141,6 +141,16 @@ def test_Tensor_transpose():
         == Tensor.cups(Dim(2), Dim(2))
 
 
+@pytest.mark.parametrize("name", ["pytorch", "jax"])
+def test_Tensor_transpose_on_backend(name):
+    pytest.importorskip({"pytorch": "torch"}.get(name, name))
+    t = lambda: Tensor(list(range(12)), Dim(2, 3), Dim(2))
+    run = lambda: [t().r.array.tolist(), t().l.array.tolist()]
+    expected = run()
+    with backend(name):
+        assert run() == expected
+
+
 def test_Tensor_conjugate():
     assert Tensor[complex]([1j], Dim(1), Dim(1)).conjugate().array == -1j
 
@@ -316,6 +326,28 @@ def test_Tensor_subs():
     from sympy.abc import x
     s = Tensor[sympy.Expr]([x], Dim(1), Dim(1))
     assert s.subs(x, 1).array == 1
+
+
+def test_symbolic_eval_is_functorial():
+    sympy = pytest.importorskip("sympy")
+    from sympy.abc import x, y
+    f = Box('f', Dim(2), Dim(2), [x, 0, 0, y])
+    F = lambda diagram: diagram.eval(dtype=sympy.Expr)
+    assert F(f >> f) == F(f) >> F(f)
+    n, s = compact.Ty('n'), compact.Box('s', compact.Ty(), compact.Ty())
+    G = Functor({n: Dim(2)}, {s: [x]}, dom=compact.Diagram, dtype=sympy.Expr)
+    loop = compact.Cap(n, n.r) >> compact.Cup(n, n.r)
+    assert G(loop @ s) == Tensor[sympy.Expr]([2 * x], Dim(1), Dim(1))
+
+
+def test_Functor_pytorch_keeps_float32():
+    torch = pytest.importorskip("torch")
+    x = frobenius.Ty('x')
+    g = frobenius.Box('g', x, x)
+    with backend('pytorch'):
+        F = Functor(
+            {x: 2}, {g: torch.ones(2, 2, dtype=torch.float32)}, dtype=None)
+        assert F(g >> g).array.dtype == torch.float32
 
 
 def test_Diagram_cups_and_caps():
@@ -498,6 +530,14 @@ def test_CMap_eval():
         assert np.allclose(
             np.asarray(tensor.array, dtype=float),
             np.asarray(reference.array, dtype=float))
+
+
+def test_CMap_eval_keeps_dtype():
+    """ A map with no box evaluates in the dtype of its category. """
+    for D in (Diagram[complex], Diagram[int]):
+        x = Dim(2)
+        for diagram in (D.id(x), D.cups(x, x), D.caps(x, x) >> D.cups(x, x)):
+            assert diagram.to_map().eval() == diagram.eval()
 
 
 def test_CMap_eval_jax():
@@ -699,6 +739,12 @@ def test_Box_dagger_is_not_the_box():
     assert hash(t.dagger()) != hash(t)
 
 
+def test_rotated_Box_is_not_the_box():
+    f = Box('f', Dim(2), Dim(2), data=[1, 2, 3, 4])
+    assert f.r != f and len({f, f.r}) == 2
+    assert f.r.r == f and f.l == f.r
+
+
 def test_Tensor_trace():
     f = Tensor[int](list(range(64)), Dim(2, 2, 2), Dim(2, 2, 2))
     x, y = Dim(2), Dim(2, 2)
@@ -729,7 +775,9 @@ def test_spider_with_no_legs_in_every_dtype():
 
 
 def test_to_tn_state_spider():
-    for diagram in [Spider(0, 1, Dim(2)) @ Id(Dim(3)), Spider(0, 2, Dim(2))]:
+    for diagram in [Spider(0, 1, Dim(2)) @ Id(Dim(3)), Spider(0, 2, Dim(2)),
+                    Spider(0, 0, Dim(3)),
+                    Spider(0, 0, Dim(2)) @ Box('s', Dim(1), Dim(2), [1, 1])]:
         nodes, order = diagram.to_tn()
         array = tn.contractors.auto(nodes, output_edge_order=order).tensor
         assert array.tolist() == diagram.eval().array.tolist()
@@ -794,6 +842,20 @@ def test_grad_equal():
         assert diagram.grad(x) == diagram.grad(x) != diagram.grad(y)
         assert len({diagram.grad(x), diagram.grad(x)}) == 1
     assert square.grad(x) != f.bubble(func=lambda z: z ** 3).grad(x)
+
+
+def test_bubble_grad_is_the_chain_rule_on_any_boundary():
+    sympy = pytest.importorskip("sympy")
+    from sympy.abc import x
+    for dom, cod in [(Dim(1), Dim(2)), (Dim(2, 2), Dim(1)),
+                     (Dim(2, 3), Dim(3, 2))]:
+        size = np.prod((dom @ cod).inside, dtype=int)
+        data = [k * x ** k for k in range(1, size + 1)]
+        bubble = Box('g', dom, cod, data).bubble(func=lambda z: z ** 2)
+        result = bubble.grad(x).eval(dtype=sympy.Expr)
+        assert result == Box.grad(bubble, x).eval(dtype=sympy.Expr)
+        assert list(result.array.flatten()) == [
+            sympy.diff(entry ** 2, x) for entry in data]
 
 
 def test_grad_of_named_bubble_reads_back():

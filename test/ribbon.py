@@ -60,6 +60,13 @@ def test_to_ribbons_gadgets():
     assert isinstance(cup.dagger(), DualRailCap)
 
 
+def test_to_ribbons_gadgets_eval_repr():
+    x = Ty('x')
+    boxes = Braid(x, x).trace(left=True).to_ribbons().boxes
+    for box in boxes + [box.dagger() for box in boxes]:
+        assert eval(repr(box), Diagram.environment()) == box
+
+
 def test_to_ribbons_box():
     from discopy.balanced import double_rail
     x, y = Ty('x'), Ty('y')
@@ -72,9 +79,9 @@ def test_to_ribbons_box():
     assert (f >> x @ Twist(y) >> g).to_ribbons(width=None)
 
 
-def test_Kauffman():
-    tmp = Ty.l, Ty.r
-    Ty.l = Ty.r = property(lambda self: self)
+def test_Kauffman(monkeypatch):
+    monkeypatch.setattr(Ty, "l", property(lambda self: self))
+    monkeypatch.setattr(Ty, "r", property(lambda self: self))
     x, A = Ty('x'), Box('A', Ty(), Ty())
 
     class Polynomial(Diagram):
@@ -86,15 +93,35 @@ def test_Kauffman():
     assert Kauffman(Braid(x, x))\
         == (A @ x @ x) + (Cup(x, x) >> A.dagger() >> Cap(x, x))
 
-    Ty.l, Ty.r = tmp
-
 
 def test_rotate():
     x, y = Ty('x'), Ty('y')
-    assert Twist(x).r == Twist(x)
+    assert Twist(x).r == Twist(x.r)
     assert Braid(x, y).dagger().r == Braid(x.r, y.r).dagger()
     rotated = (Box('f', Ty(), y @ x) >> Braid(x, y).dagger()).r
     assert Diagram(rotated.inside, rotated.dom, rotated.cod) == rotated
+
+
+def test_rotation_is_well_typed():
+    x, y = Ty('x'), Ty('y')
+    f = Box('f', x @ y, x @ y)
+    snake = Cap(x, x.r) @ x >> x @ Cup(x.r, x)
+    for diagram in (f >> Braid(x, y), snake, f >> Twist(x) @ y,
+                    f >> Twist(x)[::-1] @ y):
+        for rotated in (diagram.r, diagram.l,
+                        diagram.to_ribbons().r, diagram.to_ribbons().l):
+            assert Diagram(rotated.inside, rotated.dom, rotated.cod)\
+                == rotated
+    assert DualRailCup(x @ x, y @ y, is_dagger=True).r\
+        == DualRailCap(y.r @ y.r, x.r @ x.r, is_dagger=True)
+
+
+def test_cup_joins_two_distinct_wires():
+    from pytest import raises
+    n = Ty('n')
+    for i in range(2):
+        with raises(ValueError, match="distinct"):
+            Id(n @ n.r).cup(i, i)
 
 
 def test_to_hypergraph():
@@ -126,3 +153,13 @@ def test_Bubble_to_ribbons():
     x = Ty('x')
     f = Box('f', x, x)
     assert f.bubble(name="N").to_ribbons() == f.to_ribbons().bubble(name="N")
+
+
+def test_feedback_to_ribbons_is_built_from_its_argument():
+    x = Ty('x')
+    g = Box('g', x @ x, x @ x)
+    rails = g.to_ribbons()
+    assert Trace(g).to_ribbons() == rails.trace(n=2)
+    assert Head(g).to_ribbons() == rails.head
+    assert Tail(g).to_ribbons() == rails.tail
+    assert g.delay().to_ribbons() == rails.delay()

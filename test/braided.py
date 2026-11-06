@@ -32,6 +32,17 @@ def test_naturality_foliated():
         == g @ Braid(z, a) >> z @ f @ z
 
 
+def test_naturality_needs_a_braid():
+    g, h = Box('g', x, y), Box('h', z @ y, y @ z)
+    for diagram, i, down in [
+            (z @ g >> h, 0, True),
+            (z @ g >> Braid(y, z).dagger(), 0, True),
+            (h[::-1] >> z @ g[::-1], 1, False),
+            (z @ g, 0, False)]:
+        with raises(AxiomError, match="no braid to slide"):
+            diagram.naturality(i, down=down)
+
+
 def test_to_hypergraph():
     # A braid is not a swap: it stays a box of the hypergraph and of the map.
     from discopy import hypergraph, cmap

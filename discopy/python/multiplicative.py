@@ -275,17 +275,20 @@ class Function(function.Function, ClosedCategory, TracedCategory):
 
         Parameters:
             n : The number of types to trace over.
-            left : Whether to trace on the left, not implemented.
+            left : Whether to trace the first ``n`` types instead, see
+                :meth:`discopy.abc.SymmetricCategory.left_trace`.
 
         Example
         -------
         >>> f = Function(lambda x, y: (x + y, 1), (int, int), (int, int))
         >>> assert f.trace()(5) == 6
+        >>> g = Function(lambda y, x: (1, x + y), (int, int), (int, int))
+        >>> assert g.trace(left=True)(5) == 6
         """
         if n == 0:
             return self
         if left:
-            raise NotImplementedError
+            return self.left_trace(n)
         assert_istraceable(self, n)
         dom, cod, traced = self.dom[:-n], self.cod[:-n], self.dom[-n:]
         fixed = (self >> self.discard(cod) @ traced).fix(n)
