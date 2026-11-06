@@ -659,6 +659,41 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   own axioms write a scalar: the list branch was missing that index, and a
   legless box carrying more than one amplitude raised on the reshape
   ([next#421]).
+- `python.finset.Permutation` refuses a `Function` whose domain is not its
+  codomain, so that `then` and `tensor` with a discard or a projection raise
+  rather than return a permutation of the wrong size, and `Permutation.then`
+  raises `AxiomError` on a `Function` that does not compose with it, as
+  `Function.then` does ([next#445]).
+- `Drawing.dagger` reflects a drawing with a bubble, a frame or a slot, e.g. an
+  `Equation` of coloured terms, where it used to raise a bare `AssertionError`
+  ([next#445]).
+- The dagger of a drawing with two or more boxes has a graph of its own, not a
+  frozen networkx view, so that `add_nodes`, `add_edges` and `add_box_corners`
+  work on it ([next#445]).
+- `draw(doctest=..., to_tikz=True)` compares the drawing against its `.tikz`
+  and `.tikzstyles` baselines and raises when they differ, where it used to
+  overwrite them ([next#445]).
+- TikZ output with `use_tikzstyles=True` writes its `.tikzstyles` beside the
+  `.tikz` file for any path, a `pathlib.Path`, a dotted folder or a name with
+  no extension among them ([next#445]).
+- An SVG drawn to a `BytesIO` or to an open file, text or binary, carries the
+  dark-mode style, where it used to crash after Matplotlib had written it
+  ([next#445]).
+- `Drawing.bubble` takes a `dom` and a `cod` of plain types, e.g. symmetric,
+  rigid, compact or frobenius ones, casting them with `to_drawing`: it used to
+  leave nodes with no position when their length matched the inside's, so that
+  drawing raised `KeyError` ([next#445]).
+- `Drawing.__eq__` compares the edges of the plane graph, so that drawings with
+  the same nodes and positions but different wiring are not equal ([next#445]).
+- `python.additive.Function.braid` works on an instance as well as on the
+  class, where it used to raise `TypeError` ([next#445]).
+- `Function.no_type_checking` on a subclass of `python.function.Function`
+  leaves the subclass as it found it, so that the switch on the base class
+  still reaches it and nesting the two no longer turns its type checking off
+  for good ([next#445]).
+- The label of a box or a braket coloured `config.TRANSPARENT` is drawn black
+  and turns white on a dark page, where it used to be drawn white, invisible on
+  a light one ([next#445]).
 
 ### Project
 
@@ -955,6 +990,7 @@ for the changelog of `1.2.1` and earlier.
 [next#426]: https://github.com/rel-int/discopy-next/issues/426
 [next#411]: https://github.com/rel-int/discopy-next/pull/411
 [next#438]: https://github.com/rel-int/discopy-next/issues/438
+[next#445]: https://github.com/rel-int/discopy-next/issues/445
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#56]: https://github.com/rel-int/optyx/pull/56
