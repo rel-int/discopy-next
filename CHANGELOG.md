@@ -159,6 +159,10 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   arithmetic* ([#677]), *Parsing arithmetic* and *Boolean circuits*,
   Lafont's maps, linear maps, Boolean functions and reversible circuits as
   double-pushout rewriting ([next#310], [next#316], [next#320]).
+- `yanking_left`, the yanking axiom on the left trace, i.e. Reidemeister move 1
+  for either trace on a compact category, and `SymmetricCategory.left_trace`,
+  the left trace of the python functions, the additive channels and the
+  traced lenses ([next#458]).
 
 ### Changed
 
@@ -1021,6 +1025,7 @@ for the changelog of `1.2.1` and earlier.
 [next#438]: https://github.com/rel-int/discopy-next/issues/438
 [next#443]: https://github.com/rel-int/discopy-next/issues/443
 [next#457]: https://github.com/rel-int/discopy-next/issues/457
+[next#458]: https://github.com/rel-int/discopy-next/pull/458
 [next#445]: https://github.com/rel-int/discopy-next/issues/445
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
