@@ -585,6 +585,17 @@ def test_cups_and_caps_read_the_host_category():
     assert compact.Cap(x.r, x).to_hypergraph().boxes == ()
 
 
+def test_a_spider_needs_a_category_with_spiders():
+    from discopy import symmetric, compact
+    from discopy.utils import AxiomError
+    for module in (symmetric, compact):
+        spider = module.Hypergraph.spiders(1, 2, module.Ty('x'))
+        with raises(AxiomError, match="has no spiders"):
+            spider.make_bijective()
+    with raises(AxiomError, match="has no spiders"):
+        compact.Hypergraph.spiders(1, 2, compact.Ty('x')).to_diagram()
+
+
 def test_coloured_diagram_has_no_hypergraph():
     from discopy.monoidal import Box, Colour, Diagram, Ty, Wire
     red = Colour("red")

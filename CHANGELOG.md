@@ -12,7 +12,7 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 - `discopy.abc`, the abstract base classes of the hierarchy, from `Category`
   to `PROP`, `Monoid` and `Pregroup` ([#326], [#331], [#727]).
 - `discopy.testable`, laws stated once on `abc` and checked by the Hypothesis
-  matrix in `proptest/`, so far on `cat.Arrow` ([#658], [#829]).
+  matrix in `proptest/` ([#658], [#829]).
 - `discopy.cmap`, combinatorial maps for diagrams in compact categories, with
   `genus`, `is_planar` and `to_compact` ([#338], [#532], [#690]).
 - `discopy.para`, parametric and coparametric maps over any symmetric
@@ -659,6 +659,64 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   own axioms write a scalar: the list branch was missing that index, and a
   legless box carrying more than one amplitude raised on the reshape
   ([next#421]).
+- `foliation` and `depth` work again on coloured monoidal and braided diagrams,
+  and on non-symmetric diagrams that hold a `Sum`: the hypergraph is now built
+  only for symmetric diagrams ([next#445]).
+- Composing a zero (an empty `Sum`) with an arrow it does not compose with now
+  raises `AxiomError`, on either side, rather than returning an ill-typed zero
+  ([next#445]).
+- `dumps` refuses box data holding a dict whose keys are not strings, with its
+  usual 'not JSON serialisable' `TypeError`, instead of silently writing int,
+  float, bool and None keys as strings that `loads` cannot read back
+  ([next#445]).
+- `F >> G` now agrees with `G(F(t))` when `F`'s maps use the sugar its call
+  accepts (a name for an object, a tuple for an arrow), rather than crashing
+  when composed or applied, and two `quantum.circuit.Functor`s compose
+  ([next#445]).
+- `subs` on a box, a bubble or a diagram substitutes a key that is not a
+  symbol, e.g. `sin(phi)` or `phi + psi`, as `sympy.subs` does, instead of
+  leaving the box unchanged ([next#445]).
+- An arrow, a diagram, a type or a `Dim` built from an iterator is checked and
+  stored as if built from its tuple, instead of skipping the composability
+  checks or coming out empty ([next#445]).
+- `Sum` keeps its terms as a tuple, so `Sum([f, g]) == Sum((f, g)) == f + g`
+  and is hashable, and a zero gradient `Sum([], dom, cod)` equals
+  `Sum((), dom, cod)` ([next#445]).
+- `Box.free_symbols` follows an in-place change to the box's data, so `subs`
+  and `lambdify` no longer return the box unchanged after a symbol is added to
+  mutable data ([next#445]).
+- `Box.free_symbols` reads a numeric array's dtype instead of visiting every
+  entry, so a no-op `subs` on large tensor boxes takes milliseconds instead of
+  seconds ([next#445]).
+- `Diagram.normal_form` and `normalize` read the diagram's boxes and offsets
+  once per sweep, and `Diagram.boxes` is linear, so normalising an
+  already-normal 800-box diagram takes about 1ms instead of 1.4s ([next#445]).
+- `Diagram.merge_layers`, and so `foliation`, resumes at the pair above each
+  merge instead of starting again from the first pair, with the same result
+  ([next#445]).
+- `Sum.generator` is a property, as on every other arrow: a singleton sum's
+  generator is its only term, and any other sum's is `None` ([next#445]).
+- `str` of a bubble prints a non-default `name` and `method`, as its `repr`
+  does, so `eval(str(b)) == b` holds for a named bubble ([next#445]).
+- `Nat(-1)` raises a `ValueError` instead of building a natural number that
+  cancels `Nat(1)`, and `Dim(0)`'s `ValueError` names the dimension
+  ([next#445]).
+- `monoidal.Ty(Colour('red'))` raises a `TypeError` that names both classes, as
+  every other level does, instead of an `AxiomError` printing raw class reprs
+  ([next#445]).
+- The default `op.Comarkov` and `op.Markov`, over `python.finset.Function`,
+  read back from their repr in their own `environment()` ([next#445]).
+- `Axiom.falsify` returns the shrunk arguments a law refuses to build its terms
+  on, instead of raising the law's error ([next#445]).
+- `Equation.modulo` keeps every attribute of the equation but `up_to`, e.g. the
+  `space` of a `monoidal.Equation` ([next#445]).
+- `str` of an `AxiomFailure` is the reason the broken law declares, no longer
+  the repr of the reason and the whole equation together ([next#445]).
+- `Hypergraph.make_bijective`, and so `to_diagram` over `compact`, raise
+  `AxiomError` (`NOT_FROBENIUS`) on a spider of three or more legs over a
+  category with no spiders, where they raised `AttributeError`; the unused
+  messages `MATRIX_TWO_DTYPES`, `HAS_NO_ATTRIBUTE` and
+  `COMPLEX_TYPE_HAS_NO_ATTR` are gone ([next#445]).
 - A delayed box keeps every attribute it was built with: a markov sample stays
   a sample, and so evaluates under a stream functor, and in frobenius
   `f.r.delay() == f.delay().r` ([next#445]).
