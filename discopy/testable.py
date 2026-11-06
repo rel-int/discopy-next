@@ -161,14 +161,56 @@ class Equation[ar](NamedGeneric):
             result.up_to = up_to
         return result
 
+    def __eq__(self, other):
+        """
+        Two equations are equal when they have the same type, terms and
+        symbols, and the same ``up_to``: a callable is the same only if it
+        is identical, as when both equations take it from their type.
+        Whether an equation holds is :meth:`__bool__`, not this.
+
+        >>> from discopy.cat import Ob, Box, Equation
+        >>> x = Ob('x')
+        >>> f, g = Box('f', x, x), Box('g', x, x)
+        >>> assert Equation(f, g) == Equation(f, g) != Equation(g, f)
+        >>> assert Equation(f, g) != Equation(f, g, symbol="->")
+        >>> assert Equation(f, g).modulo(len) == Equation(f, g).modulo(len)
+        >>> assert Equation(f, g).modulo(lambda term: term)\\
+        ...     != Equation(f, g).modulo(lambda term: term)
+        """
+        return type(self) is type(other) and self.terms == other.terms\
+            and self.symbols == other.symbols and self.up_to is other.up_to
+
+    def __hash__(self):
+        """
+        The hash of the type, terms and symbols, so that equal equations
+        have equal hashes: as for a tuple, an equation is hashable when
+        its terms are.
+
+        >>> from discopy.cat import Ob, Equation
+        >>> assert hash(Equation(Ob('x'))) == hash(Equation(Ob('x')))
+        >>> hash(Equation([1], [1]))
+        Traceback (most recent call last):
+        ...
+        TypeError: unhashable type: 'list'
+        """
+        return hash((type(self), self.terms, self.symbols))
+
     def __repr__(self):
         """
+        The terms, then the symbols unless they are all ``"="``, so that
+        an equation reads back from its representation, unless it was given
+        an ``up_to`` of its own, a callable with no representation.
+
         >>> from discopy.cat import Ob, Box, Equation
         >>> Equation(Box('f', Ob('x'), Ob('x')))
         cat.Equation(cat.Box('f', cat.Ob('x'), cat.Ob('x')))
+        >>> Equation(Ob('x'), Ob('y'), symbol="->")
+        cat.Equation(cat.Ob('x'), cat.Ob('y'), symbols=('->',))
         """
+        symbols = "" if all(symbol == "=" for symbol in self.symbols)\
+            else f", symbols={self.symbols!r}"
         return factory_name(type(self))\
-            + f"({', '.join(map(repr, self.terms))})"
+            + f"({', '.join(map(repr, self.terms))}{symbols})"
 
     def __str__(self):
         return f"Equation({', '.join(map(str, self.terms))})"

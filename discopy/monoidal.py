@@ -2184,6 +2184,34 @@ class Equation(cat.Equation, RichDisplay):
         super().__init__(*terms, symbol=symbol, symbols=symbols, up_to=up_to)
         self.space = space
 
+    def __eq__(self, other):
+        """
+        Two equations of diagrams are equal when they are equal as
+        :class:`.cat.Equation` and have the same space between their terms.
+
+        >>> x = Ty('x')
+        >>> f = Box('f', x, x)
+        >>> assert Equation(f, f) == Equation(f, f) != Equation(f, f, space=2)
+        """
+        return super().__eq__(other) and self.space == other.space
+
+    __hash__ = cat.Equation.__hash__
+
+    def __repr__(self):
+        """
+        The representation of a :class:`.cat.Equation`, then the space
+        unless it is ``1``, after the terms if there are any.
+
+        >>> Equation(Ty(), Ty(), space=2)
+        monoidal.Equation(monoidal.Ty(), monoidal.Ty(), space=2)
+        >>> Equation(space=2)
+        monoidal.Equation(space=2)
+        """
+        if self.space == 1:
+            return super().__repr__()
+        comma = ", " if self.terms else ""
+        return f"{super().__repr__()[:-1]}{comma}space={self.space!r})"
+
     def to_tree(self) -> dict:
         """
         Serialise an equation of diagrams, with the space between its terms,

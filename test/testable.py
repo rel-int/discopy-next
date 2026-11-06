@@ -8,7 +8,7 @@ from hypothesis import strategies as st
 from hypothesis.errors import NoSuchExample
 from pytest import raises
 
-from discopy import cat, feedback, rigid
+from discopy import cat, feedback, rigid, testable
 from discopy.abc import Category, Monoid, Nat
 from discopy.testable import (
     L, R, Axiom, AxiomFailure, Delay, Equation, Equivalence,
@@ -211,6 +211,19 @@ def test_equation_symbols():
     assert Equation(f, f, g).symbols == ("=", "=")
     with raises(ValueError):
         Equation(f, g, symbols=("=", "="))
+
+
+def test_Equation_eq_and_repr():
+    equation = Equation(1, 2, symbol="<")
+    assert repr(equation) == "testable.Equation(1, 2, symbols=('<',))"
+    assert eval(repr(equation), {"testable": testable}) == equation
+    assert hash(Equation(1, 2, symbol="<")) == hash(equation)
+    assert equation != Equation(1, 2) != Equation(2, 1)
+    assert Equation(1, 3) != ParityEquation(1, 3)
+    assert equation.modulo(abs) == equation.modulo(abs) != equation
+    assert Equation(1, 3).modulo(lambda n: n % 2)\
+        != Equation(1, 3).modulo(lambda n: n % 2)
+    assert Equation([1], [1]) == Equation([1], [1]) != Equation([1], [2])
 
 
 def test_weaken():

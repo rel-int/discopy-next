@@ -1157,3 +1157,19 @@ def test_Equation_modulo_keeps_space():
     equation = Equation(f, f, symbol="->", space=3).modulo(len)
     assert equation.space == 3 and equation.symbols == ("->", )
     assert loads(dumps(equation.modulo(None))).space == 3
+
+
+def test_Equation_eq_and_repr_keep_space():
+    f = Box('f', Ty('x'), Ty('x'))
+    equation = Equation(f, f, symbol="->", space=2)
+    assert repr(equation).endswith(", symbols=('->',), space=2)")
+    assert eval(repr(equation), Diagram.environment()) == equation
+    assert loads(dumps(equation)) == equation
+    assert equation != Equation(f, f, symbol="->")
+    assert hash(Equation(f, f, symbol="->", space=2)) == hash(equation)
+
+
+def test_Equation_repr_without_terms():
+    equation = Equation(space=2)
+    assert repr(equation) == "monoidal.Equation(space=2)"
+    assert eval(repr(equation), Diagram.environment()) == equation
