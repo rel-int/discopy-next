@@ -209,7 +209,8 @@ def test_subs_substitutes_the_parameter_of_every_symbolic_box():
         -sp.sin(x), sp.cos(x)]]), 2, 2, "R", data=x)
     for box in (qubits.Scalar(x), photonic.PhaseShiftDR(x),
                 photonic.PhotonLoss(x), classical.Z(1, 1, x),
-                classical.X(1, 1, x), gate, gate.dagger(), gate.conjugate()):
+                classical.X(1, 1, x), gate, gate.dagger(), gate.conjugate(),
+                photonic.Gate(gate.array, 2, 2, "R")):
         assert box.free_symbols == {x}
         assert not box.subs((x, .25)).double().free_symbols
         with pytest.raises(NotImplementedError, match="does not support"):

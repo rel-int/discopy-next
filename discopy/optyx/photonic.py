@@ -513,8 +513,9 @@ class Gate(AbstractGate):
     def lambdify(self, *symbols, **kwargs):
         if not self.free_symbols & set(symbols):
             return lambda *xs: self
-        matrix, data = (lambdify(symbols, value, **kwargs)
-                        for value in (self.array.tolist(), self.data))
+        matrix = lambdify(symbols, self.array.tolist(), **kwargs)
+        data = (lambda *xs: None) if self.data is None \
+            else lambdify(symbols, self.data, **kwargs)
         return lambda *xs: Gate(
             matrix(*xs), len(self.dom), len(self.cod), self.name, data(*xs))
 
