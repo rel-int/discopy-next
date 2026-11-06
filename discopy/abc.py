@@ -1367,9 +1367,8 @@ class BalancedCategory[C0: ColouredMonoid, C1: BalancedCategory](
         Tracing the braid of an object with itself on the left gives its
         twist too, i.e. the twist is either orientation of a traced braid.
         """
-        return cls.equation_factory(
-            cls.braid(x, x).trace(mem=x, left=True),
-            cls.twist(x))  # ty: ignore[unknown-argument]
+        return cls.equation_factory(cls.braid(x, x).trace(
+            mem=x, left=True), cls.twist(x))  # ty: ignore[unknown-argument]
 
 
 class RibbonCategory[C0: Pregroup, C1: RibbonCategory](
