@@ -567,7 +567,7 @@ class Wreath[base, top](NamedGeneric, FiniteGroup):
                       tuple(map(image, cls.generators())))
 
 
-@dataclass(unsafe_hash=True)
+@dataclass(frozen=True)
 class Action:
     """
     An action of a group on ``range(size)``, i.e. a functor from the group
@@ -596,7 +596,8 @@ class Action:
     images: tuple[Permutation, ...]
 
     def __post_init__(self):
-        self.images = tuple(Permutation(p, self.size) for p in self.images)
+        object.__setattr__(self, "images", tuple(
+            Permutation(p, self.size) for p in self.images))
         if len(self.images) != len(self.group.generators()):
             raise ValueError(
                 f"Expected an image for each generator of {self.group}.")

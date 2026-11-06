@@ -816,7 +816,8 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 - `group.Cyclic`, `Symmetric`, `Product` and `Wreath` compute each action
   once and return the same `Action` every time, so a wreath whose top is
   itself a wreath costs about as much as its factors (one multiply at nesting
-  4 went from about 1 s to 0.3 ms) ([next#445]).
+  4 went from about 1 s to 0.3 ms). `Action` is a frozen dataclass, so the
+  action a group shares cannot be changed under its other callers ([next#445]).
 - `CMap.eval` on a map with no boxes (an identity, cup, cap or loop) uses its
   category's dtype, e.g. `tensor.Diagram[complex]`, instead of falling back
   to float, so it agrees with `Diagram.eval` ([next#445]).

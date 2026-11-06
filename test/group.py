@@ -1,3 +1,4 @@
+from dataclasses import FrozenInstanceError
 import pickle
 import random
 from functools import reduce
@@ -120,6 +121,8 @@ def test_iterated_wreath():
     """
     G = Wreath[Cyclic[2], Symmetric[2]]
     assert G.action() is G.action()
+    with raises(FrozenInstanceError):
+        G.action().images = ()
     for _ in range(4):
         G = Wreath[Cyclic[2], G]
     g = G.sample(random.Random(0))
