@@ -61,12 +61,13 @@ Summary
         state_map
         state_join
         uniform
+        canonical
         sample
 """
 from __future__ import annotations
 
 import random
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Mapping, Set
 
 from discopy.cat import Transformation
 from discopy.python.function import EndoFunctor, Function, Ty
@@ -498,17 +499,60 @@ def uniform(seed: int) -> tuple[float, int]:
     return generator.random(), generator.getrandbits(64)
 
 
+def canonical(x: object) -> str:
+    """
+    A representation of ``x`` that does not depend on hashing, as long as
+    the :func:`repr` of every value in it that is not a tuple, a set or a
+    mapping does not: the elements of a set and the items of a mapping are
+    sorted by their own canonical representation, the elements of a tuple
+    are kept in order, a named tuple being read as a plain tuple, and every
+    other value is represented by its :func:`repr`.
+
+    Parameters:
+        x : The value to represent.
+
+    Example
+    -------
+    >>> canonical(frozenset({"z", "a"}))
+    "frozenset({'a', 'z'})"
+    >>> canonical((frozenset({2, 1}), {"y": 0, "x": 1}))
+    "(frozenset({1, 2}), dict({'x': 1, 'y': 0}))"
+    >>> assert canonical(("egg", )) == repr(("egg", ))
+
+    A value of any other type is its :func:`repr`, sets inside it included,
+    e.g. a :class:`~discopy.kleisli.multiplicative.Row`:
+
+    >>> from discopy.kleisli.multiplicative import Row
+    >>> row = Row(frozenset({"m"}))
+    >>> assert canonical(row) == repr(row)
+    """
+    if isinstance(x, tuple):
+        comma = "," if len(x) == 1 else ""
+        return f"({', '.join(map(canonical, x))}{comma})"
+    if isinstance(x, Mapping):
+        inside = (f"{canonical(k)}: {canonical(v)}" for k, v in x.items())
+    elif isinstance(x, Set):
+        inside = map(canonical, x)
+    else:
+        return repr(x)
+    return f"{type(x).__name__}({{{', '.join(sorted(inside))}}})"
+
+
 def sample(d: frozenset) -> Callable:
     """
     Draw an outcome from a subdistribution ``d`` by `inverse transform
     sampling <https://en.wikipedia.org/wiki/Inverse_transform_sampling>`_,
     i.e. a computation in the :attr:`Seed` monad.
 
-    The outcomes are ordered by their representation so that the sample
-    depends on the seed only, never on the iteration order of a
-    :class:`frozenset`. The missing mass of a subdistribution is drawn as
-    ``None``, i.e. sampling lands in :attr:`Maybe` composed with
-    :attr:`Seed`.
+    The outcomes are ordered by their :func:`canonical` representation,
+    which sorts the elements of sets first, so that the sample depends on
+    the seed only, never on the iteration order of a :class:`frozenset`
+    nor on ``PYTHONHASHSEED``, as long as every value in an outcome that is
+    not a tuple, a set or a mapping has a :func:`repr` that does not depend
+    on hashing, unlike a :class:`~discopy.kleisli.multiplicative.Row`
+    holding a set of several strings. The missing mass of a subdistribution
+    is drawn as ``None``, i.e. sampling lands in :attr:`Maybe` composed
+    with :attr:`Seed`.
 
     Parameters:
         d : The subdistribution to sample from, i.e. a finite set of pairs
@@ -520,7 +564,7 @@ def sample(d: frozenset) -> Callable:
     >>> assert sample(coin)(420)[0] in ("heads", "tails")
     >>> assert sample(frozenset({("heads", .5)}))(420)[0] in ("heads", None)
     """
-    outcomes = sorted(d, key=lambda pair: repr(pair[0]))
+    outcomes = sorted(d, key=lambda pair: canonical(pair[0]))
 
     def inside(seed):
         draw, next_seed = uniform(seed)
