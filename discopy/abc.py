@@ -321,6 +321,26 @@ class Monoid[C1: Monoid](
     """ A monoid is a coloured monoid with a single, trivial colour. """
     ob = NoneType
 
+    @classmethod
+    def whisker(cls: type[C1], other) -> C1:
+        """
+        Do nothing if ``other`` is an element, else raise ``TypeError``: the
+        product ``@`` of a monoid takes elements on either side, so its one
+        colour does not whisker as the colours of a coloured monoid do.
+
+        Parameters:
+            other : The element to be tensored on the left.
+
+        >>> None @ Nat(2)
+        Traceback (most recent call last):
+            ...
+        TypeError: Expected abc.Nat, got NoneType instead.
+        """
+        if not isinstance(other, cls):
+            raise TypeError(messages.TYPE_ERROR.format(
+                factory_name(cls), factory_name(type(other))))
+        return other
+
 
 class Groupoid[C0, C1: Groupoid](DaggerCategory[C0, C1]):
     """
