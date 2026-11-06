@@ -286,10 +286,10 @@ class Matrix[dtype](NamedGeneric, MarkovCategory, ComarkovCategory,
             other : The other matrix with which to check closeness.
             rtol:
                 The relative tolerance parameter (see Notes).
-                Default value for results of order unity is 1.e-5
+                Default value is 1.e-8
             atol :
                 The absolute tolerance parameter (see Notes).
-                Default value for results of order unity is 1.e-8
+                Default value is 1.e-8
 
         Notes:
         (taken from np.isclose documentation)
@@ -520,10 +520,14 @@ class Matrix[dtype](NamedGeneric, MarkovCategory, ComarkovCategory,
         return cls(array, len(sources), len(sources))
 
     def transpose(self) -> Matrix:
-        return type(self)(self.array.transpose(), self.cod, self.dom)
+        with backend() as np:
+            array = np.moveaxis(self.array, 0, 1)
+        return type(self)(array, self.cod, self.dom)
 
     def conjugate(self) -> Matrix:
-        return type(self)(self.array.conjugate(), self.dom, self.cod)
+        with backend() as np:
+            array = np.conj(self.array)
+        return type(self)(array, self.dom, self.cod)
 
     def dagger(self) -> Matrix:
         return self.conjugate().transpose()
@@ -553,7 +557,7 @@ class Matrix[dtype](NamedGeneric, MarkovCategory, ComarkovCategory,
     def round(self, decimals=0) -> Matrix:
         """ Rounds the entries of a matrix up to a number of decimals. """
         with backend() as np:
-            array = np.around(self.array, decimals=decimals)
+            array = np.round(self.array, decimals=decimals)
         return type(self)(array, self.dom, self.cod)
 
     @classmethod
@@ -622,8 +626,10 @@ class Matrix[dtype](NamedGeneric, MarkovCategory, ComarkovCategory,
         """
         if self.dtype != bool or self.dom != self.cod:
             raise TypeError(messages.MATRIX_REPEAT_ERROR)
-        return sum(self.id(self.dom).then(*n * [self])
-                   for n in range(index(self.dom) + 1))
+        result, length = self.id(self.dom) + self, 1
+        while length < index(self.dom):
+            result, length = result >> result, 2 * length
+        return result
 
     def trace(self, n=1, left=False) -> Matrix:
         """
