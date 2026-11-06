@@ -86,3 +86,8 @@ def test_copy_runs_its_own_parameters():
     buffer.seek(0)
     loaded = torch.load(buffer, weights_only=False)
     assert torch.equal(loaded(inputs), expected)
+    with torch.no_grad():
+        for parameter in loaded.parameters():
+            parameter.zero_()
+    assert torch.equal(loaded(inputs), inputs)
+    assert torch.equal(module(inputs), expected)

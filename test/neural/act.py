@@ -126,8 +126,9 @@ def test_float64_stays_float64():
             optimizer, cosine_schedule(optimizer, 1, 2), EMA(net, .9))
         grads.append([p.grad for p in net.parameters()])
     assert stats["logit"].dtype == torch.float64
-    assert all(torch.allclose(a, b, rtol=0, atol=1e-12)
-               for a, b in zip(*grads) if a is not None)
+    assert all((a is None) == (b is None) and (
+        a is None or torch.allclose(a, b, rtol=0, atol=1e-12))
+        for a, b in zip(*grads))
     out = rollout(net, x, target, given, (2, ))
     assert out[2]["best_q"].dtype == torch.float64
 
