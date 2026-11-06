@@ -243,6 +243,53 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   and dict functors ([next#168]); `para` and `interaction` hash ([next#31]).
 - A `Matrix` with no dtype reads it off its array without copying it, so it
   copies once, as a `Matrix[dtype]` does ([next#8]).
+- Composing a `DualRail` with any functor but the identity, on either side and
+  at every level (balanced, symmetric, ribbon, compact), raises `AxiomError`
+  saying to apply them in turn, `E(D(f))`, set by a new `Functor.composes`
+  that is false on `DualRail`: `D >> F` used to raise an unrelated `TypeError`,
+  and `F >> D` returned a functor that disagreed with `D(F(-))` on cups and
+  raised on twists, braids and swaps ([next#445]).
+- `monoidal.Wire` equality and hash count `is_dagger`, and a daggered wire
+  prints with `[::-1]` as a daggered box does: `Ty('x')[::-1] != Ty('x')`,
+  a reversed coloured wire no longer equals a fresh one with its colours
+  swapped, and a wire and its dagger, which a functor may send to different
+  images, have different heads and tails. Wires and types break ties in
+  their order by `repr`, so of two unequal types exactly one is less than
+  the other ([next#445]).
+- A bubble's `data` is part of its identity, as a box's is: bubbles that
+  differ only in `data` are unequal, and `str` prints the `data` so that
+  `eval(str(b)) == b` still holds. As for a box, a bubble holding unhashable
+  `data` is unhashable, and comparing bubbles whose `data` are arrays of more
+  than one entry raises `ValueError`, except at the tensor level, where a
+  bubble compares array and list `data` by their entries ([next#445]).
+- `cat.Transformation.id` has the shared `utils.identity` as its components,
+  and `then` drops it on either side and composes components given by a
+  dictionary into a dictionary, so that the identity is a unit and composition
+  is associative up to `==`, as for `cat.Functor` ([next#445]).
+- `Equation` compares by value: `==` compares type, terms, symbols, space and
+  `up_to`, a callable `up_to` by identity, and its hash agrees, so an equation
+  is hashable when its terms are; its repr prints the symbols unless they are
+  all `=`, and a `monoidal.Equation`'s space unless it is 1, so that
+  `eval(repr(e)) == e` unless `e` has an `up_to` of its own ([next#445]).
+- A law declared `failing` raises `AxiomFailure` only when its equation is
+  false or its terms refuse to build, and returns the equation otherwise: a
+  law fixed under its declaration XPASSes in the property matrix, and
+  `falsify()` returns a real counterexample ([next#445]).
+- A non-element on the left of a monoid's `@` raises `TypeError`, as one on
+  the right does: `Monoid.whisker` takes elements only, so `'x' @ Nat(2)` and
+  `None @ List[int](2)` no longer give back the element ([next#445]).
+- `abc.Nat` prints as `Nat(2)` rather than `2`, as `monoidal.Nat` does, so
+  `eval(str(n)) == n` holds on the nose; a `Matrix` prints its boundaries as
+  `dom=Nat(2), cod=Nat(2)`, so reading its repr back needs `Nat` in scope, as
+  `Matrix.environment()` gives ([next#445]).
+- Delaying a `Sum` or a `Bubble` works wherever delaying a box does: delay
+  distributes over a sum, so `(f + g).delay() == f.delay() + g.delay()`,
+  while a delayed bubble, circuit bubble or `ehypergraph.Join` keeps its args
+  and carries a `time_step` of its own on a delayed boundary, so
+  `f.bubble().delay() != f.delay().bubble()` ([next#445]).
+- `CMap.loops` are stored sorted by `repr`, so maps compare their loops as a
+  multiset: `Diagram.to_map()` is the fold of `then` and `CMap.dagger` is
+  contravariant on maps with loops ([next#445]).
 
 ### Deprecated
 
