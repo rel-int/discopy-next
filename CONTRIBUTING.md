@@ -51,8 +51,8 @@ set in `[tool.uv]`; `uv sync --no-dev` installs the bare package. Add more group
 
 Since dependency groups are not standard, `quantum`, `grammar`, `optyx`, `notebooks` and `docs`
 are also optional dependencies (`pip install -e '.[quantum]'`). There is no `dev` or `all`
-extra: the `test` extra bundles `quantum`, `grammar` and `optyx` with the test tools, without
-ruff, ty or pytest-benchmark.
+extra: the `test` extra bundles `quantum`, `grammar`, `optyx` and `notebooks` with the test
+tools, without ruff, ty or pytest-benchmark.
 
 ## Run the unit tests
 
