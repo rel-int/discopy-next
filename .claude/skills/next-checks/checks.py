@@ -6,10 +6,10 @@ ruff, ty, pylint and a full suite are compared with the merge base of HEAD
 and ``origin/main``, measured once in a temporary worktree and cached under
 ``~/.cache/next-checks/<kind>-<key>/``, the key hashing what the measurement
 reads; the tree under check is the working directory, untracked files
-included. Findings are matched by (rule, file, message) with every number
-ignored, so code moving down a few lines is not new. A tool that fails to
-run is a FAIL, never cached. Full logs go to a directory named on the last
-line. Exit 1 on any FAIL.
+included. Findings are matched by (rule, file, message) with the numbers in
+the message ignored, so code moving down a few lines is not new. A tool
+that fails to run is a FAIL, never cached. Full logs go to a directory
+named on the last line. Exit 1 on any FAIL.
 """
 
 import argparse
@@ -153,7 +153,7 @@ class Context:
                 "ls-tree", tree, cwd=self.root).splitlines()
                 if line.split("\t")[-1] not in NOT_TREE
                 and not line.split("\t")[-1].startswith(".")]
-        parts += [self.python, "v2"]
+        parts += [self.python, "v3"]
         digest = hashlib.sha1("\n".join(parts).encode()).hexdigest()[:16]
         path = self.mkdir(CACHE / f"{kind}-{digest}")
         os.utime(path)
@@ -290,7 +290,7 @@ def gate_pylint(ctx):
 
 def new_items(head, base):
     def norm(key):
-        return tuple(re.sub(r"\d+", "#", str(k)) for k in key)
+        return (*map(str, key[:-1]), re.sub(r"\d+", "#", str(key[-1])))
     old = collections.Counter(norm(key) for key, _ in base)
     new = []
     for key, line in head:
@@ -426,9 +426,13 @@ def gate_tests(ctx):
     if not files:
         return "SKIP", ("no discopy/ or test/ module changed (--full for all)"
                         if not infra else "no module changed" + tail)
-    _, out = pytest(ctx, ctx.root, log, files)
+    code, out = pytest(ctx, ctx.root, log, files)
     failed = failures(out)
     fact = f"{plural(len(files), 'file')}: {summary(out)}"
+    if code not in (0, 5) and not failed:
+        return "FAIL", f"pytest exited {code}: {last_error(out)}" + tail
+    if "Interrupted:" in out:
+        return "FAIL", fact + "; interrupted, not every file ran" + tail
     if not failed:
         return "PASS", fact + tail
     base_failed = set()
@@ -451,16 +455,18 @@ def gate_full(ctx):
 
     def measure(root, _log):
         cov = ctx.logs / f"coverage-{'base' if root != ctx.root else 'head'}"
-        _, out = pytest(ctx, root, log, cov=cov)
+        code, out = pytest(ctx, root, log, cov=cov)
         _, report = run([ctx.bin / "python", "-m", "coverage", "report",
                          f"--data-file={cov}"], root, log)
         total = re.search(r"^TOTAL.*?([\d.]+)%", report, re.M)
         return {"failed": failures(out), "summary": summary(out),
                 "coverage": float(total.group(1)) if total else None,
-                "interrupted": "Interrupted:" in out}
+                "code": code, "interrupted": "Interrupted:" in out
+                or (code not in (0, 5) and not failures(out))}
     head, base = measured(ctx, "full", "pytest", measure)
     if head["interrupted"]:
-        return "FAIL", f"full suite interrupted: {head['summary']}"
+        return "FAIL", (f"full suite interrupted, pytest exited "
+                        f"{head.get('code')}: {head['summary']}")
     if base["interrupted"]:
         base = {"failed": [], "coverage": None}
     toml = (ctx.root / "pyproject.toml").read_text(encoding="utf-8")

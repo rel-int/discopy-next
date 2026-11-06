@@ -1,6 +1,6 @@
 ---
 name: next-checks
-description: Run every gate of CONTRIBUTING.md's "Run the unit tests" on the current tree of rel-int/discopy-next, one line per gate, ruff/ty/pylint diffed against the merge base. Use before every push and after merging main into a branch.
+description: Run the gates of CONTRIBUTING.md's "Run the unit tests" on the current tree of rel-int/discopy-next (the full suite only with --full), one line per gate, ruff/ty/pylint diffed against the merge base. Use before every push and after merging main into a branch.
 ---
 
 # next-checks
@@ -20,6 +20,7 @@ exit 1 on any FAIL. What the lines do not say:
   `3.14 sync failed` means another interpreter: the score may differ from CI's by ~0.02.
   `FAIL lock` means `uv.lock` is stale, which CI rejects: run `uv lock`.
 - `tests` runs each changed module's test file and doctests; it names modules with no test file.
+  A nonzero pytest exit with no `FAILED` or `ERROR` line to diff is a FAIL.
   A change to `test/plugin.py`, `test/fixtures/` or a conftest only gets a collection check:
   run `--full` (~10 min locally, the whole suite under coverage, failures diffed with base).
 - `changelog` SKIPs when no bullet was added: add one if the change is user-facing.
