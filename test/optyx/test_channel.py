@@ -290,8 +290,8 @@ def test_cq_map_inflates_as_the_channel_of_its_density_matrix():
     cq_map = CQMap("cq", circuit.double(), circuit.dom, circuit.cod)
     expected = (create >> circuit >> measure).inflate(2).eval().prob_dist()
     actual = (create >> cq_map >> measure).inflate(2).eval().prob_dist()
-    for key, value in expected.items():
-        assert np.isclose(actual[key], value)
+    for key in expected.keys() | actual.keys():
+        assert np.isclose(actual.get(key, 0), expected.get(key, 0)), key
     hom = photonic.Create(
         1, 1, internal_states=([1, 0], [1, 0])) >> photonic.BS
     trace = Observable(function=lambda n: 1, dom=qmode @ qmode)
