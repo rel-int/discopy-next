@@ -712,6 +712,9 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   and agree with the undelayed one, instead of raising `AxiomError`; `to_tk`
   raises `NotImplementedError` on one, as on anything else it cannot translate
   ([next#445]).
+- `Circuit.measure` and `init_and_discard` prepare a digit of any dimension in
+  `Digits(0, dim=...)`, so a classical circuit on `Digit(4)` measures instead
+  of raising `AxiomError` ([next#445]).
 - `quantum.Measure`'s `destructive` and `Encode`'s `constructive` are
   documented the right way round, `Circuit.from_tk` says it adds logical swaps
   rather than SWAP gates, and `Controlled` that a zero distance raises

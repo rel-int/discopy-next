@@ -101,6 +101,17 @@ def test_measure_measures_every_open_qubit():
     assert np.allclose(((Ket(0) >> X) @ Bits(1)).measure(), [[0, 0], [0, 1]])
 
 
+def test_measure_initialises_digits_of_any_dimension():
+    digit = Ty(Digit(4))
+    shift = Box("shift", digit, digit, is_mixed=False, data=np.roll(
+        np.eye(4), 1, axis=1))
+    one = [0, 1, 0, 0]
+    for circuit, distribution in [
+            (Id(digit), [1, 0, 0, 0]), (shift, one), (shift.delay(), one),
+            (shift @ bit, np.outer(one, [1, 0]))]:
+        assert np.allclose(circuit.measure(), distribution)
+
+
 def test_delayed_circuit_measures_as_the_circuit():
     for circuit in (H, CX, Measure(), H @ qubit >> CX >> Measure(2),
                     H @ qubit.delay(), Copy()):

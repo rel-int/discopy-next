@@ -225,12 +225,12 @@ class Circuit(tensor.Diagram[complex]):
 
     def init_and_discard(self):
         """ Returns a circuit with empty domain and only bits as codomain. """
-        from discopy.quantum.gates import Bits, Ket, Discard
+        from discopy.quantum.gates import Digits, Ket, Discard
         circuit = self
         if circuit.dom:
             init = Id().tensor(*(
-                (Bits(0) if isinstance(x, Digit) else Ket(0)).delay(
-                    x.time_step) for x in circuit.dom.inside))
+                (Digits(0, dim=x.dim) if isinstance(x, Digit) else Ket(0))
+                .delay(x.time_step) for x in circuit.dom.inside))
             circuit = init >> circuit
         if circuit.cod != bit ** len(circuit.cod):
             discards = Id().tensor(*(
