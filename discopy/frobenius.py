@@ -335,7 +335,8 @@ class Diagram(
         """
         F = compact.Functor(
             ob_map=lambda x: x, ar_map=lambda f:
-                f.unfuse() if isinstance(f, Spider) else f,
+                f.unfuse() if isinstance(f, Spider)
+                else f.to_spiders().unfuse() if isinstance(f, Cospan) else f,
             dom=Diagram, cod=Diagram)
         return F(self)
 
@@ -759,9 +760,10 @@ class Spider(Box):
         if "_name" in state and state["_name"] == type(self).__name__:
             phase = state.get("_data", None)
             str_data = "" if phase is None else f", {phase}"
-            cod, dom = state['_dom'], state['_cod']
+            dom, cod, state["typ"] = (
+                state['_dom'], state['_cod'], state.pop('_typ'))
             state["_name"] = type(self).__name__\
-                + f"({dom.n}, {cod.n}, {state['_typ']}{str_data})"
+                + f"({dom.n}, {cod.n}, {state['typ']}{str_data})"
         super().__setstate__(state)
         if "affine" not in state:
             self.deterministic = len(self.dom) > 0 and not self.phase

@@ -332,7 +332,8 @@ class ZBox(diagram.Spider, ZWBox):
                 np.array([amplitudes[0]], dtype=complex),
             )
 
-        spider_dim = min(input_dims) if self.legs_in > 0 else 2
+        spider_dim = min(input_dims) if self.legs_in > 0 \
+            else self.determine_output_dimensions(input_dims)[0]
 
         # create the array
         if not isinstance(
@@ -384,9 +385,13 @@ class ZBox(diagram.Spider, ZWBox):
 
     def determine_output_dimensions(self, input_dims: list[int]) -> list[int]:
         """Determine the output dimensions based on the input dimensions."""
-        if self.legs_in == 0:
-            return [2 for _ in range(len(self.cod))]
-        return [min(input_dims) for _ in range(len(self.cod))]
+        if self.legs_in > 0:
+            dim = min(input_dims)
+        elif isinstance(self.amplitudes, IndexableAmplitudes):
+            dim = 2
+        else:
+            dim = max(2, np.size(self.amplitudes))
+        return [dim for _ in range(len(self.cod))]
 
     def __repr__(self):
         if isinstance(self.amplitudes, IndexableAmplitudes):

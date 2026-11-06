@@ -21,9 +21,10 @@ def test_FinSet():
 
 
 def test_transparency():
-    for arrow in (op.Markov[Matrix[int]].copy(Nat(1)), op.Markov.copy(Nat(1))):
-        assert eval(repr(arrow), type(arrow).environment() | {
-            "Function": Function, "Nat": Nat}) == arrow
+    for arrow in (
+            op.Markov[Matrix[int]].copy(Nat(1)),
+            op.Markov.copy(Nat(1)), op.Comarkov.merge(Nat(1))):
+        assert eval(repr(arrow), type(arrow).environment()) == arrow
 
 
 def test_wrong_category():

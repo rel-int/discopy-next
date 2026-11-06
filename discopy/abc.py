@@ -78,6 +78,7 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from functools import wraps
 from inspect import signature
+from operator import index
 from types import NoneType
 from typing import TYPE_CHECKING, ClassVar
 
@@ -367,6 +368,10 @@ class Nat(Testable["Nat"], Monoid["Nat"]):
         n : The natural number.
     """
     n: int = 0
+
+    def __post_init__(self):
+        if index(self.n) < 0:
+            raise ValueError(f"Expected a natural number, got {self.n}.")
 
     def tensor(self, *others: Nat) -> Nat:
         if any(not isinstance(other, Nat) for other in others):
@@ -761,6 +766,18 @@ class TracedCategory[
         # pylint: disable-next=no-member  # stated where there is a swap
         return cls.equation_factory(cls.swap(x, x).trace(mem=x), cls.id(x))
 
+    @axiom
+    def yanking_left[X: Obj[C0]](
+            cls, x: Var[C0, X]) -> Equation[Hom[C1, X, X]]:
+        """
+        Tracing the swap of an object with itself on the left gives its
+        identity, as :meth:`yanking` does on the right: on a compact category
+        the two are Reidemeister move 1 for either trace.
+        """
+        # pylint: disable-next=no-member  # stated where there is a swap
+        return cls.equation_factory(cls.swap(x, x).trace(
+            mem=x, left=True), cls.id(x))  # ty: ignore[unknown-argument]
+
 
 class ResiduatedMonoid[C0, C1: ResiduatedMonoid](ColouredMonoid[C0, C1]):
     """
@@ -1004,6 +1021,8 @@ class PivotalCategory[
     """
     yanking = TracedCategory.yanking.inapplicable(
         messages.PLANAR_YANKING)
+    yanking_left = TracedCategory.yanking_left.inapplicable(
+        messages.PLANAR_YANKING)
 
 
 class BraidedCategory[
@@ -1078,6 +1097,18 @@ class SymmetricCategory[
     @classmethod
     def braid(cls, left: C0, right: C0) -> C1:
         return cls.swap(left, right)
+
+    def left_trace(self, n: int = 1) -> C1:
+        """
+        The trace over the first ``n`` objects, as the trace over the last
+        ``n`` between swaps: the left trace of a symmetric category that only
+        implements the right one, see :meth:`TracedCategory.trace`.
+
+        Parameters:
+            n : The number of objects to trace over.
+        """
+        mem, dom, cod = self.dom[:n], self.dom[n:], self.cod[n:]
+        return (self.swap(dom, mem) >> self >> self.swap(mem, cod)).trace(n)
 
 
 class PROP[C1: PROP](PROB[C1], SymmetricCategory[Nat, C1]):
@@ -1329,6 +1360,16 @@ class BalancedCategory[C0: ColouredMonoid, C1: BalancedCategory](
             cls.braid(x, x).trace(
                 mem=x), cls.twist(x))  # ty: ignore[unknown-argument]
 
+    @axiom
+    def yanking_left[X: Obj[C0]](
+            cls, x: Var[C0, X]) -> Equation[Hom[C1, X, X]]:
+        """
+        Tracing the braid of an object with itself on the left gives its
+        twist too, i.e. the twist is either orientation of a traced braid.
+        """
+        return cls.equation_factory(cls.braid(x, x).trace(
+            mem=x, left=True), cls.twist(x))  # ty: ignore[unknown-argument]
+
 
 class RibbonCategory[C0: Pregroup, C1: RibbonCategory](
         PivotalCategory[C0, C1], BalancedCategory[C0, C1]):
@@ -1339,6 +1380,7 @@ class RibbonCategory[C0: Pregroup, C1: RibbonCategory](
     category lacks.
     """
     yanking = BalancedCategory.yanking
+    yanking_left = BalancedCategory.yanking_left
 
 
 class CompactCategory[C0: Pregroup, C1: CompactCategory](

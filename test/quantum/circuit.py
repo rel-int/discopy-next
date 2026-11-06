@@ -408,6 +408,12 @@ def test_controlled_subs():
     assert CRx(psi).l.subs((phi, 0.1), (psi, 0.2)) == CRx(0.2).l
 
 
+def test_Functor_then():
+    F = Functor({qubit: qubit}, {X: H, H: X})
+    G = Functor({qubit: qubit}, {X: Z, H: H})
+    assert isinstance(F >> G, Functor) and (F >> G)(X >> H) == H >> Z
+
+
 def test_circuit_chaining():
     circuit = Id(qubit ** 5).CX(0, 2).X(4).CRz(0.2, 4, 2).H(2)
     boxes = [Controlled(X, distance=2), X, Controlled(Rz(0.2), distance=-2), H]
