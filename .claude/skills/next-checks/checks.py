@@ -272,6 +272,10 @@ def gate_pylint(ctx):
         f"on {ctx.python}, 3.14 sync failed, CI lints on 3.14, ±0.02")
     fact = (f"{head['score']:.4f} (base {base['score']:.4f}, fail-under "
             f"{fail_under}, {where}), {plural(len(new), 'new message')}")
+    log = ctx.logs / "pylint-head.json"
+    if not log.exists():
+        log.write_text("".join(json.dumps(m) + "\n"
+                               for m in head["messages"]), encoding="utf-8")
     blocking = [m for m in head["messages"] if m[0] in fail_on]
     if head["score"] < fail_under:
         return "FAIL", fact + "; score below fail-under"
@@ -546,7 +550,7 @@ def gate_changelog(ctx):
     if missing:
         return "FAIL", fact + "; no link definition for " + capped(
             f"[{m}]" for m in missing)
-    return "PASS", fact
+    return ("PASS" if bullets else "SKIP"), fact
 
 
 def main():

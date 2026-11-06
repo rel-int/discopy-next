@@ -25,7 +25,8 @@ exit 1 on any FAIL. What the lines do not say:
   A nonzero pytest exit with no `FAILED` or `ERROR` line to diff is a FAIL.
   A change to `test/plugin.py`, `test/fixtures/` or a conftest only gets a collection check:
   run `--full` (~10 min locally, the whole suite under coverage, failures diffed with base).
-- `changelog` SKIPs when no bullet was added: add one if the change is user-facing.
+- `changelog` SKIPs when no bullet was added, even if other lines changed: add one if the
+  change is user-facing.
   It names any of base's lines the branch removes, since a bad merge drops main's bullets.
 - SKIP is not PASS: say which gates skipped when you report.
 
@@ -34,7 +35,8 @@ are cached under `~/.cache/next-checks/` by content). While iterating, use
 `--only flake8,ruff,ty,tests`; run everything once before pushing.
 
 On FAIL the line names the first finding. For more, grep the log, never cat it:
-`grep -n -m 20 '^FAILED\|^ERROR' <dir>/tests.log`, or filter `<dir>/pylint-head.json` by symbol.
+`grep -n -m 20 '^FAILED\|^ERROR' <dir>/tests.log`, or grep `<dir>/pylint-head.json` for a
+symbol (on a cache hit it holds the cached messages, one JSON list per line).
 
 Local green is evidence for the checks that ran, not for CI: CI on the pushed branch, with `main`
 merged in, remains the authority.
