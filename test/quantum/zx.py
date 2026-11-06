@@ -1,7 +1,5 @@
 import random
-import tomllib
 from fractions import Fraction
-from pathlib import Path
 
 import pytest
 
@@ -12,10 +10,10 @@ from discopy.quantum.gates import CRz, CRx, CU1, Controlled, Rz, Rx
 from discopy.quantum.zx import *
 from discopy import frobenius, tensor
 from discopy.tensor import Dim, Tensor
+from fixtures.pyproject import EXTRAS
 
-with open(Path(__file__).parents[2] / "pyproject.toml", "rb") as file:
-    QUANTUM = tomllib.load(file)["project"]["optional-dependencies"]["quantum"]
-PYZX = next(req.split("==")[1].strip() for req in QUANTUM if "pyzx" in req)
+PYZX = next(req.split("==")[1].strip()
+            for req in EXTRAS["quantum"] if "pyzx" in req)
 
 
 @fixture

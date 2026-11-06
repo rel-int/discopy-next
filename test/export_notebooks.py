@@ -4,6 +4,7 @@ on the discopy of its own tree."""
 from pathlib import Path
 
 from docs import export_notebooks
+from fixtures.pyproject import EXTRAS, installs
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -30,3 +31,9 @@ def test_every_name_must_match_a_notebook(monkeypatch, capsys):
 
     assert export_notebooks.main() == 1
     assert "fixpoint" in capsys.readouterr().err
+
+
+def test_the_docs_extra_installs_what_the_optyx_notebooks_need():
+    """The docs build installs the optyx extra and joblib, so that it renders
+    the notebooks of ``optyx/`` rather than their fallback link pages."""
+    assert installs(EXTRAS, "optyx") | {"joblib"} <= installs(EXTRAS, "docs")

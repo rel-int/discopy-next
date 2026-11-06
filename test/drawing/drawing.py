@@ -1,8 +1,6 @@
 
 import os
-import tomllib
 
-from packaging.requirements import Requirement
 from pytest import approx, importorskip, raises
 
 from discopy.utils import AxiomError
@@ -10,6 +8,7 @@ from discopy.config import DRAWING_DEFAULT
 from discopy.compact import *
 from discopy.drawing import *
 from discopy import config, monoidal
+from fixtures.pyproject import EXTRAS, installs
 
 TIKZ_FOLDER = 'test/drawing/tikz/'
 
@@ -796,22 +795,8 @@ def test_widget():
     assert pickle.loads(pickle.dumps(f)) == f
 
 
-def installs(extras, extra):
-    """The names an extra installs, with those of the extras it includes."""
-    names = set()
-    for requirement in map(Requirement, extras[extra]):
-        if requirement.name == "discopy":
-            names = names.union(
-                *(installs(extras, name) for name in requirement.extras))
-        else:
-            names.add(requirement.name)
-    return names
-
-
 def test_the_test_extra_installs_the_widget():
-    with open("pyproject.toml", "rb") as file:
-        extras = tomllib.load(file)["project"]["optional-dependencies"]
-    assert "anywidget" in installs(extras, "test")
+    assert "anywidget" in installs(EXTRAS, "test")
 
 
 def test_installs_reads_any_spelling_of_a_requirement():
