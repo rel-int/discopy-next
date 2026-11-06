@@ -15,7 +15,9 @@ Base is `merge-base(HEAD, origin/main)`; `git fetch origin main` first if it may
 One line per gate, `PASS|FAIL|SKIP <gate>: <fact>`, then `base <sha>, <seconds>, logs <dir>`;
 exit 1 on any FAIL. What the lines do not say:
 
-- ruff, ty and pylint fail only on findings new since base, matched with line numbers ignored.
+- ruff and ty fail only on findings new since base, matched with line numbers ignored.
+  pylint fails on a score below `fail-under` or any `fail-on` message (`.pylintrc`'s
+  `unused-*` family) in head, even when base has it; its new messages are named, not failed on.
 - pylint's score is the raw `json2` one, on a cached 3.14 venv synced like CI's lint job.
   `3.14 sync failed` means another interpreter: the score may differ from CI's by ~0.02.
   `FAIL lock` means `uv.lock` is stale, which CI rejects: run `uv lock`.
