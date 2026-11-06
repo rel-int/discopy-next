@@ -107,8 +107,8 @@ def mismatch(data, run, pull, repository):
 def unattested(data, run, open_pulls):
     """Why the pull request the metadata names is not the one this run
     belongs to, ``None`` when it is. A run from this repository lists its
-    pull requests and the named one must be among them, on the same two
-    commits. A run from a fork lists none, and ``open_pulls`` -- the open
+    pull requests and the named one must be among them, on the same head
+    commit. A run from a fork lists none, and ``open_pulls`` -- the open
     pull requests for its head -- must then be exactly the one named,
     since a head with two of them names neither."""
     listed = run.get("pull_requests") or []
@@ -116,14 +116,23 @@ def unattested(data, run, open_pulls):
         for candidate in listed:
             if candidate["number"] != data["pull_request"]:
                 continue
-            if (candidate["head"]["sha"] != data["head"]
-                    or candidate["base"]["sha"] != data["base"]):
+            if candidate["head"]["sha"] != data["head"]:
                 return "Benchmark run does not belong to this PR."
             return None
         return "Benchmark run does not belong to this PR."
     if [pull["number"] for pull in open_pulls] != [data["pull_request"]]:
         return "Benchmark run does not name the one pull request for its head."
     return None
+
+
+def retargeted(data, run):
+    """Whether the pull request was retargeted while the run ran: a run
+    from this repository lists it on the base it has now, not on the one
+    whose merge base the benchmark measured. That comparison is not
+    posted, and the next run of the pull request posts its own."""
+    return any(candidate["number"] == data["pull_request"]
+               and candidate["base"]["sha"] != data["base"]
+               for candidate in run.get("pull_requests") or [])
 
 
 def sanitised(report):
@@ -204,6 +213,9 @@ def main():
         repository, run)
     if reason := unattested(data, run, open_pulls):
         fail(reason)
+    if retargeted(data, run):
+        print("::notice::Skipping a comparison for a retargeted pull request.")
+        return
     pull = call(f"{API}/repos/{repository}/pulls/{data['pull_request']}")
     if reason := mismatch(data, run, pull, repository):
         fail(reason)
