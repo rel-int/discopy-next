@@ -1474,11 +1474,13 @@ class TikZ(Backend):
             i, j = graph.positions[node]
             text = node.box.drawing_name if draw_box_labels else ""
             if self.use_tikzstyles:
-                style = f"\\tikzstyle{{{node.box.tikzstyle_name}}}=" \
-                        f"[fill={self.format_color(color)}]\n"
+                style_name = f"{node.box.tikzstyle_name}_"\
+                    f"{str(color).removeprefix('#')}_{shape}"
+                style = f"\\tikzstyle{{{style_name}}}=" \
+                        f"[fill={self.format_color(color)}, shape={shape}]\n"
                 if style not in self.node_styles:
                     self.node_styles.append(style)
-                options = f"style={node.box.tikzstyle_name}"
+                options = f"style={style_name}"
             else:
                 options = f"{shape}, fill=" + (
                     self.format_color(color) if str(color).startswith("#")
