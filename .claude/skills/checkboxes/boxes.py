@@ -220,7 +220,7 @@ def read_todo(required=True):
 
 def changelog_bullets(text):
     match = re.search(
-        r"^## \[Unreleased\]\r?\n(.*?)(?=^## \[)", text, re.M | re.S
+        r"^## \[Unreleased\]\r?\n(.*?)(?=^## \[|\Z)", text, re.M | re.S
     )
     bullets = []
     for line in (match.group(1) if match else "").splitlines():
