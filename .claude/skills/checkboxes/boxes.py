@@ -339,17 +339,28 @@ def restore(had_todo):
         git(
             "rm", "-q", "--cached", "--ignore-unmatch", "--", TODO, check=False
         )
+        write(None)
+
+
+def write(text):
+    if text is None:
         if os.path.exists(TODO):
             os.remove(TODO)
+        return
+    with open(TODO, "w", encoding="utf-8", newline="") as f:
+        f.write(text)
 
 
-def commit(message, new_text, had_todo):
-    if new_text is None:
-        git("rm", "-q", "--", TODO)
-    else:
-        with open(TODO, "w", encoding="utf-8", newline="") as f:
-            f.write(new_text)
-        git("add", "--", TODO)
+def commit(message, new_text, text):
+    try:
+        if new_text is None:
+            git("rm", "-q", "--", TODO)
+        else:
+            write(new_text)
+            git("add", "--", TODO)
+    except Refused:
+        write(text)
+        raise
     result = git(
         "commit",
         "-F",
@@ -361,7 +372,7 @@ def commit(message, new_text, had_todo):
         check=False,
     )
     if result.returncode:
-        restore(had_todo)
+        restore(text is not None)
         raise Refused(
             "git commit failed (a hook, signing or identity?), TODO.md restored: "
             + (result.stderr.strip() or result.stdout.strip() or "no output")
@@ -431,7 +442,7 @@ def run(step, args):
         print("\n".join(list(diff)[2:]))
         return 0
     branch, remote = target(getattr(args, "base", "origin/main"))
-    sha = commit(message, new_text, text is not None)
+    sha = commit(message, new_text, text)
     error = push(branch, remote)
     if error is None:
         print(f"boxes: {sha} {subject}; pushed")
@@ -454,7 +465,7 @@ def run(step, args):
         )
     subject, new_text = step(text)
     message = subject + "\n" + ("\n" + "\n".join(tr) + "\n" if tr else "")
-    sha = commit(message, new_text, text is not None)
+    sha = commit(message, new_text, text)
     error = push(branch, remote)
     if error is not None:
         undo(text is not None)
