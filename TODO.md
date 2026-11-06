@@ -1,0 +1,9 @@
+> I got some spare tokens to spend: let’s use them to polish all things discopy-next. Make a deep review of the code and the infra around it, summarising your findings and suggestions in an issue, fixing any bugs that you can fix without requiring a design decisions from my side.
+
+cubic's review of #454 at 8aadf767:
+
+- [ ] **C1** test/python/function.py:37: The outer `Function.no_type_checking` context masks whether `multiplicative.Function.no_type_checking` actually disables checking, so a no-op subclass context would pass this regression test. Exercise `multiplicative.Function.no_type_checking` while the base class still has `type_checking=True`, then assert that checking is restored afterward.
+- [ ] **C2** discopy/python/finset.py:372: `Permutation.then` now reports a size mismatch as `AxiomError` only when the argument is a `Function`. A tuple or list of the wrong length still raises `ValueError` from `__init__`. Validate the length for every `other` before the constructor call so both inputs fail the same way.
+- [ ] **C3** discopy/drawing/drawing.py:1043: Passing `_check=False` here skips `validate_attributes`, which rejects the box_dom -> box_cod pass-through edges that `bubble()` creates. Teach `validate_attributes` to accept those same-box pass-through edges and drop the `_check=False`, so dagger output stays checked.
+- [ ] **C4** discopy/drawing/backend.py:302: `add_dark_mode_style` no longer accepts the path or file-like arguments its previous API supported. Preserve the old interface with a wrapper, or introduce a separate text-only helper and keep this public helper backward-compatible.
+- [ ] **C5** discopy/drawing/backend.py:342: SVG output does not replace a reused file-like buffer: `savefig` writes at its current position without rewinding or truncating. Seek to zero and truncate the destination before writing the processed text.
