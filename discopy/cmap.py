@@ -2285,7 +2285,8 @@ cycles of this map.
         """
         def owner(port):
             return self.owners.get(port, (None, ))[0]
-        ranks, below, above = self.box_ranks or (), set(boxes), set(boxes)
+        ranks, below = self.box_ranks or (), set(boxes)
+        above = set(below)
         edges = sorted(self.box_edges, key=lambda edge: ranks[owner(edge[0])])
         for source, target in edges:
             if owner(source) in below:

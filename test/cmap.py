@@ -1304,6 +1304,9 @@ def test_match_sends_straight_wires_beside_the_image(monkeypatch):
     for host, n_matches in [(h @ x >> x @ f, 2), (k @ x >> h @ x >> x @ f, 3)]:
         assert len(list(host.to_map().match((x @ f).to_map()))) == n_matches
 
+    host = (h @ x >> x @ f).to_map()
+    assert host.beside(iter([0])) == host.beside([0])
+
 
 def test_match_needs_a_connected_map():
     from discopy.monoidal import Ty, Box
