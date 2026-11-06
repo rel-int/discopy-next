@@ -41,18 +41,22 @@ class ToolError(Exception):
     pass
 
 
-def run(cmd, cwd, log, timeout=None):
+def run(cmd, cwd, log, timeout=None, stdout_only=False):
     env = dict(os.environ, PYTHONPATH=str(cwd), MPLBACKEND="Agg")
     env.pop("VIRTUAL_ENV", None)
     with open(log, "a", encoding="utf-8") as file:
         file.write(f"$ (cd {cwd} && {' '.join(map(str, cmd))})\n")
         file.flush()
-        proc = subprocess.run(
-            [str(c) for c in cmd], cwd=cwd, env=env, timeout=timeout,
-            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
-            check=False)
-        file.write(proc.stdout + f"\n[exit {proc.returncode}]\n")
-    return proc.returncode, proc.stdout
+        try:
+            proc = subprocess.run(
+                [str(c) for c in cmd], cwd=cwd, env=env, timeout=timeout,
+                capture_output=True, text=True, check=False)
+        except FileNotFoundError as error:
+            file.write(f"{error}\n[exit 127]\n")
+            return 127, str(error)
+        both = proc.stdout + proc.stderr
+        file.write(both + f"\n[exit {proc.returncode}]\n")
+    return proc.returncode, proc.stdout if stdout_only else both
 
 
 def git(*args, cwd, env=None):
@@ -114,11 +118,16 @@ class Context:
         log = self.logs / "venv.log"
         env = dict(os.environ, UV_PROJECT_ENVIRONMENT=str(VENV314))
         with open(log, "w", encoding="utf-8") as file:
-            proc = subprocess.run(
-                ["uv", "sync", "--locked", "--group", "dev", "--group", "all",
-                 "--python", "3.14"], cwd=self.root, env=env, stdout=file,
-                stderr=subprocess.STDOUT, check=False)
-        if proc.returncode == 0:
+            try:
+                code = subprocess.run(
+                    ["uv", "sync", "--locked", "--group", "dev", "--group",
+                     "all", "--python", "3.14"], cwd=self.root, env=env,
+                    stdout=file, stderr=subprocess.STDOUT,
+                    check=False).returncode
+            except FileNotFoundError as error:
+                file.write(f"{error}\n")
+                code = 127
+        if code == 0:
             return VENV314 / "bin", "3.14", None
         text = log.read_text(encoding="utf-8")
         if "needs to be updated" in text:
@@ -318,7 +327,8 @@ def diffed(ctx, name, measure, show):
 def gate_ruff(ctx):
     def measure(root, log):
         code, out = run([ctx.bin / "ruff", "check", "discopy", "-q",
-                         "--output-format", "json", "--no-cache"], root, log)
+                         "--output-format", "json", "--no-cache"], root, log,
+                        stdout_only=True)
         try:
             found = json.loads(out or "[]")
         except ValueError:
