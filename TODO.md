@@ -5,4 +5,4 @@ Found by merging all nine #445 pull requests onto `main` (`d110a140`) and runnin
 
 #447's S1-8 makes `cat.Box.subs` rebuild the box with its data substituted. `classical.Z` and `X` inherit that `subs`, since they are `CQMap`s not `Channel`s, and their constructor takes `(n_legs_in, n_legs_out, phase)`, which `rebuild` cannot call. On this branch alone they substitute through the `lambdify` S14-7 gives them; once #447 lands they raise.
 
-- [WIP] @session_01MEJxy43YMF4nTF8NEcP8Je-2026-11-06 02:35 `classical.Z` and `X` substitute their phase themselves, as `quantum.zx.Spider` does, so `subs` holds whichever of #447 and #452 lands first
+- [x] `classical.Z` and `X` substitute their phase themselves, as `quantum.zx.Spider` does, so `subs` holds whichever of #447 and #452 lands first

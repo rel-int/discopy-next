@@ -219,6 +219,13 @@ def test_subs_substitutes_the_parameter_of_every_symbolic_box():
     assert classical.Z(1, 1, x).subs((x, .25)) == classical.Z(1, 1, .25)
 
 
+def test_classical_spiders_substitute_their_phase():
+    from discopy.optyx import classical
+    for spider in (classical.Z, classical.X):
+        assert spider(1, 2, x + 1).subs(x + 1, y) == spider(1, 2, y)
+        assert spider(1, 2, x).subs({x: .25}) == spider(1, 2, .25)
+
+
 def test_cq_map_power_is_a_tensor_power():
     measure = CQMap("measure", diagram.Spider(2, 1, diagram.bit), qubit, bit)
     assert measure ** 1 == measure

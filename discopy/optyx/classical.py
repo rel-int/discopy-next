@@ -133,7 +133,7 @@ and feed the result into a controlled quantum gate.
 from typing import Callable, List
 import numpy as np
 from sympy import lambdify
-from discopy.utils import factory_name
+from discopy.utils import factory_name, rsubs
 from discopy.optyx import channel
 from discopy.optyx.core import (
     control,
@@ -631,6 +631,10 @@ class Z(ClassicalBox):
         return lambda *xs: type(self)(len(self.dom), len(self.cod), lambdify(
             symbols, self.phase, **kwargs)(*xs))
 
+    def subs(self, *args):
+        return type(self)(
+            len(self.dom), len(self.cod), rsubs(self.phase, *args))
+
 
 # pylint: disable=invalid-name
 class X(ClassicalBox):
@@ -654,7 +658,7 @@ class X(ClassicalBox):
         return f"{factory_name(type(self))}({len(self.dom)}, "\
             f"{len(self.cod)}, {self.phase!r})"
 
-    lambdify = Z.lambdify
+    lambdify, subs = Z.lambdify, Z.subs
 
 
 # pylint: disable=invalid-name
