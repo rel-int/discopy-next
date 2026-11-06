@@ -327,7 +327,7 @@ class Algebra:
             and self.generators == other.generators
 
     def __hash__(self):
-        return hash(repr(self.generators))
+        return hash(self.generators)
 
     def to_tree(self) -> dict:
         """
@@ -854,9 +854,11 @@ class Representation[algebra](TestableGeneric, frobenius.Dim):
     def qdim(self):
         """
         The quantum dimension: the value of a loop coloured by ``V``, i.e. the
-        (co)evaluation :math:`\\cup \\circ \\cap` in :class:`Intertwiner`.
+        (co)evaluation :math:`\\cup \\circ \\cap` in ``Intertwiner[H]``,
+        twisted by the pivotal element of ``H``.
         """
-        loop = Intertwiner.caps(self, self.r) >> Intertwiner.cups(self, self.r)
+        category = Intertwiner[self.algebra]
+        loop = category.caps(self, self.r) >> category.cups(self, self.r)
         return complex(loop.eval(dtype=complex).array)
 
     def is_module(self):

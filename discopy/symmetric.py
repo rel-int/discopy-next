@@ -935,7 +935,8 @@ for level in (
         if isinstance(law, (Axiom, Rule)):
             setattr(CMap, name, law.inapplicable(messages.MAP_HAS_NO_ADJOINTS))
 
-Feedback, Trace, FollowedBy, Head, Tail = feedback.generators(Diagram, Box)
+Feedback, Trace, FollowedBy, Head, Tail = feedback.structural_boxes(
+    Diagram, Box)
 Diagram.box_factory = Box
 Diagram.functor_factory = Functor
 Diagram.dual_rail_factory = DualRail

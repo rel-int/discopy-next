@@ -413,7 +413,7 @@ class Functor(markov.Functor, comarkov.Functor):
 Id = Network.id
 Equation = markov.Equation
 
-Feedback, Trace, FollowedBy, Head, Tail = feedback.generators(
+Feedback, Trace, FollowedBy, Head, Tail = feedback.structural_boxes(
     Network, Box)
 Network.box_factory = Box
 Network.functor_factory = Functor

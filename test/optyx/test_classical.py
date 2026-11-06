@@ -15,12 +15,12 @@ def test_addn():
     assert compare_arrays_of_different_sizes(d_1.double().to_tensor().eval().array,
                        d_2.double().to_tensor().eval().array)
 
-def test_subn():
-    d_1 = Digit(2, 5) >> Sub()
-    d_2 = Digit(3)
-
-    assert compare_arrays_of_different_sizes(d_1.double().to_tensor().eval().array,
-                       d_2.double().to_tensor().eval().array)
+def test_sub_subtracts_the_first_number_from_the_second():
+    for x, y in [(2, 5), (0, 4), (3, 3), (5, 2), (4, 0)]:
+        array = (Digit(x, y) >> Sub()).double().to_tensor().eval().array
+        support = np.flatnonzero(array)
+        assert support.tolist() == ([y - x] if y >= x else [])
+        assert np.allclose(array.flat[support], 1)
 
 def test_multiplyn():
     d_1 = Digit(2, 3) >> Multiply()
@@ -177,6 +177,22 @@ def test_bit_controlled_phase_shift_keeps_its_modes_quantum():
     gate = BitControlledPhaseShift(lambda bits: [0.5 * bits[0]])
     assert gate.cod == qmode
     assert (gate >> Phase(0.25)).cod == qmode
+
+
+def test_bit_controlled_phase_shift_is_controlled_by_its_classical_mode():
+    """The control is the `mode` declared after the `qmode`, so the photons
+    on the `qmode` stay there, and half a turn on one arm of a Mach-Zehnder
+    swaps its outputs."""
+    from discopy.optyx.channel import Measure, qmode
+    from discopy.optyx.photonic import BS, Create
+    gate = BitControlledPhaseShift(lambda control: [0.25 * control[0]])
+    for photons, control in [(1, 2), (2, 1), (0, 3)]:
+        kept = Create(photons) @ Digit(control) >> gate >> Measure(qmode)
+        assert kept.eval().prob_dist()[photons, ] == pytest.approx(1)
+    for control, outcome in [(0, (0, 1)), (2, (1, 0))]:
+        mzi = Create(1, 0) @ Digit(control) >> BS @ mode >> qmode @ gate
+        mzi >>= BS >> Measure(qmode ** 2)
+        assert mzi.eval().prob_dist()[outcome] == pytest.approx(1)
 
 
 def test_classical_diagram_eval():

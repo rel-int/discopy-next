@@ -226,7 +226,7 @@ def explode_channel(
         circuit_class = Diagram
 
     arrows = []
-    for layer in kraus:
+    for layer in kraus.to_staircases():
         (generator, offset), = layer.inside[0].boxes_and_offsets
         left = layer.dom[:offset]
         right = layer.dom[offset + len(generator.dom):]

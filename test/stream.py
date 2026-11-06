@@ -48,6 +48,12 @@ def test_sequence_box_of_its_category():
     assert type(box) is tensor.Box is tensor.Diagram.box_factory
 
 
+def test_sequence_of_a_name_is_one_wire():
+    mem = Ty.sequence('mem')
+    assert mem.now == Ty.sequence(symmetric.Ty('mem')).now
+    assert mem.now @ mem.later.now == symmetric.Ty('mem0', 'mem1')
+
+
 def test_feedback_errors():
     x = Ty.sequence(symmetric.Ty('x'))
     with raises(ValueError):  # A constant stream needs constant types.
@@ -152,3 +158,15 @@ def test_no_hash():
     for unhashable in (Stream.sequence('f', x, x), x):
         with raises(TypeError, match="unhashable"):
             hash(unhashable)
+
+
+def test_delay_passes_the_initial_memory_through():
+    x, y, m = (Ty.sequence(symmetric.Ty(name)) for name in "xym")
+    f = Stream.sequence("f", x @ m.delay(), y @ m)
+    for stream in (Stream.sequence("g", x, y, m), f.feedback().later):
+        delayed = stream.delay()
+        delayed.check_later()
+        assert delayed.now == symmetric.Id(stream.mem.now)
+        assert delayed.later is stream
+        assert delayed.unroll().now.to_hypergraph()\
+            == stream.now.to_hypergraph()

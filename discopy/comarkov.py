@@ -581,7 +581,8 @@ class Functor(symmetric.Functor):
 
 CMap = cmap.CMap[Diagram]
 
-Feedback, Trace, FollowedBy, Head, Tail = feedback.generators(Diagram, Box)
+Feedback, Trace, FollowedBy, Head, Tail = feedback.structural_boxes(
+    Diagram, Box)
 Diagram.box_factory = Box
 Diagram.functor_factory = Functor
 Hypergraph = hypergraph.Hypergraph[Diagram]

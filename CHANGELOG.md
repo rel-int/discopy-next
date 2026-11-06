@@ -291,6 +291,9 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   and dict functors ([next#168]); `para` and `interaction` hash ([next#31]).
 - A `Matrix` with no dtype reads it off its array without copying it, so it
   copies once, as a `Matrix[dtype]` does ([next#8]).
+- `feedback.generators` is `feedback.structural_boxes`, and
+  `feedback.wire_generators` `feedback.structural_wires`: a feedback, trace,
+  head or tail is a structural box, not a generator ([next#459]).
 
 ### Deprecated
 
@@ -874,6 +877,144 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   them left to right, as `Hypergraph` does: rigid accepts the map of a cup on
   a box onto `x @ x.r` and refuses one onto `x.r @ x`, and pivotal decodes
   both ([next#445]).
+- `tensor.Box` compares its winding number `z`, so on a self-dual `Dim` a
+  rotated box `f.r` no longer equals or hashes like `f` ([next#445]).
+- `tensor.Functor` evaluates `dtype=Expr` diagrams exactly and functorially:
+  its boundary and loop identities are integers, not floats, so
+  `F(f >> f) == F(f) >> F(f)` ([next#445]).
+- `hopf.Representation.qdim` is the loop in `Intertwiner[H]`, twisted by the
+  pivotal element, rather than `dim V`: 0, not 4, on Sweedler's regular module
+  ([next#445]).
+- `Matrix.transpose`, `conjugate`, `dagger`, `merge` and `round`, and
+  `Tensor.transpose`, `.l`, `.r` and `round`, work under `backend('pytorch')`
+  ([next#445]).
+- `tensor.Bubble.grad` applies the chain rule on any boundary (states, effects,
+  compound `Dim`s), where it used to raise `ValueError` ([next#445]).
+- Equal `hopf.Algebra`s hash equal, so `Representation[H]` is one class per
+  algebra up to equality and `Intertwiner` accepts a module over an equal
+  algebra ([next#445]).
+- `tensor.Diagram.to_tn` evaluates the spider with no legs to its dimension,
+  the circle, as `eval` does, not to 1 ([next#445]).
+- `Matrix.repeat`, and with it Boolean `Matrix.trace` and `Tensor.repeat`,
+  takes ceil(log2 n) products instead of n(n+1)/2: milliseconds instead of
+  seconds at n = 100 ([next#445]).
+- `Matrix.is_close` gives its real `rtol` default (`1.e-8`), and
+  `tensor.Diagram.jacobian` says it returns a `Sum` diagram whose `eval` is
+  `Tensor.jacobian` ([next#445]).
+- `Stream.delay` works on streams whose memory starts non-empty, e.g.
+  `Stream.sequence(name, x, y, m)` and the tail of a feedback, instead of
+  raising `AxiomError` ([next#445]).
+- `feedback.Functor` sends a daggered `FollowedBy` to the dagger of its image,
+  so even the identity functor now keeps its boundary ([next#445]).
+- The `discopy.stream` docs check the associativity of composition for real: it
+  holds as hypergraphs, i.e. up to the axioms of symmetric categories, not on
+  the nose as they claimed ([next#445]).
+- `feedback.Diagram.feedback` and `trace` raise `AxiomError` on a wrong `dom`
+  or `cod` in the keyword form when the memory is not delayed, instead of
+  silently using the diagram's own boundary ([next#445]).
+- `kleisli.additive.unpack_value` and `kleisli.multiplicative.unpack_value`
+  take the packed type, so a channel on a single wire passes a `Tagged` or
+  `Row` value through whole instead of stripping, re-tagging or splatting it
+  ([next#445]).
+- Kleisli channels of different monads raise `TypeError` when composed with
+  `>>` or tensored with `@`, instead of composing silently or failing only at
+  call time ([next#445]).
+- `stream.Ty.sequence('mem')` is one wire `mem0`, `mem1`, ... per step instead
+  of splitting the name into its characters ([next#445]).
+- `para.Closed.curry` raises `ValueError` ("Cannot split n atoms off dom") for
+  `n < 0` or `n > len(dom)`, as `para.Compact.curry` and `para.Traced.trace`
+  do, instead of currying into the parameter wires and failing with an
+  `AxiomError` about an internal composite ([next#445]).
+- optyx's `PercevalBackend` labels each outcome by the output modes alone, so a
+  diagram with a `Select` or a non-unitary part no longer puts its amplitudes
+  on the wrong outcomes once more than one outcome is non-zero ([next#445]).
+- optyx's `QuimbBackend` with a hyperoptimiser keeps the result's axes in wire
+  order, where it used to permute them once a result had eleven or more input
+  or output wires ([next#445]).
+- `optyx.classical.BitControlledPhaseShift` is controlled by its classical
+  `mode` wires, where the photon number on the `qmode` it shifts used to drive
+  the phase ([next#445]).
+- optyx's `PermanentBackend` evaluates a sum of diagrams whose terms carry
+  different numbers of photons, padding each term's amplitudes with zeros,
+  where it used to add them by broadcasting or raise ([next#445]).
+- `optyx.core.zx.ZBox` exports to PyZX as a `Z_BOX` vertex labelled with its
+  amplitude, and `from_pyzx` reads that vertex back as a `ZBox`, where
+  `to_pyzx` made it an X spider of phase twice the amplitude, so that
+  `ZBox(1, 1, .5)` became a NOT gate ([next#445]).
+- `optyx.core.path.Matrix` compares equal only when its creations, selections,
+  normalisation and scalar agree too: matrices that evaluate differently used
+  to compare equal, and matrices with different numbers of creations were
+  compared by numpy broadcasting or raised `ValueError` ([next#445]).
+- An `optyx.core.zw.ZBox` with no inputs keeps every amplitude of a finite
+  list: its outputs have dimension `max(2, len(amplitudes))` instead of 2, so
+  `ZBox(0, 1, [1, 2, 3]) >> Select(2)` is 3, as its transpose gives
+  ([next#445]).
+- `matrix.Matrix.permutation` and `Matrix.copy` hold integers again, so a
+  `Matrix[Expr]`, and any symbolic optyx path matrix with a swap, creation or
+  selection, composes instead of raising `TypeError`; optyx's
+  `Permutation.to_path` and `Swap.to_path` return the dtype they are asked for
+  ([next#445]).
+- `optyx.core.diagram.Scalar(s).inflate(d)` is `Scalar(s)` rather than
+  `s ** d`, and a `Sum` inflates term by term, so a core diagram holding a
+  scalar or a sum keeps its amplitude when inflated ([next#445]).
+- `optyx.core.zx.ZBox(0, 0, w)` evaluates to `1 + w`, the sum of its
+  amplitudes, as pyzx and spider fusion give, where it used to be `1`
+  ([next#445]).
+- Evaluating a diagram no longer changes the `photon_preservation_behaviour` of
+  the `optyx.core.control.BitControlledBox` boxes in it ([next#445]).
+- `optyx.qubits.Circuit` converts discopy's `CRx`, `CU1` and controlled gates
+  at any distance to the right unitary, converts `SWAP` and `Controlled(U1)`
+  instead of raising `KeyError`, and raises `NotImplementedError` on a mixed
+  scalar instead of squaring it ([next#445]).
+- `optyx.channel.CQMap.inflate`, and with it `Observable`, puts each `qmode`'s
+  inflated copies in the order of the inflated type, so an inflated `CQMap` on
+  qmodes no longer evaluates to zero or to complex probabilities ([next#445]).
+- `optyx.classical.Sub` subtracts the first number from the second, as its
+  docstring says, where it computed the first minus the second ([next#445]).
+- `grad` on an `optyx.channel` box that has free symbols and no gradient of its
+  own (`qubits.Z`, `X`, `Scalar`, `photonic.BBS`, `Gate`, a `CQMap` or a
+  feedback loop) raises `NotImplementedError` instead of recursing forever, and
+  still gives zero for a variable the box does not depend on; the
+  `free_symbols` of a `Channel` include those of its Kraus map and of a `CQMap`
+  those of its density matrix, so a box built from a symbolic diagram raises
+  too, where it gave a false zero ([next#445]).
+- `subs` and `lambdify` substitute the parameter of optyx's `qubits.Scalar`,
+  `photonic.Gate`, `PhotonLoss`, `PhaseShiftDR` and `classical.Z` and `X`,
+  which report it in `free_symbols`: they used to leave the symbol in place,
+  and their gradient was silently zero. A `Gate` with a symbolic matrix and no
+  `data` is substituted too ([next#445]).
+- `optyx.channel.Diagram.fix` warns that the result is truncated to `max_chi`
+  only when its backend compresses: `DiscopyBackend` and a `QuimbBackend`
+  without a compressed optimiser return the exact state without the false
+  warning ([next#445]).
+- The teleportation example of `optyx.qubits` is the standard circuit, a
+  normalised Bell pair, a CNOT and a Hadamard on its control, and its doctest
+  checks that it is the identity channel, where it used to be skipped with a
+  note blaming the library ([next#445]).
+- The docstrings of `optyx.photonic.ZMeasurementDR` and `XMeasurementDR` say
+  what they measure, the Z or X spider of phase alpha, i.e. the X or Z basis at
+  alpha = 0: the old text of `ZMeasurementDR` left out its `HadamardBS`
+  ([next#445]).
+- The docstring of `optyx.photonic.BBS` gives the matrix it computes, `i cos`
+  on the diagonal and `sin` off it, where the old one had its columns swapped,
+  and those of `TBS` and `MZI` say their matrices include their `global_phase`
+  ([next#445]).
+- `optyx.qubits.X(1, 1, .25).dual_rail()` is `BS` times `exp(-i pi / 4)`, and
+  `X(1, 1, .75)`, also written `-.25`, is `BS.dagger()` times `exp(i pi / 4)`,
+  where the old code returned the wrong beam splitter or raised
+  `NotImplementedError` ([next#445]).
+- `optyx.channel.Diagram.from_perceval` applies a `PostSelect` to the
+  processor's modes, heralded ones included, as perceval does: a condition on a
+  mode after a herald used to read the mode to its right ([next#445]).
+- `Diagram.from_perceval` accepts a `PostSelect` that uses `!=`, which perceval
+  accepts and prints back, instead of raising 'Unexpected operator'
+  ([next#445]).
+- `Diagram.from_perceval` creates photons only for input heralds
+  (`p.in_heralds`) and selects them only for output heralds, so an INPUT-only
+  or OUTPUT-only herald gives the same domain as perceval ([next#445]).
+- Optyx reads a foliated diagram one box at a time: `Diagram.sample`, `dilate`,
+  `get_kraus`, `explode_channel` and `BitControlledGate` no longer raise
+  `ValueError` on a layer that holds several boxes ([next#445]).
 
 ### Project
 
@@ -1183,6 +1324,7 @@ for the changelog of `1.2.1` and earlier.
 [next#443]: https://github.com/rel-int/discopy-next/issues/443
 [next#457]: https://github.com/rel-int/discopy-next/issues/457
 [next#458]: https://github.com/rel-int/discopy-next/pull/458
+[next#459]: https://github.com/rel-int/discopy-next/pull/459
 [next#445]: https://github.com/rel-int/discopy-next/issues/445
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29

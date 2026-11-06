@@ -150,10 +150,10 @@ to correct the state of the qubit depending on the measurement result.
 ... )
 >>> from discopy.optyx import bit
 >>> teleportation = (
-...     Id(1) @ Z(0, 2) @ Scalar(2**0.5)>>
+...     Id(1) @ Z(0, 2) @ Scalar(2**-0.5) >>
 ...     Z(1, 2) @ Id(2) >>
-...     Id(1) @ Z(2, 1) @ Id(1) >>
-...     Id(1) @ H() @ Id(1) >>
+...     Id(1) @ X(2, 1) @ Id(1) @ Scalar(2**0.5) >>
+...     H() @ Id(2) >>
 ...     Measure(1)**2 @ Id(1) >>
 ...     IdClassical(bit) @ BitControlledGate(X(1, 1, 0.5)) >>
 ...     BitControlledGate(Z(1, 1, 0.5))
@@ -167,16 +167,10 @@ to correct the state of the qubit depending on the measurement result.
 
 This produces the same protocol as an identity operation:
 
->>> assert np.allclose(  # doctest: +SKIP
+>>> assert np.allclose(
 ...     (teleportation.double().to_tensor().to_quimb()^...).data,
 ...     (Id(1).double().to_tensor().to_quimb()^...).data
 ... )
-
-.. note::
-
-    The assertion above is skipped: this example does not currently evaluate
-    to the identity channel, see the refactor roadmap
-    (`#5 <https://github.com/rel-int/optyx/issues/5>`_).
 
 **Interfacing with external tools**
 
@@ -532,7 +526,7 @@ class QubitChannel(Channel):
         """Turns gates into ZX diagrams."""
         # pylint: disable=import-outside-toplevel
         from discopy.quantum.gates import (
-            Rz, Rx,
+            Rz, Rx, U1,
             CX, CZ, Controlled  # , Digits
         )
         from discopy.quantum.gates import (
@@ -554,21 +548,19 @@ class QubitChannel(Channel):
             return (Z if isinstance(discopy_circuit, Rz)
                     else X)(1, 1, discopy_circuit.phase)
         if isinstance(discopy_circuit,
-                      Controlled) and discopy_circuit.name.startswith("CRz"):
-            return (
+                      Controlled) and discopy_circuit.distance != 1:
+            # pylint: disable=protected-access
+            return Circuit(discopy_circuit._decompose())
+        if isinstance(discopy_circuit, Controlled) and isinstance(
+                discopy_circuit.controlled, (Rz, Rx)):
+            gadget = (
                 Z(1, 2) @ Z(1, 2, discopy_circuit.phase / 2)
                 >> Id(1) @
                 (X(2, 1) >> Z(1, 0, -discopy_circuit.phase / 2)) @
                 Id(1) @ root2
             )
-        if isinstance(discopy_circuit,
-                      Controlled) and discopy_circuit.name.startswith("CRx"):
-            return (
-                X(1, 2) @ X(1, 2, discopy_circuit.phase / 2)
-                >> Id(1) @
-                (Z(2, 1) >> X(1, 0, -discopy_circuit.phase / 2)) @
-                Id(1) @ root2
-            )
+            return gadget if isinstance(discopy_circuit.controlled, Rz)\
+                else Id(1) @ H() >> gadget >> Id(1) @ H()
         # if isinstance(discopy_circuit, Digits):
         #     dgrm = Diagram.id(bit**0)
         #     # pylint: disable=invalid-name
@@ -579,20 +571,21 @@ class QubitChannel(Channel):
         #             )
         #      dgrm @= classical.X(0, 1, 0.5**d) @ classical.Scalar(0.5**0.5)
         #     return dgrm
-        if isinstance(discopy_circuit, quantum_discopy.CU1):
+        if isinstance(discopy_circuit, Controlled) and isinstance(
+                discopy_circuit.controlled, U1):
             return (
-                Z(1, 2, discopy_circuit.phase) @
-                Z(1, 2, discopy_circuit.phase) >>
+                Z(1, 2, discopy_circuit.phase / 2) @
+                Z(1, 2, discopy_circuit.phase / 2) >>
                 Id(1) @
-                (X(2, 1) >> Z(1, 0, -discopy_circuit.phase)) @
-                Id(1)
+                (X(2, 1) >> Z(1, 0, -discopy_circuit.phase / 2)) @
+                Id(1) @ root2
             )
         if isinstance(discopy_circuit, GatesScalar):
+            if discopy_circuit.is_mixed:
+                raise NotImplementedError(
+                    "Converting a mixed scalar to QubitChannel "
+                    "is not implemented.")
             return Scalar(discopy_circuit.data)
-        if isinstance(discopy_circuit,
-                      Controlled) and discopy_circuit.distance != 1:
-            # pylint: disable=protected-access
-            return Circuit(discopy_circuit._decompose())
         # if isinstance(discopy_circuit, quantum_discopy.Discard):
         #     return Discard(len(discopy_circuit.dom))
         # if isinstance(discopy_circuit, quantum_discopy.Measure):
@@ -617,6 +610,7 @@ class QubitChannel(Channel):
                 "Converting Encode to QubitChannel is not implemented."
             )
         standard_gates = {
+            quantum_discopy.SWAP: Diagram.swap(qubit, qubit),
             quantum_discopy.H: H(),
             quantum_discopy.Z: Z(1, 1, 0.5),
             quantum_discopy.X: X(1, 1, 0.5),
@@ -829,7 +823,7 @@ class X(Channel):
         )
         return box.decomp()
 
-    def dual_rail(self):  # pragma: no cover
+    def dual_rail(self):
         """Convert to dual-rail encoding."""
         from discopy.optyx import (
             photonic
@@ -852,9 +846,9 @@ class X(Channel):
         if (n, m, phase) == (1, 0, 0.5):
             return counit @ annil @ root2
         if (n, m, phase) == (1, 1, 0.25):
-            return BS.dagger()
-        if (n, m, phase) == (1, 1, -0.25):
-            return BS
+            return BS @ photonic.Scalar(np.exp(-1j * np.pi / 4))
+        if (n, m, phase) == (1, 1, 0.75):
+            return BS.dagger() @ photonic.Scalar(np.exp(1j * np.pi / 4))
         raise NotImplementedError(f"No translation of {self} in QPath.")
 
     def dagger(self):
@@ -912,6 +906,10 @@ class Scalar(Channel):
 
     def __repr__(self):
         return f"{factory_name(type(self))}({self.data!r})"
+
+    def lambdify(self, *symbols, **kwargs):
+        return lambda *xs: type(self)(
+            lambdify(symbols, self.data, **kwargs)(*xs))
 
     def decomp(self):
         """A scalar is already an elementary generator."""

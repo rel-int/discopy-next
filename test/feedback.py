@@ -193,6 +193,22 @@ def test_trace_is_an_undelayed_feedback():
         Feedback(f)
 
 
+def test_trace_checks_the_boundary_of_its_keyword_form():
+    from discopy import compact
+    x, y, z, m = map(Ty, "xyzm")
+    f, g = Box('f', x @ m, y @ m), Box('g', m @ x, m @ y)
+    h = compact.Box('h', *2 * [compact.Ty('x', 'm')])
+    assert f.trace(dom=x, cod=y, mem=m) == f.trace()
+    for traced, kwargs in (
+            (f.trace, dict(dom=z, cod=y, mem=m)),
+            (f.feedback, dict(dom=x, cod=z, mem=m)),
+            (g.trace, dict(dom=y, cod=x, mem=m, left=True)),
+            (Box('f', x @ y @ m, x @ y @ m).trace, dict(dom=z, mem=y @ m)),
+            (h.feedback, dict(dom=compact.Ty('z'), mem=compact.Ty('m')))):
+        with raises(AxiomError):
+            traced(**kwargs)
+
+
 def test_left_feedback():
     x, m = Ty('x'), Ty('m')
     f = Box('f', m.delay() @ x, m @ x)
@@ -451,3 +467,14 @@ def test_structural_boxes_delay_through_their_arguments():
 def test_structural_boxes():
     from discopy.testable import assert_structural_boxes
     assert_structural_boxes(Diagram)
+
+
+def test_functor_preserves_the_boundary_of_FollowedBy():
+    x, y = (Ty(Wire(name, is_constant=False)) for name in "xy")
+    F, identity = Functor({x: y}, {}), Functor(lambda t: t, lambda f: f)
+    for fby in (FollowedBy(x), FollowedBy(x, is_dagger=True),
+                FollowedBy(x, is_dagger=True).delay()):
+        assert identity(fby) == fby
+        assert (F(fby).dom, F(fby).cod) == (F(fby.dom), F(fby.cod))
+    iso = FollowedBy(x) >> FollowedBy(x).dagger()
+    assert F(iso) == FollowedBy(y) >> FollowedBy(y).dagger()
