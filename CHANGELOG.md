@@ -717,6 +717,54 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   category with no spiders, where they raised `AttributeError`; the unused
   messages `MATRIX_TWO_DTYPES`, `HAS_NO_ATTRIBUTE` and
   `COMPLEX_TYPE_HAS_NO_ATTR` are gone ([next#445]).
+- A delayed box keeps every attribute it was built with: a markov sample stays
+  a sample, and so evaluates under a stream functor, and in frobenius
+  `f.r.delay() == f.delay().r` ([next#445]).
+- Rotating a ribbon twist, or a dual rail braid, twist, cup or cap, gives a box
+  on the adjoints, so `.r`, `.l` and `to_ribbons().r` of a ribbon diagram are
+  well-typed ([next#445]).
+- `Diagram.naturality` raises `AxiomError` unless the layers next to the box
+  are the braid it slides through, instead of silently deleting whatever box
+  was there ([next#445]).
+- A Markov (comarkov) functor into a category with native functions sends a
+  `Function` (`Cofunction`) to one, so `Functor.id` is the identity on it
+  ([next#445]).
+- `to_ribbons` maps a hand-built `Trace`, `Head` or `Tail` to the trace, head
+  or tail of its argument's dual rail, and a delayed box to the delay of its
+  dual rail, instead of one opaque box ([next#445]).
+- `Permutation`, `Function` and `Cofunction` take numpy integer entries, the
+  identity included, like copies and merges do ([next#445]).
+- `eval(repr(x)) == x` for `ribbon.DualRailCup` and `DualRailCap`, daggered or
+  delayed ([next#445]).
+- `Diagram.cup(i, i)` in ribbon and compact diagrams raises a `ValueError`
+  instead of cupping the wrong wires ([next#445]).
+- Docstrings in `symmetric`, `balanced` and `ribbon` match the code: the trace
+  axioms of symmetric diagrams hold up to hypergraph, not on the nose, `Twist`
+  documents `dom` and `is_dagger`, and `ribbon.Diagram.cup`, `trace` and
+  `symmetric.Diagram.permutation` name their real parameters ([next#445]).
+- `Swap(x @ y, z)` says a swap takes atomic types instead of reporting a
+  permutation of length 2, and `Swap` with a non-swap permutation and
+  `finset.Function` (so `markov.Function`) with an out-of-range or wrong-length
+  list raise a `ValueError` that says what is wrong ([next#445]).
+- A `biclosed` or `closed` functor into rigid, pivotal, pregroup or tensor
+  diagrams evaluates the terms it meets instead of raising 'Expected a term',
+  so `to_rigid` and categorial `to_pregroup` of a diagram with a term work
+  again ([next#445]).
+- A closed functor maps the unitype `U` as a generator, so untyped terms can be
+  evaluated, drawn and turned into maps instead of recursing forever
+  ([next#445]).
+- `to_rigid` is the identity on rigid diagrams: it keeps winding numbers, cups
+  and caps instead of dropping them ([next#445]).
+- `to_closed` and `closed.TermBase.from_biclosed` keep the data of each
+  constant ([next#445]).
+- `eval(repr(c)) == c` for a biclosed or closed `Constant` with data, and for
+  the terms built on one ([next#445]).
+- An explicit `Curry(f, 0)` goes through biclosed and closed functors,
+  `to_map`, closed `to_compact` and delayed `to_drawing` as its argument `f`,
+  where it raised a bare `AssertionError` ([next#445]).
+- Products and exponentials print their name only when it is first read, so
+  nested `Tuple`s and exponentials build in linear time, and a thousand nested
+  `Tuple`s no longer hit the recursion limit ([next#445]).
 
 ### Project
 
@@ -759,6 +807,10 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   preview, the third being left with [next#443]. Equality still compares
   `_later` by identity, so those two now compare equal to a twin built the same
   way, where every other non-constant stream does not ([next#457]).
+- `test_Diagram_permutation` and `test_Kauffman` patch class attributes through
+  `monkeypatch`, so a failure no longer leaves them patched for the tests after
+  it, and `test/balanced.py` defines `test_functor_twist_dagger` once
+  ([next#445]).
 
 ## [1.2.2] - 2025-12-19
 

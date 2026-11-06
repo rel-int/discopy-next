@@ -840,6 +840,12 @@ class Functor(symmetric.Functor):
     def __call__(self, other):
         if isinstance(other, Copy) and hasattr(self.cod, "copy"):
             return self.cod.copy(self(other.dom), len(other.cod))
+        if isinstance(other, Function) and hasattr(
+                self.cod.ar, "function_factory")\
+                and not isinstance(other, symmetric.Permutation):
+            sizes = [Nat(len(self(x))) for x in other.dom]
+            return self.cod.ar.from_function(finset.Function.function(
+                other.func, sizes).inside, self(other.dom))
         if isinstance(other, Function) and hasattr(self.cod, "copy")\
                 and not isinstance(other, symmetric.Permutation):
             function = getattr(self.cod, "function", None)\
