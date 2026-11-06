@@ -67,8 +67,8 @@ from discopy.abc import BraidedCategory, SpacialCategory
 from discopy.cat import factory
 from discopy.monoidal import Ty, Match
 from discopy.utils import (
-    assert_isatomic, BinaryBoxConstructor, deprecated_alias, factory_name,
-    from_tree)
+    assert_isatomic, AxiomError, BinaryBoxConstructor, deprecated_alias,
+    factory_name, from_tree)
 
 
 class Wire(monoidal.Wire):
@@ -175,10 +175,13 @@ class Diagram(monoidal.Diagram, BraidedCategory):
         else:
             source = braid(right_wires[0], box.dom) >> box @ right_wires[0]
             target = right_wires[0] @ box >> braid(right_wires[0], box.cod)
-        match = Match(above=self[:i] if down else self[:i - len(source) + 1],
-                      below=self[i + len(source):] if down else self[i + 1:],
+        start = i if down else i - len(source) + 1
+        match = Match(above=self[:start], below=self[start + len(source):],
                       left=left_wires[:-1] if left else left_wires,
                       right=right_wires if left else right_wires[1:])
+        if start < 0 or self[start:start + len(source)]\
+                != match.left @ source @ match.right:
+            raise AxiomError(messages.NO_BRAID_TO_SLIDE.format(box, i))
         return match.substitute(target)  # ty: ignore[invalid-return-type]
 
 

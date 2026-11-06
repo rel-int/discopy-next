@@ -528,6 +528,8 @@ class QuimbBackend(AbstractBackend):
         """
         params = self.contraction_params if params is None else params
         quimb_tn = term.to_quimb()
+        output_inds = [f"inp{i}" for i in range(len(term.dom))] + [
+            f"out{i}" for i in range(len(term.cod))]
 
         for t in quimb_tn:
             dt = t.data.dtype
@@ -561,13 +563,12 @@ class QuimbBackend(AbstractBackend):
                 is_approx else quimb_tn.contract
             result = contract(
                 optimize=self.hyperoptimiser,
-                output_inds=sorted(quimb_tn.outer_inds()),
+                output_inds=output_inds,
                 **params
             )
 
         if isinstance(result, TensorNetwork):
-            result = result.contract(
-                output_inds=sorted(result.outer_inds()))
+            result = result.contract(output_inds=output_inds)
         if not isinstance(result, (complex, float, int)):
             result = result.data
 
@@ -696,25 +697,6 @@ class PercevalBackend(AbstractBackend):
             external_perceval_effect *
             pcvl.BasicState(selections)
         )
-
-    def _post_select_vacuum(
-        self,
-        dist,
-        m_orig,
-        k_extra,
-        task
-    ):
-        """Keep only entries where extra (ancilla)
-        modes are all 0, then drop them."""
-        if task in ("probs", "amps"):
-            if k_extra <= 0:
-                return dist
-            return {
-                k[:m_orig]: v
-                for k, v in dist.items()
-                if all(x == 0 for x in k[m_orig:])
-            }
-        return dist
 
     def _process_state(self, perceval_state):
         # pylint: disable=import-outside-toplevel
@@ -1051,12 +1033,8 @@ class PercevalBackend(AbstractBackend):
             sim_task
         )
 
-        result = self._post_select_vacuum(
-            result,
-            len(term.dom),
-            len(matrix.dom) - len(term.dom),
-            sim_task
-        )
+        if sim_task in ("probs", "amps"):
+            result = {k[:len(matrix.cod)]: v for k, v in result.items()}
 
         output_shape, output_types = self._get_output_params(
             term,
@@ -1122,45 +1100,26 @@ class PermanentBackend(AbstractBackend):
                     "n_photons must be greater than 0."
                 )
 
-        if hasattr(
-            diagram,
-            "terms"
-        ):
-            result = 0
-            dims = []
-            for term in diagram.terms:
-                matrix = self._get_matrix(term)
-                check_creations(matrix)
-                result_matrix = matrix.eval(
-                    n_photons=n_photons,
-                    as_tensor=True
-                )
-                result += result_matrix.array
-                dims.append(
-                    (
-                        result_matrix.dom.inside,  # list
-                        result_matrix.cod.inside  # list
-                    )
-                )
-        else:
-            matrix = self._get_matrix(diagram)
+        terms = diagram.terms if hasattr(diagram, "terms") else (diagram, )
+        dom = (n_photons + 1, ) * len(diagram.dom)
+        arrays = []
+        for term in terms:
+            matrix = self._get_matrix(term)
             check_creations(matrix)
-            result_matrix = matrix.eval(n_photons=n_photons, as_tensor=True)
-            result = result_matrix.array
-            dims = [(result_matrix.dom.inside, result_matrix.cod.inside)]
-
-        norm = lambda x: list(x) if isinstance(  # noqa: E731
-            x, (list, tuple)
-        ) else [x]
-        dom_lists, cod_lists = zip(*((norm(d), norm(c)) for d, c in dims))
-        max_dom_dims = [max(vals) for vals in zip(*dom_lists)]
-        max_cod_dims = [max(vals) for vals in zip(*cod_lists)]
+            n_out = n_photons - sum(matrix.selections) + sum(matrix.creations)
+            cod = (n_out + 1, ) * len(diagram.cod)
+            arrays.append(np.reshape(matrix.eval(
+                n_photons=n_photons, as_tensor=True).array, dom + cod))
+        shape = tuple(map(max, zip(*(array.shape for array in arrays))))
+        result = np.zeros(shape, dtype=complex)
+        for array in arrays:
+            result[tuple(map(slice, array.shape))] += array
 
         return EvalResult(
             discopy_tensor.Box(
                 "Result",
-                discopy_tensor.Dim(*tuple(max_dom_dims)),
-                discopy_tensor.Dim(*tuple(max_cod_dims)),
+                discopy_tensor.Dim(*dom),
+                discopy_tensor.Dim(*shape[len(dom):]),
                 result
             ),
             output_types=diagram.cod,

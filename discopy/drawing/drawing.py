@@ -286,6 +286,8 @@ class Drawing(TracedCategory["monoidal.Ty", "Drawing"], RichDisplay):
 
     yanking = TracedCategory.yanking.inapplicable(
         messages.PLANAR_YANKING)
+    yanking_left = TracedCategory.yanking_left.inapplicable(
+        messages.PLANAR_YANKING)
     serialisation = Testable.serialisation.inapplicable(
         messages.NO_TREE_DRAWING)
 
@@ -389,7 +391,8 @@ which to_drawing recomputes.
     def __eq__(self, other):
         if not isinstance(other, Drawing):
             return False
-        return self.is_parallel(other) and self.positions == other.positions
+        return self.is_parallel(other) and self.positions == other.positions\
+            and set(self.edges) == set(other.edges)
 
     @backend.matplotlib_context()
     def draw(self, **params):
@@ -1032,13 +1035,14 @@ which to_drawing recomputes.
             n: Node("cod", i=i, x=n.x) for i, n in enumerate(self.dom_nodes)})
         mapping.update({
             n: Node("dom", i=i, x=n.x) for i, n in enumerate(self.cod_nodes)})
-        graph = nx.relabel_nodes(self.graph, mapping).reverse(copy=False)
+        graph = nx.relabel_nodes(self.graph, mapping).reverse()
         inside = PlaneGraph(graph, positions={
             mapping[n]: Point(x, self.height - y)
             for n, (x, y) in self.positions.items()})
         dom, cod = self.cod, self.dom
         boxes = tuple(map(box_dagger, self.boxes[::-1]))
-        return Drawing(inside, dom, cod, boxes, self.width, self.height)
+        return Drawing(
+            inside, dom, cod, boxes, self.width, self.height, _check=False)
 
     @staticmethod
     def bubble_opening(dom, arg_dom, left, right, frame_boundary=False):
@@ -1160,8 +1164,8 @@ which to_drawing recomputes.
         .. image:: /_static/drawing/bubble-drawing.svg
             :align: center
         """
-        dom = self.dom if dom is None else dom
-        cod = self.cod if cod is None else cod
+        dom = self.dom if dom is None else dom.to_drawing()
+        cod = self.cod if cod is None else cod.to_drawing()
         arg_dom, arg_cod = self.dom, self.cod
         from discopy.monoidal import Wire, Ty
         left = Ty(Wire(name or "", dom.dom, arg_dom.dom))

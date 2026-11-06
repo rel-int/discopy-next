@@ -5,7 +5,8 @@ import itertools
 import pickle
 
 from discopy.optyx.core.control import *
-from discopy.optyx.core.control import BinaryMatrixBox, ClassicalFunctionBox
+from discopy.optyx.core.control import (
+    BinaryMatrixBox, BitControlledBox, ClassicalFunctionBox)
 from discopy.optyx.core.diagram import MAX_DIM
 from discopy.optyx.core.zw import Create, W, ZBox
 from discopy.optyx.core.diagram import PhotonThresholdDetector, Mode, Swap, Bit, Id
@@ -189,6 +190,12 @@ class TestBinaryControlledBox:
         res_1 = BitControlledBox(action, default).to_tensor().dagger().eval().array
         res_2 = BitControlledBox(action, default).dagger().to_tensor().eval().array
         assert_allclose_with_shape_mismatch(res_1, res_2)
+
+    def test_evaluation_leaves_the_box_unchanged(self):
+        box = BitControlledBox(ZBox(1, 1, lambda i: .5 ** i))
+        behaviour = box.photon_preservation_behaviour
+        ((Create(1) >> PhotonThresholdDetector()) @ Mode(1) >> box).to_tensor()
+        assert box.photon_preservation_behaviour == behaviour
 
 
 class TestClassicalFunctionBox:

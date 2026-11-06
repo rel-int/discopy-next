@@ -217,6 +217,14 @@ def test_functor_factory():
     assert Diagram.functor_factory({x: y}, {})(x.r) == y.r
 
 
+def test_to_rigid_is_the_identity_on_rigid_diagrams():
+    x, y = Ty('x'), Ty('y')
+    f, g = Box('f', x, y, data=7), Box('g', x.r, y)
+    for diagram in (g, f.r, f.l, Cup(x, x.r) >> Cap(y, y.l)):
+        assert diagram.to_rigid() == diagram
+    assert f.l.to_rigid().data == 7
+
+
 def test_Layer_merge_to_identity():
     x = Ty('x')
     with raises(AxiomError):  # a snake is no layer, see #599.
@@ -254,7 +262,7 @@ def test_Bubble_rotate():
         assert eval(repr(rotated)) == rotated == loads(dumps(rotated))
         assert rotated[::-1][::-1] == rotated
         assert eval(repr(rotated[::-1])).is_dagger
-    assert str(bubble.l.l) == "(f).bubble().l.l"
+    assert str(bubble.l.l) == "(f).bubble(name='N').l.l"
     assert bubble.r[::-1] == bubble[::-1].r
     F = Functor({x: y, y: x}, {f: g})
     assert F(bubble.r) == F(bubble).r == g.bubble(name="N").r

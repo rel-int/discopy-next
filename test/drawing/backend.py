@@ -1,4 +1,6 @@
-from pytest import raises
+from io import BytesIO
+
+from pytest import mark, raises
 
 from discopy.drawing.backend import TikZ
 from discopy.monoidal import Ty, Box
@@ -11,6 +13,21 @@ def test_draw_raises_on_relabeled_box(tmp_path):
     Box('f', x, y).draw(doctest=path, show=False)
     with raises(ValueError, match="Drawing differs"):
         Box('g', x, y).draw(doctest=path, show=False)
+
+
+def test_tikz_doctest_compares_against_its_baselines(tmp_path):
+    f, path = Box('f', Ty('x'), Ty('y')), tmp_path / "box.tikz"
+    params = dict(doctest=str(path), to_tikz=True, use_tikzstyles=True)
+    f.draw(**params)
+    f.draw(**params)
+    assert sorted(file.name for file in tmp_path.iterdir())\
+        == ["box.tikz", "box.tikzstyles"]
+    for baseline in [path, path.with_suffix(".tikzstyles")]:
+        expected = baseline.read_text()
+        baseline.write_text("not tikz\n")
+        with raises(ValueError, match="Drawing differs"):
+            f.draw(**params)
+        baseline.write_text(expected)
 
 
 def test_draw_discard_grounds_every_wire(tmp_path):
@@ -54,3 +71,28 @@ def test_tikzstyle_of_a_hexcode_has_no_hash(tmp_path):
     assert "style=336699_box" in tikz
     assert "\\tikzstyle{336699_box}" in styles
     assert "#" not in tikz + styles
+
+
+def test_tikzstyles_sit_beside_their_drawing(tmp_path):
+    folder = tmp_path / "dir.v2"
+    folder.mkdir()
+    for name in ["diagram.tikz", "diagram"]:
+        Box('f', Ty('x'), Ty('y')).draw(
+            path=folder / name, to_tikz=True, use_tikzstyles=True)
+    assert sorted(file.name for file in tmp_path.iterdir()) == ["dir.v2"]
+    assert sorted(file.name for file in folder.iterdir())\
+        == ["diagram", "diagram.tikz", "diagram.tikzstyles"]
+
+
+@mark.parametrize("mode", ["w", "wb"])
+def test_svg_to_an_open_file_has_the_dark_mode_style(tmp_path, mode):
+    f, path = Box('f', Ty('x'), Ty('y')), tmp_path / "box.svg"
+    with open(path, mode) as file:
+        f.draw(path=file, format="svg", show=False)
+    assert path.read_text(encoding="utf-8") == f.to_svg()
+
+
+def test_svg_to_a_bytes_buffer_has_the_dark_mode_style():
+    f, buffer = Box('f', Ty('x'), Ty('y')), BytesIO()
+    f.draw(path=buffer, format="svg", show=False)
+    assert buffer.getvalue().decode("utf-8") == f.to_svg()

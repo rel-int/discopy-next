@@ -398,13 +398,16 @@ class Traced(Symmetric, TracedCategory):
         Parameters:
             n : The number of atoms to trace over on each half, or one number
                 per half.
-            left : Whether to trace on the left, not implemented.
+            left : Whether to trace the first atoms instead, i.e. the trace
+                of the lens between swaps.
         """
+        if left:
+            (mem, x), (_, y) = (
+                typ.split(n, left=True) for typ in (self.dom, self.cod))
+            return (self.swap(x, mem) >> self >> self.swap(mem, y)).trace(n)
         (x, (u, u_)), (y, _) = self.dom.split(n), self.cod.split(n)
         if not u and not u_:
             return self
-        if left:
-            raise NotImplementedError
         forward = self.forward >> self.category.id(y.positive)\
             @ self.category.swap(u, self.residual)
         return type(self)(x, y, forward.trace(len(u)),

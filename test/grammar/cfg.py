@@ -20,7 +20,8 @@ def test_eq_and_hash():
 
 def test_repr():
     namespace = dict(cat=cat, monoidal=monoidal, grammar=grammar)
-    for tree in (f, f[::-1], w, Id(x), f(w, w), f(f(w, w), w)):
+    for tree in (f, f[::-1], w, Id(x), f(w, w), f(f(w, w), w),
+                 Rule(x @ x, x, name='')(w, w)):
         assert eval(repr(tree), dict(namespace)) == tree
 
 
@@ -57,6 +58,22 @@ def test_Tree():
         Rule(rigid.Ty('x') @ rigid.Ty('x'), x, name='r')(a, a)
 
 
+def test_Tree_call_typechecks():
+    y, a, b = Ty('y'), Word('a', x), Word('b', Ty('y'))
+    for tree, others in [(Id(x), (b, )), (Id(x), (a, a)), (f, (Id(y), Id(y))),
+                         (f, (Id(x), )), (f(a, a), (a, a))]:
+        with raises(AxiomError, match="does not compose with"):
+            tree(*others)
+    with raises(AxiomError, match=r"f\(Id\(x\), f\) does not compose with "
+                                  r"\(a, b, a\): x @ x @ x != x @ y @ x"):
+        f(Id(x), f)(a, b, a)
+    for tree in (w, Id(x), f(Id(x), Id(x))):
+        with raises(TypeError, match="Expected grammar.cfg.Tree, got int"):
+            tree(42)
+    with raises(TypeError, match="Expected grammar.cfg.Tree, got int"):
+        Tree(f, w, 42)
+
+
 def test_Tree_dom():
     a = Word('a', x)
     assert f(f, w).dom == x @ x and f(w, w).dom == Ty()
@@ -73,6 +90,8 @@ def test_Tree_to_diagram():
     assert f(g(a, b), a).to_diagram()\
         == (leaf_a @ leaf_b >> box('g', x @ y, x)) @ leaf_a\
         >> box('f', x @ x, x)
+    assert Id(x).to_diagram() == monoidal.Id(x)
+    assert Tree(f, Id(x), a).to_diagram() == x @ leaf_a >> box('f', x @ x, x)
 
 
 def test_Algebra():
@@ -81,6 +100,7 @@ def test_Algebra():
     g = Rule(y, x, name='g')
     identity = Algebra(lambda ob: ob, lambda ar: ar, cod=Operad())
     assert identity(f(g, g)) == f(g, g)
+    assert identity(Id(x)) == Id(x) and identity(f(w, Id(x))) == f(w, Id(x))
     with raises(TypeError):
         identity(42)
 

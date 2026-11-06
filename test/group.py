@@ -1,3 +1,4 @@
+from dataclasses import FrozenInstanceError
 import pickle
 import random
 from functools import reduce
@@ -111,6 +112,21 @@ def test_action():
         Product[Cyclic[3], Cyclic[2]].action(Cyclic[2].action())
     with raises(TypeError):
         Wreath[Cyclic[3], Cyclic[2]].action(Cyclic[2].action())
+
+
+def test_iterated_wreath():
+    """
+    A wreath whose top is a wreath is as cheap as its factors: each group
+    computes its action once, not again for each element it makes.
+    """
+    G = Wreath[Cyclic[2], Symmetric[2]]
+    assert G.action() is G.action()
+    with raises(FrozenInstanceError):
+        G.action().images = ()
+    for _ in range(4):
+        G = Wreath[Cyclic[2], G]
+    g = G.sample(random.Random(0))
+    assert G.degree() == 32 and g >> g.dagger() == G()
 
 
 def test_orbits():

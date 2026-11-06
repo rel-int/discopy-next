@@ -42,6 +42,19 @@ def test_delayed_Box_to_tree():
             assert loads(dumps(delayed)).time_step == delayed.time_step
 
 
+def test_delay_keeps_the_attributes_of_a_box():
+    from discopy import frobenius, markov
+    x = markov.Ty('x')
+    sample = markov.Box('sample', x, x, is_deterministic=False)
+    F = markov.Functor({x: x}, {sample: markov.Box('g', x, x)})
+    assert not sample.delay().is_deterministic
+    assert F(sample.delay()) == F(sample).delay()
+    f = frobenius.Box('f', frobenius.Ty('x'), frobenius.Ty('y'))
+    assert f.r.delay() == f.delay().r
+    drawn = Box('f', Ty('x'), Ty('y'), color='red', drawing_name='F')
+    assert (drawn.delay().color, drawn.delay().drawing_name) == ('red', 'F')
+
+
 def test_Feedback_to_tree():
     from discopy.utils import dumps, loads
     x, y, z = Ty('x'), Ty('y'), Ty('z')
@@ -180,6 +193,22 @@ def test_trace_is_an_undelayed_feedback():
         Feedback(f)
 
 
+def test_trace_checks_the_boundary_of_its_keyword_form():
+    from discopy import compact
+    x, y, z, m = map(Ty, "xyzm")
+    f, g = Box('f', x @ m, y @ m), Box('g', m @ x, m @ y)
+    h = compact.Box('h', *2 * [compact.Ty('x', 'm')])
+    assert f.trace(dom=x, cod=y, mem=m) == f.trace()
+    for traced, kwargs in (
+            (f.trace, dict(dom=z, cod=y, mem=m)),
+            (f.feedback, dict(dom=x, cod=z, mem=m)),
+            (g.trace, dict(dom=y, cod=x, mem=m, left=True)),
+            (Box('f', x @ y @ m, x @ y @ m).trace, dict(dom=z, mem=y @ m)),
+            (h.feedback, dict(dom=compact.Ty('z'), mem=compact.Ty('m')))):
+        with raises(AxiomError):
+            traced(**kwargs)
+
+
 def test_left_feedback():
     x, m = Ty('x'), Ty('m')
     f = Box('f', m.delay() @ x, m @ x)
@@ -233,18 +262,25 @@ def test_yanking():
     from discopy.testable import AxiomFailure
     from discopy.drawing import Drawing
     from discopy.python import Function, Ty as PythonTy
+    from discopy.python.additive import Function as Additive
+    from discopy.kleisli.additive import Channel
+    from discopy.kleisli.monad import Powerset
     x, y = symmetric.Ty('x'), compact.Ty('y')
-    assert symmetric.Diagram.yanking(x) and compact.Diagram.yanking(y)
-    assert compact.CMap.yanking(y)
-    yanked, identity = Function.yanking(PythonTy(int)).terms
-    assert yanked(42) == identity(42) == 42
-    assert para.Traced[Matrix[bool]].yanking(Nat(2))
-    assert lens.Traced[Matrix[bool]].yanking(lens.Ty[Nat](Nat(1), Nat(2)))
-    for planar in (Diagram, pivotal.Diagram, Drawing, PivotalCategory):
-        assert planar.yanking() is NotImplemented
-        assert "planar" in planar.yanking.__doc__
-    with raises(AxiomFailure):
-        balanced.Diagram.yanking(balanced.Ty('x'))
+    for law in ("yanking", "yanking_left"):
+        assert getattr(symmetric.Diagram, law)(x)
+        assert getattr(compact.Diagram, law)(y)
+        assert getattr(compact.CMap, law)(y)
+        for function in (Function, Additive, Channel[Powerset]):
+            yanked, identity = getattr(function, law)(PythonTy(int)).terms
+            assert yanked(42) == identity(42)
+        assert getattr(para.Traced[Matrix[bool]], law)(Nat(2))
+        assert getattr(lens.Traced[Matrix[bool]], law)(
+            lens.Ty[Nat](Nat(1), Nat(2)))
+        for planar in (Diagram, pivotal.Diagram, Drawing, PivotalCategory):
+            assert getattr(planar, law)() is NotImplemented
+            assert "planar" in getattr(planar, law).__doc__
+        with raises(AxiomFailure):
+            getattr(balanced.Diagram, law)(balanced.Ty('x'))
 
 
 def test_types_without_wires_are_their_own_delay():
@@ -448,3 +484,14 @@ def test_structural_boxes_delay_through_their_arguments():
             1, 2, w.d, .5, is_dagger=is_dagger)
         assert spider.delay().delay(-1) == spider
         assert pickle.loads(pickle.dumps(spider)) == spider
+
+
+def test_functor_preserves_the_boundary_of_FollowedBy():
+    x, y = (Ty(Wire(name, is_constant=False)) for name in "xy")
+    F, identity = Functor({x: y}, {}), Functor(lambda t: t, lambda f: f)
+    for fby in (FollowedBy(x), FollowedBy(x, is_dagger=True),
+                FollowedBy(x, is_dagger=True).delay()):
+        assert identity(fby) == fby
+        assert (F(fby).dom, F(fby).cod) == (F(fby.dom), F(fby.cod))
+    iso = FollowedBy(x) >> FollowedBy(x).dagger()
+    assert F(iso) == FollowedBy(y) >> FollowedBy(y).dagger()

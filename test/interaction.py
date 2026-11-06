@@ -252,10 +252,11 @@ def test_yanking():
     from discopy.abc import Nat
     from discopy.matrix import Matrix
     x = Ty[Nat](Nat(1), Nat(2))
-    assert Diagram[Matrix[bool]].yanking(x)
     X = Ty[compact.Ty](compact.Ty('x'), compact.Ty("x'", "y'"))
-    assert Diagram[compact.Diagram].yanking.modulo(
-        lambda diagram: diagram.inside.to_hypergraph())(X)
+    for law in ("yanking", "yanking_left"):
+        assert getattr(Diagram[Matrix[bool]], law)(x)
+        assert getattr(Diagram[compact.Diagram], law).modulo(
+            lambda diagram: diagram.inside.to_hypergraph())(X)
 
 
 def compact_terms():
