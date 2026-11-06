@@ -55,6 +55,10 @@ def test_Readout_repr():
     assert readout != Readout(np.array([[1.], [3.]]), np.array([3.]))
     assert Readout(np.array([[1.]]), np.array([3.])) != Readout(
         np.array([[1.], [1.]]), np.array([3.]))
+    listed = Readout([[1.], [2.]], 0)
+    assert eval(repr(listed), scope) == listed
+    assert listed == Readout(np.array([[1.], [2.]]), np.zeros(()))
+    assert listed != Readout([[1.]], 0)
     reservoir, sequence = Reservoir.random(memory=1, seed=1), [.1, .5, .9]
     assert reservoir.fit(sequence, 3 * [7.]) == reservoir.fit(
         sequence, 3 * [7.])

@@ -2,7 +2,7 @@
 
 cubic's review of #453 at 5d045108:
 
-- [ ] **C1** `discopy/quantum/reservoir.py:346`: `Readout.__eq__` assumes every field has `.shape`, so list-valued `weights` or `intercept` raise AttributeError instead of comparing. Compare with `np.shape` and `np.all` so plain sequences work too.
+- [x] **C1** `discopy/quantum/reservoir.py:346`: `Readout.__eq__` assumes every field has `.shape`, so list-valued `weights` or `intercept` raise AttributeError instead of comparing. Compare with `np.shape` and `np.all` so plain sequences work too.
 - [ ] **C2** `discopy/quantum/zx.py:555`: Under the PyTorch backend, this passes a plain Python complex to `torch.exp`, which requires a Tensor, so `circuit2zx(Rz(.3))` should raise TypeError. Wrap the phase in `np.array` under `backend()` the way `Rz.array` does.
 - [ ] **C3** `discopy/grammar/cfg.py:97`: `assert_iscomposable` dereferences `other.cod` before validating that each argument is a `Tree`, so `f(42)` raises an incidental AttributeError instead of the API's normal TypeError. Validate the arguments before reading their codomains.
 - [ ] **C4** `discopy/quantum/circuit.py:232`: `init_and_discard` treats every `Digit` as a binary bit, so circuits over `Digit(4)` cannot be initialized. Use `Digits(0, dim=x.dim)` for non-binary digits and keep `Bits(0)` only for dimension-2 digits.
