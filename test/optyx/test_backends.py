@@ -11,6 +11,7 @@ from discopy.optyx.core.backends import (
     PercevalEvalConfig
 )
 import numpy as np
+import cmath
 import math
 from itertools import chain
 import perceval as pcvl
@@ -83,9 +84,15 @@ def dict_allclose(d1: dict, d2: dict, *, rel_tol=1e-05, abs_tol=1e-10) -> bool:
     for key in set(chain(d1, d2)):
         v1 = d1.get(key, 0.0)
         v2 = d2.get(key, 0.0)
-        if not math.isclose(v1, v2, rel_tol=rel_tol, abs_tol=abs_tol):
+        if not cmath.isclose(v1, v2, rel_tol=rel_tol, abs_tol=abs_tol):
             return False
     return True
+
+
+def test_dict_allclose_compares_complex_amplitudes():
+    assert dict_allclose({(1, 0): .5j}, {(1, 0): .5j})
+    assert not dict_allclose({(1, 0): np.complex128(.5j)}, {(1, 0): -.5j})
+
 
 def test_compressed_contraction_is_deterministic():
     # Regression test for #232 (optyx#19): the compressed contraction used
