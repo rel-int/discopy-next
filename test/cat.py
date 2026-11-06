@@ -787,7 +787,7 @@ BROKEN = {
         "closed.{Tuple,Projection,Let} grammar.categorial.{FA,BA,*TR,"
         "TypeRaising,[FB][CX]}": "a term has no stated dagger",
         "grammar.categorial.*Composition": "a crossed composition has none",
-        "*.{Feedback,Head,Tail}": "it has no stated dagger",
+        "*.Feedback": "it has none, its memory would be fed back in time",
         PIVOTALS + ".Trace": "its dagger is drawn with cups and caps",
         "*.Curry": "a curry has no dagger",
         "{closed,markov,grammar.abstract}.{Copy,Discard,Function} "

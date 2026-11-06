@@ -950,6 +950,18 @@ class Head(monoidal.Bubble, Box):
         Box.__init__(self, f"({arg}).{self.part}", self.dom, self.cod,
                      time_step=time_step)
 
+    def dagger(self):
+        """
+        The dagger of a head is the head of the dagger, and the same for a
+        tail: on streams both are functors, which commute with the dagger.
+
+        >>> x, y = (Ty(Wire(name, is_constant=False)) for name in "xy")
+        >>> f = Box('f', x, y)
+        >>> assert f.head.dagger() == f.dagger().head
+        >>> assert f.tail.delay().dagger() == f.dagger().tail.delay()
+        """
+        return type(self)(self.arg.dagger(), self.time_step)
+
     delay, reset, __repr__ = HeadOb.delay, HeadOb.reset, HeadOb.__repr__
     to_tree, from_tree = HeadOb.to_tree, classmethod(HeadOb.from_tree.__func__)
     __str__ = Box.__str__
@@ -967,7 +979,7 @@ class Tail(monoidal.Bubble, Box):
     serialised_attrs = ("*args", "time_step")
     part = "tail"
 
-    __init__ = Head.__init__
+    __init__, dagger = Head.__init__, Head.dagger
     delay, reset, __repr__ = HeadOb.delay, HeadOb.reset, HeadOb.__repr__
     to_tree, from_tree = HeadOb.to_tree, classmethod(HeadOb.from_tree.__func__)
     __str__ = Box.__str__

@@ -73,6 +73,21 @@ def test_Head_Tail_FollowedBy_to_tree():
         assert loads(dumps(term)) == term
 
 
+def test_Head_Tail_dagger():
+    from itertools import product
+    from discopy import markov
+    x, y = (Ty(Wire(name, is_constant=False)) for name in "xy")
+    f, g = Box('f', x, y), Box('g', y, x)
+    h = markov.Box('h', markov.Ty('x'), markov.Ty('y'))
+    for arg, part, steps in product((f, f >> g, h), ("head", "tail"), (0, 2)):
+        term = getattr(arg, part).delay(steps)
+        dagger = getattr(arg.dagger(), part).delay(steps)
+        assert term.dagger() == term[::-1] == dagger
+        assert type(term.dagger()) is type(term)
+        assert term.dagger().dagger() == term
+    assert (f.head >> g.head).dagger() == g.dagger().head >> f.dagger().head
+
+
 def test_trace_repr():
     from discopy import feedback
     trace = Box('f', 'x', 'x').trace()
