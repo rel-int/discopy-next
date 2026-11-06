@@ -2215,6 +2215,10 @@ class Hypergraph[category](
         became wiring, and the first consumer of a spider reads a wire out of
         one.
 
+        Raise ``AxiomError`` when a spider has one leg or more than two and
+        the category has no spiders, i.e. is neither a Markov nor a Comarkov
+        category.
+
         Example
         -------
         >>> from discopy.frobenius import Ty, Spider, Hypergraph as H
@@ -2247,6 +2251,10 @@ class Hypergraph[category](
             n_legs = len(input_wires) + len(output_wires)
             if n_legs in [0, 2]:
                 continue
+            if not issubclass(
+                    self.category, (MarkovCategory, ComarkovCategory)):
+                raise AxiomError(messages.NOT_FROBENIUS.format(
+                    factory_name(self.category)))
             first = getattr(
                 self.ports[min(output_wires)], "depth", len(boxes)
             ) if output_wires else len(boxes)

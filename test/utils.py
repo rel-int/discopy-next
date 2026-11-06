@@ -16,12 +16,6 @@ from discopy.cat import Ob
 from discopy.utils import *
 from discopy.tensor import Box
 
-import pytest
-from pytest import warns
-
-from os import listdir
-import pickle
-
 zip_mock = MagicMock()
 zip_mock.open().__enter__().read.return_value =\
     '[{"factory": "cat.Ob", "name": "a"}]'
@@ -137,13 +131,6 @@ def test_wire_tree_roundtrip():
     with warns(DeprecationWarning):
         assert from_tree({'factory': 'discopy.frobenius.Ob', 'name': 'x'})\
             == frobenius.Wire('x')
-
-
-def test_MappingOrCallable():
-    from discopy.utils import MappingOrCallable
-    assert MappingOrCallable({0: 1})[0] == MappingOrCallable(lambda x: 1)[0]
-    with pytest.raises(TypeError):
-        MappingOrCallable([10, 20])
 
 
 def test_NamedGeneric_factory():
@@ -325,7 +312,7 @@ def test_dumps_unknown_data():
     for data in ({1, 2}, np.longdouble(1), np.array([1], dtype=np.longdouble),
                  np.array(['a', 'bc']), np.array([(1, 2.)], 'i4, f8'),
                  np.ma.array([1, 2], mask=[0, 1]), ragged,
-                 np.array([1], '>i4')):
+                 np.array([1], '>i4'), {1: 'a'}, {(1, 2): 3}):
         box = cat.Box('f', Ob('x'), Ob('y'), data=data)
         with pytest.raises(TypeError, match="not JSON serialisable"):
             dumps(box)

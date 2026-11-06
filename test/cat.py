@@ -69,6 +69,16 @@ def test_Arrow_init():
         Arrow((), None, None)  # Only a type has None, i.e. no colour.
 
 
+def test_Arrow_init_iterator():
+    x, y = Ob('x'), Ob('y')
+    f, g = Box('f', x, x), Box('g', y, y)
+    assert Arrow(iter([f, f]), x, x) == f >> f
+    with raises(AxiomError):
+        Arrow(iter([f, g]), x, x)
+    with raises(TypeError):
+        Arrow(iter([x]), x, x)
+
+
 def test_Arrow_len():
     assert len(Arrow((), Ob('x'), Ob('x'))) == 0
 
@@ -254,6 +264,15 @@ def test_Sum_generator_hash():
     assert {f: 42}[singleton] == 42
 
 
+def test_Sum_generator_is_its_only_term():
+    x, y = Ob('x'), Ob('y')
+    f, g = Box('f', x, y), Box('g', x, y)
+    singleton = Sum((f, ))
+    assert singleton.is_generator and singleton.generator is f
+    assert singleton.generator.setoid() == singleton.setoid()
+    assert (f + g).generator is None and Sum((), x, y).generator is None
+
+
 def test_Functor():
     x, y, z = Ob('x'), Ob('y'), Ob('z')
     f, g = Box('f', x, y), Box('g', y, z)
@@ -380,6 +399,14 @@ def test_Bubble():
     assert Functor.id()(empty) == empty
 
 
+def test_Bubble_str():
+    x, y = Ob('x'), Ob('y')
+    f = Box('f', x, y)
+    for bubble in (f.bubble(name="N"), f.bubble(method="m"),
+                   f.bubble(dom=y, cod=x, name="N", method="m")):
+        assert eval(str(bubble)) == bubble
+
+
 def test_Box_call():
     f = Box('f', Ob('x'), Ob('y'))
     with raises(TypeError):
@@ -454,6 +481,39 @@ def test_subs_forms_and_data():
         == [psi, phi, sympy.Matrix([[0]])]
 
 
+def test_subs_key_not_a_symbol():
+    sympy = pytest.importorskip("sympy")
+    from sympy.abc import phi, psi
+    x, sin = Ob('x'), sympy.sin(phi)
+    f, g = Box('f', x, x, data=sin + psi), Box('g', x, x, data=phi + psi)
+    assert f.subs(sin, 0).data == psi and g.subs(phi + psi, 0).data == 0
+    assert f.subs({sin: 0, psi: 1}).data == 1
+    assert (f >> g).subs(sin, 0) == f.subs(sin, 0) >> g
+    bubble = Bubble(f, data=sin).subs(sin, 0)
+    assert bubble == Bubble(f.subs(sin, 0)) and bubble.data == 0
+
+
+def test_free_symbols_of_numeric_array_read_from_dtype():
+    import numpy as np
+
+    class Opaque(np.ndarray):
+        def __iter__(self):
+            raise AssertionError("a numeric array was iterated")
+
+    data = np.ones((2, 2)).view(Opaque)
+    assert Box('f', Ob('x'), Ob('x'), data=data).free_symbols == set()
+
+
+def test_free_symbols_follow_mutable_data():
+    pytest.importorskip("sympy")
+    from sympy.abc import psi
+    f = Box('f', Ob('x'), Ob('x'), data=[0])
+    assert f.free_symbols == set()
+    f.data.append(psi)
+    assert f.free_symbols == {psi}
+    assert f.subs(psi, 1).data == f.lambdify(psi)(1).data == [0, 1]
+
+
 def test_Sum():
     x, y, z = map(Ob, "xyz")
     f = Box('f', x, y)
@@ -476,6 +536,18 @@ def test_Sum():
     assert len(Sum((), x, y)) == 0
     assert Sum((), x, x).then(f, g) == Sum((), x, z)
     assert Sum((), x, y).dagger() == Sum((), y, x)
+    h = Box('h', z, x)
+    with raises(AxiomError):
+        Sum((), x, y) >> h
+    with raises(AxiomError):
+        h >> Sum((), y, z)
+
+
+def test_Sum_terms_is_a_tuple():
+    x, y = Ob('x'), Ob('y')
+    f, g = Box('f', x, y), Box('g', x, y)
+    assert Sum([f, g]) == Sum(iter([f, g])) == Sum((f, g)) == f + g
+    assert hash(Sum([], x, y)) == hash(Sum((), x, y))
 
 
 def test_Functor_then_unit():
@@ -501,6 +573,15 @@ def test_Functor_then_unit():
 
     H = Functor(Strict(), Strict())
     assert (H >> F)(x) == F(x) == (F >> H)(x)
+
+
+def test_Functor_then_applies_the_first_functor():
+    x, y = Ob('x'), Ob('y')
+    f = Box('f', x, y)
+    G = Functor({x: x, y: y}, {f: f})
+    for F in (Functor({x: 'y', y: 'x'}, {f: (f[::-1], )}),
+              Functor(lambda ob: ob.name, lambda box: (box, ))):
+        assert (F >> G)(x) == G(F(x)) and (F >> G)(f) == G(F(f))
 
 
 def test_Bubble_no_common_boundary():

@@ -2,6 +2,8 @@
 
 import pickle
 
+import numpy as np
+
 from pytest import raises
 
 from discopy.cat import *
@@ -44,6 +46,12 @@ def test_coloured_Ty():
         y @ x
     with raises(AxiomError):
         Ty(Wire("x", red, green), Wire("z", blue, red))
+
+
+def test_Ty_of_a_colour_is_a_type_error():
+    with raises(TypeError, match="Expected monoidal.Wire, got monoidal."
+                                 "Colour instead."):
+        Ty(Colour("red"))
 
 
 def test_Colour_label():
@@ -116,6 +124,14 @@ def test_Ty_init():
     assert list(Ty('x', 'y', 'z')) == [Ty('x'), Ty('y'), Ty('z')]
 
 
+def test_init_iterator():
+    x = Ty('x')
+    h = Box('h', x, x)
+    assert Diagram(iter(h.inside * 2), x, x) == h >> h
+    assert Ty(inside=iter(['x', 'y'])) == Ty('x', 'y')
+    assert Dim(inside=iter([2, 3])) == Dim(2, 3)
+
+
 def test_Ty_eq():
     assert Ty('x') != 'x'
 
@@ -178,6 +194,21 @@ def test_abc_Nat_hash():
 def test_Nat_init():
     assert list(Nat(0)) == []
     assert all(len(Nat(n)) == n for n in range(5))
+
+
+def test_Nat_is_natural():
+    from discopy import abc
+    for natural in (abc.Nat, Nat):
+        with raises(ValueError, match="natural number, got -1"):
+            natural(-1)
+    with raises(TypeError):
+        abc.Nat(1.5)
+    assert abc.Nat(np.int64(2)) == abc.Nat(2)
+
+
+def test_Dim_is_positive():
+    with raises(ValueError, match="positive dimension, got 0"):
+        Dim(2, 0)
 
 
 def test_Nat_tensor():
@@ -608,6 +639,33 @@ def test_Diagram_normal_form_foliated():
         == diagram.normal_form(left=True)
 
 
+def test_normalize_reads_each_layer_once_per_sweep(monkeypatch):
+    x = Ty('x')
+    diagram = Id(x).then(*(10 * [Box('f', x, x)]))
+    reads, boxes_and_offsets = [], Layer.boxes_and_offsets.fget
+    monkeypatch.setattr(Layer, "boxes_and_offsets", property(
+        lambda layer: reads.append(layer) or boxes_and_offsets(layer)))
+    assert diagram.normal_form() == diagram and len(reads) == len(diagram)
+
+
+def test_merge_layers_tries_each_pair_of_layers_once(monkeypatch):
+    x, n = Ty('x'), 4
+    fs = Id(x).then(*(Box(f'f{i}', x, x) for i in range(n)))
+    gs = Id(Ty()).tensor(*(Box(f'g{i}', x, x) for i in range(n)))
+    diagram = fs @ x ** n >> x @ gs
+    pairs, merge = [], Layer.merge
+    monkeypatch.setattr(Layer, "merge", lambda layer, other: pairs.append(
+        (layer, other)) or merge(layer, other))
+    assert len(diagram.merge_layers()) == n
+    assert len(set(pairs)) == len(pairs)
+
+
+def test_sum_foliates():
+    x = Ty('x')
+    f, g = Box('f', x, x), Box('g', x, x)
+    assert (f + g).foliation() == (f + g).merge_layers() == f + g
+
+
 def test_AxiomError():
     inside = (Layer(Box('f', Ty('x'), Ty('y'))), )
     with raises(AxiomError) as err:
@@ -795,6 +853,14 @@ def test_Functor_then_unit():
     assert unit >> F == F == F >> unit
 
 
+def test_Functor_then_applies_the_first_functor():
+    x, y = Ty('x'), Ty('y')
+    f = Box('f', x, y)
+    F = Functor({x: 'y', y: 'x'}, {f: f[::-1]})
+    G = Functor({x: x, y: y}, {f: f})
+    assert (F >> G)(f @ x) == G(F(f @ x))
+
+
 def test_coloured_Functor_repr():
     red, green = Colour("red"), Colour("green")
     x = Ty(Wire("x", red, green))
@@ -956,6 +1022,14 @@ def test_coloured_diagram_has_no_hypergraph():
             convert(Box('f', x, x))
 
 
+def test_coloured_diagram_foliates():
+    red = Colour("red")
+    x = Ty(Wire('x', red, red))
+    f, g = Box('f', x, x), Box('g', x, x)
+    assert (f @ g).foliation().inside == (Layer(f, g), )
+    assert (f @ g).depth() == 1 and Diagram.id(x).depth() == 0
+
+
 def test_foliation_up_to_interchangers():
     from discopy import rigid, tensor
     interchangers = lambda d: d.to_staircases().normal_form(
@@ -1035,3 +1109,10 @@ def test_Functor_and_Equation_tree():
         Equation.from_tree(equation.to_tree() | {'space': 'x'})
     with raises(TypeError, match=r"Expected int \| float"):
         dumps(Equation(f, f, space="x"))
+
+
+def test_Equation_modulo_keeps_space():
+    f = Box('f', Ty('x'), Ty('x'))
+    equation = Equation(f, f, symbol="->", space=3).modulo(len)
+    assert equation.space == 3 and equation.symbols == ("->", )
+    assert loads(dumps(equation.modulo(None))).space == 3
