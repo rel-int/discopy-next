@@ -39,23 +39,29 @@ cd discopy
 uv sync
 ```
 
-Different dependency groups are available (switch with `uv sync --group <group-name>`):
-- no group: minimal set of dependencies required to work with DisCoPy.
-- `dev`: testing and linting tools.
-- `quantum`: includes quantum computating dependencies
+`uv sync` installs the package with the `dev` group (testing and linting tools), the default
+set in `[tool.uv]`; `uv sync --no-dev` installs the bare package. Add more groups with
+`uv sync --group <name>`:
+- `quantum`: quantum computing dependencies
 - `grammar`: natural language processing libraries, PyTorch included for the neural parser
+- `optyx`: the dependencies of `discopy.optyx` (photonics, ZX, tensor contraction)
 - `notebooks`: marimo, IPython and a Jupyter kernel to run the notebooks, with anywidget to show diagrams as widgets
 - `docs`: for generating the documentation
-Since dependency groups are not standard, we also provide equivalents via optional dependencies.
+- `all`: every group above, which CI's test job installs
+
+Since dependency groups are not standard, `quantum`, `grammar`, `optyx`, `notebooks` and `docs`
+are also optional dependencies (`pip install -e '.[quantum]'`). There is no `dev` or `all`
+extra: the `test` extra bundles `quantum`, `grammar` and `optyx` with the test tools, without
+ruff, ty or pytest-benchmark.
 
 ## Run the unit tests
 
 After cloning the repository, you should check you haven't broken anything by running the test suite.
-Use `uv sync --dev` before running any part of the test suite, and `uv sync --dev --group all`
-if you want to run the full test suite involving all extra dependencies.
+`uv sync` is enough for the suite; `uv sync --group all` adds every extra dependency for the
+full suite.
 
 ```shell
-uv sync --dev --group all
+uv sync --group all
 uv run pflake8 discopy
 uv run pylint discopy
 uv run ruff check discopy
@@ -65,6 +71,19 @@ uv run coverage report -m
 ```
 
 Without the extras installed, run `uv run pytest --skip-extra` to skip what needs them.
+A test that needs an extra says so with `pytest.importorskip`. A doctest that needs one marks
+an example `# doctest: +EXTRA`, usually its import line, e.g.
+`>>> from sympy.abc import phi  # doctest: +EXTRA`, and `--skip-extra` then skips the whole
+docstring. A module whose import itself needs an extra goes in `UNIMPORTABLE` in
+`test/plugin.py`, and a package goes in `UNIMPORTABLE_PACKAGES`.
+
+CI also runs every marimo notebook in `docs/notebooks/` and fails if a cell errors. With the
+`all` group synced, run `uv run python docs/export_notebooks.py --check`, adding notebook names
+(e.g. `qnlp` or `optyx/bose_hubbard`) to check only those and `--jobs N` to run N at a time.
+A notebook that a tracked bug breaks is listed in `KNOWN_BROKEN` in that script with its issue,
+and `--check` does not fail on it. Each notebook runs from its own directory, so from a git
+worktree prefix the command with `PYTHONPATH=$PWD`, or the notebooks import the main
+checkout's editable `discopy`.
 
 `coverage report` fails below the `fail_under` of `pyproject.toml`, measured on `discopy/`
 alone: without the extras the local number is lower, and CI's `Coverage` step is the gate.
@@ -86,12 +105,17 @@ new score when your change lifts it, so that the score never goes down. A law st
 declares the `factory` members a `NamedGeneric` subscript sets and lets `hypothesis.strategies`
 be imported inside a method, where a strategy is built, so that the package never imports it; a
 category of messages the code is not going to follow is disabled there with its reason, as
-`cyclic-import` is: the package imports every module.
+`cyclic-import` is: the package imports every module. CI lints on Python 3.14 only, and
+pylint's score can differ slightly between Python versions, so measure the score against
+`fail-under` on 3.14: `uv sync --group dev --python 3.14` then `uv run pylint discopy`.
 
 `ruff check` and `ty check` gate on every rule `main` passes. The rules `main` still breaks are
 listed in `pyproject.toml`, ruff's under `ignore` and ty's as `"warn"`, which ty prints without
 failing under `--exit-zero-on-warning`: the pull request that fixes the last instance of one removes it from the list, so that
 the list only shrinks, as `fail-under` only rises.
+
+A change under `.github/` is checked by [actionlint](https://github.com/rhysd/actionlint),
+`uv run pflake8 .github` and `uv run --with pyyaml pytest --import-mode=importlib .github/tests/*.py`.
 
 ## Run the property tests
 
@@ -99,7 +123,6 @@ The Hypothesis property matrix lives in `proptest/`, outside
 pytest's default `testpaths`. Run them explicitly:
 
 ```shell
-uv sync --group dev
 uv run pytest proptest/ -n auto -p no:benchmark -v
 ```
 
@@ -118,14 +141,12 @@ uv run pytest proptest/ -k unitality -v
 uv run pytest proptest/ -k 'Arrow and not dagger'
 ```
 
-A law's signature is a sequent, e.g.
-`def unitality[A: Obj[C0], B: Obj[C0]](cls, f: Hom[C1, A, B]) ->
-Equation[Hom[C1, A, B]]`: the cell draws the objects `A` and `B`, then a
-morphism `f` between them from the strategy of the category, and checks
-the equation it returns against its return annotation as well as checking
-that it holds. Under `from __future__ import annotations` the sequent is
-read back from its strings, with the type parameters of the class stating
-it in scope.
+Each law is stated once as a sequent, e.g. `cat.Arrow.unitality`
+quantifies over objects `A`, `B` and a morphism `f: Hom[C1, A, B]`, and
+its cell draws those arguments from the strategy of the category and
+checks the `Equation` it returns: how a law is stated, and how a category
+declares one failing, inapplicable or holding modulo a quotient, is the
+documentation of [`discopy.testable`](discopy/testable.py).
 
 A cell is skipped when its axiom declares that the structure does not
 apply, and xfailed when the law is declared broken, each carrying its
@@ -134,12 +155,15 @@ their reasons, and `-x` to stop at the first genuine failure.
 
 `proptest/conftest.py` registers four Hypothesis profiles over the
 `.hypothesis/examples` database, selected by `HYPOTHESIS_PROFILE`: `dev`
-by default, `pr` for the small budget a pull request runs with, under a
-fixed `--hypothesis-seed` so that it draws the same examples every time,
-and `explore` for the large one `main` and the nightly run search with.
-A fourth, `shared`, is `dev` reading the database CI uploads as a workflow
-artifact, through a `GITHUB_TOKEN`, so a failure found on CI replays on
-your machine before any search; it reaches GitHub only when selected.
+by default, `pr` for the small budget a pull request runs with, which CI
+runs under `--hypothesis-seed=0` so that it draws the same examples every
+time (the profile does not fix the seed itself: pass the flag locally too,
+and the database it replays still differs from CI's), and `explore` for
+the large one `main` and the nightly run search with. A fourth, `shared`,
+is `dev` reading the example database that discopy/discopy's CI uploads as
+a workflow artifact, through a `GITHUB_TOKEN`, so a failure found on
+upstream's CI replays on your machine before any search; it reaches GitHub
+only when selected, and does not read this repo's own CI artifact.
 
 ```shell
 HYPOTHESIS_PROFILE=explore uv run pytest proptest/ -n auto -p no:benchmark
@@ -217,7 +241,6 @@ owns timing (CPU clock and GC disabled) and automatically calibrates rounds
 and iterations for each workload.
 
 ```shell
-uv sync --group dev
 # small/medium sizes (the default); add BENCH_FLAGS=bench:full for the heavy tail
 uv run --with "pyzx==0.10.7" pytest benchmark/ -v \
     --benchmark-json=benchmark-results/bench.json
@@ -244,10 +267,10 @@ measurements present in only one of the two runs.
 
 The `benchmark` GitHub workflow benchmarks two commits on the same runner and
 compares them: on `main` the commit pushed against the branch as it was before
-the push, on a pull request labelled `benchmark` the head commit against the
-base. `main` runs the full size tail, a pull request the default sizes; a
-manual dispatch has nothing to compare against and only measures its own
-commit. Every run uploads the report of its head commit -- the raw
+the push, on a pull request labelled `benchmark` the head commit against its
+merge base with the target branch. `main` runs the full size tail, a pull
+request the default sizes; a manual dispatch has nothing to compare against
+and only measures its own commit. Every run uploads the report of its head commit -- the raw
 `bench.json`, the Markdown tables and the SVG plots -- writes the comparison to
 the job summary, and raises a warning annotation, never a failure, when a
 measurement regresses. A pull request run also posts or updates a comment with
@@ -256,20 +279,21 @@ the important regressions and speedups.
 ## Build the docs
 
 You can build the documentation locally with [sphinx](https://www.sphinx-doc.org/en/master/):
-You'll need to install [pandoc](https://pandoc.org/) and [graphviz](https://graphviz.org/) as external dependencies not managed by `uv`.
+You'll need [graphviz](https://graphviz.org/) installed as an external dependency not managed by `uv` (e.g. `apt install graphviz`), as CI and Read the Docs install it.
 
 ```shell
 uv sync --group docs
 uv run sphinx-build docs docs/_build/html
 ```
 
-You do not need to build them to see what a pull request changes: Read the Docs
-builds every pull request, the marimo notebooks included, and its check on the
-pull request links to the preview, at
-`https://discopy--<number>.org.readthedocs.build/en/<number>/`.
-The `docs` artifact of the `build` workflow is the same build, to download, but
-its notebooks do not show when opened from disk
-([#526](https://github.com/discopy/discopy/issues/526)).
+You do not need to build them to see what a pull request changes: the `docs`
+job of the `build` workflow builds them and uploads them as the `docs`
+artifact, to download, though its notebooks do not show when opened from disk
+([#526](https://github.com/discopy/discopy/issues/526)). Upstream, Read the Docs
+also builds every pull request, the marimo notebooks included, and its check
+links to the preview at
+`https://discopy--<number>.org.readthedocs.build/en/<number>/`; this repo's
+Read the Docs project (`discopy-next`) does not build pull requests.
 
 ## Build without uv
 
@@ -281,7 +305,7 @@ python -m venv .venv
 . .venv/bin/activate
 python -m pip install --upgrade pip
 python -m pip install -e '.[test]'
-python -m pip install coverage pyproject-flake8 pytest marimo
+python -m pip install 'ruff == 0.14.0' 'ty == 0.0.69'
 ```
 
 Then run:
@@ -289,6 +313,8 @@ Then run:
 ```shell
 pflake8 discopy
 pylint discopy
+ruff check discopy
+ty check --exit-zero-on-warning
 coverage run -m pytest
 coverage report -m
 ```
@@ -299,6 +325,15 @@ To build distributions without uv:
 python -m pip install build
 python -m build
 ```
+
+## Add a changelog entry
+
+Every user-facing change adds one bullet to the `[Unreleased]` section of
+[CHANGELOG.md](CHANGELOG.md), under its heading (Keep a Changelog's `Added`, `Changed`,
+`Deprecated`, `Removed`, `Fixed`, or `Project` for the repo's own tooling and process), citing
+the pull request as a reference link defined with the others at the bottom of the file:
+`[#N]` for discopy/discopy, `[next#N]` for rel-int/discopy-next. A merge conflict there resolves by hand to `main`'s
+file plus your own bullet(s), since git's union merge can bring back lines one side deleted.
 
 ## Release a version
 

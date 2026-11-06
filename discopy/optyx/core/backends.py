@@ -639,9 +639,8 @@ class PercevalBackend(AbstractBackend):
 
         Args:
             diagram (Diagram): The diagram to evaluate.
-            **extra: Additional arguments for the evaluation:
-                - config: Configuration for Perceval evaluation,
-                    see :class:`PercevalEvalConfig`.
+            **extra: Additional arguments for the evaluation, such as
+                ``config``, a :class:`PercevalEvalConfig`.
 
         Returns:
             The result of the evaluation (EvalResult).

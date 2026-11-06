@@ -94,7 +94,7 @@ the one-step optical matrix, loss channels included, and
 :meth:`Diagram.truncation_dimensions` reads each wire's photon budget off the
 diagram, which is where the cutoff search of :meth:`Diagram.eigen_fix` starts.
 
-See :doc:`/notebooks/fixpoints` for what each of these returns, and for
+See :doc:`/notebooks/optyx/fixpoints` for what each of these returns, and for
 using them to simulate feedback boson sampling.
 
 Types
@@ -1031,8 +1031,8 @@ class Diagram(frobenius.Diagram):
         >>> fixed = delay.fix(tol=1e-6, max_chi=None)
         >>> assert np.allclose(fixed.density_matrix, [[.5, 0], [0, .5]])
 
-        See :doc:`/notebooks/fixpoints` for the semantic diagram, agreement
-        map and contraction planning.
+        See :doc:`/notebooks/optyx/fixpoints` for the semantic diagram,
+        agreement map and contraction planning.
         """
         self.check_fixpoint(tol, max_chi)
         if not isinstance(max_steps, Integral) \

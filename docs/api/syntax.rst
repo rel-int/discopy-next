@@ -27,3 +27,12 @@ DisCoPy's mathematical core: a zoo of diagrams, categories and functors.
     discopy.hypergraph
     discopy.ehypergraph
     discopy.cmap
+
+Utilities shared by every module: serialisation, factories and configuration.
+
+.. autosummary::
+    :template: module.rst
+    :toctree: ../_api
+
+    discopy.utils
+    discopy.config
