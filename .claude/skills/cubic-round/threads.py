@@ -65,7 +65,8 @@ def get_all(path, ctx):
 
 def strip_details(body):
     pattern = re.compile(
-        r"<details>\s*<summary>(.*?)</summary>((?:(?!<details>).)*?)</details>",
+        r"<details>\s*<summary>((?:(?!</summary>).)*?)</summary>"
+        r"((?:(?!<details>).)*?)</details>",
         re.S | re.I,
     )
     while True:
@@ -284,6 +285,9 @@ def main():
     except (urllib.error.URLError, OSError) as error:
         sys.exit(f"threads.py: {error}")
     open_threads = [t for t in threads if not t["resolved"]]
+    if args.todo and any(t["resolved"] is None for t in threads):
+        sys.exit("threads.py: ccr route failed, resolution unknown,"
+                 " no TODO.md written")
     if args.todo:
         pending = [t for t in open_threads if unanswered(t)]
         if not pending:

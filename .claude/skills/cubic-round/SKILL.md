@@ -50,6 +50,6 @@ in full, resolved too; `--reviews` adds the review summaries.
    cubic approves a code push when it finds nothing.
 
 Edge cases: if the `ccr/review_threads` route fails, threads are rebuilt from `in_reply_to_id`
-and the header says resolution is unknown. `>=N code commit(s)` means the PR's 250-commit list
-ran out first. Cubic can mark a thread `[addressed <sha>]` while it is still unresolved: reply
-and resolve it all the same.
+and the header says resolution is unknown; `--todo` then refuses to write. `>=N code commit(s)`
+means the PR's 250-commit list ran out first. Cubic can mark a thread `[addressed <sha>]`
+while it is still unresolved: reply and resolve it all the same.
