@@ -8,7 +8,7 @@ Optyx diagrams combine three diagrammatic calculi:
 - :class:`zw` calculus: for infinite-dimensional systems (Mode type), \
 with generators :class:`zw.Z`, :class:`zw.W`, creations and selections.
 - :class:`photonic` calculus: for linear optics (Mode type), with generators \
-:class:`photonic.BS` and :class:`photonic.Phase`, or other .
+:class:`photonic.BS` and :class:`photonic.Phase`.
 - :class:`zx` calculus: for qubit systems (Bit type), with generators \
 :class:`zx.Z` and :class:`zx.X`.
 
