@@ -400,11 +400,28 @@ class DualRail(Functor):
         colour : The name of the colour filling the inside of each ribbon (or
             a function from object to colour name), see :func:`double_rail`.
 
+    Note
+    ----
+    A dual rail encoding is not determined by its maps: it sends a twist or a
+    braid, and at the levels above a swap, a cup or a cap, to a box rather
+    than to the same structure on the encoded wires. So it composes with no
+    functor but the identity, see :meth:`discopy.cat.Functor.then`: apply the
+    two in turn instead.
+
+    >>> x = Ty('x')
+    >>> D, E = DualRail(), DualRail(colour="red")
+    >>> D >> E
+    Traceback (most recent call last):
+    ...
+    discopy.utils.AxiomError: balanced.DualRail composes with no functor...
+    >>> assert len(E(D(x))) == 4 and D >> Functor.id(Diagram) is D
+
     See also
     --------
     :meth:`Diagram.to_braided`
     """
     cod = Diagram
+    composes = False
     dual_rail_twist_factory = DualRailTwist
     dual_rail_braid_factory = DualRailBraid
 

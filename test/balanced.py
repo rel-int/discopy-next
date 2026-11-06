@@ -74,6 +74,29 @@ def test_dual_rail_braid_and_twist():
     assert twist.dom == twist.cod == double_rail(x)
 
 
+def test_dual_rail_then():
+    """S1-5 of #445: a dual rail encoding sends structure to boxes, so its
+    maps do not determine it and it composes, on either side, with no
+    functor but the identity."""
+    from pytest import raises
+    from discopy import compact, ribbon
+    from discopy.utils import AxiomError
+    for module in (balanced, symmetric, ribbon, compact):
+        D = module.DualRail()
+        x, y = module.Ty('x'), D.cod.ob('y')
+        before = module.Functor({x: x}, {})
+        after = D.cod.functor_factory({y: y}, {})
+        name = module.__name__.removeprefix("discopy.")
+        for left, right in [(D, after), (before, D)]:
+            with raises(AxiomError, match=rf"^{name}\.DualRail composes with "
+                        r"no functor .* E\(D\(f\)\)"):
+                left >> right
+        assert D >> D.cod.functor_factory.id(D.cod) is D
+        assert module.Functor.id(D.dom) >> D is D
+    with raises(AxiomError, match="composes with no functor"):
+        DualRail() >> DualRail(colour="red")
+
+
 def test_to_braided_default_and_zero_width():
     from discopy import config
 

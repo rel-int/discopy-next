@@ -1099,6 +1099,7 @@ class Functor(Category[type, "Functor"]):
     ob = type[Category]
     dom: type[Any] = Arrow
     cod: type[Any] = Arrow
+    composes = True
 
     @classmethod
     def id(cls, dom: type | None = None) -> Self:
@@ -1123,11 +1124,21 @@ class Functor(Category[type, "Functor"]):
         Parameters:
             other : The other functor with which to compose.
 
+        Raises:
+            AxiomError : When a functor other than the identity is composed
+                with one whose ``composes`` is false.
+
         Note
         ----
         An identity functor, see :meth:`id`, is dropped on either side so that
         composition is unital. Otherwise functors given by functions compare
         as functions, e.g. their composition is associative only in action.
+
+        The composite sends each object and box to its image under ``other``
+        of its image under ``self``: it is the composite of two functors that
+        their maps determine. A functor that its maps do not determine, e.g.
+        :class:`discopy.balanced.DualRail`, has ``composes`` false: apply the
+        two in turn instead.
 
         Example
         -------
@@ -1145,6 +1156,10 @@ class Functor(Category[type, "Functor"]):
         if other.ob_map.mapping is other.ar_map.mapping is identity\
                 and other == other.id(other.dom):
             return self
+        for functor in (self, other):
+            if not functor.composes:
+                raise utils.AxiomError(messages.NO_COMPOSITE.format(
+                    factory_name(type(functor))))
         ob_map, ar_map = (
             {key: other(self(key)) for key in mapping}
             if isinstance(mapping, Mapping) else (lambda key: other(self(key)))
