@@ -27,7 +27,7 @@ global="$(git config --path core.attributesFile || true)"
 { [ -n "$global" ] && [ -f "$global" ] && cat "$global"; echo "CHANGELOG.md merge=changelog"; } > "$tmp/attributes"
 
 count="$(git rev-list --count HEAD..origin/main)"
-what="${1:-$(git log --first-parent --format=%s HEAD..origin/main | grep -o '^Merge pull request #[0-9]*' | grep -o '#[0-9]*' | tac | paste -sd ' ' -)}"
+what="${1:-$(git log --first-parent --reverse --format=%s HEAD..origin/main | grep -o '^Merge pull request #[0-9]*' | grep -o '#[0-9]*' | paste -sd ' ' -)}"
 what="${what:-$count commits}"
 message="Merge origin/main into $branch: $what"
 trailers="$(git config --get-all next.trailer)"

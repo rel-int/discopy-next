@@ -150,7 +150,8 @@ def still_there(gone):
     """Drop what the merged tree defines again."""
     for key in list(gone):
         path = key.replace(".", "/")
-        if os.path.exists(path + ".py") or os.path.exists(path):
+        if os.path.exists(path + ".py") or os.path.exists(
+                path + "/__init__.py"):
             del gone[key]
             continue
         module, _, name = key.rpartition(".")

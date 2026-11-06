@@ -82,13 +82,16 @@ def classify(got, want, base, ours, theirs):
     the committed file kept and the driver did not; ``driver resurrected``: a
     base unit one side deleted and the other kept as is; ``driver
     duplicated``: a unit more often than on either side; ``hand edit``: the
-    committed file wrote or dropped units of its own; ``blank lines`` else.
+    committed file wrote or dropped units of its own, or kept one that a
+    side deleted; ``blank lines`` else.
     """
     have, need, old, mine, main = (collections.Counter(
         unit for unit in DRIVER.units(text) if unit.strip())
         for text in (got, want, base, ours, theirs))
-    lost = [u for u in need if u not in have and (u in main or (
-        u in mine and u not in old))]
+    kept = [u for u in need if u not in have and u in old
+            and (u in mine) != (u in main)]
+    lost = [u for u in need if u not in have and u not in kept and (
+        u in main or (u in mine and u not in old))]
     back = [u for u in have if u in old and u not in need and (
         (u not in main and mine[u] == old[u])
         or (u not in mine and main[u] == old[u]))]
@@ -96,7 +99,7 @@ def classify(got, want, base, ours, theirs):
     marks = [u for u in have if u.startswith(("<<<<<<<", "=======",
                                               ">>>>>>>"))]
     dup = [u for u in dup if u not in marks]
-    hand = [u for u in need if u not in mine and u not in main] + [
+    hand = kept + [u for u in need if u not in mine and u not in main] + [
         u for u in have if u not in need and u in mine and (
             u in main or u not in old) and u not in marks]
     reasons = [(name, units) for name, units in (
@@ -160,8 +163,12 @@ def main():
         elif PATH not in names and ours != base and theirs != base \
                 and ours != theirs:
             got, _ = run_driver(base, ours, theirs)
-            merged = DRIVER.merge(base, ours, theirs)
             clean["driver " + compare(got, want)] += 1
+            try:
+                merged = DRIVER.merge(base, ours, theirs)
+            except Exception:  # pylint: disable=broad-exception-caught
+                clean["units alone crashed"] += 1
+                continue
             if merged is None:
                 clean["units alone declined"] += 1
                 continue
@@ -186,7 +193,8 @@ def main():
           f"units alone identical {clean['units alone identical']}, "
           f"multiset {clean['units alone multiset']}, "
           f"differs {clean['units alone differs']}, "
-          f"declined (a release) {clean['units alone declined']}")
+          f"declined (a release) {clean['units alone declined']}, "
+          f"crashed {clean['units alone crashed']}")
     if args.verbose:
         print("\n".join(notes))
 
