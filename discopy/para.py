@@ -460,6 +460,8 @@ class Closed(Markov, ClosedCategory):
         >>> k = Closed(a, a, closed.Box('k', a @ P, a), P)
         >>> assert k.curry(0) == k == k.curry(0, left=False)
         """
+        if n < 0 or n > len(self.dom):
+            raise ValueError(messages.NOT_SPLITTABLE.format(n, self.dom))
         if not n:
             return self
         if self.copar:

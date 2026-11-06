@@ -39,6 +39,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from random import Random
 
+import numpy
+
 from discopy.matrix import get_backend
 from discopy.quantum.ansatze import Sim15ansatz
 from discopy.quantum.circuit import Circuit, Id, qubit
@@ -342,6 +344,13 @@ class Readout:
     """
     weights: object
     intercept: object
+
+    def __eq__(self, other):
+        return isinstance(other, Readout) and all(
+            numpy.shape(x) == numpy.shape(y)
+            and bool(numpy.asarray(x == y).all()) for x, y in zip(
+                (self.weights, self.intercept),
+                (other.weights, other.intercept)))
 
     def __call__(self, features):
         return features @ self.weights + self.intercept

@@ -1,6 +1,8 @@
 
 import os
+import tomllib
 
+from packaging.requirements import Requirement
 from pytest import approx, importorskip, raises
 
 from discopy.utils import AxiomError
@@ -564,6 +566,24 @@ def test_draw_box_foreground_on_dark_background():
     plt.close(backend.axis.figure)
 
 
+def test_draw_transparent_box_labels_on_the_page():
+    from matplotlib import pyplot as plt
+    from discopy.quantum import Ket
+    box = monoidal.Box(
+        "f", monoidal.Ty("x"), monoidal.Ty("x"), color=config.TRANSPARENT)
+    ket = Ket(0)
+    ket.color = config.TRANSPARENT
+    for diagram in (box, ket):
+        drawing = diagram.to_drawing()
+        drawing.add_box_corners()
+        backend = Matplotlib(figsize=(2, 2))
+        backend.draw_boxes(drawing)
+        label = backend.axis.texts[-1]
+        assert label.get_color() == "black"
+        assert label.get_gid().startswith("dark-fill")
+        plt.close(backend.axis.figure)
+
+
 def test_crack_two_eggs_at_once():
     from discopy.symmetric import Ty, Box, Diagram, Layer
 
@@ -776,6 +796,30 @@ def test_widget():
     assert pickle.loads(pickle.dumps(f)) == f
 
 
+def installs(extras, extra):
+    """The names an extra installs, with those of the extras it includes."""
+    names = set()
+    for requirement in map(Requirement, extras[extra]):
+        if requirement.name == "discopy":
+            names = names.union(
+                *(installs(extras, name) for name in requirement.extras))
+        else:
+            names.add(requirement.name)
+    return names
+
+
+def test_the_test_extra_installs_the_widget():
+    with open("pyproject.toml", "rb") as file:
+        extras = tomllib.load(file)["project"]["optional-dependencies"]
+    assert "anywidget" in installs(extras, "test")
+
+
+def test_installs_reads_any_spelling_of_a_requirement():
+    extras = {"test": ["discopy[a, b]", "pytest"],
+              "a": ["anywidget >= 0.9"], "b": []}
+    assert installs(extras, "test") == {"anywidget", "pytest"}
+
+
 RIBBON_COLOURS = ("red", "green", "blue", "yellow")
 
 
@@ -874,15 +918,41 @@ def test_Drawing_validate_attributes():
 
 def test_Drawing_dagger():
     """ The reflection lists its nodes by index, whatever order the graph
-    stores them in, and the empty drawing reflects to itself. """
+    stores them in, reflects a valid drawing to a valid one, and the empty
+    drawing to itself. """
+    from discopy import symmetric
     x = monoidal.Ty('x')
     f, g = monoidal.Box('f', x, x), monoidal.Box('g', x, x)
     drawing = (f >> g).to_drawing()
     assert [node.box for node in drawing.dagger().box_nodes]\
         == [g.dagger(), f.dagger()]
     assert drawing.dagger().dagger() == drawing
+    x, y = symmetric.Ty('x'), symmetric.Ty('y')
+    h = symmetric.Box('h', x, y)
+    for diagram in [f >> g, h @ x >> symmetric.Swap(y, x) >> x @ h[::-1]]:
+        diagram.to_drawing().dagger().validate_attributes()
     empty = monoidal.Id(monoidal.Ty()).to_drawing()
     assert empty.dagger() == empty
+
+
+def test_Drawing_dagger_reflects_bubbles():
+    x = monoidal.Ty('x')
+    red, blue = monoidal.Colour('red'), monoidal.Colour('blue')
+    y = monoidal.Ty(monoidal.Wire('y', red, blue))
+    f, g = monoidal.Box('f', x, x), monoidal.Box('g', y, y)
+    for diagram in [
+            f.bubble(), f.bubble(draw_as_frame=True), monoidal.Equation(g, g)]:
+        drawing = diagram.to_drawing()
+        assert drawing.dagger().dagger() == drawing
+
+
+def test_Drawing_dagger_is_mutable():
+    from discopy.drawing import Node
+    x = monoidal.Ty('x')
+    f, g = monoidal.Box('f', x, x), monoidal.Box('g', x, x)
+    drawing = (f >> g).to_drawing().dagger()
+    drawing.add_box_corners()
+    assert Node("box-corner-00", j=0) in drawing.graph
 
 
 def test_draw_is_pure(tmp_path):
@@ -957,3 +1027,26 @@ def test_no_tree():
     with raises(TypeError, match="A drawing has no tree"):
         dumps(Box('f', Ty('x'), Ty('y')).to_drawing())
     assert Drawing.serialisation() is NotImplemented
+
+
+def test_Drawing_bubble_of_plain_types_places_every_node():
+    a, b, c, d = map(Ty, "abcd")
+    f = Box('f', a @ b, c @ d).to_drawing()
+    for dom, cod in [(c @ d, a @ b), (c @ d, a), (c, a @ b)]:
+        bubble = f.bubble(dom, cod, name="g")
+        assert set(bubble.nodes) == set(bubble.positions)
+        assert bubble == f.bubble(dom.to_drawing(), cod.to_drawing(), name="g")
+
+
+def test_Drawing_equality_compares_wires():
+    x = monoidal.Ty('x')
+    wires = Drawing.id(x @ x)
+    (a, b), (c, d) = wires.dom_nodes, wires.cod_nodes
+    graph = wires.graph.copy()
+    graph.remove_edges_from([(a, c), (b, d)])
+    graph.add_edges_from([(a, d), (b, c)])
+    crossed = Drawing(
+        PlaneGraph(graph, wires.positions), wires.dom, wires.cod, (),
+        wires.width, wires.height)
+    crossed.validate_attributes()
+    assert crossed != wires

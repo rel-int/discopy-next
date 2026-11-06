@@ -7,28 +7,28 @@ Optyx diagrams combine three diagrammatic calculi:
 
 - :class:`zw` calculus: for infinite-dimensional systems (Mode type), \
 with generators :class:`zw.Z`, :class:`zw.W`, creations and selections.
-- :class:`lo` calculus: for linear optics (Mode type), with generators \
-:class:`lo.BS` and :class:`lo.Phase`, or other .
+- :class:`photonic` calculus: for linear optics (Mode type), with generators \
+:class:`photonic.BS` and :class:`photonic.Phase`.
 - :class:`zx` calculus: for qubit systems (Bit type), with generators \
 :class:`zx.Z` and :class:`zx.X`.
 
 Mode and Bit types can moreover be combined using :class:`DualRail`
-or other instances of :class:`diagram.core.Box`.
+or other instances of :class:`Box`.
 Note that the permanent method is only defined for a subclass
-of :class:`zw` diagrams, including :class:`lo` circuits.
+of :class:`zw` diagrams, including :class:`photonic` circuits.
 These are also known as QPath diagrams [FC23]_,
 or matrices with creations and annihilation.
 They are implemented in the :class:`path.Matrix` class,
-with an interface :class:`to_perceval`
+with an interface :class:`backends.PercevalBackend`
 or the internal evaluation method :class:`eval`.
 The DisCoPy class :class:`tensor.Diagram` is used as an
 implementation of tensor networks,
 with dimensions as types and tensors as boxes,
-with an interface :class:`to_quimb`
+with an interface :class:`backends.QuimbBackend`
 or the internal evaluation method :class:`eval`.
-Linear optical circuits, built from the generators of :class:`lo`,
-can be evaluated as tensor networks
-by first applying the method :class:`to_zw`.
+Linear optical circuits, built from the generators of :class:`photonic`,
+can be evaluated as tensor networks,
+since the Kraus map of each gate is a :class:`zw` diagram.
 
 
 Types
@@ -295,7 +295,7 @@ class Bit(Ty):
 class Diagram(frobenius.Diagram):
     """Optyx diagram combining :class:`zw`,
     :class:`zx` and
-    :class:`lo` calculi."""
+    :class:`photonic` calculi."""
 
     grad = tensor.Diagram.grad
     __pow__ = monoidal.Ty.__pow__
@@ -313,7 +313,7 @@ class Diagram(frobenius.Diagram):
         """Returns the :class:`Matrix` normal form
         of a :class:`Diagram`.
         In other words, it is the underlying matrix
-        representation of a :class:`path` and :class:`lo` diagrams.
+        representation of a :class:`path` and :class:`photonic` diagrams.
 
         Feedback loops have no path semantics: they raise, asking for the
         diagram to be unrolled first.
@@ -669,8 +669,6 @@ class Box(frobenius.Box, Diagram):
     zx boxes (Bit) with tensors with dims of 2.
     """
 
-    __ambiguous_inheritance__ = (frobenius.Box,)
-
     array = None
 
     def __init__(self, name, dom, cod, array=None, **params):
@@ -965,13 +963,14 @@ class Sum(symmetric.Sum, Box):
     Formal sum of optyx diagrams
     """
 
-    __ambiguous_inheritance__ = (symmetric.Sum,)
-
     def conjugate(self):
         return sum(term.conjugate() for term in self.terms)
 
     def to_path(self, dtype: type = complex):
         return sum(term.to_path(dtype) for term in self.terms)
+
+    def inflate(self, d):
+        return Diagram.inflate(self, d)
 
     def eval(self, n_photons=0, permanent=None, dtype=complex):
         """Evaluate the sum of diagrams."""
@@ -1064,12 +1063,11 @@ class Permutation(frobenius.Permutation, Box):
     def conjugate(self):
         return self
 
-    # pylint: disable-next=unused-argument  # overrides Box.to_path
     def to_path(self, dtype: type = complex):
         size = len(self.dom)
-        return path.Matrix([int(self.perm[j] == i)
-                            for i in range(size) for j in range(size)],
-                           size, size)
+        return path.Matrix[dtype]([int(self.perm[j] == i)
+                                   for i in range(size) for j in range(size)],
+                                  size, size)
 
     def determine_output_dimensions(self, input_dims: list[int]) -> list[int]:
         """Determine the output dimensions based on the input dimensions."""
@@ -1095,7 +1093,7 @@ class Swap(Permutation, frobenius.Swap, Box):
         return self
 
     def to_path(self, dtype: type = complex):
-        return path.Matrix([0, 1, 1, 0], 2, 2)
+        return path.Matrix[dtype]([0, 1, 1, 0], 2, 2)
 
     def determine_output_dimensions(self, input_dims: list[int]) -> list[int]:
         """Determine the output dimensions based on the input dimensions."""
@@ -1146,6 +1144,9 @@ class Scalar(Box):
 
     def dagger(self) -> Diagram:
         return Scalar(self.scalar.conjugate())
+
+    def inflate(self, d):
+        return self
 
     def subs(self, *args):
         data = rsubs(self.scalar, *args)
@@ -1412,7 +1413,6 @@ class Feedback(monoidal.Bubble, Box):
     .. image:: /_static/optyx/cnot_ladder.svg
         :align: center
     """
-    __ambiguous_inheritance__ = (monoidal.Bubble,)
     serialised_attrs = ("*args", "dom", "cod", "mem", "state", "effect")
 
     @classmethod

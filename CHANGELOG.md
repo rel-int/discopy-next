@@ -247,6 +247,9 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   and dict functors ([next#168]); `para` and `interaction` hash ([next#31]).
 - A `Matrix` with no dtype reads it off its array without copying it, so it
   copies once, as a `Matrix[dtype]` does ([next#8]).
+- `feedback.generators` is `feedback.structural_boxes`, and
+  `feedback.wire_generators` `feedback.structural_wires`: a feedback, trace,
+  head or tail is a structural box, not a generator ([next#459]).
 
 ### Deprecated
 
@@ -829,6 +832,269 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   them left to right, as `Hypergraph` does: rigid accepts the map of a cup on
   a box onto `x @ x.r` and refuses one onto `x.r @ x`, and pivotal decodes
   both ([next#445]).
+- `tensor.Box` compares its winding number `z`, so on a self-dual `Dim` a
+  rotated box `f.r` no longer equals or hashes like `f` ([next#445]).
+- `tensor.Functor` evaluates `dtype=Expr` diagrams exactly and functorially:
+  its boundary and loop identities are integers, not floats, so
+  `F(f >> f) == F(f) >> F(f)` ([next#445]).
+- `hopf.Representation.qdim` is the loop in `Intertwiner[H]`, twisted by the
+  pivotal element, rather than `dim V`: 0, not 4, on Sweedler's regular module
+  ([next#445]).
+- `Matrix.transpose`, `conjugate`, `dagger`, `merge` and `round`, and
+  `Tensor.transpose`, `.l`, `.r` and `round`, work under `backend('pytorch')`
+  ([next#445]).
+- `tensor.Bubble.grad` applies the chain rule on any boundary (states, effects,
+  compound `Dim`s), where it used to raise `ValueError` ([next#445]).
+- Equal `hopf.Algebra`s hash equal, so `Representation[H]` is one class per
+  algebra up to equality and `Intertwiner` accepts a module over an equal
+  algebra ([next#445]).
+- `tensor.Diagram.to_tn` evaluates the spider with no legs to its dimension,
+  the circle, as `eval` does, not to 1 ([next#445]).
+- `Matrix.repeat`, and with it Boolean `Matrix.trace` and `Tensor.repeat`,
+  takes ceil(log2 n) products instead of n(n+1)/2: milliseconds instead of
+  seconds at n = 100 ([next#445]).
+- `Matrix.is_close` gives its real `rtol` default (`1.e-8`), and
+  `tensor.Diagram.jacobian` says it returns a `Sum` diagram whose `eval` is
+  `Tensor.jacobian` ([next#445]).
+- `Stream.delay` works on streams whose memory starts non-empty, e.g.
+  `Stream.sequence(name, x, y, m)` and the tail of a feedback, instead of
+  raising `AxiomError` ([next#445]).
+- `feedback.Functor` sends a daggered `FollowedBy` to the dagger of its image,
+  so even the identity functor now keeps its boundary ([next#445]).
+- The `discopy.stream` docs check the associativity of composition for real: it
+  holds as hypergraphs, i.e. up to the axioms of symmetric categories, not on
+  the nose as they claimed ([next#445]).
+- `feedback.Diagram.feedback` and `trace` raise `AxiomError` on a wrong `dom`
+  or `cod` in the keyword form when the memory is not delayed, instead of
+  silently using the diagram's own boundary ([next#445]).
+- `kleisli.additive.unpack_value` and `kleisli.multiplicative.unpack_value`
+  take the packed type, so a channel on a single wire passes a `Tagged` or
+  `Row` value through whole instead of stripping, re-tagging or splatting it
+  ([next#445]).
+- Kleisli channels of different monads raise `TypeError` when composed with
+  `>>` or tensored with `@`, instead of composing silently or failing only at
+  call time ([next#445]).
+- `stream.Ty.sequence('mem')` is one wire `mem0`, `mem1`, ... per step instead
+  of splitting the name into its characters ([next#445]).
+- `para.Closed.curry` raises `ValueError` ("Cannot split n atoms off dom") for
+  `n < 0` or `n > len(dom)`, as `para.Compact.curry` and `para.Traced.trace`
+  do, instead of currying into the parameter wires and failing with an
+  `AxiomError` about an internal composite ([next#445]).
+- optyx's `PercevalBackend` labels each outcome by the output modes alone, so a
+  diagram with a `Select` or a non-unitary part no longer puts its amplitudes
+  on the wrong outcomes once more than one outcome is non-zero ([next#445]).
+- optyx's `QuimbBackend` with a hyperoptimiser keeps the result's axes in wire
+  order, where it used to permute them once a result had eleven or more input
+  or output wires ([next#445]).
+- `optyx.classical.BitControlledPhaseShift` is controlled by its classical
+  `mode` wires, where the photon number on the `qmode` it shifts used to drive
+  the phase ([next#445]).
+- optyx's `PermanentBackend` evaluates a sum of diagrams whose terms carry
+  different numbers of photons, padding each term's amplitudes with zeros,
+  where it used to add them by broadcasting or raise ([next#445]).
+- `optyx.core.zx.ZBox` exports to PyZX as a `Z_BOX` vertex labelled with its
+  amplitude, and `from_pyzx` reads that vertex back as a `ZBox`, where
+  `to_pyzx` made it an X spider of phase twice the amplitude, so that
+  `ZBox(1, 1, .5)` became a NOT gate ([next#445]).
+- `optyx.core.path.Matrix` compares equal only when its creations, selections,
+  normalisation and scalar agree too: matrices that evaluate differently used
+  to compare equal, and matrices with different numbers of creations were
+  compared by numpy broadcasting or raised `ValueError` ([next#445]).
+- An `optyx.core.zw.ZBox` with no inputs keeps every amplitude of a finite
+  list: its outputs have dimension `max(2, len(amplitudes))` instead of 2, so
+  `ZBox(0, 1, [1, 2, 3]) >> Select(2)` is 3, as its transpose gives
+  ([next#445]).
+- `matrix.Matrix.permutation` and `Matrix.copy` hold integers again, so a
+  `Matrix[Expr]`, and any symbolic optyx path matrix with a swap, creation or
+  selection, composes instead of raising `TypeError`; optyx's
+  `Permutation.to_path` and `Swap.to_path` return the dtype they are asked for
+  ([next#445]).
+- `optyx.core.diagram.Scalar(s).inflate(d)` is `Scalar(s)` rather than
+  `s ** d`, and a `Sum` inflates term by term, so a core diagram holding a
+  scalar or a sum keeps its amplitude when inflated ([next#445]).
+- `optyx.core.zx.ZBox(0, 0, w)` evaluates to `1 + w`, the sum of its
+  amplitudes, as pyzx and spider fusion give, where it used to be `1`
+  ([next#445]).
+- Evaluating a diagram no longer changes the `photon_preservation_behaviour` of
+  the `optyx.core.control.BitControlledBox` boxes in it ([next#445]).
+- `optyx.qubits.Circuit` converts discopy's `CRx`, `CU1` and controlled gates
+  at any distance to the right unitary, converts `SWAP` and `Controlled(U1)`
+  instead of raising `KeyError`, and raises `NotImplementedError` on a mixed
+  scalar instead of squaring it ([next#445]).
+- `optyx.channel.CQMap.inflate`, and with it `Observable`, puts each `qmode`'s
+  inflated copies in the order of the inflated type, so an inflated `CQMap` on
+  qmodes no longer evaluates to zero or to complex probabilities ([next#445]).
+- `optyx.classical.Sub` subtracts the first number from the second, as its
+  docstring says, where it computed the first minus the second ([next#445]).
+- `grad` on an `optyx.channel` box that has free symbols and no gradient of its
+  own (`qubits.Z`, `X`, `Scalar`, `photonic.BBS`, `Gate`, a `CQMap` or a
+  feedback loop) raises `NotImplementedError` instead of recursing forever, and
+  still gives zero for a variable the box does not depend on; the
+  `free_symbols` of a `Channel` include those of its Kraus map and of a `CQMap`
+  those of its density matrix, so a box built from a symbolic diagram raises
+  too, where it gave a false zero ([next#445]).
+- `subs` and `lambdify` substitute the parameter of optyx's `qubits.Scalar`,
+  `photonic.Gate`, `PhotonLoss`, `PhaseShiftDR` and `classical.Z` and `X`,
+  which report it in `free_symbols`: they used to leave the symbol in place,
+  and their gradient was silently zero. A `Gate` with a symbolic matrix and no
+  `data` is substituted too ([next#445]).
+- `optyx.channel.Diagram.fix` warns that the result is truncated to `max_chi`
+  only when its backend compresses: `DiscopyBackend` and a `QuimbBackend`
+  without a compressed optimiser return the exact state without the false
+  warning ([next#445]).
+- The teleportation example of `optyx.qubits` is the standard circuit, a
+  normalised Bell pair, a CNOT and a Hadamard on its control, and its doctest
+  checks that it is the identity channel, where it used to be skipped with a
+  note blaming the library ([next#445]).
+- The docstrings of `optyx.photonic.ZMeasurementDR` and `XMeasurementDR` say
+  what they measure, the Z or X spider of phase alpha, i.e. the X or Z basis at
+  alpha = 0: the old text of `ZMeasurementDR` left out its `HadamardBS`
+  ([next#445]).
+- The docstring of `optyx.photonic.BBS` gives the matrix it computes, `i cos`
+  on the diagonal and `sin` off it, where the old one had its columns swapped,
+  and those of `TBS` and `MZI` say their matrices include their `global_phase`
+  ([next#445]).
+- `optyx.qubits.X(1, 1, .25).dual_rail()` is `BS` times `exp(-i pi / 4)`, and
+  `X(1, 1, .75)`, also written `-.25`, is `BS.dagger()` times `exp(i pi / 4)`,
+  where the old code returned the wrong beam splitter or raised
+  `NotImplementedError` ([next#445]).
+- `optyx.channel.Diagram.from_perceval` applies a `PostSelect` to the
+  processor's modes, heralded ones included, as perceval does: a condition on a
+  mode after a herald used to read the mode to its right ([next#445]).
+- `Diagram.from_perceval` accepts a `PostSelect` that uses `!=`, which perceval
+  accepts and prints back, instead of raising 'Unexpected operator'
+  ([next#445]).
+- `Diagram.from_perceval` creates photons only for input heralds
+  (`p.in_heralds`) and selects them only for output heralds, so an INPUT-only
+  or OUTPUT-only herald gives the same domain as perceval ([next#445]).
+- Optyx reads a foliated diagram one box at a time: `Diagram.sample`, `dilate`,
+  `get_kraus`, `explode_channel` and `BitControlledGate` no longer raise
+  `ValueError` on a layer that holds several boxes ([next#445]).
+- Mixed evaluation of a daggered or transposed pure box, e.g. `S.dagger()` or
+  `U.r`, is the doubled pure evaluation, by `channel.Functor` and by
+  `Circuit.eval(mixed=True, contractor=...)`, so circuits with a measurement
+  give the right probabilities ([next#445]).
+- `to_tk` emits a transposed `Y` with its sign, since `Y.r == -Y`: `CY.l` and
+  `CY.r` go to tket as `CY` followed by `Z` on the control, so tket samples the
+  same outcomes as `eval` ([next#445]).
+- Rotating or conjugating a `Ket`, `Bra`, `Bits`, `Digits`, `Discard` or
+  `MixedState` reverses its wires: `Ket(1, 0).r == Bra(0, 1)`,
+  `Ket(1, 0).conjugate() == Ket(0, 1)` and
+  `Discard(bit @ qubit).r == MixedState(qubit @ bit)` ([next#445]).
+- `to_tk` translates `Measure(override_bits=True)` after classical
+  post-processing correctly: it discards the old bits in post-processing and
+  measures into fresh ones, where before the post-processing read the new value
+  and a `Copy` before it raised `IndexError` ([next#445]).
+- `Circuit.eval(backend=..., measure_all=True)` and `Circuit.get_counts`
+  measure each open qubit into a fresh bit, so `eval` no longer raises
+  `IndexError` and a circuit with a `Bra` no longer post-selects on the wrong
+  qubit ([next#445]).
+- `circuit2zx` maps `sqrt(x)` to the scalar of its root, conjugated for its
+  dagger, so the images of `Circuit.cups`, `caps` and 0-input spiders are no
+  longer off by sqrt(2) ([next#445]).
+- `circuit2zx` maps `Rz(a)` and `Rx(a)` to their spiders times `exp(-i pi a)`,
+  so the image of every rotation, and of a sum or gradient of them, equals the
+  circuit exactly ([next#445]).
+- `Scalar.grad` is the derivative of the scalar's evaluation in each mode
+  (`2 Re(conj(s) s')` under mixed evaluation), and `Sqrt.grad` differentiates
+  the root instead of the radicand ([next#445]).
+- `eval(repr(x)) == x` now holds for `Ket`, `Bra`, `Copy`, `Match` and
+  `MixedScalar` (delayed too), and for a `Scalar` with a custom name, so
+  circuits that prepare, post-select, copy or match round-trip their repr
+  ([next#445]).
+- `Circuit.eval(*others, contractor=...)` evaluates every circuit it is given,
+  so `Sum.eval(contractor=...)` returns the sum of its terms instead of one
+  term's array summed along its first axis ([next#445]).
+- `lambdify` on a parametrised quantum gate or scalar evaluates its phase in
+  the current backend, whatever `modules` it is given, and passes its other
+  keyword arguments to `sympy.lambdify`, so torch gradients flow through
+  nonlinear phases and `jax.grad` works through them ([next#445]).
+- `Circuit.measure` measures every open qubit when it evaluates as a channel,
+  instead of discarding it, so `(Ket(0) >> H).measure(mixed=True)` is
+  `[.5, .5]` and `((Ket(0) >> X) @ Bits(1)).measure()` is the joint
+  distribution `[[0, 0], [0, 1]]` ([next#445]).
+- A pure circuit `Bubble` evaluates under `mixed=True` as the doubling of its
+  pure evaluation (single for a classical one), instead of raising
+  `AttributeError` on `is_classical` ([next#445]).
+- `to_pennylane` converts `U1` and `CCX` (and so every `Rydberg` ansatz)
+  instead of raising `KeyError` ([next#445]).
+- `Scalar(data, name=...)` and the other keyword forms of its constructor build
+  the scalar instead of raising `TypeError` ([next#445]).
+- `Circuit.measure` and `get_counts` without a backend accept a delayed circuit
+  and agree with the undelayed one, instead of raising `AxiomError`; `to_tk`
+  raises `NotImplementedError` on one, as on anything else it cannot translate
+  ([next#445]).
+- `Circuit.measure` and `init_and_discard` prepare a digit of any dimension in
+  `Digits(0, dim=...)`, so a classical circuit on `Digit(4)` measures instead
+  of raising `AxiomError` ([next#445]).
+- `quantum.Measure`'s `destructive` and `Encode`'s `constructive` are
+  documented the right way round, `Circuit.from_tk` says it adds logical swaps
+  rather than SWAP gates, and `Controlled` says that a zero distance raises
+  `ValueError` ([next#445]).
+- Calling a `grammar.cfg.Tree` on arguments whose types do not tensor to its
+  `dom` (all identities, an `Id` root, too many or too few arguments) raises
+  `AxiomError`, where it used to return an ill-typed or truncated tree
+  ([next#445]).
+- `grammar.cfg.Algebra` maps `Id` and any tree with an `Id` branch to the
+  identity of its codomain operad, where it used to raise `AttributeError`
+  ([next#445]).
+- `grammar.cfg.Id(x).to_diagram()` is `monoidal.Id(x)`, so the diagram of a
+  tree with an identity branch has no spurious `Id(x)` box ([next#445]).
+- `quantum.graphlike.size` counts a phase-free spider with three or more ports
+  and no box (e.g. a reduced `Z(1, 2)`), as PyZX does after its own
+  `full_reduce`; only a bare wire, cup or cap counts as no spider ([next#445]).
+- `grammar.categorial.tree2diagram(tree, dom=...)` gives `dom` to every word of
+  the tree, not only to a tree that is a single word ([next#445]).
+- `eval(repr(r)) == r` for a `grammar.thue.Rule` or `grammar.cfg.Rule` with an
+  empty name, e.g. the root of `cfg.Tree.from_nltk` on an unlabelled tree
+  ([next#445]).
+- `grammar.categorial.FX` and `BX` name subterms that compose, `C << B` with
+  `A >> B` and `B << C` with `B >> A`, where the pairs they documented raised
+  `AxiomError` ([next#445]).
+- `pregroup.Diagram.normal_form` passes `normalize` and its other params on to
+  `rigid.Diagram.normal_form`, where it used to drop them on every input
+  ([next#445]).
+- The `quantum.contextuality` module docs say the gradient is constant on each
+  context on the non-contextual polytope, not zero, and that the dual solution
+  is not unique anywhere on it when the scenario has more than one context
+  ([next#445]).
+- `reservoir.Readout` compares by value: `eval(repr(r)) == r` (with `array` in
+  scope), and two identical fits compare equal ([next#445]).
+- `python.finset.Permutation` refuses a `Function` whose domain is not its
+  codomain, so that `then` and `tensor` with a discard or a projection raise
+  rather than return a permutation of the wrong size, and `Permutation.then`
+  raises `AxiomError` on a `Function` that does not compose with it, as
+  `Function.then` does ([next#445]).
+- `Drawing.dagger` reflects a drawing with a bubble, a frame or a slot, e.g. an
+  `Equation` of coloured terms, where it used to raise a bare `AssertionError`
+  ([next#445]).
+- The dagger of a drawing with two or more boxes has a graph of its own, not a
+  frozen networkx view, so that `add_nodes`, `add_edges` and `add_box_corners`
+  work on it ([next#445]).
+- `draw(doctest=..., to_tikz=True)` compares the drawing against its `.tikz`
+  and `.tikzstyles` baselines and raises when they differ, where it used to
+  overwrite them ([next#445]).
+- TikZ output with `use_tikzstyles=True` writes its `.tikzstyles` beside the
+  `.tikz` file for any path, a `pathlib.Path`, a dotted folder or a name with
+  no extension among them ([next#445]).
+- An SVG drawn to a `BytesIO` or to an open file, text or binary, carries the
+  dark-mode style, where it used to crash after Matplotlib had written it
+  ([next#445]).
+- `Drawing.bubble` takes a `dom` and a `cod` of plain types, e.g. symmetric,
+  rigid, compact or frobenius ones, casting them with `to_drawing`: it used to
+  leave nodes with no position when their length matched the inside's, so that
+  drawing raised `KeyError` ([next#445]).
+- `Drawing.__eq__` compares the edges of the plane graph, so that drawings with
+  the same nodes and positions but different wiring are not equal ([next#445]).
+- `python.additive.Function.braid` works on an instance as well as on the
+  class, where it used to raise `TypeError` ([next#445]).
+- `Function.no_type_checking` on a subclass of `python.function.Function`
+  leaves the subclass as it found it, so that the switch on the base class
+  still reaches it and nesting the two no longer turns its type checking off
+  for good ([next#445]).
+- The label of a box or a braket coloured `config.TRANSPARENT` is drawn black
+  and turns white on a dark page, where it used to be drawn white, invisible on
+  a light one ([next#445]).
 
 ### Project
 
@@ -877,6 +1143,36 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 - `test_Diagram_permutation` and `test_Kauffman` patch class attributes through
   `monkeypatch`, so a failure no longer leaves them patched for the tests after
   it, and `test/balanced.py` defines `test_functor_twist_dagger` once
+- Every push to `main` gets its own `build` and `benchmark` run, since a
+  concurrency group per ref let a newly queued push cancel the pending one
+  ([next#445]).
+- The shared setup action runs setup-uv 10.2.0 and setup-python 7.0.0, the
+  versions `benchmark.yml` runs, and Dependabot now scans `.github/actions/*`
+  so they keep moving together ([next#445]).
+- pylint's `fail-under` is raised from 9.09 to 9.33, main's score rounded
+  down, so the score can no longer drop 0.25 without lint failing ([next#445]).
+- The `test` extra includes `notebooks`, so `pip install -e '.[test]'` brings
+  anywidget and the "Build without uv" recipe's `coverage run -m pytest` no
+  longer stops at collection on `discopy/drawing/widget.py` ([next#445]).
+- The benchmark commands in `CONTRIBUTING.md` and
+  `benchmark/test_composition.py` create `benchmark-results/` first, so they
+  run on a fresh clone ([next#445]).
+- `test/readme.py` checks every relative link and anchor of the README, so a
+  link to a deleted notebook or to a heading no section defines fails the suite
+  ([next#445]).
+- `pytest --skip-extra <file>` skips a module that needs an extra instead of
+  failing at collection, for every module `--skip-extra` covers, not only
+  `discopy.optyx` ([next#445]).
+- `pytest --help` no longer says `--skip-extra` skips nothing once the extras
+  are installed: the flag skips its fixed list whether or not they import
+  ([next#445]).
+- `benchmark/report.py`'s `NAME-results.md` writes medians with 3 significant
+  figures, so microsecond-scale cases no longer read 0.0000 ([next#445]).
+- `docs/export_notebooks.py` runs each notebook on the discopy of its own tree,
+  so `--check` from a worktree no longer tests the editable install's code
+  ([next#445]).
+- `docs/export_notebooks.py` fails when any named notebook matches nothing,
+  naming it, instead of silently checking only the names that match
   ([next#445]).
 
 ## [1.2.2] - 2025-12-19
@@ -1141,6 +1437,7 @@ for the changelog of `1.2.1` and earlier.
 [next#443]: https://github.com/rel-int/discopy-next/issues/443
 [next#457]: https://github.com/rel-int/discopy-next/issues/457
 [next#458]: https://github.com/rel-int/discopy-next/pull/458
+[next#459]: https://github.com/rel-int/discopy-next/pull/459
 [next#445]: https://github.com/rel-int/discopy-next/issues/445
 [next#462]: https://github.com/rel-int/discopy-next/pull/462
 [optyx#16]: https://github.com/rel-int/optyx/pull/16

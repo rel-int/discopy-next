@@ -38,6 +38,7 @@ def test_sentence():
 def test_repr():
     s, n = Ty('S'), Ty('N')
     scope = {"grammar": grammar, "monoidal": monoidal, "cat": cat}
-    for box in [Rule(n, s), Rule(n, s, name='r'), Word('Jane', n),
+    for box in [Rule(n, s), Rule(n, s, name='r'), Rule(n, s, name=''),
+                Rule(n, s, name='')[::-1], Word('Jane', n),
                 Word('Jane', n, dom=s)]:
         assert eval(repr(box), scope) == box

@@ -18,6 +18,24 @@ def test_repr_is_transparent():
     assert eval(repr(matrix)) == matrix
 
 
+@pytest.mark.parametrize("field", [
+    {"creations": (2, )}, {"selections": (2, )},
+    {"normalisation": 2}, {"scalar": 2}])
+def test_equality_reads_every_field_of_the_repr(field):
+    fields = {"creations": (1, ), "selections": (1, )}
+    matrix = Matrix(np.eye(2), 1, 1, **fields)
+    assert matrix == Matrix(np.eye(2), 1, 1, **fields)
+    assert matrix != Matrix(np.eye(2), 1, 1, **fields | field)
+
+
+def test_matrices_with_different_creations_are_not_equal():
+    assert zw.Create(1).to_path() != zw.Create(2).to_path()
+    assert Matrix([[1], [1]], 0, 1, creations=(1, 1)) \
+        != Matrix([[1]], 0, 1, creations=(1, ))
+    assert Matrix([[1], [1], [1]], 0, 1, creations=(1, 1, 1)) \
+        != Matrix([[1], [1]], 0, 1, creations=(1, 1))
+
+
 def test_selecting_more_photons_than_there_are():
     with pytest.raises(ValueError, match="positive number of photons"):
         zw.Select(2).to_path().eval(1)

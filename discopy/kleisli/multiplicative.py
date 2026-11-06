@@ -88,7 +88,7 @@ from discopy.kleisli.monad import Monad
 from discopy.python import function
 from discopy.python.multiplicative import Ty
 from discopy.utils import (
-    assert_isinstance, assert_iscomposable, factory, factory_name)
+    assert_iscomposable, assert_ismember, factory, factory_name)
 
 
 class Row:
@@ -144,15 +144,18 @@ def pack_value(xs: tuple):
     return xs[0] if len(xs) == 1 else Row(*xs)
 
 
-def unpack_value(value) -> tuple:
+def unpack_value(value, ty: Ty) -> tuple:
     """
-    Turn a value of a packed type back into a tuple of values, inverse to
-    :func:`pack_value`.
+    Turn a value of :func:`pack` of ``ty`` back into a tuple of values,
+    inverse to :func:`pack_value`.
 
     Parameters:
         value : The value to unpack.
+        ty : The tuple of wire types.
     """
-    return value.values if isinstance(value, Row) else (value, )
+    if len(Ty.cast(ty)) == 1 or not isinstance(value, Row):
+        return (value, )
+    return value.values
 
 
 @factory
@@ -200,7 +203,7 @@ class Channel[monad](Category, NamedGeneric):
         packed_cls = channel.Channel[monad]  # ty: ignore[invalid-type-form]
         self.inside = inside if isinstance(inside, packed_cls) else\
             packed_cls(
-                lambda v: inside(*unpack_value(v)), pack(dom), pack(cod))
+                lambda v: inside(*unpack_value(v, dom)), pack(dom), pack(cod))
         self.dom, self.cod = dom, cod
 
     @classmethod
@@ -224,7 +227,8 @@ class Channel[monad](Category, NamedGeneric):
         monad, raw = type(self).monad, self.raw(*xs)
         if len(self.cod) == 1:
             return raw
-        unpacking = function.Function(unpack_value, pack(self.cod), tuple)
+        unpacking = function.Function(
+            lambda b: unpack_value(b, self.cod), pack(self.cod), tuple)
         return monad(unpacking)(raw)
 
     def then(self, other: Channel) -> Channel:
@@ -234,7 +238,7 @@ class Channel[monad](Category, NamedGeneric):
         Parameters:
             other : The other channel to compose in sequence.
         """
-        assert_isinstance(other, type(self))
+        assert_ismember(other, type(self))
         assert_iscomposable(self, other)
         return type(self)(
             self.inside >> other.inside,  # ty: ignore[unsupported-operator]
@@ -252,7 +256,7 @@ class Channel[monad](Category, NamedGeneric):
         def inside(*xs):
             values, y = xs[:n], xs[n:]
             pairing = function.Function(
-                lambda b: pack_value(unpack_value(b) + y),
+                lambda b: pack_value(unpack_value(b, self.cod) + y),
                 pack(self.cod), pack(self.cod @ Y))
             return monad(pairing)(self.raw(*values))
         return type(self)(inside, self.dom @ Y, self.cod @ Y)
@@ -269,7 +273,7 @@ class Channel[monad](Category, NamedGeneric):
         def inside(*xs):
             x, values = xs[:n], xs[n:]
             pairing = function.Function(
-                lambda d: pack_value(x + unpack_value(d)),
+                lambda d: pack_value(x + unpack_value(d, self.cod)),
                 pack(self.cod), pack(X @ self.cod))
             return monad(pairing)(self.raw(*values))
         return type(self)(inside, X @ self.dom, X @ self.cod)
@@ -283,7 +287,7 @@ class Channel[monad](Category, NamedGeneric):
         Parameters:
             other : The other channel to tensor in parallel.
         """
-        assert_isinstance(other, type(self))
+        assert_ismember(other, type(self))
         return self.right_whisker(other.dom).then(
             other.left_whisker(self.cod))
 

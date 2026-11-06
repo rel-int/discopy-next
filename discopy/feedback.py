@@ -50,8 +50,8 @@ Summary
         :nosignatures:
         :toctree:
 
-        generators
-        wire_generators
+        structural_boxes
+        structural_wires
 
 Axioms
 ------
@@ -575,6 +575,9 @@ class Diagram(monoidal.Diagram, TracedCategory):
                 dom=dom @ fed[:-1], cod=cod @ mem[:-1], mem=mem[-1:]
             ).feedback(dom=dom, cod=cod, mem=mem[:-1])
         if fed == mem or not isinstance(mem, Ty):
+            if (self.dom, self.cod) != ((fed @ dom, mem @ cod) if left
+                                        else (dom @ fed, cod @ mem)):
+                raise AxiomError(messages.NOT_TRACEABLE.format(self, mem))
             return self.trace_factory(self, left)
         return self.feedback_factory(
             self, dom=dom, cod=cod, mem=mem, left=left)
@@ -1132,7 +1135,9 @@ class Functor(monoidal.Functor):
         if isinstance(
                 other, FollowedBy) and hasattr(self.cod, "followed_by"):
             arg = other.dom if other.is_dagger else other.cod
-            return self.cod.followed_by(self(arg))
+            result = self.cod.followed_by(self(arg))
+            return result.dagger() if other.is_dagger\
+                and hasattr(self.cod, "dagger") else result
         if isinstance(other, Feedback) and hasattr(self.cod, "feedback"):
             left = {"left": True} if other.left else {}
             return self(other.arg).feedback(
@@ -1155,7 +1160,7 @@ Hypergraph = hypergraph.Hypergraph[Diagram]
 Id = Diagram.id
 
 
-GENERATORS = {
+STRUCTURAL_BOXES = {
     "Feedback": ("feedback_factory", "A feedback of {} diagrams."),
     "Trace": ("trace_factory", "A trace of {} diagrams."),
     "FollowedBy": ("followed_by_factory", "A followed-by in {} diagrams."),
@@ -1177,7 +1182,7 @@ def subclass(name: str, bases: list[type], module: str, doc: str) -> type:
         "__module__": module, "__qualname__": name, "__doc__": doc})
 
 
-def generators(
+def structural_boxes(
         diagram: type, box: type) -> tuple[type, type, type, type, type]:
     """
     The :class:`Feedback`, :class:`Trace`, :class:`FollowedBy`, :class:`Head`
@@ -1203,22 +1208,22 @@ def generators(
     parents = [base for base in diagram.__bases__ if issubclass(base, Diagram)]
     module, level = diagram.__module__, diagram.__module__.split('.')[-1]
     result = {}
-    for name, (attr, doc) in GENERATORS.items():
+    for name, (attr, doc) in STRUCTURAL_BOXES.items():
         own = result["Feedback"] if name == "Trace" else box
         bases = [getattr(parent, attr) for parent in parents]
         bases = [base for base in bases if isinstance(base, type)] + [own]
         result[name] = subclass(name, bases, module, doc.format(level))
-    for name, (attr, _) in GENERATORS.items():
+    for name, (attr, _) in STRUCTURAL_BOXES.items():
         if name != "Trace" or isinstance(diagram.trace_factory, type):
             setattr(diagram, attr, result[name])
     return (result["Feedback"], result["Trace"], result["FollowedBy"],
             result["Head"], result["Tail"])
 
 
-def wire_generators(wire: type) -> tuple[type, type]:
+def structural_wires(wire: type) -> tuple[type, type]:
     """
     The :class:`HeadOb` and :class:`TailOb` of a wire class below feedback,
-    generated as :func:`generators` does for boxes, so that the head of a
+    generated as :func:`structural_boxes` does for boxes, so that the head of a
     wire is a wire of its own level, and bound to its factories.
 
     Parameters:

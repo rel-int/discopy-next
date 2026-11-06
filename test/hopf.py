@@ -143,6 +143,16 @@ def test_class_generic_over_the_algebra():
     assert Intertwiner[D].algebra == D and braid.algebra == D
 
 
+def test_equal_algebras_hash_equal():
+    H = Algebra.sweedler()
+    unit, counit, mult, comult, S, R = H.arrays
+    S = np.where(S == 0, -0., S)
+    K = Algebra.from_arrays(unit, counit, mult, comult, S, R)
+    assert K == H and hash(K) == hash(H)
+    assert Representation[K] is Representation[H]
+    assert Intertwiner[H].id(Representation[K].regular()).algebra == H
+
+
 def test_representation_is_a_dim():
     D, V = double_and_module()
     assert isinstance(V, Dim) and V == Dim(2)
@@ -283,6 +293,15 @@ def test_braiding_yang_baxter_and_inverse():
 def test_quantum_dimension():
     _, V = double_and_module()
     assert np.isclose(V.qdim(), 2)
+
+
+def test_quantum_dimension_is_the_pivotal_trace():
+    x = ribbon.Ty('x')
+    for H in [Algebra.sweedler(), Algebra.taft(3)]:
+        V = Representation[H].regular()
+        F = Functor(ob_map={x: V}, ar_map={}, cod=Intertwiner[H])
+        loop = complex(F(circle(x)).eval(dtype=complex))
+        assert np.isclose(loop, 0) and np.isclose(V.qdim(), loop)
 
 
 def test_dual_representation():

@@ -107,7 +107,7 @@ optyx = [
     "sympy",
 ]
 test = [
-    "discopy[grammar,optyx,quantum]",
+    "discopy[grammar,notebooks,optyx,quantum]",
     "coverage",
     "hypothesis",
     "marimo",

@@ -916,16 +916,20 @@ quantum = [
     { name = "torch", version = "2.13.0+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "sys_platform == 'linux'" },
 ]
 test = [
+    { name = "anywidget" },
     { name = "cotengra" },
     { name = "coverage" },
     { name = "graphix", version = "0.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.15'" },
     { name = "graphix", version = "0.4.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.15'" },
     { name = "hypothesis" },
+    { name = "ipykernel" },
+    { name = "ipython" },
     { name = "jax" },
     { name = "jaxlib" },
     { name = "marimo" },
     { name = "nltk" },
     { name = "opt-einsum" },
+    { name = "pandas" },
     { name = "pennylane" },
     { name = "pennylane-qiskit" },
     { name = "perceval-quandela" },
@@ -943,10 +947,12 @@ test = [
     { name = "qoolqit" },
     { name = "quimb" },
     { name = "scipy" },
+    { name = "seaborn" },
     { name = "sympy" },
     { name = "tensornetwork" },
     { name = "torch", version = "2.13.0", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform != 'linux'" },
     { name = "torch", version = "2.13.0+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "sys_platform == 'linux'" },
+    { name = "tqdm" },
 ]
 
 [package.dev-dependencies]
@@ -998,7 +1004,7 @@ requires-dist = [
     { name = "anywidget", marker = "extra == 'notebooks'" },
     { name = "cotengra", marker = "extra == 'optyx'" },
     { name = "coverage", marker = "extra == 'test'" },
-    { name = "discopy", extras = ["grammar", "optyx", "quantum"], marker = "extra == 'test'" },
+    { name = "discopy", extras = ["grammar", "notebooks", "optyx", "quantum"], marker = "extra == 'test'" },
     { name = "discopy", extras = ["notebooks"], marker = "extra == 'docs'" },
     { name = "graphix", marker = "extra == 'optyx'", specifier = ">=0.4" },
     { name = "hypothesis", marker = "extra == 'test'" },

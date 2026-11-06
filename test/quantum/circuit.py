@@ -95,6 +95,33 @@ def test_Circuit_measure():
         circuit.measure(), np.absolute(circuit.eval().array) ** 2)
 
 
+def test_measure_measures_every_open_qubit():
+    for circuit in (Ket(0) >> H, H @ X >> CX):
+        assert np.allclose(circuit.measure(mixed=True), circuit.measure())
+    assert np.allclose(((Ket(0) >> X) @ Bits(1)).measure(), [[0, 0], [0, 1]])
+
+
+def test_measure_initialises_digits_of_any_dimension():
+    digit = Ty(Digit(4))
+    shift = Box("shift", digit, digit, is_mixed=False, data=np.roll(
+        np.eye(4), 1, axis=1))
+    one = [0, 1, 0, 0]
+    for circuit, distribution in [
+            (Id(digit), [1, 0, 0, 0]), (shift, one), (shift.delay(), one),
+            (shift @ bit, np.outer(one, [1, 0]))]:
+        assert np.allclose(circuit.measure(), distribution)
+
+
+def test_delayed_circuit_measures_as_the_circuit():
+    for circuit in (H, CX, Measure(), H @ qubit >> CX >> Measure(2),
+                    H @ qubit.delay(), Copy()):
+        delayed = circuit.delay()
+        for mixed in (False, True):
+            assert np.allclose(
+                delayed.measure(mixed=mixed), circuit.measure(mixed=mixed))
+        assert delayed.get_counts() == circuit.get_counts()
+
+
 def test_Box():
     with raises(TypeError):
         Box('f', rigid.Ty('x'), bit)
@@ -240,8 +267,9 @@ def test_grad_basic():
         assert isinstance(zero, Sum) and not zero.terms
         assert (zero.dom, zero.cod) == (constant.dom, constant.cod)
 
-    assert scalar(2 * phi).grad(phi).eval().array == 2
-    assert (scalar(2 * phi) + scalar(3 * phi)).grad(phi).eval().array == 5
+    assert scalar(2 * phi).grad(phi, mixed=False).eval().array == 2
+    assert (scalar(2 * phi) + scalar(3 * phi)).grad(
+        phi, mixed=False).eval().array == 5
 
     with raises(NotImplementedError):
         Box("dummy box", qubit, qubit, data=phi).grad(phi)
@@ -328,7 +356,8 @@ def test_adjoint():
     gates = [
         Bra(0), Ket(0, 0), Rx(0.1), Ry(0.2), Rz(0.3),
         CU1(0.4), CRx(0.5), CRz(0.7), Scalar(1 + 2j), CX,
-        Swap(bit, qubit), Copy(), Match()
+        Swap(bit, qubit), Copy(), Match(),
+        Ket(1, 0), Bra(0, 1), Bits(1, 0), Discard(bit @ qubit)
     ]
 
     gates_conj = [
@@ -338,11 +367,21 @@ def test_adjoint():
         Controlled(Rz(-0.7), distance=-1),
         Scalar(1 - 2j),
         Controlled(X, distance=-1),
-        Swap(qubit, bit), Copy(), Match()
+        Swap(qubit, bit), Copy(), Match(),
+        Ket(0, 1), Bra(1, 0), Bits(0, 1), Discard(qubit @ bit)
     ]
 
     for g, g_conj in zip(gates, gates_conj):
         assert g.conjugate() == g_conj
+
+
+def test_rotation_reverses_the_wires():
+    for state in (Ket(1, 0), Bra(0, 1), Bits(1, 0), Digits(2, 0, dim=3)):
+        assert state.r.eval().is_close(state.eval().r)
+        assert state.conjugate().eval().is_close(state.eval().conjugate())
+    assert Ket(1, 0).r == Bra(0, 1) and Bits(1, 0).l == Bits(0, 1).dagger()
+    assert Discard(bit @ qubit).r == MixedState(qubit @ bit)
+    assert MixedState(qubit @ bit).l == Discard(bit @ qubit)
 
 
 def test_causal_cx():
@@ -498,12 +537,31 @@ def test_consistent_eval(c):
     assert is_close_smallno(doubled_result, mixed_result.to_tensor())
 
 
+def test_mixed_eval_of_dagger_and_transpose_is_doubled():
+    U = QuantumGate('U', qubit, qubit, [1, 2j, 3, 4j])
+    f = ClassicalGate('f', bit, bit, [1, 2, 3, 4])
+    for g in (S.dagger(), T.dagger(), U.dagger(), U.r, f.dagger()):
+        doubled = (Channel.single if g.is_classical else Channel.double)(
+            g.eval())
+        assert g.eval(mixed=True).is_close(doubled)
+        assert g.eval(mixed=True, contractor=contractor).is_close(doubled)
+    circuit = Ket(0) >> H >> S >> S.dagger() >> H >> Measure()
+    assert np.allclose(circuit.eval().array, [1, 0])
+
+
 def test_mixed_eval_foliated():
     circuit = Ket(0, 0, 1) >> H @ X @ X >> Measure() @ Discard(qubit ** 2)
     assert [len(layer.boxes) for layer in circuit.foliation().inside]\
         == [1, 3, 2]
     assert circuit.foliation().eval(mixed=True, contractor=contractor)\
         .is_close(circuit.eval(mixed=True))
+
+
+def test_contractor_eval_batches_others():
+    batch = H.eval(X, contractor=contractor)
+    assert len(batch) == 2 and all(map(is_close_smallno, batch, H.eval(X)))
+    for c in (X + Z, (Ket(0) >> H >> Measure()) + (Ket(1) >> Measure())):
+        assert is_close_smallno(c.eval(contractor=contractor), c.eval())
 
 
 @pytest.mark.parametrize('c', mixed_circuits)
@@ -609,3 +667,13 @@ def test_Bubble_is_mixed_and_grad():
     assert X.bubble().grad(phi) == Sum((), qubit, qubit)
     with raises(NotImplementedError):
         Rx(phi).bubble().grad(phi)
+
+
+def test_pure_Bubble_mixed_eval_is_doubled():
+    f = ClassicalGate('f', bit, bit, [0, 1, 1, 0])
+    for bubble in (X.bubble(), Ry(.3).bubble(func=np.conjugate), f.bubble()):
+        doubled = (Channel.single if bubble.is_classical else Channel.double)(
+            bubble.eval())
+        assert bubble.eval(mixed=True).is_close(doubled)
+    assert np.allclose((Ket(0) >> X.bubble() >> Measure()).eval().array,
+                       [1, 0])
