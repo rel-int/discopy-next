@@ -67,6 +67,11 @@ def test_Tree_call_typechecks():
     with raises(AxiomError, match=r"f\(Id\(x\), f\) does not compose with "
                                   r"\(a, b, a\): x @ x @ x != x @ y @ x"):
         f(Id(x), f)(a, b, a)
+    for tree in (w, Id(x), f(Id(x), Id(x))):
+        with raises(TypeError, match="Expected grammar.cfg.Tree, got int"):
+            tree(42)
+    with raises(TypeError, match="Expected grammar.cfg.Tree, got int"):
+        Tree(f, w, 42)
 
 
 def test_Tree_dom():

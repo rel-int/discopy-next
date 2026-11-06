@@ -74,8 +74,6 @@ class Tree:
 
     def __init__(self, root: Rule, *branches: Tree):
         assert_isinstance(root, Rule)
-        for branch in branches:
-            assert_isinstance(branch, Tree)
         self.cod, self.root, self.branches = root.cod, root, branches
         if isinstance(self, Rule):
             return
@@ -91,9 +89,12 @@ class Tree:
 
     def assert_iscomposable(self, *others: Tree):
         """
-        Raise :class:`AxiomError` unless the codomains of ``others`` tensor to
-        the domain of the tree, i.e. unless the tree can be called on them.
+        Raise :class:`TypeError` unless ``others`` are trees and
+        :class:`AxiomError` unless their codomains tensor to the domain of the
+        tree, i.e. unless the tree can be called on them.
         """
+        for other in others:
+            assert_isinstance(other, Tree)
         cods = Ty().tensor(*[other.cod for other in others])
         if self.dom != cods:
             show = str if str(self.dom) != str(cods) else repr
