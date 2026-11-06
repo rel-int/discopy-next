@@ -3,6 +3,11 @@
 The free closed markov category, i.e. with copy, discard, exponentials and
 products that are not strictly associative.
 
+Its causal diagrams are also written as lambda terms, see :class:`TermBase`,
+with tuples, projections and ``let``, and reduced to Böhm trees by a
+:class:`Strategy`. Diagrams map to combinatorial maps, i.e.
+:class:`discopy.cmap.CMap`, with :meth:`discopy.monoidal.Diagram.to_map`.
+
 Summary
 -------
 
@@ -34,11 +39,16 @@ Summary
     RightmostFirst
     Diagram
     Box
+    Timed
     Eval
     Coeval
     Curry
     Pack
     Unpack
+    Function
+    Swap
+    Permutation
+    Copy
     Discard
     Feedback
     Trace
@@ -48,7 +58,7 @@ Summary
     Sum
     Bubble
     Functor
-    CMap
+    Equation
 
 .. admonition:: Functions
 
@@ -62,7 +72,8 @@ Summary
 Axioms
 ------
 
-:meth:`Diagram.curry` and :meth:`Diagram.uncurry` are inverses.
+:meth:`discopy.biclosed.Diagram.curry` and
+:meth:`discopy.abc.BiclosedCategory.uncurry` are inverses.
 
 >>> x, y, z = map(Ty, "xyz")
 >>> f, g = Box('f', x, z << y), Box('g', x @ y, z)

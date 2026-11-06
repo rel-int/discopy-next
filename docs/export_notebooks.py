@@ -51,13 +51,12 @@ SOURCE = "{}/blob/{}".format(
     os.environ.get("READTHEDOCS_GIT_COMMIT_HASH", "main"))
 ISSUES = "https://github.com/rel-int/discopy-next/issues/"
 
-# Notebooks that fail to execute on a bug of their own, each tracked by an
-# issue, so that ``--check`` does not block on them; ``generate`` already falls
-# back to a link page for any notebook that fails to execute.
+# Notebooks that fail to execute on a bug an open issue tracks, so that
+# ``--check`` does not block on them; ``generate`` already falls back to a link
+# page for any notebook that fails to execute. An entry whose issue is closed
+# has stopped being evidence: re-run the notebook before trusting it.
 KNOWN_BROKEN = {
-    "optyx/feed_forward_example": ISSUES + "247",
-    "optyx/photon_distinguishability": ISSUES + "247",
-    "optyx/readme_example": ISSUES + "247",
+    "optyx/readme_example": ISSUES + "251",
     "optyx/test_light_cones": ISSUES + "249",
 }
 

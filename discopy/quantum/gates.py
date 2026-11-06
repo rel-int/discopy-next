@@ -31,6 +31,8 @@ Summary
     Rx
     Ry
     Rz
+    U1
+    ControlledRotation
     CU1
     CRz
     CRx
@@ -343,7 +345,7 @@ class QuantumGate(Box):
         super().__init__(name, dom, cod, data, **params)
 
     def __setstate__(self, state):
-        if "_array" in state and not state["_array"] is None:
+        if "_array" in state and state["_array"] is not None:
             state["data"] = state['_array'].flatten().tolist()
         if "_name" in state:
             if state["_name"] in GATES and hasattr(
@@ -643,9 +645,11 @@ class Controlled(QuantumGate):
     controlled : QuantumGate
         Gate to control, e.g. :code:`CX = Controlled(X)`.
     distance : int, optional
-        Number of qubits from the control to the target, default is :code:`0`.
+        Number of qubits from the control to the target, default is :code:`1`.
         If negative, the control is on the right of the target.
 
+    Example
+    -------
     >>> circuit = (Controlled(CX.l, distance=3)
     ...            >> Controlled(Controlled(CZ.l, distance=2), distance=-1))
     >>> circuit.draw(

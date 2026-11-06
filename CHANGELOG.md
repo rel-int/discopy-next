@@ -260,6 +260,28 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Fixed
 
+- The documentation says what the code does: the README, CONTRIBUTING.md,
+  AGENTS.md and the module summaries no longer name modules, classes or
+  notebooks that are gone, list the public ones they missed, and state each
+  fact in one place; the API reference gains `discopy.utils` and
+  `discopy.config`, the toctree five optyx notebooks it left out.
+- `docs/notebooks/optyx/photon_distinguishability.md` composes its photonic
+  circuits from `optyx.photonic`, where it used to take `Create` from
+  `optyx.core.zw` and `DualRail` from `optyx.core.diagram` and compose those
+  core boxes with channel-level gates: `Create(1, 1, internal_states=...) >>
+  BS` raised `TypeError: Expected optyx.core.diagram.Diagram, got
+  optyx.photonic.BBS`, so the notebook never reached the Hong-Ou-Mandel effect
+  its prose describes. `photonic`'s own module docstring states the
+  composition, and `photonic.DualRail(n, internal_states=...)` is the class
+  whose signature the notebook was already calling. The two cells that do
+  demonstrate the core boxes keep them, module-qualified ([next#435]).
+- `docs/export_notebooks.py` exempts from `--check` only the notebooks an
+  **open** issue tracks. Three of its four entries named [next#247], closed as
+  completed on 2026-10-26: `optyx/feed_forward_example` executes clean and is
+  dropped, `optyx/photon_distinguishability` is fixed above, and
+  `optyx/readme_example` fails on [next#251]'s cotengra process pool, which it
+  now names. `--check` prints nothing for an exemption that has stopped being
+  needed, so the list could only grow ([next#435]).
 - `optyx.core.path.Matrix.prob_with_perceval` computes the Born rule of the
   amplitudes, as its docstring and `prob`'s other branch say, where it used to
   answer a probability conditional on the selections: two photons bunching
@@ -674,7 +696,8 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 - Coverage's 98% gate reads `discopy/` alone, new tests bring `ehypergraph` to
   100%, and pytest imports by path, so `test/abc.py` is collected ([next#31]).
 - `ruff check` and `ty check` lint beside `pylint`, each failing on every rule
-  `main` passes, the rules it breaks listed in `pyproject.toml` ([next#263]).
+  `main` passes, the rules it breaks listed in `pyproject.toml` ([next#263]),
+  and `E714` and `RUF022` leave that list ([next#438]).
 
 ## [1.2.2] - 2025-12-19
 
@@ -927,11 +950,15 @@ for the changelog of `1.2.1` and earlier.
 [next#388]: https://github.com/rel-int/discopy-next/issues/388
 [next#399]: https://github.com/rel-int/discopy-next/issues/399
 [next#229]: https://github.com/rel-int/discopy-next/issues/229
+[next#435]: https://github.com/rel-int/discopy-next/issues/435
+[next#247]: https://github.com/rel-int/discopy-next/issues/247
+[next#251]: https://github.com/rel-int/discopy-next/issues/251
 [next#421]: https://github.com/rel-int/discopy-next/issues/421
 [next#422]: https://github.com/rel-int/discopy-next/issues/422
 [next#426]: https://github.com/rel-int/discopy-next/issues/426
 [next#411]: https://github.com/rel-int/discopy-next/pull/411
 [next#414]: https://github.com/rel-int/discopy-next/issues/414
+[next#438]: https://github.com/rel-int/discopy-next/issues/438
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#56]: https://github.com/rel-int/optyx/pull/56
