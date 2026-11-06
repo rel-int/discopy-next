@@ -50,8 +50,8 @@ Summary
         :nosignatures:
         :toctree:
 
-        generators
-        wire_generators
+        structural_boxes
+        structural_wires
 
 Axioms
 ------
@@ -1155,7 +1155,7 @@ Hypergraph = hypergraph.Hypergraph[Diagram]
 Id = Diagram.id
 
 
-GENERATORS = {
+STRUCTURAL_BOXES = {
     "Feedback": ("feedback_factory", "A feedback of {} diagrams."),
     "Trace": ("trace_factory", "A trace of {} diagrams."),
     "FollowedBy": ("followed_by_factory", "A followed-by in {} diagrams."),
@@ -1177,7 +1177,7 @@ def subclass(name: str, bases: list[type], module: str, doc: str) -> type:
         "__module__": module, "__qualname__": name, "__doc__": doc})
 
 
-def generators(
+def structural_boxes(
         diagram: type, box: type) -> tuple[type, type, type, type, type]:
     """
     The :class:`Feedback`, :class:`Trace`, :class:`FollowedBy`, :class:`Head`
@@ -1203,22 +1203,22 @@ def generators(
     parents = [base for base in diagram.__bases__ if issubclass(base, Diagram)]
     module, level = diagram.__module__, diagram.__module__.split('.')[-1]
     result = {}
-    for name, (attr, doc) in GENERATORS.items():
+    for name, (attr, doc) in STRUCTURAL_BOXES.items():
         own = result["Feedback"] if name == "Trace" else box
         bases = [getattr(parent, attr) for parent in parents]
         bases = [base for base in bases if isinstance(base, type)] + [own]
         result[name] = subclass(name, bases, module, doc.format(level))
-    for name, (attr, _) in GENERATORS.items():
+    for name, (attr, _) in STRUCTURAL_BOXES.items():
         if name != "Trace" or isinstance(diagram.trace_factory, type):
             setattr(diagram, attr, result[name])
     return (result["Feedback"], result["Trace"], result["FollowedBy"],
             result["Head"], result["Tail"])
 
 
-def wire_generators(wire: type) -> tuple[type, type]:
+def structural_wires(wire: type) -> tuple[type, type]:
     """
     The :class:`HeadOb` and :class:`TailOb` of a wire class below feedback,
-    generated as :func:`generators` does for boxes, so that the head of a
+    generated as :func:`structural_boxes` does for boxes, so that the head of a
     wire is a wire of its own level, and bound to its factories.
 
     Parameters:
