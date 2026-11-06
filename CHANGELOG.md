@@ -659,6 +659,54 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   own axioms write a scalar: the list branch was missing that index, and a
   legless box carrying more than one amplitude raised on the reshape
   ([next#421]).
+- `tensor.Box` compares its winding number `z`, so on a self-dual `Dim` a
+  rotated box `f.r` no longer equals or hashes like `f` ([next#445]).
+- `tensor.Functor` evaluates `dtype=Expr` diagrams exactly and functorially:
+  its boundary and loop identities are integers, not floats, so
+  `F(f >> f) == F(f) >> F(f)` ([next#445]).
+- `hopf.Representation.qdim` is the loop in `Intertwiner[H]`, twisted by the
+  pivotal element, rather than `dim V`: 0, not 4, on Sweedler's regular module
+  ([next#445]).
+- `Matrix.transpose`, `conjugate`, `dagger`, `merge` and `round`, and
+  `Tensor.transpose`, `.l`, `.r` and `round`, work under `backend('pytorch')`
+  ([next#445]).
+- `tensor.Bubble.grad` applies the chain rule on any boundary (states, effects,
+  compound `Dim`s), where it used to raise `ValueError` ([next#445]).
+- Equal `hopf.Algebra`s hash equal, so `Representation[H]` is one class per
+  algebra up to equality and `Intertwiner` accepts a module over an equal
+  algebra ([next#445]).
+- `tensor.Diagram.to_tn` evaluates the spider with no legs to its dimension,
+  the circle, as `eval` does, not to 1 ([next#445]).
+- `Matrix.repeat`, and with it Boolean `Matrix.trace` and `Tensor.repeat`,
+  takes ceil(log2 n) products instead of n(n+1)/2: milliseconds instead of
+  seconds at n = 100 ([next#445]).
+- `Matrix.is_close` gives its real `rtol` default (`1.e-8`), and
+  `tensor.Diagram.jacobian` says it returns a `Sum` diagram whose `eval` is
+  `Tensor.jacobian` ([next#445]).
+- `Stream.delay` works on streams whose memory starts non-empty, e.g.
+  `Stream.sequence(name, x, y, m)` and the tail of a feedback, instead of
+  raising `AxiomError` ([next#445]).
+- `feedback.Functor` sends a daggered `FollowedBy` to the dagger of its image,
+  so even the identity functor now keeps its boundary ([next#445]).
+- The `discopy.stream` docs check the associativity of composition for real: it
+  holds as hypergraphs, i.e. up to the axioms of symmetric categories, not on
+  the nose as they claimed ([next#445]).
+- `feedback.Diagram.feedback` and `trace` raise `AxiomError` on a wrong `dom`
+  or `cod` in the keyword form when the memory is not delayed, instead of
+  silently using the diagram's own boundary ([next#445]).
+- `kleisli.additive.unpack_value` and `kleisli.multiplicative.unpack_value`
+  take the packed type, so a channel on a single wire passes a `Tagged` or
+  `Row` value through whole instead of stripping, re-tagging or splatting it
+  ([next#445]).
+- Kleisli channels of different monads raise `TypeError` when composed with
+  `>>` or tensored with `@`, instead of composing silently or failing only at
+  call time ([next#445]).
+- `stream.Ty.sequence('mem')` is one wire `mem0`, `mem1`, ... per step instead
+  of splitting the name into its characters ([next#445]).
+- `para.Closed.curry` raises `ValueError` ("Cannot split n atoms off dom") for
+  `n < 0` or `n > len(dom)`, as `para.Compact.curry` and `para.Traced.trace`
+  do, instead of currying into the parameter wires and failing with an
+  `AxiomError` about an internal composite ([next#445]).
 
 ### Project
 
@@ -955,6 +1003,7 @@ for the changelog of `1.2.1` and earlier.
 [next#426]: https://github.com/rel-int/discopy-next/issues/426
 [next#411]: https://github.com/rel-int/discopy-next/pull/411
 [next#438]: https://github.com/rel-int/discopy-next/issues/438
+[next#445]: https://github.com/rel-int/discopy-next/issues/445
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#56]: https://github.com/rel-int/optyx/pull/56
