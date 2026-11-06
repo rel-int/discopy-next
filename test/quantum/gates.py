@@ -11,6 +11,7 @@ import numpy
 from pytest import importorskip, mark, raises
 
 from discopy.quantum import bit, qubit
+from discopy.quantum.circuit import Box, Circuit, Functor, Id
 from discopy.quantum.gates import (
     CCX, CCZ, CRx, CRz, CU1, CX, CY, CZ, Bits, Bra, Controlled, Copy, Digits,
     Discard, Encode, H, Ket, Match, Measure, MixedScalar, MixedState,
@@ -100,6 +101,44 @@ def test_Controlled_from_tree_reads_back_through_the_base():
     assert CRz(.25) == Controlled(Rz(.25), distance=1)
     assert from_tree(CRz(.25).to_tree()) == CRz(.25)
     assert isinstance(from_tree(CRz(.25).to_tree()), Controlled)
+
+
+@mark.parametrize("gate", [Rx, Ry, Rz, U1, CRx, CRz, CU1, Scalar])
+def test_Parametrized_compares_its_phase_exactly(gate):
+    """
+    Phases that agree up to the rounding of :code:`str` give distinct gates,
+    with distinct arrays, as a dictionary keyed on them tells, and their
+    :code:`repr` reads each one back.
+    """
+    first, second = gate(.1231), gate(.1234)
+    assert str(first) == str(second) and repr(first) != repr(second)
+    assert all(eval(repr(g), Circuit.environment()) == g
+               for g in (first, second))
+    assert not numpy.allclose(first.eval().array, second.eval().array)
+    assert first != second and first >> Id(first.cod) != second
+    assert len({first, second}) == 2 and {first: 0}.get(second) is None
+    assert first == gate(.1231) and hash(first) == hash(gate(.1231))
+
+
+def test_Rotation_is_given_by_its_class():
+    """
+    A circuit box with the name, boundary and phase of a rotation is another
+    generator, which a functor does not map the rotation to, whereas a mixed
+    scalar is the mixed :class:`Scalar` it abbreviates.
+    """
+    box = Box('Rz', qubit, qubit, data=.5)
+    assert box != Rz(.5) and len({box, Rz(.5)}) == 2
+    with raises(KeyError):
+        Functor({qubit: qubit}, {box: X})(Rz(.5))
+    assert MixedScalar(.5) == Scalar(.5, is_mixed=True)
+    assert hash(MixedScalar(.5)) == hash(Scalar(.5, is_mixed=True))
+
+
+def test_Controlled_rotation_hashes_as_the_gate_it_abbreviates():
+    assert CRz(.1231) == Controlled(Rz(.1231)) != CRz(.1234)
+    assert hash(CRz(.1231)) == hash(Controlled(Rz(.1231)))
+    assert Controlled(Rz(.1231)) >> Id(qubit ** 2) == CRz(.1231)
+    assert CRz(.5, distance=-1) != CRz(.5)
 
 
 def test_Measure_Encode_trees_carry_their_flags():
