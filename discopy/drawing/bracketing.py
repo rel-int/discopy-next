@@ -179,8 +179,24 @@ class Bracketed[free](NamedGeneric, DaggerCategory, TracedCategory):
 
     @unbiased
     def tensor(self, other: Bracketed) -> Bracketed:
-        return self.compound(
-            self.value.tensor(other.value), self.drawing.tensor(other.drawing))
+        """
+        The tensor of two terms, which brackets its compound operands, unless
+        one of them is an identity: whiskering is drawn as no operation of its
+        own, the other operand left as it is and the result as compound as it.
+        """
+        value = self.value.tensor(other.value)
+        if not (self.drawing.is_identity or other.drawing.is_identity):
+            return self.compound(
+                value, self.drawing.tensor(other.drawing))
+        drawing = self.plain().tensor(other.plain()).relabel_nodes()
+        drawing.bracketing = self.drawing.bracketing or other.drawing.bracketing
+        return type(self)(value, drawing)
+
+    def plain(self) -> Drawing:
+        """ The drawing of the term as a value, i.e. never bracketed. """
+        drawing = self.drawing.relabel_nodes()
+        drawing.bracketing = False
+        return drawing
 
     def dagger(self) -> Bracketed:
         return type(self)(self.value.dagger(), self.drawing.bracket(
