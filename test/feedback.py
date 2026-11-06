@@ -42,6 +42,19 @@ def test_delayed_Box_to_tree():
             assert loads(dumps(delayed)).time_step == delayed.time_step
 
 
+def test_delay_keeps_the_attributes_of_a_box():
+    from discopy import frobenius, markov
+    x = markov.Ty('x')
+    sample = markov.Box('sample', x, x, is_deterministic=False)
+    F = markov.Functor({x: x}, {sample: markov.Box('g', x, x)})
+    assert not sample.delay().is_deterministic
+    assert F(sample.delay()) == F(sample).delay()
+    f = frobenius.Box('f', frobenius.Ty('x'), frobenius.Ty('y'))
+    assert f.r.delay() == f.delay().r
+    drawn = Box('f', Ty('x'), Ty('y'), color='red', drawing_name='F')
+    assert (drawn.delay().color, drawn.delay().drawing_name) == ('red', 'F')
+
+
 def test_Feedback_to_tree():
     from discopy.utils import dumps, loads
     x, y, z = Ty('x'), Ty('y'), Ty('z')

@@ -303,7 +303,7 @@ class Twist(Box):
 
     Parameters:
         dom : the domain of the twist.
-        phase: the phase of the twist in integer multiples of ``2 * pi``.
+        is_dagger (bool) : Whether this is the inverse twist.
 
     Important
     ---------
