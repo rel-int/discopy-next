@@ -552,8 +552,8 @@ def gate2zx(box):
         return Id().tensor(*spiders) @ scalar(pow(2, -len(box.bitstring) / 2))
     if isinstance(box, (Rz, Rx)):
         spider = (Z if isinstance(box, Rz) else X)(1, 1, box.phase)
-        return spider @ scalar(
-            box.modules.exp(-1j * box.modules.pi * box.phase))
+        modules = box.modules if box.free_symbols else cmath
+        return spider @ scalar(modules.exp(-1j * modules.pi * box.phase))
     if isinstance(box, Controlled) and box.distance != 1:
         return circuit2zx(box._decompose())
     if isinstance(box, Controlled) and isinstance(box.controlled, (Rz, Rx)):

@@ -391,6 +391,15 @@ def test_eval_circuit2zx(random_had_cnot_diagram):
         assert diagram.eval().is_close(gate.eval())
 
 
+def test_circuit2zx_backend():
+    pytest.importorskip("torch")
+    for rotation in (Rz(.3), Rx(.3)):
+        with tensor.backend("pytorch"):
+            diagram = circuit2zx(rotation)
+        assert diagram == circuit2zx(rotation)
+        assert diagram.eval().is_close(rotation.eval())
+
+
 def test_to_hypergraph():
     diagram = Z(1, 2, .25) >> X(2, 1)
     assert diagram.to_hypergraph().to_diagram() == diagram
