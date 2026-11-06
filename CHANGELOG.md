@@ -659,6 +659,91 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   own axioms write a scalar: the list branch was missing that index, and a
   legless box carrying more than one amplitude raised on the reshape
   ([next#421]).
+- optyx's `PercevalBackend` labels each outcome by the output modes alone, so a
+  diagram with a `Select` or a non-unitary part no longer puts its amplitudes
+  on the wrong outcomes once more than one outcome is non-zero ([next#445]).
+- optyx's `QuimbBackend` with a hyperoptimiser keeps the result's axes in wire
+  order, where it used to permute them once a result had eleven or more input
+  or output wires ([next#445]).
+- `optyx.classical.BitControlledPhaseShift` is controlled by its classical
+  `mode` wires, where the photon number on the `qmode` it shifts used to drive
+  the phase ([next#445]).
+- optyx's `PermanentBackend` evaluates a sum of diagrams whose terms carry
+  different numbers of photons, padding each term's amplitudes with zeros,
+  where it used to add them by broadcasting or raise ([next#445]).
+- `optyx.core.zx.ZBox` exports to PyZX as a `Z_BOX` vertex labelled with its
+  amplitude, where `to_pyzx` made it an X spider of phase twice the amplitude,
+  so that `ZBox(1, 1, .5)` became a NOT gate ([next#445]).
+- `optyx.core.path.Matrix` compares equal only when its creations, selections,
+  normalisation and scalar agree too: matrices that evaluate differently used
+  to compare equal, and matrices with different numbers of creations were
+  compared by numpy broadcasting or raised `ValueError` ([next#445]).
+- An `optyx.core.zw.ZBox` with no inputs keeps every amplitude of a finite
+  list: its outputs have dimension `max(2, len(amplitudes))` instead of 2, so
+  `ZBox(0, 1, [1, 2, 3]) >> Select(2)` is 3, as its transpose gives
+  ([next#445]).
+- `matrix.Matrix.permutation` and `Matrix.copy` hold integers again, so a
+  `Matrix[Expr]`, and any symbolic optyx path matrix with a swap, creation or
+  selection, composes instead of raising `TypeError`; optyx's
+  `Permutation.to_path` and `Swap.to_path` return the dtype they are asked for
+  ([next#445]).
+- `optyx.core.diagram.Scalar(s).inflate(d)` is `Scalar(s)` rather than
+  `s ** d`, and a `Sum` inflates term by term, so a core diagram holding a
+  scalar or a sum keeps its amplitude when inflated ([next#445]).
+- `optyx.core.zx.ZBox(0, 0, w)` evaluates to `1 + w`, the sum of its
+  amplitudes, as pyzx and spider fusion give, where it used to be `1`
+  ([next#445]).
+- Evaluating a diagram no longer changes the `photon_preservation_behaviour` of
+  the `optyx.core.control.BitControlledBox` boxes in it ([next#445]).
+- `optyx.qubits.Circuit` converts discopy's `CRx`, `CU1` and controlled gates
+  at any distance to the right unitary, converts `SWAP` and `Controlled(U1)`
+  instead of raising `KeyError`, and raises `NotImplementedError` on a mixed
+  scalar instead of squaring it ([next#445]).
+- `optyx.channel.CQMap.inflate`, and with it `Observable`, puts each `qmode`'s
+  inflated copies in the order of the inflated type, so an inflated `CQMap` on
+  qmodes no longer evaluates to zero or to complex probabilities ([next#445]).
+- `optyx.classical.Sub` subtracts the first number from the second, as its
+  docstring says, where it computed the first minus the second ([next#445]).
+- `grad` on an `optyx.channel` box that has free symbols and no gradient of its
+  own (`qubits.Z`, `X`, `Scalar`, `photonic.BBS`, `Gate`, a `CQMap` or a
+  feedback loop) raises `NotImplementedError` instead of recursing forever, and
+  still gives zero for a variable the box does not depend on ([next#445]).
+- `subs` and `lambdify` substitute the parameter of optyx's `qubits.Scalar`,
+  `photonic.Gate`, `PhotonLoss`, `PhaseShiftDR` and `classical.Z` and `X`,
+  which report it in `free_symbols`: they used to leave the symbol in place,
+  and their gradient was silently zero ([next#445]).
+- `optyx.channel.Diagram.fix` warns that the result is truncated to `max_chi`
+  only when its backend compresses: `DiscopyBackend` and a `QuimbBackend`
+  without a compressed optimiser return the exact state without the false
+  warning ([next#445]).
+- The teleportation example of `optyx.qubits` is the standard circuit, a
+  normalised Bell pair, a CNOT and a Hadamard on its control, and its doctest
+  checks that it is the identity channel, where it used to be skipped with a
+  note blaming the library ([next#445]).
+- The docstrings of `optyx.photonic.ZMeasurementDR` and `XMeasurementDR` say
+  what they measure, the Z or X spider of phase alpha, i.e. the X or Z basis at
+  alpha = 0: the old text of `ZMeasurementDR` left out its `HadamardBS`
+  ([next#445]).
+- The docstring of `optyx.photonic.BBS` gives the matrix it computes, `i cos`
+  on the diagonal and `sin` off it, where the old one had its columns swapped,
+  and those of `TBS` and `MZI` say their matrices include their `global_phase`
+  ([next#445]).
+- `optyx.qubits.X(1, 1, .25).dual_rail()` is `BS` times `exp(-i pi / 4)`, and
+  `X(1, 1, .75)`, also written `-.25`, is `BS.dagger()` times `exp(i pi / 4)`,
+  where the old code returned the wrong beam splitter or raised
+  `NotImplementedError` ([next#445]).
+- `optyx.channel.Diagram.from_perceval` applies a `PostSelect` to the
+  processor's modes, heralded ones included, as perceval does: a condition on a
+  mode after a herald used to read the mode to its right ([next#445]).
+- `Diagram.from_perceval` accepts a `PostSelect` that uses `!=`, which perceval
+  accepts and prints back, instead of raising 'Unexpected operator'
+  ([next#445]).
+- `Diagram.from_perceval` creates photons only for input heralds
+  (`p.in_heralds`) and selects them only for output heralds, so an INPUT-only
+  or OUTPUT-only herald gives the same domain as perceval ([next#445]).
+- Optyx reads a foliated diagram one box at a time: `Diagram.sample`, `dilate`,
+  `get_kraus`, `explode_channel` and `BitControlledGate` no longer raise
+  `ValueError` on a layer that holds several boxes ([next#445]).
 
 ### Project
 
@@ -955,6 +1040,7 @@ for the changelog of `1.2.1` and earlier.
 [next#426]: https://github.com/rel-int/discopy-next/issues/426
 [next#411]: https://github.com/rel-int/discopy-next/pull/411
 [next#438]: https://github.com/rel-int/discopy-next/issues/438
+[next#445]: https://github.com/rel-int/discopy-next/issues/445
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#56]: https://github.com/rel-int/optyx/pull/56
