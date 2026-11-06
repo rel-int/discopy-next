@@ -150,9 +150,9 @@ class Diagram(frobenius.Diagram):
         is_pregroup = is_pregroup and all(
             isinstance(box, (Cup, Cap, Swap)) for box in wires.boxes)
         if not is_pregroup or not words.cod:
-            return rigid.Diagram.normal_form(self)
-        return rigid.Diagram.normal_form(words)\
-            >> rigid.Diagram.normal_form(wires)
+            return rigid.Diagram.normal_form(self, **params)
+        return rigid.Diagram.normal_form(words, **params)\
+            >> rigid.Diagram.normal_form(wires, **params)
 
     @classmethod
     def fa(cls, left, right):

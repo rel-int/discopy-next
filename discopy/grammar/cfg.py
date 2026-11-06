@@ -30,8 +30,8 @@ The axioms of multicategories (aka operads) hold on the nose.
 >>> assert f(g, h) == Tree(f, *[g, h])
 
 >>> assert Id(x)(f) == f == f(Id(x), Id(x))
->>> left = f(Id(x), h)(g, Id(x), Id(x))
->>> right = f(g, Id(x))(Id(x), Id(x), h)
+>>> left = f(Id(x), h)(g, Id(y), Id(x))
+>>> right = f(g, Id(x))(Id(x), Id(y), h)
 >>> assert f(g, h) == left == right
 """
 
@@ -74,17 +74,10 @@ class Tree:
 
     def __init__(self, root: Rule, *branches: Tree):
         assert_isinstance(root, Rule)
-        for branch in branches:
-            assert_isinstance(branch, Tree)
         self.cod, self.root, self.branches = root.cod, root, branches
         if isinstance(self, Rule):
             return
-        cods = Ty().tensor(*[branch.cod for branch in branches])
-        if root.dom != cods:
-            show = str if str(root.dom) != str(cods) else repr
-            raise AxiomError(messages.NOT_COMPOSABLE.format(
-                root, f"({', '.join(map(str, branches))})",
-                show(root.dom), show(cods)))
+        root.assert_iscomposable(*branches)
         self.dom = Ty().tensor(*[branch.dom for branch in branches])
 
     def __repr__(self):
@@ -94,8 +87,26 @@ class Tree:
     def __str__(self):
         return f"{self.root}({', '.join(map(str, self.branches))})"
 
+    def assert_iscomposable(self, *others: Tree):
+        """
+        Raise :class:`TypeError` unless ``others`` are trees and
+        :class:`AxiomError` unless their codomains tensor to the domain of the
+        tree, i.e. unless the tree can be called on them.
+        """
+        for other in others:
+            assert_isinstance(other, Tree)
+        cods = Ty().tensor(*[other.cod for other in others])
+        if self.dom != cods:
+            show = str if str(self.dom) != str(cods) else repr
+            raise AxiomError(messages.NOT_COMPOSABLE.format(
+                self, f"({', '.join(map(str, others))})",
+                show(self.dom), show(cods)))
+
     def __call__(self, *others):
-        if not others or all([isinstance(other, Id) for other in others]):
+        if not others:
+            return self
+        self.assert_iscomposable(*others)
+        if all([isinstance(other, Id) for other in others]):
             return self
         if isinstance(self, Id):
             return others[0]
@@ -262,6 +273,9 @@ class Id(Rule):
     def dagger(self) -> Id:
         return self
 
+    def to_diagram(self) -> monoidal.Diagram:
+        return monoidal.Id(self.dom)
+
 
 class Operad:
     """
@@ -292,7 +306,7 @@ class Algebra(Functor):
 
     def __call__(self, other):
         if isinstance(other, Id):
-            return self.cod.id(self.ob_map[other.dom])
+            return self.cod.ar.id(self.ob_map[other.dom])
         if isinstance(other, Rule):
             return self.ar_map[other]
         if isinstance(other, Tree):

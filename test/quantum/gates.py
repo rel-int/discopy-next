@@ -115,6 +115,12 @@ def test_Scalar_tree_carries_is_mixed():
     assert from_tree(Scalar(.5).to_tree()).is_mixed is False
 
 
+def test_Scalar_takes_its_arguments_by_keyword():
+    assert Scalar(.5, name='s') == Scalar(.5, 's')
+    assert Scalar(data=.5, name='s', is_mixed=True, time_step=1)\
+        == Scalar(.5, 's', True, 1)
+
+
 def test_Scalar_grad_keeps_is_mixed():
     phi = importorskip("sympy").Symbol("phi")
     derivative = Scalar(2 * phi, is_mixed=True).grad(phi)
@@ -162,6 +168,22 @@ def test_subs_and_lambdify_keep_distance_and_is_mixed():
         - Rz(.3 - step).eval(mixed=True).array) / (2 * step), atol=1e-4)
 
 
+def test_lambdify_evaluates_in_the_backend():
+    sympy, torch = importorskip("sympy"), importorskip("torch")
+    from discopy.tensor import backend
+    phi = sympy.Symbol("phi")
+    with backend('pytorch'):
+        for gate in (Rx(sympy.sin(phi)), Scalar(sympy.exp(phi)),
+                     MixedScalar(sympy.cos(phi)), Sqrt(sympy.exp(phi))):
+            for kwargs in ({}, {"modules": "math"}):
+                x = torch.tensor(.3, requires_grad=True)
+                assert gate.lambdify(phi, **kwargs)(
+                    x).eval().array.requires_grad
+    circuit = Ket(0, 0) >> Rz(phi) @ qubit >> Controlled(Rx(sympy.sin(phi)))
+    assert circuit.lambdify(phi, modules="sympy")(.25)\
+        == circuit.lambdify(phi)(.25)
+
+
 @mark.parametrize("mixed", [False, True])
 @mark.parametrize("rotation", [Rx, Ry, Rz, U1])
 def test_rotation_grad_is_the_finite_difference(rotation, mixed):
@@ -172,6 +194,19 @@ def test_rotation_grad_is_the_finite_difference(rotation, mixed):
         rotation(.6 + 2 * step).eval(mixed=mixed).array
         - rotation(.6 - 2 * step).eval(mixed=mixed).array) / (2 * step),
         atol=1e-4)
+
+
+@mark.parametrize("mixed", [False, True])
+def test_scalar_grad_is_the_finite_difference(mixed):
+    phi = importorskip("sympy").Symbol("phi")
+    step = 1e-6
+    for gate in (Scalar(phi), Sqrt(phi), Sqrt(2 * phi + 1),
+                 Sqrt(-phi - 1).dagger()):
+        gradient = gate.grad(phi, mixed=mixed).subs(phi, .3)
+        assert numpy.allclose(gradient.eval(mixed=mixed).array, (
+            gate.subs(phi, .3 + step).eval(mixed=mixed).array
+            - gate.subs(phi, .3 - step).eval(mixed=mixed).array) / (2 * step),
+            atol=1e-4)
 
 
 def test_QuantumGate_takes_what_a_circuit_box_takes():
@@ -221,7 +256,11 @@ def test_delay(gate):
 @mark.parametrize("gate", [
     CX, CCX, CRz(.5, distance=2), Controlled(H, distance=-2), CRx(.25).delay(),
     Bits(1, 0), Bits(1, 0).dagger(), Bits(1).delay(), Digits(2, dim=4),
-    Scalar(.5).delay(), Sqrt(-1).dagger().delay()], ids=str)
+    Scalar(.5).delay(), Sqrt(-1).dagger().delay(), Ket(1, 0), Bra(0),
+    Ket(0).delay(), Bra(1, 1).delay(2), Ket(0, 1) >> CX, Copy(),
+    Match().delay(), Copy() >> Match(), MixedScalar(.5),
+    MixedScalar(.5).delay(), Scalar(.5, 's'), Scalar(.5, 's', True, 1)],
+    ids=str)
 def test_eval_repr(gate):
     from discopy.quantum.circuit import Circuit
     assert eval(repr(gate), Circuit.environment()) == gate
