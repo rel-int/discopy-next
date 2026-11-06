@@ -13,7 +13,7 @@ permissions:
 # Supersede a pull request's own runs, but let a push to main finish: every
 # run measures two commits and cancelling one throws away the pair.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:

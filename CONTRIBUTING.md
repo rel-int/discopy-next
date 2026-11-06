@@ -51,8 +51,8 @@ set in `[tool.uv]`; `uv sync --no-dev` installs the bare package. Add more group
 
 Since dependency groups are not standard, `quantum`, `grammar`, `optyx`, `notebooks` and `docs`
 are also optional dependencies (`pip install -e '.[quantum]'`). There is no `dev` or `all`
-extra: the `test` extra bundles `quantum`, `grammar` and `optyx` with the test tools, without
-ruff, ty or pytest-benchmark.
+extra: the `test` extra bundles `quantum`, `grammar`, `optyx` and `notebooks` with the test
+tools, without ruff, ty or pytest-benchmark.
 
 ## Run the unit tests
 
@@ -79,11 +79,12 @@ docstring. A module whose import itself needs an extra goes in `UNIMPORTABLE` in
 
 CI also runs every marimo notebook in `docs/notebooks/` and fails if a cell errors. With the
 `all` group synced, run `uv run python docs/export_notebooks.py --check`, adding notebook names
-(e.g. `qnlp` or `optyx/bose_hubbard`) to check only those and `--jobs N` to run N at a time.
+(e.g. `qnlp` or `optyx/bose_hubbard`) to check only those (a name that matches no notebook
+fails the command) and `--jobs N` to run N at a time.
 A notebook that a tracked bug breaks is listed in `KNOWN_BROKEN` in that script with its issue,
-and `--check` does not fail on it. Each notebook runs from its own directory, so from a git
-worktree prefix the command with `PYTHONPATH=$PWD`, or the notebooks import the main
-checkout's editable `discopy`.
+and `--check` does not fail on it. Each notebook runs from its own directory on the `discopy`
+of the script's own tree, so a git worktree checks its own code, not the main checkout's
+editable install.
 
 `coverage report` fails below the `fail_under` of `pyproject.toml`, measured on `discopy/`
 alone: without the extras the local number is lower, and CI's `Coverage` step is the gate.
@@ -242,6 +243,7 @@ owns timing (CPU clock and GC disabled) and automatically calibrates rounds
 and iterations for each workload.
 
 ```shell
+mkdir -p benchmark-results
 # small/medium sizes (the default); add BENCH_FLAGS=bench:full for the heavy tail
 uv run --with "pyzx==0.10.7" pytest benchmark/ -v \
     --benchmark-json=benchmark-results/bench.json
