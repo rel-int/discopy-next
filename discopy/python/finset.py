@@ -363,7 +363,9 @@ class Permutation(Function, PROP, Groupoid):
         in turn, ``result[i] == other[self[i]]`` for a single ``other``.
 
         Raises:
-            AxiomError : When the permutations do not compose.
+            AxiomError : When a function's domain is not ``self.cod``.
+            ValueError : When an argument is otherwise not a permutation of
+                that size, e.g. a sequence of another length.
         """
         if not others:
             return self
