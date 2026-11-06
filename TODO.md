@@ -6,5 +6,5 @@
 - [x] build the docs in parallel: 13 min 47 s → 5 min 38 s locally without the notebooks
 - [x] run the property matrix on every pull request, and delete the unit tests that repeat its laws
 - [x] trim the slowest test
-- [ ] changelog entry
+- [x] changelog entry
 - [ ] CI under 5 min on the pull request
