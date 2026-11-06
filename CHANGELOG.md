@@ -696,8 +696,11 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   `main` passes, the rules it breaks listed in `pyproject.toml` ([next#263]),
   and `E714` and `RUF022` leave that list ([next#438]).
 - `stream.Ty.singleton` and `stream.Stream.singleton` pass the callee itself as
-  `_later` instead of a lambda wrapping it, so `PLW0108` holds on `discopy/`
-  before the rule graduates out of ruff's preview ([next#443]).
+  `_later` instead of a lambda wrapping it, which takes two of the three
+  `PLW0108` instances off `discopy/` before the rule graduates out of ruff's
+  preview, the third being left with [next#443]. Equality still compares
+  `_later` by identity, so those two now compare equal to a twin built the same
+  way, where every other non-constant stream does not ([next#457]).
 
 ## [1.2.2] - 2025-12-19
 
@@ -959,6 +962,7 @@ for the changelog of `1.2.1` and earlier.
 [next#411]: https://github.com/rel-int/discopy-next/pull/411
 [next#438]: https://github.com/rel-int/discopy-next/issues/438
 [next#443]: https://github.com/rel-int/discopy-next/issues/443
+[next#457]: https://github.com/rel-int/discopy-next/issues/457
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#56]: https://github.com/rel-int/optyx/pull/56
