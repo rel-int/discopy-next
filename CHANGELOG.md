@@ -744,7 +744,8 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   ([next#445]).
 - The `quantum.contextuality` module docs say the gradient is constant on each
   context on the non-contextual polytope, not zero, and that the dual solution
-  is not unique anywhere on it ([next#445]).
+  is not unique anywhere on it when the scenario has more than one context
+  ([next#445]).
 - `reservoir.Readout` compares by value: `eval(repr(r)) == r` (with `array` in
   scope), and two identical fits compare equal ([next#445]).
 

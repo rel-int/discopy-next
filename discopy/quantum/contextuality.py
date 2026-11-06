@@ -69,10 +69,11 @@ The contextual fraction is differentiable through the linear program: its
 value is piecewise linear in :math:`v^e` and its gradient, wherever it is
 differentiable, is the solution of the dual program, which the solver
 returns as the shadow prices of the constraints :math:`M b \\leq v^e`, see
-:meth:`Model.gradient`. On the non-contextual polytope the dual solution is
-not unique: inside it, the one returned is constant on each context, so it is
-zero along any change of empirical model, and on its boundary it is a
-subgradient.
+:meth:`Model.gradient`. On the non-contextual polytope of a scenario with more
+than one context the dual solution is not unique, as the indicator of any one
+context is optimal: inside it, the one returned is constant on each context,
+so it is zero along any change of empirical model, and on its boundary it is
+a subgradient.
 Composed with the derivatives of a parametrised model, this is the gradient
 ascent of :func:`ascend`, finding the parameters of a setup that maximise
 its contextual fraction from a contextual starting point.
