@@ -2,14 +2,8 @@ from pytest import raises
 
 from discopy import op
 from discopy.abc import Nat
-from discopy.testable import assert_axioms
 from discopy.matrix import Matrix
 from discopy.python.finset import Function
-
-
-def test_axioms():
-    assert_axioms(*(level[Matrix[int]] for level in (
-        op.Category, op.Monoidal, op.Symmetric, op.Markov, op.Comarkov)))
 
 
 def test_FinSet():

@@ -50,6 +50,9 @@ SOURCE = "{}/blob/{}".format(
     REPOSITORY.removesuffix(".git"),
     os.environ.get("READTHEDOCS_GIT_COMMIT_HASH", "main"))
 ISSUES = "https://github.com/rel-int/discopy-next/issues/"
+# The environment variable that makes :func:`generate` link to each notebook
+# rather than run it.
+SKIP = "DISCOPY_SKIP_NOTEBOOKS"
 
 # Notebooks that fail to execute on a bug an open issue tracks, so that
 # ``--check`` does not block on them; ``generate`` already falls back to a link
@@ -160,9 +163,14 @@ def generate(*, strict: bool = False) -> None:
     """Render every notebook to HTML and write its page (used by ``conf.py``).
 
     When ``strict`` is false a notebook that fails to execute falls back to a
-    link page instead of aborting the build.
+    link page instead of aborting the build. When the environment sets
+    :data:`SKIP` to ``1``, as CI does on a pull request, no notebook runs and
+    every page is a link page.
     """
     for notebook in notebooks():
+        if os.environ.get(SKIP) == "1":
+            write_page(notebook, rendered=False)
+            continue
         try:
             export(notebook, check=False)
             write_page(notebook, rendered=True)

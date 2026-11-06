@@ -69,7 +69,7 @@ jobs:
         uv run ty check --exit-zero-on-warning
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 40   # backstop: green runs take 13-25 min on 3.12 and 3.13, the runner alone varying ~2x (#439)
+    timeout-minutes: 20   # backstop: the suite takes ~4 min on four workers, the notebooks ~6 more on main
     strategy:
       matrix:
         python-version: [ "3.12", "3.13", "3.14" ]
@@ -84,17 +84,21 @@ jobs:
         graphviz: 'true'
     - name: Test
       run:
-        uv run coverage run -m pytest
+        # One worker per core; coverage follows them with `patch = subprocess`.
+        uv run coverage run -m pytest -n auto --dist worksteal
     - name: Coverage
-      run:
+      run: |
+        uv run coverage combine
         uv run coverage report --show-missing
     - name: Test notebooks
+      # Execute every marimo notebook and fail if any cell errors, on each
+      # commit of main: a pull request is checked by its merge commit.
+      if: github.event_name != 'pull_request'
       run:
-        # Execute every marimo notebook and fail if any cell errors.
         uv run python docs/export_notebooks.py --check --jobs 4
   docs:
     runs-on: ubuntu-latest
-    timeout-minutes: 25   # backstop: green builds take ~15 min since discopy.optyx's API pages (#276)
+    timeout-minutes: 30   # backstop: green builds take ~20 min on main, which runs every notebook
     strategy:
       matrix:
         python-version: [ "3.14" ]
@@ -108,6 +112,9 @@ jobs:
         groups: docs
         graphviz: 'true'
     - name: Build
+      env:
+        # A pull request links to each notebook instead of running it.
+        DISCOPY_SKIP_NOTEBOOKS: ${{ github.event_name == 'pull_request' && '1' || '' }}
       run: |
         uv run sphinx-build docs docs/_build/html
     - name: Upload

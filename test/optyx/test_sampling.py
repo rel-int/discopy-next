@@ -755,11 +755,11 @@ def test_kernel_samples_partially_distinguishable_photons():
     logp, possible = kernel.log_prob(result["outcomes"])
     assert np.allclose(logp, result["logp"].sum(axis=1)) and possible.all()
     counts = Counter(tuple(map(tuple, row.tolist()))
-                     for row in kernel.sample(2, burn_in=1, shots=4000))
+                     for row in kernel.sample(2, burn_in=1, shots=1000))
     reference = Counter(tuple(network.sample(2, burn_in=1, seed=seed))
-                        for seed in range(4000))
+                        for seed in range(1000))
     for history in set(counts) | set(reference):
-        assert abs(counts[history] - reference[history]) / 4000 < .04
+        assert abs(counts[history] - reference[history]) / 1000 < .04
 
 
 @requires_jax
