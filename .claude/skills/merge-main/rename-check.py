@@ -86,8 +86,8 @@ def show(rev, path):
 def removals(base, main):
     """Map each removed module or ``module.Name`` to a guessed successor."""
     gone, changed, deleted, new_files = {}, [], [], []
-    diff = git("diff", "--find-renames", "--name-status", base, main,
-               "--", f"{PACKAGE}/")
+    diff = git("-c", "core.quotePath=false", "diff", "--find-renames",
+               "--name-status", base, main, "--", f"{PACKAGE}/")
     for row in diff.splitlines():
         status, *paths = row.split("\t")
         if not paths[0].endswith(".py"):
@@ -199,10 +199,10 @@ def scan(path, text, gone, regexes):
     for match in IMPORT.finditer(text):
         source = resolve(path, match.group(1)) if path.endswith(".py") \
             else match.group(1)
-        names = re.findall(r"[\w]+(?:\s+as\s+\w+)?", match.group(2))
+        names = re.finditer(r"[\w]+(?:\s+as\s+\w+)?", match.group(2))
         for item in names:
-            name = item.split()[0]
-            offset = match.start(2) + match.group(2).find(item)
+            name = item.group().split()[0]
+            offset = match.start(2) + item.start()
             line = text.count("\n", 0, offset) + 1
             for old in (f"{source}.{name}", source):
                 if old in gone:

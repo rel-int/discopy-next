@@ -34,7 +34,8 @@ PATH = "CHANGELOG.md"
 def git(*args):
     """The standard output of a git command, or None when it fails."""
     proc = subprocess.run(["git", *args], capture_output=True, check=False)
-    return proc.stdout.decode() if proc.returncode == 0 else None
+    return proc.stdout.decode(errors="surrogateescape") \
+        if proc.returncode == 0 else None
 
 
 def show(rev):
@@ -44,8 +45,10 @@ def show(rev):
 
 def merges(ref, since):
     """The merge commits reachable from ref since the date, newest first."""
-    return git("log", ref, "--merges", f"--since={since}",
-               "--format=%H").split()
+    out = git("log", ref, "--merges", f"--since={since}", "--format=%H")
+    if out is None:
+        sys.exit(f"replay: git log {ref} failed")
+    return out.split()
 
 
 def run_driver(base, ours, theirs):
@@ -53,10 +56,12 @@ def run_driver(base, ours, theirs):
     with tempfile.TemporaryDirectory() as tmp:
         paths = [os.path.join(tmp, name) for name in "OAB"]
         for path, text in zip(paths, (base, ours, theirs)):
-            with open(path, "w", encoding="utf-8") as file:
+            with open(path, "w", encoding="utf-8", newline="",
+                      errors="surrogateescape") as file:
                 file.write(text)
         status = DRIVER.main(*paths)
-        with open(paths[1], encoding="utf-8") as file:
+        with open(paths[1], encoding="utf-8", newline="",
+                  errors="surrogateescape") as file:
             return file.read(), status
 
 
@@ -155,8 +160,12 @@ def main():
         elif PATH not in names and ours != base and theirs != base \
                 and ours != theirs:
             got, _ = run_driver(base, ours, theirs)
-            units = (DRIVER.merge(base, ours, theirs) or ("",))[0]
+            merged = DRIVER.merge(base, ours, theirs)
             clean["driver " + compare(got, want)] += 1
+            if merged is None:
+                clean["units alone declined"] += 1
+                continue
+            units = merged[0]
             clean["units alone " + compare(units, want)] += 1
             if compare(units, want) == "differs":
                 notes.append("clean units alone "
@@ -176,7 +185,8 @@ def main():
     print(f"clean {total}: driver identical {clean['driver identical']}, "
           f"units alone identical {clean['units alone identical']}, "
           f"multiset {clean['units alone multiset']}, "
-          f"differs {clean['units alone differs']}")
+          f"differs {clean['units alone differs']}, "
+          f"declined (a release) {clean['units alone declined']}")
     if args.verbose:
         print("\n".join(notes))
 

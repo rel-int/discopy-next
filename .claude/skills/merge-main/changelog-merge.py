@@ -138,6 +138,8 @@ def resolve(base, ours, theirs):
                 slot.text = None
             continue
         if i in o_kept:
+            if i in t_reworded:
+                at_ours[o_kept[i]] = result[t_reworded[i]]
             continue
         mine = ours[o_reworded[i]] if i in o_reworded else None
         main = theirs[t_reworded[i]] if i in t_reworded else None
