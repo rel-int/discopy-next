@@ -13,4 +13,4 @@ conflicted merges of `main` into a branch conflicted on `CHANGELOG.md` alone.
 - [x] `cubic-round`: unresolved threads compactly, a round's `TODO.md`, replies and resolves
 - [x] `checkboxes`: start, claim, done and finish of `TODO.md` boxes as one pushed commit each, finish
   checking the changelog bullet and its link definition
-- [ ] changelog line under Project
+- [x] changelog line under Project
