@@ -31,6 +31,8 @@ Summary
     Rx
     Ry
     Rz
+    U1
+    ControlledRotation
     CU1
     CRz
     CRx
@@ -643,9 +645,11 @@ class Controlled(QuantumGate):
     controlled : QuantumGate
         Gate to control, e.g. :code:`CX = Controlled(X)`.
     distance : int, optional
-        Number of qubits from the control to the target, default is :code:`0`.
+        Number of qubits from the control to the target, default is :code:`1`.
         If negative, the control is on the right of the target.
 
+    Example
+    -------
     >>> circuit = (Controlled(CX.l, distance=3)
     ...            >> Controlled(Controlled(CZ.l, distance=2), distance=-1))
     >>> circuit.draw(

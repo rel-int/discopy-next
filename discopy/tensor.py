@@ -17,6 +17,7 @@ Summary
     Diagram
     CMap
     Box
+    Permutation
     Swap
     Cup
     Cap
@@ -24,6 +25,7 @@ Summary
     Sum
     Bubble
     Diff
+    Equation
 
 Tensor combinatorial maps
 -------------------------

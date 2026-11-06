@@ -1,8 +1,11 @@
 # -*- coding: utf-8 -*-
 
 """
-The free Markov category, i.e. a semicartesian category with a supply of
-commutative comonoid, see :cite:t:`FritzLiang23`.
+The free Markov category, i.e. a symmetric category with a supply of
+commutative comonoids, see :cite:t:`FritzLiang23`. Discard is not natural on
+these diagrams (``f >> Discard(y)`` and ``Discard(x)`` are not equal), so they
+form what Fritz and Liang call the free gs-monoidal category rather than a
+semicartesian one.
 
 Summary
 -------
@@ -25,7 +28,10 @@ Summary
     FollowedBy
     Head
     Tail
+    Sum
+    Bubble
     Functor
+    Equation
 
 
 Axioms
@@ -57,10 +63,11 @@ Coherence
 
 Note
 ----
-Equality of Markov diagrams is computed by translation to hypergraph.
-Copy boxes are translated to spiders, thus when they appear in the same
-diagram as the merge boxes of :mod:`comarkov` they automatically satisfy
-the :mod:`frobenius` axioms.
+A Markov :class:`Equation` is checked by translation to hypergraph, where
+copy boxes become spiders, while ``==`` is equality on the nose. Copy boxes
+cannot be composed with the merge boxes of :mod:`~discopy.comarkov`: the two
+meet only in :mod:`~discopy.frobenius`, where both are spiders and satisfy
+the Frobenius axioms.
 """
 
 from __future__ import annotations

@@ -42,9 +42,9 @@ Summary
 Example
 -------
 
-Lenses over :class:`Function <discopy.python.Function>` are the accessors of
-functional programming: `get` reads a part of a structure and `put` writes
-it back. The lens on the first component of a pair:
+Lenses over :class:`Function <discopy.python.multiplicative.Function>` are
+the accessors of functional programming: `get` reads a part of a structure
+and `put` writes it back. The lens on the first component of a pair:
 
 >>> from discopy import python
 >>> from discopy.python import Function
@@ -518,10 +518,11 @@ class Markov(Symmetric):
         reads it with `self.get`, writes with `other.put` then `self.put`,
         so that the residual stays the input rather than accumulating as in
         :meth:`Symmetric.then`. This is why lenses over
-        :class:`Function <discopy.python.Function>` are the semantics of
-        reverse-mode differentiation :cite:p:`CruttwellEtAl22`: the reverse
-        derivative of a function `f` is the lens with `get` its value and
-        `put` its Jacobian transposed, applied to the incoming gradient.
+        :class:`Function <discopy.python.multiplicative.Function>` are the
+        semantics of reverse-mode differentiation :cite:p:`CruttwellEtAl22`:
+        the reverse derivative of a function `f` is the lens with `get` its
+        value and `put` its Jacobian transposed, applied to the incoming
+        gradient.
 
         Parameters:
             other : The lens to compose with.

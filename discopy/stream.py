@@ -3,7 +3,8 @@ The feedback category of monoidal streams over a symmetric monoidal category.
 
 We adapted the definition of intensional streams from :cite:t:`DiLavoreEtAl22`.
 
-## Summary
+Summary
+-------
 
 .. autosummary::
     :template: class.rst
@@ -13,7 +14,8 @@ We adapted the definition of intensional streams from :cite:t:`DiLavoreEtAl22`.
     Ty
     Stream
 
-## Note
+Feedback
+--------
 
 Monoidal streams form a feedback category as follows:
 
@@ -35,9 +37,8 @@ Monoidal streams form a feedback category as follows:
 .. image:: /_static/stream/feedback-to-stream.svg
     :align: center
 
-## Examples
-
-### Fibonacci
+Fibonacci
+---------
 
 We can define the Fibonacci sequence as a Markov diagram, which is a feedback
 diagram, interpreted in the category of streams of python types and functions.
@@ -76,7 +77,8 @@ diagram, interpreted in the category of streams of python types and functions.
 ...         plus: lambda x, y: x + y}, cod=cod)
 >>> assert F(fib).unroll(9).now()[:10] == (0, 1, 1, 2, 3, 5, 8, 13, 21, 34)
 
-### Random walk
+Random walk
+-----------
 
 We can define a simple random walk as a feedback diagram interpreted in the
 category of streams of python types and probabilistic functions.
@@ -102,7 +104,8 @@ category of streams of python types and probabilistic functions.
 >>> assert F(walk).unroll(9).now()[:10] == (0, -1, -2, -1, 0, 1, 0, 1, 2, 1)
 >>> assert F(walk).unroll(9).now()[:10] == (0, -1, 0, 1, 0, 1, 0, -1, 0, -1)
 
-## Axioms
+Axioms
+------
 
 Note that we can only check equality of streams up to a finite number of steps.
 
@@ -115,8 +118,8 @@ Note that we can only check equality of streams up to a finite number of steps.
 >>> g = Stream.sequence('g', y, z, n)
 >>> h = Stream.sequence('h', z, w, o)
 
-* Unitality holds on the nose, associativity as hypergraphs, i.e. up to the
-  axioms of symmetric categories:
+* Unitality holds on the nose, associativity of composition as hypergraphs,
+  i.e. up to the axioms of symmetric categories:
 
 >>> _id = Stream.id
 >>> assert eq_up_to_n(f @ _id(), f, _id() @ f)

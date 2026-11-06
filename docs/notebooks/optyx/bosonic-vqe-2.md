@@ -4,6 +4,14 @@ marimo-version: 0.24.0
 ---
 
 ```python {.marimo}
+import marimo as mo
+```
+
+# Bosonic VQE from a hopping matrix
+
+The same photonic ansatz as the [Bose-Hubbard notebook](../../../notebooks/optyx/bose_hubbard.html), with the Hamiltonian built term by term by `Diagram.from_bosonic_operator` from a matrix of hopping coefficients, then optimised by gradient descent on its expectation value.
+
+```python {.marimo}
 from discopy.optyx import photonic
 
 circuit = photonic.Create(1, 1, 1) >> photonic.ansatz(3, 4) >> photonic.Id(2) @ photonic.Select(1)
