@@ -113,7 +113,6 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
-from discopy import messages
 from discopy.abc import ComarkovCategory, TracedCategory
 from discopy.testable import Equation, TestableGeneric
 from discopy.kleisli import channel
@@ -283,17 +282,6 @@ class Channel[monad](TracedCategory, ComarkovCategory, TestableGeneric):
 
     ob = Ty
     monad: Monad
-
-    trace_dinaturality_left = TracedCategory.trace_dinaturality_left\
-        .inapplicable(messages.CHANNEL_TRACES_RIGHT)
-    trace_iteration_left = TracedCategory.trace_iteration_left.inapplicable(
-        messages.CHANNEL_TRACES_RIGHT)
-    trace_naturality_left = TracedCategory.trace_naturality_left\
-        .inapplicable(messages.CHANNEL_TRACES_RIGHT)
-    trace_superposing_left = TracedCategory.trace_superposing_left\
-        .inapplicable(messages.CHANNEL_TRACES_RIGHT)
-    trace_left = TracedCategory.trace_left.inapplicable(
-        messages.CHANNEL_TRACES_RIGHT)
 
     @classmethod
     def equation_factory(cls, *terms: Channel) -> Equation:

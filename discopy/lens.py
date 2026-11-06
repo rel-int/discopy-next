@@ -430,13 +430,11 @@ class Traced(Symmetric, TracedCategory):
     >>> assert f.trace().backward == f.backward.trace()
     """
     trace_iteration_left = TracedCategory.trace_iteration_left.inapplicable(
-        messages.LENS_TRACES_RIGHT)
-    trace_superposing_left = TracedCategory.trace_superposing_left\
-        .inapplicable(messages.LENS_TRACES_RIGHT)
+        messages.PAIR_LENGTH)
     trace_naturality_left = TracedCategory.trace_naturality_left.inapplicable(
-        messages.LENS_TRACES_RIGHT)
+        messages.PAIR_LENGTH)
     trace_dinaturality_left = TracedCategory.trace_dinaturality_left\
-        .inapplicable(messages.LENS_TRACES_RIGHT)
+        .inapplicable(messages.PAIR_LENGTH)
 
     trace_iteration_right = TracedCategory.trace_iteration_right.inapplicable(
         messages.PAIR_LENGTH)
@@ -445,7 +443,7 @@ class Traced(Symmetric, TracedCategory):
     trace_dinaturality_right = TracedCategory.trace_dinaturality_right\
         .inapplicable(messages.PAIR_LENGTH)
     trace_left = TracedCategory.trace_left.inapplicable(
-        messages.LENS_TRACES_RIGHT)
+        messages.PAIR_LENGTH)
     trace_right = TracedCategory.trace_right.inapplicable(
         messages.PAIR_LENGTH)
     joining = TracedCategory.joining.inapplicable(

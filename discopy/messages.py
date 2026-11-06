@@ -18,6 +18,9 @@ PLANAR_YANKING = "A planar traced category has no braid to yank."
 FREE_YANKING = (
     "A free trace is a bubble and a free twist a box: the free balanced "
     "diagrams are not quotiented by the yanking axiom.")
+FREE_TWIST = (
+    "A free twist is a box: the free balanced diagrams are not quotiented "
+    "by the naturality of the twist.")
 NOT_FEEDBACK = "Cannot feed {} back into {}, expected {} as its input."
 STREAM_SLIDING = (
     "A morphism slides along the feedback of streams only up to extensional "
@@ -70,7 +73,6 @@ GROUP_TENSOR = "The tensor of a group is its composition, which its dagger "\
     "reverses rather than distributes over."
 SWAP_INVOLUTION = (
     "The inverse of a swap is the swap the other way, see swap_inverse.")
-LENS_TRACES_RIGHT = "A lens is traced on the right only."
 PAIR_LENGTH = (
     "A pair of types has no single number of atoms for a trace or a curry "
     "to count.")
@@ -80,7 +82,6 @@ PARA_REPARAM = (
     "permute its parameters, which its hypergraph compares in order.")
 NO_ROTATION = (
     "There is no rotation of a morphism here, so its laws do not apply.")
-CHANNEL_TRACES_RIGHT = "A channel is traced on the right only."
 PARA_CURRY = "A closed category curries no map with coparameters."
 PARA_CURRY_COPAR = (
     "A closed category cannot curry a map with coparameters {}, as its "
