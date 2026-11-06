@@ -7,4 +7,4 @@ The chip, from the conversation: a unitary U on M + M modes, a source giving a s
 - [x] a marimo notebook `docs/notebooks/optyx/feedforward_ep.md`: the chip as an optyx diagram with feedback, a classical function and a bit-controlled gate; its shot-by-shot samples; its exact averages, unrolled; the switch against no switch
 - [x] the slow units: an energy from the exact average, its gradient by parameter shifts, checked against `eval`
 - [x] EP on the slow units, checked against finite differences, then trained on a small task
-- [WIP] @session_01XmqyhQuUzn8CQGX7CBCMw5-2026-11-06 02:20 the notebook checked with `docs/export_notebooks.py --check`, a changelog entry
+- [x] the notebook checked with `docs/export_notebooks.py --check`, a changelog entry
