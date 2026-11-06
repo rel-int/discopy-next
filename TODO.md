@@ -11,6 +11,6 @@ conflicted merges of `main` into a branch conflicted on `CHANGELOG.md` alone.
 - [x] `next-checks`: every gate on the merged tree, one line per gate, ruff/ty diffed against
   `main`, pylint's raw score on 3.14, failures diffed against the merge base
 - [x] `cubic-round`: unresolved threads compactly, a round's `TODO.md`, replies and resolves
-- [ ] `checkboxes`: start, claim, done and finish of `TODO.md` boxes as one pushed commit each, finish
+- [x] `checkboxes`: start, claim, done and finish of `TODO.md` boxes as one pushed commit each, finish
   checking the changelog bullet and its link definition
 - [ ] changelog line under Project
