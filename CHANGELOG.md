@@ -659,6 +659,24 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   own axioms write a scalar: the list branch was missing that index, and a
   legless box carrying more than one amplitude raised on the reshape
   ([next#421]).
+- `neural.torch.Module` now survives `copy.deepcopy` and `torch.save`: a copy
+  computes with and backpropagates into its own parameters, so `AveragedModel`
+  (SWA/EMA) and `best = copy.deepcopy(model)` work ([next#445]).
+- `neural.train.per_board_backward` drops a board whose gradient ratio is not
+  finite from the excluded (`halt.`) parameters too, so one NaN board no longer
+  turns every parameter NaN through `ActPool`'s global clip ([next#445]).
+- `neural.act` keeps a float64 network's losses and halt logits in float64;
+  low-precision readouts are still lifted to float32 ([next#445]).
+- `neural.geometric.Geometric.cycle` with `rounds=0` now matches the reference
+  cycle: it keeps the carried units and cells and only refreshes the answer.
+  Before, the peer net's result differed and the factor net raised
+  `StopIteration` ([next#445]).
+- `neural.geometric.Shift` with a step longer than the grid's side reads zeros,
+  the translation its docstring defines, instead of raising in `narrow()`
+  ([next#445]).
+- `neural.from_incidence`, `neural.from_relation` and `CMap.from_wiring` accept
+  numpy integer indices (an integer array, or tuples of `np.int64`), where they
+  used to say that an existing box, factor or node does not exist ([next#445]).
 
 ### Project
 
@@ -963,6 +981,7 @@ for the changelog of `1.2.1` and earlier.
 [next#438]: https://github.com/rel-int/discopy-next/issues/438
 [next#443]: https://github.com/rel-int/discopy-next/issues/443
 [next#457]: https://github.com/rel-int/discopy-next/issues/457
+[next#445]: https://github.com/rel-int/discopy-next/issues/445
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#56]: https://github.com/rel-int/optyx/pull/56

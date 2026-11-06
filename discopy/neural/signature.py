@@ -77,6 +77,7 @@ from collections import Counter
 from collections.abc import Mapping
 from dataclasses import dataclass, replace
 from enum import StrEnum
+from numbers import Integral
 
 from discopy import frobenius
 from discopy.python.finset import Permutation
@@ -425,7 +426,7 @@ def from_incidence(incidence: tuple, node: Signature,
     n_nodes = len(incidence)
     for index, incident in enumerate(incidence):
         for other in incident:
-            if not isinstance(other, int) or other < 0:
+            if not isinstance(other, Integral) or other < 0:
                 raise ValueError(f"node {index} belongs to factor {other}, "
                                  "which does not exist")
     size = Counter(other for incident in incidence for other in incident)
@@ -495,12 +496,14 @@ def from_relation(relation: tuple, node: Signature, node_name: str = NODE
     ...     ((1, ), (0, 2), (1, )), node).boxes]
     [3, 4, 3]
     """
+    relation = tuple(map(tuple, relation))
     nodes = [node.resize(0, len(others)) for others in relation]
 
     wires: list = []
     for index, others in enumerate(relation):
         for other in others:
-            if not isinstance(other, int) or not 0 <= other < len(relation):
+            if not isinstance(other, Integral) \
+                    or not 0 <= other < len(relation):
                 raise ValueError(f"node {index} is related to node {other}, "
                                  "which does not exist")
             if other == index:

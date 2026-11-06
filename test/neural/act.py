@@ -95,6 +95,44 @@ def test_terms():
                       given)[3])
 
 
+def test_float64_stays_float64():
+    torch = importorskip("torch")
+    from discopy.neural.act import (
+        ActConfig, ActPool, nearest_terms, rollout, terms)
+    from discopy.neural.train import EMA, adamw, cosine_schedule
+    Net, Stream = toy()
+
+    class Doubled(Stream):
+        def take(self, n):
+            return tuple(t.double() for t in super().take(n))
+
+    torch.manual_seed(0)
+    x, y = Doubled(0).take(4)
+    target, given = y.argmax(-1), x.sum(-1) == 1
+    every = tuple(torch.randn(4, 3, 2, dtype=torch.float64) for _ in range(2))
+    halt = torch.randn(4, 3, dtype=torch.float64)
+    for out in (terms(every, halt, every[-1], x, target, given),
+                nearest_terms(every, halt, every[-1], x, target.unsqueeze(1),
+                              torch.ones(4, 1, dtype=torch.bool), given)):
+        assert {t.dtype for t in out[:3] + out[4:]} == {torch.float64}
+    grads = []
+    for slot_clip in (1e30, None):
+        torch.manual_seed(0)
+        net = Net().double()
+        pool = ActPool(net, Doubled(0), ActConfig(
+            batch_size=4, n_sup=2, slot_clip=slot_clip, skip_spike=None))
+        optimizer = adamw(net, 0., 0.)
+        stats = pool.iterate(
+            optimizer, cosine_schedule(optimizer, 1, 2), EMA(net, .9))
+        grads.append([p.grad for p in net.parameters()])
+    assert stats["logit"].dtype == torch.float64
+    assert all((a is None) == (b is None) and (
+        a is None or torch.allclose(a, b, rtol=0, atol=1e-12))
+        for a, b in zip(*grads))
+    out = rollout(net, x, target, given, (2, ))
+    assert out[2]["best_q"].dtype == torch.float64
+
+
 def test_act_pool():
     torch = importorskip("torch")
     from discopy.neural.act import ActConfig, ActPool

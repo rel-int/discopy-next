@@ -984,6 +984,15 @@ def test_from_wiring():
     assert closed == (M.from_box(f) >> M.from_box(f)).trace()
 
 
+def test_from_wiring_reads_numpy_integers_as_indices():
+    import numpy as np
+    from discopy.symmetric import Ty, Box, CMap as M
+    f = Box("f", Ty("x"), Ty("x"))
+    wires = [((0, 0), (1, 1)), ((0, 1), (1, 0))]
+    assert M.from_wiring((f, f), np.array(wires)) \
+        == M.from_wiring((f, f), wires)
+
+
 def test_cups_and_caps_decode_with_their_legs_in_scan_order():
     """ A cup's or cap's legs go in the order their readers sit in the scan,
     so decoding adds no swap the diagram did not have, see #139. """

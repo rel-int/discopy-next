@@ -50,7 +50,8 @@ class Module(torch.nn.Module):
     Note
     ----
     A module shared by several boxes is registered once, so that the boxes
-    share its weights. ``torch.compile`` takes the module like any other.
+    share its weights. ``torch.compile``, ``copy.deepcopy`` and ``torch.save``
+    take the module like any other, a copy running on its own parameters.
     """
     def __init__(self, network: Network):
         super().__init__()
@@ -59,6 +60,15 @@ class Module(torch.nn.Module):
             id(box.module): box.module for box in network.boxes
             if isinstance(box.module, torch.nn.Module)}.values())
         self.function = network.to_function(torch.Tensor)
+
+    def __getstate__(self):
+        state = super().__getstate__()
+        state.pop('function')
+        return state
+
+    def __setstate__(self, state):
+        super().__setstate__(state)
+        self.function = self.network.to_function(torch.Tensor)
 
     def forward(self, *tensors: torch.Tensor):
         return self.function(*tensors)
