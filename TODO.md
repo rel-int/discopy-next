@@ -4,5 +4,5 @@
 
 - [x] Merge `main` (next#458's `yanking_left` folded into `yanking` on either side)
 - [x] `generators(*, dom, cod)` is `generator_strategy(*, dom, cod)`: a strategy of the generators, `generators` keeping its meaning in `group`
-- [ ] `Diagram.structural_boxes`, the structural box classes among a level's factories, each drawing itself with its own `strategy` (discopy/discopy#817): Braid, Twist, Trace, Copy, Merge, Spider with phases, Feedback, checked by `assert_structural_boxes` through their own serialisation laws
+- [x] `Diagram.structural_boxes`, the structural box classes among a level's factories, each drawing itself with its own `strategy` (discopy/discopy#817): Braid, Twist, Trace, Copy, Merge, Spider with phases, Feedback, checked by `assert_structural_boxes` through their own serialisation laws
 - [ ] Merge next#459 (`feedback.structural_boxes`) once it lands

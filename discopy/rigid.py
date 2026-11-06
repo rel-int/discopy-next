@@ -954,6 +954,18 @@ class Cup(BinaryBoxConstructor, Box):
         """
         return self.left, self.right
 
+    @classmethod
+    # pylint: disable-next=arguments-differ  # drawn with no boundary
+    def strategy(cls, *, types=None):
+        """
+        Generate the cup of an atomic type and its right adjoint.
+
+        Parameters:
+            types : The strategy to draw the types from, see
+                :meth:`atomic_strategy`.
+        """
+        return cls.atomic_strategy(types).map(lambda x: cls(x, x.r))
+
     def rotate(self, left=False):
         return self.cap_factory(self.right.l, self.left.l) if left\
             else self.cap_factory(self.right.r, self.left.r)
@@ -998,6 +1010,18 @@ class Cap(BinaryBoxConstructor, Box):
         """ The arguments of the constructor, which a pickle and a delay read.
         """
         return self.left, self.right
+
+    @classmethod
+    # pylint: disable-next=arguments-differ  # drawn with no boundary
+    def strategy(cls, *, types=None):
+        """
+        Generate the cap of an atomic type and its left adjoint.
+
+        Parameters:
+            types : The strategy to draw the types from, see
+                :meth:`atomic_strategy`.
+        """
+        return cls.atomic_strategy(types).map(lambda x: cls(x, x.l))
 
     def rotate(self, left=False):
         return self.cup_factory(self.right.l, self.left.l) if left\

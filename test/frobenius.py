@@ -273,3 +273,8 @@ def test_str_transparency_of_a_spider():
     spider = Spider(0, 0, x)
     assert spider.atoms() == [x]
     assert eval(str(spider), Diagram.str_environment(spider)) == spider
+
+
+def test_structural_boxes():
+    from discopy.testable import assert_structural_boxes
+    assert_structural_boxes(Diagram)

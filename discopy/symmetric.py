@@ -621,6 +621,27 @@ class Permutation(Box):
             draw_as_wires=True, draw_as_permutation=True,
             permutation_indices=tuple(self.perm))
 
+    @classmethod
+    # pylint: disable-next=arguments-differ  # drawn with no boundary
+    def strategy(cls, *, types=None):
+        """
+        Generate a permutation of two or three atomic types, other than the
+        identity, which is no box.
+
+        Parameters:
+            types : The strategy to draw the types from, see
+                :meth:`atomic_strategy`.
+        """
+        from hypothesis import strategies as st
+
+        def permutations(dom):
+            return st.permutations(range(len(dom))).map(
+                lambda perm: cls(dom, perm))
+
+        atoms = st.lists(cls.atomic_strategy(types), min_size=2, max_size=3)
+        return atoms.map(lambda xs: xs[0].tensor(*xs[1:])).flatmap(
+            permutations).filter(lambda perm: not perm.is_identity)
+
     def __getnewargs__(self):
         """
         The arguments of :meth:`__new__`, which a pickle and a delay read.
@@ -780,6 +801,21 @@ class Swap(Permutation, balanced.Braid, Box):
         balanced.Braid.__init__(self, left, right)
         Box.__init__(self, self.name, self.dom, self.cod,
                      draw_as_wires=True, draw_as_braid=False)
+
+    @classmethod
+    # pylint: disable-next=arguments-differ  # drawn with no boundary
+    def strategy(cls, *, types=None):
+        """
+        Generate the swap of two atomic types.
+
+        Parameters:
+            types : The strategy to draw the types from, see
+                :meth:`atomic_strategy`.
+        """
+        from hypothesis import strategies as st
+
+        atoms = cls.atomic_strategy(types)
+        return st.builds(cls, atoms, atoms)
 
     def dagger(self):
         return type(self)(self.right, self.left)

@@ -69,6 +69,8 @@ Summary
 
         axiom
         rule
+        assert_structural_boxes
+        assert_laws
         inhabits
         substitute
         is_open
@@ -1133,7 +1135,9 @@ class Testable[T](ABC):  # noqa: B024  strategy is optional, see below
         of its own, the free coloured monoid on its wires. A box that is not
         the generator of its category but defines a strategy of its own,
         e.g. a lambda term, is checked on the terms that strategy generates,
-        and so is a testable that is no category at all, e.g. a proof net.
+        and so is a testable that is no category at all, e.g. a proof net,
+        but not a structural box, e.g. a braid, which
+        :func:`assert_structural_boxes` checks instead.
         A :class:`TestableGeneric` is checked on the subscripts by the
         parameters its ``checked_params`` names, and on no other.
 
@@ -1157,7 +1161,8 @@ class Testable[T](ABC):  # noqa: B024  strategy is optional, see below
             ar = getattr(testable, "ar", None)
             return ar is testable or (ar is None or isinstance(ar, type))\
                 and "strategy" in vars(testable)\
-                and getattr(testable, "box_factory", None) is not testable
+                and getattr(testable, "box_factory", None) is not testable\
+                and testable not in getattr(ar, "structural_boxes", ())
 
         checked = {
             generic[param] for generic in TestableGeneric.subclasses()[1:]
@@ -1456,3 +1461,53 @@ class Equivalence(Testable):
         first, second, third = terms
         return Equation(
             cls.equivalent(first, third), cls.equivalent(second, third))
+
+
+def assert_structural_boxes(diagram: type, max_examples: int = 10) -> None:
+    """
+    Check that each of the :attr:`structural_boxes` of a free category, as
+    its own ``strategy`` draws it, satisfies the laws of a
+    :class:`Serialisable` as stated there: a level that declares one broken
+    for its diagrams, e.g. the string of a Markov diagram splitting its
+    layers, says nothing about a single box.
+
+    The examples are drawn afresh each time, from no example database.
+
+    Parameters:
+        diagram : The diagram class whose structural boxes are checked.
+        max_examples : The number of boxes drawn of each class.
+
+    Example
+    -------
+    >>> from discopy import braided
+    >>> assert_structural_boxes(braided.Diagram)
+    """
+    # pylint: disable-next=import-outside-toplevel  # off the package
+    from hypothesis import given, settings, strategies as st
+
+    afresh = settings(
+        max_examples=max_examples, database=None, deadline=None)
+    # pylint: disable-next=no-member  # the axioms are a classproperty
+    serialisation = Serialisable.axioms.values()
+    for box in diagram.structural_boxes:
+        laws = tuple(law.bind(box) for law in serialisation)
+        afresh(given(st.just(laws), box.strategy())(assert_laws))()
+
+
+def assert_laws(laws: tuple[Axiom, ...], term) -> None:
+    """
+    Check that each of the bound ``laws`` holds of a ``term``, or does not
+    apply to it.
+
+    Parameters:
+        laws : The laws to check, each of one term.
+        term : The term to check them of.
+
+    Example
+    -------
+    >>> from discopy.cat import Arrow, Box, Ob
+    >>> assert_laws((Arrow.repr_transparency, ), Box('f', Ob('x'), Ob('y')))
+    """
+    for law in laws:
+        verdict = law(term)
+        assert verdict is NotImplemented or verdict, f"{law}({term!r})"

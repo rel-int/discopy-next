@@ -247,6 +247,21 @@ class Braid(BinaryBoxConstructor, Box):
         return factory_name(type(self)) + \
             f"({repr(self.left)}, {repr(self.right)}{str_is_dagger})"
 
+    @classmethod
+    # pylint: disable-next=arguments-differ  # drawn with no boundary
+    def strategy(cls, *, types=None):
+        """
+        Generate the braid of two atomic types, over or under.
+
+        Parameters:
+            types : The strategy to draw the types from, see
+                :meth:`atomic_strategy`.
+        """
+        from hypothesis import strategies as st
+
+        atoms = cls.atomic_strategy(types)
+        return st.builds(cls, atoms, atoms, st.booleans())
+
     def dagger(self):
         return type(self)(self.right, self.left, not self.is_dagger)
 

@@ -17,6 +17,14 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   each law once ([next#1]).
 - `testable.Serialisable`, the roundtrips of a term as laws, and the sorts
   `Atom`, `Perm` and `Objs` ([next#1]).
+- `Diagram.structural_boxes`, the box classes among the factories of a free
+  category that draw themselves, a `strategy` for each one (braids,
+  twists, feedback and traces, swaps and permutations, copies, discards,
+  merges, noise, spiders, cups, caps, evaluations and coevaluations) on
+  atoms drawn by `Box.atomic_strategy`, and
+  `testable.assert_structural_boxes`, which checks each one by the laws of
+  `Serialisable`; it found that the string of a closed `Eval` or `Coeval`
+  on the right read back on the left, now fixed ([next#1]).
 - The laws of traced and feedback categories: the vanishing, iteration,
   superposing, naturality and dinaturality of the trace, `delay_unit`,
   `delay_composition`, and `sliding` with a memory that changes type

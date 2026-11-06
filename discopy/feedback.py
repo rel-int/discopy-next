@@ -863,6 +863,34 @@ class Feedback(Box, monoidal.Bubble):
         """ The input fed back for a memory ``mem``, its delay. """
         return mem.delay()
 
+    @classmethod
+    # pylint: disable-next=arguments-differ  # drawn with no boundary
+    def strategy(cls, *, types=None):
+        """
+        Generate the feedback of a free box over an atomic memory, on
+        either side, the trace of one for a :class:`Trace`.
+
+        Parameters:
+            types : The strategy to draw the types from, the memory one of
+                them with one wire, see :meth:`atomic_strategy`.
+        """
+        from hypothesis import strategies as st
+
+        types = cls.ob.strategy() if types is None else types
+
+        def feedbacks(args):
+            mem, dom, cod, left = args
+            fed = cls.fed_back(mem)
+            arg_dom, arg_cod = (fed @ dom, mem @ cod) if left\
+                else (dom @ fed, cod @ mem)
+            return cls.ar.box_factory.strategy(
+                types=types, dom=arg_dom, cod=arg_cod).map(
+                    lambda arg: cls(arg, mem=mem, left=left))
+
+        return st.tuples(
+            cls.atomic_strategy(types), types, types, st.booleans()
+        ).flatmap(feedbacks)
+
     def delay(self, n_steps=1):
         return type(self)(self.arg.delay(n_steps), mem=self.mem.delay(n_steps),
                           left=self.left)

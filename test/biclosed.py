@@ -522,3 +522,8 @@ def test_term_inside_a_diagram_is_drawn_as_one_box():
             for diagram in (term @ X, term >> module.Id(term.cod)):
                 assert [box.name for box in diagram.to_drawing().boxes]\
                     == [str(term)]
+
+
+def test_structural_boxes():
+    from discopy.testable import assert_structural_boxes
+    assert_structural_boxes(Diagram)

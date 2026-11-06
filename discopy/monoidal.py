@@ -1280,6 +1280,39 @@ class Diagram(cat.Arrow, MonoidalCategory, RichDisplay):
                     raise ValueError(messages.LAYERS_MUST_HAVE_A_BOX)
         super().__init__(inside, dom, cod, _scan=_scan)
 
+    @classproperty
+    # pylint: disable-next=no-self-argument  # a property of the class
+    def structural_boxes(cls) -> tuple[type[Box], ...]:
+        """
+        The structural boxes of the free category, i.e. the box classes
+        among its factories that draw themselves with a ``strategy`` of
+        their own rather than that of its :attr:`box_factory`, e.g.
+        :class:`discopy.braided.Braid` for
+        :attr:`discopy.braided.Diagram.braid_factory`. A box class of
+        another category, e.g. the braid a symmetric diagram inherits from
+        a balanced one, and a factory that is a method rather than a class
+        are left out. :func:`discopy.testable.assert_structural_boxes`
+        checks that each one is written down and read back.
+
+        Example
+        -------
+        >>> assert Diagram.structural_boxes == ()
+        >>> from discopy import braided, symmetric
+        >>> assert braided.Diagram.structural_boxes == (braided.Braid, )
+        >>> assert braided.Braid not in symmetric.Diagram.structural_boxes
+        """
+        factories = {
+            name: value
+            # pylint: disable-next=no-member  # a class has a __mro__
+            for base in reversed(cls.__mro__)
+            for name, value in vars(base).items()
+            if name.endswith("_factory")}
+        free = cls.box_factory.strategy.__func__
+        return tuple(dict.fromkeys(
+            factory for factory in factories.values()
+            if isinstance(factory, type) and issubclass(factory, cls)
+            and factory.strategy.__func__ is not free))
+
     @property
     def size(self):
         return sum(box.size for box in self.inside)
@@ -1958,6 +1991,26 @@ class Box(cat.Box, Diagram):
         Diagram.__init__(self, inside, dom, cod)
 
     is_identity = False
+
+    @classmethod
+    def atomic_strategy(cls, types=None):
+        """
+        Generate the atomic types a structural box is built on, those of
+        one wire, drawn from ``types`` if given: a structural box of a
+        composite type is a diagram of those of its atoms.
+
+        Parameters:
+            types : The strategy to draw the types from, e.g.
+                :meth:`Ty.strategy`, the one wire types otherwise.
+
+        Example
+        -------
+        >>> from hypothesis import find
+        >>> assert find(Box.atomic_strategy(), lambda _: True) == Ty('a')
+        """
+        # pylint: disable-next=no-member  # the ob of a Box is a Ty
+        return cls.ob.generator_strategy() if types is None\
+            else types.filter(lambda typ: len(typ) == 1)
 
     @property
     def size(self):

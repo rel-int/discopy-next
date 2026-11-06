@@ -553,11 +553,25 @@ class Eval(Timed, biclosed.Eval, Box):
         """ The arguments of the constructor, which a delay reads. """
         return self.x, self.left
 
+    def __str__(self):
+        """
+        The name of the evaluation, with its side when it is on the right:
+        an exponential of a closed category is on either side, so its type
+        alone does not say which.
+
+        >>> x, y = Ty('x'), Ty('y')
+        >>> print(Eval(x << y, left=False).delay())
+        Eval(y >> x, left=False).d
+        """
+        name = self.name if self.left else self.name[:-1] + ", left=False)"
+        return name + feedback.str_delayed(self.time_step)
+
 
 class Coeval(Timed, biclosed.Coeval, Box):
     "The coevaluation of an exponential type, i.e. the dagger of an Eval."
     serialised_attrs = biclosed.Coeval.serialised_attrs + ("*", "time_step")
     __getnewargs__ = Eval.__getnewargs__
+    __str__ = Eval.__str__
 
 
 class Curry(Timed, biclosed.Curry, Box):

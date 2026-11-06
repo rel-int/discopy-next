@@ -68,3 +68,8 @@ def test_Braid_to_tree():
     for braid in (Braid(x, y), Braid(x, y).dagger()):
         assert loads(dumps(braid)) == braid
         assert loads(dumps(braid)).is_dagger == braid.is_dagger
+
+
+def test_structural_boxes():
+    from discopy.testable import assert_structural_boxes
+    assert_structural_boxes(Diagram)
