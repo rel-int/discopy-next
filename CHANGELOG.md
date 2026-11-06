@@ -159,6 +159,10 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   arithmetic* ([#677]), *Parsing arithmetic* and *Boolean circuits*,
   Lafont's maps, linear maps, Boolean functions and reversible circuits as
   double-pushout rewriting ([next#310], [next#316], [next#320]).
+- `yanking_left`, the yanking axiom on the left trace, i.e. Reidemeister move 1
+  for either trace on a compact category, and `SymmetricCategory.left_trace`,
+  the left trace of the python functions, the additive channels and the
+  traced lenses ([next#458]).
 
 ### Changed
 
@@ -765,6 +769,114 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 - Products and exponentials print their name only when it is first read, so
   nested `Tuple`s and exponentials build in linear time, and a thousand nested
   `Tuple`s no longer hit the recursion limit ([next#445]).
+- `Hypergraph.to_graph` attaches each input and output to the spider it is
+  wired to, so `==` sees where an adjoint boundary attaches
+  (`f @ g @ Cap(x, x.r)` no longer equals `g @ f @ Cap(x, x.r)` as compact
+  hypergraphs), `hash` no longer raises `KeyError` and
+  `from_graph(to_graph(h))` gains no spider ([next#445]).
+- Equal hypergraphs hash equal when their boxes are equal but print
+  differently (`data=1` and `data=1.0`): the fast path of
+  `Hypergraph.__hash__` hashes the boxes, not their `repr`, so a box with
+  unhashable data makes its hypergraph unhashable, as it does its diagram
+  ([next#445]).
+- `frobenius.Diagram.unfuse` unfuses the spiders a `Cospan` holds, so
+  `(Spider(1, 4, x) @ y).unfuse()` and `Diagram.spiders(1, 4, x @ y).unfuse()`
+  have no point with more than three legs, as upstream ([next#445]).
+- `Hypergraph.from_callable` restores its category's own `__call__` and no
+  longer deletes it, so `Hypergraph[python.Function].from_callable` leaves
+  `Function` callable and a `from_callable` nested in another works
+  ([next#445]).
+- `Hypergraph.__repr__` writes `offsets` when any is set, as `to_tree` does,
+  so a planar hypergraph read back from its repr decodes without swaps
+  ([next#445]).
+- `Hypergraph.tensor` shifts each factor's offsets past the codomains of the
+  factors before it, so `x @ s.to_hypergraph()` decodes in a category without
+  swaps, like `(x @ s).to_hypergraph()` ([next#445]).
+- `Hypergraph.permutation` moves each type of a list of compound types as a
+  block, as `symmetric.Diagram.permutation` does, instead of raising or
+  wiring it as if each type were one wire ([next#445]).
+- `Hypergraph.simplify` tries each pair of boxes once, not every ordered
+  pair, and its docstring gives its real cost, cubic per pass, instead of
+  quadratic ([next#445]).
+- A legacy pickled `frobenius.Spider` loads with its legs in the right order
+  in its name and with its `typ` set, so its `repr` no longer raises
+  ([next#445]).
+- The docstring of `Hypergraph.is_monogamous` counts the wires correctly and
+  says what each spider must satisfy ([next#445]).
+- `Hypergraph` spiders with no port can take labels of any type: two of them
+  with incomparable labels, e.g. `'a'` and `0`, no longer raise `TypeError`
+  ([next#445]).
+- `CMap.copy`, `merge`, `discard`, `noise` and `spiders` are the maps of the
+  host category's own: `copy(x, 1)` is the identity, a composite type gets
+  one box per atomic object, and Markov maps no longer gain identity boxes
+  over round trips ([next#445]).
+- `CMap.match` sends a pattern's straight wires only to the wires
+  `CMap.beside` its image, so matching a box with a few wires beside it no
+  longer takes time exponential in their number (about 35 s down to 0.2 s at
+  five wires), with the same matches ([next#445]).
+- A cup on two outputs of a state, e.g.
+  `Box('s', Ty(), x @ x.r) >> Cup(x, x.r)`, decodes from its `CMap` with no
+  swap ([next#445]).
+- `group.Cyclic`, `Symmetric`, `Product` and `Wreath` compute each action
+  once and return the same `Action` every time, so a wreath whose top is
+  itself a wreath costs about as much as its factors (one multiply at nesting
+  4 went from about 1 s to 0.3 ms). `Action` is a frozen dataclass, so the
+  action a group shares cannot be changed under its other callers ([next#445]).
+- `CMap.eval` on a map with no boxes (an identity, cup, cap or loop) uses its
+  category's dtype, e.g. `tensor.Diagram[complex]`, instead of falling back
+  to float, so it agrees with `Diagram.eval` ([next#445]).
+- In rigid and pivotal maps, a cup wired between two outputs of one box reads
+  them left to right, as `Hypergraph` does: rigid accepts the map of a cup on
+  a box onto `x @ x.r` and refuses one onto `x.r @ x`, and pivotal decodes
+  both ([next#445]).
+- `tensor.Box` compares its winding number `z`, so on a self-dual `Dim` a
+  rotated box `f.r` no longer equals or hashes like `f` ([next#445]).
+- `tensor.Functor` evaluates `dtype=Expr` diagrams exactly and functorially:
+  its boundary and loop identities are integers, not floats, so
+  `F(f >> f) == F(f) >> F(f)` ([next#445]).
+- `hopf.Representation.qdim` is the loop in `Intertwiner[H]`, twisted by the
+  pivotal element, rather than `dim V`: 0, not 4, on Sweedler's regular module
+  ([next#445]).
+- `Matrix.transpose`, `conjugate`, `dagger`, `merge` and `round`, and
+  `Tensor.transpose`, `.l`, `.r` and `round`, work under `backend('pytorch')`
+  ([next#445]).
+- `tensor.Bubble.grad` applies the chain rule on any boundary (states, effects,
+  compound `Dim`s), where it used to raise `ValueError` ([next#445]).
+- Equal `hopf.Algebra`s hash equal, so `Representation[H]` is one class per
+  algebra up to equality and `Intertwiner` accepts a module over an equal
+  algebra ([next#445]).
+- `tensor.Diagram.to_tn` evaluates the spider with no legs to its dimension,
+  the circle, as `eval` does, not to 1 ([next#445]).
+- `Matrix.repeat`, and with it Boolean `Matrix.trace` and `Tensor.repeat`,
+  takes ceil(log2 n) products instead of n(n+1)/2: milliseconds instead of
+  seconds at n = 100 ([next#445]).
+- `Matrix.is_close` gives its real `rtol` default (`1.e-8`), and
+  `tensor.Diagram.jacobian` says it returns a `Sum` diagram whose `eval` is
+  `Tensor.jacobian` ([next#445]).
+- `Stream.delay` works on streams whose memory starts non-empty, e.g.
+  `Stream.sequence(name, x, y, m)` and the tail of a feedback, instead of
+  raising `AxiomError` ([next#445]).
+- `feedback.Functor` sends a daggered `FollowedBy` to the dagger of its image,
+  so even the identity functor now keeps its boundary ([next#445]).
+- The `discopy.stream` docs check the associativity of composition for real: it
+  holds as hypergraphs, i.e. up to the axioms of symmetric categories, not on
+  the nose as they claimed ([next#445]).
+- `feedback.Diagram.feedback` and `trace` raise `AxiomError` on a wrong `dom`
+  or `cod` in the keyword form when the memory is not delayed, instead of
+  silently using the diagram's own boundary ([next#445]).
+- `kleisli.additive.unpack_value` and `kleisli.multiplicative.unpack_value`
+  take the packed type, so a channel on a single wire passes a `Tagged` or
+  `Row` value through whole instead of stripping, re-tagging or splatting it
+  ([next#445]).
+- Kleisli channels of different monads raise `TypeError` when composed with
+  `>>` or tensored with `@`, instead of composing silently or failing only at
+  call time ([next#445]).
+- `stream.Ty.sequence('mem')` is one wire `mem0`, `mem1`, ... per step instead
+  of splitting the name into its characters ([next#445]).
+- `para.Closed.curry` raises `ValueError` ("Cannot split n atoms off dom") for
+  `n < 0` or `n > len(dom)`, as `para.Compact.curry` and `para.Traced.trace`
+  do, instead of currying into the parameter wires and failing with an
+  `AxiomError` about an internal composite ([next#445]).
 
 ### Project
 
@@ -1073,6 +1185,7 @@ for the changelog of `1.2.1` and earlier.
 [next#438]: https://github.com/rel-int/discopy-next/issues/438
 [next#443]: https://github.com/rel-int/discopy-next/issues/443
 [next#457]: https://github.com/rel-int/discopy-next/issues/457
+[next#458]: https://github.com/rel-int/discopy-next/pull/458
 [next#445]: https://github.com/rel-int/discopy-next/issues/445
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29

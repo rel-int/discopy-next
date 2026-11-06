@@ -536,6 +536,8 @@ class Diagram(monoidal.Diagram, TracedCategory):
 
     yanking = TracedCategory.yanking.inapplicable(
         messages.PLANAR_YANKING)
+    yanking_left = TracedCategory.yanking_left.inapplicable(
+        messages.PLANAR_YANKING)
 
     def delay(self, n_steps=1):
         """ The delay of a feedback diagram. """
@@ -573,6 +575,9 @@ class Diagram(monoidal.Diagram, TracedCategory):
                 dom=dom @ fed[:-1], cod=cod @ mem[:-1], mem=mem[-1:]
             ).feedback(dom=dom, cod=cod, mem=mem[:-1])
         if fed == mem or not isinstance(mem, Ty):
+            if (self.dom, self.cod) != ((fed @ dom, mem @ cod) if left
+                                        else (dom @ fed, cod @ mem)):
+                raise AxiomError(messages.NOT_TRACEABLE.format(self, mem))
             return self.trace_factory(self, left)
         return self.feedback_factory(
             self, dom=dom, cod=cod, mem=mem, left=left)
@@ -1130,7 +1135,9 @@ class Functor(monoidal.Functor):
         if isinstance(
                 other, FollowedBy) and hasattr(self.cod, "followed_by"):
             arg = other.dom if other.is_dagger else other.cod
-            return self.cod.followed_by(self(arg))
+            result = self.cod.followed_by(self(arg))
+            return result.dagger() if other.is_dagger\
+                and hasattr(self.cod, "dagger") else result
         if isinstance(other, Feedback) and hasattr(self.cod, "feedback"):
             left = {"left": True} if other.left else {}
             return self(other.arg).feedback(
