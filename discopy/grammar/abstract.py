@@ -23,6 +23,7 @@ Summary
     Curry
     Copy
     Discard
+    Function
     Permutation
     Swap
     Feedback
@@ -39,6 +40,9 @@ Summary
     Variable
     Application
     Abstraction
+
+.. autodata:: Position
+.. autodata:: String
 
 Vocabularies and lexicons
 -------------------------
@@ -72,8 +76,8 @@ composition, ``John.compose(seeks)`` for *John seeks*, see
 ``lambda z. x (y z)`` with the first word applied last, here the first word
 is applied first, so a string reads its positions in order.
 
-Example
--------
+John seeks a unicorn
+--------------------
 
 The two readings of Montague's *John seeks a unicorn* share one syntax, with
 a constant for each reading of *seeks* in the abstract vocabulary:

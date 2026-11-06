@@ -2,6 +2,8 @@
 
 Optyx is an open-source Python library for designing, simulating, and optimizing networked, hybrid qubit–photon architectures. It offers a compositional, ZX/ZW-based, string-diagram front end (built within the [DisCoPy](https://github.com/discopy/discopy) ecosystem) that lets you specify experiments mixing qubit registers with discrete-variable photonic modes, lossy channels, heralded measurements, and classical/quantum feedback. Optyx compiles these diagrams to optimized tensor networks and executes them with state-of-the-art contraction backends ([Quimb](https://github.com/jcmgray/quimb) and [Cotengra](https://github.com/jcmgray/cotengra)), delivering substantial speedups on hybrid circuits. The result is an end-to-end workflow—from high-level syntax to numerics—well-suited for rapid prototyping of qubit-photon experiments.
 
+Optyx lives in DisCoPy as the subpackage `discopy.optyx`, under the Apache License 2.0 (see `LICENSE` and `NOTICE` next to this file), while the rest of DisCoPy is under the BSD 3-Clause License. Install its dependencies with the `optyx` group, e.g. `uv sync --group optyx` from a clone of this repo.
+
 ## Basic syntax: the CNOT gate
 
 Circuits in Optyx are **diagrams** made of **wires** and **boxes**. Wires represent different types of data such as quantum `qubit` and `qmode` or classical `bit` and `mode`. Boxes are basic processes with input and output wires that can be composed, in sequence or in parallel, to form diagrams.

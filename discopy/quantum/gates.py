@@ -31,6 +31,8 @@ Summary
     Rx
     Ry
     Rz
+    U1
+    ControlledRotation
     CU1
     CRz
     CRx
@@ -691,6 +693,8 @@ class Controlled(QuantumGate):
         If negative, the control is on the right of the target, zero raises
         :code:`ValueError`.
 
+    Example
+    -------
     >>> circuit = (Controlled(CX.l, distance=3)
     ...            >> Controlled(Controlled(CZ.l, distance=2), distance=-1))
     >>> circuit.draw(

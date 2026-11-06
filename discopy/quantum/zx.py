@@ -3,6 +3,9 @@
 """
 ZX-calculus diagrams.
 
+The functor ``circuit2zx`` sends a :class:`discopy.quantum.circuit.Circuit`
+to a ZX diagram, each gate through :func:`gate2zx`.
+
 Summary
 -------
 
@@ -13,13 +16,25 @@ Summary
 
     Diagram
     Box
+    Sum
     Bubble
+    Permutation
     Swap
     Spider
     Z
     Y
     X
     Scalar
+
+.. admonition:: Functions
+
+    .. autosummary::
+        :template: function.rst
+        :nosignatures:
+        :toctree:
+
+        scalar
+        gate2zx
 """
 
 import cmath

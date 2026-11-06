@@ -11,18 +11,28 @@ Summary
     :nosignatures:
     :toctree:
 
+    Ty
+    Over
+    Under
     TermBase
     Constant
     Variable
     Abstraction
     FA
     BA
+    TypeRaising
+    FTR
+    BTR
+    BinaryTerm
     FC
     BC
     FX
     BX
     Diagram
     Box
+    Eval
+    Coeval
+    Curry
     Word
     ForwardCrossedComposition
     BackwardCrossedComposition

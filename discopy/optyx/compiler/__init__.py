@@ -53,6 +53,9 @@ Submodules
         :nosignatures:
         :toctree:
 
+        mbqc
+        path_cover
+        patterns
         semm
         semm_decompiler
 

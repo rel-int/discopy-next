@@ -34,16 +34,14 @@ circuit will be exactly equivalent to those of the DisCoPy circuit
 
 If `probabilities` is set to True, the output states of the PennyLane
 circuit will be the probabilities of the output states, equivalent
-to appending :class:`discopy.quantum.circuit.Measure` to all the
+to appending :class:`discopy.quantum.gates.Measure` to all the
 open wires in the DisCoPy circuit.
 
-Once a :class:`PennyLaneCircuit` has been constructed, it
-can be evaluated with :func:`.eval()`. If the circuit contains only
-concrete parameters (i.e. no symbolic parameters), no arguments
-should be passed to `eval()`. If the circuit contains symbolic
-parameters, a list of the symbolic parameters and a list of their
-associated weights should be passed to `eval()` as `symbols=` and
-`weights=`.
+Once a :class:`PennyLaneCircuit` has been constructed, it can be
+evaluated with :meth:`PennyLaneCircuit.eval`, which takes no arguments.
+If the circuit contains symbolic parameters, first call
+:meth:`PennyLaneCircuit.initialise_concrete_params` with a dict from each
+symbol to its weight.
 """
 
 from __future__ import annotations
@@ -342,9 +340,9 @@ class PennyLaneCircuit:
     def draw(self):
         """
         Print a string representation of the circuit
-        similar to `qml.draw`, but including post-selection, with its
-        concrete parameters, which a symbolic circuit gets from
-        :meth:`initialise_concrete_params`.
+        similar to `qml.draw`, but including post-selection, on its concrete
+        parameters, set with :meth:`initialise_concrete_params` when it has
+        symbolic ones.
         """
         if self._concrete_params is None:
             raise ValueError('Cannot draw circuit with symbolic parameters. '
@@ -460,8 +458,8 @@ class PennyLaneCircuit:
 
     def eval(self):
         """
-        Evaluate the circuit with its concrete parameters, which a symbolic
-        circuit gets from :meth:`initialise_concrete_params`.
+        Evaluate the circuit on its concrete parameters, set with
+        :meth:`initialise_concrete_params` when it has symbolic ones.
 
         Returns
         -------
