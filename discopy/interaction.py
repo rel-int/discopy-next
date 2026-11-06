@@ -19,7 +19,6 @@ Summary
 
     Ty
     Diagram
-    NamedGeneric
 
 .. admonition:: Functions
 
