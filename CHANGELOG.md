@@ -672,8 +672,9 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   different numbers of photons, padding each term's amplitudes with zeros,
   where it used to add them by broadcasting or raise ([next#445]).
 - `optyx.core.zx.ZBox` exports to PyZX as a `Z_BOX` vertex labelled with its
-  amplitude, where `to_pyzx` made it an X spider of phase twice the amplitude,
-  so that `ZBox(1, 1, .5)` became a NOT gate ([next#445]).
+  amplitude, and `from_pyzx` reads that vertex back as a `ZBox`, where
+  `to_pyzx` made it an X spider of phase twice the amplitude, so that
+  `ZBox(1, 1, .5)` became a NOT gate ([next#445]).
 - `optyx.core.path.Matrix` compares equal only when its creations, selections,
   normalisation and scalar agree too: matrices that evaluate differently used
   to compare equal, and matrices with different numbers of creations were
@@ -707,11 +708,15 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 - `grad` on an `optyx.channel` box that has free symbols and no gradient of its
   own (`qubits.Z`, `X`, `Scalar`, `photonic.BBS`, `Gate`, a `CQMap` or a
   feedback loop) raises `NotImplementedError` instead of recursing forever, and
-  still gives zero for a variable the box does not depend on ([next#445]).
+  still gives zero for a variable the box does not depend on; the
+  `free_symbols` of a `Channel` include those of its Kraus map and of a `CQMap`
+  those of its density matrix, so a box built from a symbolic diagram raises
+  too, where it gave a false zero ([next#445]).
 - `subs` and `lambdify` substitute the parameter of optyx's `qubits.Scalar`,
   `photonic.Gate`, `PhotonLoss`, `PhaseShiftDR` and `classical.Z` and `X`,
   which report it in `free_symbols`: they used to leave the symbol in place,
-  and their gradient was silently zero ([next#445]).
+  and their gradient was silently zero. A `Gate` with a symbolic matrix and no
+  `data` is substituted too ([next#445]).
 - `optyx.channel.Diagram.fix` warns that the result is truncated to `max_chi`
   only when its backend compresses: `DiscopyBackend` and a `QuimbBackend`
   without a compressed optimiser return the exact state without the false
