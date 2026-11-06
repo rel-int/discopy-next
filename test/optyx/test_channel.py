@@ -192,6 +192,16 @@ def test_a_box_without_a_gradient_refuses_to_differentiate():
             box.grad(x)
 
 
+def test_a_box_depends_on_the_symbols_of_its_kraus_map():
+    channel = Channel("z", zx.Z(1, 1, x))
+    cq_map = CQMap("z", channel.double(), qubit, qubit)
+    for box in (channel, cq_map, channel >> cq_map):
+        assert box.free_symbols == {x}
+        assert box.grad(y) == Diagram.sum_factory((), box.dom, box.cod)
+        with pytest.raises(NotImplementedError, match="does not support"):
+            box.grad(x)
+
+
 def test_subs_substitutes_the_parameter_of_every_symbolic_box():
     import sympy as sp
     from discopy.optyx import classical, qubits

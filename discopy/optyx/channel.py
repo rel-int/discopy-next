@@ -1726,6 +1726,11 @@ class Channel(Diagram, frobenius.Box):
         syms, exprs = zip(*args)
         return self.lambdify(*syms)(*exprs)
 
+    @property
+    def free_symbols(self):
+        """ The symbols of the box's data and of its Kraus map. """
+        return super().free_symbols | self.kraus.free_symbols
+
     def grad(self, var, **params):
         """
         Gradient with respect to :code:`var`, zero for a box that does not
@@ -1809,6 +1814,11 @@ class CQMap(Diagram, frobenius.Box):
     def __repr__(self):
         return f"{factory_name(type(self))}({self.name!r}, "\
             f"{self.density_matrix!r}, {self.dom!r}, {self.cod!r})"
+
+    @property
+    def free_symbols(self):
+        """ The symbols of the box's data and of its density matrix. """
+        return super().free_symbols | self.density_matrix.free_symbols
 
     grad = Channel.grad
 
