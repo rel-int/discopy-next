@@ -536,6 +536,8 @@ class Diagram(monoidal.Diagram, TracedCategory):
 
     yanking = TracedCategory.yanking.inapplicable(
         messages.PLANAR_YANKING)
+    yanking_left = TracedCategory.yanking_left.inapplicable(
+        messages.PLANAR_YANKING)
 
     def delay(self, n_steps=1):
         """ The delay of a feedback diagram. """

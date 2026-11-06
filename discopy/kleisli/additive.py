@@ -377,7 +377,7 @@ class Channel[monad](TracedCategory, ComarkovCategory, NamedGeneric):
         Parameters:
             n : The number of summands to trace over.
             left : Whether to trace the first rather than the last
-                summands, not implemented.
+                summands, see :meth:`discopy.abc.SymmetricCategory.left_trace`.
 
         Raises:
             ValueError : If the monad has no
@@ -405,7 +405,7 @@ class Channel[monad](TracedCategory, ComarkovCategory, NamedGeneric):
         if n == 0:
             return self
         if left:
-            raise NotImplementedError
+            return self.left_trace(n)
         monad = type(self).monad
         if monad.iterate is None:
             raise ValueError(

@@ -159,6 +159,8 @@ class Diagram(braided.Diagram, feedback.Diagram, BalancedCategory):
     """
     ob = Ty
     yanking = BalancedCategory.yanking.failing(messages.FREE_YANKING)
+    yanking_left = BalancedCategory.yanking_left.failing(
+        messages.FREE_YANKING)
 
     @classmethod
     def twist(cls, dom: monoidal.Ty) -> Diagram:
