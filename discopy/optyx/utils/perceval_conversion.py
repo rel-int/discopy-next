@@ -242,9 +242,16 @@ def postselection(circuit, p):
     )
     measure >>= copy >> permutation
 
-    postselect_f = ClassicalFunction(
-        compile_postselect(str(p.post_select_fn)), mode**n_post, bit
-    )
+    condition = compile_postselect(str(p.post_select_fn))
+    heralds = p.heralds
+
+    def on_processor_modes(counts):
+        counts = iter(counts)
+        return condition([
+            heralds[m] if m in heralds else next(counts)
+            for m in range(p.circuit_size)])
+
+    postselect_f = ClassicalFunction(on_processor_modes, mode**n_post, bit)
     measure >>= postselect_f @ mode**n_post
 
     postselection = BitControlledGate(
