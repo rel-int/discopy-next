@@ -739,6 +739,15 @@ def test_Box_dagger_is_not_the_box():
     assert hash(t.dagger()) != hash(t)
 
 
+def test_Box_time_step():
+    from discopy.quantum import circuit
+    qubit = circuit.qubit
+    f = circuit.Box('f', qubit, qubit)
+    delayed, undelayed = f.delay(), circuit.Box('f', qubit.d, qubit.d)
+    assert delayed.reset() == f != undelayed.reset()
+    assert delayed != undelayed and len({delayed, undelayed}) == 2
+
+
 def test_rotated_Box_is_not_the_box():
     f = Box('f', Dim(2), Dim(2), data=[1, 2, 3, 4])
     assert f.r != f and len({f, f.r}) == 2
@@ -825,6 +834,15 @@ def test_Bubble_data():
     one, two = f.bubble(data=[1, 2]), f.bubble(data=[2, 1])
     assert f.bubble(data=array) == f.bubble(data=array.copy()) == one != two
     assert len({one, f.bubble(data=[1, 2]), f.bubble()}) == 2
+
+
+def test_Bubble_time_step():
+    from discopy.quantum.circuit import Bubble, qubit
+    from discopy.quantum.gates import X
+    delayed = X.bubble().delay()
+    undelayed = Bubble(X, dom=qubit.d, cod=qubit.d)
+    assert delayed.reset() == X.bubble() != undelayed.reset()
+    assert delayed != undelayed and len({delayed, undelayed}) == 2
 
 
 def test_Bubble_func_dagger():
