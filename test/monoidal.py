@@ -930,6 +930,17 @@ def test_daggered_wire_str_reads_back():
         assert Diagram.str_transparency(Diagram.id(term))
 
 
+def test_daggered_Wire_str_reads_back():
+    """ A wire on its own reads its string back too: ``x[::-1]`` is its
+    dagger, and it is not sliced otherwise (next#445). """
+    red, green = Colour('red'), Colour('green')
+    for x in (Wire('x'), Wire('x', red, green)):
+        assert eval(str(x.dagger()), {'x': x}) == x.dagger() == x[::-1]
+        assert x[::-1][::-1] == x
+    with raises(TypeError):
+        Wire('x')[0]
+
+
 def test_order_of_types_is_total():
     """ Of two unequal types exactly one is less than the other, even when
     their wires share a name, so that sorting does not depend on the input

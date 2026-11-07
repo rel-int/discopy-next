@@ -183,6 +183,19 @@ class Wire(cat.Ob):
         return type(self)(
             self.name, self.cod, self.dom, is_dagger=not self.is_dagger)
 
+    def __getitem__(self, key):
+        """
+        The dagger of a wire, written ``x[::-1]`` as for a box, so that the
+        string of a daggered wire reads back.
+
+        >>> x = Wire('x')
+        >>> assert eval(str(x.dagger())) == x.dagger() == x[::-1]
+        """
+        if key != slice(None, None, -1):
+            raise TypeError(messages.ONLY_REVERSED.format(
+                factory_name(type(self))))
+        return self.dagger()
+
     def __eq__(self, other):
         return type(self) is type(other) and (
             self.name, self.dom, self.cod, self.is_dagger) == (
