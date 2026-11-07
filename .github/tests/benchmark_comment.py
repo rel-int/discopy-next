@@ -40,7 +40,7 @@ def pull():
 def test_the_honest_metadata_passes(benchmark_comment, data, run, pull):
     assert benchmark_comment.unreadable(data, run) is None
     assert benchmark_comment.unattested(data, run, []) is None
-    assert not benchmark_comment.retargeted(data, run)
+    assert not benchmark_comment.retargeted(data, run, [])
     assert benchmark_comment.mismatch(
         data, run, pull, "discopy/discopy") is None
 
@@ -83,14 +83,20 @@ def test_a_run_on_another_base_was_retargeted(
     it: the pull request was retargeted while the run ran."""
     run["pull_requests"][0]["base"] = {"sha": "f" * 40}
     assert benchmark_comment.unattested(data, run, []) is None
-    assert benchmark_comment.retargeted(data, run)
+    assert benchmark_comment.retargeted(data, run, [])
 
 
+@pytest.mark.parametrize("fork", [False, True])
 def test_main_skips_a_retargeted_run_with_a_notice(
-        benchmark_comment, data, run, monkeypatch, tmp_path, capsys):
+        benchmark_comment, data, run, monkeypatch, tmp_path, capsys, fork):
     """A retargeted run is skipped, not failed: nothing is posted and the
-    job exits 0, leaving the next run of the pull request to post."""
-    run["pull_requests"][0]["base"] = {"sha": "f" * 40}
+    job exits 0, leaving the next run of the pull request to post. A run
+    from a fork lists no pull request, and the open pull request for its
+    head is the one on the new base."""
+    listed = dict(run["pull_requests"][0], base={"sha": "f" * 40})
+    run["pull_requests"] = [] if fork else [listed]
+    if fork:
+        run["head_repository"] = {"full_name": "someone/fork"}
     (tmp_path / "benchmark-comment").mkdir()
     (tmp_path / "benchmark-comment" / "metadata.json").write_text(
         json.dumps(data))
@@ -99,10 +105,16 @@ def test_main_skips_a_retargeted_run_with_a_notice(
     monkeypatch.setenv("GITHUB_EVENT_PATH", str(tmp_path / "event.json"))
     monkeypatch.setenv("GITHUB_REPOSITORY", "discopy/discopy")
     calls = []
-    monkeypatch.setattr(
-        benchmark_comment, "call", lambda *args: calls.append(args))
+
+    def call(url, *args):
+        calls.append(url)
+        assert "/pulls?head=" in url, f"{url} called for a retargeted run"
+        return [listed]
+    monkeypatch.setattr(benchmark_comment, "call", call)
     benchmark_comment.main()
-    assert calls == []
+    query = (f"{benchmark_comment.API}/repos/discopy/discopy/pulls"
+             "?head=someone:a-branch&state=open")
+    assert calls == ([query] if fork else [])
     assert capsys.readouterr().out == (
         "::notice::Skipping a comparison for a retargeted pull request.\n")
 

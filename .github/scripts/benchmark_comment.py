@@ -125,14 +125,15 @@ def unattested(data, run, open_pulls):
     return None
 
 
-def retargeted(data, run):
-    """Whether the pull request was retargeted while the run ran: a run
-    from this repository lists it on the base it has now, not on the one
-    whose merge base the benchmark measured. That comparison is not
-    posted, and the next run of the pull request posts its own."""
+def retargeted(data, run, open_pulls):
+    """Whether the pull request was retargeted while the run ran: the run,
+    or for a fork the open pull requests for its head, list it on the base
+    it has now, not on the one whose merge base the benchmark measured.
+    That comparison is not posted, and the next run of the pull request
+    posts its own."""
     return any(candidate["number"] == data["pull_request"]
                and candidate["base"]["sha"] != data["base"]
-               for candidate in run.get("pull_requests") or [])
+               for candidate in run.get("pull_requests") or open_pulls)
 
 
 def sanitised(report):
@@ -213,7 +214,7 @@ def main():
         repository, run)
     if reason := unattested(data, run, open_pulls):
         fail(reason)
-    if retargeted(data, run):
+    if retargeted(data, run, open_pulls):
         print("::notice::Skipping a comparison for a retargeted pull request.")
         return
     pull = call(f"{API}/repos/{repository}/pulls/{data['pull_request']}")
