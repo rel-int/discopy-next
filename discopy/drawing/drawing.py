@@ -270,6 +270,7 @@ class Drawing(TracedCategory["monoidal.Ty", "Drawing"], RichDisplay):
             tensor
             dagger
             bubble
+            bracket
             frame
     """
     inside: PlaneGraph
@@ -283,6 +284,14 @@ class Drawing(TracedCategory["monoidal.Ty", "Drawing"], RichDisplay):
     nodes = property(lambda self: self.graph.nodes)
     edges = property(lambda self: self.graph.edges)
     positions = property(lambda self: self.inside.positions)
+
+    bracketing = False
+    """
+    Whether the drawing is that of a compound term, i.e. of an operation,
+    which an operation drawing it as one of its operands puts in a
+    :meth:`bracket`, see :mod:`discopy.drawing.bracketing`. A drawing is
+    that of a value by default: it is never bracketed.
+    """
 
     yanking = TracedCategory.yanking.inapplicable(
         messages.PLANAR_YANKING)
@@ -875,6 +884,7 @@ which to_drawing recomputes.
             :align: center
         """
         assert_iscomposable(self, other)
+        self, other = self.operand(), other.operand()
         for side, rest in [(self, other), (other, self)]:
             if side.is_identity and side.height <= 1:
                 result = rest.relabel_nodes()
@@ -970,6 +980,7 @@ which to_drawing recomputes.
         .. image:: /_static/drawing/tensor.svg
             :align: center
         """
+        self, other = self.operand(), other.operand()
         if self.is_empty:
             return other.relabel_nodes()
         if other.is_empty:
@@ -996,7 +1007,8 @@ which to_drawing recomputes.
         if n == 0:
             return self
         if n > 1:
-            return self.trace(left=left).trace(n=n - 1, left=left)
+            return self.operand().trace(left=left).trace(n=n - 1, left=left)
+        self = self.operand()
         dom = self.dom[1:] if left else self.dom[:-1]
         cod = self.cod[1:] if left else self.cod[:-1]
         traced_dom = self.dom[:1] if left else self.dom[-1:]
@@ -1137,7 +1149,8 @@ which to_drawing recomputes.
         return result
 
     def bubble(self, dom=None, cod=None, name=None, width=None, height=None,
-               draw_as_square=False, frame_sides=False) -> Drawing:
+               draw_as_square=False, frame_sides=False,
+               draw_as_bracket=False) -> Drawing:
         """
         Draw a closed line around a drawing, with some wires coming in and out.
 
@@ -1154,6 +1167,8 @@ which to_drawing recomputes.
                 the regions they separate show the edge in their place. A
                 bubble drawn as a square has no such colours, so it keeps its
                 sides.
+            draw_as_bracket : Whether to draw the closed line dotted, as a
+                square, see :meth:`bracket`.
 
         >>> from discopy.symmetric import *
         >>> a, b, c, d = map(Ty, "abcd")
@@ -1176,12 +1191,15 @@ which to_drawing recomputes.
         if frame_sides:
             left.inside[0].frame_boundary = right.inside[0].frame_boundary \
                 = True
-        if draw_as_square or not wires_can_go_straight:
+        left.inside[0].draw_as_bracket = right.inside[0].draw_as_bracket\
+            = draw_as_bracket
+        if draw_as_square or draw_as_bracket or not wires_can_go_straight:
             top = Drawing.frame_opening(dom, arg_dom, left, right)
             bot = Drawing.frame_closing(arg_cod, cod, left, right)
         else:
             top = Drawing.bubble_opening(dom, arg_dom, left, right)
             bot = Drawing.bubble_closing(arg_cod, cod, left, right)
+        top.box.draw_as_bracket = bot.box.draw_as_bracket = draw_as_bracket
         middle = self if height is None else self.stretch(height - self.height)
         result = top >> left @ middle @ right >> bot
         result.make_space(-0.25, 0.25, exclusive=True)
@@ -1213,6 +1231,49 @@ which to_drawing recomputes.
             result.graph.remove_edges_from([(x, node) for x in arg_cod_nodes])
             result.graph.remove_edges_from([(node, x) for x in cod_nodes])
         return result
+
+    def bracket(self, name=None, dom=None, cod=None) -> Drawing:
+        """
+        Draw a dotted square around a drawing, the bracket that says it is
+        one operand, labelled with ``name`` on the top left if given.
+
+        It is a :meth:`bubble` drawn as a square whose top and bottom are
+        squeezed onto those of the drawing inside, so that a bracket adds
+        half a unit of height, and a wire that crosses it is labelled on one
+        side only.
+
+        Parameters:
+            name (str) : The label of the bracket, drawn on the top left.
+            dom (monoidal.Ty) : The wires coming into the bracket, those
+                coming into the drawing by default.
+            cod (monoidal.Ty) : The wires coming out of the bracket, those
+                coming out of the drawing by default.
+
+        >>> from discopy.monoidal import Ty, Box
+        >>> x, y, z = map(Ty, "xyz")
+        >>> f, g = Box('f', x, y).to_drawing(), Box('g', y, z).to_drawing()
+        >>> (f >> g).bracket().draw(
+        ...     doctest="docs/_static/drawing/bracket.svg")
+
+        .. image:: /_static/drawing/bracket.svg
+            :align: center
+        """
+        result = self.relabel_nodes().bubble(
+            dom, cod, name, draw_as_bracket=True)
+        top = result.height - 0.25
+        result = result.relabel_nodes(positions={
+            n: p.shift(y=-0.25 * ((p.y >= 0.5) + (p.y >= top)))
+            for n, p in result.positions.items()})
+        result.height -= 0.5
+        return result
+
+    def operand(self) -> Drawing:
+        """
+        The drawing as the operand of an operation: in a :meth:`bracket` when
+        it is the drawing of a compound term, see :attr:`bracketing`, as it
+        is otherwise.
+        """
+        return self.bracket() if self.bracketing else self
 
     def slot(self, colour, **params):
         """

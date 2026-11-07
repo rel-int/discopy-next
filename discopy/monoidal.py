@@ -604,8 +604,9 @@ class Ty(cat.Ob, cat.FreeCategory, ColouredMonoid):
             Wire(str(x), getattr(x, 'dom', None), getattr(x, 'cod', None))
             for x in self.inside))
         for new, old in zip(result.inside, self.inside):
-            if getattr(old, "frame_boundary", False):
-                new.frame_boundary = True
+            for flag in ("frame_boundary", "draw_as_bracket"):
+                if getattr(old, flag, False):
+                    setattr(new, flag, True)
             for attr, default in (
                     WIRE_DRAWING_ATTRIBUTES | COLOUR_DRAWING_ATTRIBUTES
             ).items():
