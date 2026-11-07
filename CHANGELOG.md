@@ -294,6 +294,10 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   while a delayed bubble, circuit bubble or `ehypergraph.Join` keeps its args
   and carries a `time_step` of its own on a delayed boundary, so
   `f.bubble().delay() != f.delay().bubble()` ([next#445]).
+- A tensor or circuit box, and so a tensor bubble, counts its `time_step` in
+  `==` and `hash`, as a feedback box does: for circuit types,
+  `Box('f', x, y).delay() != Box('f', x.d, y.d)`, where they used to compare
+  equal though their resets differ ([next#445]).
 - `CMap.loops` are stored sorted by `repr`, so maps compare their loops as a
   multiset: `Diagram.to_map()` is the fold of `then` and `CMap.dagger` is
   contravariant on maps with loops ([next#445]).
