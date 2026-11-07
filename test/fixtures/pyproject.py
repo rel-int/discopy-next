@@ -13,13 +13,19 @@ EXTRAS = PYPROJECT["project"]["optional-dependencies"]
 GROUPS = PYPROJECT["dependency-groups"]
 
 
-def installs(extras, extra):
-    """The names an extra installs, with those of the extras it includes."""
+def installs(table, name, extras=EXTRAS):
+    """The names the extra or dependency group ``name`` of ``table`` installs,
+    with those of the groups it includes and of the ``extras`` of discopy it
+    requires."""
     names = set()
-    for requirement in map(Requirement, extras[extra]):
+    for entry in table[name]:
+        if isinstance(entry, dict):
+            names |= installs(table, entry["include-group"], extras)
+            continue
+        requirement = Requirement(entry)
         if requirement.name == "discopy":
-            names = names.union(
-                *(installs(extras, name) for name in requirement.extras))
+            names = names.union(*(installs(extras, extra, extras)
+                                  for extra in requirement.extras))
         else:
             names.add(requirement.name)
     return names

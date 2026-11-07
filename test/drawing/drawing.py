@@ -8,7 +8,7 @@ from discopy.config import DRAWING_DEFAULT
 from discopy.compact import *
 from discopy.drawing import *
 from discopy import config, monoidal
-from fixtures.pyproject import EXTRAS, installs
+from fixtures.pyproject import EXTRAS, GROUPS, installs
 
 TIKZ_FOLDER = 'test/drawing/tikz/'
 
@@ -802,7 +802,14 @@ def test_the_test_extra_installs_the_widget():
 def test_installs_reads_any_spelling_of_a_requirement():
     extras = {"test": ["discopy[a, b]", "pytest"],
               "a": ["anywidget >= 0.9"], "b": []}
-    assert installs(extras, "test") == {"anywidget", "pytest"}
+    assert installs(extras, "test", extras) == {"anywidget", "pytest"}
+
+
+def test_installs_reads_the_groups_a_group_includes():
+    """The all group, which CI syncs, includes the other groups, and these
+    require the extras of discopy that share their names."""
+    assert installs(GROUPS, "dev") | installs(EXTRAS, "docs") <= installs(
+        GROUPS, "all")
 
 
 RIBBON_COLOURS = ("red", "green", "blue", "yellow")
