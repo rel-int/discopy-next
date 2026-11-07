@@ -118,6 +118,19 @@ def test_join():
         Join(f, Box('k', x, x @ x), dom=x, cod=x)
 
 
+def test_join_delays_as_a_bubble():
+    from discopy import ehypergraph, feedback, markov
+    join = Join(f, g)
+    delayed = join.delay()
+    assert delayed.args == (f, g) and (delayed.dom, delayed.cod) == (x.d, x.d)
+    assert delayed.reset() == join and str(delayed) == "Join(f, g).d"
+    assert loads(dumps(delayed)) == delayed
+    assert eval(repr(delayed), dict(
+        ehypergraph=ehypergraph, feedback=feedback, markov=markov)) == delayed
+    assert distribute(delayed) == distribute(join).delay() == f.d + g.d
+    assert distribute((join >> h).delay()) == distribute(join >> h).delay()
+
+
 def test_nodes_hashcons():
     two, times = Box('2', Ty(), x), Box('*', x @ x, x)
     graph = Markov.from_diagram(two @ two >> times)

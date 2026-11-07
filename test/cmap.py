@@ -991,6 +991,25 @@ def test_from_glued_loops():
     assert two.loops == (x, y)
 
 
+def test_loops_are_a_multiset():
+    from discopy.compact import Ty, Box, Cup, Cap, Diagram, CMap as M
+    x, y = map(Ty, "xy")
+    assert M(Ty(), Ty(), (), (), loops=(y, x, y)).loops == (x, y, y)
+    a, b = (M.caps(t.r, t) >> M.cups(t.r, t) for t in (x, y))
+    assert a @ b == b @ a and hash(a @ b) == hash(b @ a)
+    f, g = Box("f", x, x).to_map() @ a, Box("g", x, x).to_map() @ b
+    assert (f >> g).dagger() == g.dagger() >> f.dagger()
+    nested = Cap(x.r, x) >> x.r @ Cap(y.r, y) @ x\
+        >> x.r @ Cup(y.r, y) @ x >> Cup(x.r, x)
+    assert nested.to_map() == M.functor(
+        ob_map=lambda typ: typ, ar_map=M.from_box,
+        dom=Diagram, cod=M)(nested)
+    loop = Cap(x.r, x) >> Cup(x.r, x)
+    h = Box("h", x, x)
+    two = h >> loop @ x >> h >> Cap(y.r, y) @ x >> Cup(y.r, y) @ x
+    assert two.dagger().to_map() == two.to_map().dagger()
+
+
 def test_logical_order():
     from discopy.compact import CMap as M
     assert M.logical_order(2, 3) == (0, 1, 4, 3, 2)

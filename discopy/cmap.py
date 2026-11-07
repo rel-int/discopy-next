@@ -179,7 +179,9 @@ class CMap[category](
         cod : The codomain of the map.
         boxes : The boxes inside the map.
         edges : A fixpoint-free involution on ports.
-        loops : The types of closed wire components with no ports.
+        loops : The types of closed wire components with no ports, a
+            multiset stored sorted by ``repr``, so that maps compare their
+            loops whatever order they closed in.
         check : Whether to :meth:`validate` the involution and the wire types.
 
     Example
@@ -247,7 +249,7 @@ class CMap[category](
         for loop in loops:
             assert_isatomic(loop, self.category.ob)
         self.dom, self.cod, self.boxes = dom, cod, tuple(boxes)
-        self.loops = tuple(loops)
+        self.loops = tuple(sorted(loops, key=repr))
 
         self.edges = Permutation(edges, self.n_ports)
         if check:

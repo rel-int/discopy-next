@@ -1203,15 +1203,6 @@ class Scalar(Parametrized):
         return super().__repr__()[:-1] + name + (
             ', is_mixed=True' if self.is_mixed else '') + time_step + ')'
 
-    def setoid(self):
-        """
-        A scalar and its delay differ only by their time step, as the delay
-        of an empty boundary is itself.
-
-        >>> assert scalar(2).delay() != scalar(2) == scalar(2).d.delay(-1)
-        """
-        return super().setoid() + (self.time_step, )
-
     def delay(self, n_steps=1):
         return type(self)(
             self.data, self.name, self.is_mixed, self.time_step + n_steps)

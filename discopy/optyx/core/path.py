@@ -59,7 +59,7 @@ evaluating the permanent of the underlying matrix:
 ... dom=1, cod=3).array)
 >>> left = Create(1, 1) >> BS.get_kraus() >> Select(2, 0)
 >>> left.to_path().prob()
-Probabilities[complex]([0.5+0.j], dom=1, cod=1)
+Probabilities[complex]([0.5+0.j], dom=Nat(1), cod=Nat(1))
 
 We can also show the Hong-Ou-Mandel effect by
 using the rules of the :class:`path` calculus:
@@ -190,7 +190,7 @@ class Matrix(underlying.Matrix):
     >>> array = np.array([[1, 1], [1, 0]])
     >>> matrix = Matrix(array, 1, 1, creations=(1,), selections=(1,))
     >>> matrix.eval(3)
-    Amplitudes([3.+0.j], dom=1, cod=1)
+    Amplitudes([3.+0.j], dom=Nat(1), cod=Nat(1))
     >>> num_op = Split(2) >> Select() @ Id(1) >> Create() @ Id(1) >> Merge(2)
     >>> assert np.allclose(num_op.to_path().eval(4).array,
     ...                    matrix.eval(4).array)
@@ -517,7 +517,7 @@ class Amplitudes(underlying.Matrix):
     >>> from discopy.optyx.photonic import BS
     >>> BS.get_kraus().to_path().eval(1)
     Amplitudes([0.    +0.70710678j, 0.70710678+0.j    , 0.70710678+0.j    ,
-     0.    +0.70710678j], dom=2, cod=2)
+     0.    +0.70710678j], dom=Nat(2), cod=Nat(2))
     >>> assert isinstance(BS.get_kraus().to_path().eval(2), Amplitudes)
     >>> assert np.allclose((BS.get_kraus() >> Select(1) @ \\
     ... Id(1)).to_path().eval(2).array,\\
@@ -539,10 +539,14 @@ class Probabilities(underlying.Matrix):
     -------
     >>> from discopy.optyx.core.zw import Create
     >>> from discopy.optyx.photonic import BS
-    >>> BS.get_kraus().to_path().prob(1).round(1)
-    Probabilities[complex]([0.5+0.j, 0.5+0.j, 0.5+0.j, 0.5+0.j], dom=2, cod=2)
-    >>> (Create(1, 1) >> BS.get_kraus()).to_path().prob().round(1)
-    Probabilities[complex]([0.5+0.j, 0. +0.j, 0.5+0.j], dom=1, cod=3)
+    >>> probabilities = BS.get_kraus().to_path().prob(1).round(1)
+    >>> probabilities  # doctest: +NORMALIZE_WHITESPACE
+    Probabilities[complex]([0.5+0.j, 0.5+0.j, 0.5+0.j, 0.5+0.j],
+                           dom=Nat(2), cod=Nat(2))
+    >>> hom = (Create(1, 1) >> BS.get_kraus()).to_path()
+    >>> hom.prob().round(1)  # doctest: +NORMALIZE_WHITESPACE
+    Probabilities[complex]([0.5+0.j, 0. +0.j, 0.5+0.j],
+                           dom=Nat(1), cod=Nat(3))
     """
 
     dtype = float

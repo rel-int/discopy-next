@@ -152,7 +152,19 @@ def uncolour_state(state: dict) -> dict:
 
 
 class Wire(cat.Ob):
-    """A generating 1-cell with a colour on either side."""
+    """
+    A generating 1-cell with a colour on either side.
+
+    Its :meth:`dagger` is a generator of its own, the colours swapped and
+    printed with ``[::-1]``, as a daggered box is: equality and hashing count
+    ``is_dagger``, so that a functor, which sends the dagger of a wire to the
+    dagger of its image, sends equal wires to equal images.
+
+    >>> red, green = Colour('red'), Colour('green')
+    >>> x = Wire('x', red, green)
+    >>> assert x.dagger() != Wire('x', green, red) and x.dagger().dagger() == x
+    >>> assert str(x.dagger()) == "x[::-1]" and str(x) == "x"
+    """
 
     def __init__(self, name: str, dom: Colour | None = None,
                  cod: Colour | None = None, is_dagger: bool = False):
@@ -171,19 +183,48 @@ class Wire(cat.Ob):
         return type(self)(
             self.name, self.cod, self.dom, is_dagger=not self.is_dagger)
 
+    def __getitem__(self, key):
+        """
+        The dagger of a wire, written ``x[::-1]`` as for a box, so that the
+        string of a daggered wire reads back.
+
+        >>> x = Wire('x')
+        >>> assert eval(str(x.dagger())) == x.dagger() == x[::-1]
+        """
+        if key != slice(None, None, -1):
+            raise TypeError(messages.ONLY_REVERSED.format(
+                factory_name(type(self))))
+        return self.dagger()
+
     def __eq__(self, other):
         return type(self) is type(other) and (
-            self.name, self.dom, self.cod) == (
-                other.name, other.dom, other.cod)
+            self.name, self.dom, self.cod, self.is_dagger) == (
+                other.name, other.dom, other.cod, other.is_dagger)
 
     def __hash__(self):
-        return hash((type(self), self.name, self.dom, self.cod))
+        return hash(
+            (type(self), self.name, self.dom, self.cod, self.is_dagger))
+
+    def __lt__(self, other):
+        """
+        Wires are ordered by name, then by ``repr``, which tells apart two
+        unequal wires of one name, e.g. a wire and its dagger: of two unequal
+        wires, exactly one is less than the other.
+
+        >>> x = Wire('x')
+        >>> assert Wire('w') < x < x.dagger() and not x.dagger() < x
+        >>> assert x.dagger() > x and not x > x.dagger() and not x < x
+        """
+        return self != other\
+            and (self.name, repr(self)) < (other.name, repr(other))
 
     def __repr__(self):
         colours = "" if self.dom is None and self.cod is None\
             else f", dom={self.dom!r}, cod={self.cod!r}"
         dagger = ", is_dagger=True" if self.is_dagger else ""
         return f"{factory_name(type(self))}({self.name!r}{colours}{dagger})"
+
+    __str__ = cat.Box.__str__
 
     def to_tree(self):
         tree = super().to_tree()
@@ -508,17 +549,22 @@ class Ty(cat.Ob, cat.FreeCategory, ColouredMonoid):
 
     def __lt__(self, other):
         """
-        Types are totally ordered by length first, then lexicographically on
-        the objects inside, e.g. ``Ty('a') < Ty('b') < Ty('a', 'b')``. The
-        remaining comparisons are filled in by :func:`functools.total_ordering`
-        on the :class:`cat.Ob` base class.
+        Types are ordered by length first, then lexicographically on the
+        objects inside, e.g. ``Ty('a') < Ty('b') < Ty('a', 'b')``, then by
+        ``repr``, which tells apart the empty types of two colours: of two
+        unequal types, exactly one is less than the other. The remaining
+        comparisons are filled in by :func:`functools.total_ordering` on the
+        :class:`cat.Ob` base class.
 
         >>> x, y, z = map(Ty, "xyz")
         >>> assert sorted([z, x @ y, x, y]) == [x, y, z, x @ y]
+        >>> assert x < x[::-1] and x[::-1] > x and not x > x[::-1]
+        >>> assert Ty.id(Colour('green')) < Ty.id(Colour('red'))
         """
         assert_isinstance(other, Ty)
-        return (len(self.inside), self.inside)\
-            < (len(other.inside), other.inside)
+        return self != other\
+            and (len(self.inside), self.inside, repr(self))\
+            < (len(other.inside), other.inside, repr(other))
 
     def __setstate__(self, state):
         if 'inside' not in state and "_objects" in state:
@@ -657,9 +703,6 @@ class Nat(abc.Nat, Ty):  # ty: ignore[invalid-generic-class]
 
     def __repr__(self):
         return factory_name(type(self)) + f"({self.n})"
-
-    def __str__(self):
-        return f"Nat({self.n})"
 
     def __eq__(self, other):
         return isinstance(other, self.factory) and self.n == other.n
@@ -2151,6 +2194,34 @@ class Equation(cat.Equation, RichDisplay):
                  up_to=None):
         super().__init__(*terms, symbol=symbol, symbols=symbols, up_to=up_to)
         self.space = space
+
+    def __eq__(self, other):
+        """
+        Two equations of diagrams are equal when they are equal as
+        :class:`.cat.Equation` and have the same space between their terms.
+
+        >>> x = Ty('x')
+        >>> f = Box('f', x, x)
+        >>> assert Equation(f, f) == Equation(f, f) != Equation(f, f, space=2)
+        """
+        return super().__eq__(other) and self.space == other.space
+
+    __hash__ = cat.Equation.__hash__
+
+    def __repr__(self):
+        """
+        The representation of a :class:`.cat.Equation`, then the space
+        unless it is ``1``, after the terms if there are any.
+
+        >>> Equation(Ty(), Ty(), space=2)
+        monoidal.Equation(monoidal.Ty(), monoidal.Ty(), space=2)
+        >>> Equation(space=2)
+        monoidal.Equation(space=2)
+        """
+        if self.space == 1:
+            return super().__repr__()
+        comma = ", " if self.terms else ""
+        return f"{super().__repr__()[:-1]}{comma}space={self.space!r})"
 
     def to_tree(self) -> dict:
         """

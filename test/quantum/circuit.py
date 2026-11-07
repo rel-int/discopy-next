@@ -624,6 +624,17 @@ def test_feedback_is_the_trace():
     assert CX.feedback(mem=qubit) == CX.trace(mem=qubit)
 
 
+def test_delayed_bubbles_and_sums():
+    bubble = X.bubble()
+    delayed = bubble.delay()
+    assert delayed.args == (X, ) and delayed.reset() == bubble
+    assert np.allclose(delayed.eval().array, bubble.eval().array)
+    circuit = (X + Z) >> H
+    assert circuit.delay() == (X + Z).delay() >> H.delay()
+    assert (X + Z).delay() == X.delay() + Z.delay()
+    assert np.allclose(circuit.delay().eval().array, circuit.eval().array)
+
+
 def test_delay():
     from discopy.quantum import gates
     from discopy.utils import loads, dumps
