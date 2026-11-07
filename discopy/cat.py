@@ -1367,7 +1367,9 @@ class Transformation(Category[Functor, "Transformation"]):
         The identity transformation on a given functor ``dom``, i.e. the
         transformation whose component at each object ``x`` is the
         identity arrow on ``dom(x)``, with the shared
-        :func:`discopy.utils.identity` as its components.
+        :func:`discopy.utils.identity` as its components. A component is read
+        by calling the transformation, as ``alpha(x)``: ``components[x]`` is
+        what was given, i.e. ``x`` itself for the identity.
 
         Parameters:
             dom : The functor on which to take the identity transformation.
@@ -1379,7 +1381,7 @@ class Transformation(Category[Functor, "Transformation"]):
         >>> alpha = Transformation.id(F)
         >>> alpha(x)
         cat.Arrow.id(cat.Ob('y'))
-        >>> assert alpha(x) == F.cod.id(F(x))
+        >>> assert alpha(x) == F.cod.id(F(x)) and alpha.components[x] == x
         >>> assert Transformation.id(F) == Transformation.id(F)
         """
         return cls(identity, dom, dom)
