@@ -1,7 +1,7 @@
 % Node styles
-\tikzstyle{unit}=[fill={rgb,255: red,0; green,0; blue,0}]
-\tikzstyle{cap}=[fill={rgb,255: red,0; green,0; blue,0}]
-\tikzstyle{counit}=[fill={rgb,255: red,0; green,0; blue,0}]
-\tikzstyle{cup}=[fill={rgb,255: red,0; green,0; blue,0}]
+\tikzstyle{unit_black_circle}=[fill={rgb,255: red,0; green,0; blue,0}, shape=circle]
+\tikzstyle{cap_black_circle}=[fill={rgb,255: red,0; green,0; blue,0}, shape=circle]
+\tikzstyle{counit_black_circle}=[fill={rgb,255: red,0; green,0; blue,0}, shape=circle]
+\tikzstyle{cup_black_circle}=[fill={rgb,255: red,0; green,0; blue,0}, shape=circle]
 % Edge styles
 \tikzstyle{box}=[-, fill={rgb,255: red,255; green,255; blue,255}]

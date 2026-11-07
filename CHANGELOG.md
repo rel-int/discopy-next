@@ -250,6 +250,85 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 - `feedback.generators` is `feedback.structural_boxes`, and
   `feedback.wire_generators` `feedback.structural_wires`: a feedback, trace,
   head or tail is a structural box, not a generator ([next#459]).
+- `feedback.Head` and `Tail`, at every level of the hierarchy, now have a
+  dagger: `Head(f).dagger() == Head(f.dagger())`, and the same for `Tail`,
+  where they used to raise `TypeError` ([next#445]).
+- `kleisli.monad.sample` orders outcomes by the new `kleisli.monad.canonical`,
+  which sorts the elements of sets and the items of mappings first, so the same
+  seed draws the same outcome whatever `PYTHONHASHSEED` is, for outcomes built
+  from tuples, sets and mappings of values whose repr does not depend on
+  hashing and tells unequal values apart ([next#445]).
+- `draw`'s docstring and `config.DRAWING_DEFAULT["fontsize"]` say 10, the
+  size Matplotlib draws box, braket and wire labels at, and that value now
+  sets it; spider labels and the symbols of an `Equation` keep 12, under
+  `DRAWING_DEFAULT["fontsize_spiders"]`, so no drawing changes ([next#445]).
+- With `use_tikzstyles=True`, a spider's TikZ style is named after its
+  `tikzstyle_name`, fill and shape, e.g. `Z_green_circle`, and writes both:
+  spiders that differ in fill no longer share one style and its last colour
+  ([next#445]).
+- Rotation and controlled-rotation gates compare and hash their phase exactly,
+  and the repr of every parametrized gate prints its phase exactly, a complex,
+  a fraction or a large integer included, so `eval(repr(g)) == g`, while `str`
+  and drawings keep 3 significant digits: a dictionary or functor keyed on
+  `Rz(0.1231)` no longer maps `Rz(0.1234)` ([next#445]).
+- `classical.BitControlledGate` prints the call to its own constructor,
+  `BitControlledGate(gate, default)` with `is_dagger` and `classical` when
+  set, so `eval(repr(x)) == x` holds for it and its dagger. It keeps its
+  gates as `data`, with the identity standing for a default not given, so
+  two boxes with different gates differ. Before, it printed the private
+  `_BitControlledSingleBox` with `Channel`'s arguments and compared equal for
+  any gates of the same type ([next#445]).
+- Composing a `DualRail` with any functor but the identity, on either side and
+  at every level (balanced, symmetric, ribbon, compact), raises `AxiomError`
+  saying to apply them in turn, `E(D(f))`, set by a new `Functor.composes`
+  that is false on `DualRail`: `D >> F` used to raise an unrelated `TypeError`,
+  and `F >> D` returned a functor that disagreed with `D(F(-))` on cups and
+  raised on twists, braids and swaps ([next#445]).
+- `monoidal.Wire` equality and hash count `is_dagger`, and a daggered wire
+  prints with `[::-1]` as a daggered box does: `Ty('x')[::-1] != Ty('x')`,
+  a reversed coloured wire no longer equals a fresh one with its colours
+  swapped, and a wire and its dagger, which a functor may send to different
+  images, have different heads and tails. Wires and types break ties in
+  their order by `repr`, so of two unequal types exactly one is less than
+  the other ([next#445]).
+- A bubble's `data` is part of its identity, as a box's is: bubbles that
+  differ only in `data` are unequal, and `str` prints the `data` so that
+  `eval(str(b)) == b` still holds. As for a box, a bubble holding unhashable
+  `data` is unhashable, and comparing bubbles whose `data` are arrays of more
+  than one entry raises `ValueError`, except at the tensor level, where a
+  bubble compares array and list `data` by their entries ([next#445]).
+- `cat.Transformation.id` has the shared `utils.identity` as its components,
+  and `then` drops it on either side and composes components given by a
+  dictionary into a dictionary, so that the identity is a unit and composition
+  is associative up to `==`, as for `cat.Functor` ([next#445]).
+- `Equation` compares by value: `==` compares type, terms, symbols, space and
+  `up_to`, a callable `up_to` by identity, and its hash agrees, so an equation
+  is hashable when its terms are; its repr prints the symbols unless they are
+  all `=`, and a `monoidal.Equation`'s space unless it is 1, so that
+  `eval(repr(e)) == e` unless `e` has an `up_to` of its own ([next#445]).
+- A law declared `failing` raises `AxiomFailure` only when its equation is
+  false or its terms refuse to build, and returns the equation otherwise: a
+  law fixed under its declaration XPASSes in the property matrix, and
+  `falsify()` returns a real counterexample ([next#445]).
+- A non-element on the left of a monoid's `@` raises `TypeError`, as one on
+  the right does: `Monoid.whisker` takes elements only, so `'x' @ Nat(2)` and
+  `None @ List[int](2)` no longer give back the element ([next#445]).
+- `abc.Nat` prints as `Nat(2)` rather than `2`, as `monoidal.Nat` does, so
+  `eval(str(n)) == n` holds on the nose; a `Matrix` prints its boundaries as
+  `dom=Nat(2), cod=Nat(2)`, so reading its repr back needs `Nat` in scope, as
+  `Matrix.environment()` gives ([next#445]).
+- Delaying a `Sum` or a `Bubble` works wherever delaying a box does: delay
+  distributes over a sum, so `(f + g).delay() == f.delay() + g.delay()`,
+  while a delayed bubble, circuit bubble or `ehypergraph.Join` keeps its args
+  and carries a `time_step` of its own on a delayed boundary, so
+  `f.bubble().delay() != f.delay().bubble()` ([next#445]).
+- A tensor or circuit box, and so a tensor bubble, counts its `time_step` in
+  `==` and `hash`, as a feedback box does: for circuit types,
+  `Box('f', x, y).delay() != Box('f', x.d, y.d)`, where they used to compare
+  equal though their resets differ ([next#445]).
+- `CMap.loops` are stored sorted by `repr`, so maps compare their loops as a
+  multiset: `Diagram.to_map()` is the fold of `then` and `CMap.dagger` is
+  contravariant on maps with loops ([next#445]).
 
 ### Deprecated
 
@@ -1181,6 +1260,26 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 - `docs/export_notebooks.py` fails when any named notebook matches nothing,
   naming it, instead of silently checking only the names that match
   ([next#445]).
+- The `shared` Hypothesis profile replays the example database of the
+  repository `HYPOTHESIS_GITHUB_REPOSITORY` names, `discopy/discopy` unless
+  set; CONTRIBUTING.md shows a local run setting it to `rel-int/discopy-next`,
+  which replays the database this repo's `proptest` workflow uploads
+  ([next#445]).
+- The `docs` extra installs `discopy[optyx]` and the `notebooks` extra joblib,
+  so with the `docs` group 13 of the 15 optyx notebooks render instead of
+  falling back to link pages, the other two being `KNOWN_BROKEN`; the docs
+  job's timeout rises to 45 minutes for them. The `dev` group installs
+  egglog, so the 40 egglog checks of `test/ehypergraph.py` and its fixture
+  run instead of skipping ([next#445]).
+- `benchmark_comment.py` skips a pull request retargeted while its benchmark
+  ran, with a `::notice::`, and exits 0, instead of failing the job as a run
+  that does not belong to it, or, for a pull request from a fork, posting the
+  comparison against its old base; the next run posts ([next#445]).
+- `project.license` is the SPDX expression `BSD-3-Clause AND Apache-2.0`, and
+  `project.license-files` lists `LICENSE`, `discopy/optyx/LICENSE` and
+  `discopy/optyx/NOTICE`, replacing the TOML table setuptools deprecates: the
+  built wheel and sdist carry `License-Expression` and all three
+  `License-File`s ([next#445]).
 
 ## [1.2.2] - 2025-12-19
 
