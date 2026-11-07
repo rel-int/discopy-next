@@ -1174,6 +1174,17 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 - The label of a box or a braket coloured `config.TRANSPARENT` is drawn black
   and turns white on a dark page, where it used to be drawn white, invisible on
   a light one ([next#445]).
+- `Hypergraph.make_bijective`, `make_left_monogamous` and
+  `make_right_monogamous` insert every box they need in one pass, where each
+  rebuilt and re-validated the whole hypergraph once per box: a hypergraph
+  with 128 spiders to fix goes from 1.1 s to 0.012 s, and one with more of
+  them than the recursion limit allows no longer raises `RecursionError`
+  ([next#445]).
+- `Hypergraph.make_left_monogamous` reads the legs of each merge in port
+  order, as `make_right_monogamous` already did, where it read them in the
+  iteration order of a `set` of port indices, so the wires, `==` and `repr` of
+  an affected hypergraph can change — the merge of a commutative monoid is
+  symmetric, so what it evaluates to does not ([next#445]).
 
 ### Project
 
