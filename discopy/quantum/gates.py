@@ -52,6 +52,7 @@ Summary
 """
 import copy
 import math
+import numbers
 from collections.abc import Sized
 from math import e, pi
 
@@ -68,15 +69,32 @@ from discopy.utils import factory_name, assert_isinstance, from_tree
 def format_number(data, exact=False):
     """
     Tries to format a number, to three significant digits or else exactly,
-    i.e. the shortest string that reads back as the same float.
+    i.e. the representation of the number a box compares: a scalar of an
+    array backend is read as the Python number it holds, and a real number
+    that is not rational, such as a :code:`sympy.Float`, prints as the float
+    it equals, if one does, i.e. the shortest string that reads back to it.
 
     >>> format_number(0.123456), format_number(0.123456, exact=True)
     ('0.123', '0.123456')
+    >>> import numpy as np
+    >>> from fractions import Fraction
+    >>> format_number(np.exp(.5j), exact=True)
+    '(0.8775825618903728+0.479425538604203j)'
+    >>> format_number(Fraction(1, 3), exact=True)
+    'Fraction(1, 3)'
+    >>> format_number(2 ** 53 + 1, exact=True)
+    '9007199254740993'
     """
     try:
-        return repr(float(data)) if exact else f'{data:.3g}'
+        if not exact:
+            return f'{data:.3g}'
+        number = getattr(data, "tolist", lambda: data)()
     except TypeError:
         return data
+    inexact = isinstance(number, numbers.Real)\
+        and not isinstance(number, numbers.Rational)
+    return repr(float(number) if inexact and float(number) == number
+                else number)
 
 
 class SelfConjugate(Box):

@@ -7,6 +7,8 @@ own, and where the tree does not hold what its constructor reads, a
 :code:`to_tree` to put it there (discopy/discopy#780).
 """
 
+from fractions import Fraction
+
 import numpy
 from pytest import importorskip, mark, raises
 
@@ -118,6 +120,48 @@ def test_Parametrized_compares_its_phase_exactly(gate):
     assert first != second and first >> Id(first.cod) != second
     assert len({first, second}) == 2 and {first: 0}.get(second) is None
     assert first == gate(.1231) and hash(first) == hash(gate(.1231))
+
+
+@mark.parametrize("gate", [
+    Rz(Fraction(1, 3)), CRz(2 ** 53 + 1), Scalar(numpy.exp(1j * numpy.pi / 3)),
+    MixedScalar(numpy.complex128(.5 + .5j)), Rx(numpy.float32(.1))])
+def test_Parametrized_repr_reads_back_its_phase(gate):
+    """
+    The :code:`repr` of a gate prints the number its phase is, not the float
+    nearest to it: a fraction, an integer past the precision of a float, the
+    imaginary part of a numpy complex, each reads back to an equal gate, and
+    a numpy scalar prints as the Python number it holds.
+    """
+    environment = dict(Circuit.environment(), Fraction=Fraction)
+    copy = eval(repr(gate), environment)
+    assert copy == gate and hash(copy) == hash(gate)
+
+
+def test_Parametrized_repr_reads_back_a_sympy_float():
+    """
+    A substitution that goes through :code:`sympy.subs`, for a key that is
+    not a symbol or a value that is a sympy number, leaves a sympy float,
+    which prints as the float it equals, not as sympy's fifteen digits.
+    """
+    sympy = importorskip("sympy")
+    theta, phi = sympy.IndexedBase("theta"), sympy.Symbol("phi")
+    x = 0.6369616873214543
+    for gate in (Rx(theta[0]).subs(theta[0], x), CRz(phi).subs(
+            phi, sympy.Float(x)), Scalar(phi).subs(phi, sympy.Float(1 / 3))):
+        assert isinstance(gate.data, sympy.Float)
+        copy = eval(repr(gate), Circuit.environment())
+        assert copy == gate and hash(copy) == hash(gate)
+
+
+def test_Parametrized_repr_prints_a_traced_phase():
+    """
+    A phase that cannot be read as a number, such as a jax tracer under
+    :code:`jax.grad`, prints as itself rather than raising.
+    """
+    jax = importorskip("jax")
+    reprs = []
+    jax.grad(lambda x: (reprs.append(repr(Rz(x))), x * 2.)[1])(.5)
+    assert reprs[0].startswith("quantum.gates.Rz(") and "Tracer" in reprs[0]
 
 
 def test_Rotation_is_given_by_its_class():
