@@ -1182,7 +1182,9 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   ([next#445]).
 - `Hypergraph.make_left_monogamous` reads the legs of each merge in port
   order, as `make_right_monogamous` already did, where it read them in the
-  iteration order of a `set` of port indices ([next#445]).
+  iteration order of a `set` of port indices, so the wires, `==` and `repr` of
+  an affected hypergraph can change — the merge of a commutative monoid is
+  symmetric, so what it evaluates to does not ([next#445]).
 
 ### Project
 
