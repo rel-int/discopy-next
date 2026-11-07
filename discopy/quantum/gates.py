@@ -52,6 +52,7 @@ Summary
 """
 import copy
 import math
+import numbers
 from collections.abc import Sized
 from math import e, pi
 
@@ -65,12 +66,35 @@ from discopy.tensor import backend
 from discopy.utils import factory_name, assert_isinstance, from_tree
 
 
-def format_number(data):
-    """ Tries to format a number. """
+def format_number(data, exact=False):
+    """
+    Tries to format a number, to three significant digits or else exactly,
+    i.e. the representation of the number a box compares: a scalar of an
+    array backend is read as the Python number it holds, and a real number
+    that is not rational, such as a :code:`sympy.Float`, prints as the float
+    it equals, if one does, i.e. the shortest string that reads back to it.
+
+    >>> format_number(0.123456), format_number(0.123456, exact=True)
+    ('0.123', '0.123456')
+    >>> import numpy as np
+    >>> from fractions import Fraction
+    >>> format_number(np.exp(.5j), exact=True)
+    '(0.8775825618903728+0.479425538604203j)'
+    >>> format_number(Fraction(1, 3), exact=True)
+    'Fraction(1, 3)'
+    >>> format_number(2 ** 53 + 1, exact=True)
+    '9007199254740993'
+    """
     try:
-        return f'{data:.3g}'
+        if not exact:
+            return f'{data:.3g}'
+        number = getattr(data, "tolist", lambda: data)()
     except TypeError:
         return data
+    inexact = isinstance(number, numbers.Real)\
+        and not isinstance(number, numbers.Rational)
+    return repr(float(number) if inexact and float(number) == number
+                else number)
 
 
 class SelfConjugate(Box):
@@ -769,7 +793,7 @@ class Controlled(QuantumGate):
         """
         The constructor call of a controlled gate with its module, the same
         for a subclass such as :class:`CRz`, which is equal to the gate it
-        abbreviates and so hashes the same.
+        abbreviates.
 
         >>> from discopy.quantum.circuit import Circuit
         >>> assert eval(repr(CX), Circuit.environment()) == CX
@@ -778,15 +802,22 @@ class Controlled(QuantumGate):
         return factory_name(Controlled)\
             + f'({self.controlled!r}, distance={self.distance!r})'
 
+    def setoid(self):
+        """
+        A controlled gate is given by the gate it controls and its distance,
+        not by its class, so that a subclass such as :class:`CRz` equals and
+        hashes the same as the gate it abbreviates, its phase compared
+        exactly.
+
+        >>> assert CRz(.5) == Controlled(Rz(.5))
+        >>> assert hash(CRz(.5)) == hash(Controlled(Rz(.5)))
+        >>> assert CRz(.1231) != Controlled(Rz(.1234))
+        """
+        return Controlled, self.controlled.setoid(), self.distance
+
     def __str__(self):
         return self.name + str_delayed(self.time_step) if self.distance == 1\
             else f'Controlled({self.controlled}, distance={self.distance})'
-
-    def __eq__(self, other):
-        return not isinstance(other, Box) and super().__eq__(other)\
-            or isinstance(other, Controlled)\
-            and self.distance == other.distance\
-            and self.controlled == other.controlled
 
     def to_tree(self) -> dict:
         return dict(controlled=self.controlled.to_tree(),
@@ -798,7 +829,7 @@ class Controlled(QuantumGate):
         Reads back through :class:`Controlled` rather than through ``cls``: a
         subclass such as :class:`CRz` takes the phase of the rotation it
         controls where :class:`Controlled` takes the gate itself, and
-        :meth:`__eq__` compares the gate and the distance rather than the
+        :meth:`setoid` compares the gate and the distance rather than the
         class, so the two are equal.
 
         >>> assert from_tree(CRz(.25).to_tree()) == CRz(.25)
@@ -809,8 +840,6 @@ class Controlled(QuantumGate):
     @property
     def phase(self):
         return self.controlled.phase
-
-    __hash__ = QuantumGate.__hash__
 
     def _decompose_grad(self):
         if self.time_step:
@@ -950,7 +979,8 @@ class Parametrized(Box):
             + str_delayed(self.time_step)
 
     def __repr__(self):
-        return factory_name(type(self)) + f"({format_number(self.data)})"
+        return factory_name(type(self))\
+            + f"({format_number(self.data, exact=True)})"
 
 
 class Rotation(Parametrized, QuantumGate):
@@ -1000,6 +1030,21 @@ class Rotation(Parametrized, QuantumGate):
     def __repr__(self):
         time_step = f", time_step={self.time_step}" if self.time_step else ""
         return super().__repr__()[:-1] + time_step + ")"
+
+    def setoid(self):
+        """
+        A rotation is given by its class, as a :class:`discopy.cat.Box` is,
+        and by the attributes of a :class:`discopy.tensor.Box`, its phase
+        compared exactly, as its representation prints it: only its string
+        rounds it, for display.
+
+        >>> from discopy.quantum.circuit import Box
+        >>> assert str(Rz(.1231)) == str(Rz(.1234)) == 'Rz(0.123)'
+        >>> assert repr(Rz(.1231)) == 'quantum.gates.Rz(0.1231)'
+        >>> assert Rz(.1231) != Rz(.1234) and len({Rz(.25), Rz(.25)}) == 1
+        >>> assert Rz(.5) != Box('Rz', qubit, qubit, data=.5)
+        """
+        return (type(self), ) + Box.setoid(self)
 
     def grad(self, var, **params):
         if var not in self.free_symbols:
