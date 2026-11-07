@@ -1101,6 +1101,28 @@ def test_decoder():
             >> CMap[Tensor].swap(Dim(3), Dim(3))).to_diagram()\
         == Dim(3) @ t >> Tensor.swap(Dim(3), Dim(3))
 
+
+def test_Hypergraph_make_methods_insert_in_one_pass(monkeypatch):
+    """
+    However many boxes they insert, the ``make_*`` methods scan the wires and
+    the types of the result once, i.e. they build one hypergraph rather than
+    one per box, which also keeps them off the recursion limit.
+    """
+    for method, legs in [("make_bijective", (1, 2)),
+                         ("make_left_monogamous", (2, 3)),
+                         ("make_right_monogamous", (3, 2))]:
+        x = Ty('x')
+        graph = H.spiders(*legs, x)
+        for _ in range(9):
+            graph = graph @ H.spiders(*legs, x)
+        scans = []
+        monkeypatch.setattr(
+            H, "scan_types", lambda self: scans.append(self))
+        result = getattr(graph, method)()
+        monkeypatch.undo()
+        assert len(scans) == 1 and len(result.boxes) == 10
+
+
 def test_Hypergraph_make_left_monogamous_merges_in_port_order():
     """
     The legs of a merge read their ports in order, where they used to read
