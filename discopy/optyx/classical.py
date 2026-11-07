@@ -161,12 +161,21 @@ class BitControlledGate(Channel):
     the Kraus operators for the gate.
     """
     class _BitControlledSingleBox(Channel):
+        """
+        The box of a :class:`BitControlledGate`: it keeps its gate and its
+        default, the identity unless one is given, as its ``data``, so that
+        equality reads them, and prints the call to
+        :class:`BitControlledGate` that builds it.
+        """
         def __init__(
             self,
             control_gate,
             default_gate=None,
-            classical=False
+            classical=False,
+            is_dagger=False
         ):
+            if default_gate is None:
+                default_gate = control_gate.id(control_gate.dom)
             if isinstance(control_gate, (Diagram, Channel)):
                 assert control_gate.is_pure, \
                     "The input gates must be pure quantum channels"
@@ -191,23 +200,39 @@ class BitControlledGate(Channel):
                 default_gate_single
             )
 
+            dom = bit @ tp**len(control_gate_single.dom)
+            cod = tp**len(control_gate_single.cod)
             super().__init__(
                 "BitControlledGate",
-                kraus,
-                bit @ tp**len(control_gate_single.dom),
-                tp**len(control_gate_single.cod)
+                kraus.dagger() if is_dagger else kraus,
+                cod if is_dagger else dom,
+                dom if is_dagger else cod
             )
+            self.control_gate, self.default_gate = control_gate, default_gate
+            self.classical, self.is_dagger = classical, is_dagger
+            self.data = (control_gate, default_gate)
+
+        def __repr__(self):
+            dagger = ", is_dagger=True" if self.is_dagger else ""
+            classical = ", classical=True" if self.classical else ""
+            return f"{factory_name(BitControlledGate)}("\
+                f"{self.control_gate!r}, {self.default_gate!r}"\
+                f"{dagger}{classical})"
+
+        def dagger(self):
+            return type(self)(self.control_gate, self.default_gate,
+                              self.classical, not self.is_dagger)
+
+        @property
+        def free_symbols(self):
+            """ The symbols of its gates. """
+            return self.control_gate.free_symbols\
+                | self.default_gate.free_symbols
 
     def __new__(cls, diag, default_box=None, is_dagger=False, classical=False):
         if default_box is not None:
             return cls._BitControlledSingleBox(
-                diag, default_box, classical=classical
-            ).dagger() if is_dagger else \
-                 cls._BitControlledSingleBox(
-                    diag,
-                    default_box,
-                    classical=classical
-                )
+                diag, default_box, classical, is_dagger)
 
         boxes, staircases = [], diag.to_staircases()
         for i in range(len(staircases)):

@@ -1731,7 +1731,8 @@ class Box(cat.Box, Diagram):
     drawing_name : str, optional
         The name to use when drawing the box.
     tikzstyle_name : str, optional
-        The name of the style when tikzing the box.
+        The name a spider's TikZ style starts with, followed by its colour and
+        shape, e.g. :code:`"Z_green_circle"` for a green circle named "Z".
     color : str, optional
         The color to use when drawing the box, one of
         :code:`"transparent", "red", "green", "blue", "yellow", "black"` or any

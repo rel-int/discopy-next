@@ -36,6 +36,9 @@ jobs:
         ${{ github.event_name == 'pull_request' && 'pr' || 'explore' }}
       PYTEST_ADDOPTS: >-
         ${{ github.event_name == 'pull_request' && '--hypothesis-seed=0' || '' }}
+      # The repository whose example database the `shared` profile replays:
+      # this one, which uploads it below, rather than the default upstream.
+      HYPOTHESIS_GITHUB_REPOSITORY: rel-int/discopy-next
     steps:
     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       with:

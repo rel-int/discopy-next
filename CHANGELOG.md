@@ -250,6 +250,34 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 - `feedback.generators` is `feedback.structural_boxes`, and
   `feedback.wire_generators` `feedback.structural_wires`: a feedback, trace,
   head or tail is a structural box, not a generator ([next#459]).
+- `feedback.Head` and `Tail`, at every level of the hierarchy, now have a
+  dagger: `Head(f).dagger() == Head(f.dagger())`, and the same for `Tail`,
+  where they used to raise `TypeError` ([next#445]).
+- `kleisli.monad.sample` orders outcomes by the new `kleisli.monad.canonical`,
+  which sorts the elements of sets and the items of mappings first, so the same
+  seed draws the same outcome whatever `PYTHONHASHSEED` is, for outcomes built
+  from tuples, sets and mappings of values whose repr does not depend on
+  hashing and tells unequal values apart ([next#445]).
+- `draw`'s docstring and `config.DRAWING_DEFAULT["fontsize"]` say 10, the
+  size Matplotlib draws box, braket and wire labels at, and that value now
+  sets it; spider labels and the symbols of an `Equation` keep 12, under
+  `DRAWING_DEFAULT["fontsize_spiders"]`, so no drawing changes ([next#445]).
+- With `use_tikzstyles=True`, a spider's TikZ style is named after its
+  `tikzstyle_name`, fill and shape, e.g. `Z_green_circle`, and writes both:
+  spiders that differ in fill no longer share one style and its last colour
+  ([next#445]).
+- Rotation and controlled-rotation gates compare and hash their phase exactly,
+  and the repr of every parametrized gate prints its phase exactly, a complex,
+  a fraction or a large integer included, so `eval(repr(g)) == g`, while `str`
+  and drawings keep 3 significant digits: a dictionary or functor keyed on
+  `Rz(0.1231)` no longer maps `Rz(0.1234)` ([next#445]).
+- `classical.BitControlledGate` prints the call to its own constructor,
+  `BitControlledGate(gate, default)` with `is_dagger` and `classical` when
+  set, so `eval(repr(x)) == x` holds for it and its dagger. It keeps its
+  gates as `data`, with the identity standing for a default not given, so
+  two boxes with different gates differ. Before, it printed the private
+  `_BitControlledSingleBox` with `Channel`'s arguments and compared equal for
+  any gates of the same type ([next#445]).
 
 ### Deprecated
 
@@ -1171,6 +1199,26 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 - `docs/export_notebooks.py` fails when any named notebook matches nothing,
   naming it, instead of silently checking only the names that match
   ([next#445]).
+- The `shared` Hypothesis profile replays the example database of the
+  repository `HYPOTHESIS_GITHUB_REPOSITORY` names, `discopy/discopy` unless
+  set; CONTRIBUTING.md shows a local run setting it to `rel-int/discopy-next`,
+  which replays the database this repo's `proptest` workflow uploads
+  ([next#445]).
+- The `docs` extra installs `discopy[optyx]` and the `notebooks` extra joblib,
+  so with the `docs` group 13 of the 15 optyx notebooks render instead of
+  falling back to link pages, the other two being `KNOWN_BROKEN`; the docs
+  job's timeout rises to 45 minutes for them. The `dev` group installs
+  egglog, so the 40 egglog checks of `test/ehypergraph.py` and its fixture
+  run instead of skipping ([next#445]).
+- `benchmark_comment.py` skips a pull request retargeted while its benchmark
+  ran, with a `::notice::`, and exits 0, instead of failing the job as a run
+  that does not belong to it, or, for a pull request from a fork, posting the
+  comparison against its old base; the next run posts ([next#445]).
+- `project.license` is the SPDX expression `BSD-3-Clause AND Apache-2.0`, and
+  `project.license-files` lists `LICENSE`, `discopy/optyx/LICENSE` and
+  `discopy/optyx/NOTICE`, replacing the TOML table setuptools deprecates: the
+  built wheel and sdist carry `License-Expression` and all three
+  `License-File`s ([next#445]).
 
 ## [1.2.2] - 2025-12-19
 

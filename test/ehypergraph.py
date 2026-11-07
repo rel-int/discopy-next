@@ -15,6 +15,7 @@ from discopy.hypergraph import Hypergraph
 from discopy.markov import Ty, Box, Copy, Diagram, Functor, Swap
 from discopy.tensor import Dim, Tensor
 from discopy.utils import AxiomError, dumps, loads
+from fixtures.pyproject import GROUPS, installs
 
 x = Ty('x')
 f, g, h = Box('f', x, x), Box('g', x, x), Box('h', x, x)
@@ -659,6 +660,12 @@ def test_egglog_naive_sampling():
             functor(to_diagram(extracted, ["p"])).array, expected)
         assert np.allclose(functor(saturated(
             program, rules).extract().to_diagram()).array, expected)
+
+
+def test_the_dev_group_installs_egglog():
+    """ The egglog tests run, rather than skip, wherever ``uv sync`` installs
+    the dev group, its default. """
+    assert "egglog" in installs(GROUPS, "dev")
 
 
 def test_Join_dagger_flags():

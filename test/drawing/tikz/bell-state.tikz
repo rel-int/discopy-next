@@ -37,7 +37,7 @@
 \node [] (34) at (0.75, 0.75) {};
 \node [] (35) at (0.5, 0.25) {};
 \node [style=none, fill=white] (36) at (0.5, 0.5) {0};
-\node [style=H, scale=0.447] (37) at (0.5, 2.5) {};
+\node [style=H_yellow_circle, scale=0.447] (37) at (0.5, 2.5) {};
 \end{pgfonlayer}
 \begin{pgfonlayer}{edgelayer}
 \draw [style=box] (1.center) to (2.center) to (3.center) to (4.center) to (1.center);

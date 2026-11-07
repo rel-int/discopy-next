@@ -61,9 +61,9 @@ def draw(diagram, **params):
     nodesize : float, optional
         Node size for spiders and controlled gates.
     fontsize : int, optional
-        Font size for the boxes, default is :code:`12`.
+        Font size for the boxes, default is :code:`10`.
     fontsize_types : int, optional
-        Font size for the types, default is :code:`12`.
+        Font size for the types, default is :code:`10`.
     figsize : tuple, optional
         Figure size.
     path : str, optional
