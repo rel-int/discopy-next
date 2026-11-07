@@ -163,6 +163,10 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   for either trace on a compact category, and `SymmetricCategory.left_trace`,
   the left trace of the python functions, the additive channels and the
   traced lenses ([next#458]).
+- `docs/notebooks/optyx/feedforward_ep.md`, a photonic loop whose counts drive
+  a fast switch on the loop modes, sampled shot by shot and evaluated exactly,
+  with slow electronic units trained on it by equilibrium propagation
+  ([next#461]).
 
 ### Changed
 
@@ -1534,6 +1538,7 @@ for the changelog of `1.2.1` and earlier.
 [next#457]: https://github.com/rel-int/discopy-next/issues/457
 [next#458]: https://github.com/rel-int/discopy-next/pull/458
 [next#459]: https://github.com/rel-int/discopy-next/pull/459
+[next#461]: https://github.com/rel-int/discopy-next/pull/461
 [next#445]: https://github.com/rel-int/discopy-next/issues/445
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
