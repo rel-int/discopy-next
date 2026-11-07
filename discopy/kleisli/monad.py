@@ -547,12 +547,14 @@ def sample(d: frozenset) -> Callable:
     The outcomes are ordered by their :func:`canonical` representation,
     which sorts the elements of sets first, so that the sample depends on
     the seed only, never on the iteration order of a :class:`frozenset`
-    nor on ``PYTHONHASHSEED``, as long as every value in an outcome that is
-    not a tuple, a set or a mapping has a :func:`repr` that does not depend
-    on hashing, unlike a :class:`~discopy.kleisli.multiplicative.Row`
-    holding a set of several strings. The missing mass of a subdistribution
-    is drawn as ``None``, i.e. sampling lands in :attr:`Maybe` composed
-    with :attr:`Seed`.
+    nor on ``PYTHONHASHSEED``. This holds as long as every value in an
+    outcome that is not a tuple, a set or a mapping has a :func:`repr` that
+    tells unequal values apart and does not depend on hashing, unlike a
+    :class:`~discopy.kleisli.multiplicative.Row` holding a set of several
+    strings: unequal outcomes with one canonical representation are drawn in
+    the order the subdistribution iterates over them. The missing mass of a
+    subdistribution is drawn as ``None``, i.e. sampling lands in
+    :attr:`Maybe` composed with :attr:`Seed`.
 
     Parameters:
         d : The subdistribution to sample from, i.e. a finite set of pairs
