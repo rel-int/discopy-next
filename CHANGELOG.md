@@ -1096,6 +1096,10 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   and turns white on a dark page, where it used to be drawn white, invisible on
   a light one ([next#445]).
 
+- `Hypergraph.make_left_monogamous` reads the legs of each merge in port
+  order, as `make_right_monogamous` already did, where it read them in the
+  iteration order of a `set` of port indices ([next#445]).
+
 ### Project
 
 - `AGENTS.md`, `RULES.md` and `STYLE.md` for agents, and an LLM contribution

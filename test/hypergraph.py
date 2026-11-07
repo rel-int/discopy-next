@@ -1100,3 +1100,16 @@ def test_decoder():
     assert (CMap[Tensor].id(Dim(3)) @ CMap[Tensor].from_box(t)
             >> CMap[Tensor].swap(Dim(3), Dim(3))).to_diagram()\
         == Dim(3) @ t >> Tensor.swap(Dim(3), Dim(3))
+
+def test_Hypergraph_make_left_monogamous_merges_in_port_order():
+    """
+    The legs of a merge read their ports in order, where they used to read
+    them in the iteration order of a ``set`` of port indices: the ports of
+    the first spider below are ``{6, 7, 8}``, which iterates ``8, 6, 7``.
+    """
+    x = Ty('x')
+    effect = H.spiders(3, 0, x)
+    graph = (effect @ effect @ effect).make_left_monogamous()
+    assert [dom for dom, _ in graph.wires[1]]\
+        == [(6, 7, 8), (3, 4, 5), (0, 1, 2)]
+    assert graph.boxes == 3 * (Spider(3, 1, x), )

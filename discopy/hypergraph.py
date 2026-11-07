@@ -2445,7 +2445,7 @@ class Hypergraph[category](
                 len(input_wires), 1, typ), ) + self.boxes[depth:]
             offsets = self.offsets[:depth] + (None, ) + self.offsets[depth:]
             fwires = list(self.flat_wires)
-            for j, port in enumerate(input_wires):
+            for j, port in enumerate(sorted(input_wires)):
                 fwires[port] = self.n_spiders + j
             i = len(self.dom) + len(
                 sum([sum(wires, ()) for wires in self.box_wires[:depth]], ()))
