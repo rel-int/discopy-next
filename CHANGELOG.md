@@ -257,7 +257,7 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   which sorts the elements of sets and the items of mappings first, so the same
   seed draws the same outcome whatever `PYTHONHASHSEED` is, for outcomes built
   from tuples, sets and mappings of values whose repr does not depend on
-  hashing ([next#445]).
+  hashing and tells unequal values apart ([next#445]).
 - `draw`'s docstring and `config.DRAWING_DEFAULT["fontsize"]` say 10, the
   size Matplotlib draws box, braket and wire labels at, and that value now
   sets it; spider labels and the symbols of an `Equation` keep 12, under
@@ -267,8 +267,9 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   spiders that differ in fill no longer share one style and its last colour
   ([next#445]).
 - Rotation and controlled-rotation gates compare and hash their phase exactly,
-  and their repr prints it exactly, so `eval(repr(g)) == g`, while `str` and
-  drawings keep 3 significant digits: a dictionary or functor keyed on
+  and the repr of every parametrized gate prints its phase exactly, a complex,
+  a fraction or a large integer included, so `eval(repr(g)) == g`, while `str`
+  and drawings keep 3 significant digits: a dictionary or functor keyed on
   `Rz(0.1231)` no longer maps `Rz(0.1234)` ([next#445]).
 - `classical.BitControlledGate` prints the call to its own constructor,
   `BitControlledGate(gate, default)` with `is_dagger` and `classical` when
@@ -1209,10 +1210,10 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   job's timeout rises to 45 minutes for them. The `dev` group installs
   egglog, so the 40 egglog checks of `test/ehypergraph.py` and its fixture
   run instead of skipping ([next#445]).
-- `benchmark_comment.py` skips a same-repository pull request retargeted
-  while its benchmark ran, with a `::notice::`, and exits 0, instead of
-  failing the job as a run that does not belong to it; the next run posts
-  ([next#445]).
+- `benchmark_comment.py` skips a pull request retargeted while its benchmark
+  ran, with a `::notice::`, and exits 0, instead of failing the job as a run
+  that does not belong to it, or, for a pull request from a fork, posting the
+  comparison against its old base; the next run posts ([next#445]).
 - `project.license` is the SPDX expression `BSD-3-Clause AND Apache-2.0`, and
   `project.license-files` lists `LICENSE`, `discopy/optyx/LICENSE` and
   `discopy/optyx/NOTICE`, replacing the TOML table setuptools deprecates: the
