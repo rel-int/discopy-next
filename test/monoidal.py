@@ -897,7 +897,9 @@ def test_coloured_Ob_dagger():
 
 def test_Functor_sends_equal_wires_to_equal_images():
     """ A daggered wire is a generator of its own, not a fresh wire with its
-    colours swapped, so that a functor is well defined on it (next#445). """
+    colours swapped, so that a functor sends equal wires to equal images,
+    however each was built: from a name or a wire, daggered or built with
+    ``is_dagger=True`` (next#445). """
     red, green, pink, lime = map(Colour, ("red", "green", "pink", "lime"))
     x, y, z = Ty('x'), Ty('y'), Ty('z')
     c, d = Ty(Wire('x', red, green)), Ty(Wire('x', green, red))
@@ -905,7 +907,13 @@ def test_Functor_sends_equal_wires_to_equal_images():
     F = Functor({x: y @ z, c: X, d: W}, {},
                 colour_map={red: pink, green: lime})
     types = [x, x[::-1], c, c[::-1], d, d[::-1]]
-    for a, b in [(a, b) for a in types for b in types if a == b]:
+    twins = [Ty(Wire('x')), Ty(Wire('x', is_dagger=True)),
+             Ty(Wire('x', red, green)),
+             Ty(Wire('x', green, red, is_dagger=True)),
+             Ty(Wire('x', red, green, is_dagger=True))[::-1],
+             Ty(Wire('x', green, red))[::-1]]
+    assert all(a == b for a, b in zip(types, twins))
+    for a, b in [(a, b) for a in types for b in twins if a == b]:
         assert F(a) == F(b), (a, b)
     assert len(set(types)) == len(types)
     assert F(x[::-1]) == F(x)[::-1] and F(c[::-1]) == F(c)[::-1]
