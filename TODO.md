@@ -32,5 +32,5 @@
 - [x] `CHANGELOG.md` bullet under `[Unreleased]` with a `[next#463]` reference link.
 - [ ] Gates: `pflake8`, `pylint`, `ruff`, `ty`, `coverage run -m pytest`, each as a delta
       against `origin/main`.
-- [ ] Report the `uncurry` signature mismatch with `abc` (`abc` takes `n`, `multiplicative`
-      does not) as its own issue.
+- [x] Report the `uncurry` signature mismatch with `abc` (`abc` takes `n`, `multiplicative`
+      does not) as its own issue: filed as #477, `uncurry(0)` is not the identity.
