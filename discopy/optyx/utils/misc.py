@@ -17,6 +17,20 @@ from typing import (
 from numbers import Number
 
 
+def listed(internal_states):
+    """
+    The internal states as lists of numbers, which is what their
+    representation reads back: they are declared as lists and used as
+    arrays, and `STYLE.md` reads a representation holding an array up to
+    elision.
+
+    >>> listed((np.array([1, 0]), [0, 1]))
+    '([1, 0], [0, 1])'
+    """
+    states = ", ".join(repr(np.asarray(s).tolist()) for s in internal_states)
+    return f"({states},)" if len(internal_states) == 1 else f"({states})"
+
+
 def _build_w_layer(n_nonzero_counts, dagger=False):
     # pylint: disable=import-outside-toplevel
     from discopy.optyx.core import zw

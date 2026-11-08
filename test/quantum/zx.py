@@ -289,6 +289,21 @@ def test_repr_and_rotate():
     assert Z(1, 2, .5).rotate() == Z(2, 1, .5)
 
 
+@pytest.mark.parametrize("box", [
+    Scalar(2), Scalar(.5j), Scalar(Fraction(1, 3)), scalar(2 ** 0.5),
+    SWAP, Swap(Nat(1), Nat(1)), Z(1, 2), Z(1, 1, .5), X(0, 1, .25),
+    Y(2, 1, .3), H, Box("f", Nat(1), Nat(1)),
+    Z(1, 2) @ Nat(1) >> Nat(1) @ X(2, 1),
+    SWAP >> Z(1, 1) @ Z(1, 1) >> scalar(2) @ Nat(2)],
+    ids=str)
+def test_eval_repr(box):
+    """
+    STYLE.md's transparency law, which next#468 broke for a ``Scalar``, and
+    whose ``Swap`` row next#168 lists.
+    """
+    assert eval(repr(box), Diagram.environment()) == box
+
+
 def matrix(diagram):
     """ The matrix of a diagram with outputs as rows, as pyzx has it. """
     n, m = len(diagram.dom), len(diagram.cod)

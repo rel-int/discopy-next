@@ -1,6 +1,11 @@
 """
 The transparency law of STYLE.md, i.e. :meth:`discopy.testable.transparency`,
-on every box of :mod:`discopy.optyx`.
+on every box of :mod:`discopy.optyx`, the core and the tower.
+
+``zw.ZBox`` and ``zw.IndexableAmplitudes`` are not quantified over: the
+amplitudes may be lazy or infinite, so a representation cannot print what it
+cannot enumerate, and which way that goes waits on
+rel-int/discopy-next#472.
 
 A cell of :func:`test_transparency` is only as strong as the equality it is
 checked by, and the boxes whose semantics live outside ``setoid`` —
@@ -21,11 +26,13 @@ import sys
 import numpy as np
 import pytest
 
+import sympy
+
 import discopy
 from discopy import optyx
 from discopy.optyx import channel, classical, photonic, qubits
 from discopy.optyx.channel import bit, mode, qubit, qmode
-from discopy.optyx.core import diagram
+from discopy.optyx.core import diagram, zw, zx
 
 
 def environment(module):
@@ -86,7 +93,26 @@ CLASSICAL = [
 ]
 
 
-@pytest.mark.parametrize("box", CHANNEL + QUBITS + PHOTONIC + CLASSICAL,
+CORE = [
+    zw.W(1), zw.W(2), zw.W(2).dagger(),
+    zw.Create(), zw.Create(1, 0, 2), zw.Select(), zw.Select(2),
+    zw.Endo(0.5), zw.Endo(2j),
+    zw.Add(2), zw.Add(3).dagger(), zw.Multiply(), zw.Multiply().dagger(),
+    zw.Divide(), zw.Divide().dagger(), zw.Mod2(), zw.Mod2().dagger(),
+    zx.Spider(1, 1), zx.Z(1, 2), zx.X(0, 1, 0.5), zx.ZBox(1, 1),
+    zx.And(), zx.And(3), zx.And().dagger(), zx.Or(), zx.Or(3).dagger(),
+    diagram.Scalar(2), diagram.Scalar(0.5j),
+    diagram.DualRail(), diagram.DualRail(True),
+    diagram.PhotonThresholdDetector(),
+    diagram.PhotonThresholdDetector(True),
+    diagram.EmbeddingTensor(1, 2), diagram.EmbeddingTensor(3, 2),
+    diagram.Box("f", diagram.Mode(1), diagram.Mode(1)),
+    diagram.Spider(1, 2, diagram.Mode(1)),
+    diagram.Swap(diagram.Mode(1), diagram.Bit(1)),
+]
+
+
+@pytest.mark.parametrize("box", CHANNEL + QUBITS + PHOTONIC + CLASSICAL + CORE,
                          ids=lambda box: type(box).__name__)
 def test_transparency(box):
     module = sys.modules[type(box).__module__]
@@ -94,6 +120,9 @@ def test_transparency(box):
 
 
 IGNORED = [
+    (zw.Create(1, 1, internal_states=(np.array([1, 0]), [0, 1])),
+     "internal_states"),
+    (diagram.DualRail(internal_state=[1, 0]), "internal_state"),
     (photonic.BBS(0.5, is_conj=True), "is_conj"),
     (photonic.TBS(0.25, is_gate_dagger=True), "is_gate_dagger"),
     (photonic.MZI(0.25, 0.5, is_conj=True), "is_conj"),
@@ -110,7 +139,9 @@ def test_what_equality_ignores(box, attribute):
     module = sys.modules[type(box).__module__]
     other = eval(repr(box), environment(module))
     assert other == box
-    if attribute == "density_matrix":
+    if attribute == "internal_state":
+        assert np.array_equal(other.internal_state, box.internal_state)
+    elif attribute == "density_matrix":
         assert np.array_equal(other.density_matrix.matrix,
                               box.density_matrix.matrix)
     elif attribute == "internal_states":
@@ -133,3 +164,29 @@ DIAGRAMS = [
 @pytest.mark.parametrize("term", DIAGRAMS, ids=str)
 def test_transparency_of_diagrams(term):
     assert eval(repr(term), environment(channel)) == term
+
+
+PSI = sympy.Symbol("psi")
+
+SYMBOLIC = [zw.Endo(PSI ** 2), diagram.Scalar(2 * PSI), zx.Z(1, 1, PSI)]
+
+
+@pytest.mark.parametrize("box", SYMBOLIC, ids=lambda box: type(box).__name__)
+def test_transparency_of_a_symbol(box):
+    """A symbolic phase reads back where its symbol is named, as a float
+    would not: the representation prints the number ``==`` compares."""
+    module = sys.modules[type(box).__module__]
+    assert eval(repr(box), {**environment(module), "psi": PSI}) == box
+
+
+CORE_DIAGRAMS = [
+    zw.Create(1) >> zw.W(2) >> zw.Endo(0.5) @ diagram.Mode(1),
+    zw.Create(2) >> zw.Mod2() >> zx.Z(1, 2),
+    diagram.Scalar(2) @ zx.And() >> zx.Z(1, 1),
+    zw.Add(2).dagger() >> diagram.PhotonThresholdDetector() @ zw.Select(),
+]
+
+
+@pytest.mark.parametrize("term", CORE_DIAGRAMS, ids=str)
+def test_transparency_of_core_diagrams(term):
+    assert eval(repr(term), environment(zw)) == term

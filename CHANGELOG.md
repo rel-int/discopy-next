@@ -343,6 +343,26 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Fixed
 
+- `eval(repr(x)) == x`, `STYLE.md`'s transparency law, holds for the fifteen box
+  classes that broke it in the two copies of `zx` and in `optyx.core`. Fourteen
+  of them printed the generic box call — name, dom, cod and a `data=` keyword —
+  which their own narrowed constructors reject, so `zw.Endo`, `zw.Add`,
+  `zw.Multiply`, `zw.Divide`, `zw.Mod2`, `zx.And`, `zx.Or`, `diagram.Scalar`,
+  `diagram.DualRail` and `diagram.PhotonThresholdDetector` raised `TypeError`,
+  `zw.W` and `diagram.EmbeddingTensor` raised `NameError` on an unqualified
+  name, and `zw.Create` and `zw.Select` read back silently unequal, their
+  photons being their own name, dom and cod. `quantum.zx.Scalar` raised
+  `TypeError` the same way. Each now prints the call to its public constructor
+  and keeps its data where `==` reads it — `zw.W(2, is_dagger=True)`,
+  `diagram.EmbeddingTensor(1, 2)`, `quantum.zx.Scalar(2)` — the shape
+  [next#445] ruled for `quantum.gates.Parametrized` and
+  `optyx.qubits.BitControlledGate`. `diagram.EmbeddingTensor` keeps its
+  `input_dim` and `output_dim` as public attributes to print them, and the
+  `listed` helper for internal states moves from `optyx.photonic` to
+  `optyx.utils.misc`, where the core can reach it. `test/optyx/test_repr.py`
+  now quantifies the law over the core as well as the tower, and
+  `test/quantum/zx.py` over the ZX boxes, `Swap` included ([next#472],
+  [next#468], [next#168]).
 - The documentation says what the code does: the README, CONTRIBUTING.md,
   AGENTS.md and the module summaries no longer name modules, classes or
   notebooks that are gone, list the public ones they missed, and state each
@@ -1546,6 +1566,9 @@ for the changelog of `1.2.1` and earlier.
 [next#458]: https://github.com/rel-int/discopy-next/pull/458
 [next#459]: https://github.com/rel-int/discopy-next/pull/459
 [next#445]: https://github.com/rel-int/discopy-next/issues/445
+[next#168]: https://github.com/rel-int/discopy-next/issues/168
+[next#468]: https://github.com/rel-int/discopy-next/issues/468
+[next#472]: https://github.com/rel-int/discopy-next/issues/472
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#56]: https://github.com/rel-int/optyx/pull/56
