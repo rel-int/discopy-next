@@ -36,6 +36,7 @@ docs/notebooks/optyx/*.rst
 docs/_static/notebooks/
 # drawings left behind by a failing drawing test (backend.temporary_path)
 docs/_static/*/_*.svg
+docs/_static/*/_*.png
 benchmark-results/
 plans/
 .style-review/
