@@ -343,6 +343,20 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Fixed
 
+- `python.multiplicative.Function` and `python.additive.Function` build their
+  structural morphisms with `cls` and `type(self)` rather than with the base
+  class, the way `permutation` already did, so a subclass can be a functor's
+  codomain: `swap`, `copy`, `discard`, `ev`, `merge` and `twist` are the
+  classmethods `discopy.abc` declares them to be, and `tensor`, `curry`,
+  `fix`, `trace` and `dagger` return the class of their argument. A
+  `markov.Functor` into a subclass of `python.Function` used to send `Copy` to
+  a plain `Function` and then raise `TypeError: Expected F, got
+  python.multiplicative.Function instead` on composing it with the `Id` the
+  subclass did give. A subclass that is also a symmetric functor's codomain
+  wants `@factory` so that its `ar` is itself rather than its base, see the
+  second gotcha of the README. `python.finset.Function` keeps its base class
+  on purpose: `finset.Permutation` subclasses it narrowing `__init__`
+  ([next#463]).
 - The documentation says what the code does: the README, CONTRIBUTING.md,
   AGENTS.md and the module summaries no longer name modules, classes or
   notebooks that are gone, list the public ones they missed, and state each
@@ -1546,6 +1560,7 @@ for the changelog of `1.2.1` and earlier.
 [next#458]: https://github.com/rel-int/discopy-next/pull/458
 [next#459]: https://github.com/rel-int/discopy-next/pull/459
 [next#445]: https://github.com/rel-int/discopy-next/issues/445
+[next#463]: https://github.com/rel-int/discopy-next/issues/463
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#56]: https://github.com/rel-int/optyx/pull/56

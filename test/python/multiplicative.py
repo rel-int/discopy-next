@@ -290,3 +290,31 @@ def test_functor_casts_a_tuple_image():
     assert F(x) == Ty(float, int) and len(F(x)) == 2
     G = feedback.Functor(ob_map={x: (1, 1)}, ar_map={}, cod=zx.Diagram)
     assert G(x) == zx.Nat(2)
+
+
+def test_subclass_as_functor_codomain():
+    """ The reproducer of rel-int/discopy-next#463. """
+    from discopy import markov
+    from discopy.utils import factory
+
+    @factory
+    class Sub(Function):
+        """ A subclass of ``Function``, e.g. one with its own ``__call__``. """
+
+    G = markov.Ty('G')
+    F = markov.Functor({G: tuple}, {}, cod=Sub)
+    structure = [F(box) for box in (
+        markov.Id(G), markov.Copy(G), markov.Discard(G),
+        markov.Swap(G, G), markov.Copy(G) @ markov.Copy(G))]
+    assert all(isinstance(f, Sub) for f in structure)
+
+    sort = markov.Copy(G) >> markov.Swap(G, G) >> markov.Discard(G) @ G
+    assert isinstance(F(sort), Sub) and F(sort)((1, 2)) == (1, 2)
+
+    x = Sub.ob(int)
+    assert all(isinstance(f, Sub) for f in (
+        Sub.permutation((1, 0), (x, x)), Sub.braid(x, x), Sub.ev(x, x),
+        Sub(lambda a, b: a + b, x @ x, x).curry(),
+        Sub(lambda a, b: a + b, x @ x, x).curry().uncurry(),
+        Sub(lambda a, b: a + b, x @ x, x).fix(),
+        Sub(lambda a, b: (a + b, 1), x @ x, x @ x).trace()))
