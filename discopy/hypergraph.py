@@ -2581,17 +2581,35 @@ class Hypergraph[category](
         that every wire points forward: a left-monogamous hypergraph becomes
         causal and a right-monogamous one cocausal, since cutting a wire
         open keeps either.
+
+        Cutting one wire can make another point forward, so the wires to cut
+        are not known before the first cut: they are cut one at a time, by
+        :meth:`cut_backward_wire`, until every wire points forward. The
+        traces all apply to the result of the last cut, so they are counted
+        rather than nested.
+        """
+        graph, cuts = self, 0
+        while (cut := graph.cut_backward_wire()) is not None:
+            graph, cuts = cut, cuts + 1
+        for _ in range(cuts):
+            graph = graph.explicit_trace()
+        return graph
+
+    def cut_backward_wire(self) -> "Hypergraph | None":
+        """
+        Cut open one scalar spider, or one wire that points backward, into an
+        extra input and output to be traced, or ``None`` when every wire
+        already points forward, see :meth:`trace_backward_wires`.
         """
         for spider in self.scalar_spiders:
             typ = self.spider_types[spider]
             dom, cod = self.dom @ typ, self.cod @ typ
             wires = (self.dom_wires + (spider, ), self.box_wires,
                      self.cod_wires + (spider, ))
-            arg = type(self)(
+            return type(self)(
                 dom, cod, self.boxes, wires, self.spider_types, self.offsets)
-            return arg.trace_backward_wires().explicit_trace()
         if self.is_topologically_ordered:
-            return self
+            return None
         causal_graph = self.causal_graph()
         input_spider, input_wire, output_wire = next(
             (spider, u, v)
@@ -2607,9 +2625,8 @@ class Hypergraph[category](
         fwires = fwires[:len(self.dom)] + [output_spider]\
             + fwires[len(self.dom):] + [input_spider]
         wires = self.rebracket(fwires, dom=dom)
-        arg = type(self)(
+        return type(self)(
             dom, cod, self.boxes, wires, spider_types, self.offsets)
-        return arg.trace_backward_wires().explicit_trace()
 
     @property
     def is_generator(self):

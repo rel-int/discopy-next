@@ -1190,6 +1190,12 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   of ports: a hypergraph with 128 transposes to bend goes from 4.8 s to
   0.060 s, and one with more pairs than the recursion limit allows no longer
   raises `RecursionError` ([next#471]).
+- `Hypergraph.trace_backward_wires`, and so `make_causal` and `make_cocausal`,
+  cuts its wires in a loop rather than one frame of recursion per cut, so a
+  graph with a thousand of them no longer raises `RecursionError` and no
+  longer holds every intermediate hypergraph alive at once. It is as fast as
+  it was: four fifths of the time is `explicit_trace`, which this leaves
+  alone ([next#471]).
 
 ### Project
 

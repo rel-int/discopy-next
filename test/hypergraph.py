@@ -1172,3 +1172,27 @@ def test_Hypergraph_make_monogamous_carries_leg_order():
     assert graph.make_monogamous().boxes == (
         f, compact.Cap(c.r, c), compact.Cap(b.r, b), g)
 
+
+def test_Hypergraph_trace_backward_wires_loops(monkeypatch):
+    """
+    ``trace_backward_wires`` cuts one wire at a time in a loop, so a graph
+    with many wires to cut does not nest one frame per cut as it used to,
+    which raised ``RecursionError`` at a thousand of them: every trace below
+    is applied from the one frame of the loop.
+    """
+    import inspect
+    x = Ty('x')
+    scalar = H.spiders(0, 0, x)
+    graph = scalar.tensor(*19 * [scalar])
+    explicit_trace, frames = H.explicit_trace, []
+
+    def counted(self, left=False):
+        frames.append(sum(frame.function == "trace_backward_wires"
+                          for frame in inspect.stack()))
+        return explicit_trace(self, left)
+
+    monkeypatch.setattr(H, "explicit_trace", counted)
+    result = graph.trace_backward_wires()
+    monkeypatch.undo()
+    assert len(frames) == 20 and set(frames) == {1}
+    assert len(result.boxes) == 40 and result.is_causal
