@@ -19,18 +19,18 @@
 
 ## Work
 
-- [WIP] @463-2026-11-08 00:00 `multiplicative.Function`: `swap`, `copy`, `discard` and `ev` become classmethods
+- [x] `multiplicative.Function`: `swap`, `copy`, `discard` and `ev` become classmethods
       returning `cls(...)`, `tensor`, `curry` and `fix` return `type(self)(...)`, `uncurry`
       calls `self.ev`. `discopy.abc` already declares every one of them a classmethod.
-- [WIP] @463-2026-11-08 00:00 `additive.Function`: the same defect at `tensor`, `swap`, `trace`, `dagger` and
+- [x] `additive.Function`: the same defect at `tensor`, `swap`, `trace`, `dagger` and
       `merge`, plus `twist = id` inside the class body instead of a bound `Function.id`.
-- [WIP] @463-2026-11-08 00:00 `finset.Function`: decide and record whether it has the defect — `Permutation`
+- [x] `finset.Function`: decide and record whether it has the defect — `Permutation`
       subclasses it narrowing `__init__`, so `cls(...)` is not a safe refactor there.
-- [WIP] @463-2026-11-08 00:00 Check every call site of the changed methods in `discopy/`, `test/` and `proptest/`.
-- [WIP] @463-2026-11-08 00:00 The issue's reproducer as a test in `test/python/multiplicative.py`, plus the
+- [x] Check every call site of the changed methods in `discopy/`, `test/` and `proptest/`.
+- [x] The issue's reproducer as a test in `test/python/multiplicative.py`, plus the
       `additive` equivalent in `test/python/additive.py`.
-- [WIP] @463-2026-11-08 00:00 `CHANGELOG.md` bullet under `[Unreleased]` with a `[next#463]` reference link.
-- [WIP] @463-2026-11-08 00:00 Gates: `pflake8`, `pylint`, `ruff`, `ty`, `coverage run -m pytest`, each as a delta
+- [x] `CHANGELOG.md` bullet under `[Unreleased]` with a `[next#463]` reference link.
+- [ ] Gates: `pflake8`, `pylint`, `ruff`, `ty`, `coverage run -m pytest`, each as a delta
       against `origin/main`.
-- [WIP] @463-2026-11-08 00:00 Report the `uncurry` signature mismatch with `abc` (`abc` takes `n`, `multiplicative`
+- [ ] Report the `uncurry` signature mismatch with `abc` (`abc` takes `n`, `multiplicative`
       does not) as its own issue.
