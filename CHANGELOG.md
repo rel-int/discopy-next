@@ -343,19 +343,33 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Fixed
 
+- `python.multiplicative.Function` and `python.additive.Function` build their
+  structural morphisms with `cls` and `type(self)` rather than with the base
+  class, the way `permutation` already did, so a subclass can be a functor's
+  codomain: `swap`, `copy`, `discard`, `ev`, `merge` and `twist` are the
+  classmethods `discopy.abc` declares them to be, and `tensor`, `curry`,
+  `fix`, `trace` and `dagger` return the class of their argument. A
+  `markov.Functor` into a subclass of `python.Function` used to send `Copy` to
+  a plain `Function` and then raise `TypeError: Expected F, got
+  python.multiplicative.Function instead` on composing it with the `Id` the
+  subclass did give. A subclass that is also a symmetric functor's codomain
+  wants `@factory` so that its `ar` is itself rather than its base, see the
+  second gotcha of the README. `python.finset.Function` keeps its base class
+  on purpose: `finset.Permutation` subclasses it narrowing `__init__`
+  ([next#463]).
 - `eval(repr(x)) == x`, `STYLE.md`'s transparency law, holds for the fifteen box
-  classes that broke it in the two copies of `zx` and in `optyx.core`. Fourteen
-  of them printed the generic box call — name, dom, cod and a `data=` keyword —
-  which their own narrowed constructors reject, so `zw.Endo`, `zw.Add`,
-  `zw.Multiply`, `zw.Divide`, `zw.Mod2`, `zx.And`, `zx.Or`, `diagram.Scalar`,
-  `diagram.DualRail` and `diagram.PhotonThresholdDetector` raised `TypeError`,
-  `zw.W` and `diagram.EmbeddingTensor` raised `NameError` on an unqualified
-  name, and `zw.Create` and `zw.Select` read back silently unequal, their
-  photons being their own name, dom and cod. `quantum.zx.Scalar` raised
-  `TypeError` the same way. Each now prints the call to its public constructor
-  and keeps its data where `==` reads it — `zw.W(2, is_dagger=True)`,
-  `diagram.EmbeddingTensor(1, 2)`, `quantum.zx.Scalar(2)` — the shape
-  [next#445] ruled for `quantum.gates.Parametrized` and
+  classes that broke it in the two copies of `zx` and in `optyx.core`. Each
+  printed the generic box call — name, dom, cod and a `data=` keyword — which
+  their own narrowed constructors reject: `zw.Endo`, `zw.Add`, `zw.Multiply`,
+  `zw.Divide`, `zw.Mod2`, `zx.And`, `zx.Or`, `diagram.Scalar`,
+  `diagram.DualRail`, `diagram.PhotonThresholdDetector` and
+  `quantum.zx.Scalar` raised `TypeError`, `zw.W` and
+  `diagram.EmbeddingTensor` raised `NameError` on an unqualified name, and
+  `zw.Create` and `zw.Select` read back silently unequal, their photons being
+  their own name, dom and cod. Each now prints the call to its public
+  constructor and keeps its data where `==` reads it — `zw.W(2,
+  is_dagger=True)`, `diagram.EmbeddingTensor(1, 2)`, `quantum.zx.Scalar(2)` —
+  the shape [next#445] ruled for `quantum.gates.Parametrized` and
   `optyx.qubits.BitControlledGate`. `diagram.EmbeddingTensor` keeps its
   `input_dim` and `output_dim` as public attributes to print them, and the
   `listed` helper for internal states moves from `optyx.photonic` to
@@ -1570,7 +1584,7 @@ for the changelog of `1.2.1` and earlier.
 [next#458]: https://github.com/rel-int/discopy-next/pull/458
 [next#459]: https://github.com/rel-int/discopy-next/pull/459
 [next#445]: https://github.com/rel-int/discopy-next/issues/445
-[next#168]: https://github.com/rel-int/discopy-next/issues/168
+[next#463]: https://github.com/rel-int/discopy-next/issues/463
 [next#468]: https://github.com/rel-int/discopy-next/issues/468
 [next#472]: https://github.com/rel-int/discopy-next/issues/472
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
