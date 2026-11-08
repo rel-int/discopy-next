@@ -96,7 +96,7 @@ CLASSICAL = [
 CORE = [
     zw.W(1), zw.W(2), zw.W(2).dagger(),
     zw.Create(), zw.Create(1, 0, 2), zw.Select(), zw.Select(2),
-    zw.Endo(0.5), zw.Endo(2j),
+    zw.Endo(0.5), zw.Endo(2j), zw.Endo(-2j), zw.Endo(2j).dagger(),
     zw.Add(2), zw.Add(3).dagger(), zw.Multiply(), zw.Multiply().dagger(),
     zw.Divide(), zw.Divide().dagger(), zw.Mod2(), zw.Mod2().dagger(),
     zx.Spider(1, 1), zx.Z(1, 2), zx.X(0, 1, 0.5), zx.ZBox(1, 1),
