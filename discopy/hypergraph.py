@@ -2436,9 +2436,9 @@ class Hypergraph[category](
                     self.flat_wires[source + 1:].index(spider) + source + 1)
                 if self.ports[target].kind not in kinds:
                     continue
-                box = None if cups else getattr(
+                consumer = None if cups else getattr(
                     self.ports[source], "depth", None)
-                depth = n_boxes if box is None else depths[box]
+                depth = n_boxes if consumer is None else depths[consumer]
                 factory = self.category.cup_factory if cups\
                     else self.category.cap_factory
                 legs = self.leg_order(source, target)
