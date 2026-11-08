@@ -2,7 +2,6 @@ import random
 from fractions import Fraction
 
 import pytest
-import sympy
 
 import numpy as np
 from pytest import raises, fixture
@@ -305,17 +304,16 @@ def test_eval_repr(box):
     assert eval(repr(box), Diagram.environment()) == box
 
 
-@pytest.mark.parametrize("box", [
-    Scalar(sympy.Symbol("phi")), Scalar(2 * sympy.Symbol("phi")),
-    Z(1, 1, sympy.Symbol("phi")), X(1, 2, sympy.Symbol("phi") ** 2)], ids=str)
-def test_eval_repr_of_a_symbol(box):
+def test_eval_repr_of_a_symbol():
     """
     A symbolic parameter prints as itself, as every parametrized box in the
     library does, so it reads back where the caller names its symbols:
     ``Diagram.environment()`` holds the classes, not the symbols.
     """
-    environment = {**Diagram.environment(), "phi": sympy.Symbol("phi")}
-    assert eval(repr(box), environment) == box
+    phi = pytest.importorskip("sympy").Symbol("phi")
+    environment = {**Diagram.environment(), "phi": phi}
+    for box in [Scalar(phi), Scalar(2 * phi), Z(1, 1, phi), X(1, 2, phi ** 2)]:
+        assert eval(repr(box), environment) == box
 
 
 def matrix(diagram):
