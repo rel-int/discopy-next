@@ -637,20 +637,24 @@ class Endo(ZWBox):
     >>> derivative = phase.grad(psi).subs((psi, 0.5)).to_path().eval(2).array
     >>> assert np.allclose(derivative, 4 * np.pi * 1j)
 
-    A negative zero is not a different scalar, although the name the box
-    carries its scalar in would print one, so that the conjugate of an
-    imaginary phase is the phase its representation reads back:
+    Two endomorphisms are equal when their scalars are, the name being
+    derived from the scalar and printing a negative zero where the scalar
+    does not have one, so that a conjugate is the scalar it conjugates to:
 
+    >>> assert Endo(0.5).conjugate() == Endo(0.5)
     >>> assert Endo(-2j) == Endo(2j).dagger()
     """
 
     def __init__(self, scalar: complex):
         try:
-            scalar = complex(scalar) + 0
+            scalar = complex(scalar)
         except TypeError:
             pass
         self.scalar = scalar
         super().__init__(f"Endo({scalar})", 1, 1, data=scalar)
+
+    def setoid(self):
+        return type(self), self.dom, self.cod, self.is_dagger, self.scalar
 
     def __repr__(self):
         return f"{factory_name(type(self))}"\

@@ -361,8 +361,12 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   `listed` helper for internal states moves from `optyx.photonic` to
   `optyx.utils.misc`, where the core can reach it. `test/optyx/test_repr.py`
   now quantifies the law over the core as well as the tower, and
-  `test/quantum/zx.py` over the ZX boxes, `Swap` included ([next#472],
-  [next#468], [next#168]).
+  `test/quantum/zx.py` over the ZX boxes, `Swap` included. `zw.Endo` also
+  reads its scalar rather than the name derived from it in `setoid`, so that two
+  endomorphisms with equal scalars are equal: `Endo(0.5).conjugate() ==
+  Endo(0.5)` was false, the conjugate's name printing the negative zero
+  `(0.5-0j)` that the scalar does not have, and no representation of it could
+  have read back ([next#472], [next#468], [next#168]).
 - The documentation says what the code does: the README, CONTRIBUTING.md,
   AGENTS.md and the module summaries no longer name modules, classes or
   notebooks that are gone, list the public ones they missed, and state each
