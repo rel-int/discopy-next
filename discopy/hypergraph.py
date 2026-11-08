@@ -2423,52 +2423,38 @@ class Hypergraph[category](
         """
         if not self.is_bijective:
             return self.make_bijective().make_monogamous()
-        for kinds, cups_or_caps in [
-                (["input", "cod"], "cups"),
-                (["dom", "output"], "caps")]:
-            for source, spider in [
-                    (source, spider) for source, (spider, port)
-                    in enumerate(zip(self.flat_wires, self.ports))
-                    if port.kind in kinds]:
-                if spider not in self.flat_wires[source + 1:]:
+        spider_types = dict(enumerate(self.spider_types))
+        depths, n_boxes = list(range(len(self.boxes))), len(self.boxes)
+        insertions, rewiring, fresh = [], {}, self.n_spiders
+        for kinds, cups in [(("input", "cod"), True),
+                            (("dom", "output"), False)]:
+            for source, spider in enumerate(self.flat_wires):
+                if self.ports[source].kind not in kinds\
+                        or spider not in self.flat_wires[source + 1:]:
                     continue
                 target = (
                     self.flat_wires[source + 1:].index(spider) + source + 1)
-                if self.ports[target].kind in kinds:
-                    spider_types = dict(enumerate(self.spider_types))
-                    typ = spider_types[spider]
-                    depth = getattr(
-                        self.ports[source], "depth", len(self.boxes))
-                    source, target = self.leg_order(source, target)
-                    source_obj, target_obj = (
-                        self.ports[source].obj, self.ports[target].obj)
-                    left, right = len(spider_types), len(spider_types) + 1
-                    fwires = list(self.flat_wires)
-                    fwires[source], fwires[target] = left, right
-                    if cups_or_caps == "cups":
-                        boxes = self.boxes + (self.category.cup_factory(
-                            source_obj, target_obj), )
-                        offsets = self.offsets + (None, )
-                        fwires = fwires[:len(fwires) - len(self.cod)] + [
-                            left, right] + fwires[len(fwires) - len(self.cod):]
-                    else:
-                        boxes = self.boxes[:depth] + (
-                            self.category.cap_factory(
-                                source_obj, target_obj), ) + self.boxes[depth:]
-                        offsets = self.offsets[:depth] + (None, )\
-                            + self.offsets[depth:]
-                        i = len(self.dom) + len(sum(
-                            [sum(ports, ()) for ports
-                             in self.box_wires[:depth]], ()))
-                        fwires = fwires[:i] + [left, right] + fwires[i:]
-                    wires = self.rebracket(fwires, boxes=boxes)
-                    spider_types[left] = spider_types[right] = typ
-                    del spider_types[spider]
-                    return type(self)(
-                        self.dom, self.cod, boxes, wires, spider_types, offsets
-                    ).make_monogamous()
-        assert self.is_monogamous
-        return self
+                if self.ports[target].kind not in kinds:
+                    continue
+                box = None if cups else getattr(
+                    self.ports[source], "depth", None)
+                depth = n_boxes if box is None else depths[box]
+                factory = self.category.cup_factory if cups\
+                    else self.category.cap_factory
+                legs = self.leg_order(source, target)
+                spiders = (fresh, fresh + 1)
+                insertions.append((depth, factory(
+                    *(self.ports[leg].obj for leg in legs)), spiders))
+                rewiring.update(zip(legs, spiders))
+                spider_types.update(
+                    dict.fromkeys(spiders, spider_types[spider]))
+                del spider_types[spider]
+                depths, n_boxes = self.shift_depths(depths, depth), n_boxes + 1
+                fresh += 2
+        if not insertions:
+            assert self.is_monogamous
+            return self
+        return self.insert_boxes(insertions, rewiring, spider_types)
 
     def make_left_monogamous(self) -> "Hypergraph":
         """

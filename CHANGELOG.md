@@ -1185,6 +1185,11 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   iteration order of a `set` of port indices, so the wires, `==` and `repr` of
   an affected hypergraph can change — the merge of a commutative monoid is
   symmetric, so what it evaluates to does not ([next#445]).
+- `Hypergraph.make_monogamous` inserts every cup and cap it needs in one
+  pass, where it rebuilt and re-validated the whole hypergraph once per pair
+  of ports: a hypergraph with 128 transposes to bend goes from 4.8 s to
+  0.060 s, and one with more pairs than the recursion limit allows no longer
+  raises `RecursionError` ([next#471]).
 
 ### Project
 
@@ -1546,6 +1551,7 @@ for the changelog of `1.2.1` and earlier.
 [next#458]: https://github.com/rel-int/discopy-next/pull/458
 [next#459]: https://github.com/rel-int/discopy-next/pull/459
 [next#445]: https://github.com/rel-int/discopy-next/issues/445
+[next#471]: https://github.com/rel-int/discopy-next/issues/471
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#56]: https://github.com/rel-int/optyx/pull/56

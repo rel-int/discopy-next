@@ -1135,3 +1135,40 @@ def test_Hypergraph_make_left_monogamous_merges_in_port_order():
     assert [dom for dom, _ in graph.wires[1]]\
         == [(6, 7, 8), (3, 4, 5), (0, 1, 2)]
     assert graph.boxes == 3 * (Spider(3, 1, x), )
+
+
+def test_Hypergraph_make_monogamous_inserts_in_one_pass(monkeypatch):
+    """
+    However many cups and caps it inserts, ``make_monogamous`` scans the
+    wires and the types of the result once, i.e. it builds one hypergraph
+    rather than one per box, which also keeps it off the recursion limit.
+    """
+    x = Ty('x')
+    transpose = Box('f', x, x).transpose().to_hypergraph()
+    graph = transpose
+    for _ in range(9):
+        graph = graph @ transpose
+    scans = []
+    monkeypatch.setattr(H, "scan_types", lambda self: scans.append(self))
+    result = graph.make_monogamous()
+    monkeypatch.undo()
+    assert len(scans) == 1 and len(result.boxes) == 30
+    assert result.is_monogamous
+
+
+def test_Hypergraph_make_monogamous_carries_leg_order():
+    """
+    The legs of each cup and cap read :meth:`Hypergraph.leg_order` on the
+    graph the pass starts from, which is the answer the recursion read on the
+    graph as it stood: both caps below reorder their legs, the second one
+    after the first has already been inserted.
+    """
+    from discopy import compact
+    a, b, c, d = map(compact.Ty, "abcd")
+    f, g = compact.Box('f', d, d), compact.Box('g', c @ b, a)
+    graph = Hypergraph[compact.Diagram](
+        d.r @ a, b.r @ c.r @ d.r @ a @ a, (f, g),
+        ((0, 1), (((2, ), (2, )), ((3, 4), (5, ))), (4, 3, 0, 1, 5)))
+    assert graph.make_monogamous().boxes == (
+        f, compact.Cap(c.r, c), compact.Cap(b.r, b), g)
+
