@@ -1279,6 +1279,21 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   longer holds every intermediate hypergraph alive at once. It is as fast as
   it was: four fifths of the time is `explicit_trace`, which this leaves
   alone ([next#471]).
+- `python.Function.uncurry` takes `abc`'s `n`, splitting a nested exponential
+  as every other closed category does, where `uncurry(0)` bound `0` to `left`
+  and uncurried with its arguments swapped; `curry(0)` and `uncurry(0)` are
+  the identity, and `uncurry(n)` raises `ValueError` when the exponent has
+  more than `n` types ([next#477]).
+- The TikZ backend spells a colour that matplotlib draws and xcolor does not
+  know, e.g. `tab:blue`, `C0`, `0.5`, `navy` or an RGB tuple, by its RGB
+  values, with or without `use_tikzstyles`, so its drawing compiles; it was
+  written raw, which pdflatex rejects, and a tuple raised `TypeError`
+  ([next#466]).
+- The Matplotlib backend draws a box, a spider, a ket or a bra coloured by an
+  RGB list or a NumPy array, which matplotlib reads as a colour: it looked
+  every colour up in `COLORS` and raised `TypeError` on an unhashable one.
+  `Backend.resolve` and `Backend.is_transparent` look up and compare a colour
+  only when it is a name, for both backends ([next#482]).
 
 ### Project
 
@@ -1293,6 +1308,9 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 - CodeRabbit reviews style, and a pull request is a draft while it has a
   `TODO.md` ([#485], [#708]).
 - The notebook pages of the docs are titled by their first heading ([#825]).
+- Skills for agents in `.claude/skills/`: `merge-main` with a `CHANGELOG.md`
+  merge driver and a check of what `main` renamed, `next-checks`, `cubic-round`
+  and `checkboxes` ([next#462]).
 - Every pull request gets a preview of the docs from Read the Docs ([#824]).
 - `fail-under` rises from 8.77 to 8.85 ([#443], [#639], [#767], [next#94],
   [next#121]), and pylint reads `@axiom` with no plugin ([#770], [#776],
@@ -1645,10 +1663,14 @@ for the changelog of `1.2.1` and earlier.
 [next#459]: https://github.com/rel-int/discopy-next/pull/459
 [next#445]: https://github.com/rel-int/discopy-next/issues/445
 [next#460]: https://github.com/rel-int/discopy-next/pull/460
+[next#462]: https://github.com/rel-int/discopy-next/pull/462
 [next#463]: https://github.com/rel-int/discopy-next/issues/463
+[next#466]: https://github.com/rel-int/discopy-next/issues/466
 [next#471]: https://github.com/rel-int/discopy-next/issues/471
 [next#468]: https://github.com/rel-int/discopy-next/issues/468
 [next#472]: https://github.com/rel-int/discopy-next/issues/472
+[next#477]: https://github.com/rel-int/discopy-next/issues/477
+[next#482]: https://github.com/rel-int/discopy-next/issues/482
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#56]: https://github.com/rel-int/optyx/pull/56
