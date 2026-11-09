@@ -1234,6 +1234,11 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   longer holds every intermediate hypergraph alive at once. It is as fast as
   it was: four fifths of the time is `explicit_trace`, which this leaves
   alone ([next#471]).
+- `python.Function.uncurry` takes `abc`'s `n`, splitting a nested exponential
+  as every other closed category does, where `uncurry(0)` bound `0` to `left`
+  and uncurried with its arguments swapped; `curry(0)` and `uncurry(0)` are
+  the identity, and `uncurry(n)` raises `ValueError` when the exponent has
+  more than `n` types ([next#477]).
 - The TikZ backend spells a colour that matplotlib draws and xcolor does not
   know, e.g. `tab:blue`, `C0`, `0.5`, `navy` or an RGB tuple, by its RGB
   values, with or without `use_tikzstyles`, so its drawing compiles; it was
@@ -1244,6 +1249,11 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   `(f[::-1]).bubble()`: bubbling and daggering need not commute, so that
   string read back as the other value wherever a `setoid` counts `is_dagger`,
   e.g. `tensor.Bubble` ([next#467]).
+- The Matplotlib backend draws a box, a spider, a ket or a bra coloured by an
+  RGB list or a NumPy array, which matplotlib reads as a colour: it looked
+  every colour up in `COLORS` and raised `TypeError` on an unhashable one.
+  `Backend.resolve` and `Backend.is_transparent` look up and compare a colour
+  only when it is a name, for both backends ([next#482]).
 
 ### Project
 
@@ -1620,6 +1630,8 @@ for the changelog of `1.2.1` and earlier.
 [next#471]: https://github.com/rel-int/discopy-next/issues/471
 [next#468]: https://github.com/rel-int/discopy-next/issues/468
 [next#472]: https://github.com/rel-int/discopy-next/issues/472
+[next#477]: https://github.com/rel-int/discopy-next/issues/477
+[next#482]: https://github.com/rel-int/discopy-next/issues/482
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#56]: https://github.com/rel-int/optyx/pull/56
