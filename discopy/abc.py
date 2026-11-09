@@ -221,8 +221,11 @@ class DaggerCategory[C0, C1: DaggerCategory](Category[C0, C1]):
     ``(f >> g).dagger() == g.dagger() >> f.dagger()``
     and ``f.dagger().dagger() == f``.
 
-    Its two laws are stated here rather than on :class:`Category`, so that a
+    Its laws are stated here rather than on :class:`Category`, so that a
     category with no dagger does not have to declare them inapplicable.
+    The third, :meth:`dagger_monoidality`, needs a tensor too: a dagger
+    category with none declares it inapplicable, as
+    :class:`discopy.cat.Arrow` does.
     """
     @abstractmethod
     def dagger(self) -> C1:
