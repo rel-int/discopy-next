@@ -1234,6 +1234,11 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   longer holds every intermediate hypergraph alive at once. It is as fast as
   it was: four fifths of the time is `explicit_trace`, which this leaves
   alone ([next#471]).
+- The TikZ backend spells a colour that matplotlib draws and xcolor does not
+  know, e.g. `tab:blue`, `C0`, `0.5`, `navy` or an RGB tuple, by its RGB
+  values, with or without `use_tikzstyles`, so its drawing compiles; it was
+  written raw, which pdflatex rejects, and a tuple raised `TypeError`
+  ([next#466]).
 
 ### Project
 
@@ -1605,6 +1610,7 @@ for the changelog of `1.2.1` and earlier.
 [next#460]: https://github.com/rel-int/discopy-next/pull/460
 [next#462]: https://github.com/rel-int/discopy-next/pull/462
 [next#463]: https://github.com/rel-int/discopy-next/issues/463
+[next#466]: https://github.com/rel-int/discopy-next/issues/466
 [next#471]: https://github.com/rel-int/discopy-next/issues/471
 [next#468]: https://github.com/rel-int/discopy-next/issues/468
 [next#472]: https://github.com/rel-int/discopy-next/issues/472
