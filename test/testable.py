@@ -357,6 +357,8 @@ def test_testable_generic():
     from discopy.kleisli import additive, Maybe, Powerset
     from discopy.utils import NamedGeneric
     for subclass in Testable.subclasses():
+        if not subclass.__module__.startswith("discopy."):
+            continue  # a class another test defines, e.g. test/utils.py's
         assert not issubclass(subclass, NamedGeneric)\
             or issubclass(subclass, TestableGeneric)
     assert additive.Channel[Maybe] not in Testable.enrolled()
