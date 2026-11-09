@@ -15,4 +15,4 @@
 > [P2] This deletion leaves five group instances without any axiom checks. Keep this parametrized test, or add these instances to the matrix’s checked parameters so edge cases such as orders 0 and 1 remain covered.
 
 - [ ] discopy/testable.py:801 Atom premise over an object type with no generator_strategy
-- [ ] test/group.py:56 five groups the matrix does not enrol lose their law checks
+- [WIP] @session_01MEJxy65KogNCEukoKHtHe1-2026-11-09 01:29 test/group.py:56 five groups the matrix does not enrol lose their law checks
