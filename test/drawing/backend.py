@@ -1,3 +1,4 @@
+import re
 from io import BytesIO
 
 from pytest import mark, raises
@@ -116,3 +117,29 @@ def test_svg_to_a_bytes_buffer_has_the_dark_mode_style():
     f, buffer = Box('f', Ty('x'), Ty('y')), BytesIO()
     f.draw(path=buffer, format="svg", show=False)
     assert buffer.getvalue().decode("utf-8") == f.to_svg()
+
+
+@mark.parametrize("use_tikzstyles", [False, True])
+@mark.parametrize("colour", ["tab:blue", "C0", "0.5", "navy", (.1, .2, .3)])
+def test_tikz_spells_a_matplotlib_only_colour_by_its_rgb(
+        tmp_path, colour, use_tikzstyles):
+    """ A colour that matplotlib reads and xcolor does not is written as its
+    RGB values, see rel-int/discopy-next#466. """
+    from matplotlib.colors import to_rgb
+    from discopy.monoidal import Equation
+    red, green, blue = (round(255 * x) for x in to_rgb(colour))
+    rgb = f"{{rgb,255: red,{red}; green,{green}; blue,{blue}}}"
+    x, path = Ty('x'), tmp_path / "colour.tikz"
+    Equation(Box('f', x, x, color=colour),
+             Box('g', x, x, color=colour, draw_as_spider=True)).draw(
+        path=str(path), to_tikz=True, use_tikzstyles=use_tikzstyles)
+    styles = path.with_suffix(".tikzstyles")
+    tikz = path.read_text() + (styles.read_text() if use_tikzstyles else "")
+    assert tikz.count(f"fill={rgb}") == 2
+    assert all(re.fullmatch(r"\w+", name)
+               for name in re.findall(r"style=([^,\]]*)", tikz))
+
+
+@mark.parametrize("colour", ["purple", "lightgray", "RoyalPurple", "red!50"])
+def test_tikz_keeps_an_xcolor_name(colour):
+    assert TikZ.format_color(colour) == colour
