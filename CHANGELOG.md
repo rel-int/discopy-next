@@ -247,6 +247,88 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   and dict functors ([next#168]); `para` and `interaction` hash ([next#31]).
 - A `Matrix` with no dtype reads it off its array without copying it, so it
   copies once, as a `Matrix[dtype]` does ([next#8]).
+- `feedback.generators` is `feedback.structural_boxes`, and
+  `feedback.wire_generators` `feedback.structural_wires`: a feedback, trace,
+  head or tail is a structural box, not a generator ([next#459]).
+- `feedback.Head` and `Tail`, at every level of the hierarchy, now have a
+  dagger: `Head(f).dagger() == Head(f.dagger())`, and the same for `Tail`,
+  where they used to raise `TypeError` ([next#445]).
+- `kleisli.monad.sample` orders outcomes by the new `kleisli.monad.canonical`,
+  which sorts the elements of sets and the items of mappings first, so the same
+  seed draws the same outcome whatever `PYTHONHASHSEED` is, for outcomes built
+  from tuples, sets and mappings of values whose repr does not depend on
+  hashing and tells unequal values apart ([next#445]).
+- `draw`'s docstring and `config.DRAWING_DEFAULT["fontsize"]` say 10, the
+  size Matplotlib draws box, braket and wire labels at, and that value now
+  sets it; spider labels and the symbols of an `Equation` keep 12, under
+  `DRAWING_DEFAULT["fontsize_spiders"]`, so no drawing changes ([next#445]).
+- With `use_tikzstyles=True`, a spider's TikZ style is named after its
+  `tikzstyle_name`, fill and shape, e.g. `Z_green_circle`, and writes both:
+  spiders that differ in fill no longer share one style and its last colour
+  ([next#445]).
+- Rotation and controlled-rotation gates compare and hash their phase exactly,
+  and the repr of every parametrized gate prints its phase exactly, a complex,
+  a fraction or a large integer included, so `eval(repr(g)) == g`, while `str`
+  and drawings keep 3 significant digits: a dictionary or functor keyed on
+  `Rz(0.1231)` no longer maps `Rz(0.1234)` ([next#445]).
+- `classical.BitControlledGate` prints the call to its own constructor,
+  `BitControlledGate(gate, default)` with `is_dagger` and `classical` when
+  set, so `eval(repr(x)) == x` holds for it and its dagger. It keeps its
+  gates as `data`, with the identity standing for a default not given, so
+  two boxes with different gates differ. Before, it printed the private
+  `_BitControlledSingleBox` with `Channel`'s arguments and compared equal for
+  any gates of the same type ([next#445]).
+- Composing a `DualRail` with any functor but the identity, on either side and
+  at every level (balanced, symmetric, ribbon, compact), raises `AxiomError`
+  saying to apply them in turn, `E(D(f))`, set by a new `Functor.composes`
+  that is false on `DualRail`: `D >> F` used to raise an unrelated `TypeError`,
+  and `F >> D` returned a functor that disagreed with `D(F(-))` on cups and
+  raised on twists, braids and swaps ([next#445]).
+- `monoidal.Wire` equality and hash count `is_dagger`, and a daggered wire
+  prints with `[::-1]` as a daggered box does: `Ty('x')[::-1] != Ty('x')`,
+  a reversed coloured wire no longer equals a fresh one with its colours
+  swapped, and a wire and its dagger, which a functor may send to different
+  images, have different heads and tails. Wires and types break ties in
+  their order by `repr`, so of two unequal types exactly one is less than
+  the other ([next#445]).
+- A bubble's `data` is part of its identity, as a box's is: bubbles that
+  differ only in `data` are unequal, and `str` prints the `data` so that
+  `eval(str(b)) == b` still holds. As for a box, a bubble holding unhashable
+  `data` is unhashable, and comparing bubbles whose `data` are arrays of more
+  than one entry raises `ValueError`, except at the tensor level, where a
+  bubble compares array and list `data` by their entries ([next#445]).
+- `cat.Transformation.id` has the shared `utils.identity` as its components,
+  and `then` drops it on either side and composes components given by a
+  dictionary into a dictionary, so that the identity is a unit and composition
+  is associative up to `==`, as for `cat.Functor` ([next#445]).
+- `Equation` compares by value: `==` compares type, terms, symbols, space and
+  `up_to`, a callable `up_to` by identity, and its hash agrees, so an equation
+  is hashable when its terms are; its repr prints the symbols unless they are
+  all `=`, and a `monoidal.Equation`'s space unless it is 1, so that
+  `eval(repr(e)) == e` unless `e` has an `up_to` of its own ([next#445]).
+- A law declared `failing` raises `AxiomFailure` only when its equation is
+  false or its terms refuse to build, and returns the equation otherwise: a
+  law fixed under its declaration XPASSes in the property matrix, and
+  `falsify()` returns a real counterexample ([next#445]).
+- A non-element on the left of a monoid's `@` raises `TypeError`, as one on
+  the right does: `Monoid.whisker` takes elements only, so `'x' @ Nat(2)` and
+  `None @ List[int](2)` no longer give back the element ([next#445]).
+- `abc.Nat` prints as `Nat(2)` rather than `2`, as `monoidal.Nat` does, so
+  `eval(str(n)) == n` holds on the nose; a `Matrix` prints its boundaries as
+  `dom=Nat(2), cod=Nat(2)`, so reading its repr back needs `Nat` in scope, as
+  `Matrix.environment()` gives ([next#445]).
+- Delaying a `Sum` or a `Bubble` works wherever delaying a box does: delay
+  distributes over a sum, so `(f + g).delay() == f.delay() + g.delay()`,
+  while a delayed bubble, circuit bubble or `ehypergraph.Join` keeps its args
+  and carries a `time_step` of its own on a delayed boundary, so
+  `f.bubble().delay() != f.delay().bubble()` ([next#445]).
+- A tensor or circuit box, and so a tensor bubble, counts its `time_step` in
+  `==` and `hash`, as a feedback box does: for circuit types,
+  `Box('f', x, y).delay() != Box('f', x.d, y.d)`, where they used to compare
+  equal though their resets differ ([next#445]).
+- `CMap.loops` are stored sorted by `repr`, so maps compare their loops as a
+  multiset: `Diagram.to_map()` is the fold of `then` and `CMap.dagger` is
+  contravariant on maps with loops ([next#445]).
 
 ### Deprecated
 
@@ -261,6 +343,44 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Fixed
 
+- `python.multiplicative.Function` and `python.additive.Function` build their
+  structural morphisms with `cls` and `type(self)` rather than with the base
+  class, the way `permutation` already did, so a subclass can be a functor's
+  codomain: `swap`, `copy`, `discard`, `ev`, `merge` and `twist` are the
+  classmethods `discopy.abc` declares them to be, and `tensor`, `curry`,
+  `fix`, `trace` and `dagger` return the class of their argument. A
+  `markov.Functor` into a subclass of `python.Function` used to send `Copy` to
+  a plain `Function` and then raise `TypeError: Expected F, got
+  python.multiplicative.Function instead` on composing it with the `Id` the
+  subclass did give. A subclass that is also a symmetric functor's codomain
+  wants `@factory` so that its `ar` is itself rather than its base, see the
+  second gotcha of the README. `python.finset.Function` keeps its base class
+  on purpose: `finset.Permutation` subclasses it narrowing `__init__`
+  ([next#463]).
+- `eval(repr(x)) == x`, `STYLE.md`'s transparency law, holds for the fifteen box
+  classes that broke it in the two copies of `zx` and in `optyx.core`. Each
+  printed the generic box call — name, dom, cod and a `data=` keyword — which
+  their own narrowed constructors reject: `zw.Endo`, `zw.Add`, `zw.Multiply`,
+  `zw.Divide`, `zw.Mod2`, `zx.And`, `zx.Or`, `diagram.Scalar`,
+  `diagram.DualRail`, `diagram.PhotonThresholdDetector` and
+  `quantum.zx.Scalar` raised `TypeError`, `zw.W` and
+  `diagram.EmbeddingTensor` raised `NameError` on an unqualified name, and
+  `zw.Create` and `zw.Select` read back silently unequal, their photons being
+  their own name, dom and cod. Each now prints the call to its public
+  constructor and keeps its data where `==` reads it — `zw.W(2,
+  is_dagger=True)`, `diagram.EmbeddingTensor(1, 2)`, `quantum.zx.Scalar(2)` —
+  the shape [next#445] ruled for `quantum.gates.Parametrized` and
+  `optyx.qubits.BitControlledGate`. `diagram.EmbeddingTensor` keeps its
+  `input_dim` and `output_dim` as public attributes to print them, and the
+  `listed` helper for internal states moves from `optyx.photonic` to
+  `optyx.utils.misc`, where the core can reach it. `test/optyx/test_repr.py`
+  now quantifies the law over the core as well as the tower, and
+  `test/quantum/zx.py` over the ZX boxes, `Swap` included. `zw.Endo` also
+  reads its scalar rather than the name derived from it in `setoid`, so that two
+  endomorphisms with equal scalars are equal: `Endo(0.5).conjugate() ==
+  Endo(0.5)` was false, the conjugate's name printing the negative zero
+  `(0.5-0j)` that the scalar does not have, and no representation of it could
+  have read back ([next#472], [next#468], [next#168]).
 - The documentation says what the code does: the README, CONTRIBUTING.md,
   AGENTS.md and the module summaries no longer name modules, classes or
   notebooks that are gone, list the public ones they missed, and state each
@@ -967,6 +1087,153 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 - Optyx reads a foliated diagram one box at a time: `Diagram.sample`, `dilate`,
   `get_kraus`, `explode_channel` and `BitControlledGate` no longer raise
   `ValueError` on a layer that holds several boxes ([next#445]).
+- Mixed evaluation of a daggered or transposed pure box, e.g. `S.dagger()` or
+  `U.r`, is the doubled pure evaluation, by `channel.Functor` and by
+  `Circuit.eval(mixed=True, contractor=...)`, so circuits with a measurement
+  give the right probabilities ([next#445]).
+- `to_tk` emits a transposed `Y` with its sign, since `Y.r == -Y`: `CY.l` and
+  `CY.r` go to tket as `CY` followed by `Z` on the control, so tket samples the
+  same outcomes as `eval` ([next#445]).
+- Rotating or conjugating a `Ket`, `Bra`, `Bits`, `Digits`, `Discard` or
+  `MixedState` reverses its wires: `Ket(1, 0).r == Bra(0, 1)`,
+  `Ket(1, 0).conjugate() == Ket(0, 1)` and
+  `Discard(bit @ qubit).r == MixedState(qubit @ bit)` ([next#445]).
+- `to_tk` translates `Measure(override_bits=True)` after classical
+  post-processing correctly: it discards the old bits in post-processing and
+  measures into fresh ones, where before the post-processing read the new value
+  and a `Copy` before it raised `IndexError` ([next#445]).
+- `Circuit.eval(backend=..., measure_all=True)` and `Circuit.get_counts`
+  measure each open qubit into a fresh bit, so `eval` no longer raises
+  `IndexError` and a circuit with a `Bra` no longer post-selects on the wrong
+  qubit ([next#445]).
+- `circuit2zx` maps `sqrt(x)` to the scalar of its root, conjugated for its
+  dagger, so the images of `Circuit.cups`, `caps` and 0-input spiders are no
+  longer off by sqrt(2) ([next#445]).
+- `circuit2zx` maps `Rz(a)` and `Rx(a)` to their spiders times `exp(-i pi a)`,
+  so the image of every rotation, and of a sum or gradient of them, equals the
+  circuit exactly ([next#445]).
+- `Scalar.grad` is the derivative of the scalar's evaluation in each mode
+  (`2 Re(conj(s) s')` under mixed evaluation), and `Sqrt.grad` differentiates
+  the root instead of the radicand ([next#445]).
+- `eval(repr(x)) == x` now holds for `Ket`, `Bra`, `Copy`, `Match` and
+  `MixedScalar` (delayed too), and for a `Scalar` with a custom name, so
+  circuits that prepare, post-select, copy or match round-trip their repr
+  ([next#445]).
+- `Circuit.eval(*others, contractor=...)` evaluates every circuit it is given,
+  so `Sum.eval(contractor=...)` returns the sum of its terms instead of one
+  term's array summed along its first axis ([next#445]).
+- `lambdify` on a parametrised quantum gate or scalar evaluates its phase in
+  the current backend, whatever `modules` it is given, and passes its other
+  keyword arguments to `sympy.lambdify`, so torch gradients flow through
+  nonlinear phases and `jax.grad` works through them ([next#445]).
+- `Circuit.measure` measures every open qubit when it evaluates as a channel,
+  instead of discarding it, so `(Ket(0) >> H).measure(mixed=True)` is
+  `[.5, .5]` and `((Ket(0) >> X) @ Bits(1)).measure()` is the joint
+  distribution `[[0, 0], [0, 1]]` ([next#445]).
+- A pure circuit `Bubble` evaluates under `mixed=True` as the doubling of its
+  pure evaluation (single for a classical one), instead of raising
+  `AttributeError` on `is_classical` ([next#445]).
+- `to_pennylane` converts `U1` and `CCX` (and so every `Rydberg` ansatz)
+  instead of raising `KeyError` ([next#445]).
+- `Scalar(data, name=...)` and the other keyword forms of its constructor build
+  the scalar instead of raising `TypeError` ([next#445]).
+- `Circuit.measure` and `get_counts` without a backend accept a delayed circuit
+  and agree with the undelayed one, instead of raising `AxiomError`; `to_tk`
+  raises `NotImplementedError` on one, as on anything else it cannot translate
+  ([next#445]).
+- `Circuit.measure` and `init_and_discard` prepare a digit of any dimension in
+  `Digits(0, dim=...)`, so a classical circuit on `Digit(4)` measures instead
+  of raising `AxiomError` ([next#445]).
+- `quantum.Measure`'s `destructive` and `Encode`'s `constructive` are
+  documented the right way round, `Circuit.from_tk` says it adds logical swaps
+  rather than SWAP gates, and `Controlled` says that a zero distance raises
+  `ValueError` ([next#445]).
+- Calling a `grammar.cfg.Tree` on arguments whose types do not tensor to its
+  `dom` (all identities, an `Id` root, too many or too few arguments) raises
+  `AxiomError`, where it used to return an ill-typed or truncated tree
+  ([next#445]).
+- `grammar.cfg.Algebra` maps `Id` and any tree with an `Id` branch to the
+  identity of its codomain operad, where it used to raise `AttributeError`
+  ([next#445]).
+- `grammar.cfg.Id(x).to_diagram()` is `monoidal.Id(x)`, so the diagram of a
+  tree with an identity branch has no spurious `Id(x)` box ([next#445]).
+- `quantum.graphlike.size` counts a phase-free spider with three or more ports
+  and no box (e.g. a reduced `Z(1, 2)`), as PyZX does after its own
+  `full_reduce`; only a bare wire, cup or cap counts as no spider ([next#445]).
+- `grammar.categorial.tree2diagram(tree, dom=...)` gives `dom` to every word of
+  the tree, not only to a tree that is a single word ([next#445]).
+- `eval(repr(r)) == r` for a `grammar.thue.Rule` or `grammar.cfg.Rule` with an
+  empty name, e.g. the root of `cfg.Tree.from_nltk` on an unlabelled tree
+  ([next#445]).
+- `grammar.categorial.FX` and `BX` name subterms that compose, `C << B` with
+  `A >> B` and `B << C` with `B >> A`, where the pairs they documented raised
+  `AxiomError` ([next#445]).
+- `pregroup.Diagram.normal_form` passes `normalize` and its other params on to
+  `rigid.Diagram.normal_form`, where it used to drop them on every input
+  ([next#445]).
+- The `quantum.contextuality` module docs say the gradient is constant on each
+  context on the non-contextual polytope, not zero, and that the dual solution
+  is not unique anywhere on it when the scenario has more than one context
+  ([next#445]).
+- `reservoir.Readout` compares by value: `eval(repr(r)) == r` (with `array` in
+  scope), and two identical fits compare equal ([next#445]).
+- `python.finset.Permutation` refuses a `Function` whose domain is not its
+  codomain, so that `then` and `tensor` with a discard or a projection raise
+  rather than return a permutation of the wrong size, and `Permutation.then`
+  raises `AxiomError` on a `Function` that does not compose with it, as
+  `Function.then` does ([next#445]).
+- `Drawing.dagger` reflects a drawing with a bubble, a frame or a slot, e.g. an
+  `Equation` of coloured terms, where it used to raise a bare `AssertionError`
+  ([next#445]).
+- The dagger of a drawing with two or more boxes has a graph of its own, not a
+  frozen networkx view, so that `add_nodes`, `add_edges` and `add_box_corners`
+  work on it ([next#445]).
+- `draw(doctest=..., to_tikz=True)` compares the drawing against its `.tikz`
+  and `.tikzstyles` baselines and raises when they differ, where it used to
+  overwrite them ([next#445]).
+- TikZ output with `use_tikzstyles=True` writes its `.tikzstyles` beside the
+  `.tikz` file for any path, a `pathlib.Path`, a dotted folder or a name with
+  no extension among them ([next#445]).
+- An SVG drawn to a `BytesIO` or to an open file, text or binary, carries the
+  dark-mode style, where it used to crash after Matplotlib had written it
+  ([next#445]).
+- `Drawing.bubble` takes a `dom` and a `cod` of plain types, e.g. symmetric,
+  rigid, compact or frobenius ones, casting them with `to_drawing`: it used to
+  leave nodes with no position when their length matched the inside's, so that
+  drawing raised `KeyError` ([next#445]).
+- `Drawing.__eq__` compares the edges of the plane graph, so that drawings with
+  the same nodes and positions but different wiring are not equal ([next#445]).
+- `python.additive.Function.braid` works on an instance as well as on the
+  class, where it used to raise `TypeError` ([next#445]).
+- `Function.no_type_checking` on a subclass of `python.function.Function`
+  leaves the subclass as it found it, so that the switch on the base class
+  still reaches it and nesting the two no longer turns its type checking off
+  for good ([next#445]).
+- The label of a box or a braket coloured `config.TRANSPARENT` is drawn black
+  and turns white on a dark page, where it used to be drawn white, invisible on
+  a light one ([next#445]).
+- `Hypergraph.make_bijective`, `make_left_monogamous` and
+  `make_right_monogamous` insert every box they need in one pass, where each
+  rebuilt and re-validated the whole hypergraph once per box: a hypergraph
+  with 128 spiders to fix goes from 1.1 s to 0.012 s, and one with more of
+  them than the recursion limit allows no longer raises `RecursionError`
+  ([next#445]).
+- `Hypergraph.make_left_monogamous` reads the legs of each merge in port
+  order, as `make_right_monogamous` already did, where it read them in the
+  iteration order of a `set` of port indices, so the wires, `==` and `repr` of
+  an affected hypergraph can change — the merge of a commutative monoid is
+  symmetric, so what it evaluates to does not ([next#445]).
+- `Hypergraph.make_monogamous` inserts every cup and cap it needs in one
+  pass, where it rebuilt and re-validated the whole hypergraph once per pair
+  of ports: a hypergraph with 128 transposes to bend goes from 4.8 s to
+  0.060 s, and one with more pairs than the recursion limit allows no longer
+  raises `RecursionError` ([next#471]).
+- `Hypergraph.trace_backward_wires`, and so `make_causal` and `make_cocausal`,
+  cuts its wires in a loop rather than one frame of recursion per cut, so a
+  graph with a thousand of them no longer raises `RecursionError` and no
+  longer holds every intermediate hypergraph alive at once. It is as fast as
+  it was: four fifths of the time is `explicit_trace`, which this leaves
+  alone ([next#471]).
 
 ### Project
 
@@ -1016,7 +1283,57 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 - `test_Diagram_permutation` and `test_Kauffman` patch class attributes through
   `monkeypatch`, so a failure no longer leaves them patched for the tests after
   it, and `test/balanced.py` defines `test_functor_twist_dagger` once
+- Every push to `main` gets its own `build` and `benchmark` run, since a
+  concurrency group per ref let a newly queued push cancel the pending one
   ([next#445]).
+- The shared setup action runs setup-uv 10.2.0 and setup-python 7.0.0, the
+  versions `benchmark.yml` runs, and Dependabot now scans `.github/actions/*`
+  so they keep moving together ([next#445]).
+- pylint's `fail-under` is raised from 9.09 to 9.33, main's score rounded
+  down, so the score can no longer drop 0.25 without lint failing ([next#445]).
+- The `test` extra includes `notebooks`, so `pip install -e '.[test]'` brings
+  anywidget and the "Build without uv" recipe's `coverage run -m pytest` no
+  longer stops at collection on `discopy/drawing/widget.py` ([next#445]).
+- The benchmark commands in `CONTRIBUTING.md` and
+  `benchmark/test_composition.py` create `benchmark-results/` first, so they
+  run on a fresh clone ([next#445]).
+- `test/readme.py` checks every relative link and anchor of the README, so a
+  link to a deleted notebook or to a heading no section defines fails the suite
+  ([next#445]).
+- `pytest --skip-extra <file>` skips a module that needs an extra instead of
+  failing at collection, for every module `--skip-extra` covers, not only
+  `discopy.optyx` ([next#445]).
+- `pytest --help` no longer says `--skip-extra` skips nothing once the extras
+  are installed: the flag skips its fixed list whether or not they import
+  ([next#445]).
+- `benchmark/report.py`'s `NAME-results.md` writes medians with 3 significant
+  figures, so microsecond-scale cases no longer read 0.0000 ([next#445]).
+- `docs/export_notebooks.py` runs each notebook on the discopy of its own tree,
+  so `--check` from a worktree no longer tests the editable install's code
+  ([next#445]).
+- `docs/export_notebooks.py` fails when any named notebook matches nothing,
+  naming it, instead of silently checking only the names that match
+  ([next#445]).
+- The `shared` Hypothesis profile replays the example database of the
+  repository `HYPOTHESIS_GITHUB_REPOSITORY` names, `discopy/discopy` unless
+  set; CONTRIBUTING.md shows a local run setting it to `rel-int/discopy-next`,
+  which replays the database this repo's `proptest` workflow uploads
+  ([next#445]).
+- The `docs` extra installs `discopy[optyx]` and the `notebooks` extra joblib,
+  so with the `docs` group 13 of the 15 optyx notebooks render instead of
+  falling back to link pages, the other two being `KNOWN_BROKEN`; the docs
+  job's timeout rises to 45 minutes for them. The `dev` group installs
+  egglog, so the 40 egglog checks of `test/ehypergraph.py` and its fixture
+  run instead of skipping ([next#445]).
+- `benchmark_comment.py` skips a pull request retargeted while its benchmark
+  ran, with a `::notice::`, and exits 0, instead of failing the job as a run
+  that does not belong to it, or, for a pull request from a fork, posting the
+  comparison against its old base; the next run posts ([next#445]).
+- `project.license` is the SPDX expression `BSD-3-Clause AND Apache-2.0`, and
+  `project.license-files` lists `LICENSE`, `discopy/optyx/LICENSE` and
+  `discopy/optyx/NOTICE`, replacing the TOML table setuptools deprecates: the
+  built wheel and sdist carry `License-Expression` and all three
+  `License-File`s ([next#445]).
 
 ## [1.2.2] - 2025-12-19
 
@@ -1280,8 +1597,13 @@ for the changelog of `1.2.1` and earlier.
 [next#443]: https://github.com/rel-int/discopy-next/issues/443
 [next#457]: https://github.com/rel-int/discopy-next/issues/457
 [next#458]: https://github.com/rel-int/discopy-next/pull/458
+[next#459]: https://github.com/rel-int/discopy-next/pull/459
 [next#445]: https://github.com/rel-int/discopy-next/issues/445
 [next#460]: https://github.com/rel-int/discopy-next/pull/460
+[next#463]: https://github.com/rel-int/discopy-next/issues/463
+[next#471]: https://github.com/rel-int/discopy-next/issues/471
+[next#468]: https://github.com/rel-int/discopy-next/issues/468
+[next#472]: https://github.com/rel-int/discopy-next/issues/472
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#56]: https://github.com/rel-int/optyx/pull/56

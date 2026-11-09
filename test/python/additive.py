@@ -66,6 +66,13 @@ def test_permutation():
     assert f.trace(0) is f
 
 
+def test_braid_of_an_instance_is_the_swap():
+    from discopy.python.additive import Function
+
+    X = Function.ob(int)
+    assert Function.id(X).braid(X, X) == Function.swap(X, X)
+
+
 def test_trace_takes_the_keyword_form():
     from pytest import raises
     from discopy.python.additive import Function
@@ -119,3 +126,19 @@ def test_Hypergraph_pass_token():
     copy = Hypergraph[Function](X, X @ X, (), ((0, ), (), (0, 0)))
     with raises(AxiomError, match="is not right-monogamous"):
         copy(1)
+
+
+def test_subclass_as_functor_codomain():
+    """ The additive half of rel-int/discopy-next#463. """
+    from discopy.python.additive import Function
+
+    class Sub(Function):
+        """ A subclass of ``Function``, e.g. one with its own ``__call__``. """
+
+    x = Sub.ob(int)
+    assert all(isinstance(f, Sub) for f in (
+        Sub.id(x), Sub.twist(x), Sub.merge(x), Sub.noise(x),
+        Sub.swap(x, x), Sub.swap(x, x).dagger(),
+        Sub.permutation((1, 0), (x, x)), Sub.id(x).tensor(Sub.id(x)),
+        Sub(lambda n, tag=0: (n, 0) if n else (n - 1, 1),
+            x @ x, x @ x).trace()))

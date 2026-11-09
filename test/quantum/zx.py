@@ -1,7 +1,5 @@
 import random
-import tomllib
 from fractions import Fraction
-from pathlib import Path
 
 import pytest
 
@@ -12,10 +10,10 @@ from discopy.quantum.gates import CRz, CRx, CU1, Controlled, Rz, Rx
 from discopy.quantum.zx import *
 from discopy import frobenius, tensor
 from discopy.tensor import Dim, Tensor
+from fixtures.pyproject import EXTRAS
 
-with open(Path(__file__).parents[2] / "pyproject.toml", "rb") as file:
-    QUANTUM = tomllib.load(file)["project"]["optional-dependencies"]["quantum"]
-PYZX = next(req.split("==")[1].strip() for req in QUANTUM if "pyzx" in req)
+PYZX = next(req.split("==")[1].strip()
+            for req in EXTRAS["quantum"] if "pyzx" in req)
 
 
 @fixture
@@ -255,9 +253,9 @@ def test_circuit2zx():
     gadget = [Z(1, 2), Z(1, 2), X(2, 1), Z(1, 0), scalar(2 ** 0.5)]
     assert circuit2zx(circuit) == Diagram.decode(
         dom=Nat(0), boxes_and_offsets=zip(
-            [X(0, 1), X(0, 1), scalar(0.5), H, X(1, 1)]
+            [X(0, 1), X(0, 1), scalar(0.5), H, X(1, 1), scalar(1)]
             + gadget + [H] + gadget + [H] + gadget,
-            [0, 1, 2, 0, 1]
+            [0, 1, 2, 0, 1, 2]
             + [0, 2, 1, 1, 2] + [1] + [0, 2, 1, 1, 2] + [1] + [0, 2, 1, 1, 2]))
 
     # Verify XYZ=iI
@@ -289,6 +287,33 @@ def test_circuit2zx():
 def test_repr_and_rotate():
     assert str(Scalar(2)) == "scalar(2)"
     assert Z(1, 2, .5).rotate() == Z(2, 1, .5)
+
+
+@pytest.mark.parametrize("box", [
+    Scalar(2), Scalar(.5j), Scalar(Fraction(1, 3)), scalar(2 ** 0.5),
+    SWAP, Swap(Nat(1), Nat(1)), Z(1, 2), Z(1, 1, .5), X(0, 1, .25),
+    Y(2, 1, .3), H, Box("f", Nat(1), Nat(1)),
+    Z(1, 2) @ Nat(1) >> Nat(1) @ X(2, 1),
+    SWAP >> Z(1, 1) @ Z(1, 1) >> scalar(2) @ Nat(2)],
+    ids=str)
+def test_eval_repr(box):
+    """
+    STYLE.md's transparency law, which next#468 broke for a ``Scalar``, and
+    whose ``Swap`` row next#168 lists.
+    """
+    assert eval(repr(box), Diagram.environment()) == box
+
+
+def test_eval_repr_of_a_symbol():
+    """
+    A symbolic parameter prints as itself, as every parametrized box in the
+    library does, so it reads back where the caller names its symbols:
+    ``Diagram.environment()`` holds the classes, not the symbols.
+    """
+    phi = pytest.importorskip("sympy").Symbol("phi")
+    environment = {**Diagram.environment(), "phi": phi}
+    for box in [Scalar(phi), Scalar(2 * phi), Z(1, 1, phi), X(1, 2, phi ** 2)]:
+        assert eval(repr(box), environment) == box
 
 
 def matrix(diagram):
@@ -378,17 +403,26 @@ def test_eval_circuit2zx(random_had_cnot_diagram):
     gates = [
         quantum.H, quantum.X, quantum.Y, quantum.Z, quantum.S, quantum.T,
         quantum.CX, quantum.CZ, quantum.SWAP, Ket(0, 1), Bra(1, 0),
-        quantum.scalar(1j), CU1(.3).dagger(), CRz(.3).dagger(),
+        quantum.scalar(1j), quantum.sqrt(2), quantum.gates.Sqrt(-1),
+        quantum.gates.Sqrt(-1).dagger(), Circuit.cups(qubit, qubit),
+        Circuit.spiders(0, 1, qubit), CU1(.3).dagger(), CRz(.3).dagger(),
         CRx(.3).dagger(), Controlled(quantum.X, distance=-2),
-        Controlled(quantum.Z, distance=2), random_had_cnot_diagram(3, 20)]
+        Controlled(quantum.Z, distance=2), random_had_cnot_diagram(3, 20),
+        Rz(.3), Rx(.3), Rz(.3) + Rz(-.3), Rx(.3) + Rx(-.3)]
     for gate in controlled + gates:
         diagram = circuit2zx(gate)
         assert (diagram.dom, diagram.cod)\
             == (Nat(len(gate.dom)), Nat(len(gate.cod)))
         assert diagram.eval().is_close(gate.eval())
+
+
+def test_circuit2zx_backend():
+    pytest.importorskip("torch")
     for rotation in (Rz(.3), Rx(.3)):
-        assert proportional(circuit2zx(rotation).eval().array,
-                            rotation.eval().array)
+        with tensor.backend("pytorch"):
+            diagram = circuit2zx(rotation)
+        assert diagram == circuit2zx(rotation)
+        assert diagram.eval().is_close(rotation.eval())
 
 
 def test_to_hypergraph():

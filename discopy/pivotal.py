@@ -114,7 +114,7 @@ class Wire(feedback.Wire, rigid.Wire):
         return self.l
 
 
-HeadOb, TailOb = feedback.wire_generators(Wire)
+HeadOb, TailOb = feedback.structural_wires(Wire)
 
 
 @factory
@@ -318,6 +318,8 @@ class Bubble(rigid.Bubble, feedback.Bubble, Box):
     >>> bubble = Box('f', x, y).bubble()
     >>> assert bubble.r.r == bubble == bubble.l.l and bubble.r == bubble.l
     """
+    serialised_attrs = rigid.Bubble.serialised_attrs + ("time_step", )
+
     def rotate(self, left=False) -> Bubble:
         result = super().rotate(left)
         result.z %= 2
@@ -337,7 +339,8 @@ class Functor(rigid.Functor, feedback.Functor):
     dom = cod = Diagram
 
 
-Feedback, Trace, FollowedBy, Head, Tail = feedback.generators(Diagram, Box)
+Feedback, Trace, FollowedBy, Head, Tail = feedback.structural_boxes(
+    Diagram, Box)
 Diagram.box_factory = Box
 Diagram.functor_factory = Functor
 Diagram.cup_factory, Diagram.cap_factory = Cup, Cap

@@ -6,7 +6,12 @@ discopy error messages.
 
 TYPE_ERROR = "Expected {}, got {} instead."
 NOT_COMPOSABLE = "{} does not compose with {}: {} != {}."
+NO_COMPOSITE = (
+    "{} composes with no functor but the identity, as its maps do not "
+    "determine it: apply them in turn instead, i.e. E(D(f)) rather than "
+    "(D >> E)(f).")
 NOT_PARALLEL = "Expected parallel arrows, got {} and {} instead."
+ONLY_REVERSED = "A {} is not sliced, only reversed with [::-1]."
 NOT_GLOBULAR = "Expected a globular box, got boundaries {} -> {} and {} -> {}."
 NOT_ATOMIC = "Expected {} of length 1, got length {} instead."
 NOT_CONNECTED = "{} is not boundary-connected."

@@ -28,6 +28,8 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from contextlib import contextmanager
+from functools import partial
+from io import StringIO
 from itertools import combinations
 from math import sqrt
 import os
@@ -40,6 +42,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 
+from matplotlib import cbook
 from matplotlib.colors import is_color_like, to_hex, to_rgb
 from matplotlib.testing.compare import compare_images
 from matplotlib.testing.exceptions import ImageComparisonFailure
@@ -296,28 +299,15 @@ DARK_MODE_STYLE = (
     '}</style>')
 
 
-def add_dark_mode_style(path):
+def add_dark_mode_style(text):
     """
-    Insert :data:`DARK_MODE_STYLE` after the opening tag of an SVG saved at
-    ``path``, a file name or an in-memory text buffer: a media query turning
-    the elements tagged by :meth:`Matplotlib.dark_gid` white on a dark page,
-    every other renderer keeping the static black on a transparent canvas.
+    Insert :data:`DARK_MODE_STYLE` after the opening tag of the SVG ``text``:
+    a media query turning the elements tagged by :meth:`Matplotlib.dark_gid`
+    white on a dark page, every other renderer keeping the static black on a
+    transparent canvas.
     """
-    is_file = not isinstance(path, (str, bytes, os.PathLike))
-    if is_file:
-        text = path.getvalue()
-    else:
-        with open(path, encoding="utf-8") as file:
-            text = file.read()
     opening = text.index(">", text.index("<svg")) + 1
-    text = text[:opening] + DARK_MODE_STYLE + text[opening:]
-    if is_file:
-        path.seek(0)
-        path.truncate()
-        path.write(text)
-    else:
-        with open(path, "w", encoding="utf-8") as file:
-            file.write(text)
+    return text[:opening] + DARK_MODE_STYLE + text[opening:]
 
 
 def savefig(path, format=None, compare=False, tol=DEFAULT['plt_tol']):
@@ -343,11 +333,16 @@ def savefig(path, format=None, compare=False, tol=DEFAULT['plt_tol']):
         {"Software": None} if is_png else None
 
     def save(actual_path):
+        target = StringIO() if is_svg else actual_path
         with matplotlib_context():
-            plt.savefig(actual_path, format=format, metadata=metadata,
-                        transparent=is_svg)
+            plt.savefig(target, format="svg" if is_svg else format,
+                        metadata=metadata, transparent=is_svg)
         if is_svg:
-            add_dark_mode_style(actual_path)
+            text = add_dark_mode_style(target.getvalue())
+            with cbook.open_file_cm(
+                    actual_path, "w", encoding="utf-8") as file:
+                file.write(text if cbook.file_requires_unicode(file)
+                           else text.encode("utf-8"))
 
     save_and_compare(path, save, tol) if compare else save(path)
 
@@ -1074,10 +1069,13 @@ class Backend(ABC):
         points[i] = points[i].shift(x=asymmetry)
         self.draw_polygon(*points, facecolor=box.color)
         if params.get('draw_box_labels', True):
+            adaptive = box.color == TRANSPARENT
             self.draw_text(box.drawing_name, *positions[node],
                            ha='center', va='center',
-                           color=self.readable_foreground(box.color),
-                           fontsize=params.get('fontsize', None))
+                           color=self.readable_foreground(
+                               "white" if adaptive else box.color),
+                           fontsize=params.get('fontsize', None),
+                           adaptive=adaptive)
 
     def draw_discard(self, positions, node, **params):
         """ Draws a :class:`discopy.quantum.circuit.Discard` box. """
@@ -1212,7 +1210,7 @@ class Backend(ABC):
     def draw_brakets(self, positions, node, **params):
         """ Draws a :class:`discopy.quantum.gates.Ket` box. """
         box, j = node.box, node.j
-        is_bra = len(box.dom) > 0
+        is_bra, adaptive = len(box.dom) > 0, box.color == TRANSPARENT
         for i, bit in enumerate(box._digits):
             kind = "box_dom" if is_bra else "box_cod"
             x = box.dom[i] if is_bra else box.cod[i]
@@ -1227,8 +1225,9 @@ class Backend(ABC):
             self.draw_text(
                 bit, middle[0], middle[1] + (-.25 if is_bra else .2),
                 ha='center', va='center',
-                color=self.readable_foreground(box.color),
-                fontsize=params.get('fontsize', None))
+                color=self.readable_foreground(
+                    "white" if adaptive else box.color),
+                fontsize=params.get('fontsize', None), adaptive=adaptive)
 
     def draw_controlled_gate(self, positions, node, **params):
         """ Draws a :class:`discopy.quantum.gates.Controlled` gate. """
@@ -1475,11 +1474,13 @@ class TikZ(Backend):
             i, j = graph.positions[node]
             text = node.box.drawing_name if draw_box_labels else ""
             if self.use_tikzstyles:
-                style = f"\\tikzstyle{{{node.box.tikzstyle_name}}}=" \
-                        f"[fill={self.format_color(color)}]\n"
+                style_name = f"{node.box.tikzstyle_name}_"\
+                    f"{str(color).removeprefix('#')}_{shape}"
+                style = f"\\tikzstyle{{{style_name}}}=" \
+                        f"[fill={self.format_color(color)}, shape={shape}]\n"
                 if style not in self.node_styles:
                     self.node_styles.append(style)
-                options = f"style={node.box.tikzstyle_name}"
+                options = f"style={style_name}"
             else:
                 options = f"{shape}, fill=" + (
                     self.format_color(color) if str(color).startswith("#")
@@ -1504,14 +1505,24 @@ class TikZ(Backend):
         edges = ["\\begin{pgfonlayer}{edgelayer}\n"] + self.edgelayer\
             + ["\\end{pgfonlayer}\n"]
         end = ["\\end{tikzpicture}\n"]
+
+        def write(lines, actual_path):
+            with open(actual_path, 'w+') as file:
+                file.writelines(lines)
+
+        def save(file_path, lines):
+            if params.get("compare", False):
+                save_and_compare(file_path, partial(write, lines))
+            else:
+                write(lines, file_path)
+
         if path is not None:
             if output_tikzstyle:
-                style_path = '.'.join(path.split('.')[:-1]) + '.tikzstyles'
-                with open(style_path, 'w+') as file:
-                    file.writelines(["% Node styles\n"] + self.node_styles)
-                    file.writelines(["% Edge styles\n"] + self.edge_styles)
-            with open(path, 'w+') as file:
-                file.writelines(begin + nodes + edges + end)
+                style_path = os.path.splitext(os.fspath(path))[0]\
+                    + '.tikzstyles'
+                save(style_path, ["% Node styles\n"] + self.node_styles
+                     + ["% Edge styles\n"] + self.edge_styles)
+            save(path, begin + nodes + edges + end)
         elif show:  # pragma: no cover
             if output_tikzstyle:
                 print(''.join(self.node_styles + self.edge_styles))
@@ -1540,7 +1551,8 @@ class Matplotlib(Backend):
         super().draw_boundary(graph, boundary_color=boundary_color, **params)
 
     def draw_text(self, text, i, j, **params):
-        params['fontsize'] = params.get('fontsize', DEFAULT['fontsize'])
+        if params.get('fontsize') is None:
+            params['fontsize'] = DEFAULT['fontsize']
         if params.pop('adaptive', False):
             params['gid'] = self.dark_gid("fill")
         self.axis.text(i, j, text, **params)
@@ -1662,7 +1674,8 @@ class Matplotlib(Backend):
         dark page: black spiders lie on the neutral canvas so they turn
         white, coloured ones keep their colour. A transparent spider is just
         its label, e.g. the symbol of an :class:`discopy.monoidal.Equation`,
-        which leaves no patch on a coloured page.
+        which leaves no patch on a coloured page. The labels are drawn at
+        ``DRAWING_DEFAULT["fontsize_spiders"]``, whatever the ``fontsize``.
         """
         import networkx as nx
         nodes = [node for node in graph.nodes
@@ -1684,6 +1697,7 @@ class Matplotlib(Backend):
                     self.draw_text(
                         node.box.drawing_name, *graph.positions[node],
                         ha='center', va='center',
+                        fontsize=DEFAULT['fontsize_spiders'],
                         adaptive=node.box.color == TRANSPARENT)
         super().draw_spiders(graph, draw_box_labels)
 

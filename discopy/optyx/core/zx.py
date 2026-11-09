@@ -522,6 +522,10 @@ class And(ZXBox):
     def dagger(self):
         return And(n=self.n, is_dagger=not self.is_dagger)
 
+    def __repr__(self):
+        dagger = ", is_dagger=True" if self.is_dagger else ""
+        return f"{factory_name(type(self))}({self.n}{dagger})"
+
     def conjugate(self):
         return And(n=self.n, is_dagger=self.is_dagger)
 
@@ -580,6 +584,10 @@ class Or(ZXBox):
 
     def dagger(self):
         return Or(n=self.n, is_dagger=not self.is_dagger)
+
+    def __repr__(self):
+        dagger = ", is_dagger=True" if self.is_dagger else ""
+        return f"{factory_name(type(self))}({self.n}{dagger})"
 
     def conjugate(self):
         return Or(n=self.n, is_dagger=self.is_dagger)

@@ -220,6 +220,9 @@ class Permutation(Function, PROP, Groupoid):
     True
     """
     def __init__(self, inside=(), size: int | None = None):
+        if isinstance(inside, Function) and inside.dom != inside.cod:
+            raise ValueError(messages.NOT_A_PERMUTATION.format(
+                len(inside.dom), inside))
         inside = tuple(inside)
         if size is None:
             size = len(inside)
@@ -358,11 +361,20 @@ class Permutation(Function, PROP, Groupoid):
 
     def then(self, *others: Self) -> Self:
         """ Return ``self ; others``, i.e. each index pushed through them
-        in turn, ``result[i] == other[self[i]]`` for a single ``other``. """
+        in turn, ``result[i] == other[self[i]]`` for a single ``other``.
+
+        Raises:
+            AxiomError : When a function's domain is not ``self.cod``.
+            ValueError : When an argument is otherwise not a permutation of
+                that size, e.g. a sequence of another length.
+        """
         if not others:
             return self
         inside = self.inside
         for other in others:
+            if isinstance(other, Function) and other.dom != self.cod:
+                raise AxiomError(messages.NOT_COMPOSABLE.format(
+                    self, other, self.cod, other.dom))
             image = type(self)(other, len(self)).inside
             inside = [image[i] for i in inside]
         return type(self)(inside, len(self))

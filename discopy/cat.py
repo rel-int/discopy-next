@@ -947,11 +947,19 @@ one, they have [cat.Ob('x'), cat.Ob('y')].
     def setoid(self):
         """
         Ensure that bubbles are equal if they have the same type, their `args`
-        are equal as well as their attributes `dom, cod, name, method`.
+        are equal as well as their attributes `dom, cod, name, method` and
+        `data`, as for a :class:`Box`: if the `data` is not hashable then
+        neither is the bubble. Its string prints the `data`, so that it reads
+        back.
+
+        >>> f = Box('f', Ob('x'), Ob('y'))
+        >>> assert f.bubble(data=1) != f.bubble(data=2)
+        >>> print(f.bubble(data=1))
+        (f).bubble(data=1)
         """
         args_data = tuple(f.setoid() for f in self.args)
         return (type(self), ) + args_data + tuple(getattr(self, x) for x in (
-            "dom", "cod", "name", "method"))
+            "dom", "cod", "name", "method", "data"))
 
     def __str__(self):
         str_args = ",".join(map(str, self.args))
@@ -960,6 +968,7 @@ one, they have [cat.Ob('x'), cat.Ob('y')].
         str_kwargs += [f"name={self.name!r}"] if self.name else []
         str_kwargs += [] if self.method == "bubble"\
             else [f"method={self.method!r}"]
+        str_kwargs += [] if self.data is None else [f"data={self.data!r}"]
         return f"({str_args}).bubble({', '.join(str_kwargs)})"
 
     def atoms(self) -> list:
@@ -1099,6 +1108,7 @@ class Functor(Category[type, "Functor"]):
     ob = type[Category]
     dom: type[Any] = Arrow
     cod: type[Any] = Arrow
+    composes = True
 
     @classmethod
     def id(cls, dom: type | None = None) -> Self:
@@ -1123,11 +1133,21 @@ class Functor(Category[type, "Functor"]):
         Parameters:
             other : The other functor with which to compose.
 
+        Raises:
+            AxiomError : When a functor other than the identity is composed
+                with one whose ``composes`` is false.
+
         Note
         ----
         An identity functor, see :meth:`id`, is dropped on either side so that
         composition is unital. Otherwise functors given by functions compare
         as functions, e.g. their composition is associative only in action.
+
+        The composite sends each object and box to its image under ``other``
+        of its image under ``self``: it is the composite of two functors that
+        their maps determine. A functor that its maps do not determine, e.g.
+        :class:`discopy.balanced.DualRail`, has ``composes`` false: apply the
+        two in turn instead.
 
         Example
         -------
@@ -1145,6 +1165,10 @@ class Functor(Category[type, "Functor"]):
         if other.ob_map.mapping is other.ar_map.mapping is identity\
                 and other == other.id(other.dom):
             return self
+        for functor in (self, other):
+            if not functor.composes:
+                raise utils.AxiomError(messages.NO_COMPOSITE.format(
+                    factory_name(type(functor))))
         ob_map, ar_map = (
             {key: other(self(key)) for key in mapping}
             if isinstance(mapping, Mapping) else (lambda key: other(self(key)))
@@ -1279,7 +1303,9 @@ class Transformation(Category[Functor, "Transformation"]):
     Parameters:
         components :
             A mapping from objects ``x`` in the domain category to arrows
-            ``components[x] : dom(x) -> cod(x)`` in the codomain category.
+            ``components[x] : dom(x) -> cod(x)`` in the codomain category,
+            or :func:`discopy.utils.identity` for the identity, see
+            :meth:`id`.
         dom : The domain functor.
         cod : The codomain functor.
 
@@ -1327,7 +1353,8 @@ class Transformation(Category[Functor, "Transformation"]):
         cat.Box('f', cat.Ob('x'), cat.Ob('y'))
         >>> assert alpha(x).dom == F(x) and alpha(x).cod == G(x)
         """
-        component = self.components[x]
+        component = self.dom.cod.id(self.dom(x))\
+            if self.components.mapping is identity else self.components[x]
         if component.dom != self.dom(x) or component.cod != self.cod(x):
             raise utils.AxiomError(
                 f"The component at {x} must be an arrow "
@@ -1339,7 +1366,10 @@ class Transformation(Category[Functor, "Transformation"]):
         """
         The identity transformation on a given functor ``dom``, i.e. the
         transformation whose component at each object ``x`` is the
-        identity arrow on ``dom(x)``.
+        identity arrow on ``dom(x)``, with the shared
+        :func:`discopy.utils.identity` as its components. A component is read
+        by calling the transformation, as ``alpha(x)``: ``components[x]`` is
+        what was given, i.e. ``x`` itself for the identity.
 
         Parameters:
             dom : The functor on which to take the identity transformation.
@@ -1351,9 +1381,10 @@ class Transformation(Category[Functor, "Transformation"]):
         >>> alpha = Transformation.id(F)
         >>> alpha(x)
         cat.Arrow.id(cat.Ob('y'))
-        >>> assert alpha(x) == F.cod.id(F(x))
+        >>> assert alpha(x) == F.cod.id(F(x)) and alpha.components[x] == x
+        >>> assert Transformation.id(F) == Transformation.id(F)
         """
-        return cls(lambda x: dom.cod.id(dom(x)), dom, dom)
+        return cls(identity, dom, dom)
 
     @unbiased
     def then(self, other: Transformation) -> Transformation:
@@ -1362,12 +1393,40 @@ class Transformation(Category[Functor, "Transformation"]):
 
         Parameters:
             other : The other transformation with which to compose.
+
+        Note
+        ----
+        An identity transformation, see :meth:`id`, is dropped on either side
+        so that composition is unital, and components given by a dictionary
+        compose into a dictionary over the same objects, so that composition
+        is associative. Otherwise transformations given by functions compare
+        as functions, e.g. their composition is associative only in action.
+
+        Example
+        -------
+        >>> x, y = Ob('x'), Ob('y')
+        >>> f = Box('f', x, y)
+        >>> F, G = Functor.id(), Functor({x: y, y: x}, {})
+        >>> alpha = Transformation({x: f, y: f[::-1]}, F, G)
+        >>> beta = Transformation({x: f[::-1], y: f}, G, F)
+        >>> assert (alpha >> beta).components == {
+        ...     x: f >> f[::-1], y: f[::-1] >> f}
+        >>> idF, idG = Transformation.id(F), Transformation.id(G)
+        >>> assert idF >> alpha == alpha == alpha >> idG
+        >>> assert (alpha >> beta) >> alpha == alpha >> (beta >> alpha)
         """
         assert_isinstance(other, Transformation)
         if self.cod != other.dom:
             raise utils.AxiomError(messages.NOT_COMPOSABLE.format(
                 self, other, self.cod, other.dom))
-        components = lambda x: self(x) >> other(x)
+        if self.components.mapping is identity and self == self.id(self.dom):
+            return other
+        if other.components.mapping is identity\
+                and other == other.id(other.dom):
+            return self
+        mapping = self.components.mapping
+        components = {x: self(x) >> other(x) for x in mapping}\
+            if isinstance(mapping, Mapping) else lambda x: self(x) >> other(x)
         return type(self)(components, self.dom, other.cod)
 
     def __eq__(self, other):

@@ -134,10 +134,13 @@ def export(notebook: Path, *, check: bool) -> None:
         else:
             output = HTML_DIR / f"{name_of(notebook)}.html"
             output.parent.mkdir(parents=True, exist_ok=True)
+        path = os.pathsep.join(filter(None, (
+            str(DOCS.parent), os.environ.get("PYTHONPATH"))))
         subprocess.run(
             [sys.executable, "-m", "marimo", "export", "html", notebook.name,
              "-o", str(output), "-f"],
-            cwd=notebook.parent, check=True)
+            cwd=notebook.parent, env=os.environ | {"PYTHONPATH": path},
+            check=True)
         add_theme_style(output, title_of(notebook))
 
 
@@ -207,8 +210,11 @@ def main() -> int:
     names = set(args.notebooks)
     selected = [nb for nb in notebooks()
                 if not names or {nb.stem, name_of(nb)} & names]
-    if not selected:
-        print("no matching notebooks found", file=sys.stderr)
+    unmatched = names.difference(
+        *({nb.stem, name_of(nb)} for nb in selected))
+    if not selected or unmatched:
+        print("no matching notebooks found:", *sorted(unmatched),
+              file=sys.stderr)
         return 1
 
     with ThreadPoolExecutor(args.jobs) as pool:

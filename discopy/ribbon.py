@@ -338,7 +338,7 @@ class Twist(balanced.Twist, Box):
         return type(self)(self.dom.r, self.is_dagger)
 
 
-class Sum(rigid.Sum, Box):
+class Sum(rigid.Sum, feedback.Sum, Box):
     """
     A ribbon sum is a sum of ribbon diagrams.
 
@@ -405,7 +405,8 @@ class DualRail(balanced.DualRail, Functor):
         return super().__call__(other)
 
 
-Feedback, Trace, FollowedBy, Head, Tail = feedback.generators(Diagram, Box)
+Feedback, Trace, FollowedBy, Head, Tail = feedback.structural_boxes(
+    Diagram, Box)
 Diagram.box_factory = Box
 Diagram.braid_factory, Diagram.functor_factory = Braid, Functor
 Diagram.cup_factory, Diagram.cap_factory = Cup, Cap

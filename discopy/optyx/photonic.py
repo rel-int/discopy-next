@@ -264,7 +264,7 @@ from discopy.optyx.core import (
 )
 
 from discopy.optyx.classical import ClassicalFunction, DiscardMode
-from discopy.optyx.utils.misc import matrix_to_zw
+from discopy.optyx.utils.misc import listed, matrix_to_zw
 
 from discopy.optyx.channel import (
     bit,
@@ -276,20 +276,6 @@ from discopy.optyx.channel import (
     Channel,
     Diagram
 )
-
-
-def listed(internal_states):
-    """
-    The internal states as lists of numbers, which is what their
-    representation reads back: they are declared as lists and used as
-    arrays, and `STYLE.md` reads a representation holding an array up to
-    elision.
-
-    >>> listed((np.array([1, 0]), [0, 1]))
-    '([1, 0], [0, 1])'
-    """
-    states = ", ".join(repr(np.asarray(s).tolist()) for s in internal_states)
-    return f"({states},)" if len(internal_states) == 1 else f"({states})"
 
 
 class Select(Channel):

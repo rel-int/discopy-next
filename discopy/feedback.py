@@ -50,8 +50,8 @@ Summary
         :nosignatures:
         :toctree:
 
-        generators
-        wire_generators
+        structural_boxes
+        structural_wires
 
 Axioms
 ------
@@ -704,7 +704,8 @@ class Box(monoidal.Box, Diagram):
         arguments it is built from, e.g. a swap, a copy or a controlled gate,
         is built from their delays, those of its types and its diagrams; any
         other box from its delayed boundary, one more time step on, drawn as
-        it is.
+        it is, e.g. a :class:`Bubble`, whose args stay as they are inside. A
+        :class:`Sum` is the sum of the delays of its terms.
 
         Parameters:
             n_steps : The number of time steps to delay.
@@ -950,6 +951,18 @@ class Head(monoidal.Bubble, Box):
         Box.__init__(self, f"({arg}).{self.part}", self.dom, self.cod,
                      time_step=time_step)
 
+    def dagger(self):
+        """
+        The dagger of a head is the head of the dagger, and the same for a
+        tail: on streams both are functors, which commute with the dagger.
+
+        >>> x, y = (Ty(Wire(name, is_constant=False)) for name in "xy")
+        >>> f = Box('f', x, y)
+        >>> assert f.head.dagger() == f.dagger().head
+        >>> assert f.tail.delay().dagger() == f.dagger().tail.delay()
+        """
+        return type(self)(self.arg.dagger(), self.time_step)
+
     delay, reset, __repr__ = HeadOb.delay, HeadOb.reset, HeadOb.__repr__
     to_tree, from_tree = HeadOb.to_tree, classmethod(HeadOb.from_tree.__func__)
     __str__ = Box.__str__
@@ -967,7 +980,7 @@ class Tail(monoidal.Bubble, Box):
     serialised_attrs = ("*args", "time_step")
     part = "tail"
 
-    __init__ = Head.__init__
+    __init__, dagger = Head.__init__, Head.dagger
     delay, reset, __repr__ = HeadOb.delay, HeadOb.reset, HeadOb.__repr__
     to_tree, from_tree = HeadOb.to_tree, classmethod(HeadOb.from_tree.__func__)
     __str__ = Box.__str__
@@ -1051,19 +1064,90 @@ class FollowedBy(Box):
 
 class Sum(monoidal.Sum, Box):
     """
-    A feedback sum is a sum of feedback diagrams.
+    A feedback sum is a sum of feedback diagrams, over which delay
+    distributes.
 
     Parameters:
         terms (tuple[Diagram, ...]) : The terms of the formal sum.
         dom (Ty) : The domain of the formal sum.
         cod (Ty) : The codomain of the formal sum.
+
+    Example
+    -------
+    >>> x, y = Ty('x'), Ty('y')
+    >>> f, g, h = Box('f', x, y), Box('g', x, y), Box('h', y, y)
+    >>> assert (f + g).delay() == f.delay() + g.delay()
+    >>> assert ((f + g) >> h).delay() == (f + g).delay() >> h.delay()
     """
+    def delay(self, n_steps=1):
+        """ The delay of a sum, the sum of the delays of its terms. """
+        return self.sum_factory(
+            tuple(term.delay(n_steps) for term in self.terms),
+            self.dom.delay(n_steps), self.cod.delay(n_steps))
 
 
 class Bubble(monoidal.Bubble, Box):
     """
-    A feedback bubble is a monoidal bubble and a feedback box.
+    A feedback bubble is a monoidal bubble and a feedback box, which delays as
+    a box does: its boundary is delayed and its time step counts, its args
+    stay as they are inside.
+
+    Parameters:
+        args (Diagram) : The diagrams inside the bubble.
+        time_step (int) : The number of times the bubble has been delayed,
+            its boundary that of its args delayed as many times by default.
+        kwargs : Passed to :class:`monoidal.Bubble`.
+
+    Example
+    -------
+    >>> x, y = Ty('x'), Ty('y')
+    >>> f = Box('f', x, y)
+    >>> bubble = f.bubble().delay()
+    >>> assert bubble.args == (f, ) and (bubble.dom, bubble.cod) == (x.d, y.d)
+    >>> assert bubble.time_step == 1 and bubble.reset() == f.bubble()
+    >>> assert bubble == Bubble(f, time_step=1) != f.delay().bubble()
+    >>> print(bubble)
+    (f).bubble().d
     """
+    serialised_attrs = monoidal.Bubble.serialised_attrs + ("time_step", )
+
+    def __init__(self, *args: Diagram, time_step: int = 0, **kwargs):
+        for attr in ("dom", "cod"):
+            if time_step and kwargs.get(attr) is None:
+                kwargs[attr] = self.common(args, attr).delay(time_step)
+        super().__init__(*args, **kwargs)
+        self.time_step = time_step
+
+    def __str__(self):
+        if not self.time_step:
+            return super().__str__()
+        return str(self.reset()) + str_delayed(self.time_step)
+
+    def __repr__(self):
+        if not self.time_step:
+            return super().__repr__()
+        return super().__repr__()[:-1] + f", time_step={self.time_step})"
+
+    def setoid(self):
+        return super().setoid() + (self.time_step, )
+
+    def to_tree(self) -> dict:
+        """
+        Serialise a bubble as the bubble at time step zero, with its time step.
+
+        >>> from discopy.utils import dumps, loads
+        >>> bubble = Box('f', Ty('x'), Ty('y')).bubble().delay(2)
+        >>> assert loads(dumps(bubble)) == bubble
+        """
+        if not self.time_step:
+            return super().to_tree()
+        return self.reset().to_tree() | {'time_step': self.time_step}
+
+    @classmethod
+    def from_tree(cls, tree: dict):
+        bubble = super().from_tree(tree)
+        return bubble.delay(tree['time_step']) if 'time_step' in tree\
+            else bubble
 
 
 class Functor(monoidal.Functor):
@@ -1160,7 +1244,7 @@ Hypergraph = hypergraph.Hypergraph[Diagram]
 Id = Diagram.id
 
 
-GENERATORS = {
+STRUCTURAL_BOXES = {
     "Feedback": ("feedback_factory", "A feedback of {} diagrams."),
     "Trace": ("trace_factory", "A trace of {} diagrams."),
     "FollowedBy": ("followed_by_factory", "A followed-by in {} diagrams."),
@@ -1182,7 +1266,7 @@ def subclass(name: str, bases: list[type], module: str, doc: str) -> type:
         "__module__": module, "__qualname__": name, "__doc__": doc})
 
 
-def generators(
+def structural_boxes(
         diagram: type, box: type) -> tuple[type, type, type, type, type]:
     """
     The :class:`Feedback`, :class:`Trace`, :class:`FollowedBy`, :class:`Head`
@@ -1208,22 +1292,22 @@ def generators(
     parents = [base for base in diagram.__bases__ if issubclass(base, Diagram)]
     module, level = diagram.__module__, diagram.__module__.split('.')[-1]
     result = {}
-    for name, (attr, doc) in GENERATORS.items():
+    for name, (attr, doc) in STRUCTURAL_BOXES.items():
         own = result["Feedback"] if name == "Trace" else box
         bases = [getattr(parent, attr) for parent in parents]
         bases = [base for base in bases if isinstance(base, type)] + [own]
         result[name] = subclass(name, bases, module, doc.format(level))
-    for name, (attr, _) in GENERATORS.items():
+    for name, (attr, _) in STRUCTURAL_BOXES.items():
         if name != "Trace" or isinstance(diagram.trace_factory, type):
             setattr(diagram, attr, result[name])
     return (result["Feedback"], result["Trace"], result["FollowedBy"],
             result["Head"], result["Tail"])
 
 
-def wire_generators(wire: type) -> tuple[type, type]:
+def structural_wires(wire: type) -> tuple[type, type]:
     """
     The :class:`HeadOb` and :class:`TailOb` of a wire class below feedback,
-    generated as :func:`generators` does for boxes, so that the head of a
+    generated as :func:`structural_boxes` does for boxes, so that the head of a
     wire is a wire of its own level, and bound to its factories.
 
     Parameters:

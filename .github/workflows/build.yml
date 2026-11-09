@@ -12,7 +12,7 @@ permissions:
 # run that proves it green: cancelling those leaves main with commits nothing
 # ever built, as it did on 112b6036.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
@@ -102,7 +102,7 @@ jobs:
         uv run python docs/export_notebooks.py --check --jobs 4
   docs:
     runs-on: ubuntu-latest
-    timeout-minutes: 30   # backstop: a pull request's build takes ~5 min on four processes, main's longer for running every notebook
+    timeout-minutes: 45   # backstop: a pull request's build takes ~5 min without notebooks; main's renders every notebook one after another, ~13 min more (#445)
     strategy:
       matrix:
         python-version: [ "3.14" ]

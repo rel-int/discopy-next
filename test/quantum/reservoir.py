@@ -6,7 +6,7 @@ from pytest import raises
 
 from discopy import frobenius, compact, quantum
 from discopy.quantum import Discard, Id, Ket, Measure
-from discopy.quantum.reservoir import Reservoir
+from discopy.quantum.reservoir import Readout, Reservoir
 
 
 def test_Reservoir_errors():
@@ -39,13 +39,33 @@ def test_Reservoir_random_depth():
 
 
 def test_Reservoir_repr():
+    """ The repr rounds the random phases, which the gates compare exactly. """
     reservoir = Reservoir.random(memory=1, inputs=1, seed=5)
     scope = {"Reservoir": Reservoir, "quantum": quantum,
              "compact": compact, "frobenius": frobenius,
              **vars(quantum.gates)}
-    assert eval(repr(reservoir), scope) == reservoir
+    copy = eval(repr(reservoir), scope)
+    assert repr(copy) == repr(reservoir)
+    assert np.allclose(copy.unitary.eval().array,
+                       reservoir.unitary.eval().array, atol=1e-2)
     assert reservoir == Reservoir.random(memory=1, inputs=1, seed=5)
     assert reservoir != Reservoir.random(memory=1, inputs=1, seed=6)
+
+
+def test_Readout_repr():
+    readout = Readout(np.array([[1.], [2.]]), np.array([3.]))
+    scope = {"Readout": Readout, "array": np.array}
+    assert eval(repr(readout), scope) == readout
+    assert readout != Readout(np.array([[1.], [3.]]), np.array([3.]))
+    assert Readout(np.array([[1.]]), np.array([3.])) != Readout(
+        np.array([[1.], [1.]]), np.array([3.]))
+    listed = Readout([[1.], [2.]], 0)
+    assert eval(repr(listed), scope) == listed
+    assert listed == Readout(np.array([[1.], [2.]]), np.zeros(()))
+    assert listed != Readout([[1.]], 0)
+    reservoir, sequence = Reservoir.random(memory=1, seed=1), [.1, .5, .9]
+    assert reservoir.fit(sequence, 3 * [7.]) == reservoir.fit(
+        sequence, 3 * [7.])
 
 
 def test_Reservoir_step():

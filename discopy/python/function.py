@@ -19,6 +19,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 from contextlib import contextmanager
+from typing import Self
 
 from discopy import messages
 from discopy.abc import Category
@@ -72,16 +73,16 @@ class Function(Category[Ty, "Function"]):
             inside, self.ob.cast(dom), self.ob.cast(cod))
 
     @classmethod
-    def id(cls, dom: type) -> Function:
+    def id(cls, dom: Ty | type | tuple[type, ...]) -> Self:
         """
         The identity function on a given list of types :code:`dom`.
 
         Parameters:
-            dom (type) : The list of types on which to take the identity.
+            dom : The list of types on which to take the identity.
         """
         return cls(lambda *xs: untuplify(xs), dom, dom)
 
-    def then(self, *others: Function) -> Function:
+    def then(self, *others: Function) -> Self:
         """
         The sequential composition of ``n`` functions, called with
         :code:`>>`.
@@ -112,11 +113,15 @@ class Function(Category[Ty, "Function"]):
     @classproperty
     @contextmanager
     def no_type_checking(cls):
+        had = "type_checking" in vars(cls)
         tmp, cls.type_checking = cls.type_checking, False
         try:
             yield
         finally:
-            cls.type_checking = tmp
+            if had:
+                cls.type_checking = tmp
+            else:
+                del cls.type_checking
 
     def __call__(self, arg):
         if self.type_checking:

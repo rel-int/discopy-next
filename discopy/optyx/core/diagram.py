@@ -669,8 +669,6 @@ class Box(frobenius.Box, Diagram):
     zx boxes (Bit) with tensors with dims of 2.
     """
 
-    __ambiguous_inheritance__ = (frobenius.Box,)
-
     array = None
 
     def __init__(self, name, dom, cod, array=None, **params):
@@ -965,8 +963,6 @@ class Sum(symmetric.Sum, Box):
     Formal sum of optyx diagrams
     """
 
-    __ambiguous_inheritance__ = (symmetric.Sum,)
-
     def conjugate(self):
         return sum(term.conjugate() for term in self.terms)
 
@@ -1143,6 +1139,10 @@ class Scalar(Box):
     def __str__(self):
         return f"scalar({format_number(self.data)})"
 
+    def __repr__(self):
+        return f"{factory_name(type(self))}"\
+            f"({format_number(self.scalar, exact=True)})"
+
     def to_path(self, dtype: type = complex):
         return path.Matrix[dtype]([], 0, 0, scalar=self.scalar)
 
@@ -1253,6 +1253,13 @@ class DualRail(Box):
         return DualRail(not self.is_dagger,
                         internal_state=self.internal_state)
 
+    def __repr__(self):
+        args = "is_dagger=True" if self.is_dagger else ""
+        if self.internal_state is not None:
+            state = repr(np.asarray(self.internal_state).tolist())
+            args += f"{', ' if args else ''}internal_state={state}"
+        return f"{factory_name(type(self))}({args})"
+
 
 class PhotonThresholdDetector(Box):
     """
@@ -1303,6 +1310,10 @@ class PhotonThresholdDetector(Box):
     def dagger(self):
         return PhotonThresholdDetector(not self.is_dagger)
 
+    def __repr__(self):
+        dagger = "is_dagger=True" if self.is_dagger else ""
+        return f"{factory_name(type(self))}({dagger})"
+
     def inflate(self, d):
         from discopy.optyx.core.zw import Add
         dgrm = Add(d) >> PhotonThresholdDetector()
@@ -1331,6 +1342,11 @@ class EmbeddingTensor(tensor.Box):
             Dim(int(output_dim)),
             embedding_array.T,
         )
+        self.input_dim, self.output_dim = int(input_dim), int(output_dim)
+
+    def __repr__(self):
+        return f"{factory_name(type(self))}"\
+            f"({self.input_dim}, {self.output_dim})"
 
     def conjugate(self):
         return self
@@ -1417,7 +1433,6 @@ class Feedback(monoidal.Bubble, Box):
     .. image:: /_static/optyx/cnot_ladder.svg
         :align: center
     """
-    __ambiguous_inheritance__ = (monoidal.Bubble,)
     serialised_attrs = ("*args", "dom", "cod", "mem", "state", "effect")
 
     @classmethod

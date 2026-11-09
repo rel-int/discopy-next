@@ -1,6 +1,6 @@
 % Node styles
-\tikzstyle{X}=[fill={rgb,255: red,232; green,165; blue,165}]
-\tikzstyle{Z}=[fill={rgb,255: red,216; green,248; blue,216}]
-\tikzstyle{symbol}=[fill=none]
+\tikzstyle{X_red_circle}=[fill={rgb,255: red,232; green,165; blue,165}, shape=circle]
+\tikzstyle{Z_green_circle}=[fill={rgb,255: red,216; green,248; blue,216}, shape=circle]
+\tikzstyle{symbol_none_circle}=[fill=none, shape=circle]
 % Edge styles
 \tikzstyle{box}=[-, fill={rgb,255: red,255; green,255; blue,255}]

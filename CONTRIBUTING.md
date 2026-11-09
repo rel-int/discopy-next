@@ -51,8 +51,8 @@ set in `[tool.uv]`; `uv sync --no-dev` installs the bare package. Add more group
 
 Since dependency groups are not standard, `quantum`, `grammar`, `optyx`, `notebooks` and `docs`
 are also optional dependencies (`pip install -e '.[quantum]'`). There is no `dev` or `all`
-extra: the `test` extra bundles `quantum`, `grammar` and `optyx` with the test tools, without
-ruff, ty or pytest-benchmark.
+extra: the `test` extra bundles `quantum`, `grammar`, `optyx` and `notebooks` with the test
+tools, without egglog, ruff, ty or pytest-benchmark.
 
 ## Run the unit tests
 
@@ -90,11 +90,12 @@ CI also runs every marimo notebook in `docs/notebooks/` on each commit of `main`
 pull request, and fails if a cell errors; a pull request's `docs` build links to each notebook
 instead of running it, as `DISCOPY_SKIP_NOTEBOOKS=1` does locally. With the
 `all` group synced, run `uv run python docs/export_notebooks.py --check`, adding notebook names
-(e.g. `qnlp` or `optyx/bose_hubbard`) to check only those and `--jobs N` to run N at a time.
+(e.g. `qnlp` or `optyx/bose_hubbard`) to check only those (a name that matches no notebook
+fails the command) and `--jobs N` to run N at a time.
 A notebook that a tracked bug breaks is listed in `KNOWN_BROKEN` in that script with its issue,
-and `--check` does not fail on it. Each notebook runs from its own directory, so from a git
-worktree prefix the command with `PYTHONPATH=$PWD`, or the notebooks import the main
-checkout's editable `discopy`.
+and `--check` does not fail on it. Each notebook runs from its own directory on the `discopy`
+of the script's own tree, so a git worktree checks its own code, not the main checkout's
+editable install.
 
 `coverage report` fails below the `fail_under` of `pyproject.toml`, measured on `discopy/`
 alone: without the extras the local number is lower, and CI's `Coverage` step is the gate.
@@ -171,13 +172,17 @@ runs under `--hypothesis-seed=0` so that it draws the same examples every
 time (the profile does not fix the seed itself: pass the flag locally too,
 and the database it replays still differs from CI's), and `explore` for
 the large one `main` and the nightly run search with. A fourth, `shared`,
-is `dev` reading the example database that discopy/discopy's CI uploads as
-a workflow artifact, through a `GITHUB_TOKEN`, so a failure found on
-upstream's CI replays on your machine before any search; it reaches GitHub
-only when selected, and does not read this repo's own CI artifact.
+is `dev` reading the example database that the CI of the repository named
+by `HYPOTHESIS_GITHUB_REPOSITORY` uploads as a workflow artifact, through a
+`GITHUB_TOKEN`, so a failure found on that CI replays on your machine before
+any search; it reaches GitHub only when selected. The variable defaults to
+`discopy/discopy`; this repo's CI sets it to `rel-int/discopy-next`, and a
+local run sets it the same way to replay what this repo's CI found:
 
 ```shell
 HYPOTHESIS_PROFILE=explore uv run pytest proptest/ -n auto -p no:benchmark
+HYPOTHESIS_PROFILE=shared HYPOTHESIS_GITHUB_REPOSITORY=rel-int/discopy-next \
+    uv run pytest proptest/
 ```
 
 `Axiom.falsify` searches for a shrunk counterexample to a law on demand,
@@ -252,6 +257,7 @@ owns timing (CPU clock and GC disabled) and automatically calibrates rounds
 and iterations for each workload.
 
 ```shell
+mkdir -p benchmark-results
 # small/medium sizes (the default); add BENCH_FLAGS=bench:full for the heavy tail
 uv run --with "pyzx==0.10.7" pytest benchmark/ -v \
     --benchmark-json=benchmark-results/bench.json
