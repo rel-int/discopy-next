@@ -1069,7 +1069,8 @@ class Backend(ABC):
         points[i] = points[i].shift(x=asymmetry)
         self.draw_polygon(*points, facecolor=box.color)
         if params.get('draw_box_labels', True):
-            adaptive = box.color == TRANSPARENT
+            adaptive = isinstance(box.color, str)\
+                and box.color == TRANSPARENT
             self.draw_text(box.drawing_name, *positions[node],
                            ha='center', va='center',
                            color=self.readable_foreground(
@@ -1365,11 +1366,11 @@ class TikZ(Backend):
         >>> TikZ.format_color("lightgray")
         'lightgray'
         """
-        if not (isinstance(color, str) and color in COLORS)\
-                and not cls.needs_rgb(color):
+        is_named = isinstance(color, str) and color in COLORS
+        if not is_named and not cls.needs_rgb(color):
             return color
-        red, green, blue = (
-            round(255 * x) for x in to_rgb(COLORS.get(color, color)))
+        rgb = to_rgb(COLORS[color] if is_named else color)
+        red, green, blue = (round(255 * x) for x in rgb)
         return f"{{rgb,255: red,{red}; green,{green}; blue,{blue}}}"
 
     @classmethod
@@ -1422,7 +1423,8 @@ class TikZ(Backend):
             nodes.append(self.add_node(*point))
         nodes.append(nodes[0])
         if self.use_tikzstyles:
-            style_name = "box" if facecolor == DEFAULT["facecolor"]\
+            style_name = "box" if isinstance(facecolor, str)\
+                and facecolor == DEFAULT["facecolor"]\
                 else f"{self.style_color(facecolor)}_box"
             style = f"\\tikzstyle{{{style_name}}}=" \
                     f"[-, fill={self.format_color(facecolor)}]\n"

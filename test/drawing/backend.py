@@ -1,6 +1,7 @@
 import re
 from io import BytesIO
 
+import numpy as np
 from pytest import mark, raises
 
 from discopy.drawing.backend import TikZ
@@ -120,7 +121,9 @@ def test_svg_to_a_bytes_buffer_has_the_dark_mode_style():
 
 
 @mark.parametrize("use_tikzstyles", [False, True])
-@mark.parametrize("colour", ["tab:blue", "C0", "0.5", "navy", (.1, .2, .3)])
+@mark.parametrize("colour", [
+    "tab:blue", "C0", "0.5", "navy", (.1, .2, .3), [.1, .2, .3],
+    np.array([.1, .2, .3])])
 def test_tikz_spells_a_matplotlib_only_colour_by_its_rgb(
         tmp_path, colour, use_tikzstyles):
     """ A colour that matplotlib reads and xcolor does not is written as its
