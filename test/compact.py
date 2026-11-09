@@ -80,3 +80,8 @@ def test_feedback_is_the_trace():
         assert isinstance(traced, Diagram) and traced == f.trace()
     assert f.feedback(left=True) == f.trace(left=True)
     assert Equation(f.feedback(2), f.trace(2), f.trace(mem=x @ x))
+
+
+def test_structural_boxes():
+    from discopy.testable import assert_structural_boxes
+    assert_structural_boxes(Diagram)

@@ -34,4 +34,4 @@ def test_Monoid_refuses_non_elements_on_either_side():
 def test_Nat_str_transparency():
     assert str(Nat(2)) == "Nat(2)"
     for n in range(4):
-        assert Nat.str_transparency(Nat(n))
+        assert eval(str(Nat(n)), {"Nat": Nat}) == Nat(n)

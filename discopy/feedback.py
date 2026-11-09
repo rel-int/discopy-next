@@ -258,7 +258,8 @@ from copy import copy
 from typing import ClassVar
 
 from discopy import monoidal, cmap, hypergraph, messages
-from discopy.abc import FeedbackCategory, TracedCategory
+from discopy.abc import (
+    DaggerCategory, FeedbackCategory, MonoidalCategory, TracedCategory)
 from discopy.config import BOX_DRAWING_ATTRIBUTES
 from discopy.monoidal import (  # noqa: F401  pylint: disable=unused-import
     Equation)
@@ -536,8 +537,6 @@ class Diagram(monoidal.Diagram, TracedCategory):
 
     yanking = TracedCategory.yanking.inapplicable(
         messages.PLANAR_YANKING)
-    yanking_left = TracedCategory.yanking_left.inapplicable(
-        messages.PLANAR_YANKING)
 
     def delay(self, n_steps=1):
         """ The delay of a feedback diagram. """
@@ -648,6 +647,37 @@ class Diagram(monoidal.Diagram, TracedCategory):
         return monoidal.Diagram.to_drawing(self, functor_factory=Functor)
 
     d = Wire.d
+
+    trace_naturality_left = TracedCategory.trace_naturality_left.failing(
+        messages.NO_PLANAR_NORMAL_FORM)
+    trace_naturality_right = TracedCategory.trace_naturality_right.failing(
+        messages.NO_PLANAR_NORMAL_FORM)
+    trace_dinaturality_left = TracedCategory.trace_dinaturality_left.failing(
+        messages.NO_PLANAR_NORMAL_FORM)
+    trace_dinaturality_right = TracedCategory.trace_dinaturality_right.failing(
+        messages.NO_PLANAR_NORMAL_FORM)
+    trace_superposing_left = TracedCategory.trace_superposing_left.failing(
+        messages.NO_PLANAR_NORMAL_FORM)
+    trace_superposing_right = TracedCategory.trace_superposing_right.failing(
+        messages.NO_PLANAR_NORMAL_FORM)
+    hypergraph_section = monoidal.Diagram.hypergraph_section.failing(
+        messages.SECTION_NEEDS_SWAPS)
+    dagger_involution = DaggerCategory.dagger_involution.failing(
+        messages.FEEDBACK_HAS_NO_DAGGER)
+    dagger_involution_traced = DaggerCategory.dagger_involution.weaken(
+        within=MonoidalCategory)
+    dagger_contravariance = DaggerCategory.dagger_contravariance.failing(
+        messages.FEEDBACK_HAS_NO_DAGGER)
+    dagger_contravariance_traced = DaggerCategory.dagger_contravariance\
+        .weaken(within=MonoidalCategory)
+    dagger_monoidality = DaggerCategory.dagger_monoidality.failing(
+        messages.FEEDBACK_HAS_NO_DAGGER)
+    tightening = FeedbackCategory.tightening.failing(
+        messages.FREE_FEEDBACK)
+    sliding = FeedbackCategory.sliding.failing(
+        messages.FREE_FEEDBACK)
+    strength = FeedbackCategory.strength.failing(
+        messages.FREE_FEEDBACK)
 
 
 class Box(monoidal.Box, Diagram):
@@ -833,6 +863,34 @@ class Feedback(Box, monoidal.Bubble):
     def fed_back(mem: Ty) -> Ty:
         """ The input fed back for a memory ``mem``, its delay. """
         return mem.delay()
+
+    @classmethod
+    # pylint: disable-next=arguments-differ  # drawn with no boundary
+    def strategy(cls, *, types=None):
+        """
+        Generate the feedback of a free box over an atomic memory, on
+        either side, the trace of one for a :class:`Trace`.
+
+        Parameters:
+            types : The strategy to draw the types from, the memory one of
+                them with one wire, see :meth:`atomic_strategy`.
+        """
+        from hypothesis import strategies as st
+
+        types = cls.ob.strategy() if types is None else types
+
+        def feedbacks(args):
+            mem, dom, cod, left = args
+            fed = cls.fed_back(mem)
+            arg_dom, arg_cod = (fed @ dom, mem @ cod) if left\
+                else (dom @ fed, cod @ mem)
+            return cls.ar.box_factory.strategy(
+                types=types, dom=arg_dom, cod=arg_cod).map(
+                    lambda arg: cls(arg, mem=mem, left=left))
+
+        return st.tuples(
+            cls.atomic_strategy(types), types, types, st.booleans()
+        ).flatmap(feedbacks)
 
     def delay(self, n_steps=1):
         return type(self)(self.arg.delay(n_steps), mem=self.mem.delay(n_steps),
@@ -1222,7 +1280,9 @@ class Functor(monoidal.Functor):
             result = self.cod.followed_by(self(arg))
             return result.dagger() if other.is_dagger\
                 and hasattr(self.cod, "dagger") else result
-        if isinstance(other, Feedback) and hasattr(self.cod, "feedback"):
+        if isinstance(other, Feedback)\
+                and issubclass(self.cod, FeedbackCategory)\
+                and self.cod.delay is not FeedbackCategory.delay:
             left = {"left": True} if other.left else {}
             return self(other.arg).feedback(
                 dom=self(other.dom), cod=self(other.cod),

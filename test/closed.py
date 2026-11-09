@@ -971,3 +971,8 @@ def test_Bubble_is_linear_and_has_no_term():
     assert f.bubble().is_linear and Diagram.copy(x).bubble(cod=x).is_linear
     with raises(AxiomError):
         (f.bubble() >> g).to_term()
+
+
+def test_structural_boxes():
+    from discopy.testable import assert_structural_boxes
+    assert_structural_boxes(Diagram)

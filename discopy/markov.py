@@ -81,6 +81,7 @@ from typing import ClassVar
 from discopy import (
     cat, symmetric, monoidal, feedback, cmap, hypergraph, messages)
 from discopy.abc import ComarkovCategory, MarkovCategory, Nat
+from discopy.testable import FUEL
 from discopy.cat import factory
 from discopy.feedback import (  # noqa: F401  pylint: disable=unused-import
     Wire, Ty)
@@ -165,10 +166,35 @@ class Diagram(symmetric.Diagram, MarkovCategory):
     layer_factory = Layer
 
     @classmethod
+    def quotient_strategy(cls, *, dom=None, cod=None, fuel=FUEL):
+        """
+        Sample Markov diagrams through their quotient: a hypergraph drawn
+        by :meth:`discopy.hypergraph.Hypergraph.strategy` with at most
+        ``fuel + 1`` boxes, besides the one balancing box that may close its
+        boundary, and the spiders that the category supports, i.e.
+        copies and discards here and every spider in a hypergraph category,
+        downgraded with :meth:`discopy.hypergraph.Hypergraph.to_diagram`.
+        """
+        category = hypergraph.Hypergraph[cls]  # ty: ignore[invalid-type-form]
+        return category.strategy(
+            dom=dom, cod=cod, max_leaves=fuel + 1).map(
+                lambda graph: graph.to_diagram())
+
+    @classmethod
     def spider_factory(cls, n_legs_in, n_legs_out, typ, phase=None):
-        if phase is not None or n_legs_in != 1:
+        """
+        The spiders of a Markov category: the copies, with one leg in, and
+        the traces of copies, with none, i.e. what tracing a copy back into
+        its own input encodes to as a hypergraph.
+
+        >>> x = Ty('x')
+        >>> assert Diagram.spider_factory(0, 1, x) == Copy(x).trace(left=True)
+        """
+        if phase is not None or n_legs_in not in (0, 1):
             raise ValueError(messages.NO_SUCH_SPIDER.format(
                 factory_name(cls), "copies"))
+        if not n_legs_in:
+            return cls.copy(typ, n_legs_out + 1).trace(left=True)
         return cls.copy_factory(typ, n_legs_out)
 
     @classmethod
@@ -203,6 +229,11 @@ class Diagram(symmetric.Diagram, MarkovCategory):
             x : The type to discard.
         """
         return cls.copy(x, 0)
+
+    map_agreement = monoidal.Diagram.map_agreement.failing(
+        messages.MAP_HAS_NO_SPIDERS)
+    str_transparency = monoidal.Diagram.str_transparency.failing(
+        messages.STR_SPLITS_LAYERS)
 
     @classmethod
     def from_function(cls, func, dom: monoidal.Ty) -> Diagram:
@@ -694,6 +725,21 @@ class Copy(Function):
         """
         return self.dom, len(self.cod)
 
+    @classmethod
+    # pylint: disable-next=arguments-differ  # drawn with no boundary
+    def strategy(cls, *, types=None):
+        """
+        Generate two or three copies of an atomic type.
+
+        Parameters:
+            types : The strategy to draw the types from, see
+                :meth:`atomic_strategy`.
+        """
+        from hypothesis import strategies as st
+
+        return st.builds(
+            cls, cls.atomic_strategy(types), st.sampled_from((2, 3)))
+
     func = property(lambda self: finset.Function.copy(1, len(self.cod)))
 
     def to_drawing(self):
@@ -726,6 +772,18 @@ class Discard(Copy):
         if self.cod:
             raise ValueError(
                 f"A discard has no copies, got n={len(self.cod)}.")
+
+    @classmethod
+    # pylint: disable-next=arguments-differ  # drawn with no boundary
+    def strategy(cls, *, types=None):
+        """
+        Generate the discard of an atomic type.
+
+        Parameters:
+            types : The strategy to draw the types from, see
+                :meth:`atomic_strategy`.
+        """
+        return cls.atomic_strategy(types).map(cls)
 
 
 class Sum(symmetric.Sum, Box):

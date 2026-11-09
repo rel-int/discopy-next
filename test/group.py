@@ -3,9 +3,9 @@ import pickle
 import random
 from functools import reduce
 
+from hypothesis import Phase, find, settings
 from pytest import mark, raises
 
-from discopy.testable import assert_axioms
 from discopy.group import (
     Action, Cyclic, Product, Symmetric, Wreath, kronecker)
 from discopy.python.finset import Permutation
@@ -58,9 +58,16 @@ def test_sample(G):
     Wreath[Cyclic[2], Symmetric[3]],
     Wreath[Product[Cyclic[2], Cyclic[2]], Cyclic[2]]))
 def test_axioms(G):
-    """ The groups of :data:`GROUPS` that the property matrix does not enrol:
-    the others are checked there. """
-    assert_axioms(G)
+    """ The groups of :data:`GROUPS` that the property matrix does not enrol
+    hold every law that applies on one generated example: the others are
+    checked there. """
+    single_shot = settings(
+        max_examples=1, phases=(Phase.generate, ), database=None)
+    for law in G.axioms.values():
+        if law.applicable and not law.broken:
+            arguments = find(law.strategy(), lambda _: True,
+                             settings=single_shot)
+            assert law(**arguments), law
 
 
 @mark.parametrize("G", GROUPS)

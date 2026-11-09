@@ -31,7 +31,8 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
-from discopy.abc import Category, NamedGeneric
+from discopy.abc import Category
+from discopy.testable import TestableGeneric
 from discopy.kleisli.monad import Monad
 from discopy.python.function import Function
 from discopy.utils import (
@@ -39,7 +40,7 @@ from discopy.utils import (
 
 
 @factory
-class Channel[monad](Category, NamedGeneric):
+class Channel[monad](Category, TestableGeneric):
     """
     A channel is a morphism in the Kleisli category of a monad ``M``, i.e. a
     :class:`~discopy.python.function.Function` from ``X`` to ``M(Y)``.
@@ -66,6 +67,11 @@ class Channel[monad](Category, NamedGeneric):
     >>> identity = Safe.id(int)
     >>> assert (identity >> half)(4) == half(4) == (half >> identity)(4)
     """
+    @classmethod
+    def checked_params(cls) -> tuple:
+        """ None, the channels being checked by tuples and tags. """
+        return ()
+
     ob = type
     monad: Monad
 
