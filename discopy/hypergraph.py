@@ -2226,6 +2226,55 @@ class Hypergraph[category](
             spider = self.box_wires[i][1][port]
         return obj if len(self.cod_wires) == 1 else (obj, exits[spider])
 
+    def insert_boxes(self, insertions, rewiring, spider_types
+                     ) -> "Hypergraph":
+        """
+        Introduce boxes into a hypergraph in one pass, i.e. scanning its
+        wires and its types once however many boxes are inserted. This is
+        what the ``make_*`` methods below use to introduce every spider, cup,
+        cap or trace they need at once.
+
+        Parameters:
+            insertions : Triples of a depth, a box and the spiders on its
+                ports, in the order they are inserted, each depth an index
+                into the box list **as it stands when that box goes in**,
+                which is the depth each ``make_*`` method computes as it
+                scans.
+            rewiring : The new spider for each port of self that moves.
+            spider_types : The type of every spider of the result, each
+                spider that stays keeping its key.
+
+        Example
+        -------
+        >>> from discopy.frobenius import Ty, Box, Spider, Hypergraph as H
+        >>> x = Ty('x')
+        >>> f = Box('f', x, x).to_hypergraph()
+        >>> g = f.insert_boxes([(1, Spider(1, 1, x), (1, 2))], {3: 2},
+        ...                    f.spider_types + f.spider_types[:1])
+        >>> assert g.boxes == (f.boxes[0], Spider(1, 1, x))
+        >>> assert g.wires == ((0, ), (((0, ), (1, )), ((1, ), (2, ))), (2, ))
+        """
+        flat = [rewiring.get(port, spider)
+                for port, spider in enumerate(self.flat_wires)]
+        boxes, offsets = list(self.boxes), list(self.offsets)
+        for depth, box, legs in insertions:
+            port = len(self.dom) + sum(
+                len(b.dom) + len(b.cod) for b in boxes[:depth])
+            boxes.insert(depth, box)
+            offsets.insert(depth, None)
+            flat[port:port] = legs
+        return type(self)(
+            self.dom, self.cod, tuple(boxes),
+            self.rebracket(flat, boxes=boxes), spider_types, tuple(offsets))
+
+    def shift_depths(self, depths: list[int], depth: int) -> list[int]:
+        """
+        Where the boxes at ``depths`` sit once one is inserted at ``depth``,
+        so that a scan can keep computing depths against the box list it is
+        growing, see :meth:`insert_boxes`.
+        """
+        return [d + 1 if d >= depth else d for d in depths]
+
     def make_bijective(self) -> "Hypergraph":
         """
         Introduces spider boxes to make self bijective.
@@ -2262,15 +2311,14 @@ class Hypergraph[category](
         >>> graph = (f @ g >> Copy(x) @ x >> h @ x @ x).to_hypergraph()
         >>> assert graph.make_bijective().boxes == (f, g, Copy(x), h)
         """
-        boxes = list(self.boxes)
-        f_wires = list(self.flat_wires)
-        spider_types = list(self.spider_types)
-        after_states = max((
-            depth + 1 for depth, (box, offset)
-            in enumerate(zip(self.boxes, self.offsets))
-            if offset is not None and not box.dom), default=0)
+        spider_types = dict(enumerate(self.spider_types))
+        states = [depth for depth, (box, offset)
+                  in enumerate(zip(self.boxes, self.offsets))
+                  if offset is not None and not box.dom]
+        depths, n_boxes = list(range(len(self.boxes))), len(self.boxes)
+        insertions, rewiring, fresh = [], {}, self.n_spiders
         for spider, (typ, (input_wires, output_wires)) in reversed(list(
-                enumerate(zip(spider_types, self.spider_wires)))):
+                enumerate(zip(self.spider_types, self.spider_wires)))):
             n_legs = len(input_wires) + len(output_wires)
             if n_legs in [0, 2]:
                 continue
@@ -2278,34 +2326,32 @@ class Hypergraph[category](
                     self.category, (MarkovCategory, ComarkovCategory)):
                 raise AxiomError(messages.NOT_FROBENIUS.format(
                     factory_name(self.category)))
-            first = getattr(
-                self.ports[min(output_wires)], "depth", len(boxes)
-            ) if output_wires else len(boxes)
-            depth = max(
-                getattr(self.ports[max(input_wires)], "depth", -1) + 1
-                if input_wires else first, min(after_states, first))
-            boxes = boxes[:depth] + [self.category.spider_factory(
-                len(input_wires), len(output_wires), typ)] + boxes[depth:]
-            offsets = self.offsets[:depth] + (None, ) + self.offsets[depth:]
+            after_states = depths[states[-1]] + 1 if states else 0
+            consumer = getattr(
+                self.ports[min(output_wires)], "depth", None
+            ) if output_wires else None
+            first = n_boxes if consumer is None else depths[consumer]
+            producer = getattr(
+                self.ports[max(input_wires)], "depth", None
+            ) if input_wires else None
+            depth = max(first if not input_wires else 0 if producer is None
+                        else depths[producer] + 1, min(after_states, first))
             port_key = lambda port: (
                 getattr(self.ports[port], "i", port), port)
             ports = tuple(sorted(input_wires, key=port_key))\
                 + tuple(sorted(output_wires, key=port_key))
-            for j, port in enumerate(ports):
-                f_wires[port] = len(spider_types) + j
-            i = len(self.dom) + len(
-                sum([sum(ports, ()) for ports in self.box_wires[:depth]], ()))
-            f_wires = f_wires[:i] + list(range(
-                len(spider_types), len(spider_types) + n_legs)) + f_wires[i:]
-            spider_types += n_legs * [typ]
+            legs = tuple(range(fresh, fresh + n_legs))
+            fresh += n_legs
+            rewiring.update(zip(ports, legs))
+            spider_types.update(dict.fromkeys(legs, typ))
             del spider_types[spider]
-            f_wires = [w - 1 if w > spider else w for w in f_wires]
-            wires = self.rebracket(f_wires, boxes=boxes)
-            return type(self)(
-                self.dom, self.cod, tuple(boxes),
-                wires, spider_types, offsets).make_bijective()
-        assert self.is_bijective
-        return self
+            insertions.append((depth, self.category.spider_factory(
+                len(input_wires), len(output_wires), typ), legs))
+            depths, n_boxes = self.shift_depths(depths, depth), n_boxes + 1
+        if not insertions:
+            assert self.is_bijective
+            return self
+        return self.insert_boxes(insertions, rewiring, spider_types)
 
     def leg_order(self, *legs: int) -> tuple[int, ...]:
         """
@@ -2377,52 +2423,38 @@ class Hypergraph[category](
         """
         if not self.is_bijective:
             return self.make_bijective().make_monogamous()
-        for kinds, cups_or_caps in [
-                (["input", "cod"], "cups"),
-                (["dom", "output"], "caps")]:
-            for source, spider in [
-                    (source, spider) for source, (spider, port)
-                    in enumerate(zip(self.flat_wires, self.ports))
-                    if port.kind in kinds]:
-                if spider not in self.flat_wires[source + 1:]:
+        spider_types = dict(enumerate(self.spider_types))
+        depths, n_boxes = list(range(len(self.boxes))), len(self.boxes)
+        insertions, rewiring, fresh = [], {}, self.n_spiders
+        for kinds, cups in [(("input", "cod"), True),
+                            (("dom", "output"), False)]:
+            for source, spider in enumerate(self.flat_wires):
+                if self.ports[source].kind not in kinds\
+                        or spider not in self.flat_wires[source + 1:]:
                     continue
                 target = (
                     self.flat_wires[source + 1:].index(spider) + source + 1)
-                if self.ports[target].kind in kinds:
-                    spider_types = dict(enumerate(self.spider_types))
-                    typ = spider_types[spider]
-                    depth = getattr(
-                        self.ports[source], "depth", len(self.boxes))
-                    source, target = self.leg_order(source, target)
-                    source_obj, target_obj = (
-                        self.ports[source].obj, self.ports[target].obj)
-                    left, right = len(spider_types), len(spider_types) + 1
-                    fwires = list(self.flat_wires)
-                    fwires[source], fwires[target] = left, right
-                    if cups_or_caps == "cups":
-                        boxes = self.boxes + (self.category.cup_factory(
-                            source_obj, target_obj), )
-                        offsets = self.offsets + (None, )
-                        fwires = fwires[:len(fwires) - len(self.cod)] + [
-                            left, right] + fwires[len(fwires) - len(self.cod):]
-                    else:
-                        boxes = self.boxes[:depth] + (
-                            self.category.cap_factory(
-                                source_obj, target_obj), ) + self.boxes[depth:]
-                        offsets = self.offsets[:depth] + (None, )\
-                            + self.offsets[depth:]
-                        i = len(self.dom) + len(sum(
-                            [sum(ports, ()) for ports
-                             in self.box_wires[:depth]], ()))
-                        fwires = fwires[:i] + [left, right] + fwires[i:]
-                    wires = self.rebracket(fwires, boxes=boxes)
-                    spider_types[left] = spider_types[right] = typ
-                    del spider_types[spider]
-                    return type(self)(
-                        self.dom, self.cod, boxes, wires, spider_types, offsets
-                    ).make_monogamous()
-        assert self.is_monogamous
-        return self
+                if self.ports[target].kind not in kinds:
+                    continue
+                consumer = None if cups else getattr(
+                    self.ports[source], "depth", None)
+                depth = n_boxes if consumer is None else depths[consumer]
+                factory = self.category.cup_factory if cups\
+                    else self.category.cap_factory
+                legs = self.leg_order(source, target)
+                spiders = (fresh, fresh + 1)
+                insertions.append((depth, factory(
+                    *(self.ports[leg].obj for leg in legs)), spiders))
+                rewiring.update(zip(legs, spiders))
+                spider_types.update(
+                    dict.fromkeys(spiders, spider_types[spider]))
+                del spider_types[spider]
+                depths, n_boxes = self.shift_depths(depths, depth), n_boxes + 1
+                fresh += 2
+        if not insertions:
+            assert self.is_monogamous
+            return self
+        return self.insert_boxes(insertions, rewiring, spider_types)
 
     def make_left_monogamous(self) -> "Hypergraph":
         """
@@ -2435,30 +2467,28 @@ class Hypergraph[category](
         >>> assert h.boxes == (Spider(2, 1, Ty('x')), )
         >>> assert h.wires == ((0, 1), (((0, 1), (2,)),), (2, 2, 2))
         """
+        spider_types = dict(enumerate(self.spider_types))
+        depths = list(range(len(self.boxes)))
+        insertions, rewiring, fresh = [], {}, self.n_spiders
         for spider, (typ, (input_wires, _)) in enumerate(
                 zip(self.spider_types, self.spider_wires)):
             if len(input_wires) == 1:
                 continue
-            depth = getattr(self.ports[max(input_wires)], "depth", -1) + 1\
-                if input_wires else 0
-            boxes = self.boxes[:depth] + (self.category.spider_factory(
-                len(input_wires), 1, typ), ) + self.boxes[depth:]
-            offsets = self.offsets[:depth] + (None, ) + self.offsets[depth:]
-            fwires = list(self.flat_wires)
-            for j, port in enumerate(input_wires):
-                fwires[port] = self.n_spiders + j
-            i = len(self.dom) + len(
-                sum([sum(wires, ()) for wires in self.box_wires[:depth]], ()))
-            fwires = fwires[:i] + list(range(
-                self.n_spiders, self.n_spiders + len(input_wires))
-            ) + [spider] + fwires[i:]
-            wires = self.rebracket(fwires, boxes=boxes)
-            spider_types = self.spider_types + len(input_wires) * (typ, )
-            return type(self)(
-                self.dom, self.cod, boxes, wires, spider_types, offsets
-            ).make_left_monogamous()
-        assert self.is_left_monogamous
-        return self
+            producer = getattr(
+                self.ports[max(input_wires)], "depth", None
+            ) if input_wires else None
+            depth = 0 if producer is None else depths[producer] + 1
+            legs = tuple(range(fresh, fresh + len(input_wires)))
+            fresh += len(input_wires)
+            rewiring.update(zip(sorted(input_wires), legs))
+            spider_types.update(dict.fromkeys(legs, typ))
+            insertions.append((depth, self.category.spider_factory(
+                len(input_wires), 1, typ), legs + (spider, )))
+            depths = self.shift_depths(depths, depth)
+        if not insertions:
+            assert self.is_left_monogamous
+            return self
+        return self.insert_boxes(insertions, rewiring, spider_types)
 
     def make_right_monogamous(self) -> "Hypergraph":
         """
@@ -2472,31 +2502,28 @@ class Hypergraph[category](
         >>> assert h.boxes == (Spider(1, 2, Ty('x')), )
         >>> assert h.wires == ((0, 0, 0), (((0,), (1, 2)),), (1, 2))
         """
+        spider_types = dict(enumerate(self.spider_types))
+        depths, n_boxes = list(range(len(self.boxes))), len(self.boxes)
+        insertions, rewiring, fresh = [], {}, self.n_spiders
         for spider, (typ, (_, output_wires)) in enumerate(
                 zip(self.spider_types, self.spider_wires)):
             if len(output_wires) == 1:
                 continue
-            depth = getattr(
-                self.ports[min(output_wires)], "depth", len(self.boxes)
-            ) if output_wires else len(self.boxes)
-            boxes = self.boxes[:depth] + (self.category.spider_factory(
-                1, len(output_wires), typ), ) + self.boxes[depth:]
-            offsets = self.offsets[:depth] + (None, ) + self.offsets[depth:]
-            fwires = list(self.flat_wires)
-            for j, port in enumerate(sorted(output_wires)):
-                fwires[port] = self.n_spiders + j
-            i = len(self.dom) + len(
-                sum([sum(wires, ()) for wires in self.box_wires[:depth]], ()))
-            fwires = fwires[:i] + [spider] + list(range(
-                self.n_spiders, self.n_spiders + len(output_wires))
-            ) + fwires[i:]
-            wires = self.rebracket(fwires, boxes=boxes)
-            spider_types = self.spider_types + len(output_wires) * (typ, )
-            return type(self)(
-                self.dom, self.cod, boxes, wires, spider_types, offsets
-            ).make_right_monogamous()
-        assert self.is_right_monogamous
-        return self
+            consumer = getattr(
+                self.ports[min(output_wires)], "depth", None
+            ) if output_wires else None
+            depth = n_boxes if consumer is None else depths[consumer]
+            legs = tuple(range(fresh, fresh + len(output_wires)))
+            fresh += len(output_wires)
+            rewiring.update(zip(sorted(output_wires), legs))
+            spider_types.update(dict.fromkeys(legs, typ))
+            insertions.append((depth, self.category.spider_factory(
+                1, len(output_wires), typ), (spider, ) + legs))
+            depths, n_boxes = self.shift_depths(depths, depth), n_boxes + 1
+        if not insertions:
+            assert self.is_right_monogamous
+            return self
+        return self.insert_boxes(insertions, rewiring, spider_types)
 
     def make_causal(self) -> "Hypergraph":
         """
@@ -2554,17 +2581,35 @@ class Hypergraph[category](
         that every wire points forward: a left-monogamous hypergraph becomes
         causal and a right-monogamous one cocausal, since cutting a wire
         open keeps either.
+
+        Cutting one wire can make another point forward, so the wires to cut
+        are not known before the first cut: they are cut one at a time, by
+        :meth:`cut_backward_wire`, until every wire points forward. The
+        traces all apply to the result of the last cut, so they are counted
+        rather than nested.
+        """
+        graph, cuts = self, 0
+        while (cut := graph.cut_backward_wire()) is not None:
+            graph, cuts = cut, cuts + 1
+        for _ in range(cuts):
+            graph = graph.explicit_trace()
+        return graph
+
+    def cut_backward_wire(self) -> "Hypergraph | None":
+        """
+        Cut open one scalar spider, or one wire that points backward, into an
+        extra input and output to be traced, or ``None`` when every wire
+        already points forward, see :meth:`trace_backward_wires`.
         """
         for spider in self.scalar_spiders:
             typ = self.spider_types[spider]
             dom, cod = self.dom @ typ, self.cod @ typ
             wires = (self.dom_wires + (spider, ), self.box_wires,
                      self.cod_wires + (spider, ))
-            arg = type(self)(
+            return type(self)(
                 dom, cod, self.boxes, wires, self.spider_types, self.offsets)
-            return arg.trace_backward_wires().explicit_trace()
         if self.is_topologically_ordered:
-            return self
+            return None
         causal_graph = self.causal_graph()
         input_spider, input_wire, output_wire = next(
             (spider, u, v)
@@ -2580,9 +2625,8 @@ class Hypergraph[category](
         fwires = fwires[:len(self.dom)] + [output_spider]\
             + fwires[len(self.dom):] + [input_spider]
         wires = self.rebracket(fwires, dom=dom)
-        arg = type(self)(
+        return type(self)(
             dom, cod, self.boxes, wires, spider_types, self.offsets)
-        return arg.trace_backward_wires().explicit_trace()
 
     @property
     def is_generator(self):

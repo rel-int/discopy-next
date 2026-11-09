@@ -45,9 +45,9 @@ graphviz_output_format = 'svg'
 
 autosummary_generate = True
 
-# discopy.quantum.pennylane imports pennylane and discopy.optyx imports
-# cotengra, quimb and pyzx, none of which the docs extra installs.
-autodoc_mock_imports = ["pennylane", "cotengra", "quimb", "pyzx"]
+# discopy.quantum.pennylane imports pennylane, which the docs extra does not
+# install.
+autodoc_mock_imports = ["pennylane"]
 
 autodoc_typehints = "description"
 autodoc_typehints_format = "short"

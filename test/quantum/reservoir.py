@@ -39,11 +39,15 @@ def test_Reservoir_random_depth():
 
 
 def test_Reservoir_repr():
+    """ The repr rounds the random phases, which the gates compare exactly. """
     reservoir = Reservoir.random(memory=1, inputs=1, seed=5)
     scope = {"Reservoir": Reservoir, "quantum": quantum,
              "compact": compact, "frobenius": frobenius,
              **vars(quantum.gates)}
-    assert eval(repr(reservoir), scope) == reservoir
+    copy = eval(repr(reservoir), scope)
+    assert repr(copy) == repr(reservoir)
+    assert np.allclose(copy.unitary.eval().array,
+                       reservoir.unitary.eval().array, atol=1e-2)
     assert reservoir == Reservoir.random(memory=1, inputs=1, seed=5)
     assert reservoir != Reservoir.random(memory=1, inputs=1, seed=6)
 

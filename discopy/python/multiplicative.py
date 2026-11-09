@@ -92,7 +92,7 @@ class Function(function.Function, ClosedCategory, TracedCategory):
                 callable(y) or assert_isinstance(y, t)
         return ys
 
-    def tensor(self, *others: Function) -> Function:
+    def tensor(self, *others: Function) -> Self:
         """
         The parallel composition of ``n`` functions, called with :code:`@`.
 
@@ -116,10 +116,10 @@ class Function(function.Function, ClosedCategory, TracedCategory):
                 for i, factor in enumerate(factors)), ()))
         dom = self.dom.tensor(*(other.dom for other in others))
         cod = self.cod.tensor(*(other.cod for other in others))
-        return Function(inside, dom, cod)
+        return type(self)(inside, dom, cod)
 
-    @staticmethod
-    def swap(x: Ty, y: Ty) -> Function:
+    @classmethod
+    def swap(cls, x: Ty, y: Ty) -> Self:
         """
         The function for swapping two lists of types :code:`x` and :code:`y`.
 
@@ -127,11 +127,11 @@ class Function(function.Function, ClosedCategory, TracedCategory):
             x : The list of types on the left.
             y : The list of types on the right.
         """
-        x, y = map(Ty.cast, (x, y))
+        x, y = map(cls.ob.cast, (x, y))
 
         def inside(*xs):
             return untuplify(xs[len(x):] + xs[:len(x)])
-        return Function(inside, dom=x @ y, cod=y @ x)
+        return cls(inside, dom=x @ y, cod=y @ x)
 
     @classmethod
     def permutation(cls, xs, doms) -> Self:
@@ -151,8 +151,8 @@ class Function(function.Function, ClosedCategory, TracedCategory):
 
     braid = swap
 
-    @staticmethod
-    def copy(x: Ty, n=2) -> Function:
+    @classmethod
+    def copy(cls, x: Ty, n=2) -> Self:
         """
         The function for making :code:`n` copies of a list of types :code:`x`.
 
@@ -160,21 +160,21 @@ class Function(function.Function, ClosedCategory, TracedCategory):
             x : The list of types to copy.
             n : The number of copies.
         """
-        x = Ty.cast(x)
-        return Function(lambda *xs: untuplify(n * xs), dom=x, cod=x ** n)
+        x = cls.ob.cast(x)
+        return cls(lambda *xs: untuplify(n * xs), dom=x, cod=x ** n)
 
-    @staticmethod
-    def discard(dom: Ty) -> Function:
+    @classmethod
+    def discard(cls, dom: Ty) -> Self:
         """
         The function discarding a list of types, i.e. making zero copies.
 
         Parameters:
             dom : The list of types to discard.
         """
-        return Function.copy(dom, 0)
+        return cls.copy(dom, 0)
 
-    @staticmethod
-    def ev(base: Ty, exponent: Ty, left=True) -> Function:
+    @classmethod
+    def ev(cls, base: Ty, exponent: Ty, left=True) -> Self:
         """
         The evaluation function,
         i.e. take a function and apply it to an argument.
@@ -184,14 +184,14 @@ class Function(function.Function, ClosedCategory, TracedCategory):
             exponent : The input type.
             left : Whether to take the function on the left or right.
         """
-        base, exponent = map(Ty.cast, (base, exponent))
+        base, exponent = map(cls.ob.cast, (base, exponent))
         if left:
-            dom, cod = Function.exp(base, exponent) @ exponent, base
-            return Function(lambda f, *xs: f(*xs), dom, cod)
-        dom, cod = exponent @ Function.exp(base, exponent), base
-        return Function(lambda *xs: xs[-1](*xs[:-1]), dom, cod)
+            dom, cod = cls.exp(base, exponent) @ exponent, base
+            return cls(lambda f, *xs: f(*xs), dom, cod)
+        dom, cod = exponent @ cls.exp(base, exponent), base
+        return cls(lambda *xs: xs[-1](*xs[:-1]), dom, cod)
 
-    def curry(self, n=1, left=True) -> Function:
+    def curry(self, n=1, left=True) -> Self:
         """
         Currying, i.e. turn a binary function into a function-valued function.
 
@@ -206,13 +206,13 @@ class Function(function.Function, ClosedCategory, TracedCategory):
             raise ValueError(messages.NOT_SPLITTABLE.format(n, self.dom))
         if left:
             dom = self.dom[:len(self.dom) - n]
-            cod = Function.exp(self.cod, self.dom[len(self.dom) - n:])
+            cod = self.exp(self.cod, self.dom[len(self.dom) - n:])
         else:
-            dom, cod = self.dom[n:], Function.exp(self.cod, self.dom[:n])
-        return Function(dom=dom, cod=cod, inside=lambda *xs: lambda *ys:
-                        self(*(xs + ys) if left else (ys + xs)))
+            dom, cod = self.dom[n:], self.exp(self.cod, self.dom[:n])
+        return type(self)(dom=dom, cod=cod, inside=lambda *xs: lambda *ys:
+                          self(*(xs + ys) if left else (ys + xs)))
 
-    def uncurry(self, left=True) -> Function:
+    def uncurry(self, left=True) -> Self:
         """
         Uncurrying,
         i.e. turn a function-valued function into a binary function.
@@ -222,10 +222,10 @@ class Function(function.Function, ClosedCategory, TracedCategory):
         """
         traced = self.cod.inside[0].__args__
         base, exponent = map(Ty.cast, (traced[-1].__args__, traced[:-1]))
-        return self @ exponent >> Function.ev(base, exponent) if left\
-            else exponent @ self >> Function.ev(base, exponent, left=False)
+        return self @ exponent >> self.ev(base, exponent) if left\
+            else exponent @ self >> self.ev(base, exponent, left=False)
 
-    def fix(self, n=1) -> Function:
+    def fix(self, n=1) -> Self:
         """
         The parameterised fixed point of a function ``f : A @ X -> X`` over
         the last ``n`` types ``X`` of its domain, i.e. ``fix(f) : A -> X``
@@ -262,7 +262,7 @@ class Function(function.Function, ClosedCategory, TracedCategory):
             while (zs := tuplify(self(*xs, *ys), n)) != ys:
                 ys = zs
             return untuplify(ys)
-        return Function(inside, self.dom[:len(self.dom) - n], self.cod)
+        return type(self)(inside, self.dom[:len(self.dom) - n], self.cod)
 
     def trace(self, n=1, left=False):
         """

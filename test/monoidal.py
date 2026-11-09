@@ -887,12 +887,72 @@ def test_coloured_Ob_dagger():
     red, green = Colour("red"), Colour("green")
     x = Wire("x", red, green)
     # Dagger swaps the boundary colours and toggles is_dagger.
-    assert x.dagger() == Wire("x", green, red)
+    assert x.dagger() == Wire("x", green, red, is_dagger=True)
     assert x.is_dagger is False and x.dagger().is_dagger is True
     assert x.dagger().dagger() == x and x.dagger().dagger().is_dagger is False
-    # Equality and hashing ignore is_dagger.
-    assert x.dagger() == Wire("x", green, red, is_dagger=True)
-    assert hash(x.dagger()) == hash(Wire("x", green, red))
+    # Equality and hashing count is_dagger.
+    assert x.dagger() != Wire("x", green, red)
+    assert hash(x.dagger()) == hash(Wire("x", green, red, is_dagger=True))
+
+
+def test_Functor_sends_equal_wires_to_equal_images():
+    """ A daggered wire is a generator of its own, not a fresh wire with its
+    colours swapped, so that a functor sends equal wires to equal images,
+    however each was built: from a name or a wire, daggered or built with
+    ``is_dagger=True`` (next#445). """
+    red, green, pink, lime = map(Colour, ("red", "green", "pink", "lime"))
+    x, y, z = Ty('x'), Ty('y'), Ty('z')
+    c, d = Ty(Wire('x', red, green)), Ty(Wire('x', green, red))
+    X, W = Ty(Wire('X', pink, lime)), Ty(Wire('W', lime, pink))
+    F = Functor({x: y @ z, c: X, d: W}, {},
+                colour_map={red: pink, green: lime})
+    types = [x, x[::-1], c, c[::-1], d, d[::-1]]
+    twins = [Ty(Wire('x')), Ty(Wire('x', is_dagger=True)),
+             Ty(Wire('x', red, green)),
+             Ty(Wire('x', green, red, is_dagger=True)),
+             Ty(Wire('x', red, green, is_dagger=True))[::-1],
+             Ty(Wire('x', green, red))[::-1]]
+    assert all(a == b for a, b in zip(types, twins))
+    for a, b in [(a, b) for a in types for b in twins if a == b]:
+        assert F(a) == F(b), (a, b)
+    assert len(set(types)) == len(types)
+    assert F(x[::-1]) == F(x)[::-1] and F(c[::-1]) == F(c)[::-1]
+
+
+def test_daggered_wire_str_reads_back():
+    """ The string of a daggered wire ends in ``[::-1]``, as that of a
+    daggered box does, so that it reads back to the wire and not to the
+    one it daggers (next#445). """
+    x, y = Ty('x'), Ty('y')
+    assert str(x[::-1]) == "x[::-1]" and str(x @ y[::-1]) == "x @ y[::-1]"
+    for term in (x[::-1], x @ y[::-1], (x @ y)[::-1]):
+        assert Ty.str_transparency(term)
+        assert Diagram.str_transparency(Diagram.id(term))
+
+
+def test_daggered_Wire_str_reads_back():
+    """ A wire on its own reads its string back too: ``x[::-1]`` is its
+    dagger, and it is not sliced otherwise (next#445). """
+    red, green = Colour('red'), Colour('green')
+    for x in (Wire('x'), Wire('x', red, green)):
+        assert eval(str(x.dagger()), {'x': x}) == x.dagger() == x[::-1]
+        assert x[::-1][::-1] == x
+    with raises(TypeError):
+        Wire('x')[0]
+
+
+def test_order_of_types_is_total():
+    """ Of two unequal types exactly one is less than the other, even when
+    their wires share a name, so that sorting does not depend on the input
+    order (next#445). """
+    red, green = Colour("red"), Colour("green")
+    x, c = Ty('x'), Ty(Wire('x', red, green))
+    types = [x, x[::-1], c, c[::-1], Ty(Wire('x', green, red)), Ty(),
+             Ty.id(red), Ty.id(green), x @ x[::-1], x[::-1] @ x]
+    for a, b in [(a, b) for a in types for b in types]:
+        assert [a < b, a == b, b < a].count(True) == 1, (a, b)
+        assert (a > b, a <= b, a >= b) == (b < a, not b < a, not a < b)
+    assert sorted(types) == sorted(types[::-1])
 
 
 def test_coloured_Functor_dagger():
@@ -1116,3 +1176,19 @@ def test_Equation_modulo_keeps_space():
     equation = Equation(f, f, symbol="->", space=3).modulo(len)
     assert equation.space == 3 and equation.symbols == ("->", )
     assert loads(dumps(equation.modulo(None))).space == 3
+
+
+def test_Equation_eq_and_repr_keep_space():
+    f = Box('f', Ty('x'), Ty('x'))
+    equation = Equation(f, f, symbol="->", space=2)
+    assert repr(equation).endswith(", symbols=('->',), space=2)")
+    assert eval(repr(equation), Diagram.environment()) == equation
+    assert loads(dumps(equation)) == equation
+    assert equation != Equation(f, f, symbol="->")
+    assert hash(Equation(f, f, symbol="->", space=2)) == hash(equation)
+
+
+def test_Equation_repr_without_terms():
+    equation = Equation(space=2)
+    assert repr(equation) == "monoidal.Equation(space=2)"
+    assert eval(repr(equation), Diagram.environment()) == equation

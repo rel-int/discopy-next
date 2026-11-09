@@ -64,13 +64,13 @@
 \node [] (61) at (6.0, 0.25) {};
 \node [style=none, fill=white, right] (62) at (6.0625, 0.1875) {1};
 \node [] (63) at (6.0, 0) {};
-\node [style=X, scale=0.378] (64) at (1.0, 3.0) {};
-\node [style=Z, scale=0.378] (65) at (1.0, 2.0) {};
-\node [style=symbol, scale=0.378] (66) at (2.5, 2.5) {=};
-\node [style=Z, scale=0.378] (67) at (4.0, 4.5) {};
-\node [style=Z, scale=0.378] (68) at (6.0, 3.5) {};
-\node [style=X, scale=0.378] (69) at (4.0, 1.5) {};
-\node [style=X, scale=0.378] (70) at (6.0, 0.5) {};
+\node [style=X_red_circle, scale=0.378] (64) at (1.0, 3.0) {};
+\node [style=Z_green_circle, scale=0.378] (65) at (1.0, 2.0) {};
+\node [style=symbol_none_circle, scale=0.378] (66) at (2.5, 2.5) {=};
+\node [style=Z_green_circle, scale=0.378] (67) at (4.0, 4.5) {};
+\node [style=Z_green_circle, scale=0.378] (68) at (6.0, 3.5) {};
+\node [style=X_red_circle, scale=0.378] (69) at (4.0, 1.5) {};
+\node [style=X_red_circle, scale=0.378] (70) at (6.0, 0.5) {};
 \end{pgfonlayer}
 \begin{pgfonlayer}{edgelayer}
 \draw [style=box] (1.center) to (2.center) to (3.center) to (4.center) to (1.center);

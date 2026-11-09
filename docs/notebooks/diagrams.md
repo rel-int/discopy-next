@@ -399,14 +399,14 @@ assert unit @ x_1 == x_1 == x_1 @ unit
 assert x_1 @ y_1 @ z_1 == x_1 @ (y_1 @ z_1)
 ```
 
-Types can be indexed and sliced like Python strings, i.e.
+Types can be indexed and sliced like Python strings, except that a negative step reverses a type as the dagger reverses an arrow, i.e. it daggers each of its wires:
 
 ```python {.marimo}
 assert x_1[0] == x_1 and 'x'[0] == 'x'
 t = x_1 @ y_1 @ z_1
 assert t[:1] == t[:-2] == x_1
 assert t[1:] == t[-2:] == y_1 @ z_1
-assert t[1:0:-1].inside == t.inside[1:0:-1]
+assert t[2:0:-1] == z_1[::-1] @ y_1[::-1] != z_1 @ y_1
 ```
 
 Now a **monoidal signature** is a graph $G = (G_0, G_1, \mathtt{dom}, \mathtt{cod})$ where the edges have lists of nodes as source and target, i.e. with $\mathtt{dom}, \mathtt{cod} : G_1 \to G_0^\star$.
