@@ -852,6 +852,9 @@ def test_Bubble_func_dagger():
     assert bubble.dagger().drawing_name == "B"
     assert bubble != f.bubble() != f.bubble().dagger()
     assert repr(f.bubble().dagger()) == repr(f.bubble()) + ".dagger()"
+    assert str(f.bubble().dagger()) == "(f).bubble()[::-1]"
+    assert eval(str(f.bubble().dagger())) == f.bubble().dagger()
+    assert eval(str(f.dagger().bubble())) == f.dagger().bubble()
     from discopy import tensor
     assert repr(bubble).endswith(", func=abs)") and eval(repr(bubble)) == bubble
     F = frobenius.Functor.id(Diagram)
