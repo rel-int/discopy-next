@@ -225,8 +225,9 @@ class Function(function.Function, ClosedCategory, TracedCategory):
             left : Whether to uncurry on the left or right.
 
         Raises:
-            ValueError : When the codomain is not one ``Callable`` type, or
-                its exponent has more than ``n`` types.
+            ValueError : When the codomain is not one ``Callable`` type
+                returning a ``tuple``, or its exponent has more than ``n``
+                types.
 
         Example
         -------
@@ -241,6 +242,8 @@ class Function(function.Function, ClosedCategory, TracedCategory):
         if get_origin(function_type) is not Callable:
             raise ValueError(messages.NOT_EXPONENTIAL.format(self, self.cod))
         *exponent, base = function_type.__args__
+        if get_origin(base) is not tuple:
+            raise ValueError(messages.NOT_EXPONENTIAL.format(self, self.cod))
         base, exponent = Ty(*base.__args__), Ty(*exponent)
         if n < len(exponent):
             raise ValueError(messages.NOT_UNCURRIABLE.format(

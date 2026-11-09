@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import itertools
+from collections.abc import Callable
 from typing import List
 from pytest import raises
 
@@ -44,6 +45,8 @@ def test_curry_uncurry_n():
             h.curry(2, left).uncurry(1, left)
         with raises(ValueError, match="exponential"):
             f.uncurry(1, left)
+        with raises(ValueError, match="exponential"):
+            Function(lambda: abs, (), (Callable[[int], int], )).uncurry()
 
 
 def test_curry_out_of_range():
