@@ -1405,6 +1405,12 @@ class BraidedCategory[
     A braided category is a :class:`MonoidalCategory` with a method
     :code:`braid` for the natural isomorphism :code:`x @ y -> y @ x`. It is
     a :class:`SpacialCategory`: a scalar slides along the braid of the unit.
+
+    The inverse of a braid is read as its :code:`dagger`, which every braided
+    category here has, so :meth:`braid_then_inverse`,
+    :meth:`inverse_then_braid` and :meth:`inverse_braiding` state it by
+    that name; a :class:`SymmetricCategory` declares the first two
+    inapplicable, its swap being its own inverse.
     """
     @classmethod
     @abstractmethod
