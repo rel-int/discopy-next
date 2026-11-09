@@ -143,6 +143,21 @@ def test_tikz_spells_a_matplotlib_only_colour_by_its_rgb(
                for name in re.findall(r"style=([^,\]]*)", tikz))
 
 
+@mark.parametrize("colour", [(.1, .2, .3), [.1, .2, .3], np.array([.1, .2, .3])])
+def test_matplotlib_draws_an_unhashable_colour(colour):
+    """ A colour matplotlib reads need not be hashable, e.g. a list or an
+    array, see rel-int/discopy-next#482. """
+    from discopy.monoidal import Equation
+    from discopy.quantum.gates import Bra, Ket
+    x, ket, bra, buffer = Ty('x'), Ket(0), Bra(1), BytesIO()
+    ket.color = bra.color = colour
+    Equation(
+        Box('f', x, x, color=colour),
+        Box('g', x, x, color=colour, draw_as_spider=True), ket, bra).draw(
+        path=buffer, format="svg", show=False)
+    assert buffer.getvalue().decode("utf-8").count("fill: #1a334c") == 4
+
+
 @mark.parametrize("colour", ["purple", "lightgray", "RoyalPurple", "red!50"])
 def test_tikz_keeps_an_xcolor_name(colour):
     assert TikZ.format_color(colour) == colour
