@@ -25,7 +25,9 @@ travel between runs in; :mod:`proptest.conftest` is the plugin that collects
 one and prints the other.
 """
 
+import argparse
 import json
+import pathlib
 from dataclasses import asdict, dataclass
 
 PASSED, SKIPPED, XFAILED, XPASSED = (
@@ -285,3 +287,58 @@ def loads(source):
              distinct=entry.get("distinct"), budget=entry.get("budget"))
         for name, entry in sorted(entries.items())
         if isinstance(entry, dict) and "outcome" in entry)
+
+
+def merge(*reports):
+    """
+    The report of a whole run, out of the reports of its shards. Each cell
+    belongs to exactly one shard, so a cell two shards both report is a
+    split that went wrong and raises rather than letting one hide the other.
+
+    >>> merge([Cell("a", PASSED)], [Cell("b", SKIPPED)])
+    (Cell(name='a', outcome='passed', distinct=None, budget=None), \
+Cell(name='b', outcome='skipped', distinct=None, budget=None))
+    >>> merge([Cell("a", PASSED)], [Cell("a", SKIPPED)])
+    Traceback (most recent call last):
+     ...
+    ValueError: cell(s) reported by more than one shard: a
+    """
+    cells = [cell for report in reports for cell in report]
+    names = [cell.name for cell in cells]
+    if twice := sorted({name for name in names if names.count(name) > 1}):
+        raise ValueError(
+            f"cell(s) reported by more than one shard: {', '.join(twice)}")
+    return tuple(sorted(cells, key=lambda cell: cell.name))
+
+
+def main(argv=None):
+    """
+    Merge the reports of a sharded run, print what the whole matrix checked
+    against the baseline, if any, and write the merged report, which is
+    what the next run reads as its baseline. A baseline that cannot be read
+    is named and skipped, as the plugin does in an unsharded run.
+    """
+    parser = argparse.ArgumentParser(
+        prog="python -m proptest.report", description=main.__doc__)
+    parser.add_argument("shards", nargs="*", type=pathlib.Path)
+    parser.add_argument("--baseline", type=pathlib.Path)
+    parser.add_argument("--report", type=pathlib.Path)
+    args = parser.parse_args(argv)
+    cells = merge(*(loads(path.read_text()) for path in args.shards))
+    baseline = None
+    if args.baseline is not None:
+        try:
+            baseline = loads(args.baseline.read_text())
+        except (OSError, ValueError) as error:
+            baseline = ()
+            print(f"unreadable baseline {args.baseline}: {error}")
+    print(f"{len(cells)} cell(s) from {len(args.shards)} shard(s)")
+    print("\n".join(render(cells, baseline)))
+    if args.report is not None:
+        args.report.parent.mkdir(parents=True, exist_ok=True)
+        args.report.write_text(dumps(cells))
+        print(f"report written to {args.report}")
+
+
+if __name__ == "__main__":
+    main()

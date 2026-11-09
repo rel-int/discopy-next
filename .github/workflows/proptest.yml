@@ -20,10 +20,23 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  proptest:
+  shard:
+    # `explore` runs 2,908 cells for some five runner-hours, so a push, the
+    # nightly and a dispatch deal them round 20 runners, each with its own
+    # timeout; a pull request's `pr` budget fits one. Each shard writes its
+    # own report and database, and the `proptest` job below merges them: a
+    # baseline is a claim about the whole matrix, never one shard of it.
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: >-
+          ${{ github.event_name == 'pull_request' && fromJSON('[1]')
+          || fromJSON('[1, 2, 3, 4, 5, 6, 7, 8, 9, 10,
+                       11, 12, 13, 14, 15, 16, 17, 18, 19, 20]') }}
     env:
+      SHARDS: ${{ github.event_name == 'pull_request' && 1 || 20 }}
       # A pull request replays what the database remembers and generates a
       # few examples on top, from a fixed seed so that a run draws the same
       # examples every time; every other run searches new ground.
@@ -49,20 +62,68 @@ jobs:
         search_artifacts: true
         workflow_conclusion: completed
         if_no_artifact_found: warn
+    - name: List the database this shard starts from
+      run: |
+        mkdir -p .hypothesis/examples shard
+        (cd .hypothesis/examples && find . -type f | sort) > shard/before.txt
+    - name: Run property tests
+      run:
+        uv run pytest proptest/ -n auto -p no:benchmark -vrxX
+        --hypothesis-show-statistics
+        --proptest-shard=${{ matrix.shard }}/${{ env.SHARDS }}
+        --proptest-report=shard/report.json
+    - name: Gather the shard's database and the entries it deleted
+      if: always()
+      run: |
+        (cd .hypothesis/examples && find . -type f | sort) > shard/after.txt
+        comm -23 shard/before.txt shard/after.txt > shard/deleted.txt
+        cp -r .hypothesis/examples shard/examples
+    - name: Upload the shard
+      # Read by the `proptest` job of this run alone, which is why it keeps
+      # for a day: the artifacts other runs read are the merged ones.
+      if: always()
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      with:
+        name: proptest-shard-${{ matrix.shard }}
+        path: shard
+        include-hidden-files: true
+        retention-days: 1
+
+  proptest:
+    # Runs whatever the shards did, so that a run whose shard failed or timed
+    # out still says which cells it checked, and fails unless every shard
+    # passed, so that it is the one check a pull request waits on.
+    needs: shard
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        persist-credentials: false
+    - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+      with:
+        python-version: "3.14"
+    - name: Download the shards
+      uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+      with:
+        pattern: proptest-shard-*
+        path: shards
     - name: Download the previous report
       # The cells the previous run checked, so that this one can name the
       # ones it no longer checks. Missing on the first run and on a branch
       # whose only ancestor runs predate this artifact, which the comparison
       # reports as no baseline rather than failing.
       #
-      # Narrower than the database above, because a baseline is a claim about
+      # Narrower than the database, because a baseline is a claim about
       # what `main` checks rather than a pile of examples any run may add to.
       # `branch: main` because the action searches every branch without it and
       # a dispatch may be run anywhere, so a feature branch that legitimately
       # skips a cell would otherwise become the baseline that cell is missing
       # from. `success` because the upload below is `always()`: a run that died
-      # mid-suite uploads a partial report, which stays available to look at
-      # and must not be what the next run compares against.
+      # mid-suite, or one of whose shards did, uploads a partial report, which
+      # stays available to look at and must not be what the next run compares
+      # against.
       uses: dawidd6/action-download-artifact@27e4ae67c24b67d3b54bc6d6a45475be1e28031b # v26
       with:
         name: proptest-report
@@ -71,12 +132,14 @@ jobs:
         search_artifacts: true
         workflow_conclusion: success
         if_no_artifact_found: warn
-    - name: Run property tests
+    - name: Merge the shards' reports
       run:
-        uv run pytest proptest/ -n auto -p no:benchmark -vrxX
-        --hypothesis-show-statistics
-        --proptest-baseline=baseline/proptest-report.json
-        --proptest-report=report/proptest-report.json
+        python -m proptest.report shards/*/report.json
+        --baseline=baseline/proptest-report.json
+        --report=report/proptest-report.json
+    - name: Merge the shards' databases
+      if: always()
+      run: python .github/scripts/merge_examples.py examples shards/*
     - name: Upload the report
       # Written whether the suite passed or not, and uploaded on the same
       # terms as the database below: a pull request reads the shared reading
@@ -96,6 +159,9 @@ jobs:
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
       with:
         name: hypothesis-example-db
-        path: .hypothesis/examples
+        path: examples
         include-hidden-files: true
         retention-days: 90
+    - name: Fail unless every shard passed
+      if: needs.shard.result != 'success'
+      run: echo "a shard ended ${{ needs.shard.result }}" && exit 1
