@@ -1601,6 +1601,7 @@ for the changelog of `1.2.1` and earlier.
 [next#459]: https://github.com/rel-int/discopy-next/pull/459
 [next#445]: https://github.com/rel-int/discopy-next/issues/445
 [next#463]: https://github.com/rel-int/discopy-next/issues/463
+[next#466]: https://github.com/rel-int/discopy-next/issues/466
 [next#471]: https://github.com/rel-int/discopy-next/issues/471
 [next#468]: https://github.com/rel-int/discopy-next/issues/468
 [next#472]: https://github.com/rel-int/discopy-next/issues/472
@@ -1617,4 +1618,3 @@ for the changelog of `1.2.1` and earlier.
 [lambek#8]: https://github.com/rel-int/lambek/pull/8
 [lambek#12]: https://github.com/rel-int/lambek/pull/12
 [Recursive_GNNs#1]: https://github.com/rel-int/Recursive_GNNs/issues/1
-[next#466]: https://github.com/rel-int/discopy-next/issues/466
