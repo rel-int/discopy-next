@@ -550,3 +550,10 @@ def test_functor_preserves_the_boundary_of_FollowedBy():
         assert (F(fby).dom, F(fby).cod) == (F(fby.dom), F(fby.cod))
     iso = FollowedBy(x) >> FollowedBy(x).dagger()
     assert F(iso) == FollowedBy(y) >> FollowedBy(y).dagger()
+
+
+def test_Ty_has_canonical_instances():
+    assert Ty.box_factory is Wire
+    for law in Ty.axioms.values():
+        if law.name != "str_transparency":  # a canonical wire is coloured
+            assert law.canonical(), law
