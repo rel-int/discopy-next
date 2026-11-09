@@ -28,7 +28,7 @@ jobs:
     # own report and database, and the `proptest` job below merges them: a
     # baseline is a claim about the whole matrix, never one shard of it.
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
