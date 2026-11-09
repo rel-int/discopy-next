@@ -253,8 +253,8 @@ legitimately skips a cell cannot become the baseline that cell is missing
 from, and a run that died mid-suite stays available to look at without being
 compared against.
 
-Under `explore` the matrix takes some five runner-hours, so every run but a
-pull request's deals it round 20 runners, the `shard` jobs, and the
+Under `explore` the matrix takes some ten runner-hours, so every run but a
+pull request's deals it round 40 runners, the `shard` jobs, and the
 `proptest` job merges them: the report is compared and uploaded only once,
 for the whole run, which succeeds only when every shard does. Every shard
 starts from the same example database and writes only under the keys of

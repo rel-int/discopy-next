@@ -1302,7 +1302,7 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Project
 
-- The `proptest` workflow deals `explore` round 20 runners, `--proptest-shard`,
+- The `proptest` workflow deals `explore` round 40 runners, `--proptest-shard`,
   and merges their reports and example databases into one, so that `main`
   finishes its search again ([next#487]).
 - `AGENTS.md`, `RULES.md` and `STYLE.md` for agents, and an LLM contribution
