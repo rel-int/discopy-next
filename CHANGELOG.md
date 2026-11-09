@@ -1234,6 +1234,11 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   longer holds every intermediate hypergraph alive at once. It is as fast as
   it was: four fifths of the time is `explicit_trace`, which this leaves
   alone ([next#471]).
+- The TikZ backend spells a colour that matplotlib draws and xcolor does not
+  know, e.g. `tab:blue`, `C0`, `0.5`, `navy` or an RGB tuple, by its RGB
+  values, with or without `use_tikzstyles`, so its drawing compiles; it was
+  written raw, which pdflatex rejects, and a tuple raised `TypeError`
+  ([next#466]).
 
 ### Project
 
@@ -1612,3 +1617,4 @@ for the changelog of `1.2.1` and earlier.
 [lambek#8]: https://github.com/rel-int/lambek/pull/8
 [lambek#12]: https://github.com/rel-int/lambek/pull/12
 [Recursive_GNNs#1]: https://github.com/rel-int/Recursive_GNNs/issues/1
+[next#466]: https://github.com/rel-int/discopy-next/issues/466
