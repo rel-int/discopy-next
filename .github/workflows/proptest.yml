@@ -132,14 +132,19 @@ jobs:
         search_artifacts: true
         workflow_conclusion: success
         if_no_artifact_found: warn
+    # Found rather than globbed: one matching artifact is extracted into
+    # `shards` itself, several each into a directory of their own.
     - name: Merge the shards' reports
       run:
-        python -m proptest.report shards/*/report.json
+        find shards -name report.json -print0 | sort -z
+        | xargs -0 python -m proptest.report
         --baseline=baseline/proptest-report.json
         --report=report/proptest-report.json
     - name: Merge the shards' databases
       if: always()
-      run: python .github/scripts/merge_examples.py examples shards/*
+      run:
+        find shards -name deleted.txt -printf '%h\0' | sort -z
+        | xargs -0 python .github/scripts/merge_examples.py examples
     - name: Upload the report
       # Written whether the suite passed or not, and uploaded on the same
       # terms as the database below: a pull request reads the shared reading
