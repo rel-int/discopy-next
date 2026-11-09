@@ -95,9 +95,10 @@ jobs:
   proptest:
     # Runs whatever the shards did, so that a run whose shard failed or timed
     # out still says which cells it checked, and fails unless every shard
-    # passed, so that it is the one check a pull request waits on.
+    # passed, so that it is the one check a pull request waits on. Not when
+    # the run itself was cancelled, i.e. superseded: there is nothing to read.
     needs: shard
-    if: always()
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
