@@ -324,6 +324,8 @@ def test_canonical_instances():
     statement fails here before the property matrix ever searches for a
     counterexample. """
     for category in Testable.enrolled():
+        if not category.__module__.startswith("discopy."):
+            continue  # a category another test defines, e.g. the README's
         box = getattr(category, "box_factory", None)
         if box is None or not (issubclass(box, category)
                                or issubclass(category, ColouredMonoid)):
