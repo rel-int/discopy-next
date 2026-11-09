@@ -356,9 +356,9 @@ def test_extensional():
 def test_testable_generic():
     from discopy.kleisli import additive, Maybe, Powerset
     from discopy.utils import NamedGeneric
-    for testable in Testable.subclasses():
-        assert not issubclass(testable, NamedGeneric)\
-            or issubclass(testable, TestableGeneric)
+    for subclass in Testable.subclasses():
+        assert not issubclass(subclass, NamedGeneric)\
+            or issubclass(subclass, TestableGeneric)
     assert additive.Channel[Maybe] not in Testable.enrolled()
     assert additive.Channel[Powerset] in Testable.enrolled()
 
