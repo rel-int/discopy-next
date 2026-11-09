@@ -1325,26 +1325,64 @@ class TikZ(Backend):
         self.nodes, self.nodelayer, self.edgelayer = {}, [], []
         super().__init__()
 
-    @staticmethod
-    def format_color(color):
+    #: The colour names every xcolor knows, i.e. without package options.
+    XCOLOR_NAMES = (
+        "red", "green", "blue", "cyan", "magenta", "yellow", "black", "gray",
+        "white", "darkgray", "lightgray", "brown", "lime", "olive", "orange",
+        "pink", "purple", "teal", "violet")
+
+    @classmethod
+    def needs_rgb(cls, color):
         """
-        Formats a color: a name in :data:`COLORS` or a hexcode, in any form
-        matplotlib reads, as its RGB values, any other color as it is, e.g.
-        transparency, which TikZ spells like matplotlib, or an xcolor name.
+        Whether a color is one matplotlib reads and xcolor does not, e.g.
+        ``"tab:blue"``, ``"C0"``, ``"0.5"``, ``"navy"`` or an RGB tuple, so
+        that TikZ must spell it by its RGB values, or a hexcode.
+
+        >>> assert TikZ.needs_rgb("tab:blue") and TikZ.needs_rgb((0, 0, 1))
+        >>> assert not TikZ.needs_rgb("purple") and not TikZ.needs_rgb("none")
+        """
+        if isinstance(color, str) and (
+                color in COLORS or color in cls.XCOLOR_NAMES
+                or color == TRANSPARENT):
+            return False
+        return is_color_like(color)
+
+    @classmethod
+    def format_color(cls, color):
+        """
+        Formats a color: a name in :data:`COLORS` or one that matplotlib
+        reads and xcolor does not, e.g. a hexcode, as its RGB values, any
+        other color as it is, e.g. transparency, which TikZ spells like
+        matplotlib, or an xcolor name or expression.
         A TikZ color has no alpha channel, so that of a hexcode is dropped.
 
         >>> TikZ.format_color("red")
         '{rgb,255: red,232; green,165; blue,165}'
         >>> assert TikZ.format_color("#e8a5a5") == TikZ.format_color("red")
         >>> assert TikZ.format_color("#abc") == TikZ.format_color("#aabbcc80")
+        >>> TikZ.format_color("tab:blue")
+        '{rgb,255: red,31; green,119; blue,180}'
         >>> TikZ.format_color("lightgray")
         'lightgray'
         """
-        hexcode = COLORS.get(color, color)
-        if not str(hexcode).startswith("#"):
+        if not (isinstance(color, str) and color in COLORS)\
+                and not cls.needs_rgb(color):
             return color
-        red, green, blue = (round(255 * x) for x in to_rgb(hexcode))
+        red, green, blue = (
+            round(255 * x) for x in to_rgb(COLORS.get(color, color)))
         return f"{{rgb,255: red,{red}; green,{green}; blue,{blue}}}"
+
+    @classmethod
+    def style_color(cls, color):
+        """
+        The color in the name of a tikzstyle: as it is written, without the
+        ``#`` of a hexcode, or the hexcode of a color xcolor does not read.
+
+        >>> TikZ.style_color("#336699"), TikZ.style_color("tab:blue")
+        ('336699', '1f77b4')
+        """
+        return to_hex(color)[1:] if cls.needs_rgb(color)\
+            else str(color).removeprefix("#")
 
     def add_node(self, i, j, text=None, options=None, rounded=4):
         """ Add a node to the tikz picture, return its unique id. """
@@ -1385,7 +1423,7 @@ class TikZ(Backend):
         nodes.append(nodes[0])
         if self.use_tikzstyles:
             style_name = "box" if facecolor == DEFAULT["facecolor"]\
-                else f"{str(facecolor).removeprefix('#')}_box"
+                else f"{self.style_color(facecolor)}_box"
             style = f"\\tikzstyle{{{style_name}}}=" \
                     f"[-, fill={self.format_color(facecolor)}]\n"
             if style not in self.edge_styles:
@@ -1393,7 +1431,7 @@ class TikZ(Backend):
             options = f"style={style_name}"
         else:
             options = "-, fill=" + (
-                self.format_color(facecolor) if str(facecolor).startswith("#")
+                self.format_color(facecolor) if self.needs_rgb(facecolor)
                 else f"{{{facecolor}}}")
         str_connections = " to ".join(f"({node}.center)" for node in nodes)
         self.edgelayer.append(f"\\draw [{options}] {str_connections};\n")
@@ -1475,7 +1513,7 @@ class TikZ(Backend):
             text = node.box.drawing_name if draw_box_labels else ""
             if self.use_tikzstyles:
                 style_name = f"{node.box.tikzstyle_name}_"\
-                    f"{str(color).removeprefix('#')}_{shape}"
+                    f"{self.style_color(color)}_{shape}"
                 style = f"\\tikzstyle{{{style_name}}}=" \
                         f"[fill={self.format_color(color)}, shape={shape}]\n"
                 if style not in self.node_styles:
@@ -1483,7 +1521,7 @@ class TikZ(Backend):
                 options = f"style={style_name}"
             else:
                 options = f"{shape}, fill=" + (
-                    self.format_color(color) if str(color).startswith("#")
+                    self.format_color(color) if self.needs_rgb(color)
                     else color)
             if params.get("nodesize", 1) != 1:
                 options +=\
