@@ -284,3 +284,8 @@ def test_hash():
     for term in terms:
         assert hash(term) == hash(type(term)(*vars(term).values()))
     assert len({f, type(f)(f.inside, x, y), g}) == 2
+
+
+def test_Ty_is_atomic_on_integers():
+    assert Ty[int](1, 1).is_atomic
+    assert not Ty[int](1, 2).is_atomic and not Ty[int]().is_atomic

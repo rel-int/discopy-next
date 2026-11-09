@@ -73,7 +73,7 @@ from discopy import (
     messages
 )
 from discopy.abc import (
-    Pregroup, RibbonCategory, SymmetricCategory,
+    Nat, Pregroup, RibbonCategory, SymmetricCategory,
     TracedCategory)
 from discopy.testable import Equation, TestableGeneric, quotient
 from discopy.cat import assert_iscomposable
@@ -232,8 +232,14 @@ class Ty[natural](Pregroup, TestableGeneric):
 
     @property
     def is_atomic(self) -> bool:
-        """ Whether a pair of types is a generator, i.e. of atomic halves. """
-        return self.positive.is_atomic and self.negative.is_atomic
+        """
+        Whether a pair of types is a generator, i.e. of atomic halves, an
+        integer half being atomic when it is one, as a :class:`Nat` is.
+
+        >>> assert Ty[int](1, 1).is_atomic and not Ty[int](1, 2).is_atomic
+        """
+        return all((Nat(half) if isinstance(half, int) else half).is_atomic
+                   for half in self)
 
     def split(self, n: int | tuple[int, int] = 1, left: bool = False
               ) -> tuple[Ty, Ty]:
