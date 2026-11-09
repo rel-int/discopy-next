@@ -427,9 +427,10 @@ def test_Bubble():
 def test_Bubble_str():
     x, y = Ob('x'), Ob('y')
     f = Box('f', x, y)
-    for bubble in (f.bubble(name="N"), f.bubble(method="m"),
-                   f.bubble(dom=y, cod=x, name="N", method="m"),
-                   f.bubble(data=1), f.bubble(name="N", data=[1, 2])):
+    shapes = (f.bubble(name="N"), f.bubble(method="m"),
+              f.bubble(dom=y, cod=x, name="N", method="m"),
+              f.bubble(data=1), f.bubble(name="N", data=[1, 2]))
+    for bubble in shapes + tuple(shape.dagger() for shape in shapes):
         assert eval(str(bubble)) == bubble
 
 

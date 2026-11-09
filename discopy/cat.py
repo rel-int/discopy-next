@@ -962,6 +962,20 @@ one, they have [cat.Ob('x'), cat.Ob('y')].
             "dom", "cod", "name", "method", "data"))
 
     def __str__(self):
+        """
+        A bubble prints as a call on its args, a daggered one as the dagger
+        of the bubble inside it: bubbling and daggering need not commute, so
+        printing the dagger on the args would read back as the other value,
+        e.g. in :class:`discopy.tensor.Bubble`.
+
+        >>> f = Box('f', Ob('x'), Ob('y'))
+        >>> print(f.bubble().dagger())
+        (f).bubble()[::-1]
+        >>> print(f.dagger().bubble())
+        (f[::-1]).bubble()
+        """
+        if self.is_dagger:
+            return f"{self.dagger()}[::-1]"
         str_args = ",".join(map(str, self.args))
         str_kwargs = [] if self.is_id_on_objects else [
             f"dom={self.dom}", f"cod={self.cod}"]
