@@ -144,6 +144,44 @@ def pytest_addoption(parser):
         "--proptest-baseline", metavar="PATH", default=None,
         help="compare this run against the report at PATH, naming the cells "
              "it checked and this run did not")
+    group.addoption(
+        "--proptest-shard", metavar="I/N", default=None,
+        help="run the I-th of N shards of the collected tests, counting from "
+             "1, each test in exactly one shard")
+
+
+def shard(items, index, count):
+    """
+    The items of the ``index``-th of ``count`` shards, counting from 1:
+    every ``count``-th item of the collection, from the ``index``-th. The
+    collection order is deterministic, so the split is too, and dealing the
+    items round the shards spreads each law's cells between them rather than
+    sending the slow ones to the same runner.
+
+    >>> [shard(range(7), index, 3) for index in (1, 2, 3)]
+    [[0, 3, 6], [1, 4], [2, 5]]
+    >>> shard(range(7), 4, 3)
+    Traceback (most recent call last):
+     ...
+    ValueError: shard 4/3 is not one of 1/3 to 3/3
+    """
+    if not 1 <= index <= count:
+        raise ValueError(
+            f"shard {index}/{count} is not one of "
+            f"1/{count} to {count}/{count}")
+    return list(items)[index - 1::count]
+
+
+def pytest_collection_modifyitems(config, items):
+    """ Keep the items of the shard ``--proptest-shard`` names, if any. """
+    if (option := config.getoption("--proptest-shard")) is None:
+        return
+    index, _, count = option.partition("/")
+    kept = shard(items, int(index), int(count))
+    ids = set(map(id, kept))
+    config.hook.pytest_deselected(
+        items=[item for item in items if id(item) not in ids])
+    items[:] = kept
 
 
 def pytest_runtest_logreport(report):

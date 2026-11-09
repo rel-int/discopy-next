@@ -1302,6 +1302,9 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Project
 
+- The `proptest` workflow deals `explore` round 40 runners, `--proptest-shard`,
+  and merges their reports and example databases into one, so that `main`
+  finishes its search again ([next#487]).
 - `AGENTS.md`, `RULES.md` and `STYLE.md` for agents, and an LLM contribution
   needs its own handle and a human approval other than its prompter's
   ([#378], [#720]).
@@ -1677,6 +1680,7 @@ for the changelog of `1.2.1` and earlier.
 [next#472]: https://github.com/rel-int/discopy-next/issues/472
 [next#477]: https://github.com/rel-int/discopy-next/issues/477
 [next#482]: https://github.com/rel-int/discopy-next/issues/482
+[next#487]: https://github.com/rel-int/discopy-next/pull/487
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#56]: https://github.com/rel-int/optyx/pull/56

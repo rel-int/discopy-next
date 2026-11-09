@@ -13,7 +13,7 @@ import proptest.conftest as plugin
 from proptest.conftest import cell_name
 from proptest.report import (
     GONE, PASSED, SKIPPED, UNSETTLED, XFAILED, XPASSED,
-    Cell, classify, dumps, exhausted, loads, render, stopped)
+    Cell, classify, dumps, exhausted, loads, main, render, stopped)
 
 CELL = "proptest/test_axioms.py::test_axiom[cat.Arrow.unitality]"
 
@@ -263,3 +263,25 @@ def test_cell_name_is_the_parameter_pytest_prints():
         "cat.Arrow.x")
     assert cell_name("proptest/test_report.py::test_the_report") is None
     assert cell_name("proptest/report.py::proptest.report.Cell") is None
+
+
+def test_main_merges_the_shards_against_the_baseline(tmp_path, capsys):
+    """ A whole run's reading, out of its shards, as the workflow runs it. """
+    (tmp_path / "1.json").write_text(dumps([Cell("a", PASSED)]))
+    (tmp_path / "2.json").write_text(dumps([Cell("b", SKIPPED)]))
+    (tmp_path / "base.json").write_text(
+        dumps([Cell("a", PASSED), Cell("b", PASSED), Cell("c", PASSED)]))
+    main([str(tmp_path / "1.json"), str(tmp_path / "2.json"),
+          "--baseline", str(tmp_path / "base.json"),
+          "--report", str(tmp_path / "out" / "report.json")])
+    printed = capsys.readouterr().out
+    assert "2 cell(s) from 2 shard(s)" in printed
+    assert "  b: skipped\n  c: gone" in printed
+    assert loads((tmp_path / "out" / "report.json").read_text()) == (
+        Cell("a", PASSED), Cell("b", SKIPPED))
+
+
+def test_main_names_an_unreadable_baseline(tmp_path, capsys):
+    (tmp_path / "1.json").write_text(dumps([Cell("a", PASSED)]))
+    main([str(tmp_path / "1.json"), "--baseline", str(tmp_path / "none")])
+    assert "unreadable baseline" in capsys.readouterr().out

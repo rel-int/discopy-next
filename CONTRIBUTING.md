@@ -142,7 +142,17 @@ The cells of the matrix are independent, so `-n auto`
 ([pytest-xdist](https://pytest-xdist.readthedocs.io)) runs them on all
 cores, with `-p no:benchmark` unloading the benchmark plugin that is
 incompatible with it; drop both to run serially, e.g. when debugging a
-single cell.
+single cell. `--proptest-shard=I/N` runs the `I`-th of `N` shards, every
+`N`-th test of the collection from the `I`-th, so that `N` runs cover it
+exactly once, and `python -m proptest.report` merges their reports into the
+report of the whole run:
+
+```shell
+uv run pytest proptest/ --proptest-shard=1/2 --proptest-report=1.json
+uv run pytest proptest/ --proptest-shard=2/2 --proptest-report=2.json
+uv run python -m proptest.report 1.json 2.json --report=report.json \
+    --baseline=baseline.json
+```
 
 Every cell of the matrix is one axiom of one category, named
 `<module>.<Category>.<law>`, so pytest's own `-k` selects cells for
@@ -242,6 +252,16 @@ only. A pull request never uploads one, a dispatch on a feature branch that
 legitimately skips a cell cannot become the baseline that cell is missing
 from, and a run that died mid-suite stays available to look at without being
 compared against.
+
+Under `explore` the matrix takes some ten runner-hours, so every run but a
+pull request's deals it round 40 runners, the `shard` jobs, and the
+`proptest` job merges them: the report is compared and uploaded only once,
+for the whole run, which succeeds only when every shard does. Every shard
+starts from the same example database and writes only under the keys of
+its own cells, so the merged database is the union of what the shards end
+with minus what each of them deleted, by
+`.github/scripts/merge_examples.py`. A pull request's `pr` budget fits one
+shard, through the same two jobs.
 
 ## Run the benchmarks
 

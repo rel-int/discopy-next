@@ -56,3 +56,23 @@ def test_a_pull_request_supersedes_its_own_runs(concurrency):
         group, pull_request("b"))
     assert evaluate(concurrency["cancel-in-progress"], pull_request("a"))\
         == "True"
+
+
+def shards(event):
+    """The shards the proptest workflow runs on an event, and their count."""
+    with open(GITHUB / "workflows" / "proptest.yml") as file:
+        job = yaml.safe_load(file)["jobs"]["shard"]
+    lists = re.findall(
+        r"fromJSON\('(\[.*?\])'\)", job["strategy"]["matrix"]["shard"], re.S)
+    chosen = lists[0] if event["event_name"] == "pull_request" else lists[1]
+    return yaml.safe_load(chosen), int(evaluate(job["env"]["SHARDS"], event))
+
+
+@pytest.mark.parametrize("event", [push("a"), pull_request("a")])
+def test_the_shards_are_one_to_their_count(event):
+    matrix, count = shards(event)
+    assert matrix == list(range(1, count + 1))
+
+
+def test_main_is_sharded_and_a_pull_request_is_not():
+    assert shards(pull_request("a"))[1] == 1 < shards(push("a"))[1]

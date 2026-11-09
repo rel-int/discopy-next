@@ -25,3 +25,8 @@ def load(path):
 @pytest.fixture(scope="session")
 def benchmark_comment():
     return load(GITHUB / "scripts" / "benchmark_comment.py")
+
+
+@pytest.fixture(scope="session")
+def merge_examples():
+    return load(GITHUB / "scripts" / "merge_examples.py")
