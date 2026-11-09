@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import itertools
+from collections.abc import Callable
 from typing import List
 from pytest import raises
 
@@ -22,6 +23,30 @@ def test_Function():
     assert f.uncurry(left=False).curry(left=False)(True)(1j) == f(True)(1j)
     assert g.curry().uncurry()(1j, True) == g(1j, True)
     assert g.curry(left=False).uncurry(left=False)(1j, True) == g(1j, True)
+
+
+def test_curry_uncurry_n():
+    """ ``uncurry(n)`` takes abc's ``n``: no object is the identity, and it
+    inverts ``curry(n)`` on either side, recursing on nested exponentials. """
+    f = Function(lambda x, y: x - y, (int, int), (int, ))
+    h = Function(lambda a, b, c: 100 * a + 10 * b + c, (int, ) * 3, (int, ))
+    for left in (True, False):
+        assert f.curry(0, left) == f == f.uncurry(0, left)
+        g = f.curry(left=left)
+        assert g.uncurry(0, left) == g
+        assert g.uncurry(0, left)(3)(2) == (1 if left else -1)
+        assert g.uncurry(1, left).dom == f.dom
+        assert g.uncurry(1, left)(5, 2) == 3
+        assert h.curry(2, left).uncurry(2, left)(1, 2, 3) == 123
+        nested = h.curry(left=left).curry(left=left)
+        assert nested.uncurry(2, left).dom == h.dom
+        assert nested.uncurry(2, left)(1, 2, 3) == 123
+        with raises(ValueError, match="Cannot uncurry 1 of the 2"):
+            h.curry(2, left).uncurry(1, left)
+        with raises(ValueError, match="exponential"):
+            f.uncurry(1, left)
+        with raises(ValueError, match="exponential"):
+            Function(lambda: abs, (), (Callable[[int], int], )).uncurry()
 
 
 def test_curry_out_of_range():
