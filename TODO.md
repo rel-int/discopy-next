@@ -19,5 +19,5 @@
 
 - [x] discopy/interaction.py:236 is_atomic on a Ty[int] half
 - [WIP] @session_01MEJxy65KogNCEukoKHtHe1-2026-11-09 00:39 discopy/abc.py:1470 braided declarations use a dagger inverse BraidedCategory does not provide
-- [ ] discopy/abc.py:251 dagger_monoidality on DaggerCategory, which has no tensor
+- [WIP] @session_01MEJxy65KogNCEukoKHtHe1-2026-11-09 00:41 discopy/abc.py:251 dagger_monoidality on DaggerCategory, which has no tensor
 - [x] discopy/feedback.py:475 box_factory = None on feedback.Ty
