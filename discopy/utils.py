@@ -170,8 +170,10 @@ class MappingOrCallable(Mapping[KT, VT]):
 
 def identity(x: KT) -> KT:
     """
-    The identity function, which every identity functor is built from so that
-    it can be recognised, see :meth:`discopy.cat.Functor.then`.
+    The identity function, which every identity functor and transformation is
+    built from so that it can be recognised, see
+    :meth:`discopy.cat.Functor.then` and
+    :meth:`discopy.cat.Transformation.then`.
 
     Example
     -------

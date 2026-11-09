@@ -35,8 +35,8 @@
 \node [style=none, fill=white, right] (32) at (3.5625, 1.1875) {$y$};
 \node [style=none, fill=white, right] (33) at (1.5625, 0.1875) {$y$};
 \node [style=none, fill=white, right] (34) at (2.5625, 0.1875) {$x$};
-\node [style=COPY, scale=0.5] (35) at (1.0, 2.5) {};
-\node [style=COPY, scale=0.5] (36) at (3.0, 1.5) {};
+\node [style=COPY_black_circle, scale=0.5] (35) at (1.0, 2.5) {};
+\node [style=COPY_black_circle, scale=0.5] (36) at (3.0, 1.5) {};
 \end{pgfonlayer}
 \begin{pgfonlayer}{edgelayer}
 \draw [style=box] (1.center) to (2.center) to (3.center) to (4.center) to (1.center);

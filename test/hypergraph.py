@@ -1144,3 +1144,99 @@ def test_atoms():
     assert f in graph.atoms()
     assert eval(str(graph), Diagram.str_environment(f)).to_hypergraph()\
         == graph
+
+
+def test_Hypergraph_make_methods_insert_in_one_pass(monkeypatch):
+    """
+    However many boxes they insert, the ``make_*`` methods scan the wires and
+    the types of the result once, i.e. they build one hypergraph rather than
+    one per box, which also keeps them off the recursion limit.
+    """
+    for method, legs in [("make_bijective", (1, 2)),
+                         ("make_left_monogamous", (2, 3)),
+                         ("make_right_monogamous", (3, 2))]:
+        x = Ty('x')
+        graph = H.spiders(*legs, x)
+        for _ in range(9):
+            graph = graph @ H.spiders(*legs, x)
+        scans = []
+        monkeypatch.setattr(
+            H, "scan_types", lambda self: scans.append(self))
+        result = getattr(graph, method)()
+        monkeypatch.undo()
+        assert len(scans) == 1 and len(result.boxes) == 10
+
+
+def test_Hypergraph_make_left_monogamous_merges_in_port_order():
+    """
+    The legs of a merge read their ports in order, where they used to read
+    them in the iteration order of a ``set`` of port indices: the ports of
+    the first spider below are ``{6, 7, 8}``, which iterates ``8, 6, 7``.
+    """
+    x = Ty('x')
+    effect = H.spiders(3, 0, x)
+    graph = (effect @ effect @ effect).make_left_monogamous()
+    assert [dom for dom, _ in graph.wires[1]]\
+        == [(6, 7, 8), (3, 4, 5), (0, 1, 2)]
+    assert graph.boxes == 3 * (Spider(3, 1, x), )
+
+
+def test_Hypergraph_make_monogamous_inserts_in_one_pass(monkeypatch):
+    """
+    However many cups and caps it inserts, ``make_monogamous`` scans the
+    wires and the types of the result once, i.e. it builds one hypergraph
+    rather than one per box, which also keeps it off the recursion limit.
+    """
+    x = Ty('x')
+    transpose = Box('f', x, x).transpose().to_hypergraph()
+    graph = transpose
+    for _ in range(9):
+        graph = graph @ transpose
+    scans = []
+    monkeypatch.setattr(H, "scan_types", lambda self: scans.append(self))
+    result = graph.make_monogamous()
+    monkeypatch.undo()
+    assert len(scans) == 1 and len(result.boxes) == 30
+    assert result.is_monogamous
+
+
+def test_Hypergraph_make_monogamous_carries_leg_order():
+    """
+    The legs of each cup and cap read :meth:`Hypergraph.leg_order` on the
+    graph the pass starts from, which is the answer the recursion read on the
+    graph as it stood: both caps below reorder their legs, the second one
+    after the first has already been inserted.
+    """
+    from discopy import compact
+    a, b, c, d = map(compact.Ty, "abcd")
+    f, g = compact.Box('f', d, d), compact.Box('g', c @ b, a)
+    graph = Hypergraph[compact.Diagram](
+        d.r @ a, b.r @ c.r @ d.r @ a @ a, (f, g),
+        ((0, 1), (((2, ), (2, )), ((3, 4), (5, ))), (4, 3, 0, 1, 5)))
+    assert graph.make_monogamous().boxes == (
+        f, compact.Cap(c.r, c), compact.Cap(b.r, b), g)
+
+
+def test_Hypergraph_trace_backward_wires_loops(monkeypatch):
+    """
+    ``trace_backward_wires`` cuts one wire at a time in a loop, so a graph
+    with many wires to cut does not nest one frame per cut as it used to,
+    which raised ``RecursionError`` at a thousand of them: every trace below
+    is applied from the one frame of the loop.
+    """
+    import inspect
+    x = Ty('x')
+    scalar = H.spiders(0, 0, x)
+    graph = scalar.tensor(*19 * [scalar])
+    explicit_trace, frames = H.explicit_trace, []
+
+    def counted(self, left=False):
+        frames.append(sum(frame.function == "trace_backward_wires"
+                          for frame in inspect.stack()))
+        return explicit_trace(self, left)
+
+    monkeypatch.setattr(H, "explicit_trace", counted)
+    result = graph.trace_backward_wires()
+    monkeypatch.undo()
+    assert len(frames) == 20 and set(frames) == {1}
+    assert len(result.boxes) == 40 and result.is_causal

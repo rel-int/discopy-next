@@ -73,6 +73,26 @@ def test_tikzstyle_of_a_hexcode_has_no_hash(tmp_path):
     assert "#" not in tikz + styles
 
 
+def test_tikz_spider_styles_are_keyed_by_name_fill_and_shape(tmp_path):
+    from discopy.monoidal import Equation
+    x, path = Ty('x'), tmp_path / "spiders.tikz"
+    red = Box('f(x)', x, x, draw_as_spider=True, color='red')
+    blue = Box('g(x)', x, x, draw_as_spider=True, color='blue',
+               shape='rectangle')
+    Equation(red, blue).draw(
+        path=str(path), to_tikz=True, use_tikzstyles=True)
+    tikz, styles = path.read_text(), path.with_suffix(".tikzstyles")\
+        .read_text()
+    assert styles.splitlines()[1:4] == [
+        "\\tikzstyle{symbol_red_circle}="
+        f"[fill={TikZ.format_color('red')}, shape=circle]",
+        "\\tikzstyle{symbol_none_circle}=[fill=none, shape=circle]",
+        "\\tikzstyle{symbol_blue_rectangle}="
+        f"[fill={TikZ.format_color('blue')}, shape=rectangle]"]
+    for name in ["red_circle", "none_circle", "blue_rectangle"]:
+        assert f"[style=symbol_{name}, " in tikz
+
+
 def test_tikzstyles_sit_beside_their_drawing(tmp_path):
     folder = tmp_path / "dir.v2"
     folder.mkdir()

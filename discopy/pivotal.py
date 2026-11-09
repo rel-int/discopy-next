@@ -345,6 +345,8 @@ class Bubble(rigid.Bubble, feedback.Bubble, Box):
     >>> bubble = Box('f', x, y).bubble()
     >>> assert bubble.r.r == bubble == bubble.l.l and bubble.r == bubble.l
     """
+    serialised_attrs = rigid.Bubble.serialised_attrs + ("time_step", )
+
     def rotate(self, left=False) -> Bubble:
         result = super().rotate(left)
         result.z %= 2

@@ -513,7 +513,11 @@ class X(Spider):
 
 
 class Scalar(Box):
-    """ Scalar in a ZX diagram. """
+    """
+    Scalar in a ZX diagram.
+
+    >>> assert eval(repr(scalar(2)), Diagram.environment()) == scalar(2)
+    """
     serialised_attrs = ("data", )
 
     def __init__(self, data):
@@ -522,6 +526,10 @@ class Scalar(Box):
 
     def __str__(self):
         return f"scalar({format_number(self.data)})"
+
+    def __repr__(self):
+        return f"{factory_name(type(self))}"\
+            f"({format_number(self.data, exact=True)})"
 
     def subs(self, *args):
         data = cat.rsubs(self.data, *args)

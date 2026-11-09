@@ -1,8 +1,6 @@
 
 import os
-import tomllib
 
-from packaging.requirements import Requirement
 from pytest import approx, importorskip, raises
 
 from discopy.utils import AxiomError
@@ -10,6 +8,7 @@ from discopy.config import DRAWING_DEFAULT
 from discopy.compact import *
 from discopy.drawing import *
 from discopy import config, monoidal
+from fixtures.pyproject import EXTRAS, GROUPS, installs
 
 TIKZ_FOLDER = 'test/drawing/tikz/'
 
@@ -796,28 +795,21 @@ def test_widget():
     assert pickle.loads(pickle.dumps(f)) == f
 
 
-def installs(extras, extra):
-    """The names an extra installs, with those of the extras it includes."""
-    names = set()
-    for requirement in map(Requirement, extras[extra]):
-        if requirement.name == "discopy":
-            names = names.union(
-                *(installs(extras, name) for name in requirement.extras))
-        else:
-            names.add(requirement.name)
-    return names
-
-
 def test_the_test_extra_installs_the_widget():
-    with open("pyproject.toml", "rb") as file:
-        extras = tomllib.load(file)["project"]["optional-dependencies"]
-    assert "anywidget" in installs(extras, "test")
+    assert "anywidget" in installs(EXTRAS, "test")
 
 
 def test_installs_reads_any_spelling_of_a_requirement():
     extras = {"test": ["discopy[a, b]", "pytest"],
               "a": ["anywidget >= 0.9"], "b": []}
-    assert installs(extras, "test") == {"anywidget", "pytest"}
+    assert installs(extras, "test", extras) == {"anywidget", "pytest"}
+
+
+def test_installs_reads_the_groups_a_group_includes():
+    """The all group, which CI syncs, includes the other groups, and these
+    require the extras of discopy that share their names."""
+    assert installs(GROUPS, "dev") | installs(EXTRAS, "docs") <= installs(
+        GROUPS, "all")
 
 
 RIBBON_COLOURS = ("red", "green", "blue", "yellow")

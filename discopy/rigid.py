@@ -886,7 +886,7 @@ class Bubble(biclosed.Bubble, Box):
 
     def __init__(self, *args: Diagram, z: int = 0, **kwargs):
         self.z = z
-        biclosed.Bubble.__init__(self, *args, **kwargs)
+        super().__init__(*args, **kwargs)
 
     def __str__(self):
         if not self.z:

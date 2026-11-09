@@ -213,6 +213,12 @@ def test_Bubble_dagger():
     assert b.dagger().dagger() == b
 
 
+def test_Bubble_data_eq():
+    f = Box('f', Ob('x'), Ob('y'))
+    one, two = f.bubble(data=1), f.bubble(data=2)
+    assert one != two and len({one, two, f.bubble(data=1)}) == 2
+
+
 def test_Box_repr():
     f = Box('f', Ob('x'), Ob('y'), data=42)
     assert repr(f) == "cat.Box('f', cat.Ob('x'), cat.Ob('y'), data=42)"
@@ -346,6 +352,25 @@ def test_Transformation_then():
     assert (alpha >> beta).dom == F and (alpha >> beta).cod == G
 
 
+def test_Transformation_laws():
+    """ The identity is shared and dropped on either side, and dictionaries
+    compose into dictionaries, so the laws of a category hold up to ==. """
+    x, y = Ob('x'), Ob('y')
+    f = Box('f', x, y)
+    F, G = Functor.id(), Functor({x: y, y: x}, {})
+    alpha = Transformation({x: f, y: f[::-1]}, F, G)
+    beta = Transformation({x: f[::-1], y: f}, G, F)
+    gamma = Transformation(lambda z: f if z == x else f[::-1], F, G)
+    idF, idG = Transformation.id(F), Transformation.id(G)
+    assert idF == Transformation.id(F)
+    for delta in (alpha, gamma):
+        assert idF >> delta == delta == delta >> idG
+    assert alpha >> beta == alpha >> beta
+    assert (alpha >> beta).components == {x: f >> f[::-1], y: f[::-1] >> f}
+    assert (alpha >> beta) >> alpha == alpha >> (beta >> alpha)
+    assert gamma >> beta != gamma >> beta
+
+
 def test_Transformation_eq():
     x, y = Ob('x'), Ob('y')
     f = Box('f', x, y)
@@ -403,7 +428,8 @@ def test_Bubble_str():
     x, y = Ob('x'), Ob('y')
     f = Box('f', x, y)
     for bubble in (f.bubble(name="N"), f.bubble(method="m"),
-                   f.bubble(dom=y, cod=x, name="N", method="m")):
+                   f.bubble(dom=y, cod=x, name="N", method="m"),
+                   f.bubble(data=1), f.bubble(name="N", data=[1, 2])):
         assert eval(str(bubble)) == bubble
 
 
@@ -490,7 +516,7 @@ def test_subs_key_not_a_symbol():
     assert f.subs({sin: 0, psi: 1}).data == 1
     assert (f >> g).subs(sin, 0) == f.subs(sin, 0) >> g
     bubble = Bubble(f, data=sin).subs(sin, 0)
-    assert bubble == Bubble(f.subs(sin, 0)) and bubble.data == 0
+    assert bubble == Bubble(f.subs(sin, 0), data=0) and bubble.data == 0
 
 
 def test_free_symbols_of_numeric_array_read_from_dtype():
@@ -643,6 +669,7 @@ EXAMPLES = {  # a box of each constructor, from a class c, types x, y, data v
     "feedback.Trace": "c(box(c, y @ x, y @ x, v), left=True)",
     "feedback.{Head,Tail}": "c(box(c, x, y, v), 1)",
     "feedback.FollowedBy": "c(x, True, 1)",
+    "feedback.Bubble": 'c(box(c, x, y, v), name="b", time_step=1)',
     "markov.Box": 'c("f", x, y, data=v, is_deterministic=False).delay()',
     "markov.Copy comarkov.Merge": "c(x, 3)",
     "markov.Discard comarkov.Noise quantum.gates.{Discard,MixedState} "
@@ -787,7 +814,7 @@ BROKEN = {
         "closed.{Tuple,Projection,Let} grammar.categorial.{FA,BA,*TR,"
         "TypeRaising,[FB][CX]}": "a term has no stated dagger",
         "grammar.categorial.*Composition": "a crossed composition has none",
-        "*.{Feedback,Head,Tail}": "it has no stated dagger",
+        "*.Feedback": "it has none, its memory would be fed back in time",
         PIVOTALS + ".Trace": "its dagger is drawn with cups and caps",
         "*.Curry": "a curry has no dagger",
         "{closed,markov,grammar.abstract}.{Copy,Discard,Function} "

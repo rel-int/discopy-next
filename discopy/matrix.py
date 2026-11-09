@@ -97,7 +97,7 @@ class Matrix[dtype](
     For example:
 
     >>> Matrix[complex].id(1)
-    Matrix[complex]([1.+0.j], dom=1, cod=1)
+    Matrix[complex]([1.+0.j], dom=Nat(1), cod=Nat(1))
     >>> assert Matrix[complex].id(1) != Matrix[float].id(1)
 
     The default data type is determined by underlying array datastructure of
@@ -117,7 +117,7 @@ class Matrix[dtype](
     Other precisions keep numpy's names.
 
     >>> Matrix([1, 2], 1, 2).cast(np.float32)
-    Matrix[float32]([1., 2.], dom=1, cod=2)
+    Matrix[float32]([1., 2.], dom=Nat(1), cod=Nat(2))
 
     Composition promotes the data type as the backend does, see
     :meth:`promote`, so that the integer identity is a unit for a float
@@ -135,9 +135,9 @@ class Matrix[dtype](
     >>> m = Matrix([0, 1, 1, 0], 2, 2)
     >>> v = Matrix([0, 1], 1, 2)
     >>> v >> m >> v.dagger()
-    Matrix[int]([0], dom=1, cod=1)
+    Matrix[int]([0], dom=Nat(1), cod=Nat(1))
     >>> m + m
-    Matrix[int]([0, 2, 2, 0], dom=2, cod=2)
+    Matrix[int]([0, 2, 2, 0], dom=Nat(2), cod=Nat(2))
     >>> assert m.then(m, m, m, m) == m >> m >> m >> m >> m
 
     The monoidal product for :py:class:`.Matrix` is the direct sum:
@@ -147,7 +147,7 @@ class Matrix[dtype](
     array([[2],
            [4]])
     >>> x @ x
-    Matrix[int]([2, 0, 4, 0, 0, 2, 0, 4], dom=4, cod=2)
+    Matrix[int]([2, 0, 4, 0, 0, 2, 0, 4], dom=Nat(4), cod=Nat(2))
     >>> (x @ x).array
     array([[2, 0],
            [4, 0],
@@ -160,7 +160,7 @@ class Matrix[dtype](
     those:
 
     >>> Matrix[int]([0] * 24, 4, 6)
-    Matrix[int]([0, 0, 0, ..., 0, 0, 0], dom=4, cod=6)
+    Matrix[int]([0, 0, 0, ..., 0, 0, 0], dom=Nat(4), cod=Nat(6))
     """
     @classmethod
     def checked_params(cls) -> tuple:
@@ -476,9 +476,9 @@ class Matrix[dtype](
         Example
         -------
         >>> Matrix.swap(1, 1)
-        Matrix[int]([0, 1, 1, 0], dom=2, cod=2)
+        Matrix[int]([0, 1, 1, 0], dom=Nat(2), cod=Nat(2))
         >>> Matrix.swap(2,1)
-        Matrix[int]([0, 1, 0, 0, 0, 1, 1, 0, 0], dom=3, cod=3)
+        Matrix[int]([0, 1, 0, 0, 0, 1, 1, 0, 0], dom=Nat(3), cod=Nat(3))
         """
         return cls.permutation([1, 0], [left, right])
 
@@ -505,7 +505,7 @@ class Matrix[dtype](
         -------
         >>> assert Matrix.permutation([1, 0]) == Matrix.swap(1, 1)
         >>> Matrix.permutation([1, 2, 0])
-        Matrix[int]([0, 0, 1, 1, 0, 0, 0, 1, 0], dom=3, cod=3)
+        Matrix[int]([0, 0, 1, 1, 0, 0, 0, 1, 0], dom=Nat(3), cod=Nat(3))
         >>> ones = Matrix.permutation([1, 2, 0], [1, 1, 1])
         >>> assert ones == Matrix.permutation([1, 2, 0])
 
@@ -551,9 +551,9 @@ class Matrix[dtype](
         Example
         -------
         >>> Matrix([1, 2], 1, 2).map(lambda x: x + 0.5)
-        Matrix[float]([1.5, 2.5], dom=1, cod=2)
+        Matrix[float]([1.5, 2.5], dom=Nat(1), cod=Nat(2))
         >>> Matrix([1, 2], 1, 2).map(lambda x: x + 0.5, dtype=int)
-        Matrix[int]([1, 2], dom=1, cod=2)
+        Matrix[int]([1, 2], dom=Nat(1), cod=Nat(2))
         """
         array = list(map(func, self.array.reshape(-1)))
         if dtype is None and array:
@@ -579,7 +579,7 @@ class Matrix[dtype](
         Example
         -------
         >>> Matrix.copy(2)
-        Matrix[int]([1, 0, 1, 0, 0, 1, 0, 1], dom=2, cod=4)
+        Matrix[int]([1, 0, 1, 0, 0, 1, 0, 1], dom=Nat(2), cod=Nat(4))
         >>> assert Matrix.copy(2) >> Matrix.id(2) @ Matrix.discard(2)\\
         ...     == Matrix.id(2)
         """
@@ -614,7 +614,7 @@ class Matrix[dtype](
         Example
         -------
         >>> Matrix.basis(4, 2)
-        Matrix[int]([0, 0, 1, 0], dom=1, cod=4)
+        Matrix[int]([0, 0, 1, 0], dom=Nat(1), cod=Nat(4))
         >>> assert Matrix.basis(0, 0).dtype == Matrix.id(0).dtype
         """
         with backend() as np:
@@ -629,7 +629,7 @@ class Matrix[dtype](
         Example
         -------
         >>> Matrix[bool]([0, 1, 1, 0], 2, 2).repeat()
-        Matrix[bool]([True, True, True, True], dom=2, cod=2)
+        Matrix[bool]([True, True, True, True], dom=Nat(2), cod=Nat(2))
         """
         if self.dtype != bool or self.dom != self.cod:
             raise TypeError(messages.MATRIX_REPEAT_ERROR)

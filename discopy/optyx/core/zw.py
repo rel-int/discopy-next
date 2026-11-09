@@ -149,8 +149,11 @@ from typing import List, Union, Tuple, Iterable
 import numpy as np
 from discopy.frobenius import Dim
 from discopy import tensor
+from discopy.utils import factory_name
+from discopy.quantum.gates import format_number
 from discopy.optyx.core import diagram
 from discopy.optyx.utils.misc import (
+    listed,
     occupation_numbers,
     multinomial,
     BasisTransition,
@@ -257,8 +260,8 @@ class W(ZWBox):
         return W(self.n_legs, not self.is_dagger)
 
     def __repr__(self):
-        attr = ", dagger=True" if self.is_dagger else ""
-        return f"W({self.n_legs}{attr})"
+        dagger = ", is_dagger=True" if self.is_dagger else ""
+        return f"{factory_name(type(self))}({self.n_legs}{dagger})"
 
     def __eq__(self, other: "W") -> bool:
         if not isinstance(other, W):
@@ -430,7 +433,7 @@ class Create(ZWBox):
     -------
     >>> assert Create() == Create(1)
     >>> Create(1).to_path().eval()
-    Amplitudes([1.+0.j], dom=1, cod=1)
+    Amplitudes([1.+0.j], dom=Nat(1), cod=Nat(1))
     """
 
     draw_as_spider = True
@@ -461,6 +464,12 @@ class Create(ZWBox):
 
     def photon_number_transform(self, dims_in, dims_out):
         return super().photon_number_transform(dims_in, dims_out)
+
+    def __repr__(self):
+        args = ", ".join(map(repr, self.photons))
+        if self.internal_states is not None:
+            args += f", internal_states={listed(self.internal_states)}"
+        return f"{factory_name(type(self))}({args})"
 
     def conjugate(self):
         return self
@@ -570,6 +579,8 @@ class Select(ZWBox):
     def photon_number_transform(self, dims_in, dims_out):
         return super().photon_number_transform(dims_in, dims_out)
 
+    __repr__ = Create.__repr__
+
     def inflate(self, d):
 
         dgrm = Create(
@@ -625,6 +636,13 @@ class Endo(ZWBox):
     >>> phase = Endo(sp.exp(1j * psi * 2 * sp.pi))
     >>> derivative = phase.grad(psi).subs((psi, 0.5)).to_path().eval(2).array
     >>> assert np.allclose(derivative, 4 * np.pi * 1j)
+
+    Two endomorphisms are equal when their scalars are, the name being
+    derived from the scalar and printing a negative zero where the scalar
+    does not have one, so that a conjugate is the scalar it conjugates to:
+
+    >>> assert Endo(0.5).conjugate() == Endo(0.5)
+    >>> assert Endo(-2j) == Endo(2j).dagger()
     """
 
     def __init__(self, scalar: complex):
@@ -634,6 +652,13 @@ class Endo(ZWBox):
             pass
         self.scalar = scalar
         super().__init__(f"Endo({scalar})", 1, 1, data=scalar)
+
+    def setoid(self):
+        return type(self), self.dom, self.cod, self.is_dagger, self.scalar
+
+    def __repr__(self):
+        return f"{factory_name(type(self))}"\
+            f"({format_number(self.scalar, exact=True)})"
 
     def conjugate(self):
         return Endo(self.scalar.conjugate())
@@ -714,6 +739,10 @@ class Add(ZWBox):
     def dagger(self):
         return Add(self.n, not self.is_dagger)
 
+    def __repr__(self):
+        dagger = ", is_dagger=True" if self.is_dagger else ""
+        return f"{factory_name(type(self))}({self.n}{dagger})"
+
     def conjugate(self):
         return self
 
@@ -761,6 +790,10 @@ class Multiply(ZWBox):
     def dagger(self):
         return Multiply(not self.is_dagger)
 
+    def __repr__(self):
+        dagger = "is_dagger=True" if self.is_dagger else ""
+        return f"{factory_name(type(self))}({dagger})"
+
 
 class Divide(ZWBox):
     """
@@ -805,6 +838,10 @@ class Divide(ZWBox):
 
     def dagger(self):
         return Divide(not self.is_dagger)
+
+    def __repr__(self):
+        dagger = "is_dagger=True" if self.is_dagger else ""
+        return f"{factory_name(type(self))}({dagger})"
 
 
 class Mod2(ZWBox):
@@ -858,6 +895,10 @@ class Mod2(ZWBox):
 
     def dagger(self):
         return Mod2(not self.is_dagger)
+
+    def __repr__(self):
+        dagger = "is_dagger=True" if self.is_dagger else ""
+        return f"{factory_name(type(self))}({dagger})"
 
 
 SWAP = diagram.Swap(diagram.Mode(1), diagram.Mode(1))

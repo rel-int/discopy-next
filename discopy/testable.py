@@ -180,14 +180,56 @@ class Equation[T]:
             result.up_to = up_to
         return result
 
+    def __eq__(self, other):
+        """
+        Two equations are equal when they have the same type, terms and
+        symbols, and the same ``up_to``: a callable is the same only if it
+        is identical, as when both equations take it from their type.
+        Whether an equation holds is :meth:`__bool__`, not this.
+
+        >>> from discopy.cat import Ob, Box, Equation
+        >>> x = Ob('x')
+        >>> f, g = Box('f', x, x), Box('g', x, x)
+        >>> assert Equation(f, g) == Equation(f, g) != Equation(g, f)
+        >>> assert Equation(f, g) != Equation(f, g, symbol="->")
+        >>> assert Equation(f, g).modulo(len) == Equation(f, g).modulo(len)
+        >>> assert Equation(f, g).modulo(lambda term: term)\\
+        ...     != Equation(f, g).modulo(lambda term: term)
+        """
+        return type(self) is type(other) and self.terms == other.terms\
+            and self.symbols == other.symbols and self.up_to is other.up_to
+
+    def __hash__(self):
+        """
+        The hash of the type, terms and symbols, so that equal equations
+        have equal hashes: as for a tuple, an equation is hashable when
+        its terms are.
+
+        >>> from discopy.cat import Ob, Equation
+        >>> assert hash(Equation(Ob('x'))) == hash(Equation(Ob('x')))
+        >>> hash(Equation([1], [1]))
+        Traceback (most recent call last):
+        ...
+        TypeError: unhashable type: 'list'
+        """
+        return hash((type(self), self.terms, self.symbols))
+
     def __repr__(self):
         """
+        The terms, then the symbols unless they are all ``"="``, so that
+        an equation reads back from its representation, unless it was given
+        an ``up_to`` of its own, a callable with no representation.
+
         >>> from discopy.cat import Ob, Box, Equation
         >>> Equation(Box('f', Ob('x'), Ob('x')))
         cat.Equation(cat.Box('f', cat.Ob('x'), cat.Ob('x')))
+        >>> Equation(Ob('x'), Ob('y'), symbol="->")
+        cat.Equation(cat.Ob('x'), cat.Ob('y'), symbols=('->',))
         """
+        symbols = "" if all(symbol == "=" for symbol in self.symbols)\
+            else f", symbols={self.symbols!r}"
         return factory_name(type(self))\
-            + f"({', '.join(map(repr, self.terms))})"
+            + f"({', '.join(map(repr, self.terms))}{symbols})"
 
     def __str__(self):
         return f"Equation({', '.join(map(str, self.terms))})"
@@ -271,10 +313,10 @@ class Extensional[T](Equation[T]):
 
 class AxiomFailure(AxiomError):
     """
-    A law declared broken, raised when the bound axiom is called: the
-    reason is the message and :attr:`equation` is the law evaluated on the
-    arguments, whose sides say how it failed, or the error raised when its
-    terms could not be built.
+    A law declared broken, raised when the bound axiom is called on a
+    counterexample: the reason is the message and :attr:`equation` is the
+    law evaluated on the arguments, whose sides say how it failed, or the
+    error raised when its terms could not be built.
     """
 
     def __init__(self, reason: str, equation):
@@ -598,11 +640,15 @@ class Declaration[**P, T](classmethod):
 
     def failing(self, reason: str) -> Self:
         """
-        The same declaration declared broken: calling it raises an
-        :class:`AxiomFailure` with the reason as message and what it
-        evaluates to on the arguments, or the error raised when the
-        implementation refuses to build it, e.g. ``braid_naturality =
+        The same declaration declared broken: calling it returns what it
+        evaluates to on the arguments when that is an :class:`Equation`
+        which holds on them, or :obj:`NotImplemented`, and otherwise raises
+        an :class:`AxiomFailure` with the reason as message and what it
+        evaluates to, or the error raised when the implementation refuses
+        to build it, e.g. ``braid_naturality =
         BraidedCategory.braid_naturality.failing("A free braid is a box.")``.
+        A broken rule, which concludes a term rather than an equation,
+        always raises.
         """
         @wraps(self.function)
         def equation(*args, **kwargs):
@@ -610,6 +656,9 @@ class Declaration[**P, T](classmethod):
                 evaluated = self.function(*args, **kwargs)
             except Exception as error:
                 raise AxiomFailure(reason, error) from error
+            if evaluated is NotImplemented\
+                    or isinstance(evaluated, Equation) and evaluated:
+                return evaluated
             raise AxiomFailure(reason, evaluated)
         equation.__doc__ = reason
         return replace(self, function=equation, broken=True)
@@ -802,12 +851,14 @@ class Axiom[**P, T](Declaration[P, T]):
     Calling a bound axiom returns its own verdict: :obj:`NotImplemented`
     when the structure does not apply to the category, and the equation
     itself otherwise; a law declared broken raises an
-    :class:`AxiomFailure` carrying that equation instead of returning it.
+    :class:`AxiomFailure` carrying that equation instead of returning it
+    when it is false.
 
     A law is broken when *some* argument is a counterexample, not every one,
     so :attr:`broken` is declared by :meth:`failing` before any argument is
     generated — the property matrix marks such an axiom as an expected
-    failure and lets the search find the counterexample.
+    failure and lets the search find the counterexample, so that a law
+    which holds after all passes unexpectedly.
     """
 
     __hash__ = Declaration.__hash__

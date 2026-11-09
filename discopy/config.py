@@ -106,9 +106,13 @@ COLOUR_DRAWING_ATTRIBUTES = {
         ob.cod if hasattr(getattr(ob, "cod", None), "width") else None,
 }
 
-#: Default drawing parameters.
+#: Default drawing parameters. In Matplotlib, ``fontsize`` is the size of the
+#: labels of boxes and wires, and ``fontsize_spiders`` the size of the labels
+#: of spiders, e.g. the symbol of an :class:`discopy.monoidal.Equation`,
+#: which do not follow the ``fontsize`` given to ``draw``.
 DRAWING_DEFAULT: dict[str, Any] = {
-    "fontsize": 12,
+    "fontsize": 10,
+    "fontsize_spiders": 12,
     "margins": (0, 0),
     "textpad": (2**-4, 2**-4),
     "facecolor": "white",

@@ -51,23 +51,33 @@ if PROFILE != "shared":
     settings.load_profile(PROFILE)
 
 
+def artifact():
+    """
+    The example database CI uploads as a workflow artifact, on the repository
+    that ``HYPOTHESIS_GITHUB_REPOSITORY`` names as ``owner/name``, which is
+    ``discopy/discopy`` unless it is set.
+    """
+    owner, _, repo = os.environ.get(
+        "HYPOTHESIS_GITHUB_REPOSITORY", "discopy/discopy").partition("/")
+    return GitHubArtifactDatabase(owner, repo)
+
+
 def pytest_configure(config):
     """
     Register the marker the report keys on, and the ``shared`` profile on
     demand.
 
-    ``shared`` is the ``dev`` budget over the local database backed by CI's,
-    read-only, so that a developer with a ``GITHUB_TOKEN`` replays what CI
-    found without recording anything. Building the artifact database touches
-    storage, which Hypothesis warns against at conftest import, so it happens
-    only when the profile is asked for.
+    ``shared`` is the ``dev`` budget over the local database backed by
+    :func:`artifact`, read-only, so that a developer with a ``GITHUB_TOKEN``
+    replays what CI found without recording anything. Building the artifact
+    database touches storage, which Hypothesis warns against at conftest
+    import, so it happens only when the profile is asked for.
     """
     config.addinivalue_line(
         "markers", f"{CELL}: a cell of the property matrix, i.e. one law of "
         "one category, whose outcome and draws the report collects")
     if PROFILE == "shared":
-        database = MultiplexedDatabase(LOCAL, ReadOnlyDatabase(
-            GitHubArtifactDatabase("discopy", "discopy")))
+        database = MultiplexedDatabase(LOCAL, ReadOnlyDatabase(artifact()))
         settings.register_profile(
             "shared", max_examples=100, **dict(COMMON, database=database))
         settings.load_profile("shared")
