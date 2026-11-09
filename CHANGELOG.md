@@ -1244,6 +1244,11 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   values, with or without `use_tikzstyles`, so its drawing compiles; it was
   written raw, which pdflatex rejects, and a tuple raised `TypeError`
   ([next#466]).
+- The Matplotlib backend draws a box, a spider, a ket or a bra coloured by an
+  RGB list or a NumPy array, which matplotlib reads as a colour: it looked
+  every colour up in `COLORS` and raised `TypeError` on an unhashable one.
+  `Backend.resolve` and `Backend.is_transparent` look up and compare a colour
+  only when it is a name, for both backends ([next#482]).
 
 ### Project
 
@@ -1620,6 +1625,7 @@ for the changelog of `1.2.1` and earlier.
 [next#468]: https://github.com/rel-int/discopy-next/issues/468
 [next#472]: https://github.com/rel-int/discopy-next/issues/472
 [next#477]: https://github.com/rel-int/discopy-next/issues/477
+[next#482]: https://github.com/rel-int/discopy-next/issues/482
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#56]: https://github.com/rel-int/optyx/pull/56
