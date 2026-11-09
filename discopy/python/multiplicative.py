@@ -27,7 +27,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from itertools import accumulate
-from typing import Self
+from typing import Self, get_origin
 
 from discopy import messages
 from discopy.abc import ClosedCategory, TracedCategory
@@ -194,6 +194,7 @@ class Function(function.Function, ClosedCategory, TracedCategory):
     def curry(self, n=1, left=True) -> Self:
         """
         Currying, i.e. turn a binary function into a function-valued function.
+        Currying no type is the identity.
 
         Parameters:
             n : The number of types to curry.
@@ -204,6 +205,8 @@ class Function(function.Function, ClosedCategory, TracedCategory):
         """
         if n < 0 or n > len(self.dom):
             raise ValueError(messages.NOT_SPLITTABLE.format(n, self.dom))
+        if not n:
+            return self
         if left:
             dom = self.dom[:len(self.dom) - n]
             cod = self.exp(self.cod, self.dom[len(self.dom) - n:])
@@ -212,18 +215,37 @@ class Function(function.Function, ClosedCategory, TracedCategory):
         return type(self)(dom=dom, cod=cod, inside=lambda *xs: lambda *ys:
                           self(*(xs + ys) if left else (ys + xs)))
 
-    def uncurry(self, left=True) -> Self:
+    def base_and_exponent(self, n: int, left: bool) -> tuple[Ty, Ty]:
         """
-        Uncurrying,
-        i.e. turn a function-valued function into a binary function.
+        The base and exponent that :meth:`uncurry` evaluates, read off the
+        ``Callable`` type of the codomain, on either side.
 
         Parameters:
+            n : The number of types to uncurry.
             left : Whether to uncurry on the left or right.
+
+        Raises:
+            ValueError : When the codomain is not one ``Callable`` type, or
+                its exponent has more than ``n`` types.
+
+        Example
+        -------
+        >>> f = Function(lambda x, y: x - y, (int, int), (int, ))
+        >>> g = f.curry()
+        >>> assert g.uncurry(0) is g
+        >>> assert f.curry().uncurry()(5, 2) == 3
+        >>> assert f.curry(left=False).uncurry(left=False)(5, 2) == 3
         """
-        traced = self.cod.inside[0].__args__
-        base, exponent = map(Ty.cast, (traced[-1].__args__, traced[:-1]))
-        return self @ exponent >> self.ev(base, exponent) if left\
-            else exponent @ self >> self.ev(base, exponent, left=False)
+        # pylint: disable=unused-argument  # an exponential has no side
+        function_type = self.cod.inside[0] if len(self.cod) == 1 else None
+        if get_origin(function_type) is not Callable:
+            raise ValueError(messages.NOT_EXPONENTIAL.format(self, self.cod))
+        *exponent, base = function_type.__args__
+        base, exponent = Ty(*base.__args__), Ty(*exponent)
+        if n < len(exponent):
+            raise ValueError(messages.NOT_UNCURRIABLE.format(
+                n, len(exponent), self.cod))
+        return base, exponent
 
     def fix(self, n=1) -> Self:
         """
