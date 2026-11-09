@@ -141,3 +141,4 @@ _NODE_VISITORS = {
 def setup(app):
     app.add_node(youtube, **_NODE_VISITORS)
     app.add_directive("youtube", YouTube)
+    return {'parallel_read_safe': True, 'parallel_write_safe': True}

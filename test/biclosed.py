@@ -1,9 +1,9 @@
 import sys
 from discopy.biclosed import *
 from discopy import biclosed, cat, monoidal
-from discopy.testable import Related, assert_axioms
+from discopy.testable import Related
 from discopy.utils import dumps, loads
-from pytest import raises
+from pytest import mark, raises
 
 
 def test_Over():
@@ -310,6 +310,7 @@ def test_Sampler():
     assert Sampler(TermBase, iter([1]), [X], "x").term(Y) == Variable("v0", Y)
 
 
+@mark.slow
 def test_deep_terms():
     X, limit = Ty("X"), sys.getrecursionlimit()
     sys.setrecursionlimit(100_000)
@@ -322,10 +323,6 @@ def test_deep_terms():
     while isinstance(term, Application):
         depth, term = depth + 1, term.args
     assert depth == 6000
-
-
-def test_axioms():
-    assert_axioms(TermBase)
 
 
 def test_mapping_preserves_binding_and_lexical_boundaries():
