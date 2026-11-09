@@ -17,7 +17,7 @@
 > 4. discopy/feedback.py:475 (thread 4492193143)
 > [P3] Setting `box_factory = None` on feedback `Ty` overrides the wire generator that `monoidal.Ty` exposes, and the docstring is wrong: `Wire` objects are named. It also makes `test_canonical_instances` skip this type. Remove the override and its docstring, or document why `Ty` has no canonical instance.
 
-- [ ] discopy/interaction.py:236 is_atomic on a Ty[int] half
+- [WIP] @session_01MEJxy65KogNCEukoKHtHe1-2026-11-09 00:38 discopy/interaction.py:236 is_atomic on a Ty[int] half
 - [ ] discopy/abc.py:1470 braided declarations use a dagger inverse BraidedCategory does not provide
 - [ ] discopy/abc.py:251 dagger_monoidality on DaggerCategory, which has no tensor
 - [ ] discopy/feedback.py:475 box_factory = None on feedback.Ty
