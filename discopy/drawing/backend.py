@@ -450,6 +450,30 @@ class Backend(ABC):
         self.max_width = max(self.max_width, max(i for i, _ in points))
 
     @staticmethod
+    def is_transparent(colour) -> bool:
+        """
+        Whether a colour is :data:`discopy.config.TRANSPARENT`, comparing
+        only a name, since an array compares elementwise.
+
+        >>> import numpy as np
+        >>> assert Backend.is_transparent("none")
+        >>> assert not Backend.is_transparent(np.array([.1, .2, .3]))
+        """
+        return isinstance(colour, str) and colour == TRANSPARENT
+
+    @staticmethod
+    def resolve(colour):
+        """
+        The colour matplotlib reads for a name in :data:`COLORS`, any other
+        colour as it is, e.g. an RGB list or array, which is unhashable.
+
+        >>> Backend.resolve("red"), Backend.resolve([.1, .2, .3])
+        ('#e8a5a5', [0.1, 0.2, 0.3])
+        """
+        return COLORS.get(colour, colour) if isinstance(colour, str)\
+            else colour
+
+    @staticmethod
     def readable_foreground(colour, threshold=.5):
         """
         Pick a readable foreground text colour, i.e. ``"white"`` or
@@ -464,7 +488,7 @@ class Backend(ABC):
         """
         from matplotlib.colors import to_rgb
         try:
-            red, green, blue = to_rgb(COLORS.get(colour, colour))
+            red, green, blue = to_rgb(Backend.resolve(colour))
         except (ValueError, TypeError):
             return "black"
         luma = 0.299 * red + 0.587 * green + 0.114 * blue
@@ -1069,8 +1093,7 @@ class Backend(ABC):
         points[i] = points[i].shift(x=asymmetry)
         self.draw_polygon(*points, facecolor=box.color)
         if params.get('draw_box_labels', True):
-            adaptive = isinstance(box.color, str)\
-                and box.color == TRANSPARENT
+            adaptive = self.is_transparent(box.color)
             self.draw_text(box.drawing_name, *positions[node],
                            ha='center', va='center',
                            color=self.readable_foreground(
@@ -1165,9 +1188,9 @@ class Backend(ABC):
             # too, where the front of a name like purple is xcolor's RGB.
             # Any other is an xcolor expression, mixed 60% with black, a
             # trailing `!<pct>` being a mix with white.
-            value = COLORS.get(color, color)
+            value = self.resolve(color)
             mix = f"{color}!white" if str(color).count("!") % 2 else color
-            back = color if color == TRANSPARENT\
+            back = color if self.is_transparent(color)\
                 else f"{mix}!60!black" if not is_color_like(value)\
                 else config.darken(to_hex(value, keep_alpha=True))
             front_top0, back_top0 = (
@@ -1211,7 +1234,7 @@ class Backend(ABC):
     def draw_brakets(self, positions, node, **params):
         """ Draws a :class:`discopy.quantum.gates.Ket` box. """
         box, j = node.box, node.j
-        is_bra, adaptive = len(box.dom) > 0, box.color == TRANSPARENT
+        is_bra, adaptive = len(box.dom) > 0, self.is_transparent(box.color)
         for i, bit in enumerate(box._digits):
             kind = "box_dom" if is_bra else "box_cod"
             x = box.dom[i] if is_bra else box.cod[i]
@@ -1342,9 +1365,8 @@ class TikZ(Backend):
         >>> assert TikZ.needs_rgb("tab:blue") and TikZ.needs_rgb((0, 0, 1))
         >>> assert not TikZ.needs_rgb("purple") and not TikZ.needs_rgb("none")
         """
-        if isinstance(color, str) and (
-                color in COLORS or color in cls.XCOLOR_NAMES
-                or color == TRANSPARENT):
+        if cls.is_transparent(color) or isinstance(color, str) and (
+                color in COLORS or color in cls.XCOLOR_NAMES):
             return False
         return is_color_like(color)
 
@@ -1602,7 +1624,7 @@ class Matplotlib(Backend):
         color = params.get("color", "black")
         self.axis.scatter(
             [i], [j],
-            c=COLORS.get(color, color),
+            c=self.resolve(color),
             marker=SHAPES[params.get("shape", "circle")],
             s=300 * params.get("nodesize", 1),
             edgecolors=params.get("edgecolor", None),
@@ -1621,8 +1643,8 @@ class Matplotlib(Backend):
         self.axis.add_patch(PathPatch(
             path,
             linewidth=self.linewidth,
-            facecolor=COLORS.get(facecolor, facecolor),
-            edgecolor=COLORS.get(edgecolor, edgecolor)))
+            facecolor=self.resolve(facecolor),
+            edgecolor=self.resolve(edgecolor)))
         super().draw_polygon(*points)
 
     def draw_region_cell(self, left, right, facecolor):
@@ -1641,7 +1663,7 @@ class Matplotlib(Backend):
             Path(vertices, [Path.MOVETO] + codes(left) + [Path.LINETO]
                  + codes(right) + [Path.CLOSEPOLY]),
             linewidth=0, antialiased=False,
-            facecolor=COLORS.get(facecolor, facecolor), edgecolor='none'))
+            facecolor=self.resolve(facecolor), edgecolor='none'))
         super().draw_region_cell(left, right, facecolor)
 
     def draw_regions(self, graph, **params):
@@ -1657,7 +1679,7 @@ class Matplotlib(Backend):
         if not colours:
             return
         handles = [
-            Patch(facecolor=COLORS.get(colour.name, colour.name),
+            Patch(facecolor=self.resolve(colour.name),
                   edgecolor="none", label=colour.legend_label)
             for colour in colours.values()]
         self.axis.legend(
@@ -1704,7 +1726,7 @@ class Matplotlib(Backend):
         vertices.append(start)
         codes.append(Path.CLOSEPOLY)
         self.axis.add_patch(PathPatch(
-            Path(vertices, codes), facecolor=COLORS.get(color, color),
+            Path(vertices, codes), facecolor=self.resolve(color),
             edgecolor='none', linewidth=0))
         super().draw_filled_shape(start, steps, color)
 
@@ -1723,12 +1745,12 @@ class Matplotlib(Backend):
         groups = {}
         for node in nodes:
             groups.setdefault(
-                (node.box.shape, node.box.color == "black"), []).append(node)
+                (node.box.shape, isinstance(node.box.color, str)
+                 and node.box.color == "black"), []).append(node)
         for (shape, adaptive), group in groups.items():
             nx.draw_networkx_nodes(
                 *graph.inside, nodelist=group,
-                node_color=[COLORS.get(node.box.color, node.box.color)
-                            for node in group],
+                node_color=[self.resolve(node.box.color) for node in group],
                 node_shape=SHAPES[shape], ax=self.axis,
                 node_size=300 * params.get("nodesize", 1)
             ).set_gid(self.dark_gid("fill") if adaptive else None)
@@ -1738,7 +1760,7 @@ class Matplotlib(Backend):
                         node.box.drawing_name, *graph.positions[node],
                         ha='center', va='center',
                         fontsize=DEFAULT['fontsize_spiders'],
-                        adaptive=node.box.color == TRANSPARENT)
+                        adaptive=self.is_transparent(node.box.color))
         super().draw_spiders(graph, draw_box_labels)
 
     def output(self, path=None, show=True, **params):
