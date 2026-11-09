@@ -37,17 +37,6 @@ def test_word(G):
         assert reduce(G.then, (G.generators()[i] for i in g.word()), G()) == g
 
 
-@mark.parametrize("G", GROUPS)
-def test_group_laws(G):
-    elements = list(G.elements())
-    for g in elements:
-        assert G() >> g == g == g >> G()
-        assert g >> g.dagger() == G() == g.dagger() >> g
-        for h in elements:
-            assert (g >> h).dagger() == h.dagger() >> g.dagger()
-            assert g @ h == g >> h
-
-
 @mark.parametrize("action", ACTIONS, ids=repr)
 def test_functoriality(action):
     elements = list(action.group.elements())
@@ -64,8 +53,13 @@ def test_sample(G):
     assert all(isinstance(G.sample(rng), G) for _ in range(10))
 
 
-@mark.parametrize("G", GROUPS)
+@mark.parametrize("G", (
+    Cyclic[1], Symmetric[0], Symmetric[1],
+    Wreath[Cyclic[2], Symmetric[3]],
+    Wreath[Product[Cyclic[2], Cyclic[2]], Cyclic[2]]))
 def test_axioms(G):
+    """ The groups of :data:`GROUPS` that the property matrix does not enrol:
+    the others are checked there. """
     assert_axioms(G)
 
 

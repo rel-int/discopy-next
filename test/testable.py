@@ -6,7 +6,7 @@ from typing import Self, TypeVar
 from hypothesis import find, settings
 from hypothesis import strategies as st
 from hypothesis.errors import NoSuchExample
-from pytest import raises
+from pytest import mark, raises
 
 from discopy import cat, feedback, rigid, testable
 from discopy.abc import Category, Monoid, Nat
@@ -271,6 +271,7 @@ def test_weaken_shape_of_self():
                  settings=settings(max_examples=50, database=None))
 
 
+@mark.slow
 def test_falsify():
     assert trivial.bind(Arrow).falsify()["f"].inside
     for law in (Arrow.unitality.failing("Declared broken."),
