@@ -150,10 +150,11 @@ declares one failing, inapplicable or holding modulo a quotient, is the
 documentation of [`discopy.testable`](discopy/testable.py).
 
 A cell is skipped when its axiom declares that the structure does not
-apply, and xfailed when the law is declared broken, strictly so that a law
-that holds again fails the run, each carrying its reason: pass `-rsxX` to
-list the skips, xfails and unexpected passes with their reasons, and `-x`
-to stop at the first genuine failure.
+apply, and xfailed when the law is declared broken, each carrying its
+reason. A broken law raises only on a counterexample, so a cell whose
+search finds none, e.g. once the law is fixed, passes unexpectedly: pass
+`-rsxX` to list the skips, xfails and unexpected passes with their
+reasons, and `-x` to stop at the first genuine failure.
 
 `proptest/conftest.py` registers four Hypothesis profiles over the
 `.hypothesis/examples` database, selected by `HYPOTHESIS_PROFILE`: `dev`

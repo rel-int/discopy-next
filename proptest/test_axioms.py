@@ -15,15 +15,16 @@ from proptest.conftest import PROFILE
 
 def cells():
     """
-    One parameter per law, skipped when it does not apply and a strict
-    expected failure when it is declared broken.
+    One parameter per law, skipped when it does not apply and an expected
+    failure when it is declared broken, which passes unexpectedly when the
+    search finds no counterexample, e.g. once the law is fixed.
     """
     for law in Testable.matrix(once=PROFILE == "fast"):
         reason = (law.__doc__ or "").strip()
         if not law.applicable:
             marks = pytest.mark.skip(reason=reason)
         elif law.broken:
-            marks = pytest.mark.xfail(reason=reason, strict=True)
+            marks = pytest.mark.xfail(reason=reason)
         else:
             marks = ()
         yield pytest.param(law, marks=marks, id=repr(law))
