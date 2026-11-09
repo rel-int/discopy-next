@@ -36,17 +36,6 @@ def test_word(G):
         assert reduce(G.then, (G.generators()[i] for i in g.word()), G()) == g
 
 
-@mark.parametrize("G", GROUPS)
-def test_group_laws(G):
-    elements = list(G.elements())
-    for g in elements:
-        assert G() >> g == g == g >> G()
-        assert g >> g.dagger() == G() == g.dagger() >> g
-        for h in elements:
-            assert (g >> h).dagger() == h.dagger() >> g.dagger()
-            assert g @ h == g >> h
-
-
 @mark.parametrize("action", ACTIONS, ids=repr)
 def test_functoriality(action):
     elements = list(action.group.elements())

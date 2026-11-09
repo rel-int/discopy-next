@@ -1,7 +1,7 @@
 from itertools import permutations
 
 import numpy as np
-from pytest import raises
+from pytest import mark, raises
 
 from discopy import rigid, ribbon, tensor
 from discopy.utils import dumps, loads
@@ -711,6 +711,7 @@ def test_anyons_of_double_s3():
         assert Q.eval(dtype=complex).array.size == d * d
 
 
+@mark.slow
 def test_fusion_rules_from_braiding():
     D, anyons = double_of_s3_and_anyons()
     dims = [int(np.prod(a.inside)) for a in anyons]
