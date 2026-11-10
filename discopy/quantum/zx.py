@@ -28,6 +28,7 @@ Summary
     Number
     Hypergraph
     Rewriter
+    Agenda
 
 .. admonition:: Functions
 
@@ -38,6 +39,9 @@ Summary
 
         scalar
         gate2zx
+
+.. autodata:: RULES
+    :no-value:
 """
 
 from __future__ import annotations
