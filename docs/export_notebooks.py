@@ -50,14 +50,16 @@ SOURCE = "{}/blob/{}".format(
     REPOSITORY.removesuffix(".git"),
     os.environ.get("READTHEDOCS_GIT_COMMIT_HASH", "main"))
 ISSUES = "https://github.com/rel-int/discopy-next/issues/"
+# The environment variable that makes :func:`generate` link to each notebook
+# rather than run it.
+SKIP = "DISCOPY_SKIP_NOTEBOOKS"
 
-# Notebooks that fail to execute on a bug of their own, each tracked by an
-# issue, so that ``--check`` does not block on them; ``generate`` already falls
-# back to a link page for any notebook that fails to execute.
+# Notebooks that fail to execute on a bug an open issue tracks, so that
+# ``--check`` does not block on them; ``generate`` already falls back to a link
+# page for any notebook that fails to execute. An entry whose issue is closed
+# has stopped being evidence: re-run the notebook before trusting it.
 KNOWN_BROKEN = {
-    "optyx/feed_forward_example": ISSUES + "247",
-    "optyx/photon_distinguishability": ISSUES + "247",
-    "optyx/readme_example": ISSUES + "247",
+    "optyx/readme_example": ISSUES + "251",
     "optyx/test_light_cones": ISSUES + "249",
 }
 
@@ -132,10 +134,13 @@ def export(notebook: Path, *, check: bool) -> None:
         else:
             output = HTML_DIR / f"{name_of(notebook)}.html"
             output.parent.mkdir(parents=True, exist_ok=True)
+        path = os.pathsep.join(filter(None, (
+            str(DOCS.parent), os.environ.get("PYTHONPATH"))))
         subprocess.run(
             [sys.executable, "-m", "marimo", "export", "html", notebook.name,
              "-o", str(output), "-f"],
-            cwd=notebook.parent, check=True)
+            cwd=notebook.parent, env=os.environ | {"PYTHONPATH": path},
+            check=True)
         add_theme_style(output, title_of(notebook))
 
 
@@ -161,9 +166,14 @@ def generate(*, strict: bool = False) -> None:
     """Render every notebook to HTML and write its page (used by ``conf.py``).
 
     When ``strict`` is false a notebook that fails to execute falls back to a
-    link page instead of aborting the build.
+    link page instead of aborting the build. When the environment sets
+    :data:`SKIP` to ``1``, as CI does on a pull request, no notebook runs and
+    every page is a link page.
     """
     for notebook in notebooks():
+        if os.environ.get(SKIP) == "1":
+            write_page(notebook, rendered=False)
+            continue
         try:
             export(notebook, check=False)
             write_page(notebook, rendered=True)
@@ -200,8 +210,11 @@ def main() -> int:
     names = set(args.notebooks)
     selected = [nb for nb in notebooks()
                 if not names or {nb.stem, name_of(nb)} & names]
-    if not selected:
-        print("no matching notebooks found", file=sys.stderr)
+    unmatched = names.difference(
+        *({nb.stem, name_of(nb)} for nb in selected))
+    if not selected or unmatched:
+        print("no matching notebooks found:", *sorted(unmatched),
+              file=sys.stderr)
         return 1
 
     with ThreadPoolExecutor(args.jobs) as pool:

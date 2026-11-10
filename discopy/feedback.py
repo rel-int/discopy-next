@@ -7,14 +7,16 @@ the free traced category as the case where the loop is not delayed.
 We follow the definition of :cite:t:`DiLavoreEtAl22` with some extra structure
 for the head and tail of streams with the :class:`FollowedBy` generator.
 A traced category is a feedback category whose delay is the identity, so
-every level of the hierarchy below this one, from :mod:`balanced` and
-:mod:`pivotal` down, is a feedback category: its wires carry a time step,
-a :class:`Trace` is a :class:`Feedback` whose memory is not delayed.
+every level of the hierarchy below this one, from :mod:`~discopy.balanced`
+and :mod:`~discopy.pivotal` down, is a feedback category: its wires carry a
+time step, a :class:`Trace` is a :class:`Feedback` whose memory is not
+delayed.
 
-Note that these diagrams are planar, so that e.g. :mod:`pivotal` diagrams are
-traced in this sense. See :mod:`symmetric` for the usual notion of trace,
-:mod:`markov` for the syntax of streams and :mod:`discopy.stream` for its
-interpretation, the main example of a feedback category.
+Note that these diagrams are planar, so that e.g. :mod:`~discopy.pivotal`
+diagrams are traced in this sense. See :mod:`~discopy.symmetric` for the usual
+notion of trace, :mod:`~discopy.markov` for the syntax of streams and
+:mod:`discopy.stream` for its interpretation, the main example of a feedback
+category.
 
 Summary
 -------
@@ -48,8 +50,8 @@ Summary
         :nosignatures:
         :toctree:
 
-        generators
-        wire_generators
+        structural_boxes
+        structural_wires
 
 Axioms
 ------
@@ -65,8 +67,7 @@ of the following shape:
 .. image:: /_static/feedback/feedback-operator.svg
     :align: center
 
-A trace is a feedback whose memory is not delayed, i.e. a feedback in a
-category whose delay is the identity. It is a right trace by default:
+The :class:`Trace` is a right trace by default:
 
 >>> z = Ty('z')
 >>> g = Box("g", x @ z, y @ z)
@@ -91,9 +92,10 @@ The laws are stated once on :class:`discopy.abc.FeedbackCategory`, those of
 a traced category being the same laws with the delay the identity, plus
 yanking from :class:`discopy.abc.TracedCategory`. Under each law, feedback
 comes first, checked on the nose where it can be and otherwise drawn and
-checked up to a functor into streams, then the trace, checked on the nose
-for symmetric diagrams: equality of planar traced diagrams is not
-implemented.
+checked up to a functor into streams, then the trace on symmetric diagrams,
+checked on the nose for vanishing and joining and otherwise with
+:class:`discopy.symmetric.Equation`, i.e. up to hypergraph isomorphism:
+equality of planar traced diagrams is not implemented.
 
 >>> from discopy import stream, symmetric
 >>> F0 = Functor(
@@ -102,7 +104,7 @@ implemented.
 ...     F0, lambda f: stream.Stream.sequence(f.name, F0(f.dom), F0(f.cod)),
 ...     cod=stream.Stream)
 >>> all_eq = lambda xs: len(set(xs)) == 1
->>> eq_up_to_F = lambda *fs, n=2: all_eq(F(f).unroll(2).now for f in fs)
+>>> eq_up_to_F = lambda *fs, n=2: all_eq(F(f).unroll(n).now for f in fs)
 
 >>> s = symmetric.Ty('s')
 >>> t, k = symmetric.Box('t', s @ s, s @ s), symmetric.Box('k', s, s)
@@ -194,7 +196,8 @@ this can only be checked up to extensional equivalence of streams.
 .. image:: /_static/feedback/slide-unroll.svg
     :align: center
 
-For a trace, the delay is the identity and the morphism slides on the nose:
+For a trace, the delay is the identity and the morphism slides without
+delay, up to the hypergraph isomorphism of :class:`discopy.symmetric.Equation`:
 
 >>> sliding_left = symmetric.Equation(
 ...     (t >> k @ s).trace(left=True),
@@ -255,7 +258,9 @@ from copy import copy
 from typing import ClassVar
 
 from discopy import monoidal, cmap, hypergraph, messages
-from discopy.abc import FeedbackCategory, TracedCategory
+from discopy.abc import (
+    DaggerCategory, FeedbackCategory, MonoidalCategory, TracedCategory)
+from discopy.config import BOX_DRAWING_ATTRIBUTES
 from discopy.monoidal import (  # noqa: F401  pylint: disable=unused-import
     Equation)
 from discopy.utils import (
@@ -569,6 +574,9 @@ class Diagram(monoidal.Diagram, TracedCategory):
                 dom=dom @ fed[:-1], cod=cod @ mem[:-1], mem=mem[-1:]
             ).feedback(dom=dom, cod=cod, mem=mem[:-1])
         if fed == mem or not isinstance(mem, Ty):
+            if (self.dom, self.cod) != ((fed @ dom, mem @ cod) if left
+                                        else (dom @ fed, cod @ mem)):
+                raise AxiomError(messages.NOT_TRACEABLE.format(self, mem))
             return self.trace_factory(self, left)
         return self.feedback_factory(
             self, dom=dom, cod=cod, mem=mem, left=left)
@@ -640,6 +648,37 @@ class Diagram(monoidal.Diagram, TracedCategory):
 
     d = Wire.d
 
+    trace_naturality_left = TracedCategory.trace_naturality_left.failing(
+        messages.NO_PLANAR_NORMAL_FORM)
+    trace_naturality_right = TracedCategory.trace_naturality_right.failing(
+        messages.NO_PLANAR_NORMAL_FORM)
+    trace_dinaturality_left = TracedCategory.trace_dinaturality_left.failing(
+        messages.NO_PLANAR_NORMAL_FORM)
+    trace_dinaturality_right = TracedCategory.trace_dinaturality_right.failing(
+        messages.NO_PLANAR_NORMAL_FORM)
+    trace_superposing_left = TracedCategory.trace_superposing_left.failing(
+        messages.NO_PLANAR_NORMAL_FORM)
+    trace_superposing_right = TracedCategory.trace_superposing_right.failing(
+        messages.NO_PLANAR_NORMAL_FORM)
+    hypergraph_section = monoidal.Diagram.hypergraph_section.failing(
+        messages.SECTION_NEEDS_SWAPS)
+    dagger_involution = DaggerCategory.dagger_involution.failing(
+        messages.FEEDBACK_HAS_NO_DAGGER)
+    dagger_involution_traced = DaggerCategory.dagger_involution.weaken(
+        within=MonoidalCategory)
+    dagger_contravariance = DaggerCategory.dagger_contravariance.failing(
+        messages.FEEDBACK_HAS_NO_DAGGER)
+    dagger_contravariance_traced = DaggerCategory.dagger_contravariance\
+        .weaken(within=MonoidalCategory)
+    dagger_monoidality = DaggerCategory.dagger_monoidality.failing(
+        messages.FEEDBACK_HAS_NO_DAGGER)
+    tightening = FeedbackCategory.tightening.failing(
+        messages.FREE_FEEDBACK)
+    sliding = FeedbackCategory.sliding.failing(
+        messages.FREE_FEEDBACK)
+    strength = FeedbackCategory.strength.failing(
+        messages.FREE_FEEDBACK)
+
 
 class Box(monoidal.Box, Diagram):
     """
@@ -654,7 +693,7 @@ class Box(monoidal.Box, Diagram):
     """
     serialised_attrs = monoidal.Box.serialised_attrs + ("time_step", )
 
-    _time_step, _args, _params = 0, (), {}
+    _time_step = 0
 
     @property
     def time_step(self) -> int | None:
@@ -674,10 +713,7 @@ class Box(monoidal.Box, Diagram):
         return None if hasattr(self, "__getnewargs__") else self._time_step
 
     def __init__(self, *args, time_step: int = 0, **params):
-        self._time_step, self._args = time_step, args[3:]
-        self._params = {
-            key: value for key, value in params.items()
-            if key not in ("name", "dom", "cod")}
+        self._time_step = time_step
         super().__init__(*args, **params)
 
     @time_step.setter
@@ -697,7 +733,9 @@ class Box(monoidal.Box, Diagram):
         objects are; a structural box, one whose ``__getnewargs__`` gives the
         arguments it is built from, e.g. a swap, a copy or a controlled gate,
         is built from their delays, those of its types and its diagrams; any
-        other box from its delayed boundary, one more time step on.
+        other box from its delayed boundary, one more time step on, drawn as
+        it is, e.g. a :class:`Bubble`, whose args stay as they are inside. A
+        :class:`Sum` is the sum of the delays of its terms.
 
         Parameters:
             n_steps : The number of time steps to delay.
@@ -709,11 +747,13 @@ class Box(monoidal.Box, Diagram):
             return type(self)(*(
                 x.delay(n_steps) if isinstance(x, (Ty, Diagram)) else x
                 for x in arguments()))
-        dom, cod = self.dom.delay(n_steps), self.cod.delay(n_steps)
-        time_step = self.time_step + n_steps
-        return type(self)(
-            self.name, dom, cod, *self._args, time_step=time_step,
-            **self._params)
+        box = self.rebuild(
+            dom=self.dom.delay(n_steps), cod=self.cod.delay(n_steps),
+            time_step=self.time_step + n_steps)
+        vars(box).update(
+            (attr, value) for attr, value in vars(self).items()
+            if attr in BOX_DRAWING_ATTRIBUTES)
+        return box
 
     def reset(self):
         """
@@ -823,6 +863,34 @@ class Feedback(Box, monoidal.Bubble):
     def fed_back(mem: Ty) -> Ty:
         """ The input fed back for a memory ``mem``, its delay. """
         return mem.delay()
+
+    @classmethod
+    # pylint: disable-next=arguments-differ  # drawn with no boundary
+    def strategy(cls, *, types=None):
+        """
+        Generate the feedback of a free box over an atomic memory, on
+        either side, the trace of one for a :class:`Trace`.
+
+        Parameters:
+            types : The strategy to draw the types from, the memory one of
+                them with one wire, see :meth:`atomic_strategy`.
+        """
+        from hypothesis import strategies as st
+
+        types = cls.ob.strategy() if types is None else types
+
+        def feedbacks(args):
+            mem, dom, cod, left = args
+            fed = cls.fed_back(mem)
+            arg_dom, arg_cod = (fed @ dom, mem @ cod) if left\
+                else (dom @ fed, cod @ mem)
+            return cls.ar.box_factory.strategy(
+                types=types, dom=arg_dom, cod=arg_cod).map(
+                    lambda arg: cls(arg, mem=mem, left=left))
+
+        return st.tuples(
+            cls.atomic_strategy(types), types, types, st.booleans()
+        ).flatmap(feedbacks)
 
     def delay(self, n_steps=1):
         return type(self)(self.arg.delay(n_steps), mem=self.mem.delay(n_steps),
@@ -941,6 +1009,18 @@ class Head(monoidal.Bubble, Box):
         Box.__init__(self, f"({arg}).{self.part}", self.dom, self.cod,
                      time_step=time_step)
 
+    def dagger(self):
+        """
+        The dagger of a head is the head of the dagger, and the same for a
+        tail: on streams both are functors, which commute with the dagger.
+
+        >>> x, y = (Ty(Wire(name, is_constant=False)) for name in "xy")
+        >>> f = Box('f', x, y)
+        >>> assert f.head.dagger() == f.dagger().head
+        >>> assert f.tail.delay().dagger() == f.dagger().tail.delay()
+        """
+        return type(self)(self.arg.dagger(), self.time_step)
+
     delay, reset, __repr__ = HeadOb.delay, HeadOb.reset, HeadOb.__repr__
     to_tree, from_tree = HeadOb.to_tree, classmethod(HeadOb.from_tree.__func__)
     __str__ = Box.__str__
@@ -958,7 +1038,7 @@ class Tail(monoidal.Bubble, Box):
     serialised_attrs = ("*args", "time_step")
     part = "tail"
 
-    __init__ = Head.__init__
+    __init__, dagger = Head.__init__, Head.dagger
     delay, reset, __repr__ = HeadOb.delay, HeadOb.reset, HeadOb.__repr__
     to_tree, from_tree = HeadOb.to_tree, classmethod(HeadOb.from_tree.__func__)
     __str__ = Box.__str__
@@ -1042,19 +1122,90 @@ class FollowedBy(Box):
 
 class Sum(monoidal.Sum, Box):
     """
-    A feedback sum is a sum of feedback diagrams.
+    A feedback sum is a sum of feedback diagrams, over which delay
+    distributes.
 
     Parameters:
         terms (tuple[Diagram, ...]) : The terms of the formal sum.
         dom (Ty) : The domain of the formal sum.
         cod (Ty) : The codomain of the formal sum.
+
+    Example
+    -------
+    >>> x, y = Ty('x'), Ty('y')
+    >>> f, g, h = Box('f', x, y), Box('g', x, y), Box('h', y, y)
+    >>> assert (f + g).delay() == f.delay() + g.delay()
+    >>> assert ((f + g) >> h).delay() == (f + g).delay() >> h.delay()
     """
+    def delay(self, n_steps=1):
+        """ The delay of a sum, the sum of the delays of its terms. """
+        return self.sum_factory(
+            tuple(term.delay(n_steps) for term in self.terms),
+            self.dom.delay(n_steps), self.cod.delay(n_steps))
 
 
 class Bubble(monoidal.Bubble, Box):
     """
-    A feedback bubble is a monoidal bubble and a feedback box.
+    A feedback bubble is a monoidal bubble and a feedback box, which delays as
+    a box does: its boundary is delayed and its time step counts, its args
+    stay as they are inside.
+
+    Parameters:
+        args (Diagram) : The diagrams inside the bubble.
+        time_step (int) : The number of times the bubble has been delayed,
+            its boundary that of its args delayed as many times by default.
+        kwargs : Passed to :class:`monoidal.Bubble`.
+
+    Example
+    -------
+    >>> x, y = Ty('x'), Ty('y')
+    >>> f = Box('f', x, y)
+    >>> bubble = f.bubble().delay()
+    >>> assert bubble.args == (f, ) and (bubble.dom, bubble.cod) == (x.d, y.d)
+    >>> assert bubble.time_step == 1 and bubble.reset() == f.bubble()
+    >>> assert bubble == Bubble(f, time_step=1) != f.delay().bubble()
+    >>> print(bubble)
+    (f).bubble().d
     """
+    serialised_attrs = monoidal.Bubble.serialised_attrs + ("time_step", )
+
+    def __init__(self, *args: Diagram, time_step: int = 0, **kwargs):
+        for attr in ("dom", "cod"):
+            if time_step and kwargs.get(attr) is None:
+                kwargs[attr] = self.common(args, attr).delay(time_step)
+        super().__init__(*args, **kwargs)
+        self.time_step = time_step
+
+    def __str__(self):
+        if not self.time_step:
+            return super().__str__()
+        return str(self.reset()) + str_delayed(self.time_step)
+
+    def __repr__(self):
+        if not self.time_step:
+            return super().__repr__()
+        return super().__repr__()[:-1] + f", time_step={self.time_step})"
+
+    def setoid(self):
+        return super().setoid() + (self.time_step, )
+
+    def to_tree(self) -> dict:
+        """
+        Serialise a bubble as the bubble at time step zero, with its time step.
+
+        >>> from discopy.utils import dumps, loads
+        >>> bubble = Box('f', Ty('x'), Ty('y')).bubble().delay(2)
+        >>> assert loads(dumps(bubble)) == bubble
+        """
+        if not self.time_step:
+            return super().to_tree()
+        return self.reset().to_tree() | {'time_step': self.time_step}
+
+    @classmethod
+    def from_tree(cls, tree: dict):
+        bubble = super().from_tree(tree)
+        return bubble.delay(tree['time_step']) if 'time_step' in tree\
+            else bubble
 
 
 class Functor(monoidal.Functor):
@@ -1126,8 +1277,12 @@ class Functor(monoidal.Functor):
         if isinstance(
                 other, FollowedBy) and hasattr(self.cod, "followed_by"):
             arg = other.dom if other.is_dagger else other.cod
-            return self.cod.followed_by(self(arg))
-        if isinstance(other, Feedback) and hasattr(self.cod, "feedback"):
+            result = self.cod.followed_by(self(arg))
+            return result.dagger() if other.is_dagger\
+                and hasattr(self.cod, "dagger") else result
+        if isinstance(other, Feedback)\
+                and issubclass(self.cod, FeedbackCategory)\
+                and self.cod.delay is not FeedbackCategory.delay:
             left = {"left": True} if other.left else {}
             return self(other.arg).feedback(
                 dom=self(other.dom), cod=self(other.cod),
@@ -1149,7 +1304,7 @@ Hypergraph = hypergraph.Hypergraph[Diagram]
 Id = Diagram.id
 
 
-GENERATORS = {
+STRUCTURAL_BOXES = {
     "Feedback": ("feedback_factory", "A feedback of {} diagrams."),
     "Trace": ("trace_factory", "A trace of {} diagrams."),
     "FollowedBy": ("followed_by_factory", "A followed-by in {} diagrams."),
@@ -1171,7 +1326,7 @@ def subclass(name: str, bases: list[type], module: str, doc: str) -> type:
         "__module__": module, "__qualname__": name, "__doc__": doc})
 
 
-def generators(
+def structural_boxes(
         diagram: type, box: type) -> tuple[type, type, type, type, type]:
     """
     The :class:`Feedback`, :class:`Trace`, :class:`FollowedBy`, :class:`Head`
@@ -1197,22 +1352,22 @@ def generators(
     parents = [base for base in diagram.__bases__ if issubclass(base, Diagram)]
     module, level = diagram.__module__, diagram.__module__.split('.')[-1]
     result = {}
-    for name, (attr, doc) in GENERATORS.items():
+    for name, (attr, doc) in STRUCTURAL_BOXES.items():
         own = result["Feedback"] if name == "Trace" else box
         bases = [getattr(parent, attr) for parent in parents]
         bases = [base for base in bases if isinstance(base, type)] + [own]
         result[name] = subclass(name, bases, module, doc.format(level))
-    for name, (attr, _) in GENERATORS.items():
+    for name, (attr, _) in STRUCTURAL_BOXES.items():
         if name != "Trace" or isinstance(diagram.trace_factory, type):
             setattr(diagram, attr, result[name])
     return (result["Feedback"], result["Trace"], result["FollowedBy"],
             result["Head"], result["Tail"])
 
 
-def wire_generators(wire: type) -> tuple[type, type]:
+def structural_wires(wire: type) -> tuple[type, type]:
     """
     The :class:`HeadOb` and :class:`TailOb` of a wire class below feedback,
-    generated as :func:`generators` does for boxes, so that the head of a
+    generated as :func:`structural_boxes` does for boxes, so that the head of a
     wire is a wire of its own level, and bound to its factories.
 
     Parameters:

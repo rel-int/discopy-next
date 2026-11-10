@@ -15,6 +15,9 @@ Summary
     Box
     Braid
     Twist
+    Ribbon
+    DualRailBraid
+    DualRailTwist
     Feedback
     Trace
     FollowedBy
@@ -23,6 +26,21 @@ Summary
     Sum
     Bubble
     Functor
+    DualRail
+    Equation
+
+.. admonition:: Functions
+
+    .. autosummary::
+        :template: function.rst
+        :nosignatures:
+        :toctree:
+
+        double_rail
+
+The dual rail encoding :meth:`Diagram.to_braided` doubles every wire of a
+balanced diagram into its two rails, see :class:`DualRail` and
+:func:`double_rail`.
 
 Axioms
 ------
@@ -137,8 +155,11 @@ class Diagram(braided.Diagram, feedback.Diagram, BalancedCategory):
     balanced category does have the desired cancellation property and it does
     in fact embed faithfully into the free balanced traced category.
 
-    .. _nLab: https://ncatlab.org/nlab/show/traced+monoidal+category)
+    .. _nLab: https://ncatlab.org/nlab/show/traced+monoidal+category
     """
+    twist_naturality = BalancedCategory.twist_naturality.failing(
+        messages.FREE_TWIST)
+
     ob = Ty
     yanking = BalancedCategory.yanking.failing(messages.FREE_YANKING)
 
@@ -196,7 +217,7 @@ class Diagram(braided.Diagram, feedback.Diagram, BalancedCategory):
 
 class Box(braided.Box, feedback.Box, Diagram):
     """
-    A braided box is a monoidal box in a braided diagram.
+    A balanced box is a braided box and a feedback box in a balanced diagram.
 
     Parameters:
         name (str) : The name of the box.
@@ -283,7 +304,7 @@ class Twist(Box):
 
     Parameters:
         dom : the domain of the twist.
-        phase: the phase of the twist in integer multiples of ``2 * pi``.
+        is_dagger (bool) : Whether this is the inverse twist.
 
     Important
     ---------
@@ -302,6 +323,20 @@ class Twist(Box):
         if self.is_dagger:
             return repr(self.dagger()) + ".dagger()"
         return factory_name(type(self)) + f"({self.dom!r})"
+
+    @classmethod
+    # pylint: disable-next=arguments-differ  # drawn with no boundary
+    def strategy(cls, *, types=None):
+        """
+        Generate the twist of an atomic type, or its inverse.
+
+        Parameters:
+            types : The strategy to draw the types from, see
+                :meth:`atomic_strategy`.
+        """
+        from hypothesis import strategies as st
+
+        return st.builds(cls, cls.atomic_strategy(types), st.booleans())
 
     def dagger(self):
         return type(self)(self.dom, not self.is_dagger)
@@ -329,9 +364,9 @@ class Twist(Box):
         return cls(from_tree(tree['dom']), tree.get('is_dagger', False))
 
 
-class Sum(braided.Sum, Box):
+class Sum(braided.Sum, feedback.Sum, Box):
     """
-    A balanced sum is a braided sum and a balanced box.
+    A balanced sum is a braided and feedback sum and a balanced box.
 
     Parameters:
         terms (tuple[Diagram, ...]) : The terms of the formal sum.
@@ -382,11 +417,28 @@ class DualRail(Functor):
         colour : The name of the colour filling the inside of each ribbon (or
             a function from object to colour name), see :func:`double_rail`.
 
+    Note
+    ----
+    A dual rail encoding is not determined by its maps: it sends a twist or a
+    braid, and at the levels above a swap, a cup or a cap, to a box rather
+    than to the same structure on the encoded wires. So it composes with no
+    functor but the identity, see :meth:`discopy.cat.Functor.then`: apply the
+    two in turn instead.
+
+    >>> x = Ty('x')
+    >>> D, E = DualRail(), DualRail(colour="red")
+    >>> D >> E
+    Traceback (most recent call last):
+    ...
+    discopy.utils.AxiomError: balanced.DualRail composes with no functor...
+    >>> assert len(E(D(x))) == 4 and D >> Functor.id(Diagram) is D
+
     See also
     --------
     :meth:`Diagram.to_braided`
     """
     cod = Diagram
+    composes = False
     dual_rail_twist_factory = DualRailTwist
     dual_rail_braid_factory = DualRailBraid
 
@@ -409,7 +461,8 @@ class DualRail(Functor):
         return super().__call__(other)
 
 
-Feedback, Trace, FollowedBy, Head, Tail = feedback.generators(Diagram, Box)
+Feedback, Trace, FollowedBy, Head, Tail = feedback.structural_boxes(
+    Diagram, Box)
 Diagram.box_factory = Box
 Diagram.functor_factory = Functor
 CMap = cmap.CMap[Diagram]

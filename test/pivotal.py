@@ -39,3 +39,8 @@ def test_Bubble_rotate():
     x, y = Ty('x'), Ty('y')
     bubble = Box('f', x, y).bubble()
     assert bubble.r.z == bubble.l.z == 1 and bubble.r.r == bubble
+
+
+def test_structural_boxes():
+    from discopy.testable import assert_structural_boxes
+    assert_structural_boxes(Diagram)

@@ -99,6 +99,9 @@ class Dims(monoidal.Ty):
     >>> assert loads(dumps(Dims(2, Dim(2, 3)))) == Dims(2, Dim(2, 3))
     """
     generator_factory = Dim
+    box_factory = None
+    """ No generator of one colour is named, so there is no canonical
+    instance of a law, see :meth:`discopy.testable.Axiom.canonical`. """
 
     def __init__(self, *inside: int | Dim, **kwargs):
         inside = kwargs.pop('inside', inside)
@@ -410,7 +413,7 @@ class Functor(markov.Functor, comarkov.Functor):
 Id = Network.id
 Equation = markov.Equation
 
-Feedback, Trace, FollowedBy, Head, Tail = feedback.generators(
+Feedback, Trace, FollowedBy, Head, Tail = feedback.structural_boxes(
     Network, Box)
 Network.box_factory = Box
 Network.functor_factory = Functor

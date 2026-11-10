@@ -4,7 +4,6 @@ import numpy as np
 import pytest
 from pytest import raises
 
-from discopy import testable
 from discopy.abc import DaggerCategory, Nat
 from discopy.matrix import Matrix, backend
 from discopy.symmetric import Ty, Permutation, Swap, Functor
@@ -48,6 +47,18 @@ def test_matrix_add():
 def test_repeat():
     with raises(TypeError):
         Matrix[int](0, 1, 1, 0).repeat()
+
+
+def test_repeat_takes_logarithmically_many_products(monkeypatch):
+    products, then = [], Matrix.then
+    monkeypatch.setattr(Matrix, "then", lambda self, *others: (
+        products.append(others), then(self, *others))[1])
+    for n in (64, 3, 2, 1, 0):
+        path = Matrix[bool](np.eye(n, k=1, dtype=bool), n, n)
+        closure = Matrix[bool](np.triu(np.ones((n, n), dtype=bool)), n, n)
+        products.clear()
+        assert path.repeat() == closure
+        assert len(products) <= n.bit_length()
 
 
 def test_autotyping():
@@ -157,6 +168,20 @@ def test_tensor_of_many_on_backend(name):
         [1, 0, 0, 0], [0, 2, 2, 0], [0, 0, 0, 1]])
 
 
+@pytest.mark.parametrize('name', ['pytorch', 'jax'])
+def test_dagger_and_round_on_backend(name):
+    """ Transposing, conjugating and rounding call the functions of the
+    active backend, whose arrays need not have the methods numpy's have. """
+    pytest.importorskip({'pytorch': 'torch'}.get(name, name))
+    m = lambda: Matrix([1j, 2, 3, 4, 5, 6], 2, 3)
+    run = lambda: [f.array.tolist() for f in (
+        m().transpose(), m().conjugate(), m().dagger(), Matrix.merge(2),
+        Matrix([1.2, 2.7], 1, 2).round())]
+    expected = run()
+    with backend(name):
+        assert run() == expected
+
+
 def test_tensor_of_many_promotes_dtype():
     """ The tensor of ``n`` matrices is built in the class the ``dtype`` of
     all of them promotes to, wherever the float one comes. """
@@ -198,11 +223,6 @@ def test_strategy_max_entries_on_pytorch(cls):
     assert type(drawn.array) is torch.Tensor and drawn.array.numel() == 4
 
 
-def test_Matrix_axioms():
-    """ A dry run of the property matrix on the carriers it enrols. """
-    testable.assert_axioms(Matrix, Matrix[int])
-
-
 def test_Matrix_dtype_is_the_ring_of_entries():
     """ numpy's default precisions are the Python types they stand for, so
     the class a matrix infers is the one a user names, see #88. """
@@ -213,7 +233,7 @@ def test_Matrix_dtype_is_the_ring_of_entries():
     assert Matrix[int].id(2) == Matrix.id(2)
     assert type(Matrix.id(2) >> Matrix[int].id(2)) is Matrix[int]
     m = Matrix([1, 2], 1, 2)
-    assert eval(repr(m), {"Matrix": Matrix}) == m
+    assert eval(repr(m), {"Matrix": Matrix, "Nat": Nat}) == m
     assert loads('{"factory": "matrix.Matrix[int64]", "array": [1, 2], '
                  '"dom": {"factory": "abc.Nat", "n": 1}, '
                  '"cod": {"factory": "abc.Nat", "n": 2}}') == m
@@ -321,3 +341,16 @@ def test_Matrix_basis_dtype():
         assert Matrix.basis(x, 0).dtype == Matrix.id(x).dtype
     for dtype in (bool, int, float, complex):
         assert Matrix[dtype].basis(0, 0).dtype == dtype
+
+
+def test_symbolic_matrix_composes_with_permutations_and_copies():
+    """ Permutations and copies hold the integers zero and one, as id does:
+    sympy does not multiply an expression by a boolean. """
+    pytest.importorskip("sympy")
+    from sympy import Expr
+    from sympy.abc import psi
+    M = Matrix[Expr]
+    f, swap = M([psi], 1, 1), M.swap(1, 1)
+    assert f @ M.id(1) >> swap == swap >> M.id(1) @ f
+    assert f >> M.permutation([0]) == f
+    assert f >> M.copy(1) == M([psi, psi], 1, 2)

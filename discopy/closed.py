@@ -3,6 +3,11 @@
 The free closed markov category, i.e. with copy, discard, exponentials and
 products that are not strictly associative.
 
+Its causal diagrams are also written as lambda terms, see :class:`TermBase`,
+with tuples, projections and ``let``, and reduced to Böhm trees by a
+:class:`Strategy`. Diagrams map to combinatorial maps, i.e.
+:class:`discopy.cmap.CMap`, with :meth:`discopy.monoidal.Diagram.to_map`.
+
 Summary
 -------
 
@@ -34,11 +39,16 @@ Summary
     RightmostFirst
     Diagram
     Box
+    Timed
     Eval
     Coeval
     Curry
     Pack
     Unpack
+    Function
+    Swap
+    Permutation
+    Copy
     Discard
     Feedback
     Trace
@@ -48,7 +58,7 @@ Summary
     Sum
     Bubble
     Functor
-    CMap
+    Equation
 
 .. admonition:: Functions
 
@@ -62,7 +72,8 @@ Summary
 Axioms
 ------
 
-:meth:`Diagram.curry` and :meth:`Diagram.uncurry` are inverses.
+:meth:`discopy.biclosed.Diagram.curry` and
+:meth:`discopy.abc.BiclosedCategory.uncurry` are inverses.
 
 >>> x, y, z = map(Ty, "xyz")
 >>> f, g = Box('f', x, z << y), Box('g', x @ y, z)
@@ -88,7 +99,8 @@ from typing import Callable, ClassVar, Dict, Self
 
 from discopy import (
     monoidal, biclosed, markov, feedback, cmap, hypergraph, messages)
-from discopy.abc import ClosedCategory
+from discopy.abc import ClosedCategory, DaggerCategory, MonoidalCategory
+from discopy.testable import Serialisable
 from discopy.cat import factory
 from discopy.drawing import Drawing
 from discopy.utils import (
@@ -109,7 +121,7 @@ class Wire(feedback.Wire, biclosed.Wire):
     """
 
 
-HeadOb, TailOb = feedback.wire_generators(Wire)
+HeadOb, TailOb = feedback.structural_wires(Wire)
 
 
 @factory
@@ -189,6 +201,11 @@ class Exp(Wire, biclosed.Exp):
 
     ob = Ty
 
+    @cached_property
+    def name(self):  # pylint: disable=method-hidden  # deleted by __init__
+        "The name of an exponential is its undelayed print, read when needed."
+        return str(self.reset())
+
     def __str__(self):
         return f"({self.exponent} >> {self.base})"\
             + feedback.str_delayed(self.time_step)
@@ -222,7 +239,13 @@ class Product(Wire):
         for typ in factors:
             assert_isinstance(typ, self.ob)
         self.factors = factors
-        super().__init__(str(self), **params)
+        super().__init__("", **params)
+        del self.name
+
+    @cached_property
+    def name(self):  # pylint: disable=method-hidden  # deleted by __init__
+        "The name of a product is its undelayed print, read when needed."
+        return str(self.reset())
 
     def __eq__(self, other):
         return isinstance(other, type(self))\
@@ -368,6 +391,8 @@ class Diagram(markov.Diagram, biclosed.Diagram, ClosedCategory):
         def image(box):
             if box.time_step:
                 return image(box.reset()).delay(box.time_step)
+            if isinstance(box, Curry) and not box.n:
+                return box.arg.to_compact()
             if isinstance(box, Curry):
                 return (box.arg.to_compact() >> Coeval(
                     box.cod, left=box.left)).trace(
@@ -386,6 +411,13 @@ class Diagram(markov.Diagram, biclosed.Diagram, ClosedCategory):
 
     def to_drawing(self):
         return monoidal.Diagram.to_drawing(self, functor_factory=Functor)
+
+    dagger_monoidality = DaggerCategory.dagger_monoidality.failing(
+        messages.CURRY_HAS_NO_DAGGER)
+    dagger_monoidality_monoidal = DaggerCategory.dagger_monoidality.weaken(
+        within=MonoidalCategory)
+    currying_symmetry = ClosedCategory.currying_symmetry.failing(
+        messages.FREE_CURRY)
 
     def to_term(self) -> Term:
         """
@@ -521,11 +553,25 @@ class Eval(Timed, biclosed.Eval, Box):
         """ The arguments of the constructor, which a delay reads. """
         return self.x, self.left
 
+    def __str__(self):
+        """
+        The name of the evaluation, with its side when it is on the right:
+        an exponential of a closed category is on either side, so its type
+        alone does not say which.
+
+        >>> x, y = Ty('x'), Ty('y')
+        >>> print(Eval(x << y, left=False).delay())
+        Eval(y >> x, left=False).d
+        """
+        name = self.name if self.left else self.name[:-1] + ", left=False)"
+        return name + feedback.str_delayed(self.time_step)
+
 
 class Coeval(Timed, biclosed.Coeval, Box):
     "The coevaluation of an exponential type, i.e. the dagger of an Eval."
     serialised_attrs = biclosed.Coeval.serialised_attrs + ("*", "time_step")
     __getnewargs__ = Eval.__getnewargs__
+    __str__ = Eval.__str__
 
 
 class Curry(Timed, biclosed.Curry, Box):
@@ -551,6 +597,8 @@ class Curry(Timed, biclosed.Curry, Box):
         """
         if not self.time_step:
             return super().to_drawing()
+        if not self.n:
+            return self.arg.delay(self.time_step).to_drawing()
         coeval = self.coeval_factory(self.reset().cod, left=self.left)
         return (self.arg >> coeval).delay(self.time_step).to_drawing()\
             .trace(self.n, left=not self.left)
@@ -705,6 +753,8 @@ class Functor(biclosed.Functor, markov.Functor):
     dom = cod = Diagram
 
     def __call__(self, other):
+        if isinstance(other, Unitype) and not other.time_step:
+            return monoidal.Functor.__call__(self, other)
         if self.cod is Drawing:
             return super().__call__(other)
         if isinstance(other, (Wire, Box)) and other.time_step:
@@ -734,7 +784,8 @@ Diagram.copy_factory = Copy
 Diagram.function_factory = Function
 Diagram.swap_factory = Swap
 Diagram.permutation_factory = Permutation
-Feedback, Trace, FollowedBy, Head, Tail = feedback.generators(Diagram, Box)
+Feedback, Trace, FollowedBy, Head, Tail = feedback.structural_boxes(
+    Diagram, Box)
 Feedback.is_linear = Head.is_linear = Tail.is_linear = property(
     lambda self: self.arg.is_linear)
 Diagram.box_factory = Box
@@ -751,7 +802,7 @@ Ty.under_factory = Ty.over_factory = staticmethod(Exp)
 Id = Diagram.id
 
 
-class TermBase(Box, biclosed.TermBase):
+class TermBase(Box, biclosed.TermBase, biclosed.Normalising):
     """
     A term in the internal language of a closed category, i.e. a lambda term
     which need not be linear: this module implements closed markov categories
@@ -775,6 +826,7 @@ class TermBase(Box, biclosed.TermBase):
     >>> assert x(f, left=True) == f(x)
     """
     functor = Functor.id(Diagram)
+    str_transparency = Serialisable.str_transparency
 
     def __call__(self, other, left=False):
         args = (other, self) if left else (self, other)
@@ -926,12 +978,26 @@ class TermBase(Box, biclosed.TermBase):
         """
         functor = biclosed.Functor(
             ob_map=lambda x: cls.ob(x.inside[0].name),
-            ar_map=lambda c: cls.ob.constant_factory(c.name, functor(c.cod)),
+            ar_map=lambda c: cls.ob.constant_factory(
+                c.name, functor(c.cod), data=c.data),
             dom=biclosed.Diagram, cod=cls.functor.cod)
         return functor(term)
 
     @classmethod
-    def generate(cls, cod, choices, types, letters):
+    def strategy(cls, **params):
+        """
+        Generate closed terms, which need not be linear, see
+        :meth:`generate`.
+
+        Parameters:
+            params : Passed to :meth:`biclosed.TermBase.shapes`.
+        """
+        return super().strategy(**params)
+
+    @classmethod
+    # pylint: disable-next=too-many-arguments,too-many-positional-arguments
+    def generate(  # a shape, a naming and whether it takes constants
+            cls, cod, choices, types, letters, constants=True):
         """
         Build a term as :meth:`biclosed.TermBase.generate` does, except
         that a closed term need not be linear: its :class:`biclosed.Sampler`
@@ -947,7 +1013,8 @@ class TermBase(Box, biclosed.TermBase):
         X(lambda x0: c0)
         """
         return biclosed.Sampler(
-            cls, iter(choices), types, letters, linear=False).term(cod)
+            cls, iter(choices), types, letters, linear=False,
+            constants=constants).term(cod)
 
     def reduce(self, budget: int | None = None,
                strategy: type[Strategy] | None = None) -> BohmTree | None:
@@ -1024,13 +1091,6 @@ X(lambda x: x)(x).
 
 type Term = Constant | Variable | Application | Abstraction\
     | Tuple | Projection | Let
-
-
-for law in ("copy_coassociativity", "copy_cocommutativity",
-            "copy_counitality", "copy_coherence", "vanishing", "joining",
-            "strength", "tightening", "sliding", "yanking", "scalar_sliding"):
-    setattr(TermBase, law, getattr(Box, law).inapplicable(
-        messages.TERM_IS_A_BOX))
 
 
 class Constant(TermBase, biclosed.Constant):
@@ -1856,6 +1916,12 @@ Ty.application_factory = Application
 Ty.abstraction_factory = Abstraction
 Ty.product_factory = Product
 TermBase.strategy_factory = LeftmostOutermost
+TermBase.reduction_strategies = (LeftmostOutermost, RightmostFirst)
+
+for law in sorted(
+        set(Box.axioms) - set(Serialisable.axioms) | set(Box.rules)):
+    setattr(TermBase, law, getattr(Box, law).inapplicable(
+        messages.TERM_IS_A_BOX))
 
 
 class Equation(markov.Equation):

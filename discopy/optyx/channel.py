@@ -94,7 +94,7 @@ the one-step optical matrix, loss channels included, and
 :meth:`Diagram.truncation_dimensions` reads each wire's photon budget off the
 diagram, which is where the cutoff search of :meth:`Diagram.eigen_fix` starts.
 
-See :doc:`/notebooks/fixpoints` for what each of these returns, and for
+See :doc:`/notebooks/optyx/fixpoints` for what each of these returns, and for
 using them to simulate feedback boson sampling.
 
 Types
@@ -725,7 +725,7 @@ class Diagram(frobenius.Diagram):
         >>> assert BS.dilate() == BS.get_kraus()
         """
         kraus, env = diagram.Id(self.dom.single()), diagram.Ty()
-        for layer in self:
+        for layer in self.to_staircases():
             (box, offset), = layer.inside[0].boxes_and_offsets
             left = layer.dom[:offset]
             right = layer.dom[offset + len(box.dom):]
@@ -1005,11 +1005,11 @@ class Diagram(frobenius.Diagram):
         Parameters:
             tol : The error the certified depth approximates the fixed point
                 within, and the stopping distance of the fallback iteration.
-            max_chi : The largest bond dimension the contraction keeps: a
-                bond past it is truncated down to `max_chi`, with a warning.
-                The public `MAX_BOND_DIMENSION` of eight by default — what a
-                laptop contracts in seconds. `None` contracts exactly,
-                whatever that costs.
+            max_chi : The largest bond dimension a compressed contraction
+                keeps: a bond past it is truncated down to `max_chi`, with a
+                warning. The public `MAX_BOND_DIMENSION` of eight by default
+                — what a laptop contracts in seconds. `None` contracts
+                exactly, whatever that costs.
             max_steps : The maximum number of time steps, including the final
                 readout. The public `DEFAULT_MAX_STEPS` is sixty-four.
             backend : An optional
@@ -1031,8 +1031,8 @@ class Diagram(frobenius.Diagram):
         >>> fixed = delay.fix(tol=1e-6, max_chi=None)
         >>> assert np.allclose(fixed.density_matrix, [[.5, 0], [0, .5]])
 
-        See :doc:`/notebooks/fixpoints` for the semantic diagram, agreement
-        map and contraction planning.
+        See :doc:`/notebooks/optyx/fixpoints` for the semantic diagram,
+        agreement map and contraction planning.
         """
         self.check_fixpoint(tol, max_chi)
         if not isinstance(max_steps, Integral) \
@@ -1060,16 +1060,16 @@ class Diagram(frobenius.Diagram):
         depth = self.unroll_certificate(tol, max_steps)
         network = self.at_time(depth - 1)
 
+        compressible = max_chi is not None and isinstance(
+            getattr(backend, "hyperoptimiser", None),
+            (ReusableHyperCompressedOptimizer, HyperCompressedOptimizer))
         needed = max(network.truncation_dimensions(), default=1)
-        if max_chi is not None and needed > max_chi:
+        if compressible and needed > max_chi:
             warnings.warn(
                 f"the contraction needs dimension {needed} but "
                 f"max_chi={max_chi}: the result is an approximation with "
                 "those bonds truncated down to max_chi.",
                 UserWarning, stacklevel=2)
-        compressible = max_chi is not None and isinstance(
-            getattr(backend, "hyperoptimiser", None),
-            (ReusableHyperCompressedOptimizer, HyperCompressedOptimizer))
         result = network.eval(
             backend, **({"max_bond": max_chi} if compressible else {}))
 
@@ -1377,7 +1377,7 @@ class Diagram(frobenius.Diagram):
             # if we prepare quantum from classical types, it's not pure
             if (
                 isinstance(generator, Encode) and
-                any(ty.is_classical for ty in generator.cod.inside)
+                any(ty.is_classical for ty in generator.dom.inside)
             ):
                 return False
 
@@ -1401,7 +1401,7 @@ class Diagram(frobenius.Diagram):
         """
         assert self.is_pure, "Cannot get a Kraus map of non-pure circuit"
         kraus_maps = [diagram.Id(self.dom.single())]
-        for layer in self:
+        for layer in self.to_staircases():
             (generator, offset), = layer.inside[0].boxes_and_offsets
             left = layer.dom[:offset]
             right = layer.dom[offset + len(generator.dom):]
@@ -1467,7 +1467,7 @@ class Diagram(frobenius.Diagram):
         assert self.is_pure, "Diagram must be pure to convert to tket."
 
         kraus_maps = []
-        for layer in self:
+        for layer in self.to_staircases():
             (generator, offset), = layer.inside[0].boxes_and_offsets
             left = layer.dom[:offset]
             right = layer.dom[offset + len(generator.dom):]
@@ -1569,10 +1569,9 @@ class Diagram(frobenius.Diagram):
 
         n_modes = p.circuit_size
         circuit = photonic.Id(n_modes)
-        heralds = p.heralds
 
         circuit = perceval_conversion.heralds_diagram(
-            heralds, n_modes, circuit, "in"
+            p.in_heralds, n_modes, circuit, "in"
         ) >> circuit
 
         for wires, component in p.components:
@@ -1612,7 +1611,7 @@ class Diagram(frobenius.Diagram):
                 circuit >>= circuit.cod[:m] @ box @ circuit.cod[m + 1:]
 
         circuit >>= perceval_conversion.heralds_diagram(
-            heralds, n_modes, circuit, "out"
+            p.heralds, n_modes, circuit, "out"
         )
         if p.post_select_fn.has_condition:
             circuit >>= perceval_conversion.postselection(circuit, p)
@@ -1727,6 +1726,22 @@ class Channel(Diagram, frobenius.Box):
         syms, exprs = zip(*args)
         return self.lambdify(*syms)(*exprs)
 
+    @property
+    def free_symbols(self):
+        """ The symbols of the box's data and of its Kraus map. """
+        return super().free_symbols | self.kraus.free_symbols
+
+    def grad(self, var, **params):
+        """
+        Gradient with respect to :code:`var`, zero for a box that does not
+        depend on it: a box that does needs a gradient of its own.
+        """
+        # pylint: disable=unused-argument  # the signature of Diagram.grad
+        if var not in self.free_symbols:
+            return self.sum_factory((), self.dom, self.cod)
+        raise NotImplementedError(
+            f"{type(self).__name__} does not support grad")
+
     def inflate(self, d):
         r"""Translates from an indistinguishable setting
         to a distinguishable one. For a map on :math:`F(\mathbb{C})`,
@@ -1764,8 +1779,6 @@ class Sum(symmetric.Sum, Diagram):
     Formal sum of optyx channel diagrams
     """
 
-    __ambiguous_inheritance__ = (symmetric.Sum,)
-
     def double(self):
         return diagram.Diagram.sum_factory(
             [term.double() for term in self.terms],
@@ -1800,6 +1813,13 @@ class CQMap(Diagram, frobenius.Box):
         return f"{factory_name(type(self))}({self.name!r}, "\
             f"{self.density_matrix!r}, {self.dom!r}, {self.cod!r})"
 
+    @property
+    def free_symbols(self):
+        """ The symbols of the box's data and of its density matrix. """
+        return super().free_symbols | self.density_matrix.free_symbols
+
+    grad = Channel.grad
+
     def double(self):
         return self.density_matrix
 
@@ -1818,11 +1838,20 @@ class CQMap(Diagram, frobenius.Box):
         :math:`F(\mathbb{C}^d)`,
         obtain a map on :math:`F(\mathbb{C})^{\widetilde{\otimes} d}`.
         """
+        def interleave(ty, inflated):
+            perm = []
+            for ob in ty:
+                n = len(perm)
+                perm += [n + i + j * d for i in range(d) for j in (0, 1)]\
+                    if ob.needs_inflation() else range(n, n + len(ob.double()))
+            return diagram.Diagram.permutation(perm, inflated)
 
+        density_matrix = self.density_matrix.inflate(d)\
+            if self.needs_inflation() else self.density_matrix
         return CQMap(
             name=self.name + f"^{d}",
-            density_matrix=self.density_matrix.inflate(d) if
-            self.needs_inflation() else self.density_matrix,
+            density_matrix=interleave(self.dom, density_matrix.dom).dagger()
+            >> density_matrix >> interleave(self.cod, density_matrix.cod),
             dom=self.dom.inflate(d),
             cod=self.cod.inflate(d)
         )
@@ -1887,7 +1916,6 @@ class Feedback(monoidal.Bubble, Diagram, frobenius.Box):
     >>> assert ladder.unroll(1).double().merge_layers()\\
     ...     == ladder.double().unroll(1).merge_layers()
     """
-    __ambiguous_inheritance__ = (monoidal.Bubble, frobenius.Box)
     serialised_attrs = ("*args", "dom", "cod", "mem", "state", "effect")
 
     @classmethod
@@ -1925,6 +1953,7 @@ class Feedback(monoidal.Bubble, Diagram, frobenius.Box):
     __repr__ = diagram.Feedback.__repr__
     dagger = diagram.Feedback.dagger
     to_drawing = diagram.Feedback.to_drawing
+    grad = Channel.grad
 
     def double(self):
         """The feedback loop of the doubled diagram."""

@@ -173,10 +173,9 @@ def int_trace(lens_, U):
 
 def test_traced():
     assert traced().trace(0) == traced()
-    with raises(NotImplementedError):
-        traced().trace(left=True)
-    with raises(AxiomError):
-        traced().trace()
+    for left in (False, True):
+        with raises(AxiomError):
+            traced().trace(left=left)
     with raises(TypeError):
         traced() >> g
 
@@ -193,6 +192,8 @@ def test_trace_axioms():
         assert equal(
             (Traced.id(W) @ fu).trace(n), Traced.id(W) @ fu.trace(n))
         assert equal(Traced.swap(U, U).trace(n), Traced.id(U))
+        mirrored = Traced.swap(U, X) >> fu >> Traced.swap(Y, U)
+        assert equal(mirrored.trace(n, left=True), fu.trace(n))
         fuv = lens_(X @ U @ V, Y @ U @ V)
         assert equal(fuv.trace(k).trace(n), fuv.trace(n + k))
         fv, guv = lens_(X @ V, Y @ U), lens_(U, V)

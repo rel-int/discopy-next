@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 
 """
-DisCopy's grammar modules:
-thue, cfg, categorial, pregroup, dependency, abstract, proofnet and neural,
-the last one needing PyTorch, which the ``grammar`` extra installs, and
-imported on its own.
+DisCoPy's grammar modules.
+
+:mod:`discopy.grammar.neural` needs PyTorch, which the ``grammar`` extra
+installs, so it is not imported here: import it on its own.
 """
 
 from discopy.grammar import (

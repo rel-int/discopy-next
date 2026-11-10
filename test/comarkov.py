@@ -36,6 +36,12 @@ def test_Merge_takes_index():
         assert isinstance(box, Noise) and box == Noise(x)
 
 
+def test_Cofunction_takes_index():
+    from numpy import int64
+    x, y = Ty('x'), Ty('y')
+    assert Cofunction(x @ y, int64([1, 0, 0])) == Cofunction(x @ y, [1, 0, 0])
+
+
 def test_Noise():
     x = Ty('x')
     assert Merge(x, 0) == Noise(x) == Noise(x, 0)
@@ -184,6 +190,14 @@ def test_Cofunction_Functor():
     assert diagram.to_hypergraph().to_diagram() == diagram
 
 
+def test_Functor_sends_a_Cofunction_to_one_Cofunction():
+    x, y = Ty('x'), Ty('y')
+    f = Cofunction(x @ y, [1, 0, 0])
+    assert Functor.id(Diagram)(f) == f
+    G = Functor({x: x @ y, y: x}, {})
+    assert G(f) == Cofunction(x @ y @ x, [2, 0, 1, 0, 1])
+
+
 def test_Layer():
     x, y = Ty('x'), Ty('y')
     assert Layer(Merge(x), Merge(y)).boxes_or_types == (
@@ -200,3 +214,8 @@ def test_dagger():
     assert C(x @ y, [1, 0, 0]).dagger() == F(x @ y, [1, 0, 0])
     with raises(AxiomError):
         Cofunction(Ty('x') @ Ty('y'), [1, 0, 0]).dagger()
+
+
+def test_structural_boxes():
+    from discopy.testable import assert_structural_boxes
+    assert_structural_boxes(Diagram)

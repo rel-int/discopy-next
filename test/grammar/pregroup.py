@@ -63,6 +63,22 @@ def test_normal_form():
     assert (n @ w1).normal_form() == n @ w1
 
 
+def test_normal_form_forwards_params():
+    n = Ty('n')
+    w1, w2, f = Word('a', n), Word('b', n), Box('f', n, n)
+    sentence = w1 @ w2 >> n @ Cap(n, n.l) @ n >> n @ n @ Cup(n.l, n)
+    calls = []
+
+    def normalize(diagram, **params):
+        calls.append(params)
+        return rigid.Diagram.normalize(diagram, **params)
+
+    for diagram in (sentence, sentence.foliation(), f >> f):
+        calls.clear()
+        diagram.normal_form(normalize=normalize, left=True)
+        assert calls and all(params == {'left': True} for params in calls)
+
+
 def test_from_tree():
     s, n = Ty('s'), Ty('n')
     Alice, Bob = Word('Alice', n), Word('Bob', n)

@@ -23,15 +23,39 @@ Summary
 -------
 
 .. autosummary::
-    :template: function.rst
+    :template: class.rst
     :nosignatures:
     :toctree:
 
-    from_diagram
-    from_pyzx
-    to_pyzx
-    size
-    full_reduce
+    Simplifier
+    Agenda
+
+.. admonition:: Functions
+
+    .. autosummary::
+        :template: function.rst
+        :nosignatures:
+        :toctree:
+
+        from_diagram
+        from_pyzx
+        to_pyzx
+        size
+        full_reduce
+        reduce
+        normalize
+        remove_identity
+        pivot
+        complement
+        pivot_boundary
+        near_boundary
+        fuse_gadgets
+        copy
+        supplement
+        pivot_gadget
+
+.. autodata:: RULES
+    :no-value:
 
 Example
 -------
@@ -992,7 +1016,7 @@ def size(graph) -> tuple[int, int, int]:
     """
     The number of spiders, of Hadamard edges between them and of spiders
     whose phase is not Clifford, the T-count, counting a boundary behind a
-    Hadamard edge as no spider, as PyZX does.
+    Hadamard edge and a bare wire, cup or cap as no spider, as PyZX does.
 
     Two spiders are joined by an edge when an odd number of Hadamards lie
     between them, again as PyZX has it: a Hadamard self-loop is a half-turn
@@ -1011,7 +1035,7 @@ def size(graph) -> tuple[int, int, int]:
     rewriter = Simplifier(graph)
     spiders = [s for s in range(graph.n_spiders)
                if not is_boundary(rewriter, s) and (
-                   rewriter.ports[s] < 2 or rewriter.incidence[s])]
+                   rewriter.ports[s] != 2 or rewriter.incidence[s])]
     inside = set(spiders)
     hadamards = Counter(
         frozenset({dom[0], cod[0]})
