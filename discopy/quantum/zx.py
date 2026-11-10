@@ -908,7 +908,7 @@ class Hypergraph(hypergraph.Hypergraph):
         return (Diagram, )
 
     @classmethod
-    def cup_factory(cls, left, right) -> Hypergraph:
+    def cup_factory(cls, left, right) -> hypergraph.Hypergraph:
         """
         The cup :code:`Z(2, 0)` as a box rather than a spider, for
         :meth:`to_diagram` to trace a wire it cuts open: as a spider,
@@ -917,7 +917,7 @@ class Hypergraph(hypergraph.Hypergraph):
         return super().from_box(Diagram.cup_factory(left, right))
 
     @classmethod
-    def cap_factory(cls, left, right) -> Hypergraph:
+    def cap_factory(cls, left, right) -> hypergraph.Hypergraph:
         """ The cap :code:`Z(0, 2)` as a box, see :meth:`cup_factory`. """
         return super().from_box(Diagram.cap_factory(left, right))
 
