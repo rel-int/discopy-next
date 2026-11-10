@@ -1413,7 +1413,10 @@ class Diagram(cat.Arrow, MonoidalCategory, RichDisplay):
             self @ other == self @ other.dom >> self.cod @ other
 
         Each layer of the ``i``-th diagram is whiskered by the codomains of
-        the diagrams before it and the domains of those after it.
+        the diagrams before it and the domains of those after it. A layer
+        whose plumbing whiskers into the identity, e.g. a frobenius spider
+        with one leg on each side, has no box left and is dropped, since the
+        identity is the empty sequence of layers.
 
         Example
         -------
@@ -1442,13 +1445,15 @@ class Diagram(cat.Arrow, MonoidalCategory, RichDisplay):
         for diagram in (self, ) + others:
             suffix = suffixes.pop() if suffixes else None
             if prefix and suffix:
-                inside += [prefix @ layer @ suffix for layer in diagram.inside]
+                whiskered = (
+                    prefix @ layer @ suffix for layer in diagram.inside)
             elif prefix:
-                inside += [prefix @ layer for layer in diagram.inside]
+                whiskered = (prefix @ layer for layer in diagram.inside)
             elif suffix:
-                inside += [layer @ suffix for layer in diagram.inside]
+                whiskered = (layer @ suffix for layer in diagram.inside)
             else:
-                inside += diagram.inside
+                whiskered = diagram.inside
+            inside += [layer for layer in whiskered if layer.boxes]
             prefix = diagram.cod if prefix is None else prefix @ diagram.cod
         return self.ar(tuple(inside), dom, prefix, _scan=False)
 
