@@ -5,10 +5,12 @@ so ``--skip-extra`` skips this file with the rest of ``test/optyx``."""
 from pathlib import Path
 
 import matplotlib
+from pytest import mark
 
 README = Path(__file__).parent.parent.parent / "discopy" / "optyx" / "README.md"
 
 
+@mark.slow
 def test_readme(monkeypatch):
     from fixtures.readme import run_code_blocks
     monkeypatch.chdir(README.parent)

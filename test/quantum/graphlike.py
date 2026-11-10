@@ -175,6 +175,15 @@ def test_size_hadamard_loops_and_parallel_edges():
     assert G.size(G.to_pyzx(parallel)) == G.size(parallel)
 
 
+def test_size_skips_a_bare_spider_only_when_it_is_a_wire():
+    copy, wire = (G.full_reduce(G.from_diagram(d)) for d in (Z(1, 2), Z(1, 1)))
+    assert G.size(copy) == (1, 0, 0) and G.size(wire) == (0, 0, 0)
+    zx = pytest.importorskip("pyzx")
+    graph = G.to_pyzx(copy)
+    zx.full_reduce(graph)
+    assert G.size(graph) == G.size(copy)
+
+
 def test_from_diagram_errors():
     from discopy.quantum.zx import Y
     with pytest.raises(ValueError):

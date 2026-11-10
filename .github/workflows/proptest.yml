@@ -2,7 +2,6 @@ name: proptest
 
 on:
   pull_request:
-    types: [opened, reopened, ready_for_review, synchronize, labeled]
   push:
     branches: [main]
   schedule:
@@ -22,10 +21,6 @@ concurrency:
 
 jobs:
   proptest:
-    # Pull requests opt in with the "proptest" label.
-    if: >-
-      github.event_name != 'pull_request'
-      || contains(github.event.pull_request.labels.*.name, 'proptest')
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
@@ -36,6 +31,9 @@ jobs:
         ${{ github.event_name == 'pull_request' && 'pr' || 'explore' }}
       PYTEST_ADDOPTS: >-
         ${{ github.event_name == 'pull_request' && '--hypothesis-seed=0' || '' }}
+      # The repository whose example database the `shared` profile replays:
+      # this one, which uploads it below, rather than the default upstream.
+      HYPOTHESIS_GITHUB_REPOSITORY: rel-int/discopy-next
     steps:
     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       with:

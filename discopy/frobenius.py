@@ -120,9 +120,10 @@ class Wire(pivotal.Wire):
         return result
 
     r = l
+    windings = (0, )
 
 
-HeadOb, TailOb = feedback.wire_generators(Wire)
+HeadOb, TailOb = feedback.structural_wires(Wire)
 
 
 @factory
@@ -232,6 +233,7 @@ class Diagram(
 
     ob = Ty
     layer_factory = Layer
+    str_transparency = compact.Diagram.str_transparency
 
     @classmethod
     def from_cospan(cls, apex: Ty, left, right) -> Diagram:
@@ -335,7 +337,8 @@ class Diagram(
         """
         F = compact.Functor(
             ob_map=lambda x: x, ar_map=lambda f:
-                f.unfuse() if isinstance(f, Spider) else f,
+                f.unfuse() if isinstance(f, Spider)
+                else f.to_spiders().unfuse() if isinstance(f, Cospan) else f,
             dom=Diagram, cod=Diagram)
         return F(self)
 
@@ -759,9 +762,10 @@ class Spider(Box):
         if "_name" in state and state["_name"] == type(self).__name__:
             phase = state.get("_data", None)
             str_data = "" if phase is None else f", {phase}"
-            cod, dom = state['_dom'], state['_cod']
+            dom, cod, state["typ"] = (
+                state['_dom'], state['_cod'], state.pop('_typ'))
             state["_name"] = type(self).__name__\
-                + f"({dom.n}, {cod.n}, {state['_typ']}{str_data})"
+                + f"({dom.n}, {cod.n}, {state['typ']}{str_data})"
         super().__setstate__(state)
         if "affine" not in state:
             self.deterministic = len(self.dom) > 0 and not self.phase
@@ -775,6 +779,25 @@ class Spider(Box):
         """
         return (
             len(self.dom), len(self.cod), self.typ, self.phase, self.is_dagger)
+
+    @classmethod
+    # pylint: disable-next=arguments-differ  # drawn with no boundary
+    def strategy(cls, *, types=None):
+        """
+        Generate a spider on an atomic type with up to two legs a side,
+        with or without a phase, and a phased one marked as a dagger or not.
+
+        Parameters:
+            types : The strategy to draw the types from, see
+                :meth:`atomic_strategy`.
+        """
+        from hypothesis import strategies as st
+
+        legs = st.sampled_from(((0, 1), (1, 0), (1, 2), (2, 1), (2, 2)))
+        phases = st.sampled_from((None, 0.25, 0.5))
+        return st.tuples(
+            legs, cls.atomic_strategy(types), phases, st.booleans()).map(
+                lambda args: cls(*args[0], *args[1:3], is_dagger=args[3]))
 
     @property
     def phase(self):
@@ -975,7 +998,8 @@ def coherence(cls: type, factory: Callable
 
 CMap = cmap.CMap[Diagram]
 
-Feedback, Trace, FollowedBy, Head, Tail = feedback.generators(Diagram, Box)
+Feedback, Trace, FollowedBy, Head, Tail = feedback.structural_boxes(
+    Diagram, Box)
 Diagram.box_factory = Box
 Diagram.functor_factory = Functor
 Diagram.cup_factory, Diagram.cap_factory = Cup, Cap

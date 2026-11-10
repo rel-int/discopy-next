@@ -64,7 +64,7 @@ def to_markdown(table: pl.DataFrame) -> str:
     ]
     for row in table.iter_rows():
         cells = list(row[:2]) + [
-            "" if value is None else f"{value:.4f}" for value in row[2:]]
+            "" if value is None else f"{value:.3g}" for value in row[2:]]
         lines.append("| " + " | ".join(cells) + " |")
     return "\n".join(lines)
 

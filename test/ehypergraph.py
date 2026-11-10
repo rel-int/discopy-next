@@ -15,6 +15,7 @@ from discopy.hypergraph import Hypergraph
 from discopy.markov import Ty, Box, Copy, Diagram, Functor, Swap
 from discopy.tensor import Dim, Tensor
 from discopy.utils import AxiomError, dumps, loads
+from fixtures.pyproject import GROUPS, installs
 
 x = Ty('x')
 f, g, h = Box('f', x, x), Box('g', x, x), Box('h', x, x)
@@ -115,6 +116,19 @@ def test_join():
         Copy(x) >> g @ f, Copy(x) >> g @ g)
     with raises(AxiomError):
         Join(f, Box('k', x, x @ x), dom=x, cod=x)
+
+
+def test_join_delays_as_a_bubble():
+    from discopy import ehypergraph, feedback, markov
+    join = Join(f, g)
+    delayed = join.delay()
+    assert delayed.args == (f, g) and (delayed.dom, delayed.cod) == (x.d, x.d)
+    assert delayed.reset() == join and str(delayed) == "Join(f, g).d"
+    assert loads(dumps(delayed)) == delayed
+    assert eval(repr(delayed), dict(
+        ehypergraph=ehypergraph, feedback=feedback, markov=markov)) == delayed
+    assert distribute(delayed) == distribute(join).delay() == f.d + g.d
+    assert distribute((join >> h).delay()) == distribute(join >> h).delay()
 
 
 def test_nodes_hashcons():
@@ -355,7 +369,8 @@ def test_to_tree():
     assert (tree['factory'], tree['category']) == (
         'ehypergraph.EHypergraph', 'markov.Diagram')
     assert Markov.from_tree(tree) == graph
-    assert Markov.serialisation(graph) and Markov.transparency(graph)
+    assert Markov.serialisation(term=graph)\
+        and Markov.repr_transparency(term=graph)
 
 
 def test_strategy_needs_a_copy_discard_category():
@@ -659,6 +674,12 @@ def test_egglog_naive_sampling():
             functor(to_diagram(extracted, ["p"])).array, expected)
         assert np.allclose(functor(saturated(
             program, rules).extract().to_diagram()).array, expected)
+
+
+def test_the_dev_group_installs_egglog():
+    """ The egglog tests run, rather than skip, wherever ``uv sync`` installs
+    the dev group, its default. """
+    assert "egglog" in installs(GROUPS, "dev")
 
 
 def test_Join_dagger_flags():
