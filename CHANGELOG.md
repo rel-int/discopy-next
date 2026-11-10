@@ -387,6 +387,10 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Fixed
 
+- A rotated rigid box, e.g. `f.r`, reads back from its string: its atom is
+  the box its string rotates, so the law `str_transparency` binds `f` rather
+  than failing on a `NameError` for compact, pivotal, ribbon, rigid and
+  frobenius diagrams ([next#489]).
 - `python.multiplicative.Function` and `python.additive.Function` build their
   structural morphisms with `cls` and `type(self)` rather than with the base
   class, the way `permutation` already did, so a subclass can be a functor's
@@ -1677,6 +1681,7 @@ for the changelog of `1.2.1` and earlier.
 [next#472]: https://github.com/rel-int/discopy-next/issues/472
 [next#477]: https://github.com/rel-int/discopy-next/issues/477
 [next#482]: https://github.com/rel-int/discopy-next/issues/482
+[next#489]: https://github.com/rel-int/discopy-next/issues/489
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#56]: https://github.com/rel-int/optyx/pull/56
