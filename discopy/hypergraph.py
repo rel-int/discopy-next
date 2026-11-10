@@ -332,9 +332,6 @@ class Hypergraph[category](
     MAX_ARITY = 3
     """ The largest number of ports :meth:`strategy` samples for a box. """
 
-    MAX_ARITY = 3
-    """ The largest number of ports :meth:`strategy` samples for a box. """
-
     functor = classproperty(lambda cls: cls.category.functor_factory)
     ob = classproperty(lambda cls: cls.category.ob)
 
