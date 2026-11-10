@@ -24,6 +24,21 @@ associativity of its product, its composition; a :class:`Groupoid` is a
 dagger category that adds the invertibility of its arrows, which its dagger
 inverts.
 
+Each axiom draws itself on the page of the class that states it, under
+"Axioms": its generic instance, see
+:meth:`discopy.testable.Declaration.generic`, is evaluated in the most
+general free category of diagrams that states it, with each compound operand
+in a dotted bracket, see :mod:`discopy.drawing.bracketing`, e.g. for
+:meth:`Category.associativity`:
+
+.. image:: /_static/bracketing/associativity.svg
+    :align: center
+
+A :class:`MonoidalCategory`, :class:`BraidedCategory`,
+:class:`SymmetricCategory` or :class:`RigidCategory` states no axiom of its
+own yet, so its page draws none, and no free category of diagrams is a
+groupoid, so :meth:`Groupoid.invertibility` is not drawn.
+
 Summary
 -------
 

@@ -828,6 +828,43 @@ class Declaration[**P, T](classmethod):
 
         return sequents()
 
+    def generic(self, given: dict | None = None) -> tuple[dict, dict]:
+        """
+        The generic instance of the bound declaration, i.e. its universal
+        one: the scope and the arguments built from names rather than
+        sampled, see :meth:`sequents`. A variable ``A: Obj[C0]`` is the
+        generating object ``A`` of the objects
+        :meth:`discopy.abc.Category.typeparams` names, :obj:`None` for those
+        of a group, ``N: Nat`` the number two, the least to tell a tensor
+        from its factors, a premise ``f: Hom[C1, A, B]`` the box ``f`` of the
+        ``box_factory`` of the category with its boundary, and ``x: Var[T,
+        X]`` the value ``X``.
+
+        >>> from discopy.monoidal import Diagram
+        >>> scope, arguments = Diagram.associativity.generic()
+        >>> print(*arguments.values())
+        f g h
+        >>> print(Diagram.associativity(**arguments))
+        Equation(f >> g >> h, f >> g >> h)
+        """
+        ob = self.category.typeparams()[0]
+
+        def variable(name, sort):
+            if isinstance(sort, type) and issubclass(sort, Testable):
+                return sort(2)
+            return None if ob is NoneType else ob(name)
+
+        def value(name, kind):
+            if get_origin(kind) is Var:
+                return get_args(kind)[1]
+            if get_origin(kind) is Hom:
+                _, dom, cod = get_args(kind)
+                return self.category.box_factory(name, dom, cod)
+            raise TypeError(messages.NO_GENERIC.format(name, kind))
+
+        scope = self.scope(variable, given)
+        return scope, self.instantiate(scope, value)
+
     def arguments(
             self, given: dict | None = None, **params
     ) -> st.SearchStrategy[dict]:
