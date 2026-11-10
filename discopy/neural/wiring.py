@@ -401,7 +401,8 @@ class Block(NamedTuple):
     @property
     def free(self) -> tuple[int, ...]:
         """ The axes a block runs over. """
-        return tuple(a for a in range(len(self.shape)) if a not in self.keep)
+        return tuple(a for a in range(len(self.shape))
+                     if all(a != kept for kept in self.keep))
 
     @property
     def order(self) -> tuple[int, ...]:
@@ -411,7 +412,7 @@ class Block(NamedTuple):
     @property
     def size(self) -> int:
         """ The number of points in each block. """
-        return math.prod(self.shape[a] for a in self.free)
+        return math.prod([self.shape[a] for a in self.free])
 
     @property
     def count(self) -> int:

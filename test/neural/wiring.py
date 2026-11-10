@@ -5,7 +5,7 @@ The tables a recursive network gathers along: the primal graph and the
 routing of a factor table, and the factor table read back off a drawn map.
 """
 
-from pytest import raises
+from pytest import importorskip, raises
 
 from discopy.frobenius import Box, CMap, Ty
 from discopy.neural.signature import (
@@ -14,6 +14,23 @@ from discopy.neural.wiring import (
     Routing, from_map, memberships, primal, routing, table_of)
 
 MESSAGE, STATE = Ty("message"), Ty("state")
+
+
+def test_dynamic_block_axes():
+    """Dynamic tracing must preserve the complement of the kept axes."""
+    torch = importorskip("torch")
+    from discopy.neural.wiring import Block
+
+    def select(x, block):
+        return x[list(block.free)]
+
+    compiled = torch.compile(select, backend="eager", fullgraph=True,
+                             dynamic=True)
+    x = torch.arange(4)
+    for keep, free in (((0, 1), (2, 3)), ((2, 3), (0, 1)),
+                       ((0, 1, 2, 3), ())):
+        actual = compiled(x, Block((3, 3, 3, 3), keep))
+        torch.testing.assert_close(actual, torch.tensor(free, dtype=x.dtype))
 
 
 def sudoku(side: int = 4, box: int = 2) -> tuple:
