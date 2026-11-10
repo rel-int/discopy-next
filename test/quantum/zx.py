@@ -682,6 +682,18 @@ def test_size_skips_a_bare_spider_only_when_it_is_a_wire():
     assert Hypergraph.from_pyzx(graph).size() == copy.size()
 
 
+def test_Hypergraph_to_diagram_cuts_backward_wires():
+    """
+    A wire that points backward is cut open and traced with a cup and a cap
+    that stay boxes, rather than spiders that dissolve back into the wire.
+    """
+    f = Box('f', Nat(1), Nat(1)).to_hypergraph()
+    cycle = Hypergraph.caps(Nat(1), Nat(1)) >> Hypergraph.cups(Nat(1), Nat(1))
+    for graph in (cycle, (f >> f).interchange(0, 1),
+                  (f @ Nat(1) >> Hypergraph.cups(Nat(1), Nat(1))).dagger()):
+        assert graph.to_diagram().to_hypergraph() == graph
+
+
 def test_Hypergraph_to_pyzx_errors():
     pytest.importorskip("pyzx", minversion=PYZX)
     with raises(ValueError):

@@ -898,6 +898,29 @@ class Hypergraph(hypergraph.Hypergraph):
     """
     category = Diagram
 
+    @classmethod
+    def checked_params(cls) -> tuple:
+        """
+        ZX diagrams only, the category this hypergraph encodes: over any
+        other, :meth:`to_diagram` reads back to the plain hypergraph of that
+        category, which knows no phases nor scalars.
+        """
+        return (Diagram, )
+
+    @classmethod
+    def cup_factory(cls, left, right) -> Hypergraph:
+        """
+        The cup :code:`Z(2, 0)` as a box rather than a spider, for
+        :meth:`to_diagram` to trace a wire it cuts open: as a spider,
+        :meth:`from_box` would wire the cut back as it was.
+        """
+        return super().from_box(Diagram.cup_factory(left, right))
+
+    @classmethod
+    def cap_factory(cls, left, right) -> Hypergraph:
+        """ The cap :code:`Z(0, 2)` as a box, see :meth:`cup_factory`. """
+        return super().from_box(Diagram.cap_factory(left, right))
+
     # pylint: disable=too-many-arguments,too-many-positional-arguments
     # pylint: disable=redefined-outer-name
     def __init__(
