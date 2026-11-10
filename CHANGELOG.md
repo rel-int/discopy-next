@@ -387,6 +387,10 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Fixed
 
+- `interaction.Diagram`'s docstring states the codomain of the diagram
+  inside as `y.positive @ x.negative`, which is what its constructor, its
+  `strategy` and its `to_tree` doctest all read, and an example asserts
+  both boundaries ([next#494]).
 - A rotated rigid box, e.g. `f.r`, reads back from its string: its atom is
   the box its string rotates, so the law `str_transparency` binds `f` rather
   than failing on a `NameError` for compact, pivotal, ribbon, rigid and
@@ -1688,6 +1692,7 @@ for the changelog of `1.2.1` and earlier.
 [next#488]: https://github.com/rel-int/discopy-next/issues/488
 [next#489]: https://github.com/rel-int/discopy-next/issues/489
 [next#490]: https://github.com/rel-int/discopy-next/issues/490
+[next#494]: https://github.com/rel-int/discopy-next/pull/494
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#56]: https://github.com/rel-int/optyx/pull/56

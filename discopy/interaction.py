@@ -283,12 +283,21 @@ class Ty[natural](Pregroup, TestableGeneric):
 class Diagram[natural](RibbonCategory, TestableGeneric):
     """
     An integer diagram from ``x`` to ``y`` is a :attr:`natural` diagram
-    from ``x.positive @ y.negative`` to ``x.negative @ y.positive``.
+    from ``x.positive @ y.negative`` to ``y.positive @ x.negative``, i.e.
+    the positive halves go forward and the negative halves backward.
 
     Parameters:
         inside : The natural diagram inside.
         dom : The domain of the diagram, i.e. its input.
         cod : The codomain of the diagram, i.e. its output.
+
+    Example
+    -------
+    >>> from discopy.ribbon import Ty as T, Box
+    >>> x, y = Ty[T]('x', 'u'), Ty[T]('y', 'v')
+    >>> f = Diagram(Box('f', T('x', 'v'), T('y', 'u')), x, y)
+    >>> assert f.inside.dom == x.positive @ y.negative
+    >>> assert f.inside.cod == y.positive @ x.negative
 
     Note
     ----
