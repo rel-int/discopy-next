@@ -278,3 +278,17 @@ def test_str_transparency_of_a_spider():
 def test_structural_boxes():
     from discopy.testable import assert_structural_boxes
     assert_structural_boxes(Diagram)
+
+
+def test_tensor_drops_a_whiskered_identity_spider():
+    """ Whiskering a spider with one leg on each side leaves the identity,
+    i.e. no layer, so that the tensor serialises, foliates and draws. """
+    from discopy.utils import dumps, loads
+    x = Ty('x')
+    f, spider = Box('f', x, x), Spider(1, 1, x)
+    for diagram in (spider @ f, f @ spider, (f >> spider) @ f):
+        assert all(layer.boxes for layer in diagram.inside)
+        assert loads(dumps(diagram)) == diagram
+        assert diagram.foliation().foliation() == diagram.foliation()
+        assert diagram.to_drawing().dagger().dagger() == diagram.to_drawing()
+    assert spider @ f == x @ f and f @ spider == f @ x

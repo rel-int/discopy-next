@@ -390,6 +390,10 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Fixed
 
+- A rotated rigid box, e.g. `f.r`, reads back from its string: its atom is
+  the box its string rotates, so the law `str_transparency` binds `f` rather
+  than failing on a `NameError` for compact, pivotal, ribbon, rigid and
+  frobenius diagrams ([next#489]).
 - `python.multiplicative.Function` and `python.additive.Function` build their
   structural morphisms with `cls` and `type(self)` rather than with the base
   class, the way `permutation` already did, so a subclass can be a functor's
@@ -1302,6 +1306,10 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   every colour up in `COLORS` and raised `TypeError` on an unhashable one.
   `Backend.resolve` and `Backend.is_transparent` look up and compare a colour
   only when it is a name, for both backends ([next#482]).
+- `Diagram.tensor` drops a layer whose plumbing whiskers into the identity,
+  e.g. a phase-free frobenius `Spider(1, 1, x)` tensored with a box: it kept
+  the layer with no box, which did not serialise, foliate or draw
+  ([next#488], [next#490]).
 
 ### Project
 
@@ -1681,6 +1689,9 @@ for the changelog of `1.2.1` and earlier.
 [next#472]: https://github.com/rel-int/discopy-next/issues/472
 [next#477]: https://github.com/rel-int/discopy-next/issues/477
 [next#482]: https://github.com/rel-int/discopy-next/issues/482
+[next#488]: https://github.com/rel-int/discopy-next/issues/488
+[next#489]: https://github.com/rel-int/discopy-next/issues/489
+[next#490]: https://github.com/rel-int/discopy-next/issues/490
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#56]: https://github.com/rel-int/optyx/pull/56
