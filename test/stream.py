@@ -48,6 +48,12 @@ def test_sequence_box_of_its_category():
     assert type(box) is tensor.Box is tensor.Diagram.box_factory
 
 
+def test_sequence_of_a_name_is_one_wire():
+    mem = Ty.sequence('mem')
+    assert mem.now == Ty.sequence(symmetric.Ty('mem')).now
+    assert mem.now @ mem.later.now == symmetric.Ty('mem0', 'mem1')
+
+
 def test_feedback_errors():
     x = Ty.sequence(symmetric.Ty('x'))
     with raises(ValueError):  # A constant stream needs constant types.
@@ -114,7 +120,7 @@ def test_feedback_laws():
             ("tightening", dict(f=f, g=g, h=h, x=x, y=y, m=m @ n))):
         assert getattr(FeedbackCategory, law).bind(Stream).modulo(up_to)(
             **arguments)
-    sliding = dict(f=f, k=k, x=x, y=y, m=m @ n)
+    sliding = dict(f=f, k=k, x=x, y=y)
     assert not FeedbackCategory.sliding.bind(Stream).modulo(up_to)(**sliding)
     with raises(AxiomFailure):
         Stream.sliding(**sliding)
@@ -127,7 +133,21 @@ def test_no_tree():
                    Stream(symmetric.Box('f', x.now, x.now))):
         with raises(TypeError, match="A stream has no tree"):
             dumps(stream)
-    assert Stream.serialisation() is NotImplemented
+    assert "serialisation" not in Stream.axioms
+
+
+def test_singleton_equality_compares_the_callee():
+    """ `_later` is still compared by identity, as :func:`test_no_hash` says,
+    but the two ``singleton``s put the callee itself there rather than a fresh
+    lambda, so two built the same way hold the *same* object and compare equal.
+    Every other non-constant stream closes over its arguments and so compares
+    by closure identity, which is rel-int/discopy-next#457. """
+    x, y = symmetric.Ty('x'), symmetric.Ty('y')
+    assert Ty.singleton(x) == Ty.singleton(x)
+    assert Ty.singleton(x) != Ty.singleton(y)
+    f = Stream.singleton(symmetric.Box('f', x, y))
+    assert f == Stream.singleton(symmetric.Box('f', x, y))
+    assert f.later == Stream.id() and f.now == symmetric.Box('f', x, y)
 
 
 def test_no_hash():
@@ -138,3 +158,15 @@ def test_no_hash():
     for unhashable in (Stream.sequence('f', x, x), x):
         with raises(TypeError, match="unhashable"):
             hash(unhashable)
+
+
+def test_delay_passes_the_initial_memory_through():
+    x, y, m = (Ty.sequence(symmetric.Ty(name)) for name in "xym")
+    f = Stream.sequence("f", x @ m.delay(), y @ m)
+    for stream in (Stream.sequence("g", x, y, m), f.feedback().later):
+        delayed = stream.delay()
+        delayed.check_later()
+        assert delayed.now == symmetric.Id(stream.mem.now)
+        assert delayed.later is stream
+        assert delayed.unroll().now.to_hypergraph()\
+            == stream.now.to_hypergraph()

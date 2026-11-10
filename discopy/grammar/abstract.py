@@ -23,6 +23,7 @@ Summary
     Curry
     Copy
     Discard
+    Function
     Permutation
     Swap
     Feedback
@@ -39,6 +40,9 @@ Summary
     Variable
     Application
     Abstraction
+
+.. autodata:: Position
+.. autodata:: String
 
 Vocabularies and lexicons
 -------------------------
@@ -72,8 +76,8 @@ composition, ``John.compose(seeks)`` for *John seeks*, see
 ``lambda z. x (y z)`` with the first word applied last, here the first word
 is applied first, so a string reads its positions in order.
 
-Example
--------
+John seeks a unicorn
+--------------------
 
 The two readings of Montague's *John seeks a unicorn* share one syntax, with
 a constant for each reading of *seeks* in the abstract vocabulary:
@@ -388,6 +392,7 @@ CMap = cmap.CMap[Diagram]
 class TermBase(Box, closed.TermBase):
     "A term in the internal language of an abstract categorial grammar."
     functor = Functor.id(Diagram)
+    strategy = classmethod(closed.TermBase.strategy.__func__)
 
 
 class Constant(TermBase, closed.Constant):
@@ -412,7 +417,8 @@ class Abstraction(TermBase, closed.Abstraction):
 type Term = Constant | Variable | Application | Abstraction
 
 Id = Diagram.id
-Feedback, Trace, FollowedBy, Head, Tail = feedback.generators(Diagram, Box)
+Feedback, Trace, FollowedBy, Head, Tail = feedback.structural_boxes(
+    Diagram, Box)
 Diagram.box_factory, Diagram.functor_factory = Box, Functor
 Diagram.copy_factory = Copy
 Diagram.function_factory = Function

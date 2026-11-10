@@ -6,7 +6,12 @@ discopy error messages.
 
 TYPE_ERROR = "Expected {}, got {} instead."
 NOT_COMPOSABLE = "{} does not compose with {}: {} != {}."
+NO_COMPOSITE = (
+    "{} composes with no functor but the identity, as its maps do not "
+    "determine it: apply them in turn instead, i.e. E(D(f)) rather than "
+    "(D >> E)(f).")
 NOT_PARALLEL = "Expected parallel arrows, got {} and {} instead."
+ONLY_REVERSED = "A {} is not sliced, only reversed with [::-1]."
 NOT_GLOBULAR = "Expected a globular box, got boundaries {} -> {} and {} -> {}."
 NOT_ATOMIC = "Expected {} of length 1, got length {} instead."
 NOT_CONNECTED = "{} is not boundary-connected."
@@ -18,6 +23,9 @@ PLANAR_YANKING = "A planar traced category has no braid to yank."
 FREE_YANKING = (
     "A free trace is a bubble and a free twist a box: the free balanced "
     "diagrams are not quotiented by the yanking axiom.")
+FREE_TWIST = (
+    "A free twist is a box: the free balanced diagrams are not quotiented "
+    "by the naturality of the twist.")
 NOT_FEEDBACK = "Cannot feed {} back into {}, expected {} as its input."
 STREAM_SLIDING = (
     "A morphism slides along the feedback of streams only up to extensional "
@@ -31,7 +39,6 @@ NOT_MAPPING_OR_CALLABLE = "Expected a Mapping or a Callable, got {!r}."
 NOT_RIGID_ADJOINT = "{} is not the left adjoint of {}, maybe you meant to use"\
                     " a pivotal type rather than a rigid one?"
 MISSING_TYPES_FOR_EMPTY_SUM = "Empty sum needs a domain and codomain."
-MATRIX_TWO_DTYPES = "Matrix class cannot be indexed twice."
 MATRIX_REPEAT_ERROR = "The reflexive transitive closure is only defined for "\
                       "square boolean matrices."
 BOX_IS_MIXED = "Pure boxes can have only digits or only qudits as dom and cod."
@@ -39,27 +46,65 @@ LAYERS_MUST_HAVE_A_BOX = "Layers must have at least one box."
 NOT_MERGEABLE = "Layers {} and {} cannot be merged."
 LAYERS_DO_NOT_COMPOSE = "Compose diagrams, not layers: {}."
 INTERCHANGER_ERROR = "Boxes {} and {} do not commute."
+NO_BRAID_TO_SLIDE = "Box {} at layer {} has no braid to slide through."
 WRONG_PERMUTATION = "Expected a permutation of length {}, got {}."
 NOT_A_PERMUTATION = "Expected a permutation of range({}), got {}."
+NOT_A_SWAP = "Expected the swap [1, 0], got {}."
+WRONG_FUNCTION = "Expected a function of length {}, got {}."
+NOT_A_FUNCTION = "Expected a function to range({}), got {}."
 ZERO_DISTANCE_CONTROLLED = "Zero-distance controlled gates are ill-defined."
 REAL_SQRT_IS_SELF_ADJOINT = "The dagger of a real square root is itself."
-HAS_NO_ATTRIBUTE = "{!r} object has no attribute {!r}"
 WRONG_DOM = "Expected inside.dom == {}, got {} instead."
 WRONG_COD = "Expected inside.cod == {}, got {} instead."
-COMPLEX_TYPE_HAS_NO_ATTR = "{!r} object of length != 1 has no attribute {!r}"
 NOT_FROBENIUS = \
     "{} has no spiders, cups or caps to downgrade this hypergraph."
 NOT_RIGID = "{} has no cups or caps for the wiring of this map."
 NOT_TRACED = "{} has no traces for the cycles of this map."
+NO_PLANAR_NORMAL_FORM = (
+    "A planar law is compared on the nose: a hypergraph is faithful only "
+    "from symmetric categories on, and there is no normal form for this "
+    "doctrine yet.")
+NOT_BOUNDARY_CONNECTED = (
+    "A rigid law is compared on the nose: its sides have a normal form only "
+    "when they are boundary-connected, which they need not be.")
 COLOURED_QUOTIENT = (
     "{} is coloured: a hypergraph or a map is symmetric, and a swap is "
     "ill-typed across 0-cells, so it would lose its colours.")
+NO_VALUES = "{} has no sample of values, see testable.values."
+NO_DAGGER = "There is no dagger here, so the dagger laws do not apply."
+NO_TENSOR = "An arrow of a category has no tensor for its dagger to "\
+    "distribute over."
+GROUP_TENSOR = "The tensor of a group is its composition, which its dagger "\
+    "reverses rather than distributes over."
+SWAP_INVOLUTION = (
+    "The inverse of a swap is the swap the other way, see swap_inverse.")
+PAIR_LENGTH = (
+    "A pair of types has no single number of atoms for a trace or a curry "
+    "to count.")
+PAIR_TYPES = "A pair of types is checked as the boundary of its diagrams."
+PARA_REPARAM = (
+    "A parametric map is equal only up to the reparametrisations that "
+    "permute its parameters, which its hypergraph compares in order.")
+NO_ROTATION = (
+    "There is no rotation of a morphism here, so its laws do not apply.")
+PARA_CURRY = "A closed category curries no map with coparameters."
 PARA_CURRY_COPAR = (
     "A closed category cannot curry a map with coparameters {}, as its "
     "exponential would swallow them.")
+LENS_NATURALITY = (
+    "A Markov lens is a unit and associative only up to the naturality of "
+    "copy and discard, which a hypergraph does not decide.")
+LENS_BRAID_NATURALITY = (
+    "A Markov braid copies its input for its put, so a Markov lens is "
+    "natural in it only up to the naturality of copy, which a hypergraph "
+    "does not decide.")
 NO_SWAP = "{} is not symmetric, it has no swaps."
 NO_BRAID = "{} is not braided, it has no braids."
 NO_TWIST = "{} is not balanced, it has no twists."
+NO_BRAID_GROUP = (
+    "A braid is a box of the hypergraph of a category that is not "
+    "symmetric: there is no braid group implementation to compare braid "
+    "words with yet.")
 NO_CUPS = "{} is not rigid, it has no cups or caps."
 NO_SUMS = "{} has no sums, it encodes a single diagram."
 NO_PHASES = "{} is not a hypergraph category, its spiders have no phases."
@@ -70,15 +115,43 @@ NOT_A_DAGGER = "{} has no dagger: {} is not a dagger category."
 NO_SUCH_SPIDER = "The only spiders of {} are its {}."
 NOT_ACYCLIC = "{} has a directed cycle, its boxes cannot be ordered."
 
+FREE_CURRY = (
+    "A free curry is a bubble, which a hypergraph keeps as a box: nothing "
+    "evaluates it.")
+FREE_FEEDBACK = (
+    "A free feedback is a bubble, which a hypergraph keeps as a box: nothing "
+    "slides into it.")
 RIGID_TYPE_HAS_NO_DAGGER = "Rigid types have no dagger, use pivotal instead."
+RIGID_HAS_NO_DAGGER = (
+    "Rigid cups and caps have no dagger, use pivotal instead.")
 FEEDBACK_HAS_NO_DAGGER = (
     "Feedback has no dagger and no rotation, "
     "either would feed its memory back in time.")
+MAP_HAS_NO_ADJOINTS = (
+    "A map is compact whatever category hosts it, but a host that is not "
+    "rigid has no adjoints or curries for the laws to quantify over.")
+SECTION_NEEDS_SWAPS = (
+    "Decoding a hypergraph orders its boxes with swaps, which a category "
+    "with no symmetry does not have.")
+MAP_OF_A_CURRY = (
+    "The map of a curry rebuilds its inside from the map of it, which can "
+    "whisker a scalar on the other side, while a hypergraph compares the "
+    "inside of a bubble syntactically.")
+MAP_HAS_NO_SPIDERS = (
+    "A map has no spiders: it keeps a copy or a merge as a box where a "
+    "hypergraph merges its wires.")
+STR_SPLITS_LAYERS = (
+    "A string tensors the boxes of a layer one after the other, so that a "
+    "layer of several boxes, as a hypergraph decodes to, reads back as "
+    "several layers, equal to it only up to interchange.")
 NO_TYPE_PARAMETER = (
     "{} has no type parameter to subscript, declare one as in class C[name].")
 NOT_PROGRESSIVE = "No line sweeps the map down meeting each box with its "\
     "inputs side by side, past the cut {}."
 NOT_DOWNWARD = "{} has cups, caps or loops: its wires do not all go down."
+NAT_HAS_NO_ADJOINTS = (
+    "The objects of a cospan of finite sets are numbers, with no adjoints "
+    "for the laws and rules of rigid and closed categories to quantify over.")
 FREE_SCALAR = "A free scalar is a box: it slides on the map of a diagram, "\
     "not on the nose."
 NOT_LEFT_MONOGAMOUS = "{} is not left-monogamous."
@@ -94,7 +167,7 @@ WRONG_NUMBER_OF_WIRES = "Expected {} wires for {}, got {} instead."
 WRONG_NUMBER_OF_BOUNDARIES = \
     "Expected one boundary of wires for each of {} boxes, got {} instead."
 TERM_IS_A_BOX = \
-    "A term is a box: the laws of its category are the diagram's."
+    "A term is a box: the laws and rules of its category are the diagram's."
 MISSING_BOXES_AND_OFFSETS = (
     "Decoding needs either boxes and offsets, or the two of them zipped.")
 CURRY_HAS_NO_DAGGER = "A curry has no dagger."

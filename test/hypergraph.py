@@ -19,6 +19,14 @@ def test_Hypergraph_init():
         H(x, y, (), ((0,), (), (0,)))
 
 
+def test_Hypergraph_scalar_spiders_take_labels_of_any_type():
+    x, y = map(Ty, "xy")
+    graph = H(Ty(), Ty(), (), ((), (), ()), {'a': x, 0: y})
+    assert graph.spider_types == (x, y)
+    assert graph == H.spiders(0, 0, x @ y)
+    assert H(Ty(), Ty(), (), ((), (), ()), {object(): x, object(): y})
+
+
 def test_Hypergraph_str():
     x, y = map(Ty, "xy")
     assert str(H.swap(x, y)) == "Swap(x, y)"
@@ -36,9 +44,27 @@ def test_Hypergraph_repr():
     assert eval(repr(graph)) == graph
 
 
+def test_Hypergraph_repr_keeps_the_offsets():
+    from discopy import hypergraph, monoidal
+    x, y = monoidal.Ty('x'), monoidal.Ty('y')
+    s = monoidal.Box('s', monoidal.Ty(), y)
+    graph = (x @ s).to_hypergraph()
+    loaded = eval(repr(graph), dict(hypergraph=hypergraph, monoidal=monoidal))
+    assert loaded.offsets == graph.offsets == (1, )
+    assert loaded.to_diagram() == x @ s
+
+
 def test_Hypergraph_hash():
     x, y = map(Ty, "xy")
     assert hash(H.id(x @ y)) == hash(H.id(x) @ H.id(y))
+
+
+def test_Hypergraph_hash_agrees_with_the_equality_of_boxes():
+    x = Ty('x')
+    left = Box('f', x, x, data=1).to_hypergraph()
+    right = Box('f', x, x, data=1.0).to_hypergraph()
+    assert left.is_fast_eligible and left == right
+    assert hash(left) == hash(right)
 
 
 def test_Hypergraph_eq_sees_the_type_of_a_scalar_spider():
@@ -52,6 +78,17 @@ def test_Hypergraph_eq_sees_the_type_of_a_scalar_spider():
     assert not Equation(Spider(0, 0, x) @ f, Spider(0, 0, y) @ f)
 
 
+def test_Hypergraph_to_graph_attaches_an_adjoint_boundary_to_its_spider():
+    from discopy import compact
+    x = compact.Ty('x')
+    f, g = compact.Box('f', x.r, x.r), compact.Box('g', x.r, x.r)
+    cap = compact.Cap(x, x.r)
+    assert (f @ g @ cap).to_hypergraph() != (g @ f @ cap).to_hypergraph()
+    cup = compact.Cup(x.r, x).to_hypergraph()
+    assert hash(cup) == hash(compact.Cup(x.r, x).to_hypergraph())
+    assert type(cup).from_graph(cup.to_graph()) == cup
+
+
 def test_Hypergraph_then():
     x, y = map(Ty, "xy")
     with raises(AxiomError, match="Expected y, got x"):
@@ -61,6 +98,24 @@ def test_Hypergraph_then():
 def test_Hypergraph_tensor():
     Id = H.id
     assert Id().tensor(Id(), Id()) == Id().tensor() == Id()
+
+
+def test_Hypergraph_tensor_shifts_the_offsets():
+    from discopy import monoidal
+    x, y = monoidal.Ty('x'), monoidal.Ty('y')
+    f, s = monoidal.Box('f', x, y), monoidal.Box('s', monoidal.Ty(), y)
+    graph = f.to_hypergraph() @ (x @ s).to_hypergraph()
+    assert graph.offsets == (f @ x @ s).to_hypergraph().offsets == (None, 2)
+    assert graph.to_diagram() == (f @ x @ s).foliation()
+    assert (x @ s.to_hypergraph()).to_diagram() == x @ s
+
+
+def test_Hypergraph_permutation_moves_each_type_as_a_block():
+    x, y, z = map(Ty, "xyz")
+    for xs, doms in [([1, 0], [x @ y, z]), ([1, 0], [x @ x, Ty()]),
+                     ([0, 2, 1], [x @ x, x, Ty()])]:
+        assert H.permutation(xs, doms)\
+            == Diagram.permutation(xs, doms).to_hypergraph()
 
 
 def test_Hypergraph_getitem():
@@ -209,6 +264,17 @@ def test_traced_copy_of_a_wire_with_a_dagger():
         == loop.to_hypergraph()
 
 
+def test_str_transparency():
+    """ A hypergraph prints as the diagram it decodes to, which reads back in
+    the environment of its category, and to the hypergraph. """
+    from discopy import symmetric
+    from discopy.hypergraph import Hypergraph
+    x = symmetric.Ty('x')
+    graph = (symmetric.Box('f', x, x) @ x >> symmetric.Swap(x, x)
+             ).to_hypergraph()
+    assert str(graph) == "f @ x >> Swap(x, x)"
+    assert Hypergraph[symmetric.Diagram].str_transparency(term=graph)
+
 
 def test_rotation_is_the_transpose():
     """ Decision 7 of #56: a rotated box has the hypergraph of its
@@ -287,12 +353,14 @@ def test_Hypergraph_eq_fast_path_trace():
     fast canonical-form path rather than falling back to VF2. """
     x, y, z = map(Ty, "xyz")
     g = Box('g', x @ z, y @ z).to_hypergraph()
-    trace = g.trace()
+    h = Box('h', y @ z, x @ z).to_hypergraph()
+    trace = (g >> h).trace()
 
     assert trace.is_acyclic is False
     assert trace.is_fast_eligible
 
-    shuffled = trace.interchange(0, min(1, len(trace.boxes) - 1))
+    shuffled = trace.interchange(0, 1)
+    assert shuffled.boxes != trace.boxes
     assert trace == shuffled
     assert hash(trace) == hash(shuffled)
 
@@ -300,14 +368,13 @@ def test_Hypergraph_eq_fast_path_trace():
 def test_Hypergraph_eq_fallback_scalars_and_empty_boundary():
     """ Hypergraphs that are not boundary-connected (scalars, closed
     diagrams) must still compare correctly via the VF2 fallback. """
-    scalar_a = Box('s', Ty(), Ty()).to_hypergraph()
-    scalar_b = Box('s', Ty(), Ty()).to_hypergraph()
-    assert not (scalar_a @ scalar_b).is_fast_eligible
-    assert scalar_a @ scalar_b == scalar_b @ scalar_a
+    s, t, u = (Box(name, Ty(), Ty()).to_hypergraph() for name in "stu")
+    assert not (s @ t).is_fast_eligible
+    assert s @ t == t @ s and s @ t != s @ u
 
     x = Ty('x')
-    f = Box('f', x, x).to_hypergraph()
-    assert f.trace() == f.trace()
+    f, g = (Box(name, x, x).to_hypergraph() for name in "fg")
+    assert f.trace() == f.trace() and f.trace() != g.trace()
 
 
 def test_Hypergraph_simplify_two_wires():
@@ -318,6 +385,21 @@ def test_Hypergraph_simplify_two_wires():
 
     assert interchanged.to_diagram().size > (f >> g).to_diagram().size
     assert interchanged.simplify().to_diagram() == (f >> g).to_diagram()
+
+
+def test_Hypergraph_simplify_tries_each_pair_of_boxes_once(monkeypatch):
+    from itertools import combinations
+    x = Ty('x')
+    chain = H.id(x).then(*(
+        Box(f'f{i}', x, x).to_hypergraph() for i in range(4)))
+    pairs, interchange = [], H.interchange
+
+    def recorded(self, i, j):
+        pairs.append((i, j))
+        return interchange(self, i, j)
+    monkeypatch.setattr(H, "interchange", recorded)
+    assert chain.simplify() == chain
+    assert pairs == list(combinations(range(4), 2))
 
 
 def test_simplify():
@@ -406,6 +488,20 @@ def test_Hypergraph_from_glued():
     x = Ty('x')
     f, g = Box('f', x, x).to_hypergraph(), Box('g', x, x).to_hypergraph()
     assert H.from_glued(x, x, [(f, 0), (g, 0)]) == f >> g
+
+
+def test_Hypergraph_from_callable_restores_the_call_of_its_category():
+    from discopy.python import Function, Ty as T
+    add = Function(lambda x, y: x + y, (int, int), int)
+    graph = Hypergraph[Function].from_callable(T(int, int), T(int))(add)
+    assert add(2, 3) == graph(2, 3) == 5
+    x = Ty('x')
+    f = Box('f', x, x)
+
+    def outer(wire):
+        H.from_callable(x, x)(f)
+        return f(wire)
+    assert H.from_callable(x, x)(outer) == f.to_hypergraph()
 
 
 def test_Hypergraph_from_diagram_closed_loop():
@@ -566,6 +662,29 @@ def test_trace_needs_traced_pivotal():
         assert graph.trace().cod == graph.trace(left=True).cod == x
 
 
+def test_planar_comparison():
+    """ Below symmetric categories, a hypergraph is not faithful, so the
+    laws of a planar level are compared on the nose: each pair here was
+    identified when they were compared by hypergraph. """
+    from discopy import balanced, braided, monoidal, rigid
+    x, y = braided.Ty('x'), braided.Ty('y')
+    braid, inverse = braided.Braid(x, y), braided.Braid(y, x)[::-1]
+    assert braid.to_hypergraph() != inverse.to_hypergraph()
+    assert not braided.Diagram.equation_factory(braid, inverse)
+    x = balanced.Ty('x')
+    twist, identity = balanced.Twist(x), balanced.Diagram.id(x)
+    assert twist.to_hypergraph() != identity.to_hypergraph()
+    assert not balanced.Diagram.equation_factory(twist, identity)
+    x = rigid.Ty('x')
+    left = rigid.Cap(x, x.l) @ x >> x @ rigid.Cup(x.l, x)
+    right = x @ rigid.Cap(x.r, x) >> rigid.Cup(x, x.r) @ x
+    assert left.to_hypergraph() != right.to_hypergraph()  # cups are boxes
+    assert not rigid.Diagram.equation_factory(left, right)
+    x, scalar = monoidal.Ty('x'), monoidal.Box('s', monoidal.Ty(), monoidal.Ty())
+    assert (scalar @ x).to_hypergraph() == (x @ scalar).to_hypergraph()
+    assert not monoidal.Diagram.equation_factory(scalar @ x, x @ scalar)
+
+
 def test_cups_and_caps_read_the_host_category():
     from discopy import symmetric, rigid, pivotal, ribbon, compact
     x = symmetric.Ty('x')
@@ -583,6 +702,17 @@ def test_cups_and_caps_read_the_host_category():
     x = compact.Ty('x')
     assert compact.Cup(x, x.r).to_hypergraph().boxes == ()
     assert compact.Cap(x.r, x).to_hypergraph().boxes == ()
+
+
+def test_a_spider_needs_a_category_with_spiders():
+    from discopy import symmetric, compact
+    from discopy.utils import AxiomError
+    for module in (symmetric, compact):
+        spider = module.Hypergraph.spiders(1, 2, module.Ty('x'))
+        with raises(AxiomError, match="has no spiders"):
+            spider.make_bijective()
+    with raises(AxiomError, match="has no spiders"):
+        compact.Hypergraph.spiders(1, 2, compact.Ty('x')).to_diagram()
 
 
 def test_coloured_diagram_has_no_hypergraph():
@@ -1004,3 +1134,109 @@ def test_decoder():
     assert (CMap[Tensor].id(Dim(3)) @ CMap[Tensor].from_box(t)
             >> CMap[Tensor].swap(Dim(3), Dim(3))).to_diagram()\
         == Dim(3) @ t >> Tensor.swap(Dim(3), Dim(3))
+
+
+def test_atoms():
+    x, y = Ty('x'), Ty('y')
+    f = Box('f', x, y)
+    graph = f.to_hypergraph()
+    assert graph.atoms() == graph.to_diagram().atoms()
+    assert f in graph.atoms()
+    assert eval(str(graph), Diagram.str_environment(f)).to_hypergraph()\
+        == graph
+
+
+def test_Hypergraph_make_methods_insert_in_one_pass(monkeypatch):
+    """
+    However many boxes they insert, the ``make_*`` methods scan the wires and
+    the types of the result once, i.e. they build one hypergraph rather than
+    one per box, which also keeps them off the recursion limit.
+    """
+    for method, legs in [("make_bijective", (1, 2)),
+                         ("make_left_monogamous", (2, 3)),
+                         ("make_right_monogamous", (3, 2))]:
+        x = Ty('x')
+        graph = H.spiders(*legs, x)
+        for _ in range(9):
+            graph = graph @ H.spiders(*legs, x)
+        scans = []
+        monkeypatch.setattr(
+            H, "scan_types", lambda self: scans.append(self))
+        result = getattr(graph, method)()
+        monkeypatch.undo()
+        assert len(scans) == 1 and len(result.boxes) == 10
+
+
+def test_Hypergraph_make_left_monogamous_merges_in_port_order():
+    """
+    The legs of a merge read their ports in order, where they used to read
+    them in the iteration order of a ``set`` of port indices: the ports of
+    the first spider below are ``{6, 7, 8}``, which iterates ``8, 6, 7``.
+    """
+    x = Ty('x')
+    effect = H.spiders(3, 0, x)
+    graph = (effect @ effect @ effect).make_left_monogamous()
+    assert [dom for dom, _ in graph.wires[1]]\
+        == [(6, 7, 8), (3, 4, 5), (0, 1, 2)]
+    assert graph.boxes == 3 * (Spider(3, 1, x), )
+
+
+def test_Hypergraph_make_monogamous_inserts_in_one_pass(monkeypatch):
+    """
+    However many cups and caps it inserts, ``make_monogamous`` scans the
+    wires and the types of the result once, i.e. it builds one hypergraph
+    rather than one per box, which also keeps it off the recursion limit.
+    """
+    x = Ty('x')
+    transpose = Box('f', x, x).transpose().to_hypergraph()
+    graph = transpose
+    for _ in range(9):
+        graph = graph @ transpose
+    scans = []
+    monkeypatch.setattr(H, "scan_types", lambda self: scans.append(self))
+    result = graph.make_monogamous()
+    monkeypatch.undo()
+    assert len(scans) == 1 and len(result.boxes) == 30
+    assert result.is_monogamous
+
+
+def test_Hypergraph_make_monogamous_carries_leg_order():
+    """
+    The legs of each cup and cap read :meth:`Hypergraph.leg_order` on the
+    graph the pass starts from, which is the answer the recursion read on the
+    graph as it stood: both caps below reorder their legs, the second one
+    after the first has already been inserted.
+    """
+    from discopy import compact
+    a, b, c, d = map(compact.Ty, "abcd")
+    f, g = compact.Box('f', d, d), compact.Box('g', c @ b, a)
+    graph = Hypergraph[compact.Diagram](
+        d.r @ a, b.r @ c.r @ d.r @ a @ a, (f, g),
+        ((0, 1), (((2, ), (2, )), ((3, 4), (5, ))), (4, 3, 0, 1, 5)))
+    assert graph.make_monogamous().boxes == (
+        f, compact.Cap(c.r, c), compact.Cap(b.r, b), g)
+
+
+def test_Hypergraph_trace_backward_wires_loops(monkeypatch):
+    """
+    ``trace_backward_wires`` cuts one wire at a time in a loop, so a graph
+    with many wires to cut does not nest one frame per cut as it used to,
+    which raised ``RecursionError`` at a thousand of them: every trace below
+    is applied from the one frame of the loop.
+    """
+    import inspect
+    x = Ty('x')
+    scalar = H.spiders(0, 0, x)
+    graph = scalar.tensor(*19 * [scalar])
+    explicit_trace, frames = H.explicit_trace, []
+
+    def counted(self, left=False):
+        frames.append(sum(frame.function == "trace_backward_wires"
+                          for frame in inspect.stack()))
+        return explicit_trace(self, left)
+
+    monkeypatch.setattr(H, "explicit_trace", counted)
+    result = graph.trace_backward_wires()
+    monkeypatch.undo()
+    assert len(frames) == 20 and set(frames) == {1}
+    assert len(result.boxes) == 40 and result.is_causal

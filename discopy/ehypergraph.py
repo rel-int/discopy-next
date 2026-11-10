@@ -27,11 +27,39 @@ which is sound for cartesian diagrams only. Unlike the paper's, a class may
 depend on itself, as in egg, which :meth:`EHypergraph.to_diagram` refuses, as
 drawing it would need a trace.
 
+Summary
+-------
+
+.. autosummary::
+    :template: class.rst
+    :nosignatures:
+    :toctree:
+
+    EHypergraph
+    Join
+
+.. admonition:: Functions
+
+    .. autosummary::
+        :template: function.rst
+        :nosignatures:
+        :toctree:
+
+        partition
+        relabel
+        is_pattern
+        pattern
+        rewire
+        ast_size
+        distribute
+
 Example
 -------
-Egg's example, ``(a * 2) / 2`` with ``a`` an input and each constant a box
-with no input, the two ``2`` one class from the start as egg hash-conses
-them, saturates in three rounds with egg's classes and extracts ``a``:
+``Markov`` is ``EHypergraph[markov.Diagram]``, the e-hypergraphs over
+Markov diagrams. Egg's example, ``(a * 2) / 2`` with ``a`` an input and each
+constant a box with no input, the two ``2`` one class from the start as egg
+hash-conses them, saturates in three rounds with egg's classes and extracts
+``a``:
 
 >>> from discopy.markov import Ty, Box, Diagram
 >>> x = Ty('x')
@@ -65,29 +93,6 @@ shared cancels, then is discarded with ``p`` unless a condition reads it:
 Copy(x) >> sample @ sample >> -
 Discard(x) @ 0
 sample >> 0 @ condition
-
-Summary
--------
-
-.. autosummary::
-    :template: class.rst
-    :nosignatures:
-    :toctree:
-
-    EHypergraph
-    Join
-
-.. admonition:: Functions
-
-    .. autosummary::
-        :template: function.rst
-        :nosignatures:
-        :toctree:
-
-        partition
-        is_pattern
-        ast_size
-        distribute
 """
 
 from collections import Counter
@@ -101,15 +106,16 @@ from typing import TYPE_CHECKING, Self, SupportsIndex
 from networkx import DiGraph
 from networkx.algorithms.isomorphism import is_isomorphic
 
-from discopy import markov, messages, monoidal
+from discopy import feedback, markov, messages, monoidal
 from discopy.abc import HypergraphCategory, MonoidalCategory, Nat
 from discopy.testable import (
-    GENERATORS, Equation, Hom, Obj, Testable, Var, axiom)
+    GENERATORS, Equation, Hom, Obj, Serialisable, TestableGeneric, Var,
+    axiom)
 from discopy.drawing import Node
 from discopy.hypergraph import Hypergraph
 from discopy.monoidal import Ty
 from discopy.utils import (
-    AxiomError, NamedGeneric, assert_isparallel, classproperty, factory_name,
+    AxiomError, assert_isparallel, classproperty, factory_name,
     from_tree, pushout, resolve_factory, unbiased)
 
 if TYPE_CHECKING:
@@ -187,16 +193,18 @@ def ast_size(_box) -> int:
     return 1
 
 
-class Join(monoidal.Bubble, markov.Box):
+class Join(feedback.Bubble, markov.Box):
     """
     The join of parallel diagrams, an e-box of the string diagrams of a
     semilattice-enriched category :cite:`TiurinEtAl24`, drawn as a frame with
     a slot for each term. It is deterministic when it has one term, which is,
-    and affine when every term is, discarding being idempotent.
+    and affine when every term is, discarding being idempotent. It delays as
+    a feedback bubble does, its terms staying as they are inside.
 
     Parameters:
-        terms : The diagrams joined, with the same domain and codomain.
-        params : Passed to :class:`monoidal.Bubble`, e.g. by :meth:`dagger`.
+        terms : The diagrams joined, with the same domain and codomain, that
+            of the join at time step zero.
+        params : Passed to :class:`feedback.Bubble`, e.g. by :meth:`dagger`.
 
     Example
     -------
@@ -216,12 +224,14 @@ class Join(monoidal.Bubble, markov.Box):
         params.pop("method", None)
         super().__init__(*terms, method="join", **params)
         for term in terms:
-            assert_isparallel(self, term)
+            assert_isparallel(
+                self, term.delay(self.time_step) if self.time_step else term)
         self.deterministic = len(terms) == 1 and terms[0].is_deterministic
         self.affine = all(term.is_affine for term in terms)
 
     def __str__(self):
-        return f"Join({', '.join(map(str, self.args))})"
+        return f"Join({', '.join(map(str, self.args))})"\
+            + feedback.str_delayed(self.time_step)
 
 
 def distribute(diagram: monoidal.Diagram) -> markov.Sum:
@@ -238,7 +248,7 @@ def distribute(diagram: monoidal.Diagram) -> markov.Sum:
 
 
 class EHypergraph[category](
-        MonoidalCategory, NamedGeneric, Testable):
+        MonoidalCategory, TestableGeneric, Serialisable):
     """
     An e-hypergraph over a copy-discard ``category``, equal to another up to
     renaming its spiders, see :mod:`discopy.ehypergraph`.
@@ -263,6 +273,11 @@ class EHypergraph[category](
     f g
     """
     ob = classproperty(lambda cls: cls.category.ob)
+
+    @classmethod
+    def checked_params(cls) -> tuple:
+        """ The free Markov category, whose diagrams it shares. """
+        return (markov.Diagram, )
 
     def __init__(
             self, graph: Hypergraph, classes: tuple[int, ...] | None = None):

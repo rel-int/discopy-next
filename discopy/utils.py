@@ -1,6 +1,46 @@
 # -*- coding: utf-8 -*-
 
-""" DisCoPy utility functions. """
+"""
+DisCoPy utility functions: factories, serialisation, assertions and display.
+
+:func:`discopy.cat.factory` and :func:`discopy.hypergraph.pushout` live here
+too, documented where they are used.
+
+Summary
+-------
+
+.. autosummary::
+    :template: class.rst
+    :nosignatures:
+    :toctree:
+
+    NamedGeneric
+    MappingOrCallable
+    AxiomError
+    RichDisplay
+
+.. admonition:: Functions
+
+    .. autosummary::
+        :template: function.rst
+        :nosignatures:
+        :toctree:
+
+        factory_name
+        from_tree
+        dumps
+        loads
+        rmap
+        rsubs
+        assert_isinstance
+        unbiased
+        inductive
+        tuplify
+        untuplify
+        assert_iscomposable
+        assert_isparallel
+        assert_isatomic
+"""
 
 from __future__ import annotations
 
@@ -130,8 +170,10 @@ class MappingOrCallable(Mapping[KT, VT]):
 
 def identity(x: KT) -> KT:
     """
-    The identity function, which every identity functor is built from so that
-    it can be recognised, see :meth:`discopy.cat.Functor.then`.
+    The identity function, which every identity functor and transformation is
+    built from so that it can be recognised, see
+    :meth:`discopy.cat.Functor.then` and
+    :meth:`discopy.cat.Transformation.then`.
 
     Example
     -------
@@ -252,9 +294,10 @@ class NamedGeneric:
     it builds through ``cls.ar`` carry the parameter.
 
     >>> from discopy.abc import Category
+    >>> from discopy.testable import TestableGeneric
     >>> @factory
-    ... class C[dtype](Category, NamedGeneric):
-    ...     pass
+    ... class C[dtype](Category, TestableGeneric):
+    ...     checked_params = classmethod(lambda cls: ())
     >>> assert C[int].factory is C[int] is C[int].ar
 
     A DisCoPy class is named by its module, since every level of the
@@ -538,7 +581,8 @@ def encode(tree: Any) -> Any:
     array or scalar, see :func:`encode_numpy`,
     and a sympy expression, see :func:`encode_sympy`. Every other value is
     left as it is, so a tree without tuples keeps the bytes JSON gives it, as
-    is one that these refuse, for the ``default`` of ``json.dumps``.
+    is one that these refuse, for the ``default`` of ``json.dumps``. A key
+    that is not a string, which JSON would write as one, raises.
     This is what :func:`dumps` writes and :func:`decode` reads back.
 
     Example
@@ -548,8 +592,16 @@ def encode(tree: Any) -> Any:
 [1, {'factory': 'complex', 're': 0.0, 'im': 2.0}]}}
     >>> encode({'data': {1, 2}})
     {'data': {1, 2}}
+    >>> encode({'data': {1: 'a'}})
+    Traceback (most recent call last):
+    ...
+    TypeError: Object of type dict with int keys is not JSON serialisable.
     """
     if isinstance(tree, dict):
+        keys = [key for key in tree if not isinstance(key, str)]
+        if keys:
+            raise TypeError(messages.NOT_JSON_SERIALISABLE.format(
+                f"dict with {type(keys[0]).__name__} keys"))
         return {key: encode(value) for key, value in tree.items()}
     if isinstance(tree, list | tuple):
         inside = list(map(encode, tree))
@@ -1089,16 +1141,15 @@ def assert_ismember(object_, cls: type):
 
 def unbiased(binary_method):
     """
-    Turn a biased method with signature (self, other) to an unbiased one, i.e.
-    with signature (self, *others), see the `nLab`_.
+    Turn a biased method with signature ``(self, other)`` into an unbiased
+    one with signature ``(self, *others)``, see the
+    `nLab <https://ncatlab.org/nlab/show/biased+definition>`__.
 
     One argument is the base case, more are folded by calling the method by
     its name on the running result, so that a subclass overriding the binary
     case has its own folded rather than the one decorated. An operand passed
     by keyword, e.g. ``f.then(other=g)``, goes to the binary method as it is,
     rather than being dropped as if there were none.
-
-    .. _nLab: https://ncatlab.org/nlab/show/biased+definition
     """
     @wraps(binary_method)
     def method(self, *others, **params):
@@ -1353,7 +1404,10 @@ def assert_isparallel(left: Category, right: Category):
 
 
 def assert_isatomic(typ: Ty, cls: type | None = None):
-    """ Raise :class:`AxiomError` if a type does not have length one. """
+    """
+    Raise ``TypeError`` if a type is not a ``cls`` and ``ValueError`` if it
+    does not have length one.
+    """
     cls = cls or type(typ)
     assert_isinstance(typ, cls)
     if not typ.is_atomic:
@@ -1362,7 +1416,10 @@ def assert_isatomic(typ: Ty, cls: type | None = None):
 
 
 def assert_istraceable(arg, n=1, left=False):
-    """ Raise :class:`AxiomError` if a diagram is not traceable. """
+    """
+    Raise ``ValueError`` if ``n`` atoms cannot be split off a diagram and
+    :class:`AxiomError` if the traced types differ.
+    """
     if n < 0 or n > min(len(arg.dom), len(arg.cod)):
         raise ValueError(messages.NOT_SPLITTABLE.format(n, arg))
     traced_dom, traced_cod = (arg.dom[:n], arg.cod[:n]) if left\

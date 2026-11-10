@@ -628,3 +628,18 @@ def test_legless_zbox_reads_its_first_amplitude():
         assert np.allclose(array, value)
     assert np.allclose(
         ZBox(0, 0, lambda i: i + 1).to_tensor().eval().array, 1)
+
+
+def test_zbox_state_carries_every_amplitude():
+    """A spider is symmetric under bending its legs, so `ZBox(0, 1, f)`
+    meets an effect as its transpose `ZBox(1, 0, f)` meets a state, and
+    `ZBox(0, 1, f) >> ZBox(1, 0, g)` sums `f(i)g(i)` over the whole list."""
+    def value(dgrm):
+        return dgrm.to_tensor().eval().array
+
+    state, effect = ZBox(0, 1, [1, 2, 3]), ZBox(1, 0, [1, 2, 3])
+    for n in range(3):
+        assert np.isclose(value(state >> Select(n)), n + 1)
+        assert np.isclose(value(Create(n) >> effect), n + 1)
+    assert np.isclose(value(state >> ZBox(1, 0, [1, 1, 1])), 6)
+    assert np.isclose(value(ZBox(0, 2, [1, 2, 3]) >> Select(2) @ Select(2)), 3)

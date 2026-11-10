@@ -3,6 +3,9 @@
 """
 ZX-calculus diagrams.
 
+The functor ``circuit2zx`` sends a :class:`discopy.quantum.circuit.Circuit`
+to a ZX diagram, each gate through :func:`gate2zx`.
+
 Summary
 -------
 
@@ -13,7 +16,9 @@ Summary
 
     Diagram
     Box
+    Sum
     Bubble
+    Permutation
     Swap
     Spider
     Z
@@ -23,6 +28,16 @@ Summary
     Number
     Hypergraph
     Rewriter
+
+.. admonition:: Functions
+
+    .. autosummary::
+        :template: function.rst
+        :nosignatures:
+        :toctree:
+
+        scalar
+        gate2zx
 """
 
 from __future__ import annotations
@@ -43,7 +58,7 @@ from discopy import (
 from discopy.cat import factory
 from discopy.quantum.circuit import qubit, Circuit
 from discopy.quantum.gates import (
-    Bra, Ket, Rz, Rx, U1, CX, CZ, Controlled, format_number)
+    Bra, Ket, Rz, Rx, U1, CX, CZ, Controlled, Sqrt, format_number)
 from discopy.quantum.gates import Scalar as GatesScalar
 from discopy.rigid import Sum, Nat
 from discopy.tensor import Dim, backend
@@ -530,7 +545,11 @@ class X(Spider):
 
 
 class Scalar(Box):
-    """ Scalar in a ZX diagram. """
+    """
+    Scalar in a ZX diagram.
+
+    >>> assert eval(repr(scalar(2)), Diagram.environment()) == scalar(2)
+    """
     serialised_attrs = ("data", )
 
     def __init__(self, data):
@@ -539,6 +558,10 @@ class Scalar(Box):
 
     def __str__(self):
         return f"scalar({format_number(self.data)})"
+
+    def __repr__(self):
+        return f"{factory_name(type(self))}"\
+            f"({format_number(self.data, exact=True)})"
 
     def subs(self, *args):
         data = cat.rsubs(self.data, *args)
@@ -568,7 +591,9 @@ def gate2zx(box):
         spiders = [X(dom, cod, phase=.5 * bit) for bit in box.bitstring]
         return Id().tensor(*spiders) @ scalar(pow(2, -len(box.bitstring) / 2))
     if isinstance(box, (Rz, Rx)):
-        return (Z if isinstance(box, Rz) else X)(1, 1, box.phase)
+        spider = (Z if isinstance(box, Rz) else X)(1, 1, box.phase)
+        modules = box.modules if box.free_symbols else cmath
+        return spider @ scalar(modules.exp(-1j * modules.pi * box.phase))
     if isinstance(box, Controlled) and box.distance != 1:
         return circuit2zx(box._decompose())
     if isinstance(box, Controlled) and isinstance(box.controlled, (Rz, Rx)):
@@ -579,6 +604,9 @@ def gate2zx(box):
     if isinstance(box, Controlled) and isinstance(box.controlled, U1):
         return Z(1, 2, box.phase / 2) @ Z(1, 2, box.phase / 2)\
             >> Id(1) @ (X(2, 1) >> Z(1, 0, -box.phase / 2)) @ Id(1) @ root2
+    if isinstance(box, Sqrt):
+        root = scalar(box.data ** .5)
+        return root.dagger() if box.is_dagger else root
     if isinstance(box, GatesScalar):
         if box.is_mixed:
             raise NotImplementedError
@@ -1126,7 +1154,8 @@ class Hypergraph(hypergraph.Hypergraph):
         """
         The number of spiders, of Hadamard edges between them and of spiders
         whose phase is not Clifford, the T-count, counting a boundary behind
-        a Hadamard edge as no spider, as PyZX does.
+        a Hadamard edge and a bare wire, cup or cap as no spider, as PyZX
+        does.
 
         Two spiders are joined by an edge when an odd number of Hadamards lie
         between them, again as PyZX has it: a Hadamard self-loop is a
@@ -1139,7 +1168,7 @@ class Hypergraph(hypergraph.Hypergraph):
         rewriter = Rewriter(self)
         spiders = [s for s in range(self.n_spiders)
                    if not rewriter.is_boundary(s) and (
-                       rewriter.ports[s] < 2 or rewriter.incidence[s]
+                       rewriter.ports[s] != 2 or rewriter.incidence[s]
                        or rewriter.phases[s])]
         inside = set(spiders)
         hadamards = Counter(

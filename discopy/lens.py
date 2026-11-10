@@ -42,9 +42,9 @@ Summary
 Example
 -------
 
-Lenses over :class:`Function <discopy.python.Function>` are the accessors of
-functional programming: `get` reads a part of a structure and `put` writes
-it back. The lens on the first component of a pair:
+Lenses over :class:`Function <discopy.python.multiplicative.Function>` are
+the accessors of functional programming: `get` reads a part of a structure
+and `put` writes it back. The lens on the first component of a pair:
 
 >>> from discopy import python
 >>> from discopy.python import Function
@@ -70,7 +70,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from discopy import interaction, markov, messages, symmetric
 from discopy.abc import (
-    MarkovCategory, NamedGeneric, SymmetricCategory, TracedCategory)
+    MarkovCategory, SymmetricCategory, TracedCategory)
+from discopy.testable import Equation, TestableGeneric, quotient
 from discopy.utils import (
     AxiomError, assert_iscomposable, assert_isinstance, classproperty,
     factory_name, get_origin, unbiased)
@@ -108,7 +109,7 @@ def pairs(category) -> type:
 
 
 @dataclass
-class Symmetric[category](SymmetricCategory, NamedGeneric):
+class Symmetric[category](SymmetricCategory, TestableGeneric):
     """
     A lens from `dom` to `cod` over a symmetric `category` is a `residual`
     with a `forward` morphism `dom.positive -> cod.positive @ residual` and
@@ -150,6 +151,11 @@ class Symmetric[category](SymmetricCategory, NamedGeneric):
             to_int
             to_markov
     """
+    @classmethod
+    def checked_params(cls) -> tuple:
+        """ The default underlying category, for the class itself. """
+        return (cls.category, )
+
     category = symmetric.Diagram
     ob = classproperty(lambda cls: pairs(cls.category))
 
@@ -158,6 +164,41 @@ class Symmetric[category](SymmetricCategory, NamedGeneric):
     forward: category
     backward: category
     residual: category.ob = None  # ty: ignore[invalid-assignment]
+
+    @classmethod
+    def equation_factory(cls, *terms: Symmetric) -> Equation:
+        """
+        The equation of a law, compared by the boundary of its terms and the
+        inside of their :meth:`to_int` up to the equation of the underlying
+        category, e.g. its hypergraph, so that two lenses are equal when they
+        wire the same legs, whatever their residual.
+        """
+        return Equation(*terms, up_to=lambda lens: (
+            lens.dom, lens.cod, quotient(cls.category, lens.to_int().inside)))
+
+    @classmethod
+    def strategy(cls, *, dom=None, cod=None, **params):
+        """
+        Generate lenses: a residual, then a forward and a backward leg from
+        the strategy of the underlying category, with the boundary they
+        need, the parameters passed to both.
+        """
+        from hypothesis import strategies as st
+
+        @st.composite
+        def lenses(draw):
+            source = draw(cls.ob.strategy()) if dom is None else dom
+            target = draw(cls.ob.strategy()) if cod is None else cod
+            residual = draw(cls.category.ob.strategy())
+            forward = draw(cls.category.strategy(
+                dom=source.positive, cod=target.positive @ residual,
+                **params))
+            backward = draw(cls.category.strategy(
+                dom=residual @ target.negative, cod=source.negative,
+                **params))
+            return cls(source, target, forward, backward, residual)
+
+        return lenses()
 
     def __post_init__(self):
         if self.residual is None:
@@ -388,6 +429,33 @@ class Traced(Symmetric, TracedCategory):
     ...     == (f.forward >> x @ Diagram.swap(u, m)).trace()
     >>> assert f.trace().backward == f.backward.trace()
     """
+    trace_iteration_left = TracedCategory.trace_iteration_left.inapplicable(
+        messages.PAIR_LENGTH)
+    trace_naturality_left = TracedCategory.trace_naturality_left.inapplicable(
+        messages.PAIR_LENGTH)
+    trace_dinaturality_left = TracedCategory.trace_dinaturality_left\
+        .inapplicable(messages.PAIR_LENGTH)
+
+    trace_iteration_right = TracedCategory.trace_iteration_right.inapplicable(
+        messages.PAIR_LENGTH)
+    trace_naturality_right = TracedCategory.trace_naturality_right\
+        .inapplicable(messages.PAIR_LENGTH)
+    trace_dinaturality_right = TracedCategory.trace_dinaturality_right\
+        .inapplicable(messages.PAIR_LENGTH)
+    trace_left = TracedCategory.trace_left.inapplicable(
+        messages.PAIR_LENGTH)
+    trace_right = TracedCategory.trace_right.inapplicable(
+        messages.PAIR_LENGTH)
+    joining = TracedCategory.joining.inapplicable(
+        messages.PAIR_LENGTH)
+    tightening = TracedCategory.tightening.inapplicable(
+        messages.PAIR_LENGTH)
+    sliding = TracedCategory.sliding.inapplicable(
+        messages.PAIR_LENGTH)
+    strength = TracedCategory.strength.inapplicable(
+        messages.PAIR_LENGTH)
+    feedback_right = TracedCategory.feedback_right.inapplicable(
+        messages.PAIR_LENGTH)
     def trace(self, n: int | tuple[int, int] = 1, left: bool = False
               ) -> Traced:
         """
@@ -398,13 +466,16 @@ class Traced(Symmetric, TracedCategory):
         Parameters:
             n : The number of atoms to trace over on each half, or one number
                 per half.
-            left : Whether to trace on the left, not implemented.
+            left : Whether to trace the first atoms instead, i.e. the trace
+                of the lens between swaps.
         """
+        if left:
+            (mem, x), (_, y) = (
+                typ.split(n, left=True) for typ in (self.dom, self.cod))
+            return (self.swap(x, mem) >> self >> self.swap(mem, y)).trace(n)
         (x, (u, u_)), (y, _) = self.dom.split(n), self.cod.split(n)
         if not u and not u_:
             return self
-        if left:
-            raise NotImplementedError
         forward = self.forward >> self.category.id(y.positive)\
             @ self.category.swap(u, self.residual)
         return type(self)(x, y, forward.trace(len(u)),
@@ -476,6 +547,32 @@ class Markov(Symmetric):
 
     put = property(lambda self: self.backward)
 
+    unitality = Symmetric.unitality.failing(messages.LENS_NATURALITY)
+    associativity = Symmetric.associativity.failing(messages.LENS_NATURALITY)
+    braid_naturality = Symmetric.braid_naturality.failing(
+        messages.LENS_BRAID_NATURALITY)
+
+    @classmethod
+    def strategy(cls, *, dom=None, cod=None, **params):
+        """
+        Generate Markov lenses: a `get` and a `put` from the strategy of the
+        underlying category, with the boundary they need.
+        """
+        from hypothesis import strategies as st
+
+        @st.composite
+        def lenses(draw):
+            source = draw(cls.ob.strategy()) if dom is None else dom
+            target = draw(cls.ob.strategy()) if cod is None else cod
+            get = draw(cls.category.strategy(
+                dom=source.positive, cod=target.positive, **params))
+            put = draw(cls.category.strategy(
+                dom=source.positive @ target.negative, cod=source.negative,
+                **params))
+            return cls(source, target, get, put)
+
+        return lenses()
+
     def __repr__(self):
         factory, category = map(
             factory_name, (get_origin(type(self)), self.category))
@@ -518,10 +615,11 @@ class Markov(Symmetric):
         reads it with `self.get`, writes with `other.put` then `self.put`,
         so that the residual stays the input rather than accumulating as in
         :meth:`Symmetric.then`. This is why lenses over
-        :class:`Function <discopy.python.Function>` are the semantics of
-        reverse-mode differentiation :cite:p:`CruttwellEtAl22`: the reverse
-        derivative of a function `f` is the lens with `get` its value and
-        `put` its Jacobian transposed, applied to the incoming gradient.
+        :class:`Function <discopy.python.multiplicative.Function>` are the
+        semantics of reverse-mode differentiation :cite:p:`CruttwellEtAl22`:
+        the reverse derivative of a function `f` is the lens with `get` its
+        value and `put` its Jacobian transposed, applied to the incoming
+        gradient.
 
         Parameters:
             other : The lens to compose with.

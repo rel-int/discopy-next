@@ -3,7 +3,8 @@ The feedback category of monoidal streams over a symmetric monoidal category.
 
 We adapted the definition of intensional streams from :cite:t:`DiLavoreEtAl22`.
 
-## Summary
+Summary
+-------
 
 .. autosummary::
     :template: class.rst
@@ -13,7 +14,8 @@ We adapted the definition of intensional streams from :cite:t:`DiLavoreEtAl22`.
     Ty
     Stream
 
-## Note
+Feedback
+--------
 
 Monoidal streams form a feedback category as follows:
 
@@ -35,9 +37,8 @@ Monoidal streams form a feedback category as follows:
 .. image:: /_static/stream/feedback-to-stream.svg
     :align: center
 
-## Examples
-
-### Fibonacci
+Fibonacci
+---------
 
 We can define the Fibonacci sequence as a Markov diagram, which is a feedback
 diagram, interpreted in the category of streams of python types and functions.
@@ -76,7 +77,8 @@ diagram, interpreted in the category of streams of python types and functions.
 ...         plus: lambda x, y: x + y}, cod=cod)
 >>> assert F(fib).unroll(9).now()[:10] == (0, 1, 1, 2, 3, 5, 8, 13, 21, 34)
 
-### Random walk
+Random walk
+-----------
 
 We can define a simple random walk as a feedback diagram interpreted in the
 category of streams of python types and probabilistic functions.
@@ -102,7 +104,8 @@ category of streams of python types and probabilistic functions.
 >>> assert F(walk).unroll(9).now()[:10] == (0, -1, -2, -1, 0, 1, 0, 1, 2, 1)
 >>> assert F(walk).unroll(9).now()[:10] == (0, -1, 0, 1, 0, 1, 0, -1, 0, -1)
 
-## Axioms
+Axioms
+------
 
 Note that we can only check equality of streams up to a finite number of steps.
 
@@ -115,12 +118,14 @@ Note that we can only check equality of streams up to a finite number of steps.
 >>> g = Stream.sequence('g', y, z, n)
 >>> h = Stream.sequence('h', z, w, o)
 
-* Unitality and associativity hold on the nose:
+* Unitality holds on the nose, associativity of composition as hypergraphs,
+  i.e. up to the axioms of symmetric categories:
 
 >>> _id = Stream.id
 >>> assert eq_up_to_n(f @ _id(), f, _id() @ f)
 >>> assert eq_up_to_n(f >> _id(f.cod), f, _id(f.dom) >> f)
->>> assert eq_up_to_n((f >> g) >> h), (f >> (g >> h))
+>>> assert all_eq(x.unroll(3).now.to_hypergraph()
+...               for x in ((f >> g) >> h, f >> (g >> h)))
 >>> ((f >> g) >> h).now.draw(
 ...     doctest="docs/_static/stream/feedback-associativity.svg")
 
@@ -167,7 +172,7 @@ from dataclasses import dataclass
 
 from discopy import messages, symmetric
 from discopy.abc import FeedbackCategory, NamedGeneric
-from discopy.testable import Testable
+from discopy.testable import TestableGeneric
 from discopy.python import finset
 from discopy.utils import (
     AxiomError,
@@ -229,7 +234,7 @@ class Ty[base](NamedGeneric):
         Ty()
         Ty()
         """
-        return cls(now=x, _later=lambda: cls())
+        return cls(now=x, _later=cls)
 
     @inductive
     def delay(self) -> Ty:
@@ -257,6 +262,7 @@ class Ty[base](NamedGeneric):
         x1 @ y1
         x2 @ y2
         """
+        x = cls.base.cast(x)
         now = cls.base().tensor(*(cls.base(f"{obj}{n_steps}") for obj in x))
         return cls(now, _later=lambda: cls.sequence(x, n_steps + 1))
 
@@ -332,16 +338,16 @@ NO_TREE = messages.NO_TREE_STREAM
 
 
 @dataclass
-class Stream[category](FeedbackCategory, NamedGeneric):
+class Stream[category](FeedbackCategory, TestableGeneric):
     """
     Monoidal streams over an underlying `category`.
 
     Parameters:
         now (category) : The value of the stream at time step zero.
         dom (Optional[Ty[category.ob]]) :
-            The domain of the stream, constant `now.dom` if `_later is None`.
+            The domain of the stream, the constant `now.dom` when not given.
         cod (Optional[Ty[category.ob]]) :
-            The codomain of the stream, constant `now.dom` if `_later is None`.
+            The codomain of the stream, the constant `now.cod` when not given.
         mem (Optional[Ty[category.ob]]) :
             The memory of the stream, the constant empty type by default.
         _later (Optional[Callable[[], Stream[category]]]) :
@@ -358,6 +364,7 @@ class Stream[category](FeedbackCategory, NamedGeneric):
     >>> f = S(now, dom, cod, mem, lambda: later)
     >>> f.unroll(2).now(1, 2, 3)
     (True, False, True, '1 2 3')
+    >>> assert (S(now).dom, S(now).cod) == (T(now.dom), T(now.cod))
 
     Note
     ----
@@ -370,6 +377,11 @@ class Stream[category](FeedbackCategory, NamedGeneric):
     >>> assert cod.later.now == later.cod.now
     >>> assert mem.later.now == later.mem.now
     """
+    @classmethod
+    def checked_params(cls) -> tuple:
+        """ None, a stream drawing no terms yet. """
+        return ()
+
     category = symmetric.Diagram
     ob = classproperty(lambda cls: Ty[cls.category.ob])
 
@@ -382,7 +394,6 @@ class Stream[category](FeedbackCategory, NamedGeneric):
     later, is_constant = Ty.later, Ty.is_constant
     head, tail = Ty.head, Ty.tail
     sliding = FeedbackCategory.sliding.failing(messages.STREAM_SLIDING)
-    serialisation = Testable.serialisation.inapplicable(NO_TREE)
 
     def __init__(
             self, now: category,
@@ -444,7 +455,7 @@ callable returns or, for a constant stream, itself, which JSON cannot hold.
         Construct the stream with a given arrow now and the empty stream later.
         """
         dom, cod = map(cls.ob.singleton, (arg.dom, arg.cod))
-        return cls(arg, dom, cod, _later=lambda: cls.id())
+        return cls(arg, dom, cod, _later=cls.id)
 
     @classmethod
     def sequence(
@@ -476,7 +487,8 @@ callable returns or, for a constant stream, itself, which JSON cannot hold.
     @inductive
     def delay(self) -> Stream:
         """ Delay a stream by one time step, shortened to `self.d`. """
-        dom, cod, mem = [x.delay() for x in (self.dom, self.cod, self.mem)]
+        dom, cod = self.dom.delay(), self.cod.delay()
+        mem = self.ob(self.mem.now, lambda: self.mem)
         now, _later = self.category.id(self.mem.now), lambda: self
         return type(self)(now, dom, cod, mem, _later)
 

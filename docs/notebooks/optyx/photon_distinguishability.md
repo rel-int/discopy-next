@@ -28,20 +28,18 @@ When creating a photon we can give an internal state of some dimension *d*, whic
 The amplitudes and probabilities for circuits with internal states are computed by *inflating* the diagram by *d*.
 
 ```python {.marimo}
-from discopy.optyx.core.zw import Create
+from discopy.optyx.core import diagram, zw
 
 state1 = [1, 0]
 state2 = [0.5**0.5, 0.5**0.5]
 
-Create(1, internal_states=(state2, )).inflate(2).foliation().draw(figsize=(6, 3))
+zw.Create(1, internal_states=(state2, )).inflate(2).foliation().draw(figsize=(6, 3))
 ```
 
 Similarly, every DualRail box with an internal state can be inflated.
 
 ```python {.marimo}
-from discopy.optyx.core.diagram import DualRail
-
-DualRail(internal_state=state1).inflate(2).foliation().draw()
+diagram.DualRail(internal_state=state1).inflate(2).foliation().draw()
 ```
 
 ### HOM with indistinguishable photons
@@ -49,7 +47,8 @@ DualRail(internal_state=state1).inflate(2).foliation().draw()
 We will show that if the photons are non-distinguishable, we obtain a perfect Hong-Ou-Mandel effect.
 
 ```python {.marimo}
-from discopy.optyx.photonic import NumberResolvingMeasurement, BS
+from discopy.optyx.photonic import (
+    Create, DualRail, NumberResolvingMeasurement, BS)
 ```
 
 The states of two particles are the same:

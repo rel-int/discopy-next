@@ -33,20 +33,43 @@ Summary
     :toctree:
 
     Monad
-    Maybe
-    Powerset
-    Subdistribution
-    Seed
-    make_state
-    iterate_maybe
-    iterate_powerset
-    iterate_subdistribution
+
+.. admonition:: Data
+
+    .. autosummary::
+        :nosignatures:
+        :toctree:
+
+        Maybe
+        Powerset
+        Subdistribution
+        Seed
+
+.. admonition:: Functions
+
+    .. autosummary::
+        :template: function.rst
+        :nosignatures:
+        :toctree:
+
+        make_state
+        iterate_maybe
+        iterate_powerset
+        iterate_subdistribution
+        merge
+        dist
+        state_map
+        state_join
+        uniform
+        canonical
+        sample
 """
 from __future__ import annotations
 
 import random
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Mapping, Set
 
+from discopy.testable import values
 from discopy.cat import Transformation
 from discopy.python.function import EndoFunctor, Function, Ty
 from discopy.utils import (
@@ -70,6 +93,10 @@ class Monad(EndoFunctor):
         mult_map : Mapping from a type ``X`` to the function
             ``mu_X : M(M(X)) -> M(X)``.
         iterate : The optional iteration operator, see :attr:`iterate`.
+        generate : Mapping from a tuple of outcomes to a Hypothesis
+            strategy for the monadic values over them.
+        observe : Mapping from a monadic value to what two of them are
+            compared by, the value itself by default.
 
     Example
     -------
@@ -111,13 +138,19 @@ class Monad(EndoFunctor):
     :meth:`discopy.kleisli.additive.Channel.trace` defined exactly for the
     monads that supply one, see :func:`iterate_maybe`,
     :func:`iterate_powerset` and :func:`iterate_subdistribution`.
+
+    See Adámek, Milius & Velebil, `Elgot theories: a new perspective of the
+    equational properties of iteration <https://arxiv.org/abs/1006.0918>`_
+    (2010).
     """
 
     # pylint: disable-next=too-many-arguments,too-many-positional-arguments
     def __init__(  # a monad is a name and five maps
             self, name: str, ob_map: Callable, lift: Callable,
             unit_map: Callable, mult_map: Callable,
-            iterate: Callable | None = None):
+            iterate: Callable | None = None,
+            generate: Callable | None = None,
+            observe: Callable = lambda value: value):
         def unwrap(X):
             return Ty.cast(X).inside[0]
 
@@ -129,7 +162,8 @@ class Monad(EndoFunctor):
             lambda X: unit_map(unwrap(X)), EndoFunctor.id(), self)
         self.mult = Transformation(
             lambda X: mult_map(unwrap(X)), self.then(self), self)
-        self.iterate = iterate
+        self.iterate, self.observe = iterate, observe
+        self.generate = generate
 
     @unbiased
     def then(self, other: EndoFunctor) -> EndoFunctor:
@@ -230,6 +264,31 @@ def iterate_powerset[T](
     return inside
 
 
+def generate_maybe(outcomes: tuple):
+    """
+    The values of the :attr:`Maybe` monad over some ``outcomes``: one of
+    them or ``None``.
+
+    Parameters:
+        outcomes : The outcomes to draw from.
+    """
+    from hypothesis import strategies as st
+    return st.none() | st.sampled_from(outcomes) if outcomes else st.none()
+
+
+def generate_powerset(outcomes: tuple):
+    """
+    The values of the :attr:`Powerset` monad over some ``outcomes``: a set
+    of at most three of them.
+
+    Parameters:
+        outcomes : The outcomes to draw from.
+    """
+    from hypothesis import strategies as st
+    return st.frozensets(st.sampled_from(outcomes), max_size=3) if outcomes\
+        else st.just(frozenset())
+
+
 Maybe = Monad(
     "Maybe",
     ob_map=lambda X: X | None,
@@ -238,11 +297,13 @@ Maybe = Monad(
         f.dom.inside[0] | None, f.cod.inside[0] | None),
     unit_map=lambda X: Function(lambda x: x, X, X | None),
     mult_map=lambda X: Function(lambda x: x, (X | None) | None, X | None),
-    iterate=iterate_maybe)
+    iterate=iterate_maybe,
+    generate=generate_maybe)
 """
-The maybe monad, sending a type ``X`` to ``X | None``: the unit and the
-multiplication are both the identity, since Python's native optional type
-does not distinguish ``None`` from a doubly-wrapped ``None``.
+The maybe monad, sending a type ``X`` to ``X | None``.
+
+Its unit and multiplication are both the identity, since Python's native
+optional type does not distinguish ``None`` from a doubly-wrapped ``None``.
 """
 
 Powerset = Monad(
@@ -256,10 +317,12 @@ Powerset = Monad(
     mult_map=lambda X: Function(
         lambda xss: frozenset().union(*xss),
         frozenset[frozenset[X]], frozenset[X]),
-    iterate=iterate_powerset)
+    iterate=iterate_powerset,
+    generate=generate_powerset)
 """
-The powerset monad, sending a type ``X`` to ``frozenset[X]``: the unit takes
-a singleton and the multiplication takes a union.
+The powerset monad, sending a type ``X`` to ``frozenset[X]``.
+
+Its unit takes a singleton and its multiplication takes a union.
 """
 
 
@@ -350,6 +413,34 @@ def iterate_subdistribution[T](
     return inside
 
 
+def generate_subdistribution(outcomes: tuple):
+    """
+    The values of the :attr:`Subdistribution` monad over some ``outcomes``:
+    at most three of them, with a mass of at most ``.9``, so that a loop
+    loses mass at every step and its trace terminates.
+
+    Parameters:
+        outcomes : The outcomes to draw from.
+    """
+    from hypothesis import strategies as st
+    weights = st.dictionaries(
+        st.sampled_from(outcomes), st.floats(.1, 1.), max_size=3)\
+        if outcomes else st.just({})
+    return weights.map(lambda ws: frozenset(
+        (x, .9 * p / max(1., sum(ws.values()))) for x, p in ws.items()))
+
+
+def observe_subdistribution(d: frozenset) -> frozenset:
+    """
+    A subdistribution up to the rounding of its weights, as the order in
+    which they are multiplied and summed moves their last digits.
+
+    Parameters:
+        d : The subdistribution to observe.
+    """
+    return frozenset((x, round(p, 6)) for x, p in d if round(p, 6))
+
+
 Subdistribution = Monad(
     "Subdistribution",
     ob_map=dist,
@@ -362,7 +453,9 @@ Subdistribution = Monad(
         lambda dd: merge(
             (x, p_out * p_in) for d, p_out in dd for x, p_in in d),
         dist(dist(X)), dist(X)),
-    iterate=iterate_subdistribution)
+    iterate=iterate_subdistribution,
+    generate=generate_subdistribution,
+    observe=observe_subdistribution)
 """
 The subdistribution monad, sending a type ``X`` to finite subprobability
 distributions over ``X``: the unit is the Dirac distribution and the
@@ -404,7 +497,8 @@ def make_state(S: type) -> Monad:
     """
     The state monad for a type ``S`` of states, sending a type ``X`` to the
     type ``S -> (X, S)`` of computations reading a state and returning a
-    value together with the next state.
+    value together with the next state. Two computations are compared by
+    what they do on the states :func:`~discopy.testable.values` samples.
 
     Parameters:
         S : The type of states.
@@ -432,6 +526,15 @@ def make_state(S: type) -> Monad:
     """
     def ob_map(X):
         return Callable[[S], tuple[X, S]]  # ty: ignore[invalid-type-form]
+
+    def generate(outcomes):
+        from hypothesis import strategies as st
+        if not outcomes:
+            return st.nothing()
+        return st.fixed_dictionaries({
+            state: st.tuples(
+                st.sampled_from(outcomes), st.sampled_from(values(S)))
+            for state in values(S)}).map(lambda table: table.__getitem__)
     return Monad(
         f"State[{factory_name(S)}]",
         ob_map=ob_map,
@@ -441,13 +544,16 @@ def make_state(S: type) -> Monad:
         unit_map=lambda X: Function(
             lambda x: lambda state: (x, state), X, ob_map(X)),
         mult_map=lambda X: Function(
-            state_join, ob_map(ob_map(X)), ob_map(X)))
+            state_join, ob_map(ob_map(X)), ob_map(X)),
+        generate=generate,
+        observe=lambda m: tuple(m(state) for state in values(S)))
 
 
 Seed = make_state(int)
 """
-The state monad on integer seeds, i.e. the monad of seeded randomness: a
-random computation is the pure function sending a seed to a sample and the
+The state monad on integer seeds, i.e. the monad of seeded randomness.
+
+A random computation is the pure function sending a seed to a sample and the
 seed for the next sample, see :func:`uniform` and :func:`sample`.
 """
 
@@ -470,17 +576,62 @@ def uniform(seed: int) -> tuple[float, int]:
     return generator.random(), generator.getrandbits(64)
 
 
+def canonical(x: object) -> str:
+    """
+    A representation of ``x`` that does not depend on hashing, as long as
+    the :func:`repr` of every value in it that is not a tuple, a set or a
+    mapping does not: the elements of a set and the items of a mapping are
+    sorted by their own canonical representation, the elements of a tuple
+    are kept in order, a named tuple being read as a plain tuple, and every
+    other value is represented by its :func:`repr`.
+
+    Parameters:
+        x : The value to represent.
+
+    Example
+    -------
+    >>> canonical(frozenset({"z", "a"}))
+    "frozenset({'a', 'z'})"
+    >>> canonical((frozenset({2, 1}), {"y": 0, "x": 1}))
+    "(frozenset({1, 2}), dict({'x': 1, 'y': 0}))"
+    >>> assert canonical(("egg", )) == repr(("egg", ))
+
+    A value of any other type is its :func:`repr`, sets inside it included,
+    e.g. a :class:`~discopy.kleisli.multiplicative.Row`:
+
+    >>> from discopy.kleisli.multiplicative import Row
+    >>> row = Row(frozenset({"m"}))
+    >>> assert canonical(row) == repr(row)
+    """
+    if isinstance(x, tuple):
+        comma = "," if len(x) == 1 else ""
+        return f"({', '.join(map(canonical, x))}{comma})"
+    if isinstance(x, Mapping):
+        inside = (f"{canonical(k)}: {canonical(v)}" for k, v in x.items())
+    elif isinstance(x, Set):
+        inside = map(canonical, x)
+    else:
+        return repr(x)
+    return f"{type(x).__name__}({{{', '.join(sorted(inside))}}})"
+
+
 def sample(d: frozenset) -> Callable:
     """
     Draw an outcome from a subdistribution ``d`` by `inverse transform
     sampling <https://en.wikipedia.org/wiki/Inverse_transform_sampling>`_,
     i.e. a computation in the :attr:`Seed` monad.
 
-    The outcomes are ordered by their representation so that the sample
-    depends on the seed only, never on the iteration order of a
-    :class:`frozenset`. The missing mass of a subdistribution is drawn as
-    ``None``, i.e. sampling lands in :attr:`Maybe` composed with
-    :attr:`Seed`.
+    The outcomes are ordered by their :func:`canonical` representation,
+    which sorts the elements of sets first, so that the sample depends on
+    the seed only, never on the iteration order of a :class:`frozenset`
+    nor on ``PYTHONHASHSEED``. This holds as long as every value in an
+    outcome that is not a tuple, a set or a mapping has a :func:`repr` that
+    tells unequal values apart and does not depend on hashing, unlike a
+    :class:`~discopy.kleisli.multiplicative.Row` holding a set of several
+    strings: unequal outcomes with one canonical representation are drawn in
+    the order the subdistribution iterates over them. The missing mass of a
+    subdistribution is drawn as ``None``, i.e. sampling lands in
+    :attr:`Maybe` composed with :attr:`Seed`.
 
     Parameters:
         d : The subdistribution to sample from, i.e. a finite set of pairs
@@ -492,7 +643,7 @@ def sample(d: frozenset) -> Callable:
     >>> assert sample(coin)(420)[0] in ("heads", "tails")
     >>> assert sample(frozenset({("heads", .5)}))(420)[0] in ("heads", None)
     """
-    outcomes = sorted(d, key=lambda pair: repr(pair[0]))
+    outcomes = sorted(d, key=lambda pair: canonical(pair[0]))
 
     def inside(seed):
         draw, next_seed = uniform(seed)

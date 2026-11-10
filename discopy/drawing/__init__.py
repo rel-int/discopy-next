@@ -1,4 +1,10 @@
-""" DisCoPy's drawing modules. """
+"""
+DisCoPy's drawing modules: :mod:`discopy.drawing.drawing` is the category of
+drawings, i.e. labeled graphs embedded in the plane, onto which every diagram
+is sent by a functor; :mod:`discopy.drawing.backend` renders them with
+matplotlib or TikZ; :mod:`discopy.drawing.widget` shows them as interactive
+anywidget widgets in notebooks.
+"""
 
 import os
 from base64 import b64encode
@@ -37,17 +43,13 @@ def __getattr__(name):
 
 def draw(diagram, **params):
     """
-    Draws a diagram using networkx and matplotlib.
+    Draws a diagram with matplotlib, or as TikZ code with ``to_tikz=True``,
+    see :func:`discopy.drawing.backend.draw`.
 
     Parameters
     ----------
-    draw_as_nodes : bool, optional
-        Whether to draw boxes as nodes, default is :code:`False`.
-    color : string, optional
-        Color of the box or node, default is white (:code:`'#ffffff'`) for
-        boxes and red (:code:`'#ff0000'`) for nodes.
     textpad : pair of floats, optional
-        Padding between text and wires, default is :code:`(0.1, 0.1)`.
+        Padding between text and wires, default is :code:`(2**-4, 2**-4)`.
     wire_labels : bool, optional
         Whether to draw type labels, default is :code:`False`.
     draw_box_labels : bool, optional
@@ -55,13 +57,13 @@ def draw(diagram, **params):
     aspect : string, optional
         Aspect ratio, one of :code:`['auto', 'equal']`.
     margins : tuple, optional
-        Margins, default is :code:`(0.05, 0.05)`.
+        Margins, default is :code:`(0, 0)`.
     nodesize : float, optional
         Node size for spiders and controlled gates.
     fontsize : int, optional
-        Font size for the boxes, default is :code:`12`.
+        Font size for the boxes, default is :code:`10`.
     fontsize_types : int, optional
-        Font size for the types, default is :code:`12`.
+        Font size for the types, default is :code:`10`.
     figsize : tuple, optional
         Figure size.
     path : str, optional
@@ -71,15 +73,19 @@ def draw(diagram, **params):
         when it is a file name, required when it is an in-memory buffer.
     doctest : str, optional
         Path to a documentation image used as a drawing baseline: the
-        image is created if missing and compared against otherwise, see
-        :code:`config.OVERRIDE_DOCTEST_IMAGES`.
+        image is created if missing and compared against otherwise, or
+        overwritten when :code:`discopy.config.OVERRIDE_DOCTEST_IMAGES`
+        is :code:`True`.
     tol : float, optional
         Comparison tolerance for raster images, default is :code:`20`.
     to_tikz : bool, optional
         Whether to output tikz code instead of matplotlib.
     asymmetry : float, optional
-        Make a box and its dagger mirror images, default is
-        :code:`.25 * any(box.is_dagger for box in diagram.boxes)`.
+        Shift one corner of each box drawn as a plain polygon (not spiders,
+        wires, braids or other special shapes) so that a box, its dagger, its
+        transpose and its conjugate are told apart, default is :code:`0.125`
+        when some box is a conjugate, a transpose or a dagger not drawn as a
+        braid, :code:`0` otherwise.
     """
     return diagram.to_drawing().draw(**params)
 

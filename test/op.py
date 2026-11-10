@@ -2,14 +2,17 @@ from pytest import raises
 
 from discopy import op
 from discopy.abc import Nat
-from discopy.testable import assert_axioms
+from discopy.testable import Testable
 from discopy.matrix import Matrix
 from discopy.python.finset import Function
 
 
-def test_axioms():
-    assert_axioms(*(level[Matrix[int]] for level in (
-        op.Category, op.Monoidal, op.Symmetric, op.Markov, op.Comarkov)))
+def test_enrolled():
+    """ The opposites of integer matrices are checked by the matrix. """
+    enrolled = Testable.enrolled()
+    for level in (
+            op.Category, op.Monoidal, op.Symmetric, op.Markov, op.Comarkov):
+        assert level[Matrix[int]] in enrolled
 
 
 def test_FinSet():
@@ -21,9 +24,10 @@ def test_FinSet():
 
 
 def test_transparency():
-    for arrow in (op.Markov[Matrix[int]].copy(Nat(1)), op.Markov.copy(Nat(1))):
-        assert eval(repr(arrow), type(arrow).environment() | {
-            "Function": Function, "Nat": Nat}) == arrow
+    for arrow in (
+            op.Markov[Matrix[int]].copy(Nat(1)),
+            op.Markov.copy(Nat(1)), op.Comarkov.merge(Nat(1))):
+        assert eval(repr(arrow), type(arrow).environment()) == arrow
 
 
 def test_wrong_category():

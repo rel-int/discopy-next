@@ -34,16 +34,14 @@ circuit will be exactly equivalent to those of the DisCoPy circuit
 
 If `probabilities` is set to True, the output states of the PennyLane
 circuit will be the probabilities of the output states, equivalent
-to appending :class:`discopy.quantum.circuit.Measure` to all the
+to appending :class:`discopy.quantum.gates.Measure` to all the
 open wires in the DisCoPy circuit.
 
-Once a :class:`PennyLaneCircuit` has been constructed, it
-can be evaluated with :func:`.eval()`. If the circuit contains only
-concrete parameters (i.e. no symbolic parameters), no arguments
-should be passed to `eval()`. If the circuit contains symbolic
-parameters, a list of the symbolic parameters and a list of their
-associated weights should be passed to `eval()` as `symbols=` and
-`weights=`.
+Once a :class:`PennyLaneCircuit` has been constructed, it can be
+evaluated with :meth:`PennyLaneCircuit.eval`, which takes no arguments.
+If the circuit contains symbolic parameters, first call
+:meth:`PennyLaneCircuit.initialise_concrete_params` with a dict from each
+symbol to its weight.
 """
 
 from __future__ import annotations
@@ -72,12 +70,14 @@ OP_MAP = {
     OpType.Rx: qml.RX,
     OpType.Ry: qml.RY,
     OpType.Rz: qml.RZ,
+    OpType.U1: qml.U1,
     OpType.CX: qml.CNOT,
     OpType.CY: qml.CY,
     OpType.CZ: qml.CZ,
     OpType.CRx: qml.CRX,
     OpType.CRy: qml.CRY,
     OpType.CRz: qml.CRZ,
+    OpType.CCX: qml.Toffoli,
     OpType.CU1: lambda a, wires: qml.ctrl(qml.U1(a, wires=wires[1]),
                                           control=wires[0]),
     OpType.SWAP: qml.SWAP,
@@ -340,14 +340,9 @@ class PennyLaneCircuit:
     def draw(self):
         """
         Print a string representation of the circuit
-        similar to `qml.draw`, but including post-selection.
-
-        Parameters
-        ----------
-        symbols : list of :class:`sympy.core.symbol.Symbol`, default: None
-            The symbols from the original DisCoPy circuit.
-        weights : list of :class:`torch.FloatTensor`, default: None
-            The weights to substitute for the symbols.
+        similar to `qml.draw`, but including post-selection, on its concrete
+        parameters, set with :meth:`initialise_concrete_params` when it has
+        symbolic ones.
         """
         if self._concrete_params is None:
             raise ValueError('Cannot draw circuit with symbolic parameters. '
@@ -463,16 +458,8 @@ class PennyLaneCircuit:
 
     def eval(self):
         """
-        Evaluate the circuit. The symbols should be those
-        from the original DisCoPy diagram, which will be substituted
-        for the concrete parameters in weights.
-
-        Parameters
-        ----------
-        symbols : list of :class:`sympy.core.symbol.Symbol`, default: None
-            The symbols from the original DisCoPy circuit.
-        weights : list of :class:`torch.FloatTensor`, default: None
-            The weights to substitute for the symbols.
+        Evaluate the circuit on its concrete parameters, set with
+        :meth:`initialise_concrete_params` when it has symbolic ones.
 
         Returns
         -------

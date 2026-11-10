@@ -1,4 +1,5 @@
 import pytest
+import cmath
 import math
 from discopy.optyx.core.zw import *
 from discopy.optyx.photonic import (
@@ -114,7 +115,7 @@ def dict_allclose(d1: dict, d2: dict, *, rel_tol=1e-05, abs_tol=1e-10) -> bool:
     for key in all_keys:
         v1 = d1.get(key, 0.0)
         v2 = d2.get(key, 0.0)
-        if not math.isclose(v1, v2, rel_tol=rel_tol, abs_tol=abs_tol):
+        if not cmath.isclose(v1, v2, rel_tol=rel_tol, abs_tol=abs_tol):
             return False
     return True
 
@@ -401,6 +402,38 @@ def test_trailing_detector():
     measured = circuit >> circuit.cod[:1] @ NumberResolvingMeasurement(1)
     check_dict_agreement(
         expected, (Create_(1, 1) >> measured).eval().prob_dist())
+
+
+@pytest.mark.parametrize("herald, condition", [
+    (0, "[1]==1"), (0, "[2]==1"), (1, "[2]==1"), (2, "[1]==1"),
+    (0, "[0,2]==1")])
+def test_postselection_reads_processor_modes(herald, condition):
+    """A postselection names the modes of the processor, heralded ones
+    included, as in perceval."""
+    p = pcvl.Processor("SLOS", 3)
+    p.add(0, pcvl.BS())
+    p.add(1, pcvl.BS())
+    p.add_herald(herald, 0)
+    p.set_postselection(pcvl.PostSelect(condition))
+    p.with_input(pcvl.BasicState([1, 0]))
+    expected = {tuple(k): v for k, v in p.probs()["results"].items()}
+    check_dict_agreement(expected, (
+        Create_(1, 0) >> Channel.from_perceval(p)).eval().prob_dist())
+
+
+@pytest.mark.parametrize("location, state", [
+    (pcvl.PortLocation.INPUT, [0]), (pcvl.PortLocation.OUTPUT, [1, 0]),
+    (pcvl.PortLocation.IN_OUT, [0])])
+def test_heralds_act_at_their_location(location, state):
+    """A herald creates its photons on the input, selects them on the
+    output, or both, as its location says in perceval."""
+    p = pcvl.Processor("SLOS", 2)
+    p.add(0, pcvl.BS())
+    p.add_herald(0, 1, location=location)
+    p.with_input(pcvl.BasicState(state))
+    expected = {tuple(k): v for k, v in p.probs()["results"].items()}
+    check_dict_agreement(expected, (
+        Create_(*state) >> Channel.from_perceval(p)).eval().prob_dist())
 
 
 CONFIGURATOR_VALUES = {"alpha": 0.3, "beta": 1.1}

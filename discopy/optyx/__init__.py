@@ -9,32 +9,35 @@ in, with qubits in :mod:`discopy.optyx.qubits`, photons in
 :mod:`discopy.optyx.photonic` and bits in :mod:`discopy.optyx.classical`, on
 top of the calculi of :mod:`discopy.optyx.core`.
 :mod:`discopy.optyx.contextuality` gives the empirical models of their
-Bell tests, :mod:`discopy.optyx.sampling` samples their outputs tick after
-tick, and
-:mod:`discopy.optyx.compiler` compiles measurement-based patterns to
-single-emitter photonic hardware.
+Bell tests, :mod:`discopy.optyx.interaction` closes their feedback loops as
+combinatorial maps of recurrent channels with stream and stationary
+semantics, :mod:`discopy.optyx.sampling` samples their outputs tick after
+tick, and :mod:`discopy.optyx.compiler` compiles measurement-based patterns
+to single-emitter photonic hardware.
 
 .. autosummary::
     :template: module.rst
     :toctree: ../_api
 
-    discopy.optyx.channel
-    discopy.optyx.qubits
-    discopy.optyx.photonic
-    discopy.optyx.classical
-    discopy.optyx.contextuality
-    discopy.optyx.interaction
-    discopy.optyx.core
-    discopy.optyx.sampling
-    discopy.optyx.compiler
+    channel
+    qubits
+    photonic
+    classical
+    contextuality
+    interaction
+    core
+    sampling
+    compiler
 
 Note
 ----
 Unlike the rest of DisCoPy, which is under the BSD 3-Clause License,
 ``discopy.optyx`` is under the Apache License, Version 2.0: see ``LICENSE``
-and ``NOTICE`` in its directory. It needs the ``optyx`` extra, i.e.
-``pip install discopy[optyx]``, and ``import discopy.optyx`` imports none of
-perceval, graphix, pytket or qiskit until they are called for.
+and ``NOTICE`` in its directory. It needs the ``optyx`` extra of this
+repository, e.g. ``uv sync --group optyx``, or ``pip install -e '.[optyx]'``
+from a clone: the ``discopy`` on PyPI does not include ``discopy.optyx`` yet.
+``import discopy.optyx`` imports none of perceval, graphix, pytket or qiskit
+until they are called for.
 """
 
 from discopy.optyx import channel

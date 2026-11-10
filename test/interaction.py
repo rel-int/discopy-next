@@ -252,8 +252,8 @@ def test_yanking():
     from discopy.abc import Nat
     from discopy.matrix import Matrix
     x = Ty[Nat](Nat(1), Nat(2))
-    assert Diagram[Matrix[bool]].yanking(x)
     X = Ty[compact.Ty](compact.Ty('x'), compact.Ty("x'", "y'"))
+    assert Diagram[Matrix[bool]].yanking(x)
     assert Diagram[compact.Diagram].yanking.modulo(
         lambda diagram: diagram.inside.to_hypergraph())(X)
 
@@ -284,3 +284,8 @@ def test_hash():
     for term in terms:
         assert hash(term) == hash(type(term)(*vars(term).values()))
     assert len({f, type(f)(f.inside, x, y), g}) == 2
+
+
+def test_Ty_is_atomic_on_integers():
+    assert Ty[int](1, 1).is_atomic
+    assert not Ty[int](1, 2).is_atomic and not Ty[int]().is_atomic
