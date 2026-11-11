@@ -60,6 +60,7 @@ dev = [
 ]
 docs = ["discopy[docs]"]
 notebooks = ["discopy[notebooks]"]
+tensor = ["discopy[tensor]"]
 quantum = ["discopy[quantum]"]
 grammar = ["discopy[grammar]"]
 optyx = ["discopy[optyx]"]
@@ -67,12 +68,18 @@ all = [
     { include-group = "dev" },
     { include-group = "docs" },
     { include-group = "notebooks" },
+    { include-group = "tensor" },
     { include-group = "quantum" },
     { include-group = "grammar" },
     { include-group = "optyx" },
 ]
 
 [project.optional-dependencies]
+tensor = [
+    "opt_einsum",
+    "quimb",
+    "cotengra",
+]
 quantum = [
     "pytket",
     "pyzx == 0.10.7",
