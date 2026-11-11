@@ -1459,7 +1459,6 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   `discopy/optyx/NOTICE`, replacing the TOML table setuptools deprecates: the
   built wheel and sdist carry `License-Expression` and all three
   `License-File`s ([next#445]).
-
 - `benchmark/data/egraph-traces/` holds 50 e-graph traces of a program search
   on 1D-ARC, without values and with heads renamed: the test data of the
   e-graph builder benchmark ([next#500]).
