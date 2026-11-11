@@ -219,7 +219,7 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 - `optyx.classical.Digit`, `PostselectDigit` and `PostselectBit` reject the
   empty case with a `ValueError` instead of reading it as one mode or as the
-  scalar one: a digit of no digits is `Id()` already ([next#497]).
+  scalar one: a digit of no digits is `Id()` already ([next#498]).
 
 - `tensor.Diagram.to_quimb` is built on the combinatorial map, through
   `tensor.Functor.to_quimb`: swaps, cups and caps are wiring instead of
@@ -405,7 +405,7 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 - `optyx.core.zx.H` is its own dagger: a box declares itself self-adjoint
   with `is_dagger=None`, as `quantum.gates.SWAP` does, where the optyx
   dagger otherwise returns a differently named copy — so `H[::-1] == H`
-  and `to_pyzx` reads a daggered Hadamard ([next#497]).
+  and `to_pyzx` reads a daggered Hadamard ([next#498]).
 - `interaction.Diagram`'s docstring states the codomain of the diagram
   inside as `y.positive @ x.negative`, which is what its constructor, its
   `strategy` and its `to_tree` doctest all read, and an example asserts
@@ -1732,7 +1732,7 @@ for the changelog of `1.2.1` and earlier.
 [next#490]: https://github.com/rel-int/discopy-next/issues/490
 [next#494]: https://github.com/rel-int/discopy-next/pull/494
 [next#495]: https://github.com/rel-int/discopy-next/pull/495
-[next#497]: https://github.com/rel-int/discopy-next/pull/497
+[next#498]: https://github.com/rel-int/discopy-next/pull/498
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#56]: https://github.com/rel-int/optyx/pull/56
