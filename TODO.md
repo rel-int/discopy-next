@@ -13,4 +13,4 @@
 - [WIP] @session_01MEJxy29LoL954iS6TzLhbH-2026-11-11 00:12 `matrix.Contractor(Backend)`: a backend whose `einsum` contracts the arrays of another backend, with `OptEinsum` and `Quimb`; a plain `Backend` is the einsum engine
 - [WIP] @session_01MEJxy29LoL954iS6TzLhbH-2026-11-11 00:12 one word: `contractor` is the parameter and the attribute of `tensor.Functor`, and the parameter of `Diagram.eval` and `Circuit.eval`
 - [WIP] @session_01MEJxy29LoL954iS6TzLhbH-2026-11-11 00:12 keep #533's `Functor.operands` and `Functor.to_quimb`, its tests adapted, its `tensor` extra and README line
-- [ ] CHANGELOG bullets and the checks of CONTRIBUTING.md
+- [WIP] @session_01MEJxy29LoL954iS6TzLhbH-2026-11-11 00:20 CHANGELOG bullets and the checks of CONTRIBUTING.md
