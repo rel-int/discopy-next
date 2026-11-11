@@ -273,7 +273,7 @@ def distribute(diagram: monoidal.Diagram) -> markov.Sum:
         else markov.Sum((result, ))
 
 
-class Builder:
+class Builder:  # pylint: disable=too-many-instance-attributes  # egg's tables
     """
     A mutable e-graph, built as egg does :cite:`WillseyEtAl21`: a union-find
     over the spiders, a hash-cons from each deterministic box up to the
