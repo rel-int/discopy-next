@@ -265,11 +265,15 @@ class Circuit(tensor.Diagram[complex]):
         mixed : bool, optional
             Whether to apply :class:`discopy.tensor.Functor`
             or :class:`ChannelFunctor`.
-        contractor : :class:`discopy.matrix.Contractor` or callable, optional
-            The contractor of the network, e.g.
+        contractor : :class:`discopy.matrix.Backend` or callable, optional
+            The backend whose ``einsum`` contracts the network, e.g.
+            :class:`discopy.matrix.NumPy` or a
+            :class:`discopy.matrix.Contractor` such as
             :class:`discopy.matrix.Quimb`, see
             :meth:`discopy.tensor.Functor.contract`, or a
-            :class:`tensornetwork` contractor.
+            :class:`tensornetwork` contractor. A mixed circuit without a
+            tensornetwork contractor composes its channels layer by layer,
+            with no network for a backend to contract.
         params : kwargs, optional
             Get passed to Circuit.get_counts.
 

@@ -488,7 +488,8 @@ class Functor(frobenius.Functor):
         optimize : The contraction path, passed verbatim to the backend
             ``einsum``, e.g. ``"greedy"``, ``"optimal"`` or an explicit
             path.
-        contractor : The :class:`Contractor` of the network, e.g.
+        contractor : The backend whose ``einsum`` contracts the network,
+            e.g. :class:`NumPy` or a :class:`Contractor` such as
             :class:`OptEinsum` or :class:`Quimb`. By default, the
             ``einsum`` of the active :func:`backend`, switching to
             :class:`OptEinsum` past ``config.MAX_EINSUM_INDICES`` indices.
@@ -527,7 +528,7 @@ class Functor(frobenius.Functor):
             self, ob_map: dict[cat.Ob, Dim] | Callable[[cat.Ob], Dim],
             ar_map: dict[cat.Box, list] | Callable[[cat.Box], list],
             dom: type | None = None, dtype: type | None = float,
-            optimize="greedy", contractor: Contractor | None = None,
+            optimize="greedy", contractor: Backend | None = None,
             **params):
         self.dtype, self.optimize, self.params = dtype, optimize, params
         self.contractor = contractor
@@ -809,7 +810,7 @@ class Diagram[dtype](TestableGeneric, frobenius.Diagram):
         return Dim(*(getattr(obj, "dim", obj) for obj in typ.inside))
 
     def eval(self, dtype: type | None = None, optimize="greedy",
-             contractor: Contractor | None = None, **params) -> Tensor:
+             contractor: Backend | None = None, **params) -> Tensor:
         """
         Evaluate a tensor network as a :class:`Tensor`: call the
         :class:`Functor` that sends each type to its :meth:`dim` and each
@@ -822,8 +823,8 @@ class Diagram[dtype](TestableGeneric, frobenius.Diagram):
                 :meth:`Matrix.promote` gives for their ``dtype``.
             optimize : The contraction path, passed verbatim to the
                 ``einsum`` of the contractor.
-            contractor : The :class:`Contractor` of the network, see
-                :meth:`Functor.contract`.
+            contractor : The backend whose ``einsum`` contracts the
+                network, see :meth:`Functor.contract`.
             params : Any other optional parameter of the ``einsum``
                 method of the contractor, passed verbatim.
 
