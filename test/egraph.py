@@ -529,6 +529,7 @@ def test_building(examples):
 def test_history_strategy(history):
     graph, operations = history
     assert history.graph == graph and history.operations == operations
+    assert not History.checked_params()
     assert {name for name, *_ in operations} <= {"add", "merge", "rebuild"}
     assert len(graph.dom) % 2 == 0
     assert history.build().classes == history.fold().classes
