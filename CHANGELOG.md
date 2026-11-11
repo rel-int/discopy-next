@@ -9,6 +9,12 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Added
 
+- `egraph.Builder`, a mutable e-graph built as egg does, with a union-find, a
+  hash-cons and a worklist: `add` in amortised constant time, `rebuild`
+  repairing only what changed, started with `EGraph.builder` and frozen back
+  into an `EGraph` with `freeze`, where the law `EGraph.building` says it is
+  what the same operations give on the pure one, over `egraph.History`
+  ([next#502]).
 - `matrix.Contractor`, a backend whose `einsum` contracts the arrays of
   another backend, with `OptEinsum` and `Quimb`, which takes `cotengra`
   path optimizers as `optimize` and contracts approximately past a
@@ -1746,6 +1752,7 @@ for the changelog of `1.2.1` and earlier.
 [next#496]: https://github.com/rel-int/discopy-next/pull/496
 [next#498]: https://github.com/rel-int/discopy-next/pull/498
 [next#501]: https://github.com/rel-int/discopy-next/pull/501
+[next#502]: https://github.com/rel-int/discopy-next/pull/502
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#56]: https://github.com/rel-int/optyx/pull/56
