@@ -66,11 +66,11 @@ We also have its dagger and its transpose:
 
 from __future__ import annotations
 
-from typing import ClassVar
 from copy import copy
+from typing import ClassVar
 
-from discopy import cat, cmap, rigid, feedback
-from discopy.abc import PivotalCategory
+from discopy import cat, cmap, messages, rigid, feedback
+from discopy.abc import DaggerCategory, PivotalCategory, RigidCategory
 from discopy.cat import factory
 from discopy.utils import deprecated_alias
 
@@ -104,6 +104,7 @@ class Wire(feedback.Wire, rigid.Wire):
 
     def __repr__(self):
         return rigid.Wire.__repr__(self)[:-1] + self.repr_time_step() + ")"
+    windings = (0, 1)
 
     def dagger(self) -> Wire:
         """
@@ -114,7 +115,7 @@ class Wire(feedback.Wire, rigid.Wire):
         return self.l
 
 
-HeadOb, TailOb = feedback.wire_generators(Wire)
+HeadOb, TailOb = feedback.structural_wires(Wire)
 
 
 @factory
@@ -158,6 +159,11 @@ class Diagram(rigid.Diagram, feedback.Diagram, PivotalCategory):
         dom (Ty) : The domain of the diagram, i.e. its input.
         cod (Ty) : The codomain of the diagram, i.e. its output.
     """
+    pivotality = PivotalCategory.pivotality.failing(
+        messages.NO_PLANAR_NORMAL_FORM)
+    trace_superposing_left = PivotalCategory.trace_superposing_left
+    trace_superposing_right = PivotalCategory.trace_superposing_right
+
     sum_factory: ClassVar[type["Sum"]]
     box_factory: ClassVar[type["Box"]]
     functor_factory: ClassVar[type["Functor"]]
@@ -226,6 +232,27 @@ class Diagram(rigid.Diagram, feedback.Diagram, PivotalCategory):
             >> diagram @ traced_wire.r\
             >> cod @ cls.cup_factory(traced_wire, traced_wire.r)
 
+    dagger_involution = DaggerCategory.dagger_involution.failing(
+        messages.FEEDBACK_HAS_NO_DAGGER)
+    dagger_involution_rigid = DaggerCategory.dagger_involution.weaken(
+        within=RigidCategory)
+    dagger_contravariance = DaggerCategory.dagger_contravariance.failing(
+        messages.FEEDBACK_HAS_NO_DAGGER)
+    dagger_contravariance_rigid = DaggerCategory.dagger_contravariance\
+        .weaken(within=RigidCategory)
+    dagger_monoidality = DaggerCategory.dagger_monoidality.failing(
+        messages.NO_PLANAR_NORMAL_FORM)
+    rotate_contravariance = PivotalCategory.rotate_contravariance.failing(
+        messages.FEEDBACK_HAS_NO_DAGGER)
+    rotate_contravariance_rigid = PivotalCategory.rotate_contravariance\
+        .weaken(within=RigidCategory)
+    adjunction = PivotalCategory.adjunction.failing(
+        messages.FEEDBACK_HAS_NO_DAGGER)
+    adjunction_rigid = PivotalCategory.adjunction.weaken(within=RigidCategory)
+    dagger_involution_monoidal = None
+    dagger_contravariance_monoidal = None
+    dagger_monoidality_monoidal = None
+
 
 class Box(rigid.Box, feedback.Box, Diagram):
     """
@@ -241,7 +268,7 @@ class Box(rigid.Box, feedback.Box, Diagram):
 
     def __init__(self, name, dom, cod, *args, time_step: int = 0, **params):
         rigid.Box.__init__(self, name, dom, cod, *args, **params)
-        self._time_step, self._args, self._params = time_step, args, params
+        self._time_step = time_step
 
     def __repr__(self):
         if self.is_dagger:
@@ -318,6 +345,8 @@ class Bubble(rigid.Bubble, feedback.Bubble, Box):
     >>> bubble = Box('f', x, y).bubble()
     >>> assert bubble.r.r == bubble == bubble.l.l and bubble.r == bubble.l
     """
+    serialised_attrs = rigid.Bubble.serialised_attrs + ("time_step", )
+
     def rotate(self, left=False) -> Bubble:
         result = super().rotate(left)
         result.z %= 2
@@ -337,7 +366,8 @@ class Functor(rigid.Functor, feedback.Functor):
     dom = cod = Diagram
 
 
-Feedback, Trace, FollowedBy, Head, Tail = feedback.generators(Diagram, Box)
+Feedback, Trace, FollowedBy, Head, Tail = feedback.structural_boxes(
+    Diagram, Box)
 Diagram.box_factory = Box
 Diagram.functor_factory = Functor
 Diagram.cup_factory, Diagram.cap_factory = Cup, Cap

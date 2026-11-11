@@ -392,6 +392,7 @@ CMap = cmap.CMap[Diagram]
 class TermBase(Box, closed.TermBase):
     "A term in the internal language of an abstract categorial grammar."
     functor = Functor.id(Diagram)
+    strategy = classmethod(closed.TermBase.strategy.__func__)
 
 
 class Constant(TermBase, closed.Constant):
@@ -416,7 +417,8 @@ class Abstraction(TermBase, closed.Abstraction):
 type Term = Constant | Variable | Application | Abstraction
 
 Id = Diagram.id
-Feedback, Trace, FollowedBy, Head, Tail = feedback.generators(Diagram, Box)
+Feedback, Trace, FollowedBy, Head, Tail = feedback.structural_boxes(
+    Diagram, Box)
 Diagram.box_factory, Diagram.functor_factory = Box, Functor
 Diagram.copy_factory = Copy
 Diagram.function_factory = Function

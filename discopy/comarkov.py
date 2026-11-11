@@ -114,6 +114,9 @@ class Diagram(symmetric.Diagram, ComarkovCategory):
     cofunction_factory: ClassVar[type["Cofunction"]]
     layer_factory = Layer
 
+    map_agreement = monoidal.Diagram.map_agreement.failing(
+        messages.MAP_HAS_NO_SPIDERS)
+
     @classmethod
     def spider_factory(cls, n_legs_in, n_legs_out, typ, phase=None):
         if phase is not None or n_legs_out != 1:
@@ -237,8 +240,8 @@ class Cofunction(Box):
     def __init__(self, cod: monoidal.Ty, cofunc):
         func = finset.Function(list(cofunc), Nat(len(cod)), Nat(len(cofunc)))
         self.cofunc = op.Comarkov(func)  # ty: ignore[invalid-argument-type]
-        dom = cod[:0].tensor(*(cod[i] for i in cofunc))
-        Box.__init__(self, f"Cofunction({list(cofunc)})", dom, cod)
+        dom = cod[:0].tensor(*(cod[i] for i in func))
+        Box.__init__(self, f"Cofunction({list(func)})", dom, cod)
 
     def __getnewargs__(self):
         """
@@ -447,6 +450,21 @@ class Merge(Cofunction):
         """
         return self.cod, len(self.dom)
 
+    @classmethod
+    # pylint: disable-next=arguments-differ  # drawn with no boundary
+    def strategy(cls, *, types=None):
+        """
+        Generate the merge of two or three copies of an atomic type.
+
+        Parameters:
+            types : The strategy to draw the types from, see
+                :meth:`atomic_strategy`.
+        """
+        from hypothesis import strategies as st
+
+        return st.builds(
+            cls, cls.atomic_strategy(types), st.sampled_from((2, 3)))
+
     cofunc = property(lambda self: op.Comarkov(
         finset.Function.copy(
             1, len(self.dom))))  # ty: ignore[invalid-argument-type]
@@ -484,6 +502,18 @@ class Noise(Merge):
         super().__init__(x, n)
         if self.dom:
             raise ValueError(f"A noise has no copies, got n={len(self.dom)}.")
+
+    @classmethod
+    # pylint: disable-next=arguments-differ  # drawn with no boundary
+    def strategy(cls, *, types=None):
+        """
+        Generate the noise on an atomic type.
+
+        Parameters:
+            types : The strategy to draw the types from, see
+                :meth:`atomic_strategy`.
+        """
+        return cls.atomic_strategy(types).map(cls)
 
 
 class Sum(symmetric.Sum, Box):
@@ -534,6 +564,12 @@ class Functor(symmetric.Functor):
     def __call__(self, other):
         if isinstance(other, Merge) and hasattr(self.cod, "merge"):
             return self.cod.merge(self(other.cod), len(other.dom))
+        if isinstance(other, Cofunction) and hasattr(
+                self.cod.ar, "cofunction_factory")\
+                and not isinstance(other, symmetric.Permutation):
+            sizes = [Nat(len(self(x))) for x in other.cod]
+            return self.cod.ar.from_cofunction(finset.Function.function(
+                other.cofunc.inside, sizes).inside, self(other.cod))
         if isinstance(other, Cofunction) and hasattr(self.cod, "merge")\
                 and not isinstance(other, symmetric.Permutation):
             cofunction = getattr(self.cod, "cofunction", None)\
@@ -545,7 +581,8 @@ class Functor(symmetric.Functor):
 
 CMap = cmap.CMap[Diagram]
 
-Feedback, Trace, FollowedBy, Head, Tail = feedback.generators(Diagram, Box)
+Feedback, Trace, FollowedBy, Head, Tail = feedback.structural_boxes(
+    Diagram, Box)
 Diagram.box_factory = Box
 Diagram.functor_factory = Functor
 Hypergraph = hypergraph.Hypergraph[Diagram]

@@ -217,6 +217,14 @@ def test_functor_factory():
     assert Diagram.functor_factory({x: y}, {})(x.r) == y.r
 
 
+def test_to_rigid_is_the_identity_on_rigid_diagrams():
+    x, y = Ty('x'), Ty('y')
+    f, g = Box('f', x, y, data=7), Box('g', x.r, y)
+    for diagram in (g, f.r, f.l, Cup(x, x.r) >> Cap(y, y.l)):
+        assert diagram.to_rigid() == diagram
+    assert f.l.to_rigid().data == 7
+
+
 def test_Layer_merge_to_identity():
     x = Ty('x')
     with raises(AxiomError):  # a snake is no layer, see #599.
@@ -254,7 +262,7 @@ def test_Bubble_rotate():
         assert eval(repr(rotated)) == rotated == loads(dumps(rotated))
         assert rotated[::-1][::-1] == rotated
         assert eval(repr(rotated[::-1])).is_dagger
-    assert str(bubble.l.l) == "(f).bubble().l.l"
+    assert str(bubble.l.l) == "(f).bubble(name='N').l.l"
     assert bubble.r[::-1] == bubble[::-1].r
     F = Functor({x: y, y: x}, {f: g})
     assert F(bubble.r) == F(bubble).r == g.bubble(name="N").r
@@ -266,3 +274,19 @@ def test_Bubble_rotate_subs():
     x, y = Ty('x'), Ty('y')
     symbolic = Box('f', x, y, data=phi).bubble()
     assert symbolic.r.subs(phi, 1) == symbolic.subs(phi, 1).r
+
+
+def test_structural_boxes():
+    from discopy.testable import assert_structural_boxes
+    assert_structural_boxes(Diagram)
+
+
+def test_str_transparency_of_a_rotated_box():
+    """ A rotated box prints as its unwound box rotated, e.g. ``f.r``, so
+    its atom is that box, by its name, see #489. """
+    x, y = Ty('x'), Ty('y')
+    f = Box('f', x, y)
+    for box in [f.r, f.l, f.r.r, f.l.l, f[::-1].r, f.l[::-1].l]:
+        assert box.atoms()[0] == f
+        assert Diagram.str_transparency(box)
+    assert Diagram.str_transparency(f.l @ f.r >> x.l @ f.r[::-1])

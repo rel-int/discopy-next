@@ -130,7 +130,8 @@ import numpy as np
 
 from discopy import monoidal, ribbon, tensor, frobenius, messages
 from discopy.tensor import Dim, Box, Id
-from discopy.abc import RibbonCategory, NamedGeneric
+from discopy.abc import RibbonCategory
+from discopy.testable import TestableGeneric
 from discopy.utils import (
     assert_isinstance, assert_iscomposable, classproperty, factory,
     factory_name, from_tree, get_origin, product, unbiased)
@@ -326,7 +327,7 @@ class Algebra:
             and self.generators == other.generators
 
     def __hash__(self):
-        return hash(repr(self.generators))
+        return hash(self.generators)
 
     def to_tree(self) -> dict:
         """
@@ -685,7 +686,7 @@ class Double(Algebra):
         return cls(from_tree(tree['base']))
 
 
-class Representation[algebra](NamedGeneric, frobenius.Dim):
+class Representation[algebra](TestableGeneric, frobenius.Dim):
     """
     A finite-dimensional (left) module over the class parameter ``algebra``:
     given a :class:`Algebra` ``H``, the class ``Representation[H]`` is
@@ -728,6 +729,11 @@ class Representation[algebra](NamedGeneric, frobenius.Dim):
     .. graphviz:: /_static/hopf/module.dot
         :align: center
     """
+    @classmethod
+    def checked_params(cls) -> tuple:
+        """ None, a representation drawing no algebra. """
+        return ()
+
     def __init__(self, dim=None, action=None):
         if self.algebra is None:
             raise ValueError(
@@ -848,9 +854,11 @@ class Representation[algebra](NamedGeneric, frobenius.Dim):
     def qdim(self):
         """
         The quantum dimension: the value of a loop coloured by ``V``, i.e. the
-        (co)evaluation :math:`\\cup \\circ \\cap` in :class:`Intertwiner`.
+        (co)evaluation :math:`\\cup \\circ \\cap` in ``Intertwiner[H]``,
+        twisted by the pivotal element of ``H``.
         """
-        loop = Intertwiner.caps(self, self.r) >> Intertwiner.cups(self, self.r)
+        category = Intertwiner[self.algebra]
+        loop = category.caps(self, self.r) >> category.cups(self, self.r)
         return complex(loop.eval(dtype=complex).array)
 
     def is_module(self):
@@ -945,7 +953,7 @@ class Representation[algebra](NamedGeneric, frobenius.Dim):
 
 
 @factory
-class Intertwiner[algebra](NamedGeneric, RibbonCategory):
+class Intertwiner[algebra](TestableGeneric, RibbonCategory):
     """
     The ribbon category :math:`\\mathrm{Rep}(H)` of representations of the
     class parameter ``algebra``: given a :class:`Algebra` ``H``, an
@@ -1009,6 +1017,11 @@ class Intertwiner[algebra](NamedGeneric, RibbonCategory):
     ob = classproperty(
         lambda cls: frobenius.Dim if cls.algebra is None
         else Representation[cls.algebra])
+
+    @classmethod
+    def checked_params(cls) -> tuple:
+        """ None, an intertwiner drawing no algebra. """
+        return ()
 
     def __init__(self, inside, dom, cod):
         for x in (dom, cod):

@@ -316,6 +316,22 @@ def test_diagram_to_map_structure_and_errors():
         frobenius.Diagram.spiders(1, 2, x), )
 
 
+def test_copy_is_the_map_of_the_copy_of_its_category():
+    from discopy import markov, tensor
+    M, D = markov.CMap, markov.Diagram
+    x, y = map(markov.Ty, "xy")
+    assert M.copy(x, 1) == M.id(x)
+    assert M.copy(x @ y) == D.copy(x @ y).to_map()
+    assert M.discard(x @ y).boxes == (D.discard(x), D.discard(y))
+    diagram = markov.Box("f", x, x) @ y >> D.copy(x @ y)
+    assert len(diagram.to_map().to_diagram().to_map().boxes) == 3
+    x, y = map(comarkov.Ty, "xy")
+    assert comarkov.CMap.merge(x @ y)\
+        == comarkov.Diagram.merge(x @ y).to_map()
+    spiders = tensor.CMap.spiders(1, 2, tensor.Dim(2, 3))
+    assert {type(box) for box in spiders.boxes} == {tensor.Spider}
+
+
 def test_rigid_handedness():
     from discopy import cmap, rigid
 
@@ -336,6 +352,30 @@ def test_rigid_handedness():
         == compact.Cup(cx.r, cx)
     assert compact.CMap.caps(cx, cx.r).to_diagram()\
         == compact.Cap(cx, cx.r)
+
+
+def test_cup_on_outputs_reads_them_left_to_right():
+    """ A cup wired onto two outputs of a box reads them left to right, as
+    a hypergraph does, though the map stores a box's outputs clockwise. """
+    from discopy import cmap, pivotal, rigid
+    from discopy.hypergraph import Hypergraph
+
+    M, H = cmap.CMap[rigid.Diagram], Hypergraph[rigid.Diagram]
+    x, unit = rigid.Ty("x"), rigid.Ty()
+    f, g = rigid.Box("f", unit, x @ x.r), rigid.Box("g", unit, x.r @ x)
+    cup = f >> rigid.Cup(x, x.r)
+    assert M(unit, unit, (f, ), (1, 0)).to_diagram() == cup
+    assert (H.from_box(f) >> H.cups(x, x.r)).to_map().to_diagram() == cup
+    with raises(AxiomError, match="pivotal"):
+        M(unit, unit, (g, ), (1, 0))
+
+    M = cmap.CMap[pivotal.Diagram]
+    x, unit = pivotal.Ty("x"), pivotal.Ty()
+    f, g = pivotal.Box("f", unit, x @ x.r), pivotal.Box("g", unit, x.r @ x)
+    assert M(unit, unit, (f, ), (1, 0)).to_diagram()\
+        == f >> pivotal.Cup(x, x.r)
+    assert M(unit, unit, (g, ), (1, 0)).to_diagram()\
+        == g >> pivotal.Cup(x.r, x)
 
 
 def test_only_to_diagram_needs_the_structure():
@@ -921,7 +961,7 @@ def test_from_glued_agrees_with_folding():
         h >> Swap(y, y) >> g,
         Diagram.id(x) @ Cap(x.r, x) >> Cup(x, x.r) @ Diagram.id(x),
         Cap(x.r, x) >> Cup(x.r, x),
-        h >> Cup(y, y.r) if y.r == y else h >> g,
+        Box("k", x, y @ y.r) >> Cup(y, y.r),
     ]
     for diagram in diagrams:
         folded = M.functor(
@@ -949,6 +989,25 @@ def test_from_glued_loops():
         (M.caps(x.r, x), 0), (M.caps(y.r, y), 2),
         (M.cups(y.r, y), 2), (M.cups(x.r, x), 0)])
     assert two.loops == (x, y)
+
+
+def test_loops_are_a_multiset():
+    from discopy.compact import Ty, Box, Cup, Cap, Diagram, CMap as M
+    x, y = map(Ty, "xy")
+    assert M(Ty(), Ty(), (), (), loops=(y, x, y)).loops == (x, y, y)
+    a, b = (M.caps(t.r, t) >> M.cups(t.r, t) for t in (x, y))
+    assert a @ b == b @ a and hash(a @ b) == hash(b @ a)
+    f, g = Box("f", x, x).to_map() @ a, Box("g", x, x).to_map() @ b
+    assert (f >> g).dagger() == g.dagger() >> f.dagger()
+    nested = Cap(x.r, x) >> x.r @ Cap(y.r, y) @ x\
+        >> x.r @ Cup(y.r, y) @ x >> Cup(x.r, x)
+    assert nested.to_map() == M.functor(
+        ob_map=lambda typ: typ, ar_map=M.from_box,
+        dom=Diagram, cod=M)(nested)
+    loop = Cap(x.r, x) >> Cup(x.r, x)
+    h = Box("h", x, x)
+    two = h >> loop @ x >> h >> Cap(y.r, y) @ x >> Cup(y.r, y) @ x
+    assert two.dagger().to_map() == two.to_map().dagger()
 
 
 def test_logical_order():
@@ -1253,6 +1312,28 @@ def test_a_match_does_not_cross_wires():
         assert len(matches) == n_matches
         assert all(match.substitute(pattern.to_diagram()).normal_form()
                    == host.to_diagram().normal_form() for match in matches)
+
+
+def test_match_sends_straight_wires_beside_the_image(monkeypatch):
+    from discopy import cmap
+    from discopy.monoidal import Ty, Box
+    x = Ty('x')
+    f, g, h, k = (Box(name, x, x) for name in "fghk")
+    calls, complement = [], cmap.CMap.complement
+
+    def recorded(self, pattern, homomorphism):
+        calls.append(homomorphism)
+        return complement(self, pattern, homomorphism)
+    monkeypatch.setattr(cmap.CMap, "complement", recorded)
+    column = x ** 3 @ f >> x ** 3 @ g
+    host, pattern = (column >> column).to_map(), (x ** 3 @ f).to_map()
+    assert len(list(host.match(pattern))) == 2
+    assert len(calls) <= 2 * 3 ** 3
+    for host, n_matches in [(h @ x >> x @ f, 2), (k @ x >> h @ x >> x @ f, 3)]:
+        assert len(list(host.to_map().match((x @ f).to_map()))) == n_matches
+
+    host = (h @ x >> x @ f).to_map()
+    assert host.beside(iter([0])) == host.beside([0])
 
 
 def test_match_needs_a_connected_map():

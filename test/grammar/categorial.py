@@ -333,6 +333,14 @@ def test_tree2diagram():
         == Word("word", Ty("NP"), dom=Ty("D"))
 
 
+def test_tree2diagram_gives_every_word_its_dom():
+    D, NP, S = Ty("D"), Ty("NP"), Ty("S")
+    sentence = {"type": "ba", "cat": "S", "children": [
+        {"word": "Alice", "cat": "NP"}, {"word": "sleeps", "cat": r"S\NP"}]}
+    assert tree2diagram(sentence, dom=D) == Word("Alice", NP, dom=D)\
+        @ Word("sleeps", NP >> S, dom=D) >> Diagram.ba(NP, S)
+
+
 def test_alpha_eq():
     X, Y, Z = Ty("X"), Ty("Y"), Ty("Z")
     f, g = Constant("f", Y << X), Constant("g", X << Z)

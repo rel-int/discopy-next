@@ -52,13 +52,13 @@ from itertools import count
 from typing import TYPE_CHECKING, Callable, ClassVar, Sequence, TypeVar
 
 from discopy import (
-    cat, monoidal, rigid, frobenius, cmap, config, messages)
+    cat, monoidal, rigid, feedback, frobenius, cmap, config, messages)
 from discopy.cat import factory, assert_iscomposable
 from discopy.frobenius import Dim, Cup
 from discopy.matrix import (  # noqa: F401  pylint: disable=unused-import
     Matrix, backend, set_backend, get_backend,
     NumPy, JAX, PyTorch, TensorFlow)
-from discopy.abc import NamedGeneric
+from discopy.testable import TestableGeneric, no_strategy
 from discopy.python import finset
 from discopy.utils import (
     factory_name, assert_isinstance, product, assert_isatomic,
@@ -131,6 +131,15 @@ class Tensor(Matrix):
     ...     assert jax.grad(f)(1., 2.) == 2.
     """
     ob = Dim
+
+    @classmethod
+    def checked_params(cls) -> tuple:
+        """
+        None, the Kronecker product of the dimensions a law draws growing
+        exponentially in their number, where the direct sum of a matrix
+        grows linearly.
+        """
+        return ()
 
     def __init__(self, array, dom: Dim, cod: Dim):
         assert_isinstance(dom, Dim)
@@ -390,8 +399,10 @@ class Tensor(Matrix):
         This is *not* the same as the algebraic transpose for non-atomic dims.
         """
         # pylint: disable=unused-argument  # Dim is self-dual: one transpose
-        return type(self)(
-            self.array.transpose(), self.cod[::-1], self.dom[::-1])
+        axes = list(range(len(self.dom @ self.cod)))
+        with backend() as np:
+            array = np.moveaxis(self.array, axes, axes[::-1])
+        return type(self)(array, self.cod[::-1], self.dom[::-1])
 
     l = r = property(transpose)
 
@@ -644,7 +655,9 @@ einsum of a backend verbatim, which a file should not reach.
             factor for port in boundary for factor in wires[port]]
         arrays, indices, output = [], [], []
         with backend() as np:
-            eye = lambda dim: np.array(np.eye(dim), dtype=self.dtype)
+            eye = lambda dim: np.array(np.eye(dim) if self.dtype is None
+                                       else np.eye(dim, dtype=int),
+                                       dtype=self.dtype)
             for wire, dim in factors(range(len(other.dom))):
                 label = next(fresh)
                 arrays.append(eye(dim))
@@ -696,7 +709,7 @@ einsum of a backend verbatim, which a file should not reach.
 
 
 @factory
-class Diagram[dtype](NamedGeneric, frobenius.Diagram):
+class Diagram[dtype](TestableGeneric, frobenius.Diagram):
     """
     A tensor diagram is a frobenius diagram with tensor boxes.
 
@@ -716,6 +729,11 @@ class Diagram[dtype](NamedGeneric, frobenius.Diagram):
     >>> Box('f', Dim(1), Dim(1), [0.5])
     tensor.Box[float]('f', Dim(1), Dim(1), data=[0.5])
     """
+    @classmethod
+    def checked_params(cls) -> tuple:
+        """ None, a tensor diagram drawing no arrays. """
+        return ()
+
     sum_factory: ClassVar[type["Sum"]]
     swap_factory: ClassVar[type["Swap"]]
     permutation_factory: ClassVar[type["Permutation"]]
@@ -776,7 +794,8 @@ class Diagram[dtype](NamedGeneric, frobenius.Diagram):
         Tensor[float]([0. , 0.5], dom=Dim(1), cod=Dim(2))
         """
         category = self.category if isinstance(self, cmap.CMap) else self.ar
-        dtype = dtype or getattr(self, "dtype", None)
+        dtype = dtype or getattr(self, "dtype", None)\
+            or getattr(category, "dtype", None)
         boxes = list(self.boxes) if dtype is None else []
         for box in boxes:
             inside = box.terms if isinstance(box, Sum)\
@@ -881,9 +900,9 @@ class Diagram[dtype](NamedGeneric, frobenius.Diagram):
                 outputs[offset:offset + len(box.dom)] = [
                     segment[i] for i in box.perm]
                 continue
-            if isinstance(box, Cup)\
-                    or isinstance(box, Spider) and box.phase is None:
-                dims = (len(box.dom), len(box.cod))
+            dims = (len(box.dom), len(box.cod))
+            if isinstance(box, Cup) or isinstance(box, Spider)\
+                    and box.phase is None and dims != (0, 0):
                 if dims == (1, 1):  # identity
                     continue
                 elif dims == (2, 0):  # cup
@@ -927,9 +946,11 @@ class Diagram[dtype](NamedGeneric, frobenius.Diagram):
 
         Returns
         -------
-        tensor : Tensor
-            with :code:`tensor.dom == self.dom`
-            and :code:`tensor.cod == Dim(len(variables)) @ self.cod`.
+        diagram : Sum
+            with :code:`diagram.dom == self.dom`
+            and :code:`diagram.cod == Dim(len(variables)) @ self.cod`,
+            whose :meth:`eval` is the :meth:`Tensor.jacobian` of
+            :code:`self.eval()`.
 
         Examples
         --------
@@ -937,7 +958,7 @@ class Diagram[dtype](NamedGeneric, frobenius.Diagram):
         >>> from sympy.abc import x, y, z
         >>> vector = Box("v", Dim(1), Dim(2), [x ** 2, y * z])
         >>> vector.jacobian([x, y, z]).eval(dtype=Expr)
-        Tensor[Expr]([2.0*x, 0, 0, 1.0*z, 0, 1.0*y], dom=Dim(1), cod=Dim(3, 2))
+        Tensor[Expr]([2*x, 0, 0, z, 0, y], dom=Dim(1), cod=Dim(3, 2))
         """
         dim = Dim(len(variables) or 1)
         result = Sum((), self.dom, dim @ self.cod)
@@ -947,6 +968,11 @@ class Diagram[dtype](NamedGeneric, frobenius.Diagram):
             result += Box(str(var), Dim(1), dim, onehot.array)\
                 @ self.grad(var, **params)
         return result
+
+    # A tensor box carries an array, which the strategy of a free category
+    # does not draw: tensor diagrams, circuits and ZX diagrams stay out of
+    # the matrix.
+    strategy = no_strategy
 
 
 CMap = cmap.CMap[Diagram]
@@ -1017,7 +1043,9 @@ class Box[dtype](frobenius.Box, Diagram[dtype]):
         and inside tuples too, and a complex one with a non-zero imaginary
         part the pair of its parts, so that a box holding nan equals itself
         and its hash is stable: the data labels a generator, it is not a
-        number being compared.
+        number being compared. The winding number ``z`` is compared too, as
+        in :meth:`discopy.rigid.Box.setoid`, and the time step, as in
+        :meth:`discopy.feedback.Box.setoid`.
 
         >>> import numpy as np
         >>> f = Box('f', Dim(2), Dim(2), np.array([[0, 1], [1, 0]]))
@@ -1045,7 +1073,7 @@ class Box[dtype](frobenius.Box, Diagram[dtype]):
         entries = () if data is None\
             else tuple(data) if isinstance(data, list) else (data, )
         return (self.name, self.dom, self.cod, self.dtype, self.is_dagger,
-                self.deterministic, self.affine)\
+                self.z, self.deterministic, self.affine, self.time_step)\
             + tuple(map(canonical, entries))
 
 
@@ -1160,9 +1188,10 @@ def func_repr(func: Callable) -> str:
         else f"{func.__module__}.{name}".removeprefix("builtins.")
 
 
-class Bubble(monoidal.Bubble, Box):
+class Bubble(feedback.Bubble, Box):
     """
-    Bubble in a tensor diagram, applies a function elementwise.
+    Bubble in a tensor diagram, applies a function elementwise. It is a
+    feedback bubble, so that a circuit bubble delays as one.
 
     Parameters
     ----------
@@ -1205,7 +1234,7 @@ class Bubble(monoidal.Bubble, Box):
     .. image:: /_static/tensor/product-rule.svg
         :align: center
     """
-    serialised_attrs = monoidal.Bubble.serialised_attrs + ("func", )
+    serialised_attrs = feedback.Bubble.serialised_attrs + ("func", )
     func = staticmethod(lambda x: int(not x))
 
     def __new__(cls, *args, data=None, **kwargs):
@@ -1217,8 +1246,18 @@ class Bubble(monoidal.Bubble, Box):
         super().__init__(inside, **params)
 
     def setoid(self):
-        """ Tensor bubbles are equal when their funcs and daggers are too. """
-        return super().setoid() + (self.func, self.is_dagger)
+        """
+        Tensor bubbles are equal when their args, methods and funcs are, and
+        they are equal as tensor boxes: their daggers too, and their data by
+        its entries, so that a bubble holding a list hashes as a box does.
+
+        >>> import numpy as np
+        >>> f = Box('f', Dim(2), Dim(2), [1, 0, 0, 1])
+        >>> assert f.bubble(data=np.array([1, 2])) == f.bubble(data=[1, 2])
+        >>> assert len({f.bubble(data=[1, 2]), f.bubble(data=[1, 3])}) == 2
+        """
+        args = tuple(f.setoid() for f in self.args)
+        return (type(self), self.method, self.func) + args + Box.setoid(self)
 
     def __repr__(self):
         if self.is_dagger:
@@ -1244,11 +1283,11 @@ class Bubble(monoidal.Bubble, Box):
         """
         from sympy import Symbol
         name = "$\\frac{{\\partial {}}}{{\\partial {}}}$"
-        return Spider(1, 2, self.dom)\
+        return Diagram.spiders(1, 2, self.dom)\
             >> self.arg.bubble(
                 func=Diff(Symbol("tmp"), self.func),
                 drawing_name=name.format(self.drawing_name, var))\
-            @ self.arg.grad(var) >> Spider(2, 1, self.cod)
+            @ self.arg.grad(var) >> Diagram.spiders(2, 1, self.cod)
 
 
 class Diff:

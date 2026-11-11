@@ -28,6 +28,8 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from contextlib import contextmanager
+from functools import partial
+from io import StringIO
 from itertools import combinations
 from math import sqrt
 import os
@@ -40,6 +42,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 
+from matplotlib import cbook
 from matplotlib.colors import is_color_like, to_hex, to_rgb
 from matplotlib.testing.compare import compare_images
 from matplotlib.testing.exceptions import ImageComparisonFailure
@@ -296,28 +299,15 @@ DARK_MODE_STYLE = (
     '}</style>')
 
 
-def add_dark_mode_style(path):
+def add_dark_mode_style(text):
     """
-    Insert :data:`DARK_MODE_STYLE` after the opening tag of an SVG saved at
-    ``path``, a file name or an in-memory text buffer: a media query turning
-    the elements tagged by :meth:`Matplotlib.dark_gid` white on a dark page,
-    every other renderer keeping the static black on a transparent canvas.
+    Insert :data:`DARK_MODE_STYLE` after the opening tag of the SVG ``text``:
+    a media query turning the elements tagged by :meth:`Matplotlib.dark_gid`
+    white on a dark page, every other renderer keeping the static black on a
+    transparent canvas.
     """
-    is_file = not isinstance(path, (str, bytes, os.PathLike))
-    if is_file:
-        text = path.getvalue()
-    else:
-        with open(path, encoding="utf-8") as file:
-            text = file.read()
     opening = text.index(">", text.index("<svg")) + 1
-    text = text[:opening] + DARK_MODE_STYLE + text[opening:]
-    if is_file:
-        path.seek(0)
-        path.truncate()
-        path.write(text)
-    else:
-        with open(path, "w", encoding="utf-8") as file:
-            file.write(text)
+    return text[:opening] + DARK_MODE_STYLE + text[opening:]
 
 
 def savefig(path, format=None, compare=False, tol=DEFAULT['plt_tol']):
@@ -343,11 +333,16 @@ def savefig(path, format=None, compare=False, tol=DEFAULT['plt_tol']):
         {"Software": None} if is_png else None
 
     def save(actual_path):
+        target = StringIO() if is_svg else actual_path
         with matplotlib_context():
-            plt.savefig(actual_path, format=format, metadata=metadata,
-                        transparent=is_svg)
+            plt.savefig(target, format="svg" if is_svg else format,
+                        metadata=metadata, transparent=is_svg)
         if is_svg:
-            add_dark_mode_style(actual_path)
+            text = add_dark_mode_style(target.getvalue())
+            with cbook.open_file_cm(
+                    actual_path, "w", encoding="utf-8") as file:
+                file.write(text if cbook.file_requires_unicode(file)
+                           else text.encode("utf-8"))
 
     save_and_compare(path, save, tol) if compare else save(path)
 
@@ -455,6 +450,30 @@ class Backend(ABC):
         self.max_width = max(self.max_width, max(i for i, _ in points))
 
     @staticmethod
+    def is_transparent(colour) -> bool:
+        """
+        Whether a colour is :data:`discopy.config.TRANSPARENT`, comparing
+        only a name, since an array compares elementwise.
+
+        >>> import numpy as np
+        >>> assert Backend.is_transparent("none")
+        >>> assert not Backend.is_transparent(np.array([.1, .2, .3]))
+        """
+        return isinstance(colour, str) and colour == TRANSPARENT
+
+    @staticmethod
+    def resolve(colour):
+        """
+        The colour matplotlib reads for a name in :data:`COLORS`, any other
+        colour as it is, e.g. an RGB list or array, which is unhashable.
+
+        >>> Backend.resolve("red"), Backend.resolve([.1, .2, .3])
+        ('#e8a5a5', [0.1, 0.2, 0.3])
+        """
+        return COLORS.get(colour, colour) if isinstance(colour, str)\
+            else colour
+
+    @staticmethod
     def readable_foreground(colour, threshold=.5):
         """
         Pick a readable foreground text colour, i.e. ``"white"`` or
@@ -469,7 +488,7 @@ class Backend(ABC):
         """
         from matplotlib.colors import to_rgb
         try:
-            red, green, blue = to_rgb(COLORS.get(colour, colour))
+            red, green, blue = to_rgb(Backend.resolve(colour))
         except (ValueError, TypeError):
             return "black"
         luma = 0.299 * red + 0.587 * green + 0.114 * blue
@@ -1074,10 +1093,13 @@ class Backend(ABC):
         points[i] = points[i].shift(x=asymmetry)
         self.draw_polygon(*points, facecolor=box.color)
         if params.get('draw_box_labels', True):
+            adaptive = self.is_transparent(box.color)
             self.draw_text(box.drawing_name, *positions[node],
                            ha='center', va='center',
-                           color=self.readable_foreground(box.color),
-                           fontsize=params.get('fontsize', None))
+                           color=self.readable_foreground(
+                               "white" if adaptive else box.color),
+                           fontsize=params.get('fontsize', None),
+                           adaptive=adaptive)
 
     def draw_discard(self, positions, node, **params):
         """ Draws a :class:`discopy.quantum.circuit.Discard` box. """
@@ -1166,9 +1188,9 @@ class Backend(ABC):
             # too, where the front of a name like purple is xcolor's RGB.
             # Any other is an xcolor expression, mixed 60% with black, a
             # trailing `!<pct>` being a mix with white.
-            value = COLORS.get(color, color)
+            value = self.resolve(color)
             mix = f"{color}!white" if str(color).count("!") % 2 else color
-            back = color if color == TRANSPARENT\
+            back = color if self.is_transparent(color)\
                 else f"{mix}!60!black" if not is_color_like(value)\
                 else config.darken(to_hex(value, keep_alpha=True))
             front_top0, back_top0 = (
@@ -1212,7 +1234,7 @@ class Backend(ABC):
     def draw_brakets(self, positions, node, **params):
         """ Draws a :class:`discopy.quantum.gates.Ket` box. """
         box, j = node.box, node.j
-        is_bra = len(box.dom) > 0
+        is_bra, adaptive = len(box.dom) > 0, self.is_transparent(box.color)
         for i, bit in enumerate(box._digits):
             kind = "box_dom" if is_bra else "box_cod"
             x = box.dom[i] if is_bra else box.cod[i]
@@ -1227,8 +1249,9 @@ class Backend(ABC):
             self.draw_text(
                 bit, middle[0], middle[1] + (-.25 if is_bra else .2),
                 ha='center', va='center',
-                color=self.readable_foreground(box.color),
-                fontsize=params.get('fontsize', None))
+                color=self.readable_foreground(
+                    "white" if adaptive else box.color),
+                fontsize=params.get('fontsize', None), adaptive=adaptive)
 
     def draw_controlled_gate(self, positions, node, **params):
         """ Draws a :class:`discopy.quantum.gates.Controlled` gate. """
@@ -1326,26 +1349,63 @@ class TikZ(Backend):
         self.nodes, self.nodelayer, self.edgelayer = {}, [], []
         super().__init__()
 
-    @staticmethod
-    def format_color(color):
+    #: The colour names every xcolor knows, i.e. without package options.
+    XCOLOR_NAMES = (
+        "red", "green", "blue", "cyan", "magenta", "yellow", "black", "gray",
+        "white", "darkgray", "lightgray", "brown", "lime", "olive", "orange",
+        "pink", "purple", "teal", "violet")
+
+    @classmethod
+    def needs_rgb(cls, color):
         """
-        Formats a color: a name in :data:`COLORS` or a hexcode, in any form
-        matplotlib reads, as its RGB values, any other color as it is, e.g.
-        transparency, which TikZ spells like matplotlib, or an xcolor name.
+        Whether a color is one matplotlib reads and xcolor does not, e.g.
+        ``"tab:blue"``, ``"C0"``, ``"0.5"``, ``"navy"`` or an RGB tuple, so
+        that TikZ must spell it by its RGB values, or a hexcode.
+
+        >>> assert TikZ.needs_rgb("tab:blue") and TikZ.needs_rgb((0, 0, 1))
+        >>> assert not TikZ.needs_rgb("purple") and not TikZ.needs_rgb("none")
+        """
+        if cls.is_transparent(color) or isinstance(color, str) and (
+                color in COLORS or color in cls.XCOLOR_NAMES):
+            return False
+        return is_color_like(color)
+
+    @classmethod
+    def format_color(cls, color):
+        """
+        Formats a color: a name in :data:`COLORS` or one that matplotlib
+        reads and xcolor does not, e.g. a hexcode, as its RGB values, any
+        other color as it is, e.g. transparency, which TikZ spells like
+        matplotlib, or an xcolor name or expression.
         A TikZ color has no alpha channel, so that of a hexcode is dropped.
 
         >>> TikZ.format_color("red")
         '{rgb,255: red,232; green,165; blue,165}'
         >>> assert TikZ.format_color("#e8a5a5") == TikZ.format_color("red")
         >>> assert TikZ.format_color("#abc") == TikZ.format_color("#aabbcc80")
+        >>> TikZ.format_color("tab:blue")
+        '{rgb,255: red,31; green,119; blue,180}'
         >>> TikZ.format_color("lightgray")
         'lightgray'
         """
-        hexcode = COLORS.get(color, color)
-        if not str(hexcode).startswith("#"):
+        is_named = isinstance(color, str) and color in COLORS
+        if not is_named and not cls.needs_rgb(color):
             return color
-        red, green, blue = (round(255 * x) for x in to_rgb(hexcode))
+        rgb = to_rgb(COLORS[color] if is_named else color)
+        red, green, blue = (round(255 * x) for x in rgb)
         return f"{{rgb,255: red,{red}; green,{green}; blue,{blue}}}"
+
+    @classmethod
+    def style_color(cls, color):
+        """
+        The color in the name of a tikzstyle: as it is written, without the
+        ``#`` of a hexcode, or the hexcode of a color xcolor does not read.
+
+        >>> TikZ.style_color("#336699"), TikZ.style_color("tab:blue")
+        ('336699', '1f77b4')
+        """
+        return to_hex(color)[1:] if cls.needs_rgb(color)\
+            else str(color).removeprefix("#")
 
     def add_node(self, i, j, text=None, options=None, rounded=4):
         """ Add a node to the tikz picture, return its unique id. """
@@ -1385,8 +1445,9 @@ class TikZ(Backend):
             nodes.append(self.add_node(*point))
         nodes.append(nodes[0])
         if self.use_tikzstyles:
-            style_name = "box" if facecolor == DEFAULT["facecolor"]\
-                else f"{str(facecolor).removeprefix('#')}_box"
+            style_name = "box" if isinstance(facecolor, str)\
+                and facecolor == DEFAULT["facecolor"]\
+                else f"{self.style_color(facecolor)}_box"
             style = f"\\tikzstyle{{{style_name}}}=" \
                     f"[-, fill={self.format_color(facecolor)}]\n"
             if style not in self.edge_styles:
@@ -1394,7 +1455,7 @@ class TikZ(Backend):
             options = f"style={style_name}"
         else:
             options = "-, fill=" + (
-                self.format_color(facecolor) if str(facecolor).startswith("#")
+                self.format_color(facecolor) if self.needs_rgb(facecolor)
                 else f"{{{facecolor}}}")
         str_connections = " to ".join(f"({node}.center)" for node in nodes)
         self.edgelayer.append(f"\\draw [{options}] {str_connections};\n")
@@ -1475,14 +1536,16 @@ class TikZ(Backend):
             i, j = graph.positions[node]
             text = node.box.drawing_name if draw_box_labels else ""
             if self.use_tikzstyles:
-                style = f"\\tikzstyle{{{node.box.tikzstyle_name}}}=" \
-                        f"[fill={self.format_color(color)}]\n"
+                style_name = f"{node.box.tikzstyle_name}_"\
+                    f"{self.style_color(color)}_{shape}"
+                style = f"\\tikzstyle{{{style_name}}}=" \
+                        f"[fill={self.format_color(color)}, shape={shape}]\n"
                 if style not in self.node_styles:
                     self.node_styles.append(style)
-                options = f"style={node.box.tikzstyle_name}"
+                options = f"style={style_name}"
             else:
                 options = f"{shape}, fill=" + (
-                    self.format_color(color) if str(color).startswith("#")
+                    self.format_color(color) if self.needs_rgb(color)
                     else color)
             if params.get("nodesize", 1) != 1:
                 options +=\
@@ -1504,14 +1567,24 @@ class TikZ(Backend):
         edges = ["\\begin{pgfonlayer}{edgelayer}\n"] + self.edgelayer\
             + ["\\end{pgfonlayer}\n"]
         end = ["\\end{tikzpicture}\n"]
+
+        def write(lines, actual_path):
+            with open(actual_path, 'w+') as file:
+                file.writelines(lines)
+
+        def save(file_path, lines):
+            if params.get("compare", False):
+                save_and_compare(file_path, partial(write, lines))
+            else:
+                write(lines, file_path)
+
         if path is not None:
             if output_tikzstyle:
-                style_path = '.'.join(path.split('.')[:-1]) + '.tikzstyles'
-                with open(style_path, 'w+') as file:
-                    file.writelines(["% Node styles\n"] + self.node_styles)
-                    file.writelines(["% Edge styles\n"] + self.edge_styles)
-            with open(path, 'w+') as file:
-                file.writelines(begin + nodes + edges + end)
+                style_path = os.path.splitext(os.fspath(path))[0]\
+                    + '.tikzstyles'
+                save(style_path, ["% Node styles\n"] + self.node_styles
+                     + ["% Edge styles\n"] + self.edge_styles)
+            save(path, begin + nodes + edges + end)
         elif show:  # pragma: no cover
             if output_tikzstyle:
                 print(''.join(self.node_styles + self.edge_styles))
@@ -1540,7 +1613,8 @@ class Matplotlib(Backend):
         super().draw_boundary(graph, boundary_color=boundary_color, **params)
 
     def draw_text(self, text, i, j, **params):
-        params['fontsize'] = params.get('fontsize', DEFAULT['fontsize'])
+        if params.get('fontsize') is None:
+            params['fontsize'] = DEFAULT['fontsize']
         if params.pop('adaptive', False):
             params['gid'] = self.dark_gid("fill")
         self.axis.text(i, j, text, **params)
@@ -1550,7 +1624,7 @@ class Matplotlib(Backend):
         color = params.get("color", "black")
         self.axis.scatter(
             [i], [j],
-            c=COLORS.get(color, color),
+            c=self.resolve(color),
             marker=SHAPES[params.get("shape", "circle")],
             s=300 * params.get("nodesize", 1),
             edgecolors=params.get("edgecolor", None),
@@ -1569,8 +1643,8 @@ class Matplotlib(Backend):
         self.axis.add_patch(PathPatch(
             path,
             linewidth=self.linewidth,
-            facecolor=COLORS.get(facecolor, facecolor),
-            edgecolor=COLORS.get(edgecolor, edgecolor)))
+            facecolor=self.resolve(facecolor),
+            edgecolor=self.resolve(edgecolor)))
         super().draw_polygon(*points)
 
     def draw_region_cell(self, left, right, facecolor):
@@ -1589,7 +1663,7 @@ class Matplotlib(Backend):
             Path(vertices, [Path.MOVETO] + codes(left) + [Path.LINETO]
                  + codes(right) + [Path.CLOSEPOLY]),
             linewidth=0, antialiased=False,
-            facecolor=COLORS.get(facecolor, facecolor), edgecolor='none'))
+            facecolor=self.resolve(facecolor), edgecolor='none'))
         super().draw_region_cell(left, right, facecolor)
 
     def draw_regions(self, graph, **params):
@@ -1605,7 +1679,7 @@ class Matplotlib(Backend):
         if not colours:
             return
         handles = [
-            Patch(facecolor=COLORS.get(colour.name, colour.name),
+            Patch(facecolor=self.resolve(colour.name),
                   edgecolor="none", label=colour.legend_label)
             for colour in colours.values()]
         self.axis.legend(
@@ -1652,7 +1726,7 @@ class Matplotlib(Backend):
         vertices.append(start)
         codes.append(Path.CLOSEPOLY)
         self.axis.add_patch(PathPatch(
-            Path(vertices, codes), facecolor=COLORS.get(color, color),
+            Path(vertices, codes), facecolor=self.resolve(color),
             edgecolor='none', linewidth=0))
         super().draw_filled_shape(start, steps, color)
 
@@ -1662,7 +1736,8 @@ class Matplotlib(Backend):
         dark page: black spiders lie on the neutral canvas so they turn
         white, coloured ones keep their colour. A transparent spider is just
         its label, e.g. the symbol of an :class:`discopy.monoidal.Equation`,
-        which leaves no patch on a coloured page.
+        which leaves no patch on a coloured page. The labels are drawn at
+        ``DRAWING_DEFAULT["fontsize_spiders"]``, whatever the ``fontsize``.
         """
         import networkx as nx
         nodes = [node for node in graph.nodes
@@ -1670,12 +1745,12 @@ class Matplotlib(Backend):
         groups = {}
         for node in nodes:
             groups.setdefault(
-                (node.box.shape, node.box.color == "black"), []).append(node)
+                (node.box.shape, isinstance(node.box.color, str)
+                 and node.box.color == "black"), []).append(node)
         for (shape, adaptive), group in groups.items():
             nx.draw_networkx_nodes(
                 *graph.inside, nodelist=group,
-                node_color=[COLORS.get(node.box.color, node.box.color)
-                            for node in group],
+                node_color=[self.resolve(node.box.color) for node in group],
                 node_shape=SHAPES[shape], ax=self.axis,
                 node_size=300 * params.get("nodesize", 1)
             ).set_gid(self.dark_gid("fill") if adaptive else None)
@@ -1684,7 +1759,8 @@ class Matplotlib(Backend):
                     self.draw_text(
                         node.box.drawing_name, *graph.positions[node],
                         ha='center', va='center',
-                        adaptive=node.box.color == TRANSPARENT)
+                        fontsize=DEFAULT['fontsize_spiders'],
+                        adaptive=self.is_transparent(node.box.color))
         super().draw_spiders(graph, draw_box_labels)
 
     def output(self, path=None, show=True, **params):

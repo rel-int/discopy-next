@@ -3,7 +3,7 @@
 import copy
 import io
 
-from pytest import importorskip, raises
+from pytest import importorskip, mark, raises
 
 from discopy.neural.network import Box, Dims, Network
 from discopy.utils import AxiomError
@@ -52,6 +52,7 @@ def test_module_unhashable():
     assert list(module.boxes) == [first, second]
 
 
+@mark.slow
 def test_compile():
     torch = importorskip("torch")
     from discopy.neural.torch import Module

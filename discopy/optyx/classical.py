@@ -121,8 +121,8 @@ and feed the result into a controlled quantum gate.
 **3. Arithmetic on natural-number modes**
 
 >>> num = Digit(3, 2)
->>> add = Add(2)                     # (x,y,z) => x+y+z
->>> parity = add >> Mod2()            # outputs (x+y+z) mod 2 as a bit
+>>> add = Add(2)                     # (x, y) => x + y
+>>> parity = add >> Mod2()            # outputs (x + y) mod 2 as a bit
 >>> post = PostselectBit(1)
 >>> assert np.allclose(
 ...     (num >> parity >> post).double().to_tensor().eval().array, 1
@@ -132,7 +132,8 @@ and feed the result into a controlled quantum gate.
 
 from typing import Callable, List
 import numpy as np
-from discopy.utils import factory_name
+from sympy import lambdify
+from discopy.utils import factory_name, rsubs
 from discopy.optyx import channel
 from discopy.optyx.core import (
     control,
@@ -160,12 +161,21 @@ class BitControlledGate(Channel):
     the Kraus operators for the gate.
     """
     class _BitControlledSingleBox(Channel):
+        """
+        The box of a :class:`BitControlledGate`: it keeps its gate and its
+        default, the identity unless one is given, as its ``data``, so that
+        equality reads them, and prints the call to
+        :class:`BitControlledGate` that builds it.
+        """
         def __init__(
             self,
             control_gate,
             default_gate=None,
-            classical=False
+            classical=False,
+            is_dagger=False
         ):
+            if default_gate is None:
+                default_gate = control_gate.id(control_gate.dom)
             if isinstance(control_gate, (Diagram, Channel)):
                 assert control_gate.is_pure, \
                     "The input gates must be pure quantum channels"
@@ -190,27 +200,43 @@ class BitControlledGate(Channel):
                 default_gate_single
             )
 
+            dom = bit @ tp**len(control_gate_single.dom)
+            cod = tp**len(control_gate_single.cod)
             super().__init__(
                 "BitControlledGate",
-                kraus,
-                bit @ tp**len(control_gate_single.dom),
-                tp**len(control_gate_single.cod)
+                kraus.dagger() if is_dagger else kraus,
+                cod if is_dagger else dom,
+                dom if is_dagger else cod
             )
+            self.control_gate, self.default_gate = control_gate, default_gate
+            self.classical, self.is_dagger = classical, is_dagger
+            self.data = (control_gate, default_gate)
+
+        def __repr__(self):
+            dagger = ", is_dagger=True" if self.is_dagger else ""
+            classical = ", classical=True" if self.classical else ""
+            return f"{factory_name(BitControlledGate)}("\
+                f"{self.control_gate!r}, {self.default_gate!r}"\
+                f"{dagger}{classical})"
+
+        def dagger(self):
+            return type(self)(self.control_gate, self.default_gate,
+                              self.classical, not self.is_dagger)
+
+        @property
+        def free_symbols(self):
+            """ The symbols of its gates. """
+            return self.control_gate.free_symbols\
+                | self.default_gate.free_symbols
 
     def __new__(cls, diag, default_box=None, is_dagger=False, classical=False):
         if default_box is not None:
             return cls._BitControlledSingleBox(
-                diag, default_box, classical=classical
-            ).dagger() if is_dagger else \
-                 cls._BitControlledSingleBox(
-                    diag,
-                    default_box,
-                    classical=classical
-                )
+                diag, default_box, classical, is_dagger)
 
-        boxes = []
-        for i in range(len(diag)):
-            layer = diag[i]
+        boxes, staircases = [], diag.to_staircases()
+        for i in range(len(staircases)):
+            layer = staircases[i]
             (box, offset), = layer.inside[0].boxes_and_offsets
             left = layer.dom[:offset]
             right = layer.dom[offset + len(box.dom):]
@@ -250,9 +276,11 @@ class BitControlledPhaseShift(Channel):
                  n_modes: int = 1,
                  n_control_modes: int = 1):
         self.function = function
-        kraus = control.ControlledPhaseShift(function,
-                                             n_modes,
-                                             n_control_modes)
+        kraus = diagram.Diagram.swap(
+            diagram.Mode(n_modes), diagram.Mode(n_control_modes)
+        ) >> control.ControlledPhaseShift(function,
+                                          n_modes,
+                                          n_control_modes)
         super().__init__(
             "BitControlledPhaseShift",
             kraus,
@@ -324,9 +352,9 @@ class Sub(ClassicalBox):
         super().__init__(
             "SubInt",
             (
-                zw.Add(2).dagger() @ diagram.Id(diagram.Mode(1)) >>
-                diagram.Id(diagram.Mode(1)) @ diagram.Spider(2, 0,
-                                                             diagram.Mode(1))
+                diagram.Id(diagram.Mode(1)) @ zw.Add(2).dagger() >>
+                diagram.Spider(2, 0, diagram.Mode(1)) @
+                diagram.Id(diagram.Mode(1))
             ),
             mode**2,
             mode
@@ -618,10 +646,19 @@ class Z(ClassicalBox):
             bit**n_legs_in,
             bit**n_legs_out,
         )
+        self.data = phase
 
     def __repr__(self):
         return f"{factory_name(type(self))}({len(self.dom)}, "\
             f"{len(self.cod)}, {self.phase!r})"
+
+    def lambdify(self, *symbols, **kwargs):
+        return lambda *xs: type(self)(len(self.dom), len(self.cod), lambdify(
+            symbols, self.phase, **kwargs)(*xs))
+
+    def subs(self, *args):
+        return type(self)(
+            len(self.dom), len(self.cod), rsubs(self.phase, *args))
 
 
 # pylint: disable=invalid-name
@@ -640,10 +677,13 @@ class X(ClassicalBox):
             bit**n_legs_in,
             bit**n_legs_out,
         )
+        self.data = phase
 
     def __repr__(self):
         return f"{factory_name(type(self))}({len(self.dom)}, "\
             f"{len(self.cod)}, {self.phase!r})"
+
+    lambdify, subs = Z.lambdify, Z.subs
 
 
 # pylint: disable=invalid-name

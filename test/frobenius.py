@@ -119,6 +119,16 @@ def test_spider_decomposition():
                                            >> Spider(2, 1, n))
 
 
+def test_unfuse_unfuses_the_spiders_of_a_cospan():
+    x, y = Ty('x'), Ty('y')
+    for diagram in (Spider(1, 4, x) @ y, Spider(1, 3, x) @ Spider(1, 3, y),
+                    Diagram.spiders(1, 4, x @ y)):
+        unfused = diagram.unfuse()
+        assert Equation(diagram, unfused)
+        assert all(box.legs.left.count(k) + box.legs.right.count(k) <= 3
+                   for box in unfused.boxes for k in range(box.legs.apex))
+
+
 def test_Sum():
     f = Box('f', 'x', 'x')
     assert Sum([f]) == f
@@ -145,6 +155,18 @@ def test_Spider_repr():
     for spider in (Spider(1, 2, x, 0.5), Spider(2, 0, x, is_dagger=True),
                    Spider(0, 1, x, 0.25, is_dagger=True)):
         assert eval(repr(spider)) == spider
+
+
+def test_Spider_loads_a_legacy_state_with_its_legs_and_type():
+    x = Ty('x')
+    for n_legs_in, n_legs_out in [(2, 1), (0, 3)]:
+        old = Spider.__new__(Spider)
+        old.__setstate__({
+            '_name': 'Spider', '_data': None, '_dagger': False,
+            '_dom': Nat(n_legs_in), '_cod': Nat(n_legs_out), '_boxes': [],
+            '_layers': [], '_z': 0, '_typ': x})
+        spider = Spider(n_legs_in, n_legs_out, x)
+        assert old.name == spider.name and repr(old) == repr(spider)
 
 
 def test_Wire_adjoints():
@@ -251,3 +273,22 @@ def test_str_transparency_of_a_spider():
     spider = Spider(0, 0, x)
     assert spider.atoms() == [x]
     assert eval(str(spider), Diagram.str_environment(spider)) == spider
+
+
+def test_structural_boxes():
+    from discopy.testable import assert_structural_boxes
+    assert_structural_boxes(Diagram)
+
+
+def test_tensor_drops_a_whiskered_identity_spider():
+    """ Whiskering a spider with one leg on each side leaves the identity,
+    i.e. no layer, so that the tensor serialises, foliates and draws. """
+    from discopy.utils import dumps, loads
+    x = Ty('x')
+    f, spider = Box('f', x, x), Spider(1, 1, x)
+    for diagram in (spider @ f, f @ spider, (f >> spider) @ f):
+        assert all(layer.boxes for layer in diagram.inside)
+        assert loads(dumps(diagram)) == diagram
+        assert diagram.foliation().foliation() == diagram.foliation()
+        assert diagram.to_drawing().dagger().dagger() == diagram.to_drawing()
+    assert spider @ f == x @ f and f @ spider == f @ x

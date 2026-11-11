@@ -88,20 +88,21 @@ from __future__ import annotations
 
 from abc import abstractmethod
 from dataclasses import dataclass, field, replace
+from functools import cached_property
 from inspect import signature
 from itertools import count
 from typing import (
     TYPE_CHECKING, Callable, ClassVar, Iterator, Self, Sequence)
 
 from discopy import cat, monoidal, cmap, hypergraph, messages
-from discopy.abc import BiclosedCategory
+from discopy.abc import BiclosedCategory, DaggerCategory, MonoidalCategory
 from discopy.testable import (
-    GENERATORS, Equation as AbstractEquation, Equivalence, Testable, axiom)
+    GENERATORS, Equation as AbstractEquation, Equivalence, Serialisable,
+    Testable, TestableGeneric, axiom)
 from discopy.drawing import Drawing
 from discopy.cat import factory
 from discopy.utils import (
     AxiomError,
-    NamedGeneric,
     assert_isinstance,
     deprecated_alias,
     factory_name,
@@ -180,19 +181,23 @@ class Ty(monoidal.Ty):
         raise ValueError
 
     @classmethod
-    def strategy(cls, *, max_leaves=3):
+    def strategy(cls, *, max_leaves=3, **params):
         """
         Generate atomic types and their exponentials, ``max_leaves`` atoms
-        at most.
+        at most, or with ``params`` the types the search of the free monoid
+        derives within them, e.g. between a given ``dom`` and ``cod``.
         """
         from hypothesis import strategies as st
+
+        if params:
+            return super().strategy(**params)
 
         def exponentials(types):
             return st.builds(lambda x, y: x << y, types, types)\
                 | st.builds(lambda x, y: x >> y, types, types)
 
         return st.recursive(
-            super().strategy(), exponentials, max_leaves=max_leaves)
+            cls.generator_strategy(), exponentials, max_leaves=max_leaves)
 
     def __repr__(self):
         return factory_name(type(self))\
@@ -307,7 +312,13 @@ class Exp(Wire):
         assert_isinstance(base, self.ob)
         assert_isinstance(exponent, self.ob)
         self.base, self.exponent = base, exponent
-        super().__init__(str(self))
+        super().__init__("")
+        del self.name
+
+    @cached_property
+    def name(self):  # pylint: disable=method-hidden  # deleted by __init__
+        "The name of an exponential is its print, computed when first read."
+        return str(self)
 
     def __eq__(self, other):
         return isinstance(other, type(self))\
@@ -442,6 +453,32 @@ class Diagram(monoidal.Diagram, BiclosedCategory):
     def to_drawing(self):
         return monoidal.Diagram.to_drawing(self, functor_factory=Functor)
 
+    map_agreement = monoidal.Diagram.map_agreement.failing(
+        messages.MAP_OF_A_CURRY)
+    dagger_involution = DaggerCategory.dagger_involution.failing(
+        messages.CURRY_HAS_NO_DAGGER)
+    dagger_involution_monoidal = DaggerCategory.dagger_involution.weaken(
+        within=MonoidalCategory)
+    dagger_contravariance = DaggerCategory.dagger_contravariance.failing(
+        messages.CURRY_HAS_NO_DAGGER)
+    dagger_contravariance_monoidal = DaggerCategory.dagger_contravariance\
+        .weaken(within=MonoidalCategory)
+    dagger_monoidality = DaggerCategory.dagger_monoidality.failing(
+        messages.CURRY_HAS_NO_DAGGER)
+    dagger_monoidality_monoidal = DaggerCategory.dagger_monoidality.weaken(
+        within=MonoidalCategory).failing(messages.NO_PLANAR_NORMAL_FORM)
+    currying_left = BiclosedCategory.currying_left.failing(messages.FREE_CURRY)
+    currying_right = BiclosedCategory.currying_right.failing(
+        messages.FREE_CURRY)
+    currying_eta_left = BiclosedCategory.currying_eta_left.failing(
+        messages.FREE_CURRY)
+    currying_eta_right = BiclosedCategory.currying_eta_right.failing(
+        messages.FREE_CURRY)
+    currying_naturality_left = BiclosedCategory.currying_naturality_left\
+        .failing(messages.FREE_CURRY)
+    currying_naturality_right = BiclosedCategory.currying_naturality_right\
+        .failing(messages.FREE_CURRY)
+
 
 class Box(monoidal.Box, Diagram):
     """
@@ -485,6 +522,25 @@ class Eval(Box):
         super().__setstate__(state)
         self.name = "Eval" + str(self.x)
 
+    @classmethod
+    # pylint: disable-next=arguments-differ  # drawn with no boundary
+    def strategy(cls, *, types=None):
+        """
+        Generate the evaluation of an exponential of two atomic types,
+        ``x << y`` on the left or ``y >> x`` on the right.
+
+        Parameters:
+            types : The strategy to draw the types from, see
+                :meth:`atomic_strategy`.
+        """
+        from hypothesis import strategies as st
+
+        atoms = cls.atomic_strategy(types)
+        return st.tuples(atoms, atoms, st.booleans()).map(
+            lambda args: cls(
+                args[0] << args[1] if args[2] else args[1] >> args[0],
+                left=args[2]))
+
     def __repr__(self):
         return f"{factory_name(type(self))}({self.x!r}, left={self.left!r})"
 
@@ -527,6 +583,7 @@ class Coeval(Box):
     __repr__ = Eval.__repr__
     to_tree = Eval.to_tree
     from_tree = classmethod(Eval.from_tree.__func__)
+    strategy = classmethod(Eval.strategy.__func__)
 
     def __init__(self, x: Exp, left=None):
         assert x.is_exp
@@ -658,8 +715,8 @@ class Functor(monoidal.Functor):
 
     Note
     ----
-    When the codomain objects are biclosed types, the functor sends terms to
-    terms rather than evaluating them to morphisms:
+    When the codomain has terms, i.e. its constants are its arrows, the functor
+    sends terms to terms rather than evaluating them to morphisms:
 
     >>> X, Y = Ty("X"), Ty("Y")
     >>> f, x = (Y << X)("f"), X("x")
@@ -694,8 +751,8 @@ class Functor(monoidal.Functor):
             if issubclass(get_origin(self.cod), hypergraph.Hypergraph)\
                     and not isinstance(other, Constant):
                 return self(other.eval())
-            if issubclass(get_origin(self.cod.ob), Ty) and not issubclass(
-                    get_origin(self.cod), (cmap.CMap, hypergraph.Hypergraph)):
+            if issubclass(get_origin(self.cod.ob), Ty) and issubclass(
+                    self.cod.ob.constant_factory, get_origin(self.cod)):
                 return self.map_term(other)
             return other.eval(self)
         for cls, attr in [(Over, "over"), (Under, "under"), (Exp, "exp")]:
@@ -706,8 +763,8 @@ class Functor(monoidal.Functor):
                 if hasattr(self.cod, attr):
                     return getattr(self.cod, attr)(base, exponent)
         if isinstance(other, Curry) and hasattr(self.cod, "curry"):
-            return self.cod.curry(
-                self(other.arg), len(self(other.cod.exponent)), other.left)
+            n = len(self(other.cod.exponent)) if other.n else 0
+            return self.cod.curry(self(other.arg), n, other.left)
         if isinstance(other, (Eval, Coeval)) and hasattr(self.cod, "ev"):
             base, exponent, left = other.x.base, other.x.exponent, other.left
             result = self.cod.ev(self(base), self(exponent), left)
@@ -770,6 +827,155 @@ CMap = cmap.CMap[Diagram]
 
 
 Diagram.functor_factory = Functor
+
+
+class Renamed[factory](TestableGeneric, tuple):
+    """
+    Alpha-equivalent terms of the ``factory``: one shape generated under two
+    or more namings of its bound variables, see :meth:`TermBase.generate`.
+
+    Example
+    -------
+    >>> from hypothesis import find
+    >>> terms = find(
+    ...     Renamed[TermBase].strategy(), lambda terms: len(terms) == 3)
+    >>> assert terms[0].alpha_eq(*terms[1:])
+    """
+    @classmethod
+    def checked_params(cls) -> tuple:
+        """ None, a sort of premises being drawn over a category. """
+        return ()
+
+    @classmethod
+    def strategy(cls, **params) -> "st.SearchStrategy[Renamed]":
+        """
+        Generate a shape and at least two namings of it.
+
+        Parameters:
+            params : Passed to :meth:`TermBase.shapes`.
+        """
+        from hypothesis import strategies as st
+
+        category = cls.factory
+        return st.builds(
+            lambda shape, namings: cls(
+                category.generate(*shape, letters) for letters in namings),
+            category.shapes(**params),
+            st.lists(category.namings(), min_size=2, max_size=3))
+
+
+class Canonical[factory](TestableGeneric, tuple):
+    """
+    Two terms of the ``factory`` followed by their canonical forms: two
+    shapes of one type, the second the first's or another, each generated
+    under its own naming and then under the one naming ``"x"``, which names
+    every bound variable by its level, so that the two terms are
+    alpha-equivalent exactly when their canonical forms are equal. Where
+    :class:`Renamed` draws terms alpha-equivalent by construction, this
+    decides the alpha-equivalence of any pair, see
+    :meth:`TermBase.alpha_completeness`.
+
+    Example
+    -------
+    >>> from hypothesis import find
+    >>> first, second, *canonical = find(
+    ...     Canonical[TermBase].strategy(),
+    ...     lambda terms: terms[0] != terms[1] and terms[2] == terms[3])
+    >>> assert first.alpha_eq(second)
+    """
+    @classmethod
+    def checked_params(cls) -> tuple:
+        """ None, a sort of premises being drawn over a category. """
+        return ()
+
+    @classmethod
+    def build(cls, shape: tuple, others: list[int] | None,
+              namings: tuple[Sequence[str], Sequence[str]]) -> "Canonical":
+        """
+        The terms of a shape and of another, the same when ``others`` is
+        ``None``, under their namings and then under the canonical one.
+        """
+        cod, choices, types = shape
+        shapes = (choices, choices if others is None else others)
+        return cls(
+            cls.factory.generate(cod, each, types, letters)
+            for each, letters in zip(2 * shapes, (*namings, "x", "x")))
+
+    @classmethod
+    def strategy(cls, **params) -> "st.SearchStrategy[Canonical]":
+        """
+        Generate a shape, its choices again or others, and two namings.
+
+        Parameters:
+            params : Passed to :meth:`TermBase.shapes`.
+        """
+        from hypothesis import strategies as st
+
+        category = cls.factory
+        return st.builds(
+            cls.build, category.shapes(**params),
+            st.none() | category.choices(),
+            st.tuples(category.namings(), category.namings()))
+
+
+class Reducible[factory](TestableGeneric, tuple):
+    """
+    A term of the ``factory`` with free variables in place of constants, so
+    that beta reduction reads a variable at every head, see
+    :class:`Normalising`.
+    """
+    @classmethod
+    def checked_params(cls) -> tuple:
+        """ None, a sort of premises being drawn over a category. """
+        return ()
+
+    @classmethod
+    def strategy(cls, **params) -> "st.SearchStrategy[Reducible]":
+        """
+        Generate a shape and a naming, with no constants.
+
+        Parameters:
+            params : Passed to :meth:`TermBase.shapes`.
+        """
+        from hypothesis import strategies as st
+
+        category = cls.factory
+        return st.builds(
+            lambda shape, letters: cls((
+                category.generate(*shape, letters, constants=False), )),
+            category.shapes(**params), category.namings())
+
+
+class Normalising(Testable):
+    """
+    The laws of beta reduction, for terms with a ``normal_form`` reached by
+    each of their :attr:`reduction_strategies`, e.g.
+    :class:`discopy.closed.TermBase`.
+    """
+    reduction_strategies: ClassVar[tuple] = ()
+
+    @axiom
+    def normal_form_idempotence(
+            cls, terms: Reducible[Self]) -> AbstractEquation:
+        """ A normal form is its own normal form. """
+        normal_form = terms[0].normal_form()
+        return Equation(normal_form.normal_form(), normal_form)
+
+    @axiom
+    def normal_form_typing(cls, terms: Reducible[Self]) -> AbstractEquation:
+        """ Beta reduction preserves the type of a term. """
+        return Equation(terms[0].normal_form().cod, terms[0].cod)
+
+    @axiom
+    def normal_form_confluence(
+            cls, terms: Reducible[Self]) -> AbstractEquation:
+        """
+        Every reduction strategy reaches the same normal form, up to the
+        names of its bound variables.
+        """
+        return AlphaEquation(*(
+            terms[0].normal_form(strategy=strategy)
+            for strategy in cls.reduction_strategies))
 
 
 class TermBase(Box, Equivalence):
@@ -945,15 +1151,18 @@ class TermBase(Box, Equivalence):
         return result
 
     @classmethod
-    def generate(cls, cod: Ty, choices: Sequence[int], types: Sequence[Ty],
-                 letters: Sequence[str]) -> Term:
+    # pylint: disable-next=too-many-arguments,too-many-positional-arguments
+    def generate(  # a shape, a naming and whether it takes constants
+            cls, cod: Ty, choices: Sequence[int], types: Sequence[Ty],
+            letters: Sequence[str], constants: bool = True) -> "Term":
         """
         Build a term of type ``cod`` from a sequence of ``choices``, one per
         node of the term, taking leaves once it runs out; the exponents of
         its applications are drawn from ``types`` and the variable bound at
         each level of binders is named by the letter at that level, so that
         the same choices under other letters give an alpha-equivalent term.
-        Free variables are named ``v0, v1, ...`` and constants ``c0, c1, ...``.
+        Free variables are named ``v0, v1, ...`` and constants ``c0, c1, ...``,
+        free variables taking the place of constants unless ``constants``.
         The term is planar and linear, as any term of a closed category is
         too, see :class:`Sampler` for the procedure.
 
@@ -966,7 +1175,8 @@ class TermBase(Box, Equivalence):
         >>> assert term.alpha_eq(
         ...     TermBase.generate(Y << X, [8, 0, 0], [X], "z"))
         """
-        return Sampler(cls, iter(choices), types, letters).term(cod)
+        return Sampler(
+            cls, iter(choices), types, letters, constants=constants).term(cod)
 
     @classmethod
     def choices(cls) -> st.SearchStrategy[list[int]]:
@@ -1029,6 +1239,9 @@ class TermBase(Box, Equivalence):
         return st.builds(
             lambda terms: (terms[0], terms[2], terms[1]),
             Canonical[cls].strategy(**params))  # ty: ignore[invalid-type-form]
+
+    serialisation = Serialisable.serialisation.failing(
+        "A term does not read back from its tree, see #692.")
 
     @axiom
     def alpha_renaming(cls, terms: Renamed[Self]) -> AbstractEquation:
@@ -1117,7 +1330,9 @@ class Constant(TermBase):
         return functor.ar_map[self]
 
     def __repr__(self):
-        return factory_name(type(self)) + f"({self.name!r}, {self.cod!r})"
+        data = "" if self.data is None else f", data={self.data!r}"
+        return factory_name(type(self))\
+            + f"({self.name!r}, {self.cod!r}{data})"
 
     def __str__(self):
         return f"{self.cod!s}({self.name!r})"
@@ -1372,9 +1587,8 @@ class Abstraction(TermBase):
 type Term = Constant | Variable | Application | Abstraction
 
 
-for law in (
-        "unitality", "associativity",
-        "dagger_involution", "dagger_contravariance"):
+for law in sorted(
+        set(Box.axioms) - set(Serialisable.axioms) | set(Box.rules)):
     setattr(TermBase, law, getattr(Box, law).inapplicable(
         messages.TERM_IS_A_BOX))
 
@@ -1406,6 +1620,9 @@ class Sampler:
         linear : Whether each bound variable occurs exactly once, in the
             order of the binders, as :mod:`biclosed` requires; a term of
             :mod:`discopy.closed` may use one any number of times.
+        constants : Whether a leaf or the head of a spine may be a
+            constant, else a free variable, so that beta reduction reads a
+            variable at every head, see :class:`Reducible`.
 
     Example
     -------
@@ -1422,13 +1639,16 @@ class Sampler:
     letters: Sequence[str]
     counter: Iterator[int] = field(default_factory=count)
     linear: bool = True
+    constants: bool = True
 
     def choose(self, options: Sequence):
         """ Pick an option by the next choice, the first when they ran out. """
         return options[next(self.choices, 0) % len(options)]
 
-    def constant(self, cod: Ty) -> Constant:
-        """ A fresh constant of a given type. """
+    def constant(self, cod: Ty) -> Constant | Variable:
+        """ A fresh constant of a given type, if the sampler takes any. """
+        if not self.constants:
+            return self.variable(cod)
         return self.category.ob.constant_factory(
             f"c{next(self.counter)}", cod)
 
@@ -1584,85 +1804,6 @@ class Constraints:
     def variables(self) -> tuple[Variable, ...]:
         """ The bound variables in scope, the prefix then the suffix. """
         return self.prefix + self.suffix
-
-
-class Renamed[factory](Testable, NamedGeneric, tuple):
-    """
-    Alpha-equivalent terms of the ``factory``: one shape generated under two
-    or more namings of its bound variables, see :meth:`TermBase.generate`.
-
-    Example
-    -------
-    >>> from hypothesis import find
-    >>> terms = find(
-    ...     Renamed[TermBase].strategy(), lambda terms: len(terms) == 3)
-    >>> assert terms[0].alpha_eq(*terms[1:])
-    """
-    @classmethod
-    def strategy(cls, **params) -> st.SearchStrategy[Renamed]:
-        """
-        Generate a shape and at least two namings of it.
-
-        Parameters:
-            params : Passed to :meth:`TermBase.shapes`.
-        """
-        from hypothesis import strategies as st
-
-        category = cls.factory
-        return st.builds(
-            lambda shape, namings: cls(
-                category.generate(*shape, letters) for letters in namings),
-            category.shapes(**params),
-            st.lists(category.namings(), min_size=2, max_size=3))
-
-
-class Canonical[factory](Testable, NamedGeneric, tuple):
-    """
-    Two terms of the ``factory`` followed by their canonical forms: two
-    shapes of one type, the second the first's or another, each generated
-    under its own naming and then under the one naming ``"x"``, which names
-    every bound variable by its level, so that the two terms are
-    alpha-equivalent exactly when their canonical forms are equal. Where
-    :class:`Renamed` draws terms alpha-equivalent by construction, this
-    decides the alpha-equivalence of any pair, see
-    :meth:`TermBase.alpha_completeness`.
-
-    Example
-    -------
-    >>> from hypothesis import find
-    >>> first, second, *canonical = find(
-    ...     Canonical[TermBase].strategy(),
-    ...     lambda terms: terms[0] != terms[1] and terms[2] == terms[3])
-    >>> assert first.alpha_eq(second)
-    """
-    @classmethod
-    def build(cls, shape: tuple, others: list[int] | None,
-              namings: tuple[Sequence[str], Sequence[str]]) -> Canonical:
-        """
-        The terms of a shape and of another, the same when ``others`` is
-        ``None``, under their namings and then under the canonical one.
-        """
-        cod, choices, types = shape
-        shapes = (choices, choices if others is None else others)
-        return cls(
-            cls.factory.generate(cod, each, types, letters)
-            for each, letters in zip(2 * shapes, (*namings, "x", "x")))
-
-    @classmethod
-    def strategy(cls, **params) -> st.SearchStrategy[Canonical]:
-        """
-        Generate a shape, its choices again or others, and two namings.
-
-        Parameters:
-            params : Passed to :meth:`TermBase.shapes`.
-        """
-        from hypothesis import strategies as st
-
-        category = cls.factory
-        return st.builds(
-            cls.build, category.shapes(**params),
-            st.none() | category.choices(),
-            st.tuples(category.namings(), category.namings()))
 
 
 Ty.variable_factory = Variable

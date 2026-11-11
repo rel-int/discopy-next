@@ -124,6 +124,7 @@ class Diagram(pivotal.Diagram, balanced.Diagram, RibbonCategory):
 
         Parameters:
             n : The number of wires to trace.
+            left : Whether to trace the wires on the left or right.
         """
         if not n:
             return self
@@ -137,15 +138,17 @@ class Diagram(pivotal.Diagram, balanced.Diagram, RibbonCategory):
 
     def cup(self, x, y):
         """
-        Post-compose a ribbon diagram with a cup between wires ``i`` and ``j``
+        Post-compose a ribbon diagram with a cup between wires ``x`` and ``y``
         by introducing braids.
 
         Parameters:
-            i : The wire on the left of the cup.
-            j : The wire on the right of the cup.
+            x : The wire on the left of the cup.
+            y : The wire on the right of the cup.
         """
         if min(x, y) < 0 or max(x, y) >= len(self.cod):
             raise ValueError(f'Indices {x, y} are out of range.')
+        if x == y:
+            raise ValueError(f'A cup joins two distinct wires, got {x, y}.')
         x, y = min(x, y), max(x, y)
         for i in range(x, y - 1):
             braid = self.braid_factory(self.cod[i], self.cod[i + 1])
@@ -244,7 +247,7 @@ class DualRailBraid(balanced.DualRailBraid, Box):
 
     def rotate(self, left=False):
         del left
-        return type(self)(self.right, self.left, self.is_dagger)
+        return type(self)(self.left.r, self.right.r, self.is_dagger)
 
 
 class DualRailTwist(balanced.DualRailTwist, Box):
@@ -258,7 +261,7 @@ class DualRailTwist(balanced.DualRailTwist, Box):
 
     def rotate(self, left=False):
         del left
-        return self
+        return type(self)(self.dom.r, self.is_dagger)
 
 
 class DualRailCup(Box):
@@ -285,9 +288,11 @@ class DualRailCup(Box):
         """
         return self.left, self.right, self.is_dagger
 
+    __repr__ = balanced.DualRailBraid.__repr__
+
     def rotate(self, left=False):
         del left
-        return DualRailCap(self.left.r, self.right.r)
+        return DualRailCap(self.right.r, self.left.r, self.is_dagger)
 
     def dagger(self):
         return DualRailCap(self.left, self.right, not self.is_dagger)
@@ -309,10 +314,11 @@ class DualRailCap(Box):
             is_dagger=is_dagger, draw_as_dual_rail_cap=True)
 
     __getnewargs__ = DualRailCup.__getnewargs__
+    __repr__ = DualRailCup.__repr__
 
     def rotate(self, left=False):
         del left
-        return DualRailCup(self.left.r, self.right.r)
+        return DualRailCup(self.right.r, self.left.r, self.is_dagger)
 
     def dagger(self):
         return DualRailCup(self.left, self.right, not self.is_dagger)
@@ -323,17 +329,16 @@ class Twist(balanced.Twist, Box):
     Balanced twist in a ribbon category.
 
     Parameters:
-        left (pivotal.Ty) : The type on the top left and bottom right.
-        right (pivotal.Ty) : The type on the top right and bottom left.
-        is_dagger (bool) : Braiding over or under.
+        dom (pivotal.Ty) : The domain of the twist.
+        is_dagger (bool) : Whether this is the inverse twist.
     """
 
     def rotate(self, left=False):
         del left
-        return self
+        return type(self)(self.dom.r, self.is_dagger)
 
 
-class Sum(rigid.Sum, Box):
+class Sum(rigid.Sum, feedback.Sum, Box):
     """
     A ribbon sum is a sum of ribbon diagrams.
 
@@ -390,7 +395,9 @@ class DualRail(balanced.DualRail, Functor):
             return DualRailCap(self(other.cod[:1]), self(other.cod[1:]))
         if isinstance(other, (Braid, Twist)):
             return super().__call__(other)  # A single dual rail box crossing.
-        if isinstance(other, Box) and not isinstance(other, (Sum, Bubble)):
+        if isinstance(other, Box) and not other.time_step and not isinstance(
+                other, (Sum, Bubble, feedback.Feedback, feedback.FollowedBy,
+                        feedback.Head, feedback.Tail)):
             # A generator is doubled into a box on the rails of its ribbons;
             # self doubles its domain and codomain per object.
             return Box(other.name, self(other.dom), self(other.cod),
@@ -398,7 +405,8 @@ class DualRail(balanced.DualRail, Functor):
         return super().__call__(other)
 
 
-Feedback, Trace, FollowedBy, Head, Tail = feedback.generators(Diagram, Box)
+Feedback, Trace, FollowedBy, Head, Tail = feedback.structural_boxes(
+    Diagram, Box)
 Diagram.box_factory = Box
 Diagram.braid_factory, Diagram.functor_factory = Braid, Functor
 Diagram.cup_factory, Diagram.cap_factory = Cup, Cap

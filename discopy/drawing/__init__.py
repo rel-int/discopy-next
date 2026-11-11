@@ -49,7 +49,7 @@ def draw(diagram, **params):
     Parameters
     ----------
     textpad : pair of floats, optional
-        Padding between text and wires, default is :code:`(0.1, 0.1)`.
+        Padding between text and wires, default is :code:`(2**-4, 2**-4)`.
     wire_labels : bool, optional
         Whether to draw type labels, default is :code:`False`.
     draw_box_labels : bool, optional
@@ -57,13 +57,13 @@ def draw(diagram, **params):
     aspect : string, optional
         Aspect ratio, one of :code:`['auto', 'equal']`.
     margins : tuple, optional
-        Margins, default is :code:`(0.05, 0.05)`.
+        Margins, default is :code:`(0, 0)`.
     nodesize : float, optional
         Node size for spiders and controlled gates.
     fontsize : int, optional
-        Font size for the boxes, default is :code:`12`.
+        Font size for the boxes, default is :code:`10`.
     fontsize_types : int, optional
-        Font size for the types, default is :code:`12`.
+        Font size for the types, default is :code:`10`.
     figsize : tuple, optional
         Figure size.
     path : str, optional
