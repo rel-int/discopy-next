@@ -1,5 +1,8 @@
 # -*- coding: utf-8 -*-
 
+import copy
+import io
+
 from pytest import importorskip, mark, raises
 
 from discopy.neural.network import Box, Dims, Network
@@ -59,3 +62,33 @@ def test_compile():
     module = Module(Network.copy(x) >> layer @ x >> add)
     inputs = torch.rand(2, 3)
     assert torch.allclose(torch.compile(module)(inputs), module(inputs))
+
+
+def test_copy_runs_its_own_parameters():
+    torch = importorskip("torch")
+    from discopy.neural.torch import Module
+    x = Dims(3)
+    layer = Box('layer', x, x, module=torch.nn.Linear(3, 3))
+    add = Box('add', x @ x, x, module=torch.add)
+    module = Module(Network.copy(x) >> layer @ x >> layer @ x >> add)
+    inputs = torch.rand(2, 3)
+    expected = module(inputs)
+    twin = copy.deepcopy(module)
+    with torch.no_grad():
+        for parameter in twin.parameters():
+            parameter.zero_()
+    assert torch.equal(twin(inputs), inputs)
+    assert torch.equal(module(inputs), expected)
+    twin(inputs).sum().backward()
+    assert all(p.grad is not None for p in twin.parameters())
+    assert all(p.grad is None for p in module.parameters())
+    buffer = io.BytesIO()
+    torch.save(module, buffer)
+    buffer.seek(0)
+    loaded = torch.load(buffer, weights_only=False)
+    assert torch.equal(loaded(inputs), expected)
+    with torch.no_grad():
+        for parameter in loaded.parameters():
+            parameter.zero_()
+    assert torch.equal(loaded(inputs), inputs)
+    assert torch.equal(module(inputs), expected)

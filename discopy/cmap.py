@@ -54,6 +54,7 @@ from inspect import isclass
 from io import BytesIO
 from itertools import accumulate, product
 from math import inf, lcm
+from numbers import Integral
 from typing import TYPE_CHECKING, Literal, Self
 
 from discopy import cat, hypergraph, messages
@@ -1076,12 +1077,12 @@ class CMap[category](
             n_ports += len(box.dom) + len(box.cod)
 
         def global_index(box_index: int, position: int) -> int:
-            if not isinstance(box_index, int) \
+            if not isinstance(box_index, Integral) \
                     or not 0 <= box_index < len(boxes):
                 raise ValueError(f"There is no box {box_index}.")
             box = boxes[box_index]
             offsets = cls.logical_order(len(box.dom), len(box.cod))
-            if not isinstance(position, int) \
+            if not isinstance(position, Integral) \
                     or not 0 <= position < len(offsets):
                 raise ValueError(f"Box {box_index} has no port {position}.")
             return starts[box_index] + offsets[position]

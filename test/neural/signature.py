@@ -99,6 +99,18 @@ def test_the_relation_must_be_symmetric_irreflexive_and_in_range():
             from_incidence(incidence, node, factor)
 
 
+def test_numpy_integers_index_nodes_and_factors():
+    import numpy as np
+    node = Signature((Orbit(PEER, 2, Sym.PERM), Orbit(STATE, traced=True)))
+    factor = Signature((Orbit(PEER, 3, Sym.PERM), ))
+    incidence, relation = ((0, 1), ) * 3, ((1, 2), (0, 2), (0, 1))
+    for table in (np.array, lambda rows: tuple(map(tuple, np.array(rows)))):
+        assert from_incidence(table(incidence), node, factor) \
+            == from_incidence(incidence, node, factor)
+        assert from_relation(table(relation), node) \
+            == from_relation(relation, node)
+
+
 def test_incidence_names_and_signatures():
     """
     Factors may carry one signature each, under one name each; the names
