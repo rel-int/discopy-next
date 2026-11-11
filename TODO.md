@@ -8,4 +8,4 @@
 - [x] the law `EGraph.building`: a builder freezes into the pure fold of the same operations, over `History`, random operations whose merges make boxes congruent, in the proptest matrix
 - [x] unit tests on hand-built operations, each failing on a builder with a part removed
 - [x] replay of 3 small traces of #500 in `test/egraph.py`: the frozen partition is the recorded one, and a check that fails if `Builder.rebuild` is a no-op
-- [ ] CHANGELOG `Added`, docs summary, every check of CONTRIBUTING.md
+- [WIP] @session_01MEJxy1eq4ERdiEMTUzTY22-2026-11-11 13:40 CHANGELOG `Added`, docs summary, every check of CONTRIBUTING.md
