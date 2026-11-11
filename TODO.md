@@ -10,4 +10,4 @@
 - [x] the module docstring opens with the definition: an e-hypergraph is a monoidal e-graph
 - [x] a doctest of the cartesian case: egg's e-graph is an `EGraph` fed cartesian boxes with one output each, `rebuild` merges two equal cartesian boxes and never two samples
 - [x] the proptest report loses no cell against `main` except renamed ones, each named in the pull request
-- [ ] one `Changed` bullet in CHANGELOG.md
+- [WIP] @session_01MEJxy1eq4ERdiEMTUzTY22-2026-11-11 12:53 one `Changed` bullet in CHANGELOG.md
