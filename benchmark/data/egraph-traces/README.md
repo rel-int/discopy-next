@@ -43,7 +43,8 @@ exercises `add`, the hash-cons and `merge` of a fresh class, not the cascade of 
 ## Timings
 
 - `egraph_seconds`: the time the search's own bookkeeping takes on the trace, replayed without
-  values, best of 7. That bookkeeping is a `dict` from `(head, args)` to the class and two lists:
+  values, best of 7. That bookkeeping is a `dict` from `(head, args)` to the class and two lists,
+  `enodes` and `kinds`; `out` is only what the replay returns:
 
   ```python
   def replay(trace):
