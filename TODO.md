@@ -48,7 +48,7 @@
 > 10. discopy/tensor.py:566 (thread 4532374120)
 > [P3] A contractor-only functor now raises a serialization error that says only einsum `params` prevent a tree, which misidentifies the cause. Update the no-tree documentation/message to mention non-serializable contractors as well.
 
-- [ ] test/quantum/circuit.py:606 This test fails whenever the optional `quimb` package is not installed.
+- [WIP] @session_01MEJxy29LoL954iS6TzLhbH-2026-11-11 00:39 test/quantum/circuit.py:606 This test fails whenever the optional `quimb` package is not installed.
 - [WIP] @session_01MEJxy29LoL954iS6TzLhbH-2026-11-11 00:38 README.md:24 This new backend list leaves the later tensor-valued-functor section stale: it still describes `TensorNetwork…
 - [WIP] @session_01MEJxy29LoL954iS6TzLhbH-2026-11-11 00:39 test/tensor.py:710 This optional autodiff test fails the tensor test suite when PyTorch is not installed.
 - [WIP] @session_01MEJxy29LoL954iS6TzLhbH-2026-11-11 00:39 discopy/quantum/circuit.py:326 Plain matrix backends such as `NumPy()` still enter the legacy callable path here and raise `TypeError` inste…
