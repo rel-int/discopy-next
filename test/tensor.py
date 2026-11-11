@@ -707,7 +707,7 @@ def test_quimb_pytorch_autodiff():
     if tuple(map(int, autoray.__version__.split('.')[:2])) < (0, 9):
         pytest.skip('autoray < 0.9 loses gradients on cached '
                     'contraction trees')
-    import torch
+    torch = pytest.importorskip('torch')
     x = frobenius.Ty('x')
     v = frobenius.Box('v', frobenius.Ty(), x)
     t = torch.tensor(3.0, dtype=torch.float64, requires_grad=True)
@@ -1025,8 +1025,25 @@ def test_Functor_tree():
         assert type(G) is type(F) and G.cod == F.cod
         assert G(sentence) == F(sentence)
     assert G.optimize == "optimal" and G.dtype is complex
-    with raises(TypeError, match="with params has no tree"):
+    with raises(TypeError, match="with params or a contractor has no tree"):
         dumps(Functor({n: 2}, {}, backend="os"))
     for optimize in ({'not': 'a path'}, 5):
         with raises(TypeError, match=r"Expected str \| bool \| list"):
             Functor.from_tree(G.to_tree() | {'optimize': optimize})
+
+
+def test_to_quimb_sum():
+    pytest.importorskip('quimb')
+    vector = Box('vector', Dim(1), Dim(2), [1., 2.])
+    diagram = vector >> vector[::-1]
+    network = (diagram + diagram).to_quimb()
+    assert network.contract(preserve_tensor=True).data == 10
+
+
+def test_contractor_reads_the_active_backend():
+    contractor = Quimb()
+    assert contractor.module is NumPy().module
+    torch = pytest.importorskip('torch')
+    with backend('pytorch'):
+        assert contractor.module is torch
+    assert eval(repr(Quimb(NumPy()))) == Quimb(NumPy()) != Quimb()

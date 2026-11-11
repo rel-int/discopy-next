@@ -57,7 +57,7 @@ from discopy.cat import factory, assert_iscomposable
 from discopy.frobenius import Dim, Cup
 from discopy.matrix import (  # noqa: F401  pylint: disable=unused-import
     Matrix, backend, set_backend, get_backend,
-    NumPy, JAX, PyTorch, TensorFlow, Contractor, OptEinsum, Quimb)
+    Backend, NumPy, JAX, PyTorch, TensorFlow, Contractor, OptEinsum, Quimb)
 from discopy.testable import TestableGeneric, no_strategy
 from discopy.python import finset
 from discopy.utils import (
@@ -550,7 +550,8 @@ class Functor(frobenius.Functor):
     def to_tree(self) -> dict:
         """
         Serialise a tensor functor, its dtype in the name of its codomain,
-        see :meth:`discopy.cat.Functor.to_tree`, unless it has ``params``.
+        see :meth:`discopy.cat.Functor.to_tree`, unless it has ``params``
+        or a ``contractor``.
 
         >>> from discopy.utils import dumps, loads
         >>> x = frobenius.Ty('x')
@@ -560,8 +561,8 @@ class Functor(frobenius.Functor):
         >>> dumps(Functor({x: 2}, {}, order='C'))
         Traceback (most recent call last):
         ...
-        TypeError: A tensor functor with params has no tree: they go to the \
-einsum of a backend verbatim, which a file should not reach.
+        TypeError: A tensor functor with params or a contractor has no tree: \
+they go to the einsum of a backend verbatim, which a file should not reach.
         """
         if self.params or self.contractor is not None:
             raise TypeError(messages.NO_TREE_PARAMS)
@@ -876,6 +877,9 @@ class Diagram[dtype](TestableGeneric, frobenius.Diagram):
         >>> t_net = vector[::-1].to_quimb(dtype=complex)  # doctest: +EXTRA
         >>> assert t_net.contract(preserve_tensor=True).data.dtype == complex
         """
+        if isinstance(self, Sum):
+            return Box("sum", self.dom, self.cod, self.eval(dtype).array)\
+                .to_quimb(dtype)
         category = self.category if isinstance(self, cmap.CMap) else self.ar
         return Functor(
             ob_map=category.dim, ar_map=lambda box: box.array,

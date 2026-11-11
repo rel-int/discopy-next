@@ -213,7 +213,7 @@ Many other grammatical frameworks can be encoded as diagrams, e.g. [`cfg`](https
 ### Functors & Rewrites
 
 **Monoidal functors** compute the meaning of a diagram, given an interpretation for each wire and for each box.
-In particular, **tensor-valued functors** evaluate a diagram as a tensor network using [numpy](https://numpy.org/), [PyTorch](https://pytorch.org/), [TensorFlow](https://www.tensorflow.org/), [TensorNetwork](https://github.com/google/TensorNetwork) or [JAX](https://github.com/google/jax).
+In particular, **tensor-valued functors** evaluate a diagram as a tensor network using [numpy](https://numpy.org/), [PyTorch](https://pytorch.org/), [TensorFlow](https://www.tensorflow.org/) or [JAX](https://github.com/google/jax), contracted by the `einsum` of the backend or a `contractor`, e.g. `OptEinsum()` or `Quimb()`.
 
 Applied to pregroup diagrams, DisCoPy implements the
 **categorical compositional distributional** (_DisCoCat_) models of

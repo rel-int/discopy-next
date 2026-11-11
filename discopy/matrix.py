@@ -716,6 +716,16 @@ class Backend:
     def __getattr__(self, attr):
         return getattr(self.module, attr)
 
+    def __repr__(self):
+        return f"{type(self).__name__}()"
+
+    def __eq__(self, other):
+        return type(self) is type(other)\
+            and getattr(self, "base", None) == getattr(other, "base", None)
+
+    def __hash__(self):
+        return hash((type(self), getattr(self, "base", None)))
+
 
 class NumPy(Backend):
     """ NumPy backend. """
@@ -756,7 +766,8 @@ class Contractor(Backend):
     A plain :class:`Backend` contracts with its own ``einsum``.
 
     Parameters:
-        base : The backend of the arrays, the active one by default.
+        base : The backend of the arrays, the active one at contraction
+            time by default.
 
     Example
     -------
@@ -764,23 +775,28 @@ class Contractor(Backend):
     >>> vector = Box('vector', Dim(1), Dim(2), [0, 1])
     >>> diagram = vector >> vector[::-1]
     >>> assert diagram.eval(contractor=OptEinsum()) == diagram.eval()
-    >>> OptEinsum()
-    OptEinsum()
+    >>> OptEinsum(), Quimb(NumPy())
+    (OptEinsum(), Quimb(NumPy()))
+    >>> assert eval(repr(Quimb(NumPy()))) == Quimb(NumPy()) != Quimb()
     """
     def __init__(self, base: Backend | None = None):
+        # pylint: disable=super-init-not-called
+        # the module and array of the base are read at contraction time
         self.base = base
-        arrays = base or get_backend()
-        super().__init__(arrays.module, arrays.array)
+
+    @property
+    def module(self) -> ModuleType:
+        """ The module of the base, the active backend by default. """
+        return (self.base or get_backend()).module
+
+    @property
+    def array(self) -> Callable:
+        """ The array of the base, the active backend by default. """
+        return (self.base or get_backend()).array
 
     def __repr__(self):
         base = "" if self.base is None else repr(self.base)
         return f"{type(self).__name__}({base})"
-
-    def __eq__(self, other):
-        return type(self) is type(other) and self.base == other.base
-
-    def __hash__(self):
-        return hash((type(self), self.base))
 
     def einsum(self, *operands, **params):
         """

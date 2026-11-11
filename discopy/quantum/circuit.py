@@ -323,7 +323,7 @@ class Circuit(tensor.Diagram[complex]):
             return [circuit.eval(mixed=mixed, contractor=contractor, **params)
                     for circuit in (self, ) + others]
         if contractor is not None\
-                and not isinstance(contractor, tensor.Contractor):
+                and not isinstance(contractor, tensor.Backend):
             array = contractor(*self.to_tn(mixed=mixed)).tensor
             if self.is_mixed or mixed:
                 f = channel.Functor({}, {}, dom=Circuit)

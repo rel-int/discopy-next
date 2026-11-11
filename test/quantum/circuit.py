@@ -602,7 +602,14 @@ def test_quimb_pure_eval(c):
 
 
 @pytest.mark.parametrize('c', pure_circuits + mixed_circuits)
+def test_contractor_numpy_eval(c):
+    from discopy.matrix import NumPy
+    assert c.eval(contractor=NumPy()).is_close(c.eval())
+
+
+@pytest.mark.parametrize('c', pure_circuits + mixed_circuits)
 def test_contractor_quimb_eval(c):
+    pytest.importorskip("quimb")
     assert c.eval(contractor=Quimb()).is_close(c.eval())
 
 

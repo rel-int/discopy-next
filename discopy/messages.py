@@ -176,8 +176,9 @@ NO_TREE_CALLABLE = "{} has no tree: its {} is a Python callable, which "\
     "JSON cannot hold."
 NO_TREE_DRAWING = "A drawing has no tree: it is the layout of a diagram, "\
     "which to_drawing recomputes."
-NO_TREE_PARAMS = "A tensor functor with params has no tree: they go to the "\
-    "einsum of a backend verbatim, which a file should not reach."
+NO_TREE_PARAMS = "A tensor functor with params or a contractor has no "\
+    "tree: they go to the einsum of a backend verbatim, which a file should "\
+    "not reach."
 NO_TREE_STREAM = "A stream has no tree: its later is what a Python callable "\
     "returns or, for a constant stream, itself, which JSON cannot hold."
 NO_SUCH_TYPE = "No type named {!r} in builtins or numpy, so the name of the "\
