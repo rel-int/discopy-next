@@ -3,6 +3,7 @@ import json
 import random
 from functools import reduce
 from itertools import islice
+from math import inf
 from operator import eq, lt
 from pathlib import Path
 
@@ -411,7 +412,8 @@ def examples() -> list[EGraph]:
 
 @pytest.mark.parametrize("law", [
     "rebuild_minimality", "extraction_soundness", "extraction_optimality",
-    "translation", "effects_kept", "rewrite_identity", "saturation"])
+    "sharing", "translation", "effects_kept", "rewrite_identity",
+    "saturation"])
 def test_laws_of_one_graph(law, examples):
     """ A law weakened to cartesian e-hypergraphs holds on those, any other
     law on every example. """
@@ -430,6 +432,8 @@ def test_builder_hash_conses_deterministic_boxes():
         assert outputs == expected
     assert builder.boxes == [f, sample, sample]
     assert builder.keys == [(0, 0), (), ()] and builder.heads == {f: 0}
+    assert builder.known == {id(f): (f, 0, 1), id(sample): (sample, None, 1)}
+    assert builder.add(Box('f', x, x), (0, )) == (1, ) != id(f)
     assert builder.hashcons == {(0, 0): 0} and builder.parents == {0: [0]}
     assert builder.freeze() == graph
 
@@ -503,6 +507,36 @@ def test_builder_checks_as_it_freezes():
     builder.merge(0, 1)
     with raises(AxiomError):
         builder.freeze()
+
+
+def test_dag_cost_counts_a_class_once():
+    join, split = Box('j', x @ x, x), Box('s', x, x @ x)
+    shared = Markov.from_diagram(Copy(x) >> f @ f >> join)
+    assert (shared.cost(), shared.dag_cost()) == (5, 3)
+    assert shared.dag_bound() == {0: 1, 1: 2, 3: 3}
+    assert shared.dag_cost(box_cost=lambda box: 2, input_cost=0) == 4
+    assert shared.dag_cost(shared.graph) == 4
+    apart = Markov.from_diagram(Copy(x) >> sample @ sample >> join)
+    assert (apart.cost(), apart.dag_cost()) == (5, 4)
+    twice = Markov.from_diagram(split >> join)
+    assert (twice.cost(), twice.dag_cost()) == (5, 3)
+    assert twice.dag_bound()[twice.classes[twice.graph.cod_wires[0]]] == 3
+    unread = Markov.from_diagram(f @ Diagram.discard(x))
+    assert unread.extract().dom == x @ x and unread.dag_cost() == 2
+
+
+def test_dag_bound_needs_an_acyclic_choice():
+    """ With boxes that cost nothing, the least tree cost may be that of a
+    class read by its own producer, which has no section. """
+    constant = Box('c', Ty(), x)
+    graph = Markov(Hypergraph[Diagram](Ty(), x, (g, f, constant), (
+        (), (((1, ), (2, )), ((0, ), (1, )), ((), (0, ))), (2, )))
+    ).merge(0, 2)
+    assert graph.dag_bound() == {0: 1, 1: 2}
+    with raises(AxiomError):
+        graph.dag_bound(lambda box: 0)
+    stuck = Markov.from_diagram(f).merge(0, 1)
+    assert stuck.dag_bound(input_cost=inf) == {0: inf}
 
 
 def test_building(examples):
