@@ -32,7 +32,7 @@ DisCoPy is a Python toolkit for computing with [string diagrams](https://en.wiki
 * [`discopy.optyx`](https://docs.discopy.org/en/main/api/optyx.html), string diagrams for networked quantum computing that mix qubits, photonic modes and classical bits, with lossy channels, heralded measurements and feed-forward
 * a `Drawing` data structure for labeled graphs embedded in the plane
 * a `Term` data structure for lambda terms in the internal language of (bi)closed monoidal categories and their translation back and forth to diagrams
-* a `Hypergraph` data structure for string diagrams in hypergraph categories, with its restrictions down the hierarchy (monoidal, symmetric, feedback, Markov, compact, ...) and double-pushout rewriting, and e-hypergraphs (`discopy.ehypergraph`), i.e. e-graphs of diagrams with sharing
+* a `Hypergraph` data structure for string diagrams in hypergraph categories, with its restrictions down the hierarchy (monoidal, symmetric, feedback, Markov, compact, ...) and double-pushout rewriting, and monoidal e-graphs (`discopy.egraph`), also called e-hypergraphs, i.e. e-graphs of diagrams with sharing
 * a `CMap` (combinatorial map) data structure for string diagrams in compact categories and its restrictions to symmetric, (bi)closed and traced categories. The orientation on boxes can also help to enforce planarity.
 * a `Stream` data structure, an implementation of [monoidal streams](https://arxiv.org/abs/2212.14494) as a [category with delayed feedback](https://doi.org/10.1051/ita:2002009)
 * the `Int`-construction, also called the [geometry of interaction](https://ncatlab.org/nlab/show/Geometry+of+Interaction), i.e. the free tortile/compact closed category on a balanced/symmetric traced category

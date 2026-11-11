@@ -9,8 +9,8 @@ from hypothesis import assume, example, given, settings, strategies as st
 from pytest import raises
 
 from discopy import symmetric
-from discopy.ehypergraph import (
-    EHypergraph, Join, Markov, distribute, partition)
+from discopy.egraph import (
+    EGraph, Join, Markov, distribute, partition)
 from discopy.hypergraph import Hypergraph
 from discopy.markov import Ty, Box, Copy, Diagram, Functor, Swap
 from discopy.tensor import Dim, Tensor
@@ -39,7 +39,7 @@ def test_samples_are_independent():
 
 def test_category_has_flags():
     with raises(AxiomError):
-        EHypergraph[symmetric.Diagram].from_diagram(symmetric.Box('f', x, x))
+        EGraph[symmetric.Diagram].from_diagram(symmetric.Box('f', x, x))
 
 
 def test_effects_are_kept():
@@ -83,7 +83,7 @@ def test_rewrite_glues():
     assert len(rewritten.sections()) == 1
 
 
-def names(graph: EHypergraph) -> list[list[str]]:
+def names(graph: EGraph) -> list[list[str]]:
     """ The e-nodes of each class by name, as the dashed boxes of Tiurin et
     al.'s figures, an input named ``"input"``. """
     def name(port):
@@ -99,7 +99,7 @@ def joins(diagram: Diagram) -> list[list[str]]:
                   for box in diagram.boxes if isinstance(box, Join))
 
 
-def spider(graph: EHypergraph, box: Box) -> int:
+def spider(graph: EGraph, box: Box) -> int:
     """ The output of the first occurrence of a box with one output. """
     output, = graph.graph.box_wires[graph.graph.boxes.index(box)][1]
     return output
@@ -119,14 +119,14 @@ def test_join():
 
 
 def test_join_delays_as_a_bubble():
-    from discopy import ehypergraph, feedback, markov
+    from discopy import egraph, feedback, markov
     join = Join(f, g)
     delayed = join.delay()
     assert delayed.args == (f, g) and (delayed.dom, delayed.cod) == (x.d, x.d)
     assert delayed.reset() == join and str(delayed) == "Join(f, g).d"
     assert loads(dumps(delayed)) == delayed
     assert eval(repr(delayed), dict(
-        ehypergraph=ehypergraph, feedback=feedback, markov=markov)) == delayed
+        egraph=egraph, feedback=feedback, markov=markov)) == delayed
     assert distribute(delayed) == distribute(join).delay() == f.d + g.d
     assert distribute((join >> h).delay()) == distribute(join >> h).delay()
 
@@ -181,7 +181,7 @@ def test_figure_1():
         [['*', '<<'], ['/'], ['1'], ['2'], ['a']],
         [['*', '/'], ['*', '<<'], ['/'], ['1'], ['2'], ['a']],
         [['*', '/'], ['*', '<<'], ['/', '1'], ['2'], ['a']]]
-    assert list(map(len, map(EHypergraph.sections, steps))) == [1, 2, 3, 5]
+    assert list(map(len, map(EGraph.sections, steps))) == [1, 2, 3, 5]
     assert list(map(len, (joins(step.to_diagram()) for step in steps))) == [
         0, 1, 2, 3]
     assert all(map(Markov.translation, steps))
@@ -367,7 +367,7 @@ def test_to_tree():
     graph = Markov.from_diagram(Copy(x) >> f @ sample).merge(1, 2)
     tree = graph.to_tree()
     assert (tree['factory'], tree['category']) == (
-        'ehypergraph.EHypergraph', 'markov.Diagram')
+        'egraph.EGraph', 'markov.Diagram')
     assert Markov.from_tree(tree) == graph
     assert Markov.serialisation(term=graph)\
         and Markov.repr_transparency(term=graph)
@@ -377,7 +377,7 @@ def test_strategy_needs_a_copy_discard_category():
     from discopy import frobenius
     for category in (symmetric.Diagram, frobenius.Diagram):
         with raises(NotImplementedError):
-            EHypergraph[category].strategy()
+            EGraph[category].strategy()
 
 
 @settings(max_examples=20, deadline=None)
@@ -392,8 +392,8 @@ def test_strategy(graph):
 
 
 @pytest.fixture(scope="module")
-def examples() -> list[EHypergraph]:
-    """ Egg's example of :mod:`discopy.ehypergraph`, ``f`` rewritten into
+def examples() -> list[EGraph]:
+    """ Egg's example of :mod:`discopy.egraph`, ``f`` rewritten into
     ``g``, a sample read by a condition, ``f`` and ``g``, then with the
     outputs of ``f`` and ``g`` related, and the empty one. """
     two, times, divide = (
@@ -508,7 +508,7 @@ def box_cost(box) -> int:
     return COSTS.get(box.name, 1)
 
 
-def lookup(graph: EHypergraph, term, names) -> int:
+def lookup(graph: EGraph, term, names) -> int:
     """ The class of a subterm of the cartesian term a graph comes from. """
     if term[0] == "var":
         return graph.classes[graph.graph.dom_wires[names.index(term[1])]]
@@ -610,7 +610,7 @@ def naive(term):
         else (term[0], *map(naive, children(term)))
 
 
-def saturated(program, rules) -> EHypergraph:
+def saturated(program, rules) -> EGraph:
     """ The last round of saturating a program of ``p`` under some rules. """
     graph = Markov.from_diagram(to_diagram(program, ["p"]))
     *_, last = graph, *graph.saturate(*to_rules(rules))
