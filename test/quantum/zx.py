@@ -460,8 +460,9 @@ def test_Scalar_to_tree():
     """#168: Scalar.__init__ takes its data alone, so the inherited
     from_tree passed it a name it refuses."""
     from discopy.utils import dumps, loads
-    for term in (scalar(2), scalar(2 ** 0.5), root2, scalar(0.5).dagger()):
+    for term in (scalar(2), scalar(2 ** 0.5), root2, scalar(0.5j).dagger()):
         assert loads(dumps(term)) == term
+    assert loads(dumps(scalar(0.5j).dagger())) == scalar(-0.5j)
     diagram = Z(1, 2, .5) @ scalar(2) >> X(2, 1) @ Id(Nat(0))
     assert loads(dumps(diagram)) == diagram
 
