@@ -324,7 +324,7 @@ class Builder:  # pylint: disable=too-many-instance-attributes  # egg's tables
         self.boxes: list = []
         self.box_wires: list[tuple[tuple[int, ...], tuple[int, ...]]] = []
         self.heads: dict = {}
-        self.keys: dict[int, tuple[int, ...]] = {}
+        self.keys: list[tuple[int, ...]] = []
         self.hashcons: dict[tuple[int, ...], int] = {}
         self.parents: dict[int, list[int]] = {}
         self.worklist: list[tuple[int, int]] = []
@@ -343,12 +343,12 @@ class Builder:  # pylint: disable=too-many-instance-attributes  # egg's tables
         """ The class of a spider, the least spider related to it. """
         return self.least[self.root(spider)]
 
-    def key(self, box, inputs: tuple[int, ...]) -> tuple[int, ...] | None:
+    def key(self, box, inputs: tuple[int, ...]) -> tuple[int, ...]:
         """ A deterministic box up to the classes it reads, i.e. its number
-        among the :attr:`heads` then the roots of its inputs, :obj:`None` for
+        among the :attr:`heads` then the roots of its inputs, and nothing for
         a sample, which the hash-cons leaves alone. """
         if not box.is_deterministic:
-            return None
+            return ()
         return (self.heads.setdefault(box, len(self.heads)),
                 *map(self.root, inputs))
 
@@ -363,13 +363,13 @@ class Builder:  # pylint: disable=too-many-instance-attributes  # egg's tables
             self.worklist.append((first, box))
 
     def place(self, box, wires: tuple[tuple[int, ...], tuple[int, ...]],
-              key: tuple[int, ...] | None):
-        """ Append a box on its wires, with its key if it is deterministic:
-        hash-consed and a parent of each class it reads. """
+              key: tuple[int, ...]):
+        """ Append a box on its wires with its key: hash-consed and a parent
+        of each class it reads if it is deterministic. """
         self.boxes.append(box)
         self.box_wires.append(wires)
-        if key is not None:
-            self.keys[len(self.boxes) - 1] = key
+        self.keys.append(key)
+        if key:
             self.cons(len(self.boxes) - 1)
             for root in key[1:]:
                 self.parents.setdefault(root, []).append(len(self.boxes) - 1)
@@ -379,7 +379,7 @@ class Builder:  # pylint: disable=too-many-instance-attributes  # egg's tables
         the next spiders, or those of the first equal deterministic box on
         their classes, as :meth:`EGraph.add` does. """
         inputs, key = tuple(inputs), self.key(box, inputs)
-        if key is not None and key in self.hashcons:
+        if key in self.hashcons:
             return self.box_wires[self.hashcons[key]][1]
         n = len(self.label)
         outputs = tuple(range(n, n + len(box.cod)))

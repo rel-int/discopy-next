@@ -429,7 +429,7 @@ def test_builder_hash_conses_deterministic_boxes():
         graph, expected = graph.add(box, (0, ))
         assert outputs == expected
     assert builder.boxes == [f, sample, sample]
-    assert builder.keys == {0: (0, 0)} and builder.heads == {f: 0}
+    assert builder.keys == [(0, 0), (), ()] and builder.heads == {f: 0}
     assert builder.hashcons == {(0, 0): 0} and builder.parents == {0: [0]}
     assert builder.freeze() == graph
 
