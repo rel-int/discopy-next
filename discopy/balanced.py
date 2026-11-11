@@ -267,6 +267,28 @@ class DualRailBraid(Box):
     def dagger(self):
         return type(self)(self.right, self.left, not self.is_dagger)
 
+    def to_tree(self) -> dict:
+        """
+        Serialise a dual rail braid, keeping which ribbon goes over.
+
+        >>> from discopy.utils import dumps, loads
+        >>> x, y = Ty('x'), Ty('y')
+        >>> braid = DualRailBraid(x @ x, y @ y)
+        >>> assert loads(dumps(braid)) == braid
+        >>> assert loads(dumps(braid.dagger())) == braid.dagger()
+        """
+        tree = {
+            'factory': factory_name(type(self)),
+            'left': self.left.to_tree(), 'right': self.right.to_tree()}
+        if self.is_dagger:
+            tree['is_dagger'] = True
+        return tree
+
+    @classmethod
+    def from_tree(cls, tree: dict) -> DualRailBraid:
+        left, right = map(from_tree, (tree['left'], tree['right']))
+        return cls(left, right, is_dagger=tree.get('is_dagger', False))
+
 
 class DualRailTwist(Box):
     """
@@ -296,6 +318,20 @@ class DualRailTwist(Box):
 
     def dagger(self):
         return type(self)(self.dom, not self.is_dagger)
+
+    @classmethod
+    def from_tree(cls, tree: dict) -> DualRailTwist:
+        """
+        Decode a dual rail twist, which the inherited :meth:`to_tree` writes
+        with the ribbon it twists as both its domain and its codomain.
+
+        >>> from discopy.utils import dumps, loads
+        >>> twist = DualRailTwist(Ty('x') @ Ty('x'))
+        >>> assert loads(dumps(twist)) == twist
+        >>> assert loads(dumps(twist.dagger())) == twist.dagger()
+        """
+        return cls(
+            from_tree(tree['dom']), is_dagger=tree.get('is_dagger', False))
 
 
 class Twist(Box):

@@ -398,6 +398,12 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Fixed
 
+- Every dual rail diagram serialises: `balanced.DualRailBraid`,
+  `balanced.DualRailTwist`, `ribbon.DualRailCup`, `ribbon.DualRailCap` and
+  `quantum.zx.Scalar` read back the arguments their own constructors take,
+  where the inherited `from_tree` passed them a `name` they refuse, so
+  `loads(dumps(x))` raised a `TypeError` on the image of either `DualRail`
+  functor and on any diagram holding a ZX scalar ([next#496]).
 - `interaction.Diagram`'s docstring states the codomain of the diagram
   inside as `y.positive @ x.negative`, which is what its constructor, its
   `strategy` and its `to_tree` doctest all read, and an example asserts
@@ -1724,6 +1730,7 @@ for the changelog of `1.2.1` and earlier.
 [next#490]: https://github.com/rel-int/discopy-next/issues/490
 [next#494]: https://github.com/rel-int/discopy-next/pull/494
 [next#495]: https://github.com/rel-int/discopy-next/pull/495
+[next#496]: https://github.com/rel-int/discopy-next/pull/496
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#56]: https://github.com/rel-int/optyx/pull/56
