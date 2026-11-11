@@ -7,5 +7,5 @@
 - [x] `benchmark/test_egraph.py`, suite `egraph`: the 50 traces through `Builder`, through the search's own bookkeeping on the same machine, through the pure fold on the small ones, and a rebuild of two copies
 - [x] profile the builder on the traces and fix what the profile shows, under 150 lines
 - [x] `EGraph.dag_cost` of a section and `dag_bound`, its greedy bound per class, with the law that sharing costs no more
-- [WIP] @session_01MEJxy1eq4ERdiEMTUzTY22-2026-11-11 14:24 both targets of #499 measured, the table in the pull request, a miss filed as an issue
+- [x] both targets of #499 measured, the table in the pull request, a miss filed as an issue
 - [ ] CHANGELOG, CONTRIBUTING, every check of CONTRIBUTING.md
