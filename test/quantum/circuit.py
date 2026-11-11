@@ -15,6 +15,7 @@ from discopy.quantum.circuit import *
 from discopy.quantum.gates import *
 from discopy.quantum.ansatze import IQPansatz
 from discopy import rigid
+from discopy.matrix import Quimb
 
 
 def test_index2bitstring():
@@ -601,13 +602,8 @@ def test_quimb_pure_eval(c):
 
 
 @pytest.mark.parametrize('c', pure_circuits + mixed_circuits)
-def test_contract_quimb_eval(c):
-    assert c.eval(contract="quimb").is_close(c.eval())
-
-
-def test_contractor_and_contract():
-    with raises(ValueError):
-        H.eval(contractor=contractor, contract="quimb")
+def test_contractor_quimb_eval(c):
+    assert c.eval(contractor=Quimb()).is_close(c.eval())
 
 
 def test_logical_vs_physical_swap():

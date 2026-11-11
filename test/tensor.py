@@ -616,38 +616,43 @@ def test_eval_params():
         "dom=frobenius.Diagram, dtype=float, optimize='optimal')"
 
 
-@pytest.mark.parametrize('contract', ['einsum', 'opt_einsum', 'quimb'])
-def test_contract_engines(contract):
-    if contract != 'einsum':
-        pytest.importorskip(contract)
+@pytest.mark.parametrize('engine', ['numpy', 'opt_einsum', 'quimb'])
+def test_contractors(engine):
+    if engine != 'numpy':
+        pytest.importorskip(engine)
+    contractor = {'numpy': NumPy, 'opt_einsum': OptEinsum, 'quimb': Quimb}[
+        engine]()
     for diagram in cmap_diagrams():
-        result, reference = diagram.eval(contract=contract), diagram.eval()
+        result = diagram.eval(contractor=contractor)
+        reference = diagram.eval()
         assert (result.dom, result.cod) == (reference.dom, reference.cod)
         assert np.allclose(
             np.asarray(result.array, dtype=float),
             np.asarray(reference.array, dtype=float))
 
 
-def test_contract_empty_and_unknown():
-    assert Id(Dim()).eval(contract='einsum').array == [1]
+def test_contractor_empty_and_abstract():
+    assert Id(Dim()).eval(contractor=Quimb()).array == [1]
     vector = Box('vector', Dim(1), Dim(2), [0., 1.])
-    with raises(ValueError):
-        (vector >> vector[::-1]).eval(contract='python')
+    with raises(NotImplementedError):
+        (vector >> vector[::-1]).eval(contractor=Contractor())
 
 
 def test_contract_sum():
     pytest.importorskip('quimb')
     vector = Box('vector', Dim(1), Dim(2), [1., 2.])
     diagram = vector >> vector[::-1]
-    result = (diagram + diagram).eval(contract='quimb')
+    result = (diagram + diagram).eval(contractor=Quimb())
     assert np.allclose(np.asarray(result.array), 2 * diagram.eval().array)
 
 
 def test_contract_repr():
     from discopy import tensor
-    F = Functor({}, {}, contract='quimb')
+    F = Functor({}, {}, contractor=Quimb())
     assert repr(F) == "tensor.Functor(ob_map={}, ar_map={}, " \
-        "dom=frobenius.Diagram, dtype=float, contract='quimb')"
+        "dom=frobenius.Diagram, dtype=float, contractor=Quimb())"
+    assert Quimb() == Quimb() != OptEinsum()
+    assert hash(Quimb()) == hash(Quimb())
     assert repr(eval(repr(F))) == repr(F)
 
 
@@ -677,22 +682,22 @@ def test_quimb_cotengra():
     u = Box('u', Dim(2), Dim(2, 2), list(range(1, 9)))
     diagram = u >> u[::-1]
     exact = diagram.eval().array
-    result = diagram.eval(contract='quimb', max_bond=4)
+    result = diagram.eval(contractor=Quimb(), max_bond=4)
     assert np.allclose(np.asarray(result.array), exact)
     exact_optimizer = cotengra.HyperOptimizer(
         max_repeats=2, parallel=False, progbar=False)
-    result = diagram.eval(contract='quimb', optimize=exact_optimizer)
+    result = diagram.eval(contractor=Quimb(), optimize=exact_optimizer)
     assert np.allclose(np.asarray(result.array), exact)
     compressed_optimizer = cotengra.HyperCompressedOptimizer(
         chi=4, methods=['greedy-compressed'], max_repeats=2,
         parallel=False, progbar=False)
     result = diagram.eval(
-        contract='quimb', optimize=compressed_optimizer, max_bond=4)
+        contractor=Quimb(), optimize=compressed_optimizer, max_bond=4)
     assert np.allclose(np.asarray(result.array), exact)
     reusable = cotengra.ReusableHyperCompressedOptimizer(
         chi=4, methods=['greedy-compressed'], max_repeats=2,
         parallel=False, progbar=False)
-    result = diagram.eval(contract='quimb', optimize=reusable)
+    result = diagram.eval(contractor=Quimb(), optimize=reusable)
     assert np.allclose(np.asarray(result.array), exact)
 
 
@@ -707,7 +712,7 @@ def test_quimb_pytorch_autodiff():
     v = frobenius.Box('v', frobenius.Ty(), x)
     t = torch.tensor(3.0, dtype=torch.float64, requires_grad=True)
     F = Functor({x: 2}, {v: torch.stack([t, t])},
-                dtype=torch.float64, contract='quimb')
+                dtype=torch.float64, contractor=Quimb())
     with backend('pytorch'):
         result = F(v >> v.dagger()).array
     result.backward()
