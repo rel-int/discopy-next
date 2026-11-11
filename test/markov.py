@@ -442,7 +442,7 @@ def test_Box_flags_subs():
 
 
 def test_Bubble_flags():
-    from discopy.ehypergraph import Markov
+    from discopy.egraph import Markov
     from discopy.utils import dumps, loads
     x = Ty('x')
     noisy = Box('sample', x, x, is_deterministic=False).bubble(

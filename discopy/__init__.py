@@ -22,7 +22,7 @@ from discopy import (
     closed,
     frobenius,
     hypergraph,
-    ehypergraph,
+    egraph,
     cmap,
     interaction,
     feedback,
