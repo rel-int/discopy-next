@@ -38,6 +38,8 @@ Summary
     :toctree:
 
     EGraph
+    Builder
+    History
     Join
 
 .. admonition:: Functions
@@ -124,7 +126,7 @@ from collections.abc import Callable, Iterator
 from functools import cached_property, reduce
 from itertools import accumulate, pairwise, repeat, takewhile
 from math import inf
-from operator import add, index
+from operator import add, index, itemgetter
 from typing import TYPE_CHECKING, Self, SupportsIndex
 
 from networkx import DiGraph
@@ -269,6 +271,280 @@ def distribute(diagram: monoidal.Diagram) -> markov.Sum:
     result = functor(diagram)
     return result if isinstance(result, markov.Sum)\
         else markov.Sum((result, ))
+
+
+class Builder:  # pylint: disable=too-many-instance-attributes  # egg's tables
+    """
+    A mutable e-graph, built as egg does :cite:`WillseyEtAl21`: a union-find
+    over the spiders, a hash-cons from each deterministic box up to the
+    classes it reads to its first occurrence, the parents of each class, i.e.
+    the occurrences reading it, and a worklist of the pairs found congruent.
+    Adding a box takes amortised constant time, where :meth:`EGraph.add` scans
+    every box, and :meth:`rebuild` repairs only what read a class related
+    since the last one, where :meth:`EGraph.rebuild` goes over the lot.
+
+    It is the one mutable object of the module, egg's runner rather than a
+    diagram: it only changes between :meth:`EGraph.builder` and
+    :meth:`freeze`, composition and tensor staying on :class:`EGraph`, and it
+    freezes into what the same operations give on its e-graph, see the law
+    :meth:`EGraph.building`. A box is checked against the spiders it reads
+    when it freezes, not as it is added: only a spider that is not there
+    raises at once, as a deterministic box looks up its class.
+
+    Parameters:
+        graph : The e-graph to start from.
+
+    Example
+    -------
+    Egg's example fed one e-node at a time: ``2`` is added once, and stating
+    ``(a * 2) / 2 = a * (2 / 2)``, ``2 / 2 = 1`` and ``a * 1 = a`` relates
+    the term to ``a`` once rebuilt, the two products being congruent:
+
+    >>> from discopy.markov import Ty, Box
+    >>> x = Ty('x')
+    >>> one, two = Box('1', Ty(), x), Box('2', Ty(), x)
+    >>> times, divide = Box('*', x @ x, x), Box('/', x @ x, x)
+    >>> builder = Markov.id(x).builder()
+    >>> (b, ), (c, ) = builder.add(two, ()), builder.add(one, ())
+    >>> assert builder.add(two, ()) == (b, )
+    >>> (d, ) = builder.add(times, (0, b))
+    >>> (e, ) = builder.add(divide, (d, b))
+    >>> (f, ) = builder.add(divide, (b, b))
+    >>> (g, ), (h, ) = builder.add(times, (0, f)), builder.add(times, (0, c))
+    >>> for equation in ((e, g), (f, c), (h, 0)):
+    ...     builder.merge(*equation)
+    >>> assert builder.find(e) != builder.find(0)
+    >>> builder.rebuild()
+    >>> assert builder.find(e) == builder.find(0) == 0
+    >>> builder.freeze().classes
+    (0, 1, 2, 3, 0, 2, 0, 0)
+    """
+    def __init__(self, graph: "EGraph"):
+        self.factory, self.start = type(graph), graph.graph
+        self.label, self.least = list(graph.classes), list(graph.classes)
+        self.boxes: list = []
+        self.box_wires: list[tuple[tuple[int, ...], tuple[int, ...]]] = []
+        self.heads: dict = {}
+        self.keys: list[tuple[int, ...]] = []
+        self.hashcons: dict[tuple[int, ...], int] = {}
+        self.parents: dict[int, list[int]] = {}
+        self.worklist: list[tuple[int, int]] = []
+        for box, wires in zip(self.start.boxes, self.start.box_wires):
+            self.place(box, wires, self.key(box, wires[0]))
+
+    def root(self, spider: int) -> int:
+        """ The root of the class of a spider in the union-find, halving the
+        path there. """
+        label = self.label
+        while label[spider] != spider:
+            label[spider] = spider = label[label[spider]]
+        return spider
+
+    def find(self, spider: int) -> int:
+        """ The class of a spider, the least spider related to it. """
+        return self.least[self.root(spider)]
+
+    def key(self, box, inputs: tuple[int, ...]) -> tuple[int, ...]:
+        """ A deterministic box up to the classes it reads, i.e. its number
+        among the :attr:`heads` then the roots of its inputs, and nothing for
+        a sample, which the hash-cons leaves alone. """
+        if not box.is_deterministic:
+            return ()
+        return (self.heads.setdefault(box, len(self.heads)),
+                *map(self.root, inputs))
+
+    def cons(self, box: int):
+        """ Enter a box, given by its index, in the hash-cons under its key:
+        the least box of a key stays, any other is congruent to it, their
+        pair put on the worklist. """
+        key = self.keys[box]
+        first = self.hashcons.setdefault(key, box)
+        if first != box:
+            self.hashcons[key] = min(first, box)
+            self.worklist.append((first, box))
+
+    def place(self, box, wires: tuple[tuple[int, ...], tuple[int, ...]],
+              key: tuple[int, ...]):
+        """ Append a box on its wires with its key: hash-consed and a parent
+        of each class it reads if it is deterministic. """
+        self.boxes.append(box)
+        self.box_wires.append(wires)
+        self.keys.append(key)
+        if key:
+            self.cons(len(self.boxes) - 1)
+            for root in key[1:]:
+                self.parents.setdefault(root, []).append(len(self.boxes) - 1)
+
+    def add(self, box, inputs: tuple[int, ...]) -> tuple[int, ...]:
+        """ Add a box reading some spiders, egg's add, and give its outputs:
+        the next spiders, or those of the first equal deterministic box on
+        their classes, as :meth:`EGraph.add` does. """
+        inputs, key = tuple(inputs), self.key(box, inputs)
+        if key in self.hashcons:
+            return self.box_wires[self.hashcons[key]][1]
+        n = len(self.label)
+        outputs = tuple(range(n, n + len(box.cod)))
+        self.label.extend(outputs)
+        self.least.extend(outputs)
+        self.place(box, (inputs, outputs), key)
+        return outputs
+
+    def union(self, left: int, right: int):
+        """ Relate two spiders, egg's union: the class with fewer parents
+        joins the other, and each of its parents moves to its new key in the
+        hash-cons, where it may meet a box now congruent to it. """
+        left, right = self.root(left), self.root(right)
+        if left == right:
+            return
+        if len(self.parents.get(left, ())) < len(self.parents.get(right, ())):
+            left, right = right, left
+        moved = self.parents.pop(right, [])
+        for box in moved:
+            self.hashcons.pop(self.keys[box], None)
+        self.label[right] = left
+        self.least[left] = min(self.least[left], self.least[right])
+        for box in moved:
+            head, *inputs = self.keys[box]
+            self.keys[box] = (head, *map(self.root, inputs))
+            self.cons(box)
+        if moved:
+            self.parents.setdefault(left, []).extend(moved)
+
+    def merge(self, *spiders: int):
+        """ Relate spiders, i.e. state that they are equal, without closing
+        under congruence, as :meth:`EGraph.merge` does. """
+        for left, right in pairwise(spiders):
+            self.union(left, right)
+
+    def rebuild(self):
+        """ The congruence closure, egg's rebuild: relate the outputs of each
+        pair of boxes found congruent, until none is left to find. """
+        while self.worklist:
+            first, second = self.worklist.pop()
+            for left, right in zip(
+                    self.box_wires[first][1], self.box_wires[second][1]):
+                self.union(left, right)
+
+    def freeze(self) -> "EGraph":
+        """ The e-graph built so far, as it is: not rebuilt. """
+        start = self.start
+        graph = type(start)(start.dom, start.cod, tuple(self.boxes), (
+            start.dom_wires, tuple(self.box_wires), start.cod_wires))
+        return self.factory(
+            graph, tuple(map(self.find, range(len(self.label)))))
+
+
+class History[factory](TestableGeneric, tuple):
+    """
+    An e-graph of the ``factory`` and operations on it, each the name of a
+    method among ``add``, ``merge`` and ``rebuild`` followed by its arguments:
+    what a search growing an e-graph does to it, without its values, see the
+    law :meth:`EGraph.building`.
+
+    Parameters:
+        graph : The e-graph to start from.
+        operations : The operations in turn.
+
+    Example
+    -------
+    >>> from discopy.markov import Ty, Box
+    >>> x = Ty('x')
+    >>> f = Box('f', x, x)
+    >>> history = History[Markov](Markov.id(x @ x), (
+    ...     ("add", f, (0, )), ("add", f, (1, )), ("merge", 0, 1),
+    ...     ("rebuild", )))
+    >>> assert history.build() == history.fold()
+    >>> history.fold().classes
+    (0, 0, 2, 2)
+    """
+    def __new__(cls, graph, operations):
+        return super().__new__(cls, (graph, tuple(operations)))
+
+    graph, operations = property(itemgetter(0)), property(itemgetter(1))
+
+    @classmethod
+    def checked_params(cls) -> tuple:
+        """ None, a sort of premises being drawn over a category. """
+        return ()
+
+    def fold(self) -> "EGraph":
+        """ The e-graph after each operation in turn. """
+        graph = self.graph
+        for name, *args in self.operations:
+            result = getattr(graph, name)(*args)
+            graph = result[0] if name == "add" else result
+        return graph
+
+    def build(self) -> "EGraph":
+        """ What a :class:`Builder` freezes into after the operations. """
+        builder = self.graph.builder()
+        for name, *args in self.operations:
+            getattr(builder, name)(*args)
+        return builder.freeze()
+
+    @classmethod
+    def twice(cls, graph: "EGraph") -> Self:
+        """ An e-graph beside its domain, then each of its boxes added again
+        on that copy of its inputs, in a causal order. """
+        start = result = graph @ type(graph).id(graph.dom)
+        dom, n = start.graph.dom_wires, len(graph.dom)
+        image, operations = dict(zip(dom[:n], dom[n:])), []
+        todo = list(zip(start.graph.boxes, start.graph.box_wires))
+        while todo:
+            box, (src, tgt) = todo.pop(next(
+                i for i, (_, (src, _)) in enumerate(todo)
+                if set(src) <= set(image)))
+            operations.append(("add", box, tuple(map(image.get, src))))
+            result, outputs = result.add(*operations[-1][1:])
+            image.update(zip(tgt, outputs))
+        return cls(start, operations)
+
+    @classmethod
+    def strategy(cls, effects: bool = True, max_operations: int = 4, **params
+                 ) -> "st.SearchStrategy[History]":
+        """ The :meth:`twice` of an e-graph, ``effects`` and ``params`` going
+        to its strategy, then each input merged with its copy in some order,
+        so that rebuilding relates what the two copies determine, among up to
+        ``max_operations`` others at each step: a rebuild, two spiders of one
+        type merged, or a new box named after a generator added on up to two
+        spiders, not deterministic one time in three if ``effects``. """
+        from hypothesis import strategies as st
+
+        category, number = cls.factory.category, st.integers(0, 9)
+        kinds = st.sampled_from(("rebuild", "merge", "add"))
+        names = st.sampled_from(GENERATORS[:2])
+        sample = st.sampled_from((False, False, effects))
+
+        def operation(draw, graph):
+            kind, types = draw(kinds), graph.graph.spider_types
+            if kind == "merge":
+                return kind, *graph.pair(draw(number), draw(number))
+            if kind == "rebuild":
+                return (kind, )
+            inputs = tuple(i % len(types) for i in draw(st.lists(
+                number, max_size=2 if types else 0)))
+            name = draw(names)
+            return kind, category.box_factory(name, category.ob().tensor(*map(
+                types.__getitem__, inputs)), category.ob(name),
+                is_deterministic=not draw(sample)), inputs
+
+        @st.composite
+        def histories(draw):
+            start, operations = cls.twice(
+                draw(cls.factory.strategy(effects, **params)))
+            dom = start.graph.dom_wires
+            pairs = list(zip(dom[:len(dom) // 2], dom[len(dom) // 2:]))
+            graph = cls(start, operations).fold()
+            for pair in [()] + draw(st.permutations(pairs)):
+                steps = [("merge", *pair)] if pair else []
+                graph = cls(graph, steps).fold()
+                for _ in range(draw(st.integers(0, max_operations))):
+                    steps.append(operation(draw, graph))
+                    graph = cls(graph, steps[-1:]).fold()
+                operations += tuple(steps)
+            return cls(start, operations)
+
+        return histories()
 
 
 class EGraph[category](
@@ -423,6 +699,10 @@ class EGraph[category](
         return type(self)(type(graph)(
             graph.dom, graph.cod, graph.boxes + (box, ), wires),
             self.classes + outputs), outputs
+
+    def builder(self) -> Builder:
+        """ A :class:`Builder` starting from the e-graph, to grow it fast. """
+        return Builder(self)
 
     def assert_equation(self, region: tuple[int, ...], dom: tuple, cod: tuple,
                         rhs: Hypergraph):
@@ -1006,6 +1286,11 @@ class EGraph[category](
                 for match in last.matches(lhs.to_hypergraph()))
 
         return Equation(saturated(same), saturated(same + renamed), True)
+
+    @axiom
+    def building(cls, history: History[Self]) -> Equation[Self]:
+        """ A builder freezes into what its operations give in turn. """
+        return Equation(history.build(), history.fold())
 
     rewrite_identity = rewrite_identity.weaken(effects=False)
     extraction_rewrite = extraction_rewrite.weaken(effects=False)

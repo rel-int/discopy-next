@@ -1,7 +1,10 @@
+import gzip
+import json
 import random
 from functools import reduce
 from itertools import islice
 from operator import eq, lt
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -10,7 +13,7 @@ from pytest import raises
 
 from discopy import symmetric
 from discopy.egraph import (
-    EGraph, Join, Markov, distribute, partition)
+    EGraph, History, Join, Markov, distribute, partition)
 from discopy.hypergraph import Hypergraph
 from discopy.markov import Ty, Box, Copy, Diagram, Functor, Swap
 from discopy.tensor import Dim, Tensor
@@ -417,6 +420,168 @@ def test_laws_of_one_graph(law, examples):
         if law.params.get("effects", True) or all(
                 box.is_cartesian for box in graph.graph.boxes):
             assert law(graph)
+
+
+def test_builder_hash_conses_deterministic_boxes():
+    builder, graph = Markov.id(x).builder(), Markov.id(x)
+    for box in (f, f, sample, sample):
+        outputs = builder.add(box, (0, ))
+        graph, expected = graph.add(box, (0, ))
+        assert outputs == expected
+    assert builder.boxes == [f, sample, sample]
+    assert builder.keys == [(0, 0), (), ()] and builder.heads == {f: 0}
+    assert builder.hashcons == {(0, 0): 0} and builder.parents == {0: [0]}
+    assert builder.freeze() == graph
+
+
+def test_builder_rebuild_repairs_parents():
+    """ Three ``f`` then a ``g`` reading both ends, on each of two inputs:
+    merging the inputs finds one pair congruent, rebuilding the others. """
+    builder, chains = Markov.id(x @ x).builder(), ([0], [1])
+    for chain in chains:
+        for _ in range(3):
+            chain.extend(builder.add(f, chain[-1:]))
+        chain.extend(builder.add(
+            Box('g', x @ x, x @ x), (chain[0], chain[-1])))
+    left, right = chains
+    assert list(map(builder.find, right)) == right
+    builder.merge(0, 1)
+    assert list(map(builder.find, right)) == [0] + right[1:]
+    assert builder.worklist == [(0, 4)]
+    builder.rebuild()
+    assert list(map(builder.find, right)) == left and not builder.worklist
+    assert builder.add(f, (1, )) == (left[1], )
+    assert set(builder.hashcons.values()) == {0, 1, 2, 3}
+    frozen = builder.freeze()
+    assert frozen == frozen.rebuild() == frozen.builder().freeze()
+
+
+def test_builder_keeps_samples_apart():
+    builder = Markov.id(x @ x).builder()
+    (a, ), (b, ) = builder.add(sample, (0, )), builder.add(sample, (1, ))
+    (c, ), (d, ) = builder.add(f, (a, )), builder.add(f, (b, ))
+    builder.merge(0, 1)
+    builder.rebuild()
+    assert len(set(map(builder.find, (a, b, c, d)))) == 4
+    builder.merge(a, b)
+    builder.rebuild()
+    assert builder.find(c) == builder.find(d) != builder.find(a)
+
+
+def test_builder_class_with_fewer_parents_joins():
+    """ The class read more often stays the root, and the least spider of a
+    class names it whichever the root is. """
+    builder = Markov.id(x @ x).builder()
+    builder.add(f, (1, )), builder.add(g, (1, )), builder.add(h, (0, ))
+    builder.merge(0, 1)
+    assert builder.root(0) == 1 and builder.find(1) == 0
+    assert builder.parents == {1: [0, 1, 2]}
+    assert builder.freeze().classes == (0, 0, 2, 3, 4)
+    builder.merge(0, 1)
+    assert builder.parents == {1: [0, 1, 2]}
+
+
+def test_builder_starts_from_a_value():
+    """ A builder finds the boxes of an e-graph that are congruent as it
+    starts, and freezes into that e-graph unless it rebuilds. """
+    graph = Markov((Copy(x) >> f @ f >> g @ g).to_hypergraph())
+    builder = graph.builder()
+    assert builder.worklist == [(0, 1)] and builder.freeze() == graph
+    builder.rebuild()
+    assert builder.freeze() == graph.rebuild() != graph
+    related = graph.merge(1, 2)
+    assert related.builder().freeze() == related
+    assert related.builder().find(2) == 1
+
+
+def test_builder_checks_as_it_freezes():
+    builder = Markov.id(x).builder()
+    builder.add(Box('f', Ty('y'), x), (0, ))
+    with raises(AxiomError):
+        builder.freeze()
+    builder = Markov.id(x @ Ty('y')).builder()
+    builder.merge(0, 1)
+    with raises(AxiomError):
+        builder.freeze()
+
+
+def test_building(examples):
+    """ The builder of two copies of each example, then with their inputs
+    merged and rebuilt, freezes into what the pure e-graph gives. """
+    for graph in examples:
+        start, operations = history = History[Markov].twice(graph)
+        dom, n = start.graph.dom_wires, len(graph.dom)
+        merged = History[Markov](start, operations + tuple(
+            ("merge", *pair) for pair in zip(dom[:n], dom[n:])) + (
+            ("rebuild", ), ))
+        for case in (history, merged):
+            assert Markov.building(case)
+            assert case.build().classes == case.fold().classes
+        deterministic = [
+            j for j, box in enumerate(graph.graph.boxes)
+            if box.is_deterministic]
+        assert len(set(merged.fold().classes)) <= len(set(
+            history.fold().classes)) - bool(deterministic and n)
+
+
+@settings(max_examples=20, deadline=None)
+@given(History[Markov].strategy(max_operations=2))
+def test_history_strategy(history):
+    graph, operations = history
+    assert history.graph == graph and history.operations == operations
+    assert not History.checked_params()
+    assert {name for name, *_ in operations} <= {"add", "merge", "rebuild"}
+    assert len(graph.dom) % 2 == 0
+    assert history.build().classes == history.fold().classes
+
+
+TRACES = Path(__file__).parents[1] / "benchmark" / "data" / "egraph-traces"
+
+
+def replay(trace: dict, builder, suffix: str = "") -> tuple[list, list]:
+    """ The e-nodes of a trace added to a builder in turn, each merged with
+    the class recorded for it: the spider standing for each class, then the
+    output of each e-node. The base classes take a suffix, so that two
+    replays are two copies. """
+    boxes = [Box(head["name"] + suffix * (not head["arity"]),
+                 Ty().tensor(*head["arity"] * [x]), x)
+             for head in trace["heads"]]
+    classes, outputs = [], []
+    for head, out, *args in trace["rows"]:
+        spider, = builder.add(boxes[head], tuple(classes[i] for i in args))
+        outputs.append(spider)
+        if out == len(classes):
+            classes.append(spider)
+        else:
+            builder.merge(spider, classes[out])
+    return classes, outputs
+
+
+@pytest.mark.parametrize("number", range(3))
+def test_builder_replays_a_trace(number):
+    """ A builder ends on the partition a 1D-ARC search recorded, and
+    relating the base classes of two copies leaves one once rebuilt, which
+    it would not were ``rebuild`` to do nothing. """
+    with gzip.open(TRACES / f"trace-{number:02}.json.gz", "rt") as file:
+        trace = json.load(file)
+    recorded = [out for _, out, *_ in trace["rows"]]
+    builder = Markov.id(Ty()).builder()
+    classes, outputs = replay(trace, builder)
+    found = [builder.find(spider) for spider in outputs]
+    assert len(builder.boxes) == trace["enodes"] == len(recorded)
+    assert len(set(found)) == len(set(recorded)) == len(set(zip(
+        found, recorded))) == trace["classes"]
+    assert builder.freeze().classes == tuple(found)
+    others, _ = replay(trace, builder, suffix="'")
+    bases = sum(not head["arity"] for head in trace["heads"])
+    for left, right in zip(classes[:bases], others[:bases]):
+        builder.merge(left, right)
+    count = len(set(map(builder.find, range(len(builder.label)))))
+    assert count == 2 * trace["classes"] - bases
+    builder.rebuild()
+    assert len(set(map(builder.find, range(len(builder.label))))) == trace[
+        "classes"]
+    assert list(map(builder.find, others)) == list(map(builder.find, classes))
 
 
 @pytest.mark.parametrize("i, j, k", [(0, 0, 0), (0, 1, 2), (3, 2, 1)])
