@@ -217,9 +217,10 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Changed
 
-- `optyx.classical.Digit`, `PostselectDigit` and `PostselectBit` reject the
-  empty case with a `ValueError` instead of reading it as one mode or as the
-  scalar one: a digit of no digits is `Id()` already ([next#498]).
+- `optyx.classical.Digit`, `PostselectDigit`, `PostselectBit` and the `Bit`
+  built on the last reject the empty case with a `ValueError` instead of
+  reading it as one mode or as the scalar one: a digit of no digits is
+  `Id()` already ([next#498]).
 
 - `tensor.Diagram.to_quimb` is built on the combinatorial map, through
   `tensor.Functor.to_quimb`: swaps, cups and caps are wiring instead of
@@ -405,7 +406,8 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 - `optyx.core.zx.H` is its own dagger: a box declares itself self-adjoint
   with `is_dagger=None`, as `quantum.gates.SWAP` does, where the optyx
   dagger otherwise returns a differently named copy — so `H[::-1] == H`
-  and `to_pyzx` reads a daggered Hadamard ([next#498]).
+  and `to_pyzx` translates a daggered Hadamard, which `from_pyzx` reads
+  back as `H` ([next#498]).
 - `interaction.Diagram`'s docstring states the codomain of the diagram
   inside as `y.positive @ x.negative`, which is what its constructor, its
   `strategy` and its `to_tree` doctest all read, and an example asserts
