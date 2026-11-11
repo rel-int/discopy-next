@@ -744,7 +744,13 @@ class Box(frobenius.Box, Diagram):
     def dagger(self) -> Box:
         """Return the dagger of the box.
         Inheriting boxes should implement this method.
-        Otherwise it is defined by the array."""
+        Otherwise it is defined by the array.
+
+        A box declares itself self-adjoint with ``is_dagger=None``, as
+        :data:`discopy.quantum.gates.SWAP` does, and is then its own dagger
+        rather than a differently named copy of itself."""
+        if self.is_dagger is None:
+            return self
         if self.array is not None:
             return type(self)(
                 self.name + ".dagger()",
