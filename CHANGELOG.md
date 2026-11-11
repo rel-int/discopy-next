@@ -1460,6 +1460,10 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   built wheel and sdist carry `License-Expression` and all three
   `License-File`s ([next#445]).
 
+- `benchmark/data/egraph-traces/` holds 50 e-graph traces of a program search
+  on 1D-ARC, without values and with heads renamed: the test data of the
+  e-graph builder benchmark ([next#500]).
+
 ## [1.2.2] - 2025-12-19
 
 See the [GitHub release](https://github.com/discopy/discopy/releases/tag/1.2.2).
@@ -1742,6 +1746,7 @@ for the changelog of `1.2.1` and earlier.
 [next#495]: https://github.com/rel-int/discopy-next/pull/495
 [next#496]: https://github.com/rel-int/discopy-next/pull/496
 [next#498]: https://github.com/rel-int/discopy-next/pull/498
+[next#500]: https://github.com/rel-int/discopy-next/pull/500
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#56]: https://github.com/rel-int/optyx/pull/56
