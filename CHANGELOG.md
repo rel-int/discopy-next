@@ -217,6 +217,11 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Changed
 
+- `optyx.classical.Digit`, `PostselectDigit`, `PostselectBit` and the `Bit`
+  built on the last reject the empty case with a `ValueError` instead of
+  reading it as one mode or as the scalar one: a digit of no digits is
+  `Id()` already ([next#498]).
+
 - `tensor.Diagram.to_quimb` is built on the combinatorial map, through
   `tensor.Functor.to_quimb`: swaps, cups and caps are wiring instead of
   dense tensors, the network is deterministic and `dtype` takes effect
@@ -398,6 +403,11 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Fixed
 
+- `optyx.core.zx.H` is its own dagger: a box declares itself self-adjoint
+  with `is_dagger=None`, as `quantum.gates.SWAP` does, where the optyx
+  dagger otherwise returns a differently named copy — so `H[::-1] == H`
+  and `to_pyzx` translates a daggered Hadamard, which `from_pyzx` reads
+  back as `H` ([next#498]).
 - Every dual rail diagram serialises: `balanced.DualRailBraid`,
   `balanced.DualRailTwist`, `ribbon.DualRailCup`, `ribbon.DualRailCap` and
   `quantum.zx.Scalar` read back the arguments their own constructors take,
@@ -1731,6 +1741,7 @@ for the changelog of `1.2.1` and earlier.
 [next#494]: https://github.com/rel-int/discopy-next/pull/494
 [next#495]: https://github.com/rel-int/discopy-next/pull/495
 [next#496]: https://github.com/rel-int/discopy-next/pull/496
+[next#498]: https://github.com/rel-int/discopy-next/pull/498
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#56]: https://github.com/rel-int/optyx/pull/56

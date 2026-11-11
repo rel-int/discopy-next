@@ -463,12 +463,18 @@ class PostselectBit(ClassicalBox):
     Postselect on a bit result.
     The domain of the map is a bit.
 
-    Postselecting on no bit is the empty product, the scalar one.
+    Postselecting on no bit is not a map, it is the identity: the empty
+    case is rejected rather than read as one bit.
 
-    >>> assert PostselectBit().dom == PostselectBit().cod == bit ** 0
+    >>> PostselectBit()
+    Traceback (most recent call last):
+    ...
+    ValueError: Postselect on at least one bit, or compose Id() instead.
     """
     def __init__(self, *bits):
-
+        if not bits:
+            raise ValueError(
+                "Postselect on at least one bit, or compose Id() instead.")
         if not all(bit in (0, 1) for bit in bits):
             raise ValueError("Bits must be a list of 0s and 1s.")
         self.bits = bits
@@ -494,12 +500,18 @@ class PostselectDigit(ClassicalBox):
     Postselect on a digit result.
     The domain of the map is a digit.
 
-    >>> assert PostselectDigit() == PostselectDigit(1)
+    >>> PostselectDigit()
+    Traceback (most recent call last):
+    ...
+    ValueError: Postselect on at least one digit, or compose Id() instead.
     """
     def __init__(self, *digits):
+        if not digits:
+            raise ValueError(
+                "Postselect on at least one digit, or compose Id() instead.")
         if not all(isinstance(digit, int) for digit in digits):
             raise ValueError("Digits must be a list of integers.")
-        self.digits = digits or (1,)
+        self.digits = digits
         super().__init__(
             f"PostselectDigit({self.digits})",
             zw.Select(*self.digits),
@@ -794,10 +806,16 @@ class Digit(ClassicalBox):
     Create a classical state with
     a natural number.
 
-    >>> assert Digit() == Digit(1)
+    >>> Digit()
+    Traceback (most recent call last):
+    ...
+    ValueError: Create at least one digit, or compose Id() instead.
     """
     def __init__(self, *photons: int):
-        self.photons = photons or (1,)
+        if not photons:
+            raise ValueError(
+                "Create at least one digit, or compose Id() instead.")
+        self.photons = photons
         super().__init__(
             f"Digit({self.photons})",
             zw.Create(*self.photons),
