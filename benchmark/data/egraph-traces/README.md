@@ -38,7 +38,8 @@ head. An argument is always a class created by an earlier row.
 **The final partition** is the column `out`: row `i` is an e-node of class `rows[i][1]`, and
 `classes` counts the distinct values. No pair `(head, args)` occurs twice, and a class never
 merges with another once both exist, so replaying a trace never has to repair a parent: it
-exercises `add`, the hash-cons and `merge` of a fresh class, not the cascade of a rebuild.
+exercises `add`, the hash-cons where it misses and `merge` of a fresh class. It never takes the
+hit of the hash-cons nor the cascade of a rebuild: neither is in `egraph_seconds`.
 
 ## Timings
 
