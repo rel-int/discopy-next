@@ -1,30 +1,32 @@
 # -*- coding: utf-8 -*-
 
 """
-E-hypergraphs, i.e. e-graphs of diagrams with sharing.
+E-graphs of diagrams with sharing: an e-hypergraph is a monoidal e-graph.
 
-A cartesian diagram, whose boxes are total functions, is a term with sharing,
-and an e-graph gathers equal terms in e-classes :cite:`WillseyEtAl21`. An
-e-hypergraph over a copy-discard category is a diagram with sharing, i.e. a
-left-monogamous acyclic :class:`discopy.hypergraph.Hypergraph` whose boxes are
-the e-nodes, with an equivalence on its spiders whose classes are the
-e-classes, so that over cartesian diagrams it is an e-graph. A **section**
-chooses a producer for each class it needs. Two samples are independent and
-every section keeps a condition: equations are between cartesian diagrams,
-effects being context.
+An e-graph gathers equal terms in e-classes :cite:`WillseyEtAl21`, a term
+with sharing being a cartesian diagram, i.e. one whose boxes are total
+functions with one output each. An :class:`EGraph` over a copy-discard
+category is the same data structure with boxes of any arity that need not be
+cartesian: a diagram with sharing, i.e. a left-monogamous acyclic
+:class:`discopy.hypergraph.Hypergraph` whose boxes are the e-nodes, with an
+equivalence on its spiders whose classes are the e-classes. We call it an
+e-graph, a monoidal e-graph or an e-hypergraph alike, egg's e-graphs being
+those over cartesian diagrams. A **section** chooses a producer for each
+class it needs. Two samples are independent and every section keeps a
+condition: equations are between cartesian diagrams, effects being context.
 
 Tiurin, Barrett, Ghica and Hu :cite:`TiurinEtAl24` give e-graphs their
 semantics in the free semilattice-enriched Cartesian category, where an
 e-class is the :class:`Join` of its e-nodes, drawn as an e-box, and
-composition and tensor distribute over joins. :meth:`EHypergraph.to_diagram`
+composition and tensor distribute over joins. :meth:`EGraph.to_diagram`
 is their translation, and distributing its joins gives the sections, one
 choice per class as the copy after an e-box says, see the law
-:meth:`EHypergraph.translation`. Their e-hypergraphs are hierarchical, with
+:meth:`EGraph.translation`. Their e-hypergraphs are hierarchical, with
 nested e-boxes of any arity, so as to represent any symmetric monoidal
 theory, where these are flat with one output per e-box, the image of
 e-graphs: an equation with several outputs is entered as its projections,
 which is sound for cartesian diagrams only. Unlike the paper's, a class may
-depend on itself, as in egg, which :meth:`EHypergraph.to_diagram` refuses, as
+depend on itself, as in egg, which :meth:`EGraph.to_diagram` refuses, as
 drawing it would need a trace.
 
 Summary
@@ -35,7 +37,7 @@ Summary
     :nosignatures:
     :toctree:
 
-    EHypergraph
+    EGraph
     Join
 
 .. admonition:: Functions
@@ -55,7 +57,7 @@ Summary
 
 Example
 -------
-``Markov`` is ``EHypergraph[markov.Diagram]``, the e-hypergraphs over
+``Markov`` is ``EGraph[markov.Diagram]``, the e-graphs over
 Markov diagrams. Egg's example, ``(a * 2) / 2`` with ``a`` an input and each
 constant a box with no input, the two ``2`` one class from the start as egg
 hash-conses them, saturates in three rounds with egg's classes and extracts
@@ -76,6 +78,19 @@ hash-conses them, saturates in three rounds with egg's classes and extracts
 >>> print(rounds[-1].extract().to_diagram())
 Id(x)
 
+Egg's e-graph is the cartesian case, fed one e-node at a time: adding ``2``
+again gives the e-node there is, and ``(a * 2) / 2`` ends up in the class of
+the input ``a``, with the same classes in each round:
+
+>>> graph, (b, ) = Markov.id(x).add(two, ())
+>>> assert graph.add(two, ()) == (graph, (b, ))
+>>> graph, (c, ) = graph.add(times, (0, b))
+>>> graph, (d, ) = graph.add(divide, (c, b))
+>>> rounds = list(graph.saturate(*rules))
+>>> [len(set(rewritten.classes)) for rewritten in [graph] + rounds]
+[4, 6, 5, 4]
+>>> assert rounds[-1].classes[d] == rounds[-1].classes[0]
+
 A ``sample`` is not deterministic and a ``condition`` not affine: under
 ``x - x = 0``, two independent samples of ``p`` stay apart, while one sample
 shared cancels, then is discarded with ``p`` unless a condition reads it:
@@ -93,6 +108,15 @@ shared cancels, then is discarded with ``p`` unless a condition reads it:
 Copy(x) >> sample @ sample >> -
 Discard(x) @ 0
 sample >> 0 @ condition
+
+Rebuilding relates the outputs of two equal cartesian boxes on one input,
+never those of two samples:
+
+>>> for box in (Box('f', x, x), sample):
+...     graph = Markov((Diagram.copy(x) >> box @ box).to_hypergraph())
+...     print(len(set(graph.classes)), len(set(graph.rebuild().classes)))
+3 2
+3 3
 """
 
 from collections import Counter
@@ -153,7 +177,7 @@ def relabel(wires, label: Callable):
 
 
 def is_pattern(graph: Hypergraph) -> bool:
-    """ Whether a hypergraph is a pattern, see :meth:`EHypergraph.matches`. """
+    """ Whether a hypergraph is a pattern, see :meth:`EGraph.matches`. """
     return all(box.is_cartesian for box in graph.boxes)\
         and graph.is_left_monogamous and graph.is_acyclic\
         and not set(graph.dom_wires) & set(graph.cod_wires)
@@ -247,11 +271,12 @@ def distribute(diagram: monoidal.Diagram) -> markov.Sum:
         else markov.Sum((result, ))
 
 
-class EHypergraph[category](
+class EGraph[category](
         MonoidalCategory, TestableGeneric, Serialisable):
     """
-    An e-hypergraph over a copy-discard ``category``, equal to another up to
-    renaming its spiders, see :mod:`discopy.ehypergraph`.
+    An e-graph over a copy-discard ``category``, i.e. a monoidal e-graph or
+    e-hypergraph, equal to another up to renaming its spiders, see
+    :mod:`discopy.egraph`.
 
     Parameters:
         graph : A left-monogamous acyclic hypergraph, its boxes the e-nodes.
@@ -742,7 +767,7 @@ class EHypergraph[category](
         return graph
 
     def __eq__(self, other) -> bool:
-        return isinstance(other, EHypergraph) and self.graph == other.graph\
+        return isinstance(other, EGraph) and self.graph == other.graph\
             and is_isomorphic(self.to_graph(), other.to_graph(), dict.__eq__)
 
     def __hash__(self) -> int:
@@ -754,7 +779,7 @@ class EHypergraph[category](
 
     def to_tree(self) -> dict:
         """ Serialise the e-hypergraph, with the name of its category. """
-        return {'factory': factory_name(EHypergraph),
+        return {'factory': factory_name(EGraph),
                 'category': factory_name(self.category),
                 'graph': self.graph.to_tree(), 'classes': list(self.classes)}
 
@@ -766,7 +791,7 @@ class EHypergraph[category](
 
     @classmethod
     def strategy(cls, effects: bool = True, max_merges: int = 3, **params
-                 ) -> "st.SearchStrategy[EHypergraph]":
+                 ) -> "st.SearchStrategy[EGraph]":
         """ An acyclic hypergraph, its types and boxes named after two
         generators, some not deterministic or not affine if ``effects``, then
         up to ``max_merges`` merges, ``params`` going to the hypergraph. """
@@ -784,7 +809,7 @@ class EHypergraph[category](
         effect = st.booleans() if effects else st.just(False)
 
         @st.composite
-        def ehypergraphs(draw):
+        def egraphs(draw):
             graph = draw(graphs)
             boxes = tuple(category.box_factory(
                 draw(st.sampled_from(GENERATORS[:2])), box.dom, box.cod,
@@ -796,7 +821,7 @@ class EHypergraph[category](
                     draw(st.integers(0, 9)), draw(st.integers(0, 9))))
             return result
 
-        return ehypergraphs()
+        return egraphs()
 
     @axiom
     def graph_functoriality[
@@ -988,4 +1013,4 @@ class EHypergraph[category](
     saturation = saturation.weaken(effects=False)
 
 
-Markov = EHypergraph[markov.Diagram]
+Markov = EGraph[markov.Diagram]
