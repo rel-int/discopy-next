@@ -10,7 +10,7 @@
 >
 > > I find it too confusing to have three different words `contract`, `contractor`, `contraction` for almost the same thing, we need to find a better design. In fact, even `backend` is doing the same job already, can we just have a `Contractor` subclass of `Backend`?
 
-- [ ] `matrix.Contractor(Backend)`: a backend whose `einsum` contracts the arrays of another backend, with `OptEinsum` and `Quimb`; a plain `Backend` is the einsum engine
+- [WIP] @session_01MEJxy29LoL954iS6TzLhbH-2026-11-11 00:12 `matrix.Contractor(Backend)`: a backend whose `einsum` contracts the arrays of another backend, with `OptEinsum` and `Quimb`; a plain `Backend` is the einsum engine
 - [ ] one word: `contractor` is the parameter and the attribute of `tensor.Functor`, and the parameter of `Diagram.eval` and `Circuit.eval`
 - [ ] keep #533's `Functor.operands` and `Functor.to_quimb`, its tests adapted, its `tensor` extra and README line
 - [ ] CHANGELOG bullets and the checks of CONTRIBUTING.md
