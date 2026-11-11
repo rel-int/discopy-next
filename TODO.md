@@ -4,4 +4,4 @@
 - [x] balanced.DualRailBraid and DualRailTwist: trees that carry their own constructor arguments
 - [x] ribbon.DualRailCup and DualRailCap: the same
 - [x] quantum.zx.Scalar: from_tree reading the data its __init__ takes
-- [WIP] @session_01C7YfAQPBvoNzR5cj8KD3LA-2026-11-11 01:26 Regression tests for each, plus the CHANGELOG bullet
+- [x] Regression tests for each, plus the CHANGELOG bullet
