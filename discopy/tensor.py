@@ -67,7 +67,7 @@ from discopy.utils import (
 if TYPE_CHECKING:
     import sympy
     import tensornetwork
-    import quimb
+    import quimb.tensor
 
 
 @factory

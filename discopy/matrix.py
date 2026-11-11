@@ -56,6 +56,7 @@ from discopy.utils import (
 
 if TYPE_CHECKING:
     import sympy
+    import quimb.tensor
 
 
 @factory
@@ -755,7 +756,7 @@ class Contractor(Backend):
     A plain :class:`Backend` contracts with its own ``einsum``.
 
     Parameters:
-        backend : The backend of the arrays, the active one by default.
+        base : The backend of the arrays, the active one by default.
 
     Example
     -------
@@ -766,20 +767,20 @@ class Contractor(Backend):
     >>> OptEinsum()
     OptEinsum()
     """
-    def __init__(self, backend: Backend | None = None):
-        self.backend = backend
-        arrays = backend or get_backend()
+    def __init__(self, base: Backend | None = None):
+        self.base = base
+        arrays = base or get_backend()
         super().__init__(arrays.module, arrays.array)
 
     def __repr__(self):
-        backend = "" if self.backend is None else repr(self.backend)
-        return f"{type(self).__name__}({backend})"
+        base = "" if self.base is None else repr(self.base)
+        return f"{type(self).__name__}({base})"
 
     def __eq__(self, other):
-        return type(self) is type(other) and self.backend == other.backend
+        return type(self) is type(other) and self.base == other.base
 
     def __hash__(self):
-        return hash((type(self), self.backend))
+        return hash((type(self), self.base))
 
     def einsum(self, *operands, **params):
         """
@@ -805,7 +806,7 @@ class OptEinsum(Contractor):
                 "Contracting more than "
                 f"{config.MAX_EINSUM_INDICES} indices requires "
                 "opt_einsum, run `pip install opt_einsum`.") from error
-        return opt_einsum.contract(*operands, **params)  # ty: ignore
+        return opt_einsum.contract(*operands, **params)
 
 
 class Quimb(Contractor):

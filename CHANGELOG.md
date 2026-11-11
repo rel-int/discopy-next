@@ -9,6 +9,13 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Added
 
+- `matrix.Contractor`, a backend whose `einsum` contracts the arrays of
+  another backend, with `OptEinsum` and `Quimb`, which takes `cotengra`
+  path optimizers as `optimize` and contracts approximately past a
+  `max_bond`, chosen by the `contractor` parameter of `tensor.Functor`,
+  `tensor.Diagram.eval` and `quantum.Circuit.eval`; the Einstein notation is
+  `tensor.Functor.operands`, and the contraction dependencies are the new
+  `tensor` extra ([#533], [next#495]).
 - `testable.Rule` and `@rule`, inference rules stated like laws on each
   structure of `abc`, and `FreeCategory.search`, the terms of a free
   category derived from its rules, which the property matrix draws:
@@ -210,6 +217,10 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Changed
 
+- `tensor.Diagram.to_quimb` is built on the combinatorial map, through
+  `tensor.Functor.to_quimb`: swaps, cups and caps are wiring instead of
+  dense tensors, the network is deterministic and `dtype` takes effect
+  ([#533], [next#495]).
 - `NamedGeneric` takes the parameters of PEP 695, `class Matrix[dtype](...,
   NamedGeneric)`, and the abstract base classes bound theirs; `ty` errors on
   all but the six rules main still breaks, which stay `"warn"` ([next#1]).
@@ -1486,6 +1497,7 @@ for the changelog of `1.2.1` and earlier.
 [#526]: https://github.com/discopy/discopy/pull/526
 [#529]: https://github.com/discopy/discopy/pull/529
 [#532]: https://github.com/discopy/discopy/pull/532
+[#533]: https://github.com/discopy/discopy/pull/533
 [#535]: https://github.com/discopy/discopy/pull/535
 [#538]: https://github.com/discopy/discopy/pull/538
 [#539]: https://github.com/discopy/discopy/pull/539
@@ -1693,6 +1705,7 @@ for the changelog of `1.2.1` and earlier.
 [next#489]: https://github.com/rel-int/discopy-next/issues/489
 [next#490]: https://github.com/rel-int/discopy-next/issues/490
 [next#494]: https://github.com/rel-int/discopy-next/pull/494
+[next#495]: https://github.com/rel-int/discopy-next/pull/495
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#56]: https://github.com/rel-int/optyx/pull/56
