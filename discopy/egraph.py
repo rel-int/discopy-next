@@ -287,8 +287,9 @@ class Builder:  # pylint: disable=too-many-instance-attributes  # egg's tables
     diagram: it only changes between :meth:`EGraph.builder` and
     :meth:`freeze`, composition and tensor staying on :class:`EGraph`, and it
     freezes into what the same operations give on its e-graph, see the law
-    :meth:`EGraph.building`. A box and the spiders it reads are checked when
-    it freezes, not as they are added.
+    :meth:`EGraph.building`. A box is checked against the spiders it reads
+    when it freezes, not as it is added: only a spider that is not there
+    raises at once, as a deterministic box looks up its class.
 
     Parameters:
         graph : The e-graph to start from.
