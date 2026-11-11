@@ -217,6 +217,9 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Changed
 
+- `discopy.ehypergraph` is now `discopy.egraph` and `EHypergraph` is `EGraph`,
+  with no alias: an e-hypergraph is a monoidal e-graph, egg's e-graphs being
+  those over cartesian diagrams ([next#501]).
 - `optyx.classical.Digit`, `PostselectDigit`, `PostselectBit` and the `Bit`
   built on the last reject the empty case with a `ValueError` instead of
   reading it as one mode or as the scalar one: a digit of no digits is
@@ -1742,6 +1745,7 @@ for the changelog of `1.2.1` and earlier.
 [next#495]: https://github.com/rel-int/discopy-next/pull/495
 [next#496]: https://github.com/rel-int/discopy-next/pull/496
 [next#498]: https://github.com/rel-int/discopy-next/pull/498
+[next#501]: https://github.com/rel-int/discopy-next/pull/501
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#56]: https://github.com/rel-int/optyx/pull/56
