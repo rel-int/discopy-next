@@ -21,7 +21,7 @@ DisCoPy is a Python toolkit for computing with [string diagrams](https://en.wiki
 * a property-testing framework, [`discopy.testable`](https://docs.discopy.org/en/main/_api/discopy.testable.html), where each law is stated once as an `Axiom` on an abstract base class and checked with [Hypothesis](https://hypothesis.readthedocs.io) on every category that implements it
 * a `Diagram` data structure for string diagrams in any (pre)monoidal category with methods for diagram composition, drawing, rewriting and `Functor` evaluation into:
   - `Function`, i.e. wires as types and boxes as functions with either disjoint union (`python.additive`) or tuples (`python.multiplicative`)
-  - `Tensor`, i.e. wires as dimensions and boxes as arrays from [NumPy](https://numpy.org), [PyTorch](https://pytorch.org/), [TensorFlow](https://www.tensorflow.org/), [TensorNetwork](https://github.com/google/TensorNetwork), [JAX](https://github.com/google/jax) and [Quimb](https://quimb.readthedocs.io/en/latest)
+  - `Tensor`, i.e. wires as dimensions and boxes as arrays from [NumPy](https://numpy.org), [PyTorch](https://pytorch.org/), [TensorFlow](https://www.tensorflow.org/) and [JAX](https://github.com/google/jax), contracted with the backend `einsum`, [opt_einsum](https://optimized-einsum.readthedocs.io/en/stable/) or [Quimb](https://quimb.readthedocs.io/en/latest) with [cotengra](https://cotengra.readthedocs.io/en/latest/) path optimizers
   - `Matrix`, i.e. wires as natural numbers and boxes as matrices, with the direct sum as monoidal product
   - neural networks (`discopy.neural`), compiled to a function on tensors that runs as a PyTorch module or under `jax.jit`
 * an implementation of formal grammars ([Thue](https://en.wikipedia.org/wiki/Semi-Thue_system), [context-free](https://en.wikipedia.org/wiki/Context-free_grammar), [categorial](https://en.wikipedia.org/wiki/Categorial_grammar), [abstract categorial](https://aclanthology.org/P01-1033/), [pregroup](https://en.wikipedia.org/wiki/Pregroup_grammar) or [dependency](https://en.wikipedia.org/wiki/Dependency_grammar)) with interfaces to [depccg](https://github.com/masashi-y/depccg), [spaCy](https://spacy.io/) and [NLTK](https://www.nltk.org/)
@@ -213,7 +213,7 @@ Many other grammatical frameworks can be encoded as diagrams, e.g. [`cfg`](https
 ### Functors & Rewrites
 
 **Monoidal functors** compute the meaning of a diagram, given an interpretation for each wire and for each box.
-In particular, **tensor-valued functors** evaluate a diagram as a tensor network using [numpy](https://numpy.org/), [PyTorch](https://pytorch.org/), [TensorFlow](https://www.tensorflow.org/), [TensorNetwork](https://github.com/google/TensorNetwork) or [JAX](https://github.com/google/jax).
+In particular, **tensor-valued functors** evaluate a diagram as a tensor network using [numpy](https://numpy.org/), [PyTorch](https://pytorch.org/), [TensorFlow](https://www.tensorflow.org/) or [JAX](https://github.com/google/jax), contracted by the `einsum` of the backend or a `contractor`, e.g. `OptEinsum()` or `Quimb()`.
 
 Applied to pregroup diagrams, DisCoPy implements the
 **categorical compositional distributional** (_DisCoCat_) models of
