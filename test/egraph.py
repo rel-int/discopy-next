@@ -539,6 +539,17 @@ def test_dag_bound_needs_an_acyclic_choice():
     assert stuck.dag_bound(input_cost=inf) == {0: inf}
 
 
+def test_dag_bound_of_a_deep_section():
+    """ A chain deeper than the stack of Python, its boxes from the last to
+    the first so that the first class asked for is the deepest. """
+    depth = 1100
+    box_wires = tuple(((j + 1, ), (j, )) for j in range(1, depth + 1))
+    graph = Markov(Hypergraph[Diagram](
+        x, x, depth * (f, ), ((depth + 1, ), box_wires, (1, ))))
+    assert graph.dag_bound()[graph.classes[graph.graph.cod_wires[0]]]\
+        == depth + 1 == graph.dag_cost()
+
+
 def test_building(examples):
     """ The builder of two copies of each example, then with their inputs
     merged and rebuilt, freezes into what the pure e-graph gives. """

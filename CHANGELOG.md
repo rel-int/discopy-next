@@ -1476,11 +1476,10 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 - `benchmark/data/egraph-traces/` holds 50 e-graph traces of a program search
   on 1D-ARC, without values and with heads renamed: the test data of the
   e-graph builder benchmark ([next#500]).
-- `benchmark/test_egraph.py` replays those traces through `egraph.Builder`,
-  the pure `EGraph` and the bookkeeping of the search that grew them: the
-  builder takes about a microsecond per e-node, five times that bookkeeping
-  ([next#504]) and ten thousand times less than the pure fold at 1,746
-  e-nodes ([next#503]).
+- `benchmark/test_egraph.py` replays those traces through `egraph.Builder`
+  and the bookkeeping of the search that grew them, the small ones through
+  the pure `EGraph`, and times a rebuild and a freeze ([next#503]); what it
+  measured against the targets it was given is in [next#504].
 
 ## [1.2.2] - 2025-12-19
 

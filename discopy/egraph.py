@@ -1009,16 +1009,24 @@ class EGraph[category](
         find: that of its section of least tree cost, i.e. the producers
         :meth:`relax` chooses below it, each box and input counted once. """
         costs, choice = self.relax(box_cost, input_cost)
-        below: dict[int, frozenset[int] | None] = {}
+        below: dict[int, frozenset[int]] = {}
+        started: set[int] = set()
 
-        def visit(q):
-            if q in below and below[q] is None:
-                raise AxiomError(messages.NOT_ACYCLIC.format(self))
-            if q not in below:
-                below[q] = None
-                below[q] = frozenset({choice[q]}).union(*map(
-                    visit, self.reads(choice[q])))
-            return below[q]
+        def visit(root):
+            todo = [root]
+            while todo:
+                q, reads = todo[-1], self.reads(choice[todo[-1]])
+                waiting = [r for r in reads if r not in below]
+                if started.intersection(waiting):
+                    raise AxiomError(messages.NOT_ACYCLIC.format(self))
+                if waiting:
+                    started.add(q)
+                    todo.extend(waiting)
+                else:
+                    below[q] = frozenset({choice[q]}).union(
+                        *(below[r] for r in reads))
+                    todo.pop()
+            return below[root]
 
         def weight(ports):
             boxes = set(map(self.box_of, ports))
