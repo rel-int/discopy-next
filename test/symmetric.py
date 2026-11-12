@@ -422,6 +422,25 @@ def test_default_Permutation_to_hypergraph():
     assert Equation(perm, perm.to_swaps())
 
 
+def test_Functor_asks_the_level_of_its_codomain():
+    from discopy.abc import SymmetricCategory
+    from discopy.drawing import Drawing
+    from discopy.python import Function
+    from discopy.stream import Stream
+
+    assert issubclass(Drawing, SymmetricCategory)
+    assert issubclass(Stream, SymmetricCategory)
+
+    x, y = Ty('x'), Ty('y')
+    left, right = x.to_drawing(), y.to_drawing()
+    assert Drawing.swap(left, right).cod == (y @ x).to_drawing()
+
+    functor = Functor({x: int, y: str}, {}, cod=Function)
+    cycle = functor(Permutation(x @ y @ x, [1, 2, 0]))
+    assert cycle(0, "a", 1) == ("a", 1, 0)
+    assert functor(Swap(x, y))(0, "a") == Function.swap(int, str)(0, "a")
+
+
 def test_Permutation_to_drawing():
     from discopy.drawing import Drawing
 

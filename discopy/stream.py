@@ -171,7 +171,8 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 
 from discopy import messages, symmetric
-from discopy.abc import FeedbackCategory, NamedGeneric
+from discopy.abc import (
+    FeedbackCategory, NamedGeneric, SymmetricCategory)
 from discopy.testable import TestableGeneric
 from discopy.python import finset
 from discopy.utils import (
@@ -338,7 +339,8 @@ NO_TREE = messages.NO_TREE_STREAM
 
 
 @dataclass
-class Stream[category](FeedbackCategory, TestableGeneric):
+class Stream[category](
+        FeedbackCategory, SymmetricCategory, TestableGeneric):
     """
     Monoidal streams over an underlying `category`.
 

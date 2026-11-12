@@ -891,15 +891,12 @@ class Functor(balanced.Functor):
     dom = cod = Diagram
 
     def __call__(self, other):
-        if isinstance(other, Permutation) and hasattr(
-                self.cod.ar, "permutation_factory"):
+        if isinstance(other, Permutation) and issubclass(self.cod.ar, Diagram):
             sizes = [len(self(x)) for x in other.dom]
             return self.cod.ar.from_permutation(finset.Function.permutation(
                 other.perm, sizes).inside, self(other.dom))
-        if isinstance(other, Swap) and hasattr(self.cod.ar, "swap"):
-            return self.cod.ar.swap(self(other.dom[0]), self(other.dom[1]))
-        if isinstance(other, Permutation) and hasattr(
-                self.cod.ar, "permutation"):
+        if isinstance(other, Permutation) and issubclass(
+                self.cod.ar, SymmetricCategory):
             return self.cod.ar.permutation(
                 other.perm, list(map(self, other.dom)))
         if isinstance(other, Permutation) and not isinstance(other, Swap):
