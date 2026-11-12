@@ -122,3 +122,26 @@ def test_sum_product_torch():
     backprop = network.to_lens(torch.Tensor, rounds=1).put(
         *(tensor.detach() for tensor in tensors), *gradients)
     assert gap(backprop, expected) < 1e-9
+
+
+def test_belief_of_sharp_messages():
+    sharp = np.array([-800., -801.])
+    assert np.allclose(belief(sharp), belief(sharp + 800))
+    assert np.allclose(belief(sharp, sharp), belief(np.array([0., -2.])))
+    impossible = np.array([-np.inf, -3.])
+    assert np.array_equal(belief(impossible), [0., 1.])
+
+
+def test_reply_of_a_wide_factor():
+    for arity in (27, 52):
+        sent = reply(np.ones(arity * (1, )), *arity * [np.zeros(1)])
+        assert len(sent) == arity and all(np.allclose(s, 0) for s in sent)
+    with raises(ValueError, match="at most 52 nodes, got 53"):
+        reply(np.ones(53 * (1, )), *53 * [np.zeros(1)])
+
+
+def test_marginals_wants_a_tensor_per_factor():
+    factors, tensor = ((0, 1), (1, 2)), np.ones((2, 2))
+    for tensors in ((tensor, ), (tensor, tensor, tensor)):
+        with raises(ValueError, match=f"Expected 2 tensors, got {len(tensors)}"):
+            marginals(factors, *tensors)

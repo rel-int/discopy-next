@@ -33,6 +33,7 @@ Summary
     exclusive
     belief
     reply
+    weigh
 
 Example
 -------
@@ -56,6 +57,8 @@ array([0.328, 0.672])
 """
 
 from __future__ import annotations
+
+from string import ascii_letters
 
 from discopy.monoidal import Dim
 from discopy.neural.network import Box, Dims, Network, Trace, namespace
@@ -88,6 +91,25 @@ def normalise(weights):
     return weights / weights.sum(-1)[..., None]
 
 
+def weigh(message):
+    """
+    The weights of a message, i.e. its exponential, up to a factor: the
+    largest logarithm is taken off first, so that a sharp message, of
+    logarithms too low to exponentiate, keeps its ratios.
+
+    Parameters:
+        message : The logarithms of positive weights, along the last axis.
+
+    Example
+    -------
+    >>> import numpy as np
+    >>> weigh(np.array([-801., -800.])).round(3).tolist()
+    [0.368, 1.0]
+    """
+    array = namespace(message)
+    return array.exp(message - array.amax(message, -1)[..., None])
+
+
 def belief(*messages):
     """
     The belief of a node: the product of the messages of all its factors,
@@ -102,8 +124,7 @@ def belief(*messages):
     >>> belief(np.log([1., 3.]), np.log([2., 2.]))
     array([0.25, 0.75])
     """
-    total = sum(messages)
-    return normalise(namespace(total).exp(total))
+    return normalise(weigh(sum(messages)))
 
 
 def reply(tensor, *messages) -> tuple:
@@ -113,7 +134,8 @@ def reply(tensor, *messages) -> tuple:
 
     Parameters:
         tensor : The tensor of the factor, positive, one axis per node.
-        messages : The message of each node of the factor, a logarithm.
+        messages : The message of each node of the factor, a logarithm,
+            at most as many as the letters an ``einsum`` names axes with.
 
     Example
     -------
@@ -122,9 +144,11 @@ def reply(tensor, *messages) -> tuple:
     >>> [np.exp(message).tolist() for message in reply(tensor, zero, zero)]
     [[0.25, 0.75], [0.5, 0.5]]
     """
-    array = namespace(tensor)
-    axes = "abcdefghijklmnopqrstuvwxyz"[:len(messages)]
-    weights = list(map(array.exp, messages))
+    if len(messages) > len(ascii_letters):
+        raise ValueError(f"A factor holds at most {len(ascii_letters)} "
+                         f"nodes, got {len(messages)}.")
+    array, axes = namespace(tensor), ascii_letters[:len(messages)]
+    weights = list(map(weigh, messages))
 
     def to(slot):
         others = [k for k in range(len(messages)) if k != slot]
@@ -210,6 +234,9 @@ def marginals(factors, *tensors) -> list:
     [[0.25, 0.75], [0.5, 0.5]]
     """
     table = table_of(factors)
+    if len(tensors) != len(table):
+        raise ValueError(
+            f"Expected {len(table)} tensors, got {len(tensors)}.")
     operands = [x for pair in zip(tensors, map(list, table)) for x in pair]
     try:
         # pylint: disable-next=import-outside-toplevel  # an optional extra
