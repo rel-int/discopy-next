@@ -3,8 +3,9 @@ import EGraph.Hashed
 /-!
 # Placing a node
 
-`Builder.place` keeps the invariant: the node it appends is entered in the
-hash-cons and becomes a parent of each root of its key.
+`Builder.place` keeps the invariant: a deterministic node it appends is
+entered in the hash-cons and becomes a parent of each root of its key, and a
+sample, whose key is empty, is only appended.
 -/
 
 namespace EGraph
