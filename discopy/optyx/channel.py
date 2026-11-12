@@ -1629,6 +1629,24 @@ class Diagram(frobenius.Diagram):
         return backend.eval(self, **kwargs)
 
 
+def hashable(value):
+    """
+    A value as a hashable one, a list or an array as the tuple of its own
+    hashable entries, so that a semantic attribute can go in a
+    :meth:`Channel.setoid` without making the box unhashable, as an
+    unhashable :code:`data` makes a :class:`discopy.cat.Box`.
+
+    Example
+    -------
+    >>> assert hashable([[1, 2], [3]]) == ((1, 2), (3, ))
+    >>> assert hashable(np.array([1, 2])) == (1, 2)
+    >>> assert hashable("xy") == "xy"
+    """
+    if isinstance(value, (list, tuple, np.ndarray)):
+        return tuple(map(hashable, value))
+    return value
+
+
 class Channel(Diagram, frobenius.Box):
     """
     Channel initialised by its Kraus map.
@@ -1651,6 +1669,27 @@ class Channel(Diagram, frobenius.Box):
         self.kraus = kraus
         self.env = env
         super().__init__(name, dom, cod)
+
+    semantic_attrs: tuple[str, ...] = ()
+    """
+    The attributes besides :code:`name`, :code:`dom`, :code:`cod` and
+    :code:`data` that decide what a channel computes, compared by
+    :meth:`setoid`.
+    """
+
+    def setoid(self):
+        """
+        Two channels are equal when they agree as boxes and on each of their
+        :attr:`semantic_attrs`: what a channel computes is in none of
+        :code:`name`, :code:`dom`, :code:`cod` or :code:`data` otherwise, so
+        e.g. a conjugated gate equalled the gate it conjugates.
+
+        >>> from discopy.optyx.photonic import BBS
+        >>> assert BBS(0.5) != BBS(0.5, is_conj=True)
+        >>> assert BBS(0.5) == BBS(0.5)
+        """
+        return super().setoid() + tuple(
+            hashable(getattr(self, attr)) for attr in self.semantic_attrs)
 
     def __repr__(self):
         env = "" if not self.env else f", env={self.env!r}"
@@ -1808,6 +1847,23 @@ class CQMap(Diagram, frobenius.Box):
 
         self.density_matrix = density_matrix
         super().__init__(name, dom, cod)
+
+    semantic_attrs: tuple[str, ...] = ("density_matrix", )
+
+    def setoid(self):
+        """
+        The density matrix is the whole of what a `CQMap` means and is in no
+        other component, so two of them with one name, `dom` and `cod` were
+        equal, e.g. every `classical.BinaryMatrix`, all named
+        `"LogicalMatrix"`.
+
+        >>> from discopy.optyx.classical import BinaryMatrix
+        >>> identity, swap = ([[1, 0], [0, 1]], [[0, 1], [1, 0]])
+        >>> assert BinaryMatrix(identity) != BinaryMatrix(swap)
+        >>> assert BinaryMatrix(identity) == BinaryMatrix(identity)
+        """
+        return super().setoid() + tuple(
+            hashable(getattr(self, attr)) for attr in self.semantic_attrs)
 
     def __repr__(self):
         return f"{factory_name(type(self))}({self.name!r}, "\
