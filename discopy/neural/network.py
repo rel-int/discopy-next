@@ -67,9 +67,13 @@ two back together; a recurrent cell feeds one of its outputs back in.
 
 from __future__ import annotations
 
-from discopy import comarkov, feedback, markov, messages, monoidal, python
+from typing import Self
+
+from discopy import (
+    comarkov, feedback, markov, messages, monoidal, python, testable)
 from discopy.cat import factory
 from discopy.monoidal import Dim
+from discopy.testable import axiom
 from discopy.utils import (
     AxiomError, assert_isinstance, factory_name, tuplify, untuplify)
 
@@ -84,7 +88,10 @@ class Dims(monoidal.Ty):
     Together with the product ``*`` of shapes, which distributes over the
     concatenation, this is the free rig on the natural numbers: ``Dims()``
     is the zero and ``Dims(1)`` the one, both operations commutative only
-    up to :class:`Swap`.
+    up to :class:`Swap`. Its laws are axioms: :meth:`product_unitality`,
+    :meth:`product_associativity`, :meth:`absorption` and
+    :meth:`distributivity_right` hold on the nose,
+    :meth:`distributivity_left` up to a permutation of the legs.
 
     Parameters:
         inside : The shape of each leg, an integer standing for a vector.
@@ -111,6 +118,54 @@ class Dims(monoidal.Ty):
     def __mul__(self, other: Dims) -> Dims:
         assert_isinstance(other, Dims)
         return type(self)(*(x @ y for x in self.inside for y in other.inside))
+
+    @axiom
+    def product_unitality(cls, x: Self) -> testable.Equation[Self]:
+        """ ``Dims(1)`` is the unit of the product, on both sides. """
+        one = type(x)(1)
+        return testable.Equation(one * x, x, x * one)
+
+    @axiom
+    def product_associativity(
+            cls, x: Self, y: Self, z: Self) -> testable.Equation[Self]:
+        """ The product is associative. """
+        return testable.Equation((x * y) * z, x * (y * z))
+
+    @axiom
+    def absorption(cls, x: Self) -> testable.Equation[Self]:
+        """ ``Dims()`` absorbs the product, on both sides. """
+        zero = type(x)()
+        return testable.Equation(zero * x, zero, x * zero)
+
+    @axiom
+    def distributivity_right(
+            cls, x: Self, y: Self, z: Self) -> testable.Equation[Self]:
+        """ The product distributes over a concatenation on its left. """
+        return testable.Equation((x @ y) * z, (x * z) @ (y * z))
+
+    @axiom
+    def distributivity_left(
+            cls, x: Self, y: Self, z: Self) -> testable.Equation[Self]:
+        """
+        The product distributes over a concatenation on its right, up to
+        a permutation of the legs: ``x * (y @ z)`` lists the legs of ``y``
+        and ``z`` for each leg of ``x`` in turn, ``(x * y) @ (x * z)``
+        those of ``y`` for every leg of ``x`` first. That permutation is the
+        left distributor of a rig category :cite:p:`Laplaza72`, where the
+        right one is an identity.
+        """
+        return testable.Equation(
+            x * (y @ z), (x * y) @ (x * z), up_to=cls.legs)
+
+    def legs(self) -> list[tuple[int, ...]]:
+        """
+        The shapes of the legs in lexicographic order, i.e. the list up to
+        permutation.
+
+        >>> Dims(3, Dim(2, 4), 2).legs()
+        [(2,), (2, 4), (3,)]
+        """
+        return sorted(dim.inside for dim in self.inside)
 
     def __repr__(self):
         return f"Dims({', '.join(map(repr, self.inside))})"

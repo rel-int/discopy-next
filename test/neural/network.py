@@ -39,6 +39,17 @@ def test_dims():
         Dims(2) * Dim(2)
 
 
+def test_distributivity_left_is_a_permutation():
+    x, y, z = Dims(2, 3), Dims(4), Dims(5)
+    left, right = x * (y @ z), (x * y) @ (x * z)
+    assert left == Dims(Dim(2, 4), Dim(2, 5), Dim(3, 4), Dim(3, 5))
+    assert right == Dims(Dim(2, 4), Dim(3, 4), Dim(2, 5), Dim(3, 5))
+    assert left != right and left.legs() == right.legs()
+    assert Dims.distributivity_left(x, y, z)
+    assert not Dims.distributivity_left(x, y, z).modulo(None)
+    assert Dims.distributivity_right(y, z, x).up_to is None
+
+
 def test_check():
     import numpy as np
     Dims().check()
