@@ -4,8 +4,8 @@ import EGraph
 # What is proved about the model of `discopy.egraph`
 
 Every definition a theorem mentions is restated here, by `rfl` or by a
-characterisation, and every theorem under "Theorems" is restated with the
-proof it refers to and one broken implementation it rules out. `Audit.lean` checks that none of them rests on `sorry`,
+characterisation, and every theorem under a heading of theorems is restated
+with the proof it refers to and one broken implementation it rules out. `Audit.lean` checks that none of them rests on `sorry`,
 `native_decide` or an axiom beyond `propext`, `Quot.sound`, `Classical.choice`.
 The model is linked to the Python by `test_oracle.py`, not by a proof.
 -/
@@ -45,5 +45,134 @@ theorem partition_least (n : Nat) (pairs : List (Nat × Nat))
       ∃ c, (partition n pairs)[i]? = some c ∧ Related pairs i c
         ∧ ∀ j, Related pairs i j → c ≤ j :=
   EGraph.partition_least n pairs bound
+
+/-! ## The e-graph: definitions
+
+An e-graph is its nodes `⟨head, det, inputs, outputs⟩`, a box given by a
+number with whether it is deterministic on its input and output spiders, and
+the classes of its spiders. -/
+
+/-- The class of a spider is itself when it is not there, and two spiders
+are the same when they have one class. -/
+theorem same_def (classes : List Nat) (i j : Nat) :
+    Same classes i j ↔ classes.getD i i = classes.getD j j := Iff.rfl
+
+/-- Merging is the partition of each spider with its class and each spider
+merged with the next. -/
+theorem merge_def (g : Graph) (spiders : List Nat) :
+    g.merge spiders = { g with
+      classes := partition g.classes.length
+        ((g.classes.zipIdx.map fun entry => (entry.2, entry.1))
+          ++ spiders.zip spiders.tail) } := rfl
+
+/-- Adding a deterministic box gives the outputs of the first deterministic
+node of its head on the classes of its inputs if there is one. Any other box
+is appended as a node on the next spiders. -/
+theorem add_def (g : Graph) (head : Nat) (det : Bool) (arity : Nat)
+    (inputs : List Nat) : g.add head det arity inputs =
+      match g.nodes.find? fun node => det && (node.det && node.head == head
+        && node.inputs.map (find g.classes) == inputs.map (find g.classes)) with
+      | some node => (g, node.outputs)
+      | none => (⟨g.nodes ++ [⟨head, det, inputs, List.range' g.classes.length arity⟩],
+          g.classes ++ List.range' g.classes.length arity⟩,
+        List.range' g.classes.length arity) := rfl
+
+/-- A round of rebuilding merges the outputs of each deterministic node with
+those of the first deterministic node of its head on the classes it reads. -/
+theorem step_def (nodes : List Node) (classes : List Nat) :
+    Graph.step nodes classes = partition classes.length
+      ((classes.zipIdx.map fun entry => (entry.2, entry.1))
+        ++ nodes.flatMap fun node =>
+          match node.det, nodes.find? fun first => first.det
+            && first.head == node.head && first.inputs.map (find classes)
+              == node.inputs.map (find classes) with
+          | true, some first => first.outputs.zip node.outputs
+          | _, _ => []) := rfl
+
+/-- Rebuilding runs rounds until one changes nothing. Its fuel is the sum of
+the classes, which `rebuild_congruent` shows is enough. -/
+theorem rebuild_def (g : Graph) (fuel : Nat) (classes : List Nat) :
+    g.rebuild = { g with classes := Graph.close g.nodes g.classes.sum g.classes }
+      ∧ Graph.close g.nodes 0 classes = classes
+      ∧ Graph.close g.nodes (fuel + 1) classes
+        = if Graph.step g.nodes classes = classes then classes
+          else Graph.close g.nodes fuel (Graph.step g.nodes classes) :=
+  ⟨rfl, rfl, rfl⟩
+
+/-- A relation is congruent when two deterministic nodes of one head on
+inputs related one by one have outputs related one by one. -/
+theorem congruent_def (nodes : List Node) (r : Nat → Nat → Prop) :
+    Congruent nodes r ↔ ∀ a ∈ nodes, ∀ b ∈ nodes, a.det = true → b.det = true →
+      a.head = b.head
+      → (a.inputs.length = b.inputs.length
+        ∧ ∀ p ∈ a.inputs.zip b.inputs, r p.1 p.2)
+      → a.outputs.length = b.outputs.length
+        ∧ ∀ p ∈ a.outputs.zip b.outputs, r p.1 p.2 := Iff.rfl
+
+/-- The theorems are about valid e-graphs: each spider goes to the least
+spider of its class, outputs are spiders, a head has one number of outputs. -/
+theorem valid_def (g : Graph) : g.Valid ↔
+    (∀ i c : Nat, g.classes[i]? = some c → c ≤ i ∧ g.classes[c]? = some c)
+    ∧ (∀ node ∈ g.nodes, ∀ s ∈ node.outputs, s < g.classes.length)
+    ∧ ∀ a ∈ g.nodes, ∀ b ∈ g.nodes, a.head = b.head →
+      a.outputs.length = b.outputs.length :=
+  ⟨fun h => ⟨fun i c some => ⟨h.normal.below i c some, h.normal.idem i c some⟩,
+    h.outputs, h.arity⟩,
+   fun h => ⟨⟨fun i c some => (h.1 i c some).1, fun i c some => (h.1 i c some).2⟩,
+    h.2.1, h.2.2⟩⟩
+
+/-! ## The e-graph: theorems -/
+
+/-- Merging is reflexive, symmetric and transitive, the Python law of that
+name. Rules out: a merge that forgets the classes it starts from. -/
+theorem merge_equivalence (g : Graph) (valid : g.Valid) (s t u : Nat)
+    (hs : s < g.classes.length) (ht : t < g.classes.length)
+    (hu : u < g.classes.length) :
+    g.merge [s, s] = g ∧ g.merge [s, t] = g.merge [t, s]
+      ∧ ((g.merge [s, t]).merge [t, u]).merge [s, u]
+        = (g.merge [s, t]).merge [t, u] :=
+  ⟨Graph.merge_of_same g valid.normal _ (by simp [hs]) (by simp [Graph.chain, Same]),
+    Graph.merge_symm g valid.normal s t hs ht,
+    Graph.merge_trans g valid.normal s t u hs ht hu⟩
+
+/-- Adding a deterministic box again on the same classes changes nothing and
+gives the same outputs. Rules out: a hash-cons keyed on spiders, not classes. -/
+theorem add_hashcons (g : Graph) (head arity : Nat) (inputs again : List Nat)
+    (same : again.map (find (g.add head true arity inputs).1.classes)
+      = inputs.map (find (g.add head true arity inputs).1.classes)) :
+    (g.add head true arity inputs).1.add head true arity again
+      = g.add head true arity inputs :=
+  Graph.add_hashcons g head arity inputs again same
+
+/-- Rebuilding ends on a valid e-graph with the same nodes whose classes are
+congruent. Rules out: a loop that stops after one round. -/
+theorem rebuild_congruent (g : Graph) (valid : g.Valid) :
+    g.rebuild.Valid ∧ g.rebuild.nodes = g.nodes
+      ∧ Congruent g.nodes (Same g.rebuild.classes) :=
+  ⟨Graph.rebuild_valid valid, rfl, Graph.rebuild_congruent valid⟩
+
+/-- Rebuilding relates what was related. Rules out: rebuilding from the
+identity instead of the classes. -/
+theorem rebuild_extensive (g : Graph) (valid : g.Valid) (i j : Nat)
+    (same : Same g.classes i j) : Same g.rebuild.classes i j :=
+  Graph.rebuild_extensive valid same
+
+/-- Rebuilding relates no more than any congruent equivalence containing
+what was related. Rules out: relating the outputs of two samples, or of two
+nodes of different heads. -/
+theorem rebuild_least (g : Graph) (valid : g.Valid) (r : Nat → Nat → Prop)
+    (eqv : Equivalence r) (congruent : Congruent g.nodes r)
+    (sub : ∀ i j, Same g.classes i j → r i j) (i j : Nat)
+    (same : Same g.rebuild.classes i j) : r i j :=
+  Graph.rebuild_least valid eqv congruent sub same
+
+/-- Rebuilding is idempotent, extensive and confluent, the Python law of that
+name. Rules out: a closure that depends on when the spiders were merged. -/
+theorem rebuild_closure (g : Graph) (valid : g.Valid) (s t : Nat)
+    (hs : s < g.classes.length) (ht : t < g.classes.length) :
+    (g.merge [s, t]).rebuild.rebuild = (g.merge [s, t]).rebuild
+      ∧ (g.merge [s, t]).rebuild.merge [s, t] = (g.merge [s, t]).rebuild
+      ∧ (g.rebuild.merge [s, t]).rebuild = (g.merge [s, t]).rebuild :=
+  Graph.rebuild_closure valid s t hs ht
 
 end Statements

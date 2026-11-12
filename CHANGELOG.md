@@ -1440,6 +1440,12 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Project
 
+- The Lean model in `lean/` covers the pure `EGraph`: `merge` is reflexive,
+  symmetric and transitive, `add` returns the same outputs when a
+  deterministic box is added again, and `rebuild` ends on the least
+  congruent equivalence containing the classes, hence idempotent and
+  confluent; the differential test compares the fold of a history with
+  `History.fold()` ([next#522]).
 - `lean/`, a Lean 4 model of `egraph.partition` with the theorem that it
   sends each spider to the least spider related to it by pairs of spiders
   in range, and a differential test of the model against the Python
@@ -1852,6 +1858,7 @@ for the changelog of `1.2.1` and earlier.
 [next#519]: https://github.com/rel-int/discopy-next/pull/519
 [next#520]: https://github.com/rel-int/discopy-next/pull/520
 [next#521]: https://github.com/rel-int/discopy-next/pull/521
+[next#522]: https://github.com/rel-int/discopy-next/pull/522
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#56]: https://github.com/rel-int/optyx/pull/56
