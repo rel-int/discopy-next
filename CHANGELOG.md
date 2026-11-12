@@ -14,6 +14,10 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   copies its positive half and merges the copies of its negative half, as
   the reverse derivative of a fan-out sums the gradients, and `discard`
   puts the noise ([next#511]).
+- The rig laws of `neural.network.Dims` as axioms, checked by the property
+  matrix: `product_unitality`, `product_associativity`, `absorption` and
+  `distributivity_right` on the nose, `distributivity_left` up to a
+  permutation of the legs, which `Dims.legs` forgets ([next#510]).
 - `EGraph.dag_cost`, the cost of a section as a diagram with sharing, i.e.
   each box and each input it reads counted once however often it is read,
   `EGraph.dag_bound`, that of the section of least tree cost of each class,
@@ -1798,6 +1802,7 @@ for the changelog of `1.2.1` and earlier.
 [next#506]: https://github.com/rel-int/discopy-next/issues/506
 [next#507]: https://github.com/rel-int/discopy-next/pull/507
 [next#508]: https://github.com/rel-int/discopy-next/pull/508
+[next#510]: https://github.com/rel-int/discopy-next/pull/510
 [next#511]: https://github.com/rel-int/discopy-next/pull/511
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
