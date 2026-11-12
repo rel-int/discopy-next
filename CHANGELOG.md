@@ -1440,6 +1440,9 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Project
 
+- The invariant of the builder of the Lean model, on the roots of its
+  spiders, with the proofs that entering a node in the hash-cons, placing a
+  node and a class joining another keep it ([next#527]).
 - The Lean model in `lean/` has the `Builder`, method by method, with the
   proof that path halving ends on the root of a spider; the differential
   test compares what it freezes into with `History.build()`, on generated
@@ -1875,6 +1878,7 @@ for the changelog of `1.2.1` and earlier.
 [next#523]: https://github.com/rel-int/discopy-next/pull/523
 [next#525]: https://github.com/rel-int/discopy-next/pull/525
 [next#526]: https://github.com/rel-int/discopy-next/pull/526
+[next#527]: https://github.com/rel-int/discopy-next/pull/527
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#56]: https://github.com/rel-int/optyx/pull/56

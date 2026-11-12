@@ -19,6 +19,10 @@ algorithms there is followed here, or the differential test says so.
 | [`EGraph/History.lean`](EGraph/History.lean) | operations and the fold of a history |
 | [`EGraph/UnionFind.lean`](EGraph/UnionFind.lean) | the labels of the builder: `root` with path halving, which ends on the root and keeps every root |
 | [`EGraph/Builder.lean`](EGraph/Builder.lean) | the `Builder`, method by method, and `build`, what it freezes into after a history |
+| [`EGraph/Invariant.lean`](EGraph/Invariant.lean) | the invariant of the builder, stated on the root of each spider |
+| [`EGraph/Hashed.lean`](EGraph/Hashed.lean) | entering a node in the hash-cons keeps it |
+| [`EGraph/Place.lean`](EGraph/Place.lean) | placing a node keeps it |
+| [`EGraph/Link.lean`](EGraph/Link.lean) | a class joining another keeps it |
 | [`Statements/Premonoidal.lean`](Statements/Premonoidal.lean) | the same for diagrams: strict premonoidal categories, Diagram(S) and what is proved of it |
 | [`Premonoidal/Basic.lean`](Premonoidal/Basic.lean) | categories and strict premonoidal categories |
 | [`Premonoidal/Diagram.lean`](Premonoidal/Diagram.lean) | Diagram(S), the proof that it is strict premonoidal and not monoidal |
