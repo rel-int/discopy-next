@@ -233,7 +233,6 @@ class Diagram(
 
     ob = Ty
     layer_factory = Layer
-    str_transparency = compact.Diagram.str_transparency
 
     @classmethod
     def from_cospan(cls, apex: Ty, left, right) -> Diagram:
@@ -1011,6 +1010,8 @@ Diagram.bubble_factory = Bubble
 Layer.plumbing = (Ty, Cospan)
 Cospan.register(Permutation)
 Diagram.sum_factory = Sum
+Diagram.str_transparency = compact.Diagram.str_transparency.modulo(
+    Diagram.to_hypergraph)
 Hypergraph = hypergraph.Hypergraph[Diagram]
 Id = Diagram.id
 
