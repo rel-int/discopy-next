@@ -1454,10 +1454,10 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   with one box per layer, with the theorems that they are a strict
   premonoidal category and that interchange holds for two boxes only when
   they are one and the same scalar, and a differential test of the model against the Python ([next#523]).
-- `lean/Premonoidal/Functor.lean`, the theorems that the diagrams of the
+- `lean/Premonoidal/Functor.lean`, which proves that the diagrams of the
   Lean model are the free strict premonoidal category: generating objects
   and boxes sent into a strict premonoidal category extend to a strict
-  premonoidal functor, and to one only; the differential test compares it
+  premonoidal functor, and this functor is unique; the differential test compares it
   with `monoidal.Functor` into diagrams ([next#526]).
 - `AGENTS.md`, `RULES.md` and `STYLE.md` for agents, and an LLM contribution
   needs its own handle and a human approval other than its prompter's

@@ -73,6 +73,14 @@ def answer (op : String) (case : Json) : Except String Json := do
       return ((← box.getObjValAs? String "name",
         ← box.getObjValAs? (List String) "dom",
         ← box.getObjValAs? (List String) "cod"), ← parse (← box.getObjVal? "ar"))
+    let image (X : List String) : Except String (List String) :=
+      X.flatMapM fun x => (ob.lookup x).elim (throw s!"no image for the wire {x}") pure
+    discard <| image f.dom
+    for layer in f.layers do
+      let some g := ar.lookup layer.box | throw s!"no image for the box {layer.box.1}"
+      if g.dom ≠ (← image layer.box.2.1) ∨ g.cod ≠ (← image layer.box.2.2) then
+        throw s!"the image of the box {layer.box.1} has the wrong domain or codomain"
+      discard <| image (layer.left ++ layer.right)
     return encode <| Lift.map (Diagram.premonoidal Named)
       (fun x => (ob.lookup x).getD [x])
       (fun box => (ar.lookup box).getD (Diagram.box box)) f
