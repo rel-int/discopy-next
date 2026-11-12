@@ -275,6 +275,19 @@ def test_str_transparency_of_a_spider():
     assert eval(str(spider), Diagram.str_environment(spider)) == spider
 
 
+
+def test_str_transparency_of_a_packed_layer():
+    """ A layer that packs a cospan beside a box prints as their tensor,
+    which reads back as two layers: the same hypergraph, not the same
+    diagram, so the law holds up to :meth:`Diagram.to_hypergraph`. """
+    a = Ty('a')
+    f, cospan = Box('f', a, a), Cospan(a @ a, [0, 1], [1])
+    packed = Diagram((Layer(cospan, f), ), cospan.dom @ a, cospan.cod @ a)
+    unpacked = eval(str(packed), Diagram.str_environment(packed))
+    assert unpacked != packed
+    assert unpacked.to_hypergraph() == packed.to_hypergraph()
+    assert Diagram.str_transparency(packed)
+
 def test_structural_boxes():
     from discopy.testable import assert_structural_boxes
     assert_structural_boxes(Diagram)
