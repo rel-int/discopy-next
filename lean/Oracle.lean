@@ -1,9 +1,11 @@
 import Lean.Data.Json
 import EGraph
+import Premonoidal.Oracle
 
 /-!
 The model as an executable: one JSON case per line on the standard input and
-what the model gives for it on the standard output. A case with `pairs` is a
+what the model gives for it on the standard output. A case with `op` is an
+operation on diagrams, see `Premonoidal/Oracle.lean`. A case with `pairs` is a
 partition, `{"spiders": 4, "pairs": [[3, 1], [1, 2]]}` giving
 `{"partition": [0, 1, 1, 1]}`. Any other is a history: `nodes`, each
 `[head, det, inputs, outputs]`, the `classes` of the spiders and `operations`,
@@ -40,6 +42,8 @@ def graph (g : Graph) : Json :=
 
 def answer (line : String) : Except String Json := do
   let case ← Json.parse line
+  if let .ok op := case.getObjValAs? String "op" then
+    return ← Premonoidal.answer op case
   if let .ok pairs := case.getObjValAs? (List (Nat × Nat)) "pairs" then
     let spiders ← case.getObjValAs? Nat "spiders"
     return Json.mkObj [("partition", toJson (partition spiders pairs))]
