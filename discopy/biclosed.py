@@ -105,6 +105,7 @@ from discopy.utils import (
     AxiomError,
     assert_isinstance,
     deprecated_alias,
+    factory_key,
     factory_name,
     from_tree,
     get_origin,
@@ -1475,7 +1476,7 @@ class Application(TermBase):
         are, rather than when they print the same between the same types:
         a closed constant prints as its bare name, whatever its type.
         """
-        return type(self), self.func, self.args, self.left
+        return factory_key(type(self)), self.func, self.args, self.left
 
     @property
     def constants(self):
@@ -1558,7 +1559,7 @@ class Abstraction(TermBase):
         Abstractions are equal when their variables, bodies and sides are,
         see :meth:`Application.setoid`.
         """
-        return type(self), self.var, self.body, self.left
+        return factory_key(type(self)), self.var, self.body, self.left
 
     @property
     def constants(self):

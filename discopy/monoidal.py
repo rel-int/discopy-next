@@ -84,6 +84,7 @@ from discopy.config import (
     COLOUR_DRAWING_ATTRIBUTES, TRANSPARENT)
 from discopy.utils import (
     factory,
+    factory_key,
     factory_name,
     from_tree,
     assert_isinstance,
@@ -213,7 +214,8 @@ class Wire(cat.Ob):
 
     def __hash__(self):
         return hash(
-            (type(self), self.name, self.dom, self.cod, self.is_dagger))
+            (factory_key(type(self)),
+             self.name, self.dom, self.cod, self.is_dagger))
 
     def __lt__(self, other):
         """
@@ -347,7 +349,15 @@ class List[generator_factory](Monoid["List"], TestableGeneric):
         return type(self) is type(other) and self.inside == other.inside
 
     def __hash__(self):
-        return hash((type(self), self.inside))
+        """
+        A list's generators can themselves be classes, `python.Ty` being
+        `List[type]`, and a class hashes as its address: those take their
+        :func:`discopy.utils.factory_key` here, as a setoid's leading
+        component does.
+        """
+        return hash((factory_key(type(self)), tuple(
+            factory_key(x) if isinstance(x, type) else x
+            for x in self.inside)))
 
     @classmethod
     def generator_repr(cls, generator) -> str:
@@ -560,7 +570,7 @@ class Ty(cat.Ob, cat.FreeCategory, ColouredMonoid):
             and (self.dom, self.cod) == (other.dom, other.cod)
 
     def __hash__(self):
-        return hash((type(self), self.inside, self.dom, self.cod))
+        return hash((factory_key(type(self)), self.inside, self.dom, self.cod))
 
     def __repr__(self):
         if not self.inside and self.dom is not None:

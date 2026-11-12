@@ -61,7 +61,7 @@ from discopy.matrix import (  # noqa: F401  pylint: disable=unused-import
 from discopy.testable import TestableGeneric, no_strategy
 from discopy.python import finset
 from discopy.utils import (
-    factory_name, assert_isinstance, product, assert_isatomic,
+    factory_key, factory_name, assert_isinstance, product, assert_isatomic,
     assert_istraceable)
 
 if TYPE_CHECKING:
@@ -1064,7 +1064,10 @@ class Box[dtype](frobenius.Box, Diagram[dtype]):
         and its hash is stable: the data labels a generator, it is not a
         number being compared. The winding number ``z`` is compared too, as
         in :meth:`discopy.rigid.Box.setoid`, and the time step, as in
-        :meth:`discopy.feedback.Box.setoid`.
+        :meth:`discopy.feedback.Box.setoid`. The ``dtype`` is compared by its
+        :func:`discopy.utils.factory_name`, a class object hashing as its
+        address and a backend's descriptor, e.g. ``torch.float64``, being no
+        class at all.
 
         >>> import numpy as np
         >>> f = Box('f', Dim(2), Dim(2), np.array([[0, 1], [1, 0]]))
@@ -1091,7 +1094,8 @@ class Box[dtype](frobenius.Box, Diagram[dtype]):
                 data = np.array(data).reshape(-1).tolist()
         entries = () if data is None\
             else tuple(data) if isinstance(data, list) else (data, )
-        return (self.name, self.dom, self.cod, self.dtype, self.is_dagger,
+        dtype = None if self.dtype is None else factory_name(self.dtype)
+        return (self.name, self.dom, self.cod, dtype, self.is_dagger,
                 self.z, self.deterministic, self.affine, self.time_step)\
             + tuple(map(canonical, entries))
 
@@ -1276,7 +1280,8 @@ class Bubble(feedback.Bubble, Box):
         >>> assert len({f.bubble(data=[1, 2]), f.bubble(data=[1, 3])}) == 2
         """
         args = tuple(f.setoid() for f in self.args)
-        return (type(self), self.method, self.func) + args + Box.setoid(self)
+        return (factory_key(type(self)), self.method, self.func)\
+            + args + Box.setoid(self)
 
     def __repr__(self):
         if self.is_dagger:

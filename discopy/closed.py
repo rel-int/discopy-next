@@ -104,7 +104,7 @@ from discopy.testable import Serialisable
 from discopy.cat import factory
 from discopy.drawing import Drawing
 from discopy.utils import (
-    AxiomError, assert_isinstance, factory_name, from_tree)
+    AxiomError, assert_isinstance, factory_key, factory_name, from_tree)
 
 
 class Wire(feedback.Wire, biclosed.Wire):
@@ -1249,7 +1249,7 @@ class Compound(TermBase):
         raise NotImplementedError
 
     def setoid(self):
-        return (type(self), ) + self.parts
+        return (factory_key(type(self)), ) + self.parts
 
 
 class Tuple(Compound):

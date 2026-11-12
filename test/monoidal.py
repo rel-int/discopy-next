@@ -541,9 +541,15 @@ def test_Diagram_width():
 
 
 def test_Bubble_dagger():
+    """
+    Bubbling and daggering do not commute, see #467: a tensor bubble counts
+    `is_dagger` in its array, so a bubble equal to the bubble of a dagger
+    would be sent to an unequal image and a functor would not be well
+    defined on bubbles.
+    """
     x, y = Ty('x'), Ty('y')
     f = Box('f', x, y)
-    assert f.bubble().dagger() == f.dagger().bubble()
+    assert f.bubble().dagger() != f.dagger().bubble()
     assert f.bubble().dagger().dagger() == f.bubble()
 
 
