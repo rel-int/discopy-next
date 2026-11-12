@@ -417,6 +417,10 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Fixed
 
+- `frobenius.Diagram.str_transparency` holds up to `Diagram.to_hypergraph`:
+  a layer packing a cospan beside a box prints as a tensor that reads back as
+  two layers, the same hypergraph but not the same diagram, which `explore`
+  found ([next#505]).
 - `optyx.core.zx.H` is its own dagger: a box declares itself self-adjoint
   with `is_dagger=None`, as `quantum.gates.SWAP` does, where the optyx
   dagger otherwise returns a differently named copy — so `H[::-1] == H`
@@ -1768,6 +1772,7 @@ for the changelog of `1.2.1` and earlier.
 [next#502]: https://github.com/rel-int/discopy-next/pull/502
 [next#503]: https://github.com/rel-int/discopy-next/pull/503
 [next#504]: https://github.com/rel-int/discopy-next/issues/504
+[next#505]: https://github.com/rel-int/discopy-next/pull/505
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#56]: https://github.com/rel-int/optyx/pull/56
