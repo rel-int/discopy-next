@@ -23,6 +23,9 @@ algorithms there is followed here, or the differential test says so.
 | [`EGraph/Hashed.lean`](EGraph/Hashed.lean) | entering a node in the hash-cons keeps it |
 | [`EGraph/Place.lean`](EGraph/Place.lean) | placing a node keeps it |
 | [`EGraph/Link.lean`](EGraph/Link.lean) | a class joining another keeps it |
+| [`EGraph/Union.lean`](EGraph/Union.lean) | `union` keeps it, relates its two spiders and lowers what `rebuild` has left to do |
+| [`EGraph/Drain.lean`](EGraph/Drain.lean) | `rebuild` keeps it and ends with an empty worklist |
+| [`EGraph/Freeze.lean`](EGraph/Freeze.lean) | what a builder freezes into, where `merge` and `rebuild` are those of the e-graph |
 | [`Statements/Premonoidal.lean`](Statements/Premonoidal.lean) | the same for diagrams: strict premonoidal categories, Diagram(S) and what is proved of it |
 | [`Premonoidal/Basic.lean`](Premonoidal/Basic.lean) | categories and strict premonoidal categories |
 | [`Premonoidal/Diagram.lean`](Premonoidal/Diagram.lean) | Diagram(S), the proof that it is strict premonoidal and not monoidal |
