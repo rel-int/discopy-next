@@ -349,3 +349,32 @@ def test_readings_do_not_depend_on_foliation():
             (classical.BitControlledGate,
              photonic.Phase(.3) @ photonic.Phase(.4))]:
         assert reading(term.foliation()) == reading(term), reading
+
+
+def test_semantic_attrs():
+    """
+    A channel is equal to another when they compute the same thing, see #386:
+    what a gate computes is in its array, what a creation computes in the
+    internal states of its photons, what a `CQMap` computes in its density
+    matrix, and none of those were in any component `cat.Box.setoid` compares.
+    """
+    from discopy.optyx import classical
+    pairs = [
+        (photonic.BBS(0.5), photonic.BBS(0.5, is_conj=True)),
+        (photonic.TBS(0.25), photonic.TBS(0.25, is_gate_dagger=True)),
+        (photonic.MZI(0.25, 0.5), photonic.MZI(0.25, 0.5, is_conj=True)),
+        (photonic.Gate(np.eye(2), 2, 2, "G"),
+         photonic.Gate(np.array([[0, 1], [1, 0]]), 2, 2, "G")),
+        (photonic.Create(1, 1),
+         photonic.Create(1, 1, internal_states=([1, 0], [0, 1]))),
+        (photonic.DualRail(1), photonic.DualRail(1, ([1, 0], ))),
+        (zw.Create(1, 1), zw.Create(1, 1, ([1, 0], [0, 1]))),
+        (diagram.DualRail(), diagram.DualRail(internal_state=[1, 0])),
+        (classical.BinaryMatrix([[1, 0], [0, 1]]),
+         classical.BinaryMatrix([[0, 1], [1, 0]])),
+    ]
+    for one, other in pairs:
+        assert one != other, type(one).__name__
+        assert one == one and hash(one) == hash(one)
+    for one, other in pairs[:4]:
+        assert not np.allclose(one.array, other.array)

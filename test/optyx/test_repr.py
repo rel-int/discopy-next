@@ -8,11 +8,12 @@ cannot enumerate, and which way that goes waits on
 rel-int/discopy-next#472.
 
 A cell of :func:`test_transparency` is only as strong as the equality it is
-checked by, and the boxes whose semantics live outside ``setoid`` —
+checked by, and the boxes whose semantics lived outside ``setoid`` —
 ``BBS``, ``TBS``, ``MZI``, ``Create``, ``DualRail`` and every ``CQMap`` —
-would pass a representation that dropped one, see
-rel-int/discopy-next#386. :func:`test_what_equality_ignores` is their cell:
-it reads back what ``==`` does not.
+would have passed a representation that dropped one. Since
+rel-int/discopy-next#386 those attributes are in the setoid, so their cells
+are as strong as the others and they are quantified over here with them;
+``test/optyx/test_channel.py`` states the equalities themselves.
 
 A box holding a Python function — ``channel.Observable`` with a
 ``function``, ``classical.ClassicalFunction``,
@@ -112,45 +113,27 @@ CORE = [
 ]
 
 
-@pytest.mark.parametrize("box", CHANNEL + QUBITS + PHOTONIC + CLASSICAL + CORE,
-                         ids=lambda box: type(box).__name__)
+SEMANTIC = [
+    zw.Create(1, 1, internal_states=(np.array([1, 0]), [0, 1])),
+    diagram.DualRail(internal_state=[1, 0]),
+    photonic.BBS(0.5, is_conj=True),
+    photonic.TBS(0.25, is_gate_dagger=True),
+    photonic.MZI(0.25, 0.5, is_conj=True),
+    photonic.Create(1, 1, internal_states=(np.array([1, 0]), [0, 1])),
+    photonic.DualRail(1, internal_states=([1, 0],)),
+    classical.BinaryMatrix([[0, 1], [1, 0]]),
+]
+"""
+The boxes whose semantics were outside ``setoid`` until #386: their cells
+are now as strong as the rest, so they are quantified over with them.
+"""
+
+
+@pytest.mark.parametrize("box", CHANNEL + QUBITS + PHOTONIC + CLASSICAL + CORE
+                         + SEMANTIC, ids=lambda box: type(box).__name__)
 def test_transparency(box):
     module = sys.modules[type(box).__module__]
     assert eval(repr(box), environment(module)) == box
-
-
-IGNORED = [
-    (zw.Create(1, 1, internal_states=(np.array([1, 0]), [0, 1])),
-     "internal_states"),
-    (diagram.DualRail(internal_state=[1, 0]), "internal_state"),
-    (photonic.BBS(0.5, is_conj=True), "is_conj"),
-    (photonic.TBS(0.25, is_gate_dagger=True), "is_gate_dagger"),
-    (photonic.MZI(0.25, 0.5, is_conj=True), "is_conj"),
-    (photonic.Create(1, 1, internal_states=(np.array([1, 0]), [0, 1])),
-     "internal_states"),
-    (photonic.DualRail(1, internal_states=([1, 0],)), "internal_states"),
-    (classical.BinaryMatrix([[0, 1], [1, 0]]), "density_matrix"),
-]
-
-
-@pytest.mark.parametrize("box, attribute", IGNORED,
-                         ids=lambda x: x if isinstance(x, str) else "")
-def test_what_equality_ignores(box, attribute):
-    module = sys.modules[type(box).__module__]
-    other = eval(repr(box), environment(module))
-    assert other == box
-    if attribute == "internal_state":
-        assert np.array_equal(other.internal_state, box.internal_state)
-    elif attribute == "density_matrix":
-        assert np.array_equal(other.density_matrix.matrix,
-                              box.density_matrix.matrix)
-    elif attribute == "internal_states":
-        assert len(other.internal_states) == len(box.internal_states)
-        assert all(np.array_equal(x, y) for x, y in zip(
-            other.internal_states, box.internal_states))
-    else:
-        assert getattr(other, attribute) == getattr(box, attribute)
-        assert np.allclose(other.array, box.array)
 
 
 DIAGRAMS = [

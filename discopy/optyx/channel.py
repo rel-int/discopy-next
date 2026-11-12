@@ -236,6 +236,7 @@ from discopy.cat import factory
 from discopy.python import finset
 from discopy.utils import AxiomError, factory_name
 from discopy.optyx.core import diagram, control, path, zw
+from discopy.optyx.utils.misc import hashable
 from discopy.optyx.sampling import Interferometer, Unravelling
 
 
@@ -1627,24 +1628,6 @@ class Diagram(frobenius.Diagram):
             backend = QuimbBackend()
 
         return backend.eval(self, **kwargs)
-
-
-def hashable(value):
-    """
-    A value as a hashable one, a list or an array as the tuple of its own
-    hashable entries, so that a semantic attribute can go in a
-    :meth:`Channel.setoid` without making the box unhashable, as an
-    unhashable :code:`data` makes a :class:`discopy.cat.Box`.
-
-    Example
-    -------
-    >>> assert hashable([[1, 2], [3]]) == ((1, 2), (3, ))
-    >>> assert hashable(np.array([1, 2])) == (1, 2)
-    >>> assert hashable("xy") == "xy"
-    """
-    if isinstance(value, (list, tuple, np.ndarray)):
-        return tuple(map(hashable, value))
-    return value
 
 
 class Channel(Diagram, frobenius.Box):

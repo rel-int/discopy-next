@@ -153,6 +153,7 @@ from discopy.utils import factory_name
 from discopy.quantum.gates import format_number
 from discopy.optyx.core import diagram
 from discopy.optyx.utils.misc import (
+    hashable,
     listed,
     occupation_numbers,
     multinomial,
@@ -464,6 +465,16 @@ class Create(ZWBox):
 
     def photon_number_transform(self, dims_in, dims_out):
         return super().photon_number_transform(dims_in, dims_out)
+
+    def setoid(self):
+        """
+        The internal states of the photons created are in no other component,
+        so two creations of the same photons in different states were equal.
+
+        >>> assert Create(1, 1) != Create(1, 1, ([1, 0], [0, 1]))
+        >>> assert Create(1, 1) == Create(1, 1)
+        """
+        return super().setoid() + (hashable(self.internal_states), )
 
     def __repr__(self):
         args = ", ".join(map(repr, self.photons))
