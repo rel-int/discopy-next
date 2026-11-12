@@ -62,7 +62,7 @@ Example
 """
 
 from __future__ import annotations
-from typing import Sequence
+from typing import Self, Sequence
 from dataclasses import dataclass
 from functools import wraps
 from operator import index
@@ -209,7 +209,7 @@ class Ty[natural](Pregroup, TestableGeneric):
     def unit(cls) -> Ty:
         return cls()
 
-    def __pow__(self, n_times: int) -> Ty:
+    def __pow__(self, n_times: int) -> Self:
         """
         The tensor of a pair with itself ``n_times``.
 
