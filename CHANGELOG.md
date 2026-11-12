@@ -417,6 +417,13 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Fixed
 
+- An optyx box is what it computes: `channel.Channel.semantic_attrs` names
+  the attributes besides `name`, `dom`, `cod` and `data` that decide it, and
+  `setoid` compares them — a gate its `array`, which is what `is_conj` and
+  `is_gate_dagger` decide, a creation the internal states of its photons, a
+  `CQMap` its density matrix and a `BinaryMatrixBox` its matrix. Two boxes
+  computing different arrays were equal, every `classical.BinaryMatrix`
+  among them ([next#508]).
 - `frobenius.Diagram.str_transparency` holds up to `Diagram.to_hypergraph`:
   a layer packing a cospan beside a box prints as a tensor that reads back as
   two layers, the same hypergraph but not the same diagram, which `explore`
@@ -1773,6 +1780,7 @@ for the changelog of `1.2.1` and earlier.
 [next#503]: https://github.com/rel-int/discopy-next/pull/503
 [next#504]: https://github.com/rel-int/discopy-next/issues/504
 [next#505]: https://github.com/rel-int/discopy-next/pull/505
+[next#508]: https://github.com/rel-int/discopy-next/pull/508
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#56]: https://github.com/rel-int/optyx/pull/56
