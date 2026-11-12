@@ -121,7 +121,7 @@ never those of two samples:
 3 3
 """
 
-from collections import Counter
+from collections import Counter, defaultdict
 from collections.abc import Callable, Iterator
 from functools import cached_property, reduce
 from itertools import accumulate, pairwise, repeat, takewhile
@@ -321,16 +321,19 @@ class Builder:  # pylint: disable=too-many-instance-attributes  # egg's tables
     """
     def __init__(self, graph: "EGraph"):
         self.factory, self.start = type(graph), graph.graph
-        self.label, self.least = list(graph.classes), list(graph.classes)
+        self.label, self.least = list(graph.classes), {}
         self.boxes: list = []
         self.box_wires: list[tuple[tuple[int, ...], tuple[int, ...]]] = []
         self.heads: dict = {}
+        self.known: dict[int, tuple] = {}
         self.keys: list[tuple[int, ...]] = []
         self.hashcons: dict[tuple[int, ...], int] = {}
-        self.parents: dict[int, list[int]] = {}
+        self.parents: defaultdict[int, list[int]] = defaultdict(list)
         self.worklist: list[tuple[int, int]] = []
         for box, wires in zip(self.start.boxes, self.start.box_wires):
-            self.place(box, wires, self.key(box, wires[0]))
+            _, number, _ = self.head(box)
+            self.place(box, wires, () if number is None else (
+                number, *map(self.root, wires[0])))
 
     def root(self, spider: int) -> int:
         """ The root of the class of a spider in the union-find, halving the
@@ -341,17 +344,19 @@ class Builder:  # pylint: disable=too-many-instance-attributes  # egg's tables
         return spider
 
     def find(self, spider: int) -> int:
-        """ The class of a spider, the least spider related to it. """
-        return self.least[self.root(spider)]
+        """ The class of a spider, the least spider related to it: its root
+        unless :attr:`least` says otherwise. """
+        root = self.root(spider)
+        return self.least.get(root, root)
 
-    def key(self, box, inputs: tuple[int, ...]) -> tuple[int, ...]:
-        """ A deterministic box up to the classes it reads, i.e. its number
-        among the :attr:`heads` then the roots of its inputs, and nothing for
-        a sample, which the hash-cons leaves alone. """
-        if not box.is_deterministic:
-            return ()
-        return (self.heads.setdefault(box, len(self.heads)),
-                *map(self.root, inputs))
+    def head(self, box) -> tuple:
+        """ What the builder keeps of a box, :attr:`known` by its identity so
+        that it is hashed once: the box, its number among the :attr:`heads`
+        if it is deterministic, and how many outputs it has. """
+        number = self.heads.setdefault(box, len(self.heads))\
+            if box.is_deterministic else None
+        self.known[id(box)] = box, number, len(box.cod)
+        return self.known[id(box)]
 
     def cons(self, box: int):
         """ Enter a box, given by its index, in the hash-cons under its key:
@@ -365,50 +370,67 @@ class Builder:  # pylint: disable=too-many-instance-attributes  # egg's tables
 
     def place(self, box, wires: tuple[tuple[int, ...], tuple[int, ...]],
               key: tuple[int, ...]):
-        """ Append a box on its wires with its key: hash-consed and a parent
-        of each class it reads if it is deterministic. """
+        """ Append a box on its wires with its key, i.e. the number of its
+        head then the roots of its inputs, a deterministic box up to the
+        classes it reads, hash-consed and a parent of each, and nothing for
+        a sample, which the hash-cons leaves alone. """
         self.boxes.append(box)
         self.box_wires.append(wires)
         self.keys.append(key)
         if key:
             self.cons(len(self.boxes) - 1)
             for root in key[1:]:
-                self.parents.setdefault(root, []).append(len(self.boxes) - 1)
+                self.parents[root].append(len(self.boxes) - 1)
 
     def add(self, box, inputs: tuple[int, ...]) -> tuple[int, ...]:
         """ Add a box reading some spiders, egg's add, and give its outputs:
         the next spiders, or those of the first equal deterministic box on
         their classes, as :meth:`EGraph.add` does. """
-        inputs, key = tuple(inputs), self.key(box, inputs)
-        if key in self.hashcons:
-            return self.box_wires[self.hashcons[key]][1]
-        n = len(self.label)
-        outputs = tuple(range(n, n + len(box.cod)))
-        self.label.extend(outputs)
-        self.least.extend(outputs)
-        self.place(box, (inputs, outputs), key)
+        _, number, arity = self.known.get(id(box)) or self.head(box)
+        label, key = self.label, ()
+        if number is not None:
+            key = (number, *inputs)
+            for spider in inputs:
+                if label[spider] != spider:
+                    key = (number, *map(self.root, inputs))
+                    break
+            first = self.hashcons.get(key)
+            if first is not None:
+                return self.box_wires[first][1]
+        outputs = tuple(range(len(label), len(label) + arity))
+        label.extend(outputs)
+        self.place(box, (tuple(inputs), outputs), key)
         return outputs
 
     def union(self, left: int, right: int):
         """ Relate two spiders, egg's union: the class with fewer parents
-        joins the other, and each of its parents moves to its new key in the
-        hash-cons, where it may meet a box now congruent to it. """
-        left, right = self.root(left), self.root(right)
+        joins the other, the greater root if they have as many, and each of
+        its parents moves to its new key in the hash-cons, where it may meet
+        a box now congruent to it. """
+        label, parents = self.label, self.parents
+        left = left if label[left] == left else self.root(left)
+        right = right if label[right] == right else self.root(right)
         if left == right:
             return
-        if len(self.parents.get(left, ())) < len(self.parents.get(right, ())):
+        if left > right:
             left, right = right, left
-        moved = self.parents.pop(right, [])
+        if right not in parents:
+            label[right] = left
+            return
+        if len(parents.get(left, ())) < len(parents[right]):
+            left, right = right, left
+        moved, least = parents.pop(right, []), self.least.pop(right, right)
         for box in moved:
             self.hashcons.pop(self.keys[box], None)
-        self.label[right] = left
-        self.least[left] = min(self.least[left], self.least[right])
+        label[right] = left
+        if least < self.least.get(left, left):
+            self.least[left] = least
         for box in moved:
-            head, *inputs = self.keys[box]
-            self.keys[box] = (head, *map(self.root, inputs))
+            number, *inputs = self.keys[box]
+            self.keys[box] = (number, *map(self.root, inputs))
             self.cons(box)
         if moved:
-            self.parents.setdefault(left, []).extend(moved)
+            parents[left].extend(moved)
 
     def merge(self, *spiders: int):
         """ Relate spiders, i.e. state that they are equal, without closing
@@ -958,6 +980,63 @@ class EGraph[category](
         """ A section of least tree cost, egg's extraction. """
         return self.section(self.relax(box_cost, input_cost)[1])
 
+    def dag_cost(self, section: Hypergraph | None = None,
+                 box_cost: Callable = ast_size, input_cost: float = 1
+                 ) -> float:
+        """
+        The DAG cost of a section, the one extracted by default: each of its
+        boxes and each input it reads counted once, however often it is read,
+        i.e. its size as a diagram with sharing, where the tree cost counts a
+        class once per use.
+
+        >>> from discopy.markov import Ty, Box, Diagram
+        >>> x = Ty('x')
+        >>> f, g = Box('f', x, x), Box('g', x @ x, x)
+        >>> graph = Markov.from_diagram(Diagram.copy(x) >> f @ f >> g)
+        >>> graph.cost(), graph.dag_cost()
+        (5, 3)
+        """
+        section = self.extract(box_cost, input_cost)\
+            if section is None else section
+        dom_wires, box_wires, cod_wires = section.wires
+        read = set(cod_wires).union(*(src for src, _ in box_wires))
+        return sum(map(box_cost, section.boxes)) + input_cost * len(
+            read.intersection(dom_wires))
+
+    def dag_bound(self, box_cost: Callable = ast_size, input_cost: float = 1
+                  ) -> dict[int, float]:
+        """ A bound on the least DAG cost of each class, which is hard to
+        find: that of its section of least tree cost, i.e. the producers
+        :meth:`relax` chooses below it, each box and input counted once. """
+        costs, choice = self.relax(box_cost, input_cost)
+        below: dict[int, frozenset[int]] = {}
+        started: set[int] = set()
+
+        def visit(root):
+            todo = [root]
+            while todo:
+                q, reads = todo[-1], self.reads(choice[todo[-1]])
+                waiting = [r for r in reads if r not in below]
+                if started.intersection(waiting):
+                    raise AxiomError(messages.NOT_ACYCLIC.format(self))
+                if waiting:
+                    started.add(q)
+                    todo.extend(waiting)
+                else:
+                    below[q] = frozenset({choice[q]}).union(
+                        *(below[r] for r in reads))
+                    todo.pop()
+            return below[root]
+
+        def weight(ports):
+            boxes = set(map(self.box_of, ports))
+            return input_cost * sum(
+                self.box_of(port) is None for port in ports) + sum(
+                box_cost(self.graph.boxes[j]) for j in boxes if j is not None)
+
+        return {q: weight(visit(q)) if cost < inf else inf
+                for q, cost in costs.items()}
+
     def is_inside(self, box: int) -> bool:
         """ Whether a box is an e-node inside an e-box, being cartesian with
         one output, rather than context, see :meth:`to_diagram`. """
@@ -1179,6 +1258,18 @@ class EGraph[category](
         """ What is extracted costs :meth:`cost`, no section costs less. """
         return Equation(type(graph)(graph.extract()).cost(), graph.cost(), min(
             type(graph)(section).cost() for section in graph.sections()))
+
+    @axiom
+    def sharing(cls, graph: Self) -> Equation[bool]:
+        """ Sharing costs no more: the DAG cost of a section is at most its
+        tree cost, and that of the one extracted at most the bounds of the
+        classes it needs with the cost of its roots. """
+        bound, boxes = graph.dag_bound(), graph.graph.boxes
+        return Equation(all(
+            graph.dag_cost(section) <= type(graph)(section).cost()
+            for section in graph.sections()), graph.dag_cost() <= sum(
+            bound[q] for q in graph.needs()) + sum(
+            ast_size(boxes[j]) for j in graph.roots()), True)
 
     @axiom
     def translation(cls, graph: Self) -> Equation[frozenset]:

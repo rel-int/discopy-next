@@ -9,6 +9,11 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Added
 
+- `EGraph.dag_cost`, the cost of a section as a diagram with sharing, i.e.
+  each box and each input it reads counted once however often it is read,
+  `EGraph.dag_bound`, that of the section of least tree cost of each class,
+  and the law `EGraph.sharing` that it is at most the tree cost
+  ([next#503]).
 - `egraph.Builder`, a mutable e-graph built as egg does, with a union-find, a
   hash-cons and a worklist: `add` in amortised constant time, `rebuild`
   repairing only what changed, started with `EGraph.builder` and frozen back
@@ -1471,6 +1476,10 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 - `benchmark/data/egraph-traces/` holds 50 e-graph traces of a program search
   on 1D-ARC, without values and with heads renamed: the test data of the
   e-graph builder benchmark ([next#500]).
+- `benchmark/test_egraph.py` replays those traces through `egraph.Builder`
+  and the bookkeeping of the search that grew them, the small ones through
+  the pure `EGraph`, and times a rebuild and a freeze ([next#503]); what it
+  measured against the targets it was given is in [next#504].
 
 ## [1.2.2] - 2025-12-19
 
@@ -1757,6 +1766,8 @@ for the changelog of `1.2.1` and earlier.
 [next#500]: https://github.com/rel-int/discopy-next/pull/500
 [next#501]: https://github.com/rel-int/discopy-next/pull/501
 [next#502]: https://github.com/rel-int/discopy-next/pull/502
+[next#503]: https://github.com/rel-int/discopy-next/pull/503
+[next#504]: https://github.com/rel-int/discopy-next/issues/504
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#56]: https://github.com/rel-int/optyx/pull/56
