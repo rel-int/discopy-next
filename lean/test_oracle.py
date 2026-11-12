@@ -64,9 +64,10 @@ def partitions(draw) -> dict:
         st.tuples(spider, spider), max_size=2 * n))}
 
 
-def encoding(history: History) -> tuple[dict, Callable[[EGraph], dict]]:
+def encoding(history: History) -> tuple[dict, Callable[..., dict]]:
     """ A history as a case of the oracle, and what the oracle gives for an
-    e-graph, with the boxes numbered by their first occurrence. """
+    e-graph and the outputs of each ``add``, with the boxes numbered by their
+    first occurrence. """
     heads: dict = {}
 
     def nodes(graph: EGraph) -> list:
@@ -83,14 +84,38 @@ def encoding(history: History) -> tuple[dict, Callable[[EGraph], dict]]:
         return [name, heads.setdefault(box, len(heads)),
                 box.is_deterministic, len(box.cod), list(inputs)]
 
-    def result(graph: EGraph) -> dict:
-        return {"classes": list(graph.classes), "nodes": nodes(graph)}
+    def result(graph: EGraph, outputs=()) -> dict:
+        return {"classes": list(graph.classes), "nodes": nodes(graph),
+                "outputs": list(map(list, outputs))}
 
     start = history.graph
-    return {
-        "spiders": start.graph.n_spiders, **result(start),
-        "operations": [operation(*step) for step in history.operations]
-    }, result
+    case = result(start) | {
+        "spiders": start.graph.n_spiders,
+        "operations": [operation(*step) for step in history.operations]}
+    del case["outputs"]
+    return case, result
+
+
+def folded(history: History) -> tuple[EGraph, list]:
+    """ The fold of a history with the outputs each ``add`` gave. """
+    graph, outputs = history.graph, []
+    for name, *args in history.operations:
+        graph = getattr(graph, name)(*args)
+        if name == "add":
+            graph, added = graph
+            outputs.append(added)
+    return graph, outputs
+
+
+def built(history: History) -> tuple[EGraph, list]:
+    """ What the builder of a history freezes into with the outputs each
+    ``add`` gave. """
+    builder, outputs = history.graph.builder(), []
+    for name, *args in history.operations:
+        added = getattr(builder, name)(*args)
+        if name == "add":
+            outputs.append(added)
+    return builder.freeze(), outputs
 
 
 @pytest.mark.parametrize("random_seed", SEEDS)
@@ -109,8 +134,8 @@ def test_history(random_seed):
     cases, results = zip(*map(encoding, histories))
     for history, case, result, answer in zip(
             histories, cases, results, answers(cases), strict=True):
-        assert answer["fold"] == result(history.fold()), case
-        assert answer["build"] == result(history.build()), case
+        assert answer["fold"] == result(*folded(history)), case
+        assert answer["build"] == result(*built(history)), case
     print(f"history: {len(cases)} cases agree under seed {random_seed}, "
           f"{len(set(map(json.dumps, cases)))} distinct, "
           f"{sum(len(case['operations']) for case in cases)} operations")
@@ -155,6 +180,6 @@ def test_traces(twice):
     cases = [case | {"run": ["build"]} for case in cases]
     for history, result, answer in zip(
             histories, results, answers(cases), strict=True):
-        assert answer["build"] == result(history.build())
+        assert answer["build"] == result(*built(history))
     print(f"traces: {len(cases)} agree, twice is {twice}, "
           f"{sum(len(case['operations']) for case in cases)} operations")

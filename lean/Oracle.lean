@@ -9,8 +9,8 @@ partition, `{"spiders": 4, "pairs": [[3, 1], [1, 2]]}` giving
 `[head, det, inputs, outputs]`, the `classes` of the spiders and `operations`,
 each `["add", head, det, arity, inputs]`, `["merge", spider, ...]` or
 `["rebuild"]`, giving the `nodes` and `classes` of the `fold` and of what
-the builder freezes into, the `build`, from the partition of the classes as
-`EGraph.__init__` takes it. A case may ask for one of them alone,
+the builder freezes into, the `build`, each with the `outputs` every `add`
+gave, from the partition of the classes as `EGraph.__init__` takes it. A case may ask for one of them alone,
 `"run": ["build"]`: the fold goes through every node at each step.
 -/
 
@@ -36,9 +36,30 @@ def operation (json : Json) : Except String Operation := do
     return .rebuild
   throw s!"unknown operation {name}"
 
-def graph (g : Graph) : Json :=
+def graph (g : Graph) (outputs : Array (List Nat)) : Json :=
   Json.mkObj [("classes", toJson g.classes), ("nodes", Json.arr (g.nodes.toArray.map
-    fun n => Json.arr #[toJson n.head, toJson n.det, toJson n.inputs, toJson n.outputs]))]
+    fun n => Json.arr #[toJson n.head, toJson n.det, toJson n.inputs, toJson n.outputs])),
+    ("outputs", toJson outputs)]
+
+/-- The fold of a history with the outputs each `add` gave. -/
+def fold (g : Graph) (operations : List Operation) : Json :=
+  let result := operations.foldl (fun (state : Graph × Array (List Nat)) operation =>
+    match operation with
+    | .add head det arity inputs =>
+      let added := state.1.add head det arity inputs
+      (added.1, state.2.push added.2)
+    | _ => (state.1.apply operation, state.2)) (g, #[])
+  graph result.1 result.2
+
+/-- What the builder of a history freezes into with the outputs each `add` gave. -/
+def build (g : Graph) (operations : List Operation) : Json :=
+  let result := operations.foldl (fun (state : Builder × Array (List Nat)) operation =>
+    match operation with
+    | .add head det arity inputs =>
+      let added := state.1.add head det arity inputs
+      (added.1, state.2.push added.2)
+    | _ => (state.1.apply operation, state.2)) (Builder.start g, #[])
+  graph result.1.freeze result.2
 
 def answer (line : String) : Except String Json := do
   let case ← Json.parse line
@@ -50,11 +71,11 @@ def answer (line : String) : Except String Json := do
   let operations ← (← case.getObjValAs? (List Json) "operations").mapM operation
   let classes := partition classes.length (links classes)
   let run := (case.getObjValAs? (List String) "run").toOption.getD ["fold", "build"]
-  let fold := if run.contains "fold"
-    then [("fold", graph (Graph.fold ⟨nodes, classes⟩ operations))] else []
-  let build := if run.contains "build"
-    then [("build", graph (Builder.build ⟨nodes, classes⟩ operations))] else []
-  return Json.mkObj (fold ++ build)
+  let folded := if run.contains "fold"
+    then [("fold", fold ⟨nodes, classes⟩ operations)] else []
+  let built := if run.contains "build"
+    then [("build", build ⟨nodes, classes⟩ operations)] else []
+  return Json.mkObj (folded ++ built)
 
 partial def main : IO UInt32 := do
   let stdin ← IO.getStdin
