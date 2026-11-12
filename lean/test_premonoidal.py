@@ -84,7 +84,7 @@ def cases(draw) -> dict:
 
 @st.composite
 def functors(draw) -> dict:
-    """ A diagram and a functor into diagrams, given on its wires and boxes. """
+    """ A diagram and a functor into diagrams, by its wires and boxes. """
     ob = {wire: draw(st.lists(st.sampled_from("xyz"), max_size=2))
           for wire in "xyz"}
     f, ar = draw(diagrams(draw(types))), {}
