@@ -28,8 +28,11 @@ def hashable(value):
     -------
     >>> assert hashable([[1, 2], [3]]) == ((1, 2), (3, ))
     >>> assert hashable(np.array([1, 2])) == (1, 2)
+    >>> assert hashable(np.array(1)) == 1
     >>> assert hashable("xy") == "xy"
     """
+    if isinstance(value, np.ndarray) and not value.ndim:
+        return value.item()
     if isinstance(value, (list, tuple, np.ndarray)):
         return tuple(map(hashable, value))
     return value

@@ -468,11 +468,16 @@ class Create(ZWBox):
 
     def setoid(self):
         """
-        The internal states of the photons created are in no other component,
-        so two creations of the same photons in different states were equal.
+        The internal states of the photons are in no other component, so two
+        creations of the same photons in different states were equal, and two
+        post-selections too: :class:`Select` is the dagger of a `Create` and
+        carries the same states, so it compares them the same way.
 
-        >>> assert Create(1, 1) != Create(1, 1, ([1, 0], [0, 1]))
+        >>> states = dict(internal_states=([1, 0], [0, 1]))
+        >>> assert Create(1, 1) != Create(1, 1, **states)
         >>> assert Create(1, 1) == Create(1, 1)
+        >>> assert Select(1, 1) != Select(1, 1, **states)
+        >>> assert Create(1, 1, **states).dagger() == Select(1, 1, **states)
         """
         return super().setoid() + (hashable(self.internal_states), )
 
@@ -591,6 +596,10 @@ class Select(ZWBox):
         return super().photon_number_transform(dims_in, dims_out)
 
     __repr__ = Create.__repr__
+
+    def setoid(self):
+        """ The internal states of the photons, as for a :class:`Create`. """
+        return super().setoid() + (hashable(self.internal_states), )
 
     def inflate(self, d):
 

@@ -1653,11 +1653,13 @@ class Channel(Diagram, frobenius.Box):
         self.env = env
         super().__init__(name, dom, cod)
 
-    semantic_attrs: tuple[str, ...] = ()
+    semantic_attrs: tuple[str, ...] = ("kraus", )
     """
     The attributes besides :code:`name`, :code:`dom`, :code:`cod` and
     :code:`data` that decide what a channel computes, compared by
-    :meth:`setoid`.
+    :meth:`setoid`. A channel is initialised by its Kraus map, so that is
+    every channel's; a subclass computing its own map from arguments of its
+    own, e.g. a gate from its array, declares those instead.
     """
 
     def setoid(self):
