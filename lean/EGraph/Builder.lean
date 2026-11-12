@@ -14,9 +14,6 @@ and gives it back, where the Python changes it in place.
 Two dictionaries of the Python are arrays here: `least[root]` is the root
 where the Python has no entry, and `parents[root]` is empty where it has
 none. `heads` and `known` number the boxes, which a node has done already.
-`Builder.union` is three methods here, `union`, `join` and `link`: finding
-the two roots, choosing which joins the other, and moving its parents. The
-loops of `root` and `rebuild` run on fuel.
 -/
 
 namespace EGraph
@@ -60,7 +57,7 @@ def cons (b : Builder) (box : Nat) : Builder :=
     if first = box then b
     else { b with
       hashcons := b.hashcons.insert key (min first box)
-      worklist := b.worklist ++ [(first, box)] }
+      worklist := (first, box) :: b.worklist }
 
 /-- Append a node with its key: hash-consed and a parent of each root of its
 key when it is deterministic, nothing for a sample, whose key is empty. -/
@@ -145,11 +142,11 @@ of them. -/
 def drain : Nat → Builder → Builder
   | 0, b => b
   | fuel + 1, b =>
-    match b.worklist.getLast? with
-    | none => b
-    | some pair =>
+    match b.worklist with
+    | [] => b
+    | pair :: rest =>
       drain fuel (((b.outputs pair.1).zip (b.outputs pair.2)).foldl
-        (fun b pair => b.union pair.1 pair.2) { b with worklist := b.worklist.dropLast })
+        (fun b pair => b.union pair.1 pair.2) { b with worklist := rest })
 
 /-- How many parents there are in all. -/
 def total (b : Builder) : Nat :=
@@ -166,9 +163,9 @@ def rebuild (b : Builder) : Builder := drain b.fuel b
 
 /-- The classes of the spiders, `map(self.find, range(len(self.label)))`. -/
 def classes (b : Builder) : List Nat :=
-  ((List.range b.label.size).foldl (fun (state : Builder × List Nat) spider =>
+  ((List.range b.label.size).foldl (fun (state : Builder × Array Nat) spider =>
     let found := state.1.find spider
-    (found.1, state.2 ++ [found.2])) (b, [])).2
+    (found.1, state.2.push found.2)) (b, #[])).2.toList
 
 /-- The e-graph built so far, as it is: not rebuilt. -/
 def freeze (b : Builder) : Graph := ⟨b.nodes.toList, b.classes⟩
