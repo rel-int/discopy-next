@@ -372,6 +372,13 @@ def test_to_lens_jax():
     expected = jax.vjp(network.to_function(jax.Array), inputs)[1](gradient)[0]
     put = jax.jit(network.to_lens(jax.Array).put)
     assert jnp.allclose(put(inputs, gradient), expected)
+    single = Box('single', x, x, module=lambda v: (2 * v, ))
+    assert jnp.allclose(single.backward(inputs, inputs), 2 * inputs)
+    split = Box('split', x, Dims(1, 1),
+                module=lambda v: (v[..., :1], 3 * v[..., 1:]))
+    halves = inputs[..., :1], inputs[..., 1:]
+    assert jnp.allclose(
+        split.backward(inputs, *halves), inputs * jnp.array([1., 3.]))
 
 
 def test_delay_is_the_identity():

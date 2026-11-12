@@ -668,7 +668,8 @@ def autodiff(module, inputs: tuple, gradients: tuple) -> tuple:
     if framework in ("jax", "jaxlib"):
         # pylint: disable-next=import-outside-toplevel  # no framework above
         import jax
-        return jax.vjp(module, *inputs)[1](untuplify(gradients))
+        return jax.vjp(
+            lambda *xs: tuplify(module(*xs)), *inputs)[1](tuple(gradients))
     raise NotImplementedError(
         f"No reverse mode for {framework}: give the box a vjp.")
 
