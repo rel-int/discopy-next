@@ -8,7 +8,7 @@ from pytest import importorskip, raises
 from discopy import neural, python
 from discopy.neural.network import (
     Box, Cofunction, Copy, Dim, Dims, Discard, Equation, Function, Functor,
-    Id, Merge, Network, Noise, Permutation, Swap, Trace)
+    Id, Lens, Merge, Network, Noise, Permutation, Swap, Trace, autodiff)
 from discopy.utils import AxiomError, dumps, loads
 
 
@@ -218,6 +218,160 @@ def test_to_function_jax():
         network(weights).to_function(jax.Array)(inputs))
     gradient = jax.grad(loss)(weights, jnp.ones((4, 2)))
     assert gradient.shape == (2, 3) and float(gradient[0, 0]) == 8.
+
+
+def test_to_lens():
+    import numpy as np
+    x = Dims(2)
+    square = Box('square', x, x, module=lambda v: v * v,
+                 vjp=lambda v, dv: 2 * v * dv)
+    add = Box('add', x @ x, x, module=lambda v, w: v + w,
+              vjp=lambda v, w, dv: (dv, dv))
+    v, dv = np.array([1, 2]), np.array([1, 10])
+    residual = (Network.copy(x) >> square @ x >> add).to_lens(np.ndarray)
+    assert isinstance(residual, Lens) and residual.dom == residual.cod
+    assert residual.dom == Lens.ob((np.ndarray, ), (np.ndarray, ))
+    assert list(residual.get(v)) == [2, 6]
+    assert list(residual.put(v, dv)) == [3, 50]
+    chain = (square >> square).to_lens()
+    assert list(chain.get(v)) == [1, 16] and list(chain.put(v, dv)) == [4, 320]
+    swapped = (square @ x >> Swap(x, x)).to_lens()
+    assert [list(dw) for dw in swapped.put(v, v, dv, 0 * dv)] == [[0, 0], [1, 10]]
+    dropped = (Network.copy(x) >> square @ Network.discard(x)).to_lens()
+    assert list(dropped.put(v, dv)) == [2, 40]
+    assert list(Network.discard(x).to_lens().put(v)) == [0, 0]
+    assert list(Network.copy(x, 3).to_lens().put(v, dv, dv, dv)) == [3, 30]
+    assert list(Id(x).to_lens().put(v, dv)) == list(dv)
+    assert Network.copy(x @ x).to_lens().get(v, dv)[2] is v
+    both = Network.copy(x @ x).to_lens().put(v, dv, v, dv, dv, v)
+    assert [list(dw) for dw in both] == [[2, 12], [2, 12]]
+
+
+def test_to_lens_errors():
+    import numpy as np
+    x = Dims(2)
+    double = Box('double', x, x, module=lambda v: 2 * v)
+    with raises(NotImplementedError, match="No reverse mode for numpy"):
+        double.to_lens().put(np.ones(2), np.ones(2))
+    with raises(NotImplementedError, match="only feedforward"):
+        Box('f', x @ x, x @ x, module=lambda v, w: (v, w)).trace().to_lens()
+    with raises(NotImplementedError, match="no adjoint"):
+        double.dagger().to_lens()
+    with raises(ValueError, match="has no module"):
+        Box('f', x, x, vjp=lambda v, dv: dv).to_lens()
+    with raises(ValueError, match="has no module"):
+        Box('f', x, x).backward(np.ones(2), np.ones(2))
+    wide = Box('f', x, x, module=lambda v: v, vjp=lambda v, dv: (dv, dv))
+    with raises(AxiomError, match="f: Expected 1 tensors, got 2"):
+        wide.backward(np.ones(2), np.ones(2))
+    with raises(AxiomError, match="f: Expected a shape ending in"):
+        wide.backward(np.ones(2), np.ones(3))
+    assert autodiff(lambda: np.ones(2), (), (np.ones(2), )) == ()
+
+
+def test_vjp_is_kept_but_not_compared():
+    x = Dims(2)
+    vjp = lambda v, dv: 2 * dv
+    double = Box('double', x, x, module=None, vjp=vjp)
+    assert double == Box('double', x, x) and double.vjp is vjp
+    assert double.dagger().dagger().vjp is vjp
+    assert repr(double) == repr(Box('double', x, x))
+    assert 'vjp' not in double.to_tree() and loads(dumps(double)).vjp is None
+    assert Copy(x).vjp is None and Swap(x, x).vjp is None
+
+
+def random_network(rng, torch, width=3, depth=5):
+    """ A feedforward network of linear, ReLU, add, copy and discard. """
+    x = Dims(width)
+    add = Box('add', x @ x, x, module=torch.add)
+    relu = Box('relu', x, x, module=torch.relu)
+
+    def linear():
+        return Box('linear', x, x,
+                   module=torch.nn.Linear(width, width).double())
+
+    def step(kind):
+        if kind == 'residual':
+            return Network.copy(x) >> linear() @ x >> add
+        if kind == 'fork':
+            return Network.copy(x, 3) >> linear() @ (linear() >> relu) @ x\
+                >> add @ x >> add
+        if kind == 'drop':
+            return Network.copy(x) >> linear() @ Network.discard(x)
+        return relu if kind == 'relu' else linear()
+
+    return Id(x).then(*(step(rng.choice(
+        ['linear', 'relu', 'residual', 'fork', 'drop'])) for _ in range(depth)))
+
+
+def test_to_lens_is_autograd():
+    import random
+    torch = importorskip("torch")
+    rng = random.Random(0)
+    torch.manual_seed(0)
+    for _ in range(20):
+        network = random_network(rng, torch)
+        inputs = torch.randn(4, 3, dtype=torch.float64, requires_grad=True)
+        gradient = torch.randn(4, 3, dtype=torch.float64)
+        outputs = network.to_function(torch.Tensor)(inputs)
+        expected, = torch.autograd.grad(outputs, inputs, gradient)
+        backprop = network.to_lens(torch.Tensor)
+        assert torch.equal(backprop.get(inputs.detach()), outputs)
+        assert torch.allclose(
+            backprop.put(inputs.detach(), gradient), expected, atol=1e-6)
+
+
+def test_to_lens_fails_when_copy_drops_a_branch(monkeypatch):
+    torch = importorskip("torch")
+    x = Dims(3)
+
+    def copy(cls, pair, n=2):
+        return cls(pair, pair ** n, cls.category.copy(pair.positive, n),
+                   cls.category(lambda *tensors: tensors[len(x)],
+                                pair.positive @ (pair ** n).negative,
+                                pair.negative))
+
+    torch.manual_seed(0)
+    linear = Box('linear', x, x, module=torch.nn.Linear(3, 3).double())
+    network = Network.copy(x) >> linear @ x\
+        >> Box('add', x @ x, x, module=torch.add)
+    inputs = torch.randn(4, 3, dtype=torch.float64, requires_grad=True)
+    gradient = torch.randn(4, 3, dtype=torch.float64)
+    expected, = torch.autograd.grad(
+        network.to_function()(inputs), inputs, gradient)
+    assert torch.allclose(network.to_lens().put(inputs.detach(), gradient),
+                          expected, atol=1e-6)
+    monkeypatch.setattr(Lens, "copy", classmethod(copy))
+    assert not torch.allclose(
+        network.to_lens().put(inputs.detach(), gradient), expected, atol=1e-6)
+
+
+def test_autodiff_torch():
+    torch = importorskip("torch")
+    x = torch.tensor([1., 2.])
+    assert torch.equal(autodiff(torch.relu, (-x, ), (x, ))[0], 0 * x)
+    constant = autodiff(lambda v: torch.ones(2), (x, ), (x, ))
+    assert torch.equal(constant[0], 0 * x)
+    unused = autodiff(lambda v, w: (v * v, torch.ones(2)), (x, x), (x, x))
+    assert torch.equal(unused[0], 2 * x * x) and torch.equal(unused[1], 0 * x)
+    split = Box('split', Dims(2), Dims(1, 1),
+                module=lambda v: (v[..., :1], v[..., 1:]))
+    assert torch.equal(split.backward(x, x[:1], x[1:]), x)
+
+
+def test_to_lens_jax():
+    jax = importorskip("jax")
+    import jax.numpy as jnp
+    x, h = Dims(2), Dims(3)
+    weights = jnp.arange(6.).reshape(2, 3)
+    linear = Box('linear', x, h, module=lambda v: v @ weights)
+    relu = Box('relu', h, h, module=jax.nn.relu)
+    add = Box('add', h @ h, h, module=jnp.add)
+    network = Network.copy(x) >> linear @ linear >> relu @ h >> add
+    inputs, gradient = jnp.array([[1., -1.], [2., 2.]]), jnp.ones((2, 3))
+    expected = jax.vjp(network.to_function(jax.Array), inputs)[1](gradient)[0]
+    put = jax.jit(network.to_lens(jax.Array).put)
+    assert jnp.allclose(put(inputs, gradient), expected)
 
 
 def test_delay_is_the_identity():

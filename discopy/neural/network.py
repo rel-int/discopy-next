@@ -17,7 +17,8 @@ their boxes, see :mod:`discopy.markov`, :mod:`discopy.comarkov` and
 :mod:`discopy.feedback`. A feedforward network
 compiles to a function on tensors with :meth:`Network.to_function`, which
 :mod:`discopy.neural.torch` wraps as a PyTorch module and ``jax.jit`` takes
-as it is.
+as it is, and to its reverse derivative with :meth:`Network.to_lens`, a
+:class:`Lens` whose ``put`` is backpropagation.
 
 Summary
 -------
@@ -44,6 +45,16 @@ Summary
     Head
     Tail
     Functor
+    Lens
+
+.. admonition:: Functions
+
+    .. autosummary::
+        :template: function.rst
+        :nosignatures:
+        :toctree:
+
+        autodiff
 
 Example
 -------
@@ -70,7 +81,8 @@ from __future__ import annotations
 from typing import Self
 
 from discopy import (
-    comarkov, feedback, markov, messages, monoidal, python, testable)
+    comarkov, feedback, lens, markov, messages, monoidal, python, testable)
+from discopy.abc import MarkovCategory
 from discopy.cat import factory
 from discopy.monoidal import Dim
 from discopy.testable import axiom
@@ -263,6 +275,14 @@ class Network(markov.Diagram, comarkov.Diagram):
             ...
         NotImplementedError: Trace(add >> double) has a trace, only ...
         """
+        self.assert_isfeedforward()
+        return Functor(ob_map=lambda leg: (tensor, ),
+                       ar_map=lambda box: box.assert_hasmodule().forward,
+                       cod=python.Function)(self)
+
+    def assert_isfeedforward(self) -> None:
+        """ Raise ``NotImplementedError`` on a trace or a dagger: neither
+        compiles to a function on tensors. """
         if any(isinstance(box, Trace) for box in self.boxes):
             raise NotImplementedError(
                 f"{self} has a trace, only feedforward networks compile.")
@@ -270,13 +290,48 @@ class Network(markov.Diagram, comarkov.Diagram):
             if box.is_dagger:
                 raise NotImplementedError(f"{box} has no adjoint module.")
 
-        def forward(box):
-            if box.module is None:
-                raise ValueError(f"{box} has no module.")
-            return box.forward
+    def to_lens(self, tensor: type = object) -> Lens:
+        """
+        The reverse derivative of a feedforward network
+        :cite:p:`CruttwellEtAl22`: the lens whose ``get`` is
+        :meth:`to_function` and whose ``put`` takes one tensor per input
+        leg, then one gradient per output leg, to one gradient per input
+        leg. It is the functor into :class:`Lens` sending every leg to a
+        pair of ``tensor`` and every box to its :meth:`Box.forward` and
+        :meth:`Box.backward`: composition is the chain rule, a copy sums
+        the gradients of its branches and a discard gives zero.
 
-        return Functor(ob_map=lambda leg: (tensor, ), ar_map=forward,
-                       cod=python.Function)(self)
+        Parameters:
+            tensor : The type of the tensors and of their gradients.
+
+        Example
+        -------
+        >>> import numpy as np
+        >>> x = Dims(2)
+        >>> square = Box('square', x, x, module=lambda v: v * v,
+        ...              vjp=lambda v, dv: 2 * v * dv)
+        >>> add = Box('add', x @ x, x, module=lambda v, w: v + w,
+        ...           vjp=lambda v, w, dv: (dv, dv))
+        >>> residual = Network.copy(x) >> square @ x >> add
+        >>> backprop = residual.to_lens(np.ndarray)
+        >>> backprop.get(np.array([1, 2]))
+        array([2, 6])
+        >>> backprop.put(np.array([1, 2]), np.array([1, 1]))
+        array([3, 5])
+        """
+        self.assert_isfeedforward()
+        leg = Lens.ob((tensor, ), (tensor, ))
+
+        def reverse(box):
+            box.assert_hasmodule()
+            dom, cod = (leg ** len(legs) for legs in (box.dom, box.cod))
+            return Lens(
+                dom, cod,
+                python.Function(box.forward, dom.positive, cod.positive),
+                python.Function(box.backward, dom.positive @ cod.negative,
+                                dom.negative))
+
+        return Functor(ob_map=lambda _: leg, ar_map=reverse, cod=Lens)(self)
 
 
 class Box(markov.Box, Network):
@@ -289,6 +344,9 @@ class Box(markov.Box, Network):
         dom : The input legs of the layer.
         cod : The output legs of the layer.
         module : The object computing the layer, e.g. a ``torch.nn.Module``.
+        vjp : The vector-Jacobian product of the layer, from one tensor per
+            input leg then one gradient per output leg to one gradient per
+            input leg; :func:`autodiff` of the module by default.
 
     Note
     ----
@@ -297,7 +355,9 @@ class Box(markov.Box, Network):
     identity. The repr and the serialisation omit the module, which has no
     eval-able representation, so ``eval(repr(f)) == f`` and
     ``loads(dumps(f)) == f`` hold for a box without one and give the shape
-    of one with.
+    of one with. The ``vjp`` is how the derivative of the module is
+    computed, not part of what the box is: it is kept by :meth:`rebuild`
+    and read by neither the equality, the repr nor the serialisation.
 
     Example
     -------
@@ -306,11 +366,12 @@ class Box(markov.Box, Network):
     >>> f
     neural.network.Box('f', Dims(Dim(2)), Dims(Dim(3), Dim(3)))
     """
-    module = None
+    module = vjp = None
+    serialised_attrs = (*markov.Box.serialised_attrs, "vjp")
 
     def __init__(self, name: str, dom: Dims, cod: Dims,
-                 module: object = None, data=None, **params):
-        self.module = data if module is None else module
+                 module: object = None, data=None, vjp=None, **params):
+        self.module, self.vjp = data if module is None else module, vjp
         super().__init__(name, dom, cod, data=self.module, **params)
 
     def __repr__(self):
@@ -344,13 +405,51 @@ class Box(markov.Box, Network):
             ...
         discopy.utils.AxiomError: f: Expected a shape ending in (2,), got (4,).
         """
-        if self.module is None:
-            raise ValueError(f"{self} has no module.")
+        self.assert_hasmodule()
         try:
             self.dom.check(*tensors)
             outputs = tuplify(
                 self.module(*tensors))  # ty: ignore[call-non-callable]
             self.cod.check(*outputs)
+        except AxiomError as error:
+            raise AxiomError(f"{self}: {error}") from error
+        return untuplify(outputs)
+
+    def assert_hasmodule(self) -> Box:
+        """ Raise ``ValueError`` unless the box has a module, else return
+        the box itself. """
+        if self.module is None:
+            raise ValueError(f"{self} has no module.")
+        return self
+
+    def backward(self, *tensors):
+        """
+        Apply the vector-Jacobian product of the layer to one tensor per
+        leg of ``dom`` then one gradient per leg of ``cod``, and return one
+        gradient per leg of ``dom``, each checked against its leg: the
+        :attr:`vjp` of the box when it has one, else :func:`autodiff` of
+        its module.
+
+        Parameters:
+            tensors : One tensor per input leg, one gradient per output leg.
+
+        Example
+        -------
+        >>> import numpy as np
+        >>> scale = Box('scale', Dims(2), Dims(2), module=lambda v: 3 * v,
+        ...             vjp=lambda v, dv: 3 * dv)
+        >>> scale.backward(np.array([1, 2]), np.array([1, 0]))
+        array([3, 0])
+        """
+        self.assert_hasmodule()
+        inputs, gradients = tensors[:len(self.dom)], tensors[len(self.dom):]
+        try:
+            self.dom.check(*inputs)
+            self.cod.check(*gradients)
+            outputs = tuplify(
+                autodiff(self.module, inputs, gradients) if self.vjp is None
+                else self.vjp(*tensors))
+            self.dom.check(*outputs)
         except AxiomError as error:
             raise AxiomError(f"{self}: {error}") from error
         return untuplify(outputs)
@@ -463,6 +562,114 @@ class Functor(markov.Functor, comarkov.Functor):
     >>> assert F(residual)([1, 2]) == [3, 6]
     """
     dom = cod = Network
+
+
+class Lens(lens.Markov, MarkovCategory):
+    """
+    The lenses of functions on tensors, where the reverse derivative of a
+    network lives, see :meth:`Network.to_lens`: ``get`` runs the network
+    forward, ``put`` takes its inputs and the gradients of its outputs to
+    the gradients of its inputs. They form a Markov category as those of
+    :class:`discopy.lens.Comarkov` do, with the sum of the gradients as
+    merge and zero as its unit.
+
+    Parameters:
+        dom (lens.Ty) : The types of the inputs and of their gradients.
+        cod (lens.Ty) : The types of the outputs and of their gradients.
+        get (python.Function) : The forward pass.
+        put (python.Function) : The backward pass.
+
+    Example
+    -------
+    >>> x = Lens.ob((float, ), (float, ))
+    >>> Function = python.Function
+    >>> square = Lens(
+    ...     x, x, Function(lambda a: a * a, (float, ), (float, )),
+    ...     Function(lambda a, da: 2 * a * da, (float, float), (float, )))
+    >>> fan_out = Lens.copy(x) >> square @ square
+    >>> fan_out.get(3.)
+    (9.0, 9.0)
+    >>> fan_out.put(3., 1., 1.)
+    12.0
+    >>> (Lens.copy(x) >> square @ Lens.discard(x)).put(3., 1.)
+    6.0
+
+    Note
+    ----
+    The ``put`` of a composition runs the ``get`` of what comes first again,
+    see :meth:`discopy.lens.Markov.then`, so that the backward pass of a
+    network of depth ``n`` runs its layers forward a number of times
+    quadratic in ``n``.
+    """
+    category = python.Function
+
+    @classmethod
+    def checked_params(cls) -> tuple:
+        """ No subscript is checked: functions are not generated. """
+        return ()
+
+    @classmethod
+    def copy(cls, x: lens.Ty, n: int = 2) -> Lens:
+        """
+        The copy of a pair ``n`` times: ``get`` copies the tensors, ``put``
+        sums the ``n`` gradients of each, zero when there is none.
+
+        Parameters:
+            x : The pair of types to copy.
+            n : The number of copies.
+        """
+        width = len(x.positive)
+
+        def put(*tensors):
+            inputs, gradients = tensors[:width], tensors[width:]
+            return untuplify(tuple(
+                sum(gradients[i::width], 0 * tensor)
+                for i, tensor in enumerate(inputs)))
+
+        return cls(x, x ** n, cls.category.copy(x.positive, n), cls.category(
+            put, x.positive @ (x ** n).negative, x.negative))
+
+
+def autodiff(module, inputs: tuple, gradients: tuple) -> tuple:
+    """
+    The vector-Jacobian product of a ``module`` at its ``inputs``, applied
+    to the ``gradients`` of its outputs, by the reverse mode of the
+    framework the tensors come from: PyTorch or JAX.
+
+    Parameters:
+        module : The function to differentiate, from tensors to tensors.
+        inputs : The tensors to differentiate at, one per argument.
+        gradients : The gradients of the outputs, one per output.
+
+    Example
+    -------
+    >>> import torch  # doctest: +EXTRA
+    >>> x, dy = torch.tensor([1., 2.]), torch.tensor([1., 1.])
+    >>> autodiff(lambda v: v * v, (x, ), (dy, ))
+    (tensor([2., 4.]),)
+    """
+    if not inputs:
+        return ()
+    framework = type(inputs[0]).__module__.partition(".")[0]
+    if framework == "torch":
+        # pylint: disable-next=import-outside-toplevel  # no framework above
+        import torch
+        with torch.enable_grad():
+            inputs = tuple(x.detach().requires_grad_() for x in inputs)
+            live = [pair for pair in zip(tuplify(module(*inputs)), gradients)
+                    if pair[0].requires_grad]
+            if not live:
+                return tuple(0 * x for x in inputs)
+            outputs, gradients = zip(*live)
+            return torch.autograd.grad(
+                outputs, inputs, gradients,
+                allow_unused=True, materialize_grads=True)
+    if framework in ("jax", "jaxlib"):
+        # pylint: disable-next=import-outside-toplevel  # no framework above
+        import jax
+        return jax.vjp(module, *inputs)[1](untuplify(gradients))
+    raise NotImplementedError(
+        f"No reverse mode for {framework}: give the box a vjp.")
 
 
 Id = Network.id
