@@ -153,6 +153,7 @@ from discopy.utils import factory_key, factory_name
 from discopy.quantum.gates import format_number
 from discopy.optyx.core import diagram
 from discopy.optyx.utils.misc import (
+    hashable,
     listed,
     occupation_numbers,
     multinomial,
@@ -465,6 +466,21 @@ class Create(ZWBox):
     def photon_number_transform(self, dims_in, dims_out):
         return super().photon_number_transform(dims_in, dims_out)
 
+    def setoid(self):
+        """
+        The internal states of the photons are in no other component, so two
+        creations of the same photons in different states were equal, and two
+        post-selections too: :class:`Select` is the dagger of a `Create` and
+        carries the same states, so it compares them the same way.
+
+        >>> states = dict(internal_states=([1, 0], [0, 1]))
+        >>> assert Create(1, 1) != Create(1, 1, **states)
+        >>> assert Create(1, 1) == Create(1, 1)
+        >>> assert Select(1, 1) != Select(1, 1, **states)
+        >>> assert Create(1, 1, **states).dagger() == Select(1, 1, **states)
+        """
+        return super().setoid() + (hashable(self.internal_states), )
+
     def __repr__(self):
         args = ", ".join(map(repr, self.photons))
         if self.internal_states is not None:
@@ -580,6 +596,10 @@ class Select(ZWBox):
         return super().photon_number_transform(dims_in, dims_out)
 
     __repr__ = Create.__repr__
+
+    def setoid(self):
+        """ The internal states of the photons, as for a :class:`Create`. """
+        return super().setoid() + (hashable(self.internal_states), )
 
     def inflate(self, d):
 

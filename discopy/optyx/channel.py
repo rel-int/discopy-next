@@ -236,6 +236,7 @@ from discopy.cat import factory
 from discopy.python import finset
 from discopy.utils import AxiomError, factory_name
 from discopy.optyx.core import diagram, control, path, zw
+from discopy.optyx.utils.misc import hashable
 from discopy.optyx.sampling import Interferometer, Unravelling
 
 
@@ -1652,6 +1653,29 @@ class Channel(Diagram, frobenius.Box):
         self.env = env
         super().__init__(name, dom, cod)
 
+    semantic_attrs: tuple[str, ...] = ("kraus", )
+    """
+    The attributes besides :code:`name`, :code:`dom`, :code:`cod` and
+    :code:`data` that decide what a channel computes, compared by
+    :meth:`setoid`. A channel is initialised by its Kraus map, so that is
+    every channel's; a subclass computing its own map from arguments of its
+    own, e.g. a gate from its array, declares those instead.
+    """
+
+    def setoid(self):
+        """
+        Two channels are equal when they agree as boxes and on each of their
+        :attr:`semantic_attrs`: what a channel computes is in none of
+        :code:`name`, :code:`dom`, :code:`cod` or :code:`data` otherwise, so
+        e.g. a conjugated gate equalled the gate it conjugates.
+
+        >>> from discopy.optyx.photonic import BBS
+        >>> assert BBS(0.5) != BBS(0.5, is_conj=True)
+        >>> assert BBS(0.5) == BBS(0.5)
+        """
+        return super().setoid() + tuple(
+            hashable(getattr(self, attr)) for attr in self.semantic_attrs)
+
     def __repr__(self):
         env = "" if not self.env else f", env={self.env!r}"
         return f"{factory_name(type(self))}({self.name!r}, {self.kraus!r}, "\
@@ -1808,6 +1832,23 @@ class CQMap(Diagram, frobenius.Box):
 
         self.density_matrix = density_matrix
         super().__init__(name, dom, cod)
+
+    semantic_attrs: tuple[str, ...] = ("density_matrix", )
+
+    def setoid(self):
+        """
+        The density matrix is the whole of what a `CQMap` means and is in no
+        other component, so two of them with one name, `dom` and `cod` were
+        equal, e.g. every `classical.BinaryMatrix`, all named
+        `"LogicalMatrix"`.
+
+        >>> from discopy.optyx.classical import BinaryMatrix
+        >>> identity, swap = ([[1, 0], [0, 1]], [[0, 1], [1, 0]])
+        >>> assert BinaryMatrix(identity) != BinaryMatrix(swap)
+        >>> assert BinaryMatrix(identity) == BinaryMatrix(identity)
+        """
+        return super().setoid() + tuple(
+            hashable(getattr(self, attr)) for attr in self.semantic_attrs)
 
     def __repr__(self):
         return f"{factory_name(type(self))}({self.name!r}, "\
