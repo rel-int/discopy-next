@@ -5,4 +5,4 @@
 - [x] the creations: internal_states on photonic.Create and DualRail, internal_state on their core boxes
 - [x] the logical matrix: BinaryMatrixBox's matrix, which is what makes every BinaryMatrix equal
 - [x] test_repr.py's IGNORED list is empty: its boxes join the transparency cells, and test_channel.py states the equalities
-- [ ] CHANGELOG.md bullet and the gates of CONTRIBUTING.md
+- [x] CHANGELOG.md bullet and the gates of CONTRIBUTING.md
