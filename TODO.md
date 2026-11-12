@@ -6,4 +6,4 @@
 - [x] Path halving ends and keeps the root of every spider (`Forest.root_spec`)
 - [x] The oracle builds a history, and `lean/test_oracle.py` compares it with `History.build()` on generated histories and on the 50 traces of `benchmark/data/egraph-traces`, plain and doubled then rebuilt
 - [x] Docs: `lean/README.md`, CONTRIBUTING.md, AGENTS.md, a CHANGELOG.md `Project` bullet
-- [ ] 50,000 histories over three seeds agree locally and one seeded mutant of the builder fails the test, both stated in the pull request
+- [WIP] @session_01MEJxy2cXv66NHgL7vwn3q8-2026-11-12 17:46 50,000 histories over three seeds agree locally and one seeded mutant of the builder fails the test, both stated in the pull request
