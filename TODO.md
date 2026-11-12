@@ -8,5 +8,5 @@
 
 - [x] slice 6 of the brief on #93: `neural.propagation`, one round of sum-product on a factor table as a `Network` whose trace is the message state
 - [x] the law on trees: after `diameter` rounds the beliefs equal the marginals of the contraction, on random factor tables with random positive tensors; the test fails if a factor's message includes the node it is sent to
-- [WIP] @session_01MEJxy4n4hekCBMayiVejgd-2026-11-12 11:39 the 4×4 sudoku, which has cycles: nothing asserted, the gap per round reported in the pull request
+- [x] the 4×4 sudoku, which has cycles: nothing asserted, the gap per round reported in the pull request
 - [ ] CHANGELOG bullet, gates of next-checks, CI green with `main` merged in
