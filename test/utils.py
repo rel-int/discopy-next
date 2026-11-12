@@ -504,7 +504,7 @@ def test_unbiased_keyword_operand():
 
 DETERMINISTIC_HASHES = """
 from discopy import (cat, monoidal, symmetric, markov, comarkov, frobenius,
-                     biclosed, closed, rigid, tensor, matrix, testable)
+                     biclosed, closed, rigid, tensor, matrix, python, testable)
 x, y = monoidal.Ty('x'), monoidal.Ty('y')
 f = monoidal.Box('f', x, y)
 g = cat.Box('f', cat.Ob('x'), cat.Ob('y'))
@@ -518,6 +518,7 @@ print([hash(value) for value in (
     biclosed.Ty('x') >> biclosed.Ty('y'),
     closed.Ty('x') >> closed.Ty('y'), matrix.NumPy(),
     tensor.Box('g', tensor.Dim(2), tensor.Dim(2), [1, 0, 0, 1]),
+    monoidal.List[type](int, str), python.Ty(int, str),
     testable.Equation(g, g.dagger()))])
 """
 
@@ -533,6 +534,12 @@ def test_deterministic_hashes():
 
     `tensor.Bubble` is absent because its setoid holds the function it maps
     with, whose hash is an address of its own, see #506.
+
+    A `List` of classes, i.e. `python.Ty`, is here rather than in
+    `test_setoid_holds_no_class` because a list hashes without a setoid, so
+    this is its only oracle — and it is one that passes on a machine whose
+    class objects happen to sit still, which is how both of this head's own
+    class components got through a local run and failed on CI.
     """
     def hashes():
         return subprocess.run(

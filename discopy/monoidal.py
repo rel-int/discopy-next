@@ -349,7 +349,15 @@ class List[generator_factory](Monoid["List"], TestableGeneric):
         return type(self) is type(other) and self.inside == other.inside
 
     def __hash__(self):
-        return hash((factory_key(type(self)), self.inside))
+        """
+        A list's generators can themselves be classes, `python.Ty` being
+        `List[type]`, and a class hashes as its address: those take their
+        :func:`discopy.utils.factory_key` here, as a setoid's leading
+        component does.
+        """
+        return hash((factory_key(type(self)), tuple(
+            factory_key(x) if isinstance(x, type) else x
+            for x in self.inside)))
 
     @classmethod
     def generator_repr(cls, generator) -> str:

@@ -1065,8 +1065,9 @@ class Box[dtype](frobenius.Box, Diagram[dtype]):
         number being compared. The winding number ``z`` is compared too, as
         in :meth:`discopy.rigid.Box.setoid`, and the time step, as in
         :meth:`discopy.feedback.Box.setoid`. The ``dtype`` is compared by its
-        :func:`discopy.utils.factory_key`, a class object hashing as its
-        address.
+        :func:`discopy.utils.factory_name`, a class object hashing as its
+        address and a backend's descriptor, e.g. ``torch.float64``, being no
+        class at all.
 
         >>> import numpy as np
         >>> f = Box('f', Dim(2), Dim(2), np.array([[0, 1], [1, 0]]))
@@ -1093,7 +1094,7 @@ class Box[dtype](frobenius.Box, Diagram[dtype]):
                 data = np.array(data).reshape(-1).tolist()
         entries = () if data is None\
             else tuple(data) if isinstance(data, list) else (data, )
-        dtype = None if self.dtype is None else factory_key(self.dtype)
+        dtype = None if self.dtype is None else factory_name(self.dtype)
         return (self.name, self.dom, self.cod, dtype, self.is_dagger,
                 self.z, self.deterministic, self.affine, self.time_step)\
             + tuple(map(canonical, entries))
