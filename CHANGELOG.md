@@ -1444,6 +1444,10 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   sends each spider to the least spider related to it by pairs of spiders
   in range, and a differential test of the model against the Python
   ([next#521]).
+- `lean/Premonoidal`, a Lean 4 model of the diagrams of `monoidal.Diagram`
+  with one box per layer, with the theorems that they are a strict
+  premonoidal category and that interchange fails for boxes, and a
+  differential test of the model against the Python ([next#523]).
 - `AGENTS.md`, `RULES.md` and `STYLE.md` for agents, and an LLM contribution
   needs its own handle and a human approval other than its prompter's
   ([#378], [#720]).
@@ -1852,6 +1856,7 @@ for the changelog of `1.2.1` and earlier.
 [next#519]: https://github.com/rel-int/discopy-next/pull/519
 [next#520]: https://github.com/rel-int/discopy-next/pull/520
 [next#521]: https://github.com/rel-int/discopy-next/pull/521
+[next#523]: https://github.com/rel-int/discopy-next/pull/523
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#56]: https://github.com/rel-int/optyx/pull/56
