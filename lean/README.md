@@ -22,6 +22,7 @@ algorithms there is followed here, or the differential test says so.
 | [`Statements/Premonoidal.lean`](Statements/Premonoidal.lean) | the same for diagrams: strict premonoidal categories, Diagram(S) and what is proved of it |
 | [`Premonoidal/Basic.lean`](Premonoidal/Basic.lean) | categories and strict premonoidal categories |
 | [`Premonoidal/Diagram.lean`](Premonoidal/Diagram.lean) | Diagram(S), the proof that it is strict premonoidal and not monoidal |
+| [`Premonoidal/Functor.lean`](Premonoidal/Functor.lean) | strict premonoidal functors, the functor out of Diagram(S) and its uniqueness |
 | [`Premonoidal/Oracle.lean`](Premonoidal/Oracle.lean) | diagrams read and written as `Diagram.encode` does, for the oracle |
 | [`test_premonoidal.py`](test_premonoidal.py) | the differential test of diagrams against `monoidal.Diagram` |
 | [`Audit.lean`](Audit.lean) | fails on `sorry`, `native_decide` or an axiom beyond `propext`, `Quot.sound`, `Classical.choice` |
@@ -59,7 +60,9 @@ What is modelled, and what is not:
 domain and a list of boxes with offsets, and proves that these diagrams are a
 strict premonoidal category in which interchange holds for two boxes only
 when they are one and the same scalar: with any other box, Diagram(S) is not
-monoidal. The model mirrors
+monoidal. It is the free one: generating objects and boxes sent into a strict
+premonoidal category extend to exactly one strict premonoidal functor. The
+model mirrors
 `discopy/monoidal.py` as of `c842a24`.
 
 - Morphisms are untyped, with `dom` and `cod`, as in the Python, so that
@@ -67,6 +70,8 @@ monoidal. The model mirrors
   along `(X ++ Y) ++ Z = X ++ (Y ++ Z)`. Composition is total and every law
   about it assumes its arguments composable: where the Python raises, the
   model returns its first argument and nothing is said of it.
+- A functor is tested against `monoidal.Functor` into diagrams only, where
+  it sends each box to a diagram; the theorem is about any codomain.
 - One box per layer: a `Layer` with several boxes, which `foliation` makes
   and `encode` flattens, is not modelled.
 - No colours: types are lists of wires, the free monoid, where a coloured
