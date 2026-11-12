@@ -1440,6 +1440,9 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Project
 
+- `lean/`, a Lean 4 model of `discopy.egraph` with theorems proved on it and
+  a differential test against the Python: `partition` gives the canonical
+  form of the equivalence its pairs generate ([next#521]).
 - `AGENTS.md`, `RULES.md` and `STYLE.md` for agents, and an LLM contribution
   needs its own handle and a human approval other than its prompter's
   ([#378], [#720]).
@@ -1847,6 +1850,7 @@ for the changelog of `1.2.1` and earlier.
 [next#518]: https://github.com/rel-int/discopy-next/pull/518
 [next#519]: https://github.com/rel-int/discopy-next/pull/519
 [next#520]: https://github.com/rel-int/discopy-next/pull/520
+[next#521]: https://github.com/rel-int/discopy-next/pull/521
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#56]: https://github.com/rel-int/optyx/pull/56

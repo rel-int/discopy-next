@@ -299,6 +299,31 @@ the job summary, and raises a warning annotation, never a failure, when a
 measurement regresses. A pull request run also posts or updates a comment with
 the important regressions and speedups.
 
+## Run the Lean proofs
+
+`lean/` is a [Lake](https://lean-lang.org/doc/reference/latest/Build-Tools-and-Distribution/Lake/)
+project holding a Lean 4 model of `discopy.egraph` with theorems proved on it,
+see its [README](lean/README.md); it needs the Lean of `lean/lean-toolchain`
+and no other dependency. It lives outside the package and outside `testpaths`,
+so run it explicitly:
+
+```shell
+cd lean
+lake build                 # the proofs and the `oracle` executable
+lake env lean Audit.lean   # no `sorry`, no axiom beyond the three standard ones
+cd ..
+uv run pytest lean/test_oracle.py -s
+```
+
+`lean/Statements.lean` restates every theorem in one short file. The last
+command is the differential test: Hypothesis draws cases, the `oracle` answers
+them in one run and each answer is compared with the Python's; it is skipped
+when the binary is not built. `ORACLE_EXAMPLES` sets the number of cases per
+seed (2,000 by default) and `ORACLE_SEEDS` the seeds (`0` by default), e.g.
+`ORACLE_EXAMPLES=17000 ORACLE_SEEDS=0,1,2`. The `lean` GitHub workflow runs
+all three on `main` and on a pull request touching `lean/` or
+`discopy/egraph.py`.
+
 ## Build the docs
 
 You can build the documentation locally with [sphinx](https://www.sphinx-doc.org/en/master/):
