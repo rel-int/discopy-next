@@ -57,6 +57,7 @@ Summary
         :nosignatures:
         :toctree:
 
+        tape
         autodiff
         zeros
         namespace
@@ -84,7 +85,9 @@ two back together; a recurrent cell feeds one of its outputs back in.
 from __future__ import annotations
 
 import importlib
+from collections.abc import Callable
 from dataclasses import dataclass
+from functools import partial
 from typing import Self
 
 from discopy import (
@@ -346,9 +349,11 @@ class Network(markov.Diagram, comarkov.Diagram):
         :meth:`to_function` and whose ``put`` takes one tensor per input
         leg, then one gradient per output leg, to one gradient per input
         leg. It is the functor into :class:`Lens` sending every leg to a
-        pair of ``tensor`` and every box to its :meth:`Box.forward` and
-        :meth:`Box.backward`: composition is the chain rule, a copy sums
-        the gradients of its branches and a discard gives zero.
+        pair of ``tensor`` and every box to its :meth:`Box.tape` forward,
+        the pullback as residual, and to the call of that pullback
+        backward: composition is the chain rule, a copy sums the gradients
+        of its branches and a discard gives zero. A ``put`` runs every
+        layer forward once and its pullback once.
 
         Parameters:
             tensor : The type of the tensors and of their gradients.
@@ -373,16 +378,18 @@ class Network(markov.Diagram, comarkov.Diagram):
         if rounds is not None:
             return self.unroll(rounds).to_lens(tensor)
         self.assert_isfeedforward()
-        leg = Lens.ob((tensor, ), (tensor, ))
+        leg, pullback = Lens.ob((tensor, ), (tensor, )), python.Ty(Callable)
 
         def reverse(box):
             box.assert_hasmodule()
             dom, cod = (leg ** len(legs) for legs in (box.dom, box.cod))
             return Lens(
                 dom, cod,
-                python.Function(box.forward, dom.positive, cod.positive),
-                python.Function(box.backward, dom.positive @ cod.negative,
-                                dom.negative))
+                python.Function(
+                    box.tape, dom.positive, cod.positive @ pullback),
+                python.Function(lambda back, *gradients: back(*gradients),
+                                pullback @ cod.negative, dom.negative),
+                pullback)
 
         return Functor(ob_map=lambda _: leg, ar_map=reverse, cod=Lens)(self)
 
@@ -475,13 +482,53 @@ class Box(markov.Box, Network):
             raise ValueError(f"{self} has no module.")
         return self
 
+    def tape(self, *tensors):
+        """
+        Run the layer forward on one tensor per leg of ``dom`` and return
+        one per leg of ``cod``, then its pullback: the function from one
+        gradient per leg of ``cod`` to one gradient per leg of ``dom``, each
+        checked against its leg. The pullback is the :attr:`vjp` of the box
+        at these tensors when it has one, else the :func:`tape` of its
+        module.
+
+        Parameters:
+            tensors : One tensor per input leg.
+
+        Example
+        -------
+        >>> import numpy as np
+        >>> square = Box('square', Dims(2), Dims(2), module=lambda v: v * v,
+        ...              vjp=lambda v, dv: 2 * v * dv)
+        >>> y, pullback = square.tape(np.array([1, 2]))
+        >>> y, pullback(np.array([1, 0]))
+        (array([1, 4]), array([2, 0]))
+        """
+        self.assert_hasmodule()
+        try:
+            self.dom.check(*tensors)
+            outputs, vjp = tape(self.module, tensors) if self.vjp is None\
+                else (tuplify(self.module(  # ty: ignore[call-non-callable]
+                    *tensors)), partial(self.vjp, *tensors))
+            self.cod.check(*outputs)
+        except AxiomError as error:
+            raise AxiomError(f"{self}: {error}") from error
+
+        def pullback(*gradients):
+            try:
+                self.cod.check(*gradients)
+                result = tuplify(vjp(*gradients))
+                self.dom.check(*result)
+            except AxiomError as error:
+                raise AxiomError(f"{self}: {error}") from error
+            return untuplify(result)
+
+        return untuplify((*outputs, pullback))
+
     def backward(self, *tensors):
         """
         Apply the vector-Jacobian product of the layer to one tensor per
         leg of ``dom`` then one gradient per leg of ``cod``, and return one
-        gradient per leg of ``dom``, each checked against its leg: the
-        :attr:`vjp` of the box when it has one, else :func:`autodiff` of
-        its module.
+        gradient per leg of ``dom``: the pullback of :meth:`tape`.
 
         Parameters:
             tensors : One tensor per input leg, one gradient per output leg.
@@ -494,18 +541,8 @@ class Box(markov.Box, Network):
         >>> scale.backward(np.array([1, 2]), np.array([1, 0]))
         array([3, 0])
         """
-        self.assert_hasmodule()
         inputs, gradients = tensors[:len(self.dom)], tensors[len(self.dom):]
-        try:
-            self.dom.check(*inputs)
-            self.cod.check(*gradients)
-            outputs = tuplify(
-                autodiff(self.module, inputs, gradients) if self.vjp is None
-                else self.vjp(*tensors))
-            self.dom.check(*outputs)
-        except AxiomError as error:
-            raise AxiomError(f"{self}: {error}") from error
-        return untuplify(outputs)
+        return tuplify(self.tape(*inputs))[-1](*gradients)
 
 
 class Function(markov.Function, Box):
@@ -645,28 +682,31 @@ class Unroll(Functor):
         return network >> body >> y @ Network.discard(mem)
 
 
-class Lens(lens.Markov, MarkovCategory):
+class Lens(lens.Symmetric, MarkovCategory):
     """
     The lenses of functions on tensors, where the reverse derivative of a
-    network lives, see :meth:`Network.to_lens`: ``get`` runs the network
-    forward, ``put`` takes its inputs and the gradients of its outputs to
-    the gradients of its inputs. They form a Markov category as those of
+    network lives, see :meth:`Network.to_lens`: ``forward`` runs the
+    network and returns its outputs then the tape, i.e. its residual,
+    ``backward`` takes the tape and the gradients of the outputs to the
+    gradients of the inputs. They form a Markov category as those of
     :class:`discopy.lens.Comarkov` do, with the sum of the gradients as
     merge and zero as its unit.
 
     Parameters:
         dom (lens.Ty) : The types of the inputs and of their gradients.
         cod (lens.Ty) : The types of the outputs and of their gradients.
-        get (python.Function) : The forward pass.
-        put (python.Function) : The backward pass.
+        forward (python.Function) : The forward pass, outputs then tape.
+        backward (python.Function) : The backward pass, from the tape.
+        residual (python.Ty) : The types on the tape.
 
     Example
     -------
     >>> x = Lens.ob((float, ), (float, ))
     >>> Function = python.Function
     >>> square = Lens(
-    ...     x, x, Function(lambda a: a * a, (float, ), (float, )),
-    ...     Function(lambda a, da: 2 * a * da, (float, float), (float, )))
+    ...     x, x, Function(lambda a: (a * a, a), (float, ), (float, float)),
+    ...     Function(lambda a, da: 2 * a * da, (float, float), (float, )),
+    ...     python.Ty(float))
     >>> fan_out = Lens.copy(x) >> square @ square
     >>> fan_out.get(3.)
     (9.0, 9.0)
@@ -677,11 +717,11 @@ class Lens(lens.Markov, MarkovCategory):
 
     Note
     ----
-    The ``put`` of a composition runs the ``get`` of what comes first again,
-    see :meth:`discopy.lens.Markov.then`, so that the backward pass of a
-    network of depth ``n`` runs its layers forward a number of times
-    quadratic in ``n``, see `next#516
-    <https://github.com/rel-int/discopy-next/issues/516>`_.
+    The tape of a composition is the tensor of the tapes, see
+    :meth:`discopy.lens.Symmetric.then`, so that the backward pass of a
+    network runs each layer forward once, where the ``put`` of a
+    :class:`discopy.lens.Markov` runs the ``get`` of what comes first again,
+    once per layer after it.
     """
     category = python.Function
 
@@ -690,11 +730,18 @@ class Lens(lens.Markov, MarkovCategory):
         """ No subscript is checked: functions are not generated. """
         return ()
 
+    get = property(lambda self: self.to_markov().get)
+    """ The forward pass with the tape discarded. """
+    put = property(lambda self: self.to_markov().put)
+    """ The forward pass then the backward pass, from the inputs and the
+    gradients of the outputs to the gradients of the inputs. """
+
     @classmethod
     def copy(cls, x: lens.Ty, n: int = 2) -> Lens:
         """
-        The copy of a pair ``n`` times: ``get`` copies the tensors, ``put``
-        sums the ``n`` gradients of each, zero when there is none.
+        The copy of a pair ``n`` times: ``forward`` copies the tensors onto
+        the tape too, ``backward`` sums the ``n`` gradients of each, zero
+        when there is none.
 
         Parameters:
             x : The pair of types to copy.
@@ -702,14 +749,15 @@ class Lens(lens.Markov, MarkovCategory):
         """
         width = len(x.positive)
 
-        def put(*tensors):
+        def backward(*tensors):
             inputs, gradients = tensors[:width], tensors[width:]
             return untuplify(tuple(
                 sum(gradients[i::width], 0 * tensor)
                 for i, tensor in enumerate(inputs)))
 
-        return cls(x, x ** n, cls.category.copy(x.positive, n), cls.category(
-            put, x.positive @ (x ** n).negative, x.negative))
+        return cls(x, x ** n, cls.category.copy(x.positive, n + 1),
+                   cls.category(backward, x.positive @ (x ** n).negative,
+                                x.negative), x.positive)
 
     @classmethod
     def descent(cls, x: lens.Ty, rate: float) -> Lens:
@@ -736,8 +784,8 @@ class Lens(lens.Markov, MarkovCategory):
                 weight - rate * gradient for weight, gradient in zip(
                     tensors[:len(weights)], tensors[len(weights):])))
 
-        return cls(cls.ob(weights, weights), x, cls.category.id(weights),
-                   cls.category(put, weights @ x.negative, weights))
+        return cls(cls.ob(weights, weights), x, cls.category.copy(weights),
+                   cls.category(put, weights @ x.negative, weights), weights)
 
 
 class Learner(para.Markov):
@@ -816,6 +864,60 @@ class Learner(para.Markov):
         return self.reparam(step)  # ty: ignore[invalid-argument-type]
 
 
+def tape(module, inputs: tuple) -> tuple:
+    """
+    The outputs of a ``module`` at its ``inputs`` and its pullback, the
+    vector-Jacobian product from the gradients of the outputs to those of
+    the inputs, by the reverse mode of the framework the tensors come from:
+    PyTorch or JAX, as ``jax.vjp`` does. The pullback of any other
+    framework raises ``NotImplementedError`` when it is called.
+
+    Parameters:
+        module : The function to differentiate, from tensors to tensors.
+        inputs : The tensors to differentiate at, one per argument.
+
+    Example
+    -------
+    >>> import torch  # doctest: +EXTRA
+    >>> x = torch.tensor([1., 2.])
+    >>> outputs, pullback = tape(lambda v: v * v, (x, ))
+    >>> outputs, pullback(torch.tensor([1., 1.]))
+    ((tensor([1., 4.]),), (tensor([2., 4.]),))
+    """
+    framework = type(inputs[0]).__module__.partition(".")[0] if inputs\
+        else None
+    if framework == "torch":
+        # pylint: disable-next=import-outside-toplevel  # no framework above
+        import torch
+        with torch.enable_grad():
+            inputs = tuple(x.detach().requires_grad_() for x in inputs)
+            outputs = tuplify(module(*inputs))
+
+        def pullback(*gradients):
+            live = [pair for pair in zip(outputs, gradients)
+                    if pair[0].requires_grad]
+            if not live:
+                return tuple(0 * x for x in inputs)
+            ys, dys = zip(*live)
+            return torch.autograd.grad(
+                ys, inputs, dys, allow_unused=True, materialize_grads=True)
+
+        return tuple(y.detach() for y in outputs), pullback
+    if framework in ("jax", "jaxlib"):
+        # pylint: disable-next=import-outside-toplevel  # no framework above
+        import jax
+        outputs, vjp = jax.vjp(lambda *xs: tuplify(module(*xs)), *inputs)
+        return outputs, lambda *gradients: vjp(tuple(gradients))
+
+    def unsupported(*_):
+        if not inputs:
+            return ()
+        raise NotImplementedError(
+            f"No reverse mode for {framework}: give the box a vjp.")
+
+    return tuplify(module(*inputs)), unsupported
+
+
 @dataclass(frozen=True)
 class Zeros:
     """
@@ -890,8 +992,7 @@ def namespace(like):
 def autodiff(module, inputs: tuple, gradients: tuple) -> tuple:
     """
     The vector-Jacobian product of a ``module`` at its ``inputs``, applied
-    to the ``gradients`` of its outputs, by the reverse mode of the
-    framework the tensors come from: PyTorch or JAX.
+    to the ``gradients`` of its outputs: the pullback of its :func:`tape`.
 
     Parameters:
         module : The function to differentiate, from tensors to tensors.
@@ -905,29 +1006,7 @@ def autodiff(module, inputs: tuple, gradients: tuple) -> tuple:
     >>> autodiff(lambda v: v * v, (x, ), (dy, ))
     (tensor([2., 4.]),)
     """
-    if not inputs:
-        return ()
-    framework = type(inputs[0]).__module__.partition(".")[0]
-    if framework == "torch":
-        # pylint: disable-next=import-outside-toplevel  # no framework above
-        import torch
-        with torch.enable_grad():
-            inputs = tuple(x.detach().requires_grad_() for x in inputs)
-            live = [pair for pair in zip(tuplify(module(*inputs)), gradients)
-                    if pair[0].requires_grad]
-            if not live:
-                return tuple(0 * x for x in inputs)
-            outputs, gradients = zip(*live)
-            return torch.autograd.grad(
-                outputs, inputs, gradients,
-                allow_unused=True, materialize_grads=True)
-    if framework in ("jax", "jaxlib"):
-        # pylint: disable-next=import-outside-toplevel  # no framework above
-        import jax
-        return jax.vjp(
-            lambda *xs: tuplify(module(*xs)), *inputs)[1](tuple(gradients))
-    raise NotImplementedError(
-        f"No reverse mode for {framework}: give the box a vjp.")
+    return tape(module, inputs)[1](*gradients)
 
 
 Id = Network.id
