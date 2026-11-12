@@ -94,8 +94,8 @@ from discopy.abc import HypergraphCategory
 from discopy.cat import factory
 from discopy.python import finset
 from discopy.utils import (
-    assert_isatomic, assert_iscomposable, deprecated_alias, factory_name,
-    from_tree)
+    assert_isatomic, assert_iscomposable, deprecated_alias, factory_key,
+    factory_name, from_tree)
 
 
 class Wire(pivotal.Wire):
@@ -483,7 +483,8 @@ class Cospan(Box):
     def setoid(self):
         if self.is_identity:
             return (), self.dom, self.cod
-        return type(self), self.apex, tuple(self.legs.left), tuple(
+        return factory_key(type(self)), self.apex, tuple(
+            self.legs.left), tuple(
             self.legs.right)
 
     def to_spiders(self) -> Diagram:

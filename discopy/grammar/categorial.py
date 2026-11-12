@@ -65,6 +65,7 @@ from discopy.grammar import thue
 from discopy.utils import (
     BinaryBoxConstructor,
     AxiomError,
+    factory_key,
     factory_name,
     from_tree,
     get_origin,
@@ -450,7 +451,7 @@ class BinaryTerm(TermBase):
         Binary terms are equal when their kinds and sides are, see
         :meth:`discopy.biclosed.Application.setoid`.
         """
-        return type(self), self.left, self.right
+        return factory_key(type(self)), self.left, self.right
 
     def __repr__(self):
         return factory_name(type(self)) + f"({self.left!r}, {self.right!r})"

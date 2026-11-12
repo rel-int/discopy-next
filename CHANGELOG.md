@@ -228,6 +228,10 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Changed
 
+- A bubble does not commute with dagger: `cat.Bubble.setoid` counts
+  `is_dagger`, as `tensor.Bubble`'s has and as `cat.Bubble.__str__` prints,
+  so that a functor cannot separate equal bubbles. Upstream states the
+  commuting law, which next `main` now diverges from ([next#507]).
 - `discopy.ehypergraph` is now `discopy.egraph` and `EHypergraph` is `EGraph`,
   with no alias: an e-hypergraph is a monoidal e-graph, egg's e-graphs being
   those over cartesian diagrams ([next#501]).
@@ -417,6 +421,12 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Fixed
 
+- Every hash in the library is the same in every interpreter:
+  `utils.factory_key`, a class's module and qualified name, leads a `setoid`
+  or a `__hash__` where `type(self)` did, the hash of a class object being
+  its address. No equality changes, a subscript being part of a qualified
+  name; `tensor.Bubble` is left, holding the function it maps with
+  ([next#506], [next#507]).
 - `frobenius.Diagram.str_transparency` holds up to `Diagram.to_hypergraph`:
   a layer packing a cospan beside a box prints as a tensor that reads back as
   two layers, the same hypergraph but not the same diagram, which `explore`
@@ -1773,6 +1783,8 @@ for the changelog of `1.2.1` and earlier.
 [next#503]: https://github.com/rel-int/discopy-next/pull/503
 [next#504]: https://github.com/rel-int/discopy-next/issues/504
 [next#505]: https://github.com/rel-int/discopy-next/pull/505
+[next#506]: https://github.com/rel-int/discopy-next/issues/506
+[next#507]: https://github.com/rel-int/discopy-next/pull/507
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#56]: https://github.com/rel-int/optyx/pull/56
