@@ -1,7 +1,7 @@
 # The Lean model of `discopy.egraph`
 
 A pure Lean 4 model of the algorithms of [`discopy/egraph.py`](../discopy/egraph.py),
-`partition` so far, with theorems proved on the model. Nothing here is a proof about the Python:
+`partition` and the pure `EGraph` so far, with theorems proved on the model. Nothing here is a proof about the Python:
 the two are linked by a differential test, the model run as an oracle against
 the Python on generated cases.
 
@@ -12,6 +12,10 @@ algorithms there is followed here, or the differential test says so.
 | --- | --- |
 | [`Statements.lean`](Statements.lean) | the definitions and the main theorems restated, the one file to read |
 | [`EGraph/Partition.lean`](EGraph/Partition.lean) | `partition` and the proof of `partition_least` |
+| [`EGraph/Classes.lean`](EGraph/Classes.lean) | lists of classes: normal ones are equal when they relate the same spiders |
+| [`EGraph/Graph.lean`](EGraph/Graph.lean) | the e-graph, `merge` and `add`, with the lemmas `merge_equivalence` is made of and `add_hashcons` |
+| [`EGraph/Rebuild.lean`](EGraph/Rebuild.lean) | `rebuild`, its termination, and that it is the least congruent equivalence |
+| [`EGraph/History.lean`](EGraph/History.lean) | operations and the fold of a history |
 | [`Statements/Premonoidal.lean`](Statements/Premonoidal.lean) | the same for diagrams: strict premonoidal categories, Diagram(S) and what is proved of it |
 | [`Premonoidal/Basic.lean`](Premonoidal/Basic.lean) | categories and strict premonoidal categories |
 | [`Premonoidal/Diagram.lean`](Premonoidal/Diagram.lean) | Diagram(S), the proof that it is strict premonoidal and not monoidal |
@@ -26,9 +30,18 @@ What is modelled, and what is not:
 - `partition n pairs` is modelled by its result, the least spider related to
   each spider, not by its union-find: the model rewrites the whole list of
   classes for each pair.
+- An e-graph is a list of nodes and the class of each spider: a node is a
+  box, given by a number, whether it is deterministic, and its input and
+  output spiders. There is no `Hypergraph`: no domain or codomain, and
+  left-monogamy and acyclicity are neither modelled nor needed.
+- `rebuild` runs on fuel, the sum of the classes, where the Python loops
+  until nothing changes: `rebuild_congruent` shows the fuel is enough.
+- `add` leaves out the `partition` of `EGraph.__init__`, which changes nothing
+  on normal classes.
 - Spiders are natural numbers and have no type: `partition` takes any pairs,
   in the Python as in the model, and it is `EGraph.__init__` that refuses
-  classes relating spiders of two types.
+  classes relating spiders of two types. A valid e-graph of the model has
+  one number of outputs for each head, which the Python reads off the type.
 
 ## Diagrams are the morphisms of a premonoidal category
 
