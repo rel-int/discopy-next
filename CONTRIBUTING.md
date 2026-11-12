@@ -302,8 +302,8 @@ the important regressions and speedups.
 ## Run the Lean proofs
 
 `lean/` is a [Lake](https://lean-lang.org/doc/reference/latest/Build-Tools-and-Distribution/Lake/)
-project holding a Lean 4 model of `egraph.partition` and of the pure `EGraph`
-(`merge`, `add`, `rebuild`) with theorems proved on it,
+project holding a Lean 4 model of `egraph.partition`, the pure `EGraph`
+(`merge`, `add`, `rebuild`) and the `Builder` with theorems proved on it,
 see its [README](lean/README.md); it needs the Lean of `lean/lean-toolchain`
 and no other dependency. It lives outside the package and outside `testpaths`,
 so run it explicitly:
@@ -324,7 +324,8 @@ when the binary is not built. `ORACLE_EXAMPLES` sets the number of cases per
 seed (2,000 by default) and `ORACLE_SEEDS` the seeds (`0` by default), e.g.
 `ORACLE_EXAMPLES=17000 ORACLE_SEEDS=0,1,2`. The `lean` GitHub workflow runs
 all three on `main` and on a pull request touching `lean/`,
-`discopy/egraph.py` or what installs the environment.
+`discopy/egraph.py`, the traces of the benchmark, which the test replays, or
+what installs the environment.
 
 ## Build the docs
 

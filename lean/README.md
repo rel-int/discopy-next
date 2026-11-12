@@ -1,7 +1,8 @@
 # The Lean model of `discopy.egraph`
 
 A pure Lean 4 model of the algorithms of [`discopy/egraph.py`](../discopy/egraph.py),
-`partition` and the pure `EGraph` so far, with theorems proved on the model. Nothing here is a proof about the Python:
+`partition`, the pure `EGraph` and the `Builder`, with theorems proved on the
+model. Nothing here is a proof about the Python:
 the two are linked by a differential test, the model run as an oracle against
 the Python on generated cases.
 
@@ -16,6 +17,8 @@ algorithms there is followed here, or the differential test says so.
 | [`EGraph/Graph.lean`](EGraph/Graph.lean) | the e-graph, `merge` and `add`, with the lemmas `merge_equivalence` is made of and `add_hashcons` |
 | [`EGraph/Rebuild.lean`](EGraph/Rebuild.lean) | `rebuild`, its termination, and that it is the least congruent equivalence |
 | [`EGraph/History.lean`](EGraph/History.lean) | operations and the fold of a history |
+| [`EGraph/UnionFind.lean`](EGraph/UnionFind.lean) | the labels of the builder: `root` with path halving, which ends on the root and keeps every root |
+| [`EGraph/Builder.lean`](EGraph/Builder.lean) | the `Builder`, method by method, and `build`, what it freezes into after a history |
 | [`Audit.lean`](Audit.lean) | fails on `sorry`, `native_decide` or an axiom beyond `propext`, `Quot.sound`, `Classical.choice` |
 | [`Oracle.lean`](Oracle.lean) | the `oracle` executable: one JSON case per line in, the model's answer out |
 | [`test_oracle.py`](test_oracle.py) | the differential test against the Python |
@@ -33,6 +36,12 @@ What is modelled, and what is not:
   until nothing changes: `rebuild_congruent` shows the fuel is enough.
 - `add` leaves out the `partition` of `EGraph.__init__`, which changes nothing
   on normal classes.
+- The `Builder` keeps `least` and `parents` in arrays where the Python has
+  dictionaries, has no `heads` or `known`, since a node carries the number of
+  its box, and cuts `union` in three methods, `union`, `join` and `link`. Its
+  loops, in `root` and `rebuild`, run on fuel. That a builder freezes into
+  what its operations give in turn, the law `building`, is tested here and
+  not yet proved in this directory.
 - Spiders are natural numbers and have no type: `partition` takes any pairs,
   in the Python as in the model, and it is `EGraph.__init__` that refuses
   classes relating spiders of two types. A valid e-graph of the model has
