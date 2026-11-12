@@ -9,3 +9,6 @@ import EGraph.Invariant
 import EGraph.Hashed
 import EGraph.Place
 import EGraph.Link
+import EGraph.Union
+import EGraph.Drain
+import EGraph.Freeze
