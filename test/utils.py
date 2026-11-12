@@ -540,3 +540,31 @@ def test_deterministic_hashes():
             check=True, text=True, capture_output=True,
             env=dict(os.environ, PYTHONHASHSEED="0")).stdout
     assert hashes() == hashes()
+
+
+def test_setoid_holds_no_class():
+    """
+    A class in a setoid is an address in the hash whatever leads it: the hash
+    of a class object is its identity, so `tensor.Box.setoid`'s `dtype` moved
+    between interpreters whether or not the key before it did, see #479. The
+    one component left that hashes as an address is a function, see #506.
+    """
+    from discopy import monoidal, tensor
+    from discopy.quantum import gates
+    x, y = monoidal.Ty('x'), monoidal.Ty('y')
+    f = monoidal.Box('f', x, y)
+    values = (
+        Box('g', tensor.Dim(2), tensor.Dim(2), [1, 0, 0, 1]),
+        Box[complex]('g', tensor.Dim(1), tensor.Dim(1), [1]),
+        Box('h', tensor.Dim(1), tensor.Dim(1)), gates.Rz(0.25),
+        cat.Box('f', Ob('x'), Ob('y')), f, f >> f.dagger())
+
+    def components(value, depth=0):
+        if isinstance(value, tuple) and depth < 8:
+            for item in value:
+                yield from components(item, depth + 1)
+        else:
+            yield value
+    for value in values:
+        for component in components(value.setoid()):
+            assert not isinstance(component, type), (value, component)

@@ -504,6 +504,18 @@ def factory_key(cls: type) -> tuple[str, str]:
 
     >>> from discopy.tensor import Box as TensorBox
     >>> assert factory_key(TensorBox[float]) != factory_key(TensorBox[complex])
+
+    A class is keyed by the name it is reachable at, which is the identity
+    :func:`factory_name` and :func:`resolve_factory` already give it when a
+    term is serialised. Two classes of that same name in that same module are
+    one key, e.g. two calls of a factory defining a class in its own body:
+    their terms compare equal where before they compared unequal by address.
+
+    >>> def make():
+    ...     class Local(Box): pass
+    ...     return Local
+    >>> assert make() is not make()
+    >>> assert factory_key(make()) == factory_key(make())
     """
     return cls.__module__, cls.__qualname__
 
