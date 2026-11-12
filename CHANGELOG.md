@@ -232,6 +232,13 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Changed
 
+- A functor from a symmetric category asks the level of its codomain rather
+  than its attributes: a permutation goes to one native box in a free
+  symmetric category, to the codomain's own `permutation` of the images of
+  the wires in any other `SymmetricCategory`, and swap by swap otherwise.
+  `stream.Stream` and `drawing.Drawing`, which had a swap without saying so,
+  are `SymmetricCategory`, and `Drawing.swap` draws one ([next#514]).
+
 - A bubble does not commute with dagger: `cat.Bubble.setoid` counts
   `is_dagger`, as `tensor.Bubble`'s has and as `cat.Bubble.__str__` prints,
   so that a functor cannot separate equal bubbles. Upstream states the
@@ -1798,6 +1805,7 @@ for the changelog of `1.2.1` and earlier.
 [next#507]: https://github.com/rel-int/discopy-next/pull/507
 [next#508]: https://github.com/rel-int/discopy-next/pull/508
 [next#510]: https://github.com/rel-int/discopy-next/pull/510
+[next#514]: https://github.com/rel-int/discopy-next/pull/514
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#56]: https://github.com/rel-int/optyx/pull/56
