@@ -4,4 +4,4 @@
 - [x] slice 4 of the brief on #93: `Learner`, the parametric lenses of functions on tensors, with gradient descent as a reparametrisation and weight tying as `reparam` by the copy
 - [x] `neural.torch.Module` holds the weights of a parametric network as its parameters (#124)
 - [x] tests that fail on `main`: one step of the learner equals one step of `torch.optim.SGD`, tied weights included
-- [WIP] @session_01MEJxy4n4hekCBMayiVejgd-2026-11-12 10:45 CHANGELOG bullet, gates of next-checks, CI green with `main` merged in
+- [x] CHANGELOG bullet, gates of next-checks, CI green with `main` merged in
