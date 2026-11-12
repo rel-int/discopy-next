@@ -102,6 +102,7 @@ from discopy.utils import (
     NamedGeneric,
     classproperty,
     dumps,
+    factory_key,
     factory_name,
     from_tree,
     loads,
@@ -212,7 +213,7 @@ class Equation[T]:
         ...
         TypeError: unhashable type: 'list'
         """
-        return hash((type(self), self.terms, self.symbols))
+        return hash((factory_key(type(self)), self.terms, self.symbols))
 
     def __repr__(self):
         """

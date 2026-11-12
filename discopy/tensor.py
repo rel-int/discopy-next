@@ -61,7 +61,7 @@ from discopy.matrix import (  # noqa: F401  pylint: disable=unused-import
 from discopy.testable import TestableGeneric, no_strategy
 from discopy.python import finset
 from discopy.utils import (
-    factory_name, assert_isinstance, product, assert_isatomic,
+    factory_key, factory_name, assert_isinstance, product, assert_isatomic,
     assert_istraceable)
 
 if TYPE_CHECKING:
@@ -1276,7 +1276,8 @@ class Bubble(feedback.Bubble, Box):
         >>> assert len({f.bubble(data=[1, 2]), f.bubble(data=[1, 3])}) == 2
         """
         args = tuple(f.setoid() for f in self.args)
-        return (type(self), self.method, self.func) + args + Box.setoid(self)
+        return (factory_key(type(self)), self.method, self.func)\
+            + args + Box.setoid(self)
 
     def __repr__(self):
         if self.is_dagger:

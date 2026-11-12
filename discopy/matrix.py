@@ -52,7 +52,7 @@ from discopy.cat import (
     assert_isparallel,
 )
 from discopy.utils import (
-    assert_isinstance, factory_name, from_tree, unbiased)
+    assert_isinstance, factory_key, factory_name, from_tree, unbiased)
 
 if TYPE_CHECKING:
     import sympy
@@ -724,7 +724,7 @@ class Backend:
             and getattr(self, "base", None) == getattr(other, "base", None)
 
     def __hash__(self):
-        return hash((type(self), getattr(self, "base", None)))
+        return hash((factory_key(type(self)), getattr(self, "base", None)))
 
 
 class NumPy(Backend):

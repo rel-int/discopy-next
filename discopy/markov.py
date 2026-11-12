@@ -88,7 +88,7 @@ from discopy.feedback import (  # noqa: F401  pylint: disable=unused-import
 from discopy.python import finset
 from discopy.utils import (
     AxiomError, assert_isatomic, assert_iscomposable, deprecated_alias,
-    factory_name, from_tree)
+    factory_key, factory_name, from_tree)
 
 
 class Layer(symmetric.Layer):
@@ -549,7 +549,7 @@ class Function(Box):
     def setoid(self):
         if self.is_identity:
             return (), self.dom, self.cod
-        return type(self), self.dom, tuple(self.func)
+        return factory_key(type(self)), self.dom, tuple(self.func)
 
     def to_drawing(self):
         """ Draw the copies of each input, then the permutation. """

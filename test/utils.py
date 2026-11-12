@@ -1,7 +1,10 @@
 from os import listdir
 
+import os
 import pickle
 import re
+import subprocess
+import sys
 
 import numpy as np
 
@@ -497,3 +500,43 @@ def test_unbiased_keyword_operand():
     F, G = Functor({x: y}, {}), Functor({y: z}, {})
     assert F.then(other=G)(x) == F.then(G)(x) == z
     assert F.then() == F
+
+
+DETERMINISTIC_HASHES = """
+from discopy import (cat, monoidal, symmetric, markov, comarkov, frobenius,
+                     biclosed, closed, rigid, tensor, matrix, testable)
+x, y = monoidal.Ty('x'), monoidal.Ty('y')
+f = monoidal.Box('f', x, y)
+g = cat.Box('f', cat.Ob('x'), cat.Ob('y'))
+print([hash(value) for value in (
+    cat.Ob('x'), g, g + g, g.bubble(data=1), g >> g.dagger(),
+    x, monoidal.Wire('x'), f, monoidal.Layer(f), f >> f.dagger(), f.bubble(),
+    symmetric.Diagram.permutation((1, 0), symmetric.Ty('x', 'y')),
+    markov.Copy(markov.Ty('x')), comarkov.Merge(comarkov.Ty('x')),
+    frobenius.Spider(1, 2, frobenius.Ty('x')),
+    rigid.Cup(rigid.Ty('x'), rigid.Ty('x').r),
+    biclosed.Ty('x') >> biclosed.Ty('y'),
+    closed.Ty('x') >> closed.Ty('y'), matrix.NumPy(),
+    tensor.Box('g', tensor.Dim(2), tensor.Dim(2), [1, 0, 0, 1]),
+    testable.Equation(g, g.dagger()))])
+"""
+
+
+def test_deterministic_hashes():
+    """
+    The hash of an arrow is the hash of its :meth:`setoid`, so a setoid
+    leading with the class itself leads with the address of a class object:
+    `hash` then answers a fresh number in every interpreter, which the
+    determinism of `STYLE.md` rules out. One value per module that leads a
+    setoid or a `__hash__`, hashed in two interpreters with `PYTHONHASHSEED`
+    fixed, see #479.
+
+    `tensor.Bubble` is absent because its setoid holds the function it maps
+    with, whose hash is an address of its own, see #506.
+    """
+    def hashes():
+        return subprocess.run(
+            [sys.executable, "-c", DETERMINISTIC_HASHES],
+            check=True, text=True, capture_output=True,
+            env=dict(os.environ, PYTHONHASHSEED="0")).stdout
+    assert hashes() == hashes()

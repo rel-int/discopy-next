@@ -112,7 +112,8 @@ from discopy.feedback import (  # noqa: F401  pylint: disable=unused-import
     Wire, Ty, Nat)
 from discopy.python import finset
 from discopy.utils import (
-    AxiomError, assert_iscomposable, classproperty, factory_name, from_tree)
+    AxiomError, assert_iscomposable, classproperty, factory_key,
+    factory_name, from_tree)
 
 
 class Layer(feedback.Layer):
@@ -669,7 +670,7 @@ class Permutation(Box):
     def setoid(self):
         if self.is_identity:
             return (), self.dom, self.cod
-        return type(self), self.dom, tuple(self.perm)
+        return factory_key(type(self)), self.dom, tuple(self.perm)
 
     def to_drawing(self):
         """ Draw as a compact band, or as wires for the identity. """

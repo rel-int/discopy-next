@@ -27,6 +27,7 @@ Summary
         :toctree:
 
         factory_name
+        factory_key
         from_tree
         dumps
         loads
@@ -484,6 +485,27 @@ def factory_name(cls: type) -> str:
         return str(cls).removeprefix('discopy.')
     module = cls.__module__.removeprefix('discopy.')
     return f"{module}.{cls.__name__}".removeprefix('builtins.')
+
+
+def factory_key(cls: type) -> tuple[str, str]:
+    """
+    Returns a deterministic key for a DisCoPy class, i.e. the pair of its
+    module and its qualified name. This is what a :meth:`setoid` leads with,
+    rather than the class itself: the hash of a class is its address, so a
+    setoid holding one hashes to a different number in every interpreter,
+    which the determinism of `STYLE.md` rules out.
+
+    Example
+    -------
+    >>> from discopy.cat import Box
+    >>> assert factory_key(Box) == ("discopy.cat", "Box")
+
+    A subscript is part of the name, so two of them keep different keys.
+
+    >>> from discopy.tensor import Box as TensorBox
+    >>> assert factory_key(TensorBox[float]) != factory_key(TensorBox[complex])
+    """
+    return cls.__module__, cls.__qualname__
 
 
 def from_tree(tree: dict):

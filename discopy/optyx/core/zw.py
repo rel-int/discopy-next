@@ -149,7 +149,7 @@ from typing import List, Union, Tuple, Iterable
 import numpy as np
 from discopy.frobenius import Dim
 from discopy import tensor
-from discopy.utils import factory_name
+from discopy.utils import factory_key, factory_name
 from discopy.quantum.gates import format_number
 from discopy.optyx.core import diagram
 from discopy.optyx.utils.misc import (
@@ -654,7 +654,8 @@ class Endo(ZWBox):
         super().__init__(f"Endo({scalar})", 1, 1, data=scalar)
 
     def setoid(self):
-        return type(self), self.dom, self.cod, self.is_dagger, self.scalar
+        return (factory_key(type(self)),
+                self.dom, self.cod, self.is_dagger, self.scalar)
 
     def __repr__(self):
         return f"{factory_name(type(self))}"\
