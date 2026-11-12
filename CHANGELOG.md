@@ -258,10 +258,10 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Changed
 
-- `python.Function.then` keeps the functions of a composition as the
-  `factors` of its `inside` and extends them when composed again, so that a
-  long composition built one function at a time is called by a loop rather
-  than by as many nested calls ([next#518]).
+- The `inside` of a composition of `python.Function` is a
+  `python.function.Composition` of its `factors`, extended when composed
+  again, so that a long composition built one function at a time is called
+  by a loop rather than by as many nested calls ([next#518]).
 - A bubble does not commute with dagger: `cat.Bubble.setoid` counts
   `is_dagger`, as `tensor.Bubble`'s has and as `cat.Bubble.__str__` prints,
   so that a functor cannot separate equal bubbles. Upstream states the
