@@ -12,3 +12,5 @@ import EGraph.Link
 import EGraph.Union
 import EGraph.Drain
 import EGraph.Freeze
+import EGraph.Add
+import EGraph.Building

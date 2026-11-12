@@ -26,6 +26,8 @@ algorithms there is followed here, or the differential test says so.
 | [`EGraph/Union.lean`](EGraph/Union.lean) | `union` keeps it, relates its two spiders and lowers what `rebuild` has left to do |
 | [`EGraph/Drain.lean`](EGraph/Drain.lean) | `rebuild` keeps it and ends with an empty worklist |
 | [`EGraph/Freeze.lean`](EGraph/Freeze.lean) | what a builder freezes into, where `merge` and `rebuild` are those of the e-graph |
+| [`EGraph/Add.lean`](EGraph/Add.lean) | appending a node on new spiders keeps the invariant |
+| [`EGraph/Building.lean`](EGraph/Building.lean) | `add` is that of the e-graph, the builder of an e-graph, and the laws `building` and `adding` |
 | [`Statements/Premonoidal.lean`](Statements/Premonoidal.lean) | the same for diagrams: strict premonoidal categories, Diagram(S) and what is proved of it |
 | [`Premonoidal/Basic.lean`](Premonoidal/Basic.lean) | categories and strict premonoidal categories |
 | [`Premonoidal/Diagram.lean`](Premonoidal/Diagram.lean) | Diagram(S), the proof that it is strict premonoidal and not monoidal |
@@ -52,9 +54,12 @@ What is modelled, and what is not:
 - The `Builder` keeps `least` and `parents` in arrays where the Python has
   dictionaries, has no `heads` or `known`, since a node carries the number of
   its box, and cuts `union` in three methods, `union`, `join` and `link`. Its
-  loops, in `root` and `rebuild`, run on fuel. That a builder freezes into
-  what its operations give in turn, the law `building`, is tested here and
-  not yet proved in this directory.
+  loops, in `root` and `rebuild`, run on fuel, which `building` shows is
+  enough. That law, a builder freezes into what its operations give in turn,
+  is proved for a valid e-graph whose nodes read spiders that are there, and
+  for the histories the Python accepts: each box added reads spiders that are
+  there and has the number of outputs of its head, each merge relates spiders
+  that are there.
 - Spiders are natural numbers and have no type: `partition` takes any pairs,
   in the Python as in the model, and it is `EGraph.__init__` that refuses
   classes relating spiders of two types. A valid e-graph of the model has

@@ -176,4 +176,63 @@ theorem rebuild_closure (g : Graph) (valid : g.Valid) (s t : Nat)
       ∧ (g.rebuild.merge [s, t]).rebuild = (g.merge [s, t]).rebuild :=
   Graph.rebuild_closure valid s t hs ht
 
+/-! ## The builder
+
+`EGraph/Builder.lean` is `egraph.Builder` method by method, 200 lines that
+are not restated here: what is proved is that they compute the fold. -/
+
+/-- A history folds its operations on an e-graph, and builds them on the
+builder of that e-graph, then freezes it. -/
+theorem history_def (g : Graph) (operations : List Operation) :
+    g.fold operations = operations.foldl Graph.apply g
+      ∧ Builder.build g operations
+        = (operations.foldl Builder.apply (Builder.start g)).freeze := ⟨rfl, rfl⟩
+
+/-- An operation is the name of a method with its arguments, on either. -/
+theorem apply_def (g : Graph) (b : Builder) (head arity : Nat) (det : Bool)
+    (spiders : List Nat) :
+    g.apply (.add head det arity spiders) = (g.add head det arity spiders).1
+      ∧ g.apply (.merge spiders) = g.merge spiders ∧ g.apply .rebuild = g.rebuild
+      ∧ b.apply (.add head det arity spiders) = (b.add head det arity spiders).1
+      ∧ b.apply (.merge spiders) = b.merge spiders ∧ b.apply .rebuild = b.rebuild :=
+  ⟨rfl, rfl, rfl, rfl, rfl, rfl⟩
+
+/-- The histories the Python accepts: each box added reads spiders that are
+there and has as many outputs as the nodes of its head, each merge relates
+spiders that are there. -/
+theorem accepts_def (g : Graph) (operation : Operation) (operations : List Operation)
+    (head arity : Nat) (det : Bool) (spiders : List Nat) :
+    (g.Accepts [] ↔ True)
+      ∧ (g.Accepts (operation :: operations)
+        ↔ g.Allows operation ∧ (g.apply operation).Accepts operations)
+      ∧ (g.Allows (.add head det arity spiders)
+        ↔ (∀ s ∈ spiders, s < g.classes.length)
+          ∧ ∀ node ∈ g.nodes, node.head = head → node.outputs.length = arity)
+      ∧ (g.Allows (.merge spiders) ↔ ∀ s ∈ spiders, s < g.classes.length)
+      ∧ (g.Allows .rebuild ↔ True) :=
+  ⟨Iff.rfl, Iff.rfl, Iff.rfl, Iff.rfl, Iff.rfl⟩
+
+/-- A builder freezes into what its operations give in turn, the Python law
+`EGraph.building`, with the same nodes on the same spiders in the same
+classes. Rules out: a union that forgets a parent or the least spider of a
+class, a rebuild that stops before the worklist is empty. -/
+theorem building (g : Graph) (valid : g.Valid)
+    (inputs : ∀ node ∈ g.nodes, ∀ s ∈ node.inputs, s < g.classes.length)
+    (operations : List Operation) (accepted : g.Accepts operations) :
+    Builder.build g operations = g.fold operations :=
+  Builder.building g valid inputs operations accepted
+
+/-- After a history, adding a box on the builder gives the outputs that
+adding it on the e-graph gives: those of the first node of its key. Rules
+out: a hash-cons that keeps another node of a key, which freezes into the
+same e-graph. -/
+theorem adding (g : Graph) (valid : g.Valid)
+    (inputs : ∀ node ∈ g.nodes, ∀ s ∈ node.inputs, s < g.classes.length)
+    (operations : List Operation) (accepted : g.Accepts operations)
+    (head : Nat) (det : Bool) (arity : Nat) (spiders : List Nat)
+    (allowed : (g.fold operations).Allows (.add head det arity spiders)) :
+    ((operations.foldl Builder.apply (Builder.start g)).add head det arity spiders).2
+      = ((g.fold operations).add head det arity spiders).2 :=
+  Builder.adding g valid inputs operations accepted head det arity spiders allowed
+
 end Statements
