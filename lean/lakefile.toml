@@ -1,0 +1,12 @@
+name = "egraph"
+defaultTargets = ["EGraph", "Statements", "oracle"]
+
+[[lean_lib]]
+name = "EGraph"
+
+[[lean_lib]]
+name = "Statements"
+
+[[lean_exe]]
+name = "oracle"
+root = "Oracle"
