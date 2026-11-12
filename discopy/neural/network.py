@@ -46,6 +46,7 @@ Summary
     Tail
     Functor
     Lens
+    Learner
 
 .. admonition:: Functions
 
@@ -81,7 +82,8 @@ from __future__ import annotations
 from typing import Self
 
 from discopy import (
-    comarkov, feedback, lens, markov, messages, monoidal, python, testable)
+    comarkov, feedback, lens, markov, messages, monoidal, para, python,
+    testable)
 from discopy.abc import MarkovCategory
 from discopy.cat import factory
 from discopy.monoidal import Dim
@@ -629,6 +631,110 @@ class Lens(lens.Markov, MarkovCategory):
 
         return cls(x, x ** n, cls.category.copy(x.positive, n), cls.category(
             put, x.positive @ (x ** n).negative, x.negative))
+
+    @classmethod
+    def descent(cls, x: lens.Ty, rate: float) -> Lens:
+        """
+        Gradient descent at a learning ``rate``, the lens into a pair ``x``
+        of weights and gradients from the pair of the weights and their
+        new values: ``get`` is the identity, ``put`` subtracts ``rate``
+        times its gradient from each weight :cite:p:`CruttwellEtAl22`.
+
+        Parameters:
+            x : The pair of the types of the weights and of their gradients.
+            rate : The learning rate.
+
+        Example
+        -------
+        >>> x = Lens.ob((float, ), (float, ))
+        >>> assert Lens.descent(x, rate=.5).get(3.) == 3.
+        >>> assert Lens.descent(x, rate=.5).put(3., 2.) == 2.
+        """
+        weights = x.positive
+
+        def put(*tensors):
+            return untuplify(tuple(
+                weight - rate * gradient for weight, gradient in zip(
+                    tensors[:len(weights)], tensors[len(weights):])))
+
+        return cls(cls.ob(weights, weights), x, cls.category.id(weights),
+                   cls.category(put, weights @ x.negative, weights))
+
+
+class Learner(para.Markov):
+    """
+    A learner is a parametric lens of functions on tensors
+    :cite:p:`FongEtAl19,CruttwellEtAl22`, i.e. a parametric map over
+    :class:`Lens`: its ``inside`` is a lens from the inputs and the weights
+    to the outputs, its ``param`` the pair of the types of the weights and
+    of what ``put`` returns for them, their gradients.
+
+    Composition tensors the weights, :meth:`reparam` by :meth:`Lens.copy`
+    ties them, so that ``put`` sums their gradients, and by
+    :meth:`Lens.descent` turns the gradients into the new weights:
+    :meth:`descent` is one step of an optimiser.
+
+    Parameters:
+        dom (lens.Ty) : The types of the inputs and of their gradients.
+        cod (lens.Ty) : The types of the outputs and of their gradients.
+        inside (Lens) : The lens ``dom @ param -> cod``.
+        param (lens.Ty) : The types of the weights and of their gradients.
+
+    Example
+    -------
+    >>> import numpy as np
+    >>> x = Dims(2)
+    >>> scale = para.Markov[Network](x, x, param=x, inside=Box(
+    ...     'scale', x @ x, x, module=lambda v, w: v * w,
+    ...     vjp=lambda v, w, dv: (w * dv, v * dv)))
+    >>> layer = Learner.reverse(scale, np.ndarray)
+    >>> learner = layer >> layer
+    >>> v, w, dv = np.array([1., 2.]), np.array([3., 4.]), np.ones(2)
+    >>> learner.inside.get(v, w, w)
+    array([ 9., 32.])
+    >>> learner.inside.put(v, w, w, dv)
+    (array([ 9., 16.]), array([3., 8.]), array([3., 8.]))
+    >>> tied = learner.reparam(Lens.copy(layer.param))
+    >>> tied.inside.put(v, w, dv)
+    (array([ 9., 16.]), array([ 6., 16.]))
+    >>> tied.descent(rate=.5).inside.put(v, w, dv)
+    (array([ 9., 16.]), array([ 0., -4.]))
+    """
+    category = Lens
+
+    @classmethod
+    def checked_params(cls) -> tuple:
+        """ No subscript is checked: functions are not generated. """
+        return ()
+
+    @classmethod
+    def reverse(cls, network: para.Symmetric, tensor: type = object
+                ) -> Learner:
+        """
+        The reverse derivative of a parametric network, i.e. that of its
+        inside by :meth:`Network.to_lens`, a pair of ``tensor`` for each of
+        its legs, weights included.
+
+        Parameters:
+            network : The parametric network, over :class:`Network`.
+            tensor : The type of the tensors and of their gradients.
+        """
+        leg = Lens.ob((tensor, ), (tensor, ))
+        dom, cod, param, copar = (leg ** len(legs) for legs in (
+            network.dom, network.cod, network.param, network.copar))
+        return cls(dom, cod, network.inside.to_lens(tensor), param, copar)
+
+    def descent(self, rate: float) -> para.Symmetric:
+        """
+        One step of gradient descent at a learning ``rate``: the learner
+        whose ``put`` returns the new weights where that of ``self`` returns
+        their gradients, i.e. :meth:`reparam` by :meth:`Lens.descent`.
+
+        Parameters:
+            rate : The learning rate.
+        """
+        step = Lens.descent(self.param, rate)
+        return self.reparam(step)  # ty: ignore[invalid-argument-type]
 
 
 def autodiff(module, inputs: tuple, gradients: tuple) -> tuple:
