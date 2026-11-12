@@ -13,7 +13,7 @@ algorithms there is followed here, or the differential test says so.
 | [`Statements.lean`](Statements.lean) | the definitions and the main theorems restated, the one file to read |
 | [`EGraph/Partition.lean`](EGraph/Partition.lean) | `partition` and the proof of `partition_least` |
 | [`EGraph/Classes.lean`](EGraph/Classes.lean) | lists of classes: normal ones are equal when they relate the same spiders |
-| [`EGraph/Graph.lean`](EGraph/Graph.lean) | the e-graph, `merge` and `add`, with `merge_equivalence` and `add_hashcons` |
+| [`EGraph/Graph.lean`](EGraph/Graph.lean) | the e-graph, `merge` and `add`, with the lemmas `merge_equivalence` is made of and `add_hashcons` |
 | [`EGraph/Rebuild.lean`](EGraph/Rebuild.lean) | `rebuild`, its termination, and that it is the least congruent equivalence |
 | [`EGraph/History.lean`](EGraph/History.lean) | operations and the fold of a history |
 | [`Audit.lean`](Audit.lean) | fails on `sorry`, `native_decide` or an axiom beyond `propext`, `Quot.sound`, `Classical.choice` |

@@ -43,7 +43,9 @@ def reads (classes : List Nat) (head : Nat) (key : List Nat) (node : Node) : Boo
   node.det && node.head == head && node.inputs.map (find classes) == key
 
 /-- Add a box reading some spiders and give its outputs: the next spiders, or
-those of the first deterministic node of that head on their classes. -/
+those of the first deterministic node of that head on their classes, however
+many: a head has one number of outputs in a valid e-graph, as a box has one
+codomain. -/
 def add (g : Graph) (head : Nat) (det : Bool) (arity : Nat)
     (inputs : List Nat) : Graph × List Nat :=
   let key := inputs.map (find g.classes)

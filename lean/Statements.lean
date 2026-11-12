@@ -65,8 +65,9 @@ theorem merge_def (g : Graph) (spiders : List Nat) :
         ((g.classes.zipIdx.map fun entry => (entry.2, entry.1))
           ++ spiders.zip spiders.tail) } := rfl
 
-/-- Adding a box gives the outputs of the first deterministic node of its
-head on the classes of its inputs, or appends a node on the next spiders. -/
+/-- Adding a deterministic box gives the outputs of the first deterministic
+node of its head on the classes of its inputs if there is one. Any other box
+is appended as a node on the next spiders. -/
 theorem add_def (g : Graph) (head : Nat) (det : Bool) (arity : Nat)
     (inputs : List Nat) : g.add head det arity inputs =
       match g.nodes.find? fun node => det && (node.det && node.head == head

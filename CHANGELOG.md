@@ -1441,10 +1441,11 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 ### Project
 
 - The Lean model in `lean/` covers the pure `EGraph`: `merge` is reflexive,
-  symmetric and transitive, `add` gives a deterministic box added again the
-  same outputs, and `rebuild` ends on the least congruent equivalence
-  containing the classes, hence idempotent and confluent; the differential
-  test compares the fold of a history with `History.fold()` ([next#522]).
+  symmetric and transitive, `add` returns the same outputs when a
+  deterministic box is added again, and `rebuild` ends on the least
+  congruent equivalence containing the classes, hence idempotent and
+  confluent; the differential test compares the fold of a history with
+  `History.fold()` ([next#522]).
 - `lean/`, a Lean 4 model of `egraph.partition` with the theorem that it
   sends each spider to the least spider related to it by pairs of spiders
   in range, and a differential test of the model against the Python

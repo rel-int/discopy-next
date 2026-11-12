@@ -8,7 +8,8 @@ partition, `{"spiders": 4, "pairs": [[3, 1], [1, 2]]}` giving
 `{"partition": [0, 1, 1, 1]}`. Any other is a history: `nodes`, each
 `[head, det, inputs, outputs]`, the `classes` of the spiders and `operations`,
 each `["add", head, det, arity, inputs]`, `["merge", spider, ...]` or
-`["rebuild"]`, giving the `nodes` and `classes` of the fold.
+`["rebuild"]`, giving the `nodes` and `classes` of the fold, from the
+partition of the classes as `EGraph.__init__` takes it.
 -/
 
 open Lean EGraph
@@ -45,6 +46,7 @@ def answer (line : String) : Except String Json := do
   let nodes ← (← case.getObjValAs? (List Json) "nodes").mapM node
   let classes ← case.getObjValAs? (List Nat) "classes"
   let operations ← (← case.getObjValAs? (List Json) "operations").mapM operation
+  let classes := partition classes.length (links classes)
   return graph (Graph.fold ⟨nodes, classes⟩ operations)
 
 partial def main : IO UInt32 := do
