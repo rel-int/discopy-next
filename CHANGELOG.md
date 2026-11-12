@@ -1440,6 +1440,10 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Project
 
+- The law `EGraph.building` is proved on the Lean model: for a valid
+  e-graph and a history the Python accepts, the builder freezes into what
+  the operations give in turn, the same nodes on the same spiders in the
+  same classes, and each `add` gives the same outputs on both ([next#529]).
 - `union` and `rebuild` keep the invariant of the builder of the Lean model,
   `rebuild` ends, and `merge` and `rebuild` on a builder are those of the
   e-graph it freezes into ([next#528]).
@@ -1883,6 +1887,7 @@ for the changelog of `1.2.1` and earlier.
 [next#526]: https://github.com/rel-int/discopy-next/pull/526
 [next#527]: https://github.com/rel-int/discopy-next/pull/527
 [next#528]: https://github.com/rel-int/discopy-next/pull/528
+[next#529]: https://github.com/rel-int/discopy-next/pull/529
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#56]: https://github.com/rel-int/optyx/pull/56
