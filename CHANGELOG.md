@@ -9,6 +9,13 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Added
 
+- `Network.to_lens`, the reverse derivative of a feedforward network as a
+  `neural.network.Lens`, i.e. a lens of functions on tensors whose `get` is
+  `to_function` and whose `put` is backpropagation: every box gives its
+  `Box.forward` and `Box.backward`, the latter its `vjp` or the `autodiff`
+  of its module by PyTorch or JAX, composition is the chain rule of
+  `lens.Markov`, a copy sums the gradients of its branches and a discard
+  gives zero ([next#515], cost in [next#516]).
 - `lens.Comarkov`, the lenses `(get, put)` over a category that is both
   Markov and comarkov, which form a Markov category: the `copy` of a pair
   copies its positive half and merges the copies of its negative half, as
@@ -1804,6 +1811,8 @@ for the changelog of `1.2.1` and earlier.
 [next#508]: https://github.com/rel-int/discopy-next/pull/508
 [next#510]: https://github.com/rel-int/discopy-next/pull/510
 [next#511]: https://github.com/rel-int/discopy-next/pull/511
+[next#515]: https://github.com/rel-int/discopy-next/pull/515
+[next#516]: https://github.com/rel-int/discopy-next/issues/516
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#56]: https://github.com/rel-int/optyx/pull/56

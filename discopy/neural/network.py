@@ -599,7 +599,8 @@ class Lens(lens.Markov, MarkovCategory):
     The ``put`` of a composition runs the ``get`` of what comes first again,
     see :meth:`discopy.lens.Markov.then`, so that the backward pass of a
     network of depth ``n`` runs its layers forward a number of times
-    quadratic in ``n``.
+    quadratic in ``n``, see `next#516
+    <https://github.com/rel-int/discopy-next/issues/516>`_.
     """
     category = python.Function
 
