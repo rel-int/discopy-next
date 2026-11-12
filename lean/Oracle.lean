@@ -13,7 +13,7 @@ each `["add", head, det, arity, inputs]`, `["merge", spider, ...]` or
 `["rebuild"]`, giving the `nodes` and `classes` of the `fold` and of what
 the builder freezes into, the `build`, each with the `outputs` every `add`
 gave, from the partition of the classes as `EGraph.__init__` takes it. A case may ask for one of them alone,
-`"run": ["build"]`: the fold goes through every node at each step.
+`"run": ["build"]`: the fold searches the nodes at each step.
 -/
 
 open Lean EGraph
@@ -74,7 +74,11 @@ def answer (line : String) : Except String Json := do
   let classes ← case.getObjValAs? (List Nat) "classes"
   let operations ← (← case.getObjValAs? (List Json) "operations").mapM operation
   let classes := partition classes.length (links classes)
-  let run := (case.getObjValAs? (List String) "run").toOption.getD ["fold", "build"]
+  let run ← match case.getObjVal? "run" with
+    | .ok json => (fromJson? json : Except String (List String))
+    | .error _ => pure ["fold", "build"]
+  if let some name := run.find? (!["fold", "build"].contains ·) then
+    throw s!"unknown run {name}"
   let folded := if run.contains "fold"
     then [("fold", fold ⟨nodes, classes⟩ operations)] else []
   let built := if run.contains "build"

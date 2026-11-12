@@ -134,8 +134,12 @@ def test_history(random_seed):
     cases, results = zip(*map(encoding, histories))
     for history, case, result, answer in zip(
             histories, cases, results, answers(cases), strict=True):
-        assert answer["fold"] == result(*folded(history)), case
-        assert answer["build"] == result(*built(history)), case
+        graph, outputs = folded(history)
+        assert result(history.fold(), outputs) == result(graph, outputs), case
+        assert answer["fold"] == result(graph, outputs), case
+        graph, outputs = built(history)
+        assert result(history.build(), outputs) == result(graph, outputs), case
+        assert answer["build"] == result(graph, outputs), case
     print(f"history: {len(cases)} cases agree under seed {random_seed}, "
           f"{len(set(map(json.dumps, cases)))} distinct, "
           f"{sum(len(case['operations']) for case in cases)} operations")
@@ -180,6 +184,8 @@ def test_traces(twice):
     cases = [case | {"run": ["build"]} for case in cases]
     for history, result, answer in zip(
             histories, results, answers(cases), strict=True):
-        assert answer["build"] == result(*built(history))
+        graph, outputs = built(history)
+        assert result(history.build(), outputs) == result(graph, outputs)
+        assert answer["build"] == result(graph, outputs)
     print(f"traces: {len(cases)} agree, twice is {twice}, "
           f"{sum(len(case['operations']) for case in cases)} operations")
