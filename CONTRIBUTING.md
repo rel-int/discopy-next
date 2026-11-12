@@ -302,8 +302,10 @@ the important regressions and speedups.
 ## Run the Lean proofs
 
 `lean/` is a [Lake](https://lean-lang.org/doc/reference/latest/Build-Tools-and-Distribution/Lake/)
-project holding a Lean 4 model of `egraph.partition` and one of the diagrams of
-`monoidal.Diagram`, with theorems proved on each, see its [README](lean/README.md); it needs the Lean of `lean/lean-toolchain`
+project holding a Lean 4 model of `egraph.partition` and of the pure `EGraph`
+(`merge`, `add`, `rebuild`), and one of the diagrams of `monoidal.Diagram`,
+with theorems proved on each,
+see its [README](lean/README.md); it needs the Lean of `lean/lean-toolchain`
 and no other dependency. It lives outside the package and outside `testpaths`,
 so run it explicitly:
 
