@@ -6,4 +6,4 @@
 - [x] Theorems `merge_equivalence`, `add_hashcons`, `rebuild_congruent`, `rebuild_extensive`, `rebuild_least` and `rebuild_closure`, restated in `Statements.lean` with what each rules out
 - [x] The oracle folds a history and `lean/test_oracle.py` compares it with `History.fold()`
 - [x] Docs: `lean/README.md`, CONTRIBUTING.md, AGENTS.md, a CHANGELOG.md `Project` bullet
-- [WIP] @session_01MEJxy2cXv66NHgL7vwn3q8-2026-11-12 16:59 50,000 histories over three seeds agree locally and one seeded mutant (`rebuild` ignoring `det`) fails the test, both stated in the pull request
+- [x] 50,000 histories over three seeds agree locally and one seeded mutant (`rebuild` ignoring `det`) fails the test, both stated in the pull request
