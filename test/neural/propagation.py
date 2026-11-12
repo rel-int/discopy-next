@@ -153,3 +153,9 @@ def test_marginals_wants_a_tensor_per_factor():
     for tensors in ((tensor, ), (tensor, tensor, tensor)):
         with raises(ValueError, match=f"Expected 2 tensors, got {len(tensors)}"):
             marginals(factors, *tensors)
+
+
+def test_sum_product_wants_two_states():
+    for states in (1, 0):
+        with raises(ValueError, match=f"at least two states, got {states}"):
+            sum_product(((0, 1), ), states)

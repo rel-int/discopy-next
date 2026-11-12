@@ -181,6 +181,8 @@ def sum_product(factors, states: int) -> Network:
     batch of problems on one table. A learned propagator is this network
     with other boxes on its factors.
     """
+    if states < 2:
+        raise ValueError(f"Expected at least two states, got {states}.")
     table = table_of(factors)
     nodes = memberships(table)
     message = Dims(states)
