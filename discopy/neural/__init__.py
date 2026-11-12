@@ -5,7 +5,10 @@
 :mod:`discopy.neural.network` is the traced category of feedforward
 networks, with lists of shapes :class:`Dims` as objects and layers as boxes,
 compiling to a function on tensors that :mod:`discopy.neural.torch` runs as
-a PyTorch module and ``jax.jit`` takes as it is.
+a PyTorch module and ``jax.jit`` takes as it is, and to its reverse
+derivative, a lens whose ``put`` is backpropagation.
+:mod:`discopy.neural.propagation` is the sum-product algorithm as such a
+network with a trace, equal on a tree to the contraction of its tensors.
 :mod:`discopy.neural.signature` says what a generator of a source category
 promises: its legs grouped into orbits, the symmetry each orbit carries, and
 the wirings drawn out of a family's combinatorics.
@@ -28,6 +31,7 @@ symmetry group rather than along its tables.
     :toctree: ../_api
 
     network
+    propagation
     signature
     torch
     wiring
