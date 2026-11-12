@@ -2,8 +2,8 @@
 The differential test of the Lean model of diagrams against
 :class:`discopy.monoidal.Diagram`: Hypothesis draws diagrams with one box per
 layer and no colours, as :meth:`Diagram.encode` writes them, the ``oracle``
-binary composes, tensors and whiskers them in one run, and each answer is
-compared with the Python's.
+binary composes, tensors and whiskers them, or applies a functor into
+diagrams to them, in one run, and each answer is compared with the Python's.
 
 It is skipped when the binary is not built. ``ORACLE_EXAMPLES`` is the number
 of cases per seed, 2,000 by default, and ``ORACLE_SEEDS`` the seeds separated
@@ -19,7 +19,7 @@ import pytest
 from hypothesis import HealthCheck, Phase, given, seed, settings
 from hypothesis import strategies as st
 
-from discopy.monoidal import Box, Diagram, Ty
+from discopy.monoidal import Box, Diagram, Functor, Ty
 
 ORACLE = pathlib.Path(__file__).parent / ".lake" / "build" / "bin" / "oracle"
 EXAMPLES = int(os.environ.get("ORACLE_EXAMPLES", "2000"))
@@ -82,16 +82,48 @@ def cases(draw) -> dict:
     return {"op": op, "f": f, "ob": draw(types)}
 
 
+@st.composite
+def functors(draw) -> dict:
+    """ A diagram and a functor into diagrams, given on its wires and boxes. """
+    ob = {wire: draw(st.lists(st.sampled_from("xyz"), max_size=2))
+          for wire in "xyz"}
+    f, ar = draw(diagrams(draw(types))), {}
+    for box in f["boxes"]:
+        key = (box["name"], tuple(box["dom"]), tuple(box["cod"]))
+        if key in ar:
+            continue
+        dom, cod = (sum((ob[wire] for wire in box[side]), [])
+                    for side in ("dom", "cod"))
+        image = draw(diagrams(dom))
+        if image["cod"] != cod:
+            image["boxes"].append(
+                {"name": "h", "offset": 0, "dom": image["cod"], "cod": cod})
+            image["cod"] = cod
+        ar[key] = {"name": box["name"], "dom": box["dom"], "cod": box["cod"],
+                   "ar": image}
+    return {"op": "functor", "f": f, "ar": list(ar.values()),
+            "ob": [{"name": wire, "ob": image} for wire, image in ob.items()]}
+
+
+def box_of(box: dict) -> Box:
+    """ The box that a case names. """
+    return Box(box["name"], Ty(*box["dom"]), Ty(*box["cod"]))
+
+
 def decode(diagram: dict) -> Diagram:
     """ The diagram of the Python that a case or an answer encodes. """
     return Diagram.decode(Ty(*diagram["dom"]), [
-        (Box(box["name"], Ty(*box["dom"]), Ty(*box["cod"])), box["offset"])
-        for box in diagram["boxes"]], cod=Ty(*diagram["cod"]))
+        (box_of(box), box["offset"]) for box in diagram["boxes"]],
+        cod=Ty(*diagram["cod"]))
 
 
 def python(case: dict) -> Diagram:
     """ What the Python gives for a case. """
     f = decode(case["f"])
+    if case["op"] == "functor":
+        return Functor(
+            ob_map={Ty(wire["name"]): Ty(*wire["ob"]) for wire in case["ob"]},
+            ar_map={box_of(box): decode(box["ar"]) for box in case["ar"]})(f)
     return {
         "then": lambda: f >> decode(case["g"]),
         "tensor": lambda: f @ decode(case["g"]),
@@ -99,9 +131,10 @@ def python(case: dict) -> Diagram:
         "whisker_right": lambda: f @ Ty(*case["ob"])}[case["op"]]()
 
 
+@pytest.mark.parametrize("strategy", [cases, functors])
 @pytest.mark.parametrize("random_seed", SEEDS)
-def test_premonoidal(random_seed):
-    drawn_cases = drawn(cases(), random_seed)
+def test_premonoidal(random_seed, strategy):
+    drawn_cases = drawn(strategy(), random_seed)
     results = answers(drawn_cases)
     assert len(results) == len(drawn_cases)
     for case, result in zip(drawn_cases, results):
@@ -109,5 +142,5 @@ def test_premonoidal(random_seed):
         assert decode(result) == expected, case
         assert [box["offset"] for box in result["boxes"]] == list(
             expected.offsets), case
-    print(f"premonoidal: {len(drawn_cases)} cases agree under seed "
+    print(f"{strategy.__name__}: {len(drawn_cases)} agree under seed "
           f"{random_seed}, {len(set(map(json.dumps, drawn_cases)))} distinct")

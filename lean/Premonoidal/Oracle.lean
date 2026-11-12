@@ -1,9 +1,10 @@
 import Lean.Data.Json
-import Premonoidal.Diagram
+import Premonoidal.Functor
 
 /-!
 The model of diagrams as an oracle: a case names an operation and its
-arguments, `{"op": "then", "f": ..., "g": ...}`, a diagram is written as
+arguments, `{"op": "then", "f": ..., "g": ...}`, or a functor into diagrams
+by its images of wires and boxes, `{"op": "functor", "ob": ..., "ar": ..., "f": ...}`, a diagram is written as
 `Diagram.encode` writes it, `{"dom": ["x"], "boxes": [{"name": "f",
 "dom": ["x"], "cod": ["y"], "offset": 0}]}`, and so is the answer, with its
 codomain.
@@ -62,6 +63,16 @@ def answer (op : String) (case : Json) : Except String Json := do
     return encode (Diagram.whiskerLeft (← case.getObjValAs? (List String) "ob") f)
   | "whisker_right" =>
     return encode (f.whiskerRight (← case.getObjValAs? (List String) "ob"))
+  | "functor" =>
+    let ob ← (← case.getObjValAs? (List Json) "ob").mapM fun wire => do
+      return (← wire.getObjValAs? String "name", ← wire.getObjValAs? (List String) "ob")
+    let ar ← (← case.getObjValAs? (List Json) "ar").mapM fun box => do
+      return ((← box.getObjValAs? String "name",
+        ← box.getObjValAs? (List String) "dom",
+        ← box.getObjValAs? (List String) "cod"), ← parse (← box.getObjVal? "ar"))
+    return encode <| Lift.map (Diagram.premonoidal Named)
+      (fun x => (ob.lookup x).getD [x])
+      (fun box => (ar.lookup box).getD (Diagram.box box)) f
   | _ => throw s!"unknown operation {op}"
 
 end Premonoidal
