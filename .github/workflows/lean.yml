@@ -7,6 +7,9 @@ on:
     paths:
     - lean/**
     - discopy/egraph.py
+    - benchmark/test_egraph.py
+    - benchmark/config.py
+    - benchmark/data/egraph-traces/**
     - discopy/monoidal.py
     - discopy/cat.py
     - pyproject.toml

@@ -21,6 +21,7 @@ import pytest
 from hypothesis import HealthCheck, Phase, given, seed, settings
 from hypothesis import strategies as st
 
+from benchmark.test_egraph import EMPTY, TRACES, load
 from discopy.egraph import EGraph, History, Markov, partition
 
 ORACLE = pathlib.Path(__file__).parent / ".lake" / "build" / "bin" / "oracle"
@@ -63,9 +64,10 @@ def partitions(draw) -> dict:
         st.tuples(spider, spider), max_size=2 * n))}
 
 
-def encoding(history: History) -> tuple[dict, Callable[[EGraph], dict]]:
+def encoding(history: History) -> tuple[dict, Callable[..., dict]]:
     """ A history as a case of the oracle, and what the oracle gives for an
-    e-graph, with the boxes numbered by their first occurrence. """
+    e-graph and the outputs of each ``add``, with the boxes numbered by their
+    first occurrence. """
     heads: dict = {}
 
     def nodes(graph: EGraph) -> list:
@@ -82,14 +84,38 @@ def encoding(history: History) -> tuple[dict, Callable[[EGraph], dict]]:
         return [name, heads.setdefault(box, len(heads)),
                 box.is_deterministic, len(box.cod), list(inputs)]
 
-    def result(graph: EGraph) -> dict:
-        return {"classes": list(graph.classes), "nodes": nodes(graph)}
+    def result(graph: EGraph, outputs=()) -> dict:
+        return {"classes": list(graph.classes), "nodes": nodes(graph),
+                "outputs": list(map(list, outputs))}
 
     start = history.graph
-    return {
-        "spiders": start.graph.n_spiders, **result(start),
-        "operations": [operation(*step) for step in history.operations]
-    }, result
+    case = result(start) | {
+        "spiders": start.graph.n_spiders,
+        "operations": [operation(*step) for step in history.operations]}
+    del case["outputs"]
+    return case, result
+
+
+def folded(history: History) -> tuple[EGraph, list]:
+    """ The fold of a history with the outputs each ``add`` gave. """
+    graph, outputs = history.graph, []
+    for name, *args in history.operations:
+        graph = getattr(graph, name)(*args)
+        if name == "add":
+            graph, added = graph
+            outputs.append(added)
+    return graph, outputs
+
+
+def built(history: History) -> tuple[EGraph, list]:
+    """ What the builder of a history freezes into with the outputs each
+    ``add`` gave. """
+    builder, outputs = history.graph.builder(), []
+    for name, *args in history.operations:
+        added = getattr(builder, name)(*args)
+        if name == "add":
+            outputs.append(added)
+    return builder.freeze(), outputs
 
 
 @pytest.mark.parametrize("random_seed", SEEDS)
@@ -103,12 +129,63 @@ def test_partition(random_seed):
 
 
 @pytest.mark.parametrize("random_seed", SEEDS)
-def test_fold(random_seed):
+def test_history(random_seed):
     histories = drawn(History[Markov].strategy(), random_seed)
     cases, results = zip(*map(encoding, histories))
     for history, case, result, answer in zip(
             histories, cases, results, answers(cases), strict=True):
-        assert answer == result(history.fold()), case
-    print(f"fold: {len(cases)} cases agree under seed {random_seed}, "
+        graph, outputs = folded(history)
+        assert result(history.fold(), outputs) == result(graph, outputs), case
+        assert answer["fold"] == result(graph, outputs), case
+        graph, outputs = built(history)
+        assert result(history.build(), outputs) == result(graph, outputs), case
+        assert answer["build"] == result(graph, outputs), case
+    print(f"history: {len(cases)} cases agree under seed {random_seed}, "
           f"{len(set(map(json.dumps, cases)))} distinct, "
+          f"{sum(len(case['operations']) for case in cases)} operations")
+
+
+def replayed(trace, twice: bool) -> History:
+    """ The history of a trace of ``benchmark/data/egraph-traces`` through a
+    builder, each e-node added then related to the class recorded for it,
+    and ``twice`` on base classes of its own, related then rebuilt. """
+    builder, operations = EMPTY.builder(), []
+
+    def replay(boxes) -> list:
+        classes = []
+        for head, out, *args in trace.rows:
+            inputs = tuple(classes[i] for i in args)
+            operations.append(("add", boxes[head], inputs))
+            spider, = builder.add(boxes[head], inputs)
+            if out == len(classes):
+                classes.append(spider)
+                continue
+            operations.append(("merge", spider, classes[out]))
+            builder.union(spider, classes[out])
+        return classes
+
+    classes = replay(trace.boxes)
+    if twice:
+        others = replay(trace.others)
+        operations.extend(
+            ("merge", *pair) for pair in zip(classes[:trace.bases], others))
+        operations.append(("rebuild", ))
+    return History[Markov](EMPTY, operations)
+
+
+@pytest.mark.parametrize("twice", (False, True))
+def test_traces(twice):
+    index = json.loads((TRACES / "index.json").read_text())["traces"]
+    histories = [
+        replayed(load(chosen, n + 1), twice)
+        for chosen in ("random", "largest")
+        for n in range(sum(item["chosen"] == chosen for item in index))]
+    cases, results = zip(*map(encoding, histories))
+    cases = [case | {"run": ["build"]} for case in cases]
+    for history, result, answer in zip(
+            histories, results, answers(cases), strict=True):
+        graph, outputs = built(history)
+        assert result(history.build(), outputs) == result(graph, outputs)
+        assert answer["build"] == result(graph, outputs)
+    print(f"traces: {len(cases)} agree, twice is {twice}, "
           f"{sum(len(case['operations']) for case in cases)} operations")

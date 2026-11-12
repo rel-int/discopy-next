@@ -3,3 +3,5 @@ import EGraph.Classes
 import EGraph.Graph
 import EGraph.Rebuild
 import EGraph.History
+import EGraph.UnionFind
+import EGraph.Builder
