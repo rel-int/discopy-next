@@ -113,6 +113,16 @@ class Function(Category[Ty, "Function"]):
         >>> from discopy.python.multiplicative import Function
         >>> succ = Function(lambda x: x + 1, (int, ), (int, ))
         >>> assert succ.then(succ, succ)(0) == 3
+
+        Note
+        ----
+        A composition keeps the functions it was made of as the ``factors``
+        of its ``inside`` and composing it again extends them, so that
+        calling a long composition, built one function at a time as a
+        functor does, takes a loop rather than as many nested calls.
+
+        >>> from functools import reduce
+        >>> assert reduce(Function.then, 2000 * [succ])(0) == 2000
         """
         if not others:
             return self
@@ -120,12 +130,15 @@ class Function(Category[Ty, "Function"]):
         for factor, other in zip(factors, others):
             assert_isinstance(other, type(self))
             assert_iscomposable(factor, other)
-        *before, last = factors
+        *before, last = (
+            part for factor in factors
+            for part in getattr(factor.inside, "factors", (factor, )))
 
         def inside(*args):
             for factor in before:
                 args = tuplify(factor(*args), len(factor.cod))
             return last(*args)
+        inside.factors = (*before, last)
         return type(self)(inside, self.dom, others[-1].cod)
 
     @classproperty
