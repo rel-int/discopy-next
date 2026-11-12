@@ -5,3 +5,7 @@ import EGraph.Rebuild
 import EGraph.History
 import EGraph.UnionFind
 import EGraph.Builder
+import EGraph.Invariant
+import EGraph.Hashed
+import EGraph.Place
+import EGraph.Link
