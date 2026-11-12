@@ -56,8 +56,10 @@ What is modelled, and what is not:
   its box, and cuts `union` in three methods, `union`, `join` and `link`. Its
   loops, in `root` and `rebuild`, run on fuel, which `building` shows is
   enough. That law, a builder freezes into what its operations give in turn,
-  is proved for the histories the Python accepts: boxes on spiders that are
-  there, with as many outputs as the nodes of their head.
+  is proved for a valid e-graph whose nodes read spiders that are there, and
+  for the histories the Python accepts: each box added reads spiders that are
+  there and has the number of outputs of its head, each merge relates spiders
+  that are there.
 - Spiders are natural numbers and have no type: `partition` takes any pairs,
   in the Python as in the model, and it is `EGraph.__init__` that refuses
   classes relating spiders of two types. A valid e-graph of the model has

@@ -187,22 +187,6 @@ theorem start_spec (g : Graph) (valid : g.Valid)
         cases node.det
         · rfl
         · simp only [ite_true, eq]
-      have tables : Tables n (rep label) (Builder.place { b with label := label } node
-          (key (rep label) node)) := by
-        have := inv.tables.place node (by simpa [size', size] using inputs)
-          (by simpa [size', size] using outputs)
-          (fun s mem => by
-            show rep label s < label.size
-            exact forest'.rep_lt (by rw [size', size]; exact inputs s mem))
-          (fun a mem eq => arity a (List.mem_append_left _ mem) eq)
-        simpa [size', size] using this
-      have sample : node.det = false → Builder.place b node (key (rep label) node)
-          = Builder.place { b with label := b.label } node (key (rep label) node) := fun _ => rfl
-      have inv' : Inv (Builder.place { b with label := label } node (key (rep label) node)) :=
-        ⟨⟨rank, by rw [place_label]; exact forest'⟩, by
-          rw [place_label]
-          show Tables label.size (rep label) _
-          rw [size', size]; exact tables⟩
       -- a sample is placed on the labels as they are, which have the same roots
       have result : ∀ b' : Builder, b' = (if node.det then { b with label := label } else b) →
           ∃ label', b' = { b with label := label' } ∧ Forest label' rank
