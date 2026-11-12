@@ -1452,8 +1452,8 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   ([next#521]).
 - `lean/Premonoidal`, a Lean 4 model of the diagrams of `monoidal.Diagram`
   with one box per layer, with the theorems that they are a strict
-  premonoidal category and that interchange fails for boxes, and a
-  differential test of the model against the Python ([next#523]).
+  premonoidal category and that interchange holds for two boxes only when
+  they are one and the same scalar, and a differential test of the model against the Python ([next#523]).
 - `AGENTS.md`, `RULES.md` and `STYLE.md` for agents, and an LLM contribution
   needs its own handle and a human approval other than its prompter's
   ([#378], [#720]).

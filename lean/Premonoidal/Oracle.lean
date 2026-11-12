@@ -41,7 +41,10 @@ def parse (json : Json) : Except String (Diagram Named) := do
       ← box.getObjValAs? (List String) "dom",
       ← box.getObjValAs? (List String) "cod"),
       ← box.getObjValAs? Nat "offset")
-  decode dom boxes
+  let diagram ← decode dom boxes
+  if let .ok cod := json.getObjValAs? (List String) "cod" then
+    if diagram.cod ≠ cod then throw "the codomain is not the one given"
+  return diagram
 
 /-- `Diagram.encode`, with the codomain. -/
 def encode (f : Diagram Named) : Json :=

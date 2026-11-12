@@ -48,7 +48,9 @@ What is modelled, and what is not:
 [`Statements/Premonoidal.lean`](Statements/Premonoidal.lean) models
 [`monoidal.Diagram`](../discopy/monoidal.py) as `Diagram.encode` writes it, a
 domain and a list of boxes with offsets, and proves that these diagrams are a
-strict premonoidal category in which interchange fails. The model mirrors
+strict premonoidal category in which interchange holds for two boxes only
+when they are one and the same scalar: with any other box, Diagram(S) is not
+monoidal. The model mirrors
 `discopy/monoidal.py` as of `c842a24`.
 
 - Morphisms are untyped, with `dom` and `cod`, as in the Python, so that
