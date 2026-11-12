@@ -7,6 +7,8 @@ on:
     paths:
     - lean/**
     - discopy/egraph.py
+    - discopy/monoidal.py
+    - discopy/cat.py
     - pyproject.toml
     - uv.lock
     - .github/actions/setup/**
@@ -57,4 +59,4 @@ jobs:
         ORACLE_SEEDS: 0
       run: |
         test -x lean/.lake/build/bin/oracle
-        uv run pytest lean/test_oracle.py -s
+        uv run pytest lean/test_oracle.py lean/test_premonoidal.py -s

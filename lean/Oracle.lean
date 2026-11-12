@@ -1,5 +1,6 @@
 import Lean.Data.Json
 import EGraph
+import Premonoidal.Oracle
 
 /-!
 The model as an executable: one JSON case per line on the standard input,
@@ -11,6 +12,8 @@ open Lean
 
 def answer (line : String) : Except String Json := do
   let case ← Json.parse line
+  if let .ok op := case.getObjValAs? String "op" then
+    return ← Premonoidal.answer op case
   let spiders ← case.getObjValAs? Nat "spiders"
   let pairs ← case.getObjValAs? (List (Nat × Nat)) "pairs"
   return Json.mkObj [("partition", toJson (EGraph.partition spiders pairs))]

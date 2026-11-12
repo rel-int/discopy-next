@@ -1,8 +1,11 @@
 name = "egraph"
-defaultTargets = ["EGraph", "Statements", "oracle"]
+defaultTargets = ["EGraph", "Premonoidal", "Statements", "oracle"]
 
 [[lean_lib]]
 name = "EGraph"
+
+[[lean_lib]]
+name = "Premonoidal"
 
 [[lean_lib]]
 name = "Statements"
