@@ -21,6 +21,7 @@ import pytest
 from hypothesis import HealthCheck, Phase, given, seed, settings
 from hypothesis import strategies as st
 
+from benchmark.test_egraph import EMPTY, TRACES, load
 from discopy.egraph import EGraph, History, Markov, partition
 
 ORACLE = pathlib.Path(__file__).parent / ".lake" / "build" / "bin" / "oracle"
@@ -103,12 +104,57 @@ def test_partition(random_seed):
 
 
 @pytest.mark.parametrize("random_seed", SEEDS)
-def test_fold(random_seed):
+def test_history(random_seed):
     histories = drawn(History[Markov].strategy(), random_seed)
     cases, results = zip(*map(encoding, histories))
     for history, case, result, answer in zip(
             histories, cases, results, answers(cases), strict=True):
-        assert answer == result(history.fold()), case
-    print(f"fold: {len(cases)} cases agree under seed {random_seed}, "
+        assert answer["fold"] == result(history.fold()), case
+        assert answer["build"] == result(history.build()), case
+    print(f"history: {len(cases)} cases agree under seed {random_seed}, "
           f"{len(set(map(json.dumps, cases)))} distinct, "
+          f"{sum(len(case['operations']) for case in cases)} operations")
+
+
+def replayed(trace, twice: bool) -> History:
+    """ The history of a trace of ``benchmark/data/egraph-traces`` through a
+    builder, each e-node added then related to the class recorded for it,
+    and ``twice`` on base classes of its own, related then rebuilt. """
+    builder, operations = EMPTY.builder(), []
+
+    def replay(boxes) -> list:
+        classes = []
+        for head, out, *args in trace.rows:
+            inputs = tuple(classes[i] for i in args)
+            operations.append(("add", boxes[head], inputs))
+            spider, = builder.add(boxes[head], inputs)
+            if out == len(classes):
+                classes.append(spider)
+                continue
+            operations.append(("merge", spider, classes[out]))
+            builder.union(spider, classes[out])
+        return classes
+
+    classes = replay(trace.boxes)
+    if twice:
+        others = replay(trace.others)
+        operations.extend(
+            ("merge", *pair) for pair in zip(classes[:trace.bases], others))
+        operations.append(("rebuild", ))
+    return History[Markov](EMPTY, operations)
+
+
+@pytest.mark.parametrize("twice", (False, True))
+def test_traces(twice):
+    index = json.loads((TRACES / "index.json").read_text())["traces"]
+    histories = [
+        replayed(load(chosen, n + 1), twice)
+        for chosen in ("random", "largest")
+        for n in range(sum(item["chosen"] == chosen for item in index))]
+    cases, results = zip(*map(encoding, histories))
+    cases = [case | {"run": ["build"]} for case in cases]
+    for history, result, answer in zip(
+            histories, results, answers(cases), strict=True):
+        assert answer["build"] == result(history.build())
+    print(f"traces: {len(cases)} agree, twice is {twice}, "
           f"{sum(len(case['operations']) for case in cases)} operations")

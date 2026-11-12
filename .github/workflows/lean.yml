@@ -7,6 +7,8 @@ on:
     paths:
     - lean/**
     - discopy/egraph.py
+    - benchmark/test_egraph.py
+    - benchmark/data/egraph-traces/**
     - pyproject.toml
     - uv.lock
     - .github/actions/setup/**
