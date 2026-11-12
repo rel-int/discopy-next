@@ -59,6 +59,20 @@ theorem strict_def :
 /-- The tensor of two morphisms does the first one first. -/
 theorem tensorHom_def : C.tensorHom f g = (f ⋉ C.dom g) ≫ (C.cod f ⋊ g) := rfl
 
+/-- A strict premonoidal functor preserves all of it, on the nose. -/
+theorem functor_def (D : StrictPremonoidal) (F : Functor C D) (fg : C.cod f = C.dom g) :
+    D.dom (F.map f) = F.ob (C.dom f) ∧ D.cod (F.map f) = F.ob (C.cod f)
+    ∧ F.map (C.id X) = D.id (F.ob X) ∧ F.map (f ≫ g) = D.comp (F.map f) (F.map g)
+    ∧ F.ob C.unit = D.unit ∧ F.ob (X ⊗ Y) = D.tensor (F.ob X) (F.ob Y)
+    ∧ F.map (X ⋊ f) = D.whiskerLeft (F.ob X) (F.map f)
+    ∧ F.map (f ⋉ X) = D.whiskerRight (F.map f) (F.ob X) :=
+  ⟨F.dom_map f, F.cod_map f, F.map_id X, F.map_comp f g fg, F.ob_unit,
+    F.ob_tensor X Y, F.map_whiskerLeft X f, F.map_whiskerRight f X⟩
+
+/-- The product of a list of objects. -/
+theorem prod_def (Xs : List C.Ob) : C.prod [] = C.unit
+    ∧ C.prod (X :: Xs) = X ⊗ C.prod Xs := ⟨rfl, rfl⟩
+
 end
 
 /-! ## Definitions: Diagram(S), for a signature `S` of objects and boxes -/
@@ -121,5 +135,24 @@ theorem not_monoidal (f g : S.Box) :
     (f'.whiskerRight (S.dom g)).comp (Diagram.whiskerLeft (S.cod f) g')
       = (Diagram.whiskerLeft (S.dom f) g').comp (f'.whiskerRight (S.cod g))
     ↔ f = g ∧ S.dom f = [] ∧ S.cod f = [] := Diagram.interchange_iff f g
+
+/-- Diagram(S) is free: objects of `C` for the generating objects, and for
+each box a morphism between the products of its domain and codomain, extend
+to a strict premonoidal functor.
+Rules out: a functor that whiskers the image of a box on the wrong side. -/
+theorem lift (C : StrictPremonoidal) (ob : S.Ob → C.Ob) (ar : S.Box → C.Hom)
+    (dom : ∀ b, C.dom (ar b) = C.prod ((S.dom b).map ob))
+    (cod : ∀ b, C.cod (ar b) = C.prod ((S.cod b).map ob)) :
+    ∃ F : Functor (Diagram.premonoidal S) C,
+      (∀ x, F.ob [x] = ob x) ∧ ∀ b, F.map (Diagram.box b) = ar b :=
+  ⟨Lift.functor C ob ar dom cod, Lift.obs_singleton C ob, Lift.map_box C ob ar cod⟩
+
+/-- The extension is unique: strict premonoidal functors from Diagram(S)
+that agree on the generating objects and on the boxes are equal.
+Rules out: a diagram that is not a composite of whiskered boxes. -/
+theorem lift_unique (C : StrictPremonoidal) (F G : Functor (Diagram.premonoidal S) C)
+    (ob : ∀ x, F.ob [x] = G.ob [x])
+    (ar : ∀ b, F.map (Diagram.box b) = G.map (Diagram.box b)) : F = G :=
+  Functor.unique F G ob ar
 
 end Statements.Premonoidal
