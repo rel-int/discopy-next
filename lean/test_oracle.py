@@ -31,7 +31,7 @@ def drawn(strategy: st.SearchStrategy, random_seed: int) -> list:
     @seed(random_seed)
     @settings(max_examples=EXAMPLES, database=None, deadline=None,
               phases=(Phase.generate, ),
-              suppress_health_check=tuple(HealthCheck))
+              suppress_health_check=(HealthCheck.too_slow, ))
     @given(strategy)
     def collect(case):
         cases.append(case)

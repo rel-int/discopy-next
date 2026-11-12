@@ -3,9 +3,9 @@ import EGraph
 /-!
 # What is proved about the model of `discopy.egraph`
 
-Every definition a theorem mentions is restated here by `rfl`, and every
-theorem is restated with the proof it refers to and one broken implementation
-it rules out. `Audit.lean` checks that none of them rests on `sorry`,
+Every definition a theorem mentions is restated here, by `rfl` or by a
+characterisation, and every theorem under "Theorems" is restated with the
+proof it refers to and one broken implementation it rules out. `Audit.lean` checks that none of them rests on `sorry`,
 `native_decide` or an axiom beyond `propext`, `Quot.sound`, `Classical.choice`.
 The model is linked to the Python by `test_oracle.py`, not by a proof.
 -/

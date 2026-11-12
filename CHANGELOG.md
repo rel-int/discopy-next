@@ -1440,9 +1440,10 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Project
 
-- `lean/`, a Lean 4 model of `discopy.egraph` with theorems proved on it and
-  a differential test against the Python: `partition` gives the canonical
-  form of the equivalence its pairs generate ([next#521]).
+- `lean/`, a Lean 4 model of `egraph.partition` with the theorem that it
+  sends each spider to the least spider related to it by pairs of spiders
+  in range, and a differential test of the model against the Python
+  ([next#521]).
 - `AGENTS.md`, `RULES.md` and `STYLE.md` for agents, and an LLM contribution
   needs its own handle and a human approval other than its prompter's
   ([#378], [#720]).
