@@ -35,4 +35,4 @@
 - [x] discopy/neural/propagation.py:126 `reply` fails for factors with more than 26 nodes because the einsum label alphabet is exhausted.
 - [x] discopy/neural/propagation.py:106 `belief` uses an unstable softmax, so sufficiently sharp but valid messages can produce NaN beliefs.
 - [x] discopy/neural/propagation.py:213 `marginals` silently ignores extra tensors and contracts too few factors when tensors are missing because `zi…
-- [WIP] @session_01MEJxy4n4hekCBMayiVejgd-2026-11-12 11:47 discopy/neural/__init__.py:11 This summary implies exact contraction on every tree without stating the required number of rounds.
+- [x] discopy/neural/__init__.py:11 This summary implies exact contraction on every tree without stating the required number of rounds.
