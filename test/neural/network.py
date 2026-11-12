@@ -8,7 +8,8 @@ from pytest import importorskip, raises
 from discopy import neural, python
 from discopy.neural.network import (
     Box, Cofunction, Copy, Dim, Dims, Discard, Equation, Function, Functor,
-    Id, Lens, Merge, Network, Noise, Permutation, Swap, Trace, autodiff)
+    Id, Lens, Merge, Network, Noise, Permutation, Swap, Trace, autodiff,
+    tape)
 from discopy.utils import AxiomError, dumps, loads
 
 
@@ -326,10 +327,10 @@ def test_to_lens_fails_when_copy_drops_a_branch(monkeypatch):
     x = Dims(3)
 
     def copy(cls, pair, n=2):
-        return cls(pair, pair ** n, cls.category.copy(pair.positive, n),
+        return cls(pair, pair ** n, cls.category.copy(pair.positive, n + 1),
                    cls.category(lambda *tensors: tensors[len(x)],
                                 pair.positive @ (pair ** n).negative,
-                                pair.negative))
+                                pair.negative), pair.positive)
 
     torch.manual_seed(0)
     linear = Box('linear', x, x, module=torch.nn.Linear(3, 3).double())
@@ -344,6 +345,56 @@ def test_to_lens_fails_when_copy_drops_a_branch(monkeypatch):
     monkeypatch.setattr(Lens, "copy", classmethod(copy))
     assert not torch.allclose(
         network.to_lens().put(inputs.detach(), gradient), expected, atol=1e-6)
+
+
+def test_to_lens_runs_each_layer_once():
+    import numpy as np
+    x, calls = Dims(2), []
+
+    def layer(i):
+        return Box(f'layer{i}', x, x,
+                   module=lambda v: calls.append(i) or 2 * v,
+                   vjp=lambda v, dv: 2 * dv)
+
+    for depth in (1, 4, 16):
+        calls.clear()
+        chain = Id(x).then(*map(layer, range(depth))).to_lens(np.ndarray)
+        assert list(chain.put(np.ones(2), np.ones(2))) == [2 ** depth] * 2
+        assert calls == list(range(depth))
+
+
+def test_to_lens_runs_each_module_once():
+    torch = importorskip("torch")
+    x, calls = Dims(2), []
+
+    def module(v):
+        calls.append(v)
+        return torch.sin(v)
+
+    chain = Id(x).then(*(Box(f'sin{i}', x, x, module=module)
+                         for i in range(8))).to_lens(torch.Tensor)
+    v = torch.tensor([.1, .2], dtype=torch.float64, requires_grad=True)
+    dy = torch.ones(2, dtype=torch.float64)
+    gradient = chain.put(v.detach(), dy)
+    assert len(calls) == 8
+    outputs = v
+    for _ in range(8):
+        outputs = torch.sin(outputs)
+    expected, = torch.autograd.grad(outputs, v, dy)
+    assert torch.allclose(gradient, expected)
+
+
+def test_tape():
+    import numpy as np
+    jax = importorskip("jax")
+    outputs, pullback = tape(jax.numpy.sin, (jax.numpy.zeros(2), ))
+    assert list(outputs[0]) == [0, 0]
+    assert list(pullback(jax.numpy.ones(2))[0]) == [1, 1]
+    outputs, pullback = tape(lambda v: 2 * v, (np.ones(2), ))
+    assert list(outputs[0]) == [2, 2]
+    with raises(NotImplementedError, match="No reverse mode for numpy"):
+        pullback(np.ones(2))
+    assert tape(lambda: np.ones(2), ())[1](np.ones(2)) == ()
 
 
 def test_autodiff_torch():
