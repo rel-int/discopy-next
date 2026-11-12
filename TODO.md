@@ -7,4 +7,4 @@
 - [x] The `oracle` executable, one JSON case per line, and `lean/test_oracle.py` comparing it with `egraph.partition`, skipped when the binary is not built
 - [x] A `lean` workflow: build, audit and differential test on pull requests touching `lean/**` or `discopy/egraph.py` and on `main`
 - [x] `lean/README.md` with the commit the model mirrors, CONTRIBUTING.md's "Run the Lean proofs", a CHANGELOG.md `Project` bullet
-- [WIP] @session_01MEJxy2cXv66NHgL7vwn3q8-2026-11-12 16:27 50,000 cases over three seeds agree locally and one seeded mutant of the model fails the test, both stated in the pull request
+- [x] 50,000 cases over three seeds agree locally and one seeded mutant of the model fails the test, both stated in the pull request
