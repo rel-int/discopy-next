@@ -122,7 +122,8 @@ class Dims(monoidal.Ty):
     @axiom
     def product_unitality(cls, x: Self) -> testable.Equation[Self]:
         """ ``Dims(1)`` is the unit of the product, on both sides. """
-        return testable.Equation(cls(1) * x, x, x * cls(1))
+        one = type(x)(1)
+        return testable.Equation(one * x, x, x * one)
 
     @axiom
     def product_associativity(
@@ -133,7 +134,8 @@ class Dims(monoidal.Ty):
     @axiom
     def absorption(cls, x: Self) -> testable.Equation[Self]:
         """ ``Dims()`` absorbs the product, on both sides. """
-        return testable.Equation(cls() * x, cls(), x * cls())
+        zero = type(x)()
+        return testable.Equation(zero * x, zero, x * zero)
 
     @axiom
     def distributivity_right(
