@@ -9,6 +9,11 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Added
 
+- `lens.Comarkov`, the lenses `(get, put)` over a category that is both
+  Markov and comarkov, which form a Markov category: the `copy` of a pair
+  copies its positive half and merges the copies of its negative half, as
+  the reverse derivative of a fan-out sums the gradients, and `discard`
+  puts the noise ([next#511]).
 - The rig laws of `neural.network.Dims` as axioms, checked by the property
   matrix: `product_unitality`, `product_associativity`, `absorption` and
   `distributivity_right` on the nose, `distributivity_left` up to a
@@ -1798,6 +1803,7 @@ for the changelog of `1.2.1` and earlier.
 [next#507]: https://github.com/rel-int/discopy-next/pull/507
 [next#508]: https://github.com/rel-int/discopy-next/pull/508
 [next#510]: https://github.com/rel-int/discopy-next/pull/510
+[next#511]: https://github.com/rel-int/discopy-next/pull/511
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#56]: https://github.com/rel-int/optyx/pull/56

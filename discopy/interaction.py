@@ -62,9 +62,10 @@ Example
 """
 
 from __future__ import annotations
-from typing import Sequence
+from typing import Self, Sequence
 from dataclasses import dataclass
 from functools import wraps
+from operator import index
 
 from discopy import (
     balanced,
@@ -207,6 +208,16 @@ class Ty[natural](Pregroup, TestableGeneric):
     @classmethod
     def unit(cls) -> Ty:
         return cls()
+
+    def __pow__(self, n_times: int) -> Self:
+        """
+        The tensor of a pair with itself ``n_times``.
+
+        >>> from discopy.ribbon import Ty as T
+        >>> x = Ty[T](T('x'), T('y'))
+        >>> assert x ** 2 == x @ x and x ** 0 == Ty[T]()
+        """
+        return type(self)().tensor(*index(n_times) * [self])
 
     def tensor(self, *others: Ty):
         if any(not isinstance(other, type(self)) for other in others):
