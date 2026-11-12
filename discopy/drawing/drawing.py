@@ -220,7 +220,7 @@ import networkx as nx
 from discopy import messages
 from discopy.drawing import backend, Node, Point
 from discopy.config import BOX_DRAWING_ATTRIBUTES, TRANSPARENT
-from discopy.abc import TracedCategory
+from discopy.abc import SymmetricCategory, TracedCategory
 from discopy.python import finset
 from discopy.utils import (
     assert_isinstance, assert_iscomposable, unbiased, factory, RichDisplay)
@@ -244,7 +244,9 @@ class PlaneGraph(NamedTuple):
 
 @factory
 @dataclass
-class Drawing(TracedCategory["monoidal.Ty", "Drawing"], RichDisplay):
+class Drawing(
+        TracedCategory["monoidal.Ty", "Drawing"],
+        SymmetricCategory["monoidal.Ty", "Drawing"], RichDisplay):
     """
     A drawing is a plane graph with designated input and output types.
 
@@ -637,6 +639,11 @@ which to_drawing recomputes.
         right_dom = Node("dom", i=len(self.dom) - 1, x=self.dom[-1])
         target, = self.graph.successors(right_dom)
         return target.kind == "cod" and target.i == len(self.cod) - 1
+
+    @classmethod
+    def swap(cls, left: "monoidal.Ty", right: "monoidal.Ty") -> Drawing:
+        """ Draw the swap of two blocks of wires, see :meth:`permutation`. """
+        return cls.permutation([1, 0], [left, right])
 
     @classmethod
     def permutation(cls, xs: Sequence[int], doms) -> Drawing:
