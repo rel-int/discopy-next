@@ -718,7 +718,7 @@ class Comarkov(Markov, MarkovCategory):
                 factory_name(cls.category)))
 
     @classmethod
-    def copy(cls, x: Ty, n: int = 2) -> Comarkov:
+    def copy(cls, x: Ty, n: int = 2) -> Markov:
         """
         The copy of a pair `n` times: `get` copies its positive half, `put`
         discards the input and merges the `n` copies of its negative half.
