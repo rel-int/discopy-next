@@ -45,8 +45,10 @@ Summary
     Head
     Tail
     Functor
+    Unroll
     Lens
     Learner
+    Zeros
 
 .. admonition:: Functions
 
@@ -57,6 +59,8 @@ Summary
 
         tape
         autodiff
+        zeros
+        namespace
 
 Example
 -------
@@ -80,7 +84,9 @@ two back together; a recurrent cell feeds one of its outputs back in.
 
 from __future__ import annotations
 
+import importlib
 from collections.abc import Callable
+from dataclasses import dataclass
 from functools import partial
 from typing import Self
 
@@ -254,7 +260,8 @@ class Network(markov.Diagram, comarkov.Diagram):
         return cls.copy_factory(typ, n_legs_out) if n_legs_in == 1\
             else cls.merge_factory(typ, n_legs_in)
 
-    def to_function(self, tensor: type = object) -> python.Function:
+    def to_function(self, tensor: type = object, rounds: int | None = None
+                    ) -> python.Function:
         """
         Compile a feedforward network to a function on tensors, one per leg:
         the functor sending every leg to ``tensor`` and every box to its
@@ -265,6 +272,8 @@ class Network(markov.Diagram, comarkov.Diagram):
         Parameters:
             tensor : The type of the tensors on the legs, e.g. ``jax.Array``
                 or ``torch.Tensor``, checked on every wire.
+            rounds : The number of rounds to :meth:`unroll` every trace
+                into, a network with a trace not compiling without.
 
         Example
         -------
@@ -280,10 +289,47 @@ class Network(markov.Diagram, comarkov.Diagram):
             ...
         NotImplementedError: Trace(add >> double) has a trace, only ...
         """
+        if rounds is not None:
+            return self.unroll(rounds).to_function(tensor)
         self.assert_isfeedforward()
         return Functor(ob_map=lambda leg: (tensor, ),
                        ar_map=lambda box: box.assert_hasmodule().forward,
                        cod=python.Function)(self)
+
+    def unroll(self, rounds: int) -> Network:
+        """
+        The feedforward network running every trace for a number of
+        ``rounds``: the traced legs start at :func:`zeros`, every round
+        reads a copy of the input and the state the round before left, the
+        output is that of the last round and its state is discarded.
+
+        This is feedback with a delay rather than a trace: one round of a
+        swap gives zero, where yanking asks for the identity. Its reverse
+        derivative :meth:`to_lens` is backpropagation through time, i.e.
+        the rounds of the reverse derivative of the body, run backward from
+        the last one with their gradients summed: the reverse derivative is
+        a functor that preserves the rounds of a trace. A trace as a fixed
+        point is not covered, its derivative being implicit.
+
+        Parameters:
+            rounds : The number of rounds, at least one.
+
+        Example
+        -------
+        >>> import numpy as np
+        >>> x = Dims(2)
+        >>> add = Box('add', x @ x, x @ x, module=lambda v, m: (v + m, v + m))
+        >>> counter = add.trace()
+        >>> assert counter.unroll(3).dom == x == counter.unroll(3).cod
+        >>> counter.to_function(rounds=3)(np.array([1, 2]))
+        array([3, 6])
+        >>> counter.unroll(2).draw(
+        ...     doctest="docs/_static/neural/unroll.svg", figsize=(5, 5))
+
+        .. image:: /_static/neural/unroll.svg
+            :align: center
+        """
+        return Unroll(rounds)(self)
 
     def assert_isfeedforward(self) -> None:
         """ Raise ``NotImplementedError`` on a trace or a dagger: neither
@@ -295,7 +341,8 @@ class Network(markov.Diagram, comarkov.Diagram):
             if box.is_dagger:
                 raise NotImplementedError(f"{box} has no adjoint module.")
 
-    def to_lens(self, tensor: type = object) -> Lens:
+    def to_lens(self, tensor: type = object, rounds: int | None = None
+                ) -> Lens:
         """
         The reverse derivative of a feedforward network
         :cite:p:`CruttwellEtAl22`: the lens whose ``get`` is
@@ -310,6 +357,8 @@ class Network(markov.Diagram, comarkov.Diagram):
 
         Parameters:
             tensor : The type of the tensors and of their gradients.
+            rounds : The number of rounds to :meth:`unroll` every trace
+                into, a network with a trace having no lens without.
 
         Example
         -------
@@ -326,6 +375,8 @@ class Network(markov.Diagram, comarkov.Diagram):
         >>> backprop.put(np.array([1, 2]), np.array([1, 1]))
         array([3, 5])
         """
+        if rounds is not None:
+            return self.unroll(rounds).to_lens(tensor)
         self.assert_isfeedforward()
         leg, pullback = Lens.ob((tensor, ), (tensor, )), python.Ty(Callable)
 
@@ -603,6 +654,34 @@ class Functor(markov.Functor, comarkov.Functor):
     dom = cod = Network
 
 
+class Unroll(Functor):
+    """
+    The functor from networks to feedforward networks running every trace
+    for a number of ``rounds``, see :meth:`Network.unroll`.
+
+    Parameters:
+        rounds : The number of rounds, at least one.
+    """
+    def __init__(self, rounds: int):
+        if rounds < 1:
+            raise ValueError(f"Expected at least one round, got {rounds}.")
+        self.rounds = rounds
+        super().__init__(ob_map=lambda leg: leg, ar_map=lambda box: box)
+
+    def __call__(self, other):
+        if not isinstance(other, Trace):
+            return super().__call__(other)
+        mem, x, y, body = other.mem, other.dom, other.cod, self(other.arg)
+        if other.left:
+            body = Network.swap(x, mem) >> body >> Network.swap(mem, y)
+        start = Box('zeros', x, mem, module=Zeros(x, mem), vjp=Zeros(x, x))
+        hidden = body >> Network.discard(y) @ mem
+        network = Network.copy(x, self.rounds + 1) >> x ** self.rounds @ start
+        for left in reversed(range(1, self.rounds)):
+            network >>= x ** left @ hidden
+        return network >> body >> y @ Network.discard(mem)
+
+
 class Lens(lens.Symmetric, MarkovCategory):
     """
     The lenses of functions on tensors, where the reverse derivative of a
@@ -837,6 +916,77 @@ def tape(module, inputs: tuple) -> tuple:
             f"No reverse mode for {framework}: give the box a vjp.")
 
     return tuplify(module(*inputs)), unsupported
+
+
+@dataclass(frozen=True)
+class Zeros:
+    """
+    The module of a layer returning one tensor of zeros per leg of ``cod``,
+    with the leading dimensions of its first input, e.g. those of a batch:
+    the initial state of the traced legs in :meth:`Network.unroll`, and the
+    gradient of its inputs.
+
+    Parameters:
+        dom : The legs of the inputs.
+        cod : The legs of the outputs.
+
+    Example
+    -------
+    >>> import numpy as np
+    >>> Zeros(Dims(2), Dims(3, 1))(np.ones((5, 2)))[0].shape
+    (5, 3)
+    """
+    dom: Dims
+    cod: Dims
+
+    def __call__(self, *tensors):
+        if not self.dom:
+            raise NotImplementedError(
+                "A trace with no input has no tensor to take zeros like.")
+        like, leg = tensors[0], self.dom.inside[0]
+        batch = tuple(like.shape)[:len(like.shape) - len(leg)]
+        return untuplify(tuple(
+            zeros(like, batch + dim.inside) for dim in self.cod.inside))
+
+
+def zeros(like, shape: tuple[int, ...]):
+    """
+    The tensor of zeros of a ``shape``, in the framework and with the type
+    of the tensor it is ``like``: NumPy, PyTorch or JAX.
+
+    Parameters:
+        like : The tensor to take the framework and the type of.
+        shape : The shape of the zeros.
+
+    Example
+    -------
+    >>> import numpy as np
+    >>> zeros(np.ones(2, dtype=int), (1, 3))
+    array([[0, 0, 0]])
+    """
+    if hasattr(like, "new_zeros"):
+        return like.new_zeros(shape)
+    return namespace(like).zeros(shape, like.dtype)
+
+
+def namespace(like):
+    """
+    The module of array functions of the framework a tensor comes from:
+    ``torch``, ``jax.numpy`` or ``numpy``.
+
+    Parameters:
+        like : The tensor to take the framework of.
+
+    Example
+    -------
+    >>> import numpy as np
+    >>> assert namespace(np.ones(2)) is np
+    """
+    framework = type(like).__module__.partition(".")[0]
+    if framework in ("torch", "jax", "jaxlib"):
+        return importlib.import_module(
+            "torch" if framework == "torch" else "jax.numpy")
+    return importlib.import_module("numpy")
 
 
 def autodiff(module, inputs: tuple, gradients: tuple) -> tuple:

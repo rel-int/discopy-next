@@ -8,8 +8,8 @@ from pytest import importorskip, raises
 from discopy import neural, python
 from discopy.neural.network import (
     Box, Cofunction, Copy, Dim, Dims, Discard, Equation, Function, Functor,
-    Id, Lens, Merge, Network, Noise, Permutation, Swap, Trace, autodiff,
-    tape)
+    Id, Lens, Merge, Network, Noise, Permutation, Swap, Trace, Unroll, Zeros,
+    autodiff, tape, zeros)
 from discopy.utils import AxiomError, dumps, loads
 
 
@@ -430,6 +430,110 @@ def test_to_lens_jax():
     halves = inputs[..., :1], inputs[..., 1:]
     assert jnp.allclose(
         split.backward(inputs, *halves), inputs * jnp.array([1., 3.]))
+
+
+def test_unroll():
+    import numpy as np
+    x, m = Dims(2), Dims(Dim(2, 2), 3)
+    add = Box('add', x @ x, x @ x, module=lambda v, w: (v + w, v + w),
+              vjp=lambda v, w, dv, dw: (dv + dw, dv + dw))
+    counter = add.trace()
+    for rounds in (1, 2, 5):
+        unrolled = counter.unroll(rounds)
+        assert unrolled == Unroll(rounds)(counter)
+        assert unrolled.dom == unrolled.cod == x
+        assert not any(isinstance(box, Trace) for box in unrolled.boxes)
+        assert [box.name for box in unrolled.boxes].count('add') == rounds
+        v = np.array([1, 2])
+        assert list(counter.to_function(np.ndarray, rounds)(v)) == [
+            rounds, 2 * rounds]
+        assert list(counter.to_lens(rounds=rounds).put(v, 3 * v)) == [
+            3 * rounds, 6 * rounds]
+    left = Box('add', x @ x, x @ x, module=add.module).trace(left=True)
+    assert list(left.to_function(rounds=3)(np.array([1, 2]))) == [3, 6]
+    assert left.unroll(1).boxes[1].module == Zeros(x, x)
+    swap = Swap(x, x).trace()
+    assert list(swap.to_function(rounds=1)(np.array([1, 2]))) == [0, 0]
+    assert list(swap.to_function(rounds=2)(np.array([1, 2]))) == [1, 2]
+    nested = (add @ x >> x @ add).trace().trace().unroll(2)
+    assert [box.name for box in nested.boxes].count('add') == 2 * 2 * 2
+    assert Id(x).unroll(3) == Id(x) and add.unroll(3) == add
+    wide = Zeros(x, m)(np.ones((5, 4, 2), dtype=int))
+    assert [w.shape for w in wide] == [(5, 4, 2, 2), (5, 4, 3)]
+    assert wide[0].dtype == int and not wide[0].any()
+    with raises(ValueError, match="at least one round, got 0"):
+        counter.unroll(0)
+    with raises(NotImplementedError, match="no input"):
+        Box('f', x, x, module=lambda v: v).trace().to_function(rounds=1)()
+
+
+def recurrent(torch, width=3, state=4):
+    """ A recurrent cell and a readout of its state, with a trace. """
+    x, m, y = Dims(width), Dims(state), Dims(2)
+    linear = torch.nn.Linear(width + state, state).double()
+    cell = Box('cell', x @ m, m, module=lambda v, h: torch.tanh(
+        linear(torch.cat([v, h], -1))))
+    readout = Box('readout', m, y, module=torch.nn.Linear(state, 2).double())
+    return (cell >> Network.copy(m) >> readout @ m).trace()
+
+
+def test_backprop_through_time():
+    torch = importorskip("torch")
+    torch.manual_seed(0)
+    network = recurrent(torch)
+    cell, _, readout = network.boxes[0].arg.boxes
+    for rounds in (1, 2, 5):
+        inputs = torch.randn(6, 3, dtype=torch.float64, requires_grad=True)
+        gradient = torch.randn(6, 2, dtype=torch.float64)
+        state = torch.zeros(6, 4, dtype=torch.float64)
+        for _ in range(rounds):
+            state = cell.module(inputs, state)
+        outputs = readout.module(state)
+        expected, = torch.autograd.grad(outputs, inputs, gradient)
+        function = network.to_function(torch.Tensor, rounds)
+        assert torch.equal(function(inputs), outputs)
+        backprop = network.to_lens(torch.Tensor, rounds)
+        assert torch.equal(backprop.get(inputs.detach()), outputs)
+        assert torch.allclose(
+            backprop.put(inputs.detach(), gradient), expected, atol=1e-6)
+
+
+def test_reverse_preserves_the_rounds_of_a_trace():
+    torch = importorskip("torch")
+    torch.manual_seed(0)
+    network = recurrent(torch)
+    body = network.boxes[0].arg.to_lens(torch.Tensor)
+    for rounds in (1, 2, 5):
+        inputs = torch.randn(6, 3, dtype=torch.float64)
+        gradient = torch.randn(6, 2, dtype=torch.float64)
+        states = [zeros(inputs, (6, 4))]
+        for _ in range(rounds):
+            outputs, state = body.get(inputs, states[-1])
+            states.append(state)
+        total, back = 0 * inputs, (gradient, 0 * states[-1])
+        for i, state in enumerate(reversed(states[:-1])):
+            step, back = body.put(inputs, state, *back)
+            total, back = total + step, (0 * gradient, back)
+        unrolled = network.to_lens(torch.Tensor, rounds)
+        assert torch.allclose(unrolled.get(inputs), outputs, atol=1e-12)
+        assert torch.allclose(
+            unrolled.put(inputs, gradient), total, atol=1e-12)
+
+
+def test_unroll_jax():
+    jax = importorskip("jax")
+    import jax.numpy as jnp
+    x = Dims(2)
+    cell = Box('cell', x @ x, x @ x, module=lambda v, h: (
+        jnp.tanh(v + h), jnp.tanh(v + h)))
+    network = cell.trace()
+    inputs, gradient = jnp.array([[1., -1.], [.5, 2.]]), jnp.ones((2, 2))
+    function = network.to_function(jax.Array, rounds=3)
+    assert jnp.allclose(function(inputs), jnp.tanh(
+        inputs + jnp.tanh(inputs + jnp.tanh(inputs))))
+    expected = jax.vjp(function, inputs)[1](gradient)[0]
+    put = jax.jit(network.to_lens(jax.Array, rounds=3).put)
+    assert jnp.allclose(put(inputs, gradient), expected)
 
 
 def test_delay_is_the_identity():
