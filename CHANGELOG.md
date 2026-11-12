@@ -9,6 +9,11 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Added
 
+- `Network.unroll`, the feedforward network running every trace for a
+  number of rounds from a state of `zeros`, which `Network.to_function` and
+  `Network.to_lens` take as `rounds`, so that a network with a trace
+  compiles and its reverse derivative is backpropagation through time: the
+  reverse derivative preserves the rounds of a trace ([next#518]).
 - `neural.network.Learner`, the parametric lenses of functions on tensors,
   i.e. a learnable network with its weights and their gradients as a pair
   of parameters: `Learner.reverse` is the reverse derivative of a parametric
@@ -253,6 +258,10 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Changed
 
+- The `inside` of a composition of `python.Function` is a
+  `python.function.Composition` of its `factors`, extended when composed
+  again, so that a long composition built one function at a time is called
+  by a loop rather than by as many nested calls ([next#518]).
 - A bubble does not commute with dagger: `cat.Bubble.setoid` counts
   `is_dagger`, as `tensor.Bubble`'s has and as `cat.Bubble.__str__` prints,
   so that a functor cannot separate equal bubbles. Upstream states the
@@ -1823,6 +1832,7 @@ for the changelog of `1.2.1` and earlier.
 [next#515]: https://github.com/rel-int/discopy-next/pull/515
 [next#516]: https://github.com/rel-int/discopy-next/issues/516
 [next#517]: https://github.com/rel-int/discopy-next/pull/517
+[next#518]: https://github.com/rel-int/discopy-next/pull/518
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#56]: https://github.com/rel-int/optyx/pull/56
