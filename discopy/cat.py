@@ -1002,20 +1002,28 @@ one, they have [cat.Ob('x'), cat.Ob('y')].
     def setoid(self):
         """
         Ensure that bubbles are equal if they have the same type, their `args`
-        are equal as well as their attributes `dom, cod, name, method` and
-        `data`, as for a :class:`Box`: if the `data` is not hashable then
-        neither is the bubble. Its string prints the `data`, so that it reads
-        back.
+        are equal as well as their attributes `dom, cod, name, method,
+        is_dagger` and `data`, as for a :class:`Box`: if the `data` is not
+        hashable then neither is the bubble. Its string prints the `data`, so
+        that it reads back.
 
         >>> f = Box('f', Ob('x'), Ob('y'))
         >>> assert f.bubble(data=1) != f.bubble(data=2)
         >>> print(f.bubble(data=1))
         (f).bubble(data=1)
+
+        Bubbling and daggering do not commute, as :meth:`__str__` prints
+        them: the dagger of a bubble is not the bubble of a dagger, so that
+        a functor cannot separate equal bubbles, e.g. into
+        :class:`discopy.tensor.Bubble` where the two have different arrays.
+
+        >>> assert f.bubble().dagger() != f.dagger().bubble()
+        >>> assert f.bubble().dagger().dagger() == f.bubble()
         """
         args_data = tuple(f.setoid() for f in self.args)
         return (factory_key(type(self)), ) + args_data + tuple(
             getattr(self, x)
-            for x in ("dom", "cod", "name", "method", "data"))
+            for x in ("dom", "cod", "name", "method", "is_dagger", "data"))
 
     def __str__(self):
         """
