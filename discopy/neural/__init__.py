@@ -9,7 +9,7 @@ a PyTorch module and ``jax.jit`` takes as it is, and to its reverse
 derivative, a lens whose ``put`` is backpropagation.
 :mod:`discopy.neural.propagation` is the sum-product algorithm as such a
 network with a trace, equal on a tree to the contraction of its tensors
-once it has run for as many rounds as the diameter of the tree.
+once it has run for as many rounds as the radius of the tree.
 :mod:`discopy.neural.signature` says what a generator of a source category
 promises: its legs grouped into orbits, the symmetry each orbit carries, and
 the wirings drawn out of a family's combinatorics.

@@ -14,7 +14,7 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   the tensor of each factor to the belief of each node, its traced legs the
   messages and a round its `exclusive`, `reply` and `belief` boxes;
   `marginals` contracts the same tensors, and on a factor table whose
-  incidence graph is a tree the two agree after `diameter` rounds
+  incidence graph is a tree the two agree after `radius` rounds
   ([next#520]).
 - `Network.unroll`, the feedforward network running every trace for a
   number of rounds from a state of `zeros`, which `Network.to_function` and

@@ -13,7 +13,7 @@ rounds.
 
 The law is that on a factor table whose incidence graph is a tree, the
 rounds of :func:`sum_product` give the :func:`marginals`, exactly, as soon
-as there are as many rounds as the :func:`diameter` of the tree. On a graph
+as there are as many rounds as the :func:`radius` of the tree. On a graph
 with cycles they give an approximation.
 
 The messages are logarithms, so that the zero a trace starts from is the
@@ -29,7 +29,9 @@ Summary
 
     sum_product
     marginals
+    radius
     diameter
+    eccentricities
     exclusive
     belief
     reply
@@ -45,7 +47,7 @@ A path of three nodes with two states each, the middle one in both factors:
 >>> network = sum_product(factors, states=2)
 >>> network.dom, network.cod
 (Dims(Dim(2, 2), Dim(2, 2)), Dims(Dim(2), Dim(2), Dim(2)))
->>> beliefs = network.to_function(rounds=diameter(factors))(*tensors)
+>>> beliefs = network.to_function(rounds=radius(factors))(*tensors)
 >>> assert np.allclose(beliefs, marginals(factors, *tensors))
 >>> np.round(beliefs[1], 3)
 array([0.328, 0.672])
@@ -247,12 +249,11 @@ def marginals(factors, *tensors) -> list:
             for node in range(len(memberships(table)))]
 
 
-def diameter(factors) -> int:
+def eccentricities(factors) -> list[int]:
     """
-    The diameter of the incidence graph of a factor table, i.e. the longest
-    of the shortest paths between its nodes and factors, each membership
-    one step: the number of rounds after which :func:`sum_product` is exact
-    on a tree.
+    The eccentricity of every node, then of every factor, in the incidence
+    graph of a factor table: how far the farthest of the others is, each
+    membership one step.
 
     Parameters:
         factors : The factor table, see
@@ -260,8 +261,8 @@ def diameter(factors) -> int:
 
     Example
     -------
-    >>> diameter(((0, 1), (1, 2)))
-    4
+    >>> eccentricities(((0, 1), (1, 2)))
+    [4, 2, 4, 3, 3]
     """
     table = table_of(factors)
     nodes = memberships(table)
@@ -280,4 +281,43 @@ def diameter(factors) -> int:
             raise ValueError("The factor table is not connected.")
         return steps
 
-    return max(map(eccentricity, edges))
+    return list(map(eccentricity, edges))
+
+
+def diameter(factors) -> int:
+    """
+    The diameter of the incidence graph of a factor table, the largest of
+    its :func:`eccentricities`: the longest of the shortest paths between
+    its nodes and factors.
+
+    Parameters:
+        factors : The factor table, see
+            :func:`discopy.neural.wiring.table_of`, connected.
+
+    Example
+    -------
+    >>> diameter(((0, 1), (1, 2)))
+    4
+    """
+    return max(eccentricities(factors))
+
+
+def radius(factors) -> int:
+    """
+    The radius of the incidence graph of a factor table, the least of its
+    :func:`eccentricities`, which on a tree is half the :func:`diameter`,
+    rounded up: the number of rounds after which :func:`sum_product` is
+    exact on a tree, and not one before, since a round takes a message two
+    steps, from a factor to a node and from the node on to its other
+    factors.
+
+    Parameters:
+        factors : The factor table, see
+            :func:`discopy.neural.wiring.table_of`, connected.
+
+    Example
+    -------
+    >>> radius(((0, 1), (1, 2)))
+    2
+    """
+    return min(eccentricities(factors))

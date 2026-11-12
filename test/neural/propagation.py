@@ -8,7 +8,8 @@ from pytest import importorskip, raises
 from discopy.neural import propagation
 from discopy.neural.network import Dim, Dims, Trace
 from discopy.neural.propagation import (
-    belief, diameter, exclusive, marginals, reply, sum_product)
+    belief, diameter, eccentricities, exclusive, marginals, radius, reply,
+    sum_product)
 
 
 def random_tree(rng, n_factors=5, max_arity=3):
@@ -40,9 +41,13 @@ def test_sum_product_is_the_contraction_on_trees():
         network, exact = sum_product(factors, states), marginals(
             factors, *tensors)
         assert network.cod == Dims(states) ** len(exact)
-        for rounds in (diameter(factors), diameter(factors) + 3):
+        assert radius(factors) == (diameter(factors) + 1) // 2
+        for rounds in (radius(factors), radius(factors) + 3):
             beliefs = network.to_function(np.ndarray, rounds)(*tensors)
             assert gap(np.atleast_2d(beliefs), exact) < 1e-6
+        if radius(factors) > 1:
+            early = network.to_function(rounds=radius(factors) - 1)(*tensors)
+            assert gap(np.atleast_2d(early), exact) > 1e-6
 
 
 def test_sum_product_needs_its_rounds():
@@ -51,14 +56,14 @@ def test_sum_product_needs_its_rounds():
     network, exact = sum_product(factors, 2), marginals(factors, *tensors)
     gaps = [gap(network.to_function(rounds=rounds)(*tensors), exact)
             for rounds in range(1, 5)]
-    assert diameter(factors) == 8 and gaps[0] > 1e-3 and gaps[-1] < 1e-12
-    assert gaps == sorted(gaps, reverse=True)
+    assert diameter(factors) == 8 and radius(factors) == 4
+    assert min(gaps[:3]) > 1e-6 and gaps[3] < 1e-12
 
 
 def test_a_reply_leaves_out_the_node_it_is_sent_to(monkeypatch):
     factors = ((0, 1), (1, 2), (1, 3))
     tensors = random_tensors(np.random.default_rng(0), factors, 3)
-    exact, rounds = marginals(factors, *tensors), diameter(factors)
+    exact, rounds = marginals(factors, *tensors), radius(factors)
 
     def echo(tensor, *messages):
         return tuple(sent + message for sent, message in zip(
@@ -83,7 +88,7 @@ def test_sum_product_on_a_batch():
     network = sum_product(factors, 2)
     assert isinstance(network, Trace) and len(network.mem) == 6
     assert network.dom == Dims(2, Dim(2, 2, 2), Dim(2, 2))
-    beliefs = network.to_function(rounds=diameter(factors))(*batch)
+    beliefs = network.to_function(rounds=radius(factors))(*batch)
     assert all(node.shape == (4, 2) for node in beliefs)
     for row in range(4):
         exact = marginals(factors, *(tensor[row] for tensor in batch))
@@ -101,7 +106,10 @@ def test_messages():
     first, second = reply(tensor, np.log([1., 3.]), np.zeros(2))
     assert np.allclose(np.exp(first), [.25, .75])
     assert np.allclose(np.exp(second), [.4, .6])
-    assert diameter(((0, ), )) == 1 and diameter(((0, 1), (1, 2), (0, 2))) == 3
+    assert diameter(((0, ), )) == 1 == radius(((0, ), ))
+    triangle = ((0, 1), (1, 2), (0, 2))
+    assert diameter(triangle) == 3 == radius(triangle)
+    assert eccentricities(((0, 1), (1, 2))) == [4, 2, 4, 3, 3]
     with raises(ValueError, match="not connected"):
         diameter(((0, 1), (2, 3)))
 
@@ -112,7 +120,7 @@ def test_sum_product_torch():
     tensors = [torch.tensor(tensor, requires_grad=True) for tensor in
                random_tensors(np.random.default_rng(0), factors, 2)]
     network = sum_product(factors, 2)
-    beliefs = network.to_function(torch.Tensor, diameter(factors))(*tensors)
+    beliefs = network.to_function(torch.Tensor, radius(factors))(*tensors)
     exact = marginals(factors, *tensors)
     assert gap([b.detach() for b in beliefs], [e.detach() for e in exact])\
         < 1e-12
