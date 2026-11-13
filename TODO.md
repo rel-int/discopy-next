@@ -6,4 +6,4 @@
 - [ ] #478: the measurement on the issue — reading 2 is the same term as reading 1, and the quadratic cost is scan_types, not the trace count
 - [x] #478: cmap.CMap's identical explicit_trace loop, filed as its own issue, filed as #537
 - [x] CHANGELOG.md bullet and the gates of CONTRIBUTING.md
-- [WIP] @session_01C7YfAQNzY28EVbk6YirCHJ-2026-11-13 01:50 #478: the real quadratic cause — scan_types on every intermediate hypergraph — filed as its own issue
+- [x] #478: the real quadratic cause — scan_types on every intermediate hypergraph — filed as its own issue, filed as #536
