@@ -171,7 +171,7 @@ from typing import Optional
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 
-from discopy import messages, symmetric
+from discopy import messages, symmetric, testable
 from discopy.abc import FeedbackCategory, NamedGeneric
 from discopy.testable import TestableGeneric
 from discopy.python import finset
@@ -358,11 +358,76 @@ class Ty[base](NamedGeneric):
         return type(self)(now, None if self.is_constant and suffix.is_constant
                           else lambda: self.later.without(suffix.later))
 
+    @classmethod
+    def generator_strategy(cls):
+        """
+        Generate the sequence of one named object: one object per time step
+        is what an atom of a stream of types is, there being no object that
+        stands still.
+
+        >>> atom = Ty.generator_strategy().example()
+        >>> assert len(atom.now) == 1 and not atom.is_constant
+        """
+        from hypothesis import strategies as st
+
+        return st.sampled_from(testable.GENERATORS).map(
+            lambda name: cls.sequence(cls.base(name)))
+
+    @classmethod
+    def strategy(cls):
+        """
+        Generate a stream of types of at most three wires per step, built
+        one of the four ways that differ in their tail: constant, a
+        :meth:`singleton`, a :meth:`sequence`, and the :meth:`delay` of a
+        constant one.
+
+        >>> assert Ty.strategy().example().unroll(2) is not None
+        """
+        from hypothesis import strategies as st
+
+        types = st.lists(st.sampled_from(testable.GENERATORS), max_size=3).map(
+            lambda names: cls.base().tensor(*map(cls.base, names)))
+        return st.one_of(
+            types.map(cls),
+            types.map(cls.singleton),
+            types.map(cls.sequence),
+            types.map(lambda x: cls(x).delay()))
+
     __matmul__ = symmetric.Ty.__matmul__
     __pow__ = symmetric.Ty.__pow__
 
 
 NO_TREE = messages.NO_TREE_STREAM
+
+STEPS = 3
+""" How many steps of a stream :func:`up_to_steps` compares. """
+
+
+def up_to_steps(term: "Ty | Stream"):
+    """
+    The first :data:`STEPS` steps of a stream, as one arrow of the
+    underlying category when it has one, else as one type: the stream
+    unrolled that far, its `now` taken and quotiented by the equation of
+    the underlying category.
+
+    This is the relation a law of streams is read with, see
+    :meth:`Stream.equation_factory`. Equality on a stream is intensional,
+    see :class:`Ty`, so a law stated with `==` would be false of any two
+    terms built separately and say nothing about the law. It is what the
+    module docstring states by hand with its own ``eq_up_to_n``, with the
+    quotient of the underlying category on top, which is what makes
+    associativity of composition hold: it holds up to the axioms of
+    symmetric categories, i.e. up to the isomorphism of hypergraphs.
+
+    >>> x, y = map(Ty.sequence, "xy")
+    >>> f = Stream.sequence('f', x, y)
+    >>> assert up_to_steps(Stream.id(x) >> f) == up_to_steps(f)
+    >>> assert up_to_steps(Stream.id(x)) != up_to_steps(f)
+    """
+    unrolled = term.unroll(STEPS).now
+    category = getattr(type(term), "category", None)
+    return unrolled if category is None\
+        else testable.quotient(category, unrolled)
 
 
 @dataclass
@@ -415,13 +480,24 @@ class Stream[category](FeedbackCategory, TestableGeneric):
     >>> assert Stream.id(X) != Stream.id(X)
     >>> assert Stream.sequence('f', X, Y) != Stream.sequence('f', X, Y)
 
-    So a law of a feedback category is checked on streams up to a finite
-    number of steps, which is what :class:`Equation` compares and what the
-    property matrix checks, see :meth:`equation_factory`.
+    So a law of a feedback category is read on streams up to a finite number
+    of steps, which is what :func:`up_to_steps` computes and
+    :meth:`equation_factory` compares.
     """
     @classmethod
     def checked_params(cls) -> tuple:
-        """ None, a stream drawing no terms yet. """
+        """
+        None, so that the property matrix does not check streams yet: a
+        stream draws its terms, see :meth:`strategy`, and states the
+        equality its laws are read with, see :meth:`equation_factory`, but
+        :func:`discopy.testable.inhabits` compares the boundary of a term
+        with `==`, which on objects of intensional equality is identity, so
+        nine cells would fail on the type check of a law that holds. That,
+        and the three feedback laws that hold only up to a permutation of
+        the memory, are the two decisions of
+        `#533 <https://github.com/rel-int/discopy-next/issues/533>`_;
+        returning ``(cls.category, )`` enrols streams the day they land.
+        """
         return ()
 
     category = symmetric.Diagram
@@ -436,6 +512,48 @@ class Stream[category](FeedbackCategory, TestableGeneric):
     later, is_constant = Ty.later, Ty.is_constant
     head, tail = Ty.head, Ty.tail
     sliding = FeedbackCategory.sliding.failing(messages.STREAM_SLIDING)
+
+    @classmethod
+    def equation_factory(cls, *terms: Stream) -> testable.Equation:
+        """
+        The equation of a law, compared up to :data:`STEPS` steps of each
+        term, see :func:`up_to_steps`: `==` on a stream is intensional, so
+        a law compared on the nose would be false of any two terms built
+        separately.
+
+        >>> x, y = map(Ty.sequence, "xy")
+        >>> f = Stream.sequence('f', x, y)
+        >>> assert Stream.equation_factory(f @ Stream.id(), f)
+        >>> assert not Stream.equation_factory(f, Stream.id(x))
+        """
+        return testable.Equation(*terms, up_to=up_to_steps)
+
+    @classmethod
+    def strategy(cls, *, dom=None, cod=None, mem=None):
+        """
+        Generate a stream of boxes over a drawn memory, see
+        :meth:`sequence`: one box per time step is the free feedback
+        category the laws quantify over, and the memory is what makes a
+        stream more than a stream of arrows.
+
+        Parameters:
+            dom : The domain of the stream, drawn when not given.
+            cod : The codomain of the stream, drawn when not given.
+            mem : The memory of the stream, drawn when not given.
+
+        >>> f = Stream.strategy().example()
+        >>> assert f.check_later() is None and f.unroll(STEPS) is not None
+        """
+        from hypothesis import strategies as st
+
+        @st.composite
+        def streams(draw):
+            source = draw(cls.ob.strategy()) if dom is None else dom
+            target = draw(cls.ob.strategy()) if cod is None else cod
+            memory = draw(cls.ob.strategy()) if mem is None else mem
+            name = draw(st.sampled_from(testable.GENERATORS))
+            return cls.sequence(name, source, target, memory)
+        return streams()
 
     def __init__(
             self, now: category,
