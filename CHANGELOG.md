@@ -1453,6 +1453,11 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Project
 
+- `build`'s `test` job has a 40-minute backstop instead of 20, above the
+  9.7-20.3 minutes it runs in on `main` rather than inside it: a job over
+  `timeout-minutes` reports `cancelled`, so the six jobs it cut over five
+  runs of `main` in fifteen hours read as nothing having happened
+  ([next#532]).
 - The law `EGraph.building` is proved on the Lean model: for a valid
   e-graph whose nodes read spiders that are there and a history the Python
   accepts, the builder freezes into what the operations give in turn, the
@@ -1903,6 +1908,7 @@ for the changelog of `1.2.1` and earlier.
 [next#528]: https://github.com/rel-int/discopy-next/pull/528
 [next#529]: https://github.com/rel-int/discopy-next/pull/529
 [next#531]: https://github.com/rel-int/discopy-next/pull/531
+[next#532]: https://github.com/rel-int/discopy-next/pull/532
 [next#533]: https://github.com/rel-int/discopy-next/issues/533
 [next#535]: https://github.com/rel-int/discopy-next/pull/535
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
