@@ -796,30 +796,65 @@ class Hypergraph[category](
     l = property(lambda self: self.rotate(left=True))
     r = property(lambda self: self.rotate(left=False))
 
-    def explicit_trace(self, left=False):
+    def explicit_trace(self, n=1, left=False):
         """
-        The trace of a hypergraph with explicit boxes (trace, cup or cap).
+        The trace of ``n`` wires of a hypergraph with explicit boxes (trace,
+        cup or cap), in one pass.
 
         Parameters:
+            n : The number of wires to trace.
             left : Whether to trace on the left or right.
 
         Note
         ----
         When ``category.trace_factory`` is a subclass of ``category``,
         e.g. for symmetric diagrams, then the result is just one big trace box
-        wrapped up as a hypergraph.
+        wrapped up as a hypergraph, whatever ``n``, since the trace of ``n``
+        wires of a diagram is its ``n`` one-wire traces nested, see
+        :meth:`discopy.feedback.Diagram.feedback`. Nesting them on the diagram
+        converts the hypergraph once instead of once per wire.
 
         Otherwise, we assume that the trace factory is a class method, e.g.
         for compact diagrams, in which case we use this method to introduce
-        cup and cap boxes.
+        cup and cap boxes, one pair per wire: the cups and caps of a pivotal
+        category are atomic, so the ``n``-wire trace is the nest of ``n``
+        one-wire traces there as well.
+
+        >>> from discopy import frobenius, markov
+        >>> x = markov.Ty('x')
+        >>> f = markov.Box('f', x @ x @ x, x @ x @ x).to_hypergraph()
+        >>> assert f.explicit_trace(2) == f.explicit_trace().explicit_trace()
+        >>> y = frobenius.Ty('y')
+        >>> g = frobenius.Box('g', y @ y @ y, y @ y @ y).to_hypergraph()
+        >>> assert g.explicit_trace(2) == g.explicit_trace().explicit_trace()
+
+        Tracing no wire is the identity, whatever the category, so a graph
+        with nothing to trace needs no traces, see
+        :meth:`trace_backward_wires`; any other ``n`` is checked against the
+        wires there are, as :meth:`trace` checks it.
+
+        >>> from discopy import rigid
+        >>> z = rigid.Ty('z')
+        >>> h = rigid.Box('h', z, z).to_hypergraph()
+        >>> assert h.explicit_trace(0) == h
+        >>> f.explicit_trace(-1)
+        Traceback (most recent call last):
+         ...
+        ValueError: Cannot split -1 atoms off f.
         """
+        if n == 0:
+            return self
         if not issubclass(self.category, TracedCategory):
             raise AxiomError(messages.NOT_TRACED.format(
                 factory_name(self.category)))
+        assert_istraceable(self, n, left)
         factory = self.category.trace_factory
         if isclass(factory) and issubclass(factory, self.category):
-            return self.from_box(factory(self.to_diagram(), left))
-        return factory.__func__(type(self), self, left)
+            return self.from_box(self.to_diagram().trace(n, left))
+        result = self
+        for _ in range(n):
+            result = factory.__func__(type(self), result, left)
+        return result
 
     def trace(self, n=1, left=False):
         """
@@ -847,7 +882,7 @@ class Hypergraph[category](
                 factory_name(self.category)))
         assert_istraceable(self, n, left)
         if not issubclass(self.category, SymmetricCategory):
-            return self.explicit_trace(left).trace(n - 1, left)
+            return self.explicit_trace(n, left)
         (dom, inputs, dom_wires), (cod, outputs, cod_wires) = (
             (typ[n:], wires[:n], wires[n:]) if left
             else (typ[:-n], wires[-n:], wires[:-n])
@@ -2629,14 +2664,12 @@ class Hypergraph[category](
         are not known before the first cut: they are cut one at a time, by
         :meth:`cut_backward_wire`, until every wire points forward. The
         traces all apply to the result of the last cut, so they are counted
-        rather than nested.
+        and taken in one pass, see :meth:`explicit_trace`.
         """
         graph, cuts = self, 0
         while (cut := graph.cut_backward_wire()) is not None:
             graph, cuts = cut, cuts + 1
-        for _ in range(cuts):
-            graph = graph.explicit_trace()
-        return graph
+        return graph.explicit_trace(cuts)
 
     def cut_backward_wire(self) -> "Hypergraph | None":
         """

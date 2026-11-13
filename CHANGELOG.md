@@ -279,6 +279,15 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Changed
 
+- `Hypergraph.explicit_trace` takes the number of wires to trace and takes
+  them in one pass, so `make_causal` and `make_cocausal` convert the graph
+  once rather than once per cut: 7.5x faster on the traces of a graph with
+  128 of them over a category whose trace is a box, and the same term, the
+  `n`-wire trace being the `n` nested one-wire ones on either kind of
+  `trace_factory`. Its signature is now `explicit_trace(n=1, left=False)`,
+  `Hypergraph.trace`'s own, so a call passing `left` positionally — which
+  used to read `explicit_trace(True)` — passes it as `n` and must be spelled
+  `explicit_trace(left=True)` ([next#534]).
 - The `inside` of a composition of `python.Function` is a
   `python.function.Composition` of its `factors`, extended when composed
   again, so that a long composition built one function at a time is called
@@ -1910,6 +1919,7 @@ for the changelog of `1.2.1` and earlier.
 [next#531]: https://github.com/rel-int/discopy-next/pull/531
 [next#532]: https://github.com/rel-int/discopy-next/pull/532
 [next#533]: https://github.com/rel-int/discopy-next/issues/533
+[next#534]: https://github.com/rel-int/discopy-next/pull/534
 [next#535]: https://github.com/rel-int/discopy-next/pull/535
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
