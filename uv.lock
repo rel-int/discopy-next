@@ -968,6 +968,11 @@ quantum = [
     { name = "torch", version = "2.13.0", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform != 'linux'" },
     { name = "torch", version = "2.13.0+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "sys_platform == 'linux'" },
 ]
+tensor = [
+    { name = "cotengra" },
+    { name = "opt-einsum" },
+    { name = "quimb" },
+]
 test = [
     { name = "anywidget" },
     { name = "cotengra" },
@@ -1012,7 +1017,7 @@ test = [
 [package.dev-dependencies]
 all = [
     { name = "coverage" },
-    { name = "discopy", extra = ["docs", "grammar", "notebooks", "optyx", "quantum"] },
+    { name = "discopy", extra = ["docs", "grammar", "notebooks", "optyx", "quantum", "tensor"] },
     { name = "egglog" },
     { name = "hypothesis" },
     { name = "marimo" },
@@ -1054,11 +1059,15 @@ optyx = [
 quantum = [
     { name = "discopy", extra = ["quantum"] },
 ]
+tensor = [
+    { name = "discopy", extra = ["tensor"] },
+]
 
 [package.metadata]
 requires-dist = [
     { name = "anywidget", marker = "extra == 'notebooks'" },
     { name = "cotengra", marker = "extra == 'optyx'" },
+    { name = "cotengra", marker = "extra == 'tensor'" },
     { name = "coverage", marker = "extra == 'test'" },
     { name = "discopy", extras = ["grammar", "notebooks", "optyx", "quantum"], marker = "extra == 'test'" },
     { name = "discopy", extras = ["notebooks", "optyx"], marker = "extra == 'docs'" },
@@ -1079,6 +1088,7 @@ requires-dist = [
     { name = "nltk", marker = "extra == 'grammar'" },
     { name = "numpy" },
     { name = "opt-einsum", marker = "extra == 'optyx'" },
+    { name = "opt-einsum", marker = "extra == 'tensor'" },
     { name = "pandas", marker = "extra == 'notebooks'" },
     { name = "pennylane", marker = "extra == 'quantum'", specifier = ">=0.45.0" },
     { name = "pennylane-qiskit", marker = "extra == 'quantum'", specifier = ">=0.45.0" },
@@ -1100,6 +1110,7 @@ requires-dist = [
     { name = "qoolqit", marker = "extra == 'quantum'" },
     { name = "quimb", marker = "extra == 'optyx'" },
     { name = "quimb", marker = "extra == 'quantum'" },
+    { name = "quimb", marker = "extra == 'tensor'" },
     { name = "scipy", marker = "extra == 'optyx'" },
     { name = "scipy", marker = "extra == 'quantum'" },
     { name = "seaborn", marker = "extra == 'notebooks'" },
@@ -1119,7 +1130,7 @@ requires-dist = [
     { name = "torch", marker = "sys_platform != 'linux' and extra == 'quantum'" },
     { name = "tqdm", marker = "extra == 'notebooks'" },
 ]
-provides-extras = ["quantum", "grammar", "optyx", "test", "notebooks", "docs"]
+provides-extras = ["tensor", "quantum", "grammar", "optyx", "test", "notebooks", "docs"]
 
 [package.metadata.requires-dev]
 all = [
@@ -1129,6 +1140,7 @@ all = [
     { name = "discopy", extras = ["notebooks"] },
     { name = "discopy", extras = ["optyx"] },
     { name = "discopy", extras = ["quantum"] },
+    { name = "discopy", extras = ["tensor"] },
     { name = "egglog" },
     { name = "hypothesis" },
     { name = "marimo" },
@@ -1160,6 +1172,7 @@ grammar = [{ name = "discopy", extras = ["grammar"] }]
 notebooks = [{ name = "discopy", extras = ["notebooks"] }]
 optyx = [{ name = "discopy", extras = ["optyx"] }]
 quantum = [{ name = "discopy", extras = ["quantum"] }]
+tensor = [{ name = "discopy", extras = ["tensor"] }]
 
 [[package]]
 name = "docutils"

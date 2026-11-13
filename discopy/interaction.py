@@ -62,9 +62,10 @@ Example
 """
 
 from __future__ import annotations
-from typing import Sequence
+from typing import Self, Sequence
 from dataclasses import dataclass
 from functools import wraps
+from operator import index
 
 from discopy import (
     balanced,
@@ -208,6 +209,16 @@ class Ty[natural](Pregroup, TestableGeneric):
     def unit(cls) -> Ty:
         return cls()
 
+    def __pow__(self, n_times: int) -> Self:
+        """
+        The tensor of a pair with itself ``n_times``.
+
+        >>> from discopy.ribbon import Ty as T
+        >>> x = Ty[T](T('x'), T('y'))
+        >>> assert x ** 2 == x @ x and x ** 0 == Ty[T]()
+        """
+        return type(self)().tensor(*index(n_times) * [self])
+
     def tensor(self, *others: Ty):
         if any(not isinstance(other, type(self)) for other in others):
             return NotImplemented
@@ -283,12 +294,21 @@ class Ty[natural](Pregroup, TestableGeneric):
 class Diagram[natural](RibbonCategory, TestableGeneric):
     """
     An integer diagram from ``x`` to ``y`` is a :attr:`natural` diagram
-    from ``x.positive @ y.negative`` to ``x.negative @ y.positive``.
+    from ``x.positive @ y.negative`` to ``y.positive @ x.negative``, i.e.
+    the positive halves go forward and the negative halves backward.
 
     Parameters:
         inside : The natural diagram inside.
         dom : The domain of the diagram, i.e. its input.
         cod : The codomain of the diagram, i.e. its output.
+
+    Example
+    -------
+    >>> from discopy.ribbon import Ty as T, Box
+    >>> x, y = Ty[T]('x', 'u'), Ty[T]('y', 'v')
+    >>> f = Diagram(Box('f', T('x', 'v'), T('y', 'u')), x, y)
+    >>> assert f.inside.dom == x.positive @ y.negative
+    >>> assert f.inside.cod == y.positive @ x.negative
 
     Note
     ----

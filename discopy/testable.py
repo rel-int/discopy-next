@@ -102,6 +102,7 @@ from discopy.utils import (
     NamedGeneric,
     classproperty,
     dumps,
+    factory_key,
     factory_name,
     from_tree,
     loads,
@@ -212,7 +213,7 @@ class Equation[T]:
         ...
         TypeError: unhashable type: 'list'
         """
-        return hash((type(self), self.terms, self.symbols))
+        return hash((factory_key(type(self)), self.terms, self.symbols))
 
     def __repr__(self):
         """
@@ -1368,8 +1369,8 @@ class Serialisable[T](Testable[T]):
         identifiers, as those the strategies draw: a term with two of one
         name is assumed away, one named e.g. ``"a box"`` or ``"class"`` does
         not read back. Nor do the colours of a wire, which no string prints,
-        a bubble of other than one argument, a rotated box, e.g. ``f.r``, or
-        a gate with parameters, e.g. ``Rz(0.5)``.
+        a bubble of other than one argument or a gate with parameters, e.g.
+        ``Rz(0.5)``.
         """
         try:
             environment = cls.str_environment(term)

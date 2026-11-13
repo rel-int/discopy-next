@@ -87,6 +87,17 @@ def test_ZXBox_equals_its_diagram():
     assert Z(1, 1, 0.25) != Z(1, 1, 0.5) and Z(1, 1) != X(1, 1)
 
 
+def test_H_is_its_own_dagger():
+    """#387's sibling, #366: the optyx dagger renamed a box, so `H[::-1]`
+    was a box called `H.dagger()` that `H` did not equal and `to_pyzx`
+    refused. `H` declares itself self-adjoint with `is_dagger=None`, as
+    `quantum.gates.SWAP` does."""
+    assert H.is_dagger is None
+    assert H[::-1] is H and H[::-1] == H and hash(H[::-1]) == hash(H)
+    assert ZXDiagram.from_pyzx((Z(1, 1, .25) >> H[::-1]).to_pyzx()) \
+        == Z(1, 1, .25) >> H
+
+
 def test_to_pyzx_errors():
     with raises(NotImplementedError):
         Diagram.to_pyzx(quantum.H)

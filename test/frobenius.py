@@ -275,6 +275,33 @@ def test_str_transparency_of_a_spider():
     assert eval(str(spider), Diagram.str_environment(spider)) == spider
 
 
+
+def test_str_transparency_of_a_packed_layer():
+    """ A layer that packs a cospan beside a box prints as their tensor,
+    which reads back as two layers: the same hypergraph, not the same
+    diagram, so the law holds up to :meth:`Diagram.to_hypergraph`. """
+    a = Ty('a')
+    f, cospan = Box('f', a, a), Cospan(a @ a, [0, 1], [1])
+    packed = Diagram((Layer(cospan, f), ), cospan.dom @ a, cospan.cod @ a)
+    unpacked = eval(str(packed), Diagram.str_environment(packed))
+    assert unpacked != packed
+    assert unpacked.to_hypergraph() == packed.to_hypergraph()
+    assert Diagram.str_transparency(packed)
+
 def test_structural_boxes():
     from discopy.testable import assert_structural_boxes
     assert_structural_boxes(Diagram)
+
+
+def test_tensor_drops_a_whiskered_identity_spider():
+    """ Whiskering a spider with one leg on each side leaves the identity,
+    i.e. no layer, so that the tensor serialises, foliates and draws. """
+    from discopy.utils import dumps, loads
+    x = Ty('x')
+    f, spider = Box('f', x, x), Spider(1, 1, x)
+    for diagram in (spider @ f, f @ spider, (f >> spider) @ f):
+        assert all(layer.boxes for layer in diagram.inside)
+        assert loads(dumps(diagram)) == diagram
+        assert diagram.foliation().foliation() == diagram.foliation()
+        assert diagram.to_drawing().dagger().dagger() == diagram.to_drawing()
+    assert spider @ f == x @ f and f @ spider == f @ x

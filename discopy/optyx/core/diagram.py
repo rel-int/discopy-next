@@ -213,6 +213,7 @@ from discopy import (
 from discopy import stream as monoidal_stream
 from discopy.cat import factory, rsubs
 from discopy.frobenius import Dim
+from discopy.optyx.utils.misc import hashable
 from discopy.utils import AxiomError, factory_name
 from discopy.quantum.gates import format_number
 from discopy.optyx.core import path
@@ -744,7 +745,13 @@ class Box(frobenius.Box, Diagram):
     def dagger(self) -> Box:
         """Return the dagger of the box.
         Inheriting boxes should implement this method.
-        Otherwise it is defined by the array."""
+        Otherwise it is defined by the array.
+
+        A box declares itself self-adjoint with ``is_dagger=None``, as
+        :data:`discopy.quantum.gates.SWAP` does, and is then its own dagger
+        rather than a differently named copy of itself."""
+        if self.is_dagger is None:
+            return self
         if self.array is not None:
             return type(self)(
                 self.name + ".dagger()",
@@ -1195,6 +1202,16 @@ class DualRail(Box):
         self.is_dagger = is_dagger
         self.photon_preservation_behaviour = \
             PhotonNumberPreservation.CUSTOM
+
+    def setoid(self):
+        """
+        The internal state of the photon is in no other component, so two
+        encodings in different states were equal.
+
+        >>> assert DualRail() != DualRail(internal_state=[1, 0])
+        >>> assert DualRail() == DualRail()
+        """
+        return super().setoid() + (hashable(self.internal_state), )
 
     def photon_number_transform(self, dims_in, dims_out):
         from discopy.optyx.core.zw import Create

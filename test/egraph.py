@@ -1,7 +1,11 @@
+import gzip
+import json
 import random
 from functools import reduce
 from itertools import islice
+from math import inf
 from operator import eq, lt
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -9,8 +13,8 @@ from hypothesis import assume, example, given, settings, strategies as st
 from pytest import raises
 
 from discopy import symmetric
-from discopy.ehypergraph import (
-    EHypergraph, Join, Markov, distribute, partition)
+from discopy.egraph import (
+    EGraph, History, Join, Markov, distribute, partition)
 from discopy.hypergraph import Hypergraph
 from discopy.markov import Ty, Box, Copy, Diagram, Functor, Swap
 from discopy.tensor import Dim, Tensor
@@ -39,7 +43,7 @@ def test_samples_are_independent():
 
 def test_category_has_flags():
     with raises(AxiomError):
-        EHypergraph[symmetric.Diagram].from_diagram(symmetric.Box('f', x, x))
+        EGraph[symmetric.Diagram].from_diagram(symmetric.Box('f', x, x))
 
 
 def test_effects_are_kept():
@@ -83,7 +87,7 @@ def test_rewrite_glues():
     assert len(rewritten.sections()) == 1
 
 
-def names(graph: EHypergraph) -> list[list[str]]:
+def names(graph: EGraph) -> list[list[str]]:
     """ The e-nodes of each class by name, as the dashed boxes of Tiurin et
     al.'s figures, an input named ``"input"``. """
     def name(port):
@@ -99,7 +103,7 @@ def joins(diagram: Diagram) -> list[list[str]]:
                   for box in diagram.boxes if isinstance(box, Join))
 
 
-def spider(graph: EHypergraph, box: Box) -> int:
+def spider(graph: EGraph, box: Box) -> int:
     """ The output of the first occurrence of a box with one output. """
     output, = graph.graph.box_wires[graph.graph.boxes.index(box)][1]
     return output
@@ -119,14 +123,14 @@ def test_join():
 
 
 def test_join_delays_as_a_bubble():
-    from discopy import ehypergraph, feedback, markov
+    from discopy import egraph, feedback, markov
     join = Join(f, g)
     delayed = join.delay()
     assert delayed.args == (f, g) and (delayed.dom, delayed.cod) == (x.d, x.d)
     assert delayed.reset() == join and str(delayed) == "Join(f, g).d"
     assert loads(dumps(delayed)) == delayed
     assert eval(repr(delayed), dict(
-        ehypergraph=ehypergraph, feedback=feedback, markov=markov)) == delayed
+        egraph=egraph, feedback=feedback, markov=markov)) == delayed
     assert distribute(delayed) == distribute(join).delay() == f.d + g.d
     assert distribute((join >> h).delay()) == distribute(join >> h).delay()
 
@@ -181,7 +185,7 @@ def test_figure_1():
         [['*', '<<'], ['/'], ['1'], ['2'], ['a']],
         [['*', '/'], ['*', '<<'], ['/'], ['1'], ['2'], ['a']],
         [['*', '/'], ['*', '<<'], ['/', '1'], ['2'], ['a']]]
-    assert list(map(len, map(EHypergraph.sections, steps))) == [1, 2, 3, 5]
+    assert list(map(len, map(EGraph.sections, steps))) == [1, 2, 3, 5]
     assert list(map(len, (joins(step.to_diagram()) for step in steps))) == [
         0, 1, 2, 3]
     assert all(map(Markov.translation, steps))
@@ -367,7 +371,7 @@ def test_to_tree():
     graph = Markov.from_diagram(Copy(x) >> f @ sample).merge(1, 2)
     tree = graph.to_tree()
     assert (tree['factory'], tree['category']) == (
-        'ehypergraph.EHypergraph', 'markov.Diagram')
+        'egraph.EGraph', 'markov.Diagram')
     assert Markov.from_tree(tree) == graph
     assert Markov.serialisation(term=graph)\
         and Markov.repr_transparency(term=graph)
@@ -377,7 +381,7 @@ def test_strategy_needs_a_copy_discard_category():
     from discopy import frobenius
     for category in (symmetric.Diagram, frobenius.Diagram):
         with raises(NotImplementedError):
-            EHypergraph[category].strategy()
+            EGraph[category].strategy()
 
 
 @settings(max_examples=20, deadline=None)
@@ -392,8 +396,8 @@ def test_strategy(graph):
 
 
 @pytest.fixture(scope="module")
-def examples() -> list[EHypergraph]:
-    """ Egg's example of :mod:`discopy.ehypergraph`, ``f`` rewritten into
+def examples() -> list[EGraph]:
+    """ Egg's example of :mod:`discopy.egraph`, ``f`` rewritten into
     ``g``, a sample read by a condition, ``f`` and ``g``, then with the
     outputs of ``f`` and ``g`` related, and the empty one. """
     two, times, divide = (
@@ -408,7 +412,8 @@ def examples() -> list[EHypergraph]:
 
 @pytest.mark.parametrize("law", [
     "rebuild_minimality", "extraction_soundness", "extraction_optimality",
-    "translation", "effects_kept", "rewrite_identity", "saturation"])
+    "sharing", "translation", "effects_kept", "rewrite_identity",
+    "saturation"])
 def test_laws_of_one_graph(law, examples):
     """ A law weakened to cartesian e-hypergraphs holds on those, any other
     law on every example. """
@@ -417,6 +422,211 @@ def test_laws_of_one_graph(law, examples):
         if law.params.get("effects", True) or all(
                 box.is_cartesian for box in graph.graph.boxes):
             assert law(graph)
+
+
+def test_builder_hash_conses_deterministic_boxes():
+    builder, graph = Markov.id(x).builder(), Markov.id(x)
+    for box in (f, f, sample, sample):
+        outputs = builder.add(box, (0, ))
+        graph, expected = graph.add(box, (0, ))
+        assert outputs == expected
+    assert builder.boxes == [f, sample, sample]
+    assert builder.keys == [(0, 0), (), ()] and builder.heads == {f: 0}
+    assert builder.known == {id(f): (f, 0, 1), id(sample): (sample, None, 1)}
+    assert builder.add(Box('f', x, x), (0, )) == (1, ) != id(f)
+    assert builder.hashcons == {(0, 0): 0} and builder.parents == {0: [0]}
+    assert builder.freeze() == graph
+
+
+def test_builder_rebuild_repairs_parents():
+    """ Three ``f`` then a ``g`` reading both ends, on each of two inputs:
+    merging the inputs finds one pair congruent, rebuilding the others. """
+    builder, chains = Markov.id(x @ x).builder(), ([0], [1])
+    for chain in chains:
+        for _ in range(3):
+            chain.extend(builder.add(f, chain[-1:]))
+        chain.extend(builder.add(
+            Box('g', x @ x, x @ x), (chain[0], chain[-1])))
+    left, right = chains
+    assert list(map(builder.find, right)) == right
+    builder.merge(0, 1)
+    assert list(map(builder.find, right)) == [0] + right[1:]
+    assert builder.worklist == [(0, 4)]
+    builder.rebuild()
+    assert list(map(builder.find, right)) == left and not builder.worklist
+    assert builder.add(f, (1, )) == (left[1], )
+    assert set(builder.hashcons.values()) == {0, 1, 2, 3}
+    frozen = builder.freeze()
+    assert frozen == frozen.rebuild() == frozen.builder().freeze()
+
+
+def test_builder_keeps_samples_apart():
+    builder = Markov.id(x @ x).builder()
+    (a, ), (b, ) = builder.add(sample, (0, )), builder.add(sample, (1, ))
+    (c, ), (d, ) = builder.add(f, (a, )), builder.add(f, (b, ))
+    builder.merge(0, 1)
+    builder.rebuild()
+    assert len(set(map(builder.find, (a, b, c, d)))) == 4
+    builder.merge(a, b)
+    builder.rebuild()
+    assert builder.find(c) == builder.find(d) != builder.find(a)
+
+
+def test_builder_class_with_fewer_parents_joins():
+    """ The class read more often stays the root, and the least spider of a
+    class names it whichever the root is. """
+    builder = Markov.id(x @ x).builder()
+    builder.add(f, (1, )), builder.add(g, (1, )), builder.add(h, (0, ))
+    builder.merge(0, 1)
+    assert builder.root(0) == 1 and builder.find(1) == 0
+    assert builder.parents == {1: [0, 1, 2]}
+    assert builder.freeze().classes == (0, 0, 2, 3, 4)
+    builder.merge(0, 1)
+    assert builder.parents == {1: [0, 1, 2]}
+
+
+def test_builder_starts_from_a_value():
+    """ A builder finds the boxes of an e-graph that are congruent as it
+    starts, and freezes into that e-graph unless it rebuilds. """
+    graph = Markov((Copy(x) >> f @ f >> g @ g).to_hypergraph())
+    builder = graph.builder()
+    assert builder.worklist == [(0, 1)] and builder.freeze() == graph
+    builder.rebuild()
+    assert builder.freeze() == graph.rebuild() != graph
+    related = graph.merge(1, 2)
+    assert related.builder().freeze() == related
+    assert related.builder().find(2) == 1
+
+
+def test_builder_checks_as_it_freezes():
+    builder = Markov.id(x).builder()
+    builder.add(Box('f', Ty('y'), x), (0, ))
+    with raises(AxiomError):
+        builder.freeze()
+    builder = Markov.id(x @ Ty('y')).builder()
+    builder.merge(0, 1)
+    with raises(AxiomError):
+        builder.freeze()
+
+
+def test_dag_cost_counts_a_class_once():
+    join, split = Box('j', x @ x, x), Box('s', x, x @ x)
+    shared = Markov.from_diagram(Copy(x) >> f @ f >> join)
+    assert (shared.cost(), shared.dag_cost()) == (5, 3)
+    assert shared.dag_bound() == {0: 1, 1: 2, 3: 3}
+    assert shared.dag_cost(box_cost=lambda box: 2, input_cost=0) == 4
+    assert shared.dag_cost(shared.graph) == 4
+    apart = Markov.from_diagram(Copy(x) >> sample @ sample >> join)
+    assert (apart.cost(), apart.dag_cost()) == (5, 4)
+    twice = Markov.from_diagram(split >> join)
+    assert (twice.cost(), twice.dag_cost()) == (5, 3)
+    assert twice.dag_bound()[twice.classes[twice.graph.cod_wires[0]]] == 3
+    unread = Markov.from_diagram(f @ Diagram.discard(x))
+    assert unread.extract().dom == x @ x and unread.dag_cost() == 2
+
+
+def test_dag_bound_needs_an_acyclic_choice():
+    """ With boxes that cost nothing, the least tree cost may be that of a
+    class read by its own producer, which has no section. """
+    constant = Box('c', Ty(), x)
+    graph = Markov(Hypergraph[Diagram](Ty(), x, (g, f, constant), (
+        (), (((1, ), (2, )), ((0, ), (1, )), ((), (0, ))), (2, )))
+    ).merge(0, 2)
+    assert graph.dag_bound() == {0: 1, 1: 2}
+    with raises(AxiomError):
+        graph.dag_bound(lambda box: 0)
+    stuck = Markov.from_diagram(f).merge(0, 1)
+    assert stuck.dag_bound(input_cost=inf) == {0: inf}
+
+
+def test_dag_bound_of_a_deep_section():
+    """ A chain deeper than the stack of Python, its boxes from the last to
+    the first so that the first class asked for is the deepest. """
+    depth = 1100
+    box_wires = tuple(((j + 1, ), (j, )) for j in range(1, depth + 1))
+    graph = Markov(Hypergraph[Diagram](
+        x, x, depth * (f, ), ((depth + 1, ), box_wires, (1, ))))
+    assert graph.dag_bound()[graph.classes[graph.graph.cod_wires[0]]]\
+        == depth + 1 == graph.dag_cost()
+
+
+def test_building(examples):
+    """ The builder of two copies of each example, then with their inputs
+    merged and rebuilt, freezes into what the pure e-graph gives. """
+    for graph in examples:
+        start, operations = history = History[Markov].twice(graph)
+        dom, n = start.graph.dom_wires, len(graph.dom)
+        merged = History[Markov](start, operations + tuple(
+            ("merge", *pair) for pair in zip(dom[:n], dom[n:])) + (
+            ("rebuild", ), ))
+        for case in (history, merged):
+            assert Markov.building(case)
+            assert case.build().classes == case.fold().classes
+        deterministic = [
+            j for j, box in enumerate(graph.graph.boxes)
+            if box.is_deterministic]
+        assert len(set(merged.fold().classes)) <= len(set(
+            history.fold().classes)) - bool(deterministic and n)
+
+
+@settings(max_examples=20, deadline=None)
+@given(History[Markov].strategy(max_operations=2))
+def test_history_strategy(history):
+    graph, operations = history
+    assert history.graph == graph and history.operations == operations
+    assert not History.checked_params()
+    assert {name for name, *_ in operations} <= {"add", "merge", "rebuild"}
+    assert len(graph.dom) % 2 == 0
+    assert history.build().classes == history.fold().classes
+
+
+TRACES = Path(__file__).parents[1] / "benchmark" / "data" / "egraph-traces"
+
+
+def replay(trace: dict, builder, suffix: str = "") -> tuple[list, list]:
+    """ The e-nodes of a trace added to a builder in turn, each merged with
+    the class recorded for it: the spider standing for each class, then the
+    output of each e-node. The base classes take a suffix, so that two
+    replays are two copies. """
+    boxes = [Box(head["name"] + suffix * (not head["arity"]),
+                 Ty().tensor(*head["arity"] * [x]), x)
+             for head in trace["heads"]]
+    classes, outputs = [], []
+    for head, out, *args in trace["rows"]:
+        spider, = builder.add(boxes[head], tuple(classes[i] for i in args))
+        outputs.append(spider)
+        if out == len(classes):
+            classes.append(spider)
+        else:
+            builder.merge(spider, classes[out])
+    return classes, outputs
+
+
+@pytest.mark.parametrize("number", range(3))
+def test_builder_replays_a_trace(number):
+    """ A builder ends on the partition a 1D-ARC search recorded, and
+    relating the base classes of two copies leaves one once rebuilt, which
+    it would not were ``rebuild`` to do nothing. """
+    with gzip.open(TRACES / f"trace-{number:02}.json.gz", "rt") as file:
+        trace = json.load(file)
+    recorded = [out for _, out, *_ in trace["rows"]]
+    builder = Markov.id(Ty()).builder()
+    classes, outputs = replay(trace, builder)
+    found = [builder.find(spider) for spider in outputs]
+    assert len(builder.boxes) == trace["enodes"] == len(recorded)
+    assert len(set(found)) == len(set(recorded)) == len(set(zip(
+        found, recorded))) == trace["classes"]
+    assert builder.freeze().classes == tuple(found)
+    others, _ = replay(trace, builder, suffix="'")
+    bases = sum(not head["arity"] for head in trace["heads"])
+    for left, right in zip(classes[:bases], others[:bases]):
+        builder.merge(left, right)
+    count = len(set(map(builder.find, range(len(builder.label)))))
+    assert count == 2 * trace["classes"] - bases
+    builder.rebuild()
+    assert len(set(map(builder.find, range(len(builder.label))))) == trace[
+        "classes"]
+    assert list(map(builder.find, others)) == list(map(builder.find, classes))
 
 
 @pytest.mark.parametrize("i, j, k", [(0, 0, 0), (0, 1, 2), (3, 2, 1)])
@@ -508,7 +718,7 @@ def box_cost(box) -> int:
     return COSTS.get(box.name, 1)
 
 
-def lookup(graph: EHypergraph, term, names) -> int:
+def lookup(graph: EGraph, term, names) -> int:
     """ The class of a subterm of the cartesian term a graph comes from. """
     if term[0] == "var":
         return graph.classes[graph.graph.dom_wires[names.index(term[1])]]
@@ -610,7 +820,7 @@ def naive(term):
         else (term[0], *map(naive, children(term)))
 
 
-def saturated(program, rules) -> EHypergraph:
+def saturated(program, rules) -> EGraph:
     """ The last round of saturating a program of ``p`` under some rules. """
     graph = Markov.from_diagram(to_diagram(program, ["p"]))
     *_, last = graph, *graph.saturate(*to_rules(rules))

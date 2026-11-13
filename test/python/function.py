@@ -55,3 +55,24 @@ def test_no_tree():
     with raises(TypeError, match="A function has no tree"):
         dumps(Function(abs, int, int))
     assert "serialisation" not in Function.axioms
+
+
+def test_then_flattens_its_own_compositions_only():
+    from functools import reduce
+    from discopy.python.function import Composition
+    succ = Function(lambda x: x + 1, int, int)
+    long = reduce(Function.then, 2000 * [succ])
+    assert long(0) == 2000 and isinstance(long.inside, Composition)
+    assert long.inside.factors == 2000 * (succ, )
+    assert succ.then(succ.then(succ), succ).inside.factors == 4 * (succ, )
+    assert succ.then() is succ
+
+    class Polynomial:
+        factors = (2, 3)
+
+        def __call__(self, x):
+            return 6 * x
+
+    polynomial = Function(Polynomial(), int, int)
+    assert (succ >> polynomial >> succ)(1) == 13
+    assert (polynomial >> succ)(1) == 7 and (succ >> polynomial)(1) == 12

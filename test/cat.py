@@ -712,7 +712,7 @@ EXAMPLES = {  # a box of each constructor, from a class c, types x, y, data v
     "grammar.pregroup.Word": 'c("w", x @ y, data=v)',
     "tensor.Bubble":
     'c(box(c, x, x, [v, 0, 0, 1]), func=abs, drawing_name="B")',
-    "ehypergraph.Join": "c(box(c, x, y, v), box(c, x, y, v))",
+    "egraph.Join": "c(box(c, x, y, v), box(c, x, y, v))",
     "quantum.circuit.Box": 'c("f", x, y, data=[v, 0, 0, 1], is_mixed=False)',
     "quantum.gates.QuantumGate": 'c("g", x, x, [v, 0, 0, 1])',
     "quantum.gates.{Ket,Bra}": "c(1, 0, time_step=1)",
@@ -833,8 +833,6 @@ BROKEN = {
         "*.Spider quantum.zx.[XYZ]": "it keeps no n_legs_in or n_legs_out",
     },
     "tree": {
-        "*.DualRail* quantum.zx.Scalar":
-        "it has no from_tree of its own",
         "quantum.gates.C[RU]*": "its tree is that of a controlled gate",
         "grammar.categorial.TypeRaising": "its tree drops its cod",
         "neural.network.{Box,Feedback,Trace,Head,Tail}": "a module has none",

@@ -1217,26 +1217,49 @@ def test_Hypergraph_make_monogamous_carries_leg_order():
         f, compact.Cap(c.r, c), compact.Cap(b.r, b), g)
 
 
+def test_Hypergraph_explicit_trace_of_n_wires_is_the_n_nested_ones():
+    """
+    The ``n``-wire trace is the nest of ``n`` one-wire traces, on both kinds
+    of ``trace_factory``: a class, where the whole nest is one trace box on
+    the diagram, and a class method, where the cups and caps of a pivotal
+    category are atomic and the nest is the onion of ``n`` pairs. So taking
+    them in one pass is the same term, not just the same morphism.
+    """
+    from discopy import compact, comarkov, frobenius, markov, symmetric
+    for module in (symmetric, markov, comarkov, compact, frobenius):
+        x, a = module.Ty('x'), module.Ty('a')
+        for n in (1, 2, 3):
+            for left in (False, True):
+                typ = x ** n @ a if left else a @ x ** n
+                graph = module.Box('f', typ, typ).to_hypergraph()
+                nested = graph
+                for _ in range(n):
+                    nested = nested.explicit_trace(1, left)
+                assert graph.explicit_trace(n, left) == nested, (
+                    module.__name__, n, left)
+
+
 def test_Hypergraph_trace_backward_wires_loops(monkeypatch):
     """
     ``trace_backward_wires`` cuts one wire at a time in a loop, so a graph
     with many wires to cut does not nest one frame per cut as it used to,
-    which raised ``RecursionError`` at a thousand of them: every trace below
-    is applied from the one frame of the loop.
+    which raised ``RecursionError`` at a thousand of them; and the traces it
+    counts are taken in one call rather than one per cut, from the one frame
+    of the loop.
     """
     import inspect
     x = Ty('x')
     scalar = H.spiders(0, 0, x)
     graph = scalar.tensor(*19 * [scalar])
-    explicit_trace, frames = H.explicit_trace, []
+    explicit_trace, calls = H.explicit_trace, []
 
-    def counted(self, left=False):
-        frames.append(sum(frame.function == "trace_backward_wires"
-                          for frame in inspect.stack()))
-        return explicit_trace(self, left)
+    def counted(self, n=1, left=False):
+        calls.append((n, sum(frame.function == "trace_backward_wires"
+                             for frame in inspect.stack())))
+        return explicit_trace(self, n, left)
 
     monkeypatch.setattr(H, "explicit_trace", counted)
     result = graph.trace_backward_wires()
     monkeypatch.undo()
-    assert len(frames) == 20 and set(frames) == {1}
+    assert calls == [(20, 1)]
     assert len(result.boxes) == 40 and result.is_causal

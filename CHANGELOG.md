@@ -9,6 +9,75 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Added
 
+- `stream.up_to_steps`, the relation a law of streams is read with: a term
+  unrolled for `stream.STEPS` steps, its arrow `now` taken and quotiented by
+  the equation of the underlying category, which `Stream.equation_factory`
+  compares. Equality on a stream is intensional — `==` compares the thunk
+  `_later` by identity, so it is identity on any non-constant stream, which
+  `stream.Ty` now documents — so a law stated with `==` says nothing about
+  the law. `Ty.strategy`, `Ty.generator_strategy` and `Stream.strategy`
+  generate the terms those laws quantify over; the property matrix does not
+  check streams yet, see [next#533] ([next#535]).
+- `neural.propagation`, belief propagation: `sum_product` is the
+  sum-product algorithm on a factor table as a network with a trace, from
+  the tensor of each factor to the belief of each node, its traced legs the
+  messages and a round its `exclusive`, `reply` and `belief` boxes;
+  `marginals` contracts the same tensors, and on a factor table whose
+  incidence graph is a tree the two agree after `radius` rounds
+  ([next#520]).
+- `Network.unroll`, the feedforward network running every trace for a
+  number of rounds from a state of `zeros`, which `Network.to_function` and
+  `Network.to_lens` take as `rounds`, so that a network with a trace
+  compiles and its reverse derivative is backpropagation through time: the
+  reverse derivative preserves the rounds of a trace ([next#518]).
+- `neural.network.Learner`, the parametric lenses of functions on tensors,
+  i.e. a learnable network with its weights and their gradients as a pair
+  of parameters: `Learner.reverse` is the reverse derivative of a parametric
+  network, `Lens.descent` gradient descent as a lens and `Learner.descent`
+  the reparametrisation by it, one step of an optimiser, while a
+  reparametrisation by `Lens.copy` ties weights and sums their gradients.
+  `neural.torch.Module` takes a parametric network with its initial weights
+  and holds them as its parameters, one per leg of the parameter space
+  ([next#517]).
+- `Network.to_lens`, the reverse derivative of a feedforward network as a
+  `neural.network.Lens`, i.e. a lens of functions on tensors whose `get` is
+  `to_function` and whose `put` is backpropagation: every box gives its
+  `Box.tape`, composition is the chain rule of `lens.Symmetric` with the
+  tapes as residual, a copy sums the gradients of its branches and a
+  discard gives zero ([next#515]).
+- `neural.network.tape` and `Box.tape`, the outputs of a layer and its
+  pullback, as `jax.vjp` returns them: the `vjp` of the box at its inputs
+  or the reverse mode of PyTorch or JAX. A `Lens` keeps the pullbacks as
+  its residual, so that its `put` runs each layer forward once rather than
+  once per layer after it, `n` forward calls for a chain of `n` layers
+  where they were `n(n-1)/2` ([next#519], fixes [next#516]).
+- `lens.Comarkov`, the lenses `(get, put)` over a category that is both
+  Markov and comarkov, which form a Markov category: the `copy` of a pair
+  copies its positive half and merges the copies of its negative half, as
+  the reverse derivative of a fan-out sums the gradients, and `discard`
+  puts the noise ([next#511]).
+- The rig laws of `neural.network.Dims` as axioms, checked by the property
+  matrix: `product_unitality`, `product_associativity`, `absorption` and
+  `distributivity_right` on the nose, `distributivity_left` up to a
+  permutation of the legs, which `Dims.legs` forgets ([next#510]).
+- `EGraph.dag_cost`, the cost of a section as a diagram with sharing, i.e.
+  each box and each input it reads counted once however often it is read,
+  `EGraph.dag_bound`, that of the section of least tree cost of each class,
+  and the law `EGraph.sharing` that it is at most the tree cost
+  ([next#503]).
+- `egraph.Builder`, a mutable e-graph built as egg does, with a union-find, a
+  hash-cons and a worklist: `add` in amortised constant time, `rebuild`
+  repairing only what changed, started with `EGraph.builder` and frozen back
+  into an `EGraph` with `freeze`, where the law `EGraph.building` says it is
+  what the same operations give on the pure one, over `egraph.History`
+  ([next#502]).
+- `matrix.Contractor`, a backend whose `einsum` contracts the arrays of
+  another backend, with `OptEinsum` and `Quimb`, which takes `cotengra`
+  path optimizers as `optimize` and contracts approximately past a
+  `max_bond`, chosen by the `contractor` parameter of `tensor.Functor`,
+  `tensor.Diagram.eval` and `quantum.Circuit.eval`; the Einstein notation is
+  `tensor.Functor.operands`, and the contraction dependencies are the new
+  `tensor` extra ([#533], [next#495]).
 - `testable.Rule` and `@rule`, inference rules stated like laws on each
   structure of `abc`, and `FreeCategory.search`, the terms of a free
   category derived from its rules, which the property matrix draws:
@@ -213,6 +282,35 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Changed
 
+- `Hypergraph.explicit_trace` takes the number of wires to trace and takes
+  them in one pass, so `make_causal` and `make_cocausal` convert the graph
+  once rather than once per cut: 7.5x faster on the traces of a graph with
+  128 of them over a category whose trace is a box, and the same term, the
+  `n`-wire trace being the `n` nested one-wire ones on either kind of
+  `trace_factory`. Its signature is now `explicit_trace(n=1, left=False)`,
+  `Hypergraph.trace`'s own, so a call passing `left` positionally — which
+  used to read `explicit_trace(True)` — passes it as `n` and must be spelled
+  `explicit_trace(left=True)` ([next#534]).
+- The `inside` of a composition of `python.Function` is a
+  `python.function.Composition` of its `factors`, extended when composed
+  again, so that a long composition built one function at a time is called
+  by a loop rather than by as many nested calls ([next#518]).
+- A bubble does not commute with dagger: `cat.Bubble.setoid` counts
+  `is_dagger`, as `tensor.Bubble`'s has and as `cat.Bubble.__str__` prints,
+  so that a functor cannot separate equal bubbles. Upstream states the
+  commuting law, which next `main` now diverges from ([next#507]).
+- `discopy.ehypergraph` is now `discopy.egraph` and `EHypergraph` is `EGraph`,
+  with no alias: an e-hypergraph is a monoidal e-graph, egg's e-graphs being
+  those over cartesian diagrams ([next#501]).
+- `optyx.classical.Digit`, `PostselectDigit`, `PostselectBit` and the `Bit`
+  built on the last reject the empty case with a `ValueError` instead of
+  reading it as one mode or as the scalar one: a digit of no digits is
+  `Id()` already ([next#498]).
+
+- `tensor.Diagram.to_quimb` is built on the combinatorial map, through
+  `tensor.Functor.to_quimb`: swaps, cups and caps are wiring instead of
+  dense tensors, the network is deterministic and `dtype` takes effect
+  ([#533], [next#495]).
 - `NamedGeneric` takes the parameters of PEP 695, `class Matrix[dtype](...,
   NamedGeneric)`, and the abstract base classes bound theirs; `ty` errors on
   all but the six rules main still breaks, which stay `"warn"` ([next#1]).
@@ -390,6 +488,46 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Fixed
 
+- The law `EGraph.building` compares the outputs each `add` gives on the
+  builder and on the pure e-graph, not only the e-graphs they end on:
+  `egraph.History.run` gives both, so a hash-cons keeping the wrong node of a
+  key fails it ([next#531]).
+- An optyx box is what it computes: `channel.Channel.semantic_attrs` names
+  the attributes besides `name`, `dom`, `cod` and `data` that decide it, and
+  `setoid` compares them — a gate its `array`, which is what `is_conj` and
+  `is_gate_dagger` decide, a creation the internal states of its photons, a
+  `CQMap` its density matrix and a `BinaryMatrixBox` its matrix. Two boxes
+  computing different arrays were equal, every `classical.BinaryMatrix`
+  among them ([next#508]).
+- Every hash in the library is the same in every interpreter:
+  `utils.factory_key`, a class's module and qualified name, leads a `setoid`
+  or a `__hash__` where `type(self)` did, the hash of a class object being
+  its address. No equality changes, a subscript being part of a qualified
+  name; `tensor.Bubble` is left, holding the function it maps with
+  ([next#506], [next#507]).
+- `frobenius.Diagram.str_transparency` holds up to `Diagram.to_hypergraph`:
+  a layer packing a cospan beside a box prints as a tensor that reads back as
+  two layers, the same hypergraph but not the same diagram, which `explore`
+  found ([next#505]).
+- `optyx.core.zx.H` is its own dagger: a box declares itself self-adjoint
+  with `is_dagger=None`, as `quantum.gates.SWAP` does, where the optyx
+  dagger otherwise returns a differently named copy — so `H[::-1] == H`
+  and `to_pyzx` translates a daggered Hadamard, which `from_pyzx` reads
+  back as `H` ([next#498]).
+- Every dual rail diagram serialises: `balanced.DualRailBraid`,
+  `balanced.DualRailTwist`, `ribbon.DualRailCup`, `ribbon.DualRailCap` and
+  `quantum.zx.Scalar` read back the arguments their own constructors take,
+  where the inherited `from_tree` passed them a `name` they refuse, so
+  `loads(dumps(x))` raised a `TypeError` on the image of either `DualRail`
+  functor and on any diagram holding a ZX scalar ([next#496]).
+- `interaction.Diagram`'s docstring states the codomain of the diagram
+  inside as `y.positive @ x.negative`, which is what its constructor, its
+  `strategy` and its `to_tree` doctest all read, and an example asserts
+  both boundaries ([next#494]).
+- A rotated rigid box, e.g. `f.r`, reads back from its string: its atom is
+  the box its string rotates, so the law `str_transparency` binds `f` rather
+  than failing on a `NameError` for compact, pivotal, ribbon, rigid and
+  frobenius diagrams ([next#489]).
 - `python.multiplicative.Function` and `python.additive.Function` build their
   structural morphisms with `cls` and `type(self)` rather than with the base
   class, the way `permutation` already did, so a subclass can be a functor's
@@ -831,6 +969,24 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   own axioms write a scalar: the list branch was missing that index, and a
   legless box carrying more than one amplitude raised on the reshape
   ([next#421]).
+- `neural.torch.Module` now survives `copy.deepcopy` and `torch.save`: a copy
+  computes with and backpropagates into its own parameters, so `AveragedModel`
+  (SWA/EMA) and `best = copy.deepcopy(model)` work ([next#445]).
+- `neural.train.per_board_backward` drops a board whose gradient ratio is not
+  finite from the excluded (`halt.`) parameters too, so one NaN board no longer
+  turns every parameter NaN through `ActPool`'s global clip ([next#445]).
+- `neural.act` keeps a float64 network's losses and halt logits in float64;
+  low-precision readouts are still lifted to float32 ([next#445]).
+- `neural.geometric.Geometric.cycle` with `rounds=0` now matches the reference
+  cycle: it keeps the carried units and cells and only refreshes the answer.
+  Before, the peer net's result differed and the factor net raised
+  `StopIteration` ([next#445]).
+- `neural.geometric.Shift` with a step longer than the grid's side reads zeros,
+  the translation its docstring defines, instead of raising in `narrow()`
+  ([next#445]).
+- `neural.from_incidence`, `neural.from_relation` and `CMap.from_wiring` accept
+  numpy integer indices (an integer array, or tuples of `np.int64`), where they
+  used to say that an existing box, factor or node does not exist ([next#445]).
 - `foliation` and `depth` work again on coloured monoidal and braided diagrams,
   and on non-symmetric diagrams that hold a `Sum`: the hypergraph is now built
   only for symmetric diagrams ([next#445]).
@@ -1302,9 +1458,52 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   every colour up in `COLORS` and raised `TypeError` on an unhashable one.
   `Backend.resolve` and `Backend.is_transparent` look up and compare a colour
   only when it is a name, for both backends ([next#482]).
+- `Diagram.tensor` drops a layer whose plumbing whiskers into the identity,
+  e.g. a phase-free frobenius `Spider(1, 1, x)` tensored with a box: it kept
+  the layer with no box, which did not serialise, foliate or draw
+  ([next#488], [next#490]).
 
 ### Project
 
+- `build`'s `test` job has a 40-minute backstop instead of 20, above the
+  9.7-20.3 minutes it runs in on `main` rather than inside it: a job over
+  `timeout-minutes` reports `cancelled`, so the six jobs it cut over five
+  runs of `main` in fifteen hours read as nothing having happened
+  ([next#532]).
+- The law `EGraph.building` is proved on the Lean model: for a valid
+  e-graph whose nodes read spiders that are there and a history the Python
+  accepts, the builder freezes into what the operations give in turn, the
+  same nodes on the same spiders in the same classes, and each `add` gives
+  the same outputs on both ([next#529]).
+- `union` and `rebuild` keep the invariant of the builder of the Lean model,
+  `rebuild` ends, and `merge` and `rebuild` on a builder are those of the
+  e-graph it freezes into ([next#528]).
+- The invariant of the builder of the Lean model, on the roots of its
+  spiders, with the proofs that entering a node in the hash-cons, placing a
+  node and a class joining another keep it ([next#527]).
+- The Lean model in `lean/` has the `Builder`, method by method, with the
+  proof that path halving ends on the root of a spider; the differential
+  test compares what it freezes into with `History.build()`, on generated
+  histories and on the 50 traces of the benchmark ([next#525]).
+- The Lean model in `lean/` covers the pure `EGraph`: `merge` is reflexive,
+  symmetric and transitive, `add` returns the same outputs when a
+  deterministic box is added again, and `rebuild` ends on the least
+  congruent equivalence containing the classes, hence idempotent and
+  confluent; the differential test compares the fold of a history with
+  `History.fold()` ([next#522]).
+- `lean/`, a Lean 4 model of `egraph.partition` with the theorem that it
+  sends each spider to the least spider related to it by pairs of spiders
+  in range, and a differential test of the model against the Python
+  ([next#521]).
+- `lean/Premonoidal`, a Lean 4 model of the diagrams of `monoidal.Diagram`
+  with one box per layer, with the theorems that they are a strict
+  premonoidal category and that interchange holds for two boxes only when
+  they are one and the same scalar, and a differential test of the model against the Python ([next#523]).
+- `lean/Premonoidal/Functor.lean`, which proves that the diagrams of the
+  Lean model are the free strict premonoidal category: generating objects
+  and boxes sent into a strict premonoidal category extend to a strict
+  premonoidal functor, and this functor is unique; the differential test compares it
+  with `monoidal.Functor` into diagrams ([next#526]).
 - `AGENTS.md`, `RULES.md` and `STYLE.md` for agents, and an LLM contribution
   needs its own handle and a human approval other than its prompter's
   ([#378], [#720]).
@@ -1405,6 +1604,13 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   `discopy/optyx/NOTICE`, replacing the TOML table setuptools deprecates: the
   built wheel and sdist carry `License-Expression` and all three
   `License-File`s ([next#445]).
+- `benchmark/data/egraph-traces/` holds 50 e-graph traces of a program search
+  on 1D-ARC, without values and with heads renamed: the test data of the
+  e-graph builder benchmark ([next#500]).
+- `benchmark/test_egraph.py` replays those traces through `egraph.Builder`
+  and the bookkeeping of the search that grew them, the small ones through
+  the pure `EGraph`, and times a rebuild and a freeze ([next#503]); what it
+  measured against the targets it was given is in [next#504].
 
 ## [1.2.2] - 2025-12-19
 
@@ -1477,6 +1683,7 @@ for the changelog of `1.2.1` and earlier.
 [#526]: https://github.com/discopy/discopy/pull/526
 [#529]: https://github.com/discopy/discopy/pull/529
 [#532]: https://github.com/discopy/discopy/pull/532
+[#533]: https://github.com/discopy/discopy/pull/533
 [#535]: https://github.com/discopy/discopy/pull/535
 [#538]: https://github.com/discopy/discopy/pull/538
 [#539]: https://github.com/discopy/discopy/pull/539
@@ -1681,6 +1888,43 @@ for the changelog of `1.2.1` and earlier.
 [next#472]: https://github.com/rel-int/discopy-next/issues/472
 [next#477]: https://github.com/rel-int/discopy-next/issues/477
 [next#482]: https://github.com/rel-int/discopy-next/issues/482
+[next#488]: https://github.com/rel-int/discopy-next/issues/488
+[next#489]: https://github.com/rel-int/discopy-next/issues/489
+[next#490]: https://github.com/rel-int/discopy-next/issues/490
+[next#494]: https://github.com/rel-int/discopy-next/pull/494
+[next#495]: https://github.com/rel-int/discopy-next/pull/495
+[next#496]: https://github.com/rel-int/discopy-next/pull/496
+[next#498]: https://github.com/rel-int/discopy-next/pull/498
+[next#500]: https://github.com/rel-int/discopy-next/pull/500
+[next#501]: https://github.com/rel-int/discopy-next/pull/501
+[next#502]: https://github.com/rel-int/discopy-next/pull/502
+[next#503]: https://github.com/rel-int/discopy-next/pull/503
+[next#504]: https://github.com/rel-int/discopy-next/issues/504
+[next#505]: https://github.com/rel-int/discopy-next/pull/505
+[next#506]: https://github.com/rel-int/discopy-next/issues/506
+[next#507]: https://github.com/rel-int/discopy-next/pull/507
+[next#508]: https://github.com/rel-int/discopy-next/pull/508
+[next#510]: https://github.com/rel-int/discopy-next/pull/510
+[next#511]: https://github.com/rel-int/discopy-next/pull/511
+[next#515]: https://github.com/rel-int/discopy-next/pull/515
+[next#516]: https://github.com/rel-int/discopy-next/issues/516
+[next#517]: https://github.com/rel-int/discopy-next/pull/517
+[next#518]: https://github.com/rel-int/discopy-next/pull/518
+[next#519]: https://github.com/rel-int/discopy-next/pull/519
+[next#520]: https://github.com/rel-int/discopy-next/pull/520
+[next#521]: https://github.com/rel-int/discopy-next/pull/521
+[next#522]: https://github.com/rel-int/discopy-next/pull/522
+[next#523]: https://github.com/rel-int/discopy-next/pull/523
+[next#525]: https://github.com/rel-int/discopy-next/pull/525
+[next#526]: https://github.com/rel-int/discopy-next/pull/526
+[next#527]: https://github.com/rel-int/discopy-next/pull/527
+[next#528]: https://github.com/rel-int/discopy-next/pull/528
+[next#529]: https://github.com/rel-int/discopy-next/pull/529
+[next#531]: https://github.com/rel-int/discopy-next/pull/531
+[next#532]: https://github.com/rel-int/discopy-next/pull/532
+[next#533]: https://github.com/rel-int/discopy-next/issues/533
+[next#534]: https://github.com/rel-int/discopy-next/pull/534
+[next#535]: https://github.com/rel-int/discopy-next/pull/535
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#56]: https://github.com/rel-int/optyx/pull/56

@@ -42,6 +42,7 @@ uv sync
 `uv sync` installs the package with the `dev` group (testing and linting tools), the default
 set in `[tool.uv]`; `uv sync --no-dev` installs the bare package. Add more groups with
 `uv sync --group <name>`:
+- `tensor`: the contraction engines opt_einsum, quimb and cotengra
 - `quantum`: quantum computing dependencies
 - `grammar`: natural language processing libraries, PyTorch included for the neural parser
 - `optyx`: the dependencies of `discopy.optyx` (photonics, ZX, tensor contraction)
@@ -49,7 +50,7 @@ set in `[tool.uv]`; `uv sync --no-dev` installs the bare package. Add more group
 - `docs`: for generating the documentation
 - `all`: every group above, which CI's test job installs
 
-Since dependency groups are not standard, `quantum`, `grammar`, `optyx`, `notebooks` and `docs`
+Since dependency groups are not standard, `tensor`, `quantum`, `grammar`, `optyx`, `notebooks` and `docs`
 are also optional dependencies (`pip install -e '.[quantum]'`). There is no `dev` or `all`
 extra: the `test` extra bundles `quantum`, `grammar`, `optyx` and `notebooks` with the test
 tools, without egglog, ruff, ty or pytest-benchmark.
@@ -247,13 +248,16 @@ compared against.
 
 `benchmark/test_composition.py` reproduces the scaling experiments of
 arXiv:2105.09257 for `Diagram` and `Hypergraph`, with analogous `CMap` cases;
-`benchmark/test_conversion.py` covers conversions between all three, and
+`benchmark/test_conversion.py` covers conversions between all three,
 `benchmark/test_zx.py` races `quantum.graphlike.full_reduce` against PyZX's,
 skipped without PyZX: run it with `uv run --with "pyzx==0.10.7"`, as the
-workflow does. They live outside `testpaths`, so run them explicitly. Results
-are keyed by suite (`composition`, `conversion` or `zx`), family
-(representation, conversion or implementation), case (workload) and size
-`n`. Each data point is a declarative
+workflow does, and `benchmark/test_egraph.py` replays the 50 e-graphs of
+`benchmark/data/egraph-traces` through `egraph.Builder` and the bookkeeping
+of the search that grew them, and the small ones through the pure `EGraph`.
+They live outside `testpaths`, so run them explicitly. Results are keyed by
+suite (`composition`, `conversion`, `zx` or `egraph`), family
+(representation, conversion, implementation or operation), case (workload)
+and size `n`. Each data point is a declarative
 [`pytest-benchmark`](https://pytest-benchmark.readthedocs.io) test; the fixture
 owns timing (CPU clock and GC disabled) and automatically calibrates rounds
 and iterations for each workload.
@@ -294,6 +298,36 @@ and only measures its own commit. Every run uploads the report of its head commi
 the job summary, and raises a warning annotation, never a failure, when a
 measurement regresses. A pull request run also posts or updates a comment with
 the important regressions and speedups.
+
+## Run the Lean proofs
+
+`lean/` is a [Lake](https://lean-lang.org/doc/reference/latest/Build-Tools-and-Distribution/Lake/)
+project holding a Lean 4 model of `egraph.partition`, the pure `EGraph`
+(`merge`, `add`, `rebuild`) and the `Builder`, and one of the diagrams of
+`monoidal.Diagram`, with theorems proved on each,
+see its [README](lean/README.md); it needs the Lean of `lean/lean-toolchain`
+and no other dependency. It lives outside the package and outside `testpaths`,
+so run it explicitly:
+
+```shell
+cd lean
+lake build                 # the proofs and the `oracle` executable
+lake env lean Audit.lean   # no `sorry`, no axiom beyond the three standard ones
+cd ..
+uv run pytest lean/test_oracle.py lean/test_premonoidal.py -s
+```
+
+`lean/Statements.lean` restates the definitions and the main theorems in one
+short file, and `lean/Statements/Premonoidal.lean` those of diagrams. The last
+command is the differential test: Hypothesis draws cases, the `oracle` answers
+them in one run and each answer is compared with the Python's; it is skipped
+when the binary is not built. `ORACLE_EXAMPLES` sets the number of cases per
+seed (2,000 by default) and `ORACLE_SEEDS` the seeds (`0` by default), e.g.
+`ORACLE_EXAMPLES=17000 ORACLE_SEEDS=0,1,2`. The `lean` GitHub workflow runs
+all three on `main` and on a pull request touching `lean/`,
+`discopy/egraph.py`, `discopy/monoidal.py`, `discopy/cat.py`, the traces of the
+benchmark with their loader `benchmark/test_egraph.py`, which the test
+replays, or what installs the environment.
 
 ## Build the docs
 

@@ -52,10 +52,11 @@ from discopy.cat import (
     assert_isparallel,
 )
 from discopy.utils import (
-    assert_isinstance, factory_name, from_tree, unbiased)
+    assert_isinstance, factory_key, factory_name, from_tree, unbiased)
 
 if TYPE_CHECKING:
     import sympy
+    import quimb.tensor
 
 
 @factory
@@ -715,6 +716,16 @@ class Backend:
     def __getattr__(self, attr):
         return getattr(self.module, attr)
 
+    def __repr__(self):
+        return f"{type(self).__name__}()"
+
+    def __eq__(self, other):
+        return type(self) is type(other)\
+            and getattr(self, "base", None) == getattr(other, "base", None)
+
+    def __hash__(self):
+        return hash((factory_key(type(self)), getattr(self, "base", None)))
+
 
 class NumPy(Backend):
     """ NumPy backend. """
@@ -744,6 +755,128 @@ class TensorFlow(Backend):
         from tensorflow.python.ops.numpy_ops import np_config  # ty: ignore
         np_config.enable_numpy_behavior()
         super().__init__(tnp)
+
+
+class Contractor(Backend):
+    """
+    A contraction engine, i.e. a backend whose ``einsum`` contracts the
+    arrays of another backend, to which it delegates everything else, so
+    that e.g. gradients of pytorch arrays survive the contraction.
+
+    A plain :class:`Backend` contracts with its own ``einsum``.
+
+    Parameters:
+        base : The backend of the arrays, the active one at contraction
+            time by default.
+
+    Example
+    -------
+    >>> from discopy.tensor import Box, Dim
+    >>> vector = Box('vector', Dim(1), Dim(2), [0, 1])
+    >>> diagram = vector >> vector[::-1]
+    >>> assert diagram.eval(contractor=OptEinsum()) == diagram.eval()
+    >>> OptEinsum(), Quimb(NumPy())
+    (OptEinsum(), Quimb(NumPy()))
+    >>> assert eval(repr(Quimb(NumPy()))) == Quimb(NumPy()) != Quimb()
+    """
+    def __init__(self, base: Backend | None = None):
+        # pylint: disable=super-init-not-called
+        # the module and array of the base are read at contraction time
+        self.base = base
+
+    @property
+    def module(self) -> ModuleType:
+        """ The module of the base, the active backend by default. """
+        return (self.base or get_backend()).module
+
+    @property
+    def array(self) -> Callable:
+        """ The array of the base, the active backend by default. """
+        return (self.base or get_backend()).array
+
+    def __repr__(self):
+        base = "" if self.base is None else repr(self.base)
+        return f"{type(self).__name__}({base})"
+
+    def einsum(self, *operands, **params):
+        """
+        Contract interleaved operands, i.e. arrays each followed by its
+        list of integer indices, then the list of output indices.
+
+        Parameters:
+            operands : The interleaved operands and the output indices.
+            params : The parameters of the engine, e.g. ``optimize``.
+        """
+        raise NotImplementedError
+
+
+class OptEinsum(Contractor):
+    """ The contraction engine of the optional ``opt_einsum`` package. """
+    def einsum(self, *operands, **params):
+        try:
+            import opt_einsum
+        except ImportError as error:
+            if error.name != "opt_einsum":
+                raise
+            raise ImportError(
+                "Contracting more than "
+                f"{config.MAX_EINSUM_INDICES} indices requires "
+                "opt_einsum, run `pip install opt_einsum`.") from error
+        return opt_einsum.contract(*operands, **params)
+
+
+class Quimb(Contractor):
+    """
+    The contraction engine of the optional ``quimb`` package, where
+    ``optimize`` may be a ``cotengra`` path optimizer, and a ``max_bond``
+    parameter or a compressed optimizer selects approximate contraction.
+
+    Gradients of jax and pytorch arrays survive the contraction with
+    ``autoray >= 0.9``, whose older versions fall back to numpy when
+    reusing a cached contraction tree.
+    """
+    def network(self, arrays: list, indices: list[list[int]],
+                names: dict[int, str] | None = None
+                ) -> "quimb.tensor.TensorNetwork":
+        """
+        The quimb tensor network of arrays with integer indices, each
+        index named ``names[j]`` or ``f"w{j}"``. An index repeated on one
+        array, i.e. a trace, is summed over beforehand.
+
+        Parameters:
+            arrays : The arrays.
+            indices : The list of integer indices of each array.
+            names : The names of the indices, ``f"w{j}"`` by default.
+        """
+        import quimb.tensor as qtn
+        names = names or {}
+        tensors = []
+        for array, inds in zip(arrays, indices):
+            kept = [j for j in inds if inds.count(j) == 1]
+            if kept != inds:
+                local = {j: i for i, j in enumerate(dict.fromkeys(inds))}
+                array = self.module.einsum(
+                    array, [local[j] for j in inds],
+                    [local[j] for j in kept])
+            tensors.append(qtn.Tensor(
+                array, inds=tuple(names.get(j, f"w{j}") for j in kept)))
+        return qtn.TensorNetwork(tensors)
+
+    def einsum(self, *operands, optimize="greedy", **params):
+        import quimb.tensor as qtn
+        *operands, output = operands
+        network = self.network(operands[::2], operands[1::2])
+        compressed = "max_bond" in params\
+            or getattr(optimize, "compressed", False)\
+            or "Compressed" in type(optimize).__name__
+        for tensor in network.tensors if compressed else ():
+            if getattr(tensor.data.dtype, "kind", "") in "?bui":
+                tensor.modify(data=tensor.data.astype("complex128"))
+        method = network.contract_compressed if compressed\
+            else network.contract
+        result = method(output_inds=[f"w{j}" for j in output],
+                        optimize=optimize, **params)
+        return result.data if isinstance(result, qtn.Tensor) else result
 
 
 BACKENDS = {

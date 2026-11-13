@@ -57,17 +57,17 @@ from discopy.cat import factory, assert_iscomposable
 from discopy.frobenius import Dim, Cup
 from discopy.matrix import (  # noqa: F401  pylint: disable=unused-import
     Matrix, backend, set_backend, get_backend,
-    NumPy, JAX, PyTorch, TensorFlow)
+    Backend, NumPy, JAX, PyTorch, TensorFlow, Contractor, OptEinsum, Quimb)
 from discopy.testable import TestableGeneric, no_strategy
 from discopy.python import finset
 from discopy.utils import (
-    factory_name, assert_isinstance, product, assert_isatomic,
+    factory_key, factory_name, assert_isinstance, product, assert_isatomic,
     assert_istraceable)
 
 if TYPE_CHECKING:
     import sympy
     import tensornetwork
-    import quimb
+    import quimb.tensor
 
 
 @factory
@@ -476,8 +476,8 @@ class Functor(frobenius.Functor):
     and ``Tensor[dtype]`` as codomain for a given ``dtype``.
 
     Calling it on a diagram converts it to a :class:`CMap` and contracts
-    the network in a single ``einsum`` call under the active
-    :func:`backend`, passing any optional einsum parameters through.
+    the network in a single ``einsum`` call of its ``contractor``,
+    passing any optional einsum parameters through.
 
     Parameters:
         ob_map : The object mapping.
@@ -488,8 +488,13 @@ class Functor(frobenius.Functor):
         optimize : The contraction path, passed verbatim to the backend
             ``einsum``, e.g. ``"greedy"``, ``"optimal"`` or an explicit
             path.
-        params : Any other optional parameter of the backend ``einsum``
-            method, passed verbatim.
+        contractor : The backend whose ``einsum`` contracts the network,
+            e.g. :class:`NumPy` or a :class:`Contractor` such as
+            :class:`OptEinsum` or :class:`Quimb`. By default, the
+            ``einsum`` of the active :func:`backend`, switching to
+            :class:`OptEinsum` past ``config.MAX_EINSUM_INDICES`` indices.
+        params : Any other optional parameter of the ``einsum`` method of
+            the contractor, passed verbatim.
 
     Example
     -------
@@ -523,8 +528,10 @@ class Functor(frobenius.Functor):
             self, ob_map: dict[cat.Ob, Dim] | Callable[[cat.Ob], Dim],
             ar_map: dict[cat.Box, list] | Callable[[cat.Box], list],
             dom: type | None = None, dtype: type | None = float,
-            optimize="greedy", **params):
+            optimize="greedy", contractor: Backend | None = None,
+            **params):
         self.dtype, self.optimize, self.params = dtype, optimize, params
+        self.contractor = contractor
         cod = type(self).cod[dtype]
         super().__init__(ob_map, ar_map, dom=dom or type(self).dom, cod=cod)
 
@@ -532,17 +539,20 @@ class Functor(frobenius.Functor):
         dtype = None if self.dtype is None else self.dtype.__name__
         optimize = "" if self.optimize == "greedy"\
             else f", optimize={self.optimize!r}"
+        contractor = "" if self.contractor is None\
+            else f", contractor={self.contractor!r}"
         params = "".join(
             f", {key}={value!r}" for key, value in self.params.items())
         return factory_name(type(self))\
             + f"(ob_map={self.ob_map}, ar_map={self.ar_map}, "\
             + f"dom={factory_name(self.dom)}, "\
-            + f"dtype={dtype}{optimize}{params})"
+            + f"dtype={dtype}{optimize}{contractor}{params})"
 
     def to_tree(self) -> dict:
         """
         Serialise a tensor functor, its dtype in the name of its codomain,
-        see :meth:`discopy.cat.Functor.to_tree`, unless it has ``params``.
+        see :meth:`discopy.cat.Functor.to_tree`, unless it has ``params``
+        or a ``contractor``.
 
         >>> from discopy.utils import dumps, loads
         >>> x = frobenius.Ty('x')
@@ -552,10 +562,10 @@ class Functor(frobenius.Functor):
         >>> dumps(Functor({x: 2}, {}, order='C'))
         Traceback (most recent call last):
         ...
-        TypeError: A tensor functor with params has no tree: they go to the \
-einsum of a backend verbatim, which a file should not reach.
+        TypeError: A tensor functor with params or a contractor has no tree: \
+they go to the einsum of a backend verbatim, which a file should not reach.
         """
-        if self.params:
+        if self.params or self.contractor is not None:
             raise TypeError(messages.NO_TREE_PARAMS)
         return super().to_tree() | (
             {} if self.optimize == "greedy" else {'optimize': self.optimize})
@@ -612,32 +622,37 @@ einsum of a backend verbatim, which a file should not reach.
         assert_isinstance(other, monoidal.Diagram)
         return self.contract(cmap.CMap.from_diagram(other))
 
-    def contract(self, other: "cmap.CMap") -> Tensor:
+    def operands(self, other: "cmap.CMap") -> tuple[
+            list, list[list[int]], list[int], list[int]]:
         """
-        Contract the image of a combinatorial map in a single ``einsum``
-        call under the active :func:`backend`.
+        The Einstein notation for the image of a combinatorial map: its
+        arrays, the list of integer indices of each, and the free indices
+        of its domain and codomain.
 
-        The map is Einstein notation: the 2-cycles of its ``edges``
-        involution are the summed indices, boxes are the tensors and the
-        boundary ports are the free indices, with integer labels. A wire
-        is one index of the size of its object's image, pairing its
+        The 2-cycles of its ``edges`` involution are the summed indices,
+        boxes are the tensors and the boundary ports are the free indices,
+        each carried by an identity so that every index is on an array. A
+        wire is one index of the size of its object's image, pairing its
         factors in order as a straight wire and a spider do, except a cup
         or a cap between two distinct adjoints, which pairs them nested,
-        one index per factor, as :meth:`Tensor.cups` does. Networks with
-        more than ``config.MAX_EINSUM_INDICES`` indices are contracted
-        with the optional ``opt_einsum`` package instead.
+        one index per factor, as :meth:`Tensor.cups` does. A loop is an
+        identity with a repeated index, i.e. a trace.
 
         Parameters:
-            other : The combinatorial map to contract.
+            other : The combinatorial map to translate.
 
         Example
         -------
-        >>> from discopy import compact
-        >>> n = compact.Ty('n')
-        >>> F = Functor({n: Dim(2, 3)}, {}, dom=compact.Diagram, dtype=int)
-        >>> cup = compact.Cup(n, n.r)
-        >>> assert F(cup) == F(compact.Id(n @ n.r) >> cup)\\
-        ...     == Tensor[int].cups(Dim(2, 3), Dim(3, 2))
+        >>> vector = Box('vector', Dim(1), Dim(2), [0, 1])
+        >>> F = Functor(ob_map=lambda dim: dim,
+        ...             ar_map=lambda box: box.array, dtype=int)
+        >>> arrays, indices, inputs, outputs = F.operands(
+        ...     (vector >> vector[::-1]).to_map())
+        >>> for array, index in zip(arrays, indices):
+        ...     print(f"{array.tolist()}, {index}")
+        [0, 1], [0]
+        [0, 1], [0]
+        >>> assert inputs == outputs == []
         """
         ports, wires, fresh = other.ports, {}, count()
         for source, target in enumerate(other.edges):
@@ -653,7 +668,7 @@ einsum of a backend verbatim, which a file should not reach.
             wires[target] = labels[::-1] if is_nested else labels
         factors = lambda boundary: [
             factor for port in boundary for factor in wires[port]]
-        arrays, indices, output = [], [], []
+        arrays, indices, inputs, outputs = [], [], [], []
         with backend() as np:
             eye = lambda dim: np.array(np.eye(dim) if self.dtype is None
                                        else np.eye(dim, dtype=int),
@@ -662,7 +677,7 @@ einsum of a backend verbatim, which a file should not reach.
                 label = next(fresh)
                 arrays.append(eye(dim))
                 indices.append([label, wire])
-                output.append(label)
+                inputs.append(label)
             start = len(other.dom)
             for box in other.boxes:
                 arity, coarity = len(box.dom), len(box.cod)
@@ -678,33 +693,62 @@ einsum of a backend verbatim, which a file should not reach.
                 label = next(fresh)
                 arrays.append(eye(dim))
                 indices.append([wire, label])
-                output.append(label)
+                outputs.append(label)
             for loop in other.loops:
                 arrays.append(eye(product(self(loop).inside)))
                 indices.append(2 * [next(fresh)])
-            if not arrays:
-                return self.cod([1], self(other.dom), self(other.cod))
-            operands = [
-                x for pair in zip(arrays, indices) for x in pair]
-            if next(fresh) > config.MAX_EINSUM_INDICES:
-                try:
-                    import opt_einsum
-                except ImportError as error:
-                    if error.name != "opt_einsum":
-                        raise
-                    raise ImportError(
-                        "Contracting more than "
-                        f"{config.MAX_EINSUM_INDICES} indices requires "
-                        "opt_einsum, run `pip install opt_einsum`."
-                    ) from error
-                array = opt_einsum.contract(  # ty: ignore
-                    *operands, output,
-                    optimize=self.optimize, **self.params)
-            else:
-                params = dict(self.params, optimize=self.optimize)\
-                    if isinstance(get_backend(), (NumPy, JAX))\
-                    else self.params
-                array = np.einsum(*operands, output, **params)
+        return arrays, indices, inputs, outputs
+
+    def to_quimb(self, other) -> "quimb.tensor.TensorNetwork":
+        """
+        The quimb tensor network of the image of a diagram or a
+        combinatorial map: one tensor per array of :meth:`operands`, with
+        the free indices named ``inp0, ...`` and ``out0, ...`` in boundary
+        order, the order in which quimb contraction outputs them.
+
+        Parameters:
+            other : The diagram or combinatorial map to translate.
+        """
+        if not isinstance(other, cmap.CMap):
+            other = cmap.CMap.from_diagram(other)
+        arrays, indices, inputs, outputs = self.operands(other)
+        names = {label: f"inp{i}" for i, label in enumerate(inputs)}\
+            | {label: f"out{i}" for i, label in enumerate(outputs)}
+        return Quimb().network(arrays, indices, names)
+
+    def contract(self, other: "cmap.CMap") -> Tensor:
+        """
+        Contract the image of a combinatorial map, read as Einstein
+        notation by :meth:`operands`, in a single ``einsum`` call of the
+        ``contractor``. By default, this is the ``einsum`` of the active
+        :func:`backend`, and networks with more than
+        ``config.MAX_EINSUM_INDICES`` indices are contracted with
+        :class:`OptEinsum` instead.
+
+        Parameters:
+            other : The combinatorial map to contract.
+
+        Example
+        -------
+        >>> from discopy import compact
+        >>> n = compact.Ty('n')
+        >>> F = Functor({n: Dim(2, 3)}, {}, dom=compact.Diagram, dtype=int)
+        >>> cup = compact.Cup(n, n.r)
+        >>> assert F(cup) == F(compact.Id(n @ n.r) >> cup)\\
+        ...     == Tensor[int].cups(Dim(2, 3), Dim(3, 2))
+        """
+        arrays, indices, inputs, outputs = self.operands(other)
+        if not arrays:
+            return self.cod([1], self(other.dom), self(other.cod))
+        operands = [x for pair in zip(arrays, indices) for x in pair]
+        n_indices = len({j for index in indices for j in index})
+        contractor = self.contractor or (
+            get_backend() if n_indices <= config.MAX_EINSUM_INDICES
+            else OptEinsum())
+        params = dict(self.params, optimize=self.optimize)\
+            if isinstance(contractor, (NumPy, JAX, Contractor))\
+            else self.params
+        array = contractor.einsum(*operands, inputs + outputs, **params)
         return self.cod(array, self(other.dom), self(other.cod))
 
 
@@ -766,7 +810,7 @@ class Diagram[dtype](TestableGeneric, frobenius.Diagram):
         return Dim(*(getattr(obj, "dim", obj) for obj in typ.inside))
 
     def eval(self, dtype: type | None = None, optimize="greedy",
-             **params) -> Tensor:
+             contractor: Backend | None = None, **params) -> Tensor:
         """
         Evaluate a tensor network as a :class:`Tensor`: call the
         :class:`Functor` that sends each type to its :meth:`dim` and each
@@ -778,9 +822,11 @@ class Diagram[dtype](TestableGeneric, frobenius.Diagram):
                 and bubbles included, i.e. the one
                 :meth:`Matrix.promote` gives for their ``dtype``.
             optimize : The contraction path, passed verbatim to the
-                backend ``einsum``.
-            params : Any other optional parameter of the backend
-                ``einsum`` method, passed verbatim.
+                ``einsum`` of the contractor.
+            contractor : The backend whose ``einsum`` contracts the
+                network, see :meth:`Functor.contract`.
+            params : Any other optional parameter of the ``einsum``
+                method of the contractor, passed verbatim.
 
         Examples
         --------
@@ -788,6 +834,8 @@ class Diagram[dtype](TestableGeneric, frobenius.Diagram):
         >>> assert (vector >> vector[::-1]).eval().array == 1
         >>> assert (vector >> vector[::-1]).eval(
         ...     optimize="optimal").array == 1
+        >>> assert (vector >> vector[::-1]).eval(  # doctest: +EXTRA
+        ...     contractor=Quimb()).array == 1
         >>> (vector >> vector[::-1]).eval()
         Tensor[int]([1], dom=Dim(1), cod=Dim(1))
         >>> (vector @ Box('half', Dim(1), Dim(1), [0.5])).eval()
@@ -807,15 +855,20 @@ class Diagram[dtype](TestableGeneric, frobenius.Diagram):
             dtype = typed[0].promote(*typed[1:]).dtype
         return Functor(
             ob_map=category.dim, ar_map=lambda box: box.array,
-            dtype=dtype, optimize=optimize, **params)(self)
+            dtype=dtype, optimize=optimize, contractor=contractor,
+            **params)(self)
 
     def to_quimb(
             self, dtype: type | None = None) -> "quimb.tensor.TensorNetwork":
         """
-        Convert a tensor diagram to a quimb tensor.
+        Convert a tensor diagram to a quimb tensor network, see
+        :meth:`Functor.to_quimb`: swaps, cups and caps are wiring and the
+        free indices are named ``inp0, ...`` and ``out0, ...`` in
+        boundary order.
 
         Parameters:
-            dtype : Used for spiders.
+            dtype : The datatype for spiders and boundary identities,
+                inferred from the boxes by default.
 
         Examples
         --------
@@ -825,47 +878,13 @@ class Diagram[dtype](TestableGeneric, frobenius.Diagram):
         >>> t_net = vector[::-1].to_quimb(dtype=complex)  # doctest: +EXTRA
         >>> assert t_net.contract(preserve_tensor=True).data.dtype == complex
         """
-        import quimb.tensor as qtn
-        spider_params = {} if dtype is None else {"dtype": dtype}
-        inputs = [
-                qtn.COPY_tensor(
-                    d=dim, inds=(f'inp{i}', f'inp{i}_end'), **spider_params
-                ) for i, dim in enumerate(self.dim(self.dom).inside)]
-        tensors = inputs[:]
-        scan = [(t, 1) for t in inputs]
-
-        for i, (box, off) in enumerate(zip(self.boxes, self.offsets)):
-            if isinstance(box, Permutation):
-                segment = scan[off:off + len(box.dom)]
-                scan[off:off + len(box.dom)] = [
-                    segment[i] for i in box.perm]
-                continue
-
-            in_inds = [f't{i}_i{j}' for j in range(len(box.dom))]
-            out_inds = [f't{i}_o{j}' for j in range(len(box.cod))]
-            t = qtn.Tensor(
-                data=box.eval().array,
-                inds=in_inds + out_inds,
-            )
-            tensors.append(t)
-            for j in range(len(box.dom)):
-                other_t, other_ind = scan[off + j]
-                qtn.connect(other_t, t, other_ind, j)
-
-            scan[off:off + len(box.dom)] = [
-                (t, len(box.dom) + ind) for ind in range(len(out_inds))
-            ]
-
-        for i, (t, j) in enumerate(scan):
-            output = qtn.COPY_tensor(
-                d=t.data.shape[j],
-                inds=(f'out{i}_start', f'out{i}'), **spider_params
-            )
-            qtn.connect(t, output, j, 0)
-            tensors.append(output)
-
-        tensor_net = qtn.TensorNetwork(tensors)
-        return tensor_net
+        if isinstance(self, Sum):
+            return Box("sum", self.dom, self.cod, self.eval(dtype).array)\
+                .to_quimb(dtype)
+        category = self.category if isinstance(self, cmap.CMap) else self.ar
+        return Functor(
+            ob_map=category.dim, ar_map=lambda box: box.array,
+            dtype=dtype or getattr(self, "dtype", None)).to_quimb(self)
 
     def to_tn(self, dtype: type | None = None) -> tuple[
             list["tensornetwork.AbstractNode"], list["tensornetwork.Edge"]]:
@@ -1045,7 +1064,10 @@ class Box[dtype](frobenius.Box, Diagram[dtype]):
         and its hash is stable: the data labels a generator, it is not a
         number being compared. The winding number ``z`` is compared too, as
         in :meth:`discopy.rigid.Box.setoid`, and the time step, as in
-        :meth:`discopy.feedback.Box.setoid`.
+        :meth:`discopy.feedback.Box.setoid`. The ``dtype`` is compared by its
+        :func:`discopy.utils.factory_name`, a class object hashing as its
+        address and a backend's descriptor, e.g. ``torch.float64``, being no
+        class at all.
 
         >>> import numpy as np
         >>> f = Box('f', Dim(2), Dim(2), np.array([[0, 1], [1, 0]]))
@@ -1072,7 +1094,8 @@ class Box[dtype](frobenius.Box, Diagram[dtype]):
                 data = np.array(data).reshape(-1).tolist()
         entries = () if data is None\
             else tuple(data) if isinstance(data, list) else (data, )
-        return (self.name, self.dom, self.cod, self.dtype, self.is_dagger,
+        dtype = None if self.dtype is None else factory_name(self.dtype)
+        return (self.name, self.dom, self.cod, dtype, self.is_dagger,
                 self.z, self.deterministic, self.affine, self.time_step)\
             + tuple(map(canonical, entries))
 
@@ -1257,7 +1280,8 @@ class Bubble(feedback.Bubble, Box):
         >>> assert len({f.bubble(data=[1, 2]), f.bubble(data=[1, 3])}) == 2
         """
         args = tuple(f.setoid() for f in self.args)
-        return (type(self), self.method, self.func) + args + Box.setoid(self)
+        return (factory_key(type(self)), self.method, self.func)\
+            + args + Box.setoid(self)
 
     def __repr__(self):
         if self.is_dagger:

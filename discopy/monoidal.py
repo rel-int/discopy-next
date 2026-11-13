@@ -84,6 +84,7 @@ from discopy.config import (
     COLOUR_DRAWING_ATTRIBUTES, TRANSPARENT)
 from discopy.utils import (
     factory,
+    factory_key,
     factory_name,
     from_tree,
     assert_isinstance,
@@ -213,7 +214,8 @@ class Wire(cat.Ob):
 
     def __hash__(self):
         return hash(
-            (type(self), self.name, self.dom, self.cod, self.is_dagger))
+            (factory_key(type(self)),
+             self.name, self.dom, self.cod, self.is_dagger))
 
     def __lt__(self, other):
         """
@@ -347,7 +349,15 @@ class List[generator_factory](Monoid["List"], TestableGeneric):
         return type(self) is type(other) and self.inside == other.inside
 
     def __hash__(self):
-        return hash((type(self), self.inside))
+        """
+        A list's generators can themselves be classes, `python.Ty` being
+        `List[type]`, and a class hashes as its address: those take their
+        :func:`discopy.utils.factory_key` here, as a setoid's leading
+        component does.
+        """
+        return hash((factory_key(type(self)), tuple(
+            factory_key(x) if isinstance(x, type) else x
+            for x in self.inside)))
 
     @classmethod
     def generator_repr(cls, generator) -> str:
@@ -560,7 +570,7 @@ class Ty(cat.Ob, cat.FreeCategory, ColouredMonoid):
             and (self.dom, self.cod) == (other.dom, other.cod)
 
     def __hash__(self):
-        return hash((type(self), self.inside, self.dom, self.cod))
+        return hash((factory_key(type(self)), self.inside, self.dom, self.cod))
 
     def __repr__(self):
         if not self.inside and self.dom is not None:
@@ -1413,7 +1423,10 @@ class Diagram(cat.Arrow, MonoidalCategory, RichDisplay):
             self @ other == self @ other.dom >> self.cod @ other
 
         Each layer of the ``i``-th diagram is whiskered by the codomains of
-        the diagrams before it and the domains of those after it.
+        the diagrams before it and the domains of those after it. A layer
+        whose plumbing whiskers into the identity, e.g. a frobenius spider
+        with one leg on each side, has no box left and is dropped, since the
+        identity is the empty sequence of layers.
 
         Example
         -------
@@ -1442,13 +1455,15 @@ class Diagram(cat.Arrow, MonoidalCategory, RichDisplay):
         for diagram in (self, ) + others:
             suffix = suffixes.pop() if suffixes else None
             if prefix and suffix:
-                inside += [prefix @ layer @ suffix for layer in diagram.inside]
+                whiskered = (
+                    prefix @ layer @ suffix for layer in diagram.inside)
             elif prefix:
-                inside += [prefix @ layer for layer in diagram.inside]
+                whiskered = (prefix @ layer for layer in diagram.inside)
             elif suffix:
-                inside += [layer @ suffix for layer in diagram.inside]
+                whiskered = (layer @ suffix for layer in diagram.inside)
             else:
-                inside += diagram.inside
+                whiskered = diagram.inside
+            inside += [layer for layer in whiskered if layer.boxes]
             prefix = diagram.cod if prefix is None else prefix @ diagram.cod
         return self.ar(tuple(inside), dom, prefix, _scan=False)
 

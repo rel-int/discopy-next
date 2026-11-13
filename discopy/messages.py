@@ -109,6 +109,7 @@ NO_CUPS = "{} is not rigid, it has no cups or caps."
 NO_SUMS = "{} has no sums, it encodes a single diagram."
 NOT_SYMMETRIC = "{} has no swaps to downgrade this map."
 NOT_MARKOV = "{} has no copy or discard."
+NOT_COMARKOV = "{} has no merge or noise."
 NOT_A_DAGGER = "{} has no dagger: {} is not a dagger category."
 NO_SUCH_SPIDER = "The only spiders of {} are its {}."
 NOT_ACYCLIC = "{} has a directed cycle, its boxes cannot be ordered."
@@ -176,8 +177,9 @@ NO_TREE_CALLABLE = "{} has no tree: its {} is a Python callable, which "\
     "JSON cannot hold."
 NO_TREE_DRAWING = "A drawing has no tree: it is the layout of a diagram, "\
     "which to_drawing recomputes."
-NO_TREE_PARAMS = "A tensor functor with params has no tree: they go to the "\
-    "einsum of a backend verbatim, which a file should not reach."
+NO_TREE_PARAMS = "A tensor functor with params or a contractor has no "\
+    "tree: they go to the einsum of a backend verbatim, which a file should "\
+    "not reach."
 NO_TREE_STREAM = "A stream has no tree: its later is what a Python callable "\
     "returns or, for a constant stream, itself, which JSON cannot hold."
 NO_SUCH_TYPE = "No type named {!r} in builtins or numpy, so the name of the "\

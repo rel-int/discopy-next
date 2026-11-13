@@ -94,8 +94,8 @@ from discopy.abc import HypergraphCategory
 from discopy.cat import factory
 from discopy.python import finset
 from discopy.utils import (
-    assert_isatomic, assert_iscomposable, deprecated_alias, factory_name,
-    from_tree)
+    assert_isatomic, assert_iscomposable, deprecated_alias, factory_key,
+    factory_name, from_tree)
 
 
 class Wire(pivotal.Wire):
@@ -233,7 +233,6 @@ class Diagram(
 
     ob = Ty
     layer_factory = Layer
-    str_transparency = compact.Diagram.str_transparency
 
     @classmethod
     def from_cospan(cls, apex: Ty, left, right) -> Diagram:
@@ -484,7 +483,8 @@ class Cospan(Box):
     def setoid(self):
         if self.is_identity:
             return (), self.dom, self.cod
-        return type(self), self.apex, tuple(self.legs.left), tuple(
+        return factory_key(type(self)), self.apex, tuple(
+            self.legs.left), tuple(
             self.legs.right)
 
     def to_spiders(self) -> Diagram:
@@ -1011,6 +1011,8 @@ Diagram.bubble_factory = Bubble
 Layer.plumbing = (Ty, Cospan)
 Cospan.register(Permutation)
 Diagram.sum_factory = Sum
+Diagram.str_transparency = compact.Diagram.str_transparency.modulo(
+    Diagram.to_hypergraph)
 Hypergraph = hypergraph.Hypergraph[Diagram]
 Id = Diagram.id
 

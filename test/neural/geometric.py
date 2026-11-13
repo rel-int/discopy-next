@@ -52,6 +52,15 @@ def test_operators():
     assert not right(x).view(2, 2, 3, 4, 3)[..., :2, :].any()
 
 
+def test_shift_past_the_grid_reads_zero():
+    torch = importorskip("torch")
+    from discopy.neural.geometric import Shift
+    x = torch.rand(2, 24, 3, dtype=torch.float64)
+    for axis, step in ((0, 3), (0, -3), (1, 4), (2, -6)):
+        assert torch.equal(Shift((2, 3, 4), axis, step)(x),
+                           torch.zeros_like(x))
+
+
 def test_peer_and_factor():
     torch = importorskip("torch")
     from discopy.neural.geometric import Factors, Geometric, Peers
@@ -86,6 +95,11 @@ def test_peer_and_factor():
                 assert (p.grad is None) == (q.grad is None)
                 assert p.grad is None or torch.allclose(
                     p.grad, q.grad, rtol=0, atol=1e-12)
+        ref = reference(WIDTHS, wiring, 4, 0, 4, 2).double()
+        geo = geometric(WIDTHS, wiring, 4, 0, 4, 2).double()
+        geo.load_state_dict(ref.state_dict())
+        ref.split = True
+        same(torch, ref.cycle(ref.initial(x)), geo.cycle(geo.initial(x)))
     geo = GeometricFactorNet(WIDTHS, units, 4, 2, 4, 2).double()
     s = geo.initial(x)
     assert torch.equal(FactorNet.round(geo, s).units, geo.round(s).units)
