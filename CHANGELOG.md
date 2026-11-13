@@ -467,6 +467,10 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Fixed
 
+- The law `EGraph.building` compares the outputs each `add` gives on the
+  builder and on the pure e-graph, not only the e-graphs they end on:
+  `egraph.History.run` gives both, so a hash-cons keeping the wrong node of a
+  key fails it ([next#531]).
 - An optyx box is what it computes: `channel.Channel.semantic_attrs` names
   the attributes besides `name`, `dom`, `cod` and `data` that decide it, and
   `setoid` compares them — a gate its `array`, which is what `is_conj` and
@@ -1889,6 +1893,7 @@ for the changelog of `1.2.1` and earlier.
 [next#527]: https://github.com/rel-int/discopy-next/pull/527
 [next#528]: https://github.com/rel-int/discopy-next/pull/528
 [next#529]: https://github.com/rel-int/discopy-next/pull/529
+[next#531]: https://github.com/rel-int/discopy-next/pull/531
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#56]: https://github.com/rel-int/optyx/pull/56

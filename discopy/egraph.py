@@ -478,6 +478,8 @@ class History[factory](TestableGeneric, tuple):
     >>> assert history.build() == history.fold()
     >>> history.fold().classes
     (0, 0, 2, 2)
+    >>> history.run(builder=True)[1]
+    ((2,), (3,))
     """
     def __new__(cls, graph, operations):
         return super().__new__(cls, (graph, tuple(operations)))
@@ -491,18 +493,24 @@ class History[factory](TestableGeneric, tuple):
 
     def fold(self) -> "EGraph":
         """ The e-graph after each operation in turn. """
-        graph = self.graph
-        for name, *args in self.operations:
-            result = getattr(graph, name)(*args)
-            graph = result[0] if name == "add" else result
-        return graph
+        return self.run()[0]
 
     def build(self) -> "EGraph":
         """ What a :class:`Builder` freezes into after the operations. """
-        builder = self.graph.builder()
+        return self.run(builder=True)[0]
+
+    def run(self, builder: bool = False) -> tuple["EGraph", tuple]:
+        """ The e-graph after the operations with the outputs each ``add``
+        gave, on the e-graph itself, each operation giving the next one, or
+        on its :class:`Builder`, frozen at the end. """
+        graph, outputs = self.graph.builder() if builder else self.graph, []
         for name, *args in self.operations:
-            getattr(builder, name)(*args)
-        return builder.freeze()
+            result = getattr(graph, name)(*args)
+            if name == "add":
+                outputs.append(result if builder else result[1])
+            if not builder:
+                graph = result[0] if name == "add" else result
+        return graph.freeze() if builder else graph, tuple(outputs)
 
     @classmethod
     def twice(cls, graph: "EGraph") -> Self:
@@ -1379,9 +1387,11 @@ class EGraph[category](
         return Equation(saturated(same), saturated(same + renamed), True)
 
     @axiom
-    def building(cls, history: History[Self]) -> Equation[Self]:
-        """ A builder freezes into what its operations give in turn. """
-        return Equation(history.build(), history.fold())
+    def building(cls, history: History[Self]
+                 ) -> Equation[tuple[Self, tuple]]:
+        """ A builder freezes into what its operations give in turn, each
+        ``add`` giving the same outputs on both. """
+        return Equation(history.run(builder=True), history.run())
 
     rewrite_identity = rewrite_identity.weaken(effects=False)
     extraction_rewrite = extraction_rewrite.weaken(effects=False)
