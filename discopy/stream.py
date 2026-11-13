@@ -194,10 +194,13 @@ class Ty[base](NamedGeneric):
     ----
     Equality on a stream is **intensional**: a stream is a coinductive type,
     equality on one is undecidable in general, so `==` compares `now` and
-    the thunk :attr:`_later`, and a thunk is compared by identity. Two
-    streams are equal when they hold the same tail, not when they unfold to
-    the same types, so a factory that closes a fresh lambda over its
-    arguments gives a stream equal to itself and to nothing built beside it:
+    the thunk :attr:`_later`, and two thunks are equal only where Python
+    says so — two lambdas never are, however alike their code, while a
+    class and a bound method of one function are the same callable every
+    time. Two streams are equal when they hold equal tails, not when they
+    unfold to the same types, so a factory that closes a fresh lambda over
+    its arguments gives a stream equal to itself and to nothing built
+    beside it:
 
     >>> x = symmetric.Ty('x')
     >>> assert Ty(x) == Ty(x)
@@ -207,9 +210,10 @@ class Ty[base](NamedGeneric):
 
     The two that are equal are so for a reason each: a constant stream has
     no thunk at all, and :meth:`singleton` passes the class itself rather
-    than a lambda wrapping it. It is also why :meth:`__repr__` carries the
-    address of a lambda, which is the same non-determinism that the
-    determinism of `STYLE.md` rules out.
+    than a lambda wrapping it. A caller who passes one thunk to two streams
+    gets the same, which is the only way to build an equal pair by hand. It
+    is also why :meth:`__repr__` carries the address of a lambda, which is
+    the same non-determinism that the determinism of `STYLE.md` rules out.
 
     To compare two streams built independently, :meth:`unroll` as far as
     you mean to look and compare the `now` of the result, which is what the
@@ -471,7 +475,9 @@ class Stream[category](FeedbackCategory, TestableGeneric):
     >>> assert mem.later.now == later.mem.now
 
     Equality on a stream of arrows is intensional for the same reason as on
-    a stream of types, see :class:`Ty`:
+    a stream of types, see :class:`Ty`, with :meth:`singleton` passing
+    :meth:`id` — a bound method, so a fresh object each time but an equal
+    one — where :meth:`Ty.singleton` passes the class:
 
     >>> f = symmetric.Box('f', symmetric.Ty('x'), symmetric.Ty('x'))
     >>> X, Y = Ty.sequence(symmetric.Ty('x')), Ty.sequence(symmetric.Ty('y'))

@@ -138,10 +138,12 @@ def test_no_tree():
 
 def test_singleton_equality_compares_the_callee():
     """ The two ``singleton``s put the callee itself in `_later` rather than
-    a fresh lambda, so two built the same way hold the *same* object and
-    compare equal, where every other non-constant stream closes over its
-    arguments. Why `_later` is compared at all is the intensional equality
-    of :class:`discopy.stream.Ty`, whose doctests state it. """
+    a fresh lambda: the class for ``Ty``, which is one object, and the bound
+    ``Stream.id`` for ``Stream``, which is a fresh object every time but an
+    equal one. Either way two built the same way compare equal, where a
+    factory closing over its arguments does not. Why `_later` is compared at
+    all is the intensional equality of :class:`discopy.stream.Ty`, whose
+    doctests state it. """
     x, y = symmetric.Ty('x'), symmetric.Ty('y')
     assert Ty.singleton(x) == Ty.singleton(x)
     assert Ty.singleton(x) != Ty.singleton(y)
