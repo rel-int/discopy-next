@@ -69,7 +69,15 @@ jobs:
         uv run ty check --exit-zero-on-warning
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 20   # backstop: a pull request takes ~3 min, main ~6 for the slow tests and the notebooks ~6 more
+    # Backstop against a job that reports nothing for hours (#591), at ~2x
+    # the worst this job has taken rather than at it: 40 against the 20.3
+    # minutes of the slowest of the 90 test jobs of main's last 30 build
+    # runs. At 20 it had stopped being a backstop and become a budget the
+    # suite grows into, cutting 6 jobs over 5 runs of main in fifteen hours
+    # while 17 green ones finished at 19 minutes or more (next#509). When
+    # `Test notebooks` pushes the job past ~20 minutes of its own again,
+    # give the notebooks a job of their own rather than raising this.
+    timeout-minutes: 40
     strategy:
       matrix:
         # A pull request tests the version CI lints on; main tests every one.
