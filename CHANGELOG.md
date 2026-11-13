@@ -275,7 +275,10 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   once rather than once per cut: 7.5x faster on the traces of a graph with
   128 of them over a category whose trace is a box, and the same term, the
   `n`-wire trace being the `n` nested one-wire ones on either kind of
-  `trace_factory` ([next#534]).
+  `trace_factory`. Its signature is now `explicit_trace(n=1, left=False)`,
+  `Hypergraph.trace`'s own, so a call passing `left` positionally — which
+  used to read `explicit_trace(True)` — passes it as `n` and must be spelled
+  `explicit_trace(left=True)` ([next#534]).
 - The `inside` of a composition of `python.Function` is a
   `python.function.Composition` of its `factors`, extended when composed
   again, so that a long composition built one function at a time is called

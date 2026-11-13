@@ -830,18 +830,24 @@ class Hypergraph[category](
 
         Tracing no wire is the identity, whatever the category, so a graph
         with nothing to trace needs no traces, see
-        :meth:`trace_backward_wires`.
+        :meth:`trace_backward_wires`; any other ``n`` is checked against the
+        wires there are, as :meth:`trace` checks it.
 
         >>> from discopy import rigid
         >>> z = rigid.Ty('z')
         >>> h = rigid.Box('h', z, z).to_hypergraph()
         >>> assert h.explicit_trace(0) == h
+        >>> f.explicit_trace(-1)
+        Traceback (most recent call last):
+         ...
+        ValueError: Cannot split -1 atoms off f.
         """
         if n == 0:
             return self
         if not issubclass(self.category, TracedCategory):
             raise AxiomError(messages.NOT_TRACED.format(
                 factory_name(self.category)))
+        assert_istraceable(self, n, left)
         factory = self.category.trace_factory
         if isclass(factory) and issubclass(factory, self.category):
             return self.from_box(self.to_diagram().trace(n, left))
