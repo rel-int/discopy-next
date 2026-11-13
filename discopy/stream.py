@@ -529,6 +529,7 @@ class Stream[category](FeedbackCategory, TestableGeneric):
         return testable.Equation(*terms, up_to=up_to_steps)
 
     @classmethod
+    # pylint: disable-next=arguments-differ  # the three it implements
     def strategy(cls, *, dom=None, cod=None, mem=None):
         """
         Generate a stream of boxes over a drawn memory, see
