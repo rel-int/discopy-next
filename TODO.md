@@ -4,4 +4,4 @@
 - [x] #457: test/stream.py's test_no_hash agrees with the docstring rather than restating the mechanism
 - [x] #457: enrol Stream in the property matrix — checked_params, strategy, and a stream Equation up to a finite number of steps, filed as #533
 - [x] #457: every FeedbackCategory law the matrix shows weaker on streams is declared with the reason the module docstring already states, or filed when the issue does not settle it, filed as #533
-- [ ] CHANGELOG.md bullet and the gates of CONTRIBUTING.md
+- [WIP] @session_01C7YfAQNzY28EVbk6YirCHJ-2026-11-13 01:46 CHANGELOG.md bullet and the gates of CONTRIBUTING.md
