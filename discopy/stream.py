@@ -107,7 +107,8 @@ category of streams of python types and probabilistic functions.
 Axioms
 ------
 
-Note that we can only check equality of streams up to a finite number of steps.
+Note that we can only check equality of streams up to a finite number of
+steps: `==` on a stream is intensional, see :class:`Ty`.
 
 >>> from discopy.stream import *
 >>> all_eq = lambda xs: len(set(xs)) == 1
@@ -188,6 +189,33 @@ class Ty[base](NamedGeneric):
         now (base) : The value of the stream at time step zero.
         _later (Optional[Callable[[], Ty[base]]]) :
             A thunk for the tail of the stream, constant by default.
+
+    Note
+    ----
+    Equality on a stream is **intensional**: a stream is a coinductive type,
+    equality on one is undecidable in general, so `==` compares `now` and
+    the thunk :attr:`_later`, and a thunk is compared by identity. Two
+    streams are equal when they hold the same tail, not when they unfold to
+    the same types, so a factory that closes a fresh lambda over its
+    arguments gives a stream equal to itself and to nothing built beside it:
+
+    >>> x = symmetric.Ty('x')
+    >>> assert Ty(x) == Ty(x)
+    >>> assert Ty.singleton(x) == Ty.singleton(x)
+    >>> assert Ty.sequence(x) != Ty.sequence(x)
+    >>> assert Ty(x).delay() != Ty(x).delay()
+
+    The two that are equal are so for a reason each: a constant stream has
+    no thunk at all, and :meth:`singleton` passes the class itself rather
+    than a lambda wrapping it. It is also why :meth:`__repr__` carries the
+    address of a lambda, which is the same non-determinism that the
+    determinism of `STYLE.md` rules out.
+
+    To compare two streams built independently, :meth:`unroll` as far as
+    you mean to look and compare the `now` of the result, which is what the
+    `eq_up_to_n` of the module docstring does:
+
+    >>> assert Ty.sequence(x).unroll(3).now == Ty.sequence(x).unroll(3).now
     """
     base = symmetric.Ty  # The underlying class of types.
 
@@ -376,6 +404,20 @@ class Stream[category](FeedbackCategory, TestableGeneric):
     >>> assert dom.later.now == later.dom.now
     >>> assert cod.later.now == later.cod.now
     >>> assert mem.later.now == later.mem.now
+
+    Equality on a stream of arrows is intensional for the same reason as on
+    a stream of types, see :class:`Ty`:
+
+    >>> f = symmetric.Box('f', symmetric.Ty('x'), symmetric.Ty('x'))
+    >>> X, Y = Ty.sequence(symmetric.Ty('x')), Ty.sequence(symmetric.Ty('y'))
+    >>> assert Stream(f) == Stream(f)
+    >>> assert Stream.singleton(f) == Stream.singleton(f)
+    >>> assert Stream.id(X) != Stream.id(X)
+    >>> assert Stream.sequence('f', X, Y) != Stream.sequence('f', X, Y)
+
+    So a law of a feedback category is checked on streams up to a finite
+    number of steps, which is what :class:`Equation` compares and what the
+    property matrix checks, see :meth:`equation_factory`.
     """
     @classmethod
     def checked_params(cls) -> tuple:
