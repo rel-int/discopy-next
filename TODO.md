@@ -16,6 +16,6 @@
 > > and what the loop costs on each.
 
 - [x] measure both kinds of trace_factory on a CMap, and say which call sites reach which
-- [ ] explicit_trace takes n and converts once on the class-factory branch; trace and make_causal stop looping
+- [WIP] @session_01C7YfAPBzDhC42HUCSUu4td-2026-11-14 01:42 explicit_trace takes n and converts once on the class-factory branch; trace and make_causal stop looping
 - [ ] a test that the n-wire trace is the n nested ones on a CMap, both kinds, and that the conversion happens once
 - [ ] CHANGELOG.md and every check of CONTRIBUTING.md's Run the unit tests
