@@ -1239,6 +1239,37 @@ def test_Hypergraph_explicit_trace_of_n_wires_is_the_n_nested_ones():
                     module.__name__, n, left)
 
 
+def test_Hypergraph_explicit_trace_builds_the_onion_in_one_call(monkeypatch):
+    """
+    Over a pivotal category the ``n``-wire trace is an onion of ``n`` cup and
+    cap pairs around the graph, and the whole onion goes to one constructor
+    call. Composing it pair by pair built ``2 * n`` intermediate graphs, each
+    scanning a boundary that grows with ``n``, which is what made
+    ``make_causal`` quadratic in the wires it traces (#536).
+    """
+    from discopy import compact, frobenius
+    for module in (compact, frobenius):
+        graph = module.Box(
+            'f', module.Ty('x') ** 8, module.Ty('x') ** 8).to_hypergraph()
+        for left in (False, True):
+            calls, init = [], module.Hypergraph.__init__
+
+            def counted(self, *args, _init=init, _calls=calls, **kwargs):
+                _calls.append(None)
+                return _init(self, *args, **kwargs)
+
+            monkeypatch.setattr(module.Hypergraph, "__init__", counted)
+            result = graph.explicit_trace(4, left)
+            monkeypatch.undo()
+            assert len(calls) == 1, (module.__name__, left, len(calls))
+            nested = graph
+            for _ in range(4):
+                nested = nested.explicit_trace(1, left)
+            assert result.boxes == nested.boxes, (module.__name__, left)
+            assert result.wires == nested.wires, (module.__name__, left)
+            assert result.spider_types == nested.spider_types
+
+
 def test_Hypergraph_trace_backward_wires_loops(monkeypatch):
     """
     ``trace_backward_wires`` cuts one wire at a time in a loop, so a graph
