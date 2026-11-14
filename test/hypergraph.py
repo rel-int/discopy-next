@@ -1270,6 +1270,30 @@ def test_Hypergraph_explicit_trace_builds_the_onion_in_one_call(monkeypatch):
             assert result.spider_types == nested.spider_types
 
 
+def test_Hypergraph_explicit_trace_keeps_an_overridden_factory(monkeypatch):
+    """
+    The onion in one call *is* the pivotal trace, so it is built only when
+    ``trace_factory`` is pivotal's own class method: a category overriding it
+    gets the nest its own factory builds, one wire at a time, rather than the
+    cups and caps it never asked for.
+    """
+    from discopy import frobenius, pivotal
+    pivotal_trace, calls = pivotal.Diagram.trace_factory.__func__, []
+
+    def overridden(cls, diagram, left=False):
+        calls.append(left)
+        return pivotal_trace(cls, diagram, left)
+
+    x = frobenius.Ty('x')
+    graph = frobenius.Box('f', x ** 8, x ** 8).to_hypergraph()
+    onion = graph.explicit_trace(4)
+    monkeypatch.setattr(
+        frobenius.Diagram, "trace_factory", classmethod(overridden))
+    assert graph.explicit_trace(4) == onion
+    monkeypatch.undo()
+    assert calls == 4 * [False]
+
+
 def test_Hypergraph_trace_backward_wires_loops(monkeypatch):
     """
     ``trace_backward_wires`` cuts one wire at a time in a loop, so a graph

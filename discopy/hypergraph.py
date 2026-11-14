@@ -83,8 +83,7 @@ from discopy import cat, cmap, messages
 from discopy.abc import (
     BalancedCategory, BraidedCategory, ColouredMonoid, ComarkovCategory,
     CompactCategory, DaggerCategory, HypergraphCategory, MarkovCategory,
-    MonoidalCategory, PivotalCategory, RigidCategory, SymmetricCategory,
-    TracedCategory)
+    MonoidalCategory, RigidCategory, SymmetricCategory, TracedCategory)
 from discopy.testable import Equation, Serialisable, TestableGeneric, axiom
 from discopy.drawing import Node, backend
 from discopy.python.finset import Function, Permutation
@@ -820,7 +819,10 @@ class Hypergraph[category](
         for compact diagrams, in which case we use this method to introduce
         cup and cap boxes, one pair per wire: the cups and caps of a pivotal
         category are atomic, so the ``n``-wire trace is the nest of ``n``
-        one-wire traces there as well.
+        one-wire traces there as well. When that class method is the pivotal
+        one itself, the whole onion of ``n`` cup and cap pairs goes to one
+        constructor call rather than being composed pair by pair; a category
+        overriding it gets the nest its own factory builds.
 
         >>> from discopy import frobenius, markov
         >>> x = markov.Ty('x')
@@ -853,7 +855,9 @@ class Hypergraph[category](
         factory = self.category.trace_factory
         if isclass(factory) and issubclass(factory, self.category):
             return self.from_box(self.to_diagram().trace(n, left))
-        if not issubclass(self.category, PivotalCategory):
+        # pylint: disable-next=import-outside-toplevel  # pivotal imports us
+        from discopy.pivotal import Diagram as Pivotal
+        if factory.__func__ is not Pivotal.trace_factory.__func__:
             result = self
             for _ in range(n):
                 result = factory.__func__(type(self), result, left)
