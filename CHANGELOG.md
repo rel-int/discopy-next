@@ -497,6 +497,11 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   that is not a number of wires the map has raises where it used to return
   the map untraced. The pivotal branch, where a cut becomes cups and caps,
   still composes one pair at a time, see [next#541] ([next#540]).
+- `Hypergraph.explicit_trace` over a pivotal category builds its onion of
+  cups and caps in one constructor call instead of composing one pair at a
+  time, so tracing *n* wires scans the boundary once rather than 2*n* times:
+  it is linear in the wires traced where it was quadratic, 260× at *n*=128,
+  and `make_causal` is 2.3× there ([next#539]).
 - The law `EGraph.building` compares the outputs each `add` gives on the
   builder and on the pure e-graph, not only the e-graphs they end on:
   `egraph.History.run` gives both, so a hash-cons keeping the wrong node of a
@@ -1934,6 +1939,7 @@ for the changelog of `1.2.1` and earlier.
 [next#533]: https://github.com/rel-int/discopy-next/issues/533
 [next#534]: https://github.com/rel-int/discopy-next/pull/534
 [next#535]: https://github.com/rel-int/discopy-next/pull/535
+[next#539]: https://github.com/rel-int/discopy-next/pull/539
 [next#540]: https://github.com/rel-int/discopy-next/pull/540
 [next#541]: https://github.com/rel-int/discopy-next/issues/541
 [optyx#16]: https://github.com/rel-int/optyx/pull/16

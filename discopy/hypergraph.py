@@ -796,7 +796,8 @@ class Hypergraph[category](
     l = property(lambda self: self.rotate(left=True))
     r = property(lambda self: self.rotate(left=False))
 
-    def explicit_trace(self, n=1, left=False):
+    def explicit_trace(  # pylint: disable=too-many-locals  # the onion
+            self, n=1, left=False):
         """
         The trace of ``n`` wires of a hypergraph with explicit boxes (trace,
         cup or cap), in one pass.
@@ -818,7 +819,10 @@ class Hypergraph[category](
         for compact diagrams, in which case we use this method to introduce
         cup and cap boxes, one pair per wire: the cups and caps of a pivotal
         category are atomic, so the ``n``-wire trace is the nest of ``n``
-        one-wire traces there as well.
+        one-wire traces there as well. When that class method is the pivotal
+        one itself, the whole onion of ``n`` cup and cap pairs goes to one
+        constructor call rather than being composed pair by pair; a category
+        overriding it gets the nest its own factory builds.
 
         >>> from discopy import frobenius, markov
         >>> x = markov.Ty('x')
@@ -851,10 +855,39 @@ class Hypergraph[category](
         factory = self.category.trace_factory
         if isclass(factory) and issubclass(factory, self.category):
             return self.from_box(self.to_diagram().trace(n, left))
-        result = self
-        for _ in range(n):
-            result = factory.__func__(type(self), result, left)
-        return result
+        # pylint: disable-next=import-outside-toplevel  # pivotal imports us
+        from discopy.pivotal import Diagram as Pivotal
+        if factory.__func__ is not Pivotal.trace_factory.__func__:
+            result = self
+            for _ in range(n):
+                result = factory.__func__(type(self), result, left)
+            return result
+        dom, cod, traced = (self.dom[n:], self.cod[n:], self.dom[:n]) if left\
+            else (self.dom[:-n], self.cod[:-n], self.dom[-n:])
+        (dom_wires, into), (cod_wires, out_of) = (
+            (wires[n:], wires[:n]) if left else (wires[:-n], wires[-n:])
+            for wires in (self.dom_wires, self.cod_wires))
+        loop = tuple(range(self.n_spiders, self.n_spiders + n))
+        legs = [(traced[i:i + 1].r, traced[i:i + 1]) if left
+                else (traced[i:i + 1], traced[i:i + 1].r) for i in range(n)]
+        cap_wires = [(loop[i], into[i]) if left else (into[i], loop[i])
+                     for i in range(n)]
+        cup_wires = [(loop[i], out_of[i]) if left else (out_of[i], loop[i])
+                     for i in range(n)]
+        order = tuple(reversed(range(n))) if left else tuple(range(n))
+        boxes = tuple(self.category.cap_factory(*legs[i]) for i in order)\
+            + self.boxes + tuple(
+                self.category.cup_factory(*legs[i]) for i in order[::-1])
+        box_wires = tuple(((), cap_wires[i]) for i in order) + self.box_wires\
+            + tuple((cup_wires[i], ()) for i in order[::-1])
+        spider_types = dict(enumerate(self.spider_types)) | {
+            loop[i]: legs[i][0 if left else 1] for i in range(n)}
+        offsets = n * (None, ) + tuple(
+            offset if offset is None else offset + (n if left else 0)
+            for offset in self.offsets) + n * (None, )
+        return type(self)(
+            dom, cod, boxes, (dom_wires, box_wires, cod_wires),
+            spider_types, offsets)
 
     def trace(self, n=1, left=False):
         """
