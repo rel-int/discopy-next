@@ -797,7 +797,8 @@ class Hypergraph[category](
     l = property(lambda self: self.rotate(left=True))
     r = property(lambda self: self.rotate(left=False))
 
-    def explicit_trace(self, n=1, left=False):
+    def explicit_trace(  # pylint: disable=too-many-locals  # the onion
+            self, n=1, left=False):
         """
         The trace of ``n`` wires of a hypergraph with explicit boxes (trace,
         cup or cap), in one pass.
