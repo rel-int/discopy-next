@@ -859,29 +859,29 @@ class Hypergraph[category](
             return result
         dom, cod, traced = (self.dom[n:], self.cod[n:], self.dom[:n]) if left\
             else (self.dom[:-n], self.cod[:-n], self.dom[-n:])
-        boundary = lambda wires: wires[n:] if left else wires[:-n]
-        feedback = lambda wires: wires[:n] if left else wires[-n:]
-        legs = lambda i: (traced[i:i + 1].r, traced[i:i + 1]) if left\
-            else (traced[i:i + 1], traced[i:i + 1].r)
+        (dom_wires, into), (cod_wires, out_of) = (
+            (wires[n:], wires[:n]) if left else (wires[:-n], wires[-n:])
+            for wires in (self.dom_wires, self.cod_wires))
         loop = tuple(range(self.n_spiders, self.n_spiders + n))
-        pair = lambda i, wires: (loop[i], wires[i]) if left\
-            else (wires[i], loop[i])
-        caps = tuple(reversed(range(n))) if left else tuple(range(n))
-        boxes = tuple(self.category.cap_factory(*legs(i)) for i in caps)\
+        legs = [(traced[i:i + 1].r, traced[i:i + 1]) if left
+                else (traced[i:i + 1], traced[i:i + 1].r) for i in range(n)]
+        cap_wires = [(loop[i], into[i]) if left else (into[i], loop[i])
+                     for i in range(n)]
+        cup_wires = [(loop[i], out_of[i]) if left else (out_of[i], loop[i])
+                     for i in range(n)]
+        order = tuple(reversed(range(n))) if left else tuple(range(n))
+        boxes = tuple(self.category.cap_factory(*legs[i]) for i in order)\
             + self.boxes + tuple(
-                self.category.cup_factory(*legs(i)) for i in caps[::-1])
-        box_wires = tuple(
-            ((), pair(i, feedback(self.dom_wires))) for i in caps
-        ) + self.box_wires + tuple(
-            (pair(i, feedback(self.cod_wires)), ()) for i in caps[::-1])
+                self.category.cup_factory(*legs[i]) for i in order[::-1])
+        box_wires = tuple(((), cap_wires[i]) for i in order) + self.box_wires\
+            + tuple((cup_wires[i], ()) for i in order[::-1])
         spider_types = dict(enumerate(self.spider_types)) | {
-            loop[i]: legs(i)[0 if left else 1] for i in range(n)}
+            loop[i]: legs[i][0 if left else 1] for i in range(n)}
         offsets = n * (None, ) + tuple(
             offset if offset is None else offset + (n if left else 0)
             for offset in self.offsets) + n * (None, )
         return type(self)(
-            dom, cod, boxes,
-            (boundary(self.dom_wires), box_wires, boundary(self.cod_wires)),
+            dom, cod, boxes, (dom_wires, box_wires, cod_wires),
             spider_types, offsets)
 
     def trace(self, n=1, left=False):
