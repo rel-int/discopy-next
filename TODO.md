@@ -15,4 +15,4 @@
 - [x] explicit_trace builds the cup-and-cap trace in one Hypergraph constructor call, equal term by term to the n one-wire nest
 - [x] a test that the one-call result equals the nest, on every pivotal category the branch is reachable from, left and right
 - [x] measure make_causal on frobenius before and after, at the sizes #536 reports
-- [ ] CHANGELOG.md and every check of CONTRIBUTING.md's Run the unit tests
+- [x] CHANGELOG.md and every check of CONTRIBUTING.md's Run the unit tests
