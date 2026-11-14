@@ -10,5 +10,5 @@
 > > an exact zero check and validate `n` with `assert_istraceable` before dispatch, matching
 > > `Hypergraph.explicit_trace`.
 
-- [ ] a negative count raises rather than returning the map, as on Hypergraph, with a doctest
+- [x] a negative count raises rather than returning the map, as on Hypergraph, with a doctest
 - [ ] say in the changelog that the first argument is the count now, and answer the compatibility finding
