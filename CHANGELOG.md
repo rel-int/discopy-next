@@ -488,12 +488,15 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Fixed
 
-- `CMap.explicit_trace` takes the number of wires to trace, like
-  `Hypergraph.explicit_trace`, so `CMap.trace` and `CMap.make_causal` hand it
-  their count instead of looping: over a traced category that is not
-  symmetric the map is converted once rather than once per wire, 4.9× at
-  *n*=128. The pivotal branch, where a cut becomes cups and caps, still
-  composes one pair at a time, see [next#541] ([next#540]).
+- `CMap.explicit_trace` takes the number of wires to trace as its **first**
+  argument, like `Hypergraph.explicit_trace`, so `CMap.trace` and
+  `CMap.make_causal` hand it their count instead of looping: over a traced
+  category that is not symmetric the map is converted once rather than once
+  per wire, 4.9× at *n*=128. A positional `explicit_trace(True)` therefore
+  now means one trace on the right rather than one on the left, and a count
+  that is not a number of wires the map has raises where it used to return
+  the map untraced. The pivotal branch, where a cut becomes cups and caps,
+  still composes one pair at a time, see [next#541] ([next#540]).
 - The law `EGraph.building` compares the outputs each `add` gives on the
   builder and on the pure e-graph, not only the e-graphs they end on:
   `egraph.History.run` gives both, so a hash-cons keeping the wrong node of a

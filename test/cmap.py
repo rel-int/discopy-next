@@ -1370,6 +1370,21 @@ def test_CMap_explicit_trace_of_n_wires_is_the_n_nested_ones():
                     module.__name__, n, left)
 
 
+def test_CMap_explicit_trace_checks_the_count():
+    """
+    Tracing no wire is the identity, and any other count is checked against
+    the wires there are: before it took one, a negative count fell through
+    an empty ``range`` and returned the map untraced.
+    """
+    x = compact.Ty('x')
+    cmap = compact.Box('f', x @ x, x @ x).to_map()
+    assert cmap.explicit_trace(0) == cmap
+    with raises(ValueError, match="Cannot split -1 atoms"):
+        cmap.explicit_trace(-1)
+    with raises(ValueError, match="Cannot split 3 atoms"):
+        cmap.explicit_trace(3)
+
+
 def test_CMap_explicit_trace_converts_once(monkeypatch):
     """
     Over a planar traced category the whole nest is one trace box on the

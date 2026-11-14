@@ -1679,10 +1679,15 @@ class CMap[category](
         nothing to trace needs no traces, see :meth:`make_causal`.
 
         >>> assert g.explicit_trace(0) == g
+
+        Any other ``n`` is checked against the wires there are, as
+        :meth:`trace` and :meth:`Hypergraph.explicit_trace` check it: a
+        negative count raises rather than tracing nothing.
         """
-        if not n:
+        if n == 0:
             return self
         type(self).assert_istraced()
+        assert_istraceable(self, n, left)
         factory = self.category.trace_factory
         if isclass(factory):
             return self.from_box(self.to_diagram().trace(n, left))
