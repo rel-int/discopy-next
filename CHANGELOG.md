@@ -488,6 +488,15 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Fixed
 
+- `CMap.explicit_trace` takes the number of wires to trace as its **first**
+  argument, like `Hypergraph.explicit_trace`, so `CMap.trace` and
+  `CMap.make_causal` hand it their count instead of looping: over a traced
+  category that is not symmetric the map is converted once rather than once
+  per wire, 4.9× at *n*=128. A positional `explicit_trace(True)` therefore
+  now means one trace on the right rather than one on the left, and a count
+  that is not a number of wires the map has raises where it used to return
+  the map untraced. The pivotal branch, where a cut becomes cups and caps,
+  still composes one pair at a time, see [next#541] ([next#540]).
 - `Hypergraph.explicit_trace` over a pivotal category builds its onion of
   cups and caps in one constructor call instead of composing one pair at a
   time, so tracing *n* wires scans the boundary once rather than 2*n* times:
@@ -1931,6 +1940,8 @@ for the changelog of `1.2.1` and earlier.
 [next#534]: https://github.com/rel-int/discopy-next/pull/534
 [next#535]: https://github.com/rel-int/discopy-next/pull/535
 [next#539]: https://github.com/rel-int/discopy-next/pull/539
+[next#540]: https://github.com/rel-int/discopy-next/pull/540
+[next#541]: https://github.com/rel-int/discopy-next/issues/541
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#56]: https://github.com/rel-int/optyx/pull/56

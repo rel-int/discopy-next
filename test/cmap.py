@@ -1346,3 +1346,66 @@ def test_match_needs_a_connected_map():
         next(f.to_map().rewrite((f.to_map(), s.to_map())))
     with raises(AxiomError):
         compact.CMap.cups(compact.Ty('x'), compact.Ty('x').r).wiring()
+
+
+def test_CMap_explicit_trace_of_n_wires_is_the_n_nested_ones():
+    """
+    The ``n``-wire trace is the nest of ``n`` one-wire traces, on both kinds
+    of ``trace_factory``: a class, where the whole nest is one trace box on
+    the diagram, and a class method, where the cups and caps of a pivotal
+    category are atomic and the nest is the onion of ``n`` pairs. So taking
+    them in one pass is the same map, not just the same morphism.
+    """
+    from discopy import feedback
+    for module in (feedback, compact):
+        x, a = module.Ty('x'), module.Ty('a')
+        for n in (1, 2, 3):
+            for left in (False, True):
+                typ = x ** n @ a if left else a @ x ** n
+                cmap = module.Box('f', typ, typ).to_map()
+                nested = cmap
+                for _ in range(n):
+                    nested = nested.explicit_trace(1, left)
+                assert cmap.explicit_trace(n, left) == nested, (
+                    module.__name__, n, left)
+
+
+def test_CMap_explicit_trace_checks_the_count():
+    """
+    Tracing no wire is the identity, and any other count is checked against
+    the wires there are: before it took one, a negative count fell through
+    an empty ``range`` and returned the map untraced.
+    """
+    x = compact.Ty('x')
+    cmap = compact.Box('f', x @ x, x @ x).to_map()
+    assert cmap.explicit_trace(0) == cmap
+    with raises(ValueError, match="Cannot split -1 atoms"):
+        cmap.explicit_trace(-1)
+    with raises(ValueError, match="Cannot split 3 atoms"):
+        cmap.explicit_trace(3)
+
+
+def test_CMap_explicit_trace_converts_once(monkeypatch):
+    """
+    Over a planar traced category the whole nest is one trace box on the
+    diagram, so the map is converted once however many wires it traces:
+    looping ``explicit_trace`` converted it once per wire, which is what made
+    ``trace`` and ``make_causal`` quadratic in them (#537).
+    """
+    from discopy import feedback
+    x = feedback.Ty('x')
+    cmap = feedback.Box('f', x ** 8, x ** 8).to_map()
+    to_diagram, calls = feedback.CMap.to_diagram, []
+
+    def counted(self, *args, **kwargs):
+        calls.append(None)
+        return to_diagram(self, *args, **kwargs)
+
+    monkeypatch.setattr(feedback.CMap, "to_diagram", counted)
+    result = cmap.trace(4)
+    monkeypatch.undo()
+    assert len(calls) == 1
+    nested = cmap
+    for _ in range(4):
+        nested = nested.explicit_trace()
+    assert result == nested

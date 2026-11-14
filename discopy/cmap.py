@@ -1494,10 +1494,7 @@ class CMap[category](
         assert_istraceable(self, n, left)
         if issubclass(self.category, TracedCategory)\
                 and not issubclass(self.category, SymmetricCategory):
-            result = self
-            for _ in range(n):
-                result = result.explicit_trace(left)
-            return result
+            return self.explicit_trace(n, left)
 
         if left:
             dom, cod = self.dom[n:], self.cod[n:]
@@ -1648,25 +1645,56 @@ class CMap[category](
             new_dom, cod, boxes, edge,
             loops=self.loops)
 
-    def explicit_trace(self, left: bool = False) -> "CMap":
+    def explicit_trace(self, n: int = 1, left: bool = False) -> "CMap":
         """
-        The trace of a map with explicit boxes (trace, cup or cap).
+        The trace of ``n`` wires of a map with explicit boxes (trace, cup or
+        cap), in one pass, like :meth:`Hypergraph.explicit_trace`.
 
         Parameters:
+            n : The number of wires to trace.
             left : Whether to trace on the left or right.
 
         Note
         ----
-        When ``category.trace_factory`` is a class, e.g. for symmetric
-        diagrams, then the result is just one big trace box wrapped up as a
-        map. Otherwise it is a class method, e.g. for compact diagrams, in
-        which case we use it to introduce cup and cap boxes.
+        When ``category.trace_factory`` is a class, e.g. for a planar traced
+        category, then the result is just one big trace box wrapped up as a
+        map, whatever ``n``, since the trace of ``n`` wires of a diagram is
+        its ``n`` one-wire traces nested: nesting them on the diagram
+        converts the map once instead of once per wire.
+
+        Otherwise it is a class method, e.g. for compact diagrams, in which
+        case we use it to introduce cup and cap boxes, one pair per wire: the
+        cups and caps of a pivotal category are atomic, so the ``n``-wire
+        trace is the nest of ``n`` one-wire traces there as well.
+
+        >>> from discopy import compact, feedback
+        >>> x = feedback.Ty('x')
+        >>> f = feedback.Box('f', x @ x @ x, x @ x @ x).to_map()
+        >>> assert f.explicit_trace(2) == f.explicit_trace().explicit_trace()
+        >>> y = compact.Ty('y')
+        >>> g = compact.Box('g', y @ y @ y, y @ y @ y).to_map()
+        >>> assert g.explicit_trace(2) == g.explicit_trace().explicit_trace()
+
+        Tracing no wire is the identity, whatever the category, so a map with
+        nothing to trace needs no traces, see :meth:`make_causal`.
+
+        >>> assert g.explicit_trace(0) == g
+
+        Any other ``n`` is checked against the wires there are, as
+        :meth:`trace` and :meth:`Hypergraph.explicit_trace` check it: a
+        negative count raises rather than tracing nothing.
         """
+        if n == 0:
+            return self
         type(self).assert_istraced()
+        assert_istraceable(self, n, left)
         factory = self.category.trace_factory
         if isclass(factory):
-            return self.from_box(factory(self.to_diagram(), left))
-        return factory.__func__(type(self), self, left)
+            return self.from_box(self.to_diagram().trace(n, left))
+        result = self
+        for _ in range(n):
+            result = factory.__func__(type(self), result, left)
+        return result
 
     def leg_order(self, *legs: int) -> tuple[int, ...]:
         """
@@ -1808,9 +1836,7 @@ class CMap[category](
         result = type(self)(
             self.dom @ typ, self.cod @ typ, self.boxes, edges,
             check=False)
-        for _ in range(n_traces):
-            result = result.explicit_trace()
-        return result
+        return result.explicit_trace(n_traces)
 
     def to_compact(self) -> "CMap":
         """
