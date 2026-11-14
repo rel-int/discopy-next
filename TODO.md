@@ -18,4 +18,4 @@
 - [x] measure both kinds of trace_factory on a CMap, and say which call sites reach which
 - [x] explicit_trace takes n and converts once on the class-factory branch; trace and make_causal stop looping
 - [x] a test that the n-wire trace is the n nested ones on a CMap, both kinds, and that the conversion happens once
-- [ ] CHANGELOG.md and every check of CONTRIBUTING.md's Run the unit tests
+- [x] CHANGELOG.md and every check of CONTRIBUTING.md's Run the unit tests
