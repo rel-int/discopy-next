@@ -11,4 +11,4 @@
 > > standard pivotal trace implementation and retain the factory loop for overrides.
 
 - [x] the onion is built only for pivotal's own trace_factory; an override keeps the loop, with a test
-- [ ] answer the counter finding with the measurement: 40 calls on the merge base, 1 on the head
+- [x] answer the counter finding with the measurement: 40 calls on the merge base, 1 on the head
