@@ -24,5 +24,5 @@
 - [x] Build the onion in one constructor call in CMap.explicit_trace, the way Hypergraph.explicit_trace does, keeping the nest for a category that overrides trace_factory
 - [x] Pin the map, not just the morphism: explicit_trace(n) against the n-fold nest on the pivotal kind, n=1..3, both sides, and the count of CMap.then calls
 - [x] Measure after, same table, and say what the ratio is
-- [ ] CHANGELOG.md bullet and the gates of CONTRIBUTING.md
+- [x] CHANGELOG.md bullet and the gates of CONTRIBUTING.md
 - [x] Answer the duplicate-code pair the onion adds: filed as an issue rather than decided inside a performance fix, filed as #546
