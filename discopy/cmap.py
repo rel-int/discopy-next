@@ -1645,7 +1645,8 @@ class CMap[category](
             new_dom, cod, boxes, edge,
             loops=self.loops)
 
-    def explicit_trace(self, n: int = 1, left: bool = False) -> "CMap":
+    def explicit_trace(  # pylint: disable=too-many-locals  # the onion
+            self, n: int = 1, left: bool = False) -> "CMap":
         """
         The trace of ``n`` wires of a map with explicit boxes (trace, cup or
         cap), in one pass, like :meth:`Hypergraph.explicit_trace`.
@@ -1665,7 +1666,11 @@ class CMap[category](
         Otherwise it is a class method, e.g. for compact diagrams, in which
         case we use it to introduce cup and cap boxes, one pair per wire: the
         cups and caps of a pivotal category are atomic, so the ``n``-wire
-        trace is the nest of ``n`` one-wire traces there as well.
+        trace is the nest of ``n`` one-wire traces there as well. When that
+        class method is the pivotal one itself, the whole onion of ``n`` cup
+        and cap pairs goes to one constructor call rather than being composed
+        pair by pair; a category overriding it gets the nest its own factory
+        builds, like :meth:`Hypergraph.explicit_trace`.
 
         >>> from discopy import compact, feedback
         >>> x = feedback.Ty('x')
@@ -1691,10 +1696,48 @@ class CMap[category](
         factory = self.category.trace_factory
         if isclass(factory):
             return self.from_box(self.to_diagram().trace(n, left))
-        result = self
-        for _ in range(n):
-            result = factory.__func__(type(self), result, left)
-        return result
+        # pylint: disable-next=import-outside-toplevel  # pivotal imports us
+        from discopy.pivotal import Diagram as Pivotal
+        if factory.__func__ is not Pivotal.trace_factory.__func__:
+            result = self
+            for _ in range(n):
+                result = factory.__func__(type(self), result, left)
+            return result
+        dom, cod, traced = (self.dom[n:], self.cod[n:], self.dom[:n]) if left\
+            else (self.dom[:-n], self.cod[:-n], self.dom[-n:])
+        legs = [(traced[i:i + 1].r, traced[i:i + 1]) if left
+                else (traced[i:i + 1], traced[i:i + 1].r) for i in range(n)]
+        order = tuple(reversed(range(n))) if left else tuple(range(n))
+        boxes = tuple(self.category.cap_factory(*legs[i]) for i in order)\
+            + self.boxes + tuple(
+                self.category.cup_factory(*legs[i]) for i in order[::-1])
+        inside = self.n_ports - len(self.dom) - len(self.cod)
+        caps = len(dom)
+        cups = caps + 2 * n + inside
+        outputs = cups + 2 * n
+        # The traced wire and the adjoint leg of each cap and cup, the cap of
+        # the i-th wire sitting outside the cap of the next one: a box lists
+        # its domain forwards and its codomain backwards.
+        cap_legs = [(caps + 2 * (n - 1 - i), caps + 2 * (n - 1 - i) + 1)
+                    if left else (caps + 2 * i + 1, caps + 2 * i)
+                    for i in range(n)]
+        cup_legs = [(cups + 2 * i + 1, cups + 2 * i) if left
+                    else (cups + 2 * (n - 1 - i), cups + 2 * (n - 1 - i) + 1)
+                    for i in range(n)]
+        into, out_of = ([wire for wire, _ in cap_legs],
+                        [wire for wire, _ in cup_legs])
+        untraced = [outputs + i for i in range(len(cod))]
+        moved = (into + list(range(caps)) if left
+                 else list(range(caps)) + into)\
+            + [port + n for port in range(
+                len(self.dom), len(self.dom) + inside)]\
+            + (out_of + untraced if left else untraced + out_of)
+        edges = Permutation.from_transpositions([
+            (moved[source], moved[target])
+            for source, target in enumerate(self.edges) if source < target
+        ] + [(cap_legs[i][1], cup_legs[i][1]) for i in range(n)],
+            outputs + len(cod))
+        return type(self)(dom, cod, boxes, edges, loops=self.loops)
 
     def leg_order(self, *legs: int) -> tuple[int, ...]:
         """

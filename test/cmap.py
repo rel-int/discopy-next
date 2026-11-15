@@ -1409,3 +1409,56 @@ def test_CMap_explicit_trace_converts_once(monkeypatch):
     for _ in range(4):
         nested = nested.explicit_trace()
     assert result == nested
+
+
+def test_CMap_explicit_trace_builds_the_onion_in_one_call(monkeypatch):
+    """
+    Over a pivotal category the ``n``-wire trace is an onion of ``n`` cup and
+    cap pairs around the map, and the whole onion goes to one constructor
+    call. Composing it pair by pair built ``2 * n`` intermediate maps, each
+    rebuilding a permutation over a port set that grows with ``n``, which is
+    what made ``make_causal`` quadratic in the wires it cuts (#541).
+    """
+    from discopy import frobenius
+    for module in (compact, frobenius):
+        cmap = module.Box(
+            'f', module.Ty('x') ** 8, module.Ty('x') ** 8).to_map()
+        for left in (False, True):
+            calls, init = [], module.CMap.__init__
+
+            def counted(self, *args, _init=init, _calls=calls, **kwargs):
+                _calls.append(None)
+                return _init(self, *args, **kwargs)
+
+            monkeypatch.setattr(module.CMap, "__init__", counted)
+            result = cmap.explicit_trace(4, left)
+            monkeypatch.undo()
+            assert len(calls) == 1, (module.__name__, left, len(calls))
+            nested = cmap
+            for _ in range(4):
+                nested = nested.explicit_trace(1, left)
+            assert result == nested, (module.__name__, left)
+
+
+def test_CMap_explicit_trace_keeps_an_overridden_factory(monkeypatch):
+    """
+    The onion in one call *is* the pivotal trace, so it is built only when
+    ``trace_factory`` is pivotal's own class method: a category overriding it
+    gets the nest its own factory builds, one wire at a time, rather than the
+    cups and caps it never asked for.
+    """
+    from discopy import frobenius, pivotal
+    pivotal_trace, calls = pivotal.Diagram.trace_factory.__func__, []
+
+    def overridden(cls, diagram, left=False):
+        calls.append(left)
+        return pivotal_trace(cls, diagram, left)
+
+    x = frobenius.Ty('x')
+    cmap = frobenius.Box('f', x ** 8, x ** 8).to_map()
+    onion = cmap.explicit_trace(4)
+    monkeypatch.setattr(
+        frobenius.Diagram, "trace_factory", classmethod(overridden))
+    assert cmap.explicit_trace(4) == onion
+    monkeypatch.undo()
+    assert calls == 4 * [False]
