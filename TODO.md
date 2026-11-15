@@ -25,3 +25,4 @@
 - [x] Pin the map, not just the morphism: explicit_trace(n) against the n-fold nest on the pivotal kind, n=1..3, both sides, and the count of CMap.then calls
 - [x] Measure after, same table, and say what the ratio is
 - [ ] CHANGELOG.md bullet and the gates of CONTRIBUTING.md
+- [WIP] @session_01C7YfAQ2ahFS6FBBoo8K71V-2026-11-15 01:39 Answer the duplicate-code pair the onion adds: filed as an issue rather than decided inside a performance fix
