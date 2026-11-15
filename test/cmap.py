@@ -1448,17 +1448,20 @@ def test_CMap_explicit_trace_keeps_an_overridden_factory(monkeypatch):
     cups and caps it never asked for.
     """
     from discopy import frobenius, pivotal
-    pivotal_trace, calls = pivotal.Diagram.trace_factory.__func__, []
+    pivotal_trace = pivotal.Diagram.trace_factory.__func__
+    for module in (compact, frobenius):
+        x = module.Ty('x')
+        cmap = module.Box('f', x ** 8, x ** 8).to_map()
+        for left in (False, True):
+            calls = []
 
-    def overridden(cls, diagram, left=False):
-        calls.append(left)
-        return pivotal_trace(cls, diagram, left)
+            def overridden(cls, diagram, left=False, _calls=calls):
+                _calls.append(left)
+                return pivotal_trace(cls, diagram, left)
 
-    x = frobenius.Ty('x')
-    cmap = frobenius.Box('f', x ** 8, x ** 8).to_map()
-    onion = cmap.explicit_trace(4)
-    monkeypatch.setattr(
-        frobenius.Diagram, "trace_factory", classmethod(overridden))
-    assert cmap.explicit_trace(4) == onion
-    monkeypatch.undo()
-    assert calls == 4 * [False]
+            onion = cmap.explicit_trace(4, left)
+            monkeypatch.setattr(
+                module.Diagram, "trace_factory", classmethod(overridden))
+            assert cmap.explicit_trace(4, left) == onion
+            monkeypatch.undo()
+            assert calls == 4 * [left], (module.__name__, left, calls)
