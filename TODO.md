@@ -20,7 +20,7 @@
 > > combinatorially — *n* caps, the map's boxes, *n* cups, and one permutation — so
 > > `explicit_trace(n)` can build the edge permutation itself instead of composing 2*n* maps.
 
-- [WIP] @session_01C7YfAQ2ahFS6FBBoo8K71V-2026-11-15 01:21 Measure the pivotal branch before the change: compact make_causal over n=16..128, with a profile of where the time goes
+- [x] Measure the pivotal branch before the change: compact make_causal over n=16..128, with a profile of where the time goes
 - [ ] Build the onion in one constructor call in CMap.explicit_trace, the way Hypergraph.explicit_trace does, keeping the nest for a category that overrides trace_factory
 - [WIP] @session_01C7YfAQ2ahFS6FBBoo8K71V-2026-11-15 01:23 Pin the map, not just the morphism: explicit_trace(n) against the n-fold nest on the pivotal kind, n=1..3, both sides, and the count of CMap.then calls
 - [ ] Measure after, same table, and say what the ratio is
