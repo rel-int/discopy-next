@@ -57,7 +57,11 @@ class Str(TypstNode):
     value: str
 
     def render(self, indent=0):
-        escaped = self.value.replace("\\", "\\\\").replace('"', '\\"')
+        escaped = self.value
+        for character, escape in (
+                ("\\", "\\\\"), ('"', '\\"'), ("\n", "\\n"),
+                ("\r", "\\r"), ("\t", "\\t")):
+            escaped = escaped.replace(character, escape)
         return f'"{escaped}"'
 
 
@@ -161,6 +165,8 @@ class Import(TypstNode):
 
     def render(self, indent=0):
         path = Str(self.path).render()
+        if self.members and self.alias:
+            raise ValueError("An import has members or an alias, not both.")
         if self.members:
             return f'#import {path}: {", ".join(self.members)}'
         if self.alias:

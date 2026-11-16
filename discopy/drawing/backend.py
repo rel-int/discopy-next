@@ -29,7 +29,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from contextlib import contextmanager
 from functools import partial
-from io import StringIO
+from io import StringIO, TextIOBase
 from itertools import combinations
 from math import sqrt
 import os
@@ -99,6 +99,10 @@ def matplotlib_context():
 
 def draw(graph: Drawing, **params):
     """ Load a :class:`Backend` and draw a :class:`Drawing` on it. """
+    if params.get("format") == "typst":
+        path, show = params.pop("path", None), params.pop("show", True)
+        return Typst(**params).draw(graph, **params).output(
+            path=path, show=show, **params)
     aspect = params.get('aspect', 'auto' if 'figsize' in params else 'equal')
     if params.get('legend', False) and not params.get('to_tikz', False):
         colours = Backend.region_colours(graph)
@@ -1603,14 +1607,7 @@ def wire_bezier_points(source, target, bend_out, bend_in):
     """
     if source[0] == target[0] or source[1] == target[1]:
         return None
-    if bend_out and bend_in:
-        mid = (target[0], source[1])
-    elif bend_in:
-        mid = (source[0], target[1])
-    elif bend_out:
-        mid = (target[0], source[1])
-    else:
-        return None
+    mid = (target[0], source[1]) if bend_out else (source[0], target[1])
     c1 = ((source[0] + 2 * mid[0]) / 3, (source[1] + 2 * mid[1]) / 3)
     c2 = ((2 * mid[0] + target[0]) / 3, (2 * mid[1] + target[1]) / 3)
     return c1, c2
@@ -1731,12 +1728,12 @@ class Typst(Backend):
                      edgecolor=DEFAULT["edgecolor"]):
         coords = [self.coord(*p) for p in points]
         kwargs = {"close": Bool(True)}
-        if facecolor is None or facecolor == "none":
+        if facecolor is None or self.is_transparent(facecolor):
             kwargs["fill"] = Ident("none")
         else:
             kwargs["fill"] = Ident(
                 self.color_expr(self.format_color(facecolor)))
-        if edgecolor is None or edgecolor == "none":
+        if edgecolor is None or self.is_transparent(edgecolor):
             kwargs["stroke"] = Ident("none")
         else:
             kwargs["stroke"] = self.stroke(edgecolor)
@@ -1745,11 +1742,11 @@ class Typst(Backend):
 
     def draw_wire(self, source, target, bend_out=False, bend_in=False,
                   style=None, linewidth=None, adaptive=True):
-        cps = wire_bezier_points(source, target, bend_out, bend_in)
         options: dict[str, TypstNode] = {
             "stroke": self.stroke("black", linewidth)}
+        cps = wire_bezier_points(source, target, bend_out, bend_in)
         if style == "->":
-            options["mark"] = Ident('(end: ">", fill: black)')
+            cps, options["mark"] = None, Ident('(end: ">", fill: black)')
         if cps is not None:
             c1, c2 = cps
             self.body.append(
@@ -1819,10 +1816,12 @@ class Typst(Backend):
                 inner, math = self.math_label(label)
                 fc = 'rgb("#ffffff")' if hexcolour == "#000000"\
                     else 'rgb("#000000")'
+                scale = Float(params.get(
+                    "fontsize_spiders", DEFAULT["fontsize_spiders"])
+                    / DEFAULT["fontsize"]).render()
                 lbl = Call(
                     Ident("text"), [ContentExpr(inner, math=math)],
-                    {"fill": Ident(fc)}
-                )
+                    {"fill": Ident(fc), "size": Ident(f"{scale}em")})
                 self.body.append(Call(
                     Ident("content"), [self.coord(i, j), lbl]))
         super().draw_spiders(graph, draw_box_labels)
@@ -1857,7 +1856,8 @@ class Typst(Backend):
     def output(self, path=None, show=True, **params):
         doc = self.to_document(**params)
         source = doc.render()
-        if path is not None and str(path).endswith(".typ"):
+        if isinstance(path, (str, os.PathLike))\
+                and str(path).endswith(".typ"):
             pathlib.Path(path).write_text(source, encoding="utf-8")
             return source
         try:
@@ -1868,6 +1868,9 @@ class Typst(Backend):
             raise ImportError(
                 "Typst rendering requires the 'typst' package. "
                 "Install it with: pip install typst") from error
+        if hasattr(path, "write"):
+            path.write(svg.decode() if isinstance(path, TextIOBase) else svg)
+            return svg
         if path is not None:
             pathlib.Path(path).write_bytes(svg)
             return svg

@@ -218,7 +218,8 @@ def test_wire_bezier_points():
     from discopy.drawing.backend import wire_bezier_points
     assert wire_bezier_points((0, 0), (0, 1), True, True) is None
     assert wire_bezier_points((0, 0), (1, 0), True, True) is None
-    assert wire_bezier_points((0, 0), (1, 1), False, False) is None
+    assert wire_bezier_points((0, 0), (3, 3), False, False)\
+        == wire_bezier_points((0, 0), (3, 3), False, True)
     both = wire_bezier_points((0, 0), (3, 3), True, True)
     assert both == wire_bezier_points((0, 0), (3, 3), True, False)
     assert both == ((2, 0), (3, 1))
@@ -326,3 +327,47 @@ def test_typst_keeps_the_arrow_of_a_measurement():
 def test_typst_import_quotes_its_path():
     from discopy.drawing.typst_ast import Import
     assert Import('a"b').render() == '#import "a' + chr(92) + '"b"'
+
+
+def test_typst_from_every_way_of_drawing(tmp_path):
+    """A drawing and an equation draw with Typst as a diagram does."""
+    from io import BytesIO, StringIO
+    from discopy.monoidal import Equation
+    x, y = Ty("x"), Ty("y")
+    f = Box("f", x, y)
+    paths = [tmp_path / name for name in ("f.typ", "d.typ", "e.typ")]
+    source = f.draw(format="typst", path=paths[0])
+    assert f.to_drawing().draw(format="typst", path=paths[1]) == source
+    assert "canvas" in Equation(f, f).draw(format="typst", path=paths[2])
+    binary, text = BytesIO(), StringIO()
+    svg = drawn(f, path=binary, show=False)
+    assert binary.getvalue() == svg
+    assert drawn(f, path=text, show=False).decode() == text.getvalue()
+
+
+def test_typst_wire_bends_as_matplotlib_does():
+    from discopy.drawing.backend import wire_bezier_points
+    for bend_out, bend_in in ((0, 0), (0, 1), (1, 0), (1, 1)):
+        first, _ = wire_bezier_points((0, 3), (3, 0), bend_out, bend_in)
+        assert first == ((2, 3) if bend_out else (0, 1))
+    assert wire_bezier_points((0, 1), (0, 0), True, True) is None
+
+
+def test_typst_strings_and_imports():
+    from discopy.drawing.typst_ast import Import, Str
+    assert Str("a\nb\tc").render() == '"a' + chr(92) + 'nb' + chr(92) + 'tc"'
+    with pytest.raises(ValueError):
+        Import("x", members=["a"], alias="y").render()
+
+
+def test_typst_array_colours_and_spider_sizes():
+    import numpy as np
+    from discopy.drawing.backend import Typst
+    backend = Typst()
+    backend.draw_polygon(
+        (0, 0), (1, 0), (1, 1), facecolor=np.array([1., 0, 0]),
+        edgecolor=np.array([0, 0, 1.]))
+    assert 'fill: rgb("#ff0000"), stroke: rgb("#0000ff")'\
+        in backend.body[0].render()
+    assert "size: 2.4em" in Z(1, 2, 0.5).to_typst(
+        fontsize_spiders=24).render()
