@@ -299,3 +299,30 @@ def test_propagate_alone_solves_the_maze():
     graph, language = maze(MAZE)
     (solution, ) = language.solutions(graph)
     assert language.propagate(graph) == [{value} for value in solution]
+
+
+def test_propagate_reads_a_repeated_variable_once():
+    """ A constraint on the same variable twice is a relation on its
+    diagonal: ``neq`` on ``(0, 0)`` supports no value. """
+    language = Language({X: 2}, {"neq": lambda a, b: a != b})
+    graph = instance([("neq", (0, 0))], [X])
+    assert list(language.solutions(graph)) == []
+    assert language.propagate(graph) == [set()]
+
+
+def test_propagate_with_a_false_nullary_constraint_empties_every_variable():
+    language = Language({X: 2}, {"no": lambda: False, "any": lambda a: True})
+    graph = instance([("any", (0, )), ("no", ())], [X, X])
+    assert language.propagate(graph) == [set(), set()]
+
+
+def test_propagate_from_given_domains():
+    """ Candidates given by a clue, as in a puzzle: fixing the first cell
+    of a ``lt`` chain fixes the rest, or empties every cell when no
+    solution has it. """
+    language = Language({X: 4}, {"lt": lambda a, b: a < b})
+    chain = instance([("lt", (0, 1)), ("lt", (1, 2))], 3 * [X])
+    assert language.propagate(chain, [{1}, set(range(4)), set(range(4))])\
+        == [{1}, {2}, {3}]
+    assert language.propagate(chain, [{2}, set(range(4)), set(range(4))])\
+        == [set(), set(), set()]

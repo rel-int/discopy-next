@@ -312,16 +312,52 @@ class Language:
         while changed and (rounds is None or done < rounds):
             changed, done = False, done + 1
             for predicate, scope in constraints:
-                supports = [
-                    values for values in product(
-                        *(candidates[i] for i in scope))
-                    if predicate(*values)]
-                for k, variable in enumerate(scope):
-                    kept = {values[k] for values in supports}
-                    if kept < candidates[variable]:
-                        candidates[variable] &= kept
+                if not scope and not predicate():
+                    return [set() for _ in candidates]
+                variables = list(dict.fromkeys(scope))
+                kept = self.supports(predicate, scope, variables, candidates)
+                for variable, values in zip(variables, kept):
+                    if values < candidates[variable]:
+                        candidates[variable] = values
                         changed = True
         return candidates
+
+    @staticmethod
+    def supports(
+            predicate: Callable[..., bool], scope: tuple[int, ...],
+            variables: list[int], candidates: list[set[int]]
+            ) -> list[set[int]]:
+        """
+        The candidates of each distinct variable of a scope that have a
+        support, an assignment of the variables, a variable that occurs
+        twice taking one value, on which the predicate holds. It keeps no
+        assignment and stops once every candidate has one.
+
+        Parameters:
+            predicate : The relation of the constraint.
+            scope : Its variables, maybe with repetitions.
+            variables : The distinct variables of the scope, in order.
+            candidates : The candidates of every variable.
+
+        Example
+        -------
+        >>> neq = lambda a, b: a != b
+        >>> Language.supports(neq, (0, 0), [0], [{0, 1}])
+        [set()]
+        >>> Language.supports(neq, (0, 1), [0, 1], [{0, 1}, {1}])
+        [{0}, {1}]
+        """
+        position = {variable: k for k, variable in enumerate(variables)}
+        kept: list[set[int]] = [set() for _ in variables]
+        for values in product(*(candidates[i] for i in variables)):
+            if not predicate(*(values[position[i]] for i in scope)):
+                continue
+            for values_k, value in zip(kept, values):
+                values_k.add(value)
+            if all(len(values_k) == len(candidates[i])
+                   for values_k, i in zip(kept, variables)):
+                break
+        return kept
 
 
 def all_different(*values: int) -> bool:
