@@ -1166,6 +1166,25 @@ def test_foliations_of_a_state_enclosed_by_a_box():
         in [str(foliation) for foliation in diagram.foliations()]
 
 
+def test_foliations_of_a_state_enclosed_after_an_effect():
+    x = Ty('x')
+    a, b = Box('a', Ty(), x @ x), Box('b', x, x @ x)
+    e, s, g = Box('e', x, Ty()), Box('s', Ty(), x), Box('g', x, x)
+    diagram = a >> b @ x >> x @ e @ x >> x @ s @ x >> x @ g @ x
+    assert diagram.dependencies()[3] == (0, )
+    assert "a >> x @ s @ x >> b @ g @ x >> x @ e @ x @ x"\
+        in [str(foliation) for foliation in diagram.foliations()]
+
+
+def test_foliations_of_a_deep_diagram():
+    x = Ty('x')
+    f, diagram = Box('f', x, x), Diagram.id(x)
+    for _ in range(1000):
+        diagram = diagram >> f
+    assert diagram.foliations(limit=1) == [diagram]
+    assert Diagram.id(x).foliations() == [Diagram.id(x)]
+
+
 def test_foliations_limit():
     f = Box('f', Ty('x'), Ty('x'))
     assert (f @ f).foliations(limit=0) == []

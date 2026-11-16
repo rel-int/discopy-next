@@ -1777,8 +1777,9 @@ class Diagram(cat.Arrow, MonoidalCategory, RichDisplay):
         """
         The boxes each box of a staircase diagram must stay below, i.e. those
         whose outputs it takes as inputs or, for a box with no inputs, those
-        whose outputs enclose the gap it sits in: no interchange moves it
-        above them.
+        whose outputs enclose the gap it sits in, with the boxes above them:
+        no interchange moves it above them. A box with no outputs joins two
+        gaps, enclosed by the boxes that enclose both.
 
         Example
         -------
@@ -1791,25 +1792,24 @@ class Diagram(cat.Arrow, MonoidalCategory, RichDisplay):
         ((), (0,), (0,))
         """
         wires: "list[int | None]" = len(self.dom) * [None]
-        gaps: "list[tuple[int, ...]]" = (len(self.dom) + 1) * [()]
+        gaps: "list[frozenset[int]]" = (len(self.dom) + 1) * [frozenset()]
+        above: "list[frozenset[int]]" = []
         result: "list[tuple[int, ...]]" = []
         for box, offset in zip(self.boxes, self.offsets):
-            n, m = len(box.dom), len(box.cod)
+            n, m, j = len(box.dom), len(box.cod), len(result)
             inputs = {i for i in wires[offset:offset + n] if i is not None}\
                 if n else set(gaps[offset])
+            above.append(frozenset(inputs).union(*(above[i] for i in inputs)))
             left, right = gaps[offset], gaps[offset + n]
-            wires[offset:offset + n] = m * [len(result)]
+            wires[offset:offset + n] = m * [j]
             gaps[offset:offset + n + 1] = [left] + (m - 1) * [
-                (len(result), )] + [right] if m else [
-                    tuple(sorted(set(left) & set(right)))]
+                above[j] | {j}] + [right] if m else [left & right]
             result.append(tuple(sorted(inputs)))
         return tuple(result)
 
     @staticmethod
     def layerings(
-            dependencies: "tuple[tuple[int, ...], ...]",
-            placed: "tuple[int, ...]" = (),
-            previous: "tuple[int, ...]" = ()
+            dependencies: "tuple[tuple[int, ...], ...]"
     ) -> "Iterator[tuple[tuple[int, ...], ...]]":
         """
         The ways to split boxes into layers that respect their dependencies,
@@ -1818,28 +1818,35 @@ class Diagram(cat.Arrow, MonoidalCategory, RichDisplay):
 
         Parameters:
             dependencies : As given by :meth:`dependencies`.
-            placed : The boxes already in a layer.
-            previous : The last layer, which the next one must depend on.
 
         Example
         -------
         >>> list(Diagram.layerings(((), (), (0, ))))
         [((0, 1), (2,)), ((0,), (1, 2))]
         """
-        if len(placed) == len(dependencies):
+        def layers(placed, previous):
+            free = [i for i, before in enumerate(dependencies)
+                    if i not in placed and set(before) <= placed]
+            return (layer for size in range(len(free), 0, -1)
+                    for layer in itertools.combinations(free, size)
+                    if not previous or any(
+                        set(dependencies[i]) & set(previous) for i in layer))
+        if not dependencies:
             yield ()
             return
-        free = [i for i, before in enumerate(dependencies)
-                if i not in placed and set(before) <= set(placed)]
-        for layer in itertools.chain.from_iterable(
-                itertools.combinations(free, size)
-                for size in range(len(free), 0, -1)):
-            if previous and not any(
-                    set(dependencies[i]) & set(previous) for i in layer):
+        stack: "list[tuple[tuple, frozenset[int], Iterator]]" = [
+            ((), frozenset(), layers(frozenset(), ()))]
+        while stack:
+            layering, placed, candidates = stack[-1]
+            layer = next(candidates, None)
+            if layer is None:
+                stack.pop()
                 continue
-            for rest in Diagram.layerings(
-                    dependencies, placed + layer, layer):
-                yield (layer, ) + rest
+            layering, placed = layering + (layer, ), placed | set(layer)
+            if len(placed) == len(dependencies):
+                yield layering
+                continue
+            stack.append((layering, placed, layers(placed, layer)))
 
     def foliate(
             self, layering: "tuple[tuple[int, ...], ...]", left=False
