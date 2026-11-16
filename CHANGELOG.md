@@ -9,6 +9,11 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Added
 
+- `Drawing.layout`, the geometry of a drawing as a vector: the coordinates
+  of its nodes, box corners included. `Drawing.relayout` takes a vector back
+  to a drawing and refuses one that `Drawing.is_feasible` says draws another
+  diagram (an edge turned, other wires crossing, boxes overlapping, a port
+  outside its box) ([next#578]).
 - `shape="triangle"` on any box draws it as a triangle, matplotlib and TikZ
   alike: its base the width of the side with more wires, its apex on the
   other, at its wire when there is one, and its dagger upside down
@@ -2021,6 +2026,7 @@ for the changelog of `1.2.1` and earlier.
 [next#568]: https://github.com/rel-int/discopy-next/pull/568
 [next#569]: https://github.com/rel-int/discopy-next/pull/569
 [next#570]: https://github.com/rel-int/discopy-next/pull/570
+[next#578]: https://github.com/rel-int/discopy-next/pull/578
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#56]: https://github.com/rel-int/optyx/pull/56

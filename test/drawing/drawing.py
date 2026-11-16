@@ -1088,7 +1088,7 @@ def test_relayout_refuses_what_is_not_the_same_diagram():
     nodes = drawing.relabel_nodes()
     nodes.add_box_corners()
     index = {node: 2 * k for k, node in enumerate(nodes.ordered_nodes())}
-    with raises(ValueError, match="expected"):
+    with raises(ValueError, match="given"):
         drawing.relayout(layout[:-1])
     left, right = [node for node in nodes.ordered_nodes()
                    if node.kind == "box_cod" and node.j == 0]
