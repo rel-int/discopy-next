@@ -50,13 +50,15 @@ def test_every_reference_and_citation_of_the_latex_resolves(names):
 
 def test_the_transpiler_refuses_what_it_does_not_read():
     for refused in ["#strike[this]", "$a / b$", "$integral f$", "#link[x]",
+                    "$50% x$", "$a ~ b$", "${x}$",
                     '#link(<label>)[x]', "a \\ b", "half a $ sign"]:
         with pytest.raises(Unsupported):
             transpile.inline(refused)
     with pytest.raises(Unsupported, match="no blank line"):
         transpile.blocks("A paragraph\n= and a heading\n")
-    with pytest.raises(Unsupported):
-        transpile.block_to_latex("#table()", build.PAPER)
+    for refused in ["#table()", "==== Too deep", "=No space"]:
+        with pytest.raises(Unsupported):
+            transpile.block_to_latex(refused, build.PAPER)
 
 
 @pytest.mark.slow
