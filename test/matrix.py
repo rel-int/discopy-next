@@ -161,11 +161,12 @@ def test_trace_over_a_field_in_jax():
 
 
 def test_is_field():
+    assert is_field(float) and is_field(complex) and not is_field(int)
+    assert is_field(np.float32) and not is_field(object) and not is_field(bool)
+    assert is_field(np.dtype("float64")) and not is_field(np.dtype("int64"))
     torch = pytest.importorskip("torch")
     assert is_field(torch.float32) and is_field(torch.complex64)
     assert not is_field(torch.int64) and not is_field(torch.bool)
-    assert is_field(np.float32) and not is_field(object)
-    assert is_field(np.dtype("float64")) and not is_field(np.dtype("int64"))
 
 
 def test_permutation():
