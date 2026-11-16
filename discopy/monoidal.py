@@ -1809,6 +1809,8 @@ class Diagram(cat.Arrow, MonoidalCategory, RichDisplay):
                 if n else set(gaps[offset][0])
             above.append(frozenset(inputs).union(*(above[i] for i in inputs)))
             left, right = gaps[offset], gaps[offset + n]
+            if not n:
+                left, right = (left[0], frozenset()), (right[0], frozenset())
             wires[offset:offset + n] = m * [j]
             gaps[offset:offset + n + 1] = [left] + (m - 1) * [
                 (above[j] | {j}, frozenset())] + [right] if m else [
@@ -1937,7 +1939,8 @@ class Diagram(cat.Arrow, MonoidalCategory, RichDisplay):
         one box and right of another, is missed, and so is the order of a
         box with no inputs and one with no outputs inside a layer that
         :meth:`Layer.merge` does not choose, e.g. ``e @ s >> f`` beside
-        ``s @ e >> f``.
+        ``s @ e >> f``: see `#576
+        <https://github.com/rel-int/discopy-next/issues/576>`_.
         """
         staircase, result = self.to_staircases(), []
         candidates = (

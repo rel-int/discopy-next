@@ -1192,6 +1192,9 @@ def test_foliations_below_an_effect_between_inputs():
     diagram = x @ e @ x >> h
     assert diagram.dependencies() == ((), (0, ))
     assert diagram.foliations() == [diagram]
+    s = Box('s', Ty(), x)
+    assert "x @ s @ x >> h @ e"\
+        in [str(d) for d in (x @ e >> x @ s >> h).foliations()]
     f, g, k = Box('f', x, x), Box('g', x, x), Box('k', x, x)
     assert [str(d) for d in ((f >> g) @ k).foliations()]\
         == ["f @ k >> g @ x", "f @ x >> g @ k"]
