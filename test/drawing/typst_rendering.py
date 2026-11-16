@@ -371,3 +371,11 @@ def test_typst_array_colours_and_spider_sizes():
         in backend.body[0].render()
     assert "size: 2.4em" in Z(1, 2, 0.5).to_typst(
         fontsize_spiders=24).render()
+
+
+def test_typst_labels_that_are_numbers():
+    """A ket is labelled by its digits, which are integers."""
+    from discopy.quantum.gates import Ket
+    source = Ket(0, 1).to_typst().render()
+    assert '"0"' in source and '"1"' in source
+    assert compiled(source, format="svg")

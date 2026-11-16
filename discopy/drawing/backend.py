@@ -1664,6 +1664,7 @@ class Typst(Backend):
         like ``Alice`` stay as plain text — Typst would otherwise treat them
         as undefined variables (``unknown variable: Alice``).
         """
+        text = str(text)
         if text.startswith("$") and text.endswith("$") and len(text) >= 2:
             return text[1:-1], True
         return text, False
