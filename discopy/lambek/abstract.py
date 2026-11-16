@@ -129,7 +129,7 @@ Categorial grammars
 -------------------
 
 A categorial grammar is a vocabulary of its own, a planar one: a lexicon out
-of it is a :class:`discopy.grammar.categorial.Functor` into abstract terms,
+of it is a :class:`discopy.lambek.categorial.Functor` into abstract terms,
 sending each atom to a type and each word to a term of the image of its type,
 its strings written per word like every lexicon of the paper.
 :meth:`Diagram.from_categorial` forgets planarity instead, collapsing left and
@@ -137,7 +137,7 @@ right exponentials into the one exponential of a closed category, so that a
 derivation becomes a closed term: application evaluates, composition and type
 raising curry, and crossed composition composes.
 
->>> from discopy.grammar import categorial
+>>> from discopy.lambek import categorial
 >>> N, S = categorial.Ty("n"), categorial.Ty("s")
 >>> Alice, loves, Bob = N("Alice"), ((N >> S) << N)("loves"), N("Bob")
 >>> LOVES = String("loves")
@@ -159,7 +159,7 @@ from typing import ClassVar
 
 from discopy import closed, feedback, cmap, hypergraph
 from discopy.cat import factory
-from discopy.grammar import categorial
+from discopy.lambek import categorial
 
 
 @factory
@@ -269,7 +269,7 @@ class Diagram(closed.Diagram):
 
         Example
         -------
-        >>> from discopy.grammar import categorial
+        >>> from discopy.lambek import categorial
         >>> n, s = categorial.Ty("n"), categorial.Ty("s")
         >>> Alice, loves, Bob = n("Alice"), ((n >> s) << n)("loves"), n("Bob")
         >>> print(Diagram.from_categorial(Alice(loves(Bob), left=True)))

@@ -1,7 +1,7 @@
-grammar
-=======
+lambek
+======
 
-.. automodule:: discopy.grammar
+.. automodule:: discopy.lambek
 
 .. autosummary::
     :template: module.rst

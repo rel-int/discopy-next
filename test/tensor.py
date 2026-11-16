@@ -13,7 +13,7 @@ from pytest import raises
 from discopy.utils import AxiomError, dumps, loads
 from discopy.tensor import *
 from discopy import compact, frobenius, pivotal, rigid
-from discopy.grammar import pregroup
+from discopy.lambek import pregroup
 
 
 def test_backend():
@@ -1014,7 +1014,7 @@ def test_grad_of_named_bubble_reads_back():
 
 
 def test_Functor_tree():
-    from discopy.grammar.pregroup import Cup, Functor as Pregroup, Ty, Word
+    from discopy.lambek.pregroup import Cup, Functor as Pregroup, Ty, Word
     s, n = Ty('s'), Ty('n')
     Alice, loves = Word('Alice', n), Word('loves', n.r @ s)
     sentence = Alice @ loves >> Cup(n, n.r) @ s

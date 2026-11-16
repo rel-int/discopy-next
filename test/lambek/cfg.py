@@ -1,7 +1,7 @@
 from pytest import importorskip, raises
 
-from discopy import cat, grammar, monoidal, rigid
-from discopy.grammar.cfg import Tree, Rule, Word, Id, Ty
+from discopy import cat, lambek, monoidal, rigid
+from discopy.lambek.cfg import Tree, Rule, Word, Id, Ty
 from discopy.utils import AxiomError, dumps, loads
 
 x = Ty('x')
@@ -19,7 +19,7 @@ def test_eq_and_hash():
 
 
 def test_repr():
-    namespace = dict(cat=cat, monoidal=monoidal, grammar=grammar)
+    namespace = dict(cat=cat, monoidal=monoidal, lambek=lambek)
     for tree in (f, f[::-1], w, Id(x), f(w, w), f(f(w, w), w),
                  Rule(x @ x, x, name='')(w, w)):
         assert eval(repr(tree), dict(namespace)) == tree
@@ -68,9 +68,9 @@ def test_Tree_call_typechecks():
                                   r"\(a, b, a\): x @ x @ x != x @ y @ x"):
         f(Id(x), f)(a, b, a)
     for tree in (w, Id(x), f(Id(x), Id(x))):
-        with raises(TypeError, match="Expected grammar.cfg.Tree, got int"):
+        with raises(TypeError, match="Expected lambek.cfg.Tree, got int"):
             tree(42)
-    with raises(TypeError, match="Expected grammar.cfg.Tree, got int"):
+    with raises(TypeError, match="Expected lambek.cfg.Tree, got int"):
         Tree(f, w, 42)
 
 
@@ -95,7 +95,7 @@ def test_Tree_to_diagram():
 
 
 def test_Algebra():
-    from discopy.grammar.cfg import Algebra, Operad
+    from discopy.lambek.cfg import Algebra, Operad
     y = Ty('y')
     g = Rule(y, x, name='g')
     identity = Algebra(lambda ob: ob, lambda ar: ar, cod=Operad())
@@ -106,7 +106,7 @@ def test_Algebra():
 
 
 def test_Algebra_no_tree():
-    from discopy.grammar.cfg import Algebra
+    from discopy.lambek.cfg import Algebra
     with raises(TypeError, match="Object of type Operad is not JSON"):
         dumps(Algebra({Ty('s'): Ty('s')}, {}))
 
@@ -119,7 +119,7 @@ def test_to_tree():
                  Id(x), f(g, Id(x)), Tree(Id(x), a)):
         assert loads(dumps(tree)) == tree
         assert type(loads(dumps(tree))) is type(tree)
-    raw = '{"factory": "grammar.cfg.Word", "name": "a", '\
+    raw = '{"factory": "lambek.cfg.Word", "name": "a", '\
         '"dom": {"factory": "monoidal.Ty", "inside": []}, '\
         '"cod": {"factory": "monoidal.Ty", "inside": '\
         '[{"factory": "monoidal.Wire", "name": "x"}]}}'

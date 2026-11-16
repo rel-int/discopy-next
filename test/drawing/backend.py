@@ -161,3 +161,26 @@ def test_matplotlib_draws_an_unhashable_colour(colour):
 @mark.parametrize("colour", ["purple", "lightgray", "RoyalPurple", "red!50"])
 def test_tikz_keeps_an_xcolor_name(colour):
     assert TikZ.format_color(colour) == colour
+
+
+def test_triangle_flips_with_dagger_and_transpose_not_conjugate():
+    from discopy import pivotal
+    from discopy.drawing.backend import Backend
+    x = pivotal.Ty('x')
+    f = pivotal.Box('f', x, x, shape="triangle")
+
+    def apex_down(diagram):
+        drawing = diagram.to_drawing()
+        drawing.add_box_corners()
+        node, = (n for n in drawing.positions if n.kind == "box")
+        base, _, apex = Backend.triangle_corners(drawing.positions, node)
+        return apex.y < base.y
+    assert [apex_down(g) for g in (f, f.r, f.dagger(), f.conjugate())]\
+        == [True, False, False, True]
+
+
+def test_controlled_triangle_draws(tmp_path):
+    from discopy.quantum.gates import Controlled, QuantumGate
+    from discopy.quantum.circuit import qubit
+    gate = QuantumGate('U', qubit, qubit, [1, 0, 0, 1], shape="triangle")
+    Controlled(gate).draw(path=str(tmp_path / "controlled.png"), show=False)

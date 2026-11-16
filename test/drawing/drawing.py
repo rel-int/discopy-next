@@ -634,9 +634,16 @@ def test_snake_equation_to_tikz():
     return Equation(Id(x.r).transpose(left=True), Id(x), Id(x.l).transpose())
 
 
+@tikz_and_compare("triangle.tikz")
+def test_triangle_to_tikz():
+    x = Ty('x')
+    merge = Box("t", x ** 2, x, shape="triangle")
+    return merge >> merge[::-1]
+
+
 @tikz_and_compare("who-ansatz.tikz")
 def test_who_ansatz_to_tikz():
-    from discopy.grammar.pregroup import Ty, Cap, Word, Id, Box
+    from discopy.lambek.pregroup import Ty, Cap, Word, Id, Box
     s, n = Ty('s'), Ty('n')
     who = Word('who', n.r @ n @ s.l @ n)
     who_ansatz = Cap(n.r, n)\
@@ -1042,3 +1049,12 @@ def test_Drawing_equality_compares_wires():
         wires.width, wires.height)
     crossed.validate_attributes()
     assert crossed != wires
+
+
+def test_box_height_spans_its_wires():
+    x = monoidal.Ty('x')
+    drawing = monoidal.Box('f', x, x, height=2).to_drawing()
+    drawing.add_box_corners()
+    ys = {node.kind: y for node, (_, y) in drawing.positions.items()}
+    assert ys["box-corner-00"] == ys["box_cod"] == 0.25
+    assert ys["box-corner-01"] == ys["box_dom"] == 1.75

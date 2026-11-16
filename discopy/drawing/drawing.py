@@ -134,7 +134,7 @@ boundary, see issue #520:
 .. image:: /_static/drawing/who-ansatz.svg
     :align: center
 
->>> from discopy.grammar.categorial import Eval, Ty as CTy, Word
+>>> from discopy.lambek.categorial import Eval, Ty as CTy, Word
 >>> s, n = map(CTy, 'sn')
 >>> sentence = (Word('Alice', n) @ Word('loves', (n >> s) << n)
 ...             @ Word('Bob', n) >> n @ Eval((n >> s) << n) >> Eval(n >> s))
@@ -457,7 +457,19 @@ which to_drawing recomputes.
         return self
 
     def add_box_corners(self):
-        """ Recenter boxes w.r.t their wires then draw the corners. """
+        """
+        Recenter boxes w.r.t their wires then draw the corners: a box is its
+        ``height`` minus the half of a wire high, at least half a wire.
+
+        >>> from discopy.monoidal import Ty, Box
+        >>> x = Ty('x')
+        >>> f, g = Box('f', x, x, height=2), Box('g', x, x)
+        >>> (f @ g >> g @ f).draw(
+        ...     doctest='docs/_static/drawing/box-height.svg')
+
+        .. image:: /_static/drawing/box-height.svg
+            :align: center
+        """
         for j, box in enumerate(self.boxes):
             box_node = Node("box", j=j, box=box)
             box_x, box_y = self.positions[box_node]
@@ -466,6 +478,7 @@ which to_drawing recomputes.
                 for kind, xs in [("box_dom", box.dom), ("box_cod", box.cod)])
             xs = [self.positions[n].x for n in box_dom_nodes + box_cod_nodes]
             left, right = min(xs + [box_x]) - 0.25, max(xs + [box_x]) + 0.25
+            half = max(box.height / 2 - 0.25, 0.25)
             if box.min_width and right - left < box.min_width:
                 center = (left + right) / 2
                 left = center - box.min_width / 2
@@ -473,7 +486,7 @@ which to_drawing recomputes.
             self.add_nodes({
                 Node(f"box-corner-{a}{b}", j=j): Point(x, box_y + y)
                 for a, x in enumerate([left, right])
-                for b, y in enumerate([-0.25, 0.25])})
+                for b, y in enumerate([-half, half])})
             if box.draw_as_wires or box.draw_as_spider:
                 if len(box.dom) == 1 or len(box.cod) == 1:
                     continue

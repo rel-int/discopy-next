@@ -294,7 +294,7 @@ class Hypergraph[category](
         # pylint: disable=import-outside-toplevel  # they import this
         from discopy import (
             closed, compact, feedback, frobenius, markov, symmetric)
-        from discopy.grammar import abstract
+        from discopy.lambek import abstract
         return tuple(category.Diagram for category in (
             symmetric, markov, compact, frobenius, closed, feedback,
             abstract))

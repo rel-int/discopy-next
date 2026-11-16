@@ -1,5 +1,5 @@
-from discopy import cat, grammar, monoidal
-from discopy.grammar.thue import Rule, Word, Ty
+from discopy import cat, lambek, monoidal
+from discopy.lambek.thue import Rule, Word, Ty
 from discopy.utils import dumps, loads
 
 
@@ -13,7 +13,7 @@ def test_dagger():
         assert (box >> box[::-1]).cod == box.dom
         for x in (box, box[::-1]):
             assert eval(repr(x), dict(
-                cat=cat, monoidal=monoidal, grammar=grammar)) == x
+                cat=cat, monoidal=monoidal, lambek=lambek)) == x
             assert loads(dumps(x)) == x
 
 
@@ -37,7 +37,7 @@ def test_sentence():
 
 def test_repr():
     s, n = Ty('S'), Ty('N')
-    scope = {"grammar": grammar, "monoidal": monoidal, "cat": cat}
+    scope = {"lambek": lambek, "monoidal": monoidal, "cat": cat}
     for box in [Rule(n, s), Rule(n, s, name='r'), Rule(n, s, name=''),
                 Rule(n, s, name='')[::-1], Word('Jane', n),
                 Word('Jane', n, dom=s)]:

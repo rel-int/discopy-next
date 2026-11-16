@@ -384,7 +384,7 @@ def test_generated_boxes_at_every_level():
     from discopy import (
         balanced, closed, comarkov, compact, frobenius, markov, pivotal,
         ribbon, symmetric)
-    from discopy.grammar import abstract
+    from discopy.lambek import abstract
     from discopy.neural import network
     from discopy.utils import dumps, factory_name, loads
     for module in (balanced, symmetric, markov, comarkov, pivotal, ribbon,
