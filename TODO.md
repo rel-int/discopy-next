@@ -7,4 +7,4 @@
 > > write the brief for discopy.csp
 
 - [WIP] @session_01MEJxy5FM3MT3hk7p67LLmW-2026-11-16 17:17 slice 3 of #553: the predicates and `sudoku`, `queens`, `cnf`, `maze`, their sizes and counts (288; 2, 10, 4; a random formula's truth table; 1), the 9×9 sudoku's 810 primal edges, the maze drawn as a doctest image
-- [ ] the test with `negation` as equality, which breaks the count; the maze with a cycle; changelog; slice 3 opened
+- [WIP] @session_01MEJxy5FM3MT3hk7p67LLmW-2026-11-16 17:17 the test with `negation` as equality, which breaks the count; the maze with a cycle; changelog; slice 3 opened
