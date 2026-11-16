@@ -61,7 +61,7 @@
 - [WIP] @session_01MEJxy4FrWd3ymhMeQGF7x8-2026-11-16 21:29 pyproject.toml:67 The new Typst tests are not covered by the existing `test` extra.
 - [WIP] @session_01MEJxy4FrWd3ymhMeQGF7x8-2026-11-16 21:29 discopy/drawing/backend.py:1817 Every Typst document imports Fletcher even though the generated body never uses it.
 - [WIP] @session_01MEJxy4FrWd3ymhMeQGF7x8-2026-11-16 21:29 discopy/drawing/backend.py:1651 RGB sequence colours fail before Typst source generation.
-- [ ] discopy/drawing/__init__.py:95 Typst skips `frame_dual_rail()`, so dual-rail cups and caps are drawn using bounds that exclude their folds.
+- [WIP] @session_01MEJxy4FrWd3ymhMeQGF7x8-2026-11-16 21:29 discopy/drawing/__init__.py:95 Typst skips `frame_dual_rail()`, so dual-rail cups and caps are drawn using bounds that exclude their folds.
 - [ ] discopy/drawing/__init__.py:94 `Drawing.to_typst()` mutates the caller by adding corner nodes directly to its graph.
 - [ ] test/drawing/typst_rendering.py:210 This test does not check what its docstring says.
 - [ ] discopy/drawing/typst_ast.py:7 The example output is stale: it shows fletcher `0.5.9`, but the backend emits `0.5.8`.
