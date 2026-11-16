@@ -216,14 +216,10 @@ def test_typst_color_helpers():
 def test_wire_bezier_points():
     """A wire only bends when it is neither horizontal nor vertical."""
     from discopy.drawing.backend import wire_bezier_points
-    assert wire_bezier_points((0, 0), (0, 1), True, True) is None
-    assert wire_bezier_points((0, 0), (1, 0), True, True) is None
-    assert wire_bezier_points((0, 0), (3, 3), False, False)\
-        == wire_bezier_points((0, 0), (3, 3), False, True)
-    both = wire_bezier_points((0, 0), (3, 3), True, True)
-    assert both == wire_bezier_points((0, 0), (3, 3), True, False)
-    assert both == ((2, 0), (3, 1))
-    assert wire_bezier_points((0, 0), (3, 3), False, True) == ((0, 2), (1, 3))
+    assert wire_bezier_points((0, 0), (0, 1), True) is None
+    assert wire_bezier_points((0, 0), (1, 0), True) is None
+    assert wire_bezier_points((0, 0), (3, 3), True) == ((2, 0), (3, 1))
+    assert wire_bezier_points((0, 0), (3, 3), False) == ((0, 2), (1, 3))
 
 
 def test_typst_fontsize_and_text_colour():
@@ -346,11 +342,16 @@ def test_typst_from_every_way_of_drawing(tmp_path):
 
 
 def test_typst_wire_bends_as_matplotlib_does():
-    from discopy.drawing.backend import wire_bezier_points
-    for bend_out, bend_in in ((0, 0), (0, 1), (1, 0), (1, 1)):
-        first, _ = wire_bezier_points((0, 3), (3, 0), bend_out, bend_in)
+    """Out of the source when asked to, into the target otherwise."""
+    from discopy.drawing.backend import Typst, wire_bezier_points
+    for bend_out in (False, True):
+        first, _ = wire_bezier_points((0, 3), (3, 0), bend_out)
         assert first == ((2, 3) if bend_out else (0, 1))
-    assert wire_bezier_points((0, 1), (0, 0), True, True) is None
+    backend = Typst()
+    backend.draw_wire((0, 3), (3, 0))
+    backend.draw_wire((0, 3), (3, 0), style="->")
+    assert backend.body[0].render().startswith("bezier(")
+    assert backend.body[1].render().startswith("line(")
 
 
 def test_typst_strings_and_imports():

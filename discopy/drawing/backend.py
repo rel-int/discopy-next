@@ -1599,11 +1599,12 @@ class TikZ(Backend):
             print(''.join(begin + nodes + edges + end))
 
 
-def wire_bezier_points(source, target, bend_out, bend_in):
+def wire_bezier_points(source, target, bend_out):
     """
-    Compute cubic bezier control points for a wire from ``source`` to
-    ``target`` bending out and/or in, matching the quadratic-bezier
-    wiring used by the Matplotlib backend.
+    The two control points of the cubic bezier of a wire from ``source`` to
+    ``target``, or ``None`` when it is straight: the quadratic curve of the
+    Matplotlib backend, which bends out of the source or else into the
+    target.
     """
     if source[0] == target[0] or source[1] == target[1]:
         return None
@@ -1745,7 +1746,7 @@ class Typst(Backend):
                   style=None, linewidth=None, adaptive=True):
         options: dict[str, TypstNode] = {
             "stroke": self.stroke("black", linewidth)}
-        cps = wire_bezier_points(source, target, bend_out, bend_in)
+        cps = wire_bezier_points(source, target, bend_out)
         if style == "->":
             cps, options["mark"] = None, Ident('(end: ">", fill: black)')
         if cps is not None:
