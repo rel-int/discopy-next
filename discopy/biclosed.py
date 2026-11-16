@@ -943,23 +943,6 @@ class Structural(Box):
         """
         raise AxiomError(messages.BANG_HAS_NO_DAGGER.format(self))
 
-    @classmethod
-    # pylint: disable-next=arguments-differ  # drawn with no boundary
-    def strategy(cls, *, types=None):
-        """
-        Generate the box at atomic types.
-
-        Parameters:
-            types : The strategy to draw the types from, see
-                :meth:`atomic_strategy`.
-        """
-        from hypothesis import strategies as st
-
-        atoms = cls.atomic_strategy(types)
-        return st.builds(cls, *(
-            st.booleans() if attr == "is_dagger" else atoms
-            for attr in cls.serialised_attrs))
-
 
 class Dereliction(Structural):
     """
@@ -981,6 +964,18 @@ class Dereliction(Structural):
         self.x = x
         super().__init__(f"Dereliction({x})", x.bang(), x)
 
+    @classmethod
+    # pylint: disable-next=arguments-differ  # drawn with no boundary
+    def strategy(cls, *, types=None):
+        """
+        Generate the box at an atomic type.
+
+        Parameters:
+            types : The strategy to draw the types from, see
+                :meth:`atomic_strategy`.
+        """
+        return cls.atomic_strategy(types).map(cls)
+
 
 class Digging(Structural):
     """
@@ -996,6 +991,7 @@ class Digging(Structural):
     """
     serialised_attrs = ("x", )
     drawing_name = "δ"
+    strategy = classmethod(Dereliction.strategy.__func__)
 
     def __init__(self, x: Ty):
         self.x = x
@@ -1017,6 +1013,7 @@ class Contraction(Structural):
     """
     serialised_attrs = ("x", )
     drawing_name = "Δ"
+    strategy = classmethod(Dereliction.strategy.__func__)
 
     def __init__(self, x: Ty):
         self.x = x
@@ -1038,6 +1035,7 @@ class Weakening(Structural):
     """
     serialised_attrs = ("x", )
     drawing_name = "e"
+    strategy = classmethod(Dereliction.strategy.__func__)
 
     def __init__(self, x: Ty):
         self.x = x
@@ -1074,6 +1072,21 @@ class Exchange(Structural):
 
     def dagger(self) -> Exchange:
         return type(self)(self.x, self.y, not self.is_dagger)
+
+    @classmethod
+    # pylint: disable-next=arguments-differ  # drawn with no boundary
+    def strategy(cls, *, types=None):
+        """
+        Generate the exchange of two atomic types, or its inverse.
+
+        Parameters:
+            types : The strategy to draw the types from, see
+                :meth:`atomic_strategy`.
+        """
+        from hypothesis import strategies as st
+
+        atoms = cls.atomic_strategy(types)
+        return st.builds(cls, atoms, atoms, st.booleans())
 
 
 class Laxator(Structural):
