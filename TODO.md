@@ -6,4 +6,4 @@
 
 - [x] the outline of a box spans its `height`: corners at ±max(height / 2 − 0.25, 0.25), so it meets its ports
 - [x] test and doctest drawing `docs/_static/drawing/box-height.svg`
-- [ ] changelog entry, next-checks
+- [x] changelog entry, next-checks
