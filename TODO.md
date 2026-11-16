@@ -24,7 +24,7 @@
 >   codomain's bang support, or through its ordinary maps otherwise. The laws
 > ```
 
-- [ ] discopy/abc.py:1479 This law proves only a right inverse for `exchange`, not invertibility.
+- [WIP] @session_01MEJxy2QJCwia83KHppaJ1H-2026-11-16 23:29 discopy/abc.py:1479 This law proves only a right inverse for `exchange`, not invertibility.
 - [ ] discopy/testable.py:534 The `discopy.closed` example is incorrect: its `Ty` and `Diagram` inherit the banged-object implementation fr…
 - [ ] CHANGELOG.md:16 `x.bang()` is the containing type, not the `BangOb` wire itself.
 - [ ] CHANGELOG.md:19 This sentence has an unfinished possessive and obscures the dispatch rule.
