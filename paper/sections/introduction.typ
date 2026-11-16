@@ -56,6 +56,7 @@ The paper lives in the repository of the library, in the directory
 - Every listing runs. The Python listings are run in order by the test
   suite, in one namespace, so that a listing can use the names of the
   ones before it, and a listing that raises an error fails the build.
+  The one exception is source quoted from the library, shown as it is.
 - Every figure is drawn by the library. A figure is the drawing of a
   value that a listing named, and the build draws it from that value:
   no picture is committed.

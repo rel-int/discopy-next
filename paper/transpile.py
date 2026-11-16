@@ -133,7 +133,7 @@ def math(text: str) -> str:
             result.append(r"\text{" + text_escape(token[1:-1]) + "}")
         elif token in SYMBOLS:
             result.append(SYMBOLS[token])
-        elif len(token) > 1 and token[0].isalpha() or token in "/#&":
+        elif len(token) > 1 and token[0].isalpha() or token in "/#&%\\{}~$":
             raise Unsupported(f"{token!r} in the mathematics {text!r}")
         else:
             result.append(token)
@@ -311,7 +311,10 @@ def block_to_latex(block: str, root: Path) -> str:
         return "\n".join([
             r"\begin{lstlisting}" + option, listing, r"\end{lstlisting}"])
     if block.startswith("="):
-        level, title, label = HEADING.match(block).groups()
+        heading = HEADING.match(block)
+        if heading is None or len(heading.group(1)) > len(SECTIONS):
+            raise Unsupported(block[:60])
+        level, title, label = heading.groups()
         return "\\" + SECTIONS[len(level) - 1] + "{" + inline(title) + "}"\
             + (r"\label{" + label + "}" if label else "")
     if block.startswith(("- ", "+ ")):

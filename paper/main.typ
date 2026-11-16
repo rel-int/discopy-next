@@ -19,8 +19,9 @@
     representations of a Hopf algebra, constraint satisfaction and drawing
     itself, which is now a functor. The applications are neural networks,
     photonic and quantum computing, categorial grammars and first-order
-    logic. Every listing of this paper runs in its test suite and every
-    figure is drawn by the library from the listing above it.
+    logic. Every listing of this paper runs in its test suite, but for
+    the source that it quotes from the library, and every figure is drawn
+    by the library from the listing above it.
   ],
 )
 
