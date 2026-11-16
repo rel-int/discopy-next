@@ -14,7 +14,8 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   Scott, `A + B (id - D)^-1 C`, a partial trace raising `ValueError` when
   `id - D` is singular (Malherbe, Scott and Selinger, arXiv:1107.3608,
   Definition 3.11). `bool` keeps the Kleene star, any other dtype raises
-  `TypeError` ([next#550]).
+  `TypeError`; `matrix.is_field` says which dtypes are a field, in any
+  backend ([next#550]).
 - `stream.up_to_steps`, the relation a law of streams is read with: a term
   unrolled for `stream.STEPS` steps, its arrow `now` taken and quotiented by
   the equation of the underlying category, which `Stream.equation_factory`
