@@ -174,7 +174,7 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   category ([#559], [#575]).
 - `discopy.hopf`, ribbon semantics in the representations of a
   finite-dimensional Hopf algebra and its Drinfeld double ([#405], [#484]).
-- `grammar.abstract`, abstract categorial grammars ([#400]), and
+- `lambek.abstract`, abstract categorial grammars ([#400]), and
   `categorial.Ty` with type raising and crossed composition ([#332], [#341]).
 - Lambda terms in `biclosed` and `closed`, with products, `Let` and
   capture-avoiding substitution, to and from diagrams ([#322], [#332], [#400],
@@ -243,13 +243,13 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   Message Passing ([Recursive_GNNs#1]).
 - `neural.geometric`, the same networks run along the blocks of their
   symmetry group, reductions in place of gathers ([Recursive_GNNs#1]).
-- `grammar.proofnet`, parses as proof nets read back to normal terms, and
-  `grammar.neural`, a PyTorch parser into them ([lambek#8]).
+- `lambek.proofnet`, parses as proof nets read back to normal terms, and
+  `lambek.neural`, a PyTorch parser into them ([lambek#8]).
 - `categorial.parse`, the `k` best terms of a sentence by CKY ([lambek#2]).
-- `grammar.neural.Parser.search`, parsing as search over the correct proof
+- `lambek.neural.Parser.search`, parsing as search over the correct proof
   nets of the `k` best types of each word ([lambek#12]).
-- `grammar.proofnet.Sequent.linkings`, the `m` best linkings by Murty's
-  ranking of the `assignments` of each block, and `grammar.neural.Parser.search`'s
+- `lambek.proofnet.Sequent.linkings`, the `m` best linkings by Murty's
+  ranking of the `assignments` of each block, and `lambek.neural.Parser.search`'s
   `depth` and `links`, its `width` counting only the sequents with a goal, so
   that it searches past those with none and the linkings with no term
   ([lambek#12]).
@@ -324,6 +324,11 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Changed
 
+- `discopy.grammar` is `discopy.lambek`, with its tests in `test/lambek`,
+  its pictures in `docs/_static/lambek` and its extra `discopy[lambek]`.
+  `discopy.grammar` stays as a deprecated alias: importing it warns and
+  makes each `discopy.grammar.x` the module `discopy.lambek.x`, so that a
+  pickle or a tree written under the old name reads back ([next#NNN]).
 - `Hypergraph.explicit_trace` takes the number of wires to trace and takes
   them in one pass, so `make_causal` and `make_cocausal` convert the graph
   once rather than once per cut: 7.5x faster on the traces of a graph with
@@ -834,7 +839,7 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   every other box, so a spider equals the one-layer diagram holding it and
   can go in a set ([next#359]).
 - `closed.TermBase.normal_form` and `reduce` take a constant as the head of a
-  spine, e.g. on the terms of `grammar.abstract` ([next#278]).
+  spine, e.g. on the terms of `lambek.abstract` ([next#278]).
 - `optyx.channel.Swap.dagger` is the swap the other way round ([next#290]).
 - `optyx.channel.Diagram.eval` evaluates a diagram of classical boxes, which
   `is_pure` called pure though a `CQMap` has no Kraus map ([next#260]).
@@ -881,7 +886,7 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   ([#768]), and spiders on PyTorch ([#584]).
 - `python.additive.Function.trace` on wires of different lengths ([#561]),
   and `python.Function.tensor` is variadic ([#489]).
-- `grammar.categorial.cat2ty` on brackets, features and associativity
+- `lambek.categorial.cat2ty` on brackets, features and associativity
   ([#529]).
 - Drawing controlled gates ([#439]) and discards ([#514]).
 - `Hypergraph`: equality on spiders with no legs, `depth`, `make_monogamous`,
@@ -976,7 +981,7 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 - `Drawing.permutation` permutes blocks, step-by-step `then` is a list past an
   identity, TikZ twists take xcolor names, hexcode styles drop `#` ([next#31]).
 - A law reads its type parameters when another class shares its name.
-- `discopy.grammar.neural` installs with the `grammar` extra ([next#52]).
+- `discopy.lambek.neural` installs with the `lambek` extra ([next#52]).
 - `zx.H`, quantum gates that do not send basis states to basis states,
   `gates.Bra`, `gates.Match` and `tensor.Sum` no longer claim to be cartesian
   ([next#115]).
@@ -1413,24 +1418,24 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   documented the right way round, `Circuit.from_tk` says it adds logical swaps
   rather than SWAP gates, and `Controlled` says that a zero distance raises
   `ValueError` ([next#445]).
-- Calling a `grammar.cfg.Tree` on arguments whose types do not tensor to its
+- Calling a `lambek.cfg.Tree` on arguments whose types do not tensor to its
   `dom` (all identities, an `Id` root, too many or too few arguments) raises
   `AxiomError`, where it used to return an ill-typed or truncated tree
   ([next#445]).
-- `grammar.cfg.Algebra` maps `Id` and any tree with an `Id` branch to the
+- `lambek.cfg.Algebra` maps `Id` and any tree with an `Id` branch to the
   identity of its codomain operad, where it used to raise `AttributeError`
   ([next#445]).
-- `grammar.cfg.Id(x).to_diagram()` is `monoidal.Id(x)`, so the diagram of a
+- `lambek.cfg.Id(x).to_diagram()` is `monoidal.Id(x)`, so the diagram of a
   tree with an identity branch has no spurious `Id(x)` box ([next#445]).
 - `quantum.graphlike.size` counts a phase-free spider with three or more ports
   and no box (e.g. a reduced `Z(1, 2)`), as PyZX does after its own
   `full_reduce`; only a bare wire, cup or cap counts as no spider ([next#445]).
-- `grammar.categorial.tree2diagram(tree, dom=...)` gives `dom` to every word of
+- `lambek.categorial.tree2diagram(tree, dom=...)` gives `dom` to every word of
   the tree, not only to a tree that is a single word ([next#445]).
-- `eval(repr(r)) == r` for a `grammar.thue.Rule` or `grammar.cfg.Rule` with an
+- `eval(repr(r)) == r` for a `lambek.thue.Rule` or `lambek.cfg.Rule` with an
   empty name, e.g. the root of `cfg.Tree.from_nltk` on an unlabelled tree
   ([next#445]).
-- `grammar.categorial.FX` and `BX` name subterms that compose, `C << B` with
+- `lambek.categorial.FX` and `BX` name subterms that compose, `C << B` with
   `A >> B` and `B << C` with `B >> A`, where the pairs they documented raised
   `AxiomError` ([next#445]).
 - `pregroup.Diagram.normal_form` passes `normalize` and its other params on to

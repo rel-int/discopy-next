@@ -325,7 +325,7 @@ Parsings are given by **syntax trees** with rules as nodes and words as leaves.
 **Example:**
 
 ```python {.marimo}
-from discopy.grammar.thue import Word, Rule
+from discopy.lambek.thue import Word, Rule
 _s, _n, tv, itv = Ty(*'s n tv itv'.split())
 # sentence, noun, transitive and intransitive verbs
 words = [Word('Alice', _n), Word('loves', tv), Word('Bob', _n)]
@@ -370,7 +370,7 @@ A sequence $w \in V^\star$ is grammatical if there is a diagram $g : w \to s$ in
 **Example:**
 
 ```python {.marimo}
-from discopy.grammar import categorial
+from discopy.lambek import categorial
 _s, _n = map(categorial.Ty, 'sn')
 _Alice = categorial.Word('Alice', _n)
 _loves = categorial.Word('loves', _n >> _s << _n)
@@ -420,7 +420,7 @@ A sequence $w \in V^\star$ is grammatical if there is a diagram $g : w \to s$ in
 **Example:**
 
 ```python {.marimo}
-from discopy.grammar import pregroup
+from discopy.lambek import pregroup
 _s, _n = (pregroup.Ty('s'), pregroup.Ty('n'))
 _Alice, _Bob = (pregroup.Word('Alice', _n), pregroup.Word('Bob', _n))
 _loves = pregroup.Word('loves', _n.r @ _s @ _n.l)

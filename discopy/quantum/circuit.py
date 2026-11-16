@@ -44,7 +44,7 @@ Examples
 .. image:: /_static/quantum/circuit-example.svg
     :align: center
 
->>> from discopy.grammar import pregroup
+>>> from discopy.lambek import pregroup
 >>> s, n = pregroup.Ty('s'), pregroup.Ty('n')
 >>> Alice = pregroup.Word('Alice', n)
 >>> loves = pregroup.Word('loves', n.r @ s @ n.l)

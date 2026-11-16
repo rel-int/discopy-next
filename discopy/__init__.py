@@ -40,7 +40,7 @@ from discopy import (
     hopf,
     group,
     quantum,
-    grammar,
+    lambek,
     drawing,
     utils,
     config,

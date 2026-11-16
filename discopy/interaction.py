@@ -32,8 +32,8 @@ Summary
 Example
 -------
 
->>> from discopy.grammar import pregroup
->>> from discopy.grammar.pregroup import Word, Cup, Diagram, Functor
+>>> from discopy.lambek import pregroup
+>>> from discopy.lambek.pregroup import Word, Cup, Diagram, Functor
 >>> s, n = map(pregroup.Ty, "sn")
 >>> Alice, loves, Bob\\
 ...     = Word('Alice', n), Word('loves', n.r @ s @ n.l), Word('Bob', n)

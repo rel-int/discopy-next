@@ -636,7 +636,7 @@ def test_snake_equation_to_tikz():
 
 @tikz_and_compare("who-ansatz.tikz")
 def test_who_ansatz_to_tikz():
-    from discopy.grammar.pregroup import Ty, Cap, Word, Id, Box
+    from discopy.lambek.pregroup import Ty, Cap, Word, Id, Box
     s, n = Ty('s'), Ty('n')
     who = Word('who', n.r @ n @ s.l @ n)
     who_ansatz = Cap(n.r, n)\

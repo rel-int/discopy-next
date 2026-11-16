@@ -7,9 +7,9 @@ from random import Random
 
 from pytest import raises
 
-from discopy.grammar import proofnet
-from discopy.grammar.abstract import Ty, Variable, Abstraction
-from discopy.grammar.proofnet import *
+from discopy.lambek import proofnet
+from discopy.lambek.abstract import Ty, Variable, Abstraction
+from discopy.lambek.proofnet import *
 from discopy.utils import AxiomError
 
 n, np, s = Ty("n"), Ty("np"), Ty("s")
@@ -21,7 +21,7 @@ loves = (n >> (n >> s))("loves")
 def test_lazy_torch_import():
     subprocess.run([
         sys.executable, "-c",
-        "import sys; import discopy.grammar; "
+        "import sys; import discopy.lambek; "
         "assert 'torch' not in sys.modules"], check=True)
 
 

@@ -477,8 +477,8 @@ def factory_name(cls: type) -> str:
 
     Example
     -------
-    >>> from discopy.grammar.pregroup import Word
-    >>> assert factory_name(Word) == "grammar.pregroup.Word"
+    >>> from discopy.lambek.pregroup import Word
+    >>> assert factory_name(Word) == "lambek.pregroup.Word"
     >>> assert factory_name(int | None) == "int | None"
     """
     if not isinstance(cls, type):

@@ -455,8 +455,8 @@ The cooking steps are of two kinds: words and cups. Words have no inputs, they o
 For example:
 
 ```python {.marimo}
-from discopy.grammar.pregroup import Word
-from discopy.grammar import pregroup
+from discopy.lambek.pregroup import Word
+from discopy.lambek import pregroup
 n, s = (pregroup.Ty('n'), pregroup.Ty('s'))
 Alice = Word('Alice', n)
 loves = Word('loves', n.r @ s @ n.l)

@@ -114,7 +114,7 @@ def test_named_generic_pickle_subscript():
 def test_deprecated_ob():
     from discopy import (
         biclosed, braided, compact, feedback, frobenius, pivotal, rigid)
-    from discopy.grammar import pregroup
+    from discopy.lambek import pregroup
     from discopy.quantum import circuit
     for module in (rigid, braided, biclosed, pivotal, frobenius, feedback,
                    circuit, pregroup, compact):
