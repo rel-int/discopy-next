@@ -11,4 +11,4 @@
 > [P2] Track the state’s placement relative to an effect instead of copying the gap’s effect history to both sides. This makes `h` depend on `e` and causes `foliations()` to omit the valid `x @ s @ x >> h @ e` foliation.
 
 - [x] discopy/monoidal.py:1815 ** Avoid retaining unconditional effect dependencies across states** When a state is inserted into a gap join…
-- [ ] discopy/monoidal.py:1814 Track the state’s placement relative to an effect instead of copying the gap’s effect history to both sides.
+- [x] discopy/monoidal.py:1814 Track the state’s placement relative to an effect instead of copying the gap’s effect history to both sides.
