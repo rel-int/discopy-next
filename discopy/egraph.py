@@ -330,6 +330,8 @@ class Builder:  # pylint: disable=too-many-instance-attributes  # egg's tables
         self.hashcons: dict[tuple[int, ...], int] = {}
         self.parents: defaultdict[int, list[int]] = defaultdict(list)
         self.worklist: list[tuple[int, int]] = []
+        self.rows: defaultdict[int, list[int]] = defaultdict(list)
+        self.indexed = 0
         for box, wires in zip(self.start.boxes, self.start.box_wires):
             _, number, _ = self.head(box)
             self.place(box, wires, () if number is None else (
@@ -454,6 +456,103 @@ class Builder:  # pylint: disable=too-many-instance-attributes  # egg's tables
             start.dom_wires, tuple(self.box_wires), start.cod_wires))
         return self.factory(
             graph, tuple(map(self.find, range(len(self.label)))))
+
+    def relations(self) -> defaultdict[int, list[int]]:
+        """ The rows of each head, i.e. the deterministic boxes of each number
+        among the :attr:`heads`, as :attr:`rows`: the boxes added since the
+        last call are indexed as it asks, so that :meth:`add` pays nothing. """
+        for box in range(self.indexed, len(self.keys)):
+            if self.keys[box]:
+                self.rows[self.keys[box][0]].append(box)
+        self.indexed = len(self.keys)
+        return self.rows
+
+    def lookup(self, number: int) -> tuple[dict, dict]:
+        """ The rows of a head as they stand, each the classes of its inputs
+        then of its outputs, with their hash index from an output position
+        and the class there to the boxes with that output. """
+        rows: dict[int, tuple[int, ...]] = {}
+        result: defaultdict[tuple[int, int], list[int]] = defaultdict(list)
+        for box in self.relations()[number]:
+            _, *inputs = self.keys[box]
+            rows[box] = tuple(map(self.find, (
+                *inputs, *self.box_wires[box][1])))
+            for k, spider in enumerate(rows[box][len(inputs):]):
+                result[k, spider].append(box)
+        return rows, result
+
+    def matches(self, lhs: Hypergraph) -> list[tuple[tuple, tuple, tuple]]:
+        """
+        The matches of a pattern, those :meth:`EGraph.matches` gives on what
+        the builder freezes into, see the law
+        :meth:`EGraph.matching_agreement`,
+        found as relational e-matching does `(Zhang et al., 2022)
+        <https://arxiv.org/abs/2108.02290>`_: the pattern is a conjunctive
+        query, one atom for each box over the relation of its head and one
+        variable for each spider, and a match is a row of the join of its
+        atoms, taken from the codomain up as :meth:`EGraph.bind` does.
+
+        >>> from discopy.markov import Ty, Box, Diagram
+        >>> x = Ty('x')
+        >>> f, g = Box('f', x, x), Box('g', x @ x, x)
+        >>> builder = Markov.from_diagram(f @ f >> g).builder()
+        >>> builder.merge(0, 1)
+        >>> builder.matches((Diagram.copy(x) >> f @ f >> g).to_hypergraph())
+        [((0, 1, 2), (0,), (4,))]
+        """
+        if not is_pattern(lhs):
+            raise AxiomError(messages.NOT_A_PATTERN.format(lhs))
+        lhs, partial, bound, tables = lhs.topological_order(), [((), ())], [
+            ], {}
+        for box, wires in reversed(list(zip(lhs.boxes, lhs.box_wires))):
+            if (number := self.heads.get(box)) is None:
+                return []
+            if number not in tables:
+                tables[number] = self.lookup(number)
+            partial = list(self.join(tables[number], wires, bound, partial))
+        position = {s: n for n, s in enumerate(bound)}
+        dom, cod = ([position.get(s, -1) for s in wires]
+                    for wires in (lhs.dom_wires, lhs.cod_wires))
+        return list(dict.fromkeys((tuple(sorted(set(region))), *(
+            tuple(map((values + (None, )).__getitem__, at))
+            for at in (dom, cod))) for values, region in partial))
+
+    @staticmethod
+    def plan(ports: tuple[int, ...], bound: list[int]
+             ) -> tuple[list[tuple[int, int]], tuple[int, ...]]:
+        """ What joining a box on some ports to matches binding some spiders
+        compares, each position in a row with one in a match extended by the
+        row, and the positions in a row that extend it, putting the spiders
+        it binds on ``bound``: the same for every match, as a pattern goes
+        in one order. """
+        position = {s: n for n, s in enumerate(bound)}
+        first = {s: ports.index(s) for s in ports if s not in position}
+        position.update((s, len(bound) + n) for n, s in enumerate(first))
+        bound.extend(first)
+        return [(a, position[s]) for a, s in enumerate(ports)
+                if first.get(s) != a], tuple(first.values())
+
+    def join(self, table: tuple[dict, dict], wires: tuple, bound: list[int],
+             partial: list[tuple[tuple, tuple]]
+             ) -> Iterator[tuple[tuple, tuple]]:
+        """
+        The join of partial matches with a box of a pattern on some wires,
+        each match a region and the classes of the spiders ``bound`` so far:
+        the rows of the :meth:`lookup` of its head that agree with them, by
+        its :meth:`plan`, those with the class an output is bound to if any,
+        else every row.
+        """
+        rows, outputs = table
+        probe = next(((k, bound.index(s)) for k, s in enumerate(wires[1])
+                      if s in bound), None)
+        checks, picks = self.plan(sum(wires, ()), bound)
+        for values, region in partial:
+            for h in rows if probe is None else outputs.get(
+                    (probe[0], values[probe[1]]), ()):
+                row = rows[h]
+                new = values + tuple(row[a] for a in picks)
+                if all(row[a] == new[n] for a, n in checks):
+                    yield new, region + (h, )
 
 
 class History[factory](TestableGeneric, tuple):
@@ -1392,6 +1491,32 @@ class EGraph[category](
         """ A builder freezes into what its operations give in turn, each
         ``add`` giving the same outputs on both. """
         return Equation(history.run(builder=True), history.run())
+
+    @axiom
+    def matching_agreement[I: Nat, J: Nat](
+            cls, history: History[Self], i: Var[Nat, I], j: Var[Nat, J]
+    ) -> Equation[tuple[frozenset, ...]]:
+        """ A builder matches what the e-graph of its operations does, rebuilt
+        or not: the pattern of the boxes of that e-graph made cartesian, it
+        rewired, and its ``i``-th box alone, then on one copied input if
+        it reads one type. """
+        graph, builder = history.fold(), history.graph.builder()
+        for name, *args in history.operations:
+            getattr(builder, name)(*args)
+        hypergraph, factory = graph.graph, cls.category.box_factory
+        boxes = tuple(factory(box.name, box.dom, box.cod)
+                      for box in hypergraph.boxes)
+        lhs = pattern(type(hypergraph)(
+            hypergraph.dom, hypergraph.cod, boxes, hypergraph.wires))
+        patterns = [lhs, rewire(lhs, i, j)]
+        if boxes:
+            box = boxes[index(i) % len(boxes)]
+            copy = cls.category.copy(box.dom[:1], len(box.dom))
+            patterns += [box.to_hypergraph()] + (
+                [(copy >> box).to_hypergraph()] if copy.cod == box.dom else [])
+        return Equation(
+            tuple(frozenset(builder.matches(lhs)) for lhs in patterns),
+            tuple(frozenset(graph.matches(lhs)) for lhs in patterns))
 
     rewrite_identity = rewrite_identity.weaken(effects=False)
     extraction_rewrite = extraction_rewrite.weaken(effects=False)
