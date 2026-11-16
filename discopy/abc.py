@@ -46,6 +46,7 @@ Summary
     TracedCategory
     ResiduatedMonoid
     BiclosedCategory
+    LinearCategory
     Pregroup
     RigidCategory
     PivotalCategory
@@ -84,7 +85,7 @@ from typing import TYPE_CHECKING, ClassVar, SupportsIndex
 
 from discopy import messages
 from discopy.testable import (
-    Atom, Delay, Equation, Hom, L, Obj, Objs, Over, Perm, R, Repeat,
+    Atom, Bang, Delay, Equation, Hom, L, Obj, Objs, Over, Perm, R, Repeat,
     Tensor, Testable, Under, Unit, Var, axiom, rule)
 from discopy.utils import (  # noqa: F401  pylint: disable=unused-import
     AxiomError, NamedGeneric, classproperty, factory_name)
@@ -1169,6 +1170,350 @@ class BiclosedCategory[
     ) -> Hom[C1, Tensor[E, Under[E, B]], B]:
         """ The evaluation on the right, ``E @ (E >> B) -> B``. """
         return cls.ev(base, exponent, left=False)
+
+
+class LinearCategory[C0: ResiduatedMonoid, C1: LinearCategory](
+        BiclosedCategory[C0, C1]):
+    """
+    A linear category is a :class:`BiclosedCategory` with a linear exponential
+    comonad :meth:`bang`, see :cite:t:`Bierman95`, here without symmetry: a
+    banged object is exchanged with any other, the rule of the Lambek
+    calculus with a relevant modality !L* of :cite:t:`KanovichEtAl16`.
+
+    * ``!`` is a comonad, with counit :meth:`dereliction` ``!x -> x`` and
+      comultiplication :meth:`digging` ``!x -> !!x``,
+    * it is lax monoidal, with :meth:`laxator` ``!x @ !y -> !(x @ y)`` and
+      ``Ty() -> !Ty()``, the dereliction and the digging monoidal,
+    * each ``!x`` is a comonoid, with :meth:`contraction` ``!x -> !x @ !x``
+      and :meth:`weakening` ``!x -> Ty()``, natural and morphisms of
+      coalgebras, the digging a morphism of comonoids,
+    * the :meth:`exchange` ``!x @ y -> y @ !x`` is invertible, natural and
+      satisfies the hexagon: ``!x`` is central, which replaces the symmetry,
+      and the comonoid is cocommutative through it.
+
+    The promotion of !L*, from ``!x -> y`` to ``!x -> !y``, is derived: the
+    digging, then the bang of the arrow.
+    """
+    @abstractmethod
+    def bang(self: C1) -> C1:
+        """ The bang of a morphism, to be instantiated. """
+
+    @classmethod
+    @abstractmethod
+    def dereliction(cls, x: C0) -> C1:
+        """
+        The counit ``!x -> x`` of the bang, to be instantiated.
+
+        Parameters:
+            x : The object.
+        """
+
+    @classmethod
+    @abstractmethod
+    def digging(cls, x: C0) -> C1:
+        """
+        The comultiplication ``!x -> !!x`` of the bang, to be instantiated.
+
+        Parameters:
+            x : The object.
+        """
+
+    @classmethod
+    @abstractmethod
+    def contraction(cls, x: C0) -> C1:
+        """
+        The copy ``!x -> !x @ !x`` of a banged object, to be instantiated.
+
+        Parameters:
+            x : The object.
+        """
+
+    @classmethod
+    @abstractmethod
+    def weakening(cls, x: C0) -> C1:
+        """
+        The discard ``!x -> Ty()`` of a banged object, to be instantiated.
+
+        Parameters:
+            x : The object.
+        """
+
+    @classmethod
+    @abstractmethod
+    def exchange(cls, x: C0, y: C0, is_dagger: bool = False) -> C1:
+        """
+        The exchange ``!x @ y -> y @ !x`` of a banged object with another,
+        its inverse ``y @ !x -> !x @ y`` when ``is_dagger``, to be
+        instantiated.
+
+        Parameters:
+            x : The object that is banged.
+            y : The object it is exchanged with.
+            is_dagger : Whether to take the inverse.
+        """
+
+    @classmethod
+    @abstractmethod
+    def laxator(cls, x: C0 | None = None, y: C0 | None = None) -> C1:
+        """
+        The laxator ``!x @ !y -> !(x @ y)`` of the bang, or its unit
+        ``Ty() -> !Ty()`` when given no object, to be instantiated.
+
+        Parameters:
+            x : The object on the left.
+            y : The object on the right.
+        """
+
+    @classmethod
+    def banged(cls, x: C0) -> C0:
+        """ The bang of an object, read off the bang of its identity. """
+        return cls.id(x).bang().dom
+
+    @axiom
+    def bang_identity[X: Obj[C0]](
+            cls, x: Var[C0, X]) -> Equation[Hom[C1, Bang[C1, X], Bang[C1, X]]]:
+        """ The bang of an identity is the identity. """
+        return cls.equation_factory(cls.id(x).bang(), cls.id(cls.banged(x)))
+
+    @axiom
+    def bang_composition[A: Obj[C0], B: Obj[C0], C: Obj[C0]](
+            cls, f: Hom[C1, A, B], g: Hom[C1, B, C]
+    ) -> Equation[Hom[C1, Bang[C1, A], Bang[C1, C]]]:
+        """ The bang of a composition is the composition of the bangs. """
+        return cls.equation_factory(
+            f.then(g).bang(), f.bang().then(g.bang()))
+
+    @axiom
+    def dereliction_naturality[A: Obj[C0], B: Obj[C0]](
+            cls, f: Hom[C1, A, B]) -> Equation[Hom[C1, Bang[C1, A], B]]:
+        """ The dereliction is natural. """
+        return cls.equation_factory(
+            f.bang() >> cls.dereliction(f.cod), cls.dereliction(f.dom) >> f)
+
+    @axiom
+    def digging_naturality[A: Obj[C0], B: Obj[C0]](
+            cls, f: Hom[C1, A, B]
+    ) -> Equation[Hom[C1, Bang[C1, A], Bang[C1, Bang[C1, B]]]]:
+        """ The digging is natural. """
+        return cls.equation_factory(
+            f.bang() >> cls.digging(f.cod),
+            cls.digging(f.dom) >> f.bang().bang())
+
+    @axiom
+    def comonad_counit[X: Obj[C0]](
+            cls, x: Var[C0, X]) -> Equation[Hom[C1, Bang[C1, X], Bang[C1, X]]]:
+        """ Digging then derelicting either bang is the identity. """
+        digging, banged = cls.digging(x), cls.banged(x)
+        return cls.equation_factory(
+            digging >> cls.dereliction(banged), cls.id(banged),
+            digging >> cls.dereliction(x).bang())
+
+    @axiom
+    def comonad_coassociativity[X: Obj[C0]](
+            cls, x: Var[C0, X]
+    ) -> Equation[Hom[C1, Bang[C1, X], Bang[C1, Bang[C1, Bang[C1, X]]]]]:
+        """ Digging twice is digging either bang. """
+        digging = cls.digging(x)
+        return cls.equation_factory(
+            digging >> cls.digging(cls.banged(x)), digging >> digging.bang())
+
+    @axiom
+    def laxator_naturality[
+            A: Obj[C0], B: Obj[C0], C: Obj[C0], D: Obj[C0]](
+            cls, f: Hom[C1, A, B], g: Hom[C1, C, D]
+    ) -> Equation[Hom[C1, Tensor[Bang[C1, A], Bang[C1, C]],
+                      Bang[C1, Tensor[B, D]]]]:
+        """ The laxator is natural. """
+        return cls.equation_factory(
+            f.bang() @ g.bang() >> cls.laxator(f.cod, g.cod),
+            cls.laxator(f.dom, g.dom) >> (f @ g).bang())
+
+    @axiom
+    def laxator_associativity[X: Obj[C0], Y: Obj[C0], Z: Obj[C0]](
+            cls, x: Var[C0, X], y: Var[C0, Y], z: Var[C0, Z]
+    ) -> Equation[Hom[C1, Tensor[Bang[C1, X], Bang[C1, Y], Bang[C1, Z]],
+                      Bang[C1, Tensor[X, Y, Z]]]]:
+        """ The laxator is associative. """
+        return cls.equation_factory(
+            cls.laxator(x, y) @ cls.banged(z) >> cls.laxator(x @ y, z),
+            cls.banged(x) @ cls.laxator(y, z) >> cls.laxator(x, y @ z))
+
+    @axiom
+    def laxator_unitality[X: Obj[C0]](
+            cls, x: Var[C0, X]) -> Equation[Hom[C1, Bang[C1, X], Bang[C1, X]]]:
+        """ The laxator is unital on either side. """
+        unit, banged = cls.laxator(), cls.banged(x)
+        return cls.equation_factory(
+            unit @ banged >> cls.laxator(x[:0], x), cls.id(banged),
+            banged @ unit >> cls.laxator(x, x[:0]))
+
+    @axiom
+    def dereliction_monoidality[X: Obj[C0], Y: Obj[C0]](
+            cls, x: Var[C0, X], y: Var[C0, Y]
+    ) -> Equation[Hom[C1, Tensor[Bang[C1, X], Bang[C1, Y]], Tensor[X, Y]]]:
+        """ The dereliction is monoidal. """
+        return cls.equation_factory(
+            cls.laxator(x, y) >> cls.dereliction(x @ y),
+            cls.dereliction(x) @ cls.dereliction(y))
+
+    @axiom
+    def dereliction_unit[X: Obj[C0]](
+            cls, x: Var[C0, X]) -> Equation[Hom[C1, Unit[C0], Unit[C0]]]:
+        """ The dereliction is monoidal on the unit. """
+        return cls.equation_factory(
+            cls.laxator() >> cls.dereliction(x[:0]), cls.id(x[:0]))
+
+    @axiom
+    def digging_monoidality[X: Obj[C0], Y: Obj[C0]](
+            cls, x: Var[C0, X], y: Var[C0, Y]
+    ) -> Equation[Hom[C1, Tensor[Bang[C1, X], Bang[C1, Y]],
+                      Bang[C1, Bang[C1, Tensor[X, Y]]]]]:
+        """ The digging is monoidal. """
+        laxator = cls.laxator(x, y)
+        return cls.equation_factory(
+            laxator >> cls.digging(x @ y),
+            cls.digging(x) @ cls.digging(y)
+            >> cls.laxator(cls.banged(x), cls.banged(y)) >> laxator.bang())
+
+    @axiom
+    def digging_unit[X: Obj[C0]](
+            cls, x: Var[C0, X]
+    ) -> Equation[Hom[C1, Unit[C0], Bang[C1, Bang[C1, Unit[C0]]]]]:
+        """ The digging is monoidal on the unit. """
+        unit = cls.laxator()
+        return cls.equation_factory(
+            unit >> cls.digging(x[:0]), unit >> unit.bang())
+
+    @axiom
+    def contraction_coassociativity[X: Obj[C0]](
+            cls, x: Var[C0, X]) -> Equation[Hom[
+                C1, Bang[C1, X],
+                Tensor[Bang[C1, X], Bang[C1, X], Bang[C1, X]]]]:
+        """ Copying either of two copies gives the same three copies. """
+        contraction, banged = cls.contraction(x), cls.banged(x)
+        return cls.equation_factory(
+            contraction >> contraction @ banged,
+            contraction >> banged @ contraction)
+
+    @axiom
+    def contraction_counitality[X: Obj[C0]](
+            cls, x: Var[C0, X]) -> Equation[Hom[C1, Bang[C1, X], Bang[C1, X]]]:
+        """ Weakening either of two copies leaves the banged object. """
+        contraction, banged = cls.contraction(x), cls.banged(x)
+        weakening = cls.weakening(x)
+        return cls.equation_factory(
+            contraction >> weakening @ banged, cls.id(banged),
+            contraction >> banged @ weakening)
+
+    @axiom
+    def contraction_cocommutativity[X: Obj[C0]](
+            cls, x: Var[C0, X]) -> Equation[Hom[
+                C1, Bang[C1, X], Tensor[Bang[C1, X], Bang[C1, X]]]]:
+        """ The two copies are interchangeable, through the exchange. """
+        contraction = cls.contraction(x)
+        return cls.equation_factory(
+            contraction >> cls.exchange(x, cls.banged(x)), contraction)
+
+    @axiom
+    def contraction_naturality[A: Obj[C0], B: Obj[C0]](
+            cls, f: Hom[C1, A, B]
+    ) -> Equation[Hom[C1, Bang[C1, A], Tensor[Bang[C1, B], Bang[C1, B]]]]:
+        """ The contraction is natural. """
+        return cls.equation_factory(
+            f.bang() >> cls.contraction(f.cod),
+            cls.contraction(f.dom) >> f.bang() @ f.bang())
+
+    @axiom
+    def weakening_naturality[A: Obj[C0], B: Obj[C0]](
+            cls, f: Hom[C1, A, B]) -> Equation[Hom[C1, Bang[C1, A], Unit[C0]]]:
+        """ The weakening is natural. """
+        return cls.equation_factory(
+            f.bang() >> cls.weakening(f.cod), cls.weakening(f.dom))
+
+    @axiom
+    def contraction_coalgebra[X: Obj[C0]](
+            cls, x: Var[C0, X]) -> Equation[Hom[
+                C1, Bang[C1, X], Bang[C1, Tensor[Bang[C1, X], Bang[C1, X]]]]]:
+        """ The contraction is a morphism of coalgebras. """
+        digging, banged = cls.digging(x), cls.banged(x)
+        return cls.equation_factory(
+            cls.contraction(x) >> digging @ digging
+            >> cls.laxator(banged, banged),
+            digging >> cls.contraction(x).bang())
+
+    @axiom
+    def weakening_coalgebra[X: Obj[C0]](
+            cls, x: Var[C0, X]
+    ) -> Equation[Hom[C1, Bang[C1, X], Bang[C1, Unit[C0]]]]:
+        """ The weakening is a morphism of coalgebras. """
+        return cls.equation_factory(
+            cls.weakening(x) >> cls.laxator(),
+            cls.digging(x) >> cls.weakening(x).bang())
+
+    @axiom
+    def digging_comonoid[X: Obj[C0]](
+            cls, x: Var[C0, X]) -> Equation[Hom[
+                C1, Bang[C1, X],
+                Tensor[Bang[C1, Bang[C1, X]], Bang[C1, Bang[C1, X]]]]]:
+        """ The digging is a morphism of comonoids, for the contraction. """
+        digging = cls.digging(x)
+        return cls.equation_factory(
+            digging >> cls.contraction(cls.banged(x)),
+            cls.contraction(x) >> digging @ digging)
+
+    @axiom
+    def digging_weakening[X: Obj[C0]](
+            cls, x: Var[C0, X]) -> Equation[Hom[C1, Bang[C1, X], Unit[C0]]]:
+        """ The digging is a morphism of comonoids, for the weakening. """
+        return cls.equation_factory(
+            cls.digging(x) >> cls.weakening(cls.banged(x)),
+            cls.weakening(x))
+
+    @axiom
+    def exchange_inverse[X: Obj[C0], Y: Obj[C0]](
+            cls, x: Var[C0, X], y: Var[C0, Y]
+    ) -> Equation[Hom[C1, Tensor[Bang[C1, X], Y], Tensor[Bang[C1, X], Y]]]:
+        """ Exchanging back and forth is the identity. """
+        exchange = cls.exchange(x, y)
+        return cls.equation_factory(
+            exchange >> cls.exchange(x, y, is_dagger=True),
+            cls.id(exchange.dom))
+
+    @axiom
+    def exchange_naturality[X: Obj[C0], A: Obj[C0], B: Obj[C0]](
+            cls, x: Var[C0, X], f: Hom[C1, A, B]
+    ) -> Equation[Hom[C1, Tensor[Bang[C1, X], A], Tensor[B, Bang[C1, X]]]]:
+        """ The exchange is natural in the object it is exchanged with. """
+        banged = cls.banged(x)
+        return cls.equation_factory(
+            cls.exchange(x, f.dom) >> f @ banged,
+            banged @ f >> cls.exchange(x, f.cod))
+
+    @axiom
+    def exchange_naturality_bang[A: Obj[C0], B: Obj[C0], Y: Obj[C0]](
+            cls, f: Hom[C1, A, B], y: Var[C0, Y]
+    ) -> Equation[Hom[C1, Tensor[Bang[C1, A], Y], Tensor[Y, Bang[C1, B]]]]:
+        """ The exchange is natural in the banged object. """
+        return cls.equation_factory(
+            f.bang() @ y >> cls.exchange(f.cod, y),
+            cls.exchange(f.dom, y) >> y @ f.bang())
+
+    @axiom
+    def exchange_hexagon[X: Obj[C0], Y: Obj[C0], Z: Obj[C0]](
+            cls, x: Var[C0, X], y: Var[C0, Y], z: Var[C0, Z]
+    ) -> Equation[Hom[C1, Tensor[Bang[C1, X], Y, Z],
+                      Tensor[Y, Z, Bang[C1, X]]]]:
+        """ Exchanging past a tensor is exchanging past each factor. """
+        return cls.equation_factory(
+            cls.exchange(x, y @ z),
+            cls.exchange(x, y) @ z >> y @ cls.exchange(x, z))
+
+    @axiom
+    def exchange_unit[X: Obj[C0]](
+            cls, x: Var[C0, X]) -> Equation[Hom[C1, Bang[C1, X], Bang[C1, X]]]:
+        """ Exchanging past the unit is the identity. """
+        return cls.equation_factory(
+            cls.exchange(x, x[:0]), cls.id(cls.banged(x)))
 
 
 class Pregroup[C0, C1: Pregroup](ResiduatedMonoid[C0, C1]):

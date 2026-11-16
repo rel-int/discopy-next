@@ -52,6 +52,7 @@ Summary
     L
     R
     Delay
+    Bang
     Over
     Under
     Repeat
@@ -488,6 +489,22 @@ class Delay[Coarse, Object](Constructor):
         return category.id(obj).delay().dom
 
 
+class Bang[Coarse, Object](Constructor):
+    """
+    The bang of an object in a signature, read off the bang of its identity
+    in a category ``Coarse``, i.e. ``Coarse.id(M).bang().dom``, as
+    :class:`Delay` reads the delay, so that a category whose bang is the
+    identity, e.g. :mod:`discopy.closed`, reads each object as its own bang.
+
+    >>> from discopy.biclosed import Ty, Diagram
+    >>> assert Bang[Diagram, Ty('x')] == Ty('x').bang()
+    """
+    @staticmethod
+    def form(*args):
+        category, obj = args
+        return category.id(obj).bang().dom
+
+
 class Over[Base, Exponent](Constructor):
     """ The exponential on the left in a signature, ``base << exponent``. """
     @staticmethod
@@ -602,8 +619,8 @@ class Declaration[**P, T](classmethod):
     object expression and :data:`typing.Self` a term, and the return
     annotation the type of its output, see :meth:`output`. Object
     expressions are built by :class:`Tensor`, :class:`Unit`, :class:`L`,
-    :class:`R`, :class:`Delay`, :class:`Over`, :class:`Under` and
-    :class:`Repeat`, which stay expressions until the variables are
+    :class:`R`, :class:`Delay`, :class:`Bang`, :class:`Over`, :class:`Under`
+    and :class:`Repeat`, which stay expressions until the variables are
     substituted, see :func:`substitute`. The type parameters of the class
     stating it stand for what :meth:`discopy.abc.Category.typeparams` says,
     see :func:`position`, and the annotations are read as objects, see

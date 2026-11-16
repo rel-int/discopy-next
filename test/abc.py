@@ -35,3 +35,21 @@ def test_Nat_str_transparency():
     assert str(Nat(2)) == "Nat(2)"
     for n in range(4):
         assert eval(str(Nat(n)), {"Nat": Nat}) == Nat(n)
+
+
+def test_LinearCategory_states_the_laws_of_a_linear_category():
+    from discopy import biclosed, rigid
+    from discopy.abc import LinearCategory
+    from discopy.testable import Bang
+
+    assert issubclass(biclosed.Diagram, LinearCategory)
+    assert len(LinearCategory.axioms) - len(
+        biclosed.BiclosedCategory.axioms) == 27
+    x = biclosed.Ty('x')
+    assert Bang[biclosed.Diagram, x] == x.bang()
+    for law in set(LinearCategory.axioms) - set(
+            biclosed.BiclosedCategory.axioms):
+        assert getattr(biclosed.Diagram, law).broken
+        assert getattr(rigid.Diagram, law).broken
+    with raises(TypeError):
+        type("Free", (LinearCategory, ), {})()
