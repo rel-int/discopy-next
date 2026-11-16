@@ -271,6 +271,94 @@ class Language:
             sort: tensor.Dim(size) for sort, size in self.sizes.items()}
         return tensor.Functor(ob_map, self.array, dtype=dtype, **params)
 
+    def propagate(
+            self, graph: frobenius.Hypergraph,
+            domains: Sequence[set[int]] | None = None,
+            rounds: int | None = None) -> list[set[int]]:
+        """
+        Arc consistency: a set of candidate values for each variable, and in
+        each round, for each constraint and each variable of its scope, only
+        the values with a support, i.e. an assignment of the scope from the
+        candidates that the constraint holds on. Repeated until no set
+        shrinks, or for a given number of rounds.
+
+        It removes no value that a solution takes. When the incidence graph
+        of the instance, a node per variable and per constraint, is a tree,
+        its fixed point is the projection of the solutions on each
+        variable :cite:p:`Freuder82`. On any graph, its empty sets are the
+        zeros belief propagation finds :cite:p:`DechterMateescu03`.
+
+        Parameters:
+            graph : The instance.
+            domains : The candidates of each variable, by default every
+                value of its sort.
+            rounds : The number of rounds, by default until a fixed point.
+
+        Example
+        -------
+        >>> x = frobenius.Ty('x')
+        >>> language = Language({x: 3}, {"lt": lambda a, b: a < b})
+        >>> chain = instance([("lt", (0, 1)), ("lt", (1, 2))], 3 * [x])
+        >>> language.propagate(chain)
+        [{0}, {1}, {2}]
+        >>> language.propagate(chain, rounds=1)
+        [{0, 1}, {1}, {2}]
+        """
+        candidates = [set(self.domain(sort)) for sort in graph.spider_types]\
+            if domains is None else [set(domain) for domain in domains]
+        constraints = [(self.predicates[name], scope)
+                       for name, scope in scopes(graph)]
+        done, changed = 0, True
+        while changed and (rounds is None or done < rounds):
+            changed, done = False, done + 1
+            for predicate, scope in constraints:
+                if not scope and not predicate():
+                    return [set() for _ in candidates]
+                variables = list(dict.fromkeys(scope))
+                kept = self.supports(predicate, scope, variables, candidates)
+                for variable, values in zip(variables, kept):
+                    if values < candidates[variable]:
+                        candidates[variable] = values
+                        changed = True
+        return candidates
+
+    @staticmethod
+    def supports(
+            predicate: Callable[..., bool], scope: tuple[int, ...],
+            variables: list[int], candidates: list[set[int]]
+            ) -> list[set[int]]:
+        """
+        The candidates of each distinct variable of a scope that have a
+        support, an assignment of the variables, a variable that occurs
+        twice taking one value, on which the predicate holds. It keeps no
+        assignment and stops once every candidate has one.
+
+        Parameters:
+            predicate : The relation of the constraint.
+            scope : Its variables, maybe with repetitions.
+            variables : The distinct variables of the scope, in order.
+            candidates : The candidates of every variable.
+
+        Example
+        -------
+        >>> neq = lambda a, b: a != b
+        >>> Language.supports(neq, (0, 0), [0], [{0, 1}])
+        [set()]
+        >>> Language.supports(neq, (0, 1), [0, 1], [{0, 1}, {1}])
+        [{0}, {1}]
+        """
+        position = {variable: k for k, variable in enumerate(variables)}
+        kept: list[set[int]] = [set() for _ in variables]
+        for values in product(*(candidates[i] for i in variables)):
+            if not predicate(*(values[position[i]] for i in scope)):
+                continue
+            for values_k, value in zip(kept, values):
+                values_k.add(value)
+            if all(len(values_k) == len(candidates[i])
+                   for values_k, i in zip(kept, variables)):
+                break
+        return kept
+
 
 def all_different(*values: int) -> bool:
     """ Whether the values are pairwise distinct. """
