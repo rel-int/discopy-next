@@ -16,6 +16,6 @@
 - [x] biclosed: BangOb(arg) a wire like Exp, Ty.bang, str/repr/eq/hash/serialisation, drawn !x
 - [x] biclosed: Bang(arg) a bubble like Curry, Diagram.bang, factories
 - [x] biclosed: Dereliction, Digging, Contraction, Weakening, Exchange, Laxator
-- [WIP] @session_01MEJxy2QJCwia83KHppaJ1H-2026-11-16 21:55 biclosed: Functor through cod.bang and the primitives, else ob_map/ar_map
+- [x] biclosed: Functor through cod.bang and the primitives, else ob_map/ar_map
 - [WIP] @session_01MEJxy2QJCwia83KHppaJ1H-2026-11-16 21:55 biclosed: the laws declared failing on the free category, testable.Bang, proptest cells, rigid's inherited cells
 - [WIP] @session_01MEJxy2QJCwia83KHppaJ1H-2026-11-16 21:55 tests in test/biclosed.py and test/abc.py, the brief's doctests, CHANGELOG
