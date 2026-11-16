@@ -26,6 +26,17 @@ Summary
 
     instance
     scopes
+    all_different
+    exactly_one
+    at_most_one
+    zero_or_two
+    disjunction
+    negation
+    sudoku
+    queens
+    cnf
+    maze_diagram
+    maze
 
 .. autosummary::
     :template: class.rst
@@ -259,3 +270,214 @@ class Language:
         ob_map: dict[cat.Ob, tensor.Dim] = {
             sort: tensor.Dim(size) for sort, size in self.sizes.items()}
         return tensor.Functor(ob_map, self.array, dtype=dtype, **params)
+
+
+def all_different(*values: int) -> bool:
+    """ Whether the values are pairwise distinct. """
+    return len(set(values)) == len(values)
+
+
+def exactly_one(*bits: int) -> bool:
+    """ Whether exactly one of the bits is set. """
+    return sum(bits) == 1
+
+
+def at_most_one(*bits: int) -> bool:
+    """ Whether at most one of the bits is set. """
+    return sum(bits) <= 1
+
+
+def zero_or_two(*bits: int) -> bool:
+    """ Whether none or two of the bits are set, i.e. a path goes through
+    a cell or it does not. """
+    return sum(bits) in (0, 2)
+
+
+def disjunction(*bits: int) -> bool:
+    """ Whether one of the bits is set, a clause on its literals. """
+    return any(bits)
+
+
+def negation(bit: int, other: int) -> bool:
+    """ Whether two bits differ, i.e. one is the negation of the other. """
+    return bit != other
+
+
+BIT = frobenius.Ty('bit')
+""" The sort of the Boolean variables, of size two. """
+
+
+def sudoku(n: int) -> tuple[frobenius.Hypergraph, Language]:
+    """
+    The sudoku of blocks of side ``n``: a variable per cell of the
+    ``n ** 2`` by ``n ** 2`` grid, with ``n ** 2`` values, the cells
+    numbered row by row, and ``AllDifferent`` on each row, column and
+    block.
+
+    Parameters:
+        n : The side of a block, 3 for the usual sudoku.
+
+    Example
+    -------
+    >>> graph, language = sudoku(2)
+    >>> len(graph.spider_types), len(graph.boxes)
+    (16, 12)
+    >>> language.functor(int)(graph)
+    Tensor[int]([288], dom=Dim(1), cod=Dim(1))
+    """
+    side, digit = n * n, frobenius.Ty('digit')
+    rows = [tuple(range(side * r, side * (r + 1))) for r in range(side)]
+    columns = [tuple(column) for column in zip(*rows)]
+    blocks = [tuple(rows[n * i + k][n * j + m]
+                    for k in range(n) for m in range(n))
+              for i in range(n) for j in range(n)]
+    constraints = [("AllDifferent", scope)
+                   for scope in rows + columns + blocks]
+    return instance(constraints, side * side * [digit]), Language(
+        {digit: side}, {"AllDifferent": all_different})
+
+
+def queens(n: int) -> tuple[frobenius.Hypergraph, Language]:
+    """
+    The ``n`` queens: a bit per square of the board, numbered row by row,
+    saying whether a queen is on it, ``ExactlyOne`` on each row and column
+    and ``AtMostOne`` on each diagonal of two squares or more.
+
+    Parameters:
+        n : The side of the board.
+
+    Example
+    -------
+    >>> graph, language = queens(4)
+    >>> len(graph.spider_types), len(graph.boxes)
+    (16, 18)
+    >>> sorted(language.solutions(graph))[0]
+    (0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0)
+    """
+    rows = [tuple(range(n * r, n * (r + 1))) for r in range(n)]
+    lines = rows + [tuple(column) for column in zip(*rows)]
+    diagonals = [
+        tuple(rows[r][c] for r in range(n) for c in range(n)
+              if (r - c if anti else r + c) == k)
+        for anti in (False, True) for k in range(-n + 1, 2 * n - 1)]
+    constraints = [("ExactlyOne", scope) for scope in lines] + [
+        ("AtMostOne", scope) for scope in diagonals if len(scope) > 1]
+    return instance(constraints, n * n * [BIT]), Language(
+        {BIT: 2}, {"ExactlyOne": exactly_one, "AtMostOne": at_most_one})
+
+
+def cnf(clauses: Sequence[Sequence[int]]
+        ) -> tuple[frobenius.Hypergraph, Language]:
+    """
+    A formula in conjunctive normal form, a clause a list of non-zero
+    integers as in DIMACS, ``-i`` the negation of the variable ``i``: a bit
+    per variable, numbered from zero, ``Or`` on the literals of each clause,
+    and each negated occurrence a fresh bit plugged to its variable through
+    ``Not``, the relation of two distinct bits. So ``Or`` is one symmetric
+    symbol at every arity, and the solutions are those of the formula, each
+    fresh bit being fixed by its variable. The instance numbers the bits as
+    they first occur, see :func:`instance`: here ``Not`` first, on the
+    second variable and its negation.
+
+    Parameters:
+        clauses : The clauses, each a list of literals.
+
+    Example
+    -------
+    >>> graph, language = cnf([[1, -2], [2, 3]])
+    >>> scopes(graph)
+    [('Not', (0, 1)), ('Or', (2, 1)), ('Or', (0, 3))]
+    >>> language.functor(int)(graph)
+    Tensor[int]([4], dom=Dim(1), cod=Dim(1))
+    """
+    n_variables = max((abs(literal) for clause in clauses
+                       for literal in clause), default=0)
+    constraints, fresh = [], n_variables
+    for clause in clauses:
+        scope = []
+        for literal in clause:
+            if literal > 0:
+                scope.append(literal - 1)
+                continue
+            constraints.append(("Not", (-literal - 1, fresh)))
+            scope.append(fresh)
+            fresh += 1
+        constraints.append(("Or", tuple(scope)))
+    return instance(constraints, fresh * [BIT]), Language(
+        {BIT: 2}, {"Or": disjunction, "Not": negation})
+
+
+def maze_diagram(grid: Sequence[str]) -> frobenius.Diagram:
+    """
+    The diagram of a maze drawn as the maze is: a box per walkable cell, a
+    wire per edge between two adjacent walkable cells, i.e. a bit saying
+    whether the path takes that edge. A row of the maze is a layer, a
+    vertical edge a wire down to the next row and a horizontal edge a cup
+    between two neighbours, so that the diagram is planar.
+
+    A cell with neighbours ``up``, ``left``, ``down``, ``right`` walkable
+    is ``Box(name, bit ** up, bit ** (left + down + right))``, named after
+    its character: ``S`` the start, ``G`` the goal, ``.`` any other.
+
+    Parameters:
+        grid : The rows of the maze, ``#`` a wall.
+
+    Example
+    -------
+    >>> grid = ["S..#.",
+    ...         "##.#.",
+    ...         ".....",
+    ...         ".###.",
+    ...         "..G#."]
+    >>> maze_diagram(grid).draw(
+    ...     wire_labels=False, figsize=(5, 5),
+    ...     doctest='docs/_static/csp/maze.svg')
+
+    .. image:: /_static/csp/maze.svg
+        :align: center
+    """
+    def walkable(r, c):
+        return 0 <= r < len(grid) and 0 <= c < len(grid[r])\
+            and grid[r][c] != '#'
+    diagram = frobenius.Id()
+    for r, row in enumerate(grid):
+        boxes, plumbing = frobenius.Id(), frobenius.Id()
+        for c, char in enumerate(row):
+            if char == '#':
+                continue
+            up, left, down, right = (walkable(r + i, c + j) for i, j in (
+                (-1, 0), (0, -1), (1, 0), (0, 1)))
+            boxes @= frobenius.Box(
+                char, BIT ** up, BIT ** (left + down + right))
+            plumbing @= (frobenius.Cup(BIT, BIT) if left else frobenius.Id())\
+                @ BIT ** down
+        diagram >>= (boxes >> plumbing).foliation()
+    return diagram
+
+
+def maze(grid: Sequence[str]) -> tuple[frobenius.Hypergraph, Language]:
+    """
+    The maze of :func:`maze_diagram` as an instance: a bit per edge, and on
+    the edges of each cell ``ExactlyOne`` at the start and the goal,
+    ``ZeroOrTwo`` anywhere else. When the walkable cells form a tree, its
+    one solution is the path from the start to the goal. With a cycle the
+    constraints also take the path with any disjoint loops beside it.
+
+    Parameters:
+        grid : The rows of the maze, ``#`` a wall.
+
+    Example
+    -------
+    >>> graph, language = maze(["S..#.",
+    ...                         "##.#.",
+    ...                         ".....",
+    ...                         ".###.",
+    ...                         "..G#."])
+    >>> len(graph.spider_types), len(graph.boxes)
+    (16, 17)
+    >>> language.functor(int)(graph)
+    Tensor[int]([1], dom=Dim(1), cod=Dim(1))
+    """
+    graph = frobenius.Hypergraph.from_diagram(maze_diagram(grid))
+    return graph, Language({BIT: 2}, {
+        'S': exactly_one, 'G': exactly_one, '.': zero_or_two})

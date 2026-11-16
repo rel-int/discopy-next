@@ -1,9 +1,12 @@
+import itertools
+
 import numpy as np
+import pytest
 from hypothesis import given, settings, strategies as st
 from pytest import raises
 
 from discopy import frobenius
-from discopy.csp import Language, instance, scopes
+from discopy.csp import Language, instance, scopes, sudoku, queens, cnf, maze
 
 X, Y = frobenius.Ty('x'), frobenius.Ty('y')
 SIZES = {X: 2, Y: 3}
@@ -140,3 +143,91 @@ def test_a_daggered_box_is_its_relation_reversed():
     assert list(language.solutions(graph)) == [(1, 0)]
     assert np.array_equal(
         np.asarray(language.functor(bool)(graph).array), [True, False])
+
+
+def test_sudoku_9x9_sizes():
+    """ The 9x9 sudoku has 81 variables, 27 scopes of 9 and 810 edges in
+    the primal graph of its scopes, each cell with 20 peers. """
+    from discopy.neural.wiring import primal
+    graph, _ = sudoku(3)
+    constraints = scopes(graph)
+    assert len(graph.spider_types) == 81 and len(constraints) == 27
+    assert {len(scope) for _, scope in constraints} == {9}
+    peers = primal([scope for _, scope in constraints], 81)
+    assert {len(row) for row in peers} == {20}
+    assert sum(map(len, peers)) // 2 == 810
+
+
+def test_sudoku_4x4_counts_288():
+    graph, language = sudoku(2)
+    assert language.functor(int)(graph).array.item() == 288
+
+
+@pytest.mark.parametrize("n, count", [(4, 2), (5, 10), (6, 4)])
+def test_queens_counts(n, count):
+    """ 2, 10 and 4 solutions: by the functor up to 5, by backtracking at 6,
+    whose contraction takes seconds. """
+    graph, language = queens(n)
+    assert len(list(language.solutions(graph))) == count
+    if n <= 5:
+        assert language.functor(int)(graph).array.item() == count
+
+
+def test_queens_has_no_padding():
+    graph, _ = queens(5)
+    arities = sorted(len(scope) for _, scope in scopes(graph))
+    assert arities == 4 * [2] + 4 * [3] + 4 * [4] + 12 * [5]
+
+
+@settings(max_examples=40, deadline=None)
+@given(st.integers(1, 4).flatmap(lambda n: st.lists(st.lists(
+    st.integers(1, n).flatmap(lambda i: st.sampled_from([i, -i])),
+    min_size=0, max_size=3), max_size=4)))
+def test_cnf_counts_the_truth_table(clauses):
+    """ A formula has as many solutions as its truth table has satisfying
+    rows. """
+    graph, language = cnf(clauses)
+    n = max((abs(literal) for clause in clauses for literal in clause),
+            default=0)
+    rows = sum(all(any(row[abs(i) - 1] == (i > 0) for i in clause)
+                   for clause in clauses)
+               for row in itertools.product((False, True), repeat=n))
+    assert language.functor(int)(graph).array.item() == rows
+    assert len(list(language.solutions(graph))) == rows
+
+
+def test_cnf_needs_negation_to_be_distinct():
+    """ With ``Not`` read as equality, the counting law fails: ``x`` and
+    ``not x`` have no solution, but one when the fresh bit equals ``x``. """
+    graph, language = cnf([[1], [-1]])
+    assert language.functor(int)(graph).array.item() == 0
+    equality = Language(language.sizes, dict(
+        language.predicates, Not=lambda bit, other: bit == other))
+    assert equality.functor(int)(graph).array.item() == 1
+
+
+MAZE = ["S..#.",
+        "##.#.",
+        ".....",
+        ".###.",
+        "..G#."]
+
+
+def test_maze_has_one_solution_the_path():
+    graph, language = maze(MAZE)
+    assert len(graph.boxes) == 17 and len(graph.spider_types) == 16
+    assert all(len(ports) == 2 for ports in map(
+        lambda wires: wires[0] | wires[1], graph.spider_wires))
+    (solution, ) = language.solutions(graph)
+    on_path = [any(solution[i] for i in scope) for _, scope in scopes(graph)]
+    assert sum(solution) == 10 and sum(on_path) == 11
+    assert language.functor(int)(graph).array.item() == 1
+
+
+def test_maze_with_a_cycle_takes_loops_beside_the_path():
+    """ With a cycle off the path, the constraints also take the path with
+    the loop beside it, as the docstring of :func:`maze` says. """
+    graph, language = maze(["S.#..",
+                            "#.#..",
+                            "#.G##"])
+    assert language.functor(int)(graph).array.item() == 2
