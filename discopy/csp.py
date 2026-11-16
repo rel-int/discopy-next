@@ -65,6 +65,12 @@ def instance(
     The instance with a variable of each sort, a box for each constraint
     plugged on its scope and the given variables as its outputs.
 
+    A hypergraph is equal to any renaming of its spiders, and numbers them
+    as they first occur on its ports: the scopes in order, then its
+    outputs, then the variables on no port. So the variables keep their
+    numbers when they first occur in that order, as in this example, and
+    are renamed otherwise.
+
     Parameters:
         constraints : A symbol and a scope for each constraint.
         sorts : The sort of each variable, an atomic type.
@@ -79,6 +85,8 @@ def instance(
 frobenius.Wire('y'))), frobenius.Box('S', frobenius.Ty(), \
 frobenius.Ty(frobenius.Wire('y'))))
     >>> assert scopes(graph) == [("R", (0, 1)), ("S", (1, ))]
+    >>> scopes(instance([("R", (1, 0))], [y, x]))
+    [('R', (0, 1))]
     """
     sorts = tuple(sorts)
     for sort in sorts:
