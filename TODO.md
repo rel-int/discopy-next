@@ -9,4 +9,4 @@
 - [x] unit tests in test/egraph.py, including Copy(x) >> g
 - [x] measure the join against EGraph.matches on the largest trace
 - [x] CHANGELOG bullet under Added
-- [WIP] @session_01MEJxy5XXNWvvBFsNYRgcmW-2026-11-16 00:28 the gates of CONTRIBUTING.md's Run the unit tests
+- [x] the gates of CONTRIBUTING.md's Run the unit tests
