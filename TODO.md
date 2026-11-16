@@ -4,5 +4,5 @@ USER, 2026-11-16, on the tool paper of #564, whose rulings on its source are: Ty
 
 - [x] paper/: the template, the transpiler from Typst to LaTeX and the build that runs the listings and draws the figures with both backends
 - [x] test/paper.py and the paper workflow, both PDFs built in CI
-- [ ] the introduction and the method section, the other sections as stated gaps
+- [WIP] @session_01MEJxy4FrWd3ymhMeQGF7x8-2026-11-16 23:28 the introduction and the method section, the other sections as stated gaps
 - [ ] CONTRIBUTING and AGENTS, the references, changelog entry, next-checks
