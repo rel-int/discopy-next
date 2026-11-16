@@ -1099,6 +1099,8 @@ class Backend(ABC):
         if box.is_conjugate or box.is_transpose:
             asymmetry *= -1
         points[i] = points[i].shift(x=asymmetry)
+        if box.shape == "triangle":
+            points = self.triangle_corners(positions, node)
         self.draw_polygon(*points, facecolor=box.color)
         if params.get('draw_box_labels', True):
             adaptive = self.is_transparent(box.color)
@@ -1108,6 +1110,51 @@ class Backend(ABC):
                                "white" if adaptive else box.color),
                            fontsize=params.get('fontsize', None),
                            adaptive=adaptive)
+
+    @staticmethod
+    def triangle_corners(positions, node):
+        """
+        The corners of a box drawn as a triangle, i.e. with ``shape``
+        ``"triangle"``: its base the width of the side with more wires, its
+        apex on the other side, at the wire when there is one. With two or
+        more wires on both sides, the apex is cut to the span of its wires.
+
+        The apex points down when the codomain has fewer wires, or as many
+        and the box is flipped upside down by neither a dagger nor a half
+        turn, i.e. a transpose, so that both flip it and a conjugate, their
+        composite, does not.
+
+        Example
+        -------
+        >>> from discopy.monoidal import Ty, Box
+        >>> x = Ty('x')
+        >>> merge = Box('t', x ** 2, x, shape="triangle").to_drawing()
+        >>> merge.add_box_corners()
+        >>> node, = (n for n in merge.positions if n.kind == "box")
+        >>> Backend.triangle_corners(merge.positions, node)
+        [Point(x=0.25, y=0.75), Point(x=1.75, y=0.75), Point(x=1.0, y=0.25)]
+
+        >>> t = Box('t', x ** 3, x, shape="triangle")
+        >>> (t >> t[::-1]).draw(doctest='docs/_static/drawing/triangle.svg')
+
+        .. image:: /_static/drawing/triangle.svg
+            :align: center
+        """
+        box, j = node.box, node.j
+        (left, bottom), (right, top) = (
+            positions[Node(f"box-corner-{c}", j=j)] for c in ["00", "11"])
+        flipped = (
+            box.is_dagger + bool(box.is_transpose) + box.is_conjugate) % 2
+        down = len(box.cod) < len(box.dom) or (
+            len(box.cod) == len(box.dom) and not flipped)
+        side, base, apex = ("box_cod", top, bottom) if down\
+            else ("box_dom", bottom, top)
+        xs = [positions[Node(side, i=i, j=j, x=x)][0]
+              for i, x in enumerate(box.cod if down else box.dom)]
+        tips = [min(xs), max(xs)] if xs else [positions[node][0]]
+        tips = tips[:1] if tips[0] == tips[-1] else tips
+        return [Point(left, base), Point(right, base)] + [
+            Point(x, apex) for x in reversed(tips)]
 
     def draw_discard(self, positions, node, **params):
         """ Draws a :class:`discopy.quantum.circuit.Discard` box. """

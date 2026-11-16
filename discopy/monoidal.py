@@ -2074,6 +2074,22 @@ class Box(cat.Box, Diagram):
             else (self.layer_factory(self, normalise=False), )
         Diagram.__init__(self, inside, dom, cod)
 
+    def rebuild(self, **changes):
+        """
+        Rebuild a box, keeping the drawing attributes it was given that its
+        constructor does not set, e.g. so that a dagger keeps its shape.
+
+        >>> x = Ty('x')
+        >>> merge = Box('t', x @ x, x, shape="triangle", color="red")
+        >>> assert merge.dagger().shape == "triangle"
+        >>> assert merge.dagger().dagger().color == "red"
+        """
+        box = super().rebuild(**changes)
+        for attr in BOX_DRAWING_ATTRIBUTES:
+            if attr in vars(self) and attr not in vars(box):
+                setattr(box, attr, getattr(self, attr))
+        return box
+
     is_identity = False
 
     @classmethod
