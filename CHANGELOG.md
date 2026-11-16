@@ -15,6 +15,9 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   (`Backend.triangle_corners`). A box's dagger, and any box `rebuild` makes,
   keeps the drawing attributes it was given, its `color` and `shape`
   ([next#568]).
+- A box is drawn as high as its `height`, its outline meeting its wires: the
+  layout already stacked layers by it, but the outline was always half a
+  wire high ([next#570]).
 - `csp.Language.propagate`, arc consistency: a set of candidates per
   variable, kept to the values each constraint supports, until no set
   shrinks or for a number of rounds. It removes no value a solution takes,
@@ -2003,6 +2006,7 @@ for the changelog of `1.2.1` and earlier.
 [next#557]: https://github.com/rel-int/discopy-next/pull/557
 [next#558]: https://github.com/rel-int/discopy-next/pull/558
 [next#568]: https://github.com/rel-int/discopy-next/pull/568
+[next#570]: https://github.com/rel-int/discopy-next/pull/570
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#56]: https://github.com/rel-int/optyx/pull/56
