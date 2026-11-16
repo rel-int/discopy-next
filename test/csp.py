@@ -322,7 +322,8 @@ def test_propagate_from_given_domains():
     solution has it. """
     language = Language({X: 4}, {"lt": lambda a, b: a < b})
     chain = instance([("lt", (0, 1)), ("lt", (1, 2))], 3 * [X])
-    assert language.propagate(chain, [{1}, set(range(4)), set(range(4))])\
-        == [{1}, {2}, {3}]
+    clues = [{1}, set(range(4)), set(range(4))]
+    assert language.propagate(chain, clues) == [{1}, {2}, {3}]
+    assert clues == [{1}, set(range(4)), set(range(4))]
     assert language.propagate(chain, [{2}, set(range(4)), set(range(4))])\
         == [set(), set(), set()]
