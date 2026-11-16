@@ -464,7 +464,8 @@ which to_drawing recomputes.
         >>> from discopy.monoidal import Ty, Box
         >>> x = Ty('x')
         >>> f, g = Box('f', x, x, height=2), Box('g', x, x)
-        >>> (f @ g >> g @ f).draw(doctest='docs/_static/drawing/box-height.svg')
+        >>> (f @ g >> g @ f).draw(
+        ...     doctest='docs/_static/drawing/box-height.svg')
 
         .. image:: /_static/drawing/box-height.svg
             :align: center
