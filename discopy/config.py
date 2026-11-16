@@ -74,6 +74,7 @@ BOX_DRAWING_ATTRIBUTES: dict[str, Callable[[Any], Any]] = {
     "controlled": lambda _: None,  # Used for drawing controlled gates.
     "distance": lambda _: None,  # Used for drawing controlled gates.
     "_digits": lambda _: None,  # Used for drawing brakets.
+    # "circle" for a spider, "triangle" for a box drawn as a triangle.
     "shape": lambda box:
         "circle" if getattr(box, "draw_as_spider", False) else None,
     "color": lambda box:
