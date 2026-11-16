@@ -38,6 +38,7 @@ Summary
 
 from __future__ import annotations
 
+import os
 from collections import Counter
 from concurrent.futures import ProcessPoolExecutor
 from itertools import islice
@@ -148,13 +149,15 @@ def tensor(images: np.ndarray) -> torch.Tensor:
 
 def train(data: dict, seed=0, epochs=6, batch=16, lr=2e-3, log=print,
           pixel: PixelNet | None = None, module: ModuleNet | None = None,
-          threads: int | None = None):
+          threads: int | None = None, checkpoint: str | None = None):
     """
     Train a :class:`PixelNet` and a :class:`ModuleNet` on a
     :func:`dataset`, with AdamW and a one-cycle schedule, background pixels
     weighted a tenth as much as the others, on ``threads`` threads: more
     than the free cores slows it down many times. Deterministic given
-    ``seed`` and the threads.
+    ``seed`` and the threads. With a ``checkpoint`` path, the networks, the
+    optimiser, the schedule and the random states are saved there after
+    each epoch, and training resumes from it when it exists.
     """
     if threads is not None:
         torch.set_num_threads(threads)
@@ -166,8 +169,15 @@ def train(data: dict, seed=0, epochs=6, batch=16, lr=2e-3, log=print,
     schedule = torch.optim.lr_scheduler.OneCycleLR(optimiser, lr, steps)
     weight = torch.ones(len(LABELS))
     weight[0] = .1
-    rng = np.random.default_rng(seed)
-    for epoch in range(epochs):
+    rng, first = np.random.default_rng(seed), 0
+    if checkpoint is not None and os.path.exists(checkpoint):
+        state = torch.load(checkpoint, weights_only=False)
+        for name, part in [("pixel", pixel), ("module", module),
+                           ("optimiser", optimiser), ("schedule", schedule)]:
+            part.load_state_dict(state[name])
+        rng.bit_generator.state, first = state["rng"], state["epoch"] + 1
+        torch.set_rng_state(state["torch"])
+    for epoch in range(first, epochs):
         order, total = rng.permutation(len(data["images"])), 0.
         for i in range(0, len(order) - batch + 1, batch):
             index = order[i:i + batch]
@@ -182,6 +192,14 @@ def train(data: dict, seed=0, epochs=6, batch=16, lr=2e-3, log=print,
             schedule.step()
             total += loss.item()
         log(f"epoch {epoch}: loss {total / (len(order) // batch):.4f}")
+        if checkpoint is not None:
+            torch.save({
+                "pixel": pixel.state_dict(), "module": module.state_dict(),
+                "optimiser": optimiser.state_dict(),
+                "schedule": schedule.state_dict(), "epoch": epoch,
+                "rng": rng.bit_generator.state,
+                "torch": torch.get_rng_state()}, checkpoint + ".part")
+            os.replace(checkpoint + ".part", checkpoint)
     return pixel.eval(), module.eval()
 
 
