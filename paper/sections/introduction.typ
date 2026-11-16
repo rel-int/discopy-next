@@ -20,8 +20,9 @@ method.
 
 - *Syntax* (@sec:syntax) is every free category. The hierarchy gained
   three levels, `feedback`, `spacial` and `comarkov`, and diagrams gained
-  coloured regions, so that they are the 2-cells of a free premonoidal
-  2-category. Beside `Diagram` and `Hypergraph` there are two more data
+  coloured regions: a wire has a colour on either side, and diagrams
+  compose along a colour as well as along a type. Beside `Diagram` and
+  `Hypergraph` there are two more data
   structures for the same terms, `Term` for the lambda calculus of closed
   categories and `CMap` for diagrams in compact categories with their
   embedding in a surface. Rewriting is by double pushout, on hypergraphs
