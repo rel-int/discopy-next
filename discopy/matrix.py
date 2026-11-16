@@ -87,6 +87,7 @@ class Matrix[dtype](
             noise
             basis
             repeat
+            resolvent
             trace
             lambdify
             subs
@@ -639,14 +640,58 @@ class Matrix[dtype](
             result, length = result >> result, 2 * length
         return result
 
+    def resolvent(self) -> Matrix:
+        """
+        The inverse of ``id - self`` for a square matrix over a field, i.e.
+        with ``float`` or ``complex`` entries: where the sum of the powers of
+        ``self`` converges, e.g. when it is nilpotent, the resolvent is that
+        sum, the analogue over a field of :meth:`repeat`.
+
+        Raises:
+            TypeError : When the matrix is not square or its entries do not
+                form a field, e.g. integers, whose inverses need not be.
+            ValueError : When ``id - self`` is singular.
+
+        Example
+        -------
+        >>> Matrix[float]([0, 1, 0, 0], 2, 2).resolvent()
+        Matrix[float]([1., 1., 0., 1.], dom=Nat(2), cod=Nat(2))
+        >>> Matrix[float]([1], 1, 1).resolvent()
+        Traceback (most recent call last):
+            ...
+        ValueError: Matrix[float]([1.], dom=Nat(1), cod=Nat(1)) has no \
+resolvent: the trace over a field is partial, defined when id - D is invertible.
+        """
+        import numpy
+        if self.dom != self.cod or not isinstance(self.dtype, type)\
+                or not issubclass(self.dtype, (float, complex, numpy.inexact)):
+            raise TypeError(messages.MATRIX_RESOLVENT_ERROR)
+        with backend() as np:
+            difference = self.id(self.dom).array - self.array
+            if index(self.dom) and not np.linalg.matrix_rank(
+                    difference) == index(self.dom):
+                raise ValueError(messages.MATRIX_SINGULAR.format(self))
+            return type(self)(np.linalg.inv(difference), self.dom, self.cod)
+
     def trace(self, n=1, left=False) -> Matrix:
         """
-        The trace of a Boolean matrix, computed with :meth:`Matrix.repeat`.
+        The partial trace of a matrix, i.e. for ``f: dom @ n -> cod @ n``
+        with blocks ``A: dom -> cod``, ``B: dom -> n``, ``C: n -> cod`` and
+        ``D: n -> n``, the matrix ``A + B >> D* >> C``, where ``D*`` is the
+        :meth:`repeat` of a Boolean matrix and the :meth:`resolvent` of a
+        matrix over a field. The latter is the trace of Haghverdi and Scott,
+        a partial trace defined when ``id - D`` is invertible, see
+        :cite:t:`MalherbeEtAl11`, Definition 3.11: when ``D`` is nilpotent it
+        is the sum over the unrollings ``A + B >> D ** k >> C``.
 
         Parameters:
             n : The number of dimensions to trace.
             left : Whether to trace the first ``n`` dimensions rather than
                 the last, by conjugating with swaps.
+
+        Raises:
+            TypeError : When the entries are neither Booleans nor a field.
+            ValueError : When ``id - D`` is singular.
 
         Example
         -------
@@ -654,6 +699,12 @@ class Matrix[dtype](
         >>> f = Matrix[bool]([[1, 1], [0, 0]], 2, 2)
         >>> assert f.trace() == Matrix[bool]([[1]], 1, 1)
         >>> assert f.trace(left=True) == Matrix[bool]([[0]], 1, 1)
+
+        Over a field, ``0.5 + 1 * (1 - 0.25) ** -1 * 1 == 0.5 + 4 / 3``:
+
+        >>> g = Matrix[float]([[0.5, 1], [1, 0.25]], 2, 2)
+        >>> assert g.trace().is_close(Matrix[float]([[0.5 + 4 / 3]], 1, 1))
+        >>> assert Matrix[float].swap(1, 1).trace() == Matrix[float].id(1)
         """
         dom, cod = index(self.dom) - n, index(self.cod) - n
         if left:
@@ -663,7 +714,8 @@ class Matrix[dtype](
                                   self.ones(dom) @ self.id(n)]
                       for column in [self.id(cod) @ self.discard(n),
                                      self.discard(cod) @ self.id(n)])
-        return A + (B >> D.repeat() >> C)
+        star = D.repeat() if self.dtype == bool else D.resolvent()
+        return A + (B >> star >> C)
 
     def lambdify(
             self, *symbols: "sympy.Symbol", dtype=None, **kwargs) -> Callable:
