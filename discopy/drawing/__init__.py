@@ -16,6 +16,7 @@ from discopy.drawing import backend, drawing
 from discopy.drawing.backend import (
     Backend,
     TikZ,
+    Typst,
     Matplotlib,
     ATTRIBUTES,
     DEFAULT,
@@ -70,7 +71,8 @@ def draw(diagram, **params):
         Where to save the image, if `None` we call :code:`plt.show()`.
     format : str, optional
         Format of the saved image, taken from the extension of :code:`path`
-        when it is a file name, required when it is an in-memory buffer.
+        when it is a file name, required when it is an in-memory buffer;
+        :code:`"typst"` draws with the :class:`Typst` backend.
     doctest : str, optional
         Path to a documentation image used as a drawing baseline: the
         image is created if missing and compared against otherwise, or
@@ -88,6 +90,33 @@ def draw(diagram, **params):
         braid, :code:`0` otherwise.
     """
     return diagram.to_drawing().draw(**params)
+
+
+def to_typst(diagram, **params):
+    """
+    Convert a diagram to a Typst Document AST.
+
+    Parameters
+    ----------
+    diagram : Diagram
+        The diagram to convert.
+    params : Passed to :class:`Typst`.
+
+    Returns
+    -------
+    doc : Document
+        A Typst Document AST that can be rendered to source text or SVG.
+
+    Example
+    -------
+    >>> from discopy.monoidal import Ty, Box
+    >>> f = Box('f', Ty('x'), Ty('y'))
+    >>> doc = to_typst(f)
+    >>> source = doc.render()
+    >>> assert 'import "@preview/cetz' in source
+    >>> assert 'bezier' in source or 'line' in source
+    """
+    return diagram.to_drawing().to_typst(**params)
 
 
 def to_gif(diagram, *diagrams, **params):  # pragma: no cover
