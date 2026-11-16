@@ -53,6 +53,7 @@ class Alias(MetaPathFinder, Loader):
     """
     def find_spec(self, fullname, path=None, target=None):
         """ The spec of a submodule of ``discopy.grammar``, else ``None``. """
+        # pylint: disable=unused-argument  # the name alone finds the module
         if fullname.startswith(__name__ + "."):
             return spec_from_loader(fullname, self)
         return None
