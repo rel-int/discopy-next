@@ -50,6 +50,7 @@ from torch.nn import functional as F
 
 from discopy.drawing import picture
 from discopy.drawing.picture import LABELS, MODULES
+from discopy.utils import AxiomError
 
 
 class Rounds(nn.Sequential):
@@ -244,7 +245,8 @@ def recovered(mask, module: str, diagram) -> bool:
     """ Whether a mask decodes to a diagram, up to the module's axioms. """
     try:
         return picture.equal(picture.decode(mask, module), diagram, module)
-    except (ValueError, IndexError, NotImplementedError, AssertionError):
+    except (AxiomError, ValueError, IndexError, NotImplementedError,
+            AssertionError):
         return False
 
 
