@@ -1146,7 +1146,9 @@ def test_foliations_of_states_and_effects():
     assert [str(d) for d in (cup >> x @ s @ x >> f @ x @ x).foliations()]\
         == ["cup >> f @ s @ x"]
     diagram = s @ s >> f @ x >> e @ e
-    for foliation in diagram.foliations():
+    foliations = diagram.foliations()
+    assert foliations
+    for foliation in foliations:
         assert sorted(map(str, foliation.boxes)) == ["e", "e", "f", "s", "s"]
         assert (foliation.dom, foliation.cod) == (diagram.dom, diagram.cod)
         for upper, lower in zip(foliation.inside, foliation.inside[1:]):
