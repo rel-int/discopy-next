@@ -1795,8 +1795,8 @@ class Diagram(cat.Arrow, MonoidalCategory, RichDisplay):
             if not box.dom and 0 < offset < len(wires)\
                     and wires[offset - 1] == wires[offset]:
                 inputs = [wires[offset]]
+            wires[offset:offset + len(box.dom)] = len(box.cod) * [len(result)]
             result.append(tuple(sorted({i for i in inputs if i is not None})))
-            wires[offset:offset + len(box.dom)] = len(box.cod) * [len(result) - 1]
         return tuple(result)
 
     @staticmethod
