@@ -6,4 +6,4 @@
 
 - [x] merge discopy/discopy#467's head `38403e40` as a merge commit, its commits kept, each conflict resolved once
 - [ ] the Typst tests and every gate of next-checks pass on the merged tree
-- [WIP] @session_01MEJxy4FrWd3ymhMeQGF7x8-2026-11-16 21:01 CHANGELOG.md bullet under [Unreleased], its links defined
+- [x] CHANGELOG.md bullet under [Unreleased], its links defined
