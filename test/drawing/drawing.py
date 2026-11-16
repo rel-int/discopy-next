@@ -634,6 +634,13 @@ def test_snake_equation_to_tikz():
     return Equation(Id(x.r).transpose(left=True), Id(x), Id(x.l).transpose())
 
 
+@tikz_and_compare("triangle.tikz")
+def test_triangle_to_tikz():
+    x = Ty('x')
+    merge = Box("t", x ** 2, x, shape="triangle")
+    return merge >> merge[::-1]
+
+
 @tikz_and_compare("who-ansatz.tikz")
 def test_who_ansatz_to_tikz():
     from discopy.grammar.pregroup import Ty, Cap, Word, Id, Box
