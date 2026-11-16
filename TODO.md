@@ -6,4 +6,4 @@
 
 - [x] read port positions by index, so tuples work: test a controlled triangle
 - [x] apex of an equal-arity triangle flips with dagger and transpose, not conjugate: test f, f.r, f.dagger(), f.conjugate()
-- [ ] merge main
+- [x] merge main
