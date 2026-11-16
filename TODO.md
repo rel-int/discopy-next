@@ -4,6 +4,6 @@
 >
 > The upstream pull request is discopy/discopy#467, "Add proper Typst rendering backend" (0x0f0f0f, draft, head `38403e40`). The paper is the tool paper of #564.
 
-- [WIP] @session_01MEJxy4FrWd3ymhMeQGF7x8-2026-11-16 20:55 merge discopy/discopy#467's head `38403e40` as a merge commit, its commits kept, each conflict resolved once
+- [x] merge discopy/discopy#467's head `38403e40` as a merge commit, its commits kept, each conflict resolved once
 - [ ] the Typst tests and every gate of next-checks pass on the merged tree
 - [ ] CHANGELOG.md bullet under [Unreleased], its links defined
