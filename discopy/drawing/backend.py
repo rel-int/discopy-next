@@ -52,6 +52,9 @@ from PIL import Image, ImageSequence
 
 from discopy import config
 from discopy.drawing import Node, Point
+from discopy.drawing.typst_ast import (
+    Bool, Call, Canvas, ContentExpr, Coord, Document, Float, Ident,
+    Import, RawText, Str, TypstNode)
 
 from discopy.config import (  # noqa: F401  pylint: disable=unused-import
     BOX_DRAWING_ATTRIBUTES as ATTRIBUTES,
@@ -1671,23 +1674,16 @@ class Typst(Backend):
         return text, False
 
     def coord(self, x, y):
-        from discopy.drawing.typst_ast import Coord
-
         return Coord(x, y)
 
     def stroke(self, color="black", linewidth=None):
-        from discopy.drawing.typst_ast import Ident
-
         lw = self.linewidth if linewidth is None else linewidth
         return Ident(
             f"{self.color_expr(self.format_color(color))} + {lw:g}pt")
 
     def draw_text(self, text, i, j, **params):
-        from discopy.drawing.typst_ast import (
-            Call, ContentExpr, Float, Ident, Str)
-
         colour = params.get("color", None)
-        extra = {}
+        extra: dict[str, TypstNode] = {}
         if colour and colour != "black":
             extra["fill"] = Ident(self.color_expr(self.format_color(colour)))
         # Wire labels use va='top' (see draw_wire_label); park them to the
@@ -1711,8 +1707,6 @@ class Typst(Backend):
     def draw_polygon(self, *points,
                      facecolor=DEFAULT["facecolor"],
                      edgecolor=DEFAULT["edgecolor"]):
-        from discopy.drawing.typst_ast import Bool, Call, Ident
-
         coords = [self.coord(*p) for p in points]
         kwargs = {"close": Bool(True)}
         if facecolor is None or facecolor == "none":
@@ -1728,9 +1722,7 @@ class Typst(Backend):
         super().draw_polygon(*points)
 
     def draw_wire(self, source, target, bend_out=False, bend_in=False,
-                  style=None, linewidth=None):
-        from discopy.drawing.typst_ast import Call, Ident
-
+                  style=None, linewidth=None, adaptive=True):
         cps = wire_bezier_points(source, target, bend_out, bend_in)
         stroke = self.stroke("black", linewidth)
         if cps is not None:
@@ -1757,9 +1749,7 @@ class Typst(Backend):
             )
         super().draw_wire(source, target, bend_out=bend_out, bend_in=bend_in)
 
-    def draw_bezier(self, points):
-        from discopy.drawing.typst_ast import Call, Ident
-
+    def draw_bezier(self, points, adaptive=True):
         s, e, c1, c2 = points
         self.body.append(
             Call(
@@ -1772,8 +1762,6 @@ class Typst(Backend):
         super().draw_bezier(points)
 
     def draw_spiders(self, graph, draw_box_labels=True, **params):
-        from discopy.drawing.typst_ast import Call, ContentExpr, Float, Ident
-
         for node in graph.nodes:
             if node.kind != "box" or not node.box.draw_as_spider:
                 continue
@@ -1818,9 +1806,6 @@ class Typst(Backend):
         super().draw_regions(graph, **params)
 
     def to_document(self, **params):
-        from discopy.drawing.typst_ast import (
-            Canvas, Document, Ident, Import, RawText)
-
         # Auto-crop the page so SVG viewBox hugs the diagram instead of
         # shipping an empty A4 sheet (which shrinks wires to invisibility).
         margin = params.get("page_margin", "0.2cm")
@@ -1853,9 +1838,7 @@ class Typst(Backend):
         try:
             import typst
 
-            svg = typst.compile(
-                {"main.typ": source.encode()}, format="svg", pretty=True
-            )
+            svg = typst.compile(source.encode(), format="svg", pretty=True)
         except ImportError:  # pragma: no cover
             raise ImportError(
                 "Typst rendering requires the 'typst' package. "

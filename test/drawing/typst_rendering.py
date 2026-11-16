@@ -5,7 +5,7 @@ import os
 import pytest
 
 from discopy.monoidal import Ty, Box
-from discopy.symmetric import Swap
+from discopy.symmetric import Ty as STy, Swap
 from discopy.rigid import Ty as RTy, Cup, Cap, Id
 from discopy.braided import Braid
 from discopy.frobenius import Ty as FTy, Spider
@@ -60,7 +60,7 @@ def test_tensor_to_typst():
 
 @typst_and_compare("swap.typ")
 def test_swap_to_typst():
-    x = Ty("x")
+    x = STy("x")
     return Swap(x, x)
 
 
