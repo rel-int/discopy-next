@@ -1,7 +1,3 @@
-import pytest
-
-pytest.importorskip("opt_einsum")
-
 import numpy as np
 from hypothesis import given, settings, strategies as st
 from pytest import raises
@@ -124,3 +120,11 @@ def test_a_box_bent_to_have_inputs_is_the_same_constraint(problem, data):
     assert np.array_equal(
         np.asarray(language.functor(int)(bent).array),
         np.asarray(language.functor(int)(graph).array))
+
+
+def test_holds_refuses_an_assignment_off_the_domains():
+    language = Language({X: 2}, {"eq": lambda a, b: a == b})
+    graph = instance([("eq", (0, 1))], [X, X])
+    assert not language.holds(graph, (2, 2))
+    assert not language.holds(graph, (1, 1, 1))
+    assert not language.holds(graph, (1, ))

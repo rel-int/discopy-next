@@ -105,12 +105,13 @@ def scopes(graph: frobenius.Hypergraph) -> list[Constraint]:
     """
     The symbol and the scope of each constraint of an instance, so that
     ``instance(scopes(graph), graph.spider_types, graph.cod_wires)`` is the
-    instance itself.
+    instance itself when its boxes have no input.
 
     A box may also have inputs, bent into outputs as a hypergraph category
     allows: its scope is the variables on its inputs, then on its outputs,
     so that a diagram drawn in the plane, e.g. a maze with a wire per edge,
-    reads as the instance it draws.
+    reads as the instance it draws. Rebuilt by :func:`instance`, its boxes
+    have no input: the scopes are the same, the hypergraph is not.
 
     Parameters:
         graph : An instance, a hypergraph with no input.
@@ -169,15 +170,19 @@ class Language:
               assignment: Sequence[int]) -> bool:
         """
         Whether an assignment, a value for each variable, satisfies every
-        constraint of an instance.
+        constraint of an instance: not when it has a value for too many or
+        too few variables, or one outside the domain of its sort.
 
         Parameters:
             graph : The instance.
             assignment : The value of each variable, in order.
         """
-        return all(
-            self.predicates[name](*(assignment[i] for i in scope))
-            for name, scope in scopes(graph))
+        sorts = graph.spider_types
+        return len(assignment) == len(sorts) and all(
+            value in self.domain(sort)
+            for value, sort in zip(assignment, sorts)) and all(
+                self.predicates[name](*(assignment[i] for i in scope))
+                for name, scope in scopes(graph))
 
     def solutions(self, graph: frobenius.Hypergraph) -> Iterator[tuple]:
         """
