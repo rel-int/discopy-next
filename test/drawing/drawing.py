@@ -1042,3 +1042,12 @@ def test_Drawing_equality_compares_wires():
         wires.width, wires.height)
     crossed.validate_attributes()
     assert crossed != wires
+
+
+def test_box_height_spans_its_wires():
+    x = monoidal.Ty('x')
+    drawing = monoidal.Box('f', x, x, height=2).to_drawing()
+    drawing.add_box_corners()
+    ys = {node.kind: y for node, (_, y) in drawing.positions.items()}
+    assert ys["box-corner-00"] == ys["box_cod"] == 0.25
+    assert ys["box-corner-01"] == ys["box_dom"] == 1.75
