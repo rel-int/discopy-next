@@ -42,7 +42,8 @@ FONTS = {
 MATH_TOKEN = re.compile(
     r'"[^"]*"|[A-Za-z]+(?:\.[A-Za-z]+)*|\|->|->|=>|<=|>=|!=|\.\.\.|\s+|.')
 TEXT_ESCAPES = {
-    "&": r"\&", "%": r"\%", "{": r"\{", "}": r"\}", "^": r"\^{}"}
+    "&": r"\&", "%": r"\%", "{": r"\{", "}": r"\}", "^": r"\^{}",
+    "_": r"\_"}
 CODE_ESCAPES = {
     "\\": r"\textbackslash{}", "{": r"\{", "}": r"\}", "_": r"\_",
     "#": r"\#", "%": r"\%", "&": r"\&", "$": r"\$", "^": r"\^{}",
@@ -145,14 +146,32 @@ def text_escape(text: str) -> str:
     return "".join(TEXT_ESCAPES.get(char, char) for char in text)
 
 
+def plain(text: str) -> str:
+    """
+    What is left of a paragraph between its markup, escaped: a backslash, a
+    dollar or a backtick there is markup that was not read.
+
+    >>> print(plain("snake_case, 100% of {it}"))
+    snake\\_case, 100\\% of \\{it\\}
+    """
+    stray = re.search(r"[\\$`]", text)
+    if stray:
+        raise Unsupported(f"{stray.group()!r} in the text {text!r}")
+    return text_escape(text)
+
+
 def call(text: str, start: int) -> tuple[str, int]:
     """ The LaTeX of the ``#link`` or ``#footnote`` at ``start``, its end. """
     if text.startswith("#footnote[", start):
         end = balanced(text, start + len("#footnote"))
         return r"\footnote{" + inline(
             text[start + len("#footnote["):end - 1]) + "}", end
+    if not text.startswith('#link("', start):
+        raise Unsupported(text[start:start + 40])
     middle = balanced(text, start + len("#link"))
     url = text[start + len('#link("'):middle - 2]
+    if text[middle - 2:middle] != '")' or '"' in url:
+        raise Unsupported(text[start:middle])
     if not text.startswith("[", middle):
         return r"\url{" + url + "}", middle
     end = balanced(text, middle)
@@ -172,7 +191,7 @@ def inline(text: str) -> str:
         match = INLINE.search(text, i)
         if match is None:
             break
-        result.append(text_escape(text[i:match.start()]))
+        result.append(plain(text[i:match.start()]))
         kind, found, i = match.lastgroup, match.group(), match.end()
         if kind == "code":
             result.append(code(found[1:-1]))
@@ -197,7 +216,7 @@ def inline(text: str) -> str:
                 found[1], "\\" + found[1]))
         else:
             raise Unsupported(f"{text[match.start():match.start() + 40]!r}")
-    return "".join(result) + text_escape(text[i:])
+    return "".join(result) + plain(text[i:])
 
 
 def arguments(text: str) -> dict[str, str]:

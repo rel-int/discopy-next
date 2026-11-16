@@ -344,14 +344,14 @@ uv run python -m paper.build --pdf  # paper/main.pdf from Typst, paper/latex.pdf
 ```
 
 Typst downloads the CeTZ package on its first run. The LaTeX build needs `latexmk` and what
-`paper/preamble.tex` loads, on Debian the packages the `paper` workflow installs; without them
-its test is skipped. A `python` fence of the paper runs, a `py` fence is shown and not run, and
+`paper/preamble.tex` loads, on Debian the packages the `paper` workflow installs: its test is
+skipped without `latexmk`, and fails with it when a package is missing. A `python` fence of the paper runs, a `py` fence is shown and not run, and
 `#drawing("name")` is the drawing of the value `name` of the listings. `paper/transpile.py`
 reads the part of Typst its docstring lists and raises `Unsupported` on anything else: write
 the paper within it, or add the LaTeX of what you need to it. The references are those of the
 docs, `docs/discopy.bib`. `paper/figures/`, `paper/main.tex` and the PDFs are built, not
 committed: the `paper` workflow uploads them as the `paper` artifact, on `main` and on a pull
-request that touches the paper or the drawing backends.
+request that touches the paper or the library its listings run.
 
 ## Build the docs
 

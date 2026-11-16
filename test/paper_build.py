@@ -47,7 +47,8 @@ def test_every_reference_and_citation_of_the_latex_resolves(names):
 
 
 def test_the_transpiler_refuses_what_it_does_not_read():
-    for refused in ["#strike[this]", "$a / b$", "$integral f$"]:
+    for refused in ["#strike[this]", "$a / b$", "$integral f$", "#link[x]",
+                    '#link(<label>)[x]', "a \\ b", "half a $ sign"]:
         with pytest.raises(Unsupported):
             transpile.inline(refused)
     with pytest.raises(Unsupported, match="no blank line"):
@@ -76,3 +77,10 @@ def test_the_latex_compiles_with_nothing_undefined(names):
     assert pdf.read_bytes().startswith(b"%PDF")
     log = pdf.with_suffix(".log").read_text("utf-8", errors="replace")
     assert "undefined" not in log.lower()
+
+
+def test_the_transpiler_escapes_what_latex_reads_as_markup():
+    assert transpile.inline("snake_case & 100% {x} a~b")\
+        == r"snake\_case \& 100\% \{x\} a~b"
+    assert transpile.inline('#link("https://a.b/c_d#e")[text_1]')\
+        == r"\href{https://a.b/c_d\#e}{text\_1}"

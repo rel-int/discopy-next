@@ -4,7 +4,7 @@
 #let paper(title: none, authors: (), abstract: none, body) = {
   set document(title: title, author: authors)
   set page(paper: "a4", margin: 2.5cm, numbering: "1")
-  set text(size: 10.5pt)
+  set text(size: 10pt)
   set par(justify: true)
   set heading(numbering: "1.1")
   show link: set text(fill: rgb("#1f4e79"))

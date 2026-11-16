@@ -8,7 +8,7 @@ on:
     - paper/**
     - test/paper_build.py
     - docs/discopy.bib
-    - discopy/drawing/**
+    - discopy/**
     - pyproject.toml
     - uv.lock
     - .github/actions/setup/**
