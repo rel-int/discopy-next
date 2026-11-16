@@ -892,7 +892,8 @@ class Bang(monoidal.Bubble, Box):
         return self.name
 
     def to_tree(self):
-        return dict(factory=factory_name(type(self)), arg=self.arg.to_tree())
+        return {'factory': factory_name(type(self)),
+                'arg': self.arg.to_tree()}
 
     @classmethod
     def from_tree(cls, tree):
@@ -1101,7 +1102,8 @@ class Laxator(Structural):
             raise ValueError(messages.LAXATOR_ARITY.format((x, y)))
         self.x, self.y = x, y
         if x is None or y is None:
-            name, dom, cod = "Laxator()", self.ob(), self.ob().bang()
+            name, dom = "Laxator()", self.ob()
+            cod = dom.bang()
         else:
             name, dom = f"Laxator({x}, {y})", x.bang() @ y.bang()
             cod = (x @ y).bang()
@@ -1137,9 +1139,10 @@ Diagram.contraction_factory = Contraction
 Diagram.weakening_factory = Weakening
 Diagram.exchange_factory = Exchange
 Diagram.laxator_factory = Laxator
-for name, law in vars(LinearCategory).items():
-    if name in LinearCategory.axioms:
-        setattr(Diagram, name, law.failing(messages.FREE_BANG))
+for law in sorted(
+        set(LinearCategory.axioms) - set(BiclosedCategory.axioms)):
+    setattr(Diagram, law, getattr(LinearCategory, law).failing(
+        messages.FREE_BANG))
 
 
 class Functor(monoidal.Functor):
