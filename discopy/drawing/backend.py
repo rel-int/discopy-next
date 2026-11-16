@@ -1112,7 +1112,9 @@ class Backend(ABC):
         more wires on both sides, the apex is cut to the span of its wires.
 
         The apex points down when the codomain has fewer wires, or as many
-        and the box is not a dagger, so that the dagger flips it.
+        and the box is flipped upside down by neither a dagger nor a half
+        turn, i.e. a transpose, so that both flip it and a conjugate, their
+        composite, does not.
 
         Example
         -------
@@ -1133,13 +1135,15 @@ class Backend(ABC):
         box, j = node.box, node.j
         (left, bottom), (right, top) = (
             positions[Node(f"box-corner-{c}", j=j)] for c in ["00", "11"])
+        flipped = (
+            box.is_dagger + bool(box.is_transpose) + box.is_conjugate) % 2
         down = len(box.cod) < len(box.dom) or (
-            len(box.cod) == len(box.dom) and not box.is_dagger)
+            len(box.cod) == len(box.dom) and not flipped)
         side, base, apex = ("box_cod", top, bottom) if down\
             else ("box_dom", bottom, top)
-        xs = [positions[Node(side, i=i, j=j, x=x)].x
+        xs = [positions[Node(side, i=i, j=j, x=x)][0]
               for i, x in enumerate(box.cod if down else box.dom)]
-        tips = [min(xs), max(xs)] if xs else [positions[node].x]
+        tips = [min(xs), max(xs)] if xs else [positions[node][0]]
         tips = tips[:1] if tips[0] == tips[-1] else tips
         return [Point(left, base), Point(right, base)] + [
             Point(x, apex) for x in reversed(tips)]
