@@ -8,4 +8,4 @@
 - [x] dagger flips it: `Box.dagger` keeps the drawing attributes
 - [x] test drawing `Box("t", x ** 2, x, shape="triangle")` against a baseline, fails on main
 - [x] doctest drawing `docs/_static/drawing/triangle.svg`: a box `m -> 1` and its dagger
-- [ ] changelog entry, next-checks
+- [x] changelog entry, next-checks
