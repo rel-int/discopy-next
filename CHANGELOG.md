@@ -11,9 +11,9 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 - `csp.sudoku`, `csp.queens`, `csp.cnf` and `csp.maze`, four families of
   constraint satisfaction problems as instances with their languages, and
-  the predicates they use; `csp.maze_diagram` draws a maze as it is, a row a
-  layer and an edge a wire or a cup, its instance a bit per edge, on the path
-  or not ([next#557]).
+  the predicates they use. `csp.maze_diagram` draws a maze as its grid: a row
+  is a layer, a vertical edge a wire, a horizontal edge a cup. `csp.maze`
+  makes each edge a bit saying whether the path takes it ([next#557]).
 - `discopy.csp`, a constraint satisfaction problem as a diagram and its
   language as a functor: `instance` builds a `frobenius.Hypergraph` with a
   spider per variable and a box with no input per constraint, plugged on its

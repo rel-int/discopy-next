@@ -182,7 +182,7 @@ def test_queens_has_no_padding():
 @settings(max_examples=40, deadline=None)
 @given(st.integers(1, 4).flatmap(lambda n: st.lists(st.lists(
     st.integers(1, n).flatmap(lambda i: st.sampled_from([i, -i])),
-    min_size=1, max_size=3), max_size=4)))
+    min_size=0, max_size=3), max_size=4)))
 def test_cnf_counts_the_truth_table(clauses):
     """ A formula has as many solutions as its truth table has satisfying
     rows. """
