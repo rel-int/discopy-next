@@ -9,6 +9,12 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Added
 
+- `Matrix.resolvent`, the inverse of `id - D` over a field, and with it
+  `Matrix.trace` over `float` and `complex`: the trace of Haghverdi and
+  Scott, `A + B (id - D)^-1 C`, a partial trace raising `ValueError` when
+  `id - D` is singular (Malherbe, Scott and Selinger, arXiv:1107.3608,
+  Definition 3.11). `bool` keeps the Kleene star, any other dtype raises
+  `TypeError` ([next#550]).
 - `stream.up_to_steps`, the relation a law of streams is read with: a term
   unrolled for `stream.STEPS` steps, its arrow `now` taken and quotiented by
   the equation of the underlying category, which `Stream.equation_factory`
@@ -1948,6 +1954,7 @@ for the changelog of `1.2.1` and earlier.
 [next#540]: https://github.com/rel-int/discopy-next/pull/540
 [next#541]: https://github.com/rel-int/discopy-next/issues/541
 [next#545]: https://github.com/rel-int/discopy-next/pull/545
+[next#550]: https://github.com/rel-int/discopy-next/pull/550
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#56]: https://github.com/rel-int/optyx/pull/56
