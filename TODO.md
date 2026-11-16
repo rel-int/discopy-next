@@ -4,6 +4,6 @@
 >
 > For the first-order logic of the tool paper's plan, #564: its axioms are inclusions of relations, checked in Boolean matrices.
 
-- [ ] `Matrix.__le__`, the pointwise order on parallel matrices, which `Tensor` inherits
+- [WIP] @session_01MEJxy4FrWd3ymhMeQGF7x8-2026-11-16 21:10 `Matrix.__le__`, the pointwise order on parallel matrices, which `Tensor` inherits
 - [ ] `testable.Inequation`, an `Equation` whose terms are compared with `<=`, so that an axiom can state an inclusion
 - [ ] tests, doctests, CHANGELOG.md bullet, every gate of next-checks
