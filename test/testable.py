@@ -353,6 +353,46 @@ def test_extensional():
         values(list)
 
 
+def test_inequation():
+    from discopy.matrix import Matrix
+    from discopy.testable import Inequation
+    R, S = Matrix[bool]([1, 0, 0, 0], 2, 2), Matrix[bool].id(2)
+    assert Inequation(R, S) and Inequation(R, R) and not Inequation(S, R)
+    assert Inequation(R >> R, R, S) and not Inequation(R, S, R)
+    assert Inequation(S, R).modulo(lambda matrix: matrix.array.any())
+    assert Inequation(1, 2) == eval(
+        repr(Inequation(1, 2)), {"testable": testable})
+    assert Inequation(1, 2) != Equation(1, 2)
+    assert Inequation(1, 2).symbols == ("<=", )
+    assert Equation(1, 2, symbol="<=") != Equation(1, 2)
+    assert str(Inequation(1, 2)) == "Inequation(1, 2)"
+    assert hash(Inequation(1, 2)) == hash(Inequation(1, 2))
+    with raises(TypeError):
+        bool(Inequation(1j, 2j))
+
+
+def test_axiom_of_an_inequation():
+    from discopy.matrix import Matrix
+    from discopy.testable import Inequation
+
+    @axiom
+    def deflation(cls, f: Self) -> Inequation[Self]:
+        """ Every relation is below the identity, which a full one is not. """
+        return Inequation(f, cls.id(f.dom))
+
+    law = deflation.bind(Matrix[bool])
+    assert law(f=Matrix[bool]([1, 0, 0, 0], 2, 2))
+    assert not law(f=Matrix[bool]([1, 1, 1, 1], 2, 2))
+    with raises(AxiomFailure) as error:
+        law.failing("A full relation is not below the identity.")(
+            f=Matrix[bool]([1, 1, 1, 1], 2, 2))
+    assert isinstance(error.value.equation, Inequation)
+    full = Matrix[bool]([1, 1, 1, 1], 2, 2)
+    assert inhabits(law(f=full), law.output({Self: Matrix[bool]}))
+    assert not inhabits(Equation(full, full), Inequation[Matrix[bool]])
+    assert not inhabits(law(f=full), Inequation[Matrix[int]])
+
+
 def test_testable_generic():
     from discopy.kleisli import additive, Maybe, Powerset
     from discopy.utils import NamedGeneric
