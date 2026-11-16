@@ -2,9 +2,12 @@ import pytest
 
 pytest.importorskip("tensornetwork")
 
+import zlib
+import itertools
+
 import numpy as np
 import tensornetwork as tn
-from hypothesis import find
+from hypothesis import find, given, settings, strategies as st
 from pytest import raises
 
 from discopy.utils import AxiomError, dumps, loads
@@ -1060,3 +1063,61 @@ def test_Tensor_resolvent_reshapes_its_factors():
         Tensor[float].id(Dim(2, 2)).resolvent()
     with raises(TypeError):
         Tensor[float].swap(Dim(2), Dim(3)).resolvent()
+
+
+HYPERGRAPH_X, HYPERGRAPH_Y = frobenius.Ty('x'), frobenius.Ty('y')
+
+
+def hypergraph_functor(dtype, contractor=None):
+    """ A tensor functor with an array for any box on ``x`` and ``y``,
+    drawn from a seed its name and its type fix. """
+    ob_map = {HYPERGRAPH_X: Dim(2), HYPERGRAPH_Y: Dim(3)}
+
+    def ar_map(box):
+        dims = Dim(*(ob_map[frobenius.Ty(obj)].inside[0]
+                     for obj in (box.dom @ box.cod).inside))
+        rng = np.random.default_rng(zlib.crc32(repr(box).encode()))
+        array = rng.integers(0, 3, dims.inside or (1, ))
+        return array.astype(dtype) if dtype is not None else array * .5
+    return Functor(ob_map, ar_map, dtype=dtype, contractor=contractor)
+
+
+@pytest.mark.parametrize("dtype", [bool, int, float, complex, None])
+@pytest.mark.parametrize("contractor", [None, OptEinsum()], ids=repr)
+@settings(max_examples=30, deadline=None)
+@given(data=st.data())
+def test_Functor_contracts_a_hypergraph_as_its_diagram(
+        dtype, contractor, data):
+    """ A frobenius hypergraph, with a boundary, boxes with a domain and
+    spiders on no port, contracts to the image of its diagram. """
+    x, y = HYPERGRAPH_X, HYPERGRAPH_Y
+    types = st.sampled_from([frobenius.Ty(), x, y, x @ y, x @ x])
+    graph = data.draw(frobenius.Hypergraph.strategy(
+        types=types, max_leaves=3, max_scalars=1))
+    F = hypergraph_functor(dtype, contractor)
+    result, reference = F(graph), F(graph.to_diagram())
+    assert (result.dom, result.cod) == (reference.dom, reference.cod)
+    assert np.allclose(
+        np.asarray(result.array, dtype=complex),
+        np.asarray(reference.array, dtype=complex))
+
+
+def test_Functor_counts_the_4x4_sudoku():
+    """ A spider is one index: the 4x4 sudoku, a closed hypergraph of 16
+    spiders and 12 boxes, counts its 288 grids, where its diagram has an
+    index per leg of each spider and numpy refuses the einsum. """
+    x, n = frobenius.Ty('x'), 2
+    cell = lambda row, col: (n * n) * row + col
+    rows = [[cell(r, c) for c in range(n * n)] for r in range(n * n)]
+    blocks = [[cell(n * i + k, n * j + m) for k in range(n) for m in range(n)]
+              for i in range(n) for j in range(n)]
+    scopes = rows + [list(col) for col in zip(*rows)] + blocks
+    box = frobenius.Box('AllDifferent', frobenius.Ty(), x ** (n * n))
+    graph = frobenius.Hypergraph(
+        frobenius.Ty(), frobenius.Ty(), len(scopes) * (box, ),
+        ((), tuple(((), tuple(scope)) for scope in scopes), ()),
+        spider_types=dict.fromkeys(range(n ** 4), x))
+    array = [len(set(values)) == n * n
+             for values in itertools.product(range(n * n), repeat=n * n)]
+    F = Functor({x: n * n}, {box: array}, dtype=int)
+    assert F(graph) == Tensor[int]([288], Dim(1), Dim(1))
