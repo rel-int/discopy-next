@@ -1480,6 +1480,15 @@ class LinearCategory[C0: ResiduatedMonoid, C1: LinearCategory](
             cls.id(exchange.dom))
 
     @axiom
+    def exchange_inverse_dagger[X: Obj[C0], Y: Obj[C0]](
+            cls, x: Var[C0, X], y: Var[C0, Y]
+    ) -> Equation[Hom[C1, Tensor[Y, Bang[C1, X]], Tensor[Y, Bang[C1, X]]]]:
+        """ Exchanging forth and back is the identity. """
+        inverse = cls.exchange(x, y, is_dagger=True)
+        return cls.equation_factory(
+            inverse >> cls.exchange(x, y), cls.id(inverse.dom))
+
+    @axiom
     def exchange_naturality[X: Obj[C0], A: Obj[C0], B: Obj[C0]](
             cls, x: Var[C0, X], f: Hom[C1, A, B]
     ) -> Equation[Hom[C1, Tensor[Bang[C1, X], A], Tensor[B, Bang[C1, X]]]]:

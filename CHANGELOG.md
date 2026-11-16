@@ -12,12 +12,13 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 - `abc.LinearCategory`, a linear category (Bierman, TLCA 1995) without
   symmetry: a comonad `bang` with `dereliction` and `digging`, lax monoidal
   with a `laxator`, each `!x` a comonoid by `contraction` and `weakening`, and
-  an `exchange` of `!x` with any object, its 27 laws as axioms. `biclosed` is
-  the free one: `BangOb`, the wire `x.bang()` holding a type, `Bang`, the
-  bubble `f.bang()`, and the boxes `Dereliction`, `Digging`, `Contraction`,
-  `Weakening`, `Exchange` and `Laxator`, which a `Functor` sends through its
-  codomain's, or through its maps when its types are not biclosed. The laws
-  are declared failing on the free category ([next#571]).
+  an invertible `exchange` of `!x` with any object, its 28 laws as axioms.
+  `biclosed` is the free one: `BangOb`, the wire holding a type inside
+  `x.bang()`, `Bang`, the bubble `f.bang()`, and the boxes `Dereliction`,
+  `Digging`, `Contraction`, `Weakening`, `Exchange` and `Laxator`. A `Functor`
+  sends them through the `bang` and the structure of its codomain when its
+  types are biclosed, and through its `ob_map` and `ar_map` otherwise. The
+  laws are declared failing on the free category ([next#571]).
 - `shape="triangle"` on any box draws it as a triangle, matplotlib and TikZ
   alike: its base the width of the side with more wires, its apex on the
   other, at its wire when there is one, and its dagger upside down

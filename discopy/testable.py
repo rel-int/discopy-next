@@ -531,7 +531,7 @@ class Bang[Coarse, Object](Constructor):
     The bang of an object in a signature, read off the bang of its identity
     in a category ``Coarse``, i.e. ``Coarse.id(M).bang().dom``, as
     :class:`Delay` reads the delay, so that a category whose bang is the
-    identity, e.g. :mod:`discopy.closed`, reads each object as its own bang.
+    identity reads each object as its own bang.
 
     >>> from discopy.biclosed import Ty, Diagram
     >>> assert Bang[Diagram, Ty('x')] == Ty('x').bang()

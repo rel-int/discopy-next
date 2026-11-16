@@ -44,7 +44,7 @@ def test_LinearCategory_states_the_laws_of_a_linear_category():
 
     assert issubclass(biclosed.Diagram, LinearCategory)
     assert len(LinearCategory.axioms) - len(
-        biclosed.BiclosedCategory.axioms) == 27
+        biclosed.BiclosedCategory.axioms) == 28
     x = biclosed.Ty('x')
     assert Bang[biclosed.Diagram, x] == x.bang()
     for law in set(LinearCategory.axioms) - set(
