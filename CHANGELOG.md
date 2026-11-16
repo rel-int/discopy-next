@@ -9,11 +9,11 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Added
 
-- `monoidal.Diagram.foliations`, the diagrams equal to one up to interchange
-  whose adjacent layers cannot be merged, the largest layers first, read off
-  `Diagram.dependencies` (the boxes each box must stay below) by
-  `Diagram.layerings` and built by `Diagram.foliate`, interchangers then
-  `Layer.merge` ([next#567]).
+- `monoidal.Diagram.foliations(limit)` lists the foliations of a diagram:
+  diagrams equal to it up to interchange whose adjacent layers cannot merge,
+  the largest layers first, so that the first is `Diagram.foliation()`. The
+  steps are public too: `dependencies`, `layerings` and `foliate`
+  ([next#567]).
 - `csp.Language.propagate`, arc consistency: a set of candidates per
   variable, kept to the values each constraint supports, until no set
   shrinks or for a number of rounds. It removes no value a solution takes,

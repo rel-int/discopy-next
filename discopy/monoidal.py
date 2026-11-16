@@ -1776,8 +1776,9 @@ class Diagram(cat.Arrow, MonoidalCategory, RichDisplay):
     def dependencies(self) -> "tuple[tuple[int, ...], ...]":
         """
         The boxes each box of a staircase diagram must stay below, i.e. those
-        whose outputs it takes as inputs or, for a box with no inputs, the box
-        whose outputs it sits between: no interchange moves it above them.
+        whose outputs it takes as inputs or, for a box with no inputs, those
+        whose outputs enclose the gap it sits in: no interchange moves it
+        above them.
 
         Example
         -------
@@ -1786,17 +1787,22 @@ class Diagram(cat.Arrow, MonoidalCategory, RichDisplay):
         >>> cup, s = Box('cup', Ty(), x @ x), Box('s', Ty(), x)
         >>> (f @ g >> h).to_staircases().dependencies()
         ((), (), (0, 1))
-        >>> (cup >> x @ s @ x).dependencies()
-        ((), (0,))
+        >>> (cup >> f @ x >> x @ s @ x).dependencies()
+        ((), (0,), (0,))
         """
-        wires, result = len(self.dom) * [None], []
+        wires: "list[int | None]" = len(self.dom) * [None]
+        gaps: "list[tuple[int, ...]]" = (len(self.dom) + 1) * [()]
+        result: "list[tuple[int, ...]]" = []
         for box, offset in zip(self.boxes, self.offsets):
-            inputs = wires[offset:offset + len(box.dom)]
-            if not box.dom and 0 < offset < len(wires)\
-                    and wires[offset - 1] == wires[offset]:
-                inputs = [wires[offset]]
-            wires[offset:offset + len(box.dom)] = len(box.cod) * [len(result)]
-            result.append(tuple(sorted({i for i in inputs if i is not None})))
+            n, m = len(box.dom), len(box.cod)
+            inputs = {i for i in wires[offset:offset + n] if i is not None}\
+                if n else set(gaps[offset])
+            left, right = gaps[offset], gaps[offset + n]
+            wires[offset:offset + n] = m * [len(result)]
+            gaps[offset:offset + n + 1] = [left] + (m - 1) * [
+                (len(result), )] + [right] if m else [
+                    tuple(sorted(set(left) & set(right)))]
+            result.append(tuple(sorted(inputs)))
         return tuple(result)
 
     @staticmethod
@@ -1875,9 +1881,12 @@ class Diagram(cat.Arrow, MonoidalCategory, RichDisplay):
 
     def foliations(self, limit: int | None = None) -> "list[Diagram]":
         """
-        The foliations of a diagram, i.e. the diagrams equal to it up to
-        interchange whose adjacent layers cannot be merged, the largest layers
-        first: :meth:`foliation` picks one of them.
+        Foliations of a diagram, i.e. diagrams equal to it up to interchange
+        whose adjacent layers cannot be merged, the largest layers first:
+        :meth:`foliation` picks one of them. Each layering of
+        :meth:`dependencies` is foliated, then merged by the level's own
+        :meth:`Layer.merge`, e.g. two permutations fuse in
+        :mod:`discopy.symmetric`.
 
         Parameters:
             limit : The maximum number of foliations to return.
@@ -1908,16 +1917,18 @@ class Diagram(cat.Arrow, MonoidalCategory, RichDisplay):
         one box and right of another, is missed.
         """
         staircase, result = self.to_staircases(), []
-        for layering, left in itertools.product(
-                self.layerings(staircase.dependencies()), (False, True)):
+        candidates = (
+            (layering, left) for layering in self.layerings(
+                staircase.dependencies()) for left in (False, True))
+        for layering, left in candidates:
+            if limit is not None and len(result) >= limit:
+                break
             try:
-                foliation = staircase.foliate(layering, left=left)
+                foliation = staircase.foliate(layering, left).merge_layers()
             except AxiomError:
                 continue
             if foliation not in result:
                 result.append(foliation)
-            if len(result) == limit:
-                break
         return result
 
     def depth(self):

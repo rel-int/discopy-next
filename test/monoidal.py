@@ -1145,8 +1145,35 @@ def test_foliations_of_states_and_effects():
     assert (cup >> x @ s @ x).dependencies() == ((), (0, ))
     assert [str(d) for d in (cup >> x @ s @ x >> f @ x @ x).foliations()]\
         == ["cup >> f @ s @ x"]
-    for foliation in (s @ s >> f @ x >> e @ e).foliations():
+    diagram = s @ s >> f @ x >> e @ e
+    for foliation in diagram.foliations():
         assert sorted(map(str, foliation.boxes)) == ["e", "e", "f", "s", "s"]
+        assert (foliation.dom, foliation.cod) == (diagram.dom, diagram.cod)
+        for upper, lower in zip(foliation.inside, foliation.inside[1:]):
+            with raises(AxiomError):
+                upper.merge(lower)
+
+
+def test_foliations_of_a_state_enclosed_by_a_box():
+    x = Ty('x')
+    f, g = Box('f', x, x), Box('g', x, x)
+    cup, s = Box('cup', Ty(), x @ x), Box('s', Ty(), x)
+    diagram = cup >> f @ x >> x @ s @ x >> x @ g @ x
+    assert diagram.dependencies() == ((), (0, ), (0, ), (2, ))
+    assert "cup >> x @ s @ x >> f @ g @ x"\
+        in [str(foliation) for foliation in diagram.foliations()]
+
+
+def test_foliations_limit():
+    f = Box('f', Ty('x'), Ty('x'))
+    assert (f @ f).foliations(limit=0) == []
+    assert len((f @ f).foliations(limit=1)) == 1
+
+
+def test_foliations_merge_by_the_level():
+    from discopy import symmetric
+    p = symmetric.Permutation(symmetric.Ty('x') ** 3, [1, 2, 0])
+    assert (p >> p).foliations() == [(p >> p).foliation()]
 
 def test_box_factory():
     """ Every level with boxes of its own binds them, which a stream of boxes
