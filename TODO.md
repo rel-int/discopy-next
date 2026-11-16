@@ -65,4 +65,4 @@
 - [WIP] @session_01MEJxy4FrWd3ymhMeQGF7x8-2026-11-16 21:29 discopy/drawing/__init__.py:94 `Drawing.to_typst()` mutates the caller by adding corner nodes directly to its graph.
 - [WIP] @session_01MEJxy4FrWd3ymhMeQGF7x8-2026-11-16 21:29 test/drawing/typst_rendering.py:210 This test does not check what its docstring says.
 - [WIP] @session_01MEJxy4FrWd3ymhMeQGF7x8-2026-11-16 21:29 discopy/drawing/typst_ast.py:7 The example output is stale: it shows fletcher `0.5.9`, but the backend emits `0.5.8`.
-- [ ] discopy/drawing/typst_ast.py:63 With `prec=0`, `Float` has no decimal point to anchor the strip, so `Float(10, prec=0)` renders as `1`.
+- [WIP] @session_01MEJxy4FrWd3ymhMeQGF7x8-2026-11-16 21:30 discopy/drawing/typst_ast.py:63 With `prec=0`, `Float` has no decimal point to anchor the strip, so `Float(10, prec=0)` renders as `1`.
