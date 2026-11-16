@@ -8,4 +8,4 @@
 
 - [x] slice 2 of #553: `csp.instance`, `csp.scopes`, the round trip
 - [x] `Language`: `holds`, `solutions` (backtracking), `functor` (a `tensor.Functor`), the counting law and the projection law on random instances
-- [ ] the references checked and in `docs/discopy.bib`; `discopy.csp` in `docs/api/semantics.rst` beside `discopy.tensor`, the import list, one README bullet, the changelog; slice 2 opened
+- [x] the references checked and in `docs/discopy.bib`; `discopy.csp` in `docs/api/semantics.rst` beside `discopy.tensor`, the import list, one README bullet, the changelog; slice 2 opened
