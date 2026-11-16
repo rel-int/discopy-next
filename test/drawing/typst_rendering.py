@@ -163,6 +163,7 @@ def test_typst_output_to_file(tmp_path):
     source = f.draw(format="typst", path=tmp_path / "f.typ", show=False)
     assert (tmp_path / "f.typ").read_text() == source
     assert 'import "@preview/cetz' in source
+    pytest.importorskip("typst")
     svg = f.draw(format="typst", path=tmp_path / "f.svg", show=False)
     assert (tmp_path / "f.svg").read_bytes() == svg
 
@@ -204,10 +205,12 @@ def test_wire_bezier_points():
 
 
 def test_typst_fontsize_and_text_colour():
-    """A non-default fontsize and a coloured box name are honoured."""
+    """A non-default fontsize scales the text by its ratio to the default."""
     x, y = Ty("x"), Ty("y")
     source = Box("f", x, y).to_typst(fontsize=24).render()
-    assert "text(" in source and "size:" in source
+    assert 'text("f", size: 2.4em)' in source
+    typst = pytest.importorskip("typst")
+    assert typst.compile(source.encode(), format="svg")
 
 
 def test_typst_ast_nodes():
@@ -224,6 +227,58 @@ def test_typst_ast_nodes():
 def test_typst_show_returns_ipython_svg():
     """With no path and ``show``, ``output`` hands IPython an SVG to display."""
     pytest.importorskip("IPython")
+    pytest.importorskip("typst")
     x, y = Ty("x"), Ty("y")
     svg = Box("f", x, y).draw(format="typst", show=True)
     assert type(svg).__name__ == "SVG"
+
+
+def test_typst_bezier_ends_where_the_curve_does():
+    """A bezier of the backend is start, two controls, end; CeTZ takes the
+    two ends first."""
+    from discopy.drawing.backend import Typst
+    backend = Typst()
+    backend.draw_bezier([(0, 1), (0, 0.5), (1, 0.5), (1, 0)])
+    assert backend.body[0].render() == (
+        'bezier((0, 1), (1, 0), (0, 0.5), (1, 0.5), '
+        'stroke: rgb("#000000") + 1pt)')
+    x = Ty("x")
+    strands = [line for line in Braid(x, x).to_typst().render().splitlines()
+               if "bezier" in line]
+    assert any("bezier((1.5, 1), (0.5, 0)," in line for line in strands)
+
+
+def test_typst_names_are_not_markup():
+    """A name is a string literal, whatever characters it holds."""
+    x = Ty("x")
+    source = Box('f]#x "y"', x, x).to_typst().render()
+    assert r'"f]#x \"y\""' in source
+    typst = pytest.importorskip("typst")
+    assert typst.compile(source.encode(), format="svg")
+
+
+def test_typst_colours_given_as_numbers():
+    from discopy.drawing.backend import Typst
+    assert Typst.format_color([1, 0, 0]) == "#ff0000"
+    assert Typst.format_color("#00ff00") == "#00ff00"
+    assert Typst.format_color(None) == "none"
+
+
+def test_to_typst_leaves_the_drawing_as_it_was():
+    x, y = Ty("x"), Ty("y")
+    drawing = Box("f", x, y).to_drawing()
+    nodes, source = set(drawing.positions), drawing.to_typst().render()
+    assert set(drawing.positions) == nodes
+    assert drawing.to_typst().render() == source
+
+
+def test_typst_frames_dual_rails():
+    """A dual rail cup is drawn with its fold inside the frame."""
+    from discopy import ribbon
+    x = ribbon.Ty("x")
+    drawing = ribbon.Braid(x, x).trace().to_ribbons().to_drawing()
+    framed = drawing.relabel_nodes()
+    framed.add_box_corners()
+    framed.frame_dual_rail()
+    source = drawing.to_typst().render()
+    assert f"({framed.width:g}, {framed.height:g})" in source

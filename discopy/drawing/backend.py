@@ -1629,7 +1629,11 @@ class Typst(Backend):
         super().__init__()
 
     def draw(self, graph, **params):
-        """Orchestrate drawing, mirroring the module-level ``draw()``."""
+        """
+        Draw a graph on the canvas, as :func:`draw` does, and return the
+        backend: :meth:`to_document` is its source, :meth:`output` compiles
+        it.
+        """
         max_v = max(graph.height, graph.width, 0.01)
         self.nodesize = round(params.get("nodesize", 1.0) / sqrt(max_v), 3)
         self.draw_boundary(graph, **params)
@@ -1637,18 +1641,15 @@ class Typst(Backend):
         self.draw_wires(graph, **params)
         self.draw_boxes(graph, **params)
         self.draw_spiders(graph, **params)
-        path = params.pop("path", None)
-        show = params.pop("show", True)
-        return self.output(path=path, show=show, **params)
+        return self
 
     @staticmethod
     def format_color(color):
         """Format a colour name or hexcode to a Typst-friendly string."""
         if color is None:
             return "none"
-        if isinstance(color, str) and color.startswith("#"):
-            return color
-        return COLORS.get(color, color)
+        return COLORS.get(color, color) if isinstance(color, str)\
+            else to_hex(color)
 
     @staticmethod
     def color_expr(hexcode):
@@ -1694,9 +1695,9 @@ class Typst(Backend):
         content = ContentExpr(inner, math=math)
         fs = params.get("fontsize", None)
         if fs is not None and fs != DEFAULT["fontsize"]:
+            scale = Float(fs / DEFAULT["fontsize"]).render()
             text_call = Call(
-                Ident("text"), [content],
-                {"size": Float(fs / DEFAULT["fontsize"])})
+                Ident("text"), [content], {"size": Ident(f"{scale}em")})
         else:
             text_call = content
         self.body.append(Call(
@@ -1749,12 +1750,12 @@ class Typst(Backend):
         super().draw_wire(source, target, bend_out=bend_out, bend_in=bend_in)
 
     def draw_bezier(self, points, adaptive=True):
-        s, e, c1, c2 = points
+        start, first, second, end = points
         self.body.append(
             Call(
                 Ident("bezier"),
-                [self.coord(*s), self.coord(*e),
-                 self.coord(*c1), self.coord(*c2)],
+                [self.coord(*start), self.coord(*end),
+                 self.coord(*first), self.coord(*second)],
                 {"stroke": self.stroke()},
             )
         )
@@ -1814,7 +1815,6 @@ class Typst(Backend):
         doc = Document(
             imports=[
                 Import("@preview/cetz:0.5.2", members=["canvas", "draw"]),
-                Import("@preview/fletcher:0.5.8", alias="fletcher"),
             ],
             preamble=[
                 RawText("#set page("

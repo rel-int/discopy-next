@@ -91,15 +91,32 @@ def draw(diagram, **params):
         braid, :code:`0` otherwise.
     """
     if params.get("format") == "typst":
-        drawing = diagram.to_drawing()
-        drawing.add_box_corners()
-        asymmetry = params.pop("asymmetry", 0.125 * any(
-            box.is_conjugate or box.is_transpose or (
-                box.is_dagger and not box.draw_as_braid)
-            for box in drawing.boxes))
-        backend = Typst(**params)
-        return backend.draw(drawing, asymmetry=asymmetry, **params)
+        path, show = params.pop("path", None), params.pop("show", True)
+        return typst_canvas(diagram, **params).output(
+            path=path, show=show, **params)
     return diagram.to_drawing().draw(**params)
+
+
+def typst_canvas(diagram, **params) -> Typst:
+    """
+    The :class:`Typst` backend with a diagram drawn on it: like
+    :meth:`Drawing.draw`, it draws a copy with its box corners added and its
+    dual rails framed, so that the drawing of the diagram is left as it was.
+
+    >>> from discopy.monoidal import Ty, Box
+    >>> drawing = Box('f', Ty('x'), Ty('y')).to_drawing()
+    >>> nodes = len(drawing.positions)
+    >>> canvas = typst_canvas(drawing)
+    >>> assert len(drawing.positions) == nodes
+    """
+    drawing = diagram.to_drawing().relabel_nodes()
+    drawing.add_box_corners()
+    drawing.frame_dual_rail()
+    asymmetry = params.pop("asymmetry", 0.125 * any(
+        box.is_conjugate or box.is_transpose or (
+            box.is_dagger and not box.draw_as_braid)
+        for box in drawing.boxes))
+    return Typst(**params).draw(drawing, asymmetry=asymmetry, **params)
 
 
 def to_typst(diagram, **params):
@@ -126,22 +143,7 @@ def to_typst(diagram, **params):
     >>> assert 'import "@preview/cetz' in source
     >>> assert 'bezier' in source or 'line' in source
     """
-    from math import sqrt
-    drawing = diagram.to_drawing()
-    drawing.add_box_corners()
-    asymmetry = params.pop("asymmetry", 0.125 * any(
-        box.is_conjugate or box.is_transpose or (
-            box.is_dagger and not box.draw_as_braid)
-        for box in drawing.boxes))
-    max_v = max(drawing.height, drawing.width, 0.01)
-    params["nodesize"] = round(params.get("nodesize", 1.0) / sqrt(max_v), 3)
-    backend = Typst(**params)
-    backend.draw_boundary(drawing, **params)
-    backend.draw_regions(drawing, **params)
-    backend.draw_wires(drawing, **params)
-    backend.draw_boxes(drawing, asymmetry=asymmetry, **params)
-    backend.draw_spiders(drawing, **params)
-    return backend.to_document(**params)
+    return typst_canvas(diagram, **params).to_document(**params)
 
 
 def to_gif(diagram, *diagrams, **params):  # pragma: no cover

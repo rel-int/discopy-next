@@ -4,14 +4,13 @@ Typst AST for generating CeTZ/Fletcher string diagrams.
 Example output::
 
     #import "@preview/cetz:0.5.2": canvas, draw
-    #import "@preview/fletcher:0.5.9" as fletcher
 
     #canvas({
-      import draw: *
-      bezier((0,0), (1,0), (0.3, -0.5), (0.7, 0.5))
-      line((0.6, 0.5), (1.8, 0.5), (1.8, 1.1), (0.6, 1.1),
-           close: true, fill: white, stroke: black + 0.5pt)
-      content((1.2, 0.8), [$f$])
+        import draw: *
+        bezier((0, 0), (1, 0), (0.3, -0.5), (0.7, 0.5))
+        line((0.6, 0.5), (1.8, 0.5), (1.8, 1.1), (0.6, 1.1), close: true)
+        content((1.2, 0.8), [$f$])
+        content((1.2, 0.2), "a name")
     })
 
 Summary
@@ -25,9 +24,13 @@ Summary
     TypstNode
     Str
     Float
+    Bool
+    RawText
+    Ident
     Coord
     Call
     ContentExpr
+    Import
     Canvas
     Document
 """
@@ -45,22 +48,34 @@ class TypstNode:
 
 @dataclass
 class Str(TypstNode):
-    """A quoted string literal."""
+    """
+    A quoted string literal, its backslashes and quotes escaped.
+
+    >>> print(Str('say "hi"').render())
+    "say \\"hi\\""
+    """
     value: str
 
     def render(self, indent=0):
-        return f'"{self.value}"'
+        escaped = self.value.replace("\\", "\\\\").replace('"', '\\"')
+        return f'"{escaped}"'
 
 
 @dataclass
 class Float(TypstNode):
-    """A floating-point literal, rendered with 4 decimal places."""
+    """
+    A floating-point literal, rounded to ``prec`` decimal places with the
+    trailing zeros of its fraction dropped.
+
+    >>> Float(0.5).render(), Float(2.0).render(), Float(10, prec=0).render()
+    ('0.5', '2', '10')
+    """
     value: float
     prec: int = 4
 
     def render(self, indent=0):
         s = f"{round(self.value, self.prec):.{self.prec}f}"
-        return s.rstrip('0').rstrip('.')
+        return s.rstrip('0').rstrip('.') if '.' in s else s
 
 
 @dataclass
@@ -113,22 +128,28 @@ class Call(TypstNode):
 
     def render(self, indent=0):
         pre = " " * (indent * 4)
-        parts = [a.render(indent) for a in self.args]
-        parts += [f"{k}: {v.render(indent)}" for k, v in self.kwargs.items()]
+        parts = [a.render() for a in self.args]
+        parts += [f"{k}: {v.render()}" for k, v in self.kwargs.items()]
         inner = ", ".join(parts)
-        return f"{pre}{self.func.render(indent)}({inner})"
+        return f"{pre}{self.func.render()}({inner})"
 
 
 @dataclass
 class ContentExpr(TypstNode):
-    """Typst content: ``[text]`` or ``[$math$]``."""
+    """
+    Typst content: ``[$math$]``, or plain text as a string literal, so that
+    no character of a name is read as markup.
+
+    >>> ContentExpr("x^2", math=True).render(), ContentExpr("f]#x").render()
+    ('[$x^2$]', '"f]#x"')
+    """
     text: str
     math: bool = False
 
     def render(self, indent=0):
         pre = " " * (indent * 4)
-        inner = f"${self.text}$" if self.math else self.text
-        return f"{pre}[{inner}]"
+        return pre + (
+            f"[${self.text}$]" if self.math else Str(self.text).render())
 
 
 @dataclass
