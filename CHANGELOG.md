@@ -11,7 +11,7 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 - `egraph.Builder.matches`, e-matching on the builder as a join over its
   tables, one relation per head indexed as a match asks so that `add` pays
-  nothing, a match a row of the join of the atoms of the pattern, as in
+  nothing, a match being a row of the join of the atoms of the pattern, as in
   relational e-matching, and the law `EGraph.matching_agreement` that it
   matches what the e-graph of the same operations does ([next#549]).
 - `stream.up_to_steps`, the relation a law of streams is read with: a term
