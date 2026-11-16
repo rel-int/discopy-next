@@ -1836,6 +1836,9 @@ class Diagram(cat.Arrow, MonoidalCategory, RichDisplay):
         def layers(placed, previous):
             free = [i for i, before in enumerate(dependencies)
                     if i not in placed and set(before) <= placed]
+            if previous and not any(
+                    set(dependencies[i]) & set(previous) for i in free):
+                return iter(())
             return (layer for size in range(len(free), 0, -1)
                     for layer in itertools.combinations(free, size)
                     if not previous or any(
@@ -1931,7 +1934,10 @@ class Diagram(cat.Arrow, MonoidalCategory, RichDisplay):
         ----
         Each layering is built with right interchangers, then with left ones:
         a foliation that needs both, e.g. a box with no inputs moved left of
-        one box and right of another, is missed.
+        one box and right of another, is missed, and so is the order of a
+        box with no inputs and one with no outputs inside a layer that
+        :meth:`Layer.merge` does not choose, e.g. ``e @ s >> f`` beside
+        ``s @ e >> f``.
         """
         staircase, result = self.to_staircases(), []
         candidates = (

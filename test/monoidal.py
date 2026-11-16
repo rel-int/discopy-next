@@ -1183,6 +1183,7 @@ def test_foliations_of_a_deep_diagram():
         diagram = diagram >> f
     assert diagram.foliations(limit=1) == [diagram]
     assert Diagram.id(x).foliations() == [Diagram.id(x)]
+    assert list(Diagram.layerings(16 * ((), ))) == [(tuple(range(16)), )]
 
 
 def test_foliations_below_an_effect_between_inputs():
