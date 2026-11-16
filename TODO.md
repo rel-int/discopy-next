@@ -6,6 +6,6 @@
 >
 > > write the brief for discopy.csp
 
-- [ ] slice 4 of #553: `Language.propagate`, arc consistency to its fixed point; soundness (no value a solution takes is removed) on random instances
+- [WIP] @session_01MEJxy5FM3MT3hk7p67LLmW-2026-11-16 17:52 slice 4 of #553: `Language.propagate`, arc consistency to its fixed point; soundness (no value a solution takes is removed) on random instances
 - [ ] the tree law: on random instances whose incidence graph is a tree, the fixed point is the projection of the solutions; one round alone fails it, a test shows an instance
 - [ ] on the maze it alone leaves one value per variable; Freuder (JACM 1982) and Dechter–Mateescu (UAI 2003) in docs/discopy.bib; changelog; slice 4 opened
