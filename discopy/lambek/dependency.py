@@ -15,7 +15,7 @@ Summary
         from_spacy
 """
 
-from discopy.grammar.cfg import Word, Rule
+from discopy.lambek.cfg import Word, Rule
 from discopy.monoidal import Ty
 
 

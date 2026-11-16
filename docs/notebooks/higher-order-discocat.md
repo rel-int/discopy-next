@@ -41,7 +41,7 @@ Tensor[bool].bubble = lambda self, **_: self.map(lambda x: not x)
 ## 2) Parse natural language sentences using a categorial grammar
 
 ```python {.marimo}
-from discopy.grammar.categorial import Ty, Word, Eval
+from discopy.lambek.categorial import Ty, Word, Eval
 
 n, p, s = Ty('n'), Ty('p'), Ty('s')  # noun, phrase and sentence
 
@@ -84,7 +84,7 @@ A, M, I, B, S = (Predicate(P, 0, 1, data)
 ```python {.marimo}
 from typing import Callable
 
-from discopy.grammar.categorial import Functor
+from discopy.lambek.categorial import Functor
 from discopy.python import Function
 
 F = Functor(

@@ -44,15 +44,15 @@ set in `[tool.uv]`; `uv sync --no-dev` installs the bare package. Add more group
 `uv sync --group <name>`:
 - `tensor`: the contraction engines opt_einsum, quimb and cotengra
 - `quantum`: quantum computing dependencies
-- `grammar`: natural language processing libraries, PyTorch included for the neural parser
+- `lambek`: natural language processing libraries, PyTorch included for the neural parser
 - `optyx`: the dependencies of `discopy.optyx` (photonics, ZX, tensor contraction)
 - `notebooks`: marimo, IPython and a Jupyter kernel to run the notebooks, with anywidget to show diagrams as widgets
 - `docs`: for generating the documentation
 - `all`: every group above, which CI's test job installs
 
-Since dependency groups are not standard, `tensor`, `quantum`, `grammar`, `optyx`, `notebooks` and `docs`
+Since dependency groups are not standard, `tensor`, `quantum`, `lambek`, `optyx`, `notebooks` and `docs`
 are also optional dependencies (`pip install -e '.[quantum]'`). There is no `dev` or `all`
-extra: the `test` extra bundles `quantum`, `grammar`, `optyx` and `notebooks` with the test
+extra: the `test` extra bundles `quantum`, `lambek`, `optyx` and `notebooks` with the test
 tools, without egglog, ruff, ty or pytest-benchmark.
 
 ## Run the unit tests

@@ -4,10 +4,10 @@ import pytest
 
 torch = pytest.importorskip("torch")
 
-from discopy.grammar import proofnet
-from discopy.grammar.abstract import Ty
-from discopy.grammar.neural import *
-from discopy.grammar.proofnet import ProofNet, Sequent, hungarian
+from discopy.lambek import proofnet
+from discopy.lambek.abstract import Ty
+from discopy.lambek.neural import *
+from discopy.lambek.proofnet import ProofNet, Sequent, hungarian
 from discopy.utils import AxiomError
 
 n, s = Ty("n"), Ty("s")

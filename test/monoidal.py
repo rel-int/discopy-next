@@ -557,7 +557,7 @@ def test_Bubble_every_level():
     from discopy import (
         spacial, feedback, braided, balanced, symmetric, markov, comarkov,
         biclosed, closed, rigid, pivotal, ribbon, compact, frobenius)
-    from discopy.grammar import pregroup, categorial, abstract
+    from discopy.lambek import pregroup, categorial, abstract
     for module in (
             spacial, feedback, braided, balanced, symmetric, markov,
             comarkov, biclosed, closed, rigid, pivotal, ribbon, compact,
@@ -1122,7 +1122,7 @@ def test_box_factory():
         cat, monoidal, braided, balanced, symmetric, traced, markov, rigid,
         pivotal, ribbon, biclosed, closed, compact, frobenius, feedback,
         tensor)
-    from discopy.grammar import categorial, abstract, pregroup
+    from discopy.lambek import categorial, abstract, pregroup
     from discopy.quantum import circuit, zx
     from discopy.neural import network
     assert cat.Arrow.box_factory is cat.Box

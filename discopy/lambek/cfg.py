@@ -42,7 +42,7 @@ from typing import TYPE_CHECKING
 from discopy import messages, monoidal
 from discopy.cat import factory, Functor
 from discopy.config import BOX_DRAWING_ATTRIBUTES
-from discopy.grammar import thue
+from discopy.lambek import thue
 from discopy.monoidal import Ty
 from discopy.utils import (
     assert_isinstance, factory_name, assert_isatomic, AxiomError, from_tree)
@@ -161,9 +161,9 @@ class Tree:
         >>> f = Rule(x @ x, x, name='f')
         >>> tree = f(f(f, f), f)
         >>> tree.to_diagram().foliation().draw(
-        ...     doctest='docs/_static/grammar/tree-to-diagram.svg')
+        ...     doctest='docs/_static/lambek/tree-to-diagram.svg')
 
-        .. image:: /_static/grammar/tree-to-diagram.svg
+        .. image:: /_static/lambek/tree-to-diagram.svg
             :align: center
         """
         return self.root.to_diagram()\
@@ -179,7 +179,7 @@ class Tree:
         >>> print(Tree.from_nltk(t))
         S(I, VP(saw, him))
         >>> Tree.from_nltk(t).branches[0]
-        grammar.cfg.Word('I', monoidal.Ty(monoidal.Wire('NP')))
+        lambek.cfg.Word('I', monoidal.Ty(monoidal.Wire('NP')))
 
         A word is typed by the label of the tree it sits in.
 

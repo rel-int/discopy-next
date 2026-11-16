@@ -197,7 +197,7 @@ In particular, DisCoPy can draw the grammatical structure of natural language se
 See Lambek, [From Word To Sentence (2008)](http://www.math.mcgill.ca/barr/lambek/pdffiles/2008lambek.pdf) for an introduction.
 
 ```python
-from discopy.grammar.pregroup import Ty, Word, Cup
+from discopy.lambek.pregroup import Ty, Word, Cup
 
 s, n = Ty('s'), Ty('n')  # sentence and noun
 Alice, Bob = Word('Alice', n), Word('Bob', n)
@@ -209,7 +209,7 @@ sentence.foliation().draw(doctest="docs/_static/readme/alice-loves-bob.svg")
 
 ![Alice loves Bob](https://github.com/discopy/discopy/raw/main/docs/_static/readme/alice-loves-bob.svg)
 
-Many other grammatical frameworks can be encoded as diagrams, e.g. [`cfg`](https://docs.discopy.org/en/main/_api/discopy.grammar.cfg.html) (context-free), [`categorial`](https://docs.discopy.org/en/main/_api/discopy.grammar.categorial.html) and [`dependency`](https://docs.discopy.org/en/main/_api/discopy.grammar.dependency.html) grammars.
+Many other grammatical frameworks can be encoded as diagrams, e.g. [`cfg`](https://docs.discopy.org/en/main/_api/discopy.lambek.cfg.html) (context-free), [`categorial`](https://docs.discopy.org/en/main/_api/discopy.lambek.categorial.html) and [`dependency`](https://docs.discopy.org/en/main/_api/discopy.lambek.dependency.html) grammars.
 
 ### Functors & Rewrites
 
@@ -221,7 +221,7 @@ Applied to pregroup diagrams, DisCoPy implements the
 [Clark, Coecke, Sadrzadeh (2008)](http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.363.8703&rep=rep1&type=pdf).
 
 ```python
-from discopy.grammar import pregroup
+from discopy.lambek import pregroup
 from discopy.tensor import Dim, Tensor
 
 F = pregroup.Functor(
@@ -236,7 +236,7 @@ assert F(sentence)
 The result can then be simplified using `diagram.normalize()` to remove the snakes, this is called [autonomisation](https://arxiv.org/abs/1411.3827).
 
 ```python
-from discopy.grammar.pregroup import Cap, Box
+from discopy.lambek.pregroup import Cap, Box
 
 def wiring(word):
     if word.cod == n:  # word is a noun

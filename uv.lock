@@ -926,6 +926,11 @@ grammar = [
     { name = "torch", version = "2.13.0", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform != 'linux'" },
     { name = "torch", version = "2.13.0+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "sys_platform == 'linux'" },
 ]
+lambek = [
+    { name = "nltk" },
+    { name = "torch", version = "2.13.0", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform != 'linux'" },
+    { name = "torch", version = "2.13.0+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "sys_platform == 'linux'" },
+]
 notebooks = [
     { name = "anywidget" },
     { name = "ipykernel" },
@@ -1017,7 +1022,7 @@ test = [
 [package.dev-dependencies]
 all = [
     { name = "coverage" },
-    { name = "discopy", extra = ["docs", "grammar", "notebooks", "optyx", "quantum", "tensor"] },
+    { name = "discopy", extra = ["docs", "lambek", "notebooks", "optyx", "quantum", "tensor"] },
     { name = "egglog" },
     { name = "hypothesis" },
     { name = "marimo" },
@@ -1047,8 +1052,8 @@ dev = [
 docs = [
     { name = "discopy", extra = ["docs"] },
 ]
-grammar = [
-    { name = "discopy", extra = ["grammar"] },
+lambek = [
+    { name = "discopy", extra = ["lambek"] },
 ]
 notebooks = [
     { name = "discopy", extra = ["notebooks"] },
@@ -1069,7 +1074,8 @@ requires-dist = [
     { name = "cotengra", marker = "extra == 'optyx'" },
     { name = "cotengra", marker = "extra == 'tensor'" },
     { name = "coverage", marker = "extra == 'test'" },
-    { name = "discopy", extras = ["grammar", "notebooks", "optyx", "quantum"], marker = "extra == 'test'" },
+    { name = "discopy", extras = ["lambek"], marker = "extra == 'grammar'" },
+    { name = "discopy", extras = ["lambek", "notebooks", "optyx", "quantum"], marker = "extra == 'test'" },
     { name = "discopy", extras = ["notebooks", "optyx"], marker = "extra == 'docs'" },
     { name = "graphix", marker = "extra == 'optyx'", specifier = ">=0.4" },
     { name = "hypothesis", marker = "extra == 'test'" },
@@ -1085,7 +1091,7 @@ requires-dist = [
     { name = "matplotlib" },
     { name = "myst-parser", marker = "extra == 'docs'", specifier = "==2.0.*" },
     { name = "networkx" },
-    { name = "nltk", marker = "extra == 'grammar'" },
+    { name = "nltk", marker = "extra == 'lambek'" },
     { name = "numpy" },
     { name = "opt-einsum", marker = "extra == 'optyx'" },
     { name = "opt-einsum", marker = "extra == 'tensor'" },
@@ -1123,20 +1129,20 @@ requires-dist = [
     { name = "sympy", marker = "extra == 'quantum'" },
     { name = "tensornetwork", marker = "extra == 'quantum'" },
     { name = "torch", marker = "sys_platform == 'linux' and extra == 'docs'", index = "https://download.pytorch.org/whl/cpu" },
-    { name = "torch", marker = "sys_platform == 'linux' and extra == 'grammar'", index = "https://download.pytorch.org/whl/cpu" },
+    { name = "torch", marker = "sys_platform == 'linux' and extra == 'lambek'", index = "https://download.pytorch.org/whl/cpu" },
     { name = "torch", marker = "sys_platform == 'linux' and extra == 'quantum'", index = "https://download.pytorch.org/whl/cpu" },
     { name = "torch", marker = "sys_platform != 'linux' and extra == 'docs'" },
-    { name = "torch", marker = "sys_platform != 'linux' and extra == 'grammar'" },
+    { name = "torch", marker = "sys_platform != 'linux' and extra == 'lambek'" },
     { name = "torch", marker = "sys_platform != 'linux' and extra == 'quantum'" },
     { name = "tqdm", marker = "extra == 'notebooks'" },
 ]
-provides-extras = ["tensor", "quantum", "grammar", "optyx", "test", "notebooks", "docs"]
+provides-extras = ["tensor", "quantum", "lambek", "grammar", "optyx", "test", "notebooks", "docs"]
 
 [package.metadata.requires-dev]
 all = [
     { name = "coverage" },
     { name = "discopy", extras = ["docs"] },
-    { name = "discopy", extras = ["grammar"] },
+    { name = "discopy", extras = ["lambek"] },
     { name = "discopy", extras = ["notebooks"] },
     { name = "discopy", extras = ["optyx"] },
     { name = "discopy", extras = ["quantum"] },
@@ -1168,7 +1174,7 @@ dev = [
     { name = "ty", specifier = "==0.0.69" },
 ]
 docs = [{ name = "discopy", extras = ["docs"] }]
-grammar = [{ name = "discopy", extras = ["grammar"] }]
+lambek = [{ name = "discopy", extras = ["lambek"] }]
 notebooks = [{ name = "discopy", extras = ["notebooks"] }]
 optyx = [{ name = "discopy", extras = ["optyx"] }]
 quantum = [{ name = "discopy", extras = ["quantum"] }]
