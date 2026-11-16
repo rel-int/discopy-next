@@ -33,6 +33,7 @@ DisCoPy is a Python toolkit for computing with [string diagrams](https://en.wiki
 * a `Drawing` data structure for labeled graphs embedded in the plane
 * a `Term` data structure for lambda terms in the internal language of (bi)closed monoidal categories and their translation back and forth to diagrams
 * a `Hypergraph` data structure for string diagrams in hypergraph categories, with its restrictions down the hierarchy (monoidal, symmetric, feedback, Markov, compact, ...) and double-pushout rewriting, and monoidal e-graphs (`discopy.egraph`), also called e-hypergraphs, i.e. e-graphs of diagrams with sharing
+* constraint satisfaction problems (`discopy.csp`): an instance is a `Hypergraph` with a variable as a spider and a constraint as a box on its scope, a language is a functor to `Tensor[bool]` that sends it to the projection of its solutions on its outputs, and over `int` counts them
 * a `CMap` (combinatorial map) data structure for string diagrams in compact categories and its restrictions to symmetric, (bi)closed and traced categories. The orientation on boxes can also help to enforce planarity.
 * a `Stream` data structure, an implementation of [monoidal streams](https://arxiv.org/abs/2212.14494) as a [category with delayed feedback](https://doi.org/10.1051/ita:2002009)
 * the `Int`-construction, also called the [geometry of interaction](https://ncatlab.org/nlab/show/Geometry+of+Interaction), i.e. the free tortile/compact closed category on a balanced/symmetric traced category

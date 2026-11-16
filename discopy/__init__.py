@@ -36,6 +36,7 @@ from discopy import (
     monad,
     matrix,
     tensor,
+    csp,
     hopf,
     group,
     quantum,
