@@ -99,3 +99,28 @@ def test_a_false_nullary_constraint_has_no_solution():
     graph = instance([("no", ())], [X])
     assert list(language.solutions(graph)) == []
     assert language.functor(int)(graph).array.item() == 0
+
+
+@settings(max_examples=60, deadline=None)
+@given(problems(), st.data())
+def test_a_box_bent_to_have_inputs_is_the_same_constraint(problem, data):
+    """ Bending the first legs of each box into inputs, as a diagram drawn
+    in the plane does, changes neither the solutions nor their count. """
+    graph, language = problem
+    sorts = graph.spider_types
+    boxes, box_wires = [], []
+    for name, scope in scopes(graph):
+        k = data.draw(st.integers(0, len(scope)))
+        boxes.append(frobenius.Box(
+            name, frobenius.Ty().tensor(*(sorts[i] for i in scope[:k])),
+            frobenius.Ty().tensor(*(sorts[i] for i in scope[k:]))))
+        box_wires.append((scope[:k], scope[k:]))
+    bent = frobenius.Hypergraph(
+        frobenius.Ty(), graph.cod, tuple(boxes),
+        ((), tuple(box_wires), graph.cod_wires), spider_types=sorts)
+    assert scopes(bent) == scopes(graph)
+    assert sorted(language.solutions(bent)) == sorted(
+        language.solutions(graph))
+    assert np.array_equal(
+        np.asarray(language.functor(int)(bent).array),
+        np.asarray(language.functor(int)(graph).array))

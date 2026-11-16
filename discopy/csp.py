@@ -99,15 +99,31 @@ def scopes(graph: frobenius.Hypergraph) -> list[Constraint]:
     ``instance(scopes(graph), graph.spider_types, graph.cod_wires)`` is the
     instance itself.
 
+    A box may also have inputs, bent into outputs as a hypergraph category
+    allows: its scope is the variables on its inputs, then on its outputs,
+    so that a diagram drawn in the plane, e.g. a maze with a wire per edge,
+    reads as the instance it draws.
+
     Parameters:
-        graph : An instance, a hypergraph with no input whose boxes have
-            no input.
+        graph : An instance, a hypergraph with no input.
+
+    Example
+    -------
+    >>> x = frobenius.Ty('x')
+    >>> neq = frobenius.Box("neq", x, x)
+    >>> chain = (frobenius.Spider(0, 1, x) >> neq >> neq).to_hypergraph()
+    >>> scopes(chain)
+    [('neq', (0, 1)), ('neq', (1, 2))]
+    >>> language = Language({x: 3}, {"neq": lambda a, b: a != b})
+    >>> language.functor(int)(chain)
+    Tensor[int]([4, 4, 4], dom=Dim(1), cod=Dim(3))
     """
-    if graph.dom or any(box.dom for box in graph.boxes):
+    if graph.dom:
         raise ValueError(
             f"Expected an instance, with no inputs, got {graph!r}.")
-    return [(box.name, cod_wires)
-            for box, (_, cod_wires) in zip(graph.boxes, graph.box_wires)]
+    return [(box.name, dom_wires + cod_wires)
+            for box, (dom_wires, cod_wires) in zip(
+                graph.boxes, graph.box_wires)]
 
 
 @dataclass
@@ -198,15 +214,16 @@ class Language:
     def array(self, box: cat.Box) -> list:
         """
         The relation of a constraint box as a flat list of booleans, one per
-        tuple of values of its sorts, in row-major order, by enumeration.
+        tuple of values of its sorts, its inputs then its outputs, in
+        row-major order, by enumeration.
 
         Parameters:
-            box : A box ``Box(name, Ty(), sorts)``.
+            box : A box ``Box(name, dom, cod)``.
         """
         if box not in self.arrays:
             predicate = self.predicates[box.name]
-            domains = [
-                self.domain(frobenius.Ty(obj)) for obj in box.cod.inside]
+            domains = [self.domain(frobenius.Ty(obj))
+                       for obj in (box.dom @ box.cod).inside]
             self.arrays[box] = [
                 bool(predicate(*values)) for values in product(*domains)]
         return self.arrays[box]
