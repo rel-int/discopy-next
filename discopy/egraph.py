@@ -513,9 +513,11 @@ class Builder:  # pylint: disable=too-many-instance-attributes  # egg's tables
         position = {s: n for n, s in enumerate(bound)}
         dom, cod = ([position.get(s, -1) for s in wires]
                     for wires in (lhs.dom_wires, lhs.cod_wires))
-        return list(dict.fromkeys((tuple(sorted(set(region))), *(
-            tuple(map((values + (None, )).__getitem__, at))
-            for at in (dom, cod))) for values, region in partial))
+        return list(dict.fromkeys((
+            tuple(sorted(set(region))),
+            tuple(map((values + (None, )).__getitem__, dom)),
+            tuple(map((values + (None, )).__getitem__, cod)))
+            for values, region in partial))
 
     @staticmethod
     def plan(ports: tuple[int, ...], bound: list[int]
@@ -1501,10 +1503,10 @@ class EGraph[category](
         rewired, and its ``i``-th box alone, then on one copied input if
         it reads one type. """
         graph, builder = history.fold(), history.graph.builder()
-        for name, *args in history.operations:
-            getattr(builder, name)(*args)
-        hypergraph, factory = graph.graph, cls.category.box_factory
-        boxes = tuple(factory(box.name, box.dom, box.cod)
+        for operation in history.operations:
+            getattr(builder, operation[0])(*operation[1:])
+        hypergraph = graph.graph
+        boxes = tuple(cls.category.box_factory(box.name, box.dom, box.cod)
                       for box in hypergraph.boxes)
         lhs = pattern(type(hypergraph)(
             hypergraph.dom, hypergraph.cod, boxes, hypergraph.wires))
