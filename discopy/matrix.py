@@ -291,15 +291,22 @@ class Matrix[dtype](
     def __le__(self, other):
         """
         The pointwise order on parallel matrices: every entry is at most
-        that of the ``other``, which has the same data type. A Boolean
-        matrix is a relation and the order is inclusion; composition, tensor
-        and transpose are monotone.
+        that of the ``other``. A Boolean matrix is a relation and the order
+        is inclusion; composition, tensor and transpose are monotone.
 
         >>> R, S = Matrix[bool]([1, 0, 0, 0], 2, 2), Matrix[bool].id(2)
         >>> assert R <= S and S >= R and not S <= R
         >>> assert R >> R <= S >> S and R @ R <= S @ S
         >>> assert not R <= Matrix[bool]([1, 1], 1, 2)
         >>> assert not Matrix([1, 2], 1, 2) <= Matrix([2, 1], 1, 2)
+
+        Matrices of different data types are not compared:
+
+        >>> R <= R.cast(int)
+        Traceback (most recent call last):
+        ...
+        TypeError: '<=' not supported between instances of 'Matrix[bool]' \
+and 'Matrix[int]'
 
         The complex numbers have no order, as in Python:
 
@@ -312,8 +319,7 @@ class Matrix[dtype](
             return NotImplemented
         if is_complex(self.dtype):
             raise TypeError(messages.MATRIX_ORDER_ERROR.format(self.dtype))
-        return self.dtype == other.dtype\
-            and (self.dom, self.cod) == (other.dom, other.cod)\
+        return (self.dom, self.cod) == (other.dom, other.cod)\
             and (self.array <= other.array).all()
 
     def is_close(self, other: Matrix, rtol: float = 1.e-8, atol: float = 1.e-8

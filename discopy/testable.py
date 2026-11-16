@@ -589,9 +589,9 @@ def inhabits(value, kind) -> bool:
     """
     Whether a value has an evaluated type of a sequent: a morphism of
     ``Hom[C, dom, cod]`` has that boundary, the value of ``Var[T, x]`` is
-    ``x``, an equation of ``Equation[T]`` has terms of type ``T``, a tuple of
-    ``tuple[T, ...]`` has its elements of these types and ``type[T]`` is a
-    subclass of ``T``.
+    ``x``, an equation of ``Equation[T]`` has terms of type ``T``, as an
+    inequation of ``Inequation[T]`` does, a tuple of ``tuple[T, ...]`` has
+    its elements of these types and ``type[T]`` is a subclass of ``T``.
 
     >>> from discopy.monoidal import Ty, Box, Diagram
     >>> x, y = Ty('x'), Ty('y')
@@ -599,6 +599,8 @@ def inhabits(value, kind) -> bool:
     >>> assert inhabits(f, Hom[Diagram, x, y])
     >>> assert not inhabits(f, Hom[Diagram, y, x])
     >>> assert inhabits(Equation(f, f), Equation[Hom[Diagram, x, y]])
+    >>> assert inhabits(Inequation(1, 2), Inequation[int])
+    >>> assert not inhabits(Equation(1, 2), Inequation[int])
     """
     origin, args = get_origin(kind), get_args(kind)
     if origin is Hom:
@@ -606,8 +608,8 @@ def inhabits(value, kind) -> bool:
             and (value.dom, value.cod) == args[1:]
     if origin is Var:
         return value == args[1]
-    if origin is Equation:
-        return isinstance(value, Equation) and all(
+    if isinstance(origin, type) and issubclass(origin, Equation):
+        return isinstance(value, origin) and all(
             inhabits(term, args[0]) for term in value.terms)
     if origin is tuple:
         if not isinstance(value, tuple):

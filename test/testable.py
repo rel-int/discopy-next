@@ -387,6 +387,10 @@ def test_axiom_of_an_inequation():
         law.failing("A full relation is not below the identity.")(
             f=Matrix[bool]([1, 1, 1, 1], 2, 2))
     assert isinstance(error.value.equation, Inequation)
+    full = Matrix[bool]([1, 1, 1, 1], 2, 2)
+    assert inhabits(law(f=full), law.output({Self: Matrix[bool]}))
+    assert not inhabits(Equation(full, full), Inequation[Matrix[bool]])
+    assert not inhabits(law(f=full), Inequation[Matrix[int]])
 
 
 def test_testable_generic():
