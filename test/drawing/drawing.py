@@ -1058,3 +1058,49 @@ def test_box_height_spans_its_wires():
     ys = {node.kind: y for node, (_, y) in drawing.positions.items()}
     assert ys["box-corner-00"] == ys["box_cod"] == 0.25
     assert ys["box-corner-01"] == ys["box_dom"] == 1.75
+
+
+def test_relayout_of_the_default_layout_draws_the_same():
+    from discopy import symmetric
+    from discopy.lambek.pregroup import Ty as PTy, Word, Cup as PCup
+    x, y = Ty('x'), Ty('y')
+    s, n = PTy('s'), PTy('n')
+    sentence = Word('Alice', n) @ Word('loves', n.r @ s @ n.l)\
+        @ Word('Bob', n) >> PCup(n, n.r) @ s @ PCup(n.l, n)
+    gallery = [
+        Box('f', x, x @ y, height=2) >> Box('g', x @ y, x),
+        Box('f', x, x).bubble(),
+        x @ Cap(x.r, x) >> Cup(x, x.r) @ x,
+        symmetric.Permutation(symmetric.Ty('x', 'y', 'z'), [2, 0, 1]),
+        Box('a_very_long_name', x, x, min_width=3) @ Box('g', y, y),
+        sentence.foliation()]
+    for diagram in gallery:
+        drawing = diagram.to_drawing()
+        relaid = drawing.relayout(drawing.layout())
+        assert relaid.to_svg() == drawing.to_svg()
+        assert relaid.layout() == drawing.layout()
+
+
+def test_relayout_refuses_what_is_not_the_same_diagram():
+    x = Ty('x')
+    drawing = (Box('f', x, x @ x) >> Box('g', x @ x, x)).to_drawing()
+    layout = drawing.layout()
+    nodes = drawing.relabel_nodes()
+    nodes.add_box_corners()
+    index = {node: 2 * k for k, node in enumerate(nodes.ordered_nodes())}
+    with raises(ValueError, match="expected"):
+        drawing.relayout(layout[:-1])
+    left, right = [node for node in nodes.ordered_nodes()
+                   if node.kind == "box_cod" and node.j == 0]
+    swapped = list(layout)
+    swapped[index[left]], swapped[index[right]]\
+        = layout[index[right]], layout[index[left]]
+    with raises(ValueError, match="same diagram"):
+        drawing.relayout(swapped)
+    corner = Node("box-corner-11", j=0)
+    narrow = list(layout)
+    narrow[index[corner]] = layout[index[left]] - 0.1
+    with raises(ValueError, match="same diagram"):
+        drawing.relayout(narrow)
+    with raises(ValueError, match="same diagram"):
+        drawing.relayout([-c for c in layout])

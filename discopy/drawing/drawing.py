@@ -212,6 +212,7 @@ The regions of a crossing follow its strands, see
 
 from __future__ import annotations
 
+import itertools
 from typing import NamedTuple, TYPE_CHECKING, Sequence
 from dataclasses import dataclass
 
@@ -234,6 +235,24 @@ def trailing_margin(ob) -> float:
     return max(
         0, getattr(ob, "right_margin", 0) - 0.5,
         getattr(ob, "min_right_margin", 0))
+
+
+def sign(number: float) -> int:
+    """ The sign of a number, -1, 0 or 1. """
+    return (number > 0) - (number < 0)
+
+
+def cross(a: Point, b: Point, c: Point, d: Point) -> bool:
+    """ Whether the segments ``ab`` and ``cd`` properly intersect. """
+    def side(p, q, r):
+        return sign((q.x - p.x) * (r.y - p.y) - (q.y - p.y) * (r.x - p.x))
+    return side(a, b, c) * side(a, b, d) < 0 and side(c, d, a) * side(
+        c, d, b) < 0
+
+
+def overlap(a: Point, b: Point, c: Point, d: Point) -> bool:
+    """ Whether the rectangles with corners ``a, b`` and ``c, d`` overlap. """
+    return a.x < d.x and c.x < b.x and a.y < d.y and c.y < b.y
 
 
 class PlaneGraph(NamedTuple):
@@ -472,6 +491,8 @@ which to_drawing recomputes.
         """
         for j, box in enumerate(self.boxes):
             box_node = Node("box", j=j, box=box)
+            if Node("box-corner-00", j=j) in self.positions:
+                continue
             box_x, box_y = self.positions[box_node]
             box_dom_nodes, box_cod_nodes = ([
                     Node(kind, i=i, j=j, x=x) for i, x in enumerate(xs)]
@@ -492,6 +513,160 @@ which to_drawing recomputes.
                     continue
             self.positions[box_node] = Point(
                 (right + left) / 2, self.positions[box_node].y)
+
+    def ordered_nodes(self) -> list[Node]:
+        """
+        The nodes of a drawing in a fixed order: by kind, then by box and wire.
+
+        >>> from discopy.monoidal import Box
+        >>> for node in Box('f', 'x', 'y').to_drawing().ordered_nodes():
+        ...     print(node)
+        Node('box', box=f, j=0)
+        Node('box_cod', i=0, j=0, x=y)
+        Node('box_dom', i=0, j=0, x=x)
+        Node('cod', i=0, x=y)
+        Node('dom', i=0, x=x)
+        """
+        return sorted(self.nodes, key=lambda node: (
+            node.kind, node.index, repr(node)))
+
+    def layout(self) -> tuple[float, ...]:
+        """
+        The geometry of a drawing as a vector: the coordinates of each of
+        :meth:`ordered_nodes` once its box corners are added, so that it holds
+        the width and the height of each box, the gaps between wires and the
+        heights of layers. :meth:`relayout` takes it back.
+
+        >>> from discopy.monoidal import Box
+        >>> Box('f', 'x', 'y').to_drawing().layout()
+        (0.5, 0.5, 0.25, 0.25, 0.25, 0.75, 0.75, 0.25, 0.75, 0.75, 0.5, 0.25, \
+0.5, 0.75, 0.5, 0, 0.5, 1)
+        """
+        drawing = self.relabel_nodes()
+        drawing.add_box_corners()
+        return tuple(coordinate for node in drawing.ordered_nodes()
+                     for coordinate in drawing.positions[node])
+
+    def relayout(self, layout: Sequence[float]) -> Drawing:
+        """
+        The drawing with the geometry of a vector given by :meth:`layout`.
+
+        Parameters:
+            layout : Two coordinates for each of the :meth:`ordered_nodes` of
+                the drawing with its box corners.
+
+        Raises:
+            ValueError : When the layout has the wrong length or when it is
+                not feasible, see :meth:`is_feasible`.
+
+        >>> from discopy.monoidal import Ty, Box
+        >>> x = Ty('x')
+        >>> drawing = (Box('f', x, x @ x) >> Box('g', x @ x, x)).to_drawing()
+        >>> svg = drawing.to_svg()
+        >>> assert drawing.relayout(drawing.layout()).to_svg() == svg
+        >>> wider = [2 * c for c in drawing.layout()]
+        >>> drawing.relayout(wider).draw(
+        ...     doctest='docs/_static/drawing/relayout.svg')
+
+        .. image:: /_static/drawing/relayout.svg
+            :align: center
+        """
+        reference = self.relabel_nodes()
+        reference.add_box_corners()
+        nodes = reference.ordered_nodes()
+        if len(layout) != 2 * len(nodes):
+            raise ValueError(messages.LAYOUT_LENGTH.format(
+                len(layout), 2 * len(nodes)))
+        positions = {node: Point(layout[2 * k], layout[2 * k + 1])
+                     for k, node in enumerate(nodes)}
+        result = reference.relabel_nodes(positions=positions)
+        result.width = reference.width + max(p.x for p in positions.values())\
+            - max(p.x for p in reference.positions.values())
+        result.height = reference.height + max(
+            p.y for p in positions.values()) - max(
+                p.y for p in reference.positions.values())
+        if not result.is_feasible(reference):
+            raise ValueError(messages.LAYOUT_NOT_FEASIBLE)
+        return result
+
+    def wires(self) -> list[tuple[Node, Node]]:
+        """
+        The edges of a drawing that are wires, i.e. not ending at a box node.
+
+        >>> from discopy.monoidal import Box
+        >>> len(Box('f', 'x', 'y').to_drawing().wires())
+        2
+        """
+        return sorted(((u, v) for u, v in self.edges
+                       if "box" not in (u.kind, v.kind)), key=repr)
+
+    def crossings(self) -> set[tuple[int, int]]:
+        """
+        The pairs of :meth:`wires`, by index, that cross away from their ends.
+
+        >>> from discopy.monoidal import Ty
+        >>> drawing = Drawing.id(Ty('x', 'y'))
+        >>> assert not drawing.crossings()
+        >>> x, y = drawing.cod_nodes
+        >>> drawing.relabel_nodes(positions={
+        ...     x: drawing.positions[y], y: drawing.positions[x]}).crossings()
+        {(0, 1)}
+        """
+        segments = [(self.positions[u], self.positions[v])
+                    for u, v in self.wires()]
+        return {(i, j) for i, (a, b) in enumerate(segments)
+                for j, (c, d) in enumerate(segments[i + 1:], i + 1)
+                if not {a, b} & {c, d} and cross(a, b, c, d)}
+
+    def rectangles(self) -> list[tuple[Point, Point]]:
+        """
+        The bottom left and top right corners of each box, once added by
+        :meth:`add_box_corners`.
+        """
+        return [(self.positions[Node("box-corner-00", j=j)],
+                 self.positions[Node("box-corner-11", j=j)])
+                for j, _ in enumerate(self.boxes)
+                if Node("box-corner-00", j=j) in self.positions]
+
+    def is_feasible(self, reference: Drawing) -> bool:
+        """
+        Whether a drawing with the nodes of a reference draws the same
+        diagram: no coordinate is negative, every edge keeps its direction up
+        or down, the same wires cross, the boxes that did not overlap still
+        do not and each box keeps its ports between its sides.
+
+        Parameters:
+            reference : The drawing it was laid out from.
+
+        >>> from discopy.monoidal import Ty, Box
+        >>> x = Ty('x')
+        >>> drawing = (Box('f', x, x) @ Box('g', x, x)).to_drawing()
+        >>> layout = list(drawing.layout())
+        >>> assert drawing.relabel_nodes().is_feasible(drawing)
+        >>> layout[1] += 10
+        >>> drawing.relayout(layout)
+        Traceback (most recent call last):
+        ...
+        ValueError: This layout does not draw the same diagram.
+        """
+        positions, old = self.positions, reference.positions
+        if any(min(p) < 0 for p in positions.values()):
+            return False
+        if any(sign(positions[u].y - positions[v].y)
+               != sign(old[u].y - old[v].y) for u, v in self.edges):
+            return False
+        if self.crossings() != reference.crossings():
+            return False
+        rectangles, before = self.rectangles(), reference.rectangles()
+        if any(overlap(*rectangles[i], *rectangles[j])
+               for i, j in itertools.combinations(range(len(rectangles)), 2)
+               if not overlap(*before[i], *before[j])):
+            return False
+        return all(
+            left.x <= positions[node].x <= right.x
+            for (left, right), j in zip(rectangles, itertools.count())
+            for node in self.nodes
+            if node.kind in ("box_dom", "box_cod") and node.j == j)
 
     def union(self, other, dom, cod, width=None, height=None, _check=True):
         """ Take the union of two drawings, assuming nodes are distinct. """
