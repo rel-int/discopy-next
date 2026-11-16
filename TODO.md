@@ -5,5 +5,5 @@
 > > Account for rotations when orienting equal-arity triangles: `f.r` points down like `f`, `f.conjugate()` points up though a conjugate is a horizontal reflection.
 
 - [x] read port positions by index, so tuples work: test a controlled triangle
-- [ ] apex of an equal-arity triangle flips with dagger and transpose, not conjugate: test f, f.r, f.dagger(), f.conjugate()
+- [x] apex of an equal-arity triangle flips with dagger and transpose, not conjugate: test f, f.r, f.dagger(), f.conjugate()
 - [ ] merge main
