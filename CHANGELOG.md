@@ -9,9 +9,6 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Added
 
-- A box is drawn as high as its `height`, its outline meeting its wires: the
-  layout already stacked layers by it, but the outline was always half a
-  wire high ([next#570]).
 - `csp.Language.propagate`, arc consistency: a set of candidates per
   variable, kept to the values each constraint supports, until no set
   shrinks or for a number of rounds. It removes no value a solution takes,
@@ -533,6 +530,9 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Fixed
 
+- A box is drawn as high as its `height`, its outline meeting its wires: the
+  layout already stacked layers by it, but the outline was always half a
+  wire high ([next#570]).
 - `CMap.explicit_trace` takes the number of wires to trace as its **first**
   argument, like `Hypergraph.explicit_trace`, so `CMap.trace` and
   `CMap.make_causal` hand it their count instead of looping: over a traced
