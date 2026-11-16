@@ -9,6 +9,15 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Added
 
+- `abc.LinearCategory`, a linear category (Bierman, TLCA 1995) without
+  symmetry: a comonad `bang` with `dereliction` and `digging`, lax monoidal
+  with a `laxator`, each `!x` a comonoid by `contraction` and `weakening`, and
+  an `exchange` of `!x` with any object, its 27 laws as axioms. `biclosed` is
+  the free one: `BangOb`, the wire `x.bang()` holding a type, `Bang`, the
+  bubble `f.bang()`, and the boxes `Dereliction`, `Digging`, `Contraction`,
+  `Weakening`, `Exchange` and `Laxator`, which a `Functor` sends through its
+  codomain's, or through its maps when its types are not biclosed. The laws
+  are declared failing on the free category ([next#571]).
 - `csp.Language.propagate`, arc consistency: a set of candidates per
   variable, kept to the values each constraint supports, until no set
   shrinks or for a number of rounds. It removes no value a solution takes,
@@ -1996,6 +2005,7 @@ for the changelog of `1.2.1` and earlier.
 [next#556]: https://github.com/rel-int/discopy-next/pull/556
 [next#557]: https://github.com/rel-int/discopy-next/pull/557
 [next#558]: https://github.com/rel-int/discopy-next/pull/558
+[next#571]: https://github.com/rel-int/discopy-next/pull/571
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#56]: https://github.com/rel-int/optyx/pull/56

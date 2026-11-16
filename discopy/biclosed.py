@@ -1187,7 +1187,7 @@ class Functor(monoidal.Functor):
     dom = cod = Diagram
 
     @property
-    def is_linear(self) -> bool:
+    def has_bang(self) -> bool:
         """
         Whether the codomain is a linear category whose objects are made of
         biclosed wires, which a :class:`BangOb` and the structural boxes are
@@ -1202,10 +1202,10 @@ class Functor(monoidal.Functor):
             issubclass(generator, Wire)
             or issubclass(ob, Ty) and generator is monoidal.Wire)
 
-    def map_linear(self, other):
+    def map_bang(self, other):
         """
         The image of a :class:`BangOb`, a :class:`Bang` or a structural box
-        in a linear codomain, see :attr:`is_linear`.
+        in a codomain with a bang, see :attr:`has_bang`.
 
         Parameters:
             other : The wire or box to map.
@@ -1224,7 +1224,7 @@ class Functor(monoidal.Functor):
     def __call__(self, other):
         if isinstance(other, (BangOb, Bang, Structural))\
                 and self.cod is not Drawing:
-            return self.map_linear(other) if self.is_linear\
+            return self.map_bang(other) if self.has_bang\
                 else monoidal.Functor.__call__(self, other)
         if isinstance(other, TermBase) and self.cod is not Drawing:
             if issubclass(get_origin(self.cod), hypergraph.Hypergraph)\
