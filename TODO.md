@@ -42,6 +42,6 @@
 
 - [x] discopy/csp.py:318 ** Enforce equal values for repeated variables in a scope** When a constraint mentions the same variable more…
 - [x] discopy/csp.py:318 ** Accumulate supported values without retaining every tuple** For high-arity constraints with many satisfyin…
-- [WIP] @session_01MEJxy5FM3MT3hk7p67LLmW-2026-11-16 18:06 discopy/csp.py:318 `propagate` treats repeated variables in a constraint scope as independent values.
+- [x] discopy/csp.py:318 `propagate` treats repeated variables in a constraint scope as independent values.
 - [WIP] @session_01MEJxy5FM3MT3hk7p67LLmW-2026-11-16 18:06 discopy/csp.py:319 A false nullary constraint is silently ignored because the support loop has no variables to prune.
 - [WIP] @session_01MEJxy5FM3MT3hk7p67LLmW-2026-11-16 18:06 test/csp.py:231 The new tests never pass `domains` to `propagate`.
