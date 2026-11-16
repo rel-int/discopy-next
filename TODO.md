@@ -24,7 +24,7 @@
 
 - [x] discopy/__init__.py:43 Dropping `grammar` from this import list means `import discopy` no longer exposes `discopy.grammar`, so exist…
 - [x] discopy/grammar.py:30 The shim only aliases submodules, so top-level names the old `discopy.grammar` package exported are lost.
-- [WIP] @session_01MEJxy4FrWd3ymhMeQGF7x8-2026-11-16 21:46 discopy/grammar.py:36 The neural alias only works if `discopy.lambek.neural` was imported earlier.
+- [x] discopy/grammar.py:36 The neural alias only works if `discopy.lambek.neural` was imported earlier.
 - [WIP] @session_01MEJxy4FrWd3ymhMeQGF7x8-2026-11-16 21:46 pyproject.toml:65 Removing the `grammar` extra breaks existing `pip install discopy[grammar]` commands.
 - [WIP] @session_01MEJxy4FrWd3ymhMeQGF7x8-2026-11-16 21:46 test/grammar.py:25 This test imports `discopy.grammar` itself before calling `loads`, which hides a load failure.
 - [WIP] @session_01MEJxy4FrWd3ymhMeQGF7x8-2026-11-16 21:47 test/biclosed.py:385 This assertion was the only check that legacy `grammar.categorial.Ty` JSON still loads, and the rename change…
