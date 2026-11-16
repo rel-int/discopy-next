@@ -9,6 +9,15 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Added
 
+- `tensor.Functor` contracts a `frobenius.Hypergraph` as it stands,
+  `Functor.spider_operands` writing its Einstein notation: one index per
+  spider however many ports it has, one array per box, the boundary as free
+  indices and a spider on no port summed alone, so that it counts its type.
+  With NumPy, a hypergraph lifts the default bound on intermediates for the
+  greedy path, the largest operand, which forbids every pairwise step when an
+  index is on many arrays: the 4×4 sudoku as 16 spiders and 12 boxes counts
+  its 288 grids in milliseconds, where its diagram raises `iterator is too
+  large` ([next#554]).
 - `Matrix.resolvent`, the inverse of `id - D` over a field, which a
   `Tensor` inherits, and with it
   `Matrix.trace` over `float` and `complex`: the trace of Haghverdi and
@@ -1963,6 +1972,7 @@ for the changelog of `1.2.1` and earlier.
 [next#545]: https://github.com/rel-int/discopy-next/pull/545
 [next#549]: https://github.com/rel-int/discopy-next/pull/549
 [next#550]: https://github.com/rel-int/discopy-next/pull/550
+[next#554]: https://github.com/rel-int/discopy-next/pull/554
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#56]: https://github.com/rel-int/optyx/pull/56
