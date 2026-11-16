@@ -1047,3 +1047,16 @@ def test_contractor_reads_the_active_backend():
     with backend('pytorch'):
         assert contractor.module is torch
     assert eval(repr(Quimb(NumPy()))) == Quimb(NumPy()) != Quimb()
+
+
+def test_Tensor_resolvent_reshapes_its_factors():
+    # A tensor has one axis per factor, its resolvent that of its matrix.
+    array = np.random.default_rng(0).uniform(0, .1, (2, 3, 2, 3))
+    f, size = Tensor[float](array, Dim(2, 3), Dim(2, 3)), 6
+    expected = np.linalg.inv(np.eye(size) - f.array.reshape(size, size))
+    assert np.allclose(f.resolvent().array.reshape(size, size), expected)
+    assert f.resolvent().dom == f.resolvent().cod == Dim(2, 3)
+    with raises(ValueError, match="partial"):
+        Tensor[float].id(Dim(2, 2)).resolvent()
+    with raises(TypeError):
+        Tensor[float].swap(Dim(2), Dim(3)).resolvent()

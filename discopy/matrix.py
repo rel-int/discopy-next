@@ -25,6 +25,7 @@ Summary
 
         backend
         set_backend
+        is_field
         get_backend
 
 See also
@@ -37,6 +38,7 @@ See also
 from __future__ import annotations
 
 from contextlib import contextmanager
+from math import isqrt, prod
 from operator import index
 from types import ModuleType
 from collections.abc import Sequence
@@ -87,6 +89,7 @@ class Matrix[dtype](
             noise
             basis
             repeat
+            resolvent
             trace
             lambdify
             subs
@@ -639,9 +642,45 @@ class Matrix[dtype](
             result, length = result >> result, 2 * length
         return result
 
+    def resolvent(self) -> Matrix:
+        """
+        The inverse of ``id - self`` over a field, see :func:`is_field`, i.e.
+        the sum of its powers where it converges, raising ``TypeError`` over
+        integers, ``ValueError`` when singular unless traced by ``jax.jit``.
+
+        Example
+        -------
+        >>> Matrix[float]([0, 1, 0, 0], 2, 2).resolvent()
+        Matrix[float]([1., 1., 0., 1.], dom=Nat(2), cod=Nat(2))
+        >>> Matrix[float]([1], 1, 1).resolvent()
+        Traceback (most recent call last):
+            ...
+        ValueError: id - D is singular: the trace over a field is partial.
+        """
+        if self.dom != self.cod or not is_field(self.dtype):
+            raise TypeError(messages.MATRIX_RESOLVENT_ERROR)
+        square = self.array.reshape(2 * (isqrt(prod(self.array.shape)), ))
+        with backend() as np:
+            try:
+                inverse = np.linalg.inv(np.eye(len(square)) - square)
+            except getattr(np.linalg, "LinAlgError", ()) as error:
+                raise ValueError(messages.MATRIX_SINGULAR) from error
+            try:
+                singular = not np.isfinite(inverse).all()
+            except TypeError:
+                singular = False
+            if singular:
+                raise ValueError(messages.MATRIX_SINGULAR)
+            return type(self)(inverse, self.dom, self.cod)
+
     def trace(self, n=1, left=False) -> Matrix:
         """
-        The trace of a Boolean matrix, computed with :meth:`Matrix.repeat`.
+        The partial trace ``A + B >> D* >> C`` of a matrix with blocks
+        ``A: dom -> cod``, ``B: dom -> n``, ``C: n -> cod``, ``D: n -> n``,
+        with ``D*`` the :meth:`repeat` over ``bool`` and the
+        :meth:`resolvent` over a field: the trace of Haghverdi and Scott,
+        defined when ``id - D`` is invertible, see :cite:t:`MalherbeEtAl11`,
+        Definition 3.11, and the sum over unrollings when ``D`` is nilpotent.
 
         Parameters:
             n : The number of dimensions to trace.
@@ -654,6 +693,8 @@ class Matrix[dtype](
         >>> f = Matrix[bool]([[1, 1], [0, 0]], 2, 2)
         >>> assert f.trace() == Matrix[bool]([[1]], 1, 1)
         >>> assert f.trace(left=True) == Matrix[bool]([[0]], 1, 1)
+        >>> g = Matrix[float]([[0.5, 1], [1, 0.25]], 2, 2)
+        >>> assert g.trace().is_close(Matrix[float]([[0.5 + 4 / 3]], 1, 1))
         """
         dom, cod = index(self.dom) - n, index(self.cod) - n
         if left:
@@ -663,7 +704,8 @@ class Matrix[dtype](
                                   self.ones(dom) @ self.id(n)]
                       for column in [self.id(cod) @ self.discard(n),
                                      self.discard(cod) @ self.id(n)])
-        return A + (B >> D.repeat() >> C)
+        star = D.repeat() if self.dtype == bool else D.resolvent()
+        return A + (B >> star >> C)
 
     def lambdify(
             self, *symbols: "sympy.Symbol", dtype=None, **kwargs) -> Callable:
@@ -877,6 +919,16 @@ class Quimb(Contractor):
         result = method(output_inds=[f"w{j}" for j in output],
                         optimize=optimize, **params)
         return result.data if isinstance(result, qtn.Tensor) else result
+
+
+def is_field(dtype) -> bool:
+    """ Whether a ``dtype`` is floating-point or complex, in any backend. """
+    flags = ("is_floating_point", "is_floating", "is_complex")
+    with backend("numpy") as numpy:
+        return any(getattr(dtype, flag, False) is True for flag in flags)\
+            or getattr(dtype, "kind", None) in ("f", "c")\
+            or isinstance(dtype, type)\
+            and issubclass(dtype, (float, complex, numpy.inexact))
 
 
 BACKENDS = {

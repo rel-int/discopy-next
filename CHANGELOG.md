@@ -9,6 +9,14 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Added
 
+- `Matrix.resolvent`, the inverse of `id - D` over a field, which a
+  `Tensor` inherits, and with it
+  `Matrix.trace` over `float` and `complex`: the trace of Haghverdi and
+  Scott, `A + B (id - D)^-1 C`, a partial trace raising `ValueError` when
+  `id - D` is singular (Malherbe, Scott and Selinger, arXiv:1107.3608,
+  Definition 3.11). `bool` keeps the Kleene star, any other dtype raises
+  `TypeError`; `matrix.is_field` says which dtypes are a field, in any
+  backend ([next#550]).
 - `egraph.Builder.matches`, e-matching on the builder as a join over its
   tables, one relation per head indexed as a match asks so that `add` pays
   nothing, a match being a row of the join of the atoms of the pattern, as in
@@ -1954,6 +1962,7 @@ for the changelog of `1.2.1` and earlier.
 [next#541]: https://github.com/rel-int/discopy-next/issues/541
 [next#545]: https://github.com/rel-int/discopy-next/pull/545
 [next#549]: https://github.com/rel-int/discopy-next/pull/549
+[next#550]: https://github.com/rel-int/discopy-next/pull/550
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#56]: https://github.com/rel-int/optyx/pull/56

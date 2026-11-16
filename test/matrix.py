@@ -4,8 +4,8 @@ import numpy as np
 import pytest
 from pytest import raises
 
-from discopy.abc import DaggerCategory, Nat
-from discopy.matrix import Matrix, backend
+from discopy.abc import DaggerCategory, Nat, TracedCategory
+from discopy.matrix import Matrix, backend, is_field
 from discopy.symmetric import Ty, Permutation, Swap, Functor
 from discopy.tensor import Tensor, Dim
 from discopy.utils import AxiomError, Subscript, dumps, loads
@@ -16,6 +16,76 @@ def test_Matrix_trace_left():
     assert f.trace() == Matrix[bool]([[1]], 1, 1)
     assert f.trace(left=True) == Matrix[bool]([[0]], 1, 1)
     assert Matrix[bool].swap(1, 1).trace(left=True) == Matrix[bool].id(1)
+
+
+def test_trace_over_a_field_is_the_sum_over_unrollings_when_acyclic():
+    rng = np.random.default_rng(0)
+    for dtype in (float, complex):
+        for dom, cod, n in [(1, 1, 1), (2, 3, 2), (0, 2, 3), (3, 1, 4)]:
+            array = rng.integers(-3, 4, (dom + n, cod + n)).astype(dtype)
+            array[dom:, cod:] = np.triu(array[dom:, cod:], k=1)
+            f = Matrix[dtype](array, dom + n, cod + n)
+            A, B = array[:dom, :cod], array[:dom, cod:]
+            C, D = array[dom:, :cod], array[dom:, cod:]
+            unrolled = A + sum(
+                B @ np.linalg.matrix_power(D, k) @ C for k in range(n + 1))
+            assert f.trace(n).is_close(Matrix[dtype](unrolled, dom, cod))
+            assert f.trace(n).dtype == dtype
+
+
+def test_trace_over_a_field_is_partial():
+    f = Matrix[float]([[0.5, 1], [1, 1]], 2, 2)
+    with raises(ValueError, match="partial"):
+        f.trace()
+    with raises(ValueError, match="partial"):
+        Matrix[complex].id(2).trace(left=True)
+    assert Matrix[float].id(2).trace(0) == Matrix[float].id(2)
+    ill_conditioned = Matrix[float]([[0, 1e8], [0, 0]], 2, 2)
+    assert ill_conditioned.resolvent()\
+        == Matrix[float]([[1, 1e8], [0, 1]], 2, 2)
+
+
+def test_trace_needs_booleans_or_a_field():
+    f = Matrix[int]([[0, 1], [1, 0]], 2, 2)
+    with raises(TypeError):
+        f.trace()
+    assert f.cast(float).trace() == Matrix[float]([[1]], 1, 1)
+
+
+def test_trace_over_a_field_satisfies_the_traced_laws():
+    # Matrix is not enrolled as a TracedCategory, so the property matrix has
+    # no traced cell for it: the laws are stated on arrays here, with entries
+    # small enough for every trace they take to be defined.
+    rng, M = np.random.default_rng(0), Matrix[float]
+
+    def matrix(dom, cod):
+        return M(rng.uniform(0, .2, (dom, cod)), dom, cod)
+
+    def holds(equation):
+        first, *others = equation.terms
+        return all(first.is_close(other) for other in others)
+
+    laws = {name: getattr(TracedCategory, name).function for name in (
+        "yanking", "trace_vanishing", "trace_iteration_left",
+        "trace_iteration_right", "trace_superposing_left",
+        "trace_superposing_right", "trace_naturality_left",
+        "trace_naturality_right", "trace_dinaturality_left",
+        "trace_dinaturality_right")}
+    assert holds(laws["yanking"](M, Nat(1)))
+    for _ in range(20):
+        a, b, m, s, t = (int(x) for x in rng.integers(0, 3, 5))
+        assert holds(laws["trace_vanishing"](M, matrix(a, b)))
+        for side in ("left", "right"):
+            f = matrix(m + a, m + b)
+            assert holds(laws[f"trace_iteration_{side}"](M, f, Nat(m)))
+            f = matrix(1 + a, 1 + b)
+            assert holds(laws[f"trace_superposing_{side}"](M, f, Nat(s)))
+            f, g = matrix(1 + s + b, 1 + s + a), matrix(a, b)
+            assert holds(laws[f"trace_naturality_{side}"](M, Nat(1 + s), f, g))
+            f, g = matrix(1 + s + a, 1 + t + b), matrix(1 + t, 1 + s)
+            if side == "right":
+                f = matrix(a + 1 + s, b + 1 + t)
+            assert holds(laws[f"trace_dinaturality_{side}"](M, f, g))
 
 
 def test_bad_composition():
@@ -71,6 +141,32 @@ def test_autotyping():
     with backend('pytorch'):
         assert Matrix([0.5, 0.5], dom=1, cod=2).dtype == torch.float32
 
+
+
+def test_trace_over_a_field_in_jax():
+    pytest.importorskip("jax")
+    with backend("jax"):
+        f = Matrix([[0.5, 1.], [1., 0.25]], 2, 2)
+        assert f.trace().is_close(Matrix([[0.5 + 4 / 3]], 1, 1), rtol=1e-5)
+        with raises(ValueError, match="partial"):
+            Matrix([[0.5, 1.], [1., 1.]], 2, 2).trace()
+
+    def trace(array):
+        with backend("jax"):
+            return Matrix(array, 2, 2).trace().array
+
+    jax = pytest.importorskip("jax")
+    traced = jax.jit(trace)(np.array([[0.5, 1.], [1., 0.25]]))
+    assert np.allclose(traced, [[0.5 + 4 / 3]], rtol=1e-5)
+
+
+def test_is_field():
+    assert is_field(float) and is_field(complex) and not is_field(int)
+    assert is_field(np.float32) and not is_field(object) and not is_field(bool)
+    assert is_field(np.dtype("float64")) and not is_field(np.dtype("int64"))
+    torch = pytest.importorskip("torch")
+    assert is_field(torch.float32) and is_field(torch.complex64)
+    assert not is_field(torch.int64) and not is_field(torch.bool)
 
 
 def test_permutation():

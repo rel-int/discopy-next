@@ -41,6 +41,10 @@ NOT_RIGID_ADJOINT = "{} is not the left adjoint of {}, maybe you meant to use"\
 MISSING_TYPES_FOR_EMPTY_SUM = "Empty sum needs a domain and codomain."
 MATRIX_REPEAT_ERROR = "The reflexive transitive closure is only defined for "\
                       "square boolean matrices."
+MATRIX_RESOLVENT_ERROR = "The resolvent is only defined for square matrices "\
+                         "over a field, i.e. float or complex: a Matrix[int] "\
+                         "can be cast to float first."
+MATRIX_SINGULAR = "id - D is singular: the trace over a field is partial."
 BOX_IS_MIXED = "Pure boxes can have only digits or only qudits as dom and cod."
 LAYERS_MUST_HAVE_A_BOX = "Layers must have at least one box."
 NOT_MERGEABLE = "Layers {} and {} cannot be merged."
