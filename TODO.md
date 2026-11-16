@@ -18,4 +18,4 @@
 - [x] biclosed: Dereliction, Digging, Contraction, Weakening, Exchange, Laxator
 - [x] biclosed: Functor through cod.bang and the primitives, else ob_map/ar_map
 - [x] biclosed: the laws declared failing on the free category, testable.Bang, proptest cells, rigid's inherited cells
-- [WIP] @session_01MEJxy2QJCwia83KHppaJ1H-2026-11-16 21:55 tests in test/biclosed.py and test/abc.py, the brief's doctests, CHANGELOG
+- [x] tests in test/biclosed.py and test/abc.py, the brief's doctests, CHANGELOG
