@@ -6,7 +6,7 @@
 # `pyproject.toml` pins torch to the CPU index at download.pytorch.org on
 # Linux, whose index page links the wheels and their metadata from
 # download-r2.pytorch.org. A session whose network policy does not allow both
-# hosts cannot sync the `quantum` and `grammar` extras, nor run `uv lock`, and
+# hosts cannot sync the `quantum` and `lambek` extras, nor run `uv lock`, and
 # every torch test used to be skipped: the fallback syncs everything but torch
 # and installs the locked version from PyPI, which ships CUDA wheels that run
 # on the CPU. The allowlist is the better fix.

@@ -33,7 +33,7 @@ def test_Functor_phased_spider():
 
 
 def test_Spider_dagger():
-    from discopy.grammar import pregroup
+    from discopy.lambek import pregroup
     x = Ty('x')
     phased, box = Spider(1, 1, x, .5), Box('box', x, x)
     F = Functor({x: x}, {phased: box})

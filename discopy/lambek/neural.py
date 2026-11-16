@@ -26,7 +26,7 @@ Summary
 Parsing in two steps
 --------------------
 
-A parser goes from words to a :class:`discopy.grammar.proofnet.ProofNet` in
+A parser goes from words to a :class:`discopy.lambek.proofnet.ProofNet` in
 two steps, the two halves of a proof net: the sequent, then the linking
 (Kogkalidis, Moortgat and Moot, `Neural proof nets (2020)
 <https://aclanthology.org/2020.conll-1.3/>`_). Both read the states of the
@@ -44,7 +44,7 @@ Deoskar, `Constructive type-logical supertagging with self-attention networks
 
 The :class:`Linker` scores each pair of a negative and a positive port, from
 the states of their words and what they are, and
-:meth:`discopy.grammar.proofnet.Sequent.decode` takes the best linking. A
+:meth:`discopy.lambek.proofnet.Sequent.decode` takes the best linking. A
 linking is a permutation of each block of ports, and a permutation matrix
 is a vertex of the polytope of doubly stochastic matrices: :func:`sinkhorn`
 normalises scores to the nearest such matrix in entropy, and the linker is
@@ -54,7 +54,7 @@ trained on the likelihood of the gold permutation there (Mena et al.,
 the normalisation, so that decoding takes the raw scores. The goal of the
 sentence need not be given: by default it is the smallest type that the count
 invariant of the predicted types allows, see
-:meth:`discopy.grammar.proofnet.Sequent.infer`.
+:meth:`discopy.lambek.proofnet.Sequent.infer`.
 
 A tagger trained on several languages at once over one signature can keep each
 language within its own atoms, a sub-signature, both in its loss and in its
@@ -67,10 +67,10 @@ Taking the most likely type of each word, then the best linking of the
 sequent they make, fails whenever that sequent has no goal or that linking
 no term. :meth:`Parser.search` searches the space of proof nets instead: it
 enumerates the ``depth`` best sequents of the ``k`` most likely types of each
-word best first, with :func:`discopy.grammar.proofnet.products`, tries the
+word best first, with :func:`discopy.lambek.proofnet.products`, tries the
 ``width`` first that the count invariant gives a goal, i.e. those in its
 fibre over the goals, links each by the first of its ``links`` best linkings
-that is correct, :meth:`discopy.grammar.proofnet.Sequent.linkings`, and
+that is correct, :meth:`discopy.lambek.proofnet.Sequent.linkings`, and
 returns the net of highest joint score, the log-probability of its types
 plus a weight times that of its linking, :meth:`Linker.log_likelihood`.
 Sinkhorn normalisation only shifts the rows and the columns of each block,
@@ -79,8 +79,8 @@ so that it ranks the linkings of a sequent as the scores do.
 Example
 -------
 >>> import torch
->>> from discopy.grammar.abstract import Ty
->>> from discopy.grammar.proofnet import ProofNet
+>>> from discopy.lambek.abstract import Ty
+>>> from discopy.lambek.proofnet import ProofNet
 >>> n, s = Ty("n"), Ty("s")
 >>> Alice, loves, Bob = n("Alice"), (n >> (n >> s))("loves"), n("Bob")
 >>> nets = [ProofNet.from_term(loves(y)(x), (x, loves, y))
@@ -109,8 +109,8 @@ from dataclasses import dataclass
 import torch  # pylint: disable=import-error  # torch is an extra
 from torch import nn  # pylint: disable=import-error  # torch is an extra
 
-from discopy.grammar.abstract import Ty
-from discopy.grammar.proofnet import Sequent, ProofNet, ports, products
+from discopy.lambek.abstract import Ty
+from discopy.lambek.proofnet import Sequent, ProofNet, ports, products
 from discopy.utils import AxiomError
 
 
@@ -500,7 +500,7 @@ class Parser(nn.Module):
             states : Their states, ``(length, hidden)``.
             goal : The type of the sentence, by default the smallest one
                 their types allow, see
-                :meth:`discopy.grammar.proofnet.Sequent.infer`.
+                :meth:`discopy.lambek.proofnet.Sequent.infer`.
             atoms : The atoms of the types, all of them by default.
         """
         mask = states.new_ones(1, len(states), dtype=torch.bool)
@@ -528,19 +528,19 @@ class Parser(nn.Module):
             states : Their states, ``(length, hidden)``.
             goal : The type of the sentence, by default the smallest one
                 each sequent allows, see
-                :meth:`discopy.grammar.proofnet.Sequent.infer`.
+                :meth:`discopy.lambek.proofnet.Sequent.infer`.
             atoms : The atoms of the types, all of them by default.
             k : The number of types of each word.
             width : The number of sequents with a goal tried, i.e. those
-                :meth:`discopy.grammar.proofnet.Sequent.infer` accepts or,
+                :meth:`discopy.lambek.proofnet.Sequent.infer` accepts or,
                 with a goal given, those balanced with it, see
-                :attr:`discopy.grammar.proofnet.Sequent.is_balanced`.
+                :attr:`discopy.lambek.proofnet.Sequent.is_balanced`.
             weight : The weight of the linking in the joint score.
             skip : A type whose words are left out of the sequent, e.g.
                 the punctuation a treebank does not use.
             depth : The number of sequents enumerated, ``width`` by default.
             links : The number of linkings tried for each sequent, see
-                :meth:`discopy.grammar.proofnet.Sequent.linkings`.
+                :meth:`discopy.lambek.proofnet.Sequent.linkings`.
 
         Example
         -------
@@ -552,7 +552,7 @@ class Parser(nn.Module):
         >>> net = parser.search(
         ...     ["Alice", "loves", "Bob"], torch.zeros(3, 8), k=2, width=2)
         >>> net.sequent.goal
-        grammar.abstract.Ty(closed.Wire('s'))
+        lambek.abstract.Ty(closed.Wire('s'))
         """
         mask = states.new_ones(1, len(states), dtype=torch.bool)
         beams = self.tagger.beam(states[None], mask, k=k, atoms=atoms)

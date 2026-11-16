@@ -376,14 +376,15 @@ def test_Wire_reads_back_main():
     monoidal ones of dumps, pickles and printed text from before read back as
     such, in categorial types too. """
     import pickle
-    from discopy.grammar import categorial
+    from discopy.lambek import categorial
     x = Ty('x')
     assert Ty(Wire('x')) == x == Ty(cat.Ob('x')) and type(x.inside[0]) is Wire
     assert eval("biclosed.Ty(monoidal.Wire('x'))") == x
     wire = '{"factory": "monoidal.Wire", "name": "x"}'
     assert loads('{"factory": "biclosed.Ty", "inside": [' + wire + ']}') == x
-    assert loads('{"factory": "grammar.categorial.Ty", "inside": ['
-                 + wire + ']}') == categorial.Ty('x')
+    for module in ("lambek", "grammar"):
+        assert loads('{"factory": "' + module + '.categorial.Ty", "inside": ['
+                     + wire + ']}') == categorial.Ty('x')
     assert pickle.loads(
         b'\x80\x04\x95\xab\x00\x00\x00\x00\x00\x00\x00\x8c\x10discopy.bicl'
         b'osed\x94\x8c\x02Ty\x94\x93\x94)\x81\x94}\x94(\x8c\x03dom\x94\x8c'
@@ -416,7 +417,7 @@ def test_pow_is_over():
     written with it, built by hand or read back from a dump of main. """
     import json
     from discopy import rigid
-    from discopy.grammar import categorial, pregroup
+    from discopy.lambek import categorial, pregroup
     for module in (biclosed, rigid, pregroup, categorial):
         x, y = module.Ty('x'), module.Ty('y')
         assert x ** y == x << y
@@ -442,7 +443,7 @@ def test_pow_reads_back_main_at_its_level():
     import base64
     import pickle
     import zlib
-    from discopy.grammar import categorial
+    from discopy.lambek import categorial
     x, y = categorial.Ty('x'), categorial.Ty('y')
     assert categorial.Ty(Exp(x, y)) == x ** y == x << y
     old = pickle.loads(zlib.decompress(base64.b64decode(
