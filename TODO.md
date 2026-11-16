@@ -12,4 +12,4 @@
 - [WIP] @session_01MEJxy2QJCwia83KHppaJ1H-2026-11-16 21:15 biclosed: Dereliction, Digging, Contraction, Exchange
 - [WIP] @session_01MEJxy2QJCwia83KHppaJ1H-2026-11-16 21:15 biclosed: Functor through cod.bang, else ob_map/ar_map
 - [WIP] @session_01MEJxy2QJCwia83KHppaJ1H-2026-11-16 21:15 biclosed: the laws declared failing on the free category, testable.Bang, proptest cells
-- [ ] tests in test/biclosed.py and test/abc.py, the brief's doctests, CHANGELOG
+- [WIP] @session_01MEJxy2QJCwia83KHppaJ1H-2026-11-16 21:15 tests in test/biclosed.py and test/abc.py, the brief's doctests, CHANGELOG
