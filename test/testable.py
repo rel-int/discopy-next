@@ -360,7 +360,8 @@ def test_inequation():
     assert Inequation(R, S) and Inequation(R, R) and not Inequation(S, R)
     assert Inequation(R >> R, R, S) and not Inequation(R, S, R)
     assert Inequation(S, R).modulo(lambda matrix: matrix.array.any())
-    assert Inequation(1, 2) == eval(repr(Inequation(1, 2)), {"testable": testable})
+    assert Inequation(1, 2) == eval(
+        repr(Inequation(1, 2)), {"testable": testable})
     assert Inequation(1, 2) != Equation(1, 2)
     assert Inequation(1, 2).symbols == ("<=", )
     assert Equation(1, 2, symbol="<=") != Equation(1, 2)
