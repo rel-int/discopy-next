@@ -135,8 +135,7 @@ def to_typst(diagram, **params):
         for box in drawing.boxes))
     max_v = max(drawing.height, drawing.width, 0.01)
     params["nodesize"] = round(params.get("nodesize", 1.0) / sqrt(max_v), 3)
-    from discopy.drawing.backend import Typst as TB
-    backend = TB(**params)
+    backend = Typst(**params)
     backend.draw_boundary(drawing, **params)
     backend.draw_regions(drawing, **params)
     backend.draw_wires(drawing, **params)

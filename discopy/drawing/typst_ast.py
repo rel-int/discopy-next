@@ -39,6 +39,7 @@ from dataclasses import dataclass, field
 class TypstNode:
     """Base class for Typst AST nodes."""
     def render(self, indent: int = 0) -> str:
+        """ The Typst source of a node, at a level of indentation. """
         raise NotImplementedError
 
 

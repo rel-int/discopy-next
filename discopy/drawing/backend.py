@@ -33,6 +33,7 @@ from io import StringIO
 from itertools import combinations
 from math import sqrt
 import os
+import pathlib
 import re
 from xml.etree import ElementTree
 
@@ -1629,8 +1630,6 @@ class Typst(Backend):
 
     def draw(self, graph, **params):
         """Orchestrate drawing, mirroring the module-level ``draw()``."""
-        from math import sqrt
-
         max_v = max(graph.height, graph.width, 0.01)
         self.nodesize = round(params.get("nodesize", 1.0) / sqrt(max_v), 3)
         self.draw_boundary(graph, **params)
@@ -1649,8 +1648,6 @@ class Typst(Backend):
             return "none"
         if isinstance(color, str) and color.startswith("#"):
             return color
-        from discopy.config import COLORS
-
         return COLORS.get(color, color)
 
     @staticmethod
@@ -1674,9 +1671,11 @@ class Typst(Backend):
         return text, False
 
     def coord(self, x, y):
+        """ A point of the canvas. """
         return Coord(x, y)
 
     def stroke(self, color="black", linewidth=None):
+        """ A stroke, i.e. a colour and a width in points. """
         lw = self.linewidth if linewidth is None else linewidth
         return Ident(
             f"{self.color_expr(self.format_color(color))} + {lw:g}pt")
@@ -1803,11 +1802,14 @@ class Typst(Backend):
         super().draw_spiders(graph, draw_box_labels)
 
     def draw_regions(self, graph, **params):
+        """ Coloured regions are not drawn in Typst yet, as in TikZ. """
         super().draw_regions(graph, **params)
 
     def to_document(self, **params):
-        # Auto-crop the page so SVG viewBox hugs the diagram instead of
-        # shipping an empty A4 sheet (which shrinks wires to invisibility).
+        """
+        The document of what was drawn: a CeTZ canvas on a page cropped to
+        it, with ``page_margin`` around and ``unit_length`` to a unit.
+        """
         margin = params.get("page_margin", "0.2cm")
         doc = Document(
             imports=[
@@ -1831,22 +1833,18 @@ class Typst(Backend):
         doc = self.to_document(**params)
         source = doc.render()
         if path is not None and str(path).endswith(".typ"):
-            from pathlib import Path as P
-
-            P(path).write_text(source)
+            pathlib.Path(path).write_text(source, encoding="utf-8")
             return source
         try:
             import typst
 
             svg = typst.compile(source.encode(), format="svg", pretty=True)
-        except ImportError:  # pragma: no cover
+        except ImportError as error:  # pragma: no cover
             raise ImportError(
                 "Typst rendering requires the 'typst' package. "
-                "Install it with: pip install typst")
+                "Install it with: pip install typst") from error
         if path is not None:
-            from pathlib import Path as P
-
-            P(path).write_bytes(svg)
+            pathlib.Path(path).write_bytes(svg)
             return svg
         if show:
             try:
