@@ -1832,34 +1832,35 @@ class Typst(Backend):
         )
         super().draw_bezier(points)
 
+    def spider_shape(self, box, i, j) -> list[Call]:
+        """
+        The disc or the square of a spider at ``(i, j)``, and nothing when
+        its colour is transparent: such a spider is just its label, e.g. the
+        symbol of an :class:`discopy.monoidal.Equation`.
+        """
+        if self.is_transparent(box.color):
+            return []
+        colour = self.color_expr(self.format_color(box.color))
+        options = {"fill": Ident(colour), "stroke": self.stroke(linewidth=0.5)}
+        if box.shape == "rectangle":
+            size = self.nodesize * 0.15
+            return [Call(Ident("rect"), [
+                self.coord(i - size, j - size),
+                self.coord(i + size, j + size)], options)]
+        return [Call(Ident("circle"), [self.coord(i, j)], {
+            "radius": Float(self.nodesize * 0.12), **options})]
+
     def draw_spiders(self, graph, draw_box_labels=True, **params):
+        """
+        Draws each spider as its shape and its label, at
+        ``fontsize_spiders`` whatever the ``fontsize``.
+        """
         for node in graph.nodes:
             if node.kind != "box" or not node.box.draw_as_spider:
                 continue
             i, j = graph.positions[node]
             hexcolour = self.format_color(node.box.color)
-            colour = self.color_expr(hexcolour)
-            radius = self.nodesize * 0.12
-            shape = node.box.shape or "circle"
-            if shape == "rectangle":
-                sz = self.nodesize * 0.15
-                call = Call(
-                    Ident("rect"),
-                    [self.coord(i - sz, j - sz), self.coord(i + sz, j + sz)],
-                    {"fill": Ident(colour),
-                     "stroke": self.stroke(linewidth=0.5)},
-                )
-            else:
-                call = Call(
-                    Ident("circle"),
-                    [self.coord(i, j)],
-                    {
-                        "radius": Float(radius),
-                        "fill": Ident(colour),
-                        "stroke": self.stroke(linewidth=0.5),
-                    },
-                )
-            self.body.append(call)
+            self.body.extend(self.spider_shape(node.box, i, j))
             if draw_box_labels and node.box.drawing_name:
                 label = node.box.drawing_name
                 inner, math = self.math_label(label)

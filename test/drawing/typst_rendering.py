@@ -380,3 +380,13 @@ def test_typst_labels_that_are_numbers():
     source = Ket(0, 1).to_typst().render()
     assert '"0"' in source and '"1"' in source
     assert compiled(source, format="svg")
+
+
+def test_typst_draws_the_symbol_of_an_equation_as_its_label_alone():
+    from discopy.monoidal import Equation
+    x = Ty("x")
+    source = Equation(Box("f", x, x), Box("g", x, x)).to_drawing()\
+        .to_typst().render()
+    assert 'text("=", fill: rgb("#000000")' in source
+    assert "circle(" not in source
+    assert compiled(source, format="svg")
