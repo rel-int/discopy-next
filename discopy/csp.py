@@ -271,6 +271,58 @@ class Language:
             sort: tensor.Dim(size) for sort, size in self.sizes.items()}
         return tensor.Functor(ob_map, self.array, dtype=dtype, **params)
 
+    def propagate(
+            self, graph: frobenius.Hypergraph,
+            domains: Sequence[set[int]] | None = None,
+            rounds: int | None = None) -> list[set[int]]:
+        """
+        Arc consistency: a set of candidate values for each variable, and in
+        each round, for each constraint and each variable of its scope, only
+        the values with a support, i.e. an assignment of the scope from the
+        candidates that the constraint holds on. Repeated until no set
+        shrinks, or for a given number of rounds.
+
+        It removes no value that a solution takes. When the incidence graph
+        of the instance, a node per variable and per constraint, is a tree,
+        its fixed point is the projection of the solutions on each
+        variable :cite:p:`Freuder82`. On any graph, its empty sets are the
+        zeros belief propagation finds :cite:p:`DechterMateescu03`.
+
+        Parameters:
+            graph : The instance.
+            domains : The candidates of each variable, by default every
+                value of its sort.
+            rounds : The number of rounds, by default until a fixed point.
+
+        Example
+        -------
+        >>> x = frobenius.Ty('x')
+        >>> language = Language({x: 3}, {"lt": lambda a, b: a < b})
+        >>> chain = instance([("lt", (0, 1)), ("lt", (1, 2))], 3 * [x])
+        >>> language.propagate(chain)
+        [{0}, {1}, {2}]
+        >>> language.propagate(chain, rounds=1)
+        [{0, 1}, {1}, {2}]
+        """
+        candidates = [set(self.domain(sort)) for sort in graph.spider_types]\
+            if domains is None else [set(domain) for domain in domains]
+        constraints = [(self.predicates[name], scope)
+                       for name, scope in scopes(graph)]
+        done, changed = 0, True
+        while changed and (rounds is None or done < rounds):
+            changed, done = False, done + 1
+            for predicate, scope in constraints:
+                supports = [
+                    values for values in product(
+                        *(candidates[i] for i in scope))
+                    if predicate(*values)]
+                for k, variable in enumerate(scope):
+                    kept = {values[k] for values in supports}
+                    if kept < candidates[variable]:
+                        candidates[variable] &= kept
+                        changed = True
+        return candidates
+
 
 def all_different(*values: int) -> bool:
     """ Whether the values are pairwise distinct. """

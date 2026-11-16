@@ -231,3 +231,71 @@ def test_maze_with_a_cycle_takes_loops_beside_the_path():
                             "#.#..",
                             "#.G##"])
     assert language.functor(int)(graph).array.item() == 2
+
+
+@settings(max_examples=60, deadline=None)
+@given(problems())
+def test_propagate_removes_no_value_a_solution_takes(problem):
+    graph, language = problem
+    candidates = language.propagate(graph)
+    for solution in language.solutions(graph):
+        assert all(value in candidates[i] for i, value in enumerate(solution))
+
+
+@st.composite
+def trees(draw):
+    """ An instance whose incidence graph, a node per variable and per
+    constraint, is a tree: each new constraint has at most one variable
+    already in the tree, and each variable is in it once. """
+    n_constraints = draw(st.integers(1, 5))
+    sorts, constraints = [draw(st.sampled_from([X, Y]))], []
+    for i in range(n_constraints):
+        anchor = draw(st.integers(0, len(sorts) - 1))
+        fresh = draw(st.integers(0 if i else 1, 2))
+        scope = (anchor, *range(len(sorts), len(sorts) + fresh))
+        sorts += [draw(st.sampled_from([X, Y])) for _ in range(fresh)]
+        constraints.append((f"R{i}", scope))
+    relations = {}
+    for name, scope in constraints:
+        shape = [SIZES[sorts[i]] for i in scope]
+        table = draw(st.lists(st.booleans(), min_size=int(np.prod(shape)),
+                              max_size=int(np.prod(shape))))
+        relations[name] = np.array(table, dtype=bool).reshape(shape)
+    predicates = {
+        name: (lambda array: lambda *values: bool(array[values]))(array)
+        for name, array in relations.items()}
+    return instance(constraints, sorts), Language(SIZES, predicates)
+
+
+@settings(max_examples=300, deadline=None)
+@given(trees())
+def test_propagate_on_a_tree_is_the_projection_of_the_solutions(problem):
+    """ On a tree, arc consistency at its fixed point leaves exactly the
+    values some solution takes, or nothing when there is no solution. """
+    graph, language = problem
+    solutions = list(language.solutions(graph))
+    projections = [{solution[i] for solution in solutions}
+                   for i in range(len(graph.spider_types))]
+    candidates = language.propagate(graph)
+    if solutions:
+        assert candidates == projections
+    else:
+        assert any(not values for values in candidates)
+
+
+def test_propagate_needs_more_than_one_round():
+    """ On a chain of ``lt`` read from its end, one round leaves values no
+    solution takes: the tree law is for the fixed point. """
+    language = Language({X: 3}, {"lt": lambda a, b: a < b})
+    chain = instance([("lt", (1, 2)), ("lt", (0, 1))], 3 * [X])
+    assert scopes(chain) == [("lt", (0, 1)), ("lt", (2, 0))]
+    fixed = language.propagate(chain)
+    assert fixed == [{1}, {2}, {0}]
+    once = language.propagate(chain, rounds=1)
+    assert once == [{1}, {1, 2}, {0}] and once != fixed
+
+
+def test_propagate_alone_solves_the_maze():
+    graph, language = maze(MAZE)
+    (solution, ) = language.solutions(graph)
+    assert language.propagate(graph) == [{value} for value in solution]
