@@ -128,3 +128,15 @@ def test_holds_refuses_an_assignment_off_the_domains():
     assert not language.holds(graph, (2, 2))
     assert not language.holds(graph, (1, 1, 1))
     assert not language.holds(graph, (1, ))
+
+
+def test_a_daggered_box_is_its_relation_reversed():
+    """ The dagger of a box reads its outputs then its inputs, as the
+    functor does, which evaluates the box and transposes it. """
+    language = Language({X: 2}, {"lt": lambda a, b: a < b})
+    lt = frobenius.Box("lt", X, X)
+    graph = (frobenius.Spider(0, 1, X) >> lt.dagger()).to_hypergraph()
+    assert scopes(graph) == [("lt", (1, 0))]
+    assert list(language.solutions(graph)) == [(1, 0)]
+    assert np.array_equal(
+        np.asarray(language.functor(bool)(graph).array), [True, False])

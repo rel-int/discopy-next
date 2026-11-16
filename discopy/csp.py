@@ -111,7 +111,9 @@ def scopes(graph: frobenius.Hypergraph) -> list[Constraint]:
     allows: its scope is the variables on its inputs, then on its outputs,
     so that a diagram drawn in the plane, e.g. a maze with a wire per edge,
     reads as the instance it draws. Rebuilt by :func:`instance`, its boxes
-    have no input: the scopes are the same, the hypergraph is not.
+    have no input: the scopes are the same, the hypergraph is not. The
+    dagger of a box is its relation reversed: its scope is its outputs,
+    then its inputs, those of the box it is the dagger of.
 
     Parameters:
         graph : An instance, a hypergraph with no input.
@@ -130,7 +132,8 @@ def scopes(graph: frobenius.Hypergraph) -> list[Constraint]:
     if graph.dom:
         raise ValueError(
             f"Expected an instance, with no inputs, got {graph!r}.")
-    return [(box.name, dom_wires + cod_wires)
+    return [(box.name, cod_wires + dom_wires if box.is_dagger
+             else dom_wires + cod_wires)
             for box, (dom_wires, cod_wires) in zip(
                 graph.boxes, graph.box_wires)]
 
