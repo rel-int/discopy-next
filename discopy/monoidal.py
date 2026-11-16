@@ -1835,7 +1835,9 @@ class Diagram(cat.Arrow, MonoidalCategory, RichDisplay):
                     dependencies, placed + layer, layer):
                 yield (layer, ) + rest
 
-    def foliate(self, layering: "tuple[tuple[int, ...], ...]") -> "Diagram":
+    def foliate(
+            self, layering: "tuple[tuple[int, ...], ...]", left=False
+    ) -> "Diagram":
         """
         The foliation of a staircase diagram with the given layers: each box
         is interchanged up to its place, then each layer is merged.
@@ -1843,6 +1845,12 @@ class Diagram(cat.Arrow, MonoidalCategory, RichDisplay):
         Parameters:
             layering : The indices of the boxes in each layer, as given by
                 :meth:`layerings`.
+            left : Passed to :meth:`interchange`, which side a box with no
+                inputs takes of a box with no outputs it moves above.
+
+        Raises:
+            AxiomError : When a layer does not merge, e.g. a box with no
+                inputs moved between the outputs of a box in its layer.
 
         Example
         -------
@@ -1853,7 +1861,8 @@ class Diagram(cat.Arrow, MonoidalCategory, RichDisplay):
         """
         diagram, order = self, list(range(len(self)))
         for position, i in enumerate(i for layer in layering for i in layer):
-            diagram = diagram.interchange(order.index(i), position)
+            diagram = diagram.interchange(
+                order.index(i), position, left=left)
             order.insert(position, order.pop(order.index(i)))
         inside, start = [], 0
         for layer in layering:
@@ -1883,10 +1892,33 @@ class Diagram(cat.Arrow, MonoidalCategory, RichDisplay):
         f @ g @ x >> h @ f
         >>> assert len((f @ f @ f @ f).foliations()) == 1
         >>> assert len((f @ f @ f >> f @ f @ f).foliations(limit=2)) == 2
+
+        A box with no inputs can go either side of a box with no outputs:
+
+        >>> s, e = Box('s', Ty(), x), Box('e', x @ x, Ty())
+        >>> for foliation in (e >> s >> f).foliations(): print(foliation)
+        s @ e >> f
+        s @ x @ x >> f @ e
+        x @ x @ s >> e @ f
+
+        Note
+        ----
+        Each layering is built with right interchangers, then with left ones:
+        a foliation that needs both, e.g. a box with no inputs moved left of
+        one box and right of another, is missed.
         """
-        staircase = self.to_staircases()
-        return [staircase.foliate(layering) for layering in itertools.islice(
-            self.layerings(staircase.dependencies()), limit)]
+        staircase, result = self.to_staircases(), []
+        for layering, left in itertools.product(
+                self.layerings(staircase.dependencies()), (False, True)):
+            try:
+                foliation = staircase.foliate(layering, left=left)
+            except AxiomError:
+                continue
+            if foliation not in result:
+                result.append(foliation)
+            if len(result) == limit:
+                break
+        return result
 
     def depth(self):
         """
