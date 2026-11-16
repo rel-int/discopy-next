@@ -42,6 +42,7 @@ Summary
     :toctree:
 
     Equation
+    Inequation
     Declaration
     Axiom
     Rule
@@ -134,7 +135,8 @@ class Equation[T]:
 
     Parameters:
         terms : The terms of the equation.
-        symbol : The symbol between each pair of terms, ``"="`` by default.
+        symbol : The symbol between each pair of terms, by default the
+            :attr:`symbol` of the class, ``"="``.
         symbols : The symbols between each pair of consecutive terms, one
             fewer than the terms, overriding ``symbol``.
         up_to : The function up to which ``bool(equation)`` compares its
@@ -153,10 +155,12 @@ class Equation[T]:
     >>> assert Equation(f, f >> g >> g, up_to=parity)
     """
     up_to = None
+    symbol = "="
 
-    def __init__(self, *terms, symbol="=", symbols=None, up_to=None):
+    def __init__(self, *terms, symbol=None, symbols=None, up_to=None):
         self.terms = terms
         gaps = max(len(terms) - 1, 0)
+        symbol = self.symbol if symbol is None else symbol
         self.symbols = gaps * (symbol, ) if symbols is None\
             else tuple(symbols)
         if len(self.symbols) != gaps:
@@ -218,7 +222,8 @@ class Equation[T]:
 
     def __repr__(self):
         """
-        The terms, then the symbols unless they are all ``"="``, so that
+        The terms, then the symbols unless they are all the :attr:`symbol`
+        of the class, so that
         an equation reads back from its representation, unless it was given
         an ``up_to`` of its own, a callable with no representation.
 
@@ -228,18 +233,50 @@ class Equation[T]:
         >>> Equation(Ob('x'), Ob('y'), symbol="->")
         cat.Equation(cat.Ob('x'), cat.Ob('y'), symbols=('->',))
         """
-        symbols = "" if all(symbol == "=" for symbol in self.symbols)\
+        symbols = "" if all(symbol == self.symbol for symbol in self.symbols)\
             else f", symbols={self.symbols!r}"
         return factory_name(type(self))\
             + f"({', '.join(map(repr, self.terms))}{symbols})"
 
     def __str__(self):
-        return f"Equation({', '.join(map(str, self.terms))})"
+        return f"{type(self).__name__}({', '.join(map(str, self.terms))})"
 
     def __bool__(self):
         terms = self.terms if self.up_to is None\
             else list(map(self.up_to, self.terms))
         return all(term == terms[0] for term in terms)
+
+
+class Inequation[T](Equation[T]):
+    """
+    An inequation is a list of ``terms`` in increasing order: casting it to
+    ``bool`` checks that each term is ``<=`` the next, up to ``up_to``. An
+    axiom states an inclusion by returning one, e.g. between relations as
+    Boolean matrices, and it is checked as an equation is.
+
+    >>> from discopy.matrix import Matrix
+    >>> R, S = Matrix[bool]([1, 0, 0, 0], 2, 2), Matrix[bool].id(2)
+    >>> assert Inequation(R, S) and not Inequation(S, R)
+    >>> assert Inequation(R >> R, R, S) and not Inequation(R, S, R)
+    >>> assert Inequation(S, R).modulo(lambda matrix: matrix.array.any())
+    >>> Inequation(1, 2)
+    testable.Inequation(1, 2)
+    >>> print(Inequation(1, 2))
+    Inequation(1, 2)
+
+    Terms with no order raise ``TypeError``, as ``<=`` does:
+
+    >>> bool(Inequation(1j, 2j))
+    Traceback (most recent call last):
+    ...
+    TypeError: '<=' not supported between instances of 'complex' and 'complex'
+    """
+    symbol = "<="
+
+    def __bool__(self):
+        terms = self.terms if self.up_to is None\
+            else list(map(self.up_to, self.terms))
+        return all(left <= right for left, right in zip(terms, terms[1:]))
 
 
 def quotient(category, term):
@@ -569,9 +606,9 @@ def inhabits(value, kind) -> bool:
     """
     Whether a value has an evaluated type of a sequent: a morphism of
     ``Hom[C, dom, cod]`` has that boundary, the value of ``Var[T, x]`` is
-    ``x``, an equation of ``Equation[T]`` has terms of type ``T``, a tuple of
-    ``tuple[T, ...]`` has its elements of these types and ``type[T]`` is a
-    subclass of ``T``.
+    ``x``, an equation of ``Equation[T]`` has terms of type ``T``, as an
+    inequation of ``Inequation[T]`` does, a tuple of ``tuple[T, ...]`` has
+    its elements of these types and ``type[T]`` is a subclass of ``T``.
 
     >>> from discopy.monoidal import Ty, Box, Diagram
     >>> x, y = Ty('x'), Ty('y')
@@ -579,6 +616,8 @@ def inhabits(value, kind) -> bool:
     >>> assert inhabits(f, Hom[Diagram, x, y])
     >>> assert not inhabits(f, Hom[Diagram, y, x])
     >>> assert inhabits(Equation(f, f), Equation[Hom[Diagram, x, y]])
+    >>> assert inhabits(Inequation(1, 2), Inequation[int])
+    >>> assert not inhabits(Equation(1, 2), Inequation[int])
     """
     origin, args = get_origin(kind), get_args(kind)
     if origin is Hom:
@@ -586,8 +625,8 @@ def inhabits(value, kind) -> bool:
             and (value.dom, value.cod) == args[1:]
     if origin is Var:
         return value == args[1]
-    if origin is Equation:
-        return isinstance(value, Equation) and all(
+    if isinstance(origin, type) and issubclass(origin, Equation):
+        return isinstance(value, origin) and all(
             inhabits(term, args[0]) for term in value.terms)
     if origin is tuple:
         if not isinstance(value, tuple):

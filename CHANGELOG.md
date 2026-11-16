@@ -18,6 +18,17 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   `Weakening`, `Exchange` and `Laxator`, which a `Functor` sends through its
   codomain's, or through its maps when its types are not biclosed. The laws
   are declared failing on the free category ([next#571]).
+- `shape="triangle"` on any box draws it as a triangle, matplotlib and TikZ
+  alike: its base the width of the side with more wires, its apex on the
+  other, at its wire when there is one, and its dagger upside down
+  (`Backend.triangle_corners`). A box's dagger, and any box `rebuild` makes,
+  keeps the drawing attributes it was given, its `color` and `shape`
+  ([next#568]).
+- `Matrix.__le__`, the pointwise order on parallel matrices, which a
+  `Tensor` inherits: over `bool` it is the inclusion of relations, over the
+  complex numbers it raises `TypeError`. `testable.Inequation`, an `Equation`
+  whose terms are compared with `<=`, so that an axiom states an inclusion
+  and the property matrix checks it as it does an equation ([next#566]).
 - `csp.Language.propagate`, arc consistency: a set of candidates per
   variable, kept to the values each constraint supports, until no set
   shrinks or for a number of rounds. It removes no value a solution takes,
@@ -539,6 +550,9 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Fixed
 
+- A box is drawn as high as its `height`, its outline meeting its wires: the
+  layout already stacked layers by it, but the outline was always half a
+  wire high ([next#570]).
 - `CMap.explicit_trace` takes the number of wires to trace as its **first**
   argument, like `Hypergraph.explicit_trace`, so `CMap.trace` and
   `CMap.make_causal` hand it their count instead of looping: over a traced
@@ -2005,6 +2019,9 @@ for the changelog of `1.2.1` and earlier.
 [next#556]: https://github.com/rel-int/discopy-next/pull/556
 [next#557]: https://github.com/rel-int/discopy-next/pull/557
 [next#558]: https://github.com/rel-int/discopy-next/pull/558
+[next#566]: https://github.com/rel-int/discopy-next/pull/566
+[next#568]: https://github.com/rel-int/discopy-next/pull/568
+[next#570]: https://github.com/rel-int/discopy-next/pull/570
 [next#571]: https://github.com/rel-int/discopy-next/pull/571
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
