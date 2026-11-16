@@ -6,7 +6,7 @@
 
 - [WIP] @session_01MEJxy5XXNWvvBFsNYRgcmW-2026-11-16 00:13 Builder.matches: a hash join over keys, box_wires and heads, with an index by head filled lazily when a match asks
 - [WIP] @session_01MEJxy5XXNWvvBFsNYRgcmW-2026-11-16 00:13 law matching_agreement as an Axiom, enrolled in the property matrix
-- [ ] unit tests in test/egraph.py, including Copy(x) >> g
+- [WIP] @session_01MEJxy5XXNWvvBFsNYRgcmW-2026-11-16 00:13 unit tests in test/egraph.py, including Copy(x) >> g
 - [ ] measure the join against EGraph.matches on the largest trace
 - [ ] CHANGELOG bullet under Added
 - [ ] the gates of CONTRIBUTING.md's Run the unit tests
