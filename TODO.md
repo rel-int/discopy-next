@@ -3,6 +3,6 @@
 (default taken 2026-11-16 after the 48 h rule, toumix/desire AGENTS.md; issue rel-int/discopy-next#538)
 
 - [x] the resolvent for field dtypes in `Matrix.trace`
-- [WIP] @session_01MEJxy5XXNWvvBFsNYRgcmW-2026-11-16 00:35 doctest and the three tests
+- [x] doctest and the three tests
 - [ ] the property matrix: enrol or declare
 - [ ] changelog bullet
