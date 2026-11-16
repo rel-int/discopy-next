@@ -9,6 +9,15 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Added
 
+- `discopy.csp`, a constraint satisfaction problem as a diagram and its
+  language as a functor: `instance` builds a `frobenius.Hypergraph` with a
+  spider per variable and a box with no input per constraint, plugged on its
+  scope, and `scopes` reads the constraints back; a `Language` gives a size
+  to each sort and a predicate to each symbol, with `holds`, `solutions` by
+  backtracking, and `functor`, the `tensor.Functor` that sends an instance to
+  the number of its solutions over `int` and to their projection on its
+  outputs over `bool` (Chandra and Merlin, STOC 1977; Bonchi, Seeber and
+  Sobociński, CSL 2018) ([next#556]).
 - `tensor.Functor` contracts a `frobenius.Hypergraph` as it stands,
   `Functor.spider_operands` writing its Einstein notation: one index per
   spider however many ports it has, one array per box, the boundary as free
@@ -1973,6 +1982,7 @@ for the changelog of `1.2.1` and earlier.
 [next#549]: https://github.com/rel-int/discopy-next/pull/549
 [next#550]: https://github.com/rel-int/discopy-next/pull/550
 [next#554]: https://github.com/rel-int/discopy-next/pull/554
+[next#556]: https://github.com/rel-int/discopy-next/pull/556
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#56]: https://github.com/rel-int/optyx/pull/56
