@@ -411,6 +411,11 @@ which to_drawing recomputes.
         result.frame_dual_rail()
         return backend.draw(result, asymmetry=asymmetry, **params)
 
+    def to_typst(self, **params):
+        """Return a Typst Document AST for this drawing."""
+        from discopy.drawing import to_typst
+        return to_typst(self, **params)
+
     def frame_dual_rail(self, margin=0.5):
         """
         Reframe a dual rail drawing so its boundary box contains the cup and
