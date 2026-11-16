@@ -59,7 +59,7 @@
 - [x] test/drawing/typst/box.typ:8 The spacing before `[x]` (and the same gap on the `[y]` and `[f]` lines) doesn't match what `Call.render` emi…
 - [x] discopy/drawing/typst_ast.py:131 Plain diagram labels are emitted as raw Typst content, so characters such as `]` and `#` can corrupt or execu…
 - [x] pyproject.toml:67 The new Typst tests are not covered by the existing `test` extra.
-- [WIP] @session_01MEJxy4FrWd3ymhMeQGF7x8-2026-11-16 21:29 discopy/drawing/backend.py:1817 Every Typst document imports Fletcher even though the generated body never uses it.
+- [x] discopy/drawing/backend.py:1817 Every Typst document imports Fletcher even though the generated body never uses it.
 - [WIP] @session_01MEJxy4FrWd3ymhMeQGF7x8-2026-11-16 21:29 discopy/drawing/backend.py:1651 RGB sequence colours fail before Typst source generation.
 - [WIP] @session_01MEJxy4FrWd3ymhMeQGF7x8-2026-11-16 21:29 discopy/drawing/__init__.py:95 Typst skips `frame_dual_rail()`, so dual-rail cups and caps are drawn using bounds that exclude their folds.
 - [WIP] @session_01MEJxy4FrWd3ymhMeQGF7x8-2026-11-16 21:29 discopy/drawing/__init__.py:94 `Drawing.to_typst()` mutates the caller by adding corner nodes directly to its graph.
