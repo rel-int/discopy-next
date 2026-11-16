@@ -9,6 +9,11 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Added
 
+- `monoidal.Diagram.foliations`, the diagrams equal to one up to interchange
+  whose adjacent layers cannot be merged, the largest layers first, read off
+  `Diagram.dependencies` (the boxes each box must stay below) by
+  `Diagram.layerings` and built by `Diagram.foliate`, interchangers then
+  `Layer.merge` ([next#567]).
 - `csp.Language.propagate`, arc consistency: a set of candidates per
   variable, kept to the values each constraint supports, until no set
   shrinks or for a number of rounds. It removes no value a solution takes,
@@ -1996,6 +2001,7 @@ for the changelog of `1.2.1` and earlier.
 [next#556]: https://github.com/rel-int/discopy-next/pull/556
 [next#557]: https://github.com/rel-int/discopy-next/pull/557
 [next#558]: https://github.com/rel-int/discopy-next/pull/558
+[next#567]: https://github.com/rel-int/discopy-next/pull/567
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#56]: https://github.com/rel-int/optyx/pull/56
