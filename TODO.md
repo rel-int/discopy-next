@@ -8,5 +8,5 @@
 - [x] law matching_agreement as an Axiom, enrolled in the property matrix
 - [x] unit tests in test/egraph.py, including Copy(x) >> g
 - [WIP] @session_01MEJxy5XXNWvvBFsNYRgcmW-2026-11-16 00:28 measure the join against EGraph.matches on the largest trace
-- [ ] CHANGELOG bullet under Added
+- [WIP] @session_01MEJxy5XXNWvvBFsNYRgcmW-2026-11-16 00:28 CHANGELOG bullet under Added
 - [ ] the gates of CONTRIBUTING.md's Run the unit tests
