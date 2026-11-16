@@ -25,6 +25,7 @@ Summary
 
         backend
         set_backend
+        is_field
         get_backend
 
 See also
@@ -661,17 +662,17 @@ class Matrix[dtype](
             ...
         ValueError: id - D is singular: the trace over a field is partial.
         """
-        with backend("numpy") as numpy:
-            field = (float, complex, numpy.inexact)
-        if self.dom != self.cod or not isinstance(self.dtype, type)\
-                or not issubclass(self.dtype, field):
+        if self.dom != self.cod or not is_field(self.dtype):
             raise TypeError(messages.MATRIX_RESOLVENT_ERROR)
         with backend() as np:
-            difference = self.id(self.dom).array - self.array
-            if index(self.dom) and not np.linalg.matrix_rank(
-                    difference) == index(self.dom):
+            singular = getattr(np.linalg, "LinAlgError", ())
+            try:
+                inverse = np.linalg.inv(self.id(self.dom).array - self.array)
+            except singular as error:
+                raise ValueError(messages.MATRIX_SINGULAR) from error
+            if not np.isfinite(inverse).all():
                 raise ValueError(messages.MATRIX_SINGULAR)
-            return type(self)(np.linalg.inv(difference), self.dom, self.cod)
+            return type(self)(inverse, self.dom, self.cod)
 
     def trace(self, n=1, left=False) -> Matrix:
         """
@@ -929,6 +930,29 @@ class Quimb(Contractor):
         result = method(output_inds=[f"w{j}" for j in output],
                         optimize=optimize, **params)
         return result.data if isinstance(result, qtn.Tensor) else result
+
+
+def is_field(dtype) -> bool:
+    """
+    Whether a ``dtype`` is that of a field, i.e. floating-point or complex,
+    in any backend: a Python or NumPy type, or a PyTorch or TensorFlow dtype.
+
+    Parameters:
+        dtype : The data type.
+
+    Example
+    -------
+    >>> assert is_field(float) and is_field(complex)
+    >>> assert not is_field(int) and not is_field(bool)
+    """
+    if any(getattr(dtype, attr, False) is True for attr in (
+            "is_floating_point", "is_floating", "is_complex")):
+        return True
+    with backend("numpy") as numpy:
+        try:
+            return bool(numpy.issubdtype(dtype, numpy.inexact))
+        except TypeError:
+            return False
 
 
 BACKENDS = {

@@ -5,7 +5,7 @@ import pytest
 from pytest import raises
 
 from discopy.abc import DaggerCategory, Nat, TracedCategory
-from discopy.matrix import Matrix, backend
+from discopy.matrix import Matrix, backend, is_field
 from discopy.symmetric import Ty, Permutation, Swap, Functor
 from discopy.tensor import Tensor, Dim
 from discopy.utils import AxiomError, Subscript, dumps, loads
@@ -40,6 +40,9 @@ def test_trace_over_a_field_is_partial():
     with raises(ValueError, match="partial"):
         Matrix[complex].id(2).trace(left=True)
     assert Matrix[float].id(2).trace(0) == Matrix[float].id(2)
+    ill_conditioned = Matrix[float]([[0, 1e8], [0, 0]], 2, 2)
+    assert ill_conditioned.resolvent()\
+        == Matrix[float]([[1, 1e8], [0, 1]], 2, 2)
 
 
 def test_trace_needs_booleans_or_a_field():
@@ -138,6 +141,22 @@ def test_autotyping():
     with backend('pytorch'):
         assert Matrix([0.5, 0.5], dom=1, cod=2).dtype == torch.float32
 
+
+
+def test_trace_over_a_field_in_jax():
+    pytest.importorskip("jax")
+    with backend("jax"):
+        f = Matrix([[0.5, 1.], [1., 0.25]], 2, 2)
+        assert f.trace().is_close(Matrix([[0.5 + 4 / 3]], 1, 1), rtol=1e-5)
+        with raises(ValueError, match="partial"):
+            Matrix([[0.5, 1.], [1., 1.]], 2, 2).trace()
+
+
+def test_is_field():
+    torch = pytest.importorskip("torch")
+    assert is_field(torch.float32) and is_field(torch.complex64)
+    assert not is_field(torch.int64) and not is_field(torch.bool)
+    assert is_field(np.float32) and not is_field(object)
 
 
 def test_permutation():
