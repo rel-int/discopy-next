@@ -6,6 +6,6 @@
 >
 > > write the brief for discopy.csp
 
-- [WIP] @session_01MEJxy5FM3MT3hk7p67LLmW-2026-11-16 16:40 slice 2 of #553: `csp.instance`, `csp.scopes`, the round trip
+- [x] slice 2 of #553: `csp.instance`, `csp.scopes`, the round trip
 - [WIP] @session_01MEJxy5FM3MT3hk7p67LLmW-2026-11-16 16:41 `Language`: `holds`, `solutions` (backtracking), `functor` (a `tensor.Functor`), the counting law and the projection law on random instances
 - [ ] the references checked and in `docs/discopy.bib`; `discopy.csp` in `docs/api/semantics.rst` beside `discopy.tensor`, the import list, one README bullet, the changelog; slice 2 opened
