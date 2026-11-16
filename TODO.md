@@ -3,4 +3,4 @@
 - [x] Diagram.dependencies, Diagram.layerings, Diagram.foliate, Diagram.foliations in discopy/monoidal.py, with doctests
 - [x] tests in test/monoidal.py: every foliation is in d's class, its layers do not merge, no duplicates
 - [x] CHANGELOG.md entry
-- [ ] next-checks green
+- [x] next-checks green
