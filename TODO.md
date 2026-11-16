@@ -1,0 +1,15 @@
+> USER, 11-16, in a live session (brief: #562):
+>
+> > write the brief for the modality, it can go all the way down to biclosed with closed and categorial as subclasses, it needs to be a free endo functor as for the delay, ie an integer for each Ob and Box together with diagram methods and Box subclasses for the structural primitives of a bang modality
+>
+> > of course we should also reproduce the experiments!
+>
+> > Go!
+
+- [ ] abc: ModalCategory with abstract bang, the four primitives as classmethods, the laws as axioms
+- [ ] biclosed: Wire.bangs, Wire/Ty/Diagram/Box.bang, str/repr/eq/hash/serialisation, drawn !x
+- [ ] biclosed: Eval, Coeval, Curry banged keeping their arguments, Sum and Bubble banged
+- [ ] biclosed: Dereliction, Digging, Contraction, Exchange
+- [ ] biclosed: Functor through cod.bang, else ob_map/ar_map
+- [ ] biclosed: the laws declared failing on the free category, testable.Bang, proptest cells
+- [ ] tests in test/biclosed.py and test/abc.py, the brief's doctests, CHANGELOG
