@@ -1462,10 +1462,32 @@ class TikZ(Backend):
         return to_hex(color)[1:] if cls.needs_rgb(color)\
             else str(color).removeprefix("#")
 
+    #: What LaTeX reads as markup in a label outside mathematics, escaped.
+    ESCAPES = {
+        "_": r"\_", "&": r"\&", "%": r"\%", "#": r"\#",
+        "<<": "<{}<", ">>": ">{}>"}
+
+    @classmethod
+    def escape(cls, text) -> str:
+        """
+        A label as LaTeX reads it: outside the mathematics between dollars,
+        an underscore, an ampersand, a percent and a hash are escaped, and
+        two angle brackets are kept from joining into a guillemet. A
+        backslash and braces are left, so that a label can still be LaTeX.
+
+        >>> print(TikZ.escape("feed_forward $x_1$ (n >> s) 50%"))
+        feed\\_forward $x_1$ (n >{}> s) 50\\%
+        """
+        pattern = "|".join(map(re.escape, cls.ESCAPES))
+        return "".join(
+            part if i % 2 else re.sub(
+                pattern, lambda match: cls.ESCAPES[match.group()], part)
+            for i, part in enumerate(re.split(r"(\$[^$]*\$)", str(text))))
+
     def add_node(self, i, j, text=None, options=None, rounded=4):
         """ Add a node to the tikz picture, return its unique id. """
         node = len(self.nodelayer) + 1
-        text = "" if text is None else text
+        text = "" if text is None else self.escape(text)
         self.nodelayer.append(
             f"\\node [{options or ''}] ({node}) at "
             f"({round(i, rounded)}, {round(j, rounded)}) {{{text}}};\n")
@@ -1652,7 +1674,7 @@ class TikZ(Backend):
             if params.get("nodesize", 1) != 1:
                 options += f", inner sep={self.inner_sep(params['nodesize'])}"
             if text:
-                options += f", label={{center:{{{text}}}}}"
+                options += f", label={{center:{{{self.escape(text)}}}}}"
             self.add_node(i, j, None, options)
         super().draw_spiders(graph, draw_box_labels)
 
