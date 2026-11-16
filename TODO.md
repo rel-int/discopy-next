@@ -8,5 +8,5 @@
 
 - [x] slice 1 of #553: `tensor.Functor` contracts a `Hypergraph`, one index per spider, one array per box, the boundary as free indices, a spider on no port counts its sort
 - [x] the law `F(graph) == F(graph.to_diagram())` on small random frobenius hypergraphs with a boundary, each dtype
-- [ ] the 4×4 sudoku counted as 288 by `F(graph)` (through `to_diagram()` it raises `iterator is too large` on main)
+- [x] the 4×4 sudoku counted as 288 by `F(graph)` (through `to_diagram()` it raises `iterator is too large` on main)
 - [ ] changelog; next-checks --full and the notebooks on the merged tree; slice 1 opened
