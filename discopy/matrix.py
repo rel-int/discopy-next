@@ -659,8 +659,7 @@ class Matrix[dtype](
         """
         if self.dom != self.cod or not is_field(self.dtype):
             raise TypeError(messages.MATRIX_RESOLVENT_ERROR)
-        shape = self.array.shape
-        square = self.array.reshape(2 * (isqrt(prod(shape)), ))
+        square = self.array.reshape(2 * (isqrt(prod(self.array.shape)), ))
         with backend() as np:
             try:
                 inverse = np.linalg.inv(np.eye(len(square)) - square)
@@ -672,7 +671,7 @@ class Matrix[dtype](
                 singular = False
             if singular:
                 raise ValueError(messages.MATRIX_SINGULAR)
-            return type(self)(inverse.reshape(shape), self.dom, self.cod)
+            return type(self)(inverse, self.dom, self.cod)
 
     def trace(self, n=1, left=False) -> Matrix:
         """
@@ -927,6 +926,7 @@ def is_field(dtype) -> bool:
     flags = ("is_floating_point", "is_floating", "is_complex")
     with backend("numpy") as numpy:
         return any(getattr(dtype, flag, False) is True for flag in flags)\
+            or getattr(dtype, "kind", None) in ("f", "c")\
             or isinstance(dtype, type)\
             and issubclass(dtype, (float, complex, numpy.inexact))
 
