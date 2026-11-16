@@ -921,6 +921,11 @@ docs = [
     { name = "torch", version = "2.13.0+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "sys_platform == 'linux'" },
     { name = "tqdm" },
 ]
+grammar = [
+    { name = "nltk" },
+    { name = "torch", version = "2.13.0", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform != 'linux'" },
+    { name = "torch", version = "2.13.0+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "sys_platform == 'linux'" },
+]
 lambek = [
     { name = "nltk" },
     { name = "torch", version = "2.13.0", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform != 'linux'" },
@@ -1069,6 +1074,7 @@ requires-dist = [
     { name = "cotengra", marker = "extra == 'optyx'" },
     { name = "cotengra", marker = "extra == 'tensor'" },
     { name = "coverage", marker = "extra == 'test'" },
+    { name = "discopy", extras = ["lambek"], marker = "extra == 'grammar'" },
     { name = "discopy", extras = ["lambek", "notebooks", "optyx", "quantum"], marker = "extra == 'test'" },
     { name = "discopy", extras = ["notebooks", "optyx"], marker = "extra == 'docs'" },
     { name = "graphix", marker = "extra == 'optyx'", specifier = ">=0.4" },
@@ -1130,7 +1136,7 @@ requires-dist = [
     { name = "torch", marker = "sys_platform != 'linux' and extra == 'quantum'" },
     { name = "tqdm", marker = "extra == 'notebooks'" },
 ]
-provides-extras = ["tensor", "quantum", "lambek", "optyx", "test", "notebooks", "docs"]
+provides-extras = ["tensor", "quantum", "lambek", "grammar", "optyx", "test", "notebooks", "docs"]
 
 [package.metadata.requires-dev]
 all = [

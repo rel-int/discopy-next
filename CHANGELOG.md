@@ -326,9 +326,11 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 - `discopy.grammar` is `discopy.lambek`, with its tests in `test/lambek`,
   its pictures in `docs/_static/lambek` and its extra `discopy[lambek]`.
-  `discopy.grammar` stays as a deprecated alias: importing it warns and
-  makes each `discopy.grammar.x` the module `discopy.lambek.x`, so that a
-  pickle or a tree written under the old name reads back ([next#569]).
+  The old name stays as a deprecated alias: `discopy.grammar` warns and has
+  every name of `discopy.lambek`, `discopy.grammar.x` is the module
+  `discopy.lambek.x`, imported when asked for, the extra `discopy[grammar]`
+  installs `discopy[lambek]`, and `utils.RENAMED` lets a tree written under
+  the old name load, as a pickle does ([next#569]).
 - `Hypergraph.explicit_trace` takes the number of wires to trace and takes
   them in one pass, so `make_causal` and `make_cocausal` convert the graph
   once rather than once per cut: 7.5x faster on the traces of a graph with

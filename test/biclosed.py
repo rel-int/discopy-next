@@ -382,8 +382,9 @@ def test_Wire_reads_back_main():
     assert eval("biclosed.Ty(monoidal.Wire('x'))") == x
     wire = '{"factory": "monoidal.Wire", "name": "x"}'
     assert loads('{"factory": "biclosed.Ty", "inside": [' + wire + ']}') == x
-    assert loads('{"factory": "lambek.categorial.Ty", "inside": ['
-                 + wire + ']}') == categorial.Ty('x')
+    for module in ("lambek", "grammar"):
+        assert loads('{"factory": "' + module + '.categorial.Ty", "inside": ['
+                     + wire + ']}') == categorial.Ty('x')
     assert pickle.loads(
         b'\x80\x04\x95\xab\x00\x00\x00\x00\x00\x00\x00\x8c\x10discopy.bicl'
         b'osed\x94\x8c\x02Ty\x94\x93\x94)\x81\x94}\x94(\x8c\x03dom\x94\x8c'

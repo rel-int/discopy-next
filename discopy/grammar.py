@@ -3,20 +3,26 @@
 """
 The deprecated name of :mod:`discopy.lambek`.
 
-Importing it warns, and makes each ``discopy.grammar.x`` the module
-``discopy.lambek.x`` that :mod:`discopy.lambek` imports, so that a pickle or
-a tree written under the old name reads back.
+Importing it warns. Every name of ``discopy.grammar`` is that of
+:mod:`discopy.lambek`, and ``discopy.grammar.x`` is the module
+``discopy.lambek.x``, imported when it is asked for, so that code and pickles
+written under the old name still load.
 
->>> import warnings
->>> from importlib import reload
+>>> import sys, warnings
+>>> from importlib import import_module, reload
 >>> from discopy import lambek
 >>> with warnings.catch_warnings(record=True) as caught:
 ...     warnings.simplefilter("always")
-...     from discopy import grammar
-...     grammar = reload(grammar)
+...     grammar = reload(import_module("discopy.grammar"))
 >>> print(caught[-1].message)
 discopy.grammar is deprecated, use discopy.lambek instead.
 >>> assert grammar.pregroup is lambek.pregroup
+>>> from discopy.grammar import Word
+>>> from discopy.grammar.cfg import Rule
+>>> assert Word is lambek.Word and Rule is lambek.cfg.Rule
+
+A tree written under the old name loads with no import of this module, see
+:data:`discopy.utils.RENAMED`.
 
 >>> from discopy.utils import dumps, loads
 >>> n = lambek.pregroup.Ty('n')
@@ -26,6 +32,9 @@ discopy.grammar is deprecated, use discopy.lambek instead.
 
 import sys
 import warnings
+from importlib import import_module
+from importlib.abc import Loader, MetaPathFinder
+from importlib.util import spec_from_loader
 
 from discopy import lambek
 
@@ -33,9 +42,33 @@ warnings.warn(
     "discopy.grammar is deprecated, use discopy.lambek instead.",
     DeprecationWarning, stacklevel=2)
 
-for name in list(sys.modules):
-    if name.startswith(lambek.__name__ + "."):
-        child = name.removeprefix(lambek.__name__ + ".")
-        sys.modules[f"{__name__}.{child}"] = sys.modules[name]
-        if "." not in child:
-            globals()[child] = sys.modules[name]
+__path__: list[str] = []
+
+
+class Alias(MetaPathFinder, Loader):
+    """
+    Finds ``discopy.grammar.x`` as the module ``discopy.lambek.x``, importing
+    it if need be, e.g. ``neural``, which needs PyTorch and which
+    :mod:`discopy.lambek` does not import.
+    """
+    def find_spec(self, fullname, path=None, target=None):
+        """ The spec of a submodule of ``discopy.grammar``, else ``None``. """
+        if fullname.startswith(__name__ + "."):
+            return spec_from_loader(fullname, self)
+        return None
+
+    def create_module(self, spec):
+        """ The module of :mod:`discopy.lambek` with the same name. """
+        return import_module(
+            lambek.__name__ + spec.name.removeprefix(__name__))
+
+    def exec_module(self, module):
+        """ Nothing to run: the module was imported under its own name. """
+
+
+if not any(isinstance(finder, Alias) for finder in sys.meta_path):
+    sys.meta_path.append(Alias())
+
+
+def __getattr__(name):
+    return getattr(lambek, name)
