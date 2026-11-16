@@ -42,3 +42,4 @@ plans/
 .style-review/
 # Lake (build products of lean/)
 lean/.lake
+wip/

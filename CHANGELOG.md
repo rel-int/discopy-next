@@ -13,6 +13,11 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   diagrams equal to it up to interchange whose adjacent layers cannot merge,
   the largest layers first. The steps are public too: `dependencies`,
   `layerings` and `foliate` ([next#567]).
+- A Typst drawing backend, `drawing.backend.Typst`: `Diagram.to_typst` and
+  `Drawing.to_typst` return a `drawing.typst_ast.Document`, whose `render`
+  is the Typst source of a CeTZ canvas, and `draw(format="typst")` compiles
+  it to SVG with the optional `typst` extra, or writes the source to a path
+  ending in `.typ` ([#467], [next#565]).
 - `shape="triangle"` on any box draws it as a triangle, matplotlib and TikZ
   alike: its base the width of the side with more wires, its apex on the
   other, at its wire when there is one, and its dagger upside down
@@ -1757,6 +1762,7 @@ for the changelog of `1.2.1` and earlier.
 [#457]: https://github.com/discopy/discopy/pull/457
 [#459]: https://github.com/discopy/discopy/pull/459
 [#466]: https://github.com/discopy/discopy/pull/466
+[#467]: https://github.com/discopy/discopy/pull/467
 [#469]: https://github.com/discopy/discopy/pull/469
 [#470]: https://github.com/discopy/discopy/pull/470
 [#472]: https://github.com/discopy/discopy/pull/472
@@ -2021,6 +2027,7 @@ for the changelog of `1.2.1` and earlier.
 [next#556]: https://github.com/rel-int/discopy-next/pull/556
 [next#557]: https://github.com/rel-int/discopy-next/pull/557
 [next#558]: https://github.com/rel-int/discopy-next/pull/558
+[next#565]: https://github.com/rel-int/discopy-next/pull/565
 [next#566]: https://github.com/rel-int/discopy-next/pull/566
 [next#567]: https://github.com/rel-int/discopy-next/pull/567
 [next#568]: https://github.com/rel-int/discopy-next/pull/568
