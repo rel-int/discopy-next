@@ -1773,6 +1773,121 @@ class Diagram(cat.Arrow, MonoidalCategory, RichDisplay):
             i = max(i - 1, 0)
         return diagram
 
+    def dependencies(self) -> "tuple[tuple[int, ...], ...]":
+        """
+        The boxes each box of a staircase diagram must stay below, i.e. those
+        whose outputs it takes as inputs or, for a box with no inputs, the box
+        whose outputs it sits between: no interchange moves it above them.
+
+        Example
+        -------
+        >>> x = Ty('x')
+        >>> f, g, h = Box('f', x, x), Box('g', x, x), Box('h', x @ x, x)
+        >>> cup, s = Box('cup', Ty(), x @ x), Box('s', Ty(), x)
+        >>> (f @ g >> h).to_staircases().dependencies()
+        ((), (), (0, 1))
+        >>> (cup >> x @ s @ x).dependencies()
+        ((), (0,))
+        """
+        wires, result = len(self.dom) * [None], []
+        for box, offset in zip(self.boxes, self.offsets):
+            inputs = wires[offset:offset + len(box.dom)]
+            if not box.dom and 0 < offset < len(wires)\
+                    and wires[offset - 1] == wires[offset]:
+                inputs = [wires[offset]]
+            result.append(tuple(sorted({i for i in inputs if i is not None})))
+            wires[offset:offset + len(box.dom)] = len(box.cod) * [len(result) - 1]
+        return tuple(result)
+
+    @staticmethod
+    def layerings(
+            dependencies: "tuple[tuple[int, ...], ...]",
+            placed: "tuple[int, ...]" = (),
+            previous: "tuple[int, ...]" = ()
+    ) -> "Iterator[tuple[tuple[int, ...], ...]]":
+        """
+        The ways to split boxes into layers that respect their dependencies,
+        each layer depending on the one above it, i.e. no two adjacent layers
+        could be merged, the largest layers first.
+
+        Parameters:
+            dependencies : As given by :meth:`dependencies`.
+            placed : The boxes already in a layer.
+            previous : The last layer, which the next one must depend on.
+
+        Example
+        -------
+        >>> list(Diagram.layerings(((), (), (0, ))))
+        [((0, 1), (2,)), ((0,), (1, 2))]
+        """
+        if len(placed) == len(dependencies):
+            yield ()
+            return
+        free = [i for i, before in enumerate(dependencies)
+                if i not in placed and set(before) <= set(placed)]
+        for layer in itertools.chain.from_iterable(
+                itertools.combinations(free, size)
+                for size in range(len(free), 0, -1)):
+            if previous and not any(
+                    set(dependencies[i]) & set(previous) for i in layer):
+                continue
+            for rest in Diagram.layerings(
+                    dependencies, placed + layer, layer):
+                yield (layer, ) + rest
+
+    def foliate(self, layering: "tuple[tuple[int, ...], ...]") -> "Diagram":
+        """
+        The foliation of a staircase diagram with the given layers: each box
+        is interchanged up to its place, then each layer is merged.
+
+        Parameters:
+            layering : The indices of the boxes in each layer, as given by
+                :meth:`layerings`.
+
+        Example
+        -------
+        >>> x = Ty('x')
+        >>> f, g, h = Box('f', x, x), Box('g', x, x), Box('h', x @ x, x)
+        >>> print((f @ g >> h).to_staircases().foliate(((1, ), (0, ), (2, ))))
+        x @ g >> f @ x >> h
+        """
+        diagram, order = self, list(range(len(self)))
+        for position, i in enumerate(i for layer in layering for i in layer):
+            diagram = diagram.interchange(order.index(i), position)
+            order.insert(position, order.pop(order.index(i)))
+        inside, start = [], 0
+        for layer in layering:
+            merged = diagram.inside[start]
+            for other in diagram.inside[start + 1:start + len(layer)]:
+                merged = merged.merge(other)
+            inside.append(merged)
+            start += len(layer)
+        return self.ar(tuple(inside), self.dom, self.cod)
+
+    def foliations(self, limit: int | None = None) -> "list[Diagram]":
+        """
+        The foliations of a diagram, i.e. the diagrams equal to it up to
+        interchange whose adjacent layers cannot be merged, the largest layers
+        first: :meth:`foliation` picks one of them.
+
+        Parameters:
+            limit : The maximum number of foliations to return.
+
+        Example
+        -------
+        >>> x = Ty('x')
+        >>> f, g, h = Box('f', x, x), Box('g', x, x), Box('h', x @ x, x)
+        >>> for foliation in (f @ g @ f >> h @ x).foliations():
+        ...     print(foliation)
+        f @ g @ f >> h @ x
+        f @ g @ x >> h @ f
+        >>> assert len((f @ f @ f @ f).foliations()) == 1
+        >>> assert len((f @ f @ f >> f @ f @ f).foliations(limit=2)) == 2
+        """
+        staircase = self.to_staircases()
+        return [staircase.foliate(layering) for layering in itertools.islice(
+            self.layerings(staircase.dependencies()), limit)]
+
     def depth(self):
         """
         Computes (an upper bound to) the depth of a diagram by foliating it.

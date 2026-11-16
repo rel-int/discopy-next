@@ -1114,6 +1114,40 @@ def test_foliation_up_to_interchangers():
     assert F((k @ snake).foliation()) == F(k @ snake)
 
 
+
+def test_foliations_up_to_interchangers():
+    from discopy import rigid
+    interchangers = lambda d: d.to_staircases().normal_form(
+        normalize=Diagram.normalize)
+    x = Ty('x')
+    f, g, h = Box('f', x, x), Box('g', x, x), Box('h', x @ x, x)
+    a = rigid.Ty('a')
+    snake = a @ rigid.Cap(a.r, a) >> rigid.Cup(a, a.r) @ a
+    for diagram in [
+            f @ g @ f >> h @ x >> f @ x >> h, f @ f @ f >> f @ f @ f,
+            f.bubble(name="N") @ h, snake]:
+        foliations = diagram.foliations()
+        assert foliations[0] == diagram.foliation()
+        assert len(set(foliations)) == len(foliations)
+        for foliation in foliations:
+            assert interchangers(foliation) == interchangers(diagram)
+            for upper, lower in zip(foliation.inside, foliation.inside[1:]):
+                with raises(AxiomError):
+                    upper.merge(lower)
+    assert len((f @ f @ f >> f @ f @ f).foliations()) == 19
+    assert len((f @ f @ f >> f @ f @ f).foliations(limit=5)) == 5
+
+
+def test_foliations_of_states_and_effects():
+    x = Ty('x')
+    f, cup = Box('f', x, x), Box('cup', Ty(), x @ x)
+    s, e = Box('s', Ty(), x), Box('e', x, Ty())
+    assert (cup >> x @ s @ x).dependencies() == ((), (0, ))
+    assert [str(d) for d in (cup >> x @ s @ x >> f @ x @ x).foliations()]\
+        == ["cup >> f @ s @ x"]
+    for foliation in (s @ s >> f @ x >> e @ e).foliations():
+        assert sorted(map(str, foliation.boxes)) == ["e", "e", "f", "s", "s"]
+
 def test_box_factory():
     """ Every level with boxes of its own binds them, which a stream of boxes
     reads: the diagrams of the hierarchy, the tensors, the grammars, the
