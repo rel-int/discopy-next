@@ -8,7 +8,7 @@
 
 - [WIP] @session_01MEJxy2QJCwia83KHppaJ1H-2026-11-16 21:14 abc: ModalCategory with abstract bang, the four primitives as classmethods, the laws as axioms
 - [WIP] @session_01MEJxy2QJCwia83KHppaJ1H-2026-11-16 21:14 biclosed: Wire.bangs, Wire/Ty/Diagram/Box.bang, str/repr/eq/hash/serialisation, drawn !x
-- [ ] biclosed: Eval, Coeval, Curry banged keeping their arguments, Sum and Bubble banged
+- [WIP] @session_01MEJxy2QJCwia83KHppaJ1H-2026-11-16 21:14 biclosed: Eval, Coeval, Curry banged keeping their arguments, Sum and Bubble banged
 - [ ] biclosed: Dereliction, Digging, Contraction, Exchange
 - [ ] biclosed: Functor through cod.bang, else ob_map/ar_map
 - [ ] biclosed: the laws declared failing on the free category, testable.Bang, proptest cells
