@@ -26,6 +26,7 @@ Summary
         backend
         set_backend
         is_field
+        is_complex
         get_backend
 
 See also
@@ -286,6 +287,34 @@ class Matrix[dtype](
             and self.dtype == other.dtype\
             and (self.dom, self.cod) == (other.dom, other.cod)\
             and (self.array == other.array).all()
+
+    def __le__(self, other):
+        """
+        The pointwise order on parallel matrices: every entry is at most
+        that of the ``other``, which has the same data type. A Boolean
+        matrix is a relation and the order is inclusion; composition, tensor
+        and transpose are monotone.
+
+        >>> R, S = Matrix[bool]([1, 0, 0, 0], 2, 2), Matrix[bool].id(2)
+        >>> assert R <= S and S >= R and not S <= R
+        >>> assert R >> R <= S >> S and R @ R <= S @ S
+        >>> assert not R <= Matrix[bool]([1, 1], 1, 2)
+        >>> assert not Matrix([1, 2], 1, 2) <= Matrix([2, 1], 1, 2)
+
+        The complex numbers have no order, as in Python:
+
+        >>> Matrix[complex]([1j], 1, 1) <= Matrix[complex]([2j], 1, 1)
+        Traceback (most recent call last):
+        ...
+        TypeError: Matrices over <class 'complex'> have no pointwise order.
+        """
+        if not isinstance(other, self.ar):
+            return NotImplemented
+        if is_complex(self.dtype):
+            raise TypeError(messages.MATRIX_ORDER_ERROR.format(self.dtype))
+        return self.dtype == other.dtype\
+            and (self.dom, self.cod) == (other.dom, other.cod)\
+            and (self.array <= other.array).all()
 
     def is_close(self, other: Matrix, rtol: float = 1.e-8, atol: float = 1.e-8
                  ) -> bool:
@@ -929,6 +958,15 @@ def is_field(dtype) -> bool:
             or getattr(dtype, "kind", None) in ("f", "c")\
             or isinstance(dtype, type)\
             and issubclass(dtype, (float, complex, numpy.inexact))
+
+
+def is_complex(dtype) -> bool:
+    """ Whether a ``dtype`` is complex, in any backend. """
+    with backend("numpy") as numpy:
+        return getattr(dtype, "is_complex", False) is True\
+            or getattr(dtype, "kind", None) == "c"\
+            or isinstance(dtype, type)\
+            and issubclass(dtype, (complex, numpy.complexfloating))
 
 
 BACKENDS = {
