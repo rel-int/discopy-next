@@ -795,9 +795,9 @@ they go to the einsum of a backend verbatim, which a file should not reach.
             self, other: "cmap.CMap | hypergraph.Hypergraph") -> Tensor:
         """
         Contract the image of a combinatorial map or a hypergraph, read as
-        Einstein notation by :meth:`operands`, in a single ``einsum`` call of the
-        ``contractor``. By default, this is the ``einsum`` of the active
-        :func:`backend`, and networks with more than
+        Einstein notation by :meth:`operands`, in a single ``einsum`` call
+        of the ``contractor``. By default, this is the ``einsum`` of the
+        active :func:`backend`, and networks with more than
         ``config.MAX_EINSUM_INDICES`` indices are contracted with
         :class:`OptEinsum` instead.
 
