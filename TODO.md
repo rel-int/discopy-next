@@ -5,4 +5,4 @@
 - [x] the resolvent for field dtypes in `Matrix.trace`
 - [x] doctest and the three tests
 - [x] the property matrix: enrol or declare, filed as #548
-- [WIP] @session_01MEJxy5XXNWvvBFsNYRgcmW-2026-11-16 00:35 changelog bullet
+- [x] changelog bullet
