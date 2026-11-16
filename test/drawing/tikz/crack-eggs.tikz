@@ -55,11 +55,11 @@
 \node [] (52) at (3.75, 3.75) {};
 \node [] (53) at (3.75, 3.25) {};
 \node [style=none, fill=white] (54) at (3.0, 3.5) {crack};
-\node [circle, fill=black, scale=0.447] (55) at (1.0, 1.5) {merge};
-\node [circle, fill=black, scale=0.447] (56) at (3.0, 0.5) {merge};
+\node [circle, fill=black, inner sep=0.149em, label={center:{merge}}] (55) at (1.0, 1.5) {};
+\node [circle, fill=black, inner sep=0.149em, label={center:{merge}}] (56) at (3.0, 0.5) {};
 \end{pgfonlayer}
 \begin{pgfonlayer}{edgelayer}
-\draw [-, fill={white}] (1.center) to (2.center) to (3.center) to (4.center) to (1.center);
+\draw [-, fill={white}, draw={white}] (1.center) to (2.center) to (3.center) to (4.center) to (1.center);
 \draw (5.center) .. controls (6.center) and (6.center) .. (7.center);
 \draw (8.center) .. controls (9.center) and (10.center) .. (11.center);
 \draw (12.center) .. controls (10.center) and (9.center) .. (13.center);
