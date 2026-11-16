@@ -2,5 +2,5 @@
 
 - [x] Drawing.layout, Drawing.relayout, Drawing.crossings, Drawing.is_feasible in discopy/drawing/drawing.py; add_box_corners keeps given corners
 - [x] tests: relayout(layout()) draws the same SVG on a gallery of diagrams; infeasible layouts raise
-- [ ] CHANGELOG.md entry
+- [x] CHANGELOG.md entry
 - [ ] next-checks green
