@@ -44,8 +44,7 @@ MATRIX_REPEAT_ERROR = "The reflexive transitive closure is only defined for "\
 MATRIX_RESOLVENT_ERROR = "The resolvent is only defined for square matrices "\
                          "over a field, i.e. float or complex: a Matrix[int] "\
                          "can be cast to float first."
-MATRIX_SINGULAR = "{} has no resolvent: the trace over a field is partial, "\
-                  "defined when id - D is invertible."
+MATRIX_SINGULAR = "id - D is singular: the trace over a field is partial."
 BOX_IS_MIXED = "Pure boxes can have only digits or only qudits as dom and cod."
 LAYERS_MUST_HAVE_A_BOX = "Layers must have at least one box."
 NOT_MERGEABLE = "Layers {} and {} cannot be merged."

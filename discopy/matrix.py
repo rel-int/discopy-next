@@ -659,18 +659,18 @@ class Matrix[dtype](
         >>> Matrix[float]([1], 1, 1).resolvent()
         Traceback (most recent call last):
             ...
-        ValueError: Matrix[float]([1.], dom=Nat(1), cod=Nat(1)) has no \
-resolvent: the trace over a field is partial, defined when id - D is invertible.
+        ValueError: id - D is singular: the trace over a field is partial.
         """
-        import numpy
+        with backend("numpy") as numpy:
+            field = (float, complex, numpy.inexact)
         if self.dom != self.cod or not isinstance(self.dtype, type)\
-                or not issubclass(self.dtype, (float, complex, numpy.inexact)):
+                or not issubclass(self.dtype, field):
             raise TypeError(messages.MATRIX_RESOLVENT_ERROR)
         with backend() as np:
             difference = self.id(self.dom).array - self.array
             if index(self.dom) and not np.linalg.matrix_rank(
                     difference) == index(self.dom):
-                raise ValueError(messages.MATRIX_SINGULAR.format(self))
+                raise ValueError(messages.MATRIX_SINGULAR)
             return type(self)(np.linalg.inv(difference), self.dom, self.cod)
 
     def trace(self, n=1, left=False) -> Matrix:
