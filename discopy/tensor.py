@@ -626,12 +626,12 @@ they go to the einsum of a backend verbatim, which a file should not reach.
         if other is None or isinstance(other, (
                 cat.Ob, cat.Box, monoidal.Colour, monoidal.Ty)):
             return super().__call__(other)
-        if isinstance(other, cmap.CMap):
+        if isinstance(other, cmap.CMap) or isinstance(
+                other, hypergraph.Hypergraph) and issubclass(
+                    other.category, frobenius.Diagram):
             return self.contract(other)
         if isinstance(other, hypergraph.Hypergraph):
-            return self.contract(other) if issubclass(
-                other.category, frobenius.Diagram) else self(
-                    other.to_diagram())
+            other = other.to_diagram()
         assert_isinstance(other, monoidal.Diagram)
         return self.contract(cmap.CMap.from_diagram(other))
 
@@ -752,9 +752,10 @@ they go to the einsum of a backend verbatim, which a file should not reach.
         arrays, indices, inputs, outputs = [], [], [], []
         fresh = count(other.n_spiders)
         with backend() as np:
-            cast = lambda unit, dim: np.array(
-                unit(dim) if self.dtype is None else unit(dim, dtype=int),
-                dtype=self.dtype)
+            def cast(unit, dim):
+                return np.array(
+                    unit(dim) if self.dtype is None
+                    else unit(dim, dtype=int), dtype=self.dtype)
             for spider in other.dom_wires:
                 inputs.append(next(fresh))
                 arrays.append(cast(np.eye, dims[spider]))

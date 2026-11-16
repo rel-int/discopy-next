@@ -1121,3 +1121,11 @@ def test_Functor_counts_the_4x4_sudoku():
              for values in itertools.product(range(n * n), repeat=n * n)]
     F = Functor({x: n * n}, {box: array}, dtype=int)
     assert F(graph) == Tensor[int]([288], Dim(1), Dim(1))
+
+
+def test_Functor_contracts_another_hypergraph_through_its_diagram():
+    x = compact.Ty('x')
+    f = compact.Box('f', x, x)
+    diagram = f @ x.r >> compact.Cup(x, x.r)
+    F = Functor({x: 2}, {f: [[0, 1], [1, 1]]}, dom=compact.Diagram, dtype=int)
+    assert F(diagram.to_hypergraph()) == F(diagram)
