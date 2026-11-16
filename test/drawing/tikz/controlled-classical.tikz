@@ -47,7 +47,7 @@
 \node [circle, black] (44) at (3.5, 0.5) {};
 \end{pgfonlayer}
 \begin{pgfonlayer}{edgelayer}
-\draw [-, fill={white}] (1.center) to (2.center) to (3.center) to (4.center) to (1.center);
+\draw [-, fill={white}, draw={white}] (1.center) to (2.center) to (3.center) to (4.center) to (1.center);
 \draw [in=90, out=-90] (6.center) to (7.center);
 \draw [in=90, out=-90] (9.center) to (10.center);
 \draw [in=90, out=-90] (12.center) to (13.center);

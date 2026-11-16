@@ -184,3 +184,29 @@ def test_controlled_triangle_draws(tmp_path):
     from discopy.quantum.circuit import qubit
     gate = QuantumGate('U', qubit, qubit, [1, 0, 0, 1], shape="triangle")
     Controlled(gate).draw(path=str(tmp_path / "controlled.png"), show=False)
+
+
+def test_tikz_background_has_the_edge_of_its_face(tmp_path):
+    """ The background is white on white: LaTeX draws no black frame. """
+    for use_tikzstyles, background in [
+            (False, "\\draw [-, fill={white}, draw={white}] "),
+            (True, "\\draw [style=white_white_box] ")]:
+        path = tmp_path / "box.tikz"
+        Box('f', Ty('x'), Ty('x')).draw(
+            path=str(path), to_tikz=True, use_tikzstyles=use_tikzstyles)
+        polygons = [line for line in path.read_text().splitlines()
+                    if line.startswith("\\draw [") and "fill" in line
+                    or line.startswith("\\draw [style=")]
+        assert polygons[0].startswith(background)
+        assert all(not line.startswith(background) for line in polygons[1:])
+
+
+def test_tikz_spider_label_is_not_scaled_with_its_node(tmp_path):
+    from discopy.monoidal import Equation
+    x, path = Ty('x'), tmp_path / "equation.tikz"
+    Equation(Box('f', x, x), Box('g', x, x)).draw(
+        path=str(path), to_tikz=True)
+    symbol, = [line for line in path.read_text().splitlines()
+               if "{=}" in line]
+    assert "scale" not in symbol and "label={center:{=}}" in symbol
+    assert symbol.endswith("{};")
