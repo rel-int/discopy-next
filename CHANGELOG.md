@@ -546,6 +546,9 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Fixed
 
+- A box is drawn as high as its `height`, its outline meeting its wires: the
+  layout already stacked layers by it, but the outline was always half a
+  wire high ([next#570]).
 - `CMap.explicit_trace` takes the number of wires to trace as its **first**
   argument, like `Hypergraph.explicit_trace`, so `CMap.trace` and
   `CMap.make_causal` hand it their count instead of looping: over a traced
@@ -2016,6 +2019,7 @@ for the changelog of `1.2.1` and earlier.
 [next#565]: https://github.com/rel-int/discopy-next/pull/565
 [next#566]: https://github.com/rel-int/discopy-next/pull/566
 [next#568]: https://github.com/rel-int/discopy-next/pull/568
+[next#570]: https://github.com/rel-int/discopy-next/pull/570
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#56]: https://github.com/rel-int/optyx/pull/56
