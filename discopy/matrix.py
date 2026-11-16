@@ -643,15 +643,9 @@ class Matrix[dtype](
 
     def resolvent(self) -> Matrix:
         """
-        The inverse of ``id - self`` for a square matrix over a field, i.e.
-        with ``float`` or ``complex`` entries: where the sum of the powers of
-        ``self`` converges, e.g. when it is nilpotent, the resolvent is that
-        sum, the analogue over a field of :meth:`repeat`.
-
-        Raises:
-            TypeError : When the matrix is not square or its entries do not
-                form a field, e.g. integers, whose inverses need not be.
-            ValueError : When ``id - self`` is singular.
+        The inverse of ``id - self`` over a field, see :func:`is_field`, the
+        sum of the powers of ``self`` where it converges as :meth:`repeat`,
+        raising ``TypeError`` over integers, ``ValueError`` when singular.
 
         Example
         -------
@@ -665,10 +659,9 @@ class Matrix[dtype](
         if self.dom != self.cod or not is_field(self.dtype):
             raise TypeError(messages.MATRIX_RESOLVENT_ERROR)
         with backend() as np:
-            singular = getattr(np.linalg, "LinAlgError", ())
             try:
                 inverse = np.linalg.inv(self.id(self.dom).array - self.array)
-            except singular as error:
+            except getattr(np.linalg, "LinAlgError", ()) as error:
                 raise ValueError(messages.MATRIX_SINGULAR) from error
             if not np.isfinite(inverse).all():
                 raise ValueError(messages.MATRIX_SINGULAR)
@@ -676,23 +669,17 @@ class Matrix[dtype](
 
     def trace(self, n=1, left=False) -> Matrix:
         """
-        The partial trace of a matrix, i.e. for ``f: dom @ n -> cod @ n``
-        with blocks ``A: dom -> cod``, ``B: dom -> n``, ``C: n -> cod`` and
-        ``D: n -> n``, the matrix ``A + B >> D* >> C``, where ``D*`` is the
-        :meth:`repeat` of a Boolean matrix and the :meth:`resolvent` of a
-        matrix over a field. The latter is the trace of Haghverdi and Scott,
-        a partial trace defined when ``id - D`` is invertible, see
-        :cite:t:`MalherbeEtAl11`, Definition 3.11: when ``D`` is nilpotent it
-        is the sum over the unrollings ``A + B >> D ** k >> C``.
+        The partial trace ``A + B >> D* >> C`` of a matrix with blocks
+        ``A: dom -> cod``, ``B: dom -> n``, ``C: n -> cod``, ``D: n -> n``,
+        with ``D*`` the :meth:`repeat` over ``bool`` and the
+        :meth:`resolvent` over a field: the trace of Haghverdi and Scott,
+        defined when ``id - D`` is invertible, see :cite:t:`MalherbeEtAl11`,
+        Definition 3.11, and the sum over unrollings when ``D`` is nilpotent.
 
         Parameters:
             n : The number of dimensions to trace.
             left : Whether to trace the first ``n`` dimensions rather than
                 the last, by conjugating with swaps.
-
-        Raises:
-            TypeError : When the entries are neither Booleans nor a field.
-            ValueError : When ``id - D`` is singular.
 
         Example
         -------
@@ -700,9 +687,6 @@ class Matrix[dtype](
         >>> f = Matrix[bool]([[1, 1], [0, 0]], 2, 2)
         >>> assert f.trace() == Matrix[bool]([[1]], 1, 1)
         >>> assert f.trace(left=True) == Matrix[bool]([[0]], 1, 1)
-
-        Over a field, ``0.5 + 1 * (1 - 0.25) ** -1 * 1 == 0.5 + 4 / 3``:
-
         >>> g = Matrix[float]([[0.5, 1], [1, 0.25]], 2, 2)
         >>> assert g.trace().is_close(Matrix[float]([[0.5 + 4 / 3]], 1, 1))
         >>> assert Matrix[float].swap(1, 1).trace() == Matrix[float].id(1)
@@ -934,25 +918,16 @@ class Quimb(Contractor):
 
 def is_field(dtype) -> bool:
     """
-    Whether a ``dtype`` is that of a field, i.e. floating-point or complex,
-    in any backend: a Python or NumPy type, or a PyTorch or TensorFlow dtype.
+    Whether a ``dtype`` is floating-point or complex, a Python or NumPy type
+    or a PyTorch or TensorFlow dtype.
 
-    Parameters:
-        dtype : The data type.
-
-    Example
-    -------
-    >>> assert is_field(float) and is_field(complex)
-    >>> assert not is_field(int) and not is_field(bool)
+    >>> assert is_field(float) and is_field(complex) and not is_field(int)
     """
-    if any(getattr(dtype, attr, False) is True for attr in (
-            "is_floating_point", "is_floating", "is_complex")):
-        return True
+    flags = ("is_floating_point", "is_floating", "is_complex")
     with backend("numpy") as numpy:
-        try:
-            return bool(numpy.issubdtype(dtype, numpy.inexact))
-        except TypeError:
-            return False
+        return any(getattr(dtype, flag, False) is True for flag in flags)\
+            or isinstance(dtype, type)\
+            and issubclass(dtype, (float, complex, numpy.inexact))
 
 
 BACKENDS = {
