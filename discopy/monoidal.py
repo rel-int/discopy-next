@@ -1775,35 +1775,44 @@ class Diagram(cat.Arrow, MonoidalCategory, RichDisplay):
 
     def dependencies(self) -> "tuple[tuple[int, ...], ...]":
         """
-        The boxes each box of a staircase diagram must stay below, i.e. those
-        whose outputs it takes as inputs or, for a box with no inputs, those
-        whose outputs enclose the gap it sits in, with the boxes above them:
-        no interchange moves it above them. A box with no outputs joins two
-        gaps, enclosed by the boxes that enclose both.
+        The boxes each box of a staircase diagram must stay below: no
+        interchange moves it above them. These are
+
+        * the boxes whose outputs it takes as inputs,
+        * for a box with no inputs, the boxes whose outputs enclose the gap it
+          sits in, with the boxes above them: a box with no outputs joins two
+          gaps, enclosed by the boxes that enclose both,
+        * the boxes with no outputs that joined a gap between its inputs.
 
         Example
         -------
         >>> x = Ty('x')
         >>> f, g, h = Box('f', x, x), Box('g', x, x), Box('h', x @ x, x)
         >>> cup, s = Box('cup', Ty(), x @ x), Box('s', Ty(), x)
+        >>> e = Box('e', x, Ty())
         >>> (f @ g >> h).to_staircases().dependencies()
         ((), (), (0, 1))
         >>> (cup >> f @ x >> x @ s @ x).dependencies()
         ((), (0,), (0,))
+        >>> (x @ e @ x >> h).dependencies()
+        ((), (0,))
         """
         wires: "list[int | None]" = len(self.dom) * [None]
-        gaps: "list[frozenset[int]]" = (len(self.dom) + 1) * [frozenset()]
+        gaps: "list[tuple[frozenset[int], frozenset[int]]]" = (
+            len(self.dom) + 1) * [(frozenset(), frozenset())]
         above: "list[frozenset[int]]" = []
         result: "list[tuple[int, ...]]" = []
         for box, offset in zip(self.boxes, self.offsets):
             n, m, j = len(box.dom), len(box.cod), len(result)
             inputs = {i for i in wires[offset:offset + n] if i is not None}\
-                if n else set(gaps[offset])
+                .union(*(gap[1] for gap in gaps[offset + 1:offset + n]))\
+                if n else set(gaps[offset][0])
             above.append(frozenset(inputs).union(*(above[i] for i in inputs)))
             left, right = gaps[offset], gaps[offset + n]
             wires[offset:offset + n] = m * [j]
             gaps[offset:offset + n + 1] = [left] + (m - 1) * [
-                above[j] | {j}] + [right] if m else [left & right]
+                (above[j] | {j}, frozenset())] + [right] if m else [
+                    (left[0] & right[0], left[1] | right[1] | {j})]
             result.append(tuple(sorted(inputs)))
         return tuple(result)
 
@@ -1889,8 +1898,9 @@ class Diagram(cat.Arrow, MonoidalCategory, RichDisplay):
     def foliations(self, limit: int | None = None) -> "list[Diagram]":
         """
         Foliations of a diagram, i.e. diagrams equal to it up to interchange
-        whose adjacent layers cannot be merged, the largest layers first:
-        :meth:`foliation` picks one of them. Each layering of
+        whose adjacent layers cannot be merged, the largest layers first, from
+        the top: :meth:`foliation` merges layers top-down instead, so it may
+        come later, e.g. ``(f >> g) @ h``. Each layering of
         :meth:`dependencies` is foliated, then merged by the level's own
         :meth:`Layer.merge`, e.g. two permutations fuse in
         :mod:`discopy.symmetric`.

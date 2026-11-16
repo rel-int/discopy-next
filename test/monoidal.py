@@ -1127,7 +1127,7 @@ def test_foliations_up_to_interchangers():
             f @ g @ f >> h @ x >> f @ x >> h, f @ f @ f >> f @ f @ f,
             f.bubble(name="N") @ h, snake]:
         foliations = diagram.foliations()
-        assert foliations[0] == diagram.foliation()
+        assert diagram.foliation() in foliations
         assert len(set(foliations)) == len(foliations)
         for foliation in foliations:
             assert interchangers(foliation) == interchangers(diagram)
@@ -1183,6 +1183,17 @@ def test_foliations_of_a_deep_diagram():
         diagram = diagram >> f
     assert diagram.foliations(limit=1) == [diagram]
     assert Diagram.id(x).foliations() == [Diagram.id(x)]
+
+
+def test_foliations_below_an_effect_between_inputs():
+    x = Ty('x')
+    e, h = Box('e', x, Ty()), Box('h', x @ x, x)
+    diagram = x @ e @ x >> h
+    assert diagram.dependencies() == ((), (0, ))
+    assert diagram.foliations() == [diagram]
+    f, g, k = Box('f', x, x), Box('g', x, x), Box('k', x, x)
+    assert [str(d) for d in ((f >> g) @ k).foliations()]\
+        == ["f @ k >> g @ x", "f @ x >> g @ k"]
 
 
 def test_foliations_limit():

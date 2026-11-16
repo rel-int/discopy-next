@@ -11,9 +11,8 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 - `monoidal.Diagram.foliations(limit)` lists the foliations of a diagram:
   diagrams equal to it up to interchange whose adjacent layers cannot merge,
-  the largest layers first, so that the first is `Diagram.foliation()`. The
-  steps are public too: `dependencies`, `layerings` and `foliate`
-  ([next#567]).
+  the largest layers first. The steps are public too: `dependencies`,
+  `layerings` and `foliate` ([next#567]).
 - `Matrix.__le__`, the pointwise order on parallel matrices, which a
   `Tensor` inherits: over `bool` it is the inclusion of relations, over the
   complex numbers it raises `TypeError`. `testable.Inequation`, an `Equation`
