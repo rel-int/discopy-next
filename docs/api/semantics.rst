@@ -2,7 +2,7 @@ semantics
 =========
 
 DisCoPy's computational core: concrete categories (functions, matrices,
-tensors, neural networks, finite groups, representations of Hopf algebras)
+tensors, constraint satisfaction problems, neural networks, finite groups, representations of Hopf algebras)
 and constructions on categories (opposites, Kleisli categories of monads,
 streams, parametric maps, lenses, the Int-construction).
 
@@ -16,6 +16,7 @@ streams, parametric maps, lenses, the Int-construction).
     discopy.monad
     discopy.matrix
     discopy.tensor
+    discopy.csp
     discopy.hopf
     discopy.stream
     discopy.op
