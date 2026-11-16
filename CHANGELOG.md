@@ -14,6 +14,11 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   to a drawing and refuses one that `Drawing.is_feasible` says draws another
   diagram (an edge turned, other wires crossing, boxes overlapping, a port
   outside its box) ([next#578]).
+- A Typst drawing backend, `drawing.backend.Typst`: `Diagram.to_typst` and
+  `Drawing.to_typst` return a `drawing.typst_ast.Document`, whose `render`
+  is the Typst source of a CeTZ canvas, and `draw(format="typst")` compiles
+  it to SVG with the optional `typst` extra, or writes the source to a path
+  ending in `.typ` ([#467], [next#565]).
 - `shape="triangle"` on any box draws it as a triangle, matplotlib and TikZ
   alike: its base the width of the side with more wires, its apex on the
   other, at its wire when there is one, and its dagger upside down
@@ -553,6 +558,11 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Fixed
 
+- The TikZ backend draws no black frame around a drawing: `TikZ.draw_polygon`
+  writes the `edgecolor` it is given, e.g. the white edge of the background.
+  A spider is an empty node padded by `nodesize` with its label over its
+  center, so that the label keeps the size of the text: the symbol of an
+  equation was scaled down with its node ([next#575]).
 - A box is drawn as high as its `height`, its outline meeting its wires: the
   layout already stacked layers by it, but the outline was always half a
   wire high ([next#570]).
@@ -1758,6 +1768,7 @@ for the changelog of `1.2.1` and earlier.
 [#457]: https://github.com/discopy/discopy/pull/457
 [#459]: https://github.com/discopy/discopy/pull/459
 [#466]: https://github.com/discopy/discopy/pull/466
+[#467]: https://github.com/discopy/discopy/pull/467
 [#469]: https://github.com/discopy/discopy/pull/469
 [#470]: https://github.com/discopy/discopy/pull/470
 [#472]: https://github.com/discopy/discopy/pull/472
@@ -2022,10 +2033,12 @@ for the changelog of `1.2.1` and earlier.
 [next#556]: https://github.com/rel-int/discopy-next/pull/556
 [next#557]: https://github.com/rel-int/discopy-next/pull/557
 [next#558]: https://github.com/rel-int/discopy-next/pull/558
+[next#565]: https://github.com/rel-int/discopy-next/pull/565
 [next#566]: https://github.com/rel-int/discopy-next/pull/566
 [next#568]: https://github.com/rel-int/discopy-next/pull/568
 [next#569]: https://github.com/rel-int/discopy-next/pull/569
 [next#570]: https://github.com/rel-int/discopy-next/pull/570
+[next#575]: https://github.com/rel-int/discopy-next/pull/575
 [next#578]: https://github.com/rel-int/discopy-next/pull/578
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29

@@ -421,14 +421,44 @@ which to_drawing recomputes.
         >>> svg = drawing.to_svg()
         >>> assert drawing.to_svg() == svg
         """
-        asymmetry = params.pop("asymmetry", 0.125 * any(
-            box.is_conjugate or box.is_transpose or (
-                box.is_dagger and not box.draw_as_braid)
-            for box in self.boxes))
+        params.setdefault("asymmetry", self.asymmetry())
+        return backend.draw(self.framed(), **params)
+
+    def framed(self) -> Drawing:
+        """
+        A copy with its box corners added and its dual rails framed: what a
+        backend draws, so that drawing never changes the drawing.
+        """
         result = self.relabel_nodes()
         result.add_box_corners()
         result.frame_dual_rail()
-        return backend.draw(result, asymmetry=asymmetry, **params)
+        return result
+
+    def asymmetry(self) -> float:
+        """
+        The shift of one corner of each box drawn as a polygon when nothing
+        else is asked for: :code:`0.125` when some box is a conjugate, a
+        transpose or a dagger not drawn as a braid, :code:`0` otherwise.
+        """
+        return 0.125 * any(
+            box.is_conjugate or box.is_transpose or (
+                box.is_dagger and not box.draw_as_braid)
+            for box in self.boxes)
+
+    def to_typst(self, **params):
+        """
+        The :class:`discopy.drawing.typst_ast.Document` of the drawing,
+        whose ``render`` is its Typst source.
+
+        >>> from discopy.monoidal import Ty, Box
+        >>> drawing = Box('f', Ty('x'), Ty('y')).to_drawing()
+        >>> nodes = len(drawing.positions)
+        >>> assert 'canvas' in drawing.to_typst().render()
+        >>> assert len(drawing.positions) == nodes
+        """
+        params.setdefault("asymmetry", self.asymmetry())
+        return backend.Typst(**params).draw(
+            self.framed(), **params).to_document(**params)
 
     def frame_dual_rail(self, margin=0.5):
         """

@@ -29,10 +29,11 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from contextlib import contextmanager
 from functools import partial
-from io import StringIO
+from io import StringIO, TextIOBase
 from itertools import combinations
 from math import sqrt
 import os
+import pathlib
 import re
 from xml.etree import ElementTree
 
@@ -52,6 +53,9 @@ from PIL import Image, ImageSequence
 
 from discopy import config
 from discopy.drawing import Node, Point
+from discopy.drawing.typst_ast import (
+    Bool, Call, Canvas, ContentExpr, Coord, Document, Float, Ident,
+    Import, RawText, Str, TypstNode)
 
 from discopy.config import (  # noqa: F401  pylint: disable=unused-import
     BOX_DRAWING_ATTRIBUTES as ATTRIBUTES,
@@ -95,6 +99,10 @@ def matplotlib_context():
 
 def draw(graph: Drawing, **params):
     """ Load a :class:`Backend` and draw a :class:`Drawing` on it. """
+    if params.get("format") == "typst":
+        path, show = params.pop("path", None), params.pop("show", True)
+        return Typst(**params).draw(graph, **params).output(
+            path=path, show=show, **params)
     aspect = params.get('aspect', 'auto' if 'figsize' in params else 'equal')
     if params.get('legend', False) and not params.get('to_tikz', False):
         colours = Backend.region_colours(graph)
@@ -1484,26 +1492,48 @@ class TikZ(Backend):
         self.add_node(i, j, text, options)
         super().draw_text(text, i, j, **params)
 
+    @classmethod
+    def color_option(cls, color):
+        """
+        A color as the value of an option, in braces.
+
+        >>> TikZ.color_option("white"), TikZ.color_option("#ff0000")
+        ('{white}', '{rgb,255: red,255; green,0; blue,0}')
+        """
+        return cls.format_color(color) if cls.needs_rgb(color)\
+            else f"{{{color}}}"
+
     def draw_polygon(
             self, *points,
             facecolor=DEFAULT["facecolor"], edgecolor=DEFAULT["edgecolor"]):
-        nodes = []
-        for point in points:
-            nodes.append(self.add_node(*point))
+        """
+        A polygon filled with ``facecolor`` and stroked with ``edgecolor``,
+        which is written when it is not the default: the background of a
+        drawing has the edge of its face, not a black frame.
+
+        >>> tikz = TikZ(use_tikzstyles=False)
+        >>> tikz.draw_polygon((0, 0), (1, 0), (0, 1), edgecolor="white")
+        >>> print(tikz.edgelayer[0].split("]")[0] + "]")
+        \\draw [-, fill={white}, draw={white}]
+        """
+        nodes = [self.add_node(*point) for point in points]
         nodes.append(nodes[0])
+        colors = {"-, fill": facecolor} | ({} if isinstance(
+            edgecolor, str) and edgecolor == DEFAULT["edgecolor"]
+            else {"draw": edgecolor})
+        options = ", ".join(
+            f"{key}={self.color_option(color)}"
+            for key, color in colors.items())
         if self.use_tikzstyles:
-            style_name = "box" if isinstance(facecolor, str)\
-                and facecolor == DEFAULT["facecolor"]\
-                else f"{self.style_color(facecolor)}_box"
-            style = f"\\tikzstyle{{{style_name}}}=" \
-                    f"[-, fill={self.format_color(facecolor)}]\n"
+            name = "box" if isinstance(facecolor, str) and list(
+                colors.values()) == [DEFAULT["facecolor"]] else "_".join(
+                    list(map(self.style_color, colors.values())) + ["box"])
+            style = f"\\tikzstyle{{{name}}}=[" + ", ".join(
+                f"{key}={self.format_color(color)}"
+                for key, color in colors.items()) + "]\n"
             if style not in self.edge_styles:
                 self.edge_styles.append(style)
-            options = f"style={style_name}"
-        else:
-            options = "-, fill=" + (
-                self.format_color(facecolor) if self.needs_rgb(facecolor)
-                else f"{{{facecolor}}}")
+            options = f"style={name}"
         str_connections = " to ".join(f"({node}.center)" for node in nodes)
         self.edgelayer.append(f"\\draw [{options}] {str_connections};\n")
         super().draw_polygon(*points)
@@ -1575,7 +1605,32 @@ class TikZ(Backend):
             f"{path} -- cycle;\n")
         super().draw_filled_shape(start, steps, color)
 
+    @staticmethod
+    def inner_sep(nodesize) -> str:
+        """
+        The padding of a spider of a given ``nodesize``, a share of the
+        default ``0.3333em`` of a node, i.e. half the width of its disc.
+
+        >>> TikZ.inner_sep(0.5)
+        '0.1667em'
+        """
+        return f"{round(nodesize / 3, 4)}em"
+
     def draw_spiders(self, graph, draw_box_labels=True, **params):
+        """
+        Draws each spider as an empty node of its shape and colour, its size
+        set by ``nodesize``, with its label over its center at the size of
+        the text, as matplotlib does: a ``scale`` would shrink the label with
+        the node, e.g. the symbol of an equation in a large drawing.
+
+        >>> from discopy.monoidal import Ty, Box, Equation
+        >>> x = Ty('x')
+        >>> tikz = TikZ(use_tikzstyles=False)
+        >>> drawing = Equation(Box('f', x, x), Box('g', x, x)).to_drawing()
+        >>> tikz.draw_spiders(drawing, nodesize=0.5)
+        >>> print(tikz.nodelayer[0].split("]")[0] + "]")
+        \\node [circle, fill=none, inner sep=0.1667em, label={center:{=}}]
+        """
         spiders = [(node, node.box.color, node.box.shape)
                    for node in graph.nodes
                    if node.kind == "box" and node.box.draw_as_spider]
@@ -1595,9 +1650,10 @@ class TikZ(Backend):
                     self.format_color(color) if self.needs_rgb(color)
                     else color)
             if params.get("nodesize", 1) != 1:
-                options +=\
-                    f", scale={params.get('nodesize')}"  # pragma: no cover
-            self.add_node(i, j, text, options)
+                options += f", inner sep={self.inner_sep(params['nodesize'])}"
+            if text:
+                options += f", label={{center:{{{text}}}}}"
+            self.add_node(i, j, None, options)
         super().draw_spiders(graph, draw_box_labels)
 
     def output(self, path=None, show=True, **params):
@@ -1636,6 +1692,294 @@ class TikZ(Backend):
             if output_tikzstyle:
                 print(''.join(self.node_styles + self.edge_styles))
             print(''.join(begin + nodes + edges + end))
+
+
+def wire_bezier_points(source, target, bend_out):
+    """
+    The two control points of the cubic bezier of a wire from ``source`` to
+    ``target``, or ``None`` when it is straight: the quadratic curve of the
+    Matplotlib backend, which bends out of the source or else into the
+    target.
+    """
+    if source[0] == target[0] or source[1] == target[1]:
+        return None
+    mid = (target[0], source[1]) if bend_out else (source[0], target[1])
+    c1 = ((source[0] + 2 * mid[0]) / 3, (source[1] + 2 * mid[1]) / 3)
+    c2 = ((2 * mid[0] + target[0]) / 3, (2 * mid[1] + target[1]) / 3)
+    return c1, c2
+
+
+class Typst(Backend):
+    """Typst/CeTZ drawing backend."""
+
+    def __init__(self, **params):
+        self.body: list = []
+        self.nodesize = params.get("nodesize", 1)
+        self.fontsize = params.get("fontsize", DEFAULT["fontsize"])
+        # Match Matplotlib's default stroke weight so wires/boxes read at
+        # paper scale once the page is auto-cropped (see ``to_document``).
+        self.linewidth = params.get("linewidth", 1.0)
+        super().__init__()
+
+    def draw(self, graph, **params):
+        """
+        Draw a graph on the canvas, as :func:`draw` does, and return the
+        backend: :meth:`to_document` is its source, :meth:`output` compiles
+        it.
+        """
+        max_v = max(graph.height, graph.width, 0.01)
+        self.nodesize = round(params.get("nodesize", 1.0) / sqrt(max_v), 3)
+        self.draw_boundary(graph, **params)
+        self.draw_regions(graph, **params)
+        self.draw_wires(graph, **params)
+        self.draw_boxes(graph, **params)
+        self.draw_spiders(graph, **params)
+        return self
+
+    @staticmethod
+    def format_color(color):
+        """Format a colour name or hexcode to a Typst-friendly string."""
+        if color is None or Backend.is_transparent(color):
+            return "none"
+        color = Backend.resolve(color)
+        return to_hex(color) if is_color_like(color) else color
+
+    @staticmethod
+    def color_expr(hexcode):
+        """Build a Typst ``rgb(\"#hex\")`` expression string."""
+        if hexcode == "none":
+            return "none"
+        return f'rgb("{hexcode}")' if hexcode.startswith("#") else hexcode
+
+    @staticmethod
+    def math_label(text):
+        """
+        Return ``(inner, math)`` for a diagram label.
+
+        Only explicit ``$...$`` wrappers enter Typst math mode. Bare words
+        like ``Alice`` stay as plain text — Typst would otherwise treat them
+        as undefined variables (``unknown variable: Alice``).
+        """
+        text = str(text)
+        if text.startswith("$") and text.endswith("$") and len(text) >= 2:
+            return text[1:-1], True
+        return text, False
+
+    def coord(self, x, y):
+        """ A point of the canvas. """
+        return Coord(x, y)
+
+    def stroke(self, color="black", linewidth=None):
+        """ A stroke, i.e. a colour and a width in points. """
+        lw = self.linewidth if linewidth is None else linewidth
+        return Ident(
+            f"{self.color_expr(self.format_color(color))} + {lw:g}pt")
+
+    def draw_text(self, text, i, j, **params):
+        colour = params.get("color", None)
+        extra: dict[str, TypstNode] = {}
+        if colour and colour != "black":
+            extra["fill"] = Ident(self.color_expr(self.format_color(colour)))
+        # Wire labels use va='top' (see draw_wire_label); park them to the
+        # right of the wire like TikZ's ``anchor=west``, so the stroke does
+        # not strike through the glyph.
+        if params.get("verticalalignment", "center") == "top":
+            extra["anchor"] = Str("west")
+        inner, math = self.math_label(text)
+        content = ContentExpr(inner, math=math)
+        fs = params.get("fontsize", None)
+        if fs is not None and fs != DEFAULT["fontsize"]:
+            scale = Float(fs / DEFAULT["fontsize"]).render()
+            text_call = Call(
+                Ident("text"), [content], {"size": Ident(f"{scale}em")})
+        else:
+            text_call = content
+        self.body.append(Call(
+            Ident("content"), [self.coord(i, j), text_call], extra))
+        super().draw_text(text, i, j, **params)
+
+    def draw_node(self, i, j, **params):
+        """
+        A node of a controlled gate: a disc of the given colour, its edge
+        drawn when it has an ``edgecolor``, or a plus sign.
+        """
+        radius = 0.06 * self.nodesize * sqrt(params.get("nodesize", 1))
+        if params.get("shape", "circle") == "plus":
+            for x, y in ((radius, 0), (0, radius)):
+                self.body.append(Call(
+                    Ident("line"),
+                    [self.coord(i - x, j - y), self.coord(i + x, j + y)],
+                    {"stroke": self.stroke(linewidth=0.5)}))
+        else:
+            edge = params.get("edgecolor", None)
+            self.body.append(Call(Ident("circle"), [self.coord(i, j)], {
+                "radius": Float(radius),
+                "fill": Ident(self.color_expr(
+                    self.format_color(params.get("color", "black")))),
+                "stroke": Ident("none") if edge is None
+                else self.stroke(edge, linewidth=0.5)}))
+        super().draw_node(i, j, **params)
+
+    def draw_polygon(self, *points,
+                     facecolor=DEFAULT["facecolor"],
+                     edgecolor=DEFAULT["edgecolor"]):
+        coords = [self.coord(*p) for p in points]
+        kwargs = {"close": Bool(True)}
+        if facecolor is None or self.is_transparent(facecolor):
+            kwargs["fill"] = Ident("none")
+        else:
+            kwargs["fill"] = Ident(
+                self.color_expr(self.format_color(facecolor)))
+        if edgecolor is None or self.is_transparent(edgecolor):
+            kwargs["stroke"] = Ident("none")
+        else:
+            kwargs["stroke"] = self.stroke(edgecolor)
+        self.body.append(Call(Ident("line"), coords, kwargs))
+        super().draw_polygon(*points)
+
+    def draw_wire(self, source, target, bend_out=False, bend_in=False,
+                  style=None, linewidth=None, adaptive=True):
+        options: dict[str, TypstNode] = {
+            "stroke": self.stroke("black", linewidth)}
+        cps = wire_bezier_points(source, target, bend_out)
+        if style == "->":
+            cps, options["mark"] = None, Ident('(end: ">", fill: black)')
+        if cps is not None:
+            c1, c2 = cps
+            self.body.append(
+                Call(
+                    Ident("bezier"),
+                    [
+                        self.coord(*source),
+                        self.coord(*target),
+                        self.coord(*c1),
+                        self.coord(*c2),
+                    ],
+                    options,
+                )
+            )
+        else:
+            self.body.append(
+                Call(
+                    Ident("line"),
+                    [self.coord(*source), self.coord(*target)],
+                    options,
+                )
+            )
+        super().draw_wire(source, target, bend_out=bend_out, bend_in=bend_in)
+
+    def draw_bezier(self, points, adaptive=True):
+        start, first, second, end = points
+        self.body.append(
+            Call(
+                Ident("bezier"),
+                [self.coord(*start), self.coord(*end),
+                 self.coord(*first), self.coord(*second)],
+                {"stroke": self.stroke()},
+            )
+        )
+        super().draw_bezier(points)
+
+    def spider_shape(self, box, i, j) -> list[Call]:
+        """
+        The disc or the square of a spider at ``(i, j)``, and nothing when
+        its colour is transparent: such a spider is just its label, e.g. the
+        symbol of an :class:`discopy.monoidal.Equation`.
+        """
+        if self.is_transparent(box.color):
+            return []
+        colour = self.color_expr(self.format_color(box.color))
+        options = {"fill": Ident(colour), "stroke": self.stroke(linewidth=0.5)}
+        if box.shape == "rectangle":
+            size = self.nodesize * 0.15
+            return [Call(Ident("rect"), [
+                self.coord(i - size, j - size),
+                self.coord(i + size, j + size)], options)]
+        return [Call(Ident("circle"), [self.coord(i, j)], {
+            "radius": Float(self.nodesize * 0.12), **options})]
+
+    def draw_spiders(self, graph, draw_box_labels=True, **params):
+        """
+        Draws each spider as its shape and its label, at
+        ``fontsize_spiders`` whatever the ``fontsize``.
+        """
+        for node in graph.nodes:
+            if node.kind != "box" or not node.box.draw_as_spider:
+                continue
+            i, j = graph.positions[node]
+            hexcolour = self.format_color(node.box.color)
+            self.body.extend(self.spider_shape(node.box, i, j))
+            if draw_box_labels and node.box.drawing_name:
+                label = node.box.drawing_name
+                inner, math = self.math_label(label)
+                fc = 'rgb("#ffffff")' if hexcolour == "#000000"\
+                    else 'rgb("#000000")'
+                scale = Float(params.get(
+                    "fontsize_spiders", DEFAULT["fontsize_spiders"])
+                    / DEFAULT["fontsize"]).render()
+                lbl = Call(
+                    Ident("text"), [ContentExpr(inner, math=math)],
+                    {"fill": Ident(fc), "size": Ident(f"{scale}em")})
+                self.body.append(Call(
+                    Ident("content"), [self.coord(i, j), lbl]))
+        super().draw_spiders(graph, draw_box_labels)
+
+    def draw_regions(self, graph, **params):
+        """ Coloured regions are not drawn in Typst yet, as in TikZ. """
+        super().draw_regions(graph, **params)
+
+    def to_document(self, **params):
+        """
+        The document of what was drawn: a CeTZ canvas on a page cropped to
+        it, with ``page_margin`` around and ``unit_length`` to a unit.
+        """
+        margin = params.get("page_margin", "0.2cm")
+        doc = Document(
+            imports=[
+                Import("@preview/cetz:0.5.2", members=["canvas", "draw"]),
+            ],
+            preamble=[
+                RawText("#set page("
+                        f"width: auto, height: auto, margin: {margin})")
+            ],
+        )
+        unit_len = params.get("unit_length", "1in")
+        canvas = Canvas(
+            canvas_kwargs={"length": Ident(unit_len)},
+            body=[RawText("import draw: *")] + self.body,
+        )
+        doc.content = canvas
+        return doc
+
+    def output(self, path=None, show=True, **params):
+        doc = self.to_document(**params)
+        source = doc.render()
+        if isinstance(path, (str, os.PathLike))\
+                and str(path).endswith(".typ"):
+            pathlib.Path(path).write_text(source, encoding="utf-8")
+            return source
+        try:
+            import typst
+
+            svg = typst.compile(source.encode(), format="svg", pretty=True)
+        except ImportError as error:  # pragma: no cover
+            raise ImportError(
+                "Typst rendering requires the 'typst' package. "
+                "Install it with: pip install typst") from error
+        if hasattr(path, "write"):
+            path.write(svg.decode() if isinstance(path, TextIOBase) else svg)
+            return svg
+        if path is not None:
+            pathlib.Path(path).write_bytes(svg)
+            return svg
+        if show:
+            try:
+                from IPython.display import SVG
+
+                return SVG(svg)
+            except ImportError:
+                pass
+        return svg
 
 
 class Matplotlib(Backend):
