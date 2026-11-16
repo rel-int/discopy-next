@@ -2049,7 +2049,7 @@ class Box(cat.Box, Diagram):
             else (self.layer_factory(self, normalise=False), )
         Diagram.__init__(self, inside, dom, cod)
 
-    def rebuild(self, **changes) -> Box:
+    def rebuild(self, **changes):
         """
         Rebuild a box, keeping the drawing attributes it was given that its
         constructor does not set, e.g. so that a dagger keeps its shape.
