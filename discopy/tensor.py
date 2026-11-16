@@ -609,7 +609,8 @@ they go to the einsum of a backend verbatim, which a file should not reach.
         >>> assert F(g.r) == F(g.transpose()) != F(g).r
 
         A hypergraph of :mod:`discopy.frobenius` is contracted as it
-        stands, see :meth:`spider_operands`, any other through its diagram.
+        stands, see :meth:`spider_operands`, any other through its diagram,
+        see :meth:`operands`.
 
         >>> graph = (g >> frobenius.Spider(1, 2, n)).to_hypergraph()
         >>> assert F(graph) == F(graph.to_diagram())
@@ -626,12 +627,8 @@ they go to the einsum of a backend verbatim, which a file should not reach.
         if other is None or isinstance(other, (
                 cat.Ob, cat.Box, monoidal.Colour, monoidal.Ty)):
             return super().__call__(other)
-        if isinstance(other, cmap.CMap) or isinstance(
-                other, hypergraph.Hypergraph) and issubclass(
-                    other.category, frobenius.Diagram):
+        if isinstance(other, (cmap.CMap, hypergraph.Hypergraph)):
             return self.contract(other)
-        if isinstance(other, hypergraph.Hypergraph):
-            other = other.to_diagram()
         assert_isinstance(other, monoidal.Diagram)
         return self.contract(cmap.CMap.from_diagram(other))
 
@@ -669,7 +666,9 @@ they go to the einsum of a backend verbatim, which a file should not reach.
         >>> assert inputs == outputs == []
         """
         if isinstance(other, hypergraph.Hypergraph):
-            return self.spider_operands(other)
+            if issubclass(other.category, frobenius.Diagram):
+                return self.spider_operands(other)
+            other = cmap.CMap.from_diagram(other.to_diagram())
         ports, wires, fresh = other.ports, {}, count()
         for source, target in enumerate(other.edges):
             if source > target:
@@ -723,11 +722,14 @@ they go to the einsum of a backend verbatim, which a file should not reach.
         its type, and one array per box, indexed by the spiders on its
         ports. A spider is one index however many ports it has, not a
         tensor. Each boundary port is a free index carried by an identity,
-        and a spider on no port is summed over alone, i.e. it counts the
+        and so is each port of a box after the first on the same spider, so
+        that no array repeats an index, which some contractors read as a
+        trace. A spider on no port is summed over alone, i.e. it counts the
         size of its type.
 
         Parameters:
-            other : The hypergraph to translate, of :mod:`frobenius`.
+            other : The hypergraph to translate, of :mod:`frobenius`: any
+                other goes through its diagram, see :meth:`operands`.
 
         Example
         -------
@@ -739,7 +741,7 @@ they go to the einsum of a backend verbatim, which a file should not reach.
         ...     frobenius.Ty(), x, (f, ), ((), (((), (0, 0)), ), (0, )))
         >>> arrays, indices, inputs, outputs = F.spider_operands(graph)
         >>> indices
-        [[0, 0], [0, 1]]
+        [[1, 0], [0, 1], [0, 2]]
         >>> F(graph)
         Tensor[int]([1, 1, 1], dom=Dim(1), cod=Dim(3))
         >>> scalar = frobenius.Hypergraph(
@@ -760,12 +762,18 @@ they go to the einsum of a backend verbatim, which a file should not reach.
                 inputs.append(next(fresh))
                 arrays.append(cast(np.eye, dims[spider]))
                 indices.append([inputs[-1], spider])
-            for box, (dom_wires, cod_wires) in zip(
-                    other.boxes, other.box_wires):
-                wires = dom_wires + cod_wires
+            for box, wiring in zip(other.boxes, other.box_wires):
+                wires, index = sum(wiring, ()), []
+                for spider in wires:
+                    if spider in index:  # a diagonal, kept as one index
+                        index.append(next(fresh))
+                        arrays.append(cast(np.eye, dims[spider]))
+                        indices.append([index[-1], spider])
+                    else:
+                        index.append(spider)
                 arrays.append(self(box).array.reshape(
                     [dims[spider] for spider in wires]))
-                indices.append(list(wires))
+                indices.append(index)
             for spider in other.cod_wires:
                 outputs.append(next(fresh))
                 arrays.append(cast(np.eye, dims[spider]))

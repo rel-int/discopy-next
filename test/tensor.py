@@ -1129,3 +1129,29 @@ def test_Functor_contracts_another_hypergraph_through_its_diagram():
     diagram = f @ x.r >> compact.Cup(x, x.r)
     F = Functor({x: 2}, {f: [[0, 1], [1, 1]]}, dom=compact.Diagram, dtype=int)
     assert F(diagram.to_hypergraph()) == F(diagram)
+
+
+def test_Functor_keeps_a_diagonal_shared_with_another_array():
+    """ A spider on two ports of one box and on the boundary is a diagonal
+    that stays an index of the network, by every contractor. """
+    pytest.importorskip("quimb")
+    x = frobenius.Ty('x')
+    f = frobenius.Box('f', frobenius.Ty(), x @ x)
+    graph = frobenius.Hypergraph(
+        frobenius.Ty(), x, (f, ), ((), (((), (0, 0)), ), (0, )))
+    for contractor in (None, OptEinsum(), Quimb()):
+        F = Functor({x: 2}, {f: [[1, 0], [0, 2]]}, dtype=int,
+                    contractor=contractor)
+        assert F(graph) == Tensor[int]([1, 2], Dim(1), Dim(2))
+    network = F.to_quimb(graph)
+    assert network.contract(output_inds=["out0"]).data.tolist() == [1, 2]
+
+
+def test_Functor_contract_takes_another_hypergraph_through_its_diagram():
+    """ A hypergraph of compact cups nests a compound image as its diagram
+    does, through contract as through the call. """
+    y = compact.Ty('y')
+    cup = compact.Cup(y, y.r)
+    F = Functor({y: Dim(2, 3)}, {}, dom=compact.Diagram, dtype=int)
+    graph = cup.to_hypergraph()
+    assert F.contract(graph) == F(graph) == F(cup)
