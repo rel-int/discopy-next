@@ -19,6 +19,28 @@ def _normalize_typst(text):
     return "\n".join(line.rstrip() for line in text.splitlines())
 
 
+def compiled(source, **params):
+    """Compile Typst source, or skip when CeTZ cannot be downloaded."""
+    typst = pytest.importorskip("typst")
+    try:
+        return typst.compile(source.encode(), **params)
+    except typst.TypstError as error:
+        if "failed to download package" in str(error):
+            pytest.skip("CeTZ cannot be downloaded.")
+        raise
+
+
+def drawn(diagram, **params):
+    """Draw with Typst, or skip when CeTZ cannot be downloaded."""
+    typst = pytest.importorskip("typst")
+    try:
+        return diagram.draw(format="typst", **params)
+    except typst.TypstError as error:
+        if "failed to download package" in str(error):
+            pytest.skip("CeTZ cannot be downloaded.")
+        raise
+
+
 def typst_and_compare(file):
     """Decorator that compares to_typst() output against a reference."""
     def decorator(func):
@@ -151,7 +173,7 @@ def test_typst_compilation():
     from discopy.monoidal import Ty, Box
     x, y = Ty("x"), Ty("y")
     f = Box("f", x, y)
-    svg = f.draw(format="typst", show=False)
+    svg = drawn(f, show=False)
     assert isinstance(svg, bytes)
     assert svg.startswith(b"<svg") or svg.startswith(b"<?xml")
 
@@ -163,8 +185,7 @@ def test_typst_output_to_file(tmp_path):
     source = f.draw(format="typst", path=tmp_path / "f.typ", show=False)
     assert (tmp_path / "f.typ").read_text() == source
     assert 'import "@preview/cetz' in source
-    pytest.importorskip("typst")
-    svg = f.draw(format="typst", path=tmp_path / "f.svg", show=False)
+    svg = drawn(f, path=tmp_path / "f.svg", show=False)
     assert (tmp_path / "f.svg").read_bytes() == svg
 
 
@@ -209,8 +230,7 @@ def test_typst_fontsize_and_text_colour():
     x, y = Ty("x"), Ty("y")
     source = Box("f", x, y).to_typst(fontsize=24).render()
     assert 'text("f", size: 2.4em)' in source
-    typst = pytest.importorskip("typst")
-    assert typst.compile(source.encode(), format="svg")
+    assert compiled(source, format="svg")
 
 
 def test_typst_ast_nodes():
@@ -227,9 +247,8 @@ def test_typst_ast_nodes():
 def test_typst_show_returns_ipython_svg():
     """With no path and ``show``, ``output`` hands IPython an SVG to display."""
     pytest.importorskip("IPython")
-    pytest.importorskip("typst")
     x, y = Ty("x"), Ty("y")
-    svg = Box("f", x, y).draw(format="typst", show=True)
+    svg = drawn(Box("f", x, y), show=True)
     assert type(svg).__name__ == "SVG"
 
 
@@ -253,15 +272,17 @@ def test_typst_names_are_not_markup():
     x = Ty("x")
     source = Box('f]#x "y"', x, x).to_typst().render()
     assert r'"f]#x \"y\""' in source
-    typst = pytest.importorskip("typst")
-    assert typst.compile(source.encode(), format="svg")
+    assert compiled(source, format="svg")
 
 
 def test_typst_colours_given_as_numbers():
     from discopy.drawing.backend import Typst
     assert Typst.format_color([1, 0, 0]) == "#ff0000"
     assert Typst.format_color("#00ff00") == "#00ff00"
-    assert Typst.format_color(None) == "none"
+    assert Typst.format_color(None) == Typst.format_color("none") == "none"
+    assert Typst.format_color("tab:blue") == "#1f77b4"
+    assert Typst.format_color("0.5") == "#808080"
+    assert Typst.format_color("white") == "#ffffff"
 
 
 def test_to_typst_leaves_the_drawing_as_it_was():
@@ -282,3 +303,26 @@ def test_typst_frames_dual_rails():
     framed.frame_dual_rail()
     source = drawing.to_typst().render()
     assert f"({framed.width:g}, {framed.height:g})" in source
+
+
+def test_typst_draws_the_nodes_of_a_controlled_gate():
+    """A CX has a black control dot and a circled plus as its target."""
+    from discopy.quantum.gates import CX
+    source = CX.to_typst().render()
+    circles = [line for line in source.splitlines() if "circle(" in line]
+    assert any('fill: rgb("#000000")' in line for line in circles)
+    assert any('fill: rgb("#ffffff"), stroke: rgb("#000000")' in line
+               for line in circles)
+    assert compiled(source, format="svg")
+
+
+def test_typst_keeps_the_arrow_of_a_measurement():
+    from discopy.quantum.circuit import Measure
+    source = Measure().to_typst().render()
+    assert source.count('mark: (end: ">", fill: black)') == 1
+    assert compiled(source, format="svg")
+
+
+def test_typst_import_quotes_its_path():
+    from discopy.drawing.typst_ast import Import
+    assert Import('a"b').render() == '#import "a' + chr(92) + '"b"'

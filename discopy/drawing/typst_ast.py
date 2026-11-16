@@ -160,11 +160,12 @@ class Import(TypstNode):
     alias: str | None = None
 
     def render(self, indent=0):
+        path = Str(self.path).render()
         if self.members:
-            return f'#import "{self.path}": {", ".join(self.members)}'
+            return f'#import {path}: {", ".join(self.members)}'
         if self.alias:
-            return f'#import "{self.path}" as {self.alias}'
-        return f'#import "{self.path}"'
+            return f'#import {path} as {self.alias}'
+        return f'#import {path}'
 
 
 @dataclass

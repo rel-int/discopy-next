@@ -1646,10 +1646,10 @@ class Typst(Backend):
     @staticmethod
     def format_color(color):
         """Format a colour name or hexcode to a Typst-friendly string."""
-        if color is None:
+        if color is None or Backend.is_transparent(color):
             return "none"
-        return COLORS.get(color, color) if isinstance(color, str)\
-            else to_hex(color)
+        color = Backend.resolve(color)
+        return to_hex(color) if is_color_like(color) else color
 
     @staticmethod
     def color_expr(hexcode):
@@ -1704,6 +1704,28 @@ class Typst(Backend):
             Ident("content"), [self.coord(i, j), text_call], extra))
         super().draw_text(text, i, j, **params)
 
+    def draw_node(self, i, j, **params):
+        """
+        A node of a controlled gate: a disc of the given colour, its edge
+        drawn when it has an ``edgecolor``, or a plus sign.
+        """
+        radius = 0.06 * self.nodesize * sqrt(params.get("nodesize", 1))
+        if params.get("shape", "circle") == "plus":
+            for x, y in ((radius, 0), (0, radius)):
+                self.body.append(Call(
+                    Ident("line"),
+                    [self.coord(i - x, j - y), self.coord(i + x, j + y)],
+                    {"stroke": self.stroke(linewidth=0.5)}))
+        else:
+            edge = params.get("edgecolor", None)
+            self.body.append(Call(Ident("circle"), [self.coord(i, j)], {
+                "radius": Float(radius),
+                "fill": Ident(self.color_expr(
+                    self.format_color(params.get("color", "black")))),
+                "stroke": Ident("none") if edge is None
+                else self.stroke(edge, linewidth=0.5)}))
+        super().draw_node(i, j, **params)
+
     def draw_polygon(self, *points,
                      facecolor=DEFAULT["facecolor"],
                      edgecolor=DEFAULT["edgecolor"]):
@@ -1724,7 +1746,10 @@ class Typst(Backend):
     def draw_wire(self, source, target, bend_out=False, bend_in=False,
                   style=None, linewidth=None, adaptive=True):
         cps = wire_bezier_points(source, target, bend_out, bend_in)
-        stroke = self.stroke("black", linewidth)
+        options: dict[str, TypstNode] = {
+            "stroke": self.stroke("black", linewidth)}
+        if style == "->":
+            options["mark"] = Ident('(end: ">", fill: black)')
         if cps is not None:
             c1, c2 = cps
             self.body.append(
@@ -1736,7 +1761,7 @@ class Typst(Backend):
                         self.coord(*c1),
                         self.coord(*c2),
                     ],
-                    {"stroke": stroke},
+                    options,
                 )
             )
         else:
@@ -1744,7 +1769,7 @@ class Typst(Backend):
                 Call(
                     Ident("line"),
                     [self.coord(*source), self.coord(*target)],
-                    {"stroke": stroke},
+                    options,
                 )
             )
         super().draw_wire(source, target, bend_out=bend_out, bend_in=bend_in)

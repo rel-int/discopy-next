@@ -71,7 +71,8 @@ def draw(diagram, **params):
         Where to save the image, if `None` we call :code:`plt.show()`.
     format : str, optional
         Format of the saved image, taken from the extension of :code:`path`
-        when it is a file name, required when it is an in-memory buffer.
+        when it is a file name, required when it is an in-memory buffer;
+        :code:`"typst"` draws with the :class:`Typst` backend.
     doctest : str, optional
         Path to a documentation image used as a drawing baseline: the
         image is created if missing and compared against otherwise, or
@@ -81,8 +82,6 @@ def draw(diagram, **params):
         Comparison tolerance for raster images, default is :code:`20`.
     to_tikz : bool, optional
         Whether to output tikz code instead of matplotlib.
-    format : str, optional
-        Output format: ``"svg"``, ``"png"``, or ``"typst"``.
     asymmetry : float, optional
         Shift one corner of each box drawn as a plain polygon (not spiders,
         wires, braids or other special shapes) so that a box, its dagger, its
