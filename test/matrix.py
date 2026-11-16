@@ -151,6 +151,14 @@ def test_trace_over_a_field_in_jax():
         with raises(ValueError, match="partial"):
             Matrix([[0.5, 1.], [1., 1.]], 2, 2).trace()
 
+    def trace(array):
+        with backend("jax"):
+            return Matrix(array, 2, 2).trace().array
+
+    jax = pytest.importorskip("jax")
+    traced = jax.jit(trace)(np.array([[0.5, 1.], [1., 0.25]]))
+    assert np.allclose(traced, [[0.5 + 4 / 3]], rtol=1e-5)
+
 
 def test_is_field():
     torch = pytest.importorskip("torch")

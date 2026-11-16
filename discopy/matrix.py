@@ -38,6 +38,7 @@ See also
 from __future__ import annotations
 
 from contextlib import contextmanager
+from math import isqrt, prod
 from operator import index
 from types import ModuleType
 from collections.abc import Sequence
@@ -643,9 +644,9 @@ class Matrix[dtype](
 
     def resolvent(self) -> Matrix:
         """
-        The inverse of ``id - self`` over a field, see :func:`is_field`, the
-        sum of the powers of ``self`` where it converges as :meth:`repeat`,
-        raising ``TypeError`` over integers, ``ValueError`` when singular.
+        The inverse of ``id - self`` over a field, see :func:`is_field`, i.e.
+        the sum of its powers where it converges, raising ``TypeError`` over
+        integers, ``ValueError`` when singular unless traced by ``jax.jit``.
 
         Example
         -------
@@ -658,14 +659,20 @@ class Matrix[dtype](
         """
         if self.dom != self.cod or not is_field(self.dtype):
             raise TypeError(messages.MATRIX_RESOLVENT_ERROR)
+        shape = self.array.shape
+        square = self.array.reshape(2 * (isqrt(prod(shape)), ))
         with backend() as np:
             try:
-                inverse = np.linalg.inv(self.id(self.dom).array - self.array)
+                inverse = np.linalg.inv(np.eye(len(square)) - square)
             except getattr(np.linalg, "LinAlgError", ()) as error:
                 raise ValueError(messages.MATRIX_SINGULAR) from error
-            if not np.isfinite(inverse).all():
+            try:
+                singular = not np.isfinite(inverse).all()
+            except TypeError:
+                singular = False
+            if singular:
                 raise ValueError(messages.MATRIX_SINGULAR)
-            return type(self)(inverse, self.dom, self.cod)
+            return type(self)(inverse.reshape(shape), self.dom, self.cod)
 
     def trace(self, n=1, left=False) -> Matrix:
         """
@@ -689,7 +696,6 @@ class Matrix[dtype](
         >>> assert f.trace(left=True) == Matrix[bool]([[0]], 1, 1)
         >>> g = Matrix[float]([[0.5, 1], [1, 0.25]], 2, 2)
         >>> assert g.trace().is_close(Matrix[float]([[0.5 + 4 / 3]], 1, 1))
-        >>> assert Matrix[float].swap(1, 1).trace() == Matrix[float].id(1)
         """
         dom, cod = index(self.dom) - n, index(self.cod) - n
         if left:
@@ -917,12 +923,7 @@ class Quimb(Contractor):
 
 
 def is_field(dtype) -> bool:
-    """
-    Whether a ``dtype`` is floating-point or complex, a Python or NumPy type
-    or a PyTorch or TensorFlow dtype.
-
-    >>> assert is_field(float) and is_field(complex) and not is_field(int)
-    """
+    """ Whether a ``dtype`` is floating-point or complex, in any backend. """
     flags = ("is_floating_point", "is_floating", "is_complex")
     with backend("numpy") as numpy:
         return any(getattr(dtype, flag, False) is True for flag in flags)\

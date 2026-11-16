@@ -9,7 +9,8 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Added
 
-- `Matrix.resolvent`, the inverse of `id - D` over a field, and with it
+- `Matrix.resolvent`, the inverse of `id - D` over a field, which a
+  `Tensor` inherits, and with it
   `Matrix.trace` over `float` and `complex`: the trace of Haghverdi and
   Scott, `A + B (id - D)^-1 C`, a partial trace raising `ValueError` when
   `id - D` is singular (Malherbe, Scott and Selinger, arXiv:1107.3608,
