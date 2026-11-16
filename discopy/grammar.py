@@ -58,12 +58,21 @@ class Alias(MetaPathFinder, Loader):
         return None
 
     def create_module(self, spec):
-        """ The module of :mod:`discopy.lambek` with the same name. """
-        return import_module(
+        """
+        The module of :mod:`discopy.lambek` with the same name, its own spec
+        kept as the state of the loader.
+        """
+        module = import_module(
             lambek.__name__ + spec.name.removeprefix(__name__))
+        spec.loader_state = module.__spec__
+        return module
 
     def exec_module(self, module):
-        """ Nothing to run: the module was imported under its own name. """
+        """
+        Nothing to run, the module was imported under its own name: it gets
+        its own spec back, so that it still reloads.
+        """
+        module.__spec__ = module.__spec__.loader_state
 
 
 if not any(isinstance(finder, Alias) for finder in sys.meta_path):

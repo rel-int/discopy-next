@@ -18,6 +18,7 @@ def test_grammar_is_the_deprecated_name_of_lambek():
         assert getattr(grammar, name) is getattr(lambek, name)
         assert import_module(f"discopy.grammar.{name}")\
             is getattr(lambek, name)
+        assert getattr(lambek, name).__spec__.name == f"discopy.lambek.{name}"
     from discopy.grammar import Word, Rule
     from discopy.grammar.cfg import Tree
     assert (Word, Rule, Tree) == (lambek.Word, lambek.Rule, lambek.cfg.Tree)
