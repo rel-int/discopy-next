@@ -61,7 +61,7 @@ from typing import ClassVar
 from discopy import biclosed, cmap, messages
 from discopy.abc import ClosedCategory
 from discopy.cat import factory
-from discopy.grammar import thue
+from discopy.lambek import thue
 from discopy.utils import (
     BinaryBoxConstructor,
     AxiomError,
@@ -107,7 +107,7 @@ class Diagram(biclosed.Diagram):
     ob = Ty
 
     def to_pregroup(self):
-        from discopy.grammar import pregroup
+        from discopy.lambek import pregroup
 
         return Functor(
             ob_map=lambda x: pregroup.Ty(x.inside[0].name),
@@ -271,9 +271,9 @@ class TermBase(Box, biclosed.TermBase):
     def to_abstract(self):
         """
         The abstract term of a categorial term, dropping planarity,
-        see :meth:`discopy.grammar.abstract.Diagram.from_categorial`.
+        see :meth:`discopy.lambek.abstract.Diagram.from_categorial`.
         """
-        from discopy.grammar.abstract import Diagram
+        from discopy.lambek.abstract import Diagram
         return Diagram.from_categorial(self)
 
 

@@ -11,8 +11,8 @@ import marimo as mo
 
 The sequence `a + b * c` has two readings, `a + (b * c)` and `(a + b) * c`, and the convention that `*` binds tighter than `+` picks the first one.
 In this notebook we teach a neural network that convention from examples, with nothing but the modules
-[`grammar.proofnet`](../../_api/discopy.grammar.proofnet.html) and
-[`grammar.neural`](../../_api/discopy.grammar.neural.html):
+[`lambek.proofnet`](../../_api/discopy.lambek.proofnet.html) and
+[`lambek.neural`](../../_api/discopy.lambek.neural.html):
 the network never sees a bracket, it learns to link the operands of each operator.
 
 ## Formulae are terms
@@ -27,9 +27,9 @@ from itertools import permutations
 import torch
 from torch import nn
 
-from discopy.grammar.abstract import Ty, Constant, Functor
-from discopy.grammar.proofnet import ProofNet
-from discopy.grammar.neural import Signature, Parser
+from discopy.lambek.abstract import Ty, Constant, Functor
+from discopy.lambek.proofnet import ProofNet
+from discopy.lambek.neural import Signature, Parser
 from discopy.python import Function
 from discopy.utils import AxiomError
 

@@ -1,8 +1,8 @@
 from pytest import raises
 
-from discopy import cat, grammar, biclosed, monoidal
+from discopy import cat, lambek, biclosed, monoidal
 from discopy.utils import dumps, from_tree, loads
-from discopy.grammar.categorial import *
+from discopy.lambek.categorial import *
 
 tree = {
   'type': 'ba',
@@ -253,7 +253,7 @@ def test_to_tree():
 
 
 def pregroup_diagram():
-    from discopy.grammar.pregroup import Ty, Box, Cup, Diagram
+    from discopy.lambek.pregroup import Ty, Box, Cup, Diagram
     from discopy.rigid import Wire
 
     boxes = [
@@ -281,8 +281,8 @@ def pregroup_diagram():
 
 
 def test_to_pregroup():
-    from discopy.grammar import pregroup
-    from discopy.grammar.pregroup import Cup, Cap, Id, Swap
+    from discopy.lambek import pregroup
+    from discopy.lambek.pregroup import Cup, Cap, Id, Swap
     x, y = Ty('x'), Ty('y')
     x_, y_ = pregroup.Ty('x'), pregroup.Ty('y')
     assert Diagram.ba(x, y).curry(left=True).to_pregroup().normal_form()\
@@ -374,7 +374,7 @@ def test_Coeval():
 
 def tokens(string):
     "The words of a string term, read by interpreting positions as lists."
-    from discopy.grammar import abstract
+    from discopy.lambek import abstract
     from discopy.python import Function
     python = abstract.Functor(
         {abstract.Position: list},
@@ -383,7 +383,7 @@ def tokens(string):
 
 
 def test_parse():
-    from discopy.grammar.abstract import Diagram as Abstract, String
+    from discopy.lambek.abstract import Diagram as Abstract, String
     n, np, s = Ty("n"), Ty("np"), Ty("s")
     vp = np >> s
     I, Mary, man = np("I"), np("Mary"), n("man")

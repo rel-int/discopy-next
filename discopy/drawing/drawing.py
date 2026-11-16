@@ -134,7 +134,7 @@ boundary, see issue #520:
 .. image:: /_static/drawing/who-ansatz.svg
     :align: center
 
->>> from discopy.grammar.categorial import Eval, Ty as CTy, Word
+>>> from discopy.lambek.categorial import Eval, Ty as CTy, Word
 >>> s, n = map(CTy, 'sn')
 >>> sentence = (Word('Alice', n) @ Word('loves', (n >> s) << n)
 ...             @ Word('Bob', n) >> n @ Eval((n >> s) << n) >> Eval(n >> s))

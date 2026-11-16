@@ -62,7 +62,7 @@ docs = ["discopy[docs]"]
 notebooks = ["discopy[notebooks]"]
 tensor = ["discopy[tensor]"]
 quantum = ["discopy[quantum]"]
-grammar = ["discopy[grammar]"]
+lambek = ["discopy[lambek]"]
 optyx = ["discopy[optyx]"]
 typst = ["discopy[typst]"]
 all = [
@@ -71,7 +71,7 @@ all = [
     { include-group = "notebooks" },
     { include-group = "tensor" },
     { include-group = "quantum" },
-    { include-group = "grammar" },
+    { include-group = "lambek" },
     { include-group = "optyx" },
     { include-group = "typst" },
 ]
@@ -98,10 +98,12 @@ quantum = [
     "qoolqit",
     "scipy",
 ]
-grammar = [
+lambek = [
     "nltk",
     "torch",
 ]
+# the deprecated name of the lambek extra
+grammar = ["discopy[lambek]"]
 # discopy.optyx, under Apache-2.0: see discopy/optyx/LICENSE
 optyx = [
     "cotengra",
@@ -118,7 +120,7 @@ optyx = [
     "sympy",
 ]
 test = [
-    "discopy[grammar,notebooks,optyx,quantum]",
+    "discopy[lambek,notebooks,optyx,quantum]",
     "coverage",
     "hypothesis",
     "marimo",

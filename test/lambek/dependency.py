@@ -1,5 +1,5 @@
-from discopy.grammar.cfg import Word, Rule, Ty
-from discopy.grammar.dependency import doc2tree
+from discopy.lambek.cfg import Word, Rule, Ty
+from discopy.lambek.dependency import doc2tree
 
 
 class Token:
