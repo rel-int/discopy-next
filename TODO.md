@@ -4,7 +4,7 @@
 >
 > (USER, 2026-11-16; brief #559, slice 1)
 
-- [ ] `shape="triangle"` on any box, drawn by `Backend.draw_box` for every backend: apex on the side with fewer wires, at that wire when there is one
+- [x] `shape="triangle"` on any box, drawn by `Backend.draw_box` for every backend: apex on the side with fewer wires, at that wire when there is one
 - [ ] dagger flips it: `Box.dagger` keeps the drawing attributes
 - [ ] test drawing `Box("t", x ** 2, x, shape="triangle")` against a baseline, fails on main
 - [ ] doctest drawing `docs/_static/drawing/triangle.svg`: a box `m -> 1` and its dagger
