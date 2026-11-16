@@ -14,6 +14,11 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   is the Typst source of a CeTZ canvas, and `draw(format="typst")` compiles
   it to SVG with the optional `typst` extra, or writes the source to a path
   ending in `.typ` ([#467], [next#565]).
+- `Matrix.__le__`, the pointwise order on parallel matrices, which a
+  `Tensor` inherits: over `bool` it is the inclusion of relations, over the
+  complex numbers it raises `TypeError`. `testable.Inequation`, an `Equation`
+  whose terms are compared with `<=`, so that an axiom states an inclusion
+  and the property matrix checks it as it does an equation ([next#566]).
 - `csp.Language.propagate`, arc consistency: a set of candidates per
   variable, kept to the values each constraint supports, until no set
   shrinks or for a number of rounds. It removes no value a solution takes,
@@ -2003,6 +2008,7 @@ for the changelog of `1.2.1` and earlier.
 [next#557]: https://github.com/rel-int/discopy-next/pull/557
 [next#558]: https://github.com/rel-int/discopy-next/pull/558
 [next#565]: https://github.com/rel-int/discopy-next/pull/565
+[next#566]: https://github.com/rel-int/discopy-next/pull/566
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#56]: https://github.com/rel-int/optyx/pull/56
