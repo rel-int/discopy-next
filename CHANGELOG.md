@@ -2116,6 +2116,7 @@ for the changelog of `1.2.1` and earlier.
 [next#569]: https://github.com/rel-int/discopy-next/pull/569
 [next#570]: https://github.com/rel-int/discopy-next/pull/570
 [next#571]: https://github.com/rel-int/discopy-next/pull/571
+[next#573]: https://github.com/rel-int/discopy-next/pull/573
 [next#575]: https://github.com/rel-int/discopy-next/pull/575
 [next#577]: https://github.com/rel-int/discopy-next/pull/577
 [next#578]: https://github.com/rel-int/discopy-next/pull/578
@@ -2129,7 +2130,6 @@ for the changelog of `1.2.1` and earlier.
 [next#589]: https://github.com/rel-int/discopy-next/pull/589
 [next#591]: https://github.com/rel-int/discopy-next/pull/591
 [next#598]: https://github.com/rel-int/discopy-next/pull/598
-[next#573]: https://github.com/rel-int/discopy-next/pull/573
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#56]: https://github.com/rel-int/optyx/pull/56
