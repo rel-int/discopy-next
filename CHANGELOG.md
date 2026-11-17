@@ -9,6 +9,11 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Added
 
+- `monad.algebra.Algebra.product` and `Algebra.power`, the products of the
+  Eilenberg-Moore category, `monad.algebra.Operation`, a value of `M(n)` acting
+  on every algebra as a function `Aⁿ → A` that every homomorphism commutes
+  with, and `monad.algebra.Writer`, the writer monad `G × -` of a group, whose
+  algebras on `range(n)` are its `group.Action`s ([next#134]).
 - `lambek.categorial.Parser`, the chart parser of the reproduction of Bobcat
   (Clark, 2021) on CCGrebank: a CKY chart over the binary and unary rules
   seen in the treebank and the schemata of `schemata` at a penalty, scored by
@@ -625,6 +630,9 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Fixed
 
+- `utils.get_origin` of a union is the union of the origins, so that a
+  `python.Function` type-checks a value of `frozenset[int] | None`, e.g. a
+  channel of `Maybe` on a generic type ([next#134]).
 - The TikZ backend fills the coloured regions of a diagram, so a ribbon is
   filled along its straight rails and not only at its folds and braids; the
   loop over `region_cells` moves from `Matplotlib` to `Backend` ([next#605]).

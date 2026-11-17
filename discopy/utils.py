@@ -50,9 +50,11 @@ import inspect
 import json
 import sys
 from fractions import Fraction
-from functools import lru_cache, wraps
+from functools import lru_cache, reduce, wraps
 from math import ceil, prod
+from operator import or_
 from pathlib import Path
+from types import UnionType
 from typing import (
     Callable,
     ClassVar,
@@ -65,6 +67,7 @@ from typing import (
     NamedTuple,
     Sequence,
     Union,
+    get_args,
     TYPE_CHECKING,
 )
 
@@ -185,16 +188,19 @@ def identity(x: KT) -> KT:
 
 def get_origin(typ):
     """
-    Get origin of a parameterized generic type, leaving a union type
-    untouched so that ``isinstance`` can be called on it directly.
+    Get origin of a parameterized generic type, and the union of the origins
+    of a union type, so that ``isinstance`` can be called on it directly.
 
     Example
     -------
     >>> assert get_origin(tuple[int, str]) is tuple
     >>> assert get_origin(int | None) == (int | None)
+    >>> assert get_origin(frozenset[int] | None) == (frozenset | None)
     """
     origin = getattr(typ, "__origin__", typ)
-    return typ if origin is Union else origin
+    if origin is Union or isinstance(typ, UnionType):
+        return reduce(or_, map(get_origin, get_args(typ)))
+    return origin
 
 
 @lru_cache(maxsize=None)
