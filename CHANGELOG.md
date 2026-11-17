@@ -9,6 +9,11 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Added
 
+- `drawing.from_picture(jpeg, config)`: the diagram a picture shows, read
+  by `drawing.vision`, a pixel net (`PixelNet`) that classes each pixel and
+  a small OCR model (`OCR`) that reads box names and wire types, then decoded
+  in the least module it decodes in (`picture.decode_least`); with `train`,
+  `train_ocr` and `evaluate`, and `picture.crop` ([next#602]).
 - `drawing.picture.decode` and `read`: a picture's pixel classes back to
   its diagram. `regions` splits them into boxes, wires and labels, `attach`
   hangs each label on its wire, `refine` writes the names and types read
@@ -2137,6 +2142,7 @@ for the changelog of `1.2.1` and earlier.
 [next#591]: https://github.com/rel-int/discopy-next/pull/591
 [next#598]: https://github.com/rel-int/discopy-next/pull/598
 [next#601]: https://github.com/rel-int/discopy-next/pull/601
+[next#602]: https://github.com/rel-int/discopy-next/pull/602
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#56]: https://github.com/rel-int/optyx/pull/56
