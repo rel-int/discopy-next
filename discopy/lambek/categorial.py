@@ -1067,11 +1067,12 @@ class Parser:
         for width in range(2, len(words) + 1):
             for start in range(len(words) - width + 1):
                 self.fill(chart, start, start + width,
-                          labels((start, start + width)), missing)
+                          labels=labels((start, start + width)),
+                          missing=missing)
         return chart
 
     def fill(  # pylint: disable=too-many-arguments
-            self, chart, start: int, end: int, labels, missing: bool):
+            self, chart, start: int, end: int, *, labels, missing: bool):
         """ Fill the cell of a span from every split of it in two. """
         cell = {}
         for middle in range(start + 1, end):
