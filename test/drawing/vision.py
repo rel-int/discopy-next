@@ -101,17 +101,16 @@ def test_evaluate_on_one_module():
     assert result["oracle"]["monoidal"] == 1
 
 
-def test_from_picture_takes_a_path_to_weights(tmp_path):
-    from discopy.utils import AxiomError
-    path = tmp_path / "weights.pt"
-    vision.save(path, vision.PixelNet(), vision.OCR())
-    image = picture.render(picture.load("monoidal").Box(
-        'f', picture.load("monoidal").Ty('a'),
-        picture.load("monoidal").Ty('a')), 160)
-    try:
-        from_picture(jpeg(image), {"weights": path})
-    except (ValueError, AxiomError):
-        pass
+def test_from_picture_takes_a_path_to_weights(tmp_path, monkeypatch):
+    from discopy.monoidal import Ty, Box
+    diagram = Box('f', Ty('a'), Ty('a'))
+    image, mask = picture.render(diagram, 160), picture.render(
+        diagram, 160, mask=True)
+    path, loaded = tmp_path / "weights.pt", []
+    monkeypatch.setattr(vision, "load", lambda p: loaded.append(p) or (
+        TruePixels(mask), TrueText(["f", "a", "a"])))
+    result = from_picture(jpeg(image), {"weights": path, "module": None})
+    assert loaded == [path] and picture.equal(result, diagram, "monoidal")
 
 
 def test_from_picture_keeps_to_its_module():
@@ -158,3 +157,11 @@ def test_train_rejects_a_batch_larger_than_the_data():
             "modules": np.array([0]), "diagrams": [diagram]}
     with raises(ValueError):
         vision.train(data, epochs=1, batch=2, log=lambda _: None)
+
+
+def test_decode_least_rejects_an_empty_range():
+    mask = picture.render(picture.load("monoidal").Box(
+        'f', picture.load("monoidal").Ty('a'),
+        picture.load("monoidal").Ty('a')), 96, mask=True)
+    with raises(ValueError):
+        picture.decode_least(mask, "compact", "monoidal")

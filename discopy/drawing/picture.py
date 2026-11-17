@@ -1029,6 +1029,8 @@ def decode_least(mask: np.ndarray, module: str, most=MODULES[-1]):
     which is not compact: a :func:`scan` cannot tell them apart.
     """
     least, last = MODULES.index(module), MODULES.index(most)
+    if last < least:
+        raise ValueError(f"Expected {most!r} at or after {module!r}.")
     for i, candidate in enumerate(MODULES[least:last + 1], least):
         try:
             return decode(mask, candidate)

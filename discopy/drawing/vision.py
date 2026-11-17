@@ -380,8 +380,8 @@ def from_picture(jpeg, config: dict):
     image = np.asarray(canvas)
     classes = predict(pixel, image[None])[0]
     boxes, wires, names, types = read(ocr, image, classes)
-    module, most = scan(classes, types.values()), config.get(
-        "module", MODULES[-1])
+    module = scan(classes, types.values())
+    most = config.get("module") or MODULES[-1]
     if MODULES.index(module) > MODULES.index(most):
         raise ValueError(f"The picture shows a {module} diagram.")
     return decode_least(
