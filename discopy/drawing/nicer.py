@@ -21,6 +21,9 @@ Summary
     features
     hand_score
     make_nicer
+    stretch
+    clearance
+    nicer_layout
 
 Example
 -------
@@ -46,11 +49,12 @@ f @ g @ f >> h @ x >> h
 
 from __future__ import annotations
 
+from bisect import bisect_right
 from math import hypot, log
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING, Callable, Sequence
 
 from discopy.drawing.backend import Backend
-from discopy.drawing.drawing import Drawing, Point
+from discopy.drawing.drawing import Drawing, Node, Point
 from discopy.utils import text_width
 
 if TYPE_CHECKING:
@@ -236,3 +240,159 @@ def make_nicer(
     score = hand_score if score is None else score
     candidates = [diagram] + diagram.foliations(limit)
     return max(candidates, key=lambda d: score(d.to_drawing()))
+
+
+def piecewise(knots: Sequence[float], scales: Sequence[float]):
+    """
+    The increasing map that stretches the gap between two consecutive knots
+    by its scale, fixing the first knot, with slope one outside the knots.
+
+    >>> f = piecewise([0, 1, 3], [2, .5])
+    >>> [f(x) for x in (-1, 0, .5, 1, 2, 3, 4)]
+    [-1.0, 0.0, 1.0, 2.0, 2.5, 3.0, 4.0]
+    """
+    images = [float(knots[0])] if knots else []
+    for (a, b), scale in zip(zip(knots, knots[1:]), scales):
+        images.append(images[-1] + scale * (b - a))
+
+    def image(x: float) -> float:
+        i = max(bisect_right(knots, x) - 1, 0)
+        slope = scales[i] if knots[i] <= x and i < len(scales) else 1
+        return images[i] + slope * (x - knots[i])
+    return image
+
+
+def stretch(
+        drawing: Drawing, columns: Sequence[float], rows: Sequence[float],
+        widths: Sequence[float], heights: Sequence[float]) -> Drawing:
+    """
+    The drawing with the gaps between its columns and between its rows
+    stretched by a scale each, and the width and the height of each box by a
+    scale of their own, through :meth:`Drawing.relayout`.
+
+    Parameters:
+        drawing : The drawing to stretch.
+        columns : A scale for each gap between consecutive distinct
+            abscissas of the nodes that are not box corners.
+        rows : A scale for each gap between their consecutive ordinates.
+        widths : A scale for the width of each box.
+        heights : A scale for the height of each box.
+
+    Raises:
+        ValueError : When the result does not draw the same diagram, see
+            :meth:`Drawing.is_feasible`.
+
+    >>> from discopy.monoidal import Ty, Box
+    >>> x = Ty('x')
+    >>> drawing = (Box('f', x, x) @ Box('g', x, x)).foliation().to_drawing()
+    >>> xs, ys, n = knots(drawing)[0], knots(drawing)[1], len(drawing.boxes)
+    >>> wide = stretch(drawing, [2] * (len(xs) - 1), [1] * (len(ys) - 1),
+    ...                [1.5] * n, [1] * n)
+    >>> wide.width > drawing.width
+    True
+    """
+    framed = drawing.relabel_nodes()
+    framed.add_box_corners()
+    xs, ys = knots(framed)
+    across, up = piecewise(xs, columns), piecewise(ys, rows)
+    positions = {node: Point(across(p.x), up(p.y))
+                 for node, p in framed.positions.items()
+                 if not node.kind.startswith("box-corner")}
+    for j, (low, high) in enumerate(framed.rectangles()):
+        x, y = across((low.x + high.x) / 2), up((low.y + high.y) / 2)
+        half_x = widths[j] * (high.x - low.x) / 2
+        half_y = heights[j] * (high.y - low.y) / 2
+        for a, b in [(0, 0), (0, 1), (1, 0), (1, 1)]:
+            positions[Node(f"box-corner-{a}{b}", j=j)] = Point(
+                x + (2 * a - 1) * half_x, y + (2 * b - 1) * half_y)
+    return drawing.relayout([coordinate for node in framed.ordered_nodes()
+                             for coordinate in positions[node]])
+
+
+def knots(drawing: Drawing) -> tuple[list[float], list[float]]:
+    """
+    The distinct abscissas and ordinates of the nodes of a drawing that are
+    not box corners, in increasing order: the columns and the rows that
+    :func:`stretch` scales the gaps between.
+
+    >>> from discopy.monoidal import Ty, Box
+    >>> knots(Box('f', Ty('x'), Ty('x')).to_drawing())
+    ([0.5], [0, 0.25, 0.5, 0.75, 1])
+    """
+    points = [p for node, p in drawing.positions.items()
+              if not node.kind.startswith("box-corner")]
+    return sorted({p.x for p in points}), sorted({p.y for p in points})
+
+
+def clearance(drawing: Drawing) -> float:
+    """
+    How much room a drawing leaves: the least gap between two boxes, along
+    the axis that separates them, and between a box and the row of the
+    inputs or the outputs of the drawing, infinite with no box.
+
+    >>> from discopy.monoidal import Ty, Box
+    >>> x = Ty('x')
+    >>> clearance((Box('f', x, x) >> Box('g', x, x)).to_drawing())
+    0.25
+    """
+    framed = drawing.relabel_nodes()
+    framed.add_box_corners()
+    boxes = framed.rectangles()
+    ys = [p.y for node, p in framed.positions.items()
+          if node.kind in ("dom", "cod")]
+    top, bottom = max(ys, default=framed.height), min(ys, default=0)
+    gaps = [max(c.x - b.x, a.x - d.x, c.y - b.y, a.y - d.y)
+            for i, (a, b) in enumerate(boxes) for c, d in boxes[i + 1:]]
+    gaps += [gap for a, b in boxes for gap in (top - b.y, a.y - bottom)]
+    return min(gaps, default=float("inf"))
+
+
+def nicer_layout(
+        drawing: Drawing, score: Callable[[Drawing], float] | None = None,
+        factors: Sequence[float] = (.5, .8, 1.25, 2.), rounds: int = 2
+        ) -> Drawing:
+    """
+    The geometry of a drawing that scores best, by coordinate search over
+    the scales of :func:`stretch`: each scale in turn is multiplied by each
+    factor, and the change is kept when its drawing is feasible and scores
+    better and leaves as much room as the drawing, see :func:`clearance`.
+    The drawing itself is returned when nothing scores better.
+
+    Parameters:
+        drawing : The drawing to lay out.
+        score : The score to maximise, :func:`hand_score` by default.
+        factors : What a scale is multiplied by at each step.
+        rounds : How many times every scale is tried.
+
+    >>> from discopy.monoidal import Ty, Box
+    >>> x = Ty('x')
+    >>> drawing = (Box('f', x, x) @ Box('g', x, x)).foliation().to_drawing()
+    >>> nicer = nicer_layout(drawing)
+    >>> assert hand_score(nicer) >= hand_score(drawing)
+    """
+    score = hand_score if score is None else score
+    xs, ys = knots(drawing)
+    n = len(drawing.boxes)
+    sizes = [max(len(xs) - 1, 0), max(len(ys) - 1, 0), n, n]
+    scales = [1.] * sum(sizes)
+
+    def build(values):
+        parts, start = [], 0
+        for size in sizes:
+            parts.append(values[start:start + size])
+            start += size
+        return stretch(drawing, *parts)
+
+    best, value, room = drawing, score(drawing), clearance(drawing)
+    for _ in range(rounds):
+        for i in range(len(scales)):
+            for factor in factors:
+                values = scales[:i] + [scales[i] * factor] + scales[i + 1:]
+                try:
+                    candidate = build(values)
+                except ValueError:
+                    continue
+                if clearance(candidate) >= room\
+                        and score(candidate) > value:
+                    best, value, scales = candidate, score(candidate), values
+    return best

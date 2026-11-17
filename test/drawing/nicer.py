@@ -96,3 +96,20 @@ def test_features_of_a_relayout_and_of_spiders():
     from discopy.utils import text_width
     (left, _, right, _), = rectangles(Z(1, 1, 0.123456789).to_drawing())
     assert right - left >= text_width('0.123456789')
+
+
+def test_stretch_and_nicer_layout():
+    from pytest import raises
+    from discopy.drawing.nicer import stretch, knots, clearance, nicer_layout
+    drawing = (f @ x @ x >> x @ g @ x >> x @ x @ f >> h @ x >> h).foliation(
+    ).to_drawing()
+    xs, ys = knots(drawing)
+    n = len(drawing.boxes)
+    ones = [1] * (len(xs) - 1), [1] * (len(ys) - 1), [1] * n, [1] * n
+    assert stretch(drawing, *ones).layout() == drawing.layout()
+    with raises(ValueError):
+        stretch(drawing, ones[0], ones[1], [9] * n, ones[3])
+    nicer = nicer_layout(drawing)
+    assert hand_score(nicer) > hand_score(drawing)
+    assert clearance(nicer) >= clearance(drawing)
+    assert nicer_layout(drawing, score=lambda d: 0) is drawing
