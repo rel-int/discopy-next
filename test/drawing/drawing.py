@@ -1182,3 +1182,13 @@ def test_relayout_keeps_order_and_labels():
         boxes.relayout([float("nan")] + layout[1:])
     assert boxes.relayout(layout).is_feasible(boxes)
 
+
+
+def test_relayout_reads_wires_as_drawn():
+    drawing = (Box('f', Ty('x'), Ty('x')) @ Ty('y')).to_drawing()
+    (_, dom), (_, cod) = drawing.dom_nodes, drawing.cod_nodes
+    bent = drawing.relabel_nodes(positions={
+        dom: Point(.6, 1), cod: Point(2, 0)})
+    assert not bent.is_feasible(drawing)
+    assert drawing.relabel_nodes(positions={
+        dom: Point(1.6, 1), cod: Point(2, 0)}).is_feasible(drawing)

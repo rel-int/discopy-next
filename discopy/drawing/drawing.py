@@ -284,6 +284,25 @@ def touch(a: Point, b: Point, c: Point, d: Point) -> bool:
         (a, b, c), (a, b, d), (c, d, a), (c, d, b)]))
 
 
+def curve(a: Point, b: Point, steps: int = 8) -> list[tuple[Point, Point]]:
+    """
+    The quadratic Bézier curve from ``a`` to ``b`` with control point
+    ``(a.x, b.y)``, the way a backend draws a wire, as ``steps`` segments.
+
+    >>> curve(Point(0, 0), Point(2, 1), steps=2)
+    [(Point(x=0.0, y=0.0), Point(x=0.5, y=0.75)), \
+(Point(x=0.5, y=0.75), Point(x=2.0, y=1.0))]
+    """
+    points = [Point(a.x + t * t * (b.x - a.x), a.y + (2 - t) * t * (b.y - a.y))
+              for t in (i / steps for i in range(steps + 1))]
+    return list(zip(points, points[1:]))
+
+
+def meet(test, path: list, other: list) -> bool:
+    """ Whether ``test`` holds of a segment of ``path`` and of ``other``. """
+    return any(test(*p, *q) for p in path for q in other)
+
+
 def overlap(a: Point, b: Point, c: Point, d: Point) -> bool:
     """ Whether the rectangles with corners ``a, b`` and ``c, d`` overlap. """
     return a.x < d.x and c.x < b.x and a.y < d.y and c.y < b.y
@@ -669,7 +688,8 @@ which to_drawing recomputes.
 
     def crossings(self) -> set[tuple[int, int]]:
         """
-        The pairs of :meth:`wires`, by index, that cross away from their ends.
+        The pairs of :meth:`wires`, by index, that cross away from their ends,
+        each wire drawn as its :func:`curve`.
 
         >>> from discopy.monoidal import Ty
         >>> drawing = Drawing.id(Ty('x', 'y'))
@@ -679,11 +699,12 @@ which to_drawing recomputes.
         ...     x: drawing.positions[y], y: drawing.positions[x]}).crossings()
         {(0, 1)}
         """
-        segments = [(self.positions[u], self.positions[v])
-                    for u, v in self.wires()]
-        return {(i, j) for i, (a, b) in enumerate(segments)
-                for j, (c, d) in enumerate(segments[i + 1:], i + 1)
-                if not {a, b} & {c, d} and cross(a, b, c, d)}
+        ends = [(self.positions[u], self.positions[v])
+                for u, v in self.wires()]
+        paths = [curve(*end) for end in ends]
+        return {(i, j) for i, j in itertools.combinations(range(len(ends)), 2)
+                if not set(ends[i]) & set(ends[j])
+                and meet(cross, paths[i], paths[j])}
 
     def rectangles(self) -> list[tuple[Point, Point]]:
         """
@@ -712,10 +733,11 @@ which to_drawing recomputes.
         """
         What a layout keeps of a drawing, see :meth:`is_feasible`: the
         direction of each edge, the :meth:`crossings` of wires, which wires
-        with no end in common touch, which wires pass through which box,
-        which boxes overlap, where each port and each box node sits with
-        respect to the sides of its box, and the order from left to right of
-        the wires at each boundary and at each side of each box.
+        with no end in common touch, which wires pass through which box, each
+        wire drawn as its :func:`curve`, which boxes overlap, where each port
+        and each box node sits with respect to the sides of its box, and the
+        order from left to right of the wires at each boundary and at each
+        side of each box.
 
         >>> from discopy.monoidal import Box
         >>> drawing = Box('f', 'x', 'y').to_drawing()
@@ -725,7 +747,7 @@ which to_drawing recomputes.
         """
         positions, rectangles, wires = (
             self.positions, self.rectangles(), self.wires())
-        segments = [(positions[u], positions[v]) for u, v in wires]
+        paths = [curve(positions[u], positions[v]) for u, v in wires]
         ports = sorted((node for node in self.nodes
                         if node.kind in ("box_dom", "box_cod", "box")),
                        key=repr)
@@ -741,10 +763,10 @@ which to_drawing recomputes.
             "touchings": {
                 (i, j) for i, j in itertools.combinations(range(len(wires)), 2)
                 if not set(wires[i]) & set(wires[j])
-                and touch(*segments[i], *segments[j])},
-            "through": {(i, j) for i, (a, b) in enumerate(segments)
+                and meet(touch, paths[i], paths[j])},
+            "through": {(i, j) for i, path in enumerate(paths)
                         for j, rectangle in enumerate(rectangles)
-                        if through(a, b, *rectangle)},
+                        if meet(through, path, [rectangle])},
             "overlaps": {(i, j) for i, j in itertools.combinations(
                 range(len(rectangles)), 2)
                 if overlap(*rectangles[i], *rectangles[j])},
