@@ -394,6 +394,12 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Changed
 
+- The TikZ backend sets a box label at 8 points and a wire label at 7, below
+  and to the right of its port as in Matplotlib, and a unit of its picture is
+  8/12 inch, the size at which the width the layout measures a label at fits
+  it: every box fits its label, and pictures are 1.7 times larger. A wire of
+  a drawing is named by its object's `drawing_name` when it has one, and a
+  `monoidal.Dim` is drawn as its numbers, `4` for `Dim(4)` ([next#605]).
 - `egraph.EGraph.saturate` runs its rounds on one `Builder`, freezing it
   after each round that changes something: associativity and commutativity
   of `+` on five leaves saturate 55 times faster, and on six in under a
@@ -611,6 +617,9 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Fixed
 
+- The TikZ backend fills the coloured regions of a diagram, so a ribbon is
+  filled along its straight rails and not only at its folds and braids; the
+  loop over `region_cells` moves from `Matplotlib` to `Backend` ([next#605]).
 - The TikZ backend escapes in a label what LaTeX reads as markup outside
   the mathematics between dollars, an underscore, an ampersand, a percent
   and a hash, and keeps `<<` and `>>` from joining into guillemets
@@ -2145,6 +2154,7 @@ for the changelog of `1.2.1` and earlier.
 [next#598]: https://github.com/rel-int/discopy-next/pull/598
 [next#601]: https://github.com/rel-int/discopy-next/pull/601
 [next#603]: https://github.com/rel-int/discopy-next/pull/603
+[next#605]: https://github.com/rel-int/discopy-next/pull/605
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#56]: https://github.com/rel-int/optyx/pull/56
