@@ -1157,3 +1157,28 @@ def test_relayout_keeps_wires_apart():
         drawing.relayout(collapsed)
     assert drawing.relayout(layout).layout() == drawing.layout()
 
+
+def test_relayout_keeps_order_and_labels():
+    x, y = Ty('x'), Ty('y')
+    drawing = Drawing.id(x @ y)
+    nodes, layout = drawing.ordered_nodes(), list(drawing.layout())
+    swapped = list(layout)
+    for k, node in enumerate(nodes):
+        twin = nodes.index(next(
+            n for n in nodes if n.kind == node.kind and n.i != node.i))
+        swapped[2 * k] = layout[2 * twin]
+    with raises(ValueError, match="same diagram"):
+        drawing.relayout(swapped)
+    boxes = (Box('f', x, x) @ Box('g', x, x)).to_drawing()
+    nodes = boxes.relabel_nodes()
+    nodes.add_box_corners()
+    ordered, layout = nodes.ordered_nodes(), list(boxes.layout())
+    f, g = [2 * k for k, node in enumerate(ordered) if node.kind == "box"]
+    labels = list(layout)
+    labels[f], labels[g] = layout[g], layout[f]
+    with raises(ValueError, match="same diagram"):
+        boxes.relayout(labels)
+    with raises(ValueError, match="same diagram"):
+        boxes.relayout([float("nan")] + layout[1:])
+    assert boxes.relayout(layout).is_feasible(boxes)
+

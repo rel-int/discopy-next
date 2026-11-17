@@ -213,6 +213,7 @@ The regions of a crossing follow its strands, see
 from __future__ import annotations
 
 import itertools
+from math import isfinite
 from typing import NamedTuple, TYPE_CHECKING, Sequence
 from dataclasses import dataclass
 
@@ -712,20 +713,26 @@ which to_drawing recomputes.
         What a layout keeps of a drawing, see :meth:`is_feasible`: the
         direction of each edge, the :meth:`crossings` of wires, which wires
         with no end in common touch, which wires pass through which box,
-        which boxes overlap and where each port sits with respect to the
-        sides of its box.
+        which boxes overlap, where each port and each box node sits with
+        respect to the sides of its box, and the order from left to right of
+        the wires at each boundary and at each side of each box.
 
         >>> from discopy.monoidal import Box
         >>> drawing = Box('f', 'x', 'y').to_drawing()
         >>> drawing.add_box_corners()
         >>> drawing.shape()["ports"]
-        ((0, 0, -1, 1, 1), (0, 1, 0, 1, 1))
+        ((0, 1, -1, 1, 1), (0, 0, -1, 1, 1), (0, 1, 0, 1, 1))
         """
         positions, rectangles, wires = (
             self.positions, self.rectangles(), self.wires())
         segments = [(positions[u], positions[v]) for u, v in wires]
         ports = sorted((node for node in self.nodes
-                        if node.kind in ("box_dom", "box_cod")), key=repr)
+                        if node.kind in ("box_dom", "box_cod", "box")),
+                       key=repr)
+        rows: dict[tuple, list] = {}
+        for node in sorted(self.nodes, key=repr):
+            if node.kind in ("dom", "cod", "box_dom", "box_cod"):
+                rows.setdefault((node.kind, node.index[0]), []).append(node)
         return {
             "edges": tuple(sign(positions[u].y - positions[v].y)
                            for u, v in sorted(
@@ -747,13 +754,18 @@ which to_drawing recomputes.
                     (positions[node].y, rectangles[node.j][1].y),
                     (positions[node].x, rectangles[node.j][0].x),
                     (rectangles[node.j][1].x, positions[node].x)]))
-                for node in ports if node.j < len(rectangles))}
+                for node in ports if node.j < len(rectangles)),
+            "order": tuple(
+                (key, tuple(node.index[1] for node in sorted(
+                    row, key=lambda node: positions[node].x)))
+                for key, row in sorted(rows.items()))}
 
     def is_feasible(self, reference: Drawing) -> bool:
         """
         Whether a drawing with the nodes of a reference draws the same
-        diagram: no coordinate is negative, the corners of each box make a
-        rectangle and its :meth:`shape` is the reference's.
+        diagram: every coordinate is finite and not negative, the corners of
+        each box make a rectangle and its :meth:`shape` is the reference's,
+        once both have their box corners.
 
         Parameters:
             reference : The drawing it was laid out from.
@@ -769,8 +781,13 @@ which to_drawing recomputes.
         ...
         ValueError: This layout does not draw the same diagram.
         """
-        return all(min(p) >= 0 for p in self.positions.values())\
-            and self.has_rectangles() and self.shape() == reference.shape()
+        drawing, reference = self.relabel_nodes(), reference.relabel_nodes()
+        drawing.add_box_corners()
+        reference.add_box_corners()
+        return all(isfinite(c) and c >= 0
+                   for p in drawing.positions.values() for c in p)\
+            and drawing.has_rectangles()\
+            and drawing.shape() == reference.shape()
 
     def union(self, other, dom, cod, width=None, height=None, _check=True):
         """ Take the union of two drawings, assuming nodes are distinct. """
