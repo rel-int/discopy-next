@@ -68,14 +68,20 @@ STRUCTURAL = {
     "compact": ("swap", "cup", "cap"),
     "frobenius": ("swap", "cup", "cap", "spider")}
 
-#: The label of each pixel, by its index in a mask.
-LABELS = ("background", ) + TYPES + NAMES + STRUCTURAL["frobenius"]
+#: The label of each pixel, by its index in a mask: the text of a wire
+#: label by the type it names, and ``"wire"`` a wire whose type is unknown.
+LABELS = ("background", ) + TYPES + NAMES + STRUCTURAL["frobenius"]\
+    + tuple(f"label {x}" for x in TYPES) + ("wire", )
+
+#: The classes of the pixel net, coarser than :data:`LABELS`: no name, no
+#: type, only what a box, a wire and a label are and which primitive.
+COARSE = ("background", "wire", "box", "label") + STRUCTURAL["frobenius"]
 
 #: The flags of :func:`augment`, applied in this order.
 AUGMENTATIONS = (
     "warp", "rotate", "perspective", "chalk", "whiteboard", "blur", "jpeg")
 
-DPI, SPIDER = 72, .15
+DPI, SPIDER, WIRE, TEXT = 72, .15, LABELS.index("wire"), 7
 
 
 def load(module: str):
@@ -255,14 +261,18 @@ def structural_boxes(module: str) -> list:
 class Mask(Matplotlib):
     """
     A backend that draws the label of each pixel as its red channel, the
-    index of :data:`LABELS`, without antialiasing and without text: a wire
-    by its type, a box by its name, a structural generator by its kind, and
-    a disc of radius ``port`` pixels of its type at each port of a
-    generator drawn as wires, so that two of them that meet are apart.
+    index of :data:`LABELS`, without antialiasing. In ``mode="shapes"`` it
+    draws no text: a wire by its type, a box by its name, a structural
+    generator by its kind, and a disc of radius ``port`` pixels of its type
+    at each port of a generator drawn as wires, so that two of them that
+    meet are apart. In ``mode="labels"`` it draws the labels of the wires
+    alone, each in green with its index times ``TEXT`` in red, see
+    :func:`render`.
     """
-    def __init__(self, axis=None, linewidth=1, port=3, scale=1):
+    def __init__(self, axis=None, linewidth=1, port=3, scale=1,
+                 mode="shapes"):
         super().__init__(axis=axis, linewidth=linewidth)
-        self.port, self.scale = port, scale
+        self.port, self.scale, self.mode = port, scale, mode
 
     @staticmethod
     def colour(label: str) -> tuple[float, float, float]:
@@ -288,7 +298,11 @@ class Mask(Matplotlib):
             "lines.color": self.colour(label)})
 
     def draw_text(self, text, i, j, **params):
-        Backend.draw_text(self, text, i, j, **params)
+        if self.mode == "labels" and text in TYPES:
+            params |= {"color": (TEXT * LABELS.index(f"label {text}") / 255,
+                                 1, 0), "adaptive": False}
+            return super().draw_text(text, i, j, **params)
+        return Backend.draw_text(self, text, i, j, **params)
 
     def draw_boundary(self, graph, boundary_color="none", **params):
         """ The boundary is the background. """
@@ -302,6 +316,12 @@ class Mask(Matplotlib):
         super().draw_box(positions, node, **params)
 
     def draw_wires(self, graph, **params):
+        if self.mode == "labels":
+            for source, _ in self.visible_edges(graph):
+                if source.kind in ["dom", "box_cod"]:
+                    self.draw_wire_label(
+                        source.x, *graph.positions[source], **params)
+            return
         for node in graph.nodes:
             if node.kind == "box" and node.box.is_crossing:
                 with self.stroke(self.label(node)):
@@ -328,6 +348,8 @@ class Mask(Matplotlib):
             edgecolor=mpl.rcParams["patch.edgecolor"]))
 
     def draw_boxes(self, graph, **params):
+        if self.mode == "labels":
+            return
         from matplotlib.patches import Circle
         for node in graph.nodes:
             box = graph.boxes[node.j] if node.kind in (
@@ -339,6 +361,8 @@ class Mask(Matplotlib):
         super().draw_boxes(graph, **params)
 
     def draw_spiders(self, graph, draw_box_labels=True, **params):
+        if self.mode == "labels":
+            return
         from matplotlib.patches import Circle
         for node in graph.nodes:
             if node.kind == "box" and node.box.draw_as_spider:
@@ -353,6 +377,12 @@ def render(diagram, size=160, mask=False, **params) -> np.ndarray:
     with ``mask=True`` the label of each pixel, see :class:`Mask`, as an
     array of shape ``(size, size)``.
 
+    Text cannot be drawn without antialiasing, so the mask draws the labels
+    of the wires apart, on top of the rest, each in green with its index
+    times ``TEXT`` in red, read back as their ratio where the green is at
+    least half: on black, the ratio does not depend on the antialiasing. A
+    label covers the background and boxes, never a wire or a primitive.
+
     The diagram is centred at ``scale`` pixels per unit, ``24`` by default,
     its text ``fontsize`` pixels high, its strokes ``linewidth`` wide.
     ``xkcd=True`` draws it by hand, see :func:`matplotlib.pyplot.xkcd`.
@@ -366,35 +396,48 @@ def render(diagram, size=160, mask=False, **params) -> np.ndarray:
     >>> sorted(LABELS[i] for i in set(mask.flat))
     ['a', 'background', 'f']
     """
+    scale = params.pop("scale", 24)
+    xkcd, drawing = params.pop("xkcd", False), diagram.to_drawing()
+    params = {"fontsize": .4 * scale, "wire_labels": True,
+              "nodesize": np.pi * (SPIDER * scale) ** 2 / 300 * np.sqrt(
+                  max(drawing.height, drawing.width, .01))} | params
+    if not mask:
+        return paint(drawing, size, scale, xkcd, Matplotlib, mask, **params)
+    shapes, text = (paint(
+        drawing, size, scale, xkcd, Mask, mask, mode=mode, **params)
+        for mode in ("shapes", "labels"))
+    labels = shapes[..., 0].astype(np.int64)
+    labels[shapes[..., 1] > 0] = 0
+    red, green = (text[..., i].astype(np.int64) for i in (0, 1))
+    solid = (green >= 128) & ((labels == 0) | np.isin(
+        labels, [LABELS.index(name) for name in NAMES]))
+    labels[solid] = np.rint(red[solid] * 255 / (TEXT * green[solid]))
+    labels[labels >= len(LABELS)] = 0
+    return labels
+
+
+def paint(drawing, size, scale, xkcd, backend, mask, mode=None, **params):
+    """ The pixels of a drawing on a backend, see :func:`render`. """
     import matplotlib as mpl
     import matplotlib.pyplot as plt
-    scale, linewidth = params.pop("scale", 24), params.pop("linewidth", 1.5)
-    xkcd = plt.xkcd(randomness=1, scale=.5, length=50)\
-        if params.pop("xkcd", False) else nullcontext()
-    with xkcd, mpl.rc_context({
-            "lines.antialiased": not mask, "patch.antialiased": not mask,
-            "text.antialiased": not mask, "path.snap": False}):
+    with plt.xkcd(randomness=1, scale=.5, length=50) if xkcd\
+            else nullcontext(), mpl.rc_context({
+                "lines.antialiased": not mask, "patch.antialiased": not mask,
+                "text.antialiased": not mask, "path.snap": False}):
         figure, axis = plt.subplots(
             figsize=(size / DPI, size / DPI), dpi=DPI,
             facecolor="black" if mask else "white")
-        backend = Mask(axis, linewidth, scale=scale) if mask\
-            else Matplotlib(axis, linewidth=linewidth)
-        drawing = diagram.to_drawing()
-        params = {"fontsize": .4 * scale, "wire_labels": True,
-                  "nodesize": np.pi * (SPIDER * scale) ** 2 / 300 * np.sqrt(
-                      max(drawing.height, drawing.width, .01))} | params
-        drawing.draw(backend=backend, show=False, aspect="equal", **params)
+        painter = backend(axis, params.pop("linewidth", 1.5), scale=scale,
+                          mode=mode) if mask else backend(
+            axis, linewidth=params.pop("linewidth", 1.5))
+        drawing.draw(backend=painter, show=False, aspect="equal", **params)
         half = size / scale / 2
         axis.set_xlim(drawing.width / 2 - half, drawing.width / 2 + half)
         axis.set_ylim(drawing.height / 2 - half, drawing.height / 2 + half)
         figure.canvas.draw()
         pixels = np.asarray(figure.canvas.buffer_rgba())[..., :3].copy()
         plt.close(figure)
-    if not mask:
-        return pixels
-    labels = pixels[..., 0].astype(np.int64)
-    labels[(labels >= len(LABELS)) | (pixels[..., 1] > 0)] = 0
-    return labels
+    return pixels
 
 
 def fits(diagram, size=160, scale=24, margin=1) -> bool:
@@ -614,7 +657,8 @@ def decode(mask: np.ndarray, module: str, min_pixels=3):
     allowed = [LABELS.index(name) for name in NAMES + STRUCTURAL[module]]
     is_box = np.isin(mask, allowed)
     boxes = components(np.where(is_box, mask, -1))
-    links = components(np.where((mask > 0) & (mask < first), 0, -1))
+    links = components(np.where(
+        (mask > 0) & (mask < first) | (mask == WIRE), 0, -1))
     small = np.bincount(links[links >= 0], minlength=1) < min_pixels
     links = components(np.where(
         (links >= 0) & ~small[np.maximum(links, 0)], 0, -1))
@@ -695,7 +739,7 @@ def decode(mask: np.ndarray, module: str, min_pixels=3):
 def link_types(mask, links, first) -> dict[int, str]:
     """ The type of each link with wire pixels, by majority. """
     types = {}
-    wire = (mask > 0) & (mask < first)
+    wire = (mask > 0) & (mask < first)  # a wire of unknown type is not
     for link in np.unique(links[wire]):
         types[int(link)] = LABELS[np.bincount(
             mask[wire & (links == link)]).argmax()]
@@ -772,3 +816,133 @@ def equal(diagram, other, module: str) -> bool:
         except NotImplementedError:
             pass  # A closed component is a scalar, which commutes.
     return diagram.to_hypergraph() == other.to_hypergraph()
+
+
+def coarse(label: str) -> str:
+    """
+    The class of :data:`COARSE` a label of :data:`LABELS` falls in.
+
+    >>> [coarse(x) for x in ("a.r", "f", "label a", "swap")]
+    ['wire', 'box', 'label', 'swap']
+    """
+    if label in TYPES or label == "wire":
+        return "wire"
+    if label in NAMES:
+        return "box"
+    return "label" if label.startswith("label ") else label
+
+
+def coarsen(mask: np.ndarray) -> np.ndarray:
+    """ The classes of :data:`COARSE` of the labels of a mask. """
+    table = np.array([COARSE.index(coarse(label)) for label in LABELS])
+    return table[mask]
+
+
+def regions(classes: np.ndarray, min_pixels=3):
+    """
+    The boxes, the wires and the labels of a picture from the classes of
+    its pixels, see :data:`COARSE`: three arrays of component ids, ``-1``
+    elsewhere. The characters of one label are one component, the label
+    pixels grown by two first; a label drawn over a box is part of the box
+    too, which joins it across the label; a component of fewer than
+    ``min_pixels`` pixels is dropped.
+    """
+    def drop_small(ids):
+        sizes = np.bincount(ids[ids >= 0], minlength=1)
+        return np.where((ids >= 0) & (sizes[np.maximum(ids, 0)] >= min_pixels),
+                        ids, -1)
+    text = classes == COARSE.index("label")
+    box = classes == COARSE.index("box")
+    joined = components(np.where(box | text, 0, -1))
+    boxes = np.where(np.isin(joined, joined[box]), joined, -1)
+    wires = components(np.where(classes == COARSE.index("wire"), 0, -1))
+    near = text
+    for _ in range(2):
+        near = near | np.any([shift(near, dr, dc, False)
+                              for dr, dc in SHIFTS], axis=0)
+    labels = np.where(text, components(np.where(near, 0, -1)), -1)
+    return drop_small(boxes), drop_small(wires), drop_small(labels)
+
+
+def attach(labels: np.ndarray, wires: np.ndarray) -> dict[int, int]:
+    """ The wire each label names: the one nearest its top left pixel,
+    as :meth:`Backend.draw_wire_label` draws a label right of its wire. """
+    wire_rows, wire_cols = np.nonzero(wires >= 0)
+    result = {}
+    for label in np.unique(labels[labels >= 0]):
+        rows, cols = np.nonzero(labels == label)
+        left = cols.min()
+        top = rows[cols == left].min()
+        if len(wire_rows):
+            nearest = ((wire_rows - top) ** 2 + (wire_cols - left) ** 2).argmin()
+            result[int(label)] = int(wires[wire_rows[nearest], wire_cols[nearest]])
+    return result
+
+
+def refine(classes, boxes, wires, names: dict, types: dict) -> np.ndarray:
+    """
+    The mask of :data:`LABELS` from the classes of the pixels, see
+    :data:`COARSE`, the components of :func:`regions`, the name of each
+    box and the type of each wire: a wire with no type is ``"wire"``, a
+    label is background. Raises :class:`ValueError` on a name or a type
+    outside :data:`NAMES` and :data:`TYPES`.
+
+    >>> from discopy.monoidal import Ty, Box
+    >>> f = Box('f', Ty('a'), Ty('b'))
+    >>> mask = render(f, 64, mask=True)
+    >>> classes = coarsen(mask)
+    >>> boxes, wires, labels = regions(classes)
+    >>> names = {b: "f" for b in np.unique(boxes[boxes >= 0])}
+    >>> assert equal(decode(refine(classes, boxes, wires, names, {}),
+    ...                     "monoidal"), Box('f', Ty('a'), Ty('a')), "monoidal")
+    """
+    for name in names.values():
+        if name not in NAMES:
+            raise ValueError(f"Unknown box name {name!r}.")
+    for typ in types.values():
+        if typ not in TYPES:
+            raise ValueError(f"Unknown wire type {typ!r}.")
+    fine = np.zeros_like(classes)
+    for name in STRUCTURAL["frobenius"]:
+        fine[classes == COARSE.index(name)] = LABELS.index(name)
+    fine[wires >= 0] = WIRE
+    for wire, typ in types.items():
+        fine[wires == wire] = LABELS.index(typ)
+    for box, name in names.items():
+        fine[boxes == box] = LABELS.index(name)
+    return fine
+
+
+def scan(classes: np.ndarray, min_pixels=3) -> str:
+    """
+    The smallest module whose structural primitives appear in a picture,
+    from the classes of its pixels: ``monoidal`` with none, ``symmetric``
+    with swaps, ``compact`` with cups or caps, ``frobenius`` with spiders.
+
+    >>> from discopy.symmetric import Ty, Box, Swap
+    >>> x = Ty('a')
+    >>> scan(coarsen(render(Box('f', x, x), 64, mask=True)))
+    'monoidal'
+    >>> scan(coarsen(render(Swap(x, x), 64, mask=True)))
+    'symmetric'
+    """
+    seen = {name for name in STRUCTURAL["frobenius"]
+            if (classes == COARSE.index(name)).sum() >= min_pixels}
+    return next(module for module in MODULES
+                if seen <= set(STRUCTURAL[module]))
+
+
+def read(classes: np.ndarray, name: Callable, typ: Callable, module=None):
+    """
+    The diagram a picture shows from the classes of its pixels: each box is
+    named by ``name(rows, cols)`` and each labelled wire typed by
+    ``typ(rows, cols)``, given the pixels of the box or the label, the
+    module is the :func:`scan` unless given, then :func:`decode`.
+    """
+    boxes, wires, labels = regions(classes)
+    names = {int(b): name(*np.nonzero(boxes == b))
+             for b in np.unique(boxes[boxes >= 0])}
+    types = {wires_id: typ(*np.nonzero(labels == label))
+             for label, wires_id in attach(labels, wires).items()}
+    return decode(refine(classes, boxes, wires, names, types),
+                  module or scan(classes))
