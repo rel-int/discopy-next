@@ -279,3 +279,14 @@ def test_Bubble_rotate_subs():
 def test_structural_boxes():
     from discopy.testable import assert_structural_boxes
     assert_structural_boxes(Diagram)
+
+
+def test_str_transparency_of_a_rotated_box():
+    """ A rotated box prints as its unwound box rotated, e.g. ``f.r``, so
+    its atom is that box, by its name, see #489. """
+    x, y = Ty('x'), Ty('y')
+    f = Box('f', x, y)
+    for box in [f.r, f.l, f.r.r, f.l.l, f[::-1].r, f.l[::-1].l]:
+        assert box.atoms()[0] == f
+        assert Diagram.str_transparency(box)
+    assert Diagram.str_transparency(f.l @ f.r >> x.l @ f.r[::-1])

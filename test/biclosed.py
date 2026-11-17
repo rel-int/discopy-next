@@ -376,14 +376,15 @@ def test_Wire_reads_back_main():
     monoidal ones of dumps, pickles and printed text from before read back as
     such, in categorial types too. """
     import pickle
-    from discopy.grammar import categorial
+    from discopy.lambek import categorial
     x = Ty('x')
     assert Ty(Wire('x')) == x == Ty(cat.Ob('x')) and type(x.inside[0]) is Wire
     assert eval("biclosed.Ty(monoidal.Wire('x'))") == x
     wire = '{"factory": "monoidal.Wire", "name": "x"}'
     assert loads('{"factory": "biclosed.Ty", "inside": [' + wire + ']}') == x
-    assert loads('{"factory": "grammar.categorial.Ty", "inside": ['
-                 + wire + ']}') == categorial.Ty('x')
+    for module in ("lambek", "grammar"):
+        assert loads('{"factory": "' + module + '.categorial.Ty", "inside": ['
+                     + wire + ']}') == categorial.Ty('x')
     assert pickle.loads(
         b'\x80\x04\x95\xab\x00\x00\x00\x00\x00\x00\x00\x8c\x10discopy.bicl'
         b'osed\x94\x8c\x02Ty\x94\x93\x94)\x81\x94}\x94(\x8c\x03dom\x94\x8c'
@@ -416,7 +417,7 @@ def test_pow_is_over():
     written with it, built by hand or read back from a dump of main. """
     import json
     from discopy import rigid
-    from discopy.grammar import categorial, pregroup
+    from discopy.lambek import categorial, pregroup
     for module in (biclosed, rigid, pregroup, categorial):
         x, y = module.Ty('x'), module.Ty('y')
         assert x ** y == x << y
@@ -442,7 +443,7 @@ def test_pow_reads_back_main_at_its_level():
     import base64
     import pickle
     import zlib
-    from discopy.grammar import categorial
+    from discopy.lambek import categorial
     x, y = categorial.Ty('x'), categorial.Ty('y')
     assert categorial.Ty(Exp(x, y)) == x ** y == x << y
     old = pickle.loads(zlib.decompress(base64.b64decode(
@@ -528,3 +529,90 @@ def test_term_inside_a_diagram_is_drawn_as_one_box():
 def test_structural_boxes():
     from discopy.testable import assert_structural_boxes
     assert_structural_boxes(Diagram)
+
+
+def test_bang_is_one_wire_and_a_bubble():
+    x, y = Ty('x'), Ty('y')
+    f, g = Box('f', x, y), Box('g', y, x)
+    assert f.bang() == Bang(f) and f.bang().dom == x.bang() == Ty(BangOb(x))
+    assert (x @ y).bang() != x.bang() @ y.bang()
+    assert len((x @ y).bang()) == 1 and (x @ y).bang().inside[0].arg == x @ y
+    assert (x << y).bang() != x.bang() << y.bang()
+    assert (f >> g).bang() != f.bang() >> g.bang()
+    assert Id(x).bang() != Id(x.bang()) and Bang(Id(x)).arg == Id(x)
+    assert Bang(f).dagger() == Bang(f[::-1])
+    assert Ty().bang() == Ty(BangOb(Ty())) != Ty()
+
+
+def test_structural_primitives_of_a_linear_category():
+    x, y = Ty('x'), Ty('y')
+    assert Dereliction(x).dom == x.bang() and Dereliction(x).cod == x
+    assert Digging(x).cod == x.bang().bang()
+    assert Contraction(x).cod == x.bang() @ x.bang()
+    assert Weakening(x).dom == x.bang() and Weakening(x).cod == Ty()
+    assert Exchange(x, y).dom == x.bang() @ y == Exchange(x, y, True).cod
+    assert Exchange(x, y)[::-1] == Exchange(x, y, True)
+    assert Laxator(x, y).dom == x.bang() @ y.bang()
+    assert Laxator(x, y).cod == (x @ y).bang()
+    assert Laxator().dom == Ty() and Laxator().cod == Ty().bang()
+    for method, box in [
+            (Diagram.dereliction, Dereliction), (Diagram.digging, Digging),
+            (Diagram.contraction, Contraction), (Diagram.weakening, Weakening)]:
+        assert method(x) == box(x)
+    assert Diagram.exchange(x, y, True) == Exchange(x, y, True)
+    assert Diagram.laxator(x, y) == Laxator(x, y)
+    assert Diagram.laxator() == Laxator()
+    promotion = Digging(x) >> Box('g', x.bang(), y).bang()
+    assert (promotion.dom, promotion.cod) == (x.bang(), y.bang())
+    with raises(ValueError):
+        Laxator(x)
+    from discopy.utils import AxiomError
+    for box in (Dereliction(x), Digging(x), Contraction(x), Weakening(x),
+                Laxator()):
+        with raises(AxiomError):
+            box.dagger()
+
+
+def test_bang_reads_back():
+    x, y = Ty('x'), Ty('y')
+    f = Box('f', x, y)
+    namespace = vars(biclosed) | dict(x=x, y=y, f=f, biclosed=biclosed)
+    for thing in (
+            x.bang(), (x @ y).bang().bang(), (x << y).bang(), Ty().bang(),
+            x.bang() << y, f.bang(), (f >> f[::-1]).bang(), Bang(f).bang(),
+            Dereliction(x @ y), Digging(x.bang()), Contraction(x),
+            Weakening(x), Exchange(x, y), Exchange(x, y @ x, True),
+            Laxator(x, y), Laxator()):
+        assert eval(repr(thing), namespace) == thing
+        assert eval(str(thing), namespace) == thing
+        assert loads(dumps(thing)) == thing
+    assert str(x.bang()) == "x.bang()"
+    assert str((x @ y).bang()) == "(x @ y).bang()"
+
+
+def test_Functor_sends_the_bang_through_the_codomain():
+    from discopy import tensor
+    x, y = Ty('x'), Ty('y')
+    f = Box('f', x, y)
+    F = Functor({x: y, y: x}, {f: f[::-1]})
+    assert F(x.bang()) == y.bang() and F(f.bang()) == f[::-1].bang()
+    assert F(Dereliction(x)) == Dereliction(y)
+    assert F(Exchange(x, y, True)) == Exchange(y, x, True)
+    assert F(Laxator(x, y)) == Laxator(y, x) and F(Laxator()) == Laxator()
+    assert F(Contraction(x) >> f.bang() @ Weakening(x)) == (
+        Contraction(y) >> f[::-1].bang() @ Weakening(y))
+    G = Functor(
+        ob_map={x: tensor.Dim(2), y: tensor.Dim(3), x.bang(): tensor.Dim(4)},
+        ar_map={Dereliction(x): tensor.Box('e', tensor.Dim(4), tensor.Dim(2))},
+        cod=tensor.Diagram)
+    assert G(x.bang()) == tensor.Dim(4)
+    assert G(Dereliction(x)) == tensor.Box('e', tensor.Dim(4), tensor.Dim(2))
+
+
+def test_bang_is_drawn_with_an_exclamation_mark():
+    x, y = Ty('x'), Ty('y')
+    drawing = (Contraction(x) >> Box('f', x, y).bang() @ Dereliction(x))\
+        .to_drawing()
+    assert [str(wire) for wire in drawing.dom.inside] == ["!x"]
+    assert Ty(BangOb(x @ y)).to_drawing().inside[0].name == "!(x @ y)"
+    assert {"Δ", "ε"} <= {box.drawing_name for box in drawing.boxes}

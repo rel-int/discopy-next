@@ -1043,6 +1043,15 @@ def test_from_wiring():
     assert closed == (M.from_box(f) >> M.from_box(f)).trace()
 
 
+def test_from_wiring_reads_numpy_integers_as_indices():
+    import numpy as np
+    from discopy.symmetric import Ty, Box, CMap as M
+    f = Box("f", Ty("x"), Ty("x"))
+    wires = [((0, 0), (1, 1)), ((0, 1), (1, 0))]
+    assert M.from_wiring((f, f), np.array(wires)) \
+        == M.from_wiring((f, f), wires)
+
+
 def test_cups_and_caps_decode_with_their_legs_in_scan_order():
     """ A cup's or cap's legs go in the order their readers sit in the scan,
     so decoding adds no swap the diagram did not have, see #139. """
@@ -1337,3 +1346,122 @@ def test_match_needs_a_connected_map():
         next(f.to_map().rewrite((f.to_map(), s.to_map())))
     with raises(AxiomError):
         compact.CMap.cups(compact.Ty('x'), compact.Ty('x').r).wiring()
+
+
+def test_CMap_explicit_trace_of_n_wires_is_the_n_nested_ones():
+    """
+    The ``n``-wire trace is the nest of ``n`` one-wire traces, on both kinds
+    of ``trace_factory``: a class, where the whole nest is one trace box on
+    the diagram, and a class method, where the cups and caps of a pivotal
+    category are atomic and the nest is the onion of ``n`` pairs. So taking
+    them in one pass is the same map, not just the same morphism.
+    """
+    from discopy import feedback
+    for module in (feedback, compact):
+        x, a = module.Ty('x'), module.Ty('a')
+        for n in (1, 2, 3):
+            for left in (False, True):
+                typ = x ** n @ a if left else a @ x ** n
+                cmap = module.Box('f', typ, typ).to_map()
+                nested = cmap
+                for _ in range(n):
+                    nested = nested.explicit_trace(1, left)
+                assert cmap.explicit_trace(n, left) == nested, (
+                    module.__name__, n, left)
+
+
+def test_CMap_explicit_trace_checks_the_count():
+    """
+    Tracing no wire is the identity, and any other count is checked against
+    the wires there are: before it took one, a negative count fell through
+    an empty ``range`` and returned the map untraced.
+    """
+    x = compact.Ty('x')
+    cmap = compact.Box('f', x @ x, x @ x).to_map()
+    assert cmap.explicit_trace(0) == cmap
+    with raises(ValueError, match="Cannot split -1 atoms"):
+        cmap.explicit_trace(-1)
+    with raises(ValueError, match="Cannot split 3 atoms"):
+        cmap.explicit_trace(3)
+
+
+def test_CMap_explicit_trace_converts_once(monkeypatch):
+    """
+    Over a planar traced category the whole nest is one trace box on the
+    diagram, so the map is converted once however many wires it traces:
+    looping ``explicit_trace`` converted it once per wire, which is what made
+    ``trace`` and ``make_causal`` quadratic in them (#537).
+    """
+    from discopy import feedback
+    x = feedback.Ty('x')
+    cmap = feedback.Box('f', x ** 8, x ** 8).to_map()
+    to_diagram, calls = feedback.CMap.to_diagram, []
+
+    def counted(self, *args, **kwargs):
+        calls.append(None)
+        return to_diagram(self, *args, **kwargs)
+
+    monkeypatch.setattr(feedback.CMap, "to_diagram", counted)
+    result = cmap.trace(4)
+    monkeypatch.undo()
+    assert len(calls) == 1
+    nested = cmap
+    for _ in range(4):
+        nested = nested.explicit_trace()
+    assert result == nested
+
+
+def test_CMap_explicit_trace_builds_the_onion_in_one_call(monkeypatch):
+    """
+    Over a pivotal category the ``n``-wire trace is an onion of ``n`` cup and
+    cap pairs around the map, and the whole onion goes to one constructor
+    call. Composing it pair by pair built ``2 * n`` intermediate maps, each
+    rebuilding a permutation over a port set that grows with ``n``, which is
+    what made ``make_causal`` quadratic in the wires it cuts (#541).
+    """
+    from discopy import frobenius
+    for module in (compact, frobenius):
+        cmap = module.Box(
+            'f', module.Ty('x') ** 8, module.Ty('x') ** 8).to_map()
+        for left in (False, True):
+            calls, init = [], module.CMap.__init__
+
+            def counted(self, *args, _init=init, _calls=calls, **kwargs):
+                _calls.append(None)
+                return _init(self, *args, **kwargs)
+
+            monkeypatch.setattr(module.CMap, "__init__", counted)
+            result = cmap.explicit_trace(4, left)
+            monkeypatch.undo()
+            assert len(calls) == 1, (module.__name__, left, len(calls))
+            nested = cmap
+            for _ in range(4):
+                nested = nested.explicit_trace(1, left)
+            assert result == nested, (module.__name__, left)
+
+
+def test_CMap_explicit_trace_keeps_an_overridden_factory(monkeypatch):
+    """
+    The onion in one call *is* the pivotal trace, so it is built only when
+    ``trace_factory`` is pivotal's own class method: a category overriding it
+    gets the nest its own factory builds, one wire at a time, rather than the
+    cups and caps it never asked for.
+    """
+    from discopy import frobenius, pivotal
+    pivotal_trace = pivotal.Diagram.trace_factory.__func__
+    for module in (compact, frobenius):
+        x = module.Ty('x')
+        cmap = module.Box('f', x ** 8, x ** 8).to_map()
+        for left in (False, True):
+            calls = []
+
+            def overridden(cls, diagram, left=False, _calls=calls):
+                _calls.append(left)
+                return pivotal_trace(cls, diagram, left)
+
+            onion = cmap.explicit_trace(4, left)
+            monkeypatch.setattr(
+                module.Diagram, "trace_factory", classmethod(overridden))
+            assert cmap.explicit_trace(4, left) == onion
+            monkeypatch.undo()
+            assert calls == 4 * [left], (module.__name__, left, calls)

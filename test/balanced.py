@@ -139,6 +139,19 @@ def test_Twist_to_tree():
         assert loads(dumps(twist)).is_dagger == twist.is_dagger
 
 
+def test_dual_rail_to_tree():
+    """#168: no dual rail diagram round-tripped, DualRailBraid and
+    DualRailTwist falling through to cat.Box.from_tree."""
+    from discopy.utils import dumps, loads
+    x, y = Ty('x'), Ty('y')
+    diagram = DualRail()(Braid(x, y) >> Twist(y) @ x)
+    assert loads(dumps(diagram)) == diagram
+    for box in (DualRailBraid(x @ x, y @ y), DualRailTwist(x @ x)):
+        for term in (box, box.dagger()):
+            assert loads(dumps(term)) == term
+            assert loads(dumps(term)).is_dagger == term.is_dagger
+
+
 def test_dual_rail_keeps_twist_dagger():
     x = Ty('x')
     twist = Twist(x)

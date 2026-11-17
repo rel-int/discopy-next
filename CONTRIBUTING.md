@@ -42,16 +42,17 @@ uv sync
 `uv sync` installs the package with the `dev` group (testing and linting tools), the default
 set in `[tool.uv]`; `uv sync --no-dev` installs the bare package. Add more groups with
 `uv sync --group <name>`:
+- `tensor`: the contraction engines opt_einsum, quimb and cotengra
 - `quantum`: quantum computing dependencies
-- `grammar`: natural language processing libraries, PyTorch included for the neural parser
+- `lambek`: natural language processing libraries, PyTorch included for the neural parser
 - `optyx`: the dependencies of `discopy.optyx` (photonics, ZX, tensor contraction)
 - `notebooks`: marimo, IPython and a Jupyter kernel to run the notebooks, with anywidget to show diagrams as widgets
 - `docs`: for generating the documentation
 - `all`: every group above, which CI's test job installs
 
-Since dependency groups are not standard, `quantum`, `grammar`, `optyx`, `notebooks` and `docs`
+Since dependency groups are not standard, `tensor`, `quantum`, `lambek`, `optyx`, `notebooks` and `docs`
 are also optional dependencies (`pip install -e '.[quantum]'`). There is no `dev` or `all`
-extra: the `test` extra bundles `quantum`, `grammar`, `optyx` and `notebooks` with the test
+extra: the `test` extra bundles `quantum`, `lambek`, `optyx` and `notebooks` with the test
 tools, without egglog, ruff, ty or pytest-benchmark.
 
 ## Run the unit tests
@@ -247,13 +248,20 @@ compared against.
 
 `benchmark/test_composition.py` reproduces the scaling experiments of
 arXiv:2105.09257 for `Diagram` and `Hypergraph`, with analogous `CMap` cases;
-`benchmark/test_conversion.py` covers conversions between all three, and
+`benchmark/test_conversion.py` covers conversions between all three,
 `benchmark/test_zx.py` races `quantum.graphlike.full_reduce` against PyZX's,
 skipped without PyZX: run it with `uv run --with "pyzx==0.10.7"`, as the
-workflow does. They live outside `testpaths`, so run them explicitly. Results
-are keyed by suite (`composition`, `conversion` or `zx`), family
-(representation, conversion or implementation), case (workload) and size
-`n`. Each data point is a declarative
+workflow does, and `benchmark/test_egraph.py` replays the 50 e-graphs of
+`benchmark/data/egraph-traces` through `egraph.Builder` and the bookkeeping
+of the search that grew them, and the small ones through the pure `EGraph`.
+It also matches each trace with its two-box pattern of the most matches, on
+the builder and on the pure `EGraph`, and saturates `+` under associativity
+and commutativity on four to seven leaves (eight in the full tail) on the
+builder, and on four and five by the pure rounds of `EGraph.step`.
+They live outside `testpaths`, so run them explicitly. Results are keyed by
+suite (`composition`, `conversion`, `zx` or `egraph`), family
+(representation, conversion, implementation or operation), case (workload)
+and size `n`. Each data point is a declarative
 [`pytest-benchmark`](https://pytest-benchmark.readthedocs.io) test; the fixture
 owns timing (CPU clock and GC disabled) and automatically calibrates rounds
 and iterations for each workload.
@@ -294,6 +302,62 @@ and only measures its own commit. Every run uploads the report of its head commi
 the job summary, and raises a warning annotation, never a failure, when a
 measurement regresses. A pull request run also posts or updates a comment with
 the important regressions and speedups.
+
+## Run the Lean proofs
+
+`lean/` is a [Lake](https://lean-lang.org/doc/reference/latest/Build-Tools-and-Distribution/Lake/)
+project holding a Lean 4 model of `egraph.partition`, the pure `EGraph`
+(`merge`, `add`, `rebuild`) and the `Builder`, and one of the diagrams of
+`monoidal.Diagram`, with theorems proved on each,
+see its [README](lean/README.md); it needs the Lean of `lean/lean-toolchain`
+and no other dependency. It lives outside the package and outside `testpaths`,
+so run it explicitly:
+
+```shell
+cd lean
+lake build                 # the proofs and the `oracle` executable
+lake env lean Audit.lean   # no `sorry`, no axiom beyond the three standard ones
+cd ..
+uv run pytest lean/test_oracle.py lean/test_premonoidal.py -s
+```
+
+`lean/Statements.lean` restates the definitions and the main theorems in one
+short file, and `lean/Statements/Premonoidal.lean` those of diagrams. The last
+command is the differential test: Hypothesis draws cases, the `oracle` answers
+them in one run and each answer is compared with the Python's; it is skipped
+when the binary is not built. `ORACLE_EXAMPLES` sets the number of cases per
+seed (2,000 by default) and `ORACLE_SEEDS` the seeds (`0` by default), e.g.
+`ORACLE_EXAMPLES=17000 ORACLE_SEEDS=0,1,2`. The `lean` GitHub workflow runs
+all three on `main` and on a pull request touching `lean/`,
+`discopy/egraph.py`, `discopy/monoidal.py`, `discopy/cat.py`, the traces of the
+benchmark with their loader `benchmark/test_egraph.py`, which the test
+replays, or what installs the environment.
+
+## Build the paper
+
+`paper/` holds the source of the tool paper, in [Typst](https://typst.app), and it is checked
+as the code is. `test/paper_build.py` runs its Python listings in order in one namespace, as
+`test/readme.py` runs the README's, draws each figure from the value a listing named, once
+with the Typst backend and once with the TikZ one, writes its LaTeX with `paper/transpile.py`,
+and compiles both where their compiler is installed:
+
+```shell
+uv sync --group all
+uv run pytest test/paper_build.py -rs
+uv run python -m paper.build --pdf  # paper/main.pdf from Typst, paper/latex.pdf from LaTeX
+```
+
+Typst downloads the CeTZ package on its first run. The LaTeX build needs `latexmk` and what
+`paper/preamble.tex` loads, on Debian the packages the `paper` workflow installs: its test is
+skipped without `latexmk`, and fails with it when a package is missing. A `python` fence of the paper runs, a `py` fence is shown and not run, and
+`#drawing("name")` is the drawing of the value `name` of the listings. `paper/transpile.py`
+reads the part of Typst its docstring lists and raises `Unsupported` on anything else: write
+the paper within it, or add the LaTeX of what you need to it. The references are those of the
+docs, `docs/discopy.bib`. `paper/figures/`, `paper/main.tex` and the PDFs are built, not
+committed: the `paper` workflow uploads them as the `paper` artifact, on `main` and on a pull
+request that touches the paper or the library its listings run. The tests that build the paper
+are marked `slow`, since its listings import PyTorch and JAX: on a pull request that workflow
+is what runs them.
 
 ## Build the docs
 

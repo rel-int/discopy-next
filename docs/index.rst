@@ -17,7 +17,7 @@ DisCoPy documentation
     api/semantics
     api/quantum
     api/optyx
-    api/grammar
+    api/lambek
     api/drawing
     api/testable
 
@@ -40,6 +40,7 @@ DisCoPy documentation
     notebooks/equivalence-hypergraphs
     notebooks/contextual-fraction
     notebooks/boolean-circuits
+    notebooks/from_picture
 
 .. toctree::
     :caption: Optyx notebooks

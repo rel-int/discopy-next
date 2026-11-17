@@ -634,9 +634,16 @@ def test_snake_equation_to_tikz():
     return Equation(Id(x.r).transpose(left=True), Id(x), Id(x.l).transpose())
 
 
+@tikz_and_compare("triangle.tikz")
+def test_triangle_to_tikz():
+    x = Ty('x')
+    merge = Box("t", x ** 2, x, shape="triangle")
+    return merge >> merge[::-1]
+
+
 @tikz_and_compare("who-ansatz.tikz")
 def test_who_ansatz_to_tikz():
-    from discopy.grammar.pregroup import Ty, Cap, Word, Id, Box
+    from discopy.lambek.pregroup import Ty, Cap, Word, Id, Box
     s, n = Ty('s'), Ty('n')
     who = Word('who', n.r @ n @ s.l @ n)
     who_ansatz = Cap(n.r, n)\
@@ -1042,3 +1049,175 @@ def test_Drawing_equality_compares_wires():
         wires.width, wires.height)
     crossed.validate_attributes()
     assert crossed != wires
+
+
+def test_box_height_spans_its_wires():
+    x = monoidal.Ty('x')
+    drawing = monoidal.Box('f', x, x, height=2).to_drawing()
+    drawing.add_box_corners()
+    ys = {node.kind: y for node, (_, y) in drawing.positions.items()}
+    assert ys["box-corner-00"] == ys["box_cod"] == 0.25
+    assert ys["box-corner-01"] == ys["box_dom"] == 1.75
+
+
+def test_relayout_of_the_default_layout_draws_the_same():
+    from discopy import symmetric
+    from discopy.lambek.pregroup import Ty as PTy, Word, Cup as PCup
+    x, y = Ty('x'), Ty('y')
+    s, n = PTy('s'), PTy('n')
+    sentence = Word('Alice', n) @ Word('loves', n.r @ s @ n.l)\
+        @ Word('Bob', n) >> PCup(n, n.r) @ s @ PCup(n.l, n)
+    gallery = [
+        Box('f', x, x @ y, height=2) >> Box('g', x @ y, x),
+        Box('f', x, x).bubble(),
+        x @ Cap(x.r, x) >> Cup(x, x.r) @ x,
+        symmetric.Permutation(symmetric.Ty('x', 'y', 'z'), [2, 0, 1]),
+        Box('a_very_long_name', x, x, min_width=3) @ Box('g', y, y),
+        sentence.foliation()]
+    for diagram in gallery:
+        drawing = diagram.to_drawing()
+        relaid = drawing.relayout(drawing.layout())
+        assert relaid.to_svg() == drawing.to_svg()
+        assert relaid.layout() == drawing.layout()
+
+
+def test_relayout_refuses_what_is_not_the_same_diagram():
+    x = Ty('x')
+    drawing = (Box('f', x, x @ x) >> Box('g', x @ x, x)).to_drawing()
+    layout = drawing.layout()
+    nodes = drawing.relabel_nodes()
+    nodes.add_box_corners()
+    index = {node: 2 * k for k, node in enumerate(nodes.ordered_nodes())}
+    with raises(ValueError, match="given"):
+        drawing.relayout(layout[:-1])
+    left, right = [node for node in nodes.ordered_nodes()
+                   if node.kind == "box_cod" and node.j == 0]
+    swapped = list(layout)
+    swapped[index[left]], swapped[index[right]]\
+        = layout[index[right]], layout[index[left]]
+    with raises(ValueError, match="same diagram"):
+        drawing.relayout(swapped)
+    corner = Node("box-corner-11", j=0)
+    narrow = list(layout)
+    narrow[index[corner]] = layout[index[left]] - 0.1
+    with raises(ValueError, match="same diagram"):
+        drawing.relayout(narrow)
+    with raises(ValueError, match="same diagram"):
+        drawing.relayout([-c for c in layout])
+
+
+def test_relayout_review_round():
+    import numpy as np
+    x, y = Ty('x'), Ty('y')
+    assert Drawing.id().relayout(()) == Drawing.id().relayout(
+        Drawing.id().layout())
+    drawing = (Box('f', x, x) >> Box('g', x, x)).to_drawing()
+    assert drawing.relayout(np.array(drawing.layout())).layout()\
+        == drawing.layout()
+    relaid = drawing.relayout(drawing.layout())
+    assert relaid.dagger().dagger().layout() == relaid.layout()
+    assert relaid.dagger().to_svg() == drawing.dagger().to_svg()
+    nodes = drawing.relabel_nodes()
+    nodes.add_box_corners()
+    index = {node: 2 * k for k, node in enumerate(nodes.ordered_nodes())}
+
+    def moved(node, dx=0., dy=0.):
+        layout = list(drawing.layout())
+        layout[index[node]] += dx
+        layout[index[node] + 1] += dy
+        return layout
+    port = next(node for node in nodes.ordered_nodes()
+                if node.kind == "box_dom" and node.j == 0)
+    for layout in [moved(Node("box-corner-01", j=0), dx=5),
+                   moved(port, dy=0.1)]:
+        with raises(ValueError, match="same diagram"):
+            drawing.relayout(layout)
+    bypass = (Box('f', x, x) @ y).to_drawing()
+    nodes = bypass.relabel_nodes()
+    nodes.add_box_corners()
+    index = {node: 2 * k for k, node in enumerate(nodes.ordered_nodes())}
+    layout = list(bypass.layout())
+    for node in nodes.ordered_nodes():
+        if node.kind in ("dom", "cod") and node.i == 1:
+            layout[index[node]] = 0.6
+    with raises(ValueError, match="same diagram"):
+        bypass.relayout(layout)
+
+
+def test_relayout_keeps_wires_apart():
+    drawing = Drawing.id(Ty('x', 'y'))
+    layout = list(drawing.layout())
+    collapsed = list(layout)
+    nodes = drawing.ordered_nodes()
+    for k, node in enumerate(nodes):
+        if node.i == 1:
+            collapsed[2 * k] = layout[2 * nodes.index(
+                next(n for n in nodes if n.kind == node.kind and n.i == 0))]
+    with raises(ValueError, match="same diagram"):
+        drawing.relayout(collapsed)
+    assert drawing.relayout(layout).layout() == drawing.layout()
+
+
+def test_relayout_keeps_order_and_labels():
+    x, y = Ty('x'), Ty('y')
+    drawing = Drawing.id(x @ y)
+    nodes, layout = drawing.ordered_nodes(), list(drawing.layout())
+    swapped = list(layout)
+    for k, node in enumerate(nodes):
+        twin = nodes.index(next(
+            n for n in nodes if n.kind == node.kind and n.i != node.i))
+        swapped[2 * k] = layout[2 * twin]
+    with raises(ValueError, match="same diagram"):
+        drawing.relayout(swapped)
+    boxes = (Box('f', x, x) @ Box('g', x, x)).to_drawing()
+    nodes = boxes.relabel_nodes()
+    nodes.add_box_corners()
+    ordered, layout = nodes.ordered_nodes(), list(boxes.layout())
+    f, g = [2 * k for k, node in enumerate(ordered) if node.kind == "box"]
+    labels = list(layout)
+    labels[f], labels[g] = layout[g], layout[f]
+    with raises(ValueError, match="same diagram"):
+        boxes.relayout(labels)
+    with raises(ValueError, match="same diagram"):
+        boxes.relayout([float("nan")] + layout[1:])
+    assert boxes.relayout(layout).is_feasible(boxes)
+
+
+
+def test_relayout_reads_wires_as_drawn():
+    drawing = (Box('f', Ty('x'), Ty('x')) @ Ty('y')).to_drawing()
+    (_, dom), (_, cod) = drawing.dom_nodes, drawing.cod_nodes
+    bent = drawing.relabel_nodes(positions={
+        dom: Point(.6, 1), cod: Point(2, 0)})
+    assert not bent.is_feasible(drawing)
+    assert drawing.relabel_nodes(positions={
+        dom: Point(1.6, 1), cod: Point(2, 0)}).is_feasible(drawing)
+
+
+def test_tikz_fills_a_straight_ribbon(tmp_path):
+    from discopy.ribbon import Ty, Diagram
+    path = tmp_path / "ribbon.tikz"
+    Diagram.id(Ty('x')).to_ribbons().draw(
+        to_tikz=True, path=str(path), wire_labels=False)
+    tikz = path.read_text()
+    assert "x=0.6667in, y=0.6667in" in tikz
+    assert any(
+        "fill=" in line and "fill=none" not in line
+        and "line width=0.25pt" in line and line.endswith("-- cycle;")
+        for line in tikz.splitlines())
+
+
+def test_a_dimension_is_drawn_as_its_numbers():
+    from discopy.neural.network import Dims
+    assert Dims(4, monoidal.Dim(4, 4)).to_drawing() == monoidal.Ty(
+        monoidal.Wire('4'), monoidal.Wire('4, 4'))
+    assert str(Dims(4)) == "Dims(Dim(4))"
+
+
+def test_tikz_writes_a_label_in_its_colour():
+    tikz = TikZ()
+    tikz.draw_text("x", 0, 0, verticalalignment="top", color="white",
+                   adaptive=False)
+    tikz.draw_text("y", 1, 0, verticalalignment="top", color="black")
+    assert "text={white}" in tikz.nodelayer[0]
+    assert "text=" not in tikz.nodelayer[1]

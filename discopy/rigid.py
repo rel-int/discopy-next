@@ -758,6 +758,16 @@ class Box(biclosed.Box, Diagram):
         return cat.Box.__str__(self) if not self.z\
             else str(self.r) + '.l' if self.z < 0 else str(self.l) + '.r'
 
+    def atoms(self) -> list:
+        """
+        The atoms of the box its string rotates, e.g. ``f.r`` names ``f``.
+
+        >>> f = Box('f', Ty('x'), Ty('y'))
+        >>> assert f.r.atoms() == f.l.l.atoms() == f.atoms()
+        """
+        return super().atoms() if not self.z\
+            else self.r.atoms() if self.z < 0 else self.l.atoms()
+
     def __repr__(self):
         if self.is_dagger:
             return biclosed.Box.__repr__(self)

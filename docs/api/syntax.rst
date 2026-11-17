@@ -25,7 +25,7 @@ DisCoPy's mathematical core: a zoo of diagrams, categories and functors.
     discopy.compact
     discopy.frobenius
     discopy.hypergraph
-    discopy.ehypergraph
+    discopy.egraph
     discopy.cmap
 
 Utilities shared by every module: serialisation, factories and configuration.

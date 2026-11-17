@@ -455,7 +455,7 @@ def Id(n):
           else diagram.Diagram.id(diagram.Bit(n))
 
 
-H = ZXBox("H", 1, 1)
+H = ZXBox("H", 1, 1, is_dagger=None)
 H.draw_as_spider = False
 (H.drawing_name, H.tikzstyle_name,) = (
     "",

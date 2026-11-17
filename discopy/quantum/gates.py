@@ -63,7 +63,8 @@ from discopy.matrix import get_backend
 from discopy.quantum.circuit import (
     Circuit, Digit, Ty, bit, qubit, Box, Sum, Id)
 from discopy.tensor import backend
-from discopy.utils import factory_name, assert_isinstance, from_tree
+from discopy.utils import (
+    factory_key, factory_name, assert_isinstance, from_tree)
 
 
 def format_number(data, exact=False):
@@ -1044,7 +1045,7 @@ class Rotation(Parametrized, QuantumGate):
         >>> assert Rz(.1231) != Rz(.1234) and len({Rz(.25), Rz(.25)}) == 1
         >>> assert Rz(.5) != Box('Rz', qubit, qubit, data=.5)
         """
-        return (type(self), ) + Box.setoid(self)
+        return (factory_key(type(self)), ) + Box.setoid(self)
 
     def grad(self, var, **params):
         if var not in self.free_symbols:

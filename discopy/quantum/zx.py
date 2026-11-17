@@ -531,6 +531,17 @@ class Scalar(Box):
         return f"{factory_name(type(self))}"\
             f"({format_number(self.data, exact=True)})"
 
+    @classmethod
+    def from_tree(cls, tree: dict) -> "Scalar":
+        """
+        Decode a scalar, which the inherited :meth:`to_tree` writes with its
+        data beside the name and the empty boundary its constructor sets.
+
+        >>> from discopy.utils import dumps, loads
+        >>> assert loads(dumps(scalar(2))) == scalar(2)
+        """
+        return cls(tree['data'])
+
     def subs(self, *args):
         data = cat.rsubs(self.data, *args)
         return Scalar(data)

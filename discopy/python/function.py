@@ -12,6 +12,7 @@ Summary
     :toctree:
 
     Function
+    Composition
     EndoFunctor
 """
 from __future__ import annotations
@@ -38,6 +39,31 @@ NO_TREE = messages.NO_TREE_CALLABLE.format("A function", "inside")
 
 
 @factory
+@dataclass(frozen=True, eq=False)
+class Composition:
+    """
+    The callable inside a composition of functions: it calls its ``factors``
+    in turn, each on the outputs of the one before, see
+    :meth:`Function.then`.
+
+    Parameters:
+        factors : The functions composed, at least one.
+
+    Example
+    -------
+    >>> succ = Function(lambda x: x + 1, (int, ), (int, ))
+    >>> assert Composition((succ, succ, succ))(0) == 3
+    >>> assert (succ >> succ >> succ).inside.factors == (succ, succ, succ)
+    """
+    factors: tuple[Function, ...]
+
+    def __call__(self, *args):
+        *before, last = self.factors
+        for factor in before:
+            args = tuplify(factor(*args), len(factor.cod))
+        return last(*args)
+
+
 @dataclass(unsafe_hash=True)
 class Function(Category[Ty, "Function"]):
     """
@@ -113,6 +139,16 @@ class Function(Category[Ty, "Function"]):
         >>> from discopy.python.multiplicative import Function
         >>> succ = Function(lambda x: x + 1, (int, ), (int, ))
         >>> assert succ.then(succ, succ)(0) == 3
+
+        Note
+        ----
+        The ``inside`` of a composition is a :class:`Composition` of the
+        functions it was made of, and composing it again extends them, so
+        that calling a long composition, built one function at a time as a
+        functor does, takes a loop rather than as many nested calls.
+
+        >>> from functools import reduce
+        >>> assert reduce(Function.then, 2000 * [succ])(0) == 2000
         """
         if not others:
             return self
@@ -120,12 +156,10 @@ class Function(Category[Ty, "Function"]):
         for factor, other in zip(factors, others):
             assert_isinstance(other, type(self))
             assert_iscomposable(factor, other)
-        *before, last = factors
-
-        def inside(*args):
-            for factor in before:
-                args = tuplify(factor(*args), len(factor.cod))
-            return last(*args)
+        inside = Composition(tuple(
+            part for factor in factors for part in (
+                factor.inside.factors
+                if isinstance(factor.inside, Composition) else (factor, ))))
         return type(self)(inside, self.dom, others[-1].cod)
 
     @classproperty

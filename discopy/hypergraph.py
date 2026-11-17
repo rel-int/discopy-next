@@ -294,7 +294,7 @@ class Hypergraph[category](
         # pylint: disable=import-outside-toplevel  # they import this
         from discopy import (
             closed, compact, feedback, frobenius, markov, symmetric)
-        from discopy.grammar import abstract
+        from discopy.lambek import abstract
         return tuple(category.Diagram for category in (
             symmetric, markov, compact, frobenius, closed, feedback,
             abstract))
@@ -796,30 +796,98 @@ class Hypergraph[category](
     l = property(lambda self: self.rotate(left=True))
     r = property(lambda self: self.rotate(left=False))
 
-    def explicit_trace(self, left=False):
+    def explicit_trace(  # pylint: disable=too-many-locals  # the onion
+            self, n=1, left=False):
         """
-        The trace of a hypergraph with explicit boxes (trace, cup or cap).
+        The trace of ``n`` wires of a hypergraph with explicit boxes (trace,
+        cup or cap), in one pass.
 
         Parameters:
+            n : The number of wires to trace.
             left : Whether to trace on the left or right.
 
         Note
         ----
         When ``category.trace_factory`` is a subclass of ``category``,
         e.g. for symmetric diagrams, then the result is just one big trace box
-        wrapped up as a hypergraph.
+        wrapped up as a hypergraph, whatever ``n``, since the trace of ``n``
+        wires of a diagram is its ``n`` one-wire traces nested, see
+        :meth:`discopy.feedback.Diagram.feedback`. Nesting them on the diagram
+        converts the hypergraph once instead of once per wire.
 
         Otherwise, we assume that the trace factory is a class method, e.g.
         for compact diagrams, in which case we use this method to introduce
-        cup and cap boxes.
+        cup and cap boxes, one pair per wire: the cups and caps of a pivotal
+        category are atomic, so the ``n``-wire trace is the nest of ``n``
+        one-wire traces there as well. When that class method is the pivotal
+        one itself, the whole onion of ``n`` cup and cap pairs goes to one
+        constructor call rather than being composed pair by pair; a category
+        overriding it gets the nest its own factory builds.
+
+        >>> from discopy import frobenius, markov
+        >>> x = markov.Ty('x')
+        >>> f = markov.Box('f', x @ x @ x, x @ x @ x).to_hypergraph()
+        >>> assert f.explicit_trace(2) == f.explicit_trace().explicit_trace()
+        >>> y = frobenius.Ty('y')
+        >>> g = frobenius.Box('g', y @ y @ y, y @ y @ y).to_hypergraph()
+        >>> assert g.explicit_trace(2) == g.explicit_trace().explicit_trace()
+
+        Tracing no wire is the identity, whatever the category, so a graph
+        with nothing to trace needs no traces, see
+        :meth:`trace_backward_wires`; any other ``n`` is checked against the
+        wires there are, as :meth:`trace` checks it.
+
+        >>> from discopy import rigid
+        >>> z = rigid.Ty('z')
+        >>> h = rigid.Box('h', z, z).to_hypergraph()
+        >>> assert h.explicit_trace(0) == h
+        >>> f.explicit_trace(-1)
+        Traceback (most recent call last):
+         ...
+        ValueError: Cannot split -1 atoms off f.
         """
+        if n == 0:
+            return self
         if not issubclass(self.category, TracedCategory):
             raise AxiomError(messages.NOT_TRACED.format(
                 factory_name(self.category)))
+        assert_istraceable(self, n, left)
         factory = self.category.trace_factory
         if isclass(factory) and issubclass(factory, self.category):
-            return self.from_box(factory(self.to_diagram(), left))
-        return factory.__func__(type(self), self, left)
+            return self.from_box(self.to_diagram().trace(n, left))
+        # pylint: disable-next=import-outside-toplevel  # pivotal imports us
+        from discopy.pivotal import Diagram as Pivotal
+        if factory.__func__ is not Pivotal.trace_factory.__func__:
+            result = self
+            for _ in range(n):
+                result = factory.__func__(type(self), result, left)
+            return result
+        dom, cod, traced = (self.dom[n:], self.cod[n:], self.dom[:n]) if left\
+            else (self.dom[:-n], self.cod[:-n], self.dom[-n:])
+        (dom_wires, into), (cod_wires, out_of) = (
+            (wires[n:], wires[:n]) if left else (wires[:-n], wires[-n:])
+            for wires in (self.dom_wires, self.cod_wires))
+        loop = tuple(range(self.n_spiders, self.n_spiders + n))
+        legs = [(traced[i:i + 1].r, traced[i:i + 1]) if left
+                else (traced[i:i + 1], traced[i:i + 1].r) for i in range(n)]
+        cap_wires = [(loop[i], into[i]) if left else (into[i], loop[i])
+                     for i in range(n)]
+        cup_wires = [(loop[i], out_of[i]) if left else (out_of[i], loop[i])
+                     for i in range(n)]
+        order = tuple(reversed(range(n))) if left else tuple(range(n))
+        boxes = tuple(self.category.cap_factory(*legs[i]) for i in order)\
+            + self.boxes + tuple(
+                self.category.cup_factory(*legs[i]) for i in order[::-1])
+        box_wires = tuple(((), cap_wires[i]) for i in order) + self.box_wires\
+            + tuple((cup_wires[i], ()) for i in order[::-1])
+        spider_types = dict(enumerate(self.spider_types)) | {
+            loop[i]: legs[i][0 if left else 1] for i in range(n)}
+        offsets = n * (None, ) + tuple(
+            offset if offset is None else offset + (n if left else 0)
+            for offset in self.offsets) + n * (None, )
+        return type(self)(
+            dom, cod, boxes, (dom_wires, box_wires, cod_wires),
+            spider_types, offsets)
 
     def trace(self, n=1, left=False):
         """
@@ -847,7 +915,7 @@ class Hypergraph[category](
                 factory_name(self.category)))
         assert_istraceable(self, n, left)
         if not issubclass(self.category, SymmetricCategory):
-            return self.explicit_trace(left).trace(n - 1, left)
+            return self.explicit_trace(n, left)
         (dom, inputs, dom_wires), (cod, outputs, cod_wires) = (
             (typ[n:], wires[:n], wires[n:]) if left
             else (typ[:-n], wires[-n:], wires[:-n])
@@ -2629,14 +2697,12 @@ class Hypergraph[category](
         are not known before the first cut: they are cut one at a time, by
         :meth:`cut_backward_wire`, until every wire points forward. The
         traces all apply to the result of the last cut, so they are counted
-        rather than nested.
+        and taken in one pass, see :meth:`explicit_trace`.
         """
         graph, cuts = self, 0
         while (cut := graph.cut_backward_wire()) is not None:
             graph, cuts = cut, cuts + 1
-        for _ in range(cuts):
-            graph = graph.explicit_trace()
-        return graph
+        return graph.explicit_trace(cuts)
 
     def cut_backward_wire(self) -> "Hypergraph | None":
         """
