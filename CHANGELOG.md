@@ -9,6 +9,11 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Added
 
+- `drawing.picture.decode` and `read`: a picture's pixel classes back to
+  its diagram. `regions` splits them into boxes, wires and labels, `attach`
+  hangs each label on its wire, `refine` writes the names and types read
+  back, and `scan` picks the smallest module whose primitives appear, at
+  least compact when a type is an adjoint ([next#601]).
 - `drawing.picture`, pictures of diagrams as training data for reading them
   back: `samples` draws random diagrams of `monoidal`, `symmetric`,
   `compact` or `frobenius` one generator at a time, renders each with a mask
@@ -2131,6 +2136,7 @@ for the changelog of `1.2.1` and earlier.
 [next#589]: https://github.com/rel-int/discopy-next/pull/589
 [next#591]: https://github.com/rel-int/discopy-next/pull/591
 [next#598]: https://github.com/rel-int/discopy-next/pull/598
+[next#601]: https://github.com/rel-int/discopy-next/pull/601
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#56]: https://github.com/rel-int/optyx/pull/56
