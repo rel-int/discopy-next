@@ -9,6 +9,9 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Added
 
+- `Drawing.stretch(y, boxes=...)`: a fraction of the extra height scales the
+  boxes and the wires between them rather than only the input and output
+  wires; `Drawing.tensor(other, boxes=...)` passes it on ([next#599]).
 - `abc.LinearCategory`, a linear category (Bierman, TLCA 1995) without
   symmetry: a comonad `bang` with `dereliction` and `digging`, lax monoidal
   with a `laxator`, each `!x` a comonoid by `contraction` and `weakening`, and
@@ -2116,6 +2119,7 @@ for the changelog of `1.2.1` and earlier.
 [next#587]: https://github.com/rel-int/discopy-next/pull/587
 [next#589]: https://github.com/rel-int/discopy-next/pull/589
 [next#591]: https://github.com/rel-int/discopy-next/pull/591
+[next#599]: https://github.com/rel-int/discopy-next/pull/599
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#56]: https://github.com/rel-int/optyx/pull/56

@@ -213,6 +213,7 @@ The regions of a crossing follow its strands, see
 from __future__ import annotations
 
 import itertools
+from copy import copy as copy_of
 from math import isfinite
 from typing import NamedTuple, TYPE_CHECKING, Sequence
 from dataclasses import dataclass
@@ -1257,11 +1258,21 @@ which to_drawing recomputes.
                 step.width = result.width
         return steps if draw_step_by_step else result
 
-    def stretch(self, y, copy=True):
+    def stretch(self, y, copy=True, boxes=0):
         """
-        Stretch input and output wires to increase the height of a diagram
-        by a given length.
-        .
+        Stretch a drawing vertically by a given length: by default its input
+        and output wires get longer, and with ``boxes`` a fraction of the
+        length goes inside the drawing instead, scaling its height, its boxes
+        and the wires between them by the same factor.
+
+        Parameters:
+            y : The length to add to the height of the drawing.
+            copy : Whether to return a new drawing rather than change this
+                one.
+            boxes : The fraction of ``y`` that scales the inside of the
+                drawing, from ``0`` (the wires at its boundary only) to ``1``
+                (its boxes and inner wires only).
+
         Example
         -------
         >>> from discopy.monoidal import Box
@@ -1270,21 +1281,55 @@ which to_drawing recomputes.
 
         .. image:: /_static/drawing/stretch.svg
             :align: center
+
+        >>> g = f >> f
+        >>> (g @ g.stretch(2, boxes=.5) @ g.stretch(2, boxes=1)).draw(
+        ...     doctest="docs/_static/drawing/stretch-boxes.svg")
+
+        .. image:: /_static/drawing/stretch-boxes.svg
+            :align: center
         """
         if not y:
             # Nothing to stretch: avoid shifting middle nodes by y / 2 == 0.0,
             # which would turn integer coordinates into floats.
             return self.relabel_nodes(copy=copy)
-        result = self.relabel_nodes(copy=copy, positions={n: p.shift(y=(
-                y if n.kind == "dom" else 0 if n.kind == "cod" else y / 2))
+        inside, outside = boxes * y, (1 - boxes) * y
+        scale = (self.height + inside) / self.height if inside else 1
+        result = self.relabel_nodes(copy=copy, positions={n: Point(
+            p.x, p.y * scale + (outside if n.kind == "dom"
+                                else 0 if n.kind == "cod" else outside / 2))
             for n, p in self.positions.items()})
+        if inside:
+            result.boxes = tuple(
+                self.scale_box(box, scale) for box in result.boxes)
         result.height += y
         return result
 
-    @unbiased
-    def tensor(self, other: Drawing) -> Drawing:
+    @staticmethod
+    def scale_box(box, scale):
         """
-        Draw two diagrams side by side.
+        A copy of a box whose outline is ``scale`` times as high: the height
+        of the box, less the half wire its ports sit within, scales.
+
+        >>> from discopy.monoidal import Box
+        >>> box, = Drawing.from_box(Box('f', 'x', 'x')).boxes
+        >>> Drawing.scale_box(box, 3).height
+        2.0
+        """
+        result = copy_of(box)
+        result.height = scale * (getattr(box, "height", 1) - .5) + .5
+        return result
+
+    @unbiased
+    def tensor(self, other: Drawing, boxes=0) -> Drawing:
+        """
+        Draw two diagrams side by side, the shorter one stretched to the
+        height of the other, see :meth:`stretch`.
+
+        Parameters:
+            other : The drawing to put on the right.
+            boxes : The fraction of the stretch that goes into the boxes of
+                the shorter drawing, rather than its input and output wires.
 
         Example
         -------
@@ -1306,9 +1351,9 @@ which to_drawing recomputes.
         mapping.update({n: n.shift_i(len(self.dom)) for n in other.dom_nodes})
         mapping.update({n: n.shift_i(len(self.cod)) for n in other.cod_nodes})
         if self.height < other.height:
-            self = self.stretch(other.height - self.height)
+            self = self.stretch(other.height - self.height, boxes=boxes)
         elif self.height > other.height:
-            other = other.stretch(self.height - other.height)
+            other = other.stretch(self.height - other.height, boxes=boxes)
         x_shift = self.width + (
             0.25 if self.right_is_whiskered or other.left_is_whiskered else 0)
         result = self.union(other.relabel_nodes(mapping, positions={
