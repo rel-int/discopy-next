@@ -350,15 +350,12 @@ class Tensor(Matrix):
         assert_isatomic(typ, Dim)
         n, = typ.inside
         dom, cod = typ ** n_legs_in, typ ** n_legs_out
-        with backend('numpy'):
-            result = cls.zero(dom, cod)
-            for i in range(n):
-                index = len(dom @ cod) * (i, )
-                result.array[index] = result.array[index] + 1
-        if isinstance(get_backend(), NumPy):
-            return result
-        with backend() as np:
-            return cls(np.array(result.array), dom, cod)
+        with backend('numpy') as np:
+            array = np.zeros((dom @ cod).inside, dtype=cls.dtype or int)
+        for i in range(n):
+            index = len(dom @ cod) * (i, )
+            array[index] = array[index] + 1
+        return cls(array, dom, cod)
 
     @classmethod
     def spiders(cls, n_legs_in: int, n_legs_out: int, typ: Dim, phase=None
@@ -465,11 +462,12 @@ class Tensor(Matrix):
         >>> vector.jacobian(x, y, z)
         Tensor[Expr]([2*x, 0, 0, z, 0, y], dom=Dim(1), cod=Dim(3, 2))
         """
-        dim = Dim(len(variables) or 1)
+        n = len(variables) or 1
+        dim = Dim(n)
         result = self.zero(self.dom, dim @ self.cod)
         for i, var in enumerate(variables):
-            onehot = self.zero(Dim(1), dim)
-            onehot.array[i] = 1
+            onehot = type(self)(
+                [int(j == i) for j in range(n)], Dim(1), dim)
             result += onehot @ self.grad(var, **params)
         return result
 
@@ -1076,12 +1074,12 @@ class Diagram[dtype](TestableGeneric, frobenius.Diagram):
         >>> vector.jacobian([x, y, z]).eval(dtype=Expr)
         Tensor[Expr]([2*x, 0, 0, z, 0, y], dom=Dim(1), cod=Dim(3, 2))
         """
-        dim = Dim(len(variables) or 1)
+        n = len(variables) or 1
+        dim = Dim(n)
         result = Sum((), self.dom, dim @ self.cod)
         for i, var in enumerate(variables):
-            onehot = Tensor.zero(Dim(1), dim)
-            onehot.array[i] = 1
-            result += Box(str(var), Dim(1), dim, onehot.array)\
+            onehot = [int(j == i) for j in range(n)]
+            result += Box(str(var), Dim(1), dim, onehot)\
                 @ self.grad(var, **params)
         return result
 

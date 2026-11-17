@@ -489,3 +489,16 @@ def test_symbolic_matrix_composes_with_permutations_and_copies():
     assert f @ M.id(1) >> swap == swap >> M.id(1) @ f
     assert f >> M.permutation([0]) == f
     assert f >> M.copy(1) == M([psi, psi], 1, 2)
+
+
+def test_Matrix_shares_a_read_only_view():
+    """ #8: an array of the right dtype is not copied, and the matrix
+    stays immutable without freezing the caller's array. """
+    array = np.arange(4, dtype=float).reshape((2, 2))
+    m = Matrix[float](array, 2, 2)
+    assert np.shares_memory(m.array, array)
+    assert not m.array.flags.writeable and array.flags.writeable
+    with raises(ValueError):
+        m.array[0, 0] = 1
+    array[0, 0] = 1
+    assert array[0, 0] == 1
