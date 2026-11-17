@@ -1192,3 +1192,20 @@ def test_relayout_reads_wires_as_drawn():
     assert not bent.is_feasible(drawing)
     assert drawing.relabel_nodes(positions={
         dom: Point(1.6, 1), cod: Point(2, 0)}).is_feasible(drawing)
+
+
+def test_stretch_with_its_boxes():
+    f = Drawing.from_box(monoidal.Box('f', 'x', 'x'))
+    g = f >> f
+    assert g.stretch(2, boxes=0).positions == g.stretch(2).positions
+    for boxes, outline in [(0, .5), (.5, .75), (1, 1)]:
+        stretched = g.stretch(2, boxes=boxes)
+        assert stretched.height == g.height + 2
+        stretched.add_box_corners()
+        assert all(high.y - low.y == outline
+                   for low, high in stretched.rectangles())
+        assert stretched.is_feasible(g.stretch(2))
+    tall = f.tensor(g, boxes=1)
+    tall.add_box_corners()
+    assert [high.y - low.y for low, high in tall.rectangles()] == [1, .5, .5]
+    assert (f @ g).positions == f.tensor(g, boxes=0).positions
