@@ -622,6 +622,10 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 - Parameters nothing read: `Tree.to_diagram(contravariant)`,
   `Tree.from_nltk(lexicalised, word_types)`, `Drawing.id(length)`,
   `markov.Diagram.discard(n)` and `Backend(linewidth)` ([#768]).
+- The notebook `docs/notebooks/optyx/test_light_cones.md`, which imported
+  modules removed from optyx: it was the prototype of the light-cone bound
+  that `optyx.utils.misc.get_max_dim_for_box` computes for
+  `Diagram.to_tensor`, now unit-tested ([next#249]).
 
 ### Fixed
 
