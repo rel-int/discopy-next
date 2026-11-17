@@ -4,4 +4,4 @@
 
 - [x] nicer.stretch: a drawing's geometry from per-gap scales of its columns and rows and per-box scales of width and height, through Drawing.relayout
 - [x] nicer.nicer_layout: coordinate search over those scales, keeping feasible layouts, maximising the score
-- [WIP] @session_01MEJxy3Gb9UVB1Y7ExMgpNV-2026-11-17 08:36 tests, docs, changelog
+- [x] tests, docs, changelog
