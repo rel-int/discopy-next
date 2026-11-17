@@ -13,8 +13,9 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   back: `samples` draws random diagrams of `monoidal`, `symmetric`,
   `compact` or `frobenius` one generator at a time, renders each with a mask
   labelling every pixel by its wire type, box name or structural primitive,
-  and `augment` warps, rotates, blurs and restyles both together (chalk,
-  whiteboard, xkcd); `draw(backend=...)` takes the backend to draw with
+  by hand with `xkcd`; `augment` warps, rotates and changes the perspective
+  of the image and its mask together, then restyles the image alone (chalk,
+  whiteboard, blur, JPEG); `draw(backend=...)` takes the backend to draw with
   ([next#573]).
 - `abc.LinearCategory`, a linear category (Bierman, TLCA 1995) without
   symmetry: a comonad `bang` with `dereliction` and `digging`, lax monoidal

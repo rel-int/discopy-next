@@ -17,14 +17,16 @@ def test_elementary_draws_one_generator_at_a_time():
     result = elementary(diagram)
     assert {kind(box) for box in result.boxes} <= {
         "swap", "cup", "cap", "spider"}
+    assert all(len(layer.boxes_and_offsets) == 1 for layer in result.inside)
     assert equal(result, diagram, "frobenius")
 
 
 def test_samples_are_deterministic():
-    first, second = (next(samples("compact", seed=3, size=64))
+    first, second = (list(islice(samples("compact", seed=3, size=64), 3))
                      for _ in range(2))
-    assert first[0] == second[0]
-    assert all(np.array_equal(a, b) for a, b in zip(first[1:], second[1:]))
+    for one, other in zip(first, second):
+        assert one[0] == other[0]
+        assert all(np.array_equal(a, b) for a, b in zip(one[1:], other[1:]))
 
 
 @mark.parametrize("module", MODULES)
@@ -54,9 +56,19 @@ def test_augment_moves_image_and_mask_together():
     assert set(labels.flat) <= set(mask.flat)
     assert (labels == LABELS.index("f")).sum()\
         > .8 * (mask == LABELS.index("f")).sum()
+    moved, labels = augment(image, mask, np.random.default_rng(0), warp=True,
+                            rotate=True, perspective=True)
+    ink = moved.mean(axis=2) < 128
+    assert (labels[ink] != 0).mean() > .9
 
 
 @mark.parametrize("flag", ["chalk", "whiteboard", "xkcd"])
 def test_every_style_draws(flag):
-    _, image, _ = next(samples("symmetric", seed=2, size=64, **{flag: True}))
+    x = compact.Ty('a')
+    diagram = compact.Box('f', x, x @ x) >> compact.Swap(x, x)
+    plain = render(diagram, 64)
+    image, _ = augment(plain, render(diagram, 64, mask=True),
+                       np.random.default_rng(0), **{flag: True})\
+        if flag != "xkcd" else (render(diagram, 64, xkcd=True), None)
     assert image.shape == (64, 64, 3)
+    assert not np.array_equal(image, plain)

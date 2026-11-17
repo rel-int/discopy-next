@@ -527,7 +527,14 @@ def blur(array, sigma: float) -> np.ndarray:
 
 def sample_at(array, rows, cols, fill, nearest=False) -> np.ndarray:
     """ The values of an array at real coordinates, bilinear or nearest,
-    ``fill`` outside it. """
+    ``fill`` outside it.
+
+    >>> grey = np.full((2, 2, 1), 9.)
+    >>> sample_at(grey, np.array([-5., .5, 3.]), np.array([0., .5, 0.]), 0.)
+    array([[0.],
+           [9.],
+           [0.]])
+    """
     size = array.shape[0]
     if nearest:
         r, c = np.rint(rows).astype(int), np.rint(cols).astype(int)
@@ -537,8 +544,8 @@ def sample_at(array, rows, cols, fill, nearest=False) -> np.ndarray:
         return result
     r0, c0 = np.floor(rows).astype(int), np.floor(cols).astype(int)
     dr, dc = (rows - r0)[..., None], (cols - c0)[..., None]
-    padded = np.pad(array, ((1, 2), (1, 2), (0, 0)), constant_values=fill)
-    r0, c0 = np.clip(r0 + 1, 0, size + 1), np.clip(c0 + 1, 0, size + 1)
+    padded = np.pad(array, ((2, 2), (2, 2), (0, 0)), constant_values=fill)
+    r0, c0 = np.clip(r0 + 2, 0, size + 2), np.clip(c0 + 2, 0, size + 2)
     return (padded[r0, c0] * (1 - dr) * (1 - dc)
             + padded[r0 + 1, c0] * dr * (1 - dc)
             + padded[r0, c0 + 1] * (1 - dr) * dc
