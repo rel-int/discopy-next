@@ -613,7 +613,7 @@ class MonoidalCategory[C0: ColouredMonoid, C1: MonoidalCategory](
 
 
 class DaggerMonoidalCategory[C0: ColouredMonoid, C1: DaggerMonoidalCategory](
-        DaggerCategory[C0, C1], MonoidalCategory[C0, C1]):
+        DaggerCategory, MonoidalCategory):
     """
     A dagger monoidal category is a :class:`DaggerCategory` and a
     :class:`MonoidalCategory` whose dagger distributes over the tensor, see
