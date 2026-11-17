@@ -2,6 +2,6 @@
 >
 > (USER, 2026-11-17, on brief #559; this branch is its slices 5 and 6: the networks in drawing.vision and drawing.from_picture)
 
-- [ ] vision.py and from_picture from the pipeline measured at 852c2c1, with their tests
+- [x] vision.py and from_picture from the pipeline measured at 852c2c1, with their tests
 - [ ] docs/notebooks/from_picture.md with the numbers of slices 4 to 6 and run 7
 - [ ] changelog entry, next-checks
