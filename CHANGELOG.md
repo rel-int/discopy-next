@@ -9,6 +9,11 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Added
 
+- `discopy.drawing.nicer`: nine hand features of a drawing, each a cost
+  (wire length, bends, slope, aspect, asymmetry, whitespace, misalignment,
+  label overlap, area), `hand_score` their weighted sum with equal weights
+  until fitted on votes, and `make_nicer`, the foliation of a diagram whose
+  drawing scores best ([next#582]).
 - `monoidal.Diagram.foliations(limit)` lists the foliations of a diagram:
   diagrams equal to it up to interchange whose adjacent layers cannot merge,
   the largest layers first. The steps are public too: `dependencies`,
@@ -2045,6 +2050,7 @@ for the changelog of `1.2.1` and earlier.
 [next#570]: https://github.com/rel-int/discopy-next/pull/570
 [next#575]: https://github.com/rel-int/discopy-next/pull/575
 [next#577]: https://github.com/rel-int/discopy-next/pull/577
+[next#582]: https://github.com/rel-int/discopy-next/pull/582
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#56]: https://github.com/rel-int/optyx/pull/56
