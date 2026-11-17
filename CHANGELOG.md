@@ -14,6 +14,20 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   a small OCR model (`OCR`) that reads box names and wire types, then decoded
   in the least module it decodes in (`picture.decode_least`); with `train`,
   `train_ocr` and `evaluate`, and `picture.crop` ([next#602]).
+- `lambek.categorial.Parser`, the chart parser of the reproduction of Bobcat
+  (Clark, 2021) on CCGrebank: a CKY chart over the binary and unary rules
+  seen in the treebank and the schemata of `schemata` at a penalty, scored by
+  the log-probabilities of a supertagger and a span classifier, each cell the
+  best `Derivation` of each category in a beam. A derivation is a categorial
+  diagram by `tree2diagram`. `structure`, `render` and `normalise` read the
+  categories of the treebank with their features ([next#603]).
+- `lambek.categorial.Parser.from_pretrained` loads the model of the Bobcat
+  reproduction, `rel-int/bobcat-rebank-deberta-v3-large` on Hugging Face, and
+  a parser called on a sentence gives its categorial diagram, with a label for
+  every span if it can. `lambek.neural.Encoder` gives each word the state of
+  its first subword, and `lambek.neural.ChartClassifier` gives a supertag for
+  each word and a label for each span. `transformers` joins the `lambek` extra
+  ([next#604]).
 - `drawing.picture.decode` and `read`: a picture's pixel classes back to
   its diagram. `regions` splits them into boxes, wires and labels, `attach`
   hangs each label on its wire, `refine` writes the names and types read
@@ -2143,6 +2157,8 @@ for the changelog of `1.2.1` and earlier.
 [next#598]: https://github.com/rel-int/discopy-next/pull/598
 [next#601]: https://github.com/rel-int/discopy-next/pull/601
 [next#602]: https://github.com/rel-int/discopy-next/pull/602
+[next#603]: https://github.com/rel-int/discopy-next/pull/603
+[next#604]: https://github.com/rel-int/discopy-next/pull/604
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#56]: https://github.com/rel-int/optyx/pull/56

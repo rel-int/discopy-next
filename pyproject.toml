@@ -101,6 +101,7 @@ quantum = [
 lambek = [
     "nltk",
     "torch",
+    "transformers",
 ]
 # the deprecated name of the lambek extra
 grammar = ["discopy[lambek]"]
