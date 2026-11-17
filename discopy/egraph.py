@@ -124,7 +124,7 @@ never those of two samples:
 from collections import Counter, defaultdict
 from collections.abc import Callable, Iterator
 from functools import cached_property, reduce
-from itertools import accumulate, pairwise, repeat, takewhile
+from itertools import pairwise
 from math import inf
 from operator import add, index, itemgetter
 from typing import TYPE_CHECKING, Self, SupportsIndex
@@ -518,6 +518,49 @@ class Builder:  # pylint: disable=too-many-instance-attributes  # egg's tables
             tuple(map((values + (None, )).__getitem__, dom)),
             tuple(map((values + (None, )).__getitem__, cod)))
             for values, region in partial))
+
+    def rewrite(  # pylint: disable=unused-argument  # a match has a region
+            self, region: tuple[int, ...], dom: tuple, cod: tuple,
+            rhs: Hypergraph):
+        """
+        State that a match of a rule equals its right-hand side, as
+        :meth:`EGraph.rewrite` does: :meth:`add` each box of ``rhs`` on
+        ``dom``, then relate ``cod`` to its outputs. It checks nothing, the
+        region included, which it does not read: :meth:`EGraph.saturate`
+        checks each rule once, and a match of :meth:`matches` fires. The
+        boxes of ``rhs`` go in turn, in a causal order as
+        :meth:`Hypergraph.topological_order` gives, which :meth:`step` puts
+        each rule in once: a box before what it reads raises :class:`KeyError`.
+
+        >>> from discopy.markov import Ty, Box
+        >>> x = Ty('x')
+        >>> f, g = Box('f', x, x), Box('g', x, x)
+        >>> builder = Markov.from_diagram(f).builder()
+        >>> builder.rewrite((0, ), (0, ), (1, ), g.to_hypergraph())
+        >>> assert builder.freeze() == Markov.from_diagram(f).rewrite(
+        ...     (0, ), (0, ), (1, ), g.to_hypergraph())
+        """
+        image = dict(zip(rhs.dom_wires, dom))
+        for box, (src, tgt) in zip(rhs.boxes, rhs.box_wires):
+            image.update(zip(tgt, self.add(box, tuple(map(
+                image.__getitem__, src)))))
+        for spider, target in zip(cod, rhs.cod_wires):
+            self.union(spider, image[target])
+
+    def step(self, rules: list[tuple[Hypergraph, Hypergraph]]):
+        """ A round of egg's schedule, as :meth:`EGraph.step`: the matches of
+        each rule as it begins, rewritten, then rebuilt, see the law
+        :meth:`EGraph.stepping`. """
+        rules = [(lhs, rhs.topological_order()) for lhs, rhs in rules]
+        for match, rhs in [(match, rhs) for lhs, rhs in rules
+                           for match in self.matches(lhs)]:
+            self.rewrite(*match, rhs)
+        self.rebuild()
+
+    def size(self) -> tuple[int, int]:
+        """ How many boxes and classes the builder has. """
+        return len(self.boxes), sum(
+            s == root for s, root in enumerate(self.label))
 
     @staticmethod
     def plan(ports: tuple[int, ...], bound: list[int]
@@ -936,7 +979,9 @@ class EGraph[category](
     def saturate(self, *rules) -> Iterator[Self]:
         """
         Each :meth:`step` that adds a box or relates two classes, until one
-        does neither, if ever. A rule is a pair ``(lhs, rhs)`` of cartesian
+        does neither, if ever, each a :meth:`Builder.step` on one builder,
+        frozen: the e-nodes and classes of a pure step, see the law
+        :meth:`stepping`. A rule is a pair ``(lhs, rhs)`` of cartesian
         diagrams of one type, ``lhs`` a pattern and ``rhs`` reading only what
         ``lhs`` reads, as in egg, else it raises :class:`AxiomError`.
         """
@@ -944,8 +989,15 @@ class EGraph[category](
             return {k for k, s in enumerate(graph.dom_wires)
                     if graph.spider_wires[s][1]}
 
-        def size(graph):
-            return len(graph.graph.boxes), len(set(graph.classes))
+        def rounds(builder):
+            builder.rebuild()
+            before = builder.size()
+            while True:
+                builder.step(pairs)
+                if builder.size() == before:
+                    return
+                before = builder.size()
+                yield builder.freeze()
 
         pairs = []
         for lhs, rhs in rules:
@@ -955,10 +1007,7 @@ class EGraph[category](
                     or not reads(right) <= reads(left):
                 raise AxiomError(messages.NOT_A_RULE.format(lhs, rhs))
             pairs.append((left, right))
-        rounds = pairwise(accumulate(
-            repeat(pairs), type(self).step, initial=self.rebuild()))
-        return (new for _, new in takewhile(
-            lambda pair: size(pair[0]) != size(pair[1]), rounds))
+        return rounds(self.builder())
 
     @cached_property
     def producers(self) -> dict[int, tuple[int, ...]]:
@@ -990,6 +1039,38 @@ class EGraph[category](
         invariant :cite:`WillseyEtAl21`. """
         return {q: tuple(sorted({self.key(port): port for port in reversed(
             ports)}.values())) for q, ports in self.producers.items()}
+
+    def reduced(self) -> Hypergraph:
+        """
+        The e-graph as egg's tables: a spider for each class, and a box for
+        each e-node, i.e. of the deterministic boxes on related inputs the
+        least, on the classes of its inputs and outputs, and every sample.
+        Two rebuilt e-graphs reduce to the same hypergraph, up to renaming,
+        exactly when they have the same e-nodes on the same classes, whatever
+        duplicates of a box each keeps. It need not be left-monogamous.
+
+        >>> from discopy.markov import Ty, Box, Diagram
+        >>> x = Ty('x')
+        >>> f = Box('f', x, x)
+        >>> graph = Markov((Diagram.copy(x) >> f @ f).to_hypergraph())
+        >>> assert graph.rebuild().reduced() == (
+        ...     f >> Diagram.copy(x)).to_hypergraph()
+        """
+        graph, classes, found = self.graph, self.classes, {}
+        for j in range(len(graph.boxes)):
+            found.setdefault(self.occurrence(j), j)
+        number = {q: n for n, q in enumerate(dict.fromkeys(classes))}
+
+        def spiders(wires):
+            return tuple(number[classes[s]] for s in wires)
+
+        return type(graph)(
+            graph.dom, graph.cod,
+            tuple(graph.boxes[j] for j in found.values()),
+            (spiders(graph.dom_wires), tuple(tuple(map(
+                spiders, graph.box_wires[j])) for j in found.values()),
+             spiders(graph.cod_wires)),
+            [graph.spider_types[q] for q in number])
 
     def roots(self) -> tuple[int, ...]:
         """ The boxes every section keeps, not affine, once for equal
@@ -1520,10 +1601,28 @@ class EGraph[category](
             tuple(frozenset(builder.matches(lhs)) for lhs in patterns),
             tuple(frozenset(graph.matches(lhs)) for lhs in patterns))
 
+    @axiom
+    def stepping(cls, graph: Self) -> Equation[Hypergraph]:
+        """ A round on a builder gives the e-nodes and classes a pure
+        :meth:`step` does, under the rules of :meth:`saturation`: the same
+        hypergraph once reduced, the two firing matches in other orders. The
+        rules of the last box go first, so that a rewrite relates what a box
+        before reads, which only the rebuild closes. """
+        rules, fresh = [], GENERATORS[2]
+        for b in dict.fromkeys(graph.graph.boxes[::-1]):
+            rules += [(b.to_hypergraph(), c.to_hypergraph()) for c in (
+                *dict.fromkeys(graph.graph.boxes), cls.category.box_factory(
+                    fresh, b.dom, b.cod)) if (b.dom, b.cod) == (c.dom, c.cod)]
+        builder = graph.builder()
+        builder.step(rules)
+        return Equation(
+            builder.freeze().reduced(), graph.step(rules).reduced())
+
     rewrite_identity = rewrite_identity.weaken(effects=False)
     extraction_rewrite = extraction_rewrite.weaken(effects=False)
     matching_completeness = matching_completeness.weaken(effects=False)
     saturation = saturation.weaken(effects=False)
+    stepping = stepping.weaken(effects=False)
 
 
 Markov = EGraph[markov.Diagram]

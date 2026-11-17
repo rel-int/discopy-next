@@ -81,6 +81,11 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   nothing, a match being a row of the join of the atoms of the pattern, as in
   relational e-matching, and the law `EGraph.matching_agreement` that it
   matches what the e-graph of the same operations does ([next#549]).
+- `egraph.Builder.rewrite` and `egraph.Builder.step`, a match rewritten by
+  `add` and `union` and a round of rules on the builder, `EGraph.reduced`,
+  the e-graph as a spider per class and a box per e-node, and the law
+  `EGraph.stepping` that a round on the builder and a pure `step` reduce to
+  the same hypergraph ([next#586]).
 - `stream.up_to_steps`, the relation a law of streams is read with: a term
   unrolled for `stream.STEPS` steps, its arrow `now` taken and quotiented by
   the equation of the underlying category, which `Stream.equation_factory`
@@ -354,6 +359,10 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Changed
 
+- `egraph.EGraph.saturate` runs its rounds on one `Builder`, freezing it
+  after each round that changes something: associativity and commutativity
+  of `+` on five leaves saturate 55 times faster, and on six in under a
+  second ([next#586]).
 - `discopy.grammar` is `discopy.lambek`, with its tests in `test/lambek`,
   its pictures in `docs/_static/lambek` and its extra `discopy[lambek]`.
   The old name stays as a deprecated alias: `discopy.grammar` warns and has
@@ -567,6 +576,11 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Fixed
 
+- The TikZ backend escapes in a label what LaTeX reads as markup outside
+  the mathematics between dollars, an underscore, an ampersand, a percent
+  and a hash, and keeps `<<` and `>>` from joining into guillemets
+  (`TikZ.escape`): a box named `feed_forward` or an evaluated lambda term,
+  drawn as `__call__`, stopped LaTeX ([next#580]).
 - `Matrix.id` builds its array over `int` and casts it with the active
   backend, so a matrix inferred under `backend("pytorch")` traces, and
   `Matrix.then` casts both factors to the dtype they promote to, so it
@@ -1581,6 +1595,10 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Project
 
+- `benchmark/test_egraph.py` has the families `match`, the builder's matcher
+  against the pure one on each trace, and `saturate`, `+` under
+  associativity and commutativity on four to eight leaves on the builder,
+  and on four and five by the pure rounds ([next#589]).
 - `paper/`, the source of the tool paper in Typst: `paper/transpile.py` writes
   its LaTeX from the part of Typst it is written in, `paper/build.py` runs
   its listings and draws each figure with the Typst and the TikZ backends,
@@ -2069,10 +2087,13 @@ for the changelog of `1.2.1` and earlier.
 [next#575]: https://github.com/rel-int/discopy-next/pull/575
 [next#577]: https://github.com/rel-int/discopy-next/pull/577
 [next#578]: https://github.com/rel-int/discopy-next/pull/578
+[next#580]: https://github.com/rel-int/discopy-next/pull/580
 [next#581]: https://github.com/rel-int/discopy-next/pull/581
 [next#582]: https://github.com/rel-int/discopy-next/pull/582
 [next#583]: https://github.com/rel-int/discopy-next/pull/583
 [next#585]: https://github.com/rel-int/discopy-next/pull/585
+[next#586]: https://github.com/rel-int/discopy-next/pull/586
+[next#589]: https://github.com/rel-int/discopy-next/pull/589
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#56]: https://github.com/rel-int/optyx/pull/56

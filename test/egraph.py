@@ -1,6 +1,7 @@
 import gzip
 import json
 import random
+import time
 from functools import reduce
 from itertools import islice
 from math import inf
@@ -413,7 +414,7 @@ def examples() -> list[EGraph]:
 @pytest.mark.parametrize("law", [
     "rebuild_minimality", "extraction_soundness", "extraction_optimality",
     "sharing", "translation", "effects_kept", "rewrite_identity",
-    "saturation"])
+    "saturation", "stepping"])
 def test_laws_of_one_graph(law, examples):
     """ A law weakened to cartesian e-hypergraphs holds on those, any other
     law on every example. """
@@ -966,3 +967,42 @@ def test_builder_matches_a_trace():
         for second in unary[:3]:
             lhs = (first >> second).to_hypergraph()
             assert set(builder.matches(lhs)) == set(frozen.matches(lhs))
+
+
+def test_builder_step_needs_its_rebuild():
+    """ The rules of the law go from the last box up: ``h`` rewritten into
+    ``g`` last relates the inputs of the two ``f``, which only the rebuild of
+    the round relates in turn. """
+    graph = Markov.from_diagram(Copy(x) >> h @ g >> f @ f)
+    assert Markov.stepping(graph)
+    rules = [(f.to_hypergraph(), g.to_hypergraph()),
+             (h.to_hypergraph(), g.to_hypergraph())]
+    builder = graph.builder()
+    for match, rhs in [(match, rhs) for lhs, rhs in rules
+                       for match in builder.matches(lhs)]:
+        builder.rewrite(*match, rhs)
+    assert builder.freeze().reduced() != graph.step(rules).reduced()
+    builder.rebuild()
+    assert builder.freeze().reduced() == graph.step(rules).reduced()
+
+
+def test_reduced_keeps_samples_and_classes():
+    graph = Markov.from_diagram(Copy(x) >> sample @ sample)
+    assert len(graph.reduced().boxes) == 2
+    assert graph.merge(0, 1).reduced().n_spiders == 2
+
+
+@pytest.mark.parametrize("n", range(1, 7))
+def test_saturate_closed_form(n):
+    """ Associativity and commutativity of ``+`` on ``n`` leaves saturate to
+    the non-empty subsets as classes and their ordered splits in two as
+    e-nodes, on the builder in under 2 s at ``n = 6``. """
+    plus = Box('+', x @ x, x)
+    rules = (plus, Swap(x, x) >> plus), (plus @ x >> plus, x @ plus >> plus)
+    term = reduce(Diagram.then, (
+        plus @ x ** k for k in reversed(range(n - 1))), Diagram.id(x ** n))
+    graph, start = Markov.from_diagram(term), time.perf_counter()
+    *_, last = graph, *graph.saturate(*rules)
+    assert time.perf_counter() - start < 2
+    assert len(set(last.classes)) == 2 ** n - 1
+    assert len(last.reduced().boxes) == 3 ** n - 2 ** (n + 1) + 1
