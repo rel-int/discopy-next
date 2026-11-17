@@ -3,4 +3,4 @@
 - [x] `Matrix.__init__`: `asarray`, a read-only view on numpy, the sharing documented
 - [x] every site writing into a matrix or tensor array after construction builds its array first
 - [x] test: shares memory, read-only, the caller's array writeable
-- [WIP] @session_01MEJxy5Y19SnBwRFf22vqRj-2026-11-17 18:44 CHANGELOG.md bullet
+- [x] CHANGELOG.md bullet
