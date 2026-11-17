@@ -191,15 +191,15 @@ def tensor(images: np.ndarray) -> torch.Tensor:
     return torch.from_numpy(images).permute(0, 3, 1, 2).float() / 255
 
 
-def crop(image: np.ndarray, rows, cols, label=False,
-         classes: np.ndarray | None = None) -> np.ndarray:
+def crop(image: np.ndarray, rows, cols, label=False) -> np.ndarray:
     """
     The ink of an image, from zero for white to one for black, in a window
     of shape :data:`CROP`: centred on the box with these pixels, where its
     name is drawn, or from the top left of the label with these pixels,
-    with no ink outside their bounding box nor, given the classes of the
-    pixels, on a wire, a box or a primitive, so that one drawn through the
-    label is not read with it, though text the classes missed still is.
+    with no ink outside their bounding box. Keeping only the label's own
+    pixels, or erasing those classed wire, box or primitive, reads a box
+    edge through a label better but loses the text the pixel net misses:
+    recovery fell by 7 to 15 points (#559).
     """
     height, width = CROP
     if label:
@@ -213,9 +213,6 @@ def crop(image: np.ndarray, rows, cols, label=False,
         inside = np.zeros(ink.shape, dtype=bool)
         inside[max(rows.min() - 1, 0):rows.max() + 2,
                max(cols.min() - 1, 0):cols.max() + 2] = True
-        if classes is not None:
-            inside &= np.isin(classes, [COARSE.index("background"),
-                                        COARSE.index("label")])
         ink = ink * inside
     ink = np.pad(ink, ((height, height), (width, width)))
     return ink[top + height:top + 2 * height, left + width:left + 2 * width]
@@ -241,12 +238,11 @@ def texts(data: dict, label: bool) -> tuple[np.ndarray, list[str]]:
     :func:`dataset` and the text each shows, from its masks. """
     crops, strings = [], []
     for image, mask in zip(data["images"], data["masks"]):
-        classes, boxes, _, labels, names, reads = truths(mask)
+        _, boxes, _, labels, names, reads = truths(mask)
         ids, found = (labels, reads) if label else (boxes, names)
         for i, text in found.items():
             if text in (TYPES if label else NAMES):
-                crops.append(crop(
-                    image, *np.nonzero(ids == i), label, classes))
+                crops.append(crop(image, *np.nonzero(ids == i), label))
                 strings.append(text)
     return np.stack(crops).astype(np.float32), strings
 
@@ -349,8 +345,7 @@ def read(ocr: OCR, image: np.ndarray, classes: np.ndarray):
     box_ids = [int(b) for b in np.unique(boxes[boxes >= 0])]
     attached = picture.attach(labels, wires)
     crops = [crop(image, *np.nonzero(boxes == b)) for b in box_ids] + [
-        crop(image, *np.nonzero(labels == t), True, classes)
-        for t in attached]
+        crop(image, *np.nonzero(labels == t), True) for t in attached]
     found = ocr.read(torch.from_numpy(np.stack(crops).astype(
         np.float32)).unsqueeze(1)) if crops else []
     names = dict(zip(box_ids, found))
