@@ -690,6 +690,8 @@ def decode(mask: np.ndarray, module: str, min_pixels=3):
     >>> x, y = Ty('a'), Ty('b')
     >>> diagram = Box('f', x, x @ y) >> Swap(x, y)
     >>> mask = render(diagram, 96, mask=True)
+    >>> print(decode(mask, "symmetric"))
+    f >> Swap(a, b)
     >>> assert equal(decode(mask, "symmetric"), diagram, "symmetric")
     """
     mask, mod = np.asarray(mask, dtype=np.intp), load(module)
