@@ -2,4 +2,4 @@
 
 - [WIP] @session_01MEJxy5Y19SnBwRFf22vqRj-2026-11-17 17:29 the Coverage step of build.yml combines with --debug=dataio and fails with its own error when it combined the controller's data file alone
 - [WIP] @session_01MEJxy5Y19SnBwRFf22vqRj-2026-11-17 17:29 a test in .github/tests runs the step's snippet with worker data and without it
-- [ ] CHANGELOG.md bullet under Project
+- [WIP] @session_01MEJxy5Y19SnBwRFf22vqRj-2026-11-17 17:29 CHANGELOG.md bullet under Project
