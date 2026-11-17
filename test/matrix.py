@@ -184,6 +184,21 @@ def test_trace_over_a_field_in_jax():
     assert np.allclose(traced, [[0.5 + 4 / 3]], rtol=1e-5)
 
 
+@pytest.mark.parametrize('name', ['pytorch', 'jax'])
+def test_trace_and_composition_on_backend(name):
+    """ The identity takes the dtype of the backend, so a matrix inferred
+    there traces, and composes with the integer structural matrices on a
+    backend whose product does not promote. """
+    pytest.importorskip({'pytorch': 'torch'}.get(name, name))
+    with backend(name):
+        f = Matrix([[0.5, 1.], [1., 0.25]], 2, 2)
+        assert type(f).id(2).dtype == f.dtype
+        assert f.trace().is_close(Matrix([[0.5 + 4 / 3]], 1, 1), rtol=1e-5)
+        assert (f >> Matrix.id(2)).dtype == f.dtype\
+            == (Matrix.id(2) >> f).dtype
+        assert (Matrix.id(2) >> f).is_close(f)
+
+
 def test_is_field():
     assert is_field(float) and is_field(complex) and not is_field(int)
     assert is_field(np.float32) and not is_field(object) and not is_field(bool)

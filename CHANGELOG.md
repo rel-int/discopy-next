@@ -566,6 +566,16 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Fixed
 
+- `Matrix.id` builds its array over `int` and casts it with the active
+  backend, so a matrix inferred under `backend("pytorch")` traces, and
+  `Matrix.then` casts both factors to the dtype they promote to, so it
+  composes with the integer structural matrices on a backend whose product
+  does not promote ([next#583]).
+- `discopy.optyx`: the dagger of a channel with an environment, e.g.
+  `PhotonLoss(.1).dagger()`, is the adjoint CP map, whose Kraus map bends the
+  environment back by a cap, where it failed an assertion; `power_fix` raises
+  when `n_steps` exceeds `max_steps`, and `fn_to_semm` emits each fusion's own
+  type rather than X for all ([next#585]).
 - The TikZ backend draws no black frame around a drawing: `TikZ.draw_polygon`
   writes the `edgecolor` it is given, e.g. the white edge of the background.
   A spider is an empty node padded by `nodesize` with its label over its
@@ -2058,6 +2068,8 @@ for the changelog of `1.2.1` and earlier.
 [next#575]: https://github.com/rel-int/discopy-next/pull/575
 [next#577]: https://github.com/rel-int/discopy-next/pull/577
 [next#581]: https://github.com/rel-int/discopy-next/pull/581
+[next#583]: https://github.com/rel-int/discopy-next/pull/583
+[next#585]: https://github.com/rel-int/discopy-next/pull/585
 [next#586]: https://github.com/rel-int/discopy-next/pull/586
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29

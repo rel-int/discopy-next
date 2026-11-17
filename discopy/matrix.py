@@ -440,7 +440,7 @@ and 'Matrix[int]'
     @classmethod
     def id(cls, dom=0) -> Matrix:
         with backend('numpy') as np:
-            array = np.identity(index(dom), dtype=cls.dtype or int)
+            array = np.identity(index(dom), dtype=int)
         return cls(array, dom, dom)
 
     twist = id
@@ -449,9 +449,14 @@ and 'Matrix[int]'
     def then(self, other: Matrix) -> Matrix:
         assert_isinstance(other, self.ar)
         assert_iscomposable(self, other)
+        cls = self.promote(other)
+        left, right = (
+            factor.array if factor.dtype == cls.dtype
+            else cls(factor.array, factor.dom, factor.cod).array
+            for factor in (self, other))
         with backend() as np:
-            array = np.matmul(self.array, other.array)
-        return self.promote(other)(array, self.dom, other.cod)
+            array = np.matmul(left, right)
+        return cls(array, self.dom, other.cod)
 
     def tensor(self, *others: Matrix):
         """
