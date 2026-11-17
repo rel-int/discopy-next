@@ -282,7 +282,6 @@ Equation(unfold, moore, symbol=",")
 ## What is missing
 
 Everything above runs on today's DisCoPy.
-Writing it hit two gaps:
+Writing it hit one gap:
 
 * **Equivariant layers as boxes.** The weight tying above is computed by hand: a box whose module is the matrix tied on orbitals, or better factorised along the construction of the group, is slice 3 of [#121](https://github.com/rel-int/discopy-next/issues/121).
-* **A module holding the parameters.** A network in `para.Markov[Network]` compiles to a pure function of its inputs and parameters, as JAX wants it, but [`neural.torch.Module`](../../_api/discopy.neural.torch.html) takes every wire as an input: nothing yet turns a copied parameter wire into one `torch.nn.Parameter` ([#124](https://github.com/rel-int/discopy-next/issues/124)).
