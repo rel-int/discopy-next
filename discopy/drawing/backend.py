@@ -656,15 +656,16 @@ class Backend(ABC):
             (0, 0), (x, 0), (x, y), (0, y),
             facecolor=boundary_color, edgecolor=boundary_color)
 
-    @abstractmethod
     def draw_regions(self, graph, **params):
         """
         Draw coloured 0-cell regions, e.g. the background of a
-        :meth:`Drawing.frame` or the wire-typed regions of a diagram.
-
-        This has no default drawing logic: backends that do not want to
-        support coloured regions can simply inherit this no-op.
+        :meth:`Drawing.frame`, the wire-typed regions of a diagram or the
+        inside of a ribbon, one :meth:`draw_region_cell` for each cell of
+        :meth:`region_cells`.
         """
+        # pylint: disable=unused-argument  # draw passes params to all
+        for left, right, colour in self.region_cells(graph):
+            self.draw_region_cell(left, right, colour)
 
     def draw_legend(self, graph, **params):
         """Draw a legend of region colours when supported by the backend."""
@@ -865,6 +866,35 @@ class Backend(ABC):
         # pylint: disable=unused-argument  # the base only measures the width
         self.max_width = max(
             self.max_width, max(x for x, _ in left + right))
+
+    @staticmethod
+    def cubic(curve):
+        """
+        The four control points of a Bezier given by three or four, i.e. a
+        quadratic Bezier raised to the cubic one that draws the same curve.
+
+        >>> start, control, end = Point(0, 3), Point(0, 0), Point(3, 0)
+        >>> [tuple(p) for p in Backend.cubic([start, control, end])]
+        [(0, 3), (0.0, 1.0), (1.0, 0.0), (3, 0)]
+        """
+        if len(curve) == 4:
+            return list(curve)
+        start, control, end = curve
+        return [start] + [
+            Point(point.x + 2 / 3 * (control.x - point.x),
+                  point.y + 2 / 3 * (control.y - point.y))
+            for point in (start, end)] + [end]
+
+    @classmethod
+    def region_cell_steps(cls, left, right):
+        """
+        The boundary of a cell of :meth:`region_cells` as the ``steps`` of
+        :meth:`draw_filled_shape` from the top of ``left``: down ``left``,
+        across the bottom, up ``right`` and back across the top.
+        """
+        left, right = cls.cubic(left), cls.cubic(right)
+        return [("curve", *left[1:]), ("line", right[3]),
+                ("curve", right[2], right[1], right[0]), ("line", left[0])]
 
     @staticmethod
     def visible_edges(graph):
@@ -1398,6 +1428,27 @@ class Backend(ABC):
 
 class TikZ(Backend):
     """ Tikz drawing backend. """
+    #: The size in points of the label of a box, and of a wire one size down.
+    LABEL_SIZE, WIRE_LABEL_SIZE = 8, 7
+
+    @classmethod
+    def unit(cls) -> str:
+        """
+        The length of one unit of a drawing, at which the label of a box fits
+        it: the layout measures a label at twelve points in inches, see
+        :func:`discopy.utils.text_width`, and TikZ sets it at
+        :attr:`LABEL_SIZE` points.
+
+        >>> TikZ.unit()
+        '0.6667in'
+        """
+        return f"{cls.LABEL_SIZE / 12:.4f}in"
+
+    @staticmethod
+    def font(size) -> str:
+        """ The font option of a label of ``size`` points. """
+        return f"font=\\fontsize{{{size}}}{{{1.2 * size:g}}}\\selectfont"
+
     def __init__(self, use_tikzstyles=None):
         self.use_tikzstyles = DEFAULT["use_tikzstyles"]\
             if use_tikzstyles is None else use_tikzstyles
@@ -1508,11 +1559,31 @@ class TikZ(Backend):
         super().draw_node(i, j, **params)
 
     def draw_text(self, text, i, j, **params):
-        options = "style=none, fill=white"
+        """
+        A label as a node, in a font of :attr:`LABEL_SIZE` points. A wire
+        label, aligned to its top, hangs below and to the right of its point
+        in a font of :attr:`WIRE_LABEL_SIZE` points, filled white only over a
+        region with no colour, see :meth:`draw_wire_label`.
+
+        >>> tikz = TikZ()
+        >>> tikz.draw_text("f", 0, 0)
+        >>> tikz.draw_text("x", 0, 1, verticalalignment="top")
+        >>> tikz.draw_text("y", 1, 1, verticalalignment="top", adaptive=False)
+        >>> for node in tikz.nodelayer:
+        ...     print(node.split("] ")[0].split("style=none, ")[1])
+        fill=white, font=\\fontsize{8}{9.6}\\selectfont
+        fill=white, anchor=north west, font=\\fontsize{7}{8.4}\\selectfont
+        anchor=north west, font=\\fontsize{7}{8.4}\\selectfont
+        """
+        is_wire_label = params.get("verticalalignment", "center") == "top"
+        options = "style=none" + (
+            ", fill=white" if params.get("adaptive", True) else "")
         if params.get('horizontalalignment', 'center') == 'left':
             options += ", anchor=west"
-        if params.get("verticalalignment", "center") == "top":  # wire labels
-            options += ", right"
+        if is_wire_label:
+            options += ", anchor=north west"
+        options += ", " + self.font(
+            self.WIRE_LABEL_SIZE if is_wire_label else self.LABEL_SIZE)
         if 'fontsize' in params and params['fontsize'] is not None:
             options += f", scale={params['fontsize']}"
         self.add_node(i, j, text, options)
@@ -1564,17 +1635,17 @@ class TikZ(Backend):
         self.edgelayer.append(f"\\draw [{options}] {str_connections};\n")
         super().draw_polygon(*points)
 
-    def draw_regions(self, graph, **params):
+    def draw_region_cell(self, left, right, facecolor):
         """
-        Coloured regions are not wired up for the TikZ backend yet, even
-        though :meth:`Backend.region_cells` computes their extents for any
-        backend: region colours may be arbitrary matplotlib colours (e.g.
-        hexcodes) that are not valid TikZ/xcolor names, so filling them in
-        for real needs a colour-formatting step similar to
-        :meth:`format_color`. This is a deliberate no-op in the meantime,
-        leaving TikZ's output as-is.
+        Fill the cell between two Beziers as one closed path, see
+        :meth:`Backend.region_cell_steps`, stroked in its own colour so that
+        two cells meeting edge to edge leave no seam where a viewer
+        antialiases each of them.
         """
-        super().draw_regions(graph, **params)
+        self.draw_filled_shape(
+            left[0], self.region_cell_steps(left, right), facecolor,
+            stroke=True)
+        super().draw_region_cell(left, right, facecolor)
 
     def draw_wire(self, source, target, bend_out=False, bend_in=False,
                   style=None, linewidth=None, adaptive=True):
@@ -1614,7 +1685,9 @@ class TikZ(Backend):
             "({}.center);\n".format(*(self.nodes[tuple(p)] for p in points)))
         super().draw_bezier(points)
 
-    def draw_filled_shape(self, start, steps, color):
+    def draw_filled_shape(self, start, steps, color, stroke=False):
+        """ The shape of :meth:`Backend.draw_filled_shape`, with a hairline
+        in its own colour if ``stroke``, else none. """
         def node(point):
             if tuple(point) not in self.nodes:
                 self.add_node(*point)
@@ -1626,8 +1699,10 @@ class TikZ(Backend):
             else:
                 path += " .. controls ({}.center) and ({}.center) .. "\
                     "({}.center)".format(*(node(p) for p in step[1:]))
+        draw = f"{self.format_color(color)}, line width=0.25pt" if stroke\
+            else "none"
         self.edgelayer.append(
-            f"\\draw [fill={self.format_color(color)}, draw=none] "
+            f"\\draw [fill={self.format_color(color)}, draw={draw}] "
             f"{path} -- cycle;\n")
         super().draw_filled_shape(start, steps, color)
 
@@ -1687,8 +1762,8 @@ class TikZ(Backend):
         tikz_options = params.get("tikz_options", None)
         output_tikzstyle = self.use_tikzstyles\
             and params.get("output_tikzstyle", True)
-        options = "baseline=(0.base)" if tikz_options is None\
-            else "baseline=(0.base), " + tikz_options
+        options = f"baseline=(0.base), x={self.unit()}, y={self.unit()}"\
+            + ("" if tikz_options is None else ", " + tikz_options)
         begin = [f"\\begin{{tikzpicture}}[{options}]\n"]
         nodes = ["\\begin{pgfonlayer}{nodelayer}\n",
                  f"\\node (0) at (0, {baseline}) {{}};\n"]\
@@ -1950,10 +2025,6 @@ class Typst(Backend):
                     Ident("content"), [self.coord(i, j), lbl]))
         super().draw_spiders(graph, draw_box_labels)
 
-    def draw_regions(self, graph, **params):
-        """ Coloured regions are not drawn in Typst yet, as in TikZ. """
-        super().draw_regions(graph, **params)
-
     def to_document(self, **params):
         """
         The document of what was drawn: a CeTZ canvas on a page cropped to
@@ -2082,13 +2153,6 @@ class Matplotlib(Backend):
             linewidth=0, antialiased=False,
             facecolor=self.resolve(facecolor), edgecolor='none'))
         super().draw_region_cell(left, right, facecolor)
-
-    def draw_regions(self, graph, **params):
-        """ Fill the coloured 0-cell regions of the diagram, one patch per
-        cell of :meth:`region_cells`. """
-        for left, right, colour in self.region_cells(graph):
-            self.draw_region_cell(left, right, facecolor=colour)
-        super().draw_regions(graph, **params)
 
     def draw_legend(self, graph, **params):
         """Add a legend mapping each region colour to its label."""

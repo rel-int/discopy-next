@@ -1192,3 +1192,20 @@ def test_relayout_reads_wires_as_drawn():
     assert not bent.is_feasible(drawing)
     assert drawing.relabel_nodes(positions={
         dom: Point(1.6, 1), cod: Point(2, 0)}).is_feasible(drawing)
+
+
+def test_tikz_fills_a_straight_ribbon(tmp_path):
+    from discopy.ribbon import Ty, Diagram
+    path = tmp_path / "ribbon.tikz"
+    Diagram.id(Ty('x')).to_ribbons().draw(
+        to_tikz=True, path=str(path), wire_labels=False)
+    tikz = path.read_text()
+    assert "x=0.6667in, y=0.6667in" in tikz
+    assert "line width=0.25pt" in tikz and "-- cycle" in tikz
+
+
+def test_a_dimension_is_drawn_as_its_numbers():
+    from discopy.neural.network import Dims
+    assert Dims(4, monoidal.Dim(4, 4)).to_drawing() == monoidal.Ty(
+        monoidal.Wire('4'), monoidal.Wire('4, 4'))
+    assert str(Dims(4)) == "Dims(Dim(4))"
