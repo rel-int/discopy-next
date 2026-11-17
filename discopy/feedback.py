@@ -259,7 +259,8 @@ from typing import ClassVar
 
 from discopy import monoidal, cmap, hypergraph, messages
 from discopy.abc import (
-    DaggerCategory, FeedbackCategory, MonoidalCategory, TracedCategory)
+    DaggerCategory, DaggerMonoidalCategory, FeedbackCategory, MonoidalCategory,
+    TracedCategory)
 from discopy.config import BOX_DRAWING_ATTRIBUTES
 from discopy.monoidal import (  # noqa: F401  pylint: disable=unused-import
     Equation)
@@ -670,7 +671,7 @@ class Diagram(monoidal.Diagram, TracedCategory):
         messages.FEEDBACK_HAS_NO_DAGGER)
     dagger_contravariance_traced = DaggerCategory.dagger_contravariance\
         .weaken(within=MonoidalCategory)
-    dagger_monoidality = DaggerCategory.dagger_monoidality.failing(
+    dagger_monoidality = DaggerMonoidalCategory.dagger_monoidality.failing(
         messages.FEEDBACK_HAS_NO_DAGGER)
     tightening = FeedbackCategory.tightening.failing(
         messages.FREE_FEEDBACK)

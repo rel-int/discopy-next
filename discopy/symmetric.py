@@ -103,9 +103,9 @@ from typing import ClassVar
 
 from discopy import monoidal, feedback, balanced, hypergraph, cmap, messages
 from discopy.abc import (
-    BalancedCategory, BiclosedCategory, CompactCategory, DaggerCategory,
-    PivotalCategory, RigidCategory, SpacialCategory, SymmetricCategory,
-    TracedCategory)
+    BalancedCategory, BiclosedCategory, CompactCategory,
+    DaggerMonoidalCategory, PivotalCategory, RigidCategory, SpacialCategory,
+    SymmetricCategory, TracedCategory)
 from discopy.testable import FUEL, Axiom, Rule
 from discopy.cat import factory
 from discopy.feedback import (  # noqa: F401  pylint: disable=unused-import
@@ -279,9 +279,9 @@ class Diagram(balanced.Diagram, SymmetricCategory):
     """
     # A hypergraph is faithful from symmetric categories on.
     bifunctoriality = SymmetricCategory.bifunctoriality
-    dagger_monoidality = DaggerCategory.dagger_monoidality.failing(
+    dagger_monoidality = DaggerMonoidalCategory.dagger_monoidality.failing(
         messages.FEEDBACK_HAS_NO_DAGGER)
-    dagger_monoidality_symmetric = DaggerCategory.dagger_monoidality\
+    dagger_monoidality_symmetric = DaggerMonoidalCategory.dagger_monoidality\
         .weaken(within=SymmetricCategory)
     braid_naturality = SymmetricCategory.braid_naturality
     braid_then_inverse = SymmetricCategory.braid_then_inverse

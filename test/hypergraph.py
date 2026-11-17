@@ -3,6 +3,7 @@ import random
 from pytest import raises
 
 from discopy.hypergraph import *
+from discopy.abc import DaggerMonoidalCategory
 from discopy.frobenius import (
     Ty, Box, Cap, Cup, Diagram, Nat, Spider, Hypergraph as H)
 
@@ -322,7 +323,7 @@ def test_spider_producers_and_consumers():
 
 def test_cups():
     x = Ty('x')
-    assert issubclass(H, DaggerCategory)
+    assert issubclass(H, DaggerMonoidalCategory)
     assert H.cups(x, x).make_monogamous().dagger()\
         == H.caps(x, x).make_monogamous()
     assert H.caps(x, x).make_monogamous().dagger()\

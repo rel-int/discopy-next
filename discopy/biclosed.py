@@ -105,7 +105,8 @@ from typing import (
 
 from discopy import cat, monoidal, cmap, hypergraph, messages
 from discopy.abc import (
-    BiclosedCategory, DaggerCategory, LinearCategory, MonoidalCategory)
+    BiclosedCategory, DaggerCategory, DaggerMonoidalCategory, LinearCategory,
+    MonoidalCategory)
 from discopy.testable import (
     GENERATORS, Equation as AbstractEquation, Equivalence, Serialisable,
     Testable, TestableGeneric, axiom)
@@ -614,10 +615,11 @@ class Diagram(monoidal.Diagram, LinearCategory):
         messages.CURRY_HAS_NO_DAGGER)
     dagger_contravariance_monoidal = DaggerCategory.dagger_contravariance\
         .weaken(within=MonoidalCategory)
-    dagger_monoidality = DaggerCategory.dagger_monoidality.failing(
+    dagger_monoidality = DaggerMonoidalCategory.dagger_monoidality.failing(
         messages.CURRY_HAS_NO_DAGGER)
-    dagger_monoidality_monoidal = DaggerCategory.dagger_monoidality.weaken(
-        within=MonoidalCategory).failing(messages.NO_PLANAR_NORMAL_FORM)
+    dagger_monoidality_monoidal = DaggerMonoidalCategory.dagger_monoidality\
+        .weaken(within=MonoidalCategory)\
+        .failing(messages.NO_PLANAR_NORMAL_FORM)
     currying_left = BiclosedCategory.currying_left.failing(messages.FREE_CURRY)
     currying_right = BiclosedCategory.currying_right.failing(
         messages.FREE_CURRY)

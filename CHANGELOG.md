@@ -9,6 +9,12 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Added
 
+- `abc.BraidedCategory.braid_inverse`, the inverse of the braid, by default
+  its dagger: `braid_then_inverse`, `inverse_then_braid` and
+  `inverse_braiding` read the inverse braid from it. `abc.DaggerMonoidalCategory`,
+  the first class with both a dagger and a tensor, states
+  `dagger_monoidality`, which `abc.DaggerCategory` no longer does: `cat.Arrow`
+  and `abc.Group` drop their declarations that it does not apply ([next#485]).
 - `lambek.categorial.Parser`, the chart parser of the reproduction of Bobcat
   (Clark, 2021) on CCGrebank: a CKY chart over the binary and unary rules
   seen in the treebank and the schemata of `schemata` at a penalty, scored by
@@ -2092,6 +2098,7 @@ for the changelog of `1.2.1` and earlier.
 [next#472]: https://github.com/rel-int/discopy-next/issues/472
 [next#477]: https://github.com/rel-int/discopy-next/issues/477
 [next#482]: https://github.com/rel-int/discopy-next/issues/482
+[next#485]: https://github.com/rel-int/discopy-next/issues/485
 [next#488]: https://github.com/rel-int/discopy-next/issues/488
 [next#489]: https://github.com/rel-int/discopy-next/issues/489
 [next#490]: https://github.com/rel-int/discopy-next/issues/490

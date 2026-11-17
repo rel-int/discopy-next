@@ -47,7 +47,7 @@ from typing import Literal, Callable, TYPE_CHECKING
 
 from discopy import config, messages
 from discopy.abc import (
-    ComarkovCategory, DaggerCategory, MarkovCategory, Nat)
+    ComarkovCategory, DaggerMonoidalCategory, MarkovCategory, Nat)
 from discopy.testable import Serialisable, TestableGeneric
 from discopy.cat import (
     factory,
@@ -64,8 +64,8 @@ if TYPE_CHECKING:
 
 @factory
 class Matrix[dtype](
-        MarkovCategory, ComarkovCategory, DaggerCategory, TestableGeneric,
-        Serialisable):
+        MarkovCategory, ComarkovCategory, DaggerMonoidalCategory,
+        TestableGeneric, Serialisable):
     """
     A matrix is an ``array`` with natural numbers as ``dom`` and ``cod``.
 

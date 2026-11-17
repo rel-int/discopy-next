@@ -62,7 +62,7 @@ from discopy.abc import (
     BalancedCategory,
     BraidedCategory,
     CompactCategory,
-    DaggerCategory,
+    DaggerMonoidalCategory,
     MarkovCategory,
     Pregroup,
     RigidCategory,
@@ -144,7 +144,8 @@ class Port:
 
 
 class CMap[category](
-        CompactCategory, DaggerCategory, TestableGeneric, Serialisable):
+        CompactCategory, DaggerMonoidalCategory, TestableGeneric,
+        Serialisable):
     r"""
     An open combinatorial map, i.e. a diagram represented as a bijection
     between its ports.
