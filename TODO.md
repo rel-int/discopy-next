@@ -6,6 +6,6 @@
 >
 > (USER, 2026-11-16; brief #559, slice 3 with the augmentation of its extension comment)
 
-- [ ] merge main once #568 and #570 have landed
+- [x] merge main once #568 and #570 have landed
 - [ ] keep sample, draw, mask, augment here; move decode to slice 4's branch and vision.py to slice 5's
 - [ ] tests test/drawing/picture.py, changelog entry, next-checks
