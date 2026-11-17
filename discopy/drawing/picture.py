@@ -672,7 +672,7 @@ def decode(mask: np.ndarray, module: str, min_pixels=3):
     >>> mask = render(diagram, 96, mask=True)
     >>> assert equal(decode(mask, "symmetric"), diagram, "symmetric")
     """
-    mask, mod = np.asarray(mask, dtype=np.int64), load(module)
+    mask, mod = np.asarray(mask, dtype=np.intp), load(module)
     first = LABELS.index(NAMES[0])
     allowed = [LABELS.index(name) for name in NAMES + STRUCTURAL[module]]
     is_box = np.isin(mask, allowed)
@@ -927,7 +927,7 @@ def refine(classes, boxes, wires, names: dict, types: dict) -> np.ndarray:
     for typ in types.values():
         if typ not in TYPES:
             raise ValueError(f"Unknown wire type {typ!r}.")
-    fine = np.zeros(classes.shape, dtype=np.int64)
+    fine = np.zeros(classes.shape, dtype=np.intp)
     for name in STRUCTURAL["frobenius"]:
         fine[classes == COARSE.index(name)] = LABELS.index(name)
     fine[wires >= 0] = WIRE
