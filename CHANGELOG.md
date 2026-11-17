@@ -14,6 +14,11 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   label overlap, area), `hand_score` minus their weighted sum, with equal weights
   until fitted on votes, and `make_nicer`, the foliation of a diagram whose
   drawing scores best, or the diagram itself on a tie ([next#582]).
+- `Drawing.layout`, the geometry of a drawing as a vector: the coordinates
+  of its nodes, box corners included. `Drawing.relayout` takes a vector back
+  to a drawing and refuses one that `Drawing.is_feasible` says draws another
+  diagram (an edge turned, other wires crossing, boxes overlapping, a port
+  outside its box) ([next#578]).
 - `monoidal.Diagram.foliations(limit)` lists the foliations of a diagram:
   diagrams equal to it up to interchange whose adjacent layers cannot merge,
   the largest layers first. The steps are public too: `dependencies`,
@@ -562,6 +567,16 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Fixed
 
+- `Matrix.id` builds its array over `int` and casts it with the active
+  backend, so a matrix inferred under `backend("pytorch")` traces, and
+  `Matrix.then` casts both factors to the dtype they promote to, so it
+  composes with the integer structural matrices on a backend whose product
+  does not promote ([next#583]).
+- `discopy.optyx`: the dagger of a channel with an environment, e.g.
+  `PhotonLoss(.1).dagger()`, is the adjoint CP map, whose Kraus map bends the
+  environment back by a cap, where it failed an assertion; `power_fix` raises
+  when `n_steps` exceeds `max_steps`, and `fn_to_semm` emits each fusion's own
+  type rather than X for all ([next#585]).
 - The TikZ backend draws no black frame around a drawing: `TikZ.draw_polygon`
   writes the `edgecolor` it is given, e.g. the white edge of the background.
   A spider is an empty node padded by `nodesize` with its label over its
@@ -2053,8 +2068,11 @@ for the changelog of `1.2.1` and earlier.
 [next#570]: https://github.com/rel-int/discopy-next/pull/570
 [next#575]: https://github.com/rel-int/discopy-next/pull/575
 [next#577]: https://github.com/rel-int/discopy-next/pull/577
+[next#578]: https://github.com/rel-int/discopy-next/pull/578
 [next#581]: https://github.com/rel-int/discopy-next/pull/581
 [next#582]: https://github.com/rel-int/discopy-next/pull/582
+[next#583]: https://github.com/rel-int/discopy-next/pull/583
+[next#585]: https://github.com/rel-int/discopy-next/pull/585
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#56]: https://github.com/rel-int/optyx/pull/56

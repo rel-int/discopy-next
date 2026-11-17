@@ -221,3 +221,6 @@ NOT_A_PATTERN = (
 NOT_A_RULE = (
     "{} = {} is not a rule: its sides are cartesian diagrams of one type, the "
     "left a pattern and the right reading only the inputs the left reads.")
+
+LAYOUT_LENGTH = "A layout of {} coordinates was given, {} expected."
+LAYOUT_NOT_FEASIBLE = "This layout does not draw the same diagram."

@@ -382,3 +382,13 @@ def test_semantic_attrs():
         assert one == one and hash(one) == hash(one)
     for one, other in pairs[:4]:
         assert not np.allclose(one.array, other.array)
+
+
+@pytest.mark.parametrize("box", [
+    photonic.PhotonLoss(.3), Discard(qmode), Discard(qubit)])
+def test_dagger_of_a_channel_with_an_environment(box):
+    """next#314: the dagger of a channel is the dagger of its double."""
+    assert box.dagger().env == box.env
+    assert np.allclose(
+        box.dagger().double().to_tensor().eval().array,
+        box.double().dagger().to_tensor().eval().array)
