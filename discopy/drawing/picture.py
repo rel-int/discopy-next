@@ -394,7 +394,7 @@ def render(diagram, size=160, mask=False, **params) -> np.ndarray:
     >>> image.shape, mask.shape
     ((64, 64, 3), (64, 64))
     >>> sorted(LABELS[i] for i in set(mask.flat))
-    ['a', 'background', 'f']
+    ['a', 'background', 'f', 'label a']
     """
     scale = params.pop("scale", 24)
     xkcd, drawing = params.pop("xkcd", False), diagram.to_drawing()
@@ -701,6 +701,8 @@ def decode(mask: np.ndarray, module: str, min_pixels=3):
     def typ(link):
         name = types.get(link, TYPES[0])
         result = mod.Ty(name.removesuffix(".r"))
+        if name.endswith(".r") and not hasattr(result, "r"):
+            raise ValueError(f"No adjoint {name} in {module}.")
         return result.r if name.endswith(".r") else result
 
     def top_row(g):
