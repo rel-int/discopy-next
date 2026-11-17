@@ -175,6 +175,13 @@ TERM_IS_A_BOX = \
 MISSING_BOXES_AND_OFFSETS = (
     "Decoding needs either boxes and offsets, or the two of them zipped.")
 CURRY_HAS_NO_DAGGER = "A curry has no dagger."
+BANG_HAS_NO_DAGGER = (
+    "{} has no dagger: !L* has no rule from its codomain back to its domain.")
+LAXATOR_ARITY = (
+    "A laxator takes two types, or none for the unit, got {}.")
+FREE_BANG = (
+    "A free bang is a bubble and its structure boxes, which a hypergraph "
+    "keeps as boxes: nothing cancels, merges or slides through them.")
 NAME_CLASH = "{!r} names two things in the string of {}."
 WRONG_SIDE = "Expected left={} for {}, got left={} instead."
 NOT_JSON_SERIALISABLE = "Object of type {} is not JSON serialisable."
