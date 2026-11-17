@@ -14,6 +14,10 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   to a drawing and refuses one that `Drawing.is_feasible` says draws another
   diagram (an edge turned, other wires crossing, boxes overlapping, a port
   outside its box) ([next#578]).
+- `monoidal.Diagram.foliations(limit)` lists the foliations of a diagram:
+  diagrams equal to it up to interchange whose adjacent layers cannot merge,
+  the largest layers first. The steps are public too: `dependencies`,
+  `layerings` and `foliate` ([next#567]).
 - A Typst drawing backend, `drawing.backend.Typst`: `Diagram.to_typst` and
   `Drawing.to_typst` return a `drawing.typst_ast.Document`, whose `render`
   is the Typst source of a CeTZ canvas, and `draw(format="typst")` compiles
@@ -1562,6 +1566,14 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Project
 
+- `paper/`, the source of the tool paper in Typst: `paper/transpile.py` writes
+  its LaTeX from the part of Typst it is written in, `paper/build.py` runs
+  its listings and draws each figure with the Typst and the TikZ backends,
+  `test/paper_build.py` checks both and the `paper` workflow uploads both
+  PDFs ([next#577]).
+- The sections of the tool paper on syntax, semantics and applications, with
+  what the draft leaves open said in place and grouped in its last section;
+  the tests that build the paper are marked `slow` ([next#581]).
 - `build`'s `test` job has a 40-minute backstop instead of 20, above the
   9.7-20.3 minutes it runs in on `main` rather than inside it: a job over
   `timeout-minutes` reports `cancelled`, so the six jobs it cut over five
@@ -2035,11 +2047,14 @@ for the changelog of `1.2.1` and earlier.
 [next#558]: https://github.com/rel-int/discopy-next/pull/558
 [next#565]: https://github.com/rel-int/discopy-next/pull/565
 [next#566]: https://github.com/rel-int/discopy-next/pull/566
+[next#567]: https://github.com/rel-int/discopy-next/pull/567
 [next#568]: https://github.com/rel-int/discopy-next/pull/568
 [next#569]: https://github.com/rel-int/discopy-next/pull/569
 [next#570]: https://github.com/rel-int/discopy-next/pull/570
 [next#575]: https://github.com/rel-int/discopy-next/pull/575
+[next#577]: https://github.com/rel-int/discopy-next/pull/577
 [next#578]: https://github.com/rel-int/discopy-next/pull/578
+[next#581]: https://github.com/rel-int/discopy-next/pull/581
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#56]: https://github.com/rel-int/optyx/pull/56
