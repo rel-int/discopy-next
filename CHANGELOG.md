@@ -626,8 +626,9 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 ### Fixed
 
 - The hand features of `drawing.nicer` count the rails of a dual rail
-  braid, twist, cup and cap, which `Backend.dual_rail_wires` reads as
-  `Backend.crossing_wires` reads the strands of a crossing ([next#609]).
+  braid, twist, cup and cap, each read as the chord between its ends by
+  `Backend.dual_rail_wires`, as `Backend.crossing_wires` reads the strands of
+  a crossing ([next#609]).
 - The TikZ backend fills the coloured regions of a diagram, so a ribbon is
   filled along its straight rails and not only at its folds and braids; the
   loop over `region_cells` moves from `Matplotlib` to `Backend` ([next#605]).
