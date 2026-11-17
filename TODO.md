@@ -8,4 +8,4 @@
 
 - [x] merge main once #568 and #570 have landed
 - [x] keep sample, draw, mask, augment here; move decode to slice 4's branch and vision.py to slice 5's
-- [ ] tests test/drawing/picture.py, changelog entry, next-checks
+- [x] tests test/drawing/picture.py, changelog entry, next-checks
