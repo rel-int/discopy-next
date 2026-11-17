@@ -19,8 +19,8 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 - `lambek.categorial.Parser.from_pretrained` loads the model of the Bobcat
   reproduction, `rel-int/bobcat-rebank-deberta-v3-large` on Hugging Face, and
   a parser called on a sentence gives its categorial diagram, with a label for
-  every span if it can: `lambek.neural.Encoder`, the state of each word that
-  of its first subword, and `lambek.neural.ChartClassifier`, a supertag for
+  every span if it can. `lambek.neural.Encoder` gives each word the state of
+  its first subword, and `lambek.neural.ChartClassifier` gives a supertag for
   each word and a label for each span. `transformers` joins the `lambek` extra
   ([next#604]).
 - `drawing.picture.decode` and `read`: a picture's pixel classes back to

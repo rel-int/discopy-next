@@ -1060,7 +1060,9 @@ class Parser:  # pylint: disable=too-many-instance-attributes
         """
         The diagram of a sentence, its words split on spaces if it is a
         string, ``None`` if it has no parse: the best parse with a label for
-        every span, else the best parse, as Bobcat's command line does.
+        every span, else the best parse, as Bobcat's command line does. A
+        sentence longer than the encoder reads is cut to the words it reads,
+        as the reproduction does.
         """
         tree = self.derive(sentence)
         return None if tree is None else tree.to_diagram()
