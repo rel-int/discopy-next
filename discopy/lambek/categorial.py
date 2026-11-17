@@ -796,7 +796,8 @@ def render(category: str | tuple) -> str:
 
 
 @cache
-def schemata(left: str, right: str) -> frozenset[str]:
+def schemata(  # pylint: disable=too-many-locals
+        left: str, right: str) -> frozenset[str]:
     r"""
     The categories that the schemata of CCG derive from two adjacent ones:
     application, harmonic composition, a modifier ``X|X`` applied to
@@ -945,7 +946,7 @@ class Parser:
     >>> print(tree.to_diagram().cod)
     S
     """
-    def __init__(
+    def __init__(  # pylint: disable=too-many-arguments
             self, binary: dict[tuple[str, str], frozenset[str]],
             unary: dict[str, frozenset[str]], *,
             root: frozenset[str] | None = None,
@@ -1159,17 +1160,23 @@ class Parser:
                 word, candidates, labels((i, i + 1)), missing)
         for width in range(2, len(words) + 1):
             for start in range(len(words) - width + 1):
-                end, cell = start + width, {}
-                for middle in range(start + 1, end):
-                    for left in chart.get((start, middle), {}).values():
-                        for right in chart.get((middle, end), {}).values():
-                            self.combine(
-                                cell, left, right,
-                                labels=labels((start, end)), missing=missing)
-                if cell:
-                    self.close(cell, labels((start, end)), missing)
-                    chart[start, end] = self.prune(cell)
+                self.fill(chart, start, start + width,
+                          labels=labels((start, start + width)),
+                          missing=missing)
         return chart
+
+    def fill(  # pylint: disable=too-many-arguments
+            self, chart, start: int, end: int, *, labels, missing: bool):
+        """ Fill the cell of a span from every split of it in two. """
+        cell = {}
+        for middle in range(start + 1, end):
+            for left in chart.get((start, middle), {}).values():
+                for right in chart.get((middle, end), {}).values():
+                    self.combine(cell, left, right, labels=labels,
+                                 missing=missing)
+        if cell:
+            self.close(cell, labels, missing)
+            chart[start, end] = self.prune(cell)
 
     def lexical(self, word: str, candidates: list[tuple[str, float]],
                 labels, missing: bool) -> dict[str, Derivation]:
@@ -1180,8 +1187,9 @@ class Parser:
         self.close(cell, labels, missing)
         return self.prune(cell)
 
-    def combine(self, cell, left: Derivation, right: Derivation, *,
-                labels, missing: bool):
+    def combine(  # pylint: disable=too-many-arguments
+            self, cell, left: Derivation, right: Derivation, *, labels,
+            missing: bool):
         """ Add to a cell the derivations of two adjacent ones. """
         seen = self.binary.get((left.cat, right.cat), ())
         for parent in self.parents(left.cat, right.cat):
