@@ -43,6 +43,3 @@ plans/
 # Lake (build products of lean/)
 lean/.lake
 wip/
-# the tool paper: its figures and its LaTeX are built (see paper/build.py)
-paper/figures/
-paper/main.tex
