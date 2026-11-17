@@ -89,7 +89,7 @@ def wires(drawing: Drawing) -> list[tuple[Point, Point]]:
 def rectangles(drawing: Drawing) -> list[tuple[float, float, float, float]]:
     """
     The rectangle ``(left, bottom, right, top)`` of each box, wide enough for
-    its wires and its label.
+    its wires and the label it draws, as high as its ``height``.
 
     >>> from discopy.monoidal import Ty, Box
     >>> rectangles(Box('f', Ty('x'), Ty('x')).to_drawing())
@@ -101,11 +101,14 @@ def rectangles(drawing: Drawing) -> list[tuple[float, float, float, float]]:
             node for node in drawing.box_nodes if node.j == j)]
         xs = [drawing.positions[node].x for node in drawing.nodes
               if node.kind in ("box_dom", "box_cod") and node.j == j] + [x]
+        label = "" if getattr(box, "no_label", False)\
+            else str(getattr(box, "drawing_name", box.name))
         half = max(
             (max(xs) - min(xs)) / 2 + .25,
-            CHARACTER_WIDTH * len(str(box.name)) / 2, box.min_width / 2)
+            CHARACTER_WIDTH * len(label) / 2, box.min_width / 2)
+        high = max(getattr(box, "height", 1) / 2 - .25, .25)
         centre = (max(xs) + min(xs)) / 2
-        result.append((centre - half, y - .25, centre + half, y + .25))
+        result.append((centre - half, y - high, centre + half, y + high))
     return result
 
 

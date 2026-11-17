@@ -42,3 +42,13 @@ def test_make_nicer_takes_a_score():
     assert make_nicer(f @ g, score=lambda d: d.height) == f @ g
     assert make_nicer(f @ g, score=lambda d: -d.height)\
         == (f @ g).foliation()
+
+
+def test_rectangles_follow_height_and_label():
+    tall = Box('f', x, x, height=3).to_drawing()
+    (_, bottom, _, top), = rectangles(tall)
+    assert (bottom, top) == (0.25, 2.75)
+    short = Box('a' * 40, x, x, drawing_name='f').to_drawing()
+    (left, _, right, _), = rectangles(short)
+    assert right - left == 0.5
+
