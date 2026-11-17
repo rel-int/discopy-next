@@ -5,10 +5,34 @@ import pytest
 from pytest import raises
 
 from discopy.abc import DaggerCategory, Nat, TracedCategory
-from discopy.matrix import Matrix, backend, is_field
+from discopy.matrix import Matrix, backend, is_complex, is_field
 from discopy.symmetric import Ty, Permutation, Swap, Functor
 from discopy.tensor import Tensor, Dim
 from discopy.utils import AxiomError, Subscript, dumps, loads
+
+
+def test_Matrix_order():
+    R, S = Matrix[bool]([1, 0, 0, 0], 2, 2), Matrix[bool].id(2)
+    assert R <= S and S >= R and R <= R and not S <= R
+    assert R >> R <= S >> S and R @ R <= S @ S
+    assert R.transpose() <= S.transpose()
+    assert not R <= Matrix[bool]([1, 1], 1, 2)
+    assert Matrix([1, 1], 1, 2) <= Matrix([2, 1], 1, 2)
+    assert not Matrix([1, 2], 1, 2) <= Matrix([2, 1], 1, 2)
+    assert Matrix([.5], 1, 1) <= Matrix([1.5], 1, 1)
+    full = Tensor[bool]([1, 1, 1, 1], Dim(2), Dim(2))
+    assert Tensor[bool].id(Dim(2)) <= full and not full <= full.id(Dim(2))
+    with raises(TypeError):
+        R <= 1
+    with raises(TypeError):
+        R <= R.cast(int)
+    with raises(TypeError):
+        R < S
+    for dtype in (complex, np.complex64):
+        with raises(TypeError):
+            Matrix[dtype]([1j], 1, 1) <= Matrix[dtype]([2j], 1, 1)
+    assert is_complex(complex) and is_complex(np.dtype("complex64"))
+    assert not is_complex(float) and not is_complex(bool)
 
 
 def test_Matrix_trace_left():
@@ -158,6 +182,21 @@ def test_trace_over_a_field_in_jax():
     jax = pytest.importorskip("jax")
     traced = jax.jit(trace)(np.array([[0.5, 1.], [1., 0.25]]))
     assert np.allclose(traced, [[0.5 + 4 / 3]], rtol=1e-5)
+
+
+@pytest.mark.parametrize('name', ['pytorch', 'jax'])
+def test_trace_and_composition_on_backend(name):
+    """ The identity takes the dtype of the backend, so a matrix inferred
+    there traces, and composes with the integer structural matrices on a
+    backend whose product does not promote. """
+    pytest.importorskip({'pytorch': 'torch'}.get(name, name))
+    with backend(name):
+        f = Matrix([[0.5, 1.], [1., 0.25]], 2, 2)
+        assert type(f).id(2).dtype == f.dtype
+        assert f.trace().is_close(Matrix([[0.5 + 4 / 3]], 1, 1), rtol=1e-5)
+        assert (f >> Matrix.id(2)).dtype == f.dtype\
+            == (Matrix.id(2) >> f).dtype
+        assert (Matrix.id(2) >> f).is_close(f)
 
 
 def test_is_field():

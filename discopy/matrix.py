@@ -26,6 +26,7 @@ Summary
         backend
         set_backend
         is_field
+        is_complex
         get_backend
 
 See also
@@ -209,7 +210,8 @@ class Matrix[dtype](
 
     def cast(self, dtype: type) -> Matrix:
         """
-        Cast a matrix to a given ``dtype``.
+        Cast a matrix to a given ``dtype``, the matrix itself when it
+        already has it.
 
         Parameters:
             dtype : The target datatype.
@@ -217,7 +219,11 @@ class Matrix[dtype](
         Example
         -------
         >>> assert Matrix.id().cast(bool) == Matrix[bool].id()
+        >>> m = Matrix[float].id(2)
+        >>> assert m.cast(float) is m
         """
+        if dtype == self.dtype:
+            return self
         return type(self)[dtype](self.array, self.dom, self.cod)
 
     def promote(self, *others: Matrix) -> type:
@@ -286,6 +292,40 @@ class Matrix[dtype](
             and self.dtype == other.dtype\
             and (self.dom, self.cod) == (other.dom, other.cod)\
             and (self.array == other.array).all()
+
+    def __le__(self, other):
+        """
+        The pointwise order on parallel matrices: every entry is at most
+        that of the ``other``. A Boolean matrix is a relation and the order
+        is inclusion; composition, tensor and transpose are monotone.
+
+        >>> R, S = Matrix[bool]([1, 0, 0, 0], 2, 2), Matrix[bool].id(2)
+        >>> assert R <= S and S >= R and not S <= R
+        >>> assert R >> R <= S >> S and R @ R <= S @ S
+        >>> assert not R <= Matrix[bool]([1, 1], 1, 2)
+        >>> assert not Matrix([1, 2], 1, 2) <= Matrix([2, 1], 1, 2)
+
+        Matrices of different data types are not compared:
+
+        >>> R <= R.cast(int)
+        Traceback (most recent call last):
+        ...
+        TypeError: '<=' not supported between instances of 'Matrix[bool]' \
+and 'Matrix[int]'
+
+        The complex numbers have no order, as in Python:
+
+        >>> Matrix[complex]([1j], 1, 1) <= Matrix[complex]([2j], 1, 1)
+        Traceback (most recent call last):
+        ...
+        TypeError: Matrices over <class 'complex'> have no pointwise order.
+        """
+        if not isinstance(other, self.ar):
+            return NotImplemented
+        if is_complex(self.dtype):
+            raise TypeError(messages.MATRIX_ORDER_ERROR.format(self.dtype))
+        return (self.dom, self.cod) == (other.dom, other.cod)\
+            and (self.array <= other.array).all()
 
     def is_close(self, other: Matrix, rtol: float = 1.e-8, atol: float = 1.e-8
                  ) -> bool:
@@ -405,7 +445,7 @@ class Matrix[dtype](
     @classmethod
     def id(cls, dom=0) -> Matrix:
         with backend('numpy') as np:
-            array = np.identity(index(dom), dtype=cls.dtype or int)
+            array = np.identity(index(dom), dtype=int)
         return cls(array, dom, dom)
 
     twist = id
@@ -414,9 +454,12 @@ class Matrix[dtype](
     def then(self, other: Matrix) -> Matrix:
         assert_isinstance(other, self.ar)
         assert_iscomposable(self, other)
+        cls = self.promote(other)
+        left, right = (
+            factor.cast(cls.dtype).array for factor in (self, other))
         with backend() as np:
-            array = np.matmul(self.array, other.array)
-        return self.promote(other)(array, self.dom, other.cod)
+            array = np.matmul(left, right)
+        return cls(array, self.dom, other.cod)
 
     def tensor(self, *others: Matrix):
         """
@@ -929,6 +972,15 @@ def is_field(dtype) -> bool:
             or getattr(dtype, "kind", None) in ("f", "c")\
             or isinstance(dtype, type)\
             and issubclass(dtype, (float, complex, numpy.inexact))
+
+
+def is_complex(dtype) -> bool:
+    """ Whether a ``dtype`` is complex, in any backend. """
+    with backend("numpy") as numpy:
+        return getattr(dtype, "is_complex", False) is True\
+            or getattr(dtype, "kind", None) == "c"\
+            or isinstance(dtype, type)\
+            and issubclass(dtype, (complex, numpy.complexfloating))
 
 
 BACKENDS = {

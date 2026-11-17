@@ -15,9 +15,45 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   (`Backend.triangle_corners`). A box's dagger, and any box `rebuild` makes,
   keeps the drawing attributes it was given, its `color` and `shape`
   ([next#568]).
-- A box is drawn as high as its `height`, its outline meeting its wires: the
-  layout already stacked layers by it, but the outline was always half a
-  wire high ([next#570]).
+- `abc.LinearCategory`, a linear category (Bierman, TLCA 1995) without
+  symmetry: a comonad `bang` with `dereliction` and `digging`, lax monoidal
+  with a `laxator`, each `!x` a comonoid by `contraction` and `weakening`, and
+  an invertible `exchange` of `!x` with any object, its 28 laws as axioms.
+  `biclosed` is the free one: `BangOb`, the wire holding a type inside
+  `x.bang()`, `Bang`, the bubble `f.bang()`, and the boxes `Dereliction`,
+  `Digging`, `Contraction`, `Weakening`, `Exchange` and `Laxator`. A `Functor`
+  sends them through the `bang` and the structure of its codomain when its
+  types are biclosed, and through its `ob_map` and `ar_map` otherwise. The
+  laws are declared failing on the free category ([next#571]).
+- `discopy.drawing.nicer`: nine hand features of a drawing, each a cost
+  (wire length, bends, slope, aspect, asymmetry, whitespace, misalignment,
+  label overlap, area), `hand_score` minus their weighted sum, with equal weights
+  until fitted on votes, and `make_nicer`, the foliation of a diagram whose
+  drawing scores best, or the diagram itself on a tie ([next#582]).
+- `discopy.drawing.nicer.nicer_layout` searches the geometry of a drawing:
+  `stretch` scales its column and row gaps and its box sizes through
+  `Drawing.relayout`, and a step is kept when it scores better and keeps the
+  `clearance` between boxes and from the inputs' and outputs' rows
+  ([next#598]).
+- `Drawing.layout`, the geometry of a drawing as a vector: the coordinates
+  of its nodes, box corners included. `Drawing.relayout` takes a vector back
+  to a drawing and refuses one that `Drawing.is_feasible` says draws another
+  diagram (an edge turned, other wires crossing, boxes overlapping, a port
+  outside its box) ([next#578]).
+- `monoidal.Diagram.foliations(limit)` lists the foliations of a diagram:
+  diagrams equal to it up to interchange whose adjacent layers cannot merge,
+  the largest layers first. The steps are public too: `dependencies`,
+  `layerings` and `foliate` ([next#567]).
+- A Typst drawing backend, `drawing.backend.Typst`: `Diagram.to_typst` and
+  `Drawing.to_typst` return a `drawing.typst_ast.Document`, whose `render`
+  is the Typst source of a CeTZ canvas, and `draw(format="typst")` compiles
+  it to SVG with the optional `typst` extra, or writes the source to a path
+  ending in `.typ` ([#467], [next#565]).
+- `Matrix.__le__`, the pointwise order on parallel matrices, which a
+  `Tensor` inherits: over `bool` it is the inclusion of relations, over the
+  complex numbers it raises `TypeError`. `testable.Inequation`, an `Equation`
+  whose terms are compared with `<=`, so that an axiom states an inclusion
+  and the property matrix checks it as it does an equation ([next#566]).
 - `csp.Language.propagate`, arc consistency: a set of candidates per
   variable, kept to the values each constraint supports, until no set
   shrinks or for a number of rounds. It removes no value a solution takes,
@@ -60,6 +96,11 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   nothing, a match being a row of the join of the atoms of the pattern, as in
   relational e-matching, and the law `EGraph.matching_agreement` that it
   matches what the e-graph of the same operations does ([next#549]).
+- `egraph.Builder.rewrite` and `egraph.Builder.step`, a match rewritten by
+  `add` and `union` and a round of rules on the builder, `EGraph.reduced`,
+  the e-graph as a spider per class and a box per e-node, and the law
+  `EGraph.stepping` that a round on the builder and a pure `step` reduce to
+  the same hypergraph ([next#586]).
 - `stream.up_to_steps`, the relation a law of streams is read with: a term
   unrolled for `stream.STEPS` steps, its arrow `now` taken and quotiented by
   the equation of the underlying category, which `Stream.equation_factory`
@@ -183,7 +224,7 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   category ([#559], [#575]).
 - `discopy.hopf`, ribbon semantics in the representations of a
   finite-dimensional Hopf algebra and its Drinfeld double ([#405], [#484]).
-- `grammar.abstract`, abstract categorial grammars ([#400]), and
+- `lambek.abstract`, abstract categorial grammars ([#400]), and
   `categorial.Ty` with type raising and crossed composition ([#332], [#341]).
 - Lambda terms in `biclosed` and `closed`, with products, `Let` and
   capture-avoiding substitution, to and from diagrams ([#322], [#332], [#400],
@@ -252,13 +293,13 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   Message Passing ([Recursive_GNNs#1]).
 - `neural.geometric`, the same networks run along the blocks of their
   symmetry group, reductions in place of gathers ([Recursive_GNNs#1]).
-- `grammar.proofnet`, parses as proof nets read back to normal terms, and
-  `grammar.neural`, a PyTorch parser into them ([lambek#8]).
+- `lambek.proofnet`, parses as proof nets read back to normal terms, and
+  `lambek.neural`, a PyTorch parser into them ([lambek#8]).
 - `categorial.parse`, the `k` best terms of a sentence by CKY ([lambek#2]).
-- `grammar.neural.Parser.search`, parsing as search over the correct proof
+- `lambek.neural.Parser.search`, parsing as search over the correct proof
   nets of the `k` best types of each word ([lambek#12]).
-- `grammar.proofnet.Sequent.linkings`, the `m` best linkings by Murty's
-  ranking of the `assignments` of each block, and `grammar.neural.Parser.search`'s
+- `lambek.proofnet.Sequent.linkings`, the `m` best linkings by Murty's
+  ranking of the `assignments` of each block, and `lambek.neural.Parser.search`'s
   `depth` and `links`, its `width` counting only the sequents with a goal, so
   that it searches past those with none and the linkings with no term
   ([lambek#12]).
@@ -333,6 +374,17 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Changed
 
+- `egraph.EGraph.saturate` runs its rounds on one `Builder`, freezing it
+  after each round that changes something: associativity and commutativity
+  of `+` on five leaves saturate 55 times faster, and on six in under a
+  second ([next#586]).
+- `discopy.grammar` is `discopy.lambek`, with its tests in `test/lambek`,
+  its pictures in `docs/_static/lambek` and its extra `discopy[lambek]`.
+  The old name stays as a deprecated alias: `discopy.grammar` warns and has
+  every name of `discopy.lambek`, `discopy.grammar.x` is the module
+  `discopy.lambek.x`, imported when asked for, the extra `discopy[grammar]`
+  installs `discopy[lambek]`, and `utils.RENAMED` lets a tree written under
+  the old name load, as a pickle does ([next#569]).
 - `Hypergraph.explicit_trace` takes the number of wires to trace and takes
   them in one pass, so `make_causal` and `make_cocausal` convert the graph
   once rather than once per cut: 7.5x faster on the traces of a graph with
@@ -539,6 +591,33 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Fixed
 
+- The TikZ backend escapes in a label what LaTeX reads as markup outside
+  the mathematics between dollars, an underscore, an ampersand, a percent
+  and a hash, and keeps `<<` and `>>` from joining into guillemets
+  (`TikZ.escape`): a box named `feed_forward` or an evaluated lambda term,
+  drawn as `__call__`, stopped LaTeX ([next#580]).
+- `Matrix.id` builds its array over `int` and casts it with the active
+  backend, so a matrix inferred under `backend("pytorch")` traces, and
+  `Matrix.then` casts both factors to the dtype they promote to, so it
+  composes with the integer structural matrices on a backend whose product
+  does not promote ([next#583]).
+- `Tensor.then` and `Tensor.tensor` cast each factor to the dtype they
+  promote to, as `Matrix.then` does, so a float tensor composes and tensors
+  with the integer identity on the pytorch backend; `Matrix.cast` returns
+  the matrix itself when it already has the dtype ([next#587]).
+- `discopy.optyx`: the dagger of a channel with an environment, e.g.
+  `PhotonLoss(.1).dagger()`, is the adjoint CP map, whose Kraus map bends the
+  environment back by a cap, where it failed an assertion; `power_fix` raises
+  when `n_steps` exceeds `max_steps`, and `fn_to_semm` emits each fusion's own
+  type rather than X for all ([next#585]).
+- The TikZ backend draws no black frame around a drawing: `TikZ.draw_polygon`
+  writes the `edgecolor` it is given, e.g. the white edge of the background.
+  A spider is an empty node padded by `nodesize` with its label over its
+  center, so that the label keeps the size of the text: the symbol of an
+  equation was scaled down with its node ([next#575]).
+- A box is drawn as high as its `height`, its outline meeting its wires: the
+  layout already stacked layers by it, but the outline was always half a
+  wire high ([next#570]).
 - `CMap.explicit_trace` takes the number of wires to trace as its **first**
   argument, like `Hypergraph.explicit_trace`, so `CMap.trace` and
   `CMap.make_causal` hand it their count instead of looping: over a traced
@@ -843,7 +922,7 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   every other box, so a spider equals the one-layer diagram holding it and
   can go in a set ([next#359]).
 - `closed.TermBase.normal_form` and `reduce` take a constant as the head of a
-  spine, e.g. on the terms of `grammar.abstract` ([next#278]).
+  spine, e.g. on the terms of `lambek.abstract` ([next#278]).
 - `optyx.channel.Swap.dagger` is the swap the other way round ([next#290]).
 - `optyx.channel.Diagram.eval` evaluates a diagram of classical boxes, which
   `is_pure` called pure though a `CQMap` has no Kraus map ([next#260]).
@@ -890,7 +969,7 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   ([#768]), and spiders on PyTorch ([#584]).
 - `python.additive.Function.trace` on wires of different lengths ([#561]),
   and `python.Function.tensor` is variadic ([#489]).
-- `grammar.categorial.cat2ty` on brackets, features and associativity
+- `lambek.categorial.cat2ty` on brackets, features and associativity
   ([#529]).
 - Drawing controlled gates ([#439]) and discards ([#514]).
 - `Hypergraph`: equality on spiders with no legs, `depth`, `make_monogamous`,
@@ -985,7 +1064,7 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 - `Drawing.permutation` permutes blocks, step-by-step `then` is a list past an
   identity, TikZ twists take xcolor names, hexcode styles drop `#` ([next#31]).
 - A law reads its type parameters when another class shares its name.
-- `discopy.grammar.neural` installs with the `grammar` extra ([next#52]).
+- `discopy.lambek.neural` installs with the `lambek` extra ([next#52]).
 - `zx.H`, quantum gates that do not send basis states to basis states,
   `gates.Bra`, `gates.Match` and `tensor.Sum` no longer claim to be cartesian
   ([next#115]).
@@ -1422,24 +1501,24 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   documented the right way round, `Circuit.from_tk` says it adds logical swaps
   rather than SWAP gates, and `Controlled` says that a zero distance raises
   `ValueError` ([next#445]).
-- Calling a `grammar.cfg.Tree` on arguments whose types do not tensor to its
+- Calling a `lambek.cfg.Tree` on arguments whose types do not tensor to its
   `dom` (all identities, an `Id` root, too many or too few arguments) raises
   `AxiomError`, where it used to return an ill-typed or truncated tree
   ([next#445]).
-- `grammar.cfg.Algebra` maps `Id` and any tree with an `Id` branch to the
+- `lambek.cfg.Algebra` maps `Id` and any tree with an `Id` branch to the
   identity of its codomain operad, where it used to raise `AttributeError`
   ([next#445]).
-- `grammar.cfg.Id(x).to_diagram()` is `monoidal.Id(x)`, so the diagram of a
+- `lambek.cfg.Id(x).to_diagram()` is `monoidal.Id(x)`, so the diagram of a
   tree with an identity branch has no spurious `Id(x)` box ([next#445]).
 - `quantum.graphlike.size` counts a phase-free spider with three or more ports
   and no box (e.g. a reduced `Z(1, 2)`), as PyZX does after its own
   `full_reduce`; only a bare wire, cup or cap counts as no spider ([next#445]).
-- `grammar.categorial.tree2diagram(tree, dom=...)` gives `dom` to every word of
+- `lambek.categorial.tree2diagram(tree, dom=...)` gives `dom` to every word of
   the tree, not only to a tree that is a single word ([next#445]).
-- `eval(repr(r)) == r` for a `grammar.thue.Rule` or `grammar.cfg.Rule` with an
+- `eval(repr(r)) == r` for a `lambek.thue.Rule` or `lambek.cfg.Rule` with an
   empty name, e.g. the root of `cfg.Tree.from_nltk` on an unlabelled tree
   ([next#445]).
-- `grammar.categorial.FX` and `BX` name subterms that compose, `C << B` with
+- `lambek.categorial.FX` and `BX` name subterms that compose, `C << B` with
   `A >> B` and `B << C` with `B >> A`, where the pairs they documented raised
   `AxiomError` ([next#445]).
 - `pregroup.Diagram.normal_form` passes `normalize` and its other params on to
@@ -1535,6 +1614,23 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Project
 
+- `proptest` groups a push to `main` by commit, as `build`, `benchmark`,
+  `lean` and `paper` do, and a scheduled or dispatched run by its own run id:
+  one group per ref keeps one running and one pending run, so a third merge
+  cancelled the pending one before it ever reached a runner.
+  `.github/tests/workflows.py` checks every one of the five ([next#591]).
+- `benchmark/test_egraph.py` has the families `match`, the builder's matcher
+  against the pure one on each trace, and `saturate`, `+` under
+  associativity and commutativity on four to eight leaves on the builder,
+  and on four and five by the pure rounds ([next#589]).
+- `paper/`, the source of the tool paper in Typst: `paper/transpile.py` writes
+  its LaTeX from the part of Typst it is written in, `paper/build.py` runs
+  its listings and draws each figure with the Typst and the TikZ backends,
+  `test/paper_build.py` checks both and the `paper` workflow uploads both
+  PDFs ([next#577]).
+- The sections of the tool paper on syntax, semantics and applications, with
+  what the draft leaves open said in place and grouped in its last section;
+  the tests that build the paper are marked `slow` ([next#581]).
 - `build`'s `test` job has a 40-minute backstop instead of 20, above the
   9.7-20.3 minutes it runs in on `main` rather than inside it: a job over
   `timeout-minutes` reports `cancelled`, so the six jobs it cut over five
@@ -1741,6 +1837,7 @@ for the changelog of `1.2.1` and earlier.
 [#457]: https://github.com/discopy/discopy/pull/457
 [#459]: https://github.com/discopy/discopy/pull/459
 [#466]: https://github.com/discopy/discopy/pull/466
+[#467]: https://github.com/discopy/discopy/pull/467
 [#469]: https://github.com/discopy/discopy/pull/469
 [#470]: https://github.com/discopy/discopy/pull/470
 [#472]: https://github.com/discopy/discopy/pull/472
@@ -2005,8 +2102,26 @@ for the changelog of `1.2.1` and earlier.
 [next#556]: https://github.com/rel-int/discopy-next/pull/556
 [next#557]: https://github.com/rel-int/discopy-next/pull/557
 [next#558]: https://github.com/rel-int/discopy-next/pull/558
+[next#565]: https://github.com/rel-int/discopy-next/pull/565
+[next#566]: https://github.com/rel-int/discopy-next/pull/566
+[next#567]: https://github.com/rel-int/discopy-next/pull/567
 [next#568]: https://github.com/rel-int/discopy-next/pull/568
+[next#569]: https://github.com/rel-int/discopy-next/pull/569
 [next#570]: https://github.com/rel-int/discopy-next/pull/570
+[next#571]: https://github.com/rel-int/discopy-next/pull/571
+[next#575]: https://github.com/rel-int/discopy-next/pull/575
+[next#577]: https://github.com/rel-int/discopy-next/pull/577
+[next#578]: https://github.com/rel-int/discopy-next/pull/578
+[next#580]: https://github.com/rel-int/discopy-next/pull/580
+[next#581]: https://github.com/rel-int/discopy-next/pull/581
+[next#582]: https://github.com/rel-int/discopy-next/pull/582
+[next#583]: https://github.com/rel-int/discopy-next/pull/583
+[next#585]: https://github.com/rel-int/discopy-next/pull/585
+[next#586]: https://github.com/rel-int/discopy-next/pull/586
+[next#587]: https://github.com/rel-int/discopy-next/pull/587
+[next#589]: https://github.com/rel-int/discopy-next/pull/589
+[next#591]: https://github.com/rel-int/discopy-next/pull/591
+[next#598]: https://github.com/rel-int/discopy-next/pull/598
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#56]: https://github.com/rel-int/optyx/pull/56

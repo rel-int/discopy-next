@@ -477,8 +477,8 @@ def factory_name(cls: type) -> str:
 
     Example
     -------
-    >>> from discopy.grammar.pregroup import Word
-    >>> assert factory_name(Word) == "grammar.pregroup.Word"
+    >>> from discopy.lambek.pregroup import Word
+    >>> assert factory_name(Word) == "lambek.pregroup.Word"
     >>> assert factory_name(int | None) == "int | None"
     """
     if not isinstance(cls, type):
@@ -565,6 +565,12 @@ def resolve_factory(name: str) -> type:
     >>> assert resolve_factory("tensor.Diagram[complex]") is Diagram[complex]
     >>> assert resolve_factory("tensor.Diagram[float64]") is Diagram[float64]
 
+    A module that was renamed is found under its old name, see
+    :data:`RENAMED`, so that a tree written before the rename still loads.
+
+    >>> from discopy.lambek import pregroup
+    >>> assert resolve_factory("grammar.pregroup.Ty") is pregroup.Ty
+
     Any other name raises, e.g. that of an object a module of DisCoPy
     imports, so that a file names no function for :func:`loads` to reach.
 
@@ -578,6 +584,7 @@ def resolve_factory(name: str) -> type:
         return resolve_factory(origin)[
             resolve_factory(parameter)]  # ty: ignore[not-subscriptable]
     *modules, factory = name.removeprefix('discopy.').split('.')
+    modules[:1] = [RENAMED.get(module, module) for module in modules[:1]]
     import discopy  # pylint: disable=import-outside-toplevel
     if not modules and factory not in vars(discopy):
         import numpy
@@ -591,6 +598,9 @@ def resolve_factory(name: str) -> type:
         raise AttributeError(messages.NO_SUCH_CLASS.format(name))
     return cls
 
+
+RENAMED = {"grammar": "lambek"}
+""" The modules of DisCoPy that were renamed, from old name to new. """
 
 SYMPY_CONSTANTS = (
     "Zero", "One", "NegativeOne", "Half", "Pi", "Exp1", "ImaginaryUnit",

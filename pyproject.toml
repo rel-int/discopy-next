@@ -40,7 +40,7 @@ dependencies = [
   "numpy",
   "networkx",
   "matplotlib",
-  "pillow"
+  "pillow",
 ]
 
 [dependency-groups]
@@ -62,16 +62,18 @@ docs = ["discopy[docs]"]
 notebooks = ["discopy[notebooks]"]
 tensor = ["discopy[tensor]"]
 quantum = ["discopy[quantum]"]
-grammar = ["discopy[grammar]"]
+lambek = ["discopy[lambek]"]
 optyx = ["discopy[optyx]"]
+typst = ["discopy[typst]"]
 all = [
     { include-group = "dev" },
     { include-group = "docs" },
     { include-group = "notebooks" },
     { include-group = "tensor" },
     { include-group = "quantum" },
-    { include-group = "grammar" },
+    { include-group = "lambek" },
     { include-group = "optyx" },
+    { include-group = "typst" },
 ]
 
 [project.optional-dependencies]
@@ -96,10 +98,12 @@ quantum = [
     "qoolqit",
     "scipy",
 ]
-grammar = [
+lambek = [
     "nltk",
     "torch",
 ]
+# the deprecated name of the lambek extra
+grammar = ["discopy[lambek]"]
 # discopy.optyx, under Apache-2.0: see discopy/optyx/LICENSE
 optyx = [
     "cotengra",
@@ -116,7 +120,7 @@ optyx = [
     "sympy",
 ]
 test = [
-    "discopy[grammar,notebooks,optyx,quantum]",
+    "discopy[lambek,notebooks,optyx,quantum]",
     "coverage",
     "hypothesis",
     "marimo",
@@ -150,6 +154,9 @@ docs  = [
     "sphinxcontrib-bibtex == 2.5.*",
     "sphinxcontrib-tikz == 0.4.*",
     "sphinxcontrib-youtube == 1.4.*",
+]
+typst = [
+    "typst >= 0.15.0",
 ]
 
 [tool.setuptools_scm]

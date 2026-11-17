@@ -45,6 +45,7 @@ MATRIX_RESOLVENT_ERROR = "The resolvent is only defined for square matrices "\
                          "over a field, i.e. float or complex: a Matrix[int] "\
                          "can be cast to float first."
 MATRIX_SINGULAR = "id - D is singular: the trace over a field is partial."
+MATRIX_ORDER_ERROR = "Matrices over {} have no pointwise order."
 BOX_IS_MIXED = "Pure boxes can have only digits or only qudits as dom and cod."
 LAYERS_MUST_HAVE_A_BOX = "Layers must have at least one box."
 NOT_MERGEABLE = "Layers {} and {} cannot be merged."
@@ -174,6 +175,13 @@ TERM_IS_A_BOX = \
 MISSING_BOXES_AND_OFFSETS = (
     "Decoding needs either boxes and offsets, or the two of them zipped.")
 CURRY_HAS_NO_DAGGER = "A curry has no dagger."
+BANG_HAS_NO_DAGGER = (
+    "{} has no dagger: !L* has no rule from its codomain back to its domain.")
+LAXATOR_ARITY = (
+    "A laxator takes two types, or none for the unit, got {}.")
+FREE_BANG = (
+    "A free bang is a bubble and its structure boxes, which a hypergraph "
+    "keeps as boxes: nothing cancels, merges or slides through them.")
 NAME_CLASH = "{!r} names two things in the string of {}."
 WRONG_SIDE = "Expected left={} for {}, got left={} instead."
 NOT_JSON_SERIALISABLE = "Object of type {} is not JSON serialisable."
@@ -220,3 +228,9 @@ NOT_A_PATTERN = (
 NOT_A_RULE = (
     "{} = {} is not a rule: its sides are cartesian diagrams of one type, the "
     "left a pattern and the right reading only the inputs the left reads.")
+
+LAYOUT_LENGTH = "A layout of {} coordinates was given, {} expected."
+LAYOUT_NOT_FEASIBLE = "This layout does not draw the same diagram."
+STRETCH_LENGTHS = (
+    "Give a scale for each gap between columns and between rows, and for "
+    "the width and the height of each box.")
