@@ -1061,4 +1061,5 @@ def crop(image: np.ndarray, rows, cols, label=False) -> np.ndarray:
                max(cols.min() - 1, 0):cols.max() + 2] = True
         ink = ink * inside
     ink = np.pad(ink, ((height, height), (width, width)))
-    return ink[top + height:top + 2 * height, left + width:left + 2 * width]
+    return ink[top + height:top + 2 * height,
+               left + width:left + 2 * width].astype(np.float32)
