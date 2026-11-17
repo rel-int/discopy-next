@@ -13,7 +13,7 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   (wire length, bends, slope, aspect, asymmetry, whitespace, misalignment,
   label overlap, area), `hand_score` minus their weighted sum, with equal weights
   until fitted on votes, and `make_nicer`, the foliation of a diagram whose
-  drawing scores best ([next#582]).
+  drawing scores best, or the diagram itself on a tie ([next#582]).
 - `monoidal.Diagram.foliations(limit)` lists the foliations of a diagram:
   diagrams equal to it up to interchange whose adjacent layers cannot merge,
   the largest layers first. The steps are public too: `dependencies`,
