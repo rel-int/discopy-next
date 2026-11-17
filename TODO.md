@@ -2,4 +2,4 @@
 
 - [x] `channel.Sum.double` doubles coherently, the doubling of the channel whose Kraus map is `get_kraus()`; an impure term refuses
 - [x] tests: the Bell sum keeps its cross terms and agrees with the density matrix of `get_kraus`; `(BS + BS).double()` is 4x
-- [ ] CHANGELOG bullet
+- [x] CHANGELOG bullet
