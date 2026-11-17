@@ -16,6 +16,6 @@
 > Maths: the composite of f: A -> B and g: B -> C over dtypes s and t lives over the join s v t that `promote` computes; each factor is first sent along the inclusion s -> s v t (the identity when s = s v t), then contracted. Same for the tensor product.
 
 - [WIP] @session_01MEJxy4kqJ6YhajqkcZRUXm-2026-11-17 01:03 Matrix.cast is the identity on a matrix that already has the dtype; Matrix.then uses it
-- [ ] Tensor.then and Tensor.tensor cast each factor to the promoted dtype before tensordot
+- [WIP] @session_01MEJxy4kqJ6YhajqkcZRUXm-2026-11-17 01:03 Tensor.then and Tensor.tensor cast each factor to the promoted dtype before tensordot
 - [ ] test in test/tensor.py on pytorch and jax
 - [ ] CHANGELOG.md bullet
