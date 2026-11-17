@@ -4,4 +4,4 @@
 
 - [x] vision.py and from_picture from the pipeline measured at 852c2c1, with their tests
 - [x] docs/notebooks/from_picture.md with the numbers of slices 4 to 6 and run 7
-- [ ] changelog entry, next-checks
+- [x] changelog entry, next-checks
