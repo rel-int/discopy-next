@@ -238,19 +238,15 @@ def test_classical_box_in_parallel_layer_is_not_pure():
     assert not layer.is_pure
 
 
-def test_constructors_with_no_argument():
-    """``zw.Select`` and ``zw.Create`` default to one photon on one mode, so
-    the classical boxes wrapping them declare one mode."""
-    assert PostselectDigit() == PostselectDigit(1) and Digit() == Digit(1)
-    assert PostselectDigit().digits == Digit().photons == (1,)
-    assert PostselectDigit().dom == Digit().cod == mode
-    assert (Digit() >> PostselectDigit()).eval().prob_dist() == {(): 1.}
-
-
-def test_postselect_on_no_bit_is_the_empty_product():
-    """The box is the tensor of one effect per bit, so with no bit it is
-    the scalar one."""
-    assert PostselectBit().dom == PostselectBit().cod == bit ** 0
+def test_constructors_with_no_argument_are_rejected():
+    """#387: a digit of no digits is ``Id()`` already, so the empty case is
+    rejected rather than read as one mode or as the scalar one. This undoes
+    #419's reading, on toumix's call of 11-09."""
+    for constructor in (Digit, PostselectDigit, PostselectBit, Bit):
+        with pytest.raises(ValueError):
+            constructor()
+    assert PostselectDigit(1).digits == Digit(1).photons == (1,)
+    assert PostselectDigit(1).dom == Digit(1).cod == mode
+    assert (Digit(1) >> PostselectDigit(1)).eval().prob_dist() == {(): 1.}
     assert np.isclose(
-        PostselectBit().double().to_tensor().eval().array, 1)
-    assert Bit().dom == Bit().cod == bit ** 0
+        (Bit(0) >> PostselectBit(0)).double().to_tensor().eval().array, 1)

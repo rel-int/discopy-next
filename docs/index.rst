@@ -17,7 +17,7 @@ DisCoPy documentation
     api/semantics
     api/quantum
     api/optyx
-    api/grammar
+    api/lambek
     api/drawing
     api/testable
 

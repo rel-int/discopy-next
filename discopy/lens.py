@@ -3,9 +3,11 @@
 """
 Monoidal lenses, also called optics, over an underlying `category`, with
 one class for each doctrine as in :mod:`discopy.para`: :class:`Symmetric`
-over a symmetric category, :class:`Traced` over a traced one and
+over a symmetric category, :class:`Traced` over a traced one,
 :class:`Markov`, the lenses `(get, put)` of functional programming, over a
-Markov one, i.e. the symmetric lenses whose residual is the input, copied.
+Markov one, i.e. the symmetric lenses whose residual is the input, copied,
+and :class:`Comarkov` over one that is comarkov too, where they form a
+Markov category.
 
 A lens from a pair `(x, x_)` to a pair `(y, y_)` is a residual `m` with a
 `forward` morphism `x -> y @ m` and a `backward` morphism `m @ y_ -> x_` in
@@ -38,6 +40,7 @@ Summary
     Symmetric
     Traced
     Markov
+    Comarkov
 
 Example
 -------
@@ -68,9 +71,9 @@ It is well-behaved, i.e. it satisfies the three lens laws:
 from __future__ import annotations
 
 from dataclasses import dataclass
-from discopy import interaction, markov, messages, symmetric
+from discopy import frobenius, interaction, markov, messages, symmetric
 from discopy.abc import (
-    MarkovCategory, SymmetricCategory, TracedCategory)
+    ComarkovCategory, MarkovCategory, SymmetricCategory, TracedCategory)
 from discopy.testable import Equation, TestableGeneric, quotient
 from discopy.utils import (
     AxiomError, assert_iscomposable, assert_isinstance, classproperty,
@@ -137,7 +140,8 @@ class Symmetric[category](SymmetricCategory, TestableGeneric):
     Markov category, lenses are only symmetric: copying a pair would ask
     for a merge on its negative half and discarding for a unit, which is
     why :class:`Markov`, the subclass with the copied input as residual,
-    is only a symmetric category too.
+    is only a symmetric category too, and :class:`Comarkov`, over a
+    category with both, a Markov one.
 
     .. admonition:: Summary
 
@@ -522,7 +526,8 @@ class Markov(Symmetric):
     cartesian category is. Unlike :class:`para.Markov <discopy.para.Markov>`,
     a Markov lens is not a Markov category but only a symmetric one: copying
     a pair would ask for a monoid on its negative half, which is how the
-    reverse derivative of a fan-out sums the gradients. A neural network is
+    reverse derivative of a fan-out sums the gradients, see
+    :class:`Comarkov`. A neural network is
     a parametric lens, i.e. a :class:`para.Symmetric <discopy.para.Symmetric>`
     over `lens.Markov`; see :mod:`discopy.neural`.
 
@@ -664,3 +669,64 @@ class Markov(Symmetric):
             @ swap(other.dom.positive, self.cod.negative)\
             @ identity(other.cod.negative) >> self.put @ other.put
         return type(self)(self.dom @ other.dom, self.cod @ other.cod, get, put)
+
+
+class Comarkov(Markov, MarkovCategory):
+    """
+    Lenses `(get, put)` over a `category` that is both Markov and comarkov
+    form a Markov category: the copy of a pair `(x, x_)` copies `x` with
+    `get`, while `put` discards the input and merges the copies of `x_`.
+    Its discard, the case of no copy, discards `x` and puts the noise on
+    `x_`, the unit of the merge.
+
+    Read as reverse derivatives :cite:p:`CruttwellEtAl22`, the merge is the
+    sum: the gradient of an activation sent to several layers is the sum of
+    theirs, that of one sent to none is zero.
+
+    Example
+    -------
+    >>> from discopy.frobenius import Ty as T, Diagram
+    >>> x, x_ = T('x'), T("x'")
+    >>> X = Ty[T](x, x_)
+    >>> copy = Comarkov.copy(X)
+    >>> assert copy.dom == X and copy.cod == X @ X
+    >>> assert copy.get == Diagram.copy(x)
+    >>> assert copy.put == Diagram.discard(x) @ Diagram.merge(x_)
+    >>> assert Comarkov.discard(X).put\\
+    ...     == Diagram.discard(x) @ Diagram.noise(x_)
+    >>> copy.to_int().draw(doctest="docs/_static/lens/copy.svg")
+
+    .. image:: /_static/lens/copy.svg
+        :align: center
+
+    Note
+    ----
+    The default category is the free hypergraph category, the first of the
+    hierarchy with both a copy and a merge: its spiders fuse, which is more
+    than the laws of a Markov category ask for. A category with a copy and
+    a merge and no law between the two is that of
+    :class:`discopy.neural.network.Network`.
+    """
+    category = frobenius.Diagram
+
+    @classmethod
+    def assert_iscomarkov(cls):
+        """ Assert that :attr:`category` has merge and noise. """
+        cls.assert_ismarkov()
+        if not issubclass(cls.category, ComarkovCategory):
+            raise AxiomError(messages.NOT_COMARKOV.format(
+                factory_name(cls.category)))
+
+    @classmethod
+    def copy(cls, x: Ty, n: int = 2) -> Markov:
+        """
+        The copy of a pair `n` times: `get` copies its positive half, `put`
+        discards the input and merges the `n` copies of its negative half.
+
+        Parameters:
+            x : The pair to copy.
+            n : The number of copies.
+        """
+        cls.assert_iscomarkov()
+        return cls.lift(cls.category.copy(x.positive, n),
+                        cls.category.merge(x.negative, n))

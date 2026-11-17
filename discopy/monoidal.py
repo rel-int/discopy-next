@@ -84,6 +84,7 @@ from discopy.config import (
     COLOUR_DRAWING_ATTRIBUTES, TRANSPARENT)
 from discopy.utils import (
     factory,
+    factory_key,
     factory_name,
     from_tree,
     assert_isinstance,
@@ -213,7 +214,8 @@ class Wire(cat.Ob):
 
     def __hash__(self):
         return hash(
-            (type(self), self.name, self.dom, self.cod, self.is_dagger))
+            (factory_key(type(self)),
+             self.name, self.dom, self.cod, self.is_dagger))
 
     def __lt__(self, other):
         """
@@ -347,7 +349,15 @@ class List[generator_factory](Monoid["List"], TestableGeneric):
         return type(self) is type(other) and self.inside == other.inside
 
     def __hash__(self):
-        return hash((type(self), self.inside))
+        """
+        A list's generators can themselves be classes, `python.Ty` being
+        `List[type]`, and a class hashes as its address: those take their
+        :func:`discopy.utils.factory_key` here, as a setoid's leading
+        component does.
+        """
+        return hash((factory_key(type(self)), tuple(
+            factory_key(x) if isinstance(x, type) else x
+            for x in self.inside)))
 
     @classmethod
     def generator_repr(cls, generator) -> str:
@@ -560,7 +570,7 @@ class Ty(cat.Ob, cat.FreeCategory, ColouredMonoid):
             and (self.dom, self.cod) == (other.dom, other.cod)
 
     def __hash__(self):
-        return hash((type(self), self.inside, self.dom, self.cod))
+        return hash((factory_key(type(self)), self.inside, self.dom, self.cod))
 
     def __repr__(self):
         if not self.inside and self.dom is not None:
@@ -681,10 +691,16 @@ class Ty(cat.Ob, cat.FreeCategory, ColouredMonoid):
         return cls()
 
     def to_drawing(self) -> "Ty":
+        """
+        The type of a drawing: a wire for each object, labelled by its
+        ``drawing_name`` when it has one, e.g. ``4`` for ``Dim(4)``, else by
+        its string.
+        """
         if not self.inside:
             return Ty.id(self.dom)
         result = Ty(*(
-            Wire(str(x), getattr(x, 'dom', None), getattr(x, 'cod', None))
+            Wire(getattr(x, 'drawing_name', None) or str(x),
+                 getattr(x, 'dom', None), getattr(x, 'cod', None))
             for x in self.inside))
         for new, old in zip(result.inside, self.inside):
             if getattr(old, "frame_boundary", False):
@@ -881,6 +897,17 @@ class Dim(Ty):
         return f"Dim({', '.join(map(repr, self.inside)) or '1'})"
 
     __str__ = __repr__
+
+    @property
+    def drawing_name(self) -> str:
+        """
+        The label of a wire of this dimension in a drawing: its numbers,
+        without the ``Dim`` that :meth:`__repr__` prints.
+
+        >>> Dim(4).drawing_name, Dim(4, 4).drawing_name, Dim(1).drawing_name
+        ('4', '4, 4', '1')
+        """
+        return ", ".join(map(str, self.inside)) or "1"
 
     delay, head, tail = Nat.delay, Nat.head, Nat.tail
 
@@ -1556,6 +1583,31 @@ class Diagram(cat.Arrow, MonoidalCategory, RichDisplay):
         cod = Drawing
         return (functor_factory or Functor)(ob, ar, dom, cod)(self)
 
+    def to_typst(self, **params):
+        """
+        Return a Typst Document AST for this diagram.
+
+        Parameters
+        ----------
+        params : Passed to :class:`Typst`.
+
+        Returns
+        -------
+        doc : Document
+            A Typst Document AST with imports and a ``cetz.canvas`` block.
+
+        Example
+        -------
+        >>> from discopy.monoidal import Ty, Box
+        >>> f = Box('f', Ty('x'), Ty('y'))
+        >>> doc = f.to_typst()
+        >>> source = doc.render()
+        >>> 'cetz' in source and 'canvas' in source
+        True
+        """
+        from discopy.drawing import to_typst
+        return to_typst(self, **params)
+
     def to_map(self) -> "CMap":
         """
         Translate a diagram into a combinatorial map.
@@ -1762,6 +1814,190 @@ class Diagram(cat.Arrow, MonoidalCategory, RichDisplay):
             diagram = diagram.ar(inside, diagram.dom, diagram.cod)
             i = max(i - 1, 0)
         return diagram
+
+    def dependencies(self) -> "tuple[tuple[int, ...], ...]":
+        """
+        The boxes each box of a staircase diagram must stay below: no
+        interchange moves it above them. These are
+
+        * the boxes whose outputs it takes as inputs,
+        * for a box with no inputs, the boxes whose outputs enclose the gap it
+          sits in, with the boxes above them: a box with no outputs joins two
+          gaps, enclosed by the boxes that enclose both,
+        * the boxes with no outputs that joined a gap between its inputs.
+
+        Example
+        -------
+        >>> x = Ty('x')
+        >>> f, g, h = Box('f', x, x), Box('g', x, x), Box('h', x @ x, x)
+        >>> cup, s = Box('cup', Ty(), x @ x), Box('s', Ty(), x)
+        >>> e = Box('e', x, Ty())
+        >>> (f @ g >> h).to_staircases().dependencies()
+        ((), (), (0, 1))
+        >>> (cup >> f @ x >> x @ s @ x).dependencies()
+        ((), (0,), (0,))
+        >>> (x @ e @ x >> h).dependencies()
+        ((), (0,))
+        """
+        wires: "list[int | None]" = len(self.dom) * [None]
+        gaps: "list[tuple[frozenset[int], frozenset[int]]]" = (
+            len(self.dom) + 1) * [(frozenset(), frozenset())]
+        above: "list[frozenset[int]]" = []
+        result: "list[tuple[int, ...]]" = []
+        for box, offset in zip(self.boxes, self.offsets):
+            n, m, j = len(box.dom), len(box.cod), len(result)
+            inputs = {i for i in wires[offset:offset + n] if i is not None}\
+                .union(*(gap[1] for gap in gaps[offset + 1:offset + n]))\
+                if n else set(gaps[offset][0])
+            above.append(frozenset(inputs).union(*(above[i] for i in inputs)))
+            left, right = gaps[offset], gaps[offset + n]
+            if not n:
+                left, right = (left[0], frozenset()), (right[0], frozenset())
+            wires[offset:offset + n] = m * [j]
+            gaps[offset:offset + n + 1] = [left] + (m - 1) * [
+                (above[j] | {j}, frozenset())] + [right] if m else [
+                    (left[0] & right[0], left[1] | right[1] | {j})]
+            result.append(tuple(sorted(inputs)))
+        return tuple(result)
+
+    @staticmethod
+    def layerings(
+            dependencies: "tuple[tuple[int, ...], ...]"
+    ) -> "Iterator[tuple[tuple[int, ...], ...]]":
+        """
+        The ways to split boxes into layers that respect their dependencies,
+        each layer depending on the one above it, i.e. no two adjacent layers
+        could be merged, the largest layers first.
+
+        Parameters:
+            dependencies : As given by :meth:`dependencies`.
+
+        Example
+        -------
+        >>> list(Diagram.layerings(((), (), (0, ))))
+        [((0, 1), (2,)), ((0,), (1, 2))]
+        """
+        def layers(placed, previous):
+            free = [i for i, before in enumerate(dependencies)
+                    if i not in placed and set(before) <= placed]
+            if previous and not any(
+                    set(dependencies[i]) & set(previous) for i in free):
+                return iter(())
+            return (layer for size in range(len(free), 0, -1)
+                    for layer in itertools.combinations(free, size)
+                    if not previous or any(
+                        set(dependencies[i]) & set(previous) for i in layer))
+        if not dependencies:
+            yield ()
+            return
+        stack: "list[tuple[tuple, frozenset[int], Iterator]]" = [
+            ((), frozenset(), layers(frozenset(), ()))]
+        while stack:
+            layering, placed, candidates = stack[-1]
+            layer = next(candidates, None)
+            if layer is None:
+                stack.pop()
+                continue
+            layering, placed = layering + (layer, ), placed | set(layer)
+            if len(placed) == len(dependencies):
+                yield layering
+                continue
+            stack.append((layering, placed, layers(placed, layer)))
+
+    def foliate(
+            self, layering: "tuple[tuple[int, ...], ...]", left=False
+    ) -> "Diagram":
+        """
+        The foliation of a staircase diagram with the given layers: each box
+        is interchanged up to its place, then each layer is merged.
+
+        Parameters:
+            layering : The indices of the boxes in each layer, as given by
+                :meth:`layerings`.
+            left : Passed to :meth:`interchange`, which side a box with no
+                inputs takes of a box with no outputs it moves above.
+
+        Raises:
+            AxiomError : When a layer does not merge, e.g. a box with no
+                inputs moved between the outputs of a box in its layer.
+
+        Example
+        -------
+        >>> x = Ty('x')
+        >>> f, g, h = Box('f', x, x), Box('g', x, x), Box('h', x @ x, x)
+        >>> print((f @ g >> h).to_staircases().foliate(((1, ), (0, ), (2, ))))
+        x @ g >> f @ x >> h
+        """
+        diagram, order = self, list(range(len(self)))
+        for position, i in enumerate(i for layer in layering for i in layer):
+            diagram = diagram.interchange(
+                order.index(i), position, left=left)
+            order.insert(position, order.pop(order.index(i)))
+        inside, start = [], 0
+        for layer in layering:
+            merged = diagram.inside[start]
+            for other in diagram.inside[start + 1:start + len(layer)]:
+                merged = merged.merge(other)
+            inside.append(merged)
+            start += len(layer)
+        return self.ar(tuple(inside), self.dom, self.cod)
+
+    def foliations(self, limit: int | None = None) -> "list[Diagram]":
+        """
+        Foliations of a diagram, i.e. diagrams equal to it up to interchange
+        whose adjacent layers cannot be merged, the largest layers first, from
+        the top: :meth:`foliation` merges layers top-down instead, so it may
+        come later, e.g. ``(f >> g) @ h``. Each layering of
+        :meth:`dependencies` is foliated, then merged by the level's own
+        :meth:`Layer.merge`, e.g. two permutations fuse in
+        :mod:`discopy.symmetric`.
+
+        Parameters:
+            limit : The maximum number of foliations to return.
+
+        Example
+        -------
+        >>> x = Ty('x')
+        >>> f, g, h = Box('f', x, x), Box('g', x, x), Box('h', x @ x, x)
+        >>> for foliation in (f @ g @ f >> h @ x).foliations():
+        ...     print(foliation)
+        f @ g @ f >> h @ x
+        f @ g @ x >> h @ f
+        >>> assert len((f @ f @ f @ f).foliations()) == 1
+        >>> assert len((f @ f @ f >> f @ f @ f).foliations(limit=2)) == 2
+
+        A box with no inputs can go either side of a box with no outputs:
+
+        >>> s, e = Box('s', Ty(), x), Box('e', x @ x, Ty())
+        >>> for foliation in (e >> s >> f).foliations(): print(foliation)
+        s @ e >> f
+        s @ x @ x >> f @ e
+        x @ x @ s >> e @ f
+
+        Note
+        ----
+        Each layering is built with right interchangers, then with left ones:
+        a foliation that needs both, e.g. a box with no inputs moved left of
+        one box and right of another, is missed, and so is the order of a
+        box with no inputs and one with no outputs inside a layer that
+        :meth:`Layer.merge` does not choose, e.g. ``e @ s >> f`` beside
+        ``s @ e >> f``: see `#576
+        <https://github.com/rel-int/discopy-next/issues/576>`_.
+        """
+        staircase, result = self.to_staircases(), []
+        candidates = (
+            (layering, left) for layering in self.layerings(
+                staircase.dependencies()) for left in (False, True))
+        for layering, left in candidates:
+            if limit is not None and len(result) >= limit:
+                break
+            try:
+                foliation = staircase.foliate(layering, left).merge_layers()
+            except AxiomError:
+                continue
+            if foliation not in result:
+                result.append(foliation)
+        return result
 
     def depth(self):
         """
@@ -2038,6 +2274,22 @@ class Box(cat.Box, Diagram):
         inside = () if self.is_identity\
             else (self.layer_factory(self, normalise=False), )
         Diagram.__init__(self, inside, dom, cod)
+
+    def rebuild(self, **changes):
+        """
+        Rebuild a box, keeping the drawing attributes it was given that its
+        constructor does not set, e.g. so that a dagger keeps its shape.
+
+        >>> x = Ty('x')
+        >>> merge = Box('t', x @ x, x, shape="triangle", color="red")
+        >>> assert merge.dagger().shape == "triangle"
+        >>> assert merge.dagger().dagger().color == "red"
+        """
+        box = super().rebuild(**changes)
+        for attr in BOX_DRAWING_ATTRIBUTES:
+            if attr in vars(self) and attr not in vars(box):
+                setattr(box, attr, getattr(self, attr))
+        return box
 
     is_identity = False
 

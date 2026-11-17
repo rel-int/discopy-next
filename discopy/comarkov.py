@@ -76,8 +76,8 @@ from discopy.feedback import (  # noqa: F401  pylint: disable=unused-import
     Wire, Ty)
 from discopy.python import finset
 from discopy.utils import (
-    AxiomError, assert_isatomic, assert_iscomposable, factory_name,
-    from_tree)
+    AxiomError, assert_isatomic, assert_iscomposable, factory_key,
+    factory_name, from_tree)
 
 
 class Layer(symmetric.Layer):
@@ -274,7 +274,7 @@ class Cofunction(Box):
     def setoid(self):
         if self.is_identity:
             return (), self.dom, self.cod
-        return type(self), self.cod, tuple(self.cofunc.inside)
+        return factory_key(type(self)), self.cod, tuple(self.cofunc.inside)
 
     def to_drawing(self):
         """ Draw the permutation of the inputs, then the merges. """

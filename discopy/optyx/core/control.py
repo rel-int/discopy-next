@@ -472,6 +472,22 @@ class BinaryMatrixBox(ClassicalBox):
         self.matrix = matrix
         self.is_dagger = is_dagger
 
+    def setoid(self):
+        """
+        The matrix is what a logical matrix box means and is in none of its
+        name, the constant :code:`"LogicalMatrix"`, its boundary or its data,
+        so two of them over the same bits were equal. It is compared **modulo
+        2**, the transformation being the one over GF(2): two matrices
+        congruent mod 2 compute the same map.
+
+        >>> identity, swap = [[1, 0], [0, 1]], [[0, 1], [1, 0]]
+        >>> assert BinaryMatrixBox(identity) != BinaryMatrixBox(swap)
+        >>> assert BinaryMatrixBox(identity) == BinaryMatrixBox(identity)
+        >>> assert BinaryMatrixBox([[0]]) == BinaryMatrixBox([[2]])
+        """
+        return super().setoid() + (
+            tuple(map(tuple, (np.asarray(self.matrix) % 2).tolist())), )
+
     def truncation_specification(
         self,
         inp: Tuple[int, ...] = None,

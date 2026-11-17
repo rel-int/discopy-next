@@ -8,7 +8,7 @@ from discopy import (
     cat, feedback, lens, markov, monoidal, para, python, symmetric)
 from discopy.abc import Nat
 from discopy.interaction import Diagram as IntDiagram, Ty as IntTy
-from discopy.lens import Markov, Symmetric, Traced, Ty
+from discopy.lens import Comarkov, Markov, Symmetric, Traced, Ty
 from discopy.python import Function
 from discopy.symmetric import Box, Diagram
 from discopy.symmetric import Ty as T
@@ -269,6 +269,40 @@ def test_markov_is_symmetric():
     ).to_hypergraph()
     assert l.to_markov().get.to_hypergraph() == l.get.to_hypergraph()
     assert (l >> Markov.id(Y)).residual == x
+
+
+def test_comarkov_copy_merges_backward():
+    from discopy.neural.network import Box as Layer, Dims, Network
+    a, b = Dims(2), Dims(3)
+    A = Ty[Dims](a, a)
+    lenses = Comarkov[Network]
+    copy, discard = lenses.copy(A, 3), lenses.discard(A)
+    assert copy.dom == A and copy.cod == A @ A @ A
+    assert copy.get == Network.copy(a, 3)
+    assert copy.put == Network.discard(a) @ Network.merge(a, 3)
+    assert discard.dom == A and discard.cod == Ty[Dims]()
+    assert discard.get == Network.discard(a)
+    assert discard.put == Network.discard(a) @ Network.noise(a)
+    for law in (lenses.copy_counitality, lenses.copy_cocommutativity,
+                lenses.copy_coassociativity):
+        assert law(A), law
+    assert lenses.copy_coherence(A, Ty[Dims](b, b))
+    assert lenses.discard_coherence(A, Ty[Dims](b, b))
+    layer = lenses(A, Ty[Dims](b, b), Layer('f', a, b), Layer("f'", a @ b, a))
+    fan_out = copy >> layer @ layer @ lenses.id(A)
+    assert fan_out.get == Network.copy(a, 3) >> layer.get @ layer.get @ a
+    assert fan_out.put.cod == a and len(fan_out.put.dom) == 4
+    assert sum(isinstance(box, type(Network.merge(a, 3)))
+               for box in fan_out.put.boxes) == 1
+
+
+def test_comarkov_without_merge():
+    for category in (markov.Diagram, Function):
+        with raises(AxiomError, match="no merge or noise"):
+            Comarkov[category].copy(Ty[category.ob]())
+    with raises(AxiomError, match="no copy or discard"):
+        Comarkov[Diagram].copy(X)
+    assert not hasattr(Markov[markov.Diagram], "copy")
 
 
 R = Ty[python.Ty]((float, ), (float, ))

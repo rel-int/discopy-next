@@ -623,7 +623,7 @@ def test_Bubble_no_common_boundary():
         Bubble()
 
 
-ABSTRACT = ("Timed", "ControlledRotation", "BinaryTerm", "Parametrized")
+ABSTRACT = ("Timed", "Structural", "ControlledRotation", "BinaryTerm", "Parametrized")
 
 
 @cache
@@ -674,45 +674,49 @@ EXAMPLES = {  # a box of each constructor, from a class c, types x, y, data v
     "markov.Box": 'c("f", x, y, data=v, is_deterministic=False).delay()',
     "markov.Copy comarkov.Merge": "c(x, 3)",
     "markov.Discard comarkov.Noise quantum.gates.{Discard,MixedState} "
-    "grammar.cfg.Id": "c(x)",
+    "lambek.cfg.Id": "c(x)",
     "markov.Function comarkov.Cofunction": "c(x @ y, [1, 0, 0])",
     "rigid.Box": 'c("f", x, y, data=v).r',
     "{rigid,frobenius}.Cup": "c(x, x.r)",
     "{rigid,frobenius}.Cap": "c(x, x.l)",
     "pivotal.Box": 'c("f", x, y, data=v).delay().r',
-    "grammar.pregroup.Box": 'c("f", x, y, data=v, is_deterministic=False).r',
+    "lambek.pregroup.Box": 'c("f", x, y, data=v, is_deterministic=False).r',
     "tensor.Box": 'c("f", x, y, [v] + [0] * 5)',
     "frobenius.Spider": "c(1, 2, x, data=v)",
     "frobenius.Cospan": "c(x @ y, [0, 0, 1], [1])",
+    "biclosed.Bang": "c(box(c, x, y, v))",
+    "biclosed.{Dereliction,Digging,Contraction,Weakening}": "c(x)",
+    "biclosed.Exchange": "c(x, y, True)",
+    "biclosed.Laxator": "c(x, y)",
     "biclosed.{Eval,Coeval}": "c(x << y)",
     "closed.{Eval,Coeval}": "c(x << y, time_step=1)",
     "{biclosed,closed}.Curry": "c(box(c, x @ y, x, v), 1, False)",
     "biclosed.Constant": 'c("c", x, data=v)',
-    "{closed,grammar.categorial}.Constant {biclosed,closed}.Variable":
+    "{closed,lambek.categorial}.Constant {biclosed,closed}.Variable":
     'c("c", x)',
-    "{biclosed,closed}.Application grammar.categorial.FA": "c(f, a)",
-    "{biclosed,closed,grammar.categorial}.Abstraction": "c(u, f(u))",
+    "{biclosed,closed}.Application lambek.categorial.FA": "c(f, a)",
+    "{biclosed,closed,lambek.categorial}.Abstraction": "c(u, f(u))",
     "closed.{Pack,Unpack}": "c(x * y, 1)",
     "closed.Tuple": "c(a, u)",
     "closed.Projection": "c(closed.Tuple(a, u), 1)",
     "closed.Let": "c(closed.Tuple(a), [u], u)",
-    "grammar.categorial.BA": 'c(a, cg.Constant("f", y >> x))',
-    "grammar.categorial.{FTR,BTR}": "c(y, a)",
-    "grammar.categorial.TypeRaising": "c(y, a, y << (x >> y))",
-    "grammar.categorial.FC": 'c(f, cg.Constant("g", y << x))',
-    "grammar.categorial.BC":
+    "lambek.categorial.BA": 'c(a, cg.Constant("f", y >> x))',
+    "lambek.categorial.{FTR,BTR}": "c(y, a)",
+    "lambek.categorial.TypeRaising": "c(y, a, y << (x >> y))",
+    "lambek.categorial.FC": 'c(f, cg.Constant("g", y << x))',
+    "lambek.categorial.BC":
     'c(cg.Constant("f", x >> y), cg.Constant("g", y >> x))',
-    "grammar.categorial.{FX,BX}": 'c(f, cg.Constant("g", x >> y))',
-    "grammar.categorial.ForwardCrossedComposition": "c(x << y, x >> y)",
-    "grammar.categorial.BackwardCrossedComposition": "c(y << x, y >> x)",
-    "grammar.thue.Rule": 'c(x @ y, x, "r", data=v)',
-    "grammar.thue.Word": 'c("w", x @ y, y, data=v)',
-    "grammar.cfg.Rule": 'c(x @ y, x, "r")',
-    "grammar.cfg.Word": 'c("w", x, y)',
-    "grammar.pregroup.Word": 'c("w", x @ y, data=v)',
+    "lambek.categorial.{FX,BX}": 'c(f, cg.Constant("g", x >> y))',
+    "lambek.categorial.ForwardCrossedComposition": "c(x << y, x >> y)",
+    "lambek.categorial.BackwardCrossedComposition": "c(y << x, y >> x)",
+    "lambek.thue.Rule": 'c(x @ y, x, "r", data=v)',
+    "lambek.thue.Word": 'c("w", x @ y, y, data=v)',
+    "lambek.cfg.Rule": 'c(x @ y, x, "r")',
+    "lambek.cfg.Word": 'c("w", x, y)',
+    "lambek.pregroup.Word": 'c("w", x @ y, data=v)',
     "tensor.Bubble":
     'c(box(c, x, x, [v, 0, 0, 1]), func=abs, drawing_name="B")',
-    "ehypergraph.Join": "c(box(c, x, y, v), box(c, x, y, v))",
+    "egraph.Join": "c(box(c, x, y, v), box(c, x, y, v))",
     "quantum.circuit.Box": 'c("f", x, y, data=[v, 0, 0, 1], is_mixed=False)',
     "quantum.gates.QuantumGate": 'c("g", x, x, [v, 0, 0, 1])',
     "quantum.gates.{Ket,Bra}": "c(1, 0, time_step=1)",
@@ -733,7 +737,7 @@ EXAMPLES = {  # a box of each constructor, from a class c, types x, y, data v
 def example(cls, value):
     """ The box of a class that :data:`EXAMPLES` builds, with some data. """
     from discopy import closed, monoidal, tensor
-    from discopy.grammar import categorial as cg
+    from discopy.lambek import categorial as cg
     from discopy.neural.network import Dims
     from discopy.quantum import circuit, gates
     from discopy.rigid import Nat
@@ -812,13 +816,15 @@ BROKEN = {
     },
     "dagger": {
         "*.{Constant,Variable,Abstraction,Application} "
-        "closed.{Tuple,Projection,Let} grammar.categorial.{FA,BA,*TR,"
+        "closed.{Tuple,Projection,Let} lambek.categorial.{FA,BA,*TR,"
         "TypeRaising,[FB][CX]}": "a term has no stated dagger",
-        "grammar.categorial.*Composition": "a crossed composition has none",
+        "lambek.categorial.*Composition": "a crossed composition has none",
         "*.Feedback": "it has none, its memory would be fed back in time",
         PIVOTALS + ".Trace": "its dagger is drawn with cups and caps",
         "*.Curry": "a curry has no dagger",
-        "{closed,markov,grammar.abstract}.{Copy,Discard,Function} "
+        "*.{Dereliction,Digging,Contraction,Weakening,Laxator}":
+        "!L* has no rule from its codomain back to its domain",
+        "{closed,markov,lambek.abstract}.{Copy,Discard,Function} "
         "comarkov.{Cofunction,Merge,Noise}": "its category has no dagger",
         "rigid.C[ua]p": "a rigid cup or cap has none, a pivotal one has",
     },
@@ -833,10 +839,8 @@ BROKEN = {
         "*.Spider quantum.zx.[XYZ]": "it keeps no n_legs_in or n_legs_out",
     },
     "tree": {
-        "*.DualRail* quantum.zx.Scalar":
-        "it has no from_tree of its own",
         "quantum.gates.C[RU]*": "its tree is that of a controlled gate",
-        "grammar.categorial.TypeRaising": "its tree drops its cod",
+        "lambek.categorial.TypeRaising": "its tree drops its cod",
         "neural.network.{Box,Feedback,Trace,Head,Tail}": "a module has none",
         "{tensor,quantum.circuit,quantum.zx}.Bubble":
         "its tree drops its func, which == compares",

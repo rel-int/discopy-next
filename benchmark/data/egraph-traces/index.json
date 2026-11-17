@@ -1,0 +1,405 @@
+{
+ "traces": [
+  {
+   "file": "trace-00.json.gz",
+   "chosen": "random",
+   "enodes": 52,
+   "classes": 41,
+   "egraph_seconds": 2.4e-05,
+   "search_seconds": 0.0054
+  },
+  {
+   "file": "trace-01.json.gz",
+   "chosen": "random",
+   "enodes": 52,
+   "classes": 41,
+   "egraph_seconds": 1.3e-05,
+   "search_seconds": 0.0056
+  },
+  {
+   "file": "trace-02.json.gz",
+   "chosen": "random",
+   "enodes": 312,
+   "classes": 140,
+   "egraph_seconds": 8.3e-05,
+   "search_seconds": 0.0295
+  },
+  {
+   "file": "trace-03.json.gz",
+   "chosen": "random",
+   "enodes": 312,
+   "classes": 181,
+   "egraph_seconds": 8.7e-05,
+   "search_seconds": 0.0432
+  },
+  {
+   "file": "trace-04.json.gz",
+   "chosen": "random",
+   "enodes": 312,
+   "classes": 179,
+   "egraph_seconds": 7.6e-05,
+   "search_seconds": 0.0336
+  },
+  {
+   "file": "trace-05.json.gz",
+   "chosen": "random",
+   "enodes": 312,
+   "classes": 187,
+   "egraph_seconds": 7.4e-05,
+   "search_seconds": 0.0361
+  },
+  {
+   "file": "trace-06.json.gz",
+   "chosen": "random",
+   "enodes": 312,
+   "classes": 193,
+   "egraph_seconds": 7.6e-05,
+   "search_seconds": 0.0377
+  },
+  {
+   "file": "trace-07.json.gz",
+   "chosen": "random",
+   "enodes": 312,
+   "classes": 190,
+   "egraph_seconds": 8.4e-05,
+   "search_seconds": 0.043
+  },
+  {
+   "file": "trace-08.json.gz",
+   "chosen": "random",
+   "enodes": 312,
+   "classes": 190,
+   "egraph_seconds": 8.8e-05,
+   "search_seconds": 0.038
+  },
+  {
+   "file": "trace-09.json.gz",
+   "chosen": "random",
+   "enodes": 312,
+   "classes": 190,
+   "egraph_seconds": 8e-05,
+   "search_seconds": 0.0408
+  },
+  {
+   "file": "trace-10.json.gz",
+   "chosen": "random",
+   "enodes": 312,
+   "classes": 179,
+   "egraph_seconds": 8.6e-05,
+   "search_seconds": 0.0378
+  },
+  {
+   "file": "trace-11.json.gz",
+   "chosen": "random",
+   "enodes": 314,
+   "classes": 141,
+   "egraph_seconds": 8e-05,
+   "search_seconds": 0.0311
+  },
+  {
+   "file": "trace-12.json.gz",
+   "chosen": "random",
+   "enodes": 314,
+   "classes": 139,
+   "egraph_seconds": 8.6e-05,
+   "search_seconds": 0.0326
+  },
+  {
+   "file": "trace-13.json.gz",
+   "chosen": "random",
+   "enodes": 314,
+   "classes": 137,
+   "egraph_seconds": 8.2e-05,
+   "search_seconds": 0.0299
+  },
+  {
+   "file": "trace-14.json.gz",
+   "chosen": "random",
+   "enodes": 315,
+   "classes": 143,
+   "egraph_seconds": 8.8e-05,
+   "search_seconds": 0.0314
+  },
+  {
+   "file": "trace-15.json.gz",
+   "chosen": "random",
+   "enodes": 344,
+   "classes": 199,
+   "egraph_seconds": 9e-05,
+   "search_seconds": 0.0594
+  },
+  {
+   "file": "trace-16.json.gz",
+   "chosen": "random",
+   "enodes": 344,
+   "classes": 189,
+   "egraph_seconds": 0.000121,
+   "search_seconds": 0.0531
+  },
+  {
+   "file": "trace-17.json.gz",
+   "chosen": "random",
+   "enodes": 344,
+   "classes": 196,
+   "egraph_seconds": 0.000197,
+   "search_seconds": 0.0845
+  },
+  {
+   "file": "trace-18.json.gz",
+   "chosen": "random",
+   "enodes": 344,
+   "classes": 211,
+   "egraph_seconds": 8.3e-05,
+   "search_seconds": 0.0802
+  },
+  {
+   "file": "trace-19.json.gz",
+   "chosen": "random",
+   "enodes": 344,
+   "classes": 205,
+   "egraph_seconds": 8.4e-05,
+   "search_seconds": 0.0735
+  },
+  {
+   "file": "trace-20.json.gz",
+   "chosen": "random",
+   "enodes": 344,
+   "classes": 205,
+   "egraph_seconds": 0.000146,
+   "search_seconds": 0.1528
+  },
+  {
+   "file": "trace-21.json.gz",
+   "chosen": "random",
+   "enodes": 345,
+   "classes": 217,
+   "egraph_seconds": 0.000172,
+   "search_seconds": 0.1796
+  },
+  {
+   "file": "trace-22.json.gz",
+   "chosen": "random",
+   "enodes": 358,
+   "classes": 190,
+   "egraph_seconds": 8.4e-05,
+   "search_seconds": 0.062
+  },
+  {
+   "file": "trace-23.json.gz",
+   "chosen": "random",
+   "enodes": 1682,
+   "classes": 483,
+   "egraph_seconds": 0.0005,
+   "search_seconds": 0.3659
+  },
+  {
+   "file": "trace-24.json.gz",
+   "chosen": "random",
+   "enodes": 1746,
+   "classes": 513,
+   "egraph_seconds": 0.000586,
+   "search_seconds": 0.4005
+  },
+  {
+   "file": "trace-25.json.gz",
+   "chosen": "largest",
+   "enodes": 9070,
+   "classes": 2328,
+   "egraph_seconds": 0.004182,
+   "search_seconds": 2.2188
+  },
+  {
+   "file": "trace-26.json.gz",
+   "chosen": "largest",
+   "enodes": 9072,
+   "classes": 2328,
+   "egraph_seconds": 0.004024,
+   "search_seconds": 2.2208
+  },
+  {
+   "file": "trace-27.json.gz",
+   "chosen": "largest",
+   "enodes": 9079,
+   "classes": 2268,
+   "egraph_seconds": 0.004064,
+   "search_seconds": 2.3202
+  },
+  {
+   "file": "trace-28.json.gz",
+   "chosen": "largest",
+   "enodes": 9084,
+   "classes": 2341,
+   "egraph_seconds": 0.003945,
+   "search_seconds": 2.4244
+  },
+  {
+   "file": "trace-29.json.gz",
+   "chosen": "largest",
+   "enodes": 17718,
+   "classes": 4469,
+   "egraph_seconds": 0.007765,
+   "search_seconds": 5.0084
+  },
+  {
+   "file": "trace-30.json.gz",
+   "chosen": "largest",
+   "enodes": 17718,
+   "classes": 4440,
+   "egraph_seconds": 0.007998,
+   "search_seconds": 4.9664
+  },
+  {
+   "file": "trace-31.json.gz",
+   "chosen": "largest",
+   "enodes": 17718,
+   "classes": 4458,
+   "egraph_seconds": 0.008782,
+   "search_seconds": 5.0478
+  },
+  {
+   "file": "trace-32.json.gz",
+   "chosen": "largest",
+   "enodes": 17718,
+   "classes": 4466,
+   "egraph_seconds": 0.008795,
+   "search_seconds": 5.4499
+  },
+  {
+   "file": "trace-33.json.gz",
+   "chosen": "largest",
+   "enodes": 17718,
+   "classes": 4467,
+   "egraph_seconds": 0.008704,
+   "search_seconds": 4.8648
+  },
+  {
+   "file": "trace-34.json.gz",
+   "chosen": "largest",
+   "enodes": 17719,
+   "classes": 4448,
+   "egraph_seconds": 0.008721,
+   "search_seconds": 4.4874
+  },
+  {
+   "file": "trace-35.json.gz",
+   "chosen": "largest",
+   "enodes": 17719,
+   "classes": 4425,
+   "egraph_seconds": 0.008135,
+   "search_seconds": 4.4873
+  },
+  {
+   "file": "trace-36.json.gz",
+   "chosen": "largest",
+   "enodes": 17719,
+   "classes": 4445,
+   "egraph_seconds": 0.008609,
+   "search_seconds": 4.7438
+  },
+  {
+   "file": "trace-37.json.gz",
+   "chosen": "largest",
+   "enodes": 17719,
+   "classes": 4440,
+   "egraph_seconds": 0.008027,
+   "search_seconds": 4.4473
+  },
+  {
+   "file": "trace-38.json.gz",
+   "chosen": "largest",
+   "enodes": 17719,
+   "classes": 4420,
+   "egraph_seconds": 0.008019,
+   "search_seconds": 4.6678
+  },
+  {
+   "file": "trace-39.json.gz",
+   "chosen": "largest",
+   "enodes": 17719,
+   "classes": 4426,
+   "egraph_seconds": 0.008309,
+   "search_seconds": 4.2977
+  },
+  {
+   "file": "trace-40.json.gz",
+   "chosen": "largest",
+   "enodes": 17719,
+   "classes": 4429,
+   "egraph_seconds": 0.009034,
+   "search_seconds": 4.6988
+  },
+  {
+   "file": "trace-41.json.gz",
+   "chosen": "largest",
+   "enodes": 17719,
+   "classes": 4423,
+   "egraph_seconds": 0.008321,
+   "search_seconds": 4.997
+  },
+  {
+   "file": "trace-42.json.gz",
+   "chosen": "largest",
+   "enodes": 17719,
+   "classes": 4457,
+   "egraph_seconds": 0.008127,
+   "search_seconds": 4.777
+  },
+  {
+   "file": "trace-43.json.gz",
+   "chosen": "largest",
+   "enodes": 17719,
+   "classes": 4435,
+   "egraph_seconds": 0.007991,
+   "search_seconds": 4.2843
+  },
+  {
+   "file": "trace-44.json.gz",
+   "chosen": "largest",
+   "enodes": 17719,
+   "classes": 4436,
+   "egraph_seconds": 0.00826,
+   "search_seconds": 4.3308
+  },
+  {
+   "file": "trace-45.json.gz",
+   "chosen": "largest",
+   "enodes": 17720,
+   "classes": 4388,
+   "egraph_seconds": 0.007866,
+   "search_seconds": 4.6014
+  },
+  {
+   "file": "trace-46.json.gz",
+   "chosen": "largest",
+   "enodes": 17720,
+   "classes": 4431,
+   "egraph_seconds": 0.00843,
+   "search_seconds": 4.6044
+  },
+  {
+   "file": "trace-47.json.gz",
+   "chosen": "largest",
+   "enodes": 17721,
+   "classes": 4375,
+   "egraph_seconds": 0.007902,
+   "search_seconds": 4.5117
+  },
+  {
+   "file": "trace-48.json.gz",
+   "chosen": "largest",
+   "enodes": 18759,
+   "classes": 4566,
+   "egraph_seconds": 0.008092,
+   "search_seconds": 4.8256
+  },
+  {
+   "file": "trace-49.json.gz",
+   "chosen": "largest",
+   "enodes": 19764,
+   "classes": 4526,
+   "egraph_seconds": 0.008836,
+   "search_seconds": 5.0474
+  }
+ ],
+ "bytes": 1690133
+}

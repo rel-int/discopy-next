@@ -409,6 +409,8 @@ class Create(Channel):
             zw.Create(*self.photons, internal_states=internal_states)
         )
 
+    semantic_attrs = ("internal_states", )
+
     def __repr__(self):
         args = ", ".join(map(repr, self.photons))
         if self.internal_states is not None:
@@ -434,6 +436,14 @@ class AbstractGate(Channel, ABC):
             self._normal_form(dom, cod)
         )
         self.data = data
+
+    semantic_attrs = ("array", )
+    """
+    A gate is its array: a flag that conjugates or daggers it, e.g.
+    :code:`BBS.is_conj` or :code:`TBS.is_gate_dagger`, changes the array and
+    nothing else a box compares, so the array is what
+    :meth:`channel.Channel.setoid` has to read.
+    """
 
     def _normal_form(self, dom, cod):
         return matrix_to_zw(self.array.reshape(dom, cod))
@@ -984,6 +994,8 @@ class DualRail(Channel):
             f"DualRail({n_qubits})",
             diagram.dual_rail(n_qubits, internal_states=internal_states)
         )
+
+    semantic_attrs = ("internal_states", )
 
     def __repr__(self):
         args = str(len(self.dom))

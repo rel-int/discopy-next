@@ -2,15 +2,18 @@ import pytest
 
 pytest.importorskip("tensornetwork")
 
+import zlib
+import itertools
+
 import numpy as np
 import tensornetwork as tn
-from hypothesis import find
+from hypothesis import find, given, settings, strategies as st
 from pytest import raises
 
 from discopy.utils import AxiomError, dumps, loads
 from discopy.tensor import *
 from discopy import compact, frobenius, pivotal, rigid
-from discopy.grammar import pregroup
+from discopy.lambek import pregroup
 
 
 def test_backend():
@@ -508,23 +511,29 @@ def test_Tensor_array():
     assert box.array is None
 
 
-def test_CMap_eval():
+def cmap_diagrams():
     vector = Box('vector', Dim(1), Dim(2), [0., 1.])
     f = Box('f', Dim(2), Dim(2), [0., 1., 1., 0.])
     a = Box('a', Dim(1), Dim(2), [1., 2.])
     b = Box('b', Dim(1), Dim(2), [3., 4.])
     u = Box('u', Dim(1), Dim(2, 3), list(map(float, range(6))))
+    g = Box('g', Dim(2, 2), Dim(2, 2), list(map(float, range(16))))
     spider = Spider(1, 1, Dim(2)) >> Spider(1, 2, Dim(2)) \
         >> Spider(2, 0, Dim(2))
-    for diagram in [
-            vector >> vector[::-1],
-            spider,
-            f >> f,
-            a @ b >> Swap(Dim(2), Dim(2)),
-            u >> u[::-1],
-            Id(Dim(2)),
-            Cup(Dim(2), Dim(2)),
-            Cap(Dim(2), Dim(2)) >> Cup(Dim(2), Dim(2))]:
+    return [
+        vector >> vector[::-1],
+        spider,
+        f >> f,
+        a @ b >> Swap(Dim(2), Dim(2)),
+        u >> u[::-1],
+        g.trace(),
+        Id(Dim(2)),
+        Cup(Dim(2), Dim(2)),
+        Cap(Dim(2), Dim(2)) >> Cup(Dim(2), Dim(2))]
+
+
+def test_CMap_eval():
+    for diagram in cmap_diagrams():
         tensor, reference = diagram.to_map().eval(), diagram.eval()
         assert (tensor.dom, tensor.cod) == (reference.dom, reference.cod)
         assert np.allclose(
@@ -608,6 +617,109 @@ def test_eval_params():
         "ar_map={frobenius.Box('v', frobenius.Ty(), " \
         "frobenius.Ty(frobenius.Wire('x'))): [1.0, 2.0]}, " \
         "dom=frobenius.Diagram, dtype=float, optimize='optimal')"
+
+
+@pytest.mark.parametrize('engine', ['numpy', 'opt_einsum', 'quimb'])
+def test_contractors(engine):
+    if engine != 'numpy':
+        pytest.importorskip(engine)
+    contractor = {'numpy': NumPy, 'opt_einsum': OptEinsum, 'quimb': Quimb}[
+        engine]()
+    for diagram in cmap_diagrams():
+        result = diagram.eval(contractor=contractor)
+        reference = diagram.eval()
+        assert (result.dom, result.cod) == (reference.dom, reference.cod)
+        assert np.allclose(
+            np.asarray(result.array, dtype=float),
+            np.asarray(reference.array, dtype=float))
+
+
+def test_contractor_empty_and_abstract():
+    assert Id(Dim()).eval(contractor=Quimb()).array == [1]
+    vector = Box('vector', Dim(1), Dim(2), [0., 1.])
+    with raises(NotImplementedError):
+        (vector >> vector[::-1]).eval(contractor=Contractor())
+
+
+def test_contract_sum():
+    pytest.importorskip('quimb')
+    vector = Box('vector', Dim(1), Dim(2), [1., 2.])
+    diagram = vector >> vector[::-1]
+    result = (diagram + diagram).eval(contractor=Quimb())
+    assert np.allclose(np.asarray(result.array), 2 * diagram.eval().array)
+
+
+def test_contract_repr():
+    from discopy import tensor
+    F = Functor({}, {}, contractor=Quimb())
+    assert repr(F) == "tensor.Functor(ob_map={}, ar_map={}, " \
+        "dom=frobenius.Diagram, dtype=float, contractor=Quimb())"
+    assert Quimb() == Quimb() != OptEinsum()
+    assert hash(Quimb()) == hash(Quimb())
+    assert repr(eval(repr(F))) == repr(F)
+
+
+def test_to_quimb():
+    pytest.importorskip('quimb')
+    for diagram in cmap_diagrams():
+        network, reference = diagram.to_quimb(), diagram.eval()
+        output_inds = [f'inp{i}' for i in range(len(diagram.dom))] \
+            + [f'out{i}' for i in range(len(diagram.cod))]
+        assert sorted(network.outer_inds()) == sorted(output_inds)
+        result = network.contract(
+            output_inds=output_inds, preserve_tensor=True)
+        assert np.allclose(
+            np.asarray(result.data).flatten(),
+            np.asarray(reference.array, dtype=complex).flatten())
+
+
+def test_to_quimb_dtype():
+    pytest.importorskip('quimb')
+    network = Id(Dim(2)).to_quimb(dtype=complex)
+    assert all(tensor.data.dtype == complex for tensor in network.tensors)
+
+
+def test_quimb_cotengra():
+    pytest.importorskip('quimb')
+    cotengra = pytest.importorskip('cotengra')
+    u = Box('u', Dim(2), Dim(2, 2), list(range(1, 9)))
+    diagram = u >> u[::-1]
+    exact = diagram.eval().array
+    result = diagram.eval(contractor=Quimb(), max_bond=4)
+    assert np.allclose(np.asarray(result.array), exact)
+    exact_optimizer = cotengra.HyperOptimizer(
+        max_repeats=2, parallel=False, progbar=False)
+    result = diagram.eval(contractor=Quimb(), optimize=exact_optimizer)
+    assert np.allclose(np.asarray(result.array), exact)
+    compressed_optimizer = cotengra.HyperCompressedOptimizer(
+        chi=4, methods=['greedy-compressed'], max_repeats=2,
+        parallel=False, progbar=False)
+    result = diagram.eval(
+        contractor=Quimb(), optimize=compressed_optimizer, max_bond=4)
+    assert np.allclose(np.asarray(result.array), exact)
+    reusable = cotengra.ReusableHyperCompressedOptimizer(
+        chi=4, methods=['greedy-compressed'], max_repeats=2,
+        parallel=False, progbar=False)
+    result = diagram.eval(contractor=Quimb(), optimize=reusable)
+    assert np.allclose(np.asarray(result.array), exact)
+
+
+def test_quimb_pytorch_autodiff():
+    pytest.importorskip('quimb')
+    autoray = pytest.importorskip('autoray')
+    if tuple(map(int, autoray.__version__.split('.')[:2])) < (0, 9):
+        pytest.skip('autoray < 0.9 loses gradients on cached '
+                    'contraction trees')
+    torch = pytest.importorskip('torch')
+    x = frobenius.Ty('x')
+    v = frobenius.Box('v', frobenius.Ty(), x)
+    t = torch.tensor(3.0, dtype=torch.float64, requires_grad=True)
+    F = Functor({x: 2}, {v: torch.stack([t, t])},
+                dtype=torch.float64, contractor=Quimb())
+    with backend('pytorch'):
+        result = F(v >> v.dagger()).array
+    result.backward()
+    assert result.item() == 18. and t.grad.item() == 12.
 
 
 def test_Functor_bubble():
@@ -902,7 +1014,7 @@ def test_grad_of_named_bubble_reads_back():
 
 
 def test_Functor_tree():
-    from discopy.grammar.pregroup import Cup, Functor as Pregroup, Ty, Word
+    from discopy.lambek.pregroup import Cup, Functor as Pregroup, Ty, Word
     s, n = Ty('s'), Ty('n')
     Alice, loves = Word('Alice', n), Word('loves', n.r @ s)
     sentence = Alice @ loves >> Cup(n, n.r) @ s
@@ -916,8 +1028,144 @@ def test_Functor_tree():
         assert type(G) is type(F) and G.cod == F.cod
         assert G(sentence) == F(sentence)
     assert G.optimize == "optimal" and G.dtype is complex
-    with raises(TypeError, match="with params has no tree"):
+    with raises(TypeError, match="with params or a contractor has no tree"):
         dumps(Functor({n: 2}, {}, backend="os"))
     for optimize in ({'not': 'a path'}, 5):
         with raises(TypeError, match=r"Expected str \| bool \| list"):
             Functor.from_tree(G.to_tree() | {'optimize': optimize})
+
+
+def test_to_quimb_sum():
+    pytest.importorskip('quimb')
+    vector = Box('vector', Dim(1), Dim(2), [1., 2.])
+    diagram = vector >> vector[::-1]
+    network = (diagram + diagram).to_quimb()
+    assert network.contract(preserve_tensor=True).data == 10
+
+
+def test_contractor_reads_the_active_backend():
+    contractor = Quimb()
+    assert contractor.module is NumPy().module
+    torch = pytest.importorskip('torch')
+    with backend('pytorch'):
+        assert contractor.module is torch
+    assert eval(repr(Quimb(NumPy()))) == Quimb(NumPy()) != Quimb()
+
+
+def test_Tensor_resolvent_reshapes_its_factors():
+    # A tensor has one axis per factor, its resolvent that of its matrix.
+    array = np.random.default_rng(0).uniform(0, .1, (2, 3, 2, 3))
+    f, size = Tensor[float](array, Dim(2, 3), Dim(2, 3)), 6
+    expected = np.linalg.inv(np.eye(size) - f.array.reshape(size, size))
+    assert np.allclose(f.resolvent().array.reshape(size, size), expected)
+    assert f.resolvent().dom == f.resolvent().cod == Dim(2, 3)
+    with raises(ValueError, match="partial"):
+        Tensor[float].id(Dim(2, 2)).resolvent()
+    with raises(TypeError):
+        Tensor[float].swap(Dim(2), Dim(3)).resolvent()
+
+
+HYPERGRAPH_X, HYPERGRAPH_Y = frobenius.Ty('x'), frobenius.Ty('y')
+
+
+def hypergraph_functor(dtype, contractor=None):
+    """ A tensor functor with an array for any box on ``x`` and ``y``,
+    drawn from a seed its name and its type fix. """
+    ob_map = {HYPERGRAPH_X: Dim(2), HYPERGRAPH_Y: Dim(3)}
+
+    def ar_map(box):
+        dims = Dim(*(ob_map[frobenius.Ty(obj)].inside[0]
+                     for obj in (box.dom @ box.cod).inside))
+        rng = np.random.default_rng(zlib.crc32(repr(box).encode()))
+        array = rng.integers(0, 3, dims.inside or (1, ))
+        return array.astype(dtype) if dtype is not None else array * .5
+    return Functor(ob_map, ar_map, dtype=dtype, contractor=contractor)
+
+
+@pytest.mark.parametrize("dtype", [bool, int, float, complex, None])
+@pytest.mark.parametrize("contractor", [None, OptEinsum()], ids=repr)
+@settings(max_examples=30, deadline=None)
+@given(data=st.data())
+def test_Functor_contracts_a_hypergraph_as_its_diagram(
+        dtype, contractor, data):
+    """ A frobenius hypergraph, with a boundary, boxes with a domain and
+    spiders on no port, contracts to the image of its diagram. """
+    x, y = HYPERGRAPH_X, HYPERGRAPH_Y
+    types = st.sampled_from([frobenius.Ty(), x, y, x @ y, x @ x])
+    graph = data.draw(frobenius.Hypergraph.strategy(
+        types=types, max_leaves=3, max_scalars=1))
+    F = hypergraph_functor(dtype, contractor)
+    result, reference = F(graph), F(graph.to_diagram())
+    assert (result.dom, result.cod) == (reference.dom, reference.cod)
+    assert np.allclose(
+        np.asarray(result.array, dtype=complex),
+        np.asarray(reference.array, dtype=complex))
+
+
+def test_Functor_counts_the_4x4_sudoku():
+    """ A spider is one index: the 4x4 sudoku, a closed hypergraph of 16
+    spiders and 12 boxes, counts its 288 grids, where its diagram has an
+    index per leg of each spider and numpy refuses the einsum. """
+    x, n = frobenius.Ty('x'), 2
+    cell = lambda row, col: (n * n) * row + col
+    rows = [[cell(r, c) for c in range(n * n)] for r in range(n * n)]
+    blocks = [[cell(n * i + k, n * j + m) for k in range(n) for m in range(n)]
+              for i in range(n) for j in range(n)]
+    scopes = rows + [list(col) for col in zip(*rows)] + blocks
+    box = frobenius.Box('AllDifferent', frobenius.Ty(), x ** (n * n))
+    graph = frobenius.Hypergraph(
+        frobenius.Ty(), frobenius.Ty(), len(scopes) * (box, ),
+        ((), tuple(((), tuple(scope)) for scope in scopes), ()),
+        spider_types=dict.fromkeys(range(n ** 4), x))
+    array = [len(set(values)) == n * n
+             for values in itertools.product(range(n * n), repeat=n * n)]
+    F = Functor({x: n * n}, {box: array}, dtype=int)
+    assert F(graph) == Tensor[int]([288], Dim(1), Dim(1))
+
+
+def test_Functor_contracts_another_hypergraph_through_its_diagram():
+    x = compact.Ty('x')
+    f = compact.Box('f', x, x)
+    diagram = f @ x.r >> compact.Cup(x, x.r)
+    F = Functor({x: 2}, {f: [[0, 1], [1, 1]]}, dom=compact.Diagram, dtype=int)
+    assert F(diagram.to_hypergraph()) == F(diagram)
+
+
+def test_Functor_keeps_a_diagonal_shared_with_another_array():
+    """ A spider on two ports of one box and on the boundary is a diagonal
+    that stays an index of the network, by every contractor. """
+    pytest.importorskip("quimb")
+    x = frobenius.Ty('x')
+    f = frobenius.Box('f', frobenius.Ty(), x @ x)
+    graph = frobenius.Hypergraph(
+        frobenius.Ty(), x, (f, ), ((), (((), (0, 0)), ), (0, )))
+    for contractor in (None, OptEinsum(), Quimb()):
+        F = Functor({x: 2}, {f: [[1, 0], [0, 2]]}, dtype=int,
+                    contractor=contractor)
+        assert F(graph) == Tensor[int]([1, 2], Dim(1), Dim(2))
+    network = F.to_quimb(graph)
+    assert network.contract(output_inds=["out0"]).data.tolist() == [1, 2]
+
+
+def test_Functor_contract_takes_another_hypergraph_through_its_diagram():
+    """ A hypergraph of compact cups nests a compound image as its diagram
+    does, through contract as through the call. """
+    y = compact.Ty('y')
+    cup = compact.Cup(y, y.r)
+    F = Functor({y: Dim(2, 3)}, {}, dom=compact.Diagram, dtype=int)
+    graph = cup.to_hypergraph()
+    assert F.contract(graph) == F(graph) == F(cup)
+
+
+@pytest.mark.parametrize('name', ['pytorch', 'jax'])
+def test_composition_promotes_on_backend(name):
+    """ A float tensor composes and tensors with the integer identity on a
+    backend whose ``tensordot`` does not promote. """
+    pytest.importorskip({'pytorch': 'torch'}.get(name, name))
+    with backend(name):
+        t = Tensor([0.5, 1., 1., .25], Dim(2), Dim(2))
+        unit = Tensor.id(Dim(2))
+        for composite in (t >> unit, unit >> t):
+            assert composite.dtype == t.dtype and composite.is_close(t)
+        assert (t @ unit).dtype == (unit @ t).dtype == t.dtype
+        assert (t @ unit).is_close(t @ unit.cast(t.dtype))

@@ -97,6 +97,7 @@ from discopy.abc import RibbonCategory
 from discopy.cat import factory
 from discopy.pivotal import (  # noqa: F401  pylint: disable=unused-import
     Ty, Nat)
+from discopy.utils import from_tree
 
 
 @factory
@@ -297,6 +298,23 @@ class DualRailCup(Box):
     def dagger(self):
         return DualRailCap(self.left, self.right, not self.is_dagger)
 
+    to_tree = balanced.DualRailBraid.to_tree
+
+    @classmethod
+    def from_tree(cls, tree: dict) -> "DualRailCup":
+        """
+        Decode a dual rail cup, which :meth:`to_tree` writes with the two
+        ribbons it joins.
+
+        >>> from discopy.utils import dumps, loads
+        >>> x = Ty('x')
+        >>> cup = DualRailCup(x @ x, x.r @ x.r)
+        >>> assert loads(dumps(cup)) == cup
+        >>> assert loads(dumps(cup.dagger())) == cup.dagger()
+        """
+        left, right = map(from_tree, (tree['left'], tree['right']))
+        return cls(left, right, is_dagger=tree.get('is_dagger', False))
+
 
 class DualRailCap(Box):
     """
@@ -322,6 +340,22 @@ class DualRailCap(Box):
 
     def dagger(self):
         return DualRailCup(self.left, self.right, not self.is_dagger)
+
+    to_tree = balanced.DualRailBraid.to_tree
+
+    @classmethod
+    def from_tree(cls, tree: dict) -> "DualRailCap":
+        """
+        Decode a dual rail cap, see :class:`DualRailCup`.
+
+        >>> from discopy.utils import dumps, loads
+        >>> x = Ty('x')
+        >>> cap = DualRailCap(x @ x, x.r @ x.r)
+        >>> assert loads(dumps(cap)) == cap
+        >>> assert loads(dumps(cap.dagger())) == cap.dagger()
+        """
+        left, right = map(from_tree, (tree['left'], tree['right']))
+        return cls(left, right, is_dagger=tree.get('is_dagger', False))
 
 
 class Twist(balanced.Twist, Box):

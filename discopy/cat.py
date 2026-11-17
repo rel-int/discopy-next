@@ -87,6 +87,7 @@ from discopy.testable import (
     FUEL, GENERATORS, Equation as AbstractEquation, Serialisable)
 from discopy.utils import (  # noqa: F401
     factory,
+    factory_key,
     factory_name,
     from_tree,
     resolve_factory,
@@ -784,7 +785,7 @@ class Box(Arrow):
         particular if the `data` is not hashable then neither is the `Box`.
         """
         attributes = self.name, self.dom, self.cod, self.is_dagger, self.data
-        return (type(self), ) + attributes
+        return (factory_key(type(self)), ) + attributes
 
     def __lt__(self, other):
         return self.name < other.name
@@ -870,7 +871,7 @@ class Sum(Box):
     def setoid(self):
         """ Ensure that a singleton sum is in fact equal to its only term. """
         return self.terms[0].setoid() if len(self.terms) == 1 else (
-            type(self), self.terms, self.dom, self.cod)
+            factory_key(type(self)), self.terms, self.dom, self.cod)
 
     def __repr__(self):
         return self.name
@@ -1001,19 +1002,28 @@ one, they have [cat.Ob('x'), cat.Ob('y')].
     def setoid(self):
         """
         Ensure that bubbles are equal if they have the same type, their `args`
-        are equal as well as their attributes `dom, cod, name, method` and
-        `data`, as for a :class:`Box`: if the `data` is not hashable then
-        neither is the bubble. Its string prints the `data`, so that it reads
-        back.
+        are equal as well as their attributes `dom, cod, name, method,
+        is_dagger` and `data`, as for a :class:`Box`: if the `data` is not
+        hashable then neither is the bubble. Its string prints the `data`, so
+        that it reads back.
 
         >>> f = Box('f', Ob('x'), Ob('y'))
         >>> assert f.bubble(data=1) != f.bubble(data=2)
         >>> print(f.bubble(data=1))
         (f).bubble(data=1)
+
+        Bubbling and daggering do not commute, as :meth:`__str__` prints
+        them: the dagger of a bubble is not the bubble of a dagger, so that
+        a functor cannot separate equal bubbles, e.g. into
+        :class:`discopy.tensor.Bubble` where the two have different arrays.
+
+        >>> assert f.bubble().dagger() != f.dagger().bubble()
+        >>> assert f.bubble().dagger().dagger() == f.bubble()
         """
         args_data = tuple(f.setoid() for f in self.args)
-        return (type(self), ) + args_data + tuple(getattr(self, x) for x in (
-            "dom", "cod", "name", "method", "data"))
+        return (factory_key(type(self)), ) + args_data + tuple(
+            getattr(self, x)
+            for x in ("dom", "cod", "name", "method", "is_dagger", "data"))
 
     def __str__(self):
         """

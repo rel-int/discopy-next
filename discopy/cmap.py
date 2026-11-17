@@ -54,6 +54,7 @@ from inspect import isclass
 from io import BytesIO
 from itertools import accumulate, product
 from math import inf, lcm
+from numbers import Integral
 from typing import TYPE_CHECKING, Literal, Self
 
 from discopy import cat, hypergraph, messages
@@ -1076,12 +1077,12 @@ class CMap[category](
             n_ports += len(box.dom) + len(box.cod)
 
         def global_index(box_index: int, position: int) -> int:
-            if not isinstance(box_index, int) \
+            if not isinstance(box_index, Integral) \
                     or not 0 <= box_index < len(boxes):
                 raise ValueError(f"There is no box {box_index}.")
             box = boxes[box_index]
             offsets = cls.logical_order(len(box.dom), len(box.cod))
-            if not isinstance(position, int) \
+            if not isinstance(position, Integral) \
                     or not 0 <= position < len(offsets):
                 raise ValueError(f"Box {box_index} has no port {position}.")
             return starts[box_index] + offsets[position]
@@ -1493,10 +1494,7 @@ class CMap[category](
         assert_istraceable(self, n, left)
         if issubclass(self.category, TracedCategory)\
                 and not issubclass(self.category, SymmetricCategory):
-            result = self
-            for _ in range(n):
-                result = result.explicit_trace(left)
-            return result
+            return self.explicit_trace(n, left)
 
         if left:
             dom, cod = self.dom[n:], self.cod[n:]
@@ -1647,25 +1645,99 @@ class CMap[category](
             new_dom, cod, boxes, edge,
             loops=self.loops)
 
-    def explicit_trace(self, left: bool = False) -> "CMap":
+    def explicit_trace(  # pylint: disable=too-many-locals  # the onion
+            self, n: int = 1, left: bool = False) -> "CMap":
         """
-        The trace of a map with explicit boxes (trace, cup or cap).
+        The trace of ``n`` wires of a map with explicit boxes (trace, cup or
+        cap), in one pass, like :meth:`Hypergraph.explicit_trace`.
 
         Parameters:
+            n : The number of wires to trace.
             left : Whether to trace on the left or right.
 
         Note
         ----
-        When ``category.trace_factory`` is a class, e.g. for symmetric
-        diagrams, then the result is just one big trace box wrapped up as a
-        map. Otherwise it is a class method, e.g. for compact diagrams, in
-        which case we use it to introduce cup and cap boxes.
+        When ``category.trace_factory`` is a class, e.g. for a planar traced
+        category, then the result is just one big trace box wrapped up as a
+        map, whatever ``n``, since the trace of ``n`` wires of a diagram is
+        its ``n`` one-wire traces nested: nesting them on the diagram
+        converts the map once instead of once per wire.
+
+        Otherwise it is a class method, e.g. for compact diagrams, in which
+        case we use it to introduce cup and cap boxes, one pair per wire: the
+        cups and caps of a pivotal category are atomic, so the ``n``-wire
+        trace is the nest of ``n`` one-wire traces there as well. When that
+        class method is the pivotal one itself, the whole onion of ``n`` cup
+        and cap pairs goes to one constructor call rather than being composed
+        pair by pair; a category overriding it gets the nest its own factory
+        builds, like :meth:`Hypergraph.explicit_trace`.
+
+        >>> from discopy import compact, feedback
+        >>> x = feedback.Ty('x')
+        >>> f = feedback.Box('f', x @ x @ x, x @ x @ x).to_map()
+        >>> assert f.explicit_trace(2) == f.explicit_trace().explicit_trace()
+        >>> y = compact.Ty('y')
+        >>> g = compact.Box('g', y @ y @ y, y @ y @ y).to_map()
+        >>> assert g.explicit_trace(2) == g.explicit_trace().explicit_trace()
+
+        Tracing no wire is the identity, whatever the category, so a map with
+        nothing to trace needs no traces, see :meth:`make_causal`.
+
+        >>> assert g.explicit_trace(0) == g
+
+        Any other ``n`` is checked against the wires there are, as
+        :meth:`trace` and :meth:`Hypergraph.explicit_trace` check it: a
+        negative count raises rather than tracing nothing.
         """
+        if n == 0:
+            return self
         type(self).assert_istraced()
+        assert_istraceable(self, n, left)
         factory = self.category.trace_factory
         if isclass(factory):
-            return self.from_box(factory(self.to_diagram(), left))
-        return factory.__func__(type(self), self, left)
+            return self.from_box(self.to_diagram().trace(n, left))
+        # pylint: disable-next=import-outside-toplevel  # pivotal imports us
+        from discopy.pivotal import Diagram as Pivotal
+        if factory.__func__ is not Pivotal.trace_factory.__func__:
+            result = self
+            for _ in range(n):
+                result = factory.__func__(type(self), result, left)
+            return result
+        dom, cod, traced = (self.dom[n:], self.cod[n:], self.dom[:n]) if left\
+            else (self.dom[:-n], self.cod[:-n], self.dom[-n:])
+        legs = [(traced[i:i + 1].r, traced[i:i + 1]) if left
+                else (traced[i:i + 1], traced[i:i + 1].r) for i in range(n)]
+        order = tuple(reversed(range(n))) if left else tuple(range(n))
+        boxes = tuple(self.category.cap_factory(*legs[i]) for i in order)\
+            + self.boxes + tuple(
+                self.category.cup_factory(*legs[i]) for i in order[::-1])
+        inside = self.n_ports - len(self.dom) - len(self.cod)
+        caps = len(dom)
+        cups = caps + 2 * n + inside
+        outputs = cups + 2 * n
+        # The traced wire and the adjoint leg of each cap and cup, the cap of
+        # the i-th wire sitting outside the cap of the next one: a box lists
+        # its domain forwards and its codomain backwards.
+        cap_legs = [(caps + 2 * (n - 1 - i), caps + 2 * (n - 1 - i) + 1)
+                    if left else (caps + 2 * i + 1, caps + 2 * i)
+                    for i in range(n)]
+        cup_legs = [(cups + 2 * i + 1, cups + 2 * i) if left
+                    else (cups + 2 * (n - 1 - i), cups + 2 * (n - 1 - i) + 1)
+                    for i in range(n)]
+        into, out_of = ([wire for wire, _ in cap_legs],
+                        [wire for wire, _ in cup_legs])
+        untraced = [outputs + i for i in range(len(cod))]
+        moved = (into + list(range(caps)) if left
+                 else list(range(caps)) + into)\
+            + [port + n for port in range(
+                len(self.dom), len(self.dom) + inside)]\
+            + (out_of + untraced if left else untraced + out_of)
+        edges = Permutation.from_transpositions([
+            (moved[source], moved[target])
+            for source, target in enumerate(self.edges) if source < target
+        ] + [(cap_legs[i][1], cup_legs[i][1]) for i in range(n)],
+            outputs + len(cod))
+        return type(self)(dom, cod, boxes, edges, loops=self.loops)
 
     def leg_order(self, *legs: int) -> tuple[int, ...]:
         """
@@ -1807,9 +1879,7 @@ class CMap[category](
         result = type(self)(
             self.dom @ typ, self.cod @ typ, self.boxes, edges,
             check=False)
-        for _ in range(n_traces):
-            result = result.explicit_trace()
-        return result
+        return result.explicit_trace(n_traces)
 
     def to_compact(self) -> "CMap":
         """
