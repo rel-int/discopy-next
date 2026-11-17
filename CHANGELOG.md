@@ -581,6 +581,10 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   `Matrix.then` casts both factors to the dtype they promote to, so it
   composes with the integer structural matrices on a backend whose product
   does not promote ([next#583]).
+- `Tensor.then` and `Tensor.tensor` cast each factor to the dtype they
+  promote to, as `Matrix.then` does, so a float tensor composes and tensors
+  with the integer identity on the pytorch backend; `Matrix.cast` returns
+  the matrix itself when it already has the dtype ([next#587]).
 - `discopy.optyx`: the dagger of a channel with an environment, e.g.
   `PhotonLoss(.1).dagger()`, is the adjoint CP map, whose Kraus map bends the
   environment back by a cap, where it failed an assertion; `power_fix` raises
@@ -2092,6 +2096,7 @@ for the changelog of `1.2.1` and earlier.
 [next#583]: https://github.com/rel-int/discopy-next/pull/583
 [next#585]: https://github.com/rel-int/discopy-next/pull/585
 [next#586]: https://github.com/rel-int/discopy-next/pull/586
+[next#587]: https://github.com/rel-int/discopy-next/pull/587
 [next#589]: https://github.com/rel-int/discopy-next/pull/589
 [next#591]: https://github.com/rel-int/discopy-next/pull/591
 [optyx#16]: https://github.com/rel-int/optyx/pull/16

@@ -210,7 +210,8 @@ class Matrix[dtype](
 
     def cast(self, dtype: type) -> Matrix:
         """
-        Cast a matrix to a given ``dtype``.
+        Cast a matrix to a given ``dtype``, the matrix itself when it
+        already has it.
 
         Parameters:
             dtype : The target datatype.
@@ -218,7 +219,11 @@ class Matrix[dtype](
         Example
         -------
         >>> assert Matrix.id().cast(bool) == Matrix[bool].id()
+        >>> m = Matrix[float].id(2)
+        >>> assert m.cast(float) is m
         """
+        if dtype == self.dtype:
+            return self
         return type(self)[dtype](self.array, self.dom, self.cod)
 
     def promote(self, *others: Matrix) -> type:
@@ -451,9 +456,7 @@ and 'Matrix[int]'
         assert_iscomposable(self, other)
         cls = self.promote(other)
         left, right = (
-            factor.array if factor.dtype == cls.dtype
-            else cls(factor.array, factor.dom, factor.cod).array
-            for factor in (self, other))
+            factor.cast(cls.dtype).array for factor in (self, other))
         with backend() as np:
             array = np.matmul(left, right)
         return cls(array, self.dom, other.cod)
