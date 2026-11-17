@@ -5,7 +5,7 @@
 > (slice 2 of rel-int/discopy-next#512; default taken 2026-11-16 by the 48 h rule)
 
 - [WIP] @session_01MEJxy4kqJ6YhajqkcZRUXm-2026-11-17 00:19 Builder.rewrite and Builder.step: a match rewritten by add and union, a round rewritten then rebuilt
-- [ ] EGraph.saturate on the builder, a freeze after each round that changes something
+- [WIP] @session_01MEJxy4kqJ6YhajqkcZRUXm-2026-11-17 00:19 EGraph.saturate on the builder, a freeze after each round that changes something
 - [ ] EGraph.reduced, one spider per class and one box per e-node, and law stepping
 - [ ] the closed form of + on n leaves as a test: 63 classes and 602 e-nodes at n = 6 in under 2 s
 - [ ] CHANGELOG bullets under Added and Changed
