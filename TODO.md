@@ -2,4 +2,4 @@
 
 - [x] `Reservoir.fit(..., washout=0)` drops the first `washout` rows of features and targets, validating `0 <= washout < len(sequence)`
 - [x] Doctest, and a unit test in `test/quantum/reservoir.py` that fails on main
-- [ ] CHANGELOG `Added` bullet citing next#216
+- [x] CHANGELOG `Added` bullet citing next#216
