@@ -23,7 +23,12 @@ def test_wires_and_rectangles():
     assert len(wires(drawing)) == 4
     (l0, b0, r0, t0), (l1, b1, r1, t1) = rectangles(drawing)
     assert b0 == b1 and t0 == t1 and r0 <= l1
-    assert features(Box('a' * 40, x, x).to_drawing())["label_overlap"] == 0
+    long = Box('a' * 40, x, x, min_width=0)
+    assert features((long @ long).foliation().to_drawing())[
+        "label_overlap"] == 1
+    assert features((f @ g).foliation().to_drawing())["label_overlap"] == 0
+    assert features((Box('f', x, x, height=3) @ long).foliation(
+    ).to_drawing())["label_overlap"] == 1
 
 
 def test_make_nicer_keeps_the_diagram():
@@ -39,6 +44,8 @@ def test_make_nicer_keeps_the_diagram():
 
 
 def test_make_nicer_takes_a_score():
+    diagram = f @ g
+    assert make_nicer(diagram, score=lambda d: 0) is diagram
     assert make_nicer(f @ g, score=lambda d: d.height) == f @ g
     assert make_nicer(f @ g, score=lambda d: -d.height)\
         == (f @ g).foliation()
@@ -52,3 +59,6 @@ def test_rectangles_follow_height_and_label():
     (left, _, right, _), = rectangles(short)
     assert right - left == 0.5
 
+    latex = Box('$\\mathrm{f}$', x, x).to_drawing()
+    (left, _, right, _), = rectangles(latex)
+    assert right - left == 0.5

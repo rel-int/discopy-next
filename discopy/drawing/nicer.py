@@ -50,6 +50,7 @@ from math import hypot, log
 from typing import TYPE_CHECKING, Callable
 
 from discopy.drawing.drawing import Drawing, Point
+from discopy.utils import text_width
 
 if TYPE_CHECKING:
     from discopy import monoidal
@@ -66,9 +67,6 @@ WEIGHTS = {
     "area": 1.,
 }
 """ The weight of each feature in :func:`hand_score`, equal until fitted. """
-
-CHARACTER_WIDTH = .1
-""" The width of a character of a box label, as a fraction of a wire gap. """
 
 
 def wires(drawing: Drawing) -> list[tuple[Point, Point]]:
@@ -105,7 +103,7 @@ def rectangles(drawing: Drawing) -> list[tuple[float, float, float, float]]:
             else str(getattr(box, "drawing_name", box.name))
         half = max(
             (max(xs) - min(xs)) / 2 + .25,
-            CHARACTER_WIDTH * len(label) / 2, box.min_width / 2)
+            text_width(label) / 2, box.min_width / 2)
         high = max(getattr(box, "height", 1) / 2 - .25, .25)
         centre = (max(xs) + min(xs)) / 2
         result.append((centre - half, y - high, centre + half, y + high))
@@ -131,8 +129,9 @@ def features(drawing: Drawing) -> dict[str, float]:
       height, over the square of their mean,
     * ``misalignment``: the mean distance from a box to the centre of its
       wires,
-    * ``label_overlap``: the fraction of pairs of boxes at the same height
-      whose rectangles overlap, see :func:`rectangles`,
+    * ``label_overlap``: the fraction of pairs of boxes side by side, i.e.
+      whose rectangles share a range of heights, that overlap, see
+      :func:`rectangles`,
     * ``area``: the log of the area of the drawing per box, zero up to one
       unit square per box.
 
@@ -155,7 +154,7 @@ def features(drawing: Drawing) -> dict[str, float]:
             for a, b in zip(sorted(xs), sorted(xs)[1:]) if b > a]
     boxes = rectangles(drawing)
     pairs = [(a, b) for i, a in enumerate(boxes) for b in boxes[i + 1:]
-             if a[1] == b[1]]
+             if a[1] < b[3] and b[1] < a[3]]
     return {
         "wire_length": mean(
             [hypot(a.x - b.x, a.y - b.y) for a, b in segments]) / height,
