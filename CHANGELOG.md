@@ -402,11 +402,12 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 ### Changed
 
 - The TikZ backend sets a box label at 8 points and a wire label at 7, below
-  and to the right of its port as in Matplotlib, and a unit of its picture is
-  8/12 inch, the size at which the width the layout measures a label at fits
-  it: every box fits its label, and pictures are 1.7 times larger. A wire of
-  a drawing is named by its object's `drawing_name` when it has one, and a
-  `monoidal.Dim` is drawn as its numbers, `4` for `Dim(4)` ([next#605]).
+  and to the right of its port as in Matplotlib, in the colour the backend
+  picks for it, and a unit of its picture is 8/12 inch, which fits the width
+  the layout measures for a label: every box fits its label, and pictures are
+  1.7 times larger. A wire of a drawing is named by its object's
+  `drawing_name` when it has one, and a `monoidal.Dim` is drawn as its
+  numbers, `4` for `Dim(4)` ([next#605]).
 - `egraph.EGraph.saturate` runs its rounds on one `Builder`, freezing it
   after each round that changes something: associativity and commutativity
   of `+` on five leaves saturate 55 times faster, and on six in under a
