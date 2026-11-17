@@ -1699,10 +1699,10 @@ class TikZ(Backend):
             else:
                 path += " .. controls ({}.center) and ({}.center) .. "\
                     "({}.center)".format(*(node(p) for p in step[1:]))
-        draw = f"{self.format_color(color)}, line width=0.25pt" if stroke\
-            else "none"
+        outline = f"{self.format_color(color)}, line width=0.25pt"\
+            if stroke else "none"
         self.edgelayer.append(
-            f"\\draw [fill={self.format_color(color)}, draw={draw}] "
+            f"\\draw [fill={self.format_color(color)}, draw={outline}] "
             f"{path} -- cycle;\n")
         super().draw_filled_shape(start, steps, color)
 
