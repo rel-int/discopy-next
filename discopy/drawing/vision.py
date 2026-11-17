@@ -200,6 +200,12 @@ def truths(mask: np.ndarray):
     return classes, boxes, wires, labels, names, reads
 
 
+def cut(image: np.ndarray, ids: np.ndarray, i: int, label=False):
+    """ The :func:`picture.crop` of the component ``i`` of ``ids``. """
+    rows, cols = np.nonzero(ids == i)
+    return crop(image, rows, cols, label)
+
+
 def texts(data: dict, label: bool) -> tuple[np.ndarray, list[str]]:
     """ The crops of every box, or of every wire label, of a
     :func:`dataset` and the text each shows, from its masks. """
@@ -209,7 +215,7 @@ def texts(data: dict, label: bool) -> tuple[np.ndarray, list[str]]:
         ids, found = (labels, reads) if label else (boxes, names)
         for i, text in found.items():
             if text in (TYPES if label else NAMES):
-                crops.append(crop(image, *np.nonzero(ids == i), label))
+                crops.append(cut(image, ids, i, label))
                 strings.append(text)
     return np.stack(crops).astype(np.float32), strings
 
@@ -311,8 +317,8 @@ def read(ocr: OCR, image: np.ndarray, classes: np.ndarray):
     boxes, wires, labels = picture.regions(classes)
     box_ids = [int(b) for b in np.unique(boxes[boxes >= 0])]
     attached = picture.attach(labels, wires)
-    crops = [crop(image, *np.nonzero(boxes == b)) for b in box_ids] + [
-        crop(image, *np.nonzero(labels == t), True) for t in attached]
+    crops = [cut(image, boxes, b) for b in box_ids] + [
+        cut(image, labels, t, True) for t in attached]
     found = ocr.read(torch.from_numpy(np.stack(crops).astype(
         np.float32)).unsqueeze(1)) if crops else []
     names = dict(zip(box_ids, found))
