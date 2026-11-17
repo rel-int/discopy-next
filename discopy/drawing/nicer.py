@@ -272,7 +272,8 @@ def stretch(
     """
     The drawing with the gaps between its columns and between its rows
     stretched by a scale each, and the width and the height of each box by a
-    scale of their own, through :meth:`Drawing.relayout`.
+    scale of their own, its ports moving with its top and bottom, through
+    :meth:`Drawing.relayout`.
 
     Parameters:
         drawing : The drawing to stretch.
@@ -305,7 +306,13 @@ def stretch(
     positions = {node: Point(across(p.x), up(p.y))
                  for node, p in framed.positions.items()
                  if not node.kind.startswith("box-corner")}
-    for j, (low, high) in enumerate(framed.rectangles()):
+    boxes = framed.rectangles()
+    for node, p in framed.positions.items():
+        if node.kind in ("box_dom", "box_cod"):
+            middle = (boxes[node.j][0].y + boxes[node.j][1].y) / 2
+            positions[node] = Point(positions[node].x, up(middle)
+                                    + heights[node.j] * (p.y - middle))
+    for j, (low, high) in enumerate(boxes):
         centre = Point(across((low.x + high.x) / 2), up((low.y + high.y) / 2))
         positions.update(corners(j, centre, Point(
             widths[j] * (high.x - low.x) / 2,
