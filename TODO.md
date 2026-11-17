@@ -2,4 +2,4 @@
 
 - [x] discopy/sum.py: the generic Sum[category], a box of its category, with cat.Sum's behaviour and monoidal.Sum's tensor and drawing
 - [x] cat.Sum and monoidal.Sum as deprecated aliases, a test that the old names warn and are the new class
-- [ ] every existing test passes; plan the remaining levels in the PR body
+- [x] every existing test passes; plan the remaining levels in the PR body
