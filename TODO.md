@@ -9,4 +9,4 @@
 - [x] EGraph.reduced, one spider per class and one box per e-node, and law stepping
 - [x] the closed form of + on n leaves as a test: 63 classes and 602 e-nodes at n = 6 in under 2 s
 - [x] CHANGELOG bullets under Added and Changed
-- [WIP] @session_01MEJxy4kqJ6YhajqkcZRUXm-2026-11-17 00:30 the gates of CONTRIBUTING.md's Run the unit tests
+- [x] the gates of CONTRIBUTING.md's Run the unit tests
