@@ -1,6 +1,7 @@
 > the ribbon drawing with tikz is broken too, the inside are coloured only for cups and caps
 > also wire labels should be shifted down and drawn with a smaller font
 > "Dim(4)" should be printed as such but its drawing name should be just "4"
+> the min box width should be set properly here so the labels fit
 
 Found while building the tool paper's figures with the TikZ backend. The first point is a box of #579 (ribbons filled differently by each backend).
 
