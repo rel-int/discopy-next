@@ -2,5 +2,5 @@
 
 - [x] Check nothing links to or includes the notebook
 - [x] Cover with a unit test of misc.py whatever the notebook checks that no test does
-- [WIP] @session_01MEJxy5Y19SnBwRFf22vqRj-2026-11-17 17:54 Delete the notebook and its KNOWN_BROKEN entry, with a CHANGELOG bullet
+- [x] Delete the notebook and its KNOWN_BROKEN entry, with a CHANGELOG bullet
 - [ ] Run next-checks and an optyx notebook
