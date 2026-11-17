@@ -109,6 +109,11 @@ def test_stretch_and_nicer_layout():
     assert stretch(drawing, *ones).layout() == drawing.layout()
     with raises(ValueError):
         stretch(drawing, ones[0], ones[1], [9] * n, ones[3])
+    labelled = Box('a_long_label', x, x).to_drawing()
+    xs, ys = knots(labelled)
+    (low, high), = stretch(labelled, [1] * (len(xs) - 1), [1] * (len(ys) - 1),
+                           [.1], [1]).rectangles()
+    assert high.x - low.x >= labelled.boxes[0].min_width
     with raises(ValueError, match="each gap"):
         stretch(drawing, [], [], [], [])
     off_centre = Box('e', x @ x, x) @ x >> Box('t', x @ x, x @ x)\

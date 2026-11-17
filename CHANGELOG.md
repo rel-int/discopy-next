@@ -17,7 +17,8 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 - `discopy.drawing.nicer.nicer_layout` searches the geometry of a drawing:
   `stretch` scales its column and row gaps and its box sizes through
   `Drawing.relayout`, and a step is kept when it scores better and keeps the
-  `clearance` between boxes ([next#598]).
+  `clearance` between boxes and from the inputs' and outputs' rows
+  ([next#598]).
 - `Drawing.layout`, the geometry of a drawing as a vector: the coordinates
   of its nodes, box corners included. `Drawing.relayout` takes a vector back
   to a drawing and refuses one that `Drawing.is_feasible` says draws another

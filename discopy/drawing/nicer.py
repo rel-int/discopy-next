@@ -274,8 +274,8 @@ def stretch(
     """
     The drawing with the gaps between its columns and between its rows
     stretched by a scale each, and the width and the height of each box by a
-    scale of their own, its ports moving with its top and bottom, through
-    :meth:`Drawing.relayout`.
+    scale of their own, never narrower than its ``min_width``, its ports
+    moving with its top and bottom, through :meth:`Drawing.relayout`.
 
     Parameters:
         drawing : The drawing to stretch.
@@ -312,7 +312,7 @@ def stretch(
     for j, (low, high) in enumerate(framed.rectangles()):
         centre = Point(across((low.x + high.x) / 2), up((low.y + high.y) / 2))
         positions.update(corners(j, centre, Point(
-            widths[j] * (high.x - low.x) / 2,
+            max(widths[j] * (high.x - low.x), framed.boxes[j].min_width) / 2,
             heights[j] * (high.y - low.y) / 2)))
     return drawing.relayout([coordinate for node in framed.ordered_nodes()
                              for coordinate in positions[node]])
@@ -334,12 +334,12 @@ def box_ports(drawing: Drawing, across: Callable[[float], float],
     >>> for node, point in box_ports(
     ...         drawing, lambda x: x, lambda y: 2 * y, [2]).items():
     ...     print(node.kind, point)
-    box_cod Point(x=0.5, y=0.5)
     box_dom Point(x=0.5, y=1.5)
+    box_cod Point(x=0.5, y=0.5)
     """
     boxes = drawing.rectangles()
     result = {}
-    for node, point in sorted(drawing.positions.items(), key=repr):
+    for node, point in drawing.positions.items():
         if node.kind in ("box_dom", "box_cod"):
             middle = (boxes[node.j][0].y + boxes[node.j][1].y) / 2
             result[node] = Point(across(point.x), up(middle)
