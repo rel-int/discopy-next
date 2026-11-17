@@ -562,6 +562,11 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   and a hash, and keeps `<<` and `>>` from joining into guillemets
   (`TikZ.escape`): a box named `feed_forward` or an evaluated lambda term,
   drawn as `__call__`, stopped LaTeX ([next#580]).
+- `Matrix.id` builds its array over `int` and casts it with the active
+  backend, so a matrix inferred under `backend("pytorch")` traces, and
+  `Matrix.then` casts both factors to the dtype they promote to, so it
+  composes with the integer structural matrices on a backend whose product
+  does not promote ([next#583]).
 - `discopy.optyx`: the dagger of a channel with an environment, e.g.
   `PhotonLoss(.1).dagger()`, is the adjoint CP map, whose Kraus map bends the
   environment back by a cap, where it failed an assertion; `power_fix` raises
@@ -2060,6 +2065,7 @@ for the changelog of `1.2.1` and earlier.
 [next#577]: https://github.com/rel-int/discopy-next/pull/577
 [next#580]: https://github.com/rel-int/discopy-next/pull/580
 [next#581]: https://github.com/rel-int/discopy-next/pull/581
+[next#583]: https://github.com/rel-int/discopy-next/pull/583
 [next#585]: https://github.com/rel-int/discopy-next/pull/585
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
