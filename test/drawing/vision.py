@@ -86,3 +86,13 @@ def test_flood_is_background_box_and_wire():
 def test_distance():
     assert vision.distance("", "abc") == 3
     assert vision.distance("kitten", "sitting") == 3
+
+
+def test_evaluate_on_one_module():
+    diagram, image, mask = picture.sample("monoidal", seed=0)
+    data = {"images": image[None], "masks": mask[None],
+            "modules": np.array([0]), "diagrams": [diagram]}
+    classes = picture.coarsen(mask)[None]
+    result = vision.evaluate(data, classes, vision.OCR(), workers=1)
+    assert set(result["oracle"]) == {"monoidal"}
+    assert result["oracle"]["monoidal"] == 1

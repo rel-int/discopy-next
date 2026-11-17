@@ -480,7 +480,8 @@ def evaluate(data: dict, classes: np.ndarray, ocr: OCR, workers=4) -> dict:
             for module, ok in zip(
                     modules, pool.map(score, jobs, chunksize=16)):
                 hits[module] += ok
-            result[name] = {m: hits[m] / count[m] for m in MODULES}
+            result[name] = {m: hits[m] / count[m] for m in MODULES
+                            if count[m]}
     truth = picture.coarsen(data["masks"])
     result["pixels"] = {COARSE[c]: float((classes[truth == c] == c).mean())
                         for c in np.unique(truth)}
