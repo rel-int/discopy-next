@@ -254,6 +254,10 @@ skipped without PyZX: run it with `uv run --with "pyzx==0.10.7"`, as the
 workflow does, and `benchmark/test_egraph.py` replays the 50 e-graphs of
 `benchmark/data/egraph-traces` through `egraph.Builder` and the bookkeeping
 of the search that grew them, and the small ones through the pure `EGraph`.
+It also matches each trace with its two-box pattern of the most matches, on
+the builder and on the pure `EGraph`, and saturates `+` under associativity
+and commutativity on four to seven leaves (eight in the full tail) on the
+builder, and on four and five by the pure rounds of `EGraph.step`.
 They live outside `testpaths`, so run them explicitly. Results are keyed by
 suite (`composition`, `conversion`, `zx` or `egraph`), family
 (representation, conversion, implementation or operation), case (workload)
