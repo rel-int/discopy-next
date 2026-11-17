@@ -9,6 +9,10 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Added
 
+- `monoidal.Diagram.foliations(limit)` lists the foliations of a diagram:
+  diagrams equal to it up to interchange whose adjacent layers cannot merge,
+  the largest layers first. The steps are public too: `dependencies`,
+  `layerings` and `foliate` ([next#567]).
 - A Typst drawing backend, `drawing.backend.Typst`: `Diagram.to_typst` and
   `Drawing.to_typst` return a `drawing.typst_ast.Document`, whose `render`
   is the Typst source of a CeTZ canvas, and `draw(format="typst")` compiles
@@ -2040,6 +2044,7 @@ for the changelog of `1.2.1` and earlier.
 [next#558]: https://github.com/rel-int/discopy-next/pull/558
 [next#565]: https://github.com/rel-int/discopy-next/pull/565
 [next#566]: https://github.com/rel-int/discopy-next/pull/566
+[next#567]: https://github.com/rel-int/discopy-next/pull/567
 [next#568]: https://github.com/rel-int/discopy-next/pull/568
 [next#569]: https://github.com/rel-int/discopy-next/pull/569
 [next#570]: https://github.com/rel-int/discopy-next/pull/570
