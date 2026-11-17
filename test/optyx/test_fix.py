@@ -154,6 +154,7 @@ def test_fix_validates_the_tolerance(solver, tol):
 
 @pytest.mark.parametrize("kwargs", [
     {"n_steps": 0}, {"n_steps": 1.5}, {"max_steps": 0}, {"tol": 0},
+    {"n_steps": 3, "max_steps": 2},
 ])
 def test_power_fix_validates_parameters(kwargs):
     with pytest.raises(ValueError):
