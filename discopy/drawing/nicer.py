@@ -49,6 +49,7 @@ from __future__ import annotations
 from math import hypot, log
 from typing import TYPE_CHECKING, Callable
 
+from discopy.drawing.backend import Backend
 from discopy.drawing.drawing import Drawing, Point
 from discopy.utils import text_width
 
@@ -71,8 +72,8 @@ WEIGHTS = {
 
 def wires(drawing: Drawing) -> list[tuple[Point, Point]]:
     """
-    The segments of a drawing that are wires, i.e. its edges not ending at a
-    box node.
+    The segments of a drawing that are wires, i.e. the edges a backend draws,
+    see :meth:`Backend.visible_edges`.
 
     >>> from discopy.monoidal import Ty, Box
     >>> for wire in wires(Box('f', Ty('x'), Ty('x')).to_drawing()):
@@ -81,7 +82,7 @@ def wires(drawing: Drawing) -> list[tuple[Point, Point]]:
     Point(x=0.5, y=0.25) Point(x=0.5, y=0)
     """
     return [(drawing.positions[u], drawing.positions[v])
-            for u, v in drawing.edges if "box" not in (u.kind, v.kind)]
+            for u, v in Backend.visible_edges(drawing)]
 
 
 def rectangles(drawing: Drawing) -> list[tuple[float, float, float, float]]:
@@ -127,8 +128,8 @@ def features(drawing: Drawing) -> dict[str, float]:
       width,
     * ``whitespace``: the variance of the gaps between nodes at the same
       height, over the square of their mean,
-    * ``misalignment``: the mean distance from a box to the centre of its
-      wires,
+    * ``misalignment``: the mean distance between the centres of the inputs
+      and of the outputs of a box that has both,
     * ``label_overlap``: the fraction of pairs of boxes side by side, i.e.
       whose rectangles share a range of heights, that overlap, see
       :func:`rectangles`,
@@ -152,6 +153,11 @@ def features(drawing: Drawing) -> dict[str, float]:
         rows.setdefault(p.y, []).append(p.x)
     gaps = [b - a for xs in rows.values()
             for a, b in zip(sorted(xs), sorted(xs)[1:]) if b > a]
+    ports: dict[int, dict[str, list[float]]] = {
+        j: {"box_dom": [], "box_cod": []} for j in range(len(drawing.boxes))}
+    for node in drawing.nodes:
+        if node.kind in ("box_dom", "box_cod"):
+            ports[node.j][node.kind].append(drawing.positions[node].x)
     boxes = rectangles(drawing)
     pairs = [(a, b) for i, a in enumerate(boxes) for b in boxes[i + 1:]
              if a[1] < b[3] and b[1] < a[3]]
@@ -167,9 +173,8 @@ def features(drawing: Drawing) -> dict[str, float]:
             for p in positions]) / width,
         "whitespace": mean([(gap - mean(gaps)) ** 2 for gap in gaps])
         / (mean(gaps) ** 2 or 1),
-        "misalignment": mean([abs(
-            (left + right) / 2 - drawing.positions[node].x)
-            for node, (left, _, right, _) in zip(drawing.box_nodes, boxes)]),
+        "misalignment": mean([abs(mean(xs["box_dom"]) - mean(xs["box_cod"]))
+                              for xs in ports.values() if all(xs.values())]),
         "label_overlap": mean([
             float(a[0] < b[2] and b[0] < a[2]) for a, b in pairs]),
         "area": log(max(1., width * height / max(1, len(drawing.boxes)))),

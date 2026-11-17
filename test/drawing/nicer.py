@@ -62,3 +62,13 @@ def test_rectangles_follow_height_and_label():
     latex = Box('$\\mathrm{f}$', x, x).to_drawing()
     (left, _, right, _), = rectangles(latex)
     assert right - left == 0.5
+
+
+def test_wires_and_misalignment_as_drawn():
+    from discopy.rigid import Ty as T, Cup
+    cup = Cup(T('x'), T('x').r).to_drawing()
+    assert len(wires(cup)) == 4 and features(cup)["wire_length"] > 0
+    box = Box('f', x @ x, x).to_drawing()
+    assert features(box)["misalignment"] == 0
+    assert features(box.make_space(2, .5, .75, 1., copy=True))[
+        "misalignment"] == 2
