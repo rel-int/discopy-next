@@ -9,6 +9,11 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Added
 
+- `Drawing.layout`, the geometry of a drawing as a vector: the coordinates
+  of its nodes, box corners included. `Drawing.relayout` takes a vector back
+  to a drawing and refuses one that `Drawing.is_feasible` says draws another
+  diagram (an edge turned, other wires crossing, boxes overlapping, a port
+  outside its box) ([next#578]).
 - `monoidal.Diagram.foliations(limit)` lists the foliations of a diagram:
   diagrams equal to it up to interchange whose adjacent layers cannot merge,
   the largest layers first. The steps are public too: `dependencies`,
@@ -2062,6 +2067,7 @@ for the changelog of `1.2.1` and earlier.
 [next#570]: https://github.com/rel-int/discopy-next/pull/570
 [next#575]: https://github.com/rel-int/discopy-next/pull/575
 [next#577]: https://github.com/rel-int/discopy-next/pull/577
+[next#578]: https://github.com/rel-int/discopy-next/pull/578
 [next#581]: https://github.com/rel-int/discopy-next/pull/581
 [next#583]: https://github.com/rel-int/discopy-next/pull/583
 [next#585]: https://github.com/rel-int/discopy-next/pull/585
