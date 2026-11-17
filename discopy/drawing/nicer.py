@@ -22,6 +22,8 @@ Summary
     hand_score
     make_nicer
     stretch
+    shape
+    split
     clearance
     nicer_layout
 
@@ -50,6 +52,7 @@ f @ g @ f >> h @ x >> h
 from __future__ import annotations
 
 from bisect import bisect_right
+from itertools import accumulate
 from math import hypot, log
 from typing import TYPE_CHECKING, Callable, Sequence
 
@@ -243,23 +246,23 @@ def make_nicer(
     return max(candidates, key=lambda d: score(d.to_drawing()))
 
 
-def piecewise(knots: Sequence[float], scales: Sequence[float]):
+def piecewise(points: Sequence[float], scales: Sequence[float]):
     """
-    The increasing map that stretches the gap between two consecutive knots
-    by its scale, fixing the first knot, with slope one outside the knots.
+    The increasing map that stretches the gap between two consecutive points
+    by its scale, fixing the first knot, with slope one outside the points.
 
     >>> f = piecewise([0, 1, 3], [2, .5])
     >>> [f(x) for x in (-1, 0, .5, 1, 2, 3, 4)]
     [-1.0, 0.0, 1.0, 2.0, 2.5, 3.0, 4.0]
     """
-    images = [float(knots[0])] if knots else []
-    for (a, b), scale in zip(zip(knots, knots[1:]), scales):
+    images = [float(points[0])] if points else []
+    for (a, b), scale in zip(zip(points, points[1:]), scales):
         images.append(images[-1] + scale * (b - a))
 
     def image(x: float) -> float:
-        i = max(bisect_right(knots, x) - 1, 0)
-        slope = scales[i] if knots[i] <= x and i < len(scales) else 1
-        return images[i] + slope * (x - knots[i])
+        i = max(bisect_right(points, x) - 1, 0)
+        slope = scales[i] if points[i] <= x and i < len(scales) else 1
+        return images[i] + slope * (x - points[i])
     return image
 
 
@@ -303,14 +306,50 @@ def stretch(
                  for node, p in framed.positions.items()
                  if not node.kind.startswith("box-corner")}
     for j, (low, high) in enumerate(framed.rectangles()):
-        x, y = across((low.x + high.x) / 2), up((low.y + high.y) / 2)
-        half_x = widths[j] * (high.x - low.x) / 2
-        half_y = heights[j] * (high.y - low.y) / 2
-        for a, b in [(0, 0), (0, 1), (1, 0), (1, 1)]:
-            positions[Node(f"box-corner-{a}{b}", j=j)] = Point(
-                x + (2 * a - 1) * half_x, y + (2 * b - 1) * half_y)
+        centre = Point(across((low.x + high.x) / 2), up((low.y + high.y) / 2))
+        positions.update(corners(j, centre, Point(
+            widths[j] * (high.x - low.x) / 2,
+            heights[j] * (high.y - low.y) / 2)))
     return drawing.relayout([coordinate for node in framed.ordered_nodes()
                              for coordinate in positions[node]])
+
+
+def corners(j: int, centre: Point, half: Point) -> dict[Node, Point]:
+    """
+    The four corners of the box ``j`` around a centre, at a half width and
+    a half height.
+
+    >>> corners(0, Point(1, 1), Point(.5, .25))[Node("box-corner-11", j=0)]
+    Point(x=1.5, y=1.25)
+    """
+    return {Node(f"box-corner-{a}{b}", j=j): Point(
+        centre.x + (2 * a - 1) * half.x, centre.y + (2 * b - 1) * half.y)
+        for a in range(2) for b in range(2)}
+
+
+def shape(drawing: Drawing) -> list[int]:
+    """
+    How many scales :func:`stretch` takes for each of its arguments: the
+    gaps between columns, the gaps between rows, the widths and the heights.
+
+    >>> from discopy.monoidal import Ty, Box
+    >>> shape(Box('f', Ty('x'), Ty('x')).to_drawing())
+    [0, 4, 1, 1]
+    """
+    xs, ys = knots(drawing)
+    return [len(xs) - 1, len(ys) - 1] + 2 * [len(drawing.boxes)]
+
+
+def split(drawing: Drawing, scales: Sequence[float]) -> list[list[float]]:
+    """
+    A flat list of the scales of :func:`stretch` cut by its :func:`shape`.
+
+    >>> from discopy.monoidal import Ty, Box
+    >>> split(Box('f', Ty('x'), Ty('x')).to_drawing(), [1, 2, 3, 4, 5, 6])
+    [[], [1, 2, 3, 4], [5], [6]]
+    """
+    ends = list(accumulate(shape(drawing)))
+    return [list(scales[a:b]) for a, b in zip([0] + ends, ends)]
 
 
 def knots(drawing: Drawing) -> tuple[list[float], list[float]]:
@@ -378,28 +417,23 @@ def nicer_layout(
     >>> assert hand_score(nicer) >= hand_score(drawing)
     """
     score = hand_score if score is None else score
-    xs, ys = knots(drawing)
-    n = len(drawing.boxes)
-    sizes = [max(len(xs) - 1, 0), max(len(ys) - 1, 0), n, n]
-    scales = [1.] * sum(sizes)
-
-    def build(values):
-        parts, start = [], 0
-        for size in sizes:
-            parts.append(values[start:start + size])
-            start += size
-        return stretch(drawing, *parts)
-
+    dimension = sum(shape(drawing))
+    scales = [1.] * dimension
     best, value, room = drawing, score(drawing), clearance(drawing)
+
+    def attempt(values):
+        columns, rows, widths, heights = split(drawing, values)
+        try:
+            candidate = stretch(drawing, columns, rows, widths, heights)
+        except ValueError:
+            return None
+        return candidate if clearance(candidate) >= room else None
+
     for _ in range(rounds):
-        for i in range(len(scales)):
+        for i in range(dimension):
             for factor in factors:
                 values = scales[:i] + [scales[i] * factor] + scales[i + 1:]
-                try:
-                    candidate = build(values)
-                except ValueError:
-                    continue
-                if clearance(candidate) >= room\
-                        and score(candidate) > value:
+                candidate = attempt(values)
+                if candidate is not None and score(candidate) > value:
                     best, value, scales = candidate, score(candidate), values
     return best
