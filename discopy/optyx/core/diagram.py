@@ -971,7 +971,9 @@ class Sum(symmetric.Sum, Box):
     """
 
     def conjugate(self):
-        return sum(term.conjugate() for term in self.terms)
+        return self.sum_factory(
+            tuple(term.conjugate() for term in self.terms),
+            self.dom, self.cod)
 
     def to_path(self, dtype: type = complex):
         return sum(term.to_path(dtype) for term in self.terms)

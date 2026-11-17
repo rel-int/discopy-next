@@ -625,6 +625,12 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Fixed
 
+- `optyx.channel.Sum.double` doubles a sum coherently, cross terms included,
+  as the doubling of the channel whose Kraus map is `get_kraus()`: the doubled
+  Bell sum is the Bell state and no longer the mixture, `(BS + BS).double()` is
+  four times `BS.double()`, and a sum with an impure term refuses; the
+  conjugate of an empty `optyx.core.diagram.Sum` keeps its types ([next#252]).
+
 - The TikZ backend fills the coloured regions of a diagram, so a ribbon is
   filled along its straight rails and not only at its folds and braids; the
   loop over `region_cells` moves from `Matplotlib` to `Backend` ([next#605]).
@@ -2030,6 +2036,7 @@ for the changelog of `1.2.1` and earlier.
 [next#236]: https://github.com/rel-int/discopy-next/issues/236
 [next#249]: https://github.com/rel-int/discopy-next/issues/249
 [next#250]: https://github.com/rel-int/discopy-next/issues/250
+[next#252]: https://github.com/rel-int/discopy-next/issues/252
 [next#254]: https://github.com/rel-int/discopy-next/issues/254
 [next#258]: https://github.com/rel-int/discopy-next/issues/258
 [next#260]: https://github.com/rel-int/discopy-next/issues/260
