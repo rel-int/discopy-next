@@ -16,6 +16,13 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   best `Derivation` of each category in a beam. A derivation is a categorial
   diagram by `tree2diagram`. `structure`, `render` and `normalise` read the
   categories of the treebank with their features ([next#603]).
+- `lambek.categorial.Parser.from_pretrained` loads the model of the Bobcat
+  reproduction, `rel-int/bobcat-rebank-deberta-v3-large` on Hugging Face, and
+  a parser called on a sentence gives its categorial diagram, with a label for
+  every span if it can: `lambek.neural.Encoder`, the state of each word that
+  of its first subword, and `lambek.neural.ChartClassifier`, a supertag for
+  each word and a label for each span. `transformers` joins the `lambek` extra
+  ([next#604]).
 - `abc.LinearCategory`, a linear category (Bierman, TLCA 1995) without
   symmetry: a comonad `bang` with `dereliction` and `digging`, lax monoidal
   with a `laxator`, each `!x` a comonoid by `contraction` and `weakening`, and
@@ -2130,6 +2137,7 @@ for the changelog of `1.2.1` and earlier.
 [next#591]: https://github.com/rel-int/discopy-next/pull/591
 [next#598]: https://github.com/rel-int/discopy-next/pull/598
 [next#603]: https://github.com/rel-int/discopy-next/pull/603
+[next#604]: https://github.com/rel-int/discopy-next/pull/604
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#56]: https://github.com/rel-int/optyx/pull/56
