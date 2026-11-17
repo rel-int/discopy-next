@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-DisCopy's drawing backends: Matplotlib and TikZ.
+DisCopy's drawing backends: Matplotlib, TikZ and Typst.
 
 Summary
 -------
@@ -13,6 +13,7 @@ Summary
     Backend
     TikZ
     Matplotlib
+    Typst
 
 .. admonition:: Functions
 
