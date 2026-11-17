@@ -1201,7 +1201,10 @@ def test_tikz_fills_a_straight_ribbon(tmp_path):
         to_tikz=True, path=str(path), wire_labels=False)
     tikz = path.read_text()
     assert "x=0.6667in, y=0.6667in" in tikz
-    assert "line width=0.25pt" in tikz and "-- cycle" in tikz
+    assert any(
+        "fill=" in line and "fill=none" not in line
+        and "line width=0.25pt" in line and line.endswith("-- cycle;")
+        for line in tikz.splitlines())
 
 
 def test_a_dimension_is_drawn_as_its_numbers():
