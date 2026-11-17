@@ -17,7 +17,6 @@ Summary
     Arrow
     Box
     Id
-    Sum
     Bubble
     Functor
     Transformation
@@ -76,7 +75,7 @@ Functors are bubble-preserving.
 
 from __future__ import annotations
 
-from functools import total_ordering, cached_property
+from functools import total_ordering
 from typing import (
     Any, Callable, ClassVar, Mapping, Iterable, Self, TYPE_CHECKING)
 
@@ -96,7 +95,6 @@ from discopy.utils import (  # noqa: F401
     MappingOrCallable,
     assert_isinstance,
     assert_iscomposable,
-    assert_isparallel,
     get_origin,
     identity,
 )
@@ -386,7 +384,7 @@ class Arrow(FreeCategory, DaggerCategory, Serialisable["Arrow"]):
     dagger_monoidality = DaggerCategory.dagger_monoidality.inapplicable(
         messages.NO_TENSOR)
     box_factory: ClassVar[type["Box"]]
-    sum_factory: ClassVar[type["Sum"]]
+    sum_factory: ClassVar[type[formal_sum.Sum]]
     bubble_factory: ClassVar[type["Bubble"]]
     ob = Ob
 
@@ -497,7 +495,7 @@ class Arrow(FreeCategory, DaggerCategory, Serialisable["Arrow"]):
         >>> assert Arrow.id() == Id() == Id(Ob())
         >>> assert Arrow.id('x') == Id('x') == Id(Ob('x'))
         """
-        if any(isinstance(other, Sum) for other in others):
+        if any(isinstance(other, formal_sum.Sum) for other in others):
             return self.sum_factory((self, )).then(*others)
         return super().then(*others)
 
@@ -808,135 +806,6 @@ class Box(Arrow):
         dom, cod = map(from_tree, (tree['dom'], tree['cod']))
         data, is_dagger = tree.get('data', None), tree.get('is_dagger', False)
         return cls(name=name, dom=dom, cod=cod, data=data, is_dagger=is_dagger)
-
-
-class Sum(Box):
-    """
-    A sum is a tuple of arrows :code:`terms` with the same domain and codomain.
-
-    Parameters:
-        terms : The terms of the formal sum.
-        dom : The domain of the formal sum.
-        cod : The codomain of the formal sum.
-
-    Example
-    -------
-    >>> x, y, z = Ob('x'), Ob('y'), Ob('z')
-    >>> f, g = Box('f', x, y), Box('g', y, z)
-    >>> unit = Sum((), x, y)
-    >>> assert f + unit == f == unit + f
-    >>> assert f >> (g + g) == (f >> g) + (f >> g) == (f + f) >> g
-
-    Important
-    ---------
-    Domain and codomain are optional only if the terms are non-empty.
-
-    Note
-    ----
-    The sum is non-commutative, i.e. :code:`Sum([f, g]) != Sum([g, f])`.
-    """
-    serialised_attrs = ("terms", "dom", "cod")
-
-    def __init__(
-            self, terms: tuple[Arrow, ...],
-            dom: Ob | None = None, cod: Ob | None = None):
-        terms = tuple(terms)
-        if not terms and (dom is None or cod is None):
-            raise ValueError(messages.MISSING_TYPES_FOR_EMPTY_SUM)
-        dom = terms[0].dom if dom is None else dom
-        cod = terms[0].cod if cod is None else cod
-        unit = Sum((), dom, cod) if terms else None
-        for arrow in terms:
-            assert_isparallel(unit, arrow)  # ty: ignore[invalid-argument-type]
-        self.terms = terms
-        super().__init__("", dom, cod)
-        del self.name
-
-    @cached_property
-    def name(self):  # pylint: disable=method-hidden  # deleted by __init__
-        """ The name of a sum is its :code:`repr`, computed when needed. """
-        str_args = "" if self.terms\
-            else f", dom={repr(self.dom)}, cod={repr(self.cod)}"
-        return factory_name(type(self))\
-            + f"(terms={repr(self.terms)}{str_args})"
-
-    @property
-    def is_generator(self):
-        return len(self.terms) == 1 and self.terms[0].is_generator
-
-    @property
-    def generator(self):
-        return self.terms[0].generator if self.is_generator else None
-
-    def setoid(self):
-        """ Ensure that a singleton sum is in fact equal to its only term. """
-        return self.terms[0].setoid() if len(self.terms) == 1 else (
-            factory_key(type(self)), self.terms, self.dom, self.cod)
-
-    def __repr__(self):
-        return self.name
-
-    def __str__(self):
-        return " + ".join(f"({arrow})" for arrow in self.terms)\
-            if self.terms else\
-            f"{factory_name(type(self))}((), {self.dom}, {self.cod})"
-
-    def atoms(self) -> list:
-        """ The atoms of a sum: those of its boundary and of its terms. """
-        return self.dom.atoms() + self.cod.atoms() + [
-            atom for term in self.terms for atom in term.atoms()]
-
-    def __add__(self, other):
-        assert_isparallel(self, other)
-        other = other if isinstance(other, Sum)\
-            else self.sum_factory((other, ))
-        return self.sum_factory(
-            (*self.terms, *other.terms), self.dom, self.cod)
-
-    def __iter__(self):
-        for arrow in self.terms:
-            yield arrow
-
-    def __len__(self):
-        return len(self.terms)
-
-    @unbiased
-    def then(self, other):
-        assert_iscomposable(self, other)
-        other = other if isinstance(other, Sum)\
-            else self.sum_factory((other, ))
-        terms = tuple(f.then(g) for f in self.terms for g in other.terms)
-        return self.sum_factory(terms, self.dom, other.cod)
-
-    def dagger(self):
-        terms = tuple(f.dagger() for f in self.terms)
-        return self.sum_factory(terms, self.cod, self.dom)
-
-    @property
-    def free_symbols(self):
-        return {x for box in self.terms for x in box.free_symbols}
-
-    def subs(self, *args):
-        terms = tuple(f.subs(*args) for f in self.terms)
-        return self.sum_factory(terms, self.dom, self.cod)
-
-    def lambdify(self, *symbols, **kwargs):
-        return lambda *xs: self.sum_factory(
-            tuple(box.lambdify(*symbols, **kwargs)(*xs) for box in self.terms),
-            dom=self.dom, cod=self.cod)
-
-    def to_tree(self):
-        return {
-            'factory': factory_name(type(self)),
-            'terms': [t.to_tree() for t in self.terms],
-            'dom': self.dom.to_tree(),
-            'cod': self.cod.to_tree()}
-
-    @classmethod
-    def from_tree(cls, tree):
-        dom, cod = map(from_tree, (tree['dom'], tree['cod']))
-        terms = tuple(map(from_tree, tree['terms']))
-        return cls(terms=terms, dom=dom, cod=cod)
 
 
 class Bubble(Box):
@@ -1344,7 +1213,7 @@ which JSON cannot hold.
             if isinstance(result, tuple) and not issubclass(origin, Nat):
                 return self.cod.ob(*result)
             return self.cod.ob(result)
-        if isinstance(other, Sum):
+        if isinstance(other, formal_sum.Sum):
             return sum(map(self, other.terms),
                        self.cod.zero(self(other.dom), self(other.cod)))
         if isinstance(other, Bubble) and hasattr(self.cod, other.method):
@@ -1572,6 +1441,10 @@ which JSON cannot hold.
 
 Ob.equation_factory = Equation
 Arrow.equation_factory = Equation  # ty: ignore[invalid-assignment]
-Arrow.sum_factory = Sum
 Arrow.bubble_factory = Bubble
 Id = Arrow.id
+
+# pylint: disable-next=wrong-import-position,ungrouped-imports  # a cat.Box
+from discopy import sum as formal_sum  # noqa: E402
+
+__getattr__ = utils.deprecated_alias(__name__, {"Sum": "discopy.sum.Sum"})

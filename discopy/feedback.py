@@ -258,6 +258,7 @@ from copy import copy
 from typing import ClassVar
 
 from discopy import monoidal, cmap, hypergraph, messages
+from discopy import sum as formal_sum
 from discopy.abc import (
     DaggerCategory, FeedbackCategory, MonoidalCategory, TracedCategory)
 from discopy.config import BOX_DRAWING_ATTRIBUTES
@@ -1120,7 +1121,7 @@ class FollowedBy(Box):
                    tree.get('time_step', 0))
 
 
-class Sum(monoidal.Sum, Box):
+class Sum(formal_sum.Sum, Box):
     """
     A feedback sum is a sum of feedback diagrams, over which delay
     distributes.

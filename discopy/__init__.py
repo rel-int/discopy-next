@@ -58,3 +58,8 @@ from discopy.version import (
 doctest.register_optionflag("EXTRA")
 
 __getattr__ = utils.deprecated_alias(__name__, {"grammar": "discopy.lambek"})
+
+# `from discopy import *` leaves the builtin `sum` alone: the module of formal
+# sums is `discopy.sum`, imported by `discopy.cat`.
+__all__ = [
+    name for name in dir() if not name.startswith("_") and name != "sum"]
