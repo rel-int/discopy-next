@@ -1067,6 +1067,32 @@ class Backend(ABC):
                  Node("box_cod", i=i, j=j, x=box.cod[i]))
                 for i, source in enumerate(indices)]
 
+    @staticmethod
+    def dual_rail_wires(node):
+        """
+        The nodes joined by each rail of a dual rail box, as
+        :meth:`crossing_wires` gives the strands of a crossing: a
+        :class:`discopy.balanced.DualRailBraid` sends the ribbon of inputs
+        ``(0, 1)`` to outputs ``(2, 3)`` and vice-versa, a
+        :class:`discopy.balanced.DualRailTwist` sends each rail back to its
+        own position, a :class:`discopy.ribbon.DualRailCup` (resp.
+        :class:`discopy.ribbon.DualRailCap`) folds input (resp. output) ``0``
+        onto ``3`` and ``1`` onto ``2``, see :meth:`draw_dual_rail_braid`,
+        :meth:`draw_dual_rail_twist`, :meth:`draw_dual_rail_cup` and
+        :meth:`draw_dual_rail_cap`.
+        """
+        box, j = node.box, node.j
+        def dom(i):
+            return Node("box_dom", i=i, j=j, x=box.dom[i])
+        def cod(i):
+            return Node("box_cod", i=i, j=j, x=box.cod[i])
+        if getattr(box, "draw_as_dual_rail_braid", False):
+            return [(dom(i), cod((i + 2) % 4)) for i in range(4)]
+        if getattr(box, "draw_as_dual_rail_twist", False):
+            return [(dom(i), cod(i)) for i in range(2)]
+        side = dom if getattr(box, "draw_as_dual_rail_cup", False) else cod
+        return [(side(0), side(3)), (side(1), side(2))]
+
     def draw_braid(self, positions, node):
         """
         Draws a braid or a swap as its two wires crossing diagonally, so that
@@ -1219,18 +1245,14 @@ class Backend(ABC):
         ``(0, 1)`` and ``(2, 3)`` crossing as a whole rather than wire by wire.
         """
         # pylint: disable=unused-argument  # draw_boxes passes params to all
-        box, j = node.box, node.j
-        dom = [positions[Node("box_dom", i=i, j=j, x=box.dom[i])]
-               for i in range(len(box.dom))]
-        cod = [positions[Node("box_cod", i=i, j=j, x=box.cod[i])]
-               for i in range(len(box.cod))]
+        box = node.box
+        rails = [(positions[dom], positions[cod])
+                 for dom, cod in self.dual_rail_wires(node)]
         _, y_middle = positions[node]
         # The left ribbon goes to the right and vice-versa. As with a braid,
         # the left ribbon goes under the right one unless the box is dagger.
-        left = ([(dom[0], cod[2]), (dom[1], cod[3])],
-                getattr(box.dom.inside[0].ribbon, "name", None))
-        right = ([(dom[2], cod[0]), (dom[3], cod[1])],
-                 getattr(box.dom.inside[2].ribbon, "name", None))
+        left = (rails[:2], getattr(box.dom.inside[0].ribbon, "name", None))
+        right = (rails[2:], getattr(box.dom.inside[2].ribbon, "name", None))
         over, under = (left, right) if box.is_dagger else (right, left)
         # Fill (and stroke) under first, then over: the band going under is
         # broken around the crossing so the one going over is clearly on top.
