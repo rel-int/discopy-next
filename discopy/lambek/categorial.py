@@ -901,7 +901,7 @@ class Derivation:
         return tree2diagram(self.to_tree())
 
 
-class Parser:
+class Parser:  # pylint: disable=too-many-instance-attributes
     r"""
     The chart parser of the reproduction of Bobcat (Clark, `Something old,
     something new: grammar-based CCG parsing with transformer models (2021)
@@ -954,6 +954,8 @@ class Parser:
             missing: float | None = 4.):
         self.binary, self.unary, self.root = binary, unary, root
         self.beam, self.generic, self.missing = beam, generic, missing
+        self.encoder = self.classifier = None
+        self.decoding: dict[str, float] = {}
 
     @classmethod
     def from_json(cls, data: dict, **params) -> Parser:
@@ -975,6 +977,105 @@ class Parser:
         return cls({key: frozenset(value) for key, value in binary.items()},
                    {key: frozenset(value) for key, value in unary.items()},
                    **params)
+
+    @classmethod
+    def from_pretrained(  # pylint: disable=too-many-locals
+            cls, directory, device: str = "cpu", **params) -> Parser:
+        """
+        A parser from the directory of a model, e.g. a download of
+        `rel-int/bobcat-rebank-deberta-v3-large
+        <https://huggingface.co/rel-int/bobcat-rebank-deberta-v3-large>`_:
+        its ``native_grammar.json``, ``label_maps.json``,
+        ``rebank_pipeline_config.json``, the configuration and the tokenizer
+        of its encoder and its weights ``pytorch_model.bin``. It needs
+        ``transformers``.
+
+        Parameters:
+            directory : The directory, a string or a path.
+            device : Where the model runs.
+            params : The parameters of :class:`Parser`, by default those of
+                the model's pipeline.
+        """
+        # pylint: disable=import-outside-toplevel  # torch is an extra
+        import json
+        from pathlib import Path
+
+        import torch
+        from transformers import (  # pylint: disable=import-error
+            AutoConfig, AutoModel, AutoTokenizer)
+
+        from discopy.lambek.neural import ChartClassifier, Encoder
+
+        path = Path(directory)
+        pipeline = json.loads(
+            (path / "rebank_pipeline_config.json").read_text())
+        maps = json.loads((path / "label_maps.json").read_text())
+        params.setdefault("beam", pipeline["parser"]["beam_size"])
+        params.setdefault(
+            "generic", pipeline["parser"]["generic_rule_penalty"]
+            if pipeline["parser"]["use_generic_rules"] else None)
+        params.setdefault(
+            "missing", pipeline["parser"]["missing_span_penalty"])
+        parser = cls.from_json(json.loads(
+            (path / "native_grammar.json").read_text()), **params)
+        config = AutoConfig.from_pretrained(path)
+        parser.encoder = Encoder(
+            AutoModel.from_config(config), AutoTokenizer.from_pretrained(path),
+            config.max_position_embeddings)
+        tags, labels = (sorted(maps[key], key=maps[key].get)
+                        for key in ("tag2id", "cat2id"))
+        parser.classifier = ChartClassifier(tags, labels, config.hidden_size)
+        state = torch.load(path / "pytorch_model.bin", map_location="cpu")
+        parser.encoder.model.load_state_dict({
+            key[len("bert."):]: value for key, value in state.items()
+            if key.startswith("bert.")})
+        parser.classifier.load_state_dict({
+            key: value for key, value in state.items()
+            if not key.startswith("bert.")})
+        parser.encoder.to(device).eval()
+        parser.classifier.to(device).eval()
+        parser.decoding = {
+            "tag_k": pipeline["decoder"]["tag_top_k"],
+            "tag_threshold": pipeline["decoder"]["tag_prob_threshold"],
+            "span_k": pipeline["decoder"]["span_top_k"],
+            "span_threshold": pipeline["decoder"]["span_prob_threshold"]}
+        return parser
+
+    def decode(self, sentences: list[list[str]]) -> list[tuple[list, dict]]:
+        """
+        The supertags and the labels of the spans of each sentence, by the
+        model of :meth:`from_pretrained`, see
+        :meth:`discopy.lambek.neural.ChartClassifier.decode`.
+        """
+        if self.encoder is None or self.classifier is None:
+            raise ValueError("no model: see Parser.from_pretrained")
+        # pylint: disable=import-outside-toplevel  # torch is an extra
+        import torch
+
+        with torch.inference_mode():
+            states, mask = self.encoder(sentences)
+            return self.classifier.decode(states, mask, **self.decoding)
+
+    def __call__(self, sentence: str | list[str]) -> Diagram | None:
+        """
+        The diagram of a sentence, its words split on spaces if it is a
+        string, ``None`` if it has no parse: the best parse with a label for
+        every span, else the best parse, as Bobcat's command line does. A
+        sentence longer than the encoder reads is cut to the words it reads,
+        as the reproduction does.
+        """
+        tree = self.derive(sentence)
+        return None if tree is None else tree.to_diagram()
+
+    def derive(self, sentence: str | list[str]) -> Derivation | None:
+        """ The derivation of :meth:`__call__`. """
+        words = sentence.split() if isinstance(sentence, str) else sentence
+        if not words:
+            return None
+        tags, spans = self.decode([words])[0]
+        words = words[:len(tags)]
+        return self.parse(words, tags, spans, missing=False)\
+            or self.parse(words, tags, spans)
 
     def parents(self, left: str, right: str) -> list[str]:
         """ The parents of two categories, observed or generic. """
