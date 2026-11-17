@@ -1142,3 +1142,18 @@ def test_relayout_review_round():
             layout[index[node]] = 0.6
     with raises(ValueError, match="same diagram"):
         bypass.relayout(layout)
+
+
+def test_relayout_keeps_wires_apart():
+    drawing = Drawing.id(Ty('x', 'y'))
+    layout = list(drawing.layout())
+    collapsed = list(layout)
+    nodes = drawing.ordered_nodes()
+    for k, node in enumerate(nodes):
+        if node.i == 1:
+            collapsed[2 * k] = layout[2 * nodes.index(
+                next(n for n in nodes if n.kind == node.kind and n.i == 0))]
+    with raises(ValueError, match="same diagram"):
+        drawing.relayout(collapsed)
+    assert drawing.relayout(layout).layout() == drawing.layout()
+

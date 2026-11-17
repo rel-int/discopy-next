@@ -268,6 +268,21 @@ def through(a: Point, b: Point, low: Point, high: Point) -> bool:
     return start < end
 
 
+def touch(a: Point, b: Point, c: Point, d: Point) -> bool:
+    """ Whether the closed segments ``ab`` and ``cd`` share a point. """
+    def side(p, q, r):
+        return sign((q.x - p.x) * (r.y - p.y) - (q.y - p.y) * (r.x - p.x))
+
+    def within(p, q, r):
+        return min(p.x, q.x) <= r.x <= max(p.x, q.x)\
+            and min(p.y, q.y) <= r.y <= max(p.y, q.y)
+    sides = side(a, b, c), side(a, b, d), side(c, d, a), side(c, d, b)
+    if sides[0] * sides[1] < 0 and sides[2] * sides[3] < 0:
+        return True
+    return any(s == 0 and within(p, q, r) for s, (p, q, r) in zip(sides, [
+        (a, b, c), (a, b, d), (c, d, a), (c, d, b)]))
+
+
 def overlap(a: Point, b: Point, c: Point, d: Point) -> bool:
     """ Whether the rectangles with corners ``a, b`` and ``c, d`` overlap. """
     return a.x < d.x and c.x < b.x and a.y < d.y and c.y < b.y
@@ -539,7 +554,8 @@ which to_drawing recomputes.
         """
         for j, box in enumerate(self.boxes):
             box_node = Node("box", j=j, box=box)
-            if Node("box-corner-00", j=j) in self.positions:
+            if all(Node(f"box-corner-{a}{b}", j=j) in self.positions
+                   for a in range(2) for b in range(2)):
                 continue
             box_x, box_y = self.positions[box_node]
             box_dom_nodes, box_cod_nodes = ([
@@ -695,8 +711,9 @@ which to_drawing recomputes.
         """
         What a layout keeps of a drawing, see :meth:`is_feasible`: the
         direction of each edge, the :meth:`crossings` of wires, which wires
-        pass through which box, which boxes overlap and where each port sits
-        with respect to the sides of its box.
+        with no end in common touch, which wires pass through which box,
+        which boxes overlap and where each port sits with respect to the
+        sides of its box.
 
         >>> from discopy.monoidal import Box
         >>> drawing = Box('f', 'x', 'y').to_drawing()
@@ -704,8 +721,9 @@ which to_drawing recomputes.
         >>> drawing.shape()["ports"]
         ((0, 0, -1, 1, 1), (0, 1, 0, 1, 1))
         """
-        positions, rectangles = self.positions, self.rectangles()
-        segments = [(positions[u], positions[v]) for u, v in self.wires()]
+        positions, rectangles, wires = (
+            self.positions, self.rectangles(), self.wires())
+        segments = [(positions[u], positions[v]) for u, v in wires]
         ports = sorted((node for node in self.nodes
                         if node.kind in ("box_dom", "box_cod")), key=repr)
         return {
@@ -713,6 +731,10 @@ which to_drawing recomputes.
                            for u, v in sorted(
                                ((u, v) for u, v in self.edges), key=repr)),
             "crossings": self.crossings(),
+            "touchings": {
+                (i, j) for i, j in itertools.combinations(range(len(wires)), 2)
+                if not set(wires[i]) & set(wires[j])
+                and touch(*segments[i], *segments[j])},
             "through": {(i, j) for i, (a, b) in enumerate(segments)
                         for j, rectangle in enumerate(rectangles)
                         if through(a, b, *rectangle)},
