@@ -76,6 +76,11 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   nothing, a match being a row of the join of the atoms of the pattern, as in
   relational e-matching, and the law `EGraph.matching_agreement` that it
   matches what the e-graph of the same operations does ([next#549]).
+- `egraph.Builder.rewrite` and `egraph.Builder.step`, a match rewritten by
+  `add` and `union` and a round of rules on the builder, `EGraph.reduced`,
+  the e-graph as a spider per class and a box per e-node, and the law
+  `EGraph.stepping` that a round on the builder and a pure `step` reduce to
+  the same hypergraph ([next#586]).
 - `stream.up_to_steps`, the relation a law of streams is read with: a term
   unrolled for `stream.STEPS` steps, its arrow `now` taken and quotiented by
   the equation of the underlying category, which `Stream.equation_factory`
@@ -349,6 +354,10 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Changed
 
+- `egraph.EGraph.saturate` runs its rounds on one `Builder`, freezing it
+  after each round that changes something: associativity and commutativity
+  of `+` on five leaves saturate 55 times faster, and on six in under a
+  second ([next#586]).
 - `discopy.grammar` is `discopy.lambek`, with its tests in `test/lambek`,
   its pictures in `docs/_static/lambek` and its extra `discopy[lambek]`.
   The old name stays as a deprecated alias: `discopy.grammar` warns and has
@@ -2071,6 +2080,7 @@ for the changelog of `1.2.1` and earlier.
 [next#581]: https://github.com/rel-int/discopy-next/pull/581
 [next#583]: https://github.com/rel-int/discopy-next/pull/583
 [next#585]: https://github.com/rel-int/discopy-next/pull/585
+[next#586]: https://github.com/rel-int/discopy-next/pull/586
 [next#587]: https://github.com/rel-int/discopy-next/pull/587
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
