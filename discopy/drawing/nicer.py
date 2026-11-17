@@ -50,7 +50,7 @@ from math import hypot, log
 from typing import TYPE_CHECKING, Callable
 
 from discopy.drawing.backend import Backend
-from discopy.drawing.drawing import Drawing, Node, Point
+from discopy.drawing.drawing import Drawing, Point
 from discopy.utils import text_width
 
 if TYPE_CHECKING:
@@ -93,36 +93,23 @@ def wires(drawing: Drawing) -> list[tuple[Point, Point]]:
 
 def rectangles(drawing: Drawing) -> list[tuple[float, float, float, float]]:
     """
-    The rectangle ``(left, bottom, right, top)`` of each box, wide enough for
-    its wires and the label it draws, as high as its ``height``, or its
-    corners widened to its label when the drawing has them, e.g. once
-    :meth:`Drawing.relayout` gave it its geometry.
+    The rectangle ``(left, bottom, right, top)`` of each box: the one
+    :meth:`Drawing.add_box_corners` draws, see :meth:`Drawing.rectangles`,
+    widened to the label it draws.
 
     >>> from discopy.monoidal import Ty, Box
     >>> rectangles(Box('f', Ty('x'), Ty('x')).to_drawing())
     [(0.25, 0.25, 0.75, 0.75)]
     """
+    framed = drawing.relabel_nodes()
+    framed.add_box_corners()
     result = []
-    for j, box in enumerate(drawing.boxes):
-        x, y = drawing.positions[next(
-            node for node in drawing.box_nodes if node.j == j)]
-        xs = [drawing.positions[node].x for node in drawing.nodes
-              if node.kind in ("box_dom", "box_cod") and node.j == j] + [x]
+    for box, (low, high) in zip(drawing.boxes, framed.rectangles()):
         label = "" if getattr(box, "no_label", False)\
             else str(getattr(box, "drawing_name", box.name))
-        half = max(
-            (max(xs) - min(xs)) / 2 + .25,
-            text_width(label) / 2, box.min_width / 2)
-        corners = [Node(f"box-corner-{a}", j=j) for a in ("00", "11")]
-        if all(node in drawing.positions for node in corners):
-            low, top = (drawing.positions[node] for node in corners)
-            centre = (low.x + top.x) / 2
-            half = max((top.x - low.x) / 2, text_width(label) / 2)
-            result.append((centre - half, low.y, centre + half, top.y))
-            continue
-        high = max(getattr(box, "height", 1) / 2 - .25, .25)
-        centre = (max(xs) + min(xs)) / 2
-        result.append((centre - half, y - high, centre + half, y + high))
+        centre = (low.x + high.x) / 2
+        half = max((high.x - low.x) / 2, text_width(label) / 2)
+        result.append((centre - half, low.y, centre + half, high.y))
     return result
 
 
