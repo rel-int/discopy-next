@@ -9,6 +9,16 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Added
 
+- `abc.LinearCategory`, a linear category (Bierman, TLCA 1995) without
+  symmetry: a comonad `bang` with `dereliction` and `digging`, lax monoidal
+  with a `laxator`, each `!x` a comonoid by `contraction` and `weakening`, and
+  an invertible `exchange` of `!x` with any object, its 28 laws as axioms.
+  `biclosed` is the free one: `BangOb`, the wire holding a type inside
+  `x.bang()`, `Bang`, the bubble `f.bang()`, and the boxes `Dereliction`,
+  `Digging`, `Contraction`, `Weakening`, `Exchange` and `Laxator`. A `Functor`
+  sends them through the `bang` and the structure of its codomain when its
+  types are biclosed, and through its `ob_map` and `ar_map` otherwise. The
+  laws are declared failing on the free category ([next#571]).
 - `discopy.drawing.nicer`: nine hand features of a drawing, each a cost
   (wire length, bends, slope, aspect, asymmetry, whitespace, misalignment,
   label overlap, area), `hand_score` minus their weighted sum, with equal weights
@@ -2098,6 +2108,7 @@ for the changelog of `1.2.1` and earlier.
 [next#568]: https://github.com/rel-int/discopy-next/pull/568
 [next#569]: https://github.com/rel-int/discopy-next/pull/569
 [next#570]: https://github.com/rel-int/discopy-next/pull/570
+[next#571]: https://github.com/rel-int/discopy-next/pull/571
 [next#575]: https://github.com/rel-int/discopy-next/pull/575
 [next#577]: https://github.com/rel-int/discopy-next/pull/577
 [next#578]: https://github.com/rel-int/discopy-next/pull/578

@@ -66,6 +66,8 @@ Coherence
 
 from typing import ClassVar
 
+# pylint: disable=inconsistent-mro  # astroid misreads the MRO, C3 does not
+
 from discopy import symmetric, ribbon, pivotal, feedback, cmap, hypergraph
 from discopy.abc import CompactCategory
 from discopy.cat import factory

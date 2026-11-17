@@ -623,7 +623,7 @@ def test_Bubble_no_common_boundary():
         Bubble()
 
 
-ABSTRACT = ("Timed", "ControlledRotation", "BinaryTerm", "Parametrized")
+ABSTRACT = ("Timed", "Structural", "ControlledRotation", "BinaryTerm", "Parametrized")
 
 
 @cache
@@ -684,6 +684,10 @@ EXAMPLES = {  # a box of each constructor, from a class c, types x, y, data v
     "tensor.Box": 'c("f", x, y, [v] + [0] * 5)',
     "frobenius.Spider": "c(1, 2, x, data=v)",
     "frobenius.Cospan": "c(x @ y, [0, 0, 1], [1])",
+    "biclosed.Bang": "c(box(c, x, y, v))",
+    "biclosed.{Dereliction,Digging,Contraction,Weakening}": "c(x)",
+    "biclosed.Exchange": "c(x, y, True)",
+    "biclosed.Laxator": "c(x, y)",
     "biclosed.{Eval,Coeval}": "c(x << y)",
     "closed.{Eval,Coeval}": "c(x << y, time_step=1)",
     "{biclosed,closed}.Curry": "c(box(c, x @ y, x, v), 1, False)",
@@ -818,6 +822,8 @@ BROKEN = {
         "*.Feedback": "it has none, its memory would be fed back in time",
         PIVOTALS + ".Trace": "its dagger is drawn with cups and caps",
         "*.Curry": "a curry has no dagger",
+        "*.{Dereliction,Digging,Contraction,Weakening,Laxator}":
+        "!L* has no rule from its codomain back to its domain",
         "{closed,markov,lambek.abstract}.{Copy,Discard,Function} "
         "comarkov.{Cofunction,Merge,Noise}": "its category has no dagger",
         "rigid.C[ua]p": "a rigid cup or cap has none, a pivotal one has",
