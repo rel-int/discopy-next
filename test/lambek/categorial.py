@@ -450,18 +450,18 @@ def test_Word_dagger():
     assert (Bob >> Bob[::-1]).cod == Ty() and Bob[::-1][::-1] == Bob
 
 
-def test_split_render():
-    assert split("((NP))") == "NP"
-    assert split(r"(S\NP)/(S\NP)") == ("/", ("\\", "S", "NP"), ("\\", "S", "NP"))
-    assert split("(NP)/(N)") == ("/", "NP", "N")
-    assert split("/NP") is None and split("") is None
-    assert render(split(r"((S\NP)/NP)")) == r"(S\NP)/NP"
+def test_structure_render():
+    assert structure("((NP))") == "NP"
+    assert structure(r"(S\NP)/(S\NP)") == ("/", ("\\", "S", "NP"), ("\\", "S", "NP"))
+    assert structure("(NP)/(N)") == ("/", "NP", "N")
+    assert structure("/NP") is None and structure("") is None
+    assert render(structure(r"((S\NP)/NP)")) == r"(S\NP)/NP"
     assert normalise("PR/NP") == "PP/NP" and normalise("SPR") == "SPR"
 
 
-def test_generic():
+def test_schemata():
     def parents(left, right):
-        return sorted(generic(left, right))
+        return sorted(schemata(left, right))
     assert parents("NP/N", "N") == ["NP"]
     assert parents("NP", r"S\NP") == ["S"]
     assert parents("N/N", "N/N") == ["N", "N/N"]

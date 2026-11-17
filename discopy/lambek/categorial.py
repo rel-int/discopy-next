@@ -68,9 +68,9 @@ Summary
         :toctree:
 
         normalise
-        split
+        structure
         render
-        generic
+        schemata
 """
 
 from __future__ import annotations
@@ -753,13 +753,13 @@ def normalise(label: str) -> str:
 
 
 @cache
-def split(category: str) -> str | tuple | None:
+def structure(category: str) -> str | tuple | None:
     r"""
     A category as an atom or a triple ``(slash, result, argument)``, its
     slashes associating to the left, ``None`` if it is malformed. Unlike
     :func:`cat2ty`, it keeps the features.
 
-    >>> split(r"(S[dcl]\NP)/NP")
+    >>> structure(r"(S[dcl]\NP)/NP")
     ('/', ('\\', 'S[dcl]', 'NP'), 'NP')
     """
     category = category.strip()
@@ -777,7 +777,8 @@ def split(category: str) -> str | tuple | None:
     for i in reversed(range(len(category))):
         depth += {")": 1, "(": -1}.get(category[i], 0)
         if depth == 0 and category[i] in "/\\":
-            result, argument = split(category[:i]), split(category[i + 1:])
+            result = structure(category[:i])
+            argument = structure(category[i + 1:])
             if result is None or argument is None:
                 return None
             return category[i], result, argument
@@ -785,7 +786,7 @@ def split(category: str) -> str | tuple | None:
 
 
 def render(category: str | tuple) -> str:
-    """ The string of a category split by :func:`split`. """
+    """ The string of a category split by :func:`structure`. """
     if isinstance(category, str):
         return category
     slash, *sides = category
@@ -795,15 +796,15 @@ def render(category: str | tuple) -> str:
 
 
 @cache
-def generic(left: str, right: str) -> frozenset[str]:
+def schemata(left: str, right: str) -> frozenset[str]:
     r"""
     The categories that the schemata of CCG derive from two adjacent ones:
     application, harmonic composition, a modifier ``X|X`` applied to
     anything, punctuation, conjunction and coordination.
 
-    >>> sorted(generic(r"NP", r"S[dcl]\NP"))
+    >>> sorted(schemata(r"NP", r"S[dcl]\NP"))
     ['S[dcl]']
-    >>> sorted(generic(r"S/S", r"S/NP"))
+    >>> sorted(schemata(r"S/S", r"S/NP"))
     ['S/NP']
     """
     parents = set()
@@ -811,17 +812,14 @@ def generic(left: str, right: str) -> frozenset[str]:
         else (left, False)
     right_base, right_conj = (right[:-6], True) if right.endswith("[conj]")\
         else (right, False)
-    x, y = split(left_base), split(right_base)
+    x, y = structure(left_base), structure(right_base)
     if x is None or y is None:
         return frozenset()
-    if left == "conj":
-        parents.add(f"{right_base}[conj]")
-    if right == "conj":
-        parents.add(f"{left_base}[conj]")
-    if left in PUNCTUATION:
-        parents.add(right_base)
-    if right in PUNCTUATION:
-        parents.add(left_base)
+    for this, other in ((left, right_base), (right, left_base)):
+        if this == "conj":
+            parents.add(f"{other}[conj]")
+        if this in PUNCTUATION:
+            parents.add(other)
     if (left_conj or right_conj) and left_base == right_base:
         parents.add(left_base)
     (x_slash, *x_sides), (y_slash, *y_sides) = (
@@ -916,7 +914,7 @@ class Parser:
     A derivation scores the sum of the log-probabilities of its supertags
     and of the best label of each of its spans that has its category, less a
     penalty ``generic`` for a binary rule licensed by the schemata of
-    :func:`generic` only, and ``missing`` for a span with no such label. A
+    :func:`schemata` only, and ``missing`` for a span with no such label. A
     cell keeps the best derivation of each category, then the ``beam`` best,
     and a sentence is parsed when its last cell has a ``root`` category.
     Ties go to the first derivation found, the parents of a rule taken in
@@ -947,9 +945,9 @@ class Parser:
     >>> print(tree.to_diagram().cod)
     S
     """
-    def __init__(  # pylint: disable=too-many-arguments
+    def __init__(
             self, binary: dict[tuple[str, str], frozenset[str]],
-            unary: dict[str, frozenset[str]],
+            unary: dict[str, frozenset[str]], *,
             root: frozenset[str] | None = None,
             beam: int = 256, generic: float | None = .05,
             missing: float | None = 4.):
@@ -981,7 +979,7 @@ class Parser:
         """ The parents of two categories, observed or generic. """
         parents = set(self.binary.get((left, right), ()))
         if self.generic is not None:
-            parents |= generic(left, right)
+            parents |= schemata(left, right)
         return sorted(parents)
 
     def span_score(self, cat: str, labels: dict[str, float] | None,
@@ -1063,27 +1061,33 @@ class Parser:
         def labels(span):
             return None if spans is None else best.get(span, {})
         for i, (word, candidates) in enumerate(zip(words, tags)):
-            cell = {}
-            for tag, score in candidates:
-                self.add(cell, Derivation(normalise(tag), score, word))
-            self.close(cell, labels((i, i + 1)), missing)
-            chart[i, i + 1] = self.prune(cell)
+            chart[i, i + 1] = self.lexical(
+                word, candidates, labels((i, i + 1)), missing)
         for width in range(2, len(words) + 1):
             for start in range(len(words) - width + 1):
                 end, cell = start + width, {}
                 for middle in range(start + 1, end):
                     for left in chart.get((start, middle), {}).values():
                         for right in chart.get((middle, end), {}).values():
-                            self.combine(cell, left, right,
-                                         labels((start, end)), missing)
+                            self.combine(
+                                cell, left, right,
+                                labels=labels((start, end)), missing=missing)
                 if cell:
                     self.close(cell, labels((start, end)), missing)
                     chart[start, end] = self.prune(cell)
         return chart
 
-    def combine(  # pylint: disable=too-many-arguments
-            self, cell, left: Derivation, right: Derivation, labels,
-            missing: bool):
+    def lexical(self, word: str, candidates: list[tuple[str, float]],
+                labels, missing: bool) -> dict[str, Derivation]:
+        """ The cell of a word, its supertags closed under unary rules. """
+        cell = {}
+        for tag, score in candidates:
+            self.add(cell, Derivation(normalise(tag), score, word))
+        self.close(cell, labels, missing)
+        return self.prune(cell)
+
+    def combine(self, cell, left: Derivation, right: Derivation, *,
+                labels, missing: bool):
         """ Add to a cell the derivations of two adjacent ones. """
         seen = self.binary.get((left.cat, right.cat), ())
         for parent in self.parents(left.cat, right.cat):
