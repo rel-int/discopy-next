@@ -96,3 +96,54 @@ def test_evaluate_on_one_module():
     result = vision.evaluate(data, classes, vision.OCR(), workers=1)
     assert set(result["oracle"]) == {"monoidal"}
     assert result["oracle"]["monoidal"] == 1
+
+
+def test_from_picture_takes_a_path_to_weights(tmp_path):
+    from discopy.utils import AxiomError
+    path = tmp_path / "weights.pt"
+    vision.save(path, vision.PixelNet(), vision.OCR())
+    image = picture.render(picture.load("monoidal").Box(
+        'f', picture.load("monoidal").Ty('a'),
+        picture.load("monoidal").Ty('a')), 160)
+    try:
+        from_picture(jpeg(image), {"weights": path})
+    except (ValueError, AxiomError):
+        pass
+
+
+def test_from_picture_keeps_to_its_module():
+    from discopy import frobenius
+    from discopy.utils import AxiomError
+    x = frobenius.Ty('a')
+    diagram = frobenius.Cup(x, x)
+    image, mask = picture.render(diagram, 160), picture.render(
+        diagram, 160, mask=True)
+    classes = picture.coarsen(mask)
+    _, wires, labels = picture.regions(classes)
+    types = [picture.LABELS[np.bincount(mask[labels == t]).argmax()]
+             .removeprefix("label ")
+             for t in picture.attach(labels, wires)]
+    weights = (TruePixels(mask), TrueText(types))
+    assert picture.equal(
+        from_picture(jpeg(image), {"weights": weights}), diagram, "frobenius")
+    with raises((ValueError, AxiomError)):
+        from_picture(jpeg(image), {"weights": weights, "module": "compact"})
+
+
+def test_train_ocr_trains_a_loaded_model():
+    crops = np.random.default_rng(0).random((8, *picture.CROP))
+    ocr = vision.OCR().eval()
+    before = ocr.convs[1].running_mean.clone()
+    vision.train_ocr(crops.astype(np.float32), ["f"] * 8, epochs=1,
+                     batch=8, ocr=ocr, log=lambda _: None)
+    assert not torch.equal(before, ocr.convs[1].running_mean)
+
+
+def test_evaluate_without_wire_labels():
+    diagram, image, mask = picture.sample(
+        "monoidal", seed=0, wire_labels=False)
+    data = {"images": image[None], "masks": mask[None],
+            "modules": np.array([0]), "diagrams": [diagram]}
+    result = vision.evaluate(
+        data, picture.coarsen(mask)[None], vision.OCR(), workers=1)
+    assert "types" not in result["ocr"]

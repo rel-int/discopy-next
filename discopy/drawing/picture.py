@@ -1022,18 +1022,18 @@ def read(classes: np.ndarray, name: Callable, typ: Callable, module=None):
     return decode_least(mask, scan(classes, types.values()))
 
 
-def decode_least(mask: np.ndarray, module: str):
+def decode_least(mask: np.ndarray, module: str, most=MODULES[-1]):
     """
-    :func:`decode` in the least module from ``module`` up in which the
-    mask decodes, e.g. ``frobenius`` for a cup on ``a`` and ``a``, which is
-    not compact: a :func:`scan` cannot tell them apart.
+    :func:`decode` in the least module from ``module`` up to ``most`` in
+    which the mask decodes, e.g. ``frobenius`` for a cup on ``a`` and ``a``,
+    which is not compact: a :func:`scan` cannot tell them apart.
     """
-    least = MODULES.index(module)
-    for i, candidate in enumerate(MODULES[least:], least):
+    least, last = MODULES.index(module), MODULES.index(most)
+    for i, candidate in enumerate(MODULES[least:last + 1], least):
         try:
             return decode(mask, candidate)
         except AxiomError:
-            if i == len(MODULES) - 1:
+            if i == last:
                 raise
 
 

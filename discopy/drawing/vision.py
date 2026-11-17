@@ -217,7 +217,8 @@ def texts(data: dict, label: bool) -> tuple[np.ndarray, list[str]]:
             if text in (TYPES if label else NAMES):
                 crops.append(cut(image, ids, i, label))
                 strings.append(text)
-    return np.stack(crops).astype(np.float32), strings
+    return np.stack(crops).astype(np.float32) if crops else np.zeros(
+        (0, *CROP), np.float32), strings
 
 
 def train(data: dict, seed=0, epochs=6, batch=16, lr=2e-3, log=print,
@@ -279,7 +280,7 @@ def train_ocr(crops: np.ndarray, strings: list[str], seed=0, epochs=4,
     """ Train an :class:`OCR` on crops and their texts, with Adam and the
     connectionist temporal classification loss. """
     torch.manual_seed(seed)
-    ocr = ocr or OCR()
+    ocr = (ocr or OCR()).train()
     optimiser = torch.optim.Adam(ocr.parameters(), lr=lr)
     targets = [torch.tensor([CHARS.index(c) + 1 for c in s]) for s in strings]
     rng = np.random.default_rng(seed)
@@ -360,7 +361,8 @@ def from_picture(jpeg, config: dict):
     """
     from PIL import Image
     weights = config["weights"]
-    pixel, ocr = load(weights) if isinstance(weights, str) else weights
+    pixel, ocr = load(weights) if isinstance(weights, (str, os.PathLike))\
+        else weights
     source = BytesIO(jpeg) if isinstance(jpeg, bytes) else jpeg
     photo = Image.open(source).convert("RGB")
     if config.get("scale"):
@@ -374,11 +376,12 @@ def from_picture(jpeg, config: dict):
     image = np.asarray(canvas)
     classes = predict(pixel, image[None])[0]
     boxes, wires, names, types = read(ocr, image, classes)
-    module = scan(classes, types.values())
-    if config.get("module") is not None and MODULES.index(
-            module) > MODULES.index(config["module"]):
+    module, most = scan(classes, types.values()), config.get(
+        "module", MODULES[-1])
+    if MODULES.index(module) > MODULES.index(most):
         raise ValueError(f"The picture shows a {module} diagram.")
-    return decode_least(refine(classes, boxes, wires, names, types), module)
+    return decode_least(
+        refine(classes, boxes, wires, names, types), module, most)
 
 
 def flood(image: np.ndarray, threshold=128) -> np.ndarray:
@@ -491,8 +494,9 @@ def evaluate(data: dict, classes: np.ndarray, ocr: OCR, workers=4) -> dict:
     truth = picture.coarsen(data["masks"])
     result["pixels"] = {COARSE[c]: float((classes[truth == c] == c).mean())
                         for c in np.unique(truth)}
-    result["ocr"] = {kind: text_accuracy(ocr, *texts(data, label))
-                     for kind, label in (("names", False), ("types", True))}
+    result["ocr"] = {kind: text_accuracy(ocr, *found)
+                     for kind, label in (("names", False), ("types", True))
+                     if len((found := texts(data, label))[1])}
     result["scan"] = float(np.mean([
         picture.scan(c) == picture.scan(t) for c, t in zip(classes, truth)]))
     return result
