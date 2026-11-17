@@ -552,13 +552,16 @@ def sample_at(array, rows, cols, fill, nearest=False) -> np.ndarray:
             + padded[r0 + 1, c0 + 1] * dr * dc)
 
 
-def samples(module: str, seed=0, size=160, max_boxes=6, **flags) -> Iterator:
+def samples(module: str, seed=0, size=160, max_boxes=6, scales=(20, 28),
+            text=None, **flags) -> Iterator:
     """
     Yield triples ``(diagram, image, mask)``: a diagram of a module from
     :func:`diagrams`, :func:`dress`-ed by the flags ``heights``, ``widths``
     and ``triangles`` (on by default), its picture of ``size`` pixels, by
     :func:`render` with ``wire_labels`` (on by default) and ``xkcd``, and
     the labels of its pixels, both moved by the flags of :func:`augment`.
+    A picture is drawn at a scale drawn from ``scales``, in pixels per unit,
+    its text a fraction of it drawn from ``text`` if given, else ``.4``.
 
     Every flag is drawn at random when set to ``"random"``, e.g.
     ``samples("compact", blur="random")`` blurs half the images.
@@ -573,8 +576,10 @@ def samples(module: str, seed=0, size=160, max_boxes=6, **flags) -> Iterator:
             key: drawn.pop(key) for key in ("heights", "widths", "triangles")})
         params = {"xkcd": drawn.pop("xkcd", False),
                   "wire_labels": drawn.pop("wire_labels"),
-                  "scale": rng.uniform(20, 28),
+                  "scale": rng.uniform(*scales),
                   "linewidth": rng.uniform(1, 2.5)}
+        if text is not None:
+            params["fontsize"] = params["scale"] * rng.uniform(*text)
         if not fits(diagram, size, params["scale"]):
             continue
         image = render(diagram, size, **params)
