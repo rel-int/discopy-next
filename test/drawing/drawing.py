@@ -1209,3 +1209,12 @@ def test_a_dimension_is_drawn_as_its_numbers():
     assert Dims(4, monoidal.Dim(4, 4)).to_drawing() == monoidal.Ty(
         monoidal.Wire('4'), monoidal.Wire('4, 4'))
     assert str(Dims(4)) == "Dims(Dim(4))"
+
+
+def test_tikz_writes_a_label_in_its_colour():
+    tikz = TikZ()
+    tikz.draw_text("x", 0, 0, verticalalignment="top", color="white",
+                   adaptive=False)
+    tikz.draw_text("y", 1, 0, verticalalignment="top", color="black")
+    assert "text={white}" in tikz.nodelayer[0]
+    assert "text=" not in tikz.nodelayer[1]

@@ -1560,10 +1560,11 @@ class TikZ(Backend):
 
     def draw_text(self, text, i, j, **params):
         """
-        A label as a node, in a font of :attr:`LABEL_SIZE` points. A wire
-        label, aligned to its top, hangs below and to the right of its point
-        in a font of :attr:`WIRE_LABEL_SIZE` points, filled white only over a
-        region with no colour, see :meth:`draw_wire_label`.
+        A label as a node, in a font of :attr:`LABEL_SIZE` points and its
+        ``color`` when it is not black. A wire label, aligned to its top,
+        hangs below and to the right of its point in a font of
+        :attr:`WIRE_LABEL_SIZE` points, filled white only over a region with
+        no colour, see :meth:`draw_wire_label`.
 
         >>> tikz = TikZ()
         >>> tikz.draw_text("f", 0, 0)
@@ -1584,6 +1585,10 @@ class TikZ(Backend):
             options += ", anchor=north west"
         options += ", " + self.font(
             self.WIRE_LABEL_SIZE if is_wire_label else self.LABEL_SIZE)
+        color = params.get("color")
+        if color is not None and not (
+                isinstance(color, str) and color == "black"):
+            options += f", text={self.color_option(color)}"
         if 'fontsize' in params and params['fontsize'] is not None:
             options += f", scale={params['fontsize']}"
         self.add_node(i, j, text, options)
