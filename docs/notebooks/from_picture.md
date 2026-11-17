@@ -106,6 +106,26 @@ reads three of the four modules better than these masks. On the clean
 set the pixel net held, at 95 to 99.7% per class, and the OCR fell: it reads
 74.9% of box names, from 95.7%.
 
+Run 8 kept run 7's data and changed what the pixel net predicts: the
+outline of a box instead of its fill, no cups and caps, and a `port` class
+where a wire meets a box. A pre-pass then fills each closed outline and finds
+cups and caps at the lowest and highest points of the wires. On true masks
+this pre-pass reads back exactly as many pictures as before, at both scales.
+The OCR was also given crops scaled to the text. It was refuted on both its
+pre-registered lines (#559):
+
+| exact recovery | monoidal | symmetric | compact | frobenius |
+|---|---|---|---|---|
+| the clean set above | 56.3% | 65.6% | 74.5% | 80.0% |
+| whiteboard style, 12 to 20 px per unit | 7.7% | 15.1% | 5.2% | 9.3% |
+| ceiling, clean true masks at 12 to 20 px per unit | 86.6% | 87.3% | 86.4% | 85.6% |
+
+It beats run 7 on every module, by 25 to 44 points on the clean set, but
+stays below the weights trained on clean pictures alone. The OCR still reads
+73.4% of box names on the clean set, scaled crops or not. The third row is a
+ceiling: at 12 px per unit a short wire has no room for its label, so its type
+is not in the picture.
+
 The weights are not in git. With weights `vision.save` wrote:
 
 ```py
