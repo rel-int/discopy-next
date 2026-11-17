@@ -3,4 +3,4 @@
 - [x] discopy/drawing/nicer.py: wires, rectangles, features, hand_score, make_nicer over Diagram.foliations, with doctests and before/after pictures
 - [x] test/drawing/nicer.py: features finite, make_nicer keeps the diagram and does not lower the score, takes a score
 - [x] docs: nicer in docs/api/drawing.rst; CHANGELOG.md entry
-- [ ] next-checks green
+- [x] next-checks green
