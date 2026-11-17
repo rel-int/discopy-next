@@ -1586,9 +1586,9 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 ### Project
 
 - `benchmark/test_egraph.py` has the families `match`, the builder's matcher
-  against the pure one on each trace, and `saturate`, `+` on four to eight
-  leaves under associativity and commutativity, on the builder and by the
-  pure rounds ([next#589]).
+  against the pure one on each trace, and `saturate`, `+` under
+  associativity and commutativity on four to eight leaves on the builder,
+  and on four and five by the pure rounds ([next#589]).
 - `paper/`, the source of the tool paper in Typst: `paper/transpile.py` writes
   its LaTeX from the part of Typst it is written in, `paper/build.py` runs
   its listings and draws each figure with the Typst and the TikZ backends,
