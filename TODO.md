@@ -1,0 +1,10 @@
+> the ribbon drawing with tikz is broken too, the inside are coloured only for cups and caps
+> also wire labels should be shifted down and drawn with a smaller font
+> "Dim(4)" should be printed as such but its drawing name should be just "4"
+
+Found while building the tool paper's figures with the TikZ backend. The first point is a box of #579 (ribbons filled differently by each backend).
+
+- [ ] TikZ fills the regions of a diagram, the inside of a ribbon included, as Matplotlib does: the loop over region cells moves to the base class
+- [ ] A TikZ wire label hangs below and to the right of its port, as in Matplotlib, at footnote size, filled white only over an uncoloured region
+- [ ] `monoidal.Dim.drawing_name` is its numbers, and a wire label uses an object's drawing name when it has one
+- [ ] Baselines, tests and the changelog
