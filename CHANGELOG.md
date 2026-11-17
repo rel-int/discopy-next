@@ -1585,10 +1585,11 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Project
 
-- `proptest` groups a push to `main` by commit and a pull request by
-  ref, as `build` and `benchmark` have since [next#445]: one group per ref
-  keeps one running and one pending run, so a third merge cancelled the
-  pending one before it ever reached a runner ([next#591]).
+- `proptest` groups a push to `main` by commit, as `build`, `benchmark`,
+  `lean` and `paper` do: one group per ref keeps one running and one
+  pending run, so a third merge cancelled the pending one before it ever
+  reached a runner. `.github/tests/workflows.py` checks every one of the
+  five ([next#591]).
 - `paper/`, the source of the tool paper in Typst: `paper/transpile.py` writes
   its LaTeX from the part of Typst it is written in, `paper/build.py` runs
   its listings and draws each figure with the Typst and the TikZ backends,

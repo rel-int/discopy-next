@@ -38,7 +38,8 @@ def pull_request(sha):
             "event": {"pull_request": {"number": 1}}}
 
 
-@pytest.fixture(params=["build", "benchmark", "lean", "paper"])
+@pytest.fixture(
+    params=["build", "benchmark", "lean", "paper", "proptest"])
 def concurrency(request):
     with open(GITHUB / "workflows" / f"{request.param}.yml") as file:
         return yaml.safe_load(file)["concurrency"]
