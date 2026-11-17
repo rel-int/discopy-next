@@ -1172,8 +1172,8 @@ class BiclosedCategory[
         return cls.ev(base, exponent, left=False)
 
 
-class LinearCategory[C0: ResiduatedMonoid, C1: LinearCategory](
-        BiclosedCategory[C0, C1]):
+class LinearCategory[
+        C0: ResiduatedMonoid, C1: LinearCategory](BiclosedCategory[C0, C1]):
     """
     A linear category is a :class:`BiclosedCategory` with a linear exponential
     comonad :meth:`bang`, see :cite:t:`Bierman95`, here without symmetry: a

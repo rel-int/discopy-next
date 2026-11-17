@@ -1116,7 +1116,7 @@ class Laxator(Structural):
         self.x, self.y = x, y
         if x is None or y is None:
             name, dom = "Laxator()", self.ob()
-            cod = dom.bang()
+            cod = Ty.bang(dom)
         else:
             name, dom = f"Laxator({x}, {y})", x.bang() @ y.bang()
             cod = (x @ y).bang()
