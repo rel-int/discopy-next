@@ -6,5 +6,5 @@ Found while building the tool paper's figures with the TikZ backend. The first p
 
 - [WIP] @session_01MEJxy4FrWd3ymhMeQGF7x8-2026-11-17 16:33 TikZ fills the regions of a diagram, the inside of a ribbon included, as Matplotlib does: the loop over region cells moves to the base class
 - [WIP] @session_01MEJxy4FrWd3ymhMeQGF7x8-2026-11-17 16:33 A TikZ wire label hangs below and to the right of its port, as in Matplotlib, at footnote size, filled white only over an uncoloured region
-- [ ] `monoidal.Dim.drawing_name` is its numbers, and a wire label uses an object's drawing name when it has one
+- [WIP] @session_01MEJxy4FrWd3ymhMeQGF7x8-2026-11-17 16:33 `monoidal.Dim.drawing_name` is its numbers, and a wire label uses an object's drawing name when it has one
 - [ ] Baselines, tests and the changelog
