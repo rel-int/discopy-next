@@ -1047,10 +1047,14 @@ class Parser:  # pylint: disable=too-many-instance-attributes
         model of :meth:`from_pretrained`, see
         :meth:`discopy.lambek.neural.ChartClassifier.decode`.
         """
+        # pylint: disable=import-outside-toplevel  # torch is an extra
+        import torch
+
         if self.encoder is None or self.classifier is None:
             raise ValueError("no model: see Parser.from_pretrained")
-        states, mask = self.encoder(sentences)
-        return self.classifier.decode(states, mask, **self.decoding)
+        with torch.inference_mode():
+            states, mask = self.encoder(sentences)
+            return self.classifier.decode(states, mask, **self.decoding)
 
     def __call__(self, sentence: str | list[str]) -> Diagram | None:
         """
