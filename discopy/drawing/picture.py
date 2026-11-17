@@ -1,10 +1,11 @@
 """
-Pictures of diagrams: sample a diagram, draw it as an image and label each
-of its pixels.
+Pictures of diagrams: sample a diagram, draw it as an image, label each of
+its pixels, and decode the labels back to the diagram.
 
-Drawing is a functor from diagrams to images, reading one back is a
-section of it, up to the axioms of its module, see :func:`equal`. Training
-data for reading is free: :func:`sample` draws a diagram of a module, its
+Drawing is a functor from diagrams to images, reading is a section of it:
+:func:`decode` sends the labels of the picture of a diagram back to that
+diagram, up to the axioms of its module, see :func:`equal`. Training data
+for reading is free: :func:`sample` draws a diagram of a module, its
 picture and the labels of its pixels, its mask.
 
 A pixel is the background, a wire with a type, or a box with a name or a
@@ -33,12 +34,21 @@ Summary
     augment
     sample
     samples
+    decode
     equal
+    coarse
+    coarsen
+    regions
+    attach
+    refine
+    scan
+    read
 """
 
 from __future__ import annotations
 
 import importlib
+from collections import defaultdict
 from collections.abc import Callable, Iterator
 from contextlib import nullcontext
 from io import BytesIO
@@ -69,6 +79,10 @@ STRUCTURAL = {
 #: label by the type it names, and ``"wire"`` a wire whose type is unknown.
 LABELS = ("background", ) + TYPES + NAMES + STRUCTURAL["frobenius"]\
     + tuple(f"label {x}" for x in TYPES) + ("wire", )
+
+#: The classes of the pixel net, coarser than :data:`LABELS`: no name, no
+#: type, only what a box, a wire and a label are and which primitive.
+COARSE = ("background", "wire", "box", "label") + STRUCTURAL["frobenius"]
 
 #: The flags of :func:`augment`, applied in this order.
 AUGMENTATIONS = (
@@ -595,6 +609,7 @@ def sample(module: str, seed=0, **flags):
     >>> diagram, image, mask = sample("monoidal", seed=0, size=96)
     >>> image.shape, mask.shape
     ((96, 96, 3), (96, 96))
+    >>> assert equal(decode(mask, "monoidal"), diagram, "monoidal")
     """
     return next(samples(module, seed, **flags))
 
@@ -617,3 +632,348 @@ def equal(diagram, other, module: str) -> bool:
         except NotImplementedError:
             pass  # A closed component is a scalar, which commutes.
     return diagram.to_hypergraph() == other.to_hypergraph()
+
+
+SHIFTS = [(-1, -1), (-1, 0), (-1, 1), (0, -1), (0, 1), (1, -1), (1, 0), (1, 1)]
+
+
+def shift(array, dr: int, dc: int, fill):
+    """ The array moved by ``(dr, dc)``: ``shift(a, 1, 0)[r] == a[r - 1]``,
+    ``fill`` where nothing moves in. """
+    result = np.full_like(array, fill)
+    rows, cols = array.shape
+    result[max(dr, 0):rows + min(dr, 0), max(dc, 0):cols + min(dc, 0)]\
+        = array[max(-dr, 0):rows + min(-dr, 0), max(-dc, 0):cols + min(-dc, 0)]
+    return result
+
+
+def components(classes: np.ndarray) -> np.ndarray:
+    """
+    The 8-connected components of the pixels of equal class, ``-1`` where
+    the class is negative, numbered from ``0`` in reading order.
+
+    >>> components(np.array([[1, 1, -1, 2], [-1, -1, -1, 2], [1, -1, 2, 2]]))
+    array([[ 0,  0, -1,  1],
+           [-1, -1, -1,  1],
+           [ 2, -1,  1,  1]])
+    """
+    size = classes.size
+    ids = np.where(classes >= 0, np.arange(size).reshape(classes.shape), size)
+    while True:
+        previous = ids
+        for dr, dc in SHIFTS:
+            same = shift(classes, dr, dc, -1) == classes
+            ids = np.where(same & (classes >= 0), np.minimum(
+                ids, shift(ids, dr, dc, size)), ids)
+        if np.array_equal(ids, previous):
+            break
+    _, numbered = np.unique(ids, return_inverse=True)
+    numbered = numbered.reshape(classes.shape)
+    return np.where(classes >= 0, numbered, -1)
+
+
+def decode(mask: np.ndarray, module: str, min_pixels=3):
+    """
+    The diagram of a module whose picture has these labels, see
+    :data:`LABELS`. Raises :class:`ValueError` when the labels are not those
+    of a picture.
+
+    The generators are the components of box pixels of each label, the
+    links those of wire and port pixels together. A link meets a generator
+    on its top or bottom, at a port, ordered from left to right. A sweep
+    from top to bottom keeps the list of open links: a generator closes the
+    adjacent links on its top and opens those on its bottom. A link with no
+    type is given one by the generators it meets, e.g. the two sides of a
+    swap, else the first of :data:`TYPES`.
+
+    >>> from discopy.symmetric import Ty, Box, Swap
+    >>> x, y = Ty('a'), Ty('b')
+    >>> diagram = Box('f', x, x @ y) >> Swap(x, y)
+    >>> mask = render(diagram, 96, mask=True)
+    >>> assert equal(decode(mask, "symmetric"), diagram, "symmetric")
+    """
+    mask, mod = np.asarray(mask, dtype=np.intp), load(module)
+    first = LABELS.index(NAMES[0])
+    allowed = [LABELS.index(name) for name in NAMES + STRUCTURAL[module]]
+    is_box = np.isin(mask, allowed)
+    boxes = components(np.where(is_box, mask, -1))
+    links = components(np.where(
+        (mask > 0) & (mask < first) | (mask == WIRE), 0, -1))
+    small = np.bincount(links[links >= 0], minlength=1) < min_pixels
+    links = components(np.where(
+        (links >= 0) & ~small[np.maximum(links, 0)], 0, -1))
+    sizes = np.bincount(boxes[boxes >= 0])
+    rows, cols = np.mgrid[0:mask.shape[0], 0:mask.shape[1]]
+    generators = [g for g in range(len(sizes)) if sizes[g] >= min_pixels]
+    centre = {g: rows[boxes == g].mean() for g in generators}
+    contacts = defaultdict(list)
+    for dr, dc in SHIFTS:
+        moved = shift(boxes, dr, dc, -1)
+        touch = (links >= 0) & (moved >= 0)
+        for link, g, r, c in zip(
+                links[touch], moved[touch], rows[touch], cols[touch]):
+            contacts[link, g].append((r, c))
+    tops, bottoms, ends = defaultdict(list), defaultdict(list), defaultdict(
+        list)
+    for (link, g), points in contacts.items():
+        if g not in centre:
+            continue
+        r, c = np.mean(points, axis=0)
+        side = tops if r < centre[g] else bottoms
+        side[g].append((c, link))
+        ends[link].append((g, side is tops, r))
+    types = link_types(mask, links, first)
+    inputs, outputs = [], []
+    for link in range(links.max() + 1):
+        at = [top for _, top, _ in ends[link]]
+        rs, cs = rows[links == link], cols[links == link]
+        if not any(not top for top in at):
+            inputs.append((cs[rs == rs.min()].mean(), link))
+        if not any(at):
+            outputs.append((cs[rs == rs.max()].mean(), link))
+    label = {g: LABELS[np.bincount(mask[boxes == g]).argmax()]
+             for g in generators}
+    tops = {g: [link for _, link in sorted(tops[g])] for g in generators}
+    bottoms = {g: [link for _, link in sorted(bottoms[g])] for g in generators}
+    infer_types(types, label, tops, bottoms, module)
+
+    def typ(link):
+        name = types.get(link, TYPES[0])
+        result = mod.Ty(name.removesuffix(".r"))
+        if name.endswith(".r") and not hasattr(result, "r"):
+            raise ValueError(f"No adjoint {name} in {module}.")
+        return result.r if name.endswith(".r") else result
+
+    def top_row(g):
+        return min((r for link in tops[g] for h, top, r in ends[link]
+                    if h == g and top), default=rows[boxes == g].min())
+
+    def column(link, row):
+        rs, cs = rows[links == link], cols[links == link]
+        nearest = rs[np.abs(rs - row).argmin()]
+        return cs[rs == nearest].mean()
+
+    open_ = [link for _, link in sorted(inputs)]
+    result = mod.Diagram.id(mod.Ty().tensor(*map(typ, open_)))
+    for g in sorted(generators, key=lambda g: (
+            top_row(g), cols[boxes == g].mean())):
+        dom = tops[g]
+        if dom:
+            if dom[0] not in open_:
+                raise ValueError(f"Generator {label[g]} has no open input.")
+            i = open_.index(dom[0])
+            if open_[i:i + len(dom)] != dom:
+                raise ValueError(f"Inputs of {label[g]} are not adjacent.")
+        else:
+            c, row = cols[boxes == g].mean(), rows[boxes == g].min()
+            i = sum(column(link, row) < c for link in open_)
+        box = generator(mod, label[g], list(map(typ, dom)),
+                        list(map(typ, bottoms[g])))
+        left = mod.Ty().tensor(*map(typ, open_[:i]))
+        right = mod.Ty().tensor(*map(typ, open_[i + len(dom):]))
+        result = result >> left @ box @ right
+        open_[i:i + len(dom)] = bottoms[g]
+    if open_ != [link for _, link in sorted(outputs)]:
+        raise ValueError("The outputs do not match the open links.")
+    return result
+
+
+def link_types(mask, links, first) -> dict[int, str]:
+    """ The type of each link with wire pixels, by majority. """
+    types = {}
+    wire = (mask > 0) & (mask < first)  # a wire of unknown type is not
+    for link in np.unique(links[wire]):
+        types[int(link)] = LABELS[np.bincount(
+            mask[wire & (links == link)]).argmax()]
+    return types
+
+
+def adjoint(name: str, module: str) -> str:
+    """ The name of the adjoint of a type, itself unless compact. """
+    if module != "compact":
+        return name
+    return name.removesuffix(".r") if name.endswith(".r") else name + ".r"
+
+
+def infer_types(types, label, tops, bottoms, module):
+    """ Give a type to each link that has none, from the generators it
+    meets, until none is given. """
+    def rules(g):
+        top, bottom = tops[g], bottoms[g]
+        if label[g] == "swap" and len(top) == 2 == len(bottom):
+            yield from [(top[0], bottom[1], str), (top[1], bottom[0], str)]
+        if label[g] in ("cup", "cap"):
+            legs = top if label[g] == "cup" else bottom
+            if len(legs) == 2:
+                yield legs[0], legs[1], lambda x: adjoint(x, module)
+        if label[g] == "spider":
+            legs = top + bottom
+            yield from [(legs[0], leg, str) for leg in legs[1:]]
+    changed = True
+    while changed:
+        changed = False
+        for g in label:
+            for a, b, func in rules(g):
+                if a in types and b not in types:
+                    types[b], changed = func(types[a]), True
+                elif b in types and a not in types:
+                    types[a], changed = func(types[b]), True
+
+
+def generator(mod, label: str, dom: list, cod: list):
+    """ The box of a module for a label and the types of its ports. """
+    if label in NAMES:
+        return mod.Box(label, mod.Ty().tensor(*dom), mod.Ty().tensor(*cod))
+    arity = {"swap": (2, 2), "cup": (2, 0), "cap": (0, 2)}.get(label)
+    if arity is not None and arity != (len(dom), len(cod)):
+        raise ValueError(f"A {label} with {len(dom)} inputs, {len(cod)} "
+                         "outputs.")
+    if label == "swap":
+        return mod.Swap(*dom)
+    if label == "cup":
+        return mod.Cup(*dom)
+    if label == "cap":
+        return mod.Cap(*cod)
+    legs = dom + cod
+    if not legs or any(x != legs[0] for x in legs):
+        raise ValueError("A spider with no legs or legs of many types.")
+    return mod.Spider(len(dom), len(cod), legs[0])
+
+
+def coarse(label: str) -> str:
+    """
+    The class of :data:`COARSE` a label of :data:`LABELS` falls in.
+
+    >>> [coarse(x) for x in ("a.r", "f", "label a", "swap")]
+    ['wire', 'box', 'label', 'swap']
+    """
+    if label in TYPES or label == "wire":
+        return "wire"
+    if label in NAMES:
+        return "box"
+    return "label" if label.startswith("label ") else label
+
+
+def coarsen(mask: np.ndarray) -> np.ndarray:
+    """ The classes of :data:`COARSE` of the labels of a mask. """
+    table = np.array([COARSE.index(coarse(label)) for label in LABELS])
+    return table[mask]
+
+
+def regions(classes: np.ndarray, min_pixels=3):
+    """
+    The boxes, the wires and the labels of a picture from the classes of
+    its pixels, see :data:`COARSE`: three arrays of component ids, ``-1``
+    elsewhere. The characters of one label are one component, the label
+    pixels grown by two first; a label drawn over a box is part of the box
+    too, which joins it across the label; a component of fewer than
+    ``min_pixels`` pixels is dropped.
+    """
+    def drop_small(ids):
+        sizes = np.bincount(ids[ids >= 0], minlength=1)
+        return np.where((ids >= 0) & (sizes[np.maximum(ids, 0)] >= min_pixels),
+                        ids, -1)
+    text = classes == COARSE.index("label")
+    box = classes == COARSE.index("box")
+    joined = components(np.where(box | text, 0, -1))
+    boxes = np.where(np.isin(joined, joined[box]), joined, -1)
+    wires = components(np.where(classes == COARSE.index("wire"), 0, -1))
+    near = text
+    for _ in range(2):
+        near = near | np.any([shift(near, dr, dc, False)
+                              for dr, dc in SHIFTS], axis=0)
+    labels = np.where(text, components(np.where(near, 0, -1)), -1)
+    return drop_small(boxes), drop_small(wires), drop_small(labels)
+
+
+def attach(labels: np.ndarray, wires: np.ndarray) -> dict[int, int]:
+    """ The wire each label names: the one nearest its top left pixel,
+    as :meth:`Backend.draw_wire_label` draws a label right of its wire. """
+    wire_rows, wire_cols = np.nonzero(wires >= 0)
+    result = {}
+    for label in np.unique(labels[labels >= 0]):
+        rows, cols = np.nonzero(labels == label)
+        left = cols.min()
+        top = rows[cols == left].min()
+        if len(wire_rows):
+            nearest = ((wire_rows - top) ** 2
+                       + (wire_cols - left) ** 2).argmin()
+            result[int(label)] = int(
+                wires[wire_rows[nearest], wire_cols[nearest]])
+    return result
+
+
+def refine(classes, boxes, wires, names: dict, types: dict) -> np.ndarray:
+    """
+    The mask of :data:`LABELS` from the classes of the pixels, see
+    :data:`COARSE`, the components of :func:`regions`, the name of each
+    box and the type of each wire: a wire with no type is ``"wire"``, a
+    label is background. Raises :class:`ValueError` on a name or a type
+    outside :data:`NAMES` and :data:`TYPES`.
+
+    >>> from discopy.monoidal import Ty, Box
+    >>> f = Box('f', Ty('a'), Ty('b'))
+    >>> mask = render(f, 64, mask=True)
+    >>> classes = coarsen(mask)
+    >>> boxes, wires, labels = regions(classes)
+    >>> names = {b: "f" for b in np.unique(boxes[boxes >= 0])}
+    >>> mask = refine(classes, boxes, wires, names, {})
+    >>> assert equal(decode(mask, "monoidal"),
+    ...              Box('f', Ty('a'), Ty('a')), "monoidal")
+    """
+    for name in names.values():
+        if name not in NAMES:
+            raise ValueError(f"Unknown box name {name!r}.")
+    for typ in types.values():
+        if typ not in TYPES:
+            raise ValueError(f"Unknown wire type {typ!r}.")
+    fine = np.zeros(classes.shape, dtype=np.intp)
+    for name in STRUCTURAL["frobenius"]:
+        fine[classes == COARSE.index(name)] = LABELS.index(name)
+    fine[wires >= 0] = WIRE
+    for wire, typ in types.items():
+        fine[wires == wire] = LABELS.index(typ)
+    for box, name in names.items():
+        fine[boxes == box] = LABELS.index(name)
+    return fine
+
+
+def scan(classes: np.ndarray, types=(), min_pixels=3) -> str:
+    """
+    The smallest module whose structural primitives appear in a picture,
+    from the classes of its pixels: ``monoidal`` with none, ``symmetric``
+    with swaps, ``compact`` with cups or caps, ``frobenius`` with spiders,
+    and ``compact`` at least if one of the ``types`` read is an adjoint.
+
+    >>> from discopy.symmetric import Ty, Box, Swap
+    >>> x = Ty('a')
+    >>> scan(coarsen(render(Box('f', x, x), 64, mask=True)))
+    'monoidal'
+    >>> scan(coarsen(render(Swap(x, x), 64, mask=True)))
+    'symmetric'
+    >>> scan(coarsen(render(Swap(x, x), 64, mask=True)), ['a.r'])
+    'compact'
+    """
+    seen = {name for name in STRUCTURAL["frobenius"]
+            if (classes == COARSE.index(name)).sum() >= min_pixels}
+    least = MODULES.index("compact") if any(
+        typ.endswith(".r") for typ in types) else 0
+    return next(module for module in MODULES[least:]
+                if seen <= set(STRUCTURAL[module]))
+
+
+def read(classes: np.ndarray, name: Callable, typ: Callable, module=None):
+    """
+    The diagram a picture shows from the classes of its pixels: each box is
+    named by ``name(rows, cols)`` and each labelled wire typed by
+    ``typ(rows, cols)``, given the pixels of the box or the label, the
+    module is the :func:`scan` of the classes and the types read unless
+    given, then :func:`decode`.
+    """
+    boxes, wires, labels = regions(classes)
+    names = {int(b): name(*np.nonzero(boxes == b))
+             for b in np.unique(boxes[boxes >= 0])}
+    types = {wires_id: typ(*np.nonzero(labels == label))
+             for label, wires_id in attach(labels, wires).items()}
+    return decode(refine(classes, boxes, wires, names, types),
+                  module or scan(classes, types.values()))

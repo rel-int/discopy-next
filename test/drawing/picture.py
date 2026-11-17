@@ -1,12 +1,13 @@
 from itertools import islice
 
 import numpy as np
-from pytest import mark
+from pytest import mark, raises
 
 from discopy import compact, frobenius
 from discopy.drawing import picture
 from discopy.drawing.picture import (
-    LABELS, MODULES, augment, elementary, equal, kind, render, samples)
+    COARSE, LABELS, MODULES, augment, coarsen, decode, elementary, equal,
+    kind, read, render, samples, scan)
 
 
 def test_elementary_draws_one_generator_at_a_time():
@@ -72,3 +73,49 @@ def test_every_style_draws(flag):
         if flag != "xkcd" else (render(diagram, 64, xkcd=True), None)
     assert image.shape == (64, 64, 3)
     assert not np.array_equal(image, plain)
+
+
+def read_true_mask(mask, module):
+    def majority(rows, cols):
+        return LABELS[np.bincount(mask[rows, cols]).argmax()]
+    return read(coarsen(mask), majority,
+                lambda rows, cols: majority(rows, cols).removeprefix("label "),
+                module=module)
+
+
+@mark.parametrize("module", MODULES)
+def test_read_true_masks(module):
+    """ A label drawn over a primitive, e.g. a spider on a short wire, is
+    hidden in the mask, so a type can be lost: 990 to 1,000 of 1,000 read
+    back per module from seed 7, the reading's ceiling (#559). """
+    read_back = 0
+    for diagram, _, mask in islice(samples(module, seed=7), 25):
+        assert scan(coarsen(mask)) in MODULES[:MODULES.index(module) + 1]
+        read_back += equal(read_true_mask(mask, module), diagram, module)
+    assert read_back >= 24
+
+
+def test_wire_labels_are_read_from_the_mask():
+    x, y = compact.Ty('b'), compact.Ty('c')
+    mask = render(compact.Box('f', x, y), 96, mask=True)
+    labels = {LABELS[i] for i in np.unique(mask)}
+    assert {"label b", "label c"} <= labels
+    classes = coarsen(mask)
+    assert set(np.unique(classes)) == {
+        COARSE.index(c) for c in ("background", "wire", "box", "label")}
+
+
+def test_decode_raises_on_what_is_not_a_picture():
+    mask = np.zeros((32, 32), dtype=np.int64)
+    mask[8:24, 8:24] = LABELS.index("swap")
+    mask[:8, 15] = LABELS.index("a")
+    with raises(ValueError):
+        decode(mask, "symmetric")
+
+
+def test_an_adjoint_type_reads_compact():
+    x = compact.Ty('a')
+    diagram = compact.Swap(x.r, x)
+    mask = render(diagram, 96, mask=True)
+    assert scan(coarsen(mask)) == "symmetric"
+    assert equal(read_true_mask(mask, None), diagram, "compact")
