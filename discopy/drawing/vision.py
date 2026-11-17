@@ -40,7 +40,6 @@ Summary
         :toctree:
 
         dataset
-        crop
         texts
         train
         train_ocr
@@ -68,14 +67,9 @@ from torch.nn import functional as F
 
 from discopy.drawing import picture
 from discopy.drawing.picture import (
-    COARSE, LABELS, MODULES, NAMES, TYPES, decode, refine, scan)
+    CHARS, COARSE, CROP, LABELS, MODULES, NAMES, TYPES, crop, decode, refine,
+    scan)
 from discopy.utils import AxiomError
-
-#: The characters the OCR model reads, after the blank of its alphabet.
-CHARS = "".join(sorted(set("".join(NAMES + TYPES))))
-
-#: The height and width of a crop the OCR model reads, in pixels.
-CROP = (24, 48)
 
 
 class Rounds(nn.Sequential):
@@ -189,33 +183,6 @@ def dataset(n: int, seed=0, modules=MODULES, workers=4, **flags) -> dict:
 def tensor(images: np.ndarray) -> torch.Tensor:
     """ Images as a float tensor of shape ``(n, 3, size, size)``. """
     return torch.from_numpy(images).permute(0, 3, 1, 2).float() / 255
-
-
-def crop(image: np.ndarray, rows, cols, label=False) -> np.ndarray:
-    """
-    The ink of an image, from zero for white to one for black, in a window
-    of shape :data:`CROP`: centred on the box with these pixels, where its
-    name is drawn, or from the top left of the label with these pixels,
-    with no ink outside their bounding box. Keeping only the label's own
-    pixels, or erasing those classed wire, box or primitive, reads a box
-    edge through a label better but loses the text the pixel net misses:
-    recovery fell by 7 to 15 points (#559).
-    """
-    height, width = CROP
-    if label:
-        top = rows[cols == cols.min()].min() - height // 4
-        left = cols.min() - 4
-    else:
-        top = (rows.min() + rows.max()) // 2 - height // 2
-        left = (cols.min() + cols.max()) // 2 - width // 2
-    ink = 1 - image.mean(axis=2) / 255
-    if label:
-        inside = np.zeros(ink.shape, dtype=bool)
-        inside[max(rows.min() - 1, 0):rows.max() + 2,
-               max(cols.min() - 1, 0):cols.max() + 2] = True
-        ink = ink * inside
-    ink = np.pad(ink, ((height, height), (width, width)))
-    return ink[top + height:top + 2 * height, left + width:left + 2 * width]
 
 
 def truths(mask: np.ndarray):
