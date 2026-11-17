@@ -1594,6 +1594,11 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Project
 
+- `proptest` groups a push to `main` by commit, as `build`, `benchmark`,
+  `lean` and `paper` do, and a scheduled or dispatched run by its own run id:
+  one group per ref keeps one running and one pending run, so a third merge
+  cancelled the pending one before it ever reached a runner.
+  `.github/tests/workflows.py` checks every one of the five ([next#591]).
 - `benchmark/test_egraph.py` has the families `match`, the builder's matcher
   against the pure one on each trace, and `saturate`, `+` under
   associativity and commutativity on four to eight leaves on the builder,
@@ -2093,6 +2098,7 @@ for the changelog of `1.2.1` and earlier.
 [next#586]: https://github.com/rel-int/discopy-next/pull/586
 [next#587]: https://github.com/rel-int/discopy-next/pull/587
 [next#589]: https://github.com/rel-int/discopy-next/pull/589
+[next#591]: https://github.com/rel-int/discopy-next/pull/591
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#56]: https://github.com/rel-int/optyx/pull/56
