@@ -9,6 +9,14 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Added
 
+- `drawing.picture`, pictures of diagrams as training data for reading them
+  back: `samples` draws random diagrams of `monoidal`, `symmetric`,
+  `compact` or `frobenius` one generator at a time, renders each with a mask
+  labelling every pixel by its wire type, box name or structural primitive,
+  by hand with `xkcd`; `augment` warps, rotates and changes the perspective
+  of the image and its mask together, then restyles the image alone (chalk,
+  whiteboard, blur, JPEG); `draw(backend=...)` takes the backend to draw with
+  ([next#573]).
 - `abc.LinearCategory`, a linear category (Bierman, TLCA 1995) without
   symmetry: a comonad `bang` with `dereliction` and `digging`, lax monoidal
   with a `laxator`, each `!x` a comonoid by `contraction` and `weakening`, and
@@ -2109,6 +2117,7 @@ for the changelog of `1.2.1` and earlier.
 [next#569]: https://github.com/rel-int/discopy-next/pull/569
 [next#570]: https://github.com/rel-int/discopy-next/pull/570
 [next#571]: https://github.com/rel-int/discopy-next/pull/571
+[next#573]: https://github.com/rel-int/discopy-next/pull/573
 [next#575]: https://github.com/rel-int/discopy-next/pull/575
 [next#577]: https://github.com/rel-int/discopy-next/pull/577
 [next#578]: https://github.com/rel-int/discopy-next/pull/578

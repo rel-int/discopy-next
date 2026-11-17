@@ -123,7 +123,7 @@ def draw(graph: Drawing, **params):
                 space, graph.width, exclusive=True, copy=True)
     figsize = params.get('figsize', None if aspect == 'auto' else (
         graph.width or 1, graph.height or 1))
-    backend = (
+    backend = params.get('backend', None) or (
         TikZ(use_tikzstyles=params.get('use_tikzstyles', None))
         if params.get('to_tikz', False)
         else Matplotlib(figsize=figsize,
