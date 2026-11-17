@@ -215,10 +215,12 @@ def test_tikz_spider_label_is_not_scaled_with_its_node(tmp_path):
 def test_tikz_escapes_a_label_outside_mathematics(tmp_path):
     from discopy.monoidal import Equation
     x, path = Ty('x_1'), tmp_path / "labels.tikz"
-    Equation(Box('feed_forward', x, x), Box('50% & #1', x, x),
+    spider = Box('50% & #1', x, x, draw_as_spider=True)
+    Equation(Box('feed_forward', x, x), spider,
              symbol="$a_1 \\mapsto b$").draw(path=str(path), to_tikz=True)
     tikz = path.read_text()
-    for label in ["{feed\\_forward}", "{x\\_1}", "{50\\% \\& \\#1}",
-                  "{$a_1 \\mapsto b$}"]:
+    for label in ["{feed\\_forward}", "{x\\_1}", "{$a_1 \\mapsto b$}",
+                  "label={center:{50\\% \\& \\#1}}"]:
         assert label in tikz
     assert TikZ.escape("(n >> s) << n") == "(n >{}> s) <{}< n"
+    assert TikZ.escape(">>> a\\_b \\$x_y\\$") == ">{}>{}> a\\_b \\$x\\_y\\$"
