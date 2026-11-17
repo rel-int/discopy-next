@@ -9,6 +9,11 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Added
 
+- `drawing.from_picture(jpeg, config)`: the diagram a picture shows, read
+  by `drawing.vision`, a pixel net (`PixelNet`) that classes each pixel and
+  a small OCR model (`OCR`) that reads box names and wire types, then decoded
+  in the least module it decodes in (`picture.decode_least`); with `train`,
+  `train_ocr` and `evaluate`, and `picture.crop` ([next#602]).
 - `lambek.categorial.Parser`, the chart parser of the reproduction of Bobcat
   (Clark, 2021) on CCGrebank: a CKY chart over the binary and unary rules
   seen in the treebank and the schemata of `schemata` at a penalty, scored by
@@ -2161,6 +2166,7 @@ for the changelog of `1.2.1` and earlier.
 [next#591]: https://github.com/rel-int/discopy-next/pull/591
 [next#598]: https://github.com/rel-int/discopy-next/pull/598
 [next#601]: https://github.com/rel-int/discopy-next/pull/601
+[next#602]: https://github.com/rel-int/discopy-next/pull/602
 [next#603]: https://github.com/rel-int/discopy-next/pull/603
 [next#604]: https://github.com/rel-int/discopy-next/pull/604
 [next#605]: https://github.com/rel-int/discopy-next/pull/605
