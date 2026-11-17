@@ -938,11 +938,12 @@ def refine(classes, boxes, wires, names: dict, types: dict) -> np.ndarray:
     return fine
 
 
-def scan(classes: np.ndarray, min_pixels=3) -> str:
+def scan(classes: np.ndarray, types=(), min_pixels=3) -> str:
     """
     The smallest module whose structural primitives appear in a picture,
     from the classes of its pixels: ``monoidal`` with none, ``symmetric``
-    with swaps, ``compact`` with cups or caps, ``frobenius`` with spiders.
+    with swaps, ``compact`` with cups or caps, ``frobenius`` with spiders,
+    and ``compact`` at least if one of the ``types`` read is an adjoint.
 
     >>> from discopy.symmetric import Ty, Box, Swap
     >>> x = Ty('a')
@@ -950,10 +951,14 @@ def scan(classes: np.ndarray, min_pixels=3) -> str:
     'monoidal'
     >>> scan(coarsen(render(Swap(x, x), 64, mask=True)))
     'symmetric'
+    >>> scan(coarsen(render(Swap(x, x), 64, mask=True)), ['a.r'])
+    'compact'
     """
     seen = {name for name in STRUCTURAL["frobenius"]
             if (classes == COARSE.index(name)).sum() >= min_pixels}
-    return next(module for module in MODULES
+    least = MODULES.index("compact") if any(
+        typ.endswith(".r") for typ in types) else 0
+    return next(module for module in MODULES[least:]
                 if seen <= set(STRUCTURAL[module]))
 
 
@@ -962,7 +967,8 @@ def read(classes: np.ndarray, name: Callable, typ: Callable, module=None):
     The diagram a picture shows from the classes of its pixels: each box is
     named by ``name(rows, cols)`` and each labelled wire typed by
     ``typ(rows, cols)``, given the pixels of the box or the label, the
-    module is the :func:`scan` unless given, then :func:`decode`.
+    module is the :func:`scan` of the classes and the types read unless
+    given, then :func:`decode`.
     """
     boxes, wires, labels = regions(classes)
     names = {int(b): name(*np.nonzero(boxes == b))
@@ -970,7 +976,7 @@ def read(classes: np.ndarray, name: Callable, typ: Callable, module=None):
     types = {wires_id: typ(*np.nonzero(labels == label))
              for label, wires_id in attach(labels, wires).items()}
     return decode(refine(classes, boxes, wires, names, types),
-                  module or scan(classes))
+                  module or scan(classes, types.values()))
 
 
 def crop(image: np.ndarray, rows, cols, label=False) -> np.ndarray:

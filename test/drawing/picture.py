@@ -99,3 +99,11 @@ def test_decode_raises_on_what_is_not_a_picture():
     mask[:8, 15] = LABELS.index("a")
     with raises(ValueError):
         decode(mask, "symmetric")
+
+
+def test_an_adjoint_type_reads_compact():
+    x = compact.Ty('a')
+    diagram = compact.Swap(x.r, x)
+    mask = render(diagram, 96, mask=True)
+    assert scan(coarsen(mask)) == "symmetric"
+    assert equal(read_true_mask(mask, None), diagram, "compact")

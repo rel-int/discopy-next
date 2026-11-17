@@ -367,11 +367,11 @@ def from_picture(jpeg, config: dict):
                            (size - picture.height) // 2))
     image = np.asarray(canvas)
     classes = predict(pixel, image[None])[0]
-    module = scan(classes)
+    boxes, wires, names, types = read(ocr, image, classes)
+    module = scan(classes, types.values())
     if config.get("module") is not None and MODULES.index(
             module) > MODULES.index(config["module"]):
         raise ValueError(f"The picture shows a {module} diagram.")
-    boxes, wires, names, types = read(ocr, image, classes)
     return decode(refine(classes, boxes, wires, names, types), module)
 
 
