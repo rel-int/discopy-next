@@ -2,4 +2,4 @@
 
 - [x] touchings: no new contact between wires that share no end
 - [x] add_box_corners: skip only when all four corners exist
-- [ ] answer and resolve every thread
+- [x] answer and resolve every thread
