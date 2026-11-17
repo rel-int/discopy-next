@@ -351,7 +351,9 @@ reads the part of Typst its docstring lists and raises `Unsupported` on anything
 the paper within it, or add the LaTeX of what you need to it. The references are those of the
 docs, `docs/discopy.bib`. `paper/figures/`, `paper/main.tex` and the PDFs are built, not
 committed: the `paper` workflow uploads them as the `paper` artifact, on `main` and on a pull
-request that touches the paper or the library its listings run.
+request that touches the paper or the library its listings run. The tests that build the paper
+are marked `slow`, since its listings import PyTorch and JAX: on a pull request that workflow
+is what runs them.
 
 ## Build the docs
 

@@ -26,6 +26,7 @@ def test_the_transpiler_does_what_its_docstrings_say():
     assert doctest.testmod(transpile).failed == 0
 
 
+@pytest.mark.slow
 def test_the_listings_run_and_every_figure_is_drawn_twice(names):
     assert names == sorted(set(names), key=names.index)
     for name in names:
@@ -35,6 +36,7 @@ def test_the_listings_run_and_every_figure_is_drawn_twice(names):
         assert tikz.startswith("\\begin{tikzpicture}")
 
 
+@pytest.mark.slow
 def test_every_reference_and_citation_of_the_latex_resolves(names):
     assert names
     latex = (build.PAPER / "main.tex").read_text("utf-8")
@@ -59,6 +61,7 @@ def test_the_transpiler_refuses_what_it_does_not_read():
             transpile.block_to_latex(refused, build.PAPER)
 
 
+@pytest.mark.slow
 def test_the_typst_compiles(names):
     typst = pytest.importorskip("typst")
     assert names
@@ -71,6 +74,7 @@ def test_the_typst_compiles(names):
     assert pdf.startswith(b"%PDF")
 
 
+@pytest.mark.slow
 def test_the_latex_compiles_with_nothing_undefined(names):
     if shutil.which("latexmk") is None:
         pytest.skip("latexmk is not installed.")
