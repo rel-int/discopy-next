@@ -388,7 +388,8 @@ def render(diagram, size=160, mask=False, **params) -> np.ndarray:
     of the wires apart, on top of the rest, each in green with its index
     times ``TEXT`` in red, read back as their ratio where the green is at
     least half: on black, the ratio does not depend on the antialiasing. A
-    label covers the background and boxes, never a wire or a primitive.
+    label covers the background and boxes, never a wire or a primitive, so
+    one drawn across a box can cut it in two, which :func:`decode` joins.
 
     The diagram is centred at ``scale`` pixels per unit, ``24`` by default,
     its text ``fontsize`` pixels high, its strokes ``linewidth`` wide.
@@ -698,7 +699,8 @@ def decode(mask: np.ndarray, module: str, min_pixels=3):
     first = LABELS.index(NAMES[0])
     allowed = [LABELS.index(name) for name in NAMES + STRUCTURAL[module]]
     is_box = np.isin(mask, allowed)
-    boxes = components(np.where(is_box, mask, -1))
+    boxes = join(components(np.where(is_box, mask, -1)), mask,
+                 (mask >= LABELS.index("label " + TYPES[0])) & (mask != WIRE))
     links = components(np.where(
         (mask > 0) & (mask < first) | (mask == WIRE), 0, -1))
     small = np.bincount(links[links >= 0], minlength=1) < min_pixels
@@ -778,6 +780,20 @@ def decode(mask: np.ndarray, module: str, min_pixels=3):
     if open_ != [link for _, link in sorted(outputs)]:
         raise ValueError("The outputs do not match the open links.")
     return result
+
+
+def join(boxes: np.ndarray, mask: np.ndarray, text: np.ndarray):
+    """
+    The components of the boxes of a mask, two of one name joined where a
+    label drawn across a box cuts it in two: labels cover boxes, so that
+    one under a box keeps its type, see :func:`render`.
+    """
+    joined = components(np.where((boxes >= 0) | text, 0, -1))
+    for j in np.unique(joined[boxes >= 0]):
+        inside = (joined == j) & (boxes >= 0)
+        if len(np.unique(mask[inside])) == 1:
+            boxes[inside] = boxes[inside].min()
+    return boxes
 
 
 def link_types(mask, links, first) -> dict[int, str]:

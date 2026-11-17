@@ -119,3 +119,15 @@ def test_an_adjoint_type_reads_compact():
     mask = render(diagram, 96, mask=True)
     assert scan(coarsen(mask)) == "symmetric"
     assert equal(read_true_mask(mask, None), diagram, "compact")
+
+
+def test_decode_joins_a_box_a_label_cuts():
+    from discopy import symmetric
+    x, y = symmetric.Ty('a'), symmetric.Ty('b')
+    diagram = symmetric.Box('f', x, x @ y) >> symmetric.Swap(x, y)
+    mask = render(diagram, 96, mask=True)
+    rows, cols = np.nonzero(mask == LABELS.index("f"))
+    middle = (cols.min() + cols.max()) // 2
+    mask[rows.min():rows.max() + 1, middle:middle + 2] = LABELS.index(
+        "label a")
+    assert equal(decode(mask, "symmetric"), diagram, "symmetric")
