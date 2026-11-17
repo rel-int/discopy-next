@@ -18,4 +18,4 @@
 - [x] Matrix.cast is the identity on a matrix that already has the dtype; Matrix.then uses it
 - [x] Tensor.then and Tensor.tensor cast each factor to the promoted dtype before tensordot
 - [x] test in test/tensor.py on pytorch and jax
-- [WIP] @session_01MEJxy4kqJ6YhajqkcZRUXm-2026-11-17 01:05 CHANGELOG.md bullet
+- [x] CHANGELOG.md bullet
