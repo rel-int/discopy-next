@@ -90,7 +90,20 @@ reads 95.7% of box names and 99.7% of wire types, and the scan picks the
 right module for 99.8% of the pictures. `from_picture` takes 0.11 s a picture
 on a CPU once loaded, and 1.7 s to import.
 
-Run 7, trained on pictures in whiteboard style, reports on #559.
+Run 7 trained on pictures half clean and half in whiteboard style (warped,
+blurred, in perspective, hand-drawn), at 12 to 28 px per unit in a 320 px
+frame, and was refuted on both its pre-registered lines (#559):
+
+| exact recovery | monoidal | symmetric | compact | frobenius |
+|---|---|---|---|---|
+| whiteboard style, 6 to 10 px per unit | 7.4% | 13.7% | 2.8% | 5.4% |
+| its ceiling, true classes | 6.7% | 16.0% | 0.5% | 1.1% |
+| the clean set above | 31.6% | 39.9% | 36.9% | 36.3% |
+
+At 6 to 10 px per unit the decoder cannot read most pictures even from the
+true classes, so the first row could not pass its line of 50%. On the clean
+set the pixel net held, at 95 to 99.7% per class, and the OCR fell: it reads
+74.9% of box names, from 95.7%.
 
 The weights are not in git. With weights `vision.save` wrote:
 
