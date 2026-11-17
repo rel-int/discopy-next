@@ -87,7 +87,9 @@ def read_true_mask(mask, module):
 def test_read_true_masks(module):
     """ A label drawn over a primitive, e.g. a spider on a short wire, is
     hidden in the mask, so a type can be lost: 990 to 1,000 of 1,000 read
-    back per module from seed 7, the reading's ceiling (#559). """
+    back per module from seed 7, the reading's ceiling (#559). This test
+    reads the first 25 and allows one miss; the 1,000, some ten minutes,
+    are the gate run on #559. """
     read_back = 0
     for diagram, _, mask in islice(samples(module, seed=7), 25):
         assert scan(coarsen(mask)) in MODULES[:MODULES.index(module) + 1]
@@ -146,3 +148,16 @@ def test_read_a_self_dual_cup_in_frobenius():
     mask = render(diagram, 96, mask=True)
     assert scan(coarsen(mask)) == "compact"
     assert equal(read_true_mask(mask, None), diagram, "frobenius")
+
+
+def test_decode_raises_on_a_primitive_outside_its_module():
+    x = compact.Ty('a')
+    mask = render(compact.Cup(x, x.r), 96, mask=True)
+    with raises(ValueError):
+        decode(mask, "symmetric")
+
+
+def test_scan_ignores_scattered_pixels():
+    classes = np.zeros((32, 32), dtype=np.uint8)
+    classes[[2, 10, 20], [3, 15, 28]] = COARSE.index("swap")
+    assert scan(classes) == "monoidal"

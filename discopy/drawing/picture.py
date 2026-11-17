@@ -696,6 +696,8 @@ def decode(mask: np.ndarray, module: str, min_pixels=3):
     >>> assert equal(decode(mask, "symmetric"), diagram, "symmetric")
     """
     mask, mod = np.asarray(mask, dtype=np.intp), load(module)
+    if mask.size and not 0 <= mask.min() <= mask.max() < len(LABELS):
+        raise ValueError(f"Expected labels in range({len(LABELS)}).")
     first = LABELS.index(NAMES[0])
     allowed = [LABELS.index(name) for name in NAMES + STRUCTURAL[module]]
     is_box = np.isin(mask, allowed)
@@ -963,7 +965,8 @@ def refine(classes, boxes, wires, names: dict, types: dict) -> np.ndarray:
 def scan(classes: np.ndarray, types=(), min_pixels=3) -> str:
     """
     The smallest module whose structural primitives appear in a picture,
-    from the classes of its pixels: ``monoidal`` with none, ``symmetric``
+    a component of at least ``min_pixels`` each, from the classes of its
+    pixels: ``monoidal`` with none, ``symmetric``
     with swaps, ``compact`` with cups or caps, ``frobenius`` with spiders,
     and ``compact`` at least if one of the ``types`` read is an adjoint.
 
@@ -976,8 +979,11 @@ def scan(classes: np.ndarray, types=(), min_pixels=3) -> str:
     >>> scan(coarsen(render(Swap(x, x), 64, mask=True)), ['a.r'])
     'compact'
     """
-    seen = {name for name in STRUCTURAL["frobenius"]
-            if (classes == COARSE.index(name)).sum() >= min_pixels}
+    def appears(name):
+        ids = components(np.where(classes == COARSE.index(name), 0, -1))
+        return bool((np.bincount(ids[ids >= 0], minlength=1)
+                     >= min_pixels).any())
+    seen = set(filter(appears, STRUCTURAL["frobenius"]))
     least = MODULES.index("compact") if any(
         typ.endswith(".r") for typ in types) else 0
     return next(module for module in MODULES[least:]
