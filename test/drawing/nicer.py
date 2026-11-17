@@ -79,3 +79,11 @@ def test_wires_of_a_swap_are_its_strands():
     swap = Swap(T('x'), T('y')).to_drawing()
     assert len(wires(swap)) == 6
     assert features(swap)["bends"] == 1 / 3
+
+
+def test_rectangles_of_a_relaid_out_drawing():
+    drawing = (f >> g).to_drawing()
+    scaled = drawing.relayout([2 * v for v in drawing.layout()])
+    (_, b0, _, t0), (_, b1, _, t1) = sorted(
+        rectangles(scaled), key=lambda r: r[1])
+    assert (t0 - b0, t1 - b1) == (1, 1) and t0 <= b1
