@@ -1137,6 +1137,9 @@ class Diagram(frobenius.Diagram):
             if not isinstance(value, Integral) or isinstance(value, bool) \
                     or value <= 0:
                 raise ValueError(f"{name} must be a positive integer.")
+        if n_steps > max_steps:
+            raise ValueError(
+                f"n_steps={n_steps} must not exceed max_steps={max_steps}.")
         backends = import_module("discopy.optyx.core.backends")
         warned = False
 
