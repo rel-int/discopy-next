@@ -18,5 +18,5 @@
 >   fits its label, and pictures are 1.7 times larger. A wire of
 > ```
 
-- [WIP] @session_01MEJxy4FrWd3ymhMeQGF7x8-2026-11-17 17:04 discopy/drawing/backend.py:1580 TikZ drops the foreground `color` selected for wire and box labels.
+- [x] discopy/drawing/backend.py:1580 TikZ drops the foreground `color` selected for wire and box labels.
 - [ ] CHANGELOG.md:407 The phrase `the width the layout measures a label at fits it` is ungrammatical and obscures the sizing ration…
