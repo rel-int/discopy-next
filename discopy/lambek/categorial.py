@@ -904,10 +904,12 @@ class Derivation:
 
 class Parser:
     r"""
-    The chart parser of the Bobcat of ``rel-int/parsers``, a reproduction of
-    Clark, `Something old, something new: grammar-based CCG parsing with
-    transformer models (2021) <https://arxiv.org/abs/2109.10044>`_ trained
-    on CCGrebank: a CKY chart over the binary and unary rules observed in
+    The chart parser of the reproduction of Bobcat (Clark, `Something old,
+    something new: grammar-based CCG parsing with transformer models (2021)
+    <https://arxiv.org/abs/2109.10044>`_) trained on CCGrebank, whose model
+    is `rel-int/bobcat-rebank-deberta-v3-large
+    <https://huggingface.co/rel-int/bobcat-rebank-deberta-v3-large>`_ on
+    Hugging Face: a CKY chart over the binary and unary rules observed in
     the treebank, scored by a supertagger for the words and a span classifier
     for the constituents.
 
