@@ -571,6 +571,11 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Fixed
 
+- The TikZ backend escapes in a label what LaTeX reads as markup outside
+  the mathematics between dollars, an underscore, an ampersand, a percent
+  and a hash, and keeps `<<` and `>>` from joining into guillemets
+  (`TikZ.escape`): a box named `feed_forward` or an evaluated lambda term,
+  drawn as `__call__`, stopped LaTeX ([next#580]).
 - `Matrix.id` builds its array over `int` and casts it with the active
   backend, so a matrix inferred under `backend("pytorch")` traces, and
   `Matrix.then` casts both factors to the dtype they promote to, so it
@@ -2073,6 +2078,7 @@ for the changelog of `1.2.1` and earlier.
 [next#575]: https://github.com/rel-int/discopy-next/pull/575
 [next#577]: https://github.com/rel-int/discopy-next/pull/577
 [next#578]: https://github.com/rel-int/discopy-next/pull/578
+[next#580]: https://github.com/rel-int/discopy-next/pull/580
 [next#581]: https://github.com/rel-int/discopy-next/pull/581
 [next#583]: https://github.com/rel-int/discopy-next/pull/583
 [next#585]: https://github.com/rel-int/discopy-next/pull/585

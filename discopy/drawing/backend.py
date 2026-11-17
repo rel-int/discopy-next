@@ -1462,10 +1462,35 @@ class TikZ(Backend):
         return to_hex(color)[1:] if cls.needs_rgb(color)\
             else str(color).removeprefix("#")
 
+    #: What a label keeps as it is, an escaped character or the mathematics
+    #: between two dollars, then what LaTeX reads as markup outside them.
+    MARKUP = re.compile(
+        r"(?P<kept>\\.|\$[^$]*\$)|(?P<char>[_&%#])"
+        r"|(?P<pair>[<>])(?=(?P=pair))")
+
+    @classmethod
+    def escape(cls, text) -> str:
+        """
+        A label as LaTeX reads it: outside the mathematics between dollars,
+        an underscore, an ampersand, a percent and a hash are escaped, and
+        angle brackets are kept from joining into guillemets. A backslash
+        with the character after it and braces are left, so that a label can
+        still be LaTeX, with its own escapes.
+
+        >>> print(TikZ.escape("feed_forward $x_1$ (n >> s) 50%"))
+        feed\\_forward $x_1$ (n >{}> s) 50\\%
+        >>> print(TikZ.escape(r"\\$5 for x_y\\$, a\\_b, <<<"))
+        \\$5 for x\\_y\\$, a\\_b, <{}<{}<
+        """
+        return cls.MARKUP.sub(
+            lambda match: match["kept"] or (
+                "\\" + match["char"] if match["char"]
+                else match["pair"] + "{}"), str(text))
+
     def add_node(self, i, j, text=None, options=None, rounded=4):
         """ Add a node to the tikz picture, return its unique id. """
         node = len(self.nodelayer) + 1
-        text = "" if text is None else text
+        text = "" if text is None else self.escape(text)
         self.nodelayer.append(
             f"\\node [{options or ''}] ({node}) at "
             f"({round(i, rounded)}, {round(j, rounded)}) {{{text}}};\n")
@@ -1652,7 +1677,7 @@ class TikZ(Backend):
             if params.get("nodesize", 1) != 1:
                 options += f", inner sep={self.inner_sep(params['nodesize'])}"
             if text:
-                options += f", label={{center:{{{text}}}}}"
+                options += f", label={{center:{{{self.escape(text)}}}}}"
             self.add_node(i, j, None, options)
         super().draw_spiders(graph, draw_box_labels)
 
