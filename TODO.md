@@ -2,4 +2,4 @@
 
 - [x] shape: order of dom, cod and each box's ports by x; each box node against its own box
 - [x] is_feasible: finite coordinates, corners added to copies of both drawings
-- [ ] answer and resolve every thread
+- [x] answer and resolve every thread
