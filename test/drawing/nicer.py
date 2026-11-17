@@ -72,3 +72,10 @@ def test_wires_and_misalignment_as_drawn():
     assert features(box)["misalignment"] == 0
     assert features(box.make_space(2, .5, .75, 1., copy=True))[
         "misalignment"] == 2
+
+
+def test_wires_of_a_swap_are_its_strands():
+    from discopy.symmetric import Ty as T, Swap
+    swap = Swap(T('x'), T('y')).to_drawing()
+    assert len(wires(swap)) == 6
+    assert features(swap)["bends"] == 1 / 3

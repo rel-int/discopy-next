@@ -73,7 +73,9 @@ WEIGHTS = {
 def wires(drawing: Drawing) -> list[tuple[Point, Point]]:
     """
     The segments of a drawing that are wires, i.e. the edges a backend draws,
-    see :meth:`Backend.visible_edges`.
+    see :meth:`Backend.visible_edges`, with each strand of a swap, a braid or
+    a permutation from its input to its output, see
+    :meth:`Backend.crossing_wires`.
 
     >>> from discopy.monoidal import Ty, Box
     >>> for wire in wires(Box('f', Ty('x'), Ty('x')).to_drawing()):
@@ -81,8 +83,12 @@ def wires(drawing: Drawing) -> list[tuple[Point, Point]]:
     Point(x=0.5, y=1) Point(x=0.5, y=0.75)
     Point(x=0.5, y=0.25) Point(x=0.5, y=0)
     """
-    return [(drawing.positions[u], drawing.positions[v])
-            for u, v in Backend.visible_edges(drawing)]
+    crossings = [node for node in drawing.box_nodes
+                 if node.box.draw_as_permutation or node.box.is_crossing]
+    edges = [(u, v) for u, v in Backend.visible_edges(drawing)
+             if u not in crossings and v not in crossings] + [
+        edge for node in crossings for edge in Backend.crossing_wires(node)]
+    return [(drawing.positions[u], drawing.positions[v]) for u, v in edges]
 
 
 def rectangles(drawing: Drawing) -> list[tuple[float, float, float, float]]:
@@ -153,6 +159,7 @@ def features(drawing: Drawing) -> dict[str, float]:
         rows.setdefault(p.y, []).append(p.x)
     gaps = [b - a for xs in rows.values()
             for a, b in zip(sorted(xs), sorted(xs)[1:]) if b > a]
+    gap_mean = mean(gaps)
     ports: dict[int, dict[str, list[float]]] = {
         j: {"box_dom": [], "box_cod": []} for j in range(len(drawing.boxes))}
     for node in drawing.nodes:
@@ -171,8 +178,8 @@ def features(drawing: Drawing) -> dict[str, float]:
         "asymmetry": mean([min(
             hypot(p.x - q.x, p.y - q.y) for q in mirrored)
             for p in positions]) / width,
-        "whitespace": mean([(gap - mean(gaps)) ** 2 for gap in gaps])
-        / (mean(gaps) ** 2 or 1),
+        "whitespace": mean([(gap - gap_mean) ** 2 for gap in gaps])
+        / (gap_mean ** 2 or 1),
         "misalignment": mean([abs(mean(xs["box_dom"]) - mean(xs["box_cod"]))
                               for xs in ports.values() if all(xs.values())]),
         "label_overlap": mean([
