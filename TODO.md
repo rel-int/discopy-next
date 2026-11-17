@@ -2,5 +2,5 @@
 
 - [x] Add `Backend.dual_rail_wires` beside `crossing_wires`, used by `draw_dual_rail_braid`
 - [x] `nicer.wires` reads the rails of dual-rail boxes
-- [ ] Test in `test/drawing/nicer.py`, failing on main
+- [x] Test in `test/drawing/nicer.py`, failing on main
 - [ ] CHANGELOG bullet, next-checks
