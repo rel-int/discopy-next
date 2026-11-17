@@ -254,6 +254,10 @@ skipped without PyZX: run it with `uv run --with "pyzx==0.10.7"`, as the
 workflow does, and `benchmark/test_egraph.py` replays the 50 e-graphs of
 `benchmark/data/egraph-traces` through `egraph.Builder` and the bookkeeping
 of the search that grew them, and the small ones through the pure `EGraph`.
+It also matches each trace with its two-box pattern of the most matches, on
+the builder and on the pure `EGraph`, and saturates `+` under associativity
+and commutativity on four to seven leaves (eight in the full tail) on the
+builder, and on four and five by the pure rounds of `EGraph.step`.
 They live outside `testpaths`, so run them explicitly. Results are keyed by
 suite (`composition`, `conversion`, `zx` or `egraph`), family
 (representation, conversion, implementation or operation), case (workload)
@@ -328,6 +332,32 @@ all three on `main` and on a pull request touching `lean/`,
 `discopy/egraph.py`, `discopy/monoidal.py`, `discopy/cat.py`, the traces of the
 benchmark with their loader `benchmark/test_egraph.py`, which the test
 replays, or what installs the environment.
+
+## Build the paper
+
+`paper/` holds the source of the tool paper, in [Typst](https://typst.app), and it is checked
+as the code is. `test/paper_build.py` runs its Python listings in order in one namespace, as
+`test/readme.py` runs the README's, draws each figure from the value a listing named, once
+with the Typst backend and once with the TikZ one, writes its LaTeX with `paper/transpile.py`,
+and compiles both where their compiler is installed:
+
+```shell
+uv sync --group all
+uv run pytest test/paper_build.py -rs
+uv run python -m paper.build --pdf  # paper/main.pdf from Typst, paper/latex.pdf from LaTeX
+```
+
+Typst downloads the CeTZ package on its first run. The LaTeX build needs `latexmk` and what
+`paper/preamble.tex` loads, on Debian the packages the `paper` workflow installs: its test is
+skipped without `latexmk`, and fails with it when a package is missing. A `python` fence of the paper runs, a `py` fence is shown and not run, and
+`#drawing("name")` is the drawing of the value `name` of the listings. `paper/transpile.py`
+reads the part of Typst its docstring lists and raises `Unsupported` on anything else: write
+the paper within it, or add the LaTeX of what you need to it. The references are those of the
+docs, `docs/discopy.bib`. `paper/figures/`, `paper/main.tex` and the PDFs are built, not
+committed: the `paper` workflow uploads them as the `paper` artifact, on `main` and on a pull
+request that touches the paper or the library its listings run. The tests that build the paper
+are marked `slow`, since its listings import PyTorch and JAX: on a pull request that workflow
+is what runs them.
 
 ## Build the docs
 

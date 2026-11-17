@@ -151,16 +151,15 @@ def fn_to_semm(fn: FusionNetwork, order: PartialOrder) -> list[Instruction]:
     for v in fn.path:
         ins.append(NextNodeOp(v))
 
-        # Number of photons in a given node
-        num_fusions = len(get_fused_neighbours(fn.fusions, v))
-
-        for _ in range(num_fusions):
+        # One photon for each fusion of the node, in the order of `fusions`
+        for fusion in fn.fusions:
+            if not fusion.contains(v):
+                continue
             photon += 1
             pair = f[photon]
 
             delay = max(0, pair - photon)
-            # NOTE: the X fusion is hard coded into here
-            ins.append(FusionOp(delay, "X"))
+            ins.append(FusionOp(delay, fusion.fusion_type))
 
         # Node "v" is an output, and therefore isn't measured
         if v not in fn.measurements:

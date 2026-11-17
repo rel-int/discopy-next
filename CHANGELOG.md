@@ -19,6 +19,20 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   sends them through the `bang` and the structure of its codomain when its
   types are biclosed, and through its `ob_map` and `ar_map` otherwise. The
   laws are declared failing on the free category ([next#571]).
+- `discopy.drawing.nicer`: nine hand features of a drawing, each a cost
+  (wire length, bends, slope, aspect, asymmetry, whitespace, misalignment,
+  label overlap, area), `hand_score` minus their weighted sum, with equal weights
+  until fitted on votes, and `make_nicer`, the foliation of a diagram whose
+  drawing scores best, or the diagram itself on a tie ([next#582]).
+- `Drawing.layout`, the geometry of a drawing as a vector: the coordinates
+  of its nodes, box corners included. `Drawing.relayout` takes a vector back
+  to a drawing and refuses one that `Drawing.is_feasible` says draws another
+  diagram (an edge turned, other wires crossing, boxes overlapping, a port
+  outside its box) ([next#578]).
+- `monoidal.Diagram.foliations(limit)` lists the foliations of a diagram:
+  diagrams equal to it up to interchange whose adjacent layers cannot merge,
+  the largest layers first. The steps are public too: `dependencies`,
+  `layerings` and `foliate` ([next#567]).
 - A Typst drawing backend, `drawing.backend.Typst`: `Diagram.to_typst` and
   `Drawing.to_typst` return a `drawing.typst_ast.Document`, whose `render`
   is the Typst source of a CeTZ canvas, and `draw(format="typst")` compiles
@@ -77,6 +91,11 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   nothing, a match being a row of the join of the atoms of the pattern, as in
   relational e-matching, and the law `EGraph.matching_agreement` that it
   matches what the e-graph of the same operations does ([next#549]).
+- `egraph.Builder.rewrite` and `egraph.Builder.step`, a match rewritten by
+  `add` and `union` and a round of rules on the builder, `EGraph.reduced`,
+  the e-graph as a spider per class and a box per e-node, and the law
+  `EGraph.stepping` that a round on the builder and a pure `step` reduce to
+  the same hypergraph ([next#586]).
 - `stream.up_to_steps`, the relation a law of streams is read with: a term
   unrolled for `stream.STEPS` steps, its arrow `now` taken and quotiented by
   the equation of the underlying category, which `Stream.equation_factory`
@@ -350,6 +369,10 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Changed
 
+- `egraph.EGraph.saturate` runs its rounds on one `Builder`, freezing it
+  after each round that changes something: associativity and commutativity
+  of `+` on five leaves saturate 55 times faster, and on six in under a
+  second ([next#586]).
 - `discopy.grammar` is `discopy.lambek`, with its tests in `test/lambek`,
   its pictures in `docs/_static/lambek` and its extra `discopy[lambek]`.
   The old name stays as a deprecated alias: `discopy.grammar` warns and has
@@ -563,6 +586,30 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Fixed
 
+- The TikZ backend escapes in a label what LaTeX reads as markup outside
+  the mathematics between dollars, an underscore, an ampersand, a percent
+  and a hash, and keeps `<<` and `>>` from joining into guillemets
+  (`TikZ.escape`): a box named `feed_forward` or an evaluated lambda term,
+  drawn as `__call__`, stopped LaTeX ([next#580]).
+- `Matrix.id` builds its array over `int` and casts it with the active
+  backend, so a matrix inferred under `backend("pytorch")` traces, and
+  `Matrix.then` casts both factors to the dtype they promote to, so it
+  composes with the integer structural matrices on a backend whose product
+  does not promote ([next#583]).
+- `Tensor.then` and `Tensor.tensor` cast each factor to the dtype they
+  promote to, as `Matrix.then` does, so a float tensor composes and tensors
+  with the integer identity on the pytorch backend; `Matrix.cast` returns
+  the matrix itself when it already has the dtype ([next#587]).
+- `discopy.optyx`: the dagger of a channel with an environment, e.g.
+  `PhotonLoss(.1).dagger()`, is the adjoint CP map, whose Kraus map bends the
+  environment back by a cap, where it failed an assertion; `power_fix` raises
+  when `n_steps` exceeds `max_steps`, and `fn_to_semm` emits each fusion's own
+  type rather than X for all ([next#585]).
+- The TikZ backend draws no black frame around a drawing: `TikZ.draw_polygon`
+  writes the `edgecolor` it is given, e.g. the white edge of the background.
+  A spider is an empty node padded by `nodesize` with its label over its
+  center, so that the label keeps the size of the text: the symbol of an
+  equation was scaled down with its node ([next#575]).
 - A box is drawn as high as its `height`, its outline meeting its wires: the
   layout already stacked layers by it, but the outline was always half a
   wire high ([next#570]).
@@ -1562,6 +1609,23 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Project
 
+- `proptest` groups a push to `main` by commit, as `build`, `benchmark`,
+  `lean` and `paper` do, and a scheduled or dispatched run by its own run id:
+  one group per ref keeps one running and one pending run, so a third merge
+  cancelled the pending one before it ever reached a runner.
+  `.github/tests/workflows.py` checks every one of the five ([next#591]).
+- `benchmark/test_egraph.py` has the families `match`, the builder's matcher
+  against the pure one on each trace, and `saturate`, `+` under
+  associativity and commutativity on four to eight leaves on the builder,
+  and on four and five by the pure rounds ([next#589]).
+- `paper/`, the source of the tool paper in Typst: `paper/transpile.py` writes
+  its LaTeX from the part of Typst it is written in, `paper/build.py` runs
+  its listings and draws each figure with the Typst and the TikZ backends,
+  `test/paper_build.py` checks both and the `paper` workflow uploads both
+  PDFs ([next#577]).
+- The sections of the tool paper on syntax, semantics and applications, with
+  what the draft leaves open said in place and grouped in its last section;
+  the tests that build the paper are marked `slow` ([next#581]).
 - `build`'s `test` job has a 40-minute backstop instead of 20, above the
   9.7-20.3 minutes it runs in on `main` rather than inside it: a job over
   `timeout-minutes` reports `cancelled`, so the six jobs it cut over five
@@ -2035,10 +2099,23 @@ for the changelog of `1.2.1` and earlier.
 [next#558]: https://github.com/rel-int/discopy-next/pull/558
 [next#565]: https://github.com/rel-int/discopy-next/pull/565
 [next#566]: https://github.com/rel-int/discopy-next/pull/566
+[next#567]: https://github.com/rel-int/discopy-next/pull/567
 [next#568]: https://github.com/rel-int/discopy-next/pull/568
 [next#569]: https://github.com/rel-int/discopy-next/pull/569
 [next#570]: https://github.com/rel-int/discopy-next/pull/570
 [next#571]: https://github.com/rel-int/discopy-next/pull/571
+[next#575]: https://github.com/rel-int/discopy-next/pull/575
+[next#577]: https://github.com/rel-int/discopy-next/pull/577
+[next#578]: https://github.com/rel-int/discopy-next/pull/578
+[next#580]: https://github.com/rel-int/discopy-next/pull/580
+[next#581]: https://github.com/rel-int/discopy-next/pull/581
+[next#582]: https://github.com/rel-int/discopy-next/pull/582
+[next#583]: https://github.com/rel-int/discopy-next/pull/583
+[next#585]: https://github.com/rel-int/discopy-next/pull/585
+[next#586]: https://github.com/rel-int/discopy-next/pull/586
+[next#587]: https://github.com/rel-int/discopy-next/pull/587
+[next#589]: https://github.com/rel-int/discopy-next/pull/589
+[next#591]: https://github.com/rel-int/discopy-next/pull/591
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#56]: https://github.com/rel-int/optyx/pull/56

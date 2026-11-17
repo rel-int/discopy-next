@@ -210,7 +210,8 @@ class Matrix[dtype](
 
     def cast(self, dtype: type) -> Matrix:
         """
-        Cast a matrix to a given ``dtype``.
+        Cast a matrix to a given ``dtype``, the matrix itself when it
+        already has it.
 
         Parameters:
             dtype : The target datatype.
@@ -218,7 +219,11 @@ class Matrix[dtype](
         Example
         -------
         >>> assert Matrix.id().cast(bool) == Matrix[bool].id()
+        >>> m = Matrix[float].id(2)
+        >>> assert m.cast(float) is m
         """
+        if dtype == self.dtype:
+            return self
         return type(self)[dtype](self.array, self.dom, self.cod)
 
     def promote(self, *others: Matrix) -> type:
@@ -440,7 +445,7 @@ and 'Matrix[int]'
     @classmethod
     def id(cls, dom=0) -> Matrix:
         with backend('numpy') as np:
-            array = np.identity(index(dom), dtype=cls.dtype or int)
+            array = np.identity(index(dom), dtype=int)
         return cls(array, dom, dom)
 
     twist = id
@@ -449,9 +454,12 @@ and 'Matrix[int]'
     def then(self, other: Matrix) -> Matrix:
         assert_isinstance(other, self.ar)
         assert_iscomposable(self, other)
+        cls = self.promote(other)
+        left, right = (
+            factor.cast(cls.dtype).array for factor in (self, other))
         with backend() as np:
-            array = np.matmul(self.array, other.array)
-        return self.promote(other)(array, self.dom, other.cod)
+            array = np.matmul(left, right)
+        return cls(array, self.dom, other.cod)
 
     def tensor(self, *others: Matrix):
         """

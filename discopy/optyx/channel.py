@@ -1137,6 +1137,9 @@ class Diagram(frobenius.Diagram):
             if not isinstance(value, Integral) or isinstance(value, bool) \
                     or value <= 0:
                 raise ValueError(f"{name} must be a positive integer.")
+        if n_steps > max_steps:
+            raise ValueError(
+                f"n_steps={n_steps} must not exceed max_steps={max_steps}.")
         backends = import_module("discopy.optyx.core.backends")
         warned = False
 
@@ -1723,11 +1726,26 @@ class Channel(Diagram, frobenius.Box):
         return top >> self.kraus @ self.kraus.conjugate() >> bot
 
     def dagger(self):
+        """
+        The adjoint of the channel as a CP map, :math:`\\rho \\mapsto
+        \\sum_i K_i^\\dagger \\rho K_i`: its Kraus map is the dagger of
+        the Kraus map with the environment bent back by a cap, so that it
+        is again a map to the domain and the environment.
+
+        >>> from discopy.optyx.photonic import PhotonLoss
+        >>> loss = PhotonLoss(.1)
+        >>> assert np.allclose(
+        ...     loss.dagger().double().to_tensor().eval().array,
+        ...     loss.double().dagger().to_tensor().eval().array)
+        """
+        kraus = self.cod.single() @ diagram.Diagram.spiders(
+            0, 2, self.env) >> self.kraus.dagger() @ self.env
         return Channel(
             name=self.name + ".dagger()",
-            kraus=self.kraus.dagger(),
+            kraus=kraus,
             dom=self.cod,
             cod=self.dom,
+            env=self.env,
         )
 
     def decomp(self):

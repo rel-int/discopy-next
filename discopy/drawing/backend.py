@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-DisCopy's drawing backends: Matplotlib and TikZ.
+DisCopy's drawing backends: Matplotlib, TikZ and Typst.
 
 Summary
 -------
@@ -13,6 +13,7 @@ Summary
     Backend
     TikZ
     Matplotlib
+    Typst
 
 .. admonition:: Functions
 
@@ -1462,10 +1463,35 @@ class TikZ(Backend):
         return to_hex(color)[1:] if cls.needs_rgb(color)\
             else str(color).removeprefix("#")
 
+    #: What a label keeps as it is, an escaped character or the mathematics
+    #: between two dollars, then what LaTeX reads as markup outside them.
+    MARKUP = re.compile(
+        r"(?P<kept>\\.|\$[^$]*\$)|(?P<char>[_&%#])"
+        r"|(?P<pair>[<>])(?=(?P=pair))")
+
+    @classmethod
+    def escape(cls, text) -> str:
+        """
+        A label as LaTeX reads it: outside the mathematics between dollars,
+        an underscore, an ampersand, a percent and a hash are escaped, and
+        angle brackets are kept from joining into guillemets. A backslash
+        with the character after it and braces are left, so that a label can
+        still be LaTeX, with its own escapes.
+
+        >>> print(TikZ.escape("feed_forward $x_1$ (n >> s) 50%"))
+        feed\\_forward $x_1$ (n >{}> s) 50\\%
+        >>> print(TikZ.escape(r"\\$5 for x_y\\$, a\\_b, <<<"))
+        \\$5 for x\\_y\\$, a\\_b, <{}<{}<
+        """
+        return cls.MARKUP.sub(
+            lambda match: match["kept"] or (
+                "\\" + match["char"] if match["char"]
+                else match["pair"] + "{}"), str(text))
+
     def add_node(self, i, j, text=None, options=None, rounded=4):
         """ Add a node to the tikz picture, return its unique id. """
         node = len(self.nodelayer) + 1
-        text = "" if text is None else text
+        text = "" if text is None else self.escape(text)
         self.nodelayer.append(
             f"\\node [{options or ''}] ({node}) at "
             f"({round(i, rounded)}, {round(j, rounded)}) {{{text}}};\n")
@@ -1492,26 +1518,48 @@ class TikZ(Backend):
         self.add_node(i, j, text, options)
         super().draw_text(text, i, j, **params)
 
+    @classmethod
+    def color_option(cls, color):
+        """
+        A color as the value of an option, in braces.
+
+        >>> TikZ.color_option("white"), TikZ.color_option("#ff0000")
+        ('{white}', '{rgb,255: red,255; green,0; blue,0}')
+        """
+        return cls.format_color(color) if cls.needs_rgb(color)\
+            else f"{{{color}}}"
+
     def draw_polygon(
             self, *points,
             facecolor=DEFAULT["facecolor"], edgecolor=DEFAULT["edgecolor"]):
-        nodes = []
-        for point in points:
-            nodes.append(self.add_node(*point))
+        """
+        A polygon filled with ``facecolor`` and stroked with ``edgecolor``,
+        which is written when it is not the default: the background of a
+        drawing has the edge of its face, not a black frame.
+
+        >>> tikz = TikZ(use_tikzstyles=False)
+        >>> tikz.draw_polygon((0, 0), (1, 0), (0, 1), edgecolor="white")
+        >>> print(tikz.edgelayer[0].split("]")[0] + "]")
+        \\draw [-, fill={white}, draw={white}]
+        """
+        nodes = [self.add_node(*point) for point in points]
         nodes.append(nodes[0])
+        colors = {"-, fill": facecolor} | ({} if isinstance(
+            edgecolor, str) and edgecolor == DEFAULT["edgecolor"]
+            else {"draw": edgecolor})
+        options = ", ".join(
+            f"{key}={self.color_option(color)}"
+            for key, color in colors.items())
         if self.use_tikzstyles:
-            style_name = "box" if isinstance(facecolor, str)\
-                and facecolor == DEFAULT["facecolor"]\
-                else f"{self.style_color(facecolor)}_box"
-            style = f"\\tikzstyle{{{style_name}}}=" \
-                    f"[-, fill={self.format_color(facecolor)}]\n"
+            name = "box" if isinstance(facecolor, str) and list(
+                colors.values()) == [DEFAULT["facecolor"]] else "_".join(
+                    list(map(self.style_color, colors.values())) + ["box"])
+            style = f"\\tikzstyle{{{name}}}=[" + ", ".join(
+                f"{key}={self.format_color(color)}"
+                for key, color in colors.items()) + "]\n"
             if style not in self.edge_styles:
                 self.edge_styles.append(style)
-            options = f"style={style_name}"
-        else:
-            options = "-, fill=" + (
-                self.format_color(facecolor) if self.needs_rgb(facecolor)
-                else f"{{{facecolor}}}")
+            options = f"style={name}"
         str_connections = " to ".join(f"({node}.center)" for node in nodes)
         self.edgelayer.append(f"\\draw [{options}] {str_connections};\n")
         super().draw_polygon(*points)
@@ -1583,7 +1631,32 @@ class TikZ(Backend):
             f"{path} -- cycle;\n")
         super().draw_filled_shape(start, steps, color)
 
+    @staticmethod
+    def inner_sep(nodesize) -> str:
+        """
+        The padding of a spider of a given ``nodesize``, a share of the
+        default ``0.3333em`` of a node, i.e. half the width of its disc.
+
+        >>> TikZ.inner_sep(0.5)
+        '0.1667em'
+        """
+        return f"{round(nodesize / 3, 4)}em"
+
     def draw_spiders(self, graph, draw_box_labels=True, **params):
+        """
+        Draws each spider as an empty node of its shape and colour, its size
+        set by ``nodesize``, with its label over its center at the size of
+        the text, as matplotlib does: a ``scale`` would shrink the label with
+        the node, e.g. the symbol of an equation in a large drawing.
+
+        >>> from discopy.monoidal import Ty, Box, Equation
+        >>> x = Ty('x')
+        >>> tikz = TikZ(use_tikzstyles=False)
+        >>> drawing = Equation(Box('f', x, x), Box('g', x, x)).to_drawing()
+        >>> tikz.draw_spiders(drawing, nodesize=0.5)
+        >>> print(tikz.nodelayer[0].split("]")[0] + "]")
+        \\node [circle, fill=none, inner sep=0.1667em, label={center:{=}}]
+        """
         spiders = [(node, node.box.color, node.box.shape)
                    for node in graph.nodes
                    if node.kind == "box" and node.box.draw_as_spider]
@@ -1603,9 +1676,10 @@ class TikZ(Backend):
                     self.format_color(color) if self.needs_rgb(color)
                     else color)
             if params.get("nodesize", 1) != 1:
-                options +=\
-                    f", scale={params.get('nodesize')}"  # pragma: no cover
-            self.add_node(i, j, text, options)
+                options += f", inner sep={self.inner_sep(params['nodesize'])}"
+            if text:
+                options += f", label={{center:{{{self.escape(text)}}}}}"
+            self.add_node(i, j, None, options)
         super().draw_spiders(graph, draw_box_labels)
 
     def output(self, path=None, show=True, **params):
