@@ -35,4 +35,12 @@
 
 #include "sections/applications.typ"
 
+#include "sections/neural.typ"
+
+#include "sections/quantum.typ"
+
+#include "sections/language.typ"
+
+#include "sections/left.typ"
+
 #bibliography("../docs/discopy.bib")
