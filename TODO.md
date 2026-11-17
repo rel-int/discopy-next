@@ -2,6 +2,6 @@
 >
 > (toumix, 2026-11-17, relayed by the parent session: put the θ search in a pull request on next as slice 3's follow-up.)
 
-- [WIP] @session_01MEJxy3Gb9UVB1Y7ExMgpNV-2026-11-17 08:05 nicer.stretch: a drawing's geometry from per-gap scales of its columns and rows and per-box scales of width and height, through Drawing.relayout
+- [x] nicer.stretch: a drawing's geometry from per-gap scales of its columns and rows and per-box scales of width and height, through Drawing.relayout
 - [WIP] @session_01MEJxy3Gb9UVB1Y7ExMgpNV-2026-11-17 08:05 nicer.nicer_layout: coordinate search over those scales, keeping feasible layouts, maximising the score
 - [ ] tests, docs, changelog
