@@ -125,3 +125,11 @@ def test_stretch_and_nicer_layout():
     assert hand_score(nicer) > hand_score(drawing)
     assert clearance(nicer) >= clearance(drawing)
     assert nicer_layout(drawing, score=lambda d: 0) is drawing
+
+
+def test_clearance_and_shape_at_the_edges():
+    from discopy.drawing import Drawing
+    from discopy.drawing.nicer import clearance, shape
+    state = Box('s', Ty(), x).to_drawing()
+    assert clearance(state) > 0
+    assert shape(Drawing.id(Ty())) == [0, 0, 0, 0]

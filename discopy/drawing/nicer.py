@@ -370,7 +370,8 @@ def shape(drawing: Drawing) -> list[int]:
     [0, 4, 1, 1]
     """
     xs, ys = knots(drawing)
-    return [len(xs) - 1, len(ys) - 1] + 2 * [len(drawing.boxes)]
+    return [max(len(xs) - 1, 0), max(len(ys) - 1, 0)]\
+        + 2 * [len(drawing.boxes)]
 
 
 def split(drawing: Drawing, scales: Sequence[float]) -> list[list[float]]:
@@ -417,9 +418,10 @@ def clearance(drawing: Drawing) -> float:
     framed = drawing.relabel_nodes()
     framed.add_box_corners()
     boxes = framed.rectangles()
-    ys = [p.y for node, p in framed.positions.items()
-          if node.kind in ("dom", "cod")]
-    top, bottom = max(ys, default=framed.height), min(ys, default=0)
+    top = max((p.y for node, p in framed.positions.items()
+               if node.kind == "dom"), default=framed.height)
+    bottom = min((p.y for node, p in framed.positions.items()
+                  if node.kind == "cod"), default=0)
     gaps = [max(c.x - b.x, a.x - d.x, c.y - b.y, a.y - d.y)
             for i, (a, b) in enumerate(boxes) for c, d in boxes[i + 1:]]
     gaps += [gap for a, b in boxes for gap in (top - b.y, a.y - bottom)]
@@ -467,6 +469,8 @@ def nicer_layout(
             for factor in factors:
                 values = scales[:i] + [scales[i] * factor] + scales[i + 1:]
                 candidate = attempt(values)
-                if candidate is not None and score(candidate) > value:
-                    best, value, scales = candidate, score(candidate), values
+                candidate_value = None if candidate is None\
+                    else score(candidate)
+                if candidate_value is not None and candidate_value > value:
+                    best, value, scales = candidate, candidate_value, values
     return best
