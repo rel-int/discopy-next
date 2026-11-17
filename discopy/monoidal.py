@@ -691,10 +691,16 @@ class Ty(cat.Ob, cat.FreeCategory, ColouredMonoid):
         return cls()
 
     def to_drawing(self) -> "Ty":
+        """
+        The type of a drawing: a wire for each object, labelled by its
+        ``drawing_name`` when it has one, e.g. ``4`` for ``Dim(4)``, else by
+        its string.
+        """
         if not self.inside:
             return Ty.id(self.dom)
         result = Ty(*(
-            Wire(str(x), getattr(x, 'dom', None), getattr(x, 'cod', None))
+            Wire(getattr(x, 'drawing_name', None) or str(x),
+                 getattr(x, 'dom', None), getattr(x, 'cod', None))
             for x in self.inside))
         for new, old in zip(result.inside, self.inside):
             if getattr(old, "frame_boundary", False):
@@ -891,6 +897,17 @@ class Dim(Ty):
         return f"Dim({', '.join(map(repr, self.inside)) or '1'})"
 
     __str__ = __repr__
+
+    @property
+    def drawing_name(self) -> str:
+        """
+        The label of a wire of this dimension in a drawing: its numbers,
+        without the ``Dim`` that :meth:`__repr__` prints.
+
+        >>> Dim(4).drawing_name, Dim(4, 4).drawing_name, Dim(1).drawing_name
+        ('4', '4, 4', '1')
+        """
+        return ", ".join(map(str, self.inside)) or "1"
 
     delay, head, tail = Nat.delay, Nat.head, Nat.tail
 

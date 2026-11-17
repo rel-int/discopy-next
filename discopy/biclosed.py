@@ -258,14 +258,6 @@ class Ty(monoidal.Ty):
         """ The type of one :attr:`bang_factory` wire holding ``arg``. """
         return cls(cls.bang_factory(arg))
 
-    def to_drawing(self):
-        """ A banged wire is drawn with the label ``!x``. """
-        result = super().to_drawing()
-        for new, old in zip(result.inside, self.inside):
-            if isinstance(old, BangOb):
-                new.name = old.drawing_name
-        return result
-
     @property
     def is_exp(self):
         """
