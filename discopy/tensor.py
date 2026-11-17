@@ -189,11 +189,13 @@ class Tensor(Matrix):
         other, = others
         assert_isinstance(other, self.ar)
         assert_iscomposable(self, other)
+        cls = self.promote(other)
+        left, right = (
+            factor.cast(cls.dtype).array for factor in (self, other))
         with backend() as np:
-            array = np.tensordot(self.array, other.array, len(self.cod))\
-                if self.array.shape and other.array.shape\
-                else self.array * other.array
-        return self.promote(other)(array, self.dom, other.cod)
+            array = np.tensordot(left, right, len(self.cod))\
+                if left.shape and right.shape else left * right
+        return cls(array, self.dom, other.cod)
 
     def tensor(self, *others: Tensor) -> Tensor:
         """
@@ -216,15 +218,15 @@ class Tensor(Matrix):
             target += list(range(j, j + len(factor.cod)))
             i, j = i + len(factor.dom), j + len(factor.cod)
         source = list(range(len(target)))
+        cls = self.promote(*others)
+        array, *arrays = (factor.cast(cls.dtype).array for factor in factors)
         with backend() as np:
-            array = self.array
-            for other in others:
-                array = np.tensordot(array, other.array, 0)\
-                    if array.shape and other.array.shape\
-                    else array * other.array
+            for other in arrays:
+                array = np.tensordot(array, other, 0)\
+                    if array.shape and other.shape else array * other
             if source:
                 array = np.moveaxis(array, source, target)
-        return self.promote(*others)(array, dom, cod)
+        return cls(array, dom, cod)
 
     def dagger(self) -> Tensor:
         source = list(range(len(self.dom @ self.cod)))
