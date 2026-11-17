@@ -23,6 +23,19 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   of its first subword, and `lambek.neural.ChartClassifier`, a supertag for
   each word and a label for each span. `transformers` joins the `lambek` extra
   ([next#604]).
+- `drawing.picture.decode` and `read`: a picture's pixel classes back to
+  its diagram. `regions` splits them into boxes, wires and labels, `attach`
+  hangs each label on its wire, `refine` writes the names and types read
+  back, and `scan` picks the smallest module whose primitives appear, at
+  least compact when a type is an adjoint ([next#601]).
+- `drawing.picture`, pictures of diagrams as training data for reading them
+  back: `samples` draws random diagrams of `monoidal`, `symmetric`,
+  `compact` or `frobenius` one generator at a time, renders each with a mask
+  labelling every pixel by its wire type, box name or structural primitive,
+  by hand with `xkcd`; `augment` warps, rotates and changes the perspective
+  of the image and its mask together, then restyles the image alone (chalk,
+  whiteboard, blur, JPEG); `draw(backend=...)` takes the backend to draw with
+  ([next#573]).
 - `abc.LinearCategory`, a linear category (Bierman, TLCA 1995) without
   symmetry: a comonad `bang` with `dereliction` and `digging`, lax monoidal
   with a `laxator`, each `!x` a comonoid by `contraction` and `weakening`, and
@@ -2123,6 +2136,7 @@ for the changelog of `1.2.1` and earlier.
 [next#569]: https://github.com/rel-int/discopy-next/pull/569
 [next#570]: https://github.com/rel-int/discopy-next/pull/570
 [next#571]: https://github.com/rel-int/discopy-next/pull/571
+[next#573]: https://github.com/rel-int/discopy-next/pull/573
 [next#575]: https://github.com/rel-int/discopy-next/pull/575
 [next#577]: https://github.com/rel-int/discopy-next/pull/577
 [next#578]: https://github.com/rel-int/discopy-next/pull/578
@@ -2136,6 +2150,7 @@ for the changelog of `1.2.1` and earlier.
 [next#589]: https://github.com/rel-int/discopy-next/pull/589
 [next#591]: https://github.com/rel-int/discopy-next/pull/591
 [next#598]: https://github.com/rel-int/discopy-next/pull/598
+[next#601]: https://github.com/rel-int/discopy-next/pull/601
 [next#603]: https://github.com/rel-int/discopy-next/pull/603
 [next#604]: https://github.com/rel-int/discopy-next/pull/604
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
