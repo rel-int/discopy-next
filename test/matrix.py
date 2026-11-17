@@ -489,3 +489,14 @@ def test_symbolic_matrix_composes_with_permutations_and_copies():
     assert f @ M.id(1) >> swap == swap >> M.id(1) @ f
     assert f >> M.permutation([0]) == f
     assert f >> M.copy(1) == M([psi, psi], 1, 2)
+
+
+def test_Matrix_lambdify_modules():
+    """ #445: a ``modules`` given to ``lambdify`` replaces the backend's,
+    rather than being passed to sympy a second time. """
+    pytest.importorskip("sympy")
+    from sympy import Expr
+    from sympy.abc import psi
+    f = Matrix[Expr]([psi, 2 * psi], 1, 2)
+    assert f.lambdify(psi, dtype=float, modules="math")(3)\
+        == f.lambdify(psi, dtype=float)(3) == Matrix[float]([3., 6.], 1, 2)
