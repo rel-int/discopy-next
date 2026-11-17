@@ -22,6 +22,8 @@ Summary
     hand_score
     make_nicer
     stretch
+    box_ports
+    corners
     shape
     split
     clearance
@@ -306,19 +308,43 @@ def stretch(
     positions = {node: Point(across(p.x), up(p.y))
                  for node, p in framed.positions.items()
                  if not node.kind.startswith("box-corner")}
-    boxes = framed.rectangles()
-    for node, p in framed.positions.items():
-        if node.kind in ("box_dom", "box_cod"):
-            middle = (boxes[node.j][0].y + boxes[node.j][1].y) / 2
-            positions[node] = Point(positions[node].x, up(middle)
-                                    + heights[node.j] * (p.y - middle))
-    for j, (low, high) in enumerate(boxes):
+    positions.update(box_ports(framed, across, up, heights))
+    for j, (low, high) in enumerate(framed.rectangles()):
         centre = Point(across((low.x + high.x) / 2), up((low.y + high.y) / 2))
         positions.update(corners(j, centre, Point(
             widths[j] * (high.x - low.x) / 2,
             heights[j] * (high.y - low.y) / 2)))
     return drawing.relayout([coordinate for node in framed.ordered_nodes()
                              for coordinate in positions[node]])
+
+
+def box_ports(drawing: Drawing, across: Callable[[float], float],
+              up: Callable[[float], float],
+              heights: Sequence[float]) -> dict[Node, Point]:
+    """
+    Where the ports of each box go when :func:`stretch` maps abscissas by
+    ``across``, the centre of the box by ``up`` and scales its height: at
+    the same offset from the centre, times the scale, so that they stay on
+    its top and bottom. The drawing is framed by
+    :meth:`Drawing.add_box_corners`.
+
+    >>> from discopy.monoidal import Ty, Box
+    >>> drawing = Box('f', Ty('x'), Ty('y')).to_drawing()
+    >>> drawing.add_box_corners()
+    >>> for node, point in box_ports(
+    ...         drawing, lambda x: x, lambda y: 2 * y, [2]).items():
+    ...     print(node.kind, point)
+    box_cod Point(x=0.5, y=0.5)
+    box_dom Point(x=0.5, y=1.5)
+    """
+    boxes = drawing.rectangles()
+    result = {}
+    for node, point in sorted(drawing.positions.items(), key=repr):
+        if node.kind in ("box_dom", "box_cod"):
+            middle = (boxes[node.j][0].y + boxes[node.j][1].y) / 2
+            result[node] = Point(across(point.x), up(middle)
+                                 + heights[node.j] * (point.y - middle))
+    return result
 
 
 def corners(j: int, centre: Point, half: Point) -> dict[Node, Point]:
