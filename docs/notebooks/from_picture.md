@@ -97,11 +97,12 @@ frame, and was refuted on both its pre-registered lines (#559):
 | exact recovery | monoidal | symmetric | compact | frobenius |
 |---|---|---|---|---|
 | whiteboard style, 6 to 10 px per unit | 7.4% | 13.7% | 2.8% | 5.4% |
-| its ceiling, true classes | 6.7% | 16.0% | 0.5% | 1.1% |
+| read from its warped true masks | 6.7% | 16.0% | 0.5% | 1.1% |
 | the clean set above | 31.6% | 39.9% | 36.9% | 36.3% |
 
-At 6 to 10 px per unit the decoder cannot read most pictures even from the
-true classes, so the first row could not pass its line of 50%. On the clean
+The second row is not a ceiling: a warped mask is resampled pixel by
+pixel, which breaks the thin wires of a small picture, and the pixel net
+reads three of the four modules better than these masks. On the clean
 set the pixel net held, at 95 to 99.7% per class, and the OCR fell: it reads
 74.9% of box names, from 95.7%.
 

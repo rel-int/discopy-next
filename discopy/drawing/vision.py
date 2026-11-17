@@ -117,7 +117,7 @@ class PixelNet(nn.Module):
 class OCR(nn.Module):
     """
     The text on a crop of shape :data:`CROP`: convolutions, each with a
-    batch norm, down to a sixth of its height, a bidirectional GRU along
+    batch norm, down to a quarter of its height, a bidirectional GRU along
     its width, and for each of its
     columns a score per character of :data:`CHARS` and the blank.
 
@@ -239,6 +239,9 @@ def train(data: dict, seed=0, epochs=6, batch=16, lr=2e-3, log=print,
     pixel = pixel or PixelNet()
     optimiser = torch.optim.AdamW(
         pixel.parameters(), lr=lr, weight_decay=1e-4)
+    if not 1 <= batch <= len(data["images"]):
+        raise ValueError(
+            f"Expected a batch from 1 to {len(data['images'])}, got {batch}.")
     steps = epochs * (len(data["images"]) // batch)
     schedule = torch.optim.lr_scheduler.OneCycleLR(optimiser, lr, steps)
     weight = torch.ones(len(COARSE))
@@ -363,6 +366,7 @@ def from_picture(jpeg, config: dict):
     weights = config["weights"]
     pixel, ocr = load(weights) if isinstance(weights, (str, os.PathLike))\
         else weights
+    pixel.eval(), ocr.eval()
     source = BytesIO(jpeg) if isinstance(jpeg, bytes) else jpeg
     photo = Image.open(source).convert("RGB")
     if config.get("scale"):

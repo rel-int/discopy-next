@@ -26,6 +26,9 @@ class TrueText:
     def __init__(self, texts):
         self.texts = texts
 
+    def eval(self):
+        return self
+
     def read(self, crops):
         return self.texts[:len(crops)]
 
@@ -147,3 +150,11 @@ def test_evaluate_without_wire_labels():
     result = vision.evaluate(
         data, picture.coarsen(mask)[None], vision.OCR(), workers=1)
     assert "types" not in result["ocr"]
+
+
+def test_train_rejects_a_batch_larger_than_the_data():
+    diagram, image, mask = picture.sample("monoidal", seed=0, size=64)
+    data = {"images": image[None], "masks": mask[None],
+            "modules": np.array([0]), "diagrams": [diagram]}
+    with raises(ValueError):
+        vision.train(data, epochs=1, batch=2, log=lambda _: None)

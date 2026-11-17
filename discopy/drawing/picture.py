@@ -1032,7 +1032,7 @@ def decode_least(mask: np.ndarray, module: str, most=MODULES[-1]):
     for i, candidate in enumerate(MODULES[least:last + 1], least):
         try:
             return decode(mask, candidate)
-        except AxiomError:
+        except (AxiomError, ValueError):
             if i == last:
                 raise
 
