@@ -11,3 +11,4 @@ drawing
     backend
     typst_ast
     widget
+    nicer
