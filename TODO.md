@@ -3,4 +3,4 @@
 - [x] `BraidedCategory.braid_inverse`, defaulting to `braid(...).dagger()`, and the laws and the rule that read the inverse braid as a dagger restated with it
 - [x] `DaggerMonoidalCategory(DaggerCategory, MonoidalCategory)` carrying `dagger_monoidality`, inherited by every category with both, and the declarations that only existed for the misplacement dropped
 - [x] the property matrix before and after, with `--proptest-baseline`, every lost cell explained
-- [ ] tests, docs and a changelog bullet
+- [WIP] @session_01MEJxy5Y19SnBwRFf22vqRj-2026-11-17 20:02 tests, docs and a changelog bullet
