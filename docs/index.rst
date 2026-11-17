@@ -40,6 +40,7 @@ DisCoPy documentation
     notebooks/equivalence-hypergraphs
     notebooks/contextual-fraction
     notebooks/boolean-circuits
+    notebooks/from_picture
 
 .. toctree::
     :caption: Optyx notebooks
