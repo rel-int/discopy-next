@@ -250,6 +250,24 @@ def cross(a: Point, b: Point, c: Point, d: Point) -> bool:
         c, d, b) < 0
 
 
+def through(a: Point, b: Point, low: Point, high: Point) -> bool:
+    """
+    Whether the segment ``ab`` passes through the inside of the rectangle
+    with corners ``low, high``, by Liang-Barsky clipping: touching its sides
+    does not count.
+    """
+    start, end = 0., 1.
+    for p, q in [(a.x - b.x, a.x - low.x), (b.x - a.x, high.x - a.x),
+                 (a.y - b.y, a.y - low.y), (b.y - a.y, high.y - a.y)]:
+        if p == 0 and q <= 0:
+            return False
+        if p < 0:
+            start = max(start, q / p)
+        elif p > 0:
+            end = min(end, q / p)
+    return start < end
+
+
 def overlap(a: Point, b: Point, c: Point, d: Point) -> bool:
     """ Whether the rectangles with corners ``a, b`` and ``c, d`` overlap. """
     return a.x < d.x and c.x < b.x and a.y < d.y and c.y < b.y
@@ -607,14 +625,16 @@ which to_drawing recomputes.
         if len(layout) != 2 * len(nodes):
             raise ValueError(messages.LAYOUT_LENGTH.format(
                 len(layout), 2 * len(nodes)))
-        positions = {node: Point(layout[2 * k], layout[2 * k + 1])
-                     for k, node in enumerate(nodes)}
+        positions = {
+            node: Point(float(layout[2 * k]), float(layout[2 * k + 1]))
+            for k, node in enumerate(nodes)}
         result = reference.relabel_nodes(positions=positions)
-        result.width = reference.width + max(p.x for p in positions.values())\
-            - max(p.x for p in reference.positions.values())
+        result.width = reference.width + max(
+            (p.x for p in positions.values()), default=0) - max(
+                (p.x for p in reference.positions.values()), default=0)
         result.height = reference.height + max(
-            p.y for p in positions.values()) - max(
-                p.y for p in reference.positions.values())
+            (p.y for p in positions.values()), default=0) - max(
+                (p.y for p in reference.positions.values()), default=0)
         if not result.is_feasible(reference):
             raise ValueError(messages.LAYOUT_NOT_FEASIBLE)
         return result
@@ -658,12 +678,60 @@ which to_drawing recomputes.
                 for j, _ in enumerate(self.boxes)
                 if Node("box-corner-00", j=j) in self.positions]
 
+    def has_rectangles(self) -> bool:
+        """
+        Whether the four corners of each box are those of a rectangle, with
+        its sides parallel to the axes.
+        """
+        return all(
+            self.positions[Node("box-corner-01", j=j)]
+            == Point(left.x, right.y)
+            and self.positions[Node("box-corner-10", j=j)]
+            == Point(right.x, left.y)
+            and left.x < right.x and left.y < right.y
+            for j, (left, right) in enumerate(self.rectangles()))
+
+    def shape(self) -> dict[str, object]:
+        """
+        What a layout keeps of a drawing, see :meth:`is_feasible`: the
+        direction of each edge, the :meth:`crossings` of wires, which wires
+        pass through which box, which boxes overlap and where each port sits
+        with respect to the sides of its box.
+
+        >>> from discopy.monoidal import Box
+        >>> drawing = Box('f', 'x', 'y').to_drawing()
+        >>> drawing.add_box_corners()
+        >>> drawing.shape()["ports"]
+        ((0, 0, -1, 1, 1), (0, 1, 0, 1, 1))
+        """
+        positions, rectangles = self.positions, self.rectangles()
+        segments = [(positions[u], positions[v]) for u, v in self.wires()]
+        ports = sorted((node for node in self.nodes
+                        if node.kind in ("box_dom", "box_cod")), key=repr)
+        return {
+            "edges": tuple(sign(positions[u].y - positions[v].y)
+                           for u, v in sorted(
+                               ((u, v) for u, v in self.edges), key=repr)),
+            "crossings": self.crossings(),
+            "through": {(i, j) for i, (a, b) in enumerate(segments)
+                        for j, rectangle in enumerate(rectangles)
+                        if through(a, b, *rectangle)},
+            "overlaps": {(i, j) for i, j in itertools.combinations(
+                range(len(rectangles)), 2)
+                if overlap(*rectangles[i], *rectangles[j])},
+            "ports": tuple(
+                (node.j, *(sign(a - b) for a, b in [
+                    (positions[node].y, rectangles[node.j][0].y),
+                    (positions[node].y, rectangles[node.j][1].y),
+                    (positions[node].x, rectangles[node.j][0].x),
+                    (rectangles[node.j][1].x, positions[node].x)]))
+                for node in ports if node.j < len(rectangles))}
+
     def is_feasible(self, reference: Drawing) -> bool:
         """
         Whether a drawing with the nodes of a reference draws the same
-        diagram: no coordinate is negative, every edge keeps its direction up
-        or down, the same wires cross, the boxes that did not overlap still
-        do not and each box keeps its ports between its sides.
+        diagram: no coordinate is negative, the corners of each box make a
+        rectangle and its :meth:`shape` is the reference's.
 
         Parameters:
             reference : The drawing it was laid out from.
@@ -679,24 +747,8 @@ which to_drawing recomputes.
         ...
         ValueError: This layout does not draw the same diagram.
         """
-        positions, old = self.positions, reference.positions
-        if any(min(p) < 0 for p in positions.values()):
-            return False
-        if any(sign(positions[u].y - positions[v].y)
-               != sign(old[u].y - old[v].y) for u, v in self.edges):
-            return False
-        if self.crossings() != reference.crossings():
-            return False
-        rectangles, before = self.rectangles(), reference.rectangles()
-        if any(overlap(*rectangles[i], *rectangles[j])
-               for i, j in itertools.combinations(range(len(rectangles)), 2)
-               if not overlap(*before[i], *before[j])):
-            return False
-        return all(
-            left.x <= positions[node].x <= right.x
-            for (left, right), j in zip(rectangles, itertools.count())
-            for node in self.nodes
-            if node.kind in ("box_dom", "box_cod") and node.j == j)
+        return all(min(p) >= 0 for p in self.positions.values())\
+            and self.has_rectangles() and self.shape() == reference.shape()
 
     def union(self, other, dom, cod, width=None, height=None, _check=True):
         """ Take the union of two drawings, assuming nodes are distinct. """
@@ -1244,6 +1296,10 @@ which to_drawing recomputes.
             n: Node(kd, i=n.i, j=len(self.boxes) - n.j - 1, x=n.x)
             for (k, kd) in [("box_dom", "box_cod"), ("box_cod", "box_dom")]
             for n in self.nodes if n.kind == k})
+        mapping.update({
+            n: Node(f"box-corner-{n.kind[-2]}{1 - int(n.kind[-1])}",
+                    j=len(self.boxes) - n.j - 1)
+            for n in self.nodes if n.kind.startswith("box-corner-")})
         mapping.update({
             n: Node("cod", i=i, x=n.x) for i, n in enumerate(self.dom_nodes)})
         mapping.update({

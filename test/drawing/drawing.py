@@ -1104,3 +1104,41 @@ def test_relayout_refuses_what_is_not_the_same_diagram():
         drawing.relayout(narrow)
     with raises(ValueError, match="same diagram"):
         drawing.relayout([-c for c in layout])
+
+
+def test_relayout_review_round():
+    import numpy as np
+    x, y = Ty('x'), Ty('y')
+    assert Drawing.id().relayout(()) == Drawing.id().relayout(
+        Drawing.id().layout())
+    drawing = (Box('f', x, x) >> Box('g', x, x)).to_drawing()
+    assert drawing.relayout(np.array(drawing.layout())).layout()\
+        == drawing.layout()
+    relaid = drawing.relayout(drawing.layout())
+    assert relaid.dagger().dagger().layout() == relaid.layout()
+    assert relaid.dagger().to_svg() == drawing.dagger().to_svg()
+    nodes = drawing.relabel_nodes()
+    nodes.add_box_corners()
+    index = {node: 2 * k for k, node in enumerate(nodes.ordered_nodes())}
+
+    def moved(node, dx=0., dy=0.):
+        layout = list(drawing.layout())
+        layout[index[node]] += dx
+        layout[index[node] + 1] += dy
+        return layout
+    port = next(node for node in nodes.ordered_nodes()
+                if node.kind == "box_dom" and node.j == 0)
+    for layout in [moved(Node("box-corner-01", j=0), dx=5),
+                   moved(port, dy=0.1)]:
+        with raises(ValueError, match="same diagram"):
+            drawing.relayout(layout)
+    bypass = (Box('f', x, x) @ y).to_drawing()
+    nodes = bypass.relabel_nodes()
+    nodes.add_box_corners()
+    index = {node: 2 * k for k, node in enumerate(nodes.ordered_nodes())}
+    layout = list(bypass.layout())
+    for node in nodes.ordered_nodes():
+        if node.kind in ("dom", "cod") and node.i == 1:
+            layout[index[node]] = 0.6
+    with raises(ValueError, match="same diagram"):
+        bypass.relayout(layout)
