@@ -261,8 +261,11 @@ class Reservoir:
                 inputs, reservoir = inputs.later, reservoir.later
         return features
 
+    # pylint: disable=too-many-arguments,too-many-positional-arguments
+    # The data, then the regression's three options with their defaults.
     def fit(self, sequence: list, targets: list,
-            regularisation: float = 1e-6, bias: bool = True) -> Readout:
+            regularisation: float = 1e-6, bias: bool = True,
+            washout: int = 0) -> Readout:
         """
         The linear readout of the features of ``sequence``, fit by ridge
         regression.
@@ -270,13 +273,16 @@ class Reservoir:
         Minimises the squared error between the readout of the features and
         ``targets``, with Tikhonov ``regularisation`` on the weights. With
         ``bias``, the readout has an intercept, which the regularisation
-        leaves out, and none otherwise.
+        leaves out, and none otherwise. The first ``washout`` time steps,
+        the transient of the initial state, are left out of the regression,
+        their features and targets both.
 
         Parameters:
             sequence : A list of numbers, or tuples of numbers.
             targets : One number, or tuple of numbers, for each step.
             regularisation : The Tikhonov regularisation parameter.
             bias : Whether to fit an intercept as well.
+            washout : The number of time steps to leave out at the start.
 
         Example
         -------
@@ -286,6 +292,14 @@ class Reservoir:
         >>> sequence = [0.1, 0.5, 0.9, 0.3]
         >>> readout = reservoir.fit(sequence, len(sequence) * [7.])
         >>> assert abs(reservoir.predict(sequence, readout) - 7).max() < 1e-3
+
+        With a washout, the targets of the first steps are not read:
+
+        >>> zero, one = [0., 7., 7., 7.], [1., 7., 7., 7.]
+        >>> assert reservoir.fit(sequence, zero, washout=1) == reservoir.fit(
+        ...     sequence, one, washout=1)
+        >>> assert reservoir.fit(sequence, zero) != reservoir.fit(
+        ...     sequence, one)
         """
         if len(targets) != len(sequence):
             raise ValueError(
@@ -293,11 +307,14 @@ class Reservoir:
         if regularisation < 0:
             raise ValueError(
                 f"Expected regularisation >= 0, got {regularisation}.")
+        if not 0 <= washout < len(sequence):
+            raise ValueError(
+                f"Expected 0 <= washout < {len(sequence)}, got {washout}.")
         np = get_backend()
-        features = np.stack(self.run(sequence))
-        n_samples, n_features = np.shape(features)
+        features = np.stack(self.run(sequence))[washout:]
         targets = np.reshape(
-            np.array(targets, dtype=float), (n_samples, -1))
+            np.array(targets, dtype=float), (len(sequence), -1))[washout:]
+        n_samples, n_features = np.shape(features)
         n_targets = np.shape(targets)[1]
         if bias:
             features = np.concatenate(

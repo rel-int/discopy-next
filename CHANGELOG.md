@@ -333,6 +333,8 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 - `quantum.reservoir`, quantum reservoir computing ([#519]), the `Rydberg`
   ansatz ([#586]), and `quantum.contextuality`, the contextual fraction
   ([next#283]).
+- `Reservoir.fit(..., washout=k)` leaves the first `k` time steps, the
+  transient of the initial state, out of the regression ([next#216]).
 - `discopy.optyx`, moved in from rel-int/optyx with its 358 commits and
   their authors: ZX, ZW and linear-optical diagrams, channels, feedback and
   a compiler to photonic hardware, under the Apache License 2.0 in its own
@@ -2026,6 +2028,7 @@ for the changelog of `1.2.1` and earlier.
 [next#187]: https://github.com/rel-int/discopy-next/issues/187
 [next#201]: https://github.com/rel-int/discopy-next/issues/201
 [next#214]: https://github.com/rel-int/discopy-next/pull/214
+[next#216]: https://github.com/rel-int/discopy-next/issues/216
 [next#225]: https://github.com/rel-int/discopy-next/issues/225
 [next#236]: https://github.com/rel-int/discopy-next/issues/236
 [next#249]: https://github.com/rel-int/discopy-next/issues/249
