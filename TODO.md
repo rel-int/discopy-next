@@ -4,7 +4,7 @@
 >
 > (slice 3 of rel-int/discopy-next#512; default taken 2026-11-16 by the 48 h rule)
 
-- [ ] family match: Builder.matches against EGraph.matches on the 50 traces, the most matched two-box pattern of each
+- [WIP] @session_01MEJxy4kqJ6YhajqkcZRUXm-2026-11-17 01:15 family match: Builder.matches against EGraph.matches on the 50 traces, the most matched two-box pattern of each
 - [ ] family saturate: the closed form of + on n leaves, n from 4 to 8, pure up to 5
 - [ ] the targets, met or the miss filed: matches 10x on the largest trace, saturate on 5 leaves 100x
 - [ ] one sentence in CONTRIBUTING.md's Run the benchmarks
