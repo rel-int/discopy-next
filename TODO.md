@@ -6,6 +6,6 @@
 
 - [x] family match: Builder.matches against EGraph.matches on the 50 traces, the most matched two-box pattern of each
 - [x] family saturate: the closed form of + on n leaves, n from 4 to 8, pure up to 5
-- [WIP] @session_01MEJxy4kqJ6YhajqkcZRUXm-2026-11-17 01:19 the targets, met or the miss filed: matches 10x on the largest trace, saturate on 5 leaves 100x
+- [x] the targets, met or the miss filed: matches 10x on the largest trace, saturate on 5 leaves 100x, filed as #588
 - [ ] one sentence in CONTRIBUTING.md's Run the benchmarks
 - [ ] the gates of CONTRIBUTING.md's Run the unit tests
