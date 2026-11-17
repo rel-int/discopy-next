@@ -625,6 +625,9 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Fixed
 
+- A `Permutation` given an iterator reads it once into a list, so
+  `Permutation(x @ y, iter([1, 0]))` is the `Swap` the list form gives
+  ([next#31]).
 - The TikZ backend fills the coloured regions of a diagram, so a ribbon is
   filled along its straight rails and not only at its folds and braids; the
   loop over `region_cells` moves from `Matplotlib` to `Backend` ([next#605]).

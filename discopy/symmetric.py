@@ -98,7 +98,7 @@ Both sides foliate to the same single permutation.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Iterable, Iterator, Sequence
 from typing import ClassVar
 
 from discopy import monoidal, feedback, balanced, hypergraph, cmap, messages
@@ -572,7 +572,8 @@ class Permutation(Box):
 
     Parameters:
         dom : The domain, i.e. the wires to permute.
-        perm : The permutation as a :class:`finset.Permutation` or a list.
+        perm : The permutation as a :class:`finset.Permutation`, a list or
+            any iterable, an iterator being read once into a list.
 
     Examples
     --------
@@ -584,6 +585,7 @@ class Permutation(Box):
     >>> assert perm @ Id(w) == Permutation(x @ y @ z @ w, [1, 2, 0, 3])
     >>> assert Permutation(x @ y, [1, 0]) == Swap(x, y)
     >>> assert Permutation(x @ y, [0, 1]) == Id(x @ y)
+    >>> assert Permutation(x @ y, iter([1, 0])) == Swap(x, y)
 
     Writing permutations by hand keeps swap-heavy diagrams compact: a whole
     permutation occupies a single layer rather than a quadratic staircase of
@@ -605,16 +607,22 @@ class Permutation(Box):
     serialised_attrs = ("dom", "perm")
 
     def __new__(cls, dom: monoidal.Ty | None = None,
-                perm: Sequence[int] | None = None):
-        if dom is None or cls is cls.ar.swap_factory:
-            return super().__new__(cls)
+                perm: Iterable[int] | None = None):
+        listed = finset.Permutation(perm, len(dom))\
+            if dom is not None and isinstance(perm, Iterator) else None
+        perm = perm if listed is None else listed
         factory = cls.ar.swap_factory\
-            if isinstance(perm, Sequence)\
+            if dom is not None and cls is not cls.ar.swap_factory\
+            and isinstance(perm, Sequence)\
             and finset.Permutation.is_swap(perm) else cls
-        return super(Permutation, factory).__new__(factory)
+        result = super(Permutation, factory).__new__(factory)
+        if listed is not None:
+            result.perm = listed
+        return result
 
-    def __init__(self, dom: monoidal.Ty, perm: Sequence[int]):
-        self.perm = finset.Permutation(perm, len(dom))
+    def __init__(self, dom: monoidal.Ty, perm: Iterable[int]):
+        self.perm = finset.Permutation(
+            self.perm if isinstance(perm, Iterator) else perm, len(dom))
         cod = dom[:0].tensor(*(dom[i] for i in self.perm))
         name = f"Permutation({list(self.perm)})"
         super().__init__(
@@ -794,7 +802,8 @@ class Swap(Permutation, balanced.Braid, Box):
 
     def __init__(self, left, right):
         if not isinstance(right, monoidal.Ty) and len(left) == 2:
-            perm = finset.Permutation(right, len(left))
+            perm = finset.Permutation(
+                self.perm if isinstance(right, Iterator) else right, 2)
             if not perm.is_swap():
                 raise ValueError(messages.NOT_A_SWAP.format(list(perm)))
             left, right = left[:1], left[1:]

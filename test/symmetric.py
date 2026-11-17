@@ -4,6 +4,7 @@ import pickle
 
 from pytest import raises
 
+from discopy import feedback, symmetric
 from discopy.symmetric import *
 from discopy.utils import AxiomError, dumps, loads
 
@@ -226,6 +227,19 @@ def test_Layer_tensor():
     plumbed = Layer(f, z) @ permutation @ Layer(x, g)
     assert plumbed.boxes_or_types == (f, z @ permutation[0] @ x, g)
     assert isinstance(plumbed[1], Permutation)
+
+
+def test_Permutation_from_iterator():
+    x, y, z = Ty('x'), Ty('y'), Ty('z')
+    for dom, perm in [(x @ y, [1, 0]), (x @ y @ z, [1, 2, 0])]:
+        listed = Permutation(dom, perm)
+        for once in (iter(perm), (i for i in perm)):
+            result = Permutation(dom, once)
+            assert type(result) is type(listed) and result == listed
+            assert hash(result) == hash(listed)
+            namespace = {"feedback": feedback, "symmetric": symmetric}
+            assert eval(repr(result), namespace) == result
+    assert Swap(x @ y, iter([1, 0])) == Swap(x, y)
 
 
 def test_noncommuting_Permutation_composition():
