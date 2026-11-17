@@ -117,8 +117,8 @@ class PixelNet(nn.Module):
 
 class OCR(nn.Module):
     """
-    The text on a crop of shape :data:`CROP`: convolutions down to a sixth
-    of its height, a bidirectional GRU along its width, and for each of its
+    The text on a crop of shape :data:`CROP`: convolutions, each with a
+    batch norm, down to a sixth of its height, a bidirectional GRU along its width, and for each of its
     columns a score per character of :data:`CHARS` and the blank.
 
     >>> ocr = OCR(width=8)
@@ -130,10 +130,12 @@ class OCR(nn.Module):
     def __init__(self, width=32):
         super().__init__()
         self.convs = nn.Sequential(
-            nn.Conv2d(1, width, 3, padding=1), nn.ReLU(), nn.MaxPool2d(2),
-            nn.Conv2d(width, 2 * width, 3, padding=1), nn.ReLU(),
-            nn.MaxPool2d((2, 1)),
-            nn.Conv2d(2 * width, 2 * width, 3, padding=1), nn.ReLU())
+            nn.Conv2d(1, width, 3, padding=1), nn.BatchNorm2d(width),
+            nn.ReLU(), nn.MaxPool2d(2),
+            nn.Conv2d(width, 2 * width, 3, padding=1),
+            nn.BatchNorm2d(2 * width), nn.ReLU(), nn.MaxPool2d((2, 1)),
+            nn.Conv2d(2 * width, 2 * width, 3, padding=1),
+            nn.BatchNorm2d(2 * width), nn.ReLU())
         features = 2 * width * CROP[0] // 4
         self.rnn = nn.GRU(features, width, batch_first=True,
                           bidirectional=True)
@@ -309,7 +311,7 @@ def train_ocr(crops: np.ndarray, strings: list[str], seed=0, epochs=4,
             loss = F.ctc_loss(
                 log_probs, torch.cat(target),
                 torch.full((len(index), ), log_probs.shape[0]),
-                torch.tensor([len(t) for t in target]))
+                torch.tensor([len(t) for t in target]), zero_infinity=True)
             optimiser.zero_grad()
             loss.backward()
             optimiser.step()
