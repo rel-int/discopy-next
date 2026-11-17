@@ -12,7 +12,8 @@ A pixel is the background, a wire with a type, or a box with a name or a
 structural generator, i.e. a swap, a cup, a cap or a spider, see
 :data:`LABELS`. Where a wire meets a swap, a cup, a cap or a spider, its
 port, is a disc of the wire's type, so that two generators that meet are
-two components. A diagram is drawn one generator at a time, see :func:`elementary`, so that its picture is planar
+two components. A diagram is drawn one generator at a time, see
+:func:`elementary`, so that its picture is planar
 but for its swaps.
 
 Summary
@@ -40,10 +41,9 @@ Summary
 from __future__ import annotations
 
 import importlib
-from collections import Counter, defaultdict
+from collections import defaultdict
 from collections.abc import Callable, Iterator
 from contextlib import nullcontext
-from functools import reduce
 from io import BytesIO
 
 import numpy as np
@@ -877,8 +877,10 @@ def attach(labels: np.ndarray, wires: np.ndarray) -> dict[int, int]:
         left = cols.min()
         top = rows[cols == left].min()
         if len(wire_rows):
-            nearest = ((wire_rows - top) ** 2 + (wire_cols - left) ** 2).argmin()
-            result[int(label)] = int(wires[wire_rows[nearest], wire_cols[nearest]])
+            nearest = ((wire_rows - top) ** 2
+                       + (wire_cols - left) ** 2).argmin()
+            result[int(label)] = int(
+                wires[wire_rows[nearest], wire_cols[nearest]])
     return result
 
 
@@ -896,8 +898,9 @@ def refine(classes, boxes, wires, names: dict, types: dict) -> np.ndarray:
     >>> classes = coarsen(mask)
     >>> boxes, wires, labels = regions(classes)
     >>> names = {b: "f" for b in np.unique(boxes[boxes >= 0])}
-    >>> assert equal(decode(refine(classes, boxes, wires, names, {}),
-    ...                     "monoidal"), Box('f', Ty('a'), Ty('a')), "monoidal")
+    >>> mask = refine(classes, boxes, wires, names, {})
+    >>> assert equal(decode(mask, "monoidal"),
+    ...              Box('f', Ty('a'), Ty('a')), "monoidal")
     """
     for name in names.values():
         if name not in NAMES:

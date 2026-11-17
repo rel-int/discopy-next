@@ -46,6 +46,9 @@ Summary
         train_ocr
         predict
         read
+        save
+        load
+        from_picture
         flood
         evaluate
 """
@@ -54,6 +57,7 @@ from __future__ import annotations
 
 import os
 from collections import Counter
+from io import BytesIO
 from concurrent.futures import ProcessPoolExecutor
 from itertools import islice
 
@@ -63,7 +67,8 @@ from torch import nn
 from torch.nn import functional as F
 
 from discopy.drawing import picture
-from discopy.drawing.picture import COARSE, LABELS, MODULES, NAMES, TYPES
+from discopy.drawing.picture import (
+    COARSE, LABELS, MODULES, NAMES, TYPES, decode, refine, scan)
 from discopy.utils import AxiomError
 
 #: The characters the OCR model reads, after the blank of its alphabet.
@@ -118,7 +123,8 @@ class PixelNet(nn.Module):
 class OCR(nn.Module):
     """
     The text on a crop of shape :data:`CROP`: convolutions, each with a
-    batch norm, down to a sixth of its height, a bidirectional GRU along its width, and for each of its
+    batch norm, down to a sixth of its height, a bidirectional GRU along
+    its width, and for each of its
     columns a score per character of :data:`CHARS` and the blank.
 
     >>> ocr = OCR(width=8)
@@ -190,7 +196,8 @@ def crop(image: np.ndarray, rows, cols, label=False) -> np.ndarray:
     The ink of an image, from zero for white to one for black, in a window
     of shape :data:`CROP`: centred on the box with these pixels, where its
     name is drawn, or from the top left of the label with these pixels,
-    with no ink outside the label.
+    with no ink but on them and their neighbours, so that a wire or a box
+    drawn through the label is not read with it.
     """
     height, width = CROP
     if label:
@@ -201,9 +208,10 @@ def crop(image: np.ndarray, rows, cols, label=False) -> np.ndarray:
         left = (cols.min() + cols.max()) // 2 - width // 2
     ink = 1 - image.mean(axis=2) / 255
     if label:
-        inside = np.zeros_like(ink)
-        inside[max(rows.min() - 1, 0):rows.max() + 2,
-               max(cols.min() - 1, 0):cols.max() + 2] = 1
+        inside = np.zeros(ink.shape, dtype=bool)
+        inside[rows, cols] = True
+        inside = inside | np.any([picture.shift(inside, dr, dc, False)
+                                  for dr, dc in picture.SHIFTS], axis=0)
         ink = ink * inside
     ink = np.pad(ink, ((height, height), (width, width)))
     return ink[top + height:top + 2 * height, left + width:left + 2 * width]
@@ -343,6 +351,60 @@ def read(ocr: OCR, image: np.ndarray, classes: np.ndarray):
     types = {wire: found[len(box_ids) + k]
              for k, wire in enumerate(attached.values())}
     return boxes, wires, names, types
+
+
+def save(path: str, pixel: PixelNet, ocr: OCR):
+    """ Save the weights of the two networks to one file, with the widths
+    and depth they were built with. """
+    torch.save({"pixel": pixel.state_dict(), "ocr": ocr.state_dict(),
+                "pixel_width": pixel.head.in_channels,
+                "pixel_depth": len(pixel.down) - 1,
+                "ocr_width": ocr.rnn.hidden_size}, path)
+
+
+def load(path: str) -> tuple[PixelNet, OCR]:
+    """ The two networks whose weights :func:`save` wrote to a file. """
+    state = torch.load(path, weights_only=False)
+    pixel = PixelNet(state["pixel_width"], state["pixel_depth"])
+    ocr = OCR(state["ocr_width"])
+    pixel.load_state_dict(state["pixel"])
+    ocr.load_state_dict(state["ocr"])
+    return pixel.eval(), ocr.eval()
+
+
+def from_picture(jpeg, config: dict):
+    """
+    The diagram a picture shows, see :func:`discopy.drawing.from_picture`.
+
+    Parameters:
+        jpeg : The picture, a path or its bytes, in any format Pillow reads.
+        config : ``weights``, a path :func:`save` wrote or a pair of
+            networks; ``scale``, the pixels per unit of the picture, if it
+            is not the 24 the networks were trained at; ``size``, the side
+            of the square the picture is centred in, 160 by default;
+            ``module``, the largest module to read it in, if any.
+    """
+    from PIL import Image
+    weights = config["weights"]
+    pixel, ocr = load(weights) if isinstance(weights, str) else weights
+    source = BytesIO(jpeg) if isinstance(jpeg, bytes) else jpeg
+    picture = Image.open(source).convert("RGB")
+    if config.get("scale"):
+        ratio = 24 / config["scale"]
+        picture = picture.resize((round(picture.width * ratio),
+                                  round(picture.height * ratio)))
+    size = config.get("size", 160)
+    canvas = Image.new("RGB", (size, size), "white")
+    canvas.paste(picture, ((size - picture.width) // 2,
+                           (size - picture.height) // 2))
+    image = np.asarray(canvas)
+    classes = predict(pixel, image[None])[0]
+    module = scan(classes)
+    if config.get("module") is not None and MODULES.index(
+            module) > MODULES.index(config["module"]):
+        raise ValueError(f"The picture shows a {module} diagram.")
+    boxes, wires, names, types = read(ocr, image, classes)
+    return decode(refine(classes, boxes, wires, names, types), module)
 
 
 def flood(image: np.ndarray, threshold=128) -> np.ndarray:

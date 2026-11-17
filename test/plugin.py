@@ -32,7 +32,7 @@ UNIMPORTABLE = (
     "discopy/neural/geometric.py",
     "discopy/neural/cell.py", "discopy/neural/recursion.py",
     "discopy/neural/lattice.py", "discopy/neural/act.py", "discopy/neural/train.py",
-    "discopy/drawing/widget.py")
+    "discopy/drawing/widget.py", "discopy/drawing/vision.py")
 
 # A package whose own import needs an extra, e.g. ``discopy.optyx``.
 UNIMPORTABLE_PACKAGES = ("discopy/optyx/", "test/optyx/")
