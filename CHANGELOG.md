@@ -9,12 +9,13 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Added
 
-- `shape="triangle"` on any box draws it as a triangle, matplotlib and TikZ
-  alike: its base the width of the side with more wires, its apex on the
-  other, at its wire when there is one, and its dagger upside down
-  (`Backend.triangle_corners`). A box's dagger, and any box `rebuild` makes,
-  keeps the drawing attributes it was given, its `color` and `shape`
-  ([next#568]).
+- `drawing.picture`, pictures of diagrams as training data for reading them
+  back: `samples` draws random diagrams of `monoidal`, `symmetric`,
+  `compact` or `frobenius` one generator at a time, renders each with a mask
+  labelling every pixel by its wire type, box name or structural primitive,
+  and `augment` warps, rotates, blurs and restyles both together (chalk,
+  whiteboard, xkcd); `draw(backend=...)` takes the backend to draw with
+  ([next#573]).
 - `abc.LinearCategory`, a linear category (Bierman, TLCA 1995) without
   symmetry: a comonad `bang` with `dereliction` and `digging`, lax monoidal
   with a `laxator`, each `!x` a comonoid by `contraction` and `weakening`, and
@@ -49,6 +50,12 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   is the Typst source of a CeTZ canvas, and `draw(format="typst")` compiles
   it to SVG with the optional `typst` extra, or writes the source to a path
   ending in `.typ` ([#467], [next#565]).
+- `shape="triangle"` on any box draws it as a triangle, matplotlib and TikZ
+  alike: its base the width of the side with more wires, its apex on the
+  other, at its wire when there is one, and its dagger upside down
+  (`Backend.triangle_corners`). A box's dagger, and any box `rebuild` makes,
+  keeps the drawing attributes it was given, its `color` and `shape`
+  ([next#568]).
 - `Matrix.__le__`, the pointwise order on parallel matrices, which a
   `Tensor` inherits: over `bool` it is the inclusion of relations, over the
   complex numbers it raises `TypeError`. `testable.Inequation`, an `Equation`
@@ -2122,6 +2129,7 @@ for the changelog of `1.2.1` and earlier.
 [next#589]: https://github.com/rel-int/discopy-next/pull/589
 [next#591]: https://github.com/rel-int/discopy-next/pull/591
 [next#598]: https://github.com/rel-int/discopy-next/pull/598
+[next#573]: https://github.com/rel-int/discopy-next/pull/573
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#56]: https://github.com/rel-int/optyx/pull/56
