@@ -14,9 +14,12 @@ permissions:
 
 # Supersede a pull request's own runs, but let every commit on main keep the
 # run that proves it green: a main run is where the suite searches new
-# ground, and cancelling it throws that search away.
+# ground, and cancelling it throws that search away. A schedule and a
+# dispatch get a group each, since they share a commit with the push that
+# made it and would otherwise queue behind it.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref
+    || github.event_name == 'push' && github.sha || github.run_id }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
