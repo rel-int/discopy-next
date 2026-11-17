@@ -161,3 +161,10 @@ def test_scan_ignores_scattered_pixels():
     classes = np.zeros((32, 32), dtype=np.uint8)
     classes[[2, 10, 20], [3, 15, 28]] = COARSE.index("swap")
     assert scan(classes) == "monoidal"
+
+
+def test_decode_raises_on_a_self_dual_cup_in_monoidal():
+    x = frobenius.Ty('a')
+    mask = render(frobenius.Cup(x, x), 96, mask=True)
+    with raises(ValueError):
+        decode(mask, "monoidal")

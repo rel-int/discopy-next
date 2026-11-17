@@ -700,6 +700,10 @@ def decode(mask: np.ndarray, module: str, min_pixels=3):
         raise ValueError(f"Expected labels in range({len(LABELS)}).")
     first = LABELS.index(NAMES[0])
     allowed = [LABELS.index(name) for name in NAMES + STRUCTURAL[module]]
+    for name in set(STRUCTURAL["frobenius"]) - set(STRUCTURAL[module]):
+        ids = components(np.where(mask == LABELS.index(name), 0, -1))
+        if (np.bincount(ids[ids >= 0], minlength=1) >= min_pixels).any():
+            raise ValueError(f"A {name} is not in {module}.")
     is_box = np.isin(mask, allowed)
     boxes = join(components(np.where(is_box, mask, -1)), mask,
                  (mask >= LABELS.index("label " + TYPES[0])) & (mask != WIRE))
