@@ -77,7 +77,6 @@ AUGMENTATIONS = (
 DPI, SPIDER, WIRE, TEXT = 72, .15, LABELS.index("wire"), 7
 
 
-
 def load(module: str):
     """ The module of a name in :data:`MODULES`, e.g. ``discopy.compact``. """
     if module not in MODULES:
