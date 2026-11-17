@@ -979,7 +979,7 @@ class Parser:
                    **params)
 
     @classmethod
-    def from_pretrained(cls, path: str, device: str = "cpu", **params
+    def from_pretrained(cls, directory, device: str = "cpu", **params
                         ) -> Parser:
         """
         A parser from the directory of a model, e.g. a download of
@@ -991,7 +991,7 @@ class Parser:
         ``transformers``.
 
         Parameters:
-            path : The directory.
+            directory : The directory, a string or a path.
             device : Where the model runs.
             params : The parameters of :class:`Parser`, by default those of
                 the model's pipeline.
@@ -1005,7 +1005,7 @@ class Parser:
 
         from discopy.lambek.neural import ChartClassifier, Encoder
 
-        path = Path(path)
+        path = Path(directory)
         pipeline = json.loads(
             (path / "rebank_pipeline_config.json").read_text())
         maps = json.loads((path / "label_maps.json").read_text())
@@ -1021,9 +1021,9 @@ class Parser:
         parser.encoder = Encoder(
             AutoModel.from_config(config), AutoTokenizer.from_pretrained(path),
             config.max_position_embeddings)
-        parser.classifier = ChartClassifier(*(
-            sorted(maps[key], key=maps[key].get) for key in ("tag2id", "cat2id")
-        ), config.hidden_size)
+        tags, labels = (sorted(maps[key], key=maps[key].get)
+                        for key in ("tag2id", "cat2id"))
+        parser.classifier = ChartClassifier(tags, labels, config.hidden_size)
         state = torch.load(path / "pytorch_model.bin", map_location="cpu")
         parser.encoder.model.load_state_dict({
             key[len("bert."):]: value for key, value in state.items()
@@ -1046,6 +1046,8 @@ class Parser:
         model of :meth:`from_pretrained`, see
         :meth:`discopy.lambek.neural.ChartClassifier.decode`.
         """
+        if self.encoder is None or self.classifier is None:
+            raise ValueError("no model: see Parser.from_pretrained")
         states, mask = self.encoder(sentences)
         return self.classifier.decode(states, mask, **self.decoding)
 
@@ -1065,8 +1067,6 @@ class Parser:
             return None
         tags, spans = self.decode([words])[0]
         words = words[:len(tags)]
-        if not all(tags):
-            return None
         return self.parse(words, tags, spans, missing=False)\
             or self.parse(words, tags, spans)
 

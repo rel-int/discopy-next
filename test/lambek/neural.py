@@ -311,5 +311,7 @@ def test_Parser_from_pretrained(tmp_path):
     assert parser("Alice runs").cod == Ty("S")
     assert parser.derive(["Alice", "runs"]).cat == "S"
     assert parser("") is None
+    with pytest.raises(ValueError):
+        Parser({}, {}).decode([["Alice"]])
     assert Parser.from_pretrained(tmp_path, root=frozenset({"N"}))(
         "Alice runs") is None
