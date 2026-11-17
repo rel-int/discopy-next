@@ -2,4 +2,4 @@
 
 - [x] Materialise an iterator once in Permutation.__new__ and let each __init__ read the same list
 - [x] Test: iter and generator forms equal the list form, same type and hash
-- [ ] CHANGELOG bullet
+- [x] CHANGELOG bullet
