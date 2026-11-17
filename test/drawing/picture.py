@@ -131,3 +131,18 @@ def test_decode_joins_a_box_a_label_cuts():
     mask[rows.min():rows.max() + 1, middle:middle + 2] = LABELS.index(
         "label a")
     assert equal(decode(mask, "symmetric"), diagram, "symmetric")
+
+
+def test_decode_types_both_legs_of_an_unlabelled_cup():
+    x = compact.Ty('a')
+    diagram = compact.Cup(x, x.r)
+    mask = render(diagram, 96, mask=True, wire_labels=False)
+    assert equal(read_true_mask(mask, None), diagram, "compact")
+
+
+def test_read_a_self_dual_cup_in_frobenius():
+    x = frobenius.Ty('a')
+    diagram = frobenius.Cup(x, x)
+    mask = render(diagram, 96, mask=True)
+    assert scan(coarsen(mask)) == "compact"
+    assert equal(read_true_mask(mask, None), diagram, "frobenius")

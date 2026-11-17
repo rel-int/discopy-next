@@ -57,7 +57,7 @@ import numpy as np
 
 from discopy.drawing.backend import Backend, Matplotlib
 from discopy.testable import GENERATORS
-from discopy.utils import Node
+from discopy.utils import AxiomError, Node
 
 #: The modules a picture is read in, from the fewest generators to the most.
 MODULES = ("monoidal", "symmetric", "compact", "frobenius")
@@ -740,6 +740,10 @@ def decode(mask: np.ndarray, module: str, min_pixels=3):
     tops = {g: [link for _, link in sorted(tops[g])] for g in generators}
     bottoms = {g: [link for _, link in sorted(bottoms[g])] for g in generators}
     infer_types(types, label, tops, bottoms, module)
+    for link in range(links.max() + 1):
+        if link not in types:
+            types[link] = TYPES[0]
+            infer_types(types, label, tops, bottoms, module)
 
     def typ(link):
         name = types.get(link, TYPES[0])
@@ -985,13 +989,22 @@ def read(classes: np.ndarray, name: Callable, typ: Callable, module=None):
     The diagram a picture shows from the classes of its pixels: each box is
     named by ``name(rows, cols)`` and each labelled wire typed by
     ``typ(rows, cols)``, given the pixels of the box or the label, the
-    module is the :func:`scan` of the classes and the types read unless
-    given, then :func:`decode`.
+    module is the smallest from the :func:`scan` of the classes and the
+    types read in which it decodes, e.g. ``frobenius`` for a cup on ``a``
+    and ``a`` that is not compact, unless given, then :func:`decode`.
     """
     boxes, wires, labels = regions(classes)
     names = {int(b): name(*np.nonzero(boxes == b))
              for b in np.unique(boxes[boxes >= 0])}
     types = {wires_id: typ(*np.nonzero(labels == label))
              for label, wires_id in attach(labels, wires).items()}
-    return decode(refine(classes, boxes, wires, names, types),
-                  module or scan(classes, types.values()))
+    mask = refine(classes, boxes, wires, names, types)
+    if module is not None:
+        return decode(mask, module)
+    least = MODULES.index(scan(classes, types.values()))
+    for i, candidate in enumerate(MODULES[least:], least):
+        try:
+            return decode(mask, candidate)
+        except AxiomError:
+            if i == len(MODULES) - 1:
+                raise
