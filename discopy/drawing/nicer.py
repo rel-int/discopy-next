@@ -55,6 +55,7 @@ from typing import TYPE_CHECKING, Callable, Sequence
 
 from discopy.drawing.backend import Backend
 from discopy.drawing.drawing import Drawing, Node, Point
+from discopy import messages
 from discopy.utils import text_width
 
 if TYPE_CHECKING:
@@ -294,6 +295,9 @@ def stretch(
     framed = drawing.relabel_nodes()
     framed.add_box_corners()
     xs, ys = knots(framed)
+    if [len(columns), len(rows), len(widths), len(heights)] != [
+            len(xs) - 1, len(ys) - 1, len(framed.boxes), len(framed.boxes)]:
+        raise ValueError(messages.STRETCH_LENGTHS)
     across, up = piecewise(xs, columns), piecewise(ys, rows)
     positions = {node: Point(across(p.x), up(p.y))
                  for node, p in framed.positions.items()
@@ -312,14 +316,17 @@ def stretch(
 def knots(drawing: Drawing) -> tuple[list[float], list[float]]:
     """
     The distinct abscissas and ordinates of the nodes of a drawing that are
-    not box corners, in increasing order: the columns and the rows that
-    :func:`stretch` scales the gaps between.
+    not box corners, once its boxes are centred by
+    :meth:`Drawing.add_box_corners`, in increasing order: the columns and
+    the rows that :func:`stretch` scales the gaps between.
 
     >>> from discopy.monoidal import Ty, Box
     >>> knots(Box('f', Ty('x'), Ty('x')).to_drawing())
     ([0.5], [0, 0.25, 0.5, 0.75, 1])
     """
-    points = [p for node, p in drawing.positions.items()
+    framed = drawing.relabel_nodes()
+    framed.add_box_corners()
+    points = [p for node, p in framed.positions.items()
               if not node.kind.startswith("box-corner")]
     return sorted({p.x for p in points}), sorted({p.y for p in points})
 

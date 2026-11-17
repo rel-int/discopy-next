@@ -109,6 +109,13 @@ def test_stretch_and_nicer_layout():
     assert stretch(drawing, *ones).layout() == drawing.layout()
     with raises(ValueError):
         stretch(drawing, ones[0], ones[1], [9] * n, ones[3])
+    with raises(ValueError, match="each gap"):
+        stretch(drawing, [], [], [], [])
+    off_centre = Box('e', x @ x, x) @ x >> Box('t', x @ x, x @ x)\
+        >> Box('r', x, Ty()) @ x
+    moved = off_centre.to_drawing()
+    assert len(knots(moved)[0]) > len({p.x for p in moved.positions.values()})
+    assert nicer_layout(moved).is_feasible(moved)
     nicer = nicer_layout(drawing)
     assert hand_score(nicer) > hand_score(drawing)
     assert clearance(nicer) >= clearance(drawing)
