@@ -334,16 +334,19 @@ def box_ports(drawing: Drawing, across: Callable[[float], float],
     >>> for node, point in box_ports(
     ...         drawing, lambda x: x, lambda y: 2 * y, [2]).items():
     ...     print(node.kind, point)
-    box_dom Point(x=0.5, y=1.5)
     box_cod Point(x=0.5, y=0.5)
+    box_dom Point(x=0.5, y=1.5)
     """
-    boxes = drawing.rectangles()
-    result = {}
-    for node, point in drawing.positions.items():
-        if node.kind in ("box_dom", "box_cod"):
-            middle = (boxes[node.j][0].y + boxes[node.j][1].y) / 2
-            result[node] = Point(across(point.x), up(middle)
-                                 + heights[node.j] * (point.y - middle))
+    result: dict[Node, Point] = {}
+    for j, ((low, high), box) in enumerate(
+            zip(drawing.rectangles(), drawing.boxes)):
+        middle = (low.y + high.y) / 2
+        for kind, ty in [("box_cod", box.cod), ("box_dom", box.dom)]:
+            for i, x in enumerate(ty):
+                point = drawing.positions[Node(kind, i=i, j=j, x=x)]
+                result[Node(kind, i=i, j=j, x=x)] = Point(
+                    across(point.x),
+                    up(middle) + heights[j] * (point.y - middle))
     return result
 
 
