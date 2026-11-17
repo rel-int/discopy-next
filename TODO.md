@@ -4,4 +4,4 @@
 
 - [x] decode, regions, attach, refine, scan, read from the pipeline measured at 852c2c1, with their tests
 - [x] gate: true masks read back at 990 to 1,000 of 1,000 per module from seed 7
-- [ ] changelog entry, next-checks
+- [x] changelog entry, next-checks
