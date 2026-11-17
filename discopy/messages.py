@@ -231,3 +231,6 @@ NOT_A_RULE = (
 
 LAYOUT_LENGTH = "A layout of {} coordinates was given, {} expected."
 LAYOUT_NOT_FEASIBLE = "This layout does not draw the same diagram."
+STRETCH_LENGTHS = (
+    "Give a scale for each gap between columns and between rows, and for "
+    "the width and the height of each box.")

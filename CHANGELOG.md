@@ -24,6 +24,11 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   label overlap, area), `hand_score` minus their weighted sum, with equal weights
   until fitted on votes, and `make_nicer`, the foliation of a diagram whose
   drawing scores best, or the diagram itself on a tie ([next#582]).
+- `discopy.drawing.nicer.nicer_layout` searches the geometry of a drawing:
+  `stretch` scales its column and row gaps and its box sizes through
+  `Drawing.relayout`, and a step is kept when it scores better and keeps the
+  `clearance` between boxes and from the inputs' and outputs' rows
+  ([next#598]).
 - `Drawing.layout`, the geometry of a drawing as a vector: the coordinates
   of its nodes, box corners included. `Drawing.relayout` takes a vector back
   to a drawing and refuses one that `Drawing.is_feasible` says draws another
@@ -2116,6 +2121,7 @@ for the changelog of `1.2.1` and earlier.
 [next#587]: https://github.com/rel-int/discopy-next/pull/587
 [next#589]: https://github.com/rel-int/discopy-next/pull/589
 [next#591]: https://github.com/rel-int/discopy-next/pull/591
+[next#598]: https://github.com/rel-int/discopy-next/pull/598
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#56]: https://github.com/rel-int/optyx/pull/56
