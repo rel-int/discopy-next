@@ -4,4 +4,4 @@ USER, 2026-11-16, on the tool paper of #564. The second slice, on top of #577 (t
 
 - [x] syntax and semantics
 - [x] applications: neural networks, photonic and quantum computing, grammar, logic and rewriting
-- [WIP] @session_01MEJxy4FrWd3ymhMeQGF7x8-2026-11-16 23:47 what is left, the references, the slow marks, changelog entry, next-checks
+- [x] what is left, the references, the slow marks, changelog entry, next-checks
