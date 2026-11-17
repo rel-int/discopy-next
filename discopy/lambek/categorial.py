@@ -901,7 +901,7 @@ class Derivation:
         return tree2diagram(self.to_tree())
 
 
-class Parser:
+class Parser:  # pylint: disable=too-many-instance-attributes
     r"""
     The chart parser of the reproduction of Bobcat (Clark, `Something old,
     something new: grammar-based CCG parsing with transformer models (2021)
@@ -979,8 +979,8 @@ class Parser:
                    **params)
 
     @classmethod
-    def from_pretrained(cls, directory, device: str = "cpu", **params
-                        ) -> Parser:
+    def from_pretrained(  # pylint: disable=too-many-locals
+            cls, directory, device: str = "cpu", **params) -> Parser:
         """
         A parser from the directory of a model, e.g. a download of
         `rel-int/bobcat-rebank-deberta-v3-large
@@ -1001,7 +1001,8 @@ class Parser:
         from pathlib import Path
 
         import torch
-        from transformers import AutoConfig, AutoModel, AutoTokenizer
+        from transformers import (  # pylint: disable=import-error
+            AutoConfig, AutoModel, AutoTokenizer)
 
         from discopy.lambek.neural import ChartClassifier, Encoder
 

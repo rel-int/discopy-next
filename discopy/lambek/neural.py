@@ -679,12 +679,12 @@ class ChartClassifier(nn.Module):
         """
         index = nn.utils.rnn.pad_sequence(
             [row.nonzero().squeeze(-1) for row in mask], batch_first=True)
-        words = states.gather(1, index[..., None].expand(
+        heads = states.gather(1, index[..., None].expand(
             *index.shape, states.shape[-1]))
         spans = [(start, end - 1) for start, end in self.spans(
-            words.shape[1])]
-        pairs = words[:, spans].flatten(start_dim=-2)
-        return (self.tag_classifier(self.dropout(words)),
+            heads.shape[1])]
+        pairs = heads[:, spans].flatten(start_dim=-2)
+        return (self.tag_classifier(self.dropout(heads)),
                 self.span_classifier(self.dropout(pairs)))
 
     @staticmethod
