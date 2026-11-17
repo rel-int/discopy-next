@@ -65,6 +65,6 @@
 Prompt: rel-int/discopy-next#314, quoted above. This branch takes three boxes that still reproduce on main 89467e62.
 
 - [x] Channel.dagger with an environment: the adjoint CP map, Kraus map K† with the environment bent back by a cap, so double(c†) = double(c)†
-- [WIP] @session_01MEJxy4kqJ6YhajqkcZRUXm-2026-11-17 00:21 power_fix with n_steps > max_steps raises ValueError instead of contracting past max_steps
+- [x] power_fix with n_steps > max_steps raises ValueError instead of contracting past max_steps
 - [WIP] @session_01MEJxy4kqJ6YhajqkcZRUXm-2026-11-17 00:21 fn_to_semm emits each fusion's own type, so a Y fusion decompiles back as Y
 - [ ] CHANGELOG.md bullet
