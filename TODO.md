@@ -3,4 +3,4 @@
 - [x] `Matrix.lambdify`: a `modules` keyword replaces the backend's, with a test
 - [x] `test/optyx/test_zx.py`: drop the shadowed import of `H`
 - [x] `optyx.channel.Channel.lambdify`: substitute into `kraus` if a symbolic box reaches it, with a test
-- [WIP] @session_01MEJxy5Y19SnBwRFf22vqRj-2026-11-17 19:05 CHANGELOG.md bullet
+- [x] CHANGELOG.md bullet
