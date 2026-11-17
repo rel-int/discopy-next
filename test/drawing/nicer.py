@@ -67,7 +67,7 @@ def test_rectangles_follow_height_and_label():
 def test_wires_and_misalignment_as_drawn():
     from discopy.rigid import Ty as T, Cup
     cup = Cup(T('x'), T('x').r).to_drawing()
-    assert len(wires(cup)) == 4 and features(cup)["wire_length"] > 0
+    assert len(wires(cup)) == 2 and features(cup)["wire_length"] > 0
     box = Box('f', x @ x, x).to_drawing()
     assert features(box)["misalignment"] == 0
     assert features(box.make_space(2, .5, .75, 1., copy=True))[
@@ -77,8 +77,8 @@ def test_wires_and_misalignment_as_drawn():
 def test_wires_of_a_swap_are_its_strands():
     from discopy.symmetric import Ty as T, Swap
     swap = Swap(T('x'), T('y')).to_drawing()
-    assert len(wires(swap)) == 6
-    assert features(swap)["bends"] == 1 / 3
+    assert len(wires(swap)) == 2
+    assert features(swap)["bends"] == 1
 
 
 def test_rectangles_of_a_relaid_out_drawing():

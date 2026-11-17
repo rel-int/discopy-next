@@ -88,7 +88,8 @@ def wires(drawing: Drawing) -> list[tuple[Point, Point]]:
     edges = [(u, v) for u, v in Backend.visible_edges(drawing)
              if u not in crossings and v not in crossings] + [
         edge for node in crossings for edge in Backend.crossing_wires(node)]
-    return [(drawing.positions[u], drawing.positions[v]) for u, v in edges]
+    return [(drawing.positions[u], drawing.positions[v]) for u, v in edges
+            if drawing.positions[u] != drawing.positions[v]]
 
 
 def rectangles(drawing: Drawing) -> list[tuple[float, float, float, float]]:
