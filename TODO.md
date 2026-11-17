@@ -20,5 +20,5 @@
 
 - [x] Matrix.id builds the integer identity and casts it with the active backend
 - [x] Matrix.then casts both arrays to the promoted dtype before matmul (torch does not promote)
-- [ ] test in test/matrix.py: trace and mixed composition on pytorch and jax
+- [x] test in test/matrix.py: trace and mixed composition on pytorch and jax
 - [ ] CHANGELOG.md bullet
