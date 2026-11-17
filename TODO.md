@@ -18,7 +18,7 @@
 > `copy` and `basis` already are. A composite `f >> g` lives over the ring both promote to, so
 > both arrays are cast there before the product, as `tensor` already does.
 
-- [ ] Matrix.id builds the integer identity and casts it with the active backend
+- [WIP] @session_01MEJxy4kqJ6YhajqkcZRUXm-2026-11-17 00:18 Matrix.id builds the integer identity and casts it with the active backend
 - [ ] Matrix.then casts both arrays to the promoted dtype before matmul (torch does not promote)
 - [ ] test in test/matrix.py: trace and mixed composition on pytorch and jax
 - [ ] CHANGELOG.md bullet
