@@ -1082,16 +1082,15 @@ class Backend(ABC):
         :meth:`draw_dual_rail_cap`.
         """
         box, j = node.box, node.j
-        def dom(i):
-            return Node("box_dom", i=i, j=j, x=box.dom[i])
-        def cod(i):
-            return Node("box_cod", i=i, j=j, x=box.cod[i])
+        dom, cod = ([Node(kind, i=i, j=j, x=x) for i, x in enumerate(typ)]
+                    for kind, typ in [("box_dom", box.dom),
+                                      ("box_cod", box.cod)])
         if getattr(box, "draw_as_dual_rail_braid", False):
-            return [(dom(i), cod((i + 2) % 4)) for i in range(4)]
+            return [(dom[i], cod[(i + 2) % 4]) for i in range(4)]
         if getattr(box, "draw_as_dual_rail_twist", False):
-            return [(dom(i), cod(i)) for i in range(2)]
+            return list(zip(dom, cod))
         side = dom if getattr(box, "draw_as_dual_rail_cup", False) else cod
-        return [(side(0), side(3)), (side(1), side(2))]
+        return [(side[0], side[3]), (side[1], side[2])]
 
     def draw_braid(self, positions, node):
         """
