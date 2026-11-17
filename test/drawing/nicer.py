@@ -87,3 +87,12 @@ def test_rectangles_of_a_relaid_out_drawing():
     (_, b0, _, t0), (_, b1, _, t1) = sorted(
         rectangles(scaled), key=lambda r: r[1])
     assert (t0 - b0, t1 - b1) == (1, 1) and t0 <= b1
+
+
+def test_features_of_a_relayout_and_of_spiders():
+    drawing = (f @ f).foliation().to_drawing()
+    assert features(drawing) == features(drawing.relayout(drawing.layout()))
+    from discopy.quantum.zx import Z
+    from discopy.utils import text_width
+    (left, _, right, _), = rectangles(Z(1, 1, 0.123456789).to_drawing())
+    assert right - left >= text_width('0.123456789')

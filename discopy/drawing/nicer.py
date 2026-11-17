@@ -96,7 +96,8 @@ def rectangles(drawing: Drawing) -> list[tuple[float, float, float, float]]:
     """
     The rectangle ``(left, bottom, right, top)`` of each box: the one
     :meth:`Drawing.add_box_corners` draws, see :meth:`Drawing.rectangles`,
-    widened to the label it draws.
+    joined with the label it draws, centred at its box node: spiders draw
+    their label too.
 
     >>> from discopy.monoidal import Ty, Box
     >>> rectangles(Box('f', Ty('x'), Ty('x')).to_drawing())
@@ -105,12 +106,16 @@ def rectangles(drawing: Drawing) -> list[tuple[float, float, float, float]]:
     framed = drawing.relabel_nodes()
     framed.add_box_corners()
     result = []
-    for box, (low, high) in zip(drawing.boxes, framed.rectangles()):
-        label = "" if getattr(box, "no_label", False)\
-            else str(getattr(box, "drawing_name", box.name))
-        centre = (low.x + high.x) / 2
-        half = max((high.x - low.x) / 2, text_width(label) / 2)
-        result.append((centre - half, low.y, centre + half, high.y))
+    for node, (low, high) in zip(
+            sorted(framed.box_nodes, key=lambda node: node.j),
+            framed.rectangles()):
+        box, x = node.box, framed.positions[node].x
+        shown = getattr(box, "draw_as_spider", False)\
+            or not getattr(box, "no_label", False)
+        half = text_width(
+            str(getattr(box, "drawing_name", box.name)) if shown else "") / 2
+        result.append((min(low.x, x - half), low.y,
+                       max(high.x, x + half), high.y))
     return result
 
 
@@ -149,7 +154,8 @@ def features(drawing: Drawing) -> dict[str, float]:
     """
     segments = wires(drawing)
     width, height = drawing.width or 1, drawing.height or 1
-    positions = list(drawing.positions.values())
+    positions = [p for node, p in drawing.positions.items()
+                 if not node.kind.startswith("box-corner")]
     mirrored = [Point(width - p.x, p.y) for p in positions]
     rows: dict[float, list[float]] = {}
     for p in positions:
