@@ -2,6 +2,6 @@
 >
 > (USER, 2026-11-17, on brief #559; this branch is its slice 4, the symbolic half: components, scan and decode)
 
-- [ ] decode, regions, attach, refine, scan, read from the pipeline measured at 852c2c1, with their tests
+- [x] decode, regions, attach, refine, scan, read from the pipeline measured at 852c2c1, with their tests
 - [ ] gate: true masks read back at 990 to 1,000 of 1,000 per module from seed 7
 - [ ] changelog entry, next-checks
