@@ -421,6 +421,10 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Changed
 
+- `Matrix.__init__` no longer copies an array that already has its dtype:
+  on numpy the matrix keeps a read-only view of it, so writing into
+  `m.array` raises and the caller's array stays writeable, and a torch
+  tensor stays shared with the caller ([next#616]).
 - The dagger of an `optyx.core` box defined by its array keeps its name and
   flips `is_dagger`, as `cat.Box.dagger` does, so `f[::-1][::-1] == f`; a
   box with `is_dagger=None` is self-adjoint and is its own dagger. A dagger
@@ -2246,6 +2250,7 @@ for the changelog of `1.2.1` and earlier.
 [next#604]: https://github.com/rel-int/discopy-next/pull/604
 [next#605]: https://github.com/rel-int/discopy-next/pull/605
 [next#609]: https://github.com/rel-int/discopy-next/pull/609
+[next#616]: https://github.com/rel-int/discopy-next/pull/616
 [next#619]: https://github.com/rel-int/discopy-next/pull/619
 [next#622]: https://github.com/rel-int/discopy-next/pull/622
 [next#623]: https://github.com/rel-int/discopy-next/pull/623
