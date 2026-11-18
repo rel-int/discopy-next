@@ -329,7 +329,9 @@ class PlaneGraph(NamedTuple):
         >>> f = Box('f', x, x)
         >>> assert eval(repr(f.to_drawing())) == f.to_drawing()
         """
-        key = lambda node: (node.index, repr(node))
+        def key(node):
+            return node.index, repr(node)
+
         nodes = sorted(self.graph.nodes, key=key)
         adjacency = {
             node: sorted(self.graph.successors(node), key=key)
