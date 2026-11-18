@@ -101,6 +101,8 @@ def test_Algebra_product_and_power_satisfy_the_laws():
     assert (str(unit), unit.carrier, unit(None)) == ("1", tuple[()], ())
     with raises(TypeError):
         Algebra[Maybe].product(zero, disjunction)
+    with raises(ValueError):
+        zero.power(-1)
 
 
 def test_Algebra_product_projections_are_homomorphisms():

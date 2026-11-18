@@ -234,7 +234,10 @@ class Algebra[monad](NamedGeneric):
         The power :math:`A^n` of an algebra, i.e. the product of ``n`` copies.
 
         Parameters:
-            n : The exponent.
+            n : The exponent, a non-negative integer.
+
+        Raises:
+            ValueError : When ``n`` is negative.
 
         Example
         -------
@@ -243,6 +246,8 @@ class Algebra[monad](NamedGeneric):
         >>> zero.power(3)(None)
         (0, 0, 0)
         """
+        if n < 0:
+            raise ValueError(f"Expected a non-negative exponent, got {n}.")
         return type(self).product(*n * (self, ))
 
     def unitality(self, value) -> Equation:

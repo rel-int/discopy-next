@@ -189,18 +189,24 @@ def identity(x: KT) -> KT:
 def get_origin(typ):
     """
     Get origin of a parameterized generic type, and the union of the origins
-    of a union type, so that ``isinstance`` can be called on it directly.
+    of a union type, so that ``isinstance`` can be called on it directly,
+    leaving the union untouched when its origins are no union of types.
 
     Example
     -------
     >>> assert get_origin(tuple[int, str]) is tuple
     >>> assert get_origin(int | None) == (int | None)
     >>> assert get_origin(frozenset[int] | None) == (frozenset | None)
+    >>> from typing import Literal
+    >>> assert get_origin(int | Literal[1]) == (int | Literal[1])
     """
     origin = getattr(typ, "__origin__", typ)
-    if origin is Union or isinstance(typ, UnionType):
+    if origin is not Union and not isinstance(typ, UnionType):
+        return origin
+    try:
         return reduce(or_, map(get_origin, get_args(typ)))
-    return origin
+    except TypeError:
+        return typ
 
 
 @lru_cache(maxsize=None)
