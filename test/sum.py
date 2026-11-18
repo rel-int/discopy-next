@@ -1,6 +1,6 @@
 import pytest
 
-from discopy import cat, monoidal
+from discopy import cat, monoidal, symmetric
 from discopy.sum import Sum
 
 
@@ -24,3 +24,11 @@ def test_star_import_keeps_the_builtin_sum():
     namespace = {}
     exec("from discopy import *", namespace)
     assert "sum" not in namespace and "cat" in namespace
+
+
+@pytest.mark.parametrize("Diagram", [monoidal.Diagram, symmetric.Diagram])
+def test_Sum_is_drawn_as_a_diagram(Diagram):
+    f = Diagram.box_factory('f', 'x', 'x')
+    assert (f + f).factory is Diagram
+    assert (f + f).to_drawing() == Diagram.to_drawing(f + f)
+    assert [box.name for box in (f + f).to_drawing().boxes] == ['f', '+', 'f']
