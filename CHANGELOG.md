@@ -1676,7 +1676,8 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 - The docs' reference API is syntax (with `testable` first), semantics (with
   `drawing` at its end), `neural`, quantum, optyx and lambek, and the notebooks
   are grouped by field: What is a diagram?, quantum, optyx, linguistics and
-  machine learning ([next#634]).
+  machine learning. `api/testable.html` and `api/drawing.html` are gone: their
+  modules are listed under syntax and semantics ([next#634]).
 - The Read the Docs build fits its 15-minute limit: the sidebar shows the
   current page's branch alone, and Read the Docs links to each notebook's
   source rather than running it, as a pull request's build does: the hosted
