@@ -239,14 +239,13 @@ class Cut(alpha.Cut, frobenius.Bubble, Box):
 
         >>> from discopy import peirce
         >>> R = Box('R', Ty('x'), Ty('x'))
-        >>> for cut in (~R, Cut(R.negative(), is_deterministic=True)):
+        >>> cut = Cut(R.negative(), is_deterministic=True)
+        >>> for cut in (~R, cut, cut.dagger()):
         ...     assert eval(repr(cut)) == cut
         """
         flags = "".join(f", {name}=True" for name in self.flags())
         result = super(markov.Bubble, self).__repr__()
-        if self.is_dagger or not flags:
-            return result
-        return result[:-1] + flags + ")"
+        return result[:-1] + flags + ")" if flags else result
 
     @classmethod
     def from_tree(cls, tree: dict):
