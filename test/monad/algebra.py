@@ -199,5 +199,8 @@ def test_Writer_homomorphisms_are_equivariant():
 
 def test_Writer_hashes_as_the_monad_it_equals():
     W = Writer(Symmetric[3])
-    same = Monad(W.name, W.ob_map, W.lift, W.unit_map, W.mult_map)
+    def identity(x):
+        return x
+
+    same = Monad(W.name, identity, identity, identity, identity)
     assert W == same and hash(W) == hash(same)
