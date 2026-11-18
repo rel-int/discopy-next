@@ -92,6 +92,13 @@ FALLBACK = """\
     `{name}.md <{source}/docs/notebooks/{name}.md>`_.
 """
 
+SKIPPED = """\
+.. note::
+
+    This build does not run this notebook. You can read its source on GitHub:
+    `{name}.md <{source}/docs/notebooks/{name}.md>`_.
+"""
+
 
 def notebooks() -> list[Path]:
     """Every notebook, those of :data:`SUBDIRECTORIES` after the others."""
@@ -151,10 +158,13 @@ def add_theme_style(output: Path, title: str) -> None:
     output.write_text(text.replace("</head>", THEME_STYLE + "</head>", 1))
 
 
-def write_page(notebook: Path, *, rendered: bool) -> None:
-    """Write the reStructuredText page for ``notebook``."""
+def write_page(
+        notebook: Path, *, rendered: bool, skipped: bool = False) -> None:
+    """Write the reStructuredText page for ``notebook``: its rendering, or a
+    link to its source, saying whether the build skipped it or it failed."""
     title, name = title_of(notebook), name_of(notebook)
-    body = (IFRAME if rendered else FALLBACK).format(
+    template = IFRAME if rendered else SKIPPED if skipped else FALLBACK
+    body = template.format(
         name=name, up="../" * (name.count("/") + 1), title=escape(title),
         source=SOURCE)
     (NOTEBOOKS / f"{name}.rst").write_text(
@@ -171,7 +181,7 @@ def generate(*, strict: bool = False) -> None:
     """
     for notebook in notebooks():
         if os.environ.get(SKIP) == "1":
-            write_page(notebook, rendered=False)
+            write_page(notebook, rendered=False, skipped=True)
             continue
         try:
             export(notebook, check=False)

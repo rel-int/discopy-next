@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 
 """
-ZX simplification benchmarks: :func:`discopy.quantum.graphlike.full_reduce`,
-the rules of PyZX's ``full_reduce`` as double-pushout rewriting of
-hypergraphs, against PyZX's own on the same random circuits of CNOTs,
-Hadamards and T gates.
+ZX simplification benchmarks:
+:meth:`discopy.quantum.zx.Hypergraph.full_reduce`, the rules of PyZX's
+``full_reduce`` as double-pushout rewriting of hypergraphs, against PyZX's own
+on the same random circuits of CNOTs, Hadamards and T gates.
 
 Both inputs are built before the timer starts, PyZX's graph from its circuit
 and ours from that graph; the measured operation copies PyZX's graph, as its
@@ -17,7 +17,7 @@ from functools import partial
 
 import pytest
 
-from discopy.quantum import graphlike
+from discopy.quantum.zx import Hypergraph
 from benchmark.config import case, sizes
 
 zx = pytest.importorskip("pyzx")
@@ -37,9 +37,9 @@ def circuit(qubits, depth):
         random.setstate(state)
 
 
-@case("graphlike", "10 qubits", sizes(100, 500, full=(1000, )))
-def test_graphlike_10(n):
-    return partial(graphlike.full_reduce, graphlike.from_pyzx(circuit(10, n)))
+@case("discopy", "10 qubits", sizes(100, 500, full=(1000, )))
+def test_discopy_10(n):
+    return Hypergraph.from_pyzx(circuit(10, n)).full_reduce
 
 
 @case("pyzx", "10 qubits", sizes(100, 500, full=(1000, )))
@@ -48,9 +48,9 @@ def test_pyzx_10(n):
     return lambda: zx.full_reduce(graph.copy())
 
 
-@case("graphlike", "20 qubits", sizes(500, full=(1000, )))
-def test_graphlike_20(n):
-    return partial(graphlike.full_reduce, graphlike.from_pyzx(circuit(20, n)))
+@case("discopy", "20 qubits", sizes(500, full=(1000, )))
+def test_discopy_20(n):
+    return Hypergraph.from_pyzx(circuit(20, n)).full_reduce
 
 
 @case("pyzx", "20 qubits", sizes(500, full=(1000, )))
