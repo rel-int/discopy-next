@@ -703,6 +703,8 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Fixed
 
+- `frobenius.Diagram.unfuse` keeps the category of the diagram, e.g. the
+  cuts of a `peirce.beta.Diagram` ([next#637]).
 - `utils.get_origin` of a union is the union of the origins, so that a
   `python.Function` type-checks a value of `frozenset[int] | None`, e.g. a
   channel of `Maybe` on a generic type ([next#134]).

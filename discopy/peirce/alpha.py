@@ -261,11 +261,16 @@ class Model:
     def __repr__(self):
         return f"{factory_name(type(self))}(ob={self.ob!r}, ar={self.ar!r})"
 
-    def functor(self, dom: type[Diagram] = Diagram) -> monoidal.Functor:
+    diagram: type[Diagram]
+    """ The category of diagrams the model interprets, by default. """
+
+    def functor(self, dom: type[Diagram] | None = None) -> monoidal.Functor:
         """
         The functor from a category of diagrams ``dom`` into
         :class:`discopy.tensor.Tensor` of ``bool`` this model gives.
         """
+        dom = self.diagram if dom is None else dom
+
         def ob_map(typ):
             return Dim(*(self.ob[wire.name] for wire in typ.inside))
 
@@ -288,4 +293,5 @@ class Model:
 Diagram.box_factory = Box
 Diagram.bubble_factory = Cut
 Diagram.functor_factory = Functor
+Model.diagram = Diagram
 Id = Diagram.id

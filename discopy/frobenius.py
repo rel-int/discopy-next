@@ -338,7 +338,7 @@ class Diagram(
             ob_map=lambda x: x, ar_map=lambda f:
                 f.unfuse() if isinstance(f, Spider)
                 else f.to_spiders().unfuse() if isinstance(f, Cospan) else f,
-            dom=Diagram, cod=Diagram)
+            dom=self.factory, cod=self.factory)
         return F(self)
 
 

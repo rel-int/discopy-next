@@ -330,6 +330,8 @@ class Model(alpha.Model, Testable):
     >>> assert eval(repr(M)) == M
     >>> assert Model.copy_naturality(M) and Model.linear_distributivity_left(M)
     """
+    diagram = Diagram
+
     @classmethod
     def strategy(cls, sizes: tuple[int, ...] = (1, 2, 3)):
         """

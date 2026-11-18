@@ -85,3 +85,15 @@ def test_cups_caps_traces():
     assert model(snake) == model(Id(x))
     r = model(R).array.reshape(2, 2)
     assert (model((R @ x).trace()).array.reshape(2, 2) == r).all()
+
+
+def test_unfuse_keeps_cuts():
+    model = Model(ob={'x': 2}, ar={'R': [1, 0, 1, 1]})
+    diagram = Spider(3, 2, x) >> ~R @ x
+    assert isinstance(diagram.unfuse(), Diagram)
+    assert model(diagram.unfuse()) == model(diagram)
+
+
+def test_model_functor_default():
+    model = Model(ob={'x': 2})
+    assert model.functor()(Spider(1, 2, x)) == model(Spider(1, 2, x))
