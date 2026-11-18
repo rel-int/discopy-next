@@ -168,8 +168,9 @@ See :mod:`discopy.feedback` for the other axioms for feedback categories.
 from __future__ import annotations
 
 from typing import Optional
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Iterator, Sequence
 from dataclasses import dataclass
+from itertools import chain, groupby, permutations, product
 
 from discopy import messages, symmetric, testable
 from discopy.abc import FeedbackCategory, NamedGeneric
@@ -434,6 +435,132 @@ def up_to_steps(term: "Ty | Stream"):
         else testable.quotient(category, unrolled)
 
 
+def steps(typ: Ty) -> tuple:
+    """
+    The first :data:`STEPS` steps of a stream of types after the one now,
+    as a tuple of types of the underlying class: how
+    :meth:`Stream.ob_equation` compares objects, the same steps
+    :func:`up_to_steps` compares arrows over, one type a step.
+
+    >>> x = symmetric.Ty('x')
+    >>> assert Ty.sequence(x) != Ty.sequence(x)
+    >>> assert steps(Ty.sequence(x)) == steps(Ty.sequence(x))
+    >>> assert steps(Ty(x).delay()) != steps(Ty(x))
+    """
+    result = [typ.now]
+    for _ in range(STEPS):
+        typ = typ.later
+        result.append(typ.now)
+    return tuple(result)
+
+
+def sorted_orders(wires) -> Iterator[tuple[int, ...]]:
+    """
+    Every order of the indices of a list of wires that sorts them by their
+    representation, the stable one first, i.e. the permutations within
+    each run of equal wires.
+
+    >>> x, y = symmetric.Ty('x'), symmetric.Ty('y')
+    >>> list(sorted_orders([y, x, y]))
+    [(1, 0, 2), (1, 2, 0)]
+    """
+    runs = [[i for i, _ in run] for _, run in groupby(
+        sorted(enumerate(wires), key=lambda pair: repr(pair[1])),
+        key=lambda pair: repr(pair[1]))]
+    for orders in product(*map(permutations, runs)):
+        yield tuple(chain(*orders))
+
+
+@dataclass
+class MemoryOrbit:
+    """
+    The first :data:`STEPS` steps of a stream up to a permutation of its
+    memory, see :func:`up_to_memory`: its unrolled `now`, its memory
+    wires on either side sorted by their representation, and the number of
+    memory wires on either side. Two are equal when some permutation of
+    equal memory wires of one gives the other, up to the equation of the
+    underlying category, which is equality up to any permutation of the
+    memory of the two streams they come from.
+
+    Parameters:
+        now : The unrolled `now`, its memory wires sorted.
+        mem_dom : The number of memory wires of its domain.
+        mem_cod : The number of memory wires of its codomain.
+    """
+    now: symmetric.Diagram
+    mem_dom: int
+    mem_cod: int
+
+    @classmethod
+    def sort(cls, now, mem_dom: int, mem_cod: int,
+             dom_order=None, cod_order=None) -> MemoryOrbit:
+        """
+        The orbit of an arrow whose last ``mem_dom`` wires in and
+        ``mem_cod`` wires out are memory, permuted in the given orders,
+        the stable sort by default, see :func:`sorted_orders`.
+        """
+        dom, cod = (
+            [typ[i:i + 1] for i in range(len(typ))]
+            for typ in (now.dom, now.cod))
+        n_dom, n_cod = len(dom) - mem_dom, len(cod) - mem_cod
+        dom_order = next(sorted_orders(dom[n_dom:]))\
+            if dom_order is None else dom_order
+        cod_order = next(sorted_orders(cod[n_cod:]))\
+            if cod_order is None else cod_order
+        inverse = sorted(range(mem_dom), key=dom_order.__getitem__)
+        sources = dom[:n_dom] + [dom[n_dom + i] for i in dom_order]
+        before = type(now).permutation(
+            [*range(n_dom), *(n_dom + i for i in inverse)], sources)
+        after = type(now).permutation(
+            [*range(n_cod), *(n_cod + i for i in cod_order)], cod)
+        return cls(before >> now >> after, mem_dom, mem_cod)
+
+    def orbit(self) -> Iterator[symmetric.Diagram]:
+        """
+        The arrows of the orbit, quotiented by the equation of the
+        underlying category: :attr:`now` with its memory permuted in every
+        order that keeps it sorted.
+        """
+        dom, cod = (
+            [typ[i:i + 1] for i in range(len(typ))]
+            for typ in (self.now.dom, self.now.cod))
+        for dom_order, cod_order in product(
+                sorted_orders(dom[len(dom) - self.mem_dom:]),
+                sorted_orders(cod[len(cod) - self.mem_cod:])):
+            yield testable.quotient(type(self.now), self.sort(
+                self.now, self.mem_dom, self.mem_cod,
+                dom_order, cod_order).now)
+
+    def __eq__(self, other):
+        if not isinstance(other, MemoryOrbit):
+            return NotImplemented
+        target = testable.quotient(type(other.now), other.now)
+        return any(arrow == target for arrow in self.orbit())
+
+    __hash__ = None  # type: ignore[assignment]
+
+
+def up_to_memory(term: Stream) -> MemoryOrbit:
+    """
+    The first :data:`STEPS` steps of a stream up to a permutation of its
+    memory wires, in and out: what a law of streams whose two sides feed
+    back the same memory in another order is read with, e.g. the
+    interchanger of the module docstring, which :func:`up_to_steps`
+    tells apart.
+
+    >>> x, y, m, n = map(Ty.sequence, "xymn")
+    >>> f, g = Stream.sequence('f', x, x, m), Stream.sequence('g', y, y, n)
+    >>> h, k = Stream.sequence('h', x, x, n), Stream.sequence('k', y, y, m)
+    >>> LHS, RHS = f @ g >> h @ k, (f >> h) @ (g >> k)
+    >>> assert up_to_steps(LHS) != up_to_steps(RHS)
+    >>> assert up_to_memory(LHS) == up_to_memory(RHS)
+    >>> assert up_to_memory(f @ g) != up_to_memory(g @ f)
+    """
+    unrolled = term.unroll(STEPS)
+    return MemoryOrbit.sort(
+        unrolled.now, len(unrolled.mem_dom), len(unrolled.mem_cod))
+
+
 @dataclass
 class Stream[category](FeedbackCategory, TestableGeneric):
     """
@@ -493,18 +620,14 @@ class Stream[category](FeedbackCategory, TestableGeneric):
     @classmethod
     def checked_params(cls) -> tuple:
         """
-        None, so that the property matrix does not check streams yet: a
-        stream draws its terms, see :meth:`strategy`, and states the
-        equality its laws are read with, see :meth:`equation_factory`, but
-        :func:`discopy.testable.inhabits` compares the boundary of a term
-        with `==`, which on objects of intensional equality is identity, so
-        nine cells would fail on the type check of a law that holds. That,
-        and the three feedback laws that hold only up to a permutation of
-        the memory, are the two decisions of
-        `#533 <https://github.com/rel-int/discopy-next/issues/533>`_;
-        returning ``(cls.category, )`` enrols streams the day they land.
+        The underlying category, so that the property matrix checks streams
+        over it: a law is read up to :data:`STEPS` steps, see
+        :meth:`equation_factory`, a boundary too, see :meth:`ob_equation`,
+        and the three laws whose sides feed back the same memory in another
+        order up to a permutation of it, see :func:`up_to_memory`
+        (`#533 <https://github.com/rel-int/discopy-next/issues/533>`_).
         """
-        return ()
+        return (cls.category, )
 
     category = symmetric.Diagram
     ob = classproperty(lambda cls: Ty[cls.category.ob])
@@ -518,6 +641,23 @@ class Stream[category](FeedbackCategory, TestableGeneric):
     later, is_constant = Ty.later, Ty.is_constant
     head, tail = Ty.head, Ty.tail
     sliding = FeedbackCategory.sliding.failing(messages.STREAM_SLIDING)
+    bifunctoriality = FeedbackCategory.bifunctoriality.modulo(up_to_memory)
+    strength = FeedbackCategory.strength.modulo(up_to_memory)
+    tightening = FeedbackCategory.tightening.modulo(up_to_memory)
+
+    @classmethod
+    def ob_equation(cls, *objects: Ty) -> testable.Equation:
+        """
+        The equation of objects, compared over their first :data:`STEPS`
+        steps after now, see :func:`steps`: `==` on a stream of types is
+        intensional, so the boundary of a term would be equal to no object
+        built beside it.
+
+        >>> x = symmetric.Ty('x')
+        >>> assert Stream.ob_equation(Ty.sequence(x), Ty.sequence(x))
+        >>> assert not Stream.ob_equation(Ty.sequence(x), Ty(x))
+        """
+        return testable.Equation(*objects, up_to=steps)
 
     @classmethod
     def equation_factory(cls, *terms: Stream) -> testable.Equation:
