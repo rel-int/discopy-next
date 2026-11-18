@@ -9,6 +9,9 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Added
 
+- `lambek.abstract`'s docs build an abstract categorial grammar from English to
+  Lean: "DisCoPy diagrams are the arrows of the free premonoidal category"
+  prints the statement `lean/Statements/English.lean` proves ([next#622]).
 - Opt-in Triton forward and backward kernels for signed block peer
   reductions in `neural.geometric`, with PyTorch fallbacks for unsupported
   devices, dtypes and large blocks, and support for `torch.compile`
@@ -2190,6 +2193,7 @@ for the changelog of `1.2.1` and earlier.
 [next#603]: https://github.com/rel-int/discopy-next/pull/603
 [next#604]: https://github.com/rel-int/discopy-next/pull/604
 [next#605]: https://github.com/rel-int/discopy-next/pull/605
+[next#622]: https://github.com/rel-int/discopy-next/pull/622
 [next#623]: https://github.com/rel-int/discopy-next/pull/623
 [next#629]: https://github.com/rel-int/discopy-next/pull/629
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
