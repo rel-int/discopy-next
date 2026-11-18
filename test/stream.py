@@ -193,3 +193,17 @@ def test_up_to_memory_is_no_box_named_memory():
     effect = symmetric.Box(MEMORY, now.cod[-1:], symmetric.Ty())
     closed = now.dom[:-1] @ state >> now >> now.cod[:-1] @ effect
     assert up_to_memory(f) != closed.to_hypergraph()
+
+
+def test_up_to_memory_closes_the_memory_not_an_input():
+    """ The memory of an unrolled stream is the suffix of its boundary. """
+    x, y, m = map(Ty.sequence, "xym")
+    unrolled = Stream.sequence('f', x, y, m).unroll(STEPS)
+    assert unrolled.now.dom == unrolled.dom.now @ unrolled.mem_dom
+    assert unrolled.now.cod == unrolled.cod.now @ unrolled.mem_cod
+    closed = up_to_memory(Stream.sequence('f', x, y, m))
+    assert (closed.dom, closed.cod) == (unrolled.dom.now, unrolled.cod.now)
+    memory = [box for box in closed.boxes
+              if isinstance(box, Memory[symmetric.Box])]
+    assert [(box.dom, box.cod) for box in memory] == [
+        (symmetric.Ty(), unrolled.mem_dom), (unrolled.mem_cod, symmetric.Ty())]

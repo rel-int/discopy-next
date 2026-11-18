@@ -458,20 +458,27 @@ MEMORY = "memory"
 """ The name of the boxes :func:`up_to_memory` closes the memory with. """
 
 
-@cache
-def memory_factory(box_factory: type) -> type:
+class Memory:  # pylint: disable=too-few-public-methods  # a subscript only
     """
-    The class of the boxes :func:`up_to_memory` closes the memory with, a
-    subclass of the boxes of the underlying category: a box compares its
-    class, so no box a user builds, e.g. one named :data:`MEMORY`, is
-    read as one of them.
+    The boxes :func:`up_to_memory` closes the memory with: ``Memory[B]`` is
+    a subclass of the boxes ``B`` of the underlying category, the same one
+    every time, named so that its terms read back. A box compares its
+    class, so no box a user builds, e.g. one named :data:`MEMORY`, is read
+    as one of them.
 
     >>> x = symmetric.Ty('x')
-    >>> Memory = memory_factory(symmetric.Box)
-    >>> assert Memory(MEMORY, x, x) != symmetric.Box(MEMORY, x, x)
-    >>> assert memory_factory(symmetric.Box) is Memory
+    >>> box = Memory[symmetric.Box](MEMORY, x, x)
+    >>> assert box != symmetric.Box(MEMORY, x, x)
+    >>> assert Memory[symmetric.Box] is Memory[symmetric.Box]
+    >>> from discopy import stream, feedback
+    >>> assert eval(repr(box)) == box
     """
-    return type("Memory", (box_factory, ), {"__module__": __name__})
+    @classmethod
+    @cache
+    def __class_getitem__(cls, box_factory: type) -> type:
+        name = f"{cls.__name__}[{factory_name(box_factory)}]"
+        return type(name, (box_factory, ), {
+            "__module__": __name__, "__qualname__": name})
 
 
 def up_to_memory(term: Stream):
@@ -487,7 +494,7 @@ def up_to_memory(term: Stream):
     effect on the way out: the equation of the underlying category, e.g.
     the isomorphism of hypergraphs, forgets the order of boxes, so two
     terms are equal when some permutation of the memory of one gives the
-    other. The boxes are of their own class, see :func:`memory_factory`. A
+    other. The boxes are of their own class, see :class:`Memory`. A
     category with no boxes to close it with, e.g.
     :class:`discopy.python.Function`, compares :func:`up_to_steps`, its
     memory in order.
@@ -503,7 +510,7 @@ def up_to_memory(term: Stream):
     category = type(term).category
     if getattr(category, "box_factory", None) is None:
         return up_to_steps(term)
-    box = memory_factory(category.box_factory)
+    box = Memory[category.box_factory]
     unrolled = term.unroll(STEPS)
     now, unit = unrolled.now, category.ob()
     n_dom = len(now.dom) - len(unrolled.mem_dom)

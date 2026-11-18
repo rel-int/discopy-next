@@ -155,7 +155,7 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   compares types over their first `stream.STEPS` steps (`stream.steps`), and
   reads `bifunctoriality`, `strength` and `tightening` up to a permutation of
   the memory wires: `stream.up_to_memory` closes each one with a box of its
-  own class, `stream.memory_factory`, whose order the isomorphism of
+  own class, `stream.Memory[B]` over boxes `B`, whose order the isomorphism of
   hypergraphs forgets, and over a category with no boxes, e.g.
   `python.Function`, is `stream.up_to_steps`. The property matrix checks
   streams ([next#627], ruling on [next#533]).
