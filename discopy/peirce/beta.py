@@ -192,6 +192,19 @@ class Permutation(frobenius.Permutation, Box):
     """ A beta permutation is a frobenius permutation of coloured wires. """
 
 
+class Cup(frobenius.Cup, Box):
+    """
+    A beta cup is a frobenius cup on wires of one region.
+
+    >>> x = Ty('x')
+    >>> assert isinstance(Diagram.cups(x, x), Diagram)
+    """
+
+
+class Cap(frobenius.Cap, Box):
+    """ A beta cap is a frobenius cap on wires of one region. """
+
+
 class Swap(Permutation, frobenius.Swap, Box):
     """ A beta swap is a frobenius swap of two wires of one region. """
 
@@ -251,6 +264,7 @@ class Functor(alpha.Functor, frobenius.Functor):
 Diagram.box_factory = Box
 Diagram.spider_factory = Spider  # ty: ignore[invalid-assignment]
 Diagram.swap_factory = Swap
+Diagram.cup_factory, Diagram.cap_factory = Cup, Cap
 Diagram.permutation_factory = Permutation
 Diagram.bubble_factory = Cut
 Diagram.functor_factory = Functor

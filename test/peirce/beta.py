@@ -72,3 +72,16 @@ def test_flags():
     assert not R.is_deterministic and not R.is_affine
     assert not (~R).is_deterministic and not (~R).is_affine
     assert Box('f', x, x, is_deterministic=True).is_deterministic
+
+
+def test_negative_keeps_flags():
+    f = Box('f', x, x, is_deterministic=True, is_affine=True)
+    assert f.negative().negative() == f and f.negative().is_deterministic
+
+
+def test_cups_caps_traces():
+    model = Model(ob={'x': 2}, ar={'R': [[1, 1], [0, 0]]})
+    snake = x @ Diagram.caps(x, x) >> Diagram.cups(x, x) @ x
+    assert model(snake) == model(Id(x))
+    r = model(R).array.reshape(2, 2)
+    assert (model((R @ x).trace()).array.reshape(2, 2) == r).all()

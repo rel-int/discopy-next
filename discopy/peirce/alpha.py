@@ -115,8 +115,7 @@ class Diagram(monoidal.Diagram):
 
         def ar_map(box):
             negative = diagram.negative_functor()
-            return diagram.box_factory(box.name, negative(box.dom),
-                                       negative(box.cod), data=box.data)
+            return box.rebuild(dom=negative(box.dom), cod=negative(box.cod))
         return diagram.functor_factory(
             ob_map, ar_map, dom=diagram, cod=diagram, colour_map=NEGATIVE)
 
