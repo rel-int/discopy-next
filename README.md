@@ -28,7 +28,7 @@ DisCoPy is a Python toolkit for computing with [string diagrams](https://en.wiki
 * a `ProofNet` data structure for parses as axiom linkings, read back to lambda terms and decoded from the scores of a neural parser trained with [PyTorch](https://pytorch.org/)
 * an implementation of [categorical quantum mechanics](https://en.wikipedia.org/wiki/Categorical_quantum_mechanics) interfacing with:
   - [tket](https://github.com/CQCL/tket) for circuit compilation and [PennyLane](https://pennylane.ai) for differentiable simulation
-  - [PyZX](https://github.com/Quantomatic/pyzx) and a native graph-like simplifier by double-pushout rewriting (`quantum.graphlike`) for optimisation with the [ZX calculus](https://zxcalculus.com/)
+  - [PyZX](https://github.com/Quantomatic/pyzx) and a native graph-like simplifier by double-pushout rewriting (`quantum.zx.Hypergraph`) for optimisation with the [ZX calculus](https://zxcalculus.com/)
 * [`discopy.optyx`](https://docs.discopy.org/en/main/api/optyx.html), string diagrams for networked quantum computing that mix qubits, photonic modes and classical bits, with lossy channels, heralded measurements and feed-forward
 * a `Drawing` data structure for labeled graphs embedded in the plane
 * a `Term` data structure for lambda terms in the internal language of (bi)closed monoidal categories and their translation back and forth to diagrams

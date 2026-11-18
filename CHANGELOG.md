@@ -9,6 +9,18 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Added
 
+- `lambek.abstract`'s docs build an abstract categorial grammar from English to
+  Lean: "DisCoPy diagrams are the arrows of the free premonoidal category"
+  prints the statement `lean/Statements/English.lean` proves ([next#622]).
+- Opt-in Triton forward and backward kernels for signed block peer
+  reductions in `neural.geometric`, with PyTorch fallbacks for unsupported
+  devices, dtypes and large blocks, and support for `torch.compile`
+  ([next#377]).
+- `drawing.from_picture(jpeg, config)`: the diagram a picture shows, read
+  by `drawing.vision`, a pixel net (`PixelNet`) that classes each pixel and
+  a small OCR model (`OCR`) that reads box names and wire types, then decoded
+  in the least module it decodes in (`picture.decode_least`); with `train`,
+  `train_ocr` and `evaluate`, and `picture.crop` ([next#602]).
 - `lambek.categorial.Parser`, the chart parser of the reproduction of Bobcat
   (Clark, 2021) on CCGrebank: a CKY chart over the binary and unary rules
   seen in the treebank and the schemata of `schemata` at a penalty, scored by
@@ -301,10 +313,13 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   `CMap.sweep` and `CMap.match`.
 - `hypergraph.Rewriter`, double-pushout rewriting in place with left-linear
   rules, each step in the size of the rule rather than of the host.
-- `quantum.graphlike`, graph-like ZX diagrams as hypergraphs with one box for
-  Hadamard, simplified up to a scalar by the rules of PyZX's `full_reduce` on
-  a `hypergraph.Rewriter`, raced against PyZX in `benchmark/test_zx.py`
-  ([next#302]).
+- `Hypergraph.phases`, a phase on each spider of a hypergraph category, added
+  by the fusion of spiders and negated by the dagger ([next#375]).
+- `quantum.zx.Hypergraph`, ZX diagrams as graph-like hypergraphs: green
+  spiders with their phase, Hadamard boxes and an exact scalar, a
+  `quantum.zx.Number`, a red spider being green behind Hadamards, simplified
+  on the nose by the rules of PyZX's `full_reduce` on a `quantum.zx.Rewriter`,
+  raced against PyZX in `benchmark/test_zx.py` ([next#302], [next#375]).
 - `discopy.ehypergraph`, e-graphs of diagrams with sharing, with congruence
   closure, rewriting and e-matching.
 - `Hypergraph.pass_token`, evaluation over a disjoint-union tensor ([#363],
@@ -625,6 +640,11 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Fixed
 
+- `drawing.PlaneGraph` prints the adjacency of its graph rather than the
+  graph's address, so a `Drawing` reads back from its representation and
+  prints the same one for equal drawings: its nodes and their successors
+  are sorted by `Node.index`, and an adjacency, unlike a list of edges,
+  keeps a node that has none ([next#623]).
 - The TikZ backend fills the coloured regions of a diagram, so a ribbon is
   filled along its straight rails and not only at its folds and braids; the
   loop over `region_cells` moves from `Matplotlib` to `Backend` ([next#605]).
@@ -901,6 +921,8 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   teleportation and distinguishability assertions check what the prose around
   them claims: `np.isclose` was reading a `3` as a 300% relative tolerance, and
   `np.allclose` a doubled identity channel as one ([next#314]).
+- Preserve block free axes under dynamic `torch.compile` in
+  `neural.wiring` ([next#377]).
 - What the property matrix of [next#1] found, each with its test:
   `Feedback.dagger` and `rotate` raise `AxiomError`, as either would feed
   the memory back in time; `para.Compact.curry` keeps the coparameters and
@@ -925,7 +947,7 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   spider with several outputs to the outputs it is joined to: it used to move
   the leg already placed at an earlier output, so the tensor differed from
   PyZX's ([next#313]).
-- `quantum.graphlike.size` counts two spiders as joined when an odd number of
+- `quantum.zx.Hypergraph.size` counts two spiders as joined when an odd number of
   Hadamards lie between them, as `to_pyzx` does: a Hadamard self-loop is a
   phase and two parallel Hadamards cancel ([next#349]).
 - `optyx.core.zx.And` and `Or`: the dagger keeps the number of bits instead of
@@ -1547,8 +1569,8 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   ([next#445]).
 - `lambek.cfg.Id(x).to_diagram()` is `monoidal.Id(x)`, so the diagram of a
   tree with an identity branch has no spurious `Id(x)` box ([next#445]).
-- `quantum.graphlike.size` counts a phase-free spider with three or more ports
-  and no box (e.g. a reduced `Z(1, 2)`), as PyZX does after its own
+- `quantum.zx.Hypergraph.size` counts a phase-free spider with three or more
+  ports and no box (e.g. a reduced `Z(1, 2)`), as PyZX does after its own
   `full_reduce`; only a bare wire, cup or cap counts as no spider ([next#445]).
 - `lambek.categorial.tree2diagram(tree, dom=...)` gives `dom` to every word of
   the tree, not only to a tree that is a single word ([next#445]).
@@ -1657,6 +1679,15 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   controller's alone measured no test and read as a 36% fail-under regression.
   `.github/tests/build_coverage.py` runs the step with and without the
   workers' files ([next#596]).
+- The docs' reference API is syntax (with `testable` first), semantics (with
+  `drawing` at its end), `neural`, quantum, optyx and lambek, and the notebooks
+  are grouped by field: What is a diagram?, quantum, optyx, linguistics and
+  machine learning. `api/testable.html` and `api/drawing.html` are gone: their
+  modules are listed under syntax and semantics ([next#634]).
+- The Read the Docs build fits its 15-minute limit: the sidebar shows the
+  current page's branch alone, and Read the Docs links to each notebook's
+  source rather than running it, as a pull request's build does: the hosted
+  site no longer shows the notebooks' outputs ([next#633]).
 - `proptest` groups a push to `main` by commit, as `build`, `benchmark`,
   `lean` and `paper` do, and a scheduled or dispatched run by its own run id:
   one group per ref keeps one running and one pending run, so a third merge
@@ -2067,7 +2098,9 @@ for the changelog of `1.2.1` and earlier.
 [next#350]: https://github.com/rel-int/discopy-next/issues/350
 [next#351]: https://github.com/rel-int/discopy-next/issues/351
 [next#359]: https://github.com/rel-int/discopy-next/issues/359
+[next#375]: https://github.com/rel-int/discopy-next/pull/375
 [next#376]: https://github.com/rel-int/discopy-next/issues/376
+[next#377]: https://github.com/rel-int/discopy-next/issues/377
 [next#382]: https://github.com/rel-int/discopy-next/issues/382
 [next#386]: https://github.com/rel-int/discopy-next/issues/386
 [next#387]: https://github.com/rel-int/discopy-next/issues/387
@@ -2168,9 +2201,14 @@ for the changelog of `1.2.1` and earlier.
 [next#596]: https://github.com/rel-int/discopy-next/issues/596
 [next#598]: https://github.com/rel-int/discopy-next/pull/598
 [next#601]: https://github.com/rel-int/discopy-next/pull/601
+[next#602]: https://github.com/rel-int/discopy-next/pull/602
 [next#603]: https://github.com/rel-int/discopy-next/pull/603
 [next#604]: https://github.com/rel-int/discopy-next/pull/604
 [next#605]: https://github.com/rel-int/discopy-next/pull/605
+[next#622]: https://github.com/rel-int/discopy-next/pull/622
+[next#623]: https://github.com/rel-int/discopy-next/pull/623
+[next#633]: https://github.com/rel-int/discopy-next/pull/633
+[next#634]: https://github.com/rel-int/discopy-next/pull/634
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#56]: https://github.com/rel-int/optyx/pull/56
