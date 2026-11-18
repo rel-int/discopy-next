@@ -17,6 +17,7 @@ streams, parametric maps, lenses, the Int-construction).
     discopy.matrix
     discopy.tensor
     discopy.csp
+    discopy.peirce
     discopy.hopf
     discopy.stream
     discopy.op

@@ -1,0 +1,254 @@
+"""
+Peirce's alpha graphs: propositions as diagrams on the unit type, with two
+colours of region, the page :data:`white` and the inside of an odd number of
+cuts :data:`black`, see :cite:t:`BonchiEtAl24`.
+
+A white region is :class:`discopy.tensor.Tensor` of ``bool`` as it is: a box
+is a relation, composition is ∃ over the middle wire and tensor is ∧. A black
+region is the same structure conjugated by elementwise negation ¬: a black
+box ``R`` is ¬R, black composition is the relative sum and black tensor is
+∨. A :class:`Cut` is where the colour changes: the diagram inside it is the
+:meth:`Diagram.negative` of the one outside, i.e. the same with its colours
+swapped, so that the complement ``~d`` is the cut of the negative of ``d``,
+with the boundary of ``d``.
+
+Summary
+-------
+
+.. autosummary::
+    :template: class.rst
+    :nosignatures:
+    :toctree:
+
+    Diagram
+    Box
+    Cut
+    Functor
+    Model
+
+Example
+-------
+>>> p, q = Box('p'), Box('q')
+>>> M = Model(ar={'p': True, 'q': False})
+>>> assert M(p & q) == M(p) @ M(q) and not M(p & q).array.any()
+>>> assert M(p | q).array.all() and not M(~p).array.any()
+
+The double cut is the identity in every model:
+
+>>> from itertools import product
+>>> for P, Q in product((False, True), repeat=2):
+...     M = Model(ar={'p': P, 'q': Q})
+...     assert M(~~(p & ~q)) == M(p & ~q)
+"""
+
+from __future__ import annotations
+
+import operator
+
+from discopy import monoidal
+from discopy.matrix import Matrix
+from discopy.monoidal import Colour
+from discopy.tensor import Dim, Tensor
+from discopy.testable import no_strategy
+from discopy.utils import AxiomError, factory, factory_name
+
+white, black = Colour("white"), Colour("black")
+""" The colours of the two regions, the page and the inside of a cut. """
+
+NEGATIVE = {white: black, black: white}
+""" The other colour of each region, which a cut changes to. """
+
+
+@factory
+class Diagram(monoidal.Diagram):
+    """
+    An alpha diagram is a monoidal diagram on regions coloured :data:`white`
+    or :data:`black`, the dunders its connectives.
+
+    >>> p, q = Box('p'), Box('q')
+    >>> assert p & q == p @ q
+    >>> assert p | q == ~(~p & ~q)
+    >>> assert (~p).colour == p.colour == white and (~p).arg.colour == black
+    """
+    strategy = no_strategy
+
+    @property
+    def colour(self) -> Colour:
+        """ The colour of the region around the diagram. """
+        return self.dom.dom
+
+    @classmethod
+    def negative_functor(cls) -> Functor:
+        """
+        The functor that swaps the colours of every region, from ``cls`` to
+        itself, the category of diagrams ``cls`` is a box of.
+        """
+        cls = cls.factory
+
+        def ob_map(typ):
+            return typ.factory(*(
+                type(wire)(wire.name, dom=NEGATIVE[wire.dom],
+                           cod=NEGATIVE[wire.cod]) for wire in typ.inside))
+
+        def ar_map(box):
+            negative = cls.negative_functor()
+            return cls.box_factory(box.name, negative(box.dom),
+                                   negative(box.cod), data=box.data)
+        return cls.functor_factory(
+            ob_map, ar_map, dom=cls, cod=cls, colour_map=NEGATIVE)
+
+    def negative(self) -> Diagram:
+        """
+        The photographic negative: the same diagram with the colour of every
+        region swapped, which denotes its complement.
+
+        >>> p = Box('p')
+        >>> assert p.negative().colour == black
+        >>> assert p.negative().negative() == p
+        """
+        return self.negative_functor()(self)
+
+    def __invert__(self):
+        """
+        The complement ``~d``, the cut of the :meth:`negative` of ``d`` with
+        the boundary of ``d``.
+
+        >>> p = Box('p')
+        >>> assert ~p == Cut(p.negative()) and (~p).colour == white
+        """
+        return self.bubble_factory(self.negative(), dom=self.dom, cod=self.cod)
+
+    def __and__(self, other: Diagram) -> Diagram:
+        """ The conjunction of two propositions, their tensor. """
+        return self @ other
+
+    def __or__(self, other: Diagram) -> Diagram:
+        """ The disjunction, by de Morgan, ``~(~d & ~e)``. """
+        return ~(~self & ~other)
+
+    def relative_sum(self, other: Diagram) -> Diagram:
+        """
+        The relative sum, the composition of the black region ∀ over the
+        middle wire, as seen from the white one: ``~(~d >> ~e)``.
+        """
+        return ~(~self >> ~other)
+
+    def par(self, other: Diagram) -> Diagram:
+        """
+        The tensor of the black region as seen from the white one, i.e. the
+        product ∨ of two relations: ``~(~d @ ~e)``.
+        """
+        return ~(~self @ ~other)
+
+
+class Box(monoidal.Box, Diagram):
+    """
+    An alpha box is a proposition, a box on the unit type of its region,
+    :data:`white` by default.
+
+    >>> assert Box('p').dom == Box('p').cod == Diagram.ob.id(white)
+    """
+    def __init__(self, name: str, dom=None, cod=None, **params):
+        dom = self.ob.id(white) if dom is None else dom
+        cod = dom if cod is None else cod
+        super().__init__(name, dom, cod, **params)
+
+
+class Cut(monoidal.Bubble, Box):
+    """
+    A cut is a bubble around a diagram of the other colour, its boundary the
+    :meth:`Diagram.negative` of that of the diagram by default.
+
+    >>> p = Box('p').negative()
+    >>> assert Cut(p).colour == white and Cut(p).arg.colour == black
+    >>> Cut(Box('p'), dom=Box('p').dom)
+    Traceback (most recent call last):
+    ...
+    discopy.utils.AxiomError: A cut changes the colour of its region, \
+got white inside white.
+    """
+    def __init__(self, arg: Diagram, dom=None, cod=None, **params):
+        negative = arg.negative_functor()
+        dom = negative(arg.dom) if dom is None else dom
+        cod = negative(arg.cod) if cod is None else cod
+        if dom.dom == arg.colour:
+            raise AxiomError(
+                "A cut changes the colour of its region, "
+                f"got {arg.colour.name} inside {dom.dom.name}.")
+        super().__init__(arg, dom=dom, cod=cod, **params)
+
+
+class Functor(monoidal.Functor):
+    """
+    An alpha functor is a monoidal functor that sends a :class:`Cut` to the
+    cut of its image, or to its elementwise negation in a category of
+    matrices, e.g. :class:`discopy.tensor.Tensor` of ``bool``.
+    """
+    dom = cod = Diagram
+
+    def __call__(self, other):
+        if isinstance(other, Cut) and issubclass(self.cod, Matrix):
+            return self(other.arg).map(operator.not_, dtype=bool)
+        return super().__call__(other)
+
+
+class Model:
+    """
+    A model sends each wire to a finite set, by its name, and each box to a
+    relation, its truth values as a Boolean array: a box and its
+    :meth:`Diagram.negative` share their name, and so their relation.
+
+    The image of a diagram is that of the functor :meth:`functor` gives,
+    which forgets the colours and negates each cut, negated once more when
+    the diagram is in the black region: a black box ``R`` is ¬R.
+
+    Parameters:
+        ob : The size of the set of each wire, by name.
+        ar : The truth values of each box, by name.
+
+    >>> p = Box('p')
+    >>> M = Model(ar={'p': True})
+    >>> assert M(p).array.all() and not M(p.negative()).array.any()
+    >>> from discopy import peirce
+    >>> assert eval(repr(M)) == M
+    """
+    def __init__(self, ob: dict | None = None, ar: dict | None = None):
+        self.ob, self.ar = dict(ob or {}), dict(ar or {})
+
+    def __eq__(self, other):
+        return type(self) is type(other) and repr(self) == repr(other)
+
+    def __hash__(self):
+        return hash(repr(self))
+
+    def __repr__(self):
+        return f"{factory_name(type(self))}(ob={self.ob!r}, ar={self.ar!r})"
+
+    def functor(self, dom: type[Diagram] = Diagram) -> monoidal.Functor:
+        """
+        The functor from a category of diagrams ``dom`` into
+        :class:`discopy.tensor.Tensor` of ``bool`` this model gives.
+        """
+        def ob_map(typ):
+            return Dim(*(self.ob[wire.name] for wire in typ.inside))
+
+        def ar_map(box):
+            return Tensor[bool](self.ar[box.name], *map(
+                functor, (box.dom, box.cod)))
+
+        functor = dom.functor_factory(
+            ob_map, ar_map, dom=dom, cod=Tensor[bool],
+            colour_map=lambda _: None)
+        return functor
+
+    def __call__(self, diagram: Diagram) -> Tensor:
+        result = self.functor(
+            diagram.factory)(diagram)  # ty: ignore[invalid-argument-type]
+        return result if diagram.colour == white\
+            else result.map(operator.not_, dtype=bool)
+
+
+Diagram.box_factory = Box
+Diagram.bubble_factory = Cut
+Diagram.functor_factory = Functor
+Id = Diagram.id
