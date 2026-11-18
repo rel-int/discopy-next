@@ -7,6 +7,7 @@ from discopy.kleisli.channel import Channel
 from discopy.kleisli.monad import Maybe, Powerset, Subdistribution
 from discopy.monad import free
 from discopy.monad.algebra import Algebra, Homomorphism, Operation, Writer
+from discopy.kleisli.monad import Monad
 from discopy.python.function import Function
 
 
@@ -194,3 +195,9 @@ def test_Writer_homomorphisms_are_equivariant():
     constant = Homomorphism[W](lambda xy: 0, pairs, points)
     assert not all(constant.preservation((g, xy))
                    for g in elements for xy in range(9))
+
+
+def test_Writer_hashes_as_the_monad_it_equals():
+    W = Writer(Symmetric[3])
+    same = Monad(W.name, W.ob_map, W.lift, W.unit_map, W.mult_map)
+    assert W == same and hash(W) == hash(same)
