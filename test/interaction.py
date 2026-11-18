@@ -305,3 +305,19 @@ def test_Functor_into_Int_takes_its_dagger():
     F = monoidal.Functor(
         {monoidal.Ty('x'): X}, {f: image}, cod=Diagram[compact.Diagram])
     assert F(f.dagger()) == image.dagger()
+
+
+def test_Functor_into_Int_with_no_dagger_reads_ar_map():
+    """ rel-int/discopy-next#631: integer diagrams over python functions
+    have no dagger, so a daggered box is read off ar_map. """
+    from discopy import monoidal, python
+    D = Diagram[python.Function]
+    assert not D.has_dagger()
+    R = Ty[python.Function.ob]((float, ), (float, ))
+    square = D(python.Function(
+        lambda a, da: (a * a, 2 * a * da), (float, float), (float, float)),
+        R, R)
+    x = monoidal.Ty('x')
+    f = monoidal.Box('f', x, x)
+    F = monoidal.Functor({x: R}, {f: square, f.dagger(): square}, cod=D)
+    assert F(f.dagger()).inside(2., 1.) == (4., 4.)

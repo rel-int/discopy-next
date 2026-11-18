@@ -232,6 +232,15 @@ class DaggerCategory[C0, C1: DaggerCategory](Category[C0, C1]):
     def dagger(self) -> C1:
         """ The dagger of a morphism, to be instantiated. """
 
+    @classmethod
+    def has_dagger(cls) -> bool:
+        """
+        Whether the morphisms of the category have a dagger, true unless
+        it depends on a parameter, as for
+        :class:`discopy.interaction.Diagram` over a category with none.
+        """
+        return True
+
     @axiom
     def dagger_involution[A: Obj[C0], B: Obj[C0]](
             cls, f: Hom[C1, A, B]) -> Equation[Hom[C1, A, B]]:

@@ -1165,10 +1165,12 @@ class Functor(Category[type, "Functor"]):
     Note
     ----
     A daggered box is mapped as the dagger of the image of the box, when the
-    codomain is a :class:`~discopy.abc.DaggerCategory`. When it is not, e.g.
+    codomain is a :class:`~discopy.abc.DaggerCategory` that
+    :meth:`~discopy.abc.DaggerCategory.has_dagger`. When it is not, e.g.
     a functor into :class:`discopy.stream.Stream`,
-    :class:`discopy.python.Function` or
-    :class:`discopy.python.additive.Function`, the image of a daggered box
+    :class:`discopy.python.Function`,
+    :class:`discopy.python.additive.Function` or integer diagrams over
+    :class:`discopy.python.Function`, the image of a daggered box
     is read off :code:`ar_map` like that of any other box.
 
     >>> from discopy import python
@@ -1352,7 +1354,8 @@ which JSON cannot hold.
             return getattr(self.cod, other.method)(
                 *map(self, other.args), dom=dom, cod=cod)
         if isinstance(other, Box) and other.is_dagger\
-                and issubclass(self.cod, DaggerCategory):
+                and issubclass(self.cod, DaggerCategory)\
+                and self.cod.has_dagger():
             return self(other.dagger()).dagger()
         if isinstance(other, Box):
             result = self.ar_map[other]

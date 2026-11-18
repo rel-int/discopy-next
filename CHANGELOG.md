@@ -422,8 +422,9 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   the nose, and the dagger laws of `Int(compact.Diagram)` declared failing,
   feedback having no dagger; `python.additive.Function.dagger`, defined on
   swaps alone, is `inverse`; and a functor maps a daggered box as the dagger of its image
-  when its codomain is a `DaggerCategory`, not whenever it has a `dagger`
-  ([next#631]).
+  when its codomain is a `DaggerCategory` that `has_dagger`, which integer
+  diagrams over a category with no dagger do not, not whenever it has a
+  `dagger` ([next#631]).
 - The TikZ backend sets a box label at 8 points and a wire label at 7, below
   and to the right of its port as in Matplotlib, in the colour the backend
   picks for it, and a unit of its picture is 8/12 inch, which fits the width

@@ -423,6 +423,20 @@ class Diagram[natural](RibbonCategory, DaggerCategory, TestableGeneric):
             tree['inside'], tree['dom'], tree['cod'])))
 
     @classmethod
+    def has_dagger(cls) -> bool:
+        """
+        Whether the integer diagrams have a dagger: when the :attr:`natural`
+        category is a :class:`~discopy.abc.DaggerCategory`, so that a functor
+        into integer diagrams over e.g. :class:`discopy.python.Function`
+        reads a daggered box off its :code:`ar_map`.
+
+        >>> from discopy import compact, python
+        >>> assert Diagram[compact.Diagram].has_dagger()
+        >>> assert not Diagram[python.Function].has_dagger()
+        """
+        return issubclass(cls.natural, DaggerCategory)
+
+    @classmethod
     def is_symmetric(cls) -> bool:
         """
         Whether the integer diagrams are symmetric, i.e. compact rather than
