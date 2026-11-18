@@ -187,6 +187,11 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   copies its positive half and merges the copies of its negative half, as
   the reverse derivative of a fan-out sums the gradients, and `discard`
   puts the noise ([next#511]).
+- `lens.Prism`, the prisms `(match, build)` over a comarkov category, the
+  dual of `lens.Markov`: a symmetric lens whose residual is what `match`
+  fails on, merged with what `build` builds, defined as a Markov lens over
+  the opposite category `op.Markov`, e.g. the constructors of a sum type
+  over `python.additive.Function` ([next#42]).
 - The rig laws of `neural.network.Dims` as axioms, checked by the property
   matrix: `product_unitality`, `product_associativity`, `absorption` and
   `distributivity_right` on the nose, `distributivity_left` up to a
@@ -416,6 +421,13 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Changed
 
+- `monoidal.Diagram.encode` gives its domain and one list of `(box, offset)`
+  per layer, so that `decode(*d.encode()) == d` on a foliated diagram too;
+  `decode` reads that or a flat list, one box per layer, and
+  `to_staircases` flattens the layers itself. This breaks a caller that
+  reads the second element of `encode` as flat `(box, offset)` pairs: the
+  old list is `list(zip(d.boxes, d.offsets))`, which `decode` still reads,
+  one box per layer ([next#629]).
 - The TikZ backend sets a box label at 8 points and a wire label at 7, below
   and to the right of its port as in Matplotlib, in the colour the backend
   picks for it, and a unit of its picture is 8/12 inch, which fits the width
@@ -637,6 +649,10 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 - Parameters nothing read: `Tree.to_diagram(contravariant)`,
   `Tree.from_nltk(lexicalised, word_types)`, `Drawing.id(length)`,
   `markov.Diagram.discard(n)` and `Backend(linewidth)` ([#768]).
+- The notebook `docs/notebooks/optyx/test_light_cones.md`, which imported
+  modules removed from optyx: it was the prototype of the light-cone bound
+  that `optyx.utils.misc.get_max_dim_for_box` computes for
+  `Diagram.to_tensor`, now unit-tested ([next#249]).
 
 ### Fixed
 
@@ -645,6 +661,10 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 - `optyx.channel.Channel.lambdify` and `subs` substitute in its Kraus map,
   so `subs` on e.g. `Phase(x).inflate(2)` no longer keeps `x`; the
   channel keeps its name ([next#619]).
+- The hand features of `drawing.nicer` count the rails of a dual rail
+  braid, twist, cup and cap, each read as the chord between its ends by
+  `Backend.dual_rail_wires`, as `Backend.crossing_wires` reads the strands of
+  a crossing ([next#609]).
 - `drawing.PlaneGraph` prints the adjacency of its graph rather than the
   graph's address, so a `Drawing` reads back from its representation and
   prints the same one for equal drawings: its nodes and their successors
@@ -1678,6 +1698,12 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Project
 
+- `build`'s Coverage step combines with `--debug=dataio`, naming each data file
+  it merges, and fails with its own error when it merged fewer than two: the
+  controller of `pytest -n auto` writes one and each worker one more, so the
+  controller's alone measured no test and read as a 36% fail-under regression.
+  `.github/tests/build_coverage.py` runs the step with and without the
+  workers' files ([next#596]).
 - The docs' reference API is syntax (with `testable` first), semantics (with
   `drawing` at its end), `neural`, quantum, optyx and lambek, and the notebooks
   are grouped by field: What is a diagram?, quantum, optyx, linguistics and
@@ -2003,6 +2029,7 @@ for the changelog of `1.2.1` and earlier.
 [next#16]: https://github.com/rel-int/discopy-next/issues/16
 [next#21]: https://github.com/rel-int/discopy-next/issues/21
 [next#31]: https://github.com/rel-int/discopy-next/issues/31
+[next#42]: https://github.com/rel-int/discopy-next/issues/42
 [next#49]: https://github.com/rel-int/discopy-next/issues/49
 [next#52]: https://github.com/rel-int/discopy-next/issues/52
 [next#56]: https://github.com/rel-int/discopy-next/issues/56
@@ -2197,15 +2224,18 @@ for the changelog of `1.2.1` and earlier.
 [next#587]: https://github.com/rel-int/discopy-next/pull/587
 [next#589]: https://github.com/rel-int/discopy-next/pull/589
 [next#591]: https://github.com/rel-int/discopy-next/pull/591
+[next#596]: https://github.com/rel-int/discopy-next/issues/596
 [next#598]: https://github.com/rel-int/discopy-next/pull/598
 [next#601]: https://github.com/rel-int/discopy-next/pull/601
 [next#602]: https://github.com/rel-int/discopy-next/pull/602
 [next#603]: https://github.com/rel-int/discopy-next/pull/603
 [next#604]: https://github.com/rel-int/discopy-next/pull/604
 [next#605]: https://github.com/rel-int/discopy-next/pull/605
+[next#609]: https://github.com/rel-int/discopy-next/pull/609
 [next#619]: https://github.com/rel-int/discopy-next/pull/619
 [next#622]: https://github.com/rel-int/discopy-next/pull/622
 [next#623]: https://github.com/rel-int/discopy-next/pull/623
+[next#629]: https://github.com/rel-int/discopy-next/pull/629
 [next#633]: https://github.com/rel-int/discopy-next/pull/633
 [next#634]: https://github.com/rel-int/discopy-next/pull/634
 [optyx#16]: https://github.com/rel-int/optyx/pull/16

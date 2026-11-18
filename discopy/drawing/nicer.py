@@ -85,7 +85,8 @@ def wires(drawing: Drawing) -> list[tuple[Point, Point]]:
     The segments of a drawing that are wires, i.e. the edges a backend draws,
     see :meth:`Backend.visible_edges`, with each strand of a swap, a braid or
     a permutation from its input to its output, see
-    :meth:`Backend.crossing_wires`.
+    :meth:`Backend.crossing_wires`, and each rail of a dual rail box, see
+    :meth:`Backend.dual_rail_wires`.
 
     >>> from discopy.monoidal import Ty, Box
     >>> for wire in wires(Box('f', Ty('x'), Ty('x')).to_drawing()):
@@ -95,9 +96,13 @@ def wires(drawing: Drawing) -> list[tuple[Point, Point]]:
     """
     crossings = [node for node in drawing.box_nodes
                  if node.box.draw_as_permutation or node.box.is_crossing]
+    dual_rails = [node for node in drawing.box_nodes if any(
+        getattr(node.box, f"draw_as_dual_rail_{kind}", False)
+        for kind in ("braid", "twist", "cup", "cap"))]
     edges = [(u, v) for u, v in Backend.visible_edges(drawing)
              if u not in crossings and v not in crossings] + [
-        edge for node in crossings for edge in Backend.crossing_wires(node)]
+        edge for node in crossings for edge in Backend.crossing_wires(node)
+    ] + [edge for node in dual_rails for edge in Backend.dual_rail_wires(node)]
     return [(drawing.positions[u], drawing.positions[v]) for u, v in edges
             if drawing.positions[u] != drawing.positions[v]]
 

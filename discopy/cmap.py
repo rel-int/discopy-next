@@ -2298,8 +2298,9 @@ cycles of this map.
 
     def encode(self) -> tuple[Ty, list[tuple[Box, int]]]:
         """
-        The domain, boxes and offsets of a diagram whose map this is, see
-        :meth:`sweep` and :meth:`discopy.monoidal.Diagram.encode`.
+        The domain, boxes and offsets of a diagram whose map this is, one box
+        per layer as :meth:`discopy.monoidal.Diagram.decode` reads them, see
+        :meth:`sweep`.
 
         Example
         -------
