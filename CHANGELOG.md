@@ -1680,6 +1680,12 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Project
 
+- `build`'s Coverage step combines with `--debug=dataio`, naming each data file
+  it merges, and fails with its own error when it merged fewer than two: the
+  controller of `pytest -n auto` writes one and each worker one more, so the
+  controller's alone measured no test and read as a 36% fail-under regression.
+  `.github/tests/build_coverage.py` runs the step with and without the
+  workers' files ([next#596]).
 - The docs' reference API is syntax (with `testable` first), semantics (with
   `drawing` at its end), `neural`, quantum, optyx and lambek, and the notebooks
   are grouped by field: What is a diagram?, quantum, optyx, linguistics and
@@ -2199,6 +2205,7 @@ for the changelog of `1.2.1` and earlier.
 [next#587]: https://github.com/rel-int/discopy-next/pull/587
 [next#589]: https://github.com/rel-int/discopy-next/pull/589
 [next#591]: https://github.com/rel-int/discopy-next/pull/591
+[next#596]: https://github.com/rel-int/discopy-next/issues/596
 [next#598]: https://github.com/rel-int/discopy-next/pull/598
 [next#601]: https://github.com/rel-int/discopy-next/pull/601
 [next#602]: https://github.com/rel-int/discopy-next/pull/602
