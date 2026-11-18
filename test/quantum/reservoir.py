@@ -28,6 +28,9 @@ def test_Reservoir_errors():
         Reservoir.random(1).fit([0.1, 0.2], [0.1, 0.2, 0.3])
     with raises(ValueError):
         Reservoir.random(1).fit([0.1], [0.1], regularisation=-1)
+    for washout in (-1, 2, 0.5):
+        with raises(ValueError):
+            Reservoir.random(1).fit([0.1, 0.2], [0.1, 0.2], washout=washout)
 
 
 def test_Reservoir_random_depth():
@@ -92,6 +95,25 @@ def test_Reservoir_fit():
     predictions = reservoir.predict(sequence, readout)[:, 0]
     baseline = sum((t - np.mean(targets)) ** 2 for t in targets)
     assert sum((predictions - targets) ** 2) < baseline
+
+
+def test_Reservoir_fit_washout():
+    reservoir = Reservoir.random(memory=2, seed=42)
+    sequence = [i / 7 % 1 for i in range(20)]
+    targets = [0.] + sequence[:-1]
+    assert reservoir.fit(sequence, targets, washout=0)\
+        == reservoir.fit(sequence, targets)
+    readout = reservoir.fit(sequence, targets, bias=False, washout=5)
+    features = np.stack(reservoir.run(sequence))[5:]
+    weights = np.linalg.lstsq(
+        np.concatenate((features, 1e-3 * np.eye(4))),
+        np.concatenate((np.array(targets[5:])[:, None], np.zeros((4, 1)))),
+        rcond=None)[0]
+    assert np.allclose(readout.weights, weights)
+    assert not np.allclose(
+        reservoir.fit(sequence, targets, bias=False).weights, weights)
+    assert reservoir.fit(sequence, ["unread"] + targets[1:], washout=1)\
+        == reservoir.fit(sequence, targets, washout=1)
 
 
 def test_Reservoir_stream_unrolls_to_run():

@@ -47,7 +47,7 @@ from typing import Literal, Callable, TYPE_CHECKING
 
 from discopy import config, messages
 from discopy.abc import (
-    ComarkovCategory, DaggerCategory, MarkovCategory, Nat)
+    ComarkovCategory, DaggerMonoidalCategory, MarkovCategory, Nat)
 from discopy.testable import Serialisable, TestableGeneric
 from discopy.cat import (
     factory,
@@ -64,8 +64,8 @@ if TYPE_CHECKING:
 
 @factory
 class Matrix[dtype](
-        MarkovCategory, ComarkovCategory, DaggerCategory, TestableGeneric,
-        Serialisable):
+        MarkovCategory, ComarkovCategory, DaggerMonoidalCategory,
+        TestableGeneric, Serialisable):
     """
     A matrix is an ``array`` with natural numbers as ``dom`` and ``cod``.
 
@@ -166,6 +166,20 @@ class Matrix[dtype](
 
     >>> Matrix[int]([0] * 24, 4, 6)
     Matrix[int]([0, 0, 0, ..., 0, 0, 0], dom=Nat(4), cod=Nat(6))
+
+    A matrix is immutable, and its array is not copied when it already has
+    the right ``dtype``: a NumPy array is shared with the caller through a
+    view that is read-only, so that writing into ``m.array`` raises while
+    the caller's own array stays writeable.
+
+    >>> a = np.zeros((2, 2), dtype=int)
+    >>> m = Matrix[int](a, 2, 2)
+    >>> assert np.shares_memory(m.array, a)
+    >>> assert not m.array.flags.writeable and a.flags.writeable
+
+    JAX and TensorFlow arrays are immutable anyway, but a PyTorch tensor has
+    no such flag: the matrix shares it with the caller, who must not write
+    into it after handing it over.
     """
     @classmethod
     def checked_params(cls) -> tuple:
@@ -284,8 +298,12 @@ class Matrix[dtype](
         assert_isinstance(cod, Nat)
         self.dom, self.cod = dom, cod
         with backend() as np:
-            self.array = np.array(array, dtype=self.dtype).reshape(
+            array = np.asarray(array, dtype=self.dtype).reshape(
                 (index(dom), index(cod)))
+            if isinstance(np, NumPy):
+                array = array.view()
+                array.flags.writeable = False
+        self.array = array
 
     def __eq__(self, other):
         return isinstance(other, self.ar)\

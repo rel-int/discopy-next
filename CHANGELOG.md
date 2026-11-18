@@ -16,6 +16,15 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   A `Model` sends a diagram to `Tensor[bool]`, and the 64 axioms of the
   neo-Peircean relations of Bonchi et al. (2024) are cells of the property
   matrix ([next#637]).
+- `abc.BraidedCategory.braid_inverse`, the inverse of the braid, by default
+  its dagger and in a `abc.SymmetricCategory` the swap the other way round,
+  and `abc.DaggerMonoidalCategory`, the first class with both a dagger and a
+  tensor ([next#485]).
+- `monad.algebra.Algebra.product` and `Algebra.power`, the products of the
+  Eilenberg-Moore category, `monad.algebra.Operation`, a value of `M(n)` acting
+  on every algebra as a function `Aⁿ → A` that every homomorphism commutes
+  with, and `monad.algebra.Writer`, the writer monad `G × -` of a group, whose
+  algebras on `range(n)` are its `group.Action`s ([next#134]).
 - `lambek.abstract`'s docs build an abstract categorial grammar from English to
   Lean: "DisCoPy diagrams are the arrows of the free premonoidal category"
   prints the statement `lean/Statements/English.lean` proves ([next#622]).
@@ -156,6 +165,16 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   the law. `Ty.strategy`, `Ty.generator_strategy` and `Stream.strategy`
   generate the terms those laws quantify over; the property matrix does not
   check streams yet, see [next#533] ([next#535]).
+- `abc.Category.ob_equation`, how a category compares its objects, `==` by
+  default, as `equation_factory` says how it compares its arrows:
+  `testable.inhabits` checks the boundary of a term with it. `stream.Stream`
+  compares types over their first `stream.STEPS` steps (`stream.steps`), and
+  reads `bifunctoriality`, `strength` and `tightening` up to a permutation of
+  the memory wires: `stream.up_to_memory` closes each one with a box of its
+  own class, `stream.Memory[B]` over boxes `B`, whose order the isomorphism of
+  hypergraphs forgets, and over a category with no boxes, e.g.
+  `python.Function`, is `stream.up_to_steps`. The property matrix checks
+  streams ([next#627], ruling on [next#533]).
 - `neural.propagation`, belief propagation: `sum_product` is the
   sum-product algorithm on a factor table as a network with a trace, from
   the tensor of each factor to the belief of each node, its traced legs the
@@ -360,6 +379,8 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 - `quantum.reservoir`, quantum reservoir computing ([#519]), the `Rydberg`
   ansatz ([#586]), and `quantum.contextuality`, the contextual fraction
   ([next#283]).
+- `Reservoir.fit(..., washout=k)` leaves the first `k` time steps, the
+  transient of the initial state, out of the regression ([next#216]).
 - `discopy.optyx`, moved in from rel-int/optyx with its 358 commits and
   their authors: ZX, ZW and linear-optical diagrams, channels, feedback and
   a compiler to photonic hardware, under the Apache License 2.0 in its own
@@ -428,6 +449,14 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Changed
 
+- `abc.BraidedCategory`'s `braid_then_inverse`, `inverse_then_braid` and
+  `inverse_braiding` read the inverse braid from `braid_inverse`, not from
+  the dagger of the braid, and `dagger_monoidality` is stated by
+  `abc.DaggerMonoidalCategory`, no longer by `abc.DaggerCategory` ([next#485]).
+- `Matrix.__init__` no longer copies an array that already has its dtype:
+  on numpy the matrix keeps a read-only view of it, so writing into
+  `m.array` raises and the caller's array stays writeable, and a torch
+  tensor stays shared with the caller ([next#616]).
 - The dagger of an `optyx.core` box defined by its array keeps its name and
   flips `is_dagger`, as `cat.Box.dagger` does, so `f[::-1][::-1] == f`; a
   box with `is_dagger=None` is self-adjoint and is its own dagger. A dagger
@@ -661,6 +690,9 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Removed
 
+- The declarations of `cat.Arrow` and `abc.Group` that `dagger_monoidality`
+  does not apply, now that a class with no tensor does not state it
+  ([next#485]).
 - Parameters nothing read: `Tree.to_diagram(contravariant)`,
   `Tree.from_nltk(lexicalised, word_types)`, `Drawing.id(length)`,
   `markov.Diagram.discard(n)` and `Backend(linewidth)` ([#768]).
@@ -670,6 +702,19 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   `Diagram.to_tensor`, now unit-tested ([next#249]).
 
 ### Fixed
+
+- `utils.get_origin` of a union is the union of the origins, so that a
+  `python.Function` type-checks a value of `frozenset[int] | None`, e.g. a
+  channel of `Maybe` on a generic type ([next#134]).
+- A `Permutation` given an iterable that is not a sequence, e.g. an
+  iterator, a generator or a dict's keys, reads it once into a list, so
+  `Permutation(x @ y, iter([1, 0]))` is the `Swap` the list form gives
+  ([next#31]).
+- `optyx.channel.Sum.double` doubles a sum coherently, cross terms included,
+  as the doubling of the channel whose Kraus map is `get_kraus()`: the doubled
+  Bell sum is the Bell state and no longer the mixture, `(BS + BS).double()` is
+  four times `BS.double()`, and a sum with an impure term refuses; the
+  conjugate of an empty `optyx.core.diagram.Sum` keeps its types ([next#252]).
 
 - `Matrix.lambdify(*symbols, modules=...)` no longer raises `TypeError`:
   the `modules` given replace the backend's ([next#619]).
@@ -2103,10 +2148,12 @@ for the changelog of `1.2.1` and earlier.
 [next#187]: https://github.com/rel-int/discopy-next/issues/187
 [next#201]: https://github.com/rel-int/discopy-next/issues/201
 [next#214]: https://github.com/rel-int/discopy-next/pull/214
+[next#216]: https://github.com/rel-int/discopy-next/issues/216
 [next#225]: https://github.com/rel-int/discopy-next/issues/225
 [next#236]: https://github.com/rel-int/discopy-next/issues/236
 [next#249]: https://github.com/rel-int/discopy-next/issues/249
 [next#250]: https://github.com/rel-int/discopy-next/issues/250
+[next#252]: https://github.com/rel-int/discopy-next/issues/252
 [next#254]: https://github.com/rel-int/discopy-next/issues/254
 [next#258]: https://github.com/rel-int/discopy-next/issues/258
 [next#260]: https://github.com/rel-int/discopy-next/issues/260
@@ -2171,6 +2218,7 @@ for the changelog of `1.2.1` and earlier.
 [next#472]: https://github.com/rel-int/discopy-next/issues/472
 [next#477]: https://github.com/rel-int/discopy-next/issues/477
 [next#482]: https://github.com/rel-int/discopy-next/issues/482
+[next#485]: https://github.com/rel-int/discopy-next/issues/485
 [next#488]: https://github.com/rel-int/discopy-next/issues/488
 [next#489]: https://github.com/rel-int/discopy-next/issues/489
 [next#490]: https://github.com/rel-int/discopy-next/issues/490
@@ -2246,9 +2294,11 @@ for the changelog of `1.2.1` and earlier.
 [next#604]: https://github.com/rel-int/discopy-next/pull/604
 [next#605]: https://github.com/rel-int/discopy-next/pull/605
 [next#609]: https://github.com/rel-int/discopy-next/pull/609
+[next#616]: https://github.com/rel-int/discopy-next/pull/616
 [next#619]: https://github.com/rel-int/discopy-next/pull/619
 [next#622]: https://github.com/rel-int/discopy-next/pull/622
 [next#623]: https://github.com/rel-int/discopy-next/pull/623
+[next#627]: https://github.com/rel-int/discopy-next/pull/627
 [next#629]: https://github.com/rel-int/discopy-next/pull/629
 [next#630]: https://github.com/rel-int/discopy-next/pull/630
 [next#633]: https://github.com/rel-int/discopy-next/pull/633
