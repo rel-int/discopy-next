@@ -1236,3 +1236,14 @@ def test_a_drawing_reads_back_from_its_repr():
         assert "object at 0x" not in repr(drawing)
         assert eval(repr(drawing)) == drawing
         assert repr(eval(repr(drawing))) == repr(drawing)
+
+
+def test_a_coloured_drawing_reads_back_from_its_repr():
+    red, green = map(monoidal.Colour, ("red", "green"))
+    x = monoidal.Ty(monoidal.Wire("x", red, green))
+    f = monoidal.Box('f', x, x)
+    assert str(x) == str(monoidal.Ty(monoidal.Wire("x")))
+    assert eval(repr(f.to_drawing())) == f.to_drawing()
+    with raises(AssertionError):
+        x = monoidal.Ty(monoidal.Wire("x"))
+        eval(repr(f.to_drawing()))
