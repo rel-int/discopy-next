@@ -168,3 +168,19 @@ def test_decode_raises_on_a_self_dual_cup_in_monoidal():
     mask = render(frobenius.Cup(x, x), 96, mask=True)
     with raises(ValueError):
         decode(mask, "monoidal")
+
+
+def test_crop_owns_its_pixels():
+    from discopy.drawing.picture import CROP, crop
+    image = np.zeros((320, 320, 3), dtype=np.uint8)
+    result = crop(image, np.array([10, 20]), np.array([10, 30]))
+    assert result.shape == CROP and result.dtype == np.float32
+    assert result.base is None
+
+
+def test_decode_least_moves_up_past_a_primitive():
+    from discopy.drawing.picture import decode_least
+    x = compact.Ty('a')
+    diagram = compact.Cup(x, x.r)
+    mask = render(diagram, 96, mask=True)
+    assert equal(decode_least(mask, "monoidal"), diagram, "compact")
