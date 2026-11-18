@@ -9,6 +9,11 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Added
 
+- `monad.algebra.Algebra.product` and `Algebra.power`, the products of the
+  Eilenberg-Moore category, `monad.algebra.Operation`, a value of `M(n)` acting
+  on every algebra as a function `Aⁿ → A` that every homomorphism commutes
+  with, and `monad.algebra.Writer`, the writer monad `G × -` of a group, whose
+  algebras on `range(n)` are its `group.Action`s ([next#134]).
 - `lambek.abstract`'s docs build an abstract categorial grammar from English to
   Lean: "DisCoPy diagrams are the arrows of the free premonoidal category"
   prints the statement `lean/Statements/English.lean` proves ([next#622]).
@@ -680,6 +685,9 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Fixed
 
+- `utils.get_origin` of a union is the union of the origins, so that a
+  `python.Function` type-checks a value of `frozenset[int] | None`, e.g. a
+  channel of `Maybe` on a generic type ([next#134]).
 - A `Permutation` given an iterable that is not a sequence, e.g. an
   iterator, a generator or a dict's keys, reads it once into a list, so
   `Permutation(x @ y, iter([1, 0]))` is the `Swap` the list form gives

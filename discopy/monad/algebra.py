@@ -37,6 +37,47 @@ other algebras depend on the monad:
   expectation of numbers, the missing mass counting as zero, and a
   homomorphism between expectations is linear.
 
+The product of algebras :math:`(A_1, a_1), \\dots, (A_n, a_n)` is the
+product of their carriers with the structure computed pointwise
+
+.. math::
+    M(A_1 \\times \\dots \\times A_n) \\to A_1 \\times \\dots \\times A_n
+    \\qquad
+    m \\mapsto (a_1(M(\\pi_1)(m)), \\dots, a_n(M(\\pi_n)(m)))
+
+see :meth:`Algebra.product`: the projections :math:`\\pi_i` are
+homomorphisms and a tuple of homomorphisms into the factors is one into the
+product, i.e. the forgetful functor to types creates products, for every
+monad. The power :math:`A^n` is the product of ``n`` copies of ``A``, see
+:meth:`Algebra.power`.
+
+A value :math:`t \\in M(n)` of the monad over the outcomes
+:math:`n = \\{0, \\dots, n - 1\\}` is an ``n``-ary :class:`Operation`: it
+acts on every algebra ``(A, a)`` as the function
+
+.. math::
+    t_A : A^n \\to A
+    \\qquad
+    (x_0, \\dots, x_{n - 1}) \\mapsto a(M(i \\mapsto x_i)(t))
+
+and every homomorphism ``h`` from ``(A, a)`` to ``(B, b)`` commutes with it,
+:math:`h \\circ t_A = t_B \\circ h^n`, see :meth:`Operation.naturality`.
+E.g. ``frozenset({0, 1})`` is binary choice, the join of every algebra of
+:attr:`~discopy.kleisli.monad.Powerset`, and ``{(0, .5), (1, .5)}`` is a
+fair coin, the midpoint of every algebra of
+:attr:`~discopy.kleisli.monad.Subdistribution`.
+
+The writer monad of a group ``G``, see :class:`Writer`, sends a type ``X``
+to :math:`G \\times X`, with unit :math:`x \\mapsto (e, x)` and
+multiplication :math:`(g, (h, x)) \\mapsto (gh, x)`. An algebra
+:math:`a : G \\times A \\to A` is then unital, :math:`a(e, x) = x`, and
+associative, :math:`a(gh, x) = a(g, a(h, x))`: it is exactly an action of
+``G`` on ``A``, writing :math:`g \\cdot x = a(g, x)`, and a homomorphism is
+exactly an equivariant function, :math:`h(g \\cdot x) = g \\cdot h(x)`.
+On ``range(n)`` the actions are the :class:`~discopy.group.Action` of
+``G``, see :meth:`Writer.from_action` and :meth:`Writer.to_action`. Since
+``>>`` multiplies in diagrammatic order, ``gh`` is ``h >> g``.
+
 Python functions cannot be compared, so the laws are checked at a point:
 :meth:`Algebra.unitality`, :meth:`Algebra.associativity` and
 :meth:`Homomorphism.preservation` return an
@@ -74,6 +115,8 @@ Summary
 
     Algebra
     Homomorphism
+    Operation
+    Writer
 """
 from __future__ import annotations
 
@@ -81,8 +124,10 @@ from collections.abc import Callable
 
 from discopy.abc import Category, NamedGeneric
 from discopy.testable import Equation, TestableGeneric
+from discopy.group import Action, FiniteGroup
 from discopy.kleisli.monad import Monad
 from discopy.monad import free
+from discopy.python.finset import Permutation
 from discopy.python.function import Function
 from discopy.utils import (
     assert_iscomposable, assert_ismember, factory, factory_name)
@@ -146,6 +191,64 @@ class Algebra[monad](NamedGeneric):
         return cls(
             "free", monad(generators).inside[0],
             monad.mult(generators))  # ty: ignore[invalid-argument-type]
+
+    @classmethod
+    def product(cls, *algebras: Algebra) -> Algebra:
+        """
+        The product of algebras, i.e. the product of their carriers with the
+        structure computed pointwise, through the projections.
+
+        Parameters:
+            algebras : The algebras to take the product of, none giving the
+                terminal algebra on the empty tuple.
+
+        Example
+        -------
+        >>> from discopy.kleisli.monad import Powerset
+        >>> disjunction = Algebra[Powerset]("any", bool, any)
+        >>> conjunction = Algebra[Powerset]("all", bool, all)
+        >>> both = Algebra[Powerset].product(disjunction, conjunction)
+        >>> both
+        monad.algebra.Algebra[Powerset]('any × all', tuple[bool, bool])
+        >>> both(frozenset({(True, True), (False, True)}))
+        (True, True)
+        """
+        monad = cls.monad
+        for algebra in algebras:
+            assert_ismember(algebra, cls)
+        carriers = tuple(algebra.carrier for algebra in algebras)
+        carrier = tuple[carriers]  # ty: ignore[invalid-type-form]
+        projections = tuple(
+            monad(Function(lambda xs, i=i: xs[i], carrier, algebra.carrier))
+            for i, algebra in enumerate(algebras))
+
+        def structure(value):
+            return tuple(
+                algebra(projection(value))
+                for algebra, projection in zip(algebras, projections))
+        name = " × ".join(map(str, algebras)) or "1"
+        return cls(name, carrier, structure)
+
+    def power(self, n: int) -> Algebra:
+        """
+        The power :math:`A^n` of an algebra, i.e. the product of ``n`` copies.
+
+        Parameters:
+            n : The exponent, a non-negative integer.
+
+        Raises:
+            ValueError : When ``n`` is negative.
+
+        Example
+        -------
+        >>> from discopy.kleisli.monad import Maybe
+        >>> zero = Algebra[Maybe]("zero", int, lambda x: 0 if x is None else x)
+        >>> zero.power(3)(None)
+        (0, 0, 0)
+        """
+        if n < 0:
+            raise ValueError(f"Expected a non-negative exponent, got {n}.")
+        return type(self).product(*n * (self, ))
 
     def unitality(self, value) -> Equation:
         """
@@ -320,3 +423,161 @@ class Homomorphism[monad](Category, TestableGeneric):
     def __repr__(self):
         return factory_name(type(self))\
             + f"({self.inside!r}, dom={self.dom!r}, cod={self.cod!r})"
+
+
+class Operation[monad](NamedGeneric):
+    """
+    An ``n``-ary operation of a monad ``M``, i.e. a value ``t`` of ``M(n)``
+    over the outcomes ``range(n)``, acting on every algebra ``(A, a)`` as
+    the function :math:`t_A : A^n \\to A` sending ``xs`` to
+    :math:`a(M(i \\mapsto x_i)(t))`.
+
+    Parameters:
+        inside : The value ``t`` of ``M(n)``.
+        arity : The number ``n`` of arguments.
+
+    Example
+    -------
+    A fair coin is the midpoint of every expectation:
+
+    >>> from discopy.kleisli.monad import Subdistribution
+    >>> coin = Operation[Subdistribution](frozenset({(0, .5), (1, .5)}), 2)
+    >>> mean = Algebra[Subdistribution](
+    ...     "mean", float, lambda d: sum((p * x for x, p in d), 0.))
+    >>> coin(mean)((2., 4.))
+    3.0
+
+    Doubling commutes with it, being a homomorphism:
+
+    >>> double = Homomorphism[Subdistribution](lambda x: 2 * x, mean, mean)
+    >>> assert coin.naturality(double, (2., 4.))
+    """
+    monad: Monad
+
+    def __init__(self, inside, arity: int):
+        self.inside, self.arity = inside, arity
+
+    def __call__(self, algebra: Algebra) -> Function:
+        monad = type(self).monad
+        assert_ismember(
+            algebra, Algebra[monad])  # ty: ignore[invalid-type-form]
+        return Function(lambda xs: algebra(monad(Function(
+            xs.__getitem__, int, algebra.carrier))(self.inside)),
+            algebra.power(self.arity).carrier, algebra.carrier)
+
+    def naturality(self, homomorphism: Homomorphism, value) -> Equation:
+        """
+        The commutation of a homomorphism ``h`` with the operation at a value
+        ``xs`` of :math:`A^n`, i.e. :math:`h(t_A(xs)) = t_B(h^n(xs))`.
+
+        Parameters:
+            homomorphism : The homomorphism ``h`` from ``A`` to ``B``.
+            value : The tuple ``xs`` of arguments.
+        """
+        assert_ismember(homomorphism, Homomorphism[
+            type(self).monad])  # ty: ignore[invalid-type-form]
+        h = homomorphism
+        return Equation(
+            h(self(h.dom)(value)), self(h.cod)(tuple(map(h, value))))
+
+    def __eq__(self, other):
+        return isinstance(other, Operation) and (
+            self.monad, self.inside, self.arity) == (
+                other.monad, other.inside, other.arity)
+
+    def __hash__(self):
+        return hash((self.monad, self.inside, self.arity))
+
+    def __repr__(self):
+        return factory_name(type(self)) + f"({self.inside!r}, {self.arity})"
+
+
+class Writer(Monad):
+    """
+    The writer monad of a group ``G``, sending a type ``X`` to the type
+    ``tuple[G, X]``, with unit :math:`x \\mapsto (e, x)` and multiplication
+    :math:`(g, (h, x)) \\mapsto (gh, x)`, where ``gh`` is ``h >> g``.
+
+    Its algebras are the actions of ``G`` and its homomorphisms the
+    equivariant functions, see :meth:`from_action` and :meth:`to_action`.
+
+    Parameters:
+        group : The group ``G``.
+
+    Example
+    -------
+    >>> from discopy.group import Cyclic
+    >>> C4 = Writer(Cyclic[4])
+    >>> C4
+    Writer(group.Cyclic[4])
+    >>> C4.unit(str)("egg")
+    (Cyclic[4](0), 'egg')
+    >>> C4.mult(str)((Cyclic[4](1), (Cyclic[4](2), "egg")))
+    (Cyclic[4](3), 'egg')
+    """
+    def __init__(self, group: type[FiniteGroup]):
+        def ob_map(X):
+            return tuple[group, X]  # ty: ignore[invalid-type-form]
+        super().__init__(
+            f"Writer[{factory_name(group)}]",
+            ob_map=ob_map,
+            lift=lambda f: Function(
+                lambda gx: (gx[0], f(gx[1])),
+                ob_map(f.dom.inside[0]), ob_map(f.cod.inside[0])),
+            unit_map=lambda X: Function(
+                lambda x: (
+                    group.id(), x),  # ty: ignore[missing-argument]
+                X, ob_map(X)),
+            mult_map=lambda X: Function(
+                lambda ghx: (ghx[1][0] >> ghx[0], ghx[1][1]),
+                ob_map(ob_map(X)), ob_map(X)))
+        self.group = group
+
+    def from_action(self, action: Action) -> Algebra:
+        """
+        The algebra on ``int`` of an action on ``range(action.size)``,
+        sending ``(g, x)`` to ``action(g)[x]``, named by the action.
+
+        Parameters:
+            action : The action of the group.
+
+        Example
+        -------
+        >>> from discopy.group import Cyclic
+        >>> rotation = Writer(Cyclic[4]).from_action(Cyclic[4].action())
+        >>> rotation((Cyclic[4](3), 2))
+        1
+        >>> assert rotation.associativity((Cyclic[4](3), (Cyclic[4](2), 1)))
+        """
+        if action.group is not self.group:
+            raise TypeError(f"Expected an action of {self.group}.")
+        return Algebra[self](
+            repr(action), int, lambda gx: action(gx[0])[gx[1]])
+
+    def to_action(self, algebra: Algebra, size: int) -> Action:
+        """
+        The action on ``range(size)`` of an algebra on ``int``, each
+        generator ``g`` acting by the permutation ``x ↦ a(g, x)``, inverse
+        to :meth:`from_action`: the algebra laws make it a bijection, with
+        inverse ``x ↦ a(g.dagger(), x)``.
+
+        Parameters:
+            algebra : The algebra, whose carrier contains ``range(size)``.
+            size : The number of points acted on.
+
+        Example
+        -------
+        >>> from discopy.group import Cyclic
+        >>> C4 = Writer(Cyclic[4])
+        >>> flip = Algebra[C4]("flip", int, lambda gx: (gx[1] + gx[0].k) % 2)
+        >>> C4.to_action(flip, 2)
+        Action(group.Cyclic[4], 2, ((1, 0),))
+        """
+        assert_ismember(
+            algebra, Algebra[self])
+        return Action(self.group, size, tuple(
+            Permutation(tuple(algebra((g, x)) for x in range(size)), size)
+            for g in self.group.generators()))
+
+    def __repr__(self):
+        return f"Writer({factory_name(self.group)})"
