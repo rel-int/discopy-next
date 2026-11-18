@@ -484,7 +484,8 @@ class Permutation(Function, PROP, Groupoid, DaggerMonoidalCategory):
 
 
 @dataclass
-class Cospan(HypergraphCategory, Serialisable["Cospan"]):
+class Cospan(
+        HypergraphCategory, DaggerMonoidalCategory, Serialisable["Cospan"]):
     """
     A cospan of finite sets ``dom -> apex <- cod``, i.e. an arrow of the free
     hypergraph category on one object, the PROP of special commutative

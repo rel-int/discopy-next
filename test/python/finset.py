@@ -180,3 +180,16 @@ def test_Cospan():
     def at_most_max_size(cospan):
         assert cospan == Cospan([], [], 0)
     at_most_max_size()
+
+
+def test_Functor_into_Cospan_takes_its_dagger():
+    """ rel-int/discopy-next#373: a cospan declares a dagger category, so a
+    daggered box maps to the dagger of its image. """
+    from discopy import monoidal
+    from discopy.abc import DaggerCategory, Nat
+    from discopy.python.finset import Cospan
+    assert issubclass(Cospan, DaggerCategory)
+    x = monoidal.Ty('x')
+    f = monoidal.Box('f', x, x @ x)
+    F = monoidal.Functor({x: Nat(1)}, {f: Cospan.copy(1)}, cod=Cospan)
+    assert F(f.dagger()) == Cospan.copy(1).dagger() == Cospan.merge(1)
