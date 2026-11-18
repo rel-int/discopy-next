@@ -370,7 +370,8 @@ class Matrix(underlying.Matrix):
             raise ValueError("Expected a positive number of photons out.")
         cod_basis = occupation_numbers(n_photons_out, index(self.cod))
 
-        result = Amplitudes[self.dtype].zero(len(dom_basis), len(cod_basis))
+        array = np.zeros((len(dom_basis), len(cod_basis)),
+                         dtype=self.dtype or int)
         normalisation = self.normalisation ** (n_photons + sum(self.creations))
         for i, open_creations in enumerate(dom_basis):
             for j, open_selections in enumerate(cod_basis):
@@ -383,10 +384,10 @@ class Matrix(underlying.Matrix):
                     np.prod([factorial(n) for n in creations + selections])
                 )
                 val = self.scalar * normalisation * permanent(matrix) / divisor
-                result.array[i, j] = val
+                array[i, j] = val
         if as_tensor:
-            return amplitudes_2_tensor(result.array, dom_basis, cod_basis)
-        return result
+            return amplitudes_2_tensor(array, dom_basis, cod_basis)
+        return Amplitudes[self.dtype](array, len(dom_basis), len(cod_basis))
 
     def prob(
         self,
