@@ -81,6 +81,18 @@ def test_wires_of_a_swap_are_its_strands():
     assert features(swap)["bends"] == 1
 
 
+def test_wires_of_dual_rail_boxes_are_their_rails():
+    from discopy.ribbon import (
+        Ty as T, DualRailBraid, DualRailTwist, DualRailCup, DualRailCap)
+    y, ribbon = T('x'), T('x') @ T('x')
+    braid = DualRailBraid(ribbon, ribbon).to_drawing()
+    assert len(wires(braid)) == 12 and features(braid)["bends"] == 1 / 3
+    assert len(wires(DualRailTwist(ribbon).to_drawing())) == 6
+    for box in (DualRailCup, DualRailCap):
+        drawing = box(ribbon, y.r @ y.r).to_drawing()
+        assert len(wires(drawing)) == 6 and features(drawing)["bends"] > 0
+
+
 def test_rectangles_of_a_relaid_out_drawing():
     drawing = (f >> g).to_drawing()
     scaled = drawing.relayout([2 * v for v in drawing.layout()])
