@@ -99,6 +99,13 @@ LENS_BRAID_NATURALITY = (
     "A Markov braid copies its input for its put, so a Markov lens is "
     "natural in it only up to the naturality of copy, which a hypergraph "
     "does not decide.")
+PRISM_NATURALITY = (
+    "A prism is a unit and associative only up to the naturality of merge "
+    "and noise, which a hypergraph does not decide.")
+PRISM_BRAID_NATURALITY = (
+    "A prism braid merges its build with its residual, so a prism is "
+    "natural in it only up to the naturality of merge, which a hypergraph "
+    "does not decide.")
 NO_SWAP = "{} is not symmetric, it has no swaps."
 NO_BRAID = "{} is not braided, it has no braids."
 NO_TWIST = "{} is not balanced, it has no twists."
@@ -172,6 +179,8 @@ TERM_IS_A_BOX = \
     "A term is a box: the laws and rules of its category are the diagram's."
 MISSING_BOXES_AND_OFFSETS = (
     "Decoding needs either boxes and offsets, or the two of them zipped.")
+OVERLAPPING_BOXES = (
+    "{} at offset {} overlaps the box on its left, which ends at {}.")
 CURRY_HAS_NO_DAGGER = "A curry has no dagger."
 BANG_HAS_NO_DAGGER = (
     "{} has no dagger: !L* has no rule from its codomain back to its domain.")

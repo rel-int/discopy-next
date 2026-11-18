@@ -482,7 +482,8 @@ def per_board_backward(net: nn.Module, board_loss, batched: tuple, k: float,
 
     Example
     -------
-    >>> net = torch.nn.Linear(2, 1)  # doctest: +EXTRA
+    >>> _ = torch.manual_seed(0)  # doctest: +EXTRA
+    >>> net = torch.nn.Linear(2, 1)
     >>> def board_loss(net, x, y):
     ...     return (net(x) - y).pow(2).mean(), (net(x).detach(), )
     >>> x, y = torch.randn(4, 2), torch.randn(4, 1)

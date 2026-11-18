@@ -1,7 +1,8 @@
 """
 The differential test of the Lean model of diagrams against
 :class:`discopy.monoidal.Diagram`: Hypothesis draws diagrams with one box per
-layer and no colours, as :meth:`Diagram.encode` writes them, the ``oracle``
+layer and no colours, as a flat list of boxes and offsets that
+:meth:`Diagram.decode` reads, the ``oracle``
 binary composes, tensors and whiskers them, or applies a functor into
 diagrams to them, in one run, and each answer is compared with the Python's.
 
