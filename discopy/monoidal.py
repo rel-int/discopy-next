@@ -71,7 +71,7 @@ from functools import cached_property
 from operator import index
 from types import NoneType
 from typing import (
-    Iterable, Iterator, Callable, ClassVar, Mapping, Self, TYPE_CHECKING)
+    Iterable, Iterator, Callable, ClassVar, Mapping, Self, TYPE_CHECKING, cast)
 from warnings import warn
 
 from discopy import abc, cat, drawing, hypergraph, cmap, messages, testable
@@ -1587,9 +1587,10 @@ class Diagram(cat.Arrow, MonoidalCategory, RichDisplay):
             boxes_and_offsets = zip(boxes, offsets)
         diagram = cls.id(dom)
         for layer in boxes_and_offsets:
-            if layer and not isinstance(layer[0], tuple | list):
-                layer = [layer]
-            diagram = diagram >> cls.decode_layer(diagram.cod, layer)
+            is_pair = layer and not isinstance(layer[0], tuple | list)
+            pairs = cast(
+                "list[tuple[Box, int]]", [layer] if is_pair else layer)
+            diagram = diagram >> cls.decode_layer(diagram.cod, pairs)
         if cod is not None:
             assert_iscomposable(diagram, cls.id(cod))
         return diagram
