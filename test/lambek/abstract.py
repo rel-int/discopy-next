@@ -1,3 +1,5 @@
+import doctest
+from pathlib import Path
 from random import Random
 
 from pytest import raises
@@ -332,3 +334,17 @@ def test_normal_form_of_words():
         assert normal == normal.normal_form() and normal != image
         assert tokens(normal) == tokens(image)
         assert lexicon(term.normal_form()).normal_form() == normal
+
+
+def test_english_to_lean():
+    "lean/Statements/English.lean proves what the grammar prints."
+    from discopy.lambek import abstract
+    printed, = (
+        example.want for example in doctest.DocTestParser().get_examples(
+            abstract.__doc__)
+        if "sentence(PREMONOIDAL)))())" in example.source)
+    lean = Path(__file__).parents[2] / "lean/Statements/English.lean"
+    text = lean.read_text(encoding="utf-8")
+    _, statement = text.split("[DecidableEq S.Ob] :\n")
+    statement, _ = statement.split("\n    := ")
+    assert printed.split() == statement.split()
