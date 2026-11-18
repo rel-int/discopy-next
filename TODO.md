@@ -2,4 +2,4 @@
 
 - [x] encode returns (dom, one list of (box, offset) per layer); decode reads it
 - [x] to_staircases flattens explicitly; update every caller
-- [ ] the issue's reproducer as a test; changelog
+- [x] the issue's reproducer as a test; changelog
