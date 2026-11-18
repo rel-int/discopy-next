@@ -383,8 +383,6 @@ class Arrow(FreeCategory, DaggerCategory, Serialisable["Arrow"]):
     automatically cast. This means one can use e.g. ``int`` instead of ``Ob``,
     see :class:`monoidal.Nat`.
     """
-    dagger_monoidality = DaggerCategory.dagger_monoidality.inapplicable(
-        messages.NO_TENSOR)
     box_factory: ClassVar[type["Box"]]
     sum_factory: ClassVar[type["Sum"]]
     bubble_factory: ClassVar[type["Bubble"]]

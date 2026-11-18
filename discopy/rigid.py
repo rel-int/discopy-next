@@ -166,7 +166,8 @@ from collections.abc import Callable
 from typing import Iterator, Self, ClassVar
 
 from discopy import cat, monoidal, biclosed, messages
-from discopy.abc import DaggerCategory, Pregroup, RigidCategory
+from discopy.abc import (
+    DaggerCategory, DaggerMonoidalCategory, Pregroup, RigidCategory)
 from discopy.testable import GENERATORS
 from discopy.cat import factory
 from discopy.utils import (
@@ -699,7 +700,7 @@ class Diagram(biclosed.Diagram, RigidCategory):
         messages.RIGID_HAS_NO_DAGGER)
     dagger_contravariance = DaggerCategory.dagger_contravariance.failing(
         messages.RIGID_HAS_NO_DAGGER)
-    dagger_monoidality = DaggerCategory.dagger_monoidality.failing(
+    dagger_monoidality = DaggerMonoidalCategory.dagger_monoidality.failing(
         messages.RIGID_HAS_NO_DAGGER)
 
     # The curry of a rigid diagram is made of caps, which a map and a
