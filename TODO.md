@@ -10,3 +10,4 @@
 - [WIP] @session_01MEJxy4BLudMDJBi1HBa5XG-2026-11-18 17:01 & and | on empty and multi-wire boundaries: the empty type of a peirce diagram is white
 - [WIP] @session_01MEJxy4BLudMDJBi1HBa5XG-2026-11-18 17:01 beta.Box is neither deterministic nor affine by default
 - [WIP] @session_01MEJxy4BLudMDJBi1HBa5XG-2026-11-18 17:16 negative() keeps each wire's z (cubic P1)
+- [WIP] @session_01MEJxy4BLudMDJBi1HBa5XG-2026-11-18 17:16 Model compares its maps by content and is not hashable (cubic P2, P3)
