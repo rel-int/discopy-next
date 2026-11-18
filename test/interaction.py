@@ -289,3 +289,19 @@ def test_hash():
 def test_Ty_is_atomic_on_integers():
     assert Ty[int](1, 1).is_atomic
     assert not Ty[int](1, 2).is_atomic and not Ty[int]().is_atomic
+
+
+def test_Functor_into_Int_takes_its_dagger():
+    """ rel-int/discopy-next#373: an integer diagram declares a dagger
+    category, so a daggered box maps to the dagger of its image. """
+    from discopy import compact, monoidal
+    from discopy.abc import DaggerCategory
+    assert issubclass(Diagram, DaggerCategory)
+    x, u = compact.Ty('x'), compact.Ty('u')
+    X = Ty[compact.Ty](x, u)
+    image = Diagram[compact.Diagram](
+        compact.Box('f', x @ u @ u, x @ x @ u), X, X @ X)
+    f = monoidal.Box('f', monoidal.Ty('x'), monoidal.Ty('x', 'x'))
+    F = monoidal.Functor(
+        {monoidal.Ty('x'): X}, {f: image}, cod=Diagram[compact.Diagram])
+    assert F(f.dagger()) == image.dagger()

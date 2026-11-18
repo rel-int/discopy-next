@@ -74,7 +74,7 @@ from discopy import (
     messages
 )
 from discopy.abc import (
-    Nat, Pregroup, RibbonCategory, SymmetricCategory,
+    DaggerCategory, Nat, Pregroup, RibbonCategory, SymmetricCategory,
     TracedCategory)
 from discopy.testable import Equation, TestableGeneric, quotient
 from discopy.cat import assert_iscomposable
@@ -291,7 +291,7 @@ class Ty[natural](Pregroup, TestableGeneric):
 
 @factory
 @dataclass(unsafe_hash=True)
-class Diagram[natural](RibbonCategory, TestableGeneric):
+class Diagram[natural](RibbonCategory, DaggerCategory, TestableGeneric):
     """
     An integer diagram from ``x`` to ``y`` is a :attr:`natural` diagram
     from ``x.positive @ y.negative`` to ``y.positive @ x.negative``, i.e.

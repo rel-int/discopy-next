@@ -29,7 +29,7 @@ from dataclasses import dataclass
 
 from discopy import messages
 from discopy.abc import (
-    Groupoid, HypergraphCategory, MarkovCategory, PROP, Nat)
+    DaggerCategory, Groupoid, HypergraphCategory, MarkovCategory, PROP, Nat)
 from discopy.testable import Serialisable
 from discopy.utils import AxiomError, factory_name, unbiased
 
@@ -483,7 +483,8 @@ class Permutation(Function, PROP, Groupoid):
 
 
 @dataclass
-class Cospan(HypergraphCategory, Serialisable["Cospan"]):
+class Cospan(
+        HypergraphCategory, DaggerCategory, Serialisable["Cospan"]):
     """
     A cospan of finite sets ``dom -> apex <- cod``, i.e. an arrow of the free
     hypergraph category on one object, the PROP of special commutative

@@ -416,10 +416,12 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Changed
 
-- `drawing.Drawing` declares `abc.DaggerCategory`, its reflection being
-  involutive, with contravariance and monoidality declared failing on the
-  nose; `python.additive.Function.dagger`, defined on swaps alone, is
-  `inverse`; and a functor maps a daggered box as the dagger of its image
+- `drawing.Drawing`, `python.finset.Cospan` and `interaction.Diagram`
+  declare `abc.DaggerCategory`, the reflection of a drawing being
+  involutive, with its contravariance and monoidality declared failing on
+  the nose, and the dagger laws of `Int(compact.Diagram)` declared failing,
+  feedback having no dagger; `python.additive.Function.dagger`, defined on
+  swaps alone, is `inverse`; and a functor maps a daggered box as the dagger of its image
   when its codomain is a `DaggerCategory`, not whenever it has a `dagger`
   ([next#631]).
 - The TikZ backend sets a box label at 8 points and a wire label at 7, below
