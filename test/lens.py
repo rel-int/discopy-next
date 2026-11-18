@@ -5,11 +5,11 @@ import random
 from pytest import raises
 
 from discopy import (
-    cat, feedback, lens, markov, monoidal, para, python, symmetric)
+    cat, comarkov, feedback, lens, markov, monoidal, para, python, symmetric)
 from discopy.abc import Nat
 from discopy.interaction import Diagram as IntDiagram, Ty as IntTy
-from discopy.lens import Comarkov, Markov, Symmetric, Traced, Ty
-from discopy.python import Function
+from discopy.lens import Comarkov, Markov, Prism, Symmetric, Traced, Ty
+from discopy.python import Function, additive
 from discopy.symmetric import Box, Diagram
 from discopy.symmetric import Ty as T
 from discopy.utils import AxiomError
@@ -349,3 +349,73 @@ def test_trace_takes_the_keyword_form():
         f.trace(1, mem=U)
     with raises(AxiomError):
         f.trace(mem=X)
+
+
+def prisms():
+    a, a_, b, b_, c, c_, d, d_ = map(
+        comarkov.Ty, ["a", "a'", "b", "b'", "c", "c'", "d", "d'"])
+    A, B, C, D = Ty(a, a_), Ty(b, b_), Ty(c, c_), Ty(d, d_)
+    return (Prism(A, B, comarkov.Box('f', a, a_ @ b),
+                  comarkov.Box("f'", b_, a_)),
+            Prism(B, C, comarkov.Box('g', b, b_ @ c),
+                  comarkov.Box("g'", c_, b_)),
+            Prism(C, D, comarkov.Box('h', c, c_ @ d),
+                  comarkov.Box("h'", d_, c_)))
+
+
+def test_prism_axioms():
+    f, g, h = prisms()
+    (a, a_), (b, b_), (c, _) = f.dom, f.cod, g.cod
+    merge, swap = comarkov.Diagram.merge, comarkov.Diagram.swap
+    assert isinstance(f, Symmetric) and f.residual == a_
+    assert f.forward == f.match >> swap(a_, b)
+    assert f.backward == a_ @ f.build >> merge(a_)
+    assert (Prism.id(f.dom) >> f).build == f.build\
+        == (f >> Prism.id(f.cod)).build
+    assert (Prism.id(f.dom) >> f).match.to_hypergraph()\
+        == f.match.to_hypergraph()
+    assert (f >> g).build == g.build >> f.build
+    assert (f >> g).match == f.match >> a_ @ g.match\
+        >> a_ @ f.build @ c >> merge(a_) @ c
+    left, right = (f >> g) >> h, f >> (g >> h)
+    assert left.build == right.build
+    assert (f @ h).dom == f.dom @ h.dom and (f @ h).cod == f.cod @ h.cod
+    assert (f @ h).build == f.build @ h.build
+    assert Prism.swap(f.dom, f.cod).build == swap(b_, a_)
+    assert Prism.swap(f.dom, f.cod).match\
+        == comarkov.Diagram.noise(a_ @ b_) @ swap(a, b)
+    assert Prism.braid(f.dom, f.cod) == Prism.swap(f.dom, f.cod)
+    assert Prism.from_lens(f.to_lens()) == f
+    assert f.to_lens().dom == -f.dom and f.to_lens().get.inside == f.build
+    scope = {"lens": lens, "comarkov": comarkov, "cat": cat,
+             "monoidal": monoidal, "feedback": feedback}
+    assert eval(repr(f), scope) == f
+    with raises(AxiomError):
+        g >> f
+
+
+def test_prism_without_merge():
+    for category in (markov.Diagram, Function):
+        with raises(AxiomError, match="no merge or noise"):
+            Prism[category].id(Ty[category.ob]())
+
+
+def test_prism_of_sum_types():
+    S, A = (Ty[python.Ty](types, types) for types in ((int, str), (int, )))
+    left = Prism[additive.Function](
+        S, A,
+        additive.Function(lambda obj, tag: (obj, 2 if tag == 0 else 1),
+                          (int, str), (int, str, int)),
+        additive.Function(lambda obj: (obj, 0), (int, ), (int, str)))
+    nested = Ty[python.Ty]((int, str, str), (int, str, str))
+    outer = Prism[additive.Function](
+        nested, S,
+        additive.Function(lambda obj, tag: (obj, 2 if tag == 2 else tag + 3),
+                          (int, str, str), (int, str, str, int, str)),
+        additive.Function(lambda obj, tag: (obj, tag), (int, str),
+                          (int, str, str)))
+    both = outer >> left
+    assert both.match(1, 0) == (1, 3)
+    assert both.match("b", 1) == ("b", 1)
+    assert both.match("c", 2) == ("c", 2)
+    assert both.build(2) == (2, 0)

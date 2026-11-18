@@ -1761,8 +1761,24 @@ class Channel(Diagram, frobenius.Box):
             )
 
     def lambdify(self, *symbols, **kwargs):
-        # Non-symbolic gates can be returned directly
-        return lambda *xs: self
+        """
+        The channel as a function of ``symbols``, substituted in its Kraus
+        map: a channel with no free symbols is returned as it is. The result
+        is a plain :class:`Channel` that keeps the name: the parametrised
+        boxes, e.g. :class:`photonic.Phase`, have a ``lambdify`` of their
+        own.
+
+        >>> from sympy.abc import phi
+        >>> from discopy.optyx.photonic import Phase
+        >>> channel = Phase(phi).inflate(2)
+        >>> assert not channel.lambdify(phi)(.25).free_symbols
+        >>> assert not channel.subs((phi, .25)).free_symbols
+        """
+        if not self.kraus.free_symbols:
+            return lambda *xs: self
+        kraus = self.kraus.lambdify(*symbols, **kwargs)
+        return lambda *xs: Channel(
+            self.name, kraus(*xs), self.dom, self.cod, self.env)
 
     def subs(self, *args) -> Diagram:
         syms, exprs = zip(*args)

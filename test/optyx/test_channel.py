@@ -392,3 +392,16 @@ def test_dagger_of_a_channel_with_an_environment(box):
     assert np.allclose(
         box.dagger().double().to_tensor().eval().array,
         box.double().dagger().to_tensor().eval().array)
+
+
+def test_subs_reaches_the_kraus_map_of_a_channel():
+    """#445: a channel built from a symbolic Kraus map, e.g. an inflated
+    phase, substitutes in it rather than returning itself."""
+    channel, expected = (
+        photonic.Phase(value).inflate(2) for value in (x, .25))
+    assert type(channel) is Channel and channel.free_symbols == {x}
+    for result in (channel.subs((x, .25)), channel.lambdify(x)(.25)):
+        assert not result.free_symbols
+        assert np.allclose(
+            result.double().to_tensor().eval().array,
+            expected.double().to_tensor().eval().array)
