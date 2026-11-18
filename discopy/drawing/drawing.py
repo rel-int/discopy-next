@@ -313,6 +313,32 @@ class PlaneGraph(NamedTuple):
     graph: nx.DiGraph
     positions: dict[Node, Point]
 
+    def __repr__(self):
+        """
+        The graph as the adjacency of each of its nodes sorted by
+        :attr:`discopy.utils.Node.index`, rather than its address: the order
+        the graph happens to store its nodes in is no part of the plane
+        graph, and an adjacency also names a node with no edge, which an
+        edge list would lose.
+
+        Example
+        -------
+        >>> from discopy import monoidal
+        >>> from discopy.monoidal import Ty, Box
+        >>> x = Ty('x')
+        >>> f = Box('f', x, x)
+        >>> assert eval(repr(f.to_drawing())) == f.to_drawing()
+        """
+        key = lambda node: (node.index, repr(node))
+        nodes = sorted(self.graph.nodes, key=key)
+        adjacency = {
+            node: sorted(self.graph.successors(node), key=key)
+            for node in nodes}
+        positions = dict(
+            sorted(self.positions.items(), key=lambda item: key(item[0])))
+        return f"PlaneGraph(graph=nx.DiGraph({adjacency}), "\
+               f"positions={positions})"
+
 
 @factory
 @dataclass

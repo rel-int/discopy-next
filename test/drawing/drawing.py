@@ -1,6 +1,7 @@
 
 import os
 
+import networkx as nx  # noqa: F401  evaluates a PlaneGraph's repr
 from pytest import approx, importorskip, raises
 
 from discopy.utils import AxiomError
@@ -1221,3 +1222,17 @@ def test_tikz_writes_a_label_in_its_colour():
     tikz.draw_text("y", 1, 0, verticalalignment="top", color="black")
     assert "text={white}" in tikz.nodelayer[0]
     assert "text=" not in tikz.nodelayer[1]
+
+
+def test_a_drawing_reads_back_from_its_repr():
+    x, y = monoidal.Ty('x'), monoidal.Ty('y')
+    f, g = monoidal.Box('f', x, y), monoidal.Box('g', y, x)
+    s = monoidal.Box('s', monoidal.Ty(), monoidal.Ty())
+    drawings = [
+        f.to_drawing(), Drawing.id(x), Drawing.id(), s.to_drawing(),
+        (f >> g).to_drawing(), (f @ f).to_drawing(),
+        (f >> g).to_drawing().dagger(), (f @ g.dom >> f.cod @ g).to_drawing()]
+    for drawing in drawings:
+        assert "object at 0x" not in repr(drawing)
+        assert eval(repr(drawing)) == drawing
+        assert repr(eval(repr(drawing))) == repr(drawing)
