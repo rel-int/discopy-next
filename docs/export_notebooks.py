@@ -60,7 +60,6 @@ SKIP = "DISCOPY_SKIP_NOTEBOOKS"
 # has stopped being evidence: re-run the notebook before trusting it.
 KNOWN_BROKEN = {
     "optyx/readme_example": ISSUES + "251",
-    "optyx/test_light_cones": ISSUES + "249",
 }
 
 IFRAME = """\
