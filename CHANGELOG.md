@@ -1683,6 +1683,15 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Project
 
+- The docs' reference API is syntax (with `testable` first), semantics (with
+  `drawing` at its end), `neural`, quantum, optyx and lambek, and the notebooks
+  are grouped by field: What is a diagram?, quantum, optyx, linguistics and
+  machine learning. `api/testable.html` and `api/drawing.html` are gone: their
+  modules are listed under syntax and semantics ([next#634]).
+- The Read the Docs build fits its 15-minute limit: the sidebar shows the
+  current page's branch alone, and Read the Docs links to each notebook's
+  source rather than running it, as a pull request's build does: the hosted
+  site no longer shows the notebooks' outputs ([next#633]).
 - `proptest` groups a push to `main` by commit, as `build`, `benchmark`,
   `lean` and `paper` do, and a scheduled or dispatched run by its own run id:
   one group per ref keeps one running and one pending run, so a third merge
@@ -2202,6 +2211,8 @@ for the changelog of `1.2.1` and earlier.
 [next#622]: https://github.com/rel-int/discopy-next/pull/622
 [next#623]: https://github.com/rel-int/discopy-next/pull/623
 [next#627]: https://github.com/rel-int/discopy-next/pull/627
+[next#633]: https://github.com/rel-int/discopy-next/pull/633
+[next#634]: https://github.com/rel-int/discopy-next/pull/634
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#56]: https://github.com/rel-int/optyx/pull/56
