@@ -664,6 +664,11 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Fixed
 
+- `Matrix.lambdify(*symbols, modules=...)` no longer raises `TypeError`:
+  the `modules` given replace the backend's ([next#619]).
+- `optyx.channel.Channel.lambdify` and `subs` substitute in its Kraus map,
+  so `subs` on e.g. `Phase(x).inflate(2)` no longer keeps `x`; the
+  channel keeps its name ([next#619]).
 - The hand features of `drawing.nicer` count the rails of a dual rail
   braid, twist, cup and cap, each read as the chord between its ends by
   `Backend.dual_rail_wires`, as `Backend.crossing_wires` reads the strands of
@@ -2234,6 +2239,7 @@ for the changelog of `1.2.1` and earlier.
 [next#604]: https://github.com/rel-int/discopy-next/pull/604
 [next#605]: https://github.com/rel-int/discopy-next/pull/605
 [next#609]: https://github.com/rel-int/discopy-next/pull/609
+[next#619]: https://github.com/rel-int/discopy-next/pull/619
 [next#622]: https://github.com/rel-int/discopy-next/pull/622
 [next#623]: https://github.com/rel-int/discopy-next/pull/623
 [next#629]: https://github.com/rel-int/discopy-next/pull/629
