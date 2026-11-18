@@ -3,5 +3,5 @@
 - [x] a classmethod on abc.Category saying how objects compare, defaulting to ==, used by testable.inhabits for dom and cod
 - [x] stream.Stream overrides it: types compared up to STEPS unrolled steps
 - [x] bifunctoriality, strength, tightening of stream.Stream declared modulo a permutation of the memory
-- [ ] checked_params enrols stream; run the stream cells and the whole matrix collection
+- [x] checked_params enrols stream; run the stream cells and the whole matrix collection
 - [ ] CHANGELOG bullet, checks
