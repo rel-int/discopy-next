@@ -610,7 +610,7 @@ class Permutation(Box):
     def __new__(cls, dom: monoidal.Ty | None = None,
                 perm: Iterable[int] | None = None):
         listed = finset.Permutation(perm, len(dom))\
-            if dom is not None and perm is not None\
+            if isinstance(dom, monoidal.Ty) and perm is not None\
             and not isinstance(perm, Sequence | monoidal.Ty) else None
         perm = perm if listed is None else listed
         factory = cls.ar.swap_factory\
