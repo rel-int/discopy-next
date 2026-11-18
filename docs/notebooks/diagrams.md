@@ -7,7 +7,7 @@ marimo-version: 0.23.14
 import marimo as mo
 ```
 
-# What is a diagram?
+# Diagram 101
 
 [String diagrams](https://en.wikipedia.org/wiki/String_diagram), or **diagrams** in short, are a formal graphical language for representing the composition of **systems and processes**.
 Formally, a diagram is an arrow in a [free monoidal category](https://en.wikipedia.org/wiki/Monoidal_category#Free_strict_monoidal_category).
