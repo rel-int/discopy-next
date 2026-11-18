@@ -41,3 +41,27 @@ def test_axioms_hold():
     assert len(Model.axioms) == 67
     for law in Model.axioms.values():
         assert law(model=model), law.name
+
+
+def test_rotated_cut():
+    model = Model(ob={'x': 2}, ar={'R': [[1, 1], [0, 0]]})
+    assert model((~R).r) == model(~R).r and model((~R).l) == model(~R).l
+
+
+def test_boundaries():
+    from discopy.peirce.alpha import white
+    R2, S2 = Box('R2', x @ x, x @ x), Box('S2', x @ x, x @ x)
+    model = Model(ob={'x': 2}, ar={'R2': [1, 0] * 8, 'S2': [1, 1, 0, 0] * 4})
+    r, s = model(R2).array, model(S2).array
+    assert (model(R2 & S2).array == (r & s)).all()
+    assert (model(R2 | S2).array == (r | s)).all()
+    p = Box('p', Ty.id(white), Ty.id(white))
+    unit = Model(ar={'p': True})
+    assert unit(p & p).array.all() and unit(p | ~p).array.all()
+    assert Id().dom == Ty.id(white)
+
+
+def test_flags():
+    assert not R.is_deterministic and not R.is_affine
+    assert not (~R).is_deterministic and not (~R).is_affine
+    assert Box('f', x, x, is_deterministic=True).is_deterministic

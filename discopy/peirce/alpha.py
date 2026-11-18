@@ -72,6 +72,15 @@ class Diagram(monoidal.Diagram):
     """
     strategy = no_strategy
 
+    @classmethod
+    def id(cls, dom=None) -> Diagram:
+        """
+        The identity, on the empty type of the white region by default.
+
+        >>> assert Diagram.id().dom == Diagram.ob.id(white)
+        """
+        return super().id(cls.ob.id(white) if dom is None else dom)
+
     @property
     def colour(self) -> Colour:
         """ The colour of the region around the diagram. """
@@ -188,7 +197,10 @@ class Functor(monoidal.Functor):
 
     def __call__(self, other):
         if isinstance(other, Cut) and issubclass(self.cod, Matrix):
-            return self(other.arg).map(operator.not_, dtype=bool)
+            result = self(other.arg).map(operator.not_, dtype=bool)
+            for _ in range(abs(getattr(other, "z", 0))):
+                result = result.r if other.z > 0 else result.l
+            return result
         return super().__call__(other)
 
 

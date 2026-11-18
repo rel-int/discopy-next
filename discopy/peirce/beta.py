@@ -90,7 +90,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Self
 
-from discopy import frobenius, monoidal
+from discopy import frobenius, markov, monoidal
 from discopy.peirce import alpha
 from discopy.peirce.alpha import white
 from discopy.tensor import Tensor
@@ -148,7 +148,39 @@ class Diagram(alpha.Diagram, frobenius.Diagram):
 
 
 class Box(frobenius.Box, Diagram):
-    """ A beta box is a relation symbol, globular: its colour its region's. """
+    """
+    A beta box is a relation symbol, globular: its colour its region's. A
+    relation need be neither total nor a function, so a box is neither
+    deterministic nor affine unless it says so.
+
+    >>> x = Ty('x')
+    >>> assert not Box('R', x, x).is_deterministic
+    >>> assert not Box('R', x, x).is_affine
+    """
+    def __init__(self, name: str, dom, cod, **params):
+        params.setdefault("is_deterministic", False)
+        params.setdefault("is_affine", False)
+        super().__init__(name, dom, cod, **params)
+
+    def flags(self) -> dict[str, bool]:
+        """
+        The flags the box declares beyond those of a relation, by name, as
+        :meth:`__repr__` and :meth:`to_tree` write them down.
+
+        >>> from discopy import peirce
+        >>> f = Box('f', Ty('x'), Ty('x'), is_deterministic=True)
+        >>> assert eval(repr(f)) == f and f.flags() == {'is_deterministic': True}
+        """
+        return {name: True for name, value in [
+            ("is_deterministic", self.deterministic),
+            ("is_affine", self.affine)] if value}
+
+    def __repr__(self):
+        flags = "".join(f", {name}=True" for name in self.flags())
+        result = super(markov.Box, self).__repr__()
+        if self.is_dagger or not flags:
+            return result
+        return result[:-1] + flags + ")"
 
 
 class Spider(frobenius.Spider, Box):
@@ -169,7 +201,12 @@ class Cut(alpha.Cut, frobenius.Bubble, Box):
 
     >>> x = Ty('x')
     >>> assert (~Box('R', x, x)).arg == Box('R', x, x).negative()
+    >>> assert not (~Box('R', x, x)).is_deterministic
     """
+    def __init__(self, arg, dom=None, cod=None, **params):
+        params.setdefault("is_deterministic", False)
+        params.setdefault("is_affine", False)
+        super().__init__(arg, dom=dom, cod=cod, **params)
 
 
 class Functor(alpha.Functor, frobenius.Functor):
