@@ -28,7 +28,7 @@ def test_Reservoir_errors():
         Reservoir.random(1).fit([0.1, 0.2], [0.1, 0.2, 0.3])
     with raises(ValueError):
         Reservoir.random(1).fit([0.1], [0.1], regularisation=-1)
-    for washout in (-1, 2):
+    for washout in (-1, 2, 0.5):
         with raises(ValueError):
             Reservoir.random(1).fit([0.1, 0.2], [0.1, 0.2], washout=washout)
 
@@ -112,6 +112,8 @@ def test_Reservoir_fit_washout():
     assert np.allclose(readout.weights, weights)
     assert not np.allclose(
         reservoir.fit(sequence, targets, bias=False).weights, weights)
+    assert reservoir.fit(sequence, ["unread"] + targets[1:], washout=1)\
+        == reservoir.fit(sequence, targets, washout=1)
 
 
 def test_Reservoir_stream_unrolls_to_run():

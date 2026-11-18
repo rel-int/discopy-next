@@ -37,6 +37,7 @@ an optional bias.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from numbers import Integral
 from random import Random
 
 import numpy
@@ -261,8 +262,7 @@ class Reservoir:
                 inputs, reservoir = inputs.later, reservoir.later
         return features
 
-    # pylint: disable=too-many-arguments,too-many-positional-arguments
-    # The data, then the regression's three options with their defaults.
+    # pylint: disable-next=too-many-arguments,too-many-positional-arguments
     def fit(self, sequence: list, targets: list,
             regularisation: float = 1e-6, bias: bool = True,
             washout: int = 0) -> Readout:
@@ -307,13 +307,16 @@ class Reservoir:
         if regularisation < 0:
             raise ValueError(
                 f"Expected regularisation >= 0, got {regularisation}.")
-        if not 0 <= washout < len(sequence):
+        if not isinstance(washout, Integral)\
+                or not 0 <= washout < len(sequence):
             raise ValueError(
-                f"Expected 0 <= washout < {len(sequence)}, got {washout}.")
+                f"Expected an integer 0 <= washout < {len(sequence)}, "
+                f"got {washout}.")
         np = get_backend()
         features = np.stack(self.run(sequence))[washout:]
         targets = np.reshape(
-            np.array(targets, dtype=float), (len(sequence), -1))[washout:]
+            np.array(targets[washout:], dtype=float),
+            (len(sequence) - washout, -1))
         n_samples, n_features = np.shape(features)
         n_targets = np.shape(targets)[1]
         if bias:
