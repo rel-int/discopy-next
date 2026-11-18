@@ -105,7 +105,7 @@ def test_Permutation():
     assert perm.inside == (Layer(perm),)
     assert perm.boxes == [perm] and perm.size == 0
     assert perm.is_generator and perm.generator == perm
-    assert perm.encode() == (perm.dom, [(perm, 0)])
+    assert perm.encode() == (perm.dom, [[(perm, 0)]])
     assert Diagram.decode(*perm.encode()) == perm
     identity = Permutation(x @ y @ z, [0, 1, 2])
     assert identity.is_identity and identity == Id(x @ y @ z)
@@ -394,7 +394,11 @@ def test_unequal_arity_offsets():
     assert layer.boxes_and_offsets == [(f, 0), (permutation, 2), (g, 4)]
     diagram = Diagram((layer,), layer.dom, layer.cod)
     assert diagram.offsets == [0, 2, 4]
-    assert Diagram.decode(*diagram.encode()) == diagram.to_staircases()
+    assert diagram.encode() == (
+        layer.dom, [[(f, 0), (permutation, 2), (g, 4)]])
+    assert Diagram.decode(*diagram.encode()) == diagram
+    assert Diagram.decode(layer.dom, layer.boxes_and_offsets)\
+        == diagram.to_staircases() != diagram
 
 
 def test_Permutation_foliation():

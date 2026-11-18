@@ -6,7 +6,8 @@ from discopy.optyx.core import diagram, zw, zx
 from discopy.optyx.core.path import Matrix
 from discopy.optyx.utils.misc import (
     basis_vector_from_kets, explode_channel, filter_occupation_numbers,
-    matrix_to_zw, occupation_numbers, tensor_2_amplitudes)
+    get_max_dim_for_box, matrix_to_zw, occupation_numbers,
+    tensor_2_amplitudes)
 
 
 def test_no_photons_fit_in_no_modes():
@@ -76,3 +77,10 @@ def test_basis_vector_rejects_negative_indices():
     assert basis_vector_from_kets([1, 2], [2, 3]) == 5
     with pytest.raises(ValueError, match="non-negative"):
         basis_vector_from_kets([-1], [3])
+
+
+def test_max_dim_counts_only_the_photons_in_the_light_cone():
+    create, merge = zw.Create(1, 2, 3), zw.W(2).dagger()
+    assert get_max_dim_for_box(0, merge, 1, [], [(0, create)]) == 1 + 2 + 1
+    assert get_max_dim_for_box(1, merge, 0, [], [(0, create)]) == 2 + 3 + 1
+    assert get_max_dim_for_box(0, merge, 0, [3, 1], []) == 2 * (3 + 1) + 1
