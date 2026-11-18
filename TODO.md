@@ -5,4 +5,4 @@
 - [x] beta: Diagram on frobenius, & with white spiders, Model, the NPR axioms of Fig. 9 of BonchiEtAl24 as Inequations enrolled in the matrix
 - [x] tests in test/peirce/, doctests: ~~d == d in every model on 1 to 3 elements, each dunder against its definition
 - [x] docs api page entry, CHANGELOG bullet
-- [ ] next-checks, proptest -k peirce, CI green with main merged
+- [WIP] @session_01MEJxy4BLudMDJBi1HBa5XG-2026-11-18 16:54 next-checks, proptest -k peirce, CI green with main merged
