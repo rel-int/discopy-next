@@ -105,20 +105,23 @@ class Wire(frobenius.Wire):
 
     >>> assert Wire('x').dom == Wire('x').cod == white
     """
-    def __init__(self, name: str, dom=white, cod=None, **params):
-        super().__init__(name, dom=dom, cod=dom if cod is None else cod,
+    def __init__(self, name: str, z: int = 0, dom=white, cod=None,
+                 **params):
+        super().__init__(name, z, dom=dom, cod=dom if cod is None else cod,
                          **params)
 
 
 @factory
 class Ty(frobenius.Ty):
     """
-    A beta type is a frobenius type of :class:`Wire`.
+    A beta type is a frobenius type of :class:`Wire`. It has no closed
+    constants: a constant of a coloured type is not globular yet, #635.
 
     >>> assert Ty('x', 'y') == Ty(Wire('x'), Wire('y'))
     """
     generator_factory = Wire
     strategy = no_strategy
+    constant_factory = None
 
 
 @factory

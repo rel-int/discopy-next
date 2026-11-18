@@ -658,6 +658,10 @@ EXAMPLES = {  # a box of each constructor, from a class c, types x, y, data v
     "monoidal.Bubble": 'c(box(c, x, y, v), name="b", drawing_name="B")',
     "markov.Bubble": 'c(box(c, x, y, v), name="b", is_deterministic=False)',
     "rigid.Bubble": 'c(box(c, x, y, v), name="b", z=1)',
+    "peirce.alpha.Box": 'c("f", x, y, data=v)',
+    "peirce.alpha.Cut": 'c(c.ar.box_factory("f", t := c.ob(c.ob.generator_'
+    'factory("x", dom=(k := sys.modules["discopy.peirce.alpha"].black), '
+    'cod=k)), t, data=v), name="b")',  # not the unit, #636
     "monoidal.Layer":
     'c(x, sys.modules[c.__module__].Box("f", x, y, data=v), y)',
     "braided.Braid {balanced,ribbon}.DualRailBraid ribbon.DualRailC{u,a}p":

@@ -83,7 +83,7 @@ class Diagram(monoidal.Diagram):
         The functor that swaps the colours of every region, from ``cls`` to
         itself, the category of diagrams ``cls`` is a box of.
         """
-        cls = cls.factory
+        diagram = cls.factory
 
         def ob_map(typ):
             return typ.factory(*(
@@ -91,11 +91,11 @@ class Diagram(monoidal.Diagram):
                            cod=NEGATIVE[wire.cod]) for wire in typ.inside))
 
         def ar_map(box):
-            negative = cls.negative_functor()
-            return cls.box_factory(box.name, negative(box.dom),
-                                   negative(box.cod), data=box.data)
-        return cls.functor_factory(
-            ob_map, ar_map, dom=cls, cod=cls, colour_map=NEGATIVE)
+            negative = diagram.negative_functor()
+            return diagram.box_factory(box.name, negative(box.dom),
+                                       negative(box.cod), data=box.data)
+        return diagram.functor_factory(
+            ob_map, ar_map, dom=diagram, cod=diagram, colour_map=NEGATIVE)
 
     def negative(self) -> Diagram:
         """
