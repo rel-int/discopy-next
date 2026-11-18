@@ -1674,8 +1674,9 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 ### Project
 
 - The Read the Docs build fits its 15-minute limit: the sidebar shows the
-  current page's branch alone, and Read the Docs links to each notebook rather
-  than running it, as a pull request's build does ([next#633]).
+  current page's branch alone, and Read the Docs links to each notebook's
+  source rather than running it, as a pull request's build does: the hosted
+  site no longer shows the notebooks' outputs ([next#633]).
 - `proptest` groups a push to `main` by commit, as `build`, `benchmark`,
   `lean` and `paper` do, and a scheduled or dispatched run by its own run id:
   one group per ref keeps one running and one pending run, so a third merge
