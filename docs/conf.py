@@ -91,6 +91,10 @@ html_theme_options = {
     "repository_url": "https://github.com/discopy/discopy",
     "use_repository_button": True,
     "path_to_docs": "docs",
+    # The sidebar shows the branch of the current page alone: in full, it
+    # is ~1,200 entries rendered into each of ~1,100 pages, which is most of
+    # the build's time and timed Read the Docs out.
+    "collapse_navbar": True,
     # "extra_navbar": "",
 }
 myst_enable_extensions = ["attrs_block"]
