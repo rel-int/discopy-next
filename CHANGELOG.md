@@ -1673,6 +1673,9 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Project
 
+- The Read the Docs build fits its 15-minute limit: the sidebar shows the
+  current page's branch alone, and Read the Docs links to each notebook rather
+  than running it, as a pull request's build does ([next#633]).
 - `proptest` groups a push to `main` by commit, as `build`, `benchmark`,
   `lean` and `paper` do, and a scheduled or dispatched run by its own run id:
   one group per ref keeps one running and one pending run, so a third merge
@@ -2191,6 +2194,7 @@ for the changelog of `1.2.1` and earlier.
 [next#605]: https://github.com/rel-int/discopy-next/pull/605
 [next#622]: https://github.com/rel-int/discopy-next/pull/622
 [next#623]: https://github.com/rel-int/discopy-next/pull/623
+[next#633]: https://github.com/rel-int/discopy-next/pull/633
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#56]: https://github.com/rel-int/optyx/pull/56
