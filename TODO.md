@@ -2,4 +2,4 @@
 
 - [x] PlaneGraph.__repr__ is evaluable and deterministic: the graph as its sorted adjacency, no DiGraph address
 - [x] A test that every shape round-trips, an isolated box node included, and that no repr names an address
-- [ ] CHANGELOG.md bullet
+- [WIP] @session_01C7YfANHyM4Fh1huiDtdT8R-2026-11-18 01:22 CHANGELOG.md bullet
