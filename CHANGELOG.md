@@ -651,6 +651,10 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Fixed
 
+- The hand features of `drawing.nicer` count the rails of a dual rail
+  braid, twist, cup and cap, each read as the chord between its ends by
+  `Backend.dual_rail_wires`, as `Backend.crossing_wires` reads the strands of
+  a crossing ([next#609]).
 - `drawing.PlaneGraph` prints the adjacency of its graph rather than the
   graph's address, so a `Drawing` reads back from its representation and
   prints the same one for equal drawings: its nodes and their successors
@@ -2216,6 +2220,7 @@ for the changelog of `1.2.1` and earlier.
 [next#603]: https://github.com/rel-int/discopy-next/pull/603
 [next#604]: https://github.com/rel-int/discopy-next/pull/604
 [next#605]: https://github.com/rel-int/discopy-next/pull/605
+[next#609]: https://github.com/rel-int/discopy-next/pull/609
 [next#622]: https://github.com/rel-int/discopy-next/pull/622
 [next#623]: https://github.com/rel-int/discopy-next/pull/623
 [next#629]: https://github.com/rel-int/discopy-next/pull/629
