@@ -92,6 +92,21 @@ def draw(diagram, **params):
     return diagram.to_drawing().draw(**params)
 
 
+def from_picture(jpeg, config: dict):
+    """
+    The diagram a picture of it shows, read back by
+    :mod:`discopy.drawing.vision`: a pixel net says what each pixel is, a
+    small OCR model reads the name of each box and the type of each
+    labelled wire, the module is the smallest in which it decodes from the
+    one whose structural primitives and types appear, and
+    :func:`discopy.drawing.picture.decode` builds the diagram. It needs
+    PyTorch and trained weights, see
+    :func:`discopy.drawing.vision.from_picture` for the ``config``.
+    """
+    from discopy.drawing import vision
+    return vision.from_picture(jpeg, config)
+
+
 def to_typst(diagram, **params):
     """
     Convert a diagram to a Typst Document AST.
