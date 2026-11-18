@@ -187,6 +187,11 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   copies its positive half and merges the copies of its negative half, as
   the reverse derivative of a fan-out sums the gradients, and `discard`
   puts the noise ([next#511]).
+- `lens.Prism`, the prisms `(match, build)` over a comarkov category, the
+  dual of `lens.Markov`: a symmetric lens whose residual is what `match`
+  fails on, merged with what `build` builds, defined as a Markov lens over
+  the opposite category `op.Markov`, e.g. the constructors of a sum type
+  over `python.additive.Function` ([next#42]).
 - The rig laws of `neural.network.Dims` as axioms, checked by the property
   matrix: `product_unitality`, `product_associativity`, `absorption` and
   `distributivity_right` on the nose, `distributivity_left` up to a
@@ -2019,6 +2024,7 @@ for the changelog of `1.2.1` and earlier.
 [next#16]: https://github.com/rel-int/discopy-next/issues/16
 [next#21]: https://github.com/rel-int/discopy-next/issues/21
 [next#31]: https://github.com/rel-int/discopy-next/issues/31
+[next#42]: https://github.com/rel-int/discopy-next/issues/42
 [next#49]: https://github.com/rel-int/discopy-next/issues/49
 [next#52]: https://github.com/rel-int/discopy-next/issues/52
 [next#56]: https://github.com/rel-int/discopy-next/issues/56
