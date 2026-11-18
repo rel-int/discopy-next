@@ -935,6 +935,33 @@ def test_Drawing_dagger():
     assert empty.dagger() == empty
 
 
+
+def test_Drawing_dagger_laws():
+    """ rel-int/discopy-next#373: a drawing declares a dagger category, its
+    involution holds and the other two laws fail on the nose, with these
+    counterexamples: a wide box moves the wires a composite aligns, and a
+    tensor numbers its left boxes first. """
+    from discopy.abc import DaggerCategory
+    from discopy.testable import AxiomFailure
+    assert issubclass(Drawing, DaggerCategory)
+    assert Drawing.dagger_involution.applicable
+    assert not Drawing.dagger_involution.broken
+    assert Drawing.dagger_contravariance.broken
+    assert Drawing.dagger_monoidality.broken
+    a, x, y = monoidal.Ty('a'), monoidal.Ty('x'), monoidal.Ty('y')
+    wide = "a box with a long name"
+    f = (monoidal.Box(wide, a, a) @ a >> a @ monoidal.Box(wide, a, a))\
+        .to_drawing()
+    g = monoidal.Box(wide, a @ a, a).to_drawing()
+    with raises(AxiomFailure):
+        Drawing.dagger_contravariance(f, g)
+    h, k = monoidal.Box('h', x, y).to_drawing(), monoidal.Box(
+        'k', x @ x, y).to_drawing()
+    with raises(AxiomFailure):
+        Drawing.dagger_monoidality(h, k)
+    assert Drawing.dagger_involution(f >> g)
+
+
 def test_Drawing_dagger_reflects_bubbles():
     x = monoidal.Ty('x')
     red, blue = monoidal.Colour('red'), monoidal.Colour('blue')
