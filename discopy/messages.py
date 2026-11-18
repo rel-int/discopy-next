@@ -103,6 +103,13 @@ LENS_BRAID_NATURALITY = (
     "A Markov braid copies its input for its put, so a Markov lens is "
     "natural in it only up to the naturality of copy, which a hypergraph "
     "does not decide.")
+PRISM_NATURALITY = (
+    "A prism is a unit and associative only up to the naturality of merge "
+    "and noise, which a hypergraph does not decide.")
+PRISM_BRAID_NATURALITY = (
+    "A prism braid merges its build with its residual, so a prism is "
+    "natural in it only up to the naturality of merge, which a hypergraph "
+    "does not decide.")
 NO_SWAP = "{} is not symmetric, it has no swaps."
 NO_BRAID = "{} is not braided, it has no braids."
 NO_TWIST = "{} is not balanced, it has no twists."
