@@ -170,6 +170,7 @@ from __future__ import annotations
 from typing import Optional
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
+from functools import cache
 
 from discopy import messages, symmetric, testable
 from discopy.abc import FeedbackCategory, NamedGeneric
@@ -457,6 +458,22 @@ MEMORY = "memory"
 """ The name of the boxes :func:`up_to_memory` closes the memory with. """
 
 
+@cache
+def memory_factory(box_factory: type) -> type:
+    """
+    The class of the boxes :func:`up_to_memory` closes the memory with, a
+    subclass of the boxes of the underlying category: a box compares its
+    class, so no box a user builds, e.g. one named :data:`MEMORY`, is
+    read as one of them.
+
+    >>> x = symmetric.Ty('x')
+    >>> Memory = memory_factory(symmetric.Box)
+    >>> assert Memory(MEMORY, x, x) != symmetric.Box(MEMORY, x, x)
+    >>> assert memory_factory(symmetric.Box) is Memory
+    """
+    return type("Memory", (box_factory, ), {"__module__": __name__})
+
+
 def up_to_memory(term: Stream):
     """
     The first :data:`STEPS` steps of a stream up to a permutation of its
@@ -470,7 +487,10 @@ def up_to_memory(term: Stream):
     effect on the way out: the equation of the underlying category, e.g.
     the isomorphism of hypergraphs, forgets the order of boxes, so two
     terms are equal when some permutation of the memory of one gives the
-    other, provided no term has a box of that name.
+    other. The boxes are of their own class, see :func:`memory_factory`. A
+    category with no boxes to close it with, e.g.
+    :class:`discopy.python.Function`, compares :func:`up_to_steps`, its
+    memory in order.
 
     >>> x, y, m, n = map(Ty.sequence, "xymn")
     >>> f, g = Stream.sequence('f', x, x, m), Stream.sequence('g', y, y, n)
@@ -480,9 +500,12 @@ def up_to_memory(term: Stream):
     >>> assert up_to_memory(LHS) == up_to_memory(RHS)
     >>> assert up_to_memory(f @ h) != up_to_memory(h @ f)
     """
+    category = type(term).category
+    if getattr(category, "box_factory", None) is None:
+        return up_to_steps(term)
+    box = memory_factory(category.box_factory)
     unrolled = term.unroll(STEPS)
-    now, category = unrolled.now, type(term).category
-    box, unit = category.box_factory, category.ob()
+    now, unit = unrolled.now, category.ob()
     n_dom = len(now.dom) - len(unrolled.mem_dom)
     n_cod = len(now.cod) - len(unrolled.mem_cod)
     states = [box(MEMORY, unit, now.dom[i:i + 1])
