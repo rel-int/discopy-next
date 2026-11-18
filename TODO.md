@@ -4,4 +4,4 @@
 - [x] stream.Stream overrides it: types compared up to STEPS unrolled steps
 - [x] bifunctoriality, strength, tightening of stream.Stream declared modulo a permutation of the memory
 - [x] checked_params enrols stream; run the stream cells and the whole matrix collection
-- [ ] CHANGELOG bullet, checks
+- [x] CHANGELOG bullet, checks
