@@ -353,6 +353,8 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 - `quantum.reservoir`, quantum reservoir computing ([#519]), the `Rydberg`
   ansatz ([#586]), and `quantum.contextuality`, the contextual fraction
   ([next#283]).
+- `Reservoir.fit(..., washout=k)` leaves the first `k` time steps, the
+  transient of the initial state, out of the regression ([next#216]).
 - `discopy.optyx`, moved in from rel-int/optyx with its 358 commits and
   their authors: ZX, ZW and linear-optical diagrams, channels, feedback and
   a compiler to photonic hardware, under the Apache License 2.0 in its own
@@ -421,6 +423,18 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Changed
 
+- `Matrix.__init__` no longer copies an array that already has its dtype:
+  on numpy the matrix keeps a read-only view of it, so writing into
+  `m.array` raises and the caller's array stays writeable, and a torch
+  tensor stays shared with the caller ([next#616]).
+- The dagger of an `optyx.core` box defined by its array keeps its name and
+  flips `is_dagger`, as `cat.Box.dagger` does, so `f[::-1][::-1] == f`; a
+  box with `is_dagger=None` is self-adjoint and is its own dagger. A dagger
+  prints `f[::-1]`, not `f.dagger()`. Truncating a dagger gives the dagger
+  of the truncated box, and its repr prints the array, so it reads back. An
+  array with an axis per wire is daggered wire by wire, where it used to be
+  transposed as a matrix, which reversed the order of its wires
+  ([next#630]).
 - `monoidal.Diagram.encode` gives its domain and one list of `(box, offset)`
   per layer, so that `decode(*d.encode()) == d` on a foliated diagram too;
   `decode` reads that or a flat list, one box per layer, and
@@ -660,6 +674,17 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   iterator, a generator or a dict's keys, reads it once into a list, so
   `Permutation(x @ y, iter([1, 0]))` is the `Swap` the list form gives
   ([next#31]).
+- `optyx.channel.Sum.double` doubles a sum coherently, cross terms included,
+  as the doubling of the channel whose Kraus map is `get_kraus()`: the doubled
+  Bell sum is the Bell state and no longer the mixture, `(BS + BS).double()` is
+  four times `BS.double()`, and a sum with an impure term refuses; the
+  conjugate of an empty `optyx.core.diagram.Sum` keeps its types ([next#252]).
+
+- `Matrix.lambdify(*symbols, modules=...)` no longer raises `TypeError`:
+  the `modules` given replace the backend's ([next#619]).
+- `optyx.channel.Channel.lambdify` and `subs` substitute in its Kraus map,
+  so `subs` on e.g. `Phase(x).inflate(2)` no longer keeps `x`; the
+  channel keeps its name ([next#619]).
 - The hand features of `drawing.nicer` count the rails of a dual rail
   braid, twist, cup and cap, each read as the chord between its ends by
   `Backend.dual_rail_wires`, as `Backend.crossing_wires` reads the strands of
@@ -740,8 +765,7 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   two layers, the same hypergraph but not the same diagram, which `explore`
   found ([next#505]).
 - `optyx.core.zx.H` is its own dagger: a box declares itself self-adjoint
-  with `is_dagger=None`, as `quantum.gates.SWAP` does, where the optyx
-  dagger otherwise returns a differently named copy — so `H[::-1] == H`
+  with `is_dagger=None`, as `quantum.gates.SWAP` does, so `H[::-1] == H`
   and `to_pyzx` translates a daggered Hadamard, which `from_pyzx` reads
   back as `H` ([next#498]).
 - Every dual rail diagram serialises: `balanced.DualRailBraid`,
@@ -2088,10 +2112,12 @@ for the changelog of `1.2.1` and earlier.
 [next#187]: https://github.com/rel-int/discopy-next/issues/187
 [next#201]: https://github.com/rel-int/discopy-next/issues/201
 [next#214]: https://github.com/rel-int/discopy-next/pull/214
+[next#216]: https://github.com/rel-int/discopy-next/issues/216
 [next#225]: https://github.com/rel-int/discopy-next/issues/225
 [next#236]: https://github.com/rel-int/discopy-next/issues/236
 [next#249]: https://github.com/rel-int/discopy-next/issues/249
 [next#250]: https://github.com/rel-int/discopy-next/issues/250
+[next#252]: https://github.com/rel-int/discopy-next/issues/252
 [next#254]: https://github.com/rel-int/discopy-next/issues/254
 [next#258]: https://github.com/rel-int/discopy-next/issues/258
 [next#260]: https://github.com/rel-int/discopy-next/issues/260
@@ -2231,9 +2257,12 @@ for the changelog of `1.2.1` and earlier.
 [next#604]: https://github.com/rel-int/discopy-next/pull/604
 [next#605]: https://github.com/rel-int/discopy-next/pull/605
 [next#609]: https://github.com/rel-int/discopy-next/pull/609
+[next#616]: https://github.com/rel-int/discopy-next/pull/616
+[next#619]: https://github.com/rel-int/discopy-next/pull/619
 [next#622]: https://github.com/rel-int/discopy-next/pull/622
 [next#623]: https://github.com/rel-int/discopy-next/pull/623
 [next#629]: https://github.com/rel-int/discopy-next/pull/629
+[next#630]: https://github.com/rel-int/discopy-next/pull/630
 [next#633]: https://github.com/rel-int/discopy-next/pull/633
 [next#634]: https://github.com/rel-int/discopy-next/pull/634
 [optyx#16]: https://github.com/rel-int/optyx/pull/16

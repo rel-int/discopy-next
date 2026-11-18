@@ -1762,8 +1762,24 @@ class Channel(Diagram, frobenius.Box):
             )
 
     def lambdify(self, *symbols, **kwargs):
-        # Non-symbolic gates can be returned directly
-        return lambda *xs: self
+        """
+        The channel as a function of ``symbols``, substituted in its Kraus
+        map: a channel with no free symbols is returned as it is. The result
+        is a plain :class:`Channel` that keeps the name: the parametrised
+        boxes, e.g. :class:`photonic.Phase`, have a ``lambdify`` of their
+        own.
+
+        >>> from sympy.abc import phi
+        >>> from discopy.optyx.photonic import Phase
+        >>> channel = Phase(phi).inflate(2)
+        >>> assert not channel.lambdify(phi)(.25).free_symbols
+        >>> assert not channel.subs((phi, .25)).free_symbols
+        """
+        if not self.kraus.free_symbols:
+            return lambda *xs: self
+        kraus = self.kraus.lambdify(*symbols, **kwargs)
+        return lambda *xs: Channel(
+            self.name, kraus(*xs), self.dom, self.cod, self.env)
 
     def subs(self, *args) -> Diagram:
         syms, exprs = zip(*args)
@@ -1823,9 +1839,21 @@ class Sum(symmetric.Sum, Diagram):
     """
 
     def double(self):
-        return diagram.Diagram.sum_factory(
-            [term.double() for term in self.terms],
-            self.dom.double(), self.cod.double())
+        r"""
+        The doubling of a coherent sum :math:`\sum_i f_i` is
+        :math:`\sum_{i, j} f_i \otimes \overline{f_j}`, cross terms included:
+        the doubling of the channel whose Kraus map is :meth:`get_kraus`,
+        which reads the sum the same way. A sum with an impure term has no
+        Kraus map, and refuses.
+
+        >>> from discopy.optyx.photonic import Create, Scalar
+        >>> bell = (Create(1, 0, 1, 0) + Create(0, 1, 0, 1)) @ Scalar(.5 ** .5)
+        >>> rho = bell.double().to_tensor().eval().array
+        >>> assert np.allclose(rho[1, 1, 0, 0, 1, 1, 0, 0], .5)
+        >>> assert np.allclose(rho[1, 0, 0, 1, 1, 0, 0, 1], .5)
+        """
+        return Channel(
+            str(self), self.get_kraus(), self.dom, self.cod).double()
 
     def grad(self, var, **params):
         """Gradient with respect to :code:`var`."""
