@@ -1236,6 +1236,28 @@ def test_decode_without_boxes_and_offsets():
     with raises(ValueError):
         Diagram.decode(Ty('x'))
 
+
+def test_encode_layers():
+    x, y = Ty('x'), Ty('y')
+    f, g = Box('f', x, y), Box('g', x, y)
+    left = f @ x >> y @ g
+    right = x @ g >> f @ y
+    middle = Diagram((Layer(f, g), ), x @ x, y @ y)
+    assert left != right and left != middle and right != middle
+    assert (f @ g).foliation() == middle
+    assert middle.encode() == (x @ x, [[(f, 0), (g, 1)]])
+    for diagram in (left, right, middle):
+        assert Diagram.decode(*diagram.encode()) == diagram
+    assert middle.to_staircases() == left
+    h = Box('h', y @ y, x)
+    for diagram in (f @ g >> h, x @ f @ g @ x >> x @ h @ x, h.dagger()):
+        for foliated in (diagram, diagram.foliation()):
+            assert Diagram.decode(*foliated.encode()) == foliated
+    with raises(ValueError):
+        Diagram.decode(x @ x, [[(f, 1), (g, 0)]])
+    with raises(ValueError):
+        Diagram.decode(x, [[]])
+
 def test_List_repr():
     from discopy import cat, monoidal
     from discopy.python import Ty as PyTy
