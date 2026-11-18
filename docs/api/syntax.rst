@@ -1,12 +1,14 @@
 syntax
 ======
 
-DisCoPy's mathematical core: a zoo of diagrams, categories and functors.
+DisCoPy's mathematical core: a zoo of diagrams, categories and functors,
+and the property tests that check their axioms.
 
 .. autosummary::
     :template: module.rst
     :toctree: ../_api
 
+    discopy.testable
     discopy.abc
     discopy.cat
     discopy.monoidal

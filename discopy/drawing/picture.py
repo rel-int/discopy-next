@@ -43,6 +43,8 @@ Summary
     refine
     scan
     read
+    decode_least
+    crop
 """
 
 from __future__ import annotations
@@ -83,6 +85,12 @@ LABELS = ("background", ) + TYPES + NAMES + STRUCTURAL["frobenius"]\
 #: The classes of the pixel net, coarser than :data:`LABELS`: no name, no
 #: type, only what a box, a wire and a label are and which primitive.
 COARSE = ("background", "wire", "box", "label") + STRUCTURAL["frobenius"]
+
+#: The characters a box name or a wire type is written in.
+CHARS = "".join(sorted(set("".join(NAMES + TYPES))))
+
+#: The height and width of the crop a name or a type is read on, in pixels.
+CROP = (24, 48)
 
 #: The flags of :func:`augment`, applied in this order.
 AUGMENTATIONS = (
@@ -1011,10 +1019,49 @@ def read(classes: np.ndarray, name: Callable, typ: Callable, module=None):
     mask = refine(classes, boxes, wires, names, types)
     if module is not None:
         return decode(mask, module)
-    least = MODULES.index(scan(classes, types.values()))
-    for i, candidate in enumerate(MODULES[least:], least):
+    return decode_least(mask, scan(classes, types.values()))
+
+
+def decode_least(mask: np.ndarray, module: str, most=MODULES[-1]):
+    """
+    :func:`decode` in the least module from ``module`` up to ``most`` in
+    which the mask decodes, e.g. ``frobenius`` for a cup on ``a`` and ``a``,
+    which is not compact: a :func:`scan` cannot tell them apart.
+    """
+    least, last = MODULES.index(module), MODULES.index(most)
+    if last < least:
+        raise ValueError(f"Expected {most!r} at or after {module!r}.")
+    for i, candidate in enumerate(MODULES[least:last + 1], least):
         try:
             return decode(mask, candidate)
-        except AxiomError:
-            if i == len(MODULES) - 1:
+        except (AxiomError, ValueError):
+            if i == last:
                 raise
+
+
+def crop(image: np.ndarray, rows, cols, label=False) -> np.ndarray:
+    """
+    The ink of an image, from zero for white to one for black, in a window
+    of shape :data:`CROP`: centred on the box with these pixels, where its
+    name is drawn, or from the top left of the label with these pixels,
+    with no ink outside their bounding box. Keeping only the label's own
+    pixels, or erasing those classed wire, box or primitive, reads a box
+    edge through a label better but loses the text the pixel net misses:
+    recovery fell by 7 to 15 points (#559).
+    """
+    height, width = CROP
+    if label:
+        top = rows[cols == cols.min()].min() - height // 4
+        left = cols.min() - 4
+    else:
+        top = (rows.min() + rows.max()) // 2 - height // 2
+        left = (cols.min() + cols.max()) // 2 - width // 2
+    ink = 1 - image.mean(axis=2) / 255
+    if label:
+        inside = np.zeros(ink.shape, dtype=bool)
+        inside[max(rows.min() - 1, 0):rows.max() + 2,
+               max(cols.min() - 1, 0):cols.max() + 2] = True
+        ink = ink * inside
+    ink = np.pad(ink, ((height, height), (width, width)))
+    return ink[top + height:top + 2 * height,
+               left + width:left + 2 * width].astype(np.float32)
