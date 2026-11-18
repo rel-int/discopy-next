@@ -5,4 +5,4 @@
 - [x] testable first in syntax, no section of its own
 - [x] drawing in semantics, no section of its own
 - [x] neural its own section, out of semantics
-- [WIP] @session_01MEJxy3s8mhLoZAr9eJorAA-2026-11-18 13:57 notebooks: sections What is a diagram? (Diagram 101 and the four that fit no field), quantum (QNLP, ZX, contextual fraction, tallcat 05), linguistics, machine learning (TQFT included)
+- [x] notebooks: sections What is a diagram? (Diagram 101 and the four that fit no field), quantum (QNLP, ZX, contextual fraction, tallcat 05), linguistics, machine learning (TQFT included)
