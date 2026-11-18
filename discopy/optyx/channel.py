@@ -1838,9 +1838,21 @@ class Sum(symmetric.Sum, Diagram):
     """
 
     def double(self):
-        return diagram.Diagram.sum_factory(
-            [term.double() for term in self.terms],
-            self.dom.double(), self.cod.double())
+        r"""
+        The doubling of a coherent sum :math:`\sum_i f_i` is
+        :math:`\sum_{i, j} f_i \otimes \overline{f_j}`, cross terms included:
+        the doubling of the channel whose Kraus map is :meth:`get_kraus`,
+        which reads the sum the same way. A sum with an impure term has no
+        Kraus map, and refuses.
+
+        >>> from discopy.optyx.photonic import Create, Scalar
+        >>> bell = (Create(1, 0, 1, 0) + Create(0, 1, 0, 1)) @ Scalar(.5 ** .5)
+        >>> rho = bell.double().to_tensor().eval().array
+        >>> assert np.allclose(rho[1, 1, 0, 0, 1, 1, 0, 0], .5)
+        >>> assert np.allclose(rho[1, 0, 0, 1, 1, 0, 0, 1], .5)
+        """
+        return Channel(
+            str(self), self.get_kraus(), self.dom, self.cod).double()
 
     def grad(self, var, **params):
         """Gradient with respect to :code:`var`."""
