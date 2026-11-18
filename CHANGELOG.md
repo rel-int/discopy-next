@@ -680,6 +680,10 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Fixed
 
+- A `Permutation` given an iterable that is not a sequence, e.g. an
+  iterator, a generator or a dict's keys, reads it once into a list, so
+  `Permutation(x @ y, iter([1, 0]))` is the `Swap` the list form gives
+  ([next#31]).
 - `optyx.channel.Sum.double` doubles a sum coherently, cross terms included,
   as the doubling of the channel whose Kraus map is `get_kraus()`: the doubled
   Bell sum is the Bell state and no longer the mixture, `(BS + BS).double()` is
