@@ -7,5 +7,5 @@
 > > Default arbitrary relation boxes to non-cartesian flags (`discopy/peirce/beta.py:151`)
 
 - [WIP] @session_01MEJxy4BLudMDJBi1HBa5XG-2026-11-18 17:01 a rotated cut evaluates to the rotation of its negated tensor
-- [ ] & and | on empty and multi-wire boundaries: the empty type of a peirce diagram is white
+- [WIP] @session_01MEJxy4BLudMDJBi1HBa5XG-2026-11-18 17:01 & and | on empty and multi-wire boundaries: the empty type of a peirce diagram is white
 - [ ] beta.Box is neither deterministic nor affine by default
