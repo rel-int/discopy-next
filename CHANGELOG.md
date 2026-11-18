@@ -413,6 +413,12 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Changed
 
+- The dagger of an `optyx.core` box defined by its array keeps its name and
+  flips `is_dagger`, as `cat.Box.dagger` does, so `f[::-1][::-1] == f`: it
+  prints `f[::-1]`, not `f.dagger()`, its truncation is the dagger of the
+  box's, and its repr prints the array, so it reads back. An array with an
+  axis per wire is daggered wire by wire, where it reversed their order
+  ([next#628]).
 - The TikZ backend sets a box label at 8 points and a wire label at 7, below
   and to the right of its port as in Matplotlib, in the colour the backend
   picks for it, and a unit of its picture is 8/12 inch, which fits the width
@@ -2187,6 +2193,7 @@ for the changelog of `1.2.1` and earlier.
 [next#604]: https://github.com/rel-int/discopy-next/pull/604
 [next#605]: https://github.com/rel-int/discopy-next/pull/605
 [next#623]: https://github.com/rel-int/discopy-next/pull/623
+[next#628]: https://github.com/rel-int/discopy-next/pull/628
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#56]: https://github.com/rel-int/optyx/pull/56

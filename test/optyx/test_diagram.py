@@ -3,7 +3,8 @@ import pytest
 from sympy import Expr
 from sympy.abc import x, y
 
-from discopy.optyx.core import zw
+from discopy import optyx
+from discopy.optyx.core import control, diagram, zw, zx
 from discopy.optyx.core.diagram import (
     Bit, Box, Diagram, DualRail, EmbeddingTensor, Mode, Permutation,
     PhotonNumberPreservation, PhotonThresholdDetector, Scalar, Spider, Swap,
@@ -123,3 +124,48 @@ def test_feedback_has_no_tensor_until_unrolled():
         loop.truncation()
     with pytest.raises(ValueError, match="transforms no photon numbers"):
         loop.photon_number_transform()
+
+
+DAGGERABLE = [
+    Box("f", bit, bit @ bit, array=np.arange(8).reshape(2, 2, 2) * 1j),
+    zx.ZXBox("g", 1, 2, array=np.arange(8).reshape(2, 2, 2) * 1j),
+    zw.ZWBox("h", mode, mode, array=np.arange(9).reshape(3, 3) * 1j),
+    control.ClassicalBox("k", bit, bit, array=[[0, 1], [1, 0]]),
+    control.ControlBox("c", bit, bit, array=[[0, 1j], [1, 0]]),
+]
+
+
+@pytest.mark.parametrize("box", DAGGERABLE, ids=lambda box: box.name)
+def test_the_dagger_of_the_dagger_is_the_box(box):
+    """rel-int/discopy-next#497: the dagger flips ``is_dagger`` as in
+    :mod:`discopy.cat`, so its dagger is the box, and its array is the
+    adjoint once."""
+    dagger = box[::-1]
+    assert dagger.name == box.name and dagger.is_dagger
+    assert str(dagger) == box.name + "[::-1]"
+    assert dagger[::-1] == box and (dagger[::-1].array == box.array).all()
+    assert type(dagger) is type(box) and not dagger[::-1].is_dagger
+    dims = [3] * len(box.dom) if box.dom == mode else None
+    tensor = box.truncation(dims, dims)
+    assert dagger.truncation(dims, dims) == tensor[::-1]
+    assert np.allclose(
+        dagger.truncation(dims, dims).eval().array,
+        tensor.eval().dagger().array)
+
+
+@pytest.mark.parametrize("box", DAGGERABLE, ids=lambda box: box.name)
+def test_the_dagger_reads_back(box):
+    namespace = {**vars(diagram), **vars(zx), **vars(zw), **vars(control),
+                 "optyx": optyx}
+    assert eval(repr(box[::-1]), namespace) == box[::-1]
+    assert (eval(repr(box[::-1]), namespace).array == box[::-1].array).all()
+
+
+def test_a_weight_has_no_dagger():
+    with pytest.raises(NotImplementedError, match="dagger"):
+        control.Weight(lambda n: 1, mode)[::-1]
+
+
+def test_a_self_adjoint_box_reads_back():
+    assert zx.H[::-1] is zx.H
+    assert eval(repr(zx.H), {**vars(zx), "optyx": optyx}) == zx.H

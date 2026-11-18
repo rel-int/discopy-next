@@ -287,6 +287,8 @@ class ZXBox(diagram.Box, ZXDiagram):
 
     def truncation(self, input_dims=None, output_dims=None) -> tensor.Box:
         "Return a :class:`tensor.Box` with the underlying array"
+        if self.is_dagger:
+            return self.dagger().truncation().dagger()
         out_dims = Dim(*[2 for i in range(len(self.cod))])
         in_dims = Dim(*[2 for i in range(len(self.dom))])
 
