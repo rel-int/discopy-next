@@ -238,12 +238,21 @@ class Reiterable:
         return iter(self.inside)
 
 
+class Indexable:
+    """ Iterable by the sequence protocol alone, with no ``__iter__``. """
+    def __init__(self, items):
+        self.items = list(items)
+
+    def __getitem__(self, i):
+        return self.items[i]
+
+
 def test_Permutation_from_iterable():
     x, y, z = Ty('x'), Ty('y'), Ty('z')
     for dom, perm in [(x @ y, [1, 0]), (x @ y @ z, [1, 2, 0])]:
         listed = Permutation(dom, perm)
         for once in (iter(perm), (i for i in perm), dict.fromkeys(perm).keys(),
-                     Reiterable(perm)):
+                     Reiterable(perm), Indexable(perm)):
             result = Permutation(dom, once)
             assert type(result) is type(listed) and result == listed
             assert hash(result) == hash(listed)
