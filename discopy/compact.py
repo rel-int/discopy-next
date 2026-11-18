@@ -71,7 +71,7 @@ from typing import ClassVar
 from discopy import (
     symmetric, ribbon, pivotal, feedback, cmap, hypergraph, interaction,
     messages)
-from discopy.abc import CompactCategory, DaggerCategory
+from discopy.abc import CompactCategory, DaggerMonoidalCategory
 from discopy.cat import factory
 from discopy.utils import deprecated_alias
 from discopy.pivotal import (  # noqa: F401  pylint: disable=unused-import
@@ -239,7 +239,7 @@ Diagram.bubble_factory = Bubble
 for name in (
         "dagger_involution", "dagger_contravariance", "dagger_monoidality"):
     setattr(interaction.Diagram[Diagram], name, getattr(
-        DaggerCategory, name).failing(messages.FEEDBACK_HAS_NO_DAGGER))
+        DaggerMonoidalCategory, name).failing(messages.FEEDBACK_HAS_NO_DAGGER))
 
 
 class Equation(symmetric.Equation):

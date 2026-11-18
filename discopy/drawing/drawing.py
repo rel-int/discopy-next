@@ -222,7 +222,7 @@ import networkx as nx
 from discopy import messages
 from discopy.drawing import backend, Node, Point
 from discopy.config import BOX_DRAWING_ATTRIBUTES, TRANSPARENT
-from discopy.abc import DaggerCategory, TracedCategory
+from discopy.abc import DaggerMonoidalCategory, TracedCategory
 from discopy.python import finset
 from discopy.utils import (
     assert_isinstance, assert_iscomposable, unbiased, factory, RichDisplay)
@@ -346,7 +346,7 @@ class PlaneGraph(NamedTuple):
 @dataclass
 class Drawing(
         TracedCategory["monoidal.Ty", "Drawing"],
-        DaggerCategory["monoidal.Ty", "Drawing"], RichDisplay):
+        DaggerMonoidalCategory["monoidal.Ty", "Drawing"], RichDisplay):
     """
     A drawing is a plane graph with designated input and output types.
 
@@ -392,9 +392,9 @@ class Drawing(
 
     yanking = TracedCategory.yanking.inapplicable(
         messages.PLANAR_YANKING)
-    dagger_contravariance = DaggerCategory.dagger_contravariance.failing(
-        messages.DRAWING_DAGGER_LAYOUT)
-    dagger_monoidality = DaggerCategory.dagger_monoidality.failing(
+    dagger_contravariance = DaggerMonoidalCategory.dagger_contravariance\
+        .failing(messages.DRAWING_DAGGER_LAYOUT)
+    dagger_monoidality = DaggerMonoidalCategory.dagger_monoidality.failing(
         messages.DRAWING_DAGGER_LAYOUT)
 
     def to_tree(self) -> dict:
