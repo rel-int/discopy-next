@@ -628,6 +628,12 @@ class DaggerMonoidalCategory[C0: ColouredMonoid, C1: DaggerMonoidalCategory](
             (f @ g).dagger(), f.dagger() @ g.dagger())
 
 
+DaggerMonoidalCategory.__orig_bases__ = tuple(
+    base[*DaggerMonoidalCategory.__type_params__]
+    for base in (DaggerCategory, MonoidalCategory)
+) + DaggerMonoidalCategory.__orig_bases__[2:]
+
+
 class SpacialCategory[
         C0: ColouredMonoid, C1: SpacialCategory](MonoidalCategory[C0, C1]):
     """
@@ -1910,6 +1916,18 @@ class SymmetricCategory[
     @classmethod
     def braid(cls, left: C0, right: C0) -> C1:
         return cls.swap(left, right)
+
+    @classmethod
+    def braid_inverse(cls, left: C0, right: C0) -> C1:
+        """
+        The inverse of the braid of two objects, the swap of ``right`` and
+        ``left``, so that a symmetric category needs no dagger.
+
+        Parameters:
+            left : The object on the left of the braid.
+            right : The object on the right of the braid.
+        """
+        return cls.swap(right, left)
 
     @axiom
     def permutation_identity[N: Nat](

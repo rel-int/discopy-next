@@ -10,11 +10,9 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 ### Added
 
 - `abc.BraidedCategory.braid_inverse`, the inverse of the braid, by default
-  its dagger: `braid_then_inverse`, `inverse_then_braid` and
-  `inverse_braiding` read the inverse braid from it. `abc.DaggerMonoidalCategory`,
-  the first class with both a dagger and a tensor, states
-  `dagger_monoidality`, which `abc.DaggerCategory` no longer does: `cat.Arrow`
-  and `abc.Group` drop their declarations that it does not apply ([next#485]).
+  its dagger and in a `abc.SymmetricCategory` the swap the other way round,
+  and `abc.DaggerMonoidalCategory`, the first class with both a dagger and a
+  tensor ([next#485]).
 - `lambek.abstract`'s docs build an abstract categorial grammar from English to
   Lean: "DisCoPy diagrams are the arrows of the free premonoidal category"
   prints the statement `lean/Statements/English.lean` proves ([next#622]).
@@ -427,6 +425,10 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Changed
 
+- `abc.BraidedCategory`'s `braid_then_inverse`, `inverse_then_braid` and
+  `inverse_braiding` read the inverse braid from `braid_inverse`, not from
+  the dagger of the braid, and `dagger_monoidality` is stated by
+  `abc.DaggerMonoidalCategory`, no longer by `abc.DaggerCategory` ([next#485]).
 - `monoidal.Diagram.encode` gives its domain and one list of `(box, offset)`
   per layer, so that `decode(*d.encode()) == d` on a foliated diagram too;
   `decode` reads that or a flat list, one box per layer, and
@@ -652,6 +654,9 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Removed
 
+- The declarations of `cat.Arrow` and `abc.Group` that `dagger_monoidality`
+  does not apply, now that a class with no tensor does not state it
+  ([next#485]).
 - Parameters nothing read: `Tree.to_diagram(contravariant)`,
   `Tree.from_nltk(lexicalised, word_types)`, `Drawing.id(length)`,
   `markov.Diagram.discard(n)` and `Backend(linewidth)` ([#768]).

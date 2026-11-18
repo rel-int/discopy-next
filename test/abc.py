@@ -77,6 +77,16 @@ def test_BraidedCategory_braid_inverse():
         assert equation.terms == terms
 
 
+def test_SymmetricCategory_braid_inverse_needs_no_dagger():
+    from discopy.python.multiplicative import Function
+
+    inverse = Function.braid_inverse(int, str)
+    assert not hasattr(Function, "dagger")
+    assert inverse.dom == Function.ob(str, int)
+    assert inverse.cod == Function.ob(int, str)
+    assert inverse("a", 1) == (1, "a")
+
+
 def test_dagger_monoidality_needs_a_dagger_and_a_tensor():
     from discopy import cat, group, matrix, monoidal
     from discopy.abc import (
@@ -89,3 +99,11 @@ def test_dagger_monoidality_needs_a_dagger_and_a_tensor():
         assert issubclass(cls, DaggerMonoidalCategory)
         assert "dagger_monoidality" in cls.axioms
     assert not issubclass(MonoidalCategory, DaggerCategory)
+
+
+def test_DaggerMonoidalCategory_keeps_its_type_parameters():
+    from discopy.abc import DaggerMonoidalCategory
+    from discopy.testable import position
+
+    assert [position(param, DaggerMonoidalCategory)
+            for param in DaggerMonoidalCategory.__type_params__] == [0, 1]
