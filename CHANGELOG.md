@@ -9,6 +9,10 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Added
 
+- `abc.BraidedCategory.braid_inverse`, the inverse of the braid, by default
+  its dagger and in a `abc.SymmetricCategory` the swap the other way round,
+  and `abc.DaggerMonoidalCategory`, the first class with both a dagger and a
+  tensor ([next#485]).
 - `monad.algebra.Algebra.product` and `Algebra.power`, the products of the
   Eilenberg-Moore category, `monad.algebra.Operation`, a value of `M(n)` acting
   on every algebra as a function `Aⁿ → A` that every homomorphism commutes
@@ -447,6 +451,10 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   when its codomain is a `DaggerCategory` that `has_dagger`, which integer
   diagrams over a category with no dagger do not, not whenever it has a
   `dagger` ([next#631]).
+- `abc.BraidedCategory`'s `braid_then_inverse`, `inverse_then_braid` and
+  `inverse_braiding` read the inverse braid from `braid_inverse`, not from
+  the dagger of the braid, and `dagger_monoidality` is stated by
+  `abc.DaggerMonoidalCategory`, no longer by `abc.DaggerCategory` ([next#485]).
 - `Matrix.__init__` no longer copies an array that already has its dtype:
   on numpy the matrix keeps a read-only view of it, so writing into
   `m.array` raises and the caller's array stays writeable, and a torch
@@ -684,6 +692,9 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Removed
 
+- The declarations of `cat.Arrow` and `abc.Group` that `dagger_monoidality`
+  does not apply, now that a class with no tensor does not state it
+  ([next#485]).
 - Parameters nothing read: `Tree.to_diagram(contravariant)`,
   `Tree.from_nltk(lexicalised, word_types)`, `Drawing.id(length)`,
   `markov.Diagram.discard(n)` and `Backend(linewidth)` ([#768]).
@@ -2209,6 +2220,7 @@ for the changelog of `1.2.1` and earlier.
 [next#472]: https://github.com/rel-int/discopy-next/issues/472
 [next#477]: https://github.com/rel-int/discopy-next/issues/477
 [next#482]: https://github.com/rel-int/discopy-next/issues/482
+[next#485]: https://github.com/rel-int/discopy-next/issues/485
 [next#488]: https://github.com/rel-int/discopy-next/issues/488
 [next#489]: https://github.com/rel-int/discopy-next/issues/489
 [next#490]: https://github.com/rel-int/discopy-next/issues/490

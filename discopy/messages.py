@@ -83,10 +83,6 @@ COLOURED_QUOTIENT = (
     "ill-typed across 0-cells, so it would lose its colours.")
 NO_VALUES = "{} has no sample of values, see testable.values."
 NO_DAGGER = "There is no dagger here, so the dagger laws do not apply."
-NO_TENSOR = "An arrow of a category has no tensor for its dagger to "\
-    "distribute over."
-GROUP_TENSOR = "The tensor of a group is its composition, which its dagger "\
-    "reverses rather than distributes over."
 SWAP_INVOLUTION = (
     "The inverse of a swap is the swap the other way, see swap_inverse.")
 PAIR_LENGTH = (

@@ -29,7 +29,8 @@ from dataclasses import dataclass
 
 from discopy import messages
 from discopy.abc import (
-    DaggerCategory, Groupoid, HypergraphCategory, MarkovCategory, PROP, Nat)
+    DaggerCategory, DaggerMonoidalCategory, Groupoid, HypergraphCategory,
+    MarkovCategory, PROP, Nat)
 from discopy.testable import Serialisable
 from discopy.utils import AxiomError, factory_name, unbiased
 
@@ -203,7 +204,7 @@ type Cycle = Iterable[int]
 type Cycles = Iterable[Cycle]
 
 
-class Permutation(Function, PROP, Groupoid):
+class Permutation(Function, PROP, Groupoid, DaggerMonoidalCategory):
     """
     A permutation of a finite set, seen as a bijective finite-set function,
     i.e. an arrow of the groupoid of finite sets and bijections.
