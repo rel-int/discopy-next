@@ -135,29 +135,28 @@ A circuit evaluates with the contractors of @sec:tensors, and the ansatz
 converts to PennyLane, where it evaluates to the same state, and to
 tket.
 
-`quantum.graphlike` simplifies ZX diagrams by the rewriting of
+`quantum.zx.Hypergraph` simplifies ZX diagrams by the rewriting of
 @sec:rewriting. A ZX diagram is graph-like when its spiders are green
 and joined by Hadamard edges only @DuncanEtAl20. As a hypergraph, the
 green spiders are the spiders, so that fusing two of them is the pushout
 itself, a Hadamard edge is a box and a phase is an effect on its spider.
 The rules are those of the `full_reduce` of PyZX @KissingerWetering20,
 each one built for the match at hand and applied in place by
-`hypergraph.Rewriter`, up to a scalar. In the listing, two rotations by
+`zx.Rewriter`, as an equation on the nose: the scalar is kept exactly. In the listing, two rotations by
 an eighth of a turn on the parity of two qubits fuse into a Clifford
 phase: eight spiders, ten Hadamard edges and two phases that are not
-Clifford become three, three and none, with the same tensor up to a
-scalar.
+Clifford become three, three and none, with the same tensor.
 
 ```python
-from discopy.quantum import CX, Id, T, graphlike
+from discopy.quantum import CX, Id, T
 from discopy.quantum.zx import circuit2zx
 
 parity = CX >> Id(1) @ T >> CX
 gadgets = circuit2zx(parity >> parity)
-graph = graphlike.from_diagram(gadgets)
-reduced = graphlike.full_reduce(graph)
-assert graphlike.size(graph) == (8, 10, 2)
-assert graphlike.size(reduced) == (3, 3, 0)
+graph = gadgets.to_hypergraph()
+reduced = graph.full_reduce()
+assert graph.size() == (8, 10, 2)
+assert reduced.size() == (3, 3, 0)
 before, after = gadgets.eval().array, reduced.to_diagram().eval().array
 assert np.isclose(abs(np.vdot(before, after)),
                   np.linalg.norm(before) * np.linalg.norm(after))
