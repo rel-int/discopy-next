@@ -417,7 +417,8 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 ### Changed
 
 - The dagger of an `optyx.core` box defined by its array keeps its name and
-  flips `is_dagger`, as `cat.Box.dagger` does, so `f[::-1][::-1] == f`: it
+  flips `is_dagger`, as `cat.Box.dagger` does, so `f[::-1][::-1] == f`; a
+  box with `is_dagger=None` is self-adjoint and is its own dagger. A dagger
   prints `f[::-1]`, not `f.dagger()`. Truncating a dagger gives the dagger
   of the truncated box, and its repr prints the array, so it reads back. An
   array with an axis per wire is daggered wire by wire, where it used to be
