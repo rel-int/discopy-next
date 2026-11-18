@@ -132,7 +132,19 @@ DAGGERABLE = [
     zw.ZWBox("h", mode, mode, array=np.arange(9).reshape(3, 3) * 1j),
     control.ClassicalBox("k", bit, bit, array=[[0, 1], [1, 0]]),
     control.ControlBox("c", bit, bit, array=[[0, 1j], [1, 0]]),
+    Box("s", Ty(), bit @ bit, array=np.arange(4).reshape(2, 2) * 1j),
+    Box("e", bit @ bit, Ty(), array=np.arange(4).reshape(2, 2) * 1j),
 ]
+
+
+def adjoint(box):
+    """The conjugate of the array with its codomain axes moved first, or
+    its conjugate transpose when it is a matrix."""
+    dom, cod, array = len(box.dom), len(box.cod), np.asarray(box.array)
+    if array.ndim != dom + cod:
+        return array.T.conj()
+    return np.conj(np.moveaxis(
+        array, range(dom + cod), [*range(cod, dom + cod), *range(cod)]))
 
 
 @pytest.mark.parametrize("box", DAGGERABLE, ids=lambda box: box.name)
@@ -145,12 +157,22 @@ def test_the_dagger_of_the_dagger_is_the_box(box):
     assert str(dagger) == box.name + "[::-1]"
     assert dagger[::-1] == box and (dagger[::-1].array == box.array).all()
     assert type(dagger) is type(box) and not dagger[::-1].is_dagger
+    assert (dagger.array == adjoint(box)).all()
     dims = [3] * len(box.dom) if box.dom == mode else None
     tensor = box.truncation(dims, dims)
     assert dagger.truncation(dims, dims) == tensor[::-1]
     assert np.allclose(
         dagger.truncation(dims, dims).eval().array,
         tensor.eval().dagger().array)
+    assert np.allclose(
+        dagger.truncation(dims, dims).eval().array.reshape(-1),
+        adjoint(box).reshape(-1))
+
+
+def test_the_dagger_of_a_state_infers_its_dimension():
+    state = Box("s", Ty(), mode, array=[1, 2, 3])
+    assert state[::-1].truncation() == state.truncation()[::-1]
+    assert state[::-1].truncation().eval().array.shape == (3, )
 
 
 @pytest.mark.parametrize("box", DAGGERABLE, ids=lambda box: box.name)
@@ -169,3 +191,17 @@ def test_a_weight_has_no_dagger():
 def test_a_self_adjoint_box_reads_back():
     assert zx.H[::-1] is zx.H
     assert eval(repr(zx.H), {**vars(zx), "optyx": optyx}) == zx.H
+
+
+def test_the_dagger_is_taken_by_the_backend_of_its_array():
+    """The adjoint of the array keeps its type and its gradient, whichever
+    backend is active."""
+    torch = pytest.importorskip("torch")
+    from discopy.matrix import backend
+    array = torch.arange(8.).reshape(2, 2, 2).requires_grad_()
+    dagger = Box("f", bit, bit @ bit, array=array)[::-1].array
+    assert dagger.requires_grad and dagger[1, 0, 0] == array[0, 1, 0]
+    with backend("pytorch"):
+        dagger = Box("f", bit, bit @ bit,
+                     array=np.arange(8).reshape(2, 2, 2))[::-1].array
+    assert isinstance(dagger, np.ndarray) and dagger[1, 0, 0] == 2

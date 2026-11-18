@@ -418,9 +418,10 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 - The dagger of an `optyx.core` box defined by its array keeps its name and
   flips `is_dagger`, as `cat.Box.dagger` does, so `f[::-1][::-1] == f`: it
-  prints `f[::-1]`, not `f.dagger()`, its truncation is the dagger of the
-  box's, and its repr prints the array, so it reads back. An array with an
-  axis per wire is daggered wire by wire, where it reversed their order
+  prints `f[::-1]`, not `f.dagger()`. Truncating a dagger gives the dagger
+  of the truncated box, and its repr prints the array, so it reads back. An
+  array with an axis per wire is daggered wire by wire, where it used to be
+  transposed as a matrix, which reversed the order of its wires
   ([next#630]).
 - The TikZ backend sets a box label at 8 points and a wire label at 7, below
   and to the right of its port as in Matplotlib, in the colour the backend
@@ -722,8 +723,7 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   two layers, the same hypergraph but not the same diagram, which `explore`
   found ([next#505]).
 - `optyx.core.zx.H` is its own dagger: a box declares itself self-adjoint
-  with `is_dagger=None`, as `quantum.gates.SWAP` does, where the optyx
-  dagger otherwise returns a differently named copy — so `H[::-1] == H`
+  with `is_dagger=None`, as `quantum.gates.SWAP` does, so `H[::-1] == H`
   and `to_pyzx` translates a daggered Hadamard, which `from_pyzx` reads
   back as `H` ([next#498]).
 - Every dual rail diagram serialises: `balanced.DualRailBraid`,

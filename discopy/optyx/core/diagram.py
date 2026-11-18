@@ -661,6 +661,17 @@ class Diagram(frobenius.Diagram):
         )(self)
 
 
+def array_backend(array) -> str:
+    """The name of the :func:`discopy.matrix.backend` an array belongs to,
+    read from the module of its type.
+
+    >>> assert array_backend(np.zeros(2)) == array_backend([0]) == "numpy"
+    """
+    return {"torch": "pytorch", "jax": "jax", "jaxlib": "jax",
+            "tensorflow": "tensorflow"}.get(
+                type(array).__module__.split(".")[0], "numpy")
+
+
 class Box(frobenius.Box, Diagram):
     """A box in an optyx diagram.
 
@@ -774,13 +785,16 @@ class Box(frobenius.Box, Diagram):
         wire has its codomain axes moved before its domain axes, in order,
         any other is transposed as a matrix.
 
+        It is taken by the backend of the array, whichever is active, so a
+        PyTorch array keeps its gradient.
+
         >>> f = Box("f", bit, bit @ bit, array=np.arange(8).reshape(2, 2, 2))
         >>> assert f.array_adjoint()[1, 0, 0] == f.array[0, 1, 0]
         """
         dom, cod = len(self.dom), len(self.cod)
-        if self.array.ndim == 2 or self.array.ndim != dom + cod:
-            return self.array.T.conjugate()
-        with backend() as module:
+        with backend(array_backend(self.array)) as module:
+            if self.array.ndim != dom + cod:
+                return module.conj(self.array.T)
             return module.conj(module.moveaxis(
                 self.array, list(range(dom + cod)),
                 [*range(cod, dom + cod), *range(cod)]))
@@ -816,7 +830,8 @@ class Box(frobenius.Box, Diagram):
         if self.is_dagger:
             return self.dagger().array_truncation(
                 self.array_wire_dims(self.cod, output_dims),
-                self.array_wire_dims(self.dom, input_dims)).dagger()
+                None if input_dims is None
+                else self.array_wire_dims(self.dom, input_dims)).dagger()
         dom_dims = self.array_wire_dims(self.dom, input_dims)
         cod_dims = self.array_wire_dims(self.cod, output_dims)
         expected_size = (
