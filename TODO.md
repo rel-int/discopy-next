@@ -11,3 +11,4 @@
 - [WIP] @session_01MEJxy4BLudMDJBi1HBa5XG-2026-11-18 17:01 beta.Box is neither deterministic nor affine by default
 - [WIP] @session_01MEJxy4BLudMDJBi1HBa5XG-2026-11-18 17:16 negative() keeps each wire's z (cubic P1)
 - [WIP] @session_01MEJxy4BLudMDJBi1HBa5XG-2026-11-18 17:16 Model compares its maps by content and is not hashable (cubic P2, P3)
+- [WIP] @session_01MEJxy4BLudMDJBi1HBa5XG-2026-11-18 17:16 tests: no tautology, relative_sum and par truth values, axioms on several models; alpha.Box example on the unit; axiom docs; CHANGELOG cites in prose (cubic)
