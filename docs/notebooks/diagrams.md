@@ -496,15 +496,15 @@ assert f_1 @ f__1 == f_1 @ x_ >> y_2 @ f__1 == Diagram(inside=(Layer(f_1, x_), L
 f_1 @ f__1
 ```
 
-In fact, the full list of layers is redundant.
-In order to characterise a diagram uniquely, it is enough to give its domain, the list of its boxes and the **offset** for each box, i.e. the number of wires to its left.
-The bijection between these two encodings is implemented by the methods `encode` and `decode`.
+In fact, a diagram can be written more compactly than as its list of layers.
+When each layer has one box, as here, the domain, the list of its boxes and the **offset** for each box, i.e. the number of wires to its left, characterise a diagram.
+The methods `encode` and `decode` go back and forth between a diagram and its domain with one list of boxes and offsets per layer, so that a layer with several boxes comes back as one.
 
 ```python {.marimo}
 d = f_1 @ f__1
 assert d.boxes == [f_1, f__1]
 assert d.offsets == [0, 1]
-assert d.encode() == (d.dom, list(zip(d.boxes, d.offsets))) == (x_2 @ x_, [(f_1, 0), (f__1, 1)])
+assert d.encode() == (x_2 @ x_, [[(f_1, 0)], [(f__1, 1)]])
 assert Diagram.decode(x_2 @ x_, [(f_1, 0), (f__1, 1)]) == d
 ```
 
