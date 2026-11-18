@@ -1,8 +1,0 @@
-> * axioms (now renamed to testable) shouldn't be its own section move as first module in syntax
-> * drawing doesn't need to be its own section let's move it to semantics
-> * neural deserves to be its own section move it from semantics
-
-- [x] testable first in syntax, no section of its own
-- [x] drawing in semantics, no section of its own
-- [x] neural its own section, out of semantics
-- [x] notebooks: sections What is a diagram? (Diagram 101 and the four that fit no field), quantum (QNLP, ZX, contextual fraction, tallcat 05), linguistics, machine learning (TQFT included)
