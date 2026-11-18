@@ -1763,7 +1763,10 @@ class Channel(Diagram, frobenius.Box):
     def lambdify(self, *symbols, **kwargs):
         """
         The channel as a function of ``symbols``, substituted in its Kraus
-        map: a channel with no free symbols is returned as it is.
+        map: a channel with no free symbols is returned as it is. The result
+        is a plain :class:`Channel` that keeps the name: the parametrised
+        boxes, e.g. :class:`photonic.Phase`, have a ``lambdify`` of their
+        own.
 
         >>> from sympy.abc import phi
         >>> from discopy.optyx.photonic import Phase

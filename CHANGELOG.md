@@ -640,10 +640,11 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Fixed
 
-- `Matrix.lambdify` takes a `modules` keyword, which replaces the
-  backend's instead of reaching sympy twice, and `optyx.channel.Channel`
-  substitutes in its Kraus map, so `subs` on e.g. `Phase(x).inflate(2)`
-  no longer keeps `x` ([next#619]).
+- `Matrix.lambdify(*symbols, modules=...)` no longer raises `TypeError`:
+  the `modules` given replace the backend's ([next#619]).
+- `optyx.channel.Channel.lambdify` and `subs` substitute in its Kraus map,
+  so `subs` on e.g. `Phase(x).inflate(2)` no longer keeps `x`; the
+  channel keeps its name ([next#619]).
 - `drawing.PlaneGraph` prints the adjacency of its graph rather than the
   graph's address, so a `Drawing` reads back from its representation and
   prints the same one for equal drawings: its nodes and their successors
