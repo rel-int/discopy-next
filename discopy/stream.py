@@ -178,7 +178,8 @@ from discopy.testable import TestableGeneric
 from discopy.python import finset
 from discopy.utils import (
     AxiomError,
-    assert_isinstance, unbiased, inductive, classproperty, factory_name)
+    Subscript, assert_isinstance, unbiased, inductive, classproperty,
+    factory_name, rebuild_named_generic)
 
 
 @dataclass
@@ -461,24 +462,36 @@ MEMORY = "memory"
 class Memory:  # pylint: disable=too-few-public-methods  # a subscript only
     """
     The boxes :func:`up_to_memory` closes the memory with: ``Memory[B]`` is
-    a subclass of the boxes ``B`` of the underlying category, the same one
-    every time, named so that its terms read back. A box compares its
-    class, so no box a user builds, e.g. one named :data:`MEMORY`, is read
-    as one of them.
+    a subclass of the boxes ``B`` of the underlying category, built once and
+    pickled by its subscript, as a :class:`discopy.utils.NamedGeneric` is. A
+    box compares its class, so no box a user builds is read as one of them.
 
-    >>> x = symmetric.Ty('x')
-    >>> box = Memory[symmetric.Box](MEMORY, x, x)
-    >>> assert box != symmetric.Box(MEMORY, x, x)
-    >>> assert Memory[symmetric.Box] is Memory[symmetric.Box]
+    >>> import pickle
     >>> from discopy import stream, feedback
-    >>> assert eval(repr(box)) == box
+    >>> box = Memory[symmetric.Box](MEMORY, *2 * [symmetric.Ty('x')])
+    >>> assert box != symmetric.Box(MEMORY, *2 * [symmetric.Ty('x')])
+    >>> assert eval(repr(box)) == box == pickle.loads(pickle.dumps(box))
     """
-    @classmethod
-    @cache
-    def __class_getitem__(cls, box_factory: type) -> type:
-        name = f"{cls.__name__}[{factory_name(box_factory)}]"
-        return type(name, (box_factory, ), {
-            "__module__": __name__, "__qualname__": name})
+    def __class_getitem__(cls, box_factory: type | tuple) -> type:
+        box_factory, = box_factory if isinstance(box_factory, tuple)\
+            else (box_factory, )
+        return subclass(cls, box_factory)
+
+
+@cache
+def subclass(memory: type, box_factory: type) -> type:
+    """ The class ``Memory[box_factory]``, see :class:`Memory`. """
+    def __reduce__(self):
+        func, args, *rest = super(result, self).__reduce__()
+        return (func, args, *rest) if not args or args[0] is not result\
+            else (rebuild_named_generic, (func, memory, (
+                Subscript.encode(box_factory), ), args[1:]), *rest)
+
+    name = f"{memory.__name__}[{factory_name(box_factory)}]"
+    result = type(name, (box_factory, ), {
+        "__module__": __name__, "__qualname__": name,
+        "__reduce__": __reduce__})
+    return result
 
 
 def up_to_memory(term: Stream):
@@ -490,14 +503,11 @@ def up_to_memory(term: Stream):
     apart.
 
     It is :func:`up_to_steps` with each memory wire of the unrolled `now`
-    closed by a box named :data:`MEMORY`, a state on the way in and an
-    effect on the way out: the equation of the underlying category, e.g.
-    the isomorphism of hypergraphs, forgets the order of boxes, so two
-    terms are equal when some permutation of the memory of one gives the
-    other. The boxes are of their own class, see :class:`Memory`. A
-    category with no boxes to close it with, e.g.
-    :class:`discopy.python.Function`, compares :func:`up_to_steps`, its
-    memory in order.
+    closed by a :class:`Memory` box, a state in and an effect out: the
+    isomorphism of hypergraphs forgets the order of boxes, so two terms are
+    equal when a permutation of the memory of one gives the other. Over a
+    category with no boxes, e.g. :class:`discopy.python.Function`, it is
+    :func:`up_to_steps`, the memory in order.
 
     >>> x, y, m, n = map(Ty.sequence, "xymn")
     >>> f, g = Stream.sequence('f', x, x, m), Stream.sequence('g', y, y, n)
