@@ -44,6 +44,9 @@ The double cut is the identity in every model:
 from __future__ import annotations
 
 import operator
+from copy import copy
+
+import numpy
 
 from discopy import monoidal
 from discopy.matrix import Matrix
@@ -57,6 +60,19 @@ white, black = Colour("white"), Colour("black")
 
 NEGATIVE = {white: black, black: white}
 """ The other colour of each region, which a cut changes to. """
+
+
+def negative_wire(wire: monoidal.Wire) -> monoidal.Wire:
+    """
+    The wire with the colour on each side swapped, all else kept.
+
+    >>> wire = monoidal.Wire('x', dom=white, cod=white)
+    >>> assert negative_wire(wire).dom == black == negative_wire(wire).cod
+    """
+    result = copy(wire)
+    dom, cod = wire.dom, wire.cod
+    result.dom, result.cod = NEGATIVE[dom], NEGATIVE[cod]  # ty: ignore
+    return result
 
 
 @factory
@@ -95,9 +111,7 @@ class Diagram(monoidal.Diagram):
         diagram = cls.factory
 
         def ob_map(typ):
-            return typ.factory(*(
-                type(wire)(wire.name, dom=NEGATIVE[wire.dom],
-                           cod=NEGATIVE[wire.cod]) for wire in typ.inside))
+            return typ.factory(*map(negative_wire, typ.inside))
 
         def ar_map(box):
             negative = diagram.negative_functor()
@@ -228,10 +242,22 @@ class Model:
         self.ob, self.ar = dict(ob or {}), dict(ar or {})
 
     def __eq__(self, other):
-        return type(self) is type(other) and repr(self) == repr(other)
+        """
+        Two models are equal when they send each name to the same size and
+        the same truth values, in whatever order they were given.
 
-    def __hash__(self):
-        return hash(repr(self))
+        >>> assert Model(ar={'p': 1, 'q': 0}) == Model(ar={'q': 0, 'p': 1})
+        >>> assert Model(ar={'p': [1]}) == Model(ar={'p': 1})
+        """
+        def values(mapping):
+            return sorted(
+                (key, numpy.asarray(value).reshape(-1).tolist())
+                for key, value in mapping.items())
+        return type(self) is type(other) and all(
+            values(getattr(self, attr)) == values(getattr(other, attr))
+            for attr in ("ob", "ar"))
+
+    __hash__ = None
 
     def __repr__(self):
         return f"{factory_name(type(self))}(ob={self.ob!r}, ar={self.ar!r})"

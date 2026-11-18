@@ -169,7 +169,8 @@ class Box(frobenius.Box, Diagram):
 
         >>> from discopy import peirce
         >>> f = Box('f', Ty('x'), Ty('x'), is_deterministic=True)
-        >>> assert eval(repr(f)) == f and f.flags() == {'is_deterministic': True}
+        >>> assert eval(repr(f)) == f
+        >>> assert f.flags() == {'is_deterministic': True}
         """
         return {name: True for name, value in [
             ("is_deterministic", self.deterministic),
@@ -208,6 +209,24 @@ class Cut(alpha.Cut, frobenius.Bubble, Box):
         params.setdefault("is_affine", False)
         super().__init__(arg, dom=dom, cod=cod, **params)
 
+    def to_tree(self) -> dict:
+        """
+        The tree of the bubble with both of its flags.
+
+        >>> from discopy.utils import dumps, loads
+        >>> cut = ~Box('R', Ty('x'), Ty('x'))
+        >>> assert loads(dumps(cut)) == cut
+        """
+        return {**super().to_tree(), "is_deterministic": self.deterministic,
+                "is_affine": self.affine}
+
+    @classmethod
+    def from_tree(cls, tree: dict):
+        result = super().from_tree(tree)
+        result.deterministic = tree.get("is_deterministic", False)
+        result.affine = tree.get("is_affine", False)
+        return result
+
 
 class Functor(alpha.Functor, frobenius.Functor):
     """ A beta functor is a frobenius functor that sends cuts as alpha. """
@@ -239,15 +258,15 @@ swap = Swap(x, x)  # ty: ignore[invalid-argument-type]
 def inclusion(sides: Callable[[], tuple]) -> Axiom:
     """
     The axiom that the relation of one diagram is included in that of the
-    other in every model, its doc that of ``sides``.
+    other in every model.
     """
     @axiom
     def law(cls,
             model: Self,  # ty: ignore[invalid-type-form]
             ) -> Inequation[Tensor]:
+        """ An inclusion of NPR, Fig. 9 of :cite:t:`BonchiEtAl24`. """
         # pylint: disable=unused-argument  # the law quantifies over models
         return Inequation(*map(model, sides()))
-    law.function.__doc__ = sides.__doc__
     return law
 
 
@@ -257,9 +276,9 @@ def equality(sides: Callable[[], tuple]) -> Axiom:
     def law(cls,
             model: Self,  # ty: ignore[invalid-type-form]
             ) -> Equation[Tensor]:
+        """ An equation of NPR, Fig. 9 of :cite:t:`BonchiEtAl24`. """
         # pylint: disable=unused-argument  # the law quantifies over models
         return Equation(*map(model, sides()))
-    law.function.__doc__ = sides.__doc__
     return law
 
 

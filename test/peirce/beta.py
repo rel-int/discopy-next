@@ -33,14 +33,21 @@ def test_model():
         M = Model(ob={'x': 2}, ar={'R': r})
         assert M(~~R) == M(R) and M(R.negative()) == M(~R)
         assert (M(~R).array == ~M(R).array).all()
-        assert M(Id(x)) <= M(R) or not M(R).array.diagonal().all()
+        assert (M(Id(x)) <= M(R)) == M(R).array.diagonal().all()
 
 
 def test_axioms_hold():
-    model = Model(ob={'x': 3}, ar=dict.fromkeys("abcd", [1, 0, 1] * 3))
+    from random import Random
+    random, models = Random(0), []
+    for n in (1, 2, 3):
+        for _ in range(3):
+            models.append(Model(ob={'x': n}, ar={
+                name: [random.random() < .5 for _ in range(n * n)]
+                for name in "abcd"}))
     assert len(Model.axioms) == 67
     for law in Model.axioms.values():
-        assert law(model=model), law.name
+        for model in models:
+            assert law(model=model), (law.name, model)
 
 
 def test_rotated_cut():

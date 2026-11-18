@@ -658,7 +658,7 @@ EXAMPLES = {  # a box of each constructor, from a class c, types x, y, data v
     "monoidal.Bubble": 'c(box(c, x, y, v), name="b", drawing_name="B")',
     "markov.Bubble": 'c(box(c, x, y, v), name="b", is_deterministic=False)',
     "rigid.Bubble": 'c(box(c, x, y, v), name="b", z=1)',
-    "peirce.alpha.Box": 'c("f", x, y, data=v)',
+    "peirce.alpha.Box": 'c("f", data=v)',
     "peirce.beta.Box": 'c("f", x, y, data=v, is_deterministic=True)',
     "peirce.{alpha,beta}.Cut": 'c(c.ar.box_factory("f", t := c.ob(c.ob.generator_'
     'factory("x", dom=(k := sys.modules["discopy.peirce.alpha"].black), '

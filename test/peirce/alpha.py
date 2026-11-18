@@ -35,6 +35,7 @@ def test_model():
         assert truth(p & q) == (P and Q) and truth(p | q) == (P or Q)
         assert truth(~p) == (not P) and truth(~~p) == P
         assert truth(p.negative()) == (not P)
+        assert truth(p.relative_sum(q)) == truth(p.par(q)) == (P or Q)
         assert isinstance(M(p), Tensor)
     assert Model(ar={'p': True}) != Model(ar={'p': False})
-    assert hash(Model()) == hash(Model())
+    assert Model(ar={'p': 1, 'q': 0}) == Model(ar={'q': 0, 'p': 1})

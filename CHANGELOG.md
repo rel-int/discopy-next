@@ -14,8 +14,8 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   changes. `~d`, `d & e`, `d | e`, `d.relative_sum(e)` and `d.par(e)` are
   complement, intersection, union and the black composition and tensor.
   A `Model` sends a diagram to `Tensor[bool]`, and the 64 axioms of the
-  neo-Peircean relations of BonchiEtAl24 are cells of the property matrix
-  ([next#637]).
+  neo-Peircean relations of Bonchi et al. (2024) are cells of the property
+  matrix ([next#637]).
 - `lambek.abstract`'s docs build an abstract categorial grammar from English to
   Lean: "DisCoPy diagrams are the arrows of the free premonoidal category"
   prints the statement `lean/Statements/English.lean` proves ([next#622]).
