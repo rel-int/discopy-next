@@ -5,4 +5,4 @@
 > > P3 (docs/notebooks/diagrams.md:500): The sentence just above this line still says 'the full list of layers is redundant', which is no longer true in general. Layer grouping is only redundant when each layer has one box. Consider rewording the preceding sentence to match.
 
 - [x] CHANGELOG: say encode's new shape breaks callers and how to migrate
-- [ ] diagrams notebook: reword both sentences, re-run --check diagrams
+- [x] diagrams notebook: reword both sentences, re-run --check diagrams
