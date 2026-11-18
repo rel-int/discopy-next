@@ -1,5 +1,6 @@
 import EGraph
 import Statements.Premonoidal
+import Statements.English
 
 /-!
 # What is proved about the model of `discopy.egraph`
