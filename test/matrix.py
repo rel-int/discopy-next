@@ -502,3 +502,15 @@ def test_Matrix_shares_a_read_only_view():
         m.array[0, 0] = 1
     array[0, 0] = 1
     assert array[0, 0] == 1
+
+
+def test_Matrix_lambdify_modules():
+    """ #445: a ``modules`` given to ``lambdify`` replaces the backend's,
+    rather than being passed to sympy a second time. """
+    pytest.importorskip("sympy")
+    from sympy import Expr, sin
+    from sympy.abc import psi
+    f = Matrix[Expr]([sin(psi)], 1, 1)
+    modules = [{"sin": lambda _: 42.}, "math"]
+    assert f.lambdify(psi, dtype=float, modules=modules)(3)\
+        == Matrix[float]([42.], 1, 1) != f.lambdify(psi, dtype=float)(3)

@@ -425,6 +425,14 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   on numpy the matrix keeps a read-only view of it, so writing into
   `m.array` raises and the caller's array stays writeable, and a torch
   tensor stays shared with the caller ([next#616]).
+- The dagger of an `optyx.core` box defined by its array keeps its name and
+  flips `is_dagger`, as `cat.Box.dagger` does, so `f[::-1][::-1] == f`; a
+  box with `is_dagger=None` is self-adjoint and is its own dagger. A dagger
+  prints `f[::-1]`, not `f.dagger()`. Truncating a dagger gives the dagger
+  of the truncated box, and its repr prints the array, so it reads back. An
+  array with an axis per wire is daggered wire by wire, where it used to be
+  transposed as a matrix, which reversed the order of its wires
+  ([next#630]).
 - `monoidal.Diagram.encode` gives its domain and one list of `(box, offset)`
   per layer, so that `decode(*d.encode()) == d` on a foliated diagram too;
   `decode` reads that or a flat list, one box per layer, and
@@ -660,6 +668,11 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Fixed
 
+- `Matrix.lambdify(*symbols, modules=...)` no longer raises `TypeError`:
+  the `modules` given replace the backend's ([next#619]).
+- `optyx.channel.Channel.lambdify` and `subs` substitute in its Kraus map,
+  so `subs` on e.g. `Phase(x).inflate(2)` no longer keeps `x`; the
+  channel keeps its name ([next#619]).
 - The hand features of `drawing.nicer` count the rails of a dual rail
   braid, twist, cup and cap, each read as the chord between its ends by
   `Backend.dual_rail_wires`, as `Backend.crossing_wires` reads the strands of
@@ -740,8 +753,7 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   two layers, the same hypergraph but not the same diagram, which `explore`
   found ([next#505]).
 - `optyx.core.zx.H` is its own dagger: a box declares itself self-adjoint
-  with `is_dagger=None`, as `quantum.gates.SWAP` does, where the optyx
-  dagger otherwise returns a differently named copy — so `H[::-1] == H`
+  with `is_dagger=None`, as `quantum.gates.SWAP` does, so `H[::-1] == H`
   and `to_pyzx` translates a daggered Hadamard, which `from_pyzx` reads
   back as `H` ([next#498]).
 - Every dual rail diagram serialises: `balanced.DualRailBraid`,
@@ -2232,9 +2244,11 @@ for the changelog of `1.2.1` and earlier.
 [next#605]: https://github.com/rel-int/discopy-next/pull/605
 [next#609]: https://github.com/rel-int/discopy-next/pull/609
 [next#616]: https://github.com/rel-int/discopy-next/pull/616
+[next#619]: https://github.com/rel-int/discopy-next/pull/619
 [next#622]: https://github.com/rel-int/discopy-next/pull/622
 [next#623]: https://github.com/rel-int/discopy-next/pull/623
 [next#629]: https://github.com/rel-int/discopy-next/pull/629
+[next#630]: https://github.com/rel-int/discopy-next/pull/630
 [next#633]: https://github.com/rel-int/discopy-next/pull/633
 [next#634]: https://github.com/rel-int/discopy-next/pull/634
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
