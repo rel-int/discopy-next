@@ -9,6 +9,13 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Added
 
+- `discopy.peirce.alpha` and `discopy.peirce.beta`: Peirce's existential
+  graphs as diagrams with white and black regions, a cut where the colour
+  changes. `~d`, `d & e`, `d | e`, `d.relative_sum(e)` and `d.par(e)` are
+  complement, intersection, union and the black composition and tensor.
+  A `Model` sends a diagram to `Tensor[bool]`, and the 64 axioms of the
+  neo-Peircean relations of BonchiEtAl24 are cells of the property matrix
+  ([next#637]).
 - `lambek.abstract`'s docs build an abstract categorial grammar from English to
   Lean: "DisCoPy diagrams are the arrows of the free premonoidal category"
   prints the statement `lean/Statements/English.lean` proves ([next#622]).
@@ -2196,6 +2203,7 @@ for the changelog of `1.2.1` and earlier.
 [next#622]: https://github.com/rel-int/discopy-next/pull/622
 [next#623]: https://github.com/rel-int/discopy-next/pull/623
 [next#633]: https://github.com/rel-int/discopy-next/pull/633
+[next#637]: https://github.com/rel-int/discopy-next/pull/637
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#56]: https://github.com/rel-int/optyx/pull/56
