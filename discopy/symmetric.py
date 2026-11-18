@@ -98,7 +98,7 @@ Both sides foliate to the same single permutation.
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Iterator, Sequence
+from collections.abc import Iterable, Sequence
 from typing import ClassVar
 
 from discopy import monoidal, feedback, balanced, hypergraph, cmap, messages
@@ -573,7 +573,8 @@ class Permutation(Box):
     Parameters:
         dom : The domain, i.e. the wires to permute.
         perm : The permutation as a :class:`finset.Permutation`, a list or
-            any iterable, an iterator being read once into a list.
+            any iterable, which is read once into a list unless it is a
+            sequence.
 
     Examples
     --------
@@ -609,7 +610,8 @@ class Permutation(Box):
     def __new__(cls, dom: monoidal.Ty | None = None,
                 perm: Iterable[int] | None = None):
         listed = finset.Permutation(perm, len(dom))\
-            if dom is not None and isinstance(perm, Iterator) else None
+            if dom is not None and isinstance(perm, Iterable)\
+            and not isinstance(perm, Sequence | monoidal.Ty) else None
         perm = perm if listed is None else listed
         factory = cls.ar.swap_factory\
             if dom is not None and cls is not cls.ar.swap_factory\
@@ -622,7 +624,7 @@ class Permutation(Box):
 
     def __init__(self, dom: monoidal.Ty, perm: Iterable[int]):
         self.perm = finset.Permutation(
-            self.perm if isinstance(perm, Iterator) else perm, len(dom))
+            perm if isinstance(perm, Sequence) else self.perm, len(dom))
         cod = dom[:0].tensor(*(dom[i] for i in self.perm))
         name = f"Permutation({list(self.perm)})"
         super().__init__(
@@ -803,7 +805,7 @@ class Swap(Permutation, balanced.Braid, Box):
     def __init__(self, left, right):
         if not isinstance(right, monoidal.Ty) and len(left) == 2:
             perm = finset.Permutation(
-                self.perm if isinstance(right, Iterator) else right, 2)
+                right if isinstance(right, Sequence) else self.perm, 2)
             if not perm.is_swap():
                 raise ValueError(messages.NOT_A_SWAP.format(list(perm)))
             left, right = left[:1], left[1:]

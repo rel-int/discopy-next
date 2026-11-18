@@ -229,11 +229,21 @@ def test_Layer_tensor():
     assert isinstance(plumbed[1], Permutation)
 
 
-def test_Permutation_from_iterator():
+class Reiterable:
+    """ An iterable that is neither an iterator nor a sequence. """
+    def __init__(self, inside):
+        self.inside = inside
+
+    def __iter__(self):
+        return iter(self.inside)
+
+
+def test_Permutation_from_iterable():
     x, y, z = Ty('x'), Ty('y'), Ty('z')
     for dom, perm in [(x @ y, [1, 0]), (x @ y @ z, [1, 2, 0])]:
         listed = Permutation(dom, perm)
-        for once in (iter(perm), (i for i in perm)):
+        for once in (iter(perm), (i for i in perm), dict.fromkeys(perm).keys(),
+                     Reiterable(perm)):
             result = Permutation(dom, once)
             assert type(result) is type(listed) and result == listed
             assert hash(result) == hash(listed)

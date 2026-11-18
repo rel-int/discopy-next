@@ -656,7 +656,8 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Fixed
 
-- A `Permutation` given an iterator reads it once into a list, so
+- A `Permutation` given an iterable that is not a sequence, e.g. an
+  iterator, a generator or a dict's keys, reads it once into a list, so
   `Permutation(x @ y, iter([1, 0]))` is the `Swap` the list form gives
   ([next#31]).
 - The hand features of `drawing.nicer` count the rails of a dual rail

@@ -5,6 +5,7 @@ from sympy.abc import x, y
 from discopy.optyx.channel import (
     CQMap, Channel, Diagram, Encode, Measure, Observable, Permutation,
     bit, mode, qmode, qubit)
+from discopy import optyx
 from discopy.optyx import photonic
 from discopy.optyx.core import diagram, zw, zx
 from discopy import tensor
@@ -236,6 +237,17 @@ def test_permutation_dagger_is_its_inverse():
     perm = Permutation(qmode ** 3, [1, 2, 0])
     assert (perm.dagger().dom, perm.dagger().cod) == (perm.cod, perm.dom)
     assert np.allclose((perm >> perm.dagger()).to_path().array, np.eye(3))
+
+
+def test_permutation_from_iterator():
+    namespace = {"optyx": optyx}
+    for dom, perm in [(qubit @ bit, [1, 0]), (qubit @ bit @ mode, [1, 2, 0])]:
+        listed = Permutation(dom, perm)
+        for once in (iter(perm), (i for i in perm)):
+            result = Permutation(dom, once)
+            assert type(result) is type(listed) and result == listed
+            assert hash(result) == hash(listed)
+            assert eval(repr(result), namespace) == result
 
 
 def test_inflation_only_touches_optical_wires():
