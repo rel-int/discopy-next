@@ -281,7 +281,7 @@ a, b, c, d = (Box(name, x, x) for name in "abcd")
 
 copy, discard = Spider(1, 2, x), Spider(1, 0, x)
 merge, start = Spider(2, 1, x), Spider(0, 1, x)
-swap = Swap(x, x)  # ty: ignore[invalid-argument-type]
+swap = Swap(x, x)
 
 
 def inclusion(sides: Callable[[], tuple]) -> Axiom:
