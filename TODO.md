@@ -6,4 +6,4 @@
 - [x] tests, the issue's reproducer included
 - [x] CHANGELOG bullet
 - [x] ask USER: interaction.Diagram, finset.Cospan and hopf.Intertwiner have a total dagger and declare no DaggerCategory, so a functor into them now reads a daggered box off ar_map
-- [WIP] @session_01MEJxy45CJtENv2bizg14LE-2026-11-18 11:40 USER ruled the ask: "next#631: Declare Cospan + Int — Both declare DaggerCategory, with Int[compact]'s dagger_monoidality declared failing. Intertwiner stays undeclared and keeps its name." Declare them, cells run, a functor test into each
+- [x] USER ruled the ask: "next#631: Declare Cospan + Int — Both declare DaggerCategory, with Int[compact]'s dagger_monoidality declared failing. Intertwiner stays undeclared and keeps its name." Declare them, cells run, a functor test into each
