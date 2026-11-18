@@ -4,5 +4,5 @@
 
 (cubic-dev-ai, review of `effc773`)
 
-- [WIP] @session_01MEJxy45CJtENv2bizg14LE-2026-11-18 10:00 `up_to_memory` over a category with no `box_factory` is `up_to_steps`, tested on `Stream[python.Function]`
-- [WIP] @session_01MEJxy45CJtENv2bizg14LE-2026-11-18 10:00 `MEMORY` a name no user box carries, tested against a box named "memory"
+- [x] `up_to_memory` over a category with no `box_factory` is `up_to_steps`, tested on `Stream[python.Function]`
+- [x] `MEMORY` a name no user box carries, tested against a box named "memory"
