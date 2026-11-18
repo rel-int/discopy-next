@@ -176,6 +176,8 @@ TERM_IS_A_BOX = \
     "A term is a box: the laws and rules of its category are the diagram's."
 MISSING_BOXES_AND_OFFSETS = (
     "Decoding needs either boxes and offsets, or the two of them zipped.")
+OVERLAPPING_BOXES = (
+    "{} at offset {} overlaps the box on its left, which ends at {}.")
 CURRY_HAS_NO_DAGGER = "A curry has no dagger."
 BANG_HAS_NO_DAGGER = (
     "{} has no dagger: !L* has no rule from its codomain back to its domain.")
