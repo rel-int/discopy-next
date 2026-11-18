@@ -413,6 +413,10 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Changed
 
+- `monoidal.Diagram.encode` gives its domain and one list of `(box, offset)`
+  per layer, so that `decode(*d.encode()) == d` on a foliated diagram too;
+  `decode` reads that or a flat list, one box per layer, and
+  `to_staircases` flattens the layers itself ([next#629]).
 - The TikZ backend sets a box label at 8 points and a wire label at 7, below
   and to the right of its port as in Matplotlib, in the colour the backend
   picks for it, and a unit of its picture is 8/12 inch, which fits the width
@@ -2187,6 +2191,7 @@ for the changelog of `1.2.1` and earlier.
 [next#604]: https://github.com/rel-int/discopy-next/pull/604
 [next#605]: https://github.com/rel-int/discopy-next/pull/605
 [next#623]: https://github.com/rel-int/discopy-next/pull/623
+[next#629]: https://github.com/rel-int/discopy-next/pull/629
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#56]: https://github.com/rel-int/optyx/pull/56
