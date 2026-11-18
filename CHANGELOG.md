@@ -146,6 +146,14 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   the law. `Ty.strategy`, `Ty.generator_strategy` and `Stream.strategy`
   generate the terms those laws quantify over; the property matrix does not
   check streams yet, see [next#533] ([next#535]).
+- `abc.Category.ob_equation`, how a category compares its objects, `==` by
+  default, as `equation_factory` says how it compares its arrows:
+  `testable.inhabits` checks the boundary of a term with it. `stream.Stream`
+  compares types over their first `stream.STEPS` steps (`stream.steps`), and
+  reads `bifunctoriality`, `strength` and `tightening` up to a permutation of
+  the memory wires: `stream.up_to_memory` closes each one with a box named
+  `stream.MEMORY`, whose order the isomorphism of hypergraphs forgets. The
+  property matrix checks streams ([next#627], ruling on [next#533]).
 - `neural.propagation`, belief propagation: `sum_product` is the
   sum-product algorithm on a factor table as a network with a trace, from
   the tensor of each factor to the belief of each node, its traced legs the
@@ -2187,6 +2195,7 @@ for the changelog of `1.2.1` and earlier.
 [next#604]: https://github.com/rel-int/discopy-next/pull/604
 [next#605]: https://github.com/rel-int/discopy-next/pull/605
 [next#623]: https://github.com/rel-int/discopy-next/pull/623
+[next#627]: https://github.com/rel-int/discopy-next/pull/627
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#56]: https://github.com/rel-int/optyx/pull/56

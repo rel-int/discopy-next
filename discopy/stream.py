@@ -168,9 +168,8 @@ See :mod:`discopy.feedback` for the other axioms for feedback categories.
 from __future__ import annotations
 
 from typing import Optional
-from collections.abc import Callable, Iterator, Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
-from itertools import chain, groupby, permutations, product
 
 from discopy import messages, symmetric, testable
 from discopy.abc import FeedbackCategory, NamedGeneric
@@ -454,99 +453,24 @@ def steps(typ: Ty) -> tuple:
     return tuple(result)
 
 
-def sorted_orders(wires) -> Iterator[tuple[int, ...]]:
-    """
-    Every order of the indices of a list of wires that sorts them by their
-    representation, the stable one first, i.e. the permutations within
-    each run of equal wires.
-
-    >>> x, y = symmetric.Ty('x'), symmetric.Ty('y')
-    >>> list(sorted_orders([y, x, y]))
-    [(1, 0, 2), (1, 2, 0)]
-    """
-    runs = [[i for i, _ in run] for _, run in groupby(
-        sorted(enumerate(wires), key=lambda pair: repr(pair[1])),
-        key=lambda pair: repr(pair[1]))]
-    for orders in product(*map(permutations, runs)):
-        yield tuple(chain(*orders))
+MEMORY = "memory"
+""" The name of the boxes :func:`up_to_memory` closes the memory with. """
 
 
-@dataclass
-class MemoryOrbit:
-    """
-    The first :data:`STEPS` steps of a stream up to a permutation of its
-    memory, see :func:`up_to_memory`: its unrolled `now`, its memory
-    wires on either side sorted by their representation, and the number of
-    memory wires on either side. Two are equal when some permutation of
-    equal memory wires of one gives the other, up to the equation of the
-    underlying category, which is equality up to any permutation of the
-    memory of the two streams they come from.
-
-    Parameters:
-        now : The unrolled `now`, its memory wires sorted.
-        mem_dom : The number of memory wires of its domain.
-        mem_cod : The number of memory wires of its codomain.
-    """
-    now: symmetric.Diagram
-    mem_dom: int
-    mem_cod: int
-
-    @classmethod
-    def sort(cls, now, mem_dom: int, mem_cod: int,
-             dom_order=None, cod_order=None) -> MemoryOrbit:
-        """
-        The orbit of an arrow whose last ``mem_dom`` wires in and
-        ``mem_cod`` wires out are memory, permuted in the given orders,
-        the stable sort by default, see :func:`sorted_orders`.
-        """
-        dom, cod = (
-            [typ[i:i + 1] for i in range(len(typ))]
-            for typ in (now.dom, now.cod))
-        n_dom, n_cod = len(dom) - mem_dom, len(cod) - mem_cod
-        dom_order = next(sorted_orders(dom[n_dom:]))\
-            if dom_order is None else dom_order
-        cod_order = next(sorted_orders(cod[n_cod:]))\
-            if cod_order is None else cod_order
-        inverse = sorted(range(mem_dom), key=dom_order.__getitem__)
-        sources = dom[:n_dom] + [dom[n_dom + i] for i in dom_order]
-        before = type(now).permutation(
-            [*range(n_dom), *(n_dom + i for i in inverse)], sources)
-        after = type(now).permutation(
-            [*range(n_cod), *(n_cod + i for i in cod_order)], cod)
-        return cls(before >> now >> after, mem_dom, mem_cod)
-
-    def orbit(self) -> Iterator[symmetric.Diagram]:
-        """
-        The arrows of the orbit, quotiented by the equation of the
-        underlying category: :attr:`now` with its memory permuted in every
-        order that keeps it sorted.
-        """
-        dom, cod = (
-            [typ[i:i + 1] for i in range(len(typ))]
-            for typ in (self.now.dom, self.now.cod))
-        for dom_order, cod_order in product(
-                sorted_orders(dom[len(dom) - self.mem_dom:]),
-                sorted_orders(cod[len(cod) - self.mem_cod:])):
-            yield testable.quotient(type(self.now), self.sort(
-                self.now, self.mem_dom, self.mem_cod,
-                dom_order, cod_order).now)
-
-    def __eq__(self, other):
-        if not isinstance(other, MemoryOrbit):
-            return NotImplemented
-        target = testable.quotient(type(other.now), other.now)
-        return any(arrow == target for arrow in self.orbit())
-
-    __hash__ = None  # type: ignore[assignment]
-
-
-def up_to_memory(term: Stream) -> MemoryOrbit:
+def up_to_memory(term: Stream):
     """
     The first :data:`STEPS` steps of a stream up to a permutation of its
     memory wires, in and out: what a law of streams whose two sides feed
     back the same memory in another order is read with, e.g. the
-    interchanger of the module docstring, which :func:`up_to_steps`
-    tells apart.
+    interchanger of the module docstring, which :func:`up_to_steps` tells
+    apart.
+
+    It is :func:`up_to_steps` with each memory wire of the unrolled `now`
+    closed by a box named :data:`MEMORY`, a state on the way in and an
+    effect on the way out: the equation of the underlying category, e.g.
+    the isomorphism of hypergraphs, forgets the order of boxes, so two
+    terms are equal when some permutation of the memory of one gives the
+    other, provided no term has a box of that name.
 
     >>> x, y, m, n = map(Ty.sequence, "xymn")
     >>> f, g = Stream.sequence('f', x, x, m), Stream.sequence('g', y, y, n)
@@ -554,11 +478,20 @@ def up_to_memory(term: Stream) -> MemoryOrbit:
     >>> LHS, RHS = f @ g >> h @ k, (f >> h) @ (g >> k)
     >>> assert up_to_steps(LHS) != up_to_steps(RHS)
     >>> assert up_to_memory(LHS) == up_to_memory(RHS)
-    >>> assert up_to_memory(f @ g) != up_to_memory(g @ f)
+    >>> assert up_to_memory(f @ h) != up_to_memory(h @ f)
     """
     unrolled = term.unroll(STEPS)
-    return MemoryOrbit.sort(
-        unrolled.now, len(unrolled.mem_dom), len(unrolled.mem_cod))
+    now, category = unrolled.now, type(term).category
+    box, unit = category.box_factory, category.ob()
+    n_dom = len(now.dom) - len(unrolled.mem_dom)
+    n_cod = len(now.cod) - len(unrolled.mem_cod)
+    states = [box(MEMORY, unit, now.dom[i:i + 1])
+              for i in range(n_dom, len(now.dom))]
+    effects = [box(MEMORY, now.cod[i:i + 1], unit)
+               for i in range(n_cod, len(now.cod))]
+    closed = category.id(now.dom[:n_dom]).tensor(*states) >> now\
+        >> category.id(now.cod[:n_cod]).tensor(*effects)
+    return testable.quotient(category, closed)
 
 
 @dataclass
