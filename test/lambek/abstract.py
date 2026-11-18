@@ -344,6 +344,7 @@ def test_english_to_lean():
             abstract.__doc__)
         if "sentence(PREMONOIDAL)))())" in example.source)
     lean = Path(__file__).parents[2] / "lean/Statements/English.lean"
-    _, statement = lean.read_text().split("[DecidableEq S.Ob] :\n")
+    text = lean.read_text(encoding="utf-8")
+    _, statement = text.split("[DecidableEq S.Ob] :\n")
     statement, _ = statement.split("\n    := ")
     assert printed.split() == statement.split()
