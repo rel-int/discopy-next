@@ -2,6 +2,6 @@
 
 - [x] Drawing declares DaggerCategory, its laws checked
 - [x] additive.Function.dagger renamed inverse, callers updated
-- [ ] cat.Functor's dagger predicate is issubclass(cod, DaggerCategory)
+- [x] cat.Functor's dagger predicate is issubclass(cod, DaggerCategory)
 - [ ] tests, the issue's reproducer included
 - [ ] CHANGELOG bullet
