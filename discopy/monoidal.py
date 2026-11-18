@@ -1513,43 +1513,58 @@ class Diagram(cat.Arrow, MonoidalCategory, RichDisplay):
             len(self.dom),
             max((len(layer.cod) for layer in self), default=0))
 
-    def encode(self) -> "tuple[Ty, list[tuple[Box, int]]]":
+    def encode(self) -> "tuple[Ty, list[list[tuple[Box, int]]]]":
         """
-        Compact encoding of a diagram as a tuple of boxes and offsets.
+        Compact encoding of a diagram as its domain and its layers, each the
+        list of its boxes with their offsets, see
+        :attr:`Layer.boxes_and_offsets`: the offset of a box is the length of
+        the type on its left, the boxes on its left counted by their
+        codomain, so that flattening the layers gives the offsets of
+        :meth:`to_staircases`.
 
         Example
         -------
         >>> x, y, z, w = Ty('x'), Ty('y'), Ty('z'), Ty('w')
         >>> f0, f1, g = Box('f0', x, y), Box('f1', z, w), Box('g', y @ w, y)
         >>> diagram = f0 @ f1 >> g
-        >>> dom, boxes_and_offsets = diagram.encode()
+        >>> dom, layers = diagram.encode()
         >>> assert dom == x @ z
-        >>> assert boxes_and_offsets == [(f0, 0), (f1, 1), (g, 0)]
+        >>> assert layers == [[(f0, 0)], [(f1, 1)], [(g, 0)]]
         >>> assert diagram == Diagram.decode(*diagram.encode())
         >>> diagram.draw(doctest='docs/_static/monoidal/arrow-example.svg')
 
         .. image:: /_static/monoidal/arrow-example.svg
             :align: center
+
+        A layer with several boxes, as :meth:`foliation` makes, is one list:
+
+        >>> foliated = diagram.foliation()
+        >>> assert foliated.encode()[1] == [[(f0, 0), (f1, 1)], [(g, 0)]]
+        >>> assert foliated == Diagram.decode(*foliated.encode())
         """
-        return self.dom, list(zip(self.boxes, self.offsets))
+        return self.dom, [layer.boxes_and_offsets for layer in self.inside]
 
     @classmethod
     def decode(
             cls,
             dom: Ty,
-            boxes_and_offsets: Iterable[tuple["Box", int]] | None = None,
+            boxes_and_offsets: Iterable[
+                "tuple[Box, int] | list[tuple[Box, int]]"] | None = None,
             boxes: "list[Box] | None" = None,
             offsets: list[int] | None = None,
             cod: Ty | None = None) -> "Diagram":
         """
-        Turn a tuple of boxes and offsets into a diagram.
+        Turn a domain and layers of boxes and offsets into a diagram, the
+        inverse of :meth:`encode`.
 
         Parameters:
             dom : The domain of the diagram.
             cod : The codomain of the diagram.
-            boxes_and_offsets : The boxes and offsets of the diagram.
-            boxes : The list of boxes.
-            offsets : The list of offsets.
+            boxes_and_offsets : The layers of the diagram, each a list of
+                ``(box, offset)`` as :meth:`encode` writes them, or a single
+                ``(box, offset)`` for a layer with one box.
+            boxes : The list of boxes, one per layer.
+            offsets : The list of offsets, one per layer.
 
         Example
         -------
@@ -1557,24 +1572,61 @@ class Diagram(cat.Arrow, MonoidalCategory, RichDisplay):
         >>> f, g = Box('f', x, y), Box('g', z, w)
         >>> assert f @ z >> y @ g == Diagram.decode(
         ...     dom=x @ z, cod=y @ w, boxes=[f, g], offsets=[0, 1])
+        >>> assert f @ z >> y @ g == Diagram.decode(x @ z, [(f, 0), (g, 1)])
+        >>> assert (f @ g).foliation() == Diagram.decode(
+        ...     x @ z, [[(f, 0), (g, 1)]])
 
         Note
         ----
         If ``boxes_and_offsets is None``
-        then we set it to ``zip(boxes, offstes)``.
+        then we set it to ``zip(boxes, offsets)``.
         """
         if boxes_and_offsets is None:
             if boxes is None or offsets is None:
                 raise ValueError(messages.MISSING_BOXES_AND_OFFSETS)
             boxes_and_offsets = zip(boxes, offsets)
         diagram = cls.id(dom)
-        for box, offset in boxes_and_offsets:
-            left = diagram.cod[:offset]
-            right = diagram.cod[offset + len(box.dom):]
-            diagram = diagram >> left @ box @ right
+        for layer in boxes_and_offsets:
+            if layer and not isinstance(layer[0], tuple | list):
+                layer = [layer]
+            diagram = diagram >> cls.decode_layer(diagram.cod, layer)
         if cod is not None:
             assert_iscomposable(diagram, cls.id(cod))
         return diagram
+
+    @classmethod
+    def decode_layer(
+            cls, dom: Ty, boxes_and_offsets: "list[tuple[Box, int]]"
+    ) -> "Diagram":
+        """
+        The diagram of one layer, given its domain and its boxes with their
+        offsets as :attr:`Layer.boxes_and_offsets` writes them.
+
+        Parameters:
+            dom : The domain of the layer.
+            boxes_and_offsets : The boxes of the layer, left to right.
+
+        Example
+        -------
+        >>> x, y = map(Ty, "xy")
+        >>> f, g = Box('f', x, y), Box('g', x, y)
+        >>> layer = Diagram.decode_layer(x @ x @ x, [(f, 0), (g, 2)])
+        >>> assert layer.inside == (Layer(f, x, g), )
+        >>> assert Diagram.decode_layer(x @ x, [(g, 1)]) == x @ g
+        """
+        if len(boxes_and_offsets) == 1:
+            (box, offset), = boxes_and_offsets
+            return dom[:offset] @ box @ dom[offset + len(box.dom):]
+        inside, position, end = [], 0, 0
+        for box, offset in boxes_and_offsets:
+            if offset < end:
+                raise ValueError(messages.OVERLAPPING_BOXES.format(
+                    box, offset, end))
+            inside += [dom[position:position + offset - end], box]
+            position += offset - end + len(box.dom)
+            end = offset + len(box.cod)
+        layer = cls.layer_factory(*inside, dom[position:])
+        return cls((layer, ), layer.dom, layer.cod)
 
     def to_drawing(self, functor_factory=None) -> Drawing:
         """ Called before :meth:`Diagram.draw`. """
@@ -1626,8 +1678,8 @@ class Diagram(cat.Arrow, MonoidalCategory, RichDisplay):
 
     def to_staircases(self):
         """
-        Splits layers with more than one box into staircases, i.e. decodes
-        the boxes of the diagram with their offsets, one layer each.
+        Splits layers with more than one box into staircases, i.e. flattens
+        the layers of :meth:`encode` and decodes each box as its own layer.
 
         Example
         -------
@@ -1639,7 +1691,9 @@ class Diagram(cat.Arrow, MonoidalCategory, RichDisplay):
         >>> print(diagram.foliation().to_staircases())
         f0 @ y >> y @ f1
         """
-        return self.ar.decode(*self.encode())
+        dom, layers = self.encode()
+        return self.ar.decode(dom, [
+            pair for layer in layers for pair in layer])
 
     @axiom
     def hypergraph_identity[X: Obj[Ty]](
