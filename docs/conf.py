@@ -91,6 +91,10 @@ html_theme_options = {
     "repository_url": "https://github.com/discopy/discopy",
     "use_repository_button": True,
     "path_to_docs": "docs",
+    # The sidebar shows the branch of the current page alone: in full, it
+    # is ~1,200 entries rendered into each of ~1,100 pages, which is most of
+    # the build's time and timed Read the Docs out.
+    "collapse_navbar": True,
     # "extra_navbar": "",
 }
 myst_enable_extensions = ["attrs_block"]
@@ -106,6 +110,13 @@ master_doc = 'index'
 
 html_baseurl = os.environ.get(
     "READTHEDOCS_CANONICAL_URL", "https://docs.discopy.org")
+
+
+# Read the Docs links to each notebook rather than running it, as a pull
+# request's build does: run one after another they take longer than its
+# 15-minute limit on their own. The `build` workflow renders them on `main`.
+if os.environ.get("READTHEDOCS") == "True":
+    os.environ.setdefault("DISCOPY_SKIP_NOTEBOOKS", "1")
 
 
 def setup(app):
