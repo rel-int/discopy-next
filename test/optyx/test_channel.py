@@ -168,16 +168,29 @@ def test_decomposition_is_for_zx_channels():
         photonic.TBS(.25).to_dual_rail()
 
 
-def test_sums_double_and_differentiate_term_by_term():
+def test_sums_double_coherently_and_differentiate_term_by_term():
     dims = [2] * 4
     assert np.allclose(
         (photonic.BS + photonic.BS).double().to_tensor(dims).eval().array,
-        2 * photonic.BS.double().to_tensor(dims).eval().array)
+        4 * photonic.BS.double().to_tensor(dims).eval().array)
     phases = photonic.Phase(x) + photonic.Phase(2 * x)
     assert phases.grad(y) == Diagram.sum_factory((), qmode, qmode)
     one_photon = phases.grad(x).subs((x, .1)).eval().tensor.array[1, 1]
     assert np.isclose(one_photon, 2j * np.pi * (
         np.exp(.2j * np.pi) + 2 * np.exp(.4j * np.pi)))
+
+
+def test_a_sum_doubles_to_the_density_matrix_of_its_kraus_map():
+    """next#252: the doubled Bell sum keeps its cross terms."""
+    bell = (photonic.Create(1, 0, 1, 0) + photonic.Create(0, 1, 0, 1)
+            ) @ photonic.Scalar(2 ** -.5)
+    psi = bell.get_kraus().to_tensor().eval().array
+    rho = bell.double().to_tensor().eval().array
+    assert np.allclose(
+        rho, np.einsum("abcd,efgh->aebfcgdh", psi, psi.conjugate()))
+    assert np.isclose(rho[1, 0, 0, 1, 1, 0, 0, 1], .5)
+    with pytest.raises(AssertionError, match="non-pure"):
+        (photonic.PhotonLoss(.5) + photonic.PhotonLoss(.5)).double()
 
 
 def test_a_box_without_a_gradient_refuses_to_differentiate():
