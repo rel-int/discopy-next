@@ -39,3 +39,8 @@ def test_model():
         assert isinstance(M(p), Tensor)
     assert Model(ar={'p': True}) != Model(ar={'p': False})
     assert Model(ar={'p': 1, 'q': 0}) == Model(ar={'q': 0, 'p': 1})
+
+
+def test_cut_checks_both_boundaries():
+    with raises(AxiomError, match="changes the colour"):
+        Cut(p.negative(), cod=p.negative().cod)

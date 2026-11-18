@@ -193,7 +193,7 @@ got white inside white.
         negative = arg.negative_functor()
         dom = negative(arg.dom) if dom is None else dom
         cod = negative(arg.cod) if cod is None else cod
-        if dom.dom == arg.colour:
+        if arg.colour in (dom.dom, cod.dom):
             raise AxiomError(
                 "A cut changes the colour of its region, "
                 f"got {arg.colour.name} inside {dom.dom.name}.")
