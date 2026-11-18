@@ -5,3 +5,4 @@
 - [x] cat.Functor's dagger predicate is issubclass(cod, DaggerCategory)
 - [x] tests, the issue's reproducer included
 - [ ] CHANGELOG bullet
+- [ ] ask USER: interaction.Diagram, finset.Cospan and hopf.Intertwiner have a total dagger and declare no DaggerCategory, so a functor into them now reads a daggered box off ar_map
