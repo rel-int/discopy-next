@@ -3,4 +3,4 @@
 - [x] optyx Box.dagger flips is_dagger, no rename, array adjoint exactly once
 - [x] truncation, to_pyzx and reprs read is_dagger
 - [x] test b[::-1][::-1] == b and eval(repr(b[::-1])) == b[::-1] on the six classes
-- [ ] changelog bullet
+- [x] changelog bullet
