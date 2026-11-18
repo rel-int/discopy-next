@@ -220,6 +220,7 @@ dual-rail encoding. For example, we can create a GHZ state:
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from importlib import import_module
 from itertools import count, repeat
 import warnings
@@ -1953,7 +1954,8 @@ class Permutation(frobenius.Permutation, Channel):
     env = diagram.Ty()
 
     def __init__(self, dom, perm):
-        self.perm = finset.Permutation(perm, len(dom))
+        self.perm = finset.Permutation(
+            perm if isinstance(perm, Sequence) else self.perm, len(dom))
         cod = dom[:0].tensor(*(dom[i] for i in self.perm))
         name = f"Permutation({list(self.perm)})"
         frobenius.Box.__init__(
