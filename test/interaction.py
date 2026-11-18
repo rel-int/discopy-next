@@ -319,5 +319,8 @@ def test_Functor_into_Int_with_no_dagger_reads_ar_map():
         R, R)
     x = monoidal.Ty('x')
     f = monoidal.Box('f', x, x)
-    F = monoidal.Functor({x: R}, {f: square, f.dagger(): square}, cod=D)
-    assert F(f.dagger()).inside(2., 1.) == (4., 4.)
+    shift = D(python.Function(
+        lambda a, da: (a + 1, da), (float, float), (float, float)), R, R)
+    F = monoidal.Functor({x: R}, {f: square, f.dagger(): shift}, cod=D)
+    assert F(f).inside(2., 1.) == (4., 4.)
+    assert F(f.dagger()).inside(2., 1.) == (3., 1.)
