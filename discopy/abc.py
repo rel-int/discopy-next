@@ -148,6 +148,21 @@ class Category[C0, C1: Category](Testable[C1], ABC):
         return Equation(*terms)
 
     @classmethod
+    def ob_equation(cls, *objects) -> Equation:
+        """
+        Construct an equation of objects, using strict equality by default,
+        as :meth:`equation_factory` does of morphisms: what
+        :func:`discopy.testable.inhabits` checks the boundary of a term
+        with, so that a category whose objects compare only up to a
+        quotient, e.g. :class:`discopy.stream.Stream`, says which.
+
+        >>> from discopy.monoidal import Ty, Diagram
+        >>> assert Diagram.ob_equation(Ty('x'), Ty('x'))
+        >>> assert not Diagram.ob_equation(Ty('x'), Ty('y'))
+        """
+        return Equation(*objects)
+
+    @classmethod
     @abstractmethod
     def id(cls, dom: C0) -> C1:
         """
