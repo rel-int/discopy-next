@@ -59,9 +59,9 @@ def test_permutation():
     p = Function.permutation([1, 2, 0], [X, X @ X, X])
     assert [p(5, tag) for tag in range(4)] == [(5, 3), (5, 0), (5, 1), (5, 2)]
     assert Function.permutation([0], [X])(5) == 5
-    assert Function.swap(X, X).dagger()(1, 0) == (1, 1)
+    assert Function.swap(X, X).inverse()(1, 0) == (1, 1)
     with raises(ValueError):
-        Function(lambda obj: obj, X, X).dagger()  # Only swaps have one.
+        Function(lambda obj: obj, X, X).inverse()  # Only swaps have one.
     f = Function(lambda obj, tag=0: (obj, 1 - tag), X @ X, X @ X)
     assert f.trace(0) is f
 
@@ -138,7 +138,7 @@ def test_subclass_as_functor_codomain():
     x = Sub.ob(int)
     assert all(isinstance(f, Sub) for f in (
         Sub.id(x), Sub.twist(x), Sub.merge(x), Sub.noise(x),
-        Sub.swap(x, x), Sub.swap(x, x).dagger(),
+        Sub.swap(x, x), Sub.swap(x, x).inverse(),
         Sub.permutation((1, 0), (x, x)), Sub.id(x).tensor(Sub.id(x)),
         Sub(lambda n, tag=0: (n, 0) if n else (n - 1, 1),
             x @ x, x @ x).trace()))

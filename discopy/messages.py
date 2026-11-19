@@ -65,6 +65,12 @@ NOT_FROBENIUS = \
     "{} has no spiders, cups or caps to downgrade this hypergraph."
 NOT_RIGID = "{} has no cups or caps for the wiring of this map."
 NOT_TRACED = "{} has no traces for the cycles of this map."
+DRAWING_DAGGER_LAYOUT = (
+    "A drawing is compared on the nose, positions included: composition "
+    "aligns wires from the top down and a tensor puts its left boxes first, "
+    "so the reflection of a composite or a tensor can be laid out with "
+    "other positions or box indices.")
+ONLY_SWAP_INVERSE = "Only a swap has an inverse: a function has no dagger."
 NO_PLANAR_NORMAL_FORM = (
     "A planar law is compared on the nose: a hypergraph is faithful only "
     "from symmetric categories on, and there is no normal form for this "

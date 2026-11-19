@@ -1280,7 +1280,8 @@ class Functor(monoidal.Functor):
             arg = other.dom if other.is_dagger else other.cod
             result = self.cod.followed_by(self(arg))
             return result.dagger() if other.is_dagger\
-                and hasattr(self.cod, "dagger") else result
+                and issubclass(self.cod, DaggerCategory)\
+                and self.cod.has_dagger() else result
         if isinstance(other, Feedback)\
                 and issubclass(self.cod, FeedbackCategory)\
                 and self.cod.delay is not FeedbackCategory.delay:

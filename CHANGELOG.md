@@ -449,6 +449,15 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Changed
 
+- `drawing.Drawing`, `python.finset.Cospan` and `interaction.Diagram`
+  declare `abc.DaggerCategory`, the reflection of a drawing being
+  involutive, with its contravariance and monoidality declared failing on
+  the nose, and the dagger laws of `Int(compact.Diagram)` declared failing,
+  feedback having no dagger; `python.additive.Function.dagger`, defined on
+  swaps alone, is `inverse`; and a functor maps a daggered box as the dagger of its image
+  when its codomain is a `DaggerCategory` that `has_dagger`, which integer
+  diagrams over a category with no dagger do not, not whenever it has a
+  `dagger` ([next#631]).
 - `abc.BraidedCategory`'s `braid_then_inverse`, `inverse_then_braid` and
   `inverse_braiding` read the inverse braid from `braid_inverse`, not from
   the dagger of the braid, and `dagger_monoidality` is stated by
@@ -1759,6 +1768,12 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Project
 
+- A push to `main` measures every Python of `build`'s matrix: with `fail-fast`
+  off, one version failing in its setup leaves the other two running, so
+  `Test notebooks` — which runs on a push to `main` and on no pull request —
+  still runs on the versions that survived. The composite setup action gives
+  each download 120 seconds, uv's default 30 having not been enough for the
+  55 MiB `egglog` wheel ([next#639]).
 - `build`'s Coverage step combines with `--debug=dataio`, naming each data file
   it merges, and fails with its own error when it merged fewer than two: the
   controller of `pytest -n auto` writes one and each worker one more, so the
@@ -2303,9 +2318,11 @@ for the changelog of `1.2.1` and earlier.
 [next#627]: https://github.com/rel-int/discopy-next/pull/627
 [next#629]: https://github.com/rel-int/discopy-next/pull/629
 [next#630]: https://github.com/rel-int/discopy-next/pull/630
+[next#631]: https://github.com/rel-int/discopy-next/pull/631
 [next#633]: https://github.com/rel-int/discopy-next/pull/633
 [next#634]: https://github.com/rel-int/discopy-next/pull/634
 [next#637]: https://github.com/rel-int/discopy-next/pull/637
+[next#639]: https://github.com/rel-int/discopy-next/pull/639
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#56]: https://github.com/rel-int/optyx/pull/56
