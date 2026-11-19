@@ -101,9 +101,12 @@ def matplotlib_context():
 def draw(graph: Drawing, **params):
     """ Load a :class:`Backend` and draw a :class:`Drawing` on it. """
     if params.get("format") == "typst":
-        path, show = params.pop("path", None), params.pop("show", True)
+        path, compare = doctest_or_path(
+            params.pop("path", None), params.pop("doctest", None))
+        show = params.pop("show", True)
+        compare = params.pop("compare", False) or compare
         return Typst(**params).draw(graph, **params).output(
-            path=path, show=show, **params)
+            path=path, show=show, compare=compare, **params)
     aspect = params.get('aspect', 'auto' if 'figsize' in params else 'equal')
     if params.get('legend', False) and not params.get('to_tikz', False):
         colours = Backend.region_colours(graph)
@@ -2098,21 +2101,51 @@ class Typst(Backend):
         doc.content = canvas
         return doc
 
-    def output(self, path=None, show=True, **params):
-        doc = self.to_document(**params)
-        source = doc.render()
-        if isinstance(path, (str, os.PathLike))\
-                and str(path).endswith(".typ"):
-            pathlib.Path(path).write_text(source, encoding="utf-8")
-            return source
+    @staticmethod
+    def compile(source: str) -> bytes:
+        """ The SVG of a Typst ``source``, with the optional ``typst``. """
         try:
             import typst
-
-            svg = typst.compile(source.encode(), format="svg", pretty=True)
         except ImportError as error:  # pragma: no cover
             raise ImportError(
                 "Typst rendering requires the 'typst' package. "
                 "Install it with: pip install typst") from error
+        return typst.compile(source.encode(), format="svg", pretty=True)
+
+    @classmethod
+    def save(cls, source: str, path) -> str | bytes:
+        """ Write a Typst ``source`` to a path ending in ``.typ``, its
+        SVG to any other path, and return what was written. """
+        if str(path).endswith(".typ"):
+            pathlib.Path(path).write_bytes(source.encode("utf-8"))
+            return source
+        svg = cls.compile(source)
+        pathlib.Path(path).write_bytes(svg)
+        return svg
+
+    def output(self, path=None, show=True, **params):
+        """
+        The Typst source of the drawing when ``path`` ends in ``.typ``,
+        written there, else its SVG, written to ``path`` when there is one.
+        With ``compare``, i.e. ``draw(doctest=path)``, the file at ``path``
+        is a baseline, its source or its SVG, so ``path`` ends in ``.typ``
+        or ``.svg``: written when missing, compared with otherwise, as
+        :func:`save_and_compare` does for any other backend.
+        """
+        source = self.to_document(**params).render()
+        is_source = isinstance(path, (str, os.PathLike))\
+            and str(path).endswith(".typ")
+        if params.get("compare", False):
+            if not str(path).endswith((".typ", ".svg")):
+                raise ValueError(
+                    f"A Typst baseline ends in .typ or .svg, got {path!r}.")
+            written = []
+            save_and_compare(path, lambda file: written.append(
+                self.save(source, file)))
+            return written[0]
+        if is_source:
+            return self.save(source, path)
+        svg = self.compile(source)
         if hasattr(path, "write"):
             path.write(svg.decode() if isinstance(path, TextIOBase) else svg)
             return svg
