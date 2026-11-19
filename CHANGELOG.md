@@ -707,6 +707,9 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Fixed
 
+- The Typst backend draws its labels after every box and wire, as TikZ puts
+  them on a layer of their own, so that a box drawn after a wire label no
+  longer hides it ([next#648]).
 - The empty type of a colour is its own adjoint and reads back from its
   `repr` below `monoidal`: `rigid.Ty.l` and `.r` kept the colour of a type
   with no object to read it off, and `biclosed.Ty.__repr__` was
@@ -2322,6 +2325,7 @@ for the changelog of `1.2.1` and earlier.
 [next#634]: https://github.com/rel-int/discopy-next/pull/634
 [next#639]: https://github.com/rel-int/discopy-next/pull/639
 [next#640]: https://github.com/rel-int/discopy-next/pull/640
+[next#648]: https://github.com/rel-int/discopy-next/pull/648
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#44]: https://github.com/rel-int/optyx/pull/44
