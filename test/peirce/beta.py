@@ -100,7 +100,7 @@ def test_model_functor_default():
 
 
 def test_permutations_keep_colours():
-    model = Model(ob={'x': 2}, ar={'S': list(range(16))})
+    model = Model(ob={'x': 2}, ar={'S': [1, 0, 1, 1, 0, 0, 1, 1] + 4 * [0, 1]})
     S = Box('S', x @ x, x @ x)
     swapped = S.permute(1, 0)
     assert swapped.cod == x @ x and swapped == S >> Swap(x, x)
