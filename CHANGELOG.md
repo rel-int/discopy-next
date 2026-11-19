@@ -714,6 +714,9 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 - `frobenius.Diagram.unfuse` keeps the category of the diagram, e.g. the
   cuts of a `peirce.beta.Diagram` ([next#637]).
+- `symmetric.Diagram.permutation` starts from the empty type of the colour
+  of its types, so `permute` and `frobenius.Diagram.from_cospan` take
+  coloured wires ([next#637]).
 - The empty type of a colour is its own adjoint and reads back from its
   `repr` below `monoidal`: `rigid.Ty.l` and `.r` kept the colour of a type
   with no object to read it off, and `biclosed.Ty.__repr__` was

@@ -200,6 +200,17 @@ got white inside white.
         super().__init__(arg, dom=dom, cod=cod, **params)
 
 
+class Sum(monoidal.Sum, Box):
+    """
+    A formal sum of alpha diagrams with the same boundary, which a model
+    reads as the union of their relations.
+
+    >>> p, q = Box('p'), Box('q')
+    >>> M = Model(ar={'p': True, 'q': False})
+    >>> assert isinstance(p + q, Sum) and M(p + q) == M(p) + M(q)
+    """
+
+
 class Functor(monoidal.Functor):
     """
     An alpha functor is a monoidal functor that sends a :class:`Cut` to the
@@ -292,6 +303,7 @@ class Model:
 
 Diagram.box_factory = Box
 Diagram.bubble_factory = Cut
+Diagram.sum_factory = Sum
 Diagram.functor_factory = Functor
 Model.diagram = Diagram
 Id = Diagram.id

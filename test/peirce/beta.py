@@ -97,3 +97,22 @@ def test_unfuse_keeps_cuts():
 def test_model_functor_default():
     model = Model(ob={'x': 2})
     assert model.functor()(Spider(1, 2, x)) == model(Spider(1, 2, x))
+
+
+def test_permutations_keep_colours():
+    model = Model(ob={'x': 2}, ar={'S': list(range(16))})
+    S = Box('S', x @ x, x @ x)
+    swapped = S.permute(1, 0)
+    assert swapped.cod == x @ x and swapped == S >> Swap(x, x)
+    assert model(swapped) == model(S >> Swap(x, x))
+    assert Diagram.from_cospan(x, [0], [0, 0]) == Spider(1, 2, x)
+    y = Ty(Wire('y', dom=black, cod=black))
+    assert Diagram.permutation([1, 0], [y, y]).cod == y @ y
+
+
+def test_sums_stay_peirce():
+    S = Box('S', x, x)
+    model = Model(ob={'x': 2}, ar={'R': [1, 0, 0, 0], 'S': [0, 0, 0, 1]})
+    assert isinstance(R + S, Sum) and isinstance((R + S).negative(), Sum)
+    assert model(R + S) == model(R) + model(S)
+    assert model((R + S).negative()) == model(~(R + S))

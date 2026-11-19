@@ -255,6 +255,10 @@ class Cut(alpha.Cut, frobenius.Bubble, Box):
         return result
 
 
+class Sum(alpha.Sum, frobenius.Sum, Box):
+    """ A formal sum of beta diagrams with the same boundary. """
+
+
 class Functor(alpha.Functor, frobenius.Functor):
     """ A beta functor is a frobenius functor that sends cuts as alpha. """
     dom = cod = Diagram
@@ -266,6 +270,7 @@ Diagram.swap_factory = Swap
 Diagram.cup_factory, Diagram.cap_factory = Cup, Cap
 Diagram.permutation_factory = Permutation
 Diagram.bubble_factory = Cut
+Diagram.sum_factory = Sum
 Diagram.functor_factory = Functor
 Id = Diagram.id
 
