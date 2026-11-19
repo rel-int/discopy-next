@@ -312,28 +312,13 @@ class Ty(Pregroup, biclosed.Ty):
 
     @property
     def l(self) -> Self:
-        """
-        The left adjoint of the type, i.e. the left adjoints of the objects
-        inside in reverse order.
-
-        The empty type is its own adjoint, colour and all: it has one colour
-        on both sides, which reversing the wire swaps for itself, and there
-        is no object left to read it off.
-
-        Example
-        -------
-        >>> from discopy.monoidal import Colour
-        >>> unit = Ty.id(Colour('black'))
-        >>> assert unit.l == unit == unit.r
-        """
-        return self if not self.inside\
-            else self.ar(*[x.l for x in self.inside[::-1]])
+        """ The left adjoint of the type. """
+        return self.ar(*[x.l for x in self.inside[::-1]])
 
     @property
     def r(self) -> Self:
-        """ The right adjoint of the type, see :meth:`Ty.l`. """
-        return self if not self.inside\
-            else self.ar(*[x.r for x in self.inside[::-1]])
+        """ The right adjoint of the type. """
+        return self.ar(*[x.r for x in self.inside[::-1]])
 
     @property
     def z(self) -> int:

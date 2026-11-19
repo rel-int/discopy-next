@@ -402,6 +402,18 @@ def test_Wire_reads_back_main():
         closed.Ty(monoidal.Wire('x'))
 
 
+def test_the_empty_type_of_a_colour_reads_back():
+    """ `Ty.id(colour)` prints as itself rather than as the uncoloured empty
+    type, which the repr of `monoidal.Ty` already said and this one hid,
+    see #636. """
+    black = monoidal.Colour('black')
+    unit = Ty.id(black)
+    assert repr(unit) == "biclosed.Ty.id(monoidal.Colour('black'))"
+    assert eval(repr(unit), {'biclosed': biclosed, 'monoidal': monoidal})\
+        == unit != Ty()
+    assert repr(Ty()) == "biclosed.Ty()"
+
+
 def test_rigid_type_is_biclosed():
     """ A rigid type is a biclosed type, its atoms are rigid wires. """
     from discopy import closed, rigid

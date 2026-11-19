@@ -211,10 +211,6 @@ class Ty(monoidal.Ty):
         return st.recursive(
             cls.generator_strategy(), exponentials, max_leaves=max_leaves)
 
-    def __repr__(self):
-        return factory_name(type(self))\
-            + f"({', '.join(map(repr, self.inside))})"
-
     def cast_wire(self, x: str | cat.Ob) -> cat.Ob:
         """
         Turn a constructor argument into an atom of the type: any monoidal
