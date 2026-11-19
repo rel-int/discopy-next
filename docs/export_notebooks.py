@@ -36,6 +36,7 @@ import re
 import subprocess
 import sys
 from concurrent.futures import ThreadPoolExecutor
+from functools import partial
 from html import escape
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -149,13 +150,13 @@ def export(notebook: Path, *, check: bool) -> None:
         script = Path(scratch) / f"{notebook.stem}.py"
         path = os.pathsep.join(filter(None, (
             str(DOCS.parent), os.environ.get("PYTHONPATH"))))
-        for command in (
-                ["convert", notebook.name, "-o", str(script)],
-                ["export", "html", str(script), "-o", str(output), "-f"]):
-            subprocess.run(
-                [sys.executable, "-m", "marimo", *command],
-                cwd=notebook.parent, env=os.environ | {"PYTHONPATH": path},
-                check=True)
+        marimo = partial(
+            subprocess.run, cwd=notebook.parent,
+            env=os.environ | {"PYTHONPATH": path}, check=True)
+        marimo([sys.executable, "-m", "marimo", "convert", notebook.name,
+                "-o", str(script)], stdout=subprocess.DEVNULL)
+        marimo([sys.executable, "-m", "marimo", "export", "html", str(script),
+                "-o", str(output), "-f"])
         add_theme_style(output, title_of(notebook))
 
 
