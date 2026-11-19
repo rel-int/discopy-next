@@ -224,3 +224,13 @@ def test_tikz_escapes_a_label_outside_mathematics(tmp_path):
         assert label in tikz
     assert TikZ.escape("(n >> s) << n") == "(n >{}> s) <{}< n"
     assert TikZ.escape(">>> a\\_b \\$x_y\\$") == ">{}>{}> a\\_b \\$x\\_y\\$"
+
+
+@mark.parametrize("shape", ["rectangle", "triangle_up", "triangle_down",
+                            "plus"])
+def test_typst_draws_the_shape_of_a_spider(shape):
+    x = Ty('x')
+    spider = Box('', x, x @ x, draw_as_spider=True, shape=shape)
+    source = spider.to_typst().render()
+    assert "circle(" not in source
+    spider.draw(format="typst", path=None, show=False)

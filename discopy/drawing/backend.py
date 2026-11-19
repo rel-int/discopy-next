@@ -2009,19 +2009,43 @@ class Typst(Backend):
 
     def spider_shape(self, box, i, j) -> list[Call]:
         """
-        The disc or the square of a spider at ``(i, j)``, and nothing when
-        its colour is transparent: such a spider is just its label, e.g. the
-        symbol of an :class:`discopy.monoidal.Equation`.
+        The shape of a spider at ``(i, j)``, one of :data:`SHAPES` as
+        matplotlib draws it: a square, a triangle pointing up or down, a
+        plus sign in its colour or else a disc. Nothing when its colour is
+        transparent: such a spider is just its label, e.g. the symbol of an
+        :class:`discopy.monoidal.Equation`.
+
+        >>> from discopy.frobenius import Ty, Spider
+        >>> spider = Spider(1, 1, Ty('x'))
+        >>> for shape in SHAPES:
+        ...     spider.shape = shape
+        ...     call, *_ = Typst().spider_shape(spider, 0, 0)
+        ...     print(shape, call.func.render(), len(call.args))
+        rectangle rect 2
+        triangle_up line 3
+        triangle_down line 3
+        circle circle 1
+        plus line 2
         """
         if self.is_transparent(box.color):
             return []
         colour = self.color_expr(self.format_color(box.color))
         options = {"fill": Ident(colour), "stroke": self.stroke(linewidth=0.5)}
+        size = self.nodesize * 0.15
         if box.shape == "rectangle":
-            size = self.nodesize * 0.15
             return [Call(Ident("rect"), [
                 self.coord(i - size, j - size),
                 self.coord(i + size, j + size)], options)]
+        if box.shape in ("triangle_up", "triangle_down"):
+            apex = size if box.shape == "triangle_up" else -size
+            return [Call(Ident("line"), [
+                self.coord(i - size, j - apex), self.coord(i + size, j - apex),
+                self.coord(i, j + apex)], {"close": Bool(True), **options})]
+        if box.shape == "plus":
+            return [Call(Ident("line"), [
+                self.coord(i - x, j - y), self.coord(i + x, j + y)],
+                {"stroke": self.stroke(box.color)})
+                for x, y in ((size, 0), (0, size))]
         return [Call(Ident("circle"), [self.coord(i, j)], {
             "radius": Float(self.nodesize * 0.12), **options})]
 
