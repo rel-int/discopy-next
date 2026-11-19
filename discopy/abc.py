@@ -35,9 +35,9 @@ in a dotted bracket, see :mod:`discopy.drawing.bracketing`, e.g. for
 .. image:: /_static/bracketing/associativity.svg
     :align: center
 
-A :class:`MonoidalCategory`, :class:`BraidedCategory`,
-:class:`SymmetricCategory` or :class:`RigidCategory` states no axiom of its
-own yet, so its page draws none, and no free category of diagrams is a
+An operation other than composition and tensor, e.g. the currying of a
+:class:`BiclosedCategory` or the bang of a :class:`LinearCategory`, draws its
+operand in a bracket labelled by it. No free category of diagrams is a
 groupoid, so :meth:`Groupoid.invertibility` is not drawn.
 
 Summary

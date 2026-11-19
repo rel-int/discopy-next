@@ -4,7 +4,7 @@ from discopy import abc, monoidal
 from discopy.abc import Category, Groupoid, Nat
 from discopy.drawing.bracketing import (
     Bracketed, equation, free_category, stated_axioms)
-from discopy.testable import Axiom, Equation, Hom, Obj, Repeat, Testable
+from discopy.testable import Axiom, Equation, Hom, Obj, Repeat
 
 STATED = [
     axiom for cls in vars(abc).values()
@@ -12,9 +12,15 @@ STATED = [
     for axiom in stated_axioms(cls).values()]
 
 
+UNDRAWN = {
+    # No free category of diagrams is a groupoid.
+    "abc.Groupoid.invertibility",
+}
+
+
 @mark.parametrize("axiom", STATED, ids=map(repr, STATED))
 def test_every_axiom_draws(axiom, tmp_path):
-    if free_category(axiom) is None:
+    if repr(axiom) in UNDRAWN:
         with raises(ValueError):
             equation(axiom)
         return
@@ -36,7 +42,7 @@ def test_no_free_groupoid():
 
 def test_generic_needs_names():
     with raises(TypeError):
-        Testable.transparency.bind(monoidal.Diagram).generic()
+        monoidal.Diagram.repr_transparency.generic()
 
 
 def test_generic_number():
@@ -82,3 +88,19 @@ def test_whiskering_unbracketed():
     assert (x @ (f >> g)).drawing.bracketing
     term = ((x @ f) >> (x @ g)).to_drawing()
     assert not any(box.draw_as_bracket for box in term.boxes)
+
+
+def test_unary_operation():
+    from discopy import rigid
+    x, y = rigid.Ty('x'), rigid.Ty('y')
+    f = Bracketed[rigid.Diagram](rigid.Box('f', x, y))
+    for term, value, name in [
+            (f.transpose(), f.value.transpose(), "transpose"),
+            (f.curry(left=False), f.value.curry(left=False), "λ(left=False)"),
+            (f.r, f.value.r, "r")]:
+        assert term.value == value and (term.dom, term.cod) == (
+            value.dom, value.cod)
+        top, *_ = term.drawing.boxes
+        assert top.draw_as_bracket and str(top.cod[0]) == name
+    assert Bracketed[rigid.Diagram].cups(x, x.r).value == rigid.Cup(x, x.r)
+    assert not Bracketed[rigid.Diagram].cups(x, x.r).drawing.bracketing

@@ -12,6 +12,24 @@ Each axiom thus draws itself from its
 :meth:`~discopy.testable.Declaration.generic` instance in its
 :func:`free_category`, see :func:`equation`.
 
+A term delegates to its free category every name the axioms of that category
+use and :class:`Bracketed` lacks, see :func:`delegate`: a classmethod, e.g.
+``ev``, ``cups`` or ``laxator``, is a generator, drawn as its value and never
+bracketed; a method or a property, e.g. ``curry``, ``bang``, ``transpose`` or
+``r``, is a unary operation, which draws its operand in a dotted bracket
+labelled by its symbol, followed by the arguments it is given other than its
+defaults, e.g. ``λ(left=False)``:
+
+============= ========
+operation     label
+============= ========
+``dagger``    ``†``
+``bang``      ``!``
+``curry``     ``λ``
+``uncurry``   ``λ⁻¹``
+anything else its name
+============= ========
+
 Summary
 -------
 
@@ -29,7 +47,9 @@ Summary
         :nosignatures:
         :toctree:
 
-        generator
+        delegate
+        label
+        vocabulary
         free_category
         applies
         stated_axioms
@@ -61,44 +81,86 @@ from importlib import import_module
 from discopy import messages, monoidal
 from discopy.abc import Category, DaggerCategory, TracedCategory
 from discopy.drawing.drawing import Drawing
-from discopy.testable import Axiom, AxiomFailure, Equation
-from discopy.utils import NamedGeneric, factory, unbiased
+from discopy.testable import Axiom, AxiomFailure, Equation, TestableGeneric
+from discopy.utils import classproperty, factory, unbiased
 
 FREE_CATEGORIES = (
     "monoidal", "spacial", "feedback", "braided", "balanced", "symmetric",
-    "markov", "comarkov", "ribbon")
+    "markov", "comarkov", "biclosed", "rigid", "pivotal", "ribbon", "compact",
+    "closed", "frobenius")
 """
 The modules whose ``Diagram`` is a free category an axiom is drawn in, from
 the most general, see :func:`free_category`.
 """
 
-GENERATORS = (
-    "swap", "braid", "twist", "copy", "discard", "merge", "noise")
-"""
-The generators of a free category besides its identities, which a
-:class:`Bracketed` term delegates to it, see :func:`generator`.
-"""
+SYMBOLS = {"dagger": "†", "bang": "!", "curry": "λ", "uncurry": "λ⁻¹"}
+""" The symbol of each unary operation that has one, see :func:`label`. """
 
 
-def generator(name: str) -> classmethod:
+def vocabulary(axiom: Axiom) -> set[str]:
     """
-    The generator of a free category with a name, as a :class:`Bracketed`
-    term: the drawing of a generator is never bracketed.
+    The names the code of an axiom uses, e.g. those of the generators and
+    the operations it states a law of.
+
+    >>> from discopy.abc import RigidCategory
+    >>> assert {"caps", "cups"} <= vocabulary(RigidCategory.snake_equations)
+    """
+    return set(inspect.unwrap(axiom.function).__code__.co_names)
+
+
+def delegate(free: type, name: str):
+    """
+    The attribute of a :class:`Bracketed` term of a free category that
+    delegates to the attribute of the free category with a name: a
+    classmethod is a generator, a method or a property a unary operation,
+    see :meth:`Bracketed.operation`, and anything else, e.g. a class, is
+    that of the free category.
 
     Parameters:
-        name : The name of the classmethod of the free category.
+        free : The free category.
+        name : The name of the attribute.
     """
-    def method(cls, *args, **kwargs):
-        return cls(getattr(cls.free, name)(*args, **kwargs))
-    method.__name__ = name
-    method.__doc__ = f"The ``{name}`` of the free category, see " \
-        f":meth:`discopy.abc.Category.id`."
-    return classmethod(method)
+    attribute = inspect.getattr_static(free, name)
+    if isinstance(attribute, classmethod | staticmethod):
+        def generator(cls, *args, **kwargs):
+            return cls.term(getattr(cls.free, name)(*args, **kwargs))
+        return classmethod(generator)
+    if isinstance(attribute, property):
+        return property(lambda self: self.operation(name))
+    if inspect.isfunction(attribute):
+        def operation(self, *args, **kwargs):
+            return self.operation(name, *args, **kwargs)
+        return operation
+    return attribute
+
+
+def label(method, name: str, *args, **kwargs) -> str:
+    """
+    The label of a unary operation: its symbol, see :data:`SYMBOLS`, else its
+    name, followed by the arguments it is given other than its defaults.
+
+    Parameters:
+        method : The method of the free category, taking the operand first.
+        name : The name of the operation.
+        args : The arguments it is given after the operand.
+        kwargs : The keyword arguments it is given.
+
+    >>> from discopy.rigid import Diagram
+    >>> print(label(Diagram.curry, "curry", 1, left=False))
+    λ(left=False)
+    """
+    signature = inspect.signature(method)
+    given = signature.bind(None, *args, **kwargs).arguments
+    changed = ", ".join(
+        f"{key}={value!r}" for key, value in list(given.items())[1:]
+        if value != signature.parameters[key].default)
+    symbol = SYMBOLS.get(name, name)
+    return f"{symbol}({changed})" if changed else symbol
 
 
 @factory
 @dataclass
-class Bracketed[free](NamedGeneric, DaggerCategory, TracedCategory):
+class Bracketed[free](TestableGeneric, DaggerCategory, TracedCategory):
     """
     A term of the ``free`` category with its drawing, bracketed: its value is
     the arrow it evaluates to and its drawing that of the operations it was
@@ -110,8 +172,9 @@ class Bracketed[free](NamedGeneric, DaggerCategory, TracedCategory):
 
     The operations draw as follows: :meth:`then` and :meth:`tensor` set their
     operands one after the other or side by side, :meth:`trace` and
-    :meth:`feedback` draw a loop, and :meth:`dagger` draws its operand in a
-    bracket labelled ``†`` rather than its mirror image, which would draw the
+    :meth:`feedback` draw a loop, and every other one, e.g. :meth:`dagger`,
+    draws its operand in a bracket labelled by the operation, see
+    :meth:`operation`, rather than drawing its value, which would draw the
     involution ``f.dagger().dagger() == f`` as ``f == f``. A term of an axiom
     is drawn on its own, its outermost operation with no bracket, see
     :meth:`to_drawing`.
@@ -138,6 +201,73 @@ class Bracketed[free](NamedGeneric, DaggerCategory, TracedCategory):
     def __post_init__(self):
         if self.drawing is None:
             self.drawing = self.value.to_drawing()
+
+    def __class_getitem__(cls, values):
+        """
+        The terms of a free category, which delegate to it every name its
+        axioms use that a term lacks, see :func:`delegate`.
+        """
+        terms, free = super().__class_getitem__(values), values
+        if not isinstance(free, type):
+            return terms
+        names = set().union(*map(vocabulary, free.axioms.values()))
+        for name in sorted(names):
+            if hasattr(free, name) and not hasattr(terms, name):
+                setattr(terms, name, delegate(free, name))
+        return terms
+
+    ob = classproperty(lambda cls: cls.free.ob)
+
+    @classmethod
+    def checked_params(cls) -> tuple:
+        """ None: a term is drawn, the property matrix checks its value. """
+        return ()
+
+    @classmethod
+    def term(cls, value):
+        """
+        The term of a value the free category gives: a generator if it is an
+        arrow, never bracketed, else the value itself, e.g. an object.
+
+        Parameters:
+            value : The value.
+        """
+        # pylint: disable-next=isinstance-second-argument-not-valid-type
+        return cls(value) if isinstance(value, cls.free) else value
+
+    def operation(self, name: str, *args, **kwargs) -> Bracketed:
+        """
+        A unary operation of the free category on a term: its value is that
+        of the operation on the value of the term, any term among the
+        arguments taken as its value, and its drawing that of the term in a
+        bracket labelled by the operation, see :func:`label`. A value that is
+        not an arrow, e.g. an object, is returned as it is.
+
+        Parameters:
+            name : The name of the method or the property of the free
+                category.
+            args : The arguments of the operation after the operand.
+            kwargs : The keyword arguments of the operation.
+
+        >>> from discopy.rigid import Ty, Box, Diagram
+        >>> f = Bracketed[Diagram](Box('f', Ty('x'), Ty('y')))
+        >>> assert f.transpose().value == f.value.transpose()
+        >>> top, _, _ = f.transpose(left=True).drawing.boxes
+        >>> print(top.cod[0])
+        transpose(left=True)
+        """
+        args = [arg.value if isinstance(arg, Bracketed) else arg
+                for arg in args]
+        method = inspect.getattr_static(type(self.value), name)
+        if isinstance(method, property):
+            value, method = getattr(self.value, name), method.fget
+        else:
+            value = getattr(self.value, name)(*args, **kwargs)
+        # pylint: disable-next=isinstance-second-argument-not-valid-type
+        if not isinstance(value, self.free):
+            return value
+        return type(self)(value, self.drawing.bracket(
+            label(method, name, *args, **kwargs), value.dom, value.cod))
 
     dom = property(lambda self: self.value.dom)
     cod = property(lambda self: self.value.cod)
@@ -169,9 +299,6 @@ class Bracketed[free](NamedGeneric, DaggerCategory, TracedCategory):
         value = cls.free.id(dom)
         return cls(value, value.to_drawing().stretch(0.75))
 
-    swap, braid, twist, copy, discard, merge, noise = map(
-        generator, GENERATORS)
-
     @unbiased
     def then(self, other: Bracketed) -> Bracketed:
         return self.compound(
@@ -200,8 +327,7 @@ class Bracketed[free](NamedGeneric, DaggerCategory, TracedCategory):
         return drawing
 
     def dagger(self) -> Bracketed:
-        return type(self)(self.value.dagger(), self.drawing.bracket(
-            "†", self.drawing.cod, self.drawing.dom))
+        return self.operation("dagger")
 
     def loop(self, value: Category, left: bool = False) -> Bracketed:
         """
@@ -254,9 +380,9 @@ def free_category(axiom: Axiom) -> type | None:
     """
     The free category an axiom is drawn in: the category it is bound to if it
     is a ``Diagram``, else the first one of :data:`FREE_CATEGORIES` below the
-    class stating it that does not declare it inapplicable and has all the
-    generators it uses, :obj:`None` when there is none, e.g. for
-    :meth:`discopy.abc.Groupoid.invertibility`.
+    class stating it that does not declare it inapplicable and has every
+    name it uses that one of them has, see :func:`vocabulary`, :obj:`None`
+    when there is none, e.g. for :meth:`discopy.abc.Groupoid.invertibility`.
 
     >>> from discopy.abc import Category, TracedCategory, BalancedCategory
     >>> print(free_category(Category.associativity).__module__)
@@ -268,16 +394,19 @@ def free_category(axiom: Axiom) -> type | None:
     """
     if axiom.category is not None and axiom.category.__name__ == "Diagram":
         return axiom.category
-    names = set(inspect.unwrap(axiom.function).__code__.co_names)
-    for module in FREE_CATEGORIES:
-        candidate = import_module(f"discopy.{module}").Diagram
+    candidates = [
+        import_module(f"discopy.{module}").Diagram
+        for module in FREE_CATEGORIES]
+    structure = {
+        name for name in vocabulary(axiom)
+        if any(hasattr(candidate, name) for candidate in candidates)}
+    for candidate in candidates:
         if not issubclass(candidate, axiom.category or object):
             continue
         bound = candidate.axioms.get(axiom.name)
         if bound is not None and not applies(bound):
             continue
-        if all(hasattr(candidate, name)
-               for name in names.intersection(GENERATORS)):
+        if all(hasattr(candidate, name) for name in structure):
             return candidate
     return None
 
@@ -305,9 +434,9 @@ def stated_axioms(category: type) -> dict[str, Axiom]:
     inherits, which :func:`equation` draws, bound to that class: those it
     declares inapplicable state nothing.
 
-    >>> from discopy.abc import MarkovCategory
-    >>> print(*stated_axioms(MarkovCategory))
-    copy_coassociativity copy_cocommutativity copy_counitality copy_coherence
+    >>> from discopy.abc import ComarkovCategory
+    >>> print(*stated_axioms(ComarkovCategory))
+    merge_associativity merge_commutativity merge_unitality merge_coherence
     """
     axioms = {
         name: value.bind(category) for name, value in vars(category).items()
@@ -321,7 +450,9 @@ def equation(axiom: Axiom) -> Equation:
     evaluated on its :meth:`Declaration.generic` instance in its
     :func:`free_category`, of which each argument becomes a
     :class:`Bracketed` term. A law the free category declares broken, e.g.
-    because it is not quotiented by it, is drawn all the same.
+    because it is not quotiented by it, is drawn all the same, and one
+    between objects, e.g. :meth:`discopy.abc.PivotalCategory.self_dual`, as
+    the equation between their identities.
 
     Parameters:
         axiom : The axiom, bound to a ``Diagram`` or to the class stating it.
@@ -349,4 +480,6 @@ def equation(axiom: Axiom) -> Equation:
         result = failure.equation
     if not isinstance(result, Equation):
         raise ValueError(messages.NO_DRAWING.format(axiom, result))
+    if not all(isinstance(term, terms) for term in result.terms):
+        return terms.equation_factory(*map(terms.id, result.terms))
     return result
