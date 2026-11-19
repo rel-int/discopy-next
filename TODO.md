@@ -3,4 +3,4 @@
 - [x] Typst draws its labels after its boxes and wires
 - [x] CHANGELOG: discopy.egraph under Added, no rename under Changed
 - [x] already fixed on main: the TikZ triangle label (#605), the Typst box width, the docstrings and the notebook (8acbe9be)
-- [ ] normal_form with let: a design question, put in the PR
+- [x] normal_form with let: a design question, put in the PR, filed as #579
