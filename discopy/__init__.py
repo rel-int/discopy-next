@@ -41,6 +41,7 @@ from discopy import (
     group,
     quantum,
     lambek,
+    peirce,
     drawing,
     utils,
     config,

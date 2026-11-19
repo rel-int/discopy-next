@@ -418,7 +418,8 @@ class Diagram(balanced.Diagram, SymmetricCategory):
         types = Nat(len(xs)) if doms is None else doms
         size = len(types)
         nat = types if isinstance(types, Nat) else next(iter(types), None)
-        unit = type(nat)() if isinstance(nat, Nat) else cls.ob()
+        unit = type(nat)() if isinstance(nat, Nat)\
+            else cls.ob() if nat is None else nat.id(nat.dom)
         tensor = lambda tys: unit.tensor(*tys)
         dom = tensor(types)
 
