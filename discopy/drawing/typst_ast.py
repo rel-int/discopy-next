@@ -299,7 +299,9 @@ UNESCAPED = set("-+=")
 that is not a letter or a digit being escaped. """
 
 LATEX_TOKEN = re.compile(
-    r"\\[A-Za-z]+|\\.|\d+(?:\.\d+)?|'+|\s+|.", re.DOTALL)
+    r"\\[A-Za-z]+|\\.|'+|\s+|.", re.DOTALL)
+
+NUMBER = re.compile(r"\d+\.?\d*")
 
 
 def latex_math(source: str) -> str:
@@ -351,10 +353,13 @@ def latex_atoms(tokens: list[str], source: str, closing=None) -> list[str]:
         elif token in "{}":
             if token == "}":
                 raise ValueError(f"Unbalanced braces in {source!r}.")
-            atoms += latex_atoms(tokens, source, closing="}")
+            atoms.append(latex_group(latex_atoms(tokens, source, "}")))
         elif token.startswith("\\"):
             atoms.append(latex_command(token[1:], tokens, source))
-        elif token.replace(".", "").isalnum() or token in UNESCAPED:
+        elif atoms and NUMBER.fullmatch(atoms[-1]) and (token.isdigit() or (
+                token == "." and tokens and tokens[-1].isdigit())):
+            atoms[-1] += token
+        elif token.isalnum() or token in UNESCAPED:
             atoms.append(token)
         elif not token.isspace():
             atoms.append("\\" + token)
@@ -365,12 +370,24 @@ def latex_atoms(tokens: list[str], source: str, closing=None) -> list[str]:
     return [atom for atom in atoms if atom]
 
 
-def latex_argument(tokens: list[str], source: str) -> str:
-    """ The Typst of the argument of a command or a script: a group in
-    braces or else the next token. """
+def latex_group(atoms: list[str]) -> str:
+    """ The Typst of a group in braces: one atom for a script to apply to,
+    in an ``lr`` with no delimiters when it has several. """
+    return f"lr({' '.join(atoms)})" if len(atoms) > 1 else "".join(atoms)
+
+
+def skip_space(tokens: list[str]) -> list[str]:
+    """ Pop the space at the end of ``tokens``, which LaTeX ignores in
+    mathematics, and return them. """
     while tokens and tokens[-1].isspace():
         tokens.pop()
-    if not tokens:
+    return tokens
+
+
+def latex_argument(tokens: list[str], source: str) -> str:
+    """ The Typst of the argument of a command or a script: a group in
+    braces or else the next token, a single digit for a number. """
+    if not skip_space(tokens):
         raise ValueError(f"Missing an argument in {source!r}.")
     if tokens[-1] == "{":
         tokens.pop()
@@ -387,7 +404,7 @@ def latex_command(name: str, tokens: list[str], source: str) -> str:
     if name in LATEX_TEXT:
         text, function = latex_text(tokens, source), LATEX_TEXT[name]
         return f"{function}({text})" if function else text
-    if name == "sqrt" and tokens and tokens[-1] == "[":
+    if name == "sqrt" and skip_space(tokens) and tokens[-1] == "[":
         tokens.pop()
         index = " ".join(latex_atoms(tokens, source, closing="]"))
         return f"root({index}, {latex_argument(tokens, source)})"
@@ -406,7 +423,7 @@ def latex_command(name: str, tokens: list[str], source: str) -> str:
 def latex_text(tokens: list[str], source: str) -> str:
     """ The text in braces after a command such as ``\\text``, as a Typst
     string. """
-    if not tokens or tokens.pop() != "{":
+    if not skip_space(tokens) or tokens.pop() != "{":
         raise ValueError(f"Missing the braces of a text in {source!r}.")
     depth, text = 0, ""
     while tokens and (depth or tokens[-1] != "}"):

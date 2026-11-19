@@ -232,6 +232,7 @@ def test_typst_reads_a_label_between_dollars_as_latex(tmp_path):
     from discopy.monoidal import Equation
     importorskip("typst")
     assert Typst.math_label("$a$ and $b$") == ("$a$ and $b$", False)
+    assert Typst.math_label("$\\text{\\$5}$") == ('"$5"', True)
     f, g = Box('f', Ty('x'), Ty('y')), Box('$\\phi_1$', Ty('x'), Ty('y'))
     equation = Equation(f, g, symbol="$\\mapsto$")
     equation.draw(format="typst", path=tmp_path / "a.svg")

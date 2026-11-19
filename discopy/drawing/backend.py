@@ -1883,8 +1883,8 @@ class Typst(Backend):
         """
         Return ``(inner, math)`` for a diagram label.
 
-        A label between dollars, with no dollar in between, is LaTeX
-        mathematics, as matplotlib and TikZ read it, written in Typst
+        A label between dollars, with no other dollar but escaped ones, is
+        LaTeX mathematics, as matplotlib and TikZ read it, written in Typst
         mathematics by :func:`~discopy.drawing.typst_ast.latex_math`. Any
         other label is plain text, e.g. ``Alice``, which Typst would read as
         a variable, or ``$a$ and $b$``.
@@ -1894,7 +1894,7 @@ class Typst(Backend):
         """
         text = str(text)
         if len(text) >= 2 and text[0] == text[-1] == "$"\
-                and "$" not in text[1:-1]:
+                and not re.search(r"(?<!\\)\$", text[1:-1]):
             return latex_math(text[1:-1]), True
         return text, False
 
