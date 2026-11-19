@@ -249,6 +249,27 @@ def test_typst_reads_a_label_between_dollars_as_latex(tmp_path):
         Equation(f, g, symbol="$\\nosuch$").to_drawing().to_typst()
 
 
+@mark.parametrize("shape", ["rectangle", "triangle_up", "triangle_down",
+                            "plus"])
+def test_typst_draws_the_shape_of_a_spider(shape):
+    pytest.importorskip("typst")
+    x = Ty('x')
+
+    def source(shape):
+        return Box('', x, x @ x, draw_as_spider=True, shape=shape)\
+            .to_typst().render().splitlines()
+    calls, discs = source(shape), source("circle")
+    primitive = "rect(" if shape == "rectangle" else "line("
+    added = [call.strip() for call in calls if call not in discs]
+    assert "circle(" not in "".join(calls)
+    assert len(added) == (2 if shape == "plus" else 1)
+    assert all(call.startswith(primitive) for call in added)
+    colour = "stroke" if shape == "plus" else "fill"
+    assert all(f'{colour}: rgb("#000000")' in call for call in added)
+    Box('', x, x @ x, draw_as_spider=True, shape=shape).draw(
+        format="typst", path=None, show=False)
+
+
 @mark.parametrize("name", ["box.typ", "box.svg"])
 def test_typst_doctest_compares_against_its_baseline(tmp_path, name):
     pytest.importorskip("typst")

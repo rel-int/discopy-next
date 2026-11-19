@@ -720,6 +720,8 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   mathematics from a table of the commands it knows and raises on any other,
   so `$\mapsto$` draws in Typst, where it stopped on `unknown variable`, and
   `$<=$` is two symbols rather than `≤` ([next#642]).
+- The Typst backend draws a spider of shape `triangle_up`, `triangle_down`
+  or `plus` as matplotlib does, where it drew a disc ([next#646]).
 - `draw(format="typst", doctest=path)` checks the drawing against a
   baseline, written when missing, as `draw(doctest=...)` does for the other
   backends: the Typst source for a path ending in `.typ`, compared byte for
@@ -2378,6 +2380,7 @@ for the changelog of `1.2.1` and earlier.
 [next#642]: https://github.com/rel-int/discopy-next/pull/642
 [next#643]: https://github.com/rel-int/discopy-next/pull/643
 [next#644]: https://github.com/rel-int/discopy-next/pull/644
+[next#646]: https://github.com/rel-int/discopy-next/pull/646
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#44]: https://github.com/rel-int/optyx/pull/44
