@@ -227,6 +227,8 @@ def test_tikz_escapes_a_label_outside_mathematics(tmp_path):
 
 
 def test_typst_fills_regions_frames_and_ribbons():
+    from pytest import importorskip
+    importorskip("typst")
     from discopy import ribbon
     from discopy.egraph import Join
     from discopy.markov import Ty as MTy, Box as MBox
