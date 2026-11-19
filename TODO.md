@@ -11,4 +11,4 @@
 - [x] fail-fast: false on build.yml's test matrix, so a red sibling does not cancel the Pythons that were measuring the commit
 - [x] Install outlasts uv's 30-second default timeout, the knob uv's own error message names, with the second attempt the apt step beside it has
 - [x] Pin both in .github/tests: a push to main measures every Python of its matrix, and the Install step's timeout is not uv's default
-- [WIP] @session_01C7YfAR16vZbH1YH5TEZiCa-2026-11-19 01:21 Changelog bullet under Project, and the gates of CONTRIBUTING.md for a .github change: actionlint, pflake8 .github, .github/tests
+- [x] Changelog bullet under Project, and the gates of CONTRIBUTING.md for a .github change: actionlint, pflake8 .github, .github/tests
