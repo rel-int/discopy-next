@@ -224,3 +224,21 @@ def test_tikz_escapes_a_label_outside_mathematics(tmp_path):
         assert label in tikz
     assert TikZ.escape("(n >> s) << n") == "(n >{}> s) <{}< n"
     assert TikZ.escape(">>> a\\_b \\$x_y\\$") == ">{}>{}> a\\_b \\$x\\_y\\$"
+
+
+def test_typst_fills_regions_frames_and_ribbons():
+    from discopy import ribbon
+    from discopy.egraph import Join
+    from discopy.markov import Ty as MTy, Box as MBox
+    from discopy.drawing.backend import Typst
+    x, y = MTy('x'), ribbon.Ty('y')
+    join = Join(MBox('f', x, x), MBox('g', x, x))
+    ribbons = (ribbon.Braid(y, y) >> ribbon.Braid(y, y)).trace(
+        n=2).to_ribbons()
+    for diagram, bands in [(join, False), (ribbons, True)]:
+        drawing = diagram.to_drawing().framed()
+        cells = len(list(Typst.region_cells(drawing)))
+        shapes = Typst().draw(drawing).to_document().render().count(
+            "merge-path")
+        assert cells and (shapes > cells if bands else shapes == cells)
+        diagram.draw(format="typst", path=None, show=False)
