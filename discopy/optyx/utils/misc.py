@@ -67,11 +67,18 @@ def _build_w_layer(n_nonzero_counts, dagger=False):
     return layer
 
 
-def matrix_to_zw(U):
+def matrix_to_zw(U, dense=False):
+    """
+    The ZW diagram of a matrix: a W layer, an endomorphism per entry, a
+    permutation and a dual W layer. A zero entry is left out unless
+    :code:`dense`, which keeps every entry, e.g. one whose value is zero at
+    a point but whose derivative is not.
+    """
     # pylint: disable=import-outside-toplevel
     from discopy.optyx.core import zw
 
-    nonzero = np.asarray(U != 0, dtype=bool)
+    nonzero = np.ones(U.shape, dtype=bool) if dense\
+        else np.asarray(U != 0, dtype=bool)
     diagram = _build_w_layer(nonzero.sum(axis=1), dagger=False)
 
     # endomorphism layer

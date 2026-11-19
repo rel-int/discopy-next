@@ -105,12 +105,26 @@ def test_jax_traces_feedback_parameters():
                       atol=1e-4)
 
 
-@pytest.mark.parametrize("tensor", ["theta", "phi"])
-def test_torch_parameter_beside_a_float(tensor):
+@pytest.mark.parametrize("tensor, dtype", [
+    ("theta", "float64"), ("phi", "float64"), ("phi", "int64")])
+def test_torch_parameter_beside_a_float(tensor, dtype):
     torch = pytest.importorskip("torch")
-    params = {"theta": 0.1, "phi": 0.2}
-    params[tensor] = torch.tensor(params[tensor], dtype=torch.float64)
-    assert np.allclose(MZI(**params).array.numpy(), MZI(0.1, 0.2).array)
+    params = {"theta": 0.1, "phi": 0.2 if dtype == "float64" else 0}
+    expected = MZI(**params).array
+    params[tensor] = torch.tensor(params[tensor], dtype=getattr(torch, dtype))
+    assert np.allclose(MZI(**params).array.numpy(), expected)
+
+
+def test_jax_gradient_where_an_entry_vanishes():
+    jax = pytest.importorskip("jax")
+
+    def entry(t):
+        with backend("jax"):
+            return TBS(t).to_path().array[0, 0].imag
+
+    assert np.isclose(jax.grad(entry)(0.), jax.grad(
+        lambda t: TBS(t).array[0, 0].imag)(0.))
+    assert np.isclose(jax.grad(entry)(0.), np.pi)
 
 
 @pytest.mark.parametrize("gate", [

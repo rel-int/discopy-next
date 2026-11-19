@@ -449,7 +449,8 @@ class AbstractGate(Channel, ABC):
     """
 
     def _normal_form(self, dom, cod):
-        return matrix_to_zw(self.array.reshape(dom, cod))
+        return matrix_to_zw(self.array.reshape(dom, cod),
+                            dense=self.backend != "numpy")
 
     @cached_property
     def array(self):
@@ -475,15 +476,19 @@ class AbstractGate(Channel, ABC):
     def scalar(self, param):
         """
         A parameter of the gate in its :attr:`backend`, with the dtype of
-        the first parameter held there, so that a float beside a PyTorch
-        tensor goes through the functions of PyTorch.
+        the first parameter held there when it is a floating dtype, so that
+        a float beside a PyTorch tensor goes through the functions of
+        PyTorch and is not truncated beside an integer one.
         """
         if self.dtype is Expr or self.backend == "numpy":
             return param
-        reference = next(x for x in self.params
-                         if array_backend(x) == self.backend)
+        dtype = next(x for x in self.params
+                     if array_backend(x) == self.backend).dtype
+        floating = getattr(dtype, "is_floating_point", None)
+        if floating is None:
+            floating = np.dtype(dtype).kind == "f"
         with backend(self.backend) as module:
-            return module.array(param, dtype=reference.dtype)
+            return module.array(param, dtype=dtype if floating else None)
 
     @property
     def module(self):
