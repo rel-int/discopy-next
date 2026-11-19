@@ -10,6 +10,6 @@ x.constant_factory("f", x)
 # AxiomError: Expected a globular box, got boundaries None -> None and white -> white.
 ```
 
-- [ ] a test that fails before the fix
-- [ ] `Constant` takes the empty type of the colour of its type as domain
-- [ ] CHANGELOG.md bullet
+- [x] a test that fails before the fix
+- [x] `Constant` takes the empty type of the colour of its type as domain
+- [x] CHANGELOG.md bullet
