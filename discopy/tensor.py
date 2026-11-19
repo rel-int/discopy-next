@@ -58,7 +58,7 @@ from discopy import (
 from discopy.cat import factory, assert_iscomposable
 from discopy.frobenius import Dim, Cup
 from discopy.matrix import (  # noqa: F401  pylint: disable=unused-import
-    Matrix, backend, set_backend, get_backend, spell_nonfinite,
+    Matrix, backend, set_backend, get_backend, repr_nonfinite,
     Backend, NumPy, JAX, PyTorch, TensorFlow, Contractor, OptEinsum, Quimb)
 from discopy.testable import TestableGeneric, no_strategy
 from discopy.python import finset
@@ -1196,15 +1196,22 @@ class Box[dtype](frobenius.Box, Diagram[dtype]):
 
     def __repr__(self):
         """
-        The representation of a tensor box, with :func:`spell_nonfinite`.
+        The representation of a tensor box, with its ``data`` as the nested
+        list of its entries through :func:`repr_nonfinite`, which the box
+        equals by :meth:`setoid` whatever array it holds.
 
-        >>> f = Box('f', Dim(1), Dim(2), [float('nan'), float('-inf')])
+        >>> import numpy as np
+        >>> f = Box('f', Dim(1), Dim(2), np.array([np.nan, -np.inf]))
         >>> print(repr(f).split('data=')[1])
-        [float('nan'), -float('inf')])
+        [float('nan'), float('-inf')])
         >>> from discopy import tensor
         >>> assert eval(repr(f), {'tensor': tensor, 'Dim': Dim}) == f
         """
-        return spell_nonfinite(super().__repr__())
+        if self.data is None:
+            return super().__repr__()
+        data = getattr(self.data, "tolist", lambda: self.data)()
+        return super().__repr__().replace(
+            f", data={self.data!r}", f", data={repr_nonfinite(data)}", 1)
 
 
 class Cup(frobenius.Cup, Box):

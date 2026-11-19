@@ -717,9 +717,10 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 - An array holding `nan` or `inf` reads back from its `repr`: `Matrix`,
   `Tensor`, `tensor.Box`, `optyx.core.diagram.Box` and `photonic.Gate`
-  print them as `float('nan')`, `float('inf')`, `complex('nanj')` and
-  `complex('infj')`, spelled by `matrix.spell_nonfinite`, rather than the
-  bare tokens `eval` cannot name ([next#632]).
+  print them as `float('nan')`, `float('-inf')` or `complex('(1+nanj)')`,
+  spelled by `matrix.repr_nonfinite`, rather than the bare tokens `eval`
+  cannot name, and a `tensor.Box` prints its data as a list, not an
+  `array(...)` ([next#632]).
 - `frobenius.Diagram.unfuse` keeps the category of the diagram, e.g. the
   cuts of a `peirce.beta.Diagram` ([next#637]).
 - `symmetric.Diagram.permutation` starts from the empty type of the colour

@@ -523,4 +523,19 @@ def test_Matrix_lambdify_modules():
 def test_repr_nan_inf(matrix):
     other = eval(repr(matrix))
     assert type(other) is type(matrix)
-    assert np.array_equal(other.array, matrix.array, equal_nan=True)
+    for part in ("real", "imag"):
+        assert np.array_equal(getattr(other.array, part),
+                              getattr(matrix.array, part), equal_nan=True)
+
+
+def test_repr_symbol_named_inf():
+    sympy = pytest.importorskip("sympy")
+    inf, nan = sympy.Symbol('inf'), sympy.Symbol('nan')
+    matrix = Matrix[sympy.Expr]([inf, nan + 1, float('nan')], 1, 3)
+    assert "float('nan')" in repr(matrix)
+    env = {'Matrix': Matrix, 'Expr': sympy.Expr, 'Nat': Nat,
+           'inf': inf, 'nan': nan}
+    other = eval(repr(matrix), env)
+    entries = other.array.reshape(-1)
+    assert entries[:2].tolist() == [inf, nan + 1]
+    assert np.isnan(float(entries[2]))

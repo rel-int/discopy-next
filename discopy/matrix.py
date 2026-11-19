@@ -38,9 +38,10 @@ See also
 """
 from __future__ import annotations
 
+import cmath
 import re
 from contextlib import contextmanager
-from math import isqrt, prod
+from math import isfinite, isqrt, prod
 from operator import index
 from types import ModuleType
 from collections.abc import Sequence
@@ -791,44 +792,69 @@ and 'Matrix[int]'
 def array2string(array, **params):
     """
     Numpy array pretty print, eliding past ``config.NUMPY_THRESHOLD`` entries
-    without touching numpy's global print options.
+    without touching numpy's global print options, with ``nan`` and ``inf``
+    spelled by :func:`spell_nonfinite` so that ``eval`` reads them back.
 
     >>> import numpy
     >>> threshold = numpy.get_printoptions()['threshold']
     >>> array2string(numpy.arange(3))
     '[0, 1, 2]'
+    >>> array2string(numpy.array([1., numpy.nan]))
+    "[1., float('nan')]"
     >>> assert numpy.get_printoptions()['threshold'] == threshold
     """
     import numpy
-    params = dict({'threshold': config.NUMPY_THRESHOLD}, **params)
+    array = numpy.asarray(array)
+    params = dict({'threshold': config.NUMPY_THRESHOLD,
+                   'formatter': {'object': repr_nonfinite}}, **params)
     string = numpy.array2string(
         array, **dict(
             params, separator=', '))  # ty: ignore[invalid-argument-type]
-    return spell_nonfinite(string.replace('[ ', '[').replace('  ', ' '))
+    string = string.replace('[ ', '[').replace('  ', ' ')
+    return spell_nonfinite(string) if array.dtype.kind in 'fc' else string
 
 
-NONFINITE = re.compile(r"""('(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*")"""
-                       r"|\b(nan|inf)(j?)\b")
+NONFINITE = re.compile(r"\b(nan|inf)(j?)\b")
 
 
 def spell_nonfinite(string: str) -> str:
     """
-    Spell the ``nan`` and ``inf`` that numpy and Python print for floats as
-    ``float('nan')`` and ``float('inf')``, and ``nanj`` and ``infj`` as
-    ``complex('nanj')`` and ``complex('infj')``, so that ``eval`` reads them
-    back with no import. Quoted strings are left as they are.
+    Spell the ``nan`` and ``inf`` that numpy prints for an array of floats or
+    complex numbers as ``float('nan')`` and ``float('inf')``, and ``nanj``
+    and ``infj`` as ``complex('nanj')`` and ``complex('infj')``, so that
+    ``eval`` reads them back with no import. The string holds numbers only:
+    an entry of any other type is spelled by :func:`repr_nonfinite`.
 
-    >>> spell_nonfinite("[nan, -inf, 1.+nanj, 'nan']")
-    "[float('nan'), -float('inf'), 1.+complex('nanj'), 'nan']"
-    >>> import numpy
-    >>> x = eval(spell_nonfinite(repr([numpy.nan, complex(1, -numpy.inf)])))
-    >>> assert numpy.isnan(x[0]) and x[1] == complex(1, -numpy.inf)
+    >>> spell_nonfinite("[nan, -inf, 1.+nanj]")
+    "[float('nan'), -float('inf'), 1.+complex('nanj')]"
     """
     def spell(match):
-        quoted, token, imaginary = match.groups()
-        return quoted or (
-            f"complex('{token}j')" if imaginary else f"float('{token}')")
+        token, imaginary = match.groups()
+        return f"complex('{token}j')" if imaginary else f"float('{token}')"
     return NONFINITE.sub(spell, string)
+
+
+def repr_nonfinite(value) -> str:
+    """
+    The ``repr`` of a value or a nested list of values, with each float or
+    complex number that is not finite spelled as ``float('nan')`` or
+    ``complex('(1+nanj)')``, so that ``eval`` reads it back with no import.
+    Any other value is its ``repr``, e.g. a symbol named ``inf`` stays one.
+
+    >>> import sympy
+    >>> nan, inf = float('nan'), float('inf')
+    >>> repr_nonfinite([nan, [-inf, complex(1, nan)]])
+    "[float('nan'), [float('-inf'), complex('(1+nanj)')]]"
+    >>> repr_nonfinite([sympy.Symbol('inf'), 1.0])
+    '[inf, 1.0]'
+    """
+    if isinstance(value, list):
+        return "[" + ", ".join(map(repr_nonfinite, value)) + "]"
+    if isinstance(value, float) and not isfinite(value):
+        return f"float('{value}')"
+    if isinstance(value, complex) and not cmath.isfinite(value):
+        return f"complex('{value}')"
+    return repr(value)
 
 
 class Backend:
