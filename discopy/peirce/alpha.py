@@ -223,11 +223,16 @@ got white inside white.
 class Sum(monoidal.Sum, Box):
     """
     A formal sum of alpha diagrams with the same boundary, which a model
-    reads as the union of their relations.
+    reads as the union of their relations in the white region. Like every
+    structure of the black region, a black sum is the white one conjugated
+    by ¬, i.e. the intersection, so that the negative of a sum is still
+    its complement.
 
     >>> p, q = Box('p'), Box('q')
     >>> M = Model(ar={'p': True, 'q': False})
     >>> assert isinstance(p + q, Sum) and M(p + q) == M(p) + M(q)
+    >>> assert M((p + q).negative()) == M(~(p + q))
+    >>> assert not M((p + q).negative()).array.any()
     """
 
 
