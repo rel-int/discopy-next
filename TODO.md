@@ -5,4 +5,4 @@
 - [x] a test that a notebook starting a spawn process pool exports
 - [x] `export` runs every notebook so that a spawned worker can re-import its main module
 - [x] CHANGELOG.md bullet
-- [ ] `--check optyx/readme_example`, and KNOWN_BROKEN if it passes
+- [WIP] @session_01MEJxy37J3HnepbSJDandEn-2026-11-19 15:39 `--check optyx/readme_example`, and KNOWN_BROKEN if it passes
