@@ -143,3 +143,10 @@ def test_torch_gradient_of_gate_parameters(gate):
     expected = (loss(gate(.3 + epsilon).array)
                 - loss(gate(.3 - epsilon).array)) / (2 * epsilon)
     assert np.isclose(t.grad.item(), expected, atol=1e-4)
+
+
+def test_torch_gates_compare():
+    torch = pytest.importorskip("torch")
+    t = torch.tensor(.3, dtype=torch.float64)
+    assert TBS(t) == TBS(t) and MZI(t, 0.2) == MZI(t, 0.2)
+    assert TBS(t) != TBS(t + 1) and len({BBS(t), BBS(t)}) == 1

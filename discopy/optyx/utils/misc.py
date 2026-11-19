@@ -30,7 +30,16 @@ def hashable(value):
     >>> assert hashable(np.array([1, 2])) == (1, 2)
     >>> assert hashable(np.array(1)) == 1
     >>> assert hashable("xy") == "xy"
+
+    An array of another backend is read through its :code:`tolist`, unless
+    it has no concrete value, e.g. a JAX tracer.
     """
+    if not isinstance(value, (list, tuple, np.ndarray))\
+            and hasattr(value, "tolist"):
+        try:
+            return hashable(value.tolist())
+        except TypeError:
+            return value
     if isinstance(value, np.ndarray) and not value.ndim:
         return value.item()
     if isinstance(value, (list, tuple, np.ndarray)):
