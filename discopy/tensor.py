@@ -17,12 +17,15 @@ Summary
     Diagram
     CMap
     Box
+    Permutation
     Swap
     Cup
     Cap
     Spider
     Sum
     Bubble
+    Diff
+    Equation
 
 Tensor combinatorial maps
 -------------------------
@@ -43,26 +46,30 @@ indices. Swaps, cups and caps become wiring while spiders stay as boxes.
 
 from __future__ import annotations
 
+import math
+import numbers
+import sys
 from itertools import count
-from typing import TYPE_CHECKING, ClassVar, Sequence
+from typing import TYPE_CHECKING, Callable, ClassVar, Sequence, TypeVar
 
 from discopy import (
-    cat, monoidal, rigid, frobenius, cmap, config, messages)
+    cat, monoidal, rigid, feedback, frobenius, cmap, config, hypergraph,
+    messages)
 from discopy.cat import factory, assert_iscomposable
 from discopy.frobenius import Dim, Cup
 from discopy.matrix import (  # noqa: F401  pylint: disable=unused-import
     Matrix, backend, set_backend, get_backend,
-    NumPy, JAX, PyTorch, TensorFlow)
-from discopy.abc import NamedGeneric
+    Backend, NumPy, JAX, PyTorch, TensorFlow, Contractor, OptEinsum, Quimb)
+from discopy.testable import TestableGeneric, no_strategy
 from discopy.python import finset
 from discopy.utils import (
-    factory_name, assert_isinstance, product, assert_isatomic,
+    factory_key, factory_name, assert_isinstance, product, assert_isatomic,
     assert_istraceable)
 
 if TYPE_CHECKING:
     import sympy
     import tensornetwork
-    import quimb
+    import quimb.tensor
 
 
 @factory
@@ -127,6 +134,15 @@ class Tensor(Matrix):
     """
     ob = Dim
 
+    @classmethod
+    def checked_params(cls) -> tuple:
+        """
+        None, the Kronecker product of the dimensions a law draws growing
+        exponentially in their number, where the direct sum of a matrix
+        grows linearly.
+        """
+        return ()
+
     def __init__(self, array, dom: Dim, cod: Dim):
         assert_isinstance(dom, Dim)
         assert_isinstance(cod, Dim)
@@ -173,11 +189,13 @@ class Tensor(Matrix):
         other, = others
         assert_isinstance(other, self.ar)
         assert_iscomposable(self, other)
+        cls = self.promote(other)
+        left, right = (
+            factor.cast(cls.dtype).array for factor in (self, other))
         with backend() as np:
-            array = np.tensordot(self.array, other.array, len(self.cod))\
-                if self.array.shape and other.array.shape\
-                else self.array * other.array
-        return self.promote(other)(array, self.dom, other.cod)
+            array = np.tensordot(left, right, len(self.cod))\
+                if left.shape and right.shape else left * right
+        return cls(array, self.dom, other.cod)
 
     def tensor(self, *others: Tensor) -> Tensor:
         """
@@ -200,15 +218,15 @@ class Tensor(Matrix):
             target += list(range(j, j + len(factor.cod)))
             i, j = i + len(factor.dom), j + len(factor.cod)
         source = list(range(len(target)))
+        cls = self.promote(*others)
+        array, *arrays = (factor.cast(cls.dtype).array for factor in factors)
         with backend() as np:
-            array = self.array
-            for other in others:
-                array = np.tensordot(array, other.array, 0)\
-                    if array.shape and other.array.shape\
-                    else array * other.array
+            for other in arrays:
+                array = np.tensordot(array, other, 0)\
+                    if array.shape and other.shape else array * other
             if source:
                 array = np.moveaxis(array, source, target)
-        return self.promote(*others)(array, dom, cod)
+        return cls(array, dom, cod)
 
     def dagger(self) -> Tensor:
         source = list(range(len(self.dom @ self.cod)))
@@ -332,15 +350,12 @@ class Tensor(Matrix):
         assert_isatomic(typ, Dim)
         n, = typ.inside
         dom, cod = typ ** n_legs_in, typ ** n_legs_out
-        with backend('numpy'):
-            result = cls.zero(dom, cod)
-            for i in range(n):
-                index = len(dom @ cod) * (i, )
-                result.array[index] = result.array[index] + 1
-        if isinstance(get_backend(), NumPy):
-            return result
-        with backend() as np:
-            return cls(np.array(result.array), dom, cod)
+        with backend('numpy') as np:
+            array = np.zeros((dom @ cod).inside, dtype=cls.dtype or int)
+        for i in range(n):
+            index = len(dom @ cod) * (i, )
+            array[index] = array[index] + 1
+        return cls(array, dom, cod)
 
     @classmethod
     def spiders(cls, n_legs_in: int, n_legs_out: int, typ: Dim, phase=None
@@ -353,8 +368,8 @@ class Tensor(Matrix):
             n_legs_out : The number of legs out for each spider.
             typ : The type of the spiders.
         """
-        return frobenius.Diagram.spiders.__func__(
-            cls, n_legs_in, n_legs_out, typ, phase)
+        return frobenius.Diagram.spiders.__func__(  # ty: ignore
+            cls, n_legs_in, n_legs_out, typ, phase)  # ty: ignore
 
     @classmethod
     def copy(cls, x: Dim, n: int = 2) -> Tensor:
@@ -385,8 +400,10 @@ class Tensor(Matrix):
         This is *not* the same as the algebraic transpose for non-atomic dims.
         """
         # pylint: disable=unused-argument  # Dim is self-dual: one transpose
-        return type(self)(
-            self.array.transpose(), self.cod[::-1], self.dom[::-1])
+        axes = list(range(len(self.dom @ self.cod)))
+        with backend() as np:
+            array = np.moveaxis(self.array, axes, axes[::-1])
+        return type(self)(array, self.cod[::-1], self.dom[::-1])
 
     l = r = property(transpose)
 
@@ -445,11 +462,12 @@ class Tensor(Matrix):
         >>> vector.jacobian(x, y, z)
         Tensor[Expr]([2*x, 0, 0, z, 0, y], dom=Dim(1), cod=Dim(3, 2))
         """
-        dim = Dim(len(variables) or 1)
+        n = len(variables) or 1
+        dim = Dim(n)
         result = self.zero(self.dom, dim @ self.cod)
         for i, var in enumerate(variables):
-            onehot = self.zero(Dim(1), dim)
-            onehot.array[i] = 1
+            onehot = type(self)(
+                [int(j == i) for j in range(n)], Dim(1), dim)
             result += onehot @ self.grad(var, **params)
         return result
 
@@ -460,8 +478,8 @@ class Functor(frobenius.Functor):
     and ``Tensor[dtype]`` as codomain for a given ``dtype``.
 
     Calling it on a diagram converts it to a :class:`CMap` and contracts
-    the network in a single ``einsum`` call under the active
-    :func:`backend`, passing any optional einsum parameters through.
+    the network in a single ``einsum`` call of its ``contractor``,
+    passing any optional einsum parameters through.
 
     Parameters:
         ob_map : The object mapping.
@@ -472,8 +490,13 @@ class Functor(frobenius.Functor):
         optimize : The contraction path, passed verbatim to the backend
             ``einsum``, e.g. ``"greedy"``, ``"optimal"`` or an explicit
             path.
-        params : Any other optional parameter of the backend ``einsum``
-            method, passed verbatim.
+        contractor : The backend whose ``einsum`` contracts the network,
+            e.g. :class:`NumPy` or a :class:`Contractor` such as
+            :class:`OptEinsum` or :class:`Quimb`. By default, the
+            ``einsum`` of the active :func:`backend`, switching to
+            :class:`OptEinsum` past ``config.MAX_EINSUM_INDICES`` indices.
+        params : Any other optional parameter of the ``einsum`` method of
+            the contractor, passed verbatim.
 
     Example
     -------
@@ -504,10 +527,13 @@ class Functor(frobenius.Functor):
     dom, cod = frobenius.Diagram, Tensor
 
     def __init__(
-            self, ob_map: dict[cat.Ob, Dim], ar_map: dict[cat.Box, list],
-            dom: type = None, dtype: type = float,
-            optimize="greedy", **params):
+            self, ob_map: dict[cat.Ob, Dim] | Callable[[cat.Ob], Dim],
+            ar_map: dict[cat.Box, list] | Callable[[cat.Box], list],
+            dom: type | None = None, dtype: type | None = float,
+            optimize="greedy", contractor: Backend | None = None,
+            **params):
         self.dtype, self.optimize, self.params = dtype, optimize, params
+        self.contractor = contractor
         cod = type(self).cod[dtype]
         super().__init__(ob_map, ar_map, dom=dom or type(self).dom, cod=cod)
 
@@ -515,16 +541,54 @@ class Functor(frobenius.Functor):
         dtype = None if self.dtype is None else self.dtype.__name__
         optimize = "" if self.optimize == "greedy"\
             else f", optimize={self.optimize!r}"
+        contractor = "" if self.contractor is None\
+            else f", contractor={self.contractor!r}"
         params = "".join(
             f", {key}={value!r}" for key, value in self.params.items())
         return factory_name(type(self))\
             + f"(ob_map={self.ob_map}, ar_map={self.ar_map}, "\
             + f"dom={factory_name(self.dom)}, "\
-            + f"dtype={dtype}{optimize}{params})"
+            + f"dtype={dtype}{optimize}{contractor}{params})"
+
+    def to_tree(self) -> dict:
+        """
+        Serialise a tensor functor, its dtype in the name of its codomain,
+        see :meth:`discopy.cat.Functor.to_tree`, unless it has ``params``
+        or a ``contractor``.
+
+        >>> from discopy.utils import dumps, loads
+        >>> x = frobenius.Ty('x')
+        >>> f = frobenius.Box('f', x, x)
+        >>> F = Functor({x: 2}, {f: [[0, 1], [1, 0]]}, dtype=int)
+        >>> assert loads(dumps(F)) == F and loads(dumps(F)).dtype is int
+        >>> dumps(Functor({x: 2}, {}, order='C'))
+        Traceback (most recent call last):
+        ...
+        TypeError: A tensor functor with params or a contractor has no tree: \
+they go to the einsum of a backend verbatim, which a file should not reach.
+        """
+        if self.params or self.contractor is not None:
+            raise TypeError(messages.NO_TREE_PARAMS)
+        return super().to_tree() | (
+            {} if self.optimize == "greedy" else {'optimize': self.optimize})
+
+    @classmethod
+    def from_tree(cls, tree: dict) -> Functor:
+        """
+        Decode a tensor functor, which takes its codomain's dtype, and an
+        ``optimize`` of the types its backend reads, a string, a boolean or
+        an explicit path.
+        """
+        functor = cat.Functor.from_tree(tree)
+        optimize = tree.get('optimize', "greedy")
+        assert_isinstance(optimize, (str, bool, list))
+        return cls(functor.ob_map, functor.ar_map, dom=functor.dom,
+                   dtype=functor.cod.dtype, optimize=optimize)
 
     def __call__(self, other):
         """
-        The image of an object, a box or a diagram, see :meth:`contract`.
+        The image of an object, a box, a diagram or a hypergraph, see
+        :meth:`contract`.
 
         A cup or a cap on a self-dual object, as at frobenius, is the
         spider with two legs on its image, so that the functor factors
@@ -543,6 +607,13 @@ class Functor(frobenius.Functor):
         >>> assert F(cup) == F(frobenius.Spider(2, 0, n))\\
         ...     == F(frobenius.Id(n @ n) >> cup)
         >>> assert F(g.r) == F(g.transpose()) != F(g).r
+
+        A hypergraph of :mod:`discopy.frobenius` is contracted as it
+        stands, see :meth:`spider_operands`, any other through its diagram,
+        see :meth:`operands`.
+
+        >>> graph = (g >> frobenius.Spider(1, 2, n)).to_hypergraph()
+        >>> assert F(graph) == F(graph.to_diagram())
         """
         if isinstance(other, Bubble):
             return self(other.arg).map(other.func, self.dtype)
@@ -553,41 +624,51 @@ class Functor(frobenius.Functor):
         if isinstance(other, rigid.Box) and other.z and any(
                 x.r == x for x in other.dom @ other.cod):
             return self.contract(cmap.CMap.from_diagram(other))
-        if isinstance(other, (
+        if other is None or isinstance(other, (
                 cat.Ob, cat.Box, monoidal.Colour, monoidal.Ty)):
             return super().__call__(other)
-        if isinstance(other, cmap.CMap):
+        if isinstance(other, (cmap.CMap, hypergraph.Hypergraph)):
             return self.contract(other)
         assert_isinstance(other, monoidal.Diagram)
         return self.contract(cmap.CMap.from_diagram(other))
 
-    def contract(self, other: "cmap.CMap") -> Tensor:
+    def operands(
+            self, other: "cmap.CMap | hypergraph.Hypergraph") -> tuple[
+            list, list[list[int]], list[int], list[int]]:
         """
-        Contract the image of a combinatorial map in a single ``einsum``
-        call under the active :func:`backend`.
+        The Einstein notation for the image of a combinatorial map: its
+        arrays, the list of integer indices of each, and the free indices
+        of its domain and codomain.
 
-        The map is Einstein notation: the 2-cycles of its ``edges``
-        involution are the summed indices, boxes are the tensors and the
-        boundary ports are the free indices, with integer labels. A wire
-        is one index of the size of its object's image, pairing its
+        The 2-cycles of its ``edges`` involution are the summed indices,
+        boxes are the tensors and the boundary ports are the free indices,
+        each carried by an identity so that every index is on an array. A
+        wire is one index of the size of its object's image, pairing its
         factors in order as a straight wire and a spider do, except a cup
         or a cap between two distinct adjoints, which pairs them nested,
-        one index per factor, as :meth:`Tensor.cups` does. Networks with
-        more than ``config.MAX_EINSUM_INDICES`` indices are contracted
-        with the optional ``opt_einsum`` package instead.
+        one index per factor, as :meth:`Tensor.cups` does. A loop is an
+        identity with a repeated index, i.e. a trace.
 
         Parameters:
-            other : The combinatorial map to contract.
+            other : The combinatorial map to translate.
 
         Example
         -------
-        >>> from discopy import compact
-        >>> n = compact.Ty('n')
-        >>> F = Functor({n: Dim(2, 3)}, {}, dom=compact.Diagram, dtype=int)
-        >>> cup = compact.Cup(n, n.r)
-        >>> assert F(cup) == F(compact.Id(n @ n.r) >> cup)\\
-        ...     == Tensor[int].cups(Dim(2, 3), Dim(3, 2))
+        >>> vector = Box('vector', Dim(1), Dim(2), [0, 1])
+        >>> F = Functor(ob_map=lambda dim: dim,
+        ...             ar_map=lambda box: box.array, dtype=int)
+        >>> arrays, indices, inputs, outputs = F.operands(
+        ...     (vector >> vector[::-1]).to_map())
+        >>> for array, index in zip(arrays, indices):
+        ...     print(f"{array.tolist()}, {index}")
+        [0, 1], [0]
+        [0, 1], [0]
+        >>> assert inputs == outputs == []
         """
+        if isinstance(other, hypergraph.Hypergraph):
+            if issubclass(other.category, frobenius.Diagram):
+                return self.spider_operands(other)
+            other = cmap.CMap.from_diagram(other.to_diagram())
         ports, wires, fresh = other.ports, {}, count()
         for source, target in enumerate(other.edges):
             if source > target:
@@ -602,14 +683,16 @@ class Functor(frobenius.Functor):
             wires[target] = labels[::-1] if is_nested else labels
         factors = lambda boundary: [
             factor for port in boundary for factor in wires[port]]
-        arrays, indices, output = [], [], []
+        arrays, indices, inputs, outputs = [], [], [], []
         with backend() as np:
-            eye = lambda dim: np.array(np.eye(dim), dtype=self.dtype)
+            eye = lambda dim: np.array(np.eye(dim) if self.dtype is None
+                                       else np.eye(dim, dtype=int),
+                                       dtype=self.dtype)
             for wire, dim in factors(range(len(other.dom))):
                 label = next(fresh)
                 arrays.append(eye(dim))
                 indices.append([label, wire])
-                output.append(label)
+                inputs.append(label)
             start = len(other.dom)
             for box in other.boxes:
                 arity, coarity = len(box.dom), len(box.cod)
@@ -625,38 +708,147 @@ class Functor(frobenius.Functor):
                 label = next(fresh)
                 arrays.append(eye(dim))
                 indices.append([wire, label])
-                output.append(label)
+                outputs.append(label)
             for loop in other.loops:
                 arrays.append(eye(product(self(loop).inside)))
                 indices.append(2 * [next(fresh)])
-            if not arrays:
-                return self.cod([1], self(other.dom), self(other.cod))
-            operands = [
-                x for pair in zip(arrays, indices) for x in pair]
-            if next(fresh) > config.MAX_EINSUM_INDICES:
-                try:
-                    import opt_einsum
-                except ImportError as error:
-                    if error.name != "opt_einsum":
-                        raise
-                    raise ImportError(
-                        "Contracting more than "
-                        f"{config.MAX_EINSUM_INDICES} indices requires "
-                        "opt_einsum, run `pip install opt_einsum`."
-                    ) from error
-                array = opt_einsum.contract(
-                    *operands, output,
-                    optimize=self.optimize, **self.params)
-            else:
-                params = dict(self.params, optimize=self.optimize)\
-                    if isinstance(get_backend(), (NumPy, JAX))\
-                    else self.params
-                array = np.einsum(*operands, output, **params)
+        return arrays, indices, inputs, outputs
+
+    def spider_operands(self, other: "hypergraph.Hypergraph") -> tuple[
+            list, list[list[int]], list[int], list[int]]:
+        """
+        The Einstein notation for the image of a hypergraph, as in
+        :meth:`operands`: one index per spider, of the size of the image of
+        its type, and one array per box, indexed by the spiders on its
+        ports. A spider is one index however many ports it has, not a
+        tensor. Each boundary port is a free index carried by an identity,
+        and so is each port of a box after the first on the same spider, so
+        that no array repeats an index, which some contractors read as a
+        trace. A spider on no port is summed over alone, i.e. it counts the
+        size of its type.
+
+        Parameters:
+            other : The hypergraph to translate, of :mod:`frobenius`: any
+                other goes through its diagram, see :meth:`operands`.
+
+        Example
+        -------
+        >>> x = frobenius.Ty('x')
+        >>> f = frobenius.Box('f', frobenius.Ty(), x @ x)
+        >>> F = Functor({x: 3}, {f: [[1, 1, 0], [0, 1, 1], [1, 0, 1]]},
+        ...             dtype=int)
+        >>> graph = frobenius.Hypergraph(
+        ...     frobenius.Ty(), x, (f, ), ((), (((), (0, 0)), ), (0, )))
+        >>> arrays, indices, inputs, outputs = F.spider_operands(graph)
+        >>> indices
+        [[1, 0], [0, 1], [0, 2]]
+        >>> F(graph)
+        Tensor[int]([1, 1, 1], dom=Dim(1), cod=Dim(3))
+        >>> scalar = frobenius.Hypergraph(
+        ...     frobenius.Ty(), frobenius.Ty(), (), ((), (), ()),
+        ...     spider_types={0: x})
+        >>> F(scalar)
+        Tensor[int]([3], dom=Dim(1), cod=Dim(1))
+        """
+        dims = [product(self(typ).inside) for typ in other.spider_types]
+        arrays, indices, inputs, outputs = [], [], [], []
+        fresh = count(other.n_spiders)
+        with backend() as np:
+            def cast(unit, dim):
+                return np.array(
+                    unit(dim) if self.dtype is None
+                    else unit(dim, dtype=int), dtype=self.dtype)
+            for spider in other.dom_wires:
+                inputs.append(next(fresh))
+                arrays.append(cast(np.eye, dims[spider]))
+                indices.append([inputs[-1], spider])
+            for box, wiring in zip(other.boxes, other.box_wires):
+                wires, index = sum(wiring, ()), []
+                for spider in wires:
+                    if spider in index:  # a diagonal, kept as one index
+                        index.append(next(fresh))
+                        arrays.append(cast(np.eye, dims[spider]))
+                        indices.append([index[-1], spider])
+                    else:
+                        index.append(spider)
+                arrays.append(self(box).array.reshape(
+                    [dims[spider] for spider in wires]))
+                indices.append(index)
+            for spider in other.cod_wires:
+                outputs.append(next(fresh))
+                arrays.append(cast(np.eye, dims[spider]))
+                indices.append([spider, outputs[-1]])
+            for spider in other.scalar_spiders:
+                arrays.append(cast(np.ones, dims[spider]))
+                indices.append([spider])
+        return arrays, indices, inputs, outputs
+
+    def to_quimb(self, other) -> "quimb.tensor.TensorNetwork":
+        """
+        The quimb tensor network of the image of a diagram or a
+        combinatorial map: one tensor per array of :meth:`operands`, with
+        the free indices named ``inp0, ...`` and ``out0, ...`` in boundary
+        order, the order in which quimb contraction outputs them.
+
+        Parameters:
+            other : The diagram or combinatorial map to translate.
+        """
+        if not isinstance(other, (cmap.CMap, hypergraph.Hypergraph)):
+            other = cmap.CMap.from_diagram(other)
+        arrays, indices, inputs, outputs = self.operands(other)
+        names = {label: f"inp{i}" for i, label in enumerate(inputs)}\
+            | {label: f"out{i}" for i, label in enumerate(outputs)}
+        return Quimb().network(arrays, indices, names)
+
+    def contract(
+            self, other: "cmap.CMap | hypergraph.Hypergraph") -> Tensor:
+        """
+        Contract the image of a combinatorial map or a hypergraph, read as
+        Einstein notation by :meth:`operands`, in a single ``einsum`` call
+        of the ``contractor``. By default, this is the ``einsum`` of the
+        active :func:`backend`, and networks with more than
+        ``config.MAX_EINSUM_INDICES`` indices are contracted with
+        :class:`OptEinsum` instead.
+
+        A spider of a hypergraph is an index on any number of arrays, so
+        NumPy's default bound on intermediates, the size of the largest
+        operand, can forbid every pairwise step and leave one naive sum
+        over all the indices: a hypergraph lifts it for the ``"greedy"``
+        path, not for ``"optimal"``, whose search it would let explode.
+
+        Parameters:
+            other : The combinatorial map or the hypergraph to contract.
+
+        Example
+        -------
+        >>> from discopy import compact
+        >>> n = compact.Ty('n')
+        >>> F = Functor({n: Dim(2, 3)}, {}, dom=compact.Diagram, dtype=int)
+        >>> cup = compact.Cup(n, n.r)
+        >>> assert F(cup) == F(compact.Id(n @ n.r) >> cup)\\
+        ...     == Tensor[int].cups(Dim(2, 3), Dim(3, 2))
+        """
+        arrays, indices, inputs, outputs = self.operands(other)
+        if not arrays:
+            return self.cod([1], self(other.dom), self(other.cod))
+        operands = [x for pair in zip(arrays, indices) for x in pair]
+        n_indices = len({j for index in indices for j in index})
+        contractor = self.contractor or (
+            get_backend() if n_indices <= config.MAX_EINSUM_INDICES
+            else OptEinsum())
+        params = dict(self.params, optimize=self.optimize)\
+            if isinstance(contractor, (NumPy, JAX, Contractor))\
+            else self.params
+        if isinstance(other, hypergraph.Hypergraph)\
+                and isinstance(contractor, NumPy)\
+                and self.optimize in ("greedy", True):
+            params['optimize'] = ("greedy", sys.maxsize)
+        array = contractor.einsum(*operands, inputs + outputs, **params)
         return self.cod(array, self(other.dom), self(other.cod))
 
 
 @factory
-class Diagram(NamedGeneric['dtype'], frobenius.Diagram):
+class Diagram[dtype](TestableGeneric, frobenius.Diagram):
     """
     A tensor diagram is a frobenius diagram with tensor boxes.
 
@@ -676,6 +868,11 @@ class Diagram(NamedGeneric['dtype'], frobenius.Diagram):
     >>> Box('f', Dim(1), Dim(1), [0.5])
     tensor.Box[float]('f', Dim(1), Dim(1), data=[0.5])
     """
+    @classmethod
+    def checked_params(cls) -> tuple:
+        """ None, a tensor diagram drawing no arrays. """
+        return ()
+
     sum_factory: ClassVar[type["Sum"]]
     swap_factory: ClassVar[type["Swap"]]
     permutation_factory: ClassVar[type["Permutation"]]
@@ -685,7 +882,10 @@ class Diagram(NamedGeneric['dtype'], frobenius.Diagram):
     ob = Dim
 
     def __class_getitem__(cls, values):
-        return super().__class_getitem__(Tensor[values].dtype)
+        """ The dtype of a tensor, or the type parameter that declares a
+        subclass, e.g. ``class Box[dtype](..., Diagram[dtype])``. """
+        return super().__class_getitem__(
+            values if isinstance(values, TypeVar) else Tensor[values].dtype)
 
     @classmethod
     def dim(cls, typ: monoidal.Ty) -> Dim:
@@ -704,8 +904,8 @@ class Diagram(NamedGeneric['dtype'], frobenius.Diagram):
         """
         return Dim(*(getattr(obj, "dim", obj) for obj in typ.inside))
 
-    def eval(self, dtype: type = None, optimize="greedy",
-             **params) -> Tensor:
+    def eval(self, dtype: type | None = None, optimize="greedy",
+             contractor: Backend | None = None, **params) -> Tensor:
         """
         Evaluate a tensor network as a :class:`Tensor`: call the
         :class:`Functor` that sends each type to its :meth:`dim` and each
@@ -717,9 +917,11 @@ class Diagram(NamedGeneric['dtype'], frobenius.Diagram):
                 and bubbles included, i.e. the one
                 :meth:`Matrix.promote` gives for their ``dtype``.
             optimize : The contraction path, passed verbatim to the
-                backend ``einsum``.
-            params : Any other optional parameter of the backend
-                ``einsum`` method, passed verbatim.
+                ``einsum`` of the contractor.
+            contractor : The backend whose ``einsum`` contracts the
+                network, see :meth:`Functor.contract`.
+            params : Any other optional parameter of the ``einsum``
+                method of the contractor, passed verbatim.
 
         Examples
         --------
@@ -727,13 +929,16 @@ class Diagram(NamedGeneric['dtype'], frobenius.Diagram):
         >>> assert (vector >> vector[::-1]).eval().array == 1
         >>> assert (vector >> vector[::-1]).eval(
         ...     optimize="optimal").array == 1
+        >>> assert (vector >> vector[::-1]).eval(  # doctest: +EXTRA
+        ...     contractor=Quimb()).array == 1
         >>> (vector >> vector[::-1]).eval()
         Tensor[int]([1], dom=Dim(1), cod=Dim(1))
         >>> (vector @ Box('half', Dim(1), Dim(1), [0.5])).eval()
         Tensor[float]([0. , 0.5], dom=Dim(1), cod=Dim(2))
         """
         category = self.category if isinstance(self, cmap.CMap) else self.ar
-        dtype = dtype or getattr(self, "dtype", None)
+        dtype = dtype or getattr(self, "dtype", None)\
+            or getattr(category, "dtype", None)
         boxes = list(self.boxes) if dtype is None else []
         for box in boxes:
             inside = box.terms if isinstance(box, Sum)\
@@ -745,14 +950,20 @@ class Diagram(NamedGeneric['dtype'], frobenius.Diagram):
             dtype = typed[0].promote(*typed[1:]).dtype
         return Functor(
             ob_map=category.dim, ar_map=lambda box: box.array,
-            dtype=dtype, optimize=optimize, **params)(self)
+            dtype=dtype, optimize=optimize, contractor=contractor,
+            **params)(self)
 
-    def to_quimb(self, dtype: type = None) -> "quimb.tensor.Tensor":
+    def to_quimb(
+            self, dtype: type | None = None) -> "quimb.tensor.TensorNetwork":
         """
-        Convert a tensor diagram to a quimb tensor.
+        Convert a tensor diagram to a quimb tensor network, see
+        :meth:`Functor.to_quimb`: swaps, cups and caps are wiring and the
+        free indices are named ``inp0, ...`` and ``out0, ...`` in
+        boundary order.
 
         Parameters:
-            dtype : Used for spiders.
+            dtype : The datatype for spiders and boundary identities,
+                inferred from the boxes by default.
 
         Examples
         --------
@@ -762,50 +973,16 @@ class Diagram(NamedGeneric['dtype'], frobenius.Diagram):
         >>> t_net = vector[::-1].to_quimb(dtype=complex)  # doctest: +EXTRA
         >>> assert t_net.contract(preserve_tensor=True).data.dtype == complex
         """
-        import quimb.tensor as qtn
-        spider_params = {} if dtype is None else {"dtype": dtype}
-        inputs = [
-                qtn.COPY_tensor(
-                    d=dim, inds=(f'inp{i}', f'inp{i}_end'), **spider_params
-                ) for i, dim in enumerate(self.dim(self.dom).inside)]
-        tensors = inputs[:]
-        scan = [(t, 1) for t in inputs]
+        if isinstance(self, Sum):
+            return Box("sum", self.dom, self.cod, self.eval(dtype).array)\
+                .to_quimb(dtype)
+        category = self.category if isinstance(self, cmap.CMap) else self.ar
+        return Functor(
+            ob_map=category.dim, ar_map=lambda box: box.array,
+            dtype=dtype or getattr(self, "dtype", None)).to_quimb(self)
 
-        for i, (box, off) in enumerate(zip(self.boxes, self.offsets)):
-            if isinstance(box, Permutation):
-                segment = scan[off:off + len(box.dom)]
-                scan[off:off + len(box.dom)] = [
-                    segment[i] for i in box.perm]
-                continue
-
-            in_inds = [f't{i}_i{j}' for j in range(len(box.dom))]
-            out_inds = [f't{i}_o{j}' for j in range(len(box.cod))]
-            t = qtn.Tensor(
-                data=box.eval().array,
-                inds=in_inds + out_inds,
-            )
-            tensors.append(t)
-            for j in range(len(box.dom)):
-                other_t, other_ind = scan[off + j]
-                qtn.connect(other_t, t, other_ind, j)
-
-            scan[off:off + len(box.dom)] = [
-                (t, len(box.dom) + ind) for ind in range(len(out_inds))
-            ]
-
-        for i, (t, j) in enumerate(scan):
-            output = qtn.COPY_tensor(
-                d=t.data.shape[j],
-                inds=(f'out{i}_start', f'out{i}'), **spider_params
-            )
-            qtn.connect(t, output, j, 0)
-            tensors.append(output)
-
-        tensor_net = qtn.TensorNetwork(tensors)
-        return tensor_net
-
-    def to_tn(self, dtype: type = None) -> tuple[
-            list["tensornetwork.Node"], list["tensornetwork.Edge"]]:
+    def to_tn(self, dtype: type | None = None) -> tuple[
+            list["tensornetwork.AbstractNode"], list["tensornetwork.Edge"]]:
         """
         Convert a tensor diagram to :code:`tensornetwork`.
 
@@ -826,7 +1003,9 @@ class Diagram(NamedGeneric['dtype'], frobenius.Diagram):
         if dtype is None:
             dtype = self.dtype
         nodes = [
-            tn.CopyNode(2, dim, f'input_{i}', dtype=dtype)
+            tn.CopyNode(
+                2, dim, f'input_{i}',
+                dtype=dtype)  # ty: ignore[invalid-argument-type]
             for i, dim in enumerate(self.dim(self.dom).inside)]
         inputs, outputs = [n[0] for n in nodes], [n[1] for n in nodes]
         for box, offset in zip(self.boxes, self.offsets):
@@ -835,26 +1014,27 @@ class Diagram(NamedGeneric['dtype'], frobenius.Diagram):
                 outputs[offset:offset + len(box.dom)] = [
                     segment[i] for i in box.perm]
                 continue
-            if isinstance(box, Cup)\
-                    or isinstance(box, Spider) and box.phase is None:
-                dims = (len(box.dom), len(box.cod))
+            dims = (len(box.dom), len(box.cod))
+            if isinstance(box, Cup) or isinstance(box, Spider)\
+                    and box.phase is None and dims != (0, 0):
                 if dims == (1, 1):  # identity
                     continue
                 elif dims == (2, 0):  # cup
-                    tn.connect(*outputs[offset:offset + 2])
+                    tn.connect(outputs[offset], outputs[offset + 1])
                     del outputs[offset:offset + 2]
                     continue
                 else:
                     node = tn.CopyNode(
-                        sum(dims), box.typ.inside[0], dtype=dtype)
+                        sum(dims), box.typ.inside[0],
+                        dtype=dtype)  # ty: ignore[invalid-argument-type]
             else:
                 array = box.eval(dtype=dtype).array
                 node = tn.Node(array, str(box))
             for i, _ in enumerate(box.dom):
                 tn.connect(outputs[offset + i], node[i])
             outputs[offset:offset + len(box.dom)] = node[len(box.dom):]
-            nodes.append(node)
-        return nodes, inputs + outputs
+            nodes.append(node)  # ty: ignore[invalid-argument-type]
+        return nodes, inputs + outputs  # ty: ignore[invalid-return-type]
 
     def grad(self, var, **params):
         """ Gradient with respect to :code:`var`. """
@@ -880,9 +1060,11 @@ class Diagram(NamedGeneric['dtype'], frobenius.Diagram):
 
         Returns
         -------
-        tensor : Tensor
-            with :code:`tensor.dom == self.dom`
-            and :code:`tensor.cod == Dim(len(variables)) @ self.cod`.
+        diagram : Sum
+            with :code:`diagram.dom == self.dom`
+            and :code:`diagram.cod == Dim(len(variables)) @ self.cod`,
+            whose :meth:`eval` is the :meth:`Tensor.jacobian` of
+            :code:`self.eval()`.
 
         Examples
         --------
@@ -890,22 +1072,27 @@ class Diagram(NamedGeneric['dtype'], frobenius.Diagram):
         >>> from sympy.abc import x, y, z
         >>> vector = Box("v", Dim(1), Dim(2), [x ** 2, y * z])
         >>> vector.jacobian([x, y, z]).eval(dtype=Expr)
-        Tensor[Expr]([2.0*x, 0, 0, 1.0*z, 0, 1.0*y], dom=Dim(1), cod=Dim(3, 2))
+        Tensor[Expr]([2*x, 0, 0, z, 0, y], dom=Dim(1), cod=Dim(3, 2))
         """
-        dim = Dim(len(variables) or 1)
+        n = len(variables) or 1
+        dim = Dim(n)
         result = Sum((), self.dom, dim @ self.cod)
         for i, var in enumerate(variables):
-            onehot = Tensor.zero(Dim(1), dim)
-            onehot.array[i] = 1
-            result += Box(str(var), Dim(1), dim, onehot.array)\
+            onehot = [int(j == i) for j in range(n)]
+            result += Box(str(var), Dim(1), dim, onehot)\
                 @ self.grad(var, **params)
         return result
+
+    # A tensor box carries an array, which the strategy of a free category
+    # does not draw: tensor diagrams, circuits and ZX diagrams stay out of
+    # the matrix.
+    strategy = no_strategy
 
 
 CMap = cmap.CMap[Diagram]
 
 
-class Box(frobenius.Box, Diagram):
+class Box[dtype](frobenius.Box, Diagram[dtype]):
     """
     A tensor box is a frobenius box with an array as data.
 
@@ -958,8 +1145,7 @@ class Box(frobenius.Box, Diagram):
 
     def grad(self, var, **params):
         return self.bubble(
-            func=lambda x: getattr(x, "diff", lambda _: 0)(var),
-            drawing_name=f"$\\partial {var}$")
+            func=Diff(var), drawing_name=f"$\\partial {var}$")
 
     def setoid(self):
         """
@@ -967,21 +1153,46 @@ class Box(frobenius.Box, Diagram):
         entries: a list as it is, an array of any backend through its
         ``tolist`` and a list of lists flattened.
 
+        Every nan entry becomes the one :data:`math.nan`, of any number type
+        and inside tuples too, and a complex one with a non-zero imaginary
+        part the pair of its parts, so that a box holding nan equals itself
+        and its hash is stable: the data labels a generator, it is not a
+        number being compared. The winding number ``z`` is compared too, as
+        in :meth:`discopy.rigid.Box.setoid`, and the time step, as in
+        :meth:`discopy.feedback.Box.setoid`. The ``dtype`` is compared by its
+        :func:`discopy.utils.factory_name`, a class object hashing as its
+        address and a backend's descriptor, e.g. ``torch.float64``, being no
+        class at all.
+
         >>> import numpy as np
         >>> f = Box('f', Dim(2), Dim(2), np.array([[0, 1], [1, 0]]))
         >>> assert f == Box('f', Dim(2), Dim(2), [[0, 1], [1, 0]])\\
         ...     == Box('f', Dim(2), Dim(2), [0, 1, 1, 0])
         >>> assert f != Box('f', Dim(2), Dim(2), [0, 1, 1, 1])
         >>> assert len({f, f.dagger().dagger()}) == 1
+        >>> g = Box('g', Dim(2), Dim(2), np.array([[np.nan, 1], [0, 1]]))
+        >>> assert g == g and len({g, g.dagger().dagger()}) == 1
         """
+        def canonical(x):
+            if isinstance(x, (list, tuple)):
+                return tuple(map(canonical, x))
+            # pylint: disable-next=comparison-with-itself  # false only for nan
+            if not isinstance(x, numbers.Complex) or x == x:
+                return x
+            if isinstance(x, numbers.Real) or x.imag == 0:
+                return math.nan
+            return canonical(x.real), canonical(x.imag)
+
         data = getattr(self.data, "tolist", lambda: self.data)()
         if isinstance(data, list) and any(isinstance(x, list) for x in data):
             with backend('numpy') as np:
                 data = np.array(data).reshape(-1).tolist()
         entries = () if data is None\
             else tuple(data) if isinstance(data, list) else (data, )
-        return (self.name, self.dom, self.cod, self.dtype, self.is_dagger,
-                self.deterministic, self.affine) + entries
+        dtype = None if self.dtype is None else factory_name(self.dtype)
+        return (self.name, self.dom, self.cod, dtype, self.is_dagger,
+                self.z, self.deterministic, self.affine, self.time_step)\
+            + tuple(map(canonical, entries))
 
 
 class Cup(frobenius.Cup, Box):
@@ -1004,7 +1215,7 @@ class Cap(frobenius.Cap, Box):
     """
 
 
-class Permutation(frobenius.Permutation, Box):
+class Permutation[dtype](frobenius.Permutation, Box[dtype]):
     "A permutation in a tensor diagram."
 
     @property
@@ -1013,7 +1224,7 @@ class Permutation(frobenius.Permutation, Box):
             self.perm, [self.dim(x) for x in self.dom]).array
 
 
-class Swap(Permutation, frobenius.Swap, Box):
+class Swap[dtype](Permutation[dtype], frobenius.Swap, Box[dtype]):
     """
     A tensor swap is a frobenius swap in a tensor diagram.
 
@@ -1023,7 +1234,7 @@ class Swap(Permutation, frobenius.Swap, Box):
     """
 
 
-class Spider(frobenius.Spider, Box):
+class Spider[dtype](frobenius.Spider, Box[dtype]):
     """
     A tensor spider is a frobenius spider in a tensor diagram.
 
@@ -1055,23 +1266,50 @@ class Spider(frobenius.Spider, Box):
         if self.phase is not None:
             raise NotImplementedError(
                 f"{self} has a phase, which Tensor does not interpret.")
-        return Tensor.spiders(len(self.dom), len(self.cod), self.typ).array
+        return Tensor.spiders(
+            len(self.dom), len(self.cod),
+            self.typ).array  # ty: ignore[invalid-argument-type]
 
 
-class Sum(monoidal.Sum, Box):
+class Sum[dtype](frobenius.Sum, Box[dtype]):
     """
-    A formal sum of tensor diagrams with the same domain and codomain.
+    A formal sum of tensor diagrams with the same domain and codomain, a
+    frobenius sum with the flags of a :class:`discopy.markov.Sum`.
 
     Parameters:
         terms (tuple[Diagram, ...]) : The terms of the formal sum.
         dom (Dim) : The domain of the formal sum.
         cod (Dim) : The codomain of the formal sum.
+
+    Example
+    -------
+    >>> f = Box('f', Dim(2), Dim(2), [1, 0, 0, 1])
+    >>> assert f.is_cartesian and not (f + f).is_deterministic
     """
 
 
-class Bubble(monoidal.Bubble, Box):
+def func_repr(func: Callable) -> str:
     """
-    Bubble in a tensor diagram, applies a function elementwise.
+    The repr of a function in a tensor bubble or a derivative: a named
+    function prints as its import path, so that it reads back with
+    :func:`eval`, anything else, e.g. a lambda, as its own repr.
+
+    Example
+    -------
+    >>> import numpy
+    >>> assert func_repr(abs) == "abs"
+    >>> assert func_repr(numpy.sqrt) == "numpy.sqrt"
+    >>> assert func_repr(lambda x: x).startswith("<function")
+    """
+    name = getattr(func, "__qualname__", "<")
+    return repr(func) if "<" in name\
+        else f"{func.__module__}.{name}".removeprefix("builtins.")
+
+
+class Bubble(feedback.Bubble, Box):
+    """
+    Bubble in a tensor diagram, applies a function elementwise. It is a
+    feedback bubble, so that a circuit bubble delays as one.
 
     Parameters
     ----------
@@ -1079,6 +1317,9 @@ class Bubble(monoidal.Bubble, Box):
         The diagram inside the bubble.
     func : callable
         The function to apply, default is :code:`lambda x: int(not x)`.
+        A named function prints as its import path, e.g. :code:`abs` or
+        :code:`numpy.sqrt`, so the bubble reads back from its repr, a
+        lambda does not.
 
     Examples
     --------
@@ -1111,24 +1352,38 @@ class Bubble(monoidal.Bubble, Box):
     .. image:: /_static/tensor/product-rule.svg
         :align: center
     """
+    serialised_attrs = feedback.Bubble.serialised_attrs + ("func", )
+    func = staticmethod(lambda x: int(not x))
 
     def __new__(cls, *args, data=None, **kwargs):
         return super().__new__(cls, data=data)
 
-    def __init__(self, inside, func=lambda x: int(not x), **params):
-        self.func = func
+    def __init__(self, inside, func=None, **params):
+        if func is not None:
+            self.func = func
         super().__init__(inside, **params)
 
-    def subs(self, *args) -> Bubble:
-        return type(self)(
-            self.arg.subs(*args), func=self.func, dom=self.dom, cod=self.cod,
-            drawing_name=self.drawing_name)
+    def setoid(self):
+        """
+        Tensor bubbles are equal when their args, methods and funcs are, and
+        they are equal as tensor boxes: their daggers too, and their data by
+        its entries, so that a bubble holding a list hashes as a box does.
 
-    def lambdify(self, *symbols, **kwargs):
-        inside = self.arg.lambdify(*symbols, **kwargs)
-        return lambda *xs: type(self)(
-            inside(*xs), func=self.func, dom=self.dom, cod=self.cod,
-            drawing_name=self.drawing_name)
+        >>> import numpy as np
+        >>> f = Box('f', Dim(2), Dim(2), [1, 0, 0, 1])
+        >>> assert f.bubble(data=np.array([1, 2])) == f.bubble(data=[1, 2])
+        >>> assert len({f.bubble(data=[1, 2]), f.bubble(data=[1, 3])}) == 2
+        """
+        args = tuple(f.setoid() for f in self.args)
+        return (factory_key(type(self)), self.method, self.func)\
+            + args + Box.setoid(self)
+
+    def __repr__(self):
+        if self.is_dagger:
+            return repr(self.dagger()) + ".dagger()"
+        if self.func is type(self).func:
+            return super().__repr__()
+        return super().__repr__()[:-1] + f", func={func_repr(self.func)})"
 
     def grad(self, var, **params):
         """
@@ -1146,20 +1401,68 @@ class Bubble(monoidal.Bubble, Box):
             :align: center
         """
         from sympy import Symbol
-        tmp = Symbol("tmp")
         name = "$\\frac{{\\partial {}}}{{\\partial {}}}$"
-        return Spider(1, 2, self.dom)\
+        return Diagram.spiders(1, 2, self.dom)\
             >> self.arg.bubble(
-                func=lambda x: self.func(tmp).diff(tmp).subs(tmp, x),
+                func=Diff(Symbol("tmp"), self.func),
                 drawing_name=name.format(self.drawing_name, var))\
-            @ self.arg.grad(var) >> Spider(2, 1, self.cod)
+            @ self.arg.grad(var) >> Diagram.spiders(2, 1, self.cod)
+
+
+class Diff:
+    """
+    The derivative with respect to a variable, applied to each entry of a
+    tensor by the bubble of :meth:`Box.grad`, an entry with no ``diff``, e.g.
+    a number, being a constant. Given a ``func``, it is the derivative of that
+    function instead, bound by the variable, as the chain rule of
+    :meth:`Bubble.grad` applies it.
+
+    Parameters:
+        var : The variable.
+        func : The function to differentiate, if any.
+
+    Example
+    -------
+    >>> from sympy.abc import x, y  # doctest: +EXTRA
+    >>> assert Diff(x)(x * y) == y and Diff(x)(42) == 0
+    >>> assert Diff(y, lambda z: z ** 3)(x) == 3 * x ** 2
+
+    Diffs are equal when their variables and functions are, so that gradients
+    are too, and they read back from their repr when their function is named,
+    see :func:`func_repr`.
+
+    >>> from discopy import tensor
+    >>> assert Diff(x) == eval(repr(Diff(x))) != Diff(y)
+    >>> assert eval(repr(Diff(x, abs))) == Diff(x, abs)
+    >>> f = Box('f', Dim(2), Dim(2), [x, 0, 0, y])
+    >>> assert f.grad(x) == f.grad(x) != f.grad(y)
+    """
+    def __init__(self, var, func=None):
+        self.var, self.func = var, func
+
+    def __call__(self, entry):
+        if self.func is None:
+            return getattr(entry, "diff", lambda _: 0)(self.var)
+        return self.func(self.var).diff(self.var).subs(self.var, entry)
+
+    def __eq__(self, other):
+        return isinstance(other, Diff)\
+            and (self.var, self.func) == (other.var, other.func)
+
+    def __hash__(self):
+        return hash((self.var, self.func))
+
+    def __repr__(self):
+        func = "" if self.func is None else f", {func_repr(self.func)}"
+        return f"{factory_name(type(self))}({self.var!r}{func})"
 
 
 Diagram.box_factory = Box
 Diagram.sum_factory, Diagram.swap_factory = Sum, Swap
 Diagram.permutation_factory = Permutation
 Diagram.cup_factory, Diagram.cap_factory = Cup, Cap
-Diagram.spider_factory, Diagram.bubble_factory = Spider, Bubble
+Diagram.spider_factory = Spider  # ty: ignore[invalid-assignment]
+Diagram.bubble_factory = Bubble
 Id = Diagram.id
 
 

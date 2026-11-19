@@ -1,7 +1,9 @@
 # -*- coding: utf-8 -*-
 
 """
-The category of finite sets implemented as Python lists.
+Functions between finite sets as Python lists, read backwards: the free
+Markov category on one object, i.e. the opposite of the category of finite
+sets (see :mod:`discopy.op`), with cycles, permutations and cospans.
 
 Summary
 -------
@@ -12,28 +14,29 @@ Summary
     :toctree:
 
     Function
-    Cycles
     Permutation
     Cospan
 """
 
 from __future__ import annotations
 from discopy.utils import assert_isinstance
-from typing import Iterable, Self, Any
+from typing import Any, Iterable, Self, overload
 from itertools import accumulate
 from collections.abc import Sequence
+from operator import index
 
 from dataclasses import dataclass
 
 from discopy import messages
 from discopy.abc import (
-    Groupoid, HypergraphCategory, MarkovCategory, PROP, Nat)
-from discopy.axioms import Testable
-from discopy.utils import AxiomError, unbiased
+    DaggerMonoidalCategory, Groupoid, HypergraphCategory, MarkovCategory,
+    PROP, Nat)
+from discopy.testable import Serialisable
+from discopy.utils import AxiomError, factory_name, unbiased
 
 
 @dataclass
-class Function(MarkovCategory, Sequence):
+class Function(MarkovCategory[Nat, "Function"], Sequence):
     """
     A function between finite sets encoded as a Python list, read backwards
     as an arrow from ``dom`` to ``cod``, i.e. an arrow of the free Markov
@@ -69,12 +72,13 @@ class Function(MarkovCategory, Sequence):
         self.cod = self.cod if isinstance(self.cod, Nat) else Nat(self.cod)
         if isinstance(self.inside, dict):
             self.inside = [self.inside[i] for i in range(len(self.cod))]
-        else:
-            self.inside = list(self.inside)
+        self.inside = [index(i) for i in self.inside]
         if len(self.inside) != len(self.cod):
-            raise ValueError
+            raise ValueError(messages.WRONG_FUNCTION.format(
+                len(self.cod), len(self.inside)))
         if any(not 0 <= i < len(self.dom) for i in self.inside):
-            raise ValueError
+            raise ValueError(messages.NOT_A_FUNCTION.format(
+                len(self.dom), self.inside))
 
     def __getitem__(self, key):
         return self.inside[key]
@@ -90,10 +94,17 @@ class Function(MarkovCategory, Sequence):
         """
         The composite ``self ; others``, read off backwards, i.e. each
         index of the last codomain walked back through every function.
+
+        Raises:
+            AxiomError : When two adjacent functions do not compose.
         """
         if not others:
             return self
         factors = (self, ) + others
+        for left, right in zip(factors, factors[1:]):
+            if left.cod.n != right.dom.n:
+                raise AxiomError(messages.NOT_COMPOSABLE.format(
+                    left, right, left.cod, right.dom))
         inside = factors[-1].inside
         for factor in reversed(factors[:-1]):
             image = factor.inside
@@ -130,9 +141,10 @@ class Function(MarkovCategory, Sequence):
         >>> assert Function.swap(2, 1) >> Function.swap(1, 2) == Function.id(3)
         """
         m, n = int(x), int(y)
-        return Function(list(range(m, m + n)) + list(range(m)), m + n, m + n)
+        return Function(
+            list(range(m, m + n)) + list(range(m)), Nat(m + n), Nat(m + n))
 
-    def is_swap(self) -> bool:
+    def is_swap(self: Function | Sequence[int]) -> bool:
         """
         Whether this is the permutation ``(1, 0)``, callable on a raw
         sequence as well as on a :class:`Function` with a two-wire domain.
@@ -159,12 +171,12 @@ class Function(MarkovCategory, Sequence):
         xs = Permutation(xs, len(sizes))
         offsets = [0, *accumulate(sizes)]
         inside = [offsets[i] + j for i in xs for j in range(sizes[i])]
-        return Function(inside, offsets[-1], offsets[-1])
+        return Function(inside, Nat(offsets[-1]), Nat(offsets[-1]))
 
     @staticmethod
     def copy(x: int | Nat, n=2) -> Function:
-        k = int(x)
-        return Function([i % k for i in range(n * k)], k, n * k)
+        k, n = int(x), index(n)
+        return Function([i % k for i in range(n * k)], Nat(k), Nat(n * k))
 
     def factorise(self) -> tuple[list[int], Permutation]:
         """
@@ -175,7 +187,7 @@ class Function(MarkovCategory, Sequence):
         >>> f = Function([1, 0, 1], 2, 3)
         >>> counts, perm = f.factorise()
         >>> counts, perm
-        ([1, 2], (1, 0, 2))
+        ([1, 2], python.finset.Permutation((1, 0, 2)))
         >>> copies = [Function.copy(1, n) for n in counts]
         >>> assert copies[0].tensor(*copies[1:]) >> perm == f
         """
@@ -192,7 +204,7 @@ type Cycle = Iterable[int]
 type Cycles = Iterable[Cycle]
 
 
-class Permutation(Function, PROP, Groupoid):
+class Permutation(Function, PROP, Groupoid, DaggerMonoidalCategory):
     """
     A permutation of a finite set, seen as a bijective finite-set function,
     i.e. an arrow of the groupoid of finite sets and bijections.
@@ -204,11 +216,14 @@ class Permutation(Function, PROP, Groupoid):
     >>> Permutation((1, 0, 3, 2)).cycles()
     ((0, 1), (2, 3))
     >>> Permutation.from_cycles([(0, 1), (2, 3)], 4)
-    (1, 0, 3, 2)
+    python.finset.Permutation((1, 0, 3, 2))
     >>> Permutation((1, 0)).is_fixpoint_free_involution()
     True
     """
     def __init__(self, inside=(), size: int | None = None):
+        if isinstance(inside, Function) and inside.dom != inside.cod:
+            raise ValueError(messages.NOT_A_PERMUTATION.format(
+                len(inside.dom), inside))
         inside = tuple(inside)
         if size is None:
             size = len(inside)
@@ -220,18 +235,27 @@ class Permutation(Function, PROP, Groupoid):
             )
         if sorted(inside) != list(range(size)):
             raise ValueError(messages.NOT_A_PERMUTATION.format(size, inside))
-        super().__init__(list(inside), size, size)
+        super().__init__(list(inside), Nat(size), Nat(size))
 
     def __iter__(self):
         return (self[i] for i in range(len(self)))
 
-    def __getitem__(self, key: int) -> int:
+    @overload
+    def __getitem__(self, key: int) -> int: ...
+
+    @overload
+    def __getitem__(self, key: slice) -> tuple[int, ...]: ...
+
+    def __getitem__(self, key: int | slice) -> int | tuple[int, ...]:
         if isinstance(key, slice):
             return tuple(self)[key]
         return super().__getitem__(key)
 
     def __repr__(self) -> str:
-        return repr(tuple(self))
+        return factory_name(type(self)) + f"({tuple(self)!r})"
+
+    def __str__(self) -> str:
+        return str(tuple(self))
 
     def __eq__(self, other: Any) -> bool:
         if isinstance(other, Permutation):
@@ -258,7 +282,11 @@ class Permutation(Function, PROP, Groupoid):
 
     @classmethod
     def from_cycles(cls, cycles: Cycles, size: int) -> Self:
-        """ Build a permutation from cycles. """
+        """
+        Build a permutation of ``range(size)`` from disjoint cycles, each an
+        iterable of indices ``(i0, i1, ..., ik)`` with ``result[i0] == i1``,
+        ..., ``result[ik] == i0``, as :meth:`cycles` reads them back.
+        """
         result = list(range(size))
         seen = set()
         for cycle in map(tuple, cycles):
@@ -274,7 +302,7 @@ class Permutation(Function, PROP, Groupoid):
 
     @classmethod
     def from_transpositions(cls, transpositions: Cycles, size: int) -> Self:
-        """ Build a permutation from disjoint 2-cycles. """
+        """ Build a permutation from disjoint 2-cycles ``(i, j)``. """
         result = list(range(size))
         seen = set()
         for left, right in transpositions:
@@ -301,7 +329,7 @@ class Permutation(Function, PROP, Groupoid):
         of each box at its offset.
 
         >>> Permutation.gather([3, 1], 5, offset=1)
-        (0, 3, 1, 2, 4)
+        python.finset.Permutation((0, 3, 1, 2, 4))
         >>> assert Permutation.gather([], 3) == Permutation.id(3)
         """
         if not 0 <= offset <= size - len(xs):
@@ -334,11 +362,20 @@ class Permutation(Function, PROP, Groupoid):
 
     def then(self, *others: Self) -> Self:
         """ Return ``self ; others``, i.e. each index pushed through them
-        in turn, ``result[i] == other[self[i]]`` for a single ``other``. """
+        in turn, ``result[i] == other[self[i]]`` for a single ``other``.
+
+        Raises:
+            AxiomError : When a function's domain is not ``self.cod``.
+            ValueError : When an argument is otherwise not a permutation of
+                that size, e.g. a sequence of another length.
+        """
         if not others:
             return self
         inside = self.inside
         for other in others:
+            if isinstance(other, Function) and other.dom != self.cod:
+                raise AxiomError(messages.NOT_COMPOSABLE.format(
+                    self, other, self.cod, other.dom))
             image = type(self)(other, len(self)).inside
             inside = [image[i] for i in inside]
         return type(self)(inside, len(self))
@@ -411,7 +448,7 @@ class Permutation(Function, PROP, Groupoid):
         >>> Permutation((1, 2, 0, 3)).coequalizer()
         {0: 0, 1: 0, 2: 0, 3: 1}
         """
-        others = [type(self)(other, len(self)) for other in others]
+        others = tuple(type(self)(other, len(self)) for other in others)
         component_of = {}
         component = 0
         for start in range(len(self)):
@@ -447,7 +484,8 @@ class Permutation(Function, PROP, Groupoid):
 
 
 @dataclass
-class Cospan(HypergraphCategory, Testable["Cospan"]):
+class Cospan(
+        HypergraphCategory, DaggerMonoidalCategory, Serialisable["Cospan"]):
     """
     A cospan of finite sets ``dom -> apex <- cod``, i.e. an arrow of the free
     hypergraph category on one object, the PROP of special commutative
@@ -532,7 +570,8 @@ class Cospan(HypergraphCategory, Testable["Cospan"]):
         if self.cod != other.dom:
             raise AxiomError(messages.NOT_COMPOSABLE.format(
                 self, other, self.cod, other.dom))
-        parent = list(range(self.apex + other.apex))
+        parent = list(
+            range(self.apex + other.apex))
 
         def find(i):
             while parent[i] != i:
@@ -583,6 +622,7 @@ class Cospan(HypergraphCategory, Testable["Cospan"]):
         Cospan(left=[0, 1, 0, 1], right=[], apex=2)
         """
         k = int(typ)
+        n_legs_in, n_legs_out = index(n_legs_in), index(n_legs_out)
         return cls([i % k for i in range(n_legs_in * k)],
                    [j % k for j in range(n_legs_out * k)], k)
 
@@ -650,5 +690,17 @@ class Cospan(HypergraphCategory, Testable["Cospan"]):
                        draw(st.lists(points, min_size=n, max_size=n)), apex)
         return cospans()
 
-    serialisation = Testable.serialisation.inapplicable(
+    serialisation = Serialisable.serialisation.inapplicable(
         "A cospan of finite sets has no tree.")
+
+
+for name in (
+        "snake_equations", "caps_coherence", "cups_coherence",
+        "transpose_contravariance", "rotate_contravariance", "adjunction",
+        "self_dual", "pivotality", "reidemeister_1_cap", "reidemeister_1_cup",
+        "currying_left", "currying_right", "currying_eta_left",
+        "currying_eta_right", "currying_naturality_left",
+        "currying_naturality_right", "counit", "unit", "curry_left",
+        "curry_right", "ev_left", "ev_right"):
+    setattr(Cospan, name, getattr(Cospan, name).inapplicable(
+        messages.NAT_HAS_NO_ADJOINTS))

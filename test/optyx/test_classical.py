@@ -1,8 +1,10 @@
 import numpy as np
 import pytest
 
-from discopy.optyx import qubits
-from discopy.optyx.channel import bit, qubit
+import discopy
+from discopy import optyx
+from discopy.optyx import photonic, qubits
+from discopy.optyx.channel import bit, mode, qubit
 from discopy.optyx.classical import *
 from discopy.optyx.classical import (
     Bit, BitControlledGate, Id, PostselectBit, PostselectDigit)
@@ -15,12 +17,12 @@ def test_addn():
     assert compare_arrays_of_different_sizes(d_1.double().to_tensor().eval().array,
                        d_2.double().to_tensor().eval().array)
 
-def test_subn():
-    d_1 = Digit(2, 5) >> Sub()
-    d_2 = Digit(3)
-
-    assert compare_arrays_of_different_sizes(d_1.double().to_tensor().eval().array,
-                       d_2.double().to_tensor().eval().array)
+def test_sub_subtracts_the_first_number_from_the_second():
+    for x, y in [(2, 5), (0, 4), (3, 3), (5, 2), (4, 0)]:
+        array = (Digit(x, y) >> Sub()).double().to_tensor().eval().array
+        support = np.flatnonzero(array)
+        assert support.tolist() == ([y - x] if y >= x else [])
+        assert np.allclose(array.flat[support], 1)
 
 def test_multiplyn():
     d_1 = Digit(2, 3) >> Multiply()
@@ -92,6 +94,13 @@ def test_andbit():
     assert compare_arrays_of_different_sizes(d_1.double().to_tensor().eval().array,
                             d_2.double().to_tensor().eval().array)
 
+@pytest.mark.parametrize("bits", [(1, 1, 1), (1, 0, 1), (0, 0, 0)])
+def test_and_n(bits):
+    d_1 = Bit(*bits) >> And(3)
+    d_2 = Bit(int(all(bits)))
+    assert compare_arrays_of_different_sizes(d_1.double().to_tensor().eval().array,
+                            d_2.double().to_tensor().eval().array)
+
 def test_copybit():
     d_1 = Bit(1) >> CopyBit(3)
     d_2 = Bit(1, 1, 1)
@@ -134,6 +143,55 @@ def test_bit_controlled_diagram():
     assert BitControlledGate(phase, is_dagger=True) == controlled.dagger()
 
 
+
+@pytest.mark.parametrize("n", [1, 2, 3, 4])
+def test_xor_n_is_a_parity(n):
+    """The truth table of `Xor(n)` sends each input to the parity of its
+    bits, with probability one."""
+    array = Xor(n).double().to_tensor().eval().array
+    parity = [[int(bin(i).count("1") % 2 == out) for out in (0, 1)]
+              for i in range(2 ** n)]
+    assert np.allclose(array.reshape(2 ** n, 2), parity)
+
+
+def test_bit_controlled_identity_discards_the_bit():
+    controlled = BitControlledGate(qubits.Id(qubit))
+    assert (controlled.dom, controlled.cod) == (bit @ qubit, qubit)
+    for value in (0, 1):
+        assert np.allclose(
+            (Bit(value) @ qubits.Ket("+") >> controlled).double()
+            .to_tensor().eval().array,
+            qubits.Ket("+").double().to_tensor().eval().array)
+
+
+BIT_CONTROLLED_GATES = [
+    BitControlledGate(qubits.X(1, 1, .5), qubits.Id(1)),
+    BitControlledGate(qubits.X(1, 1, .5), qubits.Z(1, 1, .25), is_dagger=True),
+    BitControlledGate(qubits.X(1, 1, .5), qubits.Id(1), classical=True),
+    BitControlledGate(photonic.BS, photonic.BS.dagger()),
+    BitControlledGate(photonic.PhaseShiftDR(.5)),
+    BitControlledGate(photonic.PhaseShiftDR(.5), is_dagger=True),
+]
+
+
+@pytest.mark.parametrize("term", BIT_CONTROLLED_GATES)
+def test_bit_controlled_gate_is_transparent(term):
+    namespace = {name: value for name, value in vars(discopy).items()
+                 if not name.startswith("_")}
+    assert "_BitControlledSingleBox" not in repr(term)
+    assert eval(repr(term), {**namespace, "optyx": optyx}) == term
+
+
+def test_bit_controlled_gate_equality_reads_its_gates():
+    x, z = qubits.X(1, 1, .5), qubits.Z(1, 1, .5)
+    controlled = BitControlledGate(x, qubits.Id(1))
+    assert controlled.data == (x, qubits.Id(1))
+    assert controlled != BitControlledGate(z, qubits.Id(1))
+    assert controlled != BitControlledGate(x, z)
+    assert controlled.dagger() == BitControlledGate(
+        x, qubits.Id(1), is_dagger=True)
+
+
 def test_classical_guards():
     with pytest.raises(ValueError, match="0s and 1s"):
         PostselectBit(2)
@@ -142,3 +200,53 @@ def test_classical_guards():
     with pytest.raises(TypeError, match="channel.Ty"):
         Id(2)
     assert Bit(1) >> Id(bit) == Bit(1)
+
+
+def test_bit_controlled_phase_shift_keeps_its_modes_quantum():
+    from discopy.optyx.channel import qmode
+    from discopy.optyx.photonic import Phase
+    gate = BitControlledPhaseShift(lambda bits: [0.5 * bits[0]])
+    assert gate.cod == qmode
+    assert (gate >> Phase(0.25)).cod == qmode
+
+
+def test_bit_controlled_phase_shift_is_controlled_by_its_classical_mode():
+    """The control is the `mode` declared after the `qmode`, so the photons
+    on the `qmode` stay there, and half a turn on one arm of a Mach-Zehnder
+    swaps its outputs."""
+    from discopy.optyx.channel import Measure, qmode
+    from discopy.optyx.photonic import BS, Create
+    gate = BitControlledPhaseShift(lambda control: [0.25 * control[0]])
+    for photons, control in [(1, 2), (2, 1), (0, 3)]:
+        kept = Create(photons) @ Digit(control) >> gate >> Measure(qmode)
+        assert kept.eval().prob_dist()[photons, ] == pytest.approx(1)
+    for control, outcome in [(0, (0, 1)), (2, (1, 0))]:
+        mzi = Create(1, 0) @ Digit(control) >> BS @ mode >> qmode @ gate
+        mzi >>= BS >> Measure(qmode ** 2)
+        assert mzi.eval().prob_dist()[outcome] == pytest.approx(1)
+
+
+def test_classical_diagram_eval():
+    diagram = Digit(2) >> Mod2()
+    assert not diagram.is_pure
+    assert diagram.eval().prob_dist() == {(0, ): 1.0}
+
+
+def test_classical_box_in_parallel_layer_is_not_pure():
+    layer = (qubits.H() @ Digit(2)).foliation()
+    assert len(layer.inside) == 1
+    assert not layer.is_pure
+
+
+def test_constructors_with_no_argument_are_rejected():
+    """#387: a digit of no digits is ``Id()`` already, so the empty case is
+    rejected rather than read as one mode or as the scalar one. This undoes
+    #419's reading, on toumix's call of 11-09."""
+    for constructor in (Digit, PostselectDigit, PostselectBit, Bit):
+        with pytest.raises(ValueError):
+            constructor()
+    assert PostselectDigit(1).digits == Digit(1).photons == (1,)
+    assert PostselectDigit(1).dom == Digit(1).cod == mode
+    assert (Digit(1) >> PostselectDigit(1)).eval().prob_dist() == {(): 1.}
+    assert np.isclose(
+        (Bit(0) >> PostselectBit(0)).double().to_tensor().eval().array, 1)

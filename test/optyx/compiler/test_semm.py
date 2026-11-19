@@ -1,9 +1,15 @@
 import networkx as nx
 import pytest
 
-from discopy.optyx.compiler.mbqc import Measurement, OpenGraph
+from discopy.optyx.compiler.mbqc import (
+    Fusion, FusionNetwork, Measurement, OpenGraph)
+from discopy.optyx.compiler.patterns import (
+    FusionOp, MeasureOp, NextNodeOp)
 from discopy.optyx.compiler.semm import (
-    compile_to_fusion_network, compile_to_semm, decompile_from_semm)
+    compile_to_fusion_network, compile_to_semm, decompile_from_semm,
+    fn_to_semm)
+from discopy.optyx.compiler.semm_decompiler import (
+    decompile_to_fusion_network)
 
 
 # Generate many random graphs and confirm all of them can be compiled and
@@ -44,6 +50,32 @@ def test_fuzz_semm_compiler(num_vertices: int):
         assert og.isclose(og_reconstructed)
 
 
+def test_semm_compiles_a_cover_of_more_than_one_path():
+    # next#298: a star has gflow, but no single path covers it, so its
+    # fusion network joins two paths with a break and fuses across them.
+    # `add_fusion_order` used to recurse forever on the fusion.
+    star = nx.Graph([(0, 1), (1, 2), (1, 3)])
+    meas = {i: Measurement(0, "XY") for i in range(2)}
+    og = OpenGraph(star, meas, {0}, {2, 3})
+    assert og.find_gflow() is not None
+
+    ins = compile_to_semm(og)
+    assert ins == [
+        NextNodeOp(0), MeasureOp(0, meas[0]),
+        NextNodeOp(1), FusionOp(3, "X"), MeasureOp(0, meas[1]),
+        NextNodeOp(2),
+        NextNodeOp(4), MeasureOp(0, Measurement(0, "XY")),
+        NextNodeOp(3), FusionOp(0, "X")]
+
+    # The break joining the two paths is a node of the resource state and
+    # not of the graph, so what reads back is the graph plus that break:
+    # what the instructions should say about it is the rest of next#298.
+    back = decompile_from_semm(ins, {0}, {2, 3})
+    assert {frozenset(e) for e in back.inside.edges()} == {
+        frozenset(e) for e in star.edges()} | {
+            frozenset((2, 4)), frozenset((4, 3))}
+
+
 def test_a_graph_without_gflow_does_not_compile():
     triangle = nx.Graph([(0, 1), (1, 2), (0, 2)])
     meas = {i: Measurement(0, "XY") for i in range(2)}
@@ -65,3 +97,14 @@ def test_fusion_network_joins_the_paths_of_its_cover():
     fusion_edges = {(f.node1, f.node2) for f in network.fusions}
     for edge in claw.edges:
         assert {edge, edge[::-1]} & (path_edges | fusion_edges)
+
+
+def test_fn_to_semm_emits_the_type_of_each_fusion():
+    """A Y fusion is emitted as one, so decompiling gives it back."""
+    meas = Measurement(0, "XY")
+    fusions = [Fusion(0, 2, "Y"), Fusion(1, 2, "X")]
+    network = FusionNetwork([0, 1, 2], {0: meas, 1: meas}, fusions)
+    ins = fn_to_semm(network, lambda node: [node])
+    assert [op.fusion_type for op in ins if isinstance(op, FusionOp)] \
+        == ["Y", "X", "Y", "X"]
+    assert decompile_to_fusion_network(ins).fusions == fusions

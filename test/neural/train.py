@@ -124,3 +124,24 @@ def test_per_board_backward():
     assert stats["clipped_frac"] == 1.
     assert torch.allclose(net.halt.weight.grad, 2 * before)
     assert torch.allclose(net.body.weight.grad, grads[0], atol=1e-5)
+
+
+def test_per_board_backward_drops_a_board_not_finite():
+    torch = importorskip("torch")
+    from discopy.neural.train import per_board_backward
+    torch.manual_seed(0)
+    net = torch.nn.ModuleDict({
+        "body": torch.nn.Linear(3, 2), "halt": torch.nn.Linear(2, 1)})
+
+    def board_loss(net, x):
+        hidden = net.body(x)
+        return hidden.pow(2).mean() + net.halt(hidden.detach()).mean(), ()
+
+    x = torch.randn(4, 3)
+    x[3] = float("inf")
+    per_board_backward(net, board_loss, (x, ), k=1e9)
+    grads = torch.autograd.grad(
+        sum(board_loss(net, x[b:b + 1])[0] for b in range(3)) / 4,
+        list(net.parameters()))
+    assert all(torch.allclose(p.grad, g)
+               for p, g in zip(net.parameters(), grads))

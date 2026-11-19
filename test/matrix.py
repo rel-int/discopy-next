@@ -4,12 +4,35 @@ import numpy as np
 import pytest
 from pytest import raises
 
-from discopy import axioms
-from discopy.abc import DaggerCategory, Nat
-from discopy.matrix import Matrix, backend
+from discopy.abc import DaggerCategory, Nat, TracedCategory
+from discopy.matrix import Matrix, backend, is_complex, is_field
 from discopy.symmetric import Ty, Permutation, Swap, Functor
 from discopy.tensor import Tensor, Dim
 from discopy.utils import AxiomError, Subscript, dumps, loads
+
+
+def test_Matrix_order():
+    R, S = Matrix[bool]([1, 0, 0, 0], 2, 2), Matrix[bool].id(2)
+    assert R <= S and S >= R and R <= R and not S <= R
+    assert R >> R <= S >> S and R @ R <= S @ S
+    assert R.transpose() <= S.transpose()
+    assert not R <= Matrix[bool]([1, 1], 1, 2)
+    assert Matrix([1, 1], 1, 2) <= Matrix([2, 1], 1, 2)
+    assert not Matrix([1, 2], 1, 2) <= Matrix([2, 1], 1, 2)
+    assert Matrix([.5], 1, 1) <= Matrix([1.5], 1, 1)
+    full = Tensor[bool]([1, 1, 1, 1], Dim(2), Dim(2))
+    assert Tensor[bool].id(Dim(2)) <= full and not full <= full.id(Dim(2))
+    with raises(TypeError):
+        R <= 1
+    with raises(TypeError):
+        R <= R.cast(int)
+    with raises(TypeError):
+        R < S
+    for dtype in (complex, np.complex64):
+        with raises(TypeError):
+            Matrix[dtype]([1j], 1, 1) <= Matrix[dtype]([2j], 1, 1)
+    assert is_complex(complex) and is_complex(np.dtype("complex64"))
+    assert not is_complex(float) and not is_complex(bool)
 
 
 def test_Matrix_trace_left():
@@ -17,6 +40,76 @@ def test_Matrix_trace_left():
     assert f.trace() == Matrix[bool]([[1]], 1, 1)
     assert f.trace(left=True) == Matrix[bool]([[0]], 1, 1)
     assert Matrix[bool].swap(1, 1).trace(left=True) == Matrix[bool].id(1)
+
+
+def test_trace_over_a_field_is_the_sum_over_unrollings_when_acyclic():
+    rng = np.random.default_rng(0)
+    for dtype in (float, complex):
+        for dom, cod, n in [(1, 1, 1), (2, 3, 2), (0, 2, 3), (3, 1, 4)]:
+            array = rng.integers(-3, 4, (dom + n, cod + n)).astype(dtype)
+            array[dom:, cod:] = np.triu(array[dom:, cod:], k=1)
+            f = Matrix[dtype](array, dom + n, cod + n)
+            A, B = array[:dom, :cod], array[:dom, cod:]
+            C, D = array[dom:, :cod], array[dom:, cod:]
+            unrolled = A + sum(
+                B @ np.linalg.matrix_power(D, k) @ C for k in range(n + 1))
+            assert f.trace(n).is_close(Matrix[dtype](unrolled, dom, cod))
+            assert f.trace(n).dtype == dtype
+
+
+def test_trace_over_a_field_is_partial():
+    f = Matrix[float]([[0.5, 1], [1, 1]], 2, 2)
+    with raises(ValueError, match="partial"):
+        f.trace()
+    with raises(ValueError, match="partial"):
+        Matrix[complex].id(2).trace(left=True)
+    assert Matrix[float].id(2).trace(0) == Matrix[float].id(2)
+    ill_conditioned = Matrix[float]([[0, 1e8], [0, 0]], 2, 2)
+    assert ill_conditioned.resolvent()\
+        == Matrix[float]([[1, 1e8], [0, 1]], 2, 2)
+
+
+def test_trace_needs_booleans_or_a_field():
+    f = Matrix[int]([[0, 1], [1, 0]], 2, 2)
+    with raises(TypeError):
+        f.trace()
+    assert f.cast(float).trace() == Matrix[float]([[1]], 1, 1)
+
+
+def test_trace_over_a_field_satisfies_the_traced_laws():
+    # Matrix is not enrolled as a TracedCategory, so the property matrix has
+    # no traced cell for it: the laws are stated on arrays here, with entries
+    # small enough for every trace they take to be defined.
+    rng, M = np.random.default_rng(0), Matrix[float]
+
+    def matrix(dom, cod):
+        return M(rng.uniform(0, .2, (dom, cod)), dom, cod)
+
+    def holds(equation):
+        first, *others = equation.terms
+        return all(first.is_close(other) for other in others)
+
+    laws = {name: getattr(TracedCategory, name).function for name in (
+        "yanking", "trace_vanishing", "trace_iteration_left",
+        "trace_iteration_right", "trace_superposing_left",
+        "trace_superposing_right", "trace_naturality_left",
+        "trace_naturality_right", "trace_dinaturality_left",
+        "trace_dinaturality_right")}
+    assert holds(laws["yanking"](M, Nat(1)))
+    for _ in range(20):
+        a, b, m, s, t = (int(x) for x in rng.integers(0, 3, 5))
+        assert holds(laws["trace_vanishing"](M, matrix(a, b)))
+        for side in ("left", "right"):
+            f = matrix(m + a, m + b)
+            assert holds(laws[f"trace_iteration_{side}"](M, f, Nat(m)))
+            f = matrix(1 + a, 1 + b)
+            assert holds(laws[f"trace_superposing_{side}"](M, f, Nat(s)))
+            f, g = matrix(1 + s + b, 1 + s + a), matrix(a, b)
+            assert holds(laws[f"trace_naturality_{side}"](M, Nat(1 + s), f, g))
+            f, g = matrix(1 + s + a, 1 + t + b), matrix(1 + t, 1 + s)
+            if side == "right":
+                f = matrix(a + 1 + s, b + 1 + t)
+            assert holds(laws[f"trace_dinaturality_{side}"](M, f, g))
 
 
 def test_bad_composition():
@@ -50,6 +143,18 @@ def test_repeat():
         Matrix[int](0, 1, 1, 0).repeat()
 
 
+def test_repeat_takes_logarithmically_many_products(monkeypatch):
+    products, then = [], Matrix.then
+    monkeypatch.setattr(Matrix, "then", lambda self, *others: (
+        products.append(others), then(self, *others))[1])
+    for n in (64, 3, 2, 1, 0):
+        path = Matrix[bool](np.eye(n, k=1, dtype=bool), n, n)
+        closure = Matrix[bool](np.triu(np.ones((n, n), dtype=bool)), n, n)
+        products.clear()
+        assert path.repeat() == closure
+        assert len(products) <= n.bit_length()
+
+
 def test_autotyping():
     pytest.importorskip("jax")
     torch = pytest.importorskip("torch")
@@ -60,6 +165,47 @@ def test_autotyping():
     with backend('pytorch'):
         assert Matrix([0.5, 0.5], dom=1, cod=2).dtype == torch.float32
 
+
+
+def test_trace_over_a_field_in_jax():
+    pytest.importorskip("jax")
+    with backend("jax"):
+        f = Matrix([[0.5, 1.], [1., 0.25]], 2, 2)
+        assert f.trace().is_close(Matrix([[0.5 + 4 / 3]], 1, 1), rtol=1e-5)
+        with raises(ValueError, match="partial"):
+            Matrix([[0.5, 1.], [1., 1.]], 2, 2).trace()
+
+    def trace(array):
+        with backend("jax"):
+            return Matrix(array, 2, 2).trace().array
+
+    jax = pytest.importorskip("jax")
+    traced = jax.jit(trace)(np.array([[0.5, 1.], [1., 0.25]]))
+    assert np.allclose(traced, [[0.5 + 4 / 3]], rtol=1e-5)
+
+
+@pytest.mark.parametrize('name', ['pytorch', 'jax'])
+def test_trace_and_composition_on_backend(name):
+    """ The identity takes the dtype of the backend, so a matrix inferred
+    there traces, and composes with the integer structural matrices on a
+    backend whose product does not promote. """
+    pytest.importorskip({'pytorch': 'torch'}.get(name, name))
+    with backend(name):
+        f = Matrix([[0.5, 1.], [1., 0.25]], 2, 2)
+        assert type(f).id(2).dtype == f.dtype
+        assert f.trace().is_close(Matrix([[0.5 + 4 / 3]], 1, 1), rtol=1e-5)
+        assert (f >> Matrix.id(2)).dtype == f.dtype\
+            == (Matrix.id(2) >> f).dtype
+        assert (Matrix.id(2) >> f).is_close(f)
+
+
+def test_is_field():
+    assert is_field(float) and is_field(complex) and not is_field(int)
+    assert is_field(np.float32) and not is_field(object) and not is_field(bool)
+    assert is_field(np.dtype("float64")) and not is_field(np.dtype("int64"))
+    torch = pytest.importorskip("torch")
+    assert is_field(torch.float32) and is_field(torch.complex64)
+    assert not is_field(torch.int64) and not is_field(torch.bool)
 
 
 def test_permutation():
@@ -157,6 +303,20 @@ def test_tensor_of_many_on_backend(name):
         [1, 0, 0, 0], [0, 2, 2, 0], [0, 0, 0, 1]])
 
 
+@pytest.mark.parametrize('name', ['pytorch', 'jax'])
+def test_dagger_and_round_on_backend(name):
+    """ Transposing, conjugating and rounding call the functions of the
+    active backend, whose arrays need not have the methods numpy's have. """
+    pytest.importorskip({'pytorch': 'torch'}.get(name, name))
+    m = lambda: Matrix([1j, 2, 3, 4, 5, 6], 2, 3)
+    run = lambda: [f.array.tolist() for f in (
+        m().transpose(), m().conjugate(), m().dagger(), Matrix.merge(2),
+        Matrix([1.2, 2.7], 1, 2).round())]
+    expected = run()
+    with backend(name):
+        assert run() == expected
+
+
 def test_tensor_of_many_promotes_dtype():
     """ The tensor of ``n`` matrices is built in the class the ``dtype`` of
     all of them promotes to, wherever the float one comes. """
@@ -198,11 +358,6 @@ def test_strategy_max_entries_on_pytorch(cls):
     assert type(drawn.array) is torch.Tensor and drawn.array.numel() == 4
 
 
-def test_Matrix_axioms():
-    """ A dry run of the property matrix on the carriers it enrols. """
-    axioms.assert_axioms(Matrix, Matrix[int])
-
-
 def test_Matrix_dtype_is_the_ring_of_entries():
     """ numpy's default precisions are the Python types they stand for, so
     the class a matrix infers is the one a user names, see #88. """
@@ -213,7 +368,7 @@ def test_Matrix_dtype_is_the_ring_of_entries():
     assert Matrix[int].id(2) == Matrix.id(2)
     assert type(Matrix.id(2) >> Matrix[int].id(2)) is Matrix[int]
     m = Matrix([1, 2], 1, 2)
-    assert eval(repr(m), {"Matrix": Matrix}) == m
+    assert eval(repr(m), {"Matrix": Matrix, "Nat": Nat}) == m
     assert loads('{"factory": "matrix.Matrix[int64]", "array": [1, 2], '
                  '"dom": {"factory": "abc.Nat", "n": 1}, '
                  '"cod": {"factory": "abc.Nat", "n": 2}}') == m
@@ -226,6 +381,7 @@ def test_Matrix_copy():
         [[1, 0, 0, 1, 0, 0],
          [0, 1, 0, 0, 1, 0],
          [0, 0, 1, 0, 0, 1]], 3, 6)
+    assert Matrix.copy(3, Nat(2)) == Matrix.copy(3, 2)
     for x in range(4):
         for n in range(4):
             copy = Matrix.copy(x, n)
@@ -320,3 +476,41 @@ def test_Matrix_basis_dtype():
         assert Matrix.basis(x, 0).dtype == Matrix.id(x).dtype
     for dtype in (bool, int, float, complex):
         assert Matrix[dtype].basis(0, 0).dtype == dtype
+
+
+def test_symbolic_matrix_composes_with_permutations_and_copies():
+    """ Permutations and copies hold the integers zero and one, as id does:
+    sympy does not multiply an expression by a boolean. """
+    pytest.importorskip("sympy")
+    from sympy import Expr
+    from sympy.abc import psi
+    M = Matrix[Expr]
+    f, swap = M([psi], 1, 1), M.swap(1, 1)
+    assert f @ M.id(1) >> swap == swap >> M.id(1) @ f
+    assert f >> M.permutation([0]) == f
+    assert f >> M.copy(1) == M([psi, psi], 1, 2)
+
+
+def test_Matrix_shares_a_read_only_view():
+    """ #8: an array of the right dtype is not copied, and the matrix
+    stays immutable without freezing the caller's array. """
+    array = np.arange(4, dtype=float).reshape((2, 2))
+    m = Matrix[float](array, 2, 2)
+    assert np.shares_memory(m.array, array)
+    assert not m.array.flags.writeable and array.flags.writeable
+    with raises(ValueError):
+        m.array[0, 0] = 1
+    array[0, 0] = 1
+    assert array[0, 0] == 1
+
+
+def test_Matrix_lambdify_modules():
+    """ #445: a ``modules`` given to ``lambdify`` replaces the backend's,
+    rather than being passed to sympy a second time. """
+    pytest.importorskip("sympy")
+    from sympy import Expr, sin
+    from sympy.abc import psi
+    f = Matrix[Expr]([sin(psi)], 1, 1)
+    modules = [{"sin": lambda _: 42.}, "math"]
+    assert f.lambdify(psi, dtype=float, modules=modules)(3)\
+        == Matrix[float]([42.], 1, 1) != f.lambdify(psi, dtype=float)(3)

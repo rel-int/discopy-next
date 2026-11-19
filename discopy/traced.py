@@ -13,8 +13,8 @@ from discopy.utils import deprecated_alias
 
 # pylint: disable=undefined-all-variable
 __all__ = (  # noqa: F822
-    "Ty", "Diagram", "Box", "Trace", "Sum", "Functor", "CMap", "Hypergraph",
-    "Id")
+    "Box", "CMap", "Diagram", "Functor", "Hypergraph", "Id", "Sum", "Trace",
+    "Ty")
 
 __getattr__ = deprecated_alias(__name__, {
     name: f"discopy.feedback.{name}" for name in __all__})

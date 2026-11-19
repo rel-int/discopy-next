@@ -1,6 +1,6 @@
 import pytest
 from discopy.optyx import photonic, qubits, classical, mode, qubit, qmode, bit
-from cotengra import ReusableHyperCompressedOptimizer
+from cotengra import ReusableHyperCompressedOptimizer, ReusableHyperOptimizer
 from discopy.optyx.core.backends import (
     QuimbBackend,
     PercevalBackend,
@@ -11,6 +11,7 @@ from discopy.optyx.core.backends import (
     PercevalEvalConfig
 )
 import numpy as np
+import cmath
 import math
 from itertools import chain
 import perceval as pcvl
@@ -83,9 +84,28 @@ def dict_allclose(d1: dict, d2: dict, *, rel_tol=1e-05, abs_tol=1e-10) -> bool:
     for key in set(chain(d1, d2)):
         v1 = d1.get(key, 0.0)
         v2 = d2.get(key, 0.0)
-        if not math.isclose(v1, v2, rel_tol=rel_tol, abs_tol=abs_tol):
+        if not cmath.isclose(v1, v2, rel_tol=rel_tol, abs_tol=abs_tol):
             return False
     return True
+
+
+def test_dict_allclose_compares_complex_amplitudes():
+    assert dict_allclose({(1, 0): .5j}, {(1, 0): .5j})
+    assert not dict_allclose({(1, 0): np.complex128(.5j)}, {(1, 0): -.5j})
+
+
+def test_compressed_contraction_is_deterministic():
+    # Regression test for #232 (optyx#19): the compressed contraction used
+    # to perturb rank-deficient tensors with noise from the global unseeded
+    # RNG, so two calls on the same rank-deficient tensor could return
+    # different, non-reproducible data.
+    rank_deficient = np.array([[1.0, 2.0], [2.0, 4.0]])
+    term = discopy_tensor.Box(
+        "A", discopy_tensor.Dim(2), discopy_tensor.Dim(2), rank_deficient)
+    backend = QuimbBackend(ReusableHyperCompressedOptimizer(max_repeats=32))
+
+    assert np.array_equal(
+        backend.process_term(term), backend.process_term(term))
 
 class TestQuimbBackend:
     # compare exact and approx backends
@@ -117,6 +137,7 @@ class TestQuimbBackend:
             atol=COMPRESSION_TOL["abs_tol"],
         )
 
+    @pytest.mark.slow
     @pytest.mark.parametrize("circuit", MIXED_CIRCUITS_TO_TEST)
     def test_mixed_circuit(self, circuit):
         s = get_state(circuit)
@@ -807,3 +828,121 @@ def test_perceval_backend_takes_occupation_lists():
 def test_perceval_backend_validates_its_config(config, error):
     with pytest.raises(error):
         photonic.BS.eval(PercevalBackend(), config=config)
+
+
+@pytest.mark.parametrize("task", ["probs", "amps", "single_prob", "single_amp"])
+def test_perceval_backend_closed_diagram(task):
+    """A closed diagram evaluates to the amplitude of its selected outcome,
+    or its probability, as the default backend says."""
+    hom = photonic.Create(1, 1) >> photonic.BS >> photonic.Select(2, 0)
+    amp = complex(hom.eval().tensor.array)
+    expected = amp if "amp" in task else abs(amp) ** 2
+    result = hom.eval(PercevalBackend(), config=PercevalEvalConfig(task=task))
+    assert np.isclose(np.ravel(result.tensor.array)[0], expected)
+
+
+@pytest.mark.parametrize("scalar", [1j, 2, -1])
+def test_perceval_backend_carries_the_scalar(scalar):
+    """A `path.Matrix` keeps a global scalar outside its array, where the
+    circuit the simulator is given cannot carry it."""
+    state = photonic.Create(1) @ photonic.Scalar(scalar)
+    result = state.eval(
+        PercevalBackend(), config=PercevalEvalConfig(task="amps"))
+    for oracle in (state.eval(), state.eval(PermanentBackend())):
+        assert np.allclose(
+            np.ravel(result.tensor.array), np.ravel(oracle.tensor.array))
+    assert np.isclose(np.ravel(result.tensor.array)[1], scalar)
+
+
+@pytest.mark.parametrize("n_photons", [1, 2, 3])
+def test_perceval_backend_carries_the_dilation_normalisation(n_photons):
+    """`path.Matrix.dilate` divides a non-unitary matrix by its largest
+    singular value and keeps the factor in `normalisation`, so the number
+    operator on `n` photons is `n` and not the unit the simulator returns."""
+    diagram = photonic.Create(n_photons) >> photonic.NumOp()
+    result = diagram.eval(
+        PercevalBackend(), config=PercevalEvalConfig(task="amps"))
+    assert np.allclose(
+        np.ravel(result.tensor.array), np.ravel(diagram.eval().tensor.array))
+    for oracle in (diagram.eval(), diagram.eval(PermanentBackend())):
+        assert np.isclose(
+            np.ravel(oracle.tensor.array)[n_photons], n_photons)
+    assert np.isclose(np.ravel(result.tensor.array)[n_photons], n_photons)
+
+
+@pytest.mark.parametrize("task", ["amps", "probs"])
+def test_perceval_backend_sums_amplitudes_not_probabilities(task):
+    """A sum of diagrams is a sum of amplitudes, so two terms that cancel
+    have probability zero where summing their probabilities gives two."""
+    cancels = photonic.Create(1) + photonic.Create(1) @ photonic.Scalar(-1)
+    adds = photonic.Create(1) + photonic.Create(1)
+    for diagram in (cancels, adds):
+        expected = np.ravel(diagram.eval().tensor.array)
+        if task == "probs":
+            expected = np.abs(expected) ** 2
+        result = diagram.eval(
+            PercevalBackend(), config=PercevalEvalConfig(task=task))
+        assert np.allclose(np.ravel(result.tensor.array), expected)
+    assert np.allclose(
+        np.ravel(cancels.eval(PermanentBackend()).tensor.array), 0)
+    assert np.allclose(np.ravel(cancels.eval(PercevalBackend()).tensor.array), 0)
+    assert np.isclose(
+        np.ravel(adds.eval(PercevalBackend()).tensor.array)[1], 4)
+
+
+@pytest.mark.parametrize("task", ["probs", "amps", "single_prob", "single_amp"])
+@pytest.mark.parametrize("diagram", [
+    photonic.Create(1) >> photonic.Select(2),
+    photonic.Create(1, 0) >> photonic.BS >> photonic.Select(2, 0)])
+def test_perceval_backend_impossible_selection(diagram, task):
+    """A selection no photon number can satisfy is an amplitude of zero, and
+    not an effect outside the Fock space the SLOS backend enumerates: that
+    index used to raise, and the probability tasks used to report the
+    conditional probability of a postselection that never succeeds."""
+    assert np.isclose(complex(diagram.eval().tensor.array), 0)
+    result = diagram.eval(
+        PercevalBackend(), config=PercevalEvalConfig(task=task))
+    assert np.allclose(np.ravel(result.tensor.array), 0)
+
+
+@pytest.mark.parametrize("task", ["amps", "probs"])
+@pytest.mark.parametrize("diagram", [
+    photonic.Create(1, 1, 0) >> photonic.BS @ qmode >> qmode @ photonic.BS
+    >> qmode @ photonic.Select(0) @ qmode,
+    photonic.Create(1, 1, 1) >> photonic.BS @ qmode >> qmode @ photonic.BS
+    >> qmode @ photonic.Select(1) @ qmode,
+    photonic.Create(2, 0) >> photonic.BS >> photonic.NumOp() @ qmode])
+def test_perceval_backend_labels_outcomes_by_output_modes(diagram, task):
+    """Perceval's outcomes list the selected modes and the ancillas of a
+    dilation after the outputs: with more than one outcome, reading them
+    as outputs moves amplitudes onto the wrong labels."""
+    expected = np.ravel(diagram.eval().tensor.array)
+    if task == "probs":
+        expected = np.abs(expected) ** 2
+    result = diagram.eval(
+        PercevalBackend(), config=PercevalEvalConfig(task=task))
+    assert np.allclose(np.ravel(result.tensor.array), expected)
+
+
+@pytest.mark.parametrize("optimiser", [
+    ReusableHyperOptimizer, ReusableHyperCompressedOptimizer])
+def test_quimb_hyperoptimiser_keeps_the_wire_order(optimiser):
+    """The axes of a result follow its wires, even past the tenth one,
+    whose index name sorts before the third's as a string."""
+    diagram = photonic.Create(0, 0, 1, *8 * [0])
+    backend = QuimbBackend(hyperoptimiser=optimiser(max_repeats=4))
+    assert np.allclose(
+        diagram.eval(backend).tensor.array, diagram.eval().tensor.array)
+
+
+@pytest.mark.parametrize("diagram", [
+    photonic.Create(1) + photonic.Create(0),
+    photonic.Create(2, 0) + photonic.Create(1, 0),
+    (photonic.Create(1, 0) >> photonic.BS)
+    + (photonic.Create(2, 0) >> photonic.BS)])
+def test_permanent_backend_sums_terms_of_different_photon_numbers(diagram):
+    """Each term's amplitudes live on its own photon numbers, so a sum pads
+    them with zeros to the largest before adding them."""
+    result = diagram.eval(PermanentBackend())
+    assert dict_allclose(result.amplitudes(normalise=False),
+                         diagram.eval().amplitudes(normalise=False))

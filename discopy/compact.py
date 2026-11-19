@@ -11,6 +11,7 @@ Summary
     :nosignatures:
     :toctree:
 
+    Layer
     Diagram
     Box
     Cup
@@ -22,7 +23,11 @@ Summary
     FollowedBy
     Head
     Tail
+    Sum
+    Bubble
     Functor
+    DualRail
+    Equation
 
 Axioms
 ------
@@ -59,8 +64,14 @@ Coherence
 ...     Cap(x, x.r) @ Cap(y, y.r) >> x @ Diagram.swap(x.r, y @ y.r))
 """
 
-from discopy import symmetric, ribbon, pivotal, feedback, cmap, hypergraph
-from discopy.abc import CompactCategory
+from typing import ClassVar
+
+# pylint: disable=inconsistent-mro  # astroid misreads the MRO, C3 does not
+
+from discopy import (
+    symmetric, ribbon, pivotal, feedback, cmap, hypergraph, interaction,
+    messages)
+from discopy.abc import CompactCategory, DaggerMonoidalCategory
 from discopy.cat import factory
 from discopy.utils import deprecated_alias
 from discopy.pivotal import (  # noqa: F401  pylint: disable=unused-import
@@ -81,6 +92,24 @@ class Diagram(symmetric.Diagram, ribbon.Diagram, CompactCategory):
         dom (pivotal.Ty) : The domain of the diagram, i.e. its input.
         cod (pivotal.Ty) : The codomain of the diagram, i.e. its output.
     """
+    # A hypergraph is faithful from symmetric categories on.
+    snake_equations = CompactCategory.snake_equations
+    transpose_contravariance = CompactCategory.transpose_contravariance
+    pivotality = CompactCategory.pivotality
+    currying_left = CompactCategory.currying_left
+    currying_right = CompactCategory.currying_right
+    currying_eta_left = CompactCategory.currying_eta_left
+    currying_eta_right = CompactCategory.currying_eta_right
+    currying_naturality_left = CompactCategory.currying_naturality_left
+    currying_naturality_right = CompactCategory.currying_naturality_right
+
+    sum_factory: ClassVar[type["Sum"]]
+    cup_factory: ClassVar[type["Cup"]]
+    cap_factory: ClassVar[type["Cap"]]
+    box_factory: ClassVar[type["Box"]]
+    swap_factory: ClassVar[type["Swap"]]
+    functor_factory: ClassVar[type["Functor"]]
+    permutation_factory: ClassVar[type["Permutation"]]
     ob = Ty
     layer_factory = Layer
     trace_factory = classmethod(pivotal.Diagram.trace_factory.__func__)
@@ -154,6 +183,12 @@ class Sum(symmetric.Sum, ribbon.Sum, Box):
     """
 
 
+class Bubble(symmetric.Bubble, ribbon.Bubble, Box):
+    """
+    A compact bubble is a symmetric and ribbon bubble and a compact box.
+    """
+
+
 class Functor(symmetric.Functor, ribbon.Functor):
     """
     A compact functor is both a symmetric functor and a ribbon functor.
@@ -190,7 +225,8 @@ CMap = cmap.CMap[Diagram]
 
 Id = Diagram.id
 
-Feedback, Trace, FollowedBy, Head, Tail = feedback.generators(Diagram, Box)
+Feedback, Trace, FollowedBy, Head, Tail = feedback.structural_boxes(
+    Diagram, Box)
 Diagram.box_factory = Box
 Diagram.swap_factory = Swap
 Diagram.functor_factory = Functor
@@ -199,6 +235,11 @@ Diagram.permutation_factory = Permutation
 Hypergraph = hypergraph.Hypergraph[Diagram]
 Diagram.cup_factory, Diagram.cap_factory = Cup, Cap
 Diagram.sum_factory = Sum
+Diagram.bubble_factory = Bubble
+for name in (
+        "dagger_involution", "dagger_contravariance", "dagger_monoidality"):
+    setattr(interaction.Diagram[Diagram], name, getattr(
+        DaggerMonoidalCategory, name).failing(messages.FEEDBACK_HAS_NO_DAGGER))
 
 
 class Equation(symmetric.Equation):

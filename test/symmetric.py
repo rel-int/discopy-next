@@ -4,6 +4,7 @@ import pickle
 
 from pytest import raises
 
+from discopy import feedback, symmetric
 from discopy.symmetric import *
 from discopy.utils import AxiomError, dumps, loads
 
@@ -15,6 +16,14 @@ def test_Swap():
     assert Swap(x, y).dagger() == Swap(y, x)
     with raises(ValueError):
         Swap(x ** 2, Ty())
+
+
+def test_Swap_says_what_is_wrong():
+    x, y, z = Ty('x'), Ty('y'), Ty('z')
+    with raises(ValueError, match="of length 1, got length 2"):
+        Swap(x @ y, z)
+    with raises(ValueError, match=r"the swap \[1, 0\], got \[0, 1\]"):
+        Swap(x @ y, [0, 1])
 
 
 def test_Box_hash():
@@ -68,9 +77,9 @@ def test_Functor_keys_boxes_by_syntax():
     assert F(f >> g) == g >> f
 
 
-def test_Diagram_permutation():
+def test_Diagram_permutation(monkeypatch):
     x = Nat(1)
-    tmp, Diagram.ob = Diagram.ob, Nat
+    monkeypatch.setattr(Diagram, "ob", Nat)
     assert Diagram.swap(x, x ** 2)\
         == Diagram.swap(x, x) @ Id(x) >> Id(x) @ Diagram.swap(x, x)\
         == Diagram.permutation([1, 2, 0])\
@@ -79,7 +88,6 @@ def test_Diagram_permutation():
         Diagram.permutation([2, 0])
     with raises(ValueError):
         Diagram.permutation([2, 0, 1], x ** 2)
-    Diagram.ob = tmp
 
 
 def test_bad_permute():
@@ -97,7 +105,7 @@ def test_Permutation():
     assert perm.inside == (Layer(perm),)
     assert perm.boxes == [perm] and perm.size == 0
     assert perm.is_generator and perm.generator == perm
-    assert perm.encode() == (perm.dom, [(perm, 0)])
+    assert perm.encode() == (perm.dom, [[(perm, 0)]])
     assert Diagram.decode(*perm.encode()) == perm
     identity = Permutation(x @ y @ z, [0, 1, 2])
     assert identity.is_identity and identity == Id(x @ y @ z)
@@ -221,6 +229,38 @@ def test_Layer_tensor():
     assert isinstance(plumbed[1], Permutation)
 
 
+class Reiterable:
+    """ An iterable that is neither an iterator nor a sequence. """
+    def __init__(self, inside):
+        self.inside = inside
+
+    def __iter__(self):
+        return iter(self.inside)
+
+
+class Indexable:
+    """ Iterable by the sequence protocol alone, with no ``__iter__``. """
+    def __init__(self, items):
+        self.items = list(items)
+
+    def __getitem__(self, i):
+        return self.items[i]
+
+
+def test_Permutation_from_iterable():
+    x, y, z = Ty('x'), Ty('y'), Ty('z')
+    for dom, perm in [(x @ y, [1, 0]), (x @ y @ z, [1, 2, 0])]:
+        listed = Permutation(dom, perm)
+        for once in (iter(perm), (i for i in perm), dict.fromkeys(perm).keys(),
+                     Reiterable(perm), Indexable(perm)):
+            result = Permutation(dom, once)
+            assert type(result) is type(listed) and result == listed
+            assert hash(result) == hash(listed)
+            namespace = {"feedback": feedback, "symmetric": symmetric}
+            assert eval(repr(result), namespace) == result
+    assert Swap(x @ y, iter([1, 0])) == Swap(x, y)
+
+
 def test_noncommuting_Permutation_composition():
     x = Ty('x')
     first = Permutation(x ** 3, [1, 0, 2])
@@ -275,6 +315,19 @@ def test_Functor_on_whiskered_Swap():
         Nat(3), [1, 0, 2])) == Matrix.permutation([1, 0, 2], [2, 2, 2])
     perm = Permutation(Nat(3), [2, 0, 1])
     assert Functor({Nat(1): Nat(1)}, {})(perm) == perm
+
+
+def test_Functor_commutes_with_whiskering():
+    from discopy import symmetric, markov, compact, frobenius
+    for module in (symmetric, markov, compact, frobenius):
+        x, y, z = map(module.Ty, "xyz")
+        F = module.Functor(lambda ob: ob @ ob, lambda box: box,
+                           dom=module.Diagram, cod=module.Diagram)
+        assert F(module.Swap(x, y) @ z) == F(module.Swap(x, y)) @ F(z)
+        assert F(module.Swap(x, y)) == module.Permutation(
+            x @ x @ y @ y, [2, 3, 0, 1])
+        assert module.Functor.id(module.Diagram)(module.Swap(x, y))\
+            == module.Swap(x, y)
 
 
 def test_Functor_id_on_Permutation():
@@ -360,7 +413,11 @@ def test_unequal_arity_offsets():
     assert layer.boxes_and_offsets == [(f, 0), (permutation, 2), (g, 4)]
     diagram = Diagram((layer,), layer.dom, layer.cod)
     assert diagram.offsets == [0, 2, 4]
-    assert Diagram.decode(*diagram.encode()) == diagram.to_staircases()
+    assert diagram.encode() == (
+        layer.dom, [[(f, 0), (permutation, 2), (g, 4)]])
+    assert Diagram.decode(*diagram.encode()) == diagram
+    assert Diagram.decode(layer.dom, layer.boxes_and_offsets)\
+        == diagram.to_staircases() != diagram
 
 
 def test_Permutation_foliation():
@@ -413,20 +470,6 @@ def test_Permutation_to_drawing():
     drawing = functor(perm)
     assert drawing.dom == (z @ x @ y).to_drawing()
     assert drawing.cod == (x @ z @ y).to_drawing()
-
-
-def test_abc_permutation():
-    from itertools import permutations
-    from discopy.abc import SymmetricCategory
-
-    abc_permutation = SymmetricCategory.permutation.__func__
-    for n in range(1, 5):
-        doms = [Ty(name) for name in "abcd"[:n]]
-        for xs in permutations(range(n)):
-            result = abc_permutation(Diagram, list(xs), doms)
-            assert Equation(result, Diagram.permutation(list(xs), doms))
-    with raises(ValueError):
-        abc_permutation(Diagram, [0, 0], [Ty('a'), Ty('b')])
 
 
 def test_coloured_Layer_merge():
@@ -483,3 +526,8 @@ def test_tensor_coalesces_plumbing():
     assert perm.tensor(f, perm) == reduce(
         lambda g, h: g.tensor(h), [perm, f, perm])
     assert perm.tensor(x, f) == reduce(lambda g, h: g.tensor(h), [perm, x, f])
+
+
+def test_structural_boxes():
+    from discopy.testable import assert_structural_boxes
+    assert_structural_boxes(Diagram)

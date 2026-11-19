@@ -18,6 +18,7 @@ Summary
     Circuit
     Box
     Sum
+    Bubble
     Swap
     Functor
 
@@ -43,7 +44,7 @@ Examples
 .. image:: /_static/quantum/circuit-example.svg
     :align: center
 
->>> from discopy.grammar import pregroup
+>>> from discopy.lambek import pregroup
 >>> s, n = pregroup.Ty('s'), pregroup.Ty('n')
 >>> Alice = pregroup.Word('Alice', n)
 >>> loves = pregroup.Word('loves', n.r @ s @ n.l)
@@ -69,6 +70,7 @@ Examples
 from __future__ import annotations
 
 from collections.abc import Mapping
+from typing import ClassVar
 
 from discopy import messages, tensor, frobenius
 from discopy.cat import factory
@@ -109,8 +111,9 @@ class Wire(frobenius.Wire):
     @classmethod
     def from_tree(cls, tree: dict) -> Wire:
         dim, z = tree['dim'], tree.get('z', 0)
-        return cls(dim=dim, z=z, time_step=tree.get('time_step', 0),
-                   is_constant=tree.get('is_constant', True))
+        return cls(  # ty: ignore[missing-argument]
+            dim=dim, z=z, time_step=tree.get('time_step', 0),
+            is_constant=tree.get('is_constant', True))
 
     def to_tree(self) -> dict:
         return dict(dim=self.dim, **super().to_tree())
@@ -177,6 +180,17 @@ class Ty(frobenius.Ty):
     bit @ bit @ qubit @ qubit @ qubit
     """
     generator_factory = Wire
+    box_factory = None
+    """ No generator of one colour is named, so there is no canonical
+    instance of a law, see :meth:`discopy.testable.Axiom.canonical`. """
+
+    @classmethod
+    def generator_strategy(cls, *, dom=None, cod=None):
+        """ Generate a bit or a qubit, see :class:`frobenius.Ty`. """
+        # pylint: disable=unused-argument  # a circuit type has one colour
+        from hypothesis import strategies as st
+
+        return st.sampled_from([Digit(2), Qudit(2)]).map(cls)
 
 
 @factory
@@ -189,10 +203,13 @@ class Circuit(tensor.Diagram[complex]):
         dom (quantum.circuit.Ty) : The domain of the circuit diagram.
         cod (quantum.circuit.Ty) : The codomain of the circuit diagram.
     """
+    swap_factory: ClassVar[type["Swap"]]
+    sum_factory: ClassVar[type["Sum"]]
+    permutation_factory: ClassVar[type["Permutation"]]
     ob = Ty
 
     @classmethod
-    def id(cls, dom: int | Ty = None):
+    def id(cls, dom: int | Ty | None = None):
         """
         The identity circuit on a given domain.
 
@@ -219,16 +236,17 @@ class Circuit(tensor.Diagram[complex]):
 
     def init_and_discard(self):
         """ Returns a circuit with empty domain and only bits as codomain. """
-        from discopy.quantum.gates import Bits, Ket, Discard
+        from discopy.quantum.gates import Digits, Ket, Discard
         circuit = self
         if circuit.dom:
             init = Id().tensor(*(
-                Bits(0) if x == bit else Ket(0) for x in circuit.dom))
+                (Digits(0, dim=x.dim) if isinstance(x, Digit) else Ket(0))
+                .delay(x.time_step) for x in circuit.dom.inside))
             circuit = init >> circuit
         if circuit.cod != bit ** len(circuit.cod):
             discards = Id().tensor(*(
-                Discard() if x == qubit
-                else Id(bit) for x in circuit.cod))
+                Discard().delay(x.time_step) if isinstance(x, Qudit)
+                else Id(Ty(x)) for x in circuit.cod.inside))
             circuit = circuit >> discards
         return circuit
 
@@ -247,9 +265,15 @@ class Circuit(tensor.Diagram[complex]):
         mixed : bool, optional
             Whether to apply :class:`discopy.tensor.Functor`
             or :class:`ChannelFunctor`.
-        contractor : callable, optional
-            Use :class:`tensornetwork` contraction
-            instead of discopy's basic eval feature.
+        contractor : :class:`discopy.matrix.Backend` or callable, optional
+            The backend whose ``einsum`` contracts the network, e.g.
+            :class:`discopy.matrix.NumPy` or a
+            :class:`discopy.matrix.Contractor` such as
+            :class:`discopy.matrix.Quimb`, see
+            :meth:`discopy.tensor.Functor.contract`, or a
+            :class:`tensornetwork` contractor. A mixed circuit without a
+            tensornetwork contractor composes its channels layer by layer,
+            with no network for a backend to contract.
         params : kwargs, optional
             Get passed to Circuit.get_counts.
 
@@ -299,7 +323,11 @@ class Circuit(tensor.Diagram[complex]):
         on a ``pytket.Backend`` one should set ``measure_all=True``.
         """
         from discopy.quantum import channel
-        if contractor is not None:
+        if others and backend is None:
+            return [circuit.eval(mixed=mixed, contractor=contractor, **params)
+                    for circuit in (self, ) + others]
+        if contractor is not None\
+                and not isinstance(contractor, tensor.Backend):
             array = contractor(*self.to_tn(mixed=mixed)).tensor
             if self.is_mixed or mixed:
                 f = channel.Functor({}, {}, dom=Circuit)
@@ -308,28 +336,33 @@ class Circuit(tensor.Diagram[complex]):
                 lambda x: x.inside[0].dim, {},
                 dtype=complex, dom=Circuit)
             return Tensor[complex](array, f(self.dom), f(self.cod))
-
-        from discopy.quantum import channel
         if backend is None:
-            if others:
-                return [circuit.eval(mixed=mixed, **params)
-                        for circuit in (self, ) + others]
             if mixed or self.is_mixed:
                 return channel.Functor(
-                    {}, {}, dom=Circuit, dtype=complex)(self)
+                    {}, {}, dom=Circuit, dtype=complex,
+                    contractor=contractor)(self)
             return tensor.Functor(
                 lambda x: x.inside[0].dim,
                 lambda f: f.array,
                 dom=Circuit,
-                dtype=complex)(self)
-        circuits = [circuit.to_tk() for circuit in (self, ) + others]
+                dtype=complex,
+                contractor=contractor)(self)
+        circuits = (self, ) + others
+        if params.pop("measure_all", False):
+            from discopy.quantum.gates import Measure
+            circuits = tuple(circuit >> Id().tensor(*(
+                Measure() if x == qubit else Id(x) for x in circuit.cod))
+                for circuit in circuits)
+        circuits = [circuit.to_tk() for circuit in circuits]
         results, counts = [], circuits[0].get_counts(
             *circuits[1:], backend=backend, **params)
         for i, circuit in enumerate(circuits):
             n_bits = len(circuit.post_processing.dom)
-            result = Tensor[float].zero(Dim(1), Dim(*(n_bits * (2, ))))
+            with tensor.backend('numpy') as np:
+                array = np.zeros(n_bits * (2, ), dtype=float)
             for bitstring, count in counts[i].items():
-                result.array[bitstring] = count
+                array[bitstring] = count
+            result = Tensor[float](array, Dim(1), Dim(*(n_bits * (2, ))))
             if circuit.post_processing:
                 post_processing = circuit.post_processing.eval(mixed=True)
                 result = result >> post_processing.to_tensor().cast(float)
@@ -385,6 +418,11 @@ class Circuit(tensor.Diagram[complex]):
                 if result.array[bits]:
                     counts[bits] = result.array[bits].real
             return counts
+        if params.pop("measure_all", False):
+            from discopy.quantum.gates import Measure
+            return Circuit.get_counts(*(circuit >> Id().tensor(*(
+                Measure() if x == qubit else Id(x) for x in circuit.cod))
+                for circuit in (self, ) + others), backend=backend, **params)
         counts = self.to_tk().get_counts(
             *(other.to_tk() for other in others), backend=backend, **params)
         return counts if len(counts) > 1 else counts[0]
@@ -409,10 +447,16 @@ class Circuit(tensor.Diagram[complex]):
         >>> assert (Ket(0) >> H).measure().round(2).tolist() == [.5, .5]
         >>> assert Copy().measure().tolist() == [[1, 0], [0, 0]]
         """
-        from discopy.quantum.gates import Ket
-        if mixed or self.is_mixed or bit in self.dom @ self.cod:
-            return self.init_and_discard().eval(mixed=True).array.real
-        state = (Ket(*(len(self.dom) * [0])) >> self).eval()
+        from discopy.quantum import gates
+        if mixed or self.is_mixed or any(
+                isinstance(x, Digit) for x in (self.dom @ self.cod).inside):
+            circuit = self >> Id().tensor(*(
+                gates.Measure().delay(x.time_step) if isinstance(x, Qudit)
+                else Id(Ty(x)) for x in self.cod.inside))
+            return circuit.init_and_discard().eval(mixed=True).array.real
+        state = (Id().tensor(*(
+            gates.Ket(0).delay(x.time_step) for x in self.dom.inside))
+            >> self).eval()
         with backend() as np:
             return np.absolute(state.array) ** 2
 
@@ -455,7 +499,7 @@ class Circuit(tensor.Diagram[complex]):
         last_i = 0
         for i, (box, offset) in enumerate(zip(self.boxes, self.offsets)):
             if hasattr(box, '_decompose'):
-                decomp = box._decompose()
+                decomp = box._decompose()  # ty: ignore[call-non-callable]
                 diag >>= self[last_i:i]
                 dom = self.inside[i].dom
                 left, right = dom[:offset], dom[offset + len(box.dom):]
@@ -464,18 +508,24 @@ class Circuit(tensor.Diagram[complex]):
         diag >>= self[last_i:]
         self = diag
 
-        c_nodes = [tn.CopyNode(2, 2, f'c_input_{i}', dtype=complex)
-                   for i in range(self.dom.count(bit))]
-        q_nodes1 = [tn.CopyNode(2, 2, f'q1_input_{i}', dtype=complex)
-                    for i in range(self.dom.count(qubit))]
-        q_nodes2 = [tn.CopyNode(2, 2, f'q2_input_{i}', dtype=complex)
-                    for i in range(self.dom.count(qubit))]
+        c_nodes = [tn.CopyNode(
+            2, 2, f'c_input_{i}',
+            dtype=complex)  # ty: ignore[invalid-argument-type]
+            for i in range(self.dom.count(bit))]
+        q_nodes1 = [tn.CopyNode(
+            2, 2, f'q1_input_{i}',
+            dtype=complex)  # ty: ignore[invalid-argument-type]
+            for i in range(self.dom.count(qubit))]
+        q_nodes2 = [tn.CopyNode(
+            2, 2, f'q2_input_{i}',
+            dtype=complex)  # ty: ignore[invalid-argument-type]
+            for i in range(self.dom.count(qubit))]
 
         inputs = [n[0] for n in c_nodes + q_nodes1 + q_nodes2]
         c_scan = [n[1] for n in c_nodes]
         q_scan1 = [n[1] for n in q_nodes1]
         q_scan2 = [n[1] for n in q_nodes2]
-        nodes = c_nodes + q_nodes1 + q_nodes2
+        nodes: list[tn.AbstractNode] = [*c_nodes, *q_nodes1, *q_nodes2]
         for layer in self.inside:
             (box, offset), = layer.boxes_and_offsets
             left, right = layer.dom[:offset], layer.dom[offset + len(box.dom):]
@@ -509,7 +559,9 @@ class Circuit(tensor.Diagram[complex]):
                 q_scan2 = [edges[1] for typ, edges in zip(cod, scan)
                            if typ == qubit]
             elif isinstance(box, Discard) and box.dom == bit:
-                node = tn.CopyNode(1, 2, 'c_discard', dtype=complex)
+                node = tn.CopyNode(
+                    1, 2, 'c_discard',
+                    dtype=complex)  # ty: ignore[invalid-argument-type]
                 tn.connect(c_scan[c_offset], node[0])
                 del c_scan[c_offset]
                 nodes.append(node)
@@ -529,7 +581,8 @@ class Circuit(tensor.Diagram[complex]):
                     assert len(box.dom) == 1 or len(box.cod) == 1
                     rank = c_dom + 2 * q_dom + c_cod + 2 * q_cod
                     node = tn.CopyNode(
-                        rank, 2, 'cq_' + str(box), dtype=complex)
+                        rank, 2, 'cq_' + str(box),
+                        dtype=complex)  # ty: ignore[invalid-argument-type]
                 else:
                     array = box.eval(mixed=True).array
                     node = tn.Node(array + 0j, 'cq_' + str(box))
@@ -548,7 +601,7 @@ class Circuit(tensor.Diagram[complex]):
                 nodes.append(node)
             else:
                 q_offset = left.count(qubit)
-                utensor = box.array
+                utensor = box.eval().array
                 node1 = tn.Node(utensor + 0j, 'q1_' + str(box))
                 with backend() as np:
                     node2 = tn.Node(np.conj(utensor) + 0j, 'q2_' + str(box))
@@ -681,7 +734,8 @@ class Circuit(tensor.Diagram[complex]):
         Note
         ----
         * :meth:`Circuit.init_and_discard` is applied beforehand.
-        * SWAP gates are introduced when applying gates to non-adjacent qubits.
+        * Logical swaps, i.e. plumbing, are introduced when applying gates to
+          non-adjacent qubits.
 
         Examples
         --------
@@ -876,20 +930,17 @@ class Box(tensor.Box[complex], Circuit):
         data : The array inside the box.
         is_mixed : Whether the box is mixed.
     """
+    serialised_attrs = tensor.Box.serialised_attrs + ("is_mixed", )
     eval = Circuit.eval
 
     def __init__(self, name: str, dom: Ty, cod: Ty,
                  data=None, is_mixed=True, **params):
-        if not is_mixed:
-            if all(isinstance(x, Digit) for x in (dom @ cod).inside):
-                self.is_classical = True
-            elif all(isinstance(x, Qudit) for x in (dom @ cod).inside):
-                self.is_classical = False
-            else:
-                raise ValueError(messages.BOX_IS_MIXED)
+        if not is_mixed and not any(
+                all(isinstance(x, kind) for x in (dom @ cod).inside)
+                for kind in (Digit, Qudit)):
+            raise ValueError(messages.BOX_IS_MIXED)
         self._is_mixed = is_mixed
         tensor.Box[complex].__init__(self, name, dom, cod, data, **params)
-        self._params = dict(self._params, is_mixed=is_mixed)
 
     def __setstate__(self, state):
         if "_is_mixed" not in state:
@@ -914,6 +965,12 @@ class Box(tensor.Box[complex], Circuit):
     def is_mixed(self):
         return self._is_mixed
 
+    @property
+    def is_classical(self):
+        """ Whether the box is pure with only digits on its boundary. """
+        return not self.is_mixed and all(
+            isinstance(x, Digit) for x in (self.dom @ self.cod).inside)
+
     def dagger(self):
         """
         The dagger of a box, pure when the box is, as its rotation and its
@@ -923,19 +980,10 @@ class Box(tensor.Box[complex], Circuit):
         >>> assert not f.dagger().is_mixed and not f.rotate().is_mixed
         >>> assert f.dagger().eval() == f.eval().dagger()
         """
-        if self.is_dagger is None:
-            return self
-        return type(self)(
-            self.name, self.cod, self.dom, self.data, is_mixed=self.is_mixed,
-            is_dagger=not self.is_dagger, z=self.z, time_step=self.time_step)
+        return self if self.is_dagger is None else super().dagger()
 
     def rotate(self, left=False):
-        if self.z is None:
-            return self
-        return type(self)(
-            self.name, self.cod.r, self.dom.r, self.data,
-            is_mixed=self.is_mixed, is_dagger=self.is_dagger,
-            z=(self.z + 1) % 2, time_step=self.time_step)
+        return self if self.z is None else super().rotate(left)
 
 
 class Sum(tensor.Sum[complex], Box):
@@ -949,7 +997,9 @@ class Sum(tensor.Sum[complex], Box):
             return {}
         if len(self.terms) == 1:
             return self.terms[0].get_counts(backend=backend, **params)
-        counts = Circuit.get_counts(*self.terms, backend=backend, **params)
+        counts = Circuit.get_counts(
+            *self.terms,  # ty: ignore[invalid-argument-type]
+            backend=backend, **params)
         result = {}
         for circuit_counts in counts:
             for bitstring, count in circuit_counts.items():
@@ -963,13 +1013,35 @@ class Sum(tensor.Sum[complex], Box):
         if len(self.terms) == 1:
             return self.terms[0].eval(backend=backend, mixed=mixed, **params)
         return sum(
-            Circuit.eval(*self.terms, backend=backend, mixed=mixed, **params))
+            Circuit.eval(
+                *self.terms,  # ty: ignore[invalid-argument-type]
+                backend=backend, mixed=mixed, **params))
 
     def grad(self, var, **params):
         return sum(circuit.grad(var, **params) for circuit in self.terms)
 
     def to_tk(self):
         return [circuit.to_tk() for circuit in self.terms]
+
+
+class Bubble(tensor.Bubble[complex], Box):
+    """
+    A circuit bubble is a tensor bubble in a circuit, mixed when its boundary
+    has both bits and qubits or its args are mixed. It differentiates as a
+    circuit box does.
+
+    >>> from discopy.quantum.gates import X, H, Measure
+    >>> assert (X.bubble() >> X).eval() == X.bubble().eval() >> X.eval()
+    >>> assert not X.bubble().is_mixed and (H >> Measure()).bubble().is_mixed
+    >>> assert X.bubble(cod=bit).is_mixed
+    """
+    grad = Box.grad
+
+    @property
+    def is_mixed(self):
+        boundary = self.dom @ self.cod
+        return bool(boundary.count(bit) and boundary.count(qubit))\
+            or any(arg.is_mixed for arg in self.args)
 
 
 class Permutation(tensor.Permutation[complex], Box):
@@ -979,11 +1051,6 @@ class Permutation(tensor.Permutation[complex], Box):
     def is_mixed(self):
         return any(type(left.inside[0]) is not type(right.inside[0])
                    for left, right in zip(self.dom, self.cod))
-
-    @property
-    def is_classical(self):
-        return not self.is_mixed\
-            and all(isinstance(x.inside[0], Digit) for x in self.dom)
 
 
 class Swap(Permutation, tensor.Swap, Box):
@@ -1029,6 +1096,7 @@ def bitstring2index(bitstring):
 
 Circuit.box_factory = Box
 Circuit.swap_factory, Circuit.sum_factory = Swap, Sum
+Circuit.bubble_factory = Bubble
 Circuit.permutation_factory = Permutation
 bit, qubit = Ty(Digit(2)), Ty(Qudit(2))
 Id = Circuit.id

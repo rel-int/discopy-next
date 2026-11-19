@@ -54,32 +54,34 @@ from inspect import isclass
 from io import BytesIO
 from itertools import accumulate, product
 from math import inf, lcm
-from typing import TYPE_CHECKING, ClassVar, Literal
+from numbers import Integral
+from typing import TYPE_CHECKING, Literal, Self
 
-from discopy import hypergraph, messages
+from discopy import cat, hypergraph, messages
 from discopy.abc import (
     BalancedCategory,
     BraidedCategory,
     CompactCategory,
-    DaggerCategory,
-    NamedGeneric,
+    DaggerMonoidalCategory,
+    MarkovCategory,
     Pregroup,
     RigidCategory,
     SpacialCategory,
     SymmetricCategory,
     TracedCategory,
 )
+from discopy.testable import Equation, Serialisable, TestableGeneric, axiom
 from discopy.cat import Ob, Sum
 from discopy.python.finset import Permutation
 from discopy.utils import (
     AxiomError,
-    from_tree,
-    resolve_factory,
     assert_isatomic,
     assert_istraceable,
     assert_isinstance,
     classproperty,
     factory_name,
+    from_tree,
+    resolve_factory,
     get_origin,
     unbiased,
 )
@@ -141,9 +143,9 @@ class Port:
     side: Literal["up", "down"]
 
 
-class CMap[C0: Pregroup, C1: CMap](
-    CompactCategory[C0, C1], DaggerCategory[C0, C1], NamedGeneric['category']
-):
+class CMap[category](
+        CompactCategory, DaggerMonoidalCategory, TestableGeneric,
+        Serialisable):
     r"""
     An open combinatorial map, i.e. a diagram represented as a bijection
     between its ports.
@@ -189,7 +191,9 @@ class CMap[C0: Pregroup, C1: CMap](
         cod : The codomain of the map.
         boxes : The boxes inside the map.
         edges : A fixpoint-free involution on ports.
-        loops : The types of closed wire components with no ports.
+        loops : The types of closed wire components with no ports, a
+            multiset stored sorted by ``repr``, so that maps compare their
+            loops whatever order they closed in.
         check : Whether to :meth:`validate` the involution and the wire types.
 
     Example
@@ -238,19 +242,36 @@ class CMap[C0: Pregroup, C1: CMap](
         :align: center
     """
 
-    category: ClassVar[Diagram] = None
+    @classmethod
+    def checked_params(cls) -> tuple:
+        """
+        The free symmetric and compact categories, the ones a map is the
+        coherence theorem of.
+        """
+        # pylint: disable-next=import-outside-toplevel  # they import this
+        from discopy import compact, symmetric
+        return (symmetric.Diagram, compact.Diagram)
+
     functor = classproperty(lambda cls: cls.category.functor_factory)
     ob = classproperty(lambda cls: cls.category.ob)
 
-    dom: C0
-    cod: C0
-    loops: tuple[C0, ...]
+    dom: "Ty"
+    cod: "Ty"
+    loops: "tuple[Ty, ...]"
     edges: Permutation
 
+    @axiom
+    def cmap_roundtrip(cls, term: Self) -> Equation[Self]:
+        """
+        A map reads back from the diagram it decodes to, up to the order of
+        its boxes, i.e. as a hypergraph, see :meth:`equation_factory`.
+        """
+        return cls.equation_factory(term.to_diagram().to_map(), term)
+
     def __init__(
-            self, dom: C0, cod: C0, boxes: tuple[Box, ...],
+            self, dom: "Ty", cod: "Ty", boxes: "tuple[Box, ...]",
             edges: Iterable[int],
-            loops: tuple[C0, ...] = (), *, check: bool = True):
+            loops: "tuple[Ty, ...]" = (), *, check: bool = True):
         assert_isinstance(dom, self.category.ob)
         assert_isinstance(cod, self.category.ob)
         for box in boxes:
@@ -258,7 +279,7 @@ class CMap[C0: Pregroup, C1: CMap](
         for loop in loops:
             assert_isatomic(loop, self.category.ob)
         self.dom, self.cod, self.boxes = dom, cod, tuple(boxes)
-        self.loops = tuple(loops)
+        self.loops = tuple(sorted(loops, key=repr))
 
         self.edges = Permutation(edges, self.n_ports)
         if check:
@@ -346,8 +367,8 @@ class CMap[C0: Pregroup, C1: CMap](
         """ The number of faces, including closed scalar components. """
         portless_boxes = sum(
             not len(box.dom) and not len(box.cod) for box in self.boxes)
-        return len(self.faces.cycles()) + portless_boxes\
-            + len(self.loops)
+        cycles = tuple(self.faces.cycles())
+        return len(cycles) + portless_boxes + len(self.loops)
 
     @property
     def euler_characteristic(self) -> int:
@@ -485,7 +506,7 @@ class CMap[C0: Pregroup, C1: CMap](
                 factory_name(cls.category)))
 
     @property
-    def connected_components(self) -> list[CMap]:
+    def connected_components(self) -> list[Self]:
         """ The connected components, with the boundary component first. """
         if not self.n_ports:
             # Avoid recursively rebuilding the same portless component.
@@ -525,7 +546,7 @@ class CMap[C0: Pregroup, C1: CMap](
                 and not self.loops:
             return [self]
 
-        def make_component(component: int) -> CMap:
+        def make_component(component: int) -> Self:
             dom = self.dom if component == boundary_component else self.ob()
             cod = self.cod if component == boundary_component else self.ob()
             boxes = tuple(box for _, box in boxes_by_component.get(
@@ -611,9 +632,10 @@ class CMap[C0: Pregroup, C1: CMap](
     def validate_adjoint_types(cls, source: Port, target: Port):
         """
         Validate a wire between adjoint types, i.e. a cup or a cap, its ends
-        in port order as :meth:`make_monogamous` reads them: the right end
-        of a cup is the right adjoint of its left end, the left end of a cap
-        is the right adjoint of its right end.
+        in logical order as :meth:`make_monogamous` reads them, a box's
+        outputs left to right: the right end of a cup is the right adjoint
+        of its left end, the left end of a cap is the right adjoint of its
+        right end.
 
         >>> from discopy.rigid import Ty, Diagram
         >>> x = Ty('x')
@@ -624,6 +646,8 @@ class CMap[C0: Pregroup, C1: CMap](
         ...
         discopy.utils.AxiomError: x is not the left adjoint of x.l, ...
         """
+        source, target = sorted(
+            (source, target), key=lambda port: (port.depth, port.i))
         left, right = (source.obj, target.obj) if source.kind.is_positive\
             else (target.obj, source.obj)
         if not hasattr(left, "r"):
@@ -738,7 +762,7 @@ class CMap[C0: Pregroup, C1: CMap](
             int(ports[i].depth + 0.5) < int(ports[j].depth - 0.5)
             for i, j in self.box_edges)
 
-    def reorder(self, order: Iterable[int]) -> CMap:
+    def reorder(self, order: Iterable[int]) -> "CMap":
         """ Relabel ports to put boxes in the given order. """
         order = tuple(order)
         boxes = tuple(self.boxes[i] for i in order)
@@ -755,7 +779,7 @@ class CMap[C0: Pregroup, C1: CMap](
             self.dom, self.cod, boxes, edges,
             loops=self.loops, check=False)
 
-    def topological_order(self) -> CMap:
+    def topological_order(self) -> "CMap":
         """
         Reorder the boxes so that every directed wire points forward.
 
@@ -808,7 +832,7 @@ class CMap[C0: Pregroup, C1: CMap](
     def __repr__(self):
         return factory_name(type(self))\
             + f"(dom={self.dom!r}, cod={self.cod!r}, " \
-              f"boxes={self.boxes!r}, edges={self.edges!r}, " \
+              f"boxes={self.boxes!r}, edges={tuple(self.edges)!r}, " \
               f"loops={self.loops!r})"
 
     def __eq__(self, other: object):
@@ -841,7 +865,7 @@ class CMap[C0: Pregroup, C1: CMap](
             'loops': [loop.to_tree() for loop in self.loops]}
 
     @classmethod
-    def from_tree(cls, tree: dict) -> CMap:
+    def from_tree(cls, tree: dict) -> "CMap":
         """ Decode a serialised map, see :meth:`to_tree`. """
         factory = cls[resolve_factory(tree['category'])]
         return factory(
@@ -850,7 +874,22 @@ class CMap[C0: Pregroup, C1: CMap](
             loops=tuple(map(from_tree, tree['loops'])))
 
     @classmethod
-    def id(cls, dom=None) -> CMap:
+    def equation_factory(cls, *terms: "CMap") -> Equation:
+        """
+        The equation of a law, compared up to isomorphism by the hypergraphs
+        of its terms: equality of maps compares their boxes and loops in the
+        order they are listed, which composition and tensor permute.
+
+        >>> from discopy.symmetric import Ty, Box, CMap
+        >>> x = Ty('x')
+        >>> f, g = (Box(name, Ty(), x).to_map() for name in "fg")
+        >>> assert f @ g != g @ f >> CMap.swap(x, x)
+        >>> assert CMap.equation_factory(f @ g, g @ f >> CMap.swap(x, x))
+        """
+        return Equation(*terms, up_to=cls.to_hypergraph)
+
+    @classmethod
+    def id(cls, dom=None) -> "CMap":
         """ The identity map, with each input wired to its output. """
         dom = cls.ob() if dom is None else dom
         n_ports = 2 * len(dom)
@@ -859,7 +898,54 @@ class CMap[C0: Pregroup, C1: CMap](
         return cls(dom, dom, (), edge, check=False)
 
     @classmethod
-    def from_box(cls, box: Box) -> CMap:
+    def strategy(  # pylint: disable=too-many-arguments  # keyword-only bounds
+            cls, *, types=None, dom=None, cod=None, min_leaves=None,
+            max_leaves=4, max_loops=None):
+        """
+        Generate maps of :attr:`category` by drawing their edge involution,
+        which pairs ports of different kinds with equal types, and ports of
+        the same kind with adjoint types when the category is compact: this
+        is the wiring :meth:`Hypergraph.strategy` samples for a symmetric or a
+        compact category, which the map reads off with
+        :meth:`Hypergraph.to_map`.
+
+        A map is how the coherence theorem of a symmetric or compact category
+        is sampled: a planar diagram has an orientation that a map does not
+        record, and a Markov or hypergraph category has spiders that a map
+        cannot draw, so their maps are not generated.
+
+        Parameters:
+            types : A strategy for the types of boxes and boundaries.
+            dom : The domain, sampled from ``types`` if ``None``.
+            cod : The codomain, sampled from ``types`` if ``None``.
+            min_leaves : The minimum number of boxes.
+            max_leaves : The maximum number of boxes, not counting the
+                balancing box of :meth:`Hypergraph.strategy`.
+            max_loops : The maximum number of scalar loops, see
+                ``max_scalars`` in :meth:`Hypergraph.strategy`.
+
+        Example
+        -------
+        >>> from hypothesis import find
+        >>> from discopy.compact import Ty, Diagram
+        >>> x = Ty('x')
+        >>> cmap = find(
+        ...     CMap[Diagram].strategy(dom=x, cod=x),
+        ...     lambda m: not m.is_monogamous)
+        >>> assert (cmap.dom, cmap.cod) == (x, x)
+        """
+        if cls.category is None\
+                or not issubclass(cls.category, SymmetricCategory)\
+                or issubclass(cls.category, MarkovCategory):
+            raise NotImplementedError(
+                f"No strategy implemented for {factory_name(cls)}.")
+        graphs = hypergraph.Hypergraph[cls.category].strategy(
+            types=types, dom=dom, cod=cod, min_leaves=min_leaves,
+            max_leaves=max_leaves, max_scalars=max_loops)
+        return graphs.map(lambda graph: graph.to_map())
+
+    @classmethod
+    def from_box(cls, box: "Box") -> "CMap":
         """ Embed a box, wiring its boundary to fresh box ports. """
         left = len(box.dom)
         right = len(box.cod)
@@ -872,8 +958,8 @@ class CMap[C0: Pregroup, C1: CMap](
         return cls(box.dom, box.cod, (box, ), edge, check=False)
 
     @classmethod
-    def from_glued(cls, dom: Ty, cod: Ty,
-                   images: Iterable[tuple[CMap, int]]) -> CMap:
+    def from_glued(cls, dom: "Ty", cod: "Ty",
+                   images: "Iterable[tuple[CMap, int]]") -> "CMap":
         """
         Glue a sequence of maps onto a scan of open wires, in one pass.
 
@@ -898,12 +984,12 @@ class CMap[C0: Pregroup, C1: CMap](
         ...     (CMap.caps(x.r, x), 0), (CMap.cups(x.r, x), 0)]).loops == (x, )
         True
         """
-        wires, ends, objects = [], [], []
+        wires, ends, origins = [], [], []
 
-        def fresh(obj):
+        def fresh(origin=None):
             wires.append(len(wires))
             ends.append([])
-            objects.append(obj)
+            origins.append(origin)
             return len(wires) - 1
 
         def find(wire):
@@ -919,17 +1005,16 @@ class CMap[C0: Pregroup, C1: CMap](
                 wires[target] = source
 
         scan = []
-        for i, obj in enumerate(dom):
-            scan.append(fresh(obj))
+        for i in range(len(dom)):
+            scan.append(fresh())
             ends[scan[i]].append(i)
         boxes, loops, start = (), (), len(dom)
         for image, offset in images:
             arity, coarity = len(image.dom), len(image.cod)
-            local, image_ports = {}, image.ports
+            local = {}
             for source, target in enumerate(image.edges):
                 if source <= target:
-                    local[source] = local[target] = fresh(
-                        image_ports[source].obj)
+                    local[source] = local[target] = fresh((image, source))
             for port in range(arity, image.n_ports - coarity):
                 ends[find(local[port])].append(start + port - arity)
             for i in range(arity):
@@ -944,7 +1029,8 @@ class CMap[C0: Pregroup, C1: CMap](
         edges = list(range(start + len(cod)))
         for wire in {find(wire) for wire in range(len(wires))}:
             if not ends[wire]:
-                loop = objects[wire]
+                image, source = origins[wire]
+                loop = image.ports[source].obj
                 loop = loop if isinstance(loop, cls.category.ob)\
                     else cls.ob(loop)
                 loops = loops + (
@@ -955,7 +1041,7 @@ class CMap[C0: Pregroup, C1: CMap](
         return cls(dom, cod, boxes, edges, loops=loops)
 
     @classmethod
-    def from_wiring(cls, boxes: tuple, wires, loops: tuple = ()) -> CMap:
+    def from_wiring(cls, boxes: tuple, wires, loops: tuple = ()) -> "CMap":
         """
         A closed map given by boxes and wires between pairs ``(box_index,
         port_position)``, where the position counts the domain ports of the
@@ -992,12 +1078,12 @@ class CMap[C0: Pregroup, C1: CMap](
             n_ports += len(box.dom) + len(box.cod)
 
         def global_index(box_index: int, position: int) -> int:
-            if not isinstance(box_index, int) \
+            if not isinstance(box_index, Integral) \
                     or not 0 <= box_index < len(boxes):
                 raise ValueError(f"There is no box {box_index}.")
             box = boxes[box_index]
             offsets = cls.logical_order(len(box.dom), len(box.cod))
-            if not isinstance(position, int) \
+            if not isinstance(position, Integral) \
                     or not 0 <= position < len(offsets):
                 raise ValueError(f"Box {box_index} has no port {position}.")
             return starts[box_index] + offsets[position]
@@ -1019,7 +1105,7 @@ class CMap[C0: Pregroup, C1: CMap](
         return cls(cls.ob(), cls.ob(), boxes, edges, loops=loops)
 
     @classmethod
-    def from_diagram(cls, old: Diagram) -> CMap:
+    def from_diagram(cls, old: "Diagram") -> "CMap":
         """
         Turn a :class:`Diagram` into a :class:`CMap`.
 
@@ -1028,7 +1114,10 @@ class CMap[C0: Pregroup, C1: CMap](
 
         The image of each box is computed by the functor into ``cls``, then
         the images are glued in a single pass with :meth:`from_glued`. The
-        trace of a planar traced category is a box, as for
+        image of a permutation is its :meth:`permutation`, read from its
+        ``perm`` rather than by mapping it wire by wire, when the functor is
+        symmetric: a map pinned below symmetric keeps it as a box. The trace
+        of a planar traced category is a box, as for
         :meth:`Hypergraph.from_diagram`.
 
         >>> from discopy.braided import Ty, Braid
@@ -1052,14 +1141,26 @@ class CMap[C0: Pregroup, C1: CMap](
         trace = getattr(category, "trace_factory", ())
         if not isclass(trace) or issubclass(category, SymmetricCategory):
             trace = ()
+        permutation = getattr(category, "permutation_factory", ())
+        if not issubclass(cls.category or category, SymmetricCategory):
+            permutation = ()
+
+        def image(box):
+            if isinstance(box, trace):
+                return factory.from_box(box)
+            if isinstance(box, permutation):
+                edges = Permutation.from_transpositions(
+                    ((i, len(box.dom) + j) for j, i in enumerate(box.perm)),
+                    2 * len(box.dom))
+                return factory(box.dom, box.cod, (), edges, check=False)
+            return functor(box)
         return factory.from_glued(old.dom, old.cod, [
-            (factory.from_box(box) if isinstance(box, trace)
-             else functor(box), offset)
+            (image(box), offset)
             for layer in old.inside
             for box, offset in layer.boxes_and_offsets])
 
     @classmethod
-    def swap(cls, left: Ty, right: Ty) -> CMap:
+    def swap(cls, left: "Ty", right: "Ty") -> "CMap":
         """
         The swap of a symmetric category, absorbed into the edges.
 
@@ -1085,7 +1186,7 @@ class CMap[C0: Pregroup, C1: CMap](
         return cls(dom, cod, (), edge, check=False)
 
     @classmethod
-    def braid(cls, left: Ty, right: Ty) -> CMap:
+    def braid(cls, left: "Ty", right: "Ty") -> "CMap":
         """
         The braid of a braided category: the :meth:`swap` of a symmetric one,
         and boxes otherwise, a braid being no swap.
@@ -1105,7 +1206,7 @@ class CMap[C0: Pregroup, C1: CMap](
         return cls.from_diagram(cls.category.braid(left, right))
 
     @classmethod
-    def twist(cls, dom: Ty) -> CMap:
+    def twist(cls, dom: "Ty") -> "CMap":
         """
         The twist of a balanced category: the identity of a symmetric one,
         and boxes otherwise, a twist being no identity.
@@ -1125,7 +1226,7 @@ class CMap[C0: Pregroup, C1: CMap](
         return cls.from_diagram(cls.category.twist(dom))
 
     @classmethod
-    def permutation(cls, xs: Sequence[int], doms: Sequence[Ty]) -> CMap:
+    def permutation(cls, xs: Sequence[int], doms: "Sequence[Ty]") -> "CMap":
         """
         A permutation encoded as boundary wiring, i.e. with no boxes.
 
@@ -1151,14 +1252,15 @@ class CMap[C0: Pregroup, C1: CMap](
         if sorted(xs) != list(range(len(doms))):
             raise ValueError(
                 f"{xs} is not a permutation of {len(doms)} objects")
-        dom = cls.ob().tensor(*doms)
-        cod = cls.ob().tensor(*(doms[x] for x in xs))
+        dom = cls.ob.tensor(*doms) if doms else cls.ob()
+        cod = cls.ob.tensor(*(doms[x] for x in xs)) if doms else cls.ob()
         starts = [0, *accumulate(len(objects) for objects in doms)]
         inputs = [
             starts[x] + offset for x in xs for offset in range(len(doms[x]))]
         edge = Permutation.from_transpositions(
             ((i, len(dom) + j) for j, i in enumerate(inputs)), 2 * len(dom))
-        return cls(dom, cod, (), edge, check=False)
+        return cls(
+            dom, cod, (), edge, check=False)
 
     cup_factory = classmethod(lambda cls, left, right: cls.from_box(
         cls.category.cup_factory(left, right)))
@@ -1166,7 +1268,7 @@ class CMap[C0: Pregroup, C1: CMap](
         cls.category.cap_factory(left, right)))
 
     @classmethod
-    def cups(cls, left: Ty, right: Ty) -> CMap:
+    def cups(cls, left: "Ty", right: "Ty") -> "CMap":
         """
         A cup between a type and its right adjoint: a box over a rigid host
         that is not compact, whose cups are planar and oriented, see
@@ -1192,7 +1294,7 @@ class CMap[C0: Pregroup, C1: CMap](
         return cls(left @ right, cls.ob(), (), edge, check=False)
 
     @classmethod
-    def caps(cls, left: Ty, right: Ty) -> CMap:
+    def caps(cls, left: "Ty", right: "Ty") -> "CMap":
         """ A cap between a type and its left adjoint, see :meth:`cups`. """
         if cls.is_planar_rigid():
             return cls.cap_factory(left, right) if len(left) == 1\
@@ -1214,27 +1316,37 @@ class CMap[C0: Pregroup, C1: CMap](
             and not issubclass(cls.category, CompactCategory)
 
     @classmethod
-    def copy(cls, typ: Ty, n: int = 2) -> CMap:
-        """ Copy is kept as a box: one input cannot wire to many outputs. """
-        return cls.from_box(cls.category.copy(typ, n))
+    def copy(cls, typ: "Ty", n: int = 2) -> "CMap":
+        """
+        The map of the copy of the host category, where the copy of an
+        atomic object is kept as a box: one input cannot wire to many outputs.
+        """
+        copy = cls.category.copy(typ, n)
+        return cls.from_box(copy) if len(typ) == 1\
+            and isinstance(copy, cat.Box) else cls.from_diagram(copy)
 
     @classmethod
-    def merge(cls, typ: Ty, n: int = 2) -> CMap:
-        """ Merge is kept as a box: many inputs cannot wire to one output. """
-        return cls.from_box(cls.category.merge(typ, n))
+    def merge(cls, typ: "Ty", n: int = 2) -> "CMap":
+        """
+        The map of the merge of the host category, where the merge of an
+        atomic object is kept as a box: many inputs cannot wire to one output.
+        """
+        merge = cls.category.merge(typ, n)
+        return cls.from_box(merge) if len(typ) == 1\
+            and isinstance(merge, cat.Box) else cls.from_diagram(merge)
 
     @classmethod
-    def discard(cls, typ: Ty) -> CMap:
-        """ Discard is kept as a box. """
+    def discard(cls, typ: "Ty") -> "CMap":
+        """ Discard keeps a box per atomic object, see :meth:`copy`. """
         return cls.copy(typ, 0)
 
     @classmethod
-    def noise(cls, typ: Ty) -> CMap:
-        """ Noise is kept as a box. """
+    def noise(cls, typ: "Ty") -> "CMap":
+        """ Noise keeps a box per atomic object, see :meth:`merge`. """
         return cls.merge(typ, 0)
 
     @classmethod
-    def ev(cls, base: Ty, exponent: Ty, left: bool = True) -> CMap:
+    def ev(cls, base: "Ty", exponent: "Ty", left: bool = True) -> "CMap":
         """
         Evaluation is kept as an explicit box by default, or comes from the
         wiring of cups when the host category is rigid.
@@ -1243,7 +1355,7 @@ class CMap[C0: Pregroup, C1: CMap](
             return super().ev(base, exponent, left)
         return cls.from_box(cls.category.ev(base, exponent, left))
 
-    def curry(self, n: int = 1, left: bool = True) -> CMap:
+    def curry(self, n: int = 1, left: bool = True) -> "CMap":
         """
         Currying is kept as an explicit curry box by default, the more
         rigorous representation, or comes from the wiring of caps when the
@@ -1272,7 +1384,7 @@ class CMap[C0: Pregroup, C1: CMap](
         return self.from_box(self.category.curry_factory(
             self.to_diagram(), n, left))
 
-    def base_and_exponent(self, n: int, left: bool) -> tuple[Ty, Ty]:
+    def base_and_exponent(self, n: int, left: bool) -> "tuple[Ty, Ty]":
         """
         The base and exponent that :meth:`uncurry` evaluates, read off the
         codomain as in the host category.
@@ -1286,7 +1398,7 @@ class CMap[C0: Pregroup, C1: CMap](
     l = property(lambda self: self.transpose(left=True))
     r = property(lambda self: self.transpose(left=False))
 
-    def dagger(self) -> CMap:
+    def dagger(self) -> "CMap":
         """
         Reverse a combinatorial map: swap the boundary, dagger each box in
         reverse order and conjugate the edges by the port relabeling.
@@ -1315,9 +1427,10 @@ class CMap[C0: Pregroup, C1: CMap](
     @classmethod
     def spiders(
             cls, n_legs_in: int, n_legs_out: int,
-            typ: Ty, phases=None) -> CMap:
+            typ: "Ty", phases=None) -> "CMap":
         """
-        Spiders are kept as boxes, including their phase data.
+        Spiders are kept as boxes on each atomic object, including their
+        phase data.
 
         Example
         -------
@@ -1325,11 +1438,12 @@ class CMap[C0: Pregroup, C1: CMap](
         >>> assert CMap.spiders(1, 2, Dim(2, 3)).eval().is_close(
         ...     Tensor.spiders(1, 2, Dim(2, 3)))
         """
-        return cls.from_box(cls.category.spiders(
-            n_legs_in, n_legs_out, typ, phases))
+        spiders = cls.category.spiders(n_legs_in, n_legs_out, typ, phases)
+        return cls.from_box(spiders) if len(typ) == 1\
+            and isinstance(spiders, cat.Box) else cls.from_diagram(spiders)
 
     @unbiased
-    def then(self, other: CMap) -> CMap:
+    def then(self, other: "CMap") -> "CMap":
         """
         Compose maps by gluing output ports to input ports.
 
@@ -1358,7 +1472,7 @@ class CMap[C0: Pregroup, C1: CMap](
         return type(self)(
             dom, cod, boxes, edge, loops=loops, check=False)
 
-    def trace(self, n: int = 1, left: bool = False) -> CMap:
+    def trace(self, n: int = 1, left: bool = False) -> "CMap":
         """
         Trace boundary wires by splicing the selected inputs and outputs, a
         map being compact whatever hosts it, except over a planar traced
@@ -1381,10 +1495,7 @@ class CMap[C0: Pregroup, C1: CMap](
         assert_istraceable(self, n, left)
         if issubclass(self.category, TracedCategory)\
                 and not issubclass(self.category, SymmetricCategory):
-            result = self
-            for _ in range(n):
-                result = result.explicit_trace(left)
-            return result
+            return self.explicit_trace(n, left)
 
         if left:
             dom, cod = self.dom[n:], self.cod[n:]
@@ -1405,7 +1516,7 @@ class CMap[C0: Pregroup, C1: CMap](
         return type(self)(
             dom, cod, self.boxes, edge, loops=loops, check=False)
 
-    def tensor(self, *others: CMap) -> CMap:
+    def tensor(self, *others: "CMap") -> "CMap":
         """
         Tensor product given by disjoint union of ``n`` maps.
 
@@ -1441,7 +1552,7 @@ class CMap[C0: Pregroup, C1: CMap](
             tuple(boxes), edges.conjugate(Permutation(mapping)),
             loops=tuple(loops), check=False)
 
-    def interchange(self, i: int, j: int) -> CMap:
+    def interchange(self, i: int, j: int) -> "CMap":
         """
         Interchange boxes at indices ``i`` and ``j``.
 
@@ -1465,8 +1576,8 @@ class CMap[C0: Pregroup, C1: CMap](
         return self.reorder(order)
 
     def plug_input(
-            self, input_index: int, box: Box,
-            cod: C0, root_index: int = 0) -> CMap:
+            self, input_index: int, box: "Box",
+            cod: "Ty", root_index: int = 0) -> "CMap":
         """
         Plug an input boundary and the output root into a new box.
 
@@ -1535,25 +1646,99 @@ class CMap[C0: Pregroup, C1: CMap](
             new_dom, cod, boxes, edge,
             loops=self.loops)
 
-    def explicit_trace(self, left: bool = False) -> CMap:
+    def explicit_trace(  # pylint: disable=too-many-locals  # the onion
+            self, n: int = 1, left: bool = False) -> "CMap":
         """
-        The trace of a map with explicit boxes (trace, cup or cap).
+        The trace of ``n`` wires of a map with explicit boxes (trace, cup or
+        cap), in one pass, like :meth:`Hypergraph.explicit_trace`.
 
         Parameters:
+            n : The number of wires to trace.
             left : Whether to trace on the left or right.
 
         Note
         ----
-        When ``category.trace_factory`` is a class, e.g. for symmetric
-        diagrams, then the result is just one big trace box wrapped up as a
-        map. Otherwise it is a class method, e.g. for compact diagrams, in
-        which case we use it to introduce cup and cap boxes.
+        When ``category.trace_factory`` is a class, e.g. for a planar traced
+        category, then the result is just one big trace box wrapped up as a
+        map, whatever ``n``, since the trace of ``n`` wires of a diagram is
+        its ``n`` one-wire traces nested: nesting them on the diagram
+        converts the map once instead of once per wire.
+
+        Otherwise it is a class method, e.g. for compact diagrams, in which
+        case we use it to introduce cup and cap boxes, one pair per wire: the
+        cups and caps of a pivotal category are atomic, so the ``n``-wire
+        trace is the nest of ``n`` one-wire traces there as well. When that
+        class method is the pivotal one itself, the whole onion of ``n`` cup
+        and cap pairs goes to one constructor call rather than being composed
+        pair by pair; a category overriding it gets the nest its own factory
+        builds, like :meth:`Hypergraph.explicit_trace`.
+
+        >>> from discopy import compact, feedback
+        >>> x = feedback.Ty('x')
+        >>> f = feedback.Box('f', x @ x @ x, x @ x @ x).to_map()
+        >>> assert f.explicit_trace(2) == f.explicit_trace().explicit_trace()
+        >>> y = compact.Ty('y')
+        >>> g = compact.Box('g', y @ y @ y, y @ y @ y).to_map()
+        >>> assert g.explicit_trace(2) == g.explicit_trace().explicit_trace()
+
+        Tracing no wire is the identity, whatever the category, so a map with
+        nothing to trace needs no traces, see :meth:`make_causal`.
+
+        >>> assert g.explicit_trace(0) == g
+
+        Any other ``n`` is checked against the wires there are, as
+        :meth:`trace` and :meth:`Hypergraph.explicit_trace` check it: a
+        negative count raises rather than tracing nothing.
         """
+        if n == 0:
+            return self
         type(self).assert_istraced()
+        assert_istraceable(self, n, left)
         factory = self.category.trace_factory
         if isclass(factory):
-            return self.from_box(factory(self.to_diagram(), left))
-        return factory.__func__(type(self), self, left)
+            return self.from_box(self.to_diagram().trace(n, left))
+        # pylint: disable-next=import-outside-toplevel  # pivotal imports us
+        from discopy.pivotal import Diagram as Pivotal
+        if factory.__func__ is not Pivotal.trace_factory.__func__:
+            result = self
+            for _ in range(n):
+                result = factory.__func__(type(self), result, left)
+            return result
+        dom, cod, traced = (self.dom[n:], self.cod[n:], self.dom[:n]) if left\
+            else (self.dom[:-n], self.cod[:-n], self.dom[-n:])
+        legs = [(traced[i:i + 1].r, traced[i:i + 1]) if left
+                else (traced[i:i + 1], traced[i:i + 1].r) for i in range(n)]
+        order = tuple(reversed(range(n))) if left else tuple(range(n))
+        boxes = tuple(self.category.cap_factory(*legs[i]) for i in order)\
+            + self.boxes + tuple(
+                self.category.cup_factory(*legs[i]) for i in order[::-1])
+        inside = self.n_ports - len(self.dom) - len(self.cod)
+        caps = len(dom)
+        cups = caps + 2 * n + inside
+        outputs = cups + 2 * n
+        # The traced wire and the adjoint leg of each cap and cup, the cap of
+        # the i-th wire sitting outside the cap of the next one: a box lists
+        # its domain forwards and its codomain backwards.
+        cap_legs = [(caps + 2 * (n - 1 - i), caps + 2 * (n - 1 - i) + 1)
+                    if left else (caps + 2 * i + 1, caps + 2 * i)
+                    for i in range(n)]
+        cup_legs = [(cups + 2 * i + 1, cups + 2 * i) if left
+                    else (cups + 2 * (n - 1 - i), cups + 2 * (n - 1 - i) + 1)
+                    for i in range(n)]
+        into, out_of = ([wire for wire, _ in cap_legs],
+                        [wire for wire, _ in cup_legs])
+        untraced = [outputs + i for i in range(len(cod))]
+        moved = (into + list(range(caps)) if left
+                 else list(range(caps)) + into)\
+            + [port + n for port in range(
+                len(self.dom), len(self.dom) + inside)]\
+            + (out_of + untraced if left else untraced + out_of)
+        edges = Permutation.from_transpositions([
+            (moved[source], moved[target])
+            for source, target in enumerate(self.edges) if source < target
+        ] + [(cap_legs[i][1], cup_legs[i][1]) for i in range(n)],
+            outputs + len(cod))
+        return type(self)(dom, cod, boxes, edges, loops=self.loops)
 
     def leg_order(self, *legs: int) -> tuple[int, ...]:
         """
@@ -1573,20 +1758,19 @@ class CMap[C0: Pregroup, C1: CMap](
         >>> print(cmap.to_diagram())
         Cap(x.r, x) >> x.r @ g
         """
-        if not issubclass(self.category, SymmetricCategory):
-            return legs
-
         def logical(port):
             for box, ports in zip(self.boxes, self._box_port_indices):
                 if port in ports:
                     return ports[0] + self.logical_order(
                         len(box.dom), len(box.cod))[port - ports[0]]
             return port
+        if not issubclass(self.category, SymmetricCategory):
+            return tuple(sorted(legs, key=logical))
         logicals = [logical(leg) for leg in legs]
         return tuple(legs[logicals.index(port)] for port in (
-            self.to_hypergraph().leg_order(*logicals)))
+            self.to_hypergraph().leg_order(*sorted(logicals))))
 
-    def make_monogamous(self) -> CMap:
+    def make_monogamous(self) -> "CMap":
         """
         Introduce cup and cap boxes to make self :attr:`is_monogamous`,
         i.e. so that every wire connects a positive and a negative port,
@@ -1633,7 +1817,7 @@ class CMap[C0: Pregroup, C1: CMap](
                 loops=self.loops, check=False).make_monogamous()
         return self
 
-    def make_causal(self) -> CMap:
+    def make_causal(self) -> "CMap":
         """
         Make self :attr:`is_causal`, i.e. so that every wire points forward
         and there are no loops. Boxes that are merely out of order are put
@@ -1696,11 +1880,9 @@ class CMap[C0: Pregroup, C1: CMap](
         result = type(self)(
             self.dom @ typ, self.cod @ typ, self.boxes, edges,
             check=False)
-        for _ in range(n_traces):
-            result = result.explicit_trace()
-        return result
+        return result.explicit_trace(n_traces)
 
-    def to_compact(self) -> CMap:
+    def to_compact(self) -> "CMap":
         """
         Open every curry bubble into its argument followed by the dagger of
         :meth:`ev`, traced over the curried wires: the map is decoded and
@@ -1743,7 +1925,7 @@ class CMap[C0: Pregroup, C1: CMap](
         """
         return self.category.eval(self, *args, **params)
 
-    def to_diagram(self) -> Diagram:
+    def to_diagram(self) -> "Diagram":
         """
         Downgrade to a diagram directly, preserving box orientation.
 
@@ -1762,12 +1944,10 @@ class CMap[C0: Pregroup, C1: CMap](
         discopy.utils.AxiomError: monoidal.Diagram has no traces for the \
 cycles of this map.
 
-        What remains is decoded like in :meth:`Hypergraph.to_diagram`: we scan
-        the currently open wires from left to right, for each box we gather
-        its domain wires at the position of the first one with a single
-        permutation, see :meth:`discopy.python.finset.Permutation.gather`,
-        apply the box, and replace the consumed domain labels by the box
-        codomain labels.
+        What remains is decoded by the :class:`discopy.hypergraph.Decoder` of
+        :meth:`Hypergraph.to_diagram`: we scan the open wires from left to
+        right, and each box gathers its domain wires at the position of the
+        first one with a single permutation.
 
         >>> from discopy.compact import Ty, Box, CMap
         >>> x, y, z = map(Ty, "xyz")
@@ -1798,13 +1978,17 @@ cycles of this map.
         >>> print((s @ x >> e).to_map().to_diagram())
         s @ x >> e
 
-        Without swaps, a monogamous acyclic map is swept with :meth:`encode`
+        Without swaps, a monogamous acyclic map is placed by :meth:`sweep`
         instead: each state goes in the gap that keeps every face turning by
         a full turn, so that a map which some layering has always decodes.
         """
         if not issubclass(self.category, SymmetricCategory)\
                 and self.is_monogamous and self.is_acyclic:
-            return self.category.decode(*self.encode())
+            dom, vertices, cod = self.wiring()
+            decoder = hypergraph.Decoder(self.category, self.dom, dom)
+            for i, offset in self.sweep(dom, vertices, cod):
+                decoder.place(self.boxes[i], *vertices[i], offset)
+            return decoder.close(cod)
         if not self.is_causal:
             return self.make_causal().to_diagram()
 
@@ -1817,19 +2001,13 @@ cycles of this map.
         back, first_output = walk.dagger(), self.n_ports - len(self.cod)
         right_side = None if not self.cod\
             else len(self.dom) - 1 if self.dom else first_output
-        diagram = self.category.id(self.dom)
-        scan = [edge_wire[i] for i in range(len(self.dom))]
+        decoder = hypergraph.Decoder(self.category, self.dom, [
+            edge_wire[i] for i in range(len(self.dom))])
         outputs = [edge_wire[i] for i in range(first_output, self.n_ports)]
         placed, waiting = set(), []
         symmetric = issubclass(self.category, SymmetricCategory)
         caps = getattr(self.category, "cap_factory", None)
         caps = caps if isclass(caps) else ()
-
-        def permute(perm):
-            if not symmetric:
-                raise AxiomError(messages.NOT_SYMMETRIC.format(
-                    factory_name(self.category)))
-            return self.category.from_permutation(perm, diagram.cod)
 
         def turn(port):
             """ The turn at the corner before a port, in half turns, or
@@ -1850,9 +2028,10 @@ cycles of this map.
         def from_the_left(corner):
             total, port = 0, back[corner]
             while port != corner:
-                if edge_wire[port] in scan:
-                    return scan.index(edge_wire[port]) + 1 if total == 1\
-                        and ports[port].kind.is_positive else None
+                if edge_wire[port] in decoder.wires:
+                    return decoder.wires.index(edge_wire[port]) + 1\
+                        if total == 1 and ports[port].kind.is_positive\
+                        else None
                 if port == first_output:
                     return 0 if total == 0 else None
                 if turn(port) is None:
@@ -1864,13 +2043,14 @@ cycles of this map.
             total, port = 0, walk[corner]
             while port != corner:
                 if port == right_side:
-                    return len(scan) if total == 0 else None
+                    return len(decoder.wires) if total == 0 else None
                 if turn(port) is None:
                     return None
                 total += turn(port)
-                if edge_wire[port] in scan:
-                    return scan.index(edge_wire[port]) if total == 1\
-                        and ports[port].kind.is_negative else None
+                if edge_wire[port] in decoder.wires:
+                    return decoder.wires.index(edge_wire[port])\
+                        if total == 1 and ports[port].kind.is_negative\
+                        else None
                 port = walk[port]
             return None
 
@@ -1882,19 +2062,11 @@ cycles of this map.
         def gaps(depth):
             box_ports = self._box_port_indices[depth]
             return {from_the_left(box_ports[0]), from_the_right(
-                box_ports[0])} - {None} if box_ports else {len(scan)}
+                box_ports[0])} - {None} if box_ports\
+                else {len(decoder.wires)}
 
         def beside(depth, reads):
-            _, cod_wires = wires(depth)
-            if cod_wires[0] in reads[1:]:
-                before = reads[reads.index(cod_wires[0]) - 1]
-                if before in scan:
-                    return scan.index(before) + 1
-            if cod_wires[-1] in reads[:-1]:
-                after = reads[reads.index(cod_wires[-1]) + 1]
-                if after in scan:
-                    return scan.index(after)
-            return None
+            return decoder.beside(wires(depth)[1], reads, reads)
 
         def reader(depth):
             _, cod_wires = wires(depth)
@@ -1905,7 +2077,8 @@ cycles of this map.
         def where(depth):
             found = gaps(depth)
             near = None if len(found) == 1 else beside(depth, reader(depth))
-            return min(found, default=len(scan)) if near is None else near
+            return min(found, default=len(decoder.wires))\
+                if near is None else near
 
         def force(depth):
             while not gaps(depth) and beside(depth, reader(depth)) is None\
@@ -1915,19 +2088,7 @@ cycles of this map.
             place(depth, where(depth))
 
         def place(depth, offset=None):
-            nonlocal diagram, scan
-            dom_wires, cod_wires = wires(depth)
-            positions = [scan.index(wire_id) for wire_id in dom_wires]
-            if offset is None:
-                offset = positions[0] if positions else len(scan)
-                offset -= sum(j < offset for j in positions)
-            perm = Permutation.gather(positions, len(scan), offset)
-            if not perm.is_identity:
-                diagram >>= permute(perm)
-                scan = [scan[j] for j in perm]
-            scan = scan[:offset] + cod_wires + scan[offset + len(dom_wires):]
-            diagram >>= diagram.cod[:offset] @ self.boxes[depth]\
-                @ diagram.cod[offset + len(dom_wires):]
+            decoder.place(self.boxes[depth], *wires(depth), offset)
             placed.add(depth)
 
         def settle():
@@ -1950,12 +2111,7 @@ cycles of this map.
             settle()
         while waiting:
             force(waiting[0])
-
-        perm = Permutation(
-            [scan.index(wire_id) for wire_id in outputs], len(scan))
-        if not perm.is_identity:
-            diagram >>= permute(perm)
-        return diagram
+        return decoder.close(outputs)
 
     def wiring(self, ends: Iterable[int] = ()) -> tuple[
             tuple[int, ...], list[tuple[tuple[int, ...], tuple[int, ...]]],
@@ -2045,7 +2201,9 @@ cycles of this map.
         return face, result
 
     @staticmethod
-    def gap(turn: dict, face: dict, walks: list[list], cut, outputs) -> int:
+    def gap(
+            turn: dict, face: dict, walks: list[list], cut, outputs
+    ) -> int | None:
         """
         Where a state goes in a cut, or ``None`` if it cannot go yet.
 
@@ -2068,7 +2226,8 @@ cycles of this map.
         gaps = [q for q, corner in enumerate([(w, 0) for w in cut] + [top])
                 if face[corner] == face[start]]
         if not gaps:
-            return len(cut) if sum(map(turn.get, walk)) == -2 else None
+            total = sum(turn[port] for port in walk)
+            return len(cut) if total == -2 else None
         j, n = walk.index(start), len(walk)
         outer = walk.index(top) if face[top] == face[start] else None
         for q in reversed(gaps):
@@ -2138,10 +2297,11 @@ cycles of this map.
             raise AxiomError(messages.NOT_PROGRESSIVE.format(cut))
         return order
 
-    def encode(self) -> tuple[C0, list[tuple[Box, int]]]:
+    def encode(self) -> tuple[Ty, list[tuple[Box, int]]]:
         """
-        The domain, boxes and offsets of a diagram whose map this is, see
-        :meth:`sweep` and :meth:`discopy.monoidal.Diagram.encode`.
+        The domain, boxes and offsets of a diagram whose map this is, one box
+        per layer as :meth:`discopy.monoidal.Diagram.decode` reads them, see
+        :meth:`sweep`.
 
         Example
         -------
@@ -2231,7 +2391,9 @@ cycles of this map.
                      if j not in used and self.boxes[j] == pattern.boxes[box]]
 
     def homomorphisms(
-            self, pattern: CMap, boxes: dict[int, int] = None
+            self, pattern: "CMap", boxes: dict[
+                int, int] = None,  # ty: ignore[invalid-parameter-default]
+            beside: bool = False
             ) -> Iterator[tuple[tuple[int, ...], tuple[int, ...]]]:
         """
         The homomorphisms of maps from a pattern, injective on boxes: each
@@ -2245,6 +2407,8 @@ cycles of this map.
         Parameters:
             pattern : The map to match.
             boxes : A partial map on boxes to extend, empty by default.
+            beside : Whether to send straight wires only to those
+                :meth:`beside` the image, as a :meth:`complement` needs.
 
         Returns:
             The image of each box, and of each straight wire as the port it
@@ -2261,19 +2425,43 @@ cycles of this map.
         boxes = {} if boxes is None else boxes
         todo = [i for i in range(len(pattern.boxes)) if i not in boxes]
         if not todo:
+            image = tuple(boxes[i] for i in range(len(pattern.boxes)))
+            ports = self.beside(image) if beside else range(self.n_ports)
             straight = [i for i in range(len(pattern.dom))
                         if pattern.edges[i] not in pattern.owners]
             for wires in product(*(
-                    [w for w, port in enumerate(self.ports)
-                     if port.kind.is_positive
-                     and port.obj == pattern.ports[i].obj]
+                    [w for w in ports if self.ports[w].kind.is_positive
+                     and self.ports[w].obj == pattern.ports[i].obj]
                     for i in straight)):
-                yield tuple(boxes[i] for i in range(len(pattern.boxes))), wires
+                yield image, wires
             return
         box, images = self.candidates(pattern, todo, boxes)
         for image in images:
             if self.preserves(pattern, box, boxes | {box: image}):
-                yield from self.homomorphisms(pattern, boxes | {box: image})
+                yield from self.homomorphisms(
+                    pattern, boxes | {box: image}, beside)
+
+    def beside(self, boxes: Iterable[int]) -> list[int]:
+        """
+        The wires of an acyclic map that start neither at some boxes nor
+        below them and end neither at them nor above them, named by the port
+        they start at: the wires that can run beside the boxes.
+        """
+        def owner(port):
+            return self.owners.get(port, (None, ))[0]
+        ranks, below = self.box_ranks or (), set(boxes)
+        above = set(below)
+        edges = sorted(self.box_edges, key=lambda edge: ranks[owner(edge[0])])
+        for source, target in edges:
+            if owner(source) in below:
+                below.add(owner(target))
+        for source, target in reversed(edges):
+            if owner(target) in above:
+                above.add(owner(source))
+        return [port for port in range(self.n_ports)
+                if self.ports[port].kind.is_positive
+                and owner(port) not in below
+                and owner(self.edges[port]) not in above]
 
     def hole(
             self, pattern: CMap, homomorphism: tuple
@@ -2304,12 +2492,16 @@ cycles of this map.
             if port in pattern.owners:
                 outputs[j] = self.image(pattern, port, boxes)
         image = {port for j in boxes for port in self._box_port_indices[j]}
-        ends = [self.edges[port] if self.ports[port].kind.is_positive
-                else port for port in outputs]
+        kinds = [
+            self.ports[port].kind  # ty: ignore[invalid-argument-type]
+            for port in outputs]
+        positive = [kind.is_positive for kind in kinds]
+        ends = [self.edges[port] if is_positive else port
+                for port, is_positive in zip(outputs, positive)]
         if image & set(inputs + ends) or len(set(inputs)) < len(inputs)\
                 or len(set(ends)) < len(ends):
             return None
-        return tuple(inputs), tuple(outputs)
+        return tuple(inputs), tuple(outputs)  # ty: ignore[invalid-return-type]
 
     def complement(self, pattern: CMap, homomorphism: tuple) -> Match:
         """
@@ -2336,7 +2528,7 @@ cycles of this map.
             and len(boxes) < len(self.boxes)
         if hole is None or floating and not issubclass(
                 self.category, SpacialCategory):
-            return None
+            return None  # ty: ignore[invalid-return-type]
         dom, vertices, cod = self.wiring(
             port for port in hole[1] if not self.ports[port].kind.is_positive)
         kept = [j for j in range(len(self.boxes)) if j not in boxes]
@@ -2344,7 +2536,7 @@ cycles of this map.
         try:
             order = self.sweep(dom, vertices, cod)
         except AxiomError:
-            return None
+            return None  # ty: ignore[invalid-return-type]
         return self.context(vertices, order, kept)
 
     def context(
@@ -2416,7 +2608,7 @@ cycles of this map.
             raise AxiomError(messages.NOT_CONNECTED.format(self))
         self.assert_isprogressive()
         pattern.assert_isprogressive()
-        for homomorphism in self.homomorphisms(pattern):
+        for homomorphism in self.homomorphisms(pattern, beside=True):
             context = self.complement(pattern, homomorphism)
             if context is not None:
                 yield context

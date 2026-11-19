@@ -47,7 +47,7 @@ or using :code:`quimb` (with :code:`tensor.to_quimb()`).
 ...             (bSym_l.to_tensor().to_quimb()^...).data,\\
 ...             bSym_r.to_tensor().eval().array)
 >>> Equation(bSym_l, bSym_r, symbol="$=$").draw(\\
-... path="docs/_static/optyx/zw_commutativity.svg")
+... doctest="docs/_static/optyx/zw_commutativity.svg")
 
 .. image:: /_static/optyx/zw_commutativity.svg
     :align: center
@@ -60,7 +60,7 @@ or using :code:`quimb` (with :code:`tensor.to_quimb()`).
 ...             bAso_l.to_tensor().eval().array,\\
 ...             bAso_r.to_tensor().eval().array)
 >>> Equation(bAso_l, bAso_r, symbol="$=$").draw(\\
-... path="docs/_static/optyx/zw_associativity.svg")
+... doctest="docs/_static/optyx/zw_associativity.svg")
 
 .. image:: /_static/optyx/zw_associativity.svg
     :align: center
@@ -73,7 +73,7 @@ or using :code:`quimb` (with :code:`tensor.to_quimb()`).
 ...             bId_l.to_tensor().eval().array,\\
 ...             bId_r.to_tensor().eval().array)
 >>> Equation(bId_l, bId_r, symbol="$=$").draw(\\
-... path="docs/_static/optyx/zw_unit.svg")
+... doctest="docs/_static/optyx/zw_unit.svg")
 
 .. image:: /_static/optyx/zw_unit.svg
     :align: center
@@ -88,7 +88,7 @@ or using :code:`quimb` (with :code:`tensor.to_quimb()`).
 ...             bBa_l.to_tensor().eval().array,\\
 ...             bBa_r.to_tensor().eval().array)
 >>> Equation(bBa_l, bBa_r, symbol="$=$").draw(\\
-... path="docs/_static/optyx/zw_bialgebra.svg")
+... doctest="docs/_static/optyx/zw_bialgebra.svg")
 
 .. image:: /_static/optyx/zw_bialgebra.svg
     :align: center
@@ -107,7 +107,7 @@ or using :code:`quimb` (with :code:`tensor.to_quimb()`).
 ...             bZBA_l.to_tensor().eval().array,\\
 ...             bZBA_r.to_tensor().eval().array)
 >>> Equation(bZBA_l, bZBA_r, symbol="$=$").draw(\\
-... path="docs/_static/optyx/zw_zw_bialgebra.svg")
+... doctest="docs/_static/optyx/zw_zw_bialgebra.svg")
 
 .. image:: /_static/optyx/zw_zw_bialgebra.svg
     :align: center
@@ -121,7 +121,7 @@ or using :code:`quimb` (with :code:`tensor.to_quimb()`).
 ...             K0_infty_l.to_tensor().eval().array,\\
 ...             K0_infty_r.to_tensor().eval().array)
 >>> Equation(K0_infty_l, K0_infty_r, symbol="$=$").draw(\\
-... path="docs/_static/optyx/zw_z_copies.svg")
+... doctest="docs/_static/optyx/zw_z_copies.svg")
 
 .. image:: /_static/optyx/zw_z_copies.svg
     :align: center
@@ -139,7 +139,7 @@ or using :code:`quimb` (with :code:`tensor.to_quimb()`).
 ...             lemma_B7_l.to_tensor().eval().array,\\
 ...             lemma_B7_r.to_tensor().eval().array)
 >>> Equation(lemma_B7_l, lemma_B7_r, symbol="$=$").draw(\\
-... path="docs/_static/optyx/zw_lemma_B7.svg")
+... doctest="docs/_static/optyx/zw_lemma_B7.svg")
 
 .. image:: /_static/optyx/zw_lemma_B7.svg
     :align: center
@@ -149,11 +149,16 @@ from typing import List, Union, Tuple, Iterable
 import numpy as np
 from discopy.frobenius import Dim
 from discopy import tensor
+from discopy.utils import factory_key, factory_name
+from discopy.quantum.gates import format_number
 from discopy.optyx.core import diagram
 from discopy.optyx.utils.misc import (
+    hashable,
+    listed,
     occupation_numbers,
     multinomial,
-    BasisTransition
+    BasisTransition,
+    compare_arrays_of_different_sizes
 )
 from discopy.optyx.core.path import Matrix
 
@@ -256,8 +261,8 @@ class W(ZWBox):
         return W(self.n_legs, not self.is_dagger)
 
     def __repr__(self):
-        attr = ", dagger=True" if self.is_dagger else ""
-        return f"W({self.n_legs}{attr})"
+        dagger = ", is_dagger=True" if self.is_dagger else ""
+        return f"{factory_name(type(self))}({self.n_legs}{dagger})"
 
     def __eq__(self, other: "W") -> bool:
         if not isinstance(other, W):
@@ -267,10 +272,27 @@ class W(ZWBox):
             other.is_dagger,
         )
 
+    def __hash__(self) -> int:
+        return hash((W, self.n_legs, self.is_dagger))
+
 
 class ZBox(diagram.Spider, ZWBox):
     """
     Z spider from the ZW calculus.
+
+    A box with no legs is a scalar, and it is the **first** of its
+    amplitudes: an amplitude list is read at the index its legs carry, and a
+    box with no legs has no index to carry, which is how :code:`zw`'s axioms
+    write a scalar — see :code:`test_scalar` and :code:`test_lemma_B6`, where
+    a one-entry list is the value of a diagram fused down to a scalar. Fuse
+    before you truncate: it is :code:`ZBox(0, 1, f) >> ZBox(1, 0, g)` that
+    sums :code:`f(i)g(i)` over the legs it has, not the legless box. The
+    reading is also the only one total on an infinite amplitude list.
+
+    >>> ZBox(0, 0, [2]).to_tensor().eval()
+    Tensor[complex]([2.+0.j], dom=Dim(1), cod=Dim(1))
+    >>> ZBox(0, 0, lambda i: i + 1).to_tensor().eval()
+    Tensor[complex]([1.+0.j], dom=Dim(1), cod=Dim(1))
     """
 
     def __init__(
@@ -293,7 +315,7 @@ class ZBox(diagram.Spider, ZWBox):
             diagram.PhotonNumberPreservation.NON_LO
 
     def conjugate(self):
-        return ZBox(self.legs_in, self.legs_out, self.amplitudes.conjugate())
+        return ZBox(self.legs_in, self.legs_out, np.conj(self.amplitudes))
 
     def truncation(
         self, input_dims: list[int] = None, output_dims: list[int] = None
@@ -302,16 +324,20 @@ class ZBox(diagram.Spider, ZWBox):
         if input_dims is None:
             raise ValueError("Input dimensions must be provided.")
 
-        # if a scalar
+        # a spider with no legs is the scalar its first amplitude carries
         if self.legs_out == 0 and self.legs_in == 0:
             amplitudes = (
-                np.array([self.amplitudes], dtype=complex)
-                if not isinstance(self.amplitudes, IndexableAmplitudes)
-                else np.array([self.amplitudes[0]], dtype=complex)
+                self.amplitudes
+                if isinstance(self.amplitudes, IndexableAmplitudes)
+                else np.asarray(self.amplitudes).flatten()
             )
-            return tensor.Box(self.name, Dim(1), Dim(1), amplitudes)
+            return tensor.Box(
+                self.name, Dim(1), Dim(1),
+                np.array([amplitudes[0]], dtype=complex),
+            )
 
-        spider_dim = min(input_dims) if self.legs_in > 0 else 2
+        spider_dim = min(input_dims) if self.legs_in > 0 \
+            else self.determine_output_dimensions(input_dims)[0]
 
         # create the array
         if not isinstance(
@@ -363,9 +389,13 @@ class ZBox(diagram.Spider, ZWBox):
 
     def determine_output_dimensions(self, input_dims: list[int]) -> list[int]:
         """Determine the output dimensions based on the input dimensions."""
-        if self.legs_in == 0:
-            return [2 for _ in range(len(self.cod))]
-        return [min(input_dims) for _ in range(len(self.cod))]
+        if self.legs_in > 0:
+            dim = min(input_dims)
+        elif isinstance(self.amplitudes, IndexableAmplitudes):
+            dim = 2
+        else:
+            dim = max(2, np.size(self.amplitudes))
+        return [dim for _ in range(len(self.cod))]
 
     def __repr__(self):
         if isinstance(self.amplitudes, IndexableAmplitudes):
@@ -385,7 +415,9 @@ class ZBox(diagram.Spider, ZWBox):
             return False
         if isinstance(self.amplitudes, IndexableAmplitudes):
             return self.amplitudes == other.amplitudes
-        return np.allclose(self.amplitudes, other.amplitudes)
+        return compare_arrays_of_different_sizes(
+            self.amplitudes, other.amplitudes
+        )
 
     def dagger(self) -> diagram.Diagram:
         return ZBox(self.legs_out, self.legs_in, np.conj(self.amplitudes))
@@ -402,7 +434,7 @@ class Create(ZWBox):
     -------
     >>> assert Create() == Create(1)
     >>> Create(1).to_path().eval()
-    Amplitudes([1.+0.j], dom=1, cod=1)
+    Amplitudes([1.+0.j], dom=Nat(1), cod=Nat(1))
     """
 
     draw_as_spider = True
@@ -433,6 +465,27 @@ class Create(ZWBox):
 
     def photon_number_transform(self, dims_in, dims_out):
         return super().photon_number_transform(dims_in, dims_out)
+
+    def setoid(self):
+        """
+        The internal states of the photons are in no other component, so two
+        creations of the same photons in different states were equal, and two
+        post-selections too: :class:`Select` is the dagger of a `Create` and
+        carries the same states, so it compares them the same way.
+
+        >>> states = dict(internal_states=([1, 0], [0, 1]))
+        >>> assert Create(1, 1) != Create(1, 1, **states)
+        >>> assert Create(1, 1) == Create(1, 1)
+        >>> assert Select(1, 1) != Select(1, 1, **states)
+        >>> assert Create(1, 1, **states).dagger() == Select(1, 1, **states)
+        """
+        return super().setoid() + (hashable(self.internal_states), )
+
+    def __repr__(self):
+        args = ", ".join(map(repr, self.photons))
+        if self.internal_states is not None:
+            args += f", internal_states={listed(self.internal_states)}"
+        return f"{factory_name(type(self))}({args})"
 
     def conjugate(self):
         return self
@@ -542,6 +595,12 @@ class Select(ZWBox):
     def photon_number_transform(self, dims_in, dims_out):
         return super().photon_number_transform(dims_in, dims_out)
 
+    __repr__ = Create.__repr__
+
+    def setoid(self):
+        """ The internal states of the photons, as for a :class:`Create`. """
+        return super().setoid() + (hashable(self.internal_states), )
+
     def inflate(self, d):
 
         dgrm = Create(
@@ -597,6 +656,13 @@ class Endo(ZWBox):
     >>> phase = Endo(sp.exp(1j * psi * 2 * sp.pi))
     >>> derivative = phase.grad(psi).subs((psi, 0.5)).to_path().eval(2).array
     >>> assert np.allclose(derivative, 4 * np.pi * 1j)
+
+    Two endomorphisms are equal when their scalars are, the name being
+    derived from the scalar and printing a negative zero where the scalar
+    does not have one, so that a conjugate is the scalar it conjugates to:
+
+    >>> assert Endo(0.5).conjugate() == Endo(0.5)
+    >>> assert Endo(-2j) == Endo(2j).dagger()
     """
 
     def __init__(self, scalar: complex):
@@ -606,6 +672,14 @@ class Endo(ZWBox):
             pass
         self.scalar = scalar
         super().__init__(f"Endo({scalar})", 1, 1, data=scalar)
+
+    def setoid(self):
+        return (factory_key(type(self)),
+                self.dom, self.cod, self.is_dagger, self.scalar)
+
+    def __repr__(self):
+        return f"{factory_name(type(self))}"\
+            f"({format_number(self.scalar, exact=True)})"
 
     def conjugate(self):
         return Endo(self.scalar.conjugate())
@@ -686,6 +760,10 @@ class Add(ZWBox):
     def dagger(self):
         return Add(self.n, not self.is_dagger)
 
+    def __repr__(self):
+        dagger = ", is_dagger=True" if self.is_dagger else ""
+        return f"{factory_name(type(self))}({self.n}{dagger})"
+
     def conjugate(self):
         return self
 
@@ -733,6 +811,10 @@ class Multiply(ZWBox):
     def dagger(self):
         return Multiply(not self.is_dagger)
 
+    def __repr__(self):
+        dagger = "is_dagger=True" if self.is_dagger else ""
+        return f"{factory_name(type(self))}({dagger})"
+
 
 class Divide(ZWBox):
     """
@@ -777,6 +859,10 @@ class Divide(ZWBox):
 
     def dagger(self):
         return Divide(not self.is_dagger)
+
+    def __repr__(self):
+        dagger = "is_dagger=True" if self.is_dagger else ""
+        return f"{factory_name(type(self))}({dagger})"
 
 
 class Mod2(ZWBox):
@@ -830,6 +916,10 @@ class Mod2(ZWBox):
 
     def dagger(self):
         return Mod2(not self.is_dagger)
+
+    def __repr__(self):
+        dagger = "is_dagger=True" if self.is_dagger else ""
+        return f"{factory_name(type(self))}({dagger})"
 
 
 SWAP = diagram.Swap(diagram.Mode(1), diagram.Mode(1))

@@ -18,6 +18,7 @@ Classes
 
     BitControlledBox
     ControlledPhaseShift
+    Weight
 
 
 Examples
@@ -27,15 +28,16 @@ We can construct a controlled gate acting on a quantum mode:
 
 >>> f = lambda x: [x * 0.1, x * 0.2]
 >>> box = ControlledPhaseShift(f, n_modes=2)
->>> box.draw(path='docs/_static/optyx/controlled_phase.svg')
+>>> box.draw(doctest='docs/_static/optyx/controlled_phase.svg')
 
 A bit-controlled gate can be composed as:
 
 >>> from discopy.optyx.core.zw import ZBox
 >>> control = BitControlledBox(ZBox(1, 1, lambda x: x))
->>> control.draw(path='docs/_static/optyx/binary_control.svg')
+>>> control.draw(doctest='docs/_static/optyx/binary_control.svg')
 """
 
+from functools import partial
 from typing import Callable, List, Tuple, Iterable
 from discopy import tensor
 from discopy.frobenius import Dim
@@ -119,18 +121,18 @@ class BitControlledBox(ControlBox):
         self.action_box = action_box
         self.default_box = default_box
         self.is_dagger = is_dagger
-        self.photon_preservation_behaviour = \
+        self.photon_preservation_behaviour = (
             diagram.PhotonNumberPreservation.CUSTOM
+            if is_diagram_LO(action_box) and is_diagram_LO(default_box)
+            else diagram.PhotonNumberPreservation.NON_LO)
 
     def photon_number_transform(self, dims_in, dims_out):
-        if is_diagram_LO(self.action_box) and is_diagram_LO(self.default_box):
-            from discopy.optyx.core.zx import Z
-            return Z(1, 0) @ self.default_box if not self.is_dagger else \
-                Z(0, 1) @ self.default_box
-        else:
-            self.photon_preservation_behaviour = \
-                diagram.PhotonNumberPreservation.NON_LO
+        if self.photon_preservation_behaviour \
+                == diagram.PhotonNumberPreservation.NON_LO:
             return super().photon_number_transform(dims_in, dims_out)
+        from discopy.optyx.core.zx import Z
+        return Z(1, 0) @ self.default_box if not self.is_dagger else \
+            Z(0, 1) @ self.default_box
 
     def determine_output_dimensions(self, input_dims: List[int]) -> List[int]:
 
@@ -213,6 +215,20 @@ class BitControlledBox(ControlBox):
         )
 
 
+def negate_phases(function: Callable[[List[int]], List[int]],
+                  configuration: List[int]) -> List[int]:
+    """
+    The phases `function` gives a control `configuration`, negated: the data
+    of the conjugate of a :class:`ControlledPhaseShift`. It is a function of
+    the module rather than a closure so that a conjugated box pickles
+    whenever the box it is the conjugate of does.
+
+    >>> negate_phases(lambda xs: [0.25 * xs[0], 0.5], [2])
+    [-0.5, -0.5]
+    """
+    return [-y for y in function(configuration)]
+
+
 class ControlledPhaseShift(ControlBox):
     """
     A controlled phase shift on modes, where the control
@@ -236,6 +252,17 @@ class ControlledPhaseShift(ControlBox):
     ...         lambda i, y=y: np.exp(2 * np.pi * 1j * y) ** i)
     >>> assert np.allclose(controlled_phase.to_tensor().eval().array,
     ...                    zbox.to_tensor().eval().array)
+
+    Conjugation negates every phase, i.e. it sends :math:`e^{2 i \\pi y}` to
+    :math:`e^{-2 i \\pi y}`, so the truncation of the conjugate is the
+    complex conjugate of the truncation:
+
+    >>> box = ControlledPhaseShift(f, n_modes=n)
+    >>> dims = [3] * (n + 1)
+    >>> truncate = lambda b: b.truncation(
+    ...     dims, b.determine_output_dimensions(dims)).array
+    >>> assert np.allclose(truncate(box.conjugate()),
+    ...                    np.conjugate(truncate(box)))
     """
 
     def __init__(
@@ -274,6 +301,7 @@ class ControlledPhaseShift(ControlBox):
         ).T.reshape(-1, len(input_dims[:self.n_control_modes]))
 
         for i in input_combinations:
+            cell = tuple(i)
             fx = self.function(i)
             zbox = diagram.Id(diagram.Mode(0))
             for y in fx:
@@ -282,11 +310,11 @@ class ControlledPhaseShift(ControlBox):
                 )
 
             zbox = zbox.to_tensor(input_dims[self.n_control_modes:])
-            array[i, :] = (
+            array[cell] = (
                 (zbox >> diagram.truncation_tensor(zbox.cod.inside,
                                                    output_dims))
                 .eval()
-                .array.reshape(array[i, :].shape)
+                .array.reshape(array[cell].shape)
             )
 
         if self.is_dagger:
@@ -310,7 +338,8 @@ class ControlledPhaseShift(ControlBox):
 
     def conjugate(self):
         return ControlledPhaseShift(
-            self.function, self.n_modes, self.n_control_modes, self.is_dagger
+            partial(negate_phases, self.function),
+            self.n_modes, self.n_control_modes, self.is_dagger
         )
 
 
@@ -376,6 +405,38 @@ class ClassicalFunctionBox(ClassicalBox):
         )
 
 
+class Weight(ClassicalBox):
+    """
+    The effect weighting each basis state of its wires by a `function` of
+    their values, a list as for :class:`ClassicalFunctionBox`: the diagonal
+    functional :math:`|n\\rangle \\mapsto f(n)`.
+
+    >>> from discopy.optyx.core.zw import Create
+    >>> parity = Weight(lambda n: (-1) ** n[0], diagram.Mode(1))
+    >>> [complex((Create(n) >> parity).to_tensor().eval().array)
+    ...  for n in (1, 2)]
+    [(-1+0j), (1+0j)]
+
+    It has no dagger: on a mode, the state :math:`\\sum_n f(n) |n\\rangle`
+    it would be has an infinite norm for a function such as the parity.
+    """
+    def __init__(self, function: Callable[[List[int]], complex],
+                 dom: diagram.Ty):
+        super().__init__("Weight", dom, diagram.Ty())
+        self.function = function
+
+    def truncation_specification(
+        self,
+        inp: Tuple[int, ...] = None,
+        max_output_dims: Tuple[int, ...] = None
+    ) -> Iterable[BasisTransition]:
+        yield BasisTransition(
+            out=(), amp=np.conj(complex(self.function(list(inp)))))
+
+    def determine_output_dimensions(self, input_dims: List[int]) -> List[int]:
+        return []
+
+
 class BinaryMatrixBox(ClassicalBox):
     """
     Represents a linear transformation over
@@ -410,6 +471,22 @@ class BinaryMatrixBox(ClassicalBox):
 
         self.matrix = matrix
         self.is_dagger = is_dagger
+
+    def setoid(self):
+        """
+        The matrix is what a logical matrix box means and is in none of its
+        name, the constant :code:`"LogicalMatrix"`, its boundary or its data,
+        so two of them over the same bits were equal. It is compared **modulo
+        2**, the transformation being the one over GF(2): two matrices
+        congruent mod 2 compute the same map.
+
+        >>> identity, swap = [[1, 0], [0, 1]], [[0, 1], [1, 0]]
+        >>> assert BinaryMatrixBox(identity) != BinaryMatrixBox(swap)
+        >>> assert BinaryMatrixBox(identity) == BinaryMatrixBox(identity)
+        >>> assert BinaryMatrixBox([[0]]) == BinaryMatrixBox([[2]])
+        """
+        return super().setoid() + (
+            tuple(map(tuple, (np.asarray(self.matrix) % 2).tolist())), )
 
     def truncation_specification(
         self,

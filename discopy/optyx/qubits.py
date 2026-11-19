@@ -89,7 +89,7 @@ SWAP                    ``(X(1, 2) @ Id(1)) >> (Id(1) @ Z(2, 1)) >> (X(1, 2) @ I
 A single-qubit phase gate:
 
 >>> rz = Z(1, 1, 0.5)      # Rz(pi)
->>> rz.draw(path='docs/_static/optyx/rz.svg')
+>>> rz.draw(doctest='docs/_static/optyx/rz.svg')
 
 .. image:: /_static/optyx/rz.svg
    :align: center
@@ -98,7 +98,7 @@ A single-qubit phase gate:
 CNOT expressed in ZX:
 
 >>> cnot_zx = (Id(1) @ Z(1, 2)) >> (X(2, 1) @ Id(1))
->>> cnot_zx.draw(path='docs/_static/optyx/cnot_zx.svg', figsize=(4, 2))
+>>> cnot_zx.draw(doctest='docs/_static/optyx/cnot_zx.svg', figsize=(4, 2))
 
 .. image:: /_static/optyx/cnot_zx.svg
    :align: center
@@ -106,7 +106,7 @@ CNOT expressed in ZX:
 CZ gate expressed in ZX:
 
 >>> cz_zx = (Id(1) @ Z(1, 2)) >> Id(1) @ H() @ Id(1) >> (Z(2, 1) @ Id(1))
->>> cz_zx.draw(path='docs/_static/optyx/cz_zx.svg', figsize=(4, 2))
+>>> cz_zx.draw(doctest='docs/_static/optyx/cz_zx.svg', figsize=(4, 2))
 
 .. image:: /_static/optyx/cz_zx.svg
     :align: center
@@ -132,7 +132,7 @@ operations on the results, such as copying or discarding bits.
 
 :code:`XClassical(1, 1, 0.5)` acts as a NOT gate on the classical bit result.
 
->>> classical_state_operation.draw(path='docs/_static/optyx/classical_state.svg',
+>>> classical_state_operation.draw(doctest='docs/_static/optyx/classical_state.svg',
 ... figsize=(3, 5))
 
 .. image:: /_static/optyx/classical_state.svg
@@ -150,16 +150,16 @@ to correct the state of the qubit depending on the measurement result.
 ... )
 >>> from discopy.optyx import bit
 >>> teleportation = (
-...     Id(1) @ Z(0, 2) @ Scalar(2**0.5)>>
+...     Id(1) @ Z(0, 2) @ Scalar(2**-0.5) >>
 ...     Z(1, 2) @ Id(2) >>
-...     Id(1) @ Z(2, 1) @ Id(1) >>
-...     Id(1) @ H() @ Id(1) >>
+...     Id(1) @ X(2, 1) @ Id(1) @ Scalar(2**0.5) >>
+...     H() @ Id(2) >>
 ...     Measure(1)**2 @ Id(1) >>
 ...     IdClassical(bit) @ BitControlledGate(X(1, 1, 0.5)) >>
 ...     BitControlledGate(Z(1, 1, 0.5))
 ... )
 
->>> teleportation.draw(path='docs/_static/optyx/teleportation_qubit.svg',
+>>> teleportation.draw(doctest='docs/_static/optyx/teleportation_qubit.svg',
 ... figsize=(4, 6))
 
 .. image:: /_static/optyx/teleportation_qubit.svg
@@ -167,16 +167,10 @@ to correct the state of the qubit depending on the measurement result.
 
 This produces the same protocol as an identity operation:
 
->>> assert np.allclose(  # doctest: +SKIP
+>>> assert np.allclose(
 ...     (teleportation.double().to_tensor().to_quimb()^...).data,
 ...     (Id(1).double().to_tensor().to_quimb()^...).data
 ... )
-
-.. note::
-
-    The assertion above is skipped: this example does not currently evaluate
-    to the identity channel, see the refactor roadmap
-    (`#5 <https://github.com/rel-int/optyx/issues/5>`_).
 
 **Interfacing with external tools**
 
@@ -202,7 +196,7 @@ GHZ state:
 We can explicitly convert it to optyx. The resulting circuit involves
 explicit manipulation of classical data.
 
->>> #Circuit(ghz_circ).draw(path="docs/_static/optyx/ghz_circuit_exp.svg",
+>>> #Circuit(ghz_circ).draw(doctest="docs/_static/optyx/ghz_circuit_exp.svg",
 >>> #figsize=(6, 9))
 
 .. image:: /_static/optyx/ghz_circuit_exp.svg
@@ -246,7 +240,7 @@ Let us use the GHZ state from the example above.
 
 >>> #from discopy.optyx.photonic import DualRail, HadamardBS, XMeasurementDR
 >>> #circ_photonic = circ >> DualRail(3) >> HadamardBS() @ XMeasurementDR(0.5)**2
->>> #circ_photonic.draw(path="docs/_static/optyx/ghz_circ_photonic.svg",
+>>> #circ_photonic.draw(doctest="docs/_static/optyx/ghz_circ_photonic.svg",
 >>> #figsize=(6, 12))
 
 .. image:: /_static/optyx/ghz_circ_photonic.svg
@@ -263,7 +257,7 @@ We can create a graph state as follows
 ... Id(2) @ H() >> Id(2) @ Z(1, 2))
 >>> Equation(graph >> DualRail(4), graph.to_dual_rail(), \\
 ... symbol="$\\\\mapsto$").draw(figsize=(15, 20), \\
-... path="docs/_static/optyx/graph_dr_qubit.svg", draw_type_labels=False, \\
+... doctest="docs/_static/optyx/graph_dr_qubit.svg", draw_type_labels=False, \\
 ... draw_box_labels=False)
 
 .. image:: /_static/optyx/graph_dr_qubit.svg
@@ -280,7 +274,7 @@ For example, we can create a GHZ state:
 >>> ghz_path = ghz_decom.to_dual_rail()
 >>> Equation(ghz >> DualRail(3), ghz_path, \\
 ... symbol="$\\\\mapsto$").draw(figsize=(10, 10), \\
-... path="docs/_static/optyx/ghz_dr.svg")
+... doctest="docs/_static/optyx/ghz_dr.svg")
 
 .. image:: /_static/optyx/ghz_dr.svg
     :align: center
@@ -294,7 +288,7 @@ We can also create a graph state as follows
 >>> graph_path = graph_decom.to_dual_rail()
 >>> Equation(graph >> DualRail(4), graph_path, \\
 ... symbol="$\\\\mapsto$").draw(figsize=(10, 14), \\
-... path="docs/_static/optyx/graph_dr.svg", draw_type_labels=False, \\
+... doctest="docs/_static/optyx/graph_dr.svg", draw_type_labels=False, \\
 ... draw_box_labels=False)
 
 .. image:: /_static/optyx/graph_dr.svg
@@ -309,6 +303,7 @@ from discopy import quantum as quantum_discopy
 from discopy import symmetric
 from sympy import lambdify
 # from pytket import circuit as tket_circuit
+from discopy.utils import factory_name
 from discopy.optyx.utils.misc import explode_channel
 from discopy.optyx import channel
 from discopy.optyx.core import (
@@ -531,7 +526,7 @@ class QubitChannel(Channel):
         """Turns gates into ZX diagrams."""
         # pylint: disable=import-outside-toplevel
         from discopy.quantum.gates import (
-            Rz, Rx,
+            Rz, Rx, U1,
             CX, CZ, Controlled  # , Digits
         )
         from discopy.quantum.gates import (
@@ -553,21 +548,19 @@ class QubitChannel(Channel):
             return (Z if isinstance(discopy_circuit, Rz)
                     else X)(1, 1, discopy_circuit.phase)
         if isinstance(discopy_circuit,
-                      Controlled) and discopy_circuit.name.startswith("CRz"):
-            return (
+                      Controlled) and discopy_circuit.distance != 1:
+            # pylint: disable=protected-access
+            return Circuit(discopy_circuit._decompose())
+        if isinstance(discopy_circuit, Controlled) and isinstance(
+                discopy_circuit.controlled, (Rz, Rx)):
+            gadget = (
                 Z(1, 2) @ Z(1, 2, discopy_circuit.phase / 2)
                 >> Id(1) @
                 (X(2, 1) >> Z(1, 0, -discopy_circuit.phase / 2)) @
                 Id(1) @ root2
             )
-        if isinstance(discopy_circuit,
-                      Controlled) and discopy_circuit.name.startswith("CRx"):
-            return (
-                X(1, 2) @ X(1, 2, discopy_circuit.phase / 2)
-                >> Id(1) @
-                (Z(2, 1) >> X(1, 0, -discopy_circuit.phase / 2)) @
-                Id(1) @ root2
-            )
+            return gadget if isinstance(discopy_circuit.controlled, Rz)\
+                else Id(1) @ H() >> gadget >> Id(1) @ H()
         # if isinstance(discopy_circuit, Digits):
         #     dgrm = Diagram.id(bit**0)
         #     # pylint: disable=invalid-name
@@ -578,20 +571,21 @@ class QubitChannel(Channel):
         #             )
         #      dgrm @= classical.X(0, 1, 0.5**d) @ classical.Scalar(0.5**0.5)
         #     return dgrm
-        if isinstance(discopy_circuit, quantum_discopy.CU1):
+        if isinstance(discopy_circuit, Controlled) and isinstance(
+                discopy_circuit.controlled, U1):
             return (
-                Z(1, 2, discopy_circuit.phase) @
-                Z(1, 2, discopy_circuit.phase) >>
+                Z(1, 2, discopy_circuit.phase / 2) @
+                Z(1, 2, discopy_circuit.phase / 2) >>
                 Id(1) @
-                (X(2, 1) >> Z(1, 0, -discopy_circuit.phase)) @
-                Id(1)
+                (X(2, 1) >> Z(1, 0, -discopy_circuit.phase / 2)) @
+                Id(1) @ root2
             )
         if isinstance(discopy_circuit, GatesScalar):
+            if discopy_circuit.is_mixed:
+                raise NotImplementedError(
+                    "Converting a mixed scalar to QubitChannel "
+                    "is not implemented.")
             return Scalar(discopy_circuit.data)
-        if isinstance(discopy_circuit,
-                      Controlled) and discopy_circuit.distance != 1:
-            # pylint: disable=protected-access
-            return Circuit(discopy_circuit._decompose())
         # if isinstance(discopy_circuit, quantum_discopy.Discard):
         #     return Discard(len(discopy_circuit.dom))
         # if isinstance(discopy_circuit, quantum_discopy.Measure):
@@ -616,6 +610,7 @@ class QubitChannel(Channel):
                 "Converting Encode to QubitChannel is not implemented."
             )
         standard_gates = {
+            quantum_discopy.SWAP: Diagram.swap(qubit, qubit),
             quantum_discopy.H: H(),
             quantum_discopy.Z: Z(1, 1, 0.5),
             quantum_discopy.X: X(1, 1, 0.5),
@@ -646,6 +641,9 @@ class Measure(MeasureChannel):
             qubit**n
         )
 
+    def __repr__(self):
+        return f"{factory_name(type(self))}({len(self.dom)})"
+
 
 class Discard(DiscardChannel):
     """
@@ -657,6 +655,9 @@ class Discard(DiscardChannel):
             qubit**n
         )
 
+    def __repr__(self):
+        return f"{factory_name(type(self))}({len(self.dom)})"
+
 
 class Encode(EncodeChannel):
     """
@@ -667,6 +668,9 @@ class Encode(EncodeChannel):
         super().__init__(
             bit**n
         )
+
+    def __repr__(self):
+        return f"{factory_name(type(self))}({len(self.dom)})"
 
 
 # pylint: disable=invalid-name
@@ -688,6 +692,10 @@ class Z(Channel):
         self.data = phase
         self.phase = phase
 
+    def __repr__(self):
+        return f"{factory_name(type(self))}({len(self.dom)}, "\
+            f"{len(self.cod)}, {self.phase!r})"
+
     def lambdify(self, *symbols, **kwargs):
         return lambda *xs: type(self)(
             len(self.dom),
@@ -695,15 +703,18 @@ class Z(Channel):
             lambdify(symbols, self.phase, **kwargs)(*xs)
         )
 
-    def _decomp(self):
+    def decomp(self):
+        """Decompose the spider into elementary ZX generators.
+
+        >>> assert Z(0, 0).decomp().dom == Z(0, 0).decomp().cod == qubit ** 0
+        """
         n, m = len(self.dom), len(self.cod)
         phase = self.phase
         rot = Id(1) if phase == 0 else Z(1, 1, phase)
-        if n == 0:
-            return X(0, 1) >> H() >> rot >> self._make_spiders(m)
-        if m == 0:
-            return X(1, 0) << H() << rot << self._make_spiders(n).dagger()
-        return self._make_spiders(n).dagger() >> rot >> self._make_spiders(m)
+        legs_in = X(0, 1) >> H() if n == 0 \
+            else self._make_spiders(n).dagger()
+        legs_out = H() >> X(1, 0) if m == 0 else self._make_spiders(m)
+        return legs_in >> rot >> legs_out
 
     @staticmethod
     def _make_spiders(n):
@@ -718,7 +729,7 @@ class Z(Channel):
             spider = spider >> qubits.Z(1, 2) @ qubits.Id(k)
         return spider
 
-    def _to_dual_rail(self):
+    def dual_rail(self):
         """Convert to dual-rail encoding."""
 
         from discopy.optyx import (
@@ -788,6 +799,10 @@ class X(Channel):
         self.data = phase
         self.phase = phase
 
+    def __repr__(self):
+        return f"{factory_name(type(self))}({len(self.dom)}, "\
+            f"{len(self.cod)}, {self.phase!r})"
+
     def lambdify(self, *symbols, **kwargs):
         return lambda *xs: type(self)(
             len(self.dom),
@@ -795,7 +810,8 @@ class X(Channel):
             lambdify(symbols, self.phase, **kwargs)(*xs),
         )
 
-    def _decomp(self):
+    def decomp(self):
+        """Decompose the spider into elementary ZX generators."""
         n, m = len(self.dom), len(self.cod)
         phase = self.phase
         if (n, m) in ((1, 0), (0, 1)):
@@ -807,7 +823,7 @@ class X(Channel):
         )
         return box.decomp()
 
-    def _to_dual_rail(self):  # pragma: no cover
+    def dual_rail(self):
         """Convert to dual-rail encoding."""
         from discopy.optyx import (
             photonic
@@ -830,9 +846,9 @@ class X(Channel):
         if (n, m, phase) == (1, 0, 0.5):
             return counit @ annil @ root2
         if (n, m, phase) == (1, 1, 0.25):
-            return BS.dagger()
-        if (n, m, phase) == (1, 1, -0.25):
-            return BS
+            return BS @ photonic.Scalar(np.exp(-1j * np.pi / 4))
+        if (n, m, phase) == (1, 1, 0.75):
+            return BS.dagger() @ photonic.Scalar(np.exp(1j * np.pi / 4))
         raise NotImplementedError(f"No translation of {self} in QPath.")
 
     def dagger(self):
@@ -858,10 +874,14 @@ class H(Channel):
             qubit,
         )
 
-    def _decomp(self):
+    def __repr__(self):
+        return f"{factory_name(type(self))}()"
+
+    def decomp(self):
+        """Hadamard is already an elementary generator."""
         return H()
 
-    def _to_dual_rail(self):
+    def dual_rail(self):
         """Convert to dual-rail encoding."""
         from discopy.optyx import photonic
         return photonic.HadamardBS()
@@ -884,10 +904,18 @@ class Scalar(Channel):
         )
         self.data = value
 
-    def _decomp(self):
+    def __repr__(self):
+        return f"{factory_name(type(self))}({self.data!r})"
+
+    def lambdify(self, *symbols, **kwargs):
+        return lambda *xs: type(self)(
+            lambdify(symbols, self.data, **kwargs)(*xs))
+
+    def decomp(self):
+        """A scalar is already an elementary generator."""
         return Scalar(self.data)
 
-    def _to_dual_rail(self):
+    def dual_rail(self):
         """Convert to dual-rail encoding."""
         from discopy.optyx import photonic
         return photonic.Scalar(self.data)
@@ -902,6 +930,7 @@ class BitFlipError(Channel):
     """
 
     def __init__(self, prob):
+        self.prob = prob
         x_error = zx.X(1, 2) >> zx.Id(1) @ zx.ZBox(
             1, 1, np.sqrt((1 - prob) / prob)
         ) @ zx.scalar(np.sqrt(prob * 2))
@@ -913,6 +942,9 @@ class BitFlipError(Channel):
             env=diagram.Bit(1),
         )
 
+    def __repr__(self):
+        return f"{factory_name(type(self))}({self.prob!r})"
+
     def dagger(self):
         return self
 
@@ -922,6 +954,7 @@ class DephasingError(Channel):
     Represents a quantum dephasing error channel.
     """
     def __init__(self, prob):
+        self.prob = prob
         z_error = (
             zx.H
             >> zx.X(1, 2)
@@ -936,6 +969,9 @@ class DephasingError(Channel):
             cod=qubit,
             env=diagram.Bit(1),
         )
+
+    def __repr__(self):
+        return f"{factory_name(type(self))}({self.prob!r})"
 
     def dagger(self):
         return self
@@ -966,10 +1002,15 @@ class Ket(Channel):
         self, value: Literal[0, 1, "+", "-"], cod: channel.Ty = qubit
     ) -> None:
         value = basis_value(value)
+        self.value = value
         spider = zx.X if value in (0, 1) else zx.Z
         phase = 0 if value in (0, "+") else 0.5
         kraus = spider(0, 1, phase) @ diagram.Scalar(1 / np.sqrt(2))
         super().__init__(f"|{value}>", kraus, cod=cod)
+
+    def __repr__(self):
+        cod = "" if self.cod == qubit else f", {self.cod!r}"
+        return f"{factory_name(type(self))}({self.value!r}{cod})"
 
 
 class Bra(Channel):
@@ -979,10 +1020,15 @@ class Bra(Channel):
         self, value: Literal[0, 1, "+", "-"], dom: channel.Ty = qubit
     ) -> None:
         value = basis_value(value)
+        self.value = value
         spider = zx.X if value in (0, 1) else zx.Z
         phase = 0 if value in (0, "+") else 0.5
         kraus = spider(1, 0, phase) @ diagram.Scalar(1 / np.sqrt(2))
         super().__init__(f"<{value}|", kraus, dom=dom)
+
+    def __repr__(self):
+        dom = "" if self.dom == qubit else f", {self.dom!r}"
+        return f"{factory_name(type(self))}({self.value!r}{dom})"
 
 
 def Id(n):

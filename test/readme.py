@@ -1,25 +1,29 @@
-"""Extract the Python code blocks from README.md and check they run."""
+"""Check that the Python code blocks of README.md run and its links resolve."""
 
 import re
 from pathlib import Path
 
 import matplotlib
-import matplotlib.pyplot as plt
 
 README = Path(__file__).parent.parent / "README.md"
-
-CODE_BLOCK = re.compile(r"```python\n(.*?)```", re.DOTALL)
+FENCE = re.compile(r"```.*?```", re.DOTALL)
+LINK = re.compile(r"\]\(([^)]*)\)")
+HEADING = re.compile(r"^#+ (.+)$", re.MULTILINE)
 
 
 def test_readme(monkeypatch):
+    from fixtures.readme import run_code_blocks
     monkeypatch.chdir(README.parent)
     matplotlib.use("Agg")
-    text = README.read_text(encoding="utf-8")
-    blocks = list(CODE_BLOCK.finditer(text))
-    assert blocks, f"no Python code blocks found in {README}"
-    namespace = {}  # blocks share state, e.g. `sentence` is reused throughout
-    for match in blocks:
-        # Pad with newlines so tracebacks point at the actual README lines.
-        source = "\n" * text.count("\n", 0, match.start(1)) + match.group(1)
-        exec(compile(source, str(README), "exec"), namespace)
-        plt.close("all")
+    run_code_blocks(README)
+
+
+def test_readme_links_resolve():
+    text = FENCE.sub("", README.read_text(encoding="utf-8"))
+    anchors = {"#" + re.sub(r"[^\w\- ]", "", heading.lower()).replace(" ", "-")
+               for heading in HEADING.findall(text)}
+    broken = [target for target in LINK.findall(text)
+              if not target.startswith(("http://", "https://"))
+              and target not in anchors
+              and not (README.parent / target).exists()]
+    assert broken == []

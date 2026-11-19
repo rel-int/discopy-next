@@ -154,6 +154,7 @@ def test_fix_validates_the_tolerance(solver, tol):
 
 @pytest.mark.parametrize("kwargs", [
     {"n_steps": 0}, {"n_steps": 1.5}, {"max_steps": 0}, {"tol": 0},
+    {"n_steps": 3, "max_steps": 2},
 ])
 def test_power_fix_validates_parameters(kwargs):
     with pytest.raises(ValueError):
@@ -224,6 +225,34 @@ def test_power_fix_normalises_the_contracted_state():
     assert np.allclose(result.density_matrix, [[1, 0], [0, 0]])
     with pytest.raises(TypeError):
         source().power_fix(tol=1e-2, backend=DiscopyBackend())
+
+
+def test_power_fix_contracts_each_depth_with_a_fresh_optimiser(
+        monkeypatch):
+    """Each depth is a bigger network, so it gets its own optimiser: one
+    reused across depths loses the trace once `max_chi` truncates (#289).
+    The warning comes once, from the first depth that truncates, here the
+    second of three."""
+    optimisers, contract = [], QuimbBackend.eval
+
+    def spy(backend, diagram_, **extra):
+        optimisers.append(backend.hyperoptimiser)
+        return contract(backend, diagram_, **extra)
+
+    monkeypatch.setattr(QuimbBackend, "eval", spy)
+    loop = (photonic.Create(1) @ qmode >> photonic.MZI(.06, 0)
+            >> qmode @ photonic.PhotonLoss(.1)).feedback(
+        mem=qmode, state=photonic.Create(0))
+    with pytest.warns(UserWarning) as record:
+        density_matrix = loop.power_fix(
+            tol=1e-9, max_chi=2, n_steps=1, max_steps=2).density_matrix
+    truncations = [str(warning.message) for warning in record
+                   if "needs dimension" in str(warning.message)]
+    assert len(truncations) == 1 and "dimension 3" in truncations[0]
+    assert np.isclose(np.trace(density_matrix), 1)
+    assert len(optimisers) == 3
+    assert len({id(optimiser) for optimiser in optimisers}) \
+        == len(optimisers)
 
 
 def test_solvers_refuse_a_zero_state():
@@ -366,6 +395,18 @@ def test_fix_truncates_a_growing_photon_budget():
     with warnings.catch_warnings():
         warnings.simplefilter("error")
         sampler(loss=.9).fix(tol=.5, max_chi=4)
+
+
+def test_only_a_compressing_backend_warns_of_truncation():
+    """A backend that contracts exactly ignores `max_chi` and returns the
+    exact state, so it has no truncation to warn about."""
+    exact = sampler(loss=.5).fix(tol=1e-3, max_chi=None).density_matrix
+    for backend in (DiscopyBackend(), QuimbBackend()):
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            result = sampler(loss=.5).fix(
+                tol=1e-3, max_chi=2, backend=backend)
+        assert np.allclose(result.density_matrix, exact)
 
 
 def test_chi_defaults_to_a_laptop_sized_budget():

@@ -1,5 +1,9 @@
 # -*- coding: utf-8 -*-
 
+import inspect
+import sys
+from functools import cache
+
 import pytest
 from pytest import raises
 
@@ -61,6 +65,18 @@ def test_Arrow_init():
         Arrow((), Ob('x'), 1)
     with raises(TypeError) as err:
         Arrow((Ob('x'), ), Ob('x'), Ob('x'))
+    with raises(TypeError):
+        Arrow((), None, None)  # Only a type has None, i.e. no colour.
+
+
+def test_Arrow_init_iterator():
+    x, y = Ob('x'), Ob('y')
+    f, g = Box('f', x, x), Box('g', y, y)
+    assert Arrow(iter([f, f]), x, x) == f >> f
+    with raises(AxiomError):
+        Arrow(iter([f, g]), x, x)
+    with raises(TypeError):
+        Arrow(iter([x]), x, x)
 
 
 def test_Arrow_len():
@@ -182,11 +198,25 @@ def test_Box_dagger():
     assert f == f.dagger().dagger()
 
 
+def test_Box_subclass_rebuild():
+    class Gate(Box):
+        def __init__(self, label, source, target, **params):
+            super().__init__(label, source, target, **params)
+    gate = Gate('g', Ob('x'), Ob('y'), data=42)
+    assert gate.dagger().dagger() == gate and gate.rebuild(data=1).data == 1
+
+
 def test_Bubble_dagger():
     f = Box('f', Ob('x'), Ob('y'))
     b = f.bubble(data=42)
     assert b.dagger().data == 42 and b.dagger().is_dagger
     assert b.dagger().dagger() == b
+
+
+def test_Bubble_data_eq():
+    f = Box('f', Ob('x'), Ob('y'))
+    one, two = f.bubble(data=1), f.bubble(data=2)
+    assert one != two and len({one, two, f.bubble(data=1)}) == 2
 
 
 def test_Box_repr():
@@ -240,6 +270,15 @@ def test_Sum_generator_hash():
     assert {f: 42}[singleton] == 42
 
 
+def test_Sum_generator_is_its_only_term():
+    x, y = Ob('x'), Ob('y')
+    f, g = Box('f', x, y), Box('g', x, y)
+    singleton = Sum((f, ))
+    assert singleton.is_generator and singleton.generator is f
+    assert singleton.generator.setoid() == singleton.setoid()
+    assert (f + g).generator is None and Sum((), x, y).generator is None
+
+
 def test_Functor():
     x, y, z = Ob('x'), Ob('y'), Ob('z')
     f, g = Box('f', x, y), Box('g', y, z)
@@ -273,6 +312,40 @@ def test_Functor_call():
     assert F(f >> g) == f.dagger() >> f >> g
 
 
+def test_Functor_into_a_category_with_no_dagger():
+    """ A daggered box is read off `ar_map` when the codomain has no dagger,
+    and stays the dagger of the image when it has one. """
+    from discopy.python import multiplicative
+    x = Ob('x')
+    f = Box('f', x, x)
+    F = Functor(
+        {x: int}, lambda g: (lambda n: n - 1) if g.is_dagger
+        else (lambda n: n + 1), cod=multiplicative.Function)
+    assert F(f)(1) == 2 and F(f.dagger())(1) == 0
+    assert Functor({x: x}, {f: f})(f.dagger()) == f.dagger()
+
+
+
+def test_Functor_dagger_is_declared():
+    """ rel-int/discopy-next#373: a daggered box is the dagger of its image
+    exactly when the codomain declares a dagger category. """
+    from discopy import monoidal
+    from discopy.abc import DaggerCategory
+    from discopy.drawing import Drawing
+    from discopy.python import additive
+    assert issubclass(Drawing, DaggerCategory)
+    assert not issubclass(additive.Function, DaggerCategory)
+    assert not hasattr(additive.Function, "dagger")
+    x = monoidal.Ty('x')
+    f = monoidal.Box('f', x, x)
+    F = monoidal.Functor(
+        {x: int}, lambda g: (lambda n: n - 1) if g.is_dagger
+        else (lambda n: n + 1), cod=additive.Function)
+    assert F(f)(1) == 2 and F(f.dagger())(1) == 0
+    G = monoidal.Functor({x: x}, {f: f.to_drawing()}, cod=Drawing)
+    assert G(f.dagger()) == f.to_drawing().dagger()
+
+
 def test_Transformation():
     x, y = Ob('x'), Ob('y')
     f = Box('f', x, y)
@@ -298,6 +371,25 @@ def test_Transformation_then():
     beta = Transformation.id(G)
     assert (alpha >> beta)(x) == alpha(x) >> beta(x)
     assert (alpha >> beta).dom == F and (alpha >> beta).cod == G
+
+
+def test_Transformation_laws():
+    """ The identity is shared and dropped on either side, and dictionaries
+    compose into dictionaries, so the laws of a category hold up to ==. """
+    x, y = Ob('x'), Ob('y')
+    f = Box('f', x, y)
+    F, G = Functor.id(), Functor({x: y, y: x}, {})
+    alpha = Transformation({x: f, y: f[::-1]}, F, G)
+    beta = Transformation({x: f[::-1], y: f}, G, F)
+    gamma = Transformation(lambda z: f if z == x else f[::-1], F, G)
+    idF, idG = Transformation.id(F), Transformation.id(G)
+    assert idF == Transformation.id(F)
+    for delta in (alpha, gamma):
+        assert idF >> delta == delta == delta >> idG
+    assert alpha >> beta == alpha >> beta
+    assert (alpha >> beta).components == {x: f >> f[::-1], y: f[::-1] >> f}
+    assert (alpha >> beta) >> alpha == alpha >> (beta >> alpha)
+    assert gamma >> beta != gamma >> beta
 
 
 def test_Transformation_eq():
@@ -351,6 +443,16 @@ def test_Bubble():
     assert (image.data, image.is_dagger) == (42, True)
     empty = Bubble(dom=Ob('x'), cod=Ob('y'))
     assert Functor.id()(empty) == empty
+
+
+def test_Bubble_str():
+    x, y = Ob('x'), Ob('y')
+    f = Box('f', x, y)
+    shapes = (f.bubble(name="N"), f.bubble(method="m"),
+              f.bubble(dom=y, cod=x, name="N", method="m"),
+              f.bubble(data=1), f.bubble(name="N", data=[1, 2]))
+    for bubble in shapes + tuple(shape.dagger() for shape in shapes):
+        assert eval(str(bubble)) == bubble
 
 
 def test_Box_call():
@@ -427,6 +529,39 @@ def test_subs_forms_and_data():
         == [psi, phi, sympy.Matrix([[0]])]
 
 
+def test_subs_key_not_a_symbol():
+    sympy = pytest.importorskip("sympy")
+    from sympy.abc import phi, psi
+    x, sin = Ob('x'), sympy.sin(phi)
+    f, g = Box('f', x, x, data=sin + psi), Box('g', x, x, data=phi + psi)
+    assert f.subs(sin, 0).data == psi and g.subs(phi + psi, 0).data == 0
+    assert f.subs({sin: 0, psi: 1}).data == 1
+    assert (f >> g).subs(sin, 0) == f.subs(sin, 0) >> g
+    bubble = Bubble(f, data=sin).subs(sin, 0)
+    assert bubble == Bubble(f.subs(sin, 0), data=0) and bubble.data == 0
+
+
+def test_free_symbols_of_numeric_array_read_from_dtype():
+    import numpy as np
+
+    class Opaque(np.ndarray):
+        def __iter__(self):
+            raise AssertionError("a numeric array was iterated")
+
+    data = np.ones((2, 2)).view(Opaque)
+    assert Box('f', Ob('x'), Ob('x'), data=data).free_symbols == set()
+
+
+def test_free_symbols_follow_mutable_data():
+    pytest.importorskip("sympy")
+    from sympy.abc import psi
+    f = Box('f', Ob('x'), Ob('x'), data=[0])
+    assert f.free_symbols == set()
+    f.data.append(psi)
+    assert f.free_symbols == {psi}
+    assert f.subs(psi, 1).data == f.lambdify(psi)(1).data == [0, 1]
+
+
 def test_Sum():
     x, y, z = map(Ob, "xyz")
     f = Box('f', x, y)
@@ -449,20 +584,52 @@ def test_Sum():
     assert len(Sum((), x, y)) == 0
     assert Sum((), x, x).then(f, g) == Sum((), x, z)
     assert Sum((), x, y).dagger() == Sum((), y, x)
+    h = Box('h', z, x)
+    with raises(AxiomError):
+        Sum((), x, y) >> h
+    with raises(AxiomError):
+        h >> Sum((), y, z)
 
 
-def test_Functor_then_left_unit():
-    """
-    Composition is unital only on the left up to equality of functors
-    (#648): the identity functor is a pair of functions, so composing it on
-    the left of a functor given by dictionaries yields a pair of functions
-    that acts the same but compares unequal.
-    """
+def test_Sum_terms_is_a_tuple():
     x, y = Ob('x'), Ob('y')
-    F = Functor({x: y, y: x}, {})
-    assert F >> Functor.id() == F
-    assert Functor.id() >> F != F
-    assert (Functor.id() >> F)(x) == F(x)
+    f, g = Box('f', x, y), Box('g', x, y)
+    assert Sum([f, g]) == Sum(iter([f, g])) == Sum((f, g)) == f + g
+    assert hash(Sum([], x, y)) == hash(Sum((), x, y))
+
+
+def test_Functor_then_unit():
+    """ An identity is dropped on either side of a composite (#142). """
+    x, y = Ob('x'), Ob('y')
+    F, G = Functor({x: y, y: x}, {}), Functor(lambda x: x, lambda f: f[::-1])
+    for H in (F, G):
+        assert Functor.id() >> H == H == H >> Functor.id()
+    assert Functor.id() == Functor.id() >> Functor.id()
+    assert G >> G != G >> G
+    alpha, beta = (Transformation.id(Functor.id()) for _ in range(2))
+    assert (alpha >> beta)(x) == Arrow.id(x)
+
+    class Strict:
+        """ A map whose equality assumes its own type. """
+        key = 0
+
+        def __call__(self, x):
+            return x
+
+        def __eq__(self, other):
+            return self.key == other.key
+
+    H = Functor(Strict(), Strict())
+    assert (H >> F)(x) == F(x) == (F >> H)(x)
+
+
+def test_Functor_then_applies_the_first_functor():
+    x, y = Ob('x'), Ob('y')
+    f = Box('f', x, y)
+    G = Functor({x: x, y: y}, {f: f})
+    for F in (Functor({x: 'y', y: 'x'}, {f: (f[::-1], )}),
+              Functor(lambda ob: ob.name, lambda box: (box, ))):
+        assert (F >> G)(x) == G(F(x)) and (F >> G)(f) == G(F(f))
 
 
 def test_Bubble_no_common_boundary():
@@ -475,3 +642,334 @@ def test_Bubble_no_common_boundary():
     assert Bubble(f, g, dom=x).cod == x
     with raises(ValueError, match=r"they have \[\]"):
         Bubble()
+
+
+ABSTRACT = ("Timed", "Structural", "ControlledRotation", "BinaryTerm", "Parametrized")
+
+
+@cache
+def box_classes():
+    """
+    Every class of box that the package defines, see #169, but for those of
+    :mod:`discopy.optyx`, vendored with constructors of its own.
+    """
+    import importlib
+    import pkgutil
+    import discopy
+    classes = {}
+    for info in pkgutil.walk_packages(discopy.__path__, "discopy."):
+        if info.name.startswith("discopy.optyx"):
+            continue
+        try:
+            module = importlib.import_module(info.name)
+        except ImportError:  # it needs an extra, see test/plugin.py
+            continue
+        for value in vars(module).values():
+            if isinstance(value, type) and issubclass(value, Box)\
+                    and value.__module__ == info.name:
+                classes[value] = None
+    return list(classes)
+
+
+EXAMPLES = {  # a box of each constructor, from a class c, types x, y, data v
+    "cat.Box": 'c("f", x, y, data=v, is_dagger=True)',
+    "{cat,markov}.Sum": "c((box(c, x, y, v), ))",
+    "cat.Bubble": "c(box(c, x, y, v), dom=y, data=v)",
+    "{monoidal,neural.network}.Box": 'c("f", x, y, data=v)',
+    "monoidal.Bubble": 'c(box(c, x, y, v), name="b", drawing_name="B")',
+    "markov.Bubble": 'c(box(c, x, y, v), name="b", is_deterministic=False)',
+    "rigid.Bubble": 'c(box(c, x, y, v), name="b", z=1)',
+    "monoidal.Layer":
+    'c(x, sys.modules[c.__module__].Box("f", x, y, data=v), y)',
+    "braided.Braid {balanced,ribbon}.DualRailBraid ribbon.DualRailC{u,a}p":
+    "c(x, y, is_dagger=True)",
+    "balanced.{Twist,DualRailTwist}": "c(x, is_dagger=True)",
+    "symmetric.Swap": "c(x, y)",
+    "symmetric.Permutation": "c(x @ y @ x, [2, 0, 1])",
+    "feedback.Box": 'c("f", x, y, data=v).delay()',
+    "feedback.Feedback": "c(box(c, x @ y.delay(), x @ y, v))",
+    "feedback.Trace": "c(box(c, y @ x, y @ x, v), left=True)",
+    "feedback.{Head,Tail}": "c(box(c, x, y, v), 1)",
+    "feedback.FollowedBy": "c(x, True, 1)",
+    "feedback.Bubble": 'c(box(c, x, y, v), name="b", time_step=1)',
+    "markov.Box": 'c("f", x, y, data=v, is_deterministic=False).delay()',
+    "markov.Copy comarkov.Merge": "c(x, 3)",
+    "markov.Discard comarkov.Noise quantum.gates.{Discard,MixedState} "
+    "lambek.cfg.Id": "c(x)",
+    "markov.Function comarkov.Cofunction": "c(x @ y, [1, 0, 0])",
+    "rigid.Box": 'c("f", x, y, data=v).r',
+    "{rigid,frobenius}.Cup": "c(x, x.r)",
+    "{rigid,frobenius}.Cap": "c(x, x.l)",
+    "pivotal.Box": 'c("f", x, y, data=v).delay().r',
+    "lambek.pregroup.Box": 'c("f", x, y, data=v, is_deterministic=False).r',
+    "tensor.Box": 'c("f", x, y, [v] + [0] * 5)',
+    "frobenius.Spider": "c(1, 2, x, data=v)",
+    "frobenius.Cospan": "c(x @ y, [0, 0, 1], [1])",
+    "biclosed.Bang": "c(box(c, x, y, v))",
+    "biclosed.{Dereliction,Digging,Contraction,Weakening}": "c(x)",
+    "biclosed.Exchange": "c(x, y, True)",
+    "biclosed.Laxator": "c(x, y)",
+    "biclosed.{Eval,Coeval}": "c(x << y)",
+    "closed.{Eval,Coeval}": "c(x << y, time_step=1)",
+    "{biclosed,closed}.Curry": "c(box(c, x @ y, x, v), 1, False)",
+    "biclosed.Constant": 'c("c", x, data=v)',
+    "{closed,lambek.categorial}.Constant {biclosed,closed}.Variable":
+    'c("c", x)',
+    "{biclosed,closed}.Application lambek.categorial.FA": "c(f, a)",
+    "{biclosed,closed,lambek.categorial}.Abstraction": "c(u, f(u))",
+    "closed.{Pack,Unpack}": "c(x * y, 1)",
+    "closed.Tuple": "c(a, u)",
+    "closed.Projection": "c(closed.Tuple(a, u), 1)",
+    "closed.Let": "c(closed.Tuple(a), [u], u)",
+    "lambek.categorial.BA": 'c(a, cg.Constant("f", y >> x))',
+    "lambek.categorial.{FTR,BTR}": "c(y, a)",
+    "lambek.categorial.TypeRaising": "c(y, a, y << (x >> y))",
+    "lambek.categorial.FC": 'c(f, cg.Constant("g", y << x))',
+    "lambek.categorial.BC":
+    'c(cg.Constant("f", x >> y), cg.Constant("g", y >> x))',
+    "lambek.categorial.{FX,BX}": 'c(f, cg.Constant("g", x >> y))',
+    "lambek.categorial.ForwardCrossedComposition": "c(x << y, x >> y)",
+    "lambek.categorial.BackwardCrossedComposition": "c(y << x, y >> x)",
+    "lambek.thue.Rule": 'c(x @ y, x, "r", data=v)',
+    "lambek.thue.Word": 'c("w", x @ y, y, data=v)',
+    "lambek.cfg.Rule": 'c(x @ y, x, "r")',
+    "lambek.cfg.Word": 'c("w", x, y)',
+    "lambek.pregroup.Word": 'c("w", x @ y, data=v)',
+    "tensor.Bubble":
+    'c(box(c, x, x, [v, 0, 0, 1]), func=abs, drawing_name="B")',
+    "egraph.Join": "c(box(c, x, y, v), box(c, x, y, v))",
+    "quantum.circuit.Box": 'c("f", x, y, data=[v, 0, 0, 1], is_mixed=False)',
+    "quantum.gates.QuantumGate": 'c("g", x, x, [v, 0, 0, 1])',
+    "quantum.gates.{Ket,Bra}": "c(1, 0, time_step=1)",
+    "quantum.gates.Digits": "c(1, 2, dim=3, is_dagger=True, time_step=1)",
+    "quantum.gates.{Measure,Encode}": "c(2, False, True, 1)",
+    "quantum.gates.{Copy,Match}": "c(1)",
+    "quantum.gates.Controlled": "c(gates.Rz(v), -2)",
+    "quantum.gates.ControlledRotation": "c(v, -2, 1)",
+    "quantum.gates.Rotation": "c(v, 1, 1)",
+    "quantum.gates.Scalar": 'c(v, "s", True, 1)',
+    "quantum.gates.MixedScalar": "c(v, 1)",
+    "quantum.gates.Sqrt": "c(v, False, 1)",
+    "quantum.zx.Spider": "c(1, 2, v)",
+    "quantum.zx.Scalar": "c(v)",
+}
+
+
+def example(cls, value):
+    """ The box of a class that :data:`EXAMPLES` builds, with some data. """
+    from discopy import closed, monoidal, tensor
+    from discopy.lambek import categorial as cg
+    from discopy.neural.network import Dims
+    from discopy.quantum import circuit, gates
+    from discopy.rigid import Nat
+    from discopy.utils import factory_name
+    if inspect.isabstract(cls) or cls.__name__ in ABSTRACT:
+        return None
+    templates = {name: template for key, template in EXAMPLES.items()
+                 for name in globs(key)}
+    owner = next(c for c in cls.__mro__ if "__init__" in vars(c))
+    base = next(c for c in cls.__mro__ if factory_name(c) in templates)
+    assert issubclass(base, owner), f"{owner} needs an example"
+    ob = sys.modules[cls.__module__].Ty\
+        if issubclass(cls, monoidal.Layer) else cls.ob
+    x, y = (tensor.Dim(2), tensor.Dim(3)) if issubclass(cls, tensor.Box)\
+        else (Dims(2), Dims(3)) if ob is Dims\
+        else (Nat(1), Nat(1)) if ob is Nat else (ob('x'), ob('y'))
+    if issubclass(cls, circuit.Box):
+        x, y = circuit.qubit, circuit.qubit
+    terms = getattr(ob, "constant_factory", None) and (
+        ob.constant_factory("f", x << y), ob.constant_factory("a", y),
+        ob.variable_factory("u", y))
+    f, a, u = terms or (None, None, None)
+    return eval(templates[factory_name(base)], dict(
+        c=cls, x=x, y=y, v=value, f=f, a=a, u=u, sys=sys, closed=closed,
+        cg=cg, gates=gates, box=lambda c, x, y, v: c.ar.box_factory(
+            "f", x, y, data=v)))
+
+
+def holds(law, cls):
+    """ Whether a law of #169 holds of the example of a class. """
+    from discopy.utils import dumps, loads
+    box = example(cls, 1)
+    if law == "dagger":
+        return box.dagger().dagger() == box
+    if law == "rotation":
+        return not hasattr(box, "rotate") or box.r.l == box == box.l.r
+    if law == "rebuild":
+        result, expected = box.rebuild(), box
+    elif law == "subs":
+        from sympy import S
+        from sympy.abc import phi
+        symbolic, expected = example(cls, phi), example(cls, S.One)
+        for result in (symbolic.subs(phi, 1), symbolic.subs([(phi, 1)]),
+                       symbolic.lambdify(phi)(1)):
+            assert type(result) is type(expected) and result == expected
+        return True
+    else:
+        tree = type(box).from_tree(box.to_tree())
+        assert type(tree) is type(box) and tree == box
+        result, expected = loads(dumps(box)), box
+    return type(result) is type(expected) and result == expected
+
+
+def globs(patterns: str) -> list[str]:
+    """ The globs a pattern stands for, e.g. ``*.{Cup,Cap}``. """
+    import itertools
+    import re
+    result = []
+    for pattern in patterns.split():
+        parts = re.split(r"\{([^}]*)\}", pattern)
+        result += map("".join, itertools.product(*(
+            part.split(",") if i % 2 else [part]
+            for i, part in enumerate(parts))))
+    return result
+
+
+PIVOTALS = "{pivotal,ribbon,compact,frobenius}"
+BROKEN = {
+    "rebuild": {
+        "*.Layer": "a layer keeps its *inside as boxes_or_types",
+        "*.Merge *.Noise": "it keeps neither x nor n",
+        "*.Cofunction": "it keeps its cofunc in an op",
+        "*.Cospan": "it keeps left and right as legs",
+        "*.Spider quantum.zx.[XYZ]": "it keeps no n_legs_in or n_legs_out",
+        "closed.{Pack,Unpack}": "it keeps its type delayed",
+    },
+    "dagger": {
+        "*.{Constant,Variable,Abstraction,Application} "
+        "closed.{Tuple,Projection,Let} lambek.categorial.{FA,BA,*TR,"
+        "TypeRaising,[FB][CX]}": "a term has no stated dagger",
+        "lambek.categorial.*Composition": "a crossed composition has none",
+        "*.Feedback": "it has none, its memory would be fed back in time",
+        PIVOTALS + ".Trace": "its dagger is drawn with cups and caps",
+        "*.Curry": "a curry has no dagger",
+        "*.{Dereliction,Digging,Contraction,Weakening,Laxator}":
+        "!L* has no rule from its codomain back to its domain",
+        "{closed,markov,lambek.abstract}.{Copy,Discard,Function} "
+        "comarkov.{Cofunction,Merge,Noise}": "its category has no dagger",
+        "rigid.C[ua]p": "a rigid cup or cap has none, a pivotal one has",
+    },
+    "rotation": {
+        PIVOTALS + ".{Feedback,Trace,Head,Tail,FollowedBy} "
+        "{tensor,quantum.circuit,quantum.zx}.Bubble":
+        "it has no stated rotation",
+        "*.{Feedback,Trace}": "it raises for a rotation, as for a dagger",
+        "quantum.zx.Scalar": "it takes no dom, cod or z",
+    },
+    "subs": {
+        "*.Spider quantum.zx.[XYZ]": "it keeps no n_legs_in or n_legs_out",
+    },
+    "tree": {
+        "quantum.gates.C[RU]*": "its tree is that of a controlled gate",
+        "lambek.categorial.TypeRaising": "its tree drops its cod",
+        "neural.network.{Box,Feedback,Trace,Head,Tail}": "a module has none",
+        "{tensor,quantum.circuit,quantum.zx}.Bubble":
+        "its tree drops its func, which == compares",
+    },
+}
+
+
+@pytest.mark.parametrize("law", BROKEN)
+def test_every_box(law):
+    """
+    The conformance test of #169: every class of box rebuilds from its
+    fields, and so does its dagger, its rotations, its substitutions and its
+    tree, but for the breakages each law lists with their reasons.
+    """
+    if law == "subs":
+        pytest.importorskip("sympy")
+    from fnmatch import fnmatch
+    from discopy.utils import factory_name
+    patterns = [glob for key in BROKEN[law] for glob in globs(key)]
+    unexpected, fixed = {}, []
+    for cls in box_classes():
+        if example(cls, 1) is None:
+            continue
+        name = factory_name(cls)
+        try:
+            failure = None if holds(law, cls) else "not equal"
+        except Exception as error:  # pylint: disable=broad-except
+            failure = repr(error)
+        if any(fnmatch(name, glob) for glob in patterns):
+            fixed += [] if failure else [name]
+        elif failure:
+            unexpected[name] = failure
+    assert not unexpected and not fixed, (unexpected, fixed)
+
+
+@pytest.mark.parametrize(
+    "module", ["symmetric", "feedback", "markov", "frobenius"])
+def test_rebuild_strict_init(module):
+    """ A box whose constructor takes only some fields gets the others set,
+    as main did, see #169. """
+    pytest.importorskip("sympy")
+    import importlib
+    from sympy.abc import phi
+    m = importlib.import_module(f"discopy.{module}")
+
+    class Gate(m.Box):
+        def __init__(self, name, dom, cod, data=None, is_dagger=False):
+            super().__init__(name, dom, cod, data=data, is_dagger=is_dagger)
+
+    x, y = m.Ty('x'), m.Ty('y')
+    gate = Gate("g", x, y, data=phi)
+    gate.time_step, gate.is_deterministic = 2, False
+
+    def fields(box):
+        return (type(box), box.name, box.dom, box.cod, box.data, box.is_dagger,
+                box.time_step, getattr(box, "deterministic", False))
+    assert fields(gate.dagger()) == (Gate, "g", y, x, phi, True, 2, False)
+    assert fields(gate.subs(phi, 1)) == fields(gate.lambdify(phi)(1))\
+        == (Gate, "g", x, y, 1, False, 2, False)
+    assert gate.dagger().dagger() == gate
+
+
+def test_rebuild_other_constructor():
+    """ A constructor that does not take the fields of a box raises, as on
+    main, rather than rebuild from the wrong arguments. """
+    from discopy import rigid
+
+    class Digits(rigid.Box):
+        def __init__(self, *digits):
+            super().__init__(f"Digits{digits}", rigid.Ty(), rigid.Ty("x"))
+    with raises(TypeError):
+        Digits(1).r
+
+
+def test_Functor_tree():
+    from discopy.utils import dumps, loads
+    x, y = Ob('x'), Ob('y')
+    f = Box('f', x, y, data=(1, 2))
+    for F in (Functor(), Functor({x: y, y: x}, {f: f[::-1] >> f}),
+              Functor({x: x}, {f: f}, dom=Arrow, cod=Arrow),
+              Functor({x: y}, {f: {'array': (1, 2)}})):
+        assert loads(dumps(F)) == F
+    for ob_map, ar_map, attr in [
+            (lambda x: x, {}, "ob_map"), ({}, lambda f: f, "ar_map")]:
+        with raises(TypeError, match=f"its {attr} is a Python callable"):
+            dumps(Functor(ob_map, ar_map))
+    with raises(TypeError, match="A functor has no tree"):
+        dumps(Functor.id())
+    for F in (Functor({}, {}, cod=int), Functor({int: x}, {})):
+        with raises(TypeError, match="not JSON serialisable"):
+            dumps(F)
+    tree = Functor().to_tree()
+    for name in ("int", "ndarray"):
+        with raises(AttributeError, match="No class of DisCoPy"):
+            Functor.from_tree(tree | {'cod': name})
+
+
+def test_Equation_tree():
+    from discopy.utils import dumps, loads
+    x = Ob('x')
+    f = Box('f', x, x)
+    equation = Equation(f >> f, f, Id(x), symbols=("=", "->"))
+    loaded = loads(dumps(equation))
+    assert type(loaded) is Equation and bool(loaded) is bool(equation)
+    assert (loaded.terms, loaded.symbols) == (equation.terms, ("=", "->"))
+    with raises(TypeError, match="its up_to is a Python callable"):
+        dumps(Equation(f, f >> f, up_to=len))
+    with raises(TypeError, match="Expected str"):
+        Equation.from_tree(Equation(f, f).to_tree() | {'symbols': [[1]]})
+    with raises(TypeError, match="Expected str"):
+        dumps(Equation(f, f, symbols=[1]))

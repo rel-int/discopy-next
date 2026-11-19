@@ -50,6 +50,29 @@ def test_trace_unequal_arity():
     assert f.trace()(7) == (7, 1)
 
 
+def test_permutation():
+    from pytest import raises
+    from discopy.python.additive import Function
+
+    X = Function.ob(int)
+    # The blocks X, X @ X, X go to positions 2, 0, 1, carrying their tags.
+    p = Function.permutation([1, 2, 0], [X, X @ X, X])
+    assert [p(5, tag) for tag in range(4)] == [(5, 3), (5, 0), (5, 1), (5, 2)]
+    assert Function.permutation([0], [X])(5) == 5
+    assert Function.swap(X, X).inverse()(1, 0) == (1, 1)
+    with raises(ValueError):
+        Function(lambda obj: obj, X, X).inverse()  # Only swaps have one.
+    f = Function(lambda obj, tag=0: (obj, 1 - tag), X @ X, X @ X)
+    assert f.trace(0) is f
+
+
+def test_braid_of_an_instance_is_the_swap():
+    from discopy.python.additive import Function
+
+    X = Function.ob(int)
+    assert Function.id(X).braid(X, X) == Function.swap(X, X)
+
+
 def test_trace_takes_the_keyword_form():
     from pytest import raises
     from discopy.python.additive import Function
@@ -103,3 +126,19 @@ def test_Hypergraph_pass_token():
     copy = Hypergraph[Function](X, X @ X, (), ((0, ), (), (0, 0)))
     with raises(AxiomError, match="is not right-monogamous"):
         copy(1)
+
+
+def test_subclass_as_functor_codomain():
+    """ The additive half of rel-int/discopy-next#463. """
+    from discopy.python.additive import Function
+
+    class Sub(Function):
+        """ A subclass of ``Function``, e.g. one with its own ``__call__``. """
+
+    x = Sub.ob(int)
+    assert all(isinstance(f, Sub) for f in (
+        Sub.id(x), Sub.twist(x), Sub.merge(x), Sub.noise(x),
+        Sub.swap(x, x), Sub.swap(x, x).inverse(),
+        Sub.permutation((1, 0), (x, x)), Sub.id(x).tensor(Sub.id(x)),
+        Sub(lambda n, tag=0: (n, 0) if n else (n - 1, 1),
+            x @ x, x @ x).trace()))

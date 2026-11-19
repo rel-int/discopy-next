@@ -4,7 +4,6 @@ from pytest import raises
 
 from discopy import biclosed
 from discopy.closed import *
-from discopy.axioms import assert_axioms
 from discopy.biclosed import Constraints, Sampler
 from discopy.utils import dumps, loads
 
@@ -41,6 +40,18 @@ def test_product():
         Pack(X @ Y)
     with raises(TypeError):
         Unpack(X @ Y)
+
+
+def test_product_and_exponential_names_are_lazy():
+    X, Y = Ty("X"), Ty("Y")
+    for typ in (X * Y, X >> Y):
+        ob, = typ.inside
+        assert "name" not in vars(ob)
+        delayed = ob.delay()
+        assert ob.name == str(ob) == delayed.name == ob.delay().name
+    nested = Variable("x", X)
+    for _ in range(1000):
+        nested = Tuple(nested, Variable("x", X))
 
 
 def test_product_str_round_trip():
@@ -333,6 +344,14 @@ def test_church_exponentiation():
     assert exp(three)(two).normal_form() == church(9, U)
 
 
+def test_untyped_terms_evaluate_draw_and_map():
+    two, F = church(2, U), Functor.id(Diagram)
+    assert F(U) == U and F(U.delay()) == U.delay()
+    assert F(two.eval()) == two.eval()
+    assert len(two.eval().to_drawing().cod) == 1
+    assert two.to_map() == two.eval().to_map()
+
+
 def test_normal_form_idempotent():
     two, three = church(2, U), church(3, U)
     exp = two.cod(lambda m: two.cod(lambda n: n(m)))
@@ -403,8 +422,40 @@ def test_reduce_strategy():
 
     with raises(NotImplementedError):
         Strategy().order((c, ))
-    with raises(TypeError):
-        Constant('e', X).reduce()
+    e, g = Constant('e', X), Constant('g', X >> X)
+    assert e.reduce().to_term() == e == e.normal_form()
+    lam, tagged = X(lambda x: g(x)), Constant('t', X, data=[1])
+    assert lam.reduce().to_term() == lam and lam.reduce().cod() == lam.cod
+    assert g(tagged).normal_form() == g(tagged)
+    assert X(lambda x: g(x))(e).normal_form() == g(e)
+    assert g(X(lambda x: x)(c)).normal_form() == g(c)
+
+
+def test_normal_form_constants():
+    from discopy.python import Function
+    X = Ty('X')
+    f, a = Constant('f', X >> (X >> X)), Constant('a', X)
+    c, twice = Variable('c', X), (X >> X)(lambda g: X(lambda x: g(g(x))))
+    shadow = Constant('x', X)
+    terms = [
+        f(a)(c),
+        X(lambda x: f(x)(a))(c),
+        twice(f(a))(X(lambda x: x)(c)),
+        (X >> X)(lambda g: g(shadow))(X(lambda x: f(x)(shadow))),
+        X(lambda y: twice(f(y)))(a)]
+    expected = [
+        f(a)(c), f(c)(a), f(a)(f(a)(c)), f(shadow)(shadow),
+        X(lambda x: f(a)(f(a)(x)))]
+    F = Functor({X: int}, {
+        f: Function(lambda: lambda m: lambda n: 2 * m - n, (),
+                    Function.exp(Function.exp((int, ), (int, )), (int, ))),
+        a: Function(lambda: 3, (), (int, )),
+        shadow: Function(lambda: 5, (), (int, ))}, cod=Function)
+    for term, normal in zip(terms, expected):
+        assert term.normal_form() == normal == normal.normal_form()
+        values = [F(t.eval(context=[c]))(7) for t in (term, normal)]
+        values = [v(1) if callable(v) else v for v in values]
+        assert values[0] == values[1]
 
 
 def test_bohm_tree_cod():
@@ -724,10 +775,6 @@ def test_Sampler_nonlinear():
     assert str(term) == "X(lambda x0: c0(x0)(x0))"
 
 
-def test_axioms():
-    assert_axioms(TermBase)
-
-
 def test_from_biclosed():
     x, y = biclosed.Ty("x"), biclosed.Ty("y")
     X, Y = Ty("x"), Ty("y")
@@ -741,6 +788,14 @@ def test_from_biclosed():
         == Constant("h", X >> Y)(Constant("a", X))
     assert TermBase.from_biclosed(x(lambda v: g(v)))\
         == X(lambda v: Constant("g", X >> Y)(v))
+
+
+def test_from_biclosed_keeps_the_data_of_constants():
+    x, y, X, Y = biclosed.Ty("x"), biclosed.Ty("y"), Ty("x"), Ty("y")
+    g1, g2 = (biclosed.Constant("g", y << x, data=d) for d in (1, 2))
+    a = x("a")
+    assert g1(a).to_closed() != g2(a).to_closed()
+    assert g1(a).to_closed() == Constant("g", X >> Y, data=1)(X("a"))
 
 
 def test_Substitution():
@@ -897,3 +952,27 @@ def test_delay_diagrams():
         == Diagram.ev(z, y).dagger().delay()
     assert f.curry().delay().cod == (z << y).delay() != z.d << y.d
     assert f.curry().delay().arg == f
+
+
+def test_Curry_of_no_wire_maps_as_its_argument():
+    x, y, z = Ty('x'), Ty('y'), Ty('z')
+    f = Box('f', x @ y, z)
+    for left in (True, False):
+        for curry, arg in [(Curry(f, 0, left), f),
+                           (Curry(f, 0, left).delay(), f.delay())]:
+            assert Functor.id(Diagram)(curry) == arg
+            assert curry.to_compact() == arg.to_compact()
+            assert curry.to_drawing() == arg.to_drawing()
+
+
+def test_Bubble_is_linear_and_has_no_term():
+    x = Ty('x')
+    f, g = Box('f', x, x), Box('g', x, x)
+    assert f.bubble().is_linear and Diagram.copy(x).bubble(cod=x).is_linear
+    with raises(AxiomError):
+        (f.bubble() >> g).to_term()
+
+
+def test_structural_boxes():
+    from discopy.testable import assert_structural_boxes
+    assert_structural_boxes(Diagram)

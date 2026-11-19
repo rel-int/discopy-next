@@ -11,7 +11,7 @@ import marimo as mo
 
 Y. Lafont, *Towards an algebraic theory of Boolean circuits*, Journal of Pure and Applied Algebra 184 (2003), presents monoidal categories of maps by generators and relations: maps of finite sets, linear maps, Boolean functions and reversible circuits.
 Each presentation is proved complete the same way: a rewrite system takes every diagram to a canonical form, and there is one canonical form for each map.
-This notebook replays those proofs with the double-pushout rewriting of [`discopy.hypergraph`](https://docs.discopy.org/en/main/_api/discopy.hypergraph.html), after Bonchi et al., *String diagram rewrite theory* I and II.
+This notebook replays those proofs with the double-pushout rewriting of [`discopy.hypergraph`](../../_api/discopy.hypergraph.html), after Bonchi et al., *String diagram rewrite theory* I and II.
 A rule is a pair of hypergraphs, and a step plugs its right side into the pushout complement of a match of its left.
 Each completeness theorem is checked the way Lafont proves it: every diagram must reduce to the canonical form of the map it denotes.
 Theorem 12, which Musset proves by 3-cycles with no canonical form, is a construction checked in the semantics.

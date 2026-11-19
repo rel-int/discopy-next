@@ -3,9 +3,11 @@
 """
 Monoidal lenses, also called optics, over an underlying `category`, with
 one class for each doctrine as in :mod:`discopy.para`: :class:`Symmetric`
-over a symmetric category, :class:`Traced` over a traced one and
+over a symmetric category, :class:`Traced` over a traced one,
 :class:`Markov`, the lenses `(get, put)` of functional programming, over a
-Markov one, i.e. the symmetric lenses whose residual is the input, copied.
+Markov one, i.e. the symmetric lenses whose residual is the input, copied,
+and :class:`Comarkov` over one that is comarkov too, where they form a
+Markov category.
 
 A lens from a pair `(x, x_)` to a pair `(y, y_)` is a residual `m` with a
 `forward` morphism `x -> y @ m` and a `backward` morphism `m @ y_ -> x_` in
@@ -38,13 +40,15 @@ Summary
     Symmetric
     Traced
     Markov
+    Comarkov
+    Prism
 
 Example
 -------
 
-Lenses over :class:`Function <discopy.python.Function>` are the accessors of
-functional programming: `get` reads a part of a structure and `put` writes
-it back. The lens on the first component of a pair:
+Lenses over :class:`Function <discopy.python.multiplicative.Function>` are
+the accessors of functional programming: `get` reads a part of a structure
+and `put` writes it back. The lens on the first component of a pair:
 
 >>> from discopy import python
 >>> from discopy.python import Function
@@ -68,9 +72,11 @@ It is well-behaved, i.e. it satisfies the three lens laws:
 from __future__ import annotations
 
 from dataclasses import dataclass
-from discopy import interaction, markov, messages, symmetric
+from discopy import (
+    comarkov, frobenius, interaction, markov, messages, op, symmetric)
 from discopy.abc import (
-    MarkovCategory, NamedGeneric, SymmetricCategory, TracedCategory)
+    ComarkovCategory, MarkovCategory, SymmetricCategory, TracedCategory)
+from discopy.testable import Equation, TestableGeneric, quotient
 from discopy.utils import (
     AxiomError, assert_iscomposable, assert_isinstance, classproperty,
     factory_name, get_origin, unbiased)
@@ -108,7 +114,7 @@ def pairs(category) -> type:
 
 
 @dataclass
-class Symmetric(SymmetricCategory, NamedGeneric['category']):
+class Symmetric[category](SymmetricCategory, TestableGeneric):
     """
     A lens from `dom` to `cod` over a symmetric `category` is a `residual`
     with a `forward` morphism `dom.positive -> cod.positive @ residual` and
@@ -136,7 +142,8 @@ class Symmetric(SymmetricCategory, NamedGeneric['category']):
     Markov category, lenses are only symmetric: copying a pair would ask
     for a merge on its negative half and discarding for a unit, which is
     why :class:`Markov`, the subclass with the copied input as residual,
-    is only a symmetric category too.
+    is only a symmetric category too, and :class:`Comarkov`, over a
+    category with both, a Markov one.
 
     .. admonition:: Summary
 
@@ -150,14 +157,54 @@ class Symmetric(SymmetricCategory, NamedGeneric['category']):
             to_int
             to_markov
     """
+    @classmethod
+    def checked_params(cls) -> tuple:
+        """ The default underlying category, for the class itself. """
+        return (cls.category, )
+
     category = symmetric.Diagram
     ob = classproperty(lambda cls: pairs(cls.category))
 
-    dom: ob
-    cod: ob
+    dom: ob  # ty: ignore[invalid-type-form]
+    cod: ob  # ty: ignore[invalid-type-form]
     forward: category
     backward: category
-    residual: category.ob = None
+    residual: category.ob = None  # ty: ignore[invalid-assignment]
+
+    @classmethod
+    def equation_factory(cls, *terms: Symmetric) -> Equation:
+        """
+        The equation of a law, compared by the boundary of its terms and the
+        inside of their :meth:`to_int` up to the equation of the underlying
+        category, e.g. its hypergraph, so that two lenses are equal when they
+        wire the same legs, whatever their residual.
+        """
+        return Equation(*terms, up_to=lambda lens: (
+            lens.dom, lens.cod, quotient(cls.category, lens.to_int().inside)))
+
+    @classmethod
+    def strategy(cls, *, dom=None, cod=None, **params):
+        """
+        Generate lenses: a residual, then a forward and a backward leg from
+        the strategy of the underlying category, with the boundary they
+        need, the parameters passed to both.
+        """
+        from hypothesis import strategies as st
+
+        @st.composite
+        def lenses(draw):
+            source = draw(cls.ob.strategy()) if dom is None else dom
+            target = draw(cls.ob.strategy()) if cod is None else cod
+            residual = draw(cls.category.ob.strategy())
+            forward = draw(cls.category.strategy(
+                dom=source.positive, cod=target.positive @ residual,
+                **params))
+            backward = draw(cls.category.strategy(
+                dom=residual @ target.negative, cod=source.negative,
+                **params))
+            return cls(source, target, forward, backward, residual)
+
+        return lenses()
 
     def __post_init__(self):
         if self.residual is None:
@@ -182,7 +229,10 @@ class Symmetric(SymmetricCategory, NamedGeneric['category']):
             f"{self.forward!r}, {self.backward!r}, {self.residual!r})"
 
     @classmethod
-    def lift(cls, forward: category, backward: category = None) -> Symmetric:
+    def lift(
+            cls, forward: category,
+            backward: category = None,  # ty: ignore[invalid-parameter-default]
+    ) -> Symmetric:
         """
         A morphism `x -> y` of the underlying category as a lens from
         `(x, x_)` to `(y, y_)` with empty residual, the backward morphism
@@ -199,7 +249,7 @@ class Symmetric(SymmetricCategory, NamedGeneric['category']):
                    cls.ob(forward.cod, backward.dom), forward, backward)
 
     @classmethod
-    def id(cls, dom: ob = None) -> Symmetric:
+    def id(cls, dom: ob = None) -> Symmetric:  # ty: ignore[invalid-type-form]
         """
         The identity lens on `dom`, with empty residual.
 
@@ -299,7 +349,9 @@ class Symmetric(SymmetricCategory, NamedGeneric['category']):
                           forward, backward, self.residual @ other.residual)
 
     @classmethod
-    def swap(cls, left: ob, right: ob) -> Symmetric:
+    def swap(
+            cls, left: ob,  # ty: ignore[invalid-type-form]
+            right: ob) -> Symmetric:  # ty: ignore[invalid-type-form]
         """
         The swap of two pairs is the swap of their positive halves forward
         and of their negative halves backward, with empty residual.
@@ -341,8 +393,9 @@ class Symmetric(SymmetricCategory, NamedGeneric['category']):
         inside = self.forward @ self.cod.negative\
             >> self.cod.positive @ self.backward
         ob = interaction.Ty[self.ob.natural]
-        return interaction.Diagram[self.category](
-            inside, ob(*self.dom), ob(*self.cod))
+        diagram = interaction.Diagram[
+            self.category]  # ty: ignore[invalid-type-form]
+        return diagram(inside, ob(*self.dom), ob(*self.cod))
 
     def to_markov(self) -> Markov:
         """
@@ -382,6 +435,33 @@ class Traced(Symmetric, TracedCategory):
     ...     == (f.forward >> x @ Diagram.swap(u, m)).trace()
     >>> assert f.trace().backward == f.backward.trace()
     """
+    trace_iteration_left = TracedCategory.trace_iteration_left.inapplicable(
+        messages.PAIR_LENGTH)
+    trace_naturality_left = TracedCategory.trace_naturality_left.inapplicable(
+        messages.PAIR_LENGTH)
+    trace_dinaturality_left = TracedCategory.trace_dinaturality_left\
+        .inapplicable(messages.PAIR_LENGTH)
+
+    trace_iteration_right = TracedCategory.trace_iteration_right.inapplicable(
+        messages.PAIR_LENGTH)
+    trace_naturality_right = TracedCategory.trace_naturality_right\
+        .inapplicable(messages.PAIR_LENGTH)
+    trace_dinaturality_right = TracedCategory.trace_dinaturality_right\
+        .inapplicable(messages.PAIR_LENGTH)
+    trace_left = TracedCategory.trace_left.inapplicable(
+        messages.PAIR_LENGTH)
+    trace_right = TracedCategory.trace_right.inapplicable(
+        messages.PAIR_LENGTH)
+    joining = TracedCategory.joining.inapplicable(
+        messages.PAIR_LENGTH)
+    tightening = TracedCategory.tightening.inapplicable(
+        messages.PAIR_LENGTH)
+    sliding = TracedCategory.sliding.inapplicable(
+        messages.PAIR_LENGTH)
+    strength = TracedCategory.strength.inapplicable(
+        messages.PAIR_LENGTH)
+    feedback_right = TracedCategory.feedback_right.inapplicable(
+        messages.PAIR_LENGTH)
     def trace(self, n: int | tuple[int, int] = 1, left: bool = False
               ) -> Traced:
         """
@@ -392,13 +472,16 @@ class Traced(Symmetric, TracedCategory):
         Parameters:
             n : The number of atoms to trace over on each half, or one number
                 per half.
-            left : Whether to trace on the left, not implemented.
+            left : Whether to trace the first atoms instead, i.e. the trace
+                of the lens between swaps.
         """
+        if left:
+            (mem, x), (_, y) = (
+                typ.split(n, left=True) for typ in (self.dom, self.cod))
+            return (self.swap(x, mem) >> self >> self.swap(mem, y)).trace(n)
         (x, (u, u_)), (y, _) = self.dom.split(n), self.cod.split(n)
         if not u and not u_:
             return self
-        if left:
-            raise NotImplementedError
         forward = self.forward >> self.category.id(y.positive)\
             @ self.category.swap(u, self.residual)
         return type(self)(x, y, forward.trace(len(u)),
@@ -445,7 +528,8 @@ class Markov(Symmetric):
     cartesian category is. Unlike :class:`para.Markov <discopy.para.Markov>`,
     a Markov lens is not a Markov category but only a symmetric one: copying
     a pair would ask for a monoid on its negative half, which is how the
-    reverse derivative of a fan-out sums the gradients. A neural network is
+    reverse derivative of a fan-out sums the gradients, see
+    :class:`Comarkov`. A neural network is
     a parametric lens, i.e. a :class:`para.Symmetric <discopy.para.Symmetric>`
     over `lens.Markov`; see :mod:`discopy.neural`.
 
@@ -470,6 +554,32 @@ class Markov(Symmetric):
 
     put = property(lambda self: self.backward)
 
+    unitality = Symmetric.unitality.failing(messages.LENS_NATURALITY)
+    associativity = Symmetric.associativity.failing(messages.LENS_NATURALITY)
+    braid_naturality = Symmetric.braid_naturality.failing(
+        messages.LENS_BRAID_NATURALITY)
+
+    @classmethod
+    def strategy(cls, *, dom=None, cod=None, **params):
+        """
+        Generate Markov lenses: a `get` and a `put` from the strategy of the
+        underlying category, with the boundary they need.
+        """
+        from hypothesis import strategies as st
+
+        @st.composite
+        def lenses(draw):
+            source = draw(cls.ob.strategy()) if dom is None else dom
+            target = draw(cls.ob.strategy()) if cod is None else cod
+            get = draw(cls.category.strategy(
+                dom=source.positive, cod=target.positive, **params))
+            put = draw(cls.category.strategy(
+                dom=source.positive @ target.negative, cod=source.negative,
+                **params))
+            return cls(source, target, get, put)
+
+        return lenses()
+
     def __repr__(self):
         factory, category = map(
             factory_name, (get_origin(type(self)), self.category))
@@ -484,7 +594,10 @@ class Markov(Symmetric):
                 factory_name(cls.category)))
 
     @classmethod
-    def lift(cls, get: category, backward: category = None) -> Markov:
+    def lift(
+            cls, get: category,
+            backward: category = None,  # ty: ignore[invalid-parameter-default]
+    ) -> Markov:
         """
         A morphism `x -> y` of the underlying category as a lens from
         `(x, x_)` to `(y, y_)`, with `put` discarding the input and applying
@@ -509,10 +622,11 @@ class Markov(Symmetric):
         reads it with `self.get`, writes with `other.put` then `self.put`,
         so that the residual stays the input rather than accumulating as in
         :meth:`Symmetric.then`. This is why lenses over
-        :class:`Function <discopy.python.Function>` are the semantics of
-        reverse-mode differentiation :cite:p:`CruttwellEtAl22`: the reverse
-        derivative of a function `f` is the lens with `get` its value and
-        `put` its Jacobian transposed, applied to the incoming gradient.
+        :class:`Function <discopy.python.multiplicative.Function>` are the
+        semantics of reverse-mode differentiation :cite:p:`CruttwellEtAl22`:
+        the reverse derivative of a function `f` is the lens with `get` its
+        value and `put` its Jacobian transposed, applied to the incoming
+        gradient.
 
         Parameters:
             other : The lens to compose with.
@@ -557,3 +671,294 @@ class Markov(Symmetric):
             @ swap(other.dom.positive, self.cod.negative)\
             @ identity(other.cod.negative) >> self.put @ other.put
         return type(self)(self.dom @ other.dom, self.cod @ other.cod, get, put)
+
+
+class Comarkov(Markov, MarkovCategory):
+    """
+    Lenses `(get, put)` over a `category` that is both Markov and comarkov
+    form a Markov category: the copy of a pair `(x, x_)` copies `x` with
+    `get`, while `put` discards the input and merges the copies of `x_`.
+    Its discard, the case of no copy, discards `x` and puts the noise on
+    `x_`, the unit of the merge.
+
+    Read as reverse derivatives :cite:p:`CruttwellEtAl22`, the merge is the
+    sum: the gradient of an activation sent to several layers is the sum of
+    theirs, that of one sent to none is zero.
+
+    Example
+    -------
+    >>> from discopy.frobenius import Ty as T, Diagram
+    >>> x, x_ = T('x'), T("x'")
+    >>> X = Ty[T](x, x_)
+    >>> copy = Comarkov.copy(X)
+    >>> assert copy.dom == X and copy.cod == X @ X
+    >>> assert copy.get == Diagram.copy(x)
+    >>> assert copy.put == Diagram.discard(x) @ Diagram.merge(x_)
+    >>> assert Comarkov.discard(X).put\\
+    ...     == Diagram.discard(x) @ Diagram.noise(x_)
+    >>> copy.to_int().draw(doctest="docs/_static/lens/copy.svg")
+
+    .. image:: /_static/lens/copy.svg
+        :align: center
+
+    Note
+    ----
+    The default category is the free hypergraph category, the first of the
+    hierarchy with both a copy and a merge: its spiders fuse, which is more
+    than the laws of a Markov category ask for. A category with a copy and
+    a merge and no law between the two is that of
+    :class:`discopy.neural.network.Network`.
+    """
+    category = frobenius.Diagram
+
+    @classmethod
+    def assert_iscomarkov(cls):
+        """ Assert that :attr:`category` has merge and noise. """
+        cls.assert_ismarkov()
+        if not issubclass(cls.category, ComarkovCategory):
+            raise AxiomError(messages.NOT_COMARKOV.format(
+                factory_name(cls.category)))
+
+    @classmethod
+    def copy(cls, x: Ty, n: int = 2) -> Markov:
+        """
+        The copy of a pair `n` times: `get` copies its positive half, `put`
+        discards the input and merges the `n` copies of its negative half.
+
+        Parameters:
+            x : The pair to copy.
+            n : The number of copies.
+        """
+        cls.assert_iscomarkov()
+        return cls.lift(cls.category.copy(x.positive, n),
+                        cls.category.merge(x.negative, n))
+
+
+class Prism(Symmetric):
+    """
+    A prism from `dom` to `cod` over a comarkov `category` is a morphism
+    `match : dom.positive -> dom.negative @ cod.positive` and a morphism
+    `build : cod.negative -> dom.negative`, i.e. the symmetric lens with
+    `dom.negative` as residual, the output of `match` when it fails, merged
+    with that of `build`, see :cite:t:`ClarkeEtAl20` and
+    `nLab <https://ncatlab.org/nlab/show/prism>`_.
+
+    It is the dual of :class:`Markov`: a prism over `category` is a Markov
+    lens over its opposite :class:`op.Markov <discopy.op.Markov>` between
+    the pairs with their halves swapped, with `build` as its `get` and
+    `match` as its `put`, which is how prisms compose, see :meth:`to_lens`.
+
+    Parameters:
+        dom (Ty) : The domain of the prism.
+        cod (Ty) : The codomain of the prism.
+        match (category) :
+            The morphism ``dom.positive -> dom.negative @ cod.positive``.
+        build (category) : The morphism ``cod.negative -> dom.negative``.
+
+    Example
+    -------
+    Prisms over :class:`additive.Function <discopy.python.additive.Function>`
+    are the constructors of sum types: `match` reads a case, `build` writes
+    it. The prism on the first case of `int + str`:
+
+    >>> from discopy import python
+    >>> from discopy.python import additive
+    >>> S, A = Ty[python.Ty]((int, str), (int, str)), Ty[python.Ty](
+    ...     (int, ), (int, ))
+    >>> left = Prism[additive.Function](S, A,
+    ...     additive.Function(lambda obj, tag: (obj, 2 if tag == 0 else 1),
+    ...                       (int, str), (int, str, int)),
+    ...     additive.Function(lambda obj: (obj, 0), (int, ), (int, str)))
+    >>> left.match(1, 0)
+    (1, 2)
+    >>> left.match("b", 1)
+    ('b', 1)
+    >>> left.build(2)
+    (2, 0)
+
+    It is well-behaved, i.e. it satisfies the two prism laws: matching what
+    it builds succeeds, and building what it matches gives it back.
+
+    >>> assert left.match(*left.build(2)) == (2, 2)
+    >>> assert left.build(left.match(1, 0)[0]) == (1, 0)
+
+    Its forward leg is `match` with the residual on the right, its backward
+    leg `build` merged with the residual:
+
+    >>> assert left.forward(1, 0) == (1, 0)
+    >>> assert left.forward("b", 1) == ("b", 2)
+    >>> assert left.backward("b", 1) == ("b", 1)
+    >>> assert left.backward(2, 2) == (2, 0)
+
+    Over the free comarkov category:
+
+    >>> from discopy.comarkov import Ty as T, Box, Diagram
+    >>> x, x_, y, y_ = map(T, ["x", "x'", "y", "y'"])
+    >>> f = Prism(Ty(x, x_), Ty(y, y_),
+    ...           Box('match', x, x_ @ y), Box('build', y_, x_))
+    >>> assert f.residual == x_
+    >>> assert f.backward == x_ @ f.build >> Diagram.merge(x_)
+    >>> f.to_int().draw(doctest="docs/_static/lens/prism.svg")
+
+    .. image:: /_static/lens/prism.svg
+        :align: center
+
+    Note
+    ----
+    As for :class:`Markov`, the identity is a unit and composition is
+    associative only up to the naturality of merge and noise, i.e. when
+    `build` is deterministic, as every morphism of a cocartesian category
+    is.
+
+    .. admonition:: Summary
+
+        .. autosummary::
+
+            to_lens
+            from_lens
+            lift
+            then
+            tensor
+    """
+    category = comarkov.Diagram
+
+    def __init__(self, dom: Ty, cod: Ty, match: category, build: category):
+        self.assert_iscomarkov()
+        assert_isinstance(dom, self.ob)
+        assert_isinstance(cod, self.ob)
+        assert_isinstance(match, self.category)
+        assert_isinstance(build, self.category)
+        identity, merge = self.category.id, self.category.merge
+        negative = dom.negative
+        forward = match >> self.category.swap(negative, cod.positive)
+        backward = identity(negative) @ build >> merge(negative)
+        self.match, self.build = match, build
+        super().__init__(dom, cod, forward, backward, negative)
+
+    unitality = Symmetric.unitality.failing(messages.PRISM_NATURALITY)
+    associativity = Symmetric.associativity.failing(
+        messages.PRISM_NATURALITY)
+    braid_naturality = Symmetric.braid_naturality.failing(
+        messages.PRISM_BRAID_NATURALITY)
+
+    @classmethod
+    def assert_iscomarkov(cls):
+        """ Assert that :attr:`category` has merge and noise. """
+        if not issubclass(cls.category, ComarkovCategory):
+            raise AxiomError(messages.NOT_COMARKOV.format(
+                factory_name(cls.category)))
+
+    @classmethod
+    def lenses(cls) -> type:
+        """ The Markov lenses over the opposite of :attr:`category`. """
+        cls.assert_iscomarkov()
+        return Markov[op.Markov[cls.category]]
+
+    def to_lens(self) -> Markov:
+        """
+        The Markov lens over the opposite of the category, from `-dom` to
+        `-cod`, with `build` as its `get` and `match` as its `put`.
+
+        >>> from discopy.comarkov import Ty as T, Box
+        >>> x, x_, y, y_ = map(T, ["x", "x'", "y", "y'"])
+        >>> f = Prism(Ty(x, x_), Ty(y, y_),
+        ...           Box('match', x, x_ @ y), Box('build', y_, x_))
+        >>> assert f.to_lens().dom == Ty(x_, x)
+        >>> assert f.to_lens().get.inside == f.build
+        >>> assert f.to_lens().put.inside == f.match
+        >>> assert Prism.from_lens(f.to_lens()) == f
+        """
+        arrow = op.Markov[self.category]
+        return self.lenses()(
+            -self.dom, -self.cod, arrow(self.build), arrow(self.match))
+
+    @classmethod
+    def from_lens(cls, lens: Markov) -> Prism:
+        """
+        The prism of a Markov lens over the opposite of the category, the
+        inverse of :meth:`to_lens`.
+
+        Parameters:
+            lens : The Markov lens to read backwards.
+        """
+        match, build = lens.put.inside, lens.get.inside
+        return cls(-lens.dom, -lens.cod,
+                   match, build)  # ty: ignore[invalid-argument-type]
+
+    @classmethod
+    def strategy(cls, *, dom=None, cod=None, **params):
+        """
+        Generate prisms: Markov lenses over the opposite of the category,
+        read backwards.
+        """
+        return cls.lenses().strategy(
+            dom=None if dom is None else -dom,
+            cod=None if cod is None else -cod, **params).map(cls.from_lens)
+
+    def __repr__(self):
+        factory, category = map(
+            factory_name, (get_origin(type(self)), self.category))
+        return f"{factory}[{category}]"\
+            f"({self.dom!r}, {self.cod!r}, {self.match!r}, {self.build!r})"
+
+    @classmethod
+    def lift(
+            cls, forward: category,
+            backward: category = None,  # ty: ignore[invalid-parameter-default]
+    ) -> Prism:
+        """
+        A morphism `x -> y` of the underlying category as a prism from
+        `(x, x_)` to `(y, y_)` whose `match` never fails, i.e. puts the
+        noise on `x_`, with the `backward` morphism `y_ -> x_` as `build`,
+        the identity on the unit by default: the dual of
+        :meth:`Markov.lift`.
+
+        Parameters:
+            forward : The morphism to lift on the positive halves.
+            backward : The morphism to lift on the negative halves.
+        """
+        if backward is None:
+            backward = cls.category.id(cls.category.ob())
+        arrow = op.Markov[cls.category]
+        return cls.from_lens(
+            cls.lenses().lift(arrow(backward), arrow(forward)))
+
+    @unbiased
+    def then(self, other: Prism) -> Prism:
+        """
+        Sequential composition, i.e. :meth:`Markov.then` over the opposite
+        category: `match` matches with `self` then `other`, builds what
+        `other` fails on with `self.build` and merges it with what `self`
+        fails on, `build` builds with `other` then `self`.
+
+        Parameters:
+            other : The prism to compose with.
+
+        Example
+        -------
+        >>> from discopy.comarkov import Ty as T, Box, Diagram
+        >>> x, x_, y, y_, z, z_ = map(T, ["x", "x'", "y", "y'", "z", "z'"])
+        >>> f = Prism(Ty(x, x_), Ty(y, y_),
+        ...           Box('f', x, x_ @ y), Box("f'", y_, x_))
+        >>> g = Prism(Ty(y, y_), Ty(z, z_),
+        ...           Box('g', y, y_ @ z), Box("g'", z_, y_))
+        >>> assert (f >> g).build == g.build >> f.build
+        >>> assert (f >> g).match == f.match >> x_ @ g.match\\
+        ...     >> x_ @ f.build @ z >> Diagram.merge(x_) @ z
+        """
+        assert_isinstance(other, type(self))
+        assert_iscomposable(self, other)
+        return self.from_lens(self.to_lens() >> other.to_lens())
+
+    @unbiased
+    def tensor(self, other: Prism) -> Prism:
+        """
+        Parallel composition, i.e. :meth:`Markov.tensor` over the opposite
+        category: `match` swaps the output of `self` past the failure of
+        `other`.
+
+        Parameters:
+            other : The prism to compose in parallel.
+        """
+        assert_isinstance(other, type(self))
+        return self.from_lens(self.to_lens() @ other.to_lens())

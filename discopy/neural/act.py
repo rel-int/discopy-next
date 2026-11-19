@@ -16,11 +16,13 @@ minimum (:func:`halt_logit`).
   correctness of the final readout (:func:`halt_terms`), with one target
   or the nearest of several admissible ones.
 * :class:`ActPool` -- ``batch_size`` persistent slots, one segment and one
-  optimizer step per iteration; a slot whose board halt logit turns
-  positive, or which reaches ``n_sup`` segments, gets a fresh puzzle. Every
-  board's gradient passes the per-board clip of
-  :func:`~discopy.neural.train.per_board_backward`, then one global norm
-  clip, a spike watchdog and the optimizer.
+  optimizer step per iteration; a slot whose board halt logit exceeds
+  ``halt_threshold`` (zero by default), or which reaches ``n_sup``
+  segments, gets a fresh puzzle. Every board's gradient passes the
+  per-board clip of :func:`~discopy.neural.train.per_board_backward`
+  unless ``slot_clip`` is ``None``, then one global norm clip and the
+  optimizer, the step skipped when its pre-clip norm exceeds
+  ``skip_spike``.
 * :func:`rollout` -- the evaluation: one trajectory of segments, read at
   every cap as the fixed-compute answer, the ACT depth and the most
   confident answer so far.
@@ -182,20 +184,21 @@ def halt_terms(ce_cells, ce, halt, cell_ok, halt_weight: float = 1.0,
     """
     # pylint: disable=too-many-arguments,too-many-positional-arguments
     rows = cell_ok.shape[0]
+    work = torch.promote_types(halt.dtype, torch.float32)
     q_cells = F.binary_cross_entropy_with_logits(
         halt, cell_ok.detach().to(halt.dtype), reduction="none")
     q = q_cells.mean()
     q_board = None
     if board_weight:
         q_board = F.binary_cross_entropy_with_logits(
-            halt_logit(halt).float(), cell_ok.all(-1).to(torch.float32),
+            halt_logit(halt).to(work), cell_ok.all(-1).to(work),
             reduction="none")
         q = q + board_weight * q_board.mean()
     with torch.no_grad():
         board = ce_cells.reshape(rows, -1).mean(1) \
-            + halt_weight * q_cells.reshape(rows, -1).float().mean(1)
+            + halt_weight * q_cells.reshape(rows, -1).to(work).mean(1)
         if q_board is not None:
-            board = board + halt_weight * board_weight * q_board.float()
+            board = board + halt_weight * board_weight * q_board
     return ce + halt_weight * q, ce, q, cell_ok, board.detach()
 
 
@@ -216,8 +219,9 @@ def deep_ce(every, target) -> tuple:
     1.3863
     """
     n = every[0].shape[-1]
+    work = torch.promote_types(every[0].dtype, torch.float32)
     flat = target.reshape(-1)
-    ce_cells = sum(F.cross_entropy(logits.reshape(-1, n).float(), flat,
+    ce_cells = sum(F.cross_entropy(logits.reshape(-1, n).to(work), flat,
                                    reduction="none")
                    for logits in every) / len(every)
     return ce_cells, ce_cells.mean()
@@ -293,10 +297,11 @@ def nearest_terms(every, halt, final, x, sols, mask, given,
     # pylint: disable=too-many-arguments,too-many-positional-arguments
     # pylint: disable=too-many-locals
     n = every[0].shape[-1]
+    work = torch.promote_types(every[0].dtype, torch.float32)
     rows, _, cells = sols.shape
     index = torch.arange(rows, device=sols.device)
     with torch.no_grad():
-        logp = sum(F.log_softmax(logits.reshape(-1, n).float(), -1)
+        logp = sum(F.log_softmax(logits.reshape(-1, n).to(work), -1)
                    for logits in every) / len(every)
         per_k = -logp.view(rows, cells, n).gather(
             2, sols.permute(0, 2, 1)).mean(1)
@@ -471,8 +476,10 @@ class ActPool:
             x : The puzzle lattices.
             labels : The rest of :meth:`targets`.
         """
-        return terms(every, halt, every[-1], x, *labels,
-                     self.cfg.halt_weight, self.cfg.halt_board_weight)
+        weights = self.cfg.halt_weight, self.cfg.halt_board_weight
+        return terms(
+            every, halt, every[-1], x,
+            *labels, *weights)  # ty: ignore[too-many-positional-arguments]
 
     def board_loss(self, net, *args) -> tuple:
         """
@@ -562,7 +569,8 @@ class ActPool:
         ema.update(net)
         with torch.no_grad():
             depth = self.depth + 1
-            logit = halt_logit(halt.detach().float())
+            logit = halt_logit(halt.detach().to(
+                torch.promote_types(halt.dtype, torch.float32)))
             wants = logit > cfg.halt_threshold
             capped = depth >= cfg.n_sup
             halted = wants | capped
@@ -652,7 +660,7 @@ def rollout(net, x, target, given, caps, sigma: float = 0.0,
                 answer.shape, generator=generator, device=device,
                 dtype=answer.dtype))
         state, every, halt = net.act_step(state, x)[:3]
-        q = halt_logit(halt.float())
+        q = halt_logit(halt.to(torch.promote_types(halt.dtype, torch.float32)))
         matches = decode(every[-1], given, x) == target
         correct = matches.all(-1)
         newly = ~halted & (q > threshold)

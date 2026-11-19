@@ -2,6 +2,8 @@
 
 import pickle
 
+import numpy as np
+
 from pytest import raises
 
 from discopy.cat import *
@@ -13,7 +15,6 @@ from discopy.utils import AxiomError, dumps, from_tree, loads
 def test_Ty():
     x, y, z = Ty('x'), Ty('y'), Ty('z')
     assert Ty.ob is Colour and Ty.ar is Ty
-    assert isinstance(transparent, cat.Ob)
     assert isinstance(x, cat.FreeCategory)
     assert not isinstance(x, DaggerCategory) and issubclass(
         Diagram, DaggerCategory)
@@ -30,7 +31,9 @@ def test_coloured_Ty():
     y = Ty(Wire("y", green, blue))
     path = x @ y
 
-    assert Ty() == Ty.id(transparent) == Ty.id(Colour())
+    assert Ty() == Ty.id() == Ty.id(None) and Ty().dom is None
+    with raises(TypeError):
+        Colour()
     assert path.dom == red and path.cod == blue
     assert Ty.id(red) >> path == path == path >> Ty.id(blue)
     assert path[:0] == Ty.id(red)
@@ -43,6 +46,12 @@ def test_coloured_Ty():
         y @ x
     with raises(AxiomError):
         Ty(Wire("x", red, green), Wire("z", blue, red))
+
+
+def test_Ty_of_a_colour_is_a_type_error():
+    with raises(TypeError, match="Expected monoidal.Wire, got monoidal."
+                                 "Colour instead."):
+        Ty(Colour("red"))
 
 
 def test_Colour_label():
@@ -115,6 +124,14 @@ def test_Ty_init():
     assert list(Ty('x', 'y', 'z')) == [Ty('x'), Ty('y'), Ty('z')]
 
 
+def test_init_iterator():
+    x = Ty('x')
+    h = Box('h', x, x)
+    assert Diagram(iter(h.inside * 2), x, x) == h >> h
+    assert Ty(inside=iter(['x', 'y'])) == Ty('x', 'y')
+    assert Dim(inside=iter([2, 3])) == Dim(2, 3)
+
+
 def test_Ty_eq():
     assert Ty('x') != 'x'
 
@@ -159,9 +176,39 @@ def test_Ty_pow():
         Ty('x') ** Ty('y')
 
 
+def test_pow_takes_index():
+    from discopy import abc
+    two = abc.Nat(2)
+    assert Ty('x') ** two == Ty('x', 'x') and Nat(3) ** two == Nat(6)
+    assert List[int](2, 3) ** two == List[int](2, 3, 2, 3)
+    for power in (2.0, "2"):
+        with raises(TypeError):
+            Ty('x') ** power
+
+
+def test_abc_Nat_hash():
+    from discopy import abc
+    assert {abc.Nat(2), abc.Nat(2), abc.Nat(3)} == {abc.Nat(2), abc.Nat(3)}
+
+
 def test_Nat_init():
     assert list(Nat(0)) == []
     assert all(len(Nat(n)) == n for n in range(5))
+
+
+def test_Nat_is_natural():
+    from discopy import abc
+    for natural in (abc.Nat, Nat):
+        with raises(ValueError, match="natural number, got -1"):
+            natural(-1)
+    with raises(TypeError):
+        abc.Nat(1.5)
+    assert abc.Nat(np.int64(2)) == abc.Nat(2)
+
+
+def test_Dim_is_positive():
+    with raises(ValueError, match="positive dimension, got 0"):
+        Dim(2, 0)
 
 
 def test_Nat_tensor():
@@ -292,6 +339,31 @@ def test_Layer_has_no_identity():
     assert Ty() @ Layer(f) == Layer(f) == Layer(f) @ Ty()
     assert not [t for t in (x @ Layer(f)).boxes_or_types
                 if isinstance(t, Ty) and not t]
+
+
+def test_Layer_does_not_compose():
+    x, y, z = map(Ty, "xyz")
+    f, g = Box('f', x, y), Box('g', y, z)
+
+    with raises(AxiomError, match="Compose diagrams, not layers: f >> g."):
+        Layer(f) >> Layer(g)
+    with raises(AxiomError, match="Compose diagrams, not layers"):
+        Layer(g) << Layer(f)
+    with raises(AxiomError, match="Compose diagrams, not layers"):
+        Layer(f) >> (cat.Arrow.id(y) >> Layer(g))
+    with raises(AxiomError, match="Compose diagrams, not layers"):
+        cat.Arrow.id(x) >> Layer(f) >> Layer(g)
+    with raises(AxiomError, match="Compose diagrams, not layers"):
+        Layer(g) << (cat.Arrow.id(x) >> Layer(f))
+    with raises(TypeError):
+        Layer(f) >> 1
+    with raises(TypeError):
+        Layer(f) >> g
+    assert cat.Box('h', x, x) >> Layer(f) == cat.Arrow(
+        (cat.Box('h', x, x), Layer(f)), x, y)
+    assert Diagram((Layer(f), Layer(g)), x, z) == f >> g
+    assert (Layer(f) >> cat.Arrow.id(y)) == cat.Arrow.id(x) >> Layer(f)
+    assert Layer(f).then().inside == (Layer(f), )
 
 
 def test_Layer_unit():
@@ -469,10 +541,34 @@ def test_Diagram_width():
 
 
 def test_Bubble_dagger():
+    """
+    Bubbling and daggering do not commute, see #467: a tensor bubble counts
+    `is_dagger` in its array, so a bubble equal to the bubble of a dagger
+    would be sent to an unequal image and a functor would not be well
+    defined on bubbles.
+    """
     x, y = Ty('x'), Ty('y')
     f = Box('f', x, y)
-    assert f.bubble().dagger() == f.dagger().bubble()
+    assert f.bubble().dagger() != f.dagger().bubble()
     assert f.bubble().dagger().dagger() == f.bubble()
+
+
+def test_Bubble_every_level():
+    from discopy import (
+        spacial, feedback, braided, balanced, symmetric, markov, comarkov,
+        biclosed, closed, rigid, pivotal, ribbon, compact, frobenius)
+    from discopy.lambek import pregroup, categorial, abstract
+    for module in (
+            spacial, feedback, braided, balanced, symmetric, markov,
+            comarkov, biclosed, closed, rigid, pivotal, ribbon, compact,
+            frobenius, pregroup, categorial, abstract):
+        assert module.Diagram.bubble_factory is module.Bubble, module
+        x, y = module.Ty('x'), module.Ty('y')
+        bubble = module.Box('f', x, y).bubble(name="N")
+        diagram = bubble >> module.Box('h', y, y)
+        assert isinstance(diagram, module.Diagram) and diagram.cod == y
+        assert module.Functor.id(module.Diagram)(diagram) == diagram
+        assert loads(dumps(diagram)) == diagram
 
 
 def test_Bubble_data():
@@ -485,6 +581,8 @@ def test_Bubble_data():
     for b in (from_tree(named.to_tree()), loads(dumps(named))):
         assert b == named and (b.name, b.method) == ("b", "frame")
     assert "method" not in bubble.to_tree() and "name" not in bubble.to_tree()
+    from discopy import monoidal
+    assert (eval(repr(bubble)).data, eval(repr(bubble)).is_dagger) == (42, True)
 
 
 def test_Bubble_identity_Functor():
@@ -545,6 +643,33 @@ def test_Diagram_normal_form_foliated():
     assert diagram.foliation().normal_form() == diagram.normal_form()
     assert diagram.foliation().normal_form(left=True)\
         == diagram.normal_form(left=True)
+
+
+def test_normalize_reads_each_layer_once_per_sweep(monkeypatch):
+    x = Ty('x')
+    diagram = Id(x).then(*(10 * [Box('f', x, x)]))
+    reads, boxes_and_offsets = [], Layer.boxes_and_offsets.fget
+    monkeypatch.setattr(Layer, "boxes_and_offsets", property(
+        lambda layer: reads.append(layer) or boxes_and_offsets(layer)))
+    assert diagram.normal_form() == diagram and len(reads) == len(diagram)
+
+
+def test_merge_layers_tries_each_pair_of_layers_once(monkeypatch):
+    x, n = Ty('x'), 4
+    fs = Id(x).then(*(Box(f'f{i}', x, x) for i in range(n)))
+    gs = Id(Ty()).tensor(*(Box(f'g{i}', x, x) for i in range(n)))
+    diagram = fs @ x ** n >> x @ gs
+    pairs, merge = [], Layer.merge
+    monkeypatch.setattr(Layer, "merge", lambda layer, other: pairs.append(
+        (layer, other)) or merge(layer, other))
+    assert len(diagram.merge_layers()) == n
+    assert len(set(pairs)) == len(pairs)
+
+
+def test_sum_foliates():
+    x = Ty('x')
+    f, g = Box('f', x, x), Box('g', x, x)
+    assert (f + g).foliation() == (f + g).merge_layers() == f + g
 
 
 def test_AxiomError():
@@ -709,6 +834,7 @@ def test_coloured_Functor():
     assert Functor.id()(x @ y) == x @ y
     # Composing the identity with a coloured functor keeps its colours.
     assert (Functor.id() >> F)(red) == pink == (F >> Functor.id())(red)
+    assert Functor.id() >> F == F == F >> Functor.id()
 
     red2, purple, blue2 = map(
         Colour, ("salmon", "purple", "navy"))
@@ -723,6 +849,22 @@ def test_coloured_Functor():
     bad = Functor({x: Y}, {}, colour_map={red: pink, green: lime})
     with raises(AxiomError):
         bad(x)
+
+
+def test_Functor_then_unit():
+    """ The identity of a subclass is a unit too (#142). """
+    from discopy import symmetric
+    F = Functor(lambda x: x, lambda f: f[::-1])
+    unit = symmetric.Functor.id(Diagram)
+    assert unit >> F == F == F >> unit
+
+
+def test_Functor_then_applies_the_first_functor():
+    x, y = Ty('x'), Ty('y')
+    f = Box('f', x, y)
+    F = Functor({x: 'y', y: 'x'}, {f: f[::-1]})
+    G = Functor({x: x, y: y}, {f: f})
+    assert (F >> G)(f @ x) == G(F(f @ x))
 
 
 def test_coloured_Functor_repr():
@@ -751,12 +893,72 @@ def test_coloured_Ob_dagger():
     red, green = Colour("red"), Colour("green")
     x = Wire("x", red, green)
     # Dagger swaps the boundary colours and toggles is_dagger.
-    assert x.dagger() == Wire("x", green, red)
+    assert x.dagger() == Wire("x", green, red, is_dagger=True)
     assert x.is_dagger is False and x.dagger().is_dagger is True
     assert x.dagger().dagger() == x and x.dagger().dagger().is_dagger is False
-    # Equality and hashing ignore is_dagger.
-    assert x.dagger() == Wire("x", green, red, is_dagger=True)
-    assert hash(x.dagger()) == hash(Wire("x", green, red))
+    # Equality and hashing count is_dagger.
+    assert x.dagger() != Wire("x", green, red)
+    assert hash(x.dagger()) == hash(Wire("x", green, red, is_dagger=True))
+
+
+def test_Functor_sends_equal_wires_to_equal_images():
+    """ A daggered wire is a generator of its own, not a fresh wire with its
+    colours swapped, so that a functor sends equal wires to equal images,
+    however each was built: from a name or a wire, daggered or built with
+    ``is_dagger=True`` (next#445). """
+    red, green, pink, lime = map(Colour, ("red", "green", "pink", "lime"))
+    x, y, z = Ty('x'), Ty('y'), Ty('z')
+    c, d = Ty(Wire('x', red, green)), Ty(Wire('x', green, red))
+    X, W = Ty(Wire('X', pink, lime)), Ty(Wire('W', lime, pink))
+    F = Functor({x: y @ z, c: X, d: W}, {},
+                colour_map={red: pink, green: lime})
+    types = [x, x[::-1], c, c[::-1], d, d[::-1]]
+    twins = [Ty(Wire('x')), Ty(Wire('x', is_dagger=True)),
+             Ty(Wire('x', red, green)),
+             Ty(Wire('x', green, red, is_dagger=True)),
+             Ty(Wire('x', red, green, is_dagger=True))[::-1],
+             Ty(Wire('x', green, red))[::-1]]
+    assert all(a == b for a, b in zip(types, twins))
+    for a, b in [(a, b) for a in types for b in twins if a == b]:
+        assert F(a) == F(b), (a, b)
+    assert len(set(types)) == len(types)
+    assert F(x[::-1]) == F(x)[::-1] and F(c[::-1]) == F(c)[::-1]
+
+
+def test_daggered_wire_str_reads_back():
+    """ The string of a daggered wire ends in ``[::-1]``, as that of a
+    daggered box does, so that it reads back to the wire and not to the
+    one it daggers (next#445). """
+    x, y = Ty('x'), Ty('y')
+    assert str(x[::-1]) == "x[::-1]" and str(x @ y[::-1]) == "x @ y[::-1]"
+    for term in (x[::-1], x @ y[::-1], (x @ y)[::-1]):
+        assert Ty.str_transparency(term)
+        assert Diagram.str_transparency(Diagram.id(term))
+
+
+def test_daggered_Wire_str_reads_back():
+    """ A wire on its own reads its string back too: ``x[::-1]`` is its
+    dagger, and it is not sliced otherwise (next#445). """
+    red, green = Colour('red'), Colour('green')
+    for x in (Wire('x'), Wire('x', red, green)):
+        assert eval(str(x.dagger()), {'x': x}) == x.dagger() == x[::-1]
+        assert x[::-1][::-1] == x
+    with raises(TypeError):
+        Wire('x')[0]
+
+
+def test_order_of_types_is_total():
+    """ Of two unequal types exactly one is less than the other, even when
+    their wires share a name, so that sorting does not depend on the input
+    order (next#445). """
+    red, green = Colour("red"), Colour("green")
+    x, c = Ty('x'), Ty(Wire('x', red, green))
+    types = [x, x[::-1], c, c[::-1], Ty(Wire('x', green, red)), Ty(),
+             Ty.id(red), Ty.id(green), x @ x[::-1], x[::-1] @ x]
+    for a, b in [(a, b) for a in types for b in types]:
+        assert [a < b, a == b, b < a].count(True) == 1, (a, b)
+        assert (a > b, a <= b, a >= b) == (b < a, not b < a, not a < b)
+    assert sorted(types) == sorted(types[::-1])
 
 
 def test_coloured_Functor_dagger():
@@ -878,6 +1080,22 @@ def test_List():
         Ty(Wire('x', red, red), Wire('y'))
 
 
+def test_coloured_diagram_has_no_hypergraph():
+    red = Colour("red")
+    x = Ty(Wire('x', red, red))
+    for convert in (Diagram.to_hypergraph, Diagram.to_map):
+        with raises(AxiomError):
+            convert(Box('f', x, x))
+
+
+def test_coloured_diagram_foliates():
+    red = Colour("red")
+    x = Ty(Wire('x', red, red))
+    f, g = Box('f', x, x), Box('g', x, x)
+    assert (f @ g).foliation().inside == (Layer(f, g), )
+    assert (f @ g).depth() == 1 and Diagram.id(x).depth() == 0
+
+
 def test_foliation_up_to_interchangers():
     from discopy import rigid, tensor
     interchangers = lambda d: d.to_staircases().normal_form(
@@ -896,6 +1114,103 @@ def test_foliation_up_to_interchangers():
     assert F((k @ snake).foliation()) == F(k @ snake)
 
 
+
+def test_foliations_up_to_interchangers():
+    from discopy import rigid
+    interchangers = lambda d: d.to_staircases().normal_form(
+        normalize=Diagram.normalize)
+    x = Ty('x')
+    f, g, h = Box('f', x, x), Box('g', x, x), Box('h', x @ x, x)
+    a = rigid.Ty('a')
+    snake = a @ rigid.Cap(a.r, a) >> rigid.Cup(a, a.r) @ a
+    for diagram in [
+            f @ g @ f >> h @ x >> f @ x >> h, f @ f @ f >> f @ f @ f,
+            f.bubble(name="N") @ h, snake]:
+        foliations = diagram.foliations()
+        assert diagram.foliation() in foliations
+        assert len(set(foliations)) == len(foliations)
+        for foliation in foliations:
+            assert interchangers(foliation) == interchangers(diagram)
+            for upper, lower in zip(foliation.inside, foliation.inside[1:]):
+                with raises(AxiomError):
+                    upper.merge(lower)
+    assert len((f @ f @ f >> f @ f @ f).foliations()) == 19
+    assert len((f @ f @ f >> f @ f @ f).foliations(limit=5)) == 5
+
+
+def test_foliations_of_states_and_effects():
+    x = Ty('x')
+    f, cup = Box('f', x, x), Box('cup', Ty(), x @ x)
+    s, e = Box('s', Ty(), x), Box('e', x, Ty())
+    assert (cup >> x @ s @ x).dependencies() == ((), (0, ))
+    assert [str(d) for d in (cup >> x @ s @ x >> f @ x @ x).foliations()]\
+        == ["cup >> f @ s @ x"]
+    diagram = s @ s >> f @ x >> e @ e
+    foliations = diagram.foliations()
+    assert foliations
+    for foliation in foliations:
+        assert sorted(map(str, foliation.boxes)) == ["e", "e", "f", "s", "s"]
+        assert (foliation.dom, foliation.cod) == (diagram.dom, diagram.cod)
+        for upper, lower in zip(foliation.inside, foliation.inside[1:]):
+            with raises(AxiomError):
+                upper.merge(lower)
+
+
+def test_foliations_of_a_state_enclosed_by_a_box():
+    x = Ty('x')
+    f, g = Box('f', x, x), Box('g', x, x)
+    cup, s = Box('cup', Ty(), x @ x), Box('s', Ty(), x)
+    diagram = cup >> f @ x >> x @ s @ x >> x @ g @ x
+    assert diagram.dependencies() == ((), (0, ), (0, ), (2, ))
+    assert "cup >> x @ s @ x >> f @ g @ x"\
+        in [str(foliation) for foliation in diagram.foliations()]
+
+
+def test_foliations_of_a_state_enclosed_after_an_effect():
+    x = Ty('x')
+    a, b = Box('a', Ty(), x @ x), Box('b', x, x @ x)
+    e, s, g = Box('e', x, Ty()), Box('s', Ty(), x), Box('g', x, x)
+    diagram = a >> b @ x >> x @ e @ x >> x @ s @ x >> x @ g @ x
+    assert diagram.dependencies()[3] == (0, )
+    assert "a >> x @ s @ x >> b @ g @ x >> x @ e @ x @ x"\
+        in [str(foliation) for foliation in diagram.foliations()]
+
+
+def test_foliations_of_a_deep_diagram():
+    x = Ty('x')
+    f, diagram = Box('f', x, x), Diagram.id(x)
+    for _ in range(1000):
+        diagram = diagram >> f
+    assert diagram.foliations(limit=1) == [diagram]
+    assert Diagram.id(x).foliations() == [Diagram.id(x)]
+    assert list(Diagram.layerings(16 * ((), ))) == [(tuple(range(16)), )]
+
+
+def test_foliations_below_an_effect_between_inputs():
+    x = Ty('x')
+    e, h = Box('e', x, Ty()), Box('h', x @ x, x)
+    diagram = x @ e @ x >> h
+    assert diagram.dependencies() == ((), (0, ))
+    assert diagram.foliations() == [diagram]
+    s = Box('s', Ty(), x)
+    assert "x @ s @ x >> h @ e"\
+        in [str(d) for d in (x @ e >> x @ s >> h).foliations()]
+    f, g, k = Box('f', x, x), Box('g', x, x), Box('k', x, x)
+    assert [str(d) for d in ((f >> g) @ k).foliations()]\
+        == ["f @ k >> g @ x", "f @ x >> g @ k"]
+
+
+def test_foliations_limit():
+    f = Box('f', Ty('x'), Ty('x'))
+    assert (f @ f).foliations(limit=0) == []
+    assert len((f @ f).foliations(limit=1)) == 1
+
+
+def test_foliations_merge_by_the_level():
+    from discopy import symmetric
+    p = symmetric.Permutation(symmetric.Ty('x') ** 3, [1, 2, 0])
+    assert (p >> p).foliations() == [(p >> p).foliation()]
+
 def test_box_factory():
     """ Every level with boxes of its own binds them, which a stream of boxes
     reads: the diagrams of the hierarchy, the tensors, the grammars, the
@@ -904,7 +1219,7 @@ def test_box_factory():
         cat, monoidal, braided, balanced, symmetric, traced, markov, rigid,
         pivotal, ribbon, biclosed, closed, compact, frobenius, feedback,
         tensor)
-    from discopy.grammar import categorial, abstract, pregroup
+    from discopy.lambek import categorial, abstract, pregroup
     from discopy.quantum import circuit, zx
     from discopy.neural import network
     assert cat.Arrow.box_factory is cat.Box
@@ -920,6 +1235,28 @@ def test_box_factory():
 def test_decode_without_boxes_and_offsets():
     with raises(ValueError):
         Diagram.decode(Ty('x'))
+
+
+def test_encode_layers():
+    x, y = Ty('x'), Ty('y')
+    f, g = Box('f', x, y), Box('g', x, y)
+    left = f @ x >> y @ g
+    right = x @ g >> f @ y
+    middle = Diagram((Layer(f, g), ), x @ x, y @ y)
+    assert left != right and left != middle and right != middle
+    assert (f @ g).foliation() == middle
+    assert middle.encode() == (x @ x, [[(f, 0), (g, 1)]])
+    for diagram in (left, right, middle):
+        assert Diagram.decode(*diagram.encode()) == diagram
+    assert middle.to_staircases() == left
+    h = Box('h', y @ y, x)
+    for diagram in (f @ g >> h, x @ f @ g @ x >> x @ h @ x, h.dagger()):
+        for foliated in (diagram, diagram.foliation()):
+            assert Diagram.decode(*foliated.encode()) == foliated
+    with raises(ValueError):
+        Diagram.decode(x @ x, [[(f, 1), (g, 0)]])
+    with raises(ValueError):
+        Diagram.decode(x, [[]])
 
 def test_List_repr():
     from discopy import cat, monoidal
@@ -938,3 +1275,45 @@ def test_tensor_of_sum_with_diagram():
     f, g = Box('f', x, x), Box('g', x, x)
     assert f.tensor(g + g, f) == (f @ g @ f) + (f @ g @ f)
     assert (f + f).tensor(g, f) == (f @ g @ f) + (f @ g @ f)
+
+
+def test_Functor_and_Equation_tree():
+    x, y = Ty('x'), Ty('y')
+    f = Box('f', x, y)
+    red, blue = Colour('red'), Colour('blue')
+    F = Functor({x: y, y: x @ x}, {f: f[::-1] @ x}, colour_map={red: blue})
+    assert loads(dumps(F)) == F and loads(dumps(F))(red) == blue
+    assert loads(dumps(Functor({x: y}, {}))) == Functor({x: y}, {})
+    with raises(TypeError, match="its colour_map is a Python callable"):
+        dumps(Functor({}, {}, colour_map=lambda colour: colour))
+    equation = Equation(f, f >> Id(y), space=3)
+    loaded = loads(dumps(equation))
+    assert type(loaded) is Equation and loaded.terms == equation.terms
+    assert loaded.space == 3 and loads(dumps(Equation(f))).space == 1
+    with raises(TypeError, match=r"Expected int \| float"):
+        Equation.from_tree(equation.to_tree() | {'space': 'x'})
+    with raises(TypeError, match=r"Expected int \| float"):
+        dumps(Equation(f, f, space="x"))
+
+
+def test_Equation_modulo_keeps_space():
+    f = Box('f', Ty('x'), Ty('x'))
+    equation = Equation(f, f, symbol="->", space=3).modulo(len)
+    assert equation.space == 3 and equation.symbols == ("->", )
+    assert loads(dumps(equation.modulo(None))).space == 3
+
+
+def test_Equation_eq_and_repr_keep_space():
+    f = Box('f', Ty('x'), Ty('x'))
+    equation = Equation(f, f, symbol="->", space=2)
+    assert repr(equation).endswith(", symbols=('->',), space=2)")
+    assert eval(repr(equation), Diagram.environment()) == equation
+    assert loads(dumps(equation)) == equation
+    assert equation != Equation(f, f, symbol="->")
+    assert hash(Equation(f, f, symbol="->", space=2)) == hash(equation)
+
+
+def test_Equation_repr_without_terms():
+    equation = Equation(space=2)
+    assert repr(equation) == "monoidal.Equation(space=2)"
+    assert eval(repr(equation), Diagram.environment()) == equation

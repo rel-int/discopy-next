@@ -22,7 +22,10 @@ Summary
     Head
     Tail
     Sum
+    Bubble
     Functor
+    DualRail
+    Equation
 
 Axioms
 ------
@@ -95,17 +98,22 @@ Both sides foliate to the same single permutation.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 from typing import ClassVar
 
 from discopy import monoidal, feedback, balanced, hypergraph, cmap, messages
-from discopy.abc import BalancedCategory, SpacialCategory, SymmetricCategory
+from discopy.abc import (
+    BalancedCategory, BiclosedCategory, CompactCategory,
+    DaggerMonoidalCategory, PivotalCategory, RigidCategory, SpacialCategory,
+    SymmetricCategory, TracedCategory)
+from discopy.testable import FUEL, Axiom, Rule
 from discopy.cat import factory
 from discopy.feedback import (  # noqa: F401  pylint: disable=unused-import
     Wire, Ty, Nat)
 from discopy.python import finset
 from discopy.utils import (
-    AxiomError, assert_iscomposable, classproperty, factory_name, from_tree)
+    AxiomError, assert_iscomposable, classproperty, factory_key,
+    factory_name, from_tree)
 
 
 class Layer(feedback.Layer):
@@ -191,7 +199,7 @@ class Layer(feedback.Layer):
             if not result.inside:
                 raise AxiomError(messages.NOT_MERGEABLE.format(self, other))
             return type(self)(result)
-        return super().merge(other)
+        return super().merge(other)  # ty: ignore[invalid-return-type]
 
 
 @factory
@@ -254,7 +262,8 @@ class Diagram(balanced.Diagram, SymmetricCategory):
     Note
     ----
     As for :class:`discopy.balanced.Diagram`, our symmetric diagrams are traced
-    by default. However now we have that the axioms for trace hold on the nose.
+    by default. However now the axioms for trace hold, up to the hypergraph of
+    each side: see :class:`Equation`.
 
     Note
     ----
@@ -268,16 +277,92 @@ class Diagram(balanced.Diagram, SymmetricCategory):
     >>> Permutation.swap_factory = Transposition
     >>> assert Permutation.braid_factory is Transposition
     """
+    # A hypergraph is faithful from symmetric categories on.
+    bifunctoriality = SymmetricCategory.bifunctoriality
+    dagger_monoidality = DaggerMonoidalCategory.dagger_monoidality.failing(
+        messages.FEEDBACK_HAS_NO_DAGGER)
+    dagger_monoidality_symmetric = DaggerMonoidalCategory.dagger_monoidality\
+        .weaken(within=SymmetricCategory)
+    braid_naturality = SymmetricCategory.braid_naturality
+    braid_then_inverse = SymmetricCategory.braid_then_inverse
+    inverse_then_braid = SymmetricCategory.inverse_then_braid
+    inverse_braiding = SymmetricCategory.inverse_braiding
+    twist_naturality = BalancedCategory.twist_naturality
+    yanking = BalancedCategory.yanking
+    trace_naturality_left = TracedCategory.trace_naturality_left
+    trace_naturality_right = TracedCategory.trace_naturality_right
+    trace_dinaturality_left = TracedCategory.trace_dinaturality_left
+    trace_dinaturality_right = TracedCategory.trace_dinaturality_right
+    trace_superposing_left = TracedCategory.trace_superposing_left
+    trace_superposing_right = TracedCategory.trace_superposing_right
+
     box_factory: ClassVar[type["Box"]]
     functor_factory: ClassVar[type["Functor"]]
     swap_factory: ClassVar[type["Swap"]]
     permutation_factory: ClassVar[type["Permutation"]]
-    feedback_factory: ClassVar[type["Feedback"]]
-    trace_factory: ClassVar[type["Trace"]]
+    feedback_factory: ClassVar[
+        type["Feedback"]]  # ty: ignore[invalid-type-form]
+    trace_factory: ClassVar[type["Trace"]]  # ty: ignore[invalid-type-form]
     sum_factory: ClassVar[type["Sum"]]
     braid_factory = classproperty(lambda cls: cls.swap_factory)
     layer_factory = Layer
     twist_factory = classmethod(lambda cls, dom: cls.id(dom))
+
+    @classmethod
+    def equation_factory(cls, *terms: Diagram) -> Equation:
+        """
+        The equation of a law, compared up to the isomorphism of the
+        hypergraphs of its terms, the coherence theorem of symmetric
+        categories: sliding boxes past each other and composing swaps is
+        absorbed, while a free trace, curry or feedback is a box of the
+        hypergraph like any other.
+
+        >>> x = Ty('x')
+        >>> f, g = Box('f', Ty(), x), Box('g', x, Ty())
+        >>> assert Diagram.equation_factory(f @ g, g >> f)
+        """
+        return Equation(*terms)
+
+    @classmethod
+    def strategy(cls, *, dom=None, cod=None, fuel=FUEL, within=None):
+        """
+        Draw a diagram by one of two ways: :meth:`search`, the derivation from
+        the rules of the category, or :meth:`quotient_strategy`, the downgrade
+        of its combinatorial representation, which draws larger diagrams in
+        one go.
+        A morphism premise of the search is drawn by this strategy in turn,
+        so a derived diagram can contain a sampled one. A search ``within``
+        the rules of a weaker structure is not mixed with the sample, which
+        has all the structure of the category.
+
+        Parameters are those of :meth:`search`.
+
+        >>> from hypothesis import find
+        >>> x = Ty('x')
+        >>> diagram = find(Diagram.strategy(dom=x, cod=x),
+        ...                lambda d: len(d.boxes) > 1)
+        >>> assert (diagram.dom, diagram.cod) == (x, x)
+        """
+        from hypothesis import strategies as st
+
+        derivations = cls.search(dom=dom, cod=cod, fuel=fuel, within=within)
+        if within is not None:
+            return derivations
+        return st.one_of(derivations, cls.quotient_strategy(
+            dom=dom, cod=cod, fuel=fuel))
+
+    @classmethod
+    def quotient_strategy(cls, *, dom=None, cod=None, fuel=FUEL):
+        """
+        Sample symmetric diagrams through their quotient: a combinatorial map
+        drawn by :meth:`discopy.cmap.CMap.strategy` with at most ``fuel + 1``
+        boxes, monogamous unless the category has cups and caps, downgraded
+        with :meth:`discopy.cmap.CMap.to_diagram`, which makes its cycles
+        explicit as traces and its crossings as swaps.
+        """
+        return cmap.CMap[cls].strategy(  # ty: ignore[invalid-type-form]
+            dom=dom, cod=cod, max_leaves=fuel + 1).map(
+                lambda graph: graph.to_diagram())
 
     @classmethod
     def wait(cls, dom: Ty) -> Diagram:
@@ -313,11 +398,12 @@ class Diagram(balanced.Diagram, SymmetricCategory):
         ----
         This calls :func:`balanced.hexagon` and :attr:`swap_factory`.
         """
-        return cls.braid(left, right)
+        return cls.braid(left, right)  # ty: ignore[invalid-return-type]
 
     @classmethod
-    def permutation(cls, xs: Sequence[int],
-                    doms: Sequence[monoidal.Ty] | None = None) -> Diagram:
+    def permutation(
+            cls, xs: Sequence[int],
+            doms: Sequence[monoidal.Ty] | Nat | None = None) -> Diagram:
         """
         The diagram that encodes a given permutation as a composition of
         swaps.
@@ -325,35 +411,38 @@ class Diagram(balanced.Diagram, SymmetricCategory):
         Parameters:
             xs : A permutation, as a sequence of integers or a
                  :class:`finset.Permutation`.
-            dom : A type of the same length as :code:`xs`,
-                  default is :code:`Nat(len(xs))`.
+            doms : A sequence of types of the same length as :code:`xs`,
+                   default is :code:`Nat(len(xs))`.
         """
 
-        doms = Nat(len(xs)) if doms is None else doms
-        size = len(doms)
-        nat = doms if isinstance(doms, Nat) else next(iter(doms), None)
+        types = Nat(len(xs)) if doms is None else doms
+        size = len(types)
+        nat = types if isinstance(types, Nat) else next(iter(types), None)
         unit = type(nat)() if isinstance(nat, Nat) else cls.ob()
         tensor = lambda tys: unit.tensor(*tys)
-        dom = tensor(doms)
+        dom = tensor(types)
 
         xs = finset.Permutation(xs, size)
         if xs.is_identity:
             return cls.id(dom)
         i = xs[0]
         left, head, right = (
-            doms[slice]
+            types[slice]
             for slice in (
                 slice(0, i), i, slice(i + 1, None)
             )
         )
-        rest = left @ right if isinstance(doms, monoidal.Ty) else left + right
-        return cls.swap(tensor(left), head) @ tensor(right)\
-            >> head @ cls.permutation(
-                [x - 1 if x > i else x for x in xs[1:]], rest)
+        rest = (left @ right if isinstance(types, monoidal.Ty)
+                else left + right)  # ty: ignore[unsupported-operator]
+        return cls.swap(
+            tensor(left), head  # ty: ignore[invalid-argument-type]
+        ) @ tensor(right) >> head @ cls.permutation(
+            [x - 1 if x > i else x for x in xs[1:]], rest)
 
     @classmethod
-    def from_permutation(cls, perm: Sequence[int], dom: monoidal.Ty = None
-                         ) -> Diagram:
+    def from_permutation(
+            cls, perm: Sequence[int], dom: monoidal.Ty | None = None
+    ) -> Diagram:
         """
         Encode a permutation natively when the category has a matching
         :class:`Permutation` factory. Descendant categories without one use
@@ -454,6 +543,8 @@ class Diagram(balanced.Diagram, SymmetricCategory):
         """
         return self.to_hypergraph().depth()
 
+    hypergraph_section = monoidal.Diagram.hypergraph_section
+
 
 class Box(balanced.Box, Diagram):
     """
@@ -481,7 +572,9 @@ class Permutation(Box):
 
     Parameters:
         dom : The domain, i.e. the wires to permute.
-        perm : The permutation as a :class:`finset.Permutation` or a list.
+        perm : The permutation as a :class:`finset.Permutation`, a list or
+            any iterable, which is read once into a list unless it is a
+            sequence.
 
     Examples
     --------
@@ -493,6 +586,7 @@ class Permutation(Box):
     >>> assert perm @ Id(w) == Permutation(x @ y @ z @ w, [1, 2, 0, 3])
     >>> assert Permutation(x @ y, [1, 0]) == Swap(x, y)
     >>> assert Permutation(x @ y, [0, 1]) == Id(x @ y)
+    >>> assert Permutation(x @ y, iter([1, 0])) == Swap(x, y)
 
     Writing permutations by hand keeps swap-heavy diagrams compact: a whole
     permutation occupies a single layer rather than a quadratic staircase of
@@ -511,24 +605,53 @@ class Permutation(Box):
     .. image:: /_static/symmetric/foliation.svg
         :align: center
     """
+    serialised_attrs = ("dom", "perm")
 
-    def __new__(cls, dom: monoidal.Ty = None,
-                perm: Sequence[int] = None):
-        if dom is None or cls is cls.ar.swap_factory:
-            return super().__new__(cls)
+    def __new__(cls, dom: monoidal.Ty | None = None,
+                perm: Iterable[int] | None = None):
+        listed = finset.Permutation(perm, len(dom))\
+            if isinstance(dom, monoidal.Ty) and perm is not None\
+            and not isinstance(perm, Sequence | monoidal.Ty) else None
+        perm = perm if listed is None else listed
         factory = cls.ar.swap_factory\
-            if isinstance(perm, Sequence)\
+            if dom is not None and cls is not cls.ar.swap_factory\
+            and isinstance(perm, Sequence)\
             and finset.Permutation.is_swap(perm) else cls
-        return super(Permutation, factory).__new__(factory)
+        result = super(Permutation, factory).__new__(factory)
+        if listed is not None:
+            result.perm = listed
+        return result
 
-    def __init__(self, dom: monoidal.Ty, perm: Sequence[int]):
-        self.perm = finset.Permutation(perm, len(dom))
+    def __init__(self, dom: monoidal.Ty, perm: Iterable[int]):
+        self.perm = finset.Permutation(
+            perm if isinstance(perm, Sequence) else self.perm, len(dom))
         cod = dom[:0].tensor(*(dom[i] for i in self.perm))
         name = f"Permutation({list(self.perm)})"
         super().__init__(
             name, dom, cod, drawing_name=name,
             draw_as_wires=True, draw_as_permutation=True,
             permutation_indices=tuple(self.perm))
+
+    @classmethod
+    # pylint: disable-next=arguments-differ  # drawn with no boundary
+    def strategy(cls, *, types=None):
+        """
+        Generate a permutation of two or three atomic types, other than the
+        identity, which is no box.
+
+        Parameters:
+            types : The strategy to draw the types from, see
+                :meth:`atomic_strategy`.
+        """
+        from hypothesis import strategies as st
+
+        def permutations(dom):
+            return st.permutations(range(len(dom))).map(
+                lambda perm: cls(dom, perm))
+
+        atoms = st.lists(cls.atomic_strategy(types), min_size=2, max_size=3)
+        return atoms.map(lambda xs: xs[0].tensor(*xs[1:])).flatmap(
+            permutations).filter(lambda perm: not perm.is_identity)
 
     def __getnewargs__(self):
         """
@@ -557,7 +680,7 @@ class Permutation(Box):
     def setoid(self):
         if self.is_identity:
             return (), self.dom, self.cod
-        return type(self), self.dom, tuple(self.perm)
+        return factory_key(type(self)), self.dom, tuple(self.perm)
 
     def to_drawing(self):
         """ Draw as a compact band, or as wires for the identity. """
@@ -673,20 +796,38 @@ class Swap(Permutation, balanced.Braid, Box):
     :class:`Swap` is only defined for atomic types (i.e. of length 1).
     For complex types, use :meth:`Diagram.swap` instead.
     """
+    serialised_attrs = ("left", "right")
+
     def __setstate__(self, state):
         state.setdefault('perm', finset.Permutation([1, 0], 2))
         super().__setstate__(state)
 
     def __init__(self, left, right):
-        if len(left) == 2:
-            perm = finset.Permutation(right, len(left))
+        if not isinstance(right, monoidal.Ty) and len(left) == 2:
+            perm = finset.Permutation(
+                right if isinstance(right, Sequence) else self.perm, 2)
             if not perm.is_swap():
-                raise ValueError
+                raise ValueError(messages.NOT_A_SWAP.format(list(perm)))
             left, right = left[:1], left[1:]
         self.perm = finset.Permutation([1, 0], 2)
         balanced.Braid.__init__(self, left, right)
         Box.__init__(self, self.name, self.dom, self.cod,
                      draw_as_wires=True, draw_as_braid=False)
+
+    @classmethod
+    # pylint: disable-next=arguments-differ  # drawn with no boundary
+    def strategy(cls, *, types=None):
+        """
+        Generate the swap of two atomic types.
+
+        Parameters:
+            types : The strategy to draw the types from, see
+                :meth:`atomic_strategy`.
+        """
+        from hypothesis import strategies as st
+
+        atoms = cls.atomic_strategy(types)
+        return st.builds(cls, atoms, atoms)
 
     def dagger(self):
         return type(self)(self.right, self.left)
@@ -718,6 +859,12 @@ class Sum(balanced.Sum, Box):
     """
 
 
+class Bubble(balanced.Bubble, Box):
+    """
+    A symmetric bubble is a balanced bubble and a symmetric box.
+    """
+
+
 class Functor(balanced.Functor):
     """
     A symmetric functor is a monoidal functor that preserves swaps.
@@ -738,9 +885,16 @@ class Functor(balanced.Functor):
     a codomain with neither, it is sent to the images of the swaps of
     :meth:`Permutation.to_swaps`, so that a whiskered swap maps like a swap.
 
+    A :class:`Swap` is a permutation of two wires and goes the same way, so
+    that a functor commutes with whiskering on the nose even when it sends an
+    atomic type to a longer one.
+
     >>> x, y, z = map(Ty, "xyz")
     >>> perm = Permutation(x @ y @ z, [1, 2, 0])
     >>> assert Functor.id(Diagram)(perm) == perm
+    >>> assert Functor.id(Diagram)(Swap(x, y)) == Swap(x, y)
+    >>> G = Functor(lambda ob: ob @ ob, lambda box: box)
+    >>> assert G(Swap(x, y) @ z) == G(Swap(x, y)) @ G(z)
     >>> F = Functor({x: x, y: y, z: z}, {}, cod=balanced.Diagram)
     >>> print(F(Swap(x, y) @ z))
     Braid(x, y) @ z
@@ -748,13 +902,13 @@ class Functor(balanced.Functor):
     dom = cod = Diagram
 
     def __call__(self, other):
-        if isinstance(other, Swap) and hasattr(self.cod.ar, "swap"):
-            return self.cod.ar.swap(self(other.dom[0]), self(other.dom[1]))
         if isinstance(other, Permutation) and hasattr(
                 self.cod.ar, "permutation_factory"):
             sizes = [len(self(x)) for x in other.dom]
             return self.cod.ar.from_permutation(finset.Function.permutation(
                 other.perm, sizes).inside, self(other.dom))
+        if isinstance(other, Swap) and hasattr(self.cod.ar, "swap"):
+            return self.cod.ar.swap(self(other.dom[0]), self(other.dom[1]))
         if isinstance(other, Permutation) and hasattr(
                 self.cod.ar, "permutation"):
             return self.cod.ar.permutation(
@@ -787,7 +941,14 @@ class DualRail(balanced.DualRail, Functor):
 
 CMap = cmap.CMap[Diagram]
 
-Feedback, Trace, FollowedBy, Head, Tail = feedback.generators(Diagram, Box)
+for level in (
+        BiclosedCategory, RigidCategory, PivotalCategory, CompactCategory):
+    for name, law in vars(level).items():
+        if isinstance(law, (Axiom, Rule)):
+            setattr(CMap, name, law.inapplicable(messages.MAP_HAS_NO_ADJOINTS))
+
+Feedback, Trace, FollowedBy, Head, Tail = feedback.structural_boxes(
+    Diagram, Box)
 Diagram.box_factory = Box
 Diagram.functor_factory = Functor
 Diagram.dual_rail_factory = DualRail
@@ -795,6 +956,7 @@ Hypergraph = hypergraph.Hypergraph[Diagram]
 Diagram.swap_factory = Swap
 Diagram.permutation_factory = Permutation
 Diagram.sum_factory = Sum
+Diagram.bubble_factory = Bubble
 Id = Diagram.id
 
 

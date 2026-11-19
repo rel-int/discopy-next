@@ -5,7 +5,7 @@ The tables a recursive network gathers along: the primal graph and the
 routing of a factor table, and the factor table read back off a drawn map.
 """
 
-from pytest import raises
+from pytest import importorskip, raises
 
 from discopy.frobenius import Box, CMap, Ty
 from discopy.neural.signature import (
@@ -14,6 +14,23 @@ from discopy.neural.wiring import (
     Routing, from_map, memberships, primal, routing, table_of)
 
 MESSAGE, STATE = Ty("message"), Ty("state")
+
+
+def test_dynamic_block_axes():
+    """Dynamic tracing must preserve the complement of the kept axes."""
+    torch = importorskip("torch")
+    from discopy.neural.wiring import Block
+
+    def select(x, block):
+        return x[list(block.free)]
+
+    compiled = torch.compile(select, backend="eager", fullgraph=True,
+                             dynamic=True)
+    x = torch.arange(4)
+    for keep, free in (((0, 1), (2, 3)), ((2, 3), (0, 1)),
+                       ((0, 1, 2, 3), ())):
+        actual = compiled(x, Block((3, 3, 3, 3), keep))
+        torch.testing.assert_close(actual, torch.tensor(free, dtype=x.dtype))
 
 
 def sudoku(side: int = 4, box: int = 2) -> tuple:
@@ -84,11 +101,11 @@ def test_routing_padded():
 def test_from_map():
     units = sudoku()
     node = Signature((Orbit(MESSAGE, 3, Sym.PERM), Orbit(STATE, traced=True)))
-    unit = Signature((Orbit(MESSAGE, 4, Sym.PERM), ))
-    drawn = from_incidence(memberships(units), node, unit)
+    factor = Signature((Orbit(MESSAGE, 4, Sym.PERM), ))
+    drawn = from_incidence(memberships(units), node, factor)
     assert from_map(drawn) == units
     readout = from_incidence(
-        ((0, 1), (0, 1), (1, )), node, unit, "cell", ("unit", "readout"))
+        ((0, 1), (0, 1), (1, )), node, factor, "cell", ("factor", "readout"))
     assert from_map(readout) == ((0, 1), (0, 1, 2))
     clique = from_relation(primal(units), node)
     assert from_map(clique) == primal(units)
@@ -96,6 +113,50 @@ def test_from_map():
     assert from_map(renamed, "site") == primal(units)
     with raises(ValueError, match="not closed"):
         from_map(CMap.from_box(Box("cell", Ty(), MESSAGE)))
-    factor = Box("unit", Ty(), MESSAGE)
+    box = Box("factor", Ty(), MESSAGE)
     with raises(ValueError, match="box 0 is wired to a box that is not"):
-        from_map(CMap.from_wiring((factor, factor), [((0, 0), (1, 0))]))
+        from_map(CMap.from_wiring((box, box), [((0, 0), (1, 0))]))
+
+
+def test_blocks_of_a_group():
+    from discopy.group import Cyclic, Product, Symmetric, Wreath
+    from discopy.neural.wiring import (
+        Block, chains, decompose, depths, families, orbitals, unravel)
+    lines = Wreath[Symmetric[2], Symmetric[2]]
+    layout = chains(Product[lines, lines])
+    assert layout == ((2, 2), (2, 2)) == chains(Product[
+        Wreath[Symmetric[2], Cyclic[2]], lines])
+    assert len(orbitals(layout)) == 9 and unravel(13, (2, 2, 2, 2)) == (
+        1, 1, 0, 1)
+    assert depths(0, 0, layout) == (2, 2) and depths(0, 15, layout) == (0, 0)
+    units = sudoku()
+    assert [b.keep for b in families(units, layout)] == [
+        (0, 1), (2, 3), (0, 2)]
+    terms = decompose(primal(units), layout)
+    for v, related in enumerate(primal(units)):
+        for w in range(16):
+            total = sum(c for c, b in terms if any(
+                v in m and w in m for m in b.members()))
+            assert total == (w in related)
+    assert Block((2, 3), ()).members() == (tuple(range(6)), )
+    with raises(TypeError, match="Cyclic.* has more than two orbitals"):
+        chains(Cyclic[3])
+    with raises(ValueError, match="splits the orbital"):
+        decompose(((1, ), (0, ), (), ()), ((2, 2), ))
+    with raises(ValueError, match="fewer than two members"):
+        families(((0, ), ), layout)
+    with raises(ValueError, match="does not start a family"):
+        families(units[1:], layout)
+
+
+def test_blocks_errors():
+    from discopy.group import Product, Symmetric, Wreath
+    from discopy.neural.wiring import chains, decompose, families
+    with raises(TypeError, match="product inside a wreath"):
+        chains(Wreath[Product[Symmetric[2], Symmetric[2]], Symmetric[2]])
+    with raises(TypeError, match="product inside a wreath"):
+        chains(Wreath[Symmetric[2], Product[Symmetric[2], Symmetric[2]]])
+    with raises(ValueError, match="3 points for a layout of 4"):
+        decompose(((1, ), (0, ), ()), ((2, 2), ))
+    with raises(ValueError, match="off the 4 points"):
+        families(((0, 4), ), ((2, 2), ))

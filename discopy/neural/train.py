@@ -419,7 +419,7 @@ def clip_rows(k: float, *rows: torch.Tensor, ref: torch.Tensor,
     work = torch.float64 if rows[0].dtype == torch.float64 else torch.float32
     squares = sum(r.detach().reshape(b, -1).to(work).pow(2).sum(1)
                   for r in rows)
-    norms = torch.sqrt(squares)
+    norms = torch.sqrt(squares)  # ty: ignore[invalid-argument-type]
     scale = scales(norms, k, ref, reference)
     return (tuple(rescale(r, scale) for r in rows),
             statistics(norms, ref, scale))
@@ -464,7 +464,8 @@ def per_board_backward(net: nn.Module, board_loss, batched: tuple, k: float,
     ``board_loss(net, *args) -> (loss, aux)`` is ONE board's loss, every
     tensor in ``args`` with a leading batch axis of one; ``batched`` holds
     them ``(B, ...)``. Parameters under the ``exclude`` prefixes are left
-    out of the norm and summed unscaled; a parameter the loss never touches
+    out of the norm and summed unscaled, a board whose ``r_b`` is not finite
+    contributing nothing to them either; a parameter the loss never touches
     keeps ``.grad`` ``None``, as autograd would leave it (``torch.func``
     reports zeros there, and AdamW decays a zero gradient but skips a
     missing one), and so does a frozen one, ``requires_grad=False``. The
@@ -481,7 +482,8 @@ def per_board_backward(net: nn.Module, board_loss, batched: tuple, k: float,
 
     Example
     -------
-    >>> net = torch.nn.Linear(2, 1)  # doctest: +EXTRA
+    >>> _ = torch.manual_seed(0)  # doctest: +EXTRA
+    >>> net = torch.nn.Linear(2, 1)
     >>> def board_loss(net, x, y):
     ...     return (net(x) - y).pow(2).mean(), (net(x).detach(), )
     >>> x, y = torch.randn(4, 2), torch.randn(4, 1)
@@ -494,7 +496,7 @@ def per_board_backward(net: nn.Module, board_loss, batched: tuple, k: float,
     """
     # pylint: disable=too-many-arguments,too-many-positional-arguments
     # pylint: disable=too-many-locals
-    k = positive(k)
+    k = positive(k)  # ty: ignore[invalid-assignment]
     bound = Bound(net, board_loss)
     params = {name: p.detach() for name, p in bound.named_parameters()
               if p.requires_grad}
@@ -510,8 +512,9 @@ def per_board_backward(net: nn.Module, board_loss, batched: tuple, k: float,
 
     in_dims = (None, ) + (0, ) * len(batched)
     b = batched[0].shape[0]
-    rows, aux = vmap(grad(one, has_aux=True), in_dims=in_dims,
-                     randomness="same")(params, *batched)
+    gradient = grad(one, has_aux=True)
+    rows, aux = vmap(
+        gradient, in_dims=in_dims, randomness="same")(params, *batched)
     rows = {name: row.detach() for name, row in rows.items()}
     aux = tuple(a.detach() for a in aux)
     losses, aux = aux[0], aux[1:]
@@ -522,14 +525,14 @@ def per_board_backward(net: nn.Module, board_loss, batched: tuple, k: float,
     norms = torch.sqrt(squares)
     losses = losses.to(work)
     scale = scales(norms, k, losses, reference)
+    finite = torch.isfinite(ratios(norms, losses)).to(scale.dtype)
     stats = statistics(norms, losses, scale)
     with torch.no_grad():
         for name, p in bound.named_parameters():
             row = rows.get(name)
             if row is None or not bool(row.any()):
                 continue
-            if name in counted:
-                row = rescale(row, scale)
+            row = rescale(row, scale if name in counted else finite)
             total = row.sum(0) / b
             p.grad = total if p.grad is None else p.grad + total
     return aux, stats

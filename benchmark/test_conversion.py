@@ -139,13 +139,13 @@ def test_staircase_diagram_to_cmap(n):
 
 # --- permutation ------------------------------------------------------------
 
-@case("Diagram → CMap", "permutation", sizes(5, 10, 20))
+@case("Diagram → CMap", "permutation", sizes(5, 10, 20, full=(40,)))
 def test_permutation_diagram_to_cmap(n):
     morphism = generator.reverse_permutation(symmetric.Diagram, n)
     return morphism.to_map
 
 
-@case("Diagram → Hypergraph", "permutation", sizes(5, 10, 20))
+@case("Diagram → Hypergraph", "permutation", sizes(5, 10, 20, full=(40,)))
 def test_permutation_diagram_to_hypergraph(n):
     morphism = generator.reverse_permutation(symmetric.Diagram, n)
     return morphism.to_hypergraph

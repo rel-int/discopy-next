@@ -5,7 +5,7 @@ The free symmetric category with a supply of spiders, also known as special
 commutative Frobenius algebras.
 
 Diagrams in the free hypergraph category are faithfully encoded as
-:class:`Hypergraph`, see :cite:t:`BonchiEtAl22`.
+:class:`discopy.hypergraph.Hypergraph`, see :cite:t:`BonchiEtAl22`.
 
 Summary
 -------
@@ -19,6 +19,7 @@ Summary
     HeadOb
     TailOb
     Ty
+    Nat
     Dim
     Layer
     Diagram
@@ -26,16 +27,28 @@ Summary
     Cospan
     Cup
     Cap
+    Permutation
     Swap
     Spider
     Bubble
+    Sum
     Feedback
     Trace
     FollowedBy
     Head
     Tail
     Functor
-    CMap
+    Equation
+
+.. admonition:: Functions
+
+    .. autosummary::
+        :template: function.rst
+        :nosignatures:
+        :toctree:
+
+        interleaving
+        coherence
 
 Axioms
 ------
@@ -71,7 +84,8 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from copy import copy
-from typing import Self
+from operator import index
+from typing import ClassVar, Self
 
 from discopy import (
     monoidal, rigid, markov, comarkov, compact, pivotal, feedback, cmap,
@@ -80,8 +94,8 @@ from discopy.abc import HypergraphCategory
 from discopy.cat import factory
 from discopy.python import finset
 from discopy.utils import (
-    assert_isatomic, assert_iscomposable, deprecated_alias, factory_name,
-    from_tree)
+    assert_isatomic, assert_iscomposable, deprecated_alias, factory_key,
+    factory_name, from_tree)
 
 
 class Wire(pivotal.Wire):
@@ -106,9 +120,10 @@ class Wire(pivotal.Wire):
         return result
 
     r = l
+    windings = (0, )
 
 
-HeadOb, TailOb = feedback.wire_generators(Wire)
+HeadOb, TailOb = feedback.structural_wires(Wire)
 
 
 @factory
@@ -207,6 +222,14 @@ class Diagram(
         dom (Ty) : The domain of the diagram, i.e. its input.
         cod (Ty) : The codomain of the diagram, i.e. its output.
     """
+    sum_factory: ClassVar[type["Sum"]]
+    box_factory: ClassVar[type["Box"]]
+    functor_factory: ClassVar[type["Functor"]]
+    cup_factory: ClassVar[type["Cup"]]
+    cap_factory: ClassVar[type["Cap"]]
+    swap_factory: ClassVar[type["Swap"]]
+    permutation_factory: ClassVar[type["Permutation"]]
+    bubble_factory: ClassVar[type["Bubble"]]
 
     ob = Ty
     layer_factory = Layer
@@ -233,7 +256,9 @@ class Diagram(
         dom = apex[:0].tensor(*(apex[k:k + 1] for k in left))
         if len(left) == len(right) == len(apex)\
                 and sorted(left) == sorted(right) == list(range(len(apex))):
-            return cls.from_permutation([left.index(k) for k in right], dom)
+            perm = [left.index(k) for k in right]
+            result = cls.from_permutation(perm, dom)
+            return result  # ty: ignore[invalid-return-type]
         if cls.cospan_factory.ar is cls:
             return cls.cospan_factory(apex, left, right)
         return super().from_cospan(apex, left, right)
@@ -248,7 +273,8 @@ class Diagram(
         ...     == Cospan(x @ y, [0, 1], [1, 0, 0])
         """
         if cls.cospan_factory.ar is not cls:
-            return super().from_function(func, dom)
+            return super().from_function(
+                func, dom)  # ty: ignore[invalid-return-type]
         return cls.from_cospan(dom, range(len(dom)), func)
 
     @classmethod
@@ -261,7 +287,8 @@ class Diagram(
         ...     == Cospan(x @ y, [1, 0, 0], [0, 1])
         """
         if cls.cospan_factory.ar is not cls:
-            return super().from_cofunction(cofunc, cod)
+            return super().from_cofunction(
+                cofunc, cod)  # ty: ignore[invalid-return-type]
         return cls.from_cospan(cod, cofunc, range(len(cod)))
 
     @classmethod
@@ -281,6 +308,7 @@ class Diagram(
             typ : The type of the spiders.
             phases : The phase for each spider.
         """
+        n_legs_in, n_legs_out = index(n_legs_in), index(n_legs_out)
         if phases is None and len(typ) != 1\
                 and getattr(cls, "cospan_factory", None)\
                 and cls.cospan_factory.ar is cls:
@@ -308,7 +336,8 @@ class Diagram(
         """
         F = compact.Functor(
             ob_map=lambda x: x, ar_map=lambda f:
-                f.unfuse() if isinstance(f, Spider) else f,
+                f.unfuse() if isinstance(f, Spider)
+                else f.to_spiders().unfuse() if isinstance(f, Cospan) else f,
             dom=Diagram, cod=Diagram)
         return F(self)
 
@@ -331,13 +360,26 @@ class Box(compact.Box, markov.Box, comarkov.Box, Diagram):
     >>> assert f.r[::-1][::-1] == f.r and f.r.l == f
     >>> assert Box('g', x, x).is_cartesian and not Box('g', x, x).r.is_affine
     """
+    serialised_attrs = pivotal.Box.serialised_attrs + (
+        "is_deterministic", "is_affine")
+
     @property
     def is_deterministic(self) -> bool:
+        """ Whether the box is deterministic, never when it is rotated. """
         return super().is_deterministic and not self.z
 
     @property
     def is_affine(self) -> bool:
+        """ Whether the box is affine, never when it is rotated. """
         return super().is_affine and not self.z
+
+    @is_deterministic.setter
+    def is_deterministic(self, value: bool):
+        self.deterministic = value
+
+    @is_affine.setter
+    def is_affine(self, value: bool):
+        self.affine = value
 
     def rotate(self, left=False):
         return self.flagged(super().rotate(left))
@@ -382,10 +424,11 @@ class Cospan(Box):
     .. image:: /_static/frobenius/cospan.svg
         :align: center
     """
-    def __new__(cls, apex: Ty = None, left=None, right=None):
+    def __new__(cls, apex: Ty | None = None, left=None, right=None):
         if apex is None or cls is not cls.ar.cospan_factory:
             return super().__new__(cls)
-        left, right = list(left), list(right)
+        left, right = list(
+            left), list(right)  # ty: ignore[invalid-argument-type]
         if len(apex) == 1 and not any(left + right)\
                 and not len(left) == len(right) == 1:
             factory = {(2, 0): cls.ar.cup_factory, (0, 2): cls.ar.cap_factory
@@ -442,7 +485,8 @@ class Cospan(Box):
     def setoid(self):
         if self.is_identity:
             return (), self.dom, self.cod
-        return type(self), self.apex, tuple(self.legs.left), tuple(
+        return factory_key(type(self)), self.apex, tuple(
+            self.legs.left), tuple(
             self.legs.right)
 
     def to_spiders(self) -> Diagram:
@@ -457,10 +501,12 @@ class Cospan(Box):
         >>> print(Cospan(x @ y, [0, 1, 0], [1, 1]).to_spiders())
         Permutation(x @ y @ x, [0, 2, 1]) >> Cup(x, x) @ Spider(1, 2, y)
         """
+        left, right, apex = self.legs.left, self.legs.right, self.legs.apex
+        m, n = len(self.dom), len(self.cod)
         ins, gather = finset.Function(
-            self.legs.left, self.legs.apex, len(self.dom)).factorise()
+            left, apex, m).factorise()  # ty: ignore[invalid-argument-type]
         outs, scatter = finset.Function(
-            self.legs.right, self.legs.apex, len(self.cod)).factorise()
+            right, apex, n).factorise()  # ty: ignore[invalid-argument-type]
         points = [self.apex[k:k + 1] for k in range(len(self.apex))]
         spiders = []
         for x, m, n in zip(points, ins, outs):
@@ -595,6 +641,21 @@ class Cup(compact.Cup, Box):
         super().__init__(left, right)
         self.affine = False
 
+    def __setstate__(self, state):
+        """
+        Load a cup with its flags, which a pickle from before them lacks.
+
+        >>> x = Ty('x')
+        >>> cup, state = Cup(x, x.r), dict(Cup(x, x.r).__dict__)
+        >>> del state["affine"]
+        >>> old = Cup.__new__(Cup)
+        >>> old.__setstate__(state)
+        >>> assert old == cup and not old.is_affine
+        """
+        super().__setstate__(state)
+        if "affine" not in state:
+            self.affine = False
+
 
 class Cap(compact.Cap, Box):
     """
@@ -614,6 +675,11 @@ class Cap(compact.Cap, Box):
         super().__init__(left, right)
         self.deterministic = self.affine = False
 
+    def __setstate__(self, state):
+        super().__setstate__(state)
+        if "affine" not in state:
+            self.deterministic = self.affine = False
+
 
 class Permutation(
         compact.Permutation, markov.Permutation, comarkov.Permutation, Box):
@@ -626,7 +692,7 @@ class Permutation(
     """
     apex = property(lambda self: self.dom)
     legs = property(lambda self: finset.Cospan(
-        range(len(self.dom)), list(self.perm), len(self.dom)))
+        list(range(len(self.dom))), list(self.perm), len(self.dom)))
     tensor, fuse = Cospan.tensor, Cospan.fuse
 
 
@@ -659,7 +725,8 @@ class Spider(Box):
         n_legs_out : The number of legs out.
         typ : The type of the spider.
         data : The phase of the spider.
-        is_dagger : Whether the spider is marked as a dagger.
+        is_dagger : Whether the spider is marked as a dagger, which only
+            a phased one is.
 
     Examples
     --------
@@ -671,6 +738,7 @@ class Spider(Box):
     """
     draw_as_spider = True
     color = "black"
+    deterministic = affine = True
     apex = property(lambda self: self.typ)
     legs = property(lambda self: finset.Cospan.spiders(
         len(self.dom), len(self.cod), 1) if self.phase is None else None)
@@ -679,10 +747,13 @@ class Spider(Box):
     def __init__(self, n_legs_in: int, n_legs_out: int, typ: Ty, data=None,
                  is_dagger=False, **params):
         assert_isatomic(typ)
+        n_legs_in, n_legs_out = index(n_legs_in), index(n_legs_out)
         self.typ = typ
+        is_dagger = is_dagger and bool(data)
         str_data = "" if data is None else f", {data}"
-        name = type(self).__name__\
-            + f"({n_legs_in}, {n_legs_out}, {typ}{str_data})"
+        n_in, n_out = (n_legs_out, n_legs_in) if is_dagger\
+            else (n_legs_in, n_legs_out)
+        name = type(self).__name__ + f"({n_in}, {n_out}, {typ}{str_data})"
         dom, cod = typ ** n_legs_in, typ ** n_legs_out
         Box.__init__(
             self, name, dom, cod, data=data, is_dagger=is_dagger,
@@ -694,9 +765,10 @@ class Spider(Box):
         if "_name" in state and state["_name"] == type(self).__name__:
             phase = state.get("_data", None)
             str_data = "" if phase is None else f", {phase}"
-            cod, dom = state['_dom'], state['_cod']
+            dom, cod, state["typ"] = (
+                state['_dom'], state['_cod'], state.pop('_typ'))
             state["_name"] = type(self).__name__\
-                + f"({dom.n}, {cod.n}, {state['_typ']}{str_data})"
+                + f"({dom.n}, {cod.n}, {state['typ']}{str_data})"
         super().__setstate__(state)
         if "affine" not in state:
             self.deterministic = len(self.dom) > 0 and not self.phase
@@ -711,6 +783,25 @@ class Spider(Box):
         return (
             len(self.dom), len(self.cod), self.typ, self.phase, self.is_dagger)
 
+    @classmethod
+    # pylint: disable-next=arguments-differ  # drawn with no boundary
+    def strategy(cls, *, types=None):
+        """
+        Generate a spider on an atomic type with up to two legs a side,
+        with or without a phase, and a phased one marked as a dagger or not.
+
+        Parameters:
+            types : The strategy to draw the types from, see
+                :meth:`atomic_strategy`.
+        """
+        from hypothesis import strategies as st
+
+        legs = st.sampled_from(((0, 1), (1, 0), (1, 2), (2, 1), (2, 2)))
+        phases = st.sampled_from((None, 0.25, 0.5))
+        return st.tuples(
+            legs, cls.atomic_strategy(types), phases, st.booleans()).map(
+                lambda args: cls(*args[0], *args[1:3], is_dagger=args[3]))
+
     @property
     def phase(self):
         """ The phase of the spider. """
@@ -723,8 +814,25 @@ class Spider(Box):
             f", {repr(self.typ)}{phase}{is_dagger})"
 
     def dagger(self):
-        phase = None if self.phase is None else -self.phase
-        return type(self)(len(self.cod), len(self.dom), self.typ, phase)
+        """
+        The dagger of a spider with no phase, i.e. ``None`` or zero as for its
+        flags, is the spider with its legs swapped. A phased spider is a
+        generator: its dagger keeps its phase and is marked as a dagger, so
+        that any phase has one, a functor maps it to the dagger of its image,
+        and negating a phase is left to :mod:`discopy.quantum.zx`, where
+        phases form a group.
+
+        >>> x = Ty('x')
+        >>> spider = Spider(1, 2, x, "$\\\\phi$")
+        >>> print(spider.dagger())
+        Spider(1, 2, x, $\\phi$)[::-1]
+        >>> assert spider.dagger().dagger() == spider
+        >>> assert Spider(1, 2, x).dagger() == Spider(2, 1, x)
+        >>> assert Spider(1, 2, x, 0).dagger() == Spider(2, 1, x, 0)
+        >>> assert Spider(1, 2, x, is_dagger=True) == Spider(1, 2, x)
+        """
+        return type(self)(len(self.cod), len(self.dom), self.typ, self.phase,
+                          is_dagger=not self.is_dagger)
 
     def to_tree(self) -> dict:
         """
@@ -751,17 +859,27 @@ class Spider(Box):
 
     def rotate(self, left=False):
         del left
-        return type(self)(len(self.cod), len(self.dom), self.typ, self.phase)
+        return type(self)(len(self.cod), len(self.dom), self.typ, self.phase,
+                          is_dagger=self.is_dagger)
 
     def unfuse(self) -> Diagram:
+        if self.is_dagger:
+            return self.dagger().unfuse().dagger()
         return coherence(self.ar, type(self))(
             len(self.dom), len(self.cod), self.typ, self.phase)
 
 
-class Bubble(monoidal.Bubble, Box):
+class Bubble(compact.Bubble, markov.Bubble, comarkov.Bubble, Box):
     """
-    A Frobenius bubble is a monoidal bubble in a frobenius diagram.
+    A Frobenius bubble is a compact, Markov and comarkov bubble and a
+    frobenius box, which keeps its flags as it rotates.
+
+    >>> x = Ty('x')
+    >>> noisy = Box('f', x, x).bubble(is_deterministic=False)
+    >>> assert noisy.r.l == noisy and not noisy.r.l.is_deterministic
     """
+    serialised_attrs = compact.Bubble.serialised_attrs + (
+        "is_deterministic", "is_affine")
 
 
 class Sum(compact.Sum, markov.Sum, comarkov.Sum, Box):
@@ -800,7 +918,7 @@ class Functor(compact.Functor, markov.Functor, comarkov.Functor):
         if isinstance(other, Cospan)\
                 and not isinstance(other, symmetric.Permutation):
             return self(other.to_spiders())
-        if isinstance(other, markov.Copy):
+        if isinstance(other, (markov.Copy, Bubble)):
             return markov.Functor.__call__(self, other)
         if isinstance(other, comarkov.Merge):
             return comarkov.Functor.__call__(self, other)
@@ -808,7 +926,7 @@ class Functor(compact.Functor, markov.Functor, comarkov.Functor):
 
 
 def interleaving(cls: type, factory: Callable
-                 ) -> Callable[[int, int, Ty], Diagram]:
+                 ) -> Callable[..., Diagram]:
     """
     Take a ``factory`` for spiders of atomic types and extend it recursively.
 
@@ -837,7 +955,7 @@ def interleaving(cls: type, factory: Callable
 
 
 def coherence(cls: type, factory: Callable
-              ) -> Callable[[int, int, Ty], Diagram]:
+              ) -> Callable[..., Diagram]:
     """
     Take a ``factory`` for spiders with one or three legs of atomic types
     and extend it recursively to arbitrary spiders of atomic types.
@@ -883,17 +1001,21 @@ def coherence(cls: type, factory: Callable
 
 CMap = cmap.CMap[Diagram]
 
-Feedback, Trace, FollowedBy, Head, Tail = feedback.generators(Diagram, Box)
+Feedback, Trace, FollowedBy, Head, Tail = feedback.structural_boxes(
+    Diagram, Box)
 Diagram.box_factory = Box
 Diagram.functor_factory = Functor
 Diagram.cup_factory, Diagram.cap_factory = Cup, Cap
-Diagram.swap_factory, Diagram.spider_factory = Swap, Spider
+Diagram.swap_factory = Swap
+Diagram.spider_factory = Spider  # ty: ignore[invalid-assignment]
 Diagram.permutation_factory = Permutation
 Diagram.cospan_factory = Cospan
 Diagram.bubble_factory = Bubble
 Layer.plumbing = (Ty, Cospan)
 Cospan.register(Permutation)
 Diagram.sum_factory = Sum
+Diagram.str_transparency = compact.Diagram.str_transparency.modulo(
+    Diagram.to_hypergraph)
 Hypergraph = hypergraph.Hypergraph[Diagram]
 Id = Diagram.id
 

@@ -30,17 +30,11 @@ formula*. Once channels are monadic this is more than a ``while`` loop: a
 single monadic value holds both the outcomes that leave the loop and those
 that go around again, and ``(functor, unit, mult)`` cannot tell them apart.
 The trace is therefore defined exactly when the monad supplies an
-:attr:`~discopy.kleisli.monad.Monad.iterate` operator
-
-.. math::
-    (-)^\\dagger : (U \\to M(Y + U)) \\to (U \\to M(Y))
-
-i.e. when it is an `Elgot monad
-<https://ncatlab.org/nlab/show/Elgot+monad>`_, see Adámek, Milius & Velebil,
-`Elgot theories: a new perspective of the equational properties of iteration
-<https://arxiv.org/abs/1006.0918>`_ (2010). The maybe, powerset and
-subdistribution monads all are; a monad without one raises rather than
-returning a wrong answer.
+:attr:`~discopy.kleisli.monad.Monad.iterate` operator, i.e. when it is an
+Elgot monad: :data:`~discopy.kleisli.monad.Maybe`,
+:data:`~discopy.kleisli.monad.Powerset` and
+:data:`~discopy.kleisli.monad.Subdistribution` are; a monad without one
+raises rather than returning a wrong answer.
 
 Token machines
 --------------
@@ -102,22 +96,31 @@ Summary
 
     Tagged
     Channel
-    pack
-    pack_value
-    unpack_value
-    injection
+
+.. admonition:: Functions
+
+    .. autosummary::
+        :template: function.rst
+        :nosignatures:
+        :toctree:
+
+        pack
+        pack_value
+        unpack_value
+        injection
 """
 from __future__ import annotations
 
 from collections.abc import Callable
 
-from discopy.abc import ComarkovCategory, NamedGeneric, TracedCategory
+from discopy.abc import ComarkovCategory, TracedCategory
+from discopy.testable import Equation, TestableGeneric
 from discopy.kleisli import channel
-from discopy.kleisli.monad import Monad
+from discopy.kleisli.monad import Monad, Powerset, Subdistribution
 from discopy.python import function
-from discopy.python.additive import Ty
+from discopy.python.additive import Function, Ty
 from discopy.utils import (
-    assert_isinstance, assert_iscomposable, factory, factory_name, unbiased)
+    assert_iscomposable, assert_ismember, factory, factory_name, unbiased)
 
 
 class Tagged:
@@ -185,21 +188,24 @@ def pack_value(value, tag: int, ty: Ty):
     return value if len(Ty.cast(ty)) == 1 else Tagged(value, tag)
 
 
-def unpack_value(value) -> tuple:
+def unpack_value(value, ty: Ty) -> tuple:
     """
-    Turn a value of a packed type back into a pair of a value and its tag,
-    inverse to :func:`pack_value`.
+    Turn a value of :func:`pack` of ``ty`` back into a pair of a value and
+    its tag, inverse to :func:`pack_value`.
 
     Parameters:
         value : The value to unpack.
+        ty : The disjoint union of wire types.
 
     Example
     -------
-    >>> assert unpack_value(Tagged("x", 1)) == ("x", 1)
-    >>> assert unpack_value("x") == ("x", 0)
+    >>> assert unpack_value(Tagged("x", 1), (int, str)) == ("x", 1)
+    >>> assert unpack_value("x", (str, )) == ("x", 0)
+    >>> assert unpack_value(Tagged("x", 1), (Tagged, )) == (Tagged("x", 1), 0)
     """
-    return (value.value, value.tag) if isinstance(value, Tagged)\
-        else (value, 0)
+    if len(Ty.cast(ty)) == 1 or not isinstance(value, Tagged):
+        return value, 0
+    return value.value, value.tag
 
 
 def injection(offset: int, source: Ty, target: Ty) -> function.Function:
@@ -218,13 +224,13 @@ def injection(offset: int, source: Ty, target: Ty) -> function.Function:
     >>> assert injection(0, (int, str), (int, ))(Tagged(42, 0)) == 42
     """
     def inside(value):
-        value, tag = unpack_value(value)
+        value, tag = unpack_value(value, source)
         return pack_value(value, tag + offset, target)
     return function.Function(inside, pack(source), pack(target))
 
 
 @factory
-class Channel(TracedCategory, ComarkovCategory, NamedGeneric['monad']):
+class Channel[monad](TracedCategory, ComarkovCategory, TestableGeneric):
     """
     A channel is a morphism in the Kleisli category of a monad ``M`` with
     disjoint union as tensor, i.e. a Python function from a tagged value of
@@ -264,15 +270,64 @@ class Channel(TracedCategory, ComarkovCategory, NamedGeneric['monad']):
     ...     Tagged(x, 0), Tagged(-x, 1)}), (int, ), (int, int))
     >>> assert both(1) == frozenset({Tagged(1, 0), Tagged(-1, 1)})
     """
+    @classmethod
+    def checked_params(cls) -> tuple:
+        """
+        The Elgot monads whose iteration terminates on every channel their
+        strategy draws: the iteration of
+        :attr:`~discopy.kleisli.monad.Maybe` is a ``while`` loop, which a
+        drawn channel can make cycle forever.
+        """
+        return (Powerset, Subdistribution)
+
     ob = Ty
     monad: Monad
 
+    @classmethod
+    def equation_factory(cls, *terms: Channel) -> Equation:
+        """
+        The equation of a law, compared by the boundary of its terms and
+        what the monad observes of their outputs on the arguments of
+        :meth:`discopy.python.additive.Function.arguments`.
+        """
+        return Equation(*terms, up_to=lambda term: (
+            term.dom, term.cod, tuple(
+                cls.monad.observe(term(*args))
+                for args in Function.arguments(term.dom))))
+
+    @classmethod
+    def strategy(cls, *, dom=None, cod=None, **_):
+        """
+        Generate channels: a table from each argument of the domain to a
+        monadic value over the arguments of the codomain, drawn by the
+        :attr:`~discopy.kleisli.monad.Monad.generate` of the monad.
+        """
+        from hypothesis import strategies as st
+        generate = None if cls.monad is None else cls.monad.generate
+        if generate is None:
+            raise NotImplementedError
+
+        @st.composite
+        def channels(draw, generate: Callable):
+            source = draw(cls.ob.strategy()) if dom is None else dom
+            target = draw(cls.ob.strategy()) if cod is None else cod
+            outcomes = tuple(
+                pack_value(value, tag, target)
+                for value, tag in Function.arguments(target))
+            table = draw(st.fixed_dictionaries({
+                args: generate(outcomes)
+                for args in Function.arguments(source)}))
+            return cls(
+                lambda obj, tag=0: table[obj, tag], source, target)
+        return channels(generate)
+
     def __init__(self, inside: Callable, dom: Ty, cod: Ty):
         dom, cod = self.ob.cast(dom), self.ob.cast(cod)
-        packed_cls = channel.Channel[type(self).monad]
+        monad = type(self).monad
+        packed_cls = channel.Channel[monad]  # ty: ignore[invalid-type-form]
 
         def call(value):
-            value, tag = unpack_value(value)
+            value, tag = unpack_value(value, dom)
             return inside(value) if len(dom) == 1 else inside(value, tag)
         self.inside = inside if isinstance(inside, packed_cls) else\
             packed_cls(call, pack(dom), pack(cod))
@@ -288,7 +343,8 @@ class Channel(TracedCategory, ComarkovCategory, NamedGeneric['monad']):
             dom : The disjoint union of wire types.
         """
         dom = cls.ob.cast(dom)
-        return cls(channel.Channel[cls.monad].id(pack(dom)), dom, dom)
+        packed = channel.Channel[cls.monad]  # ty: ignore[invalid-type-form]
+        return cls(packed.id(pack(dom)), dom, dom)
 
     def __call__(self, obj, tag: int = 0):
         return self.inside(pack_value(obj, tag, self.dom))
@@ -300,9 +356,11 @@ class Channel(TracedCategory, ComarkovCategory, NamedGeneric['monad']):
         Parameters:
             other : The other channel to compose in sequence.
         """
-        assert_isinstance(other, type(self))
+        assert_ismember(other, type(self))
         assert_iscomposable(self, other)
-        return type(self)(self.inside >> other.inside, self.dom, other.cod)
+        return type(self)(
+            self.inside >> other.inside,  # ty: ignore[unsupported-operator]
+            self.dom, other.cod)
 
     @unbiased
     def tensor(self, other: Channel) -> Channel:
@@ -315,7 +373,7 @@ class Channel(TracedCategory, ComarkovCategory, NamedGeneric['monad']):
         Parameters:
             other : The other channel to tensor in parallel.
         """
-        assert_isinstance(other, type(self))
+        assert_ismember(other, type(self))
         monad = type(self).monad
         dom, cod = self.dom @ other.dom, self.cod @ other.cod
         left = monad(injection(0, self.cod, cod))
@@ -337,11 +395,12 @@ class Channel(TracedCategory, ComarkovCategory, NamedGeneric['monad']):
             y : The disjoint union on the right.
         """
         x, y = cls.ob.cast(x), cls.ob.cast(y)
-        unit = cls.monad.unit(pack(y @ x))
+        unit = cls.monad.unit(pack(y @ x))  # ty: ignore[invalid-argument-type]
 
         def inside(obj, tag=0):
             tag = tag + len(y) if tag < len(x) else tag - len(x)
-            return unit(pack_value(obj, tag, y @ x))
+            return unit(  # ty: ignore[call-non-callable]
+                pack_value(obj, tag, y @ x))
         return cls(inside, x @ y, y @ x)
 
     @classmethod
@@ -355,9 +414,10 @@ class Channel(TracedCategory, ComarkovCategory, NamedGeneric['monad']):
             n : The number of copies to merge.
         """
         x = cls.ob.cast(x)
-        unit = cls.monad.unit(pack(x))
+        unit = cls.monad.unit(pack(x))  # ty: ignore[invalid-argument-type]
         return cls(
-            lambda obj, tag=0: unit(pack_value(obj, tag % len(x), x)),
+            lambda obj, tag=0: unit(  # ty: ignore[call-non-callable]
+                pack_value(obj, tag % len(x), x)),
             x ** n, x)
 
     def trace(self, n: int = 1, left: bool = False) -> Channel:
@@ -369,7 +429,7 @@ class Channel(TracedCategory, ComarkovCategory, NamedGeneric['monad']):
         Parameters:
             n : The number of summands to trace over.
             left : Whether to trace the first rather than the last
-                summands, not implemented.
+                summands, see :meth:`discopy.abc.SymmetricCategory.left_trace`.
 
         Raises:
             ValueError : If the monad has no
@@ -397,7 +457,7 @@ class Channel(TracedCategory, ComarkovCategory, NamedGeneric['monad']):
         if n == 0:
             return self
         if left:
-            raise NotImplementedError
+            return self.left_trace(n)
         monad = type(self).monad
         if monad.iterate is None:
             raise ValueError(
@@ -406,10 +466,10 @@ class Channel(TracedCategory, ComarkovCategory, NamedGeneric['monad']):
         dom, cod = self.dom[:-n], self.cod[:-n]
 
         def step(value):
-            value, tag = unpack_value(value)
+            value, tag = unpack_value(value, self.cod)
             return self(value, tag - len(cod) + len(dom))
         resolve = monad.iterate(
-            step, lambda value: unpack_value(value)[1] < len(cod))
+            step, lambda value: unpack_value(value, self.cod)[1] < len(cod))
         exit_ = monad(injection(0, self.cod, cod))
         return type(self)(
             lambda obj, tag=0: exit_(resolve(self(obj, tag))), dom, cod)

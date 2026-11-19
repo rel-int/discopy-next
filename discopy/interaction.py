@@ -19,7 +19,6 @@ Summary
 
     Ty
     Diagram
-    NamedGeneric
 
 .. admonition:: Functions
 
@@ -33,8 +32,8 @@ Summary
 Example
 -------
 
->>> from discopy.grammar import pregroup
->>> from discopy.grammar.pregroup import Word, Cup, Diagram, Functor
+>>> from discopy.lambek import pregroup
+>>> from discopy.lambek.pregroup import Word, Cup, Diagram, Functor
 >>> s, n = map(pregroup.Ty, "sn")
 >>> Alice, loves, Bob\\
 ...     = Word('Alice', n), Word('loves', n.r @ s @ n.l), Word('Bob', n)
@@ -63,9 +62,10 @@ Example
 """
 
 from __future__ import annotations
-from typing import Sequence
+from typing import Self, Sequence
 from dataclasses import dataclass
 from functools import wraps
+from operator import index
 
 from discopy import (
     balanced,
@@ -74,17 +74,18 @@ from discopy import (
     messages
 )
 from discopy.abc import (
-    NamedGeneric, Pregroup, RibbonCategory, SymmetricCategory,
-    TracedCategory)
+    DaggerCategory, DaggerMonoidalCategory, Nat, Pregroup, RibbonCategory,
+    SymmetricCategory, TracedCategory)
+from discopy.testable import Equation, TestableGeneric, quotient
 from discopy.cat import assert_iscomposable
 from discopy.python import finset
 from discopy.utils import (
     AxiomError, factory, classproperty, unbiased, assert_isinstance,
-    factory_name, get_origin)
+    factory_name, from_tree, get_origin, resolve_factory)
 
 
-@dataclass
-class Ty(Pregroup, NamedGeneric['natural']):
+@dataclass(unsafe_hash=True)
+class Ty[natural](Pregroup, TestableGeneric):
     """
     An integer type is a pair of :attr:`natural` types.
 
@@ -113,13 +114,42 @@ class Ty(Pregroup, NamedGeneric['natural']):
     >>> x, y = Ty(T("x"), T("x'")), Ty(T("y"), T("y'"))
     >>> assert x @ y == Ty(T("x") @ T("y"), T("y'") @ T("x'"))
     """
+    ob = type(None)
+
+    @classmethod
+    def checked_params(cls) -> tuple:
+        """ The default :attr:`natural` types, for the class itself. """
+        return (cls.natural, )
+
     natural = pivotal.Ty
     negatives = staticmethod(reversed)
+
+    unitality = Pregroup.unitality.inapplicable(messages.PAIR_TYPES)
+    associativity = Pregroup.associativity.inapplicable(messages.PAIR_TYPES)
+    ax = Pregroup.ax.inapplicable(messages.PAIR_TYPES)
+    cut = Pregroup.cut.inapplicable(messages.PAIR_TYPES)
+
+    @classmethod
+    def strategy(cls, **params):
+        """ Generate pairs of :attr:`natural` types. """
+        from hypothesis import strategies as st
+
+        types = cls.natural.strategy(**params)
+        return st.tuples(types, types).map(lambda pair: cls(*pair))
+
+    @classmethod
+    def generator_strategy(cls, *, dom=None, cod=None):
+        """ Generate pairs of atomic :attr:`natural` types. """
+        # pylint: disable=unused-argument  # a pair has one colour
+        from hypothesis import strategies as st
+
+        atoms = cls.natural.generator_strategy()
+        return st.tuples(atoms, atoms).map(lambda pair: cls(*pair))
 
     positive: natural
     negative: natural
 
-    def __init__(self, positive: natural = None, negative: natural = None):
+    def __init__(self, positive=None, negative=None):
         positive, negative = (
             self.natural() if x is None else x for x in (positive, negative))
         positive, negative = (
@@ -135,6 +165,32 @@ class Ty(Pregroup, NamedGeneric['natural']):
     def __bool__(self):
         return bool(self.positive) or bool(self.negative)
 
+    def to_tree(self) -> dict:
+        """
+        Serialise an integer type, with the name of its natural types, each
+        half as its tree or, when it has none, e.g. an integer, as itself.
+
+        >>> from discopy.utils import dumps, loads
+        >>> from discopy.ribbon import Ty as T
+        >>> for x in (Ty[T](T('x'), T('y')), Ty[int](1, 2)):
+        ...     assert loads(dumps(x)) == x
+        """
+        positive, negative = (
+            half.to_tree() if hasattr(half, 'to_tree') else half
+            for half in (self.positive, self.negative))
+        return {
+            'factory': factory_name(get_origin(type(self))),
+            'natural': factory_name(self.natural),
+            'positive': positive, 'negative': negative}
+
+    @classmethod
+    def from_tree(cls, tree: dict) -> Ty:
+        """ Decode a serialised integer type, see :meth:`to_tree`. """
+        factory = cls[resolve_factory(tree['natural'])]
+        return factory(*(
+            from_tree(half) if isinstance(half, dict) else half
+            for half in (tree['positive'], tree['negative'])))
+
     def __repr__(self):
         factory, natural = map(
             factory_name, (get_origin(type(self)), self.natural))
@@ -143,14 +199,25 @@ class Ty(Pregroup, NamedGeneric['natural']):
 
     def __str__(self):
         try:
+            negatives = self.negatives(self.negative)
             return " @ ".join(list(map(str, self.positive)) + [
-                f"-{x}" for x in self.negatives(self.negative)])
+                f"-{x}" for x in negatives])  # ty: ignore[not-iterable]
         except TypeError:  # e.g. when Ty.natural == int
             return repr(self)
 
     @classmethod
     def unit(cls) -> Ty:
         return cls()
+
+    def __pow__(self, n_times: int) -> Self:
+        """
+        The tensor of a pair with itself ``n_times``.
+
+        >>> from discopy.ribbon import Ty as T
+        >>> x = Ty[T](T('x'), T('y'))
+        >>> assert x ** 2 == x @ x and x ** 0 == Ty[T]()
+        """
+        return type(self)().tensor(*index(n_times) * [self])
 
     def tensor(self, *others: Ty):
         if any(not isinstance(other, type(self)) for other in others):
@@ -173,6 +240,17 @@ class Ty(Pregroup, NamedGeneric['natural']):
         return type(self)(negative, positive)
 
     l = r = property(__neg__)
+
+    @property
+    def is_atomic(self) -> bool:
+        """
+        Whether a pair of types is a generator, i.e. of atomic halves, an
+        integer half being atomic when it is one, as a :class:`Nat` is.
+
+        >>> assert Ty[int](1, 1).is_atomic and not Ty[int](1, 2).is_atomic
+        """
+        return all((Nat(half) if isinstance(half, int) else half).is_atomic
+                   for half in self)
 
     def split(self, n: int | tuple[int, int] = 1, left: bool = False
               ) -> tuple[Ty, Ty]:
@@ -212,16 +290,26 @@ class Ty(Pregroup, NamedGeneric['natural']):
 
 
 @factory
-@dataclass
-class Diagram(RibbonCategory, NamedGeneric['natural']):
+@dataclass(unsafe_hash=True)
+class Diagram[natural](
+        RibbonCategory, DaggerMonoidalCategory, TestableGeneric):
     """
     An integer diagram from ``x`` to ``y`` is a :attr:`natural` diagram
-    from ``x.positive @ y.negative`` to ``x.negative @ y.positive``.
+    from ``x.positive @ y.negative`` to ``y.positive @ x.negative``, i.e.
+    the positive halves go forward and the negative halves backward.
 
     Parameters:
         inside : The natural diagram inside.
         dom : The domain of the diagram, i.e. its input.
         cod : The codomain of the diagram, i.e. its output.
+
+    Example
+    -------
+    >>> from discopy.ribbon import Ty as T, Box
+    >>> x, y = Ty[T]('x', 'u'), Ty[T]('y', 'v')
+    >>> f = Diagram(Box('f', T('x', 'v'), T('y', 'u')), x, y)
+    >>> assert f.inside.dom == x.positive @ y.negative
+    >>> assert f.inside.cod == y.positive @ x.negative
 
     Note
     ----
@@ -250,6 +338,17 @@ class Diagram(RibbonCategory, NamedGeneric['natural']):
     >>> assert (square @ square).inside(2., 3., 1., 1.) == (4., 9., 6., 4.)
     >>> assert (square >> square).dom == R == (square >> square).cod
     """
+    @classmethod
+    def checked_params(cls) -> tuple:
+        """
+        The free traced symmetric and compact categories: the planar ones
+        have no normal form to compare the insides of their integer
+        diagrams by yet.
+        """
+        # pylint: disable-next=import-outside-toplevel  # they import this
+        from discopy import compact, symmetric
+        return (symmetric.Diagram, compact.Diagram)
+
     ar = classproperty(lambda cls: cls)
     natural = ribbon.Diagram
 
@@ -258,6 +357,37 @@ class Diagram(RibbonCategory, NamedGeneric['natural']):
     inside: natural
     dom: Ty
     cod: Ty
+
+    @classmethod
+    def equation_factory(cls, *terms: Diagram) -> Equation:
+        """
+        The equation of a law, compared by the boundaries of its terms and
+        by the equation of the :attr:`natural` category on their insides.
+        """
+        return Equation(*terms, up_to=lambda diagram: (
+            diagram.dom, diagram.cod, quotient(cls.natural, diagram.inside)))
+
+    @classmethod
+    def strategy(cls, *, dom=None, cod=None, **params):
+        """
+        Generate integer diagrams, their insides drawn by the strategy of
+        the :attr:`natural` category with the boundary they need, when it
+        is symmetric, the planar categories having no normal form to
+        compare their insides by yet.
+        """
+        from hypothesis import strategies as st
+        if not issubclass(cls.natural, SymmetricCategory):
+            raise NotImplementedError
+
+        @st.composite
+        def diagrams(draw):
+            source = draw(cls.ob.strategy()) if dom is None else dom
+            target = draw(cls.ob.strategy()) if cod is None else cod
+            inside = draw(cls.natural.strategy(
+                dom=source.positive @ target.negative,
+                cod=target.positive @ source.negative, **params))
+            return cls(inside, source, target)
+        return diagrams()
 
     def __init__(self, inside: natural, dom: Ty, cod: Ty):
         assert_isinstance(inside, self.natural)
@@ -268,6 +398,44 @@ class Diagram(RibbonCategory, NamedGeneric['natural']):
             raise ValueError(messages.WRONG_COD.format(
                 cod.positive @ dom.negative, inside.cod))
         self.inside, self.dom, self.cod = inside, dom, cod
+
+    def to_tree(self) -> dict:
+        """
+        Serialise an integer diagram, with the name of its natural category.
+
+        >>> from discopy.utils import dumps, loads
+        >>> from discopy.ribbon import Ty as T, Box
+        >>> x, y = Ty[T]('x', 'u'), Ty[T]('y', 'v')
+        >>> f = Diagram(Box('f', T('x', 'v'), T('y', 'u')), x, y)
+        >>> assert loads(dumps(f)) == f
+        """
+        return {
+            'factory': factory_name(get_origin(type(self))),
+            'natural': factory_name(self.natural),
+            'inside': self.inside.to_tree(),
+            'dom': self.dom.to_tree(),
+            'cod': self.cod.to_tree()}
+
+    @classmethod
+    def from_tree(cls, tree: dict) -> Diagram:
+        """ Decode a serialised integer diagram, see :meth:`to_tree`. """
+        factory = cls[resolve_factory(tree['natural'])]
+        return factory(*map(from_tree, (
+            tree['inside'], tree['dom'], tree['cod'])))
+
+    @classmethod
+    def has_dagger(cls) -> bool:
+        """
+        Whether the integer diagrams have a dagger: when the :attr:`natural`
+        category is a :class:`~discopy.abc.DaggerCategory`, so that a functor
+        into integer diagrams over e.g. :class:`discopy.python.Function`
+        reads a daggered box off its :code:`ar_map`.
+
+        >>> from discopy import compact, python
+        >>> assert Diagram[compact.Diagram].has_dagger()
+        >>> assert not Diagram[python.Function].has_dagger()
+        """
+        return issubclass(cls.natural, DaggerCategory)
 
     @classmethod
     def is_symmetric(cls) -> bool:
@@ -294,9 +462,11 @@ class Diagram(RibbonCategory, NamedGeneric['natural']):
             inverse : Whether to take the inverse, from ``right @ left``.
         """
         if not inverse:
-            return cls.natural.braid(left, right)
+            return cls.natural.braid(
+                left, right)  # ty: ignore[invalid-return-type]
         if cls.is_symmetric():
-            return cls.natural.braid(right, left)
+            return cls.natural.braid(
+                right, left)  # ty: ignore[invalid-return-type]
         return cls.natural.braid(left, right).dagger()
 
     @classmethod
@@ -312,7 +482,9 @@ class Diagram(RibbonCategory, NamedGeneric['natural']):
         if cls.is_symmetric():
             return cls.natural.id(dom)
         twist = cls.natural.twist(dom)
-        return twist.dagger() if inverse else twist
+        if inverse:
+            twist = twist.dagger()
+        return twist  # ty: ignore[invalid-return-type]
 
     @unbiased
     def then(self, other: Diagram):
@@ -369,7 +541,7 @@ class Diagram(RibbonCategory, NamedGeneric['natural']):
         return type(self)(inside, dom, cod)
 
     @classmethod
-    def id(cls, dom: Ty = None) -> Diagram:
+    def id(cls, dom: Ty | None = None) -> Diagram:
         """
         The identity on an integer type.
 
@@ -394,7 +566,7 @@ class Diagram(RibbonCategory, NamedGeneric['natural']):
         .. image:: /_static/int/idr.svg
             :align: center
         """
-        dom = Ty[cls.natural.ob]() if dom is None else dom
+        dom = cls.ob() if dom is None else dom
         positive, negative = dom
         inside = cls.natural.id(positive) @ cls.natural_twist(negative)
         return cls(inside, dom, dom)
@@ -620,8 +792,9 @@ class Diagram(RibbonCategory, NamedGeneric['natural']):
         return type(self)(inside.trace(len(u @ u_)), dom, cod)
 
     def split_memory(
-            self, n: int | tuple[int, int] = None, left: bool = False, *,
-            dom: Ty = None, cod: Ty = None, mem: Ty = None
+            self, n: int | tuple[int, int] | None = None,
+            left: bool = False, *,
+            dom: Ty | None = None, cod: Ty | None = None, mem: Ty | None = None
             ) -> tuple[Ty, Ty, Ty]:
         """
         The domain, codomain and memory of a trace, read off either form of
@@ -645,7 +818,8 @@ class Diagram(RibbonCategory, NamedGeneric['natural']):
         if mem is not None:
             n = self.memory_size(mem)
         elif cod is not None:
-            n = tuple(len(x) - len(y) for x, y in zip(self.cod, cod))
+            n = tuple(  # ty: ignore[invalid-assignment]
+                len(x) - len(y) for x, y in zip(self.cod, cod))
         (rest_dom, _), (rest_cod, traced) = (
             x.split(1 if n is None else n, left)[::-1] if left
             else x.split(1 if n is None else n, left)
@@ -662,7 +836,7 @@ class Diagram(RibbonCategory, NamedGeneric['natural']):
         Parameters:
             mem : The memory.
         """
-        return tuple(map(len, mem))
+        return tuple(map(len, mem))  # ty: ignore[invalid-return-type]
 
     @classmethod
     def twist(cls, dom: Ty) -> Diagram:
@@ -684,7 +858,8 @@ class Diagram(RibbonCategory, NamedGeneric['natural']):
         """
         if cls.is_symmetric():
             return cls.id(dom)
-        return cls.braid(dom, dom).trace(tuple(map(len, dom)))
+        return cls.braid(dom, dom).trace(
+            tuple(map(len, dom)))  # ty: ignore[invalid-argument-type]
 
     def curry(self, n: int | tuple[int, int] = 1, left: bool = True
               ) -> Diagram:
@@ -768,7 +943,7 @@ class Diagram(RibbonCategory, NamedGeneric['natural']):
     to_drawing = lambda self: self.inside.to_drawing()
 
 
-def Int(category: TracedCategory) -> RibbonCategory:
+def Int(category: type[TracedCategory]) -> type[RibbonCategory]:
     """
     The Int construction, i.e. the free ribbon category on a given balanced
     traced `category`, or the free compact category on a symmetric traced
@@ -784,7 +959,19 @@ def Int(category: TracedCategory) -> RibbonCategory:
     >>> from discopy.ribbon import Diagram as D
     >>> assert Int(D) == Diagram[D]
     """
-    return Diagram[category]
+    return Diagram[category]  # ty: ignore[invalid-type-form]
 
 
 Id = Diagram.id
+
+for name in (
+        "trace_dinaturality_left", "trace_dinaturality_right",
+        "trace_iteration_left", "trace_iteration_right",
+        "trace_naturality_left", "trace_naturality_right",
+        "currying_eta_left", "currying_eta_right",
+        "currying_naturality_left", "currying_naturality_right",
+        "joining", "tightening", "sliding",
+        "strength", "feedback_right", "trace_left",
+        "trace_right", "curry_left", "curry_right"):
+    setattr(Diagram, name, getattr(RibbonCategory, name).inapplicable(
+        messages.PAIR_LENGTH))

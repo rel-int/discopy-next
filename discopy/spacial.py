@@ -22,6 +22,7 @@ Summary
     Diagram
     Box
     Sum
+    Bubble
     Functor
     Equation
 
@@ -89,6 +90,12 @@ class Sum(monoidal.Sum, Box):
     """
 
 
+class Bubble(monoidal.Bubble, Box):
+    """
+    A spacial bubble is a monoidal bubble and a spacial box.
+    """
+
+
 class Functor(monoidal.Functor):
     """
     A spacial functor is a monoidal functor between spacial categories.
@@ -109,6 +116,7 @@ class Equation(monoidal.Equation):
 
 Diagram.box_factory = Box
 Diagram.sum_factory = Sum
+Diagram.bubble_factory = Bubble
 Diagram.functor_factory = Functor
 CMap = cmap.CMap[Diagram]
 Hypergraph = hypergraph.Hypergraph[Diagram]

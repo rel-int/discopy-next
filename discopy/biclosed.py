@@ -16,12 +16,22 @@ Summary
     Exp
     Over
     Under
+    BangOb
     Diagram
     Box
     Eval
     Coeval
     Curry
     Sum
+    Bubble
+    Bang
+    Structural
+    Dereliction
+    Digging
+    Contraction
+    Weakening
+    Exchange
+    Laxator
     Functor
     CMap
     TermBase
@@ -87,22 +97,26 @@ from __future__ import annotations
 
 from abc import abstractmethod
 from dataclasses import dataclass, field, replace
+from functools import cached_property
 from inspect import signature
 from itertools import count
 from typing import (
     TYPE_CHECKING, Callable, ClassVar, Iterator, Self, Sequence)
 
 from discopy import cat, monoidal, cmap, hypergraph, messages
-from discopy.abc import BiclosedCategory
-from discopy.axioms import (
-    GENERATORS, Equation as AbstractEquation, Equivalence, Testable, axiom)
+from discopy.abc import (
+    BiclosedCategory, DaggerCategory, DaggerMonoidalCategory, LinearCategory,
+    MonoidalCategory)
+from discopy.testable import (
+    GENERATORS, Equation as AbstractEquation, Equivalence, Serialisable,
+    Testable, TestableGeneric, axiom)
 from discopy.drawing import Drawing
 from discopy.cat import factory
 from discopy.utils import (
     AxiomError,
-    NamedGeneric,
     assert_isinstance,
     deprecated_alias,
+    factory_key,
     factory_name,
     from_tree,
     get_origin,
@@ -127,25 +141,26 @@ class Ty(monoidal.Ty):
     """
     variable_factory: ClassVar[type["Variable"]]
     constant_factory: ClassVar[type["Constant"]]
-    application_factory: ClassVar[type["Application"]]
+    application_factory: ClassVar[Callable[..., "Application"]]
     abstraction_factory: ClassVar[type["Abstraction"]]
     over_factory: ClassVar[Callable[..., "Exp"]]
     under_factory: ClassVar[Callable[..., "Exp"]]
-    exp_factory: ClassVar[Callable[..., "Exp"]]
 
-    def __pow__(self, other: Ty) -> Ty:
+    def __pow__(self, other: "Ty | int") -> Self:
         return self.exp(other) if isinstance(other, Ty)\
             else monoidal.Ty.__pow__(self, other)
 
-    def exp(self, other: Ty) -> Ty:
+    def exp(self, other: "Ty") -> Self:
         """
-        The exponential of a type, which is the type itself when the
-        exponent is the unit, as is any exponential of the unit.
+        The exponential of a type, called with ``**``, is its :meth:`over`,
+        the default one of the two: the type itself when the exponent is the
+        unit, as is any exponential of the unit.
 
-        >>> x = Ty('x')
+        >>> x, y = Ty('x'), Ty('y')
+        >>> assert x ** y == x << y and str(x ** y) == "(x << y)"
         >>> assert x ** Ty() == x << Ty() == Ty() >> x == x
         """
-        return self.ar(self.exp_factory(self, other)) if other else self
+        return self.over(other)
 
     def over(self, other: Ty) -> Ty:
         return self.ar(self.over_factory(self, other)) if other else self
@@ -178,23 +193,71 @@ class Ty(monoidal.Ty):
         raise ValueError
 
     @classmethod
-    def strategy(cls, *, max_leaves=3):
+    def strategy(cls, *, max_leaves=3, **params):
         """
         Generate atomic types and their exponentials, ``max_leaves`` atoms
-        at most.
+        at most, or with ``params`` the types the search of the free monoid
+        derives within them, e.g. between a given ``dom`` and ``cod``.
         """
         from hypothesis import strategies as st
+
+        if params:
+            return super().strategy(**params)
 
         def exponentials(types):
             return st.builds(lambda x, y: x << y, types, types)\
                 | st.builds(lambda x, y: x >> y, types, types)
 
         return st.recursive(
-            super().strategy(), exponentials, max_leaves=max_leaves)
+            cls.generator_strategy(), exponentials, max_leaves=max_leaves)
 
     def __repr__(self):
         return factory_name(type(self))\
             + f"({', '.join(map(repr, self.inside))})"
+
+    def cast_wire(self, x: str | cat.Ob) -> cat.Ob:
+        """
+        Turn a constructor argument into an atom of the type: any monoidal
+        wire, as a rigid type is a biclosed type.
+
+        A name gives a :class:`Wire`, and so do a plain ``cat.Ob`` and a
+        :class:`monoidal.Wire` with one colour on both sides, colour kept, as
+        dumps, pickles and printed text from before hold them. A pickled
+        :class:`Exp` of no side becomes the ``over`` of its base.
+
+        >>> assert Ty(cat.Ob('x')) == Ty(monoidal.Wire('x')) == Ty(Wire('x'))
+        """
+        x = super().cast_wire(x)
+        # pylint: disable-next=unidiomatic-typecheck  # not their subclasses
+        if type(x) is monoidal.Wire and x.dom == x.cod:
+            return Wire(x.name, x.dom, x.cod)
+        # pylint: disable-next=unidiomatic-typecheck  # not its subclasses
+        return Exp(x.base, x.exponent) if type(x) is Exp else x
+
+    def __setstate__(self, state):
+        super().__setstate__(state)
+        if self.generator_factory is monoidal.Wire:
+            self.inside = tuple(map(self.cast_wire, self.inside))
+
+    def bang(self) -> Self:
+        """
+        The bang of a type, a single wire :class:`BangOb` holding it: the
+        bang is lax monoidal, ``!(x @ y)`` is one wire and not ``!x @ !y``.
+
+        Example
+        -------
+        >>> x, y = Ty('x'), Ty('y')
+        >>> assert x.bang() == Ty(BangOb(x)) != Ty(BangOb(x @ y))
+        >>> assert (x @ y).bang() != x.bang() @ y.bang()
+        >>> assert str(x.bang()) == "x.bang()"
+        >>> assert eval(str((x @ y).bang().bang())) == (x @ y).bang().bang()
+        """
+        return self.ar_bang_ob(self)
+
+    @classmethod
+    def ar_bang_ob(cls, arg: Ty) -> Self:
+        """ The type of one :attr:`bang_factory` wire holding ``arg``. """
+        return cls(cls.bang_factory(arg))
 
     @property
     def is_exp(self):
@@ -249,7 +312,7 @@ class Wire(monoidal.Wire):
     """
     A biclosed object is a self-dagger :class:`monoidal.Wire`, i.e. its left
     and right colours always match. Exponentials do not interact meaningfully
-    with colours, so for now we assume everything is transparent.
+    with colours, so for now we assume nothing is coloured.
     """
     def dagger(self) -> Wire:
         return self
@@ -257,20 +320,37 @@ class Wire(monoidal.Wire):
 
 class Exp(Wire):
     """
-    A :code:`base` type to an :code:`exponent` type, called with :code:`**`.
+    A :code:`base` type to an :code:`exponent` type, either :class:`Over` or
+    :class:`Under`: a biclosed exponential with no side is the ``over`` of
+    its base, the default one, as :meth:`Ty.exp` is.
 
     Parameters:
         base : The base type.
         exponent : The exponent type.
+
+    >>> x, y = Ty('x'), Ty('y')
+    >>> assert Exp(x, y) == Over(x, y) and Ty(Exp(x, y)) == x ** y
     """
 
     ob = Ty
+
+    # pylint: disable-next=unused-argument  # passed to __init__
+    def __new__(cls, *args, **kwargs):
+        base = args[0] if args else kwargs.get("base")
+        return super().__new__(
+            getattr(base, "over_factory", cls) if cls is Exp else cls)
 
     def __init__(self, base: Ty, exponent: Ty):
         assert_isinstance(base, self.ob)
         assert_isinstance(exponent, self.ob)
         self.base, self.exponent = base, exponent
-        super().__init__(str(self))
+        super().__init__("")
+        del self.name
+
+    @cached_property
+    def name(self):  # pylint: disable=method-hidden  # deleted by __init__
+        "The name of an exponential is its print, computed when first read."
+        return str(self)
 
     def __eq__(self, other):
         return isinstance(other, type(self))\
@@ -282,7 +362,7 @@ class Exp(Wire):
     def __str__(self):
         return f"({self.base} ** {self.exponent})"
 
-    def atoms(self) -> list[Ty]:
+    def atoms(self) -> list:
         """ The atoms of an exponential: those of its base and exponent. """
         return self.base.atoms() + self.exponent.atoms()
 
@@ -332,11 +412,79 @@ class Under(Exp):
         return f"({self.exponent} >> {self.base})"
 
 
+class BangOb(Wire):
+    """
+    The bang ``!x`` of a type ``x``, a wire of its own holding it, the way an
+    :class:`Exp` holds its base and exponent.
+
+    Parameters:
+        arg : The type to bang.
+
+    Example
+    -------
+    >>> from discopy import biclosed
+    >>> x, y = Ty('x'), Ty('y')
+    >>> assert Ty(BangOb(x @ y)) == (x @ y).bang()
+    >>> assert eval(repr(BangOb(x))) == BangOb(x)
+    >>> assert BangOb(x @ y).drawing_name == "!(x @ y)"
+    """
+    ob = Ty
+
+    def __init__(self, arg: Ty):
+        assert_isinstance(arg, self.ob)
+        self.arg = arg
+        super().__init__("")
+        del self.name
+
+    @cached_property
+    def name(self):  # pylint: disable=method-hidden  # deleted by __init__
+        "The name of a bang is its print, computed when first read."
+        return str(self)
+
+    def __eq__(self, other):
+        return isinstance(other, type(self)) and self.arg == other.arg
+
+    def __hash__(self):
+        return hash(repr(self))
+
+    def __str__(self):
+        arg = str(self.arg) if len(self.arg) == 1 else f"({self.arg})"
+        return arg + ".bang()"
+
+    @property
+    def drawing_name(self) -> str:
+        """ The label of a banged wire, e.g. ``!x`` or ``!(x @ y)``. """
+        arg = self.arg.to_drawing()
+        return "!" + (str(arg) if len(arg) == 1 else f"({arg})")
+
+    def atoms(self) -> list:
+        """ The atoms of a bang: those of the type it holds. """
+        return self.arg.atoms()
+
+    def __repr__(self):
+        return factory_name(type(self)) + f"({self.arg!r})"
+
+    def to_tree(self):
+        return {'factory': factory_name(type(self)),
+                'arg': self.arg.to_tree()}
+
+    @classmethod
+    def from_tree(cls, tree):
+        return cls(from_tree(tree['arg']))
+
+
+Ty.bang_factory = BangOb
+
+
 @factory
-class Diagram(monoidal.Diagram, BiclosedCategory):
+class Diagram(monoidal.Diagram, LinearCategory):
     """
     A biclosed diagram is a monoidal diagram
-    with :class:`Curry` and :class:`Eval` boxes.
+    with :class:`Curry` and :class:`Eval` boxes. It is the free linear
+    category without symmetry, with :class:`Bang` bubbles and the
+    :class:`Dereliction`, :class:`Digging`, :class:`Contraction`,
+    :class:`Weakening`, :class:`Exchange` and :class:`Laxator` boxes, see
+    :class:`discopy.abc.LinearCategory`.
 
     Parameters:
         inside(Layer) : The layers inside the diagram.
@@ -349,8 +497,60 @@ class Diagram(monoidal.Diagram, BiclosedCategory):
     coeval_factory: ClassVar[type["Coeval"]]
     sum_factory: ClassVar[type["Sum"]]
     functor_factory: ClassVar[type["Functor"]]
+    bang_factory: ClassVar[type["Bang"]]
+    dereliction_factory: ClassVar[type["Dereliction"]]
+    digging_factory: ClassVar[type["Digging"]]
+    contraction_factory: ClassVar[type["Contraction"]]
+    weakening_factory: ClassVar[type["Weakening"]]
+    exchange_factory: ClassVar[type["Exchange"]]
+    laxator_factory: ClassVar[type["Laxator"]]
 
     ob = Ty
+
+    def bang(self) -> Diagram:
+        """
+        Wrapper around :class:`Bang` called by :class:`Functor`: the bang of
+        a free diagram is a bubble, so it is a functor only up to the laws
+        the free category declares failing.
+
+        Example
+        -------
+        >>> x, y = Ty('x'), Ty('y')
+        >>> f = Box('f', x, y)
+        >>> assert f.bang() == Bang(f) and f.bang().dom == x.bang()
+        >>> assert Diagram.id(x).bang() != Diagram.id(x.bang())
+        """
+        return self.bang_factory(self)
+
+    @classmethod
+    def dereliction(cls, x: Ty) -> Dereliction:
+        """ Wrapper around :class:`Dereliction`. """
+        return cls.dereliction_factory(x)
+
+    @classmethod
+    def digging(cls, x: Ty) -> Digging:
+        """ Wrapper around :class:`Digging`. """
+        return cls.digging_factory(x)
+
+    @classmethod
+    def contraction(cls, x: Ty) -> Contraction:
+        """ Wrapper around :class:`Contraction`. """
+        return cls.contraction_factory(x)
+
+    @classmethod
+    def weakening(cls, x: Ty) -> Weakening:
+        """ Wrapper around :class:`Weakening`. """
+        return cls.weakening_factory(x)
+
+    @classmethod
+    def exchange(cls, x: Ty, y: Ty, is_dagger: bool = False) -> Exchange:
+        """ Wrapper around :class:`Exchange`. """
+        return cls.exchange_factory(x, y, is_dagger)
+
+    @classmethod
+    def laxator(cls, x: Ty | None = None, y: Ty | None = None) -> Laxator:
+        """ Wrapper around :class:`Laxator`. """
+        return cls.laxator_factory(x, y)
 
     def curry(self, n=1, left=True) -> Diagram:
         """
@@ -405,6 +605,33 @@ class Diagram(monoidal.Diagram, BiclosedCategory):
     def to_drawing(self):
         return monoidal.Diagram.to_drawing(self, functor_factory=Functor)
 
+    map_agreement = monoidal.Diagram.map_agreement.failing(
+        messages.MAP_OF_A_CURRY)
+    dagger_involution = DaggerCategory.dagger_involution.failing(
+        messages.CURRY_HAS_NO_DAGGER)
+    dagger_involution_monoidal = DaggerCategory.dagger_involution.weaken(
+        within=MonoidalCategory)
+    dagger_contravariance = DaggerCategory.dagger_contravariance.failing(
+        messages.CURRY_HAS_NO_DAGGER)
+    dagger_contravariance_monoidal = DaggerCategory.dagger_contravariance\
+        .weaken(within=MonoidalCategory)
+    dagger_monoidality = DaggerMonoidalCategory.dagger_monoidality.failing(
+        messages.CURRY_HAS_NO_DAGGER)
+    dagger_monoidality_monoidal = DaggerMonoidalCategory.dagger_monoidality\
+        .weaken(within=MonoidalCategory)\
+        .failing(messages.NO_PLANAR_NORMAL_FORM)
+    currying_left = BiclosedCategory.currying_left.failing(messages.FREE_CURRY)
+    currying_right = BiclosedCategory.currying_right.failing(
+        messages.FREE_CURRY)
+    currying_eta_left = BiclosedCategory.currying_eta_left.failing(
+        messages.FREE_CURRY)
+    currying_eta_right = BiclosedCategory.currying_eta_right.failing(
+        messages.FREE_CURRY)
+    currying_naturality_left = BiclosedCategory.currying_naturality_left\
+        .failing(messages.FREE_CURRY)
+    currying_naturality_right = BiclosedCategory.currying_naturality_right\
+        .failing(messages.FREE_CURRY)
+
 
 class Box(monoidal.Box, Diagram):
     """
@@ -429,6 +656,8 @@ class Eval(Box):
             An :class:`Over` is evaluated on the left only and an
             :class:`Under` on the right only.
     """
+    serialised_attrs = ("x", "left")
+
     def __init__(self, x: Exp, left=None):
         assert x.is_exp
         self.x = x
@@ -440,6 +669,30 @@ class Eval(Box):
         dom, cod = (x @ x.exponent, x.base) if self.left\
             else (x.exponent @ x, x.base)
         super().__init__("Eval" + str(x), dom, cod)
+
+    def __setstate__(self, state):
+        """ A pickle from before is named after ``x ** y``, renamed here. """
+        super().__setstate__(state)
+        self.name = "Eval" + str(self.x)
+
+    @classmethod
+    # pylint: disable-next=arguments-differ  # drawn with no boundary
+    def strategy(cls, *, types=None):
+        """
+        Generate the evaluation of an exponential of two atomic types,
+        ``x << y`` on the left or ``y >> x`` on the right.
+
+        Parameters:
+            types : The strategy to draw the types from, see
+                :meth:`atomic_strategy`.
+        """
+        from hypothesis import strategies as st
+
+        atoms = cls.atomic_strategy(types)
+        return st.tuples(atoms, atoms, st.booleans()).map(
+            lambda args: cls(
+                args[0] << args[1] if args[2] else args[1] >> args[0],
+                left=args[2]))
 
     def __repr__(self):
         return f"{factory_name(type(self))}({self.x!r}, left={self.left!r})"
@@ -477,11 +730,13 @@ class Coeval(Box):
     (2016) <https://arxiv.org/abs/1512.06751>`_. It is used by
     :meth:`Curry.to_drawing` and :meth:`Diagram.to_compact`.
     """
+    serialised_attrs = ("x", "left")
     drawing_name = "lambda"
 
     __repr__ = Eval.__repr__
     to_tree = Eval.to_tree
     from_tree = classmethod(Eval.from_tree.__func__)
+    strategy = classmethod(Eval.strategy.__func__)
 
     def __init__(self, x: Exp, left=None):
         assert x.is_exp
@@ -494,6 +749,10 @@ class Coeval(Box):
         cod, dom = (x @ x.exponent, x.base) if self.left\
             else (x.exponent @ x, x.base)
         super().__init__("Coeval" + str(x), dom, cod)
+
+    def __setstate__(self, state):
+        super().__setstate__(state)
+        self.name = "Coeval" + str(self.x)
 
     def dagger(self) -> Eval:
         return self.eval_factory(self.x, self.left)
@@ -514,6 +773,8 @@ class Curry(monoidal.Bubble, Box):
     >>> print(Curry(Box('f', x @ y, z)))
     Curry(f, 1, True)
     """
+    serialised_attrs = ("*args", "n", "left")
+
     def __init__(self, arg: Diagram, n=1, left=True):
         if not 0 <= n <= len(arg.dom):
             raise AxiomError(messages.NOT_SPLITTABLE.format(n, arg.dom))
@@ -579,12 +840,316 @@ class Sum(monoidal.Sum, Box):
     """
 
 
+class Bubble(monoidal.Bubble, Box):
+    """
+    A biclosed bubble is a monoidal bubble and a biclosed box.
+    """
+
+
+class Bang(monoidal.Bubble, Box):
+    """
+    The bang ``!f : !x -> !y`` of a diagram ``f : x -> y``, a bubble the way
+    a :class:`Curry` is.
+
+    Parameters:
+        arg : The diagram to bang.
+
+    Example
+    -------
+    >>> from discopy import biclosed
+    >>> x, y = Ty('x'), Ty('y')
+    >>> f = Box('f', x, y)
+    >>> assert Bang(f).dom == x.bang() and Bang(f).cod == y.bang()
+    >>> assert eval(repr(Bang(f))) == Bang(f) and eval(str(Bang(f))) == Bang(f)
+    >>> print(Bang(f >> f[::-1]))
+    (f >> f[::-1]).bang()
+
+    The promotion of !L*, from ``!x -> y`` to ``!x -> !y``, is the digging
+    followed by the bang:
+
+    >>> g = Box('g', x.bang(), y)
+    >>> promotion = Digging(x) >> g.bang()
+    >>> assert promotion.dom == x.bang() and promotion.cod == y.bang()
+    """
+    serialised_attrs = ("*args", )
+
+    def __init__(self, arg: Diagram):
+        dom, cod = arg.dom.bang(), arg.cod.bang()
+        monoidal.Bubble.__init__(
+            self, arg, dom=dom, cod=cod, drawing_name="!")
+        Box.__init__(self, f"({arg}).bang()", dom, cod)
+
+    def __repr__(self):
+        return f"{factory_name(type(self))}({self.arg!r})"
+
+    def __str__(self):
+        return self.name
+
+    def to_tree(self):
+        return {'factory': factory_name(type(self)),
+                'arg': self.arg.to_tree()}
+
+    @classmethod
+    def from_tree(cls, tree):
+        return cls(from_tree(tree['arg']))
+
+    def dagger(self) -> Bang:
+        """ The dagger of a bang is the bang of the dagger. """
+        return type(self)(self.arg.dagger())
+
+
+class Structural(Box):
+    """
+    A structural box of a linear category, built from the types of its
+    :attr:`serialised_attrs` rather than a name and a boundary: its name is
+    the call on them, which is its string.
+    """
+    def __getnewargs__(self):
+        """ The arguments of the constructor. """
+        return tuple(getattr(self, attr) for attr in self.serialised_attrs)
+
+    def __repr__(self):
+        arguments = (
+            repr(value) for value in self.__getnewargs__()
+            if value is not None)
+        return f"{factory_name(type(self))}({', '.join(arguments)})"
+
+    def to_tree(self):
+        return {'factory': factory_name(type(self))} | {
+            attr: value.to_tree() if isinstance(value, Ty) else value
+            for attr, value in zip(
+                self.serialised_attrs, self.__getnewargs__())}
+
+    @classmethod
+    def from_tree(cls, tree):
+        return cls(**{
+            attr: from_tree(value) if isinstance(value, dict) else value
+            for attr, value in tree.items() if attr != "factory"})
+
+    def dagger(self):
+        """
+        A structural box has no dagger but for the exchange.
+
+        >>> Dereliction(Ty('x')).dagger()
+        Traceback (most recent call last):
+        ...
+        discopy.utils.AxiomError: Dereliction(x) has no dagger: ...
+        """
+        raise AxiomError(messages.BANG_HAS_NO_DAGGER.format(self))
+
+
+class Dereliction(Structural):
+    """
+    The dereliction ``!x -> x``, the counit of the bang and the rule of !L*
+    deriving ``Γ, !x, Δ ⊢ y`` from ``Γ, x, Δ ⊢ y``.
+
+    Parameters:
+        x : The type to derelict.
+
+    Example
+    -------
+    >>> x = Ty('x')
+    >>> assert Dereliction(x).dom == x.bang() and Dereliction(x).cod == x
+    """
+    serialised_attrs = ("x", )
+    drawing_name = "ε"
+
+    def __init__(self, x: Ty):
+        self.x = x
+        super().__init__(f"Dereliction({x})", x.bang(), x)
+
+    @classmethod
+    # pylint: disable-next=arguments-differ  # drawn with no boundary
+    def strategy(cls, *, types=None):
+        """
+        Generate the box at an atomic type.
+
+        Parameters:
+            types : The strategy to draw the types from, see
+                :meth:`atomic_strategy`.
+        """
+        return cls.atomic_strategy(types).map(cls)
+
+
+class Digging(Structural):
+    """
+    The digging ``!x -> !!x``, the comultiplication of the bang.
+
+    Parameters:
+        x : The type to dig.
+
+    Example
+    -------
+    >>> x = Ty('x')
+    >>> assert Digging(x).cod == x.bang().bang()
+    """
+    serialised_attrs = ("x", )
+    drawing_name = "δ"
+    strategy = classmethod(Dereliction.strategy.__func__)
+
+    def __init__(self, x: Ty):
+        self.x = x
+        super().__init__(f"Digging({x})", x.bang(), x.bang().bang())
+
+
+class Contraction(Structural):
+    """
+    The contraction ``!x -> !x @ !x``, the rule of !L* deriving
+    ``Γ, !x, Δ ⊢ y`` from ``Γ, !x, !x, Δ ⊢ y``.
+
+    Parameters:
+        x : The type to contract.
+
+    Example
+    -------
+    >>> x = Ty('x')
+    >>> assert Contraction(x).cod == x.bang() @ x.bang()
+    """
+    serialised_attrs = ("x", )
+    drawing_name = "Δ"
+    strategy = classmethod(Dereliction.strategy.__func__)
+
+    def __init__(self, x: Ty):
+        self.x = x
+        super().__init__(f"Contraction({x})", x.bang(), x.bang() @ x.bang())
+
+
+class Weakening(Structural):
+    """
+    The weakening ``!x -> Ty()``, the counit of the contraction. !L* is
+    relevant: it has no weakening, which an example of it never uses.
+
+    Parameters:
+        x : The type to weaken.
+
+    Example
+    -------
+    >>> x = Ty('x')
+    >>> assert Weakening(x).dom == x.bang() and not Weakening(x).cod
+    """
+    serialised_attrs = ("x", )
+    drawing_name = "e"
+    strategy = classmethod(Dereliction.strategy.__func__)
+
+    def __init__(self, x: Ty):
+        self.x = x
+        super().__init__(f"Weakening({x})", x.bang(), x[:0])
+
+
+class Exchange(Structural):
+    """
+    The exchange ``!x @ y -> y @ !x`` of a banged type with any type, and its
+    inverse ``y @ !x -> !x @ y`` when ``is_dagger``, the permutation rule of
+    !L*: it makes ``!x`` central rather than the category symmetric.
+
+    Parameters:
+        x : The type that is banged.
+        y : The type it is exchanged with.
+        is_dagger : Whether to take the inverse.
+
+    Example
+    -------
+    >>> x, y = Ty('x'), Ty('y')
+    >>> assert Exchange(x, y).dom == x.bang() @ y
+    >>> assert Exchange(x, y).dagger() == Exchange(x, y, True)
+    >>> assert Exchange(x, y, True).dom == y @ x.bang()
+    >>> assert eval(str(Exchange(x, y)[::-1])) == Exchange(x, y, True)
+    """
+    serialised_attrs = ("x", "y", "is_dagger")
+    drawing_name = "σ"
+
+    def __init__(self, x: Ty, y: Ty, is_dagger: bool = False):
+        self.x, self.y = x, y
+        dom, cod = x.bang() @ y, y @ x.bang()
+        super().__init__(f"Exchange({x}, {y})", *(
+            (cod, dom) if is_dagger else (dom, cod)), is_dagger=is_dagger)
+
+    def dagger(self) -> Exchange:
+        return type(self)(self.x, self.y, not self.is_dagger)
+
+    @classmethod
+    # pylint: disable-next=arguments-differ  # drawn with no boundary
+    def strategy(cls, *, types=None):
+        """
+        Generate the exchange of two atomic types, or its inverse.
+
+        Parameters:
+            types : The strategy to draw the types from, see
+                :meth:`atomic_strategy`.
+        """
+        from hypothesis import strategies as st
+
+        atoms = cls.atomic_strategy(types)
+        return st.builds(cls, atoms, atoms, st.booleans())
+
+
+class Laxator(Structural):
+    """
+    The laxator ``!x @ !y -> !(x @ y)`` of the bang, and its unit
+    ``Ty() -> !Ty()`` when given no type.
+
+    Parameters:
+        x : The type on the left.
+        y : The type on the right.
+
+    Example
+    -------
+    >>> from discopy import biclosed
+    >>> x, y = Ty('x'), Ty('y')
+    >>> assert Laxator(x, y).dom == x.bang() @ y.bang()
+    >>> assert Laxator(x, y).cod == (x @ y).bang()
+    >>> assert not Laxator().dom and Laxator().cod == Ty().bang()
+    >>> assert eval(repr(Laxator())) == Laxator()
+    """
+    serialised_attrs = ("x", "y")
+    drawing_name = "m"
+
+    def __init__(self, x: Ty | None = None, y: Ty | None = None):
+        if (x is None) != (y is None):
+            raise ValueError(messages.LAXATOR_ARITY.format((x, y)))
+        self.x, self.y = x, y
+        if x is None or y is None:
+            name, dom = "Laxator()", self.ob()
+            cod = Ty.bang(dom)
+        else:
+            name, dom = f"Laxator({x}, {y})", x.bang() @ y.bang()
+            cod = (x @ y).bang()
+        super().__init__(name, dom, cod)
+
+    @classmethod
+    # pylint: disable-next=arguments-differ  # drawn with no boundary
+    def strategy(cls, *, types=None):
+        """
+        Generate the laxator of two atomic types, or its unit.
+
+        Parameters:
+            types : The strategy to draw the types from, see
+                :meth:`atomic_strategy`.
+        """
+        from hypothesis import strategies as st
+
+        atoms = cls.atomic_strategy(types)
+        return st.one_of(st.just(cls()), st.builds(cls, atoms, atoms))
+
+
 Id = Diagram.id
 Diagram.box_factory = Box
 Diagram.curry_factory = Curry
 Diagram.eval_factory = Eval
 Diagram.coeval_factory = Coeval
 Diagram.sum_factory = Sum
+Diagram.bubble_factory = Bubble
+Diagram.bang_factory = Bang
+Diagram.dereliction_factory = Dereliction
+Diagram.digging_factory = Digging
+Diagram.contraction_factory = Contraction
+Diagram.weakening_factory = Weakening
+Diagram.exchange_factory = Exchange
+Diagram.laxator_factory = Laxator
+for law in sorted(
+        set(LinearCategory.axioms) - set(BiclosedCategory.axioms)):
+    setattr(Diagram, law, getattr(LinearCategory, law).failing(
+        messages.FREE_BANG))
 
 
 class Functor(monoidal.Functor):
@@ -600,8 +1165,8 @@ class Functor(monoidal.Functor):
 
     Note
     ----
-    When the codomain objects are biclosed types, the functor sends terms to
-    terms rather than evaluating them to morphisms:
+    When the codomain has terms, i.e. its constants are its arrows, the functor
+    sends terms to terms rather than evaluating them to morphisms:
 
     >>> X, Y = Ty("X"), Ty("Y")
     >>> f, x = (Y << X)("f"), X("x")
@@ -615,6 +1180,13 @@ class Functor(monoidal.Functor):
 
     >>> assert f(x).to_hypergraph() == f(x).eval().to_hypergraph()
 
+    A :class:`Drawing` has neither, but a term is drawn as the box it is,
+    labelled with its name, inside a diagram as well as on its own: only
+    :meth:`TermBase.draw` draws its evaluation.
+
+    >>> assert [str(box) for box in (f(x) @ X).to_drawing().boxes] == [
+    ...     str(f(x))]
+
     The image of a term is checked to have the image of its type:
 
     >>> Functor(ob_map={X: Ty("A"), Y: Ty("B")}, ar_map={f: Ty("A")("a")})(f)
@@ -624,13 +1196,52 @@ class Functor(monoidal.Functor):
     """
     dom = cod = Diagram
 
+    @property
+    def has_bang(self) -> bool:
+        """
+        Whether the codomain is a linear category whose objects are made of
+        biclosed wires, which a :class:`BangOb` and the structural boxes are
+        sent through: those of its generator, or the monoidal wires a
+        biclosed type casts to them, see :meth:`Ty.cast_wire`. Otherwise,
+        e.g. into :class:`discopy.tensor.Diagram`, they go through
+        ``ob_map`` and ``ar_map``.
+        """
+        ob = get_origin(self.cod.ob)
+        generator = getattr(ob, "generator_factory", object)
+        return issubclass(get_origin(self.cod), LinearCategory) and (
+            issubclass(generator, Wire)
+            or issubclass(ob, Ty) and generator is monoidal.Wire)
+
+    def map_bang(self, other):
+        """
+        The image of a :class:`BangOb`, a :class:`Bang` or a structural box
+        in a codomain with a bang, see :attr:`has_bang`.
+
+        Parameters:
+            other : The wire or box to map.
+        """
+        if isinstance(other, (BangOb, Bang)):
+            return self(other.arg).bang()
+        if isinstance(other, Laxator):
+            return self.cod.laxator() if other.x is None\
+                else self.cod.laxator(self(other.x), self(other.y))
+        if isinstance(other, Exchange):
+            return self.cod.exchange(
+                self(other.x), self(other.y), other.is_dagger)
+        method = getattr(self.cod, type(other).__name__.lower())
+        return method(self(other.x))
+
     def __call__(self, other):
-        if isinstance(other, TermBase):
+        if isinstance(other, (BangOb, Bang, Structural))\
+                and self.cod is not Drawing:
+            return self.map_bang(other) if self.has_bang\
+                else monoidal.Functor.__call__(self, other)
+        if isinstance(other, TermBase) and self.cod is not Drawing:
             if issubclass(get_origin(self.cod), hypergraph.Hypergraph)\
                     and not isinstance(other, Constant):
                 return self(other.eval())
-            if issubclass(get_origin(self.cod.ob), Ty) and not issubclass(
-                    get_origin(self.cod), (cmap.CMap, hypergraph.Hypergraph)):
+            if issubclass(get_origin(self.cod.ob), Ty) and issubclass(
+                    self.cod.ob.constant_factory, get_origin(self.cod)):
                 return self.map_term(other)
             return other.eval(self)
         for cls, attr in [(Over, "over"), (Under, "under"), (Exp, "exp")]:
@@ -641,8 +1252,8 @@ class Functor(monoidal.Functor):
                 if hasattr(self.cod, attr):
                     return getattr(self.cod, attr)(base, exponent)
         if isinstance(other, Curry) and hasattr(self.cod, "curry"):
-            return self.cod.curry(
-                self(other.arg), len(self(other.cod.exponent)), other.left)
+            n = len(self(other.cod.exponent)) if other.n else 0
+            return self.cod.curry(self(other.arg), n, other.left)
         if isinstance(other, (Eval, Coeval)) and hasattr(self.cod, "ev"):
             base, exponent, left = other.x.base, other.x.exponent, other.left
             result = self.cod.ev(self(base), self(exponent), left)
@@ -669,7 +1280,8 @@ class Functor(monoidal.Functor):
             result = self.cod.ob.variable_factory(name, cod)
         return result
 
-    def map_term(self, term: TermBase, context: dict = None) -> TermBase:
+    def map_term(
+            self, term: "TermBase", context: dict | None = None) -> "TermBase":
         """
         The image of a term, a term in the internal language of the codomain,
         checked to have the image of its type and exactly the images of its
@@ -706,10 +1318,159 @@ CMap = cmap.CMap[Diagram]
 Diagram.functor_factory = Functor
 
 
+class Renamed[factory](TestableGeneric, tuple):
+    """
+    Alpha-equivalent terms of the ``factory``: one shape generated under two
+    or more namings of its bound variables, see :meth:`TermBase.generate`.
+
+    Example
+    -------
+    >>> from hypothesis import find
+    >>> terms = find(
+    ...     Renamed[TermBase].strategy(), lambda terms: len(terms) == 3)
+    >>> assert terms[0].alpha_eq(*terms[1:])
+    """
+    @classmethod
+    def checked_params(cls) -> tuple:
+        """ None, a sort of premises being drawn over a category. """
+        return ()
+
+    @classmethod
+    def strategy(cls, **params) -> "st.SearchStrategy[Renamed]":
+        """
+        Generate a shape and at least two namings of it.
+
+        Parameters:
+            params : Passed to :meth:`TermBase.shapes`.
+        """
+        from hypothesis import strategies as st
+
+        category = cls.factory
+        return st.builds(
+            lambda shape, namings: cls(
+                category.generate(*shape, letters) for letters in namings),
+            category.shapes(**params),
+            st.lists(category.namings(), min_size=2, max_size=3))
+
+
+class Canonical[factory](TestableGeneric, tuple):
+    """
+    Two terms of the ``factory`` followed by their canonical forms: two
+    shapes of one type, the second the first's or another, each generated
+    under its own naming and then under the one naming ``"x"``, which names
+    every bound variable by its level, so that the two terms are
+    alpha-equivalent exactly when their canonical forms are equal. Where
+    :class:`Renamed` draws terms alpha-equivalent by construction, this
+    decides the alpha-equivalence of any pair, see
+    :meth:`TermBase.alpha_completeness`.
+
+    Example
+    -------
+    >>> from hypothesis import find
+    >>> first, second, *canonical = find(
+    ...     Canonical[TermBase].strategy(),
+    ...     lambda terms: terms[0] != terms[1] and terms[2] == terms[3])
+    >>> assert first.alpha_eq(second)
+    """
+    @classmethod
+    def checked_params(cls) -> tuple:
+        """ None, a sort of premises being drawn over a category. """
+        return ()
+
+    @classmethod
+    def build(cls, shape: tuple, others: list[int] | None,
+              namings: tuple[Sequence[str], Sequence[str]]) -> "Canonical":
+        """
+        The terms of a shape and of another, the same when ``others`` is
+        ``None``, under their namings and then under the canonical one.
+        """
+        cod, choices, types = shape
+        shapes = (choices, choices if others is None else others)
+        return cls(
+            cls.factory.generate(cod, each, types, letters)
+            for each, letters in zip(2 * shapes, (*namings, "x", "x")))
+
+    @classmethod
+    def strategy(cls, **params) -> "st.SearchStrategy[Canonical]":
+        """
+        Generate a shape, its choices again or others, and two namings.
+
+        Parameters:
+            params : Passed to :meth:`TermBase.shapes`.
+        """
+        from hypothesis import strategies as st
+
+        category = cls.factory
+        return st.builds(
+            cls.build, category.shapes(**params),
+            st.none() | category.choices(),
+            st.tuples(category.namings(), category.namings()))
+
+
+class Reducible[factory](TestableGeneric, tuple):
+    """
+    A term of the ``factory`` with free variables in place of constants, so
+    that beta reduction reads a variable at every head, see
+    :class:`Normalising`.
+    """
+    @classmethod
+    def checked_params(cls) -> tuple:
+        """ None, a sort of premises being drawn over a category. """
+        return ()
+
+    @classmethod
+    def strategy(cls, **params) -> "st.SearchStrategy[Reducible]":
+        """
+        Generate a shape and a naming, with no constants.
+
+        Parameters:
+            params : Passed to :meth:`TermBase.shapes`.
+        """
+        from hypothesis import strategies as st
+
+        category = cls.factory
+        return st.builds(
+            lambda shape, letters: cls((
+                category.generate(*shape, letters, constants=False), )),
+            category.shapes(**params), category.namings())
+
+
+class Normalising(Testable):
+    """
+    The laws of beta reduction, for terms with a ``normal_form`` reached by
+    each of their :attr:`reduction_strategies`, e.g.
+    :class:`discopy.closed.TermBase`.
+    """
+    reduction_strategies: ClassVar[tuple] = ()
+
+    @axiom
+    def normal_form_idempotence(
+            cls, terms: Reducible[Self]) -> AbstractEquation:
+        """ A normal form is its own normal form. """
+        normal_form = terms[0].normal_form()
+        return Equation(normal_form.normal_form(), normal_form)
+
+    @axiom
+    def normal_form_typing(cls, terms: Reducible[Self]) -> AbstractEquation:
+        """ Beta reduction preserves the type of a term. """
+        return Equation(terms[0].normal_form().cod, terms[0].cod)
+
+    @axiom
+    def normal_form_confluence(
+            cls, terms: Reducible[Self]) -> AbstractEquation:
+        """
+        Every reduction strategy reaches the same normal form, up to the
+        names of its bound variables.
+        """
+        return AlphaEquation(*(
+            terms[0].normal_form(strategy=strategy)
+            for strategy in cls.reduction_strategies))
+
+
 class TermBase(Box, Equivalence):
     """
     A term in the internal language of biclosed categories, an
-    :class:`discopy.axioms.Equivalence` up to the names of its bound
+    :class:`discopy.testable.Equivalence` up to the names of its bound
     variables, see :meth:`alpha_eq`.
 
     Attributes:
@@ -752,7 +1513,7 @@ class TermBase(Box, Equivalence):
     functor: ClassVar[Functor] = Functor.id(Diagram)
 
     @abstractmethod
-    def eval(functor: Functor = None) -> BiclosedCategory:
+    def eval(self, functor: Functor | None = None) -> BiclosedCategory:
         """
         The evaluation of a :class:`Functor` on a term gives a morphism in its
         codomain. By default, this is the identity functor on the free biclosed
@@ -760,7 +1521,7 @@ class TermBase(Box, Equivalence):
         """
 
     @abstractmethod
-    def map(functor: Functor, context: dict) -> Term:
+    def map(self, functor: Functor, context: dict) -> "Term":
         """
         The image of a term under a :class:`Functor` whose codomain objects
         are biclosed types, i.e. a term in the codomain's internal language
@@ -768,7 +1529,10 @@ class TermBase(Box, Equivalence):
         """
 
     def draw(self, **kwargs):
-        "Drawing a term by evaluating it in the free biclosed category."
+        """
+        Drawing a term by evaluating it in the free biclosed category, whereas
+        inside a diagram a term is drawn as one box, see :class:`Functor`.
+        """
         return self.eval().draw(**kwargs)
 
     def to_closed(self):
@@ -876,15 +1640,18 @@ class TermBase(Box, Equivalence):
         return result
 
     @classmethod
-    def generate(cls, cod: Ty, choices: Sequence[int], types: Sequence[Ty],
-                 letters: Sequence[str]) -> Term:
+    # pylint: disable-next=too-many-arguments,too-many-positional-arguments
+    def generate(  # a shape, a naming and whether it takes constants
+            cls, cod: Ty, choices: Sequence[int], types: Sequence[Ty],
+            letters: Sequence[str], constants: bool = True) -> "Term":
         """
         Build a term of type ``cod`` from a sequence of ``choices``, one per
         node of the term, taking leaves once it runs out; the exponents of
         its applications are drawn from ``types`` and the variable bound at
         each level of binders is named by the letter at that level, so that
         the same choices under other letters give an alpha-equivalent term.
-        Free variables are named ``v0, v1, ...`` and constants ``c0, c1, ...``.
+        Free variables are named ``v0, v1, ...`` and constants ``c0, c1, ...``,
+        free variables taking the place of constants unless ``constants``.
         The term is planar and linear, as any term of a closed category is
         too, see :class:`Sampler` for the procedure.
 
@@ -897,7 +1664,8 @@ class TermBase(Box, Equivalence):
         >>> assert term.alpha_eq(
         ...     TermBase.generate(Y << X, [8, 0, 0], [X], "z"))
         """
-        return Sampler(cls, iter(choices), types, letters).term(cod)
+        return Sampler(
+            cls, iter(choices), types, letters, constants=constants).term(cod)
 
     @classmethod
     def choices(cls) -> st.SearchStrategy[list[int]]:
@@ -940,7 +1708,8 @@ class TermBase(Box, Equivalence):
         from hypothesis import strategies as st
 
         return st.builds(
-            lambda shape, letters: cls.generate(*shape, letters),
+            lambda shape, letters: cls.generate(
+                shape[0], shape[1], shape[2], letters),
             cls.shapes(**params), cls.namings())
 
     @classmethod
@@ -958,7 +1727,10 @@ class TermBase(Box, Equivalence):
 
         return st.builds(
             lambda terms: (terms[0], terms[2], terms[1]),
-            Canonical[cls].strategy(**params))
+            Canonical[cls].strategy(**params))  # ty: ignore[invalid-type-form]
+
+    serialisation = Serialisable.serialisation.failing(
+        "A term does not read back from its tree, see #692.")
 
     @axiom
     def alpha_renaming(cls, terms: Renamed[Self]) -> AbstractEquation:
@@ -1021,6 +1793,8 @@ class Constant(TermBase):
         name (str): The name of the constant.
         cod (Ty): The type of the constant.
     """
+    serialised_attrs = ("name", "cod", "*", "is_dagger", "data")
+
     def __init__(self, name: str, cod: Ty, **kwargs):
         super().__init__(name, dom=self.ob(), cod=cod, **kwargs)
         self.freevars = []
@@ -1034,7 +1808,7 @@ class Constant(TermBase):
     def constants(self):
         return [self]
 
-    def atoms(self) -> list[Ty]:
+    def atoms(self) -> list:
         """ A constant prints as its type called on its name: its atoms. """
         return self.cod.atoms()
 
@@ -1045,7 +1819,9 @@ class Constant(TermBase):
         return functor.ar_map[self]
 
     def __repr__(self):
-        return factory_name(type(self)) + f"({self.name!r}, {self.cod!r})"
+        data = "" if self.data is None else f", data={self.data!r}"
+        return factory_name(type(self))\
+            + f"({self.name!r}, {self.cod!r}{data})"
 
     def __str__(self):
         return f"{self.cod!s}({self.name!r})"
@@ -1059,6 +1835,8 @@ class Variable(TermBase):
         name (str): The name of the variable
         cod (Ty): The type of the variable.
     """
+    serialised_attrs = ("name", "cod")
+
     def __init__(self, name: str, cod: Ty):
         super().__init__(name, dom=cod, cod=cod)
         self.freevars = [self]
@@ -1128,7 +1906,9 @@ class Application(TermBase):
         args (Term): The arguments to which the function is applied.
         left (bool): Whether the argument comes in from the left or right.
     """
-    def __init__(self, func: Term, args: Term, left: bool = False):
+    serialised_attrs = ("func", "args", "left")
+
+    def __init__(self, func: TermBase, args: TermBase, left: bool = False):
         assert_isinstance(func, TermBase)
         assert_isinstance(args, TermBase)
         if not func.cod.is_exp:
@@ -1184,7 +1964,7 @@ class Application(TermBase):
         are, rather than when they print the same between the same types:
         a closed constant prints as its bare name, whatever its type.
         """
-        return type(self), self.func, self.args, self.left
+        return factory_key(type(self)), self.func, self.args, self.left
 
     @property
     def constants(self):
@@ -1207,11 +1987,12 @@ class Application(TermBase):
 
 
 class Abstraction(TermBase):
+    serialised_attrs = ("var", "body", "left")
     var: Variable
-    body: Term
+    body: TermBase
     left: bool = False
 
-    def __init__(self, var: Variable, body: Term, left: bool = False):
+    def __init__(self, var: Variable, body: TermBase, left: bool = False):
         self.var, self.body, self.left = var, body, left
         left_str = ", left=True" if left else ""
         name = f"{var.cod}(lambda {var.name}{left_str}: {body})"
@@ -1236,8 +2017,8 @@ class Abstraction(TermBase):
     def eval(self, functor=None):
         functor = functor or self.functor
         return functor.cod.curry(
-            self.body.eval(functor), len(functor(self.var.cod)),
-            not self.left)
+            self.body.eval(functor),  # ty: ignore[invalid-argument-type]
+            len(functor(self.var.cod)), not self.left)
 
     def map(self, functor, context):
         context = {key: value for key, value in context.items()
@@ -1266,7 +2047,7 @@ class Abstraction(TermBase):
         Abstractions are equal when their variables, bodies and sides are,
         see :meth:`Application.setoid`.
         """
-        return type(self), self.var, self.body, self.left
+        return factory_key(type(self)), self.var, self.body, self.left
 
     @property
     def constants(self):
@@ -1295,9 +2076,8 @@ class Abstraction(TermBase):
 type Term = Constant | Variable | Application | Abstraction
 
 
-for law in (
-        "unitality", "associativity",
-        "dagger_involution", "dagger_contravariance"):
+for law in sorted(
+        set(Box.axioms) - set(Serialisable.axioms) | set(Box.rules)):
     setattr(TermBase, law, getattr(Box, law).inapplicable(
         messages.TERM_IS_A_BOX))
 
@@ -1329,6 +2109,9 @@ class Sampler:
         linear : Whether each bound variable occurs exactly once, in the
             order of the binders, as :mod:`biclosed` requires; a term of
             :mod:`discopy.closed` may use one any number of times.
+        constants : Whether a leaf or the head of a spine may be a
+            constant, else a free variable, so that beta reduction reads a
+            variable at every head, see :class:`Reducible`.
 
     Example
     -------
@@ -1345,13 +2128,16 @@ class Sampler:
     letters: Sequence[str]
     counter: Iterator[int] = field(default_factory=count)
     linear: bool = True
+    constants: bool = True
 
     def choose(self, options: Sequence):
         """ Pick an option by the next choice, the first when they ran out. """
         return options[next(self.choices, 0) % len(options)]
 
-    def constant(self, cod: Ty) -> Constant:
-        """ A fresh constant of a given type. """
+    def constant(self, cod: Ty) -> Constant | Variable:
+        """ A fresh constant of a given type, if the sampler takes any. """
+        if not self.constants:
+            return self.variable(cod)
         return self.category.ob.constant_factory(
             f"c{next(self.counter)}", cod)
 
@@ -1465,7 +2251,7 @@ class Sampler:
             level=constraints.level + 1))
         return self.category.ob.abstraction_factory(var, body, left)
 
-    def term(self, cod: Ty, constraints: Constraints = None) -> Term:
+    def term(self, cod: Ty, constraints: "Constraints | None" = None) -> Term:
         """
         A term of a given type under the constraints, none by default: a
         leaf when the choices ran out, or the spine when none fits, else the
@@ -1509,90 +2295,11 @@ class Constraints:
         return self.prefix + self.suffix
 
 
-class Renamed(Testable, NamedGeneric["factory"], tuple):
-    """
-    Alpha-equivalent terms of the ``factory``: one shape generated under two
-    or more namings of its bound variables, see :meth:`TermBase.generate`.
-
-    Example
-    -------
-    >>> from hypothesis import find
-    >>> terms = find(
-    ...     Renamed[TermBase].strategy(), lambda terms: len(terms) == 3)
-    >>> assert terms[0].alpha_eq(*terms[1:])
-    """
-    @classmethod
-    def strategy(cls, **params) -> st.SearchStrategy[Renamed]:
-        """
-        Generate a shape and at least two namings of it.
-
-        Parameters:
-            params : Passed to :meth:`TermBase.shapes`.
-        """
-        from hypothesis import strategies as st
-
-        category = cls.factory
-        return st.builds(
-            lambda shape, namings: cls(
-                category.generate(*shape, letters) for letters in namings),
-            category.shapes(**params),
-            st.lists(category.namings(), min_size=2, max_size=3))
-
-
-class Canonical(Testable, NamedGeneric["factory"], tuple):
-    """
-    Two terms of the ``factory`` followed by their canonical forms: two
-    shapes of one type, the second the first's or another, each generated
-    under its own naming and then under the one naming ``"x"``, which names
-    every bound variable by its level, so that the two terms are
-    alpha-equivalent exactly when their canonical forms are equal. Where
-    :class:`Renamed` draws terms alpha-equivalent by construction, this
-    decides the alpha-equivalence of any pair, see
-    :meth:`TermBase.alpha_completeness`.
-
-    Example
-    -------
-    >>> from hypothesis import find
-    >>> first, second, *canonical = find(
-    ...     Canonical[TermBase].strategy(),
-    ...     lambda terms: terms[0] != terms[1] and terms[2] == terms[3])
-    >>> assert first.alpha_eq(second)
-    """
-    @classmethod
-    def build(cls, shape: tuple, others: list[int] | None,
-              namings: tuple[Sequence[str], Sequence[str]]) -> Canonical:
-        """
-        The terms of a shape and of another, the same when ``others`` is
-        ``None``, under their namings and then under the canonical one.
-        """
-        cod, choices, types = shape
-        shapes = (choices, choices if others is None else others)
-        return cls(
-            cls.factory.generate(cod, each, types, letters)
-            for each, letters in zip(2 * shapes, (*namings, "x", "x")))
-
-    @classmethod
-    def strategy(cls, **params) -> st.SearchStrategy[Canonical]:
-        """
-        Generate a shape, its choices again or others, and two namings.
-
-        Parameters:
-            params : Passed to :meth:`TermBase.shapes`.
-        """
-        from hypothesis import strategies as st
-
-        category = cls.factory
-        return st.builds(
-            cls.build, category.shapes(**params),
-            st.none() | category.choices(),
-            st.tuples(category.namings(), category.namings()))
-
-
 Ty.variable_factory = Variable
 Ty.constant_factory = Constant
 Ty.application_factory = Application
 Ty.abstraction_factory = Abstraction
-Ty.over_factory, Ty.under_factory, Ty.exp_factory = Over, Under, Exp
+Ty.over_factory, Ty.under_factory = Over, Under
 
 
 class Equation(monoidal.Equation):

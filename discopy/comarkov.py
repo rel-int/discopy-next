@@ -64,18 +64,20 @@ diagram as the copy boxes of :mod:`markov` they automatically satisfy the
 
 from __future__ import annotations
 
+from collections.abc import Sized
+from operator import index
 from typing import ClassVar
 
 from discopy import (
     symmetric, monoidal, feedback, cmap, hypergraph, messages, op)
-from discopy.abc import ComarkovCategory, MarkovCategory
+from discopy.abc import ComarkovCategory, MarkovCategory, Nat
 from discopy.cat import factory
 from discopy.feedback import (  # noqa: F401  pylint: disable=unused-import
     Wire, Ty)
 from discopy.python import finset
 from discopy.utils import (
-    AxiomError, assert_isatomic, assert_iscomposable, factory_name,
-    from_tree)
+    AxiomError, assert_isatomic, assert_iscomposable, factory_key,
+    factory_name, from_tree)
 
 
 class Layer(symmetric.Layer):
@@ -112,6 +114,9 @@ class Diagram(symmetric.Diagram, ComarkovCategory):
     cofunction_factory: ClassVar[type["Cofunction"]]
     layer_factory = Layer
 
+    map_agreement = monoidal.Diagram.map_agreement.failing(
+        messages.MAP_HAS_NO_SPIDERS)
+
     @classmethod
     def spider_factory(cls, n_legs_in, n_legs_out, typ, phase=None):
         if phase is not None or n_legs_out != 1:
@@ -139,7 +144,8 @@ class Diagram(symmetric.Diagram, ComarkovCategory):
         if cls.cofunction_factory.ar is cls:
             return cls.from_cofunction(finset.Function.copy(len(x), n), x)
         from discopy import frobenius
-        return frobenius.Diagram.spiders.__func__(cls, n, 1, x)
+        return frobenius.Diagram.spiders.__func__(
+            cls, n, 1, x)  # ty: ignore[invalid-argument-type]
 
     @classmethod
     def from_cofunction(cls, cofunc, cod: monoidal.Ty) -> Diagram:
@@ -165,7 +171,7 @@ class Diagram(symmetric.Diagram, ComarkovCategory):
         cofunc = list(cofunc)
         if sorted(cofunc) == list(range(len(cod))):
             dom = cod[:0].tensor(*(cod[i] for i in cofunc))
-            return cls.from_permutation(
+            return cls.from_permutation(  # ty: ignore[invalid-return-type]
                 finset.Permutation(cofunc).dagger(), dom)
         if cls.cofunction_factory.ar is cls:
             return cls.cofunction_factory(cod, cofunc)
@@ -221,10 +227,10 @@ class Cofunction(Box):
     .. image:: /_static/comarkov/cofunction.svg
         :align: center
     """
-    def __new__(cls, cod: monoidal.Ty = None, cofunc=None):
+    def __new__(cls, cod: monoidal.Ty | None = None, cofunc=None):
         if cod is None or cls is not cls.ar.cofunction_factory:
             return super().__new__(cls)
-        cofunc = list(cofunc)
+        cofunc = list(cofunc)  # ty: ignore[invalid-argument-type]
         if sorted(cofunc) == list(range(len(cod))):
             return cls.ar.from_cofunction(cofunc, cod)
         if len(cod) == 1 and not any(cofunc):
@@ -232,10 +238,10 @@ class Cofunction(Box):
         return super().__new__(cls)
 
     def __init__(self, cod: monoidal.Ty, cofunc):
-        self.cofunc = op.Comarkov(
-            finset.Function(list(cofunc), len(cod), len(cofunc)))
-        dom = cod[:0].tensor(*(cod[i] for i in cofunc))
-        Box.__init__(self, f"Cofunction({list(cofunc)})", dom, cod)
+        func = finset.Function(list(cofunc), Nat(len(cod)), Nat(len(cofunc)))
+        self.cofunc = op.Comarkov(func)  # ty: ignore[invalid-argument-type]
+        dom = cod[:0].tensor(*(cod[i] for i in func))
+        Box.__init__(self, f"Cofunction({list(func)})", dom, cod)
 
     def __getnewargs__(self):
         """
@@ -268,7 +274,7 @@ class Cofunction(Box):
     def setoid(self):
         if self.is_identity:
             return (), self.dom, self.cod
-        return type(self), self.cod, tuple(self.cofunc.inside)
+        return factory_key(type(self)), self.cod, tuple(self.cofunc.inside)
 
     def to_drawing(self):
         """ Draw the permutation of the inputs, then the merges. """
@@ -346,8 +352,10 @@ is not a dagger category.
                 and not others[plumbing].inside):
             other, plumbing = others[plumbing], plumbing + 1
             typ = other if isinstance(other, monoidal.Ty) else other.cod
-            cofuncs.append(other.cofunc if isinstance(other, Cofunction)
-                           else op.Comarkov.id(len(typ)))
+            cofuncs.append(
+                other.cofunc  # ty: ignore[invalid-argument-type]
+                if isinstance(other, Cofunction)
+                else op.Comarkov.id(len(typ)))
             cod = cod @ typ
         result = self if len(cofuncs) == 1 else self.ar.from_cofunction(
             cofuncs[0].tensor(*cofuncs[1:]).inside, cod)
@@ -388,8 +396,9 @@ class Permutation(symmetric.Permutation, Box):
     >>> assert isinstance(Swap(x, y), Cofunction)
     >>> assert Swap(x, y) @ Merge(x) == Cofunction(y @ x @ x, [1, 0, 2, 2])
     """
-    cofunc = property(lambda self: op.Comarkov(finset.Function(
-        list(self.perm.dagger()), len(self.cod), len(self.dom))))
+    cofunc = property(lambda self: op.Comarkov(
+        finset.Function(  # ty: ignore[invalid-argument-type]
+            list(self.perm.dagger()), Nat(len(self.cod)), Nat(len(self.dom)))))
     fuse, tensor = Cofunction.fuse, Cofunction.tensor
 
 
@@ -418,12 +427,15 @@ class Merge(Cofunction):
     """
     def __init__(self, x: monoidal.Ty, n: int = 2):
         assert_isatomic(x, monoidal.Ty)
-        n = n if isinstance(n, int) else len(n)
+        n = len(n) if isinstance(n, Sized) else index(n)
+        if n < 0:
+            raise ValueError(f"A merge count is non-negative, got n={n}.")
         name = f"Merge({x}" + ("" if n == 2 else f", {n}") + ")"
         Box.__init__(self, name, dom=x ** n, cod=x,
                      draw_as_spider=True, color="black", drawing_name="")
 
     def __new__(cls, x: monoidal.Ty, n: int = 2):
+        n = len(n) if isinstance(n, Sized) else index(n)
         return super().__new__(cls) if n else\
             cls.noise_factory.__new__(cls.noise_factory, x)
 
@@ -438,8 +450,24 @@ class Merge(Cofunction):
         """
         return self.cod, len(self.dom)
 
+    @classmethod
+    # pylint: disable-next=arguments-differ  # drawn with no boundary
+    def strategy(cls, *, types=None):
+        """
+        Generate the merge of two or three copies of an atomic type.
+
+        Parameters:
+            types : The strategy to draw the types from, see
+                :meth:`atomic_strategy`.
+        """
+        from hypothesis import strategies as st
+
+        return st.builds(
+            cls, cls.atomic_strategy(types), st.sampled_from((2, 3)))
+
     cofunc = property(lambda self: op.Comarkov(
-        finset.Function.copy(1, len(self.dom))))
+        finset.Function.copy(
+            1, len(self.dom))))  # ty: ignore[invalid-argument-type]
 
     def to_drawing(self):
         return super(Cofunction, self).to_drawing()
@@ -471,9 +499,21 @@ class Noise(Merge):
         x : The type of the noise.
     """
     def __init__(self, x: monoidal.Ty, n: int = 0):
-        if n:
-            raise ValueError(f"A noise has no copies, got n={n}.")
-        super().__init__(x, 0)
+        super().__init__(x, n)
+        if self.dom:
+            raise ValueError(f"A noise has no copies, got n={len(self.dom)}.")
+
+    @classmethod
+    # pylint: disable-next=arguments-differ  # drawn with no boundary
+    def strategy(cls, *, types=None):
+        """
+        Generate the noise on an atomic type.
+
+        Parameters:
+            types : The strategy to draw the types from, see
+                :meth:`atomic_strategy`.
+        """
+        return cls.atomic_strategy(types).map(cls)
 
 
 class Sum(symmetric.Sum, Box):
@@ -484,6 +524,12 @@ class Sum(symmetric.Sum, Box):
         terms (tuple[Diagram, ...]) : The terms of the formal sum.
         dom (Ty) : The domain of the formal sum.
         cod (Ty) : The codomain of the formal sum.
+    """
+
+
+class Bubble(symmetric.Bubble, Box):
+    """
+    A comarkov bubble is a symmetric bubble and a comarkov box.
     """
 
 
@@ -518,18 +564,25 @@ class Functor(symmetric.Functor):
     def __call__(self, other):
         if isinstance(other, Merge) and hasattr(self.cod, "merge"):
             return self.cod.merge(self(other.cod), len(other.dom))
+        if isinstance(other, Cofunction) and hasattr(
+                self.cod.ar, "cofunction_factory")\
+                and not isinstance(other, symmetric.Permutation):
+            sizes = [Nat(len(self(x))) for x in other.cod]
+            return self.cod.ar.from_cofunction(finset.Function.function(
+                other.cofunc.inside, sizes).inside, self(other.cod))
         if isinstance(other, Cofunction) and hasattr(self.cod, "merge")\
                 and not isinstance(other, symmetric.Permutation):
             cofunction = getattr(self.cod, "cofunction", None)\
                 or ComarkovCategory.cofunction.__func__.__get__(self.cod)
-            return cofunction(
+            return cofunction(  # ty: ignore[invalid-argument-type]
                 list(other.cofunc.inside), list(map(self, other.cod)))
         return super().__call__(other)
 
 
 CMap = cmap.CMap[Diagram]
 
-Feedback, Trace, FollowedBy, Head, Tail = feedback.generators(Diagram, Box)
+Feedback, Trace, FollowedBy, Head, Tail = feedback.structural_boxes(
+    Diagram, Box)
 Diagram.box_factory = Box
 Diagram.functor_factory = Functor
 Hypergraph = hypergraph.Hypergraph[Diagram]
@@ -539,6 +592,7 @@ Diagram.swap_factory = Swap
 Diagram.permutation_factory = Permutation
 Diagram.noise_factory = Noise
 Diagram.sum_factory = Sum
+Diagram.bubble_factory = Bubble
 Id = Diagram.id
 
 

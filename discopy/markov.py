@@ -1,8 +1,11 @@
 # -*- coding: utf-8 -*-
 
 """
-The free Markov category, i.e. a semicartesian category with a supply of
-commutative comonoid, see :cite:t:`FritzLiang23`.
+The free Markov category, i.e. a symmetric category with a supply of
+commutative comonoids, see :cite:t:`FritzLiang23`. Discard is not natural on
+these diagrams (``f >> Discard(y)`` and ``Discard(x)`` are not equal), so they
+form what Fritz and Liang call the free gs-monoidal category rather than a
+semicartesian one.
 
 Summary
 -------
@@ -25,7 +28,10 @@ Summary
     FollowedBy
     Head
     Tail
+    Sum
+    Bubble
     Functor
+    Equation
 
 
 Axioms
@@ -57,26 +63,32 @@ Coherence
 
 Note
 ----
-Equality of Markov diagrams is computed by translation to hypergraph.
-Copy boxes are translated to spiders, thus when they appear in the same
-diagram as the merge boxes of :mod:`comarkov` they automatically satisfy
-the :mod:`frobenius` axioms.
+A Markov :class:`Equation` is checked by translation to hypergraph, where
+copy boxes become spiders, while ``==`` is equality on the nose. Copy boxes
+cannot be composed with the merge boxes of :mod:`~discopy.comarkov`: the two
+meet only in :mod:`~discopy.frobenius`, where both are spiders and satisfy
+the Frobenius axioms.
 """
 
 from __future__ import annotations
 
 import warnings
-from typing import Callable, ClassVar
+from collections.abc import Sized
+from inspect import Parameter, Signature, signature
+from operator import index
+from typing import ClassVar
 
-from discopy import symmetric, monoidal, feedback, cmap, hypergraph, messages
-from discopy.abc import ComarkovCategory, MarkovCategory
+from discopy import (
+    cat, symmetric, monoidal, feedback, cmap, hypergraph, messages)
+from discopy.abc import ComarkovCategory, MarkovCategory, Nat
+from discopy.testable import FUEL
 from discopy.cat import factory
 from discopy.feedback import (  # noqa: F401  pylint: disable=unused-import
     Wire, Ty)
 from discopy.python import finset
 from discopy.utils import (
     AxiomError, assert_isatomic, assert_iscomposable, deprecated_alias,
-    factory_name, from_tree)
+    factory_key, factory_name, from_tree)
 
 
 class Layer(symmetric.Layer):
@@ -154,10 +166,35 @@ class Diagram(symmetric.Diagram, MarkovCategory):
     layer_factory = Layer
 
     @classmethod
+    def quotient_strategy(cls, *, dom=None, cod=None, fuel=FUEL):
+        """
+        Sample Markov diagrams through their quotient: a hypergraph drawn
+        by :meth:`discopy.hypergraph.Hypergraph.strategy` with at most
+        ``fuel + 1`` boxes, besides the one balancing box that may close its
+        boundary, and the spiders that the category supports, i.e.
+        copies and discards here and every spider in a hypergraph category,
+        downgraded with :meth:`discopy.hypergraph.Hypergraph.to_diagram`.
+        """
+        category = hypergraph.Hypergraph[cls]  # ty: ignore[invalid-type-form]
+        return category.strategy(
+            dom=dom, cod=cod, max_leaves=fuel + 1).map(
+                lambda graph: graph.to_diagram())
+
+    @classmethod
     def spider_factory(cls, n_legs_in, n_legs_out, typ, phase=None):
-        if phase is not None or n_legs_in != 1:
+        """
+        The spiders of a Markov category: the copies, with one leg in, and
+        the traces of copies, with none, i.e. what tracing a copy back into
+        its own input encodes to as a hypergraph.
+
+        >>> x = Ty('x')
+        >>> assert Diagram.spider_factory(0, 1, x) == Copy(x).trace(left=True)
+        """
+        if phase is not None or n_legs_in not in (0, 1):
             raise ValueError(messages.NO_SUCH_SPIDER.format(
                 factory_name(cls), "copies"))
+        if not n_legs_in:
+            return cls.copy(typ, n_legs_out + 1).trace(left=True)
         return cls.copy_factory(typ, n_legs_out)
 
     @classmethod
@@ -180,7 +217,8 @@ class Diagram(symmetric.Diagram, MarkovCategory):
         if cls.function_factory.ar is cls:
             return cls.from_function(finset.Function.copy(len(x), n), x)
         from discopy import frobenius
-        return frobenius.Diagram.spiders.__func__(cls, 1, n, x)
+        return frobenius.Diagram.spiders.__func__(
+            cls, 1, n, x)  # ty: ignore[invalid-argument-type]
 
     @classmethod
     def discard(cls, x: monoidal.Ty) -> Diagram:
@@ -191,6 +229,11 @@ class Diagram(symmetric.Diagram, MarkovCategory):
             x : The type to discard.
         """
         return cls.copy(x, 0)
+
+    map_agreement = monoidal.Diagram.map_agreement.failing(
+        messages.MAP_HAS_NO_SPIDERS)
+    str_transparency = monoidal.Diagram.str_transparency.failing(
+        messages.STR_SPLITS_LAYERS)
 
     @classmethod
     def from_function(cls, func, dom: monoidal.Ty) -> Diagram:
@@ -214,7 +257,8 @@ class Diagram(symmetric.Diagram, MarkovCategory):
         """
         func = list(func)
         if sorted(func) == list(range(len(dom))):
-            return cls.from_permutation(func, dom)
+            return cls.from_permutation(
+                func, dom)  # ty: ignore[invalid-return-type]
         if cls.function_factory.ar is cls:
             return cls.function_factory(dom, func)
         return super().from_function(func, dom)
@@ -237,7 +281,7 @@ class Diagram(symmetric.Diagram, MarkovCategory):
             "use discopy.comarkov.Diagram.merge instead.",
             DeprecationWarning, stacklevel=2)
         from discopy import comarkov
-        return comarkov.Diagram.merge(x, n)
+        return comarkov.Diagram.merge(x, n)  # ty: ignore[invalid-return-type]
 
     @property
     def is_deterministic(self) -> bool:
@@ -312,6 +356,8 @@ feedback.Ty(feedback.Wire('x')), is_deterministic=False)
     >>> assert f.is_cartesian and not f.dagger().is_cartesian
     >>> assert f.dagger().dagger() == f and f.dagger().deterministic
     """
+    serialised_attrs = symmetric.Box.serialised_attrs + (
+        "is_deterministic", "is_affine")
     deterministic = affine = True
 
     def __init__(self, *args, is_deterministic=True, is_affine=True,
@@ -321,13 +367,27 @@ feedback.Ty(feedback.Wire('x')), is_deterministic=False)
 
     @property
     def is_deterministic(self) -> bool:
-        """ Whether the box is declared deterministic and is no dagger. """
+        """
+        Whether the box is declared deterministic and is no dagger: setting it
+        declares it, as the constructor does.
+        """
         return self.deterministic and not self.is_dagger
+
+    @is_deterministic.setter
+    def is_deterministic(self, value: bool):
+        self.deterministic = value
 
     @property
     def is_affine(self) -> bool:
-        """ Whether the box is declared affine and is no dagger. """
+        """
+        Whether the box is declared affine and is no dagger: setting it
+        declares it, as the constructor does.
+        """
         return self.affine and not self.is_dagger
+
+    @is_affine.setter
+    def is_affine(self, value: bool):
+        self.affine = value
 
     def flags(self) -> dict[str, bool]:
         """
@@ -354,32 +414,31 @@ feedback.Ty(feedback.Wire('x')), is_deterministic=False)
 
     def flagged(self, other: Box) -> Box:
         """
-        Give a box built from this one the flags declared of this one, as
-        :meth:`dagger`, :meth:`subs` and :meth:`lambdify` do on top of those
-        of the class they extend, e.g. one that keeps a winding number, and so
-        do the rotations of a :class:`discopy.frobenius.Box`.
+        Give a box built from this one the flags declared of this one, as the
+        rotations of a :class:`discopy.frobenius.Box` do.
         """
         other.deterministic, other.affine = self.deterministic, self.affine
         return other
 
-    def dagger(self) -> Box:
-        return self.flagged(super().dagger())
-
-    def subs(self, *args) -> Box:
+    def rebuild(self, **changes) -> Box:
         """
-        Substitute a variable in the data of a box, keeping its flags.
+        Rebuild a box with the flags declared of it, when its constructor
+        takes them, else with those it computes, e.g. from its terms.
 
         >>> from sympy.abc import phi  # doctest: +EXTRA
-        >>> sample = Box('sample', Ty('x'), Ty('x'), data=phi,
-        ...              is_deterministic=False)
+        >>> x = Ty('x')
+        >>> sample = Box('sample', x, x, data=phi, is_deterministic=False)
         >>> assert not sample.subs(phi, 1).is_deterministic
         >>> assert not sample.lambdify(phi)(1).is_deterministic
+        >>> assert sample.rebuild(is_deterministic=True).is_deterministic
+        >>> f = Box('f', x, x)
+        >>> assert not Sum((f, )).rebuild(terms=(f, f)).is_deterministic
         """
-        return self.flagged(super().subs(*args))
-
-    def lambdify(self, *symbols, **kwargs) -> Callable:
-        function = super().lambdify(*symbols, **kwargs)
-        return lambda *xs: self.flagged(function(*xs))
+        declared = {"is_deterministic": self.deterministic,
+                    "is_affine": self.affine}
+        return super().rebuild(**{
+            name: value for name, value in declared.items()
+            if name in self.serialised_attrs} | changes)
 
     def to_tree(self) -> dict:
         """
@@ -441,10 +500,12 @@ class Function(Box):
     .. image:: /_static/markov/function.svg
         :align: center
     """
-    def __new__(cls, dom: monoidal.Ty = None, func=None):
+    serialised_attrs = ("dom", "func")
+
+    def __new__(cls, dom: monoidal.Ty | None = None, func=None):
         if dom is None or cls is not cls.ar.function_factory:
             return super().__new__(cls)
-        func = list(func)
+        func = list(func)  # ty: ignore[invalid-argument-type]
         if sorted(func) == list(range(len(dom))):
             return cls.ar.permutation_factory(dom, func)
         if len(dom) == 1 and not any(func):
@@ -452,7 +513,7 @@ class Function(Box):
         return super().__new__(cls)
 
     def __init__(self, dom: monoidal.Ty, func):
-        self.func = finset.Function(list(func), len(dom), len(func))
+        self.func = finset.Function(list(func), Nat(len(dom)), Nat(len(func)))
         cod = dom[:0].tensor(*(dom[i] for i in self.func))
         Box.__init__(self, f"Function({list(self.func)})", dom, cod)
 
@@ -488,7 +549,7 @@ class Function(Box):
     def setoid(self):
         if self.is_identity:
             return (), self.dom, self.cod
-        return type(self), self.dom, tuple(self.func)
+        return factory_key(type(self)), self.dom, tuple(self.func)
 
     def to_drawing(self):
         """ Draw the copies of each input, then the permutation. """
@@ -611,7 +672,7 @@ class Permutation(symmetric.Permutation, Box):
     >>> assert Swap(x, y) @ Copy(x) == Function(x @ y @ x, [1, 0, 2, 2])
     """
     func = property(lambda self: finset.Function(
-        list(self.perm), len(self.dom), len(self.cod)))
+        list(self.perm), Nat(len(self.dom)), Nat(len(self.cod))))
     fuse, tensor = Function.fuse, Function.tensor
 
 
@@ -640,13 +701,16 @@ class Copy(Function):
     """
     def __init__(self, x: monoidal.Ty, n: int = 2):
         assert_isatomic(x, monoidal.Ty)
-        n = n if isinstance(n, int) else len(n)
+        n = len(n) if isinstance(n, Sized) else index(n)
+        if n < 0:
+            raise ValueError(f"A copy count is non-negative, got n={n}.")
         name = f"Copy({x}" + ("" if n == 2 else f", {n}") + ")" if n\
             else f"Discard({x})"
         Box.__init__(self, name, dom=x, cod=x ** n,
                      draw_as_spider=True, color="black", drawing_name="")
 
     def __new__(cls, x: monoidal.Ty, n: int = 2):
+        n = len(n) if isinstance(n, Sized) else index(n)
         return super().__new__(cls) if n else\
             cls.discard_factory.__new__(cls.discard_factory, x)
 
@@ -660,6 +724,21 @@ class Copy(Function):
         >>> assert loads(dumps(Discard(x))) == Discard(x)
         """
         return self.dom, len(self.cod)
+
+    @classmethod
+    # pylint: disable-next=arguments-differ  # drawn with no boundary
+    def strategy(cls, *, types=None):
+        """
+        Generate two or three copies of an atomic type.
+
+        Parameters:
+            types : The strategy to draw the types from, see
+                :meth:`atomic_strategy`.
+        """
+        from hypothesis import strategies as st
+
+        return st.builds(
+            cls, cls.atomic_strategy(types), st.sampled_from((2, 3)))
 
     func = property(lambda self: finset.Function.copy(1, len(self.cod)))
 
@@ -689,9 +768,22 @@ class Discard(Copy):
         x : The type to discard.
     """
     def __init__(self, x: monoidal.Ty, n: int = 0):
-        if n:
-            raise ValueError(f"A discard has no copies, got n={n}.")
-        super().__init__(x, 0)
+        super().__init__(x, n)
+        if self.cod:
+            raise ValueError(
+                f"A discard has no copies, got n={len(self.cod)}.")
+
+    @classmethod
+    # pylint: disable-next=arguments-differ  # drawn with no boundary
+    def strategy(cls, *, types=None):
+        """
+        Generate the discard of an atomic type.
+
+        Parameters:
+            types : The strategy to draw the types from, see
+                :meth:`atomic_strategy`.
+        """
+        return cls.atomic_strategy(types).map(cls)
 
 
 class Sum(symmetric.Sum, Box):
@@ -720,6 +812,54 @@ class Sum(symmetric.Sum, Box):
         self.deterministic = len(self.terms) < 2 and all(
             term.is_deterministic for term in self.terms)
         self.affine = len(self.terms) == 1 and self.terms[0].is_affine
+
+
+class Bubble(symmetric.Bubble, Box):
+    """
+    A markov bubble is a symmetric bubble and a markov box: a total function
+    unless it says otherwise, whatever its args, and it keeps what it says
+    through dagger, substitution, rotation and markov functors.
+
+    Parameters:
+        args (Diagram) : The diagrams inside the bubble.
+        is_deterministic : Whether copying commutes with the bubble.
+        is_affine : Whether discarding commutes with the bubble.
+        kwargs : Passed to :class:`symmetric.Bubble`.
+
+    Example
+    -------
+    >>> x = Ty('x')
+    >>> sample = Box('sample', x, x, is_deterministic=False)
+    >>> noisy = sample.bubble(is_deterministic=False)
+    >>> assert sample.bubble().is_deterministic and not noisy.is_deterministic
+    >>> assert noisy != sample.bubble() and noisy[::-1][::-1] == noisy
+    >>> assert Functor.id(Diagram)(noisy) == noisy
+    """
+    serialised_attrs = symmetric.Bubble.serialised_attrs + (
+        "is_deterministic", "is_affine")
+
+    def __init__(self, *args: Diagram, is_deterministic=True, is_affine=True,
+                 **kwargs):
+        super().__init__(*args, **kwargs)
+        self.deterministic, self.affine = is_deterministic, is_affine
+
+    def __repr__(self):
+        flags = "".join(f", {name}=False" for name in self.flags())
+        return super().__repr__()[:-1] + flags + ")" if flags\
+            else super().__repr__()
+
+    def setoid(self):
+        return super().setoid() + (self.deterministic, self.affine)
+
+    def to_tree(self) -> dict:
+        return {**super().to_tree(), **self.flags()}
+
+    @classmethod
+    def from_tree(cls, tree: dict) -> Bubble:
+        result = super().from_tree(tree)
+        result.deterministic = tree.get("is_deterministic", True)
+        result.affine = tree.get("is_affine", True)
+        return result
 
 
 class Functor(symmetric.Functor):
@@ -758,17 +898,35 @@ class Functor(symmetric.Functor):
     def __call__(self, other):
         if isinstance(other, Copy) and hasattr(self.cod, "copy"):
             return self.cod.copy(self(other.dom), len(other.cod))
+        if isinstance(other, Function) and hasattr(
+                self.cod.ar, "function_factory")\
+                and not isinstance(other, symmetric.Permutation):
+            sizes = [Nat(len(self(x))) for x in other.dom]
+            return self.cod.ar.from_function(finset.Function.function(
+                other.func, sizes).inside, self(other.dom))
         if isinstance(other, Function) and hasattr(self.cod, "copy")\
                 and not isinstance(other, symmetric.Permutation):
             function = getattr(self.cod, "function", None)\
                 or MarkovCategory.function.__func__.__get__(self.cod)
-            return function(other.func, list(map(self, other.dom)))
-        return super().__call__(other)
+            return function(  # ty: ignore[invalid-argument-type]
+                other.func, list(map(self, other.dom)))
+        result = super().__call__(other)
+        if isinstance(other, Bubble) and isinstance(result, Bubble):
+            return other.flagged(result)
+        return result
 
+
+Box.__init__.__signature__ = Signature([
+    *list(signature(monoidal.Box.__init__).parameters.values())[:-1], *(
+        param.replace(kind=Parameter.KEYWORD_ONLY) for init in (
+            cat.Box.__init__, feedback.Box.__init__, Box.__init__)
+        for param in signature(init).parameters.values()
+        if param.default is not Parameter.empty)])
 
 CMap = cmap.CMap[Diagram]
 
-Feedback, Trace, FollowedBy, Head, Tail = feedback.generators(Diagram, Box)
+Feedback, Trace, FollowedBy, Head, Tail = feedback.structural_boxes(
+    Diagram, Box)
 Diagram.box_factory = Box
 Diagram.functor_factory = Functor
 Hypergraph = hypergraph.Hypergraph[Diagram]
@@ -778,6 +936,7 @@ Diagram.swap_factory = Swap
 Diagram.permutation_factory = Permutation
 Diagram.discard_factory = Discard
 Diagram.sum_factory = Sum
+Diagram.bubble_factory = Bubble
 Id = Diagram.id
 
 

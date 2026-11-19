@@ -1,5 +1,6 @@
 from __future__ import annotations
 import warnings
+from inspect import Parameter, signature
 from random import Random
 
 from pytest import importorskip, raises, warns
@@ -14,6 +15,9 @@ def test_Discard_has_no_copies():
     assert Copy(x, 0) == Discard(x) == Discard(x, 0)
     with raises(ValueError):
         Discard(x, 2)
+    for box in (Copy, Discard):
+        with raises(ValueError):
+            box(x, -1)
 
 
 def test_spider_factory():
@@ -143,6 +147,26 @@ def test_copy_factory():
     assert isinstance(RecipeCopy(x, 0), RecipeDiscard)
     with raises(AxiomError, match="Recipe is not a dagger category"):
         RecipeCopy(x).dagger()
+
+
+def test_Copy_takes_index():
+    from numpy import int64
+    from discopy.abc import Nat
+    x = Ty('x')
+    assert Copy(x, int64(3)) == Copy(x, Nat(3)) == Copy(x, 3)
+    assert Function(x, int64([0, 0, 0])) == Copy(x, 3)
+    zero = type("Zero", (), {"__index__": lambda _: 0})()
+    for box in (Copy(x, zero), Function(x, int64([]))):
+        assert isinstance(box, Discard) and box == Discard(x)
+
+
+def test_Function_takes_index():
+    from numpy import int64
+    x, y, z = Ty('x'), Ty('y'), Ty('z')
+    assert Function(x @ y, int64([1, 0, 0])) == Function(x @ y, [1, 0, 0])
+    assert Function(x, int64([0])) == Function(x, [0])
+    assert Permutation(x @ y @ z, int64([2, 0, 1]))\
+        == Permutation(x @ y @ z, [2, 0, 1])
 
 
 def test_Copy_pickle():
@@ -317,10 +341,16 @@ def test_Function_Functor():
     f = Function(x @ y, [1, 0, 0])
     F = Functor({x: int, y: str}, {}, cod=python.Function)
     assert F(f)(1, "a") == ("a", 1, 1)
-    G = Functor({x: x @ y, y: x}, {})
-    assert Equation(G(f), Function(x @ y @ x, [2, 0, 1, 0, 1]))
     assert (f >> Box('g', y @ x @ x, x)).to_hypergraph().to_diagram()\
         == f >> Box('g', y @ x @ x, x)
+
+
+def test_Functor_sends_a_Function_to_one_Function():
+    x, y = Ty('x'), Ty('y')
+    f = Function(x @ y, [1, 0, 0])
+    assert Functor.id(Diagram)(f) == f
+    G = Functor({x: x @ y, y: x}, {})
+    assert G(f) == Function(x @ y @ x, [2, 0, 1, 0, 1])
 
 
 def test_Layer():
@@ -362,8 +392,8 @@ def test_Box_flags():
 
 def test_Box_flags_cooperate():
     import numpy as np
-    from discopy import closed, frobenius, grammar, rigid, tensor
-    from discopy.grammar.pregroup import Ty as Grammatical, Word
+    from discopy import closed, frobenius, lambek, rigid, tensor
+    from discopy.lambek.pregroup import Ty as Grammatical, Word
     from discopy.utils import dumps, loads
     x, d = frobenius.Ty('x'), tensor.Dim(2)
     f, flagged = frobenius.Box('f', x, x), frobenius.Box(
@@ -386,7 +416,7 @@ def test_Box_flags_cooperate():
     sample = Word('w', n, is_deterministic=False)
     assert sample.r.l == sample and sample.r.flags() == sample.flags()
     assert eval(repr(sample), {
-        'Word': Word, 'grammar': grammar, 'rigid': rigid}) == sample
+        'Word': Word, 'lambek': lambek, 'rigid': rigid}) == sample
     constant = closed.Constant('c', closed.Ty('x'))
     assert loads(dumps(constant)) == constant
     t = tensor.Box('t', d, d, data=[[1, 2j], [3, 4]])
@@ -409,3 +439,49 @@ def test_Box_flags_subs():
     assert not any(diagram.is_deterministic for diagram in samples)
     assert not any(diagram.is_affine for diagram in conditions)
     assert condition.subs(phi, 1).flags() == {'is_affine': False}
+
+
+def test_Bubble_flags():
+    from discopy.egraph import Markov
+    from discopy.utils import dumps, loads
+    x = Ty('x')
+    noisy = Box('sample', x, x, is_deterministic=False).bubble(
+        is_deterministic=False, is_affine=False)
+    assert noisy[::-1].affine is False
+    plain = Box('sample', x, x, is_deterministic=False).bubble(is_affine=False)
+    assert loads(dumps(plain)) == plain == eval(repr(plain))
+    assert eval(repr(plain[::-1])).is_dagger
+    assert plain != plain.arg.bubble()
+    minus, zero = Box('-', x @ x, x), Box('0', Ty(), x)
+    program = Diagram.copy(x) >> noisy @ noisy >> minus
+    graph = Markov.from_diagram(program)
+    *_, last = graph, *graph.saturate(
+        (Diagram.copy(x) >> minus, Diagram.discard(x) >> zero))
+    assert last.extract().to_diagram() == program.foliation()
+
+
+def test_Bubble_flags_subs():
+    importorskip("sympy")
+    from sympy.abc import phi
+    x = Ty('x')
+    sample = Box('sample', x, x, data=phi, is_deterministic=False)
+    noisy = sample.bubble(is_deterministic=False, is_affine=False)
+    assert not noisy.subs(phi, 1).is_deterministic
+    assert not noisy.lambdify(phi)(1).affine
+
+
+def test_Box_signature():
+    sig = signature(Box)
+    assert list(sig.parameters) == [
+        "name", "dom", "cod", "data", "is_dagger", "time_step",
+        "is_deterministic", "is_affine"]
+    x = Ty('x')
+    box = Box('f', x, x, **{
+        name: param.default for name, param in sig.parameters.items()
+        if param.default is not Parameter.empty})
+    assert box == Box('f', x, x)
+
+
+def test_structural_boxes():
+    from discopy.testable import assert_structural_boxes
+    assert_structural_boxes(Diagram)

@@ -32,6 +32,37 @@ def test_Functor_phased_spider():
     assert spider.to_hypergraph().boxes == (spider, )
 
 
+def test_Spider_dagger():
+    from discopy.lambek import pregroup
+    x = Ty('x')
+    phased, box = Spider(1, 1, x, .5), Box('box', x, x)
+    F = Functor({x: x}, {phased: box})
+    assert F(phased.dagger()) == F(phased).dagger() == box.dagger()
+    for spider in (phased, Spider(2, 3, x, "$\\phi$")):
+        dagger = spider.dagger()
+        assert dagger.is_dagger and dagger.phase == spider.phase
+        assert dagger.dagger() == spider and dagger.r == spider.r.dagger()
+        assert dagger.unfuse() == spider.unfuse().dagger()
+    assert eval(str(phased.dagger())) == phased.dagger()
+    n = pregroup.Ty('n')
+    word = pregroup.Spider(1, 2, n, "a")
+    assert word.dagger().r == word.r.dagger()
+    for spider in (Spider(1, 1, x, 0), Spider(1, 2, x, is_dagger=True)):
+        assert not spider.is_dagger and spider.dagger().dagger() == spider
+    assert Spider(1, 1, x, 0).dagger().is_cartesian
+    assert Spider(1, 3, x, is_dagger=True).unfuse() == Spider(1, 3, x).unfuse()
+    assert Spider(3, 1, x, 0).dagger().unfuse()\
+        == Spider(1, 1, x, 0) >> Spider(1, 3, x).unfuse()
+
+
+def test_Bubble_flags_rotate():
+    x = Ty('x')
+    f, g = Box('f', x, x), Box('g', x, x)
+    noisy = f.bubble(is_affine=False).r
+    assert not noisy.l.affine and Functor({x: x}, {f: g})(noisy) == (
+        g.bubble(is_affine=False).r)
+
+
 def test_Box_hash():
     x, y = Ty('x'), Ty('y')
     f = Box('f', x, y)
@@ -65,6 +96,15 @@ def test_spider_factory():
                     assert all(map(ob.__eq__, s.cod[k::len(t)]))
 
 
+def test_spiders_take_index():
+    from discopy import abc
+    x, y = Ty('x'), Ty('y')
+    assert Spider(abc.Nat(2), abc.Nat(1), x) == Spider(2, 1, x)
+    for typ in (x, x @ y):
+        assert Diagram.spiders(abc.Nat(2), abc.Nat(0), typ)\
+            == Diagram.spiders(2, 0, typ)
+
+
 def test_spider_decomposition():
     n = Ty('n')
 
@@ -77,6 +117,16 @@ def test_spider_decomposition():
     assert Spider(5, 1, n).unfuse() == (Spider(2, 1, n) @ Spider(2, 1, n)
                                            @ Id(n) >> Spider(2, 1, n) @ Id(n)
                                            >> Spider(2, 1, n))
+
+
+def test_unfuse_unfuses_the_spiders_of_a_cospan():
+    x, y = Ty('x'), Ty('y')
+    for diagram in (Spider(1, 4, x) @ y, Spider(1, 3, x) @ Spider(1, 3, y),
+                    Diagram.spiders(1, 4, x @ y)):
+        unfused = diagram.unfuse()
+        assert Equation(diagram, unfused)
+        assert all(box.legs.left.count(k) + box.legs.right.count(k) <= 3
+                   for box in unfused.boxes for k in range(box.legs.apex))
 
 
 def test_Sum():
@@ -105,6 +155,18 @@ def test_Spider_repr():
     for spider in (Spider(1, 2, x, 0.5), Spider(2, 0, x, is_dagger=True),
                    Spider(0, 1, x, 0.25, is_dagger=True)):
         assert eval(repr(spider)) == spider
+
+
+def test_Spider_loads_a_legacy_state_with_its_legs_and_type():
+    x = Ty('x')
+    for n_legs_in, n_legs_out in [(2, 1), (0, 3)]:
+        old = Spider.__new__(Spider)
+        old.__setstate__({
+            '_name': 'Spider', '_data': None, '_dagger': False,
+            '_dom': Nat(n_legs_in), '_cod': Nat(n_legs_out), '_boxes': [],
+            '_layers': [], '_z': 0, '_typ': x})
+        spider = Spider(n_legs_in, n_legs_out, x)
+        assert old.name == spider.name and repr(old) == repr(spider)
 
 
 def test_Wire_adjoints():
@@ -190,3 +252,56 @@ def test_Cospan_Functor():
     assert F(f).eval() == F(x @ Swap(y, x)).eval()\
         >> F(Spider(2, 0, x) @ Spider(1, 2, y)).eval()
     assert (F(f) >> F(g)).eval() == F(f.fuse(g)).eval()
+
+
+def test_identity_spider_in_a_layer():
+    """ A spider with one leg on each side merges into the plumbing of its
+    layer as the identity it is, rather than as a diagram. """
+    x = Ty('x')
+    f = Box('f', x, x)
+    diagram = x @ (f >> Spider(1, 1, x)) @ f
+    assert diagram.dom == diagram.cod == x @ x @ x
+    assert all(isinstance(component, (Ty, Box))
+               and not isinstance(component, Spider)
+               for layer in diagram.inside for component in layer)
+
+
+def test_str_transparency_of_a_spider():
+    """ A spider names no generator of its own, its string is a call on its
+    type, so a spider reads back from its string. """
+    x = Ty('x')
+    spider = Spider(0, 0, x)
+    assert spider.atoms() == [x]
+    assert eval(str(spider), Diagram.str_environment(spider)) == spider
+
+
+
+def test_str_transparency_of_a_packed_layer():
+    """ A layer that packs a cospan beside a box prints as their tensor,
+    which reads back as two layers: the same hypergraph, not the same
+    diagram, so the law holds up to :meth:`Diagram.to_hypergraph`. """
+    a = Ty('a')
+    f, cospan = Box('f', a, a), Cospan(a @ a, [0, 1], [1])
+    packed = Diagram((Layer(cospan, f), ), cospan.dom @ a, cospan.cod @ a)
+    unpacked = eval(str(packed), Diagram.str_environment(packed))
+    assert unpacked != packed
+    assert unpacked.to_hypergraph() == packed.to_hypergraph()
+    assert Diagram.str_transparency(packed)
+
+def test_structural_boxes():
+    from discopy.testable import assert_structural_boxes
+    assert_structural_boxes(Diagram)
+
+
+def test_tensor_drops_a_whiskered_identity_spider():
+    """ Whiskering a spider with one leg on each side leaves the identity,
+    i.e. no layer, so that the tensor serialises, foliates and draws. """
+    from discopy.utils import dumps, loads
+    x = Ty('x')
+    f, spider = Box('f', x, x), Spider(1, 1, x)
+    for diagram in (spider @ f, f @ spider, (f >> spider) @ f):
+        assert all(layer.boxes for layer in diagram.inside)
+        assert loads(dumps(diagram)) == diagram
+        assert diagram.foliation().foliation() == diagram.foliation()
+        assert diagram.to_drawing().dagger().dagger() == diagram.to_drawing()
+    assert spider @ f == x @ f and f @ spider == f @ x

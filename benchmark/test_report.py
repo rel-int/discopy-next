@@ -108,3 +108,11 @@ def test_scaling_table_keeps_every_family():
     ))
 
     assert table["family"].to_list() == ["known", "new"]
+
+
+def test_scaling_markdown_keeps_microsecond_medians():
+    markdown = report.to_markdown(report.scaling_table(frame(
+        ("suite", "family", "case", 1, 1.9e-5),
+    )))
+
+    assert markdown.splitlines()[-1] == "| family | case | 1.9e-05 |"

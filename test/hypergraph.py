@@ -3,6 +3,7 @@ import random
 from pytest import raises
 
 from discopy.hypergraph import *
+from discopy.abc import DaggerMonoidalCategory
 from discopy.frobenius import (
     Ty, Box, Cap, Cup, Diagram, Nat, Spider, Hypergraph as H)
 
@@ -19,6 +20,14 @@ def test_Hypergraph_init():
         H(x, y, (), ((0,), (), (0,)))
 
 
+def test_Hypergraph_scalar_spiders_take_labels_of_any_type():
+    x, y = map(Ty, "xy")
+    graph = H(Ty(), Ty(), (), ((), (), ()), {'a': x, 0: y})
+    assert graph.spider_types == (x, y)
+    assert graph == H.spiders(0, 0, x @ y)
+    assert H(Ty(), Ty(), (), ((), (), ()), {object(): x, object(): y})
+
+
 def test_Hypergraph_str():
     x, y = map(Ty, "xy")
     assert str(H.swap(x, y)) == "Swap(x, y)"
@@ -27,15 +36,36 @@ def test_Hypergraph_str():
 
 def test_Hypergraph_repr():
     x, y = map(Ty, "xy")
-    assert repr(H.spiders(1, 0, x @ y))\
+    from discopy import frobenius, hypergraph
+    graph = H.spiders(1, 0, x @ y)
+    assert repr(graph)\
         == "hypergraph.Hypergraph[frobenius.Diagram]("\
            "dom=frobenius.Ty(frobenius.Wire('x'), frobenius.Wire('y')), "\
            "cod=frobenius.Ty(), boxes=(), wires=((0, 1), (), ()))"
+    assert eval(repr(graph)) == graph
+
+
+def test_Hypergraph_repr_keeps_the_offsets():
+    from discopy import hypergraph, monoidal
+    x, y = monoidal.Ty('x'), monoidal.Ty('y')
+    s = monoidal.Box('s', monoidal.Ty(), y)
+    graph = (x @ s).to_hypergraph()
+    loaded = eval(repr(graph), dict(hypergraph=hypergraph, monoidal=monoidal))
+    assert loaded.offsets == graph.offsets == (1, )
+    assert loaded.to_diagram() == x @ s
 
 
 def test_Hypergraph_hash():
     x, y = map(Ty, "xy")
     assert hash(H.id(x @ y)) == hash(H.id(x) @ H.id(y))
+
+
+def test_Hypergraph_hash_agrees_with_the_equality_of_boxes():
+    x = Ty('x')
+    left = Box('f', x, x, data=1).to_hypergraph()
+    right = Box('f', x, x, data=1.0).to_hypergraph()
+    assert left.is_fast_eligible and left == right
+    assert hash(left) == hash(right)
 
 
 def test_Hypergraph_eq_sees_the_type_of_a_scalar_spider():
@@ -49,6 +79,17 @@ def test_Hypergraph_eq_sees_the_type_of_a_scalar_spider():
     assert not Equation(Spider(0, 0, x) @ f, Spider(0, 0, y) @ f)
 
 
+def test_Hypergraph_to_graph_attaches_an_adjoint_boundary_to_its_spider():
+    from discopy import compact
+    x = compact.Ty('x')
+    f, g = compact.Box('f', x.r, x.r), compact.Box('g', x.r, x.r)
+    cap = compact.Cap(x, x.r)
+    assert (f @ g @ cap).to_hypergraph() != (g @ f @ cap).to_hypergraph()
+    cup = compact.Cup(x.r, x).to_hypergraph()
+    assert hash(cup) == hash(compact.Cup(x.r, x).to_hypergraph())
+    assert type(cup).from_graph(cup.to_graph()) == cup
+
+
 def test_Hypergraph_then():
     x, y = map(Ty, "xy")
     with raises(AxiomError, match="Expected y, got x"):
@@ -58,6 +99,24 @@ def test_Hypergraph_then():
 def test_Hypergraph_tensor():
     Id = H.id
     assert Id().tensor(Id(), Id()) == Id().tensor() == Id()
+
+
+def test_Hypergraph_tensor_shifts_the_offsets():
+    from discopy import monoidal
+    x, y = monoidal.Ty('x'), monoidal.Ty('y')
+    f, s = monoidal.Box('f', x, y), monoidal.Box('s', monoidal.Ty(), y)
+    graph = f.to_hypergraph() @ (x @ s).to_hypergraph()
+    assert graph.offsets == (f @ x @ s).to_hypergraph().offsets == (None, 2)
+    assert graph.to_diagram() == (f @ x @ s).foliation()
+    assert (x @ s.to_hypergraph()).to_diagram() == x @ s
+
+
+def test_Hypergraph_permutation_moves_each_type_as_a_block():
+    x, y, z = map(Ty, "xyz")
+    for xs, doms in [([1, 0], [x @ y, z]), ([1, 0], [x @ x, Ty()]),
+                     ([0, 2, 1], [x @ x, x, Ty()])]:
+        assert H.permutation(xs, doms)\
+            == Diagram.permutation(xs, doms).to_hypergraph()
 
 
 def test_Hypergraph_getitem():
@@ -192,6 +251,32 @@ def test_cups_and_caps_are_checked_in_port_order():
             K(dom, cod, (), ((0, 0) if dom else (), (), (0, 0) if cod else ()))
 
 
+def test_traced_copy_of_a_wire_with_a_dagger():
+    """ A traced copy reads a spider twice and writes it nowhere, a cap of a
+    wire and itself, which a category with no adjoints accepts whatever the
+    dagger of the wire: a shape reversed by ``Dim.dagger`` was refused. """
+    from discopy.neural.network import Network, Box, Dims
+    from discopy.tensor import Dim
+    x, y = Dims(Dim(2, 3)), Dims(2)
+    f = Box('f', x @ x, y)
+    loop = (Network.copy(x, 3) >> f @ x >> Network.discard(y) @ x).trace(
+        left=True)
+    assert loop.to_hypergraph().to_diagram().to_hypergraph()\
+        == loop.to_hypergraph()
+
+
+def test_str_transparency():
+    """ A hypergraph prints as the diagram it decodes to, which reads back in
+    the environment of its category, and to the hypergraph. """
+    from discopy import symmetric
+    from discopy.hypergraph import Hypergraph
+    x = symmetric.Ty('x')
+    graph = (symmetric.Box('f', x, x) @ x >> symmetric.Swap(x, x)
+             ).to_hypergraph()
+    assert str(graph) == "f @ x >> Swap(x, x)"
+    assert Hypergraph[symmetric.Diagram].str_transparency(term=graph)
+
+
 def test_rotation_is_the_transpose():
     """ Decision 7 of #56: a rotated box has the hypergraph of its
     transpose, as it has the map of its transpose, at every level from
@@ -238,7 +323,7 @@ def test_spider_producers_and_consumers():
 
 def test_cups():
     x = Ty('x')
-    assert issubclass(H, DaggerCategory)
+    assert issubclass(H, DaggerMonoidalCategory)
     assert H.cups(x, x).make_monogamous().dagger()\
         == H.caps(x, x).make_monogamous()
     assert H.caps(x, x).make_monogamous().dagger()\
@@ -269,12 +354,14 @@ def test_Hypergraph_eq_fast_path_trace():
     fast canonical-form path rather than falling back to VF2. """
     x, y, z = map(Ty, "xyz")
     g = Box('g', x @ z, y @ z).to_hypergraph()
-    trace = g.trace()
+    h = Box('h', y @ z, x @ z).to_hypergraph()
+    trace = (g >> h).trace()
 
     assert trace.is_acyclic is False
     assert trace.is_fast_eligible
 
-    shuffled = trace.interchange(0, min(1, len(trace.boxes) - 1))
+    shuffled = trace.interchange(0, 1)
+    assert shuffled.boxes != trace.boxes
     assert trace == shuffled
     assert hash(trace) == hash(shuffled)
 
@@ -282,14 +369,13 @@ def test_Hypergraph_eq_fast_path_trace():
 def test_Hypergraph_eq_fallback_scalars_and_empty_boundary():
     """ Hypergraphs that are not boundary-connected (scalars, closed
     diagrams) must still compare correctly via the VF2 fallback. """
-    scalar_a = Box('s', Ty(), Ty()).to_hypergraph()
-    scalar_b = Box('s', Ty(), Ty()).to_hypergraph()
-    assert not (scalar_a @ scalar_b).is_fast_eligible
-    assert scalar_a @ scalar_b == scalar_b @ scalar_a
+    s, t, u = (Box(name, Ty(), Ty()).to_hypergraph() for name in "stu")
+    assert not (s @ t).is_fast_eligible
+    assert s @ t == t @ s and s @ t != s @ u
 
     x = Ty('x')
-    f = Box('f', x, x).to_hypergraph()
-    assert f.trace() == f.trace()
+    f, g = (Box(name, x, x).to_hypergraph() for name in "fg")
+    assert f.trace() == f.trace() and f.trace() != g.trace()
 
 
 def test_Hypergraph_simplify_two_wires():
@@ -300,6 +386,21 @@ def test_Hypergraph_simplify_two_wires():
 
     assert interchanged.to_diagram().size > (f >> g).to_diagram().size
     assert interchanged.simplify().to_diagram() == (f >> g).to_diagram()
+
+
+def test_Hypergraph_simplify_tries_each_pair_of_boxes_once(monkeypatch):
+    from itertools import combinations
+    x = Ty('x')
+    chain = H.id(x).then(*(
+        Box(f'f{i}', x, x).to_hypergraph() for i in range(4)))
+    pairs, interchange = [], H.interchange
+
+    def recorded(self, i, j):
+        pairs.append((i, j))
+        return interchange(self, i, j)
+    monkeypatch.setattr(H, "interchange", recorded)
+    assert chain.simplify() == chain
+    assert pairs == list(combinations(range(4), 2))
 
 
 def test_simplify():
@@ -390,6 +491,20 @@ def test_Hypergraph_from_glued():
     assert H.from_glued(x, x, [(f, 0), (g, 0)]) == f >> g
 
 
+def test_Hypergraph_from_callable_restores_the_call_of_its_category():
+    from discopy.python import Function, Ty as T
+    add = Function(lambda x, y: x + y, (int, int), int)
+    graph = Hypergraph[Function].from_callable(T(int, int), T(int))(add)
+    assert add(2, 3) == graph(2, 3) == 5
+    x = Ty('x')
+    f = Box('f', x, x)
+
+    def outer(wire):
+        H.from_callable(x, x)(f)
+        return f(wire)
+    assert H.from_callable(x, x)(outer) == f.to_hypergraph()
+
+
 def test_Hypergraph_from_diagram_closed_loop():
     """ A cap glued directly onto a cup leaves a closed loop: it must
     survive gluing as a scalar spider rather than vanish because it is
@@ -425,6 +540,27 @@ def test_Hypergraph_from_diagram_matches_naive_composition():
     ]
     for diagram in diagrams:
         assert diagram.to_hypergraph() == _naive_from_diagram(diagram)
+
+
+def test_Hypergraph_from_diagram_reads_the_perm_of_a_permutation(
+        monkeypatch):
+    """ The image of a permutation box is read from its ``perm`` rather than
+    by mapping it wire by wire with :meth:`Hypergraph.swap` or
+    :meth:`Hypergraph.permutation`, and is still the image of the functor.
+    """
+    from discopy.frobenius import Permutation, Swap
+    x, y, z = map(Ty, "xyz")
+    perm = Permutation(x @ y @ z, [2, 0, 1])
+    diagrams = [
+        perm, x @ perm @ y, perm >> Box('f', z @ x, y) @ y, perm.to_swaps(),
+        Swap(x, y), Spider(1, 2, x) @ y >> Permutation(x @ x @ y, [2, 0, 1])]
+    images = list(map(_naive_from_diagram, diagrams))
+
+    def wire_by_wire(*_):
+        raise AssertionError
+    monkeypatch.setattr(H, "swap", wire_by_wire)
+    monkeypatch.setattr(H, "permutation", wire_by_wire)
+    assert [diagram.to_hypergraph() for diagram in diagrams] == images
 
 
 def test_Hypergraph_from_diagram_pinned_category():
@@ -527,6 +663,29 @@ def test_trace_needs_traced_pivotal():
         assert graph.trace().cod == graph.trace(left=True).cod == x
 
 
+def test_planar_comparison():
+    """ Below symmetric categories, a hypergraph is not faithful, so the
+    laws of a planar level are compared on the nose: each pair here was
+    identified when they were compared by hypergraph. """
+    from discopy import balanced, braided, monoidal, rigid
+    x, y = braided.Ty('x'), braided.Ty('y')
+    braid, inverse = braided.Braid(x, y), braided.Braid(y, x)[::-1]
+    assert braid.to_hypergraph() != inverse.to_hypergraph()
+    assert not braided.Diagram.equation_factory(braid, inverse)
+    x = balanced.Ty('x')
+    twist, identity = balanced.Twist(x), balanced.Diagram.id(x)
+    assert twist.to_hypergraph() != identity.to_hypergraph()
+    assert not balanced.Diagram.equation_factory(twist, identity)
+    x = rigid.Ty('x')
+    left = rigid.Cap(x, x.l) @ x >> x @ rigid.Cup(x.l, x)
+    right = x @ rigid.Cap(x.r, x) >> rigid.Cup(x, x.r) @ x
+    assert left.to_hypergraph() != right.to_hypergraph()  # cups are boxes
+    assert not rigid.Diagram.equation_factory(left, right)
+    x, scalar = monoidal.Ty('x'), monoidal.Box('s', monoidal.Ty(), monoidal.Ty())
+    assert (scalar @ x).to_hypergraph() == (x @ scalar).to_hypergraph()
+    assert not monoidal.Diagram.equation_factory(scalar @ x, x @ scalar)
+
+
 def test_cups_and_caps_read_the_host_category():
     from discopy import symmetric, rigid, pivotal, ribbon, compact
     x = symmetric.Ty('x')
@@ -544,6 +703,17 @@ def test_cups_and_caps_read_the_host_category():
     x = compact.Ty('x')
     assert compact.Cup(x, x.r).to_hypergraph().boxes == ()
     assert compact.Cap(x.r, x).to_hypergraph().boxes == ()
+
+
+def test_a_spider_needs_a_category_with_spiders():
+    from discopy import symmetric, compact
+    from discopy.utils import AxiomError
+    for module in (symmetric, compact):
+        spider = module.Hypergraph.spiders(1, 2, module.Ty('x'))
+        with raises(AxiomError, match="has no spiders"):
+            spider.make_bijective()
+    with raises(AxiomError, match="has no spiders"):
+        compact.Hypergraph.spiders(1, 2, compact.Ty('x')).to_diagram()
 
 
 def test_coloured_diagram_has_no_hypergraph():
@@ -745,6 +915,53 @@ def test_is_convex_walks_every_consumer():
                 for match in graph.homomorphisms(f >> k)] == [False]
 
 
+def test_is_convex_stops_at_the_last_writer():
+    # next#286: the walk used to visit every box downstream of the match, so
+    # it cost the size of the host and matching over it cost its square.
+    from discopy import symmetric
+
+    class Counted(list):
+        """A list of the box wires that counts what reads it."""
+        def __init__(self, wires):
+            super().__init__(wires)
+            self.reads = 0
+
+        def __getitem__(self, box):
+            self.reads += 1
+            return super().__getitem__(box)
+
+    class Host:
+        """A host that borrows the method, as a Rewriter does."""
+        is_convex = H.is_convex
+
+        def __init__(self, graph):
+            self.boxes, self.incidence = graph.boxes, graph.incidence
+            self.box_wires = Counted(graph.box_wires)
+            self.is_topologically_ordered = graph.is_topologically_ordered
+
+    x = symmetric.Ty('x')
+    f = symmetric.Box('f', x, x).to_hypergraph()
+    reads = []
+    for n in (8, 64):
+        chain = symmetric.Hypergraph.id(x).then(*n * [f])
+        assert chain.is_topologically_ordered
+        host = Host(chain)
+        assert host.is_convex(((0, 1), (0, )))
+        reads.append(host.box_wires.reads)
+    assert reads[0] == reads[1]  # it was n - 1 of them
+
+
+def test_is_convex_walks_a_long_way_back():
+    # The bound is the last box that writes into the image, so a path that
+    # leaves the image and comes back several boxes later is still found.
+    x = Ty('x')
+    f, g, h, k = (Box(name, x, x).to_hypergraph() for name in "fghk")
+    host = f >> g >> h >> k
+    assert not host.is_convex(((0, 1, 2, 3, 4), (0, 3)))
+    assert host.is_convex(((0, 1), (0, )))
+    assert host.is_convex(((2, 3, 4), (2, 3)))
+
+
 def test_rewrite_symmetric_reads_back_without_trace():
     from discopy import symmetric
     x = symmetric.Ty('x')
@@ -877,3 +1094,228 @@ def test_complements_are_lazy():
     f, g = (Box(name, x, x).to_hypergraph() for name in "fg")
     host = H.spiders(1, 40, x) >> f.tensor(*39 * [f])
     assert next(host.rewrite((H.id(x), f >> g))) is not None
+
+
+def test_decoder():
+    """ The one decoder of hypergraphs and maps (decision 8b of #56): boxes
+    side by side share a layer when it foliates, plumbing fuses when it fuses,
+    a state goes at the end of the scan by default, a layer with a diagram in
+    it is whiskered box by box, a box of a subcategory or a sum stays one box
+    of the category and a map over a concrete category, with no layers,
+    decodes too. """
+    from discopy import markov, symmetric
+    from discopy.cmap import CMap
+    from discopy.hypergraph import Decoder
+    from discopy.tensor import Dim, Tensor
+    x = markov.Ty('x')
+    f, g = markov.Box('f', x, x), markov.Box('g', x, x)
+    side_by_side = markov.Diagram((markov.Layer(f, g), ), x @ x, x @ x)
+    for foliate, expected in ((False, f @ g), (True, side_by_side)):
+        decoder = Decoder(markov.Diagram, x @ x, (0, 1), foliate=foliate)
+        decoder.place(f, (0, ), (2, ))
+        decoder.place(g, (1, ), (3, ))
+        assert decoder.close((2, 3)) == expected
+    for fuse in (False, True):
+        decoder = Decoder(markov.Diagram, x, (0, ), fuse=fuse)
+        decoder.place(markov.Copy(x), (0, ), (1, 2))
+        assert len(decoder.close((2, 1)).inside) == (1 if fuse else 2)
+    state, drop = markov.Box('s', markov.Ty(), x), markov.Function(x @ x, [0])
+    decoder = Decoder(markov.Diagram, x, (0, ))
+    decoder.place(state, (), (1, ))
+    assert decoder.close((0, 1)) == x @ state
+    assert drop.to_map().to_hypergraph().to_diagram() == drop
+    decoder = Decoder(markov.Diagram, x, (0, ))
+    assert decoder.beside((1, 2), (0, 1), ()) == 1
+    assert decoder.beside((1, 2), (), (2, 0)) == 0
+    assert decoder.beside((1, 2), (1, 0), (2, )) is None
+    for box in (f, symmetric.Box('h', x, x) + symmetric.Box('k', x, x)):
+        decoded = Hypergraph[symmetric.Diagram].from_box(box).to_diagram()
+        assert type(decoded) is symmetric.Diagram and decoded.boxes == [box]
+    t = Tensor([1, 2, 3, 4, 5, 6], Dim(2), Dim(3))
+    assert (CMap[Tensor].id(Dim(3)) @ CMap[Tensor].from_box(t)
+            >> CMap[Tensor].swap(Dim(3), Dim(3))).to_diagram()\
+        == Dim(3) @ t >> Tensor.swap(Dim(3), Dim(3))
+
+
+def test_atoms():
+    x, y = Ty('x'), Ty('y')
+    f = Box('f', x, y)
+    graph = f.to_hypergraph()
+    assert graph.atoms() == graph.to_diagram().atoms()
+    assert f in graph.atoms()
+    assert eval(str(graph), Diagram.str_environment(f)).to_hypergraph()\
+        == graph
+
+
+def test_Hypergraph_make_methods_insert_in_one_pass(monkeypatch):
+    """
+    However many boxes they insert, the ``make_*`` methods scan the wires and
+    the types of the result once, i.e. they build one hypergraph rather than
+    one per box, which also keeps them off the recursion limit.
+    """
+    for method, legs in [("make_bijective", (1, 2)),
+                         ("make_left_monogamous", (2, 3)),
+                         ("make_right_monogamous", (3, 2))]:
+        x = Ty('x')
+        graph = H.spiders(*legs, x)
+        for _ in range(9):
+            graph = graph @ H.spiders(*legs, x)
+        scans = []
+        monkeypatch.setattr(
+            H, "scan_types", lambda self: scans.append(self))
+        result = getattr(graph, method)()
+        monkeypatch.undo()
+        assert len(scans) == 1 and len(result.boxes) == 10
+
+
+def test_Hypergraph_make_left_monogamous_merges_in_port_order():
+    """
+    The legs of a merge read their ports in order, where they used to read
+    them in the iteration order of a ``set`` of port indices: the ports of
+    the first spider below are ``{6, 7, 8}``, which iterates ``8, 6, 7``.
+    """
+    x = Ty('x')
+    effect = H.spiders(3, 0, x)
+    graph = (effect @ effect @ effect).make_left_monogamous()
+    assert [dom for dom, _ in graph.wires[1]]\
+        == [(6, 7, 8), (3, 4, 5), (0, 1, 2)]
+    assert graph.boxes == 3 * (Spider(3, 1, x), )
+
+
+def test_Hypergraph_make_monogamous_inserts_in_one_pass(monkeypatch):
+    """
+    However many cups and caps it inserts, ``make_monogamous`` scans the
+    wires and the types of the result once, i.e. it builds one hypergraph
+    rather than one per box, which also keeps it off the recursion limit.
+    """
+    x = Ty('x')
+    transpose = Box('f', x, x).transpose().to_hypergraph()
+    graph = transpose
+    for _ in range(9):
+        graph = graph @ transpose
+    scans = []
+    monkeypatch.setattr(H, "scan_types", lambda self: scans.append(self))
+    result = graph.make_monogamous()
+    monkeypatch.undo()
+    assert len(scans) == 1 and len(result.boxes) == 30
+    assert result.is_monogamous
+
+
+def test_Hypergraph_make_monogamous_carries_leg_order():
+    """
+    The legs of each cup and cap read :meth:`Hypergraph.leg_order` on the
+    graph the pass starts from, which is the answer the recursion read on the
+    graph as it stood: both caps below reorder their legs, the second one
+    after the first has already been inserted.
+    """
+    from discopy import compact
+    a, b, c, d = map(compact.Ty, "abcd")
+    f, g = compact.Box('f', d, d), compact.Box('g', c @ b, a)
+    graph = Hypergraph[compact.Diagram](
+        d.r @ a, b.r @ c.r @ d.r @ a @ a, (f, g),
+        ((0, 1), (((2, ), (2, )), ((3, 4), (5, ))), (4, 3, 0, 1, 5)))
+    assert graph.make_monogamous().boxes == (
+        f, compact.Cap(c.r, c), compact.Cap(b.r, b), g)
+
+
+def test_Hypergraph_explicit_trace_of_n_wires_is_the_n_nested_ones():
+    """
+    The ``n``-wire trace is the nest of ``n`` one-wire traces, on both kinds
+    of ``trace_factory``: a class, where the whole nest is one trace box on
+    the diagram, and a class method, where the cups and caps of a pivotal
+    category are atomic and the nest is the onion of ``n`` pairs. So taking
+    them in one pass is the same term, not just the same morphism.
+    """
+    from discopy import compact, comarkov, frobenius, markov, symmetric
+    for module in (symmetric, markov, comarkov, compact, frobenius):
+        x, a = module.Ty('x'), module.Ty('a')
+        for n in (1, 2, 3):
+            for left in (False, True):
+                typ = x ** n @ a if left else a @ x ** n
+                graph = module.Box('f', typ, typ).to_hypergraph()
+                nested = graph
+                for _ in range(n):
+                    nested = nested.explicit_trace(1, left)
+                assert graph.explicit_trace(n, left) == nested, (
+                    module.__name__, n, left)
+
+
+def test_Hypergraph_explicit_trace_builds_the_onion_in_one_call(monkeypatch):
+    """
+    Over a pivotal category the ``n``-wire trace is an onion of ``n`` cup and
+    cap pairs around the graph, and the whole onion goes to one constructor
+    call. Composing it pair by pair built ``2 * n`` intermediate graphs, each
+    scanning a boundary that grows with ``n``, which is what made
+    ``make_causal`` quadratic in the wires it traces (#536).
+    """
+    from discopy import compact, frobenius
+    for module in (compact, frobenius):
+        graph = module.Box(
+            'f', module.Ty('x') ** 8, module.Ty('x') ** 8).to_hypergraph()
+        for left in (False, True):
+            calls, init = [], module.Hypergraph.__init__
+
+            def counted(self, *args, _init=init, _calls=calls, **kwargs):
+                _calls.append(None)
+                return _init(self, *args, **kwargs)
+
+            monkeypatch.setattr(module.Hypergraph, "__init__", counted)
+            result = graph.explicit_trace(4, left)
+            monkeypatch.undo()
+            assert len(calls) == 1, (module.__name__, left, len(calls))
+            nested = graph
+            for _ in range(4):
+                nested = nested.explicit_trace(1, left)
+            assert result.boxes == nested.boxes, (module.__name__, left)
+            assert result.wires == nested.wires, (module.__name__, left)
+            assert result.spider_types == nested.spider_types
+
+
+def test_Hypergraph_explicit_trace_keeps_an_overridden_factory(monkeypatch):
+    """
+    The onion in one call *is* the pivotal trace, so it is built only when
+    ``trace_factory`` is pivotal's own class method: a category overriding it
+    gets the nest its own factory builds, one wire at a time, rather than the
+    cups and caps it never asked for.
+    """
+    from discopy import frobenius, pivotal
+    pivotal_trace, calls = pivotal.Diagram.trace_factory.__func__, []
+
+    def overridden(cls, diagram, left=False):
+        calls.append(left)
+        return pivotal_trace(cls, diagram, left)
+
+    x = frobenius.Ty('x')
+    graph = frobenius.Box('f', x ** 8, x ** 8).to_hypergraph()
+    onion = graph.explicit_trace(4)
+    monkeypatch.setattr(
+        frobenius.Diagram, "trace_factory", classmethod(overridden))
+    assert graph.explicit_trace(4) == onion
+    monkeypatch.undo()
+    assert calls == 4 * [False]
+
+
+def test_Hypergraph_trace_backward_wires_loops(monkeypatch):
+    """
+    ``trace_backward_wires`` cuts one wire at a time in a loop, so a graph
+    with many wires to cut does not nest one frame per cut as it used to,
+    which raised ``RecursionError`` at a thousand of them; and the traces it
+    counts are taken in one call rather than one per cut, from the one frame
+    of the loop.
+    """
+    import inspect
+    x = Ty('x')
+    scalar = H.spiders(0, 0, x)
+    graph = scalar.tensor(*19 * [scalar])
+    explicit_trace, calls = H.explicit_trace, []
+
+    def counted(self, n=1, left=False):
+        calls.append((n, sum(frame.function == "trace_backward_wires"
+                             for frame in inspect.stack())))
+        return explicit_trace(self, n, left)
+
+    monkeypatch.setattr(H, "explicit_trace", counted)
+    result = graph.trace_backward_wires()
+    monkeypatch.undo()
+    assert calls == [(20, 1)]
+    assert len(result.boxes) == 40 and result.is_causal

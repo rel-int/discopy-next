@@ -16,6 +16,7 @@ Summary
     HeadOb
     TailOb
     Ty
+    Nat
     Layer
     Diagram
     Box
@@ -26,6 +27,9 @@ Summary
     FollowedBy
     Head
     Tail
+    Sum
+    Bubble
+    Equation
     Functor
 
 Axioms
@@ -63,11 +67,13 @@ We also have its dagger and its transpose:
 from __future__ import annotations
 
 from copy import copy
+from typing import ClassVar
 
-from discopy import cat, cmap, rigid, feedback
-from discopy.abc import PivotalCategory
+from discopy import cat, cmap, messages, rigid, feedback
+from discopy.abc import (
+    DaggerCategory, DaggerMonoidalCategory, PivotalCategory, RigidCategory)
 from discopy.cat import factory
-from discopy.utils import deprecated_alias, rsubs
+from discopy.utils import deprecated_alias
 
 
 class Wire(feedback.Wire, rigid.Wire):
@@ -99,6 +105,7 @@ class Wire(feedback.Wire, rigid.Wire):
 
     def __repr__(self):
         return rigid.Wire.__repr__(self)[:-1] + self.repr_time_step() + ")"
+    windings = (0, 1)
 
     def dagger(self) -> Wire:
         """
@@ -109,7 +116,7 @@ class Wire(feedback.Wire, rigid.Wire):
         return self.l
 
 
-HeadOb, TailOb = feedback.wire_generators(Wire)
+HeadOb, TailOb = feedback.structural_wires(Wire)
 
 
 @factory
@@ -153,6 +160,16 @@ class Diagram(rigid.Diagram, feedback.Diagram, PivotalCategory):
         dom (Ty) : The domain of the diagram, i.e. its input.
         cod (Ty) : The codomain of the diagram, i.e. its output.
     """
+    pivotality = PivotalCategory.pivotality.failing(
+        messages.NO_PLANAR_NORMAL_FORM)
+    trace_superposing_left = PivotalCategory.trace_superposing_left
+    trace_superposing_right = PivotalCategory.trace_superposing_right
+
+    sum_factory: ClassVar[type["Sum"]]
+    box_factory: ClassVar[type["Box"]]
+    functor_factory: ClassVar[type["Functor"]]
+    cup_factory: ClassVar[type["Cup"]]
+    cap_factory: ClassVar[type["Cap"]]
     ob = Ty
     layer_factory = Layer
 
@@ -216,6 +233,27 @@ class Diagram(rigid.Diagram, feedback.Diagram, PivotalCategory):
             >> diagram @ traced_wire.r\
             >> cod @ cls.cup_factory(traced_wire, traced_wire.r)
 
+    dagger_involution = DaggerCategory.dagger_involution.failing(
+        messages.FEEDBACK_HAS_NO_DAGGER)
+    dagger_involution_rigid = DaggerCategory.dagger_involution.weaken(
+        within=RigidCategory)
+    dagger_contravariance = DaggerCategory.dagger_contravariance.failing(
+        messages.FEEDBACK_HAS_NO_DAGGER)
+    dagger_contravariance_rigid = DaggerCategory.dagger_contravariance\
+        .weaken(within=RigidCategory)
+    dagger_monoidality = DaggerMonoidalCategory.dagger_monoidality.failing(
+        messages.NO_PLANAR_NORMAL_FORM)
+    rotate_contravariance = PivotalCategory.rotate_contravariance.failing(
+        messages.FEEDBACK_HAS_NO_DAGGER)
+    rotate_contravariance_rigid = PivotalCategory.rotate_contravariance\
+        .weaken(within=RigidCategory)
+    adjunction = PivotalCategory.adjunction.failing(
+        messages.FEEDBACK_HAS_NO_DAGGER)
+    adjunction_rigid = PivotalCategory.adjunction.weaken(within=RigidCategory)
+    dagger_involution_monoidal = None
+    dagger_contravariance_monoidal = None
+    dagger_monoidality_monoidal = None
+
 
 class Box(rigid.Box, feedback.Box, Diagram):
     """
@@ -227,9 +265,11 @@ class Box(rigid.Box, feedback.Box, Diagram):
         cod (Ty) : The codomain of the box, i.e. its output.
         time_step (int) : The number of times the box has been delayed.
     """
+    serialised_attrs = rigid.Box.serialised_attrs + ("time_step", )
+
     def __init__(self, name, dom, cod, *args, time_step: int = 0, **params):
         rigid.Box.__init__(self, name, dom, cod, *args, **params)
-        self._time_step, self._args, self._params = time_step, args, params
+        self._time_step = time_step
 
     def __repr__(self):
         if self.is_dagger:
@@ -242,23 +282,8 @@ class Box(rigid.Box, feedback.Box, Diagram):
 
     def rotate(self, left=False):
         del left
-        return type(self)(
-            self.name, dom=self.cod.r, cod=self.dom.r, data=self.data,
-            is_dagger=self.is_dagger, z=(self.z + 1) % 2,
-            time_step=self.time_step)
-
-    def dagger(self) -> Box:
-        return type(self)(
-            name=self.name, dom=self.cod, cod=self.dom, data=self.data,
-            is_dagger=not self.is_dagger, z=self.z, time_step=self.time_step)
-
-    def lambdify(self, *symbols, **kwargs):
-        if not self.free_symbols & set(symbols):
-            return lambda *xs: self
-        return lambda *xs: type(self)(
-            name=self.name, dom=self.dom, cod=self.cod,
-            data=rsubs(self.data, dict(zip(symbols, xs)), **kwargs),
-            is_dagger=self.is_dagger, z=self.z, time_step=self.time_step)
+        return self.rebuild(
+            dom=self.cod.r, cod=self.dom.r, z=(self.z + 1) % 2)
 
     @property
     def is_conjugate(self):
@@ -310,6 +335,25 @@ class Sum(rigid.Sum, feedback.Sum, Box):
     """
 
 
+class Bubble(rigid.Bubble, feedback.Bubble, Box):
+    """
+    A pivotal bubble is a rigid and feedback bubble and a pivotal box, whose
+    winding number is that of a pivotal box, i.e. a half-turn mod 2.
+
+    Example
+    -------
+    >>> x, y = Ty('x'), Ty('y')
+    >>> bubble = Box('f', x, y).bubble()
+    >>> assert bubble.r.r == bubble == bubble.l.l and bubble.r == bubble.l
+    """
+    serialised_attrs = rigid.Bubble.serialised_attrs + ("time_step", )
+
+    def rotate(self, left=False) -> Bubble:
+        result = super().rotate(left)
+        result.z %= 2
+        return result
+
+
 class Functor(rigid.Functor, feedback.Functor):
     """
     A pivotal functor is a rigid functor on a pivotal category.
@@ -323,11 +367,13 @@ class Functor(rigid.Functor, feedback.Functor):
     dom = cod = Diagram
 
 
-Feedback, Trace, FollowedBy, Head, Tail = feedback.generators(Diagram, Box)
+Feedback, Trace, FollowedBy, Head, Tail = feedback.structural_boxes(
+    Diagram, Box)
 Diagram.box_factory = Box
 Diagram.functor_factory = Functor
 Diagram.cup_factory, Diagram.cap_factory = Cup, Cap
 Diagram.sum_factory = Sum
+Diagram.bubble_factory = Bubble
 CMap = cmap.CMap[Diagram]
 Id = Diagram.id
 

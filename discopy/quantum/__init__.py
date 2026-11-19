@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 
 """
-DisCoPy quantum modules: channel, circuit, gates, tk and zx.
+DisCoPy's quantum modules: circuits, channels and the ZX calculus, with
+interfaces to tket and PennyLane.
 """
 
 from discopy.quantum import (

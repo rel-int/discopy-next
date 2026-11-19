@@ -1,17 +1,63 @@
 # -*- coding: utf-8 -*-
 
-""" DisCoPy utility functions. """
+"""
+DisCoPy utility functions: factories, serialisation, assertions and display.
+
+:func:`discopy.cat.factory` and :func:`discopy.hypergraph.pushout` live here
+too, documented where they are used.
+
+Summary
+-------
+
+.. autosummary::
+    :template: class.rst
+    :nosignatures:
+    :toctree:
+
+    NamedGeneric
+    MappingOrCallable
+    AxiomError
+    RichDisplay
+
+.. admonition:: Functions
+
+    .. autosummary::
+        :template: function.rst
+        :nosignatures:
+        :toctree:
+
+        factory_name
+        factory_key
+        from_tree
+        dumps
+        loads
+        rmap
+        rsubs
+        assert_isinstance
+        unbiased
+        inductive
+        tuplify
+        untuplify
+        assert_iscomposable
+        assert_isparallel
+        assert_isatomic
+"""
 
 from __future__ import annotations
 
 import builtins
+import inspect
 import json
-from functools import lru_cache, wraps
-from math import ceil
+import sys
+from fractions import Fraction
+from functools import lru_cache, reduce, wraps
+from math import ceil, prod
+from operator import or_
 from pathlib import Path
+from types import UnionType
 from typing import (
     Callable,
-    Generic,
+    ClassVar,
     Mapping,
     Iterable,
     Iterator,
@@ -19,7 +65,9 @@ from typing import (
     Any,
     Collection,
     NamedTuple,
+    Sequence,
     Union,
+    get_args,
     TYPE_CHECKING,
 )
 
@@ -31,7 +79,9 @@ from networkx import Graph, connected_components
 import discopy.messages as messages
 
 if TYPE_CHECKING:
-    from discopy.monoidal import Ty, Diagram
+    import numpy
+    import sympy
+    from discopy.monoidal import Ty
     from discopy.abc import Category
 
 KT = TypeVar('KT')
@@ -56,11 +106,13 @@ class MappingOrCallable(Mapping[KT, VT]):
     assert len(g) == 1
     assert list(g) == [0]
     """
-    def __class_getitem__(_, args: tuple[type, type]) -> type:
+    def __class_getitem__(_, args: tuple[type, type]):
         source, target = args
-        return Mapping[source, target] | Callable[[source], target]
+        return (
+            Mapping[source, target]  # ty: ignore[invalid-type-form]
+            | Callable[[source], target])  # ty: ignore[invalid-type-form]
 
-    def __init__(self, mapping: MappingOrCallable[KT, VT]) -> None:
+    def __init__(self, mapping) -> None:
         while isinstance(mapping, MappingOrCallable):
             mapping = mapping.mapping
         if not isinstance(mapping, Mapping) and not callable(mapping):
@@ -102,7 +154,7 @@ class MappingOrCallable(Mapping[KT, VT]):
     def __repr__(self):
         return repr(self.mapping)
 
-    def then(self, other: MappingOrCallable[VT, V2T]
+    def then(self, other: Mapping[VT, V2T] | Callable[[VT], V2T]
              ) -> MappingOrCallable[KT, V2T]:
         """
         Returns the composition of the object with a dict or a Callable.
@@ -120,152 +172,77 @@ class MappingOrCallable(Mapping[KT, VT]):
         return MappingOrCallable(lambda key: other[self[key]])
 
 
+def identity(x: KT) -> KT:
+    """
+    The identity function, which every identity functor and transformation is
+    built from so that it can be recognised, see
+    :meth:`discopy.cat.Functor.then` and
+    :meth:`discopy.cat.Transformation.then`.
+
+    Example
+    -------
+    >>> assert identity(42) == 42
+    """
+    return x
+
+
 def get_origin(typ):
     """
-    Get origin of a parameterized generic type, leaving a union type
-    untouched so that ``isinstance`` can be called on it directly.
+    Get origin of a parameterized generic type, and the union of the origins
+    of a union type, so that ``isinstance`` can be called on it directly,
+    leaving the union untouched when its origins are no union of types.
 
     Example
     -------
     >>> assert get_origin(tuple[int, str]) is tuple
     >>> assert get_origin(int | None) == (int | None)
+    >>> assert get_origin(frozenset[int] | None) == (frozenset | None)
+    >>> from typing import Literal
+    >>> assert get_origin(int | Literal[1]) == (int | Literal[1])
     """
     origin = getattr(typ, "__origin__", typ)
-    return typ if origin is Union else origin
+    if origin is not Union and not isinstance(typ, UnionType):
+        return origin
+    try:
+        return reduce(or_, map(get_origin, get_args(typ)))
+    except TypeError:
+        return typ
 
 
-class NamedGeneric(Generic[TypeVar('T')]):
+@lru_cache(maxsize=None)
+def keywords(function: Callable) -> frozenset[str] | None:
     """
-    A ``NamedGeneric`` is a ``Generic`` where the type parameter has a name.
-
-    Parameters:
-        attributes : The names of the type parameters.
-
-    Note
-    ----
-    In a standard ``Generic`` class, the type parameter disappears when the
-    member of the class is instantiated, e.g.
-
-    >>> assert list[int]([1, 2, 3])\\
-    ...     == list[float]([1, 2, 3])\\
-    ...     == [1, 2, 3]
-
-    In a ``NamedGeneric``, the type parameter is attached to the members of the
-    class so that we have access to it.
+    The names a function takes by keyword, ``None`` when it takes any, i.e.
+    when it has ``**kwargs``, read from its signature once per function.
 
     Example
     -------
-
-    >>> from dataclasses import dataclass
-    >>> @dataclass
-    ... class L(NamedGeneric["dtype"]):
-    ...     inside: list
-    >>> assert L[int]([1, 2, 3]).dtype == int
-    >>> assert L[int]([1, 2, 3]) != L[float]([1, 2, 3])
-
-    A subscript of a class that is its own :func:`factory`, i.e. the arrows
-    of a category, is its own factory in turn, so that the structural arrows
-    it builds through ``cls.ar`` carry the parameter.
-
-    >>> from discopy.abc import Category
-    >>> @factory
-    ... class C(Category, NamedGeneric["dtype"]):
-    ...     pass
-    >>> assert C[int].factory is C[int] is C[int].ar
-
-    A DisCoPy class is named by its module, since every level of the
-    hierarchy has a ``Diagram`` of its own:
-
-    >>> from discopy import frobenius
-    >>> frobenius.Hypergraph.__name__
-    'Hypergraph[frobenius.Diagram]'
+    >>> assert keywords(lambda x, /, y, *, z: x) == {"y", "z"}
+    >>> assert keywords(lambda x, **kwargs: x) is None
     """
-    _cache = dict()
+    parameters = inspect.signature(function).parameters.values()
+    if any(param.kind == param.VAR_KEYWORD for param in parameters):
+        return None
+    return frozenset(param.name for param in parameters if param.kind in (
+        param.POSITIONAL_OR_KEYWORD, param.KEYWORD_ONLY))
 
-    def __class_getitem__(_, attributes):
-        if not isinstance(attributes, tuple):
-            attributes = (attributes,)
-        if not all(isinstance(attribute, str) for attribute in attributes):
-            raise TypeError(messages.NO_TYPE_PARAMETER.format(_))
 
-        G = Generic.__class_getitem__(tuple(map(TypeVar, attributes)))
-
-        class Result(G):
-            def __class_getitem__(cls, values):
-                if hasattr(cls, "__is_named_generic__"):
-                    cls = cls.__bases__[0]
-                values = values if isinstance(values, tuple) else (values,)
-                cls_values = tuple(
-                    getattr(cls, attr, None) for attr in attributes)
-                if cls not in NamedGeneric._cache:
-                    NamedGeneric._cache[cls] = {cls_values: cls}
-                if values not in NamedGeneric._cache[cls]:
-                    origin = get_origin(cls)
-
-                    class C(origin):
-                        __is_named_generic__ = True
-
-                        def __reduce__(self):
-                            """
-                            Pickle a member of the subscripted class as a
-                            member of its origin carrying the values, since
-                            a class created inside a function cannot be
-                            found by name, see `how can I pickle a
-                            dynamically created nested class
-                            <https://stackoverflow.com/questions/1947904>`_.
-                            """
-                            func, args, data = super().__reduce__()
-                            if '[' in args[0].__name__:
-                                args = (origin, ) + args[1:]
-                                data = dict(
-                                    data, __class_getitem__values__=tuple(
-                                        map(Subscript.encode, values)))
-                            return func, args, data
-
-                    C.__module__ = origin.__module__
-                    names = [
-                        factory_name(v) if is_discopy_class(v)
-                        else getattr(v, "__name__", str(v)) for v in values]
-                    C.__name__ = C.__qualname__ = origin.__name__\
-                        + f"[{', '.join(names)}]"
-                    C.__origin__, C.__values__ = cls, values
-                    for attr, value in zip(attributes, values):
-                        setattr(C, attr, value)
-                    if getattr(origin, "factory", None) is origin:
-                        C.factory = C
-                    NamedGeneric._cache[cls][values] = C
-                return NamedGeneric._cache[cls][values]
-
-            def __setstate__(self, state):
-                """
-                Unpickle a member of the origin as a member of the class
-                subscripted by the values its state carries, see
-                ``__reduce__`` above, then restore the rest of the state.
-                """
-                if "__class_getitem__values__" in state:
-                    state = dict(state)
-                    self.__class__ = type(self)[tuple(map(
-                        Subscript.decode,
-                        state.pop("__class_getitem__values__")))]
-                if hasattr(super(), "__setstate__"):
-                    super().__setstate__(state)
-                else:
-                    self.__dict__.update(state)
-
-            __name__ = __qualname__\
-                = f"NamedGeneric[{', '.join(map(repr, attributes))}]"
-
-        for attr in attributes:
-            setattr(Result, attr, getattr(Result, attr, None))
-        return Result
+def rebuild_named_generic(func, origin, values, args):
+    """
+    Unpickle a member of a subscripted :class:`NamedGeneric` by calling the
+    reconstructor ``func`` of its pickle on the subscripted class itself,
+    which is found by subscripting its ``origin`` again with its ``values``,
+    each decoded from its :class:`Subscript`.
+    """
+    return func(origin[tuple(map(Subscript.decode, values))], *args)
 
 
 class Subscript:
     """
     A class subscripted by :class:`NamedGeneric`, as its origin and its
     values. Such a class is created on the fly, so it cannot be pickled by
-    name: a value that is one, e.g. the ``Matrix[int]`` of
-    ``Equation[Matrix[int]]``, is pickled as its subscript instead.
+    name: a value that is one, e.g. the ``Cyclic[2]`` of
+    ``Product[Cyclic[2], Symmetric[3]]``, is pickled as its subscript.
 
     Parameters:
         origin : The class subscripted.
@@ -298,7 +275,148 @@ class Subscript:
         return value
 
 
-def product(xs: list, unit=1):
+class NamedGeneric:
+    """
+    A ``NamedGeneric`` is a class whose type parameters are attached by name
+    to its members.
+
+    Note
+    ----
+    In a standard ``Generic`` class, the type parameter disappears when the
+    member of the class is instantiated, e.g.
+
+    >>> assert list[int]([1, 2, 3])\\
+    ...     == list[float]([1, 2, 3])\\
+    ...     == [1, 2, 3]
+
+    In a ``NamedGeneric``, the type parameter is attached to the members of the
+    class so that we have access to it.
+
+    Example
+    -------
+
+    >>> from dataclasses import dataclass
+    >>> @dataclass
+    ... class L[dtype](NamedGeneric):
+    ...     inside: list
+    >>> assert L[int]([1, 2, 3]).dtype == int
+    >>> assert L[int]([1, 2, 3]) != L[float]([1, 2, 3])
+
+    A subscript of a class that is its own :func:`factory`, i.e. the arrows
+    of a category, is its own factory in turn, so that the structural arrows
+    it builds through ``cls.ar`` carry the parameter.
+
+    >>> from discopy.abc import Category
+    >>> from discopy.testable import TestableGeneric
+    >>> @factory
+    ... class C[dtype](Category, TestableGeneric):
+    ...     checked_params = classmethod(lambda cls: ())
+    >>> assert C[int].factory is C[int] is C[int].ar
+
+    A DisCoPy class is named by its module, since every level of the
+    hierarchy has a ``Diagram`` of its own:
+
+    >>> from discopy import frobenius
+    >>> frobenius.Hypergraph.__name__
+    'Hypergraph[frobenius.Diagram]'
+    """
+    if TYPE_CHECKING:
+        #: The names of the type parameters in DisCoPy, declared so that
+        #: reading them typechecks: subscripting attaches their values.
+        dtype: ClassVar[Any]
+        category: ClassVar[Any]
+        base: ClassVar[Any]
+        natural: ClassVar[Any]
+        algebra: ClassVar[Any]
+        generator_factory: ClassVar[Any]
+
+    _cache = dict()
+
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)
+        for param in cls.__type_params__:
+            if not hasattr(cls, param.__name__):
+                setattr(cls, param.__name__, None)
+
+    def __class_getitem__(cls, values):
+        """
+        Subscripting with values builds a subclass carrying them, while
+        subscripting with the type parameters of the class syntax, e.g.
+        ``class Box[dtype](Diagram[dtype])``, declares a plain subclass.
+        """
+        values = values if isinstance(values, tuple) else (values,)
+        if any(isinstance(value, TypeVar) and value.__infer_variance__
+               for value in values):
+            return super().__class_getitem__(
+                values[0] if len(values) == 1 else values)
+        if hasattr(cls, "__is_named_generic__"):
+            cls = cls.__bases__[0]
+        attributes = next((
+            [param.__name__ for param in c.__type_params__]
+            for c in cls.__mro__ if c.__type_params__), None)
+        if attributes is None:
+            raise TypeError(messages.NO_TYPE_PARAMETER.format(cls))
+        cls_values = tuple(getattr(cls, attr, None) for attr in attributes)
+        if cls not in NamedGeneric._cache:
+            NamedGeneric._cache[cls] = {cls_values: cls}
+        if values not in NamedGeneric._cache[cls]:
+            origin = get_origin(cls)
+
+            class C(origin):
+                __is_named_generic__ = True
+
+                def __reduce__(self):
+                    """
+                    Pickle a member of the subscripted class by its
+                    origin and values, since a class created inside
+                    a function cannot be found by name, see `how can
+                    I pickle a dynamically created nested class
+                    <https://stackoverflow.com/questions/1947904>`_.
+                    The class is rebuilt before the state is set,
+                    so that unpickling needs no ``__setstate__``,
+                    which the subscripted class does not inherit.
+
+                    >>> import pickle
+                    >>> from discopy.tensor import Tensor, Dim
+                    >>> t = Tensor[int]([1, 0, 0, 1], Dim(2), Dim(2))
+                    >>> u = pickle.loads(pickle.dumps(t))
+                    >>> assert type(u) is Tensor[int] and u == t
+                    """
+                    func, args, *rest = super().__reduce__()
+                    if not args or args[0] is not C:
+                        return (func, args, *rest)
+                    return (
+                        rebuild_named_generic,
+                        (func, origin, tuple(map(Subscript.encode, values)),
+                         args[1:]), *rest)
+
+            C.__module__ = origin.__module__
+            names = [
+                factory_name(v) if is_discopy_class(v)
+                else getattr(v, "__name__", str(v)) for v in values]
+            C.__name__ = C.__qualname__ = origin.__name__\
+                + f"[{', '.join(names)}]"
+            C.__origin__, C.__values__ = cls, values
+            for attr, value in zip(attributes, values):
+                setattr(C, attr, value)
+            if getattr(origin, "factory", None) is origin:
+                C.factory = C
+            NamedGeneric._cache[cls][values] = C
+        return NamedGeneric._cache[cls][values]
+
+    def __setstate__(self, state):
+        if "__class_getitem__values__" in state:
+            state = dict(state)
+            self.__class__ = self.__class__[tuple(map(
+                Subscript.decode, state.pop("__class_getitem__values__")))]
+        setstate = getattr(super(), "__setstate__", None)
+        if setstate is None:
+            self.__dict__.update(state)
+        else:
+            setstate(state)
+
+
+def product(xs: Sequence, unit=1):
     """
     The left-fold product of a ``unit`` with list of ``xs``.
 
@@ -371,14 +489,47 @@ def factory_name(cls: type) -> str:
 
     Example
     -------
-    >>> from discopy.grammar.pregroup import Word
-    >>> assert factory_name(Word) == "grammar.pregroup.Word"
+    >>> from discopy.lambek.pregroup import Word
+    >>> assert factory_name(Word) == "lambek.pregroup.Word"
     >>> assert factory_name(int | None) == "int | None"
     """
     if not isinstance(cls, type):
         return str(cls).removeprefix('discopy.')
     module = cls.__module__.removeprefix('discopy.')
     return f"{module}.{cls.__name__}".removeprefix('builtins.')
+
+
+def factory_key(cls: type) -> tuple[str, str]:
+    """
+    Returns a deterministic key for a DisCoPy class, i.e. the pair of its
+    module and its qualified name. This is what a :meth:`setoid` leads with,
+    rather than the class itself: the hash of a class is its address, so a
+    setoid holding one hashes to a different number in every interpreter,
+    which the determinism of `STYLE.md` rules out.
+
+    Example
+    -------
+    >>> from discopy.cat import Box
+    >>> assert factory_key(Box) == ("discopy.cat", "Box")
+
+    A subscript is part of the name, so two of them keep different keys.
+
+    >>> from discopy.tensor import Box as TensorBox
+    >>> assert factory_key(TensorBox[float]) != factory_key(TensorBox[complex])
+
+    A class is keyed by the name it is reachable at, which is the identity
+    :func:`factory_name` and :func:`resolve_factory` already give it when a
+    term is serialised. Two classes of that same name in that same module are
+    one key, e.g. two calls of a factory defining a class in its own body:
+    their terms compare equal where before they compared unequal by address.
+
+    >>> def make():
+    ...     class Local(Box): pass
+    ...     return Local
+    >>> assert make() is not make()
+    >>> assert factory_key(make()) == factory_key(make())
+    """
+    return cls.__module__, cls.__qualname__
 
 
 def from_tree(tree: dict):
@@ -425,22 +576,341 @@ def resolve_factory(name: str) -> type:
     >>> from discopy.tensor import Diagram
     >>> assert resolve_factory("tensor.Diagram[complex]") is Diagram[complex]
     >>> assert resolve_factory("tensor.Diagram[float64]") is Diagram[float64]
+
+    A module that was renamed is found under its old name, see
+    :data:`RENAMED`, so that a tree written before the rename still loads.
+
+    >>> from discopy.lambek import pregroup
+    >>> assert resolve_factory("grammar.pregroup.Ty") is pregroup.Ty
+
+    Any other name raises, e.g. that of an object a module of DisCoPy
+    imports, so that a file names no function for :func:`loads` to reach.
+
+    >>> resolve_factory("utils.json.loads")
+    Traceback (most recent call last):
+    ...
+    AttributeError: No class of DisCoPy is named 'utils.json.loads'.
     """
     if name.endswith(']'):
         origin, parameter = name[:-1].split('[', 1)
-        return resolve_factory(origin)[resolve_factory(parameter)]
+        return resolve_factory(origin)[
+            resolve_factory(parameter)]  # ty: ignore[not-subscriptable]
     *modules, factory = name.removeprefix('discopy.').split('.')
-    import discopy
-    module = discopy
-    for attr in modules:
-        module = getattr(module, attr)
+    modules[:1] = [RENAMED.get(module, module) for module in modules[:1]]
+    import discopy  # pylint: disable=import-outside-toplevel
     if not modules and factory not in vars(discopy):
         import numpy
         for module in (builtins, numpy):
-            if isinstance(getattr(module, factory, None), type):
-                return getattr(module, factory)
+            if isinstance(vars(module).get(factory), type):
+                return vars(module)[factory]
         raise AttributeError(messages.NO_SUCH_TYPE.format(factory))
-    return getattr(module, factory)
+    module = sys.modules.get(".".join(["discopy", *modules]))
+    cls = getattr(module, factory, None)
+    if not is_discopy_class(cls):
+        raise AttributeError(messages.NO_SUCH_CLASS.format(name))
+    return cls
+
+
+RENAMED = {"grammar": "lambek"}
+""" The modules of DisCoPy that were renamed, from old name to new. """
+
+SYMPY_CONSTANTS = (
+    "Zero", "One", "NegativeOne", "Half", "Pi", "Exp1", "ImaginaryUnit",
+    "Infinity", "NegativeInfinity", "ComplexInfinity", "NaN", "EulerGamma",
+    "GoldenRatio", "Catalan")
+""" The sympy singletons a tree names, read back from ``sympy.S``. """
+
+SYMPY_FUNCTIONS = (
+    "Add", "Mul", "Pow", "Mod", "Min", "Max", "Abs", "sign", "floor",
+    "ceiling", "re", "im", "arg", "conjugate", "exp", "log", "sin", "cos",
+    "tan", "cot", "sec", "csc", "asin", "acos", "atan", "acot", "atan2",
+    "sinh", "cosh", "tanh", "asinh", "acosh", "atanh")
+""" The sympy classes a tree applies to its ``args``, read from ``sympy``. """
+
+
+def encode(tree: Any) -> Any:
+    """
+    A tree as JSON can write it, with a node tagged by its factory for each
+    value that JSON has no notation for, or one it would read back as
+    something else: a tuple, which it writes as a list, a complex number, see
+    :func:`encode_complex`, a fraction, see :func:`encode_fraction`, a numpy
+    array or scalar, see :func:`encode_numpy`,
+    and a sympy expression, see :func:`encode_sympy`. Every other value is
+    left as it is, so a tree without tuples keeps the bytes JSON gives it, as
+    is one that these refuse, for the ``default`` of ``json.dumps``. A key
+    that is not a string, which JSON would write as one, raises.
+    This is what :func:`dumps` writes and :func:`decode` reads back.
+
+    Example
+    -------
+    >>> encode({'name': 'f', 'data': (1, 2j)})
+    {'name': 'f', 'data': {'factory': 'tuple', 'inside': \
+[1, {'factory': 'complex', 're': 0.0, 'im': 2.0}]}}
+    >>> encode({'data': {1, 2}})
+    {'data': {1, 2}}
+    >>> encode({'data': {1: 'a'}})
+    Traceback (most recent call last):
+    ...
+    TypeError: Object of type dict with int keys is not JSON serialisable.
+    """
+    if isinstance(tree, dict):
+        keys = [key for key in tree if not isinstance(key, str)]
+        if keys:
+            raise TypeError(messages.NOT_JSON_SERIALISABLE.format(
+                f"dict with {type(keys[0]).__name__} keys"))
+        return {key: encode(value) for key, value in tree.items()}
+    if isinstance(tree, list | tuple):
+        inside = list(map(encode, tree))
+        return inside if isinstance(tree, list)\
+            else {'factory': factory_name(tuple), 'inside': inside}
+    if tree is None or isinstance(tree, bool | int | float | str):
+        return tree
+    if isinstance(tree, complex):
+        return encode_complex(tree)
+    if isinstance(tree, Fraction):
+        return encode_fraction(tree)
+    package = (type(tree).__module__ or "").partition('.')[0]
+    encoder = {"numpy": encode_numpy, "sympy": encode_sympy}.get(package)
+    try:
+        return tree if encoder is None else encoder(tree)
+    except TypeError:
+        return tree
+
+
+def decode(tree: dict) -> Any:
+    """
+    Read back a node that :func:`encode` wrote, leaving any other alone.
+
+    This is the ``object_hook`` of :func:`loads`, i.e. :mod:`json` calls it on
+    every object it decodes, innermost first, so it answers a node that it did
+    not write with that node itself. A box whose ``data`` is a dictionary of
+    its own is left alone by the factory tag, which a tree reserves: a node is
+    read back only when it has exactly the keys that :func:`encode` writes,
+    holding values of the types it writes.
+
+    Example
+    -------
+    >>> assert decode({'factory': 'tuple', 'inside': [1, 2]}) == (1, 2)
+    >>> tree = {'factory': 'tuple', 'inside': [1, 2], 'name': 'x'}
+    >>> assert decode(tree) == tree
+    """
+    name = tree.get('factory')
+    if name == factory_name(tuple) and tree.keys() == {'factory', 'inside'}\
+            and isinstance(tree['inside'], list):
+        return tuple(tree['inside'])
+    if isinstance(name, str) and name.startswith("numpy."):
+        return decode_numpy(tree)
+    if isinstance(name, str) and name.startswith("sympy."):
+        return decode_sympy(tree)
+    if name == factory_name(Fraction):
+        return decode_fraction(tree)
+    return decode_complex(tree)
+
+
+def encode_numpy(value: "numpy.ndarray | numpy.generic") -> dict:
+    """
+    A numpy array as a node with its ``dtype``, its ``shape`` and its
+    entries in order, i.e. ``flat``, or a numpy scalar as a node with its
+    ``item``, i.e. its value as a Python scalar, see :func:`encode`. It
+    raises on any value that :func:`decode_numpy` does not read back.
+
+    Example
+    -------
+    >>> import numpy
+    >>> encode_numpy(numpy.array([[1, 0], [0, 1]]))
+    {'factory': 'numpy.ndarray', 'dtype': 'int64', 'shape': [2, 2], \
+'flat': [1, 0, 0, 1]}
+    >>> encode_numpy(numpy.float32(0.5))
+    {'factory': 'numpy.float32', 'item': 0.5}
+    >>> encode_numpy(numpy.str_('a'))
+    Traceback (most recent call last):
+    ...
+    TypeError: Object of type str_ is not JSON serialisable.
+    """
+    import numpy
+    tree = {'factory': factory_name(type(value))}
+    if type(value) is numpy.ndarray:
+        tree |= {'dtype': str(value.dtype), 'shape': list(value.shape),
+                 'flat': value.reshape(-1).tolist()}
+    elif isinstance(value, numpy.generic):
+        tree['item'] = value.item()
+    if decode_numpy(tree) is tree:
+        raise TypeError(messages.NOT_JSON_SERIALISABLE.format(
+            type(value).__name__))
+    return encode(tree)
+
+
+def decode_numpy(tree: dict) -> Any:
+    """
+    Read back what :func:`encode_numpy` wrote, leaving any other node alone:
+    its scalar type is one that numpy names for booleans, integers, floats or
+    complex numbers, and its entries are the Python scalars that type reads
+    back as, in its range for an integer, so that an array allocates in
+    proportion to the file and no string is parsed as a number. A shape
+    that numpy refuses, e.g. one with a dimension too large, is left alone.
+
+    Example
+    -------
+    >>> import numpy
+    >>> array = numpy.arange(6).reshape(2, 3)
+    >>> assert (decode_numpy(encode_numpy(array)) == array).all()
+    >>> scalar = decode_numpy(encode_numpy(numpy.int8(-3)))
+    >>> assert scalar == -3 and isinstance(scalar, numpy.int8)
+    >>> for item in ('-3', 1000):
+    ...     tree = {'factory': 'numpy.int8', 'item': item}
+    ...     assert decode_numpy(tree) == tree
+    """
+    import numpy
+    name, fields = tree['factory'].removeprefix("numpy."), tree.keys()
+    if name == "ndarray" and fields == {'factory', 'dtype', 'shape', 'flat'}:
+        dtype, entries, shape = tree['dtype'], tree['flat'], tree['shape']
+    elif fields == {'factory', 'item'}:
+        dtype, entries, shape = name, [tree['item']], None
+    else:
+        return tree
+    scalar = numpy.sctypeDict.get(dtype) if isinstance(dtype, str) else None
+    if scalar is None or numpy.dtype(scalar).kind not in "biufc"\
+            or not isinstance(entries, list):
+        return tree
+    python = type(scalar(0).item())
+    bounds = numpy.iinfo(scalar) if python is int else None
+    if python not in (bool, int, float, complex)\
+            or any(type(entry) is not python for entry in entries)\
+            or bounds is not None and not all(
+                bounds.min <= entry <= bounds.max for entry in entries):
+        return tree
+    if shape is None:
+        return scalar(tree['item'])
+    if isinstance(shape, list)\
+            and all(type(n) is int and n >= 0 for n in shape)\
+            and prod(shape) == len(entries):
+        try:
+            return numpy.array(entries, dtype=scalar).reshape(shape)
+        except (ValueError, OverflowError):
+            return tree
+    return tree
+
+
+def encode_sympy(expr: "sympy.Basic") -> dict:
+    """
+    A sympy expression as a tree of sympy classes: a symbol by its ``name``
+    and the ``assumptions`` it was given, an integer by its numerator ``p``, a
+    rational by ``p`` and its denominator ``q``, a float by the decimal
+    ``num`` that reads back exactly at its ``precision``, a constant in
+    :data:`SYMPY_CONSTANTS` by its name alone and an expression whose head
+    is in :data:`SYMPY_FUNCTIONS` by its ``args``.
+
+    Any other class raises, e.g. an undefined function named ``sin``, so
+    that :func:`decode_sympy` can read back what this writes without
+    ``sympy.sympify``, which calls :func:`eval` on strings, i.e.
+    :func:`loads` runs no code from a file.
+
+    Example
+    -------
+    >>> from sympy import Dummy, Symbol, pi  # doctest: +EXTRA
+    >>> phi = Symbol('phi', real=True)
+    >>> encode_sympy(phi / 2 + pi)
+    {'factory': 'sympy.Add', 'args': [{'factory': 'sympy.Pi'}, \
+{'factory': 'sympy.Mul', 'args': [{'factory': 'sympy.Half'}, \
+{'factory': 'sympy.Symbol', 'name': 'phi', 'assumptions': {'real': True}}]}]}
+    >>> encode_sympy(Dummy())
+    Traceback (most recent call last):
+    ...
+    TypeError: Object of type Dummy is not JSON serialisable.
+    >>> from sympy import Function
+    >>> encode_sympy(phi + Function('sin')(phi))
+    Traceback (most recent call last):
+    ...
+    TypeError: Object of type sin is not JSON serialisable.
+    """
+    import sympy
+    name = type(expr).__name__
+    tree = {'factory': f"sympy.{name}"}
+    if name in SYMPY_CONSTANTS and expr is getattr(sympy.S, name):
+        return tree
+    if type(expr) is not getattr(sympy, name, None)\
+            or name == "Symbol" and not expr.name.isidentifier():
+        raise TypeError(messages.NOT_JSON_SERIALISABLE.format(name))
+    if name == "Symbol":
+        _, assumptions = expr.__getnewargs_ex__()
+        tree['name'] = expr.name
+        tree.update({'assumptions': assumptions} if assumptions else {})
+    elif name in ("Integer", "Rational"):
+        tree.update({'p': expr.p} | ({'q': expr.q} if expr.q != 1 else {}))
+    elif name == "Float":
+        from mpmath.libmp import repr_dps
+        _, options = expr.__getnewargs_ex__()
+        digits = repr_dps(options['precision'])
+        tree['num'] = str(expr.evalf(digits)) if expr else "0." + "0" * digits
+        tree['precision'] = options['precision']
+    elif name in SYMPY_FUNCTIONS:
+        tree['args'] = list(map(encode_sympy, expr.args))
+    else:
+        raise TypeError(messages.NOT_JSON_SERIALISABLE.format(name))
+    return tree
+
+
+def decode_sympy(tree: dict) -> Any:
+    """
+    Read back what :func:`encode_sympy` wrote, leaving any other node alone.
+
+    Each class is called on fields of the types it is written with, e.g. a
+    function on sympy expressions only, never on a string, which sympy would
+    parse with :func:`eval`, and with ``evaluate=False``, so that it rebuilds
+    the expression as it was written, without computing e.g. a large power.
+    A float is read at a precision of at most four bits a digit, so that it
+    allocates in proportion to the file. A node with exactly the fields
+    :func:`encode_sympy` writes for its class is still left alone when sympy
+    refuses them, e.g. a symbol with inconsistent assumptions or a function
+    with the wrong number of ``args``.
+    As the ``object_hook`` of :func:`loads` it reads the innermost nodes
+    first, i.e. the ``args`` of a node come decoded.
+
+    Example
+    -------
+    >>> from sympy import Symbol, sin  # doctest: +EXTRA
+    >>> theta = decode_sympy({'factory': 'sympy.Symbol', 'name': 'theta'})
+    >>> assert decode_sympy({'factory': 'sympy.sin', 'args': [theta]})\\
+    ...     == sin(Symbol('theta'))
+    >>> tree = {'factory': 'sympy.sin', 'args': ['__import__("os")']}
+    >>> assert decode_sympy(tree) == tree
+    >>> tree = {'factory': 'sympy.sin', 'args': [theta, theta]}
+    >>> assert decode_sympy(tree) == tree
+    """
+    import sympy
+    name, fields = tree['factory'].removeprefix("sympy."), tree.keys()
+    assumptions = tree.get('assumptions', {})
+    if name == "Symbol" and fields <= {'factory', 'name', 'assumptions'}\
+            and isinstance(tree.get('name'), str)\
+            and tree['name'].isidentifier()\
+            and isinstance(assumptions, dict)\
+            and all(isinstance(value, bool) for value in assumptions.values()):
+        try:
+            return sympy.Symbol(tree['name'], **assumptions)
+        except (TypeError, ValueError):
+            return tree
+    if name == "Integer" and fields == {'factory', 'p'}\
+            and type(tree['p']) is int:
+        return sympy.Integer(tree['p'])
+    if name == "Rational" and fields == {'factory', 'p', 'q'}\
+            and type(tree['p']) is int and type(tree['q']) is int\
+            and tree['q'] > 1:
+        return sympy.Rational(tree['p'], tree['q'])
+    if name == "Float" and fields == {'factory', 'num', 'precision'}\
+            and isinstance(tree['num'], str)\
+            and type(tree['precision']) is int\
+            and tree['precision'] <= 4 * len(tree['num']):
+        return sympy.Float(tree['num'], precision=tree['precision'])
+    if name in SYMPY_CONSTANTS and fields == {'factory'}:
+        return getattr(sympy.S, name)
+    if name in SYMPY_FUNCTIONS and fields == {'factory', 'args'}\
+            and isinstance(tree['args'], list)\
+            and all(isinstance(arg, sympy.Basic) for arg in tree['args']):
+        try:
+            return getattr(sympy, name)(*tree['args'], evaluate=False)
+        except (TypeError, ValueError):
+            return tree
+    return tree
 
 
 def encode_complex(number: complex) -> dict:
@@ -449,9 +919,8 @@ def encode_complex(number: complex) -> dict:
 
     :math:`\\mathbb{C}` is :math:`\\mathbb{R}^2` as a real vector space, so a
     complex number travels as the pair of its real and imaginary parts, tagged
-    with its factory like every other node. This is the ``default`` of
-    :func:`dumps`, i.e. it is called on whatever JSON cannot encode by itself
-    and raises on anything else, as :mod:`json` asks.
+    with its factory like every other node, see :func:`encode`. It raises on
+    anything else.
 
     Example
     -------
@@ -471,14 +940,10 @@ def encode_complex(number: complex) -> dict:
 
 def decode_complex(tree: dict) -> Any:
     """
-    Read back what :func:`encode_complex` wrote, leaving other nodes alone.
-
-    This is the ``object_hook`` of :func:`loads`, i.e. :mod:`json` calls it on
-    every object it decodes, so it answers a node that is not a complex number
-    with that node itself. A box whose ``data`` is a dictionary of its own is
-    left alone by the factory tag, which a tree reserves: the one dictionary
-    read as a complex number is ``{'factory': 'complex', 're': x, 'im': y}``,
-    with exactly those three keys, as :func:`encode_complex` writes it.
+    Read back what :func:`encode_complex` wrote, leaving other nodes alone,
+    see :func:`decode`: the one dictionary read as a complex number is
+    ``{'factory': 'complex', 're': x, 'im': y}``, with exactly those three
+    keys, as :func:`encode_complex` writes it.
 
     Example
     -------
@@ -493,6 +958,44 @@ def decode_complex(tree: dict) -> Any:
     return tree
 
 
+def encode_fraction(number: Fraction) -> dict:
+    """
+    A fraction as a node of a tree, since JSON has only integers and floats:
+    its ``numerator`` and ``denominator`` in lowest terms, tagged with its
+    factory like every other node, see :func:`encode`.
+
+    Example
+    -------
+    >>> encode_fraction(Fraction(2, 8))
+    {'factory': 'fractions.Fraction', 'numerator': 1, 'denominator': 4}
+    """
+    return {'factory': factory_name(Fraction),
+            'numerator': number.numerator, 'denominator': number.denominator}
+
+
+def decode_fraction(tree: dict) -> Any:
+    """
+    Read back what :func:`encode_fraction` wrote, leaving other nodes alone,
+    see :func:`decode`: exactly its three keys, with an integer numerator
+    and a positive integer denominator.
+
+    Example
+    -------
+    >>> assert decode_fraction(encode_fraction(Fraction(-1, 4)))\\
+    ...     == Fraction(-1, 4)
+    >>> tree = {'factory': 'fractions.Fraction',
+    ...         'numerator': 1, 'denominator': 0}
+    >>> assert decode_fraction(tree) == tree
+    """
+    if tree.keys() == {'factory', 'numerator', 'denominator'}\
+            and tree['factory'] == factory_name(Fraction)\
+            and type(tree['numerator']) is int\
+            and type(tree['denominator']) is int\
+            and tree['denominator'] > 0:
+        return Fraction(tree['numerator'], tree['denominator'])
+    return tree
+
+
 def dumps(obj, **kwargs):
     """
     Serialise a DisCoPy object as JSON.
@@ -500,7 +1003,12 @@ def dumps(obj, **kwargs):
     Parameters:
         obj : The DisCoPy object to serialise, or a list of them, which
             :func:`loads` reads back as a list, e.g. a corpus.
-        kwargs : Passed to ``json.dumps``.
+        kwargs : Passed to ``json.dumps``, e.g. a ``default`` or a ``cls``
+            for the values that :func:`encode` leaves alone, on which it
+            raises otherwise.
+
+    The tree of ``obj`` goes through :func:`encode`, so that its data may hold
+    tuples, complex numbers, numpy arrays and scalars and sympy expressions.
 
     Example
     -------
@@ -535,15 +1043,17 @@ def dumps(obj, **kwargs):
         }
     }
     """
-    kwargs.setdefault('default', encode_complex)
+    if 'cls' not in kwargs:
+        kwargs.setdefault('default', encode_complex)
     tree = [x.to_tree() for x in obj] if isinstance(obj, list)\
         else obj.to_tree()
-    return json.dumps(tree, **kwargs)
+    return json.dumps(encode(tree), **kwargs)
 
 
 def loads(raw):
     """
-    Loads a serialised DisCoPy object.
+    Loads a serialised DisCoPy object, decoding its nodes with
+    :func:`decode`, which runs no code from ``raw``.
 
     Example
     -------
@@ -554,7 +1064,7 @@ def loads(raw):
     >>> assert loads(dumps(Ob('x'))) == Ob('x')
     >>> assert loads(dumps([Ob('x'), Ob('y')])) == [Ob('x'), Ob('y')]
     """
-    obj = json.loads(raw, object_hook=decode_complex)
+    obj = json.loads(raw, object_hook=decode)
     if isinstance(obj, list):
         return [from_tree(o) for o in obj]
     return from_tree(obj)
@@ -687,16 +1197,15 @@ def assert_ismember(object_, cls: type):
 
 def unbiased(binary_method):
     """
-    Turn a biased method with signature (self, other) to an unbiased one, i.e.
-    with signature (self, *others), see the `nLab`_.
+    Turn a biased method with signature ``(self, other)`` into an unbiased
+    one with signature ``(self, *others)``, see the
+    `nLab <https://ncatlab.org/nlab/show/biased+definition>`__.
 
     One argument is the base case, more are folded by calling the method by
     its name on the running result, so that a subclass overriding the binary
     case has its own folded rather than the one decorated. An operand passed
     by keyword, e.g. ``f.then(other=g)``, goes to the binary method as it is,
     rather than being dropped as if there were none.
-
-    .. _nLab: https://ncatlab.org/nlab/show/biased+definition
     """
     @wraps(binary_method)
     def method(self, *others, **params):
@@ -841,7 +1350,7 @@ def text_width(text: str, fontsize=12, points_per_inch=72., grid=16):
     return ceil(width / points_per_inch * grid) / grid
 
 
-def tuplify(stuff: any, n: int | None = None) -> tuple:
+def tuplify(stuff: Any, n: int | None = None) -> tuple:
     """
     Turns anything into a tuple, do nothing if it is already.
 
@@ -858,7 +1367,7 @@ def tuplify(stuff: any, n: int | None = None) -> tuple:
     return stuff if n != 1 and isinstance(stuff, tuple) else (stuff, )
 
 
-def untuplify(stuff: tuple) -> any:
+def untuplify(stuff: tuple | list) -> Any:
     """
     Takes the element out of a tuple if it has length 1, otherwise do nothing.
 
@@ -950,8 +1459,11 @@ def assert_isparallel(left: Category, right: Category):
         raise AxiomError(messages.NOT_PARALLEL.format(left, right))
 
 
-def assert_isatomic(typ: Ty, cls: type = None):
-    """ Raise :class:`AxiomError` if a type does not have length one. """
+def assert_isatomic(typ: Ty, cls: type | None = None):
+    """
+    Raise ``TypeError`` if a type is not a ``cls`` and ``ValueError`` if it
+    does not have length one.
+    """
     cls = cls or type(typ)
     assert_isinstance(typ, cls)
     if not typ.is_atomic:
@@ -959,8 +1471,11 @@ def assert_isatomic(typ: Ty, cls: type = None):
             factory_name(cls), len(typ)))
 
 
-def assert_istraceable(arg: Diagram, n=1, left=False):
-    """ Raise :class:`AxiomError` if a diagram is not traceable. """
+def assert_istraceable(arg, n=1, left=False):
+    """
+    Raise ``ValueError`` if ``n`` atoms cannot be split off a diagram and
+    :class:`AxiomError` if the traced types differ.
+    """
     if n < 0 or n > min(len(arg.dom), len(arg.cod)):
         raise ValueError(messages.NOT_SPLITTABLE.format(n, arg))
     traced_dom, traced_cod = (arg.dom[:n], arg.cod[:n]) if left\

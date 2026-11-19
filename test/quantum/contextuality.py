@@ -6,7 +6,8 @@ import numpy as np
 from pytest import approx, importorskip, mark, raises
 
 from discopy.quantum import CX, H, Ket, Measure, Rz, qubit
-from discopy.quantum.contextuality import Inequality, Model, Scenario, maximise
+from discopy.quantum.contextuality import (
+    Inequality, Model, Scenario, ascend, attempt, maximise, sensitivity)
 
 importorskip("scipy")
 
@@ -43,6 +44,8 @@ def test_Scenario():
     assert (scenario.incidence().sum(axis=0) == 2).all()
     assert eval(repr(scenario)) == scenario
     assert bell.measurements == ('a1', 'b1', 'b2', 'a2')
+    assert Scenario.bell(2, settings=(3, 1)).measurements == (
+        'a1', 'b1', 'a2', 'a3')
     assert Scenario.bell(3, settings=3).contexts[:2] == (
         ('a1', 'b1', 'c1'), ('a1', 'b1', 'c2'))
 
@@ -59,7 +62,7 @@ def test_Scenario_errors():
     with raises(ValueError):
         PR.mix(Model(Scenario([('x', 'y')]), [[1, 0, 0, 0]]), 1 / 2)
     with raises(ValueError):
-        Inequality(bell, [[0] * 4] * 4).violation(PR)
+        Scenario.bell(2, settings=(2, 2, 2))
     with raises(ValueError):
         Inequality(bell, [[1, 0, 0, 0]] * 4)(Model(
             Scenario([('x', 'y')] * 4), [[1, 0, 0, 0]] * 4))
@@ -191,3 +194,86 @@ def test_theorem_2():
     assert CF(e & f) == approx(max(CF(e), CF(f)))
     assert CF(e @ f) == approx(CF(e) + CF(f) - CF(e) * CF(f))
     assert CF(CHSH @ CHSH.relabel(cd)) == approx(7 / 16)
+
+
+triangle = Scenario([('x', 'y'), ('y', 'z'), ('z', 'x')])
+specker = Model(triangle, [[0, 1 / 2, 1 / 2, 0]] * 3)
+
+
+def test_deterministic():
+    for scenario in (bell, triangle):
+        for assignment in scenario.assignments:
+            model = Model.deterministic(scenario, assignment)
+            assert model.is_compatible()
+            assert model.contextual_fraction() == approx(0, abs=1e-9)
+            assert model.bell_inequality().violation(model) == 0
+    assert Inequality(bell, [[0] * 4] * 4).violation(PR) == 0
+    scaled = CHSH.bell_inequality()
+    scaled = Inequality(bell, 1e9 * scaled.vector.reshape(4, 4), bound=0)
+    assert scaled.violation(CHSH) == approx(1 / 4)
+    assert Inequality(bell, [[1e-12] * 4] * 4).violation(PR) == 0
+    with raises(ValueError):
+        Inequality(bell, [[1, 0, 0, 0]] * 4, bound=4).violation(
+            Model(bell, [[2, 0, 0, 0]] * 4))
+
+
+@mark.parametrize("weight", np.linspace(0, 1, 11))
+def test_isotropic(weight):
+    model = PR.mix(noise, weight)
+    fraction = model.contextual_fraction()
+    assert fraction == approx(max(0, 2 * weight - 1), abs=1e-9)
+    assert model.bell_inequality().violation(model) == approx(
+        fraction, abs=1e-9)
+
+
+def test_specker():
+    assert specker.is_compatible()
+    assert specker.contextual_fraction() == approx(1)
+    inequality = specker.bell_inequality()
+    assert inequality.non_contextual_bound == approx(0, abs=1e-9)
+    assert inequality.violation(specker) == approx(1)
+
+
+@mark.parametrize("model", [CHSH, PR.mix(noise, .9), equatorial(3, 1, 2)])
+def test_gradient(model):
+    gradient = model.gradient()
+    assert gradient.scenario == model.scenario
+    assert gradient.vector @ model.vector == approx(
+        model.contextual_fraction() - 1)
+    for assignment in model.scenario.assignments:
+        deterministic = Model.deterministic(model.scenario, assignment)
+        assert gradient.vector @ deterministic.vector <= -1 + 1e-9
+    incidence = model.scenario.incidence()
+    assert np.allclose(gradient.vector, -sensitivity(
+        np.ones(incidence.shape[1]), incidence, model.vector, (0, None)))
+    with raises(ValueError):
+        Model(bell, [[1, 0, 0, 0], [0, 0, 1, 0]] + [[1 / 4] * 4] * 2
+              ).gradient()
+
+
+def test_ascend():
+    isotropic = lambda params: PR.mix(noise, min(1., max(0., params[0])))
+    weight, box = ascend(isotropic, [.75], steps=5)
+    assert box.is_close(PR) and weight[0] >= 1
+    weight, model = ascend(isotropic, [.25], steps=2)
+    assert weight[0] == approx(.25) and model.is_close(isotropic([.25]))
+    unclamped = lambda params: PR.mix(noise, params[0])
+    weight, box = ascend(unclamped, [.75], steps=5)
+    assert .99 < weight[0] <= 1 and box.contextual_fraction() > .98
+    assert attempt(unclamped, np.array([1.5])) is None
+    assert attempt(lambda params: Model(bell, [[1, 0, 0, 0], [0, 0, 1, 0]]
+                   + [[1 / 4] * 4] * 2), np.zeros(1)) is None
+
+
+def test_normalise():
+    half = Model(bell, [[1 / 4, 0, 0, 1 / 4]] * 3 + [[0, 1 / 4, 1 / 4, 0]])
+    assert half.normalise().is_close(PR)
+    with raises(ValueError):
+        Model(bell, [[1 / 4, 0, 0, 1 / 4]] * 3 + [[0, 1, 1, 0]]).normalise()
+    with raises(ValueError):
+        Model(bell, [[0] * 4] * 4).normalise()
+    rare = Model(bell, [[1e-12, 0, 0, 1e-12]] * 3 + [[0, 1e-12, 1e-12, 0]])
+    assert rare.normalise().is_close(PR)
+    with raises(ValueError):
+        Model(bell, [[1 / 2, 0, 0, 0], [0, 0, 1 / 2, 0]]
+              + [[1 / 8] * 4] * 2).normalise()

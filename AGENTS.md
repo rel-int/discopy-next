@@ -4,7 +4,7 @@
 
 DisCoPy is a Python toolkit for computing with string diagrams.
 
-Read the following documents (<10k tokens) before any work on the package:
+Read the following documents before any work on the package:
 
 - @RULES.md describes the collaboration and Git protocol for shared PR branches, follow it exactly.
 - @STYLE.md describes coding guidelines that all your work should try to follow.
@@ -19,7 +19,7 @@ This repo is the *next* repo of [discopy/discopy](https://github.com/discopy/dis
 - down: upstream `main` is merged into `main` every night, never rebased
 - up: an upstream pull request is opened only when a human asks, cut from upstream `main` and small enough to read; agents propose the slices on [#55](https://github.com/rel-int/discopy-next/issues/55)
 - drift is `git diff upstream/main...main -- . ':!.github'`, split `discopy/`, `test/` and `docs/`, and tended down by slicing: moving an open upstream pull request here raises the measured drift but adds nothing to read, it only moves where the work waits
-- experiments do not live on long branches: a big, speculative one gets a repository of its own, a small one lands in `main` as a notebook
+- experiments do not live on long branches: a big, speculative one goes to its author's folder on the [wiki](https://github.com/rel-int/wiki), `content/<author>/`, as a notebook with its code beside it (ruling: [toumix/desire#195](https://github.com/toumix/desire/issues/195)); a small one lands in `main` as a notebook
 - `#N` is this repo, `discopy/discopy#N` upstream
 
 Each human's agents move their own open work from upstream, never somebody else's; [#2](https://github.com/rel-int/discopy-next/issues/2) is the record of the first such move:
@@ -34,9 +34,12 @@ Each human's agents move their own open work from upstream, never somebody else'
 
 - [discopy](discopy/) contains the code with a lot of modules and a few submodules
 - [discopy.abc](discopy/abc.py) contains abstract base classes for each level of the hierarchy
-- [discopy.axioms](discopy/axioms.py) contains the property-testing module: `Axiom` states a law once on an abstract base class, `Testable` generates the terms it quantifies over, and the matrix in `proptest/` checks every cell. Read it before adding a category or an axiom.
-- [test](test/) is flat with one file for each module, mirroring `discopy/`; submodules (`grammar`, `quantum`, `drawing`, `python`) keep their own directory with one file per submodule, and shared test data lives in `fixtures`
-- [docs](docs/) contains notebooks and pictures generated automatically when running the tests
+- [discopy.testable](discopy/testable.py) contains the property-testing module: `Axiom` states a law once on an abstract base class, `Rule` an operation the terms of a free category are derived by, `Testable` generates the terms a law quantifies over, and the matrix in `proptest/` checks every cell. Read it before adding a category, a rule or an axiom.
+- [test](test/) mirrors `discopy/`: one file per module, and a directory per subpackage (`drawing`, `lambek`, `monad`, `neural`, `python`, `quantum`) with one file per submodule; `kleisli` is tested by a single `test/kleisli.py`, `neural/torch.py` by `neural/torch_module.py`, `traced` and `drawing/widget` have no file of their own, and `optyx` keeps its own layout of topic-named files with `compiler/` and `graph_data/` directories. Shared test code and data live in `fixtures`, and the tikz baselines in `drawing/tikz`: pytest imports test files by path (`--import-mode=importlib`), not by basename, so `test/abc.py` does not clash with the standard `abc` already loaded, and no test file imports another
+- [proptest](proptest/) holds the property matrix and [benchmark](benchmark/) the scaling benchmarks, both outside pytest's `testpaths` and run explicitly: see CONTRIBUTING.md's "Run the property tests" and "Run the benchmarks"; [.github/tests](.github/tests/) tests the composite action and the scripts in `.github/`
+- [lean](lean/) is a Lake project, a Lean 4 model of `egraph.partition`, the pure `EGraph` (`merge`, `add`, `rebuild`) and the `Builder` with theorems proved on it and a differential test against the Python, outside the package and `testpaths`: see CONTRIBUTING.md's "Run the Lean proofs"
+- [paper](paper/) is the tool paper, Typst source with its LaTeX written by `paper/transpile.py`, outside the package: `test/paper_build.py` runs its listings and draws its figures with the Typst and the TikZ backends, see CONTRIBUTING.md's "Build the paper"
+- [docs](docs/) is the Sphinx site: marimo notebooks in `docs/notebooks/` (rendered by `sphinx-build` through `docs/export_notebooks.py`, their `.rst` and HTML not committed) and, in `docs/_static/`, the pictures the tests and doctests draw with `draw(doctest=...)` and check against
 
 ## How
 
@@ -49,9 +52,9 @@ Before pushing anything, make sure that:
 
 - you have reported any bugs or confusing docs that you encounter even if unrelated
 - you have added docs and tests that are complete but concise as best as you can
-- you have added an entry to the `[Unreleased]` section of [CHANGELOG.md](CHANGELOG.md) for any user-facing change
-- you have `uv run` `pflake8 discopy`, `pylint discopy` and `coverage run -m pytest` as described in @CONTRIBUTING.md
-- you have respected the [code style guide](CONTRIBUTING.md#code-style-guide)
+- you have [added a changelog entry](CONTRIBUTING.md#add-a-changelog-entry) for any user-facing change
+- you have run every check of [Run the unit tests](CONTRIBUTING.md#run-the-unit-tests): pflake8, pylint, ruff, ty, coverage and the notebooks, plus actionlint, `pflake8 .github` and `.github/tests` for a change under `.github/`
+- you have respected the [code style guide](STYLE.md)
 
 A pull request is **ready for sign-off** when all three of these hold:
 

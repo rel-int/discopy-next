@@ -15,32 +15,64 @@ DisCoPy documentation
 
     api/syntax
     api/semantics
+    api/neural
     api/quantum
     api/optyx
-    api/grammar
-    api/drawing
-    api/axioms
+    api/lambek
 
 .. toctree::
-    :caption: Notebooks
+    :caption: What is a diagram?
     :hidden:
 
     notebooks/diagrams
     notebooks/examples
+    notebooks/boolean-circuits
+    notebooks/equivalence-hypergraphs
+    notebooks/from_picture
+
+.. toctree::
+    :caption: Quantum notebooks
+    :hidden:
+
     notebooks/qnlp
     notebooks/zx-minimality
-    notebooks/diag-diff
-    notebooks/learning-intertwiners
-    notebooks/21-05-03-tallcat
+    notebooks/contextual-fraction
     notebooks/21-05-05-tallcat
+
+.. toctree::
+    :caption: Optyx notebooks
+    :hidden:
+
+    notebooks/optyx/what_is_a_channel
+    notebooks/optyx/fixpoints
+    notebooks/optyx/feed_forward_example
+    notebooks/optyx/compile_to_semm
+    notebooks/optyx/optyx-vqe-experiment
+    notebooks/optyx/bosonic-vqe-2
+    notebooks/optyx/photon_distinguishability
+    notebooks/optyx/contextuality
+    notebooks/optyx/zw_examples
+    notebooks/optyx/bose_hubbard
+    notebooks/optyx/Compiler
+    notebooks/optyx/distributed-412-code
+    notebooks/optyx/distributed-422-code
+
+.. toctree::
+    :caption: Linguistics notebooks
+    :hidden:
+
+    notebooks/21-05-03-tallcat
     notebooks/higher-order-discocat
     notebooks/parsing-arithmetic
+
+.. toctree::
+    :caption: Machine learning notebooks
+    :hidden:
+
     notebooks/categorical-deep-learning
     notebooks/neural-church
-    notebooks/equivalence-hypergraphs
-    notebooks/contextual-fraction
-    notebooks/boolean-circuits
-
+    notebooks/diag-diff
+    notebooks/learning-intertwiners
 
 .. toctree::
     :caption: Extra

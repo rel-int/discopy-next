@@ -10,7 +10,7 @@ import marimo as mo
 # The contextual fraction
 
 This notebook reproduces the examples of Abramsky, Barbosa and Mansfield, [*The contextual fraction as a measure of contextuality*](https://arxiv.org/abs/1705.07918) (PRL 119, 050504, 2017), with the module
-[`quantum.contextuality`](https://docs.discopy.org/en/main/_api/discopy.quantum.contextuality.html).
+[`quantum.contextuality`](../../_api/discopy.quantum.contextuality.html).
 
 ## Empirical models
 

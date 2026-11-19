@@ -32,7 +32,7 @@ environment bent round and shared:
 >>> from discopy.optyx import photonic
 >>> Equation(photonic.PhotonLoss(.5), photonic.PhotonLoss(.5).double(),
 ...          symbol="$\\\\mapsto$").draw(
-...     figsize=(9, 3), path="docs/_static/optyx/doubling.png")
+...     figsize=(9, 3), doctest="docs/_static/optyx/doubling.png")
 
 .. image:: /_static/optyx/doubling.png
     :align: center
@@ -47,7 +47,7 @@ between two steps is the **memory**:
 >>> loop = (photonic.Create(1) @ qmode >> photonic.MZI(.06, 0)).feedback(
 ...     mem=qmode, state=photonic.Create(0))
 >>> assert (loop.dom, loop.cod, loop.mem) == (Ty(), qmode, qmode)
->>> loop.draw(figsize=(4, 3), path="docs/_static/optyx/feedback.png")
+>>> loop.draw(figsize=(4, 3), doctest="docs/_static/optyx/feedback.png")
 
 .. image:: /_static/optyx/feedback.png
     :align: center
@@ -61,7 +61,7 @@ the memory wire only — the inputs and outputs of each tick stay open:
 >>> assert (loop.state, loop.effect) == (photonic.Create(0), Discard(qmode))
 >>> assert loop.one_step() == loop.arg
 >>> Equation(loop, loop.unroll(2), symbol="$\\\\mapsto$").draw(
-...     figsize=(11, 4), path="docs/_static/optyx/unroll.png")
+...     figsize=(11, 4), doctest="docs/_static/optyx/unroll.png")
 
 .. image:: /_static/optyx/unroll.png
     :align: center
@@ -83,7 +83,7 @@ diagonalising the transfer matrix of one step:
 >>> fixed = measured.eigen_fix().prob_dist()
 >>> assert max(abs(settled[k] - v) for k, v in fixed.items()) < 1e-6
 >>> Equation(loop.at_time(2), symbol="").draw(
-...     figsize=(6, 3), path="docs/_static/optyx/at_time.png")
+...     figsize=(6, 3), doctest="docs/_static/optyx/at_time.png")
 
 .. image:: /_static/optyx/at_time.png
     :align: center
@@ -94,7 +94,7 @@ the one-step optical matrix, loss channels included, and
 :meth:`Diagram.truncation_dimensions` reads each wire's photon budget off the
 diagram, which is where the cutoff search of :meth:`Diagram.eigen_fix` starts.
 
-See :doc:`/notebooks/fixpoints` for what each of these returns, and for
+See :doc:`/notebooks/optyx/fixpoints` for what each of these returns, and for
 using them to simulate feedback boson sampling.
 
 Types
@@ -121,6 +121,7 @@ Generators and diagrams
     Measure
     Encode
     Discard
+    Observable
     Feedback
 
 Examples
@@ -210,7 +211,7 @@ dual-rail encoding. For example, we can create a GHZ state:
 >>> ghz_path = ghz.to_dual_rail()
 >>> Equation(ghz >> DualRail(3), ghz_path, \\
 ... symbol="$\\\\mapsto$").draw(figsize=(10, 10), \\
-... path="docs/_static/optyx/ghz_dr.svg")
+... doctest="docs/_static/optyx/ghz_dr.svg")
 
 .. image:: /_static/optyx/ghz_dr.svg
     :align: center
@@ -219,6 +220,7 @@ dual-rail encoding. For example, we can create a GHZ state:
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from importlib import import_module
 from itertools import count, repeat
 import warnings
@@ -233,20 +235,22 @@ from discopy import tensor
 from discopy import monoidal, symmetric, frobenius, hypergraph
 from discopy.cat import factory
 from discopy.python import finset
-from discopy.utils import AxiomError
-from discopy.optyx.core import diagram
+from discopy.utils import AxiomError, factory_name
+from discopy.optyx.core import diagram, control, path, zw
+from discopy.optyx.utils.misc import hashable
+from discopy.optyx.sampling import Interferometer, Unravelling
 
 
 class Ob(frobenius.Wire):
     """Basic object: bit, mode, qubit or qmode"""
 
-    _classical = {
+    classical = {
         "bit": "bit",
         "mode": "mode",
         "qubit": "bit",
         "qmode": "mode",
     }
-    _quantum = {
+    quantum = {
         "bit": "qubit",
         "mode": "qmode",
         "qubit": "qubit",
@@ -262,7 +266,7 @@ class Ob(frobenius.Wire):
     def single(self):
         """Maps :code:`qubit` to :code:`diagram.bit`
         and :code:`qmode` to :code:`diagram.mode`."""
-        return diagram.Ty(self._classical[self.name])
+        return diagram.Ty(self.classical[self.name])
 
     @property
     def double(self):
@@ -270,7 +274,7 @@ class Ob(frobenius.Wire):
         and :code:`qmode` to :code:`diagram.mode @ diagram.mode`."""
         if self.is_classical:
             return diagram.Ty(self.name)
-        name = self._classical[self.name]
+        name = self.classical[self.name]
         return diagram.Ty(name, name)
 
 
@@ -367,14 +371,12 @@ class Ty(frobenius.Ty):
         return diagram.Ty().tensor(*[ob.double for ob in self.inside])
 
     @staticmethod
-    # pylint: disable=invalid-name
     def from_optyx(ty):
         """
         Get quantum types from core/diagram.Ty.
         """
         assert isinstance(ty, diagram.Ty)
-        # pylint: disable=protected-access
-        return Ty(*[Ob._quantum[ob.name] for ob in ty.inside])
+        return Ty(*[Ob.quantum[ob.name] for ob in ty.inside])
 
     def needs_inflation(self) -> bool:
         """
@@ -382,7 +384,6 @@ class Ty(frobenius.Ty):
         """
         return any(ob.name == "qmode" for ob in self.inside)
 
-    # pylint: disable=invalid-name
     def inflate(self, d) -> Ty:
         """
         Inflate the type.
@@ -407,6 +408,7 @@ class Diagram(frobenius.Diagram):
     boundary = diagram.Diagram.boundary
     unroll = diagram.Diagram.unroll
     one_step = diagram.Diagram.one_step
+    __pow__ = monoidal.Ty.__pow__
 
     def feedback(self, dom=None, cod=None, mem=None,
                  state=None, effect=None) -> Diagram:
@@ -446,6 +448,146 @@ class Diagram(frobenius.Diagram):
         """
         return self.feedback_factory(
             self, dom=dom, cod=cod, mem=mem, state=state, effect=effect)
+
+    # pylint: disable=too-many-arguments
+    def sample(self, ticks: int = 1, tol: float = 1e-3,
+               indistinguishability: float = 1., seed=None,
+               burn_in: int = None, cap: int = 4, shots: int = None,
+               source=None) -> list:
+        """
+        Sample a diagram with feedback loops over `ticks` consecutive
+        ticks, its inputs fed by `source` at every tick and its outputs
+        measured: the photon numbers of its optical modes, the values of its
+        qubits in the computational basis and those of its classical wires.
+        The ticks are those of the stationary regime, after `burn_in` ticks
+        from the initial state of the loops, unless `burn_in=0`.
+
+        Parameters:
+            ticks : The number of ticks recorded.
+            tol : The total variation distance to the stationary regime
+                that the certified burn-in of a passive diagram reaches.
+            indistinguishability : For a passive diagram, the probability
+                that a photon is in the internal state shared by all.
+            seed : The seed of the random number generator.
+            burn_in : The number of ticks discarded first, certified from
+                `tol` for a passive diagram when not given.
+            cap : The most photons an optical mode holds in an
+                :class:`discopy.optyx.sampling.Unravelling`.
+            shots : The number of independent trajectories, from the same
+                sampler; a list of them when given.
+            source : The :class:`discopy.optyx.sampling.Source` feeding the
+                inputs, one mode per input:
+                :class:`discopy.optyx.sampling.Fock`,
+                :class:`discopy.optyx.sampling.Coherent`,
+                :class:`discopy.optyx.sampling.Thermal` or a tensor of them.
+
+        **Passive diagrams** — beam splitters, phase shifters and any other
+        linear optics, :class:`discopy.optyx.photonic.Create` boxes, photon
+        loss and discards, on optical modes only, with loops starting in the
+        vacuum — are sampled by their
+        :class:`discopy.optyx.sampling.Interferometer`: the loop is a Fock
+        state evolved by the unitary of the step, each output measured as
+        soon as the modes it depends on are, so a tick costs
+        what the photons in the loop and the inputs cost, not what every
+        mode would. Loss and discards are environment modes, measured and
+        forgotten. The burn-in is certified within `tol`. Photons are
+        partially distinguishable with `indistinguishability`, the model of
+        Renema et al.: each photon is in a shared internal state with that
+        probability and in one of its own otherwise.
+
+        **Every other diagram** is sampled by its
+        :class:`discopy.optyx.sampling.Unravelling`, one box at a time on a
+        pure state of the quantum wires and definite values of the classical
+        ones:
+
+        - linear optics is applied through the Givens decomposition of its
+          mode matrix;
+        - any other quantum box — a Kerr phase, ZW and ZX spiders, qubit
+          gates — contracts its Kraus map, truncated to `cap` photons per
+          optical mode;
+        - a box with an environment, such as a loss or a discard, and a
+          measurement have their environment or their classical outputs
+          measured, sampled and collapsed: these are the quantum
+          trajectories of the channel;
+        - a classical box, a
+          :class:`discopy.optyx.classical.ClassicalFunction` or a random
+          one, samples its outputs from its inputs, and a
+          classically controlled box applies the box its values select;
+        - photons with internal states are sampled on the diagram inflated
+          to as many internal levels, the detectors adding up the counts.
+
+        Its boundaries:
+
+        - a postselection, or any box that is not trace preserving within
+          a tick, raises, since it is not something a run can do;
+        - a mode holding more than `cap` photons raises rather than
+          truncate the state;
+        - the burn-in is not certified and must be given;
+        - `indistinguishability` is refused, give internal states instead,
+          and so is a source feeding photons with internal states;
+        - a tick is exponential in the number of quantum wires alive at
+          once.
+
+        A delay line detects at every tick the photon injected one tick
+        earlier. From the vacuum loop the first tick detects nothing, the
+        transient, and every tick of the stationary regime detects one
+        photon:
+
+        >>> from discopy.optyx.photonic import Create
+        >>> delay = (Create(1) @ qmode >> Diagram.swap(qmode, qmode)
+        ...     ).feedback(state=Create(0))
+        >>> delay.sample(ticks=3, burn_in=0, seed=0)
+        [(0,), (1,), (1,)]
+        >>> delay.sample(ticks=2, seed=0)
+        [(1,), (1,)]
+
+        The same delay line with its input left open, fed with coherent
+        light:
+
+        >>> from discopy.optyx.sampling import Coherent
+        >>> fibre = Diagram.swap(qmode, qmode).feedback(state=Create(0))
+        >>> fibre.sample(ticks=4, burn_in=0, seed=0, source=Coherent((1., )))
+        [(0,), (1,), (0,), (2,)]
+
+        A loop that measures its photon and re-injects it:
+
+        >>> from discopy.optyx.photonic import NumberResolvingMeasurement
+        >>> from discopy.optyx.classical import CopyN
+        >>> recycle = (NumberResolvingMeasurement(1) >> CopyN(2)
+        ...     >> mode @ Encode(mode)).feedback(state=Create(1))
+        >>> recycle.sample(ticks=2, burn_in=0, seed=0)
+        [(1,), (1,)]
+        >>> recycle.sample(ticks=1, burn_in=0, seed=0, shots=2)
+        [[(1,)], [(1,)]]
+        """
+        sampler, burn_in = self.sampler(
+            tol, indistinguishability, burn_in, cap, source)
+        if shots is None:
+            return sampler.sample(ticks, burn_in, seed)
+        return [sampler.sample(ticks, burn_in, child)
+                for child in np.random.SeedSequence(seed).spawn(shots)]
+
+    def sampler(self, tol: float = 1e-3, indistinguishability: float = 1.,
+                burn_in: int = None, cap: int = 4, source=None) -> tuple:
+        """
+        The sampler of :meth:`sample` and its burn-in: the
+        :class:`discopy.optyx.sampling.Interferometer` of a passive diagram,
+        with the burn-in it certifies within `tol` unless `burn_in` is given,
+        and the :class:`discopy.optyx.sampling.Unravelling` of any other,
+        with the `burn_in` given, both fed by `source`.
+        """
+        try:
+            network = Interferometer.from_diagram(
+                self, indistinguishability, source)
+        except NotImplementedError as error:
+            if indistinguishability != 1 or burn_in is None:
+                raise NotImplementedError(
+                    f"{error} Other diagrams are sampled by their "
+                    "Unravelling, with an explicit burn_in and internal "
+                    "states for distinguishable photons.") from error
+            return Unravelling(self, cap, source), burn_in
+        return network, network.burn_in(tol) if burn_in is None \
+            else burn_in
 
     def at_time(self, n_steps: int) -> Diagram:
         """
@@ -585,7 +727,7 @@ class Diagram(frobenius.Diagram):
         >>> assert BS.dilate() == BS.get_kraus()
         """
         kraus, env = diagram.Id(self.dom.single()), diagram.Ty()
-        for layer in self:
+        for layer in self.to_staircases():
             (box, offset), = layer.inside[0].boxes_and_offsets
             left = layer.dom[:offset]
             right = layer.dom[offset + len(box.dom):]
@@ -865,11 +1007,11 @@ class Diagram(frobenius.Diagram):
         Parameters:
             tol : The error the certified depth approximates the fixed point
                 within, and the stopping distance of the fallback iteration.
-            max_chi : The largest bond dimension the contraction keeps: a
-                bond past it is truncated down to `max_chi`, with a warning.
-                The public `MAX_BOND_DIMENSION` of eight by default — what a
-                laptop contracts in seconds. `None` contracts exactly,
-                whatever that costs.
+            max_chi : The largest bond dimension a compressed contraction
+                keeps: a bond past it is truncated down to `max_chi`, with a
+                warning. The public `MAX_BOND_DIMENSION` of eight by default
+                — what a laptop contracts in seconds. `None` contracts
+                exactly, whatever that costs.
             max_steps : The maximum number of time steps, including the final
                 readout. The public `DEFAULT_MAX_STEPS` is sixty-four.
             backend : An optional
@@ -891,8 +1033,8 @@ class Diagram(frobenius.Diagram):
         >>> fixed = delay.fix(tol=1e-6, max_chi=None)
         >>> assert np.allclose(fixed.density_matrix, [[.5, 0], [0, .5]])
 
-        See :doc:`/notebooks/fixpoints` for the semantic diagram, agreement
-        map and contraction planning.
+        See :doc:`/notebooks/optyx/fixpoints` for the semantic diagram,
+        agreement map and contraction planning.
         """
         self.check_fixpoint(tol, max_chi)
         if not isinstance(max_steps, Integral) \
@@ -920,16 +1062,16 @@ class Diagram(frobenius.Diagram):
         depth = self.unroll_certificate(tol, max_steps)
         network = self.at_time(depth - 1)
 
+        compressible = max_chi is not None and isinstance(
+            getattr(backend, "hyperoptimiser", None),
+            (ReusableHyperCompressedOptimizer, HyperCompressedOptimizer))
         needed = max(network.truncation_dimensions(), default=1)
-        if max_chi is not None and needed > max_chi:
+        if compressible and needed > max_chi:
             warnings.warn(
                 f"the contraction needs dimension {needed} but "
                 f"max_chi={max_chi}: the result is an approximation with "
                 "those bonds truncated down to max_chi.",
                 UserWarning, stacklevel=2)
-        compressible = max_chi is not None and isinstance(
-            getattr(backend, "hyperoptimiser", None),
-            (ReusableHyperCompressedOptimizer, HyperCompressedOptimizer))
         result = network.eval(
             backend, **({"max_bond": max_chi} if compressible else {}))
 
@@ -972,7 +1114,9 @@ class Diagram(frobenius.Diagram):
             max_steps : The depth at which it gives up and warns.
             max_chi : The largest bond dimension each contraction keeps,
                 as in :meth:`fix`; a bond past it is truncated down to
-                `max_chi` with a warning, once. `None` contracts exactly.
+                `max_chi` with a warning, once, at the first depth that
+                truncates. Each depth is contracted with a fresh optimiser.
+                `None` contracts exactly.
                 Note a truncated contraction biases the very distances
                 being watched, which is one more reason the criterion is
                 not a certificate.
@@ -994,22 +1138,26 @@ class Diagram(frobenius.Diagram):
             if not isinstance(value, Integral) or isinstance(value, bool) \
                     or value <= 0:
                 raise ValueError(f"{name} must be a positive integer.")
+        if n_steps > max_steps:
+            raise ValueError(
+                f"n_steps={n_steps} must not exceed max_steps={max_steps}.")
         backends = import_module("discopy.optyx.core.backends")
-        backend = backends.QuimbBackend(
-            hyperoptimiser=None if max_chi is None
-            else HyperCompressedOptimizer())
-        budgets = []
+        warned = False
 
         def state_at(depth):
+            nonlocal warned
             network = self.at_time(depth)
-            budgets.append(max(network.truncation_dimensions(), default=1))
-            if max_chi is not None and len(budgets) == 1 \
-                    and budgets[0] > max_chi:
+            needed = max(network.truncation_dimensions(), default=1)
+            if max_chi is not None and needed > max_chi and not warned:
+                warned = True
                 warnings.warn(
-                    f"the contraction needs dimension {budgets[0]} but "
+                    f"the contraction needs dimension {needed} but "
                     f"max_chi={max_chi}: the result is an approximation "
                     "with those bonds truncated down to max_chi.",
                     UserWarning, stacklevel=3)
+            backend = backends.QuimbBackend(
+                hyperoptimiser=None if max_chi is None
+                else HyperCompressedOptimizer())
             result = network.eval(backend, **(
                 {"max_bond": max_chi} if max_chi is not None else {}))
             state = np.asarray(result.density_matrix)
@@ -1177,7 +1325,6 @@ class Diagram(frobenius.Diagram):
         """
         return self.dom.needs_inflation() or self.cod.needs_inflation()
 
-    # pylint: disable=invalid-name
     def inflate(self, d):
         r"""Translates from an indistinguishable setting
         to a distinguishable one. For a map on :math:`F(\mathbb{C})`,
@@ -1206,12 +1353,15 @@ class Diagram(frobenius.Diagram):
         """
         Check if the diagram is pure, i.e. it does not
         contain any discards or measures acting on quantum types,
-        and does not prepare quantum types from classical types.
+        does not prepare quantum types from classical types,
+        and has no :class:`CQMap`, which is given by its density matrix
+        rather than a Kraus map.
         """
         are_layers_pure = []
         are_layers_classical = []
-        for layer in self:
-            generator, _ = layer.inside[0].boxes_and_offsets[0]
+        for generator in self.boxes:
+            if isinstance(generator, CQMap):
+                return False
 
             if isinstance(generator, Feedback) and not all(
                 part.is_pure for part in (
@@ -1232,7 +1382,7 @@ class Diagram(frobenius.Diagram):
             # if we prepare quantum from classical types, it's not pure
             if (
                 isinstance(generator, Encode) and
-                any(ty.is_classical for ty in generator.cod.inside)
+                any(ty.is_classical for ty in generator.dom.inside)
             ):
                 return False
 
@@ -1243,7 +1393,6 @@ class Diagram(frobenius.Diagram):
                 isinstance(generator, Discard)
             )
 
-            # assume all classical maps are pure
             are_layers_classical.append(
                 all(ty.is_classical for ty in generator.cod.inside) and
                 all(ty.is_classical for ty in generator.dom.inside)
@@ -1257,7 +1406,7 @@ class Diagram(frobenius.Diagram):
         """
         assert self.is_pure, "Cannot get a Kraus map of non-pure circuit"
         kraus_maps = [diagram.Id(self.dom.single())]
-        for layer in self:
+        for layer in self.to_staircases():
             (generator, offset), = layer.inside[0].boxes_and_offsets
             left = layer.dom[:offset]
             right = layer.dom[offset + len(generator.dom):]
@@ -1284,9 +1433,6 @@ class Diagram(frobenius.Diagram):
         of a :class:`Diagram`.
         In other words, it is the underlying matrix
         representation of a :class:`path` and :class:`photonic` diagrams."""
-        # pylint: disable=import-outside-toplevel
-        from discopy.optyx.core import path
-
         assert self.is_pure, "Diagram must be pure to convert to path."
 
         return frobenius.Functor(
@@ -1296,10 +1442,10 @@ class Diagram(frobenius.Diagram):
         )(self)
 
     def decomp(self):
-        # pylint: disable=protected-access
+        """Decompose into the elementary generators of the ZX calculus."""
         return frobenius.Functor(
             ob_map=lambda x: qubit**len(x),
-            ar_map=lambda arr: arr._decomp(),
+            ar_map=lambda arr: arr.decomp(),
             cod=Diagram,
         )(self)
 
@@ -1310,7 +1456,7 @@ class Diagram(frobenius.Diagram):
 
         return frobenius.Functor(
             ob_map=lambda x: qmode**(2*len(x)),
-            ar_map=lambda arr: arr._to_dual_rail(),
+            ar_map=lambda arr: arr.dual_rail(),
             cod=Diagram,
         )(self.decomp())
 
@@ -1326,7 +1472,7 @@ class Diagram(frobenius.Diagram):
         assert self.is_pure, "Diagram must be pure to convert to tket."
 
         kraus_maps = []
-        for layer in self:
+        for layer in self.to_staircases():
             (generator, offset), = layer.inside[0].boxes_and_offsets
             left = layer.dom[:offset]
             right = layer.dom[offset + len(generator.dom):]
@@ -1355,21 +1501,18 @@ class Diagram(frobenius.Diagram):
     @classmethod
     def from_tket(cls, tket_circuit):
         """Convert from tket circuit."""
-        # pylint: disable=import-outside-toplevel
         from discopy.optyx.qubits import Circuit
         return Circuit(tket_circuit)
 
     @classmethod
     def from_pyzx(cls, pyzx_circuit):
         """Convert from PyZX circuit."""
-        # pylint: disable=import-outside-toplevel
         from discopy.optyx.qubits import Circuit
         return Circuit(pyzx_circuit)
 
     @classmethod
     def from_discopy(cls, discopy_circuit):
         """Convert from discopy circuit."""
-        # pylint: disable=import-outside-toplevel
         from discopy.optyx.qubits import Circuit
         return Circuit(discopy_circuit)
 
@@ -1385,11 +1528,8 @@ class Diagram(frobenius.Diagram):
     @classmethod
     def from_bosonic_operator(cls, n_modes, operators, scalar=1):
         """Create a :class:`zw` diagram from a bosonic operator."""
-        # pylint: disable=import-outside-toplevel
-        from discopy.optyx.core import zw
         from discopy.optyx.photonic import Scalar
 
-        # pylint: disable=invalid-name
         d = Diagram.id(qmode**n_modes)
         annil = Channel("annil", zw.Split(2) >> zw.Select(1) @ zw.Id(1))
         create = annil.dagger()
@@ -1400,14 +1540,12 @@ class Diagram(frobenius.Diagram):
             d = d >> qmode**idx @ box @ qmode**(n_modes - idx - 1)
 
         if scalar != 1:
-            # pylint: disable=invalid-name
             d = Scalar(scalar) @ d
         return d
 
     @classmethod
     def from_graphix(cls, measurement_pattern):
         """Convert from Graphix measurement pattern."""
-        # pylint: disable=import-outside-toplevel
         from discopy.optyx.qubits import Circuit
         return Circuit(measurement_pattern)
 
@@ -1421,7 +1559,6 @@ class Diagram(frobenius.Diagram):
         acting on polarisation modes, time delays,
         and with symbols.
         """
-        # pylint: disable=import-outside-toplevel
         from discopy.optyx import photonic
         from discopy.optyx.utils import perceval_conversion
         import perceval as pcvl
@@ -1437,10 +1574,9 @@ class Diagram(frobenius.Diagram):
 
         n_modes = p.circuit_size
         circuit = photonic.Id(n_modes)
-        heralds = p.heralds
 
         circuit = perceval_conversion.heralds_diagram(
-            heralds, n_modes, circuit, "in"
+            p.in_heralds, n_modes, circuit, "in"
         ) >> circuit
 
         for wires, component in p.components:
@@ -1474,25 +1610,23 @@ class Diagram(frobenius.Diagram):
 
             circuit >>= (left @ box @ right)
 
+        for m, component in enumerate(p.detectors):
+            if component is not None and circuit.cod[m] == qmode:
+                box = perceval_conversion.detector(component, (m, ))
+                circuit >>= circuit.cod[:m] @ box @ circuit.cod[m + 1:]
+
         circuit >>= perceval_conversion.heralds_diagram(
-            heralds, n_modes, circuit, "out"
+            p.heralds, n_modes, circuit, "out"
         )
         if p.post_select_fn.has_condition:
             circuit >>= perceval_conversion.postselection(circuit, p)
         return circuit
-
-    # pylint: disable=invalid-name
-    def __pow__(self, n):
-        if n == 1:
-            return self
-        return self @ self ** (n - 1)
 
     def eval(self, backend=None, **kwargs):
         """
         Evaluate the diagram using the specified backend.
         If no backend is specified, it uses the QuimbBackend.
         """
-        # pylint: disable=import-outside-toplevel
         from discopy.optyx.core.backends import QuimbBackend
         if backend is None:
             backend = QuimbBackend()
@@ -1523,6 +1657,34 @@ class Channel(Diagram, frobenius.Box):
         self.env = env
         super().__init__(name, dom, cod)
 
+    semantic_attrs: tuple[str, ...] = ("kraus", )
+    """
+    The attributes besides :code:`name`, :code:`dom`, :code:`cod` and
+    :code:`data` that decide what a channel computes, compared by
+    :meth:`setoid`. A channel is initialised by its Kraus map, so that is
+    every channel's; a subclass computing its own map from arguments of its
+    own, e.g. a gate from its array, declares those instead.
+    """
+
+    def setoid(self):
+        """
+        Two channels are equal when they agree as boxes and on each of their
+        :attr:`semantic_attrs`: what a channel computes is in none of
+        :code:`name`, :code:`dom`, :code:`cod` or :code:`data` otherwise, so
+        e.g. a conjugated gate equalled the gate it conjugates.
+
+        >>> from discopy.optyx.photonic import BBS
+        >>> assert BBS(0.5) != BBS(0.5, is_conj=True)
+        >>> assert BBS(0.5) == BBS(0.5)
+        """
+        return super().setoid() + tuple(
+            hashable(getattr(self, attr)) for attr in self.semantic_attrs)
+
+    def __repr__(self):
+        env = "" if not self.env else f", env={self.env!r}"
+        return f"{factory_name(type(self))}({self.name!r}, {self.kraus!r}, "\
+            f"{self.dom!r}, {self.cod!r}{env})"
+
     def double(self):
         """
         Returns the :class:`diagram.Diagram` representing
@@ -1531,7 +1693,6 @@ class Channel(Diagram, frobenius.Box):
 
         def get_spiders(dom):
             spiders = diagram.Id()
-            # pylint: disable=invalid-name
             for ob in dom.inside:
                 if ob.is_classical:
                     box = diagram.Spider(1, 2, ob.single)
@@ -1540,7 +1701,6 @@ class Channel(Diagram, frobenius.Box):
                 spiders @= box
             return spiders
 
-        # pylint: disable=invalid-name
         def get_perm(n):
             return sorted(sorted(list(range(n))), key=lambda i: i % 2)
 
@@ -1567,43 +1727,94 @@ class Channel(Diagram, frobenius.Box):
         return top >> self.kraus @ self.kraus.conjugate() >> bot
 
     def dagger(self):
+        """
+        The adjoint of the channel as a CP map, :math:`\\rho \\mapsto
+        \\sum_i K_i^\\dagger \\rho K_i`: its Kraus map is the dagger of
+        the Kraus map with the environment bent back by a cap, so that it
+        is again a map to the domain and the environment.
+
+        >>> from discopy.optyx.photonic import PhotonLoss
+        >>> loss = PhotonLoss(.1)
+        >>> assert np.allclose(
+        ...     loss.dagger().double().to_tensor().eval().array,
+        ...     loss.double().dagger().to_tensor().eval().array)
+        """
+        kraus = self.cod.single() @ diagram.Diagram.spiders(
+            0, 2, self.env) >> self.kraus.dagger() @ self.env
         return Channel(
             name=self.name + ".dagger()",
-            kraus=self.kraus.dagger(),
+            kraus=kraus,
             dom=self.cod,
             cod=self.dom,
+            env=self.env,
         )
 
-    def _decomp(self):
-        # pylint: disable=import-outside-toplevel
+    def decomp(self):
+        """Image of a generator under :meth:`Diagram.decomp`."""
         raise NotImplementedError(
             "Decomposition is only implemented for ZX channels."
         )
 
-    def _to_dual_rail(self):
+    def dual_rail(self):
+        """Image of a generator under :meth:`Diagram.to_dual_rail`."""
         raise TypeError(
             "Only ZX channels can be converted to dual rail."
             )
 
     def lambdify(self, *symbols, **kwargs):
-        # Non-symbolic gates can be returned directly
-        return lambda *xs: self
+        """
+        The channel as a function of ``symbols``, substituted in its Kraus
+        map: a channel with no free symbols is returned as it is. The result
+        is a plain :class:`Channel` that keeps the name: the parametrised
+        boxes, e.g. :class:`photonic.Phase`, have a ``lambdify`` of their
+        own.
+
+        >>> from sympy.abc import phi
+        >>> from discopy.optyx.photonic import Phase
+        >>> channel = Phase(phi).inflate(2)
+        >>> assert not channel.lambdify(phi)(.25).free_symbols
+        >>> assert not channel.subs((phi, .25)).free_symbols
+        """
+        if not self.kraus.free_symbols:
+            return lambda *xs: self
+        kraus = self.kraus.lambdify(*symbols, **kwargs)
+        return lambda *xs: Channel(
+            self.name, kraus(*xs), self.dom, self.cod, self.env)
 
     def subs(self, *args) -> Diagram:
         syms, exprs = zip(*args)
         return self.lambdify(*syms)(*exprs)
+
+    @property
+    def free_symbols(self):
+        """ The symbols of the box's data and of its Kraus map. """
+        return super().free_symbols | self.kraus.free_symbols
+
+    def grad(self, var, **params):
+        """
+        Gradient with respect to :code:`var`, zero for a box that does not
+        depend on it: a box that does needs a gradient of its own.
+        """
+        # pylint: disable=unused-argument  # the signature of Diagram.grad
+        if var not in self.free_symbols:
+            return self.sum_factory((), self.dom, self.cod)
+        raise NotImplementedError(
+            f"{type(self).__name__} does not support grad")
 
     def inflate(self, d):
         r"""Translates from an indistinguishable setting
         to a distinguishable one. For a map on :math:`F(\mathbb{C})`,
         obtain a map on :math:`F(\mathbb{C})^{\widetilde{\otimes} d}`."""
 
+        kraus = self.kraus.inflate(d) if self.needs_inflation() \
+            else self.kraus
+        cod = self.cod.inflate(d)
         return Channel(
             name=self.name + f"^{d}",
-            kraus=self.kraus.inflate(d) if
-            self.needs_inflation() else self.kraus,
+            kraus=kraus,
             dom=self.dom.inflate(d),
-            cod=self.cod.inflate(d),
+            cod=cod,
+            env=kraus.cod[len(cod.single()):],
         )
 
 
@@ -1627,10 +1838,22 @@ class Sum(symmetric.Sum, Diagram):
     Formal sum of optyx channel diagrams
     """
 
-    __ambiguous_inheritance__ = (symmetric.Sum,)
-
     def double(self):
-        return diagram.Diagram.sum_factory([t.double() for t in self])
+        r"""
+        The doubling of a coherent sum :math:`\sum_i f_i` is
+        :math:`\sum_{i, j} f_i \otimes \overline{f_j}`, cross terms included:
+        the doubling of the channel whose Kraus map is :meth:`get_kraus`,
+        which reads the sum the same way. A sum with an impure term has no
+        Kraus map, and refuses.
+
+        >>> from discopy.optyx.photonic import Create, Scalar
+        >>> bell = (Create(1, 0, 1, 0) + Create(0, 1, 0, 1)) @ Scalar(.5 ** .5)
+        >>> rho = bell.double().to_tensor().eval().array
+        >>> assert np.allclose(rho[1, 1, 0, 0, 1, 1, 0, 0], .5)
+        >>> assert np.allclose(rho[1, 0, 0, 1, 1, 0, 0, 1], .5)
+        """
+        return Channel(
+            str(self), self.get_kraus(), self.dom, self.cod).double()
 
     def grad(self, var, **params):
         """Gradient with respect to :code:`var`."""
@@ -1639,12 +1862,9 @@ class Sum(symmetric.Sum, Diagram):
         return sum(term.grad(var, **params) for term in self.terms)
 
     def get_kraus(self):
-        if len(self.terms) == 0:
-            return diagram.Scalar(0)
-
         return diagram.Diagram.sum_factory(
-            [term.get_kraus() for term in self.terms]
-        )
+            [term.get_kraus() for term in self.terms],
+            self.dom.single(), self.cod.single())
 
 
 class CQMap(Diagram, frobenius.Box):
@@ -1659,6 +1879,34 @@ class CQMap(Diagram, frobenius.Box):
 
         self.density_matrix = density_matrix
         super().__init__(name, dom, cod)
+
+    semantic_attrs: tuple[str, ...] = ("density_matrix", )
+
+    def setoid(self):
+        """
+        The density matrix is the whole of what a `CQMap` means and is in no
+        other component, so two of them with one name, `dom` and `cod` were
+        equal, e.g. every `classical.BinaryMatrix`, all named
+        `"LogicalMatrix"`.
+
+        >>> from discopy.optyx.classical import BinaryMatrix
+        >>> identity, swap = ([[1, 0], [0, 1]], [[0, 1], [1, 0]])
+        >>> assert BinaryMatrix(identity) != BinaryMatrix(swap)
+        >>> assert BinaryMatrix(identity) == BinaryMatrix(identity)
+        """
+        return super().setoid() + tuple(
+            hashable(getattr(self, attr)) for attr in self.semantic_attrs)
+
+    def __repr__(self):
+        return f"{factory_name(type(self))}({self.name!r}, "\
+            f"{self.density_matrix!r}, {self.dom!r}, {self.cod!r})"
+
+    @property
+    def free_symbols(self):
+        """ The symbols of the box's data and of its density matrix. """
+        return super().free_symbols | self.density_matrix.free_symbols
+
+    grad = Channel.grad
 
     def double(self):
         return self.density_matrix
@@ -1678,20 +1926,23 @@ class CQMap(Diagram, frobenius.Box):
         :math:`F(\mathbb{C}^d)`,
         obtain a map on :math:`F(\mathbb{C})^{\widetilde{\otimes} d}`.
         """
+        def interleave(ty, inflated):
+            perm = []
+            for ob in ty:
+                n = len(perm)
+                perm += [n + i + j * d for i in range(d) for j in (0, 1)]\
+                    if ob.needs_inflation() else range(n, n + len(ob.double()))
+            return diagram.Diagram.permutation(perm, inflated)
 
+        density_matrix = self.density_matrix.inflate(d)\
+            if self.needs_inflation() else self.density_matrix
         return CQMap(
             name=self.name + f"^{d}",
-            density_matrix=self.density_matrix.inflate(d) if
-            self.needs_inflation() else self.density_matrix,
+            density_matrix=interleave(self.dom, density_matrix.dom).dagger()
+            >> density_matrix >> interleave(self.cod, density_matrix.cod),
             dom=self.dom.inflate(d),
             cod=self.cod.inflate(d)
         )
-
-    # pylint: disable=invalid-name
-    def __pow__(self, n):
-        if n == 1:
-            return self
-        return self @ self ** (n - 1)
 
 
 class Permutation(frobenius.Permutation, Channel):
@@ -1703,7 +1954,8 @@ class Permutation(frobenius.Permutation, Channel):
     env = diagram.Ty()
 
     def __init__(self, dom, perm):
-        self.perm = finset.Permutation(perm, len(dom))
+        self.perm = finset.Permutation(
+            perm if isinstance(perm, Sequence) else self.perm, len(dom))
         cod = dom[:0].tensor(*(dom[i] for i in self.perm))
         name = f"Permutation({list(self.perm)})"
         frobenius.Box.__init__(
@@ -1723,8 +1975,7 @@ class Swap(Permutation, frobenius.Swap, Channel):
     def __init__(self, left, right):
         frobenius.Swap.__init__(self, left, right)
 
-    def dagger(self):
-        return self
+    dagger = frobenius.Swap.dagger
 
 
 class Feedback(monoidal.Bubble, Diagram, frobenius.Box):
@@ -1754,7 +2005,7 @@ class Feedback(monoidal.Bubble, Diagram, frobenius.Box):
     >>> assert ladder.unroll(1).double().merge_layers()\\
     ...     == ladder.double().unroll(1).merge_layers()
     """
-    __ambiguous_inheritance__ = (monoidal.Bubble, frobenius.Box)
+    serialised_attrs = ("*args", "dom", "cod", "mem", "state", "effect")
 
     @classmethod
     def default_state(cls, mem) -> Diagram:
@@ -1791,6 +2042,7 @@ class Feedback(monoidal.Bubble, Diagram, frobenius.Box):
     __repr__ = diagram.Feedback.__repr__
     dagger = diagram.Feedback.dagger
     to_drawing = diagram.Feedback.to_drawing
+    grad = Channel.grad
 
     def double(self):
         """The feedback loop of the doubled diagram."""
@@ -1822,9 +2074,12 @@ class Measure(Channel):
     draw_as_measures = True
 
     def __init__(self, dom):
-        cod = Ty(*[Ob._classical[ob.name] for ob in dom.inside])
+        cod = Ty(*[Ob.classical[ob.name] for ob in dom.inside])
         kraus = diagram.Id(dom.single())
         super().__init__(name="Measure", kraus=kraus, dom=dom, cod=cod)
+
+    def __repr__(self):
+        return f"{factory_name(type(self))}({self.dom!r})"
 
     def inflate(self, d):
         r""" A specific choice of inflation for the Measure channel.
@@ -1832,20 +2087,11 @@ class Measure(Channel):
         the number of photons in the modes. Only qmodes are inflated.
         The bit, qubit and mode are not inflated.
         """
-
-        diagrams = [self._measure_wire(ob, d) for ob in self.dom]
-        return diagram.Diagram.tensor(*diagrams)
-
-    # pylint: disable=invalid-name
-    def _measure_wire(self, ob, d):
-        """Return the diagram that measures one `ob`."""
-        # pylint: disable=import-outside-toplevel
-        from discopy.optyx.core.zw import Add
-        if ob.needs_inflation():
-            return Measure(ob ** d) >> CQMap(
-                "Gather photons", Add(d), mode ** d, mode
-            )
-        return Measure(ob)
+        gather = CQMap("Gather photons", zw.Add(d), mode ** d, mode)
+        return diagram.Diagram.tensor(*[
+            Measure(ob ** d) >> gather if ob.needs_inflation()
+            else Measure(ob) for ob in self.dom
+        ])
 
 
 class Encode(Channel):
@@ -1860,7 +2106,7 @@ class Encode(Channel):
     def __init__(self,
                  dom,
                  internal_states: tuple[list[int]] = None):
-        cod = Ty(*[Ob._quantum[ob.name] for ob in dom.inside])
+        cod = Ty(*[Ob.quantum[ob.name] for ob in dom.inside])
         kraus = diagram.Id(dom.single())
         if internal_states is not None:
             if not isinstance(internal_states, tuple):
@@ -1874,6 +2120,11 @@ class Encode(Channel):
         super().__init__(name="Encode", kraus=kraus, dom=dom, cod=cod)
         self.internal_states = internal_states
 
+    def __repr__(self):
+        states = "" if self.internal_states is None else \
+            f", internal_states={self.internal_states!r}"
+        return f"{factory_name(type(self))}({self.dom!r}{states})"
+
     def inflate(self, d):
         r"""
         The internal states are used to encode the modes only.
@@ -1883,6 +2134,8 @@ class Encode(Channel):
         the Measure channel with the difference
         that instead of discarding becoming a maximally mixed state,
         we apply the encoding of the internal states.
+        The internal-state vectors are consumed in the order the
+        :code:`mode` wires appear in the domain.
         """
 
         if any(
@@ -1895,29 +2148,15 @@ class Encode(Channel):
                 internal_state in self.internal_states
             ), "All internal states must have length d"
 
-        amps_iter = iter(self.internal_states or [])
-        diagrams = [self._encode_wire(ob, d, amps_iter) for ob in self.dom]
-        return diagram.Diagram.tensor(*diagrams)
-
-    def _encode_wire(self, ob, d, amps_iter):
-        """Return the diagram that encodes *one* object `ob`.
-
-        `amps_iter` yields the internal‑state vectors for `mode` wires.
-        """
-        # pylint: disable=import-outside-toplevel
-        from discopy.optyx.core.zw import Add, Endo
-
-        if ob == mode:
-            amps = next(amps_iter)
-            amp_layer = diagram.Diagram.tensor(*[Endo(a) for a in amps])
-            return (
-                CQMap("Add†", Add(d).dagger(), mode, mode ** d)
-                >> Encode(mode ** d)
-                >> Channel("Amplitudes", amp_layer)
-            )
-        if ob == qmode:
-            return Encode(qmode ** d)
-        return Encode(ob)
+        amps = iter(self.internal_states or [])
+        return diagram.Diagram.tensor(*[
+            CQMap("Add†", zw.Add(d).dagger(), mode, mode ** d)
+            >> Encode(mode ** d)
+            >> Channel("Amplitudes", diagram.Diagram.tensor(
+                *[zw.Endo(a) for a in next(amps)]))
+            if ob == mode else Encode(ob ** d) if ob == qmode
+            else Encode(ob) for ob in self.dom
+        ])
 
 
 class Discard(Channel):
@@ -1933,11 +2172,100 @@ class Discard(Channel):
         kraus = diagram.Id(dom.single())
         super().__init__("Discard", kraus, dom=dom, cod=Ty(), env=env)
 
+    def __repr__(self):
+        return f"{factory_name(type(self))}({self.dom!r})"
+
     def inflate(self, d):
         """
         Distinguishable setting for the Discard channel.
         """
         return Discard(self.dom.inflate(d))
+
+
+class Observable(CQMap):
+    """
+    An observable on `dom`: the effect :math:`\\rho \\mapsto
+    \\mathrm{tr}(A \\rho)` of a normal operator :math:`A` on its states, a
+    map from `dom` to `Ty()`. Its value on a state is the expectation of
+    :math:`A`, computed exactly by contracting the tensor network with
+    :meth:`expectation`. For a `function`, the mean of its values on the
+    outcomes of :meth:`Diagram.sample` estimates the same number.
+
+    It is given either by a normal pure `operator`, a diagram from `dom` to
+    itself on quantum wires, or by a classical `function` of the values of
+    its wires in the number basis, the diagonal operator
+    :math:`\\sum_n f(n) |n\\rangle\\langle n|`. Discards and postselections
+    are observables: :class:`Discard` is the function one, whose
+    expectation is the trace, and a postselection :math:`\\langle n|` is
+    the projector :math:`|n\\rangle\\langle n|`, whose expectation is the
+    probability of :math:`n`.
+
+    Parameters:
+        operator : A normal pure diagram from `dom` to itself.
+        function : A function of the list of values of the wires of `dom`.
+        dom : The domain, needed with a `function`.
+        name : The name of the observable.
+
+    The number of photons a beam splitter sends to its first output, from
+    one photon in each input, is one on average:
+
+    >>> from discopy.optyx import photonic
+    >>> hom = photonic.Create(1, 1) >> photonic.BS
+    >>> number = Observable(function=lambda n: n[0], dom=qmode @ qmode)
+    >>> assert np.isclose(number.expectation(hom), 1)
+    >>> samples = (hom >> photonic.NumberResolvingMeasurement(2)).sample(
+    ...     burn_in=0, shots=8, seed=0)
+    >>> assert {number.function(list(s[0])) for s in samples} <= {0, 2}
+
+    Discards and postselections:
+
+    >>> trace = Observable(function=lambda n: 1, dom=qmode @ qmode)
+    >>> assert np.isclose(trace.expectation(hom), 1)
+    >>> bunched = Observable(function=lambda n: n == [2, 0], dom=qmode ** 2)
+    >>> assert np.isclose(bunched.expectation(hom), (
+    ...     hom >> photonic.Select(2, 0)).double().to_tensor().eval().array)
+    """
+    def __init__(self, operator: Diagram = None, function=None,
+                 dom: Ty = None, name: str = None):
+        if (operator is None) == (function is None):
+            raise ValueError("Give an operator or a function.")
+        if operator is not None:
+            dom = operator.dom
+            if operator.cod != dom or any(
+                    ob.is_classical for ob in dom.inside):
+                raise ValueError(
+                    "An operator observable is a diagram from quantum wires "
+                    "to themselves.")
+            single = dom.single()
+            density = diagram.Diagram.permutation(sorted(
+                range(2 * len(single)), key=lambda i: i % 2), dom.double()
+            ) >> operator.get_kraus() @ diagram.Id(single) \
+                >> diagram.Diagram.spiders(2, 0, single)
+        else:
+            merge = diagram.Id().tensor(*(
+                diagram.Id(ob.single) if ob.is_classical
+                else diagram.Spider(2, 1, ob.single) for ob in dom.inside))
+            density = merge >> control.Weight(function, dom.single())
+        self.operator, self.function = operator, function
+        super().__init__(name or "Observable", density, dom, Ty())
+
+    def __repr__(self):
+        given = f"operator={self.operator!r}" if self.function is None else \
+            f"function={self.function!r}, dom={self.dom!r}"
+        name = "" if self.name == "Observable" else f", name={self.name!r}"
+        return f"{factory_name(type(self))}({given}{name})"
+
+    def expectation(self, state: Diagram) -> complex:
+        """
+        The exact expectation of the observable on a closed `state`, by
+        contracting the tensor network of `state >> self`.
+        """
+        if state.cod != self.dom:
+            raise ValueError(
+                f"Expected a state of {self.dom}, got one of {state.cod}.")
+        value = complex(np.asarray(
+            (state >> self).double().to_tensor().eval().array))
+        return value.real if np.isclose(value.imag, 0) else value
 
 
 class Functor(frobenius.Functor):

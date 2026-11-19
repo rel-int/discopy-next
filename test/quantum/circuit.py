@@ -15,6 +15,7 @@ from discopy.quantum.circuit import *
 from discopy.quantum.gates import *
 from discopy.quantum.ansatze import IQPansatz
 from discopy import rigid
+from discopy.matrix import Quimb
 
 
 def test_index2bitstring():
@@ -93,6 +94,33 @@ def test_Circuit_measure():
     assert np.allclose(circuit.measure(), np.ones((2, 2, 2)) / 8)
     assert np.allclose(
         circuit.measure(), np.absolute(circuit.eval().array) ** 2)
+
+
+def test_measure_measures_every_open_qubit():
+    for circuit in (Ket(0) >> H, H @ X >> CX):
+        assert np.allclose(circuit.measure(mixed=True), circuit.measure())
+    assert np.allclose(((Ket(0) >> X) @ Bits(1)).measure(), [[0, 0], [0, 1]])
+
+
+def test_measure_initialises_digits_of_any_dimension():
+    digit = Ty(Digit(4))
+    shift = Box("shift", digit, digit, is_mixed=False, data=np.roll(
+        np.eye(4), 1, axis=1))
+    one = [0, 1, 0, 0]
+    for circuit, distribution in [
+            (Id(digit), [1, 0, 0, 0]), (shift, one), (shift.delay(), one),
+            (shift @ bit, np.outer(one, [1, 0]))]:
+        assert np.allclose(circuit.measure(), distribution)
+
+
+def test_delayed_circuit_measures_as_the_circuit():
+    for circuit in (H, CX, Measure(), H @ qubit >> CX >> Measure(2),
+                    H @ qubit.delay(), Copy()):
+        delayed = circuit.delay()
+        for mixed in (False, True):
+            assert np.allclose(
+                delayed.measure(mixed=mixed), circuit.measure(mixed=mixed))
+        assert delayed.get_counts() == circuit.get_counts()
 
 
 def test_Box():
@@ -240,8 +268,9 @@ def test_grad_basic():
         assert isinstance(zero, Sum) and not zero.terms
         assert (zero.dom, zero.cod) == (constant.dom, constant.cod)
 
-    assert scalar(2 * phi).grad(phi).eval().array == 2
-    assert (scalar(2 * phi) + scalar(3 * phi)).grad(phi).eval().array == 5
+    assert scalar(2 * phi).grad(phi, mixed=False).eval().array == 2
+    assert (scalar(2 * phi) + scalar(3 * phi)).grad(
+        phi, mixed=False).eval().array == 5
 
     with raises(NotImplementedError):
         Box("dummy box", qubit, qubit, data=phi).grad(phi)
@@ -328,7 +357,8 @@ def test_adjoint():
     gates = [
         Bra(0), Ket(0, 0), Rx(0.1), Ry(0.2), Rz(0.3),
         CU1(0.4), CRx(0.5), CRz(0.7), Scalar(1 + 2j), CX,
-        Swap(bit, qubit), Copy(), Match()
+        Swap(bit, qubit), Copy(), Match(),
+        Ket(1, 0), Bra(0, 1), Bits(1, 0), Discard(bit @ qubit)
     ]
 
     gates_conj = [
@@ -338,11 +368,21 @@ def test_adjoint():
         Controlled(Rz(-0.7), distance=-1),
         Scalar(1 - 2j),
         Controlled(X, distance=-1),
-        Swap(qubit, bit), Copy(), Match()
+        Swap(qubit, bit), Copy(), Match(),
+        Ket(0, 1), Bra(1, 0), Bits(0, 1), Discard(qubit @ bit)
     ]
 
     for g, g_conj in zip(gates, gates_conj):
         assert g.conjugate() == g_conj
+
+
+def test_rotation_reverses_the_wires():
+    for state in (Ket(1, 0), Bra(0, 1), Bits(1, 0), Digits(2, 0, dim=3)):
+        assert state.r.eval().is_close(state.eval().r)
+        assert state.conjugate().eval().is_close(state.eval().conjugate())
+    assert Ket(1, 0).r == Bra(0, 1) and Bits(1, 0).l == Bits(0, 1).dagger()
+    assert Discard(bit @ qubit).r == MixedState(qubit @ bit)
+    assert MixedState(qubit @ bit).l == Discard(bit @ qubit)
 
 
 def test_causal_cx():
@@ -367,6 +407,12 @@ def test_controlled_subs():
     from sympy.abc import phi, psi
     assert CRz(phi).subs(phi, 0.1) == CRz(0.1)
     assert CRx(psi).l.subs((phi, 0.1), (psi, 0.2)) == CRx(0.2).l
+
+
+def test_Functor_then():
+    F = Functor({qubit: qubit}, {X: H, H: X})
+    G = Functor({qubit: qubit}, {X: Z, H: H})
+    assert isinstance(F >> G, Functor) and (F >> G)(X >> H) == H >> Z
 
 
 def test_circuit_chaining():
@@ -439,264 +485,6 @@ def test_CCX_decompose(x, y, z):
     assert (out == unitary_mat).all()
 
 
-def test_circuit_to_pennylane(capsys):
-    pytest.importorskip("discopy.quantum.pennylane")
-    import torch
-    bell_state = Circuit.caps(qubit, qubit)
-    bell_effect = bell_state[::-1]
-    snake = (bell_state @ Id(1) >> Bra(0) @ bell_effect)[::-1]
-    p_snake = snake.to_pennylane()
-    p_snake.draw()
-
-    captured = capsys.readouterr()
-    assert captured.out == \
-        ("0: ───────╭●──H─┤0>\n"
-         "1: ──H─╭●─╰X────┤0>\n"
-         "2: ────╰X───────┤  State\n")
-
-    assert np.allclose(p_snake.eval().numpy(), snake.eval().array)
-
-    p_snake_prob = snake.to_pennylane(probabilities=True)
-    snake_prob = (snake >> Measure())
-
-    assert np.allclose(p_snake_prob.eval().numpy(), snake_prob.eval().array)
-
-    no_open_snake = (bell_state @ Ket(0) >> Bra(0) @ bell_effect)[::-1]
-    p_no_open_snake = no_open_snake.to_pennylane()
-    p_no_open_snake.draw()
-
-    captured = capsys.readouterr()
-    assert captured.out == \
-        ("0: ───────╭●──H─┤0>\n"
-         "1: ──H─╭●─╰X────┤0>\n"
-         "2: ────╰X───────┤0>\n")
-
-    assert np.allclose(p_no_open_snake.eval().numpy(),
-                       no_open_snake.eval().array)
-
-    # probabilities should not be normalized if all wires are post-selected
-    p_no_open_snake_prob = no_open_snake.to_pennylane(probabilities=True)
-
-    assert np.allclose(p_no_open_snake_prob.eval().numpy(),
-                       no_open_snake.eval().array)
-
-    x, y, z = sympy.symbols('x y z')
-    symbols = [x, y, z]
-    weights = [torch.tensor(1.), torch.tensor(2.), torch.tensor(3.)]
-    symbol_weight_map = dict(zip(symbols, weights))
-
-    var_circ = Circuit.decode(
-        dom=qubit ** 0, boxes_and_offsets=zip(
-            [Ket(0), Rx(0.552), Rz(x), Rx(0.917), Ket(0, 0, 0), H, H, H,
-             CRz(0.18), CRz(y), CX, H, sqrt(2), Bra(0, 0), Ket(0),
-             Rx(0.446), Rz(0.256), Rx(z), CX, H, sqrt(2), Bra(0, 0)],
-            [0, 0, 0, 0, 0, 0, 1, 2, 0, 1, 2, 2,
-             3, 2, 0, 0, 0, 0, 0, 0, 1, 0]))
-
-    p_var_circ = var_circ.to_pennylane()
-    p_var_circ.initialise_concrete_params(symbol_weight_map)
-    p_var_circ.draw()
-
-    captured = capsys.readouterr()
-    assert captured.out == \
-        ("0: ──RX(2.80)──RZ(1.61)──RX(18.85)─╭●──H─┤0>\n"
-         "1: ──H────────╭●───────────────────╰X────┤0>\n"
-         "2: ──H────────╰RZ(1.13)─╭●───────────────┤  State\n"
-         "3: ──H──────────────────╰RZ(12.57)─╭●──H─┤0>\n"
-         "4: ──RX(3.47)──RZ(6.28)──RX(5.76)──╰X────┤0>\n")
-
-    var_f = var_circ.lambdify(*symbols)
-    conc_circ = var_f(*[a.item() for a in weights])
-
-    assert np.allclose(p_var_circ.eval().numpy(),
-                       conc_circ.eval().array)
-
-    p_var_circ_prob = var_circ.to_pennylane(probabilities=True)
-    p_var_circ_prob.initialise_concrete_params(symbol_weight_map)
-    conc_circ_prob = (conc_circ >> Measure())
-
-    assert (np.allclose(p_var_circ_prob.eval().numpy(),
-                        conc_circ_prob.eval().array))
-
-
-def test_pennylane_circuit_mixed_error():
-    pytest.importorskip("discopy.quantum.pennylane")
-    bell_state = Circuit.caps(qubit, qubit)
-    bell_effect = bell_state[::-1]
-    snake = (bell_state @ Id(1) >> Bra(0) @ bell_effect)[::-1]
-    snake = (snake >> Measure())
-    with raises(ValueError):
-        snake.to_pennylane()
-
-
-def test_pennylane_circuit_draw(capsys):
-    pytest.importorskip("discopy.quantum.pennylane")
-    bell_state = Circuit.caps(qubit, qubit)
-    bell_effect = bell_state[::-1]
-    snake = (bell_state @ Id(1) >> Bra(0) @ bell_effect)[::-1]
-    p_circ = snake.to_pennylane()
-    p_circ.draw()
-
-    captured = capsys.readouterr()
-    assert captured.out == \
-        ("0: ───────╭●──H─┤0>\n"
-         "1: ──H─╭●─╰X────┤0>\n"
-         "2: ────╰X───────┤  State\n")
-
-
-def test_pennylane_ops():
-    pytest.importorskip("discopy.quantum.pennylane")
-    ops = [X, Y, Z, S, T, S.dagger(), T.dagger(), H, CX, CZ]
-
-    for op in ops:
-        disco = (Id().tensor(*([Ket(0)] * len(op.dom))) >> op).eval().array
-        plane = op.to_pennylane().eval().numpy()
-
-        assert np.allclose(disco, plane)
-
-
-def test_pennylane_parameterized_ops():
-    pytest.importorskip("discopy.quantum.pennylane")
-    ops = [Rx, Ry, Rz, CRx, CRz]
-
-    for op in ops:
-        p_op = op(0.5)
-        disco = (Id().tensor(*([Ket(0)] * len(p_op.dom))) >> p_op).eval().array
-        plane = p_op.to_pennylane().eval().numpy()
-
-        assert np.allclose(disco, plane, atol=10e-5)
-
-
-def test_pennylane_complex_scalar_probabilities():
-    pytest.importorskip("discopy.quantum.pennylane")
-    circuit = scalar(2j) @ Ket(0) >> H
-    plane = circuit.to_pennylane(probabilities=True).eval().numpy()
-    assert np.allclose(plane, (circuit >> Measure()).eval().array)
-
-
-@pytest.fixture
-def snake_circuit() -> Circuit:
-    bell_state = Circuit.caps(qubit, qubit)
-    bell_effect = bell_state[::-1]
-    snake = (bell_state @ Id(1) >> Bra(0) @ bell_effect)[::-1]
-    return snake
-
-
-@pytest.mark.skip("Honeywell device was deprecated")
-def test_pennylane_device_honeywell(snake_circuit):
-    # Honeywell backend only compatible when `probabilities=True`
-    h_backend = {'backend': 'honeywell.hqs', 'device': 'H1-1E'}
-    h_circ = snake_circuit.to_pennylane(probabilities=True, backend_config=h_backend)
-    assert h_circ._device is not None
-    with raises(ValueError):
-        h_circ = snake_circuit.to_pennylane(backend_config=h_backend)
-
-    # Device must be specified when using Honeywell backend
-    h_backend_corrupt = {'backend': 'honeywell.hqs'}
-    with raises(ValueError):
-        h_circ = snake_circuit.to_pennylane(probabilities=True,
-                                    backend_config=h_backend_corrupt)
-
-
-def test_pennylane_device_aer(snake_circuit):
-    pytest.importorskip("discopy.quantum.pennylane")
-    aer_backend = {'backend': 'qiskit.aer',
-                   'device': 'aer_simulator_statevector'}
-    aer_circ = snake_circuit.to_pennylane(backend_config=aer_backend)
-    assert aer_circ._device is not None
-
-    # `aer_simulator` is not compatible with state outputs
-    aer_backend_corrupt = {'backend': 'qiskit.aer', 'device': 'aer_simulator'}
-    with raises(ValueError):
-        aer_circ = snake_circuit.to_pennylane(backend_config=aer_backend_corrupt)
-
-
-def test_pennylane_uninitialized():
-    pytest.importorskip("discopy.quantum.pennylane")
-    x, y, z = sympy.symbols('x y z')
-    var_circ = Circuit.decode(
-        dom=qubit ** 0, boxes_and_offsets=zip(
-            [Ket(0), Rx(0.552), Rz(x), Rx(0.917), Ket(0, 0, 0), H, H, H,
-             CRz(0.18), CRz(y), CX, H, sqrt(2), Bra(0, 0), Ket(0),
-             Rx(0.446), Rz(0.256), Rx(z), CX, H, sqrt(2), Bra(0, 0)],
-            [0, 0, 0, 0, 0, 0, 1, 2, 0, 1, 2, 2,
-             3, 2, 0, 0, 0, 0, 0, 0, 1, 0]))
-    p_var_circ = var_circ.to_pennylane()
-
-    with raises(ValueError):
-        p_var_circ.draw()
-
-    with raises(ValueError):
-        p_var_circ.eval()
-
-
-def test_pennylane_parameter_reference():
-    pytest.importorskip("discopy.quantum.pennylane")
-    import torch
-    x = sympy.symbols('x')
-    p = torch.nn.Parameter(torch.tensor(1.))
-    symbol_weight_map = {x: p}
-
-    circ = Rx(x)
-    p_circ = circ.to_pennylane()
-    p_circ.initialise_concrete_params(symbol_weight_map)
-
-    with torch.no_grad():
-        p.add_(1.)
-
-    assert p_circ._concrete_params[0][0] == p
-
-    with torch.no_grad():
-        p.add_(-2.)
-
-    assert p_circ._concrete_params[0][0] == p
-
-
-def test_pennylane_gradient_methods():
-    pytest.importorskip("discopy.quantum.pennylane")
-    import torch
-    x, y, z = sympy.symbols('x y z')
-    symbols = [x, y, z]
-
-    var_circ = Circuit.decode(
-        dom=qubit ** 0, boxes_and_offsets=zip(
-            [Ket(0), Rx(0.552), Rz(x), Rx(0.917), Ket(0, 0, 0), H, H, H,
-             CRz(0.18), CRz(y), CX, H, sqrt(2), Bra(0, 0), Ket(0),
-             Rx(0.446), Rz(0.256), Rx(z), CX, H, sqrt(2), Bra(0, 0)],
-            [0, 0, 0, 0, 0, 0, 1, 2, 0, 1, 2, 2,
-             3, 2, 0, 0, 0, 0, 0, 0, 1, 0]))
-
-    for diff_method in ['backprop', 'parameter-shift', 'finite-diff']:
-
-        weights = [torch.tensor(1., requires_grad=True),
-                   torch.tensor(2., requires_grad=True),
-                   torch.tensor(3., requires_grad=True)]
-        symbol_weight_map = dict(zip(symbols, weights))
-
-        p_var_circ = var_circ.to_pennylane(probabilities=True,
-                                           diff_method=diff_method)
-        p_var_circ.initialise_concrete_params(symbol_weight_map)
-
-        loss = p_var_circ.eval().norm(dim=0, p=2)
-        loss.backward()
-        assert weights[0].grad is not None
-
-    for diff_method in ['backprop']:
-
-        weights = [torch.tensor(1., requires_grad=True),
-                   torch.tensor(2., requires_grad=True),
-                   torch.tensor(3., requires_grad=True)]
-        symbol_weight_map = dict(zip(symbols, weights))
-
-        p_var_circ = var_circ.to_pennylane(probabilities=False,
-                                           diff_method=diff_method)
-        p_var_circ.initialise_concrete_params(symbol_weight_map)
-
-        loss = p_var_circ.eval().norm(dim=0, p=2)
-        loss.backward()
-        assert weights[0].grad is not None
-
-
 def test_loads_dumps():
     from discopy.utils import loads, dumps
     assert loads(dumps(Rx(1))) == Rx(1)
@@ -750,12 +538,31 @@ def test_consistent_eval(c):
     assert is_close_smallno(doubled_result, mixed_result.to_tensor())
 
 
+def test_mixed_eval_of_dagger_and_transpose_is_doubled():
+    U = QuantumGate('U', qubit, qubit, [1, 2j, 3, 4j])
+    f = ClassicalGate('f', bit, bit, [1, 2, 3, 4])
+    for g in (S.dagger(), T.dagger(), U.dagger(), U.r, f.dagger()):
+        doubled = (Channel.single if g.is_classical else Channel.double)(
+            g.eval())
+        assert g.eval(mixed=True).is_close(doubled)
+        assert g.eval(mixed=True, contractor=contractor).is_close(doubled)
+    circuit = Ket(0) >> H >> S >> S.dagger() >> H >> Measure()
+    assert np.allclose(circuit.eval().array, [1, 0])
+
+
 def test_mixed_eval_foliated():
     circuit = Ket(0, 0, 1) >> H @ X @ X >> Measure() @ Discard(qubit ** 2)
     assert [len(layer.boxes) for layer in circuit.foliation().inside]\
         == [1, 3, 2]
     assert circuit.foliation().eval(mixed=True, contractor=contractor)\
         .is_close(circuit.eval(mixed=True))
+
+
+def test_contractor_eval_batches_others():
+    batch = H.eval(X, contractor=contractor)
+    assert len(batch) == 2 and all(map(is_close_smallno, batch, H.eval(X)))
+    for c in (X + Z, (Ket(0) >> H >> Measure()) + (Ket(1) >> Measure())):
+        assert is_close_smallno(c.eval(contractor=contractor), c.eval())
 
 
 @pytest.mark.parametrize('c', mixed_circuits)
@@ -794,6 +601,18 @@ def test_quimb_pure_eval(c):
     assert np.allclose(t, c.eval().array), f"{t} != {c.eval().array}"
 
 
+@pytest.mark.parametrize('c', pure_circuits + mixed_circuits)
+def test_contractor_numpy_eval(c):
+    from discopy.matrix import NumPy
+    assert c.eval(contractor=NumPy()).is_close(c.eval())
+
+
+@pytest.mark.parametrize('c', pure_circuits + mixed_circuits)
+def test_contractor_quimb_eval(c):
+    pytest.importorskip("quimb")
+    assert c.eval(contractor=Quimb()).is_close(c.eval())
+
+
 def test_logical_vs_physical_swap():
     logical, physical = Circuit.swap(qubit, qubit), SWAP
 
@@ -816,6 +635,17 @@ def test_feedback_is_the_trace():
     assert np.allclose(CX.feedback(left=True).eval().array,
                        np.einsum('iaib->ab', array))
     assert CX.feedback(mem=qubit) == CX.trace(mem=qubit)
+
+
+def test_delayed_bubbles_and_sums():
+    bubble = X.bubble()
+    delayed = bubble.delay()
+    assert delayed.args == (X, ) and delayed.reset() == bubble
+    assert np.allclose(delayed.eval().array, bubble.eval().array)
+    circuit = (X + Z) >> H
+    assert circuit.delay() == (X + Z).delay() >> H.delay()
+    assert (X + Z).delay() == X.delay() + Z.delay()
+    assert np.allclose(circuit.delay().eval().array, circuit.eval().array)
 
 
 def test_delay():
@@ -853,3 +683,21 @@ def test_delay():
     circuit = CX >> Rz(.5) @ H
     assert np.allclose(
         circuit.delay().eval().array, circuit.eval().array)
+
+
+def test_Bubble_is_mixed_and_grad():
+    phi = sympy.Symbol('phi')
+    assert X.bubble(cod=bit).is_mixed and not X.bubble().is_mixed
+    assert X.bubble().grad(phi) == Sum((), qubit, qubit)
+    with raises(NotImplementedError):
+        Rx(phi).bubble().grad(phi)
+
+
+def test_pure_Bubble_mixed_eval_is_doubled():
+    f = ClassicalGate('f', bit, bit, [0, 1, 1, 0])
+    for bubble in (X.bubble(), Ry(.3).bubble(func=np.conjugate), f.bubble()):
+        doubled = (Channel.single if bubble.is_classical else Channel.double)(
+            bubble.eval())
+        assert bubble.eval(mixed=True).is_close(doubled)
+    assert np.allclose((Ket(0) >> X.bubble() >> Measure()).eval().array,
+                       [1, 0])

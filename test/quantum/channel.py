@@ -80,6 +80,11 @@ def test_Measure_override_bits_evaluates():
         np.ones(2), Channel.measure(Dim(2)).array, 0))
 
 
+def test_CQ_hash():
+    from discopy.tensor import Dim
+    assert {CQ(Dim(2)): 42}[CQ(Dim(2))] == 42
+
+
 def test_Channel_then_unbiased():
     """ Composing several channels folds Channel.then, not Matrix.then. """
     channel = Channel(list(range(16)), Q(Dim(2)), Q(Dim(2)))
@@ -99,3 +104,14 @@ def test_CQ_repr():
     import discopy
     for cq in [CQ(), C(Dim(2)), C(Dim(2)) @ Q(Dim(3, 4))]:
         assert eval(repr(cq), {'quantum': discopy.quantum, 'Dim': Dim}) == cq
+
+
+def test_tree():
+    from discopy.utils import dumps, loads
+    for term in (CQ(), C(Dim(2)) @ Q(Dim(2, 3)),
+                 (Ket(0) >> H >> Measure()).eval(mixed=True),
+                 Channel.id(Q(Dim(2)))):
+        assert loads(dumps(term)) == term
+    tree = CQ().to_tree() | {'quantum': {'factory': 'cat.Ob', 'name': 'x'}}
+    with raises(TypeError, match="Expected frobenius.Dim"):
+        CQ.from_tree(tree)

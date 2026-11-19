@@ -31,6 +31,8 @@ Summary
     Rx
     Ry
     Rz
+    U1
+    ControlledRotation
     CU1
     CRz
     CRx
@@ -49,6 +51,8 @@ Summary
         scalar
 """
 import copy
+import math
+import numbers
 from collections.abc import Sized
 from math import e, pi
 
@@ -59,22 +63,46 @@ from discopy.matrix import get_backend
 from discopy.quantum.circuit import (
     Circuit, Digit, Ty, bit, qubit, Box, Sum, Id)
 from discopy.tensor import backend
-from discopy.utils import factory_name, assert_isinstance, from_tree
+from discopy.utils import (
+    factory_key, factory_name, assert_isinstance, from_tree)
 
 
-def format_number(data):
-    """ Tries to format a number. """
+def format_number(data, exact=False):
+    """
+    Tries to format a number, to three significant digits or else exactly,
+    i.e. the representation of the number a box compares: a scalar of an
+    array backend is read as the Python number it holds, and a real number
+    that is not rational, such as a :code:`sympy.Float`, prints as the float
+    it equals, if one does, i.e. the shortest string that reads back to it.
+
+    >>> format_number(0.123456), format_number(0.123456, exact=True)
+    ('0.123', '0.123456')
+    >>> import numpy as np
+    >>> from fractions import Fraction
+    >>> format_number(np.exp(.5j), exact=True)
+    '(0.8775825618903728+0.479425538604203j)'
+    >>> format_number(Fraction(1, 3), exact=True)
+    'Fraction(1, 3)'
+    >>> format_number(2 ** 53 + 1, exact=True)
+    '9007199254740993'
+    """
     try:
-        return f'{data:.3g}'
+        if not exact:
+            return f'{data:.3g}'
+        number = getattr(data, "tolist", lambda: data)()
     except TypeError:
         return data
+    inexact = isinstance(number, numbers.Real)\
+        and not isinstance(number, numbers.Rational)
+    return repr(float(number) if inexact and float(number) == number
+                else number)
 
 
 class SelfConjugate(Box):
-    """ A self-conjugate box, i.e. where the transpose is the dagger. """
-    def conjugate(self):
-        return self
-
+    """
+    A self-conjugate box, i.e. where the transpose is the dagger, up to the
+    order of the wires.
+    """
     def rotate(self, left=False):
         del left
         return self.dagger()
@@ -111,6 +139,7 @@ class Discard(SelfConjugate):
 
     >>> assert Bra(0).eval(mixed=True) != Discard(1).eval()
     """
+    serialised_attrs = ("dom", )
     draw_as_discards = True
 
     def __init__(self, dom=1):
@@ -139,6 +168,10 @@ class Discard(SelfConjugate):
     def dagger(self):
         return MixedState(self.dom)
 
+    def rotate(self, left=False):
+        del left
+        return MixedState(self.dom.r)
+
     def _decompose(self):
         return Id().tensor(*map(Discard, self.dom))
 
@@ -148,6 +181,7 @@ class MixedState(SelfConjugate):
     Maximally-mixed state on n qubits.
     If :code:`cod == bit` then uniform distribution.
     """
+    serialised_attrs = ("cod", )
     draw_as_discards = True
 
     def __init__(self, cod=1):
@@ -173,6 +207,10 @@ class MixedState(SelfConjugate):
     def dagger(self):
         return Discard(self.cod)
 
+    def rotate(self, left=False):
+        del left
+        return Discard(self.cod.r)
+
     def _decompose(self):
         return Id().tensor(*map(MixedState, self.cod))
 
@@ -186,12 +224,18 @@ class Measure(SelfConjugate):
     n_qubits : int
         Number of qubits to measure.
     destructive : bool, optional
-        Whether to do a non-destructive measurement instead.
+        Whether the measurement consumes the qubits, default is :code:`True`,
+        otherwise they are kept beside the bits.
     override_bits : bool, optional
         Whether to override input bits, this is the standard behaviour of tket.
     time_step : int, optional
         The number of times the measurement has been delayed.
+
+    >>> assert Measure().cod == bit
+    >>> assert Measure(destructive=False).cod == qubit @ bit
     """
+    serialised_attrs = (
+        "n_qubits", "destructive", "override_bits", "time_step")
     draw_as_measures = True
 
     def __init__(self, n_qubits=1, destructive=True, override_bits=False,
@@ -264,12 +308,18 @@ class Encode(SelfConjugate):
     n_bits : int
         Number of bits to encode.
     constructive : bool, optional
-        Whether to do a classically-controlled correction instead.
+        Whether the encoding prepares fresh qubits, default is :code:`True`,
+        otherwise it applies a classically-controlled correction to given
+        qubits.
     reset_bits : bool, optional
         Whether to reset the bits to the uniform distribution.
     time_step : int, optional
         The number of times the encoding has been delayed.
+
+    >>> assert Encode().dom == bit
+    >>> assert Encode(constructive=False).dom == qubit @ bit
     """
+    serialised_attrs = ("n_bits", "constructive", "reset_bits", "time_step")
     draw_as_measures = True
 
     def __init__(self, n_bits=1, constructive=True, reset_bits=False,
@@ -337,7 +387,7 @@ class QuantumGate(Box):
         super().__init__(name, dom, cod, data, **params)
 
     def __setstate__(self, state):
-        if "_array" in state and not state["_array"] is None:
+        if "_array" in state and state["_array"] is not None:
             state["data"] = state['_array'].flatten().tolist()
         if "_name" in state:
             if state["_name"] in GATES and hasattr(
@@ -349,6 +399,28 @@ class QuantumGate(Box):
     def setoid(self):
         """ Avoid checking for equality of matrices when comparing gates. """
         return (repr(self), )
+
+    @property
+    def is_deterministic(self) -> bool:
+        """
+        Whether the gate commutes with the copy of the computational basis,
+        i.e. its array sends each basis state to a basis state or to zero.
+
+        >>> assert CX.is_deterministic and Bra(0).is_deterministic
+        >>> assert not H.is_deterministic and not CRz(.25).is_deterministic
+        >>> assert Rz(0).is_deterministic and not Rz(.25).is_deterministic
+        """
+        if not super().is_deterministic or self.free_symbols:
+            return False
+        with backend('numpy') as np:
+            array = np.array(self.array, dtype=complex)
+            rows = array.reshape(math.prod(array.shape[:len(self.dom)]), -1)
+            return bool(np.isin(rows, (0, 1)).all()
+                        and (rows.sum(axis=1) <= 1).all())
+
+    @is_deterministic.setter
+    def is_deterministic(self, value: bool):
+        self.deterministic = value
 
 
 class ClassicalGate(SelfConjugate):
@@ -369,6 +441,8 @@ class ClassicalGate(SelfConjugate):
 
 class Copy(ClassicalGate):
     """ Takes a bit, returns two copies of it. """
+    serialised_attrs = ("time_step", )
+
     def __init__(self, time_step=0):
         dom = bit.delay(time_step)
         super().__init__("Copy", dom, dom ** 2, [1, 0, 0, 0, 0, 0, 0, 1],
@@ -388,20 +462,31 @@ class Copy(ClassicalGate):
     def from_tree(cls, tree: dict):
         return cls(tree.get('time_step', 0))
 
+    def __repr__(self):
+        time_step = f"time_step={self.time_step}" if self.time_step else ""
+        return f"{factory_name(type(self))}({time_step})"
+
     def dagger(self):
         return Match(self.time_step)
 
 
 class Match(ClassicalGate):
-    """ Takes two bits in, returns them if they are equal. """
+    """
+    Takes two bits in, returns them if they are equal, i.e. the merge, which
+    is deterministic but not affine.
+
+    >>> assert Match().is_deterministic and not Match().is_affine
+    """
+    serialised_attrs = ("time_step", )
+
     def __init__(self, time_step=0):
         cod = bit.delay(time_step)
         super().__init__("Match", cod ** 2, cod, [1, 0, 0, 0, 0, 0, 0, 1],
-                         time_step=time_step)
+                         time_step=time_step, is_affine=False)
         self.draw_as_spider, self.color = True, "black"
         self.drawing_name = ""
 
-    delay = Copy.delay
+    delay, __repr__ = Copy.delay, Copy.__repr__
     from_tree = classmethod(Copy.from_tree.__func__)
 
     def dagger(self):
@@ -418,6 +503,7 @@ class Digits(ClassicalGate):
     >>> assert Digits(2, dim=4).eval()\\
     ...     == Tensor[complex](dom=Dim(1), cod=Dim(4), array=[0, 0, 1, 0])
     """
+    serialised_attrs = ("*digits", "dim", "is_dagger", "time_step")
     draw_as_brakets = True
 
     def __init__(self, *digits, dim=None, is_dagger=False, time_step=0):
@@ -494,6 +580,11 @@ class Digits(ClassicalGate):
         return Digits(*self.digits, dim=self.dim, is_dagger=not self.is_dagger,
                       time_step=self.time_step)
 
+    def rotate(self, left=False):
+        del left
+        return Digits(*self.digits[::-1], dim=self.dim,
+                      is_dagger=not self.is_dagger, time_step=self.time_step)
+
     def to_drawing(self):
         result = QuantumGate.to_drawing(self)
         result.draw_as_brakets, result._digits = True, self._digits
@@ -514,6 +605,7 @@ class Ket(SelfConjugate, QuantumGate):
     >>> assert Ket(1, 0).eval()\\
     ...     == Tensor[complex](dom=Dim(1), cod=Dim(2, 2), array=[0, 0, 1, 0])
     """
+    serialised_attrs = ("*bitstring", "time_step")
     to_drawing = Digits.to_drawing
     array = Digits.array
 
@@ -541,6 +633,12 @@ class Ket(SelfConjugate, QuantumGate):
     def from_tree(cls, tree: dict):
         return cls(*tree['bitstring'], time_step=tree.get('time_step', 0))
 
+    def __repr__(self):
+        args = ', '.join(map(repr, self.bitstring))
+        time_step = f"time_step={self.time_step}" if self.time_step else ""
+        args = ", ".join(arg for arg in (args, time_step) if arg)
+        return f"{factory_name(type(self))}({args})"
+
     @property
     def bitstring(self):
         """ The bitstring of a Ket. """
@@ -549,6 +647,17 @@ class Ket(SelfConjugate, QuantumGate):
     def dagger(self):
         return Bra(*self.bitstring, time_step=self.time_step)
 
+    def rotate(self, left=False):
+        """
+        The transpose of a preparation or a post-selection, i.e. the dagger
+        of the one on the reversed bitstring.
+
+        >>> assert Ket(1, 0).r == Bra(0, 1) and Bra(0, 1).l == Ket(1, 0)
+        """
+        del left
+        return type(self)(
+            *self.bitstring[::-1], time_step=self.time_step).dagger()
+
     def _decompose(self):
         return Id().tensor(*[
             Ket(b, time_step=self.time_step) for b in self.bitstring])
@@ -556,13 +665,16 @@ class Ket(SelfConjugate, QuantumGate):
 
 class Bra(SelfConjugate, QuantumGate):
     """
-    Implements qubit post-selection for a given bitstring.
+    Implements qubit post-selection for a given bitstring, which is
+    deterministic but not affine, i.e. a partial function.
 
     >>> from discopy.tensor import Dim, Tensor
     >>> assert Bra(1, 0).dom == qubit ** 2
     >>> assert Bra(1, 0).eval()\\
     ...     == Tensor[complex](dom=Dim(2, 2), cod=Dim(1), array=[0, 0, 1, 0])
+    >>> assert Bra(1, 0).is_deterministic and not Bra(1, 0).is_affine
     """
+    serialised_attrs = ("*bitstring", "time_step")
     to_drawing = Digits.to_drawing
     array = Digits.array
 
@@ -574,8 +686,10 @@ class Bra(SelfConjugate, QuantumGate):
         dom, cod = qubit.delay(time_step) ** len(bitstring), qubit ** 0
         super().__init__(name, dom, cod, time_step=time_step)
         self._digits, self._dim, self.draw_as_brakets = bitstring, 2, True
+        self.affine = False
 
-    delay, to_tree = Ket.delay, Ket.to_tree
+    delay, to_tree, rotate = Ket.delay, Ket.to_tree, Ket.rotate
+    __repr__ = Ket.__repr__
     from_tree = classmethod(Ket.from_tree.__func__)
 
     @property
@@ -600,9 +714,12 @@ class Controlled(QuantumGate):
     controlled : QuantumGate
         Gate to control, e.g. :code:`CX = Controlled(X)`.
     distance : int, optional
-        Number of qubits from the control to the target, default is :code:`0`.
-        If negative, the control is on the right of the target.
+        Number of qubits from the control to the target, default is :code:`1`.
+        If negative, the control is on the right of the target, zero raises
+        :code:`ValueError`.
 
+    Example
+    -------
     >>> circuit = (Controlled(CX.l, distance=3)
     ...            >> Controlled(Controlled(CZ.l, distance=2), distance=-1))
     >>> circuit.draw(
@@ -612,6 +729,7 @@ class Controlled(QuantumGate):
     .. image:: /_static/quantum/long-controlled.svg
         :align: center
     """
+    serialised_attrs = ("controlled", "distance")
     draw_as_controlled = True
 
     def __init__(self, controlled, distance=1):
@@ -634,6 +752,8 @@ class Controlled(QuantumGate):
         >>> assert CX.delay() == Controlled(X.delay())
         """
         return self.controlled, self.distance
+
+    time_step = property(lambda self: self.controlled.time_step)
 
     def with_distance(self, distance) -> "Controlled":
         """
@@ -663,7 +783,7 @@ class Controlled(QuantumGate):
             self.controlled.rotate(left), distance=-self.distance)
 
     def lambdify(self, *symbols, **kwargs):
-        c_fn = self.controlled.lambdify(*symbols)
+        c_fn = self.controlled.lambdify(*symbols, **kwargs)
         return lambda *xs: type(self)(c_fn(*xs), distance=self.distance)
 
     def subs(self, *args):
@@ -674,7 +794,7 @@ class Controlled(QuantumGate):
         """
         The constructor call of a controlled gate with its module, the same
         for a subclass such as :class:`CRz`, which is equal to the gate it
-        abbreviates and so hashes the same.
+        abbreviates.
 
         >>> from discopy.quantum.circuit import Circuit
         >>> assert eval(repr(CX), Circuit.environment()) == CX
@@ -683,15 +803,22 @@ class Controlled(QuantumGate):
         return factory_name(Controlled)\
             + f'({self.controlled!r}, distance={self.distance!r})'
 
+    def setoid(self):
+        """
+        A controlled gate is given by the gate it controls and its distance,
+        not by its class, so that a subclass such as :class:`CRz` equals and
+        hashes the same as the gate it abbreviates, its phase compared
+        exactly.
+
+        >>> assert CRz(.5) == Controlled(Rz(.5))
+        >>> assert hash(CRz(.5)) == hash(Controlled(Rz(.5)))
+        >>> assert CRz(.1231) != Controlled(Rz(.1234))
+        """
+        return Controlled, self.controlled.setoid(), self.distance
+
     def __str__(self):
         return self.name + str_delayed(self.time_step) if self.distance == 1\
             else f'Controlled({self.controlled}, distance={self.distance})'
-
-    def __eq__(self, other):
-        return not isinstance(other, Box) and super().__eq__(other)\
-            or isinstance(other, Controlled)\
-            and self.distance == other.distance\
-            and self.controlled == other.controlled
 
     def to_tree(self) -> dict:
         return dict(controlled=self.controlled.to_tree(),
@@ -703,7 +830,7 @@ class Controlled(QuantumGate):
         Reads back through :class:`Controlled` rather than through ``cls``: a
         subclass such as :class:`CRz` takes the phase of the rotation it
         controls where :class:`Controlled` takes the gate itself, and
-        :meth:`__eq__` compares the gate and the distance rather than the
+        :meth:`setoid` compares the gate and the distance rather than the
         class, so the two are equal.
 
         >>> assert from_tree(CRz(.25).to_tree()) == CRz(.25)
@@ -714,8 +841,6 @@ class Controlled(QuantumGate):
     @property
     def phase(self):
         return self.controlled.phase
-
-    __hash__ = QuantumGate.__hash__
 
     def _decompose_grad(self):
         if self.time_step:
@@ -832,13 +957,20 @@ class Parametrized(Box):
 
     def subs(self, *args):
         data = rsubs(self.data, *args)
-        return type(self)(data)
+        return type(self)(data)  # ty: ignore[missing-argument]
 
     def lambdify(self, *symbols, **kwargs):
+        """
+        The function from values of ``symbols`` to gates, with the data
+        evaluated in the module of the current backend whatever ``modules``
+        it is given, its other ``kwargs`` passed to :code:`sympy.lambdify`.
+        """
         from sympy import lambdify
         with backend() as np:
-            data = lambdify(symbols, self.data, dict(kwargs, modules=np))
-        return lambda *xs: type(self)(data(*xs))
+            data = lambdify(
+                symbols, self.data, **dict(kwargs, modules=np.module))
+        return lambda *xs: type(self)(
+            data(*xs))  # ty: ignore[missing-argument]
 
     def __str__(self):
         if isinstance(self, Controlled):
@@ -848,11 +980,13 @@ class Parametrized(Box):
             + str_delayed(self.time_step)
 
     def __repr__(self):
-        return factory_name(type(self)) + f"({format_number(self.data)})"
+        return factory_name(type(self))\
+            + f"({format_number(self.data, exact=True)})"
 
 
 class Rotation(Parametrized, QuantumGate):
     """ Abstract class for rotation gates. """
+    serialised_attrs = ("phase", "z", "time_step")
     n_qubits = 1
 
     def __init__(self, phase, z=0, time_step=0):
@@ -897,6 +1031,21 @@ class Rotation(Parametrized, QuantumGate):
     def __repr__(self):
         time_step = f", time_step={self.time_step}" if self.time_step else ""
         return super().__repr__()[:-1] + time_step + ")"
+
+    def setoid(self):
+        """
+        A rotation is given by its class, as a :class:`discopy.cat.Box` is,
+        and by the attributes of a :class:`discopy.tensor.Box`, its phase
+        compared exactly, as its representation prints it: only its string
+        rounds it, for display.
+
+        >>> from discopy.quantum.circuit import Box
+        >>> assert str(Rz(.1231)) == str(Rz(.1234)) == 'Rz(0.123)'
+        >>> assert repr(Rz(.1231)) == 'quantum.gates.Rz(0.1231)'
+        >>> assert Rz(.1231) != Rz(.1234) and len({Rz(.25), Rz(.25)}) == 1
+        >>> assert Rz(.5) != Box('Rz', qubit, qubit, data=.5)
+        """
+        return (factory_key(type(self)), ) + Box.setoid(self)
 
     def grad(self, var, **params):
         if var not in self.free_symbols:
@@ -986,6 +1135,8 @@ class U1(AntiConjugate, Rotation):
 
 class ControlledRotation(Controlled, Rotation):
     """ Controlled rotation gate. """
+    serialised_attrs = ("phase", "distance", "time_step")
+
     def __init__(self, phase, distance=1, time_step=0):
         Controlled.__init__(
             self, self.controlled(phase, time_step=time_step), distance)
@@ -1030,6 +1181,11 @@ class CRx(ControlledRotation):
 
 class Scalar(Parametrized):
     """ Scalar, i.e. quantum gate with empty domain and codomain. """
+    serialised_attrs = ("data", "name", "is_mixed", "time_step")
+
+    def __new__(cls, *args, **kwargs):
+        return object.__new__(cls)
+
     def __init__(self, data, name=None, is_mixed=False, time_step=0):
         self.drawing_name = format_number(data)
         name = "scalar" if name is None else name
@@ -1042,18 +1198,11 @@ class Scalar(Parametrized):
         super().__setstate__(state)
 
     def __repr__(self):
+        name = f", {self.name!r}" if "name" in self.serialised_attrs\
+            and self.name != "scalar" else ""
         time_step = f", time_step={self.time_step}" if self.time_step else ""
-        return super().__repr__()[:-1] + (
+        return super().__repr__()[:-1] + name + (
             ', is_mixed=True' if self.is_mixed else '') + time_step + ')'
-
-    def setoid(self):
-        """
-        A scalar and its delay differ only by their time step, as the delay
-        of an empty boundary is itself.
-
-        >>> assert scalar(2).delay() != scalar(2) == scalar(2).d.delay(-1)
-        """
-        return super().setoid() + (self.time_step, )
 
     def delay(self, n_steps=1):
         return type(self)(
@@ -1065,9 +1214,24 @@ class Scalar(Parametrized):
             return np.array(self.data)
 
     def grad(self, var, **params):
+        """
+        The derivative of a scalar :math:`s`, or under mixed evaluation, where
+        a pure scalar is :math:`|s|^2`, the mixed scalar
+        :math:`2 \\mathrm{Re}(\\bar{s} s')` written as the polarisation
+        :math:`(|s + s'|^2 - |s - s'|^2) / 2`.
+
+        >>> from sympy.abc import phi  # doctest: +EXTRA
+        >>> assert scalar(phi).grad(phi).subs(phi, .5)\\
+        ...     == scalar(1, is_mixed=True)
+        """
         if var not in self.free_symbols:
             return Sum([], self.dom, self.cod)
-        return Scalar(self.data.diff(var), is_mixed=self.is_mixed,
+        data, derivative = self.data, self.data.diff(var)
+        if params.get('mixed', True) and not self.is_mixed:
+            return Scalar((abs(data + derivative) ** 2
+                           - abs(data - derivative) ** 2) / 2,
+                          is_mixed=True, time_step=self.time_step)
+        return Scalar(derivative, is_mixed=self.is_mixed,
                       time_step=self.time_step)
 
     def dagger(self):
@@ -1095,25 +1259,24 @@ class Scalar(Parametrized):
 
     @classmethod
     def from_tree(cls, tree: dict):
-        """
-        Passes its arguments positionally, as :meth:`dagger` builds one:
-        :meth:`tensor.Box.__new__` reads ``name`` as its own first argument,
-        where a scalar's first argument is its ``data``.
-
-        >>> assert from_tree(Scalar(.5).to_tree()) == Scalar(.5)
-        """
         return cls(tree['data'], tree['name'], tree['is_mixed'],
                    tree.get('time_step', 0))
 
 
 class MixedScalar(Scalar):
     """ Mixed scalar, i.e. where the Born rule has already been applied. """
+    serialised_attrs = ("data", "time_step")
+
     def __init__(self, data, time_step=0):
         super().__init__(data, is_mixed=True, time_step=time_step)
 
     @classmethod
     def from_tree(cls, tree: dict):
         return cls(tree['data'], tree.get('time_step', 0))
+
+    def __repr__(self):
+        time_step = f", time_step={self.time_step}" if self.time_step else ""
+        return Parametrized.__repr__(self)[:-1] + time_step + ")"
 
     def delay(self, n_steps=1):
         """
@@ -1137,6 +1300,8 @@ class Sqrt(Scalar):
     self-adjoint when that root is real, and conjugated by its dagger
     otherwise, e.g. for the square root of a negative number.
     """
+    serialised_attrs = ("data", "is_dagger", "time_step")
+
     def __init__(self, data, is_dagger=False, time_step=0):
         super().__init__(data, name="sqrt", time_step=time_step)
         if is_dagger and self.is_self_adjoint:
@@ -1164,17 +1329,31 @@ class Sqrt(Scalar):
     @property
     def is_self_adjoint(self):
         """ Whether the root is real, i.e. the dagger is the identity. """
-        return not self.free_symbols and not complex(self.data ** .5).imag
+        return not self.free_symbols and not complex(
+            self.data ** .5).imag  # ty: ignore[unsupported-operator]
 
     @property
     def array(self):
         with backend() as np:
-            root = np.array(self.data ** .5)
+            root = np.array(
+                self.data ** .5)  # ty: ignore[unsupported-operator]
             return root.conjugate() if self.is_dagger else root
 
     def dagger(self):
         return self if self.is_self_adjoint\
             else Sqrt(self.data, not self.is_dagger, self.time_step)
+
+    def grad(self, var, **params):
+        """
+        The derivative of the root, i.e. of the scalar it evaluates to.
+
+        >>> from sympy.abc import phi  # doctest: +EXTRA
+        >>> assert sqrt(phi).grad(phi, mixed=False) == scalar(.5 * phi ** -.5)
+        """
+        root = Scalar(self.data ** .5,  # ty: ignore[unsupported-operator]
+                      time_step=self.time_step)
+        gradient = root.grad(var, **params)
+        return gradient.dagger() if self.is_dagger else gradient
 
     def delay(self, n_steps=1):
         return Sqrt(self.data, self.is_dagger, self.time_step + n_steps)

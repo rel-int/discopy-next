@@ -50,13 +50,13 @@ Composition is that of the underlying category in the other order:
 
 from __future__ import annotations
 
+import sys
 from dataclasses import dataclass
 
 from discopy import abc, cat, monoidal, symmetric
 from discopy.abc import (
-    ComarkovCategory, MarkovCategory, MonoidalCategory, NamedGeneric,
-    SymmetricCategory)
-from discopy.axioms import Testable
+    ComarkovCategory, MarkovCategory, MonoidalCategory, SymmetricCategory)
+from discopy.testable import Serialisable, TestableGeneric
 from discopy.python import finset
 from discopy.utils import (
     assert_isinstance, classproperty, factory_name, get_origin, unbiased)
@@ -66,7 +66,8 @@ NO_TREE = "The opposite of a category has no tree: it reads back from the "\
 
 
 @dataclass
-class Category(abc.Category, Testable["Category"], NamedGeneric['category']):
+class Category[category](
+        abc.Category, TestableGeneric, Serialisable["Category"]):
     """
     An arrow of the opposite of ``category``, i.e. an arrow ``inside`` of the
     category read from its codomain to its domain.
@@ -83,6 +84,15 @@ class Category(abc.Category, Testable["Category"], NamedGeneric['category']):
     """
     category = cat.Arrow
     ob = classproperty(lambda cls: cls.category.ob)
+
+    @classmethod
+    def checked_params(cls) -> tuple:
+        """ The default category, for the class itself, and integer matrices,
+        a category with every structure an opposite reads, copies and merges
+        included. """
+        # pylint: disable-next=import-outside-toplevel  # it imports this
+        from discopy.matrix import Matrix
+        return (cls.category, Matrix[int])
 
     inside: category
 
@@ -137,12 +147,17 @@ class Category(abc.Category, Testable["Category"], NamedGeneric['category']):
     def environment(cls) -> dict:
         """
         The namespace of :class:`Testable`, with that of the category on top
-        so that the representation of ``inside`` reads back too.
+        so that the representation of ``inside`` reads back too: its own
+        environment, or the public names of its module when it has none.
         """
+        module = vars(sys.modules[cls.category.__module__])
+        public = {
+            name: value for name, value in module.items()
+            if not name.startswith("_")}
         return dict(super().environment(), **getattr(
-            cls.category, "environment", dict)())
+            cls.category, "environment", lambda: public)())
 
-    serialisation = Testable.serialisation.inapplicable(NO_TREE)
+    serialisation = Serialisable.serialisation.inapplicable(NO_TREE)
 
 
 class Monoidal(Category, MonoidalCategory):
@@ -155,6 +170,14 @@ class Monoidal(Category, MonoidalCategory):
     """
     category = monoidal.Diagram
 
+    @classmethod
+    def checked_params(cls) -> tuple:
+        """ Integer matrices only: free diagrams are compared on the nose,
+        where their opposite does not interchange. """
+        # pylint: disable-next=import-outside-toplevel  # it imports this
+        from discopy.matrix import Matrix
+        return (Matrix[int], )
+
     @unbiased
     def tensor(self, other: Monoidal) -> Monoidal:
         """
@@ -164,7 +187,8 @@ class Monoidal(Category, MonoidalCategory):
             other : The arrow to tensor with.
         """
         assert_isinstance(other, type(self))
-        return type(self)(self.inside @ other.inside)
+        inside = self.inside @ other.inside  # ty: ignore[unsupported-operator]
+        return type(self)(inside)
 
 
 class Symmetric(Monoidal, SymmetricCategory):
@@ -211,7 +235,8 @@ class Comarkov(Symmetric, ComarkovCategory):
             x : The object to merge.
             n : The number of copies.
         """
-        return cls(cls.category.copy(x, n))
+        return cls(
+            cls.category.copy(x, n))  # ty: ignore[invalid-argument-type]
 
 
 class Markov(Symmetric, MarkovCategory):

@@ -14,12 +14,24 @@ Summary
     Wire
     Ty
     Nat
+    Layer
     Diagram
     Box
     Cup
     Cap
     Sum
+    Bubble
     Functor
+    Equation
+
+.. admonition:: Functions
+
+    .. autosummary::
+        :template: function.rst
+        :nosignatures:
+        :toctree:
+
+        nesting
 
 Axioms
 ------
@@ -151,10 +163,12 @@ import copy
 
 from collections.abc import Callable
 
-from typing import ClassVar, Iterator
+from typing import Iterator, Self, ClassVar
 
 from discopy import cat, monoidal, biclosed, messages
-from discopy.abc import Pregroup, RigidCategory
+from discopy.abc import (
+    DaggerCategory, DaggerMonoidalCategory, Pregroup, RigidCategory)
+from discopy.testable import GENERATORS
 from discopy.cat import factory
 from discopy.utils import (
     assert_isatomic,
@@ -163,7 +177,6 @@ from discopy.utils import (
     BinaryBoxConstructor,
     deprecated_alias,
     factory_name,
-    rsubs,
 )
 
 
@@ -195,22 +208,34 @@ class Wire(monoidal.Wire):
         super().__setstate__(state)
 
     def __init__(self, name: str, z: int = 0,
-                 dom: monoidal.Colour = monoidal.transparent,
-                 cod: monoidal.Colour = monoidal.transparent):
+                 dom: monoidal.Colour | None = None,
+                 cod: monoidal.Colour | None = None):
         assert_isinstance(z, int)
         self.z = z
         super().__init__(name, dom, cod)
 
     def dagger(self) -> Wire:
-        raise AxiomError("Rigid types have no dagger, use pivotal instead.")
+        raise AxiomError(messages.RIGID_TYPE_HAS_NO_DAGGER)
+
+    def atoms(self) -> list[Wire]:
+        """
+        The wire with no winding, which the string of an adjoint rotates,
+        e.g. ``x.r``.
+
+        >>> x = Wire('x')
+        >>> assert x.r.atoms() == x.l.atoms() == [x]
+        """
+        dom, cod = (self.dom, self.cod) if self.z % 2 == 0\
+            else (self.cod, self.dom)
+        return [type(self)(self.name, dom=dom, cod=cod)]
 
     @property
-    def l(self) -> Wire:
+    def l(self) -> Self:
         """ The left adjoint of the object. """
         return type(self)(self.name, self.z - 1, dom=self.cod, cod=self.dom)
 
     @property
-    def r(self) -> Wire:
+    def r(self) -> Self:
         """ The right adjoint of the object. """
         return type(self)(self.name, self.z + 1, dom=self.cod, cod=self.dom)
 
@@ -219,6 +244,19 @@ class Wire(monoidal.Wire):
         result = copy.copy(self)
         result.z = 0
         return result
+
+    windings = (0, 1, -1)
+    """ The winding numbers :meth:`strategy` draws from, simplest first. """
+
+    @classmethod
+    def strategy(cls):
+        """ Generate named objects with a winding number in
+        :attr:`windings`. """
+        from hypothesis import strategies as st
+
+        return st.tuples(
+            st.sampled_from(GENERATORS), st.sampled_from(cls.windings),
+        ).map(lambda args: cls(args[0], z=args[1]))
 
     def __eq__(self, other):
         return monoidal.Wire.__eq__(self, other)\
@@ -230,7 +268,7 @@ class Wire(monoidal.Wire):
     def __repr__(self):
         cls_name = factory_name(type(self))
         z_repr = ', z=' + repr(self.z) if self.z else ''
-        if self.dom == self.cod == monoidal.transparent:
+        if self.dom is None and self.cod is None:
             return f"{cls_name}({self.name!r}{z_repr})"
         return f"{cls_name}({self.name!r}{z_repr}, " \
             f"dom={self.dom!r}, cod={self.cod!r})"
@@ -273,12 +311,12 @@ class Ty(Pregroup, biclosed.Ty):
         super().__setstate__(state)
 
     @property
-    def l(self) -> Ty:
+    def l(self) -> Self:
         """ The left adjoint of the type. """
         return self.ar(*[x.l for x in self.inside[::-1]])
 
     @property
-    def r(self) -> Ty:
+    def r(self) -> Self:
         """ The right adjoint of the type. """
         return self.ar(*[x.r for x in self.inside[::-1]])
 
@@ -323,7 +361,7 @@ class Nat(monoidal.Nat, Ty):
     """
     l = r = property(lambda self: self)
 
-    def unwind(self) -> Nat:
+    def unwind(self) -> "Nat":
         """
         The identity: a natural number has no winding.
 
@@ -626,7 +664,7 @@ class Diagram(biclosed.Diagram, RigidCategory):
                 yield _diagram
                 diagram = _diagram
         for _diagram in monoidal.Diagram.normalize(diagram, left=left):
-            yield _diagram
+            yield _diagram  # ty: ignore[invalid-yield]
 
     normalize = snake_removal
 
@@ -644,18 +682,45 @@ class Diagram(biclosed.Diagram, RigidCategory):
         False
         >>> *_, two_snakes_nf = monoidal.Diagram.normalize(two_snakes)
         >>> assert double_snake == two_snakes_nf
-        >>> f = Box('f', a, b)
 
         >>> a, b = Ty('a'), Ty('b')
         >>> double_snake = Id(a @ b).transpose(left=True)
         >>> snakes = Id(b).transpose(left=True) @ Id(a).transpose(left=True)
-        >>> double_snake == two_snakes
+        >>> double_snake == snakes
         False
         >>> *_, two_snakes_nf = monoidal.Diagram.normalize(
         ...     snakes, left=True)
         >>> assert double_snake == two_snakes_nf
         """
         return super().normal_form(**params)
+
+    hypergraph_section = monoidal.Diagram.hypergraph_section.failing(
+        messages.SECTION_NEEDS_SWAPS)
+    dagger_involution = DaggerCategory.dagger_involution.failing(
+        messages.RIGID_HAS_NO_DAGGER)
+    dagger_contravariance = DaggerCategory.dagger_contravariance.failing(
+        messages.RIGID_HAS_NO_DAGGER)
+    dagger_monoidality = DaggerMonoidalCategory.dagger_monoidality.failing(
+        messages.RIGID_HAS_NO_DAGGER)
+
+    # The curry of a rigid diagram is made of caps, which a map and a
+    # hypergraph both read as wiring, so the two agree.
+    map_agreement = monoidal.Diagram.map_agreement
+    currying_left = RigidCategory.currying_left.failing(
+        messages.NOT_BOUNDARY_CONNECTED)
+    currying_right = RigidCategory.currying_right.failing(
+        messages.NOT_BOUNDARY_CONNECTED)
+    currying_eta_left = RigidCategory.currying_eta_left.failing(
+        messages.NOT_BOUNDARY_CONNECTED)
+    currying_eta_right = RigidCategory.currying_eta_right.failing(
+        messages.NOT_BOUNDARY_CONNECTED)
+    currying_naturality_left = RigidCategory.currying_naturality_left\
+        .failing(messages.NOT_BOUNDARY_CONNECTED)
+    currying_naturality_right = RigidCategory.currying_naturality_right\
+        .failing(messages.NOT_BOUNDARY_CONNECTED)
+    snake_equations = RigidCategory.snake_equations.modulo(normal_form)
+    transpose_contravariance = RigidCategory.transpose_contravariance.failing(
+        messages.NOT_BOUNDARY_CONNECTED)
 
 
 class Box(biclosed.Box, Diagram):
@@ -677,6 +742,7 @@ class Box(biclosed.Box, Diagram):
     >>> assert f.r.l == f == f.l.r
     >>> assert f.l.l != f != f.r.r
     """
+    serialised_attrs = biclosed.Box.serialised_attrs + ("z", )
     z = 0
 
     def __setstate__(self, state):
@@ -693,6 +759,16 @@ class Box(biclosed.Box, Diagram):
         return cat.Box.__str__(self) if not self.z\
             else str(self.r) + '.l' if self.z < 0 else str(self.l) + '.r'
 
+    def atoms(self) -> list:
+        """
+        The atoms of the box its string rotates, e.g. ``f.r`` names ``f``.
+
+        >>> f = Box('f', Ty('x'), Ty('y'))
+        >>> assert f.r.atoms() == f.l.l.atoms() == f.atoms()
+        """
+        return super().atoms() if not self.z\
+            else self.r.atoms() if self.z < 0 else self.l.atoms()
+
     def __repr__(self):
         if self.is_dagger:
             return biclosed.Box.__repr__(self)
@@ -707,41 +783,16 @@ class Box(biclosed.Box, Diagram):
         return super().setoid() + (self.z, )
 
     def rotate(self, left=False):
-        dom, cod = (
-            getattr(x, 'l' if left else 'r') for x in (self.cod, self.dom))
-        z = self.z + (-1 if left else 1)
-        return type(self)(self.name, dom=dom, cod=cod,
-                          data=self.data, is_dagger=self.is_dagger, z=z)
-
-    def dagger(self) -> Box:
         """
-        The dagger of a rigid box keeps its winding number, i.e. the dagger
-        of a rotation is the rotation of the dagger, as in a dagger pivotal
-        category, see :meth:`discopy.pivotal.Diagram.conjugate`.
+        The rotation of a rigid box, which its dagger keeps, as in a dagger
+        pivotal category, see :meth:`discopy.pivotal.Diagram.conjugate`.
 
-        Example
-        -------
         >>> f = Box('f', Ty('a'), Ty('b'))
         >>> assert f.r[::-1] == f[::-1].r and f.r[::-1].z == 1
-        >>> assert f.r[::-1][::-1] == f.r and f.l.l[::-1][::-1] == f.l.l
         """
-        return type(self)(self.name, dom=self.cod, cod=self.dom,
-                          data=self.data, is_dagger=not self.is_dagger,
-                          z=self.z)
-
-    def lambdify(self, *symbols, **kwargs) -> Callable:
-        """
-        Lambdify a rigid box, keeping its winding number.
-
-        >>> from sympy.abc import phi  # doctest: +EXTRA
-        >>> f = Box('f', Ty('x'), Ty('y'), data=phi)
-        >>> assert f.r.subs(phi, 1) == f.subs(phi, 1).r
-        """
-        if not self.free_symbols & set(symbols):
-            return lambda *xs: self
-        return lambda *xs: type(self)(
-            self.name, dom=self.dom, cod=self.cod, is_dagger=self.is_dagger,
-            data=rsubs(self.data, dict(zip(symbols, xs)), **kwargs), z=self.z)
+        dom, cod = (
+            getattr(x, 'l' if left else 'r') for x in (self.cod, self.dom))
+        return self.rebuild(dom=dom, cod=cod, z=self.z + (-1 if left else 1))
 
     @classmethod
     def strategy(cls, **params):
@@ -779,7 +830,7 @@ class Box(biclosed.Box, Diagram):
         """
         box = super().from_tree(tree)
         box.z = tree.get('z', 0)
-        return box
+        return box  # ty: ignore[invalid-return-type]
 
     @property
     def is_transpose(self):
@@ -810,6 +861,77 @@ class Sum(biclosed.Sum, Box):
             tuple(term.r for term in self.terms), self.cod.r, self.dom.r)
 
 
+class Bubble(biclosed.Bubble, Box):
+    """
+    A rigid bubble is a biclosed bubble and a rigid box, which rotates as a
+    box does: its winding number turns, its args stay as they are inside.
+
+    Parameters:
+        args (Diagram) : The diagrams inside the bubble.
+        z (int) : The winding number of the bubble.
+        kwargs : Passed to :class:`biclosed.Bubble`.
+
+    Example
+    -------
+    >>> x, y = Ty('x'), Ty('y')
+    >>> f = Box('f', x, y)
+    >>> bubble = f.bubble()
+    >>> assert bubble.r.z == 1 and bubble.r.args == (f, )
+    >>> assert (bubble.r.dom, bubble.r.cod) == (y.r, x.r)
+    >>> assert bubble.r.l == bubble == bubble.l.r and bubble.l.l != bubble
+    >>> assert bubble.r != f.r.bubble()
+    >>> print(bubble.l)
+    (f).bubble().l
+
+    Its winding number is one of its :attr:`serialised_attrs`, so that its
+    dagger, its substitutions and its rotations keep it, as a box's do.
+
+    >>> assert bubble.r[::-1] == bubble[::-1].r
+    >>> assert bubble.r[::-1][::-1] == bubble.r
+    >>> from sympy.abc import phi  # doctest: +EXTRA
+    >>> g = Box('g', x, y, data=phi).bubble()
+    >>> assert g.r.subs(phi, 1) == g.subs(phi, 1).r
+    >>> assert g.r.lambdify(phi)(1) == g.lambdify(phi)(1).r
+    """
+    serialised_attrs = biclosed.Bubble.serialised_attrs + ("z", )
+
+    def __init__(self, *args: Diagram, z: int = 0, **kwargs):
+        self.z = z
+        super().__init__(*args, **kwargs)
+
+    def __str__(self):
+        if not self.z:
+            return super().__str__()
+        return str(self.r) + '.l' if self.z < 0 else str(self.l) + '.r'
+
+    def __repr__(self):
+        if not self.z:
+            return super().__repr__()
+        return super().__repr__()[:-1] + f', z={self.z})'
+
+    def setoid(self):
+        return super().setoid() + (self.z, )
+
+    def to_tree(self) -> dict:
+        """
+        Serialise a rigid bubble, with its winding number.
+
+        >>> from discopy.utils import dumps, loads
+        >>> f = Box('f', Ty('x'), Ty('y')).bubble()
+        >>> assert loads(dumps(f.r)) == f.r and loads(dumps(f.l.l)) == f.l.l
+        """
+        tree = super().to_tree()
+        if self.z:
+            tree['z'] = self.z
+        return tree
+
+    @classmethod
+    def from_tree(cls, tree: dict) -> Bubble:
+        bubble = super().from_tree(tree)
+        bubble.z = tree.get('z', 0)
+        return bubble
+
+
 class Cup(BinaryBoxConstructor, Box):
     """
     The counit of the adjunction for an atomic type.
@@ -827,6 +949,8 @@ class Cup(BinaryBoxConstructor, Box):
     .. image:: /_static/rigid/cup.svg
         :align: center
     """
+    serialised_attrs = ("left", "right")
+
     def __init__(self, left: Ty, right: Ty):
         assert_isatomic(left, Ty)
         assert_isatomic(right, Ty)
@@ -840,6 +964,18 @@ class Cup(BinaryBoxConstructor, Box):
         """ The arguments of the constructor, which a pickle and a delay read.
         """
         return self.left, self.right
+
+    @classmethod
+    # pylint: disable-next=arguments-differ  # drawn with no boundary
+    def strategy(cls, *, types=None):
+        """
+        Generate the cup of an atomic type and its right adjoint.
+
+        Parameters:
+            types : The strategy to draw the types from, see
+                :meth:`atomic_strategy`.
+        """
+        return cls.atomic_strategy(types).map(lambda x: cls(x, x.r))
 
     def rotate(self, left=False):
         return self.cap_factory(self.right.l, self.left.l) if left\
@@ -870,6 +1006,8 @@ class Cap(BinaryBoxConstructor, Box):
     .. image:: /_static/rigid/cap.svg
         :align: center
     """
+    serialised_attrs = ("left", "right")
+
     def __init__(self, left: Ty, right: Ty):
         assert_isatomic(left, Ty)
         assert_isatomic(right, Ty)
@@ -883,6 +1021,18 @@ class Cap(BinaryBoxConstructor, Box):
         """ The arguments of the constructor, which a pickle and a delay read.
         """
         return self.left, self.right
+
+    @classmethod
+    # pylint: disable-next=arguments-differ  # drawn with no boundary
+    def strategy(cls, *, types=None):
+        """
+        Generate the cap of an atomic type and its left adjoint.
+
+        Parameters:
+            types : The strategy to draw the types from, see
+                :meth:`atomic_strategy`.
+        """
+        return cls.atomic_strategy(types).map(lambda x: cls(x, x.l))
 
     def rotate(self, left=False):
         return self.cup_factory(self.right.l, self.left.l) if left\
@@ -949,7 +1099,7 @@ class Functor(biclosed.Functor):
         return super().__call__(other)
 
 
-def nesting(cls: type, factory: Callable) -> Callable[[Ty, Ty], Diagram]:
+def nesting[T](cls: type[T], factory: Callable) -> Callable[[Ty, Ty], T]:
     """
     Take a :code:`factory` for cups or caps of atomic types
     and extends it recursively, to types of the same length.
@@ -977,22 +1127,24 @@ def nesting(cls: type, factory: Callable) -> Callable[[Ty, Ty], Diagram]:
             return left[0] @ tail @ right[-1] >> head
         return head >> left[0] @ tail @ right[-1]
 
-    return method
+    return method  # ty: ignore[invalid-return-type]
 
 
 def to_rigid(self):
-    return biclosed.Functor(
+    return Functor(
         ob_map=lambda x: Ty(x.inside[0].name),
         ar_map=lambda f: Box(
             f.name, to_rigid(f.dom), to_rigid(f.cod), data=f.data),
-        cod=Diagram)(self)
+        dom=biclosed.Diagram, cod=Diagram)(self)
 
 
 biclosed.Diagram.to_rigid = to_rigid
 
 Diagram.box_factory = Box
 Diagram.cup_factory, Diagram.cap_factory, Diagram.sum_factory = Cup, Cap, Sum
+Diagram.bubble_factory = Bubble
 Diagram.functor_factory = Functor
+
 
 Id = Diagram.id
 

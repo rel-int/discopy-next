@@ -59,9 +59,9 @@ def test_linear_graph_measurements(num_measurements: int):
     fn = FusionNetwork([0, 1, 2], measurements, [])
 
     # Should maybe use the other function
-    c = [1, 2, 3]
+    c = {0: 1, 1: 2, 2: 3}
     m = get_measurement_times(fn, numeric_order, c)
-    assert m == [1, 2, 3]
+    assert m == {0: 1, 1: 2, 2: 3}
 
 
 def test_triangle_measurements():
@@ -69,10 +69,10 @@ def test_triangle_measurements():
 
     fn = FusionNetwork([0, 1, 2], measurements, [Fusion(0, 2, "X")])
 
-    c = [2, 3, 5]
+    c = {0: 2, 1: 3, 2: 5}
     m = get_measurement_times(fn, numeric_order, c)
 
-    assert m == [2, 3, 5]
+    assert m == {0: 2, 1: 3, 2: 5}
 
 
 def test_triangle_with_reverse_order_measurements():
@@ -83,10 +83,10 @@ def test_triangle_with_reverse_order_measurements():
     def reverse_order(n: int) -> list[int]:
         return list(range(n, 3))
 
-    c = [2, 3, 5]
+    c = {0: 2, 1: 3, 2: 5}
     m = get_measurement_times(fn, reverse_order, c)
 
-    assert m == [7, 6, 5]
+    assert m == {0: 7, 1: 6, 2: 5}
 
 
 def test_triangle_with_interesting_order_measurements():
@@ -99,10 +99,10 @@ def test_triangle_with_interesting_order_measurements():
             return [2, 0]
         return [n]
 
-    c = [2, 3, 5]
+    c = {0: 2, 1: 3, 2: 5}
     m = get_measurement_times(fn, custom_order, c)
 
-    assert m == [6, 3, 5]
+    assert m == {0: 6, 1: 3, 2: 5}
 
 
 def test_creation_times():
@@ -113,7 +113,7 @@ def test_creation_times():
 
     c = get_creation_times(fn)
 
-    assert c == [2, 3, 5]
+    assert c == {0: 2, 1: 3, 2: 5}
 
 
 def test_creation_times_many_fusions():
@@ -124,4 +124,46 @@ def test_creation_times_many_fusions():
 
     c = get_creation_times(fn)
 
-    assert c == [3, 5, 7, 10]
+    assert c == {0: 3, 1: 5, 2: 7, 3: 10}
+
+
+def test_creation_times_skip_the_outputs():
+    # An output is not measured, so the machine emits no photon to measure
+    # it: the creation times used to count one anyway, which left the fusion
+    # photons of every later node off by as many outputs as came before.
+    measurements = create_unique_measurements(2)
+    fn = FusionNetwork([0, 1, 2, 3], measurements, [Fusion(1, 3, "X")])
+
+    assert get_creation_times(fn) == {0: 1, 1: 3, 2: 3, 3: 4}
+
+
+def test_fusion_photons_of_a_path_that_is_not_its_ids():
+    # The path of a joined cover is not the list of its ids in order, so the
+    # times are keyed by node id rather than by position in the path.
+    measurements = create_unique_measurements(2)
+    fn = FusionNetwork([0, 1, 2, 4, 3], {
+        **measurements, 4: Measurement(0, "XY")}, [Fusion(1, 3, "X")])
+
+    assert get_creation_times(fn) == {0: 1, 1: 3, 2: 3, 4: 4, 3: 5}
+    ins = fn_to_semm(fn, lambda n: [n])
+    assert ins == [
+        NextNodeOp(0), MeasureOp(0, measurements[0]),
+        NextNodeOp(1), FusionOp(3, "X"), MeasureOp(0, measurements[1]),
+        NextNodeOp(2),
+        NextNodeOp(4), MeasureOp(0, Measurement(0, "XY")),
+        NextNodeOp(3), FusionOp(0, "X")]
+
+
+def test_fusion_photons_of_parallel_fusions():
+    # Two fusions between the same pair of nodes are two photons on each, so
+    # the photons are paired by occurrence and not by the pair itself.
+    measurements = create_unique_measurements(2)
+    fn = FusionNetwork([0, 1], measurements,
+                       [Fusion(0, 1, "X"), Fusion(0, 1, "X")])
+
+    assert get_creation_times(fn) == {0: 3, 1: 6}
+    assert fn_to_semm(fn, lambda n: [n]) == [
+        NextNodeOp(0), FusionOp(3, "X"), FusionOp(3, "X"),
+        MeasureOp(0, measurements[0]),
+        NextNodeOp(1), FusionOp(0, "X"), FusionOp(0, "X"),
+        MeasureOp(0, measurements[1])]

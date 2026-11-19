@@ -62,7 +62,7 @@ Control & routing
     BinaryMatrix
 
 Bits, digits, & selection
-------------------------
+-------------------------
 
 .. autosummary::
     :template: class.rst
@@ -73,7 +73,6 @@ Bits, digits, & selection
     PostselectDigit
     DiscardBit
     DiscardMode
-    Select
     Digit
     Bit
     Id
@@ -88,7 +87,7 @@ We can implement classical functions:
 
 1. Using a :code:`ClassicalFunction` with a Python function.
 2. Using a :code:`BinaryMatrix` to define the transformation.
-3. Using primitives such as :code:`XorBit`, :code:`AddN`, etc.
+3. Using primitives such as :code:`Xor`, :code:`Add`, etc.
 
 >>> xor_gate = Xor(2)
 >>>
@@ -114,7 +113,7 @@ and feed the result into a controlled quantum gate.
 >>> zgate = PhaseShiftDR(0.5)
 >>> cZ    = BitControlledGate(zgate)   # applies Z only when control bit = 1
 >>> hybrid = ctrl @ DualRail(1) >> cZ
->>> hybrid.draw(path="docs/_static/optyx/controlled_Z.svg")
+>>> hybrid.draw(doctest="docs/_static/optyx/controlled_Z.svg")
 
 .. image:: /_static/optyx/controlled_Z.svg
    :align: center
@@ -122,8 +121,8 @@ and feed the result into a controlled quantum gate.
 **3. Arithmetic on natural-number modes**
 
 >>> num = Digit(3, 2)
->>> add = Add(2)                     # (x,y,z) => x+y+z
->>> parity = add >> Mod2()            # outputs (x+y+z) mod 2 as a bit
+>>> add = Add(2)                     # (x, y) => x + y
+>>> parity = add >> Mod2()            # outputs (x + y) mod 2 as a bit
 >>> post = PostselectBit(1)
 >>> assert np.allclose(
 ...     (num >> parity >> post).double().to_tensor().eval().array, 1
@@ -133,6 +132,8 @@ and feed the result into a controlled quantum gate.
 
 from typing import Callable, List
 import numpy as np
+from sympy import lambdify
+from discopy.utils import factory_name, rsubs
 from discopy.optyx import channel
 from discopy.optyx.core import (
     control,
@@ -160,12 +161,21 @@ class BitControlledGate(Channel):
     the Kraus operators for the gate.
     """
     class _BitControlledSingleBox(Channel):
+        """
+        The box of a :class:`BitControlledGate`: it keeps its gate and its
+        default, the identity unless one is given, as its ``data``, so that
+        equality reads them, and prints the call to
+        :class:`BitControlledGate` that builds it.
+        """
         def __init__(
             self,
             control_gate,
             default_gate=None,
-            classical=False
+            classical=False,
+            is_dagger=False
         ):
+            if default_gate is None:
+                default_gate = control_gate.id(control_gate.dom)
             if isinstance(control_gate, (Diagram, Channel)):
                 assert control_gate.is_pure, \
                     "The input gates must be pure quantum channels"
@@ -190,27 +200,43 @@ class BitControlledGate(Channel):
                 default_gate_single
             )
 
+            dom = bit @ tp**len(control_gate_single.dom)
+            cod = tp**len(control_gate_single.cod)
             super().__init__(
                 "BitControlledGate",
-                kraus,
-                bit @ tp**len(control_gate_single.dom),
-                tp**len(control_gate_single.cod)
+                kraus.dagger() if is_dagger else kraus,
+                cod if is_dagger else dom,
+                dom if is_dagger else cod
             )
+            self.control_gate, self.default_gate = control_gate, default_gate
+            self.classical, self.is_dagger = classical, is_dagger
+            self.data = (control_gate, default_gate)
+
+        def __repr__(self):
+            dagger = ", is_dagger=True" if self.is_dagger else ""
+            classical = ", classical=True" if self.classical else ""
+            return f"{factory_name(BitControlledGate)}("\
+                f"{self.control_gate!r}, {self.default_gate!r}"\
+                f"{dagger}{classical})"
+
+        def dagger(self):
+            return type(self)(self.control_gate, self.default_gate,
+                              self.classical, not self.is_dagger)
+
+        @property
+        def free_symbols(self):
+            """ The symbols of its gates. """
+            return self.control_gate.free_symbols\
+                | self.default_gate.free_symbols
 
     def __new__(cls, diag, default_box=None, is_dagger=False, classical=False):
         if default_box is not None:
             return cls._BitControlledSingleBox(
-                diag, default_box, classical=classical
-            ).dagger() if is_dagger else \
-                 cls._BitControlledSingleBox(
-                    diag,
-                    default_box,
-                    classical=classical
-                )
+                diag, default_box, classical, is_dagger)
 
-        boxes = []
-        for i in range(len(diag)):
-            layer = diag[i]
+        boxes, staircases = [], diag.to_staircases()
+        for i in range(len(staircases)):
+            layer = staircases[i]
             (box, offset), = layer.inside[0].boxes_and_offsets
             left = layer.dom[:offset]
             right = layer.dom[offset + len(box.dom):]
@@ -232,7 +258,7 @@ class BitControlledGate(Channel):
             else:
                 boxes.append(bit @ layer)
 
-        boxes.append(Z(1, 0) @ layer.cod)
+        boxes.append(Z(1, 0) @ diag.cod)
         if is_dagger:
             return channel.Diagram.then(*boxes).dagger()
         return channel.Diagram.then(*boxes)
@@ -249,15 +275,24 @@ class BitControlledPhaseShift(Channel):
                  function: Callable[[List[int]], List[int]],
                  n_modes: int = 1,
                  n_control_modes: int = 1):
-        kraus = control.ControlledPhaseShift(function,
-                                             n_modes,
-                                             n_control_modes)
+        self.function = function
+        kraus = diagram.Diagram.swap(
+            diagram.Mode(n_modes), diagram.Mode(n_control_modes)
+        ) >> control.ControlledPhaseShift(function,
+                                          n_modes,
+                                          n_control_modes)
         super().__init__(
             "BitControlledPhaseShift",
             kraus,
             qmode**n_modes @ mode**n_control_modes,
-            mode**n_modes,
+            qmode**n_modes,
         )
+
+    def __repr__(self):
+        n_modes = len(self.cod)
+        n_control = len(self.dom) - n_modes
+        return f"{factory_name(type(self))}({self.function!r}, "\
+            f"{n_modes}, {n_control})"
 
 
 DiscardBit = lambda n: Discard(bit**n)  # noqa: E731
@@ -276,12 +311,16 @@ class Scalar(ClassicalBox):
     """
 
     def __init__(self, value):
+        self.value = value
         super().__init__(
             f"{value}",
             diagram.Scalar(value),
             bit**0,
             bit**0
         )
+
+    def __repr__(self):
+        return f"{factory_name(type(self))}({self.value!r})"
 
 
 class Add(ClassicalBox):
@@ -298,6 +337,9 @@ class Add(ClassicalBox):
             mode
         )
 
+    def __repr__(self):
+        return f"{factory_name(type(self))}({len(self.dom)})"
+
 
 class Sub(ClassicalBox):
     """
@@ -310,13 +352,16 @@ class Sub(ClassicalBox):
         super().__init__(
             "SubInt",
             (
-                zw.Add(2).dagger() @ diagram.Id(diagram.Mode(1)) >>
-                diagram.Id(diagram.Mode(1)) @ diagram.Spider(2, 0,
-                                                             diagram.Mode(1))
+                diagram.Id(diagram.Mode(1)) @ zw.Add(2).dagger() >>
+                diagram.Spider(2, 0, diagram.Mode(1)) @
+                diagram.Id(diagram.Mode(1))
             ),
             mode**2,
             mode
         )
+
+    def __repr__(self):
+        return f"{factory_name(type(self))}()"
 
 
 class Multiply(ClassicalBox):
@@ -332,6 +377,9 @@ class Multiply(ClassicalBox):
             mode**2,
             mode
         )
+
+    def __repr__(self):
+        return f"{factory_name(type(self))}()"
 
 
 class Divide(ClassicalBox):
@@ -349,6 +397,9 @@ class Divide(ClassicalBox):
             mode
         )
 
+    def __repr__(self):
+        return f"{factory_name(type(self))}()"
+
 
 class Mod2(ClassicalBox):
     """
@@ -364,6 +415,9 @@ class Mod2(ClassicalBox):
             mode,
             bit
         )
+
+    def __repr__(self):
+        return f"{factory_name(type(self))}()"
 
 
 class CopyN(ClassicalBox):
@@ -381,6 +435,9 @@ class CopyN(ClassicalBox):
             mode**n
         )
 
+    def __repr__(self):
+        return f"{factory_name(type(self))}({len(self.cod)})"
+
 
 class SwapN(ClassicalBox):
     """
@@ -397,19 +454,33 @@ class SwapN(ClassicalBox):
             mode**2
         )
 
+    def __repr__(self):
+        return f"{factory_name(type(self))}()"
+
 
 class PostselectBit(ClassicalBox):
     """
     Postselect on a bit result.
     The domain of the map is a bit.
+
+    Postselecting on no bit is not a map, it is the identity: the empty
+    case is rejected rather than read as one bit.
+
+    >>> PostselectBit()
+    Traceback (most recent call last):
+    ...
+    ValueError: Postselect on at least one bit, or compose Id() instead.
     """
     def __init__(self, *bits):
-
+        if not bits:
+            raise ValueError(
+                "Postselect on at least one bit, or compose Id() instead.")
         if not all(bit in (0, 1) for bit in bits):
             raise ValueError("Bits must be a list of 0s and 1s.")
-        kraus = zx.X(1, 0, 0.5**bits[0])
+        self.bits = bits
+        kraus = zx.Id(0)
         # pylint: disable=invalid-name
-        for b in bits[1:]:
+        for b in bits:
             kraus = kraus @ zx.X(1, 0, 0.5**b)
         kraus = kraus @ diagram.Scalar(1 / np.sqrt(2**len(bits)))
         super().__init__(
@@ -419,21 +490,38 @@ class PostselectBit(ClassicalBox):
             bit**0
         )
 
+    def __repr__(self):
+        bits = ", ".join(map(repr, self.bits))
+        return f"{factory_name(type(self))}({bits})"
+
 
 class PostselectDigit(ClassicalBox):
     """
     Postselect on a digit result.
     The domain of the map is a digit.
+
+    >>> PostselectDigit()
+    Traceback (most recent call last):
+    ...
+    ValueError: Postselect on at least one digit, or compose Id() instead.
     """
     def __init__(self, *digits):
+        if not digits:
+            raise ValueError(
+                "Postselect on at least one digit, or compose Id() instead.")
         if not all(isinstance(digit, int) for digit in digits):
             raise ValueError("Digits must be a list of integers.")
+        self.digits = digits
         super().__init__(
-            f"PostselectDigit({digits})",
-            zw.Select(*digits),
-            mode**len(digits),
+            f"PostselectDigit({self.digits})",
+            zw.Select(*self.digits),
+            mode**len(self.digits),
             mode**0
         )
+
+    def __repr__(self):
+        digits = ", ".join(map(repr, self.digits))
+        return f"{factory_name(type(self))}({digits})"
 
 
 class Not(ClassicalBox):
@@ -451,6 +539,9 @@ class Not(ClassicalBox):
             bit
         )
 
+    def __repr__(self):
+        return f"{factory_name(type(self))}()"
+
 
 class Xor(ClassicalBox):
     """
@@ -462,26 +553,34 @@ class Xor(ClassicalBox):
     def __init__(self, n=2):
         super().__init__(
             f"Xor({n})",
-            zx.X(n, 1) @ diagram.Scalar(np.sqrt(n)),
+            zx.X(n, 1) @ diagram.Scalar(np.sqrt(2 ** (n - 1))),
             bit**n,
             bit
         )
+
+    def __repr__(self):
+        n = len(self.dom)
+        return f"{factory_name(type(self))}({'' if n == 2 else n})"
 
 
 class And(ClassicalBox):
     """
     Classical AND gate.
-    The domain of the map is 2 bits.
+    The domain of the map is n bits.
     The codomain of the map is a bit.
     The map will perform AND on the basis states.
     """
     def __init__(self, n=2):
+        self.n = n
         super().__init__(
             "AndBit",
             zx.And(n),
-            bit**2,
+            bit**n,
             bit
         )
+
+    def __repr__(self):
+        return f"{factory_name(type(self))}({'' if self.n == 2 else self.n})"
 
 
 class CopyBit(ClassicalBox):
@@ -499,6 +598,10 @@ class CopyBit(ClassicalBox):
             bit**n
         )
 
+    def __repr__(self):
+        n = len(self.cod)
+        return f"{factory_name(type(self))}({'' if n == 2 else n})"
+
 
 class SwapBit(ClassicalBox):
     """
@@ -514,6 +617,9 @@ class SwapBit(ClassicalBox):
             bit**2,
             bit**2
         )
+
+    def __repr__(self):
+        return f"{factory_name(type(self))}()"
 
 
 class Or(ClassicalBox):
@@ -531,6 +637,10 @@ class Or(ClassicalBox):
             bit
         )
 
+    def __repr__(self):
+        n = len(self.dom)
+        return f"{factory_name(type(self))}({'' if n == 2 else n})"
+
 
 # pylint: disable=invalid-name
 class Z(ClassicalBox):
@@ -541,12 +651,26 @@ class Z(ClassicalBox):
 
     def __init__(self, n_legs_in, n_legs_out, phase=0):
         kraus = zx.Z(n_legs_in, n_legs_out, phase)
+        self.phase = phase
         super().__init__(
             f"Z({phase})",
             kraus,
             bit**n_legs_in,
             bit**n_legs_out,
         )
+        self.data = phase
+
+    def __repr__(self):
+        return f"{factory_name(type(self))}({len(self.dom)}, "\
+            f"{len(self.cod)}, {self.phase!r})"
+
+    def lambdify(self, *symbols, **kwargs):
+        return lambda *xs: type(self)(len(self.dom), len(self.cod), lambdify(
+            symbols, self.phase, **kwargs)(*xs))
+
+    def subs(self, *args):
+        return type(self)(
+            len(self.dom), len(self.cod), rsubs(self.phase, *args))
 
 
 # pylint: disable=invalid-name
@@ -558,12 +682,20 @@ class X(ClassicalBox):
 
     def __init__(self, n_legs_in, n_legs_out, phase=0):
         kraus = zx.X(n_legs_in, n_legs_out, phase)
+        self.phase = phase
         super().__init__(
             f"X({phase})",
             kraus,
             bit**n_legs_in,
             bit**n_legs_out,
         )
+        self.data = phase
+
+    def __repr__(self):
+        return f"{factory_name(type(self))}({len(self.dom)}, "\
+            f"{len(self.cod)}, {self.phase!r})"
+
+    lambdify, subs = Z.lambdify, Z.subs
 
 
 # pylint: disable=invalid-name
@@ -581,6 +713,9 @@ class H(ClassicalBox):
             bit,
             bit,
         )
+
+    def __repr__(self):
+        return f"{factory_name(type(self))}()"
 
 
 class ControlChannel(ClassicalBox):
@@ -611,6 +746,7 @@ class ClassicalFunction(ControlChannel):
     """
 
     def __init__(self, function, dom, cod):
+        self.function = function
         box = control.ClassicalFunctionBox(
             function,
             dom.single(),
@@ -620,12 +756,16 @@ class ClassicalFunction(ControlChannel):
             box.name,
             box,
             channel.Ty(
-                *[channel.Ob._classical[ob.name] for ob in box.dom.inside]
+                *[channel.Ob.classical[ob.name] for ob in box.dom.inside]
             ),
             channel.Ty(
-                *[channel.Ob._classical[ob.name] for ob in box.cod.inside]
+                *[channel.Ob.classical[ob.name] for ob in box.cod.inside]
             ),
         )
+
+    def __repr__(self):
+        return f"{factory_name(type(self))}({self.function!r}, "\
+            f"{self.dom!r}, {self.cod!r})"
 
 
 class BinaryMatrix(ControlChannel):
@@ -649,27 +789,43 @@ class BinaryMatrix(ControlChannel):
             box.name,
             box,
             channel.Ty(
-                *[channel.Ob._classical[ob.name] for ob in box.dom.inside]
+                *[channel.Ob.classical[ob.name] for ob in box.dom.inside]
             ),
             channel.Ty(
-                *[channel.Ob._classical[ob.name] for ob in box.cod.inside]
+                *[channel.Ob.classical[ob.name] for ob in box.cod.inside]
             ),
         )
+
+    def __repr__(self):
+        matrix = self.density_matrix.matrix.tolist()
+        return f"{factory_name(type(self))}({matrix})"
 
 
 class Digit(ClassicalBox):
     """
     Create a classical state with
     a natural number.
+
+    >>> Digit()
+    Traceback (most recent call last):
+    ...
+    ValueError: Create at least one digit, or compose Id() instead.
     """
     def __init__(self, *photons: int):
+        if not photons:
+            raise ValueError(
+                "Create at least one digit, or compose Id() instead.")
         self.photons = photons
         super().__init__(
-            f"Digit({photons})",
-            zw.Create(*photons),
+            f"Digit({self.photons})",
+            zw.Create(*self.photons),
             mode**0,
-            mode**len(photons)
+            mode**len(self.photons)
         )
+
+    def __repr__(self):
+        photons = ", ".join(map(repr, self.photons))
+        return f"{factory_name(type(self))}({photons})"
 
 
 Bit = lambda *bits: PostselectBit(*bits).dagger()  # noqa: E731

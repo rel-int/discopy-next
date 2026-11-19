@@ -74,6 +74,29 @@ def test_dual_rail_braid_and_twist():
     assert twist.dom == twist.cod == double_rail(x)
 
 
+def test_dual_rail_then():
+    """S1-5 of #445: a dual rail encoding sends structure to boxes, so its
+    maps do not determine it and it composes, on either side, with no
+    functor but the identity."""
+    from pytest import raises
+    from discopy import compact, ribbon
+    from discopy.utils import AxiomError
+    for module in (balanced, symmetric, ribbon, compact):
+        D = module.DualRail()
+        x, y = module.Ty('x'), D.cod.ob('y')
+        before = module.Functor({x: x}, {})
+        after = D.cod.functor_factory({y: y}, {})
+        name = module.__name__.removeprefix("discopy.")
+        for left, right in [(D, after), (before, D)]:
+            with raises(AxiomError, match=rf"^{name}\.DualRail composes with "
+                        r"no functor .* E\(D\(f\)\)"):
+                left >> right
+        assert D >> D.cod.functor_factory.id(D.cod) is D
+        assert module.Functor.id(D.dom) >> D is D
+    with raises(AxiomError, match="composes with no functor"):
+        DualRail() >> DualRail(colour="red")
+
+
 def test_to_braided_default_and_zero_width():
     from discopy import config
 
@@ -86,6 +109,11 @@ def test_to_braided_default_and_zero_width():
 
     # width=0 returns the diagram as is, i.e. without dual rails.
     assert twist.to_braided(width=0) == twist
+
+
+def test_functor_twist_dagger():
+    twist = Twist(Ty('x')).dagger()
+    assert Functor(ob_map=lambda x: x, ar_map=lambda f: f)(twist) == twist
 
 
 def test_to_hypergraph():
@@ -103,17 +131,25 @@ def test_to_hypergraph():
     assert symmetric.CMap.twist(x) == symmetric.CMap.id(x)
 
 
-def test_functor_twist_dagger():
-    twist = Twist(Ty('x')).dagger()
-    assert Functor(ob_map=lambda x: x, ar_map=lambda f: f)(twist) == twist
-
-
 def test_Twist_to_tree():
     from discopy.utils import dumps, loads
     x = Ty('x')
     for twist in (Twist(x), Twist(x).dagger()):
         assert loads(dumps(twist)) == twist
         assert loads(dumps(twist)).is_dagger == twist.is_dagger
+
+
+def test_dual_rail_to_tree():
+    """#168: no dual rail diagram round-tripped, DualRailBraid and
+    DualRailTwist falling through to cat.Box.from_tree."""
+    from discopy.utils import dumps, loads
+    x, y = Ty('x'), Ty('y')
+    diagram = DualRail()(Braid(x, y) >> Twist(y) @ x)
+    assert loads(dumps(diagram)) == diagram
+    for box in (DualRailBraid(x @ x, y @ y), DualRailTwist(x @ x)):
+        for term in (box, box.dagger()):
+            assert loads(dumps(term)) == term
+            assert loads(dumps(term)).is_dagger == term.is_dagger
 
 
 def test_dual_rail_keeps_twist_dagger():
@@ -141,3 +177,8 @@ def test_dual_rail_delay():
     x, y = Ty('x'), Ty('y')
     for diagram in [Twist(x).dagger(), Braid(x, y) >> Twist(y) @ x]:
         assert diagram.delay().to_braided() == diagram.to_braided().delay()
+
+
+def test_structural_boxes():
+    from discopy.testable import assert_structural_boxes
+    assert_structural_boxes(Diagram)

@@ -21,7 +21,9 @@ from functools import cache
 from itertools import accumulate
 from typing import Self
 
+from discopy import messages
 from discopy.abc import ComarkovCategory, TracedCategory
+from discopy.testable import values
 from discopy.utils import assert_isinstance
 from discopy.python import finset, function
 from discopy.python.function import Ty
@@ -46,11 +48,25 @@ class Function(function.Function, ComarkovCategory, TracedCategory):
             trace
             merge
             noise
+            twist
     """
 
     def __init__(self, inside, dom, cod, is_swap_of=None):
         self.is_swap_of = is_swap_of
         super().__init__(inside, dom, cod)
+
+    @classmethod
+    def arguments(cls, dom: Ty) -> tuple[tuple, ...]:
+        """
+        The arguments a function on ``dom`` is called with by an
+        extensional equation: a value of one of its types, with its tag.
+
+        >>> assert Function.arguments(Ty(bool, type(None))) == (
+        ...     (False, 0), (True, 0), (None, 1))
+        """
+        return tuple(
+            (value, tag) for tag, typ in enumerate(dom.inside)
+            for value in values(typ))
 
     def __call__(self, obj, tag=0):
         if self.type_checking:
@@ -61,7 +77,7 @@ class Function(function.Function, ComarkovCategory, TracedCategory):
             assert_isinstance(obj, self.cod.inside[tag])
         return result
 
-    def tensor(self, *others: Function) -> Function:
+    def tensor(self, *others: Function) -> Self:
         """
         The disjoint union of ``n`` functions, called with :code:`@`.
 
@@ -87,11 +103,11 @@ class Function(function.Function, ComarkovCategory, TracedCategory):
             result = factor(obj, tag - doms[i])
             obj, tag = (result, 0) if len(factor.cod) == 1 else result
             return obj if len(cod) == 1 else (obj, tag + cods[i])
-        return Function(inside, dom, cod)
+        return type(self)(inside, dom, cod)
 
-    @staticmethod
+    @classmethod
     @cache
-    def swap(x: Ty, y: Ty) -> Function:
+    def swap(cls, x: Ty, y: Ty) -> Self:
         """
         Swap the tags of a disjoint union from `x @ y` to `y @ x`.
 
@@ -99,7 +115,7 @@ class Function(function.Function, ComarkovCategory, TracedCategory):
             x : The list of types on the left.
             y : The list of types on the right.
         """
-        x, y = map(Ty.cast, (x, y))
+        x, y = map(cls.ob.cast, (x, y))
 
         def inside(obj, tag=0):
             new_tag = tag + len(y) if tag < len(x) else tag - len(x)
@@ -107,7 +123,7 @@ class Function(function.Function, ComarkovCategory, TracedCategory):
                 assert new_tag == 0
                 return obj
             return (obj, new_tag)
-        return Function(inside, dom=x @ y, cod=y @ x, is_swap_of=(x, y))
+        return cls(inside, dom=x @ y, cod=y @ x, is_swap_of=(x, y))
 
     @classmethod
     def permutation(cls, xs, doms) -> Self:
@@ -128,22 +144,31 @@ class Function(function.Function, ComarkovCategory, TracedCategory):
         cod = cls.ob().tensor(*(doms[i] for i in xs))
         return cls(inside, dom, cod)
 
-    def dagger(self):
-        if self.is_swap_of is None:
-            raise ValueError
-        return Function.swap(*self.is_swap_of[::-1])
+    def inverse(self) -> Self:
+        """
+        The inverse of a swap, i.e. the swap the other way round: a function
+        is no dagger category, and only a swap remembers its inverse.
 
-    def trace(self, n=1, left=False):
+        >>> X = Function.ob(int)
+        >>> assert Function.swap(X, X @ X).inverse()(1, 2) == (1, 0)
+        """
+        if self.is_swap_of is None:
+            raise ValueError(messages.ONLY_SWAP_INVERSE)
+        return self.swap(*self.is_swap_of[::-1])
+
+    def trace(self, n=1, left=False) -> Self:
         """
         The additive trace of a function.
 
         Parameters:
             n : The number of types to trace over.
+            left : Whether to trace the first ``n`` types instead, see
+                :meth:`discopy.abc.SymmetricCategory.left_trace`.
         """
         if n == 0:
             return self
         if left:
-            raise NotImplementedError
+            return self.left_trace(n)
         dom, cod = self.dom[:-n], self.cod[:-n]
 
         def inside(obj, tag=0):
@@ -155,10 +180,10 @@ class Function(function.Function, ComarkovCategory, TracedCategory):
                 result = self(obj, tag)
                 obj, tag = (result, 0) if len(self.cod) == 1 else result
             return obj if len(cod) == 1 else result
-        return Function(inside, dom, cod)
+        return type(self)(inside, dom, cod)
 
-    @staticmethod
-    def merge(x: Ty, n=2) -> Function:
+    @classmethod
+    def merge(cls, x: Ty, n=2) -> Self:
         """
         Merge :code:`n` copies of a list of types :code:`x` into one.
 
@@ -166,16 +191,21 @@ class Function(function.Function, ComarkovCategory, TracedCategory):
             x : The list of types to merge.
             n : The number of copies.
         """
-        x = Ty.cast(x)
+        x = cls.ob.cast(x)
 
         def inside(obj, tag=0):
             if len(x) == 1:
                 assert tag % len(x) == 0
                 return obj
             return (obj, tag % len(x))
-        return Function(inside, x ** n, x)
+        return cls(inside, x ** n, x)
+
+    @classmethod
+    def twist(cls, dom: Ty) -> Self:
+        """ The twist of a disjoint union is its identity. """
+        return cls.id(dom)
 
 
-Swap = Function.braid = Function.swap
-Id = Function.twist = Function.id
+Swap = Function.swap
+Id = Function.id
 Merge, Noise = Function.merge, Function.noise

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-DisCopy's drawing backends: Matplotlib and TikZ.
+DisCopy's drawing backends: Matplotlib, TikZ and Typst.
 
 Summary
 -------
@@ -10,19 +10,31 @@ Summary
     :nosignatures:
     :toctree:
 
-    draw
     Backend
     TikZ
     Matplotlib
+    Typst
+
+.. admonition:: Functions
+
+    .. autosummary::
+        :template: function.rst
+        :nosignatures:
+        :toctree:
+
+        draw
 """
 
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from contextlib import contextmanager
+from functools import partial
+from io import StringIO, TextIOBase
 from itertools import combinations
 from math import sqrt
 import os
+import pathlib
 import re
 from xml.etree import ElementTree
 
@@ -32,14 +44,19 @@ import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 
-from matplotlib.colors import to_hex, to_rgb
+from matplotlib import cbook
+from matplotlib.colors import is_color_like, to_hex, to_rgb
 from matplotlib.testing.compare import compare_images
+from matplotlib.testing.exceptions import ImageComparisonFailure
 from matplotlib.patches import PathPatch, Patch
 from matplotlib.path import Path
 from PIL import Image, ImageSequence
 
 from discopy import config
 from discopy.drawing import Node, Point
+from discopy.drawing.typst_ast import (
+    Bool, Call, Canvas, ContentExpr, Coord, Document, Float, Ident,
+    Import, RawText, Str, TypstNode)
 
 from discopy.config import (  # noqa: F401  pylint: disable=unused-import
     BOX_DRAWING_ATTRIBUTES as ATTRIBUTES,
@@ -47,7 +64,7 @@ from discopy.config import (  # noqa: F401  pylint: disable=unused-import
     TRANSPARENT)
 
 if TYPE_CHECKING:
-    from discopy.drawing import PlaneGraph
+    from discopy.drawing import Drawing
 
 
 MATPLOTLIB_RC = {
@@ -81,8 +98,12 @@ def matplotlib_context():
         yield
 
 
-def draw(graph: PlaneGraph, **params):
-    """ Load a :class:`Backend` and draw a :class:`PlaneGraph` on it. """
+def draw(graph: Drawing, **params):
+    """ Load a :class:`Backend` and draw a :class:`Drawing` on it. """
+    if params.get("format") == "typst":
+        path, show = params.pop("path", None), params.pop("show", True)
+        return Typst(**params).draw(graph, **params).output(
+            path=path, show=show, **params)
     aspect = params.get('aspect', 'auto' if 'figsize' in params else 'equal')
     if params.get('legend', False) and not params.get('to_tikz', False):
         colours = Backend.region_colours(graph)
@@ -102,7 +123,7 @@ def draw(graph: PlaneGraph, **params):
                 space, graph.width, exclusive=True, copy=True)
     figsize = params.get('figsize', None if aspect == 'auto' else (
         graph.width or 1, graph.height or 1))
-    backend = (
+    backend = params.get('backend', None) or (
         TikZ(use_tikzstyles=params.get('use_tikzstyles', None))
         if params.get('to_tikz', False)
         else Matplotlib(figsize=figsize,
@@ -223,7 +244,10 @@ def compare_drawing(path, actual_path, tol=DEFAULT['plt_tol']):
         equal = svg_equal(path, actual_path)
         difference = None
     elif extension in [".png", ".jpg", ".jpeg", ".tif", ".tiff"]:
-        difference = compare_images(path, actual_path, tol)
+        try:
+            difference = compare_images(path, actual_path, tol)
+        except ImageComparisonFailure as error:
+            difference = str(error)
         equal = difference is None
     elif extension == ".gif":
         def gif_data(gif_path):
@@ -284,28 +308,15 @@ DARK_MODE_STYLE = (
     '}</style>')
 
 
-def add_dark_mode_style(path):
+def add_dark_mode_style(text):
     """
-    Insert :data:`DARK_MODE_STYLE` after the opening tag of an SVG saved at
-    ``path``, a file name or an in-memory text buffer: a media query turning
-    the elements tagged by :meth:`Matplotlib.dark_gid` white on a dark page,
-    every other renderer keeping the static black on a transparent canvas.
+    Insert :data:`DARK_MODE_STYLE` after the opening tag of the SVG ``text``:
+    a media query turning the elements tagged by :meth:`Matplotlib.dark_gid`
+    white on a dark page, every other renderer keeping the static black on a
+    transparent canvas.
     """
-    is_file = not isinstance(path, (str, bytes, os.PathLike))
-    if is_file:
-        text = path.getvalue()
-    else:
-        with open(path, encoding="utf-8") as file:
-            text = file.read()
     opening = text.index(">", text.index("<svg")) + 1
-    text = text[:opening] + DARK_MODE_STYLE + text[opening:]
-    if is_file:
-        path.seek(0)
-        path.truncate()
-        path.write(text)
-    else:
-        with open(path, "w", encoding="utf-8") as file:
-            file.write(text)
+    return text[:opening] + DARK_MODE_STYLE + text[opening:]
 
 
 def savefig(path, format=None, compare=False, tol=DEFAULT['plt_tol']):
@@ -331,11 +342,16 @@ def savefig(path, format=None, compare=False, tol=DEFAULT['plt_tol']):
         {"Software": None} if is_png else None
 
     def save(actual_path):
+        target = StringIO() if is_svg else actual_path
         with matplotlib_context():
-            plt.savefig(actual_path, format=format, metadata=metadata,
-                        transparent=is_svg)
+            plt.savefig(target, format="svg" if is_svg else format,
+                        metadata=metadata, transparent=is_svg)
         if is_svg:
-            add_dark_mode_style(actual_path)
+            text = add_dark_mode_style(target.getvalue())
+            with cbook.open_file_cm(
+                    actual_path, "w", encoding="utf-8") as file:
+                file.write(text if cbook.file_requires_unicode(file)
+                           else text.encode("utf-8"))
 
     save_and_compare(path, save, tol) if compare else save(path)
 
@@ -443,6 +459,30 @@ class Backend(ABC):
         self.max_width = max(self.max_width, max(i for i, _ in points))
 
     @staticmethod
+    def is_transparent(colour) -> bool:
+        """
+        Whether a colour is :data:`discopy.config.TRANSPARENT`, comparing
+        only a name, since an array compares elementwise.
+
+        >>> import numpy as np
+        >>> assert Backend.is_transparent("none")
+        >>> assert not Backend.is_transparent(np.array([.1, .2, .3]))
+        """
+        return isinstance(colour, str) and colour == TRANSPARENT
+
+    @staticmethod
+    def resolve(colour):
+        """
+        The colour matplotlib reads for a name in :data:`COLORS`, any other
+        colour as it is, e.g. an RGB list or array, which is unhashable.
+
+        >>> Backend.resolve("red"), Backend.resolve([.1, .2, .3])
+        ('#e8a5a5', [0.1, 0.2, 0.3])
+        """
+        return COLORS.get(colour, colour) if isinstance(colour, str)\
+            else colour
+
+    @staticmethod
     def readable_foreground(colour, threshold=.5):
         """
         Pick a readable foreground text colour, i.e. ``"white"`` or
@@ -457,7 +497,7 @@ class Backend(ABC):
         """
         from matplotlib.colors import to_rgb
         try:
-            red, green, blue = to_rgb(COLORS.get(colour, colour))
+            red, green, blue = to_rgb(Backend.resolve(colour))
         except (ValueError, TypeError):
             return "black"
         luma = 0.299 * red + 0.587 * green + 0.114 * blue
@@ -479,7 +519,7 @@ class Backend(ABC):
     @staticmethod
     def on_neutral_canvas(*types):
         """
-        Whether wires of the given types only border transparent regions,
+        Whether wires of the given types only border regions with no colour,
         i.e. the neutral canvas, so that their strokes and labels may adapt
         to a dark page rather than keep a static colour readable over their
         region.
@@ -490,8 +530,7 @@ class Backend(ABC):
                 colour for obj in getattr(typ, "inside", ())
                 for colour in (
                     getattr(obj, "dom", None), getattr(obj, "cod", None))]
-            if any(colour is not None and colour.name != TRANSPARENT
-                   for colour in colours):
+            if any(colour is not None for colour in colours):
                 return False
         return True
 
@@ -562,7 +601,9 @@ class Backend(ABC):
         outer = min(radius, RIBBON_FOLD_DEPTH)
         return outer, outer - ribbon
 
-    def fill_strand_band(self, first, second, middle, color, gap=0):
+    def fill_strand_band(
+            self, first: tuple[Point, Point], second: tuple[Point, Point],
+            middle, color, gap=0):
         """
         Fills the band between the two parallel braid strands of a ribbon,
         see :meth:`draw_dual_rail_braid`. A non-zero ``gap`` breaks the band
@@ -615,15 +656,16 @@ class Backend(ABC):
             (0, 0), (x, 0), (x, y), (0, y),
             facecolor=boundary_color, edgecolor=boundary_color)
 
-    @abstractmethod
     def draw_regions(self, graph, **params):
         """
         Draw coloured 0-cell regions, e.g. the background of a
-        :meth:`Drawing.frame` or the wire-typed regions of a diagram.
-
-        This has no default drawing logic: backends that do not want to
-        support coloured regions can simply inherit this no-op.
+        :meth:`Drawing.frame`, the wire-typed regions of a diagram or the
+        inside of a ribbon, one :meth:`draw_region_cell` for each cell of
+        :meth:`region_cells`.
         """
+        # pylint: disable=unused-argument  # draw passes params to all
+        for left, right, colour in self.region_cells(graph):
+            self.draw_region_cell(left, right, colour)
 
     def draw_legend(self, graph, **params):
         """Draw a legend of region colours when supported by the backend."""
@@ -634,9 +676,8 @@ class Backend(ABC):
         The distinct painted region colours of a diagram, keyed by colour.
 
         Returns an order-preserving mapping from each colour's name to its
-        :class:`monoidal.Colour`, suitable for a drawing legend.
-        :data:`discopy.config.TRANSPARENT` is omitted as it is the neutral
-        background.
+        :class:`monoidal.Colour`, suitable for a drawing legend. A region
+        with no colour is omitted as it is the neutral background.
         """
         colours = {}
         types = [graph.dom, graph.cod]
@@ -648,7 +689,7 @@ class Backend(ABC):
                 candidates += [
                     getattr(obj, "dom", None), getattr(obj, "cod", None)]
             for colour in candidates:
-                if colour is not None and colour.name != TRANSPARENT:
+                if colour is not None:
                     colours.setdefault(colour.name, colour)
         return colours
 
@@ -680,13 +721,15 @@ class Backend(ABC):
             if top.y < bottom.y:
                 top, bottom = bottom, top
             typ = getattr(source, 'x', None) or getattr(target, 'x', None)
-            separators.append(((top, control, bottom), typ.cod.name))
+            separators.append(
+                ((top, control, bottom), getattr(typ.cod, "name", None)))
         for node in graph.box_nodes:
             if node.box.is_crossing:
                 separators += Backend.strand_separators(graph, node)
             if node.box.draw_as_wires or node.box.draw_as_spider:
                 continue
-            for side, colour in [(0, None), (1, node.box.dom.cod.name)]:
+            for side, colour in [
+                    (0, None), (1, getattr(node.box.dom.cod, "name", None))]:
                 top = graph.positions[Node(f"box-corner-{side}1", j=node.j)]
                 bottom = graph.positions[Node(f"box-corner-{side}0", j=node.j)]
                 separators.append(
@@ -704,7 +747,7 @@ class Backend(ABC):
         return [
             (tuple(Backend.braid_strand(
                 graph.positions[dom], graph.positions[cod], middle)),
-             dom.x.cod.name)
+             getattr(dom.x.cod, "name", None))
             for dom, cod in Backend.crossing_wires(node)]
 
     @staticmethod
@@ -760,7 +803,7 @@ class Backend(ABC):
         bands, each consecutive pair of separators bounds one cell, filled
         with the colour that its left boundary carries -- ``graph.dom.dom``
         for the leftmost cell, with the sides of the canvas as outermost
-        boundaries. Transparent cells are left out as they are the neutral
+        boundaries. Cells with no colour are left out as they are the neutral
         background, see :meth:`region_colours`, and so are the cells
         underneath a box, whose left side carries no colour at all.
 
@@ -782,7 +825,7 @@ class Backend(ABC):
         for bottom, top in zip(heights, heights[1:]):
             left, colour = (
                 Point(0, top), Point(0, bottom), Point(0, bottom)
-            ), graph.dom.dom.name
+            ), getattr(graph.dom.dom, "name", None)
             for right, next_colour in Backend.region_band(
                     separators, bottom, top):
                 if right != left:
@@ -791,8 +834,7 @@ class Backend(ABC):
             cells.append((left, (
                 Point(graph.width, top), Point(graph.width, bottom),
                 Point(graph.width, bottom)), colour))
-        return [
-            cell for cell in cells if cell[-1] not in (None, TRANSPARENT)]
+        return [cell for cell in cells if cell[-1] is not None]
 
     @staticmethod
     def strands_cross(first, second):
@@ -826,6 +868,35 @@ class Backend(ABC):
             self.max_width, max(x for x, _ in left + right))
 
     @staticmethod
+    def cubic(curve):
+        """
+        The four control points of a Bezier given by three or four, i.e. a
+        quadratic Bezier raised to the cubic one that draws the same curve.
+
+        >>> start, control, end = Point(0, 3), Point(0, 0), Point(3, 0)
+        >>> [tuple(p) for p in Backend.cubic([start, control, end])]
+        [(0, 3), (0.0, 1.0), (1.0, 0.0), (3, 0)]
+        """
+        if len(curve) == 4:
+            return list(curve)
+        start, control, end = curve
+        return [start] + [
+            Point(point.x + 2 / 3 * (control.x - point.x),
+                  point.y + 2 / 3 * (control.y - point.y))
+            for point in (start, end)] + [end]
+
+    @classmethod
+    def region_cell_steps(cls, left, right):
+        """
+        The boundary of a cell of :meth:`region_cells` as the ``steps`` of
+        :meth:`draw_filled_shape` from the top of ``left``: down ``left``,
+        across the bottom, up ``right`` and back across the top.
+        """
+        left, right = cls.cubic(left), cls.cubic(right)
+        return [("curve", *left[1:]), ("line", right[3]),
+                ("curve", right[2], right[1], right[0]), ("line", left[0])]
+
+    @staticmethod
     def visible_edges(graph):
         """ Yield the edges of a graph that are not inside a box. """
         def inside_a_box(node):
@@ -841,7 +912,7 @@ class Backend(ABC):
         """
         Draw the label of a wire, in a colour readable over the region to
         its right, which :meth:`draw_regions` paints underneath it. A
-        transparent region is the page, taken to be white and adapted to
+        region with no colour is the page, taken to be white and adapted to
         when it is dark, see :meth:`Matplotlib.dark_gid`.
         """
         draw_label_anyway = params.get('draw_box_labels', True) and getattr(
@@ -858,7 +929,7 @@ class Backend(ABC):
         j -= pad_j
         fontsize = params.get('fontsize_types', params.get('fontsize', None))
         background = getattr(x, "cod", None)
-        adaptive = background is None or background.name == TRANSPARENT
+        adaptive = background is None
         color = self.readable_foreground(
             "white" if adaptive else background.name)
         self.draw_text(
@@ -996,6 +1067,31 @@ class Backend(ABC):
                  Node("box_cod", i=i, j=j, x=box.cod[i]))
                 for i, source in enumerate(indices)]
 
+    @staticmethod
+    def dual_rail_wires(node):
+        """
+        The nodes joined by each rail of a dual rail box, as
+        :meth:`crossing_wires` gives the strands of a crossing: a
+        :class:`discopy.balanced.DualRailBraid` sends the ribbon of inputs
+        ``(0, 1)`` to outputs ``(2, 3)`` and vice-versa, a
+        :class:`discopy.balanced.DualRailTwist` sends each rail back to its
+        own position, a :class:`discopy.ribbon.DualRailCup` (resp.
+        :class:`discopy.ribbon.DualRailCap`) folds input (resp. output) ``0``
+        onto ``3`` and ``1`` onto ``2``, see :meth:`draw_dual_rail_braid`,
+        :meth:`draw_dual_rail_twist`, :meth:`draw_dual_rail_cup` and
+        :meth:`draw_dual_rail_cap`.
+        """
+        box, j = node.box, node.j
+        dom, cod = ([Node(kind, i=i, j=j, x=x) for i, x in enumerate(typ)]
+                    for kind, typ in [("box_dom", box.dom),
+                                      ("box_cod", box.cod)])
+        if getattr(box, "draw_as_dual_rail_braid", False):
+            return [(dom[i], cod[(i + 2) % 4]) for i in range(4)]
+        if getattr(box, "draw_as_dual_rail_twist", False):
+            return list(zip(dom, cod))
+        side = dom if getattr(box, "draw_as_dual_rail_cup", False) else cod
+        return [(side[0], side[3]), (side[1], side[2])]
+
     def draw_braid(self, positions, node):
         """
         Draws a braid or a swap as its two wires crossing diagonally, so that
@@ -1059,12 +1155,62 @@ class Backend(ABC):
         if box.is_conjugate or box.is_transpose:
             asymmetry *= -1
         points[i] = points[i].shift(x=asymmetry)
+        if box.shape == "triangle":
+            points = self.triangle_corners(positions, node)
         self.draw_polygon(*points, facecolor=box.color)
         if params.get('draw_box_labels', True):
+            adaptive = self.is_transparent(box.color)
             self.draw_text(box.drawing_name, *positions[node],
                            ha='center', va='center',
-                           color=self.readable_foreground(box.color),
-                           fontsize=params.get('fontsize', None))
+                           color=self.readable_foreground(
+                               "white" if adaptive else box.color),
+                           fontsize=params.get('fontsize', None),
+                           adaptive=adaptive)
+
+    @staticmethod
+    def triangle_corners(positions, node):
+        """
+        The corners of a box drawn as a triangle, i.e. with ``shape``
+        ``"triangle"``: its base the width of the side with more wires, its
+        apex on the other side, at the wire when there is one. With two or
+        more wires on both sides, the apex is cut to the span of its wires.
+
+        The apex points down when the codomain has fewer wires, or as many
+        and the box is flipped upside down by neither a dagger nor a half
+        turn, i.e. a transpose, so that both flip it and a conjugate, their
+        composite, does not.
+
+        Example
+        -------
+        >>> from discopy.monoidal import Ty, Box
+        >>> x = Ty('x')
+        >>> merge = Box('t', x ** 2, x, shape="triangle").to_drawing()
+        >>> merge.add_box_corners()
+        >>> node, = (n for n in merge.positions if n.kind == "box")
+        >>> Backend.triangle_corners(merge.positions, node)
+        [Point(x=0.25, y=0.75), Point(x=1.75, y=0.75), Point(x=1.0, y=0.25)]
+
+        >>> t = Box('t', x ** 3, x, shape="triangle")
+        >>> (t >> t[::-1]).draw(doctest='docs/_static/drawing/triangle.svg')
+
+        .. image:: /_static/drawing/triangle.svg
+            :align: center
+        """
+        box, j = node.box, node.j
+        (left, bottom), (right, top) = (
+            positions[Node(f"box-corner-{c}", j=j)] for c in ["00", "11"])
+        flipped = (
+            box.is_dagger + bool(box.is_transpose) + box.is_conjugate) % 2
+        down = len(box.cod) < len(box.dom) or (
+            len(box.cod) == len(box.dom) and not flipped)
+        side, base, apex = ("box_cod", top, bottom) if down\
+            else ("box_dom", bottom, top)
+        xs = [positions[Node(side, i=i, j=j, x=x)][0]
+              for i, x in enumerate(box.cod if down else box.dom)]
+        tips = [min(xs), max(xs)] if xs else [positions[node][0]]
+        tips = tips[:1] if tips[0] == tips[-1] else tips
+        return [Point(left, base), Point(right, base)] + [
+            Point(x, apex) for x in reversed(tips)]
 
     def draw_discard(self, positions, node, **params):
         """ Draws a :class:`discopy.quantum.circuit.Discard` box. """
@@ -1098,18 +1244,14 @@ class Backend(ABC):
         ``(0, 1)`` and ``(2, 3)`` crossing as a whole rather than wire by wire.
         """
         # pylint: disable=unused-argument  # draw_boxes passes params to all
-        box, j = node.box, node.j
-        dom = [positions[Node("box_dom", i=i, j=j, x=box.dom[i])]
-               for i in range(len(box.dom))]
-        cod = [positions[Node("box_cod", i=i, j=j, x=box.cod[i])]
-               for i in range(len(box.cod))]
+        box = node.box
+        rails = [(positions[dom], positions[cod])
+                 for dom, cod in self.dual_rail_wires(node)]
         _, y_middle = positions[node]
         # The left ribbon goes to the right and vice-versa. As with a braid,
         # the left ribbon goes under the right one unless the box is dagger.
-        left = ([(dom[0], cod[2]), (dom[1], cod[3])],
-                getattr(box.dom.inside[0].ribbon, "name", None))
-        right = ([(dom[2], cod[0]), (dom[3], cod[1])],
-                 getattr(box.dom.inside[2].ribbon, "name", None))
+        left = (rails[:2], getattr(box.dom.inside[0].ribbon, "name", None))
+        right = (rails[2:], getattr(box.dom.inside[2].ribbon, "name", None))
         over, under = (left, right) if box.is_dagger else (right, left)
         # Fill (and stroke) under first, then over: the band going under is
         # broken around the crossing so the one going over is clearly on top.
@@ -1148,9 +1290,16 @@ class Backend(ABC):
             # Each rail crosses the other at the midpoint (t=0.5) of `top`
             # and of `bottom`. The two crossings pinch off a lens where the
             # ribbon has turned over: fill it with a darker shade of the
-            # front colour, for a nicer visual of the twist.
-            back = color if color == TRANSPARENT else config.darken(
-                to_hex(COLORS.get(color, color), keep_alpha=True))
+            # front colour, for a nicer visual of the twist. A colour
+            # matplotlib reads is darkened from matplotlib's RGB, in TikZ
+            # too, where the front of a name like purple is xcolor's RGB.
+            # Any other is an xcolor expression, mixed 60% with black, a
+            # trailing `!<pct>` being a mix with white.
+            value = self.resolve(color)
+            mix = f"{color}!white" if str(color).count("!") % 2 else color
+            back = color if self.is_transparent(color)\
+                else f"{mix}!60!black" if not is_color_like(value)\
+                else config.darken(to_hex(value, keep_alpha=True))
             front_top0, back_top0 = (
                 bezier_subcurve(top0, 0, .5), bezier_subcurve(top0, .5, 1))
             back_bottom0, front_bottom0 = (
@@ -1192,7 +1341,7 @@ class Backend(ABC):
     def draw_brakets(self, positions, node, **params):
         """ Draws a :class:`discopy.quantum.gates.Ket` box. """
         box, j = node.box, node.j
-        is_bra = len(box.dom) > 0
+        is_bra, adaptive = len(box.dom) > 0, self.is_transparent(box.color)
         for i, bit in enumerate(box._digits):
             kind = "box_dom" if is_bra else "box_cod"
             x = box.dom[i] if is_bra else box.cod[i]
@@ -1207,8 +1356,9 @@ class Backend(ABC):
             self.draw_text(
                 bit, middle[0], middle[1] + (-.25 if is_bra else .2),
                 ha='center', va='center',
-                color=self.readable_foreground(box.color),
-                fontsize=params.get('fontsize', None))
+                color=self.readable_foreground(
+                    "white" if adaptive else box.color),
+                fontsize=params.get('fontsize', None), adaptive=adaptive)
 
     def draw_controlled_gate(self, positions, node, **params):
         """ Draws a :class:`discopy.quantum.gates.Controlled` gate. """
@@ -1299,6 +1449,27 @@ class Backend(ABC):
 
 class TikZ(Backend):
     """ Tikz drawing backend. """
+    #: The size in points of the label of a box, and of a wire one size down.
+    LABEL_SIZE, WIRE_LABEL_SIZE = 8, 7
+
+    @classmethod
+    def unit(cls) -> str:
+        """
+        The length of one unit of a drawing, at which the label of a box fits
+        it: the layout measures a label at twelve points in inches, see
+        :func:`discopy.utils.text_width`, and TikZ sets it at
+        :attr:`LABEL_SIZE` points.
+
+        >>> TikZ.unit()
+        '0.6667in'
+        """
+        return f"{cls.LABEL_SIZE / 12:.4f}in"
+
+    @staticmethod
+    def font(size) -> str:
+        """ The font option of a label of ``size`` points. """
+        return f"font=\\fontsize{{{size}}}{{{1.2 * size:g}}}\\selectfont"
+
     def __init__(self, use_tikzstyles=None):
         self.use_tikzstyles = DEFAULT["use_tikzstyles"]\
             if use_tikzstyles is None else use_tikzstyles
@@ -1306,31 +1477,93 @@ class TikZ(Backend):
         self.nodes, self.nodelayer, self.edgelayer = {}, [], []
         super().__init__()
 
-    @staticmethod
-    def format_color(color):
+    #: The colour names every xcolor knows, i.e. without package options.
+    XCOLOR_NAMES = (
+        "red", "green", "blue", "cyan", "magenta", "yellow", "black", "gray",
+        "white", "darkgray", "lightgray", "brown", "lime", "olive", "orange",
+        "pink", "purple", "teal", "violet")
+
+    @classmethod
+    def needs_rgb(cls, color):
         """
-        Formats a color: a name in :data:`COLORS` or a hexcode, in any form
-        matplotlib reads, as its RGB values, any other color as it is, e.g.
-        transparency, which TikZ spells like matplotlib, or an xcolor name.
+        Whether a color is one matplotlib reads and xcolor does not, e.g.
+        ``"tab:blue"``, ``"C0"``, ``"0.5"``, ``"navy"`` or an RGB tuple, so
+        that TikZ must spell it by its RGB values, or a hexcode.
+
+        >>> assert TikZ.needs_rgb("tab:blue") and TikZ.needs_rgb((0, 0, 1))
+        >>> assert not TikZ.needs_rgb("purple") and not TikZ.needs_rgb("none")
+        """
+        if cls.is_transparent(color) or isinstance(color, str) and (
+                color in COLORS or color in cls.XCOLOR_NAMES):
+            return False
+        return is_color_like(color)
+
+    @classmethod
+    def format_color(cls, color):
+        """
+        Formats a color: a name in :data:`COLORS` or one that matplotlib
+        reads and xcolor does not, e.g. a hexcode, as its RGB values, any
+        other color as it is, e.g. transparency, which TikZ spells like
+        matplotlib, or an xcolor name or expression.
         A TikZ color has no alpha channel, so that of a hexcode is dropped.
 
         >>> TikZ.format_color("red")
         '{rgb,255: red,232; green,165; blue,165}'
         >>> assert TikZ.format_color("#e8a5a5") == TikZ.format_color("red")
         >>> assert TikZ.format_color("#abc") == TikZ.format_color("#aabbcc80")
+        >>> TikZ.format_color("tab:blue")
+        '{rgb,255: red,31; green,119; blue,180}'
         >>> TikZ.format_color("lightgray")
         'lightgray'
         """
-        hexcode = COLORS.get(color, color)
-        if not str(hexcode).startswith("#"):
+        is_named = isinstance(color, str) and color in COLORS
+        if not is_named and not cls.needs_rgb(color):
             return color
-        red, green, blue = (round(255 * x) for x in to_rgb(hexcode))
+        rgb = to_rgb(COLORS[color] if is_named else color)
+        red, green, blue = (round(255 * x) for x in rgb)
         return f"{{rgb,255: red,{red}; green,{green}; blue,{blue}}}"
+
+    @classmethod
+    def style_color(cls, color):
+        """
+        The color in the name of a tikzstyle: as it is written, without the
+        ``#`` of a hexcode, or the hexcode of a color xcolor does not read.
+
+        >>> TikZ.style_color("#336699"), TikZ.style_color("tab:blue")
+        ('336699', '1f77b4')
+        """
+        return to_hex(color)[1:] if cls.needs_rgb(color)\
+            else str(color).removeprefix("#")
+
+    #: What a label keeps as it is, an escaped character or the mathematics
+    #: between two dollars, then what LaTeX reads as markup outside them.
+    MARKUP = re.compile(
+        r"(?P<kept>\\.|\$[^$]*\$)|(?P<char>[_&%#])"
+        r"|(?P<pair>[<>])(?=(?P=pair))")
+
+    @classmethod
+    def escape(cls, text) -> str:
+        """
+        A label as LaTeX reads it: outside the mathematics between dollars,
+        an underscore, an ampersand, a percent and a hash are escaped, and
+        angle brackets are kept from joining into guillemets. A backslash
+        with the character after it and braces are left, so that a label can
+        still be LaTeX, with its own escapes.
+
+        >>> print(TikZ.escape("feed_forward $x_1$ (n >> s) 50%"))
+        feed\\_forward $x_1$ (n >{}> s) 50\\%
+        >>> print(TikZ.escape(r"\\$5 for x_y\\$, a\\_b, <<<"))
+        \\$5 for x\\_y\\$, a\\_b, <{}<{}<
+        """
+        return cls.MARKUP.sub(
+            lambda match: match["kept"] or (
+                "\\" + match["char"] if match["char"]
+                else match["pair"] + "{}"), str(text))
 
     def add_node(self, i, j, text=None, options=None, rounded=4):
         """ Add a node to the tikz picture, return its unique id. """
         node = len(self.nodelayer) + 1
-        text = "" if text is None else text
+        text = "" if text is None else self.escape(text)
         self.nodelayer.append(
             f"\\node [{options or ''}] ({node}) at "
             f"({round(i, rounded)}, {round(j, rounded)}) {{{text}}};\n")
@@ -1347,50 +1580,98 @@ class TikZ(Backend):
         super().draw_node(i, j, **params)
 
     def draw_text(self, text, i, j, **params):
-        options = "style=none, fill=white"
+        """
+        A label as a node, in a font of :attr:`LABEL_SIZE` points and its
+        ``color`` when it is not black. A wire label, aligned to its top,
+        hangs below and to the right of its point in a font of
+        :attr:`WIRE_LABEL_SIZE` points, filled white only over a region with
+        no colour, see :meth:`draw_wire_label`.
+
+        >>> tikz = TikZ()
+        >>> tikz.draw_text("f", 0, 0)
+        >>> tikz.draw_text("x", 0, 1, verticalalignment="top")
+        >>> tikz.draw_text("y", 1, 1, verticalalignment="top", adaptive=False)
+        >>> for node in tikz.nodelayer:
+        ...     print(node.split("] ")[0].split("style=none, ")[1])
+        fill=white, font=\\fontsize{8}{9.6}\\selectfont
+        fill=white, anchor=north west, font=\\fontsize{7}{8.4}\\selectfont
+        anchor=north west, font=\\fontsize{7}{8.4}\\selectfont
+        """
+        is_wire_label = params.get("verticalalignment", "center") == "top"
+        options = "style=none" + (
+            ", fill=white" if params.get("adaptive", True) else "")
         if params.get('horizontalalignment', 'center') == 'left':
             options += ", anchor=west"
-        if params.get("verticalalignment", "center") == "top":  # wire labels
-            options += ", right"
+        if is_wire_label:
+            options += ", anchor=north west"
+        options += ", " + self.font(
+            self.WIRE_LABEL_SIZE if is_wire_label else self.LABEL_SIZE)
+        color = params.get("color")
+        if color is not None and not (
+                isinstance(color, str) and color == "black"):
+            options += f", text={self.color_option(color)}"
         if 'fontsize' in params and params['fontsize'] is not None:
             options += f", scale={params['fontsize']}"
         self.add_node(i, j, text, options)
         super().draw_text(text, i, j, **params)
 
+    @classmethod
+    def color_option(cls, color):
+        """
+        A color as the value of an option, in braces.
+
+        >>> TikZ.color_option("white"), TikZ.color_option("#ff0000")
+        ('{white}', '{rgb,255: red,255; green,0; blue,0}')
+        """
+        return cls.format_color(color) if cls.needs_rgb(color)\
+            else f"{{{color}}}"
+
     def draw_polygon(
             self, *points,
             facecolor=DEFAULT["facecolor"], edgecolor=DEFAULT["edgecolor"]):
-        nodes = []
-        for point in points:
-            nodes.append(self.add_node(*point))
+        """
+        A polygon filled with ``facecolor`` and stroked with ``edgecolor``,
+        which is written when it is not the default: the background of a
+        drawing has the edge of its face, not a black frame.
+
+        >>> tikz = TikZ(use_tikzstyles=False)
+        >>> tikz.draw_polygon((0, 0), (1, 0), (0, 1), edgecolor="white")
+        >>> print(tikz.edgelayer[0].split("]")[0] + "]")
+        \\draw [-, fill={white}, draw={white}]
+        """
+        nodes = [self.add_node(*point) for point in points]
         nodes.append(nodes[0])
+        colors = {"-, fill": facecolor} | ({} if isinstance(
+            edgecolor, str) and edgecolor == DEFAULT["edgecolor"]
+            else {"draw": edgecolor})
+        options = ", ".join(
+            f"{key}={self.color_option(color)}"
+            for key, color in colors.items())
         if self.use_tikzstyles:
-            style_name = "box" if facecolor == DEFAULT["facecolor"]\
-                else f"{facecolor}_box"
-            style = f"\\tikzstyle{{{style_name}}}=" \
-                    f"[-, fill={self.format_color(facecolor)}]\n"
+            name = "box" if isinstance(facecolor, str) and list(
+                colors.values()) == [DEFAULT["facecolor"]] else "_".join(
+                    list(map(self.style_color, colors.values())) + ["box"])
+            style = f"\\tikzstyle{{{name}}}=[" + ", ".join(
+                f"{key}={self.format_color(color)}"
+                for key, color in colors.items()) + "]\n"
             if style not in self.edge_styles:
                 self.edge_styles.append(style)
-            options = f"style={style_name}"
-        else:
-            options = "-, fill=" + (
-                self.format_color(facecolor) if str(facecolor).startswith("#")
-                else f"{{{facecolor}}}")
+            options = f"style={name}"
         str_connections = " to ".join(f"({node}.center)" for node in nodes)
         self.edgelayer.append(f"\\draw [{options}] {str_connections};\n")
         super().draw_polygon(*points)
 
-    def draw_regions(self, graph, **params):
+    def draw_region_cell(self, left, right, facecolor):
         """
-        Coloured regions are not wired up for the TikZ backend yet, even
-        though :meth:`Backend.region_cells` computes their extents for any
-        backend: region colours may be arbitrary matplotlib colours (e.g.
-        hexcodes) that are not valid TikZ/xcolor names, so filling them in
-        for real needs a colour-formatting step similar to
-        :meth:`format_color`. This is a deliberate no-op in the meantime,
-        leaving TikZ's output as-is.
+        Fill the cell between two Beziers as one closed path, see
+        :meth:`Backend.region_cell_steps`, stroked in its own colour so that
+        two cells meeting edge to edge leave no seam where a viewer
+        antialiases each of them.
         """
-        super().draw_regions(graph, **params)
+        self.draw_filled_shape(
+            left[0], self.region_cell_steps(left, right), facecolor,
+            stroke=True)
+        super().draw_region_cell(left, right, facecolor)
 
     def draw_wire(self, source, target, bend_out=False, bend_in=False,
                   style=None, linewidth=None, adaptive=True):
@@ -1405,7 +1686,7 @@ class TikZ(Backend):
             distance = min(dx, dy)
             looseness = round(distance / length * 2.1, 4)
         if looseness != 1:
-            style = ', '.join(
+            style = ', '.join(  # ty: ignore[no-matching-overload]
                 [style] * bool(style) + [f'looseness={looseness}'])
 
         cmd = (
@@ -1430,7 +1711,9 @@ class TikZ(Backend):
             "({}.center);\n".format(*(self.nodes[tuple(p)] for p in points)))
         super().draw_bezier(points)
 
-    def draw_filled_shape(self, start, steps, color):
+    def draw_filled_shape(self, start, steps, color, stroke=False):
+        """ The shape of :meth:`Backend.draw_filled_shape`, with a hairline
+        in its own colour if ``stroke``, else none. """
         def node(point):
             if tuple(point) not in self.nodes:
                 self.add_node(*point)
@@ -1442,12 +1725,39 @@ class TikZ(Backend):
             else:
                 path += " .. controls ({}.center) and ({}.center) .. "\
                     "({}.center)".format(*(node(p) for p in step[1:]))
+        outline = f"{self.format_color(color)}, line width=0.25pt"\
+            if stroke else "none"
         self.edgelayer.append(
-            f"\\draw [fill={self.format_color(color)}, draw=none] "
+            f"\\draw [fill={self.format_color(color)}, draw={outline}] "
             f"{path} -- cycle;\n")
         super().draw_filled_shape(start, steps, color)
 
+    @staticmethod
+    def inner_sep(nodesize) -> str:
+        """
+        The padding of a spider of a given ``nodesize``, a share of the
+        default ``0.3333em`` of a node, i.e. half the width of its disc.
+
+        >>> TikZ.inner_sep(0.5)
+        '0.1667em'
+        """
+        return f"{round(nodesize / 3, 4)}em"
+
     def draw_spiders(self, graph, draw_box_labels=True, **params):
+        """
+        Draws each spider as an empty node of its shape and colour, its size
+        set by ``nodesize``, with its label over its center at the size of
+        the text, as matplotlib does: a ``scale`` would shrink the label with
+        the node, e.g. the symbol of an equation in a large drawing.
+
+        >>> from discopy.monoidal import Ty, Box, Equation
+        >>> x = Ty('x')
+        >>> tikz = TikZ(use_tikzstyles=False)
+        >>> drawing = Equation(Box('f', x, x), Box('g', x, x)).to_drawing()
+        >>> tikz.draw_spiders(drawing, nodesize=0.5)
+        >>> print(tikz.nodelayer[0].split("]")[0] + "]")
+        \\node [circle, fill=none, inner sep=0.1667em, label={center:{=}}]
+        """
         spiders = [(node, node.box.color, node.box.shape)
                    for node in graph.nodes
                    if node.kind == "box" and node.box.draw_as_spider]
@@ -1455,19 +1765,22 @@ class TikZ(Backend):
             i, j = graph.positions[node]
             text = node.box.drawing_name if draw_box_labels else ""
             if self.use_tikzstyles:
-                style = f"\\tikzstyle{{{node.box.tikzstyle_name}}}=" \
-                        f"[fill={self.format_color(color)}]\n"
+                style_name = f"{node.box.tikzstyle_name}_"\
+                    f"{self.style_color(color)}_{shape}"
+                style = f"\\tikzstyle{{{style_name}}}=" \
+                        f"[fill={self.format_color(color)}, shape={shape}]\n"
                 if style not in self.node_styles:
                     self.node_styles.append(style)
-                options = f"style={node.box.tikzstyle_name}"
+                options = f"style={style_name}"
             else:
                 options = f"{shape}, fill=" + (
-                    self.format_color(color) if str(color).startswith("#")
+                    self.format_color(color) if self.needs_rgb(color)
                     else color)
             if params.get("nodesize", 1) != 1:
-                options +=\
-                    f", scale={params.get('nodesize')}"  # pragma: no cover
-            self.add_node(i, j, text, options)
+                options += f", inner sep={self.inner_sep(params['nodesize'])}"
+            if text:
+                options += f", label={{center:{{{self.escape(text)}}}}}"
+            self.add_node(i, j, None, options)
         super().draw_spiders(graph, draw_box_labels)
 
     def output(self, path=None, show=True, **params):
@@ -1475,8 +1788,8 @@ class TikZ(Backend):
         tikz_options = params.get("tikz_options", None)
         output_tikzstyle = self.use_tikzstyles\
             and params.get("output_tikzstyle", True)
-        options = "baseline=(0.base)" if tikz_options is None\
-            else "baseline=(0.base), " + tikz_options
+        options = f"baseline=(0.base), x={self.unit()}, y={self.unit()}"\
+            + ("" if tikz_options is None else ", " + tikz_options)
         begin = [f"\\begin{{tikzpicture}}[{options}]\n"]
         nodes = ["\\begin{pgfonlayer}{nodelayer}\n",
                  f"\\node (0) at (0, {baseline}) {{}};\n"]\
@@ -1484,18 +1797,312 @@ class TikZ(Backend):
         edges = ["\\begin{pgfonlayer}{edgelayer}\n"] + self.edgelayer\
             + ["\\end{pgfonlayer}\n"]
         end = ["\\end{tikzpicture}\n"]
+
+        def write(lines, actual_path):
+            with open(actual_path, 'w+') as file:
+                file.writelines(lines)
+
+        def save(file_path, lines):
+            if params.get("compare", False):
+                save_and_compare(file_path, partial(write, lines))
+            else:
+                write(lines, file_path)
+
         if path is not None:
             if output_tikzstyle:
-                style_path = '.'.join(path.split('.')[:-1]) + '.tikzstyles'
-                with open(style_path, 'w+') as file:
-                    file.writelines(["% Node styles\n"] + self.node_styles)
-                    file.writelines(["% Edge styles\n"] + self.edge_styles)
-            with open(path, 'w+') as file:
-                file.writelines(begin + nodes + edges + end)
+                style_path = os.path.splitext(os.fspath(path))[0]\
+                    + '.tikzstyles'
+                save(style_path, ["% Node styles\n"] + self.node_styles
+                     + ["% Edge styles\n"] + self.edge_styles)
+            save(path, begin + nodes + edges + end)
         elif show:  # pragma: no cover
             if output_tikzstyle:
                 print(''.join(self.node_styles + self.edge_styles))
             print(''.join(begin + nodes + edges + end))
+
+
+def wire_bezier_points(source, target, bend_out):
+    """
+    The two control points of the cubic bezier of a wire from ``source`` to
+    ``target``, or ``None`` when it is straight: the quadratic curve of the
+    Matplotlib backend, which bends out of the source or else into the
+    target.
+    """
+    if source[0] == target[0] or source[1] == target[1]:
+        return None
+    mid = (target[0], source[1]) if bend_out else (source[0], target[1])
+    c1 = ((source[0] + 2 * mid[0]) / 3, (source[1] + 2 * mid[1]) / 3)
+    c2 = ((2 * mid[0] + target[0]) / 3, (2 * mid[1] + target[1]) / 3)
+    return c1, c2
+
+
+class Typst(Backend):
+    """Typst/CeTZ drawing backend."""
+
+    def __init__(self, **params):
+        self.body: list = []
+        self.nodesize = params.get("nodesize", 1)
+        self.fontsize = params.get("fontsize", DEFAULT["fontsize"])
+        # Match Matplotlib's default stroke weight so wires/boxes read at
+        # paper scale once the page is auto-cropped (see ``to_document``).
+        self.linewidth = params.get("linewidth", 1.0)
+        super().__init__()
+
+    def draw(self, graph, **params):
+        """
+        Draw a graph on the canvas, as :func:`draw` does, and return the
+        backend: :meth:`to_document` is its source, :meth:`output` compiles
+        it.
+        """
+        max_v = max(graph.height, graph.width, 0.01)
+        self.nodesize = round(params.get("nodesize", 1.0) / sqrt(max_v), 3)
+        self.draw_boundary(graph, **params)
+        self.draw_regions(graph, **params)
+        self.draw_wires(graph, **params)
+        self.draw_boxes(graph, **params)
+        self.draw_spiders(graph, **params)
+        return self
+
+    @staticmethod
+    def format_color(color):
+        """Format a colour name or hexcode to a Typst-friendly string."""
+        if color is None or Backend.is_transparent(color):
+            return "none"
+        color = Backend.resolve(color)
+        return to_hex(color) if is_color_like(color) else color
+
+    @staticmethod
+    def color_expr(hexcode):
+        """Build a Typst ``rgb(\"#hex\")`` expression string."""
+        if hexcode == "none":
+            return "none"
+        return f'rgb("{hexcode}")' if hexcode.startswith("#") else hexcode
+
+    @staticmethod
+    def math_label(text):
+        """
+        Return ``(inner, math)`` for a diagram label.
+
+        Only explicit ``$...$`` wrappers enter Typst math mode. Bare words
+        like ``Alice`` stay as plain text — Typst would otherwise treat them
+        as undefined variables (``unknown variable: Alice``).
+        """
+        text = str(text)
+        if text.startswith("$") and text.endswith("$") and len(text) >= 2:
+            return text[1:-1], True
+        return text, False
+
+    def coord(self, x, y):
+        """ A point of the canvas. """
+        return Coord(x, y)
+
+    def stroke(self, color="black", linewidth=None):
+        """ A stroke, i.e. a colour and a width in points. """
+        lw = self.linewidth if linewidth is None else linewidth
+        return Ident(
+            f"{self.color_expr(self.format_color(color))} + {lw:g}pt")
+
+    def draw_text(self, text, i, j, **params):
+        colour = params.get("color", None)
+        extra: dict[str, TypstNode] = {}
+        if colour and colour != "black":
+            extra["fill"] = Ident(self.color_expr(self.format_color(colour)))
+        # Wire labels use va='top' (see draw_wire_label); park them to the
+        # right of the wire like TikZ's ``anchor=west``, so the stroke does
+        # not strike through the glyph.
+        if params.get("verticalalignment", "center") == "top":
+            extra["anchor"] = Str("west")
+        inner, math = self.math_label(text)
+        content = ContentExpr(inner, math=math)
+        fs = params.get("fontsize", None)
+        if fs is not None and fs != DEFAULT["fontsize"]:
+            scale = Float(fs / DEFAULT["fontsize"]).render()
+            text_call = Call(
+                Ident("text"), [content], {"size": Ident(f"{scale}em")})
+        else:
+            text_call = content
+        self.body.append(Call(
+            Ident("content"), [self.coord(i, j), text_call], extra))
+        super().draw_text(text, i, j, **params)
+
+    def draw_node(self, i, j, **params):
+        """
+        A node of a controlled gate: a disc of the given colour, its edge
+        drawn when it has an ``edgecolor``, or a plus sign.
+        """
+        radius = 0.06 * self.nodesize * sqrt(params.get("nodesize", 1))
+        if params.get("shape", "circle") == "plus":
+            for x, y in ((radius, 0), (0, radius)):
+                self.body.append(Call(
+                    Ident("line"),
+                    [self.coord(i - x, j - y), self.coord(i + x, j + y)],
+                    {"stroke": self.stroke(linewidth=0.5)}))
+        else:
+            edge = params.get("edgecolor", None)
+            self.body.append(Call(Ident("circle"), [self.coord(i, j)], {
+                "radius": Float(radius),
+                "fill": Ident(self.color_expr(
+                    self.format_color(params.get("color", "black")))),
+                "stroke": Ident("none") if edge is None
+                else self.stroke(edge, linewidth=0.5)}))
+        super().draw_node(i, j, **params)
+
+    def draw_polygon(self, *points,
+                     facecolor=DEFAULT["facecolor"],
+                     edgecolor=DEFAULT["edgecolor"]):
+        coords = [self.coord(*p) for p in points]
+        kwargs = {"close": Bool(True)}
+        if facecolor is None or self.is_transparent(facecolor):
+            kwargs["fill"] = Ident("none")
+        else:
+            kwargs["fill"] = Ident(
+                self.color_expr(self.format_color(facecolor)))
+        if edgecolor is None or self.is_transparent(edgecolor):
+            kwargs["stroke"] = Ident("none")
+        else:
+            kwargs["stroke"] = self.stroke(edgecolor)
+        self.body.append(Call(Ident("line"), coords, kwargs))
+        super().draw_polygon(*points)
+
+    def draw_wire(self, source, target, bend_out=False, bend_in=False,
+                  style=None, linewidth=None, adaptive=True):
+        options: dict[str, TypstNode] = {
+            "stroke": self.stroke("black", linewidth)}
+        cps = wire_bezier_points(source, target, bend_out)
+        if style == "->":
+            cps, options["mark"] = None, Ident('(end: ">", fill: black)')
+        if cps is not None:
+            c1, c2 = cps
+            self.body.append(
+                Call(
+                    Ident("bezier"),
+                    [
+                        self.coord(*source),
+                        self.coord(*target),
+                        self.coord(*c1),
+                        self.coord(*c2),
+                    ],
+                    options,
+                )
+            )
+        else:
+            self.body.append(
+                Call(
+                    Ident("line"),
+                    [self.coord(*source), self.coord(*target)],
+                    options,
+                )
+            )
+        super().draw_wire(source, target, bend_out=bend_out, bend_in=bend_in)
+
+    def draw_bezier(self, points, adaptive=True):
+        start, first, second, end = points
+        self.body.append(
+            Call(
+                Ident("bezier"),
+                [self.coord(*start), self.coord(*end),
+                 self.coord(*first), self.coord(*second)],
+                {"stroke": self.stroke()},
+            )
+        )
+        super().draw_bezier(points)
+
+    def spider_shape(self, box, i, j) -> list[Call]:
+        """
+        The disc or the square of a spider at ``(i, j)``, and nothing when
+        its colour is transparent: such a spider is just its label, e.g. the
+        symbol of an :class:`discopy.monoidal.Equation`.
+        """
+        if self.is_transparent(box.color):
+            return []
+        colour = self.color_expr(self.format_color(box.color))
+        options = {"fill": Ident(colour), "stroke": self.stroke(linewidth=0.5)}
+        if box.shape == "rectangle":
+            size = self.nodesize * 0.15
+            return [Call(Ident("rect"), [
+                self.coord(i - size, j - size),
+                self.coord(i + size, j + size)], options)]
+        return [Call(Ident("circle"), [self.coord(i, j)], {
+            "radius": Float(self.nodesize * 0.12), **options})]
+
+    def draw_spiders(self, graph, draw_box_labels=True, **params):
+        """
+        Draws each spider as its shape and its label, at
+        ``fontsize_spiders`` whatever the ``fontsize``.
+        """
+        for node in graph.nodes:
+            if node.kind != "box" or not node.box.draw_as_spider:
+                continue
+            i, j = graph.positions[node]
+            hexcolour = self.format_color(node.box.color)
+            self.body.extend(self.spider_shape(node.box, i, j))
+            if draw_box_labels and node.box.drawing_name:
+                label = node.box.drawing_name
+                inner, math = self.math_label(label)
+                fc = 'rgb("#ffffff")' if hexcolour == "#000000"\
+                    else 'rgb("#000000")'
+                scale = Float(params.get(
+                    "fontsize_spiders", DEFAULT["fontsize_spiders"])
+                    / DEFAULT["fontsize"]).render()
+                lbl = Call(
+                    Ident("text"), [ContentExpr(inner, math=math)],
+                    {"fill": Ident(fc), "size": Ident(f"{scale}em")})
+                self.body.append(Call(
+                    Ident("content"), [self.coord(i, j), lbl]))
+        super().draw_spiders(graph, draw_box_labels)
+
+    def to_document(self, **params):
+        """
+        The document of what was drawn: a CeTZ canvas on a page cropped to
+        it, with ``page_margin`` around and ``unit_length`` to a unit.
+        """
+        margin = params.get("page_margin", "0.2cm")
+        doc = Document(
+            imports=[
+                Import("@preview/cetz:0.5.2", members=["canvas", "draw"]),
+            ],
+            preamble=[
+                RawText("#set page("
+                        f"width: auto, height: auto, margin: {margin})")
+            ],
+        )
+        unit_len = params.get("unit_length", "1in")
+        canvas = Canvas(
+            canvas_kwargs={"length": Ident(unit_len)},
+            body=[RawText("import draw: *")] + self.body,
+        )
+        doc.content = canvas
+        return doc
+
+    def output(self, path=None, show=True, **params):
+        doc = self.to_document(**params)
+        source = doc.render()
+        if isinstance(path, (str, os.PathLike))\
+                and str(path).endswith(".typ"):
+            pathlib.Path(path).write_text(source, encoding="utf-8")
+            return source
+        try:
+            import typst
+
+            svg = typst.compile(source.encode(), format="svg", pretty=True)
+        except ImportError as error:  # pragma: no cover
+            raise ImportError(
+                "Typst rendering requires the 'typst' package. "
+                "Install it with: pip install typst") from error
+        if hasattr(path, "write"):
+            path.write(svg.decode() if isinstance(path, TextIOBase) else svg)
+            return svg
+        if path is not None:
+            pathlib.Path(path).write_bytes(svg)
+            return svg
+        if show:
+            try:
+                from IPython.display import SVG
+
+                return SVG(svg)
+            except ImportError:
+                pass
+        return svg
 
 
 class Matplotlib(Backend):
@@ -1520,7 +2127,8 @@ class Matplotlib(Backend):
         super().draw_boundary(graph, boundary_color=boundary_color, **params)
 
     def draw_text(self, text, i, j, **params):
-        params['fontsize'] = params.get('fontsize', DEFAULT['fontsize'])
+        if params.get('fontsize') is None:
+            params['fontsize'] = DEFAULT['fontsize']
         if params.pop('adaptive', False):
             params['gid'] = self.dark_gid("fill")
         self.axis.text(i, j, text, **params)
@@ -1530,7 +2138,7 @@ class Matplotlib(Backend):
         color = params.get("color", "black")
         self.axis.scatter(
             [i], [j],
-            c=COLORS.get(color, color),
+            c=self.resolve(color),
             marker=SHAPES[params.get("shape", "circle")],
             s=300 * params.get("nodesize", 1),
             edgecolors=params.get("edgecolor", None),
@@ -1549,8 +2157,8 @@ class Matplotlib(Backend):
         self.axis.add_patch(PathPatch(
             path,
             linewidth=self.linewidth,
-            facecolor=COLORS.get(facecolor, facecolor),
-            edgecolor=COLORS.get(edgecolor, edgecolor)))
+            facecolor=self.resolve(facecolor),
+            edgecolor=self.resolve(edgecolor)))
         super().draw_polygon(*points)
 
     def draw_region_cell(self, left, right, facecolor):
@@ -1569,15 +2177,8 @@ class Matplotlib(Backend):
             Path(vertices, [Path.MOVETO] + codes(left) + [Path.LINETO]
                  + codes(right) + [Path.CLOSEPOLY]),
             linewidth=0, antialiased=False,
-            facecolor=COLORS.get(facecolor, facecolor), edgecolor='none'))
+            facecolor=self.resolve(facecolor), edgecolor='none'))
         super().draw_region_cell(left, right, facecolor)
-
-    def draw_regions(self, graph, **params):
-        """ Fill the coloured 0-cell regions of the diagram, one patch per
-        cell of :meth:`region_cells`. """
-        for left, right, colour in self.region_cells(graph):
-            self.draw_region_cell(left, right, facecolor=colour)
-        super().draw_regions(graph, **params)
 
     def draw_legend(self, graph, **params):
         """Add a legend mapping each region colour to its label."""
@@ -1585,7 +2186,7 @@ class Matplotlib(Backend):
         if not colours:
             return
         handles = [
-            Patch(facecolor=COLORS.get(colour.name, colour.name),
+            Patch(facecolor=self.resolve(colour.name),
                   edgecolor="none", label=colour.legend_label)
             for colour in colours.values()]
         self.axis.legend(
@@ -1632,7 +2233,7 @@ class Matplotlib(Backend):
         vertices.append(start)
         codes.append(Path.CLOSEPOLY)
         self.axis.add_patch(PathPatch(
-            Path(vertices, codes), facecolor=COLORS.get(color, color),
+            Path(vertices, codes), facecolor=self.resolve(color),
             edgecolor='none', linewidth=0))
         super().draw_filled_shape(start, steps, color)
 
@@ -1642,7 +2243,8 @@ class Matplotlib(Backend):
         dark page: black spiders lie on the neutral canvas so they turn
         white, coloured ones keep their colour. A transparent spider is just
         its label, e.g. the symbol of an :class:`discopy.monoidal.Equation`,
-        which leaves no patch on a coloured page.
+        which leaves no patch on a coloured page. The labels are drawn at
+        ``DRAWING_DEFAULT["fontsize_spiders"]``, whatever the ``fontsize``.
         """
         import networkx as nx
         nodes = [node for node in graph.nodes
@@ -1650,12 +2252,12 @@ class Matplotlib(Backend):
         groups = {}
         for node in nodes:
             groups.setdefault(
-                (node.box.shape, node.box.color == "black"), []).append(node)
+                (node.box.shape, isinstance(node.box.color, str)
+                 and node.box.color == "black"), []).append(node)
         for (shape, adaptive), group in groups.items():
             nx.draw_networkx_nodes(
                 *graph.inside, nodelist=group,
-                node_color=[COLORS.get(node.box.color, node.box.color)
-                            for node in group],
+                node_color=[self.resolve(node.box.color) for node in group],
                 node_shape=SHAPES[shape], ax=self.axis,
                 node_size=300 * params.get("nodesize", 1)
             ).set_gid(self.dark_gid("fill") if adaptive else None)
@@ -1664,7 +2266,8 @@ class Matplotlib(Backend):
                     self.draw_text(
                         node.box.drawing_name, *graph.positions[node],
                         ha='center', va='center',
-                        adaptive=node.box.color == TRANSPARENT)
+                        fontsize=DEFAULT['fontsize_spiders'],
+                        adaptive=self.is_transparent(node.box.color))
         super().draw_spiders(graph, draw_box_labels)
 
     def output(self, path=None, show=True, **params):
@@ -1673,7 +2276,7 @@ class Matplotlib(Backend):
         plt.margins(*margins)
         plt.subplots_adjust(
             top=1, bottom=0, right=1, left=0, hspace=0, wspace=0)
-        self.axis.set_aspect(params.get("aspect"))
+        self.axis.set_aspect(params.get("aspect", "auto"))
         plt.axis('off')
         if xlim is not None:
             self.axis.set_xlim(*xlim)
@@ -1688,6 +2291,6 @@ class Matplotlib(Backend):
             finally:
                 plt.close()
         elif not show:
-            plt.close(self.axis.figure)
+            plt.close(self.axis.figure)  # ty: ignore[invalid-argument-type]
         if show:
             plt.show()

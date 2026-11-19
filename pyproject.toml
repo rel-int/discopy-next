@@ -13,7 +13,8 @@ dynamic = ["version"]
 description = "The Python toolkit for computing with string diagrams."
 readme = "README.md"
 requires-python = ">=3.12"
-license =  {file = "LICENSE"}
+license = "BSD-3-Clause AND Apache-2.0"
+license-files = ["LICENSE", "discopy/optyx/LICENSE", "discopy/optyx/NOTICE"]
 keywords = [
     "category theory",
     "string diagrams",
@@ -39,12 +40,13 @@ dependencies = [
   "numpy",
   "networkx",
   "matplotlib",
-  "pillow"
+  "pillow",
 ]
 
 [dependency-groups]
 dev = [
     "coverage",
+    "egglog",
     "hypothesis",
     "marimo",
     "pyproject-flake8",
@@ -53,22 +55,33 @@ dev = [
     "pytest-benchmark",
     "polars",
     "pytest-xdist",
+    "ruff == 0.14.0",
+    "ty == 0.0.69",
 ]
 docs = ["discopy[docs]"]
 notebooks = ["discopy[notebooks]"]
+tensor = ["discopy[tensor]"]
 quantum = ["discopy[quantum]"]
-grammar = ["discopy[grammar]"]
+lambek = ["discopy[lambek]"]
 optyx = ["discopy[optyx]"]
+typst = ["discopy[typst]"]
 all = [
     { include-group = "dev" },
     { include-group = "docs" },
     { include-group = "notebooks" },
+    { include-group = "tensor" },
     { include-group = "quantum" },
-    { include-group = "grammar" },
+    { include-group = "lambek" },
     { include-group = "optyx" },
+    { include-group = "typst" },
 ]
 
 [project.optional-dependencies]
+tensor = [
+    "opt_einsum",
+    "quimb",
+    "cotengra",
+]
 quantum = [
     "pytket",
     "pyzx == 0.10.7",
@@ -85,10 +98,13 @@ quantum = [
     "qoolqit",
     "scipy",
 ]
-grammar = [
+lambek = [
     "nltk",
     "torch",
+    "transformers",
 ]
+# the deprecated name of the lambek extra
+grammar = ["discopy[lambek]"]
 # discopy.optyx, under Apache-2.0: see discopy/optyx/LICENSE
 optyx = [
     "cotengra",
@@ -101,10 +117,11 @@ optyx = [
     "pytket-qiskit[aer] >= 0.68.3",
     "pyzx == 0.10.7",
     "quimb",
+    "scipy",
     "sympy",
 ]
 test = [
-    "discopy[grammar,optyx,quantum]",
+    "discopy[lambek,notebooks,optyx,quantum]",
     "coverage",
     "hypothesis",
     "marimo",
@@ -118,22 +135,29 @@ notebooks = [
     "anywidget",
     "ipykernel == 6.23.*",
     "marimo",
+    # imported by the notebooks in docs/notebooks/optyx
+    "pandas",
+    "seaborn",
+    "tqdm",
+    # cotengra pools over joblib when it can: its concurrent.futures fallback
+    # re-runs the .md file of a marimo notebook as a script (optyx/fixpoints)
+    "joblib",
 ]
 docs  = [
-    "discopy[notebooks]",
+    "discopy[notebooks,optyx]",
     "jinja2 == 3.1.*",
     "myst-parser == 2.0.*",
     # executed by marimo when rendering the notebooks at docs build time
     "jax",
-    "pytket",
-    "scipy",
-    "sympy",
     "torch",
     "sphinx == 7.4.*",
     "sphinx-book-theme == 1.1.*",
     "sphinxcontrib-bibtex == 2.5.*",
     "sphinxcontrib-tikz == 0.4.*",
     "sphinxcontrib-youtube == 1.4.*",
+]
+typst = [
+    "typst >= 0.15.0",
 ]
 
 [tool.setuptools_scm]
@@ -170,6 +194,67 @@ per-file-ignores = [
     "__init__.py:F401"
 ]
 
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "B", "PLE", "PLW", "RUF"]
+# The first four are flake8's; the rest are rules `main` breaks today, each
+# removed from this list by the pull request that fixes its last instance.
+ignore = [
+    "E731",
+    "E741",
+    "E743",
+    "F811",
+    "B006",
+    "B007",
+    "B008",
+    "B023",
+    "B027",
+    "B028",
+    "B904",
+    "B905",
+    "PLW0406",
+    "PLW0642",
+    "PLW1641",
+    "PLW2901",
+    "PLW3301",
+    "RUF001",
+    "RUF002",
+    "RUF005",
+    "RUF007",
+    "RUF010",
+    "RUF012",
+    "RUF013",
+    "RUF017",
+    "RUF021",
+    "RUF100",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401"]
+
+# optyx moved in with its own history (#276) and is typed apart from the
+# rest of the package, which typechecks.
+[tool.ty.src]
+include = ["discopy"]
+exclude = ["discopy/optyx"]
+
+[tool.ty.environment]
+python-version = "3.14"
+
+# The factory-method pattern narrows the signatures of `then`, `tensor` and
+# their friends down the tower, and attributes are dynamic by design where a
+# downgrade asks the host category for structure it may not have.
+[tool.ty.rules]
+invalid-method-override = "ignore"
+unresolved-attribute = "ignore"
+# The rules `main` breaks today, each set back to "error" by the pull request
+# that fixes its last instance.
+invalid-argument-type = "warn"
+invalid-parameter-default = "warn"
+invalid-return-type = "warn"
+no-matching-overload = "warn"
+too-many-positional-arguments = "warn"
+unsupported-operator = "warn"
+
 [tool.pytest.ini_options]
 pythonpath = [
     ".",
@@ -185,20 +270,19 @@ norecursedirs = [
     ".hypothesis",
     "test/fixtures",
 ]
-addopts = "--doctest-modules --ignore=test/fixtures -p plugin"
+addopts = "--doctest-modules --ignore=test/fixtures -p plugin --import-mode=importlib"
+markers = [
+    "slow: takes four seconds or more; CI runs it on main, not on a pull request",
+]
 
 [tool.coverage.run]
 # sys.monitoring, the default from Python 3.14 on, measures the same lines
 # at half the cost of the C tracer that 3.12 and 3.13 would otherwise use.
 core = "sysmon"
-# The skip paths are unreachable unless --skip-extra is passed, and coverage
-# runs the full suite with every extra installed. The egglog reference of
-# test/ehypergraph.py runs only where egglog is installed, which the lock does
-# not have. torch.compile writes Python under torchinductor_* directories,
-# which is not ours to cover.
-omit = [
-    "test/plugin.py", "test/fixtures/egglog_reference.py",
-    "*/torchinductor_*/*"]
+patch = ["subprocess"]
+# The gate measures the package, not the tests that exercise it: a test file
+# counted alongside is all but fully covered by construction.
+source = ["discopy"]
 
 [tool.coverage.report]
 fail_under = 98

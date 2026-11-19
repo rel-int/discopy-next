@@ -90,6 +90,16 @@ def test_closed():
     assert (right.dom, right.cod, right.param) == (b, a >> c, P)
     assert left.inside\
         == (a @ closed.Diagram.swap(P, b) >> k.inside).curry(left=True)
+    with raises(ValueError):
+        Closed(a @ b, c, closed.Box('k', a @ b, c @ P), copar=P).curry()
+
+
+def test_closed_curry_stays_in_the_domain():
+    a, b, c, P = map(closed.Ty, "abcP")
+    k = Closed(a @ b, c, closed.Box('k', a @ b @ P, c), P)
+    for n, left in [(3, True), (3, False), (-1, True), (-1, False)]:
+        with raises(ValueError, match="off a @ b"):
+            k.curry(n, left=left)
 
 
 def test_feedback():
@@ -112,6 +122,9 @@ def test_compact():
                 compact.Box('k', x @ y @ compact.Ty('P'), x),
                 compact.Ty('P'))
     assert k.curry(left=True).cod == x << y
+    P = compact.Ty('P')
+    h = Compact(x @ y, x, compact.Box('h', x @ y, x @ P), copar=P)
+    assert (h.curry().cod, h.curry().copar) == (x << y, P)
 
 
 def test_hypergraph():
@@ -170,3 +183,25 @@ def test_copar_python():
     network = cell >> cell
     assert network.param == network.copar == f ** 2
     assert network.inside(2., 1., 10.) == (13., 2., 3.)
+
+
+def terms():
+    m, X = Ty('m'), frobenius.Ty('x')
+    a, b, c, P = map(closed.Ty, "abcP")
+    return (f, f >> g, f @ g, Symmetric.id(x),
+            Symmetric(x, y, Box('t', x @ p, y @ m), p, m),
+            Hypergraph.spiders(1, 2, X),
+            Closed(a @ b, c, closed.Box('k', a @ b @ P, c), P))
+
+
+def test_tree():
+    from discopy.utils import dumps, loads
+    for term in terms():
+        loaded = loads(dumps(term))
+        assert type(loaded) is type(term) and loaded == term
+
+
+def test_hash():
+    for term in terms():
+        assert hash(term) == hash(type(term)(*vars(term).values()))
+    assert len({f, Symmetric(x, y, Box('f', x @ p, y), p), g}) == 2

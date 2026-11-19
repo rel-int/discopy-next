@@ -113,6 +113,19 @@ def test_double_unroll_commute():
     assert np.allclose(lhs, rhs)
 
 
+def test_double_unroll_commute_on_a_daggered_box():
+    """The parity loop of #236: doubling `Xor` and `CopyBit` makes a
+    daggered `W`, which a functor into `Stream` used to dagger."""
+    click = (photonic.Create(1) @ photonic.Create(0) >> photonic.MZI(.15, 0)
+             >> photonic.NumberResolvingMeasurement(2)
+             >> classical.Mod2() @ classical.DiscardMode(1))
+    step = Diagram.id(bit) @ click >> classical.Xor() >> classical.CopyBit(2)
+    loop = step.feedback(mem=bit, state=classical.Bit(0))
+    assert {type(box).__name__ for box in loop.double().arg.boxes
+            if box.is_dagger} == {"W"}
+    assert loop.unroll(1).double() == loop.double().unroll(1)
+
+
 def composite_loops():
     """Loops with an open memory: the default `Discard` effect would make
     them impure, and `to_path` would refuse them for that reason rather
@@ -243,6 +256,16 @@ def test_to_drawing():
     assert core_wait.to_drawing() is not None
 
 
+def test_compound_memory_draws(tmp_path):
+    """#239: the default effect of a loop over a compound memory is one
+    multi-wire `Discard`, which the drawing backend used to refuse."""
+    mem = bit @ bit
+    state = classical.Bit(0) @ classical.Bit(0)
+    loop = Diagram.swap(mem, mem).feedback(mem=mem, state=state)
+    loop.unroll(1).draw(path=str(tmp_path / "loop.png"))
+    Discard(qmode @ bit).draw(path=str(tmp_path / "discard.png"))
+
+
 def test_qubit_delay_line():
     wait = Diagram.swap(qubit, qubit).feedback(state=qubits.Ket(0))
     unrolled = wait.unroll(1)
@@ -292,3 +315,15 @@ def test_simplify_picks_the_diagram_with_fewest_swaps():
         simplified.to_tensor().eval().array,
         unrolled.to_tensor().eval().array)
     assert ladder.simplify() == ladder
+
+
+def test_feedback_subs():
+    pytest.importorskip("sympy")
+    from sympy.abc import phi
+
+    def loop(phase):
+        cnot = qubits.Z(1, 2, phase) @ qubit >> qubit @ qubits.X(2, 1)
+        swap = Diagram.swap(qubit, qubit)
+        return (cnot >> swap).feedback(state=qubits.Ket("+"))
+    assert loop(phi).subs((phi, 0.5)) == loop(0.5)
+    assert loop(phi).lambdify(phi)(0.5) == loop(0.5)

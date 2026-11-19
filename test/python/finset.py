@@ -61,6 +61,15 @@ def test_FinSet():
         permutation[2]
     with raises(ValueError):
         permutation.index(2)
+    assert finset.Function({0: 1, 1: 0}, 2, 2) == function
+    with raises(ValueError):
+        finset.Function([0], 1, 2)
+    assert finset.Function.permutation([1, 2, 0], [1, 1, 1]).inside\
+        == [1, 2, 0]
+    assert finset.Function.permutation([0, 1], [1, 1])\
+        == finset.Function.id(2)
+    assert permutation != [1, 0] and hash(permutation) == hash((1, 0))
+    assert permutation.embed([2, 0], 3) == (2, 1, 0)
 
     x = Ty('x')
     copy, discard, swap = Diagram.copy(x), Diagram.copy(x, 0), Diagram.swap(x, x)
@@ -81,6 +90,19 @@ def test_gather():
         finset.Permutation.gather([0, 0], 2)
     with raises(ValueError):
         finset.Permutation.gather([1], 3, offset=3)
+
+
+def test_Permutation_repr():
+    from discopy import group, python  # noqa: F401, read by eval
+    from discopy.python import finset
+
+    p = finset.Permutation((2, 0, 1))
+    assert repr(p) == "python.finset.Permutation((2, 0, 1))"
+    assert str(p) == "(2, 0, 1)"
+    assert type(eval(repr(p))) is finset.Permutation and eval(repr(p)) == p
+    assert eval(repr(p)).dagger() == (1, 2, 0)
+    assert p == (2, 0, 1) and hash(p) == hash((2, 0, 1))
+    assert repr(group.Symmetric[3](p)) == "Symmetric[3]((2, 0, 1))"
 
 
 def test_Function_swap_is_symmetric():
@@ -108,6 +130,46 @@ def test_Function_permutation_moves_blocks():
     assert Function.permutation([0, 1], [2, 3]) == Function.id(5)
 
 
+def test_Function_then_checks_composability():
+    from discopy.utils import AxiomError
+    from discopy.python.finset import Function
+    f, g, h = Function([0, 1, 0], 2, 3), Function([4, 0], 5, 2),\
+        Function([1, 0], 2, 2)
+    for left, right in [(f, g), (f, h)]:
+        with raises(AxiomError):
+            left.then(right)
+    with raises(AxiomError):
+        h.then(h, f, h)
+    assert h.then(h, h) == h
+
+
+def test_Permutation_takes_only_bijections():
+    from discopy.utils import AxiomError
+    from discopy.python.finset import Function, Permutation
+    with raises(AxiomError):
+        Permutation.id(2) >> Function([1, 0], 3, 2)
+    for function in [Function([], 1, 0), Function([0], 2, 1)]:
+        with raises(ValueError):
+            Permutation.id(1) @ function
+    assert Permutation.id(2) >> Function([1, 0], 2, 2) == (1, 0)
+    assert Permutation.id(2).then(iter((1, 0))) == (1, 0)
+
+
+def test_Function_says_what_is_wrong():
+    from discopy.python.finset import Function
+    with raises(ValueError, match="function of length 2, got 1"):
+        Function([0], 1, 2)
+    with raises(ValueError, match=r"function to range\(2\), got \[0, 2\]"):
+        Function([0, 2], 2, 2)
+
+
+def test_counts_take_index():
+    from discopy.abc import Nat
+    from discopy.python.finset import Cospan, Function
+    assert Function.copy(2, Nat(3)) == Function.copy(2, 3)
+    assert Cospan.spiders(Nat(2), Nat(1), 2) == Cospan.spiders(2, 1, 2)
+
+
 def test_Cospan():
     from hypothesis import given
     from discopy.python.finset import Cospan
@@ -118,3 +180,16 @@ def test_Cospan():
     def at_most_max_size(cospan):
         assert cospan == Cospan([], [], 0)
     at_most_max_size()
+
+
+def test_Functor_into_Cospan_takes_its_dagger():
+    """ rel-int/discopy-next#373: a cospan declares a dagger category, so a
+    daggered box maps to the dagger of its image. """
+    from discopy import monoidal
+    from discopy.abc import DaggerCategory, Nat
+    from discopy.python.finset import Cospan
+    assert issubclass(Cospan, DaggerCategory)
+    x = monoidal.Ty('x')
+    f = monoidal.Box('f', x, x @ x)
+    F = monoidal.Functor({x: Nat(1)}, {f: Cospan.copy(1)}, cod=Cospan)
+    assert F(f.dagger()) == Cospan.copy(1).dagger() == Cospan.merge(1)

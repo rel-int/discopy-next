@@ -48,6 +48,20 @@ def test_sequence_box_of_its_category():
     assert type(box) is tensor.Box is tensor.Diagram.box_factory
 
 
+def test_sequence_of_a_name_is_one_wire():
+    mem = Ty.sequence('mem')
+    assert mem.now == Ty.sequence(symmetric.Ty('mem')).now
+    assert mem.now @ mem.later.now == symmetric.Ty('mem0', 'mem1')
+
+
+def test_feedback_errors():
+    x = Ty.sequence(symmetric.Ty('x'))
+    with raises(ValueError):  # A constant stream needs constant types.
+        Stream(symmetric.Box('g', x.now, x.now), dom=x, cod=x)
+    assert Stream.permutation([0, 1], [x, x]).now\
+        == symmetric.Id(x.now @ x.now)
+
+
 def test_feedback_forms():
     from pytest import raises
     x, y, m = (Ty.sequence(symmetric.Ty(name)) for name in "xym")
@@ -93,7 +107,7 @@ def test_last_and_without():
 def test_feedback_laws():
     from pytest import raises
     from discopy.abc import FeedbackCategory
-    from discopy.axioms import AxiomFailure
+    from discopy.testable import AxiomFailure
     x, y, m, n, w, z = (Ty.sequence(symmetric.Ty(name)) for name in "xymnwz")
     f = Stream.sequence('f', x @ (m @ n).delay(), y @ m @ n)
     g, h, k, e = (Stream.sequence(name, dom, cod) for name, (dom, cod) in zip(
@@ -106,7 +120,90 @@ def test_feedback_laws():
             ("tightening", dict(f=f, g=g, h=h, x=x, y=y, m=m @ n))):
         assert getattr(FeedbackCategory, law).bind(Stream).modulo(up_to)(
             **arguments)
-    sliding = dict(f=f, k=k, x=x, y=y, m=m @ n)
+    sliding = dict(f=f, k=k, x=x, y=y)
     assert not FeedbackCategory.sliding.bind(Stream).modulo(up_to)(**sliding)
     with raises(AxiomFailure):
         Stream.sliding(**sliding)
+
+
+def test_no_tree():
+    from discopy.utils import dumps
+    x = Ty(symmetric.Ty('x'))
+    for stream in (Stream.sequence('f', x, x),
+                   Stream(symmetric.Box('f', x.now, x.now))):
+        with raises(TypeError, match="A stream has no tree"):
+            dumps(stream)
+    assert "serialisation" not in Stream.axioms
+
+
+def test_singleton_equality_compares_the_callee():
+    """ The two ``singleton``s put the callee itself in `_later` rather than
+    a fresh lambda: the class for ``Ty``, which is one object, and the bound
+    ``Stream.id`` for ``Stream``, which is a fresh object every time but an
+    equal one. Either way two built the same way compare equal, where a
+    factory closing over its arguments does not. Why `_later` is compared at
+    all is the intensional equality of :class:`discopy.stream.Ty`, whose
+    doctests state it. """
+    x, y = symmetric.Ty('x'), symmetric.Ty('y')
+    assert Ty.singleton(x) == Ty.singleton(x)
+    assert Ty.singleton(x) != Ty.singleton(y)
+    f = Stream.singleton(symmetric.Box('f', x, y))
+    assert f == Stream.singleton(symmetric.Box('f', x, y))
+    assert f.later == Stream.id() and f.now == symmetric.Box('f', x, y)
+
+
+def test_no_hash():
+    """ Streams and their types stay unhashable, with the ``__hash__ = None``
+    a dataclass gives whatever it compares, see
+    :class:`discopy.stream.Ty` for the equality it goes with. """
+    x = Ty(symmetric.Ty('x'))
+    for unhashable in (Stream.sequence('f', x, x), x):
+        with raises(TypeError, match="unhashable"):
+            hash(unhashable)
+
+
+def test_delay_passes_the_initial_memory_through():
+    x, y, m = (Ty.sequence(symmetric.Ty(name)) for name in "xym")
+    f = Stream.sequence("f", x @ m.delay(), y @ m)
+    for stream in (Stream.sequence("g", x, y, m), f.feedback().later):
+        delayed = stream.delay()
+        delayed.check_later()
+        assert delayed.now == symmetric.Id(stream.mem.now)
+        assert delayed.later is stream
+        assert delayed.unroll().now.to_hypergraph()\
+            == stream.now.to_hypergraph()
+
+
+def test_up_to_memory_over_functions():
+    """ A category with no boxes reads the memory laws up to its steps. """
+    S, T = Stream[python.Function], Ty[python.Ty]
+    x = T(int)
+    inc = S(python.Function(lambda n: n + 1, (int, ), (int, )), x, x)
+    dbl = S(python.Function(lambda n: 2 * n, (int, ), (int, )), x, x)
+    assert S.bifunctoriality(inc, dbl, dbl, inc)
+    assert up_to_memory(inc) == up_to_steps(inc)
+
+
+def test_up_to_memory_is_no_box_named_memory():
+    """ A user box named like the memory does not close it. """
+    x, m = map(Ty.sequence, "xm")
+    f = Stream.sequence('f', x, x, m)
+    now = f.unroll(STEPS).now
+    state = symmetric.Box(MEMORY, symmetric.Ty(), now.dom[-1:])
+    effect = symmetric.Box(MEMORY, now.cod[-1:], symmetric.Ty())
+    closed = now.dom[:-1] @ state >> now >> now.cod[:-1] @ effect
+    assert up_to_memory(f) != closed.to_hypergraph()
+
+
+def test_up_to_memory_closes_the_memory_not_an_input():
+    """ The memory of an unrolled stream is the suffix of its boundary. """
+    x, y, m = map(Ty.sequence, "xym")
+    unrolled = Stream.sequence('f', x, y, m).unroll(STEPS)
+    assert unrolled.now.dom == unrolled.dom.now @ unrolled.mem_dom
+    assert unrolled.now.cod == unrolled.cod.now @ unrolled.mem_cod
+    closed = up_to_memory(Stream.sequence('f', x, y, m))
+    assert (closed.dom, closed.cod) == (unrolled.dom.now, unrolled.cod.now)
+    memory = [box for box in closed.boxes
+              if isinstance(box, Memory[symmetric.Box])]
+    assert [(box.dom, box.cod) for box in memory] == [
+        (symmetric.Ty(), unrolled.mem_dom), (unrolled.mem_cod, symmetric.Ty())]

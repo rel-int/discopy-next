@@ -15,6 +15,7 @@ This module lives outside ``test/*/*.py`` so the default ``pytest`` run never
 collects it. Run it explicitly and render the table/plot from the JSON it
 emits:
 
+    mkdir -p benchmark-results
     uv run pytest benchmark/ -v --benchmark-json=benchmark-results/bench.json
     uv run python benchmark/report.py benchmark-results/bench.json
 """

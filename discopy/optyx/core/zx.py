@@ -3,9 +3,7 @@ Overview
 --------
 
 ZX diagrams, to and from conversions with :code:`pyzx`,
-evaluation with to_tensor via :code:`quimb`,
-mapping to post-selected linear
-optical circuits :code:`zx_to_path`.
+evaluation with to_tensor via :code:`quimb`.
 
 
 Generators
@@ -19,18 +17,6 @@ Generators
     Spider
     Z
     X
-
-Functions
-----------
-.. autosummary::
-    :template: function.rst
-    :nosignatures:
-    :toctree:
-
-    zx_to_path
-    decomp
-    zx2path
-
 
 Examples of usage
 ------------------
@@ -50,6 +36,7 @@ The array properties of Z and X spiders agree with PyZX.
 """
 
 from math import pi
+from operator import index
 from typing import List
 
 import numpy as np
@@ -92,6 +79,9 @@ class ZXDiagram(diagram.Diagram):
         from pyzx import VertexType, EdgeType
 
         def node2box(node, n_legs_in, n_legs_out):
+            if graph.type(node) is VertexType.Z_BOX:
+                return ZBox(n_legs_in, n_legs_out,
+                            pyzx.utils.get_z_box_label(graph, node))
             if graph.type(node) not in {VertexType.Z, VertexType.X}:
                 raise NotImplementedError  # pragma: no cover
             return (
@@ -113,19 +103,6 @@ class ZXDiagram(diagram.Diagram):
                     + (scan[source],)
                     + scan[target:source]
                     + scan[source + 1:]
-                )
-            elif target > source:
-                swaps = (
-                    Id(diagram.Bit(source))
-                    @ diagram.Diagram.swap(diagram.Bit(1),
-                                           diagram.Bit(target - source))
-                    @ Id(diagram.Bit(len(scan) - target - 1))
-                )
-                scan = (
-                    scan[:source]
-                    + scan[source + 1: target]
-                    + (scan[source],)
-                    + scan[target:]
                 )
             else:
                 swaps = Id(diagram.Bit(len(scan)))
@@ -196,7 +173,7 @@ class ZXDiagram(diagram.Diagram):
             (node,) = graph.neighbors(output)
             etype = graph.edge_type((node, output))
             hadamard = H if etype == EdgeType.HADAMARD else Id(diagram.Bit(1))
-            scan, swaps = move(scan, scan.index(node), target)
+            scan, swaps = move(scan, scan.index(node, target), target)
             dgrm = (
                 dgrm
                 >> swaps
@@ -242,7 +219,10 @@ class ZXDiagram(diagram.Diagram):
             graph.set_position(node, i, 0)
         for row, (box, offset) in enumerate(zip(self.boxes, self.offsets)):
             if isinstance(box, diagram.Spider):
-                if isinstance(box, Spider):
+                if isinstance(box, ZBox):
+                    node = graph.add_vertex(VertexType.Z_BOX)
+                    pyzx.utils.set_z_box_label(graph, node, box.phase)
+                elif isinstance(box, Spider):
                     node = graph.add_vertex(
                         (VertexType.Z if isinstance(box, Z) else VertexType.X),
                         phase=box.phase * 2 if box.phase else None,
@@ -305,21 +285,6 @@ class ZXBox(diagram.Box, ZXDiagram):
         """Determine the output dimensions"""
         return [2 for _ in range(len(self.cod))]
 
-    def truncation(self, input_dims=None, output_dims=None) -> tensor.Box:
-        "Return a :class:`tensor.Box` with the underlying array"
-        out_dims = Dim(*[2 for i in range(len(self.cod))])
-        in_dims = Dim(*[2 for i in range(len(self.dom))])
-
-        return tensor.Box(self.name, in_dims, out_dims, self.array)
-
-    def __eq__(self, other):
-        return (
-            isinstance(other, type(self))
-            and self.name == other.name
-            and self.dom == other.dom
-            and np.all(self.data == other.data)
-        )
-
     def inflate(self, d):
         return self
 
@@ -330,6 +295,7 @@ class Spider(diagram.Spider, ZXBox):
     """
 
     def __init__(self, n_legs_in, n_legs_out, phase=0):
+        n_legs_in, n_legs_out = index(n_legs_in), index(n_legs_out)
         super().__init__(n_legs_in, n_legs_out, diagram.Bit(1), phase)
         factory_str = type(self).__name__
         phase_str = f", {self.phase}" if self.phase else ""
@@ -349,16 +315,26 @@ class Spider(diagram.Spider, ZXBox):
         return type(self)(len(self.dom), len(self.cod), phase=phase)
 
     def grad(self, var, **params):
-        """Gradient with respect to a variable."""
+        """
+        The gradient of a spider is a formal sum, see arXiv:2103.07960: the
+        all-zero entry of its array is constant and the derivative of the
+        all-one entry is :code:`2j * pi * phase'` times itself, i.e.
+        :code:`1j * pi * phase'` times the difference between the spider and
+        the spider shifted by half a turn, which negates that entry and fixes
+        the other. This is :code:`discopy.quantum.zx.Spider.grad`;
+        :class:`ZBox`, whose parameter is an amplitude, overrides it.
+        """
         # pylint: disable=unused-argument  # the signature of Diagram.grad
 
         if var not in self.free_symbols:
             return diagram.Sum((), self.dom, self.cod)
         gradient = self.phase.diff(var)
         gradient = complex(gradient) if not gradient.free_symbols else gradient
-        return diagram.Scalar(pi * gradient) @ type(self)(
-            len(self.dom), len(self.cod), self.phase + 0.5
-        )
+        n_legs_in, n_legs_out = len(self.dom), len(self.cod)
+        return diagram.Scalar(1j * pi * gradient) \
+            @ type(self)(n_legs_in, n_legs_out, self.phase) \
+            + diagram.Scalar(-1j * pi * gradient) \
+            @ type(self)(n_legs_in, n_legs_out, self.phase + .5)
 
     def dagger(self):
         return type(self)(len(self.cod), len(self.dom), -self.phase)
@@ -380,26 +356,65 @@ class Spider(diagram.Spider, ZXBox):
 
 
 class ZBox(Spider):
-    """Z box."""
+    """Z box.
+
+    Its parameter is an amplitude rather than an angle, so its array is
+    :math:`P_0 + w P_1` and :meth:`grad` is not :meth:`Spider.grad`. With no
+    legs it is the scalar :math:`1 + w`, the sum of its amplitudes, as a
+    legless :class:`Z` is.
+    """
 
     tikzstyle_name = "ZBox"
 
+    def grad(self, var, **params):
+        """
+        The array is linear in the amplitude, so the gradient is
+        :code:`w'` times :math:`P_1`, i.e. the difference between the box at
+        one and the box at zero.
+        """
+        # pylint: disable=unused-argument  # the signature of Diagram.grad
+
+        if var not in self.free_symbols:
+            return diagram.Sum((), self.dom, self.cod)
+        gradient = self.phase.diff(var)
+        gradient = complex(gradient) if not gradient.free_symbols else gradient
+        n_legs_in, n_legs_out = len(self.dom), len(self.cod)
+        return diagram.Scalar(gradient) \
+            @ type(self)(n_legs_in, n_legs_out, 1) \
+            + diagram.Scalar(-gradient) \
+            @ type(self)(n_legs_in, n_legs_out, 0)
+
     def truncation(self, input_dims=None, output_dims=None) -> tensor.Box:
+        amplitudes = [1, self.phase]
+        if not self.n_legs_in and not self.n_legs_out:
+            return tensor.Box(
+                self.name, Dim(1), Dim(1), [sum(amplitudes)])
         return zw.ZBox(
-            self.n_legs_in, self.n_legs_out, [1, self.phase]
+            self.n_legs_in, self.n_legs_out, amplitudes
         ).truncation([2] * self.n_legs_in)
 
 
 class Z(Spider):
-    """Z spider."""
+    """Z spider.
+
+    A spider with no legs is the scalar :math:`1 + e^{2i\\pi\\theta}`, i.e.
+    the sum of its amplitudes, which is what the spider's own definition
+    gives: it has no index left to carry them. A legless :class:`zw.ZBox`
+    reads its first amplitude instead, so this one is not one.
+
+    >>> for phase in [0, .25, .5]:
+    ...     assert np.allclose(
+    ...         Z(0, 0, phase).to_tensor().eval().array,
+    ...         Z(0, 0, phase).to_pyzx().to_tensor())
+    """
 
     tikzstyle_name = "Z"
 
     def truncation(self, input_dims=None, output_dims=None) -> tensor.Box:
-        return zw.ZBox(
+        return ZBox(
             self.n_legs_in, self.n_legs_out,
-            [1, np.exp(1j * self.phase * 2 * np.pi)]
-        ).truncation([2] * self.n_legs_in)
+            np.exp(1j * self.phase * 2 * np.pi)
+        ).truncation()
 
 
 class X(Spider):
@@ -433,7 +448,7 @@ def Id(n):
           else diagram.Diagram.id(diagram.Bit(n))
 
 
-H = ZXBox("H", 1, 1)
+H = ZXBox("H", 1, 1, is_dagger=None)
 H.draw_as_spider = False
 (H.drawing_name, H.tikzstyle_name,) = (
     "",
@@ -444,14 +459,6 @@ H.color, H.shape = "yellow", "rectangle"
 H.conjugate = lambda: H
 
 SWAP = diagram.Swap(diagram.bit, diagram.bit)
-SWAP.array = np.array([[1, 0, 0, 0], [0, 0, 1, 0], [0, 1, 0, 0], [0, 0, 0, 1]])
-
-
-def swap_truncation(diagram, _, __):
-    return tensor.Box(diagram.name, Dim(2, 2), Dim(2, 2), diagram.array)
-
-
-SWAP.truncation = swap_truncation
 
 
 class And(ZXBox):
@@ -474,7 +481,11 @@ class And(ZXBox):
     """
 
     def __init__(self, n=2, is_dagger: bool = False):
-        super().__init__("And", diagram.Bit(n), diagram.Bit(1))
+        self.n = n
+        dom, cod = diagram.Bit(1), diagram.Bit(n)
+        if not is_dagger:
+            dom, cod = cod, dom
+        super().__init__("And", dom, cod)
         self.is_dagger = is_dagger
 
     def truncation(
@@ -499,15 +510,17 @@ class And(ZXBox):
         )
 
     def determine_output_dimensions(self, input_dims):
-        if self.is_dagger:
-            return [2]*len(input_dims)
-        return [2]
+        return [2] * self.n if self.is_dagger else [2]
 
     def dagger(self):
-        return And(not self.is_dagger)
+        return And(n=self.n, is_dagger=not self.is_dagger)
+
+    def __repr__(self):
+        dagger = ", is_dagger=True" if self.is_dagger else ""
+        return f"{factory_name(type(self))}({self.n}{dagger})"
 
     def conjugate(self):
-        return And(n=self.dom.n, is_dagger=self.is_dagger)
+        return And(n=self.n, is_dagger=self.is_dagger)
 
 
 class Or(ZXBox):
@@ -530,7 +543,11 @@ class Or(ZXBox):
     """
 
     def __init__(self, n: int = 2, is_dagger: bool = False):
-        super().__init__("Or", diagram.Bit(n), diagram.Bit(1))
+        self.n = n
+        dom, cod = diagram.Bit(1), diagram.Bit(n)
+        if not is_dagger:
+            dom, cod = cod, dom
+        super().__init__("Or", dom, cod)
         self.is_dagger = is_dagger
 
     def truncation(
@@ -556,10 +573,14 @@ class Or(ZXBox):
         return box.dagger() if self.is_dagger else box
 
     def determine_output_dimensions(self, input_dims: List[int]) -> List[int]:
-        return [2] * len(input_dims) if self.is_dagger else [2]
+        return [2] * self.n if self.is_dagger else [2]
 
     def dagger(self):
-        return Or(n=self.dom.n, is_dagger=not self.is_dagger)
+        return Or(n=self.n, is_dagger=not self.is_dagger)
+
+    def __repr__(self):
+        dagger = ", is_dagger=True" if self.is_dagger else ""
+        return f"{factory_name(type(self))}({self.n}{dagger})"
 
     def conjugate(self):
-        return Or(n=self.dom.n, is_dagger=self.is_dagger)
+        return Or(n=self.n, is_dagger=self.is_dagger)
