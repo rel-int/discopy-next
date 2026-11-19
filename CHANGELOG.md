@@ -705,6 +705,12 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Fixed
 
+- The empty type of a colour is its own adjoint and reads back from its
+  `repr` below `monoidal`: `rigid.Ty.l` and `.r` kept the colour of a type
+  with no object to read it off, and `biclosed.Ty.__repr__` was
+  `monoidal.Ty.__repr__` without the branch that prints `Ty.id(colour)`, so
+  `Ty.id(Colour('black'))` printed as `rigid.Ty()` from `biclosed` down to
+  `frobenius` ([next#640]).
 - `utils.get_origin` of a union is the union of the origins, so that a
   `python.Function` type-checks a value of `frozenset[int] | None`, e.g. a
   channel of `Maybe` on a generic type ([next#134]).
@@ -2313,6 +2319,7 @@ for the changelog of `1.2.1` and earlier.
 [next#633]: https://github.com/rel-int/discopy-next/pull/633
 [next#634]: https://github.com/rel-int/discopy-next/pull/634
 [next#639]: https://github.com/rel-int/discopy-next/pull/639
+[next#640]: https://github.com/rel-int/discopy-next/pull/640
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#56]: https://github.com/rel-int/optyx/pull/56
