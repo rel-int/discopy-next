@@ -255,7 +255,7 @@ import sympy as sp
 from sympy import Expr, lambdify
 from discopy.cat import rsubs
 from discopy.utils import factory_name
-from discopy.matrix import backend
+from discopy.matrix import backend, is_field
 
 from discopy.optyx import channel
 from discopy.optyx.core import (
@@ -484,11 +484,9 @@ class AbstractGate(Channel, ABC):
             return param
         dtype = next(x for x in self.params
                      if array_backend(x) == self.backend).dtype
-        floating = getattr(dtype, "is_floating_point", None)
-        if floating is None:
-            floating = np.dtype(dtype).kind == "f"
         with backend(self.backend) as module:
-            return module.array(param, dtype=dtype if floating else None)
+            return module.array(
+                param, dtype=dtype if is_field(dtype) else None)
 
     @property
     def module(self):
