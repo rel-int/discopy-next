@@ -172,3 +172,38 @@ def test_delay_passes_the_initial_memory_through():
         assert delayed.later is stream
         assert delayed.unroll().now.to_hypergraph()\
             == stream.now.to_hypergraph()
+
+
+def test_up_to_memory_over_functions():
+    """ A category with no boxes reads the memory laws up to its steps. """
+    S, T = Stream[python.Function], Ty[python.Ty]
+    x = T(int)
+    inc = S(python.Function(lambda n: n + 1, (int, ), (int, )), x, x)
+    dbl = S(python.Function(lambda n: 2 * n, (int, ), (int, )), x, x)
+    assert S.bifunctoriality(inc, dbl, dbl, inc)
+    assert up_to_memory(inc) == up_to_steps(inc)
+
+
+def test_up_to_memory_is_no_box_named_memory():
+    """ A user box named like the memory does not close it. """
+    x, m = map(Ty.sequence, "xm")
+    f = Stream.sequence('f', x, x, m)
+    now = f.unroll(STEPS).now
+    state = symmetric.Box(MEMORY, symmetric.Ty(), now.dom[-1:])
+    effect = symmetric.Box(MEMORY, now.cod[-1:], symmetric.Ty())
+    closed = now.dom[:-1] @ state >> now >> now.cod[:-1] @ effect
+    assert up_to_memory(f) != closed.to_hypergraph()
+
+
+def test_up_to_memory_closes_the_memory_not_an_input():
+    """ The memory of an unrolled stream is the suffix of its boundary. """
+    x, y, m = map(Ty.sequence, "xym")
+    unrolled = Stream.sequence('f', x, y, m).unroll(STEPS)
+    assert unrolled.now.dom == unrolled.dom.now @ unrolled.mem_dom
+    assert unrolled.now.cod == unrolled.cod.now @ unrolled.mem_cod
+    closed = up_to_memory(Stream.sequence('f', x, y, m))
+    assert (closed.dom, closed.cod) == (unrolled.dom.now, unrolled.cod.now)
+    memory = [box for box in closed.boxes
+              if isinstance(box, Memory[symmetric.Box])]
+    assert [(box.dom, box.cod) for box in memory] == [
+        (symmetric.Ty(), unrolled.mem_dom), (unrolled.mem_cod, symmetric.Ty())]

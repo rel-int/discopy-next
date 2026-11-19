@@ -53,6 +53,7 @@ Summary
     L
     R
     Delay
+    Bang
     Over
     Under
     Repeat
@@ -525,6 +526,22 @@ class Delay[Coarse, Object](Constructor):
         return category.id(obj).delay().dom
 
 
+class Bang[Coarse, Object](Constructor):
+    """
+    The bang of an object in a signature, read off the bang of its identity
+    in a category ``Coarse``, i.e. ``Coarse.id(M).bang().dom``, as
+    :class:`Delay` reads the delay, so that a category whose bang is the
+    identity reads each object as its own bang.
+
+    >>> from discopy.biclosed import Ty, Diagram
+    >>> assert Bang[Diagram, Ty('x')] == Ty('x').bang()
+    """
+    @staticmethod
+    def form(*args):
+        category, obj = args
+        return category.id(obj).bang().dom
+
+
 class Over[Base, Exponent](Constructor):
     """ The exponential on the left in a signature, ``base << exponent``. """
     @staticmethod
@@ -588,10 +605,12 @@ def position(variable: TypeVar, category: type) -> int | None:
 def inhabits(value, kind) -> bool:
     """
     Whether a value has an evaluated type of a sequent: a morphism of
-    ``Hom[C, dom, cod]`` has that boundary, the value of ``Var[T, x]`` is
-    ``x``, an equation of ``Equation[T]`` has terms of type ``T``, as an
-    inequation of ``Inequation[T]`` does, a tuple of ``tuple[T, ...]`` has
-    its elements of these types and ``type[T]`` is a subclass of ``T``.
+    ``Hom[C, dom, cod]`` has that boundary, compared by the
+    :meth:`discopy.abc.Category.ob_equation` of ``C``, the value of
+    ``Var[T, x]`` is ``x``, an equation of ``Equation[T]`` has terms of
+    type ``T``, as an inequation of ``Inequation[T]`` does, a tuple of
+    ``tuple[T, ...]`` has its elements of these types and ``type[T]`` is a
+    subclass of ``T``.
 
     >>> from discopy.monoidal import Ty, Box, Diagram
     >>> x, y = Ty('x'), Ty('y')
@@ -605,7 +624,8 @@ def inhabits(value, kind) -> bool:
     origin, args = get_origin(kind), get_args(kind)
     if origin is Hom:
         return isinstance(value, args[0])\
-            and (value.dom, value.cod) == args[1:]
+            and bool(args[0].ob_equation(value.dom, args[1]))\
+            and bool(args[0].ob_equation(value.cod, args[2]))
     if origin is Var:
         return value == args[1]
     if isinstance(origin, type) and issubclass(origin, Equation):
@@ -641,8 +661,8 @@ class Declaration[**P, T](classmethod):
     object expression and :data:`typing.Self` a term, and the return
     annotation the type of its output, see :meth:`output`. Object
     expressions are built by :class:`Tensor`, :class:`Unit`, :class:`L`,
-    :class:`R`, :class:`Delay`, :class:`Over`, :class:`Under` and
-    :class:`Repeat`, which stay expressions until the variables are
+    :class:`R`, :class:`Delay`, :class:`Bang`, :class:`Over`, :class:`Under`
+    and :class:`Repeat`, which stay expressions until the variables are
     substituted, see :func:`substitute`. The type parameters of the class
     stating it stand for what :meth:`discopy.abc.Category.typeparams` says,
     see :func:`position`, and the annotations are read as objects, see

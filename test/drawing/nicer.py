@@ -81,6 +81,18 @@ def test_wires_of_a_swap_are_its_strands():
     assert features(swap)["bends"] == 1
 
 
+def test_wires_of_dual_rail_boxes_are_their_rails():
+    from discopy.ribbon import (
+        Ty as T, DualRailBraid, DualRailTwist, DualRailCup, DualRailCap)
+    y, ribbon = T('x'), T('x') @ T('x')
+    braid = DualRailBraid(ribbon, ribbon).to_drawing()
+    assert len(wires(braid)) == 12 and features(braid)["bends"] == 1 / 3
+    assert len(wires(DualRailTwist(ribbon).to_drawing())) == 6
+    for box in (DualRailCup, DualRailCap):
+        drawing = box(ribbon, y.r @ y.r).to_drawing()
+        assert len(wires(drawing)) == 6 and features(drawing)["bends"] > 0
+
+
 def test_rectangles_of_a_relaid_out_drawing():
     drawing = (f >> g).to_drawing()
     scaled = drawing.relayout([2 * v for v in drawing.layout()])
@@ -96,3 +108,40 @@ def test_features_of_a_relayout_and_of_spiders():
     from discopy.utils import text_width
     (left, _, right, _), = rectangles(Z(1, 1, 0.123456789).to_drawing())
     assert right - left >= text_width('0.123456789')
+
+
+def test_stretch_and_nicer_layout():
+    from pytest import raises
+    from discopy.drawing.nicer import stretch, knots, clearance, nicer_layout
+    drawing = (f @ x @ x >> x @ g @ x >> x @ x @ f >> h @ x >> h).foliation(
+    ).to_drawing()
+    xs, ys = knots(drawing)
+    n = len(drawing.boxes)
+    ones = [1] * (len(xs) - 1), [1] * (len(ys) - 1), [1] * n, [1] * n
+    assert stretch(drawing, *ones).layout() == drawing.layout()
+    with raises(ValueError):
+        stretch(drawing, ones[0], ones[1], [9] * n, ones[3])
+    labelled = Box('a_long_label', x, x).to_drawing()
+    xs, ys = knots(labelled)
+    (low, high), = stretch(labelled, [1] * (len(xs) - 1), [1] * (len(ys) - 1),
+                           [.1], [1]).rectangles()
+    assert high.x - low.x >= labelled.boxes[0].min_width
+    with raises(ValueError, match="each gap"):
+        stretch(drawing, [], [], [], [])
+    off_centre = Box('e', x @ x, x) @ x >> Box('t', x @ x, x @ x)\
+        >> Box('r', x, Ty()) @ x
+    moved = off_centre.to_drawing()
+    assert len(knots(moved)[0]) > len({p.x for p in moved.positions.values()})
+    assert nicer_layout(moved).is_feasible(moved)
+    nicer = nicer_layout(drawing)
+    assert hand_score(nicer) > hand_score(drawing)
+    assert clearance(nicer) >= clearance(drawing)
+    assert nicer_layout(drawing, score=lambda d: 0) is drawing
+
+
+def test_clearance_and_shape_at_the_edges():
+    from discopy.drawing import Drawing
+    from discopy.drawing.nicer import clearance, shape
+    state = Box('s', Ty(), x).to_drawing()
+    assert clearance(state) > 0
+    assert shape(Drawing.id(Ty())) == [0, 0, 0, 0]

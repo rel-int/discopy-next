@@ -9,11 +9,74 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Added
 
+- `abc.BraidedCategory.braid_inverse`, the inverse of the braid, by default
+  its dagger and in a `abc.SymmetricCategory` the swap the other way round,
+  and `abc.DaggerMonoidalCategory`, the first class with both a dagger and a
+  tensor ([next#485]).
+- `monad.algebra.Algebra.product` and `Algebra.power`, the products of the
+  Eilenberg-Moore category, `monad.algebra.Operation`, a value of `M(n)` acting
+  on every algebra as a function `Aⁿ → A` that every homomorphism commutes
+  with, and `monad.algebra.Writer`, the writer monad `G × -` of a group, whose
+  algebras on `range(n)` are its `group.Action`s ([next#134]).
+- `lambek.abstract`'s docs build an abstract categorial grammar from English to
+  Lean: "DisCoPy diagrams are the arrows of the free premonoidal category"
+  prints the statement `lean/Statements/English.lean` proves ([next#622]).
+- Opt-in Triton forward and backward kernels for signed block peer
+  reductions in `neural.geometric`, with PyTorch fallbacks for unsupported
+  devices, dtypes and large blocks, and support for `torch.compile`
+  ([next#377]).
+- `drawing.from_picture(jpeg, config)`: the diagram a picture shows, read
+  by `drawing.vision`, a pixel net (`PixelNet`) that classes each pixel and
+  a small OCR model (`OCR`) that reads box names and wire types, then decoded
+  in the least module it decodes in (`picture.decode_least`); with `train`,
+  `train_ocr` and `evaluate`, and `picture.crop` ([next#602]).
+- `lambek.categorial.Parser`, the chart parser of the reproduction of Bobcat
+  (Clark, 2021) on CCGrebank: a CKY chart over the binary and unary rules
+  seen in the treebank and the schemata of `schemata` at a penalty, scored by
+  the log-probabilities of a supertagger and a span classifier, each cell the
+  best `Derivation` of each category in a beam. A derivation is a categorial
+  diagram by `tree2diagram`. `structure`, `render` and `normalise` read the
+  categories of the treebank with their features ([next#603]).
+- `lambek.categorial.Parser.from_pretrained` loads the model of the Bobcat
+  reproduction, `rel-int/bobcat-rebank-deberta-v3-large` on Hugging Face, and
+  a parser called on a sentence gives its categorial diagram, with a label for
+  every span if it can. `lambek.neural.Encoder` gives each word the state of
+  its first subword, and `lambek.neural.ChartClassifier` gives a supertag for
+  each word and a label for each span. `transformers` joins the `lambek` extra
+  ([next#604]).
+- `drawing.picture.decode` and `read`: a picture's pixel classes back to
+  its diagram. `regions` splits them into boxes, wires and labels, `attach`
+  hangs each label on its wire, `refine` writes the names and types read
+  back, and `scan` picks the smallest module whose primitives appear, at
+  least compact when a type is an adjoint ([next#601]).
+- `drawing.picture`, pictures of diagrams as training data for reading them
+  back: `samples` draws random diagrams of `monoidal`, `symmetric`,
+  `compact` or `frobenius` one generator at a time, renders each with a mask
+  labelling every pixel by its wire type, box name or structural primitive,
+  by hand with `xkcd`; `augment` warps, rotates and changes the perspective
+  of the image and its mask together, then restyles the image alone (chalk,
+  whiteboard, blur, JPEG); `draw(backend=...)` takes the backend to draw with
+  ([next#573]).
+- `abc.LinearCategory`, a linear category (Bierman, TLCA 1995) without
+  symmetry: a comonad `bang` with `dereliction` and `digging`, lax monoidal
+  with a `laxator`, each `!x` a comonoid by `contraction` and `weakening`, and
+  an invertible `exchange` of `!x` with any object, its 28 laws as axioms.
+  `biclosed` is the free one: `BangOb`, the wire holding a type inside
+  `x.bang()`, `Bang`, the bubble `f.bang()`, and the boxes `Dereliction`,
+  `Digging`, `Contraction`, `Weakening`, `Exchange` and `Laxator`. A `Functor`
+  sends them through the `bang` and the structure of its codomain when its
+  types are biclosed, and through its `ob_map` and `ar_map` otherwise. The
+  laws are declared failing on the free category ([next#571]).
 - `discopy.drawing.nicer`: nine hand features of a drawing, each a cost
   (wire length, bends, slope, aspect, asymmetry, whitespace, misalignment,
   label overlap, area), `hand_score` minus their weighted sum, with equal weights
   until fitted on votes, and `make_nicer`, the foliation of a diagram whose
   drawing scores best, or the diagram itself on a tie ([next#582]).
+- `discopy.drawing.nicer.nicer_layout` searches the geometry of a drawing:
+  `stretch` scales its column and row gaps and its box sizes through
+  `Drawing.relayout`, and a step is kept when it scores better and keeps the
+  `clearance` between boxes and from the inputs' and outputs' rows
+  ([next#598]).
 - `Drawing.layout`, the geometry of a drawing as a vector: the coordinates
   of its nodes, box corners included. `Drawing.relayout` takes a vector back
   to a drawing and refuses one that `Drawing.is_feasible` says draws another
@@ -95,6 +158,16 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   the law. `Ty.strategy`, `Ty.generator_strategy` and `Stream.strategy`
   generate the terms those laws quantify over; the property matrix does not
   check streams yet, see [next#533] ([next#535]).
+- `abc.Category.ob_equation`, how a category compares its objects, `==` by
+  default, as `equation_factory` says how it compares its arrows:
+  `testable.inhabits` checks the boundary of a term with it. `stream.Stream`
+  compares types over their first `stream.STEPS` steps (`stream.steps`), and
+  reads `bifunctoriality`, `strength` and `tightening` up to a permutation of
+  the memory wires: `stream.up_to_memory` closes each one with a box of its
+  own class, `stream.Memory[B]` over boxes `B`, whose order the isomorphism of
+  hypergraphs forgets, and over a category with no boxes, e.g.
+  `python.Function`, is `stream.up_to_steps`. The property matrix checks
+  streams ([next#627], ruling on [next#533]).
 - `neural.propagation`, belief propagation: `sum_product` is the
   sum-product algorithm on a factor table as a network with a trace, from
   the tensor of each factor to the belief of each node, its traced legs the
@@ -133,6 +206,11 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   copies its positive half and merges the copies of its negative half, as
   the reverse derivative of a fan-out sums the gradients, and `discard`
   puts the noise ([next#511]).
+- `lens.Prism`, the prisms `(match, build)` over a comarkov category, the
+  dual of `lens.Markov`: a symmetric lens whose residual is what `match`
+  fails on, merged with what `build` builds, defined as a Markov lens over
+  the opposite category `op.Markov`, e.g. the constructors of a sum type
+  over `python.additive.Function` ([next#42]).
 - The rig laws of `neural.network.Dims` as axioms, checked by the property
   matrix: `product_unitality`, `product_associativity`, `absorption` and
   `distributivity_right` on the nose, `distributivity_left` up to a
@@ -259,10 +337,13 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   `CMap.sweep` and `CMap.match`.
 - `hypergraph.Rewriter`, double-pushout rewriting in place with left-linear
   rules, each step in the size of the rule rather than of the host.
-- `quantum.graphlike`, graph-like ZX diagrams as hypergraphs with one box for
-  Hadamard, simplified up to a scalar by the rules of PyZX's `full_reduce` on
-  a `hypergraph.Rewriter`, raced against PyZX in `benchmark/test_zx.py`
-  ([next#302]).
+- `Hypergraph.phases`, a phase on each spider of a hypergraph category, added
+  by the fusion of spiders and negated by the dagger ([next#375]).
+- `quantum.zx.Hypergraph`, ZX diagrams as graph-like hypergraphs: green
+  spiders with their phase, Hadamard boxes and an exact scalar, a
+  `quantum.zx.Number`, a red spider being green behind Hadamards, simplified
+  on the nose by the rules of PyZX's `full_reduce` on a `quantum.zx.Rewriter`,
+  raced against PyZX in `benchmark/test_zx.py` ([next#302], [next#375]).
 - `discopy.ehypergraph`, e-graphs of diagrams with sharing, with congruence
   closure, rewriting and e-matching.
 - `Hypergraph.pass_token`, evaluation over a disjoint-union tensor ([#363],
@@ -291,6 +372,8 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 - `quantum.reservoir`, quantum reservoir computing ([#519]), the `Rydberg`
   ansatz ([#586]), and `quantum.contextuality`, the contextual fraction
   ([next#283]).
+- `Reservoir.fit(..., washout=k)` leaves the first `k` time steps, the
+  transient of the initial state, out of the regression ([next#216]).
 - `discopy.optyx`, moved in from rel-int/optyx with its 358 commits and
   their authors: ZX, ZW and linear-optical diagrams, channels, feedback and
   a compiler to photonic hardware, under the Apache License 2.0 in its own
@@ -359,6 +442,45 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Changed
 
+- `drawing.Drawing`, `python.finset.Cospan` and `interaction.Diagram`
+  declare `abc.DaggerCategory`, the reflection of a drawing being
+  involutive, with its contravariance and monoidality declared failing on
+  the nose, and the dagger laws of `Int(compact.Diagram)` declared failing,
+  feedback having no dagger; `python.additive.Function.dagger`, defined on
+  swaps alone, is `inverse`; and a functor maps a daggered box as the dagger of its image
+  when its codomain is a `DaggerCategory` that `has_dagger`, which integer
+  diagrams over a category with no dagger do not, not whenever it has a
+  `dagger` ([next#631]).
+- `abc.BraidedCategory`'s `braid_then_inverse`, `inverse_then_braid` and
+  `inverse_braiding` read the inverse braid from `braid_inverse`, not from
+  the dagger of the braid, and `dagger_monoidality` is stated by
+  `abc.DaggerMonoidalCategory`, no longer by `abc.DaggerCategory` ([next#485]).
+- `Matrix.__init__` no longer copies an array that already has its dtype:
+  on numpy the matrix keeps a read-only view of it, so writing into
+  `m.array` raises and the caller's array stays writeable, and a torch
+  tensor stays shared with the caller ([next#616]).
+- The dagger of an `optyx.core` box defined by its array keeps its name and
+  flips `is_dagger`, as `cat.Box.dagger` does, so `f[::-1][::-1] == f`; a
+  box with `is_dagger=None` is self-adjoint and is its own dagger. A dagger
+  prints `f[::-1]`, not `f.dagger()`. Truncating a dagger gives the dagger
+  of the truncated box, and its repr prints the array, so it reads back. An
+  array with an axis per wire is daggered wire by wire, where it used to be
+  transposed as a matrix, which reversed the order of its wires
+  ([next#630]).
+- `monoidal.Diagram.encode` gives its domain and one list of `(box, offset)`
+  per layer, so that `decode(*d.encode()) == d` on a foliated diagram too;
+  `decode` reads that or a flat list, one box per layer, and
+  `to_staircases` flattens the layers itself. This breaks a caller that
+  reads the second element of `encode` as flat `(box, offset)` pairs: the
+  old list is `list(zip(d.boxes, d.offsets))`, which `decode` still reads,
+  one box per layer ([next#629]).
+- The TikZ backend sets a box label at 8 points and a wire label at 7, below
+  and to the right of its port as in Matplotlib, in the colour the backend
+  picks for it, and a unit of its picture is 8/12 inch, which fits the width
+  the layout measures for a label: every box fits its label, and pictures are
+  1.7 times larger. A wire of a drawing is named by its object's
+  `drawing_name` when it has one, and a `monoidal.Dim` is drawn as its
+  numbers, `4` for `Dim(4)` ([next#605]).
 - `egraph.EGraph.saturate` runs its rounds on one `Builder`, freezing it
   after each round that changes something: associativity and commutativity
   of `+` on five leaves saturate 55 times faster, and on six in under a
@@ -570,12 +692,49 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Removed
 
+- The declarations of `cat.Arrow` and `abc.Group` that `dagger_monoidality`
+  does not apply, now that a class with no tensor does not state it
+  ([next#485]).
 - Parameters nothing read: `Tree.to_diagram(contravariant)`,
   `Tree.from_nltk(lexicalised, word_types)`, `Drawing.id(length)`,
   `markov.Diagram.discard(n)` and `Backend(linewidth)` ([#768]).
+- The notebook `docs/notebooks/optyx/test_light_cones.md`, which imported
+  modules removed from optyx: it was the prototype of the light-cone bound
+  that `optyx.utils.misc.get_max_dim_for_box` computes for
+  `Diagram.to_tensor`, now unit-tested ([next#249]).
 
 ### Fixed
 
+- `utils.get_origin` of a union is the union of the origins, so that a
+  `python.Function` type-checks a value of `frozenset[int] | None`, e.g. a
+  channel of `Maybe` on a generic type ([next#134]).
+- A `Permutation` given an iterable that is not a sequence, e.g. an
+  iterator, a generator or a dict's keys, reads it once into a list, so
+  `Permutation(x @ y, iter([1, 0]))` is the `Swap` the list form gives
+  ([next#31]).
+- `optyx.channel.Sum.double` doubles a sum coherently, cross terms included,
+  as the doubling of the channel whose Kraus map is `get_kraus()`: the doubled
+  Bell sum is the Bell state and no longer the mixture, `(BS + BS).double()` is
+  four times `BS.double()`, and a sum with an impure term refuses; the
+  conjugate of an empty `optyx.core.diagram.Sum` keeps its types ([next#252]).
+
+- `Matrix.lambdify(*symbols, modules=...)` no longer raises `TypeError`:
+  the `modules` given replace the backend's ([next#619]).
+- `optyx.channel.Channel.lambdify` and `subs` substitute in its Kraus map,
+  so `subs` on e.g. `Phase(x).inflate(2)` no longer keeps `x`; the
+  channel keeps its name ([next#619]).
+- The hand features of `drawing.nicer` count the rails of a dual rail
+  braid, twist, cup and cap, each read as the chord between its ends by
+  `Backend.dual_rail_wires`, as `Backend.crossing_wires` reads the strands of
+  a crossing ([next#609]).
+- `drawing.PlaneGraph` prints the adjacency of its graph rather than the
+  graph's address, so a `Drawing` reads back from its representation and
+  prints the same one for equal drawings: its nodes and their successors
+  are sorted by `Node.index`, and an adjacency, unlike a list of edges,
+  keeps a node that has none ([next#623]).
+- The TikZ backend fills the coloured regions of a diagram, so a ribbon is
+  filled along its straight rails and not only at its folds and braids; the
+  loop over `region_cells` moves from `Matplotlib` to `Backend` ([next#605]).
 - The TikZ backend escapes in a label what LaTeX reads as markup outside
   the mathematics between dollars, an underscore, an ampersand, a percent
   and a hash, and keeps `<<` and `>>` from joining into guillemets
@@ -644,8 +803,7 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   two layers, the same hypergraph but not the same diagram, which `explore`
   found ([next#505]).
 - `optyx.core.zx.H` is its own dagger: a box declares itself self-adjoint
-  with `is_dagger=None`, as `quantum.gates.SWAP` does, where the optyx
-  dagger otherwise returns a differently named copy — so `H[::-1] == H`
+  with `is_dagger=None`, as `quantum.gates.SWAP` does, so `H[::-1] == H`
   and `to_pyzx` translates a daggered Hadamard, which `from_pyzx` reads
   back as `H` ([next#498]).
 - Every dual rail diagram serialises: `balanced.DualRailBraid`,
@@ -849,6 +1007,8 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   teleportation and distinguishability assertions check what the prose around
   them claims: `np.isclose` was reading a `3` as a 300% relative tolerance, and
   `np.allclose` a doubled identity channel as one ([next#314]).
+- Preserve block free axes under dynamic `torch.compile` in
+  `neural.wiring` ([next#377]).
 - What the property matrix of [next#1] found, each with its test:
   `Feedback.dagger` and `rotate` raise `AxiomError`, as either would feed
   the memory back in time; `para.Compact.curry` keeps the coparameters and
@@ -873,7 +1033,7 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   spider with several outputs to the outputs it is joined to: it used to move
   the leg already placed at an earlier output, so the tensor differed from
   PyZX's ([next#313]).
-- `quantum.graphlike.size` counts two spiders as joined when an odd number of
+- `quantum.zx.Hypergraph.size` counts two spiders as joined when an odd number of
   Hadamards lie between them, as `to_pyzx` does: a Hadamard self-loop is a
   phase and two parallel Hadamards cancel ([next#349]).
 - `optyx.core.zx.And` and `Or`: the dagger keeps the number of bits instead of
@@ -1495,8 +1655,8 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   ([next#445]).
 - `lambek.cfg.Id(x).to_diagram()` is `monoidal.Id(x)`, so the diagram of a
   tree with an identity branch has no spurious `Id(x)` box ([next#445]).
-- `quantum.graphlike.size` counts a phase-free spider with three or more ports
-  and no box (e.g. a reduced `Z(1, 2)`), as PyZX does after its own
+- `quantum.zx.Hypergraph.size` counts a phase-free spider with three or more
+  ports and no box (e.g. a reduced `Z(1, 2)`), as PyZX does after its own
   `full_reduce`; only a bare wire, cup or cap counts as no spider ([next#445]).
 - `lambek.categorial.tree2diagram(tree, dom=...)` gives `dom` to every word of
   the tree, not only to a tree that is a single word ([next#445]).
@@ -1599,6 +1759,21 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Project
 
+- `build`'s Coverage step combines with `--debug=dataio`, naming each data file
+  it merges, and fails with its own error when it merged fewer than two: the
+  controller of `pytest -n auto` writes one and each worker one more, so the
+  controller's alone measured no test and read as a 36% fail-under regression.
+  `.github/tests/build_coverage.py` runs the step with and without the
+  workers' files ([next#596]).
+- The docs' reference API is syntax (with `testable` first), semantics (with
+  `drawing` at its end), `neural`, quantum, optyx and lambek, and the notebooks
+  are grouped by field: What is a diagram?, quantum, optyx, linguistics and
+  machine learning. `api/testable.html` and `api/drawing.html` are gone: their
+  modules are listed under syntax and semantics ([next#634]).
+- The Read the Docs build fits its 15-minute limit: the sidebar shows the
+  current page's branch alone, and Read the Docs links to each notebook's
+  source rather than running it, as a pull request's build does: the hosted
+  site no longer shows the notebooks' outputs ([next#633]).
 - `proptest` groups a push to `main` by commit, as `build`, `benchmark`
   and `lean` do, and a scheduled or dispatched run by its own run id:
   one group per ref keeps one running and one pending run, so a third merge
@@ -1912,6 +2087,7 @@ for the changelog of `1.2.1` and earlier.
 [next#16]: https://github.com/rel-int/discopy-next/issues/16
 [next#21]: https://github.com/rel-int/discopy-next/issues/21
 [next#31]: https://github.com/rel-int/discopy-next/issues/31
+[next#42]: https://github.com/rel-int/discopy-next/issues/42
 [next#49]: https://github.com/rel-int/discopy-next/issues/49
 [next#52]: https://github.com/rel-int/discopy-next/issues/52
 [next#56]: https://github.com/rel-int/discopy-next/issues/56
@@ -1971,10 +2147,12 @@ for the changelog of `1.2.1` and earlier.
 [next#187]: https://github.com/rel-int/discopy-next/issues/187
 [next#201]: https://github.com/rel-int/discopy-next/issues/201
 [next#214]: https://github.com/rel-int/discopy-next/pull/214
+[next#216]: https://github.com/rel-int/discopy-next/issues/216
 [next#225]: https://github.com/rel-int/discopy-next/issues/225
 [next#236]: https://github.com/rel-int/discopy-next/issues/236
 [next#249]: https://github.com/rel-int/discopy-next/issues/249
 [next#250]: https://github.com/rel-int/discopy-next/issues/250
+[next#252]: https://github.com/rel-int/discopy-next/issues/252
 [next#254]: https://github.com/rel-int/discopy-next/issues/254
 [next#258]: https://github.com/rel-int/discopy-next/issues/258
 [next#260]: https://github.com/rel-int/discopy-next/issues/260
@@ -2006,7 +2184,9 @@ for the changelog of `1.2.1` and earlier.
 [next#350]: https://github.com/rel-int/discopy-next/issues/350
 [next#351]: https://github.com/rel-int/discopy-next/issues/351
 [next#359]: https://github.com/rel-int/discopy-next/issues/359
+[next#375]: https://github.com/rel-int/discopy-next/pull/375
 [next#376]: https://github.com/rel-int/discopy-next/issues/376
+[next#377]: https://github.com/rel-int/discopy-next/issues/377
 [next#382]: https://github.com/rel-int/discopy-next/issues/382
 [next#386]: https://github.com/rel-int/discopy-next/issues/386
 [next#387]: https://github.com/rel-int/discopy-next/issues/387
@@ -2037,6 +2217,7 @@ for the changelog of `1.2.1` and earlier.
 [next#472]: https://github.com/rel-int/discopy-next/issues/472
 [next#477]: https://github.com/rel-int/discopy-next/issues/477
 [next#482]: https://github.com/rel-int/discopy-next/issues/482
+[next#485]: https://github.com/rel-int/discopy-next/issues/485
 [next#488]: https://github.com/rel-int/discopy-next/issues/488
 [next#489]: https://github.com/rel-int/discopy-next/issues/489
 [next#490]: https://github.com/rel-int/discopy-next/issues/490
@@ -2090,6 +2271,8 @@ for the changelog of `1.2.1` and earlier.
 [next#568]: https://github.com/rel-int/discopy-next/pull/568
 [next#569]: https://github.com/rel-int/discopy-next/pull/569
 [next#570]: https://github.com/rel-int/discopy-next/pull/570
+[next#571]: https://github.com/rel-int/discopy-next/pull/571
+[next#573]: https://github.com/rel-int/discopy-next/pull/573
 [next#575]: https://github.com/rel-int/discopy-next/pull/575
 [next#577]: https://github.com/rel-int/discopy-next/pull/577
 [next#578]: https://github.com/rel-int/discopy-next/pull/578
@@ -2102,7 +2285,25 @@ for the changelog of `1.2.1` and earlier.
 [next#587]: https://github.com/rel-int/discopy-next/pull/587
 [next#589]: https://github.com/rel-int/discopy-next/pull/589
 [next#591]: https://github.com/rel-int/discopy-next/pull/591
+[next#596]: https://github.com/rel-int/discopy-next/issues/596
 [next#597]: https://github.com/rel-int/discopy-next/pull/597
+[next#598]: https://github.com/rel-int/discopy-next/pull/598
+[next#601]: https://github.com/rel-int/discopy-next/pull/601
+[next#602]: https://github.com/rel-int/discopy-next/pull/602
+[next#603]: https://github.com/rel-int/discopy-next/pull/603
+[next#604]: https://github.com/rel-int/discopy-next/pull/604
+[next#605]: https://github.com/rel-int/discopy-next/pull/605
+[next#609]: https://github.com/rel-int/discopy-next/pull/609
+[next#616]: https://github.com/rel-int/discopy-next/pull/616
+[next#619]: https://github.com/rel-int/discopy-next/pull/619
+[next#622]: https://github.com/rel-int/discopy-next/pull/622
+[next#623]: https://github.com/rel-int/discopy-next/pull/623
+[next#627]: https://github.com/rel-int/discopy-next/pull/627
+[next#629]: https://github.com/rel-int/discopy-next/pull/629
+[next#630]: https://github.com/rel-int/discopy-next/pull/630
+[next#631]: https://github.com/rel-int/discopy-next/pull/631
+[next#633]: https://github.com/rel-int/discopy-next/pull/633
+[next#634]: https://github.com/rel-int/discopy-next/pull/634
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#56]: https://github.com/rel-int/optyx/pull/56

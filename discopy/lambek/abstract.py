@@ -151,6 +151,117 @@ raising curry, and crossed composition composes.
 Alice loves Bob
 >>> print(Alice(loves(Bob), left=True).to_abstract())
 loves(Bob)(Alice)
+
+From English to Lean
+--------------------
+
+Two lexicons on one abstract vocabulary make a translation: parse with one,
+print with the other. The abstract types are a kind of structure ``a``, nouns,
+noun phrases and sentences, and *free* is a construction on a kind, the left
+adjoint of a forgetful functor, rather than an adjective on a noun:
+
+>>> a = Ty("a")
+>>> MONOIDAL, PREMONOIDAL, FREE = a("MONOIDAL"), a("PREMONOIDAL"), (
+...     a >> n)("FREE")
+>>> DIAGRAMS, DISCOPY, ARROWS = n("DIAGRAMS"), (n >> n)("DISCOPY"), (
+...     np >> n)("ARROWS")
+>>> THE, BARE, ARE = (n >> np)("THE"), (n >> np)("BARE"), (
+...     np >> (np >> s))("ARE")
+>>> def sentence(kind):
+...     return ARE(THE(ARROWS(THE(FREE(kind)))))(BARE(DISCOPY(DIAGRAMS)))
+>>> W = {word: String(word) for word in (
+...     "DisCoPy diagrams are the arrows of free category".split()
+...     + ["monoidal", "premonoidal"])}
+>>> english = Lexicon(
+...     ob_map={a: String, n: String, np: String, s: String},
+...     ar_map={MONOIDAL: W["monoidal"], PREMONOIDAL: W["premonoidal"],
+...             FREE: String(lambda x: W["free"].compose(x, W["category"])),
+...             DIAGRAMS: W["diagrams"],
+...             DISCOPY: String(lambda x: W["DisCoPy"].compose(x)),
+...             ARROWS: String(lambda x: W["arrows"].compose(W["of"], x)),
+...             THE: String(lambda x: W["the"].compose(x)),
+...             BARE: String(lambda x: x),
+...             ARE: String(lambda o: String(
+...                 lambda x: x.compose(W["are"], o)))})
+>>> print(*words(english(sentence(MONOIDAL)))()([]))
+DisCoPy diagrams are the arrows of the free monoidal category
+
+The Lean side is Montague's, with Lean as its logic: ``e`` a Lean term, ``t``
+a Lean proposition and ``k`` a Lean structure, the model of ``lean/``. A noun
+phrase is a quantifier, *the free* ``k`` *category* is ``Diagram.k S`` and it
+contributes its universal property, *the arrows of* ``C`` are ``C.Hom`` and
+*are* is an equation:
+
+>>> k = Ty("k")
+>>> StrictMonoidal, StrictPremonoidal = k("StrictMonoidal"), k(
+...     "StrictPremonoidal")
+>>> diagram, hom, free = e("diagram"), (e >> e)("hom"), (k >> e)("free")
+>>> universal, eq = (k >> (e >> t))("universal"), (e >> (e >> t))("eq")
+>>> and_ = (t >> (t >> t))("and")
+>>> to_lean = Lexicon(
+...     ob_map={a: k, n: Quantifier, np: Quantifier, s: t},
+...     ar_map={MONOIDAL: StrictMonoidal, PREMONOIDAL: StrictPremonoidal,
+...             FREE: k(lambda x: Predicate(lambda P: and_(P(free(x)))(
+...                 universal(x)(free(x))))),
+...             DIAGRAMS: Predicate(lambda P: P(diagram)),
+...             DISCOPY: Quantifier(lambda X: X),
+...             ARROWS: Quantifier(lambda X: Predicate(
+...                 lambda P: X(e(lambda c: P(hom(c)))))),
+...             THE: Quantifier(lambda X: X),
+...             BARE: Quantifier(lambda X: X),
+...             ARE: Quantifier(lambda O: Quantifier(lambda X: X(e(
+...                 lambda x: O(e(lambda y: eq(y)(x)))))))})
+
+``Quantifier`` was ``(e >> t) >> t``, so ``Predicate(lambda P: ...)`` binds a
+predicate. A functor into :class:`discopy.python.Function` prints the Lean,
+evaluating the lambdas as it goes:
+
+>>> UNIVERSAL = '''(∀ (C : {k}) (ob : S.Ob → C.Ob) (ar : S.Box → C.Hom),
+...     (∀ b, C.dom (ar b) = C.prod ((S.dom b).map ob)) →
+...     (∀ b, C.cod (ar b) = C.prod ((S.cod b).map ob)) →
+...     ∃ F : Functor ({c}) C,
+...       (∀ x, F.ob [x] = ob x) ∧ ∀ b, F.map (Diagram.box b) = ar b)
+...   ∧ ∀ (C : {k}) (F G : Functor ({c}) C),
+...     (∀ x, F.ob [x] = G.ob [x]) →
+...     (∀ b, F.map (Diagram.box b) = G.map (Diagram.box b)) → F = G'''
+>>> lean = Functor({e: str, t: str, k: str}, {
+...     StrictMonoidal: lambda: "StrictMonoidal",
+...     StrictPremonoidal: lambda: "StrictPremonoidal",
+...     diagram: lambda: "Diagram S",
+...     hom: lambda: lambda c: f"({c}).Hom",
+...     free: lambda: lambda x: f"Diagram.{x[6:].lower()} S",
+...     universal: lambda: lambda x: lambda c: UNIVERSAL.format(k=x, c=c),
+...     eq: lambda: lambda x: lambda y: f"{x} = {y}",
+...     and_: lambda: lambda p: lambda q: f"{p}\\n  ∧ {q}"}, cod=Function)
+>>> print(lean(to_lean(sentence(MONOIDAL)))())
+(Diagram.monoidal S).Hom = Diagram S
+  ∧ (∀ (C : StrictMonoidal) (ob : S.Ob → C.Ob) (ar : S.Box → C.Hom),
+    (∀ b, C.dom (ar b) = C.prod ((S.dom b).map ob)) →
+    (∀ b, C.cod (ar b) = C.prod ((S.cod b).map ob)) →
+    ∃ F : Functor (Diagram.monoidal S) C,
+      (∀ x, F.ob [x] = ob x) ∧ ∀ b, F.map (Diagram.box b) = ar b)
+  ∧ ∀ (C : StrictMonoidal) (F G : Functor (Diagram.monoidal S) C),
+    (∀ x, F.ob [x] = G.ob [x]) →
+    (∀ b, F.map (Diagram.box b) = G.map (Diagram.box b)) → F = G
+
+That statement does not elaborate: ``lean/`` has no ``StrictMonoidal``, and its
+``not_monoidal`` says why, two boxes side by side are two diagrams, as the
+tensor of diagrams does the first one first. DisCoPy diagrams are the arrows
+of the free *premonoidal* category, which ``lean/Statements/English.lean``
+proves in the words the grammar prints:
+
+>>> print(*words(english(sentence(PREMONOIDAL)))()([]))
+DisCoPy diagrams are the arrows of the free premonoidal category
+>>> print(lean(to_lean(sentence(PREMONOIDAL)))())
+(Diagram.premonoidal S).Hom = Diagram S
+  ∧ (∀ (C : StrictPremonoidal) (ob : S.Ob → C.Ob) (ar : S.Box → C.Hom),
+    (∀ b, C.dom (ar b) = C.prod ((S.dom b).map ob)) →
+    (∀ b, C.cod (ar b) = C.prod ((S.cod b).map ob)) →
+    ∃ F : Functor (Diagram.premonoidal S) C,
+      (∀ x, F.ob [x] = ob x) ∧ ∀ b, F.map (Diagram.box b) = ar b)
+  ∧ ∀ (C : StrictPremonoidal) (F G : Functor (Diagram.premonoidal S) C),
+    (∀ x, F.ob [x] = G.ob [x]) →
+    (∀ b, F.map (Diagram.box b) = G.map (Diagram.box b)) → F = G
 """
 
 from __future__ import annotations

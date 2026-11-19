@@ -222,7 +222,7 @@ import networkx as nx
 from discopy import messages
 from discopy.drawing import backend, Node, Point
 from discopy.config import BOX_DRAWING_ATTRIBUTES, TRANSPARENT
-from discopy.abc import TracedCategory
+from discopy.abc import DaggerMonoidalCategory, TracedCategory
 from discopy.python import finset
 from discopy.utils import (
     assert_isinstance, assert_iscomposable, unbiased, factory, RichDisplay)
@@ -313,12 +313,47 @@ class PlaneGraph(NamedTuple):
     graph: nx.DiGraph
     positions: dict[Node, Point]
 
+    def __repr__(self):
+        """
+        The graph as the adjacency of each of its nodes sorted by
+        :attr:`discopy.utils.Node.index`, rather than its address: the order
+        the graph happens to store its nodes in is no part of the plane
+        graph, and an adjacency also names a node with no edge, which an
+        edge list would lose.
+
+        Example
+        -------
+        >>> from discopy import monoidal
+        >>> from discopy.monoidal import Ty, Box
+        >>> x = Ty('x')
+        >>> f = Box('f', x, x)
+        >>> assert eval(repr(f.to_drawing())) == f.to_drawing()
+        """
+        def key(node):
+            return node.index, repr(node)
+
+        nodes = sorted(self.graph.nodes, key=key)
+        adjacency = {
+            node: sorted(self.graph.successors(node), key=key)
+            for node in nodes}
+        positions = dict(
+            sorted(self.positions.items(), key=lambda item: key(item[0])))
+        return f"PlaneGraph(graph=nx.DiGraph({adjacency}), "\
+               f"positions={positions})"
+
 
 @factory
 @dataclass
-class Drawing(TracedCategory["monoidal.Ty", "Drawing"], RichDisplay):
+class Drawing(
+        TracedCategory["monoidal.Ty", "Drawing"],
+        DaggerMonoidalCategory["monoidal.Ty", "Drawing"], RichDisplay):
     """
     A drawing is a plane graph with designated input and output types.
+
+    Its dagger is the reflection along the horizontal axis, which is
+    involutive, while the layout is compared on the nose: reversing a
+    composite or a tensor can lay the same diagram out with other positions,
+    see :meth:`dagger`.
 
     Parameters:
         inside (PlaneGraph) : The plane graph underlying the drawing.
@@ -357,6 +392,10 @@ class Drawing(TracedCategory["monoidal.Ty", "Drawing"], RichDisplay):
 
     yanking = TracedCategory.yanking.inapplicable(
         messages.PLANAR_YANKING)
+    dagger_contravariance = DaggerMonoidalCategory.dagger_contravariance\
+        .failing(messages.DRAWING_DAGGER_LAYOUT)
+    dagger_monoidality = DaggerMonoidalCategory.dagger_monoidality.failing(
+        messages.DRAWING_DAGGER_LAYOUT)
 
     def to_tree(self) -> dict:
         """

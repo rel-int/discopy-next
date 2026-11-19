@@ -70,7 +70,8 @@ from copy import copy
 from typing import ClassVar
 
 from discopy import cat, cmap, messages, rigid, feedback
-from discopy.abc import DaggerCategory, PivotalCategory, RigidCategory
+from discopy.abc import (
+    DaggerCategory, DaggerMonoidalCategory, PivotalCategory, RigidCategory)
 from discopy.cat import factory
 from discopy.utils import deprecated_alias
 
@@ -240,7 +241,7 @@ class Diagram(rigid.Diagram, feedback.Diagram, PivotalCategory):
         messages.FEEDBACK_HAS_NO_DAGGER)
     dagger_contravariance_rigid = DaggerCategory.dagger_contravariance\
         .weaken(within=RigidCategory)
-    dagger_monoidality = DaggerCategory.dagger_monoidality.failing(
+    dagger_monoidality = DaggerMonoidalCategory.dagger_monoidality.failing(
         messages.NO_PLANAR_NORMAL_FORM)
     rotate_contravariance = PivotalCategory.rotate_contravariance.failing(
         messages.FEEDBACK_HAS_NO_DAGGER)

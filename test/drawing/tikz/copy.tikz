@@ -1,4 +1,4 @@
-\begin{tikzpicture}[baseline=(0.base)]
+\begin{tikzpicture}[baseline=(0.base), x=0.6667in, y=0.6667in]
 \begin{pgfonlayer}{nodelayer}
 \node (0) at (0, 1.5) {};
 \node [] (1) at (0, 0) {};
@@ -20,21 +20,21 @@
 \node [] (17) at (1.0, 2.5) {};
 \node [] (18) at (0.5, 2.25) {};
 \node [] (19) at (1.5, 2.25) {};
-\node [style=none, fill=white, right] (20) at (1.0625, 2.9375) {$x$};
+\node [style=none, fill=white, anchor=north west, font=\fontsize{7}{8.4}\selectfont] (20) at (1.0625, 2.9375) {$x$};
 \node [] (21) at (1.0, 3) {};
 \node [] (22) at (1.0, 2.75) {};
-\node [style=none, fill=white, right] (23) at (0.5625, 2.1875) {$x$};
-\node [style=none, fill=white, right] (24) at (1.5625, 2.1875) {$x$};
-\node [style=none, fill=white, right] (25) at (3.0625, 2.9375) {$y$};
+\node [style=none, fill=white, anchor=north west, font=\fontsize{7}{8.4}\selectfont] (23) at (0.5625, 2.1875) {$x$};
+\node [style=none, fill=white, anchor=north west, font=\fontsize{7}{8.4}\selectfont] (24) at (1.5625, 2.1875) {$x$};
+\node [style=none, fill=white, anchor=north west, font=\fontsize{7}{8.4}\selectfont] (25) at (3.0625, 2.9375) {$y$};
 \node [] (26) at (3.0, 3) {};
 \node [] (27) at (3.0, 1.75) {};
 \node [] (28) at (3.0, 1.5) {};
 \node [] (29) at (2.5, 1.25) {};
 \node [] (30) at (3.5, 1.25) {};
-\node [style=none, fill=white, right] (31) at (2.5625, 1.1875) {$y$};
-\node [style=none, fill=white, right] (32) at (3.5625, 1.1875) {$y$};
-\node [style=none, fill=white, right] (33) at (1.5625, 0.1875) {$y$};
-\node [style=none, fill=white, right] (34) at (2.5625, 0.1875) {$x$};
+\node [style=none, fill=white, anchor=north west, font=\fontsize{7}{8.4}\selectfont] (31) at (2.5625, 1.1875) {$y$};
+\node [style=none, fill=white, anchor=north west, font=\fontsize{7}{8.4}\selectfont] (32) at (3.5625, 1.1875) {$y$};
+\node [style=none, fill=white, anchor=north west, font=\fontsize{7}{8.4}\selectfont] (33) at (1.5625, 0.1875) {$y$};
+\node [style=none, fill=white, anchor=north west, font=\fontsize{7}{8.4}\selectfont] (34) at (2.5625, 0.1875) {$x$};
 \node [style=COPY_black_circle, inner sep=0.1667em] (35) at (1.0, 2.5) {};
 \node [style=COPY_black_circle, inner sep=0.1667em] (36) at (3.0, 1.5) {};
 \end{pgfonlayer}

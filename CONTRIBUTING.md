@@ -249,7 +249,7 @@ compared against.
 `benchmark/test_composition.py` reproduces the scaling experiments of
 arXiv:2105.09257 for `Diagram` and `Hypergraph`, with analogous `CMap` cases;
 `benchmark/test_conversion.py` covers conversions between all three,
-`benchmark/test_zx.py` races `quantum.graphlike.full_reduce` against PyZX's,
+`benchmark/test_zx.py` races `quantum.zx.Hypergraph.full_reduce` against PyZX's,
 skipped without PyZX: run it with `uv run --with "pyzx==0.10.7"`, as the
 workflow does, and `benchmark/test_egraph.py` replays the 50 e-graphs of
 `benchmark/data/egraph-traces` through `egraph.Builder` and the bookkeeping

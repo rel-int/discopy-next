@@ -1,6 +1,7 @@
 
 import os
 
+import networkx as nx  # noqa: F401  evaluates a PlaneGraph's repr
 from pytest import approx, importorskip, raises
 
 from discopy.utils import AxiomError
@@ -934,6 +935,33 @@ def test_Drawing_dagger():
     assert empty.dagger() == empty
 
 
+
+def test_Drawing_dagger_laws():
+    """ rel-int/discopy-next#373: a drawing declares a dagger category, its
+    involution holds and the other two laws fail on the nose, with these
+    counterexamples: a wide box moves the wires a composite aligns, and a
+    tensor numbers its left boxes first. """
+    from discopy.abc import DaggerCategory
+    from discopy.testable import AxiomFailure
+    assert issubclass(Drawing, DaggerCategory)
+    assert Drawing.dagger_involution.applicable
+    assert not Drawing.dagger_involution.broken
+    assert Drawing.dagger_contravariance.broken
+    assert Drawing.dagger_monoidality.broken
+    a, x, y = monoidal.Ty('a'), monoidal.Ty('x'), monoidal.Ty('y')
+    wide = "a box with a long name"
+    f = (monoidal.Box(wide, a, a) @ a >> a @ monoidal.Box(wide, a, a))\
+        .to_drawing()
+    g = monoidal.Box(wide, a @ a, a).to_drawing()
+    with raises(AxiomFailure):
+        Drawing.dagger_contravariance(f, g)
+    h, k = monoidal.Box('h', x, y).to_drawing(), monoidal.Box(
+        'k', x @ x, y).to_drawing()
+    with raises(AxiomFailure):
+        Drawing.dagger_monoidality(h, k)
+    assert Drawing.dagger_involution(f >> g)
+
+
 def test_Drawing_dagger_reflects_bubbles():
     x = monoidal.Ty('x')
     red, blue = monoidal.Colour('red'), monoidal.Colour('blue')
@@ -1192,3 +1220,57 @@ def test_relayout_reads_wires_as_drawn():
     assert not bent.is_feasible(drawing)
     assert drawing.relabel_nodes(positions={
         dom: Point(1.6, 1), cod: Point(2, 0)}).is_feasible(drawing)
+
+
+def test_tikz_fills_a_straight_ribbon(tmp_path):
+    from discopy.ribbon import Ty, Diagram
+    path = tmp_path / "ribbon.tikz"
+    Diagram.id(Ty('x')).to_ribbons().draw(
+        to_tikz=True, path=str(path), wire_labels=False)
+    tikz = path.read_text()
+    assert "x=0.6667in, y=0.6667in" in tikz
+    assert any(
+        "fill=" in line and "fill=none" not in line
+        and "line width=0.25pt" in line and line.endswith("-- cycle;")
+        for line in tikz.splitlines())
+
+
+def test_a_dimension_is_drawn_as_its_numbers():
+    from discopy.neural.network import Dims
+    assert Dims(4, monoidal.Dim(4, 4)).to_drawing() == monoidal.Ty(
+        monoidal.Wire('4'), monoidal.Wire('4, 4'))
+    assert str(Dims(4)) == "Dims(Dim(4))"
+
+
+def test_tikz_writes_a_label_in_its_colour():
+    tikz = TikZ()
+    tikz.draw_text("x", 0, 0, verticalalignment="top", color="white",
+                   adaptive=False)
+    tikz.draw_text("y", 1, 0, verticalalignment="top", color="black")
+    assert "text={white}" in tikz.nodelayer[0]
+    assert "text=" not in tikz.nodelayer[1]
+
+
+def test_a_drawing_reads_back_from_its_repr():
+    x, y = monoidal.Ty('x'), monoidal.Ty('y')
+    f, g = monoidal.Box('f', x, y), monoidal.Box('g', y, x)
+    s = monoidal.Box('s', monoidal.Ty(), monoidal.Ty())
+    drawings = [
+        f.to_drawing(), Drawing.id(x), Drawing.id(), s.to_drawing(),
+        (f >> g).to_drawing(), (f @ f).to_drawing(),
+        (f >> g).to_drawing().dagger(), (f @ g.dom >> f.cod @ g).to_drawing()]
+    for drawing in drawings:
+        assert "object at 0x" not in repr(drawing)
+        assert eval(repr(drawing)) == drawing
+        assert repr(eval(repr(drawing))) == repr(drawing)
+
+
+def test_a_coloured_drawing_reads_back_from_its_repr():
+    red, green = map(monoidal.Colour, ("red", "green"))
+    x = monoidal.Ty(monoidal.Wire("x", red, green))
+    f = monoidal.Box('f', x, x)
+    assert str(x) == str(monoidal.Ty(monoidal.Wire("x")))
+    assert eval(repr(f.to_drawing())) == f.to_drawing()
+    with raises(AssertionError):
+        x = monoidal.Ty(monoidal.Wire("x"))
+        eval(repr(f.to_drawing()))

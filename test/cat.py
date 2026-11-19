@@ -325,6 +325,27 @@ def test_Functor_into_a_category_with_no_dagger():
     assert Functor({x: x}, {f: f})(f.dagger()) == f.dagger()
 
 
+
+def test_Functor_dagger_is_declared():
+    """ rel-int/discopy-next#373: a daggered box is the dagger of its image
+    exactly when the codomain declares a dagger category. """
+    from discopy import monoidal
+    from discopy.abc import DaggerCategory
+    from discopy.drawing import Drawing
+    from discopy.python import additive
+    assert issubclass(Drawing, DaggerCategory)
+    assert not issubclass(additive.Function, DaggerCategory)
+    assert not hasattr(additive.Function, "dagger")
+    x = monoidal.Ty('x')
+    f = monoidal.Box('f', x, x)
+    F = monoidal.Functor(
+        {x: int}, lambda g: (lambda n: n - 1) if g.is_dagger
+        else (lambda n: n + 1), cod=additive.Function)
+    assert F(f)(1) == 2 and F(f.dagger())(1) == 0
+    G = monoidal.Functor({x: x}, {f: f.to_drawing()}, cod=Drawing)
+    assert G(f.dagger()) == f.to_drawing().dagger()
+
+
 def test_Transformation():
     x, y = Ob('x'), Ob('y')
     f = Box('f', x, y)
@@ -623,7 +644,7 @@ def test_Bubble_no_common_boundary():
         Bubble()
 
 
-ABSTRACT = ("Timed", "ControlledRotation", "BinaryTerm", "Parametrized")
+ABSTRACT = ("Timed", "Structural", "ControlledRotation", "BinaryTerm", "Parametrized")
 
 
 @cache
@@ -684,6 +705,10 @@ EXAMPLES = {  # a box of each constructor, from a class c, types x, y, data v
     "tensor.Box": 'c("f", x, y, [v] + [0] * 5)',
     "frobenius.Spider": "c(1, 2, x, data=v)",
     "frobenius.Cospan": "c(x @ y, [0, 0, 1], [1])",
+    "biclosed.Bang": "c(box(c, x, y, v))",
+    "biclosed.{Dereliction,Digging,Contraction,Weakening}": "c(x)",
+    "biclosed.Exchange": "c(x, y, True)",
+    "biclosed.Laxator": "c(x, y)",
     "biclosed.{Eval,Coeval}": "c(x << y)",
     "closed.{Eval,Coeval}": "c(x << y, time_step=1)",
     "{biclosed,closed}.Curry": "c(box(c, x @ y, x, v), 1, False)",
@@ -818,6 +843,8 @@ BROKEN = {
         "*.Feedback": "it has none, its memory would be fed back in time",
         PIVOTALS + ".Trace": "its dagger is drawn with cups and caps",
         "*.Curry": "a curry has no dagger",
+        "*.{Dereliction,Digging,Contraction,Weakening,Laxator}":
+        "!L* has no rule from its codomain back to its domain",
         "{closed,markov,lambek.abstract}.{Copy,Discard,Function} "
         "comarkov.{Cofunction,Merge,Noise}": "its category has no dagger",
         "rigid.C[ua]p": "a rigid cup or cap has none, a pivotal one has",

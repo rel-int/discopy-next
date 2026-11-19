@@ -365,10 +365,12 @@ class Box(compact.Box, markov.Box, comarkov.Box, Diagram):
 
     @property
     def is_deterministic(self) -> bool:
+        """ Whether the box is deterministic, never when it is rotated. """
         return super().is_deterministic and not self.z
 
     @property
     def is_affine(self) -> bool:
+        """ Whether the box is affine, never when it is rotated. """
         return super().is_affine and not self.z
 
     @is_deterministic.setter
@@ -736,6 +738,7 @@ class Spider(Box):
     """
     draw_as_spider = True
     color = "black"
+    deterministic = affine = True
     apex = property(lambda self: self.typ)
     legs = property(lambda self: finset.Cospan.spiders(
         len(self.dom), len(self.cod), 1) if self.phase is None else None)

@@ -62,7 +62,7 @@ from discopy.abc import (
     BalancedCategory,
     BraidedCategory,
     CompactCategory,
-    DaggerCategory,
+    DaggerMonoidalCategory,
     MarkovCategory,
     Pregroup,
     RigidCategory,
@@ -144,7 +144,8 @@ class Port:
 
 
 class CMap[category](
-        CompactCategory, DaggerCategory, TestableGeneric, Serialisable):
+        CompactCategory, DaggerMonoidalCategory, TestableGeneric,
+        Serialisable):
     r"""
     An open combinatorial map, i.e. a diagram represented as a bijection
     between its ports.
@@ -2298,8 +2299,9 @@ cycles of this map.
 
     def encode(self) -> tuple[Ty, list[tuple[Box, int]]]:
         """
-        The domain, boxes and offsets of a diagram whose map this is, see
-        :meth:`sweep` and :meth:`discopy.monoidal.Diagram.encode`.
+        The domain, boxes and offsets of a diagram whose map this is, one box
+        per layer as :meth:`discopy.monoidal.Diagram.decode` reads them, see
+        :meth:`sweep`.
 
         Example
         -------
