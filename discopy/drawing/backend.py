@@ -2093,7 +2093,7 @@ class Typst(Backend):
         """ Write a Typst ``source`` to a path ending in ``.typ``, its
         SVG to any other path, and return what was written. """
         if str(path).endswith(".typ"):
-            pathlib.Path(path).write_text(source, encoding="utf-8")
+            pathlib.Path(path).write_bytes(source.encode("utf-8"))
             return source
         svg = cls.compile(source)
         pathlib.Path(path).write_bytes(svg)
