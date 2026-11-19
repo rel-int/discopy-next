@@ -601,8 +601,6 @@ class Diagram(monoidal.Diagram, LinearCategory):
     def to_drawing(self):
         return monoidal.Diagram.to_drawing(self, functor_factory=Functor)
 
-    map_agreement = monoidal.Diagram.map_agreement.failing(
-        messages.MAP_OF_A_CURRY)
     dagger_involution = DaggerCategory.dagger_involution.failing(
         messages.CURRY_HAS_NO_DAGGER)
     dagger_involution_monoidal = DaggerCategory.dagger_involution.weaken(
@@ -1724,9 +1722,6 @@ class TermBase(Box, Equivalence):
         return st.builds(
             lambda terms: (terms[0], terms[2], terms[1]),
             Canonical[cls].strategy(**params))  # ty: ignore[invalid-type-form]
-
-    serialisation = Serialisable.serialisation.failing(
-        "A term does not read back from its tree, see #692.")
 
     @axiom
     def alpha_renaming(cls, terms: Renamed[Self]) -> AbstractEquation:
