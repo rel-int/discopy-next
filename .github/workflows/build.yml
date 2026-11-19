@@ -79,11 +79,11 @@ jobs:
     # give the notebooks a job of their own rather than raising this.
     timeout-minutes: 40
     strategy:
-      # A sibling cancelled on another's failure is a Python nothing
-      # measured, and `Test notebooks` runs on main alone: fail-fast on
-      # the three versions of a push to main loses the readings the
-      # matrix is there to take, and buys nothing on a pull request,
-      # whose matrix is one version (#625).
+      # Without this, one version failing cancels the jobs of the others
+      # and those versions go unmeasured. On main the matrix is three of
+      # them and `Test notebooks` runs nowhere else, so one red setup step
+      # left that step running on none of the three. A pull request's
+      # matrix is one version, where the setting decides nothing (#625).
       fail-fast: false
       matrix:
         # A pull request tests the version CI lints on; main tests every one.

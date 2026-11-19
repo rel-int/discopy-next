@@ -1759,12 +1759,12 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Project
 
-- A push to `main` measures every Python of `build`'s matrix: `fail-fast` is
-  off, so a job that dies in its setup no longer cancels the versions that
-  were measuring the commit, and `Test notebooks`, which runs on `main` and
-  on no pull request, no longer runs on none of them. The composite action
-  gives each download 120 seconds, uv's default 30 being less than the 55 MiB
-  `egglog` wheel takes ([next#639]).
+- A push to `main` measures every Python of `build`'s matrix: with `fail-fast`
+  off, one version failing in its setup leaves the other two running, so
+  `Test notebooks` — which runs on a push to `main` and on no pull request —
+  still runs on the versions that survived. The composite setup action gives
+  each download 120 seconds, uv's default 30 having not been enough for the
+  55 MiB `egglog` wheel ([next#639]).
 - `build`'s Coverage step combines with `--debug=dataio`, naming each data file
   it merges, and fails with its own error when it merged fewer than two: the
   controller of `pytest -n auto` writes one and each worker one more, so the
