@@ -213,7 +213,7 @@ from discopy import (
 from discopy import stream as monoidal_stream
 from discopy.cat import factory, rsubs
 from discopy.frobenius import Dim
-from discopy.matrix import backend
+from discopy.matrix import backend, repr_nonfinite
 from discopy.optyx.utils.misc import hashable
 from discopy.utils import AxiomError, factory_name
 from discopy.quantum.gates import format_number
@@ -803,7 +803,7 @@ class Box(frobenius.Box, Diagram):
         if self.is_dagger:
             return repr(self.dagger()) + ".dagger()"
         array = "" if self.array is None\
-            else f", array={self.array.tolist()!r}"
+            else f", array={repr_nonfinite(self.array.tolist())}"
         self_adjoint = ", is_dagger=None" if self.is_dagger is None else ""
         return super().__repr__()[:-1] + array + self_adjoint + ")"
 
