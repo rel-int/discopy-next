@@ -6,4 +6,4 @@
 > - P2 typst_ast.py:387: `\sqrt[3]{x}` consumes `[` as the radicand.
 > - P2 typst_ast.py:408: `\text{a \& b}` keeps the backslash.
 
-- [ ] the five threads fixed, each with a test
+- [x] the five threads fixed, each with a test
