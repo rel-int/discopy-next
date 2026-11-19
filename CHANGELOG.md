@@ -719,6 +719,19 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   a ribbon, as TikZ does: `Typst.draw_filled_shape` is a CeTZ `merge-path`
   and `Typst.draw_region_cell` fills a cell through it, so the frame of an
   e-graph's `Join` and the band of a ribbon show ([next#645]).
+- `draw(format="typst", doctest=path)` checks the drawing against a
+  baseline, written when missing, as `draw(doctest=...)` does for the other
+  backends: the Typst source for a path ending in `.typ`, compared byte for
+  byte, its SVG otherwise. It ignored `doctest` ([next#644]).
+- An array holding `nan` or `inf` reads back from its `repr`: `Matrix`,
+  `Tensor`, `tensor.Box`, `optyx.core.diagram.Box` and `photonic.Gate`
+  print them as `float('nan')`, `float('-inf')` or `complex('(1+nanj)')`,
+  spelled by `matrix.repr_nonfinite`, rather than the bare tokens `eval`
+  cannot name, and a `tensor.Box` prints its data as a list, not an
+  `array(...)` ([next#632]).
+- `biclosed.Constant` takes the empty type of the colour of its type as
+  domain, not the one with no colour, so a constant of a type of coloured
+  wires is a globular box ([next#643]).
 - Seventeen laws declared broken hold when searched under the `explore` profile,
   and are no longer declared so: `hypergraph_section` in `rigid`, `pivotal`,
   `ribbon`, `braided`, `balanced` and `feedback`, `map_agreement` in
@@ -1796,6 +1809,12 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Project
 
+- `docs/export_notebooks.py` runs each notebook as the Python file
+  `marimo convert` writes, not its Markdown: marimo runs that file as
+  `__main__`, which a worker spawned by `multiprocessing`, e.g. by cotengra's
+  optimizer, imports again, and a Markdown one failed it with a `SyntaxError`
+  ([next#641]). `optyx/readme_example`, its one exemption, now runs past the
+  pool and fails at `chi=1` on [next#442] instead, which it names ([next#641]).
 - A push to `main` measures every Python of `build`'s matrix: with `fail-fast`
   off, one version failing in its setup leaves the other two running, so
   `Test notebooks` — which runs on a push to `main` and on no pull request —
@@ -2248,6 +2267,7 @@ for the changelog of `1.2.1` and earlier.
 [next#411]: https://github.com/rel-int/discopy-next/pull/411
 [next#414]: https://github.com/rel-int/discopy-next/issues/414
 [next#438]: https://github.com/rel-int/discopy-next/issues/438
+[next#442]: https://github.com/rel-int/discopy-next/issues/442
 [next#443]: https://github.com/rel-int/discopy-next/issues/443
 [next#457]: https://github.com/rel-int/discopy-next/issues/457
 [next#458]: https://github.com/rel-int/discopy-next/pull/458
@@ -2347,11 +2367,15 @@ for the changelog of `1.2.1` and earlier.
 [next#629]: https://github.com/rel-int/discopy-next/pull/629
 [next#630]: https://github.com/rel-int/discopy-next/pull/630
 [next#631]: https://github.com/rel-int/discopy-next/pull/631
+[next#632]: https://github.com/rel-int/discopy-next/issues/632
 [next#633]: https://github.com/rel-int/discopy-next/pull/633
 [next#634]: https://github.com/rel-int/discopy-next/pull/634
 [next#637]: https://github.com/rel-int/discopy-next/pull/637
 [next#639]: https://github.com/rel-int/discopy-next/pull/639
 [next#640]: https://github.com/rel-int/discopy-next/pull/640
+[next#641]: https://github.com/rel-int/discopy-next/pull/641
+[next#643]: https://github.com/rel-int/discopy-next/pull/643
+[next#644]: https://github.com/rel-int/discopy-next/pull/644
 [next#645]: https://github.com/rel-int/discopy-next/pull/645
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29

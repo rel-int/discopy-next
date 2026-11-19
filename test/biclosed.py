@@ -252,6 +252,12 @@ def test_equality_reads_the_data_of_constants():
     assert X(lambda x: f(x)) != X(lambda x: g(x))
 
 
+def test_constant_of_a_coloured_type():
+    white = monoidal.Colour("white")
+    x = Ty(Wire("x", dom=white, cod=white))
+    assert x.constant_factory("f", x).dom == Ty.id(white)
+
+
 def test_alpha_eq_under_restores_the_scopes():
     X, Y = Ty("X"), Ty("Y")
     f, x = (Y << X)("f"), Variable("x", X)

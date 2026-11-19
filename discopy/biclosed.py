@@ -1787,7 +1787,7 @@ class Constant(TermBase):
     serialised_attrs = ("name", "cod", "*", "is_dagger", "data")
 
     def __init__(self, name: str, cod: Ty, **kwargs):
-        super().__init__(name, dom=self.ob(), cod=cod, **kwargs)
+        super().__init__(name, dom=self.ob.id(cod.dom), cod=cod, **kwargs)
         self.freevars = []
 
     @classmethod

@@ -173,3 +173,19 @@ CORE_DIAGRAMS = [
 @pytest.mark.parametrize("term", CORE_DIAGRAMS, ids=str)
 def test_transparency_of_core_diagrams(term):
     assert eval(repr(term), environment(zw)) == term
+
+
+NONFINITE = [
+    diagram.Box("f", diagram.Bit(1), diagram.Bit(1),
+                array=[[np.nan, 1], [-np.inf, np.inf]]),
+    photonic.Gate([[np.nan, 1], [0, np.inf]], 2, 2, "g"),
+    photonic.Gate([[1, 0], [0, 1]], 2, 2, "h", data=(np.nan, -np.inf)),
+]
+
+
+@pytest.mark.parametrize("box", NONFINITE, ids=lambda box: type(box).__name__)
+def test_transparency_of_nan_and_inf(box):
+    module = sys.modules[type(box).__module__]
+    other = eval(repr(box), environment(module))
+    assert np.array_equal(other.array, box.array, equal_nan=True)
+    assert repr(other) == repr(box)
