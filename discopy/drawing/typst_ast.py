@@ -415,7 +415,7 @@ def latex_command(name: str, tokens: list[str], source: str) -> str:
     if name not in LATEX_SYMBOLS:
         raise ValueError(
             f"No Typst for the LaTeX command \\{name} in {source!r}.")
-    if name in ("left", "right") and tokens and tokens[-1] == ".":
+    if name in ("left", "right") and skip_space(tokens) and tokens[-1] == ".":
         tokens.pop()
     return LATEX_SYMBOLS[name]
 

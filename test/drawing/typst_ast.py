@@ -34,6 +34,7 @@ def test_every_latex_function_has_its_typst(command):
     ("\\rho_\\star", "rho_(star.op)"),
     ("x^\\frac{a}{b}", "x^(frac(a, b))"),
     ("\\left( x \\right.", "\\( x"),
+    ("\\left. x \\right .", "x"),
     ("\\operatorname{Tr}(f)", 'op("Tr") \\( f \\)'),
     ("\\text{a \"b\"}", '"a \\"b\\""'),
     ("f''", "f''"),
