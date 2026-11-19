@@ -1759,6 +1759,12 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Project
 
+- A push to `main` measures every Python of `build`'s matrix: `fail-fast` is
+  off, so a job that dies in its setup no longer cancels the versions that
+  were measuring the commit, and `Test notebooks`, which runs on `main` and
+  on no pull request, no longer runs on none of them. The composite action
+  gives each download 120 seconds, uv's default 30 being less than the 55 MiB
+  `egglog` wheel takes ([next#639]).
 - `build`'s Coverage step combines with `--debug=dataio`, naming each data file
   it merges, and fails with its own error when it merged fewer than two: the
   controller of `pytest -n auto` writes one and each worker one more, so the
@@ -2306,6 +2312,7 @@ for the changelog of `1.2.1` and earlier.
 [next#631]: https://github.com/rel-int/discopy-next/pull/631
 [next#633]: https://github.com/rel-int/discopy-next/pull/633
 [next#634]: https://github.com/rel-int/discopy-next/pull/634
+[next#639]: https://github.com/rel-int/discopy-next/pull/639
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#56]: https://github.com/rel-int/optyx/pull/56
