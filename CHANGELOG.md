@@ -1796,6 +1796,12 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Project
 
+- `docs/export_notebooks.py` runs each notebook as the Python file
+  `marimo convert` writes, not its Markdown: marimo runs that file as
+  `__main__`, which a worker spawned by `multiprocessing`, e.g. by cotengra's
+  optimizer, imports again, and a Markdown one failed it with a `SyntaxError`
+  ([next#641]). `optyx/readme_example`, its one exemption, now runs past the
+  pool and fails at `chi=1` on [next#442] instead, which it names ([next#641]).
 - A push to `main` measures every Python of `build`'s matrix: with `fail-fast`
   off, one version failing in its setup leaves the other two running, so
   `Test notebooks` — which runs on a push to `main` and on no pull request —
@@ -2248,6 +2254,7 @@ for the changelog of `1.2.1` and earlier.
 [next#411]: https://github.com/rel-int/discopy-next/pull/411
 [next#414]: https://github.com/rel-int/discopy-next/issues/414
 [next#438]: https://github.com/rel-int/discopy-next/issues/438
+[next#442]: https://github.com/rel-int/discopy-next/issues/442
 [next#443]: https://github.com/rel-int/discopy-next/issues/443
 [next#457]: https://github.com/rel-int/discopy-next/issues/457
 [next#458]: https://github.com/rel-int/discopy-next/pull/458
@@ -2352,6 +2359,7 @@ for the changelog of `1.2.1` and earlier.
 [next#637]: https://github.com/rel-int/discopy-next/pull/637
 [next#639]: https://github.com/rel-int/discopy-next/pull/639
 [next#640]: https://github.com/rel-int/discopy-next/pull/640
+[next#641]: https://github.com/rel-int/discopy-next/pull/641
 [next#644]: https://github.com/rel-int/discopy-next/pull/644
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
