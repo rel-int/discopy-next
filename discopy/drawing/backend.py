@@ -1893,7 +1893,7 @@ class Typst(Backend):
         other label is plain text, e.g. ``Alice``, which Typst would read as
         a variable, or ``$a$ and $b$``.
 
-        >>> Typst.math_label("$\\mapsto$"), Typst.math_label("Alice")
+        >>> Typst.math_label("$\\\\mapsto$"), Typst.math_label("Alice")
         (('arrow.r.bar', True), ('Alice', False))
         """
         text = str(text)
