@@ -104,6 +104,7 @@ def draw(graph: Drawing, **params):
         path, compare = doctest_or_path(
             params.pop("path", None), params.pop("doctest", None))
         show = params.pop("show", True)
+        compare = params.pop("compare", False) or compare
         return Typst(**params).draw(graph, **params).output(
             path=path, show=show, compare=compare, **params)
     aspect = params.get('aspect', 'auto' if 'figsize' in params else 'equal')
@@ -2088,31 +2089,38 @@ class Typst(Backend):
         return typst.compile(source.encode(), format="svg", pretty=True)
 
     @classmethod
-    def save(cls, source: str, path):
+    def save(cls, source: str, path) -> str | bytes:
         """ Write a Typst ``source`` to a path ending in ``.typ``, its
-        SVG to any other path. """
+        SVG to any other path, and return what was written. """
         if str(path).endswith(".typ"):
             pathlib.Path(path).write_text(source, encoding="utf-8")
-        else:
-            pathlib.Path(path).write_bytes(cls.compile(source))
+            return source
+        svg = cls.compile(source)
+        pathlib.Path(path).write_bytes(svg)
+        return svg
 
     def output(self, path=None, show=True, **params):
         """
         The Typst source of the drawing when ``path`` ends in ``.typ``,
         written there, else its SVG, written to ``path`` when there is one.
         With ``compare``, i.e. ``draw(doctest=path)``, the file at ``path``
-        is a baseline: written when missing, compared with otherwise, as
+        is a baseline, its source or its SVG, so ``path`` ends in ``.typ``
+        or ``.svg``: written when missing, compared with otherwise, as
         :func:`save_and_compare` does for any other backend.
         """
         source = self.to_document(**params).render()
         is_source = isinstance(path, (str, os.PathLike))\
             and str(path).endswith(".typ")
         if params.get("compare", False):
-            save_and_compare(path, partial(self.save, source))
-            return source if is_source else self.compile(source)
+            if not str(path).endswith((".typ", ".svg")):
+                raise ValueError(
+                    f"A Typst baseline ends in .typ or .svg, got {path!r}.")
+            written = []
+            save_and_compare(path, lambda file: written.append(
+                self.save(source, file)))
+            return written[0]
         if is_source:
-            self.save(source, path)
-            return source
+            return self.save(source, path)
         svg = self.compile(source)
         if hasattr(path, "write"):
             path.write(svg.decode() if isinstance(path, TextIOBase) else svg)
