@@ -79,6 +79,7 @@ from cotengra import (
     ReusableHyperCompressedOptimizer,
 )
 from discopy import tensor as discopy_tensor
+from discopy.matrix import Quimb
 import numpy as np
 if TYPE_CHECKING:
     import perceval as pcvl
@@ -478,7 +479,7 @@ class QuimbBackend(AbstractBackend):
         if self.hyperoptimiser is not None:
             params["optimize"] = self.hyperoptimiser
         result = self._get_discopy_tensor(diagram).eval(
-            contract="quimb", **params)
+            contractor=Quimb(), **params)
         state_type = StateType.AMP if diagram.is_pure else StateType.DM
         return EvalResult(
             discopy_tensor.Box("Result", result.dom, result.cod,
@@ -501,7 +502,7 @@ class DiscopyBackend(AbstractBackend):
         Args:
             diagram (Diagram): The diagram to evaluate.
             **extra: Additional parameters for discopy's ``eval``,
-                e.g. ``contract`` and ``optimize``.
+                e.g. ``contractor`` and ``optimize``.
 
         Returns:
             The result of the evaluation.

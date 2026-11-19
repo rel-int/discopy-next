@@ -583,7 +583,7 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 - A functor maps a layer with one `n`-ary `tensor` rather than a fold of
   `@`, with one `tensor` call per layer ([next#161]).
 - `discopy.optyx`: `QuimbBackend` contracts through discopy's
-  `eval(contract="quimb")`, and `DiscopyBackend` passes its parameters on to
+  `eval(contractor=Quimb())`, and `DiscopyBackend` passes its parameters on to
   `eval` ([optyx#44]).
 - Biclosed types hold `biclosed.Wire` ([next#16]), their `**` is `<<`, and a
   term inside a diagram is drawn as one box ([next#31]).

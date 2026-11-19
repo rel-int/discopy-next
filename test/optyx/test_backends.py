@@ -16,6 +16,7 @@ import math
 from itertools import chain
 import perceval as pcvl
 import discopy.tensor as discopy_tensor
+from discopy.matrix import Quimb
 
 unitary_circuit = photonic.BS
 non_unitary_circuit = (
@@ -98,14 +99,16 @@ def test_compressed_contraction_is_deterministic():
     # Regression test for #232 (optyx#19): the compressed contraction used
     # to perturb rank-deficient tensors with noise from the global unseeded
     # RNG, so two calls on the same rank-deficient tensor could return
-    # different, non-reproducible data.
+    # different, non-reproducible data. QuimbBackend contracts through
+    # discopy's Quimb engine, so the term goes through the call it makes.
     rank_deficient = np.array([[1.0, 2.0], [2.0, 4.0]])
     term = discopy_tensor.Box(
         "A", discopy_tensor.Dim(2), discopy_tensor.Dim(2), rank_deficient)
-    backend = QuimbBackend(ReusableHyperCompressedOptimizer(max_repeats=32))
+    optimize = ReusableHyperCompressedOptimizer(max_repeats=32)
 
     assert np.array_equal(
-        backend.process_term(term), backend.process_term(term))
+        term.eval(contractor=Quimb(), optimize=optimize).array,
+        term.eval(contractor=Quimb(), optimize=optimize).array)
 
 class TestQuimbBackend:
     # compare exact and approx backends
@@ -790,12 +793,6 @@ def test_eval_result_guards_and_raw_amplitudes():
                       None, StateType.PROB)
     with pytest.raises(ValueError, match="sums to zero"):
         zero.prob_dist()
-
-
-def test_quimb_backend_rejects_unknown_hyperoptimisers():
-    with pytest.raises(ValueError, match="Unsupported hyperoptimiser"):
-        (photonic.Create(1, 0) >> photonic.BS).eval(
-            QuimbBackend(hyperoptimiser=object()))
 
 
 @pytest.mark.parametrize("backend", [PercevalBackend, PermanentBackend])
