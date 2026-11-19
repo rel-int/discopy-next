@@ -291,6 +291,9 @@ LATEX_TEXT = {"text": "", "textrm": "", "mbox": "", "operatorname": "op"}
 """ The LaTeX commands of a text in braces, written as a Typst string in the
 Typst function they map to, if any. """
 
+TEXT_ESCAPES = {"\\" + char for char in "%$#&{}_"}
+""" The escapes of LaTeX in a text, read as the character they escape. """
+
 UNESCAPED = set("-+=")
 """ The characters :func:`latex_math` leaves as they are, every other one
 that is not a letter or a digit being escaped. """
@@ -351,7 +354,7 @@ def latex_atoms(tokens: list[str], source: str, closing=None) -> list[str]:
             atoms += latex_atoms(tokens, source, closing="}")
         elif token.startswith("\\"):
             atoms.append(latex_command(token[1:], tokens, source))
-        elif token.isalnum() or token in UNESCAPED:
+        elif token.replace(".", "").isalnum() or token in UNESCAPED:
             atoms.append(token)
         elif not token.isspace():
             atoms.append("\\" + token)
@@ -384,6 +387,10 @@ def latex_command(name: str, tokens: list[str], source: str) -> str:
     if name in LATEX_TEXT:
         text, function = latex_text(tokens, source), LATEX_TEXT[name]
         return f"{function}({text})" if function else text
+    if name == "sqrt" and tokens and tokens[-1] == "[":
+        tokens.pop()
+        index = " ".join(latex_atoms(tokens, source, closing="]"))
+        return f"root({index}, {latex_argument(tokens, source)})"
     if name in LATEX_FUNCTIONS:
         arity = 2 if LATEX_FUNCTIONS[name] in ("frac", "binom") else 1
         arguments = [latex_argument(tokens, source) for _ in range(arity)]
@@ -405,7 +412,7 @@ def latex_text(tokens: list[str], source: str) -> str:
     while tokens and (depth or tokens[-1] != "}"):
         token = tokens.pop()
         depth += (token == "{") - (token == "}")
-        text += token
+        text += token[1:] if token in TEXT_ESCAPES else token
     if not tokens:
         raise ValueError(f"Unbalanced braces in {source!r}.")
     tokens.pop()

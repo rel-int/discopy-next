@@ -38,6 +38,9 @@ def test_every_latex_function_has_its_typst(command):
     ("\\text{a \"b\"}", '"a \\"b\\""'),
     ("f''", "f''"),
     ("^2", '""^(2)'),
+    ("2.5x", "2.5 x"),
+    ("\\sqrt[3]{x}", "root(3, x)"),
+    ("\\text{a \\& b}", '"a & b"'),
     ("\\int_a^b f(x)\\,dx = \\sqrt{2}",
      "integral_(a)^(b) f \\( x \\) thin d x = sqrt(2)"),
 ])
