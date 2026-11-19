@@ -10,5 +10,5 @@
 > > Asked 2026-11-18.
 
 - [x] rigid.Ty.l and .r keep the colour of the empty type, so t.r.l == t
-- [ ] The empty coloured type's repr reads back in biclosed and below, not only in monoidal
+- [WIP] @session_01C7YfAR16vZbH1YH5TEZiCa-2026-11-19 01:47 The empty coloured type's repr reads back in biclosed and below, not only in monoidal
 - [ ] Pin both down the hierarchy — rigid, pivotal, frobenius — and the changelog bullet
