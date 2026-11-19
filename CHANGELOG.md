@@ -715,6 +715,10 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Fixed
 
+- The Typst backend fills the coloured regions of a drawing and the shapes of
+  a ribbon, as TikZ does: `Typst.draw_filled_shape` is a CeTZ `merge-path`
+  and `Typst.draw_region_cell` fills a cell through it, so the frame of an
+  e-graph's `Join` and the band of a ribbon show ([next#645]).
 - `optyx.photonic`'s gates `MZI`, `TBS`, `BBS` and `Phase` compute their
   array in the backend of their parameters, so a diagram lambdified with
   `modules="jax"` evaluates on a JAX tracer and `jax.grad` reaches its
@@ -2381,6 +2385,7 @@ for the changelog of `1.2.1` and earlier.
 [next#641]: https://github.com/rel-int/discopy-next/pull/641
 [next#643]: https://github.com/rel-int/discopy-next/pull/643
 [next#644]: https://github.com/rel-int/discopy-next/pull/644
+[next#645]: https://github.com/rel-int/discopy-next/pull/645
 [next#646]: https://github.com/rel-int/discopy-next/pull/646
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
