@@ -2,4 +2,4 @@
 
 - [x] Typst translates the LaTeX of a label between dollars to Typst mathematics, raising on a command it does not know
 - [x] a test: every symbol of the table compiles, and the equation with \mapsto draws
-- [ ] CHANGELOG bullet
+- [x] CHANGELOG bullet
