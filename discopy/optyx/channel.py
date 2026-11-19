@@ -220,6 +220,7 @@ dual-rail encoding. For example, we can create a GHZ state:
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from importlib import import_module
 from itertools import count, repeat
 import warnings
@@ -1137,6 +1138,9 @@ class Diagram(frobenius.Diagram):
             if not isinstance(value, Integral) or isinstance(value, bool) \
                     or value <= 0:
                 raise ValueError(f"{name} must be a positive integer.")
+        if n_steps > max_steps:
+            raise ValueError(
+                f"n_steps={n_steps} must not exceed max_steps={max_steps}.")
         backends = import_module("discopy.optyx.core.backends")
         warned = False
 
@@ -1723,11 +1727,26 @@ class Channel(Diagram, frobenius.Box):
         return top >> self.kraus @ self.kraus.conjugate() >> bot
 
     def dagger(self):
+        """
+        The adjoint of the channel as a CP map, :math:`\\rho \\mapsto
+        \\sum_i K_i^\\dagger \\rho K_i`: its Kraus map is the dagger of
+        the Kraus map with the environment bent back by a cap, so that it
+        is again a map to the domain and the environment.
+
+        >>> from discopy.optyx.photonic import PhotonLoss
+        >>> loss = PhotonLoss(.1)
+        >>> assert np.allclose(
+        ...     loss.dagger().double().to_tensor().eval().array,
+        ...     loss.double().dagger().to_tensor().eval().array)
+        """
+        kraus = self.cod.single() @ diagram.Diagram.spiders(
+            0, 2, self.env) >> self.kraus.dagger() @ self.env
         return Channel(
             name=self.name + ".dagger()",
-            kraus=self.kraus.dagger(),
+            kraus=kraus,
             dom=self.cod,
             cod=self.dom,
+            env=self.env,
         )
 
     def decomp(self):
@@ -1743,8 +1762,24 @@ class Channel(Diagram, frobenius.Box):
             )
 
     def lambdify(self, *symbols, **kwargs):
-        # Non-symbolic gates can be returned directly
-        return lambda *xs: self
+        """
+        The channel as a function of ``symbols``, substituted in its Kraus
+        map: a channel with no free symbols is returned as it is. The result
+        is a plain :class:`Channel` that keeps the name: the parametrised
+        boxes, e.g. :class:`photonic.Phase`, have a ``lambdify`` of their
+        own.
+
+        >>> from sympy.abc import phi
+        >>> from discopy.optyx.photonic import Phase
+        >>> channel = Phase(phi).inflate(2)
+        >>> assert not channel.lambdify(phi)(.25).free_symbols
+        >>> assert not channel.subs((phi, .25)).free_symbols
+        """
+        if not self.kraus.free_symbols:
+            return lambda *xs: self
+        kraus = self.kraus.lambdify(*symbols, **kwargs)
+        return lambda *xs: Channel(
+            self.name, kraus(*xs), self.dom, self.cod, self.env)
 
     def subs(self, *args) -> Diagram:
         syms, exprs = zip(*args)
@@ -1804,9 +1839,21 @@ class Sum(symmetric.Sum, Diagram):
     """
 
     def double(self):
-        return diagram.Diagram.sum_factory(
-            [term.double() for term in self.terms],
-            self.dom.double(), self.cod.double())
+        r"""
+        The doubling of a coherent sum :math:`\sum_i f_i` is
+        :math:`\sum_{i, j} f_i \otimes \overline{f_j}`, cross terms included:
+        the doubling of the channel whose Kraus map is :meth:`get_kraus`,
+        which reads the sum the same way. A sum with an impure term has no
+        Kraus map, and refuses.
+
+        >>> from discopy.optyx.photonic import Create, Scalar
+        >>> bell = (Create(1, 0, 1, 0) + Create(0, 1, 0, 1)) @ Scalar(.5 ** .5)
+        >>> rho = bell.double().to_tensor().eval().array
+        >>> assert np.allclose(rho[1, 1, 0, 0, 1, 1, 0, 0], .5)
+        >>> assert np.allclose(rho[1, 0, 0, 1, 1, 0, 0, 1], .5)
+        """
+        return Channel(
+            str(self), self.get_kraus(), self.dom, self.cod).double()
 
     def grad(self, var, **params):
         """Gradient with respect to :code:`var`."""
@@ -1907,7 +1954,8 @@ class Permutation(frobenius.Permutation, Channel):
     env = diagram.Ty()
 
     def __init__(self, dom, perm):
-        self.perm = finset.Permutation(perm, len(dom))
+        self.perm = finset.Permutation(
+            perm if isinstance(perm, Sequence) else self.perm, len(dom))
         cod = dom[:0].tensor(*(dom[i] for i in self.perm))
         name = f"Permutation({list(self.perm)})"
         frobenius.Box.__init__(

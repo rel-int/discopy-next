@@ -25,6 +25,8 @@ Summary
 
         backend
         set_backend
+        is_field
+        is_complex
         get_backend
 
 See also
@@ -37,6 +39,7 @@ See also
 from __future__ import annotations
 
 from contextlib import contextmanager
+from math import isqrt, prod
 from operator import index
 from types import ModuleType
 from collections.abc import Sequence
@@ -44,7 +47,7 @@ from typing import Literal, Callable, TYPE_CHECKING
 
 from discopy import config, messages
 from discopy.abc import (
-    ComarkovCategory, DaggerCategory, MarkovCategory, Nat)
+    ComarkovCategory, DaggerMonoidalCategory, MarkovCategory, Nat)
 from discopy.testable import Serialisable, TestableGeneric
 from discopy.cat import (
     factory,
@@ -61,8 +64,8 @@ if TYPE_CHECKING:
 
 @factory
 class Matrix[dtype](
-        MarkovCategory, ComarkovCategory, DaggerCategory, TestableGeneric,
-        Serialisable):
+        MarkovCategory, ComarkovCategory, DaggerMonoidalCategory,
+        TestableGeneric, Serialisable):
     """
     A matrix is an ``array`` with natural numbers as ``dom`` and ``cod``.
 
@@ -87,6 +90,7 @@ class Matrix[dtype](
             noise
             basis
             repeat
+            resolvent
             trace
             lambdify
             subs
@@ -162,6 +166,20 @@ class Matrix[dtype](
 
     >>> Matrix[int]([0] * 24, 4, 6)
     Matrix[int]([0, 0, 0, ..., 0, 0, 0], dom=Nat(4), cod=Nat(6))
+
+    A matrix is immutable, and its array is not copied when it already has
+    the right ``dtype``: a NumPy array is shared with the caller through a
+    view that is read-only, so that writing into ``m.array`` raises while
+    the caller's own array stays writeable.
+
+    >>> a = np.zeros((2, 2), dtype=int)
+    >>> m = Matrix[int](a, 2, 2)
+    >>> assert np.shares_memory(m.array, a)
+    >>> assert not m.array.flags.writeable and a.flags.writeable
+
+    JAX and TensorFlow arrays are immutable anyway, but a PyTorch tensor has
+    no such flag: the matrix shares it with the caller, who must not write
+    into it after handing it over.
     """
     @classmethod
     def checked_params(cls) -> tuple:
@@ -206,7 +224,8 @@ class Matrix[dtype](
 
     def cast(self, dtype: type) -> Matrix:
         """
-        Cast a matrix to a given ``dtype``.
+        Cast a matrix to a given ``dtype``, the matrix itself when it
+        already has it.
 
         Parameters:
             dtype : The target datatype.
@@ -214,7 +233,11 @@ class Matrix[dtype](
         Example
         -------
         >>> assert Matrix.id().cast(bool) == Matrix[bool].id()
+        >>> m = Matrix[float].id(2)
+        >>> assert m.cast(float) is m
         """
+        if dtype == self.dtype:
+            return self
         return type(self)[dtype](self.array, self.dom, self.cod)
 
     def promote(self, *others: Matrix) -> type:
@@ -275,14 +298,52 @@ class Matrix[dtype](
         assert_isinstance(cod, Nat)
         self.dom, self.cod = dom, cod
         with backend() as np:
-            self.array = np.array(array, dtype=self.dtype).reshape(
+            array = np.asarray(array, dtype=self.dtype).reshape(
                 (index(dom), index(cod)))
+            if isinstance(np, NumPy):
+                array = array.view()
+                array.flags.writeable = False
+        self.array = array
 
     def __eq__(self, other):
         return isinstance(other, self.ar)\
             and self.dtype == other.dtype\
             and (self.dom, self.cod) == (other.dom, other.cod)\
             and (self.array == other.array).all()
+
+    def __le__(self, other):
+        """
+        The pointwise order on parallel matrices: every entry is at most
+        that of the ``other``. A Boolean matrix is a relation and the order
+        is inclusion; composition, tensor and transpose are monotone.
+
+        >>> R, S = Matrix[bool]([1, 0, 0, 0], 2, 2), Matrix[bool].id(2)
+        >>> assert R <= S and S >= R and not S <= R
+        >>> assert R >> R <= S >> S and R @ R <= S @ S
+        >>> assert not R <= Matrix[bool]([1, 1], 1, 2)
+        >>> assert not Matrix([1, 2], 1, 2) <= Matrix([2, 1], 1, 2)
+
+        Matrices of different data types are not compared:
+
+        >>> R <= R.cast(int)
+        Traceback (most recent call last):
+        ...
+        TypeError: '<=' not supported between instances of 'Matrix[bool]' \
+and 'Matrix[int]'
+
+        The complex numbers have no order, as in Python:
+
+        >>> Matrix[complex]([1j], 1, 1) <= Matrix[complex]([2j], 1, 1)
+        Traceback (most recent call last):
+        ...
+        TypeError: Matrices over <class 'complex'> have no pointwise order.
+        """
+        if not isinstance(other, self.ar):
+            return NotImplemented
+        if is_complex(self.dtype):
+            raise TypeError(messages.MATRIX_ORDER_ERROR.format(self.dtype))
+        return (self.dom, self.cod) == (other.dom, other.cod)\
+            and (self.array <= other.array).all()
 
     def is_close(self, other: Matrix, rtol: float = 1.e-8, atol: float = 1.e-8
                  ) -> bool:
@@ -402,7 +463,7 @@ class Matrix[dtype](
     @classmethod
     def id(cls, dom=0) -> Matrix:
         with backend('numpy') as np:
-            array = np.identity(index(dom), dtype=cls.dtype or int)
+            array = np.identity(index(dom), dtype=int)
         return cls(array, dom, dom)
 
     twist = id
@@ -411,9 +472,12 @@ class Matrix[dtype](
     def then(self, other: Matrix) -> Matrix:
         assert_isinstance(other, self.ar)
         assert_iscomposable(self, other)
+        cls = self.promote(other)
+        left, right = (
+            factor.cast(cls.dtype).array for factor in (self, other))
         with backend() as np:
-            array = np.matmul(self.array, other.array)
-        return self.promote(other)(array, self.dom, other.cod)
+            array = np.matmul(left, right)
+        return cls(array, self.dom, other.cod)
 
     def tensor(self, *others: Matrix):
         """
@@ -639,9 +703,45 @@ class Matrix[dtype](
             result, length = result >> result, 2 * length
         return result
 
+    def resolvent(self) -> Matrix:
+        """
+        The inverse of ``id - self`` over a field, see :func:`is_field`, i.e.
+        the sum of its powers where it converges, raising ``TypeError`` over
+        integers, ``ValueError`` when singular unless traced by ``jax.jit``.
+
+        Example
+        -------
+        >>> Matrix[float]([0, 1, 0, 0], 2, 2).resolvent()
+        Matrix[float]([1., 1., 0., 1.], dom=Nat(2), cod=Nat(2))
+        >>> Matrix[float]([1], 1, 1).resolvent()
+        Traceback (most recent call last):
+            ...
+        ValueError: id - D is singular: the trace over a field is partial.
+        """
+        if self.dom != self.cod or not is_field(self.dtype):
+            raise TypeError(messages.MATRIX_RESOLVENT_ERROR)
+        square = self.array.reshape(2 * (isqrt(prod(self.array.shape)), ))
+        with backend() as np:
+            try:
+                inverse = np.linalg.inv(np.eye(len(square)) - square)
+            except getattr(np.linalg, "LinAlgError", ()) as error:
+                raise ValueError(messages.MATRIX_SINGULAR) from error
+            try:
+                singular = not np.isfinite(inverse).all()
+            except TypeError:
+                singular = False
+            if singular:
+                raise ValueError(messages.MATRIX_SINGULAR)
+            return type(self)(inverse, self.dom, self.cod)
+
     def trace(self, n=1, left=False) -> Matrix:
         """
-        The trace of a Boolean matrix, computed with :meth:`Matrix.repeat`.
+        The partial trace ``A + B >> D* >> C`` of a matrix with blocks
+        ``A: dom -> cod``, ``B: dom -> n``, ``C: n -> cod``, ``D: n -> n``,
+        with ``D*`` the :meth:`repeat` over ``bool`` and the
+        :meth:`resolvent` over a field: the trace of Haghverdi and Scott,
+        defined when ``id - D`` is invertible, see :cite:t:`MalherbeEtAl11`,
+        Definition 3.11, and the sum over unrollings when ``D`` is nilpotent.
 
         Parameters:
             n : The number of dimensions to trace.
@@ -654,6 +754,8 @@ class Matrix[dtype](
         >>> f = Matrix[bool]([[1, 1], [0, 0]], 2, 2)
         >>> assert f.trace() == Matrix[bool]([[1]], 1, 1)
         >>> assert f.trace(left=True) == Matrix[bool]([[0]], 1, 1)
+        >>> g = Matrix[float]([[0.5, 1], [1, 0.25]], 2, 2)
+        >>> assert g.trace().is_close(Matrix[float]([[0.5 + 4 / 3]], 1, 1))
         """
         dom, cod = index(self.dom) - n, index(self.cod) - n
         if left:
@@ -663,14 +765,16 @@ class Matrix[dtype](
                                   self.ones(dom) @ self.id(n)]
                       for column in [self.id(cod) @ self.discard(n),
                                      self.discard(cod) @ self.id(n)])
-        return A + (B >> D.repeat() >> C)
+        star = D.repeat() if self.dtype == bool else D.resolvent()
+        return A + (B >> star >> C)
 
     def lambdify(
             self, *symbols: "sympy.Symbol", dtype=None, **kwargs) -> Callable:
         from sympy import lambdify
         with backend() as np:
+            modules = kwargs.pop("modules", np.module)
             array = lambdify(
-                symbols, self.array.tolist(), modules=np.module, **kwargs)
+                symbols, self.array.tolist(), modules=modules, **kwargs)
         dtype = dtype or self.dtype
         return lambda *xs: type(self)[dtype](array(*xs), self.dom, self.cod)
 
@@ -877,6 +981,25 @@ class Quimb(Contractor):
         result = method(output_inds=[f"w{j}" for j in output],
                         optimize=optimize, **params)
         return result.data if isinstance(result, qtn.Tensor) else result
+
+
+def is_field(dtype) -> bool:
+    """ Whether a ``dtype`` is floating-point or complex, in any backend. """
+    flags = ("is_floating_point", "is_floating", "is_complex")
+    with backend("numpy") as numpy:
+        return any(getattr(dtype, flag, False) is True for flag in flags)\
+            or getattr(dtype, "kind", None) in ("f", "c")\
+            or isinstance(dtype, type)\
+            and issubclass(dtype, (float, complex, numpy.inexact))
+
+
+def is_complex(dtype) -> bool:
+    """ Whether a ``dtype`` is complex, in any backend. """
+    with backend("numpy") as numpy:
+        return getattr(dtype, "is_complex", False) is True\
+            or getattr(dtype, "kind", None) == "c"\
+            or isinstance(dtype, type)\
+            and issubclass(dtype, (complex, numpy.complexfloating))
 
 
 BACKENDS = {

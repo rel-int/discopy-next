@@ -114,7 +114,7 @@ def test_named_generic_pickle_subscript():
 def test_deprecated_ob():
     from discopy import (
         biclosed, braided, compact, feedback, frobenius, pivotal, rigid)
-    from discopy.grammar import pregroup
+    from discopy.lambek import pregroup
     from discopy.quantum import circuit
     for module in (rigid, braided, biclosed, pivotal, frobenius, feedback,
                    circuit, pregroup, compact):
@@ -575,3 +575,9 @@ def test_setoid_holds_no_class():
     for value in values:
         for component in components(value.setoid()):
             assert not isinstance(component, type), (value, component)
+
+
+def test_get_origin_of_a_union_it_cannot_combine():
+    from typing import Literal, Union
+    union = Union[int, Literal[1]]
+    assert get_origin(union) == union and isinstance(1, get_origin(union))

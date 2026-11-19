@@ -44,7 +44,7 @@ Examples
 .. image:: /_static/quantum/circuit-example.svg
     :align: center
 
->>> from discopy.grammar import pregroup
+>>> from discopy.lambek import pregroup
 >>> s, n = pregroup.Ty('s'), pregroup.Ty('n')
 >>> Alice = pregroup.Word('Alice', n)
 >>> loves = pregroup.Word('loves', n.r @ s @ n.l)
@@ -358,9 +358,11 @@ class Circuit(tensor.Diagram[complex]):
             *circuits[1:], backend=backend, **params)
         for i, circuit in enumerate(circuits):
             n_bits = len(circuit.post_processing.dom)
-            result = Tensor[float].zero(Dim(1), Dim(*(n_bits * (2, ))))
+            with tensor.backend('numpy') as np:
+                array = np.zeros(n_bits * (2, ), dtype=float)
             for bitstring, count in counts[i].items():
-                result.array[bitstring] = count
+                array[bitstring] = count
+            result = Tensor[float](array, Dim(1), Dim(*(n_bits * (2, ))))
             if circuit.post_processing:
                 post_processing = circuit.post_processing.eval(mixed=True)
                 result = result >> post_processing.to_tensor().cast(float)

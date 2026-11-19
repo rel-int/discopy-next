@@ -1,6 +1,7 @@
 import gzip
 import json
 import random
+import time
 from functools import reduce
 from itertools import islice
 from math import inf
@@ -413,7 +414,7 @@ def examples() -> list[EGraph]:
 @pytest.mark.parametrize("law", [
     "rebuild_minimality", "extraction_soundness", "extraction_optimality",
     "sharing", "translation", "effects_kept", "rewrite_identity",
-    "saturation"])
+    "saturation", "stepping"])
 def test_laws_of_one_graph(law, examples):
     """ A law weakened to cartesian e-hypergraphs holds on those, any other
     law on every example. """
@@ -895,3 +896,113 @@ def test_the_dev_group_installs_egglog():
 def test_Join_dagger_flags():
     assert not Join(f, is_dagger=True).dagger().is_deterministic
     assert loads(dumps(Join(f, g).dagger())).dagger().is_affine
+
+
+def test_builder_matches_as_the_pure_one(examples):
+    """ The builder of each example, then with its classes related, matches
+    what its e-graph does, each box made cartesian as a pattern. """
+    for graph in examples:
+        builder = graph.builder()
+        for merged in (False, True):
+            if merged and graph.graph.n_spiders:
+                builder.merge(*range(graph.graph.n_spiders))
+            frozen = builder.freeze()
+            for box in dict.fromkeys(graph.graph.boxes):
+                lhs = Box(box.name, box.dom, box.cod).to_hypergraph()
+                assert builder.matches(lhs) == frozen.matches(lhs)
+        start, operations = History[Markov].twice(graph)
+        assert Markov.matching_agreement(History[Markov](
+            start, operations + (("rebuild", ), )), 0, 1)
+
+
+def test_builder_matches_bind_classes():
+    """ A variable read twice binds one class, which the join checks. """
+    divide = Box('/', x @ x, x)
+    builder, lhs = Markov.from_diagram(divide).builder(), (
+        Copy(x) >> divide).to_hypergraph()
+    assert builder.matches(lhs) == []
+    builder.merge(0, 1)
+    assert builder.matches(lhs) == [((0, ), (0, ), (2, ))]
+    twins = Copy(x) @ Copy(x) >> x @ Swap(x, x) @ x\
+        >> x @ x @ Swap(x, x) >> Box('m', x @ x, x) @ Box('m', x @ x, x)
+    assert Markov.from_diagram(twins).builder().matches(
+        twins.to_hypergraph()) == [((0, 1), (1, 0), (3, 2)),
+                                   ((0, 1), (0, 1), (2, 3))]
+
+
+def test_builder_matches_flags_and_patterns():
+    builder = Markov.from_diagram(
+        Copy(x) >> sample @ Box('sample', x, x)).builder()
+    assert builder.matches(Box('sample', x, x).to_hypergraph()) == [
+        ((1, ), (0, ), (2, ))]
+    assert builder.matches(Box('h', x, x).to_hypergraph()) == []
+    for lhs in [Diagram.id(x).to_hypergraph(), sample.to_hypergraph()]:
+        with raises(AxiomError):
+            builder.matches(lhs)
+
+
+def test_builder_indexes_rows_as_a_match_asks():
+    """ Adding a box indexes nothing, matching indexes what was added. """
+    builder = Markov.id(x).builder()
+    (a, ), _ = builder.add(f, (0, )), builder.add(sample, (0, ))
+    assert builder.indexed == 0 and not builder.rows
+    assert builder.matches(f.to_hypergraph()) == [((0, ), (0, ), (a, ))]
+    (b, ) = builder.add(f, (a, ))
+    assert builder.indexed == 2 and builder.rows == {0: [0]}
+    assert builder.matches((f >> f).to_hypergraph()) == [
+        ((0, 2), (0, ), (b, ))]
+    assert builder.indexed == 3 and builder.rows == {0: [0, 2]}
+
+
+def test_builder_matches_a_trace():
+    """ On a trace of a 1D-ARC search, the join finds the matches of each
+    box after another that the pure matcher finds. """
+    with gzip.open(TRACES / "trace-00.json.gz", "rt") as file:
+        trace = json.load(file)
+    builder = Markov.id(Ty()).builder()
+    replay(trace, builder)
+    frozen = builder.freeze()
+    unary = sorted({box for box in builder.boxes if box.dom == x}, key=str)
+    for first in builder.boxes[:3]:
+        for second in unary[:3]:
+            lhs = (first >> second).to_hypergraph()
+            assert set(builder.matches(lhs)) == set(frozen.matches(lhs))
+
+
+def test_builder_step_needs_its_rebuild():
+    """ The rules of the law go from the last box up: ``h`` rewritten into
+    ``g`` last relates the inputs of the two ``f``, which only the rebuild of
+    the round relates in turn. """
+    graph = Markov.from_diagram(Copy(x) >> h @ g >> f @ f)
+    assert Markov.stepping(graph)
+    rules = [(f.to_hypergraph(), g.to_hypergraph()),
+             (h.to_hypergraph(), g.to_hypergraph())]
+    builder = graph.builder()
+    for match, rhs in [(match, rhs) for lhs, rhs in rules
+                       for match in builder.matches(lhs)]:
+        builder.rewrite(*match, rhs)
+    assert builder.freeze().reduced() != graph.step(rules).reduced()
+    builder.rebuild()
+    assert builder.freeze().reduced() == graph.step(rules).reduced()
+
+
+def test_reduced_keeps_samples_and_classes():
+    graph = Markov.from_diagram(Copy(x) >> sample @ sample)
+    assert len(graph.reduced().boxes) == 2
+    assert graph.merge(0, 1).reduced().n_spiders == 2
+
+
+@pytest.mark.parametrize("n", range(1, 7))
+def test_saturate_closed_form(n):
+    """ Associativity and commutativity of ``+`` on ``n`` leaves saturate to
+    the non-empty subsets as classes and their ordered splits in two as
+    e-nodes, on the builder in under 2 s at ``n = 6``. """
+    plus = Box('+', x @ x, x)
+    rules = (plus, Swap(x, x) >> plus), (plus @ x >> plus, x @ plus >> plus)
+    term = reduce(Diagram.then, (
+        plus @ x ** k for k in reversed(range(n - 1))), Diagram.id(x ** n))
+    graph, start = Markov.from_diagram(term), time.perf_counter()
+    *_, last = graph, *graph.saturate(*rules)
+    assert time.perf_counter() - start < 2
+    assert len(set(last.classes)) == 2 ** n - 1
+    assert len(last.reduced().boxes) == 3 ** n - 2 ** (n + 1) + 1

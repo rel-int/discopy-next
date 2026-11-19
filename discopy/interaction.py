@@ -32,8 +32,8 @@ Summary
 Example
 -------
 
->>> from discopy.grammar import pregroup
->>> from discopy.grammar.pregroup import Word, Cup, Diagram, Functor
+>>> from discopy.lambek import pregroup
+>>> from discopy.lambek.pregroup import Word, Cup, Diagram, Functor
 >>> s, n = map(pregroup.Ty, "sn")
 >>> Alice, loves, Bob\\
 ...     = Word('Alice', n), Word('loves', n.r @ s @ n.l), Word('Bob', n)
@@ -62,9 +62,10 @@ Example
 """
 
 from __future__ import annotations
-from typing import Sequence
+from typing import Self, Sequence
 from dataclasses import dataclass
 from functools import wraps
+from operator import index
 
 from discopy import (
     balanced,
@@ -73,8 +74,8 @@ from discopy import (
     messages
 )
 from discopy.abc import (
-    Nat, Pregroup, RibbonCategory, SymmetricCategory,
-    TracedCategory)
+    DaggerCategory, DaggerMonoidalCategory, Nat, Pregroup, RibbonCategory,
+    SymmetricCategory, TracedCategory)
 from discopy.testable import Equation, TestableGeneric, quotient
 from discopy.cat import assert_iscomposable
 from discopy.python import finset
@@ -208,6 +209,16 @@ class Ty[natural](Pregroup, TestableGeneric):
     def unit(cls) -> Ty:
         return cls()
 
+    def __pow__(self, n_times: int) -> Self:
+        """
+        The tensor of a pair with itself ``n_times``.
+
+        >>> from discopy.ribbon import Ty as T
+        >>> x = Ty[T](T('x'), T('y'))
+        >>> assert x ** 2 == x @ x and x ** 0 == Ty[T]()
+        """
+        return type(self)().tensor(*index(n_times) * [self])
+
     def tensor(self, *others: Ty):
         if any(not isinstance(other, type(self)) for other in others):
             return NotImplemented
@@ -280,7 +291,8 @@ class Ty[natural](Pregroup, TestableGeneric):
 
 @factory
 @dataclass(unsafe_hash=True)
-class Diagram[natural](RibbonCategory, TestableGeneric):
+class Diagram[natural](
+        RibbonCategory, DaggerMonoidalCategory, TestableGeneric):
     """
     An integer diagram from ``x`` to ``y`` is a :attr:`natural` diagram
     from ``x.positive @ y.negative`` to ``y.positive @ x.negative``, i.e.
@@ -410,6 +422,20 @@ class Diagram[natural](RibbonCategory, TestableGeneric):
         factory = cls[resolve_factory(tree['natural'])]
         return factory(*map(from_tree, (
             tree['inside'], tree['dom'], tree['cod'])))
+
+    @classmethod
+    def has_dagger(cls) -> bool:
+        """
+        Whether the integer diagrams have a dagger: when the :attr:`natural`
+        category is a :class:`~discopy.abc.DaggerCategory`, so that a functor
+        into integer diagrams over e.g. :class:`discopy.python.Function`
+        reads a daggered box off its :code:`ar_map`.
+
+        >>> from discopy import compact, python
+        >>> assert Diagram[compact.Diagram].has_dagger()
+        >>> assert not Diagram[python.Function].has_dagger()
+        """
+        return issubclass(cls.natural, DaggerCategory)
 
     @classmethod
     def is_symmetric(cls) -> bool:

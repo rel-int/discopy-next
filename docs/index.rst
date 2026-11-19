@@ -15,31 +15,29 @@ DisCoPy documentation
 
     api/syntax
     api/semantics
+    api/neural
     api/quantum
     api/optyx
-    api/grammar
-    api/drawing
-    api/testable
+    api/lambek
 
 .. toctree::
-    :caption: Notebooks
+    :caption: What is a diagram?
     :hidden:
 
     notebooks/diagrams
     notebooks/examples
+    notebooks/boolean-circuits
+    notebooks/equivalence-hypergraphs
+    notebooks/from_picture
+
+.. toctree::
+    :caption: Quantum notebooks
+    :hidden:
+
     notebooks/qnlp
     notebooks/zx-minimality
-    notebooks/diag-diff
-    notebooks/learning-intertwiners
-    notebooks/21-05-03-tallcat
-    notebooks/21-05-05-tallcat
-    notebooks/higher-order-discocat
-    notebooks/parsing-arithmetic
-    notebooks/categorical-deep-learning
-    notebooks/neural-church
-    notebooks/equivalence-hypergraphs
     notebooks/contextual-fraction
-    notebooks/boolean-circuits
+    notebooks/21-05-05-tallcat
 
 .. toctree::
     :caption: Optyx notebooks
@@ -58,6 +56,23 @@ DisCoPy documentation
     notebooks/optyx/Compiler
     notebooks/optyx/distributed-412-code
     notebooks/optyx/distributed-422-code
+
+.. toctree::
+    :caption: Linguistics notebooks
+    :hidden:
+
+    notebooks/21-05-03-tallcat
+    notebooks/higher-order-discocat
+    notebooks/parsing-arithmetic
+
+.. toctree::
+    :caption: Machine learning notebooks
+    :hidden:
+
+    notebooks/categorical-deep-learning
+    notebooks/neural-church
+    notebooks/diag-diff
+    notebooks/learning-intertwiners
 
 .. toctree::
     :caption: Extra

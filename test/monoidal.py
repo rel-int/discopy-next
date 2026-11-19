@@ -557,7 +557,7 @@ def test_Bubble_every_level():
     from discopy import (
         spacial, feedback, braided, balanced, symmetric, markov, comarkov,
         biclosed, closed, rigid, pivotal, ribbon, compact, frobenius)
-    from discopy.grammar import pregroup, categorial, abstract
+    from discopy.lambek import pregroup, categorial, abstract
     for module in (
             spacial, feedback, braided, balanced, symmetric, markov,
             comarkov, biclosed, closed, rigid, pivotal, ribbon, compact,
@@ -1114,6 +1114,103 @@ def test_foliation_up_to_interchangers():
     assert F((k @ snake).foliation()) == F(k @ snake)
 
 
+
+def test_foliations_up_to_interchangers():
+    from discopy import rigid
+    interchangers = lambda d: d.to_staircases().normal_form(
+        normalize=Diagram.normalize)
+    x = Ty('x')
+    f, g, h = Box('f', x, x), Box('g', x, x), Box('h', x @ x, x)
+    a = rigid.Ty('a')
+    snake = a @ rigid.Cap(a.r, a) >> rigid.Cup(a, a.r) @ a
+    for diagram in [
+            f @ g @ f >> h @ x >> f @ x >> h, f @ f @ f >> f @ f @ f,
+            f.bubble(name="N") @ h, snake]:
+        foliations = diagram.foliations()
+        assert diagram.foliation() in foliations
+        assert len(set(foliations)) == len(foliations)
+        for foliation in foliations:
+            assert interchangers(foliation) == interchangers(diagram)
+            for upper, lower in zip(foliation.inside, foliation.inside[1:]):
+                with raises(AxiomError):
+                    upper.merge(lower)
+    assert len((f @ f @ f >> f @ f @ f).foliations()) == 19
+    assert len((f @ f @ f >> f @ f @ f).foliations(limit=5)) == 5
+
+
+def test_foliations_of_states_and_effects():
+    x = Ty('x')
+    f, cup = Box('f', x, x), Box('cup', Ty(), x @ x)
+    s, e = Box('s', Ty(), x), Box('e', x, Ty())
+    assert (cup >> x @ s @ x).dependencies() == ((), (0, ))
+    assert [str(d) for d in (cup >> x @ s @ x >> f @ x @ x).foliations()]\
+        == ["cup >> f @ s @ x"]
+    diagram = s @ s >> f @ x >> e @ e
+    foliations = diagram.foliations()
+    assert foliations
+    for foliation in foliations:
+        assert sorted(map(str, foliation.boxes)) == ["e", "e", "f", "s", "s"]
+        assert (foliation.dom, foliation.cod) == (diagram.dom, diagram.cod)
+        for upper, lower in zip(foliation.inside, foliation.inside[1:]):
+            with raises(AxiomError):
+                upper.merge(lower)
+
+
+def test_foliations_of_a_state_enclosed_by_a_box():
+    x = Ty('x')
+    f, g = Box('f', x, x), Box('g', x, x)
+    cup, s = Box('cup', Ty(), x @ x), Box('s', Ty(), x)
+    diagram = cup >> f @ x >> x @ s @ x >> x @ g @ x
+    assert diagram.dependencies() == ((), (0, ), (0, ), (2, ))
+    assert "cup >> x @ s @ x >> f @ g @ x"\
+        in [str(foliation) for foliation in diagram.foliations()]
+
+
+def test_foliations_of_a_state_enclosed_after_an_effect():
+    x = Ty('x')
+    a, b = Box('a', Ty(), x @ x), Box('b', x, x @ x)
+    e, s, g = Box('e', x, Ty()), Box('s', Ty(), x), Box('g', x, x)
+    diagram = a >> b @ x >> x @ e @ x >> x @ s @ x >> x @ g @ x
+    assert diagram.dependencies()[3] == (0, )
+    assert "a >> x @ s @ x >> b @ g @ x >> x @ e @ x @ x"\
+        in [str(foliation) for foliation in diagram.foliations()]
+
+
+def test_foliations_of_a_deep_diagram():
+    x = Ty('x')
+    f, diagram = Box('f', x, x), Diagram.id(x)
+    for _ in range(1000):
+        diagram = diagram >> f
+    assert diagram.foliations(limit=1) == [diagram]
+    assert Diagram.id(x).foliations() == [Diagram.id(x)]
+    assert list(Diagram.layerings(16 * ((), ))) == [(tuple(range(16)), )]
+
+
+def test_foliations_below_an_effect_between_inputs():
+    x = Ty('x')
+    e, h = Box('e', x, Ty()), Box('h', x @ x, x)
+    diagram = x @ e @ x >> h
+    assert diagram.dependencies() == ((), (0, ))
+    assert diagram.foliations() == [diagram]
+    s = Box('s', Ty(), x)
+    assert "x @ s @ x >> h @ e"\
+        in [str(d) for d in (x @ e >> x @ s >> h).foliations()]
+    f, g, k = Box('f', x, x), Box('g', x, x), Box('k', x, x)
+    assert [str(d) for d in ((f >> g) @ k).foliations()]\
+        == ["f @ k >> g @ x", "f @ x >> g @ k"]
+
+
+def test_foliations_limit():
+    f = Box('f', Ty('x'), Ty('x'))
+    assert (f @ f).foliations(limit=0) == []
+    assert len((f @ f).foliations(limit=1)) == 1
+
+
+def test_foliations_merge_by_the_level():
+    from discopy import symmetric
+    p = symmetric.Permutation(symmetric.Ty('x') ** 3, [1, 2, 0])
+    assert (p >> p).foliations() == [(p >> p).foliation()]
+
 def test_box_factory():
     """ Every level with boxes of its own binds them, which a stream of boxes
     reads: the diagrams of the hierarchy, the tensors, the grammars, the
@@ -1122,7 +1219,7 @@ def test_box_factory():
         cat, monoidal, braided, balanced, symmetric, traced, markov, rigid,
         pivotal, ribbon, biclosed, closed, compact, frobenius, feedback,
         tensor)
-    from discopy.grammar import categorial, abstract, pregroup
+    from discopy.lambek import categorial, abstract, pregroup
     from discopy.quantum import circuit, zx
     from discopy.neural import network
     assert cat.Arrow.box_factory is cat.Box
@@ -1138,6 +1235,28 @@ def test_box_factory():
 def test_decode_without_boxes_and_offsets():
     with raises(ValueError):
         Diagram.decode(Ty('x'))
+
+
+def test_encode_layers():
+    x, y = Ty('x'), Ty('y')
+    f, g = Box('f', x, y), Box('g', x, y)
+    left = f @ x >> y @ g
+    right = x @ g >> f @ y
+    middle = Diagram((Layer(f, g), ), x @ x, y @ y)
+    assert left != right and left != middle and right != middle
+    assert (f @ g).foliation() == middle
+    assert middle.encode() == (x @ x, [[(f, 0), (g, 1)]])
+    for diagram in (left, right, middle):
+        assert Diagram.decode(*diagram.encode()) == diagram
+    assert middle.to_staircases() == left
+    h = Box('h', y @ y, x)
+    for diagram in (f @ g >> h, x @ f @ g @ x >> x @ h @ x, h.dagger()):
+        for foliated in (diagram, diagram.foliation()):
+            assert Diagram.decode(*foliated.encode()) == foliated
+    with raises(ValueError):
+        Diagram.decode(x @ x, [[(f, 1), (g, 0)]])
+    with raises(ValueError):
+        Diagram.decode(x, [[]])
 
 def test_List_repr():
     from discopy import cat, monoidal

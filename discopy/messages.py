@@ -41,6 +41,11 @@ NOT_RIGID_ADJOINT = "{} is not the left adjoint of {}, maybe you meant to use"\
 MISSING_TYPES_FOR_EMPTY_SUM = "Empty sum needs a domain and codomain."
 MATRIX_REPEAT_ERROR = "The reflexive transitive closure is only defined for "\
                       "square boolean matrices."
+MATRIX_RESOLVENT_ERROR = "The resolvent is only defined for square matrices "\
+                         "over a field, i.e. float or complex: a Matrix[int] "\
+                         "can be cast to float first."
+MATRIX_SINGULAR = "id - D is singular: the trace over a field is partial."
+MATRIX_ORDER_ERROR = "Matrices over {} have no pointwise order."
 BOX_IS_MIXED = "Pure boxes can have only digits or only qudits as dom and cod."
 LAYERS_MUST_HAVE_A_BOX = "Layers must have at least one box."
 NOT_MERGEABLE = "Layers {} and {} cannot be merged."
@@ -60,6 +65,12 @@ NOT_FROBENIUS = \
     "{} has no spiders, cups or caps to downgrade this hypergraph."
 NOT_RIGID = "{} has no cups or caps for the wiring of this map."
 NOT_TRACED = "{} has no traces for the cycles of this map."
+DRAWING_DAGGER_LAYOUT = (
+    "A drawing is compared on the nose, positions included: composition "
+    "aligns wires from the top down and a tensor puts its left boxes first, "
+    "so the reflection of a composite or a tensor can be laid out with "
+    "other positions or box indices.")
+ONLY_SWAP_INVERSE = "Only a swap has an inverse: a function has no dagger."
 NO_PLANAR_NORMAL_FORM = (
     "A planar law is compared on the nose: a hypergraph is faithful only "
     "from symmetric categories on, and there is no normal form for this "
@@ -72,10 +83,6 @@ COLOURED_QUOTIENT = (
     "ill-typed across 0-cells, so it would lose its colours.")
 NO_VALUES = "{} has no sample of values, see testable.values."
 NO_DAGGER = "There is no dagger here, so the dagger laws do not apply."
-NO_TENSOR = "An arrow of a category has no tensor for its dagger to "\
-    "distribute over."
-GROUP_TENSOR = "The tensor of a group is its composition, which its dagger "\
-    "reverses rather than distributes over."
 SWAP_INVOLUTION = (
     "The inverse of a swap is the swap the other way, see swap_inverse.")
 PAIR_LENGTH = (
@@ -98,6 +105,13 @@ LENS_BRAID_NATURALITY = (
     "A Markov braid copies its input for its put, so a Markov lens is "
     "natural in it only up to the naturality of copy, which a hypergraph "
     "does not decide.")
+PRISM_NATURALITY = (
+    "A prism is a unit and associative only up to the naturality of merge "
+    "and noise, which a hypergraph does not decide.")
+PRISM_BRAID_NATURALITY = (
+    "A prism braid merges its build with its residual, so a prism is "
+    "natural in it only up to the naturality of merge, which a hypergraph "
+    "does not decide.")
 NO_SWAP = "{} is not symmetric, it has no swaps."
 NO_BRAID = "{} is not braided, it has no braids."
 NO_TWIST = "{} is not balanced, it has no twists."
@@ -107,8 +121,11 @@ NO_BRAID_GROUP = (
     "words with yet.")
 NO_CUPS = "{} is not rigid, it has no cups or caps."
 NO_SUMS = "{} has no sums, it encodes a single diagram."
+NO_PHASES = "{} is not a hypergraph category, its spiders have no phases."
+NOT_INVERTIBLE = "{} has no inverse, it is not sqrt(2) ** n times a phase."
 NOT_SYMMETRIC = "{} has no swaps to downgrade this map."
 NOT_MARKOV = "{} has no copy or discard."
+NOT_COMARKOV = "{} has no merge or noise."
 NOT_A_DAGGER = "{} has no dagger: {} is not a dagger category."
 NO_SUCH_SPIDER = "The only spiders of {} are its {}."
 NOT_ACYCLIC = "{} has a directed cycle, its boxes cannot be ordered."
@@ -168,7 +185,16 @@ TERM_IS_A_BOX = \
     "A term is a box: the laws and rules of its category are the diagram's."
 MISSING_BOXES_AND_OFFSETS = (
     "Decoding needs either boxes and offsets, or the two of them zipped.")
+OVERLAPPING_BOXES = (
+    "{} at offset {} overlaps the box on its left, which ends at {}.")
 CURRY_HAS_NO_DAGGER = "A curry has no dagger."
+BANG_HAS_NO_DAGGER = (
+    "{} has no dagger: !L* has no rule from its codomain back to its domain.")
+LAXATOR_ARITY = (
+    "A laxator takes two types, or none for the unit, got {}.")
+FREE_BANG = (
+    "A free bang is a bubble and its structure boxes, which a hypergraph "
+    "keeps as boxes: nothing cancels, merges or slides through them.")
 NAME_CLASH = "{!r} names two things in the string of {}."
 WRONG_SIDE = "Expected left={} for {}, got left={} instead."
 NOT_JSON_SERIALISABLE = "Object of type {} is not JSON serialisable."
@@ -215,3 +241,9 @@ NOT_A_PATTERN = (
 NOT_A_RULE = (
     "{} = {} is not a rule: its sides are cartesian diagrams of one type, the "
     "left a pattern and the right reading only the inputs the left reads.")
+
+LAYOUT_LENGTH = "A layout of {} coordinates was given, {} expected."
+LAYOUT_NOT_FEASIBLE = "This layout does not draw the same diagram."
+STRETCH_LENGTHS = (
+    "Give a scale for each gap between columns and between rows, and for "
+    "the width and the height of each box.")

@@ -48,11 +48,13 @@ from __future__ import annotations
 
 import math
 import numbers
+import sys
 from itertools import count
 from typing import TYPE_CHECKING, Callable, ClassVar, Sequence, TypeVar
 
 from discopy import (
-    cat, monoidal, rigid, feedback, frobenius, cmap, config, messages)
+    cat, monoidal, rigid, feedback, frobenius, cmap, config, hypergraph,
+    messages)
 from discopy.cat import factory, assert_iscomposable
 from discopy.frobenius import Dim, Cup
 from discopy.matrix import (  # noqa: F401  pylint: disable=unused-import
@@ -187,11 +189,13 @@ class Tensor(Matrix):
         other, = others
         assert_isinstance(other, self.ar)
         assert_iscomposable(self, other)
+        cls = self.promote(other)
+        left, right = (
+            factor.cast(cls.dtype).array for factor in (self, other))
         with backend() as np:
-            array = np.tensordot(self.array, other.array, len(self.cod))\
-                if self.array.shape and other.array.shape\
-                else self.array * other.array
-        return self.promote(other)(array, self.dom, other.cod)
+            array = np.tensordot(left, right, len(self.cod))\
+                if left.shape and right.shape else left * right
+        return cls(array, self.dom, other.cod)
 
     def tensor(self, *others: Tensor) -> Tensor:
         """
@@ -214,15 +218,15 @@ class Tensor(Matrix):
             target += list(range(j, j + len(factor.cod)))
             i, j = i + len(factor.dom), j + len(factor.cod)
         source = list(range(len(target)))
+        cls = self.promote(*others)
+        array, *arrays = (factor.cast(cls.dtype).array for factor in factors)
         with backend() as np:
-            array = self.array
-            for other in others:
-                array = np.tensordot(array, other.array, 0)\
-                    if array.shape and other.array.shape\
-                    else array * other.array
+            for other in arrays:
+                array = np.tensordot(array, other, 0)\
+                    if array.shape and other.shape else array * other
             if source:
                 array = np.moveaxis(array, source, target)
-        return self.promote(*others)(array, dom, cod)
+        return cls(array, dom, cod)
 
     def dagger(self) -> Tensor:
         source = list(range(len(self.dom @ self.cod)))
@@ -346,15 +350,12 @@ class Tensor(Matrix):
         assert_isatomic(typ, Dim)
         n, = typ.inside
         dom, cod = typ ** n_legs_in, typ ** n_legs_out
-        with backend('numpy'):
-            result = cls.zero(dom, cod)
-            for i in range(n):
-                index = len(dom @ cod) * (i, )
-                result.array[index] = result.array[index] + 1
-        if isinstance(get_backend(), NumPy):
-            return result
-        with backend() as np:
-            return cls(np.array(result.array), dom, cod)
+        with backend('numpy') as np:
+            array = np.zeros((dom @ cod).inside, dtype=cls.dtype or int)
+        for i in range(n):
+            index = len(dom @ cod) * (i, )
+            array[index] = array[index] + 1
+        return cls(array, dom, cod)
 
     @classmethod
     def spiders(cls, n_legs_in: int, n_legs_out: int, typ: Dim, phase=None
@@ -461,11 +462,12 @@ class Tensor(Matrix):
         >>> vector.jacobian(x, y, z)
         Tensor[Expr]([2*x, 0, 0, z, 0, y], dom=Dim(1), cod=Dim(3, 2))
         """
-        dim = Dim(len(variables) or 1)
+        n = len(variables) or 1
+        dim = Dim(n)
         result = self.zero(self.dom, dim @ self.cod)
         for i, var in enumerate(variables):
-            onehot = self.zero(Dim(1), dim)
-            onehot.array[i] = 1
+            onehot = type(self)(
+                [int(j == i) for j in range(n)], Dim(1), dim)
             result += onehot @ self.grad(var, **params)
         return result
 
@@ -585,7 +587,8 @@ they go to the einsum of a backend verbatim, which a file should not reach.
 
     def __call__(self, other):
         """
-        The image of an object, a box or a diagram, see :meth:`contract`.
+        The image of an object, a box, a diagram or a hypergraph, see
+        :meth:`contract`.
 
         A cup or a cap on a self-dual object, as at frobenius, is the
         spider with two legs on its image, so that the functor factors
@@ -604,6 +607,13 @@ they go to the einsum of a backend verbatim, which a file should not reach.
         >>> assert F(cup) == F(frobenius.Spider(2, 0, n))\\
         ...     == F(frobenius.Id(n @ n) >> cup)
         >>> assert F(g.r) == F(g.transpose()) != F(g).r
+
+        A hypergraph of :mod:`discopy.frobenius` is contracted as it
+        stands, see :meth:`spider_operands`, any other through its diagram,
+        see :meth:`operands`.
+
+        >>> graph = (g >> frobenius.Spider(1, 2, n)).to_hypergraph()
+        >>> assert F(graph) == F(graph.to_diagram())
         """
         if isinstance(other, Bubble):
             return self(other.arg).map(other.func, self.dtype)
@@ -617,12 +627,13 @@ they go to the einsum of a backend verbatim, which a file should not reach.
         if other is None or isinstance(other, (
                 cat.Ob, cat.Box, monoidal.Colour, monoidal.Ty)):
             return super().__call__(other)
-        if isinstance(other, cmap.CMap):
+        if isinstance(other, (cmap.CMap, hypergraph.Hypergraph)):
             return self.contract(other)
         assert_isinstance(other, monoidal.Diagram)
         return self.contract(cmap.CMap.from_diagram(other))
 
-    def operands(self, other: "cmap.CMap") -> tuple[
+    def operands(
+            self, other: "cmap.CMap | hypergraph.Hypergraph") -> tuple[
             list, list[list[int]], list[int], list[int]]:
         """
         The Einstein notation for the image of a combinatorial map: its
@@ -654,6 +665,10 @@ they go to the einsum of a backend verbatim, which a file should not reach.
         [0, 1], [0]
         >>> assert inputs == outputs == []
         """
+        if isinstance(other, hypergraph.Hypergraph):
+            if issubclass(other.category, frobenius.Diagram):
+                return self.spider_operands(other)
+            other = cmap.CMap.from_diagram(other.to_diagram())
         ports, wires, fresh = other.ports, {}, count()
         for source, target in enumerate(other.edges):
             if source > target:
@@ -699,6 +714,75 @@ they go to the einsum of a backend verbatim, which a file should not reach.
                 indices.append(2 * [next(fresh)])
         return arrays, indices, inputs, outputs
 
+    def spider_operands(self, other: "hypergraph.Hypergraph") -> tuple[
+            list, list[list[int]], list[int], list[int]]:
+        """
+        The Einstein notation for the image of a hypergraph, as in
+        :meth:`operands`: one index per spider, of the size of the image of
+        its type, and one array per box, indexed by the spiders on its
+        ports. A spider is one index however many ports it has, not a
+        tensor. Each boundary port is a free index carried by an identity,
+        and so is each port of a box after the first on the same spider, so
+        that no array repeats an index, which some contractors read as a
+        trace. A spider on no port is summed over alone, i.e. it counts the
+        size of its type.
+
+        Parameters:
+            other : The hypergraph to translate, of :mod:`frobenius`: any
+                other goes through its diagram, see :meth:`operands`.
+
+        Example
+        -------
+        >>> x = frobenius.Ty('x')
+        >>> f = frobenius.Box('f', frobenius.Ty(), x @ x)
+        >>> F = Functor({x: 3}, {f: [[1, 1, 0], [0, 1, 1], [1, 0, 1]]},
+        ...             dtype=int)
+        >>> graph = frobenius.Hypergraph(
+        ...     frobenius.Ty(), x, (f, ), ((), (((), (0, 0)), ), (0, )))
+        >>> arrays, indices, inputs, outputs = F.spider_operands(graph)
+        >>> indices
+        [[1, 0], [0, 1], [0, 2]]
+        >>> F(graph)
+        Tensor[int]([1, 1, 1], dom=Dim(1), cod=Dim(3))
+        >>> scalar = frobenius.Hypergraph(
+        ...     frobenius.Ty(), frobenius.Ty(), (), ((), (), ()),
+        ...     spider_types={0: x})
+        >>> F(scalar)
+        Tensor[int]([3], dom=Dim(1), cod=Dim(1))
+        """
+        dims = [product(self(typ).inside) for typ in other.spider_types]
+        arrays, indices, inputs, outputs = [], [], [], []
+        fresh = count(other.n_spiders)
+        with backend() as np:
+            def cast(unit, dim):
+                return np.array(
+                    unit(dim) if self.dtype is None
+                    else unit(dim, dtype=int), dtype=self.dtype)
+            for spider in other.dom_wires:
+                inputs.append(next(fresh))
+                arrays.append(cast(np.eye, dims[spider]))
+                indices.append([inputs[-1], spider])
+            for box, wiring in zip(other.boxes, other.box_wires):
+                wires, index = sum(wiring, ()), []
+                for spider in wires:
+                    if spider in index:  # a diagonal, kept as one index
+                        index.append(next(fresh))
+                        arrays.append(cast(np.eye, dims[spider]))
+                        indices.append([index[-1], spider])
+                    else:
+                        index.append(spider)
+                arrays.append(self(box).array.reshape(
+                    [dims[spider] for spider in wires]))
+                indices.append(index)
+            for spider in other.cod_wires:
+                outputs.append(next(fresh))
+                arrays.append(cast(np.eye, dims[spider]))
+                indices.append([spider, outputs[-1]])
+            for spider in other.scalar_spiders:
+                arrays.append(cast(np.ones, dims[spider]))
+                indices.append([spider])
+        return arrays, indices, inputs, outputs
+
     def to_quimb(self, other) -> "quimb.tensor.TensorNetwork":
         """
         The quimb tensor network of the image of a diagram or a
@@ -709,24 +793,31 @@ they go to the einsum of a backend verbatim, which a file should not reach.
         Parameters:
             other : The diagram or combinatorial map to translate.
         """
-        if not isinstance(other, cmap.CMap):
+        if not isinstance(other, (cmap.CMap, hypergraph.Hypergraph)):
             other = cmap.CMap.from_diagram(other)
         arrays, indices, inputs, outputs = self.operands(other)
         names = {label: f"inp{i}" for i, label in enumerate(inputs)}\
             | {label: f"out{i}" for i, label in enumerate(outputs)}
         return Quimb().network(arrays, indices, names)
 
-    def contract(self, other: "cmap.CMap") -> Tensor:
+    def contract(
+            self, other: "cmap.CMap | hypergraph.Hypergraph") -> Tensor:
         """
-        Contract the image of a combinatorial map, read as Einstein
-        notation by :meth:`operands`, in a single ``einsum`` call of the
-        ``contractor``. By default, this is the ``einsum`` of the active
-        :func:`backend`, and networks with more than
+        Contract the image of a combinatorial map or a hypergraph, read as
+        Einstein notation by :meth:`operands`, in a single ``einsum`` call
+        of the ``contractor``. By default, this is the ``einsum`` of the
+        active :func:`backend`, and networks with more than
         ``config.MAX_EINSUM_INDICES`` indices are contracted with
         :class:`OptEinsum` instead.
 
+        A spider of a hypergraph is an index on any number of arrays, so
+        NumPy's default bound on intermediates, the size of the largest
+        operand, can forbid every pairwise step and leave one naive sum
+        over all the indices: a hypergraph lifts it for the ``"greedy"``
+        path, not for ``"optimal"``, whose search it would let explode.
+
         Parameters:
-            other : The combinatorial map to contract.
+            other : The combinatorial map or the hypergraph to contract.
 
         Example
         -------
@@ -748,6 +839,10 @@ they go to the einsum of a backend verbatim, which a file should not reach.
         params = dict(self.params, optimize=self.optimize)\
             if isinstance(contractor, (NumPy, JAX, Contractor))\
             else self.params
+        if isinstance(other, hypergraph.Hypergraph)\
+                and isinstance(contractor, NumPy)\
+                and self.optimize in ("greedy", True):
+            params['optimize'] = ("greedy", sys.maxsize)
         array = contractor.einsum(*operands, inputs + outputs, **params)
         return self.cod(array, self(other.dom), self(other.cod))
 
@@ -979,12 +1074,12 @@ class Diagram[dtype](TestableGeneric, frobenius.Diagram):
         >>> vector.jacobian([x, y, z]).eval(dtype=Expr)
         Tensor[Expr]([2*x, 0, 0, z, 0, y], dom=Dim(1), cod=Dim(3, 2))
         """
-        dim = Dim(len(variables) or 1)
+        n = len(variables) or 1
+        dim = Dim(n)
         result = Sum((), self.dom, dim @ self.cod)
         for i, var in enumerate(variables):
-            onehot = Tensor.zero(Dim(1), dim)
-            onehot.array[i] = 1
-            result += Box(str(var), Dim(1), dim, onehot.array)\
+            onehot = [int(j == i) for j in range(n)]
+            result += Box(str(var), Dim(1), dim, onehot)\
                 @ self.grad(var, **params)
         return result
 
