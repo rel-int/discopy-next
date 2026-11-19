@@ -56,7 +56,7 @@ from discopy import config
 from discopy.drawing import Node, Point
 from discopy.drawing.typst_ast import (
     Bool, Call, Canvas, ContentExpr, Coord, Document, Float, Ident,
-    Import, RawText, Str, TypstNode)
+    Import, RawText, Str, TypstNode, latex_math)
 
 from discopy.config import (  # noqa: F401  pylint: disable=unused-import
     BOX_DRAWING_ATTRIBUTES as ATTRIBUTES,
@@ -1887,13 +1887,19 @@ class Typst(Backend):
         """
         Return ``(inner, math)`` for a diagram label.
 
-        Only explicit ``$...$`` wrappers enter Typst math mode. Bare words
-        like ``Alice`` stay as plain text — Typst would otherwise treat them
-        as undefined variables (``unknown variable: Alice``).
+        A label between dollars, with no other dollar but escaped ones, is
+        LaTeX mathematics, as matplotlib and TikZ read it, written in Typst
+        mathematics by :func:`~discopy.drawing.typst_ast.latex_math`. Any
+        other label is plain text, e.g. ``Alice``, which Typst would read as
+        a variable, or ``$a$ and $b$``.
+
+        >>> Typst.math_label("$\\\\mapsto$"), Typst.math_label("Alice")
+        (('arrow.r.bar', True), ('Alice', False))
         """
         text = str(text)
-        if text.startswith("$") and text.endswith("$") and len(text) >= 2:
-            return text[1:-1], True
+        if len(text) >= 2 and text[0] == text[-1] == "$"\
+                and not re.search(r"(?<!\\)\$", text[1:-1]):
+            return latex_math(text[1:-1]), True
         return text, False
 
     def coord(self, x, y):

@@ -714,6 +714,11 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Fixed
 
+- A label between dollars is LaTeX in the Typst backend too, as in
+  matplotlib and TikZ: `drawing.typst_ast.latex_math` writes it in Typst
+  mathematics from a table of the commands it knows and raises on any other,
+  so `$\mapsto$` draws in Typst, where it stopped on `unknown variable`, and
+  `$<=$` is two symbols rather than `≤` ([next#642]).
 - The Typst backend draws its labels after every box and wire, as TikZ puts
   them on a layer of their own, so that a box drawn after a wire label no
   longer hides it ([next#648]).
@@ -2385,6 +2390,7 @@ for the changelog of `1.2.1` and earlier.
 [next#639]: https://github.com/rel-int/discopy-next/pull/639
 [next#640]: https://github.com/rel-int/discopy-next/pull/640
 [next#641]: https://github.com/rel-int/discopy-next/pull/641
+[next#642]: https://github.com/rel-int/discopy-next/pull/642
 [next#643]: https://github.com/rel-int/discopy-next/pull/643
 [next#644]: https://github.com/rel-int/discopy-next/pull/644
 [next#645]: https://github.com/rel-int/discopy-next/pull/645
