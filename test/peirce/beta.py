@@ -116,3 +116,17 @@ def test_sums_stay_peirce():
     assert isinstance(R + S, Sum) and isinstance((R + S).negative(), Sum)
     assert model(R + S) == model(R) + model(S)
     assert model((R + S).negative()) == model(~(R + S))
+
+
+def test_connectives_in_either_region():
+    S = Box('S', x, x)
+    for r, s in product(product((0, 1), repeat=4), repeat=2):
+        model = Model(ob={'x': 2}, ar={'R': list(r), 'S': list(s)})
+        for d, e in ((R, S), (R.negative(), S.negative())):
+            a, b = (model(f).array.astype(bool).reshape(2, 2) for f in (d, e))
+            assert (model(d & e).array.reshape(2, 2) == (a & b)).all()
+            assert (model(d | e).array.reshape(2, 2) == (a | b)).all()
+            assert (model(d.relative_sum(e)).array.reshape(2, 2)
+                    == (a[:, :, None] | b[None]).all(axis=1)).all()
+            assert (model(d.par(e)).array.reshape(2, 2, 2, 2)
+                    == (a[:, None, :, None] | b[None, :, None, :])).all()

@@ -140,9 +140,23 @@ class Diagram(monoidal.Diagram):
         """
         return self.bubble_factory(self.negative(), dom=self.dom, cod=self.cod)
 
-    def __and__(self, other: Diagram) -> Diagram:
-        """ The conjunction of two propositions, their tensor. """
+    def conjunction(self, other: Diagram) -> Diagram:
+        """ The conjunction of two white propositions, their tensor. """
         return self @ other
+
+    def __and__(self, other: Diagram) -> Diagram:
+        """
+        The conjunction, :meth:`conjunction` in the white region and the
+        negative of the disjunction of the negatives in the black one, so
+        that a model reads it as ∧ in either.
+
+        >>> p, q = Box('p').negative(), Box('q').negative()
+        >>> M = Model(ar={'p': True, 'q': False})
+        >>> assert M(p & q) == M(p) @ M(q) and M(q).array.all()
+        """
+        if self.colour == black:
+            return (self.negative() | other.negative()).negative()
+        return self.conjunction(other)
 
     def __or__(self, other: Diagram) -> Diagram:
         """ The disjunction, by de Morgan, ``~(~d & ~e)``. """
@@ -150,16 +164,22 @@ class Diagram(monoidal.Diagram):
 
     def relative_sum(self, other: Diagram) -> Diagram:
         """
-        The relative sum, the composition of the black region ∀ over the
-        middle wire, as seen from the white one: ``~(~d >> ~e)``.
+        The relative sum, ∀ over the middle wire: ``~(~d >> ~e)`` in the
+        white region, and the composition of the black one, i.e. the
+        negative of the composition of the negatives.
         """
+        if self.colour == black:
+            return (self.negative() >> other.negative()).negative()
         return ~(~self >> ~other)
 
     def par(self, other: Diagram) -> Diagram:
         """
-        The tensor of the black region as seen from the white one, i.e. the
-        product ∨ of two relations: ``~(~d @ ~e)``.
+        The product ∨ of two relations: ``~(~d @ ~e)`` in the white region,
+        and the tensor of the black one, i.e. the negative of the tensor of
+        the negatives.
         """
+        if self.colour == black:
+            return (self.negative() @ other.negative()).negative()
         return ~(~self @ ~other)
 
 

@@ -138,10 +138,10 @@ class Diagram(alpha.Diagram, frobenius.Diagram):
     ob = Ty
     strategy = no_strategy
 
-    def __and__(self, other: Diagram) -> Diagram:
+    def conjunction(self, other: Diagram) -> Diagram:
         """
-        The intersection of two parallel relations: white copy, then both,
-        then white co-copy.
+        The intersection of two parallel white relations: copy, then both,
+        then co-copy.
         """
         return self.spiders(1, 2, self.dom) >> self @ other\
             >> self.spiders(2, 1, self.cod)
