@@ -715,7 +715,7 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Fixed
 
-- Seventeen laws declared broken hold, searched under the `explore` profile,
+- Seventeen laws declared broken hold when searched under the `explore` profile,
   and are no longer declared so: `hypergraph_section` in `rigid`, `pivotal`,
   `ribbon`, `braided`, `balanced` and `feedback`, `map_agreement` in
   `biclosed` and `lambek.categorial`, `TermBase.serialisation` in `biclosed`,
