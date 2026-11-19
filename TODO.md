@@ -14,8 +14,8 @@ step.lambdify(x, modules="jax")(jnp.array(0.3))
 - `lambdify` on a diagram with a `Feedback` box fails (`'NoneType' object has no attribute 'replace'`).
 What closes it: a `jax.grad` through the diagram's evaluation after `lambdify(x, modules="jax")` (the issue names `Interferometer.from_diagram(...)` from optyx.sampling — check what exists on main now, and use `to_path().array` or the equivalent if not). Reproduce first on today's main; parts may be fixed. Test with `pytest.importorskip("jax")`. If making the array backend-generic needs a choice (e.g. which array namespace a gate computes in), stop and report it.
 
-- [ ] `_contains_expr` does not iterate a 0-d array
-- [ ] gates compute their array in the backend of their parameters
-- [ ] `lambdify` on a `Feedback` diagram
-- [ ] a test of `jax.grad` through `to_path().array`
-- [ ] `Interferometer.from_diagram` traceable
+- [x] `_contains_expr` does not iterate a 0-d array
+- [x] gates compute their array in the backend of their parameters
+- [x] `lambdify` on a `Feedback` diagram: already works on main, tested with JAX
+- [x] a test of `jax.grad` through `to_path().array`
+- [x] `Interferometer.from_diagram` traceable: a design question (which completion to differentiate), left open on #257

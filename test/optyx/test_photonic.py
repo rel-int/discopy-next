@@ -2,12 +2,13 @@ import numpy as np
 import pytest
 from sympy.abc import x, y
 
+from discopy.matrix import backend
 from discopy.optyx import qubits
-from discopy.optyx.channel import Diagram, Ty
+from discopy.optyx.channel import Diagram, Ty, qmode
 from discopy.optyx.core import zw
 from discopy.optyx.photonic import (
-    BBS, BS, Create, DualRail, PhotonLoss, Scalar, Select, Swap,
-    XMeasurementDR, ZMeasurementDR)
+    BBS, BS, MZI, TBS, Create, DualRail, Phase, PhotonLoss, Scalar, Select,
+    Swap, XMeasurementDR, ZMeasurementDR)
 
 
 def outcomes(diagram):
@@ -67,3 +68,38 @@ def test_select_and_create_default_to_one_photon():
     assert Select().photons == Create().photons == (1,)
     assert Select().to_path() == zw.Select().to_path()
     assert outcomes(Create() >> Select()) == {(): 1}
+
+
+@pytest.mark.parametrize("gate", [
+    lambda t: MZI(t, 0.2), lambda t: MZI(0.1, t, is_gate_dagger=True),
+    lambda t: TBS(t, is_conj=True), BBS, lambda t: Phase(t) @ qmode])
+def test_jax_traces_gate_parameters(gate):
+    jax = pytest.importorskip("jax")
+    jnp = jax.numpy
+
+    def loss(diagram, module):
+        return module.abs(diagram.to_path().array[0, 0]) ** 2
+
+    def traced(t):
+        with backend("jax"):
+            return loss(step.lambdify(x, modules="jax")(t), jnp)
+
+    step = Create(1) @ qmode >> gate(x)
+    epsilon = 1e-5
+    expected = (loss(step.lambdify(x)(.3 + epsilon), np)
+                - loss(step.lambdify(x)(.3 - epsilon), np)) / (2 * epsilon)
+    assert np.isclose(traced(jnp.array(.3)), loss(step.lambdify(x)(.3), np))
+    assert np.isclose(jax.grad(traced)(.3), expected, atol=1e-4)
+
+
+def test_jax_traces_feedback_parameters():
+    jax = pytest.importorskip("jax")
+    loop = (Create(1) @ qmode >> MZI(x, 0.2)).feedback(state=Create(0))
+
+    def traced(t):
+        step = loop.lambdify(x, modules="jax")(t).one_step()
+        with backend("jax"):
+            return jax.numpy.abs(step.dilate().to_path().array[0, 0]) ** 2
+
+    assert np.isclose(jax.grad(traced)(.3), -np.pi * np.sin(.6 * np.pi),
+                      atol=1e-4)

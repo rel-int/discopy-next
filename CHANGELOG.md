@@ -708,6 +708,11 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Fixed
 
+- `optyx.photonic`'s gates `MZI`, `TBS`, `BBS` and `Phase` compute their
+  array in the backend of their parameters, so a diagram lambdified with
+  `modules="jax"` evaluates on a JAX tracer and `jax.grad` reaches its
+  parameters through `to_path().array` under `matrix.backend("jax")`
+  ([next#257]).
 - The empty type of a colour is its own adjoint and reads back from its
   `repr` below `monoidal`: `rigid.Ty.l` and `.r` kept the colour of a type
   with no object to read it off, and `biclosed.Ty.__repr__` was
@@ -2172,6 +2177,7 @@ for the changelog of `1.2.1` and earlier.
 [next#250]: https://github.com/rel-int/discopy-next/issues/250
 [next#252]: https://github.com/rel-int/discopy-next/issues/252
 [next#254]: https://github.com/rel-int/discopy-next/issues/254
+[next#257]: https://github.com/rel-int/discopy-next/issues/257
 [next#258]: https://github.com/rel-int/discopy-next/issues/258
 [next#260]: https://github.com/rel-int/discopy-next/issues/260
 [next#263]: https://github.com/rel-int/discopy-next/pull/263
