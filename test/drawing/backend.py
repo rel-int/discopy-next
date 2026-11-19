@@ -242,5 +242,7 @@ def test_typst_draws_the_shape_of_a_spider(shape):
     assert "circle(" not in "".join(calls)
     assert len(added) == (2 if shape == "plus" else 1)
     assert all(call.startswith(primitive) for call in added)
+    colour = "stroke" if shape == "plus" else "fill"
+    assert all(f'{colour}: rgb("#000000")' in call for call in added)
     Box('', x, x @ x, draw_as_spider=True, shape=shape).draw(
         format="typst", path=None, show=False)
