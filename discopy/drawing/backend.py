@@ -2011,6 +2011,50 @@ class Typst(Backend):
         )
         super().draw_bezier(points)
 
+    def draw_filled_shape(self, start, steps, color, stroke=False):
+        """
+        The shape of :meth:`Backend.draw_filled_shape` as one CeTZ
+        ``merge-path`` of its lines and curves, with a hairline in its own
+        colour if ``stroke``, else none, as :meth:`TikZ.draw_filled_shape`.
+
+        >>> typst = Typst()
+        >>> typst.draw_filled_shape((0, 0), [
+        ...     ("line", (1, 0)), ("curve", (1, 1), (0, 1), (0, 0))], "red")
+        >>> print(typst.body[0].render())  # doctest: +NORMALIZE_WHITESPACE
+        merge-path({line((0, 0), (1, 0));
+            bezier((1, 0), (0, 0), (1, 1), (0, 1))},
+            close: true, fill: rgb("#e8a5a5"), stroke: none)
+        """
+        segments, point = [], start
+        for step in steps:
+            if step[0] == "line":
+                segments.append(Call(Ident("line"), [
+                    self.coord(*point), self.coord(*step[1])]))
+            else:
+                segments.append(Call(Ident("bezier"), [
+                    self.coord(*point), self.coord(*step[3]),
+                    self.coord(*step[1]), self.coord(*step[2])]))
+            point = step[-1]
+        self.body.append(Call(Ident("merge-path"), [RawText(
+            "{" + "; ".join(segment.render() for segment in segments) + "}")
+        ], {"close": Bool(True),
+            "fill": Ident(self.color_expr(self.format_color(color))),
+            "stroke": self.stroke(color, linewidth=0.25) if stroke
+            else Ident("none")}))
+        super().draw_filled_shape(start, steps, color)
+
+    def draw_region_cell(self, left, right, facecolor):
+        """
+        Fill the cell between two Beziers as one closed path, see
+        :meth:`Backend.region_cell_steps`, stroked in its own colour so that
+        two cells meeting edge to edge leave no seam, as
+        :meth:`TikZ.draw_region_cell` does.
+        """
+        self.draw_filled_shape(
+            left[0], self.region_cell_steps(left, right), facecolor,
+            stroke=True)
+        super().draw_region_cell(left, right, facecolor)
+
     def spider_shape(self, box, i, j) -> list[Call]:
         """
         The shape of a spider at ``(i, j)``, one of :data:`SHAPES` as

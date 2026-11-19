@@ -30,7 +30,16 @@ def hashable(value):
     >>> assert hashable(np.array([1, 2])) == (1, 2)
     >>> assert hashable(np.array(1)) == 1
     >>> assert hashable("xy") == "xy"
+
+    An array of another backend is read through its :code:`tolist`, unless
+    it has no concrete value, e.g. a JAX tracer.
     """
+    if not isinstance(value, (list, tuple, np.ndarray))\
+            and hasattr(value, "tolist"):
+        try:
+            return hashable(value.tolist())
+        except TypeError:
+            return value
     if isinstance(value, np.ndarray) and not value.ndim:
         return value.item()
     if isinstance(value, (list, tuple, np.ndarray)):
@@ -67,11 +76,18 @@ def _build_w_layer(n_nonzero_counts, dagger=False):
     return layer
 
 
-def matrix_to_zw(U):
+def matrix_to_zw(U, dense=False):
+    """
+    The ZW diagram of a matrix: a W layer, an endomorphism per entry, a
+    permutation and a dual W layer. A zero entry is left out unless
+    :code:`dense`, which keeps every entry, e.g. one whose value is zero at
+    a point but whose derivative is not.
+    """
     # pylint: disable=import-outside-toplevel
     from discopy.optyx.core import zw
 
-    nonzero = np.asarray(U != 0, dtype=bool)
+    nonzero = np.ones(U.shape, dtype=bool) if dense\
+        else np.asarray(U != 0, dtype=bool)
     diagram = _build_w_layer(nonzero.sum(axis=1), dagger=False)
 
     # endomorphism layer

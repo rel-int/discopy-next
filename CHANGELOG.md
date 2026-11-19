@@ -717,6 +717,16 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 - The Typst backend draws its labels after every box and wire, as TikZ puts
   them on a layer of their own, so that a box drawn after a wire label no
   longer hides it ([next#648]).
+- The Typst backend fills the coloured regions of a drawing and the shapes of
+  a ribbon, as TikZ does: `Typst.draw_filled_shape` is a CeTZ `merge-path`
+  and `Typst.draw_region_cell` fills a cell through it, so the frame of an
+  e-graph's `Join` and the band of a ribbon show ([next#645]).
+- `optyx.photonic`'s gates `MZI`, `TBS`, `BBS` and `Phase` compute their
+  array in the backend of their parameters, so a diagram lambdified with
+  `modules="jax"` evaluates on a JAX tracer and `jax.grad` reaches its
+  parameters through `to_path().array` under `matrix.backend("jax")`;
+  a PyTorch parameter keeps its gradient in the gate's array, and a float
+  beside it in an `MZI` is cast to its dtype ([next#257]).
 - The Typst backend draws a spider of shape `triangle_up`, `triangle_down`
   or `plus` as matplotlib does, where it drew a disc ([next#646]).
 - `draw(format="typst", doctest=path)` checks the drawing against a
@@ -2219,6 +2229,7 @@ for the changelog of `1.2.1` and earlier.
 [next#250]: https://github.com/rel-int/discopy-next/issues/250
 [next#252]: https://github.com/rel-int/discopy-next/issues/252
 [next#254]: https://github.com/rel-int/discopy-next/issues/254
+[next#257]: https://github.com/rel-int/discopy-next/issues/257
 [next#258]: https://github.com/rel-int/discopy-next/issues/258
 [next#260]: https://github.com/rel-int/discopy-next/issues/260
 [next#263]: https://github.com/rel-int/discopy-next/pull/263
@@ -2376,6 +2387,7 @@ for the changelog of `1.2.1` and earlier.
 [next#641]: https://github.com/rel-int/discopy-next/pull/641
 [next#643]: https://github.com/rel-int/discopy-next/pull/643
 [next#644]: https://github.com/rel-int/discopy-next/pull/644
+[next#645]: https://github.com/rel-int/discopy-next/pull/645
 [next#646]: https://github.com/rel-int/discopy-next/pull/646
 [next#648]: https://github.com/rel-int/discopy-next/pull/648
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
