@@ -254,6 +254,7 @@ import numpy as np
 import sympy as sp
 from sympy import Expr, lambdify
 from discopy.cat import rsubs
+from discopy.matrix import repr_nonfinite
 from discopy.utils import factory_name
 
 from discopy.optyx import channel
@@ -502,8 +503,10 @@ class Gate(AbstractGate):
         return self._matrix
 
     def __repr__(self):
-        data = "" if self.data is None else f", data={self.data!r}"
-        return f"{factory_name(type(self))}({self.array.tolist()}, "\
+        data = "" if self.data is None\
+            else f", data={repr_nonfinite(self.data)}"
+        array = repr_nonfinite(self.array.tolist())
+        return f"{factory_name(type(self))}({array}, "\
             f"{len(self.dom)}, {len(self.cod)}, {self.name!r}{data})"
 
     def lambdify(self, *symbols, **kwargs):
