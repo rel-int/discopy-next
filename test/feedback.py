@@ -73,6 +73,21 @@ def test_Head_Tail_FollowedBy_to_tree():
         assert loads(dumps(term)) == term
 
 
+def test_Head_Tail_dagger():
+    from itertools import product
+    from discopy import markov
+    x, y = (Ty(Wire(name, is_constant=False)) for name in "xy")
+    f, g = Box('f', x, y), Box('g', y, x)
+    h = markov.Box('h', markov.Ty('x'), markov.Ty('y'))
+    for arg, part, steps in product((f, f >> g, h), ("head", "tail"), (0, 2)):
+        term = getattr(arg, part).delay(steps)
+        dagger = getattr(arg.dagger(), part).delay(steps)
+        assert term.dagger() == term[::-1] == dagger
+        assert type(term.dagger()) is type(term)
+        assert term.dagger().dagger() == term
+    assert (f.head >> g.head).dagger() == g.dagger().head >> f.dagger().head
+
+
 def test_trace_repr():
     from discopy import feedback
     trace = Box('f', 'x', 'x').trace()
@@ -266,21 +281,18 @@ def test_yanking():
     from discopy.kleisli.additive import Channel
     from discopy.kleisli.monad import Powerset
     x, y = symmetric.Ty('x'), compact.Ty('y')
-    for law in ("yanking", "yanking_left"):
-        assert getattr(symmetric.Diagram, law)(x)
-        assert getattr(compact.Diagram, law)(y)
-        assert getattr(compact.CMap, law)(y)
-        for function in (Function, Additive, Channel[Powerset]):
-            yanked, identity = getattr(function, law)(PythonTy(int)).terms
-            assert yanked(42) == identity(42)
-        assert getattr(para.Traced[Matrix[bool]], law)(Nat(2))
-        assert getattr(lens.Traced[Matrix[bool]], law)(
-            lens.Ty[Nat](Nat(1), Nat(2)))
-        for planar in (Diagram, pivotal.Diagram, Drawing, PivotalCategory):
-            assert getattr(planar, law)() is NotImplemented
-            assert "planar" in getattr(planar, law).__doc__
-        with raises(AxiomFailure):
-            getattr(balanced.Diagram, law)(balanced.Ty('x'))
+    assert symmetric.Diagram.yanking(x) and compact.Diagram.yanking(y)
+    assert compact.CMap.yanking(y)
+    for function in (Function, Additive, Channel[Powerset]):
+        left, identity, right = function.yanking(PythonTy(int)).terms
+        assert left(42) == identity(42) == right(42)
+    assert para.Traced[Matrix[bool]].yanking(Nat(2))
+    assert lens.Traced[Matrix[bool]].yanking(lens.Ty[Nat](Nat(1), Nat(2)))
+    for planar in (Diagram, pivotal.Diagram, Drawing, PivotalCategory):
+        assert planar.yanking() is NotImplemented
+        assert "planar" in planar.yanking.__doc__
+    with raises(AxiomFailure):
+        balanced.Diagram.yanking(balanced.Ty('x'))
 
 
 def test_types_without_wires_are_their_own_delay():
@@ -292,25 +304,6 @@ def test_types_without_wires_are_their_own_delay():
         assert x.delay() == x.delay(2) == x.head == x.tail == x
     f = frobenius.Box('f', frobenius.Nat(1), frobenius.Nat(1))
     assert f.delay().dom == f.dom and f.delay().time_step == 1
-
-
-def test_feedback_laws_on_a_traced_category():
-    from discopy import compact
-    from discopy.abc import FeedbackCategory
-    C = compact.CMap
-    x, y, m, n, w, z = map(compact.Ty, "xymnwz")
-    box = lambda name, dom, cod: compact.Box(name, dom, cod).to_map()
-    f = box('f', x @ m @ n, y @ m @ n)
-    g, h, k, e = box('g', w, x), box('h', y, z), box(
-        'k', m @ n, m @ n), box('e', w, z)
-    for law, arguments in (
-            ("vanishing", dict(f=f)),
-            ("joining", dict(f=f, x=x, y=y, m=m, n=n)),
-            ("strength", dict(e=e, f=f, x=x, y=y, m=m @ n)),
-            ("tightening", dict(f=f, g=g, h=h, x=x, y=y, m=m @ n)),
-            ("sliding", dict(f=f, k=k, x=x, y=y, m=m @ n))):
-        axiom = getattr(FeedbackCategory, law).bind(C)
-        assert axiom.modulo(C.to_hypergraph)(**arguments)
 
 
 def test_split_memory_bounds():
@@ -391,7 +384,7 @@ def test_generated_boxes_at_every_level():
     from discopy import (
         balanced, closed, comarkov, compact, frobenius, markov, pivotal,
         ribbon, symmetric)
-    from discopy.grammar import abstract
+    from discopy.lambek import abstract
     from discopy.neural import network
     from discopy.utils import dumps, factory_name, loads
     for module in (balanced, symmetric, markov, comarkov, pivotal, ribbon,
@@ -419,6 +412,22 @@ def test_generated_boxes_at_every_level():
             assert loads(dumps(box)) == box
     assert pivotal.Diagram.trace_factory.__func__\
         is pivotal.Diagram.__dict__['trace_factory'].__func__
+
+
+def test_Functor_sends_equal_heads_to_equal_images():
+    """ The head and tail of a daggered wire are named after its string,
+    which shows the dagger, so that they are not those of the wire it
+    daggers, which a functor sends elsewhere (next#445). """
+    x, y, z = map(Ty, "xyz")
+    w = Ty(Wire('w', is_constant=False))
+    F = Functor({x: y @ z, w: Ty(Wire('v', is_constant=False))}, {})
+    types = [x.head, x[::-1].head, w.tail, w[::-1].tail, w.head]
+    assert len(set(types)) == len(types)
+    assert F(x.head) == (y @ z).head != (z[::-1] @ y[::-1]).head\
+        == F(x[::-1]).head == F(x[::-1].head)
+    assert F(w[::-1].tail) == F(w[::-1]).tail
+    for term in types:
+        assert eval(str(term), {'x': x, 'w': w}) == term
 
 
 def test_heads_of_pivotal_types():
@@ -486,6 +495,52 @@ def test_structural_boxes_delay_through_their_arguments():
         assert pickle.loads(pickle.dumps(spider)) == spider
 
 
+def test_structural_boxes():
+    from discopy.testable import assert_structural_boxes
+    assert_structural_boxes(Diagram)
+
+
+def test_delayed_bubbles_are_boxes_and_delay_distributes_over_sums():
+    import pickle
+    from discopy import (
+        balanced, closed, comarkov, compact, feedback, frobenius, markov,
+        pivotal, ribbon, symmetric)
+    from discopy.utils import dumps, loads
+    modules = (feedback, balanced, symmetric, markov, comarkov, pivotal,
+               ribbon, compact, frobenius, closed)
+    namespace = {module.__name__.split('.')[-1]: module for module in modules}
+    for module in modules:
+        x, y = module.Ty('x'), module.Ty('y')
+        f, g = module.Box('f', x, y), module.Box('g', x, y)
+        h = module.Box('h', y, y)
+        F = module.Functor(lambda ob: ob, lambda box: box)
+        bubble = f.bubble()
+        delayed = bubble.delay()
+        assert type(delayed) is type(bubble) and delayed.time_step == 1
+        assert delayed.args == (f, ) and (delayed.dom, delayed.cod) == (
+            x.d, y.d)
+        assert delayed.reset() == bubble and delayed != f.delay().bubble()
+        assert delayed == module.Bubble(f, time_step=1)
+        assert bubble.delay(2) == delayed.delay()
+        assert delayed.dagger() == bubble.dagger().delay()
+        assert (bubble >> h).delay() == delayed >> h.delay()
+        assert F(delayed) == F(bubble).delay()
+        assert eval(repr(delayed), namespace) == delayed
+        assert eval(str(delayed), dict(f=f)) == delayed
+        assert loads(dumps(delayed)) == delayed
+        assert pickle.loads(pickle.dumps(delayed)) == delayed
+        if hasattr(bubble, "rotate"):
+            assert delayed.r == bubble.r.delay() and delayed.r.l == delayed
+            assert loads(dumps(delayed.r)) == delayed.r
+        assert (f + g).delay() == f.delay() + g.delay()
+        assert ((f + g) >> h).delay() == (f + g).delay() >> h.delay()
+        assert (f + g).delay(2) == (f + g).delay().delay()
+        assert F((f + g).delay()) == F(f + g).delay()
+    noisy = markov.Box('f', markov.Ty('x'), markov.Ty('x')).bubble(
+        is_deterministic=False)
+    assert not noisy.delay().is_deterministic
+
+
 def test_functor_preserves_the_boundary_of_FollowedBy():
     x, y = (Ty(Wire(name, is_constant=False)) for name in "xy")
     F, identity = Functor({x: y}, {}), Functor(lambda t: t, lambda f: f)
@@ -495,3 +550,10 @@ def test_functor_preserves_the_boundary_of_FollowedBy():
         assert (F(fby).dom, F(fby).cod) == (F(fby.dom), F(fby.cod))
     iso = FollowedBy(x) >> FollowedBy(x).dagger()
     assert F(iso) == FollowedBy(y) >> FollowedBy(y).dagger()
+
+
+def test_Ty_has_canonical_instances():
+    assert Ty.box_factory is Wire
+    for law in Ty.axioms.values():
+        if law.name != "str_transparency":  # a canonical wire is coloured
+            assert law.canonical(), law

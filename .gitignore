@@ -36,6 +36,13 @@ docs/notebooks/optyx/*.rst
 docs/_static/notebooks/
 # drawings left behind by a failing drawing test (backend.temporary_path)
 docs/_static/*/_*.svg
+docs/_static/*/_*.png
 benchmark-results/
 plans/
 .style-review/
+# Lake (build products of lean/)
+lean/.lake
+wip/
+# the tool paper: its figures and its LaTeX are built (see paper/build.py)
+paper/figures/
+paper/main.tex

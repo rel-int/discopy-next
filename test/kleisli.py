@@ -1,5 +1,10 @@
 # -*- coding: utf-8 -*-
 
+import os
+import subprocess
+import sys
+from pathlib import Path
+
 from pytest import approx, raises
 
 from discopy.cat import Transformation
@@ -433,6 +438,27 @@ def test_sample_misses_the_missing_mass():
         frozenset({(0, .25), (1, .25), (None, .5)}))
 
 
+def test_sample_ignores_the_hash_seed():
+    """
+    Sampling outcomes that are sets draws the same outcomes on every run,
+    whatever ``PYTHONHASHSEED`` is, since the elements of each set are
+    sorted before the outcomes are. Each run starts from the root of the
+    ``discopy`` under test, so that it imports that one.
+    """
+    script = """
+from discopy.kleisli.monad import sample
+d = frozenset({(frozenset({"a", "z"}), .5), (frozenset({"m"}), .5)})
+print([sorted(sample(d)(seed)[0]) for seed in range(8)])
+"""
+    outputs = {
+        subprocess.check_output(
+            [sys.executable, "-c", script],
+            cwd=Path(cat.__file__).parents[1],
+            env=dict(os.environ, PYTHONHASHSEED=str(hash_seed)))
+        for hash_seed in range(4)}
+    assert len(outputs) == 1
+
+
 def test_Tagged():
     assert Tagged("x", 1) == eval(repr(Tagged("x", 1)))
     assert Tagged("x", 1) != Tagged("x", 0) and Tagged("x", 1) != ("x", 1)
@@ -678,6 +704,14 @@ def test_additive_Channel_repr():
     half = additive.Channel[Maybe](
         lambda x: x // 2 if x % 2 == 0 else None, int, int)
     assert repr(half).startswith("kleisli.additive.Channel[Maybe](")
+
+
+def test_observe():
+    assert Subdistribution.observe(frozenset({(0, .1 + .2)}))\
+        == Subdistribution.observe(frozenset({(0, .3)}))
+    tick = lambda s: (s, s + 1)
+    assert Seed.observe(tick) == ((0, 1), (1, 2), (-1, 0), (2, 3))
+    assert Maybe.observe(None) is None
 
 
 def token_machine(constants):

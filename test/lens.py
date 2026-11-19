@@ -5,11 +5,11 @@ import random
 from pytest import raises
 
 from discopy import (
-    cat, feedback, lens, markov, monoidal, para, python, symmetric)
+    cat, comarkov, feedback, lens, markov, monoidal, para, python, symmetric)
 from discopy.abc import Nat
 from discopy.interaction import Diagram as IntDiagram, Ty as IntTy
-from discopy.lens import Markov, Symmetric, Traced, Ty
-from discopy.python import Function
+from discopy.lens import Comarkov, Markov, Prism, Symmetric, Traced, Ty
+from discopy.python import Function, additive
 from discopy.symmetric import Box, Diagram
 from discopy.symmetric import Ty as T
 from discopy.utils import AxiomError
@@ -271,6 +271,40 @@ def test_markov_is_symmetric():
     assert (l >> Markov.id(Y)).residual == x
 
 
+def test_comarkov_copy_merges_backward():
+    from discopy.neural.network import Box as Layer, Dims, Network
+    a, b = Dims(2), Dims(3)
+    A = Ty[Dims](a, a)
+    lenses = Comarkov[Network]
+    copy, discard = lenses.copy(A, 3), lenses.discard(A)
+    assert copy.dom == A and copy.cod == A @ A @ A
+    assert copy.get == Network.copy(a, 3)
+    assert copy.put == Network.discard(a) @ Network.merge(a, 3)
+    assert discard.dom == A and discard.cod == Ty[Dims]()
+    assert discard.get == Network.discard(a)
+    assert discard.put == Network.discard(a) @ Network.noise(a)
+    for law in (lenses.copy_counitality, lenses.copy_cocommutativity,
+                lenses.copy_coassociativity):
+        assert law(A), law
+    assert lenses.copy_coherence(A, Ty[Dims](b, b))
+    assert lenses.discard_coherence(A, Ty[Dims](b, b))
+    layer = lenses(A, Ty[Dims](b, b), Layer('f', a, b), Layer("f'", a @ b, a))
+    fan_out = copy >> layer @ layer @ lenses.id(A)
+    assert fan_out.get == Network.copy(a, 3) >> layer.get @ layer.get @ a
+    assert fan_out.put.cod == a and len(fan_out.put.dom) == 4
+    assert sum(isinstance(box, type(Network.merge(a, 3)))
+               for box in fan_out.put.boxes) == 1
+
+
+def test_comarkov_without_merge():
+    for category in (markov.Diagram, Function):
+        with raises(AxiomError, match="no merge or noise"):
+            Comarkov[category].copy(Ty[category.ob]())
+    with raises(AxiomError, match="no copy or discard"):
+        Comarkov[Diagram].copy(X)
+    assert not hasattr(Markov[markov.Diagram], "copy")
+
+
 R = Ty[python.Ty]((float, ), (float, ))
 square = Markov[Function](
     R, R, Function(lambda a: a * a, (float, ), (float, )),
@@ -315,3 +349,73 @@ def test_trace_takes_the_keyword_form():
         f.trace(1, mem=U)
     with raises(AxiomError):
         f.trace(mem=X)
+
+
+def prisms():
+    a, a_, b, b_, c, c_, d, d_ = map(
+        comarkov.Ty, ["a", "a'", "b", "b'", "c", "c'", "d", "d'"])
+    A, B, C, D = Ty(a, a_), Ty(b, b_), Ty(c, c_), Ty(d, d_)
+    return (Prism(A, B, comarkov.Box('f', a, a_ @ b),
+                  comarkov.Box("f'", b_, a_)),
+            Prism(B, C, comarkov.Box('g', b, b_ @ c),
+                  comarkov.Box("g'", c_, b_)),
+            Prism(C, D, comarkov.Box('h', c, c_ @ d),
+                  comarkov.Box("h'", d_, c_)))
+
+
+def test_prism_axioms():
+    f, g, h = prisms()
+    (a, a_), (b, b_), (c, _) = f.dom, f.cod, g.cod
+    merge, swap = comarkov.Diagram.merge, comarkov.Diagram.swap
+    assert isinstance(f, Symmetric) and f.residual == a_
+    assert f.forward == f.match >> swap(a_, b)
+    assert f.backward == a_ @ f.build >> merge(a_)
+    assert (Prism.id(f.dom) >> f).build == f.build\
+        == (f >> Prism.id(f.cod)).build
+    assert (Prism.id(f.dom) >> f).match.to_hypergraph()\
+        == f.match.to_hypergraph()
+    assert (f >> g).build == g.build >> f.build
+    assert (f >> g).match == f.match >> a_ @ g.match\
+        >> a_ @ f.build @ c >> merge(a_) @ c
+    left, right = (f >> g) >> h, f >> (g >> h)
+    assert left.build == right.build
+    assert (f @ h).dom == f.dom @ h.dom and (f @ h).cod == f.cod @ h.cod
+    assert (f @ h).build == f.build @ h.build
+    assert Prism.swap(f.dom, f.cod).build == swap(b_, a_)
+    assert Prism.swap(f.dom, f.cod).match\
+        == comarkov.Diagram.noise(a_ @ b_) @ swap(a, b)
+    assert Prism.braid(f.dom, f.cod) == Prism.swap(f.dom, f.cod)
+    assert Prism.from_lens(f.to_lens()) == f
+    assert f.to_lens().dom == -f.dom and f.to_lens().get.inside == f.build
+    scope = {"lens": lens, "comarkov": comarkov, "cat": cat,
+             "monoidal": monoidal, "feedback": feedback}
+    assert eval(repr(f), scope) == f
+    with raises(AxiomError):
+        g >> f
+
+
+def test_prism_without_merge():
+    for category in (markov.Diagram, Function):
+        with raises(AxiomError, match="no merge or noise"):
+            Prism[category].id(Ty[category.ob]())
+
+
+def test_prism_of_sum_types():
+    S, A = (Ty[python.Ty](types, types) for types in ((int, str), (int, )))
+    left = Prism[additive.Function](
+        S, A,
+        additive.Function(lambda obj, tag: (obj, 2 if tag == 0 else 1),
+                          (int, str), (int, str, int)),
+        additive.Function(lambda obj: (obj, 0), (int, ), (int, str)))
+    nested = Ty[python.Ty]((int, str, str), (int, str, str))
+    outer = Prism[additive.Function](
+        nested, S,
+        additive.Function(lambda obj, tag: (obj, 2 if tag == 2 else tag + 3),
+                          (int, str, str), (int, str, str, int, str)),
+        additive.Function(lambda obj, tag: (obj, tag), (int, str),
+                          (int, str, str)))
+    both = outer >> left
+    assert both.match(1, 0) == (1, 3)
+    assert both.match("b", 1) == ("b", 1)
+    assert both.match("c", 2) == ("c", 2)
+    assert both.build(2) == (2, 0)

@@ -143,6 +143,19 @@ def test_sum_factory():
     assert Diagram.sum_factory is Sum and type(f + f) is Sum
 
 
+def test_dual_rail_to_tree():
+    """#168: DualRailCup and DualRailCap wrote no left or right, so a dual
+    rail cup or cap could not be read back."""
+    from discopy.utils import dumps, loads
+    x = Ty('x')
+    diagram = DualRail()(Cap(x, x.r) >> Cup(x, x.r))
+    assert loads(dumps(diagram)) == diagram
+    for box in (DualRailCup(x @ x, x.r @ x.r), DualRailCap(x @ x, x.r @ x.r)):
+        for term in (box, box.dagger(), box.rotate()):
+            assert loads(dumps(term)) == term
+            assert loads(dumps(term)).is_dagger == term.is_dagger
+
+
 def test_dual_rail_delay():
     x = Ty('x')
     for diagram in [Cup(x, x.r), Cap(x, x.l), Twist(x), Braid(x, x)]:
@@ -163,3 +176,8 @@ def test_feedback_to_ribbons_is_built_from_its_argument():
     assert Head(g).to_ribbons() == rails.head
     assert Tail(g).to_ribbons() == rails.tail
     assert g.delay().to_ribbons() == rails.delay()
+
+
+def test_structural_boxes():
+    from discopy.testable import assert_structural_boxes
+    assert_structural_boxes(Diagram)

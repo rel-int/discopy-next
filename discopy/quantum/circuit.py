@@ -44,7 +44,7 @@ Examples
 .. image:: /_static/quantum/circuit-example.svg
     :align: center
 
->>> from discopy.grammar import pregroup
+>>> from discopy.lambek import pregroup
 >>> s, n = pregroup.Ty('s'), pregroup.Ty('n')
 >>> Alice = pregroup.Word('Alice', n)
 >>> loves = pregroup.Word('loves', n.r @ s @ n.l)
@@ -180,6 +180,17 @@ class Ty(frobenius.Ty):
     bit @ bit @ qubit @ qubit @ qubit
     """
     generator_factory = Wire
+    box_factory = None
+    """ No generator of one colour is named, so there is no canonical
+    instance of a law, see :meth:`discopy.testable.Axiom.canonical`. """
+
+    @classmethod
+    def generator_strategy(cls, *, dom=None, cod=None):
+        """ Generate a bit or a qubit, see :class:`frobenius.Ty`. """
+        # pylint: disable=unused-argument  # a circuit type has one colour
+        from hypothesis import strategies as st
+
+        return st.sampled_from([Digit(2), Qudit(2)]).map(cls)
 
 
 @factory
@@ -254,9 +265,15 @@ class Circuit(tensor.Diagram[complex]):
         mixed : bool, optional
             Whether to apply :class:`discopy.tensor.Functor`
             or :class:`ChannelFunctor`.
-        contractor : callable, optional
-            Use :class:`tensornetwork` contraction
-            instead of discopy's basic eval feature.
+        contractor : :class:`discopy.matrix.Backend` or callable, optional
+            The backend whose ``einsum`` contracts the network, e.g.
+            :class:`discopy.matrix.NumPy` or a
+            :class:`discopy.matrix.Contractor` such as
+            :class:`discopy.matrix.Quimb`, see
+            :meth:`discopy.tensor.Functor.contract`, or a
+            :class:`tensornetwork` contractor. A mixed circuit without a
+            tensornetwork contractor composes its channels layer by layer,
+            with no network for a backend to contract.
         params : kwargs, optional
             Get passed to Circuit.get_counts.
 
@@ -309,7 +326,8 @@ class Circuit(tensor.Diagram[complex]):
         if others and backend is None:
             return [circuit.eval(mixed=mixed, contractor=contractor, **params)
                     for circuit in (self, ) + others]
-        if contractor is not None:
+        if contractor is not None\
+                and not isinstance(contractor, tensor.Backend):
             array = contractor(*self.to_tn(mixed=mixed)).tensor
             if self.is_mixed or mixed:
                 f = channel.Functor({}, {}, dom=Circuit)
@@ -318,17 +336,17 @@ class Circuit(tensor.Diagram[complex]):
                 lambda x: x.inside[0].dim, {},
                 dtype=complex, dom=Circuit)
             return Tensor[complex](array, f(self.dom), f(self.cod))
-
-        from discopy.quantum import channel
         if backend is None:
             if mixed or self.is_mixed:
                 return channel.Functor(
-                    {}, {}, dom=Circuit, dtype=complex)(self)
+                    {}, {}, dom=Circuit, dtype=complex,
+                    contractor=contractor)(self)
             return tensor.Functor(
                 lambda x: x.inside[0].dim,
                 lambda f: f.array,
                 dom=Circuit,
-                dtype=complex)(self)
+                dtype=complex,
+                contractor=contractor)(self)
         circuits = (self, ) + others
         if params.pop("measure_all", False):
             from discopy.quantum.gates import Measure
@@ -340,9 +358,11 @@ class Circuit(tensor.Diagram[complex]):
             *circuits[1:], backend=backend, **params)
         for i, circuit in enumerate(circuits):
             n_bits = len(circuit.post_processing.dom)
-            result = Tensor[float].zero(Dim(1), Dim(*(n_bits * (2, ))))
+            with tensor.backend('numpy') as np:
+                array = np.zeros(n_bits * (2, ), dtype=float)
             for bitstring, count in counts[i].items():
-                result.array[bitstring] = count
+                array[bitstring] = count
+            result = Tensor[float](array, Dim(1), Dim(*(n_bits * (2, ))))
             if circuit.post_processing:
                 post_processing = circuit.post_processing.eval(mixed=True)
                 result = result >> post_processing.to_tensor().cast(float)

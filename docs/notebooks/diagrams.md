@@ -7,7 +7,7 @@ marimo-version: 0.23.14
 import marimo as mo
 ```
 
-# What is a diagram?
+# Diagram 101
 
 [String diagrams](https://en.wikipedia.org/wiki/String_diagram), or **diagrams** in short, are a formal graphical language for representing the composition of **systems and processes**.
 Formally, a diagram is an arrow in a [free monoidal category](https://en.wikipedia.org/wiki/Monoidal_category#Free_strict_monoidal_category).
@@ -399,14 +399,14 @@ assert unit @ x_1 == x_1 == x_1 @ unit
 assert x_1 @ y_1 @ z_1 == x_1 @ (y_1 @ z_1)
 ```
 
-Types can be indexed and sliced like Python strings, i.e.
+Types can be indexed and sliced like Python strings, except that a negative step reverses a type as the dagger reverses an arrow, i.e. it daggers each of its wires:
 
 ```python {.marimo}
 assert x_1[0] == x_1 and 'x'[0] == 'x'
 t = x_1 @ y_1 @ z_1
 assert t[:1] == t[:-2] == x_1
 assert t[1:] == t[-2:] == y_1 @ z_1
-assert t[1:0:-1].inside == t.inside[1:0:-1]
+assert t[2:0:-1] == z_1[::-1] @ y_1[::-1] != z_1 @ y_1
 ```
 
 Now a **monoidal signature** is a graph $G = (G_0, G_1, \mathtt{dom}, \mathtt{cod})$ where the edges have lists of nodes as source and target, i.e. with $\mathtt{dom}, \mathtt{cod} : G_1 \to G_0^\star$.
@@ -496,15 +496,15 @@ assert f_1 @ f__1 == f_1 @ x_ >> y_2 @ f__1 == Diagram(inside=(Layer(f_1, x_), L
 f_1 @ f__1
 ```
 
-In fact, the full list of layers is redundant.
-In order to characterise a diagram uniquely, it is enough to give its domain, the list of its boxes and the **offset** for each box, i.e. the number of wires to its left.
-The bijection between these two encodings is implemented by the methods `encode` and `decode`.
+In fact, a diagram can be written more compactly than as its list of layers.
+When each layer has one box, as here, the domain, the list of its boxes and the **offset** for each box, i.e. the number of wires to its left, characterise a diagram.
+The methods `encode` and `decode` go back and forth between a diagram and its domain with one list of boxes and offsets per layer, so that a layer with several boxes comes back as one.
 
 ```python {.marimo}
 d = f_1 @ f__1
 assert d.boxes == [f_1, f__1]
 assert d.offsets == [0, 1]
-assert d.encode() == (d.dom, list(zip(d.boxes, d.offsets))) == (x_2 @ x_, [(f_1, 0), (f__1, 1)])
+assert d.encode() == (x_2 @ x_, [[(f_1, 0)], [(f__1, 1)]])
 assert Diagram.decode(x_2 @ x_, [(f_1, 0), (f__1, 1)]) == d
 ```
 

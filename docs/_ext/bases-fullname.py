@@ -1,7 +1,8 @@
 """
 Make inheritance unambiguous by showing full class name.
 
-Add an attribute `__ambiguous_inheritance__: bool | list[type]` to your class.
+Every base from another module is shown by its full name, e.g. the bases of
+`discopy.symmetric.Box` read `discopy.balanced.Box, Diagram`.
 """
 
 def process_bases(app, name, obj, options, bases):

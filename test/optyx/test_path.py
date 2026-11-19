@@ -15,7 +15,7 @@ def beam_splitter():
 
 def test_repr_is_transparent():
     matrix = Matrix(np.eye(3), 2, 2, creations=(1, ), selections=(2, ))
-    assert eval(repr(matrix)) == matrix
+    assert eval(repr(matrix), Matrix.environment()) == matrix
 
 
 @pytest.mark.parametrize("field", [

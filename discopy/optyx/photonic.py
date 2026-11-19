@@ -264,7 +264,7 @@ from discopy.optyx.core import (
 )
 
 from discopy.optyx.classical import ClassicalFunction, DiscardMode
-from discopy.optyx.utils.misc import matrix_to_zw
+from discopy.optyx.utils.misc import listed, matrix_to_zw
 
 from discopy.optyx.channel import (
     bit,
@@ -276,20 +276,6 @@ from discopy.optyx.channel import (
     Channel,
     Diagram
 )
-
-
-def listed(internal_states):
-    """
-    The internal states as lists of numbers, which is what their
-    representation reads back: they are declared as lists and used as
-    arrays, and `STYLE.md` reads a representation holding an array up to
-    elision.
-
-    >>> listed((np.array([1, 0]), [0, 1]))
-    '([1, 0], [0, 1])'
-    """
-    states = ", ".join(repr(np.asarray(s).tolist()) for s in internal_states)
-    return f"({states},)" if len(internal_states) == 1 else f"({states})"
 
 
 class Select(Channel):
@@ -423,6 +409,8 @@ class Create(Channel):
             zw.Create(*self.photons, internal_states=internal_states)
         )
 
+    semantic_attrs = ("internal_states", )
+
     def __repr__(self):
         args = ", ".join(map(repr, self.photons))
         if self.internal_states is not None:
@@ -448,6 +436,14 @@ class AbstractGate(Channel, ABC):
             self._normal_form(dom, cod)
         )
         self.data = data
+
+    semantic_attrs = ("array", )
+    """
+    A gate is its array: a flag that conjugates or daggers it, e.g.
+    :code:`BBS.is_conj` or :code:`TBS.is_gate_dagger`, changes the array and
+    nothing else a box compares, so the array is what
+    :meth:`channel.Channel.setoid` has to read.
+    """
 
     def _normal_form(self, dom, cod):
         return matrix_to_zw(self.array.reshape(dom, cod))
@@ -998,6 +994,8 @@ class DualRail(Channel):
             f"DualRail({n_qubits})",
             diagram.dual_rail(n_qubits, internal_states=internal_states)
         )
+
+    semantic_attrs = ("internal_states", )
 
     def __repr__(self):
         args = str(len(self.dom))

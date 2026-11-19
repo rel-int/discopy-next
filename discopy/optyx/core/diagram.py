@@ -213,6 +213,8 @@ from discopy import (
 from discopy import stream as monoidal_stream
 from discopy.cat import factory, rsubs
 from discopy.frobenius import Dim
+from discopy.matrix import backend
+from discopy.optyx.utils.misc import hashable
 from discopy.utils import AxiomError, factory_name
 from discopy.quantum.gates import format_number
 from discopy.optyx.core import path
@@ -659,6 +661,17 @@ class Diagram(frobenius.Diagram):
         )(self)
 
 
+def array_backend(array) -> str:
+    """The name of the :func:`discopy.matrix.backend` an array belongs to,
+    read from the module of its type.
+
+    >>> assert array_backend(np.zeros(2)) == array_backend([0]) == "numpy"
+    """
+    return {"torch": "pytorch", "jax": "jax", "jaxlib": "jax",
+            "tensorflow": "tensorflow"}.get(
+                type(array).__module__.split(".")[0], "numpy")
+
+
 class Box(frobenius.Box, Diagram):
     """A box in an optyx diagram.
 
@@ -669,12 +682,11 @@ class Box(frobenius.Box, Diagram):
     zx boxes (Bit) with tensors with dims of 2.
     """
 
-    __ambiguous_inheritance__ = (frobenius.Box,)
-
     array = None
 
     def __init__(self, name, dom, cod, array=None, **params):
-        self.array = array
+        self.array = np.asarray(array) if isinstance(array, (list, tuple))\
+            else array
         super().__init__(name, dom, cod, **params)
         self.photon_preservation_behaviour = PhotonNumberPreservation.NON_LO
 
@@ -733,12 +745,7 @@ class Box(frobenius.Box, Diagram):
         Inheriting boxes should implement this method.
         Otherwise it is defined by the array."""
         if self.array is not None:
-            return type(self)(
-                self.name,
-                dom=self.dom,
-                cod=self.cod,
-                array=self.array.conjugate(),
-            )
+            return self.rebuild(array=self.array.conjugate())
         raise NotImplementedError(
             f"{self.__class__.__name__} does not support conjugation"
         )
@@ -746,17 +753,59 @@ class Box(frobenius.Box, Diagram):
     def dagger(self) -> Box:
         """Return the dagger of the box.
         Inheriting boxes should implement this method.
-        Otherwise it is defined by the array."""
+        Otherwise it is defined by the array.
+
+        As for :meth:`discopy.cat.Box.dagger`, the dagger keeps the name
+        and flips :code:`is_dagger`, so the dagger of the dagger is the box
+        itself. Its array is the :meth:`array_adjoint`, and its
+        :meth:`truncation` the dagger of the truncation of the box.
+
+        A box declares itself self-adjoint with ``is_dagger=None``, as
+        :data:`discopy.quantum.gates.SWAP` does, and is then its own dagger.
+
+        >>> f = Box("f", bit, bit @ bit, array=np.arange(8).reshape(2, 2, 2))
+        >>> print(f[::-1])
+        f[::-1]
+        >>> assert f[::-1][::-1] == f and f[::-1].is_dagger
+        >>> assert (f[::-1][::-1].array == f.array).all()
+        >>> assert f[::-1].truncation() == f.truncation()[::-1]
+        """
+        if self.is_dagger is None:
+            return self
         if self.array is not None:
-            return type(self)(
-                self.name + ".dagger()",
-                dom=self.cod,
-                cod=self.dom,
-                array=self.array.T.conjugate(),
-            )
+            return self.rebuild(
+                dom=self.cod, cod=self.dom, is_dagger=not self.is_dagger,
+                array=self.array_adjoint())
         raise NotImplementedError(
             f"{self.__class__.__name__} does not support dagger"
         )
+
+    def array_adjoint(self):
+        """The conjugate transpose of the array: an array with an axis per
+        wire has its codomain axes moved before its domain axes, in order,
+        any other is transposed as a matrix.
+
+        It is taken by the backend of the array, whichever is active, so a
+        PyTorch array keeps its gradient.
+
+        >>> f = Box("f", bit, bit @ bit, array=np.arange(8).reshape(2, 2, 2))
+        >>> assert f.array_adjoint()[1, 0, 0] == f.array[0, 1, 0]
+        """
+        dom, cod = len(self.dom), len(self.cod)
+        with backend(array_backend(self.array)) as module:
+            if self.array.ndim != dom + cod:
+                return module.conj(self.array.T)
+            return module.conj(module.moveaxis(
+                self.array, list(range(dom + cod)),
+                [*range(cod, dom + cod), *range(cod)]))
+
+    def __repr__(self):
+        if self.is_dagger:
+            return repr(self.dagger()) + ".dagger()"
+        array = "" if self.array is None\
+            else f", array={self.array.tolist()!r}"
+        self_adjoint = ", is_dagger=None" if self.is_dagger is None else ""
+        return super().__repr__()[:-1] + array + self_adjoint + ")"
 
     @staticmethod
     def array_wire_dims(ty: Ty, dims: list[int] = None) -> list[int]:
@@ -774,9 +823,15 @@ class Box(frobenius.Box, Diagram):
     def array_truncation(
         self, input_dims: list[int], output_dims: list[int]
     ) -> tensor.Box:
-        """`truncation` for a box defined by its `array`."""
+        """`truncation` for a box defined by its `array`: that of a dagger
+        is the dagger of the truncation of the box it daggers."""
         if output_dims is None:
             output_dims = self.determine_output_dimensions(input_dims or [])
+        if self.is_dagger:
+            return self.dagger().array_truncation(
+                self.array_wire_dims(self.cod, output_dims),
+                None if input_dims is None
+                else self.array_wire_dims(self.dom, input_dims)).dagger()
         dom_dims = self.array_wire_dims(self.dom, input_dims)
         cod_dims = self.array_wire_dims(self.cod, output_dims)
         expected_size = (
@@ -965,10 +1020,10 @@ class Sum(symmetric.Sum, Box):
     Formal sum of optyx diagrams
     """
 
-    __ambiguous_inheritance__ = (symmetric.Sum,)
-
     def conjugate(self):
-        return sum(term.conjugate() for term in self.terms)
+        return self.sum_factory(
+            tuple(term.conjugate() for term in self.terms),
+            self.dom, self.cod)
 
     def to_path(self, dtype: type = complex):
         return sum(term.to_path(dtype) for term in self.terms)
@@ -1143,6 +1198,10 @@ class Scalar(Box):
     def __str__(self):
         return f"scalar({format_number(self.data)})"
 
+    def __repr__(self):
+        return f"{factory_name(type(self))}"\
+            f"({format_number(self.scalar, exact=True)})"
+
     def to_path(self, dtype: type = complex):
         return path.Matrix[dtype]([], 0, 0, scalar=self.scalar)
 
@@ -1195,6 +1254,16 @@ class DualRail(Box):
         self.is_dagger = is_dagger
         self.photon_preservation_behaviour = \
             PhotonNumberPreservation.CUSTOM
+
+    def setoid(self):
+        """
+        The internal state of the photon is in no other component, so two
+        encodings in different states were equal.
+
+        >>> assert DualRail() != DualRail(internal_state=[1, 0])
+        >>> assert DualRail() == DualRail()
+        """
+        return super().setoid() + (hashable(self.internal_state), )
 
     def photon_number_transform(self, dims_in, dims_out):
         from discopy.optyx.core.zw import Create
@@ -1253,6 +1322,13 @@ class DualRail(Box):
         return DualRail(not self.is_dagger,
                         internal_state=self.internal_state)
 
+    def __repr__(self):
+        args = "is_dagger=True" if self.is_dagger else ""
+        if self.internal_state is not None:
+            state = repr(np.asarray(self.internal_state).tolist())
+            args += f"{', ' if args else ''}internal_state={state}"
+        return f"{factory_name(type(self))}({args})"
+
 
 class PhotonThresholdDetector(Box):
     """
@@ -1303,6 +1379,10 @@ class PhotonThresholdDetector(Box):
     def dagger(self):
         return PhotonThresholdDetector(not self.is_dagger)
 
+    def __repr__(self):
+        dagger = "is_dagger=True" if self.is_dagger else ""
+        return f"{factory_name(type(self))}({dagger})"
+
     def inflate(self, d):
         from discopy.optyx.core.zw import Add
         dgrm = Add(d) >> PhotonThresholdDetector()
@@ -1331,6 +1411,11 @@ class EmbeddingTensor(tensor.Box):
             Dim(int(output_dim)),
             embedding_array.T,
         )
+        self.input_dim, self.output_dim = int(input_dim), int(output_dim)
+
+    def __repr__(self):
+        return f"{factory_name(type(self))}"\
+            f"({self.input_dim}, {self.output_dim})"
 
     def conjugate(self):
         return self
@@ -1417,7 +1502,6 @@ class Feedback(monoidal.Bubble, Box):
     .. image:: /_static/optyx/cnot_ladder.svg
         :align: center
     """
-    __ambiguous_inheritance__ = (monoidal.Bubble,)
     serialised_attrs = ("*args", "dom", "cod", "mem", "state", "effect")
 
     @classmethod

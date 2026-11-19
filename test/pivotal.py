@@ -25,7 +25,7 @@ def test_Box_is_traced():
 
 def test_subs_keeps_winding_number_and_time_step():
     phi = importorskip("sympy").Symbol("phi")
-    from discopy.grammar.pregroup import Ty as P, Word
+    from discopy.lambek.pregroup import Ty as P, Word
     x = Ty('x')
     f = Box('f', x, x @ x, data=phi)
     assert f.delay().r.subs(phi, 1) == f.subs(phi, 1).delay().r
@@ -39,3 +39,8 @@ def test_Bubble_rotate():
     x, y = Ty('x'), Ty('y')
     bubble = Box('f', x, y).bubble()
     assert bubble.r.z == bubble.l.z == 1 and bubble.r.r == bubble
+
+
+def test_structural_boxes():
+    from discopy.testable import assert_structural_boxes
+    assert_structural_boxes(Diagram)

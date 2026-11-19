@@ -3,6 +3,7 @@ import random
 from pytest import raises
 
 from discopy.hypergraph import *
+from discopy.abc import DaggerMonoidalCategory
 from discopy.frobenius import (
     Ty, Box, Cap, Cup, Diagram, Nat, Spider, Hypergraph as H)
 
@@ -264,6 +265,17 @@ def test_traced_copy_of_a_wire_with_a_dagger():
         == loop.to_hypergraph()
 
 
+def test_str_transparency():
+    """ A hypergraph prints as the diagram it decodes to, which reads back in
+    the environment of its category, and to the hypergraph. """
+    from discopy import symmetric
+    from discopy.hypergraph import Hypergraph
+    x = symmetric.Ty('x')
+    graph = (symmetric.Box('f', x, x) @ x >> symmetric.Swap(x, x)
+             ).to_hypergraph()
+    assert str(graph) == "f @ x >> Swap(x, x)"
+    assert Hypergraph[symmetric.Diagram].str_transparency(term=graph)
+
 
 def test_rotation_is_the_transpose():
     """ Decision 7 of #56: a rotated box has the hypergraph of its
@@ -311,7 +323,7 @@ def test_spider_producers_and_consumers():
 
 def test_cups():
     x = Ty('x')
-    assert issubclass(H, DaggerCategory)
+    assert issubclass(H, DaggerMonoidalCategory)
     assert H.cups(x, x).make_monogamous().dagger()\
         == H.caps(x, x).make_monogamous()
     assert H.caps(x, x).make_monogamous().dagger()\
@@ -649,6 +661,29 @@ def test_trace_needs_traced_pivotal():
         x = module.Ty('x')
         graph = module.Box('f', x @ x, x @ x).to_hypergraph()
         assert graph.trace().cod == graph.trace(left=True).cod == x
+
+
+def test_planar_comparison():
+    """ Below symmetric categories, a hypergraph is not faithful, so the
+    laws of a planar level are compared on the nose: each pair here was
+    identified when they were compared by hypergraph. """
+    from discopy import balanced, braided, monoidal, rigid
+    x, y = braided.Ty('x'), braided.Ty('y')
+    braid, inverse = braided.Braid(x, y), braided.Braid(y, x)[::-1]
+    assert braid.to_hypergraph() != inverse.to_hypergraph()
+    assert not braided.Diagram.equation_factory(braid, inverse)
+    x = balanced.Ty('x')
+    twist, identity = balanced.Twist(x), balanced.Diagram.id(x)
+    assert twist.to_hypergraph() != identity.to_hypergraph()
+    assert not balanced.Diagram.equation_factory(twist, identity)
+    x = rigid.Ty('x')
+    left = rigid.Cap(x, x.l) @ x >> x @ rigid.Cup(x.l, x)
+    right = x @ rigid.Cap(x.r, x) >> rigid.Cup(x, x.r) @ x
+    assert left.to_hypergraph() != right.to_hypergraph()  # cups are boxes
+    assert not rigid.Diagram.equation_factory(left, right)
+    x, scalar = monoidal.Ty('x'), monoidal.Box('s', monoidal.Ty(), monoidal.Ty())
+    assert (scalar @ x).to_hypergraph() == (x @ scalar).to_hypergraph()
+    assert not monoidal.Diagram.equation_factory(scalar @ x, x @ scalar)
 
 
 def test_cups_and_caps_read_the_host_category():
@@ -1100,3 +1135,187 @@ def test_decoder():
     assert (CMap[Tensor].id(Dim(3)) @ CMap[Tensor].from_box(t)
             >> CMap[Tensor].swap(Dim(3), Dim(3))).to_diagram()\
         == Dim(3) @ t >> Tensor.swap(Dim(3), Dim(3))
+
+
+def test_atoms():
+    x, y = Ty('x'), Ty('y')
+    f = Box('f', x, y)
+    graph = f.to_hypergraph()
+    assert graph.atoms() == graph.to_diagram().atoms()
+    assert f in graph.atoms()
+    assert eval(str(graph), Diagram.str_environment(f)).to_hypergraph()\
+        == graph
+
+
+def test_Hypergraph_make_methods_insert_in_one_pass(monkeypatch):
+    """
+    However many boxes they insert, the ``make_*`` methods scan the wires and
+    the types of the result once, i.e. they build one hypergraph rather than
+    one per box, which also keeps them off the recursion limit.
+    """
+    for method, legs in [("make_bijective", (1, 2)),
+                         ("make_left_monogamous", (2, 3)),
+                         ("make_right_monogamous", (3, 2))]:
+        x = Ty('x')
+        graph = H.spiders(*legs, x)
+        for _ in range(9):
+            graph = graph @ H.spiders(*legs, x)
+        scans = []
+        monkeypatch.setattr(
+            H, "scan_types", lambda self: scans.append(self))
+        result = getattr(graph, method)()
+        monkeypatch.undo()
+        assert len(scans) == 1 and len(result.boxes) == 10
+
+
+def test_Hypergraph_make_left_monogamous_merges_in_port_order():
+    """
+    The legs of a merge read their ports in order, where they used to read
+    them in the iteration order of a ``set`` of port indices: the ports of
+    the first spider below are ``{6, 7, 8}``, which iterates ``8, 6, 7``.
+    """
+    x = Ty('x')
+    effect = H.spiders(3, 0, x)
+    graph = (effect @ effect @ effect).make_left_monogamous()
+    assert [dom for dom, _ in graph.wires[1]]\
+        == [(6, 7, 8), (3, 4, 5), (0, 1, 2)]
+    assert graph.boxes == 3 * (Spider(3, 1, x), )
+
+
+def test_Hypergraph_make_monogamous_inserts_in_one_pass(monkeypatch):
+    """
+    However many cups and caps it inserts, ``make_monogamous`` scans the
+    wires and the types of the result once, i.e. it builds one hypergraph
+    rather than one per box, which also keeps it off the recursion limit.
+    """
+    x = Ty('x')
+    transpose = Box('f', x, x).transpose().to_hypergraph()
+    graph = transpose
+    for _ in range(9):
+        graph = graph @ transpose
+    scans = []
+    monkeypatch.setattr(H, "scan_types", lambda self: scans.append(self))
+    result = graph.make_monogamous()
+    monkeypatch.undo()
+    assert len(scans) == 1 and len(result.boxes) == 30
+    assert result.is_monogamous
+
+
+def test_Hypergraph_make_monogamous_carries_leg_order():
+    """
+    The legs of each cup and cap read :meth:`Hypergraph.leg_order` on the
+    graph the pass starts from, which is the answer the recursion read on the
+    graph as it stood: both caps below reorder their legs, the second one
+    after the first has already been inserted.
+    """
+    from discopy import compact
+    a, b, c, d = map(compact.Ty, "abcd")
+    f, g = compact.Box('f', d, d), compact.Box('g', c @ b, a)
+    graph = Hypergraph[compact.Diagram](
+        d.r @ a, b.r @ c.r @ d.r @ a @ a, (f, g),
+        ((0, 1), (((2, ), (2, )), ((3, 4), (5, ))), (4, 3, 0, 1, 5)))
+    assert graph.make_monogamous().boxes == (
+        f, compact.Cap(c.r, c), compact.Cap(b.r, b), g)
+
+
+def test_Hypergraph_explicit_trace_of_n_wires_is_the_n_nested_ones():
+    """
+    The ``n``-wire trace is the nest of ``n`` one-wire traces, on both kinds
+    of ``trace_factory``: a class, where the whole nest is one trace box on
+    the diagram, and a class method, where the cups and caps of a pivotal
+    category are atomic and the nest is the onion of ``n`` pairs. So taking
+    them in one pass is the same term, not just the same morphism.
+    """
+    from discopy import compact, comarkov, frobenius, markov, symmetric
+    for module in (symmetric, markov, comarkov, compact, frobenius):
+        x, a = module.Ty('x'), module.Ty('a')
+        for n in (1, 2, 3):
+            for left in (False, True):
+                typ = x ** n @ a if left else a @ x ** n
+                graph = module.Box('f', typ, typ).to_hypergraph()
+                nested = graph
+                for _ in range(n):
+                    nested = nested.explicit_trace(1, left)
+                assert graph.explicit_trace(n, left) == nested, (
+                    module.__name__, n, left)
+
+
+def test_Hypergraph_explicit_trace_builds_the_onion_in_one_call(monkeypatch):
+    """
+    Over a pivotal category the ``n``-wire trace is an onion of ``n`` cup and
+    cap pairs around the graph, and the whole onion goes to one constructor
+    call. Composing it pair by pair built ``2 * n`` intermediate graphs, each
+    scanning a boundary that grows with ``n``, which is what made
+    ``make_causal`` quadratic in the wires it traces (#536).
+    """
+    from discopy import compact, frobenius
+    for module in (compact, frobenius):
+        graph = module.Box(
+            'f', module.Ty('x') ** 8, module.Ty('x') ** 8).to_hypergraph()
+        for left in (False, True):
+            calls, init = [], module.Hypergraph.__init__
+
+            def counted(self, *args, _init=init, _calls=calls, **kwargs):
+                _calls.append(None)
+                return _init(self, *args, **kwargs)
+
+            monkeypatch.setattr(module.Hypergraph, "__init__", counted)
+            result = graph.explicit_trace(4, left)
+            monkeypatch.undo()
+            assert len(calls) == 1, (module.__name__, left, len(calls))
+            nested = graph
+            for _ in range(4):
+                nested = nested.explicit_trace(1, left)
+            assert result.boxes == nested.boxes, (module.__name__, left)
+            assert result.wires == nested.wires, (module.__name__, left)
+            assert result.spider_types == nested.spider_types
+
+
+def test_Hypergraph_explicit_trace_keeps_an_overridden_factory(monkeypatch):
+    """
+    The onion in one call *is* the pivotal trace, so it is built only when
+    ``trace_factory`` is pivotal's own class method: a category overriding it
+    gets the nest its own factory builds, one wire at a time, rather than the
+    cups and caps it never asked for.
+    """
+    from discopy import frobenius, pivotal
+    pivotal_trace, calls = pivotal.Diagram.trace_factory.__func__, []
+
+    def overridden(cls, diagram, left=False):
+        calls.append(left)
+        return pivotal_trace(cls, diagram, left)
+
+    x = frobenius.Ty('x')
+    graph = frobenius.Box('f', x ** 8, x ** 8).to_hypergraph()
+    onion = graph.explicit_trace(4)
+    monkeypatch.setattr(
+        frobenius.Diagram, "trace_factory", classmethod(overridden))
+    assert graph.explicit_trace(4) == onion
+    monkeypatch.undo()
+    assert calls == 4 * [False]
+
+
+def test_Hypergraph_trace_backward_wires_loops(monkeypatch):
+    """
+    ``trace_backward_wires`` cuts one wire at a time in a loop, so a graph
+    with many wires to cut does not nest one frame per cut as it used to,
+    which raised ``RecursionError`` at a thousand of them; and the traces it
+    counts are taken in one call rather than one per cut, from the one frame
+    of the loop.
+    """
+    import inspect
+    x = Ty('x')
+    scalar = H.spiders(0, 0, x)
+    graph = scalar.tensor(*19 * [scalar])
+    explicit_trace, calls = H.explicit_trace, []
+
+    def counted(self, n=1, left=False):
+        calls.append((n, sum(frame.function == "trace_backward_wires"
+                             for frame in inspect.stack())))
+        return explicit_trace(self, n, left)
+
+    monkeypatch.setattr(H, "explicit_trace", counted)
+    result = graph.trace_backward_wires()
+    monkeypatch.undo()
+    assert calls == [(20, 1)]
+    assert len(result.boxes) == 40 and result.is_causal

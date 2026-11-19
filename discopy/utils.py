@@ -27,6 +27,7 @@ Summary
         :toctree:
 
         factory_name
+        factory_key
         from_tree
         dumps
         loads
@@ -49,9 +50,11 @@ import inspect
 import json
 import sys
 from fractions import Fraction
-from functools import lru_cache, wraps
+from functools import lru_cache, reduce, wraps
 from math import ceil, prod
+from operator import or_
 from pathlib import Path
+from types import UnionType
 from typing import (
     Callable,
     ClassVar,
@@ -64,6 +67,7 @@ from typing import (
     NamedTuple,
     Sequence,
     Union,
+    get_args,
     TYPE_CHECKING,
 )
 
@@ -170,8 +174,10 @@ class MappingOrCallable(Mapping[KT, VT]):
 
 def identity(x: KT) -> KT:
     """
-    The identity function, which every identity functor is built from so that
-    it can be recognised, see :meth:`discopy.cat.Functor.then`.
+    The identity function, which every identity functor and transformation is
+    built from so that it can be recognised, see
+    :meth:`discopy.cat.Functor.then` and
+    :meth:`discopy.cat.Transformation.then`.
 
     Example
     -------
@@ -182,16 +188,25 @@ def identity(x: KT) -> KT:
 
 def get_origin(typ):
     """
-    Get origin of a parameterized generic type, leaving a union type
-    untouched so that ``isinstance`` can be called on it directly.
+    Get origin of a parameterized generic type, and the union of the origins
+    of a union type, so that ``isinstance`` can be called on it directly,
+    leaving the union untouched when its origins are no union of types.
 
     Example
     -------
     >>> assert get_origin(tuple[int, str]) is tuple
     >>> assert get_origin(int | None) == (int | None)
+    >>> assert get_origin(frozenset[int] | None) == (frozenset | None)
+    >>> from typing import Literal
+    >>> assert get_origin(int | Literal[1]) == (int | Literal[1])
     """
     origin = getattr(typ, "__origin__", typ)
-    return typ if origin is Union else origin
+    if origin is not Union and not isinstance(typ, UnionType):
+        return origin
+    try:
+        return reduce(or_, map(get_origin, get_args(typ)))
+    except TypeError:
+        return typ
 
 
 @lru_cache(maxsize=None)
@@ -292,9 +307,10 @@ class NamedGeneric:
     it builds through ``cls.ar`` carry the parameter.
 
     >>> from discopy.abc import Category
+    >>> from discopy.testable import TestableGeneric
     >>> @factory
-    ... class C[dtype](Category, NamedGeneric):
-    ...     pass
+    ... class C[dtype](Category, TestableGeneric):
+    ...     checked_params = classmethod(lambda cls: ())
     >>> assert C[int].factory is C[int] is C[int].ar
 
     A DisCoPy class is named by its module, since every level of the
@@ -473,14 +489,47 @@ def factory_name(cls: type) -> str:
 
     Example
     -------
-    >>> from discopy.grammar.pregroup import Word
-    >>> assert factory_name(Word) == "grammar.pregroup.Word"
+    >>> from discopy.lambek.pregroup import Word
+    >>> assert factory_name(Word) == "lambek.pregroup.Word"
     >>> assert factory_name(int | None) == "int | None"
     """
     if not isinstance(cls, type):
         return str(cls).removeprefix('discopy.')
     module = cls.__module__.removeprefix('discopy.')
     return f"{module}.{cls.__name__}".removeprefix('builtins.')
+
+
+def factory_key(cls: type) -> tuple[str, str]:
+    """
+    Returns a deterministic key for a DisCoPy class, i.e. the pair of its
+    module and its qualified name. This is what a :meth:`setoid` leads with,
+    rather than the class itself: the hash of a class is its address, so a
+    setoid holding one hashes to a different number in every interpreter,
+    which the determinism of `STYLE.md` rules out.
+
+    Example
+    -------
+    >>> from discopy.cat import Box
+    >>> assert factory_key(Box) == ("discopy.cat", "Box")
+
+    A subscript is part of the name, so two of them keep different keys.
+
+    >>> from discopy.tensor import Box as TensorBox
+    >>> assert factory_key(TensorBox[float]) != factory_key(TensorBox[complex])
+
+    A class is keyed by the name it is reachable at, which is the identity
+    :func:`factory_name` and :func:`resolve_factory` already give it when a
+    term is serialised. Two classes of that same name in that same module are
+    one key, e.g. two calls of a factory defining a class in its own body:
+    their terms compare equal where before they compared unequal by address.
+
+    >>> def make():
+    ...     class Local(Box): pass
+    ...     return Local
+    >>> assert make() is not make()
+    >>> assert factory_key(make()) == factory_key(make())
+    """
+    return cls.__module__, cls.__qualname__
 
 
 def from_tree(tree: dict):
@@ -528,6 +577,12 @@ def resolve_factory(name: str) -> type:
     >>> assert resolve_factory("tensor.Diagram[complex]") is Diagram[complex]
     >>> assert resolve_factory("tensor.Diagram[float64]") is Diagram[float64]
 
+    A module that was renamed is found under its old name, see
+    :data:`RENAMED`, so that a tree written before the rename still loads.
+
+    >>> from discopy.lambek import pregroup
+    >>> assert resolve_factory("grammar.pregroup.Ty") is pregroup.Ty
+
     Any other name raises, e.g. that of an object a module of DisCoPy
     imports, so that a file names no function for :func:`loads` to reach.
 
@@ -541,6 +596,7 @@ def resolve_factory(name: str) -> type:
         return resolve_factory(origin)[
             resolve_factory(parameter)]  # ty: ignore[not-subscriptable]
     *modules, factory = name.removeprefix('discopy.').split('.')
+    modules[:1] = [RENAMED.get(module, module) for module in modules[:1]]
     import discopy  # pylint: disable=import-outside-toplevel
     if not modules and factory not in vars(discopy):
         import numpy
@@ -554,6 +610,9 @@ def resolve_factory(name: str) -> type:
         raise AttributeError(messages.NO_SUCH_CLASS.format(name))
     return cls
 
+
+RENAMED = {"grammar": "lambek"}
+""" The modules of DisCoPy that were renamed, from old name to new. """
 
 SYMPY_CONSTANTS = (
     "Zero", "One", "NegativeOne", "Half", "Pi", "Exp1", "ImaginaryUnit",

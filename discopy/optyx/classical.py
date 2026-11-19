@@ -161,12 +161,21 @@ class BitControlledGate(Channel):
     the Kraus operators for the gate.
     """
     class _BitControlledSingleBox(Channel):
+        """
+        The box of a :class:`BitControlledGate`: it keeps its gate and its
+        default, the identity unless one is given, as its ``data``, so that
+        equality reads them, and prints the call to
+        :class:`BitControlledGate` that builds it.
+        """
         def __init__(
             self,
             control_gate,
             default_gate=None,
-            classical=False
+            classical=False,
+            is_dagger=False
         ):
+            if default_gate is None:
+                default_gate = control_gate.id(control_gate.dom)
             if isinstance(control_gate, (Diagram, Channel)):
                 assert control_gate.is_pure, \
                     "The input gates must be pure quantum channels"
@@ -191,23 +200,39 @@ class BitControlledGate(Channel):
                 default_gate_single
             )
 
+            dom = bit @ tp**len(control_gate_single.dom)
+            cod = tp**len(control_gate_single.cod)
             super().__init__(
                 "BitControlledGate",
-                kraus,
-                bit @ tp**len(control_gate_single.dom),
-                tp**len(control_gate_single.cod)
+                kraus.dagger() if is_dagger else kraus,
+                cod if is_dagger else dom,
+                dom if is_dagger else cod
             )
+            self.control_gate, self.default_gate = control_gate, default_gate
+            self.classical, self.is_dagger = classical, is_dagger
+            self.data = (control_gate, default_gate)
+
+        def __repr__(self):
+            dagger = ", is_dagger=True" if self.is_dagger else ""
+            classical = ", classical=True" if self.classical else ""
+            return f"{factory_name(BitControlledGate)}("\
+                f"{self.control_gate!r}, {self.default_gate!r}"\
+                f"{dagger}{classical})"
+
+        def dagger(self):
+            return type(self)(self.control_gate, self.default_gate,
+                              self.classical, not self.is_dagger)
+
+        @property
+        def free_symbols(self):
+            """ The symbols of its gates. """
+            return self.control_gate.free_symbols\
+                | self.default_gate.free_symbols
 
     def __new__(cls, diag, default_box=None, is_dagger=False, classical=False):
         if default_box is not None:
             return cls._BitControlledSingleBox(
-                diag, default_box, classical=classical
-            ).dagger() if is_dagger else \
-                 cls._BitControlledSingleBox(
-                    diag,
-                    default_box,
-                    classical=classical
-                )
+                diag, default_box, classical, is_dagger)
 
         boxes, staircases = [], diag.to_staircases()
         for i in range(len(staircases)):
@@ -438,12 +463,18 @@ class PostselectBit(ClassicalBox):
     Postselect on a bit result.
     The domain of the map is a bit.
 
-    Postselecting on no bit is the empty product, the scalar one.
+    Postselecting on no bit is not a map, it is the identity: the empty
+    case is rejected rather than read as one bit.
 
-    >>> assert PostselectBit().dom == PostselectBit().cod == bit ** 0
+    >>> PostselectBit()
+    Traceback (most recent call last):
+    ...
+    ValueError: Postselect on at least one bit, or compose Id() instead.
     """
     def __init__(self, *bits):
-
+        if not bits:
+            raise ValueError(
+                "Postselect on at least one bit, or compose Id() instead.")
         if not all(bit in (0, 1) for bit in bits):
             raise ValueError("Bits must be a list of 0s and 1s.")
         self.bits = bits
@@ -469,12 +500,18 @@ class PostselectDigit(ClassicalBox):
     Postselect on a digit result.
     The domain of the map is a digit.
 
-    >>> assert PostselectDigit() == PostselectDigit(1)
+    >>> PostselectDigit()
+    Traceback (most recent call last):
+    ...
+    ValueError: Postselect on at least one digit, or compose Id() instead.
     """
     def __init__(self, *digits):
+        if not digits:
+            raise ValueError(
+                "Postselect on at least one digit, or compose Id() instead.")
         if not all(isinstance(digit, int) for digit in digits):
             raise ValueError("Digits must be a list of integers.")
-        self.digits = digits or (1,)
+        self.digits = digits
         super().__init__(
             f"PostselectDigit({self.digits})",
             zw.Select(*self.digits),
@@ -769,10 +806,16 @@ class Digit(ClassicalBox):
     Create a classical state with
     a natural number.
 
-    >>> assert Digit() == Digit(1)
+    >>> Digit()
+    Traceback (most recent call last):
+    ...
+    ValueError: Create at least one digit, or compose Id() instead.
     """
     def __init__(self, *photons: int):
-        self.photons = photons or (1,)
+        if not photons:
+            raise ValueError(
+                "Create at least one digit, or compose Id() instead.")
+        self.photons = photons
         super().__init__(
             f"Digit({self.photons})",
             zw.Create(*self.photons),

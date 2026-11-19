@@ -13,7 +13,8 @@ dynamic = ["version"]
 description = "The Python toolkit for computing with string diagrams."
 readme = "README.md"
 requires-python = ">=3.12"
-license =  {file = "LICENSE"}
+license = "BSD-3-Clause AND Apache-2.0"
+license-files = ["LICENSE", "discopy/optyx/LICENSE", "discopy/optyx/NOTICE"]
 keywords = [
     "category theory",
     "string diagrams",
@@ -39,12 +40,13 @@ dependencies = [
   "numpy",
   "networkx",
   "matplotlib",
-  "pillow"
+  "pillow",
 ]
 
 [dependency-groups]
 dev = [
     "coverage",
+    "egglog",
     "hypothesis",
     "marimo",
     "pyproject-flake8",
@@ -58,19 +60,28 @@ dev = [
 ]
 docs = ["discopy[docs]"]
 notebooks = ["discopy[notebooks]"]
+tensor = ["discopy[tensor]"]
 quantum = ["discopy[quantum]"]
-grammar = ["discopy[grammar]"]
+lambek = ["discopy[lambek]"]
 optyx = ["discopy[optyx]"]
+typst = ["discopy[typst]"]
 all = [
     { include-group = "dev" },
     { include-group = "docs" },
     { include-group = "notebooks" },
+    { include-group = "tensor" },
     { include-group = "quantum" },
-    { include-group = "grammar" },
+    { include-group = "lambek" },
     { include-group = "optyx" },
+    { include-group = "typst" },
 ]
 
 [project.optional-dependencies]
+tensor = [
+    "opt_einsum",
+    "quimb",
+    "cotengra",
+]
 quantum = [
     "pytket",
     "pyzx == 0.10.7",
@@ -87,10 +98,13 @@ quantum = [
     "qoolqit",
     "scipy",
 ]
-grammar = [
+lambek = [
     "nltk",
     "torch",
+    "transformers",
 ]
+# the deprecated name of the lambek extra
+grammar = ["discopy[lambek]"]
 # discopy.optyx, under Apache-2.0: see discopy/optyx/LICENSE
 optyx = [
     "cotengra",
@@ -107,7 +121,7 @@ optyx = [
     "sympy",
 ]
 test = [
-    "discopy[grammar,optyx,quantum]",
+    "discopy[lambek,notebooks,optyx,quantum]",
     "coverage",
     "hypothesis",
     "marimo",
@@ -125,22 +139,25 @@ notebooks = [
     "pandas",
     "seaborn",
     "tqdm",
+    # cotengra pools over joblib when it can: its concurrent.futures fallback
+    # re-runs the .md file of a marimo notebook as a script (optyx/fixpoints)
+    "joblib",
 ]
 docs  = [
-    "discopy[notebooks]",
+    "discopy[notebooks,optyx]",
     "jinja2 == 3.1.*",
     "myst-parser == 2.0.*",
     # executed by marimo when rendering the notebooks at docs build time
     "jax",
-    "pytket",
-    "scipy",
-    "sympy",
     "torch",
     "sphinx == 7.4.*",
     "sphinx-book-theme == 1.1.*",
     "sphinxcontrib-bibtex == 2.5.*",
     "sphinxcontrib-tikz == 0.4.*",
     "sphinxcontrib-youtube == 1.4.*",
+]
+typst = [
+    "typst >= 0.15.0",
 ]
 
 [tool.setuptools_scm]
@@ -254,11 +271,15 @@ norecursedirs = [
     "test/fixtures",
 ]
 addopts = "--doctest-modules --ignore=test/fixtures -p plugin --import-mode=importlib"
+markers = [
+    "slow: takes four seconds or more; CI runs it on main, not on a pull request",
+]
 
 [tool.coverage.run]
 # sys.monitoring, the default from Python 3.14 on, measures the same lines
 # at half the cost of the C tracer that 3.12 and 3.13 would otherwise use.
 core = "sysmon"
+patch = ["subprocess"]
 # The gate measures the package, not the tests that exercise it: a test file
 # counted alongside is all but fully covered by construction.
 source = ["discopy"]

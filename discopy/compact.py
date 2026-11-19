@@ -66,8 +66,12 @@ Coherence
 
 from typing import ClassVar
 
-from discopy import symmetric, ribbon, pivotal, feedback, cmap, hypergraph
-from discopy.abc import CompactCategory
+# pylint: disable=inconsistent-mro  # astroid misreads the MRO, C3 does not
+
+from discopy import (
+    symmetric, ribbon, pivotal, feedback, cmap, hypergraph, interaction,
+    messages)
+from discopy.abc import CompactCategory, DaggerMonoidalCategory
 from discopy.cat import factory
 from discopy.utils import deprecated_alias
 from discopy.pivotal import (  # noqa: F401  pylint: disable=unused-import
@@ -88,6 +92,17 @@ class Diagram(symmetric.Diagram, ribbon.Diagram, CompactCategory):
         dom (pivotal.Ty) : The domain of the diagram, i.e. its input.
         cod (pivotal.Ty) : The codomain of the diagram, i.e. its output.
     """
+    # A hypergraph is faithful from symmetric categories on.
+    snake_equations = CompactCategory.snake_equations
+    transpose_contravariance = CompactCategory.transpose_contravariance
+    pivotality = CompactCategory.pivotality
+    currying_left = CompactCategory.currying_left
+    currying_right = CompactCategory.currying_right
+    currying_eta_left = CompactCategory.currying_eta_left
+    currying_eta_right = CompactCategory.currying_eta_right
+    currying_naturality_left = CompactCategory.currying_naturality_left
+    currying_naturality_right = CompactCategory.currying_naturality_right
+
     sum_factory: ClassVar[type["Sum"]]
     cup_factory: ClassVar[type["Cup"]]
     cap_factory: ClassVar[type["Cap"]]
@@ -221,6 +236,10 @@ Hypergraph = hypergraph.Hypergraph[Diagram]
 Diagram.cup_factory, Diagram.cap_factory = Cup, Cap
 Diagram.sum_factory = Sum
 Diagram.bubble_factory = Bubble
+for name in (
+        "dagger_involution", "dagger_contravariance", "dagger_monoidality"):
+    setattr(interaction.Diagram[Diagram], name, getattr(
+        DaggerMonoidalCategory, name).failing(messages.FEEDBACK_HAS_NO_DAGGER))
 
 
 class Equation(symmetric.Equation):

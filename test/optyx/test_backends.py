@@ -137,6 +137,7 @@ class TestQuimbBackend:
             atol=COMPRESSION_TOL["abs_tol"],
         )
 
+    @pytest.mark.slow
     @pytest.mark.parametrize("circuit", MIXED_CIRCUITS_TO_TEST)
     def test_mixed_circuit(self, circuit):
         s = get_state(circuit)

@@ -15,6 +15,7 @@ from discopy.quantum.circuit import *
 from discopy.quantum.gates import *
 from discopy.quantum.ansatze import IQPansatz
 from discopy import rigid
+from discopy.matrix import Quimb
 
 
 def test_index2bitstring():
@@ -600,6 +601,18 @@ def test_quimb_pure_eval(c):
     assert np.allclose(t, c.eval().array), f"{t} != {c.eval().array}"
 
 
+@pytest.mark.parametrize('c', pure_circuits + mixed_circuits)
+def test_contractor_numpy_eval(c):
+    from discopy.matrix import NumPy
+    assert c.eval(contractor=NumPy()).is_close(c.eval())
+
+
+@pytest.mark.parametrize('c', pure_circuits + mixed_circuits)
+def test_contractor_quimb_eval(c):
+    pytest.importorskip("quimb")
+    assert c.eval(contractor=Quimb()).is_close(c.eval())
+
+
 def test_logical_vs_physical_swap():
     logical, physical = Circuit.swap(qubit, qubit), SWAP
 
@@ -622,6 +635,17 @@ def test_feedback_is_the_trace():
     assert np.allclose(CX.feedback(left=True).eval().array,
                        np.einsum('iaib->ab', array))
     assert CX.feedback(mem=qubit) == CX.trace(mem=qubit)
+
+
+def test_delayed_bubbles_and_sums():
+    bubble = X.bubble()
+    delayed = bubble.delay()
+    assert delayed.args == (X, ) and delayed.reset() == bubble
+    assert np.allclose(delayed.eval().array, bubble.eval().array)
+    circuit = (X + Z) >> H
+    assert circuit.delay() == (X + Z).delay() >> H.delay()
+    assert (X + Z).delay() == X.delay() + Z.delay()
+    assert np.allclose(circuit.delay().eval().array, circuit.eval().array)
 
 
 def test_delay():

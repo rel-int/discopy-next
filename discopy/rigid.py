@@ -163,10 +163,12 @@ import copy
 
 from collections.abc import Callable
 
-from typing import ClassVar, Iterator, Self
+from typing import Iterator, Self, ClassVar
 
 from discopy import cat, monoidal, biclosed, messages
-from discopy.abc import Pregroup, RigidCategory
+from discopy.abc import (
+    DaggerCategory, DaggerMonoidalCategory, Pregroup, RigidCategory)
+from discopy.testable import GENERATORS
 from discopy.cat import factory
 from discopy.utils import (
     assert_isatomic,
@@ -242,6 +244,19 @@ class Wire(monoidal.Wire):
         result = copy.copy(self)
         result.z = 0
         return result
+
+    windings = (0, 1, -1)
+    """ The winding numbers :meth:`strategy` draws from, simplest first. """
+
+    @classmethod
+    def strategy(cls):
+        """ Generate named objects with a winding number in
+        :attr:`windings`. """
+        from hypothesis import strategies as st
+
+        return st.tuples(
+            st.sampled_from(GENERATORS), st.sampled_from(cls.windings),
+        ).map(lambda args: cls(args[0], z=args[1]))
 
     def __eq__(self, other):
         return monoidal.Wire.__eq__(self, other)\
@@ -679,6 +694,34 @@ class Diagram(biclosed.Diagram, RigidCategory):
         """
         return super().normal_form(**params)
 
+    hypergraph_section = monoidal.Diagram.hypergraph_section.failing(
+        messages.SECTION_NEEDS_SWAPS)
+    dagger_involution = DaggerCategory.dagger_involution.failing(
+        messages.RIGID_HAS_NO_DAGGER)
+    dagger_contravariance = DaggerCategory.dagger_contravariance.failing(
+        messages.RIGID_HAS_NO_DAGGER)
+    dagger_monoidality = DaggerMonoidalCategory.dagger_monoidality.failing(
+        messages.RIGID_HAS_NO_DAGGER)
+
+    # The curry of a rigid diagram is made of caps, which a map and a
+    # hypergraph both read as wiring, so the two agree.
+    map_agreement = monoidal.Diagram.map_agreement
+    currying_left = RigidCategory.currying_left.failing(
+        messages.NOT_BOUNDARY_CONNECTED)
+    currying_right = RigidCategory.currying_right.failing(
+        messages.NOT_BOUNDARY_CONNECTED)
+    currying_eta_left = RigidCategory.currying_eta_left.failing(
+        messages.NOT_BOUNDARY_CONNECTED)
+    currying_eta_right = RigidCategory.currying_eta_right.failing(
+        messages.NOT_BOUNDARY_CONNECTED)
+    currying_naturality_left = RigidCategory.currying_naturality_left\
+        .failing(messages.NOT_BOUNDARY_CONNECTED)
+    currying_naturality_right = RigidCategory.currying_naturality_right\
+        .failing(messages.NOT_BOUNDARY_CONNECTED)
+    snake_equations = RigidCategory.snake_equations.modulo(normal_form)
+    transpose_contravariance = RigidCategory.transpose_contravariance.failing(
+        messages.NOT_BOUNDARY_CONNECTED)
+
 
 class Box(biclosed.Box, Diagram):
     """
@@ -715,6 +758,16 @@ class Box(biclosed.Box, Diagram):
     def __str__(self):
         return cat.Box.__str__(self) if not self.z\
             else str(self.r) + '.l' if self.z < 0 else str(self.l) + '.r'
+
+    def atoms(self) -> list:
+        """
+        The atoms of the box its string rotates, e.g. ``f.r`` names ``f``.
+
+        >>> f = Box('f', Ty('x'), Ty('y'))
+        >>> assert f.r.atoms() == f.l.l.atoms() == f.atoms()
+        """
+        return super().atoms() if not self.z\
+            else self.r.atoms() if self.z < 0 else self.l.atoms()
 
     def __repr__(self):
         if self.is_dagger:
@@ -844,7 +897,7 @@ class Bubble(biclosed.Bubble, Box):
 
     def __init__(self, *args: Diagram, z: int = 0, **kwargs):
         self.z = z
-        biclosed.Bubble.__init__(self, *args, **kwargs)
+        super().__init__(*args, **kwargs)
 
     def __str__(self):
         if not self.z:
@@ -912,6 +965,18 @@ class Cup(BinaryBoxConstructor, Box):
         """
         return self.left, self.right
 
+    @classmethod
+    # pylint: disable-next=arguments-differ  # drawn with no boundary
+    def strategy(cls, *, types=None):
+        """
+        Generate the cup of an atomic type and its right adjoint.
+
+        Parameters:
+            types : The strategy to draw the types from, see
+                :meth:`atomic_strategy`.
+        """
+        return cls.atomic_strategy(types).map(lambda x: cls(x, x.r))
+
     def rotate(self, left=False):
         return self.cap_factory(self.right.l, self.left.l) if left\
             else self.cap_factory(self.right.r, self.left.r)
@@ -956,6 +1021,18 @@ class Cap(BinaryBoxConstructor, Box):
         """ The arguments of the constructor, which a pickle and a delay read.
         """
         return self.left, self.right
+
+    @classmethod
+    # pylint: disable-next=arguments-differ  # drawn with no boundary
+    def strategy(cls, *, types=None):
+        """
+        Generate the cap of an atomic type and its left adjoint.
+
+        Parameters:
+            types : The strategy to draw the types from, see
+                :meth:`atomic_strategy`.
+        """
+        return cls.atomic_strategy(types).map(lambda x: cls(x, x.l))
 
     def rotate(self, left=False):
         return self.cup_factory(self.right.l, self.left.l) if left\

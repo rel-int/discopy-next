@@ -83,9 +83,11 @@ from typing import (
 
 from discopy import messages, utils
 from discopy.abc import Category, DaggerCategory, Nat
-from discopy.testable import GENERATORS, Equation as AbstractEquation, Testable
+from discopy.testable import (
+    FUEL, GENERATORS, Equation as AbstractEquation, Serialisable)
 from discopy.utils import (  # noqa: F401
     factory,
+    factory_key,
     factory_name,
     from_tree,
     resolve_factory,
@@ -106,7 +108,7 @@ dumps, loads = utils.dumps, utils.loads
 
 
 @total_ordering
-class Ob(Testable["Ob"]):
+class Ob(Serialisable["Ob"]):
     """
     An object with a string as :code:`name`.
 
@@ -239,6 +241,70 @@ class FreeCategory(Category):
             inside, cod = inside + other.inside, other.cod
         return self.ar(inside=inside, dom=dom, cod=cod, _scan=False)
 
+    @classmethod
+    def search(cls, *, dom=None, cod=None, fuel=FUEL, within=None):
+        """
+        Derive the terms of a free category from its rules: a generator, or the
+        conclusion of one of its :attr:`rules` chosen at random, its morphism
+        premises sampled by the :meth:`strategy` of the category with one less
+        unit of ``fuel``, see :meth:`discopy.testable.Rule.strategy`. Once the
+        fuel runs out, only the rules with no morphism premise are applied. A
+        conclusion that misses ``dom`` or ``cod`` is composed with a generator
+        from or to it, so that both are honoured, with no filtering, whenever
+        the :meth:`generator_strategy` reads them: that of a type does not,
+        since every generated colour is transparent. Every choice shrinks to
+        a generator.
+
+        Parameters:
+            dom : The domain, sampled if ``None``.
+            cod : The codomain, sampled if ``None``.
+            fuel : How deep the rules nest.
+            within : The class whose rules a term is derived from, e.g.
+                :class:`discopy.abc.MonoidalCategory` for the terms of the
+                underlying monoidal category, the category itself if
+                ``None``.
+
+        Example
+        -------
+        >>> from hypothesis import find
+        >>> x, y = Ob('x'), Ob('y')
+        >>> term = find(Arrow.search(dom=x, cod=y), lambda f: len(f) > 2)
+        >>> assert (term.dom, term.cod) == (x, y)
+        """
+        from hypothesis import strategies as st
+
+        rules = [
+            rule for name, rule in cls.rules.items()
+            if rule.applicable and name in (within or cls).rules
+            and (fuel > 0 or not rule.is_recursive)]
+
+        @st.composite
+        def terms(draw):
+            rule = draw(st.sampled_from([None, *rules]))
+            if rule is None:
+                return draw(cls.generator_strategy(dom=dom, cod=cod))
+            term = rule(**draw(rule.strategy(
+                dom, cod, fuel=fuel - 1, within=within)))
+            if dom is not None and term.dom != dom:
+                term = draw(cls.generator_strategy(
+                    dom=dom, cod=term.dom)) >> term
+            if cod is not None and term.cod != cod:
+                term = term >> draw(cls.generator_strategy(
+                    dom=term.cod, cod=cod))
+            return term
+
+        return terms()
+
+    @classmethod
+    def generator_strategy(cls, *, dom=None, cod=None):
+        """
+        Generate the generators of the free category as terms of it, from
+        ``dom`` to ``cod`` when given: a path of one :attr:`generator_factory`.
+        """
+        return cls.generator_factory.strategy(dom=dom, cod=cod).map(
+            lambda generator: cls.ar(
+                inside=(generator, ), dom=generator.dom, cod=generator.cod))
+
     def __iter__(self):
         return iter(self.inside)
 
@@ -271,7 +337,7 @@ class FreeCategory(Category):
 
 
 @factory
-class Arrow(FreeCategory, DaggerCategory, Testable["Arrow"]):
+class Arrow(FreeCategory, DaggerCategory, Serialisable["Arrow"]):
     """
     An arrow is a tuple of composable boxes :code:`inside` with a pair of
     objects :code:`dom` and :code:`cod` as domain and codomain.
@@ -323,34 +389,21 @@ class Arrow(FreeCategory, DaggerCategory, Testable["Arrow"]):
     ob = Ob
 
     @classmethod
-    def strategy(
-            cls, *, types=None, dom=None, cod=None,
-            min_leaves=None, max_leaves=10):
+    def strategy(cls, **params):
         """
-        Generate the canonical instantiation: a single identity or a single
-        generator box with the requested (or an arbitrary) boundary.
+        The strategy the property matrix samples the terms of a free category
+        from: its :meth:`search`, which a category with a combinatorial
+        representation mixes with the :meth:`quotient_strategy` of it, e.g.
+        :meth:`discopy.symmetric.Diagram.strategy`.
 
-        Callers bound the number of generators of a composite term with
-        :code:`min_leaves` and :code:`max_leaves`; a canonical
-        instantiation has at most one, so both are ignored.
+        Parameters are those of :meth:`search`.
         """
-        # pylint: disable=unused-argument  # a canonical term has one leaf
-        from hypothesis import strategies as st
+        return cls.search(**params)
 
-        types = cls.ob.strategy() if types is None else types
-
-        def generators(dom=None, cod=None):
-            """ Generator boxes between the given boundaries. """
-            return cls.generator_factory.strategy(
-                types=types, dom=dom, cod=cod)
-
-        if dom is not None and cod is not None:
-            if dom == cod:
-                return st.just(cls.id(dom))
-            return generators(dom=dom, cod=cod)
-        if dom is not None or cod is not None:
-            return generators(dom=dom, cod=cod)
-        return st.one_of(types.map(cls.id), generators())
+    @classmethod
+    def generator_strategy(cls, *, dom=None, cod=None):
+        """ Generate the boxes of the category, see :meth:`Box.strategy`. """
+        return cls.box_factory.strategy(dom=dom, cod=cod)
 
     def __setstate__(self, state):
         if '_dom' in state:  # Backward compatibility
@@ -730,7 +783,7 @@ class Box(Arrow):
         particular if the `data` is not hashable then neither is the `Box`.
         """
         attributes = self.name, self.dom, self.cod, self.is_dagger, self.data
-        return (type(self), ) + attributes
+        return (factory_key(type(self)), ) + attributes
 
     def __lt__(self, other):
         return self.name < other.name
@@ -816,7 +869,7 @@ class Sum(Box):
     def setoid(self):
         """ Ensure that a singleton sum is in fact equal to its only term. """
         return self.terms[0].setoid() if len(self.terms) == 1 else (
-            type(self), self.terms, self.dom, self.cod)
+            factory_key(type(self)), self.terms, self.dom, self.cod)
 
     def __repr__(self):
         return self.name
@@ -947,19 +1000,51 @@ one, they have [cat.Ob('x'), cat.Ob('y')].
     def setoid(self):
         """
         Ensure that bubbles are equal if they have the same type, their `args`
-        are equal as well as their attributes `dom, cod, name, method`.
+        are equal as well as their attributes `dom, cod, name, method,
+        is_dagger` and `data`, as for a :class:`Box`: if the `data` is not
+        hashable then neither is the bubble. Its string prints the `data`, so
+        that it reads back.
+
+        >>> f = Box('f', Ob('x'), Ob('y'))
+        >>> assert f.bubble(data=1) != f.bubble(data=2)
+        >>> print(f.bubble(data=1))
+        (f).bubble(data=1)
+
+        Bubbling and daggering do not commute, as :meth:`__str__` prints
+        them: the dagger of a bubble is not the bubble of a dagger, so that
+        a functor cannot separate equal bubbles, e.g. into
+        :class:`discopy.tensor.Bubble` where the two have different arrays.
+
+        >>> assert f.bubble().dagger() != f.dagger().bubble()
+        >>> assert f.bubble().dagger().dagger() == f.bubble()
         """
         args_data = tuple(f.setoid() for f in self.args)
-        return (type(self), ) + args_data + tuple(getattr(self, x) for x in (
-            "dom", "cod", "name", "method"))
+        return (factory_key(type(self)), ) + args_data + tuple(
+            getattr(self, x)
+            for x in ("dom", "cod", "name", "method", "is_dagger", "data"))
 
     def __str__(self):
+        """
+        A bubble prints as a call on its args, a daggered one as the dagger
+        of the bubble inside it: bubbling and daggering need not commute, so
+        printing the dagger on the args would read back as the other value,
+        e.g. in :class:`discopy.tensor.Bubble`.
+
+        >>> f = Box('f', Ob('x'), Ob('y'))
+        >>> print(f.bubble().dagger())
+        (f).bubble()[::-1]
+        >>> print(f.dagger().bubble())
+        (f[::-1]).bubble()
+        """
+        if self.is_dagger:
+            return f"{self.dagger()}[::-1]"
         str_args = ",".join(map(str, self.args))
         str_kwargs = [] if self.is_id_on_objects else [
             f"dom={self.dom}", f"cod={self.cod}"]
         str_kwargs += [f"name={self.name!r}"] if self.name else []
         str_kwargs += [] if self.method == "bubble"\
             else [f"method={self.method!r}"]
+        str_kwargs += [] if self.data is None else [f"data={self.data!r}"]
         return f"({str_args}).bubble({', '.join(str_kwargs)})"
 
     def atoms(self) -> list:
@@ -1078,15 +1163,13 @@ class Functor(Category[type, "Functor"]):
     Note
     ----
     A daggered box is mapped as the dagger of the image of the box, when the
-    codomain has a dagger to take. When it has none, e.g. a functor into
-    :class:`discopy.stream.Stream` or :class:`discopy.python.Function`, the
-    image of a daggered box is read off :code:`ar_map` like that of any
-    other box. The dagger is the one the codomain has rather than the one it
-    declares, neither being read off the other:
-    :class:`discopy.drawing.Drawing` has a total dagger and declares no
-    :class:`~discopy.abc.DaggerCategory`, while
-    :class:`discopy.python.additive.Function` declares none either and has
-    only a partial one, defined on swaps.
+    codomain is a :class:`~discopy.abc.DaggerCategory` that
+    :meth:`~discopy.abc.DaggerCategory.has_dagger`. When it is not, e.g.
+    a functor into :class:`discopy.stream.Stream`,
+    :class:`discopy.python.Function`,
+    :class:`discopy.python.additive.Function` or integer diagrams over
+    :class:`discopy.python.Function`, the image of a daggered box
+    is read off :code:`ar_map` like that of any other box.
 
     >>> from discopy import python
     >>> F = Functor(
@@ -1099,6 +1182,7 @@ class Functor(Category[type, "Functor"]):
     ob = type[Category]
     dom: type[Any] = Arrow
     cod: type[Any] = Arrow
+    composes = True
 
     @classmethod
     def id(cls, dom: type | None = None) -> Self:
@@ -1123,11 +1207,21 @@ class Functor(Category[type, "Functor"]):
         Parameters:
             other : The other functor with which to compose.
 
+        Raises:
+            AxiomError : When a functor other than the identity is composed
+                with one whose ``composes`` is false.
+
         Note
         ----
         An identity functor, see :meth:`id`, is dropped on either side so that
         composition is unital. Otherwise functors given by functions compare
         as functions, e.g. their composition is associative only in action.
+
+        The composite sends each object and box to its image under ``other``
+        of its image under ``self``: it is the composite of two functors that
+        their maps determine. A functor that its maps do not determine, e.g.
+        :class:`discopy.balanced.DualRail`, has ``composes`` false: apply the
+        two in turn instead.
 
         Example
         -------
@@ -1145,6 +1239,10 @@ class Functor(Category[type, "Functor"]):
         if other.ob_map.mapping is other.ar_map.mapping is identity\
                 and other == other.id(other.dom):
             return self
+        for functor in (self, other):
+            if not functor.composes:
+                raise utils.AxiomError(messages.NO_COMPOSITE.format(
+                    factory_name(type(functor))))
         ob_map, ar_map = (
             {key: other(self(key)) for key in mapping}
             if isinstance(mapping, Mapping) else (lambda key: other(self(key)))
@@ -1254,7 +1352,8 @@ which JSON cannot hold.
             return getattr(self.cod, other.method)(
                 *map(self, other.args), dom=dom, cod=cod)
         if isinstance(other, Box) and other.is_dagger\
-                and hasattr(self.cod, "dagger"):
+                and issubclass(self.cod, DaggerCategory)\
+                and self.cod.has_dagger():
             return self(other.dagger()).dagger()
         if isinstance(other, Box):
             result = self.ar_map[other]
@@ -1279,7 +1378,9 @@ class Transformation(Category[Functor, "Transformation"]):
     Parameters:
         components :
             A mapping from objects ``x`` in the domain category to arrows
-            ``components[x] : dom(x) -> cod(x)`` in the codomain category.
+            ``components[x] : dom(x) -> cod(x)`` in the codomain category,
+            or :func:`discopy.utils.identity` for the identity, see
+            :meth:`id`.
         dom : The domain functor.
         cod : The codomain functor.
 
@@ -1327,7 +1428,8 @@ class Transformation(Category[Functor, "Transformation"]):
         cat.Box('f', cat.Ob('x'), cat.Ob('y'))
         >>> assert alpha(x).dom == F(x) and alpha(x).cod == G(x)
         """
-        component = self.components[x]
+        component = self.dom.cod.id(self.dom(x))\
+            if self.components.mapping is identity else self.components[x]
         if component.dom != self.dom(x) or component.cod != self.cod(x):
             raise utils.AxiomError(
                 f"The component at {x} must be an arrow "
@@ -1339,7 +1441,10 @@ class Transformation(Category[Functor, "Transformation"]):
         """
         The identity transformation on a given functor ``dom``, i.e. the
         transformation whose component at each object ``x`` is the
-        identity arrow on ``dom(x)``.
+        identity arrow on ``dom(x)``, with the shared
+        :func:`discopy.utils.identity` as its components. A component is read
+        by calling the transformation, as ``alpha(x)``: ``components[x]`` is
+        what was given, i.e. ``x`` itself for the identity.
 
         Parameters:
             dom : The functor on which to take the identity transformation.
@@ -1351,9 +1456,10 @@ class Transformation(Category[Functor, "Transformation"]):
         >>> alpha = Transformation.id(F)
         >>> alpha(x)
         cat.Arrow.id(cat.Ob('y'))
-        >>> assert alpha(x) == F.cod.id(F(x))
+        >>> assert alpha(x) == F.cod.id(F(x)) and alpha.components[x] == x
+        >>> assert Transformation.id(F) == Transformation.id(F)
         """
-        return cls(lambda x: dom.cod.id(dom(x)), dom, dom)
+        return cls(identity, dom, dom)
 
     @unbiased
     def then(self, other: Transformation) -> Transformation:
@@ -1362,12 +1468,40 @@ class Transformation(Category[Functor, "Transformation"]):
 
         Parameters:
             other : The other transformation with which to compose.
+
+        Note
+        ----
+        An identity transformation, see :meth:`id`, is dropped on either side
+        so that composition is unital, and components given by a dictionary
+        compose into a dictionary over the same objects, so that composition
+        is associative. Otherwise transformations given by functions compare
+        as functions, e.g. their composition is associative only in action.
+
+        Example
+        -------
+        >>> x, y = Ob('x'), Ob('y')
+        >>> f = Box('f', x, y)
+        >>> F, G = Functor.id(), Functor({x: y, y: x}, {})
+        >>> alpha = Transformation({x: f, y: f[::-1]}, F, G)
+        >>> beta = Transformation({x: f[::-1], y: f}, G, F)
+        >>> assert (alpha >> beta).components == {
+        ...     x: f >> f[::-1], y: f[::-1] >> f}
+        >>> idF, idG = Transformation.id(F), Transformation.id(G)
+        >>> assert idF >> alpha == alpha == alpha >> idG
+        >>> assert (alpha >> beta) >> alpha == alpha >> (beta >> alpha)
         """
         assert_isinstance(other, Transformation)
         if self.cod != other.dom:
             raise utils.AxiomError(messages.NOT_COMPOSABLE.format(
                 self, other, self.cod, other.dom))
-        components = lambda x: self(x) >> other(x)
+        if self.components.mapping is identity and self == self.id(self.dom):
+            return other
+        if other.components.mapping is identity\
+                and other == other.id(other.dom):
+            return self
+        mapping = self.components.mapping
+        components = {x: self(x) >> other(x) for x in mapping}\
+            if isinstance(mapping, Mapping) else lambda x: self(x) >> other(x)
         return type(self)(components, self.dom, other.cod)
 
     def __eq__(self, other):

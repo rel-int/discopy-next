@@ -12,6 +12,7 @@ Summary
     :toctree:
 
     Function
+    Composition
     EndoFunctor
 """
 from __future__ import annotations
@@ -19,10 +20,11 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 from contextlib import contextmanager
+from typing import Self
 
 from discopy import messages
 from discopy.abc import Category
-from discopy.testable import Testable
+from discopy.testable import Extensional, values
 from discopy.cat import Functor
 from discopy.monoidal import List
 from discopy.utils import (
@@ -37,6 +39,31 @@ NO_TREE = messages.NO_TREE_CALLABLE.format("A function", "inside")
 
 
 @factory
+@dataclass(frozen=True, eq=False)
+class Composition:
+    """
+    The callable inside a composition of functions: it calls its ``factors``
+    in turn, each on the outputs of the one before, see
+    :meth:`Function.then`.
+
+    Parameters:
+        factors : The functions composed, at least one.
+
+    Example
+    -------
+    >>> succ = Function(lambda x: x + 1, (int, ), (int, ))
+    >>> assert Composition((succ, succ, succ))(0) == 3
+    >>> assert (succ >> succ >> succ).inside.factors == (succ, succ, succ)
+    """
+    factors: tuple[Function, ...]
+
+    def __call__(self, *args):
+        *before, last = self.factors
+        for factor in before:
+            args = tuplify(factor(*args), len(factor.cod))
+        return last(*args)
+
+
 @dataclass(unsafe_hash=True)
 class Function(Category[Ty, "Function"]):
     """
@@ -66,22 +93,40 @@ class Function(Category[Ty, "Function"]):
     ob = Ty
     type_checking = True
 
+    @classmethod
+    def equation_factory(cls, *terms: "Function") -> Extensional:
+        """
+        The equation of a law, compared by the graphs of its terms on the
+        :meth:`arguments` of their domain, see :class:`testable.Extensional`.
+        """
+        return Extensional(*terms)
+
+    @classmethod
+    def arguments(cls, dom: Ty) -> tuple[tuple, ...]:
+        """
+        The arguments a function on ``dom`` is called with by an
+        extensional equation: one value of one of its types.
+
+        >>> assert Function.arguments(Ty(bool)) == ((False, ), (True, ))
+        """
+        return tuple((value, ) for typ in dom.inside for value in values(typ))
+
     def __init__(self, inside: Callable, dom: Ty | type | tuple[type, ...],
                  cod: Ty | type | tuple[type, ...]):
         self.inside, self.dom, self.cod = (
             inside, self.ob.cast(dom), self.ob.cast(cod))
 
     @classmethod
-    def id(cls, dom: type) -> Function:
+    def id(cls, dom: Ty | type | tuple[type, ...]) -> Self:
         """
         The identity function on a given list of types :code:`dom`.
 
         Parameters:
-            dom (type) : The list of types on which to take the identity.
+            dom : The list of types on which to take the identity.
         """
         return cls(lambda *xs: untuplify(xs), dom, dom)
 
-    def then(self, *others: Function) -> Function:
+    def then(self, *others: Function) -> Self:
         """
         The sequential composition of ``n`` functions, called with
         :code:`>>`.
@@ -94,6 +139,16 @@ class Function(Category[Ty, "Function"]):
         >>> from discopy.python.multiplicative import Function
         >>> succ = Function(lambda x: x + 1, (int, ), (int, ))
         >>> assert succ.then(succ, succ)(0) == 3
+
+        Note
+        ----
+        The ``inside`` of a composition is a :class:`Composition` of the
+        functions it was made of, and composing it again extends them, so
+        that calling a long composition, built one function at a time as a
+        functor does, takes a loop rather than as many nested calls.
+
+        >>> from functools import reduce
+        >>> assert reduce(Function.then, 2000 * [succ])(0) == 2000
         """
         if not others:
             return self
@@ -101,22 +156,24 @@ class Function(Category[Ty, "Function"]):
         for factor, other in zip(factors, others):
             assert_isinstance(other, type(self))
             assert_iscomposable(factor, other)
-        *before, last = factors
-
-        def inside(*args):
-            for factor in before:
-                args = tuplify(factor(*args), len(factor.cod))
-            return last(*args)
+        inside = Composition(tuple(
+            part for factor in factors for part in (
+                factor.inside.factors
+                if isinstance(factor.inside, Composition) else (factor, ))))
         return type(self)(inside, self.dom, others[-1].cod)
 
     @classproperty
     @contextmanager
     def no_type_checking(cls):
+        had = "type_checking" in vars(cls)
         tmp, cls.type_checking = cls.type_checking, False
         try:
             yield
         finally:
-            cls.type_checking = tmp
+            if had:
+                cls.type_checking = tmp
+            else:
+                del cls.type_checking
 
     def __call__(self, arg):
         if self.type_checking:
@@ -138,8 +195,6 @@ class Function(Category[Ty, "Function"]):
 which JSON cannot hold.
         """
         raise TypeError(NO_TREE)
-
-    serialisation = Testable.serialisation.inapplicable(NO_TREE)
 
 
 @factory
@@ -180,4 +235,4 @@ class EndoFunctor(Functor):
     def __call__(self, other):
         if isinstance(other, Function):
             return self.ar_map[other]
-        return self.ob_map[Ty.cast(other)]
+        return self.ob_map[Ty.cast(other)]  # ty: ignore[invalid-argument-type]

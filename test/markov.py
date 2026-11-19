@@ -392,8 +392,8 @@ def test_Box_flags():
 
 def test_Box_flags_cooperate():
     import numpy as np
-    from discopy import closed, frobenius, grammar, rigid, tensor
-    from discopy.grammar.pregroup import Ty as Grammatical, Word
+    from discopy import closed, frobenius, lambek, rigid, tensor
+    from discopy.lambek.pregroup import Ty as Grammatical, Word
     from discopy.utils import dumps, loads
     x, d = frobenius.Ty('x'), tensor.Dim(2)
     f, flagged = frobenius.Box('f', x, x), frobenius.Box(
@@ -416,7 +416,7 @@ def test_Box_flags_cooperate():
     sample = Word('w', n, is_deterministic=False)
     assert sample.r.l == sample and sample.r.flags() == sample.flags()
     assert eval(repr(sample), {
-        'Word': Word, 'grammar': grammar, 'rigid': rigid}) == sample
+        'Word': Word, 'lambek': lambek, 'rigid': rigid}) == sample
     constant = closed.Constant('c', closed.Ty('x'))
     assert loads(dumps(constant)) == constant
     t = tensor.Box('t', d, d, data=[[1, 2j], [3, 4]])
@@ -442,7 +442,7 @@ def test_Box_flags_subs():
 
 
 def test_Bubble_flags():
-    from discopy.ehypergraph import Markov
+    from discopy.egraph import Markov
     from discopy.utils import dumps, loads
     x = Ty('x')
     noisy = Box('sample', x, x, is_deterministic=False).bubble(
@@ -480,3 +480,8 @@ def test_Box_signature():
         name: param.default for name, param in sig.parameters.items()
         if param.default is not Parameter.empty})
     assert box == Box('f', x, x)
+
+
+def test_structural_boxes():
+    from discopy.testable import assert_structural_boxes
+    assert_structural_boxes(Diagram)

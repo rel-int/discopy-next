@@ -74,6 +74,7 @@ BOX_DRAWING_ATTRIBUTES: dict[str, Callable[[Any], Any]] = {
     "controlled": lambda _: None,  # Used for drawing controlled gates.
     "distance": lambda _: None,  # Used for drawing controlled gates.
     "_digits": lambda _: None,  # Used for drawing brakets.
+    # "circle" for a spider, "triangle" for a box drawn as a triangle.
     "shape": lambda box:
         "circle" if getattr(box, "draw_as_spider", False) else None,
     "color": lambda box:
@@ -106,9 +107,13 @@ COLOUR_DRAWING_ATTRIBUTES = {
         ob.cod if hasattr(getattr(ob, "cod", None), "width") else None,
 }
 
-#: Default drawing parameters.
+#: Default drawing parameters. In Matplotlib, ``fontsize`` is the size of the
+#: labels of boxes and wires, and ``fontsize_spiders`` the size of the labels
+#: of spiders, e.g. the symbol of an :class:`discopy.monoidal.Equation`,
+#: which do not follow the ``fontsize`` given to ``draw``.
 DRAWING_DEFAULT: dict[str, Any] = {
-    "fontsize": 12,
+    "fontsize": 10,
+    "fontsize_spiders": 12,
     "margins": (0, 0),
     "textpad": (2**-4, 2**-4),
     "facecolor": "white",

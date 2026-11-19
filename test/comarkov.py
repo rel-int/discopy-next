@@ -214,3 +214,8 @@ def test_dagger():
     assert C(x @ y, [1, 0, 0]).dagger() == F(x @ y, [1, 0, 0])
     with raises(AxiomError):
         Cofunction(Ty('x') @ Ty('y'), [1, 0, 0]).dagger()
+
+
+def test_structural_boxes():
+    from discopy.testable import assert_structural_boxes
+    assert_structural_boxes(Diagram)

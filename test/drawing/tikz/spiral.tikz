@@ -1,4 +1,4 @@
-\begin{tikzpicture}[baseline=(0.base)]
+\begin{tikzpicture}[baseline=(0.base), x=0.6667in, y=0.6667in]
 \begin{pgfonlayer}{nodelayer}
 \node (0) at (0, 3.0) {};
 \node [] (1) at (0, 0) {};
@@ -21,15 +21,15 @@
 \node [] (18) at (2.5, 2.5) {};
 \node [] (19) at (2.5, 1.5) {};
 \node [] (20) at (2.5, 0.5) {};
-\node [style=unit, scale=0.408] (21) at (4.5, 5.5) {};
-\node [style=cap, scale=0.408] (22) at (2.0, 4.5) {};
-\node [style=cap, scale=0.408] (23) at (2.0, 3.5) {};
-\node [style=counit, scale=0.408] (24) at (2.5, 2.5) {};
-\node [style=cup, scale=0.408] (25) at (2.5, 1.5) {};
-\node [style=cup, scale=0.408] (26) at (2.5, 0.5) {};
+\node [style=unit_black_circle, inner sep=0.136em] (21) at (4.5, 5.5) {};
+\node [style=cap_black_circle, inner sep=0.136em] (22) at (2.0, 4.5) {};
+\node [style=cap_black_circle, inner sep=0.136em] (23) at (2.0, 3.5) {};
+\node [style=counit_black_circle, inner sep=0.136em] (24) at (2.5, 2.5) {};
+\node [style=cup_black_circle, inner sep=0.136em] (25) at (2.5, 1.5) {};
+\node [style=cup_black_circle, inner sep=0.136em] (26) at (2.5, 0.5) {};
 \end{pgfonlayer}
 \begin{pgfonlayer}{edgelayer}
-\draw [style=box] (1.center) to (2.center) to (3.center) to (4.center) to (1.center);
+\draw [style=white_white_box] (1.center) to (2.center) to (3.center) to (4.center) to (1.center);
 \draw [in=90, out=-90] (5.center) to (6.center);
 \draw [in=90, out=-90] (6.center) to (7.center);
 \draw [in=90, out=180, looseness=0.3452] (8.center) to (9.center);

@@ -285,13 +285,6 @@ class ZXBox(diagram.Box, ZXDiagram):
         """Determine the output dimensions"""
         return [2 for _ in range(len(self.cod))]
 
-    def truncation(self, input_dims=None, output_dims=None) -> tensor.Box:
-        "Return a :class:`tensor.Box` with the underlying array"
-        out_dims = Dim(*[2 for i in range(len(self.cod))])
-        in_dims = Dim(*[2 for i in range(len(self.dom))])
-
-        return tensor.Box(self.name, in_dims, out_dims, self.array)
-
     def inflate(self, d):
         return self
 
@@ -455,7 +448,7 @@ def Id(n):
           else diagram.Diagram.id(diagram.Bit(n))
 
 
-H = ZXBox("H", 1, 1)
+H = ZXBox("H", 1, 1, is_dagger=None)
 H.draw_as_spider = False
 (H.drawing_name, H.tikzstyle_name,) = (
     "",
@@ -522,6 +515,10 @@ class And(ZXBox):
     def dagger(self):
         return And(n=self.n, is_dagger=not self.is_dagger)
 
+    def __repr__(self):
+        dagger = ", is_dagger=True" if self.is_dagger else ""
+        return f"{factory_name(type(self))}({self.n}{dagger})"
+
     def conjugate(self):
         return And(n=self.n, is_dagger=self.is_dagger)
 
@@ -580,6 +577,10 @@ class Or(ZXBox):
 
     def dagger(self):
         return Or(n=self.n, is_dagger=not self.is_dagger)
+
+    def __repr__(self):
+        dagger = ", is_dagger=True" if self.is_dagger else ""
+        return f"{factory_name(type(self))}({self.n}{dagger})"
 
     def conjugate(self):
         return Or(n=self.n, is_dagger=self.is_dagger)

@@ -76,8 +76,8 @@ from discopy.feedback import (  # noqa: F401  pylint: disable=unused-import
     Wire, Ty)
 from discopy.python import finset
 from discopy.utils import (
-    AxiomError, assert_isatomic, assert_iscomposable, factory_name,
-    from_tree)
+    AxiomError, assert_isatomic, assert_iscomposable, factory_key,
+    factory_name, from_tree)
 
 
 class Layer(symmetric.Layer):
@@ -113,6 +113,9 @@ class Diagram(symmetric.Diagram, ComarkovCategory):
     noise_factory: ClassVar[type["Noise"]]
     cofunction_factory: ClassVar[type["Cofunction"]]
     layer_factory = Layer
+
+    map_agreement = monoidal.Diagram.map_agreement.failing(
+        messages.MAP_HAS_NO_SPIDERS)
 
     @classmethod
     def spider_factory(cls, n_legs_in, n_legs_out, typ, phase=None):
@@ -271,7 +274,7 @@ class Cofunction(Box):
     def setoid(self):
         if self.is_identity:
             return (), self.dom, self.cod
-        return type(self), self.cod, tuple(self.cofunc.inside)
+        return factory_key(type(self)), self.cod, tuple(self.cofunc.inside)
 
     def to_drawing(self):
         """ Draw the permutation of the inputs, then the merges. """
@@ -447,6 +450,21 @@ class Merge(Cofunction):
         """
         return self.cod, len(self.dom)
 
+    @classmethod
+    # pylint: disable-next=arguments-differ  # drawn with no boundary
+    def strategy(cls, *, types=None):
+        """
+        Generate the merge of two or three copies of an atomic type.
+
+        Parameters:
+            types : The strategy to draw the types from, see
+                :meth:`atomic_strategy`.
+        """
+        from hypothesis import strategies as st
+
+        return st.builds(
+            cls, cls.atomic_strategy(types), st.sampled_from((2, 3)))
+
     cofunc = property(lambda self: op.Comarkov(
         finset.Function.copy(
             1, len(self.dom))))  # ty: ignore[invalid-argument-type]
@@ -484,6 +502,18 @@ class Noise(Merge):
         super().__init__(x, n)
         if self.dom:
             raise ValueError(f"A noise has no copies, got n={len(self.dom)}.")
+
+    @classmethod
+    # pylint: disable-next=arguments-differ  # drawn with no boundary
+    def strategy(cls, *, types=None):
+        """
+        Generate the noise on an atomic type.
+
+        Parameters:
+            types : The strategy to draw the types from, see
+                :meth:`atomic_strategy`.
+        """
+        return cls.atomic_strategy(types).map(cls)
 
 
 class Sum(symmetric.Sum, Box):

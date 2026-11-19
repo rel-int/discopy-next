@@ -25,6 +25,8 @@ Summary
 
         backend
         set_backend
+        is_field
+        is_complex
         get_backend
 
 See also
@@ -37,30 +39,33 @@ See also
 from __future__ import annotations
 
 from contextlib import contextmanager
+from math import isqrt, prod
 from operator import index
 from types import ModuleType
 from collections.abc import Sequence
-from typing import Callable, TYPE_CHECKING, Literal
+from typing import Literal, Callable, TYPE_CHECKING
 
 from discopy import config, messages
 from discopy.abc import (
-    ComarkovCategory, DaggerCategory, MarkovCategory, NamedGeneric, Nat)
-from discopy.testable import Testable
+    ComarkovCategory, DaggerMonoidalCategory, MarkovCategory, Nat)
+from discopy.testable import Serialisable, TestableGeneric
 from discopy.cat import (
     factory,
     assert_iscomposable,
     assert_isparallel,
 )
 from discopy.utils import (
-    assert_isinstance, factory_name, from_tree, unbiased)
+    assert_isinstance, factory_key, factory_name, from_tree, unbiased)
 
 if TYPE_CHECKING:
     import sympy
+    import quimb.tensor
 
 
 @factory
-class Matrix[dtype](NamedGeneric, MarkovCategory, ComarkovCategory,
-                    DaggerCategory, Testable["Matrix"]):
+class Matrix[dtype](
+        MarkovCategory, ComarkovCategory, DaggerMonoidalCategory,
+        TestableGeneric, Serialisable):
     """
     A matrix is an ``array`` with natural numbers as ``dom`` and ``cod``.
 
@@ -85,6 +90,7 @@ class Matrix[dtype](NamedGeneric, MarkovCategory, ComarkovCategory,
             noise
             basis
             repeat
+            resolvent
             trace
             lambdify
             subs
@@ -96,7 +102,7 @@ class Matrix[dtype](NamedGeneric, MarkovCategory, ComarkovCategory,
     For example:
 
     >>> Matrix[complex].id(1)
-    Matrix[complex]([1.+0.j], dom=1, cod=1)
+    Matrix[complex]([1.+0.j], dom=Nat(1), cod=Nat(1))
     >>> assert Matrix[complex].id(1) != Matrix[float].id(1)
 
     The default data type is determined by underlying array datastructure of
@@ -116,7 +122,7 @@ class Matrix[dtype](NamedGeneric, MarkovCategory, ComarkovCategory,
     Other precisions keep numpy's names.
 
     >>> Matrix([1, 2], 1, 2).cast(np.float32)
-    Matrix[float32]([1., 2.], dom=1, cod=2)
+    Matrix[float32]([1., 2.], dom=Nat(1), cod=Nat(2))
 
     Composition promotes the data type as the backend does, see
     :meth:`promote`, so that the integer identity is a unit for a float
@@ -134,9 +140,9 @@ class Matrix[dtype](NamedGeneric, MarkovCategory, ComarkovCategory,
     >>> m = Matrix([0, 1, 1, 0], 2, 2)
     >>> v = Matrix([0, 1], 1, 2)
     >>> v >> m >> v.dagger()
-    Matrix[int]([0], dom=1, cod=1)
+    Matrix[int]([0], dom=Nat(1), cod=Nat(1))
     >>> m + m
-    Matrix[int]([0, 2, 2, 0], dom=2, cod=2)
+    Matrix[int]([0, 2, 2, 0], dom=Nat(2), cod=Nat(2))
     >>> assert m.then(m, m, m, m) == m >> m >> m >> m >> m
 
     The monoidal product for :py:class:`.Matrix` is the direct sum:
@@ -146,7 +152,7 @@ class Matrix[dtype](NamedGeneric, MarkovCategory, ComarkovCategory,
     array([[2],
            [4]])
     >>> x @ x
-    Matrix[int]([2, 0, 4, 0, 0, 2, 0, 4], dom=4, cod=2)
+    Matrix[int]([2, 0, 4, 0, 0, 2, 0, 4], dom=Nat(4), cod=Nat(2))
     >>> (x @ x).array
     array([[2, 0],
            [4, 0],
@@ -155,15 +161,34 @@ class Matrix[dtype](NamedGeneric, MarkovCategory, ComarkovCategory,
 
     A matrix reads back from its representation up to the rounding of its
     entries and only up to ``config.NUMPY_THRESHOLD`` of them, past which
-    NumPy elides the array, so that :meth:`transparency` is weakened to
+    NumPy elides the array, so that :meth:`repr_transparency` is weakened to
     those:
 
     >>> Matrix[int]([0] * 24, 4, 6)
-    Matrix[int]([0, 0, 0, ..., 0, 0, 0], dom=4, cod=6)
+    Matrix[int]([0, 0, 0, ..., 0, 0, 0], dom=Nat(4), cod=Nat(6))
+
+    A matrix is immutable, and its array is not copied when it already has
+    the right ``dtype``: a NumPy array is shared with the caller through a
+    view that is read-only, so that writing into ``m.array`` raises while
+    the caller's own array stays writeable.
+
+    >>> a = np.zeros((2, 2), dtype=int)
+    >>> m = Matrix[int](a, 2, 2)
+    >>> assert np.shares_memory(m.array, a)
+    >>> assert not m.array.flags.writeable and a.flags.writeable
+
+    JAX and TensorFlow arrays are immutable anyway, but a PyTorch tensor has
+    no such flag: the matrix shares it with the caller, who must not write
+    into it after handing it over.
     """
+    @classmethod
+    def checked_params(cls) -> tuple:
+        """ Integer matrices, whose entries every ``dtype`` reads exactly. """
+        return (int, )
+
     ob = Nat
 
-    transparency = Testable.transparency.weaken(
+    repr_transparency = Serialisable.repr_transparency.weaken(
         max_entries=config.NUMPY_THRESHOLD)
 
     @classmethod
@@ -199,7 +224,8 @@ class Matrix[dtype](NamedGeneric, MarkovCategory, ComarkovCategory,
 
     def cast(self, dtype: type) -> Matrix:
         """
-        Cast a matrix to a given ``dtype``.
+        Cast a matrix to a given ``dtype``, the matrix itself when it
+        already has it.
 
         Parameters:
             dtype : The target datatype.
@@ -207,7 +233,11 @@ class Matrix[dtype](NamedGeneric, MarkovCategory, ComarkovCategory,
         Example
         -------
         >>> assert Matrix.id().cast(bool) == Matrix[bool].id()
+        >>> m = Matrix[float].id(2)
+        >>> assert m.cast(float) is m
         """
+        if dtype == self.dtype:
+            return self
         return type(self)[dtype](self.array, self.dom, self.cod)
 
     def promote(self, *others: Matrix) -> type:
@@ -268,14 +298,52 @@ class Matrix[dtype](NamedGeneric, MarkovCategory, ComarkovCategory,
         assert_isinstance(cod, Nat)
         self.dom, self.cod = dom, cod
         with backend() as np:
-            self.array = np.array(array, dtype=self.dtype).reshape(
+            array = np.asarray(array, dtype=self.dtype).reshape(
                 (index(dom), index(cod)))
+            if isinstance(np, NumPy):
+                array = array.view()
+                array.flags.writeable = False
+        self.array = array
 
     def __eq__(self, other):
         return isinstance(other, self.ar)\
             and self.dtype == other.dtype\
             and (self.dom, self.cod) == (other.dom, other.cod)\
             and (self.array == other.array).all()
+
+    def __le__(self, other):
+        """
+        The pointwise order on parallel matrices: every entry is at most
+        that of the ``other``. A Boolean matrix is a relation and the order
+        is inclusion; composition, tensor and transpose are monotone.
+
+        >>> R, S = Matrix[bool]([1, 0, 0, 0], 2, 2), Matrix[bool].id(2)
+        >>> assert R <= S and S >= R and not S <= R
+        >>> assert R >> R <= S >> S and R @ R <= S @ S
+        >>> assert not R <= Matrix[bool]([1, 1], 1, 2)
+        >>> assert not Matrix([1, 2], 1, 2) <= Matrix([2, 1], 1, 2)
+
+        Matrices of different data types are not compared:
+
+        >>> R <= R.cast(int)
+        Traceback (most recent call last):
+        ...
+        TypeError: '<=' not supported between instances of 'Matrix[bool]' \
+and 'Matrix[int]'
+
+        The complex numbers have no order, as in Python:
+
+        >>> Matrix[complex]([1j], 1, 1) <= Matrix[complex]([2j], 1, 1)
+        Traceback (most recent call last):
+        ...
+        TypeError: Matrices over <class 'complex'> have no pointwise order.
+        """
+        if not isinstance(other, self.ar):
+            return NotImplemented
+        if is_complex(self.dtype):
+            raise TypeError(messages.MATRIX_ORDER_ERROR.format(self.dtype))
+        return (self.dom, self.cod) == (other.dom, other.cod)\
+            and (self.array <= other.array).all()
 
     def is_close(self, other: Matrix, rtol: float = 1.e-8, atol: float = 1.e-8
                  ) -> bool:
@@ -395,7 +463,7 @@ class Matrix[dtype](NamedGeneric, MarkovCategory, ComarkovCategory,
     @classmethod
     def id(cls, dom=0) -> Matrix:
         with backend('numpy') as np:
-            array = np.identity(index(dom), dtype=cls.dtype or int)
+            array = np.identity(index(dom), dtype=int)
         return cls(array, dom, dom)
 
     twist = id
@@ -404,9 +472,12 @@ class Matrix[dtype](NamedGeneric, MarkovCategory, ComarkovCategory,
     def then(self, other: Matrix) -> Matrix:
         assert_isinstance(other, self.ar)
         assert_iscomposable(self, other)
+        cls = self.promote(other)
+        left, right = (
+            factor.cast(cls.dtype).array for factor in (self, other))
         with backend() as np:
-            array = np.matmul(self.array, other.array)
-        return self.promote(other)(array, self.dom, other.cod)
+            array = np.matmul(left, right)
+        return cls(array, self.dom, other.cod)
 
     def tensor(self, *others: Matrix):
         """
@@ -470,9 +541,9 @@ class Matrix[dtype](NamedGeneric, MarkovCategory, ComarkovCategory,
         Example
         -------
         >>> Matrix.swap(1, 1)
-        Matrix[int]([0, 1, 1, 0], dom=2, cod=2)
+        Matrix[int]([0, 1, 1, 0], dom=Nat(2), cod=Nat(2))
         >>> Matrix.swap(2,1)
-        Matrix[int]([0, 1, 0, 0, 0, 1, 1, 0, 0], dom=3, cod=3)
+        Matrix[int]([0, 1, 0, 0, 0, 1, 1, 0, 0], dom=Nat(3), cod=Nat(3))
         """
         return cls.permutation([1, 0], [left, right])
 
@@ -499,7 +570,7 @@ class Matrix[dtype](NamedGeneric, MarkovCategory, ComarkovCategory,
         -------
         >>> assert Matrix.permutation([1, 0]) == Matrix.swap(1, 1)
         >>> Matrix.permutation([1, 2, 0])
-        Matrix[int]([0, 0, 1, 1, 0, 0, 0, 1, 0], dom=3, cod=3)
+        Matrix[int]([0, 0, 1, 1, 0, 0, 0, 1, 0], dom=Nat(3), cod=Nat(3))
         >>> ones = Matrix.permutation([1, 2, 0], [1, 1, 1])
         >>> assert ones == Matrix.permutation([1, 2, 0])
 
@@ -545,9 +616,9 @@ class Matrix[dtype](NamedGeneric, MarkovCategory, ComarkovCategory,
         Example
         -------
         >>> Matrix([1, 2], 1, 2).map(lambda x: x + 0.5)
-        Matrix[float]([1.5, 2.5], dom=1, cod=2)
+        Matrix[float]([1.5, 2.5], dom=Nat(1), cod=Nat(2))
         >>> Matrix([1, 2], 1, 2).map(lambda x: x + 0.5, dtype=int)
-        Matrix[int]([1, 2], dom=1, cod=2)
+        Matrix[int]([1, 2], dom=Nat(1), cod=Nat(2))
         """
         array = list(map(func, self.array.reshape(-1)))
         if dtype is None and array:
@@ -573,7 +644,7 @@ class Matrix[dtype](NamedGeneric, MarkovCategory, ComarkovCategory,
         Example
         -------
         >>> Matrix.copy(2)
-        Matrix[int]([1, 0, 1, 0, 0, 1, 0, 1], dom=2, cod=4)
+        Matrix[int]([1, 0, 1, 0, 0, 1, 0, 1], dom=Nat(2), cod=Nat(4))
         >>> assert Matrix.copy(2) >> Matrix.id(2) @ Matrix.discard(2)\\
         ...     == Matrix.id(2)
         """
@@ -608,7 +679,7 @@ class Matrix[dtype](NamedGeneric, MarkovCategory, ComarkovCategory,
         Example
         -------
         >>> Matrix.basis(4, 2)
-        Matrix[int]([0, 0, 1, 0], dom=1, cod=4)
+        Matrix[int]([0, 0, 1, 0], dom=Nat(1), cod=Nat(4))
         >>> assert Matrix.basis(0, 0).dtype == Matrix.id(0).dtype
         """
         with backend() as np:
@@ -623,7 +694,7 @@ class Matrix[dtype](NamedGeneric, MarkovCategory, ComarkovCategory,
         Example
         -------
         >>> Matrix[bool]([0, 1, 1, 0], 2, 2).repeat()
-        Matrix[bool]([True, True, True, True], dom=2, cod=2)
+        Matrix[bool]([True, True, True, True], dom=Nat(2), cod=Nat(2))
         """
         if self.dtype != bool or self.dom != self.cod:
             raise TypeError(messages.MATRIX_REPEAT_ERROR)
@@ -632,9 +703,45 @@ class Matrix[dtype](NamedGeneric, MarkovCategory, ComarkovCategory,
             result, length = result >> result, 2 * length
         return result
 
+    def resolvent(self) -> Matrix:
+        """
+        The inverse of ``id - self`` over a field, see :func:`is_field`, i.e.
+        the sum of its powers where it converges, raising ``TypeError`` over
+        integers, ``ValueError`` when singular unless traced by ``jax.jit``.
+
+        Example
+        -------
+        >>> Matrix[float]([0, 1, 0, 0], 2, 2).resolvent()
+        Matrix[float]([1., 1., 0., 1.], dom=Nat(2), cod=Nat(2))
+        >>> Matrix[float]([1], 1, 1).resolvent()
+        Traceback (most recent call last):
+            ...
+        ValueError: id - D is singular: the trace over a field is partial.
+        """
+        if self.dom != self.cod or not is_field(self.dtype):
+            raise TypeError(messages.MATRIX_RESOLVENT_ERROR)
+        square = self.array.reshape(2 * (isqrt(prod(self.array.shape)), ))
+        with backend() as np:
+            try:
+                inverse = np.linalg.inv(np.eye(len(square)) - square)
+            except getattr(np.linalg, "LinAlgError", ()) as error:
+                raise ValueError(messages.MATRIX_SINGULAR) from error
+            try:
+                singular = not np.isfinite(inverse).all()
+            except TypeError:
+                singular = False
+            if singular:
+                raise ValueError(messages.MATRIX_SINGULAR)
+            return type(self)(inverse, self.dom, self.cod)
+
     def trace(self, n=1, left=False) -> Matrix:
         """
-        The trace of a Boolean matrix, computed with :meth:`Matrix.repeat`.
+        The partial trace ``A + B >> D* >> C`` of a matrix with blocks
+        ``A: dom -> cod``, ``B: dom -> n``, ``C: n -> cod``, ``D: n -> n``,
+        with ``D*`` the :meth:`repeat` over ``bool`` and the
+        :meth:`resolvent` over a field: the trace of Haghverdi and Scott,
+        defined when ``id - D`` is invertible, see :cite:t:`MalherbeEtAl11`,
+        Definition 3.11, and the sum over unrollings when ``D`` is nilpotent.
 
         Parameters:
             n : The number of dimensions to trace.
@@ -647,6 +754,8 @@ class Matrix[dtype](NamedGeneric, MarkovCategory, ComarkovCategory,
         >>> f = Matrix[bool]([[1, 1], [0, 0]], 2, 2)
         >>> assert f.trace() == Matrix[bool]([[1]], 1, 1)
         >>> assert f.trace(left=True) == Matrix[bool]([[0]], 1, 1)
+        >>> g = Matrix[float]([[0.5, 1], [1, 0.25]], 2, 2)
+        >>> assert g.trace().is_close(Matrix[float]([[0.5 + 4 / 3]], 1, 1))
         """
         dom, cod = index(self.dom) - n, index(self.cod) - n
         if left:
@@ -656,14 +765,16 @@ class Matrix[dtype](NamedGeneric, MarkovCategory, ComarkovCategory,
                                   self.ones(dom) @ self.id(n)]
                       for column in [self.id(cod) @ self.discard(n),
                                      self.discard(cod) @ self.id(n)])
-        return A + (B >> D.repeat() >> C)
+        star = D.repeat() if self.dtype == bool else D.resolvent()
+        return A + (B >> star >> C)
 
     def lambdify(
             self, *symbols: "sympy.Symbol", dtype=None, **kwargs) -> Callable:
         from sympy import lambdify
         with backend() as np:
+            modules = kwargs.pop("modules", np.module)
             array = lambdify(
-                symbols, self.array.tolist(), modules=np.module, **kwargs)
+                symbols, self.array.tolist(), modules=modules, **kwargs)
         dtype = dtype or self.dtype
         return lambda *xs: type(self)[dtype](array(*xs), self.dom, self.cod)
 
@@ -709,6 +820,16 @@ class Backend:
     def __getattr__(self, attr):
         return getattr(self.module, attr)
 
+    def __repr__(self):
+        return f"{type(self).__name__}()"
+
+    def __eq__(self, other):
+        return type(self) is type(other)\
+            and getattr(self, "base", None) == getattr(other, "base", None)
+
+    def __hash__(self):
+        return hash((factory_key(type(self)), getattr(self, "base", None)))
+
 
 class NumPy(Backend):
     """ NumPy backend. """
@@ -738,6 +859,147 @@ class TensorFlow(Backend):
         from tensorflow.python.ops.numpy_ops import np_config  # ty: ignore
         np_config.enable_numpy_behavior()
         super().__init__(tnp)
+
+
+class Contractor(Backend):
+    """
+    A contraction engine, i.e. a backend whose ``einsum`` contracts the
+    arrays of another backend, to which it delegates everything else, so
+    that e.g. gradients of pytorch arrays survive the contraction.
+
+    A plain :class:`Backend` contracts with its own ``einsum``.
+
+    Parameters:
+        base : The backend of the arrays, the active one at contraction
+            time by default.
+
+    Example
+    -------
+    >>> from discopy.tensor import Box, Dim
+    >>> vector = Box('vector', Dim(1), Dim(2), [0, 1])
+    >>> diagram = vector >> vector[::-1]
+    >>> assert diagram.eval(contractor=OptEinsum()) == diagram.eval()
+    >>> OptEinsum(), Quimb(NumPy())
+    (OptEinsum(), Quimb(NumPy()))
+    >>> assert eval(repr(Quimb(NumPy()))) == Quimb(NumPy()) != Quimb()
+    """
+    def __init__(self, base: Backend | None = None):
+        # pylint: disable=super-init-not-called
+        # the module and array of the base are read at contraction time
+        self.base = base
+
+    @property
+    def module(self) -> ModuleType:
+        """ The module of the base, the active backend by default. """
+        return (self.base or get_backend()).module
+
+    @property
+    def array(self) -> Callable:
+        """ The array of the base, the active backend by default. """
+        return (self.base or get_backend()).array
+
+    def __repr__(self):
+        base = "" if self.base is None else repr(self.base)
+        return f"{type(self).__name__}({base})"
+
+    def einsum(self, *operands, **params):
+        """
+        Contract interleaved operands, i.e. arrays each followed by its
+        list of integer indices, then the list of output indices.
+
+        Parameters:
+            operands : The interleaved operands and the output indices.
+            params : The parameters of the engine, e.g. ``optimize``.
+        """
+        raise NotImplementedError
+
+
+class OptEinsum(Contractor):
+    """ The contraction engine of the optional ``opt_einsum`` package. """
+    def einsum(self, *operands, **params):
+        try:
+            import opt_einsum
+        except ImportError as error:
+            if error.name != "opt_einsum":
+                raise
+            raise ImportError(
+                "Contracting more than "
+                f"{config.MAX_EINSUM_INDICES} indices requires "
+                "opt_einsum, run `pip install opt_einsum`.") from error
+        return opt_einsum.contract(*operands, **params)
+
+
+class Quimb(Contractor):
+    """
+    The contraction engine of the optional ``quimb`` package, where
+    ``optimize`` may be a ``cotengra`` path optimizer, and a ``max_bond``
+    parameter or a compressed optimizer selects approximate contraction.
+
+    Gradients of jax and pytorch arrays survive the contraction with
+    ``autoray >= 0.9``, whose older versions fall back to numpy when
+    reusing a cached contraction tree.
+    """
+    def network(self, arrays: list, indices: list[list[int]],
+                names: dict[int, str] | None = None
+                ) -> "quimb.tensor.TensorNetwork":
+        """
+        The quimb tensor network of arrays with integer indices, each
+        index named ``names[j]`` or ``f"w{j}"``. An index repeated on one
+        array, i.e. a trace, is summed over beforehand.
+
+        Parameters:
+            arrays : The arrays.
+            indices : The list of integer indices of each array.
+            names : The names of the indices, ``f"w{j}"`` by default.
+        """
+        import quimb.tensor as qtn
+        names = names or {}
+        tensors = []
+        for array, inds in zip(arrays, indices):
+            kept = [j for j in inds if inds.count(j) == 1]
+            if kept != inds:
+                local = {j: i for i, j in enumerate(dict.fromkeys(inds))}
+                array = self.module.einsum(
+                    array, [local[j] for j in inds],
+                    [local[j] for j in kept])
+            tensors.append(qtn.Tensor(
+                array, inds=tuple(names.get(j, f"w{j}") for j in kept)))
+        return qtn.TensorNetwork(tensors)
+
+    def einsum(self, *operands, optimize="greedy", **params):
+        import quimb.tensor as qtn
+        *operands, output = operands
+        network = self.network(operands[::2], operands[1::2])
+        compressed = "max_bond" in params\
+            or getattr(optimize, "compressed", False)\
+            or "Compressed" in type(optimize).__name__
+        for tensor in network.tensors if compressed else ():
+            if getattr(tensor.data.dtype, "kind", "") in "?bui":
+                tensor.modify(data=tensor.data.astype("complex128"))
+        method = network.contract_compressed if compressed\
+            else network.contract
+        result = method(output_inds=[f"w{j}" for j in output],
+                        optimize=optimize, **params)
+        return result.data if isinstance(result, qtn.Tensor) else result
+
+
+def is_field(dtype) -> bool:
+    """ Whether a ``dtype`` is floating-point or complex, in any backend. """
+    flags = ("is_floating_point", "is_floating", "is_complex")
+    with backend("numpy") as numpy:
+        return any(getattr(dtype, flag, False) is True for flag in flags)\
+            or getattr(dtype, "kind", None) in ("f", "c")\
+            or isinstance(dtype, type)\
+            and issubclass(dtype, (float, complex, numpy.inexact))
+
+
+def is_complex(dtype) -> bool:
+    """ Whether a ``dtype`` is complex, in any backend. """
+    with backend("numpy") as numpy:
+        return getattr(dtype, "is_complex", False) is True\
+            or getattr(dtype, "kind", None) == "c"\
+            or isinstance(dtype, type)\
+            and issubclass(dtype, (complex, numpy.complexfloating))
 
 
 BACKENDS = {

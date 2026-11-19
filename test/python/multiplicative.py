@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import itertools
+from collections.abc import Callable
 from typing import List
 from pytest import raises
 
@@ -22,6 +23,30 @@ def test_Function():
     assert f.uncurry(left=False).curry(left=False)(True)(1j) == f(True)(1j)
     assert g.curry().uncurry()(1j, True) == g(1j, True)
     assert g.curry(left=False).uncurry(left=False)(1j, True) == g(1j, True)
+
+
+def test_curry_uncurry_n():
+    """ ``uncurry(n)`` takes abc's ``n``: no object is the identity, and it
+    inverts ``curry(n)`` on either side, recursing on nested exponentials. """
+    f = Function(lambda x, y: x - y, (int, int), (int, ))
+    h = Function(lambda a, b, c: 100 * a + 10 * b + c, (int, ) * 3, (int, ))
+    for left in (True, False):
+        assert f.curry(0, left) == f == f.uncurry(0, left)
+        g = f.curry(left=left)
+        assert g.uncurry(0, left) == g
+        assert g.uncurry(0, left)(3)(2) == (1 if left else -1)
+        assert g.uncurry(1, left).dom == f.dom
+        assert g.uncurry(1, left)(5, 2) == 3
+        assert h.curry(2, left).uncurry(2, left)(1, 2, 3) == 123
+        nested = h.curry(left=left).curry(left=left)
+        assert nested.uncurry(2, left).dom == h.dom
+        assert nested.uncurry(2, left)(1, 2, 3) == 123
+        with raises(ValueError, match="Cannot uncurry 1 of the 2"):
+            h.curry(2, left).uncurry(1, left)
+        with raises(ValueError, match="exponential"):
+            f.uncurry(1, left)
+        with raises(ValueError, match="exponential"):
+            Function(lambda: abs, (), (Callable[[int], int], )).uncurry()
 
 
 def test_curry_out_of_range():
@@ -290,3 +315,31 @@ def test_functor_casts_a_tuple_image():
     assert F(x) == Ty(float, int) and len(F(x)) == 2
     G = feedback.Functor(ob_map={x: (1, 1)}, ar_map={}, cod=zx.Diagram)
     assert G(x) == zx.Nat(2)
+
+
+def test_subclass_as_functor_codomain():
+    """ The reproducer of rel-int/discopy-next#463. """
+    from discopy import markov
+    from discopy.utils import factory
+
+    @factory
+    class Sub(Function):
+        """ A subclass of ``Function``, e.g. one with its own ``__call__``. """
+
+    G = markov.Ty('G')
+    F = markov.Functor({G: tuple}, {}, cod=Sub)
+    structure = [F(box) for box in (
+        markov.Id(G), markov.Copy(G), markov.Discard(G),
+        markov.Swap(G, G), markov.Copy(G) @ markov.Copy(G))]
+    assert all(isinstance(f, Sub) for f in structure)
+
+    sort = markov.Copy(G) >> markov.Swap(G, G) >> markov.Discard(G) @ G
+    assert isinstance(F(sort), Sub) and F(sort)((1, 2)) == (1, 2)
+
+    x = Sub.ob(int)
+    assert all(isinstance(f, Sub) for f in (
+        Sub.permutation((1, 0), (x, x)), Sub.braid(x, x), Sub.ev(x, x),
+        Sub(lambda a, b: a + b, x @ x, x).curry(),
+        Sub(lambda a, b: a + b, x @ x, x).curry().uncurry(),
+        Sub(lambda a, b: a + b, x @ x, x).fix(),
+        Sub(lambda a, b: (a + b, 1), x @ x, x @ x).trace()))

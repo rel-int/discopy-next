@@ -17,6 +17,41 @@ from typing import (
 from numbers import Number
 
 
+def hashable(value):
+    """
+    A value as a hashable one, a list or an array as the tuple of its own
+    hashable entries, so that a semantic attribute can go in a
+    :meth:`setoid` without making the box unhashable, as an
+    unhashable :code:`data` makes a :class:`discopy.cat.Box`.
+
+    Example
+    -------
+    >>> assert hashable([[1, 2], [3]]) == ((1, 2), (3, ))
+    >>> assert hashable(np.array([1, 2])) == (1, 2)
+    >>> assert hashable(np.array(1)) == 1
+    >>> assert hashable("xy") == "xy"
+    """
+    if isinstance(value, np.ndarray) and not value.ndim:
+        return value.item()
+    if isinstance(value, (list, tuple, np.ndarray)):
+        return tuple(map(hashable, value))
+    return value
+
+
+def listed(internal_states):
+    """
+    The internal states as lists of numbers, which is what their
+    representation reads back: they are declared as lists and used as
+    arrays, and `STYLE.md` reads a representation holding an array up to
+    elision.
+
+    >>> listed((np.array([1, 0]), [0, 1]))
+    '([1, 0], [0, 1])'
+    """
+    states = ", ".join(repr(np.asarray(s).tolist()) for s in internal_states)
+    return f"({states},)" if len(internal_states) == 1 else f"({states})"
+
+
 def _build_w_layer(n_nonzero_counts, dagger=False):
     # pylint: disable=import-outside-toplevel
     from discopy.optyx.core import zw
