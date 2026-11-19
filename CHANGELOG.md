@@ -1768,6 +1768,11 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Project
 
+- `docs/export_notebooks.py` runs each notebook as the Python file
+  `marimo convert` writes, not its Markdown: marimo runs that file as
+  `__main__`, which a worker spawned by `multiprocessing`, e.g. by cotengra's
+  optimizer, imports again, and a Markdown one failed it with a `SyntaxError`
+  ([next#641]).
 - A push to `main` measures every Python of `build`'s matrix: with `fail-fast`
   off, one version failing in its setup leaves the other two running, so
   `Test notebooks` — which runs on a push to `main` and on no pull request —
@@ -2323,6 +2328,7 @@ for the changelog of `1.2.1` and earlier.
 [next#634]: https://github.com/rel-int/discopy-next/pull/634
 [next#639]: https://github.com/rel-int/discopy-next/pull/639
 [next#640]: https://github.com/rel-int/discopy-next/pull/640
+[next#641]: https://github.com/rel-int/discopy-next/pull/641
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#44]: https://github.com/rel-int/optyx/pull/44
