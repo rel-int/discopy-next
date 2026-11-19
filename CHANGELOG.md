@@ -718,8 +718,9 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 - `optyx.photonic`'s gates `MZI`, `TBS`, `BBS` and `Phase` compute their
   array in the backend of their parameters, so a diagram lambdified with
   `modules="jax"` evaluates on a JAX tracer and `jax.grad` reaches its
-  parameters through `to_path().array` under `matrix.backend("jax")`
-  ([next#257]).
+  parameters through `to_path().array` under `matrix.backend("jax")`;
+  a PyTorch parameter keeps its gradient in the gate's array, and a float
+  beside it in an `MZI` is cast to its dtype ([next#257]).
 - `frobenius.Diagram.unfuse` keeps the category of the diagram, e.g. the
   cuts of a `peirce.beta.Diagram` ([next#637]).
 - `symmetric.Diagram.permutation` starts from the empty type of the colour
