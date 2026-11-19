@@ -249,6 +249,16 @@ def test_typst_reads_a_label_between_dollars_as_latex(tmp_path):
         Equation(f, g, symbol="$\\nosuch$").to_drawing().to_typst()
 
 
+def test_typst_draws_its_labels_over_its_boxes_and_wires():
+    x, y = Ty('x'), Ty('a_long_wire_name')
+    diagram = Box('hidden', x, y) >> Box('query', y, x) @ Box('k', Ty(), x)
+    lines = diagram.to_typst().render().splitlines()
+    labels = [i for i, line in enumerate(lines) if "content(" in line]
+    shapes = [i for i, line in enumerate(lines)
+              if line.lstrip().startswith(("line(", "bezier("))]
+    assert labels and max(shapes) < min(labels)
+
+
 def test_typst_fills_regions_frames_and_ribbons():
     pytest.importorskip("typst")
     from discopy import ribbon

@@ -351,8 +351,10 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   `quantum.zx.Number`, a red spider being green behind Hadamards, simplified
   on the nose by the rules of PyZX's `full_reduce` on a `quantum.zx.Rewriter`,
   raced against PyZX in `benchmark/test_zx.py` ([next#302], [next#375]).
-- `discopy.ehypergraph`, e-graphs of diagrams with sharing, with congruence
-  closure, rewriting and e-matching.
+- `discopy.egraph`, e-graphs of diagrams with sharing, with congruence
+  closure, rewriting and e-matching: an `EGraph` is a monoidal e-graph, also
+  called an e-hypergraph, egg's e-graphs being those over cartesian diagrams
+  ([next#501]).
 - `Hypergraph.pass_token`, evaluation over a disjoint-union tensor ([#363],
   [#366], [#639]), and `Hypergraph[python.Function]` with
   `hypergraph.Functor` ([#363]).
@@ -516,9 +518,6 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   `is_dagger`, as `tensor.Bubble`'s has and as `cat.Bubble.__str__` prints,
   so that a functor cannot separate equal bubbles. Upstream states the
   commuting law, which next `main` now diverges from ([next#507]).
-- `discopy.ehypergraph` is now `discopy.egraph` and `EHypergraph` is `EGraph`,
-  with no alias: an e-hypergraph is a monoidal e-graph, egg's e-graphs being
-  those over cartesian diagrams ([next#501]).
 - `optyx.classical.Digit`, `PostselectDigit`, `PostselectBit` and the `Bit`
   built on the last reject the empty case with a `ValueError` instead of
   reading it as one mode or as the scalar one: a digit of no digits is
@@ -684,7 +683,7 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   `Matrix.environment()` gives ([next#445]).
 - Delaying a `Sum` or a `Bubble` works wherever delaying a box does: delay
   distributes over a sum, so `(f + g).delay() == f.delay() + g.delay()`,
-  while a delayed bubble, circuit bubble or `ehypergraph.Join` keeps its args
+  while a delayed bubble, circuit bubble or `egraph.Join` keeps its args
   and carries a `time_step` of its own on a delayed boundary, so
   `f.bubble().delay() != f.delay().bubble()` ([next#445]).
 - A tensor or circuit box, and so a tensor bubble, counts its `time_step` in
@@ -720,6 +719,9 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   mathematics from a table of the commands it knows and raises on any other,
   so `$\mapsto$` draws in Typst, where it stopped on `unknown variable`, and
   `$<=$` is two symbols rather than `≤` ([next#642]).
+- The Typst backend draws its labels after every box and wire, as TikZ puts
+  them on a layer of their own, so that a box drawn after a wire label no
+  longer hides it ([next#648]).
 - The Typst backend fills the coloured regions of a drawing and the shapes of
   a ribbon, as TikZ does: `Typst.draw_filled_shape` is a CeTZ `merge-path`
   and `Typst.draw_region_cell` fills a cell through it, so the frame of an
@@ -2393,6 +2395,7 @@ for the changelog of `1.2.1` and earlier.
 [next#644]: https://github.com/rel-int/discopy-next/pull/644
 [next#645]: https://github.com/rel-int/discopy-next/pull/645
 [next#646]: https://github.com/rel-int/discopy-next/pull/646
+[next#648]: https://github.com/rel-int/discopy-next/pull/648
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#44]: https://github.com/rel-int/optyx/pull/44
