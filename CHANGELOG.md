@@ -717,6 +717,8 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 - The Typst backend draws its labels after every box and wire, as TikZ puts
   them on a layer of their own, so that a box drawn after a wire label no
   longer hides it ([next#648]).
+- The Typst backend draws a spider of shape `triangle_up`, `triangle_down`
+  or `plus` as matplotlib does, where it drew a disc ([next#646]).
 - `draw(format="typst", doctest=path)` checks the drawing against a
   baseline, written when missing, as `draw(doctest=...)` does for the other
   backends: the Typst source for a path ending in `.typ`, compared byte for
@@ -2374,6 +2376,7 @@ for the changelog of `1.2.1` and earlier.
 [next#641]: https://github.com/rel-int/discopy-next/pull/641
 [next#643]: https://github.com/rel-int/discopy-next/pull/643
 [next#644]: https://github.com/rel-int/discopy-next/pull/644
+[next#646]: https://github.com/rel-int/discopy-next/pull/646
 [next#648]: https://github.com/rel-int/discopy-next/pull/648
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
