@@ -582,6 +582,9 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   `CMap.permutation` and so `to_map` take `Nat` ([next#31]).
 - A functor maps a layer with one `n`-ary `tensor` rather than a fold of
   `@`, with one `tensor` call per layer ([next#161]).
+- `discopy.optyx`: `QuimbBackend` contracts through discopy's
+  `eval(contractor=Quimb())`, and `DiscopyBackend` passes its parameters on to
+  `eval` ([optyx#44]).
 - Biclosed types hold `biclosed.Wire` ([next#16]), their `**` is `<<`, and a
   term inside a diagram is drawn as one box ([next#31]).
 - `Functor.id` is built from `utils.identity`, and `then` drops an identity
@@ -2322,6 +2325,7 @@ for the changelog of `1.2.1` and earlier.
 [next#640]: https://github.com/rel-int/discopy-next/pull/640
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
+[optyx#44]: https://github.com/rel-int/optyx/pull/44
 [optyx#56]: https://github.com/rel-int/optyx/pull/56
 [optyx#67]: https://github.com/rel-int/optyx/pull/67
 [optyx#76]: https://github.com/rel-int/optyx/pull/76
