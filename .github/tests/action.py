@@ -100,3 +100,13 @@ def test_dependabot_updates_the_setup_action():
     directories = actions.get("directories", [actions.get("directory")])
     assert any(fnmatch.fnmatch("/.github/actions/setup", pattern)
                for pattern in directories)
+
+
+def test_the_install_step_gives_a_download_longer_than_uvs_default(action):
+    """uv's three retries each get 30 seconds by default, which the 55 MiB
+    egglog wheel does not fit: four attempts in 132 seconds left main red
+    with no version's suite run (#625). The budget the action sets is the
+    floor, since a later turn raising it is not a regression."""
+    install, = (step for step in action["runs"]["steps"]
+                if step.get("name") == "Install")
+    assert int(install.get("env", {}).get("UV_HTTP_TIMEOUT", 30)) >= 120
