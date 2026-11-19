@@ -60,7 +60,7 @@ SKIP = "DISCOPY_SKIP_NOTEBOOKS"
 # page for any notebook that fails to execute. An entry whose issue is closed
 # has stopped being evidence: re-run the notebook before trusting it.
 KNOWN_BROKEN = {
-    "optyx/readme_example": ISSUES + "251",
+    "optyx/readme_example": ISSUES + "442",
 }
 
 IFRAME = """\
