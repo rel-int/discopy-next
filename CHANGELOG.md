@@ -710,7 +710,7 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 - `biclosed.Constant` takes the empty type of the colour of its type as
   domain, not the one with no colour, so a constant of a type of coloured
-  wires is a globular box ([next#641]).
+  wires is a globular box ([next#643]).
 - The empty type of a colour is its own adjoint and reads back from its
   `repr` below `monoidal`: `rigid.Ty.l` and `.r` kept the colour of a type
   with no object to read it off, and `biclosed.Ty.__repr__` was
@@ -2326,7 +2326,7 @@ for the changelog of `1.2.1` and earlier.
 [next#634]: https://github.com/rel-int/discopy-next/pull/634
 [next#639]: https://github.com/rel-int/discopy-next/pull/639
 [next#640]: https://github.com/rel-int/discopy-next/pull/640
-[next#641]: https://github.com/rel-int/discopy-next/pull/641
+[next#643]: https://github.com/rel-int/discopy-next/pull/643
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#44]: https://github.com/rel-int/optyx/pull/44
