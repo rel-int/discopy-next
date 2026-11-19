@@ -836,9 +836,10 @@ def spell_nonfinite(string: str) -> str:
 
 def repr_nonfinite(value) -> str:
     """
-    The ``repr`` of a value or a nested list of values, with each float or
-    complex number that is not finite spelled as ``float('nan')`` or
-    ``complex('(1+nanj)')``, so that ``eval`` reads it back with no import.
+    The ``repr`` of a value or of nested lists and tuples of values, with
+    each float or complex number that is not finite spelled as
+    ``float('nan')`` or ``complex('(1+nanj)')``, so that ``eval`` reads it
+    back with no import.
     Any other value is its ``repr``, e.g. a symbol named ``inf`` stays one.
 
     >>> import sympy
@@ -847,9 +848,14 @@ def repr_nonfinite(value) -> str:
     "[float('nan'), [float('-inf'), complex('(1+nanj)')]]"
     >>> repr_nonfinite([sympy.Symbol('inf'), 1.0])
     '[inf, 1.0]'
+    >>> repr_nonfinite((nan, ))
+    "(float('nan'),)"
     """
     if isinstance(value, list):
         return "[" + ", ".join(map(repr_nonfinite, value)) + "]"
+    if isinstance(value, tuple):
+        entries = ", ".join(map(repr_nonfinite, value))
+        return f"({entries},)" if len(value) == 1 else f"({entries})"
     if isinstance(value, float) and not isfinite(value):
         return f"float('{value}')"
     if isinstance(value, complex) and not cmath.isfinite(value):

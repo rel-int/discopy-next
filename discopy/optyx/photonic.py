@@ -503,7 +503,8 @@ class Gate(AbstractGate):
         return self._matrix
 
     def __repr__(self):
-        data = "" if self.data is None else f", data={self.data!r}"
+        data = "" if self.data is None\
+            else f", data={repr_nonfinite(self.data)}"
         array = repr_nonfinite(self.array.tolist())
         return f"{factory_name(type(self))}({array}, "\
             f"{len(self.dom)}, {len(self.cod)}, {self.name!r}{data})"

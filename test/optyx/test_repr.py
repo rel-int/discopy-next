@@ -179,6 +179,7 @@ NONFINITE = [
     diagram.Box("f", diagram.Bit(1), diagram.Bit(1),
                 array=[[np.nan, 1], [-np.inf, np.inf]]),
     photonic.Gate([[np.nan, 1], [0, np.inf]], 2, 2, "g"),
+    photonic.Gate([[1, 0], [0, 1]], 2, 2, "h", data=(np.nan, -np.inf)),
 ]
 
 
