@@ -708,6 +708,11 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Fixed
 
+- An array holding `nan` or `inf` reads back from its `repr`: `Matrix`,
+  `Tensor`, `tensor.Box`, `optyx.core.diagram.Box` and `photonic.Gate`
+  print them as `float('nan')`, `float('inf')`, `complex('nanj')` and
+  `complex('infj')`, spelled by `matrix.spell_nonfinite`, rather than the
+  bare tokens `eval` cannot name ([next#632]).
 - The empty type of a colour is its own adjoint and reads back from its
   `repr` below `monoidal`: `rigid.Ty.l` and `.r` kept the colour of a type
   with no object to read it off, and `biclosed.Ty.__repr__` was
@@ -2319,6 +2324,7 @@ for the changelog of `1.2.1` and earlier.
 [next#629]: https://github.com/rel-int/discopy-next/pull/629
 [next#630]: https://github.com/rel-int/discopy-next/pull/630
 [next#631]: https://github.com/rel-int/discopy-next/pull/631
+[next#632]: https://github.com/rel-int/discopy-next/issues/632
 [next#633]: https://github.com/rel-int/discopy-next/pull/633
 [next#634]: https://github.com/rel-int/discopy-next/pull/634
 [next#639]: https://github.com/rel-int/discopy-next/pull/639

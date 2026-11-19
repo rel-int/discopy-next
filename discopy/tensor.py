@@ -58,7 +58,7 @@ from discopy import (
 from discopy.cat import factory, assert_iscomposable
 from discopy.frobenius import Dim, Cup
 from discopy.matrix import (  # noqa: F401  pylint: disable=unused-import
-    Matrix, backend, set_backend, get_backend,
+    Matrix, backend, set_backend, get_backend, spell_nonfinite,
     Backend, NumPy, JAX, PyTorch, TensorFlow, Contractor, OptEinsum, Quimb)
 from discopy.testable import TestableGeneric, no_strategy
 from discopy.python import finset
@@ -1193,6 +1193,18 @@ class Box[dtype](frobenius.Box, Diagram[dtype]):
         return (self.name, self.dom, self.cod, dtype, self.is_dagger,
                 self.z, self.deterministic, self.affine, self.time_step)\
             + tuple(map(canonical, entries))
+
+    def __repr__(self):
+        """
+        The representation of a tensor box, with :func:`spell_nonfinite`.
+
+        >>> f = Box('f', Dim(1), Dim(2), [float('nan'), float('-inf')])
+        >>> print(repr(f).split('data=')[1])
+        [float('nan'), -float('inf')])
+        >>> from discopy import tensor
+        >>> assert eval(repr(f), {'tensor': tensor, 'Dim': Dim}) == f
+        """
+        return spell_nonfinite(super().__repr__())
 
 
 class Cup(frobenius.Cup, Box):

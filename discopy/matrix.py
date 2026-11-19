@@ -38,6 +38,7 @@ See also
 """
 from __future__ import annotations
 
+import re
 from contextlib import contextmanager
 from math import isqrt, prod
 from operator import index
@@ -803,7 +804,31 @@ def array2string(array, **params):
     string = numpy.array2string(
         array, **dict(
             params, separator=', '))  # ty: ignore[invalid-argument-type]
-    return string.replace('[ ', '[').replace('  ', ' ')
+    return spell_nonfinite(string.replace('[ ', '[').replace('  ', ' '))
+
+
+NONFINITE = re.compile(r"""('(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*")"""
+                       r"|\b(nan|inf)(j?)\b")
+
+
+def spell_nonfinite(string: str) -> str:
+    """
+    Spell the ``nan`` and ``inf`` that numpy and Python print for floats as
+    ``float('nan')`` and ``float('inf')``, and ``nanj`` and ``infj`` as
+    ``complex('nanj')`` and ``complex('infj')``, so that ``eval`` reads them
+    back with no import. Quoted strings are left as they are.
+
+    >>> spell_nonfinite("[nan, -inf, 1.+nanj, 'nan']")
+    "[float('nan'), -float('inf'), 1.+complex('nanj'), 'nan']"
+    >>> import numpy
+    >>> x = eval(spell_nonfinite(repr([numpy.nan, complex(1, -numpy.inf)])))
+    >>> assert numpy.isnan(x[0]) and x[1] == complex(1, -numpy.inf)
+    """
+    def spell(match):
+        quoted, token, imaginary = match.groups()
+        return quoted or (
+            f"complex('{token}j')" if imaginary else f"float('{token}')")
+    return NONFINITE.sub(spell, string)
 
 
 class Backend:

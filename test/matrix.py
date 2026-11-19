@@ -514,3 +514,13 @@ def test_Matrix_lambdify_modules():
     modules = [{"sin": lambda _: 42.}, "math"]
     assert f.lambdify(psi, dtype=float, modules=modules)(3)\
         == Matrix[float]([42.], 1, 1) != f.lambdify(psi, dtype=float)(3)
+
+
+@pytest.mark.parametrize("matrix", [
+    Matrix([np.nan, 1., -np.inf], 1, 3),
+    Matrix[complex]([complex(1, np.nan), complex(np.nan, -np.inf)], 1, 2),
+    Tensor([np.nan, np.inf], Dim(1), Dim(2))])
+def test_repr_nan_inf(matrix):
+    other = eval(repr(matrix))
+    assert type(other) is type(matrix)
+    assert np.array_equal(other.array, matrix.array, equal_nan=True)

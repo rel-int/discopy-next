@@ -1169,3 +1169,9 @@ def test_composition_promotes_on_backend(name):
             assert composite.dtype == t.dtype and composite.is_close(t)
         assert (t @ unit).dtype == (unit @ t).dtype == t.dtype
         assert (t @ unit).is_close(t @ unit.cast(t.dtype))
+
+
+def test_box_repr_nan_inf():
+    box = Box('f', Dim(1), Dim(3), [np.nan, -np.inf, np.inf])
+    from discopy import tensor
+    assert eval(repr(box), {'tensor': tensor, 'Dim': Dim}) == box
