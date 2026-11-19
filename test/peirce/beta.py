@@ -130,3 +130,13 @@ def test_connectives_in_either_region():
                     == (a[:, :, None] | b[None]).all(axis=1)).all()
             assert (model(d.par(e)).array.reshape(2, 2, 2, 2)
                     == (a[:, None, :, None] | b[None, :, None, :])).all()
+
+
+def test_black_spiders_on_any_boundary():
+    y = Ty(Wire('y', dom=black, cod=black))
+    model = Model(ob={'y': 2})
+    assert Diagram.copy(y @ y).cod == y @ y @ y @ y
+    assert Diagram.copy(Ty.id(black)).dom == Ty.id(black)
+    white_copy = Model(ob={'y': 2})(Diagram.copy(y @ y).negative())
+    assert model(Diagram.copy(y @ y)) == white_copy.map(
+        lambda v: not v, dtype=bool)
