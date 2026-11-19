@@ -229,8 +229,18 @@ def test_tikz_escapes_a_label_outside_mathematics(tmp_path):
 @mark.parametrize("shape", ["rectangle", "triangle_up", "triangle_down",
                             "plus"])
 def test_typst_draws_the_shape_of_a_spider(shape):
+    from pytest import importorskip
+    importorskip("typst")
     x = Ty('x')
-    spider = Box('', x, x @ x, draw_as_spider=True, shape=shape)
-    source = spider.to_typst().render()
-    assert "circle(" not in source
-    spider.draw(format="typst", path=None, show=False)
+
+    def source(shape):
+        return Box('', x, x @ x, draw_as_spider=True, shape=shape)\
+            .to_typst().render().splitlines()
+    calls, discs = source(shape), source("circle")
+    primitive = "rect(" if shape == "rectangle" else "line("
+    added = [call.strip() for call in calls if call not in discs]
+    assert "circle(" not in "".join(calls)
+    assert len(added) == (2 if shape == "plus" else 1)
+    assert all(call.startswith(primitive) for call in added)
+    Box('', x, x @ x, draw_as_spider=True, shape=shape).draw(
+        format="typst", path=None, show=False)
