@@ -447,7 +447,9 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   symmetric category, to the codomain's own `permutation` of the images of
   the wires in any other `SymmetricCategory`, and swap by swap otherwise.
   `stream.Stream` and `drawing.Drawing`, which had a swap without saying so,
-  are `SymmetricCategory`, and `Drawing.swap` draws one ([next#514]).
+  are `SymmetricCategory`, and `Drawing.swap` draws one. The matrix then
+  checks `scalar_sliding` and `braid_naturality` on streams, up to the order
+  of their memory as `bifunctoriality` is ([next#514]).
 
 - `drawing.Drawing`, `python.finset.Cospan` and `interaction.Diagram`
   declare `abc.DaggerCategory`, the reflection of a drawing being
