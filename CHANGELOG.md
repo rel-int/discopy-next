@@ -719,6 +719,8 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   a ribbon, as TikZ does: `Typst.draw_filled_shape` is a CeTZ `merge-path`
   and `Typst.draw_region_cell` fills a cell through it, so the frame of an
   e-graph's `Join` and the band of a ribbon show ([next#645]).
+- The Typst backend draws a spider of shape `triangle_up`, `triangle_down`
+  or `plus` as matplotlib does, where it drew a disc ([next#646]).
 - `draw(format="typst", doctest=path)` checks the drawing against a
   baseline, written when missing, as `draw(doctest=...)` does for the other
   backends: the Typst source for a path ending in `.typ`, compared byte for
@@ -2377,6 +2379,7 @@ for the changelog of `1.2.1` and earlier.
 [next#643]: https://github.com/rel-int/discopy-next/pull/643
 [next#644]: https://github.com/rel-int/discopy-next/pull/644
 [next#645]: https://github.com/rel-int/discopy-next/pull/645
+[next#646]: https://github.com/rel-int/discopy-next/pull/646
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#44]: https://github.com/rel-int/optyx/pull/44
