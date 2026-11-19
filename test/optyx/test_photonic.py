@@ -103,3 +103,29 @@ def test_jax_traces_feedback_parameters():
 
     assert np.isclose(jax.grad(traced)(.3), -np.pi * np.sin(.6 * np.pi),
                       atol=1e-4)
+
+
+@pytest.mark.parametrize("tensor", ["theta", "phi"])
+def test_torch_parameter_beside_a_float(tensor):
+    torch = pytest.importorskip("torch")
+    params = {"theta": 0.1, "phi": 0.2}
+    params[tensor] = torch.tensor(params[tensor], dtype=torch.float64)
+    assert np.allclose(MZI(**params).array.numpy(), MZI(0.1, 0.2).array)
+
+
+@pytest.mark.parametrize("gate", [
+    lambda t: MZI(t, 0.2), lambda t: MZI(0.1, t, is_gate_dagger=True),
+    lambda t: TBS(t, is_conj=True), BBS, Phase])
+def test_torch_gradient_of_gate_parameters(gate):
+    torch = pytest.importorskip("torch")
+
+    def loss(array):
+        return sum((i + 1) * (x.real + 2 * x.imag)
+                   for i, x in enumerate(array.reshape(-1)))
+
+    t = torch.tensor(.3, dtype=torch.float64, requires_grad=True)
+    loss(gate(t).array).backward()
+    epsilon = 1e-5
+    expected = (loss(gate(.3 + epsilon).array)
+                - loss(gate(.3 - epsilon).array)) / (2 * epsilon)
+    assert np.isclose(t.grad.item(), expected, atol=1e-4)

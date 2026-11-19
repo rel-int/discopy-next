@@ -463,8 +463,27 @@ class AbstractGate(Channel, ABC):
         The array of nested :code:`entries`, in the :attr:`backend` of the
         gate, so that a JAX tracer or a PyTorch tensor keeps its gradient.
         """
+        def stack(entries, module):
+            if isinstance(entries, list):
+                return module.stack([stack(x, module) for x in entries])
+            return module.array(entries)
+
         with backend(self.backend) as module:
-            return module.asarray(entries)
+            return module.asarray(entries) if self.backend == "numpy"\
+                else stack(entries, module)
+
+    def scalar(self, param):
+        """
+        A parameter of the gate in its :attr:`backend`, with the dtype of
+        the first parameter held there, so that a float beside a PyTorch
+        tensor goes through the functions of PyTorch.
+        """
+        if self.dtype is Expr or self.backend == "numpy":
+            return param
+        reference = next(x for x in self.params
+                         if array_backend(x) == self.backend)
+        with backend(self.backend) as module:
+            return module.array(param, dtype=reference.dtype)
 
     @property
     def module(self):
@@ -484,10 +503,14 @@ class AbstractGate(Channel, ABC):
         in: that of the first parameter held by an array, e.g. a JAX tracer
         after :meth:`lambdify`, NumPy otherwise.
         """
-        params = self.data if isinstance(self.data, (list, tuple))\
-            else (self.data, )
-        return next((array_backend(param) for param in params
+        return next((array_backend(param) for param in self.params
                      if array_backend(param) != "numpy"), "numpy")
+
+    @property
+    def params(self) -> tuple:
+        """ The parameters of the gate, i.e. its :code:`data` as a tuple. """
+        return tuple(self.data) if isinstance(self.data, (list, tuple))\
+            else (self.data, )
 
     @abstractmethod
     def _compute_array(self):
@@ -910,18 +933,19 @@ class MZI(AbstractGate):
         """
         Global phase of the MZI.
         """
-        module = self.module
+        module, theta = self.module, self.scalar(self.theta)
         return (
-            -1j * module.exp(-1j * self.theta * module.pi)
+            -1j * module.exp(-1j * theta * module.pi)
             if self.is_gate_dagger != self.is_conj
-            else 1j * module.exp(1j * self.theta * module.pi)
+            else 1j * module.exp(1j * theta * module.pi)
         )
 
     def _compute_array(self):
         module = self.module
-        cos = module.cos(module.pi * self.theta)
-        sin = module.sin(module.pi * self.theta)
-        exp = module.exp(1j * 2 * module.pi * self.phi)
+        theta, phi = map(self.scalar, (self.theta, self.phi))
+        cos = module.cos(module.pi * theta)
+        sin = module.sin(module.pi * theta)
+        exp = module.exp(1j * 2 * module.pi * phi)
         array = self.asarray([[exp * sin, cos], [exp * cos, -sin]])
         if self.is_gate_dagger:
             array = array.T.conj()
