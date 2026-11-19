@@ -224,3 +224,13 @@ def test_tikz_escapes_a_label_outside_mathematics(tmp_path):
         assert label in tikz
     assert TikZ.escape("(n >> s) << n") == "(n >{}> s) <{}< n"
     assert TikZ.escape(">>> a\\_b \\$x_y\\$") == ">{}>{}> a\\_b \\$x\\_y\\$"
+
+
+def test_typst_draws_its_labels_over_its_boxes_and_wires():
+    x, y = Ty('x'), Ty('a_long_wire_name')
+    diagram = Box('hidden', x, y) >> Box('query', y, x) @ Box('k', Ty(), x)
+    lines = diagram.to_typst().render().splitlines()
+    labels = [i for i, line in enumerate(lines) if "content(" in line]
+    shapes = [i for i, line in enumerate(lines)
+              if line.lstrip().startswith(("line(", "bezier("))]
+    assert labels and max(shapes) < min(labels)

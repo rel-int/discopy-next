@@ -1841,6 +1841,7 @@ class Typst(Backend):
 
     def __init__(self, **params):
         self.body: list = []
+        self.labels: list = []
         self.nodesize = params.get("nodesize", 1)
         self.fontsize = params.get("fontsize", DEFAULT["fontsize"])
         # Match Matplotlib's default stroke weight so wires/boxes read at
@@ -1921,7 +1922,7 @@ class Typst(Backend):
                 Ident("text"), [content], {"size": Ident(f"{scale}em")})
         else:
             text_call = content
-        self.body.append(Call(
+        self.labels.append(Call(
             Ident("content"), [self.coord(i, j), text_call], extra))
         super().draw_text(text, i, j, **params)
 
@@ -2047,14 +2048,17 @@ class Typst(Backend):
                 lbl = Call(
                     Ident("text"), [ContentExpr(inner, math=math)],
                     {"fill": Ident(fc), "size": Ident(f"{scale}em")})
-                self.body.append(Call(
+                self.labels.append(Call(
                     Ident("content"), [self.coord(i, j), lbl]))
         super().draw_spiders(graph, draw_box_labels)
 
     def to_document(self, **params):
         """
         The document of what was drawn: a CeTZ canvas on a page cropped to
-        it, with ``page_margin`` around and ``unit_length`` to a unit.
+        it, with ``page_margin`` around and ``unit_length`` to a unit. Its
+        :attr:`labels` come after the rest of its :attr:`body`, so that no
+        box or wire drawn after a label hides it, as TikZ puts its labels on
+        a layer of their own.
         """
         margin = params.get("page_margin", "0.2cm")
         doc = Document(
@@ -2069,7 +2073,7 @@ class Typst(Backend):
         unit_len = params.get("unit_length", "1in")
         canvas = Canvas(
             canvas_kwargs={"length": Ident(unit_len)},
-            body=[RawText("import draw: *")] + self.body,
+            body=[RawText("import draw: *")] + self.body + self.labels,
         )
         doc.content = canvas
         return doc
