@@ -661,8 +661,6 @@ class Diagram(monoidal.Diagram, TracedCategory):
         messages.NO_PLANAR_NORMAL_FORM)
     trace_superposing_right = TracedCategory.trace_superposing_right.failing(
         messages.NO_PLANAR_NORMAL_FORM)
-    hypergraph_section = monoidal.Diagram.hypergraph_section.failing(
-        messages.SECTION_NEEDS_SWAPS)
     dagger_involution = DaggerCategory.dagger_involution.failing(
         messages.FEEDBACK_HAS_NO_DAGGER)
     dagger_involution_traced = DaggerCategory.dagger_involution.weaken(
