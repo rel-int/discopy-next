@@ -514,3 +514,28 @@ def test_Matrix_lambdify_modules():
     modules = [{"sin": lambda _: 42.}, "math"]
     assert f.lambdify(psi, dtype=float, modules=modules)(3)\
         == Matrix[float]([42.], 1, 1) != f.lambdify(psi, dtype=float)(3)
+
+
+@pytest.mark.parametrize("matrix", [
+    Matrix([np.nan, 1., -np.inf], 1, 3),
+    Matrix[complex]([complex(1, np.nan), complex(np.nan, -np.inf)], 1, 2),
+    Tensor([np.nan, np.inf], Dim(1), Dim(2))])
+def test_repr_nan_inf(matrix):
+    other = eval(repr(matrix))
+    assert type(other) is type(matrix)
+    for part in ("real", "imag"):
+        assert np.array_equal(getattr(other.array, part),
+                              getattr(matrix.array, part), equal_nan=True)
+
+
+def test_repr_symbol_named_inf():
+    sympy = pytest.importorskip("sympy")
+    inf, nan = sympy.Symbol('inf'), sympy.Symbol('nan')
+    matrix = Matrix[sympy.Expr]([inf, nan + 1, float('nan')], 1, 3)
+    assert "float('nan')" in repr(matrix)
+    env = {'Matrix': Matrix, 'Expr': sympy.Expr, 'Nat': Nat,
+           'inf': inf, 'nan': nan}
+    other = eval(repr(matrix), env)
+    entries = other.array.reshape(-1)
+    assert entries[:2].tolist() == [inf, nan + 1]
+    assert np.isnan(float(entries[2]))

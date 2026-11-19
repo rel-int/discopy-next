@@ -715,6 +715,12 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Fixed
 
+- An array holding `nan` or `inf` reads back from its `repr`: `Matrix`,
+  `Tensor`, `tensor.Box`, `optyx.core.diagram.Box` and `photonic.Gate`
+  print them as `float('nan')`, `float('-inf')` or `complex('(1+nanj)')`,
+  spelled by `matrix.repr_nonfinite`, rather than the bare tokens `eval`
+  cannot name, and a `tensor.Box` prints its data as a list, not an
+  `array(...)` ([next#632]).
 - `biclosed.Constant` takes the empty type of the colour of its type as
   domain, not the one with no colour, so a constant of a type of coloured
   wires is a globular box ([next#643]).
@@ -2353,6 +2359,7 @@ for the changelog of `1.2.1` and earlier.
 [next#629]: https://github.com/rel-int/discopy-next/pull/629
 [next#630]: https://github.com/rel-int/discopy-next/pull/630
 [next#631]: https://github.com/rel-int/discopy-next/pull/631
+[next#632]: https://github.com/rel-int/discopy-next/issues/632
 [next#633]: https://github.com/rel-int/discopy-next/pull/633
 [next#634]: https://github.com/rel-int/discopy-next/pull/634
 [next#637]: https://github.com/rel-int/discopy-next/pull/637
