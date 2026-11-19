@@ -79,6 +79,12 @@ jobs:
     # give the notebooks a job of their own rather than raising this.
     timeout-minutes: 40
     strategy:
+      # A sibling cancelled on another's failure is a Python nothing
+      # measured, and `Test notebooks` runs on main alone: fail-fast on
+      # the three versions of a push to main loses the readings the
+      # matrix is there to take, and buys nothing on a pull request,
+      # whose matrix is one version (#625).
+      fail-fast: false
       matrix:
         # A pull request tests the version CI lints on; main tests every one.
         python-version: ${{ fromJSON(github.event_name == 'pull_request' && '["3.14"]' || '["3.12", "3.13", "3.14"]') }}
