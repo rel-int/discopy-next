@@ -224,3 +224,14 @@ def test_tikz_escapes_a_label_outside_mathematics(tmp_path):
         assert label in tikz
     assert TikZ.escape("(n >> s) << n") == "(n >{}> s) <{}< n"
     assert TikZ.escape(">>> a\\_b \\$x_y\\$") == ">{}>{}> a\\_b \\$x\\_y\\$"
+
+
+def test_typst_reads_a_label_between_dollars_as_latex(tmp_path):
+    from discopy.monoidal import Equation
+    f, g = Box('f', Ty('x'), Ty('y')), Box('$\\phi_1$', Ty('x'), Ty('y'))
+    equation = Equation(f, g, symbol="$\\mapsto$")
+    equation.draw(format="typst", path=tmp_path / "a.svg")
+    source = equation.to_drawing().to_typst().render()
+    assert "[$arrow.r.bar$]" in source and "[$phi.alt_(1)$]" in source
+    with raises(ValueError, match="No Typst for the LaTeX command"):
+        Equation(f, g, symbol="$\\nosuch$").to_drawing().to_typst()
