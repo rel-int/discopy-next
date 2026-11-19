@@ -4,8 +4,8 @@ from pytest import raises
 
 from discopy.quantum.circuit import Circuit, Id, qubit
 from discopy.quantum.gates import (
-    CRx, CRz, CX, CZ, H, Bra, Ket, Measure, Rx, Ry, Rz, S, T, X, Y, Z,
-    scalar, sqrt)
+    CCX, CRx, CRz, CX, CZ, H, Bra, Ket, Measure, Rx, Ry, Rz, S, T, U1, X, Y,
+    Z, scalar, sqrt)
 
 sympy = pytest.importorskip("sympy")
 
@@ -136,6 +136,13 @@ def test_pennylane_parameterized_ops():
         plane = p_op.to_pennylane().eval().numpy()
 
         assert np.allclose(disco, plane, atol=10e-5)
+
+
+def test_pennylane_converts_U1_and_CCX():
+    pytest.importorskip("discopy.quantum.pennylane")
+    for circuit in (Ket(0) >> H >> U1(.3), Ket(1, 1, 0) >> CCX):
+        assert np.allclose(
+            circuit.eval().array, circuit.to_pennylane().eval().numpy())
 
 
 def test_pennylane_complex_scalar_probabilities():

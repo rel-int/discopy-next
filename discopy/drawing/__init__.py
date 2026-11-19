@@ -2,8 +2,8 @@
 DisCoPy's drawing modules: :mod:`discopy.drawing.drawing` is the category of
 drawings, i.e. labeled graphs embedded in the plane, onto which every diagram
 is sent by a functor; :mod:`discopy.drawing.backend` renders them with
-matplotlib or TikZ; :mod:`discopy.drawing.widget` shows them as interactive
-anywidget widgets in notebooks.
+matplotlib, TikZ or Typst; :mod:`discopy.drawing.widget` shows them as
+interactive anywidget widgets in notebooks.
 """
 
 import os
@@ -16,6 +16,7 @@ from discopy.drawing import backend, drawing
 from discopy.drawing.backend import (
     Backend,
     TikZ,
+    Typst,
     Matplotlib,
     ATTRIBUTES,
     DEFAULT,
@@ -49,7 +50,7 @@ def draw(diagram, **params):
     Parameters
     ----------
     textpad : pair of floats, optional
-        Padding between text and wires, default is :code:`(0.1, 0.1)`.
+        Padding between text and wires, default is :code:`(2**-4, 2**-4)`.
     wire_labels : bool, optional
         Whether to draw type labels, default is :code:`False`.
     draw_box_labels : bool, optional
@@ -57,20 +58,21 @@ def draw(diagram, **params):
     aspect : string, optional
         Aspect ratio, one of :code:`['auto', 'equal']`.
     margins : tuple, optional
-        Margins, default is :code:`(0.05, 0.05)`.
+        Margins, default is :code:`(0, 0)`.
     nodesize : float, optional
         Node size for spiders and controlled gates.
     fontsize : int, optional
-        Font size for the boxes, default is :code:`12`.
+        Font size for the boxes, default is :code:`10`.
     fontsize_types : int, optional
-        Font size for the types, default is :code:`12`.
+        Font size for the types, default is :code:`10`.
     figsize : tuple, optional
         Figure size.
     path : str, optional
         Where to save the image, if `None` we call :code:`plt.show()`.
     format : str, optional
         Format of the saved image, taken from the extension of :code:`path`
-        when it is a file name, required when it is an in-memory buffer.
+        when it is a file name, required when it is an in-memory buffer;
+        :code:`"typst"` draws with the :class:`Typst` backend.
     doctest : str, optional
         Path to a documentation image used as a drawing baseline: the
         image is created if missing and compared against otherwise, or
@@ -88,6 +90,48 @@ def draw(diagram, **params):
         braid, :code:`0` otherwise.
     """
     return diagram.to_drawing().draw(**params)
+
+
+def from_picture(jpeg, config: dict):
+    """
+    The diagram a picture of it shows, read back by
+    :mod:`discopy.drawing.vision`: a pixel net says what each pixel is, a
+    small OCR model reads the name of each box and the type of each
+    labelled wire, the module is the smallest in which it decodes from the
+    one whose structural primitives and types appear, and
+    :func:`discopy.drawing.picture.decode` builds the diagram. It needs
+    PyTorch and trained weights, see
+    :func:`discopy.drawing.vision.from_picture` for the ``config``.
+    """
+    from discopy.drawing import vision
+    return vision.from_picture(jpeg, config)
+
+
+def to_typst(diagram, **params):
+    """
+    Convert a diagram to a Typst Document AST.
+
+    Parameters
+    ----------
+    diagram : Diagram
+        The diagram to convert.
+    params : Passed to :class:`Typst`.
+
+    Returns
+    -------
+    doc : Document
+        A Typst Document AST that can be rendered to source text or SVG.
+
+    Example
+    -------
+    >>> from discopy.monoidal import Ty, Box
+    >>> f = Box('f', Ty('x'), Ty('y'))
+    >>> doc = to_typst(f)
+    >>> source = doc.render()
+    >>> assert 'import "@preview/cetz' in source
+    >>> assert 'bezier' in source or 'line' in source
+    """
+    return diagram.to_drawing().to_typst(**params)
 
 
 def to_gif(diagram, *diagrams, **params):  # pragma: no cover

@@ -1,0 +1,1008 @@
+import gzip
+import json
+import random
+import time
+from functools import reduce
+from itertools import islice
+from math import inf
+from operator import eq, lt
+from pathlib import Path
+
+import numpy as np
+import pytest
+from hypothesis import assume, example, given, settings, strategies as st
+from pytest import raises
+
+from discopy import symmetric
+from discopy.egraph import (
+    EGraph, History, Join, Markov, distribute, partition)
+from discopy.hypergraph import Hypergraph
+from discopy.markov import Ty, Box, Copy, Diagram, Functor, Swap
+from discopy.tensor import Dim, Tensor
+from discopy.utils import AxiomError, dumps, loads
+from fixtures.pyproject import GROUPS, installs
+
+x = Ty('x')
+f, g, h = Box('f', x, x), Box('g', x, x), Box('h', x, x)
+sample = Box('sample', x, x, is_deterministic=False)
+condition = Box('condition', x, Ty(), is_affine=False)
+score = Box('score', x, Ty(), is_deterministic=False, is_affine=False)
+
+
+def test_samples_are_independent():
+    assert len(set(Markov.from_diagram(Copy(x) >> f @ f).classes)) == 2
+    assert len(set(Markov.from_diagram(Copy(x) >> f @ g).classes)) == 3
+    assert len(set(Markov.from_diagram(
+        Copy(x) >> sample @ sample).classes)) == 3
+    graph = Markov.from_diagram(sample)
+    assert len(graph.add(sample, (0, ))[0].graph.boxes) == 2
+    assert Markov.from_diagram(f).add(f, (0, ))[1] == (1, )
+    noise = Box('noise', Ty(), x, is_deterministic=False, is_affine=False)
+    unit = Markov.id(Ty()).add(noise, ())[0]
+    assert unit.add(noise, ())[1] == (1, )
+
+
+def test_category_has_flags():
+    with raises(AxiomError):
+        EGraph[symmetric.Diagram].from_diagram(symmetric.Box('f', x, x))
+
+
+def test_effects_are_kept():
+    hard = Markov.from_diagram(Copy(x, 3) >> condition @ condition @ x)
+    assert hard.roots() == (0, ) and hard.extract().boxes == (condition, )
+    soft = Markov.from_diagram(Copy(x, 3) >> score @ score @ x)
+    assert soft.roots() == (0, 1) and soft.extract().boxes == (score, score)
+    unread = Markov.from_diagram(f >> condition)
+    assert unread.extract().boxes == (f, condition) and unread.cost() == 3
+    assert Markov.from_diagram(f >> Diagram.discard(x)).extract().boxes == ()
+    assert Markov.from_diagram(f.dagger() >> Diagram.discard(x)).extract(
+        ).boxes == (f.dagger(), )
+
+
+def test_rewrite_refusals():
+    graph = Markov.from_diagram(sample >> f)
+    merge = Hypergraph[Diagram](x @ x, x, (), ((0, 0), (), (0, )))
+    cyclic = Markov.from_diagram(f).merge(0, 1)
+    with raises(AxiomError):
+        cyclic.rewrite((0, ), (), (1, ), Box('c', Ty(), x).to_hypergraph())
+    for region, dom, cod, rhs in [
+            ((2, ), (0, ), (1, ), f.to_hypergraph()),
+            ((-1, ), (0, ), (1, ), f.to_hypergraph()),
+            ((1, ), (3, ), (2, ), sample.to_hypergraph()),
+            ((1, ), (1, ), (-1, ), sample.to_hypergraph()),
+            ((0, ), (0, ), (1, ), f.to_hypergraph()),
+            ((1, ), (1, ), (2, ), sample.to_hypergraph()),
+            ((1, ), (0, ), (2, ), g.to_hypergraph()),
+            ((1, ), (1, ), (2, ), Box('h', x @ x, x).to_hypergraph()),
+            ((1, ), (1, 1), (2, ), merge)]:
+        with raises(AxiomError):
+            graph.rewrite(region, dom, cod, rhs)
+
+
+def test_rewrite_glues():
+    graph = Markov.from_diagram(f >> g)
+    rewritten = graph.rewrite(
+        (0, 1), (0, ), (2, ), Diagram.id(x).to_hypergraph())
+    assert len(rewritten.graph.boxes) == 2 and rewritten.classes == (0, 1, 0)
+    assert rewritten.extract() == Diagram.id(x).to_hypergraph()
+    assert len(rewritten.sections()) == 1
+
+
+def names(graph: EGraph) -> list[list[str]]:
+    """ The e-nodes of each class by name, as the dashed boxes of Tiurin et
+    al.'s figures, an input named ``"input"``. """
+    def name(port):
+        box = graph.box_of(port)
+        return "input" if box is None else graph.graph.boxes[box].name
+
+    return sorted(sorted(map(name, ports)) for ports in graph.nodes.values())
+
+
+def joins(diagram: Diagram) -> list[list[str]]:
+    """ The terms of each join of a diagram by the names of their boxes. """
+    return sorted(sorted(str(term) for term in box.args)
+                  for box in diagram.boxes if isinstance(box, Join))
+
+
+def spider(graph: EGraph, box: Box) -> int:
+    """ The output of the first occurrence of a box with one output. """
+    output, = graph.graph.box_wires[graph.graph.boxes.index(box)][1]
+    return output
+
+
+def test_join():
+    join = Join(f, g)
+    assert join.dagger().dagger() == join and loads(dumps(join)) == join
+    assert join.is_affine and not join.is_deterministic
+    check = Box('check', x, x, is_affine=False)
+    assert Join(f).is_cartesian and not Join(f, check).is_affine
+    assert distribute(Copy(x) >> join @ join).terms == (
+        Copy(x) >> f @ f, Copy(x) >> f @ g,
+        Copy(x) >> g @ f, Copy(x) >> g @ g)
+    with raises(AxiomError):
+        Join(f, Box('k', x, x @ x), dom=x, cod=x)
+
+
+def test_join_delays_as_a_bubble():
+    from discopy import egraph, feedback, markov
+    join = Join(f, g)
+    delayed = join.delay()
+    assert delayed.args == (f, g) and (delayed.dom, delayed.cod) == (x.d, x.d)
+    assert delayed.reset() == join and str(delayed) == "Join(f, g).d"
+    assert loads(dumps(delayed)) == delayed
+    assert eval(repr(delayed), dict(
+        egraph=egraph, feedback=feedback, markov=markov)) == delayed
+    assert distribute(delayed) == distribute(join).delay() == f.d + g.d
+    assert distribute((join >> h).delay()) == distribute(join >> h).delay()
+
+
+def test_nodes_hashcons():
+    two, times = Box('2', Ty(), x), Box('*', x @ x, x)
+    graph = Markov.from_diagram(two @ two >> times)
+    assert names(graph) == [['*'], ['2']] and len(graph.graph.boxes) == 3
+    assert graph.sections() == [(two >> Copy(x) >> times).to_hypergraph()]
+    shared = Markov.from_diagram(Copy(x) >> f @ f)
+    assert shared.sections() == Markov.from_diagram(f >> Copy(x)).sections()
+    noisy = Markov.from_diagram(Copy(x) >> sample @ sample)
+    assert names(noisy) == [['input'], ['sample'], ['sample']]
+
+
+def test_translation_chooses_per_class():
+    p, q, r = Box('p', Ty(), x), Box('q', Ty(), x), Box('r', x @ x, x)
+    graph = Markov.from_diagram(p >> Copy(x) >> r)
+    graph = graph.rewrite((0, ), (), (spider(graph, p), ), q.to_hypergraph())
+    diagram = graph.to_diagram()
+    assert joins(diagram) == [['p', 'q']]
+    assert distribute(diagram).terms == (
+        p >> Copy(x) >> r, q >> Copy(x) >> r)
+    assert len(graph.sections()) == 2
+
+
+def test_effects_stay_outside_joins():
+    graph = Markov.from_diagram(sample @ f).merge(
+        spider(Markov.from_diagram(sample @ f), sample),
+        spider(Markov.from_diagram(sample @ f), f))
+    diagram = graph.to_diagram()
+    assert sample in diagram.boxes and joins(diagram) == [
+        ['Discard(x) @ f', 'Function(x @ x, [0])']]
+    assert len(graph.sections()) == 2
+
+
+def test_figure_1():
+    """ Tiurin et al. (2024), Fig. 1: ``(a * 2) / 2`` under three rules, one
+    at a time, ``a``, ``1`` and ``2`` constants, then the cycle it omits. """
+    a, one, two = (Box(name, Ty(), x) for name in "a12")
+    times, divide, shift = (Box(op, x @ x, x) for op in ("*", "/", "<<"))
+    rules = [(x @ two >> times, x @ one >> shift),
+             (times @ x >> divide, x @ divide >> times),
+             (Copy(x) >> divide, Diagram.discard(x) >> one)]
+    graph = Markov.from_diagram(a @ two @ two >> times @ x >> divide)
+    steps = [graph]
+    for lhs, rhs in rules:
+        steps.append(steps[-1].step([
+            (lhs.to_hypergraph(), rhs.to_hypergraph())]))
+    assert list(map(names, steps)) == [
+        [['*'], ['/'], ['2'], ['a']],
+        [['*', '<<'], ['/'], ['1'], ['2'], ['a']],
+        [['*', '/'], ['*', '<<'], ['/'], ['1'], ['2'], ['a']],
+        [['*', '/'], ['*', '<<'], ['/', '1'], ['2'], ['a']]]
+    assert list(map(len, map(EGraph.sections, steps))) == [1, 2, 3, 5]
+    assert list(map(len, (joins(step.to_diagram()) for step in steps))) == [
+        0, 1, 2, 3]
+    assert all(map(Markov.translation, steps))
+    cyclic = steps[-1].step([(
+        (x @ one >> times).to_hypergraph(), Diagram.id(x).to_hypergraph())])
+    assert ['*', '/', 'a'] in names(cyclic)
+    assert cyclic.extract() == a.to_hypergraph()
+    with raises(AxiomError):
+        cyclic.to_diagram()
+    assert Markov.translation(cyclic)
+
+
+def test_figures_26_and_27():
+    """ Tiurin et al. (2024), Figs. 26 and 27: relating ``b`` and ``c`` makes
+    ``f(a, b)`` and ``f(a, c)`` congruent, one e-node, shared by a copy. """
+    a, b, c = (Box(name, Ty(), x) for name in "abc")
+    k, plus = Box('f', x @ x, x), Box('+', x @ x, x)
+    graph = Markov.from_diagram(a @ b @ a @ c >> k @ k >> plus)
+    merged = graph.merge(spider(graph, b), spider(graph, c))
+    rebuilt = merged.rebuild()
+    assert list(map(len, map(set, (
+        g.classes for g in (graph, merged, rebuilt))))) == [6, 5, 4]
+    assert names(rebuilt) == [['+'], ['a'], ['b', 'c'], ['f']]
+    assert rebuilt.to_diagram().to_hypergraph() == (
+        a @ Join(b, c) >> k >> Copy(x) >> plus).to_hypergraph()
+
+
+def test_figure_17():
+    """ Tiurin et al. (2024), Fig. 17 and Appendix G: deleting ``a`` is no
+    rewrite, as no section keeps what nobody reads and is affine. """
+    a = Box('a', Ty(), x)
+    graph = Markov.from_diagram(f @ a >> x @ Diagram.discard(x))
+    graph = graph.rewrite((0, ), (0, ), (spider(graph, f), ),
+                          g.to_hypergraph())
+    deletion = (a >> Diagram.discard(x), Diagram.id(Ty()))
+    assert graph.matches(deletion[0].to_hypergraph())
+    assert not list(graph.saturate(deletion))
+    assert graph.sections() == [f.to_hypergraph(), g.to_hypergraph()]
+
+
+def narrow(diagram: Diagram, bound: int = 12) -> bool:
+    """ Whether each layer of a diagram has at most ``bound`` wires around. """
+    return all(len(layer.dom @ layer.cod) <= bound for layer in diagram.inside)
+
+
+def model(seed: int, alike: dict) -> Functor:
+    """ A random functor into tensors of dimension two, a box as its class in
+    ``alike``: a deterministic box a function, partial when not affine, any
+    other a random matrix, stochastic when affine. """
+    rng, table = np.random.default_rng(seed), {}
+
+    def array(box):
+        rows, columns = 2 ** len(box.dom), 2 ** len(box.cod)
+        if box.is_deterministic:
+            return np.eye(columns)[rng.integers(columns, size=rows)] * (
+                1 if box.is_affine else rng.integers(2, size=(rows, 1)))
+        matrix = rng.random((rows, columns))
+        return matrix / matrix.sum(axis=1, keepdims=True)\
+            if box.is_affine else matrix
+
+    def ar_map(box):
+        return Tensor[float](
+            table.setdefault(alike.get(box, box), array(box)),
+            Dim(*len(box.dom) * (2, )), Dim(*len(box.cod) * (2, )))
+
+    return Functor(ob_map=lambda _: Dim(2), ar_map=ar_map, cod=Tensor[float])
+
+
+@settings(max_examples=50, deadline=None)
+@given(st.data())
+def test_sections_evaluate_as_the_diagram(data):
+    diagram = data.draw(Markov.strategy(
+        effects=True, max_merges=0)).graph.to_diagram()
+    if data.draw(st.booleans()):
+        diagram = Diagram.copy(diagram.dom) >> diagram @ diagram
+    assume(narrow(diagram, 16))
+    graph = Markov(Hypergraph[Diagram].from_diagram(diagram))
+    boxes, rewritten, related = graph.graph.boxes, graph, []
+    pairs = st.tuples(st.integers(0, 9), st.integers(0, 9))
+    for i, j in data.draw(st.lists(pairs, max_size=3)) if boxes else ():
+        i, j = i % len(boxes), j % len(boxes)
+        if boxes[i].is_cartesian and boxes[j].is_cartesian and (
+                boxes[i].dom, boxes[i].cod) == (boxes[j].dom, boxes[j].cod):
+            rewritten = rewritten.rewrite(
+                (i, ), *graph.graph.box_wires[i], boxes[j].to_hypergraph())
+            related.append((boxes.index(boxes[i]), boxes.index(boxes[j])))
+    alike = dict(zip(boxes, map(boxes.__getitem__, partition(
+        len(boxes), related))))
+    functor = model(data.draw(st.integers(0, 2 ** 32 - 1)), alike)
+    expected = functor(diagram).array
+    for section in rewritten.rebuild().sections():
+        assert np.allclose(functor(section.to_diagram()).array, expected)
+
+
+def test_matches_flags_and_patterns():
+    noisy = Markov.from_diagram(Copy(x) >> sample @ Box('sample', x, x))
+    assert noisy.matches(Box('sample', x, x).to_hypergraph()) == [
+        ((1, ), (0, ), (2, ))]
+    graph = Markov.from_diagram(x @ Box('c', Ty(), x) >> Box('h', x @ x, x))
+    unread = Hypergraph[Diagram](x, x, (Box('c', Ty(), x), ), ((0, ), (
+        ((), (1, )), ), (1, )))
+    assert graph.matches(unread) == [((0, ), (None, ), (1, ))]
+    assert graph.rewrite((0, ), (None, ), (1, ), unread) == graph
+    for lhs in [Diagram.id(x).to_hypergraph(), sample.to_hypergraph()]:
+        with raises(AxiomError):
+            graph.matches(lhs)
+    with raises(AxiomError):
+        graph.rewrite((0, ), (None, ), (1, ), f.to_hypergraph())
+    for rule in [(Diagram.discard(x) >> Box('c', Ty(), x), f),
+                 (f, g @ Diagram.discard(x)), (f, sample), (sample, f)]:
+        with raises(AxiomError, match="is not a rule"):
+            graph.saturate(rule)
+
+
+def test_matches_bind_classes():
+    divide, m = Box('/', x @ x, x), Box('m', x @ x, x)
+    graph = Markov.from_diagram(divide)
+    lhs = (Copy(x) >> divide).to_hypergraph()
+    assert graph.matches(lhs) == []
+    assert graph.merge(0, 1).matches(lhs) == [((0, ), (0, ), (2, ))]
+    assert Markov.from_diagram(f @ g).matches((g >> f).to_hypergraph()) == []
+    twins = Copy(x) @ Copy(x) >> x @ Swap(x, x) @ x\
+        >> x @ x @ Swap(x, x) >> m @ m
+    assert Markov.from_diagram(twins).matches(twins.to_hypergraph()) == [
+        ((0, 1), (1, 0), (3, 2)), ((0, 1), (0, 1), (2, 3))]
+
+
+def test_saturate_stops_and_rebuilds():
+    graph = Markov.from_diagram(f >> f)
+    rounds = list(graph.saturate((f, g), (g, f)))
+    assert len(rounds) == 1 and len(rounds[0].graph.boxes) == 4
+    assert rounds[0].extract().boxes == (f, f)
+    *_, last = Markov.from_diagram(
+        Copy(x) >> (g >> f) @ (h >> f)).saturate((g, h))
+    first, second = last.graph.cod_wires
+    assert last.classes[first] == last.classes[second]
+
+
+def test_then_and_tensor_carry_the_classes():
+    either = Markov.from_diagram(f).rewrite(
+        (0, ), (0, ), (1, ), g.to_hypergraph())
+    after = Markov.from_diagram(h)
+    assert (either >> after).graph == either.graph >> after.graph
+    assert (either >> after).sections() == [
+        (f >> h).to_hypergraph(), (g >> h).to_hypergraph()]
+    assert (either @ after).graph == either.graph @ after.graph
+    assert (either @ after).sections() == [
+        (f @ h).to_hypergraph(), (g @ h).to_hypergraph()]
+    assert Markov.id(x) >> either == either == either >> Markov.id(x)
+    assert Markov.id() @ either == either == either @ Markov.id()
+    with raises(AxiomError):
+        either >> Markov.from_diagram(Box('k', Ty('y'), x))
+
+
+def test_equal_up_to_renaming_spiders():
+    """ The spider 1 is the output of ``f`` on the left, of ``g`` on the
+    right, so relating it to the input is not the same relation. """
+    left, right = (Markov(Hypergraph[Diagram](x, x @ x, boxes, (
+        (0, ), (((0, ), (1, )), ((0, ), (2, ))), cod_wires)))
+        for boxes, cod_wires in [((f, g), (1, 2)), ((g, f), (2, 1))])
+    assert left == right and hash(left) == hash(right)
+    assert left.merge(0, 1) == right.merge(0, 2)
+    assert hash(left.merge(0, 1)) == hash(right.merge(0, 2))
+    assert left.merge(0, 1) != right.merge(0, 1)
+
+
+def test_sharing_and_classes_are_checked():
+    two_producers = Hypergraph[Diagram](x @ x, x, (), ((0, 0), (), (0, )))
+    loop = Hypergraph[Diagram](Ty(), Ty(), (f, ), ((), (((0, ), (0, )), ), ()))
+    for graph in (two_producers, loop):
+        with raises(AxiomError, match="sharing"):
+            Markov(graph)
+    k = Box('k', x, Ty('y'))
+    for graph, classes in [(f.to_hypergraph(), (0, )),
+                           (k.to_hypergraph(), (0, 0))]:
+        with raises(AxiomError, match="a class of one type"):
+            Markov(graph, classes)
+    with raises(AxiomError, match="a class of one type"):
+        Markov.from_diagram(k).merge(0, 1)
+
+
+def test_to_tree():
+    graph = Markov.from_diagram(Copy(x) >> f @ sample).merge(1, 2)
+    tree = graph.to_tree()
+    assert (tree['factory'], tree['category']) == (
+        'egraph.EGraph', 'markov.Diagram')
+    assert Markov.from_tree(tree) == graph
+    assert Markov.serialisation(term=graph)\
+        and Markov.repr_transparency(term=graph)
+
+
+def test_strategy_needs_a_copy_discard_category():
+    from discopy import frobenius
+    for category in (symmetric.Diagram, frobenius.Diagram):
+        with raises(NotImplementedError):
+            EGraph[category].strategy()
+
+
+@settings(max_examples=20, deadline=None)
+@given(Markov.strategy(effects=False, max_merges=2))
+def test_strategy(graph):
+    from discopy.testable import GENERATORS
+    names = {ob.name for ty in graph.graph.spider_types for ob in ty.inside}
+    assert names | {box.name for box in graph.graph.boxes} <= set(
+        GENERATORS[:2])
+    assert all(box.is_cartesian for box in graph.graph.boxes)
+    assert len(set(graph.classes)) >= graph.graph.n_spiders - 2
+
+
+@pytest.fixture(scope="module")
+def examples() -> list[EGraph]:
+    """ Egg's example of :mod:`discopy.egraph`, ``f`` rewritten into
+    ``g``, a sample read by a condition, ``f`` and ``g``, then with the
+    outputs of ``f`` and ``g`` related, and the empty one. """
+    two, times, divide = (
+        Box('2', Ty(), x), Box('*', x @ x, x), Box('/', x @ x, x))
+    egg = Markov.from_diagram(x @ two @ two >> times @ x >> divide)
+    either = Markov.from_diagram(f).rewrite(
+        (0, ), (0, ), (1, ), g.to_hypergraph())
+    noisy = Markov.from_diagram(sample >> Copy(x, 3) >> condition @ f @ g)
+    related = noisy.merge(spider(noisy, f), spider(noisy, g))
+    return [egg, either, noisy, related, Markov.id()]
+
+
+@pytest.mark.parametrize("law", [
+    "rebuild_minimality", "extraction_soundness", "extraction_optimality",
+    "sharing", "translation", "effects_kept", "rewrite_identity",
+    "saturation", "stepping"])
+def test_laws_of_one_graph(law, examples):
+    """ A law weakened to cartesian e-hypergraphs holds on those, any other
+    law on every example. """
+    law = getattr(Markov, law)
+    for graph in examples:
+        if law.params.get("effects", True) or all(
+                box.is_cartesian for box in graph.graph.boxes):
+            assert law(graph)
+
+
+def test_builder_hash_conses_deterministic_boxes():
+    builder, graph = Markov.id(x).builder(), Markov.id(x)
+    for box in (f, f, sample, sample):
+        outputs = builder.add(box, (0, ))
+        graph, expected = graph.add(box, (0, ))
+        assert outputs == expected
+    assert builder.boxes == [f, sample, sample]
+    assert builder.keys == [(0, 0), (), ()] and builder.heads == {f: 0}
+    assert builder.known == {id(f): (f, 0, 1), id(sample): (sample, None, 1)}
+    assert builder.add(Box('f', x, x), (0, )) == (1, ) != id(f)
+    assert builder.hashcons == {(0, 0): 0} and builder.parents == {0: [0]}
+    assert builder.freeze() == graph
+
+
+def test_builder_rebuild_repairs_parents():
+    """ Three ``f`` then a ``g`` reading both ends, on each of two inputs:
+    merging the inputs finds one pair congruent, rebuilding the others. """
+    builder, chains = Markov.id(x @ x).builder(), ([0], [1])
+    for chain in chains:
+        for _ in range(3):
+            chain.extend(builder.add(f, chain[-1:]))
+        chain.extend(builder.add(
+            Box('g', x @ x, x @ x), (chain[0], chain[-1])))
+    left, right = chains
+    assert list(map(builder.find, right)) == right
+    builder.merge(0, 1)
+    assert list(map(builder.find, right)) == [0] + right[1:]
+    assert builder.worklist == [(0, 4)]
+    builder.rebuild()
+    assert list(map(builder.find, right)) == left and not builder.worklist
+    assert builder.add(f, (1, )) == (left[1], )
+    assert set(builder.hashcons.values()) == {0, 1, 2, 3}
+    frozen = builder.freeze()
+    assert frozen == frozen.rebuild() == frozen.builder().freeze()
+
+
+def test_builder_keeps_samples_apart():
+    builder = Markov.id(x @ x).builder()
+    (a, ), (b, ) = builder.add(sample, (0, )), builder.add(sample, (1, ))
+    (c, ), (d, ) = builder.add(f, (a, )), builder.add(f, (b, ))
+    builder.merge(0, 1)
+    builder.rebuild()
+    assert len(set(map(builder.find, (a, b, c, d)))) == 4
+    builder.merge(a, b)
+    builder.rebuild()
+    assert builder.find(c) == builder.find(d) != builder.find(a)
+
+
+def test_builder_class_with_fewer_parents_joins():
+    """ The class read more often stays the root, and the least spider of a
+    class names it whichever the root is. """
+    builder = Markov.id(x @ x).builder()
+    builder.add(f, (1, )), builder.add(g, (1, )), builder.add(h, (0, ))
+    builder.merge(0, 1)
+    assert builder.root(0) == 1 and builder.find(1) == 0
+    assert builder.parents == {1: [0, 1, 2]}
+    assert builder.freeze().classes == (0, 0, 2, 3, 4)
+    builder.merge(0, 1)
+    assert builder.parents == {1: [0, 1, 2]}
+
+
+def test_builder_starts_from_a_value():
+    """ A builder finds the boxes of an e-graph that are congruent as it
+    starts, and freezes into that e-graph unless it rebuilds. """
+    graph = Markov((Copy(x) >> f @ f >> g @ g).to_hypergraph())
+    builder = graph.builder()
+    assert builder.worklist == [(0, 1)] and builder.freeze() == graph
+    builder.rebuild()
+    assert builder.freeze() == graph.rebuild() != graph
+    related = graph.merge(1, 2)
+    assert related.builder().freeze() == related
+    assert related.builder().find(2) == 1
+
+
+def test_builder_checks_as_it_freezes():
+    builder = Markov.id(x).builder()
+    builder.add(Box('f', Ty('y'), x), (0, ))
+    with raises(AxiomError):
+        builder.freeze()
+    builder = Markov.id(x @ Ty('y')).builder()
+    builder.merge(0, 1)
+    with raises(AxiomError):
+        builder.freeze()
+
+
+def test_dag_cost_counts_a_class_once():
+    join, split = Box('j', x @ x, x), Box('s', x, x @ x)
+    shared = Markov.from_diagram(Copy(x) >> f @ f >> join)
+    assert (shared.cost(), shared.dag_cost()) == (5, 3)
+    assert shared.dag_bound() == {0: 1, 1: 2, 3: 3}
+    assert shared.dag_cost(box_cost=lambda box: 2, input_cost=0) == 4
+    assert shared.dag_cost(shared.graph) == 4
+    apart = Markov.from_diagram(Copy(x) >> sample @ sample >> join)
+    assert (apart.cost(), apart.dag_cost()) == (5, 4)
+    twice = Markov.from_diagram(split >> join)
+    assert (twice.cost(), twice.dag_cost()) == (5, 3)
+    assert twice.dag_bound()[twice.classes[twice.graph.cod_wires[0]]] == 3
+    unread = Markov.from_diagram(f @ Diagram.discard(x))
+    assert unread.extract().dom == x @ x and unread.dag_cost() == 2
+
+
+def test_dag_bound_needs_an_acyclic_choice():
+    """ With boxes that cost nothing, the least tree cost may be that of a
+    class read by its own producer, which has no section. """
+    constant = Box('c', Ty(), x)
+    graph = Markov(Hypergraph[Diagram](Ty(), x, (g, f, constant), (
+        (), (((1, ), (2, )), ((0, ), (1, )), ((), (0, ))), (2, )))
+    ).merge(0, 2)
+    assert graph.dag_bound() == {0: 1, 1: 2}
+    with raises(AxiomError):
+        graph.dag_bound(lambda box: 0)
+    stuck = Markov.from_diagram(f).merge(0, 1)
+    assert stuck.dag_bound(input_cost=inf) == {0: inf}
+
+
+def test_dag_bound_of_a_deep_section():
+    """ A chain deeper than the stack of Python, its boxes from the last to
+    the first so that the first class asked for is the deepest. """
+    depth = 1100
+    box_wires = tuple(((j + 1, ), (j, )) for j in range(1, depth + 1))
+    graph = Markov(Hypergraph[Diagram](
+        x, x, depth * (f, ), ((depth + 1, ), box_wires, (1, ))))
+    assert graph.dag_bound()[graph.classes[graph.graph.cod_wires[0]]]\
+        == depth + 1 == graph.dag_cost()
+
+
+def test_building(examples):
+    """ The builder of two copies of each example, then with their inputs
+    merged and rebuilt, freezes into what the pure e-graph gives. """
+    for graph in examples:
+        start, operations = history = History[Markov].twice(graph)
+        dom, n = start.graph.dom_wires, len(graph.dom)
+        merged = History[Markov](start, operations + tuple(
+            ("merge", *pair) for pair in zip(dom[:n], dom[n:])) + (
+            ("rebuild", ), ))
+        for case in (history, merged):
+            assert Markov.building(case)
+            assert case.build().classes == case.fold().classes
+        deterministic = [
+            j for j, box in enumerate(graph.graph.boxes)
+            if box.is_deterministic]
+        assert len(set(merged.fold().classes)) <= len(set(
+            history.fold().classes)) - bool(deterministic and n)
+
+
+@settings(max_examples=20, deadline=None)
+@given(History[Markov].strategy(max_operations=2))
+def test_history_strategy(history):
+    graph, operations = history
+    assert history.graph == graph and history.operations == operations
+    assert not History.checked_params()
+    assert {name for name, *_ in operations} <= {"add", "merge", "rebuild"}
+    assert len(graph.dom) % 2 == 0
+    assert history.build().classes == history.fold().classes
+
+
+TRACES = Path(__file__).parents[1] / "benchmark" / "data" / "egraph-traces"
+
+
+def replay(trace: dict, builder, suffix: str = "") -> tuple[list, list]:
+    """ The e-nodes of a trace added to a builder in turn, each merged with
+    the class recorded for it: the spider standing for each class, then the
+    output of each e-node. The base classes take a suffix, so that two
+    replays are two copies. """
+    boxes = [Box(head["name"] + suffix * (not head["arity"]),
+                 Ty().tensor(*head["arity"] * [x]), x)
+             for head in trace["heads"]]
+    classes, outputs = [], []
+    for head, out, *args in trace["rows"]:
+        spider, = builder.add(boxes[head], tuple(classes[i] for i in args))
+        outputs.append(spider)
+        if out == len(classes):
+            classes.append(spider)
+        else:
+            builder.merge(spider, classes[out])
+    return classes, outputs
+
+
+@pytest.mark.parametrize("number", range(3))
+def test_builder_replays_a_trace(number):
+    """ A builder ends on the partition a 1D-ARC search recorded, and
+    relating the base classes of two copies leaves one once rebuilt, which
+    it would not were ``rebuild`` to do nothing. """
+    with gzip.open(TRACES / f"trace-{number:02}.json.gz", "rt") as file:
+        trace = json.load(file)
+    recorded = [out for _, out, *_ in trace["rows"]]
+    builder = Markov.id(Ty()).builder()
+    classes, outputs = replay(trace, builder)
+    found = [builder.find(spider) for spider in outputs]
+    assert len(builder.boxes) == trace["enodes"] == len(recorded)
+    assert len(set(found)) == len(set(recorded)) == len(set(zip(
+        found, recorded))) == trace["classes"]
+    assert builder.freeze().classes == tuple(found)
+    others, _ = replay(trace, builder, suffix="'")
+    bases = sum(not head["arity"] for head in trace["heads"])
+    for left, right in zip(classes[:bases], others[:bases]):
+        builder.merge(left, right)
+    count = len(set(map(builder.find, range(len(builder.label)))))
+    assert count == 2 * trace["classes"] - bases
+    builder.rebuild()
+    assert len(set(map(builder.find, range(len(builder.label))))) == trace[
+        "classes"]
+    assert list(map(builder.find, others)) == list(map(builder.find, classes))
+
+
+@pytest.mark.parametrize("i, j, k", [(0, 0, 0), (0, 1, 2), (3, 2, 1)])
+def test_merge_and_rebuild_laws(i, j, k, examples):
+    for graph in examples:
+        assert Markov.merge_equivalence(graph, i, j, k)
+        assert Markov.rebuild_closure(graph, i, j)
+
+
+def test_laws_of_several_graphs():
+    """ Two copies of ``f`` on related inputs have related outputs, two
+    samples do not, and matching is sound for a pattern rewired to read one
+    input twice. """
+    lone, effects = Markov.from_diagram(f), Markov.from_diagram(
+        Copy(x) >> f @ sample)
+    assert len(set(lone.twice().classes)) == 2
+    assert len(set(Markov.from_diagram(sample).twice().classes)) == 3
+    assert Markov.congruence(lone, effects).terms == (
+        (True, False), (True, False))
+    assert Markov.graph_functoriality(
+        lone, effects, Markov.from_diagram(condition))
+    assert Markov.extraction_rewrite(
+        Markov.from_diagram(f >> g), Markov.from_diagram(h))
+    assert Markov.matching_completeness(
+        lone, Markov.from_diagram(Copy(x) >> g @ h))
+    pair = Markov.from_diagram(Box('m', x @ x, x))
+    for first, second in [(lone, lone), (effects, pair)]:
+        for i, j in [(0, 0), (1, 2)]:
+            assert Markov.matching_soundness(first, second, i, j)
+
+
+def to_diagram(term, names) -> Diagram:
+    """ The diagram of a term of :mod:`fixtures.egglog_reference` on inputs
+    ``names``, a box for each subterm, e.g. ``("sample", p, id)`` and
+    ``("observe", c, t)``, ``t`` conditioned on ``c``. """
+    boxes, box_wires, built = [], [], {}
+
+    def build(term):
+        if term[0] == "var":
+            return names.index(term[1])
+        if term not in built:
+            inputs, box = tuple(map(build, children(term))), node(term)
+            outputs = (len(names) + len(boxes), )[:len(box.cod)]
+            boxes.append(box)
+            box_wires.append((inputs, outputs))
+            built[term] = build(term[2]) if term[0] == "observe"\
+                else outputs[0]
+        return built[term]
+
+    root = build(term)
+    return Hypergraph[Diagram](
+        x ** len(names), x, tuple(boxes),
+        (tuple(range(len(names))), tuple(box_wires), (root, ))
+    ).to_diagram()
+
+
+def node(term) -> Box:
+    """ The box of the head of a term that is not a variable. """
+    if term[0] in ("sample", "observe"):
+        return sample if term[0] == "sample" else condition
+    return Box(str(term[1]), Ty(), x) if term[0] == "const"\
+        else Box(term[0], x ** len(term[1:]), x)
+
+
+def children(term) -> tuple:
+    """ The subterms a box reads, not the id of a sample nor what follows. """
+    if term[0] in ("var", "const"):
+        return ()
+    return term[1:2] if term[0] in ("sample", "observe") else term[1:]
+
+
+def variables(term) -> list[str]:
+    """ The variables of a term, in the order they first occur. """
+    if term[0] in ("var", "const"):
+        return [term[1]] if term[0] == "var" else []
+    return list(dict.fromkeys(sum(map(variables, term[1:]), [])))
+
+
+def to_rules(rules) -> list[tuple[Diagram, Diagram]]:
+    """ The diagrams of rules of terms, over the variables of the left. """
+    return [(to_diagram(lhs, variables(lhs)), to_diagram(rhs, variables(lhs)))
+            for lhs, rhs in rules]
+
+
+def box_cost(box) -> int:
+    """ The cost of a box in :mod:`fixtures.egglog_reference`. """
+    from fixtures.egglog_reference import COSTS
+
+    return COSTS.get(box.name, 1)
+
+
+def lookup(graph: EGraph, term, names) -> int:
+    """ The class of a subterm of the cartesian term a graph comes from. """
+    if term[0] == "var":
+        return graph.classes[graph.graph.dom_wires[names.index(term[1])]]
+    inputs = tuple(lookup(graph, child, names) for child in children(term))
+    return next(graph.classes[tgt[0]] for j, (box, (_, tgt)) in enumerate(zip(
+        graph.graph.boxes, graph.graph.box_wires))
+        if box == node(term) and graph.inputs(j) == inputs)
+
+
+def trace(term, rules, rounds: int) -> list[tuple]:
+    """ For each round of saturating a term, as ``egglog_trace`` gives it:
+    whether it changed anything, the classes of the subterms and the cost of
+    what is extracted, under the costs of the reference. """
+    from fixtures.egglog_reference import subterms
+
+    graph = Markov.from_diagram(to_diagram(term, variables(term)))
+    states = [graph, *islice(graph.saturate(*to_rules(rules)), rounds)]
+    result = []
+    for k in range(min(len(states) + 1, rounds + 1)):
+        state, members = states[min(k, len(states) - 1)], {}
+        for sub in subterms(term):
+            members.setdefault(lookup(state, sub, variables(term)), []).append(
+                sub)
+        result.append((k < len(states), tuple(sorted((tuple(sorted(
+            group, key=repr)) for group in members.values()), key=repr)),
+            Markov(state.extract(box_cost, 0)).cost(box_cost, 0)))
+    return result
+
+
+A, C0, C1, C2 = ("var", "a"), ("const", 0), ("const", 1), ("const", 2)
+
+
+@pytest.mark.parametrize("term, rounds", [
+    (("/", ("*", A, C2), C2), 5),
+    (("+", ("<<", ("*", A, C1), C2), ("<<", A, C2)), 3)])
+def test_egglog_example(term, rounds):
+    pytest.importorskip("egglog")
+    from fixtures.egglog_reference import EGG, egglog_trace
+
+    expected = [(state.updated, state.classes, state.cost)
+                for state in egglog_trace(term, EGG, 10)]
+    assert trace(term, EGG, 10) == expected and len(expected) == rounds
+
+
+@pytest.mark.parametrize("seed", range(30))
+def test_egglog_differential(seed):
+    """ Our trace and egglog's on a random term of depth three or four and
+    one of the rule sets of the reference, chosen by a seed. """
+    pytest.importorskip("egglog")
+    from fixtures.egglog_reference import RULESETS, egglog_trace, random_term
+
+    rng = random.Random(seed)
+    term, rules = random_term(rng, rng.choice((3, 4))), rng.choice(
+        list(RULESETS.values()))
+    assert trace(term, rules, 4) == [
+        (state.updated, state.classes, state.cost)
+        for state in egglog_trace(term, rules, 4)]
+
+
+X, Y, P = ("var", "x"), ("var", "y"), ("var", "p")
+CANCEL, ABSORB = [(("-", X, X), C0)], [(("*", C0, X), C0)]
+MOD3 = CANCEL + ABSORB + [
+    (("*", X, C0), C0), (("+", X, C0), X), (("*", X, C1), X),
+    (("+", X, Y), ("+", Y, X)), (("*", X, Y), ("*", Y, X)),
+    (("-", ("+", X, Y), Y), X)]
+S0, S1 = (("sample", P, ("var", f"id{i}")) for i in range(2))
+TWO, ONE, OBSERVED = ("-", S0, S1), ("-", S0, S0), (
+    "observe", S0, ("*", C0, S0))
+IDS = st.sampled_from([("var", f"id{i}") for i in range(3)])
+TERMS = st.recursive(st.sampled_from([P, C0, C1, C2]), lambda terms: st.tuples(
+    st.sampled_from("+-*"), terms, terms) | st.tuples(
+    st.just("sample"), terms, IDS), max_leaves=6)
+PROGRAMS = st.builds(lambda value, conditions: reduce(
+    lambda program, c: ("observe", c, program), conditions, value),
+    TERMS, st.lists(TERMS, max_size=2))
+
+
+def arithmetic(seed: int, n: int = 3) -> Functor:
+    """ A functor reading ``x`` as the integers modulo ``n``, where ``MOD3``
+    holds, a sample as a random stochastic matrix and a condition as a random
+    weight, zero or one, zero somewhere. """
+    rng = np.random.default_rng(seed)
+    pairs = [(a, b) for a in range(n) for b in range(n)]
+    arrays = {str(c): np.eye(n)[[c]] for c in range(n)} | {
+        op: np.eye(n)[[function(a, b) % n for a, b in pairs]] for op, function
+        in zip("+-*", (int.__add__, int.__sub__, int.__mul__))} | {
+        'sample': rng.dirichlet(np.ones(n), size=n),
+        'condition': rng.permutation(np.arange(n) > 0)[:, None] * 1.}
+    return Functor(ob_map=lambda _: Dim(n), ar_map=lambda box: Tensor[float](
+        arrays[box.name], Dim(n) ** len(box.dom), Dim(n) ** len(box.cod)),
+        cod=Tensor[float])
+
+
+def naive(term):
+    """ A term without the ids of its samples nor its conditions. """
+    if term[0] == "observe":
+        return naive(term[2])
+    return term if term[0] in ("var", "const")\
+        else (term[0], *map(naive, children(term)))
+
+
+def saturated(program, rules) -> EGraph:
+    """ The last round of saturating a program of ``p`` under some rules. """
+    graph = Markov.from_diagram(to_diagram(program, ["p"]))
+    *_, last = graph, *graph.saturate(*to_rules(rules))
+    return last
+
+
+@settings(max_examples=40, deadline=None)
+@given(program=PROGRAMS, seed=st.integers(0, 2 ** 32 - 1))
+@example(program=TWO, seed=0)
+@example(program=ONE, seed=0)
+@example(program=OBSERVED, seed=0)
+def test_sampling_and_conditioning(program, seed):
+    """ Every section of two rounds of a random program, its samples shared
+    or not, under rules modulo three evaluates there as the program does,
+    the e-hypergraph and the diagrams small enough to enumerate. """
+    diagram, functor = to_diagram(program, ["p"]), arithmetic(seed)
+    assume(narrow(diagram))
+    graph, expected = Markov.from_diagram(diagram), functor(diagram).array
+    for state in [graph, *islice(graph.saturate(*to_rules(MOD3)), 2)]:
+        sections = state.sections() if len(state.graph.boxes) < 20 else ()
+        for section in filter(narrow, (s.to_diagram() for s in sections)):
+            assert np.allclose(functor(section).array, expected)
+
+
+@pytest.mark.parametrize("program, rules, egg, compare", [
+    (TWO, CANCEL, False, eq), (ONE, CANCEL, False, eq),
+    (OBSERVED, ABSORB, False, eq),
+    (("observe", S0, ("-", ("/", ("*", S0, C2), C2), S0)), CANCEL, True, eq),
+    (("observe", S0, ("observe", S0, S0)), CANCEL, False, lt),
+    (("observe", ("*", C0, S0), ("observe", C0, S0)), ABSORB, False, lt)])
+def test_egglog_sampling(program, rules, egg, compare):
+    """
+    egglog extracts the faithful encoding of a program, an id for each sample
+    and its conditions in the term, at our cost but where a condition repeats
+    on related inputs: a hard constraint is idempotent, paid once here.
+    """
+    pytest.importorskip("egglog")
+    from fixtures.egglog_reference import EGG, egglog_extract
+
+    rules = rules + (EGG if egg else [])
+    last = saturated(program, rules)
+    assert compare(Markov(last.extract(box_cost, 0)).cost(box_cost, 0),
+                   egglog_extract(program, rules)[1])
+
+
+def test_egglog_naive_sampling():
+    """
+    The naive encoding is unsound: a sample a function, egglog cancels two
+    samples, a program its value, it drops a condition registered beside it,
+    both told apart from the program, which what we extract evaluates as.
+    """
+    pytest.importorskip("egglog")
+    from fixtures.egglog_reference import egglog_extract
+
+    functor = arithmetic(0)
+    for program, rules, extra in [(TWO, CANCEL, ()), (
+            OBSERVED, ABSORB, [("condition", naive(S0))])]:
+        expected = functor(to_diagram(program, ["p"])).array
+        extracted, _ = egglog_extract(naive(program), rules, extra=extra)
+        assert extracted == C0 and not np.allclose(
+            functor(to_diagram(extracted, ["p"])).array, expected)
+        assert np.allclose(functor(saturated(
+            program, rules).extract().to_diagram()).array, expected)
+
+
+def test_the_dev_group_installs_egglog():
+    """ The egglog tests run, rather than skip, wherever ``uv sync`` installs
+    the dev group, its default. """
+    assert "egglog" in installs(GROUPS, "dev")
+
+
+def test_Join_dagger_flags():
+    assert not Join(f, is_dagger=True).dagger().is_deterministic
+    assert loads(dumps(Join(f, g).dagger())).dagger().is_affine
+
+
+def test_builder_matches_as_the_pure_one(examples):
+    """ The builder of each example, then with its classes related, matches
+    what its e-graph does, each box made cartesian as a pattern. """
+    for graph in examples:
+        builder = graph.builder()
+        for merged in (False, True):
+            if merged and graph.graph.n_spiders:
+                builder.merge(*range(graph.graph.n_spiders))
+            frozen = builder.freeze()
+            for box in dict.fromkeys(graph.graph.boxes):
+                lhs = Box(box.name, box.dom, box.cod).to_hypergraph()
+                assert builder.matches(lhs) == frozen.matches(lhs)
+        start, operations = History[Markov].twice(graph)
+        assert Markov.matching_agreement(History[Markov](
+            start, operations + (("rebuild", ), )), 0, 1)
+
+
+def test_builder_matches_bind_classes():
+    """ A variable read twice binds one class, which the join checks. """
+    divide = Box('/', x @ x, x)
+    builder, lhs = Markov.from_diagram(divide).builder(), (
+        Copy(x) >> divide).to_hypergraph()
+    assert builder.matches(lhs) == []
+    builder.merge(0, 1)
+    assert builder.matches(lhs) == [((0, ), (0, ), (2, ))]
+    twins = Copy(x) @ Copy(x) >> x @ Swap(x, x) @ x\
+        >> x @ x @ Swap(x, x) >> Box('m', x @ x, x) @ Box('m', x @ x, x)
+    assert Markov.from_diagram(twins).builder().matches(
+        twins.to_hypergraph()) == [((0, 1), (1, 0), (3, 2)),
+                                   ((0, 1), (0, 1), (2, 3))]
+
+
+def test_builder_matches_flags_and_patterns():
+    builder = Markov.from_diagram(
+        Copy(x) >> sample @ Box('sample', x, x)).builder()
+    assert builder.matches(Box('sample', x, x).to_hypergraph()) == [
+        ((1, ), (0, ), (2, ))]
+    assert builder.matches(Box('h', x, x).to_hypergraph()) == []
+    for lhs in [Diagram.id(x).to_hypergraph(), sample.to_hypergraph()]:
+        with raises(AxiomError):
+            builder.matches(lhs)
+
+
+def test_builder_indexes_rows_as_a_match_asks():
+    """ Adding a box indexes nothing, matching indexes what was added. """
+    builder = Markov.id(x).builder()
+    (a, ), _ = builder.add(f, (0, )), builder.add(sample, (0, ))
+    assert builder.indexed == 0 and not builder.rows
+    assert builder.matches(f.to_hypergraph()) == [((0, ), (0, ), (a, ))]
+    (b, ) = builder.add(f, (a, ))
+    assert builder.indexed == 2 and builder.rows == {0: [0]}
+    assert builder.matches((f >> f).to_hypergraph()) == [
+        ((0, 2), (0, ), (b, ))]
+    assert builder.indexed == 3 and builder.rows == {0: [0, 2]}
+
+
+def test_builder_matches_a_trace():
+    """ On a trace of a 1D-ARC search, the join finds the matches of each
+    box after another that the pure matcher finds. """
+    with gzip.open(TRACES / "trace-00.json.gz", "rt") as file:
+        trace = json.load(file)
+    builder = Markov.id(Ty()).builder()
+    replay(trace, builder)
+    frozen = builder.freeze()
+    unary = sorted({box for box in builder.boxes if box.dom == x}, key=str)
+    for first in builder.boxes[:3]:
+        for second in unary[:3]:
+            lhs = (first >> second).to_hypergraph()
+            assert set(builder.matches(lhs)) == set(frozen.matches(lhs))
+
+
+def test_builder_step_needs_its_rebuild():
+    """ The rules of the law go from the last box up: ``h`` rewritten into
+    ``g`` last relates the inputs of the two ``f``, which only the rebuild of
+    the round relates in turn. """
+    graph = Markov.from_diagram(Copy(x) >> h @ g >> f @ f)
+    assert Markov.stepping(graph)
+    rules = [(f.to_hypergraph(), g.to_hypergraph()),
+             (h.to_hypergraph(), g.to_hypergraph())]
+    builder = graph.builder()
+    for match, rhs in [(match, rhs) for lhs, rhs in rules
+                       for match in builder.matches(lhs)]:
+        builder.rewrite(*match, rhs)
+    assert builder.freeze().reduced() != graph.step(rules).reduced()
+    builder.rebuild()
+    assert builder.freeze().reduced() == graph.step(rules).reduced()
+
+
+def test_reduced_keeps_samples_and_classes():
+    graph = Markov.from_diagram(Copy(x) >> sample @ sample)
+    assert len(graph.reduced().boxes) == 2
+    assert graph.merge(0, 1).reduced().n_spiders == 2
+
+
+@pytest.mark.parametrize("n", range(1, 7))
+def test_saturate_closed_form(n):
+    """ Associativity and commutativity of ``+`` on ``n`` leaves saturate to
+    the non-empty subsets as classes and their ordered splits in two as
+    e-nodes, on the builder in under 2 s at ``n = 6``. """
+    plus = Box('+', x @ x, x)
+    rules = (plus, Swap(x, x) >> plus), (plus @ x >> plus, x @ plus >> plus)
+    term = reduce(Diagram.then, (
+        plus @ x ** k for k in reversed(range(n - 1))), Diagram.id(x ** n))
+    graph, start = Markov.from_diagram(term), time.perf_counter()
+    *_, last = graph, *graph.saturate(*rules)
+    assert time.perf_counter() - start < 2
+    assert len(set(last.classes)) == 2 ** n - 1
+    assert len(last.reduced().boxes) == 3 ** n - 2 ** (n + 1) + 1

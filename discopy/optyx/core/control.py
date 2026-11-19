@@ -121,18 +121,18 @@ class BitControlledBox(ControlBox):
         self.action_box = action_box
         self.default_box = default_box
         self.is_dagger = is_dagger
-        self.photon_preservation_behaviour = \
+        self.photon_preservation_behaviour = (
             diagram.PhotonNumberPreservation.CUSTOM
+            if is_diagram_LO(action_box) and is_diagram_LO(default_box)
+            else diagram.PhotonNumberPreservation.NON_LO)
 
     def photon_number_transform(self, dims_in, dims_out):
-        if is_diagram_LO(self.action_box) and is_diagram_LO(self.default_box):
-            from discopy.optyx.core.zx import Z
-            return Z(1, 0) @ self.default_box if not self.is_dagger else \
-                Z(0, 1) @ self.default_box
-        else:
-            self.photon_preservation_behaviour = \
-                diagram.PhotonNumberPreservation.NON_LO
+        if self.photon_preservation_behaviour \
+                == diagram.PhotonNumberPreservation.NON_LO:
             return super().photon_number_transform(dims_in, dims_out)
+        from discopy.optyx.core.zx import Z
+        return Z(1, 0) @ self.default_box if not self.is_dagger else \
+            Z(0, 1) @ self.default_box
 
     def determine_output_dimensions(self, input_dims: List[int]) -> List[int]:
 
@@ -471,6 +471,22 @@ class BinaryMatrixBox(ClassicalBox):
 
         self.matrix = matrix
         self.is_dagger = is_dagger
+
+    def setoid(self):
+        """
+        The matrix is what a logical matrix box means and is in none of its
+        name, the constant :code:`"LogicalMatrix"`, its boundary or its data,
+        so two of them over the same bits were equal. It is compared **modulo
+        2**, the transformation being the one over GF(2): two matrices
+        congruent mod 2 compute the same map.
+
+        >>> identity, swap = [[1, 0], [0, 1]], [[0, 1], [1, 0]]
+        >>> assert BinaryMatrixBox(identity) != BinaryMatrixBox(swap)
+        >>> assert BinaryMatrixBox(identity) == BinaryMatrixBox(identity)
+        >>> assert BinaryMatrixBox([[0]]) == BinaryMatrixBox([[2]])
+        """
+        return super().setoid() + (
+            tuple(map(tuple, (np.asarray(self.matrix) % 2).tolist())), )
 
     def truncation_specification(
         self,

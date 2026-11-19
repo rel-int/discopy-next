@@ -24,31 +24,17 @@ def _tokenize(s: str):
         if c.isspace():
             i += 1
             continue
+        op = next((op for op in ("==", "!=", ">=", "<=", ">", "<")
+                   if s.startswith(op, i)), None)
+        if op is not None:
+            tokens.append(_Tok("OP", op))
+            i += len(op)
+            continue
         if c in "[](),&|^!":
             tokens.append(_Tok(c, c))
             i += 1
             continue
-        if c in "<>=":
-            if s.startswith("==", i):
-                tokens.append(_Tok("OP", "=="))
-                i += 2
-                continue
-            if s.startswith(">=", i):
-                tokens.append(_Tok("OP", ">="))
-                i += 2
-                continue
-            if s.startswith("<=", i):
-                tokens.append(_Tok("OP", "<="))
-                i += 2
-                continue
-            if c == ">":
-                tokens.append(_Tok("OP", ">"))
-                i += 1
-                continue
-            if c == "<":
-                tokens.append(_Tok("OP", "<"))
-                i += 1
-                continue
+        if c == "=":
             raise ValueError(f"Unexpected operator at position {i}")
         if c.isdigit():
             j = i
@@ -80,6 +66,8 @@ class _Cond:
             s += counts[m] if m < len(counts) else 0
         if self.op == "==":
             return s == self.rhs
+        if self.op == "!=":
+            return s != self.rhs
         if self.op == ">=":
             return s >= self.rhs
         if self.op == "<=":

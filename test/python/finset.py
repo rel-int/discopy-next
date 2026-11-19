@@ -143,6 +143,26 @@ def test_Function_then_checks_composability():
     assert h.then(h, h) == h
 
 
+def test_Permutation_takes_only_bijections():
+    from discopy.utils import AxiomError
+    from discopy.python.finset import Function, Permutation
+    with raises(AxiomError):
+        Permutation.id(2) >> Function([1, 0], 3, 2)
+    for function in [Function([], 1, 0), Function([0], 2, 1)]:
+        with raises(ValueError):
+            Permutation.id(1) @ function
+    assert Permutation.id(2) >> Function([1, 0], 2, 2) == (1, 0)
+    assert Permutation.id(2).then(iter((1, 0))) == (1, 0)
+
+
+def test_Function_says_what_is_wrong():
+    from discopy.python.finset import Function
+    with raises(ValueError, match="function of length 2, got 1"):
+        Function([0], 1, 2)
+    with raises(ValueError, match=r"function to range\(2\), got \[0, 2\]"):
+        Function([0, 2], 2, 2)
+
+
 def test_counts_take_index():
     from discopy.abc import Nat
     from discopy.python.finset import Cospan, Function
@@ -160,3 +180,16 @@ def test_Cospan():
     def at_most_max_size(cospan):
         assert cospan == Cospan([], [], 0)
     at_most_max_size()
+
+
+def test_Functor_into_Cospan_takes_its_dagger():
+    """ rel-int/discopy-next#373: a cospan declares a dagger category, so a
+    daggered box maps to the dagger of its image. """
+    from discopy import monoidal
+    from discopy.abc import DaggerCategory, Nat
+    from discopy.python.finset import Cospan
+    assert issubclass(Cospan, DaggerCategory)
+    x = monoidal.Ty('x')
+    f = monoidal.Box('f', x, x @ x)
+    F = monoidal.Functor({x: Nat(1)}, {f: Cospan.copy(1)}, cod=Cospan)
+    assert F(f.dagger()) == Cospan.copy(1).dagger() == Cospan.merge(1)

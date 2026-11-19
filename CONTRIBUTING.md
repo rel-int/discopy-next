@@ -42,17 +42,18 @@ uv sync
 `uv sync` installs the package with the `dev` group (testing and linting tools), the default
 set in `[tool.uv]`; `uv sync --no-dev` installs the bare package. Add more groups with
 `uv sync --group <name>`:
+- `tensor`: the contraction engines opt_einsum, quimb and cotengra
 - `quantum`: quantum computing dependencies
-- `grammar`: natural language processing libraries, PyTorch included for the neural parser
+- `lambek`: natural language processing libraries, PyTorch included for the neural parser
 - `optyx`: the dependencies of `discopy.optyx` (photonics, ZX, tensor contraction)
 - `notebooks`: marimo, IPython and a Jupyter kernel to run the notebooks, with anywidget to show diagrams as widgets
 - `docs`: for generating the documentation
 - `all`: every group above, which CI's test job installs
 
-Since dependency groups are not standard, `quantum`, `grammar`, `optyx`, `notebooks` and `docs`
+Since dependency groups are not standard, `tensor`, `quantum`, `lambek`, `optyx`, `notebooks` and `docs`
 are also optional dependencies (`pip install -e '.[quantum]'`). There is no `dev` or `all`
-extra: the `test` extra bundles `quantum`, `grammar` and `optyx` with the test tools, without
-ruff, ty or pytest-benchmark.
+extra: the `test` extra bundles `quantum`, `lambek`, `optyx` and `notebooks` with the test
+tools, without egglog, ruff, ty or pytest-benchmark.
 
 ## Run the unit tests
 
@@ -66,9 +67,18 @@ uv run pflake8 discopy
 uv run pylint discopy
 uv run ruff check discopy
 uv run ty check --exit-zero-on-warning
-uv run coverage run -m pytest
+uv run coverage run -m pytest -n auto
+uv run coverage combine
 uv run coverage report -m
 ```
+
+`-n auto` runs the suite on one [pytest-xdist](https://pytest-xdist.readthedocs.io) worker
+per core, as CI does, and `patch = ["subprocess"]` in `pyproject.toml` lets coverage follow
+the workers, so `coverage combine` merges their data before the report; drop `-n auto` to
+debug a test serially. A test that takes four seconds or more is marked `slow`, and a pull
+request runs `-m "not slow"`. CI runs the slow tests, the notebooks and Python 3.12 and 3.13
+on `main`; a pull request is tested on 3.14 alone. The property matrix checks the laws of every
+category it enrols on every pull request, so a unit test does not repeat them.
 
 Without the extras installed, run `uv run pytest --skip-extra` to skip what needs them.
 A test that needs an extra says so with `pytest.importorskip`. A doctest that needs one marks
@@ -77,13 +87,16 @@ an example `# doctest: +EXTRA`, usually its import line, e.g.
 docstring. A module whose import itself needs an extra goes in `UNIMPORTABLE` in
 `test/plugin.py`, and a package goes in `UNIMPORTABLE_PACKAGES`.
 
-CI also runs every marimo notebook in `docs/notebooks/` and fails if a cell errors. With the
+CI also runs every marimo notebook in `docs/notebooks/` on each commit of `main`, not on a
+pull request, and fails if a cell errors; a pull request's `docs` build links to each notebook
+instead of running it, as `DISCOPY_SKIP_NOTEBOOKS=1` does locally. With the
 `all` group synced, run `uv run python docs/export_notebooks.py --check`, adding notebook names
-(e.g. `qnlp` or `optyx/bose_hubbard`) to check only those and `--jobs N` to run N at a time.
+(e.g. `qnlp` or `optyx/bose_hubbard`) to check only those (a name that matches no notebook
+fails the command) and `--jobs N` to run N at a time.
 A notebook that a tracked bug breaks is listed in `KNOWN_BROKEN` in that script with its issue,
-and `--check` does not fail on it. Each notebook runs from its own directory, so from a git
-worktree prefix the command with `PYTHONPATH=$PWD`, or the notebooks import the main
-checkout's editable `discopy`.
+and `--check` does not fail on it. Each notebook runs from its own directory on the `discopy`
+of the script's own tree, so a git worktree checks its own code, not the main checkout's
+editable install.
 
 `coverage report` fails below the `fail_under` of `pyproject.toml`, measured on `discopy/`
 alone: without the extras the local number is lower, and CI's `Coverage` step is the gate.
@@ -150,8 +163,10 @@ documentation of [`discopy.testable`](discopy/testable.py).
 
 A cell is skipped when its axiom declares that the structure does not
 apply, and xfailed when the law is declared broken, each carrying its
-reason: pass `-rsxX` to list the skips, xfails and unexpected passes with
-their reasons, and `-x` to stop at the first genuine failure.
+reason. A broken law raises only on a counterexample, so a cell whose
+search finds none, e.g. once the law is fixed, passes unexpectedly: pass
+`-rsxX` to list the skips, xfails and unexpected passes with their
+reasons, and `-x` to stop at the first genuine failure.
 
 `proptest/conftest.py` registers four Hypothesis profiles over the
 `.hypothesis/examples` database, selected by `HYPOTHESIS_PROFILE`: `dev`
@@ -160,13 +175,17 @@ runs under `--hypothesis-seed=0` so that it draws the same examples every
 time (the profile does not fix the seed itself: pass the flag locally too,
 and the database it replays still differs from CI's), and `explore` for
 the large one `main` and the nightly run search with. A fourth, `shared`,
-is `dev` reading the example database that discopy/discopy's CI uploads as
-a workflow artifact, through a `GITHUB_TOKEN`, so a failure found on
-upstream's CI replays on your machine before any search; it reaches GitHub
-only when selected, and does not read this repo's own CI artifact.
+is `dev` reading the example database that the CI of the repository named
+by `HYPOTHESIS_GITHUB_REPOSITORY` uploads as a workflow artifact, through a
+`GITHUB_TOKEN`, so a failure found on that CI replays on your machine before
+any search; it reaches GitHub only when selected. The variable defaults to
+`discopy/discopy`; this repo's CI sets it to `rel-int/discopy-next`, and a
+local run sets it the same way to replay what this repo's CI found:
 
 ```shell
 HYPOTHESIS_PROFILE=explore uv run pytest proptest/ -n auto -p no:benchmark
+HYPOTHESIS_PROFILE=shared HYPOTHESIS_GITHUB_REPOSITORY=rel-int/discopy-next \
+    uv run pytest proptest/
 ```
 
 `Axiom.falsify` searches for a shrunk counterexample to a law on demand,
@@ -215,8 +234,8 @@ A test of the matrix carries `pytest.mark.cell`, which is what the report
 keys on: `proptest/test_report.py` holds the suite's unit tests of its own
 reading, and those are parametrised too.
 
-The `proptest` GitHub workflow runs this suite on pull requests labelled
-`proptest`, on `main`, nightly and on manual dispatch. It carries the report
+The `proptest` GitHub workflow runs this suite on every pull request, on
+`main`, nightly and on manual dispatch. It carries the report
 between runs as an artifact, and on narrower terms than the example database:
 a baseline is a claim about what `main` checks rather than a pile of examples
 any run may add to, so it is taken from a **successful** run **of `main`**
@@ -229,18 +248,26 @@ compared against.
 
 `benchmark/test_composition.py` reproduces the scaling experiments of
 arXiv:2105.09257 for `Diagram` and `Hypergraph`, with analogous `CMap` cases;
-`benchmark/test_conversion.py` covers conversions between all three, and
-`benchmark/test_zx.py` races `quantum.graphlike.full_reduce` against PyZX's,
+`benchmark/test_conversion.py` covers conversions between all three,
+`benchmark/test_zx.py` races `quantum.zx.Hypergraph.full_reduce` against PyZX's,
 skipped without PyZX: run it with `uv run --with "pyzx==0.10.7"`, as the
-workflow does. They live outside `testpaths`, so run them explicitly. Results
-are keyed by suite (`composition`, `conversion` or `zx`), family
-(representation, conversion or implementation), case (workload) and size
-`n`. Each data point is a declarative
+workflow does, and `benchmark/test_egraph.py` replays the 50 e-graphs of
+`benchmark/data/egraph-traces` through `egraph.Builder` and the bookkeeping
+of the search that grew them, and the small ones through the pure `EGraph`.
+It also matches each trace with its two-box pattern of the most matches, on
+the builder and on the pure `EGraph`, and saturates `+` under associativity
+and commutativity on four to seven leaves (eight in the full tail) on the
+builder, and on four and five by the pure rounds of `EGraph.step`.
+They live outside `testpaths`, so run them explicitly. Results are keyed by
+suite (`composition`, `conversion`, `zx` or `egraph`), family
+(representation, conversion, implementation or operation), case (workload)
+and size `n`. Each data point is a declarative
 [`pytest-benchmark`](https://pytest-benchmark.readthedocs.io) test; the fixture
 owns timing (CPU clock and GC disabled) and automatically calibrates rounds
 and iterations for each workload.
 
 ```shell
+mkdir -p benchmark-results
 # small/medium sizes (the default); add BENCH_FLAGS=bench:full for the heavy tail
 uv run --with "pyzx==0.10.7" pytest benchmark/ -v \
     --benchmark-json=benchmark-results/bench.json
@@ -276,6 +303,62 @@ the job summary, and raises a warning annotation, never a failure, when a
 measurement regresses. A pull request run also posts or updates a comment with
 the important regressions and speedups.
 
+## Run the Lean proofs
+
+`lean/` is a [Lake](https://lean-lang.org/doc/reference/latest/Build-Tools-and-Distribution/Lake/)
+project holding a Lean 4 model of `egraph.partition`, the pure `EGraph`
+(`merge`, `add`, `rebuild`) and the `Builder`, and one of the diagrams of
+`monoidal.Diagram`, with theorems proved on each,
+see its [README](lean/README.md); it needs the Lean of `lean/lean-toolchain`
+and no other dependency. It lives outside the package and outside `testpaths`,
+so run it explicitly:
+
+```shell
+cd lean
+lake build                 # the proofs and the `oracle` executable
+lake env lean Audit.lean   # no `sorry`, no axiom beyond the three standard ones
+cd ..
+uv run pytest lean/test_oracle.py lean/test_premonoidal.py -s
+```
+
+`lean/Statements.lean` restates the definitions and the main theorems in one
+short file, and `lean/Statements/Premonoidal.lean` those of diagrams. The last
+command is the differential test: Hypothesis draws cases, the `oracle` answers
+them in one run and each answer is compared with the Python's; it is skipped
+when the binary is not built. `ORACLE_EXAMPLES` sets the number of cases per
+seed (2,000 by default) and `ORACLE_SEEDS` the seeds (`0` by default), e.g.
+`ORACLE_EXAMPLES=17000 ORACLE_SEEDS=0,1,2`. The `lean` GitHub workflow runs
+all three on `main` and on a pull request touching `lean/`,
+`discopy/egraph.py`, `discopy/monoidal.py`, `discopy/cat.py`, the traces of the
+benchmark with their loader `benchmark/test_egraph.py`, which the test
+replays, or what installs the environment.
+
+## Build the paper
+
+`paper/` holds the source of the tool paper, in [Typst](https://typst.app), and it is checked
+as the code is. `test/paper_build.py` runs its Python listings in order in one namespace, as
+`test/readme.py` runs the README's, draws each figure from the value a listing named, once
+with the Typst backend and once with the TikZ one, writes its LaTeX with `paper/transpile.py`,
+and compiles both where their compiler is installed:
+
+```shell
+uv sync --group all
+uv run pytest test/paper_build.py -rs
+uv run python -m paper.build --pdf  # paper/main.pdf from Typst, paper/latex.pdf from LaTeX
+```
+
+Typst downloads the CeTZ package on its first run. The LaTeX build needs `latexmk` and what
+`paper/preamble.tex` loads, on Debian the packages the `paper` workflow installs: its test is
+skipped without `latexmk`, and fails with it when a package is missing. A `python` fence of the paper runs, a `py` fence is shown and not run, and
+`#drawing("name")` is the drawing of the value `name` of the listings. `paper/transpile.py`
+reads the part of Typst its docstring lists and raises `Unsupported` on anything else: write
+the paper within it, or add the LaTeX of what you need to it. The references are those of the
+docs, `docs/discopy.bib`. `paper/figures/`, `paper/main.tex` and the PDFs are built, not
+committed: the `paper` workflow uploads them as the `paper` artifact, on `main` and on a pull
+request that touches the paper or the library its listings run. The tests that build the paper
+are marked `slow`, since its listings import PyTorch and JAX: on a pull request that workflow
+is what runs them.
+
 ## Build the docs
 
 You can build the documentation locally with [sphinx](https://www.sphinx-doc.org/en/master/):
@@ -283,7 +366,7 @@ You'll need [graphviz](https://graphviz.org/) installed as an external dependenc
 
 ```shell
 uv sync --group docs
-uv run sphinx-build docs docs/_build/html
+uv run sphinx-build -j auto docs docs/_build/html
 ```
 
 You do not need to build them to see what a pull request changes: the `docs`

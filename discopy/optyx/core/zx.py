@@ -3,9 +3,7 @@ Overview
 --------
 
 ZX diagrams, to and from conversions with :code:`pyzx`,
-evaluation with to_tensor via :code:`quimb`,
-mapping to post-selected linear
-optical circuits with :meth:`discopy.optyx.core.diagram.Diagram.to_path`.
+evaluation with to_tensor via :code:`quimb`.
 
 
 Generators
@@ -81,6 +79,9 @@ class ZXDiagram(diagram.Diagram):
         from pyzx import VertexType, EdgeType
 
         def node2box(node, n_legs_in, n_legs_out):
+            if graph.type(node) is VertexType.Z_BOX:
+                return ZBox(n_legs_in, n_legs_out,
+                            pyzx.utils.get_z_box_label(graph, node))
             if graph.type(node) not in {VertexType.Z, VertexType.X}:
                 raise NotImplementedError  # pragma: no cover
             return (
@@ -218,7 +219,10 @@ class ZXDiagram(diagram.Diagram):
             graph.set_position(node, i, 0)
         for row, (box, offset) in enumerate(zip(self.boxes, self.offsets)):
             if isinstance(box, diagram.Spider):
-                if isinstance(box, Spider):
+                if isinstance(box, ZBox):
+                    node = graph.add_vertex(VertexType.Z_BOX)
+                    pyzx.utils.set_z_box_label(graph, node, box.phase)
+                elif isinstance(box, Spider):
                     node = graph.add_vertex(
                         (VertexType.Z if isinstance(box, Z) else VertexType.X),
                         phase=box.phase * 2 if box.phase else None,
@@ -280,13 +284,6 @@ class ZXBox(diagram.Box, ZXDiagram):
     def determine_output_dimensions(self, input_dims: list[int]) -> list[int]:
         """Determine the output dimensions"""
         return [2 for _ in range(len(self.cod))]
-
-    def truncation(self, input_dims=None, output_dims=None) -> tensor.Box:
-        "Return a :class:`tensor.Box` with the underlying array"
-        out_dims = Dim(*[2 for i in range(len(self.cod))])
-        in_dims = Dim(*[2 for i in range(len(self.dom))])
-
-        return tensor.Box(self.name, in_dims, out_dims, self.array)
 
     def inflate(self, d):
         return self
@@ -362,7 +359,9 @@ class ZBox(Spider):
     """Z box.
 
     Its parameter is an amplitude rather than an angle, so its array is
-    :math:`P_0 + w P_1` and :meth:`grad` is not :meth:`Spider.grad`.
+    :math:`P_0 + w P_1` and :meth:`grad` is not :meth:`Spider.grad`. With no
+    legs it is the scalar :math:`1 + w`, the sum of its amplitudes, as a
+    legless :class:`Z` is.
     """
 
     tikzstyle_name = "ZBox"
@@ -386,8 +385,12 @@ class ZBox(Spider):
             @ type(self)(n_legs_in, n_legs_out, 0)
 
     def truncation(self, input_dims=None, output_dims=None) -> tensor.Box:
+        amplitudes = [1, self.phase]
+        if not self.n_legs_in and not self.n_legs_out:
+            return tensor.Box(
+                self.name, Dim(1), Dim(1), [sum(amplitudes)])
         return zw.ZBox(
-            self.n_legs_in, self.n_legs_out, [1, self.phase]
+            self.n_legs_in, self.n_legs_out, amplitudes
         ).truncation([2] * self.n_legs_in)
 
 
@@ -408,13 +411,10 @@ class Z(Spider):
     tikzstyle_name = "Z"
 
     def truncation(self, input_dims=None, output_dims=None) -> tensor.Box:
-        amplitudes = [1, np.exp(1j * self.phase * 2 * np.pi)]
-        if not self.n_legs_in and not self.n_legs_out:
-            return tensor.Box(
-                self.name, Dim(1), Dim(1), [sum(amplitudes)])
-        return zw.ZBox(
-            self.n_legs_in, self.n_legs_out, amplitudes
-        ).truncation([2] * self.n_legs_in)
+        return ZBox(
+            self.n_legs_in, self.n_legs_out,
+            np.exp(1j * self.phase * 2 * np.pi)
+        ).truncation()
 
 
 class X(Spider):
@@ -448,7 +448,7 @@ def Id(n):
           else diagram.Diagram.id(diagram.Bit(n))
 
 
-H = ZXBox("H", 1, 1)
+H = ZXBox("H", 1, 1, is_dagger=None)
 H.draw_as_spider = False
 (H.drawing_name, H.tikzstyle_name,) = (
     "",
@@ -515,6 +515,10 @@ class And(ZXBox):
     def dagger(self):
         return And(n=self.n, is_dagger=not self.is_dagger)
 
+    def __repr__(self):
+        dagger = ", is_dagger=True" if self.is_dagger else ""
+        return f"{factory_name(type(self))}({self.n}{dagger})"
+
     def conjugate(self):
         return And(n=self.n, is_dagger=self.is_dagger)
 
@@ -573,6 +577,10 @@ class Or(ZXBox):
 
     def dagger(self):
         return Or(n=self.n, is_dagger=not self.is_dagger)
+
+    def __repr__(self):
+        dagger = ", is_dagger=True" if self.is_dagger else ""
+        return f"{factory_name(type(self))}({self.n}{dagger})"
 
     def conjugate(self):
         return Or(n=self.n, is_dagger=self.is_dagger)

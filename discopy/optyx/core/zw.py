@@ -149,8 +149,12 @@ from typing import List, Union, Tuple, Iterable
 import numpy as np
 from discopy.frobenius import Dim
 from discopy import tensor
+from discopy.utils import factory_key, factory_name
+from discopy.quantum.gates import format_number
 from discopy.optyx.core import diagram
 from discopy.optyx.utils.misc import (
+    hashable,
+    listed,
     occupation_numbers,
     multinomial,
     BasisTransition,
@@ -257,8 +261,8 @@ class W(ZWBox):
         return W(self.n_legs, not self.is_dagger)
 
     def __repr__(self):
-        attr = ", dagger=True" if self.is_dagger else ""
-        return f"W({self.n_legs}{attr})"
+        dagger = ", is_dagger=True" if self.is_dagger else ""
+        return f"{factory_name(type(self))}({self.n_legs}{dagger})"
 
     def __eq__(self, other: "W") -> bool:
         if not isinstance(other, W):
@@ -332,7 +336,8 @@ class ZBox(diagram.Spider, ZWBox):
                 np.array([amplitudes[0]], dtype=complex),
             )
 
-        spider_dim = min(input_dims) if self.legs_in > 0 else 2
+        spider_dim = min(input_dims) if self.legs_in > 0 \
+            else self.determine_output_dimensions(input_dims)[0]
 
         # create the array
         if not isinstance(
@@ -384,9 +389,13 @@ class ZBox(diagram.Spider, ZWBox):
 
     def determine_output_dimensions(self, input_dims: list[int]) -> list[int]:
         """Determine the output dimensions based on the input dimensions."""
-        if self.legs_in == 0:
-            return [2 for _ in range(len(self.cod))]
-        return [min(input_dims) for _ in range(len(self.cod))]
+        if self.legs_in > 0:
+            dim = min(input_dims)
+        elif isinstance(self.amplitudes, IndexableAmplitudes):
+            dim = 2
+        else:
+            dim = max(2, np.size(self.amplitudes))
+        return [dim for _ in range(len(self.cod))]
 
     def __repr__(self):
         if isinstance(self.amplitudes, IndexableAmplitudes):
@@ -425,7 +434,7 @@ class Create(ZWBox):
     -------
     >>> assert Create() == Create(1)
     >>> Create(1).to_path().eval()
-    Amplitudes([1.+0.j], dom=1, cod=1)
+    Amplitudes([1.+0.j], dom=Nat(1), cod=Nat(1))
     """
 
     draw_as_spider = True
@@ -456,6 +465,27 @@ class Create(ZWBox):
 
     def photon_number_transform(self, dims_in, dims_out):
         return super().photon_number_transform(dims_in, dims_out)
+
+    def setoid(self):
+        """
+        The internal states of the photons are in no other component, so two
+        creations of the same photons in different states were equal, and two
+        post-selections too: :class:`Select` is the dagger of a `Create` and
+        carries the same states, so it compares them the same way.
+
+        >>> states = dict(internal_states=([1, 0], [0, 1]))
+        >>> assert Create(1, 1) != Create(1, 1, **states)
+        >>> assert Create(1, 1) == Create(1, 1)
+        >>> assert Select(1, 1) != Select(1, 1, **states)
+        >>> assert Create(1, 1, **states).dagger() == Select(1, 1, **states)
+        """
+        return super().setoid() + (hashable(self.internal_states), )
+
+    def __repr__(self):
+        args = ", ".join(map(repr, self.photons))
+        if self.internal_states is not None:
+            args += f", internal_states={listed(self.internal_states)}"
+        return f"{factory_name(type(self))}({args})"
 
     def conjugate(self):
         return self
@@ -565,6 +595,12 @@ class Select(ZWBox):
     def photon_number_transform(self, dims_in, dims_out):
         return super().photon_number_transform(dims_in, dims_out)
 
+    __repr__ = Create.__repr__
+
+    def setoid(self):
+        """ The internal states of the photons, as for a :class:`Create`. """
+        return super().setoid() + (hashable(self.internal_states), )
+
     def inflate(self, d):
 
         dgrm = Create(
@@ -620,6 +656,13 @@ class Endo(ZWBox):
     >>> phase = Endo(sp.exp(1j * psi * 2 * sp.pi))
     >>> derivative = phase.grad(psi).subs((psi, 0.5)).to_path().eval(2).array
     >>> assert np.allclose(derivative, 4 * np.pi * 1j)
+
+    Two endomorphisms are equal when their scalars are, the name being
+    derived from the scalar and printing a negative zero where the scalar
+    does not have one, so that a conjugate is the scalar it conjugates to:
+
+    >>> assert Endo(0.5).conjugate() == Endo(0.5)
+    >>> assert Endo(-2j) == Endo(2j).dagger()
     """
 
     def __init__(self, scalar: complex):
@@ -629,6 +672,14 @@ class Endo(ZWBox):
             pass
         self.scalar = scalar
         super().__init__(f"Endo({scalar})", 1, 1, data=scalar)
+
+    def setoid(self):
+        return (factory_key(type(self)),
+                self.dom, self.cod, self.is_dagger, self.scalar)
+
+    def __repr__(self):
+        return f"{factory_name(type(self))}"\
+            f"({format_number(self.scalar, exact=True)})"
 
     def conjugate(self):
         return Endo(self.scalar.conjugate())
@@ -709,6 +760,10 @@ class Add(ZWBox):
     def dagger(self):
         return Add(self.n, not self.is_dagger)
 
+    def __repr__(self):
+        dagger = ", is_dagger=True" if self.is_dagger else ""
+        return f"{factory_name(type(self))}({self.n}{dagger})"
+
     def conjugate(self):
         return self
 
@@ -756,6 +811,10 @@ class Multiply(ZWBox):
     def dagger(self):
         return Multiply(not self.is_dagger)
 
+    def __repr__(self):
+        dagger = "is_dagger=True" if self.is_dagger else ""
+        return f"{factory_name(type(self))}({dagger})"
+
 
 class Divide(ZWBox):
     """
@@ -800,6 +859,10 @@ class Divide(ZWBox):
 
     def dagger(self):
         return Divide(not self.is_dagger)
+
+    def __repr__(self):
+        dagger = "is_dagger=True" if self.is_dagger else ""
+        return f"{factory_name(type(self))}({dagger})"
 
 
 class Mod2(ZWBox):
@@ -853,6 +916,10 @@ class Mod2(ZWBox):
 
     def dagger(self):
         return Mod2(not self.is_dagger)
+
+    def __repr__(self):
+        dagger = "is_dagger=True" if self.is_dagger else ""
+        return f"{factory_name(type(self))}({dagger})"
 
 
 SWAP = diagram.Swap(diagram.Mode(1), diagram.Mode(1))

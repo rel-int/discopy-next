@@ -264,7 +264,7 @@ from discopy.optyx.core import (
 )
 
 from discopy.optyx.classical import ClassicalFunction, DiscardMode
-from discopy.optyx.utils.misc import matrix_to_zw
+from discopy.optyx.utils.misc import listed, matrix_to_zw
 
 from discopy.optyx.channel import (
     bit,
@@ -276,20 +276,6 @@ from discopy.optyx.channel import (
     Channel,
     Diagram
 )
-
-
-def listed(internal_states):
-    """
-    The internal states as lists of numbers, which is what their
-    representation reads back: they are declared as lists and used as
-    arrays, and `STYLE.md` reads a representation holding an array up to
-    elision.
-
-    >>> listed((np.array([1, 0]), [0, 1]))
-    '([1, 0], [0, 1])'
-    """
-    states = ", ".join(repr(np.asarray(s).tolist()) for s in internal_states)
-    return f"({states},)" if len(internal_states) == 1 else f"({states})"
 
 
 class Select(Channel):
@@ -423,6 +409,8 @@ class Create(Channel):
             zw.Create(*self.photons, internal_states=internal_states)
         )
 
+    semantic_attrs = ("internal_states", )
+
     def __repr__(self):
         args = ", ".join(map(repr, self.photons))
         if self.internal_states is not None:
@@ -448,6 +436,14 @@ class AbstractGate(Channel, ABC):
             self._normal_form(dom, cod)
         )
         self.data = data
+
+    semantic_attrs = ("array", )
+    """
+    A gate is its array: a flag that conjugates or daggers it, e.g.
+    :code:`BBS.is_conj` or :code:`TBS.is_gate_dagger`, changes the array and
+    nothing else a box compares, so the array is what
+    :meth:`channel.Channel.setoid` has to read.
+    """
 
     def _normal_form(self, dom, cod):
         return matrix_to_zw(self.array.reshape(dom, cod))
@@ -510,12 +506,22 @@ class Gate(AbstractGate):
         return f"{factory_name(type(self))}({self.array.tolist()}, "\
             f"{len(self.dom)}, {len(self.cod)}, {self.name!r}{data})"
 
+    def lambdify(self, *symbols, **kwargs):
+        if not self.free_symbols & set(symbols):
+            return lambda *xs: self
+        matrix = lambdify(symbols, self.array.tolist(), **kwargs)
+        data = (lambda *xs: None) if self.data is None \
+            else lambdify(symbols, self.data, **kwargs)
+        return lambda *xs: Gate(
+            matrix(*xs), len(self.dom), len(self.cod), self.name, data(*xs))
+
     def dagger(self):
         return Gate(
             np.conjugate(self.array.T),
             len(self.cod),
             len(self.dom),
-            self.name
+            self.name,
+            self.data
         )
 
     def conjugate(self):
@@ -526,7 +532,8 @@ class Gate(AbstractGate):
             np.conjugate(self.array),
             len(self.dom),
             len(self.cod),
-            self.name
+            self.name,
+            self.data
         )  # pragma: no cover
 
 
@@ -609,10 +616,10 @@ class BBS(AbstractGate):
 
     Corresponds to :py:class:`Matrix`
     :math:`\\begin{pmatrix}
-    \\tt{sin}((0.25 + bias)\\pi)
-    & i \\tt{cos}((0.25 + bias)\\pi) \\\\
     i \\tt{cos}((0.25 + bias)\\pi)
-    & \\tt{sin}((0.25 + bias)\\pi) \\end{pmatrix}`.
+    & \\tt{sin}((0.25 + bias)\\pi) \\\\
+    \\tt{sin}((0.25 + bias)\\pi)
+    & i \\tt{cos}((0.25 + bias)\\pi) \\end{pmatrix}`.
 
     Parameters
     ----------
@@ -621,6 +628,9 @@ class BBS(AbstractGate):
 
     Example
     -------
+    >>> sin, cos = np.sin(.35 * np.pi), np.cos(.35 * np.pi)
+    >>> assert np.allclose(BBS(.1).array, [[1j * cos, sin], [sin, 1j * cos]])
+
     The standard beam splitter is:
 
     >>> BS = BBS(0)
@@ -699,7 +709,8 @@ class TBS(AbstractGate):
     \\tt{sin}(\\theta \\, \\pi)
     & \\tt{cos}(\\theta \\, \\pi) \\\\
     \\tt{cos}(\\theta \\, \\pi) & - \\tt{sin}(\\theta \\, \\pi)
-    \\end{pmatrix}`.
+    \\end{pmatrix}`
+    times its :code:`global_phase`.
 
     Parameters
     ----------
@@ -806,7 +817,8 @@ class MZI(AbstractGate):
     e^{2\\pi i \\phi} \\tt{sin}(\\theta \\, \\pi)
     & \\tt{cos}(\\theta \\, \\pi) \\\\
     e^{2\\pi i \\phi} \\tt{cos}(\\theta \\, \\pi)
-    & - \\tt{sin}(\\theta \\, \\pi) \\end{pmatrix}`.
+    & - \\tt{sin}(\\theta \\, \\pi) \\end{pmatrix}`
+    times its :code:`global_phase`.
 
     Parameters
     ----------
@@ -983,6 +995,8 @@ class DualRail(Channel):
             diagram.dual_rail(n_qubits, internal_states=internal_states)
         )
 
+    semantic_attrs = ("internal_states", )
+
     def __repr__(self):
         args = str(len(self.dom))
         if self.internal_states is not None:
@@ -1001,15 +1015,32 @@ class PhaseShiftDR(Channel):
             f"PhaseShift({phase})",
             diagram.Mode(1) @ Phase(phase).get_kraus()
         )
+        self.data = phase
 
     def __repr__(self):
         return f"{factory_name(type(self))}({self.phase!r})"
 
+    def lambdify(self, *symbols, **kwargs):
+        return lambda *xs: type(self)(
+            lambdify(symbols, self.phase, **kwargs)(*xs))
+
 
 class ZMeasurementDR(Diagram):
     """
-    ZMeasurement circuit that performs a measurement in the Z basis
-    after applying a phase shift of alpha.
+    Measurement of a dual-rail qubit with the Z spider of phase alpha:
+    a phase shift of alpha on the second rail, a :class:`HadamardBS` and
+    number-resolving detection, keeping the photon count of the second rail.
+
+    Outcome 0 projects onto :code:`|0> + exp(-2 pi i alpha) |1>` and
+    outcome 1 onto :code:`|0> - exp(-2 pi i alpha) |1>`, i.e. it measures
+    the X basis when alpha is 0.
+
+    Example
+    -------
+    >>> from discopy.optyx import qubits
+    >>> state = qubits.Ket("-") >> qubits.Z(1, 1, -.1) >> DualRail(1)
+    >>> dist = (state >> ZMeasurementDR(.1)).eval().prob_dist()
+    >>> assert np.isclose(dist[(1, )], 1)
     """
     def __new__(cls, alpha):
         return (
@@ -1022,8 +1053,9 @@ class ZMeasurementDR(Diagram):
 
 class XMeasurementDR(Diagram):
     """
-    XMeasurement circuit that performs a measurement in the X basis
-    after applying a Hadamard beam splitter.
+    Measurement of a dual-rail qubit with the X spider of phase alpha:
+    a :class:`HadamardBS` then :class:`ZMeasurementDR` of alpha, i.e. it
+    measures the Z basis when alpha is 0.
     """
     def __new__(cls, alpha):
         return (
@@ -1182,9 +1214,14 @@ class PhotonLoss(Channel):
             qmode @ channel.Ty(),
             env=qmode.single()
         )
+        self.data = p_survive
 
     def __repr__(self):
         return f"{factory_name(type(self))}({self.p_survive!r})"
+
+    def lambdify(self, *symbols, **kwargs):
+        return lambda *xs: type(self)(
+            lambdify(symbols, self.p_survive, **kwargs)(*xs))
 
 
 class FusionTypeII(Diagram):

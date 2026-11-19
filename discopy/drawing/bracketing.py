@@ -291,7 +291,12 @@ def applies(axiom: Axiom) -> bool:
     >>> assert applies(Category.unitality)
     >>> assert not applies(PivotalCategory.yanking)
     """
-    return bool(axiom.parameters) or axiom() is not NotImplemented
+    if axiom.parameters:
+        return True
+    try:
+        return axiom() is not NotImplemented
+    except Exception:  # pylint: disable=broad-exception-caught
+        return True  # A law with no premise, which only a category builds.
 
 
 def stated_axioms(category: type) -> dict[str, Axiom]:

@@ -195,6 +195,9 @@ def to_tk(circuit):
     # len(bits) == circuit[:i].cod.count(bit) and same for qubits
     tk_circ, bits, qubits = Circuit(), [], []
     circuit = circuit.init_and_discard()
+    if any(x.time_step for box in circuit.boxes
+           for x in (box.dom @ box.cod).inside):
+        raise NotImplementedError
 
     def remove_ket1(box):
         if not isinstance(box, Ket):
@@ -231,7 +234,17 @@ def to_tk(circuit):
         return bits[:offset] + list(range(start, start + len(box.cod)))\
             + [i + len(box.cod) if i >= start else i for i in bits[offset:]]
 
+    def discard_bits(bits, offset, n_bits):
+        right = Id(tk_circ.post_processing.cod[offset + n_bits:])
+        tk_circ.post_process(
+            Id(bit ** offset) @ Discard(bit ** n_bits) @ right)
+        return bits[:offset] + bits[offset + n_bits:]
+
     def measure_qubits(qubits, bits, box, bit_offset, qubit_offset):
+        if isinstance(box, Measure) and box.override_bits\
+                and tk_circ.post_processing:
+            bits = discard_bits(bits, bit_offset, box.n_qubits)
+            box = Measure(box.n_qubits, box.destructive)
         if isinstance(box, Measure) and box.override_bits:
             for j, _ in enumerate(box.dom[:len(box.dom) // 2]):
                 i_bit = bits[bit_offset + j]
@@ -296,6 +309,10 @@ def to_tk(circuit):
             op = op.dagger
         tk_circ.add_gate(op, controls + [
             qubits[offset + j] for j in range(len(box.dom))])
+        if box.z and box.name == "Y" and controls:
+            tk_circ.Z(*controls)
+        elif box.z and box.name == "Y":
+            tk_circ.add_phase(1)
 
     circuit = Functor(ob_map=lambda x: x, ar_map=remove_ket1)(circuit)
     for layer in circuit.inside:
@@ -312,12 +329,7 @@ def to_tk(circuit):
                 qubits, bits, box, left.count(bit), left.count(qubit))
         elif isinstance(box, Discard):
             if box.dom.count(bit):
-                off, n_bits = left.count(bit), box.dom.count(bit)
-                right = Id(tk_circ.post_processing.cod[off + n_bits:])
-                tk_circ.post_process(
-                    Id(bit ** off) @ Discard(bit ** n_bits) @ right)
-            bits = bits[:left.count(bit)]\
-                + bits[left.count(bit) + box.dom.count(bit):]
+                bits = discard_bits(bits, left.count(bit), box.dom.count(bit))
             qubits = qubits[:left.count(qubit)]\
                 + qubits[left.count(qubit) + box.dom.count(qubit):]
         elif isinstance(box, Permutation):

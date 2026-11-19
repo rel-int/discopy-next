@@ -316,6 +316,22 @@ def test_diagram_to_map_structure_and_errors():
         frobenius.Diagram.spiders(1, 2, x), )
 
 
+def test_copy_is_the_map_of_the_copy_of_its_category():
+    from discopy import markov, tensor
+    M, D = markov.CMap, markov.Diagram
+    x, y = map(markov.Ty, "xy")
+    assert M.copy(x, 1) == M.id(x)
+    assert M.copy(x @ y) == D.copy(x @ y).to_map()
+    assert M.discard(x @ y).boxes == (D.discard(x), D.discard(y))
+    diagram = markov.Box("f", x, x) @ y >> D.copy(x @ y)
+    assert len(diagram.to_map().to_diagram().to_map().boxes) == 3
+    x, y = map(comarkov.Ty, "xy")
+    assert comarkov.CMap.merge(x @ y)\
+        == comarkov.Diagram.merge(x @ y).to_map()
+    spiders = tensor.CMap.spiders(1, 2, tensor.Dim(2, 3))
+    assert {type(box) for box in spiders.boxes} == {tensor.Spider}
+
+
 def test_rigid_handedness():
     from discopy import cmap, rigid
 
@@ -336,6 +352,30 @@ def test_rigid_handedness():
         == compact.Cup(cx.r, cx)
     assert compact.CMap.caps(cx, cx.r).to_diagram()\
         == compact.Cap(cx, cx.r)
+
+
+def test_cup_on_outputs_reads_them_left_to_right():
+    """ A cup wired onto two outputs of a box reads them left to right, as
+    a hypergraph does, though the map stores a box's outputs clockwise. """
+    from discopy import cmap, pivotal, rigid
+    from discopy.hypergraph import Hypergraph
+
+    M, H = cmap.CMap[rigid.Diagram], Hypergraph[rigid.Diagram]
+    x, unit = rigid.Ty("x"), rigid.Ty()
+    f, g = rigid.Box("f", unit, x @ x.r), rigid.Box("g", unit, x.r @ x)
+    cup = f >> rigid.Cup(x, x.r)
+    assert M(unit, unit, (f, ), (1, 0)).to_diagram() == cup
+    assert (H.from_box(f) >> H.cups(x, x.r)).to_map().to_diagram() == cup
+    with raises(AxiomError, match="pivotal"):
+        M(unit, unit, (g, ), (1, 0))
+
+    M = cmap.CMap[pivotal.Diagram]
+    x, unit = pivotal.Ty("x"), pivotal.Ty()
+    f, g = pivotal.Box("f", unit, x @ x.r), pivotal.Box("g", unit, x.r @ x)
+    assert M(unit, unit, (f, ), (1, 0)).to_diagram()\
+        == f >> pivotal.Cup(x, x.r)
+    assert M(unit, unit, (g, ), (1, 0)).to_diagram()\
+        == g >> pivotal.Cup(x.r, x)
 
 
 def test_only_to_diagram_needs_the_structure():
@@ -921,7 +961,7 @@ def test_from_glued_agrees_with_folding():
         h >> Swap(y, y) >> g,
         Diagram.id(x) @ Cap(x.r, x) >> Cup(x, x.r) @ Diagram.id(x),
         Cap(x.r, x) >> Cup(x.r, x),
-        h >> Cup(y, y.r) if y.r == y else h >> g,
+        Box("k", x, y @ y.r) >> Cup(y, y.r),
     ]
     for diagram in diagrams:
         folded = M.functor(
@@ -949,6 +989,25 @@ def test_from_glued_loops():
         (M.caps(x.r, x), 0), (M.caps(y.r, y), 2),
         (M.cups(y.r, y), 2), (M.cups(x.r, x), 0)])
     assert two.loops == (x, y)
+
+
+def test_loops_are_a_multiset():
+    from discopy.compact import Ty, Box, Cup, Cap, Diagram, CMap as M
+    x, y = map(Ty, "xy")
+    assert M(Ty(), Ty(), (), (), loops=(y, x, y)).loops == (x, y, y)
+    a, b = (M.caps(t.r, t) >> M.cups(t.r, t) for t in (x, y))
+    assert a @ b == b @ a and hash(a @ b) == hash(b @ a)
+    f, g = Box("f", x, x).to_map() @ a, Box("g", x, x).to_map() @ b
+    assert (f >> g).dagger() == g.dagger() >> f.dagger()
+    nested = Cap(x.r, x) >> x.r @ Cap(y.r, y) @ x\
+        >> x.r @ Cup(y.r, y) @ x >> Cup(x.r, x)
+    assert nested.to_map() == M.functor(
+        ob_map=lambda typ: typ, ar_map=M.from_box,
+        dom=Diagram, cod=M)(nested)
+    loop = Cap(x.r, x) >> Cup(x.r, x)
+    h = Box("h", x, x)
+    two = h >> loop @ x >> h >> Cap(y.r, y) @ x >> Cup(y.r, y) @ x
+    assert two.dagger().to_map() == two.to_map().dagger()
 
 
 def test_logical_order():
@@ -982,6 +1041,15 @@ def test_from_wiring():
     assert closed.n_ports == 4 and closed.is_monogamous
     assert closed.dom == closed.cod == Ty() and closed.boxes == (f, f)
     assert closed == (M.from_box(f) >> M.from_box(f)).trace()
+
+
+def test_from_wiring_reads_numpy_integers_as_indices():
+    import numpy as np
+    from discopy.symmetric import Ty, Box, CMap as M
+    f = Box("f", Ty("x"), Ty("x"))
+    wires = [((0, 0), (1, 1)), ((0, 1), (1, 0))]
+    assert M.from_wiring((f, f), np.array(wires)) \
+        == M.from_wiring((f, f), wires)
 
 
 def test_cups_and_caps_decode_with_their_legs_in_scan_order():
@@ -1246,6 +1314,28 @@ def test_a_match_does_not_cross_wires():
                    == host.to_diagram().normal_form() for match in matches)
 
 
+def test_match_sends_straight_wires_beside_the_image(monkeypatch):
+    from discopy import cmap
+    from discopy.monoidal import Ty, Box
+    x = Ty('x')
+    f, g, h, k = (Box(name, x, x) for name in "fghk")
+    calls, complement = [], cmap.CMap.complement
+
+    def recorded(self, pattern, homomorphism):
+        calls.append(homomorphism)
+        return complement(self, pattern, homomorphism)
+    monkeypatch.setattr(cmap.CMap, "complement", recorded)
+    column = x ** 3 @ f >> x ** 3 @ g
+    host, pattern = (column >> column).to_map(), (x ** 3 @ f).to_map()
+    assert len(list(host.match(pattern))) == 2
+    assert len(calls) <= 2 * 3 ** 3
+    for host, n_matches in [(h @ x >> x @ f, 2), (k @ x >> h @ x >> x @ f, 3)]:
+        assert len(list(host.to_map().match((x @ f).to_map()))) == n_matches
+
+    host = (h @ x >> x @ f).to_map()
+    assert host.beside(iter([0])) == host.beside([0])
+
+
 def test_match_needs_a_connected_map():
     from discopy.monoidal import Ty, Box
     x = Ty('x')
@@ -1256,3 +1346,122 @@ def test_match_needs_a_connected_map():
         next(f.to_map().rewrite((f.to_map(), s.to_map())))
     with raises(AxiomError):
         compact.CMap.cups(compact.Ty('x'), compact.Ty('x').r).wiring()
+
+
+def test_CMap_explicit_trace_of_n_wires_is_the_n_nested_ones():
+    """
+    The ``n``-wire trace is the nest of ``n`` one-wire traces, on both kinds
+    of ``trace_factory``: a class, where the whole nest is one trace box on
+    the diagram, and a class method, where the cups and caps of a pivotal
+    category are atomic and the nest is the onion of ``n`` pairs. So taking
+    them in one pass is the same map, not just the same morphism.
+    """
+    from discopy import feedback
+    for module in (feedback, compact):
+        x, a = module.Ty('x'), module.Ty('a')
+        for n in (1, 2, 3):
+            for left in (False, True):
+                typ = x ** n @ a if left else a @ x ** n
+                cmap = module.Box('f', typ, typ).to_map()
+                nested = cmap
+                for _ in range(n):
+                    nested = nested.explicit_trace(1, left)
+                assert cmap.explicit_trace(n, left) == nested, (
+                    module.__name__, n, left)
+
+
+def test_CMap_explicit_trace_checks_the_count():
+    """
+    Tracing no wire is the identity, and any other count is checked against
+    the wires there are: before it took one, a negative count fell through
+    an empty ``range`` and returned the map untraced.
+    """
+    x = compact.Ty('x')
+    cmap = compact.Box('f', x @ x, x @ x).to_map()
+    assert cmap.explicit_trace(0) == cmap
+    with raises(ValueError, match="Cannot split -1 atoms"):
+        cmap.explicit_trace(-1)
+    with raises(ValueError, match="Cannot split 3 atoms"):
+        cmap.explicit_trace(3)
+
+
+def test_CMap_explicit_trace_converts_once(monkeypatch):
+    """
+    Over a planar traced category the whole nest is one trace box on the
+    diagram, so the map is converted once however many wires it traces:
+    looping ``explicit_trace`` converted it once per wire, which is what made
+    ``trace`` and ``make_causal`` quadratic in them (#537).
+    """
+    from discopy import feedback
+    x = feedback.Ty('x')
+    cmap = feedback.Box('f', x ** 8, x ** 8).to_map()
+    to_diagram, calls = feedback.CMap.to_diagram, []
+
+    def counted(self, *args, **kwargs):
+        calls.append(None)
+        return to_diagram(self, *args, **kwargs)
+
+    monkeypatch.setattr(feedback.CMap, "to_diagram", counted)
+    result = cmap.trace(4)
+    monkeypatch.undo()
+    assert len(calls) == 1
+    nested = cmap
+    for _ in range(4):
+        nested = nested.explicit_trace()
+    assert result == nested
+
+
+def test_CMap_explicit_trace_builds_the_onion_in_one_call(monkeypatch):
+    """
+    Over a pivotal category the ``n``-wire trace is an onion of ``n`` cup and
+    cap pairs around the map, and the whole onion goes to one constructor
+    call. Composing it pair by pair built ``2 * n`` intermediate maps, each
+    rebuilding a permutation over a port set that grows with ``n``, which is
+    what made ``make_causal`` quadratic in the wires it cuts (#541).
+    """
+    from discopy import frobenius
+    for module in (compact, frobenius):
+        cmap = module.Box(
+            'f', module.Ty('x') ** 8, module.Ty('x') ** 8).to_map()
+        for left in (False, True):
+            calls, init = [], module.CMap.__init__
+
+            def counted(self, *args, _init=init, _calls=calls, **kwargs):
+                _calls.append(None)
+                return _init(self, *args, **kwargs)
+
+            monkeypatch.setattr(module.CMap, "__init__", counted)
+            result = cmap.explicit_trace(4, left)
+            monkeypatch.undo()
+            assert len(calls) == 1, (module.__name__, left, len(calls))
+            nested = cmap
+            for _ in range(4):
+                nested = nested.explicit_trace(1, left)
+            assert result == nested, (module.__name__, left)
+
+
+def test_CMap_explicit_trace_keeps_an_overridden_factory(monkeypatch):
+    """
+    The onion in one call *is* the pivotal trace, so it is built only when
+    ``trace_factory`` is pivotal's own class method: a category overriding it
+    gets the nest its own factory builds, one wire at a time, rather than the
+    cups and caps it never asked for.
+    """
+    from discopy import frobenius, pivotal
+    pivotal_trace = pivotal.Diagram.trace_factory.__func__
+    for module in (compact, frobenius):
+        x = module.Ty('x')
+        cmap = module.Box('f', x ** 8, x ** 8).to_map()
+        for left in (False, True):
+            calls = []
+
+            def overridden(cls, diagram, left=False, _calls=calls):
+                _calls.append(left)
+                return pivotal_trace(cls, diagram, left)
+
+            onion = cmap.explicit_trace(4, left)
+            monkeypatch.setattr(
+                module.Diagram, "trace_factory", classmethod(overridden))
+            assert cmap.explicit_trace(4, left) == onion
+            monkeypatch.undo()
+            assert calls == 4 * [left], (module.__name__, left, calls)

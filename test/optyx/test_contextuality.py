@@ -1,6 +1,6 @@
 from math import sqrt
 
-from pytest import approx, raises
+from pytest import approx, mark, raises
 
 import numpy as np
 
@@ -124,6 +124,7 @@ def test_MessagePassingScenario():
             MessagePassingScenario(bell_pair_map(), Ket(0) ** 3, **kwargs)
 
 
+@mark.slow
 def test_learn():
     scenario = MessagePassingScenario(bell_pair_map(), Ket(0) ** 3, n_steps=1)
     angles, model = scenario.learn(restarts=2, steps=1)
@@ -131,6 +132,7 @@ def test_learn():
     assert model.is_close(scenario.model(angles))
 
 
+@mark.slow
 def test_dual_rail_scenario():
     pair = qmode ** 2
     bell = (Scalar(.5 ** .5) @ Z(0, 2)).to_dual_rail()

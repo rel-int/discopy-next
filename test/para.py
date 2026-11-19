@@ -94,6 +94,14 @@ def test_closed():
         Closed(a @ b, c, closed.Box('k', a @ b, c @ P), copar=P).curry()
 
 
+def test_closed_curry_stays_in_the_domain():
+    a, b, c, P = map(closed.Ty, "abcP")
+    k = Closed(a @ b, c, closed.Box('k', a @ b @ P, c), P)
+    for n, left in [(3, True), (3, False), (-1, True), (-1, False)]:
+        with raises(ValueError, match="off a @ b"):
+            k.curry(n, left=left)
+
+
 def test_feedback():
     x, y, z, P = map(markov.Ty, "xyzP")
     f = Feedback(x @ y.delay(), z @ y,

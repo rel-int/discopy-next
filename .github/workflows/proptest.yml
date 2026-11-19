@@ -2,7 +2,6 @@ name: proptest
 
 on:
   pull_request:
-    types: [opened, reopened, ready_for_review, synchronize, labeled]
   push:
     branches: [main]
   schedule:
@@ -15,17 +14,16 @@ permissions:
 
 # Supersede a pull request's own runs, but let every commit on main keep the
 # run that proves it green: a main run is where the suite searches new
-# ground, and cancelling it throws that search away.
+# ground, and cancelling it throws that search away. A schedule and a
+# dispatch get a group each, since they share a commit with the push that
+# made it and would otherwise queue behind it.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref
+    || github.event_name == 'push' && github.sha || github.run_id }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   proptest:
-    # Pull requests opt in with the "proptest" label.
-    if: >-
-      github.event_name != 'pull_request'
-      || contains(github.event.pull_request.labels.*.name, 'proptest')
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
@@ -36,6 +34,9 @@ jobs:
         ${{ github.event_name == 'pull_request' && 'pr' || 'explore' }}
       PYTEST_ADDOPTS: >-
         ${{ github.event_name == 'pull_request' && '--hypothesis-seed=0' || '' }}
+      # The repository whose example database the `shared` profile replays:
+      # this one, which uploads it below, rather than the default upstream.
+      HYPOTHESIS_GITHUB_REPOSITORY: rel-int/discopy-next
     steps:
     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       with:

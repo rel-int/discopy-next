@@ -70,12 +70,14 @@ OP_MAP = {
     OpType.Rx: qml.RX,
     OpType.Ry: qml.RY,
     OpType.Rz: qml.RZ,
+    OpType.U1: qml.U1,
     OpType.CX: qml.CNOT,
     OpType.CY: qml.CY,
     OpType.CZ: qml.CZ,
     OpType.CRx: qml.CRX,
     OpType.CRy: qml.CRY,
     OpType.CRz: qml.CRZ,
+    OpType.CCX: qml.Toffoli,
     OpType.CU1: lambda a, wires: qml.ctrl(qml.U1(a, wires=wires[1]),
                                           control=wires[0]),
     OpType.SWAP: qml.SWAP,
@@ -338,7 +340,9 @@ class PennyLaneCircuit:
     def draw(self):
         """
         Print a string representation of the circuit
-        similar to `qml.draw`, but including post-selection.
+        similar to `qml.draw`, but including post-selection, on its concrete
+        parameters, set with :meth:`initialise_concrete_params` when it has
+        symbolic ones.
         """
         if self._concrete_params is None:
             raise ValueError('Cannot draw circuit with symbolic parameters. '

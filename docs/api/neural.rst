@@ -1,0 +1,4 @@
+neural
+======
+
+.. automodule:: discopy.neural

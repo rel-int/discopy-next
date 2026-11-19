@@ -118,8 +118,8 @@ class SemmDecompiler:
         self.fusions.append(Fusion(node, fusion_node, fusion_type))
 
     def delay_then_fuse(self, delay: int):
-        """Applies a unitary to the incoming photon and measures it with a
-        particular angle"""
+        """Delays the incoming photon, which leaves the delay loop ``delay``
+        photons later to be fused by :meth:`fuse`"""
         node = self.current_node()
         self.time += 1
 

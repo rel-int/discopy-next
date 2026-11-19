@@ -5,6 +5,8 @@ from pytket import Circuit
 from pytket.utils import probs_from_counts
 from discopy.optyx import channel
 from discopy.optyx.core import zx
+from discopy.quantum.gates import (
+    CRx, CRz, CU1, CX, CZ, SWAP, U1, Controlled, Rx, Rz)
 import numpy as np
 
 def _extract(graph):
@@ -200,6 +202,22 @@ def test_discopy_circuits_with_bits():
         qubits.Circuit(circuit.Encode())
 
 
+@pytest.mark.parametrize("gate", [
+    CX, CZ, SWAP, Rz(.3), Rx(.3), CRz(.3), CRx(.3), CU1(.3),
+    CRz(.3, distance=-1), CRx(.3, distance=-1), CU1(.3, distance=-1),
+    CRz(.3, distance=2), CU1(.3, distance=2), Controlled(U1(.3), distance=2),
+], ids=str)
+def test_discopy_gates_keep_their_unitary_up_to_a_global_phase(gate):
+    n = 2 ** len(gate.dom)
+    expected = np.asarray(gate.eval().array, dtype=complex).reshape(n, n)
+    actual = np.asarray(
+        qubits.Circuit(gate).get_kraus().to_tensor().eval().array,
+        dtype=complex).reshape(n, n)
+    phase = np.vdot(actual, expected) / n
+    assert np.isclose(abs(phase), 1)
+    assert np.allclose(phase * actual, expected)
+
+
 def test_encode_is_the_ket_of_its_bit():
     from discopy.optyx import classical
     encoded = classical.Bit(1) >> qubits.Encode(1)
@@ -269,6 +287,20 @@ def test_spiders_to_dual_rail():
         assert probabilities(
             state >> DualRail(2) >> qubits.Z(2, 1).to_dual_rail()) \
             == probabilities(state >> qubits.Z(2, 1) >> DualRail(1))
+
+
+@pytest.mark.parametrize("n, m, phase", [
+    (0, 1, 0), (0, 1, .5), (1, 0, 0), (1, 0, -.5),
+    (1, 1, .25), (1, 1, .75), (1, 1, -.25)])
+def test_x_dual_rail_commutes_with_the_encoding(n, m, phase):
+    """Encoding then applying the dual-rail translation of an X spider is
+    applying the spider then encoding, scalars included."""
+    from discopy.optyx.photonic import DualRail
+    spider = qubits.X(n, m, phase)
+    left = DualRail(n) >> spider.dual_rail() if n else spider.dual_rail()
+    right = spider >> DualRail(m) if m else spider
+    assert np.allclose(left.get_kraus().to_tensor().eval().array,
+                       right.get_kraus().to_tensor().eval().array)
 
 
 def test_scalar():

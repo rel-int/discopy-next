@@ -134,7 +134,7 @@ boundary, see issue #520:
 .. image:: /_static/drawing/who-ansatz.svg
     :align: center
 
->>> from discopy.grammar.categorial import Eval, Ty as CTy, Word
+>>> from discopy.lambek.categorial import Eval, Ty as CTy, Word
 >>> s, n = map(CTy, 'sn')
 >>> sentence = (Word('Alice', n) @ Word('loves', (n >> s) << n)
 ...             @ Word('Bob', n) >> n @ Eval((n >> s) << n) >> Eval(n >> s))
@@ -212,6 +212,8 @@ The regions of a crossing follow its strands, see
 
 from __future__ import annotations
 
+import itertools
+from math import isfinite
 from typing import NamedTuple, TYPE_CHECKING, Sequence
 from dataclasses import dataclass
 
@@ -220,8 +222,7 @@ import networkx as nx
 from discopy import messages
 from discopy.drawing import backend, Node, Point
 from discopy.config import BOX_DRAWING_ATTRIBUTES, TRANSPARENT
-from discopy.abc import TracedCategory
-from discopy.testable import Testable
+from discopy.abc import DaggerMonoidalCategory, TracedCategory
 from discopy.python import finset
 from discopy.utils import (
     assert_isinstance, assert_iscomposable, unbiased, factory, RichDisplay)
@@ -237,17 +238,122 @@ def trailing_margin(ob) -> float:
         getattr(ob, "min_right_margin", 0))
 
 
+def sign(number: float) -> int:
+    """ The sign of a number, -1, 0 or 1. """
+    return (number > 0) - (number < 0)
+
+
+def cross(a: Point, b: Point, c: Point, d: Point) -> bool:
+    """ Whether the segments ``ab`` and ``cd`` properly intersect. """
+    def side(p, q, r):
+        return sign((q.x - p.x) * (r.y - p.y) - (q.y - p.y) * (r.x - p.x))
+    return side(a, b, c) * side(a, b, d) < 0 and side(c, d, a) * side(
+        c, d, b) < 0
+
+
+def through(a: Point, b: Point, low: Point, high: Point) -> bool:
+    """
+    Whether the segment ``ab`` passes through the inside of the rectangle
+    with corners ``low, high``, by Liang-Barsky clipping: touching its sides
+    does not count.
+    """
+    start, end = 0., 1.
+    for p, q in [(a.x - b.x, a.x - low.x), (b.x - a.x, high.x - a.x),
+                 (a.y - b.y, a.y - low.y), (b.y - a.y, high.y - a.y)]:
+        if p == 0 and q <= 0:
+            return False
+        if p < 0:
+            start = max(start, q / p)
+        elif p > 0:
+            end = min(end, q / p)
+    return start < end
+
+
+def touch(a: Point, b: Point, c: Point, d: Point) -> bool:
+    """ Whether the closed segments ``ab`` and ``cd`` share a point. """
+    def side(p, q, r):
+        return sign((q.x - p.x) * (r.y - p.y) - (q.y - p.y) * (r.x - p.x))
+
+    def within(p, q, r):
+        return min(p.x, q.x) <= r.x <= max(p.x, q.x)\
+            and min(p.y, q.y) <= r.y <= max(p.y, q.y)
+    sides = side(a, b, c), side(a, b, d), side(c, d, a), side(c, d, b)
+    if sides[0] * sides[1] < 0 and sides[2] * sides[3] < 0:
+        return True
+    return any(s == 0 and within(p, q, r) for s, (p, q, r) in zip(sides, [
+        (a, b, c), (a, b, d), (c, d, a), (c, d, b)]))
+
+
+def curve(a: Point, b: Point, steps: int = 8) -> list[tuple[Point, Point]]:
+    """
+    The quadratic Bézier curve from ``a`` to ``b`` with control point
+    ``(a.x, b.y)``, the way a backend draws a wire, as ``steps`` segments.
+
+    >>> curve(Point(0, 0), Point(2, 1), steps=2)
+    [(Point(x=0.0, y=0.0), Point(x=0.5, y=0.75)), \
+(Point(x=0.5, y=0.75), Point(x=2.0, y=1.0))]
+    """
+    points = [Point(a.x + t * t * (b.x - a.x), a.y + (2 - t) * t * (b.y - a.y))
+              for t in (i / steps for i in range(steps + 1))]
+    return list(zip(points, points[1:]))
+
+
+def meet(test, path: list, other: list) -> bool:
+    """ Whether ``test`` holds of a segment of ``path`` and of ``other``. """
+    return any(test(*p, *q) for p in path for q in other)
+
+
+def overlap(a: Point, b: Point, c: Point, d: Point) -> bool:
+    """ Whether the rectangles with corners ``a, b`` and ``c, d`` overlap. """
+    return a.x < d.x and c.x < b.x and a.y < d.y and c.y < b.y
+
+
 class PlaneGraph(NamedTuple):
     """ A plane graph is a graph with a mapping from nodes to points. """
     graph: nx.DiGraph
     positions: dict[Node, Point]
 
+    def __repr__(self):
+        """
+        The graph as the adjacency of each of its nodes sorted by
+        :attr:`discopy.utils.Node.index`, rather than its address: the order
+        the graph happens to store its nodes in is no part of the plane
+        graph, and an adjacency also names a node with no edge, which an
+        edge list would lose.
+
+        Example
+        -------
+        >>> from discopy import monoidal
+        >>> from discopy.monoidal import Ty, Box
+        >>> x = Ty('x')
+        >>> f = Box('f', x, x)
+        >>> assert eval(repr(f.to_drawing())) == f.to_drawing()
+        """
+        def key(node):
+            return node.index, repr(node)
+
+        nodes = sorted(self.graph.nodes, key=key)
+        adjacency = {
+            node: sorted(self.graph.successors(node), key=key)
+            for node in nodes}
+        positions = dict(
+            sorted(self.positions.items(), key=lambda item: key(item[0])))
+        return f"PlaneGraph(graph=nx.DiGraph({adjacency}), "\
+               f"positions={positions})"
+
 
 @factory
 @dataclass
-class Drawing(TracedCategory["monoidal.Ty", "Drawing"], RichDisplay):
+class Drawing(
+        TracedCategory["monoidal.Ty", "Drawing"],
+        DaggerMonoidalCategory["monoidal.Ty", "Drawing"], RichDisplay):
     """
     A drawing is a plane graph with designated input and output types.
+
+    Its dagger is the reflection along the horizontal axis, which is
+    involutive, while the layout is compared on the nose: reversing a
+    composite or a tensor can lay the same diagram out with other positions,
+    see :meth:`dagger`.
 
     Parameters:
         inside (PlaneGraph) : The plane graph underlying the drawing.
@@ -295,8 +401,10 @@ class Drawing(TracedCategory["monoidal.Ty", "Drawing"], RichDisplay):
 
     yanking = TracedCategory.yanking.inapplicable(
         messages.PLANAR_YANKING)
-    serialisation = Testable.serialisation.inapplicable(
-        messages.NO_TREE_DRAWING)
+    dagger_contravariance = DaggerMonoidalCategory.dagger_contravariance\
+        .failing(messages.DRAWING_DAGGER_LAYOUT)
+    dagger_monoidality = DaggerMonoidalCategory.dagger_monoidality.failing(
+        messages.DRAWING_DAGGER_LAYOUT)
 
     def to_tree(self) -> dict:
         """
@@ -398,7 +506,8 @@ which to_drawing recomputes.
     def __eq__(self, other):
         if not isinstance(other, Drawing):
             return False
-        return self.is_parallel(other) and self.positions == other.positions
+        return self.is_parallel(other) and self.positions == other.positions\
+            and set(self.edges) == set(other.edges)
 
     @backend.matplotlib_context()
     def draw(self, **params):
@@ -413,14 +522,44 @@ which to_drawing recomputes.
         >>> svg = drawing.to_svg()
         >>> assert drawing.to_svg() == svg
         """
-        asymmetry = params.pop("asymmetry", 0.125 * any(
-            box.is_conjugate or box.is_transpose or (
-                box.is_dagger and not box.draw_as_braid)
-            for box in self.boxes))
+        params.setdefault("asymmetry", self.asymmetry())
+        return backend.draw(self.framed(), **params)
+
+    def framed(self) -> Drawing:
+        """
+        A copy with its box corners added and its dual rails framed: what a
+        backend draws, so that drawing never changes the drawing.
+        """
         result = self.relabel_nodes()
         result.add_box_corners()
         result.frame_dual_rail()
-        return backend.draw(result, asymmetry=asymmetry, **params)
+        return result
+
+    def asymmetry(self) -> float:
+        """
+        The shift of one corner of each box drawn as a polygon when nothing
+        else is asked for: :code:`0.125` when some box is a conjugate, a
+        transpose or a dagger not drawn as a braid, :code:`0` otherwise.
+        """
+        return 0.125 * any(
+            box.is_conjugate or box.is_transpose or (
+                box.is_dagger and not box.draw_as_braid)
+            for box in self.boxes)
+
+    def to_typst(self, **params):
+        """
+        The :class:`discopy.drawing.typst_ast.Document` of the drawing,
+        whose ``render`` is its Typst source.
+
+        >>> from discopy.monoidal import Ty, Box
+        >>> drawing = Box('f', Ty('x'), Ty('y')).to_drawing()
+        >>> nodes = len(drawing.positions)
+        >>> assert 'canvas' in drawing.to_typst().render()
+        >>> assert len(drawing.positions) == nodes
+        """
+        params.setdefault("asymmetry", self.asymmetry())
+        return backend.Typst(**params).draw(
+            self.framed(), **params).to_document(**params)
 
     def frame_dual_rail(self, margin=0.5):
         """
@@ -468,15 +607,31 @@ which to_drawing recomputes.
         return self
 
     def add_box_corners(self):
-        """ Recenter boxes w.r.t their wires then draw the corners. """
+        """
+        Recenter boxes w.r.t their wires then draw the corners: a box is its
+        ``height`` minus the half of a wire high, at least half a wire.
+
+        >>> from discopy.monoidal import Ty, Box
+        >>> x = Ty('x')
+        >>> f, g = Box('f', x, x, height=2), Box('g', x, x)
+        >>> (f @ g >> g @ f).draw(
+        ...     doctest='docs/_static/drawing/box-height.svg')
+
+        .. image:: /_static/drawing/box-height.svg
+            :align: center
+        """
         for j, box in enumerate(self.boxes):
             box_node = Node("box", j=j, box=box)
+            if all(Node(f"box-corner-{a}{b}", j=j) in self.positions
+                   for a in range(2) for b in range(2)):
+                continue
             box_x, box_y = self.positions[box_node]
             box_dom_nodes, box_cod_nodes = ([
                     Node(kind, i=i, j=j, x=x) for i, x in enumerate(xs)]
                 for kind, xs in [("box_dom", box.dom), ("box_cod", box.cod)])
             xs = [self.positions[n].x for n in box_dom_nodes + box_cod_nodes]
             left, right = min(xs + [box_x]) - 0.25, max(xs + [box_x]) + 0.25
+            half = max(box.height / 2 - 0.25, 0.25)
             if box.min_width and right - left < box.min_width:
                 center = (left + right) / 2
                 left = center - box.min_width / 2
@@ -484,12 +639,225 @@ which to_drawing recomputes.
             self.add_nodes({
                 Node(f"box-corner-{a}{b}", j=j): Point(x, box_y + y)
                 for a, x in enumerate([left, right])
-                for b, y in enumerate([-0.25, 0.25])})
+                for b, y in enumerate([-half, half])})
             if box.draw_as_wires or box.draw_as_spider:
                 if len(box.dom) == 1 or len(box.cod) == 1:
                     continue
             self.positions[box_node] = Point(
                 (right + left) / 2, self.positions[box_node].y)
+
+    def ordered_nodes(self) -> list[Node]:
+        """
+        The nodes of a drawing in a fixed order: by kind, then by box and wire.
+
+        >>> from discopy.monoidal import Box
+        >>> for node in Box('f', 'x', 'y').to_drawing().ordered_nodes():
+        ...     print(node)
+        Node('box', box=f, j=0)
+        Node('box_cod', i=0, j=0, x=y)
+        Node('box_dom', i=0, j=0, x=x)
+        Node('cod', i=0, x=y)
+        Node('dom', i=0, x=x)
+        """
+        return sorted(self.nodes, key=lambda node: (
+            node.kind, node.index, repr(node)))
+
+    def layout(self) -> tuple[float, ...]:
+        """
+        The geometry of a drawing as a vector: the coordinates of each of
+        :meth:`ordered_nodes` once its box corners are added, so that it holds
+        the width and the height of each box, the gaps between wires and the
+        heights of layers. :meth:`relayout` takes it back.
+
+        >>> from discopy.monoidal import Box
+        >>> Box('f', 'x', 'y').to_drawing().layout()
+        (0.5, 0.5, 0.25, 0.25, 0.25, 0.75, 0.75, 0.25, 0.75, 0.75, 0.5, 0.25, \
+0.5, 0.75, 0.5, 0, 0.5, 1)
+        """
+        drawing = self.relabel_nodes()
+        drawing.add_box_corners()
+        return tuple(coordinate for node in drawing.ordered_nodes()
+                     for coordinate in drawing.positions[node])
+
+    def relayout(self, layout: Sequence[float]) -> Drawing:
+        """
+        The drawing with the geometry of a vector given by :meth:`layout`.
+
+        Parameters:
+            layout : Two coordinates for each of the :meth:`ordered_nodes` of
+                the drawing with its box corners.
+
+        Raises:
+            ValueError : When the layout has the wrong length or when it is
+                not feasible, see :meth:`is_feasible`.
+
+        >>> from discopy.monoidal import Ty, Box
+        >>> x = Ty('x')
+        >>> drawing = (Box('f', x, x @ x) >> Box('g', x @ x, x)).to_drawing()
+        >>> svg = drawing.to_svg()
+        >>> assert drawing.relayout(drawing.layout()).to_svg() == svg
+        >>> wider = [2 * c for c in drawing.layout()]
+        >>> drawing.relayout(wider).draw(
+        ...     doctest='docs/_static/drawing/relayout.svg')
+
+        .. image:: /_static/drawing/relayout.svg
+            :align: center
+        """
+        reference = self.relabel_nodes()
+        reference.add_box_corners()
+        nodes = reference.ordered_nodes()
+        if len(layout) != 2 * len(nodes):
+            raise ValueError(messages.LAYOUT_LENGTH.format(
+                len(layout), 2 * len(nodes)))
+        positions = {
+            node: Point(float(layout[2 * k]), float(layout[2 * k + 1]))
+            for k, node in enumerate(nodes)}
+        result = reference.relabel_nodes(positions=positions)
+        result.width = reference.width + max(
+            (p.x for p in positions.values()), default=0) - max(
+                (p.x for p in reference.positions.values()), default=0)
+        result.height = reference.height + max(
+            (p.y for p in positions.values()), default=0) - max(
+                (p.y for p in reference.positions.values()), default=0)
+        if not result.is_feasible(reference):
+            raise ValueError(messages.LAYOUT_NOT_FEASIBLE)
+        return result
+
+    def wires(self) -> list[tuple[Node, Node]]:
+        """
+        The edges of a drawing that are wires, i.e. not ending at a box node.
+
+        >>> from discopy.monoidal import Box
+        >>> len(Box('f', 'x', 'y').to_drawing().wires())
+        2
+        """
+        return sorted(((u, v) for u, v in self.edges
+                       if "box" not in (u.kind, v.kind)), key=repr)
+
+    def crossings(self) -> set[tuple[int, int]]:
+        """
+        The pairs of :meth:`wires`, by index, that cross away from their ends,
+        each wire drawn as its :func:`curve`.
+
+        >>> from discopy.monoidal import Ty
+        >>> drawing = Drawing.id(Ty('x', 'y'))
+        >>> assert not drawing.crossings()
+        >>> x, y = drawing.cod_nodes
+        >>> drawing.relabel_nodes(positions={
+        ...     x: drawing.positions[y], y: drawing.positions[x]}).crossings()
+        {(0, 1)}
+        """
+        ends = [(self.positions[u], self.positions[v])
+                for u, v in self.wires()]
+        paths = [curve(*end) for end in ends]
+        return {(i, j) for i, j in itertools.combinations(range(len(ends)), 2)
+                if not set(ends[i]) & set(ends[j])
+                and meet(cross, paths[i], paths[j])}
+
+    def rectangles(self) -> list[tuple[Point, Point]]:
+        """
+        The bottom left and top right corners of each box, once added by
+        :meth:`add_box_corners`.
+        """
+        return [(self.positions[Node("box-corner-00", j=j)],
+                 self.positions[Node("box-corner-11", j=j)])
+                for j, _ in enumerate(self.boxes)
+                if Node("box-corner-00", j=j) in self.positions]
+
+    def has_rectangles(self) -> bool:
+        """
+        Whether the four corners of each box are those of a rectangle, with
+        its sides parallel to the axes.
+        """
+        return all(
+            self.positions[Node("box-corner-01", j=j)]
+            == Point(left.x, right.y)
+            and self.positions[Node("box-corner-10", j=j)]
+            == Point(right.x, left.y)
+            and left.x < right.x and left.y < right.y
+            for j, (left, right) in enumerate(self.rectangles()))
+
+    def shape(self) -> dict[str, object]:
+        """
+        What a layout keeps of a drawing, see :meth:`is_feasible`: the
+        direction of each edge, the :meth:`crossings` of wires, which wires
+        with no end in common touch, which wires pass through which box, each
+        wire drawn as its :func:`curve`, which boxes overlap, where each port
+        and each box node sits with respect to the sides of its box, and the
+        order from left to right of the wires at each boundary and at each
+        side of each box.
+
+        >>> from discopy.monoidal import Box
+        >>> drawing = Box('f', 'x', 'y').to_drawing()
+        >>> drawing.add_box_corners()
+        >>> drawing.shape()["ports"]
+        ((0, 1, -1, 1, 1), (0, 0, -1, 1, 1), (0, 1, 0, 1, 1))
+        """
+        positions, rectangles, wires = (
+            self.positions, self.rectangles(), self.wires())
+        paths = [curve(positions[u], positions[v]) for u, v in wires]
+        ports = sorted((node for node in self.nodes
+                        if node.kind in ("box_dom", "box_cod", "box")),
+                       key=repr)
+        rows: dict[tuple, list] = {}
+        for node in sorted(self.nodes, key=repr):
+            if node.kind in ("dom", "cod", "box_dom", "box_cod"):
+                rows.setdefault((node.kind, node.index[0]), []).append(node)
+        return {
+            "edges": tuple(sign(positions[u].y - positions[v].y)
+                           for u, v in sorted(
+                               ((u, v) for u, v in self.edges), key=repr)),
+            "crossings": self.crossings(),
+            "touchings": {
+                (i, j) for i, j in itertools.combinations(range(len(wires)), 2)
+                if not set(wires[i]) & set(wires[j])
+                and meet(touch, paths[i], paths[j])},
+            "through": {(i, j) for i, path in enumerate(paths)
+                        for j, rectangle in enumerate(rectangles)
+                        if meet(through, path, [rectangle])},
+            "overlaps": {(i, j) for i, j in itertools.combinations(
+                range(len(rectangles)), 2)
+                if overlap(*rectangles[i], *rectangles[j])},
+            "ports": tuple(
+                (node.j, *(sign(a - b) for a, b in [
+                    (positions[node].y, rectangles[node.j][0].y),
+                    (positions[node].y, rectangles[node.j][1].y),
+                    (positions[node].x, rectangles[node.j][0].x),
+                    (rectangles[node.j][1].x, positions[node].x)]))
+                for node in ports if node.j < len(rectangles)),
+            "order": tuple(
+                (key, tuple(node.index[1] for node in sorted(
+                    row, key=lambda node: positions[node].x)))
+                for key, row in sorted(rows.items()))}
+
+    def is_feasible(self, reference: Drawing) -> bool:
+        """
+        Whether a drawing with the nodes of a reference draws the same
+        diagram: every coordinate is finite and not negative, the corners of
+        each box make a rectangle and its :meth:`shape` is the reference's,
+        once both have their box corners.
+
+        Parameters:
+            reference : The drawing it was laid out from.
+
+        >>> from discopy.monoidal import Ty, Box
+        >>> x = Ty('x')
+        >>> drawing = (Box('f', x, x) @ Box('g', x, x)).to_drawing()
+        >>> layout = list(drawing.layout())
+        >>> assert drawing.relabel_nodes().is_feasible(drawing)
+        >>> layout[1] += 10
+        >>> drawing.relayout(layout)
+        Traceback (most recent call last):
+        ...
+        ValueError: This layout does not draw the same diagram.
+        """
+        drawing, reference = self.relabel_nodes(), reference.relabel_nodes()
+        drawing.add_box_corners()
+        reference.add_box_corners()
+        return all(isfinite(c) and c >= 0
+                   for p in drawing.positions.values() for c in p)\
+            and drawing.has_rectangles()\
+            and drawing.shape() == reference.shape()
 
     def union(self, other, dom, cod, width=None, height=None, _check=True):
         """ Take the union of two drawings, assuming nodes are distinct. """
@@ -1041,16 +1409,21 @@ which to_drawing recomputes.
             for (k, kd) in [("box_dom", "box_cod"), ("box_cod", "box_dom")]
             for n in self.nodes if n.kind == k})
         mapping.update({
+            n: Node(f"box-corner-{n.kind[-2]}{1 - int(n.kind[-1])}",
+                    j=len(self.boxes) - n.j - 1)
+            for n in self.nodes if n.kind.startswith("box-corner-")})
+        mapping.update({
             n: Node("cod", i=i, x=n.x) for i, n in enumerate(self.dom_nodes)})
         mapping.update({
             n: Node("dom", i=i, x=n.x) for i, n in enumerate(self.cod_nodes)})
-        graph = nx.relabel_nodes(self.graph, mapping).reverse(copy=False)
+        graph = nx.relabel_nodes(self.graph, mapping).reverse()
         inside = PlaneGraph(graph, positions={
             mapping[n]: Point(x, self.height - y)
             for n, (x, y) in self.positions.items()})
         dom, cod = self.cod, self.dom
         boxes = tuple(map(box_dagger, self.boxes[::-1]))
-        return Drawing(inside, dom, cod, boxes, self.width, self.height)
+        return Drawing(
+            inside, dom, cod, boxes, self.width, self.height, _check=False)
 
     @staticmethod
     def bubble_opening(dom, arg_dom, left, right, frame_boundary=False):
@@ -1175,8 +1548,8 @@ which to_drawing recomputes.
         .. image:: /_static/drawing/bubble-drawing.svg
             :align: center
         """
-        dom = self.dom if dom is None else dom
-        cod = self.cod if cod is None else cod
+        dom = self.dom if dom is None else dom.to_drawing()
+        cod = self.cod if cod is None else cod.to_drawing()
         arg_dom, arg_cod = self.dom, self.cod
         from discopy.monoidal import Wire, Ty
         left = Ty(Wire(name or "", dom.dom, arg_dom.dom))

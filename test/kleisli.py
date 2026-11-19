@@ -1,5 +1,10 @@
 # -*- coding: utf-8 -*-
 
+import os
+import subprocess
+import sys
+from pathlib import Path
+
 from pytest import approx, raises
 
 from discopy.cat import Transformation
@@ -118,8 +123,19 @@ def test_Channel_maybe():
 
     Nondet = Channel[Powerset]
     other = Nondet(lambda x: frozenset({x}), int, int)
-    with raises(AxiomError):  # Mismatched monads, caught at Function level.
+    with raises(TypeError):
         half.then(other)
+
+
+def test_channels_of_different_monads_do_not_compose():
+    for module in (kleisli.channel, additive, multiplicative):
+        safe = module.Channel[Maybe](lambda x: x, int, int)
+        nondet = module.Channel[Powerset](lambda x: frozenset({x}), int, int)
+        with raises(TypeError):
+            safe >> nondet
+        if module is not kleisli.channel:
+            with raises(TypeError):
+                safe @ nondet
 
 
 def test_Channel_powerset():
@@ -161,9 +177,19 @@ def test_pack():
     assert multiplicative.pack_value(()) == Row()
     assert multiplicative.pack_value((1, )) == 1
     assert multiplicative.pack_value((1, 2)) == Row(1, 2)
-    assert multiplicative.unpack_value(Row()) == ()
-    assert multiplicative.unpack_value(1) == (1, )
-    assert multiplicative.unpack_value(Row(1, 2)) == (1, 2)
+    assert multiplicative.unpack_value(Row(), ()) == ()
+    assert multiplicative.unpack_value(1, (int, )) == (1, )
+    assert multiplicative.unpack_value(Row(1, 2), (int, int)) == (1, 2)
+    assert multiplicative.unpack_value(Row(1, 2), (Row, )) == (Row(1, 2), )
+
+
+def test_multiplicative_one_wire_carries_a_Row_whole():
+    Safe = multiplicative.Channel[Maybe]
+    size = Safe(lambda row: len(row.values), (Row, ), (int, ))
+    pair = Safe(lambda n: Row(n, n), (int, ), (Row, ))
+    assert size(Row(1, 2)) == 2 == (pair >> size)(1)
+    assert (pair @ (int, ))(3, 4) == (Row(3, 3), 4)
+    assert ((int, ) @ pair)(4, 3) == (4, Row(3, 3))
 
 
 def test_multiplicative_Channel_tensor():
@@ -412,6 +438,27 @@ def test_sample_misses_the_missing_mass():
         frozenset({(0, .25), (1, .25), (None, .5)}))
 
 
+def test_sample_ignores_the_hash_seed():
+    """
+    Sampling outcomes that are sets draws the same outcomes on every run,
+    whatever ``PYTHONHASHSEED`` is, since the elements of each set are
+    sorted before the outcomes are. Each run starts from the root of the
+    ``discopy`` under test, so that it imports that one.
+    """
+    script = """
+from discopy.kleisli.monad import sample
+d = frozenset({(frozenset({"a", "z"}), .5), (frozenset({"m"}), .5)})
+print([sorted(sample(d)(seed)[0]) for seed in range(8)])
+"""
+    outputs = {
+        subprocess.check_output(
+            [sys.executable, "-c", script],
+            cwd=Path(cat.__file__).parents[1],
+            env=dict(os.environ, PYTHONHASHSEED=str(hash_seed)))
+        for hash_seed in range(4)}
+    assert len(outputs) == 1
+
+
 def test_Tagged():
     assert Tagged("x", 1) == eval(repr(Tagged("x", 1)))
     assert Tagged("x", 1) != Tagged("x", 0) and Tagged("x", 1) != ("x", 1)
@@ -424,8 +471,18 @@ def test_additive_pack():
     assert additive.pack((int, str)) is Tagged
     assert additive.pack_value("x", 0, (str, )) == "x"
     assert additive.pack_value("x", 1, (int, str)) == Tagged("x", 1)
-    assert additive.unpack_value("x") == ("x", 0)
-    assert additive.unpack_value(Tagged("x", 1)) == ("x", 1)
+    assert additive.unpack_value("x", (str, )) == ("x", 0)
+    assert additive.unpack_value(Tagged("x", 1), (int, str)) == ("x", 1)
+
+
+def test_additive_one_wire_carries_a_Tagged_whole():
+    Safe = additive.Channel[Maybe]
+    tag = Safe(lambda tagged: tagged.tag, (Tagged, ), (int, ))
+    wrap = Safe(lambda n: Tagged(n, 1), (int, ), (Tagged, ))
+    assert tag(Tagged("x", 1)) == 1 == (wrap >> tag)(5)
+    assert (wrap @ wrap)(5) == Tagged(Tagged(5, 1), 0)
+    assert additive.injection(0, (Tagged, ), (Tagged, int))(
+        Tagged("x", 1)) == Tagged(Tagged("x", 1), 0)
 
 
 def test_additive_injection():
@@ -597,14 +654,20 @@ def test_additive_trace_needs_an_iteration_operator():
     stateful = additive.Channel[Seed](
         lambda x, tag=0: lambda s: (Tagged(x, 0), s),
         (int, int), (int, int))
-    with raises(ValueError):
-        stateful.trace()
-
+    for left in (False, True):
+        with raises(ValueError):
+            stateful.trace(left=left)
     assert Seed.iterate is None and Maybe.iterate is not None
-    with raises(NotImplementedError):
-        additive.Channel[Maybe](
-            lambda x, tag=0: Tagged(x, 0), (int, int), (int, int)
-        ).trace(left=True)
+
+
+def test_additive_left_trace_is_the_mirrored_right_trace():
+    loop = additive.Channel[Maybe](
+        lambda x, tag=0: Tagged(x + 1, 1) if x < 3 else Tagged(x, 0),
+        (int, int), (int, int))
+    swap = additive.Channel[Maybe].swap(Ty(int), Ty(int))
+    mirrored = swap >> loop >> swap
+    assert loop.trace()(0) == mirrored.trace(left=True)(0)
+    assert loop.trace()(0) == 3
 
 
 def test_additive_token_machine_computes_the_posterior():
@@ -641,6 +704,14 @@ def test_additive_Channel_repr():
     half = additive.Channel[Maybe](
         lambda x: x // 2 if x % 2 == 0 else None, int, int)
     assert repr(half).startswith("kleisli.additive.Channel[Maybe](")
+
+
+def test_observe():
+    assert Subdistribution.observe(frozenset({(0, .1 + .2)}))\
+        == Subdistribution.observe(frozenset({(0, .3)}))
+    tick = lambda s: (s, s + 1)
+    assert Seed.observe(tick) == ((0, 1), (1, 2), (-1, 0), (2, 3))
+    assert Maybe.observe(None) is None
 
 
 def token_machine(constants):

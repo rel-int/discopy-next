@@ -12,7 +12,7 @@ import marimo as mo
 [Tiurin, Barrett, Ghica and Hu (2024)](https://arxiv.org/abs/2406.15882) give e-graphs a categorical semantics: an acyclic e-graph is a string diagram of the free semilattice-enriched Cartesian category, where an e-class is the join of its e-nodes, drawn as an *e-box*.
 Their e-hypergraphs are the combinatorial representation of such diagrams, with double-pushout rewriting, and since only the monoidal structure is needed they extend e-graphs from algebraic theories to monoidal ones.
 
-[`discopy.ehypergraph`](../../_api/discopy.ehypergraph.html) arrived at the e-graph case independently: an `EHypergraph` over a copy-discard category is a diagram with sharing and an equivalence on its wires, whose classes are the e-classes.
+[`discopy.egraph`](../../_api/discopy.egraph.html) arrived at the e-graph case independently: an `EGraph` over a copy-discard category is a diagram with sharing and an equivalence on its wires, whose classes are the e-classes.
 This notebook checks it against the paper and reproduces its examples.
 
 ## Joins
@@ -24,7 +24,7 @@ Here is the first equation of Fig. 4:
 ```python {.marimo}
 from discopy.markov import Box, Diagram, Ty
 from discopy.monoidal import Equation
-from discopy.ehypergraph import Join, Markov, distribute
+from discopy.egraph import Join, Markov, distribute
 
 x = Ty("x")
 f, g_1, g_2 = Box("f", x, x), Box("g_1", x, x), Box("g_2", x, x)
@@ -95,7 +95,7 @@ steps[3].to_diagram().foliation()
 ## One choice per class
 
 The copy after each e-box says that a term of the e-graph chooses an e-node once per class, however many times the class is read: by Fig. 4, $(p + q) ; \Delta = p ; \Delta + q ; \Delta$.
-A *section* of an `EHypergraph` makes the same choice, so that the law `EHypergraph.translation`, checked by the property matrix, states that distributing the joins of the translation gives the sections, up to the naturality of copy and discard.
+A *section* of an `EGraph` makes the same choice, so that the law `EGraph.translation`, checked by the property matrix, states that distributing the joins of the translation gives the sections, up to the naturality of copy and discard.
 The terms an e-graph represents choose per occurrence instead, here $r(p, q)$ and $r(q, p)$ too, which only agrees up to the equations of the theory, while egg's extraction of a best term chooses per class as well:
 
 ```python {.marimo}
@@ -164,7 +164,7 @@ stuck.to_diagram()
 ## What is left
 
 The e-hypergraphs of the paper are hierarchical: an e-box has any number of inputs and outputs and its components may contain e-boxes, so that the join of any two morphisms is one (Definition VI.1), and they represent every morphism of the free semilattice-enriched symmetric monoidal category of any theory, soundly and completely (Theorems VI.7 and VI.8).
-The ones of `discopy.ehypergraph` are flat, one output per e-box, which is the image of e-graphs under the translation: a rewrite with several outputs is entered as its projections, which is only sound in a Cartesian theory, so that `rewrite` refuses a box that is not a total function.
+The ones of `discopy.egraph` are flat, one output per e-box, which is the image of e-graphs under the translation: a rewrite with several outputs is entered as its projections, which is only sound in a Cartesian theory, so that `rewrite` refuses a box that is not a total function.
 Nested e-boxes, the join of Definition VI.1 and double-pushout rewriting over monoidal theories are left to [rel-int/discopy-next#103](https://github.com/rel-int/discopy-next/pull/103).
 
-Two things go beyond the paper: cyclic e-graphs, as above, and effects. A `sample` that is not deterministic and a `condition` that is not affine are generators without the naturality of copy or discard, so two samples stay apart and every section keeps a condition, and `to_diagram` places them outside the e-boxes, as context, see the examples of `discopy.ehypergraph`.
+Two things go beyond the paper: cyclic e-graphs, as above, and effects. A `sample` that is not deterministic and a `condition` that is not affine are generators without the naturality of copy or discard, so two samples stay apart and every section keeps a condition, and `to_diagram` places them outside the e-boxes, as context, see the examples of `discopy.egraph`.

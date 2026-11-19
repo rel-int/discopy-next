@@ -154,6 +154,7 @@ def test_fix_validates_the_tolerance(solver, tol):
 
 @pytest.mark.parametrize("kwargs", [
     {"n_steps": 0}, {"n_steps": 1.5}, {"max_steps": 0}, {"tol": 0},
+    {"n_steps": 3, "max_steps": 2},
 ])
 def test_power_fix_validates_parameters(kwargs):
     with pytest.raises(ValueError):
@@ -394,6 +395,18 @@ def test_fix_truncates_a_growing_photon_budget():
     with warnings.catch_warnings():
         warnings.simplefilter("error")
         sampler(loss=.9).fix(tol=.5, max_chi=4)
+
+
+def test_only_a_compressing_backend_warns_of_truncation():
+    """A backend that contracts exactly ignores `max_chi` and returns the
+    exact state, so it has no truncation to warn about."""
+    exact = sampler(loss=.5).fix(tol=1e-3, max_chi=None).density_matrix
+    for backend in (DiscopyBackend(), QuimbBackend()):
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            result = sampler(loss=.5).fix(
+                tol=1e-3, max_chi=2, backend=backend)
+        assert np.allclose(result.density_matrix, exact)
 
 
 def test_chi_defaults_to_a_laptop_sized_budget():

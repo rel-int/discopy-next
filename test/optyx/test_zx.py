@@ -4,7 +4,7 @@ import numpy as np
 from pyzx import VertexType
 from pytest import mark, raises, fixture
 
-from discopy.quantum.gates import CRz, CRx, CU1, Ket, Rx, H
+from discopy.quantum.gates import CRz, CRx, CU1, Ket, Rx
 from discopy import abc, quantum
 from discopy.optyx.core.zx import *
 from discopy.optyx.core.zx import And, H, Or, Spider, X, Z, ZBox, ZXBox
@@ -87,6 +87,17 @@ def test_ZXBox_equals_its_diagram():
     assert Z(1, 1, 0.25) != Z(1, 1, 0.5) and Z(1, 1) != X(1, 1)
 
 
+def test_H_is_its_own_dagger():
+    """#387's sibling, #366: the optyx dagger renamed a box, so `H[::-1]`
+    was a box called `H.dagger()` that `H` did not equal and `to_pyzx`
+    refused. `H` declares itself self-adjoint with `is_dagger=None`, as
+    `quantum.gates.SWAP` does."""
+    assert H.is_dagger is None
+    assert H[::-1] is H and H[::-1] == H and hash(H[::-1]) == hash(H)
+    assert ZXDiagram.from_pyzx((Z(1, 1, .25) >> H[::-1]).to_pyzx()) \
+        == Z(1, 1, .25) >> H
+
+
 def test_to_pyzx_errors():
     with raises(NotImplementedError):
         Diagram.to_pyzx(quantum.H)
@@ -95,6 +106,12 @@ def test_to_pyzx_errors():
 def test_to_pyzx():
     assert ZXDiagram.from_pyzx(Z(0, 2).to_pyzx()) == Z(0, 2)
     assert hash(ZXDiagram.from_pyzx(Z(0, 2).to_pyzx())) == hash(Z(0, 2))
+
+
+@mark.parametrize("dgrm", [
+    ZBox(0, 2, -1j), ZBox(2, 0), Z(1, 1, .25) >> ZBox(1, 1, 3) >> H])
+def test_from_pyzx_reads_a_z_box_with_its_label(dgrm):
+    assert ZXDiagram.from_pyzx(dgrm.to_pyzx()) == dgrm
 
 
 def test_to_pyzx_scalar():
@@ -133,13 +150,13 @@ def _std_basis_v(*c):
 
 def test_circuit2zx():
     circuit = Ket(0, 0) >> quantum.H @ Rx(0) >> CRz(0) >> CRx(0) >> CU1(0)
+    gadget = [Z(1, 2), Z(1, 2), X(2, 1), Z(1, 0), scalar(2 ** 0.5)]
     assert qubits.Circuit(circuit).get_kraus() == Diagram.decode(
-        dom=Bit(0), boxes_and_offsets=zip([
-            X(0, 1), X(0, 1), scalar(0.5), H, X(1, 1),
-            Z(1, 2), Z(1, 2), X(2, 1), Z(1, 0), scalar(2 ** 0.5),
-            X(1, 2), X(1, 2), Z(2, 1), X(1, 0), scalar(2 ** 0.5),
-            Z(1, 2), Z(1, 2), X(2, 1), Z(1, 0)],
-            [0, 1, 2, 0, 1, 0, 2, 1, 1, 2, 0, 2, 1, 1, 2, 0, 2, 1, 1]))
+        dom=Bit(0), boxes_and_offsets=zip(
+            [X(0, 1), X(0, 1), scalar(0.5), H, X(1, 1)]
+            + gadget + [H] + gadget + [H] + gadget,
+            [0, 1, 2, 0, 1]
+            + [0, 2, 1, 1, 2] + [1] + [0, 2, 1, 1, 2] + [1] + [0, 2, 1, 1, 2]))
 
     # Verify XYZ=iI
     circuit = quantum.Z >> quantum.Y >> quantum.X
@@ -152,8 +169,8 @@ def test_circuit2zx():
     t = qubits.Circuit(circuit).to_pyzx().to_matrix()
     assert np.isclose(np.linalg.norm(t - 1j * np.eye(2)), 0)
 
-    # with raises(NotImplementedError):
-    #     circuit2zx(quantum.scalar(1, is_mixed=True))
+    with raises(NotImplementedError):
+        qubits.Circuit(quantum.scalar(1, is_mixed=True))
 
     circuit = Ket(0)
     t = qubits.Circuit(circuit).to_pyzx().to_matrix() - _std_basis_v(0)
@@ -232,6 +249,19 @@ def test_legless_spider_is_the_sum_of_its_amplitudes(spider, phase):
     assert np.allclose(value, box.to_pyzx().to_tensor())
     assert np.allclose(value, (
         spider(0, 1, phase) >> spider(1, 0)).to_tensor().eval().array)
+
+
+@mark.parametrize("amplitude", [0, .5, 2])
+def test_legless_zbox_is_the_sum_of_its_amplitudes(amplitude):
+    """The array of a `ZBox` is `P_0 + w P_1`, so with no legs it is `1 + w`,
+    as pyzx and fusion with the box of amplitude one both give."""
+    box = ZBox(0, 0, amplitude)
+    value = box.to_tensor().eval().array
+    assert value.shape == ()
+    assert np.allclose(value, 1 + amplitude)
+    assert np.allclose(value, box.to_pyzx().to_tensor())
+    assert np.allclose(value, (
+        ZBox(0, 1, amplitude) >> ZBox(1, 0, 1)).to_tensor().eval().array)
 
 
 @mark.parametrize("spider", [Z, X, ZBox])

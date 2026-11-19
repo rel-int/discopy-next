@@ -17,6 +17,8 @@ return.
 
 import importlib
 import pathlib
+import subprocess
+import sys
 
 import pytest
 from _pytest.doctest import DoctestItem
@@ -26,11 +28,13 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 
 UNIMPORTABLE = (
     "discopy/quantum/pennylane.py", "discopy/quantum/tk.py",
-    "discopy/grammar/neural.py", "discopy/neural/torch.py",
+    "discopy/lambek/neural.py", "discopy/neural/torch.py",
     "discopy/neural/geometric.py",
+    "discopy/neural/kernels.py",
     "discopy/neural/cell.py", "discopy/neural/recursion.py",
     "discopy/neural/lattice.py", "discopy/neural/act.py", "discopy/neural/train.py",
-    "discopy/drawing/widget.py")
+    "discopy/drawing/widget.py",
+    "discopy/drawing/vision.py")
 
 # A package whose own import needs an extra, e.g. ``discopy.optyx``.
 UNIMPORTABLE_PACKAGES = ("discopy/optyx/", "test/optyx/")
@@ -39,20 +43,25 @@ UNIMPORTABLE_PACKAGES = ("discopy/optyx/", "test/optyx/")
 def pytest_addoption(parser):
     parser.addoption("--skip-extra", action="store_true", help=(
         "Skip what needs a dependency outside `uv sync --dev`, rather than "
-        "fail. Nothing is skipped once the extras are installed."))
+        "fail, whether or not that dependency is installed."))
+
+
+def needs_extra(path):
+    """ Whether the file or directory ``path`` needs an extra to import. """
+    posix = path.as_posix()
+    return posix.endswith(UNIMPORTABLE) or any(
+        package in posix + "/" for package in UNIMPORTABLE_PACKAGES)
 
 
 def pytest_ignore_collect(collection_path, config):
     if not config.getoption("--skip-extra"):
         return None
-    path = collection_path.as_posix()
-    return path.endswith(UNIMPORTABLE) or any(
-        package in path + "/" for package in UNIMPORTABLE_PACKAGES) or None
+    return needs_extra(collection_path) or None
 
 
 class Unimportable(pytest.File):
-    """ A file of a package that needs an extra, given as an argument, so
-    that ``pytest_ignore_collect`` is not asked about it. """
+    """ A file that needs an extra, given as an argument, so that
+    ``pytest_ignore_collect`` is not asked about it. """
     def collect(self):
         pytest.skip("needs an extra")
 
@@ -75,9 +84,8 @@ def pytest_collect_file(file_path, parent):
         except Exception:  # pylint: disable=broad-exception-caught
             pass  # pytest's own import of the file reports it
     collectors = yield
-    if collectors and parent.config.getoption("--skip-extra") and any(
-            package in file_path.as_posix()
-            for package in UNIMPORTABLE_PACKAGES):
+    skip = parent.config.getoption("--skip-extra") and needs_extra(file_path)
+    if collectors and skip:
         return [Unimportable.from_parent(parent, path=file_path)]
     return collectors
 
@@ -90,3 +98,12 @@ def pytest_collection_modifyitems(config, items):
         if isinstance(item, DoctestItem) and item.dtest is not None and any(
                 "+EXTRA" in e.source for e in item.dtest.examples):
             item.add_marker(pytest.mark.skip(reason="needs an extra"))
+
+
+def test_skip_extra_skips_unimportable_arguments():
+    result = subprocess.run([
+        sys.executable, "-m", "pytest", "--skip-extra",
+        "-p", "no:cacheprovider", "-q", *UNIMPORTABLE],
+        cwd=ROOT, capture_output=True, text=True, check=False)
+    assert result.stdout.splitlines()[-1].startswith(
+        f"{len(UNIMPORTABLE)} skipped"), result.stdout

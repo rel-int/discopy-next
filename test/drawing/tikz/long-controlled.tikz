@@ -1,4 +1,4 @@
-\begin{tikzpicture}[baseline=(0.base)]
+\begin{tikzpicture}[baseline=(0.base), x=0.6667in, y=0.6667in]
 \begin{pgfonlayer}{nodelayer}
 \node (0) at (0, 1.0) {};
 \node [] (1) at (0, 0) {};
@@ -45,7 +45,7 @@
 \node [] (42) at (2.25, 0.75) {};
 \node [] (43) at (2.75, 0.75) {};
 \node [] (44) at (2.75, 0.25) {};
-\node [style=none, fill=white] (45) at (2.5, 0.5) {Z};
+\node [style=none, font=\fontsize{8}{9.6}\selectfont] (45) at (2.5, 0.5) {Z};
 \node [] (46) at (3.5, 0.5) {};
 \node [] (47) at (2.75, 0.5) {};
 \node [circle, black] (48) at (3.5, 0.5) {};
@@ -56,7 +56,7 @@
 \node [circle, black] (53) at (4.5, 0.5) {};
 \end{pgfonlayer}
 \begin{pgfonlayer}{edgelayer}
-\draw [-, fill={white}] (1.center) to (2.center) to (3.center) to (4.center) to (1.center);
+\draw [-, fill={white}, draw={white}] (1.center) to (2.center) to (3.center) to (4.center) to (1.center);
 \draw [in=90, out=-90] (5.center) to (6.center);
 \draw [in=90, out=-90] (7.center) to (8.center);
 \draw [in=90, out=-90] (9.center) to (10.center);

@@ -6,7 +6,7 @@ from pytest import raises
 
 from discopy import frobenius, compact, quantum
 from discopy.quantum import Discard, Id, Ket, Measure
-from discopy.quantum.reservoir import Reservoir
+from discopy.quantum.reservoir import Readout, Reservoir
 
 
 def test_Reservoir_errors():
@@ -28,6 +28,9 @@ def test_Reservoir_errors():
         Reservoir.random(1).fit([0.1, 0.2], [0.1, 0.2, 0.3])
     with raises(ValueError):
         Reservoir.random(1).fit([0.1], [0.1], regularisation=-1)
+    for washout in (-1, 2, 0.5):
+        with raises(ValueError):
+            Reservoir.random(1).fit([0.1, 0.2], [0.1, 0.2], washout=washout)
 
 
 def test_Reservoir_random_depth():
@@ -39,13 +42,33 @@ def test_Reservoir_random_depth():
 
 
 def test_Reservoir_repr():
+    """ The repr rounds the random phases, which the gates compare exactly. """
     reservoir = Reservoir.random(memory=1, inputs=1, seed=5)
     scope = {"Reservoir": Reservoir, "quantum": quantum,
              "compact": compact, "frobenius": frobenius,
              **vars(quantum.gates)}
-    assert eval(repr(reservoir), scope) == reservoir
+    copy = eval(repr(reservoir), scope)
+    assert repr(copy) == repr(reservoir)
+    assert np.allclose(copy.unitary.eval().array,
+                       reservoir.unitary.eval().array, atol=1e-2)
     assert reservoir == Reservoir.random(memory=1, inputs=1, seed=5)
     assert reservoir != Reservoir.random(memory=1, inputs=1, seed=6)
+
+
+def test_Readout_repr():
+    readout = Readout(np.array([[1.], [2.]]), np.array([3.]))
+    scope = {"Readout": Readout, "array": np.array}
+    assert eval(repr(readout), scope) == readout
+    assert readout != Readout(np.array([[1.], [3.]]), np.array([3.]))
+    assert Readout(np.array([[1.]]), np.array([3.])) != Readout(
+        np.array([[1.], [1.]]), np.array([3.]))
+    listed = Readout([[1.], [2.]], 0)
+    assert eval(repr(listed), scope) == listed
+    assert listed == Readout(np.array([[1.], [2.]]), np.zeros(()))
+    assert listed != Readout([[1.]], 0)
+    reservoir, sequence = Reservoir.random(memory=1, seed=1), [.1, .5, .9]
+    assert reservoir.fit(sequence, 3 * [7.]) == reservoir.fit(
+        sequence, 3 * [7.])
 
 
 def test_Reservoir_step():
@@ -72,6 +95,25 @@ def test_Reservoir_fit():
     predictions = reservoir.predict(sequence, readout)[:, 0]
     baseline = sum((t - np.mean(targets)) ** 2 for t in targets)
     assert sum((predictions - targets) ** 2) < baseline
+
+
+def test_Reservoir_fit_washout():
+    reservoir = Reservoir.random(memory=2, seed=42)
+    sequence = [i / 7 % 1 for i in range(20)]
+    targets = [0.] + sequence[:-1]
+    assert reservoir.fit(sequence, targets, washout=0)\
+        == reservoir.fit(sequence, targets)
+    readout = reservoir.fit(sequence, targets, bias=False, washout=5)
+    features = np.stack(reservoir.run(sequence))[5:]
+    weights = np.linalg.lstsq(
+        np.concatenate((features, 1e-3 * np.eye(4))),
+        np.concatenate((np.array(targets[5:])[:, None], np.zeros((4, 1)))),
+        rcond=None)[0]
+    assert np.allclose(readout.weights, weights)
+    assert not np.allclose(
+        reservoir.fit(sequence, targets, bias=False).weights, weights)
+    assert reservoir.fit(sequence, ["unread"] + targets[1:], washout=1)\
+        == reservoir.fit(sequence, targets, washout=1)
 
 
 def test_Reservoir_stream_unrolls_to_run():
@@ -111,6 +153,7 @@ def test_Reservoir_empty_sequence():
     assert Reservoir.random(memory=1).run([]) == []
 
 
+@pytest.mark.slow
 def test_Reservoir_fit_on_jax():
     from discopy.matrix import backend
     pytest.importorskip("jax")
