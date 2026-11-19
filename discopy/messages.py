@@ -145,13 +145,6 @@ FEEDBACK_HAS_NO_DAGGER = (
 MAP_HAS_NO_ADJOINTS = (
     "A map is compact whatever category hosts it, but a host that is not "
     "rigid has no adjoints or curries for the laws to quantify over.")
-SECTION_NEEDS_SWAPS = (
-    "Decoding a hypergraph orders its boxes with swaps, which a category "
-    "with no symmetry does not have.")
-MAP_OF_A_CURRY = (
-    "The map of a curry rebuilds its inside from the map of it, which can "
-    "whisker a scalar on the other side, while a hypergraph compares the "
-    "inside of a bubble syntactically.")
 MAP_HAS_NO_SPIDERS = (
     "A map has no spiders: it keeps a copy or a merge as a box where a "
     "hypergraph merges its wires.")

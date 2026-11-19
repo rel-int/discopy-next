@@ -718,6 +718,15 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 - `biclosed.Constant` takes the empty type of the colour of its type as
   domain, not the one with no colour, so a constant of a type of coloured
   wires is a globular box ([next#643]).
+- Seventeen laws declared broken hold when searched under the `explore` profile,
+  and are no longer declared so: `hypergraph_section` in `rigid`, `pivotal`,
+  `ribbon`, `braided`, `balanced` and `feedback`, `map_agreement` in
+  `biclosed` and `lambek.categorial`, `TermBase.serialisation` in `biclosed`,
+  `closed` and `lambek.abstract`, and the dagger laws, `sliding`, `strength`
+  and `tightening` of `neural.Network`, whose feedback is a trace. The dagger
+  laws of `interaction.Diagram[compact.Diagram]` fail on a feedback inside,
+  and hold on the rigid and symmetric diagrams their new `_rigid` and
+  `_symmetric` cells draw ([next#485]).
 - `frobenius.Diagram.unfuse` keeps the category of the diagram, e.g. the
   cuts of a `peirce.beta.Diagram` ([next#637]).
 - `symmetric.Diagram.permutation` starts from the empty type of the colour
