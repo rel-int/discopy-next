@@ -233,6 +233,22 @@ def test_tikz_escapes_a_label_outside_mathematics(tmp_path):
     assert TikZ.escape(">>> a\\_b \\$x_y\\$") == ">{}>{}> a\\_b \\$x\\_y\\$"
 
 
+@mark.parametrize("name", ["box.typ", "box.svg"])
+def test_typst_doctest_compares_against_its_baseline(tmp_path, name):
+    pytest.importorskip("typst")
+    f, path = Box('f', Ty('x'), Ty('y')), tmp_path / name
+    f.draw(format="typst", doctest=path)
+    baseline = path.read_bytes()
+    f.draw(format="typst", doctest=path)
+    assert [file.name for file in tmp_path.iterdir()] == [name]
+    with raises(ValueError, match="Drawing differs"):
+        Box('g', Ty('x'), Ty('y')).draw(format="typst", doctest=path)
+    assert path.read_bytes() == baseline
+    assert f.draw(format="typst", path=path, compare=True) is not None
+    with raises(ValueError, match="ends in .typ or .svg"):
+        f.draw(format="typst", doctest=tmp_path / "box.png")
+
+
 TYPST_FOLDER = "test/drawing/typst/"
 
 
