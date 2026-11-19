@@ -9,6 +9,13 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Added
 
+- `discopy.peirce.alpha` and `discopy.peirce.beta`: Peirce's existential
+  graphs as diagrams with white and black regions, a cut where the colour
+  changes. `~d`, `d & e`, `d | e`, `d.relative_sum(e)` and `d.par(e)` are
+  complement, intersection, union and the black composition and tensor.
+  A `Model` sends a diagram to `Tensor[bool]`, and the 64 axioms of the
+  neo-Peircean relations of Bonchi et al. (2024) are cells of the property
+  matrix ([next#637]).
 - `abc.BraidedCategory.braid_inverse`, the inverse of the braid, by default
   its dagger and in a `abc.SymmetricCategory` the swap the other way round,
   and `abc.DaggerMonoidalCategory`, the first class with both a dagger and a
@@ -713,6 +720,14 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   `modules="jax"` evaluates on a JAX tracer and `jax.grad` reaches its
   parameters through `to_path().array` under `matrix.backend("jax")`
   ([next#257]).
+- `frobenius.Diagram.unfuse` keeps the category of the diagram, e.g. the
+  cuts of a `peirce.beta.Diagram` ([next#637]).
+- `symmetric.Diagram.permutation` starts from the empty type of the colour
+  of its types, so `permute` and `frobenius.Diagram.from_cospan` take
+  coloured wires ([next#637]).
+- `frobenius.Diagram.spiders` on a type of more than one wire starts from
+  the empty type of that type, so spiders on coloured wires keep their colour
+  ([next#637]).
 - The empty type of a colour is its own adjoint and reads back from its
   `repr` below `monoidal`: `rigid.Ty.l` and `.r` kept the colour of a type
   with no object to read it off, and `biclosed.Ty.__repr__` was
@@ -2327,6 +2342,7 @@ for the changelog of `1.2.1` and earlier.
 [next#631]: https://github.com/rel-int/discopy-next/pull/631
 [next#633]: https://github.com/rel-int/discopy-next/pull/633
 [next#634]: https://github.com/rel-int/discopy-next/pull/634
+[next#637]: https://github.com/rel-int/discopy-next/pull/637
 [next#639]: https://github.com/rel-int/discopy-next/pull/639
 [next#640]: https://github.com/rel-int/discopy-next/pull/640
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
