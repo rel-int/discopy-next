@@ -709,8 +709,6 @@ class Diagram(biclosed.Diagram, RigidCategory):
         """
         return super().normal_form(**params)
 
-    hypergraph_section = monoidal.Diagram.hypergraph_section.failing(
-        messages.SECTION_NEEDS_SWAPS)
     dagger_involution = DaggerCategory.dagger_involution.failing(
         messages.RIGID_HAS_NO_DAGGER)
     dagger_contravariance = DaggerCategory.dagger_contravariance.failing(
