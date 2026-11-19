@@ -338,7 +338,7 @@ class Diagram(
             ob_map=lambda x: x, ar_map=lambda f:
                 f.unfuse() if isinstance(f, Spider)
                 else f.to_spiders().unfuse() if isinstance(f, Cospan) else f,
-            dom=Diagram, cod=Diagram)
+            dom=self.factory, cod=self.factory)
         return F(self)
 
 
@@ -938,7 +938,7 @@ def interleaving(cls: type, factory: Callable
         phases = phases or len(typ) * [None]
         if len(typ) == 1:
             return factory(n_legs_in, n_legs_out, typ, phases[0])
-        result = cls.id().tensor(*[
+        result = cls.id(typ[:0]).tensor(*[
             factory(n_legs_in, n_legs_out, x, p) for x, p in zip(typ, phases)])
         for i, t in enumerate(typ):
             for j in range(n_legs_in - 1):
