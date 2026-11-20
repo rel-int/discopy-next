@@ -9,6 +9,12 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Added
 
+- `lambek.abstract.spindle`, SPINDLE as an ACG port of CCGrebank:
+  `Parser.from_pretrained` loads the weights of a reproduction of SPINDLE
+  trained on CCGrebank and `Parser` reads a sentence as a
+  `lambek.abstract.proofnet.ProofNet`, the categories of its words with
+  their slashes forgotten, a ghost constant for each unary rule
+  ([next#677]).
 - `discopy.peirce.alpha` and `discopy.peirce.beta`: Peirce's existential
   graphs as diagrams with white and black regions, a cut where the colour
   changes. `~d`, `d & e`, `d | e`, `d.relative_sum(e)` and `d.par(e)` are
@@ -2427,6 +2433,7 @@ for the changelog of `1.2.1` and earlier.
 [next#667]: https://github.com/rel-int/discopy-next/pull/667
 [next#672]: https://github.com/rel-int/discopy-next/pull/672
 [next#675]: https://github.com/rel-int/discopy-next/pull/675
+[next#677]: https://github.com/rel-int/discopy-next/pull/677
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#44]: https://github.com/rel-int/optyx/pull/44
