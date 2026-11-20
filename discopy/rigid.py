@@ -166,7 +166,8 @@ from collections.abc import Callable
 from typing import Iterator, Self, ClassVar
 
 from discopy import cat, monoidal, biclosed, messages
-from discopy.abc import DaggerCategory, Pregroup, RigidCategory
+from discopy.abc import (
+    DaggerCategory, DaggerMonoidalCategory, Pregroup, RigidCategory)
 from discopy.testable import GENERATORS
 from discopy.cat import factory
 from discopy.utils import (
@@ -311,13 +312,28 @@ class Ty(Pregroup, biclosed.Ty):
 
     @property
     def l(self) -> Self:
-        """ The left adjoint of the type. """
-        return self.ar(*[x.l for x in self.inside[::-1]])
+        """
+        The left adjoint of the type, i.e. the left adjoints of the objects
+        inside in reverse order.
+
+        The empty type is its own adjoint, colour and all: it has one colour
+        on both sides, which reversing the wire swaps for itself, and there
+        is no object left to read it off.
+
+        Example
+        -------
+        >>> from discopy.monoidal import Colour
+        >>> unit = Ty.id(Colour('black'))
+        >>> assert unit.l == unit == unit.r
+        """
+        return self if not self.inside\
+            else self.ar(*[x.l for x in self.inside[::-1]])
 
     @property
     def r(self) -> Self:
-        """ The right adjoint of the type. """
-        return self.ar(*[x.r for x in self.inside[::-1]])
+        """ The right adjoint of the type, see :meth:`Ty.l`. """
+        return self if not self.inside\
+            else self.ar(*[x.r for x in self.inside[::-1]])
 
     @property
     def z(self) -> int:
@@ -693,13 +709,11 @@ class Diagram(biclosed.Diagram, RigidCategory):
         """
         return super().normal_form(**params)
 
-    hypergraph_section = monoidal.Diagram.hypergraph_section.failing(
-        messages.SECTION_NEEDS_SWAPS)
     dagger_involution = DaggerCategory.dagger_involution.failing(
         messages.RIGID_HAS_NO_DAGGER)
     dagger_contravariance = DaggerCategory.dagger_contravariance.failing(
         messages.RIGID_HAS_NO_DAGGER)
-    dagger_monoidality = DaggerCategory.dagger_monoidality.failing(
+    dagger_monoidality = DaggerMonoidalCategory.dagger_monoidality.failing(
         messages.RIGID_HAS_NO_DAGGER)
 
     # The curry of a rigid diagram is made of caps, which a map and a

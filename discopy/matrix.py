@@ -38,8 +38,10 @@ See also
 """
 from __future__ import annotations
 
+import cmath
+import re
 from contextlib import contextmanager
-from math import isqrt, prod
+from math import isfinite, isqrt, prod
 from operator import index
 from types import ModuleType
 from collections.abc import Sequence
@@ -47,7 +49,7 @@ from typing import Literal, Callable, TYPE_CHECKING
 
 from discopy import config, messages
 from discopy.abc import (
-    ComarkovCategory, DaggerCategory, MarkovCategory, Nat)
+    ComarkovCategory, DaggerMonoidalCategory, MarkovCategory, Nat)
 from discopy.testable import Serialisable, TestableGeneric
 from discopy.cat import (
     factory,
@@ -64,8 +66,8 @@ if TYPE_CHECKING:
 
 @factory
 class Matrix[dtype](
-        MarkovCategory, ComarkovCategory, DaggerCategory, TestableGeneric,
-        Serialisable):
+        MarkovCategory, ComarkovCategory, DaggerMonoidalCategory,
+        TestableGeneric, Serialisable):
     """
     A matrix is an ``array`` with natural numbers as ``dom`` and ``cod``.
 
@@ -166,6 +168,20 @@ class Matrix[dtype](
 
     >>> Matrix[int]([0] * 24, 4, 6)
     Matrix[int]([0, 0, 0, ..., 0, 0, 0], dom=Nat(4), cod=Nat(6))
+
+    A matrix is immutable, and its array is not copied when it already has
+    the right ``dtype``: a NumPy array is shared with the caller through a
+    view that is read-only, so that writing into ``m.array`` raises while
+    the caller's own array stays writeable.
+
+    >>> a = np.zeros((2, 2), dtype=int)
+    >>> m = Matrix[int](a, 2, 2)
+    >>> assert np.shares_memory(m.array, a)
+    >>> assert not m.array.flags.writeable and a.flags.writeable
+
+    JAX and TensorFlow arrays are immutable anyway, but a PyTorch tensor has
+    no such flag: the matrix shares it with the caller, who must not write
+    into it after handing it over.
     """
     @classmethod
     def checked_params(cls) -> tuple:
@@ -268,15 +284,14 @@ class Matrix[dtype](
         return super().__class_getitem__(dtype)
 
     def __new__(cls, array, *args, **kwargs):
-        with backend() as np:
-            if cls.dtype is None:
-                _array = np.asarray(array)
-                # The dtype of an np.arrays is a class that contains a type
-                # attribute that is the actual type. However, other backends
-                # have different structures, so this is the easiest option:
-                dtype = getattr(_array.dtype, "type", _array.dtype)
-                return cls.__new__(cls[dtype], array, *args, **kwargs)
-            return object.__new__(cls)
+        if cls.dtype is None:
+            _array = asarray(array)
+            # The dtype of an np.arrays is a class that contains a type
+            # attribute that is the actual type. However, other backends
+            # have different structures, so this is the easiest option:
+            dtype = getattr(_array.dtype, "type", _array.dtype)
+            return cls.__new__(cls[dtype], array, *args, **kwargs)
+        return object.__new__(cls)
 
     def __init__(self, array, dom: Nat | int, cod: Nat | int):
         dom, cod = (Nat(x) if isinstance(x, int) else x for x in (dom, cod))
@@ -284,8 +299,12 @@ class Matrix[dtype](
         assert_isinstance(cod, Nat)
         self.dom, self.cod = dom, cod
         with backend() as np:
-            self.array = np.array(array, dtype=self.dtype).reshape(
+            array = asarray(array, dtype=self.dtype).reshape(
                 (index(dom), index(cod)))
+            if isinstance(np, NumPy):
+                array = array.view()
+                array.flags.writeable = False
+        self.array = array
 
     def __eq__(self, other):
         return isinstance(other, self.ar)\
@@ -754,8 +773,9 @@ and 'Matrix[int]'
             self, *symbols: "sympy.Symbol", dtype=None, **kwargs) -> Callable:
         from sympy import lambdify
         with backend() as np:
+            modules = kwargs.pop("modules", np.module)
             array = lambdify(
-                symbols, self.array.tolist(), modules=np.module, **kwargs)
+                symbols, self.array.tolist(), modules=modules, **kwargs)
         dtype = dtype or self.dtype
         return lambda *xs: type(self)[dtype](array(*xs), self.dom, self.cod)
 
@@ -768,23 +788,120 @@ and 'Matrix[int]'
                         getattr(x, "diff", lambda _: 0)(var, **params))
 
 
+def asarray(entries, dtype=None):
+    """
+    The array of the active :func:`backend` holding nested ``entries``,
+    stacking the ones the backend already owns so that a PyTorch tensor or
+    a JAX tracer keeps its gradient: converting such an entry one by one
+    reads it as a scalar and detaches it, wherever among the entries it
+    sits. A backend whose arrays are numpy's needs no stacking, and
+    ``asarray`` leaves its array alone.
+
+    Parameters:
+        entries : The array, or the nested lists of its entries.
+        dtype : The ``dtype`` of the result, the one of the entries by
+            default.
+
+    Example
+    -------
+    >>> import numpy
+    >>> assert (asarray([[0, 1], [1, 0]]) == numpy.eye(2)[::-1]).all()
+    >>> with backend('pytorch'):  # doctest: +EXTRA
+    ...     x = asarray([0.5])
+    ...     assert asarray(x) is x
+    """
+    def stack(entries, np):
+        if isinstance(entries, (list, tuple)):
+            return np.stack([stack(x, np) for x in entries])
+        return np.array(entries, dtype=dtype)
+
+    def leaves(entries):
+        if isinstance(entries, (list, tuple)):
+            for entry in entries:
+                yield from leaves(entry)
+        else:
+            yield entries
+
+    with backend() as np:
+        array = type(np.array(0))
+        if array.__module__ != "numpy" and any(
+                isinstance(entry, array) for entry in leaves(entries)):
+            return stack(entries, np)
+        return np.asarray(entries, dtype=dtype)
+
+
 def array2string(array, **params):
     """
     Numpy array pretty print, eliding past ``config.NUMPY_THRESHOLD`` entries
-    without touching numpy's global print options.
+    without touching numpy's global print options, with ``nan`` and ``inf``
+    spelled by :func:`spell_nonfinite` so that ``eval`` reads them back.
 
     >>> import numpy
     >>> threshold = numpy.get_printoptions()['threshold']
     >>> array2string(numpy.arange(3))
     '[0, 1, 2]'
+    >>> array2string(numpy.array([1., numpy.nan]))
+    "[1., float('nan')]"
     >>> assert numpy.get_printoptions()['threshold'] == threshold
     """
     import numpy
-    params = dict({'threshold': config.NUMPY_THRESHOLD}, **params)
+    array = numpy.asarray(array)
+    params = dict({'threshold': config.NUMPY_THRESHOLD,
+                   'formatter': {'object': repr_nonfinite}}, **params)
     string = numpy.array2string(
         array, **dict(
             params, separator=', '))  # ty: ignore[invalid-argument-type]
-    return string.replace('[ ', '[').replace('  ', ' ')
+    string = string.replace('[ ', '[').replace('  ', ' ')
+    return spell_nonfinite(string) if array.dtype.kind in 'fc' else string
+
+
+NONFINITE = re.compile(r"\b(nan|inf)(j?)\b")
+
+
+def spell_nonfinite(string: str) -> str:
+    """
+    Spell the ``nan`` and ``inf`` that numpy prints for an array of floats or
+    complex numbers as ``float('nan')`` and ``float('inf')``, and ``nanj``
+    and ``infj`` as ``complex('nanj')`` and ``complex('infj')``, so that
+    ``eval`` reads them back with no import. The string holds numbers only:
+    an entry of any other type is spelled by :func:`repr_nonfinite`.
+
+    >>> spell_nonfinite("[nan, -inf, 1.+nanj]")
+    "[float('nan'), -float('inf'), 1.+complex('nanj')]"
+    """
+    def spell(match):
+        token, imaginary = match.groups()
+        return f"complex('{token}j')" if imaginary else f"float('{token}')"
+    return NONFINITE.sub(spell, string)
+
+
+def repr_nonfinite(value) -> str:
+    """
+    The ``repr`` of a value or of nested lists and tuples of values, with
+    each float or complex number that is not finite spelled as
+    ``float('nan')`` or ``complex('(1+nanj)')``, so that ``eval`` reads it
+    back with no import.
+    Any other value is its ``repr``, e.g. a symbol named ``inf`` stays one.
+
+    >>> import sympy
+    >>> nan, inf = float('nan'), float('inf')
+    >>> repr_nonfinite([nan, [-inf, complex(1, nan)]])
+    "[float('nan'), [float('-inf'), complex('(1+nanj)')]]"
+    >>> repr_nonfinite([sympy.Symbol('inf'), 1.0])
+    '[inf, 1.0]'
+    >>> repr_nonfinite((nan, ))
+    "(float('nan'),)"
+    """
+    if isinstance(value, list):
+        return "[" + ", ".join(map(repr_nonfinite, value)) + "]"
+    if isinstance(value, tuple):
+        entries = ", ".join(map(repr_nonfinite, value))
+        return f"({entries},)" if len(value) == 1 else f"({entries})"
+    if isinstance(value, float) and not isfinite(value):
+        return f"float('{value}')"
+    if isinstance(value, complex) and not cmath.isfinite(value):
+        return f"complex('{value}')"
+    return repr(value)
 
 
 class Backend:

@@ -50,9 +50,11 @@ import inspect
 import json
 import sys
 from fractions import Fraction
-from functools import lru_cache, wraps
+from functools import lru_cache, reduce, wraps
 from math import ceil, prod
+from operator import or_
 from pathlib import Path
+from types import UnionType
 from typing import (
     Callable,
     ClassVar,
@@ -65,6 +67,7 @@ from typing import (
     NamedTuple,
     Sequence,
     Union,
+    get_args,
     TYPE_CHECKING,
 )
 
@@ -185,16 +188,25 @@ def identity(x: KT) -> KT:
 
 def get_origin(typ):
     """
-    Get origin of a parameterized generic type, leaving a union type
-    untouched so that ``isinstance`` can be called on it directly.
+    Get origin of a parameterized generic type, and the union of the origins
+    of a union type, so that ``isinstance`` can be called on it directly,
+    leaving the union untouched when its origins are no union of types.
 
     Example
     -------
     >>> assert get_origin(tuple[int, str]) is tuple
     >>> assert get_origin(int | None) == (int | None)
+    >>> assert get_origin(frozenset[int] | None) == (frozenset | None)
+    >>> from typing import Literal
+    >>> assert get_origin(int | Literal[1]) == (int | Literal[1])
     """
     origin = getattr(typ, "__origin__", typ)
-    return typ if origin is Union else origin
+    if origin is not Union and not isinstance(typ, UnionType):
+        return origin
+    try:
+        return reduce(or_, map(get_origin, get_args(typ)))
+    except TypeError:
+        return typ
 
 
 @lru_cache(maxsize=None)
@@ -585,12 +597,6 @@ def resolve_factory(name: str) -> type:
     >>> assert resolve_factory("tensor.Diagram[complex]") is Diagram[complex]
     >>> assert resolve_factory("tensor.Diagram[float64]") is Diagram[float64]
 
-    A module that was renamed is found under its old name, see
-    :data:`RENAMED`, so that a tree written before the rename still loads.
-
-    >>> from discopy.lambek import pregroup
-    >>> assert resolve_factory("grammar.pregroup.Ty") is pregroup.Ty
-
     Any other name raises, e.g. that of an object a module of DisCoPy
     imports, so that a file names no function for :func:`loads` to reach.
 
@@ -604,7 +610,6 @@ def resolve_factory(name: str) -> type:
         return resolve_factory(origin)[
             resolve_factory(parameter)]  # ty: ignore[not-subscriptable]
     *modules, factory = name.removeprefix('discopy.').split('.')
-    modules[:1] = [RENAMED.get(module, module) for module in modules[:1]]
     import discopy  # pylint: disable=import-outside-toplevel
     if not modules and factory not in vars(discopy):
         import numpy
@@ -618,9 +623,6 @@ def resolve_factory(name: str) -> type:
         raise AttributeError(messages.NO_SUCH_CLASS.format(name))
     return cls
 
-
-RENAMED = {"grammar": "lambek"}
-""" The modules of DisCoPy that were renamed, from old name to new. """
 
 SYMPY_CONSTANTS = (
     "Zero", "One", "NegativeOne", "Half", "Pi", "Exp1", "ImaginaryUnit",

@@ -76,7 +76,7 @@ from warnings import warn
 from discopy import abc, cat, drawing, hypergraph, cmap, messages, testable
 from discopy import sum as formal_sum
 from discopy.abc import (
-    ColouredMonoid, DaggerCategory, Monoid, MonoidalCategory)
+    ColouredMonoid, DaggerMonoidalCategory, Monoid, MonoidalCategory)
 from discopy.testable import Hom, Obj, TestableGeneric, Var, axiom
 from discopy.drawing import Drawing
 from discopy.config import (
@@ -1299,7 +1299,7 @@ class Layer(cat.Box, ColouredMonoid):
 
 
 @factory
-class Diagram(cat.Arrow, MonoidalCategory, RichDisplay):
+class Diagram(cat.Arrow, DaggerMonoidalCategory, RichDisplay):
     """
     A diagram is a tuple of composable layers :code:`inside` with a pair of
     types :code:`dom` and :code:`cod` as domain and codomain.
@@ -1323,7 +1323,7 @@ class Diagram(cat.Arrow, MonoidalCategory, RichDisplay):
     """
     bifunctoriality = MonoidalCategory.bifunctoriality.failing(
         messages.NO_PLANAR_NORMAL_FORM)
-    dagger_monoidality = DaggerCategory.dagger_monoidality.failing(
+    dagger_monoidality = DaggerMonoidalCategory.dagger_monoidality.failing(
         messages.NO_PLANAR_NORMAL_FORM)
 
     box_factory: ClassVar[type["Box"]]

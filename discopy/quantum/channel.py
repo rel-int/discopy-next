@@ -47,8 +47,7 @@ from discopy import frobenius, tensor
 from discopy.cat import factory
 from discopy.frobenius import Box
 from discopy.matrix import backend
-from discopy.quantum.circuit import (
-    Digit, Qudit)
+from discopy.quantum.circuit import Wire
 from discopy.quantum.gates import Discard, Measure, MixedState, Encode, Scalar
 from discopy.tensor import Dim, Tensor
 from discopy.utils import (
@@ -356,10 +355,8 @@ class Functor(tensor.Functor):
     dom, cod = frobenius.Diagram, Channel
 
     def __call__(self, other):
-        if isinstance(other, Digit):
-            return C(Dim(other.dim))
-        if isinstance(other, Qudit):
-            return Q(Dim(other.dim))
+        if isinstance(other, Wire):
+            return (Q if other.is_quantum else C)(Dim(other.dim))
         if isinstance(other, tensor.Permutation):
             doms = list(map(self, other.dom))
             return self.cod.permutation(other.perm, doms)

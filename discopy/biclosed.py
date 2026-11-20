@@ -106,7 +106,8 @@ from typing import (
 from discopy import cat, monoidal, cmap, hypergraph, messages
 from discopy import sum as formal_sum
 from discopy.abc import (
-    BiclosedCategory, DaggerCategory, LinearCategory, MonoidalCategory)
+    BiclosedCategory, DaggerCategory, DaggerMonoidalCategory, LinearCategory,
+    MonoidalCategory)
 from discopy.testable import (
     GENERATORS, Equation as AbstractEquation, Equivalence, Serialisable,
     Testable, TestableGeneric, axiom)
@@ -210,10 +211,6 @@ class Ty(monoidal.Ty):
 
         return st.recursive(
             cls.generator_strategy(), exponentials, max_leaves=max_leaves)
-
-    def __repr__(self):
-        return factory_name(type(self))\
-            + f"({', '.join(map(repr, self.inside))})"
 
     def cast_wire(self, x: str | cat.Ob) -> cat.Ob:
         """
@@ -605,8 +602,6 @@ class Diagram(monoidal.Diagram, LinearCategory):
     def to_drawing(self):
         return monoidal.Diagram.to_drawing(self, functor_factory=Functor)
 
-    map_agreement = monoidal.Diagram.map_agreement.failing(
-        messages.MAP_OF_A_CURRY)
     dagger_involution = DaggerCategory.dagger_involution.failing(
         messages.CURRY_HAS_NO_DAGGER)
     dagger_involution_monoidal = DaggerCategory.dagger_involution.weaken(
@@ -615,10 +610,11 @@ class Diagram(monoidal.Diagram, LinearCategory):
         messages.CURRY_HAS_NO_DAGGER)
     dagger_contravariance_monoidal = DaggerCategory.dagger_contravariance\
         .weaken(within=MonoidalCategory)
-    dagger_monoidality = DaggerCategory.dagger_monoidality.failing(
+    dagger_monoidality = DaggerMonoidalCategory.dagger_monoidality.failing(
         messages.CURRY_HAS_NO_DAGGER)
-    dagger_monoidality_monoidal = DaggerCategory.dagger_monoidality.weaken(
-        within=MonoidalCategory).failing(messages.NO_PLANAR_NORMAL_FORM)
+    dagger_monoidality_monoidal = DaggerMonoidalCategory.dagger_monoidality\
+        .weaken(within=MonoidalCategory)\
+        .failing(messages.NO_PLANAR_NORMAL_FORM)
     currying_left = BiclosedCategory.currying_left.failing(messages.FREE_CURRY)
     currying_right = BiclosedCategory.currying_right.failing(
         messages.FREE_CURRY)
@@ -1728,9 +1724,6 @@ class TermBase(Box, Equivalence):
             lambda terms: (terms[0], terms[2], terms[1]),
             Canonical[cls].strategy(**params))  # ty: ignore[invalid-type-form]
 
-    serialisation = Serialisable.serialisation.failing(
-        "A term does not read back from its tree, see #692.")
-
     @axiom
     def alpha_renaming(cls, terms: Renamed[Self]) -> AbstractEquation:
         """ A term is alpha-equivalent to its renamings, however many. """
@@ -1795,7 +1788,7 @@ class Constant(TermBase):
     serialised_attrs = ("name", "cod", "*", "is_dagger", "data")
 
     def __init__(self, name: str, cod: Ty, **kwargs):
-        super().__init__(name, dom=self.ob(), cod=cod, **kwargs)
+        super().__init__(name, dom=self.ob.id(cod.dom), cod=cod, **kwargs)
         self.freevars = []
 
     @classmethod

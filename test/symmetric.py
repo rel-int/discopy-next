@@ -4,6 +4,7 @@ import pickle
 
 from pytest import raises
 
+from discopy import feedback, symmetric
 from discopy.symmetric import *
 from discopy.utils import AxiomError, dumps, loads
 
@@ -226,6 +227,38 @@ def test_Layer_tensor():
     plumbed = Layer(f, z) @ permutation @ Layer(x, g)
     assert plumbed.boxes_or_types == (f, z @ permutation[0] @ x, g)
     assert isinstance(plumbed[1], Permutation)
+
+
+class Reiterable:
+    """ An iterable that is neither an iterator nor a sequence. """
+    def __init__(self, inside):
+        self.inside = inside
+
+    def __iter__(self):
+        return iter(self.inside)
+
+
+class Indexable:
+    """ Iterable by the sequence protocol alone, with no ``__iter__``. """
+    def __init__(self, items):
+        self.items = list(items)
+
+    def __getitem__(self, i):
+        return self.items[i]
+
+
+def test_Permutation_from_iterable():
+    x, y, z = Ty('x'), Ty('y'), Ty('z')
+    for dom, perm in [(x @ y, [1, 0]), (x @ y @ z, [1, 2, 0])]:
+        listed = Permutation(dom, perm)
+        for once in (iter(perm), (i for i in perm), dict.fromkeys(perm).keys(),
+                     Reiterable(perm), Indexable(perm)):
+            result = Permutation(dom, once)
+            assert type(result) is type(listed) and result == listed
+            assert hash(result) == hash(listed)
+            namespace = {"feedback": feedback, "symmetric": symmetric}
+            assert eval(repr(result), namespace) == result
+    assert Swap(x @ y, iter([1, 0])) == Swap(x, y)
 
 
 def test_noncommuting_Permutation_composition():

@@ -22,7 +22,8 @@ adds the involution and contravariance of its dagger; a
 :class:`ColouredMonoid` inherits the first two as the unitality and
 associativity of its product, its composition; a :class:`Groupoid` is a
 dagger category that adds the invertibility of its arrows, which its dagger
-inverts.
+inverts; a :class:`DaggerMonoidalCategory` adds the monoidality of its
+dagger.
 
 Summary
 -------
@@ -40,6 +41,7 @@ Summary
     Group
     Nat
     MonoidalCategory
+    DaggerMonoidalCategory
     SpacialCategory
     PRO
     FeedbackCategory
@@ -146,6 +148,21 @@ class Category[C0, C1: Category](Testable[C1], ABC):
         return Equation(*terms)
 
     @classmethod
+    def ob_equation(cls, *objects) -> Equation:
+        """
+        Construct an equation of objects, using strict equality by default,
+        as :meth:`equation_factory` does of morphisms: what
+        :func:`discopy.testable.inhabits` checks the boundary of a term
+        with, so that a category whose objects compare only up to a
+        quotient, e.g. :class:`discopy.stream.Stream`, says which.
+
+        >>> from discopy.monoidal import Ty, Diagram
+        >>> assert Diagram.ob_equation(Ty('x'), Ty('x'))
+        >>> assert not Diagram.ob_equation(Ty('x'), Ty('y'))
+        """
+        return Equation(*objects)
+
+    @classmethod
     @abstractmethod
     def id(cls, dom: C0) -> C1:
         """
@@ -223,14 +240,22 @@ class DaggerCategory[C0, C1: DaggerCategory](Category[C0, C1]):
     and ``f.dagger().dagger() == f``.
 
     Its laws are stated here rather than on :class:`Category`, so that a
-    category with no dagger does not have to declare them inapplicable.
-    The third, :meth:`dagger_monoidality`, needs a tensor too: a dagger
-    category with none declares it inapplicable, as
-    :class:`discopy.cat.Arrow` does.
+    category with no dagger does not have to declare them inapplicable,
+    and the one that needs a tensor too is stated on
+    :class:`DaggerMonoidalCategory`.
     """
     @abstractmethod
     def dagger(self) -> C1:
         """ The dagger of a morphism, to be instantiated. """
+
+    @classmethod
+    def has_dagger(cls) -> bool:
+        """
+        Whether the morphisms of the category have a dagger, true unless
+        it depends on a parameter, as for
+        :class:`discopy.interaction.Diagram` over a category with none.
+        """
+        return True
 
     @axiom
     def dagger_involution[A: Obj[C0], B: Obj[C0]](
@@ -245,15 +270,6 @@ class DaggerCategory[C0, C1: DaggerCategory](Category[C0, C1]):
         """ The dagger reverses composition. """
         return cls.equation_factory(
             f.then(g).dagger(), g.dagger().then(f.dagger()))
-
-    @axiom
-    def dagger_monoidality[A: Obj[C0], B: Obj[C0], C: Obj[C0], D: Obj[C0]](
-            cls, f: Hom[C1, A, B], g: Hom[C1, C, D]
-    ) -> Equation[Hom[C1, Tensor[B, D], Tensor[A, C]]]:
-        """ The dagger distributes over the tensor, when there is one. """
-        return cls.equation_factory(
-            (f @ g).dagger(),  # ty: ignore[unsupported-operator]
-            f.dagger() @ g.dagger())
 
 
 class ColouredMonoid[C0, C1: ColouredMonoid](Category[C0, C1]):
@@ -393,8 +409,6 @@ class Group[C1: Group](
     A group is a monoid whose elements are invertible, i.e. a groupoid with
     a single object :obj:`None`, which every element goes from and to.
     """
-    dagger_monoidality = DaggerCategory.dagger_monoidality.inapplicable(
-        messages.GROUP_TENSOR)
 
 
 @dataclass
@@ -620,6 +634,28 @@ class MonoidalCategory[C0: ColouredMonoid, C1: MonoidalCategory](
             mem : The memory.
         """
         return len(mem)
+
+
+class DaggerMonoidalCategory[C0: ColouredMonoid, C1: DaggerMonoidalCategory](
+        DaggerCategory, MonoidalCategory):
+    """
+    A dagger monoidal category is a :class:`DaggerCategory` and a
+    :class:`MonoidalCategory` whose dagger distributes over the tensor, see
+    :cite:t:`Selinger10`.
+    """
+    @axiom
+    def dagger_monoidality[A: Obj[C0], B: Obj[C0], C: Obj[C0], D: Obj[C0]](
+            cls, f: Hom[C1, A, B], g: Hom[C1, C, D]
+    ) -> Equation[Hom[C1, Tensor[B, D], Tensor[A, C]]]:
+        """ The dagger distributes over the tensor. """
+        return cls.equation_factory(
+            (f @ g).dagger(), f.dagger() @ g.dagger())
+
+
+DaggerMonoidalCategory.__orig_bases__ = tuple(
+    base[*DaggerMonoidalCategory.__type_params__]
+    for base in (DaggerCategory, MonoidalCategory)
+) + DaggerMonoidalCategory.__orig_bases__[2:]
 
 
 class SpacialCategory[
@@ -1760,11 +1796,11 @@ class BraidedCategory[
     :code:`braid` for the natural isomorphism :code:`x @ y -> y @ x`. It is
     a :class:`SpacialCategory`: a scalar slides along the braid of the unit.
 
-    The inverse of a braid is read as its :code:`dagger`, which every braided
-    category here has, so :meth:`braid_then_inverse`,
-    :meth:`inverse_then_braid` and :meth:`inverse_braiding` state it by
-    that name; a :class:`SymmetricCategory` declares the first two
-    inapplicable, its swap being its own inverse.
+    The inverse of a braid is :meth:`braid_inverse`, its :code:`dagger`
+    unless a subclass says otherwise, which :meth:`braid_then_inverse`,
+    :meth:`inverse_then_braid` and :meth:`inverse_braiding` state it by;
+    a :class:`SymmetricCategory` declares the first two inapplicable, its
+    swap being its own inverse.
     """
     @classmethod
     @abstractmethod
@@ -1777,21 +1813,39 @@ class BraidedCategory[
             right : The object on the right of the braid.
         """
 
+    @classmethod
+    def braid_inverse(cls, left: C0, right: C0) -> C1:
+        """
+        The inverse of the braid of two objects, from ``right @ left`` to
+        ``left @ right``, by default its dagger.
+
+        Parameters:
+            left : The object on the left of the braid.
+            right : The object on the right of the braid.
+
+        Example
+        -------
+        >>> from discopy.braided import Ty, Diagram
+        >>> x, y = Ty('x'), Ty('y')
+        >>> assert Diagram.braid_inverse(x, y) == Diagram.braid(x, y).dagger()
+        """
+        return cls.braid(left, right).dagger()
+
     @axiom
     def braid_then_inverse[X: Atom[C0], Y: Atom[C0]](
             cls, x: Var[C0, X], y: Var[C0, Y]
     ) -> Equation[Hom[C1, Tensor[X, Y], Tensor[X, Y]]]:
         """ The braid followed by its inverse is the identity. """
-        braid = cls.braid(x, y)
-        return cls.equation_factory(braid >> braid.dagger(), cls.id(x @ y))
+        return cls.equation_factory(
+            cls.braid(x, y) >> cls.braid_inverse(x, y), cls.id(x @ y))
 
     @axiom
     def inverse_then_braid[X: Atom[C0], Y: Atom[C0]](
             cls, x: Var[C0, X], y: Var[C0, Y]
     ) -> Equation[Hom[C1, Tensor[Y, X], Tensor[Y, X]]]:
         """ The inverse of the braid followed by it is the identity. """
-        braid = cls.braid(x, y)
-        return cls.equation_factory(braid.dagger() >> braid, cls.id(y @ x))
+        return cls.equation_factory(
+            cls.braid_inverse(x, y) >> cls.braid(x, y), cls.id(y @ x))
 
     @axiom
     def hexagon_left[X: Atom[C0], Y: Atom[C0], Z: Atom[C0]](
@@ -1830,7 +1884,7 @@ class BraidedCategory[
             cls, x: Var[C0, X], y: Var[C0, Y]
     ) -> Hom[C1, Tensor[Y, X], Tensor[X, Y]]:
         """ The inverse of the braid of two atoms. """
-        return cls.braid(x, y).dagger()
+        return cls.braid_inverse(x, y)
 
 
 class PROB[C1: PROB](PRO[C1], BraidedCategory[Nat, C1]):
@@ -1886,6 +1940,18 @@ class SymmetricCategory[
     @classmethod
     def braid(cls, left: C0, right: C0) -> C1:
         return cls.swap(left, right)
+
+    @classmethod
+    def braid_inverse(cls, left: C0, right: C0) -> C1:
+        """
+        The inverse of the braid of two objects, the swap of ``right`` and
+        ``left``, so that a symmetric category needs no dagger.
+
+        Parameters:
+            left : The object on the left of the braid.
+            right : The object on the right of the braid.
+        """
+        return cls.swap(right, left)
 
     @axiom
     def permutation_identity[N: Nat](

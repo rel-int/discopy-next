@@ -98,14 +98,14 @@ Both sides foliate to the same single permutation.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 from typing import ClassVar
 
 from discopy import monoidal, feedback, balanced, hypergraph, cmap, messages
 from discopy.abc import (
-    BalancedCategory, BiclosedCategory, CompactCategory, DaggerCategory,
-    PivotalCategory, RigidCategory, SpacialCategory, SymmetricCategory,
-    TracedCategory)
+    BalancedCategory, BiclosedCategory, CompactCategory,
+    DaggerMonoidalCategory, PivotalCategory, RigidCategory, SpacialCategory,
+    SymmetricCategory, TracedCategory)
 from discopy.testable import FUEL, Axiom, Rule
 from discopy.cat import factory
 from discopy.feedback import (  # noqa: F401  pylint: disable=unused-import
@@ -279,9 +279,9 @@ class Diagram(balanced.Diagram, SymmetricCategory):
     """
     # A hypergraph is faithful from symmetric categories on.
     bifunctoriality = SymmetricCategory.bifunctoriality
-    dagger_monoidality = DaggerCategory.dagger_monoidality.failing(
+    dagger_monoidality = DaggerMonoidalCategory.dagger_monoidality.failing(
         messages.FEEDBACK_HAS_NO_DAGGER)
-    dagger_monoidality_symmetric = DaggerCategory.dagger_monoidality\
+    dagger_monoidality_symmetric = DaggerMonoidalCategory.dagger_monoidality\
         .weaken(within=SymmetricCategory)
     braid_naturality = SymmetricCategory.braid_naturality
     braid_then_inverse = SymmetricCategory.braid_then_inverse
@@ -418,7 +418,8 @@ class Diagram(balanced.Diagram, SymmetricCategory):
         types = Nat(len(xs)) if doms is None else doms
         size = len(types)
         nat = types if isinstance(types, Nat) else next(iter(types), None)
-        unit = type(nat)() if isinstance(nat, Nat) else cls.ob()
+        unit = type(nat)() if isinstance(nat, Nat)\
+            else cls.ob() if nat is None else nat.id(nat.dom)
         tensor = lambda tys: unit.tensor(*tys)
         dom = tensor(types)
 
@@ -572,7 +573,9 @@ class Permutation(Box):
 
     Parameters:
         dom : The domain, i.e. the wires to permute.
-        perm : The permutation as a :class:`finset.Permutation` or a list.
+        perm : The permutation as a :class:`finset.Permutation`, a list or
+            any iterable, which is read once into a list unless it is a
+            sequence.
 
     Examples
     --------
@@ -584,6 +587,7 @@ class Permutation(Box):
     >>> assert perm @ Id(w) == Permutation(x @ y @ z @ w, [1, 2, 0, 3])
     >>> assert Permutation(x @ y, [1, 0]) == Swap(x, y)
     >>> assert Permutation(x @ y, [0, 1]) == Id(x @ y)
+    >>> assert Permutation(x @ y, iter([1, 0])) == Swap(x, y)
 
     Writing permutations by hand keeps swap-heavy diagrams compact: a whole
     permutation occupies a single layer rather than a quadratic staircase of
@@ -605,16 +609,23 @@ class Permutation(Box):
     serialised_attrs = ("dom", "perm")
 
     def __new__(cls, dom: monoidal.Ty | None = None,
-                perm: Sequence[int] | None = None):
-        if dom is None or cls is cls.ar.swap_factory:
-            return super().__new__(cls)
+                perm: Iterable[int] | None = None):
+        listed = finset.Permutation(perm, len(dom))\
+            if isinstance(dom, monoidal.Ty) and perm is not None\
+            and not isinstance(perm, Sequence | monoidal.Ty) else None
+        perm = perm if listed is None else listed
         factory = cls.ar.swap_factory\
-            if isinstance(perm, Sequence)\
+            if dom is not None and cls is not cls.ar.swap_factory\
+            and isinstance(perm, Sequence)\
             and finset.Permutation.is_swap(perm) else cls
-        return super(Permutation, factory).__new__(factory)
+        result = super(Permutation, factory).__new__(factory)
+        if listed is not None:
+            result.perm = listed
+        return result
 
-    def __init__(self, dom: monoidal.Ty, perm: Sequence[int]):
-        self.perm = finset.Permutation(perm, len(dom))
+    def __init__(self, dom: monoidal.Ty, perm: Iterable[int]):
+        self.perm = finset.Permutation(
+            perm if isinstance(perm, Sequence) else self.perm, len(dom))
         cod = dom[:0].tensor(*(dom[i] for i in self.perm))
         name = f"Permutation({list(self.perm)})"
         super().__init__(
@@ -794,7 +805,8 @@ class Swap(Permutation, balanced.Braid, Box):
 
     def __init__(self, left, right):
         if not isinstance(right, monoidal.Ty) and len(left) == 2:
-            perm = finset.Permutation(right, len(left))
+            perm = finset.Permutation(
+                right if isinstance(right, Sequence) else self.perm, 2)
             if not perm.is_swap():
                 raise ValueError(messages.NOT_A_SWAP.format(list(perm)))
             left, right = left[:1], left[1:]

@@ -4,7 +4,7 @@ import numpy as np
 from pyzx import VertexType
 from pytest import mark, raises, fixture
 
-from discopy.quantum.gates import CRz, CRx, CU1, Ket, Rx, H
+from discopy.quantum.gates import CRz, CRx, CU1, Ket, Rx
 from discopy import abc, quantum
 from discopy.optyx.core.zx import *
 from discopy.optyx.core.zx import And, H, Or, Spider, X, Z, ZBox, ZXBox

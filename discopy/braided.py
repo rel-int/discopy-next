@@ -197,9 +197,6 @@ class Diagram(monoidal.Diagram, BraidedCategory):
             raise AxiomError(messages.NO_BRAID_TO_SLIDE.format(box, i))
         return match.substitute(target)  # ty: ignore[invalid-return-type]
 
-    hypergraph_section = monoidal.Diagram.hypergraph_section.failing(
-        messages.SECTION_NEEDS_SWAPS)
-
 
 class Box(monoidal.Box, Diagram):
     """

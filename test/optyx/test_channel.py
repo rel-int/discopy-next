@@ -5,6 +5,7 @@ from sympy.abc import x, y
 from discopy.optyx.channel import (
     CQMap, Channel, Diagram, Encode, Measure, Observable, Permutation,
     bit, mode, qmode, qubit)
+from discopy import optyx
 from discopy.optyx import photonic
 from discopy.optyx.core import diagram, zw, zx
 from discopy import tensor
@@ -168,16 +169,29 @@ def test_decomposition_is_for_zx_channels():
         photonic.TBS(.25).to_dual_rail()
 
 
-def test_sums_double_and_differentiate_term_by_term():
+def test_sums_double_coherently_and_differentiate_term_by_term():
     dims = [2] * 4
     assert np.allclose(
         (photonic.BS + photonic.BS).double().to_tensor(dims).eval().array,
-        2 * photonic.BS.double().to_tensor(dims).eval().array)
+        4 * photonic.BS.double().to_tensor(dims).eval().array)
     phases = photonic.Phase(x) + photonic.Phase(2 * x)
     assert phases.grad(y) == Diagram.sum_factory((), qmode, qmode)
     one_photon = phases.grad(x).subs((x, .1)).eval().tensor.array[1, 1]
     assert np.isclose(one_photon, 2j * np.pi * (
         np.exp(.2j * np.pi) + 2 * np.exp(.4j * np.pi)))
+
+
+def test_a_sum_doubles_to_the_density_matrix_of_its_kraus_map():
+    """next#252: the doubled Bell sum keeps its cross terms."""
+    bell = (photonic.Create(1, 0, 1, 0) + photonic.Create(0, 1, 0, 1)
+            ) @ photonic.Scalar(2 ** -.5)
+    psi = bell.get_kraus().to_tensor().eval().array
+    rho = bell.double().to_tensor().eval().array
+    assert np.allclose(
+        rho, np.einsum("abcd,efgh->aebfcgdh", psi, psi.conjugate()))
+    assert np.isclose(rho[1, 0, 0, 1, 1, 0, 0, 1], .5)
+    with pytest.raises(AssertionError, match="non-pure"):
+        (photonic.PhotonLoss(.5) + photonic.PhotonLoss(.5)).double()
 
 
 def test_a_box_without_a_gradient_refuses_to_differentiate():
@@ -236,6 +250,17 @@ def test_permutation_dagger_is_its_inverse():
     perm = Permutation(qmode ** 3, [1, 2, 0])
     assert (perm.dagger().dom, perm.dagger().cod) == (perm.cod, perm.dom)
     assert np.allclose((perm >> perm.dagger()).to_path().array, np.eye(3))
+
+
+def test_permutation_from_iterator():
+    namespace = {"optyx": optyx}
+    for dom, perm in [(qubit @ bit, [1, 0]), (qubit @ bit @ mode, [1, 2, 0])]:
+        listed = Permutation(dom, perm)
+        for once in (iter(perm), (i for i in perm)):
+            result = Permutation(dom, once)
+            assert type(result) is type(listed) and result == listed
+            assert hash(result) == hash(listed)
+            assert eval(repr(result), namespace) == result
 
 
 def test_inflation_only_touches_optical_wires():
@@ -392,3 +417,16 @@ def test_dagger_of_a_channel_with_an_environment(box):
     assert np.allclose(
         box.dagger().double().to_tensor().eval().array,
         box.double().dagger().to_tensor().eval().array)
+
+
+def test_subs_reaches_the_kraus_map_of_a_channel():
+    """#445: a channel built from a symbolic Kraus map, e.g. an inflated
+    phase, substitutes in it rather than returning itself."""
+    channel, expected = (
+        photonic.Phase(value).inflate(2) for value in (x, .25))
+    assert type(channel) is Channel and channel.free_symbols == {x}
+    for result in (channel.subs((x, .25)), channel.lambdify(x)(.25)):
+        assert not result.free_symbols
+        assert np.allclose(
+            result.double().to_tensor().eval().array,
+            expected.double().to_tensor().eval().array)

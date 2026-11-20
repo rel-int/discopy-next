@@ -220,6 +220,7 @@ dual-rail encoding. For example, we can create a GHZ state:
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from importlib import import_module
 from itertools import count, repeat
 import warnings
@@ -231,7 +232,7 @@ from cotengra import (
 )
 import numpy as np
 from discopy import tensor
-from discopy import monoidal, symmetric, frobenius, hypergraph
+from discopy import monoidal, symmetric, frobenius, hypergraph, feedback
 from discopy.cat import factory
 from discopy.python import finset
 from discopy.utils import AxiomError, factory_name
@@ -264,17 +265,33 @@ class Ob(frobenius.Wire):
     @property
     def single(self):
         """Maps :code:`qubit` to :code:`diagram.bit`
-        and :code:`qmode` to :code:`diagram.mode`."""
-        return diagram.Ty(self.classical[self.name])
+        and :code:`qmode` to :code:`diagram.mode`, keeping the delay.
+
+        >>> assert qmode.delay().single() == diagram.Ty("mode").delay()
+        """
+        return diagram.Ty(self.classical[self.name]).delay(self.time_step)
 
     @property
     def double(self):
         """Maps :code:`qubit` to :code:`diagram.bit @ diagram.bit`
-        and :code:`qmode` to :code:`diagram.mode @ diagram.mode`."""
+        and :code:`qmode` to :code:`diagram.mode @ diagram.mode`,
+        keeping the delay.
+
+        >>> assert qubit.delay().double() == diagram.Ty("bit", "bit").delay()
+        """
         if self.is_classical:
-            return diagram.Ty(self.name)
+            return diagram.Ty(self.name).delay(self.time_step)
         name = self.classical[self.name]
-        return diagram.Ty(name, name)
+        return diagram.Ty(name, name).delay(self.time_step)
+
+
+HeadOb, TailOb = feedback.structural_wires(Ob)
+for _structural, _part in ((HeadOb, "head"), (TailOb, "tail")):
+    _structural.is_classical = property(lambda self: self.arg.is_classical)
+    _structural.single = property(lambda self, part=_part: getattr(
+        self.arg.single, part).delay(self.time_step))
+    _structural.double = property(lambda self, part=_part: getattr(
+        self.arg.double, part).delay(self.time_step))
 
 
 DEFAULT_MAX_STEPS = 64
@@ -1761,8 +1778,24 @@ class Channel(Diagram, frobenius.Box):
             )
 
     def lambdify(self, *symbols, **kwargs):
-        # Non-symbolic gates can be returned directly
-        return lambda *xs: self
+        """
+        The channel as a function of ``symbols``, substituted in its Kraus
+        map: a channel with no free symbols is returned as it is. The result
+        is a plain :class:`Channel` that keeps the name: the parametrised
+        boxes, e.g. :class:`photonic.Phase`, have a ``lambdify`` of their
+        own.
+
+        >>> from sympy.abc import phi
+        >>> from discopy.optyx.photonic import Phase
+        >>> channel = Phase(phi).inflate(2)
+        >>> assert not channel.lambdify(phi)(.25).free_symbols
+        >>> assert not channel.subs((phi, .25)).free_symbols
+        """
+        if not self.kraus.free_symbols:
+            return lambda *xs: self
+        kraus = self.kraus.lambdify(*symbols, **kwargs)
+        return lambda *xs: Channel(
+            self.name, kraus(*xs), self.dom, self.cod, self.env)
 
     def subs(self, *args) -> Diagram:
         syms, exprs = zip(*args)
@@ -1822,9 +1855,21 @@ class Sum(symmetric.Sum, Diagram):
     """
 
     def double(self):
-        return diagram.Diagram.sum_factory(
-            [term.double() for term in self.terms],
-            self.dom.double(), self.cod.double())
+        r"""
+        The doubling of a coherent sum :math:`\sum_i f_i` is
+        :math:`\sum_{i, j} f_i \otimes \overline{f_j}`, cross terms included:
+        the doubling of the channel whose Kraus map is :meth:`get_kraus`,
+        which reads the sum the same way. A sum with an impure term has no
+        Kraus map, and refuses.
+
+        >>> from discopy.optyx.photonic import Create, Scalar
+        >>> bell = (Create(1, 0, 1, 0) + Create(0, 1, 0, 1)) @ Scalar(.5 ** .5)
+        >>> rho = bell.double().to_tensor().eval().array
+        >>> assert np.allclose(rho[1, 1, 0, 0, 1, 1, 0, 0], .5)
+        >>> assert np.allclose(rho[1, 0, 0, 1, 1, 0, 0, 1], .5)
+        """
+        return Channel(
+            str(self), self.get_kraus(), self.dom, self.cod).double()
 
     def grad(self, var, **params):
         """Gradient with respect to :code:`var`."""
@@ -1925,7 +1970,8 @@ class Permutation(frobenius.Permutation, Channel):
     env = diagram.Ty()
 
     def __init__(self, dom, perm):
-        self.perm = finset.Permutation(perm, len(dom))
+        self.perm = finset.Permutation(
+            perm if isinstance(perm, Sequence) else self.perm, len(dom))
         cod = dom[:0].tensor(*(dom[i] for i in self.perm))
         name = f"Permutation({list(self.perm)})"
         frobenius.Box.__init__(

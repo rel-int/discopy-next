@@ -252,6 +252,12 @@ def test_equality_reads_the_data_of_constants():
     assert X(lambda x: f(x)) != X(lambda x: g(x))
 
 
+def test_constant_of_a_coloured_type():
+    white = monoidal.Colour("white")
+    x = Ty(Wire("x", dom=white, cod=white))
+    assert x.constant_factory("f", x).dom == Ty.id(white)
+
+
 def test_alpha_eq_under_restores_the_scopes():
     X, Y = Ty("X"), Ty("Y")
     f, x = (Y << X)("f"), Variable("x", X)
@@ -382,9 +388,8 @@ def test_Wire_reads_back_main():
     assert eval("biclosed.Ty(monoidal.Wire('x'))") == x
     wire = '{"factory": "monoidal.Wire", "name": "x"}'
     assert loads('{"factory": "biclosed.Ty", "inside": [' + wire + ']}') == x
-    for module in ("lambek", "grammar"):
-        assert loads('{"factory": "' + module + '.categorial.Ty", "inside": ['
-                     + wire + ']}') == categorial.Ty('x')
+    assert loads('{"factory": "lambek.categorial.Ty", "inside": ['
+                 + wire + ']}') == categorial.Ty('x')
     assert pickle.loads(
         b'\x80\x04\x95\xab\x00\x00\x00\x00\x00\x00\x00\x8c\x10discopy.bicl'
         b'osed\x94\x8c\x02Ty\x94\x93\x94)\x81\x94}\x94(\x8c\x03dom\x94\x8c'
@@ -400,6 +405,18 @@ def test_Wire_reads_back_main():
         assert Ty(atom).inside == (atom, )
     with raises(TypeError):
         closed.Ty(monoidal.Wire('x'))
+
+
+def test_the_empty_type_of_a_colour_reads_back():
+    """ `Ty.id(colour)` prints as itself rather than as the uncoloured empty
+    type, which the repr of `monoidal.Ty` already said and this one hid,
+    see #636. """
+    black = monoidal.Colour('black')
+    unit = Ty.id(black)
+    assert repr(unit) == "biclosed.Ty.id(monoidal.Colour('black'))"
+    assert eval(repr(unit), {'biclosed': biclosed, 'monoidal': monoidal})\
+        == unit != Ty()
+    assert repr(Ty()) == "biclosed.Ty()"
 
 
 def test_rigid_type_is_biclosed():
@@ -447,14 +464,14 @@ def test_pow_reads_back_main_at_its_level():
     x, y = categorial.Ty('x'), categorial.Ty('y')
     assert categorial.Ty(Exp(x, y)) == x ** y == x << y
     old = pickle.loads(zlib.decompress(base64.b64decode(
-        "eNqNUk1PwjAYBlZgKCB+oaIHjsCBP6HcDCcTj6Tb6tpkW5d9mO1AIgeIJr1Rf6T/"
-        "wpatSyZoXNIsed/nc90b+PyqVXYPG1gkNKmfTu0Aui4MpiaMkE0DAh3Omg8Eyvl2"
-        "vFqOmGZRl+MKqz2lfMvHK74c4SrrKQGXepRYkta4pw6Ng+0OwoAHXcTFi3qI1R1o"
-        "IGceG0wzqcVxgzWIFxJLAAohg5gODZHFtFni50YMGDBEHGu5LW5gXZwWrjPwTAKk"
-        "YC0SLixo2yjgHwWqyaoJj401buKacNZR4ossXnRArpsNeiVyWnDLC32UDCeTYToW"
-        "i4tNjtD3RY+yQRt38Bk+/4eGrFV/hCkKVK+uQRMULmiwiFIfhfIawOwVOrubwafS"
-        "s2R5rMoCB71E/F04tSVeuTFgwQjyeRYGCFZHsK7Xsml1X+1HvdLyJLcSy6us6I1I"
-        "J/4B9Ee+vvqgAxmtm4FVOHyb5+oI9KVA3/2SS1kfSNUvIsfGJjam3+Qw7yQ=")))
+        "eNqNUktPwjAcBzbGUEB8oagHj8CBL6HcDCcTj6SldW3c1mUPsx1I5ADRpDfqd/Rj"
+        "2LF1yQSNS5ol/f+ebd/0z69aZfvxPqLBnHnJ2AYOxC/jOQixxXwKbMEb9xRYPnA2"
+        "w+ViwDXEHEEqvPaYiI0YLsViQKq8q/gOcxlFKc24YzaL/M0WwnUXOFjIH3Mxr9sA"
+        "YnsaQa7NGRLE4AZ1A4okoBCCdG6zACOuTWIvN+I6BAEWRMttiUFMuZqkzvUn6mMF"
+        "a9JghoBlYV98FKgGr8YigivSIDXpbOLYk1nccI9cJ9volshJwS0PzEF8OxrdJkM5"
+        "OFvnCHNX9CDbaJE2OSGn/9BIa9UfQIJ91asDWYyDGfNnYeLhIL0GffIK7O3NkOPU"
+        "s2R5qMrqNn4Oxbt0aqV45cZ1BEIgplkYXbLaknW5SptWd9V+1CsNj3IrObzIivZl"
+        "OvkG8B/5eupAr9JonQyswpHrPFdbos8l+uaXXMp6T6peETmC6wiOvwF3me6n")))
     new = categorial.Eval(x ** y) >> categorial.Coeval(x ** y)
     F = categorial.Functor.id(categorial.Diagram)
     assert old == new == F(old)

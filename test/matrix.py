@@ -5,7 +5,8 @@ import pytest
 from pytest import raises
 
 from discopy.abc import DaggerCategory, Nat, TracedCategory
-from discopy.matrix import Matrix, backend, is_complex, is_field
+from discopy.matrix import (
+    Matrix, asarray, backend, is_complex, is_field)
 from discopy.symmetric import Ty, Permutation, Swap, Functor
 from discopy.tensor import Tensor, Dim
 from discopy.utils import AxiomError, Subscript, dumps, loads
@@ -358,6 +359,36 @@ def test_strategy_max_entries_on_pytorch(cls):
     assert type(drawn.array) is torch.Tensor and drawn.array.numel() == 4
 
 
+
+def test_Matrix_of_backend_scalars_keeps_their_gradient():
+    """ #652: a list of entries the backend already owns is stacked, where
+    converting them one by one reads each as a scalar and detaches it. """
+    torch = pytest.importorskip("torch")
+    t = torch.tensor(.3, dtype=torch.float64, requires_grad=True)
+    for entries, dom, cod, expected in (
+            ([t], 1, 1, 1.), ([0, t], 1, 2, 1.), ([[t, t], [t, t]], 2, 2, 4.)):
+        t.grad = None
+        with backend('pytorch'):
+            Matrix(entries, dom, cod).array.sum().backward()
+        assert t.grad == expected
+    t.grad = None
+    with backend('pytorch'):
+        Matrix[complex]([t], 1, 1).array.real.sum().backward()
+    assert t.grad == 1.
+
+
+def test_asarray_leaves_an_array_alone():
+    """ #652: only nested entries are stacked, so an array of the right
+    dtype is still the one the caller gave. """
+    array = np.arange(4, dtype=float)
+    assert asarray(array) is array
+    assert (asarray([0.5, 0.5]) == np.array([0.5, 0.5])).all()
+    assert asarray([], dtype=float).shape == (0, )
+    jax = pytest.importorskip("jax")
+    with backend('jax'):
+        assert jax.grad(lambda x: asarray([x, x]).sum())(.5) == 2.
+
+
 def test_Matrix_dtype_is_the_ring_of_entries():
     """ numpy's default precisions are the Python types they stand for, so
     the class a matrix infers is the one a user names, see #88. """
@@ -489,3 +520,53 @@ def test_symbolic_matrix_composes_with_permutations_and_copies():
     assert f @ M.id(1) >> swap == swap >> M.id(1) @ f
     assert f >> M.permutation([0]) == f
     assert f >> M.copy(1) == M([psi, psi], 1, 2)
+
+
+def test_Matrix_shares_a_read_only_view():
+    """ #8: an array of the right dtype is not copied, and the matrix
+    stays immutable without freezing the caller's array. """
+    array = np.arange(4, dtype=float).reshape((2, 2))
+    m = Matrix[float](array, 2, 2)
+    assert np.shares_memory(m.array, array)
+    assert not m.array.flags.writeable and array.flags.writeable
+    with raises(ValueError):
+        m.array[0, 0] = 1
+    array[0, 0] = 1
+    assert array[0, 0] == 1
+
+
+def test_Matrix_lambdify_modules():
+    """ #445: a ``modules`` given to ``lambdify`` replaces the backend's,
+    rather than being passed to sympy a second time. """
+    pytest.importorskip("sympy")
+    from sympy import Expr, sin
+    from sympy.abc import psi
+    f = Matrix[Expr]([sin(psi)], 1, 1)
+    modules = [{"sin": lambda _: 42.}, "math"]
+    assert f.lambdify(psi, dtype=float, modules=modules)(3)\
+        == Matrix[float]([42.], 1, 1) != f.lambdify(psi, dtype=float)(3)
+
+
+@pytest.mark.parametrize("matrix", [
+    Matrix([np.nan, 1., -np.inf], 1, 3),
+    Matrix[complex]([complex(1, np.nan), complex(np.nan, -np.inf)], 1, 2),
+    Tensor([np.nan, np.inf], Dim(1), Dim(2))])
+def test_repr_nan_inf(matrix):
+    other = eval(repr(matrix))
+    assert type(other) is type(matrix)
+    for part in ("real", "imag"):
+        assert np.array_equal(getattr(other.array, part),
+                              getattr(matrix.array, part), equal_nan=True)
+
+
+def test_repr_symbol_named_inf():
+    sympy = pytest.importorskip("sympy")
+    inf, nan = sympy.Symbol('inf'), sympy.Symbol('nan')
+    matrix = Matrix[sympy.Expr]([inf, nan + 1, float('nan')], 1, 3)
+    assert "float('nan')" in repr(matrix)
+    env = {'Matrix': Matrix, 'Expr': sympy.Expr, 'Nat': Nat,
+           'inf': inf, 'nan': nan}
+    other = eval(repr(matrix), env)
+    entries = other.array.reshape(-1)
+    assert entries[:2].tolist() == [inf, nan + 1]
+    assert np.isnan(float(entries[2]))

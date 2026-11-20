@@ -56,7 +56,7 @@ from discopy import config
 from discopy.drawing import Node, Point
 from discopy.drawing.typst_ast import (
     Bool, Call, Canvas, ContentExpr, Coord, Document, Float, Ident,
-    Import, RawText, Str, TypstNode)
+    Import, RawText, Str, TypstNode, latex_math)
 
 from discopy.config import (  # noqa: F401  pylint: disable=unused-import
     BOX_DRAWING_ATTRIBUTES as ATTRIBUTES,
@@ -101,9 +101,12 @@ def matplotlib_context():
 def draw(graph: Drawing, **params):
     """ Load a :class:`Backend` and draw a :class:`Drawing` on it. """
     if params.get("format") == "typst":
-        path, show = params.pop("path", None), params.pop("show", True)
+        path, compare = doctest_or_path(
+            params.pop("path", None), params.pop("doctest", None))
+        show = params.pop("show", True)
+        compare = params.pop("compare", False) or compare
         return Typst(**params).draw(graph, **params).output(
-            path=path, show=show, **params)
+            path=path, show=show, compare=compare, **params)
     aspect = params.get('aspect', 'auto' if 'figsize' in params else 'equal')
     if params.get('legend', False) and not params.get('to_tikz', False):
         colours = Backend.region_colours(graph)
@@ -1841,6 +1844,7 @@ class Typst(Backend):
 
     def __init__(self, **params):
         self.body: list = []
+        self.labels: list = []
         self.nodesize = params.get("nodesize", 1)
         self.fontsize = params.get("fontsize", DEFAULT["fontsize"])
         # Match Matplotlib's default stroke weight so wires/boxes read at
@@ -1883,13 +1887,19 @@ class Typst(Backend):
         """
         Return ``(inner, math)`` for a diagram label.
 
-        Only explicit ``$...$`` wrappers enter Typst math mode. Bare words
-        like ``Alice`` stay as plain text — Typst would otherwise treat them
-        as undefined variables (``unknown variable: Alice``).
+        A label between dollars, with no other dollar but escaped ones, is
+        LaTeX mathematics, as matplotlib and TikZ read it, written in Typst
+        mathematics by :func:`~discopy.drawing.typst_ast.latex_math`. Any
+        other label is plain text, e.g. ``Alice``, which Typst would read as
+        a variable, or ``$a$ and $b$``.
+
+        >>> Typst.math_label("$\\\\mapsto$"), Typst.math_label("Alice")
+        (('arrow.r.bar', True), ('Alice', False))
         """
         text = str(text)
-        if text.startswith("$") and text.endswith("$") and len(text) >= 2:
-            return text[1:-1], True
+        if len(text) >= 2 and text[0] == text[-1] == "$"\
+                and not re.search(r"(?<!\\)\$", text[1:-1]):
+            return latex_math(text[1:-1]), True
         return text, False
 
     def coord(self, x, y):
@@ -1921,7 +1931,7 @@ class Typst(Backend):
                 Ident("text"), [content], {"size": Ident(f"{scale}em")})
         else:
             text_call = content
-        self.body.append(Call(
+        self.labels.append(Call(
             Ident("content"), [self.coord(i, j), text_call], extra))
         super().draw_text(text, i, j, **params)
 
@@ -2007,21 +2017,89 @@ class Typst(Backend):
         )
         super().draw_bezier(points)
 
+    def draw_filled_shape(self, start, steps, color, stroke=False):
+        """
+        The shape of :meth:`Backend.draw_filled_shape` as one CeTZ
+        ``merge-path`` of its lines and curves, with a hairline in its own
+        colour if ``stroke``, else none, as :meth:`TikZ.draw_filled_shape`.
+
+        >>> typst = Typst()
+        >>> typst.draw_filled_shape((0, 0), [
+        ...     ("line", (1, 0)), ("curve", (1, 1), (0, 1), (0, 0))], "red")
+        >>> print(typst.body[0].render())  # doctest: +NORMALIZE_WHITESPACE
+        merge-path({line((0, 0), (1, 0));
+            bezier((1, 0), (0, 0), (1, 1), (0, 1))},
+            close: true, fill: rgb("#e8a5a5"), stroke: none)
+        """
+        segments, point = [], start
+        for step in steps:
+            if step[0] == "line":
+                segments.append(Call(Ident("line"), [
+                    self.coord(*point), self.coord(*step[1])]))
+            else:
+                segments.append(Call(Ident("bezier"), [
+                    self.coord(*point), self.coord(*step[3]),
+                    self.coord(*step[1]), self.coord(*step[2])]))
+            point = step[-1]
+        self.body.append(Call(Ident("merge-path"), [RawText(
+            "{" + "; ".join(segment.render() for segment in segments) + "}")
+        ], {"close": Bool(True),
+            "fill": Ident(self.color_expr(self.format_color(color))),
+            "stroke": self.stroke(color, linewidth=0.25) if stroke
+            else Ident("none")}))
+        super().draw_filled_shape(start, steps, color)
+
+    def draw_region_cell(self, left, right, facecolor):
+        """
+        Fill the cell between two Beziers as one closed path, see
+        :meth:`Backend.region_cell_steps`, stroked in its own colour so that
+        two cells meeting edge to edge leave no seam, as
+        :meth:`TikZ.draw_region_cell` does.
+        """
+        self.draw_filled_shape(
+            left[0], self.region_cell_steps(left, right), facecolor,
+            stroke=True)
+        super().draw_region_cell(left, right, facecolor)
+
     def spider_shape(self, box, i, j) -> list[Call]:
         """
-        The disc or the square of a spider at ``(i, j)``, and nothing when
-        its colour is transparent: such a spider is just its label, e.g. the
-        symbol of an :class:`discopy.monoidal.Equation`.
+        The shape of a spider at ``(i, j)``, one of :data:`SHAPES` as
+        matplotlib draws it: a square, a triangle pointing up or down, a
+        plus sign in its colour or else a disc. Nothing when its colour is
+        transparent: such a spider is just its label, e.g. the symbol of an
+        :class:`discopy.monoidal.Equation`.
+
+        >>> from discopy.frobenius import Ty, Spider
+        >>> spider = Spider(1, 1, Ty('x'))
+        >>> for shape in SHAPES:
+        ...     spider.shape = shape
+        ...     call, *_ = Typst().spider_shape(spider, 0, 0)
+        ...     print(shape, call.func.render(), len(call.args))
+        rectangle rect 2
+        triangle_up line 3
+        triangle_down line 3
+        circle circle 1
+        plus line 2
         """
         if self.is_transparent(box.color):
             return []
         colour = self.color_expr(self.format_color(box.color))
         options = {"fill": Ident(colour), "stroke": self.stroke(linewidth=0.5)}
+        size = self.nodesize * 0.15
         if box.shape == "rectangle":
-            size = self.nodesize * 0.15
             return [Call(Ident("rect"), [
                 self.coord(i - size, j - size),
                 self.coord(i + size, j + size)], options)]
+        if box.shape in ("triangle_up", "triangle_down"):
+            apex = size if box.shape == "triangle_up" else -size
+            return [Call(Ident("line"), [
+                self.coord(i - size, j - apex), self.coord(i + size, j - apex),
+                self.coord(i, j + apex)], {"close": Bool(True), **options})]
+        if box.shape == "plus":
+            return [Call(Ident("line"), [
+                self.coord(i - x, j - y), self.coord(i + x, j + y)],
+                {"stroke": self.stroke(box.color)})
+                for x, y in ((size, 0), (0, size))]
         return [Call(Ident("circle"), [self.coord(i, j)], {
             "radius": Float(self.nodesize * 0.12), **options})]
 
@@ -2047,14 +2125,17 @@ class Typst(Backend):
                 lbl = Call(
                     Ident("text"), [ContentExpr(inner, math=math)],
                     {"fill": Ident(fc), "size": Ident(f"{scale}em")})
-                self.body.append(Call(
+                self.labels.append(Call(
                     Ident("content"), [self.coord(i, j), lbl]))
         super().draw_spiders(graph, draw_box_labels)
 
     def to_document(self, **params):
         """
         The document of what was drawn: a CeTZ canvas on a page cropped to
-        it, with ``page_margin`` around and ``unit_length`` to a unit.
+        it, with ``page_margin`` around and ``unit_length`` to a unit. Its
+        :attr:`labels` come after the rest of its :attr:`body`, so that no
+        box or wire drawn after a label hides it, as TikZ puts its labels on
+        a layer of their own.
         """
         margin = params.get("page_margin", "0.2cm")
         doc = Document(
@@ -2069,26 +2150,56 @@ class Typst(Backend):
         unit_len = params.get("unit_length", "1in")
         canvas = Canvas(
             canvas_kwargs={"length": Ident(unit_len)},
-            body=[RawText("import draw: *")] + self.body,
+            body=[RawText("import draw: *")] + self.body + self.labels,
         )
         doc.content = canvas
         return doc
 
-    def output(self, path=None, show=True, **params):
-        doc = self.to_document(**params)
-        source = doc.render()
-        if isinstance(path, (str, os.PathLike))\
-                and str(path).endswith(".typ"):
-            pathlib.Path(path).write_text(source, encoding="utf-8")
-            return source
+    @staticmethod
+    def compile(source: str) -> bytes:
+        """ The SVG of a Typst ``source``, with the optional ``typst``. """
         try:
             import typst
-
-            svg = typst.compile(source.encode(), format="svg", pretty=True)
         except ImportError as error:  # pragma: no cover
             raise ImportError(
                 "Typst rendering requires the 'typst' package. "
                 "Install it with: pip install typst") from error
+        return typst.compile(source.encode(), format="svg", pretty=True)
+
+    @classmethod
+    def save(cls, source: str, path) -> str | bytes:
+        """ Write a Typst ``source`` to a path ending in ``.typ``, its
+        SVG to any other path, and return what was written. """
+        if str(path).endswith(".typ"):
+            pathlib.Path(path).write_bytes(source.encode("utf-8"))
+            return source
+        svg = cls.compile(source)
+        pathlib.Path(path).write_bytes(svg)
+        return svg
+
+    def output(self, path=None, show=True, **params):
+        """
+        The Typst source of the drawing when ``path`` ends in ``.typ``,
+        written there, else its SVG, written to ``path`` when there is one.
+        With ``compare``, i.e. ``draw(doctest=path)``, the file at ``path``
+        is a baseline, its source or its SVG, so ``path`` ends in ``.typ``
+        or ``.svg``: written when missing, compared with otherwise, as
+        :func:`save_and_compare` does for any other backend.
+        """
+        source = self.to_document(**params).render()
+        is_source = isinstance(path, (str, os.PathLike))\
+            and str(path).endswith(".typ")
+        if params.get("compare", False):
+            if not str(path).endswith((".typ", ".svg")):
+                raise ValueError(
+                    f"A Typst baseline ends in .typ or .svg, got {path!r}.")
+            written = []
+            save_and_compare(path, lambda file: written.append(
+                self.save(source, file)))
+            return written[0]
+        if is_source:
+            return self.save(source, path)
+        svg = self.compile(source)
         if hasattr(path, "write"):
             path.write(svg.decode() if isinstance(path, TextIOBase) else svg)
             return svg

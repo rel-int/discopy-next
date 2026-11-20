@@ -68,8 +68,11 @@ from typing import ClassVar
 
 # pylint: disable=inconsistent-mro  # astroid misreads the MRO, C3 does not
 
-from discopy import symmetric, ribbon, pivotal, feedback, cmap, hypergraph
-from discopy.abc import CompactCategory
+from discopy import (
+    symmetric, ribbon, pivotal, feedback, cmap, hypergraph, interaction,
+    messages)
+from discopy.abc import (
+    CompactCategory, DaggerMonoidalCategory, RigidCategory, SymmetricCategory)
 from discopy.cat import factory
 from discopy.utils import deprecated_alias
 from discopy.pivotal import (  # noqa: F401  pylint: disable=unused-import
@@ -234,6 +237,17 @@ Hypergraph = hypergraph.Hypergraph[Diagram]
 Diagram.cup_factory, Diagram.cap_factory = Cup, Cap
 Diagram.sum_factory = Sum
 Diagram.bubble_factory = Bubble
+for name in (
+        "dagger_involution", "dagger_contravariance", "dagger_monoidality"):
+    setattr(interaction.Diagram[Diagram], name, getattr(
+        DaggerMonoidalCategory, name).failing(messages.FEEDBACK_HAS_NO_DAGGER))
+interaction.Diagram[Diagram].dagger_involution_rigid\
+    = DaggerMonoidalCategory.dagger_involution.weaken(within=RigidCategory)
+interaction.Diagram[Diagram].dagger_contravariance_rigid\
+    = DaggerMonoidalCategory.dagger_contravariance.weaken(within=RigidCategory)
+interaction.Diagram[Diagram].dagger_monoidality_symmetric\
+    = DaggerMonoidalCategory.dagger_monoidality.weaken(
+        within=SymmetricCategory)
 
 
 class Equation(symmetric.Equation):

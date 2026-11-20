@@ -605,10 +605,12 @@ def position(variable: TypeVar, category: type) -> int | None:
 def inhabits(value, kind) -> bool:
     """
     Whether a value has an evaluated type of a sequent: a morphism of
-    ``Hom[C, dom, cod]`` has that boundary, the value of ``Var[T, x]`` is
-    ``x``, an equation of ``Equation[T]`` has terms of type ``T``, as an
-    inequation of ``Inequation[T]`` does, a tuple of ``tuple[T, ...]`` has
-    its elements of these types and ``type[T]`` is a subclass of ``T``.
+    ``Hom[C, dom, cod]`` has that boundary, compared by the
+    :meth:`discopy.abc.Category.ob_equation` of ``C``, the value of
+    ``Var[T, x]`` is ``x``, an equation of ``Equation[T]`` has terms of
+    type ``T``, as an inequation of ``Inequation[T]`` does, a tuple of
+    ``tuple[T, ...]`` has its elements of these types and ``type[T]`` is a
+    subclass of ``T``.
 
     >>> from discopy.monoidal import Ty, Box, Diagram
     >>> x, y = Ty('x'), Ty('y')
@@ -622,7 +624,8 @@ def inhabits(value, kind) -> bool:
     origin, args = get_origin(kind), get_args(kind)
     if origin is Hom:
         return isinstance(value, args[0])\
-            and (value.dom, value.cod) == args[1:]
+            and bool(args[0].ob_equation(value.dom, args[1]))\
+            and bool(args[0].ob_equation(value.cod, args[2]))
     if origin is Var:
         return value == args[1]
     if isinstance(origin, type) and issubclass(origin, Equation):
@@ -1254,7 +1257,7 @@ class Testable[T](ABC):  # noqa: B024  strategy is optional, see below
         >>> from discopy.biclosed import TermBase
         >>> assert Arrow in Testable.enrolled() and Ty in Testable.enrolled()
         >>> assert Box not in Testable.enrolled()
-        >>> from discopy.lambek.proofnet import ProofNet
+        >>> from discopy.lambek.abstract.proofnet import ProofNet
         >>> assert TermBase in Testable.enrolled()
         >>> assert ProofNet in Testable.enrolled()
         """

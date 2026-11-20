@@ -65,6 +65,12 @@ NOT_FROBENIUS = \
     "{} has no spiders, cups or caps to downgrade this hypergraph."
 NOT_RIGID = "{} has no cups or caps for the wiring of this map."
 NOT_TRACED = "{} has no traces for the cycles of this map."
+DRAWING_DAGGER_LAYOUT = (
+    "A drawing is compared on the nose, positions included: composition "
+    "aligns wires from the top down and a tensor puts its left boxes first, "
+    "so the reflection of a composite or a tensor can be laid out with "
+    "other positions or box indices.")
+ONLY_SWAP_INVERSE = "Only a swap has an inverse: a function has no dagger."
 NO_PLANAR_NORMAL_FORM = (
     "A planar law is compared on the nose: a hypergraph is faithful only "
     "from symmetric categories on, and there is no normal form for this "
@@ -77,10 +83,6 @@ COLOURED_QUOTIENT = (
     "ill-typed across 0-cells, so it would lose its colours.")
 NO_VALUES = "{} has no sample of values, see testable.values."
 NO_DAGGER = "There is no dagger here, so the dagger laws do not apply."
-NO_TENSOR = "An arrow of a category has no tensor for its dagger to "\
-    "distribute over."
-GROUP_TENSOR = "The tensor of a group is its composition, which its dagger "\
-    "reverses rather than distributes over."
 SWAP_INVOLUTION = (
     "The inverse of a swap is the swap the other way, see swap_inverse.")
 PAIR_LENGTH = (
@@ -143,13 +145,6 @@ FEEDBACK_HAS_NO_DAGGER = (
 MAP_HAS_NO_ADJOINTS = (
     "A map is compact whatever category hosts it, but a host that is not "
     "rigid has no adjoints or curries for the laws to quantify over.")
-SECTION_NEEDS_SWAPS = (
-    "Decoding a hypergraph orders its boxes with swaps, which a category "
-    "with no symmetry does not have.")
-MAP_OF_A_CURRY = (
-    "The map of a curry rebuilds its inside from the map of it, which can "
-    "whisker a scalar on the other side, while a hypergraph compares the "
-    "inside of a bubble syntactically.")
 MAP_HAS_NO_SPIDERS = (
     "A map has no spiders: it keeps a copy or a merge as a box where a "
     "hypergraph merges its wires.")

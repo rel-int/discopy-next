@@ -170,6 +170,7 @@ from __future__ import annotations
 from typing import Optional
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
+from functools import cache
 
 from discopy import messages, symmetric, testable
 from discopy.abc import FeedbackCategory, NamedGeneric
@@ -177,7 +178,8 @@ from discopy.testable import TestableGeneric
 from discopy.python import finset
 from discopy.utils import (
     AxiomError,
-    assert_isinstance, unbiased, inductive, classproperty, factory_name)
+    Subscript, assert_isinstance, unbiased, inductive, classproperty,
+    factory_name, rebuild_named_generic)
 
 
 @dataclass
@@ -434,6 +436,104 @@ def up_to_steps(term: "Ty | Stream"):
         else testable.quotient(category, unrolled)
 
 
+def steps(typ: Ty) -> tuple:
+    """
+    The first :data:`STEPS` steps of a stream of types after the one now,
+    as a tuple of types of the underlying class: how
+    :meth:`Stream.ob_equation` compares objects, the same steps
+    :func:`up_to_steps` compares arrows over, one type a step.
+
+    >>> x = symmetric.Ty('x')
+    >>> assert Ty.sequence(x) != Ty.sequence(x)
+    >>> assert steps(Ty.sequence(x)) == steps(Ty.sequence(x))
+    >>> assert steps(Ty(x).delay()) != steps(Ty(x))
+    """
+    result = [typ.now]
+    for _ in range(STEPS):
+        typ = typ.later
+        result.append(typ.now)
+    return tuple(result)
+
+
+MEMORY = "memory"
+""" The name of the boxes :func:`up_to_memory` closes the memory with. """
+
+
+class Memory:  # pylint: disable=too-few-public-methods  # a subscript only
+    """
+    The boxes :func:`up_to_memory` closes the memory with: ``Memory[B]`` is
+    a subclass of the boxes ``B`` of the underlying category, built once and
+    pickled by its subscript, as a :class:`discopy.utils.NamedGeneric` is. A
+    box compares its class, so no box a user builds is read as one of them.
+
+    >>> import pickle
+    >>> from discopy import stream, feedback
+    >>> box = Memory[symmetric.Box](MEMORY, *2 * [symmetric.Ty('x')])
+    >>> assert box != symmetric.Box(MEMORY, *2 * [symmetric.Ty('x')])
+    >>> assert eval(repr(box)) == box == pickle.loads(pickle.dumps(box))
+    """
+    def __class_getitem__(cls, box_factory: type | tuple) -> type:
+        box_factory, = box_factory if isinstance(box_factory, tuple)\
+            else (box_factory, )
+        return subclass(cls, box_factory)
+
+
+@cache
+def subclass(memory: type, box_factory: type) -> type:
+    """ The class ``Memory[box_factory]``, see :class:`Memory`. """
+    def __reduce__(self):
+        func, args, *rest = super(result, self).__reduce__()
+        return (func, args, *rest) if not args or args[0] is not result\
+            else (rebuild_named_generic, (func, memory, (
+                Subscript.encode(box_factory), ), args[1:]), *rest)
+
+    name = f"{memory.__name__}[{factory_name(box_factory)}]"
+    result = type(name, (box_factory, ), {
+        "__module__": __name__, "__qualname__": name,
+        "__reduce__": __reduce__})
+    return result
+
+
+def up_to_memory(term: Stream):
+    """
+    The first :data:`STEPS` steps of a stream up to a permutation of its
+    memory wires, in and out: what a law of streams whose two sides feed
+    back the same memory in another order is read with, e.g. the
+    interchanger of the module docstring, which :func:`up_to_steps` tells
+    apart.
+
+    It is :func:`up_to_steps` with each memory wire of the unrolled `now`
+    closed by a :class:`Memory` box, a state in and an effect out: the
+    isomorphism of hypergraphs forgets the order of boxes, so two terms are
+    equal when a permutation of the memory of one gives the other. Over a
+    category with no boxes, e.g. :class:`discopy.python.Function`, it is
+    :func:`up_to_steps`, the memory in order.
+
+    >>> x, y, m, n = map(Ty.sequence, "xymn")
+    >>> f, g = Stream.sequence('f', x, x, m), Stream.sequence('g', y, y, n)
+    >>> h, k = Stream.sequence('h', x, x, n), Stream.sequence('k', y, y, m)
+    >>> LHS, RHS = f @ g >> h @ k, (f >> h) @ (g >> k)
+    >>> assert up_to_steps(LHS) != up_to_steps(RHS)
+    >>> assert up_to_memory(LHS) == up_to_memory(RHS)
+    >>> assert up_to_memory(f @ h) != up_to_memory(h @ f)
+    """
+    category = type(term).category
+    if getattr(category, "box_factory", None) is None:
+        return up_to_steps(term)
+    box = Memory[category.box_factory]
+    unrolled = term.unroll(STEPS)
+    now, unit = unrolled.now, category.ob()
+    n_dom = len(now.dom) - len(unrolled.mem_dom)
+    n_cod = len(now.cod) - len(unrolled.mem_cod)
+    states = [box(MEMORY, unit, now.dom[i:i + 1])
+              for i in range(n_dom, len(now.dom))]
+    effects = [box(MEMORY, now.cod[i:i + 1], unit)
+               for i in range(n_cod, len(now.cod))]
+    closed = category.id(now.dom[:n_dom]).tensor(*states) >> now\
+        >> category.id(now.cod[:n_cod]).tensor(*effects)
+    return testable.quotient(category, closed)
+
+
 @dataclass
 class Stream[category](FeedbackCategory, TestableGeneric):
     """
@@ -493,18 +593,14 @@ class Stream[category](FeedbackCategory, TestableGeneric):
     @classmethod
     def checked_params(cls) -> tuple:
         """
-        None, so that the property matrix does not check streams yet: a
-        stream draws its terms, see :meth:`strategy`, and states the
-        equality its laws are read with, see :meth:`equation_factory`, but
-        :func:`discopy.testable.inhabits` compares the boundary of a term
-        with `==`, which on objects of intensional equality is identity, so
-        nine cells would fail on the type check of a law that holds. That,
-        and the three feedback laws that hold only up to a permutation of
-        the memory, are the two decisions of
-        `#533 <https://github.com/rel-int/discopy-next/issues/533>`_;
-        returning ``(cls.category, )`` enrols streams the day they land.
+        The underlying category, so that the property matrix checks streams
+        over it: a law is read up to :data:`STEPS` steps, see
+        :meth:`equation_factory`, a boundary too, see :meth:`ob_equation`,
+        and the three laws whose sides feed back the same memory in another
+        order up to a permutation of it, see :func:`up_to_memory`
+        (`#533 <https://github.com/rel-int/discopy-next/issues/533>`_).
         """
-        return ()
+        return (cls.category, )
 
     category = symmetric.Diagram
     ob = classproperty(lambda cls: Ty[cls.category.ob])
@@ -518,6 +614,23 @@ class Stream[category](FeedbackCategory, TestableGeneric):
     later, is_constant = Ty.later, Ty.is_constant
     head, tail = Ty.head, Ty.tail
     sliding = FeedbackCategory.sliding.failing(messages.STREAM_SLIDING)
+    bifunctoriality = FeedbackCategory.bifunctoriality.modulo(up_to_memory)
+    strength = FeedbackCategory.strength.modulo(up_to_memory)
+    tightening = FeedbackCategory.tightening.modulo(up_to_memory)
+
+    @classmethod
+    def ob_equation(cls, *objects: Ty) -> testable.Equation:
+        """
+        The equation of objects, compared over their first :data:`STEPS`
+        steps after now, see :func:`steps`: `==` on a stream of types is
+        intensional, so the boundary of a term would be equal to no object
+        built beside it.
+
+        >>> x = symmetric.Ty('x')
+        >>> assert Stream.ob_equation(Ty.sequence(x), Ty.sequence(x))
+        >>> assert not Stream.ob_equation(Ty.sequence(x), Ty(x))
+        """
+        return testable.Equation(*objects, up_to=steps)
 
     @classmethod
     def equation_factory(cls, *terms: Stream) -> testable.Equation:

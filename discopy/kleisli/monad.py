@@ -189,7 +189,7 @@ class Monad(EndoFunctor):
         return isinstance(other, Monad) and self.name == other.name
 
     def __hash__(self):
-        return hash(repr(self))
+        return hash(self.name)
 
     def __repr__(self):
         return f"Monad({self.name!r})"

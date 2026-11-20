@@ -289,3 +289,38 @@ def test_hash():
 def test_Ty_is_atomic_on_integers():
     assert Ty[int](1, 1).is_atomic
     assert not Ty[int](1, 2).is_atomic and not Ty[int]().is_atomic
+
+
+def test_Functor_into_Int_takes_its_dagger():
+    """ rel-int/discopy-next#373: an integer diagram declares a dagger
+    category, so a daggered box maps to the dagger of its image. """
+    from discopy import compact, monoidal
+    from discopy.abc import DaggerCategory
+    assert issubclass(Diagram, DaggerCategory)
+    x, u = compact.Ty('x'), compact.Ty('u')
+    X = Ty[compact.Ty](x, u)
+    image = Diagram[compact.Diagram](
+        compact.Box('f', x @ u @ u, x @ x @ u), X, X @ X)
+    f = monoidal.Box('f', monoidal.Ty('x'), monoidal.Ty('x', 'x'))
+    F = monoidal.Functor(
+        {monoidal.Ty('x'): X}, {f: image}, cod=Diagram[compact.Diagram])
+    assert F(f.dagger()) == image.dagger()
+
+
+def test_Functor_into_Int_with_no_dagger_reads_ar_map():
+    """ rel-int/discopy-next#631: integer diagrams over python functions
+    have no dagger, so a daggered box is read off ar_map. """
+    from discopy import monoidal, python
+    D = Diagram[python.Function]
+    assert not D.has_dagger()
+    R = Ty[python.Function.ob]((float, ), (float, ))
+    square = D(python.Function(
+        lambda a, da: (a * a, 2 * a * da), (float, float), (float, float)),
+        R, R)
+    x = monoidal.Ty('x')
+    f = monoidal.Box('f', x, x)
+    shift = D(python.Function(
+        lambda a, da: (a + 1, da), (float, float), (float, float)), R, R)
+    F = monoidal.Functor({x: R}, {f: square, f.dagger(): shift}, cod=D)
+    assert F(f).inside(2., 1.) == (4., 4.)
+    assert F(f.dagger()).inside(2., 1.) == (3., 1.)

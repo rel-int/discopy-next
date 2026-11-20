@@ -260,7 +260,8 @@ from typing import ClassVar
 from discopy import monoidal, cmap, hypergraph, messages
 from discopy import sum as formal_sum
 from discopy.abc import (
-    DaggerCategory, FeedbackCategory, MonoidalCategory, TracedCategory)
+    DaggerCategory, DaggerMonoidalCategory, FeedbackCategory, MonoidalCategory,
+    TracedCategory)
 from discopy.config import BOX_DRAWING_ATTRIBUTES
 from discopy.monoidal import (  # noqa: F401  pylint: disable=unused-import
     Equation)
@@ -476,17 +477,17 @@ class Ty(monoidal.Ty):
 
     def delay(self, n_steps=1):
         """ The delay of a feedback type by `n_steps`. """
-        return type(self)(*(x.delay(n_steps) for x in self.inside))
+        return self.factory(*(x.delay(n_steps) for x in self.inside))
 
     @property
     def head(self):
         """ The head of a feedback type, see :class:`HeadOb`. """
-        return type(self)(*(x.head for x in self.inside if x.head))
+        return self.factory(*(x.head for x in self.inside if x.head))
 
     @property
     def tail(self):
         """ The tail of a feedback type, see :class:`TailOb`. """
-        return type(self)(*(x.tail for x in self.inside if x.tail))
+        return self.factory(*(x.tail for x in self.inside if x.tail))
 
     d = Wire.d
 
@@ -661,8 +662,6 @@ class Diagram(monoidal.Diagram, TracedCategory):
         messages.NO_PLANAR_NORMAL_FORM)
     trace_superposing_right = TracedCategory.trace_superposing_right.failing(
         messages.NO_PLANAR_NORMAL_FORM)
-    hypergraph_section = monoidal.Diagram.hypergraph_section.failing(
-        messages.SECTION_NEEDS_SWAPS)
     dagger_involution = DaggerCategory.dagger_involution.failing(
         messages.FEEDBACK_HAS_NO_DAGGER)
     dagger_involution_traced = DaggerCategory.dagger_involution.weaken(
@@ -671,7 +670,7 @@ class Diagram(monoidal.Diagram, TracedCategory):
         messages.FEEDBACK_HAS_NO_DAGGER)
     dagger_contravariance_traced = DaggerCategory.dagger_contravariance\
         .weaken(within=MonoidalCategory)
-    dagger_monoidality = DaggerCategory.dagger_monoidality.failing(
+    dagger_monoidality = DaggerMonoidalCategory.dagger_monoidality.failing(
         messages.FEEDBACK_HAS_NO_DAGGER)
     tightening = FeedbackCategory.tightening.failing(
         messages.FREE_FEEDBACK)
@@ -1280,7 +1279,8 @@ class Functor(monoidal.Functor):
             arg = other.dom if other.is_dagger else other.cod
             result = self.cod.followed_by(self(arg))
             return result.dagger() if other.is_dagger\
-                and hasattr(self.cod, "dagger") else result
+                and issubclass(self.cod, DaggerCategory)\
+                and self.cod.has_dagger() else result
         if isinstance(other, Feedback)\
                 and issubclass(self.cod, FeedbackCategory)\
                 and self.cod.delay is not FeedbackCategory.delay:

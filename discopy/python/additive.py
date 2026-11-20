@@ -21,6 +21,7 @@ from functools import cache
 from itertools import accumulate
 from typing import Self
 
+from discopy import messages
 from discopy.abc import ComarkovCategory, TracedCategory
 from discopy.testable import values
 from discopy.utils import assert_isinstance
@@ -143,9 +144,16 @@ class Function(function.Function, ComarkovCategory, TracedCategory):
         cod = cls.ob().tensor(*(doms[i] for i in xs))
         return cls(inside, dom, cod)
 
-    def dagger(self):
+    def inverse(self) -> Self:
+        """
+        The inverse of a swap, i.e. the swap the other way round: a function
+        is no dagger category, and only a swap remembers its inverse.
+
+        >>> X = Function.ob(int)
+        >>> assert Function.swap(X, X @ X).inverse()(1, 2) == (1, 0)
+        """
         if self.is_swap_of is None:
-            raise ValueError
+            raise ValueError(messages.ONLY_SWAP_INVERSE)
         return self.swap(*self.is_swap_of[::-1])
 
     def trace(self, n=1, left=False) -> Self:

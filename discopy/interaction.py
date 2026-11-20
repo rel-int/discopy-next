@@ -74,8 +74,8 @@ from discopy import (
     messages
 )
 from discopy.abc import (
-    Nat, Pregroup, RibbonCategory, SymmetricCategory,
-    TracedCategory)
+    DaggerCategory, DaggerMonoidalCategory, Nat, Pregroup, RibbonCategory,
+    SymmetricCategory, TracedCategory)
 from discopy.testable import Equation, TestableGeneric, quotient
 from discopy.cat import assert_iscomposable
 from discopy.python import finset
@@ -291,7 +291,8 @@ class Ty[natural](Pregroup, TestableGeneric):
 
 @factory
 @dataclass(unsafe_hash=True)
-class Diagram[natural](RibbonCategory, TestableGeneric):
+class Diagram[natural](
+        RibbonCategory, DaggerMonoidalCategory, TestableGeneric):
     """
     An integer diagram from ``x`` to ``y`` is a :attr:`natural` diagram
     from ``x.positive @ y.negative`` to ``y.positive @ x.negative``, i.e.
@@ -421,6 +422,20 @@ class Diagram[natural](RibbonCategory, TestableGeneric):
         factory = cls[resolve_factory(tree['natural'])]
         return factory(*map(from_tree, (
             tree['inside'], tree['dom'], tree['cod'])))
+
+    @classmethod
+    def has_dagger(cls) -> bool:
+        """
+        Whether the integer diagrams have a dagger: when the :attr:`natural`
+        category is a :class:`~discopy.abc.DaggerCategory`, so that a functor
+        into integer diagrams over e.g. :class:`discopy.python.Function`
+        reads a daggered box off its :code:`ar_map`.
+
+        >>> from discopy import compact, python
+        >>> assert Diagram[compact.Diagram].has_dagger()
+        >>> assert not Diagram[python.Function].has_dagger()
+        """
+        return issubclass(cls.natural, DaggerCategory)
 
     @classmethod
     def is_symmetric(cls) -> bool:

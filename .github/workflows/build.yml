@@ -79,6 +79,12 @@ jobs:
     # give the notebooks a job of their own rather than raising this.
     timeout-minutes: 40
     strategy:
+      # Without this, one version failing cancels the jobs of the others
+      # and those versions go unmeasured. On main the matrix is three of
+      # them and `Test notebooks` runs nowhere else, so one red setup step
+      # left that step running on none of the three. A pull request's
+      # matrix is one version, where the setting decides nothing (#625).
+      fail-fast: false
       matrix:
         # A pull request tests the version CI lints on; main tests every one.
         python-version: ${{ fromJSON(github.event_name == 'pull_request' && '["3.14"]' || '["3.12", "3.13", "3.14"]') }}

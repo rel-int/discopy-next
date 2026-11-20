@@ -326,6 +326,27 @@ def test_Functor_into_a_category_with_no_dagger():
     assert Functor({x: x}, {f: f})(f.dagger()) == f.dagger()
 
 
+
+def test_Functor_dagger_is_declared():
+    """ rel-int/discopy-next#373: a daggered box is the dagger of its image
+    exactly when the codomain declares a dagger category. """
+    from discopy import monoidal
+    from discopy.abc import DaggerCategory
+    from discopy.drawing import Drawing
+    from discopy.python import additive
+    assert issubclass(Drawing, DaggerCategory)
+    assert not issubclass(additive.Function, DaggerCategory)
+    assert not hasattr(additive.Function, "dagger")
+    x = monoidal.Ty('x')
+    f = monoidal.Box('f', x, x)
+    F = monoidal.Functor(
+        {x: int}, lambda g: (lambda n: n - 1) if g.is_dagger
+        else (lambda n: n + 1), cod=additive.Function)
+    assert F(f)(1) == 2 and F(f.dagger())(1) == 0
+    G = monoidal.Functor({x: x}, {f: f.to_drawing()}, cod=Drawing)
+    assert G(f.dagger()) == f.to_drawing().dagger()
+
+
 def test_Transformation():
     x, y = Ob('x'), Ob('y')
     f = Box('f', x, y)
@@ -659,6 +680,11 @@ EXAMPLES = {  # a box of each constructor, from a class c, types x, y, data v
     "monoidal.Bubble": 'c(box(c, x, y, v), name="b", drawing_name="B")',
     "markov.Bubble": 'c(box(c, x, y, v), name="b", is_deterministic=False)',
     "rigid.Bubble": 'c(box(c, x, y, v), name="b", z=1)',
+    "peirce.alpha.Box": 'c("f", data=v)',
+    "peirce.beta.Box": 'c("f", x, y, data=v, is_deterministic=True)',
+    "peirce.{alpha,beta}.Cut": 'c(c.ar.box_factory("f", t := c.ob(c.ob.generator_'
+    'factory("x", dom=(k := sys.modules["discopy.peirce.alpha"].black), '
+    'cod=k)), t, data=v), name="b")',  # not the unit, #636
     "monoidal.Layer":
     'c(x, sys.modules[c.__module__].Box("f", x, y, data=v), y)',
     "braided.Braid {balanced,ribbon}.DualRailBraid ribbon.DualRailC{u,a}p":

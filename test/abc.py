@@ -53,3 +53,57 @@ def test_LinearCategory_states_the_laws_of_a_linear_category():
         assert getattr(rigid.Diagram, law).broken
     with raises(TypeError):
         type("Free", (LinearCategory, ), {})()
+
+
+def test_BraidedCategory_braid_inverse():
+    from discopy import braided
+    from discopy.abc import BraidedCategory
+
+    x, y = braided.Ty('x'), braided.Ty('y')
+    braid = braided.Diagram.braid(x, y)
+    assert braided.Diagram.braid_inverse(x, y) == braid.dagger()
+
+    class Inverted(braided.Diagram):
+        @classmethod
+        def braid_inverse(cls, left, right):
+            return cls.braid(right, left)
+
+    other = Inverted.braid(y, x)
+    assert BraidedCategory.inverse_braiding.function(Inverted, x, y) == other
+    for law, terms in {
+            "braid_then_inverse": (braid >> other, braid.id(x @ y)),
+            "inverse_then_braid": (other >> braid, braid.id(y @ x))}.items():
+        equation = getattr(BraidedCategory, law).function(Inverted, x, y)
+        assert equation.terms == terms
+
+
+def test_SymmetricCategory_braid_inverse_needs_no_dagger():
+    from discopy.python.multiplicative import Function
+
+    inverse = Function.braid_inverse(int, str)
+    assert not hasattr(Function, "dagger")
+    assert inverse.dom == Function.ob(str, int)
+    assert inverse.cod == Function.ob(int, str)
+    assert inverse("a", 1) == (1, "a")
+
+
+def test_dagger_monoidality_needs_a_dagger_and_a_tensor():
+    from discopy import cat, group, matrix, monoidal
+    from discopy.abc import (
+        DaggerCategory, DaggerMonoidalCategory, Groupoid, MonoidalCategory)
+    from discopy.python import finset
+
+    for cls in (DaggerCategory, Groupoid, cat.Arrow, group.Cyclic[3]):
+        assert "dagger_monoidality" not in cls.axioms
+    for cls in (monoidal.Diagram, matrix.Matrix[int], finset.Permutation):
+        assert issubclass(cls, DaggerMonoidalCategory)
+        assert "dagger_monoidality" in cls.axioms
+    assert not issubclass(MonoidalCategory, DaggerCategory)
+
+
+def test_DaggerMonoidalCategory_keeps_its_type_parameters():
+    from discopy.abc import DaggerMonoidalCategory
+    from discopy.testable import position
+
+    assert [position(param, DaggerMonoidalCategory)
+            for param in DaggerMonoidalCategory.__type_params__] == [0, 1]
