@@ -70,9 +70,15 @@ def test_save_and_load(tmp_path):
 
 
 def test_train_ocr_lowers_its_loss():
+    """ #653: `train_ocr` seeds torch for the training it does, which is
+    after a network it is given has drawn its weights, so the test seeds
+    for the one it builds: the loss the training starts from otherwise
+    comes from whatever ran before it on the xdist worker, and the ratio
+    this asserts is a draw rather than a measurement. """
     data = vision.dataset(4, seed=600, modules=("monoidal", ), workers=1)
     crops, strings = vision.texts(data, True)
     losses = []
+    torch.manual_seed(0)
     vision.train_ocr(crops, strings, epochs=10, batch=8, ocr=vision.OCR(8),
                      log=lambda line: losses.append(float(line.split()[-1])))
     assert losses[-1] < .8 * losses[0]
