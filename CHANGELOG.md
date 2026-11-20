@@ -31,8 +31,10 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   modules that add no way to bind a variable, `spacial`, `braided`,
   `feedback`, `balanced` and `comarkov`, get terms of their own from
   `cat.kappa_calculus`, with their structural boxes as constants. A type
-  applied to a Python function is its kappa abstraction, and the laws are
-  cells of the property matrix ([next#658]).
+  applied to a Python function is its kappa abstraction, of the level of its
+  body: the string of a closed term with no box, e.g. an identity, reads back
+  as a monoidal term, equal to it. The laws are cells of the property matrix
+  ([next#658], [next#679]).
 - `discopy.peirce.alpha` and `discopy.peirce.beta`: Peirce's existential
   graphs as diagrams with white and black regions, a cut where the colour
   changes. `~d`, `d & e`, `d | e`, `d.relative_sum(e)` and `d.par(e)` are
@@ -2457,6 +2459,7 @@ for the changelog of `1.2.1` and earlier.
 [next#667]: https://github.com/rel-int/discopy-next/pull/667
 [next#672]: https://github.com/rel-int/discopy-next/pull/672
 [next#675]: https://github.com/rel-int/discopy-next/pull/675
+[next#679]: https://github.com/rel-int/discopy-next/pull/679
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#44]: https://github.com/rel-int/optyx/pull/44
