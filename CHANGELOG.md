@@ -14,7 +14,7 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   Bill does too.*, with the Fock space of `!` as photons on modes. The
   paper's k-extension is the W node of `discopy.optyx.core.zw` and its basis
   copy the Z spider; anaphora, ellipsis and both readings are checked against
-  the paper's formulas, and the two readings shown to be two maps
+  the paper's formulas, and the two readings are shown to be two maps
   ([next#674]).
 - `discopy.peirce.alpha` and `discopy.peirce.beta`: Peirce's existential
   graphs as diagrams with white and black regions, a cut where the colour
