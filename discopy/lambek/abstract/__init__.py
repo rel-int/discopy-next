@@ -53,10 +53,12 @@ Summary
 
         proofnet
         neural
+        spindle
 
 :mod:`discopy.lambek.abstract.proofnet` reads a term as a proof net and back,
-and is imported here. :mod:`discopy.lambek.abstract.neural` needs PyTorch,
-which the ``lambek`` extra installs, so it is not: import it on its own.
+and is imported here. :mod:`discopy.lambek.abstract.neural` and
+:mod:`discopy.lambek.abstract.spindle` need PyTorch, which the ``lambek``
+extra installs, so they are not: import them on their own.
 
 Vocabularies and lexicons
 -------------------------
