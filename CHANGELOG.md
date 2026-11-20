@@ -9,6 +9,12 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Added
 
+- `discopy.lean` compiles the categories of `discopy.abc` and their axioms to
+  Lean structures, read off the declarations by introspection, into
+  `discolean/Discolean/ABC.lean`; `discolean/` proves a compiled category is a
+  category of Mathlib and that strict premonoidal categories, Diagram(S)
+  included, satisfy the laws of `monoidal.Diagram` ([next#668]).
+
 - `discopy.peirce.alpha` and `discopy.peirce.beta`: Peirce's existential
   graphs as diagrams with white and black regions, a cut where the colour
   changes. `~d`, `d & e`, `d | e`, `d.relative_sum(e)` and `d.par(e)` are
@@ -451,6 +457,8 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Changed
 
+- `lean/` is now `discolean/`, a Lake package built on Mathlib with one
+  library, `Discolean` ([next#668]).
 - `drawing.Drawing`, `python.finset.Cospan` and `interaction.Diagram`
   declare `abc.DaggerCategory`, the reflection of a drawing being
   involutive, with its contravariance and monoidality declared failing on
@@ -2412,6 +2420,7 @@ for the changelog of `1.2.1` and earlier.
 [next#648]: https://github.com/rel-int/discopy-next/pull/648
 [next#654]: https://github.com/rel-int/discopy-next/pull/654
 [next#656]: https://github.com/rel-int/discopy-next/pull/656
+[next#668]: https://github.com/rel-int/discopy-next/pull/668
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#44]: https://github.com/rel-int/optyx/pull/44
