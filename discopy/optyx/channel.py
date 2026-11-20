@@ -232,7 +232,7 @@ from cotengra import (
 )
 import numpy as np
 from discopy import tensor
-from discopy import monoidal, symmetric, frobenius, hypergraph
+from discopy import monoidal, symmetric, frobenius, hypergraph, feedback
 from discopy.cat import factory
 from discopy.python import finset
 from discopy.utils import AxiomError, factory_name
@@ -283,6 +283,15 @@ class Ob(frobenius.Wire):
             return diagram.Ty(self.name).delay(self.time_step)
         name = self.classical[self.name]
         return diagram.Ty(name, name).delay(self.time_step)
+
+
+HeadOb, TailOb = feedback.structural_wires(Ob)
+for _structural, _part in ((HeadOb, "head"), (TailOb, "tail")):
+    _structural.is_classical = property(lambda self: self.arg.is_classical)
+    _structural.single = property(lambda self, part=_part: getattr(
+        self.arg.single, part).delay(self.time_step))
+    _structural.double = property(lambda self, part=_part: getattr(
+        self.arg.double, part).delay(self.time_step))
 
 
 DEFAULT_MAX_STEPS = 64

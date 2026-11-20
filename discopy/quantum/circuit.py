@@ -14,6 +14,8 @@ Summary
     Wire
     Digit
     Qudit
+    HeadOb
+    TailOb
     Ty
     Circuit
     Box
@@ -72,7 +74,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import ClassVar
 
-from discopy import messages, tensor, frobenius
+from discopy import feedback, messages, tensor, frobenius
 from discopy.cat import factory
 from discopy.matrix import backend
 from discopy.tensor import Dim, Tensor
@@ -90,12 +92,15 @@ class Wire(frobenius.Wire):
     Note
     ----
     This class can only be instantiated via its subclasses :class:`Digit` and
-    :class:`Qudit`, but feel free to open a pull-request if you discover a
-    third kind of information unit.
+    :class:`Qudit`, and as the :class:`HeadOb` or :class:`TailOb` of one,
+    with its dimension, but feel free to open a pull-request if you discover
+    a third kind of information unit.
     """
     def __init__(self, name: str, dim=2, z=0, **params):
+        assert_isinstance(self, (Digit, Qudit, HeadOb, TailOb))
+        if isinstance(self, (HeadOb, TailOb)):
+            dim = self.arg.dim  # pylint: disable=no-member  # set before
         assert_isinstance(dim, int)
-        assert_isinstance(self, (Digit, Qudit))
         if dim < 2:
             raise ValueError
         self.dim = dim
@@ -103,6 +108,18 @@ class Wire(frobenius.Wire):
 
     def __repr__(self):
         return f"{factory_name(type(self))}({self.dim}{self.repr_time_step()})"
+
+    @property
+    def is_quantum(self) -> bool:
+        """
+        Whether the wire is a :class:`Qudit`, or the head or the tail of one,
+        which is of the same kind and dimension as its argument.
+
+        >>> assert qubit.head.inside[0].is_quantum
+        >>> assert not bit.head.inside[0].is_quantum
+        >>> assert qubit.head.inside[0].dim == 2
+        """
+        return self.arg.is_quantum  # pylint: disable=no-member  # a head
 
     def atoms(self) -> list:
         """ A circuit object names no atom, its module binds it: qubit. """
@@ -134,6 +151,8 @@ class Digit(Wire):
         name = "bit" if dim == 2 else f"Digit({dim})"
         super().__init__(name, dim, **params)
 
+    is_quantum = False
+
     def __setstate__(self, state):
         if "_dim" in state:
             state["dim"] = state["_dim"]
@@ -157,6 +176,10 @@ class Qudit(Wire):
         super().__init__(name, dim, **params)
 
     __setstate__ = Digit.__setstate__
+    is_quantum = True
+
+
+HeadOb, TailOb = feedback.structural_wires(Wire)
 
 
 @factory
@@ -229,9 +252,11 @@ class Circuit(tensor.Diagram[complex]):
         Mixed circuits can be evaluated only by a
         :class:`ChannelFunctor` not a :class:`discopy.tensor.Functor`.
         """
-        both_bits_and_qubits = self.dom.count(bit) and self.dom.count(qubit)\
-            or any(layer.cod.count(bit) and layer.cod.count(qubit)
-                   for layer in self.inside)
+        def both_kinds(ty):
+            return len({x.is_quantum for x in ty.inside}) == 2
+
+        both_bits_and_qubits = both_kinds(self.dom)\
+            or any(both_kinds(layer.cod) for layer in self.inside)
         return both_bits_and_qubits or any(box.is_mixed for box in self.boxes)
 
     def init_and_discard(self):
@@ -240,12 +265,12 @@ class Circuit(tensor.Diagram[complex]):
         circuit = self
         if circuit.dom:
             init = Id().tensor(*(
-                (Digits(0, dim=x.dim) if isinstance(x, Digit) else Ket(0))
+                (Ket(0) if x.is_quantum else Digits(0, dim=x.dim))
                 .delay(x.time_step) for x in circuit.dom.inside))
             circuit = init >> circuit
         if circuit.cod != bit ** len(circuit.cod):
             discards = Id().tensor(*(
-                Discard().delay(x.time_step) if isinstance(x, Qudit)
+                Discard().delay(x.time_step) if x.is_quantum
                 else Id(Ty(x)) for x in circuit.cod.inside))
             circuit = circuit >> discards
         return circuit
@@ -449,9 +474,9 @@ class Circuit(tensor.Diagram[complex]):
         """
         from discopy.quantum import gates
         if mixed or self.is_mixed or any(
-                isinstance(x, Digit) for x in (self.dom @ self.cod).inside):
+                not x.is_quantum for x in (self.dom @ self.cod).inside):
             circuit = self >> Id().tensor(*(
-                gates.Measure().delay(x.time_step) if isinstance(x, Qudit)
+                gates.Measure().delay(x.time_step) if x.is_quantum
                 else Id(Ty(x)) for x in self.cod.inside))
             return circuit.init_and_discard().eval(mixed=True).array.real
         state = (Id().tensor(*(
@@ -935,9 +960,8 @@ class Box(tensor.Box[complex], Circuit):
 
     def __init__(self, name: str, dom: Ty, cod: Ty,
                  data=None, is_mixed=True, **params):
-        if not is_mixed and not any(
-                all(isinstance(x, kind) for x in (dom @ cod).inside)
-                for kind in (Digit, Qudit)):
+        if not is_mixed and len(
+                {x.is_quantum for x in (dom @ cod).inside}) == 2:
             raise ValueError(messages.BOX_IS_MIXED)
         self._is_mixed = is_mixed
         tensor.Box[complex].__init__(self, name, dom, cod, data, **params)
@@ -969,7 +993,7 @@ class Box(tensor.Box[complex], Circuit):
     def is_classical(self):
         """ Whether the box is pure with only digits on its boundary. """
         return not self.is_mixed and all(
-            isinstance(x, Digit) for x in (self.dom @ self.cod).inside)
+            not x.is_quantum for x in (self.dom @ self.cod).inside)
 
     def dagger(self):
         """
