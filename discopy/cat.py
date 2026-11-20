@@ -508,7 +508,7 @@ class Arrow(FreeCategory, DaggerCategory, Serialisable["Arrow"]):
         x(lambda x0: x0)
         >>> assert (f >> g).to_term().eval() == f >> g
         """
-        return TermBase.from_diagram(self)
+        return self.term_factory.from_diagram(self)
 
     def __add__(self, other):
         return self.sum_factory((self, )) + other
@@ -2000,8 +2000,13 @@ class TermBase(Serialisable, AlphaEquivalence):
         return tuple(getattr(self, attr) for attr in self.serialised_attrs)
 
     def setoid(self):
-        """ Terms are equal when their classes and their parts are. """
-        return (factory_key(type(self)), ) + self.parts
+        """
+        Terms are equal when they are built alike from equal parts, at
+        whichever level of the hierarchy: the level of a term is that of
+        the boxes of its constants, and a type applied to a Python function
+        is a kappa of the level of its body, see :meth:`highest`.
+        """
+        return (type(self).__name__, ) + self.parts
 
     def __eq__(self, other):
         return isinstance(other, TermBase) and self.setoid() == other.setoid()
@@ -2599,16 +2604,27 @@ class Kappa(TermBase):
         return 0
 
     @property
+    def front(self) -> bool:
+        """
+        Whether the variables join the stack at its front: they do unless
+        they stand right of the stack of the body, which a category has
+        none of.
+        """
+        body, variables = self.body, self.variables
+        return not (body.stack and variables and body.offset
+                    <= body.freevars.index(variables[0]))
+
+    @property
     def head(self) -> Variable | None:
         """ The variable the first input of the stack binds, if any. """
-        front = not self.body.stack or self.body.offset != self.offset
-        return self.variables[0] if self.variables and front else None
+        return self.variables[0] if self.variables and self.front else None
 
     @property
     def function(self) -> str:
         """ The Python function of the body, as printed. """
         names = "".join(f" {x.name}," for x in self.variables).rstrip(",")
-        offset = "" if self.variables else f", offset={self.offset}"
+        placed = self.place(self.variables, self.body) is not None
+        offset = "" if placed else f", offset={self.offset}"
         return f"lambda{names}: {self.body}{offset}"
 
     def __str__(self):
@@ -2743,6 +2759,7 @@ class AlphaEquation(AbstractEquation):
 
 
 TermBase.functor = Functor.id(Arrow)
+Arrow.term_factory = TermBase
 TermBase.equivalence_factory = AlphaEquation
 TermBase.variable_factory, TermBase.constant_factory = Variable, Constant
 TermBase.application_factory, TermBase.kappa_factory = Application, Kappa

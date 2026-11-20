@@ -1817,7 +1817,7 @@ class Diagram(cat.Arrow, DaggerMonoidalCategory, RichDisplay):
 let(e(x2), lambda: h(x1), offset=1)))
         >>> assert (f >> g).to_term().eval() == f >> g
         """
-        return TermBase.from_diagram(self)
+        return self.term_factory.from_diagram(self)
 
     def to_staircases(self):
         """
@@ -3016,6 +3016,7 @@ class TermBase(cat.TermBase):
     """
     stack: Ty
     cod: Ty
+    sampler_factory: ClassVar[type[Sampler]]
 
     strategy = classmethod(cat.TermBase.strategy.__func__)
 
@@ -3057,17 +3058,28 @@ class TermBase(cat.TermBase):
         for layer in diagram.inside:
             for box, offset in layer.boxes_and_offsets:
                 arguments = wires[offset:offset + len(box.dom)]
-                outputs = name(box.cod)
+                outputs = cls.rewire(box, arguments)
+                if outputs is None:
+                    outputs = name(box.cod)
+                    steps.append((cls.constant_factory(box)(
+                        *arguments), outputs, offset))
                 wires[offset:offset + len(box.dom)] = outputs
-                steps.append((
-                    cls.constant_factory(box)(*arguments), outputs, offset))
         result, = wires
         for expression, outputs, offset in reversed(steps):
             result = expression if outputs == [result]\
-                else cls.kappa_factory(
-                    tuple(outputs), result, offset)(expression)
-        return cls.kappa_factory(tuple(inputs), result, 0) if inputs\
-            else result
+                else cls.bind(outputs, result, offset)(expression)
+        return cls.bind(inputs, result) if inputs else result
+
+    @classmethod
+    def rewire(cls, box: Box, arguments: list) -> list | None:
+        """
+        The variables on the outputs of a box that a term reads as wiring
+        rather than as a constant, given those on its inputs: ``None`` in a
+        monoidal category, where every box is a constant, a permutation of
+        them in a symmetric one.
+        """
+        # pylint: disable=unused-argument  # every box is a constant here
+        return None
 
     @classmethod
     # pylint: disable-next=too-many-arguments,too-many-positional-arguments
@@ -3088,15 +3100,16 @@ class TermBase(cat.TermBase):
         >>> print(TermBase.generate(y, [1, 2, 1, 2, 2, 0, 2], [x], "ab"))
         let(c0, lambda a0, b1: c1(a0, b1, v0))
         """
-        sampler = Sampler(iter(choices), types, letters)
+        sampler = cls.sampler_factory(cls, iter(choices), types, letters)
         dom = [sampler.choose(types) for _ in range(sampler.choose(range(3)))]
         if sampler.choose((False, True)):
             return sampler.state(cod, tuple(
-                Variable(f"v{i}", typ) for i, typ in enumerate(dom)))
+                cls.variable_factory(f"v{i}", typ)
+                for i, typ in enumerate(dom)))
         variables = tuple(
             sampler.bound(i, typ) for i, typ in enumerate(dom))
         body = sampler.state(cod, variables, len(dom))
-        return Kappa(variables, body) if variables else body
+        return cls.bind(variables, body) if variables else body
 
     @classmethod
     def shapes(cls, *, types=None, cod=None) -> st.SearchStrategy[tuple]:
@@ -3106,8 +3119,8 @@ class TermBase(cat.TermBase):
         """
         from hypothesis import strategies as st
 
-        types = st.sampled_from(GENERATORS).map(Ty) if types is None\
-            else types
+        types = st.sampled_from(GENERATORS).map(cls.functor.cod.ob)\
+            if types is None else types
         return st.tuples(
             types if cod is None else st.just(cod), cls.choices(),
             st.lists(types, min_size=1, max_size=3))
@@ -3274,6 +3287,7 @@ f(c, b), which has no stack to say where it stands.
     ValueError: Expected offset 1 for the abstraction of b in f(c, b), got 0.
     """
     offset: int
+    unbound: ClassVar[str] = messages.NOT_A_BLOCK
 
     @staticmethod
     def place(variables, body):
@@ -3288,31 +3302,42 @@ f(c, b), which has no stack to say where it stands.
     def __init__(self, variables: tuple[Variable, ...], body: cat.TermBase,
                  offset: int | None = None):
         # pylint: disable=super-init-not-called  # a context is a list here
-        assert_isinstance(body, TermBase)
+        assert_isinstance(body, cat.TermBase)
         variables = tuple(variables)
-        names = ", ".join(x.name for x in variables) or "no variable"
-        if variables and variables[0] not in body.freevars:
-            raise ValueError(messages.NOT_A_BLOCK.format(body, names))
-        expected = self.place(variables, body)
-        start = expected if offset is None else offset
-        if start is None:
-            raise ValueError(messages.NO_OFFSET.format(body))
-        wanted = f"from 0 to {len(body.freevars)}" if expected is None\
-            else expected
-        valid = 0 <= start <= len(body.freevars)
-        if not valid or expected not in (None, start):
-            raise ValueError(
-                messages.WRONG_OFFSET.format(wanted, names, body, start))
+        start = self.start(variables, body, offset)
         stop = start + len(variables)
         if tuple(body.freevars[start:stop]) != variables\
                 or body.offset not in (None, start, stop):
-            raise ValueError(messages.NOT_A_BLOCK.format(body, names))
+            raise ValueError(self.unbound.format(
+                body, ", ".join(x.name for x in variables)))
         self.variables, self.body, self.offset = variables, body, start
         self.freevars = body.freevars[:start] + body.freevars[stop:]
         self.cod, bound = body.cod, body.types(variables)
-        self.stack = body.stack @ bound\
-            if body.stack and body.offset == start and variables\
-            else bound @ body.stack
+        self.stack = bound @ body.stack if self.front else body.stack @ bound
+
+    @classmethod
+    def start(cls, variables: tuple, body: cat.TermBase,
+              offset: int | None) -> int:
+        """
+        The number of free variables left of the stack: where the
+        variables or the stack of the body :meth:`place` it, or else the
+        ``offset``, which is refused when it says otherwise.
+        """
+        names = ", ".join(x.name for x in variables) or "no variable"
+        if len(set(variables)) < len(variables)\
+                or not set(variables) <= set(body.freevars):
+            raise ValueError(cls.unbound.format(body, names))
+        expected = cls.place(variables, body)
+        start = expected if offset is None else offset
+        if start is None:
+            raise ValueError(messages.NO_OFFSET.format(body))
+        rest = len(body.freevars) - len(variables)
+        wanted = f"from 0 to {rest}" if expected is None else expected
+        valid = expected is not None or 0 <= start <= rest
+        if not valid or expected not in (None, start):
+            raise ValueError(
+                messages.WRONG_OFFSET.format(wanted, names, body, start))
+        return start
 
 
 type Term = Variable | Constant | Application | Kappa
@@ -3422,6 +3447,7 @@ class Sampler:
     up to two outputs between the variables left for its body.
 
     Parameters:
+        terms : The terms to sample, i.e. their factories.
         choices : The choices left, consumed one per node.
         types : The types of one wire the variables are drawn from.
         letters : The letters naming the bound variables, one per level.
@@ -3430,10 +3456,11 @@ class Sampler:
     Example
     -------
     >>> x, y = Ty('x'), Ty('y')
-    >>> sampler = Sampler(iter([2, 0, 1, 1, 0, 0, 0]), [x], "a")
+    >>> sampler = Sampler(TermBase, iter([2, 0, 1, 1, 0, 0, 0]), [x], "a")
     >>> print(sampler.state(y, (Variable('v', x), Variable('w', x))))
     let(c0(v), lambda: c1(w), offset=0)
     """
+    terms: type[TermBase]
     choices: Iterator[int]
     types: Sequence[Ty]
     letters: Sequence[str]
@@ -3445,13 +3472,22 @@ class Sampler:
 
     def constant(self, dom: Sequence[Ty], cod: Sequence[Ty]) -> Constant:
         """ A fresh constant between the tensors of two lists of types. """
-        return Constant(Box(
-            f"c{next(self.counter)}", Ty().tensor(*dom), Ty().tensor(*cod)))
+        category = self.terms.functor.cod
+        return self.terms.constant_factory(category.box_factory(
+            f"c{next(self.counter)}", category.ob().tensor(*dom),
+            category.ob().tensor(*cod)))
 
     def bound(self, level: int, cod: Ty) -> Variable:
         """ The variable bound at a given level, named by its letter. """
-        return Variable(
+        return self.terms.variable_factory(
             f"{self.letters[level % len(self.letters)]}{level}", cod)
+
+    def shuffle(self, bound: tuple) -> tuple:
+        """
+        The bound variables in the order a term uses them: their own in a
+        monoidal category, picked by a choice where there is exchange.
+        """
+        return bound
 
     def spine(
             self, cod: Sequence[Ty], bound: tuple[Variable, ...]
@@ -3472,7 +3508,7 @@ class Sampler:
         context: a leaf when the choices ran out, else what the next
         choice picks.
         """
-        kind = next(self.choices, 0) % 3
+        kind, bound = next(self.choices, 0) % 3, self.shuffle(bound)
         if kind == 0:
             return bound[0] if [x.cod for x in bound] == [cod]\
                 else self.spine([cod], bound)
@@ -3490,10 +3526,11 @@ class Sampler:
         variables = tuple(
             self.bound(level + i, typ) for i, typ in enumerate(types))
         body = self.state(cod, left + variables + right, level + len(types))
-        return Kappa(variables, body, len(left))(expression)
+        return self.terms.bind(variables, body, len(left))(expression)
 
 
-TermBase.functor = Functor.id(Diagram)
+TermBase.functor, TermBase.sampler_factory = Functor.id(Diagram), Sampler
+Diagram.term_factory = TermBase
 TermBase.variable_factory, TermBase.constant_factory = Variable, Constant
 TermBase.application_factory, TermBase.kappa_factory = Application, Kappa
 
