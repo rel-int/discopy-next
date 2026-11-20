@@ -2,5 +2,5 @@
 
 - [WIP] @T-77611241-2026-11-20 17:49 make discopy.lambek.abstract a subpackage with proofnet and neural as its modules
 - [WIP] @T-77611241-2026-11-20 17:49 make discopy.lambek.categorial a subpackage with a bobcat module: the chart parser, Encoder and ChartClassifier
-- [ ] follow the imports in tests, docs, notebooks, the paper and the Lean statements
+- [WIP] @T-77611241-2026-11-20 17:49 follow the imports in tests, docs, notebooks, the paper and the Lean statements
 - [ ] add discopy.lambek.abstract.spindle: SPINDLE from rel-int/spindle-ccg-deberta-v3-large, read as a ProofNet (its own pull request, design asked of toumix)
