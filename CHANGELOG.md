@@ -453,10 +453,10 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 - `lambek.abstract` and `lambek.categorial` are packages: `lambek.proofnet`
   and `lambek.neural` are `lambek.abstract.proofnet` and
-  `lambek.abstract.neural`, and the Bobcat reproduction, `Parser`,
-  `Derivation`, `schemata`, `structure`, `render` and `normalise` of
-  `categorial` with `Encoder` and `ChartClassifier` of `neural`, is
-  `lambek.categorial.bobcat`, which needs PyTorch ([next#672]).
+  `lambek.abstract.neural`, and `lambek.categorial.bobcat`, which needs
+  PyTorch, is the Bobcat reproduction: `Parser`, `Derivation`, `schemata`,
+  `structure`, `render` and `normalise`, formerly in `categorial`, and
+  `Encoder` and `ChartClassifier`, formerly in `neural` ([next#672]).
 - `drawing.Drawing`, `python.finset.Cospan` and `interaction.Diagram`
   declare `abc.DaggerCategory`, the reflection of a drawing being
   involutive, with its contravariance and monoidality declared failing on
