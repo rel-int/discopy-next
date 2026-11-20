@@ -2,12 +2,13 @@ import numpy as np
 import pytest
 from sympy.abc import x, y
 
+from discopy.matrix import backend
 from discopy.optyx import qubits
-from discopy.optyx.channel import Diagram, Ty
+from discopy.optyx.channel import Diagram, Ty, qmode
 from discopy.optyx.core import zw
 from discopy.optyx.photonic import (
-    BBS, BS, Create, DualRail, PhotonLoss, Scalar, Select, Swap,
-    XMeasurementDR, ZMeasurementDR)
+    BBS, BS, MZI, TBS, Create, DualRail, Phase, PhotonLoss, Scalar, Select,
+    Swap, XMeasurementDR, ZMeasurementDR)
 
 
 def outcomes(diagram):
@@ -67,3 +68,97 @@ def test_select_and_create_default_to_one_photon():
     assert Select().photons == Create().photons == (1,)
     assert Select().to_path() == zw.Select().to_path()
     assert outcomes(Create() >> Select()) == {(): 1}
+
+
+@pytest.mark.parametrize("gate", [
+    lambda t: MZI(t, 0.2), lambda t: MZI(0.1, t, is_gate_dagger=True),
+    lambda t: TBS(t, is_conj=True), BBS, lambda t: Phase(t) @ qmode])
+def test_jax_traces_gate_parameters(gate):
+    jax = pytest.importorskip("jax")
+    jnp = jax.numpy
+
+    def loss(diagram, module):
+        return module.abs(diagram.to_path().array[0, 0]) ** 2
+
+    def traced(t):
+        with backend("jax"):
+            return loss(step.lambdify(x, modules="jax")(t), jnp)
+
+    step = Create(1) @ qmode >> gate(x)
+    epsilon = 1e-5
+    expected = (loss(step.lambdify(x)(.3 + epsilon), np)
+                - loss(step.lambdify(x)(.3 - epsilon), np)) / (2 * epsilon)
+    assert np.isclose(traced(jnp.array(.3)), loss(step.lambdify(x)(.3), np))
+    assert np.isclose(jax.grad(traced)(.3), expected, atol=1e-4)
+
+
+def test_jax_traces_feedback_parameters():
+    jax = pytest.importorskip("jax")
+    loop = (Create(1) @ qmode >> MZI(x, 0.2)).feedback(state=Create(0))
+
+    def traced(t):
+        step = loop.lambdify(x, modules="jax")(t).one_step()
+        with backend("jax"):
+            return jax.numpy.abs(step.dilate().to_path().array[0, 0]) ** 2
+
+    assert np.isclose(jax.grad(traced)(.3), -np.pi * np.sin(.6 * np.pi),
+                      atol=1e-4)
+
+
+@pytest.mark.parametrize("tensor, dtype", [
+    ("theta", "float64"), ("phi", "float64"), ("phi", "int64")])
+def test_torch_parameter_beside_a_float(tensor, dtype):
+    torch = pytest.importorskip("torch")
+    params = {"theta": 0.1, "phi": 0.2 if dtype == "float64" else 0}
+    expected = MZI(**params).array
+    params[tensor] = torch.tensor(params[tensor], dtype=getattr(torch, dtype))
+    assert np.allclose(MZI(**params).array.numpy(), expected)
+
+
+def test_jax_gradient_where_an_entry_vanishes():
+    jax = pytest.importorskip("jax")
+
+    def entry(t):
+        with backend("jax"):
+            return TBS(t).to_path().array[0, 0].imag
+
+    assert np.isclose(jax.grad(entry)(0.), jax.grad(
+        lambda t: TBS(t).array[0, 0].imag)(0.))
+    assert np.isclose(jax.grad(entry)(0.), np.pi)
+
+
+@pytest.mark.parametrize("gate", [
+    lambda t: MZI(t, 0.2), lambda t: MZI(0.1, t, is_gate_dagger=True),
+    lambda t: TBS(t, is_conj=True), BBS, Phase])
+def test_torch_gradient_of_gate_parameters(gate):
+    torch = pytest.importorskip("torch")
+
+    def loss(array):
+        return sum((i + 1) * (x.real + 2 * x.imag)
+                   for i, x in enumerate(array.reshape(-1)))
+
+    t = torch.tensor(.3, dtype=torch.float64, requires_grad=True)
+    loss(gate(t).array).backward()
+    epsilon = 1e-5
+    expected = (loss(gate(.3 + epsilon).array)
+                - loss(gate(.3 - epsilon).array)) / (2 * epsilon)
+    assert np.isclose(t.grad.item(), expected, atol=1e-4)
+
+
+def test_torch_gates_compare():
+    torch = pytest.importorskip("torch")
+    t = torch.tensor(.3, dtype=torch.float64)
+    assert TBS(t) == TBS(t) and MZI(t, 0.2) == MZI(t, 0.2)
+    assert TBS(t) != TBS(t + 1) and len({BBS(t), BBS(t)}) == 1
+
+
+def test_torch_gradient_survives_to_path():
+    """#652: the zw path of a gate is built from the entries of its array,
+    so it keeps the gradient the array has."""
+    torch = pytest.importorskip("torch")
+    t = torch.tensor(.3, dtype=torch.float64, requires_grad=True)
+    with backend("pytorch"):
+        array = MZI(t, 0.2).to_path().array
+        assert array.requires_grad
+        array.abs().sum().backward()
+    assert t.grad is not None

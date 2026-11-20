@@ -252,6 +252,12 @@ def test_equality_reads_the_data_of_constants():
     assert X(lambda x: f(x)) != X(lambda x: g(x))
 
 
+def test_constant_of_a_coloured_type():
+    white = monoidal.Colour("white")
+    x = Ty(Wire("x", dom=white, cod=white))
+    assert x.constant_factory("f", x).dom == Ty.id(white)
+
+
 def test_alpha_eq_under_restores_the_scopes():
     X, Y = Ty("X"), Ty("Y")
     f, x = (Y << X)("f"), Variable("x", X)
@@ -400,6 +406,18 @@ def test_Wire_reads_back_main():
         assert Ty(atom).inside == (atom, )
     with raises(TypeError):
         closed.Ty(monoidal.Wire('x'))
+
+
+def test_the_empty_type_of_a_colour_reads_back():
+    """ `Ty.id(colour)` prints as itself rather than as the uncoloured empty
+    type, which the repr of `monoidal.Ty` already said and this one hid,
+    see #636. """
+    black = monoidal.Colour('black')
+    unit = Ty.id(black)
+    assert repr(unit) == "biclosed.Ty.id(monoidal.Colour('black'))"
+    assert eval(repr(unit), {'biclosed': biclosed, 'monoidal': monoidal})\
+        == unit != Ty()
+    assert repr(Ty()) == "biclosed.Ty()"
 
 
 def test_rigid_type_is_biclosed():
