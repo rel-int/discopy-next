@@ -5,4 +5,4 @@
 - [x] drop tensor.Term: closed terms already copy with the codomain's copy
 - [x] fix #676 in closed.Abstraction.eval, with a regression test and the two closed baselines redrawn
 - [x] rewrite the notebook on closed terms and a closed.Functor into KExtension/BasisCopy
-- [ ] run the gates and the notebook check
+- [x] run the gates and the notebook check
