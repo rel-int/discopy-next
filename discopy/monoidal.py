@@ -3470,14 +3470,15 @@ class Sampler:
         """ Pick an option by the next choice, the first when they ran out. """
         return options[next(self.choices, 0) % len(options)]
 
-    def constant(self, dom: Sequence[Ty], cod: Sequence[Ty]) -> Constant:
+    def constant(
+            self, dom: Sequence[Ty], cod: Sequence[Ty]) -> cat.Constant:
         """ A fresh constant between the tensors of two lists of types. """
         category = self.terms.functor.cod
         return self.terms.constant_factory(category.box_factory(
             f"c{next(self.counter)}", category.ob().tensor(*dom),
             category.ob().tensor(*cod)))
 
-    def bound(self, level: int, cod: Ty) -> Variable:
+    def bound(self, level: int, cod: Ty) -> cat.Variable:
         """ The variable bound at a given level, named by its letter. """
         return self.terms.variable_factory(
             f"{self.letters[level % len(self.letters)]}{level}", cod)
@@ -3490,7 +3491,7 @@ class Sampler:
         return bound
 
     def spine(
-            self, cod: Sequence[Ty], bound: tuple[Variable, ...]
+            self, cod: Sequence[Ty], bound: tuple[cat.Variable, ...]
             ) -> cat.TermBase:
         """ A fresh constant applied to the bound variables in order. """
         return self.constant([x.cod for x in bound], cod)(*bound)
@@ -3501,7 +3502,7 @@ class Sampler:
             self.choose(range(len(bound) + 1)) for _ in range(n - 1))
         return [bound[i:j] for i, j in zip([0] + cuts, cuts + [len(bound)])]
 
-    def state(self, cod: Ty, bound: tuple[Variable, ...] = (),
+    def state(self, cod: Ty, bound: tuple[cat.Variable, ...] = (),
               level: int = 0) -> cat.TermBase:
         """
         A term of a given type with no stack and the bound variables as

@@ -2611,8 +2611,8 @@ class Kappa(TermBase):
         none of.
         """
         body, variables = self.body, self.variables
-        return not (body.stack and variables and body.offset
-                    <= body.freevars.index(variables[0]))
+        left = body.context[0]
+        return not (body.stack and variables and variables[0] not in left)
 
     @property
     def head(self) -> Variable | None:

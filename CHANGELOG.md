@@ -20,9 +20,12 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   `let` for each box but the last, which gives the output, and refuses any
   other, and `normal_form` inlines the boxes with one output, up to
   interchange, which `monoidal.InterchangeEquation` decides for small
-  diagrams by a search of the orbit under interchangers. A type applied to a
-  Python function is its kappa abstraction, and the laws are cells of the
-  property matrix ([next#658]).
+  diagrams by a search of the orbit under interchangers. In `symmetric` a
+  `Kappa` binds its variables in any order: `Diagram.to_term` reads a swap
+  as the order of the variables and `eval` gives the diagram back up to the
+  axioms of symmetric categories. A type applied to a Python function is
+  its kappa abstraction, and the laws are cells of the property matrix
+  ([next#658]).
 - `discopy.peirce.alpha` and `discopy.peirce.beta`: Peirce's existential
   graphs as diagrams with white and black regions, a cut where the colour
   changes. `~d`, `d & e`, `d | e`, `d.relative_sum(e)` and `d.par(e)` are

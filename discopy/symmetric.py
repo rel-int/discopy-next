@@ -26,6 +26,12 @@ Summary
     Functor
     DualRail
     Equation
+    TermBase
+    Variable
+    Constant
+    Application
+    Kappa
+    Sampler
 
 Axioms
 ------
@@ -99,21 +105,26 @@ Both sides foliate to the same single permutation.
 from __future__ import annotations
 
 from collections.abc import Iterable, Sequence
-from typing import ClassVar
+from dataclasses import dataclass
+from typing import ClassVar, Self
 
-from discopy import monoidal, feedback, balanced, hypergraph, cmap, messages
+from discopy import (
+    cat, monoidal, feedback, balanced, hypergraph, cmap, messages)
 from discopy.abc import (
     BalancedCategory, BiclosedCategory, CompactCategory,
     DaggerMonoidalCategory, PivotalCategory, RigidCategory, SpacialCategory,
     SymmetricCategory, TracedCategory)
-from discopy.testable import FUEL, Axiom, Rule
+from discopy.testable import (
+    FUEL, Axiom, Equation as AbstractEquation, Rule, axiom)
+# pylint: disable-next=unused-import  # the redex a term prints as
+from discopy.cat import let  # noqa: F401
 from discopy.cat import factory
 from discopy.feedback import (  # noqa: F401  pylint: disable=unused-import
     Wire, Ty, Nat)
 from discopy.python import finset
 from discopy.utils import (
-    AxiomError, assert_iscomposable, classproperty, factory_key,
-    factory_name, from_tree)
+    AxiomError, assert_iscomposable, assert_isinstance, classproperty,
+    factory_key, factory_name, from_tree)
 
 
 class Layer(feedback.Layer):
@@ -977,3 +988,197 @@ class Equation(monoidal.Equation):
 Diagram.yanking = BalancedCategory.yanking.modulo(Diagram.to_hypergraph)
 Diagram.scalar_sliding = SpacialCategory.scalar_sliding.modulo(
     Diagram.to_hypergraph)
+
+
+class TermBase(monoidal.TermBase):
+    """
+    A term of a symmetric category, i.e. of the linear kappa calculus: a
+    :class:`discopy.monoidal.TermBase` with exchange, where a :class:`Kappa`
+    binds its variables in any order, from anywhere in the context.
+
+    A variable still occurs once and the context of a term is still in the
+    order of the occurrences: a kappa is where the wires cross, so that it
+    evaluates to a permutation followed by its body, and a term to a
+    diagram up to the axioms of symmetric categories, see :class:`Equation`.
+
+    Example
+    -------
+    >>> x, y, z = map(Ty, "xyz")
+    >>> f = Box('f', x @ y, z)
+    >>> term = (Swap(y, x) >> f).to_term()
+    >>> print(term)
+    (y @ x)(lambda x0, x1: f(x1, x0))
+    >>> assert term.eval() == Swap(y, x) >> f
+
+    A diagram reads box for box up to its swaps, which a term does not
+    remember but as the order of its variables:
+
+    >>> g = Box('g', x, y)
+    >>> diagram = Swap(x, x) >> x @ g >> Swap(x, y) >> Swap(y, x) >> f
+    >>> print(diagram.to_term())
+    (x @ x)(lambda x0, x1: let(g(x0), lambda x2: f(x1, x2)))
+    >>> assert diagram.to_term().eval() == Swap(x, x) >> x @ g >> f
+    >>> assert diagram.to_term().eval() != diagram
+    >>> assert Equation(diagram.to_term().eval(), diagram)
+    >>> print(diagram.to_term().normal_form())
+    (x @ x)(lambda x0, x1: f(x1, g(x0)))
+    """
+    strategy = classmethod(monoidal.TermBase.strategy.__func__)
+
+    @classmethod
+    def rewire(cls, box, arguments):
+        """ A permutation is read as its inputs, in the order it gives. """
+        return [arguments[i] for i in box.perm]\
+            if isinstance(box, Permutation) else None
+
+    @axiom
+    def normal_form_soundness(cls, term: Self) -> AbstractEquation:
+        """
+        Beta reduction is sound: a term and its normal form evaluate to
+        diagrams equal up to the axioms of symmetric categories.
+        """
+        return Equation(term.eval(), term.normal_form().eval())
+
+    @axiom
+    def reading(cls, term: Self) -> AbstractEquation:
+        """
+        Reading is a section of evaluation up to the axioms of symmetric
+        categories: the diagram of a term reads as a term that evaluates
+        back to it, box for box but for its swaps.
+        """
+        diagram = term.eval()
+        return Equation(diagram.to_term().eval(), diagram)
+
+
+class Variable(TermBase, monoidal.Variable):
+    """
+    A variable with a name and a type of one wire, an identity diagram.
+
+    Parameters:
+        name : The name of the variable.
+        cod : The type of the variable.
+    """
+
+
+class Constant(TermBase, monoidal.Constant):
+    """
+    A box as a term, with its domain as stack.
+
+    Parameters:
+        box : The box.
+    """
+
+
+class Application(TermBase, monoidal.Application):
+    """
+    The application of a term to an argument with no stack, as in a
+    monoidal category: the context of the argument goes where the first
+    inputs of the stack were.
+
+    Parameters:
+        func : The term that is applied.
+        arg : The argument, a term with no stack.
+    """
+
+
+class Kappa(TermBase, monoidal.Kappa):
+    """
+    The abstraction of some of the free ``variables`` of the ``body``, in
+    any order and from anywhere in its context: they join its stack, which
+    stands where the stack of the body does among the variables left, or
+    else where the first of the variables did.
+
+    Parameters:
+        variables : The variables to bind, in the order of the stack.
+        body : The term in which they are bound.
+        offset : The number of free variables left of the stack, needed
+            when nothing says where it is, no variable and no stack in the
+            body: the place for a box with no output.
+
+    Example
+    -------
+    >>> x, y = Ty('x'), Ty('y')
+    >>> f, g = Constant(Box('f', x @ y, x)), Constant(Box('g', x @ x @ y, x))
+    >>> a, b, c = Variable('a', x), Variable('b', y), Variable('c', x)
+    >>> term = Kappa((b, a), f(a, b))
+    >>> assert term == (y @ x)(lambda b, a: f(a, b))
+    >>> assert term.stack == y @ x and term.eval() == Swap(y, x) >> f.box
+    >>> term = Kappa((c, a), g(a, c, b))
+    >>> assert term.freevars == [b] and term.offset == 0
+    >>> assert term.eval()\\
+    ...     == Diagram.permutation([1, 0, 2], x @ x @ y) >> g.box
+    >>> Kappa((a, a), f(a, b))
+    Traceback (most recent call last):
+        ...
+    ValueError: Expected distinct free variables of f(a, b), got a, a.
+    """
+    unbound = messages.NOT_FREE
+
+    @staticmethod
+    def place(variables, body):
+        """
+        The number of free variables left of the stack: those that are not
+        bound and stand left of the stack of the body, or else left of the
+        first of the variables, ``None`` when there is neither.
+        """
+        if not body.stack and not variables:
+            return None
+        anchor = body.offset if body.stack\
+            else body.freevars.index(variables[0])
+        return len(set(body.freevars[:anchor]).difference(variables))
+
+    def __init__(self, variables: tuple[Variable, ...], body: cat.TermBase,
+                 offset: int | None = None):
+        # pylint: disable=super-init-not-called  # no block of variables
+        assert_isinstance(body, cat.TermBase)
+        self.variables, self.body = tuple(variables), body
+        self.offset = self.start(self.variables, body, offset)
+        self.freevars = [x for x in body.freevars if x not in self.variables]
+        self.cod, bound = body.cod, body.types(self.variables)
+        self.stack = bound @ body.stack if self.front else body.stack @ bound
+
+    def eval(self, functor=None):
+        functor, body = self.identity(functor), self.body
+        stack = list(range(len(body.stack)))
+        bound = list(self.variables)
+        left, _, right = body.context
+        source = self.freevars[:self.offset] + (
+            bound + stack if self.front else stack + bound
+        ) + self.freevars[self.offset:]
+        permutation = [source.index(wire) for wire in left + stack + right]
+        result = body.eval(functor)
+        if permutation == list(range(len(source))):
+            return result
+        types = [
+            functor(body.stack[wire:wire + 1] if isinstance(wire, int)
+                    else wire.cod) for wire in source]
+        return functor.cod.permutation(permutation, types) >> result
+
+
+type Term = Variable | Constant | Application | Kappa
+
+
+@dataclass
+class Sampler(monoidal.Sampler):
+    """
+    Samples a term of a symmetric category as a
+    :class:`discopy.monoidal.Sampler` does, each subterm using its
+    variables in an order of its own.
+
+    Example
+    -------
+    >>> x, y = Ty('x'), Ty('y')
+    >>> sampler = Sampler(TermBase, iter([0, 1]), [x], "a")
+    >>> print(sampler.state(y, (Variable('v', x), Variable('w', x))))
+    c0(w, v)
+    """
+    def shuffle(self, bound):
+        """ A rotation of the variables, picked by a choice. """
+        start = self.choose(range(len(bound))) if len(bound) > 1 else 0
+        return bound[start:] + bound[:start]
+
+
+TermBase.functor, TermBase.sampler_factory = Functor.id(Diagram), Sampler
+TermBase.variable_factory, TermBase.constant_factory = Variable, Constant
+TermBase.application_factory, TermBase.kappa_factory = Application, Kappa
+Diagram.term_factory = TermBase
