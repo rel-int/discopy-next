@@ -365,10 +365,16 @@ def test_Matrix_of_backend_scalars_keeps_their_gradient():
     converting them one by one reads each as a scalar and detaches it. """
     torch = pytest.importorskip("torch")
     t = torch.tensor(.3, dtype=torch.float64, requires_grad=True)
+    for entries, dom, cod, expected in (
+            ([t], 1, 1, 1.), ([0, t], 1, 2, 1.), ([[t, t], [t, t]], 2, 2, 4.)):
+        t.grad = None
+        with backend('pytorch'):
+            Matrix(entries, dom, cod).array.sum().backward()
+        assert t.grad == expected
+    t.grad = None
     with backend('pytorch'):
-        assert Matrix([t], 1, 1).array.requires_grad
-        assert Matrix([[t, t], [t, t]], 2, 2).array.requires_grad
-        assert Matrix[complex]([t], 1, 1).array.requires_grad
+        Matrix[complex]([t], 1, 1).array.real.sum().backward()
+    assert t.grad == 1.
 
 
 def test_asarray_leaves_an_array_alone():

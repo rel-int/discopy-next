@@ -657,5 +657,9 @@ def test_endo_keeps_a_scalar_its_backend_owns():
     assert endo.conjugate().scalar.requires_grad
     assert torch.equal(endo.dagger().scalar.detach(), t.conj().detach())
     with backend("pytorch"):
-        assert endo.to_path().array.requires_grad
+        array = endo.to_path().array
+        assert array.requires_grad
+        array.abs().sum().backward()
+    assert t.grad is not None
+    assert Endo(t) == Endo(t.clone()) and len({Endo(t), Endo(t.clone())}) == 1
     assert Endo(.5).scalar == .5 and Endo(.5).conjugate() == Endo(.5)

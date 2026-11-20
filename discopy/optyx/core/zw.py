@@ -676,12 +676,12 @@ class Endo(ZWBox):
         super().__init__(f"Endo({scalar})", 1, 1, data=scalar)
 
     def setoid(self):
-        return (factory_key(type(self)),
-                self.dom, self.cod, self.is_dagger, self.scalar)
+        return (factory_key(type(self)), self.dom, self.cod, self.is_dagger,
+                hashable(self.scalar))
 
     def __repr__(self):
         return f"{factory_name(type(self))}"\
-            f"({format_number(self.scalar, exact=True)})"
+            f"({format_number(hashable(self.scalar), exact=True)})"
 
     def conjugate(self):
         with backend(diagram.array_backend(self.scalar)) as module:

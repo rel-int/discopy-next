@@ -793,8 +793,9 @@ def asarray(entries, dtype=None):
     The array of the active :func:`backend` holding nested ``entries``,
     stacking the ones the backend already owns so that a PyTorch tensor or
     a JAX tracer keeps its gradient: converting such an entry one by one
-    reads it as a scalar and detaches it. A backend whose arrays are
-    numpy's needs no stacking, and ``asarray`` leaves its array alone.
+    reads it as a scalar and detaches it, wherever among the entries it
+    sits. A backend whose arrays are numpy's needs no stacking, and
+    ``asarray`` leaves its array alone.
 
     Parameters:
         entries : The array, or the nested lists of its entries.
@@ -814,14 +815,17 @@ def asarray(entries, dtype=None):
             return np.stack([stack(x, np) for x in entries])
         return np.array(entries, dtype=dtype)
 
-    def leaf(entries):
-        while isinstance(entries, (list, tuple)) and entries:
-            entries = entries[0]
-        return entries
+    def leaves(entries):
+        if isinstance(entries, (list, tuple)):
+            for entry in entries:
+                yield from leaves(entry)
+        else:
+            yield entries
 
     with backend() as np:
         array = type(np.array(0))
-        if array.__module__ != "numpy" and isinstance(leaf(entries), array):
+        if array.__module__ != "numpy" and any(
+                isinstance(entry, array) for entry in leaves(entries)):
             return stack(entries, np)
         return np.asarray(entries, dtype=dtype)
 
