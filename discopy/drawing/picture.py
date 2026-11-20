@@ -31,6 +31,7 @@ Summary
     dress
     diagrams
     render
+    port_table
     to_dot
     layout
     graphs
@@ -62,6 +63,7 @@ from contextlib import contextmanager, nullcontext
 from io import BytesIO
 from math import lcm
 
+import networkx as nx
 import numpy as np
 
 from discopy.drawing.backend import Backend, Matplotlib
@@ -103,8 +105,16 @@ CROP = (24, 48)
 AUGMENTATIONS = (
     "warp", "rotate", "perspective", "chalk", "whiteboard", "blur", "jpeg")
 
-#: The families of graphs :func:`graphs` draws, by name.
-FAMILIES = ("complete", "star", "cycle", "cube", "grid", "tree")
+#: The families of graphs :func:`graphs` draws: the graph of each name
+#: with about ``n`` vertices, drawn by ``rng`` when it is random.
+FAMILIES = {
+    "complete": lambda n, rng: nx.complete_graph(n),
+    "star": lambda n, rng: nx.star_graph(n - 1),
+    "cycle": lambda n, rng: nx.cycle_graph(n),
+    "cube": lambda n, rng: nx.hypercube_graph(3),
+    "grid": lambda n, rng: nx.grid_2d_graph(2, max(n // 2, 2)),
+    "tree": lambda n, rng: nx.random_labeled_tree(
+        n, seed=int(rng.integers(1 << 16)))}
 
 DPI, SPIDER, WIRE, TEXT = 72, .15, LABELS.index("wire"), 7
 
@@ -501,6 +511,29 @@ def fits(diagram, size=160, scale=24, margin=1, graphviz=False) -> bool:
     return extent + 2 * margin <= size / scale
 
 
+def port_table(name: str, dom: int, cod: int) -> str:
+    """
+    The HTML table of a box for :func:`to_dot`: a bordered cell of its
+    name, with a row of ``dom`` port columns above and ``cod`` below, each
+    port as wide as the others on its side.
+
+    >>> print(port_table('f', 0, 1))  # doctest: +NORMALIZE_WHITESPACE
+    <TABLE BORDER="0" CELLSPACING="0"><TR><TD BORDER="1" CELLPADDING="6"
+    COLSPAN="1">f</TD></TR><TR><TD PORT="c0" BORDER="0" CELLPADDING="0"
+    COLSPAN="1" WIDTH="18" HEIGHT="0"></TD></TR></TABLE>
+    """
+    grid, width, rows = lcm(dom or 1, cod or 1), 18 * max(dom, cod, 1), []
+    for side, arity in (("d", dom), ("c", cod)):
+        if arity:
+            rows.append("<TR>" + "".join(
+                f'<TD PORT="{side}{j}" BORDER="0" CELLPADDING="0" '
+                f'COLSPAN="{grid // arity}" WIDTH="{width // arity}" '
+                f'HEIGHT="0"></TD>' for j in range(arity)) + "</TR>")
+    rows.insert(bool(dom), f'<TR><TD BORDER="1" CELLPADDING="6" '
+                           f'COLSPAN="{grid}">{name}</TD></TR>')
+    return '<TABLE BORDER="0" CELLSPACING="0">' + "".join(rows) + "</TABLE>"
+
+
 def to_dot(diagram) -> str:
     """
     The DOT source of the hypergraph of a diagram, for :func:`layout`.
@@ -529,18 +562,6 @@ def to_dot(diagram) -> str:
              '  node [shape=plain, fontname="DejaVu Sans", fontsize=12];']
     ends = defaultdict(list)
 
-    def table(name, dom, cod):
-        grid, width, rows = lcm(dom or 1, cod or 1), 18 * max(dom, cod, 1), []
-        for side, arity in (("d", dom), ("c", cod)):
-            if arity:
-                rows.append("<TR>" + "".join(
-                    f'<TD PORT="{side}{j}" BORDER="0" CELLPADDING="0" '
-                    f'COLSPAN="{grid // arity}" WIDTH="{width // arity}" '
-                    f'HEIGHT="0"></TD>' for j in range(arity)) + "</TR>")
-        rows.insert(bool(dom), f'<TR><TD BORDER="1" CELLPADDING="6" '
-                               f'COLSPAN="{grid}">{name}</TD></TR>')
-        return '<TABLE BORDER="0" CELLSPACING="0">' + "".join(rows)\
-            + "</TABLE>"
     for side, wires in (("in", graph.dom_wires), ("out", graph.cod_wires)):
         for i, spider in enumerate(wires):
             lines.append(f'  {side}{i} [shape=point, width=0, label=""];')
@@ -553,21 +574,21 @@ def to_dot(diagram) -> str:
     for i, (box, (dom, cod)) in enumerate(
             zip(graph.boxes, graph.box_wires)):
         lines.append(f'  b{i} [tooltip="{box.name}", '
-                     f'label=<{table(box.name, len(dom), len(cod))}>];')
+                     f'label=<{port_table(box.name, len(dom), len(cod))}>];')
         for j, spider in enumerate(dom):
             ends[spider].append((True, f"b{i}:d{j}:n"))
         for j, spider in enumerate(cod):
             ends[spider].append((False, f"b{i}:c{j}:s"))
     for spider, obj in enumerate(graph.spider_types):
-        points = [end for _, end in sorted(ends[spider], key=lambda e: e[0])]
-        if len(points) == 2:
-            lines.append(f'  {points[0]} -- {points[1]} [label="{obj}"];')
-            continue
-        lines.append(f'  s{spider} [shape=point, width={2 * SPIDER / INCH}];')
-        for is_target, end in sorted(ends[spider], key=lambda e: e[0]):
-            source, target = (f"s{spider}", end) if is_target\
-                else (end, f"s{spider}")
-            lines.append(f'  {source} -- {target} [label="{obj}"];')
+        ends[spider].sort(key=lambda end: end[0])
+        pairs = [[end for _, end in ends[spider]]]\
+            if len(ends[spider]) == 2 else [
+                (f"s{spider}", end) if is_target else (end, f"s{spider}")
+                for is_target, end in ends[spider]]
+        if len(ends[spider]) != 2:
+            lines.append(
+                f'  s{spider} [shape=point, width={2 * SPIDER / INCH}];')
+        lines += [f'  {" -- ".join(pair)} [label="{obj}"];' for pair in pairs]
     return "\n".join(lines + ["}"])
 
 
@@ -585,13 +606,15 @@ def layout(diagram) -> dict:
         capture_output=True, check=True).stdout)
 
 
-def paint_layout(graph: dict, size, scale, mask, xkcd=False, linewidth=1.5,
-                 fontsize=None) -> np.ndarray:
+def paint_layout(  # pylint: disable=too-many-locals  # one figure, as paint
+        graph: dict, size, scale, mask, **params) -> np.ndarray:
     """
     The pixels of a :func:`layout`, see :func:`render`: a box is a
     rectangle of its name with the name inside, a spider a dot and a wire
-    the spline of its edge, each in the colour of its label for a mask.
+    the spline of its edge, each in the colour of its label for a mask,
+    by hand when ``xkcd`` is set, its strokes ``linewidth`` wide.
     """
+    xkcd, linewidth = params.get("xkcd", False), params.get("linewidth", 1.5)
     from matplotlib.patches import Circle, PathPatch, Rectangle
     from matplotlib.path import Path
 
@@ -624,7 +647,7 @@ def paint_layout(graph: dict, size, scale, mask, xkcd=False, linewidth=1.5,
                     facecolor=colour(label) if mask else "white"))
                 if not mask:
                     axis.text(x, y, label, ha="center", va="center",
-                              fontsize=fontsize or .4 * scale)
+                              fontsize=params.get("fontsize", .4 * scale))
         *_, right, top = map(float, graph["bb"].split(","))
         result = pixels(figure, axis, point(f"{right / 2},{top / 2}"),
                         size, scale)
@@ -645,19 +668,12 @@ def graphs(module: str, seed=0, max_boxes=6) -> Iterator:
     >>> first = next(graphs("compact", seed=1))
     >>> assert not (first.dom or first.cod)
     """
-    import networkx as nx
     mod, rng = load(module), np.random.default_rng(seed)
     x = mod.Ty('a')
     while True:
-        family, n = rng.choice(FAMILIES), int(rng.integers(3, max_boxes + 1))
-        graph = nx.convert_node_labels_to_integers({
-            "complete": lambda: nx.complete_graph(n),
-            "star": lambda: nx.star_graph(n - 1),
-            "cycle": lambda: nx.cycle_graph(n),
-            "cube": lambda: nx.hypercube_graph(3),
-            "grid": lambda: nx.grid_2d_graph(2, max(n // 2, 2)),
-            "tree": lambda: nx.random_labeled_tree(
-                n, seed=int(rng.integers(1 << 16)))}[family]())
+        family, n = rng.choice(list(FAMILIES)), int(
+            rng.integers(3, max_boxes + 1))
+        graph = nx.convert_node_labels_to_integers(FAMILIES[family](n, rng))
         smaller = {v: sorted(u for u in graph[v] if u < v) for v in graph}
         larger = {v: sorted(u for u in graph[v] if u > v) for v in graph}
         boxes = [mod.Box('f', x ** len(smaller[v]), x ** len(larger[v]))
@@ -805,7 +821,9 @@ def samples(module: str, seed=0, size=160, max_boxes=6, scales=(20, 28),
     while True:
         drawn = {key: rng.random() < .5 if value == "random" else value
                  for key, value in (defaults | flags).items()}
-        diagram = next(sources[drawn.pop("graphs")])
+        diagram = next(sources[drawn.pop("graphs")], None)
+        if diagram is None:
+            return
         diagram = dress(diagram, rng, **{
             key: drawn.pop(key) for key in ("heights", "widths", "triangles")})
         params = {"xkcd": drawn.pop("xkcd", False),
