@@ -38,15 +38,17 @@ are then the two spiders of the ZW calculus, applied on every mode:
 - the **Z** spider copies each mode's photon number, `|n⟩ ↦ |n⟩|n⟩`, the
   paper's **basis copy** `eᵢ ↦ eᵢ ⊗ eᵢ`.
 
-Words are vectors drawn at random with a fixed seed. Each reading is a
-`tensor.Diagram` built with `from_callable`, and its copies are the optyx
-diagrams evaluated as tensors. Every reading is checked against the paper's
-formulas, written out independently with `numpy.einsum`.
+Each reading is a `tensor.Term`, a lambda term whose types are dimensions:
+`N(lambda x: ...)` is an abstraction, and a variable used twice is copied.
+The copy is chosen by the diagram class the term is evaluated in, here the
+optyx diagrams evaluated as tensors. Words are vectors drawn at random with a
+fixed seed. Every reading is checked against the paper's formulas, written
+out independently with `numpy.einsum`.
 
 ```python {.marimo}
 import numpy as np
 
-from discopy.tensor import Dim, Box, Diagram
+from discopy.tensor import Dim, Box, Diagram, Variable, Tuple
 from discopy.optyx.core import diagram as optyx
 from discopy.optyx.core.zw import W, ZBox
 ```
@@ -120,12 +122,11 @@ layer(N, basis_copy).draw(figsize=(4, 4))
 ```
 
 ```python {.marimo}
-ones = np.ones(2)
 _v = np.array([.3, .7])
 _state = Box("v", Dim(1), N, _v)
 _copied = {name: (_state >> contraction(N, spider)).eval().array
            for name, spider in [("k", k_extension), ("basis", basis_copy)]}
-assert np.allclose(_copied["k"], np.outer(_v, ones) + np.outer(ones, _v))
+assert np.allclose(_copied["k"], np.outer(_v, [1, 1]) + np.outer([1, 1], _v))
 assert np.allclose(_copied["basis"], np.diag(_v))
 assert np.allclose(
     (_state >> iota(N) >> epsilon(N)).eval().array, _v), "ε ∘ ι = id"
@@ -134,100 +135,110 @@ mo.md("W copies `v` to `v ⊗ k + k ⊗ v` and Z copies it to `Σᵢ vᵢ eᵢ �
 
 ## 2. The lexicon
 
-A word is a state, and a function type `A ⇒ B` is the space `A ⊗ B`. A
-function is applied by `ev`, a cup on `A` that leaves `B`. Every `!` of the
-paper's types is a Fock space that a contraction copies and a dereliction
-`ε` reads. A `!` that is only derelicted contributes `ε ∘ ι = id`, so it is
-left out.
+A word is a variable of a type built with `<<`, where `y << x` is the
+dimension `y @ x.l`. A function word is applied to its argument by a cup.
+A variable used twice is copied with the `copy` of the diagram class the
+term is evaluated in, so the two copies of the paper are two subclasses of
+`tensor.Diagram`. The diagram of a reading is then the paper's map, from its
+words to `S ⊗ S`, and its meaning is that map applied to the word states.
+Every `!` of the paper's types is a Fock space that a contraction copies and
+a dereliction `ε` reads; a `!` that is only derelicted contributes
+`ε ∘ ι = id`, so it is left out.
 
 | word | type of §3.3 | here |
 |---|---|---|
 | John, Bill | `!N` | `N` |
-| likes | `!((!(!N\S))/N)` | `N ⊗ N ⊗ S`: object, subject, sentence |
-| his | `(!(!N\N))/N` | `N ⊗ N ⊗ N`: possessed, owner, result |
+| likes | `!((!(!N\S))/N)` | `(S << N) << N`: object, then subject |
+| his | `(!(!N\N))/N` | `(N << N) << N`: possessed, then owner |
 | code | `N` | `N` |
-| does too | `(!(!N\S))\(!N\S)` | a map `N ⊗ S → N ⊗ S` |
+| does too | `(!(!N\S))\(!N\S)` | `(S << N) << (S << N)` |
+
+```python {.marimo}
+class KExtension(Diagram):
+    @classmethod
+    def copy(cls, x, n=2):
+        assert n == 2
+        return contraction(x, k_extension)
+
+
+class BasisCopy(Diagram):
+    @classmethod
+    def copy(cls, x, n=2):
+        assert n == 2
+        return contraction(x, basis_copy)
+
+
+copies = {"k-extension": KExtension, "basis copy": BasisCopy}
+VP = S << N
+types = {"John": N, "Bill": N, "Mary": N, "code": N, "guitar": N,
+         "sleeps": VP, "snores": VP, "He": N << N, "plays": VP << N,
+         "likes": VP << N, "his": (N << N) << N, "does too": VP << VP}
+John, Bill, Mary, code, guitar, sleeps, snores, He, plays, likes, his, \
+    does_too = (Variable(name, typ) for name, typ in types.items())
+```
+
+The arrays `a` of the words are drawn with their arguments first, the order
+the formulas below use, and transposed into the order of their types.
 
 ```python {.marimo}
 rng = np.random.default_rng(0)
+shapes = {"N": (2, ), "VP": (2, 2), "He": (2, 2), "V": (2, 2, 2),
+          "his": (2, 2, 2), "does too": (2, 2, 2, 2)}
+kinds = {"sleeps": "VP", "snores": "VP", "He": "He", "plays": "V",
+         "likes": "V", "his": "his", "does too": "does too"}
+order = {"VP": (1, 0), "He": (1, 0), "V": (2, 1, 0), "his": (2, 1, 0),
+         "does too": (3, 2, 0, 1)}
+a = {name: rng.random(shapes[kinds.get(name, "N")]) for name in types}
+lexicon = {name: Box(name, Dim(1), typ, a[name].transpose(
+    order.get(kinds.get(name), None))) for name, typ in types.items()}
 
 
-def word(name, A):
-    return Box(name, Dim(1), A, rng.random(A.inside))
-
-
-def ev(A, B):
-    return Diagram.cups(A, A) @ B
-
-
-John, Bill, Mary = word("John", N), word("Bill", N), word("Mary", N)
-code, guitar = word("code", N), word("guitar", N)
-sleeps, snores = word("sleeps", N @ S), word("snores", N @ S)
-plays, likes = word("plays", N @ N @ S), word("likes", N @ N @ S)
-his = word("his", N @ N @ N)
-He = Box("He", N, N, rng.random((2, 2)))
-does_too = Box("does too", N @ S, N @ S, rng.random((2, 2, 2, 2)))
-copies = {"k-extension": k_extension, "basis copy": basis_copy}
+def meaning(term, copy):
+    """The map of a reading, applied to the states of its words."""
+    words = Diagram.id(Dim(1)).tensor(
+        *(lexicon[var.name] for var in term.freevars))
+    return words >> term.eval(copy)
 ```
 
 ## 3. Anaphora: *John sleeps. He snores.*
 
-`John` is copied, one copy is the subject of *sleeps* and the other goes
-through *He* to *snores* (figure 11 of the paper). With k-extension the
-paper finds
+`John` is used twice, so it is copied: one copy is the subject of *sleeps*
+and the other goes through *He* to *snores* (figure 11 of the paper). With
+k-extension the paper finds
 `sleeps(ε(John)) ⊗ snores(He(k)) + sleeps(ε(k)) ⊗ snores(He(John))`.
 
 ```python {.marimo}
-def anaphora(spider):
-    @Diagram.from_callable(Dim(1), S @ S)
-    def sentence():
-        john, he = contraction(N, spider)(John())
-        return (ev(N, S)(john, *sleeps()),
-                ev(N, S)(He(he), *snores()))
-    return sentence
-
-
-anaphora(k_extension).draw(figsize=(6, 6))
+anaphora = Tuple(sleeps(John), snores(He(John)))
+meaning(anaphora, KExtension).draw(figsize=(6, 6))
 ```
 
 ```python {.marimo}
-def array(box):
-    return box.array
-
-
-_j, _sl, _sn, _he = map(array, (John, sleeps, snores, He))
-_out = anaphora(k_extension).eval().array
+ones = np.ones(2)
+_j, _sl, _sn, _he = a["John"], a["sleeps"], a["snores"], a["He"]
+_out = meaning(anaphora, KExtension).eval().array
 assert np.allclose(_out, np.outer(_j @ _sl, (ones @ _he) @ _sn)
                    + np.outer(ones @ _sl, (_j @ _he) @ _sn))
-_out = anaphora(basis_copy).eval().array
+_out = meaning(anaphora, BasisCopy).eval().array
 assert np.allclose(_out, np.einsum("i,is,ij,jt->st", _j, _sl, _he, _sn))
 mo.md("Both copies give the paper's map of §5.1.")
 ```
 
 ## 4. Ellipsis: *John plays guitar. Mary does too.*
 
-The verb phrase *plays guitar* is copied: one copy is applied to *John*, the
-other goes through *does too* to *Mary* (figure 12). With k-extension the
-paper finds `pg(John) ⊗ does_too(k)(Mary) + k(John) ⊗ does_too(pg)(Mary)`,
-where `pg = plays(guitar)`.
+The verb phrase *plays guitar* is abstracted and used twice: one copy is
+applied to *John*, the other goes through *does too* to *Mary* (figure 12).
+With k-extension the paper finds
+`pg(John) ⊗ does_too(k)(Mary) + k(John) ⊗ does_too(pg)(Mary)`, where
+`pg = plays(guitar)`.
 
 ```python {.marimo}
-def ellipsis(spider):
-    @Diagram.from_callable(Dim(1), S @ S)
-    def sentence():
-        vp = ev(N, N @ S)(guitar(), *plays())
-        vp1n, vp1s, vp2n, vp2s = contraction(N @ S, spider)(*vp)
-        return (ev(N, S)(John(), vp1n, vp1s),
-                ev(N, S)(Mary(), *does_too(vp2n, vp2s)))
-    return sentence
-
-
-ellipsis(k_extension).draw(figsize=(6, 6))
+ellipsis = VP(lambda vp: (vp(John), does_too(vp)(Mary)))(plays(guitar))
+meaning(ellipsis, KExtension).draw(figsize=(6, 6))
 ```
 
 ```python {.marimo}
-_j, _m, _dt = John.array, Mary.array, does_too.array
-_pg = np.einsum("o,ons->ns", guitar.array, plays.array)
+_j, _m, _dt = a["John"], a["Mary"], a["does too"]
+_pg = np.einsum("o,ons->ns", a["guitar"], a["plays"])
 K = np.ones((2, 2))
 
 
@@ -239,59 +250,43 @@ def too(vp, subject):
     return np.einsum("m,ns,nsmt->t", subject, vp, _dt)
 
 
-assert np.allclose(ellipsis(k_extension).eval().array,
+assert np.allclose(meaning(ellipsis, KExtension).eval().array,
                    np.outer(says(_pg, _j), too(K, _m))
                    + np.outer(says(K, _j), too(_pg, _m)))
-assert np.allclose(ellipsis(basis_copy).eval().array, np.einsum(
+assert np.allclose(meaning(ellipsis, BasisCopy).eval().array, np.einsum(
     "n,ns,nsmt,m->st", _j, _pg, _dt, _m))
 mo.md("Both copies give the paper's map of §5.2.")
 ```
 
 ## 5. Anaphora with ellipsis: strict and sloppy
 
-**Strict** (figures 3 and 13): two contractions. *John* is copied and one
-copy is the owner in *his code*. Then the verb phrase *likes John's code* is
-copied, one copy for *John* and one for *does too* and *Bill*.
+**Strict** (figures 3 and 13): two contractions. *John* is used twice, as
+the subject and as the owner in *his code*, and the verb phrase *likes
+John's code* is used twice, once for *John* and once for *does too* and
+*Bill*.
 
 ```python {.marimo}
-def strict(spider):
-    @Diagram.from_callable(Dim(1), S @ S)
-    def sentence():
-        john, owner = contraction(N, spider)(John())
-        johns_code = ev(N, N)(owner, *ev(N, N @ N)(code(), *his()))
-        vp = ev(N, N @ S)(johns_code, *likes())
-        vp1n, vp1s, vp2n, vp2s = contraction(N @ S, spider)(*vp)
-        return (ev(N, S)(john, vp1n, vp1s),
-                ev(N, S)(Bill(), *does_too(vp2n, vp2s)))
-    return sentence
-
-
-strict(k_extension).draw(figsize=(8, 9))
+strict = VP(lambda vp: (vp(John), does_too(vp)(Bill)))(
+    likes(his(code)(John)))
+mo.md(f"`{strict}`")
 ```
 
-**Sloppy** (figures 4 and 14): four contractions, one each for *John*,
-*Bill*, *his code* and *likes*. Each subject gets its own copy of *likes*
-and of *his code*, and owns its own code.
+```python {.marimo}
+meaning(strict, KExtension).draw(figsize=(8, 9))
+```
+
+**Sloppy** (figures 4 and 14): four contractions. *his code* is
+abstracted and used twice, and *John*, *Bill* and *likes* are each used
+twice, so each subject owns its own code.
 
 ```python {.marimo}
-def sloppy(spider):
-    @Diagram.from_callable(Dim(1), S @ S)
-    def sentence():
-        john, owner1 = contraction(N, spider)(John())
-        bill, owner2 = contraction(N, spider)(Bill())
-        h1p, h1r, h2p, h2r = contraction(N @ N, spider)(
-            *ev(N, N @ N)(code(), *his()))
-        l1o, l1n, l1s, l2o, l2n, l2s = contraction(N @ N @ S, spider)(
-            *likes())
-        s1 = ev(N, S)(john, *ev(N, N @ S)(
-            ev(N, N)(owner1, h1p, h1r), l1o, l1n, l1s))
-        s2 = ev(N, S)(bill, *does_too(*ev(N, N @ S)(
-            ev(N, N)(owner2, h2p, h2r), l2o, l2n, l2s)))
-        return s1, s2
-    return sentence
+sloppy = (N << N)(lambda h: (
+    likes(h(John))(John), does_too(likes(h(Bill)))(Bill)))(his(code))
+mo.md(f"`{sloppy}`")
+```
 
-
-sloppy(k_extension).draw(figsize=(9, 11))
+```python {.marimo}
+meaning(sloppy, KExtension).draw(figsize=(9, 11))
 ```
 
 The same readings written with `einsum`, with `copy` the paper's `Δ` on the
@@ -309,29 +304,30 @@ def b_copy(v):
 
 
 def strict_formula(copy, dt=None):
-    dt = does_too.array if dt is None else dt
-    j1j2 = copy(John.array)
-    vp = np.einsum("c,cjr,rns->jns", code.array, his.array,
-                   likes.array)                            # owner j
+    dt = a["does too"] if dt is None else dt
+    j1j2 = copy(a["John"])
+    vp = np.einsum("c,cjr,rns->jns", a["code"], a["his"],
+                   a["likes"])                            # owner j
     vp = np.einsum("aj,jns->ans", j1j2, vp)                # John's copy a
     pairs = np.stack([copy(vp[a]) for a in range(2)])     # a, n, s, m, t
-    return np.einsum("ansmt,an,mtbu,b->su", pairs, np.eye(2), dt, Bill.array)
+    return np.einsum("ansmt,an,mtbu,b->su", pairs, np.eye(2), dt, a["Bill"])
 
 
 def sloppy_formula(copy, dt=None):
-    dt = does_too.array if dt is None else dt
-    J, B = copy(John.array), copy(Bill.array)
-    H = copy(np.einsum("c,cpr->pr", code.array, his.array))  # p, r, q, x
-    L = copy(likes.array)                                    # r,n,s, x,m,t
+    dt = a["does too"] if dt is None else dt
+    J, B = copy(a["John"]), copy(a["Bill"])
+    H = copy(np.einsum("c,cpr->pr", a["code"], a["his"]))  # p, r, q, x
+    L = copy(a["likes"])                                    # r,n,s, x,m,t
     return np.einsum("ap,bq,prqx,rnsxmt,an,mtcu,bc->su",
                      J, B, H, L, np.eye(2), dt, np.eye(2))
 
 
-for _name, _spider, _copy in [("k-extension", k_extension, k_copy),
-                              ("basis copy", basis_copy, b_copy)]:
-    assert np.allclose(strict(_spider).eval().array, strict_formula(_copy))
-    assert np.allclose(sloppy(_spider).eval().array, sloppy_formula(_copy))
-mo.md("The optyx diagrams and the formulas agree, for both copies.")
+for _cls, _copy in [(KExtension, k_copy), (BasisCopy, b_copy)]:
+    assert np.allclose(meaning(strict, _cls).eval().array,
+                       strict_formula(_copy))
+    assert np.allclose(meaning(sloppy, _cls).eval().array,
+                       sloppy_formula(_copy))
+mo.md("The terms and the formulas agree, for both copies.")
 ```
 
 The paper writes the strict reading under k-extension as four terms
@@ -350,13 +346,13 @@ its Sweedler formula expands to.
 
 ```python {.marimo}
 def vp_of(owner):
-    return np.einsum("c,cpr,p,rns->ns", code.array, his.array, owner,
-                     likes.array)
+    return np.einsum("c,cpr,p,rns->ns", a["code"], a["his"], owner,
+                     a["likes"])
 
 
-_jo = John.array
-assert np.allclose(strict(k_extension).eval().array, sum(
-    np.outer(says(vp, subject), too(elided, Bill.array))
+_jo = a["John"]
+assert np.allclose(meaning(strict, KExtension).eval().array, sum(
+    np.outer(says(vp, subject), too(elided, a["Bill"]))
     for vp, subject, elided in [
         (vp_of(ones), _jo, K), (K, _jo, vp_of(ones)),
         (vp_of(_jo), ones, K), (K, ones, vp_of(_jo))]))
@@ -369,9 +365,9 @@ This is the claim of §5.3: the strict and the sloppy readings have
 different meanings, for either copy.
 
 ```python {.marimo}
-readings = {name: (strict(spider).eval().array.real,
-                   sloppy(spider).eval().array.real)
-            for name, spider in copies.items()}
+readings = {name: (meaning(strict, cls).eval().array.real,
+                   meaning(sloppy, cls).eval().array.real)
+            for name, cls in copies.items()}
 for _name, (_strict, _sloppy) in readings.items():
     assert not np.allclose(_strict, _sloppy), _name
 mo.md("\n".join(

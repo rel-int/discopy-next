@@ -9,11 +9,17 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Added
 
+- `discopy.tensor.Term`: lambda terms whose types are dimensions, where
+  `y << x` is `y @ x.l` and `x >> y` is `x.r @ y`. A `Dim` called on a
+  function is an `Abstraction`, a term called on a term an `Application`, and
+  `Term.eval` draws the diagram with caps and cups. Terms need not be linear: a
+  variable used twice is copied with the `copy` of the diagram class the term
+  is evaluated in, so a subclass of `Diagram` chooses the copy ([next#674]).
 - The notebook `docs/notebooks/optyx/strict_sloppy.md` reproduces §5 of
   arXiv:2110.10641, the strict and sloppy readings of *John likes his code.
-  Bill does too.*, with the Fock space of `!` as photons on modes. The
-  paper's k-extension is the W node of `discopy.optyx.core.zw` and its basis
-  copy the Z spider; anaphora, ellipsis and both readings are checked against
+  Bill does too.*, each reading a `tensor.Term`, with the Fock space of `!`
+  as photons on modes. The paper's k-extension is the W node of
+  `discopy.optyx.core.zw` and its basis copy the Z spider; anaphora, ellipsis and both readings are checked against
   the paper's formulas, and the two readings are shown to be two maps
   ([next#674]).
 - `discopy.peirce.alpha` and `discopy.peirce.beta`: Peirce's existential
