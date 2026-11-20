@@ -83,6 +83,7 @@ import json
 import math
 from collections import Counter
 from pathlib import Path
+from typing import cast
 
 import torch  # pylint: disable=import-error  # torch is an extra
 from torch import nn  # pylint: disable=import-error  # torch is an extra
@@ -113,7 +114,7 @@ def atom(symbol: str) -> str:
     return {"PR": "PP"}.get(base, base)
 
 
-class Paths(nn.Module):
+class Paths(nn.Module):  # pylint: disable=abstract-method  # parameters
     """ The orthogonal maps of a left and a right child, and the root. """
     def __init__(self, dim: int):
         super().__init__()
@@ -158,7 +159,8 @@ class Norm(nn.Module):
             self.eps).rsqrt() * self.weight
 
 
-class Tagger(nn.Module):  # pylint: disable=too-many-instance-attributes
+class Tagger(  # pylint: disable=too-many-instance-attributes,abstract-method
+        nn.Module):
     """
     The tagger of SPINDLE over the states of the goal and of the words,
     with the span classifier of its ghosts. Its parameters have the names of
@@ -202,9 +204,10 @@ class Tagger(nn.Module):  # pylint: disable=too-many-instance-attributes
         The positional encoding of each node at a depth, the product of the
         maps of its path from the root, ``(2 ** depth, dim)``.
         """
-        primitives, result = self.path_encoder.primitives, []
+        primitives = cast(torch.Tensor, self.path_encoder.primitives)
+        result = []
         for position in range(2 ** depth, 2 ** (depth + 1)):
-            state = self.path_encoder.init
+            state = cast(torch.Tensor, self.path_encoder.init)
             while position > 1:
                 state = state @ primitives[position % 2].T
                 position //= 2
@@ -254,7 +257,8 @@ class Tagger(nn.Module):  # pylint: disable=too-many-instance-attributes
         """
         words = roots[0, 1:]
         first, last = (words[[span[i] for span in spans]] for i in (0, 1))
-        return nn.functional.gelu(self.span_start(first) + self.span_end(last))
+        return nn.functional.gelu(  # pylint: disable=not-callable  # stubs
+            self.span_start(first) + self.span_end(last))
 
     @torch.no_grad()
     def ghosts(self, roots, threshold: float) -> list[tuple[int, int, int]]:
@@ -324,12 +328,11 @@ class Parser:
         path = Path(directory)
         ids = json.loads((path / "atom_map.json").read_text())["id_to_sym"]
         symbols = [ids[key] for key in sorted(ids, key=int)]
-        unary, rules = (
-            [tuple(rule) for rule in json.loads(
-                (path / f"{name}_rules.json").read_text())["rules"]]
-            for name in ("unary", "ghost"))
+        rules = {name: [tuple(rule) for rule in json.loads(
+            (path / f"{name}_rules.json").read_text())["rules"]]
+            for name in ("unary", "ghost")}
         config = AutoConfig.from_pretrained(path)
-        tagger = Tagger(config, len(symbols), len(unary) + 1)
+        tagger = Tagger(config, len(symbols), len(rules["unary"]) + 1)
         encoder = Encoder(
             AutoModel.from_config(config), AutoTokenizer.from_pretrained(path),
             config.max_position_embeddings)
@@ -342,7 +345,7 @@ class Parser:
             if not key.startswith("encoder.")})
         encoder.to(device).eval()
         tagger.to(device).eval()
-        return cls(tagger, encoder, symbols, rules, **params)
+        return cls(tagger, encoder, symbols, rules["ghost"], **params)
 
     def category(self, heap: list[int], position: int = 1
                  ) -> tuple[Ty | None, list[int]]:
@@ -433,7 +436,8 @@ class Parser:
         goal, nodes = self.category(heaps[0])
         if goal is None:
             return None
-        return Sequent(constants, goal), sites + [(0, node) for node in nodes]
+        return Sequent(tuple(constants), goal), sites + [
+            (0, node) for node in nodes]
 
     def __call__(self, sentence: str | list[str]) -> ProofNet | None:
         """
@@ -453,13 +457,8 @@ class Parser:
             heaps, nodes = self.tagger.decode(roots)
             spans = self.tagger.ghosts(roots, self.threshold)
             ghosts = [self.ghost(rule) for *_, rule in spans]
-            given = Counter()
-            for slot, heap in enumerate(heaps):
-                ty, _ = self.category(heap)
-                given.update(count(ty, slot > 0) if ty is not None else {})
-            kept = self.kept(given, [
-                count(ty) if ty is not None else Counter()
-                for ty, _ in (self.category(heap) for _, heap in ghosts)])
+            kept = self.kept(self.given(heaps), [
+                self.given([heap], polarity=True) for _, heap in ghosts])
             if kept is None:
                 return None
             if kept:
@@ -469,9 +468,29 @@ class Parser:
             result = self.sequent(words, heaps, [ghosts[k] for k in kept])
             if result is None or not result[0].is_balanced:
                 return None
-            sequent, sites = result
-            ports = torch.stack([
-                nodes[int(math.log2(node))][slot, node - 2 ** int(
-                    math.log2(node))] for slot, node in sites])
-            scores = ports * self.tagger.linker["weight"] @ ports.T
-            return sequent.decode(scores.cpu().double().numpy())
+            return self.link(*result, nodes)
+
+    def given(self, heaps: list[list[int]], polarity: bool = False
+              ) -> Counter:
+        """
+        How many more times each atom is given than wanted by heaps, the
+        first the goal, wanted, unless ``polarity``.
+        """
+        result = Counter()
+        for i, heap in enumerate(heaps):
+            ty, _ = self.category(heap)
+            result.update(
+                {} if ty is None else count(ty, polarity or i > 0))
+        return result
+
+    def link(self, sequent: Sequent, sites: list[tuple[int, int]],
+             nodes: list) -> ProofNet:
+        """
+        The best linking of a sequent, by the bilinear scores of the states
+        ``nodes[depth][slot, i]`` of the sites of its ports.
+        """
+        ports = torch.stack([
+            nodes[depth][slot, node - 2 ** depth] for slot, node, depth in (
+                (slot, node, node.bit_length() - 1) for slot, node in sites)])
+        scores = ports * self.tagger.linker["weight"] @ ports.T
+        return sequent.decode(scores.cpu().double().numpy())
