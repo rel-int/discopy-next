@@ -3,4 +3,4 @@
 > toumix: "yep fix it"
 
 - [WIP] @T-0729b388-26a3-4a3d-ac11-e727fdb06d74-2026-11-20 16:19 Kappa says what is wrong with an offset: missing, or not the one the variables or the stack ask for
-- [ ] normal_form_soundness compares diagrams up to interchange, not up to the hypergraph, which forgets the side of a scalar
+- [WIP] @T-0729b388-26a3-4a3d-ac11-e727fdb06d74-2026-11-20 16:20 normal_form_soundness compares diagrams up to interchange, not up to the hypergraph, which forgets the side of a scalar
