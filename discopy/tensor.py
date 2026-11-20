@@ -1615,7 +1615,16 @@ class Constant(Term):
         box = cod.box_factory(self.name, Dim(1), self.cod, self.data)
         return Term.wires(box(), len(self.cod))
 
-    key = property(lambda self: (self.name, self.cod))
+    @property
+    def key(self):
+        """
+        Constants are equal when their states are, data included, see
+        :meth:`Box.setoid`.
+
+        >>> v, w = Constant("v", Dim(2), [1, 0]), Constant("v", Dim(2), [0, 1])
+        >>> assert v != w
+        """
+        return (Box(self.name, Dim(1), self.cod, self.data), )
 
     def __repr__(self):
         data = "" if self.data is None else f", data={self.data!r}"
