@@ -284,15 +284,14 @@ class Matrix[dtype](
         return super().__class_getitem__(dtype)
 
     def __new__(cls, array, *args, **kwargs):
-        with backend() as np:
-            if cls.dtype is None:
-                _array = asarray(array)
-                # The dtype of an np.arrays is a class that contains a type
-                # attribute that is the actual type. However, other backends
-                # have different structures, so this is the easiest option:
-                dtype = getattr(_array.dtype, "type", _array.dtype)
-                return cls.__new__(cls[dtype], array, *args, **kwargs)
-            return object.__new__(cls)
+        if cls.dtype is None:
+            _array = asarray(array)
+            # The dtype of an np.arrays is a class that contains a type
+            # attribute that is the actual type. However, other backends
+            # have different structures, so this is the easiest option:
+            dtype = getattr(_array.dtype, "type", _array.dtype)
+            return cls.__new__(cls[dtype], array, *args, **kwargs)
+        return object.__new__(cls)
 
     def __init__(self, array, dom: Nat | int, cod: Nat | int):
         dom, cod = (Nat(x) if isinstance(x, int) else x for x in (dom, cod))
@@ -787,6 +786,7 @@ and 'Matrix[int]'
         """ Gradient with respect to variables. """
         return self.map(lambda x:
                         getattr(x, "diff", lambda _: 0)(var, **params))
+
 
 def asarray(entries, dtype=None):
     """

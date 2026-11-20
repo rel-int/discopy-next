@@ -714,6 +714,13 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Fixed
 
+- `matrix.asarray` builds an array from nested entries by stacking the ones
+  the active backend already owns, so `Matrix([t], 1, 1)` keeps the gradient
+  of a PyTorch tensor `t` where converting it entry by entry read it as a
+  scalar and detached it; `optyx.core.zw.Endo` keeps a scalar its backend
+  owns rather than calling `complex` on it, and conjugates it in that
+  backend, so a photonic gate's `to_path()` is differentiable like its
+  `array` ([next#654]).
 - A label between dollars is LaTeX in the Typst backend too, as in
   matplotlib and TikZ: `drawing.typst_ast.latex_math` writes it in Typst
   mathematics from a table of the commands it knows and raises on any other,
@@ -2396,6 +2403,7 @@ for the changelog of `1.2.1` and earlier.
 [next#645]: https://github.com/rel-int/discopy-next/pull/645
 [next#646]: https://github.com/rel-int/discopy-next/pull/646
 [next#648]: https://github.com/rel-int/discopy-next/pull/648
+[next#654]: https://github.com/rel-int/discopy-next/pull/654
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#44]: https://github.com/rel-int/optyx/pull/44
