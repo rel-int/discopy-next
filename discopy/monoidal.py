@@ -3315,6 +3315,15 @@ f(c, b), which has no stack to say where it stands.
         self.cod, bound = body.cod, body.types(variables)
         self.stack = bound @ body.stack if self.front else body.stack @ bound
 
+    @staticmethod
+    def binds(variables: tuple, body: cat.TermBase) -> bool:
+        """
+        Whether a body has the variables to bind: distinct ones, free in
+        it, each used exactly once where nothing is copied or discarded.
+        """
+        return len(set(variables)) == len(variables)\
+            and set(variables) <= set(body.freevars)
+
     @classmethod
     def start(cls, variables: tuple, body: cat.TermBase,
               offset: int | None) -> int:
@@ -3324,14 +3333,13 @@ f(c, b), which has no stack to say where it stands.
         ``offset``, which is refused when it says otherwise.
         """
         names = ", ".join(x.name for x in variables) or "no variable"
-        if len(set(variables)) < len(variables)\
-                or not set(variables) <= set(body.freevars):
+        if not cls.binds(variables, body):
             raise ValueError(cls.unbound.format(body, names))
         expected = cls.place(variables, body)
         start = expected if offset is None else offset
         if start is None:
             raise ValueError(messages.NO_OFFSET.format(body))
-        rest = len(body.freevars) - len(variables)
+        rest = len(set(body.freevars).difference(variables))
         wanted = f"from 0 to {rest}" if expected is None else expected
         valid = expected is not None or 0 <= start <= rest
         if not valid or expected not in (None, start):

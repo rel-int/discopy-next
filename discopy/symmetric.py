@@ -1031,6 +1031,20 @@ class TermBase(monoidal.TermBase):
         return [arguments[i] for i in box.perm]\
             if isinstance(box, Permutation) else None
 
+    @staticmethod
+    def wire(functor, wiring: list[int], types: list):
+        """
+        The image under a functor of the wiring from some types to those
+        at the given indices: a permutation of them, the identity when
+        nothing moves.
+
+        Parameters:
+            functor : The functor to evaluate the types.
+            wiring : The index of the input each output reads.
+            types : The types of the inputs.
+        """
+        return functor.cod.permutation(wiring, list(map(functor, types)))
+
     @axiom
     def normal_form_soundness(cls, term: Self) -> AbstractEquation:
         """
@@ -1145,14 +1159,10 @@ class Kappa(TermBase, monoidal.Kappa):
         source = self.freevars[:self.offset] + (
             bound + stack if self.front else stack + bound
         ) + self.freevars[self.offset:]
-        permutation = [source.index(wire) for wire in left + stack + right]
-        result = body.eval(functor)
-        if permutation == list(range(len(source))):
-            return result
-        types = [
-            functor(body.stack[wire:wire + 1] if isinstance(wire, int)
-                    else wire.cod) for wire in source]
-        return functor.cod.permutation(permutation, types) >> result
+        wiring = [source.index(wire) for wire in left + stack + right]
+        types = [body.stack[wire:wire + 1] if isinstance(wire, int)
+                 else wire.cod for wire in source]
+        return self.wire(functor, wiring, types) >> body.eval(functor)
 
 
 type Term = Variable | Constant | Application | Kappa
@@ -1181,4 +1191,4 @@ class Sampler(monoidal.Sampler):
 TermBase.functor, TermBase.sampler_factory = Functor.id(Diagram), Sampler
 TermBase.variable_factory, TermBase.constant_factory = Variable, Constant
 TermBase.application_factory, TermBase.kappa_factory = Application, Kappa
-Diagram.term_factory = TermBase
+Diagram.term_factory, monoidal.Kappa.above = TermBase, Kappa

@@ -114,11 +114,12 @@ calculus.
 from __future__ import annotations
 
 from abc import abstractmethod
+from contextlib import suppress
 from functools import total_ordering, cached_property, reduce
 from inspect import signature
 from itertools import count
 from typing import (
-    Any, Callable, ClassVar, Mapping, Iterable, Self, Sequence,
+    Any, Callable, ClassVar, Iterator, Mapping, Iterable, Self, Sequence,
     TYPE_CHECKING)
 
 
@@ -2180,8 +2181,10 @@ class TermBase(Serialisable, AlphaEquivalence):
         >>> assert TermBase.bind([a], a) == x(lambda a: a)
         """
         factory, variables = cls.kappa_factory, tuple(variables)
-        placed = factory.place(variables, body) is not None
-        return factory(variables, body, None if placed else offset)
+        if factory.place(variables, body) is not None:
+            return factory(variables, body)
+        rest = set(body.freevars).difference(variables)
+        return factory(variables, body, min(offset, len(rest)))
 
     def normal_form(self) -> TermBase:
         """
@@ -2581,6 +2584,7 @@ class Kappa(TermBase):
     """
     serialised_attrs = ("variables", "body", "offset")
     offset: int
+    above: ClassVar[type[Kappa] | None] = None
 
     def __init__(self, variables: tuple[Variable, ...], body: TermBase,
                  offset: int | None = None):
@@ -2660,8 +2664,7 @@ class Kappa(TermBase):
         left = dict.fromkeys(
             y for x in self.freevars[:self.offset]
             for y in inside.get(x, x).freevars)
-        return type(self)(
-            tuple(variables), body.substitute(inside), len(left))
+        return self.bind(variables, body.substitute(inside), len(left))
 
     def count(self, variable):
         return 0 if variable in self.variables else self.body.count(variable)
@@ -2709,10 +2712,32 @@ class Kappa(TermBase):
                     f"Expected {len(wires)} variables, got {len(names)}")
             variables = tuple(map(cls.variable_factory, names, wires))
             body = function(*variables)
-            return cls.highest(cls, body.kappa_factory)(
-                variables, body, offset)
+            level = cls.highest(cls, body.kappa_factory)
+            try:
+                return level(variables, body, offset)
+            except ValueError:
+                for higher in level.levels(body):
+                    with suppress(ValueError):
+                        return higher(variables, body, offset)
+                raise
 
         return decorator
+
+    @classmethod
+    def levels(cls, body: TermBase) -> Iterator[type[Kappa]]:
+        """
+        The levels :attr:`above` this one where a body evaluates, lowest
+        first: those of a category that has the boxes of its constants. A
+        kappa that this level refuses is of the lowest that accepts it,
+        e.g. only a category with discards binds a variable its body does
+        not use.
+        """
+        level = cls.above
+        while level is not None and all(
+                issubclass(constant.box.ar, level.functor.cod)
+                for constant in body.constants):
+            yield level
+            level = level.above
 
 
 type Term = Variable | Constant | Application | Kappa
