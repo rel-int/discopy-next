@@ -22,5 +22,5 @@
 > > `train_ocr` builds the `OCR` itself when none given. Small, no design.
 
 - [x] Reproduce: the loss the test starts from moves with the global torch RNG, so the ratio is a coin
-- [WIP] @session_01C7YfAP4hAgDkBVZMLuMoYv-2026-11-20 01:54 Seed before the OCR is built, train_ocr's own seed being too late for a network it is given
+- [x] Seed before the OCR is built, train_ocr's own seed being too late for a network it is given
 - [ ] Check it holds under whatever ran before it, and run the gates
