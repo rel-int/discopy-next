@@ -9,6 +9,14 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Added
 
+- `discopy.kappa`, the planar linear kappa calculus, i.e. the terms of a
+  monoidal category: a term has a context of variables, a stack of inputs
+  and one output, with `Variable`, `Constant`, `Application` and `Kappa`,
+  `let` for the redex and `Ty.kappa` for the abstraction of a Python function.
+  `monoidal.Diagram.to_term` reads a diagram with exactly one output as a
+  term with one `let` for each box and refuses any other, `eval` gives the
+  diagram back and `normal_form` inlines the boxes with one output, up to
+  interchange. Its laws are cells of the property matrix ([next#658]).
 - `discopy.peirce.alpha` and `discopy.peirce.beta`: Peirce's existential
   graphs as diagrams with white and black regions, a cut where the colour
   changes. `~d`, `d & e`, `d | e`, `d.relative_sum(e)` and `d.par(e)` are
@@ -2412,6 +2420,7 @@ for the changelog of `1.2.1` and earlier.
 [next#648]: https://github.com/rel-int/discopy-next/pull/648
 [next#654]: https://github.com/rel-int/discopy-next/pull/654
 [next#656]: https://github.com/rel-int/discopy-next/pull/656
+[next#658]: https://github.com/rel-int/discopy-next/pull/658
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#44]: https://github.com/rel-int/optyx/pull/44
