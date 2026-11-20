@@ -2092,7 +2092,7 @@ class TermBase(Serialisable, AlphaEquivalence):
         return self.eval().draw(**params)
 
     @staticmethod
-    def highest(*levels: type[TermBase]) -> type[TermBase]:
+    def highest(*levels: type[TermBase]) -> Callable[..., TermBase]:
         """
         The highest of the classes of terms of some levels of the hierarchy,
         i.e. the one that subclasses the others: a term built from terms of
@@ -2136,6 +2136,47 @@ class TermBase(Serialisable, AlphaEquivalence):
         """
         # pylint: disable=unused-argument  # a constant has no variable
         return self
+
+    def count(self, variable: Variable) -> int:
+        """
+        The number of free occurrences of a variable: at most one in a
+        linear term, any number where variables are copied and discarded,
+        see :class:`discopy.markov.TermBase`.
+
+        Example
+        -------
+        >>> x = Ob('x')
+        >>> f, a = Constant(Box('f', x, x)), Variable('a', x)
+        >>> assert f(a).count(a) == 1 and x(lambda a: f(a)).count(a) == 0
+        """
+        # pylint: disable=unused-argument  # a constant has no variable
+        return 0
+
+    @property
+    def context(self) -> tuple:
+        """
+        What a term is evaluated on: its free variables left of the stack,
+        the stack and those right of it, all of them left of no stack.
+        """
+        offset = self.offset if self.stack else len(self.freevars)
+        return self.freevars[:offset], self.stack, self.freevars[offset:]
+
+    @classmethod
+    def bind(cls, variables: Sequence[Variable], body: TermBase,
+             offset: int = 0) -> TermBase:
+        """
+        The kappa of some variables in a body, at the ``offset`` only when
+        nothing else says where it stands, see :meth:`Kappa.place`.
+
+        Example
+        -------
+        >>> x = Ob('x')
+        >>> a = Variable('a', x)
+        >>> assert TermBase.bind([a], a) == x(lambda a: a)
+        """
+        factory, variables = cls.kappa_factory, tuple(variables)
+        placed = factory.place(variables, body) is not None
+        return factory(variables, body, None if placed else offset)
 
     def normal_form(self) -> TermBase:
         """
@@ -2332,6 +2373,9 @@ class Variable(TermBase):
     def substitute(self, substitution):
         return substitution.get(self, self)
 
+    def count(self, variable):
+        return int(self == variable)
+
     def alpha_eq_under(  # pylint: disable=unused-argument  # depth: binders
             self, scopes, others, depth=0):
         """ Variables alike by the level of their binder, by name if free. """
@@ -2468,14 +2512,29 @@ type y.
         return type(self)(self.func.substitute(substitution),
                           self.arg.substitute(substitution))
 
+    def count(self, variable):
+        return self.func.count(variable) + self.arg.count(variable)
+
+    @staticmethod
+    def contractible(func: TermBase, arg: TermBase) -> bool:
+        """
+        Whether a function applied to an argument is a redex to contract:
+        the kappa of a variable of the type of the argument, binding none
+        of its free variables.
+        """
+        return isinstance(func, Kappa) and func.head is not None\
+            and func.head.cod == arg.cod\
+            and not set(func.variables).intersection(arg.freevars)
+
     def normal_form(self):
         func, arg = self.func.normal_form(), self.arg.normal_form()
-        if not isinstance(func, Kappa) or func.head is None\
-                or func.head.cod != arg.cod:
-            return type(self)(func, arg)
+        redex = type(self)(func, arg)
+        if not self.contractible(func, arg):
+            return redex
+        rest = tuple(x for x in func.variables if x != func.head)
         body = func.body.substitute({func.head: arg})
-        return type(func)(func.variables[1:], body) if func.variables[1:]\
-            else body
+        result = type(func)(rest, body) if rest else body
+        return result if result.context == redex.context else redex
 
     def alpha_eq_under(self, scopes, others, depth=0):
         """ Applications with functions and arguments alike. """
@@ -2529,6 +2588,16 @@ class Kappa(TermBase):
         self.freevars, self.cod = [], body.cod
         self.stack = body.types(variables)
 
+    @staticmethod
+    def place(variables: tuple[Variable, ...], body: TermBase) -> int | None:
+        """
+        The number of free variables left of the stack, as the variables or
+        the stack of the body say, ``None`` when neither does: none in a
+        category, where a term has one variable.
+        """
+        # pylint: disable=unused-argument  # a list of variables up from here
+        return 0
+
     @property
     def head(self) -> Variable | None:
         """ The variable the first input of the stack binds, if any. """
@@ -2572,10 +2641,14 @@ class Kappa(TermBase):
                 variables[i] = self.variable_factory.fresh(
                     variable.name, variable.cod, body, *inside.values())
                 body = body.substitute({variable: variables[i]})
-        offset = self.offset + sum(
-            len(inside[x].freevars) - 1
-            for x in self.freevars[:self.offset] if x in inside)
-        return type(self)(tuple(variables), body.substitute(inside), offset)
+        left = dict.fromkeys(
+            y for x in self.freevars[:self.offset]
+            for y in inside.get(x, x).freevars)
+        return type(self)(
+            tuple(variables), body.substitute(inside), len(left))
+
+    def count(self, variable):
+        return 0 if variable in self.variables else self.body.count(variable)
 
     def normal_form(self):
         return type(self)(

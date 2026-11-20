@@ -3275,6 +3275,16 @@ f(c, b), which has no stack to say where it stands.
     """
     offset: int
 
+    @staticmethod
+    def place(variables, body):
+        """
+        The number of free variables left of the stack: where the first of
+        the variables stands in the context of the body, or else where its
+        stack does, ``None`` when it has none.
+        """
+        return body.freevars.index(variables[0]) if variables\
+            else body.offset
+
     def __init__(self, variables: tuple[Variable, ...], body: cat.TermBase,
                  offset: int | None = None):
         # pylint: disable=super-init-not-called  # a context is a list here
@@ -3283,8 +3293,7 @@ f(c, b), which has no stack to say where it stands.
         names = ", ".join(x.name for x in variables) or "no variable"
         if variables and variables[0] not in body.freevars:
             raise ValueError(messages.NOT_A_BLOCK.format(body, names))
-        expected = body.freevars.index(variables[0]) if variables\
-            else body.offset
+        expected = self.place(variables, body)
         start = expected if offset is None else offset
         if start is None:
             raise ValueError(messages.NO_OFFSET.format(body))
