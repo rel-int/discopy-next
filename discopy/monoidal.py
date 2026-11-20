@@ -627,6 +627,26 @@ class Ty(cat.Ob, cat.FreeCategory, ColouredMonoid):
             parts.append(f'{name}("")' if s == '' else s)
         return ' @ '.join(parts)
 
+    def kappa(self, function: Callable, offset: int | None = None):
+        """
+        The kappa abstraction of a Python function from a variable for each
+        wire of the type to a term, see :class:`discopy.kappa.Kappa`.
+
+        Parameters:
+            function : The body, as a function of the variables.
+            offset : Passed to :class:`discopy.kappa.Kappa`.
+
+        Example
+        -------
+        >>> from discopy.kappa import Constant
+        >>> x, y = Ty('x'), Ty('y')
+        >>> f = Box('f', x @ y, x)
+        >>> term = (x @ y).kappa(lambda a, b: Constant(f)(a, b))
+        >>> assert term.eval() == f
+        """
+        from discopy.kappa import Kappa
+        return Kappa.from_callable(self, offset)(function)
+
     def atoms(self) -> list[Ty]:
         """
         The atoms of a type: those of its objects, each one with no adjoint
@@ -1676,6 +1696,35 @@ class Diagram(cat.Arrow, DaggerMonoidalCategory, RichDisplay):
         >>> assert c @ x != x @ c and (c @ x).to_map() == (x @ c).to_map()
         """
         return cmap.CMap[self.ar].from_diagram(self)
+
+    def to_term(self):
+        """
+        Read a diagram with exactly one output as a term of the planar
+        linear kappa calculus, see :mod:`discopy.kappa`: a variable for each
+        wire, ``x0, ..., x{n - 1}`` for the inputs, and one ``let`` for each
+        box in the order of the layers, so that :meth:`discopy.kappa.TermBase.
+        eval` gives the diagram back, box for box.
+
+        A term has one output: a diagram with any other number of them is
+        refused. Every box is a constant, structural ones included, e.g. a
+        swap, and no wire is ever copied, discarded or crossed. Closed
+        Markov diagrams read as lambda terms instead, see
+        :meth:`discopy.closed.Diagram.to_term`.
+
+        Example
+        -------
+        >>> x, y = Ty('x'), Ty('y')
+        >>> f, g = Box('f', x, y @ y), Box('g', y @ y, x)
+        >>> print((f >> g).to_term())
+        x.kappa(lambda x0: let(f(x0), lambda x1, x2: g(x1, x2)))
+        >>> e = Box('e', y, Ty())
+        >>> print((f >> y @ e >> Box('h', y, x)).to_term())
+        x.kappa(lambda x0: let(f(x0), lambda x1, x2: \
+let(e(x2), lambda: h(x1), offset=1)))
+        >>> assert (f >> g).to_term().eval() == f >> g
+        """
+        from discopy.kappa import TermBase
+        return TermBase.from_diagram(self)
 
     def to_staircases(self):
         """

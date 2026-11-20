@@ -12,6 +12,7 @@ and the property tests that check their axioms.
     discopy.abc
     discopy.cat
     discopy.monoidal
+    discopy.kappa
     discopy.spacial
     discopy.braided
     discopy.feedback

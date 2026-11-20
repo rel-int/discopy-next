@@ -240,3 +240,6 @@ LAYOUT_NOT_FEASIBLE = "This layout does not draw the same diagram."
 STRETCH_LENGTHS = (
     "Give a scale for each gap between columns and between rows, and for "
     "the width and the height of each box.")
+NOT_ONE_OUTPUT = "Expected exactly one output, got {}: a term has one."
+NOT_APPLICABLE = "{} of stack {} does not apply to {} of stack {} and type {}."
+NOT_A_BLOCK = "Expected a block of variables next to the stack of {}, got {}."

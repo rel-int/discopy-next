@@ -32,6 +32,7 @@ DisCoPy is a Python toolkit for computing with [string diagrams](https://en.wiki
 * [`discopy.optyx`](https://docs.discopy.org/en/main/api/optyx.html), string diagrams for networked quantum computing that mix qubits, photonic modes and classical bits, with lossy channels, heralded measurements and feed-forward
 * a `Drawing` data structure for labeled graphs embedded in the plane
 * a `Term` data structure for lambda terms in the internal language of (bi)closed monoidal categories and their translation back and forth to diagrams
+* the planar linear kappa calculus (`discopy.kappa`), the terms of any monoidal category: a diagram with exactly one output reads as a term with one `let` for each box, and the term evaluates back to it
 * a `Hypergraph` data structure for string diagrams in hypergraph categories, with its restrictions down the hierarchy (monoidal, symmetric, feedback, Markov, compact, ...) and double-pushout rewriting, and monoidal e-graphs (`discopy.egraph`), also called e-hypergraphs, i.e. e-graphs of diagrams with sharing
 * constraint satisfaction problems (`discopy.csp`): an instance is a `Hypergraph` with a variable as a spider and a constraint as a box on its scope, a language is a functor to `Tensor[bool]` that sends it to the projection of its solutions on its outputs, and over `int` counts them
 * a `CMap` (combinatorial map) data structure for string diagrams in compact categories and its restrictions to symmetric, (bi)closed and traced categories. The orientation on boxes can also help to enforce planarity.
@@ -164,6 +165,7 @@ However in most applications outside of diagram layout, computing a `for` loop o
 DisCoPy has a number of alternative data structures that can encode different layers of the hierarchy in a faithful way:
 
 - `Term` is a simply-typed lambda term in the internal language of (bi)closed monoidal categories, it can represent any diagram with a single output wire
+- `kappa.Term` is its first-order half, a term of the planar linear kappa calculus: it needs no exponential and represents any monoidal diagram with a single output wire, which `Pack` gives to any closed diagram
 - `CMap` is a combinatorial map, it encodes diagrams in any compact closed category as a permutation on the ports of each of its boxes
 - `Hypergraph` encodes any diagram in a hypergraph category, i.e. with spiders (a.k.a. special commutative Frobenius algebras)
 
