@@ -451,6 +451,12 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Changed
 
+- `lambek.abstract` and `lambek.categorial` are packages: `lambek.proofnet`
+  and `lambek.neural` are `lambek.abstract.proofnet` and
+  `lambek.abstract.neural`, and `lambek.categorial.bobcat`, which needs
+  PyTorch, is the Bobcat reproduction: `Parser`, `Derivation`, `schemata`,
+  `structure`, `render` and `normalise`, formerly in `categorial`, and
+  `Encoder` and `ChartClassifier`, formerly in `neural` ([next#672]).
 - `drawing.Drawing`, `python.finset.Cospan` and `interaction.Diagram`
   declare `abc.DaggerCategory`, the reflection of a drawing being
   involutive, with its contravariance and monoidality declared failing on
@@ -2423,6 +2429,7 @@ for the changelog of `1.2.1` and earlier.
 [next#656]: https://github.com/rel-int/discopy-next/pull/656
 [next#665]: https://github.com/rel-int/discopy-next/pull/665
 [next#667]: https://github.com/rel-int/discopy-next/pull/667
+[next#672]: https://github.com/rel-int/discopy-next/pull/672
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#44]: https://github.com/rel-int/optyx/pull/44

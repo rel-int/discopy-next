@@ -15,8 +15,6 @@ Summary
     Tagger
     Linker
     Parser
-    Encoder
-    ChartClassifier
 
 .. autosummary::
     :template: function.rst
@@ -28,13 +26,14 @@ Summary
 Parsing in two steps
 --------------------
 
-A parser goes from words to a :class:`discopy.lambek.proofnet.ProofNet` in
-two steps, the two halves of a proof net: the sequent, then the linking
-(Kogkalidis, Moortgat and Moot, `Neural proof nets (2020)
-<https://aclanthology.org/2020.conll-1.3/>`_). Both read the states of the
-words given by any encoder, a tensor ``(batch, length, hidden)`` with a
-boolean mask of the same batch and length saying which states are words, so
-that a parser can be trained jointly with the encoder by summing its losses.
+A parser goes from words to a
+:class:`discopy.lambek.abstract.proofnet.ProofNet` in two steps, the two
+halves of a proof net: the sequent, then the linking (Kogkalidis, Moortgat and
+Moot, `Neural proof nets (2020) <https://aclanthology.org/2020.conll-1.3/>`_).
+Both read the states of the words given by any encoder, a tensor
+``(batch, length, hidden)`` with a boolean mask of the same batch and length
+saying which states are words, so that a parser can be trained jointly with
+the encoder by summing its losses.
 
 The :class:`Tagger` gives each word a type. It is constructive: rather than
 picking a type out of the ones seen in training, it writes one symbol at a
@@ -46,8 +45,8 @@ Deoskar, `Constructive type-logical supertagging with self-attention networks
 
 The :class:`Linker` scores each pair of a negative and a positive port, from
 the states of their words and what they are, and
-:meth:`discopy.lambek.proofnet.Sequent.decode` takes the best linking. A
-linking is a permutation of each block of ports, and a permutation matrix
+:meth:`discopy.lambek.abstract.proofnet.Sequent.decode` takes the best linking.
+A linking is a permutation of each block of ports, and a permutation matrix
 is a vertex of the polytope of doubly stochastic matrices: :func:`sinkhorn`
 normalises scores to the nearest such matrix in entropy, and the linker is
 trained on the likelihood of the gold permutation there (Mena et al.,
@@ -56,7 +55,7 @@ trained on the likelihood of the gold permutation there (Mena et al.,
 the normalisation, so that decoding takes the raw scores. The goal of the
 sentence need not be given: by default it is the smallest type that the count
 invariant of the predicted types allows, see
-:meth:`discopy.lambek.proofnet.Sequent.infer`.
+:meth:`discopy.lambek.abstract.proofnet.Sequent.infer`.
 
 A tagger trained on several languages at once over one signature can keep each
 language within its own atoms, a sub-signature, both in its loss and in its
@@ -69,10 +68,11 @@ Taking the most likely type of each word, then the best linking of the
 sequent they make, fails whenever that sequent has no goal or that linking
 no term. :meth:`Parser.search` searches the space of proof nets instead: it
 enumerates the ``depth`` best sequents of the ``k`` most likely types of each
-word best first, with :func:`discopy.lambek.proofnet.products`, tries the
-``width`` first that the count invariant gives a goal, i.e. those in its
-fibre over the goals, links each by the first of its ``links`` best linkings
-that is correct, :meth:`discopy.lambek.proofnet.Sequent.linkings`, and
+word best first, with :func:`discopy.lambek.abstract.proofnet.products`,
+tries the ``width`` first that the count invariant gives a goal, i.e. those
+in its fibre over the goals, links each by the first of its ``links`` best
+linkings that is correct,
+:meth:`discopy.lambek.abstract.proofnet.Sequent.linkings`, and
 returns the net of highest joint score, the log-probability of its types
 plus a weight times that of its linking, :meth:`Linker.log_likelihood`.
 Sinkhorn normalisation only shifts the rows and the columns of each block,
@@ -82,7 +82,7 @@ Example
 -------
 >>> import torch
 >>> from discopy.lambek.abstract import Ty
->>> from discopy.lambek.proofnet import ProofNet
+>>> from discopy.lambek.abstract.proofnet import ProofNet
 >>> n, s = Ty("n"), Ty("s")
 >>> Alice, loves, Bob = n("Alice"), (n >> (n >> s))("loves"), n("Bob")
 >>> nets = [ProofNet.from_term(loves(y)(x), (x, loves, y))
@@ -106,14 +106,13 @@ loves(Alice)(Bob)
 
 from __future__ import annotations
 
-import math
 from dataclasses import dataclass
 
 import torch  # pylint: disable=import-error  # torch is an extra
 from torch import nn  # pylint: disable=import-error  # torch is an extra
 
 from discopy.lambek.abstract import Ty
-from discopy.lambek.proofnet import Sequent, ProofNet, ports, products
+from discopy.lambek.abstract.proofnet import Sequent, ProofNet, ports, products
 from discopy.utils import AxiomError
 
 
@@ -503,7 +502,7 @@ class Parser(nn.Module):
             states : Their states, ``(length, hidden)``.
             goal : The type of the sentence, by default the smallest one
                 their types allow, see
-                :meth:`discopy.lambek.proofnet.Sequent.infer`.
+                :meth:`discopy.lambek.abstract.proofnet.Sequent.infer`.
             atoms : The atoms of the types, all of them by default.
         """
         mask = states.new_ones(1, len(states), dtype=torch.bool)
@@ -531,19 +530,19 @@ class Parser(nn.Module):
             states : Their states, ``(length, hidden)``.
             goal : The type of the sentence, by default the smallest one
                 each sequent allows, see
-                :meth:`discopy.lambek.proofnet.Sequent.infer`.
+                :meth:`discopy.lambek.abstract.proofnet.Sequent.infer`.
             atoms : The atoms of the types, all of them by default.
             k : The number of types of each word.
             width : The number of sequents with a goal tried, i.e. those
-                :meth:`discopy.lambek.proofnet.Sequent.infer` accepts or,
-                with a goal given, those balanced with it, see
-                :attr:`discopy.lambek.proofnet.Sequent.is_balanced`.
+                :meth:`discopy.lambek.abstract.proofnet.Sequent.infer`
+                accepts or, with a goal given, those balanced with it, see
+                :attr:`discopy.lambek.abstract.proofnet.Sequent.is_balanced`.
             weight : The weight of the linking in the joint score.
             skip : A type whose words are left out of the sequent, e.g.
                 the punctuation a treebank does not use.
             depth : The number of sequents enumerated, ``width`` by default.
             links : The number of linkings tried for each sequent, see
-                :meth:`discopy.lambek.proofnet.Sequent.linkings`.
+                :meth:`discopy.lambek.abstract.proofnet.Sequent.linkings`.
 
         Example
         -------
@@ -589,136 +588,4 @@ class Parser(nn.Module):
             score = tagging + weight * self.linker.log_likelihood(scores, net)
             if score > best:
                 best, result = score, net
-        return result
-
-
-class Encoder(nn.Module):
-    """
-    An encoder of words by a transformer of Hugging Face: the state of a word
-    is that of its first subword, as in Clark, `Something old, something new:
-    grammar-based CCG parsing with transformer models (2021)
-    <https://arxiv.org/abs/2109.10044>`_.
-
-    Parameters:
-        model : The transformer, e.g. a ``transformers.AutoModel``.
-        tokenizer : Its fast tokenizer.
-        length : The number of subwords it reads, the rest cut off.
-    """
-    def __init__(self, model: nn.Module, tokenizer, length: int = 512):
-        super().__init__()
-        self.model, self.tokenizer, self.length = model, tokenizer, length
-
-    def forward(self, sentences: list[list[str]]):
-        """
-        The states of a batch of sentences, ``(batch, length, hidden)``, with
-        whether each is the first subword of a word, ``(batch, length)``.
-        """
-        encodings = [self.tokenizer(
-            sentence, is_split_into_words=True, truncation=True,
-            max_length=self.length, return_tensors="pt")
-            for sentence in sentences]
-        firsts = []
-        for encoding in encodings:
-            ids = encoding.word_ids(batch_index=0)
-            firsts.append(torch.tensor([
-                i is not None and i not in ids[:j]
-                for j, i in enumerate(ids)], dtype=torch.bool))
-        pad = nn.utils.rnn.pad_sequence
-        device = next(self.model.parameters()).device
-        ids = pad([e.input_ids[0] for e in encodings], batch_first=True,
-                  padding_value=self.tokenizer.pad_token_id or 0)
-        attention = pad([e.attention_mask[0] for e in encodings],
-                        batch_first=True)
-        mask = pad(firsts, batch_first=True)
-        states = self.model(input_ids=ids.to(device),
-                            attention_mask=attention.to(device))
-        return states.last_hidden_state, mask.to(device)
-
-
-class ChartClassifier(nn.Module):
-    """
-    The two classifiers of Bobcat (Clark, 2021) over the states of the
-    words: a supertag for each word, and a label for each span from the
-    states of its first and its last word, a category or a chain of unary
-    rules, ``":"`` for no constituent.
-
-    Parameters:
-        tags : The supertags.
-        labels : The labels of the spans.
-        hidden : The size of the states.
-        dropout : The dropout before each classifier.
-    """
-    def __init__(self, tags: list[str], labels: list[str], hidden: int,
-                 dropout: float = .1):
-        super().__init__()
-        self.tags, self.labels = tags, labels
-        self.dropout = nn.Dropout(dropout)
-        self.tag_classifier = nn.Linear(hidden, len(tags))
-        self.span_classifier = nn.Linear(2 * hidden, len(labels))
-
-    @staticmethod
-    def spans(length: int) -> list[tuple[int, int]]:
-        """
-        The spans of a sentence, from their first word to the one after
-        their last, in the order of the classifier.
-
-        >>> ChartClassifier.spans(2)
-        [(0, 1), (1, 2), (0, 2)]
-        """
-        return [(start, end + 1) for end in range(length)
-                for start in reversed(range(end + 1))]
-
-    def forward(self, states, mask):
-        """
-        The logits of the supertags of each word, ``(batch, words, tags)``,
-        and of the labels of each span, ``(batch, spans, labels)``.
-
-        Parameters:
-            states : The states of a batch, ``(batch, length, hidden)``.
-            mask : Whether each state is a word, ``(batch, length)``.
-        """
-        index = nn.utils.rnn.pad_sequence(
-            [row.nonzero().squeeze(-1) for row in mask], batch_first=True)
-        heads = states.gather(1, index[..., None].expand(
-            *index.shape, states.shape[-1]))
-        spans = [(start, end - 1) for start, end in self.spans(
-            heads.shape[1])]
-        pairs = heads[:, spans].flatten(start_dim=-2)
-        return (self.tag_classifier(self.dropout(heads)),
-                self.span_classifier(self.dropout(pairs)))
-
-    @staticmethod
-    def best(row, labels: list[str], k: int, threshold: float
-             ) -> list[tuple[str, float]]:
-        """
-        The ``k`` most likely labels of a row of log-probabilities, within a
-        ratio ``threshold`` of the most likely.
-        """
-        values, indices = row.topk(min(k, row.numel()) if k else row.numel())
-        bound = values[0].item() + math.log(threshold)
-        return [(labels[i], value) for value, i in zip(
-            values.tolist(), indices.tolist()) if value >= bound]
-
-    @torch.no_grad()
-    def decode(  # pylint: disable=too-many-arguments
-            self, states, mask, *, tag_k: int = 64,
-            tag_threshold: float = .002, span_k: int = 128,
-            span_threshold: float = .0003) -> list[tuple[list, dict]]:
-        """
-        The supertags of each word and the labels of each span of each
-        sentence of a batch, with their log-probability, in the format of
-        :meth:`discopy.lambek.categorial.Parser.chart`, no constituent left
-        out.
-        """
-        tags, spans = (logits.log_softmax(-1).cpu()
-                       for logits in self(states, mask))
-        result = []
-        for i, length in enumerate(mask.sum(-1).tolist()):
-            result.append((
-                [self.best(row, self.tags, tag_k, tag_threshold)
-                 for row in tags[i, :length]],
-                {span: [(label, score) for label, score in self.best(
-                    spans[i, j], self.labels, span_k, span_threshold)
-                    if label != ":"]
-                 for j, span in enumerate(self.spans(length))}))
         return result
