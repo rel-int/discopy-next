@@ -459,6 +459,12 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 - `lean/` is now `discolean/`, a Lake package built on Mathlib with one
   library, `Discolean` ([next#668]).
+- `lambek.abstract` and `lambek.categorial` are packages: `lambek.proofnet`
+  and `lambek.neural` are `lambek.abstract.proofnet` and
+  `lambek.abstract.neural`, and `lambek.categorial.bobcat`, which needs
+  PyTorch, is the Bobcat reproduction: `Parser`, `Derivation`, `schemata`,
+  `structure`, `render` and `normalise`, formerly in `categorial`, and
+  `Encoder` and `ChartClassifier`, formerly in `neural` ([next#672]).
 - `drawing.Drawing`, `python.finset.Cospan` and `interaction.Diagram`
   declare `abc.DaggerCategory`, the reflection of a drawing being
   involutive, with its contravariance and monoidality declared failing on
@@ -722,6 +728,15 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Fixed
 
+- `optyx.channel` types keep their delay through `single()` and `double()`:
+  `qubit.delay().double()` is `(bit @ bit).delay()`, no longer `bit @ bit`
+  at time step zero ([next#667]).
+- `qubit.head`, `qmode.head` and `mode.head` raised, and so did `mode.delay()`:
+  the wires of `quantum.circuit`, `optyx.channel` and `optyx.core.diagram` now
+  have heads and tails of their own, and the head of a qubit is a quantum wire of its
+  dimension (`quantum.circuit.Wire.is_quantum`), so that the initial state of
+  a loop can be written `s.head @ m.d >> FollowedBy(m)` on circuits and
+  channels ([next#665]).
 - `matrix.asarray` builds an array from nested entries by stacking the ones
   the active backend already owns, so `Matrix([t], 1, 1)` keeps the gradient
   of a PyTorch tensor `t` where converting it entry by entry read it as a
@@ -2420,7 +2435,10 @@ for the changelog of `1.2.1` and earlier.
 [next#648]: https://github.com/rel-int/discopy-next/pull/648
 [next#654]: https://github.com/rel-int/discopy-next/pull/654
 [next#656]: https://github.com/rel-int/discopy-next/pull/656
+[next#665]: https://github.com/rel-int/discopy-next/pull/665
+[next#667]: https://github.com/rel-int/discopy-next/pull/667
 [next#668]: https://github.com/rel-int/discopy-next/pull/668
+[next#672]: https://github.com/rel-int/discopy-next/pull/672
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#44]: https://github.com/rel-int/optyx/pull/44

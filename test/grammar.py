@@ -1,10 +1,9 @@
 import pickle
 import subprocess
 import sys
-import warnings
 from importlib import import_module, reload
 
-from pytest import importorskip, warns
+from pytest import warns
 
 from discopy import lambek
 from discopy.utils import dumps, loads
@@ -14,7 +13,7 @@ def test_grammar_is_the_deprecated_name_of_lambek():
     with warns(DeprecationWarning, match="use discopy.lambek instead"):
         grammar = reload(import_module("discopy.grammar"))
     for name in ("thue", "cfg", "categorial", "pregroup", "dependency",
-                 "abstract", "proofnet"):
+                 "abstract"):
         assert getattr(grammar, name) is getattr(lambek, name)
         assert import_module(f"discopy.grammar.{name}")\
             is getattr(lambek, name)
@@ -29,14 +28,6 @@ def test_the_package_still_names_grammar():
     vars(discopy).pop("grammar", None)
     with warns(DeprecationWarning, match="use discopy.lambek instead"):
         assert discopy.grammar.pregroup is lambek.pregroup
-
-
-def test_grammar_neural_is_imported_when_asked_for():
-    importorskip("torch")
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        neural = import_module("discopy.grammar.neural")
-    assert neural is import_module("discopy.lambek.neural")
 
 
 def test_a_tree_of_the_old_name_loads_in_a_fresh_process():

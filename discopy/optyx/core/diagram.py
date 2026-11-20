@@ -208,7 +208,7 @@ import numpy as np
 from sympy import lambdify
 from sympy.core import Symbol
 from discopy import (
-    monoidal, symmetric, frobenius, tensor, hypergraph
+    feedback, monoidal, symmetric, frobenius, tensor, hypergraph
 )
 from discopy import stream as monoidal_stream
 from discopy.cat import factory, rsubs
@@ -250,6 +250,9 @@ class PhotonNumberPreservation(Enum):
 
 class Ob(frobenius.Wire):
     """Basic object in an optyx Diagram: bit or mode"""
+
+
+HeadOb, TailOb = feedback.structural_wires(Ob)
 
 
 @factory
