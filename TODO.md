@@ -6,4 +6,4 @@
 
 - [x] picture.samples(layout="graphviz"): hypergraphs laid out by dot, each box an HTML table with one column per port, rendered with exact masks
 - [x] picture.graphs: named families (complete, star, cycle, cube, grid, tree) as oriented compact diagrams, each edge from its smaller vertex to its larger
-- [ ] tests, docs in from_picture notebook, changelog
+- [WIP] @T-a78eb6e6-2026-11-20 20:54 tests, docs in from_picture notebook, changelog
