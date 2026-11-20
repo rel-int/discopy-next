@@ -256,7 +256,7 @@ from sympy import Expr, lambdify
 from discopy.cat import rsubs
 from discopy.matrix import repr_nonfinite
 from discopy.utils import factory_name
-from discopy.matrix import backend, is_field
+from discopy.matrix import asarray, backend, is_field
 
 from discopy.optyx import channel
 from discopy.optyx.core import (
@@ -465,14 +465,8 @@ class AbstractGate(Channel, ABC):
         The array of nested :code:`entries`, in the :attr:`backend` of the
         gate, so that a JAX tracer or a PyTorch tensor keeps its gradient.
         """
-        def stack(entries, module):
-            if isinstance(entries, list):
-                return module.stack([stack(x, module) for x in entries])
-            return module.array(entries)
-
-        with backend(self.backend) as module:
-            return module.asarray(entries) if self.backend == "numpy"\
-                else stack(entries, module)
+        with backend(self.backend):
+            return asarray(entries)
 
     def scalar(self, param):
         """

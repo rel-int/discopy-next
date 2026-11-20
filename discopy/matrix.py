@@ -286,7 +286,7 @@ class Matrix[dtype](
     def __new__(cls, array, *args, **kwargs):
         with backend() as np:
             if cls.dtype is None:
-                _array = np.asarray(array)
+                _array = asarray(array)
                 # The dtype of an np.arrays is a class that contains a type
                 # attribute that is the actual type. However, other backends
                 # have different structures, so this is the easiest option:
@@ -300,7 +300,7 @@ class Matrix[dtype](
         assert_isinstance(cod, Nat)
         self.dom, self.cod = dom, cod
         with backend() as np:
-            array = np.asarray(array, dtype=self.dtype).reshape(
+            array = asarray(array, dtype=self.dtype).reshape(
                 (index(dom), index(cod)))
             if isinstance(np, NumPy):
                 array = array.view()
@@ -787,6 +787,43 @@ and 'Matrix[int]'
         """ Gradient with respect to variables. """
         return self.map(lambda x:
                         getattr(x, "diff", lambda _: 0)(var, **params))
+
+def asarray(entries, dtype=None):
+    """
+    The array of the active :func:`backend` holding nested ``entries``,
+    stacking the ones the backend already owns so that a PyTorch tensor or
+    a JAX tracer keeps its gradient: converting such an entry one by one
+    reads it as a scalar and detaches it. A backend whose arrays are
+    numpy's needs no stacking, and ``asarray`` leaves its array alone.
+
+    Parameters:
+        entries : The array, or the nested lists of its entries.
+        dtype : The ``dtype`` of the result, the one of the entries by
+            default.
+
+    Example
+    -------
+    >>> import numpy
+    >>> assert (asarray([[0, 1], [1, 0]]) == numpy.eye(2)[::-1]).all()
+    >>> with backend('pytorch'):  # doctest: +EXTRA
+    ...     x = asarray([0.5])
+    ...     assert asarray(x) is x
+    """
+    def stack(entries, np):
+        if isinstance(entries, (list, tuple)):
+            return np.stack([stack(x, np) for x in entries])
+        return np.array(entries, dtype=dtype)
+
+    def leaf(entries):
+        while isinstance(entries, (list, tuple)) and entries:
+            entries = entries[0]
+        return entries
+
+    with backend() as np:
+        array = type(np.array(0))
+        if array.__module__ != "numpy" and isinstance(leaf(entries), array):
+            return stack(entries, np)
+        return np.asarray(entries, dtype=dtype)
 
 
 def array2string(array, **params):

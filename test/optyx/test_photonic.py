@@ -150,3 +150,15 @@ def test_torch_gates_compare():
     t = torch.tensor(.3, dtype=torch.float64)
     assert TBS(t) == TBS(t) and MZI(t, 0.2) == MZI(t, 0.2)
     assert TBS(t) != TBS(t + 1) and len({BBS(t), BBS(t)}) == 1
+
+
+def test_torch_gradient_survives_to_path():
+    """#652: the zw path of a gate is built from the entries of its array,
+    so it keeps the gradient the array has."""
+    torch = pytest.importorskip("torch")
+    t = torch.tensor(.3, dtype=torch.float64, requires_grad=True)
+    with backend("pytorch"):
+        array = MZI(t, 0.2).to_path().array
+        assert array.requires_grad
+        array.abs().sum().backward()
+    assert t.grad is not None

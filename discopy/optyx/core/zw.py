@@ -148,6 +148,7 @@ or using :code:`quimb` (with :code:`tensor.to_quimb()`).
 from typing import List, Union, Tuple, Iterable
 import numpy as np
 from discopy.frobenius import Dim
+from discopy.matrix import backend
 from discopy import tensor
 from discopy.utils import factory_key, factory_name
 from discopy.quantum.gates import format_number
@@ -666,10 +667,11 @@ class Endo(ZWBox):
     """
 
     def __init__(self, scalar: complex):
-        try:
-            scalar = complex(scalar)
-        except TypeError:
-            pass
+        if diagram.array_backend(scalar) == "numpy":
+            try:
+                scalar = complex(scalar)
+            except TypeError:
+                pass
         self.scalar = scalar
         super().__init__(f"Endo({scalar})", 1, 1, data=scalar)
 
@@ -682,14 +684,15 @@ class Endo(ZWBox):
             f"({format_number(self.scalar, exact=True)})"
 
     def conjugate(self):
-        return Endo(self.scalar.conjugate())
+        with backend(diagram.array_backend(self.scalar)) as module:
+            return Endo(module.conj(self.scalar))
 
     def to_path(self, dtype=complex) -> Matrix:
         """Returns an equivalent :class:`Matrix` object"""
         return Matrix[dtype]([self.scalar], 1, 1)
 
     def dagger(self) -> diagram.Diagram:
-        return Endo(self.scalar.conjugate())
+        return self.conjugate()
 
     def grad(self, var):
         """Compute the gradient of the scalar with respect to a variable."""
