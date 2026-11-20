@@ -578,9 +578,9 @@ def to_dot(diagram) -> str:
                          + " [style=invis]; }")
     for i, (box, (dom, cod)) in enumerate(
             zip(graph.boxes, graph.box_wires)):
-        name = html.escape(str(box.name))
-        lines.append(f'  b{i} [tooltip="{name}", '
-                     f'label=<{port_table(name, len(dom), len(cod))}>];')
+        label = html.escape(str(box.name))
+        lines.append(f'  b{i} [tooltip="{label}", '
+                     f'label=<{port_table(label, len(dom), len(cod))}>];')
         for j, spider in enumerate(dom):
             ends[spider].append((True, f"b{i}:d{j}:n"))
         for j, spider in enumerate(cod):
