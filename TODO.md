@@ -7,5 +7,5 @@
 - [x] symmetric: terms with exchange, a variable used once in any order
 - [x] markov: terms with copy and discard, a variable used any number of times
 - [x] the modules in between (braided, traced, rigid, compact, ...): their own Term definition
-- [ ] docs, changelog and README say the terms of each module below biclosed are variants of the kappa calculus
+- [WIP] @T-0729b388-26a3-4a3d-ac11-e727fdb06d74-2026-11-20 19:10 docs, changelog and README say the terms of each module below biclosed are variants of the kappa calculus
 - [x] a type is callable on a Python function, as for lambda terms, and the kappa method is dropped
