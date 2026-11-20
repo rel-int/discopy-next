@@ -305,30 +305,31 @@ the important regressions and speedups.
 
 ## Run the Lean proofs
 
-`lean/` is a [Lake](https://lean-lang.org/doc/reference/latest/Build-Tools-and-Distribution/Lake/)
+`discolean/` is a [Lake](https://lean-lang.org/doc/reference/latest/Build-Tools-and-Distribution/Lake/)
 project holding a Lean 4 model of `egraph.partition`, the pure `EGraph`
 (`merge`, `add`, `rebuild`) and the `Builder`, and one of the diagrams of
 `monoidal.Diagram`, with theorems proved on each,
-see its [README](lean/README.md); it needs the Lean of `lean/lean-toolchain`
-and no other dependency. It lives outside the package and outside `testpaths`,
+see its [README](discolean/README.md); it needs the Lean of `discolean/lean-toolchain`, that of the Mathlib it requires,
+and Mathlib. It lives outside the package and outside `testpaths`,
 so run it explicitly:
 
 ```shell
-cd lean
+cd discolean
+lake exe cache get         # Mathlib's oleans, instead of building it
 lake build                 # the proofs and the `oracle` executable
 lake env lean Audit.lean   # no `sorry`, no axiom beyond the three standard ones
 cd ..
-uv run pytest lean/test_oracle.py lean/test_premonoidal.py -s
+uv run pytest discolean/test_oracle.py discolean/test_premonoidal.py -s
 ```
 
-`lean/Statements.lean` restates the definitions and the main theorems in one
-short file, and `lean/Statements/Premonoidal.lean` those of diagrams. The last
+`discolean/Discolean/Statements.lean` restates the definitions and the main theorems in one
+short file, and `discolean/Discolean/Statements/Premonoidal.lean` those of diagrams. The last
 command is the differential test: Hypothesis draws cases, the `oracle` answers
 them in one run and each answer is compared with the Python's; it is skipped
 when the binary is not built. `ORACLE_EXAMPLES` sets the number of cases per
 seed (2,000 by default) and `ORACLE_SEEDS` the seeds (`0` by default), e.g.
 `ORACLE_EXAMPLES=17000 ORACLE_SEEDS=0,1,2`. The `lean` GitHub workflow runs
-all three on `main` and on a pull request touching `lean/`,
+all three on `main` and on a pull request touching `discolean/`,
 `discopy/egraph.py`, `discopy/monoidal.py`, `discopy/cat.py`, the traces of the
 benchmark with their loader `benchmark/test_egraph.py`, which the test
 replays, or what installs the environment.

@@ -27,7 +27,7 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   algebras on `range(n)` are its `group.Action`s ([next#134]).
 - `lambek.abstract`'s docs build an abstract categorial grammar from English to
   Lean: "DisCoPy diagrams are the arrows of the free premonoidal category"
-  prints the statement `lean/Statements/English.lean` proves ([next#622]).
+  prints the statement `discolean/Discolean/Statements/English.lean` proves ([next#622]).
 - Opt-in Triton forward and backward kernels for signed block peer
   reductions in `neural.geometric`, with PyTorch fallbacks for unsupported
   devices, dtypes and large blocks, and support for `torch.compile`
