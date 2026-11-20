@@ -31,6 +31,10 @@ Summary
     dress
     diagrams
     render
+    port_table
+    to_dot
+    layout
+    graphs
     augment
     sample
     samples
@@ -52,9 +56,15 @@ from __future__ import annotations
 import importlib
 from collections import defaultdict
 from collections.abc import Callable, Iterator
-from contextlib import nullcontext
+import html
+import json
+import shutil
+import subprocess
+from contextlib import contextmanager, nullcontext
 from io import BytesIO
+from math import lcm
 
+import networkx as nx
 import numpy as np
 
 from discopy.drawing.backend import Backend, Matplotlib
@@ -96,7 +106,21 @@ CROP = (24, 48)
 AUGMENTATIONS = (
     "warp", "rotate", "perspective", "chalk", "whiteboard", "blur", "jpeg")
 
+#: The families of graphs :func:`graphs` draws: the graph of each name
+#: with about ``n`` vertices, drawn by ``rng`` when it is random.
+FAMILIES = {
+    "complete": lambda n, rng: nx.complete_graph(n),
+    "star": lambda n, rng: nx.star_graph(n - 1),
+    "cycle": lambda n, rng: nx.cycle_graph(n),
+    "cube": lambda n, rng: nx.hypercube_graph(3),
+    "grid": lambda n, rng: nx.grid_2d_graph(2, max(n // 2, 2)),
+    "tree": lambda n, rng: nx.random_labeled_tree(
+        n, seed=int(rng.integers(1 << 16)))}
+
 DPI, SPIDER, WIRE, TEXT = 72, .15, LABELS.index("wire"), 7
+
+#: The units of a picture in an inch of a graphviz layout.
+INCH = 3
 
 
 def load(module: str):
@@ -402,6 +426,9 @@ def render(diagram, size=160, mask=False, **params) -> np.ndarray:
     The diagram is centred at ``scale`` pixels per unit, ``24`` by default,
     its text ``fontsize`` pixels high, its strokes ``linewidth`` wide.
     ``xkcd=True`` draws it by hand, see :func:`matplotlib.pyplot.xkcd`.
+    ``graphviz=True`` draws it as laid out by :func:`layout` instead, with
+    no wire labels, an inch of the layout ``INCH`` units wide, and
+    ``graphviz=layout(diagram)`` draws a layout already computed.
 
     >>> from discopy.monoidal import Ty, Box
     >>> x = Ty('a')
@@ -413,6 +440,11 @@ def render(diagram, size=160, mask=False, **params) -> np.ndarray:
     ['a', 'background', 'f', 'label a']
     """
     scale = params.pop("scale", 24)
+    graph = params.pop("graphviz", False)
+    if graph:
+        params.pop("wire_labels", None)
+        graph = graph if isinstance(graph, dict) else layout(diagram)
+        return paint_layout(graph, size, scale, mask, **params)
     xkcd, drawing = params.pop("xkcd", False), diagram.to_drawing()
     params = {"fontsize": .4 * scale, "wire_labels": True,
               "nodesize": np.pi * (SPIDER * scale) ** 2 / 300 * np.sqrt(
@@ -432,8 +464,10 @@ def render(diagram, size=160, mask=False, **params) -> np.ndarray:
     return labels
 
 
-def paint(drawing, size, scale, xkcd, backend, mask, mode=None, **params):
-    """ The pixels of a drawing on a backend, see :func:`render`. """
+@contextmanager
+def canvas(size, xkcd, mask):
+    """ A square figure of ``size`` pixels and its axis, black for a mask
+    and drawn without antialiasing, by hand when ``xkcd`` is set. """
     import matplotlib as mpl
     import matplotlib.pyplot as plt
     with plt.xkcd(randomness=1, scale=.5, length=50) if xkcd\
@@ -443,24 +477,224 @@ def paint(drawing, size, scale, xkcd, backend, mask, mode=None, **params):
         figure, axis = plt.subplots(
             figsize=(size / DPI, size / DPI), dpi=DPI,
             facecolor="black" if mask else "white")
+        try:
+            yield figure, axis
+        finally:
+            plt.close(figure)
+
+
+def pixels(figure, axis, centre, size, scale) -> np.ndarray:
+    """ The pixels of a figure, its axis centred on a point in units. """
+    half = size / scale / 2
+    axis.set_xlim(centre[0] - half, centre[0] + half)
+    axis.set_ylim(centre[1] - half, centre[1] + half)
+    figure.canvas.draw()
+    return np.asarray(figure.canvas.buffer_rgba())[..., :3].copy()
+
+
+def paint(drawing, size, scale, xkcd, backend, mask, mode=None, **params):
+    """ The pixels of a drawing on a backend, see :func:`render`. """
+    with canvas(size, xkcd, mask) as (figure, axis):
         painter = backend(axis, params.pop("linewidth", 1.5), scale=scale,
                           mode=mode) if mask else backend(
             axis, linewidth=params.pop("linewidth", 1.5))
         drawing.draw(backend=painter, show=False, aspect="equal", **params)
-        half = size / scale / 2
-        axis.set_xlim(drawing.width / 2 - half, drawing.width / 2 + half)
-        axis.set_ylim(drawing.height / 2 - half, drawing.height / 2 + half)
-        figure.canvas.draw()
-        pixels = np.asarray(figure.canvas.buffer_rgba())[..., :3].copy()
-        plt.close(figure)
-    return pixels
+        return pixels(figure, axis, (drawing.width / 2, drawing.height / 2),
+                      size, scale)
 
 
-def fits(diagram, size=160, scale=24, margin=1) -> bool:
+def fits(diagram, size=160, scale=24, margin=1, graphviz=False) -> bool:
     """ Whether the picture of a diagram fits in the image, with a margin
     in units around it. """
-    drawing = diagram.to_drawing()
-    return max(drawing.width, drawing.height) + 2 * margin <= size / scale
+    if graphviz:
+        graph = graphviz if isinstance(graphviz, dict) else layout(diagram)
+        *_, width, height = map(float, graph["bb"].split(","))
+        extent = INCH * max(width, height) / 72
+    else:
+        drawing = diagram.to_drawing()
+        extent = max(drawing.width, drawing.height)
+    return extent + 2 * margin <= size / scale
+
+
+def port_table(name: str, dom: int, cod: int) -> str:
+    """
+    The HTML table of a box for :func:`to_dot`: a bordered cell of its
+    name, with a row of ``dom`` port columns above and ``cod`` below, each
+    port as wide as the others on its side.
+
+    >>> print(port_table('f', 0, 1))  # doctest: +NORMALIZE_WHITESPACE
+    <TABLE BORDER="0" CELLSPACING="0"><TR><TD BORDER="1" CELLPADDING="6"
+    COLSPAN="1">f</TD></TR><TR><TD PORT="c0" BORDER="0" CELLPADDING="0"
+    COLSPAN="1" WIDTH="18" HEIGHT="0"></TD></TR></TABLE>
+    """
+    grid, width, rows = lcm(dom or 1, cod or 1), 18 * max(dom, cod, 1), []
+    for side, arity in (("d", dom), ("c", cod)):
+        if arity:
+            rows.append("<TR>" + "".join(
+                f'<TD PORT="{side}{j}" BORDER="0" CELLPADDING="0" '
+                f'COLSPAN="{grid // arity}" WIDTH="{width // arity}" '
+                f'HEIGHT="0"></TD>' for j in range(arity)) + "</TR>")
+    rows.insert(bool(dom), f'<TR><TD BORDER="1" CELLPADDING="6" '
+                           f'COLSPAN="{grid}">{name}</TD></TR>')
+    return '<TABLE BORDER="0" CELLSPACING="0">' + "".join(rows) + "</TABLE>"
+
+
+def to_dot(diagram) -> str:
+    """
+    The DOT source of the hypergraph of a diagram, for :func:`layout`.
+
+    A box is an HTML table with one column per port, its domain above and
+    its codomain below, each from left to right, so that each wire leaves
+    the box where its port is. A wire with two ends is an edge from its
+    source, an input or a codomain port, to its target, and a spider with
+    any other number of ends is a dot with an edge to each. The inputs
+    are ranked first and the outputs last, each from left to right.
+
+    >>> from discopy.frobenius import Ty, Box
+    >>> x = Ty('a')
+    >>> print(to_dot(Box('f', x, x @ x)))  # doctest: +ELLIPSIS
+    graph diagram {
+    ...
+      b0 [tooltip="f", label=<...>];
+    ...
+      b0:c0:s -- out0 [label="a"];
+      b0:c1:s -- out1 [label="a"];
+    }
+    """
+    graph = diagram.to_hypergraph()
+    lines = ["graph diagram {",
+             "  graph [rankdir=TB, nodesep=.3, ranksep=.35];",
+             '  node [shape=plain, fontname="DejaVu Sans", fontsize=12];']
+    ends = defaultdict(list)
+
+    for side, wires in (("in", graph.dom_wires), ("out", graph.cod_wires)):
+        for i, spider in enumerate(wires):
+            lines.append(f'  {side}{i} [shape=point, width=0, label=""];')
+            ends[spider].append((side == "out", f"{side}{i}"))
+        if len(wires) > 1:
+            lines.append("  { rank=" + ("min" if side == "in" else "max")
+                         + "; " + " -- ".join(
+                             f"{side}{i}" for i in range(len(wires)))
+                         + " [style=invis]; }")
+    for i, (box, (dom, cod)) in enumerate(
+            zip(graph.boxes, graph.box_wires)):
+        label = html.escape(str(box.name))
+        lines.append(f'  b{i} [tooltip="{label}", '
+                     f'label=<{port_table(label, len(dom), len(cod))}>];')
+        for j, spider in enumerate(dom):
+            ends[spider].append((True, f"b{i}:d{j}:n"))
+        for j, spider in enumerate(cod):
+            ends[spider].append((False, f"b{i}:c{j}:s"))
+    for spider, obj in enumerate(graph.spider_types):
+        ends[spider].sort(key=lambda end: end[0])
+        pairs = [[end for _, end in ends[spider]]]\
+            if len(ends[spider]) == 2 else [
+                (f"s{spider}", end) if is_target else (end, f"s{spider}")
+                for is_target, end in ends[spider]]
+        if len(ends[spider]) != 2:
+            lines.append(
+                f'  s{spider} [shape=point, width={2 * SPIDER / INCH}, '
+                'label=""];')
+        label = html.escape(str(obj))
+        lines += [f'  {" -- ".join(pair)} [label="{label}"];'
+                  for pair in pairs]
+    return "\n".join(lines + ["}"])
+
+
+def layout(diagram) -> dict:
+    """
+    The layout of a diagram by graphviz's ``dot``, as the JSON it writes:
+    the bounding box ``bb``, each node of :func:`to_dot` with its ``pos``,
+    ``width`` and ``height``, and each edge with the points of its spline.
+    Raises :class:`RuntimeError` when ``dot`` is not installed.
+    """
+    if shutil.which("dot") is None:
+        raise RuntimeError("Graphviz executable 'dot' was not found.")
+    return json.loads(subprocess.run(
+        ["dot", "-Tjson"], input=to_dot(diagram).encode(),
+        capture_output=True, check=True).stdout)
+
+
+def paint_layout(  # pylint: disable=too-many-locals  # one figure, as paint
+        graph: dict, size, scale, mask, **params) -> np.ndarray:
+    """
+    The pixels of a :func:`layout`, see :func:`render`: a box is a
+    rectangle of its name with the name inside, a spider a dot and a wire
+    the spline of its edge, each in the colour of its label for a mask,
+    by hand when ``xkcd`` is set, its strokes ``linewidth`` wide.
+    """
+    xkcd, linewidth = params.get("xkcd", False), params.get("linewidth", 1.5)
+    from matplotlib.patches import Circle, PathPatch, Rectangle
+    from matplotlib.path import Path
+
+    def point(pos):
+        return tuple(INCH * float(x) / 72 for x in pos.split(","))
+
+    def colour(label):
+        return (LABELS.index(label) / 255, 0, 0) if mask else "black"
+    with canvas(size, xkcd, mask) as (figure, axis):
+        axis.axis("off")
+        for edge in graph.get("edges", []):
+            if edge.get("style") == "invis":
+                continue
+            points = [point(p) for p in edge["pos"].split()
+                      if not p.startswith(("s,", "e,"))]
+            axis.add_patch(PathPatch(Path(points, [Path.MOVETO] + [
+                Path.CURVE4] * (len(points) - 1)), facecolor="none",
+                linewidth=linewidth,
+                edgecolor=colour(html.unescape(edge["label"]))))
+        for node in filter(lambda node: "pos" in node, graph["objects"]):
+            (x, y), name = point(node["pos"]), node["name"]
+            width, height = (INCH * float(node[k]) for k in (
+                "width", "height"))
+            if name[0] == "s":
+                axis.add_patch(Circle((x, y), SPIDER, color=colour("spider")))
+            elif name[0] == "b":
+                label = html.unescape(node["tooltip"])
+                axis.add_patch(Rectangle(
+                    (x - width / 2, y - height / 2), width, height,
+                    linewidth=linewidth, edgecolor=colour(label),
+                    facecolor=colour(label) if mask else "white"))
+                if not mask:
+                    axis.text(x, y, label, ha="center", va="center",
+                              fontsize=params.get("fontsize", .4 * scale))
+        *_, right, top = map(float, graph["bb"].split(","))
+        result = pixels(figure, axis, point(f"{right / 2},{top / 2}"),
+                        size, scale)
+    if not mask:
+        return result
+    labels = result[..., 0].astype(np.int64)
+    labels[result[..., 1] > 0] = 0
+    return labels
+
+
+def graphs(module: str, seed=0, max_boxes=6) -> Iterator:
+    """
+    Yield the graphs of the :data:`FAMILIES` with three to ``max_boxes``
+    vertices, the cube with eight, as closed diagrams of a module: a vertex
+    is a box named ``f`` with an input for each smaller neighbour and an
+    output for each larger, an edge a wire of type ``a`` between them.
+    Raises :class:`ValueError` when ``max_boxes`` is less than three.
+
+    >>> first = next(graphs("compact", seed=1))
+    >>> assert not (first.dom or first.cod)
+    """
+    if max_boxes < 3:
+        raise ValueError(f"Expected max_boxes >= 3, got {max_boxes}.")
+    mod, rng = load(module), np.random.default_rng(seed)
+    x = mod.Ty('a')
+    while True:
+        family, n = rng.choice(list(FAMILIES)), int(
+            rng.integers(3, max_boxes + 1))
+        graph = nx.convert_node_labels_to_integers(FAMILIES[family](n, rng))
+        smaller = {v: sorted(u for u in graph[v] if u < v) for v in graph}
+        larger = {v: sorted(u for u in graph[v] if u > v) for v in graph}
+        boxes = [mod.Box('f', x ** len(smaller[v]), x ** len(larger[v]))
+                 for v in graph]
+        yield elementary(mod.CMap.from_wiring(boxes, [
+            ((u, len(smaller[u]) + larger[u].index(v)),
+             (v, smaller[v].index(u))) for u, v in map(sorted, graph.edges)
+        ]).to_diagram())
 
 
 def augment(image, mask, rng: np.random.Generator, **flags):
@@ -586,24 +820,34 @@ def samples(module: str, seed=0, size=160, max_boxes=6, scales=(20, 28),
     A picture is drawn at a scale drawn from ``scales``, in pixels per unit,
     its text a fraction of it drawn from ``text`` if given, else ``.4``.
 
+    ``graphviz`` lays the diagram out by graphviz, see :func:`layout`, and
+    ``graphs`` draws it from :func:`graphs` instead of :func:`diagrams`.
+
     Every flag is drawn at random when set to ``"random"``, e.g.
     ``samples("compact", blur="random")`` blurs half the images.
     """
     rng = np.random.default_rng(seed)
     defaults = {"heights": True, "widths": True, "triangles": True,
-                "wire_labels": True}
-    for diagram in diagrams(module, seed, max_boxes):
+                "wire_labels": True, "graphviz": False, "graphs": False}
+    sources = diagrams(module, seed, max_boxes), graphs(
+        module, seed, max_boxes)
+    while True:
         drawn = {key: rng.random() < .5 if value == "random" else value
                  for key, value in (defaults | flags).items()}
+        diagram = next(sources[drawn.pop("graphs")], None)
+        if diagram is None:
+            return
         diagram = dress(diagram, rng, **{
             key: drawn.pop(key) for key in ("heights", "widths", "triangles")})
         params = {"xkcd": drawn.pop("xkcd", False),
                   "wire_labels": drawn.pop("wire_labels"),
+                  "graphviz": drawn.pop("graphviz") and layout(diagram),
                   "scale": rng.uniform(*scales),
                   "linewidth": rng.uniform(1, 2.5)}
         if text is not None:
             params["fontsize"] = params["scale"] * rng.uniform(*text)
-        if not fits(diagram, size, params["scale"]):
+        if not fits(diagram, size, params["scale"],
+                    graphviz=params["graphviz"]):
             continue
         image = render(diagram, size, **params)
         mask = render(diagram, size, mask=True, **params)

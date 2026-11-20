@@ -1,3 +1,4 @@
+import shutil
 from itertools import islice
 
 import numpy as np
@@ -184,3 +185,36 @@ def test_decode_least_moves_up_past_a_primitive():
     diagram = compact.Cup(x, x.r)
     mask = render(diagram, 96, mask=True)
     assert equal(decode_least(mask, "monoidal"), diagram, "compact")
+
+
+needs_graphviz = mark.skipif(
+    shutil.which("dot") is None, reason="Graphviz is not installed.")
+
+
+@needs_graphviz
+def test_graphviz_keeps_the_port_order():
+    x, y, z = map(frobenius.Ty, "abc")
+    diagram = frobenius.Box('g', frobenius.Ty(), x)\
+        @ frobenius.Box('h', frobenius.Ty(), y)\
+        >> frobenius.Box('f', x @ y, z @ z) >> frobenius.Spider(2, 1, z)
+    mask = render(diagram, 160, mask=True, graphviz=True)
+    assert equal(decode(mask, "frobenius"), diagram, "frobenius")
+
+
+@needs_graphviz
+def test_graphviz_pictures_of_graphs_read_back():
+    """ Graphviz crosses wires without a swap, which the mask does not
+    label, so a graph whose wires cross is not read back: 38 of the first
+    40 from seed 3 are. """
+    read_back = sum(equal(decode(mask, "symmetric"), diagram, "symmetric")
+                    for diagram, _, mask in islice(samples(
+                        "symmetric", seed=3, graphviz=True, graphs=True), 10))
+    assert read_back >= 8
+
+
+@needs_graphviz
+def test_graphviz_lays_out_names_with_quotes_and_brackets():
+    x = frobenius.Ty('a')
+    names = {node.get("tooltip") for node in picture.layout(
+        frobenius.Box('f"<g>&', x, x))["objects"]}
+    assert 'f&quot;&lt;g&gt;&amp;' in names
