@@ -1606,3 +1606,16 @@ class RichDisplay:
         return {mimetype: draw() for mimetype, draw in data.items()
                 if (include is None or mimetype in include)
                 and (exclude is None or mimetype not in exclude)}
+
+
+def subclass(name: str, bases: list[type], module: str, doc: str) -> type:
+    """
+    The class ``name`` of ``module`` with the given bases, less those another
+    base subclasses, so that it prints, pickles and reads back from its tree
+    as a class written in that module would.
+    """
+    bases = tuple(dict.fromkeys(  # ty: ignore[invalid-assignment]
+        base for base in bases if not any(
+            other is not base and issubclass(other, base) for other in bases)))
+    return type(name, bases, {  # ty: ignore[invalid-argument-type]
+        "__module__": module, "__qualname__": name, "__doc__": doc})

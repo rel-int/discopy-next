@@ -41,8 +41,6 @@ Summary
     Abstraction
     Sampler
     Constraints
-    Renamed
-    Canonical
     AlphaEquation
 
 Axioms
@@ -109,10 +107,12 @@ from discopy.abc import (
     BiclosedCategory, DaggerCategory, DaggerMonoidalCategory, LinearCategory,
     MonoidalCategory)
 from discopy.testable import (
-    GENERATORS, Equation as AbstractEquation, Equivalence, Serialisable,
+    GENERATORS, Equation as AbstractEquation, Serialisable,
     Testable, TestableGeneric, axiom)
 from discopy.drawing import Drawing
-from discopy.cat import factory
+from discopy.cat import AlphaEquivalence, Renamed, factory
+# pylint: disable-next=unused-import  # still imported from this module
+from discopy.cat import Canonical  # noqa: F401
 from discopy.utils import (
     AxiomError,
     assert_isinstance,
@@ -176,6 +176,7 @@ class Ty(monoidal.Ty):
         return other.under(self)
 
     def __call__(self, arg):
+        # pylint: disable=signature-differs  # a lambda, with no offset
         if isinstance(arg, str):
             return self.constant_factory(arg, self)
         elif isinstance(arg, Callable):
@@ -1313,95 +1314,6 @@ CMap = cmap.CMap[Diagram]
 Diagram.functor_factory = Functor
 
 
-class Renamed[factory](TestableGeneric, tuple):
-    """
-    Alpha-equivalent terms of the ``factory``: one shape generated under two
-    or more namings of its bound variables, see :meth:`TermBase.generate`.
-
-    Example
-    -------
-    >>> from hypothesis import find
-    >>> terms = find(
-    ...     Renamed[TermBase].strategy(), lambda terms: len(terms) == 3)
-    >>> assert terms[0].alpha_eq(*terms[1:])
-    """
-    @classmethod
-    def checked_params(cls) -> tuple:
-        """ None, a sort of premises being drawn over a category. """
-        return ()
-
-    @classmethod
-    def strategy(cls, **params) -> "st.SearchStrategy[Renamed]":
-        """
-        Generate a shape and at least two namings of it.
-
-        Parameters:
-            params : Passed to :meth:`TermBase.shapes`.
-        """
-        from hypothesis import strategies as st
-
-        category = cls.factory
-        return st.builds(
-            lambda shape, namings: cls(
-                category.generate(*shape, letters) for letters in namings),
-            category.shapes(**params),
-            st.lists(category.namings(), min_size=2, max_size=3))
-
-
-class Canonical[factory](TestableGeneric, tuple):
-    """
-    Two terms of the ``factory`` followed by their canonical forms: two
-    shapes of one type, the second the first's or another, each generated
-    under its own naming and then under the one naming ``"x"``, which names
-    every bound variable by its level, so that the two terms are
-    alpha-equivalent exactly when their canonical forms are equal. Where
-    :class:`Renamed` draws terms alpha-equivalent by construction, this
-    decides the alpha-equivalence of any pair, see
-    :meth:`TermBase.alpha_completeness`.
-
-    Example
-    -------
-    >>> from hypothesis import find
-    >>> first, second, *canonical = find(
-    ...     Canonical[TermBase].strategy(),
-    ...     lambda terms: terms[0] != terms[1] and terms[2] == terms[3])
-    >>> assert first.alpha_eq(second)
-    """
-    @classmethod
-    def checked_params(cls) -> tuple:
-        """ None, a sort of premises being drawn over a category. """
-        return ()
-
-    @classmethod
-    def build(cls, shape: tuple, others: list[int] | None,
-              namings: tuple[Sequence[str], Sequence[str]]) -> "Canonical":
-        """
-        The terms of a shape and of another, the same when ``others`` is
-        ``None``, under their namings and then under the canonical one.
-        """
-        cod, choices, types = shape
-        shapes = (choices, choices if others is None else others)
-        return cls(
-            cls.factory.generate(cod, each, types, letters)
-            for each, letters in zip(2 * shapes, (*namings, "x", "x")))
-
-    @classmethod
-    def strategy(cls, **params) -> "st.SearchStrategy[Canonical]":
-        """
-        Generate a shape, its choices again or others, and two namings.
-
-        Parameters:
-            params : Passed to :meth:`TermBase.shapes`.
-        """
-        from hypothesis import strategies as st
-
-        category = cls.factory
-        return st.builds(
-            cls.build, category.shapes(**params),
-            st.none() | category.choices(),
-            st.tuples(category.namings(), category.namings()))
-
-
 class Reducible[factory](TestableGeneric, tuple):
     """
     A term of the ``factory`` with free variables in place of constants, so
@@ -1462,7 +1374,7 @@ class Normalising(Testable):
             for strategy in cls.reduction_strategies))
 
 
-class TermBase(Box, Equivalence):
+class TermBase(Box, AlphaEquivalence):
     """
     A term in the internal language of biclosed categories, an
     :class:`discopy.testable.Equivalence` up to the names of its bound
@@ -1541,99 +1453,6 @@ class TermBase(Box, Equivalence):
         args = (other, self, left) if left else (self, other, left)
         return self.cod.application_factory(*args)
 
-    def alpha_eq(self, *others: Term) -> bool:
-        """
-        Whether the terms are all alpha-equivalent to this one, i.e. equal up
-        to the names of their bound variables, in one pass over the terms.
-
-        Free variables are compared by name and bound ones by the depth of
-        the binder they refer to, see :meth:`alpha_eq_under`.
-        Alpha-equivalent terms evaluate to the same diagram, the converse
-        does not hold.
-
-        Example
-        -------
-        >>> X, Y = Ty("X"), Ty("Y")
-        >>> f, x, y = (Y << X)("f"), Variable("x", X), Variable("y", X)
-        >>> assert X(lambda x: f(x)).alpha_eq(
-        ...     X(lambda y: f(y)), X(lambda z: f(z)))
-        >>> assert f(x).eval() == f(y).eval() and not f(x).alpha_eq(f(y))
-        >>> h = ((Y << X) << X)("h")
-        >>> assert X(lambda x: X(lambda y: h(x)(y))).alpha_eq(
-        ...     X(lambda y: X(lambda x: h(y)(x))))
-        >>> assert not X(lambda x: x).alpha_eq(Y(lambda y: y))
-        """
-        scopes = [{} for _ in (self, *others)]
-        return self.alpha_eq_under(scopes, list(others))
-
-    def alpha_eq_under(  # pylint: disable=unused-argument  # a constant
-            self, scopes: list[dict[Variable, int]], others: list[Term],
-            depth: int = 0) -> bool:
-        """
-        Whether the terms, this one and the ``others``, are alpha-equivalent
-        under a scope for each of them, mapping each variable bound above it
-        to the depth of its binder, i.e. its de Bruijn level, the same in
-        every term: the terms are alpha-equivalent when they are equal with
-        their bound variables read as levels, which is checked without
-        building anything. A :class:`Variable` compares its levels, itself
-        when its scope says nothing of it; a term that binds nothing and
-        refers to no binder, i.e. a :class:`Constant`, is alpha-equivalent
-        to its equals, reading neither ``scopes`` nor ``depth``; every
-        other term former recurses into its subterms, with the arguments
-        spelt out rather than unpacked, so that the recursion runs in
-        Python frames, as deep as the recursion limit allows, rather than
-        through C.
-
-        Entering a binder extends every scope in place with the variable it
-        binds at the current ``depth`` and leaving it restores them, so that
-        comparing the terms is one pass over them, linear in their size, and
-        the scopes read the same after the call.
-
-        Example
-        -------
-        >>> X = Ty("X")
-        >>> x, y, c = Variable("x", X), Variable("y", X), X("c")
-        >>> assert x.alpha_eq_under([{x: 0}, {y: 0}], [y])
-        >>> assert not x.alpha_eq_under([{x: 0}, {y: 1}], [y])
-        >>> assert not x.alpha_eq_under([{x: 0}, {}], [y])
-        >>> assert c.alpha_eq_under([{x: 0}, {}], [c])
-        >>> assert not c.alpha_eq_under([{}, {}], [X("d")])
-        """
-        return all(other == self for other in others)
-
-    @staticmethod
-    def alpha_eq_bound(scopes, bodies, variables, depth=0) -> bool:
-        """
-        Whether bodies are alpha-equivalent under their scopes extended with
-        the variables each one binds, read as the levels from ``depth`` on,
-        the scopes being restored on the way out.
-
-        Parameters:
-            scopes : The scope of each body.
-            bodies : The bodies, one per scope.
-            variables : The variables each body binds, in order.
-            depth : The level of the first variable bound.
-
-        Example
-        -------
-        >>> x, y = Ty("x"), Ty("y")
-        >>> f, v, w = (y << x)("f"), Variable("v", x), Variable("w", x)
-        >>> scopes = [{v: 0}, {}]
-        >>> assert TermBase.alpha_eq_bound(scopes, [f(v), f(w)], [[v], [w]])
-        >>> assert scopes == [{v: 0}, {}]
-        """
-        shadowed = [{x: scope[x] for x in bound if x in scope}
-                    for scope, bound in zip(scopes, variables)]
-        for scope, bound in zip(scopes, variables):
-            scope.update({x: depth + i for i, x in enumerate(bound)})
-        result = bodies[0].alpha_eq_under(
-            scopes, list(bodies[1:]), depth + len(variables[0]))
-        for scope, bound, levels in zip(scopes, variables, shadowed):
-            for x in bound:
-                del scope[x]
-            scope.update(levels)
-        return result
-
     @classmethod
     # pylint: disable-next=too-many-arguments,too-many-positional-arguments
     def generate(  # a shape, a naming and whether it takes constants
@@ -1663,13 +1482,6 @@ class TermBase(Box, Equivalence):
             cls, iter(choices), types, letters, constants=constants).term(cod)
 
     @classmethod
-    def choices(cls) -> st.SearchStrategy[list[int]]:
-        """ Generate the choices of :meth:`generate`, one per node. """
-        from hypothesis import strategies as st
-
-        return st.lists(st.integers(min_value=0, max_value=11), max_size=12)
-
-    @classmethod
     def shapes(cls, *, types=None, cod=None) -> st.SearchStrategy[tuple]:
         """
         Generate the arguments of :meth:`generate` but its letters: a type,
@@ -1685,49 +1497,7 @@ class TermBase(Box, Equivalence):
             cls.choices(),
             st.lists(types, min_size=1, max_size=3))
 
-    @classmethod
-    def namings(cls) -> st.SearchStrategy[list[str]]:
-        """ Generate the letters naming the bound variables, one per level. """
-        from hypothesis import strategies as st
-
-        return st.lists(st.sampled_from("xyz"), min_size=1, max_size=3)
-
-    @classmethod
-    def strategy(cls, **params) -> st.SearchStrategy[Term]:
-        """
-        Generate terms, one :meth:`generate` call per shape and naming.
-
-        Parameters:
-            params : Passed to :meth:`shapes`.
-        """
-        from hypothesis import strategies as st
-
-        return st.builds(
-            lambda shape, letters: cls.generate(
-                shape[0], shape[1], shape[2], letters),
-            cls.shapes(**params), cls.namings())
-
-    @classmethod
-    def related(cls, **params) -> st.SearchStrategy[tuple]:
-        """
-        Generate a term, its canonical form and a second term of the same
-        type, the first again under another naming or another shape, see
-        :class:`Canonical`: the first two alpha-equivalent by construction,
-        the third alpha-equivalent to them or not.
-
-        Parameters:
-            params : Passed to :meth:`shapes`.
-        """
-        from hypothesis import strategies as st
-
-        return st.builds(
-            lambda terms: (terms[0], terms[2], terms[1]),
-            Canonical[cls].strategy(**params))  # ty: ignore[invalid-type-form]
-
-    @axiom
-    def alpha_renaming(cls, terms: Renamed[Self]) -> AbstractEquation:
-        """ A term is alpha-equivalent to its renamings, however many. """
-        return AlphaEquation(*terms)
+    strategy = classmethod(AlphaEquivalence.strategy.__func__)
 
     @axiom
     def alpha_application(cls, terms: Renamed[Self]) -> AbstractEquation:
@@ -1753,23 +1523,6 @@ class TermBase(Box, Equivalence):
         return AlphaEquation(*(
             cls.ob.abstraction_factory(w, f(term)(w), False)
             for term in terms))
-
-    @axiom
-    def alpha_soundness(cls, terms: Renamed[Self]) -> AbstractEquation:
-        """ Alpha-equivalent terms evaluate to the same diagram. """
-        return Equation(*(term.eval() for term in terms))
-
-    @axiom
-    def alpha_completeness(cls, terms: Canonical[Self]) -> AbstractEquation:
-        """
-        Alpha-equivalence is decided by the canonical naming of the bound
-        variables: two terms are alpha-equivalent exactly when their
-        canonical forms are equal, see :class:`Canonical`. The other laws
-        hold of a relation that says yes too often; this one fails when
-        terms that are not alpha-equivalent are.
-        """
-        first, second, *canonical = terms
-        return Equation(first.alpha_eq(second), canonical[0] == canonical[1])
 
 
 class Constant(TermBase):
@@ -1852,37 +1605,8 @@ class Variable(TermBase):
         """ A variable prints as its bare name, it is its own atom. """
         return [self]
 
-    def alpha_eq_under(  # pylint: disable=unused-argument  # depth: binders
-            self, scopes, others, depth=0):
-        """ Variables alike by the level of their binder, by name if free. """
-        if any(type(other) is not type(self) for other in others):
-            return False
-        images = [scope.get(term, term)
-                  for scope, term in zip(scopes, (self, *others))]
-        return all(image == images[0] for image in images[1:])
-
-    @classmethod
-    def fresh(cls, name, cod, *terms):
-        """
-        A variable of a given type whose name is not free in any of the terms,
-        underscores being appended to the name until it is not.
-
-        Parameters:
-            name : The name to start from.
-            cod : The type of the variable.
-            terms : The terms in which the variable must not be free.
-
-        Example
-        -------
-        >>> x = Ty("x")
-        >>> assert Variable.fresh("v", x, Variable("v", x))\\
-        ...     == Variable("v_", x)
-        """
-        names = {
-            variable.name for term in terms for variable in term.freevars}
-        while name in names:
-            name += "_"
-        return cls(name, cod)
+    alpha_eq_under = cat.Variable.alpha_eq_under
+    fresh = classmethod(cat.Variable.fresh.__func__)
 
     __repr__ = Constant.__repr__
 
@@ -2298,10 +2022,10 @@ class Equation(monoidal.Equation):
     """ The :class:`monoidal.Equation` of biclosed diagrams. """
 
 
-class AlphaEquation(Equation):
+class AlphaEquation(cat.AlphaEquation, Equation):
     """
     An :class:`Equation` between terms which holds when they are
-    alpha-equivalent, see :meth:`TermBase.alpha_eq`.
+    alpha-equivalent, see :meth:`discopy.cat.AlphaEquivalence.alpha_eq`.
 
     Example
     -------
@@ -2310,9 +2034,6 @@ class AlphaEquation(Equation):
     >>> assert AlphaEquation(X(lambda x: f(x)), X(lambda y: f(y)))
     >>> assert not AlphaEquation(f(Variable("x", X)), f(Variable("y", X)))
     """
-    def __bool__(self):
-        term, *others = self.terms
-        return term.alpha_eq(*others)
 
 
 TermBase.equivalence_factory = AlphaEquation
