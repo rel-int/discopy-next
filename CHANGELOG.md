@@ -9,6 +9,30 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Added
 
+- The kappa calculus, the first-order half of the lambda calculus: each
+  module below the closed categories has terms of its own, `Variable`,
+  `Constant`, `Application` and `Kappa`, with `let` for the redex. In `cat`
+  a term has one variable and is a sequence of boxes: `Arrow.to_term` reads
+  an arrow, `eval` gives it back and terms are equal up to alpha, beta and
+  eta exactly when their arrows are. In `monoidal` a term is planar and
+  linear, with a context of variables, a stack of inputs and one output:
+  `Diagram.to_term` reads a diagram with exactly one output as a term with a
+  `let` for each box but the last, which gives the output, and refuses any
+  other, and `normal_form` inlines the boxes with one output, up to
+  interchange, which `monoidal.InterchangeEquation` decides for small
+  diagrams by a search of the orbit under interchangers. In `symmetric` a
+  `Kappa` binds its variables in any order: `Diagram.to_term` reads a swap
+  as the order of the variables and `eval` gives the diagram back up to the
+  axioms of symmetric categories. In `markov` a variable occurs any number
+  of times: an `Application` copies the variables its function and its
+  argument share and a `Kappa` discards the ones its body does not use. No
+  discard is assumed natural, so `normal_form` only inlines a variable used
+  exactly once and keeps the statement of one copied or discarded. The
+  modules that add no way to bind a variable, `spacial`, `braided`,
+  `feedback`, `balanced` and `comarkov`, get terms of their own from
+  `cat.kappa_calculus`, with their structural boxes as constants. A type
+  applied to a Python function is its kappa abstraction, and the laws are
+  cells of the property matrix ([next#658]).
 - `discopy.peirce.alpha` and `discopy.peirce.beta`: Peirce's existential
   graphs as diagrams with white and black regions, a cut where the colour
   changes. `~d`, `d & e`, `d | e`, `d.relative_sum(e)` and `d.par(e)` are
@@ -460,6 +484,11 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   checks `scalar_sliding` and `braid_naturality` on streams, up to the order
   of their memory as `bifunctoriality` is ([next#514]).
 
+- The alpha-equivalence of terms is stated once, in `cat.AlphaEquivalence`,
+  for the kappa and the lambda calculus: `alpha_eq` and its laws move there
+  from `biclosed.TermBase`, which inherits them, with `Renamed` and
+  `Canonical`, still importable from `biclosed` ([next#658]).
+- `feedback.subclass` is `utils.subclass` ([next#658]).
 - `lambek.abstract` and `lambek.categorial` are packages: `lambek.proofnet`
   and `lambek.neural` are `lambek.abstract.proofnet` and
   `lambek.abstract.neural`, and `lambek.categorial.bobcat`, which needs
@@ -510,12 +539,8 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   of `+` on five leaves saturate 55 times faster, and on six in under a
   second ([next#586]).
 - `discopy.grammar` is `discopy.lambek`, with its tests in `test/lambek`,
-  its pictures in `docs/_static/lambek` and its extra `discopy[lambek]`.
-  The old name stays as a deprecated alias: `discopy.grammar` warns and has
-  every name of `discopy.lambek`, `discopy.grammar.x` is the module
-  `discopy.lambek.x`, imported when asked for, the extra `discopy[grammar]`
-  installs `discopy[lambek]`, and `utils.RENAMED` lets a tree written under
-  the old name load, as a pickle does ([next#569]).
+  its pictures in `docs/_static/lambek` and its extra `discopy[lambek]`,
+  with no alias for the old name ([next#569], [next#675]).
 - `Hypergraph.explicit_trace` takes the number of wires to trace and takes
   them in one pass, so `make_causal` and `make_cocausal` convert the graph
   once rather than once per cut: 7.5x faster on the traces of a graph with
@@ -2437,9 +2462,11 @@ for the changelog of `1.2.1` and earlier.
 [next#648]: https://github.com/rel-int/discopy-next/pull/648
 [next#654]: https://github.com/rel-int/discopy-next/pull/654
 [next#656]: https://github.com/rel-int/discopy-next/pull/656
+[next#658]: https://github.com/rel-int/discopy-next/pull/658
 [next#665]: https://github.com/rel-int/discopy-next/pull/665
 [next#667]: https://github.com/rel-int/discopy-next/pull/667
 [next#672]: https://github.com/rel-int/discopy-next/pull/672
+[next#675]: https://github.com/rel-int/discopy-next/pull/675
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#44]: https://github.com/rel-int/optyx/pull/44

@@ -550,3 +550,141 @@ def test_tensor_coalesces_plumbing():
 def test_structural_boxes():
     from discopy.testable import assert_structural_boxes
     assert_structural_boxes(Diagram)
+
+
+def test_term_reads_swaps_as_the_order_of_variables():
+    x, y, z = map(Ty, "xyz")
+    f, g = Box('f', x @ y, z), Box('g', x, y)
+    term = (Swap(y, x) >> f).to_term()
+    assert str(term) == "(y @ x)(lambda x0, x1: f(x1, x0))"
+    assert term.eval() == Swap(y, x) >> f
+    assert isinstance(term, Kappa) and term.category is Diagram
+    diagram = Swap(x, x) >> x @ g >> Swap(x, y) >> Swap(y, x) >> f
+    assert diagram.to_term().eval() == Swap(x, x) >> x @ g >> f
+    assert Equation(diagram.to_term().eval(), diagram)
+    with raises(ValueError):
+        Swap(x, y).to_term()
+
+
+def test_term_kappa_permutes():
+    x, y, z = map(Ty, "xyz")
+    k = Constant(Box('k', x @ y @ z, x))
+    a, b, c = Variable('a', x), Variable('b', y), Variable('c', z)
+    term = Kappa((c, a, b), k(a, b, c))
+    assert term.stack == z @ x @ y and term.freevars == []
+    assert term.eval() == Permutation(z @ x @ y, [1, 2, 0]) >> k.box
+    same = Constant(Box('k', x @ x @ x, x))
+    u, v, w = (Variable(name, x) for name in "uvw")
+    cycle = Kappa((w, u, v), same(u, v, w)).eval()
+    assert Equation(
+        cycle, Diagram.permutation([1, 2, 0], x @ x @ x) >> same.box)
+    assert not Equation(
+        cycle, Diagram.permutation([2, 0, 1], x @ x @ x) >> same.box)
+    planar = Kappa((a, b, c), k(a, b, c))
+    assert planar.eval() == k.box
+    assert planar == monoidal.Kappa((a, b, c), k(a, b, c))
+    functor = Functor({x: y, y: z, z: x}, {k.box: Box('k', y @ z @ x, y)})
+    assert term.eval(functor) == functor(term.eval())
+
+
+def test_term_kappa_around_a_stack():
+    x, y = Ty('x'), Ty('y')
+    m, n = Constant(Box('m', x @ x @ y, x)), Constant(Box('n', x @ y @ x, x))
+    a, c, v = Variable('a', x), Variable('c', x), Variable('v', y)
+    with raises(ValueError):
+        monoidal.Kappa((a, ), m(a, c))
+    term = Kappa((a, ), m(a, c))
+    assert term.freevars == [c] and term.offset == 1 and term.head == a
+    assert term.stack == x @ y and term.dom == x @ x @ y
+    assert term.eval() == Permutation(x @ x @ y, [1, 0, 2]) >> m.box
+    body = Kappa((v, ), n(a, v, c))
+    assert body.freevars == [a, c] and body.offset == 1 and body.stack == y
+    behind = Kappa((c, ), body)
+    assert not behind.front and behind.head is None
+    assert behind.stack == y @ x and behind.eval() == n.box
+    assert behind == monoidal.Kappa((c, ), body)
+    ahead = Kappa((c, a), body)
+    assert ahead.stack == y @ x @ x and ahead.head is None
+    assert ahead.eval() == Permutation(y @ x @ x, [2, 0, 1]) >> n.box
+
+
+def test_term_normal_form_with_exchange():
+    x, y = Ty('x'), Ty('y')
+    f, g = Constant(Box('f', x @ y, x)), Constant(Box('g', x, y))
+    k = Constant(Box('k', x @ x @ x, x))
+    a, b, c = (Variable(name, x) for name in "abc")
+    term = x(lambda a: let(g(a), lambda v: f(b, v)))
+    assert isinstance(term, Kappa) and term.eval().dom == x @ x
+    assert term.normal_form() == x(lambda a: f(b, g(a)))
+    assert TermBase.normal_form_soundness(term)
+    stuck = Kappa((c, a), k(a, b, c))(f(Variable('u', x), Variable('v', y)))
+    assert stuck.normal_form() == stuck
+    assert stuck.freevars == [b, Variable('u', x), Variable('v', y)]
+    assert TermBase.normal_form_soundness(stuck)
+    effect = Constant(Box('e', x, Ty()))
+    scalar = let(effect(a), lambda: k(b, c, Variable('d', x)), offset=1)
+    assert scalar.freevars == [b, a, c, Variable('d', x)]
+    assert scalar.eval() == x @ effect.box @ x @ x >> k.box
+    assert str(Kappa((c, b), scalar)) == (
+        "(x @ x)(lambda c, b: let(e(a), lambda: k(b, c, d), offset=1))")
+
+
+def test_term_eval_into_a_braided_category():
+    from discopy import balanced
+    x, y = Ty('x'), Ty('y')
+    f, g = Box('f', y @ x @ x, x), balanced.Box('g', y @ x @ x, x)
+    diagram = Permutation(x @ x @ y, [2, 0, 1]) >> f
+    F = Functor({x: x, y: y}, {f: g}, cod=balanced.Diagram)
+    expected = x @ balanced.Braid(x, y) >> balanced.Braid(x, y) @ x >> g
+    assert F(diagram) == expected == diagram.to_term().eval(F)
+    assert diagram.to_term().eval() == diagram
+
+
+def test_term_errors_and_levels():
+    x, y = Ty('x'), Ty('y')
+    f = Constant(Box('f', x @ y, x))
+    a, b = Variable('a', x), Variable('b', y)
+    with raises(ValueError, match="distinct free variables of f.a, b., got"):
+        Kappa((a, a), f(a, b))
+    with raises(ValueError, match="distinct free variables"):
+        Kappa((Variable('c', x), ), f(a, b))
+    with raises(ValueError, match="offset 0 for the abstraction of b, a"):
+        Kappa((b, a), f(a, b), 1)
+    with raises(ValueError, match="Expected an offset"):
+        Kappa((), f(a, b))
+    with raises(ValueError, match="offset from 0 to 2"):
+        Kappa((), f(a, b), 3)
+    assert Kappa((), f(a, b), 1).freevars == [a, b]
+    read = (y @ x)(lambda b, a: f(a, b))
+    assert type(read) is Kappa and read == Kappa((b, a), f(a, b))
+    low = monoidal.Constant(monoidal.Box('f', x @ y, x))
+    with raises(ValueError, match="block of variables"):
+        (y @ x)(lambda b, a: low(a, b))
+    assert type(x(lambda a: a)) is monoidal.Kappa
+    assert x(lambda a: a) == Kappa((a, ), a)
+    assert type(f(a)) is Application and type(low(a)) is Application
+    assert type(low(monoidal.Variable('a', x))) is monoidal.Application
+
+
+def test_term_laws():
+    x, y = Ty('x'), Ty('y')
+    laws = (
+        TermBase.eta, TermBase.reading, TermBase.normal_form_soundness,
+        TermBase.normal_form_idempotence, TermBase.repr_transparency,
+        TermBase.str_transparency, TermBase.serialisation)
+    shapes = [
+        [2, 1, 0, 1, 1], [1, 0, 0, 2, 2, 1, 2, 1, 1], [2, 2, 1, 2, 0, 1, 1],
+        [1, 1, 1, 0, 1, 2, 0, 1], [2, 1, 2, 1, 1, 0, 1, 1, 0, 2, 0, 1]]
+    swapped = 0
+    for shape in shapes:
+        term = TermBase.generate(y, shape, [x, y], "ab")
+        assert all(law(term) for law in laws)
+        swapped += any(
+            isinstance(box, Permutation) for box in term.eval().boxes)
+        renamed = TermBase.generate(y, shape, [x, y], "c")
+        assert term.alpha_eq(renamed)
+        assert Equation(term.eval(), renamed.eval())
+    assert swapped
+    sampler = Sampler(TermBase, iter([0, 1]), [x], "a")
+    v, w = Variable('v', x), Variable('w', x)
+    assert str(sampler.state(y, (v, w))) == "c0(w, v)"
