@@ -9,6 +9,12 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Added
 
+- `discopy.lean` compiles the categories of `discopy.abc` and their axioms to
+  Lean structures, read off the declarations by introspection, into
+  `discolean/Discolean/ABC.lean`; `discolean/` proves a compiled category is a
+  category of Mathlib and that strict premonoidal categories, Diagram(S)
+  included, satisfy the laws of `monoidal.Diagram` ([next#668]).
+
 - `discopy.peirce.alpha` and `discopy.peirce.beta`: Peirce's existential
   graphs as diagrams with white and black regions, a cut where the colour
   changes. `~d`, `d & e`, `d | e`, `d.relative_sum(e)` and `d.par(e)` are
@@ -27,7 +33,7 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   algebras on `range(n)` are its `group.Action`s ([next#134]).
 - `lambek.abstract`'s docs build an abstract categorial grammar from English to
   Lean: "DisCoPy diagrams are the arrows of the free premonoidal category"
-  prints the statement `lean/Statements/English.lean` proves ([next#622]).
+  prints the statement `discolean/Discolean/Statements/English.lean` proves ([next#622]).
 - Opt-in Triton forward and backward kernels for signed block peer
   reductions in `neural.geometric`, with PyTorch fallbacks for unsupported
   devices, dtypes and large blocks, and support for `torch.compile`
@@ -451,6 +457,8 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Changed
 
+- `lean/` is now `discolean/`, a Lake package built on Mathlib with one
+  library, `Discolean` ([next#668]).
 - `lambek.abstract` and `lambek.categorial` are packages: `lambek.proofnet`
   and `lambek.neural` are `lambek.abstract.proofnet` and
   `lambek.abstract.neural`, and `lambek.categorial.bobcat`, which needs
@@ -2429,6 +2437,7 @@ for the changelog of `1.2.1` and earlier.
 [next#656]: https://github.com/rel-int/discopy-next/pull/656
 [next#665]: https://github.com/rel-int/discopy-next/pull/665
 [next#667]: https://github.com/rel-int/discopy-next/pull/667
+[next#668]: https://github.com/rel-int/discopy-next/pull/668
 [next#672]: https://github.com/rel-int/discopy-next/pull/672
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
