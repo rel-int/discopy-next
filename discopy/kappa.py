@@ -57,10 +57,11 @@ One output
 
 A term has exactly one output, and the translation between diagrams and
 terms is faithful for the diagrams that have exactly one too:
-:meth:`discopy.monoidal.Diagram.to_term` reads one ``let`` for each box and
-one variable for each wire, and :meth:`TermBase.eval` gives the diagram back,
-box for box. A diagram with any other number of outputs is refused rather
-than read as the term of a different diagram.
+:meth:`discopy.monoidal.Diagram.to_term` reads one variable for each wire
+and a ``let`` for each box but the last, which gives the output and needs
+none, and :meth:`TermBase.eval` gives the diagram back, box for box. A
+diagram with any other number of outputs is refused rather than read as the
+term of a different diagram.
 
 >>> x, y, z = map(Ty, "xyz")
 >>> f, g, h = Box('f', x, y), Box('g', x, z), Box('h', y @ z, x)

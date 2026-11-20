@@ -1702,9 +1702,10 @@ class Diagram(cat.Arrow, DaggerMonoidalCategory, RichDisplay):
         """
         Read a diagram with exactly one output as a term of the planar
         linear kappa calculus, see :mod:`discopy.kappa`: a variable for each
-        wire, ``x0, ..., x{n - 1}`` for the inputs, and one ``let`` for each
-        box in the order of the layers, so that :meth:`discopy.kappa.TermBase.
-        eval` gives the diagram back, box for box.
+        wire, ``x0, ..., x{n - 1}`` for the inputs, and a ``let`` for each
+        box in the order of the layers, but the last when it gives the
+        output, so that :meth:`discopy.kappa.TermBase.eval` gives the
+        diagram back, box for box.
 
         A term has one output: a diagram with any other number of them is
         refused. Every box is a constant, structural ones included, e.g. a
