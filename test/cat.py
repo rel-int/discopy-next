@@ -984,10 +984,10 @@ def test_term_sequence():
     x, y, z = Ob('x'), Ob('y'), Ob('z')
     f, g, h = Box('f', x, y), Box('g', y, z), Box('h', z, x)
     term = (f >> g >> h).to_term()
-    assert str(term) == "x.kappa(lambda x0: h(g(f(x0))))"
+    assert str(term) == "x(lambda x0: h(g(f(x0))))"
     assert term.eval() == f >> g >> h and term.dom == term.cod == x
     assert term.constants == [Constant(h), Constant(g), Constant(f)]
-    assert Id(x).to_term() == x.kappa(lambda x0: x0)
+    assert Id(x).to_term() == x(lambda x0: x0)
     assert Id(x).to_term().eval() == Id(x)
     F = Functor({x: y, y: x, z: z}, {f: Box('g', y, x), g: Box('f', x, z)})
     assert (f >> g).to_term().eval(F) == F(f >> g)
@@ -1005,11 +1005,11 @@ def test_term_normal_form():
     assert str(statement) == "let(f(a), lambda b: let(g(b), lambda c: h(c)))"
     assert statement.normal_form() == h(g(f(a)))
     assert statement.eval() == f.box >> g.box >> h.box
-    closed = y.kappa(lambda b: g(b))
+    closed = y(lambda b: g(b))
     assert closed.normal_form() == closed and closed.eval() == g.box
-    assert x.kappa(lambda a: closed(f(a))).normal_form()\
-        == x.kappa(lambda a: g(f(a)))
-    assert g.expand() == y.kappa(lambda x: g(x)) and a.expand() == a
+    assert x(lambda a: closed(f(a))).normal_form()\
+        == x(lambda a: g(f(a)))
+    assert g.expand() == y(lambda x: g(x)) and a.expand() == a
     for term in (statement, closed, g, a, h(g(f(a)))):
         assert TermBase.normal_form_completeness(term)
         assert TermBase.eta(term) and TermBase.reading(term)
@@ -1020,7 +1020,7 @@ def test_term_normal_form():
 def test_term_alpha_and_substitute():
     x, y = Ob('x'), Ob('y')
     f, a, b = Constant(Box('f', x, y)), Variable('a', x), Variable('b', x)
-    first, second = x.kappa(lambda a: f(a)), x.kappa(lambda b: f(b))
+    first, second = x(lambda a: f(a)), x(lambda b: f(b))
     assert first != second and first.alpha_eq(second)
     assert AlphaEquation(first, second) and not AlphaEquation(f(a), f(b))
     assert not first.alpha_eq(f) and not f(a).alpha_eq(a)
@@ -1046,8 +1046,10 @@ def test_term_errors():
         Kappa((), f)
     with raises(ValueError):
         Kappa((a, ), f(a), 1)
+    with raises(TypeError, match="one level above the others"):
+        TermBase.highest(Kappa, Application)
     with raises(ValueError, match="Expected 1 variables, got 2"):
-        x.kappa(lambda a, b: a)
+        x(lambda a, b: a)
     assert Kappa((a, ), f(a), 0) == Kappa((a, ), f(a))
 
 

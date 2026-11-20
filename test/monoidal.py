@@ -1333,8 +1333,8 @@ def test_one_output():
             diagram.to_term()
     with raises(ValueError):
         Variable('a', Ty())
-    assert Diagram.id(x).to_term() == x.kappa(lambda x0: x0)
-    assert f.to_term() == x.kappa(lambda x0: Constant(f)(x0))
+    assert Diagram.id(x).to_term() == x(lambda x0: x0)
+    assert f.to_term() == x(lambda x0: Constant(f)(x0))
     assert state.to_term() == Constant(state)
 
 
@@ -1347,7 +1347,7 @@ def test_pack():
     term = TermBase.from_diagram(diagram)
     assert term.eval() == diagram and term.category is closed.Diagram
     assert str(term.normal_form())\
-        == "(X @ X).kappa(lambda x0, x1: Pack((Y * Z))(f(x0), g(x1)))"
+        == "(X @ X)(lambda x0, x1: Pack((Y * Z))(f(x0), g(x1)))"
 
 
 def test_eval():
@@ -1368,7 +1368,7 @@ def test_eval_partial_application():
     assert term.freevars == [a, b, c] and term.offset == 2
     assert term.stack == z and term.dom == x @ x @ z @ x
     assert term.eval() == x @ f @ z @ x >> k.box
-    assert term.normal_form() == z.kappa(lambda w: k(a, Constant(f)(b), w, c))
+    assert term.normal_form() == z(lambda w: k(a, Constant(f)(b), w, c))
 
 
 def test_functor():
@@ -1397,7 +1397,7 @@ def test_normal_form_interchange():
     diagram = f @ g @ state >> h @ x >> k
     normal_form = diagram.to_term().normal_form()
     assert str(normal_form)\
-        == "(x @ x).kappa(lambda x0, x1: k(h(f(x0), g(x1)), s))"
+        == "(x @ x)(lambda x0, x1: k(h(f(x0), g(x1)), s))"
     steps = [step for left in (False, True)
              for step in diagram.normalize(left=left)]
     assert len({str(step) for step in steps}) > 2
@@ -1471,19 +1471,19 @@ def test_interchange_equation():
 
 def test_substitute_avoids_capture():
     m, n = Constant(Box('m', x @ x, x)), Constant(Box('n', x, x))
-    term = let(n(b), lambda a: x.kappa(lambda b: m(a, b)))
+    term = let(n(b), lambda a: x(lambda b: m(a, b)))
     normal_form = term.normal_form()
     assert normal_form.freevars == term.freevars == [b]
-    assert str(normal_form) == "x.kappa(lambda b_: m(n(b), b_))"
+    assert str(normal_form) == "x(lambda b_: m(n(b), b_))"
     assert normal_form.eval() == term.eval() == n.box @ x >> m.box
-    assert x.kappa(lambda b: m(a, b)).substitute({c: d})\
-        == x.kappa(lambda b: m(a, b))
+    assert x(lambda b: m(a, b)).substitute({c: d})\
+        == x(lambda b: m(a, b))
 
 
 def test_alpha():
     m = Constant(Box('m', x @ x, x))
-    first = (x @ x).kappa(lambda a, b: m(a, b))
-    second = (x @ x).kappa(lambda b, a: m(b, a))
+    first = (x @ x)(lambda a, b: m(a, b))
+    second = (x @ x)(lambda b, a: m(b, a))
     assert first != second and first.alpha_eq(second)
     assert not m(a, b).alpha_eq(m(b, a)) and not m(a, b).alpha_eq(a)
     assert not first.alpha_eq(m)
@@ -1527,7 +1527,7 @@ def test_kappa_errors():
     assert Kappa((), m(a, b), 2).stack == x
     assert Kappa((a, ), m(a, b, c), 0) == Kappa((a, ), m(a, b, c))
     with raises(ValueError):
-        (x @ x).kappa(lambda a: a)
+        (x @ x)(lambda a: a)
 
 
 def test_laws():

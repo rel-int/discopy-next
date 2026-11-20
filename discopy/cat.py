@@ -90,7 +90,7 @@ An arrow also reads as a term of the kappa calculus, see :class:`TermBase`:
 a variable for its domain under the sequence of its boxes.
 
 >>> print(arrow.to_term())
-x.kappa(lambda x0: h(g(f(x0))))
+x(lambda x0: h(g(f(x0))))
 >>> assert arrow.to_term().eval() == arrow
 
 A statement :func:`let` names the output of a box, and the normal form of a
@@ -185,10 +185,12 @@ class Ob(Serialisable["Ob"]):
         """ An object is its own atom, the generator its string names. """
         return [self]
 
-    def kappa(self, function: Callable) -> Kappa:
+    def __call__(self, function: Callable) -> TermBase:
         """
         The kappa abstraction of a Python function from a variable of this
-        type to a term, see :class:`Kappa`.
+        type to a term, see :class:`Kappa`, as a type of a closed category
+        applied to a function is a lambda abstraction, see
+        :class:`discopy.biclosed.Ty`.
 
         Parameters:
             function : The body, as a function of the variable.
@@ -197,7 +199,7 @@ class Ob(Serialisable["Ob"]):
         -------
         >>> x = Ob('x')
         >>> f = Box('f', x, x)
-        >>> assert x.kappa(lambda a: Constant(f)(Constant(f)(a))).eval()\\
+        >>> assert x(lambda a: Constant(f)(Constant(f)(a))).eval()\\
         ...     == f >> f
         """
         return Kappa.from_callable(self)(function)
@@ -501,9 +503,9 @@ class Arrow(FreeCategory, DaggerCategory, Serialisable["Arrow"]):
         >>> x, y, z = Ob('x'), Ob('y'), Ob('z')
         >>> f, g = Box('f', x, y), Box('g', y, z)
         >>> print((f >> g).to_term())
-        x.kappa(lambda x0: g(f(x0)))
+        x(lambda x0: g(f(x0)))
         >>> print(Arrow.id(x).to_term())
-        x.kappa(lambda x0: x0)
+        x(lambda x0: x0)
         >>> assert (f >> g).to_term().eval() == f >> g
         """
         return TermBase.from_diagram(self)
@@ -1766,10 +1768,10 @@ class AlphaEquivalence(Equivalence):
         >>> x, y = Ob("x"), Ob("y")
         >>> f = Constant(Box("f", x, y))
         >>> a, b = Variable("a", x), Variable("b", x)
-        >>> assert x.kappa(lambda a: f(a)).alpha_eq(
-        ...     x.kappa(lambda b: f(b)), x.kappa(lambda c: f(c)))
+        >>> assert x(lambda a: f(a)).alpha_eq(
+        ...     x(lambda b: f(b)), x(lambda c: f(c)))
         >>> assert f(a).eval() == f(b).eval() and not f(a).alpha_eq(f(b))
-        >>> assert not x.kappa(lambda a: a).alpha_eq(y.kappa(lambda a: a))
+        >>> assert not x(lambda a: a).alpha_eq(y(lambda a: a))
         """
         scopes = [{} for _ in (self, *others)]
         return self.alpha_eq_under(scopes, list(others))
@@ -1973,7 +1975,7 @@ class TermBase(Serialisable, AlphaEquivalence):
     >>> f, g = Box('f', x, y), Box('g', y, z)
     >>> term = (f >> g).to_term()
     >>> print(term)
-    x.kappa(lambda x0: g(f(x0)))
+    x(lambda x0: g(f(x0)))
     >>> assert term.eval() == f >> g
     >>> a = Variable('a', x)
     >>> statement = let(Constant(f)(a), lambda b: Constant(g)(b))
@@ -2075,7 +2077,7 @@ class TermBase(Serialisable, AlphaEquivalence):
         -------
         >>> x, y = Ob('x'), Ob('y')
         >>> f, g = Box('f', x, y), Box('g', y, x)
-        >>> term = x.kappa(lambda a: Constant(g)(Constant(f)(a)))
+        >>> term = x(lambda a: Constant(g)(Constant(f)(a)))
         >>> assert term.eval() == f >> g
         >>> F = Functor({x: y, y: x}, {f: g, g: f})
         >>> assert term.eval(F) == g >> f
@@ -2089,9 +2091,32 @@ class TermBase(Serialisable, AlphaEquivalence):
         """ Draw the diagram of the term, see :meth:`eval`. """
         return self.eval().draw(**params)
 
+    @staticmethod
+    def highest(*levels: type[TermBase]) -> type[TermBase]:
+        """
+        The highest of the classes of terms of some levels of the hierarchy,
+        i.e. the one that subclasses the others: a term built from terms of
+        two levels is one of the higher, e.g. the kappa of a body with a
+        constant of a symmetric category may bind its variables in any
+        order.
+
+        Example
+        -------
+        >>> from discopy import monoidal
+        >>> assert TermBase.highest(Kappa, monoidal.Kappa) is monoidal.Kappa
+        """
+        for level in levels:
+            if all(issubclass(level, other) for other in levels):
+                return level
+        raise TypeError(messages.NO_HIGHEST_LEVEL.format(
+            ", ".join(map(factory_name, levels))))
+
     def __call__(self, *arguments: TermBase) -> TermBase:
         """ The term applied to each of the arguments in turn. """
-        return reduce(self.application_factory, arguments, self)
+        return reduce(
+            lambda func, arg: self.highest(
+                func.application_factory, arg.application_factory)(func, arg),
+            arguments, self)
 
     def substitute(
             self, substitution: dict[Variable, TermBase]) -> TermBase:
@@ -2137,7 +2162,7 @@ class TermBase(Serialisable, AlphaEquivalence):
         -------
         >>> x = Ob('x')
         >>> f = Constant(Box('f', x, x))
-        >>> assert f.expand() == x.kappa(lambda x: f(x))
+        >>> assert f.expand() == x(lambda x: f(x))
         """
         variables: list[Variable] = []
         for typ in self.wires(self.stack):
@@ -2183,7 +2208,7 @@ class TermBase(Serialisable, AlphaEquivalence):
         >>> x, y = Ob('x'), Ob('y')
         >>> choices = [0, 0, 2, 1, 1, 1, 0, 1, 0]
         >>> print(TermBase.generate(y, choices, [x, y], "ab"))
-        x.kappa(lambda a0: let(c1(a0), lambda b1: c0(b1)))
+        x(lambda a0: let(c1(a0), lambda b1: c0(b1)))
         >>> print(TermBase.generate(y, [0, 1, 1], [x, y], "ab"))
         c0(v0)
         """
@@ -2475,15 +2500,15 @@ class Kappa(TermBase):
 
     Note
     ----
-    Applying a type to a Python function with :meth:`Ob.kappa` names the
-    variable after its parameter.
+    Applying a type to a Python function names the variable after its
+    parameter, see :meth:`Ob.__call__`.
 
     Example
     -------
     >>> x, y = Ob('x'), Ob('y')
     >>> f, a = Constant(Box('f', x, y)), Variable('a', x)
     >>> term = Kappa((a, ), f(a))
-    >>> assert term == x.kappa(lambda a: f(a)) and term.eval() == f.box
+    >>> assert term == x(lambda a: f(a)) and term.eval() == f.box
     >>> assert term.stack == x and not term.freevars
     >>> Kappa((Variable('b', x), ), f(a))
     Traceback (most recent call last):
@@ -2520,7 +2545,7 @@ class Kappa(TermBase):
     def __str__(self):
         dom = self.body.types(self.variables)
         dom = f"({dom})" if len(self.variables) > 1 else str(dom)
-        return f"{dom}.kappa({self.function})"
+        return f"{dom}({self.function})"
 
     def atoms(self) -> list:
         """
@@ -2572,7 +2597,8 @@ class Kappa(TermBase):
                       ) -> Callable[[Callable], Kappa]:
         """
         The kappa of a Python function from a variable for each wire of
-        ``dom``, named after its parameters, to the body.
+        ``dom``, named after its parameters, to the body, at the level of
+        the body when it is higher, see :meth:`TermBase.highest`.
 
         Parameters:
             dom : The types of the variables.
@@ -2585,7 +2611,7 @@ class Kappa(TermBase):
         >>> @Kappa.from_callable(x)
         ... def term(a):
         ...     return f(f(a))
-        >>> assert term == x.kappa(lambda a: f(f(a)))
+        >>> assert term == x(lambda a: f(f(a)))
         """
         def decorator(function):
             names, wires = list(signature(function).parameters), cls.wires(dom)
@@ -2593,7 +2619,9 @@ class Kappa(TermBase):
                 raise ValueError(
                     f"Expected {len(wires)} variables, got {len(names)}")
             variables = tuple(map(cls.variable_factory, names, wires))
-            return cls(variables, function(*variables), offset)
+            body = function(*variables)
+            return cls.highest(cls, body.kappa_factory)(
+                variables, body, offset)
 
         return decorator
 
@@ -2617,7 +2645,7 @@ def let(expression: TermBase, body: Callable, offset: int | None = None
     >>> x, y = Ob('x'), Ob('y')
     >>> f, g = Constant(Box('f', x, y)), Constant(Box('g', y, x))
     >>> term = let(f(Variable('a', x)), lambda b: g(b))
-    >>> assert term == y.kappa(lambda b: g(b))(f(Variable('a', x)))
+    >>> assert term == y(lambda b: g(b))(f(Variable('a', x)))
     >>> assert term.eval() == f.box >> g.box
     """
     kappa = expression.kappa_factory.from_callable(expression.cod, offset)
@@ -2633,7 +2661,7 @@ class AlphaEquation(AbstractEquation):
     -------
     >>> x, y = Ob('x'), Ob('y')
     >>> f = Constant(Box('f', x, y))
-    >>> assert AlphaEquation(x.kappa(lambda a: f(a)), x.kappa(lambda b: f(b)))
+    >>> assert AlphaEquation(x(lambda a: f(a)), x(lambda b: f(b)))
     >>> assert not AlphaEquation(f(Variable('a', x)), f(Variable('b', x)))
     """
     def __bool__(self):

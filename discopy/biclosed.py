@@ -175,6 +175,7 @@ class Ty(monoidal.Ty):
         return other.under(self)
 
     def __call__(self, arg):
+        # pylint: disable=signature-differs  # a lambda, with no offset
         if isinstance(arg, str):
             return self.constant_factory(arg, self)
         elif isinstance(arg, Callable):

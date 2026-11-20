@@ -89,7 +89,7 @@ term of a different diagram.
 >>> f, g, h = Box('f', x, y), Box('g', x, z), Box('h', y @ z, x)
 >>> diagram = f @ x >> y @ g >> h
 >>> print(diagram.to_term())
-(x @ x).kappa(lambda x0, x1: let(f(x0), lambda x2: \
+(x @ x)(lambda x0, x1: let(f(x0), lambda x2: \
 let(g(x1), lambda x3: h(x2, x3))))
 >>> assert diagram.to_term().eval() == diagram
 >>> (f @ g).to_term()
@@ -109,7 +109,7 @@ and as a kappa term with :meth:`TermBase.from_diagram`.
 >>> packed = F @ G >> closed.Pack(Y * Z)
 >>> assert len(packed.cod) == 1
 >>> print(TermBase.from_diagram(packed).normal_form())
-(X @ X).kappa(lambda x0, x1: Pack((Y * Z))(f(x0), g(x1)))
+(X @ X)(lambda x0, x1: Pack((Y * Z))(f(x0), g(x1)))
 >>> assert TermBase.from_diagram(packed).eval() == packed
 
 Beta reduction :math:`(\\kappa x. e)(c) = e[c / x]` inlines the ``let`` of a
@@ -117,7 +117,7 @@ box with one output, and :meth:`TermBase.normal_form` inlines them all. It is
 sound up to interchange: the two orders of ``f @ g`` have one normal form.
 
 >>> print(diagram.to_term().normal_form())
-(x @ x).kappa(lambda x0, x1: h(f(x0), g(x1)))
+(x @ x)(lambda x0, x1: h(f(x0), g(x1)))
 >>> other = x @ g >> f @ z >> h
 >>> assert other != diagram and InterchangeEquation(other, diagram)
 >>> assert other.to_term().normal_form() == diagram.to_term().normal_form()
@@ -130,7 +130,7 @@ sound, not complete.
 
 >>> copy = Box('copy', x, x @ x)
 >>> print((copy >> f @ g >> h).to_term().normal_form())
-x.kappa(lambda x0: let(copy(x0), lambda x1, x2: h(f(x1), g(x2))))
+x(lambda x0: let(copy(x0), lambda x1, x2: h(f(x1), g(x2))))
 >>> k = Box('k', x @ x @ x @ x, x)
 >>> first = copy @ x >> x @ x @ copy >> k
 >>> second = x @ copy >> copy @ x @ x >> k
@@ -140,7 +140,7 @@ x.kappa(lambda x0: let(copy(x0), lambda x1, x2: h(f(x1), g(x2))))
 Eta expansion :math:`\\kappa x. e(x) = e` holds on the nose.
 
 >>> term = Constant(h)
->>> assert (y @ z).kappa(lambda a, b: term(a, b)).eval() == term.eval() == h
+>>> assert (y @ z)(lambda a, b: term(a, b)).eval() == term.eval() == h
 
 A term is drawn as its diagram:
 
@@ -721,10 +721,11 @@ class Ty(cat.Ob, cat.FreeCategory, ColouredMonoid):
             parts.append(f'{name}("")' if s == '' else s)
         return ' @ '.join(parts)
 
-    def kappa(self, function: Callable, offset: int | None = None):
+    def __call__(self, function: Callable, offset: int | None = None):
         """
         The kappa abstraction of a Python function from a variable for each
-        wire of the type to a term, see :class:`Kappa`.
+        wire of the type to a term, see :class:`Kappa`, as a type of a
+        closed category applied to a function is a lambda abstraction.
 
         Parameters:
             function : The body, as a function of the variables.
@@ -734,7 +735,7 @@ class Ty(cat.Ob, cat.FreeCategory, ColouredMonoid):
         -------
         >>> x, y = Ty('x'), Ty('y')
         >>> f = Box('f', x @ y, x)
-        >>> term = (x @ y).kappa(lambda a, b: Constant(f)(a, b))
+        >>> term = (x @ y)(lambda a, b: Constant(f)(a, b))
         >>> assert term.eval() == f
         """
         return Kappa.from_callable(self, offset)(function)
@@ -1809,10 +1810,10 @@ class Diagram(cat.Arrow, DaggerMonoidalCategory, RichDisplay):
         >>> x, y = Ty('x'), Ty('y')
         >>> f, g = Box('f', x, y @ y), Box('g', y @ y, x)
         >>> print((f >> g).to_term())
-        x.kappa(lambda x0: let(f(x0), lambda x1, x2: g(x1, x2)))
+        x(lambda x0: let(f(x0), lambda x1, x2: g(x1, x2)))
         >>> e = Box('e', y, Ty())
         >>> print((f >> y @ e >> Box('h', y, x)).to_term())
-        x.kappa(lambda x0: let(f(x0), lambda x1, x2: \
+        x(lambda x0: let(f(x0), lambda x1, x2: \
 let(e(x2), lambda: h(x1), offset=1)))
         >>> assert (f >> g).to_term().eval() == f >> g
         """
@@ -3009,7 +3010,7 @@ class TermBase(cat.TermBase):
     >>> assert term.stack == y and term.dom == x @ y and term.cod == x
     >>> assert term(b).dom == x @ y and term(b).offset is None
     >>> g, h = Box('g', x, y), Box('h', x @ y @ x, y)
-    >>> term = (x @ x @ x).kappa(
+    >>> term = (x @ x @ x)(
     ...     lambda a, b, c: Constant(h)(a, Constant(g)(b), c))
     >>> assert term.eval() == x @ g @ x >> h
     """
@@ -3083,7 +3084,7 @@ class TermBase(cat.TermBase):
         -------
         >>> x, y = Ty('x'), Ty('y')
         >>> print(TermBase.generate(y, [1, 0, 0, 2, 2, 1, 2], [x], "ab"))
-        x.kappa(lambda a0: let(c0(a0), lambda b1, a2: c1(b1, a2)))
+        x(lambda a0: let(c0(a0), lambda b1, a2: c1(b1, a2)))
         >>> print(TermBase.generate(y, [1, 2, 1, 2, 2, 0, 2], [x], "ab"))
         let(c0, lambda a0, b1: c1(a0, b1, v0))
         """
@@ -3238,8 +3239,8 @@ class Kappa(TermBase, cat.Kappa):
 
     Note
     ----
-    Applying a type to a Python function with :meth:`Ty.kappa` names the
-    variables after the parameters, one for each wire.
+    Applying a type to a Python function names the variables after the
+    parameters, one for each wire, see :meth:`Ty.__call__`.
 
     Example
     -------
@@ -3248,7 +3249,7 @@ class Kappa(TermBase, cat.Kappa):
     ...     Variable('b', y)
     >>> term = Kappa((b, ), f(a, b))
     >>> assert term.freevars == [a] and term.stack == y
-    >>> assert term == y.kappa(lambda b: f(a, b)) and term.eval() == f.box
+    >>> assert term == y(lambda b: f(a, b)) and term.eval() == f.box
     >>> assert Kappa((a, ), term).stack == x @ y == Kappa((a, ), f(a)).stack
     >>> Kappa((b, a), f(a, b))
     Traceback (most recent call last):
@@ -3267,7 +3268,7 @@ got b, a.
         ...
     ValueError: Expected an offset for the abstraction of no variable in \
 f(c, b), which has no stack to say where it stands.
-    >>> y.kappa(lambda b: f(c, b), offset=0)
+    >>> y(lambda b: f(c, b), offset=0)
     Traceback (most recent call last):
         ...
     ValueError: Expected offset 1 for the abstraction of b in f(c, b), got 0.
