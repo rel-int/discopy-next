@@ -1831,6 +1831,11 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Project
 
+- `test/drawing/vision.py::test_train_ocr_lowers_its_loss` seeds torch before it
+  builds the `OCR` it trains: `train_ocr` seeds for its own shuffling, after a
+  network it is given has drawn its weights, so the loss the training started
+  from came from whatever ran before the test on its xdist worker and the ratio
+  it asserts ranged 0.56 to 0.81 ([next#656]).
 - `docs/export_notebooks.py` runs each notebook as the Python file
   `marimo convert` writes, not its Markdown: marimo runs that file as
   `__main__`, which a worker spawned by `multiprocessing`, e.g. by cotengra's
@@ -2404,6 +2409,7 @@ for the changelog of `1.2.1` and earlier.
 [next#646]: https://github.com/rel-int/discopy-next/pull/646
 [next#648]: https://github.com/rel-int/discopy-next/pull/648
 [next#654]: https://github.com/rel-int/discopy-next/pull/654
+[next#656]: https://github.com/rel-int/discopy-next/pull/656
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#44]: https://github.com/rel-int/optyx/pull/44
