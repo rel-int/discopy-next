@@ -714,6 +714,9 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Fixed
 
+- `optyx.channel` types keep their delay through `single()` and `double()`:
+  `qubit.delay().double()` is `(bit @ bit).delay()`, no longer `bit @ bit`
+  at time step zero ([next#667]).
 - `matrix.asarray` builds an array from nested entries by stacking the ones
   the active backend already owns, so `Matrix([t], 1, 1)` keeps the gradient
   of a PyTorch tensor `t` where converting it entry by entry read it as a
@@ -2412,6 +2415,7 @@ for the changelog of `1.2.1` and earlier.
 [next#648]: https://github.com/rel-int/discopy-next/pull/648
 [next#654]: https://github.com/rel-int/discopy-next/pull/654
 [next#656]: https://github.com/rel-int/discopy-next/pull/656
+[next#667]: https://github.com/rel-int/discopy-next/pull/667
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#44]: https://github.com/rel-int/optyx/pull/44
