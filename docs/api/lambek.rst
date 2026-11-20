@@ -13,5 +13,3 @@ lambek
     pregroup
     dependency
     abstract
-    proofnet
-    neural

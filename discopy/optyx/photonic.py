@@ -254,7 +254,9 @@ import numpy as np
 import sympy as sp
 from sympy import Expr, lambdify
 from discopy.cat import rsubs
+from discopy.matrix import repr_nonfinite
 from discopy.utils import factory_name
+from discopy.matrix import asarray, backend, is_field
 
 from discopy.optyx import channel
 from discopy.optyx.core import (
@@ -265,6 +267,7 @@ from discopy.optyx.core import (
 
 from discopy.optyx.classical import ClassicalFunction, DiscardMode
 from discopy.optyx.utils.misc import listed, matrix_to_zw
+from discopy.optyx.core.diagram import array_backend
 
 from discopy.optyx.channel import (
     bit,
@@ -431,6 +434,7 @@ class AbstractGate(Channel, ABC):
     ):
 
         self.dtype = Expr if self._contains_expr(data) else complex
+        self.data = data
         super().__init__(
             name,
             self._normal_form(dom, cod)
@@ -446,14 +450,65 @@ class AbstractGate(Channel, ABC):
     """
 
     def _normal_form(self, dom, cod):
-        return matrix_to_zw(self.array.reshape(dom, cod))
+        return matrix_to_zw(self.array.reshape(dom, cod),
+                            dense=self.backend != "numpy")
 
     @cached_property
     def array(self):
         """
         Array to be used for building zw diagrams.
         """
-        return np.asarray(self._compute_array())
+        return self.asarray(self._compute_array())
+
+    def asarray(self, entries):
+        """
+        The array of nested :code:`entries`, in the :attr:`backend` of the
+        gate, so that a JAX tracer or a PyTorch tensor keeps its gradient.
+        """
+        with backend(self.backend):
+            return asarray(entries)
+
+    def scalar(self, param):
+        """
+        A parameter of the gate in its :attr:`backend`, with the dtype of
+        the first parameter held there when it is a floating dtype, so that
+        a float beside a PyTorch tensor goes through the functions of
+        PyTorch and is not truncated beside an integer one.
+        """
+        if self.dtype is Expr or self.backend == "numpy":
+            return param
+        dtype = next(x for x in self.params
+                     if array_backend(x) == self.backend).dtype
+        with backend(self.backend) as module:
+            return module.array(
+                param, dtype=dtype if is_field(dtype) else None)
+
+    @property
+    def module(self):
+        """
+        The module the entries of the array are computed with: SymPy for a
+        symbolic gate, the module of its :attr:`backend` otherwise.
+        """
+        if self.dtype is Expr:
+            return sp
+        with backend(self.backend) as module:
+            return module
+
+    @property
+    def backend(self):
+        """
+        The name of the :func:`discopy.matrix.backend` the array is computed
+        in: that of the first parameter held by an array, e.g. a JAX tracer
+        after :meth:`lambdify`, NumPy otherwise.
+        """
+        return next((array_backend(param) for param in self.params
+                     if array_backend(param) != "numpy"), "numpy")
+
+    @property
+    def params(self) -> tuple:
+        """ The parameters of the gate, i.e. its :code:`data` as a tuple. """
+        return tuple(self.data) if isinstance(self.data, (list, tuple))\
+            else (self.data, )
 
     @abstractmethod
     def _compute_array(self):
@@ -462,7 +517,8 @@ class AbstractGate(Channel, ABC):
     def _contains_expr(self, obj):
         if isinstance(obj, Expr):
             return True
-        if isinstance(obj, Iterable) and not isinstance(obj, (str, bytes)):
+        if isinstance(obj, Iterable) and getattr(obj, "ndim", 1)\
+                and not isinstance(obj, (str, bytes)):
             return any(self._contains_expr(item) for item in obj)
         return False
 
@@ -502,8 +558,10 @@ class Gate(AbstractGate):
         return self._matrix
 
     def __repr__(self):
-        data = "" if self.data is None else f", data={self.data!r}"
-        return f"{factory_name(type(self))}({self.array.tolist()}, "\
+        data = "" if self.data is None\
+            else f", data={repr_nonfinite(self.data)}"
+        array = repr_nonfinite(self.array.tolist())
+        return f"{factory_name(type(self))}({array}, "\
             f"{len(self.dom)}, {len(self.cod)}, {self.name!r}{data})"
 
     def lambdify(self, *symbols, **kwargs):
@@ -566,8 +624,8 @@ class Phase(AbstractGate):
         return f"{factory_name(type(self))}({self.angle!r})"
 
     def _compute_array(self):
-        backend = sp if self.dtype is Expr else np
-        return [backend.exp(2 * np.pi * 1j * self.angle)]
+        module = self.module
+        return [module.exp(2 * np.pi * 1j * self.angle)]
 
     def grad(self, var):
         """Gradient with respect to :code:`var`."""
@@ -676,14 +734,14 @@ class BBS(AbstractGate):
         return f"{factory_name(type(self))}({self.bias!r}{is_conj})"
 
     def _compute_array(self):
-        backend = sp if self.dtype is Expr else np
-        sin = backend.sin((0.25 + self.bias) * np.pi)
-        cos = backend.cos((0.25 + self.bias) * np.pi)
+        module = self.module
+        sin = module.sin((0.25 + self.bias) * np.pi)
+        cos = module.cos((0.25 + self.bias) * np.pi)
         if self.is_conj:
             array = [-1j * cos, sin, sin, -1j * cos]
         else:
             array = [1j * cos, sin, sin, 1j * cos]
-        return np.array(array).reshape(2, 2)
+        return self.asarray(array).reshape(2, 2)
 
     def lambdify(self, *symbols, **kwargs):
         return lambda *xs: type(self)(
@@ -759,22 +817,22 @@ class TBS(AbstractGate):
         """
         Global phase of the TBS.
         """
-        backend = sp if self.dtype is Expr else np
+        module = self.module
         return (
-            -1j * backend.exp(-1j * self.theta * backend.pi)
+            -1j * module.exp(-1j * self.theta * module.pi)
             if self.is_gate_dagger != self.is_conj
-            else 1j * backend.exp(1j * self.theta * backend.pi)
+            else 1j * module.exp(1j * self.theta * module.pi)
         )
 
     def _compute_array(self):
-        backend = sp if self.dtype is Expr else np
-        sin = backend.sin(self.theta * backend.pi)
-        cos = backend.cos(self.theta * backend.pi)
-        array = np.array([sin, cos, cos, -sin]).reshape(2, 2)
+        module = self.module
+        sin = module.sin(self.theta * module.pi)
+        cos = module.cos(self.theta * module.pi)
+        array = self.asarray([[sin, cos], [cos, -sin]])
         if self.is_gate_dagger:
-            array = np.conjugate(array.T)
+            array = array.T.conj()
         if self.is_conj:
-            array = np.conjugate(array)
+            array = array.conj()
         return array * self.global_phase
 
     def lambdify(self, *symbols, **kwargs):
@@ -875,23 +933,24 @@ class MZI(AbstractGate):
         """
         Global phase of the MZI.
         """
-        backend = sp if self.dtype is Expr else np
+        module, theta = self.module, self.scalar(self.theta)
         return (
-            -1j * backend.exp(-1j * self.theta * backend.pi)
+            -1j * module.exp(-1j * theta * module.pi)
             if self.is_gate_dagger != self.is_conj
-            else 1j * backend.exp(1j * self.theta * backend.pi)
+            else 1j * module.exp(1j * theta * module.pi)
         )
 
     def _compute_array(self):
-        backend = sp if self.dtype is Expr else np
-        cos = backend.cos(backend.pi * self.theta)
-        sin = backend.sin(backend.pi * self.theta)
-        exp = backend.exp(1j * 2 * backend.pi * self.phi)
-        array = np.array([exp * sin, cos, exp * cos, -sin]).reshape(2, 2)
+        module = self.module
+        theta, phi = map(self.scalar, (self.theta, self.phi))
+        cos = module.cos(module.pi * theta)
+        sin = module.sin(module.pi * theta)
+        exp = module.exp(1j * 2 * module.pi * phi)
+        array = self.asarray([[exp * sin, cos], [exp * cos, -sin]])
         if self.is_gate_dagger:
-            array = np.conjugate(array.T)
+            array = array.T.conj()
         if self.is_conj:
-            array = np.conjugate(array)
+            array = array.conj()
         return array * self.global_phase
 
     def lambdify(self, *symbols, **kwargs):

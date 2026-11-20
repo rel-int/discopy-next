@@ -1,6 +1,7 @@
 from pytest import importorskip, raises
 
 from discopy import messages
+from discopy import monoidal
 from discopy.monoidal import Colour
 from discopy.rigid import *
 
@@ -69,6 +70,22 @@ def test_Wire_unwind():
     red, blue = Colour("red"), Colour("blue")
     x = Wire("x", dom=red, cod=blue)
     assert x.r.r.unwind() == x
+
+
+def test_the_empty_type_of_a_colour_is_its_own_adjoint():
+    """ The empty type of a colour carries it on both sides, so taking an
+    adjoint swaps it for itself: ``t.r.l == t`` down the hierarchy, and the
+    colour survives the round trip through ``repr``, see #636. """
+    from discopy import frobenius, pivotal, rigid
+    black = Colour("black")
+    for module in (rigid, pivotal, frobenius):
+        unit = module.Ty.id(black)
+        assert unit.l == unit == unit.r
+        assert unit.r.dom == unit.r.cod == black
+        assert eval(repr(unit), {
+            module.__name__.split(".")[-1]: module,
+            "monoidal": monoidal}) == unit
+    assert Ty.id(black) != Ty() and Ty.id(black).r != Ty()
 
 
 def test_Ty_z():

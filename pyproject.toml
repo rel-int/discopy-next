@@ -264,6 +264,7 @@ testpaths = [
     "discopy",
     "test/*.py",
     "test/*/*.py",
+    "test/lambek/*/*.py",
     "test/optyx/compiler/*.py",
 ]
 norecursedirs = [

@@ -685,6 +685,30 @@ def test_delay():
         circuit.delay().eval().array, circuit.eval().array)
 
 
+def test_head():
+    from discopy.quantum import gates
+    from discopy.utils import loads, dumps
+    env = Circuit.environment() | vars(gates)
+    for typ in (qubit, bit, qubit @ Ty(Digit(3))):
+        assert eval(repr(typ.head), env) == typ.head
+        assert loads(dumps(typ.head)) == typ.head
+        assert [x.dim for x in typ.head.inside] == [x.dim for x in typ.inside]
+    assert [x.is_quantum for x in (qubit @ bit).head.inside] == [True, False]
+    for x in (Qudit(2, is_constant=False), Digit(3, is_constant=False)):
+        tail = Ty(x).tail
+        assert eval(repr(tail), env) == tail and loads(dumps(tail)) == tail
+        assert (tail.inside[0].dim, tail.inside[0].is_quantum)\
+            == (x.dim, x.is_quantum)
+    for typ in (qubit, bit):
+        assert Circuit.id(typ.head).eval(mixed=True)\
+            == Circuit.id(typ).eval(mixed=True)
+    init = Ket(0).head @ qubit.delay() >> Circuit.followed_by(qubit)
+    assert (init.dom, init.cod) == (qubit.delay(), qubit)
+    assert Circuit.id(bit.head @ qubit.head).is_mixed
+    assert not Circuit.id(qubit.head).is_mixed
+    assert not Box('f', qubit.head, qubit.head, is_mixed=False).is_mixed
+
+
 def test_Bubble_is_mixed_and_grad():
     phi = sympy.Symbol('phi')
     assert X.bubble(cod=bit).is_mixed and not X.bubble().is_mixed

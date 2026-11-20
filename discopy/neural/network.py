@@ -93,7 +93,8 @@ from typing import Self
 from discopy import (
     comarkov, feedback, lens, markov, messages, monoidal, para, python,
     testable)
-from discopy.abc import MarkovCategory
+from discopy.abc import (
+    DaggerCategory, DaggerMonoidalCategory, FeedbackCategory, MarkovCategory)
 from discopy.cat import factory
 from discopy.monoidal import Dim
 from discopy.testable import axiom
@@ -247,6 +248,17 @@ class Network(markov.Diagram, comarkov.Diagram):
     >>> assert residual == Network.copy(x) >> layer @ x >> add
     """
     ob = Dims
+
+    # The feedback of a network is a trace, whose dagger is the trace of the
+    # dagger of its inside: the laws a feedback breaks hold.
+    dagger_involution = DaggerCategory.dagger_involution
+    dagger_contravariance = DaggerCategory.dagger_contravariance
+    dagger_monoidality = DaggerMonoidalCategory.dagger_monoidality
+    dagger_involution_traced = dagger_contravariance_traced = None
+    dagger_monoidality_symmetric = None
+    sliding = FeedbackCategory.sliding
+    strength = FeedbackCategory.strength
+    tightening = FeedbackCategory.tightening
 
     @classmethod
     def spider_factory(cls, n_legs_in, n_legs_out, typ, phase=None):

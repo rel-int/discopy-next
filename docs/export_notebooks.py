@@ -36,6 +36,7 @@ import re
 import subprocess
 import sys
 from concurrent.futures import ThreadPoolExecutor
+from functools import partial
 from html import escape
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -59,7 +60,7 @@ SKIP = "DISCOPY_SKIP_NOTEBOOKS"
 # page for any notebook that fails to execute. An entry whose issue is closed
 # has stopped being evidence: re-run the notebook before trusting it.
 KNOWN_BROKEN = {
-    "optyx/readme_example": ISSUES + "251",
+    "optyx/readme_example": ISSUES + "442",
 }
 
 IFRAME = """\
@@ -133,20 +134,29 @@ def title_of(notebook: Path) -> str:
 
 
 def export(notebook: Path, *, check: bool) -> None:
-    """Run ``notebook`` and export the computed HTML (unless ``check``)."""
+    """Run ``notebook`` and export the computed HTML (unless ``check``).
+
+    The notebook runs as its Python form, written by ``marimo convert``, since
+    marimo makes the file it runs the ``__main__`` module, which a process
+    spawned by :mod:`multiprocessing`, e.g. by cotengra's optimizer, imports
+    again: as Markdown it is a syntax error (#251).
+    """
     with TemporaryDirectory() as scratch:
         if check:
             output = Path(scratch) / f"{notebook.stem}.html"
         else:
             output = HTML_DIR / f"{name_of(notebook)}.html"
             output.parent.mkdir(parents=True, exist_ok=True)
+        script = Path(scratch) / f"{notebook.stem}.py"
         path = os.pathsep.join(filter(None, (
             str(DOCS.parent), os.environ.get("PYTHONPATH"))))
-        subprocess.run(
-            [sys.executable, "-m", "marimo", "export", "html", notebook.name,
-             "-o", str(output), "-f"],
-            cwd=notebook.parent, env=os.environ | {"PYTHONPATH": path},
-            check=True)
+        marimo = partial(
+            subprocess.run, cwd=notebook.parent,
+            env=os.environ | {"PYTHONPATH": path}, check=True)
+        marimo([sys.executable, "-m", "marimo", "convert", notebook.name,
+                "-o", str(script)], stdout=subprocess.DEVNULL)
+        marimo([sys.executable, "-m", "marimo", "export", "html", str(script),
+                "-o", str(output), "-f"])
         add_theme_style(output, title_of(notebook))
 
 

@@ -208,12 +208,12 @@ import numpy as np
 from sympy import lambdify
 from sympy.core import Symbol
 from discopy import (
-    monoidal, symmetric, frobenius, tensor, hypergraph
+    feedback, monoidal, symmetric, frobenius, tensor, hypergraph
 )
 from discopy import stream as monoidal_stream
 from discopy.cat import factory, rsubs
 from discopy.frobenius import Dim
-from discopy.matrix import backend
+from discopy.matrix import backend, repr_nonfinite
 from discopy.optyx.utils.misc import hashable
 from discopy.utils import AxiomError, factory_name
 from discopy.quantum.gates import format_number
@@ -250,6 +250,9 @@ class PhotonNumberPreservation(Enum):
 
 class Ob(frobenius.Wire):
     """Basic object in an optyx Diagram: bit or mode"""
+
+
+HeadOb, TailOb = feedback.structural_wires(Ob)
 
 
 @factory
@@ -803,7 +806,7 @@ class Box(frobenius.Box, Diagram):
         if self.is_dagger:
             return repr(self.dagger()) + ".dagger()"
         array = "" if self.array is None\
-            else f", array={self.array.tolist()!r}"
+            else f", array={repr_nonfinite(self.array.tolist())}"
         self_adjoint = ", is_dagger=None" if self.is_dagger is None else ""
         return super().__repr__()[:-1] + array + self_adjoint + ")"
 

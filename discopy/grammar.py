@@ -48,8 +48,7 @@ __path__: list[str] = []
 class Alias(MetaPathFinder, Loader):
     """
     Finds ``discopy.grammar.x`` as the module ``discopy.lambek.x``, importing
-    it if need be, e.g. ``neural``, which needs PyTorch and which
-    :mod:`discopy.lambek` does not import.
+    it if need be.
     """
     def find_spec(self, fullname, path=None, target=None):
         """ The spec of a submodule of ``discopy.grammar``, else ``None``. """

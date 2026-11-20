@@ -35,6 +35,12 @@ runs:
     shell: bash
     env:
       GROUPS: ${{ inputs.groups }}
+      # uv retries a failed download three times and gives each 30 seconds,
+      # which the 55 MiB egglog wheel does not fit: four attempts in 132
+      # seconds turned a transient index into a red main, and uv's own error
+      # names this knob (#625). The apt step above carries the same shape,
+      # retries and a timeout, at its own sizes.
+      UV_HTTP_TIMEOUT: 120
     run: |
       args=(--locked)
       for group in $GROUPS; do args+=(--group "$group"); done
