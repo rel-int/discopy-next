@@ -610,6 +610,16 @@ def test_term_normal_form_with_exchange():
         "(x @ x)(lambda c, b: let(e(a), lambda: k(b, c, d), offset=1))")
 
 
+def test_term_eval_into_a_braided_category():
+    from discopy import balanced
+    x, y = Ty('x'), Ty('y')
+    f, g = Box('f', y @ x @ x, x), balanced.Box('g', y @ x @ x, x)
+    diagram = Permutation(x @ x @ y, [2, 0, 1]) >> f
+    F = Functor({x: x, y: y}, {f: g}, cod=balanced.Diagram)
+    expected = x @ balanced.Braid(x, y) >> balanced.Braid(x, y) @ x >> g
+    assert F(diagram) == expected == diagram.to_term().eval(F)
+
+
 def test_term_errors_and_levels():
     x, y = Ty('x'), Ty('y')
     f = Constant(Box('f', x @ y, x))

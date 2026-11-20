@@ -96,7 +96,6 @@ import warnings
 from collections.abc import Sized
 from dataclasses import dataclass
 from inspect import Parameter, Signature, signature
-from itertools import accumulate
 from operator import index
 from typing import ClassVar, Self
 
@@ -1021,13 +1020,10 @@ class TermBase(symmetric.TermBase):
     def wire(functor, wiring, dom):
         """
         The image under a functor of the wiring from a type to its wires
-        at the given indices: a function, which copies and discards them.
+        at the given indices: that of their function, which copies and
+        discards them.
         """
-        images = [functor(dom[i:i + 1]) for i in range(len(dom))]
-        starts = list(accumulate(map(len, images), initial=0))
-        return functor.cod.from_function([
-            starts[i] + j for i in wiring for j in range(len(images[i]))
-        ], functor(dom))
+        return functor(Diagram.from_function(wiring, dom))
 
     @axiom
     def eta(cls, term: Self) -> AbstractEquation:

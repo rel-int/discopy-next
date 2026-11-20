@@ -1048,16 +1048,17 @@ class TermBase(balanced.TermBase):  # ty: ignore[unsupported-base]
     def wire(functor, wiring: list[int], dom: Ty):
         """
         The image under a functor of the wiring from a type to its wires
-        at the given indices: a permutation of them, the identity when
-        nothing moves.
+        at the given indices: that of their permutation, the identity when
+        nothing moves, so that a term evaluates wherever its diagram does,
+        e.g. to braids in a braided category.
 
         Parameters:
-            functor : The functor to evaluate the types.
+            functor : The functor to evaluate the swaps.
             wiring : The index of the input each output reads.
             dom : The type of the inputs.
         """
-        return functor.cod.permutation(
-            wiring, [functor(dom[i:i + 1]) for i in range(len(dom))])
+        return functor(Diagram.permutation(
+            wiring, [dom[i:i + 1] for i in range(len(dom))]))
 
     @axiom
     def normal_form_soundness(cls, term: Self) -> AbstractEquation:
