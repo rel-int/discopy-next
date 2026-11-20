@@ -337,7 +337,7 @@ the number of cases per seed (2,000 by default) and `ORACLE_SEEDS` the seeds
 (`0` by default), e.g. `ORACLE_EXAMPLES=17000 ORACLE_SEEDS=0,1,2`. The `lean`
 GitHub workflow runs all four on `main` and on a pull request touching
 `discolean/`, `discopy/abc.py`, `discopy/lean.py`, `discopy/testable.py`,
-`discopy/lambek/abstract.py`, `discopy/egraph.py`, `discopy/monoidal.py`,
+`discopy/lambek/abstract/`, `discopy/egraph.py`, `discopy/monoidal.py`,
 `discopy/cat.py`, the traces of the benchmark with their loader
 `benchmark/test_egraph.py`, which the test replays, or what installs the
 environment.
