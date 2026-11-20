@@ -501,12 +501,8 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   of `+` on five leaves saturate 55 times faster, and on six in under a
   second ([next#586]).
 - `discopy.grammar` is `discopy.lambek`, with its tests in `test/lambek`,
-  its pictures in `docs/_static/lambek` and its extra `discopy[lambek]`.
-  The old name stays as a deprecated alias: `discopy.grammar` warns and has
-  every name of `discopy.lambek`, `discopy.grammar.x` is the module
-  `discopy.lambek.x`, imported when asked for, the extra `discopy[grammar]`
-  installs `discopy[lambek]`, and `utils.RENAMED` lets a tree written under
-  the old name load, as a pickle does ([next#569]).
+  its pictures in `docs/_static/lambek` and its extra `discopy[lambek]`,
+  with no alias for the old name ([next#569], [next#675]).
 - `Hypergraph.explicit_trace` takes the number of wires to trace and takes
   them in one pass, so `make_causal` and `make_cocausal` convert the graph
   once rather than once per cut: 7.5x faster on the traces of a graph with
@@ -2428,6 +2424,7 @@ for the changelog of `1.2.1` and earlier.
 [next#665]: https://github.com/rel-int/discopy-next/pull/665
 [next#667]: https://github.com/rel-int/discopy-next/pull/667
 [next#672]: https://github.com/rel-int/discopy-next/pull/672
+[next#675]: https://github.com/rel-int/discopy-next/pull/675
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#44]: https://github.com/rel-int/optyx/pull/44
