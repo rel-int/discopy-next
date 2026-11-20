@@ -13,4 +13,4 @@
 > The equation holds; its left side is not a `balanced.TermBase`, which `Equation[Self]` asks for.
 
 - [x] str_transparency of a term with no box: a regression test of the cell's judgement at every level, then the law stated as what a string can say
-- [ ] run the term cells of the matrix under the explore profile and fix or file whatever else it finds
+- [WIP] @T-0729b388-26a3-4a3d-ac11-e727fdb06d74-2026-11-20 22:30 run the term cells of the matrix under the explore profile and fix or file whatever else it finds
