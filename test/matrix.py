@@ -5,7 +5,8 @@ import pytest
 from pytest import raises
 
 from discopy.abc import DaggerCategory, Nat, TracedCategory
-from discopy.matrix import Matrix, backend, is_complex, is_field
+from discopy.matrix import (
+    Matrix, asarray, backend, is_complex, is_field)
 from discopy.symmetric import Ty, Permutation, Swap, Functor
 from discopy.tensor import Tensor, Dim
 from discopy.utils import AxiomError, Subscript, dumps, loads
@@ -356,6 +357,36 @@ def test_strategy_max_entries_on_pytorch(cls):
     with backend('pytorch'):
         drawn = find(strategy, lambda x: x.array.numel() > 3)
     assert type(drawn.array) is torch.Tensor and drawn.array.numel() == 4
+
+
+
+def test_Matrix_of_backend_scalars_keeps_their_gradient():
+    """ #652: a list of entries the backend already owns is stacked, where
+    converting them one by one reads each as a scalar and detaches it. """
+    torch = pytest.importorskip("torch")
+    t = torch.tensor(.3, dtype=torch.float64, requires_grad=True)
+    for entries, dom, cod, expected in (
+            ([t], 1, 1, 1.), ([0, t], 1, 2, 1.), ([[t, t], [t, t]], 2, 2, 4.)):
+        t.grad = None
+        with backend('pytorch'):
+            Matrix(entries, dom, cod).array.sum().backward()
+        assert t.grad == expected
+    t.grad = None
+    with backend('pytorch'):
+        Matrix[complex]([t], 1, 1).array.real.sum().backward()
+    assert t.grad == 1.
+
+
+def test_asarray_leaves_an_array_alone():
+    """ #652: only nested entries are stacked, so an array of the right
+    dtype is still the one the caller gave. """
+    array = np.arange(4, dtype=float)
+    assert asarray(array) is array
+    assert (asarray([0.5, 0.5]) == np.array([0.5, 0.5])).all()
+    assert asarray([], dtype=float).shape == (0, )
+    jax = pytest.importorskip("jax")
+    with backend('jax'):
+        assert jax.grad(lambda x: asarray([x, x]).sum())(.5) == 2.
 
 
 def test_Matrix_dtype_is_the_ring_of_entries():
