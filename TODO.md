@@ -3,5 +3,5 @@
 - [x] state the laws of whiskering on `abc.MonoidalCategory`, so that its theory without bifunctoriality is that of strict premonoidal categories (#669)
 - [x] compile a `Functor` structure for each class of `abc`, the maps preserving its operations
 - [x] prove the coherence of `monoidal` against the compiled definitions: Diagram(S) is the free model of `Discolean.ABC.monoidal` (#669)
-- [ ] check the new laws on every category of the property matrix
-- [ ] compile the rest of `abc` and prove one coherence theorem per module, filed as #670
+- [x] check the new laws on every category of the property matrix: they hold but for `tensor_whiskering` on `lens.Markov`, `lens.Comarkov` and `lens.Prism`, declared broken up to the naturality their unitality already is
+- [x] compile the rest of `abc` and prove one coherence theorem per module, filed as #670
