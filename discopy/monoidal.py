@@ -644,6 +644,7 @@ class Ty(cat.Ob, cat.FreeCategory, ColouredMonoid):
         >>> term = (x @ y).kappa(lambda a, b: Constant(f)(a, b))
         >>> assert term.eval() == f
         """
+        # pylint: disable-next=import-outside-toplevel  # it imports this
         from discopy.kappa import Kappa
         return Kappa.from_callable(self, offset)(function)
 
@@ -1723,6 +1724,7 @@ class Diagram(cat.Arrow, DaggerMonoidalCategory, RichDisplay):
 let(e(x2), lambda: h(x1), offset=1)))
         >>> assert (f >> g).to_term().eval() == f >> g
         """
+        # pylint: disable-next=import-outside-toplevel  # it imports this
         from discopy.kappa import TermBase
         return TermBase.from_diagram(self)
 

@@ -214,19 +214,19 @@ class TermBase(Serialisable, Equivalence):
             + f"({', '.join(map(repr, self.parts))})"
 
     def to_tree(self) -> dict:
-        tree = lambda part: [x.to_tree() for x in part]\
-            if isinstance(part, tuple)\
+        """ The tree of a term: its factory and the trees of its parts. """
+        return {"factory": factory_name(type(self)), **{
+            attr: [x.to_tree() for x in part] if isinstance(part, tuple)
             else part.to_tree() if hasattr(part, "to_tree") else part
-        return dict(factory=factory_name(type(self)), **{
-            attr: tree(getattr(self, attr))
-            for attr in self.serialised_attrs})
+            for attr, part in zip(self.serialised_attrs, self.parts)}}
 
     @classmethod
     def from_tree(cls, tree: dict) -> Self:
-        decode = lambda part: tuple(map(from_tree, part))\
-            if isinstance(part, list)\
+        """ The term of a tree, see :meth:`to_tree`. """
+        return cls(*(
+            tuple(map(from_tree, part)) if isinstance(part, list)
             else from_tree(part) if isinstance(part, dict) else part
-        return cls(*(decode(tree[attr]) for attr in cls.serialised_attrs))
+            for part in (tree[attr] for attr in cls.serialised_attrs)))
 
     def types(self, variables: Sequence[Variable]) -> Ty:
         """ The tensor of the types of some variables. """
@@ -286,11 +286,12 @@ class TermBase(Serialisable, Equivalence):
         """ Draw the diagram of the term, see :meth:`eval`. """
         return self.eval().draw(**params)
 
-    def __call__(self, *arguments: Term) -> Term:
+    def __call__(self, *arguments: TermBase) -> TermBase:
         """ The term applied to each of the arguments in turn. """
         return reduce(Application, arguments, self)
 
-    def substitute(self, substitution: dict[Variable, Term]) -> Term:
+    def substitute(
+            self, substitution: dict[Variable, TermBase]) -> TermBase:
         """
         The term with terms of no stack substituted for free variables,
         each in place and renaming the bound variables it would capture.
@@ -310,7 +311,7 @@ class TermBase(Serialisable, Equivalence):
         # pylint: disable=unused-argument  # a constant has no variable
         return self
 
-    def normal_form(self) -> Term:
+    def normal_form(self) -> TermBase:
         """
         The beta normal form of the term: every redex
         :math:`(\\kappa x. e)(c)` with :math:`c` of the type of :math:`x`
@@ -327,7 +328,7 @@ class TermBase(Serialisable, Equivalence):
         return self
 
     @classmethod
-    def from_diagram(cls, diagram: Diagram) -> Term:
+    def from_diagram(cls, diagram: Diagram) -> TermBase:
         """
         The term of a diagram with one output, see
         :meth:`discopy.monoidal.Diagram.to_term`.
@@ -338,8 +339,11 @@ class TermBase(Serialisable, Equivalence):
         if len(diagram.cod) != 1:
             raise ValueError(messages.NOT_ONE_OUTPUT.format(diagram.cod))
         fresh = count()
-        name = lambda typ: [Variable(f"x{next(fresh)}", typ[i:i + 1])
-                            for i in range(len(typ))]
+
+        def name(typ):
+            return [Variable(f"x{next(fresh)}", typ[i:i + 1])
+                    for i in range(len(typ))]
+
         inputs = name(diagram.dom)
         wires, steps = list(inputs), []
         for layer in diagram.inside:
@@ -357,7 +361,7 @@ class TermBase(Serialisable, Equivalence):
     @classmethod
     # pylint: disable-next=too-many-arguments,too-many-positional-arguments
     def generate(cls, cod: Ty, choices: Sequence[int], types: Sequence[Ty],
-                 letters: Sequence[str]) -> Term:
+                 letters: Sequence[str]) -> TermBase:
         """
         Build a term of codomain ``cod`` from a sequence of ``choices``, as
         :meth:`discopy.biclosed.TermBase.generate` does: its inputs are
@@ -461,8 +465,8 @@ class Variable(TermBase):
     def __init__(self, name: str, cod: Ty):
         if len(cod) != 1:
             raise ValueError(messages.NOT_ONE_OUTPUT.format(cod))
-        self.name, self.cod = name, cod
-        self.freevars, self.stack, self.offset = [self], cod[:0], None
+        self.name, self.cod, self.stack, self.offset = name, cod, cod[:0], None
+        self.freevars = [self]
 
     def __str__(self):
         return self.name
@@ -543,7 +547,7 @@ type y.
     """
     serialised_attrs = ("func", "arg")
 
-    def __init__(self, func: Term, arg: Term):
+    def __init__(self, func: TermBase, arg: TermBase):
         assert_isinstance(func, TermBase)
         assert_isinstance(arg, TermBase)
         if arg.stack or func.offset is None\
@@ -559,7 +563,7 @@ type y.
         self.offset = func.offset + len(arg.freevars) if self.stack else None
 
     @property
-    def spine(self) -> tuple[Term, list[Term]]:
+    def spine(self) -> tuple[TermBase, list[TermBase]]:
         """ The term applied first and its arguments, in order. """
         head, arguments = self.func, [self.arg]
         while isinstance(head, Application):
@@ -655,8 +659,9 @@ got b, a.
     >>> assert term.eval() == x @ e.box @ y >> f.box
     """
     serialised_attrs = ("variables", "body", "offset")
+    offset: int
 
-    def __init__(self, variables: tuple[Variable, ...], body: Term,
+    def __init__(self, variables: tuple[Variable, ...], body: TermBase,
                  offset: int | None = None):
         assert_isinstance(body, TermBase)
         variables = tuple(variables)
@@ -775,7 +780,7 @@ got b, a.
 type Term = Variable | Constant | Application | Kappa
 
 
-def let(expression: Term, body: Callable, offset: int | None = None
+def let(expression: TermBase, body: Callable, offset: int | None = None
         ) -> Application:
     """
     Bind the outputs of an ``expression`` inside the ``body`` of a Python
@@ -795,7 +800,8 @@ def let(expression: Term, body: Callable, offset: int | None = None
     >>> assert term == (y @ y).kappa(lambda b, c: g(b, c))(f(Variable('a', x)))
     >>> assert term.eval() == f.box >> g.box
     """
-    return Kappa.from_callable(expression.cod, offset)(body)(expression)
+    return Application(
+        Kappa.from_callable(expression.cod, offset)(body), expression)
 
 
 @dataclass
@@ -842,7 +848,8 @@ class Sampler:
         return Variable(
             f"{self.letters[level % len(self.letters)]}{level}", cod)
 
-    def spine(self, cod: Sequence[Ty], bound: tuple[Variable, ...]) -> Term:
+    def spine(
+            self, cod: Sequence[Ty], bound: tuple[Variable, ...]) -> TermBase:
         """ A fresh constant applied to the bound variables in order. """
         return self.constant([x.cod for x in bound], cod)(*bound)
 
@@ -853,7 +860,7 @@ class Sampler:
         return [bound[i:j] for i, j in zip([0] + cuts, cuts + [len(bound)])]
 
     def state(self, cod: Ty, bound: tuple[Variable, ...] = (),
-              level: int = 0) -> Term:
+              level: int = 0) -> TermBase:
         """
         A term of a given type with no stack and the bound variables as
         context: a leaf when the choices ran out, else what the next
