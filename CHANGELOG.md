@@ -19,7 +19,9 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   `tensor_unit`, `left_whiskering`, `right_whiskering` and `tensor_whiskering`,
   those of a strict premonoidal category, `tensor_whiskering` broken on Markov
   lenses and prisms as their unitality is; `discopy.lean` compiles a `Functor`
-  of each class, and `discolean/` proves the coherence of `discopy.monoidal`:
+  of each class, its abstract methods and the objects it specialises its bases
+  to, e.g. `Nat` for `abc.PRO`, and `discolean/` proves the coherence of
+  `discopy.monoidal`:
   Diagram(S) is the free model of the laws of `monoidal.Diagram` ([next#671]).
 
 - `discopy.peirce.alpha` and `discopy.peirce.beta`: Peirce's existential

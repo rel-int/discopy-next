@@ -8,10 +8,13 @@ morphisms of a category. A :class:`discopy.testable.Rule` gives an operation
 of the structure with its typing law, e.g. ``cut`` gives ``comp`` and
 ``dom (comp f g) = A ∧ cod (comp f g) = C`` for ``f : A → B`` and
 ``g : B → C``, and an :class:`discopy.testable.Axiom` gives a law, a
-proposition about these operations. A class compiles to a ``structure`` of its
-operations extending those of its bases, with one ``def`` per law and a
-``Laws`` predicate of all the laws it inherits. Morphisms are untyped, as in
-the Python: one type ``Hom`` with ``dom`` and ``cod`` into ``Ob``, every law
+proposition about these operations. A class compiles to a ``structure`` of
+these operations and of its abstract methods, extending those of its bases,
+with one ``def`` per law, a ``Laws`` predicate of all the laws it inherits
+and a ``Functor`` structure of the maps that preserve its operations.
+Morphisms are untyped, as in the Python: one type ``Hom`` with ``dom`` and
+``cod`` into ``Ob``, or into the objects a class specialises its bases to,
+e.g. ``Nat`` for :class:`discopy.abc.PRO`, see :func:`ob_type`, every law
 assuming its morphisms have the boundary their annotation states, so that the
 laws of a strict structure are plain equalities.
 
@@ -51,7 +54,7 @@ from __future__ import annotations
 import inspect
 import re
 from dataclasses import dataclass
-from typing import Self, get_args, get_origin
+from typing import Self, TypeVar, get_args, get_origin
 
 from discopy import abc, monoidal
 from discopy.testable import (
@@ -351,16 +354,90 @@ def bases(cls: type) -> list[type]:
             and issubclass(base, abc.Category)]
 
 
+OBJECTS = {abc.Nat: "Nat", type(None): "Unit"}
+""" The Lean type of the objects a class specialises its bases to. """
+
+
+def ob_type(cls: type) -> str:
+    """
+    The Lean type of the objects of an abstract class: ``Ob``, unless it or
+    one of its bases specialises them, e.g. :class:`discopy.abc.PRO` to
+    ``Nat`` and :class:`discopy.abc.Monoid` to the single object ``Unit``.
+
+    >>> print(ob_type(abc.PROB), ob_type(abc.Group), ob_type(abc.Category))
+    Nat Unit Ob
+    """
+    found = set()
+    for base in getattr(cls, "__orig_bases__", ()):
+        origin, args = get_origin(base) or base, get_args(base)
+        if origin not in bases(cls):
+            continue
+        if len(origin.__type_params__) < 2 or isinstance(args[0], TypeVar):
+            found.add(ob_type(origin))
+        elif args[0] in OBJECTS:
+            found.add(OBJECTS[args[0]])
+        else:
+            raise Unsupported(f"its objects are {args[0]}")
+    if len(found) > 1:
+        raise Unsupported(f"its objects are {' and '.join(sorted(found))}")
+    return found.pop() if found else "Ob"
+
+
+def type_arguments(cls: type, prime: str = "") -> str:
+    """ The Lean arguments of a structure, e.g. ``Ob Hom`` or ``Hom``. """
+    return f"Hom{prime}" if ob_type(cls) != "Ob" else f"Ob{prime} Hom{prime}"
+
+
+SIGNATURE_SORTS = {"C0": "Ob", "C1": "Hom", "int": "Nat", "bool": "Bool"}
+""" The Lean type of an annotation of the methods of :mod:`discopy.abc`. """
+
+
+def method(cls: type, name: str) -> tuple[str, str]:
+    """
+    The Lean name and signature of a method of a class read off its
+    annotations, a morphism ``self`` first unless it is a class method and
+    variadic arguments as one more.
+
+    >>> method(abc.ColouredMonoid, "tensor")
+    ('tensor', 'Hom → Hom → Hom')
+    """
+    is_classmethod = isinstance(vars(cls)[name], classmethod)
+    signature = inspect.signature(getattr(cls, name))
+    parameters = list(signature.parameters.values())[
+        0 if is_classmethod else 1:]
+    sorts = [] if is_classmethod else ["Hom"]
+    for annotation in [parameter.annotation for parameter in parameters if
+                       parameter.kind != parameter.VAR_KEYWORD]\
+            + [signature.return_annotation]:
+        sort = SIGNATURE_SORTS.get(
+            getattr(annotation, "__name__", annotation))
+        if sort is None:
+            raise Unsupported(f"{name} takes or returns {annotation}")
+        sorts.append(sort)
+    if any(parameter.kind in (parameter.KEYWORD_ONLY, parameter.VAR_KEYWORD)
+           for parameter in parameters):
+        raise Unsupported(f"{name} takes keywords")
+    name = LEAN_NAMES.get(name, name)
+    is_object_operation = set(sorts) == {"Ob"} and len(sorts) > 1
+    return f"{name}Ob" if is_object_operation else name, " → ".join(sorts)
+
+
 def operations(cls: type) -> dict[str, str]:
-    """ The signature of each operation of a class and of its bases. """
+    """
+    The signature of each operation of a class and of its bases: those its
+    rules and axioms apply, then its abstract methods.
+    """
     result = {"dom": "Hom → Ob", "cod": "Hom → Ob"}
     for base in bases(cls):
         result.update(operations(base))
-    for _, compiled in declarations(cls).values():
-        for name, signature in compiled.operations().items():
-            if result.setdefault(name, signature) != signature:
-                raise Unsupported(
-                    f"{name} is {result[name]} and {signature}")
+    found = [item for _, compiled in declarations(cls).values()
+             for item in compiled.operations().items()]
+    found += [method(cls, name) for name, value in vars(cls).items()
+              if getattr(getattr(value, "__func__", value),
+                         "__isabstractmethod__", False)]
+    for name, signature in found:
+        if result.setdefault(name, signature) != signature:
+            raise Unsupported(f"{name} is {result[name]} and {signature}")
     return result
 
 
@@ -403,9 +480,13 @@ def structure(cls: type) -> str:
            for operation, signature in operations(cls).items()
            if operation not in inherited}
     declared = declarations(cls)
-    extends = ", ".join(f"{base.__name__} Ob Hom" for base in parents)
+    extends = ", ".join(f"{base.__name__} "
+                        + (type_arguments(base) if ob_type(base) != "Ob"
+                           else "Ob Hom") for base in parents)
     lines = [f"/-- `{abc.__name__}.{name}`: {summary(cls)} -/",
-             f"structure {name} (Ob : Type u) (Hom : Type v)"
+             f"structure {name} "
+             + ("(Ob : Type u) " if ob_type(cls) == "Ob" else "")
+             + "(Hom : Type v)"
              + (f" extends {extends}" if extends else "") + " where"]
     lines += [f"  {operation} : {signature}"
               for operation, signature in own.items()]
@@ -419,18 +500,22 @@ def structure(cls: type) -> str:
               if isinstance(decl, Axiom)]
     for law_name, decl, compiled in axioms:
         lines += [f"/-- {summary(decl)} -/",
-                  f"def {name}.{law_name} (cat : {name} Ob Hom) : Prop :=",
+                  f"def {name}.{law_name} (cat : {name} {type_arguments(cls)})"
+                  " : Prop :=",
                   f"  {compiled.statement('cat.', operations(cls))}", ""]
     lines.append(f"/-- The laws of `{name}`. -/")
     lines.append(
-        f"structure {name}.Laws (cat : {name} Ob Hom) : Prop" + "".join(
+        f"structure {name}.Laws (cat : {name} {type_arguments(cls)}) : Prop"
+        + "".join(
             (" extends " if i == 0 else ", ")
             + f"to{base.__name__} : {base.__name__}.Laws cat.to{base.__name__}"
             for i, base in enumerate(parents))
         + (" where" if axioms else ""))
     lines += [f"  {law_name} : cat.{law_name}"
               for law_name, _, _ in axioms]
-    return "\n".join(lines) + "\n\n" + functor(cls, own, declared)
+    text = "\n".join(lines) + "\n\n" + functor(cls, own, declared)
+    return text if ob_type(cls) == "Ob"\
+        else re.sub(r"\bOb\b'?", ob_type(cls), text)
 
 
 def wrap(expression: str) -> str:
@@ -461,14 +546,14 @@ def preservation(name: str, signature: str) -> Compiled:
     arguments, e.g. ``ob (cat.tensorOb X Y) = cat'.tensorOb (ob X) (ob Y)``.
     """
     *sorts, sort = signature.split(" → ")
-    names = {"Ob": iter("XYZW"), "Hom": iter("fghk"), "Nat": iter("nm")}
+    names = {"Ob": iter("XYZW"), "Hom": iter("fghk"), "Nat": iter("nm"),
+             "Bool": iter("bc")}
     args = [(next(names[s]), s) for s in sorts]
-    sent = {"Ob": "ob {}", "Hom": "map {}", "Nat": "{}"}
+    sent = {"Ob": "ob {}", "Hom": "map {}", "Nat": "{}", "Bool": "{}"}
     source = " ".join([f"cat.{name}", *(arg for arg, _ in args)])
     target = " ".join([f"cat'.{name}", *(
         wrap(sent[s].format(arg)) for arg, s in args)])
-    return Compiled(group([arg for arg in args if arg[1] != "Nat"]
-                          + [arg for arg in args if arg[1] == "Nat"]),
+    return Compiled(group(args),
                     [], f"{sent[sort].format(wrap(source))} = {target}", None)
 
 
@@ -501,8 +586,8 @@ def functor(cls: type, own: dict[str, str], declared: dict) -> str:
                         f"cat'.to{base.__name__}" for base in parents)
     lines = [f"/-- A functor of `{name}`: it preserves each of its"
              " operations. -/",
-             f"structure {name}.Functor (cat : {name} Ob Hom)"
-             f" (cat' : {name} Ob' Hom')"
+             f"structure {name}.Functor (cat : {name} {type_arguments(cls)})"
+             f" (cat' : {name} {type_arguments(cls, chr(39))})"
              + (f" extends {extends}" if extends else "") + " where"]
     if not parents:
         lines += ["  ob : Ob → Ob'", "  map : Hom → Hom'"]
@@ -538,7 +623,7 @@ def theory(category: type, cls: type) -> str:
     return "\n".join([
         f"/-- The laws of `{cls.__name__}` that `{module}."
         f"{category.__name__}` does not declare broken. -/",
-        f"def {module} (cat : {cls.__name__} Ob Hom) : Prop :=",
+        f"def {module} (cat : {cls.__name__} {type_arguments(cls)}) : Prop :=",
         "  " + " ∧ ".join(f"cat.{name}" for name in laws)])
 
 
@@ -578,11 +663,11 @@ def generate() -> str:
         "Generated by `python -m discopy.lean` from the classes of",
         f"`{abc.__name__}`: do not edit. Each structure has the operations"
         " of its",
-        "rules and axioms, untyped as in the Python, each rule its typing"
-        " law and",
-        "each axiom a `def`, all of them in its `Laws`. The classes it does"
-        " not",
-        "compile yet:",
+        "rules, axioms and abstract methods, untyped as in the Python, each"
+        " rule its",
+        "typing law and each axiom a `def`, all of them in its `Laws`. The"
+        " classes it",
+        "does not compile yet:",
         "", *skipped, "-/", "",
         "namespace Discolean.ABC", "",
         "universe u v u' v'", "",

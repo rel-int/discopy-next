@@ -22,14 +22,16 @@ theorem toMathlib_hom {Ob : Type u} {Hom : Type v} (C : ABC.Category Ob Hom)
     @Quiver.Hom _ (C.toMathlib laws).toQuiver A B
       = {f : Hom // C.dom f = A.ob ∧ C.cod f = B.ob} := rfl
 
-/-- A strict premonoidal category has the laws of `monoidal.Diagram`, the
-tensor of morphisms being `f ⋉ dom g` then `cod f ⋊ g`.
+/-- A strict premonoidal category has the laws of `ABC.monoidal`, those of
+`abc.MonoidalCategory` but the bifunctoriality `monoidal.Diagram` declares
+broken, the tensor of morphisms being `f ⋉ dom g` then `cod f ⋊ g`.
 Rules out: a tensor of morphisms that is not the identity on identities. -/
 theorem monoidal (C : StrictPremonoidal) :
     C.toABC.tensor = C.tensorHom ∧ ABC.monoidal C.toABC :=
   ⟨rfl, C.toABC_monoidal⟩
 
-/-- Diagram(S) has the laws of `monoidal.Diagram`.
+/-- Diagram(S) has the laws of `ABC.monoidal`, not bifunctoriality: this is
+one half of `free`, the coherence theorem.
 Rules out: a compiled theory that keeps the bifunctoriality the Python
 declares broken, which `Statements.Premonoidal.not_monoidal` refutes. -/
 theorem diagram (S : Signature) [DecidableEq S.Ob] :
