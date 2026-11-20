@@ -38,17 +38,19 @@ are then the two spiders of the ZW calculus, applied on every mode:
 - the **Z** spider copies each mode's photon number, `|n⟩ ↦ |n⟩|n⟩`, the
   paper's **basis copy** `eᵢ ↦ eᵢ ⊗ eᵢ`.
 
-Each reading is a `tensor.Term`, a lambda term whose types are dimensions:
-`N(lambda x: ...)` is an abstraction, and a variable used twice is copied.
-The copy is chosen by the diagram class the term is evaluated in, here the
-optyx diagrams evaluated as tensors. Words are vectors drawn at random with a
+Each reading is a lambda term of `discopy.closed`, where a type called on a
+function, `n(lambda x: ...)`, is an abstraction and a variable used twice is
+copied. A closed functor sends the term to tensors, and the copy is that of
+its codomain, a subclass of `tensor.Diagram` whose copy is an optyx diagram
+evaluated as a tensor. Words are vectors drawn at random with a
 fixed seed. Every reading is checked against the paper's formulas, written
 out independently with `numpy.einsum`.
 
 ```python {.marimo}
 import numpy as np
 
-from discopy.tensor import Dim, Box, Diagram, Variable, Tuple
+from discopy import closed
+from discopy.tensor import Dim, Box, Diagram
 from discopy.optyx.core import diagram as optyx
 from discopy.optyx.core.zw import W, ZBox
 ```
@@ -169,12 +171,13 @@ class BasisCopy(Diagram):
 
 
 copies = {"k-extension": KExtension, "basis copy": BasisCopy}
-VP = S << N
-types = {"John": N, "Bill": N, "Mary": N, "code": N, "guitar": N,
-         "sleeps": VP, "snores": VP, "He": N << N, "plays": VP << N,
-         "likes": VP << N, "his": (N << N) << N, "does too": VP << VP}
+n, s = closed.Ty("N"), closed.Ty("S")
+VP = s << n
+types = {"John": n, "Bill": n, "Mary": n, "code": n, "guitar": n,
+         "sleeps": VP, "snores": VP, "He": n << n, "plays": VP << n,
+         "likes": VP << n, "his": (n << n) << n, "does too": VP << VP}
 John, Bill, Mary, code, guitar, sleeps, snores, He, plays, likes, his, \
-    does_too = (Variable(name, typ) for name, typ in types.items())
+    does_too = (closed.Variable(name, typ) for name, typ in types.items())
 ```
 
 The arrays `a` of the words are drawn with their arguments first, the order
@@ -189,15 +192,20 @@ kinds = {"sleeps": "VP", "snores": "VP", "He": "He", "plays": "V",
 order = {"VP": (1, 0), "He": (1, 0), "V": (2, 1, 0), "his": (2, 1, 0),
          "does too": (3, 2, 0, 1)}
 a = {name: rng.random(shapes[kinds.get(name, "N")]) for name in types}
-lexicon = {name: Box(name, Dim(1), typ, a[name].transpose(
-    order.get(kinds.get(name), None))) for name, typ in types.items()}
 
 
 def meaning(term, copy):
-    """The map of a reading, applied to the states of its words."""
-    words = Diagram.id(Dim(1)).tensor(
-        *(lexicon[var.name] for var in term.freevars))
-    return words >> term.eval(copy)
+    """
+    The map of a reading, sent by a closed functor into a diagram class that
+    chooses the copy, and applied to the states of its words.
+    """
+    functor = closed.Functor(ob_map={n: N, s: S}, ar_map={}, cod=copy)
+    states = [a[word.name].transpose(order.get(kinds.get(word.name), None))
+              for word in term.freevars]
+    words = Diagram.id(Dim(1)).tensor(*(
+        Box(word.name, Dim(1), Dim(*state.shape), state)
+        for word, state in zip(term.freevars, states)))
+    return words >> term.eval(functor)
 ```
 
 ## 3. Anaphora: *John sleeps. He snores.*
@@ -208,7 +216,7 @@ k-extension the paper finds
 `sleeps(ε(John)) ⊗ snores(He(k)) + sleeps(ε(k)) ⊗ snores(He(John))`.
 
 ```python {.marimo}
-anaphora = Tuple(sleeps(John), snores(He(John)))
+anaphora = closed.Tuple(sleeps(John), snores(He(John)))
 meaning(anaphora, KExtension).draw(figsize=(6, 6))
 ```
 
@@ -232,7 +240,8 @@ With k-extension the paper finds
 `pg = plays(guitar)`.
 
 ```python {.marimo}
-ellipsis = VP(lambda vp: (vp(John), does_too(vp)(Mary)))(plays(guitar))
+ellipsis = VP(lambda vp: closed.Tuple(
+    vp(John), does_too(vp)(Mary)))(plays(guitar))
 meaning(ellipsis, KExtension).draw(figsize=(6, 6))
 ```
 
@@ -266,7 +275,7 @@ John's code* is used twice, once for *John* and once for *does too* and
 *Bill*.
 
 ```python {.marimo}
-strict = VP(lambda vp: (vp(John), does_too(vp)(Bill)))(
+strict = VP(lambda vp: closed.Tuple(vp(John), does_too(vp)(Bill)))(
     likes(his(code)(John)))
 mo.md(f"`{strict}`")
 ```
@@ -280,7 +289,7 @@ abstracted and used twice, and *John*, *Bill* and *likes* are each used
 twice, so each subject owns its own code.
 
 ```python {.marimo}
-sloppy = (N << N)(lambda h: (
+sloppy = (n << n)(lambda h: closed.Tuple(
     likes(h(John))(John), does_too(likes(h(Bill)))(Bill)))(his(code))
 mo.md(f"`{sloppy}`")
 ```
