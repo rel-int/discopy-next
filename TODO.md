@@ -35,4 +35,4 @@
 - [x] Matrix.__new__ and Matrix.__init__ build their array with it, and photonic.Gate.asarray delegates rather than repeating the stack
 - [x] zw.Endo keeps a scalar its backend owns, and conjugates it in that backend rather than through complex
 - [ ] Tests: the issue's assertion under pytorch, the same under JAX, and the numpy path unchanged
-- [ ] CHANGELOG entry, then every gate of CONTRIBUTING.md's Run the unit tests
+- [WIP] @session_01C7YfAP4hAgDkBVZMLuMoYv-2026-11-20 01:32 CHANGELOG entry, then every gate of CONTRIBUTING.md's Run the unit tests
