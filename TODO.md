@@ -21,6 +21,6 @@
 > > Fix (default): seed before building, e.g. `torch.manual_seed(0)` in the test, or
 > > `train_ocr` builds the `OCR` itself when none given. Small, no design.
 
-- [WIP] @session_01C7YfAP4hAgDkBVZMLuMoYv-2026-11-20 01:54 Reproduce: the loss the test starts from moves with the global torch RNG, so the ratio is a coin
+- [x] Reproduce: the loss the test starts from moves with the global torch RNG, so the ratio is a coin
 - [ ] Seed before the OCR is built, train_ocr's own seed being too late for a network it is given
 - [ ] Check it holds under whatever ran before it, and run the gates
