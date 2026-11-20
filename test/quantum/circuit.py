@@ -694,6 +694,11 @@ def test_head():
         assert loads(dumps(typ.head)) == typ.head
         assert [x.dim for x in typ.head.inside] == [x.dim for x in typ.inside]
     assert [x.is_quantum for x in (qubit @ bit).head.inside] == [True, False]
+    for x in (Qudit(2, is_constant=False), Digit(3, is_constant=False)):
+        tail = Ty(x).tail
+        assert eval(repr(tail), env) == tail and loads(dumps(tail)) == tail
+        assert (tail.inside[0].dim, tail.inside[0].is_quantum)\
+            == (x.dim, x.is_quantum)
     for typ in (qubit, bit):
         assert Circuit.id(typ.head).eval(mixed=True)\
             == Circuit.id(typ).eval(mixed=True)
