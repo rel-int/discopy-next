@@ -265,17 +265,24 @@ class Ob(frobenius.Wire):
     @property
     def single(self):
         """Maps :code:`qubit` to :code:`diagram.bit`
-        and :code:`qmode` to :code:`diagram.mode`."""
-        return diagram.Ty(self.classical[self.name])
+        and :code:`qmode` to :code:`diagram.mode`, keeping the delay.
+
+        >>> assert qmode.delay().single() == diagram.Ty("mode").delay()
+        """
+        return diagram.Ty(self.classical[self.name]).delay(self.time_step)
 
     @property
     def double(self):
         """Maps :code:`qubit` to :code:`diagram.bit @ diagram.bit`
-        and :code:`qmode` to :code:`diagram.mode @ diagram.mode`."""
+        and :code:`qmode` to :code:`diagram.mode @ diagram.mode`,
+        keeping the delay.
+
+        >>> assert qubit.delay().double() == diagram.Ty("bit", "bit").delay()
+        """
         if self.is_classical:
-            return diagram.Ty(self.name)
+            return diagram.Ty(self.name).delay(self.time_step)
         name = self.classical[self.name]
-        return diagram.Ty(name, name)
+        return diagram.Ty(name, name).delay(self.time_step)
 
 
 DEFAULT_MAX_STEPS = 64
