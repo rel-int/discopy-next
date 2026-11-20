@@ -720,7 +720,9 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   scalar and detached it; `optyx.core.zw.Endo` keeps a scalar its backend
   owns rather than calling `complex` on it, and conjugates it in that
   backend, so a photonic gate's `to_path()` is differentiable like its
-  `array` ([next#654]).
+  `array` — under the `matrix.backend` its parameters belong to, outside
+  which it now raises where it used to return a detached array
+  ([next#654]).
 - A label between dollars is LaTeX in the Typst backend too, as in
   matplotlib and TikZ: `drawing.typst_ast.latex_math` writes it in Typst
   mathematics from a table of the commands it knows and raises on any other,
