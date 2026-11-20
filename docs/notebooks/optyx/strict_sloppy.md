@@ -272,7 +272,7 @@ mo.md(f"`{strict}`")
 ```
 
 ```python {.marimo}
-meaning(strict, KExtension).draw(figsize=(8, 9))
+meaning(strict, KExtension).draw(figsize=(8, 10))
 ```
 
 **Sloppy** (figures 4 and 14): four contractions. *his code* is
@@ -286,7 +286,7 @@ mo.md(f"`{sloppy}`")
 ```
 
 ```python {.marimo}
-meaning(sloppy, KExtension).draw(figsize=(9, 11))
+meaning(sloppy, KExtension).draw(figsize=(9, 12))
 ```
 
 The same readings written with `einsum`, with `copy` the paper's `Δ` on the
