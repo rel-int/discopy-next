@@ -593,7 +593,8 @@ def to_dot(diagram) -> str:
                 for is_target, end in ends[spider]]
         if len(ends[spider]) != 2:
             lines.append(
-                f'  s{spider} [shape=point, width={2 * SPIDER / INCH}];')
+                f'  s{spider} [shape=point, width={2 * SPIDER / INCH}, '
+                'label=""];')
         label = html.escape(str(obj))
         lines += [f'  {" -- ".join(pair)} [label="{label}"];'
                   for pair in pairs]
@@ -673,10 +674,13 @@ def graphs(module: str, seed=0, max_boxes=6) -> Iterator:
     vertices, the cube with eight, as closed diagrams of a module: a vertex
     is a box named ``f`` with an input for each smaller neighbour and an
     output for each larger, an edge a wire of type ``a`` between them.
+    Raises :class:`ValueError` when ``max_boxes`` is less than three.
 
     >>> first = next(graphs("compact", seed=1))
     >>> assert not (first.dom or first.cod)
     """
+    if max_boxes < 3:
+        raise ValueError(f"Expected max_boxes >= 3, got {max_boxes}.")
     mod, rng = load(module), np.random.default_rng(seed)
     x = mod.Ty('a')
     while True:
