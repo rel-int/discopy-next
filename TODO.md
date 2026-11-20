@@ -9,4 +9,4 @@
 - [x] tensor.Term: Dim called on a function is an Abstraction, terms over Dim with application by cups, abstraction by caps, copy and discard of the diagram class
 - [x] test_Term and the doctest in discopy/tensor.py, a CHANGELOG bullet
 - [x] rewrite the strict/sloppy notebook with tensor.Term, the copies as subclasses of tensor.Diagram
-- [ ] run the gates and the notebook check
+- [x] run the gates and the notebook check
