@@ -6,6 +6,6 @@
 > 4. discopy/drawing/picture.py:506 [P3] Graphviz samples lay out every accepted diagram twice: `fits` calls `layout`, then `render` calls it again.
 
 - [WIP] @T-a78eb6e6-2026-11-20 21:22 picture.py:577 escape names and labels in to_dot
-- [ ] CHANGELOG.md:40 say Graphviz is needed
+- [WIP] @T-a78eb6e6-2026-11-20 21:23 CHANGELOG.md:40 say Graphviz is needed
 - [WIP] @T-a78eb6e6-2026-11-20 21:22 from_picture.md:60 say Graphviz is needed
 - [WIP] @T-a78eb6e6-2026-11-20 21:22 picture.py:506 lay each sample out once
