@@ -8,4 +8,4 @@
 - [x] picture.py:577 escape names and labels in to_dot
 - [x] CHANGELOG.md:40 say Graphviz is needed
 - [x] from_picture.md:60 say Graphviz is needed
-- [WIP] @T-a78eb6e6-2026-11-20 21:22 picture.py:506 lay each sample out once
+- [x] picture.py:506 lay each sample out once
