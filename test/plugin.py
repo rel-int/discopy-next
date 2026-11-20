@@ -29,6 +29,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 UNIMPORTABLE = (
     "discopy/quantum/pennylane.py", "discopy/quantum/tk.py",
     "discopy/lambek/abstract/neural.py",
+    "discopy/lambek/abstract/spindle.py",
     "discopy/lambek/categorial/bobcat.py", "discopy/neural/torch.py",
     "discopy/neural/geometric.py",
     "discopy/neural/kernels.py",

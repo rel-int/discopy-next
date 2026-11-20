@@ -3,8 +3,8 @@
 """
 DisCoPy's grammar modules.
 
-:mod:`discopy.lambek.abstract.neural` and
-:mod:`discopy.lambek.categorial.bobcat` need PyTorch, which the ``lambek``
+:mod:`discopy.lambek.abstract.neural`, :mod:`discopy.lambek.abstract.spindle`
+and :mod:`discopy.lambek.categorial.bobcat` need PyTorch, which the ``lambek``
 extra installs, so they are not imported here: import them on their own.
 """
 
