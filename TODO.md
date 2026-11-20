@@ -6,7 +6,7 @@
 > > `Box.__init__` still checks `isinstance(x, Digit/Qudit)`: a pure box on head or tail wires is rejected at construction.
 > > CHANGELOG: the sentence is missing `is`.
 
-- [WIP] @T-43eb8dbf-2026-11-20 15:45 optyx `Ob.single`, `Ob.double` and `is_classical` read a head through its argument
+- [x] optyx `Ob.single`, `Ob.double` and `is_classical` read a head through its argument
 - [WIP] @T-43eb8dbf-2026-11-20 15:46 `Circuit.is_mixed` and `Box.__init__` read the kind of a wire with `is_quantum`
 - [ ] `init_and_discard` and `measure` on head wires: need gates on structural types, i.e. #662
 - [WIP] @T-43eb8dbf-2026-11-20 15:46 Changelog wording
