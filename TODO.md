@@ -33,6 +33,6 @@
 - [x] Reproduce on main: Matrix([t], 1, 1) detaches, and so do MZI(t, .2).to_path().array and zw.Endo(t).to_path().array
 - [x] matrix.asarray: the array of nested entries, stacking the ones the backend already owns
 - [x] Matrix.__new__ and Matrix.__init__ build their array with it, and photonic.Gate.asarray delegates rather than repeating the stack
-- [ ] zw.Endo keeps a scalar its backend owns, and conjugates it in that backend rather than through complex
+- [WIP] @session_01C7YfAP4hAgDkBVZMLuMoYv-2026-11-20 01:23 zw.Endo keeps a scalar its backend owns, and conjugates it in that backend rather than through complex
 - [ ] Tests: the issue's assertion under pytorch, the same under JAX, and the numpy path unchanged
 - [ ] CHANGELOG entry, then every gate of CONTRIBUTING.md's Run the unit tests
