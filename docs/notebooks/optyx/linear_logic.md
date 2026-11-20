@@ -43,20 +43,36 @@ from discopy.optyx.term import (
 
 The non-linear term `λx. (H x, H x)` uses its argument twice. Its translation
 into linear logic gives `x` the type `!qubit`, applies the bang of `H` and
-contracts the result into two copies, each one derelicted. The function
-syntax of terms writes it with one variable per wire.
+contracts the result into two copies, each one derelicted.
+
+A term of `discopy.bang` is a kappa term of `discopy.monoidal`, the planar
+terms that every module below `biclosed` shares, where a variable of a banged
+type may be used any number of times: it is copied by `Contraction` and moved
+by `Exchange`, any other variable is used once and in order. A box called on
+terms is a constant applied to them, so `H.bang()(x)` reads as it is written.
+A term has one output, so the copy of `!H x` is the term and the two
+derelictions are composed after its diagram.
 
 ```python {.marimo}
 H = Box("H", qubit, qubit, data=np.array([[1, 1], [1, -1]]) / 2 ** .5)
 
+copy_H = qubit.bang()(lambda x: Contraction(qubit)(H.bang()(x)))
+proof = copy_H.eval() >> Dereliction(qubit) @ Dereliction(qubit)
+assert isinstance(proof, Term)
+proof.draw(figsize=(3, 4))
+```
 
+The function syntax of diagrams writes the whole proof, with one variable per
+wire, and gives the same diagram, up to the layers its boxes stand in.
+
+```python {.marimo}
 @Term.from_callable(qubit.bang(), qubit @ qubit)
-def proof(x):
+def proof_(x):
     y, z = Contraction(qubit)(H.bang()(x))
     return Dereliction(qubit)(y), Dereliction(qubit)(z)
 
 
-proof.draw(figsize=(3, 4))
+assert proof_ == proof.foliation()
 ```
 
 ## The compilation

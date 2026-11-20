@@ -2,7 +2,7 @@ from pytest import raises
 
 from discopy import bang
 from discopy.bang import *
-from discopy.utils import dumps, loads
+from discopy.utils import AxiomError, dumps, loads
 
 
 def test_structural_boxes():
@@ -105,3 +105,59 @@ def test_bang_is_drawn_with_an_exclamation_mark():
     assert [str(wire) for wire in drawing.dom.inside] == ["!x"]
     assert Ty(BangOb(x @ y)).to_drawing().inside[0].name == "!(x @ y)"
     assert {"Δ", "ε"} <= {box.drawing_name for box in drawing.boxes}
+
+
+def test_wiring():
+    x, y = Ty('x'), Ty('y')
+    assert Diagram.wiring([1, 0], x @ y.bang()) == Exchange(y, x, True)
+    assert Diagram.wiring([0, 1, 0, 1], x.bang() @ y.bang())\
+        == Contraction(x) @ Contraction(y)\
+        >> x.bang() @ Exchange(x, y.bang()) @ y.bang()
+    assert Diagram.wiring([], x.bang()) == Weakening(x)
+    for wiring, dom in [([1, 0], x @ y), ([0, 0], x @ y), ([1], x @ y)]:
+        with raises(AxiomError):
+            Diagram.wiring(wiring, dom)
+
+
+def test_terms_share_banged_variables():
+    x, y, z = Ty('x'), Ty('y'), Ty('z')
+    g = Box('g', x.bang() @ y @ x.bang(), z)
+    term = (x.bang() @ y)(lambda a, b: g(a, b, a))
+    assert term.freevars == [] and term.stack == x.bang() @ y
+    assert term.eval() == Contraction(x) @ y\
+        >> x.bang() @ Exchange(x, y) >> g
+    assert term.normal_form() == term
+    with raises(ValueError):
+        (x @ y)(lambda a, b: Box('h', x @ y @ x, z)(a, b, a))
+
+
+def test_kappa_weakens_unused_banged_variables():
+    x, y, z = Ty('x'), Ty('y'), Ty('z')
+    g, h = Box('g', x.bang() @ x.bang(), z), Box('h', x @ y, z)
+    term = (x.bang() @ y.bang() @ x.bang())(lambda a, b, c: g(a, c))
+    assert term.stack == x.bang() @ y.bang() @ x.bang()
+    assert term.eval() == x.bang() @ Weakening(y) @ x.bang() >> g
+    a = Variable('a', x)
+    right = (y @ y.bang())(lambda c, d: Constant(h)(a, c))
+    assert right.freevars == [a] and right.offset == 1
+    assert right.eval() == x @ y @ Weakening(y) >> h
+    b, d = Variable('b', y), Variable('d', y.bang())
+    after = Kappa((d, b), x(lambda a: Constant(h)(a, b)))
+    assert after.stack == x @ y.bang() @ y
+    assert after.eval() == x @ Weakening(y) @ y >> h
+    f, s = Box('f', x, y), Box('s', Ty(), x.bang())
+    redex = x.bang()(lambda b: Constant(f)(a), offset=1)(Constant(s))
+    assert redex.normal_form().eval() == x @ s >> x @ Weakening(x) >> f
+    with raises(ValueError):
+        (x @ x)(lambda b, c: Constant(f)(c))
+
+
+def test_a_term_with_no_box_is_a_bang_term():
+    x, y = Ty('x'), Ty('y')
+    for term, diagram in [
+            ((x.bang() @ y)(lambda a, b: b), Weakening(x) @ y),
+            (x.bang()(lambda a: a), Id(x.bang()))]:
+        assert isinstance(term, Kappa) and term.eval() == diagram
+        assert type(eval(str(term))) is Kappa and eval(str(term)) == term
+    with raises(ValueError):
+        (x @ y)(lambda a, b: b)

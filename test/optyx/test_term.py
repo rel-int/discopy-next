@@ -68,3 +68,24 @@ def test_transparency(term):
     from numpy import array  # noqa: F401
     from discopy import bang, monoidal, optyx  # noqa: F401
     assert eval(repr(term)) == term
+
+
+def test_kappa_term():
+    H = Box("H", qubit, qubit, data=np.array([[1, 1], [1, -1]]) / 2 ** .5)
+    copy_H = qubit.bang()(lambda x: Contraction(qubit)(H.bang()(x)))
+    proof = copy_H.eval() >> Dereliction(qubit) @ Dereliction(qubit)
+    assert isinstance(proof, Term)
+    bell = amplitudes(photonic.Create(1, 1) >> proof.to_channel())
+    assert np.allclose(bell, [[1, 0], [0, -1]])
+    term = qubit.bang()(lambda x: Dereliction(qubit)(u.bang()(x)))
+    assert np.allclose(amplitudes(
+        photonic.Create(0, 1) >> term.eval().to_channel()), U[:, 1])
+
+
+def test_kappa_weakening():
+    term = (qubit.bang() @ qubit.bang())(
+        lambda a, b: Dereliction(qubit)(u.bang()(b)))
+    channel = term.eval().to_channel()
+    vacuum, photon = photonic.Create(0, 0), photonic.Create(1, 0)
+    assert np.allclose(amplitudes(vacuum @ photon >> channel), U[:, 0])
+    assert np.allclose(amplitudes(photon @ photon >> channel), 0)

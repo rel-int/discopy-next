@@ -30,6 +30,11 @@ Summary
     Exchange
     Laxator
     Functor
+    TermBase
+    Variable
+    Constant
+    Application
+    Kappa
 
 Example
 -------
@@ -56,7 +61,7 @@ the second quantisation of ``f``, see the notebook
 from __future__ import annotations
 
 from functools import cached_property
-from typing import ClassVar, Self
+from typing import Callable, ClassVar, Self
 
 from discopy import monoidal, messages
 from discopy.abc import LinearCategory, MonoidalCategory
@@ -73,6 +78,29 @@ class Ty(monoidal.Ty):
     :class:`BangOb`.
     """
     bang_factory: ClassVar[type[BangOb]]
+    term_factory: ClassVar[type["TermBase"]]
+
+    def __call__(self, function: Callable, offset: int | None = None):
+        """
+        The kappa abstraction of a Python function, a :class:`Kappa` of the
+        terms of its :attr:`term_factory`: a type with a bang binds its
+        variables in a linear category even when the body has no box, e.g.
+        weakens a banged variable it does not use.
+
+        Parameters:
+            function : The body, as a function of the variables.
+            offset : Passed to :class:`Kappa`.
+
+        Example
+        -------
+        >>> x = Ty('x')
+        >>> term = (x.bang() @ x)(lambda a, b: b)
+        >>> assert isinstance(term, Kappa)
+        >>> assert term.eval() == Weakening(x) @ x
+        >>> assert eval(str(term)) == term
+        """
+        return self.term_factory.kappa_factory.from_callable(
+            self, offset)(function)
 
     def bang(self) -> Self:
         """
@@ -278,6 +306,71 @@ class Diagram(monoidal.Diagram, LinearCategory):
         """
         return cls.id(x[:0]).tensor(*(
             cls.copy(x[i:i + 1], 0) for i in range(len(x))))
+
+    @classmethod
+    def wiring(cls, wiring: list[int], dom: Ty) -> Diagram:
+        """
+        The wiring of a type to the wires at the given indices, where only a
+        banged wire is copied, discarded or moved: the copies of each banged
+        wire by :meth:`copy`, then the exchanges that bring each copy where
+        it is read. A wire that is not banged is read once and in order.
+
+        Parameters:
+            wiring : The index of the input each output reads.
+            dom : The type of the inputs.
+
+        Example
+        -------
+        >>> x, y = Ty('x'), Ty('y')
+        >>> assert Diagram.wiring([0, 1, 0], x.bang() @ y)\\
+        ...     == Contraction(x) @ y >> x.bang() @ Exchange(x, y)
+        >>> Diagram.wiring([1, 0], x @ y)
+        Traceback (most recent call last):
+        ...
+        discopy.utils.AxiomError: x @ y is not banged: ...
+        """
+        wires = [dom[i:i + 1] for i in range(len(dom))]
+        banged = [isinstance(wire.inside[0], BangOb) for wire in wires]
+        counts = [wiring.count(i) for i in range(len(dom))]
+        if any(n != 1 and not b for n, b in zip(counts, banged)):
+            raise AxiomError(messages.NOT_BANGED.format(dom))
+        result = cls.id(dom[:0]).tensor(*(
+            cls.copy(wire, n) if b else cls.id(wire)
+            for wire, n, b in zip(wires, counts, banged)))
+        targets = {i: [j for j, k in enumerate(wiring) if k == i]
+                   for i in range(len(dom))}
+        order = [j for i in range(len(dom)) for j in targets[i]]
+        types = [wires[wiring[j]] for j in order]
+        for _ in order:
+            for i in range(len(order) - 1):
+                if order[i] < order[i + 1]:
+                    continue
+                left, right = types[i], types[i + 1]
+                if isinstance(left.inside[0], BangOb):
+                    exchange = cls.exchange(left.inside[0].arg, right)
+                elif isinstance(right.inside[0], BangOb):
+                    exchange = cls.exchange(right.inside[0].arg, left, True)
+                else:
+                    raise AxiomError(messages.NOT_BANGED.format(dom))
+                result = result >> dom[:0].tensor(*types[:i]) @ exchange\
+                    @ dom[:0].tensor(*types[i + 2:])
+                order[i], order[i + 1] = order[i + 1], order[i]
+                types[i], types[i + 1] = right, left
+        return result
+
+    def __call__(self, *arguments: TermBase) -> TermBase:
+        """
+        A box called on terms is its :class:`Constant` applied to them, so
+        that a term is written with the boxes it calls, e.g. ``f.bang()(x)``.
+
+        Example
+        -------
+        >>> x, y = Ty('x'), Ty('y')
+        >>> f = Box('f', x, y)
+        >>> print(x.bang()(lambda a: Dereliction(y)(f.bang()(a))))
+        x.bang()(lambda a: Dereliction(y)((f).bang()(a)))
+        """
+        return self.term_factory.constant_factory(self)(*arguments)
 
 
 class Box(monoidal.Box, Diagram):
@@ -662,3 +755,197 @@ class Functor(monoidal.Functor):
 
 
 Diagram.functor_factory = Functor
+
+
+class TermBase(monoidal.TermBase):
+    """
+    A term of a linear category, i.e. of the planar kappa calculus with a
+    bang: a :class:`discopy.monoidal.TermBase` where a variable of a banged
+    type ``!x`` occurs any number of times, every other variable once and in
+    order. An :class:`Application` copies the banged variables its function
+    and its argument share by :class:`Contraction` and brings each copy
+    where it is read by :class:`Exchange`, see :meth:`Diagram.wiring`.
+
+    Example
+    -------
+    >>> x, y = Ty('x'), Ty('y')
+    >>> f, g = Box('f', x, y), Box('g', y.bang() @ y.bang(), x)
+    >>> term = x.bang()(lambda a: g(f.bang()(a), f.bang()(a)))
+    >>> assert term.eval() == Contraction(x) >> x.bang() @ f.bang()\\
+    ...     >> f.bang() @ y.bang() >> g
+    >>> h = Box('h', x @ x, y)
+    >>> x(lambda a: h(a, a))
+    Traceback (most recent call last):
+    ...
+    ValueError: Expected banged variables to share, got a.
+    """
+    @staticmethod
+    def wire(functor, wiring: list[int], dom: Ty):
+        """
+        The image under a functor of the wiring from a type to its wires at
+        the given indices, see :meth:`Diagram.wiring`.
+        """
+        return functor(Diagram.wiring(wiring, dom))
+
+
+class Variable(TermBase, monoidal.Variable):
+    """
+    A variable with a name and a type of one wire, an identity diagram.
+
+    Parameters:
+        name : The name of the variable.
+        cod : The type of the variable.
+    """
+
+
+class Constant(TermBase, monoidal.Constant):
+    """
+    A box as a term, with its domain as stack.
+
+    Parameters:
+        box : The box.
+    """
+
+
+class Application(TermBase, monoidal.Application):
+    """
+    The application of a term to an argument with no stack, which shares
+    their banged variables: their context is that of the function with the
+    variables of the argument where its stack was, each one where it first
+    occurs.
+
+    Parameters:
+        func : The term that is applied.
+        arg : The argument, a term with no stack.
+    """
+    @staticmethod
+    def share(*contexts):
+        """ The distinct free variables of terms side by side. """
+        variables = [x for context in contexts for x in context]
+        shared = [x for x in dict.fromkeys(variables)
+                  if variables.count(x) > 1]
+        if any(not isinstance(x.cod.inside[0], BangOb) for x in shared):
+            raise ValueError(messages.NOT_SHARED.format(
+                ", ".join(x.name for x in shared)))
+        return list(dict.fromkeys(variables))
+
+    @staticmethod
+    def contractible(func, arg):
+        """
+        Whether a function applied to an argument is a redex to contract:
+        one that uses its variable exactly once, which is not copied.
+        """
+        return monoidal.Application.contractible(func, arg)\
+            and func.body.count(func.head) == 1
+
+    def eval(self, functor=None):
+        functor = self.identity(functor)
+        left, _, right = self.func.context
+        stack = list(range(len(self.stack)))
+        before, _, after = self.context
+        source = before + stack + after
+        wiring = [source.index(wire)
+                  for wire in left + self.arg.freevars + stack + right]
+        return self.wire(functor, wiring, self.dom) >> super().eval(functor)
+
+
+class Kappa(TermBase, monoidal.Kappa):
+    """
+    The abstraction of a block of ``variables`` of the ``body``, as in a
+    monoidal category, where a banged variable the body does not use is
+    discarded by :class:`Weakening`: the ones it uses are a block in order,
+    the others stand among them in the stack.
+
+    Parameters:
+        variables : The variables to bind, in the order of the stack.
+        body : The term in which they are bound.
+        offset : The number of free variables left of the stack, needed
+            when nothing says where it is: no stack in the body, which uses
+            none of the variables.
+
+    Example
+    -------
+    >>> x, y = Ty('x'), Ty('y')
+    >>> f = Box('f', x, y)
+    >>> term = (x.bang() @ x)(lambda a, b: f(b))
+    >>> assert term.stack == x.bang() @ x
+    >>> assert term.eval() == Weakening(x) @ x >> f
+    >>> assert x.bang()(lambda a: Constant(f), offset=0).eval()\\
+    ...     == Weakening(x) @ f
+    >>> (x @ x)(lambda a, b: f(b))
+    Traceback (most recent call last):
+    ...
+    ValueError: Expected a block of variables next to the stack of f(b), \
+got a, b.
+    """
+    above = None
+
+    @staticmethod
+    def used(variables, body) -> tuple:
+        """ The variables the body uses, in the order they are bound. """
+        return tuple(x for x in variables if x in body.freevars)
+
+    @staticmethod
+    def binds(variables, body):
+        """
+        Whether a body has the variables to bind: distinct ones, each free
+        in it or banged, so that it is discarded when the body does not use
+        it.
+        """
+        return len(set(variables)) == len(variables) and all(
+            x in body.freevars or isinstance(x.cod.inside[0], BangOb)
+            for x in variables)
+
+    @classmethod
+    def place(cls, variables, body):
+        """
+        The number of free variables left of the stack: where the first
+        variable the body uses stands in its context, or else where its
+        stack does, ``None`` when it has none.
+        """
+        used = cls.used(variables, body)
+        return body.freevars.index(used[0]) if used else body.offset
+
+    def __init__(self, variables: tuple, body: monoidal.TermBase,
+                 offset: int | None = None):
+        # pylint: disable=super-init-not-called  # unused variables too
+        assert_isinstance(body, monoidal.TermBase)
+        variables = tuple(variables)
+        used = self.used(variables, body)
+        start = self.start(variables, body, offset)
+        stop = start + len(used)
+        if tuple(body.freevars[start:stop]) != used\
+                or body.offset not in (None, start, stop):
+            raise ValueError(self.unbound.format(
+                body, ", ".join(x.name for x in variables)))
+        self.variables, self.body, self.offset = variables, body, start
+        self.freevars = body.freevars[:start] + body.freevars[stop:]
+        self.cod, bound = body.cod, body.types(variables)
+        self.stack = bound @ body.stack if self.front else body.stack @ bound
+
+    @property
+    def front(self) -> bool:
+        """
+        Whether the variables join the stack at its front: they do unless
+        the ones the body uses stand right of its stack.
+        """
+        right = self.body.context[2] if self.body.stack else []
+        return not any(
+            x in right for x in self.used(self.variables, self.body)[:1])
+
+    def eval(self, functor=None):
+        functor, body = self.identity(functor), self.body
+        stack = list(range(len(body.stack)))
+        bound = list(self.variables)
+        left, _, right = body.context
+        source = self.freevars[:self.offset] + (
+            bound + stack if self.front else stack + bound
+        ) + self.freevars[self.offset:]
+        wiring = [source.index(wire) for wire in left + stack + right]
+        return self.wire(functor, wiring, self.dom) >> body.eval(functor)
+
+
+TermBase.functor = Functor.id(Diagram)
+TermBase.variable_factory, TermBase.constant_factory = Variable, Constant
+TermBase.application_factory, TermBase.kappa_factory = Application, Kappa
+Diagram.term_factory = Ty.term_factory = TermBase

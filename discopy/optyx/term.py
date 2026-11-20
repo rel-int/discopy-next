@@ -54,6 +54,14 @@ a Hong-Ou-Mandel beam splitter and the two heralded copies are entangled.
 >>> protocol = photonic.Create(1, 1) >> copy_H.to_channel()
 >>> bell = protocol.get_kraus().to_tensor().eval().array
 >>> assert np.allclose(bell, [[1, 0], [0, -1]])
+
+The kappa terms of :mod:`discopy.bang`, those of :mod:`discopy.monoidal`
+where a banged variable may be used any number of times, write the copy of
+``!H(x)`` with the boxes it calls, and evaluate to a :class:`Term`:
+
+>>> term = qubit.bang()(lambda x: Contraction(qubit)(H.bang()(x)))
+>>> proof = term.eval() >> Dereliction(qubit) @ Dereliction(qubit)
+>>> assert isinstance(proof, Term) and proof.foliation() == copy_H
 """
 
 from __future__ import annotations

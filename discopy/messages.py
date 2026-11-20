@@ -188,6 +188,7 @@ LAXATOR_ARITY = (
 NOT_BANGED = (
     "{} is not banged: only a type !x is copied by contraction and "
     "discarded by weakening.")
+NOT_SHARED = "Expected banged variables to share, got {}."
 FREE_BANG = (
     "A free bang is a bubble and its structure boxes, which a hypergraph "
     "keeps as boxes: nothing cancels, merges or slides through them.")
