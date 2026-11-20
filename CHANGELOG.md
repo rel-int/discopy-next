@@ -96,16 +96,20 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   of the image and its mask together, then restyles the image alone (chalk,
   whiteboard, blur, JPEG); `draw(backend=...)` takes the backend to draw with
   ([next#573]).
-- `abc.LinearCategory`, a linear category (Bierman, TLCA 1995) without
-  symmetry: a comonad `bang` with `dereliction` and `digging`, lax monoidal
-  with a `laxator`, each `!x` a comonoid by `contraction` and `weakening`, and
-  an invertible `exchange` of `!x` with any object, its 28 laws as axioms.
-  `biclosed` is the free one: `BangOb`, the wire holding a type inside
-  `x.bang()`, `Bang`, the bubble `f.bang()`, and the boxes `Dereliction`,
-  `Digging`, `Contraction`, `Weakening`, `Exchange` and `Laxator`. A `Functor`
-  sends them through the `bang` and the structure of its codomain when its
-  types are biclosed, and through its `ob_map` and `ar_map` otherwise. The
-  laws are declared failing on the free category ([next#571]).
+- `abc.LinearCategory`, a linear category (Bierman, TLCA 1995) with neither
+  symmetry nor closure: a monoidal comonad `bang` with `dereliction` and
+  `digging`, lax monoidal with a `laxator`, each `!x` a comonoid by
+  `contraction` and `weakening`, and an invertible `exchange` of `!x` with
+  any object, its 28 laws as axioms.
+  `discopy.bang` is the free one, its own module above `monoidal`: `BangOb`,
+  the wire holding a type inside `x.bang()`, `Bang`, the bubble `f.bang()`,
+  and the boxes `Dereliction`, `Digging`, `Contraction`, `Weakening`,
+  `Exchange` and `Laxator`. A `Functor` sends them through the `bang` and the
+  structure of its codomain when it is a linear category, and through its
+  `ob_map` and `ar_map` otherwise, `f.bang()` as a box of its own. The laws
+  are declared failing on the free category. The notebook
+  `optyx/linear_logic` compiles a banged term to an optical protocol, `!` as
+  Fock space ([next#571]).
 - `discopy.drawing.nicer`: nine hand features of a drawing, each a cost
   (wire length, bends, slope, aspect, asymmetry, whitespace, misalignment,
   label overlap, area), `hand_score` minus their weighted sum, with equal weights
