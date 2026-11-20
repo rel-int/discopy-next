@@ -107,9 +107,14 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   `Exchange` and `Laxator`. A `Functor` sends them through the `bang` and the
   structure of its codomain when it is a linear category, and through its
   `ob_map` and `ar_map` otherwise, `f.bang()` as a box of its own. The laws
-  are declared failing on the free category. The notebook
-  `optyx/linear_logic` compiles a banged term to an optical protocol, `!` as
-  Fock space ([next#571]).
+  are declared failing on the free category. `optyx.Term`, in
+  `optyx.term`, is a term of it on the dual-rail `qubit`, written with
+  `f.bang()` in the function syntax, and `Term.to_channel` compiles it to an
+  optical protocol, `!` as Fock space: a bang to the second quantisation of
+  its unitary, `Contraction` to the W node on each mode, `Weakening` to the
+  vacuum and `Dereliction` to heralding one photon. The notebook
+  `optyx/linear_logic` compiles `copy(!H(x))` with it to a Bell state
+  ([next#571]).
 - `discopy.drawing.nicer`: nine hand features of a drawing, each a cost
   (wire length, bends, slope, aspect, asymmetry, whitespace, misalignment,
   label overlap, area), `hand_score` minus their weighted sum, with equal weights

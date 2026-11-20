@@ -11,7 +11,8 @@ top of the calculi of :mod:`discopy.optyx.core`.
 :mod:`discopy.optyx.contextuality` gives the empirical models of their
 Bell tests, :mod:`discopy.optyx.interaction` closes their feedback loops as
 combinatorial maps of recurrent channels with stream and stationary
-semantics, :mod:`discopy.optyx.sampling` samples their outputs tick after
+semantics, :mod:`discopy.optyx.term` compiles linear terms with bangs to them,
+:mod:`discopy.optyx.sampling` samples their outputs tick after
 tick, and :mod:`discopy.optyx.compiler` compiles measurement-based patterns
 to single-emitter photonic hardware.
 
@@ -25,6 +26,7 @@ to single-emitter photonic hardware.
     classical
     contextuality
     interaction
+    term
     core
     sampling
     compiler
@@ -47,6 +49,8 @@ from discopy.optyx.core import path
 from discopy.optyx.core import backends
 from discopy.optyx.core import diagram
 from discopy.optyx.core import control
+from discopy.optyx import term
+from discopy.optyx.term import Term
 from discopy.optyx.channel import (
     Channel,
     CQMap,
