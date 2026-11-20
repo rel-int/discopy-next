@@ -46,6 +46,25 @@ right.set_title("classes"); right.axis("off")
 figure
 ```
 
+## Graphviz layouts
+
+`samples(..., graphviz=True)` lays a diagram out by graphviz's `dot`
+instead: each box is an HTML table with one column per port, so each wire
+leaves its box where its port is, and the mask stays exact. With
+`graphs=True` the diagrams are named graphs (complete, star, cycle, cube,
+grid and tree), each edge oriented from its smaller vertex to its larger.
+
+```python {.marimo}
+from itertools import islice
+
+laid_out = [image for _, image, _ in islice(picture.samples(
+    "symmetric", seed=3, graphviz=True, graphs=True, xkcd=True), 3)]
+figure_graphs, axes = plt.subplots(1, 3, figsize=(9, 3))
+for axis, laid_out_image in zip(axes, laid_out):
+    axis.imshow(laid_out_image); axis.axis("off")
+figure_graphs
+```
+
 ## The symbolic half
 
 Given the classes, and something to read each box's name and each label's
