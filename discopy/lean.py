@@ -430,6 +430,84 @@ def structure(cls: type) -> str:
         + (" where" if axioms else ""))
     lines += [f"  {law_name} : cat.{law_name}"
               for law_name, _, _ in axioms]
+    return "\n".join(lines) + "\n\n" + functor(cls, own, declared)
+
+
+def wrap(expression: str) -> str:
+    """ An expression in parentheses when it is an application. """
+    return f"({expression})" if " " in expression else expression
+
+
+def image(value) -> str:
+    """
+    The Lean expression of a term sent by a functor ``F``, with ``ob`` and
+    ``map`` its action on objects and morphisms: a variable is sent by ``F``
+    and an operation is that of the codomain ``cat'``.
+
+    >>> f, g = Term("f"), Term("g")
+    >>> print(image(f >> g))
+    cat'.comp (map f) (map g)
+    """
+    if not isinstance(value, Term):
+        return render(value)
+    if not value.applied:
+        return f"{'ob' if value.sort == 'Ob' else 'map'} {value.head}"
+    return " ".join([f"cat'.{value.name}", *map(wrap, map(image, value.args))])
+
+
+def preservation(name: str, signature: str) -> Compiled:
+    """
+    That a functor preserves an operation no rule concludes, on any
+    arguments, e.g. ``ob (cat.tensorOb X Y) = cat'.tensorOb (ob X) (ob Y)``.
+    """
+    *sorts, sort = signature.split(" → ")
+    names = {"Ob": iter("XYZW"), "Hom": iter("fghk"), "Nat": iter("nm")}
+    args = [(next(names[s]), s) for s in sorts]
+    sent = {"Ob": "ob {}", "Hom": "map {}", "Nat": "{}"}
+    source = " ".join([f"cat.{name}", *(arg for arg, _ in args)])
+    target = " ".join([f"cat'.{name}", *(
+        wrap(sent[s].format(arg)) for arg, s in args)])
+    return Compiled(group([arg for arg in args if arg[1] != "Nat"]
+                          + [arg for arg in args if arg[1] == "Nat"]),
+                    [], f"{sent[sort].format(wrap(source))} = {target}", None)
+
+
+def functor(cls: type, own: dict[str, str], declared: dict) -> str:
+    """
+    The Lean structure of a functor between two structures of an abstract
+    class, extending those of its bases: its action ``ob`` on objects and
+    ``map`` on morphisms preserve each operation of the class, under the
+    premises of the rule that concludes it, if any, e.g. ``comp`` on
+    composable morphisms only, as ``cut`` concludes it.
+    """
+    name, parents = cls.__name__, bases(cls)
+    fields = {}
+    for decl, compiled in declared.values():
+        if isinstance(decl, Rule) and compiled.output.name in own:
+            sort = "ob" if compiled.output.sort == "Ob" else "map"
+            source = Compiled(
+                compiled.binders, compiled.premises,
+                f"{sort} ({compiled.output})", None).statement(
+                "cat.", operations(cls))
+            fields[f"{sort}_{compiled.output.name}"] =\
+                f"{source} = {image(compiled.output)}"
+    for operation, signature in own.items():
+        sort = "ob" if signature.endswith("Ob") else "map"
+        if f"{sort}_{operation}" not in fields:
+            fields[f"{sort}_{operation}"] = preservation(
+                operation, signature).statement()
+    extends = ", ".join(f"to{base.__name__} : {base.__name__}.Functor "
+                        f"cat.to{base.__name__} "
+                        f"cat'.to{base.__name__}" for base in parents)
+    lines = [f"/-- A functor of `{name}`: it preserves each of its"
+             " operations. -/",
+             f"structure {name}.Functor (cat : {name} Ob Hom)"
+             f" (cat' : {name} Ob' Hom')"
+             + (f" extends {extends}" if extends else "") + " where"]
+    if not parents:
+        lines += ["  ob : Ob → Ob'", "  map : Hom → Hom'"]
+    lines += [f"  {field} : {statement}"
+              for field, statement in fields.items()]
     return "\n".join(lines) + "\n"
 
 
@@ -445,7 +523,10 @@ def theory(category: type, cls: type) -> str:
 
     >>> from discopy.monoidal import Diagram
     >>> print(theory(Diagram, abc.MonoidalCategory).splitlines()[-1])
-      cat.unitality ∧ cat.associativity ∧ cat.tensor_unitality
+    ... # doctest: +NORMALIZE_WHITESPACE
+      cat.unitality ∧ cat.associativity ∧ cat.tensor_unitality ∧
+      cat.tensor_associativity ∧ cat.tensor_unit ∧ cat.left_whiskering ∧
+      cat.right_whiskering ∧ cat.tensor_whiskering
     """
     laws = [
         name for klass in reversed(cls.__mro__)
@@ -504,8 +585,9 @@ def generate() -> str:
         "compile yet:",
         "", *skipped, "-/", "",
         "namespace Discolean.ABC", "",
-        "universe u v", "",
-        "variable {Ob : Type u} {Hom : Type v}", "",
+        "universe u v u' v'", "",
+        "variable {Ob : Type u} {Hom : Type v} {Ob' : Type u'}"
+        " {Hom' : Type v'}", "",
         *parts, "end Discolean.ABC", ""])
 
 
