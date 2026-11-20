@@ -56,6 +56,7 @@ from __future__ import annotations
 import importlib
 from collections import defaultdict
 from collections.abc import Callable, Iterator
+import html
 import json
 import shutil
 import subprocess
@@ -426,7 +427,8 @@ def render(diagram, size=160, mask=False, **params) -> np.ndarray:
     its text ``fontsize`` pixels high, its strokes ``linewidth`` wide.
     ``xkcd=True`` draws it by hand, see :func:`matplotlib.pyplot.xkcd`.
     ``graphviz=True`` draws it as laid out by :func:`layout` instead, with
-    no wire labels, an inch of the layout ``INCH`` units wide.
+    no wire labels, an inch of the layout ``INCH`` units wide, and
+    ``graphviz=layout(diagram)`` draws a layout already computed.
 
     >>> from discopy.monoidal import Ty, Box
     >>> x = Ty('a')
@@ -438,9 +440,11 @@ def render(diagram, size=160, mask=False, **params) -> np.ndarray:
     ['a', 'background', 'f', 'label a']
     """
     scale = params.pop("scale", 24)
-    if params.pop("graphviz", False):
+    graph = params.pop("graphviz", False)
+    if graph:
         params.pop("wire_labels", None)
-        return paint_layout(layout(diagram), size, scale, mask, **params)
+        graph = graph if isinstance(graph, dict) else layout(diagram)
+        return paint_layout(graph, size, scale, mask, **params)
     xkcd, drawing = params.pop("xkcd", False), diagram.to_drawing()
     params = {"fontsize": .4 * scale, "wire_labels": True,
               "nodesize": np.pi * (SPIDER * scale) ** 2 / 300 * np.sqrt(
@@ -503,7 +507,8 @@ def fits(diagram, size=160, scale=24, margin=1, graphviz=False) -> bool:
     """ Whether the picture of a diagram fits in the image, with a margin
     in units around it. """
     if graphviz:
-        *_, width, height = map(float, layout(diagram)["bb"].split(","))
+        graph = graphviz if isinstance(graphviz, dict) else layout(diagram)
+        *_, width, height = map(float, graph["bb"].split(","))
         extent = INCH * max(width, height) / 72
     else:
         drawing = diagram.to_drawing()
@@ -573,8 +578,9 @@ def to_dot(diagram) -> str:
                          + " [style=invis]; }")
     for i, (box, (dom, cod)) in enumerate(
             zip(graph.boxes, graph.box_wires)):
-        lines.append(f'  b{i} [tooltip="{box.name}", '
-                     f'label=<{port_table(box.name, len(dom), len(cod))}>];')
+        name = html.escape(str(box.name))
+        lines.append(f'  b{i} [tooltip="{name}", '
+                     f'label=<{port_table(name, len(dom), len(cod))}>];')
         for j, spider in enumerate(dom):
             ends[spider].append((True, f"b{i}:d{j}:n"))
         for j, spider in enumerate(cod):
@@ -588,7 +594,9 @@ def to_dot(diagram) -> str:
         if len(ends[spider]) != 2:
             lines.append(
                 f'  s{spider} [shape=point, width={2 * SPIDER / INCH}];')
-        lines += [f'  {" -- ".join(pair)} [label="{obj}"];' for pair in pairs]
+        label = html.escape(str(obj))
+        lines += [f'  {" -- ".join(pair)} [label="{label}"];'
+                  for pair in pairs]
     return "\n".join(lines + ["}"])
 
 
@@ -632,7 +640,8 @@ def paint_layout(  # pylint: disable=too-many-locals  # one figure, as paint
                       if not p.startswith(("s,", "e,"))]
             axis.add_patch(PathPatch(Path(points, [Path.MOVETO] + [
                 Path.CURVE4] * (len(points) - 1)), facecolor="none",
-                linewidth=linewidth, edgecolor=colour(edge["label"])))
+                linewidth=linewidth,
+                edgecolor=colour(html.unescape(edge["label"]))))
         for node in filter(lambda node: "pos" in node, graph["objects"]):
             (x, y), name = point(node["pos"]), node["name"]
             width, height = (INCH * float(node[k]) for k in (
@@ -640,7 +649,7 @@ def paint_layout(  # pylint: disable=too-many-locals  # one figure, as paint
             if name[0] == "s":
                 axis.add_patch(Circle((x, y), SPIDER, color=colour("spider")))
             elif name[0] == "b":
-                label = node["tooltip"]
+                label = html.unescape(node["tooltip"])
                 axis.add_patch(Rectangle(
                     (x - width / 2, y - height / 2), width, height,
                     linewidth=linewidth, edgecolor=colour(label),
@@ -828,7 +837,7 @@ def samples(module: str, seed=0, size=160, max_boxes=6, scales=(20, 28),
             key: drawn.pop(key) for key in ("heights", "widths", "triangles")})
         params = {"xkcd": drawn.pop("xkcd", False),
                   "wire_labels": drawn.pop("wire_labels"),
-                  "graphviz": drawn.pop("graphviz"),
+                  "graphviz": drawn.pop("graphviz") and layout(diagram),
                   "scale": rng.uniform(*scales),
                   "linewidth": rng.uniform(1, 2.5)}
         if text is not None:

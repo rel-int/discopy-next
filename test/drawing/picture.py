@@ -210,3 +210,11 @@ def test_graphviz_pictures_of_graphs_read_back():
                     for diagram, _, mask in islice(samples(
                         "symmetric", seed=3, graphviz=True, graphs=True), 10))
     assert read_back >= 8
+
+
+@needs_graphviz
+def test_graphviz_lays_out_names_with_quotes_and_brackets():
+    x = frobenius.Ty('a')
+    names = {node.get("tooltip") for node in picture.layout(
+        frobenius.Box('f"<g>&', x, x))["objects"]}
+    assert 'f&quot;&lt;g&gt;&amp;' in names

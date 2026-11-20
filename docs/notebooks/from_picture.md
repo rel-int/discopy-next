@@ -53,6 +53,7 @@ instead: each box is an HTML table with one column per port, so each wire
 leaves its box where its port is, and the mask stays exact. With
 `graphs=True` the diagrams are named graphs (complete, star, cycle, cube,
 grid and tree), each edge oriented from its smaller vertex to its larger.
+It needs Graphviz installed, e.g. `apt install graphviz`, as the docs do.
 
 ```python {.marimo}
 from itertools import islice

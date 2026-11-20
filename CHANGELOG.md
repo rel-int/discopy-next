@@ -41,7 +41,9 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   `dot`, each box an HTML table with one column per port so that wires keep
   the port order, with exact masks, and `samples(graphs=True)`: named graphs
   (complete, star, cycle, cube, grid, tree) as oriented closed diagrams, with
-  `picture.to_dot`, `picture.layout` and `picture.graphs` ([next#678]).
+  `picture.to_dot`, `picture.layout` and `picture.graphs`; `render` and
+  `fits` take `graphviz` too. It needs Graphviz's `dot` installed, and
+  `layout` raises `RuntimeError` without it ([next#678]).
 - `lambek.categorial.Parser`, the chart parser of the reproduction of Bobcat
   (Clark, 2021) on CCGrebank: a CKY chart over the binary and unary rules
   seen in the treebank and the schemata of `schemata` at a penalty, scored by
