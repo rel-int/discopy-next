@@ -5,5 +5,5 @@
 > Go with oriented graphs and open the PR with your other defaults
 
 - [x] picture.samples(layout="graphviz"): hypergraphs laid out by dot, each box an HTML table with one column per port, rendered with exact masks
-- [WIP] @T-a78eb6e6-2026-11-20 20:32 picture.graphs: named families (complete, star, cycle, cube, grid, tree) as oriented compact diagrams, each edge from its smaller vertex to its larger
+- [x] picture.graphs: named families (complete, star, cycle, cube, grid, tree) as oriented compact diagrams, each edge from its smaller vertex to its larger
 - [ ] tests, docs in from_picture notebook, changelog
