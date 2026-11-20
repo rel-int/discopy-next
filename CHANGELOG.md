@@ -9,6 +9,13 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Added
 
+- The notebook `docs/notebooks/optyx/strict_sloppy.md` reproduces §5 of
+  arXiv:2110.10641, the strict and sloppy readings of *John likes his code.
+  Bill does too.*, with the Fock space of `!` as photons on modes. The
+  paper's k-extension is the W node of `discopy.optyx.core.zw` and its basis
+  copy the Z spider; anaphora, ellipsis and both readings are checked against
+  the paper's formulas, and the two readings shown to be two maps
+  ([next#674]).
 - `discopy.peirce.alpha` and `discopy.peirce.beta`: Peirce's existential
   graphs as diagrams with white and black regions, a cut where the colour
   changes. `~d`, `d & e`, `d | e`, `d.relative_sum(e)` and `d.par(e)` are
@@ -2430,6 +2437,7 @@ for the changelog of `1.2.1` and earlier.
 [next#665]: https://github.com/rel-int/discopy-next/pull/665
 [next#667]: https://github.com/rel-int/discopy-next/pull/667
 [next#672]: https://github.com/rel-int/discopy-next/pull/672
+[next#674]: https://github.com/rel-int/discopy-next/pull/674
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#44]: https://github.com/rel-int/optyx/pull/44

@@ -51,6 +51,7 @@ DisCoPy documentation
     notebooks/optyx/bosonic-vqe-2
     notebooks/optyx/photon_distinguishability
     notebooks/optyx/contextuality
+    notebooks/optyx/strict_sloppy
     notebooks/optyx/zw_examples
     notebooks/optyx/bose_hubbard
     notebooks/optyx/Compiler
