@@ -243,3 +243,7 @@ STRETCH_LENGTHS = (
 NOT_ONE_OUTPUT = "Expected exactly one output, got {}: a term has one."
 NOT_APPLICABLE = "{} of stack {} does not apply to {} of stack {} and type {}."
 NOT_A_BLOCK = "Expected a block of variables next to the stack of {}, got {}."
+NO_OFFSET = (
+    "Expected an offset for the abstraction of no variable in {}, which "
+    "has no stack to say where it stands.")
+WRONG_OFFSET = "Expected offset {} for the abstraction of {} in {}, got {}."

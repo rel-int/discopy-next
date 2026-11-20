@@ -16,8 +16,10 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   `monoidal.Diagram.to_term` reads a diagram with exactly one output as a
   term with a `let` for each box but the last, which gives the output, and
   refuses any other, `eval` gives the diagram back and `normal_form` inlines
-  the boxes with one output, up to interchange. Its laws are cells of the
-  property matrix ([next#658]).
+  the boxes with one output, up to interchange, which
+  `kappa.InterchangeEquation` decides for small diagrams by a search of the
+  orbit under interchangers. Its laws are cells of the property matrix
+  ([next#658]).
 - `discopy.peirce.alpha` and `discopy.peirce.beta`: Peirce's existential
   graphs as diagrams with white and black regions, a cut where the colour
   changes. `~d`, `d & e`, `d | e`, `d.relative_sum(e)` and `d.par(e)` are

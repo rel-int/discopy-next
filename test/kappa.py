@@ -2,7 +2,8 @@ from hypothesis import find
 from pytest import raises
 
 from discopy import closed, symmetric
-from discopy.kappa import Constant, Kappa, TermBase, Variable, let
+from discopy.kappa import (
+    Constant, InterchangeEquation, Kappa, TermBase, Variable, let)
 from discopy.monoidal import Box, Diagram, Functor, Ty
 from discopy.utils import dumps, loads
 
@@ -116,6 +117,45 @@ def test_substitute_shifts_offset():
     assert shorter.freevars == [v, d]
 
 
+def test_substitute_keeps_the_side_of_a_scalar():
+    k, m = Constant(Box('k', x @ x, x)), Constant(Box('m', x @ x, x))
+    s = Constant(Box('s', Ty(), Ty()))
+    term = let(k(a, c), lambda bound: let(s, lambda: m(bound, d), offset=1))
+    normal_form = term.normal_form()
+    assert normal_form == let(s, lambda: m(k(a, c), d), offset=2)
+    assert InterchangeEquation(term.eval(), normal_form.eval())
+    crossed = let(s, lambda: m(k(a, c), d), offset=1)
+    assert crossed.eval().to_hypergraph() == term.eval().to_hypergraph()
+    assert not InterchangeEquation(term.eval(), crossed.eval())
+    assert TermBase.normal_form_soundness(term)
+
+
+def test_interchange_equation():
+    s, e = Box('s', Ty(), Ty()), Box('e', x @ x, Ty())
+    cap, k = Box('cap', Ty(), x), Box('k', x @ x, y)
+    assert InterchangeEquation(f @ g, f @ x >> y @ g, x @ g >> f @ z)
+    assert not InterchangeEquation(f >> Box('u', y, y), f)
+    assert not InterchangeEquation(s @ x, x @ s)
+    assert not InterchangeEquation(x @ s @ x >> k, s @ x @ x >> k)
+    assert InterchangeEquation(s @ x @ x >> k, k >> s @ y)
+    assert not InterchangeEquation(s @ x @ x >> k, k >> y @ s)
+    assert not InterchangeEquation(x @ s @ x >> k, k >> s @ y)
+    assert InterchangeEquation(s @ x @ x >> e, e >> s, x @ x @ s >> e)
+    assert not InterchangeEquation(x @ s @ x >> e, e >> s)
+    assert InterchangeEquation(
+        x @ s >> x @ cap >> e, x @ cap >> s @ x @ x >> e,
+        x @ cap >> x @ s @ x >> e, x @ cap >> e >> s)
+    assert InterchangeEquation(s @ cap >> f, cap >> f >> y @ s, cap >> s @ f)
+    assert not InterchangeEquation(s @ f, f @ s)
+    assert InterchangeEquation(s @ s @ x, s @ x >> s @ x)
+    orbit = InterchangeEquation.orbit(f @ g @ f)
+    assert len(orbit) == len(set(orbit)) == 6 and orbit[0] == f @ g @ f
+    assert InterchangeEquation.orbit(f @ g @ f, x @ g @ x >> f @ z @ f)\
+        == orbit[:3]
+    assert len(InterchangeEquation.swaps(e >> cap, 1)) == 2
+    assert not InterchangeEquation.swaps(cap >> f, 1)
+
+
 def test_substitute_avoids_capture():
     m, n = Constant(Box('m', x @ x, x)), Constant(Box('n', x, x))
     term = let(n(b), lambda a: x.kappa(lambda b: m(a, b)))
@@ -160,8 +200,19 @@ def test_kappa_errors():
             ((a, ), m(a, b), None), ((), m(a, b), 1)]:
         with raises(ValueError):
             Kappa(variables, body, offset)
+    with raises(ValueError, match="Expected an offset"):
+        Kappa((), m(a, b, c))
+    with raises(ValueError, match="offset from 0 to 3 .* no variable .* 4"):
+        Kappa((), m(a, b, c), 4)
+    with raises(ValueError, match="offset 0 for the abstraction of a .* 1"):
+        Kappa((a, ), m(a, b, c), 1)
+    with raises(ValueError, match="offset 2 .* no variable in m.a, b., got 1"):
+        Kappa((), m(a, b), 1)
+    with raises(ValueError, match="block of variables .*, got d"):
+        Kappa((d, ), m(a, b, c))
     assert Kappa((b, ), m(a, b)).stack == x @ x
     assert Kappa((), m(a, b), 2).stack == x
+    assert Kappa((a, ), m(a, b, c), 0) == Kappa((a, ), m(a, b, c))
     with raises(ValueError):
         (x @ x).kappa(lambda a: a)
 

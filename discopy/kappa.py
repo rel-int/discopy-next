@@ -41,6 +41,7 @@ Summary
     Constant
     Application
     Kappa
+    InterchangeEquation
     Sampler
 
 .. admonition:: Functions
@@ -100,7 +101,7 @@ sound up to interchange: the two orders of ``f @ g`` have one normal form.
 >>> print(diagram.to_term().normal_form())
 (x @ x).kappa(lambda x0, x1: h(f(x0), g(x1)))
 >>> other = x @ g >> f @ z >> h
->>> assert other != diagram
+>>> assert other != diagram and InterchangeEquation(other, diagram)
 >>> assert other.to_term().normal_form() == diagram.to_term().normal_form()
 
 When every box has one output the normal form is a tree, and two diagrams
@@ -140,12 +141,12 @@ from inspect import signature
 from itertools import count
 from typing import TYPE_CHECKING, Callable, ClassVar, Iterator, Self, Sequence
 
-from discopy import biclosed, messages
+from discopy import biclosed, messages, monoidal
 from discopy.monoidal import Box, Diagram, Ty
 from discopy.testable import (
     GENERATORS, Equation, Equivalence, Serialisable, axiom)
 from discopy.utils import (
-    assert_isinstance, factory_key, factory_name, from_tree)
+    AxiomError, assert_isinstance, factory_key, factory_name, from_tree)
 
 if TYPE_CHECKING:
     from hypothesis import strategies as st
@@ -412,19 +413,23 @@ class TermBase(Serialisable, Equivalence):
         for i in range(len(term.stack)):
             variables.append(Variable.fresh(
                 "x", term.stack[i:i + 1], term, *variables))
-        expanded = Kappa(
-            tuple(variables), term(*variables), term.offset or 0)
+        expanded = Kappa(tuple(variables), term(*variables), term.offset or 0)
         return Equation(expanded.eval(), term.eval())
 
     @axiom
     def normal_form_soundness(cls, term: Self) -> Equation:
         """
-        Beta reduction is sound: a term and its normal form evaluate to
-        diagrams with the same hypergraph, i.e. equal up to interchange.
+        Beta reduction is sound up to interchange, see
+        :class:`InterchangeEquation`: a term, its normal form and that of
+        the reading of its foliation evaluate to diagrams of one orbit. The
+        reading is there for beta reduction to change the order of its
+        boxes, those of a layer left to right: a generated term already
+        evaluates its arguments in the order its normal form does.
         """
-        return Equation(
-            term.normal_form().eval().to_hypergraph(),
-            term.eval().to_hypergraph())
+        diagram = term.eval()
+        reading = diagram.foliation().to_term()
+        return InterchangeEquation(
+            diagram, term.normal_form().eval(), reading.normal_form().eval())
 
     @axiom
     def normal_form_idempotence(cls, term: Self) -> Equation:
@@ -628,9 +633,8 @@ class Kappa(TermBase):
         variables : The variables to bind, in the order of the context.
         body : The term in which they are bound.
         offset : The number of free variables left of the stack, needed
-            when no variable says where it is: the abstraction of no
-            variable in a body with no stack, i.e. the place for a box
-            with no output.
+            when nothing says where it is, no variable and no stack in the
+            body: the place for a box with no output.
 
     Note
     ----
@@ -658,6 +662,15 @@ got b, a.
     >>> term = let(e(a), lambda: f(c, b), offset=1)
     >>> assert term.freevars == [c, a, b]
     >>> assert term.eval() == x @ e.box @ y >> f.box
+    >>> let(e(a), lambda: f(c, b))
+    Traceback (most recent call last):
+        ...
+    ValueError: Expected an offset for the abstraction of no variable in \
+f(c, b), which has no stack to say where it stands.
+    >>> y.kappa(lambda b: f(c, b), offset=0)
+    Traceback (most recent call last):
+        ...
+    ValueError: Expected offset 1 for the abstraction of b in f(c, b), got 0.
     """
     serialised_attrs = ("variables", "body", "offset")
     offset: int
@@ -666,16 +679,24 @@ got b, a.
                  offset: int | None = None):
         assert_isinstance(body, TermBase)
         variables = tuple(variables)
-        start = body.freevars.index(variables[0])\
-            if variables and variables[0] in body.freevars\
-            else body.offset if offset is None else offset
-        stop = (start or 0) + len(variables)
-        if start is None or offset not in (None, start)\
-                or tuple(body.freevars[start:stop]) != variables\
-                or not 0 <= start <= len(body.freevars)\
+        names = ", ".join(x.name for x in variables) or "no variable"
+        if variables and variables[0] not in body.freevars:
+            raise ValueError(messages.NOT_A_BLOCK.format(body, names))
+        expected = body.freevars.index(variables[0]) if variables\
+            else body.offset
+        start = expected if offset is None else offset
+        if start is None:
+            raise ValueError(messages.NO_OFFSET.format(body))
+        wanted = f"from 0 to {len(body.freevars)}" if expected is None\
+            else expected
+        valid = 0 <= start <= len(body.freevars)
+        if not valid or expected not in (None, start):
+            raise ValueError(
+                messages.WRONG_OFFSET.format(wanted, names, body, start))
+        stop = start + len(variables)
+        if tuple(body.freevars[start:stop]) != variables\
                 or body.offset not in (None, start, stop):
-            raise ValueError(messages.NOT_A_BLOCK.format(
-                body, ", ".join(x.name for x in variables)))
+            raise ValueError(messages.NOT_A_BLOCK.format(body, names))
         self.variables, self.body, self.offset = variables, body, start
         self.freevars = body.freevars[:start] + body.freevars[stop:]
         self.cod, bound = body.cod, body.types(variables)
@@ -781,12 +802,103 @@ got b, a.
 type Term = Variable | Constant | Application | Kappa
 
 
+class InterchangeEquation(monoidal.Equation):
+    """
+    An :class:`discopy.monoidal.Equation` between diagrams which holds when
+    they are equal up to interchange, i.e. as morphisms of the free monoidal
+    category rather than of the premonoidal one: when the others are in the
+    :meth:`orbit` of the first under interchangers.
+
+    The hypergraphs of such diagrams are equal, and the converse fails: a
+    hypergraph forgets on which side of a wire a box with no wire sits. No
+    interchanger moves it across a wire that runs from the domain to the
+    codomain, only round the end of one: above a state or below an effect.
+
+    Example
+    -------
+    >>> x, y = Ty('x'), Ty('y')
+    >>> f, s = Box('f', x, y), Box('s', Ty(), Ty())
+    >>> assert InterchangeEquation(s @ x >> f, f >> s @ y, s @ f)
+    >>> assert not InterchangeEquation(s @ x, x @ s)
+    >>> assert (s @ x).to_hypergraph() == (x @ s).to_hypergraph()
+    >>> cap, cup = Box('cap', Ty(), x), Box('cup', x @ x, Ty())
+    >>> assert InterchangeEquation(
+    ...     x @ s >> x @ cap >> cup, s @ x >> x @ cap >> cup)
+
+    Note
+    ----
+    The search is exhaustive and an orbit grows as the factorial of the
+    number of boxes that commute: this is for small diagrams, such as a law
+    draws. A boundary-connected diagram has a normal form instead, see
+    :cite:t:`DelpeuchVicary22` and :meth:`monoidal.Diagram.normal_form`.
+    """
+    def __bool__(self):
+        first, *others = (term.to_staircases() for term in self.terms)
+        orbit = self.orbit(first, *others)
+        return all(other in orbit for other in others)
+
+    @staticmethod
+    def swaps(diagram: Diagram, i: int) -> list[Diagram]:
+        """
+        The interchanges of layer ``i`` with the one above it: none when
+        the two boxes do not commute, two when a box with no input goes
+        either side of a box with no output, one otherwise.
+
+        Example
+        -------
+        >>> x = Ty('x')
+        >>> e, s = Box('e', x, Ty()), Box('s', Ty(), x)
+        >>> for diagram in InterchangeEquation.swaps(e >> s, 1):
+        ...     print(diagram)
+        s @ x >> x @ e
+        x @ s >> e @ x
+        >>> assert not InterchangeEquation.swaps(s >> e, 1)
+        """
+        result = []
+        for left in (False, True):
+            try:
+                swapped = diagram.interchange(i, i - 1, left=left)
+            except AxiomError:
+                continue
+            result += [swapped] if swapped not in result else []
+        return result
+
+    @classmethod
+    def orbit(cls, diagram: Diagram, *until: Diagram) -> list[Diagram]:
+        """
+        The diagrams that a diagram with one box in each layer rewrites
+        into by interchangers, itself first, breadth first: all of them,
+        or as many as it takes to find every diagram of ``until``.
+
+        Example
+        -------
+        >>> x = Ty('x')
+        >>> f, g = Box('f', x, x), Box('g', x, x)
+        >>> for diagram in InterchangeEquation.orbit(f @ x >> x @ g):
+        ...     print(diagram)
+        f @ x >> x @ g
+        x @ g >> f @ x
+        >>> assert len(InterchangeEquation.orbit(f @ g @ f @ g)) == 24
+        >>> assert len(InterchangeEquation.orbit(f >> g)) == 1
+        """
+        result, seen, missing = [diagram], {diagram}, set(until) - {diagram}
+        position = 0
+        while position < len(result) and (missing or not until):
+            current, position = result[position], position + 1
+            found = dict.fromkeys(
+                swapped for i in range(1, len(current))
+                for swapped in cls.swaps(current, i) if swapped not in seen)
+            result += found
+            seen.update(found)
+            missing.difference_update(found)
+        return result
+
+
 def let(expression: TermBase, body: Callable, offset: int | None = None
         ) -> Application:
     """
-    Bind the outputs of an ``expression`` inside the ``body`` of a Python
-    function, i.e. the redex of its :class:`Kappa` applied to the
-    expression.
+    Bind the outputs of an ``expression`` in the ``body`` of a Python
+    function, i.e. the redex of its :class:`Kappa` applied to it.
 
     Parameters:
         expression : The term that is evaluated, with no stack.
@@ -812,10 +924,9 @@ class Sampler:
     taking leaves once it runs out, see :meth:`TermBase.generate`.
 
     The term is planar and linear: each subterm is given the variables it
-    uses, in order, and a node :meth:`split` them between its subterms. A
-    node is a leaf, a fresh constant applied to subterms, or a statement
-    binding zero, one or two outputs between the variables left for its
-    body.
+    uses, in order, and a node :meth:`split` them between its subterms. It
+    is a leaf, a fresh constant applied to subterms, or a statement binding
+    up to two outputs between the variables left for its body.
 
     Parameters:
         choices : The choices left, consumed one per node.
