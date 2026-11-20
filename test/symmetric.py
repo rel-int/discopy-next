@@ -553,7 +553,7 @@ def test_term_kappa_permutes():
     a, b, c = Variable('a', x), Variable('b', y), Variable('c', z)
     term = Kappa((c, a, b), k(a, b, c))
     assert term.stack == z @ x @ y and term.freevars == []
-    assert term.eval() == Diagram.permutation([1, 2, 0], z @ x @ y) >> k.box
+    assert term.eval() == Permutation(z @ x @ y, [1, 2, 0]) >> k.box
     same = Constant(Box('k', x @ x @ x, x))
     u, v, w = (Variable(name, x) for name in "uvw")
     cycle = Kappa((w, u, v), same(u, v, w)).eval()
@@ -577,7 +577,7 @@ def test_term_kappa_around_a_stack():
     term = Kappa((a, ), m(a, c))
     assert term.freevars == [c] and term.offset == 1 and term.head == a
     assert term.stack == x @ y and term.dom == x @ x @ y
-    assert term.eval() == Diagram.permutation([1, 0, 2], x @ x @ y) >> m.box
+    assert term.eval() == Permutation(x @ x @ y, [1, 0, 2]) >> m.box
     body = Kappa((v, ), n(a, v, c))
     assert body.freevars == [a, c] and body.offset == 1 and body.stack == y
     behind = Kappa((c, ), body)
@@ -586,7 +586,7 @@ def test_term_kappa_around_a_stack():
     assert behind == monoidal.Kappa((c, ), body)
     ahead = Kappa((c, a), body)
     assert ahead.stack == y @ x @ x and ahead.head is None
-    assert ahead.eval() == Diagram.permutation([2, 0, 1], y @ x @ x) >> n.box
+    assert ahead.eval() == Permutation(y @ x @ x, [2, 0, 1]) >> n.box
 
 
 def test_term_normal_form_with_exchange():
@@ -618,6 +618,7 @@ def test_term_eval_into_a_braided_category():
     F = Functor({x: x, y: y}, {f: g}, cod=balanced.Diagram)
     expected = x @ balanced.Braid(x, y) >> balanced.Braid(x, y) @ x >> g
     assert F(diagram) == expected == diagram.to_term().eval(F)
+    assert diagram.to_term().eval() == diagram
 
 
 def test_term_errors_and_levels():

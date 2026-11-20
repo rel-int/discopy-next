@@ -1020,10 +1020,10 @@ class TermBase(symmetric.TermBase):
     def wire(functor, wiring, dom):
         """
         The image under a functor of the wiring from a type to its wires
-        at the given indices: that of their function, which copies and
-        discards them.
+        at the given indices: that of their function in its domain, which
+        copies and discards them.
         """
-        return functor(Diagram.from_function(wiring, dom))
+        return functor(functor.dom.from_function(wiring, dom))
 
     @axiom
     def eta(cls, term: Self) -> AbstractEquation:
