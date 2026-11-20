@@ -3,10 +3,10 @@ revision = 3
 requires-python = ">=3.12"
 resolution-markers = [
     "python_full_version >= '3.15' and sys_platform == 'linux'",
-    "python_full_version == '3.14.*' and sys_platform == 'linux'",
     "python_full_version >= '3.15' and sys_platform == 'win32'",
     "python_full_version >= '3.15' and sys_platform == 'emscripten'",
     "python_full_version >= '3.15' and sys_platform != 'emscripten' and sys_platform != 'linux' and sys_platform != 'win32'",
+    "python_full_version == '3.14.*' and sys_platform == 'linux'",
     "python_full_version == '3.14.*' and sys_platform == 'win32'",
     "python_full_version == '3.14.*' and sys_platform == 'emscripten'",
     "python_full_version == '3.14.*' and sys_platform != 'emscripten' and sys_platform != 'linux' and sys_platform != 'win32'",
@@ -927,12 +927,6 @@ docs = [
     { name = "torch", version = "2.13.0+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "sys_platform == 'linux'" },
     { name = "tqdm" },
 ]
-grammar = [
-    { name = "nltk" },
-    { name = "torch", version = "2.13.0", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform != 'linux'" },
-    { name = "torch", version = "2.13.0+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "sys_platform == 'linux'" },
-    { name = "transformers" },
-]
 lambek = [
     { name = "nltk" },
     { name = "torch", version = "2.13.0", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform != 'linux'" },
@@ -1089,7 +1083,6 @@ requires-dist = [
     { name = "cotengra", marker = "extra == 'optyx'" },
     { name = "cotengra", marker = "extra == 'tensor'" },
     { name = "coverage", marker = "extra == 'test'" },
-    { name = "discopy", extras = ["lambek"], marker = "extra == 'grammar'" },
     { name = "discopy", extras = ["lambek", "notebooks", "optyx", "quantum"], marker = "extra == 'test'" },
     { name = "discopy", extras = ["notebooks", "optyx"], marker = "extra == 'docs'" },
     { name = "graphix", marker = "extra == 'optyx'", specifier = ">=0.4" },
@@ -1153,7 +1146,7 @@ requires-dist = [
     { name = "transformers", marker = "extra == 'lambek'" },
     { name = "typst", marker = "extra == 'typst'", specifier = ">=0.15.0" },
 ]
-provides-extras = ["tensor", "quantum", "lambek", "grammar", "optyx", "test", "notebooks", "docs", "typst"]
+provides-extras = ["tensor", "quantum", "lambek", "optyx", "test", "notebooks", "docs", "typst"]
 
 [package.metadata.requires-dev]
 all = [

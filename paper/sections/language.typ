@@ -4,8 +4,7 @@
 
 The last applications are syntax again: the derivations of a grammar,
 the formulae of a logic and the nets of a rewriting system are arrows of
-free categories. The package of formal grammars is now `discopy.lambek`,
-and its former name `discopy.grammar` is a deprecated alias.
+free categories. The package of formal grammars is `discopy.lambek`.
 
 === Categorial grammars <sec:lambek>
 
