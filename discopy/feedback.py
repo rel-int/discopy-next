@@ -476,17 +476,17 @@ class Ty(monoidal.Ty):
 
     def delay(self, n_steps=1):
         """ The delay of a feedback type by `n_steps`. """
-        return type(self)(*(x.delay(n_steps) for x in self.inside))
+        return self.factory(*(x.delay(n_steps) for x in self.inside))
 
     @property
     def head(self):
         """ The head of a feedback type, see :class:`HeadOb`. """
-        return type(self)(*(x.head for x in self.inside if x.head))
+        return self.factory(*(x.head for x in self.inside if x.head))
 
     @property
     def tail(self):
         """ The tail of a feedback type, see :class:`TailOb`. """
-        return type(self)(*(x.tail for x in self.inside if x.tail))
+        return self.factory(*(x.tail for x in self.inside if x.tail))
 
     d = Wire.d
 
