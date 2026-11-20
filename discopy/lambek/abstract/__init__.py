@@ -44,6 +44,20 @@ Summary
 .. autodata:: Position
 .. autodata:: String
 
+.. admonition:: Submodules
+
+    .. autosummary::
+        :template: module.rst
+        :nosignatures:
+        :toctree:
+
+        proofnet
+        neural
+
+:mod:`discopy.lambek.abstract.proofnet` reads a term as a proof net and back,
+and is imported here. :mod:`discopy.lambek.abstract.neural` needs PyTorch,
+which the ``lambek`` extra installs, so it is not: import it on its own.
+
 Vocabularies and lexicons
 -------------------------
 
@@ -558,3 +572,6 @@ of type ``String``, ``Position(lambda x: x)`` is the empty string and
 ``John.compose(seeks)`` their concatenation, see
 :meth:`discopy.closed.TermBase.compose`.
 """
+
+# pylint: disable-next=wrong-import-position  # proofnet imports this module
+from discopy.lambek.abstract import proofnet  # noqa: E402
