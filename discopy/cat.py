@@ -2533,7 +2533,7 @@ type y.
             return redex
         rest = tuple(x for x in func.variables if x != func.head)
         body = func.body.substitute({func.head: arg})
-        result = type(func)(rest, body) if rest else body
+        result = func.kappa_factory(rest, body) if rest else body
         return result if result.context == redex.context else redex
 
     def alpha_eq_under(self, scopes, others, depth=0):
