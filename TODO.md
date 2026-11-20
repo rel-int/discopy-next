@@ -6,7 +6,7 @@
 >
 > it should be possible to choose the spiders for a subclass but it’s true we can’t pick different spiders in the same diagram
 
-- [ ] tensor.Term: Dim called on a function is an Abstraction, terms over Dim with application by cups, abstraction by caps, copy and discard of the diagram class
+- [WIP] @T-01a1fa54-2026-11-20 20:56 tensor.Term: Dim called on a function is an Abstraction, terms over Dim with application by cups, abstraction by caps, copy and discard of the diagram class
 - [ ] test_Term and the doctest in discopy/tensor.py, a CHANGELOG bullet
 - [ ] rewrite the strict/sloppy notebook with tensor.Term, the copies as subclasses of tensor.Diagram
 - [ ] run the gates and the notebook check
