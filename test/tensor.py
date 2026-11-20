@@ -1178,3 +1178,38 @@ def test_box_repr_nan_inf(data):
     box = Box('f', Dim(2), Dim(2), data)
     from discopy import tensor
     assert eval(repr(box), {'tensor': tensor, 'Dim': Dim}) == box
+
+
+def test_Term():
+    N, S = Dim(2), Dim(3)
+    j, f = np.array([2., 5.]), np.arange(6.).reshape(3, 2) + 1
+    John, sleeps = Constant("John", N, j), Constant("sleeps", S << N, f)
+    sleeps_left = Constant("sleeps", N >> S, f.T)
+    value = lambda term, cod=None: term.eval(cod).eval().array
+    for term in (sleeps(John), N(lambda x: sleeps(x))(John),
+                 John(sleeps_left, left=True),
+                 John(N(lambda x, left=True: x(sleeps_left, left=True),
+                        left=True), left=True)):
+        assert np.allclose(value(term), f @ j)
+    twice = N(lambda x: (sleeps(x), sleeps(x)))(John)
+    assert np.allclose(value(twice), np.einsum("i,si,ti->st", j, f, f))
+    assert np.allclose(value(N(lambda x: sleeps(John))(John)), f @ j * 7)
+    open_term = sleeps(Variable("y", N))
+    assert (open_term.eval().dom, open_term.eval().cod) == (N, S)
+    assert eval(repr(twice)) == twice and str(twice)\
+        == "Dim(2)(lambda x: (sleeps(x), sleeps(x)))(John)"
+    with raises(TypeError):
+        sleeps(sleeps)
+
+    class Affine(Diagram):
+        @classmethod
+        def copy(cls, x, n=2):
+            array = np.zeros(3 * (x.inside[0], ))
+            for i in range(x.inside[0]):
+                array[i, i, :] += 1
+                array[i, :, i] += 1
+            return Box("copy", x, x @ x, array)
+
+    ones = f.sum(axis=1)
+    assert np.allclose(value(twice, Affine),
+                       np.outer(f @ j, ones) + np.outer(ones, f @ j))

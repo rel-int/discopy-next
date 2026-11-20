@@ -25,6 +25,12 @@ Summary
     Sum
     Bubble
     Diff
+    Term
+    Constant
+    Variable
+    Application
+    Abstraction
+    Tuple
     Equation
 
 Tensor combinatorial maps
@@ -1475,6 +1481,304 @@ class Diff:
         func = "" if self.func is None else f", {func_repr(self.func)}"
         return f"{factory_name(type(self))}({self.var!r}{func})"
 
+
+class Term:
+    """
+    A lambda term whose types are dimensions, i.e. a term in the internal
+    language of the compact closed category of tensors, where the exponential
+    ``x >> y`` of dimensions is ``x.r @ y`` and ``y << x`` is ``y @ x.l``.
+
+    A dimension called on a function is an :class:`Abstraction` and on a
+    string a :class:`Constant`, a term called on a term is an
+    :class:`Application` and a tuple of terms is a :class:`Tuple`:
+
+    >>> N, S = Dim(2), Dim(3)
+    >>> sleeps = Constant("sleeps", S << N, data=[[1, 2], [3, 4], [5, 6]])
+    >>> John = Constant("John", N, data=[1, 0])
+    >>> sleeps_ = N(lambda x: sleeps(x))
+    >>> assert sleeps_.cod == sleeps.cod == S @ N
+    >>> assert sleeps_(John).eval().eval() == sleeps(John).eval().eval()
+
+    Terms need not be linear: a variable occurring ``n`` times is copied with
+    :meth:`Diagram.copy` and one that does not occur is discarded with
+    :meth:`Diagram.discard`, those of the diagram class the term is evaluated
+    in, so that a subclass chooses its own copy for every variable at once.
+
+    >>> twice = N(lambda x: (sleeps(x), sleeps(x)))(John)
+    >>> twice.draw(figsize=(4, 4), doctest="docs/_static/tensor/twice.svg")
+
+    .. image:: /_static/tensor/twice.svg
+        :align: center
+
+    Attributes:
+        cod (Dim) : The type of the term.
+    """
+    cod: Dim
+
+    def __call__(self, other: Term, left: bool = False) -> Application:
+        return Application(other, self, left) if left\
+            else Application(self, other)
+
+    @property
+    def freevars(self) -> list[Variable]:
+        """ The free variables of the term, in order of first occurrence. """
+        raise NotImplementedError
+
+    def occurrences(self, var: Variable) -> int:
+        """ The number of free occurrences of a variable in the term. """
+        raise NotImplementedError
+
+    def build(self, cod: type[Diagram], env: dict) -> tuple:
+        """
+        The output wires of the term inside :meth:`Diagram.from_callable`,
+        given an iterator over the copies of the wires of each free variable.
+        """
+        raise NotImplementedError
+
+    def eval(self, cod: type[Diagram] | None = None) -> monoidal.Diagram:
+        """
+        The diagram of a term, from its free variables to its type.
+
+        Parameters:
+            cod : The diagram class, :class:`Diagram` by default, whose
+                :meth:`Diagram.copy` and :meth:`Diagram.discard` share the
+                variables.
+        """
+        cod = cod or Diagram
+        variables = self.freevars
+
+        def func(*nodes):
+            env, i = {}, 0
+            for var in variables:
+                n = len(var.cod)
+                env[var] = Term.share(
+                    cod, var, nodes[i:i + n], self.occurrences(var))
+                i += n
+            return self.build(cod, env)
+
+        dom = Dim(1).tensor(*(var.cod for var in variables))
+        return cod.from_callable(dom, self.cod)(func)
+
+    @staticmethod
+    def share(cod: type[Diagram], var: Variable, nodes: tuple, uses: int):
+        """ The copies of the wires of a variable, one for each use. """
+        if not uses:
+            cod.discard(var.cod)(*nodes)  # ty: ignore[call-non-callable]
+            return iter(())
+        if uses == 1:
+            return iter([nodes])
+        n = len(var.cod)
+        copy = cod.copy(var.cod, uses)
+        copies = Term.wires(
+            copy(*nodes), uses * n)  # ty: ignore[call-non-callable]
+        return iter([copies[i * n:(i + 1) * n] for i in range(uses)])
+
+    @staticmethod
+    def wires(outputs, n: int) -> tuple:
+        """ The ``n`` output wires of a diagram called on wires. """
+        return (outputs, ) if n == 1 else tuple(outputs)
+
+    def draw(self, **params):
+        """ Drawing a term is drawing its diagram, see :meth:`eval`. """
+        return self.eval().draw(**params)
+
+    def __eq__(self, other):
+        return type(self) is type(other) and self.key == other.key
+
+    def __hash__(self):
+        return hash(self.key)
+
+    @property
+    def key(self) -> tuple:
+        """ What makes two terms of the same class equal. """
+        raise NotImplementedError
+
+
+class Constant(Term):
+    """
+    A constant term of a given type, evaluated to a state with its data.
+
+    Parameters:
+        name : The name of the constant.
+        cod : Its type.
+        data : Its array.
+    """
+    def __init__(self, name: str, cod: Dim, data=None):
+        self.name, self.cod, self.data = name, cod, data
+
+    freevars = property(lambda self: [])
+
+    def occurrences(self, var):
+        return 0
+
+    def build(self, cod, env):
+        box = cod.box_factory(self.name, Dim(1), self.cod, self.data)
+        return Term.wires(box(), len(self.cod))
+
+    key = property(lambda self: (self.name, self.cod))
+
+    def __repr__(self):
+        data = "" if self.data is None else f", data={self.data!r}"
+        return f"{factory_name(type(self))}({self.name!r}, {self.cod!r}{data})"
+
+    def __str__(self):
+        return self.name
+
+
+class Variable(Term):
+    """
+    A variable with a name and a type.
+
+    Parameters:
+        name : The name of the variable.
+        cod : Its type.
+    """
+    def __init__(self, name: str, cod: Dim):
+        self.name, self.cod = name, cod
+
+    freevars = property(lambda self: [self])
+
+    def occurrences(self, var):
+        return int(self == var)
+
+    def build(self, cod, env):
+        return next(env[self])
+
+    key = property(lambda self: (self.name, self.cod))
+
+    def __repr__(self):
+        return f"{factory_name(type(self))}({self.name!r}, {self.cod!r})"
+
+    __str__ = Constant.__str__
+
+
+class Application(Term):
+    """
+    The application ``func(args)`` of a term of type ``y << x``, i.e.
+    ``y @ x.l``, to a term of type ``x``, its last legs cupped with the
+    argument, or ``args(func, left=True)`` of one of type ``x >> y``, i.e.
+    ``x.r @ y``, its first legs cupped.
+
+    Parameters:
+        func : The function.
+        args : The argument.
+        left : Whether the argument comes in from the left.
+    """
+    def __init__(self, func: Term, args: Term, left: bool = False):
+        assert_isinstance(func, Term)
+        assert_isinstance(args, Term)
+        n = len(args.cod)
+        exponent = func.cod[:n] if left else func.cod[len(func.cod) - n:]
+        if exponent != (args.cod.r if left else args.cod.l):
+            raise TypeError(
+                f"Expected {func} to take {args.cod}, got {func.cod}.")
+        self.func, self.args, self.left = func, args, left
+        self.cod = func.cod[n:] if left else func.cod[:len(func.cod) - n]
+
+    freevars = property(lambda self: list(dict.fromkeys(
+        self.func.freevars + self.args.freevars)))
+
+    def occurrences(self, var):
+        return self.func.occurrences(var) + self.args.occurrences(var)
+
+    def build(self, cod, env):
+        func, args = self.func.build(cod, env), self.args.build(cod, env)
+        n, x = len(args), self.args.cod
+        if self.left:
+            cod.cups(x, x.r)(*args, *func[:n])
+            return func[n:]
+        cod.cups(x.l, x)(*func[len(func) - n:], *args)
+        return func[:len(func) - n]
+
+    key = property(lambda self: (self.func, self.args, self.left))
+
+    def __repr__(self):
+        left = ", left=True" if self.left else ""
+        return f"{factory_name(type(self))}" \
+            f"({self.func!r}, {self.args!r}{left})"
+
+    def __str__(self):
+        return f"{self.args}({self.func}, left=True)" if self.left\
+            else f"{self.func}({self.args})"
+
+
+class Abstraction(Term):
+    """
+    The abstraction of a variable of type ``x`` in a term of type ``y``,
+    of type ``y << x`` with caps on its last legs, or ``x >> y`` with caps on
+    its first legs if ``left``. A body given as a tuple is a :class:`Tuple`.
+
+    Parameters:
+        var : The variable.
+        body : The body.
+        left : Whether the variable comes in from the left.
+    """
+    def __init__(self, var: Variable, body: Term | tuple, left=False):
+        body = Tuple(*body) if isinstance(body, tuple) else body
+        self.var, self.body, self.left = var, body, left
+        self.cod = var.cod >> body.cod if left else body.cod << var.cod
+
+    freevars = property(lambda self: [
+        var for var in self.body.freevars if var != self.var])
+
+    def occurrences(self, var):
+        return 0 if var == self.var else self.body.occurrences(var)
+
+    def build(self, cod, env):
+        x = self.var.cod
+        caps = cod.caps(x.r, x) if self.left else cod.caps(x, x.l)
+        caps = Term.wires(caps(), 2 * len(x))
+        wires, legs = (caps[len(x):], caps[:len(x)]) if self.left\
+            else (caps[:len(x)], caps[len(x):])
+        body = self.body.build(cod, env | {self.var: Term.share(
+            cod, self.var, wires, self.body.occurrences(self.var))})
+        return legs + body if self.left else body + legs
+
+    key = property(lambda self: (self.var, self.body, self.left))
+
+    def __repr__(self):
+        left = ", left=True" if self.left else ""
+        return f"{factory_name(type(self))}" \
+            f"({self.var!r}, {self.body!r}{left})"
+
+    def __str__(self):
+        left = ", left=True" if self.left else ""
+        return f"{self.var.cod!r}(lambda {self.var}{left}: {self.body})"
+
+
+class Tuple(Term):
+    """
+    A tuple of terms, of the tensor of their types.
+
+    Parameters:
+        terms : The terms.
+    """
+    def __init__(self, *terms: Term):
+        self.terms, self.cod = terms, Dim(1).tensor(*(t.cod for t in terms))
+
+    freevars = property(lambda self: list(dict.fromkeys(
+        var for term in self.terms for var in term.freevars)))
+
+    def occurrences(self, var):
+        return sum(term.occurrences(var) for term in self.terms)
+
+    def build(self, cod, env):
+        return sum((tuple(term.build(cod, env)) for term in self.terms), ())
+
+    key = property(lambda self: self.terms)
+
+    def __repr__(self):
+        terms = ', '.join(map(repr, self.terms))
+        return f"{factory_name(type(self))}({terms})"
+
+    def __str__(self):
+        return f"({', '.join(map(str, self.terms))})"
+
+
+Dim.variable_factory = Variable  # ty: ignore[invalid-assignment]
+Dim.constant_factory = Constant  # ty: ignore[invalid-assignment]
+Dim.application_factory = Application  # ty: ignore[invalid-assignment]
+Dim.abstraction_factory = Abstraction  # ty: ignore[invalid-assignment]
 
 Diagram.box_factory = Box
 Diagram.sum_factory, Diagram.swap_factory = Sum, Swap
