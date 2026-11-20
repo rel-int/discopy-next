@@ -23,4 +23,4 @@
 
 - [x] Reproduce: the loss the test starts from moves with the global torch RNG, so the ratio is a coin
 - [x] Seed before the OCR is built, train_ocr's own seed being too late for a network it is given
-- [ ] Check it holds under whatever ran before it, and run the gates
+- [WIP] @session_01C7YfAP4hAgDkBVZMLuMoYv-2026-11-20 01:55 Check it holds under whatever ran before it, and run the gates
