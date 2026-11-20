@@ -1777,6 +1777,15 @@ class AlphaEquivalence(Equivalence):
         scopes = [{} for _ in (self, *others)]
         return self.alpha_eq_under(scopes, list(others))
 
+    def alike(self, others: Sequence) -> bool:
+        """
+        Whether terms are built by the term former of this one, at
+        whichever level of the hierarchy: the class of each is that of this
+        one, a subclass of it or one it subclasses.
+        """
+        return all(isinstance(other, type(self))
+                   or isinstance(self, type(other)) for other in others)
+
     def alpha_eq_under(  # pylint: disable=unused-argument  # a constant
             self, scopes: list[dict[Variable, int]], others: list[Term],
             depth: int = 0) -> bool:
@@ -2162,9 +2171,10 @@ class TermBase(Serialisable, AlphaEquivalence):
     def context(self) -> tuple:
         """
         What a term is evaluated on: its free variables left of the stack,
-        the stack and those right of it, all of them left of no stack.
+        the stack and those right of it, all of them left when the term
+        has no place for a stack, see :attr:`offset`.
         """
-        offset = self.offset if self.stack else len(self.freevars)
+        offset = len(self.freevars) if self.offset is None else self.offset
         return self.freevars[:offset], self.stack, self.freevars[offset:]
 
     @classmethod
@@ -2387,7 +2397,7 @@ class Variable(TermBase):
     def alpha_eq_under(  # pylint: disable=unused-argument  # depth: binders
             self, scopes, others, depth=0):
         """ Variables alike by the level of their binder, by name if free. """
-        if any(type(other) is not type(self) for other in others):
+        if not self.alike(others):
             return False
         images = [scope.get(term, term)
                   for scope, term in zip(scopes, (self, *others))]
@@ -2546,7 +2556,7 @@ type y.
 
     def alpha_eq_under(self, scopes, others, depth=0):
         """ Applications with functions and arguments alike. """
-        if any(type(other) is not type(self) for other in others):
+        if not self.alike(others):
             return False
         return self.func.alpha_eq_under(
             scopes, [other.func for other in others], depth)\
@@ -2614,9 +2624,8 @@ class Kappa(TermBase):
         they stand right of the stack of the body, which a category has
         none of.
         """
-        body, variables = self.body, self.variables
-        left = body.context[0]
-        return not (body.stack and variables and variables[0] not in left)
+        right = self.body.context[2] if self.body.stack else []
+        return not any(x in right for x in self.variables[:1])
 
     @property
     def head(self) -> Variable | None:
@@ -2675,9 +2684,10 @@ class Kappa(TermBase):
 
     def alpha_eq_under(self, scopes, others, depth=0):
         """ Kappas of variables of the same types, with bodies alike. """
-        if any(type(other) is not type(self) or other.offset != self.offset
-               or [x.cod for x in other.variables]
-               != [x.cod for x in self.variables] for other in others):
+        if not self.alike(others) or any(
+                other.offset != self.offset
+                or [x.cod for x in other.variables]
+                != [x.cod for x in self.variables] for other in others):
             return False
         terms = (self, *others)
         return self.alpha_eq_bound(

@@ -23,9 +23,13 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   diagrams by a search of the orbit under interchangers. In `symmetric` a
   `Kappa` binds its variables in any order: `Diagram.to_term` reads a swap
   as the order of the variables and `eval` gives the diagram back up to the
-  axioms of symmetric categories. A type applied to a Python function is
-  its kappa abstraction, and the laws are cells of the property matrix
-  ([next#658]).
+  axioms of symmetric categories. In `markov` a variable occurs any number
+  of times: an `Application` copies the variables its function and its
+  argument share and a `Kappa` discards the ones its body does not use. No
+  discard is assumed natural, so `normal_form` only inlines a variable used
+  exactly once and keeps the statement of one copied or discarded. A type
+  applied to a Python function is its kappa abstraction, and the laws are
+  cells of the property matrix ([next#658]).
 - `discopy.peirce.alpha` and `discopy.peirce.beta`: Peirce's existential
   graphs as diagrams with white and black regions, a cut where the colour
   changes. `~d`, `d & e`, `d | e`, `d.relative_sum(e)` and `d.par(e)` are

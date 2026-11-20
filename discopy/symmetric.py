@@ -1032,18 +1032,19 @@ class TermBase(monoidal.TermBase):
             if isinstance(box, Permutation) else None
 
     @staticmethod
-    def wire(functor, wiring: list[int], types: list):
+    def wire(functor, wiring: list[int], dom: Ty):
         """
-        The image under a functor of the wiring from some types to those
+        The image under a functor of the wiring from a type to its wires
         at the given indices: a permutation of them, the identity when
         nothing moves.
 
         Parameters:
             functor : The functor to evaluate the types.
             wiring : The index of the input each output reads.
-            types : The types of the inputs.
+            dom : The type of the inputs.
         """
-        return functor.cod.permutation(wiring, list(map(functor, types)))
+        return functor.cod.permutation(
+            wiring, [functor(dom[i:i + 1]) for i in range(len(dom))])
 
     @axiom
     def normal_form_soundness(cls, term: Self) -> AbstractEquation:
@@ -1133,12 +1134,12 @@ class Kappa(TermBase, monoidal.Kappa):
         """
         The number of free variables left of the stack: those that are not
         bound and stand left of the stack of the body, or else left of the
-        first of the variables, ``None`` when there is neither.
+        first of the variables it uses, ``None`` when there is neither.
         """
-        if not body.stack and not variables:
+        used = [x for x in variables if x in body.freevars]
+        if not body.stack and not used:
             return None
-        anchor = body.offset if body.stack\
-            else body.freevars.index(variables[0])
+        anchor = body.offset if body.stack else body.freevars.index(used[0])
         return len(set(body.freevars[:anchor]).difference(variables))
 
     def __init__(self, variables: tuple[Variable, ...], body: cat.TermBase,
@@ -1160,9 +1161,7 @@ class Kappa(TermBase, monoidal.Kappa):
             bound + stack if self.front else stack + bound
         ) + self.freevars[self.offset:]
         wiring = [source.index(wire) for wire in left + stack + right]
-        types = [body.stack[wire:wire + 1] if isinstance(wire, int)
-                 else wire.cod for wire in source]
-        return self.wire(functor, wiring, types) >> body.eval(functor)
+        return self.wire(functor, wiring, self.dom) >> body.eval(functor)
 
 
 type Term = Variable | Constant | Application | Kappa

@@ -3219,13 +3219,22 @@ type y.
                 or func.stack[:len(arg.cod)] != arg.cod:
             raise ValueError(messages.NOT_APPLICABLE.format(
                 func, func.stack, arg, arg.stack, arg.cod))
-        if set(func.freevars).intersection(arg.freevars):
-            raise ValueError("Expected disjoint free variables.")
         self.func, self.arg = func, arg
-        self.freevars = func.freevars[:func.offset] + arg.freevars\
-            + func.freevars[func.offset:]
+        before = self.share(func.freevars[:func.offset], arg.freevars)
+        self.freevars = self.share(before, func.freevars[func.offset:])
         self.stack, self.cod = func.stack[len(arg.cod):], func.cod
-        self.offset = func.offset + len(arg.freevars) if self.stack else None
+        self.offset = len(before) if self.stack else None
+
+    @staticmethod
+    def share(*contexts: list) -> list:
+        """
+        The context of terms side by side: their free variables in turn,
+        which have to be disjoint where nothing is copied.
+        """
+        result = [x for context in contexts for x in context]
+        if len(set(result)) < len(result):
+            raise ValueError("Expected disjoint free variables.")
+        return result
 
     def eval(self, functor=None):
         functor = self.identity(functor)
@@ -3530,11 +3539,12 @@ class Sampler:
         left, middle, right = self.split(bound, 3)
         types = [
             self.choose(self.types) for _ in range(self.choose((1, 0, 2)))]
-        expression = self.state(types[0], middle, level) if len(types) == 1\
-            else self.spine(types, middle)
         variables = tuple(
             self.bound(level + i, typ) for i, typ in enumerate(types))
-        body = self.state(cod, left + variables + right, level + len(types))
+        inside = self.shuffle(left + variables + right)
+        expression = self.state(types[0], middle, level) if len(types) == 1\
+            else self.spine(types, middle)
+        body = self.state(cod, inside, level + len(types))
         return self.terms.bind(variables, body, len(left))(expression)
 
 
