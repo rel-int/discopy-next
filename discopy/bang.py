@@ -229,6 +229,56 @@ class Diagram(monoidal.Diagram, LinearCategory):
         """ Wrapper around :class:`Laxator`. """
         return cls.laxator_factory(x, y)
 
+    @classmethod
+    def copy(cls, x: Ty, n: int = 2) -> Diagram:
+        """
+        The ``n`` copies of a banged wire ``!y``, by :class:`Contraction`, so
+        that a term language sharing its variables with ``cod.copy`` and
+        ``cod.discard``, e.g. :class:`discopy.closed.TermBase`, copies only
+        what linear logic lets it copy.
+
+        Parameters:
+            x : The banged wire to copy.
+            n : The number of copies.
+
+        Example
+        -------
+        >>> y = Ty('y')
+        >>> assert Diagram.copy(y.bang(), 3) == Contraction(y)\\
+        ...     >> y.bang() @ Contraction(y)
+        >>> assert Diagram.copy(y.bang(), 0) == Weakening(y)
+        >>> Diagram.copy(y)
+        Traceback (most recent call last):
+        ...
+        discopy.utils.AxiomError: y is not banged: ...
+        """
+        if len(x) != 1 or not isinstance(x.inside[0], BangOb):
+            raise AxiomError(messages.NOT_BANGED.format(x))
+        arg = x.inside[0].arg
+        if not n:
+            return cls.weakening(arg)
+        result = cls.id(x)
+        for i in range(n - 1):
+            result = result >> x ** i @ cls.contraction(arg)
+        return result
+
+    @classmethod
+    def discard(cls, x: Ty) -> Diagram:
+        """
+        The discard of a tensor of banged wires, by :class:`Weakening`.
+
+        Parameters:
+            x : The banged wires to discard.
+
+        Example
+        -------
+        >>> y, z = Ty('y'), Ty('z')
+        >>> assert Diagram.discard(y.bang() @ z.bang())\\
+        ...     == Weakening(y) @ Weakening(z)
+        """
+        return cls.id(x[:0]).tensor(*(
+            cls.copy(x[i:i + 1], 0) for i in range(len(x))))
+
 
 class Box(monoidal.Box, Diagram):
     """

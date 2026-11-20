@@ -106,7 +106,9 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   and the boxes `Dereliction`, `Digging`, `Contraction`, `Weakening`,
   `Exchange` and `Laxator`. A `Functor` sends them through the `bang` and the
   structure of its codomain when it is a linear category, and through its
-  `ob_map` and `ar_map` otherwise, `f.bang()` as a box of its own. The laws
+  `ob_map` and `ar_map` otherwise, `f.bang()` as a box of its own.
+  `Diagram.copy` and `Diagram.discard` copy a banged wire by contraction
+  and discard it by weakening, and raise on any other type. The laws
   are declared failing on the free category. `optyx.Term`, in
   `optyx.term`, is a term of it on the dual-rail `qubit`, written with
   `f.bang()` in the function syntax, and `Term.to_channel` compiles it to an
