@@ -1079,6 +1079,24 @@ def test_terms_of_a_level(level, structure):
     assert type(x(lambda a: a)) is monoidal.Kappa
 
 
+@pytest.mark.parametrize("level", [
+    "cat", "monoidal", "spacial", "braided", "feedback", "balanced",
+    "comarkov", "symmetric", "markov"])
+def test_term_without_a_box_reads_back(level):
+    import importlib
+    from typing import Self
+    from discopy.testable import inhabits
+    module = importlib.import_module(f"discopy.{level}")
+    x = (module.Ob if level == "cat" else module.Ty)('x')
+    a = module.Variable('a', x)
+    law = module.TermBase.str_transparency
+    for term in (module.Kappa((a, ), a), a):
+        assert inhabits(law(term), law.output({Self: module.TermBase}))
+    read = eval(str(module.Kappa((a, ), a)), {'x': x})
+    assert read == module.Kappa((a, ), a)
+    assert type(read).__module__ in ("discopy.cat", "discopy.monoidal")
+
+
 def test_terms_from_biclosed_up():
     from discopy import biclosed, compact, symmetric
     x = compact.Ty('x')

@@ -2019,6 +2019,17 @@ class TermBase(Serialisable, AlphaEquivalence):
         """ The :func:`let` a redex prints as, in any module of terms. """
         return {**super().environment(), "let": let}
 
+    @axiom
+    def str_transparency(cls, term: Self) -> AbstractEquation[TermBase]:
+        """
+        The string of a term evaluates back to a term equal to it, see
+        :meth:`discopy.testable.Serialisable.str_transparency`, at the
+        level of its constants and its free variables: a string does not
+        say the level, so a closed term with no box, e.g. an identity,
+        reads back at the lowest one, see :meth:`setoid`.
+        """
+        return super().str_transparency(term)
+
     @property
     def parts(self) -> tuple:
         """ What the term is built from, in the order of its arguments. """
