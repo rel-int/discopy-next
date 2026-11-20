@@ -1091,7 +1091,9 @@ def test_term_without_a_box_reads_back(level):
     a = module.Variable('a', x)
     law = module.TermBase.str_transparency
     for term in (module.Kappa((a, ), a), a):
-        assert inhabits(law(term), law.output({Self: module.TermBase}))
+        equation = law(term)
+        assert equation
+        assert inhabits(equation, law.output({Self: module.TermBase}))
     read = eval(str(module.Kappa((a, ), a)), {'x': x})
     assert read == module.Kappa((a, ), a)
     assert type(read).__module__ in ("discopy.cat", "discopy.monoidal")

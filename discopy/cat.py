@@ -2026,7 +2026,7 @@ class TermBase(Serialisable, AlphaEquivalence):
         :meth:`discopy.testable.Serialisable.str_transparency`, at the
         level of its constants and its free variables: a string does not
         say the level, so a closed term with no box, e.g. an identity,
-        reads back at the lowest one, see :meth:`setoid`.
+        reads back at the lowest one that accepts it, see :meth:`setoid`.
         """
         return super().str_transparency(term)
 

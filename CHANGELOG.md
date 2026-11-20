@@ -33,8 +33,8 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   `cat.kappa_calculus`, with their structural boxes as constants. A type
   applied to a Python function is its kappa abstraction, of the level of its
   body: the string of a closed term with no box, e.g. an identity, reads back
-  as a monoidal term, equal to it. The laws are cells of the property matrix
-  ([next#658], [next#679]).
+  at the lowest level that accepts it, equal to it. The laws are cells of the
+  property matrix ([next#658], [next#679]).
 - `discopy.peirce.alpha` and `discopy.peirce.beta`: Peirce's existential
   graphs as diagrams with white and black regions, a cut where the colour
   changes. `~d`, `d & e`, `d | e`, `d.relative_sum(e)` and `d.par(e)` are
