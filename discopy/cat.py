@@ -22,6 +22,15 @@ Summary
     Functor
     Transformation
     Equation
+    TermBase
+    Variable
+    Constant
+    Application
+    Kappa
+    AlphaEquivalence
+    AlphaEquation
+    Renamed
+    Canonical
 
 .. admonition:: Functions
 
@@ -33,6 +42,7 @@ Summary
         factory
         dumps
         loads
+        let
 
 Axioms
 ------
@@ -72,19 +82,51 @@ We can check the axioms of dagger functors.
 Functors are bubble-preserving.
 
 >>> assert F(f.bubble()) == F(f).bubble()
+
+Terms
+-----
+
+An arrow also reads as a term of the kappa calculus, see :class:`TermBase`:
+a variable for its domain under the sequence of its boxes.
+
+>>> print(arrow.to_term())
+x.kappa(lambda x0: h(g(f(x0))))
+>>> assert arrow.to_term().eval() == arrow
+
+A statement :func:`let` names the output of a box, and the normal form of a
+term has none: the terms of a category are its arrows, i.e. sequences.
+
+>>> a, (c, d, e) = Variable('a', x), map(Constant, (f, g, h))
+>>> statement = let(c(a), lambda y: let(d(y), lambda z: e(z)))
+>>> print(statement)
+let(f(a), lambda y: let(g(y), lambda z: h(z)))
+>>> assert statement.normal_form() == e(d(c(a)))
+>>> assert statement.eval() == arrow
+
+Every module up the hierarchy has terms of its own, subclasses of these
+which say what a context is: one variable in a category, a list of variables
+each used once and in order in a monoidal one, see
+:class:`discopy.monoidal.TermBase`. Below :mod:`discopy.biclosed`, which
+adds the abstraction of the lambda calculus, they are variants of the kappa
+calculus.
 """
 
 from __future__ import annotations
 
-from functools import total_ordering, cached_property
+from abc import abstractmethod
+from functools import total_ordering, cached_property, reduce
+from inspect import signature
+from itertools import count
 from typing import (
-    Any, Callable, ClassVar, Mapping, Iterable, Self, TYPE_CHECKING)
+    Any, Callable, ClassVar, Mapping, Iterable, Self, Sequence,
+    TYPE_CHECKING)
 
 
 from discopy import messages, utils
 from discopy.abc import Category, DaggerCategory, Nat
 from discopy.testable import (
-    FUEL, GENERATORS, Equation as AbstractEquation, Serialisable)
+    FUEL, GENERATORS, Equation as AbstractEquation, Equivalence,
+    Serialisable, TestableGeneric, axiom)
 from discopy.utils import (  # noqa: F401
     factory,
     factory_key,
@@ -103,6 +145,7 @@ from discopy.utils import (  # noqa: F401
 
 if TYPE_CHECKING:
     import sympy
+    from hypothesis import strategies as st
 
 dumps, loads = utils.dumps, utils.loads
 
@@ -141,6 +184,23 @@ class Ob(Serialisable["Ob"]):
     def atoms(self) -> list[Ob]:
         """ An object is its own atom, the generator its string names. """
         return [self]
+
+    def kappa(self, function: Callable) -> Kappa:
+        """
+        The kappa abstraction of a Python function from a variable of this
+        type to a term, see :class:`Kappa`.
+
+        Parameters:
+            function : The body, as a function of the variable.
+
+        Example
+        -------
+        >>> x = Ob('x')
+        >>> f = Box('f', x, x)
+        >>> assert x.kappa(lambda a: Constant(f)(Constant(f)(a))).eval()\\
+        ...     == f >> f
+        """
+        return Kappa.from_callable(self)(function)
 
     def __eq__(self, other):
         return isinstance(other, type(self)) and self.name == other.name
@@ -428,6 +488,25 @@ class Arrow(FreeCategory, DaggerCategory, Serialisable["Arrow"]):
         """
         return self.dom.atoms() + [
             atom for box in self.inside for atom in box.atoms()]
+
+    def to_term(self) -> TermBase:
+        """
+        Read an arrow as a term of the kappa calculus, see
+        :class:`TermBase`: a variable ``x0`` for its domain under the
+        sequence of its boxes, so that :meth:`TermBase.eval` gives the
+        arrow back and equal arrows read as equal terms.
+
+        Example
+        -------
+        >>> x, y, z = Ob('x'), Ob('y'), Ob('z')
+        >>> f, g = Box('f', x, y), Box('g', y, z)
+        >>> print((f >> g).to_term())
+        x.kappa(lambda x0: g(f(x0)))
+        >>> print(Arrow.id(x).to_term())
+        x.kappa(lambda x0: x0)
+        >>> assert (f >> g).to_term().eval() == f >> g
+        """
+        return TermBase.from_diagram(self)
 
     def __add__(self, other):
         return self.sum_factory((self, )) + other
@@ -1571,4 +1650,998 @@ Ob.equation_factory = Equation
 Arrow.equation_factory = Equation  # ty: ignore[invalid-assignment]
 Arrow.sum_factory = Sum
 Arrow.bubble_factory = Bubble
+Arrow.functor_factory = Functor
 Id = Arrow.id
+
+
+class Renamed[factory](TestableGeneric, tuple):
+    """
+    Alpha-equivalent terms of the ``factory``: one shape generated under two
+    or more namings of its bound variables, see :meth:`TermBase.generate`.
+
+    Example
+    -------
+    >>> from hypothesis import find
+    >>> terms = find(
+    ...     Renamed[TermBase].strategy(), lambda terms: len(terms) == 3)
+    >>> assert terms[0].alpha_eq(*terms[1:])
+    """
+    @classmethod
+    def checked_params(cls) -> tuple:
+        """ None, a sort of premises being drawn over a category. """
+        return ()
+
+    @classmethod
+    def strategy(cls, **params) -> "st.SearchStrategy[Renamed]":
+        """
+        Generate a shape and at least two namings of it.
+
+        Parameters:
+            params : Passed to :meth:`TermBase.shapes`.
+        """
+        from hypothesis import strategies as st
+
+        category = cls.factory
+        return st.builds(
+            lambda shape, namings: cls(
+                category.generate(*shape, letters) for letters in namings),
+            category.shapes(**params),
+            st.lists(category.namings(), min_size=2, max_size=3))
+
+
+class Canonical[factory](TestableGeneric, tuple):
+    """
+    Two terms of the ``factory`` followed by their canonical forms: two
+    shapes of one type, the second the first's or another, each generated
+    under its own naming and then under the one naming ``"x"``, which names
+    every bound variable by its level, so that the two terms are
+    alpha-equivalent exactly when their canonical forms are equal. Where
+    :class:`Renamed` draws terms alpha-equivalent by construction, this
+    decides the alpha-equivalence of any pair, see
+    :meth:`AlphaEquivalence.alpha_completeness`.
+
+    Example
+    -------
+    >>> from hypothesis import find
+    >>> first, second, *canonical = find(
+    ...     Canonical[TermBase].strategy(),
+    ...     lambda terms: terms[0] != terms[1] and terms[2] == terms[3])
+    >>> assert first.alpha_eq(second)
+    """
+    @classmethod
+    def checked_params(cls) -> tuple:
+        """ None, a sort of premises being drawn over a category. """
+        return ()
+
+    @classmethod
+    def build(cls, shape: tuple, others: list[int] | None,
+              namings: tuple[Sequence[str], Sequence[str]]) -> "Canonical":
+        """
+        The terms of a shape and of another, the same when ``others`` is
+        ``None``, under their namings and then under the canonical one.
+        """
+        cod, choices, types = shape
+        shapes = (choices, choices if others is None else others)
+        return cls(
+            cls.factory.generate(cod, each, types, letters)
+            for each, letters in zip(2 * shapes, (*namings, "x", "x")))
+
+    @classmethod
+    def strategy(cls, **params) -> "st.SearchStrategy[Canonical]":
+        """
+        Generate a shape, its choices again or others, and two namings.
+
+        Parameters:
+            params : Passed to :meth:`TermBase.shapes`.
+        """
+        from hypothesis import strategies as st
+
+        category = cls.factory
+        return st.builds(
+            cls.build, category.shapes(**params),
+            st.none() | category.choices(),
+            st.tuples(category.namings(), category.namings()))
+
+
+class AlphaEquivalence(Equivalence):
+    """
+    Terms with bound variables, an :class:`discopy.testable.Equivalence` up
+    to their names, see :meth:`alpha_eq`: the terms of the kappa calculus,
+    see :class:`TermBase`, and those of the lambda calculus, see
+    :class:`discopy.biclosed.TermBase`.
+
+    """
+    def alpha_eq(self, *others: Term) -> bool:
+        """
+        Whether the terms are all alpha-equivalent to this one, i.e. equal up
+        to the names of their bound variables, in one pass over the terms.
+
+        Free variables are compared by name and bound ones by the depth of
+        the binder they refer to, see :meth:`alpha_eq_under`.
+        Alpha-equivalent terms evaluate to the same diagram, the converse
+        does not hold.
+
+        Example
+        -------
+        >>> x, y = Ob("x"), Ob("y")
+        >>> f = Constant(Box("f", x, y))
+        >>> a, b = Variable("a", x), Variable("b", x)
+        >>> assert x.kappa(lambda a: f(a)).alpha_eq(
+        ...     x.kappa(lambda b: f(b)), x.kappa(lambda c: f(c)))
+        >>> assert f(a).eval() == f(b).eval() and not f(a).alpha_eq(f(b))
+        >>> assert not x.kappa(lambda a: a).alpha_eq(y.kappa(lambda a: a))
+        """
+        scopes = [{} for _ in (self, *others)]
+        return self.alpha_eq_under(scopes, list(others))
+
+    def alpha_eq_under(  # pylint: disable=unused-argument  # a constant
+            self, scopes: list[dict[Variable, int]], others: list[Term],
+            depth: int = 0) -> bool:
+        """
+        Whether the terms, this one and the ``others``, are alpha-equivalent
+        under a scope for each of them, mapping each variable bound above it
+        to the depth of its binder, i.e. its de Bruijn level, the same in
+        every term: the terms are alpha-equivalent when they are equal with
+        their bound variables read as levels, which is checked without
+        building anything. A :class:`Variable` compares its levels, itself
+        when its scope says nothing of it; a term that binds nothing and
+        refers to no binder, i.e. a :class:`Constant`, is alpha-equivalent
+        to its equals, reading neither ``scopes`` nor ``depth``; every
+        other term former recurses into its subterms, with the arguments
+        spelt out rather than unpacked, so that the recursion runs in
+        Python frames, as deep as the recursion limit allows, rather than
+        through C.
+
+        Entering a binder extends every scope in place with the variable it
+        binds at the current ``depth`` and leaving it restores them, so that
+        comparing the terms is one pass over them, linear in their size, and
+        the scopes read the same after the call.
+
+        Example
+        -------
+        >>> x = Ob("x")
+        >>> a, b = Variable("a", x), Variable("b", x)
+        >>> c, d = Constant(Box("c", x, x)), Constant(Box("d", x, x))
+        >>> assert a.alpha_eq_under([{a: 0}, {b: 0}], [b])
+        >>> assert not a.alpha_eq_under([{a: 0}, {b: 1}], [b])
+        >>> assert not a.alpha_eq_under([{a: 0}, {}], [b])
+        >>> assert c.alpha_eq_under([{a: 0}, {}], [c])
+        >>> assert not c.alpha_eq_under([{}, {}], [d])
+        """
+        return all(other == self for other in others)
+
+    @staticmethod
+    def alpha_eq_bound(scopes, bodies, variables, depth=0) -> bool:
+        """
+        Whether bodies are alpha-equivalent under their scopes extended with
+        the variables each one binds, read as the levels from ``depth`` on,
+        the scopes being restored on the way out.
+
+        Parameters:
+            scopes : The scope of each body.
+            bodies : The bodies, one per scope.
+            variables : The variables each body binds, in order.
+            depth : The level of the first variable bound.
+
+        Example
+        -------
+        >>> x, y = Ob("x"), Ob("y")
+        >>> f, v, w = Constant(Box("f", x, y)), Variable("v", x), \\
+        ...     Variable("w", x)
+        >>> scopes = [{v: 0}, {}]
+        >>> assert TermBase.alpha_eq_bound(scopes, [f(v), f(w)], [[v], [w]])
+        >>> assert scopes == [{v: 0}, {}]
+        """
+        shadowed = [{x: scope[x] for x in bound if x in scope}
+                    for scope, bound in zip(scopes, variables)]
+        for scope, bound in zip(scopes, variables):
+            scope.update({x: depth + i for i, x in enumerate(bound)})
+        result = bodies[0].alpha_eq_under(
+            scopes, list(bodies[1:]), depth + len(variables[0]))
+        for scope, bound, levels in zip(scopes, variables, shadowed):
+            for x in bound:
+                del scope[x]
+            scope.update(levels)
+        return result
+
+    @classmethod
+    def choices(cls) -> st.SearchStrategy[list[int]]:
+        """ Generate the choices of :meth:`generate`, one per node. """
+        from hypothesis import strategies as st
+
+        return st.lists(st.integers(min_value=0, max_value=11), max_size=12)
+
+    @classmethod
+    def generate(cls, cod, choices: Sequence[int], types: Sequence,
+                 letters: Sequence[str]):
+        """
+        Build a term of codomain ``cod`` from a sequence of ``choices``,
+        with variables of the given ``types`` and the bound ones named by
+        the ``letters``, see :meth:`TermBase.generate`.
+        """
+        # pylint: disable=unused-argument  # each calculus builds its own
+        raise NotImplementedError
+
+    @classmethod
+    def shapes(cls, *, types=None, cod=None) -> st.SearchStrategy[tuple]:
+        """
+        Generate the arguments of :meth:`generate` but its letters: a
+        codomain, the choices and the types of the variables, so that one
+        shape under several namings gives :class:`Renamed` terms.
+        """
+        # pylint: disable=unused-argument  # each calculus draws its own
+        raise NotImplementedError
+
+    @classmethod
+    def namings(cls) -> st.SearchStrategy[list[str]]:
+        """ Generate the letters naming the bound variables, one per level. """
+        from hypothesis import strategies as st
+
+        return st.lists(st.sampled_from("xyz"), min_size=1, max_size=3)
+
+    @classmethod
+    def strategy(cls, **params) -> st.SearchStrategy[Term]:
+        """
+        Generate terms, one :meth:`generate` call per shape and naming.
+
+        Parameters:
+            params : Passed to :meth:`shapes`.
+        """
+        from hypothesis import strategies as st
+
+        return st.builds(
+            lambda shape, letters: cls.generate(
+                shape[0], shape[1], shape[2], letters),
+            cls.shapes(**params), cls.namings())
+
+    @classmethod
+    def related(cls, **params) -> st.SearchStrategy[tuple]:
+        """
+        Generate a term, its canonical form and a second term of the same
+        type, the first again under another naming or another shape, see
+        :class:`Canonical`: the first two alpha-equivalent by construction,
+        the third alpha-equivalent to them or not.
+
+        Parameters:
+            params : Passed to :meth:`shapes`.
+        """
+        from hypothesis import strategies as st
+
+        return st.builds(
+            lambda terms: (terms[0], terms[2], terms[1]),
+            Canonical[cls].strategy(**params))  # ty: ignore[invalid-type-form]
+
+    @axiom
+    def alpha_renaming(cls, terms: Renamed[Self]) -> AbstractEquation:
+        """ A term is alpha-equivalent to its renamings, however many. """
+        return cls.equivalence_factory(*terms)
+
+    @axiom
+    def alpha_soundness(cls, terms: Renamed[Self]) -> AbstractEquation:
+        """ Alpha-equivalent terms evaluate to the same diagram. """
+        return AbstractEquation(*(term.eval() for term in terms))
+
+    @axiom
+    def alpha_completeness(cls, terms: Canonical[Self]) -> AbstractEquation:
+        """
+        Alpha-equivalence is decided by the canonical naming of the bound
+        variables: two terms are alpha-equivalent exactly when their
+        canonical forms are equal, see :class:`Canonical`. The other laws
+        hold of a relation that says yes too often; this one fails when
+        terms that are not alpha-equivalent are.
+        """
+        first, second, *canonical = terms
+        return AbstractEquation(
+            first.alpha_eq(second), canonical[0] == canonical[1])
+
+
+class TermBase(Serialisable, AlphaEquivalence):
+    # pylint: disable=too-many-public-methods  # its laws are methods
+    """
+    A term of the kappa calculus of :cite:t:`Hasegawa95`, the first-order
+    half of the lambda calculus: a term denotes an arrow rather than an
+    element of a function type, so it needs no exponential. In a category
+    it needs no tensor either: a term has one input, either its free
+    variable :math:`x : a \\vdash e : b` or its stack
+    :math:`\\vdash e : a \\to b`, the input still to be applied.
+
+    - a :class:`Variable` :math:`x : a \\vdash x : a` is an identity
+    - a :class:`Constant` :math:`\\vdash f : a \\to b` is a box
+    - an :class:`Application` :math:`e(c)` is :math:`c` then :math:`e`
+    - a :class:`Kappa` :math:`\\kappa x. e` moves the variable to the stack:
+      it is the identity on arrows
+
+    A statement ``let x = c in e`` is the redex :math:`(\\kappa x. e)(c)`,
+    see :func:`let`, and a term in :meth:`normal_form` has none: it is a
+    variable under a sequence of boxes, so that the terms of a category
+    are its arrows, see :meth:`normal_form_completeness`.
+
+    The modules up the hierarchy subclass these terms and relax what a
+    context is, e.g. a :class:`discopy.monoidal.TermBase` has a list of
+    variables, each used once and in order, around a stack of many inputs.
+
+    Attributes:
+        freevars (list[Variable]): The context, one variable or none.
+        stack (Ob | None): The input still to be applied, if any.
+        offset (int | None): The number of free variables left of the
+            stack, ``None`` when the term has no stack.
+        cod (Ob): The codomain.
+
+    Example
+    -------
+    >>> x, y, z = Ob('x'), Ob('y'), Ob('z')
+    >>> f, g = Box('f', x, y), Box('g', y, z)
+    >>> term = (f >> g).to_term()
+    >>> print(term)
+    x.kappa(lambda x0: g(f(x0)))
+    >>> assert term.eval() == f >> g
+    >>> a = Variable('a', x)
+    >>> statement = let(Constant(f)(a), lambda b: Constant(g)(b))
+    >>> assert statement.normal_form() == Constant(g)(Constant(f)(a))
+    """
+    freevars: list[Variable]
+    stack: Any
+    offset: int | None
+    cod: Any
+    serialised_attrs: ClassVar[tuple[str, ...]]
+    functor: ClassVar[Functor]
+    variable_factory: ClassVar[type[Variable]]
+    constant_factory: ClassVar[type[Constant]]
+    application_factory: ClassVar[type[Application]]
+    kappa_factory: ClassVar[type[Kappa]]
+
+    strategy = classmethod(AlphaEquivalence.strategy.__func__)
+
+    @property
+    def parts(self) -> tuple:
+        """ What the term is built from, in the order of its arguments. """
+        return tuple(getattr(self, attr) for attr in self.serialised_attrs)
+
+    def setoid(self):
+        """ Terms are equal when their classes and their parts are. """
+        return (factory_key(type(self)), ) + self.parts
+
+    def __eq__(self, other):
+        return isinstance(other, TermBase) and self.setoid() == other.setoid()
+
+    def __hash__(self):
+        return hash(self.setoid())
+
+    def __repr__(self):
+        return factory_name(type(self))\
+            + f"({', '.join(map(repr, self.parts))})"
+
+    def to_tree(self) -> dict:
+        """ The tree of a term: its factory and the trees of its parts. """
+        return {"factory": factory_name(type(self)), **{
+            attr: [x.to_tree() for x in part] if isinstance(part, tuple)
+            else part.to_tree() if hasattr(part, "to_tree") else part
+            for attr, part in zip(self.serialised_attrs, self.parts)}}
+
+    @classmethod
+    def from_tree(cls, tree: dict) -> Self:
+        """ The term of a tree, see :meth:`to_tree`. """
+        return cls(*(
+            tuple(map(from_tree, part)) if isinstance(part, list)
+            else from_tree(part) if isinstance(part, dict) else part
+            for part in (tree[attr] for attr in cls.serialised_attrs)))
+
+    @staticmethod
+    def wires(typ) -> list:
+        """ The types of one wire a type is made of: itself, if any. """
+        return [typ] if typ else []
+
+    def types(self, variables: Sequence[Variable]):
+        """ The type of some variables: that of the one of a category. """
+        variable, = variables
+        return variable.cod
+
+    @property
+    def dom(self):
+        """ The domain: the stack, or else the type of the variable. """
+        return self.stack or self.types(self.freevars)
+
+    @property
+    def constants(self) -> list[Constant]:
+        """ The constants of the term, in order of occurrence. """
+        return []
+
+    @property
+    def category(self) -> type[Arrow]:
+        """
+        The category of the boxes of the term, where it evaluates by
+        default: that of its module when it has no constant.
+
+        >>> from discopy import monoidal
+        >>> f = monoidal.Box('f', monoidal.Ty('x'), monoidal.Ty('y'))
+        >>> assert Constant(f).category is monoidal.Diagram
+        """
+        return next((
+            constant.box.ar for constant in self.constants), self.functor.cod)
+
+    @abstractmethod
+    def eval(self, functor=None):
+        """
+        The image of the term under a functor, the identity of its
+        :attr:`category` by default, i.e. its arrow from :attr:`dom` to
+        :attr:`cod`: a variable is an identity, a constant its box, an
+        application composes its argument then its function, and a kappa
+        does nothing.
+
+        Parameters:
+            functor : The functor to evaluate the types and the boxes.
+
+        Example
+        -------
+        >>> x, y = Ob('x'), Ob('y')
+        >>> f, g = Box('f', x, y), Box('g', y, x)
+        >>> term = x.kappa(lambda a: Constant(g)(Constant(f)(a)))
+        >>> assert term.eval() == f >> g
+        >>> F = Functor({x: y, y: x}, {f: g, g: f})
+        >>> assert term.eval(F) == g >> f
+        """
+
+    def identity(self, functor):
+        """ The identity functor of the :attr:`category` by default. """
+        return functor or self.category.functor_factory.id(self.category)
+
+    def draw(self, **params):
+        """ Draw the diagram of the term, see :meth:`eval`. """
+        return self.eval().draw(**params)
+
+    def __call__(self, *arguments: TermBase) -> TermBase:
+        """ The term applied to each of the arguments in turn. """
+        return reduce(self.application_factory, arguments, self)
+
+    def substitute(
+            self, substitution: dict[Variable, TermBase]) -> TermBase:
+        """
+        The term with terms of no stack substituted for free variables,
+        each in place and renaming the bound variables it would capture.
+
+        Parameters:
+            substitution : The term to substitute for each variable.
+
+        Example
+        -------
+        >>> x = Ob('x')
+        >>> f, a, b = Constant(Box('f', x, x)), Variable('a', x), \\
+        ...     Variable('b', x)
+        >>> assert f(a).substitute({a: f(b)}) == f(f(b))
+        """
+        # pylint: disable=unused-argument  # a constant has no variable
+        return self
+
+    def normal_form(self) -> TermBase:
+        """
+        The beta normal form of the term: every redex
+        :math:`(\\kappa x. e)(c)` with :math:`c` of the type of :math:`x`
+        is contracted to :math:`e[c / x]`, in one pass since a linear
+        substitution creates no redex, see :meth:`normal_form_soundness`.
+
+        Example
+        -------
+        >>> x = Ob('x')
+        >>> f, a = Constant(Box('f', x, x)), Variable('a', x)
+        >>> assert let(f(a), lambda b: f(b)).normal_form() == f(f(a))
+        """
+        return self
+
+    def expand(self) -> TermBase:
+        """
+        The eta expansion of a term: its application to a fresh variable
+        for each input of its stack, under their kappa, and itself when it
+        has no stack, see :meth:`eta`.
+
+        Example
+        -------
+        >>> x = Ob('x')
+        >>> f = Constant(Box('f', x, x))
+        >>> assert f.expand() == x.kappa(lambda x: f(x))
+        """
+        variables: list[Variable] = []
+        for typ in self.wires(self.stack):
+            variables.append(self.variable_factory.fresh(
+                "x", typ, self, *variables))
+        return self.kappa_factory(
+            tuple(variables), self(*variables), self.offset)\
+            if variables else self
+
+    @classmethod
+    def from_diagram(cls, diagram: Arrow) -> TermBase:
+        """
+        The term of an arrow, see :meth:`Arrow.to_term`.
+
+        Parameters:
+            diagram : The arrow to read.
+        """
+        variable = cls.variable_factory("x0", diagram.dom)
+        body = reduce(
+            lambda term, box: cls.constant_factory(box)(term),
+            diagram.inside, variable)
+        return cls.kappa_factory((variable, ), body)
+
+    @classmethod
+    def generate(cls, cod: Ob, choices: Sequence[int], types: Sequence[Ob],
+                 letters: Sequence[str]) -> TermBase:
+        """
+        Build a term of codomain ``cod`` from a sequence of ``choices``, one
+        per node and leaves once it runs out: a variable, free and named
+        ``v0`` or bound by a kappa, under fresh constants ``c0, c1, ...``,
+        each one applied or the body of a statement. The variable bound at
+        each level is named by the letter at that level, so that one
+        sequence of choices under two namings gives alpha-equivalent terms.
+
+        Parameters:
+            cod : The codomain of the term.
+            choices : The choices, consumed one per node.
+            types : The types the variables are drawn from.
+            letters : The letters naming the bound variables.
+
+        Example
+        -------
+        >>> x, y = Ob('x'), Ob('y')
+        >>> choices = [0, 0, 2, 1, 1, 1, 0, 1, 0]
+        >>> print(TermBase.generate(y, choices, [x, y], "ab"))
+        x.kappa(lambda a0: let(c1(a0), lambda b1: c0(b1)))
+        >>> print(TermBase.generate(y, [0, 1, 1], [x, y], "ab"))
+        c0(v0)
+        """
+        left, fresh = iter(choices), count()
+
+        def choose(options):
+            return options[next(left, 0) % len(options)]
+
+        def constant(dom, cod):
+            return cls.constant_factory(Box(f"c{next(fresh)}", dom, cod))
+
+        def state(variable, cod, level):
+            kind = choose(("leaf", "apply", "let"))
+            if kind == "leaf":
+                return variable if variable.cod == cod\
+                    else constant(variable.cod, cod)(variable)
+            typ = choose(types)
+            if kind == "apply":
+                return constant(typ, cod)(state(variable, typ, level))
+            bound = cls.variable_factory(
+                f"{letters[level % len(letters)]}{level}", typ)
+            return cls.kappa_factory(
+                (bound, ), state(bound, cod, level + 1))(
+                    state(variable, typ, level))
+
+        dom = choose(types)
+        if choose((True, False)):
+            variable = cls.variable_factory(f"{letters[0]}0", dom)
+            return cls.kappa_factory((variable, ), state(variable, cod, 1))
+        return state(cls.variable_factory("v0", dom), cod, 0)
+
+    @classmethod
+    def shapes(cls, *, types=None, cod=None) -> st.SearchStrategy[tuple]:
+        """
+        Generate the arguments of :meth:`generate` but its letters.
+        """
+        from hypothesis import strategies as st
+
+        types = Ob.strategy() if types is None else types
+        return st.tuples(
+            types if cod is None else st.just(cod), cls.choices(),
+            st.lists(types, min_size=1, max_size=3))
+
+    @axiom
+    def eta(cls, term: Self) -> AbstractEquation:
+        """
+        Eta expansion on the nose: a term and its :meth:`expand` evaluate
+        to the same arrow.
+        """
+        return AbstractEquation(term.expand().eval(), term.eval())
+
+    @axiom
+    def normal_form_soundness(cls, term: Self) -> AbstractEquation:
+        """
+        Beta reduction is sound: a term and its normal form evaluate to
+        the same arrow, on the nose in a category, where nothing commutes.
+        """
+        return AbstractEquation(term.eval(), term.normal_form().eval())
+
+    @axiom
+    def normal_form_idempotence(cls, term: Self) -> AbstractEquation:
+        """ A normal form is its own normal form. """
+        normal_form = term.normal_form()
+        return AbstractEquation(normal_form.normal_form(), normal_form)
+
+    @axiom
+    def normal_form_completeness(cls, term: Self) -> AbstractEquation:
+        """
+        The terms of a category are its arrows, i.e. sequences of boxes:
+        the reading of the arrow of a term is the normal form of its
+        :meth:`expand` with its variable bound, up to the name of that
+        variable, so that two terms are equal up to alpha, beta and eta
+        exactly when their arrows are equal.
+        """
+        long = term.expand()
+        closed = cls.kappa_factory(tuple(long.freevars), long)\
+            if long.freevars else long
+        return cls.equivalence_factory(
+            term.eval().to_term(), closed.normal_form())
+
+    @axiom
+    def reading(cls, term: Self) -> AbstractEquation:
+        """
+        Reading is a section of evaluation: the arrow of a term reads as a
+        term that evaluates back to it, box for box.
+        """
+        diagram = term.eval()
+        return AbstractEquation(diagram.to_term().eval(), diagram)
+
+
+class Variable(TermBase):
+    """
+    A variable with a name and a type, an identity arrow.
+
+    Parameters:
+        name : The name of the variable.
+        cod : The type of the variable.
+
+    Example
+    -------
+    >>> a = Variable('a', Ob('x'))
+    >>> assert a.eval() == Arrow.id(Ob('x')) and a.freevars == [a]
+    """
+    serialised_attrs = ("name", "cod")
+
+    def __init__(self, name: str, cod: Ob):
+        self.name, self.cod, self.stack, self.offset = name, cod, None, None
+        self.freevars = [self]
+
+    def __str__(self):
+        return self.name
+
+    def atoms(self) -> list:
+        """ A variable prints as its bare name, it is its own atom. """
+        return [self]
+
+    def eval(self, functor=None):
+        functor = self.identity(functor)
+        return functor.cod.id(functor(self.cod))
+
+    def substitute(self, substitution):
+        return substitution.get(self, self)
+
+    def alpha_eq_under(  # pylint: disable=unused-argument  # depth: binders
+            self, scopes, others, depth=0):
+        """ Variables alike by the level of their binder, by name if free. """
+        if any(type(other) is not type(self) for other in others):
+            return False
+        images = [scope.get(term, term)
+                  for scope, term in zip(scopes, (self, *others))]
+        return all(image == images[0] for image in images[1:])
+
+    @classmethod
+    def fresh(cls, name, cod, *terms):
+        """
+        A variable of a given type whose name is not free in any of the terms,
+        underscores being appended to the name until it is not.
+
+        Parameters:
+            name : The name to start from.
+            cod : The type of the variable.
+            terms : The terms in which the variable must not be free.
+
+        Example
+        -------
+        >>> x = Ob("x")
+        >>> assert Variable.fresh("v", x, Variable("v", x))\\
+        ...     == Variable("v_", x)
+        """
+        names = {
+            variable.name for term in terms for variable in term.freevars}
+        while name in names:
+            name += "_"
+        return cls(name, cod)
+
+
+class Constant(TermBase):
+    """
+    A box as a term, with its domain as stack. It prints as the name of the
+    box, so that a term reads as a program calling its boxes.
+
+    Parameters:
+        box : The box.
+
+    Example
+    -------
+    >>> x, y = Ob('x'), Ob('y')
+    >>> f = Constant(Box('f', x, y))
+    >>> assert f.stack == x and f.cod == y and not f.freevars
+    >>> print(f(Variable('a', x)))
+    f(a)
+    """
+    serialised_attrs = ("box", )
+
+    def __init__(self, box: Box):
+        assert_isinstance(box, Box)
+        self.box, self.freevars = box, []
+        self.stack, self.cod = box.dom, box.cod
+        self.offset = 0 if box.dom else None
+
+    def __str__(self):
+        return self.box.name
+
+    def atoms(self) -> list:
+        """ A constant prints as the name of its box, it is its own atom. """
+        return [self]
+
+    @property
+    def constants(self):
+        return [self]
+
+    def eval(self, functor=None):
+        return self.identity(functor)(self.box)
+
+
+class Application(TermBase):
+    """
+    The application of a term to an argument with no stack, of the type of
+    its own stack: the composition of the argument then the term.
+
+    Parameters:
+        func : The term that is applied.
+        arg : The argument, a term with no stack.
+
+    Example
+    -------
+    >>> x, y = Ob('x'), Ob('y')
+    >>> f, g = Constant(Box('f', x, y)), Constant(Box('g', y, x))
+    >>> a = Variable('a', x)
+    >>> assert g(f(a)).eval() == f.box >> g.box
+    >>> assert g(f(a)).freevars == [a] and g(f(a)).stack is None
+    >>> f(f(a))
+    Traceback (most recent call last):
+        ...
+    ValueError: f of stack x does not apply to f(a) of stack None and \
+type y.
+    """
+    serialised_attrs = ("func", "arg")
+
+    def __init__(self, func: TermBase, arg: TermBase):
+        assert_isinstance(func, TermBase)
+        assert_isinstance(arg, TermBase)
+        if arg.stack or func.stack != arg.cod:
+            raise ValueError(messages.NOT_APPLICABLE.format(
+                func, func.stack, arg, arg.stack, arg.cod))
+        self.func, self.arg, self.freevars = func, arg, arg.freevars
+        self.stack, self.cod, self.offset = None, func.cod, None
+
+    @property
+    def spine(self) -> tuple[TermBase, list[TermBase]]:
+        """ The term applied first and its arguments, in order. """
+        head, arguments = self.func, [self.arg]
+        while isinstance(head, Application):
+            head, arguments = head.func, [head.arg] + arguments
+        return head, arguments
+
+    def __str__(self):
+        head, arguments = self.spine
+        if isinstance(head, Kappa) and len(arguments) == 1\
+                and not head.body.stack and head.stack == self.arg.cod:
+            return f"let({self.arg}, {head.function})"
+        return f"{head}({', '.join(map(str, arguments))})"
+
+    def atoms(self) -> list:
+        """ The atoms of an application: those of its function and arg. """
+        return self.func.atoms() + self.arg.atoms()
+
+    @property
+    def constants(self):
+        return self.func.constants + self.arg.constants
+
+    def eval(self, functor=None):
+        functor = self.identity(functor)
+        return self.arg.eval(functor) >> self.func.eval(functor)
+
+    def substitute(self, substitution):
+        return type(self)(self.func.substitute(substitution),
+                          self.arg.substitute(substitution))
+
+    def normal_form(self):
+        func, arg = self.func.normal_form(), self.arg.normal_form()
+        if not isinstance(func, Kappa) or func.head is None\
+                or func.head.cod != arg.cod:
+            return type(self)(func, arg)
+        body = func.body.substitute({func.head: arg})
+        return type(func)(func.variables[1:], body) if func.variables[1:]\
+            else body
+
+    def alpha_eq_under(self, scopes, others, depth=0):
+        """ Applications with functions and arguments alike. """
+        if any(type(other) is not type(self) for other in others):
+            return False
+        return self.func.alpha_eq_under(
+            scopes, [other.func for other in others], depth)\
+            and self.arg.alpha_eq_under(
+                scopes, [other.arg for other in others], depth)
+
+
+class Kappa(TermBase):
+    """
+    The abstraction of the variable of a ``body`` with no stack: it becomes
+    the stack, so that the kappa of a term is the same arrow.
+
+    Parameters:
+        variables : The variables to bind, the one of the body.
+        body : The term in which they are bound.
+        offset : The number of free variables left of the stack, none in a
+            category, see :class:`discopy.monoidal.Kappa`.
+
+    Note
+    ----
+    Applying a type to a Python function with :meth:`Ob.kappa` names the
+    variable after its parameter.
+
+    Example
+    -------
+    >>> x, y = Ob('x'), Ob('y')
+    >>> f, a = Constant(Box('f', x, y)), Variable('a', x)
+    >>> term = Kappa((a, ), f(a))
+    >>> assert term == x.kappa(lambda a: f(a)) and term.eval() == f.box
+    >>> assert term.stack == x and not term.freevars
+    >>> Kappa((Variable('b', x), ), f(a))
+    Traceback (most recent call last):
+        ...
+    ValueError: Expected the free variable of f(a), with no stack, got b.
+    """
+    serialised_attrs = ("variables", "body", "offset")
+    offset: int
+
+    def __init__(self, variables: tuple[Variable, ...], body: TermBase,
+                 offset: int | None = None):
+        assert_isinstance(body, TermBase)
+        variables = tuple(variables)
+        if body.stack or list(variables) != body.freevars or offset:
+            raise ValueError(messages.NOT_THE_VARIABLE.format(
+                body, ", ".join(x.name for x in variables)))
+        self.variables, self.body, self.offset = variables, body, 0
+        self.freevars, self.cod = [], body.cod
+        self.stack = body.types(variables)
+
+    @property
+    def head(self) -> Variable | None:
+        """ The variable the first input of the stack binds, if any. """
+        front = not self.body.stack or self.body.offset != self.offset
+        return self.variables[0] if self.variables and front else None
+
+    @property
+    def function(self) -> str:
+        """ The Python function of the body, as printed. """
+        names = "".join(f" {x.name}," for x in self.variables).rstrip(",")
+        offset = "" if self.variables else f", offset={self.offset}"
+        return f"lambda{names}: {self.body}{offset}"
+
+    def __str__(self):
+        dom = self.body.types(self.variables)
+        dom = f"({dom})" if len(self.variables) > 1 else str(dom)
+        return f"{dom}.kappa({self.function})"
+
+    def atoms(self) -> list:
+        """
+        The atoms of a kappa: those of the types of its variables and of
+        its body but the variables, which the lambda it prints binds.
+        """
+        return self.body.types(self.variables).atoms() + [
+            atom for atom in self.body.atoms() if atom not in self.variables]
+
+    @property
+    def constants(self):
+        return self.body.constants
+
+    def eval(self, functor=None):
+        return self.body.eval(self.identity(functor))
+
+    def substitute(self, substitution):
+        inside = {x: term for x, term in substitution.items()
+                  if x in self.freevars}
+        captured = {x for term in inside.values() for x in term.freevars}
+        variables, body = list(self.variables), self.body
+        for i, variable in enumerate(variables):
+            if variable in captured:
+                variables[i] = self.variable_factory.fresh(
+                    variable.name, variable.cod, body, *inside.values())
+                body = body.substitute({variable: variables[i]})
+        offset = self.offset + sum(
+            len(inside[x].freevars) - 1
+            for x in self.freevars[:self.offset] if x in inside)
+        return type(self)(tuple(variables), body.substitute(inside), offset)
+
+    def normal_form(self):
+        return type(self)(
+            self.variables, self.body.normal_form(), self.offset)
+
+    def alpha_eq_under(self, scopes, others, depth=0):
+        """ Kappas of variables of the same types, with bodies alike. """
+        if any(type(other) is not type(self) or other.offset != self.offset
+               or [x.cod for x in other.variables]
+               != [x.cod for x in self.variables] for other in others):
+            return False
+        terms = (self, *others)
+        return self.alpha_eq_bound(
+            scopes, [term.body for term in terms],
+            [term.variables for term in terms], depth)
+
+    @classmethod
+    def from_callable(cls, dom, offset: int | None = None
+                      ) -> Callable[[Callable], Kappa]:
+        """
+        The kappa of a Python function from a variable for each wire of
+        ``dom``, named after its parameters, to the body.
+
+        Parameters:
+            dom : The types of the variables.
+            offset : Passed to :class:`Kappa`.
+
+        Example
+        -------
+        >>> x = Ob('x')
+        >>> f = Constant(Box('f', x, x))
+        >>> @Kappa.from_callable(x)
+        ... def term(a):
+        ...     return f(f(a))
+        >>> assert term == x.kappa(lambda a: f(f(a)))
+        """
+        def decorator(function):
+            names, wires = list(signature(function).parameters), cls.wires(dom)
+            if len(names) != len(wires):
+                raise ValueError(
+                    f"Expected {len(wires)} variables, got {len(names)}")
+            variables = tuple(map(cls.variable_factory, names, wires))
+            return cls(variables, function(*variables), offset)
+
+        return decorator
+
+
+type Term = Variable | Constant | Application | Kappa
+
+
+def let(expression: TermBase, body: Callable, offset: int | None = None
+        ) -> TermBase:
+    """
+    Bind the outputs of an ``expression`` in the ``body`` of a Python
+    function, i.e. the redex of its :class:`Kappa` applied to it.
+
+    Parameters:
+        expression : The term that is evaluated, with no stack.
+        body : A function from a variable for each output to a term.
+        offset : Passed to :class:`Kappa`, for an expression of no output.
+
+    Example
+    -------
+    >>> x, y = Ob('x'), Ob('y')
+    >>> f, g = Constant(Box('f', x, y)), Constant(Box('g', y, x))
+    >>> term = let(f(Variable('a', x)), lambda b: g(b))
+    >>> assert term == y.kappa(lambda b: g(b))(f(Variable('a', x)))
+    >>> assert term.eval() == f.box >> g.box
+    """
+    kappa = expression.kappa_factory.from_callable(expression.cod, offset)
+    return kappa(body)(expression)
+
+
+class AlphaEquation(AbstractEquation):
+    """
+    An equation between terms which holds when they are alpha-equivalent,
+    see :meth:`AlphaEquivalence.alpha_eq`.
+
+    Example
+    -------
+    >>> x, y = Ob('x'), Ob('y')
+    >>> f = Constant(Box('f', x, y))
+    >>> assert AlphaEquation(x.kappa(lambda a: f(a)), x.kappa(lambda b: f(b)))
+    >>> assert not AlphaEquation(f(Variable('a', x)), f(Variable('b', x)))
+    """
+    def __bool__(self):
+        term, *others = self.terms
+        return term.alpha_eq(*others)
+
+
+TermBase.functor = Functor.id(Arrow)
+TermBase.equivalence_factory = AlphaEquation
+TermBase.variable_factory, TermBase.constant_factory = Variable, Constant
+TermBase.application_factory, TermBase.kappa_factory = Application, Kappa

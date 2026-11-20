@@ -243,6 +243,10 @@ STRETCH_LENGTHS = (
 NOT_ONE_OUTPUT = "Expected exactly one output, got {}: a term has one."
 NOT_APPLICABLE = "{} of stack {} does not apply to {} of stack {} and type {}."
 NOT_A_BLOCK = "Expected a block of variables next to the stack of {}, got {}."
+STATEMENTS_DO_NOT_COMMUTE = (
+    "A statement binding several outputs or none stays in a normal form, "
+    "and two of them do not commute.")
+NOT_THE_VARIABLE = "Expected the free variable of {}, with no stack, got {}."
 NO_OFFSET = (
     "Expected an offset for the abstraction of no variable in {}, which "
     "has no stack to say where it stands.")

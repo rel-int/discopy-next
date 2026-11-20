@@ -9,17 +9,20 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Added
 
-- `discopy.kappa`, the planar linear kappa calculus, i.e. the terms of a
-  monoidal category: a term has a context of variables, a stack of inputs
-  and one output, with `Variable`, `Constant`, `Application` and `Kappa`,
-  `let` for the redex and `Ty.kappa` for the abstraction of a Python function.
-  `monoidal.Diagram.to_term` reads a diagram with exactly one output as a
-  term with a `let` for each box but the last, which gives the output, and
-  refuses any other, `eval` gives the diagram back and `normal_form` inlines
-  the boxes with one output, up to interchange, which
-  `kappa.InterchangeEquation` decides for small diagrams by a search of the
-  orbit under interchangers. Its laws are cells of the property matrix
-  ([next#658]).
+- The kappa calculus, the first-order half of the lambda calculus: each
+  module below the closed categories has terms of its own, `Variable`,
+  `Constant`, `Application` and `Kappa`, with `let` for the redex. In `cat`
+  a term has one variable and is a sequence of boxes: `Arrow.to_term` reads
+  an arrow, `eval` gives it back and terms are equal up to alpha, beta and
+  eta exactly when their arrows are. In `monoidal` a term is planar and
+  linear, with a context of variables, a stack of inputs and one output:
+  `Diagram.to_term` reads a diagram with exactly one output as a term with a
+  `let` for each box but the last, which gives the output, and refuses any
+  other, and `normal_form` inlines the boxes with one output, up to
+  interchange, which `monoidal.InterchangeEquation` decides for small
+  diagrams by a search of the orbit under interchangers. `Ob.kappa` and
+  `Ty.kappa` abstract a Python function, and the laws are cells of the
+  property matrix ([next#658]).
 - `discopy.peirce.alpha` and `discopy.peirce.beta`: Peirce's existential
   graphs as diagrams with white and black regions, a cut where the colour
   changes. `~d`, `d & e`, `d | e`, `d.relative_sum(e)` and `d.par(e)` are
@@ -462,6 +465,10 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Changed
 
+- The alpha-equivalence of terms is stated once, in `cat.AlphaEquivalence`,
+  for the kappa and the lambda calculus: `alpha_eq` and its laws move there
+  from `biclosed.TermBase`, which inherits them, with `Renamed` and
+  `Canonical`, still importable from `biclosed` ([next#658]).
 - `drawing.Drawing`, `python.finset.Cospan` and `interaction.Diagram`
   declare `abc.DaggerCategory`, the reflection of a drawing being
   involutive, with its contravariance and monoidality declared failing on

@@ -25,6 +25,13 @@ Summary
     Functor
     Match
     Equation
+    TermBase
+    Variable
+    Constant
+    Application
+    Kappa
+    InterchangeEquation
+    Sampler
 
 .. admonition:: Functions
 
@@ -34,6 +41,7 @@ Summary
         :toctree:
 
         uncolour_state
+        let
 
 Axioms
 ------
@@ -61,23 +69,108 @@ We can check the Eckmann-Hilton argument, up to interchanger.
 
 .. image:: /_static/monoidal/EckmannHilton.gif
     :align: center
+
+Terms
+-----
+
+A diagram also reads as a term of the planar linear kappa calculus, see
+:class:`TermBase`: the terms of :mod:`discopy.cat` with a list of variables
+as context, each used once and in order.
+
+A term has exactly one output, and the translation between diagrams and
+terms is faithful for the diagrams that have exactly one too:
+:meth:`Diagram.to_term` reads one variable for each wire
+and a ``let`` for each box but the last, which gives the output and needs
+none, and :meth:`TermBase.eval` gives the diagram back, box for box. A
+diagram with any other number of outputs is refused rather than read as the
+term of a different diagram.
+
+>>> x, y, z = map(Ty, "xyz")
+>>> f, g, h = Box('f', x, y), Box('g', x, z), Box('h', y @ z, x)
+>>> diagram = f @ x >> y @ g >> h
+>>> print(diagram.to_term())
+(x @ x).kappa(lambda x0, x1: let(f(x0), lambda x2: \
+let(g(x1), lambda x3: h(x2, x3))))
+>>> assert diagram.to_term().eval() == diagram
+>>> (f @ g).to_term()
+Traceback (most recent call last):
+    ...
+ValueError: Expected exactly one output, got y @ z: a term has one.
+
+This loses no diagram where the category has products: a
+:class:`discopy.closed.Pack` box turns any closed diagram into one with
+exactly one output, of :class:`discopy.closed.Product` type. A closed diagram
+reads as a lambda term by default, see :meth:`discopy.closed.Diagram.to_term`,
+and as a kappa term with :meth:`TermBase.from_diagram`.
+
+>>> from discopy import closed
+>>> X, Y, Z = map(closed.Ty, "XYZ")
+>>> F, G = closed.Box('f', X, Y), closed.Box('g', X, Z)
+>>> packed = F @ G >> closed.Pack(Y * Z)
+>>> assert len(packed.cod) == 1
+>>> print(TermBase.from_diagram(packed).normal_form())
+(X @ X).kappa(lambda x0, x1: Pack((Y * Z))(f(x0), g(x1)))
+>>> assert TermBase.from_diagram(packed).eval() == packed
+
+Beta reduction :math:`(\\kappa x. e)(c) = e[c / x]` inlines the ``let`` of a
+box with one output, and :meth:`TermBase.normal_form` inlines them all. It is
+sound up to interchange: the two orders of ``f @ g`` have one normal form.
+
+>>> print(diagram.to_term().normal_form())
+(x @ x).kappa(lambda x0, x1: h(f(x0), g(x1)))
+>>> other = x @ g >> f @ z >> h
+>>> assert other != diagram and InterchangeEquation(other, diagram)
+>>> assert other.to_term().normal_form() == diagram.to_term().normal_form()
+
+When every box has one output the normal form is a tree, and two diagrams
+with one output are equal up to interchange exactly when their normal forms
+are. A box with several outputs keeps its ``let``, which binds them all at
+once, and two such statements do not commute: there the normal form is
+sound, not complete.
+
+>>> copy = Box('copy', x, x @ x)
+>>> print((copy >> f @ g >> h).to_term().normal_form())
+x.kappa(lambda x0: let(copy(x0), lambda x1, x2: h(f(x1), g(x2))))
+>>> k = Box('k', x @ x @ x @ x, x)
+>>> first = copy @ x >> x @ x @ copy >> k
+>>> second = x @ copy >> copy @ x @ x >> k
+>>> assert first.to_hypergraph() == second.to_hypergraph()
+>>> assert first.to_term().normal_form() != second.to_term().normal_form()
+
+Eta expansion :math:`\\kappa x. e(x) = e` holds on the nose.
+
+>>> term = Constant(h)
+>>> assert (y @ z).kappa(lambda a, b: term(a, b)).eval() == term.eval() == h
+
+A term is drawn as its diagram:
+
+>>> diagram.to_term().draw(doctest='docs/_static/monoidal/let.svg')
+
+.. image:: /_static/monoidal/let.svg
+    :align: center
 """
 
 from __future__ import annotations
 
 import itertools
+from itertools import count
 from dataclasses import dataclass, field
 from functools import cached_property
 from operator import index
 from types import NoneType
 from typing import (
-    Iterable, Iterator, Callable, ClassVar, Mapping, Self, TYPE_CHECKING, cast)
+    Iterable, Iterator, Callable, ClassVar, Mapping, Self, Sequence,
+    TYPE_CHECKING, cast)
 from warnings import warn
 
 from discopy import abc, cat, drawing, hypergraph, cmap, messages, testable
 from discopy.abc import (
     ColouredMonoid, DaggerMonoidalCategory, Monoid, MonoidalCategory)
-from discopy.testable import Hom, Obj, TestableGeneric, Var, axiom
+# pylint: disable-next=unused-import  # the redex a term prints as
+from discopy.cat import let  # noqa: F401
+from discopy.testable import (
+    GENERATORS, Equation as AbstractEquation, Hom, Obj, TestableGeneric,
+    Var, axiom)
 from discopy.drawing import Drawing
 from discopy.config import (
     BOX_DRAWING_ATTRIBUTES, WIRE_DRAWING_ATTRIBUTES,
@@ -99,6 +192,7 @@ from discopy.utils import (
 
 if TYPE_CHECKING:
     import sympy
+    from hypothesis import strategies as st
 
 
 @dataclass(frozen=True)
@@ -630,22 +724,19 @@ class Ty(cat.Ob, cat.FreeCategory, ColouredMonoid):
     def kappa(self, function: Callable, offset: int | None = None):
         """
         The kappa abstraction of a Python function from a variable for each
-        wire of the type to a term, see :class:`discopy.kappa.Kappa`.
+        wire of the type to a term, see :class:`Kappa`.
 
         Parameters:
             function : The body, as a function of the variables.
-            offset : Passed to :class:`discopy.kappa.Kappa`.
+            offset : Passed to :class:`Kappa`.
 
         Example
         -------
-        >>> from discopy.kappa import Constant
         >>> x, y = Ty('x'), Ty('y')
         >>> f = Box('f', x @ y, x)
         >>> term = (x @ y).kappa(lambda a, b: Constant(f)(a, b))
         >>> assert term.eval() == f
         """
-        # pylint: disable-next=import-outside-toplevel  # it imports this
-        from discopy.kappa import Kappa
         return Kappa.from_callable(self, offset)(function)
 
     def atoms(self) -> list[Ty]:
@@ -1701,10 +1792,10 @@ class Diagram(cat.Arrow, DaggerMonoidalCategory, RichDisplay):
     def to_term(self):
         """
         Read a diagram with exactly one output as a term of the planar
-        linear kappa calculus, see :mod:`discopy.kappa`: a variable for each
+        linear kappa calculus, see :class:`TermBase`: a variable for each
         wire, ``x0, ..., x{n - 1}`` for the inputs, and a ``let`` for each
         box in the order of the layers, but the last when it gives the
-        output, so that :meth:`discopy.kappa.TermBase.eval` gives the
+        output, so that :meth:`TermBase.eval` gives the
         diagram back, box for box.
 
         A term has one output: a diagram with any other number of them is
@@ -1725,8 +1816,6 @@ class Diagram(cat.Arrow, DaggerMonoidalCategory, RichDisplay):
 let(e(x2), lambda: h(x1), offset=1)))
         >>> assert (f >> g).to_term().eval() == f >> g
         """
-        # pylint: disable-next=import-outside-toplevel  # it imports this
-        from discopy.kappa import TermBase
         return TermBase.from_diagram(self)
 
     def to_staircases(self):
@@ -2875,5 +2964,527 @@ Diagram.functor_factory = Functor
 Hypergraph = hypergraph.Hypergraph[Diagram]
 Drawing.ob = Ty
 Id = Diagram.id
+
+
+class TermBase(cat.TermBase):
+    """
+    A term of a monoidal category, i.e. of the planar linear kappa calculus:
+    a :class:`discopy.cat.TermBase` with a list of variables as context,
+    each one wire, and a type as stack. A term in a context
+    :math:`\\Gamma` with a stack :math:`A` of inputs still to be applied
+    and one output :math:`b`
+
+    .. math::
+
+        \\Gamma_1, \\Gamma_2 \\vdash e : A \\to b
+        \\qquad \\text{denotes} \\qquad
+        \\Gamma_1 \\otimes A \\otimes \\Gamma_2 \\to b
+
+    - an :class:`Application` :math:`e(c)` feeds a term :math:`c` with no
+      stack to the first inputs of the stack of :math:`e`, putting the
+      context of :math:`c` where they were
+    - a :class:`Kappa` :math:`\\kappa x. e` moves a block of variables from
+      the context to the stack, where they stand
+
+    Terms are linear, each variable occurs once, and planar, the context is
+    in the order of the occurrences and nothing ever crosses, so that they
+    evaluate with composition and whiskering alone.
+
+    Attributes:
+        freevars (list[Variable]): The context, in the order of the domain.
+        stack (Ty): The inputs still to be applied.
+        offset (int | None): The number of free variables left of the stack,
+            ``None`` when the term has no place for one: a term with no
+            stack that is not a :class:`Kappa`.
+        cod (Ty): The codomain, one wire unless the term is the expression
+            of a :func:`let` binding several variables, or none.
+
+    Example
+    -------
+    >>> x, y = Ty('x'), Ty('y')
+    >>> f, a, b = Constant(Box('f', x @ y, x)), Variable('a', x), \\
+    ...     Variable('b', y)
+    >>> term = f(a)
+    >>> assert term.freevars == [a] and term.offset == 1
+    >>> assert term.stack == y and term.dom == x @ y and term.cod == x
+    >>> assert term(b).dom == x @ y and term(b).offset is None
+    >>> g, h = Box('g', x, y), Box('h', x @ y @ x, y)
+    >>> term = (x @ x @ x).kappa(
+    ...     lambda a, b, c: Constant(h)(a, Constant(g)(b), c))
+    >>> assert term.eval() == x @ g @ x >> h
+    """
+    stack: Ty
+    cod: Ty
+
+    strategy = classmethod(cat.TermBase.strategy.__func__)
+
+    @staticmethod
+    def wires(typ: Ty) -> list[Ty]:
+        """ The types of one wire a type is made of. """
+        return [typ[i:i + 1] for i in range(len(typ))]
+
+    def types(self, variables: Sequence[cat.Variable]) -> Ty:
+        """ The tensor of the types of some variables. """
+        return self.cod[:0].tensor(*(x.cod for x in variables))
+
+    @property
+    def dom(self) -> Ty:
+        """ The domain: the stack between the two halves of the context. """
+        offset = len(self.freevars) if self.offset is None else self.offset
+        return self.types(self.freevars[:offset]) @ self.stack\
+            @ self.types(self.freevars[offset:])
+
+    @classmethod
+    def from_diagram(cls, diagram: Diagram) -> cat.TermBase:
+        """
+        The term of a diagram with one output, see
+        :meth:`Diagram.to_term`.
+
+        Parameters:
+            diagram : The diagram to read.
+        """
+        if len(diagram.cod) != 1:
+            raise ValueError(messages.NOT_ONE_OUTPUT.format(diagram.cod))
+        fresh = count()
+
+        def name(typ):
+            return [cls.variable_factory(f"x{next(fresh)}", wire)
+                    for wire in cls.wires(typ)]
+
+        inputs = name(diagram.dom)
+        wires, steps = list(inputs), []
+        for layer in diagram.inside:
+            for box, offset in layer.boxes_and_offsets:
+                arguments = wires[offset:offset + len(box.dom)]
+                outputs = name(box.cod)
+                wires[offset:offset + len(box.dom)] = outputs
+                steps.append((
+                    cls.constant_factory(box)(*arguments), outputs, offset))
+        result, = wires
+        for expression, outputs, offset in reversed(steps):
+            result = expression if outputs == [result]\
+                else cls.kappa_factory(
+                    tuple(outputs), result, offset)(expression)
+        return cls.kappa_factory(tuple(inputs), result, 0) if inputs\
+            else result
+
+    @classmethod
+    # pylint: disable-next=too-many-arguments,too-many-positional-arguments
+    def generate(cls, cod: Ty, choices: Sequence[int], types: Sequence[Ty],
+                 letters: Sequence[str]) -> cat.TermBase:
+        """
+        Build a term of codomain ``cod`` from a sequence of ``choices``, as
+        :meth:`discopy.biclosed.TermBase.generate` does: its inputs are
+        bound by a kappa or left free, named ``v0, v1, ...``, and the
+        variable bound at each level is named by the letter at that level,
+        see :class:`Sampler`.
+
+        Example
+        -------
+        >>> x, y = Ty('x'), Ty('y')
+        >>> print(TermBase.generate(y, [1, 0, 0, 2, 2, 1, 2], [x], "ab"))
+        x.kappa(lambda a0: let(c0(a0), lambda b1, a2: c1(b1, a2)))
+        >>> print(TermBase.generate(y, [1, 2, 1, 2, 2, 0, 2], [x], "ab"))
+        let(c0, lambda a0, b1: c1(a0, b1, v0))
+        """
+        sampler = Sampler(iter(choices), types, letters)
+        dom = [sampler.choose(types) for _ in range(sampler.choose(range(3)))]
+        if sampler.choose((False, True)):
+            return sampler.state(cod, tuple(
+                Variable(f"v{i}", typ) for i, typ in enumerate(dom)))
+        variables = tuple(
+            sampler.bound(i, typ) for i, typ in enumerate(dom))
+        body = sampler.state(cod, variables, len(dom))
+        return Kappa(variables, body) if variables else body
+
+    @classmethod
+    def shapes(cls, *, types=None, cod=None) -> st.SearchStrategy[tuple]:
+        """
+        Generate the arguments of :meth:`generate` but its letters, with
+        types of one wire each.
+        """
+        from hypothesis import strategies as st
+
+        types = st.sampled_from(GENERATORS).map(Ty) if types is None\
+            else types
+        return st.tuples(
+            types if cod is None else st.just(cod), cls.choices(),
+            st.lists(types, min_size=1, max_size=3))
+
+    @axiom
+    def normal_form_soundness(cls, term: Self) -> AbstractEquation:
+        """
+        Beta reduction is sound up to interchange, see
+        :class:`InterchangeEquation`: a term, its normal form and that of
+        the reading of its foliation evaluate to diagrams of one orbit. The
+        reading is there for beta reduction to change the order of its
+        boxes, those of a layer left to right: a generated term already
+        evaluates its arguments in the order its normal form does.
+        """
+        diagram = term.eval()
+        reading = diagram.foliation().to_term()
+        return InterchangeEquation(
+            diagram, term.normal_form().eval(), reading.normal_form().eval())
+
+    normal_form_completeness = cat.TermBase.normal_form_completeness\
+        .failing(messages.STATEMENTS_DO_NOT_COMMUTE)
+
+
+class Variable(TermBase, cat.Variable):
+    """
+    A variable with a name and a type of one wire, an identity diagram.
+
+    Parameters:
+        name : The name of the variable.
+        cod : The type of the variable.
+
+    Example
+    -------
+    >>> x = Ty('x')
+    >>> assert Variable('a', x).eval() == Diagram.id(x)
+    >>> Variable('a', x @ x)
+    Traceback (most recent call last):
+        ...
+    ValueError: Expected exactly one output, got x @ x: a term has one.
+    """
+
+    def __init__(self, name: str, cod: Ty):
+        if len(cod) != 1:
+            raise ValueError(messages.NOT_ONE_OUTPUT.format(cod))
+        super().__init__(name, cod)
+        self.stack = cod[:0]
+
+
+class Constant(TermBase, cat.Constant):
+    """
+    A box as a term, with its domain as stack. It prints as the name of the
+    box, so that a term reads as a program calling its boxes.
+
+    Parameters:
+        box : The box.
+
+    Example
+    -------
+    >>> x, y = Ty('x'), Ty('y')
+    >>> f = Box('f', x, y)
+    >>> assert Constant(f).stack == x and Constant(f).eval() == f
+    >>> print(Constant(f)(Variable('a', x)))
+    f(a)
+    """
+
+
+class Application(TermBase, cat.Application):
+    """
+    The application of a term to an argument with no stack, which takes the
+    first inputs of the stack: the context of the argument goes where they
+    were, so that nothing crosses.
+
+    Parameters:
+        func : The term that is applied.
+        arg : The argument, a term with no stack.
+
+    Example
+    -------
+    >>> x, y = Ty('x'), Ty('y')
+    >>> g, a, b = Constant(Box('g', x @ y, x)), Variable('a', x), \\
+    ...     Variable('b', y)
+    >>> assert g(a, b) == Application(Application(g, a), b)
+    >>> assert g(a, b).freevars == [a, b]
+    >>> g(b)
+    Traceback (most recent call last):
+        ...
+    ValueError: g of stack x @ y does not apply to b of stack Ty() and \
+type y.
+    """
+
+    def __init__(self, func: TermBase, arg: TermBase):
+        # pylint: disable=super-init-not-called  # a context is a list here
+        assert_isinstance(func, TermBase)
+        assert_isinstance(arg, TermBase)
+        if arg.stack or func.offset is None\
+                or func.stack[:len(arg.cod)] != arg.cod:
+            raise ValueError(messages.NOT_APPLICABLE.format(
+                func, func.stack, arg, arg.stack, arg.cod))
+        if set(func.freevars).intersection(arg.freevars):
+            raise ValueError("Expected disjoint free variables.")
+        self.func, self.arg = func, arg
+        self.freevars = func.freevars[:func.offset] + arg.freevars\
+            + func.freevars[func.offset:]
+        self.stack, self.cod = func.stack[len(arg.cod):], func.cod
+        self.offset = func.offset + len(arg.freevars) if self.stack else None
+
+    def eval(self, functor=None):
+        functor = self.identity(functor)
+        func, identity = self.func, functor.cod.id
+        left = identity(functor(self.types(func.freevars[:func.offset])))
+        right = identity(functor(
+            self.stack @ self.types(func.freevars[func.offset:])))
+        return left @ self.arg.eval(functor) @ right >> func.eval(functor)
+
+
+class Kappa(TermBase, cat.Kappa):
+    """
+    The abstraction of a block of ``variables`` of the ``body``, contiguous
+    in its context and next to its stack if it has one: they join the stack
+    where they stand, at its front if they are left of it and at its back
+    otherwise, so that the kappa of a term is the same diagram.
+
+    Parameters:
+        variables : The variables to bind, in the order of the context.
+        body : The term in which they are bound.
+        offset : The number of free variables left of the stack, needed
+            when nothing says where it is, no variable and no stack in the
+            body: the place for a box with no output.
+
+    Note
+    ----
+    Applying a type to a Python function with :meth:`Ty.kappa` names the
+    variables after the parameters, one for each wire.
+
+    Example
+    -------
+    >>> x, y = Ty('x'), Ty('y')
+    >>> f, a, b = Constant(Box('f', x @ y, x)), Variable('a', x), \\
+    ...     Variable('b', y)
+    >>> term = Kappa((b, ), f(a, b))
+    >>> assert term.freevars == [a] and term.stack == y
+    >>> assert term == y.kappa(lambda b: f(a, b)) and term.eval() == f.box
+    >>> assert Kappa((a, ), term).stack == x @ y == Kappa((a, ), f(a)).stack
+    >>> Kappa((b, a), f(a, b))
+    Traceback (most recent call last):
+        ...
+    ValueError: Expected a block of variables next to the stack of f(a, b), \
+got b, a.
+
+    A box with no output is put between two wires by an ``offset``:
+
+    >>> e, c = Constant(Box('e', x, Ty())), Variable('c', x)
+    >>> term = let(e(a), lambda: f(c, b), offset=1)
+    >>> assert term.freevars == [c, a, b]
+    >>> assert term.eval() == x @ e.box @ y >> f.box
+    >>> let(e(a), lambda: f(c, b))
+    Traceback (most recent call last):
+        ...
+    ValueError: Expected an offset for the abstraction of no variable in \
+f(c, b), which has no stack to say where it stands.
+    >>> y.kappa(lambda b: f(c, b), offset=0)
+    Traceback (most recent call last):
+        ...
+    ValueError: Expected offset 1 for the abstraction of b in f(c, b), got 0.
+    """
+    offset: int
+
+    def __init__(self, variables: tuple[Variable, ...], body: cat.TermBase,
+                 offset: int | None = None):
+        # pylint: disable=super-init-not-called  # a context is a list here
+        assert_isinstance(body, TermBase)
+        variables = tuple(variables)
+        names = ", ".join(x.name for x in variables) or "no variable"
+        if variables and variables[0] not in body.freevars:
+            raise ValueError(messages.NOT_A_BLOCK.format(body, names))
+        expected = body.freevars.index(variables[0]) if variables\
+            else body.offset
+        start = expected if offset is None else offset
+        if start is None:
+            raise ValueError(messages.NO_OFFSET.format(body))
+        wanted = f"from 0 to {len(body.freevars)}" if expected is None\
+            else expected
+        valid = 0 <= start <= len(body.freevars)
+        if not valid or expected not in (None, start):
+            raise ValueError(
+                messages.WRONG_OFFSET.format(wanted, names, body, start))
+        stop = start + len(variables)
+        if tuple(body.freevars[start:stop]) != variables\
+                or body.offset not in (None, start, stop):
+            raise ValueError(messages.NOT_A_BLOCK.format(body, names))
+        self.variables, self.body, self.offset = variables, body, start
+        self.freevars = body.freevars[:start] + body.freevars[stop:]
+        self.cod, bound = body.cod, body.types(variables)
+        self.stack = body.stack @ bound\
+            if body.stack and body.offset == start and variables\
+            else bound @ body.stack
+
+
+type Term = Variable | Constant | Application | Kappa
+
+
+class InterchangeEquation(Equation):
+    """
+    An :class:`Equation` between diagrams which holds when
+    they are equal up to interchange, i.e. as morphisms of the free monoidal
+    category rather than of the premonoidal one: when the others are in the
+    :meth:`orbit` of the first under interchangers.
+
+    The hypergraphs of such diagrams are equal, and the converse fails: a
+    hypergraph forgets on which side of a wire a box with no wire sits. No
+    interchanger moves it across a wire that runs from the domain to the
+    codomain, only round the end of one: above a state or below an effect.
+
+    Example
+    -------
+    >>> x, y = Ty('x'), Ty('y')
+    >>> f, s = Box('f', x, y), Box('s', Ty(), Ty())
+    >>> assert InterchangeEquation(s @ x >> f, f >> s @ y, s @ f)
+    >>> assert not InterchangeEquation(s @ x, x @ s)
+    >>> assert (s @ x).to_hypergraph() == (x @ s).to_hypergraph()
+    >>> cap, cup = Box('cap', Ty(), x), Box('cup', x @ x, Ty())
+    >>> assert InterchangeEquation(
+    ...     x @ s >> x @ cap >> cup, s @ x >> x @ cap >> cup)
+
+    Note
+    ----
+    The search is exhaustive and an orbit grows as the factorial of the
+    number of boxes that commute: this is for small diagrams, such as a law
+    draws. A boundary-connected diagram has a normal form instead, see
+    :cite:t:`DelpeuchVicary22` and :meth:`Diagram.normal_form`.
+    """
+    def __bool__(self):
+        first, *others = (term.to_staircases() for term in self.terms)
+        orbit = self.orbit(first, *others)
+        return all(other in orbit for other in others)
+
+    @staticmethod
+    def swaps(diagram: Diagram, i: int) -> list[Diagram]:
+        """
+        The interchanges of layer ``i`` with the one above it: none when
+        the two boxes do not commute, two when a box with no input goes
+        either side of a box with no output, one otherwise.
+
+        Example
+        -------
+        >>> x = Ty('x')
+        >>> e, s = Box('e', x, Ty()), Box('s', Ty(), x)
+        >>> for diagram in InterchangeEquation.swaps(e >> s, 1):
+        ...     print(diagram)
+        s @ x >> x @ e
+        x @ s >> e @ x
+        >>> assert not InterchangeEquation.swaps(s >> e, 1)
+        """
+        result = []
+        for left in (False, True):
+            try:
+                swapped = diagram.interchange(i, i - 1, left=left)
+            except AxiomError:
+                continue
+            result += [swapped] if swapped not in result else []
+        return result
+
+    @classmethod
+    def orbit(cls, diagram: Diagram, *until: Diagram) -> list[Diagram]:
+        """
+        The diagrams that a diagram with one box in each layer rewrites
+        into by interchangers, itself first, breadth first: all of them,
+        or as many as it takes to find every diagram of ``until``.
+
+        Example
+        -------
+        >>> x = Ty('x')
+        >>> f, g = Box('f', x, x), Box('g', x, x)
+        >>> for diagram in InterchangeEquation.orbit(f @ x >> x @ g):
+        ...     print(diagram)
+        f @ x >> x @ g
+        x @ g >> f @ x
+        >>> assert len(InterchangeEquation.orbit(f @ g @ f @ g)) == 24
+        >>> assert len(InterchangeEquation.orbit(f >> g)) == 1
+        """
+        result, seen, missing = [diagram], {diagram}, set(until) - {diagram}
+        position = 0
+        while position < len(result) and (missing or not until):
+            current, position = result[position], position + 1
+            found = dict.fromkeys(
+                swapped for i in range(1, len(current))
+                for swapped in cls.swaps(current, i) if swapped not in seen)
+            result += found
+            seen.update(found)
+            missing.difference_update(found)
+        return result
+
+
+@dataclass
+class Sampler:
+    """
+    Samples a term with no stack from a sequence of choices, one per node,
+    taking leaves once it runs out, see :meth:`TermBase.generate`.
+
+    The term is planar and linear: each subterm is given the variables it
+    uses, in order, and a node :meth:`split` them between its subterms. It
+    is a leaf, a fresh constant applied to subterms, or a statement binding
+    up to two outputs between the variables left for its body.
+
+    Parameters:
+        choices : The choices left, consumed one per node.
+        types : The types of one wire the variables are drawn from.
+        letters : The letters naming the bound variables, one per level.
+        counter : The numbers of the constants built.
+
+    Example
+    -------
+    >>> x, y = Ty('x'), Ty('y')
+    >>> sampler = Sampler(iter([2, 0, 1, 1, 0, 0, 0]), [x], "a")
+    >>> print(sampler.state(y, (Variable('v', x), Variable('w', x))))
+    let(c0(v), lambda: c1(w), offset=0)
+    """
+    choices: Iterator[int]
+    types: Sequence[Ty]
+    letters: Sequence[str]
+    counter: Iterator[int] = field(default_factory=count)
+
+    def choose(self, options: Sequence):
+        """ Pick an option by the next choice, the first when they ran out. """
+        return options[next(self.choices, 0) % len(options)]
+
+    def constant(self, dom: Sequence[Ty], cod: Sequence[Ty]) -> Constant:
+        """ A fresh constant between the tensors of two lists of types. """
+        return Constant(Box(
+            f"c{next(self.counter)}", Ty().tensor(*dom), Ty().tensor(*cod)))
+
+    def bound(self, level: int, cod: Ty) -> Variable:
+        """ The variable bound at a given level, named by its letter. """
+        return Variable(
+            f"{self.letters[level % len(self.letters)]}{level}", cod)
+
+    def spine(
+            self, cod: Sequence[Ty], bound: tuple[Variable, ...]
+            ) -> cat.TermBase:
+        """ A fresh constant applied to the bound variables in order. """
+        return self.constant([x.cod for x in bound], cod)(*bound)
+
+    def split(self, bound: tuple, n: int) -> list[tuple]:
+        """ The bound variables cut into ``n`` contiguous blocks. """
+        cuts = sorted(
+            self.choose(range(len(bound) + 1)) for _ in range(n - 1))
+        return [bound[i:j] for i, j in zip([0] + cuts, cuts + [len(bound)])]
+
+    def state(self, cod: Ty, bound: tuple[Variable, ...] = (),
+              level: int = 0) -> cat.TermBase:
+        """
+        A term of a given type with no stack and the bound variables as
+        context: a leaf when the choices ran out, else what the next
+        choice picks.
+        """
+        kind = next(self.choices, 0) % 3
+        if kind == 0:
+            return bound[0] if [x.cod for x in bound] == [cod]\
+                else self.spine([cod], bound)
+        if kind == 1:
+            dom = [self.choose(self.types)
+                   for _ in range(1 + self.choose(range(2)))]
+            return self.constant(dom, [cod])(*(
+                self.state(typ, block, level)
+                for typ, block in zip(dom, self.split(bound, len(dom)))))
+        left, middle, right = self.split(bound, 3)
+        types = [
+            self.choose(self.types) for _ in range(self.choose((1, 0, 2)))]
+        expression = self.state(types[0], middle, level) if len(types) == 1\
+            else self.spine(types, middle)
+        variables = tuple(
+            self.bound(level + i, typ) for i, typ in enumerate(types))
+        body = self.state(cod, left + variables + right, level + len(types))
+        return Kappa(variables, body, len(left))(expression)
+
+
+TermBase.functor = Functor.id(Diagram)
+TermBase.variable_factory, TermBase.constant_factory = Variable, Constant
+TermBase.application_factory, TermBase.kappa_factory = Application, Kappa
 
 __getattr__ = deprecated_alias(__name__, {"PRO": "Nat"})
