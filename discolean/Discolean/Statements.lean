@@ -1,6 +1,7 @@
 import Discolean.EGraph
 import Discolean.Statements.Premonoidal
 import Discolean.Statements.English
+import Discolean.Statements.Coherence
 
 /-!
 # What is proved about the model of `discopy.egraph`
