@@ -32,6 +32,10 @@ def test_head_and_delay_of_types():
         assert len(ty.head) == len(ty) and ty.head.delay() != ty.head
     init = Diagram.followed_by(qmode)
     assert (init.dom, init.cod) == (qmode.head @ qmode.delay(), qmode)
+    for ty in (qubit, qmode, bit):
+        assert ty.head.single() == ty.single().head
+        assert ty.head.double() == ty.double().head
+    assert qubit.head.inside[0].is_classical is False
 
 
 def test_feedback_axioms():

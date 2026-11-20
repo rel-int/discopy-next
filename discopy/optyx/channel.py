@@ -279,6 +279,12 @@ class Ob(frobenius.Wire):
 
 
 HeadOb, TailOb = feedback.structural_wires(Ob)
+for _structural, _part in ((HeadOb, "head"), (TailOb, "tail")):
+    _structural.is_classical = property(lambda self: self.arg.is_classical)
+    _structural.single = property(lambda self, part=_part: getattr(
+        self.arg.single, part).delay(self.time_step))
+    _structural.double = property(lambda self, part=_part: getattr(
+        self.arg.double, part).delay(self.time_step))
 
 
 DEFAULT_MAX_STEPS = 64

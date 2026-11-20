@@ -252,9 +252,11 @@ class Circuit(tensor.Diagram[complex]):
         Mixed circuits can be evaluated only by a
         :class:`ChannelFunctor` not a :class:`discopy.tensor.Functor`.
         """
-        both_bits_and_qubits = self.dom.count(bit) and self.dom.count(qubit)\
-            or any(layer.cod.count(bit) and layer.cod.count(qubit)
-                   for layer in self.inside)
+        def both_kinds(ty):
+            return len({x.is_quantum for x in ty.inside}) == 2
+
+        both_bits_and_qubits = both_kinds(self.dom)\
+            or any(both_kinds(layer.cod) for layer in self.inside)
         return both_bits_and_qubits or any(box.is_mixed for box in self.boxes)
 
     def init_and_discard(self):
@@ -958,9 +960,8 @@ class Box(tensor.Box[complex], Circuit):
 
     def __init__(self, name: str, dom: Ty, cod: Ty,
                  data=None, is_mixed=True, **params):
-        if not is_mixed and not any(
-                all(isinstance(x, kind) for x in (dom @ cod).inside)
-                for kind in (Digit, Qudit)):
+        if not is_mixed and len(
+                {x.is_quantum for x in (dom @ cod).inside}) == 2:
             raise ValueError(messages.BOX_IS_MIXED)
         self._is_mixed = is_mixed
         tensor.Box[complex].__init__(self, name, dom, cod, data, **params)

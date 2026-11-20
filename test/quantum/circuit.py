@@ -699,6 +699,9 @@ def test_head():
             == Circuit.id(typ).eval(mixed=True)
     init = Ket(0).head @ qubit.delay() >> Circuit.followed_by(qubit)
     assert (init.dom, init.cod) == (qubit.delay(), qubit)
+    assert Circuit.id(bit.head @ qubit.head).is_mixed
+    assert not Circuit.id(qubit.head).is_mixed
+    assert not Box('f', qubit.head, qubit.head, is_mixed=False).is_mixed
 
 
 def test_Bubble_is_mixed_and_grad():
