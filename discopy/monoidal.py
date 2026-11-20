@@ -148,6 +148,11 @@ A term is drawn as its diagram:
 
 .. image:: /_static/monoidal/let.svg
     :align: center
+
+The modules above have terms of their own, down to :mod:`discopy.biclosed`
+where they are lambda terms: a :class:`discopy.symmetric.Kappa` binds its
+variables in any order, a :class:`discopy.markov.Kappa` need not use them
+and a :class:`discopy.markov.Application` may use one twice.
 """
 
 from __future__ import annotations

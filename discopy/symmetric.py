@@ -33,6 +33,19 @@ Summary
     Kappa
     Sampler
 
+Terms
+-----
+
+A symmetric diagram with exactly one output reads as a term of the linear
+kappa calculus, see :class:`TermBase`: a swap is the order of the variables,
+and the term evaluates back to the diagram up to the axioms below.
+
+>>> x, y = Ty('x'), Ty('y')
+>>> diagram = Swap(x, y) >> Box('f', y @ x, x)
+>>> print(diagram.to_term())
+(x @ y)(lambda x0, x1: f(x1, x0))
+>>> assert Equation(diagram.to_term().eval(), diagram)
+
 Axioms
 ------
 

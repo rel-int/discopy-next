@@ -40,6 +40,20 @@ Summary
     Sampler
 
 
+Terms
+-----
+
+A diagram with copies and discards and exactly one output reads as a term
+of the kappa calculus where a variable occurs any number of times, see
+:class:`TermBase`: twice for a copy, not at all for a discard. Neither is
+assumed natural, so a box that is copied or discarded keeps its ``let``.
+
+>>> x, y = Ty('x'), Ty('y')
+>>> diagram = Copy(x) @ Discard(y) >> Box('f', x @ x, x)
+>>> print(diagram.to_term())
+(x @ y)(lambda x0, x1: f(x0, x0))
+>>> assert Equation(diagram.to_term().eval(), diagram)
+
 Axioms
 ------
 

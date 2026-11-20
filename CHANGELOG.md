@@ -27,7 +27,10 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   of times: an `Application` copies the variables its function and its
   argument share and a `Kappa` discards the ones its body does not use. No
   discard is assumed natural, so `normal_form` only inlines a variable used
-  exactly once and keeps the statement of one copied or discarded. A type
+  exactly once and keeps the statement of one copied or discarded. The
+  modules that add no way to bind a variable, `spacial`, `braided`,
+  `feedback`, `balanced` and `comarkov`, get terms of their own from
+  `cat.kappa_calculus`, with their structural boxes as constants. A type
   applied to a Python function is its kappa abstraction, and the laws are
   cells of the property matrix ([next#658]).
 - `discopy.peirce.alpha` and `discopy.peirce.beta`: Peirce's existential
@@ -476,6 +479,7 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   for the kappa and the lambda calculus: `alpha_eq` and its laws move there
   from `biclosed.TermBase`, which inherits them, with `Renamed` and
   `Canonical`, still importable from `biclosed` ([next#658]).
+- `feedback.subclass` is `utils.subclass` ([next#658]).
 - `lambek.abstract` and `lambek.categorial` are packages: `lambek.proofnet`
   and `lambek.neural` are `lambek.abstract.proofnet` and
   `lambek.abstract.neural`, and `lambek.categorial.bobcat`, which needs
