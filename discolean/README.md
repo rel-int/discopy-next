@@ -22,7 +22,7 @@ is.
 The theory of a module is the laws of an abstract class its diagrams do not
 declare broken, `Discolean.ABC.monoidal` for `monoidal.Diagram`, and its
 coherence theorem says the diagrams are the arrows of the free model of it.
-Each class also compiles to a `Functor` structure, the maps that preserve its
+Each compiled class also has a `Functor` structure, the maps that preserve its
 operations. For `monoidal`, [`Discolean/Coherence.lean`](Discolean/Coherence.lean)
 proves the whole theorem: the models of `Discolean.ABC.monoidal` are the
 strict premonoidal categories (`toABC` and `ofABC`), and `Diagram.free` says a
