@@ -6,4 +6,4 @@
 - [x] monoidal.Diagram.to_term: one let per box, refusing a diagram without exactly one output; normal_form inlines the lets
 - [x] laws on kappa.TermBase in the property matrix: alpha, beta (normal form), eta, the section to_term of eval, serialisation
 - [x] test/kappa.py, docs/api, CHANGELOG
-- [ ] the tool paper explains one output: paragraph and listing drafted on rel-int/wiki#195 (issuecomment-7039254628), to land there once this is on main
+- [x] the tool paper explains one output: paragraph and listing drafted on rel-int/wiki#195 (issuecomment-7039254628), to land there once this is on main, filed as rel-int/wiki#195
