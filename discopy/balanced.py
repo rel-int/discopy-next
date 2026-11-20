@@ -26,6 +26,11 @@ Summary
     Sum
     Bubble
     Functor
+    TermBase
+    Variable
+    Constant
+    Application
+    Kappa
     DualRail
     Equation
 
@@ -62,7 +67,7 @@ from dataclasses import dataclass
 from discopy import (
     config, monoidal, braided, feedback, cmap, hypergraph, messages)
 from discopy.abc import BalancedCategory
-from discopy.cat import factory
+from discopy.cat import factory, kappa_calculus
 from discopy.feedback import Ty
 from discopy.monoidal import Colour
 from discopy.utils import factory_name, assert_isatomic, from_tree
@@ -513,3 +518,8 @@ Id = Diagram.id
 
 class Equation(braided.Equation):
     """ The :class:`braided.Equation` of balanced diagrams. """
+
+
+TermBase, Variable, Constant, Application, Kappa = kappa_calculus(
+    Diagram)
+Term = Variable | Constant | Application | Kappa

@@ -1119,6 +1119,7 @@ class Kappa(TermBase, symmetric.Kappa):
     @staticmethod
     def binds(variables, body):
         """ Whether the variables are distinct: a body need not use them. """
+        # pylint: disable=unused-argument  # a discarded variable is not used
         return len(set(variables)) == len(variables)
 
 

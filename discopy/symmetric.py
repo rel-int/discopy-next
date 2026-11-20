@@ -990,7 +990,7 @@ Diagram.scalar_sliding = SpacialCategory.scalar_sliding.modulo(
     Diagram.to_hypergraph)
 
 
-class TermBase(monoidal.TermBase):
+class TermBase(balanced.TermBase):  # ty: ignore[unsupported-base]
     """
     A term of a symmetric category, i.e. of the linear kappa calculus: a
     :class:`discopy.monoidal.TermBase` with exchange, where a :class:`Kappa`
@@ -1023,7 +1023,7 @@ class TermBase(monoidal.TermBase):
     >>> print(diagram.to_term().normal_form())
     (x @ x)(lambda x0, x1: f(x1, g(x0)))
     """
-    strategy = classmethod(monoidal.TermBase.strategy.__func__)
+    strategy = classmethod(balanced.TermBase.strategy.__func__)
 
     @classmethod
     def rewire(cls, box, arguments):
@@ -1065,7 +1065,7 @@ class TermBase(monoidal.TermBase):
         return Equation(diagram.to_term().eval(), diagram)
 
 
-class Variable(TermBase, monoidal.Variable):
+class Variable(TermBase, balanced.Variable):  # ty: ignore[unsupported-base]
     """
     A variable with a name and a type of one wire, an identity diagram.
 
@@ -1075,7 +1075,7 @@ class Variable(TermBase, monoidal.Variable):
     """
 
 
-class Constant(TermBase, monoidal.Constant):
+class Constant(TermBase, balanced.Constant):  # ty: ignore[unsupported-base]
     """
     A box as a term, with its domain as stack.
 
@@ -1084,7 +1084,8 @@ class Constant(TermBase, monoidal.Constant):
     """
 
 
-class Application(TermBase, monoidal.Application):
+class Application(
+        TermBase, balanced.Application):  # ty: ignore[unsupported-base]
     """
     The application of a term to an argument with no stack, as in a
     monoidal category: the context of the argument goes where the first
@@ -1096,7 +1097,7 @@ class Application(TermBase, monoidal.Application):
     """
 
 
-class Kappa(TermBase, monoidal.Kappa):
+class Kappa(TermBase, balanced.Kappa):  # ty: ignore[unsupported-base]
     """
     The abstraction of some of the free ``variables`` of the ``body``, in
     any order and from anywhere in its context: they join its stack, which

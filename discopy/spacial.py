@@ -24,6 +24,11 @@ Summary
     Sum
     Bubble
     Functor
+    TermBase
+    Variable
+    Constant
+    Application
+    Kappa
     Equation
 
 Axioms
@@ -49,7 +54,7 @@ from __future__ import annotations
 
 from discopy import monoidal, cmap, hypergraph, messages
 from discopy.abc import SpacialCategory
-from discopy.cat import factory
+from discopy.cat import factory, kappa_calculus
 from discopy.monoidal import Ty
 
 
@@ -121,3 +126,7 @@ Diagram.functor_factory = Functor
 CMap = cmap.CMap[Diagram]
 Hypergraph = hypergraph.Hypergraph[Diagram]
 Id = Diagram.id
+
+TermBase, Variable, Constant, Application, Kappa = kappa_calculus(
+    Diagram)
+Term = Variable | Constant | Application | Kappa

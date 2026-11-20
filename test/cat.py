@@ -1053,6 +1053,41 @@ def test_term_errors():
     assert Kappa((a, ), f(a), 0) == Kappa((a, ), f(a))
 
 
+@pytest.mark.parametrize("level, structure", [
+    ("spacial", lambda module, x, y: module.Id(x @ y)),
+    ("feedback", lambda module, x, y: module.Id(x @ y)),
+    ("braided", lambda module, x, y: module.Braid(y, x)),
+    ("balanced", lambda module, x, y: module.Twist(x) @ y),
+    ("comarkov", lambda module, x, y: module.Merge(x) @ y)])
+def test_terms_of_a_level(level, structure):
+    import importlib
+    import pickle
+    from discopy import monoidal
+    module = importlib.import_module(f"discopy.{level}")
+    x, y = module.Ty('x'), module.Ty('y')
+    wiring = structure(module, x, y)
+    diagram = wiring >> module.Box('f', x @ y, x)
+    term = diagram.to_term()
+    assert type(term) is module.Kappa and term.category is module.Diagram
+    assert module.Diagram.term_factory is module.TermBase
+    assert issubclass(module.Kappa, monoidal.Kappa)
+    assert term.eval() == diagram
+    assert len(term.constants) == len(diagram.boxes)
+    assert all(type(c) is module.Constant for c in term.constants)
+    for copy in (pickle.loads(pickle.dumps(term)), loads(dumps(term))):
+        assert type(copy) is module.Kappa and copy == term
+    assert type(x(lambda a: a)) is monoidal.Kappa
+
+
+def test_terms_from_biclosed_up():
+    from discopy import biclosed, compact, symmetric
+    x = compact.Ty('x')
+    diagram = compact.Swap(x, x) >> compact.Box('f', x @ x, x)
+    term = diagram.to_term()
+    assert type(term) is symmetric.Kappa and term.eval() == diagram
+    assert type(x(lambda a: a)) is biclosed.Abstraction
+
+
 def test_term_laws():
     from hypothesis import find
     x, y = Ob('x'), Ob('y')

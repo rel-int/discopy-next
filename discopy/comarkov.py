@@ -26,6 +26,11 @@ Summary
     Head
     Tail
     Functor
+    TermBase
+    Variable
+    Constant
+    Application
+    Kappa
 
 Axioms
 ------
@@ -71,7 +76,7 @@ from typing import ClassVar
 from discopy import (
     symmetric, monoidal, feedback, cmap, hypergraph, messages, op)
 from discopy.abc import ComarkovCategory, MarkovCategory, Nat
-from discopy.cat import factory
+from discopy.cat import factory, kappa_calculus
 from discopy.feedback import (  # noqa: F401  pylint: disable=unused-import
     Wire, Ty)
 from discopy.python import finset
@@ -599,3 +604,8 @@ Id = Diagram.id
 class Equation(symmetric.Equation):
     """ The :class:`symmetric.Equation` of comarkov diagrams. """
     up_to = staticmethod(Diagram.to_hypergraph)
+
+
+TermBase, Variable, Constant, Application, Kappa = kappa_calculus(
+    Diagram)
+Term = Variable | Constant | Application | Kappa

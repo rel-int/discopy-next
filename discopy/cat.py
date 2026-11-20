@@ -43,6 +43,7 @@ Summary
         dumps
         loads
         let
+        kappa_calculus
 
 Axioms
 ------
@@ -135,6 +136,7 @@ from discopy.utils import (  # noqa: F401
     from_tree,
     resolve_factory,
     rsubs,
+    subclass,
     unbiased,
     MappingOrCallable,
     assert_isinstance,
@@ -2004,6 +2006,11 @@ class TermBase(Serialisable, AlphaEquivalence):
 
     strategy = classmethod(AlphaEquivalence.strategy.__func__)
 
+    @classmethod
+    def environment(cls) -> dict:
+        """ The :func:`let` a redex prints as, in any module of terms. """
+        return {**super().environment(), "let": let}
+
     @property
     def parts(self) -> tuple:
         """ What the term is built from, in the order of its arguments. """
@@ -2774,6 +2781,64 @@ def let(expression: TermBase, body: Callable, offset: int | None = None
     """
     kappa = expression.kappa_factory.from_callable(expression.cod, offset)
     return kappa(body)(expression)
+
+
+TERMS = {
+    "TermBase": "A term of the kappa calculus of :mod:`discopy.{}`.",
+    "Variable": "A variable of the terms of :mod:`discopy.{}`.",
+    "Constant": "A box of :mod:`discopy.{}` as a term.",
+    "Application": "An application of terms of :mod:`discopy.{}`.",
+    "Kappa": "A kappa abstraction of terms of :mod:`discopy.{}`."}
+
+
+def kappa_calculus(
+        diagram: type) -> tuple[type, type, type, type, type]:
+    """
+    The :class:`TermBase`, :class:`Variable`, :class:`Constant`,
+    :class:`Application` and :class:`Kappa` of a level of the hierarchy
+    that adds no way to bind a variable, generated rather than written by
+    hand: each subclasses the one of every level ``diagram`` subclasses and
+    lives in its module. The terms evaluate in ``diagram`` by default, are
+    generated with its boxes and read its structural boxes, e.g. a braid,
+    as constants like any other.
+
+    This is for the levels below :mod:`discopy.biclosed`: from there up a
+    type applied to a Python function is a lambda abstraction, see
+    :class:`discopy.biclosed.Ty`, and a diagram reads with the kappa terms
+    of the level it subclasses, e.g. a compact one with those of
+    :mod:`discopy.symmetric`.
+
+    Parameters:
+        diagram : The diagram class of the level.
+
+    Example
+    -------
+    >>> from discopy.braided import Ty, Box, Braid, Diagram, Kappa, Constant
+    >>> x, y = Ty('x'), Ty('y')
+    >>> f = Box('f', y @ x, x)
+    >>> term = (Braid(x, y) >> f).to_term()
+    >>> print(term)
+    (x @ y)(lambda x0, x1: let(Braid(x, y)(x0, x1), lambda x2, x3: f(x2, x3)))
+    >>> assert isinstance(term, Kappa) and term.eval() == Braid(x, y) >> f
+    >>> assert Kappa.__mro__[2].__module__ == "discopy.monoidal"
+    """
+    parents: list = list(dict.fromkeys(
+        base.term_factory for base in diagram.__bases__
+        if hasattr(base, "term_factory")))
+    module, level = diagram.__module__, diagram.__module__.split('.')[-1]
+    base = subclass("TermBase", parents, module, TERMS["TermBase"].format(
+        level))
+    base.strategy = classmethod(TermBase.strategy.__func__)
+    base.functor = diagram.functor_factory.id(diagram)
+    for name in ("Variable", "Constant", "Application", "Kappa"):
+        attr = f"{name.lower()}_factory"
+        former = subclass(name, [base] + [
+            getattr(parent, attr) for parent in parents
+        ], module, TERMS[name].format(level))
+        setattr(base, attr, former)
+    base.kappa_factory.above, diagram.term_factory = None, base
+    return (base, base.variable_factory, base.constant_factory,
+            base.application_factory, base.kappa_factory)
 
 
 class AlphaEquation(AbstractEquation):
