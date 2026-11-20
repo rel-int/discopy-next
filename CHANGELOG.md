@@ -714,6 +714,12 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Fixed
 
+- `qubit.head`, `qmode.head` and `mode.head` raised, and so did `mode.delay()`:
+  the wires of `quantum.circuit`, `optyx.channel` and `optyx.core.diagram` now
+  have heads and tails of their own, the head of a qubit a quantum wire of its
+  dimension (`quantum.circuit.Wire.is_quantum`), so that the initial state of
+  a loop can be written `s.head @ m.d >> FollowedBy(m)` on circuits and
+  channels ([next#665]).
 - `matrix.asarray` builds an array from nested entries by stacking the ones
   the active backend already owns, so `Matrix([t], 1, 1)` keeps the gradient
   of a PyTorch tensor `t` where converting it entry by entry read it as a
@@ -2412,6 +2418,7 @@ for the changelog of `1.2.1` and earlier.
 [next#648]: https://github.com/rel-int/discopy-next/pull/648
 [next#654]: https://github.com/rel-int/discopy-next/pull/654
 [next#656]: https://github.com/rel-int/discopy-next/pull/656
+[next#665]: https://github.com/rel-int/discopy-next/pull/665
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#44]: https://github.com/rel-int/optyx/pull/44
