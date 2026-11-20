@@ -685,7 +685,6 @@ def test_delay():
         circuit.delay().eval().array, circuit.eval().array)
 
 
-
 def test_head():
     from discopy.quantum import gates
     from discopy.utils import loads, dumps
@@ -700,6 +699,7 @@ def test_head():
             == Circuit.id(typ).eval(mixed=True)
     init = Ket(0).head @ qubit.delay() >> Circuit.followed_by(qubit)
     assert (init.dom, init.cod) == (qubit.delay(), qubit)
+
 
 def test_Bubble_is_mixed_and_grad():
     phi = sympy.Symbol('phi')
