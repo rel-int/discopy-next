@@ -1169,3 +1169,12 @@ def test_composition_promotes_on_backend(name):
             assert composite.dtype == t.dtype and composite.is_close(t)
         assert (t @ unit).dtype == (unit @ t).dtype == t.dtype
         assert (t @ unit).is_close(t @ unit.cast(t.dtype))
+
+
+@pytest.mark.parametrize("data", [
+    [np.nan, -np.inf, np.inf, 0.], np.array([[np.nan, 1.], [2., np.inf]]),
+    np.array([complex(1, np.nan), complex(np.nan, 1), 1j, -np.inf])])
+def test_box_repr_nan_inf(data):
+    box = Box('f', Dim(2), Dim(2), data)
+    from discopy import tensor
+    assert eval(repr(box), {'tensor': tensor, 'Dim': Dim}) == box

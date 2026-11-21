@@ -232,7 +232,7 @@ from cotengra import (
 )
 import numpy as np
 from discopy import tensor
-from discopy import monoidal, symmetric, frobenius, hypergraph
+from discopy import monoidal, symmetric, frobenius, hypergraph, feedback
 from discopy.cat import factory
 from discopy.python import finset
 from discopy.utils import AxiomError, factory_name
@@ -265,17 +265,33 @@ class Ob(frobenius.Wire):
     @property
     def single(self):
         """Maps :code:`qubit` to :code:`diagram.bit`
-        and :code:`qmode` to :code:`diagram.mode`."""
-        return diagram.Ty(self.classical[self.name])
+        and :code:`qmode` to :code:`diagram.mode`, keeping the delay.
+
+        >>> assert qmode.delay().single() == diagram.Ty("mode").delay()
+        """
+        return diagram.Ty(self.classical[self.name]).delay(self.time_step)
 
     @property
     def double(self):
         """Maps :code:`qubit` to :code:`diagram.bit @ diagram.bit`
-        and :code:`qmode` to :code:`diagram.mode @ diagram.mode`."""
+        and :code:`qmode` to :code:`diagram.mode @ diagram.mode`,
+        keeping the delay.
+
+        >>> assert qubit.delay().double() == diagram.Ty("bit", "bit").delay()
+        """
         if self.is_classical:
-            return diagram.Ty(self.name)
+            return diagram.Ty(self.name).delay(self.time_step)
         name = self.classical[self.name]
-        return diagram.Ty(name, name)
+        return diagram.Ty(name, name).delay(self.time_step)
+
+
+HeadOb, TailOb = feedback.structural_wires(Ob)
+for _structural, _part in ((HeadOb, "head"), (TailOb, "tail")):
+    _structural.is_classical = property(lambda self: self.arg.is_classical)
+    _structural.single = property(lambda self, part=_part: getattr(
+        self.arg.single, part).delay(self.time_step))
+    _structural.double = property(lambda self, part=_part: getattr(
+        self.arg.double, part).delay(self.time_step))
 
 
 DEFAULT_MAX_STEPS = 64
@@ -409,6 +425,18 @@ class Diagram(frobenius.Diagram):
     unroll = diagram.Diagram.unroll
     one_step = diagram.Diagram.one_step
     __pow__ = monoidal.Ty.__pow__
+
+    @classmethod
+    def cup_factory(cls, left: Ty, right: Ty) -> Spider:
+        """
+        The cup of a channel type is its spider with two legs in and the
+        cap its dagger, see :meth:`diagram.Diagram.cup_factory`.
+
+        >>> assert Diagram.cups(qubit, qubit) == Spider(2, 0, qubit)
+        >>> assert Diagram.caps(qmode, qmode) == Spider(0, 2, qmode)
+        """
+        left.assert_isadjoint(right)
+        return cls.spider_factory(2, 0, left)
 
     def feedback(self, dom=None, cod=None, mem=None,
                  state=None, effect=None) -> Diagram:
@@ -1818,7 +1846,7 @@ class Channel(Diagram, frobenius.Box):
         )
 
 
-class Spider(frobenius.Spider, Channel):  # pragma: no cover
+class Spider(frobenius.Spider, Channel):
     """
     Spider as a channel.
     """

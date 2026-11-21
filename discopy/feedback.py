@@ -42,6 +42,11 @@ Summary
     Sum
     Bubble
     Functor
+    TermBase
+    Variable
+    Constant
+    Application
+    Kappa
 
 .. admonition:: Functions
 
@@ -264,9 +269,11 @@ from discopy.abc import (
 from discopy.config import BOX_DRAWING_ATTRIBUTES
 from discopy.monoidal import (  # noqa: F401  pylint: disable=unused-import
     Equation)
+from discopy.cat import kappa_calculus
 from discopy.utils import (
     deprecated_alias,
     factory, factory_name, assert_isinstance, AxiomError, from_tree,
+    subclass,
 )
 
 
@@ -476,17 +483,17 @@ class Ty(monoidal.Ty):
 
     def delay(self, n_steps=1):
         """ The delay of a feedback type by `n_steps`. """
-        return type(self)(*(x.delay(n_steps) for x in self.inside))
+        return self.factory(*(x.delay(n_steps) for x in self.inside))
 
     @property
     def head(self):
         """ The head of a feedback type, see :class:`HeadOb`. """
-        return type(self)(*(x.head for x in self.inside if x.head))
+        return self.factory(*(x.head for x in self.inside if x.head))
 
     @property
     def tail(self):
         """ The tail of a feedback type, see :class:`TailOb`. """
-        return type(self)(*(x.tail for x in self.inside if x.tail))
+        return self.factory(*(x.tail for x in self.inside if x.tail))
 
     d = Wire.d
 
@@ -661,8 +668,6 @@ class Diagram(monoidal.Diagram, TracedCategory):
         messages.NO_PLANAR_NORMAL_FORM)
     trace_superposing_right = TracedCategory.trace_superposing_right.failing(
         messages.NO_PLANAR_NORMAL_FORM)
-    hypergraph_section = monoidal.Diagram.hypergraph_section.failing(
-        messages.SECTION_NEEDS_SWAPS)
     dagger_involution = DaggerCategory.dagger_involution.failing(
         messages.FEEDBACK_HAS_NO_DAGGER)
     dagger_involution_traced = DaggerCategory.dagger_involution.weaken(
@@ -1315,19 +1320,6 @@ STRUCTURAL_BOXES = {
 }
 
 
-def subclass(name: str, bases: list[type], module: str, doc: str) -> type:
-    """
-    The class ``name`` of ``module`` with the given bases, less those another
-    base subclasses, so that it prints, pickles and reads back from its tree
-    as a class written in that module would.
-    """
-    bases = tuple(dict.fromkeys(  # ty: ignore[invalid-assignment]
-        base for base in bases if not any(
-            other is not base and issubclass(other, base) for other in bases)))
-    return type(name, bases, {  # ty: ignore[invalid-argument-type]
-        "__module__": module, "__qualname__": name, "__doc__": doc})
-
-
 def structural_boxes(
         diagram: type, box: type) -> tuple[type, type, type, type, type]:
     """
@@ -1401,3 +1393,7 @@ __getattr__ = deprecated_alias(__name__, {
     "Copy": "discopy.markov.Copy",
     "Discard": "discopy.markov.Discard",
 })
+
+TermBase, Variable, Constant, Application, Kappa = kappa_calculus(
+    Diagram)
+Term = Variable | Constant | Application | Kappa

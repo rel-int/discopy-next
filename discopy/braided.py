@@ -18,6 +18,11 @@ Summary
     Sum
     Bubble
     Functor
+    TermBase
+    Variable
+    Constant
+    Application
+    Kappa
     Equation
 
 .. admonition:: Functions
@@ -65,7 +70,7 @@ from typing import ClassVar
 
 from discopy import monoidal, messages
 from discopy.abc import BraidedCategory, SpacialCategory
-from discopy.cat import factory
+from discopy.cat import factory, kappa_calculus
 from discopy.monoidal import Ty, Match
 from discopy.utils import (
     assert_isatomic, AxiomError, BinaryBoxConstructor, deprecated_alias,
@@ -195,9 +200,6 @@ class Diagram(monoidal.Diagram, BraidedCategory):
                 != match.left @ source @ match.right:
             raise AxiomError(messages.NO_BRAID_TO_SLIDE.format(box, i))
         return match.substitute(target)  # ty: ignore[invalid-return-type]
-
-    hypergraph_section = monoidal.Diagram.hypergraph_section.failing(
-        messages.SECTION_NEEDS_SWAPS)
 
 
 class Box(monoidal.Box, Diagram):
@@ -357,3 +359,7 @@ class Equation(monoidal.Equation):
 
 
 __getattr__ = deprecated_alias(__name__, {"Ob": "Wire"})
+
+TermBase, Variable, Constant, Application, Kappa = kappa_calculus(
+    Diagram)
+Term = Variable | Constant | Application | Kappa

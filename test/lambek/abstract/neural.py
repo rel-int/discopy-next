@@ -4,10 +4,10 @@ import pytest
 
 torch = pytest.importorskip("torch")
 
-from discopy.lambek import proofnet
+from discopy.lambek.abstract import proofnet
 from discopy.lambek.abstract import Ty
-from discopy.lambek.neural import *
-from discopy.lambek.proofnet import ProofNet, Sequent, hungarian
+from discopy.lambek.abstract.neural import *
+from discopy.lambek.abstract.proofnet import ProofNet, Sequent, hungarian
 from discopy.utils import AxiomError
 
 n, s = Ty("n"), Ty("s")
@@ -250,68 +250,3 @@ def test_Parser_search_defaults():
             parser, sentence, states, goal, k, width, weight, skip)
         found += net is not None
     assert 20 < found < 180
-
-
-def test_ChartClassifier():
-    from discopy.lambek.neural import ChartClassifier
-    torch.manual_seed(0)
-    classifier = ChartClassifier(
-        ["NP", r"S\NP"], [":", "S", "NP"], hidden=4).eval()
-    states = torch.randn(1, 4, 4)
-    mask = torch.tensor([[False, True, True, False]])
-    tags, spans = classifier(states, mask)
-    assert tags.shape == (1, 2, 2) and spans.shape == (1, 3, 3)
-    (words, labels), = classifier.decode(states, mask, tag_k=1)
-    assert [len(word) for word in words] == [1, 1]
-    assert list(labels) == ChartClassifier.spans(2)
-    assert all(label != ":" for value in labels.values()
-               for label, _ in value)
-
-
-def test_Parser_from_pretrained(tmp_path):
-    import json
-    transformers = pytest.importorskip("transformers")
-    tokenizers = pytest.importorskip("tokenizers")
-    from discopy.lambek.categorial import Parser, Ty
-    from discopy.lambek.neural import ChartClassifier
-    torch.manual_seed(0)
-    vocab = {"[PAD]": 0, "[UNK]": 1, "Alice": 2, "runs": 3}
-    tokenizer = tokenizers.Tokenizer(
-        tokenizers.models.WordLevel(vocab, unk_token="[UNK]"))
-    tokenizer.pre_tokenizer = tokenizers.pre_tokenizers.Whitespace()
-    transformers.PreTrainedTokenizerFast(
-        tokenizer_object=tokenizer, pad_token="[PAD]", unk_token="[UNK]"
-    ).save_pretrained(tmp_path)
-    config = transformers.DebertaV2Config(
-        vocab_size=4, hidden_size=8, num_hidden_layers=1,
-        num_attention_heads=2, intermediate_size=8,
-        max_position_embeddings=16)
-    config.save_pretrained(tmp_path)
-    tags, labels = ["NP", r"S\NP"], [":", "S", "NP"]
-    encoder = transformers.AutoModel.from_config(config)
-    state = {"bert." + key: value
-             for key, value in encoder.state_dict().items()}
-    state.update(ChartClassifier(tags, labels, 8).state_dict())
-    torch.save(state, tmp_path / "pytorch_model.bin")
-    files = {
-        "native_grammar.json": {"binary": [], "unary": [],
-                                "root_categories": ["S"]},
-        "label_maps.json": {
-            "tag2id": {tag: i for i, tag in enumerate(tags)},
-            "cat2id": {label: i for i, label in enumerate(labels)}},
-        "rebank_pipeline_config.json": {
-            "decoder": {"tag_top_k": 64, "tag_prob_threshold": 1e-9,
-                        "span_top_k": 128, "span_prob_threshold": 1e-9},
-            "parser": {"beam_size": 256, "use_generic_rules": True,
-                       "generic_rule_penalty": .05,
-                       "missing_span_penalty": 4.}}}
-    for name, data in files.items():
-        (tmp_path / name).write_text(json.dumps(data))
-    parser = Parser.from_pretrained(tmp_path)
-    assert parser("Alice runs").cod == Ty("S")
-    assert parser.derive(["Alice", "runs"]).cat == "S"
-    assert parser("") is None
-    with pytest.raises(ValueError):
-        Parser({}, {}).decode([["Alice"]])
-    assert Parser.from_pretrained(tmp_path, root=frozenset({"N"}))(
-        "Alice runs") is None

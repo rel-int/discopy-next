@@ -4,8 +4,7 @@
 
 The last applications are syntax again: the derivations of a grammar,
 the formulae of a logic and the nets of a rewriting system are arrows of
-free categories. The package of formal grammars is now `discopy.lambek`,
-and its former name `discopy.grammar` is a deprecated alias.
+free categories. The package of formal grammars is `discopy.lambek`.
 
 === Categorial grammars <sec:lambek>
 
@@ -44,7 +43,7 @@ Abstract categorial grammars @deGroote01 are the module
 closed category, and a `Lexicon` is a functor between two of them.
 `to_abstract` sends a categorial term to an abstract one, forgetting the
 direction of the exponentials. A parse is then a proof, which
-`lambek.proofnet` holds as a proof net @Girard87. Every
+`lambek.abstract.proofnet` holds as a proof net @Girard87. Every
 occurrence of an atom in the types of the words and of the goal is a
 port, given or wanted, and a `ProofNet` pairs each wanted port with a
 given port of the same atom. `from_term` links a closed linear term and
@@ -54,7 +53,7 @@ read off a net gives the net back is a law of the property matrix
 (@sec:matrix).
 
 ```python
-from discopy.lambek.proofnet import ProofNet
+from discopy.lambek.abstract.proofnet import ProofNet
 
 abstract = term.to_abstract()
 net = ProofNet.from_term(abstract, [w.to_abstract() for w in words])
@@ -70,7 +69,7 @@ The net is that of the normal form: it does not remember that the
 subject was raised. These five words have 48 linkings, of which 8 are
 correct, since an abstract type does not say on which side a word takes
 its arguments. `Sequent.linkings` ranks them by a matrix of scores, and
-a parser is what gives the scores. `lambek.neural` is one in PyTorch, in
+a parser is what gives the scores. `lambek.abstract.neural` is one in PyTorch, in
 the two steps of @KogkalidisEtAl20: a `Tagger`
 writes the type of each word one symbol at a time, so that it can write
 a type that it has never seen, and a `Linker` scores each pair of ports
@@ -81,7 +80,7 @@ correct net of highest joint score among the most likely sequents.
   Two published neural parsers reproduced from their trained weights,
   each in a short listing: SPINDLE, a parser of Dutch into proof nets,
   and Bobcat, a parser for combinatory categorial grammar. The library
-  has their two targets, `lambek.neural.Parser` and `categorial.parse`,
+  has their two targets, `lambek.abstract.neural.Parser` and `categorial.parse`,
   with `cat2ty` to read the categories of a treebank. It has no encoder
   of words and no function that reads the published weights of either
   parser, and the chart of `parse` has application and composition only.

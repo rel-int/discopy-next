@@ -7,9 +7,9 @@ from random import Random
 
 from pytest import raises
 
-from discopy.lambek import proofnet
+from discopy.lambek.abstract import proofnet
 from discopy.lambek.abstract import Ty, Variable, Abstraction
-from discopy.lambek.proofnet import *
+from discopy.lambek.abstract.proofnet import *
 from discopy.utils import AxiomError
 
 n, np, s = Ty("n"), Ty("np"), Ty("s")

@@ -16,7 +16,6 @@ Summary
     Exp
     Over
     Under
-    BangOb
     Diagram
     Box
     Eval
@@ -24,14 +23,6 @@ Summary
     Curry
     Sum
     Bubble
-    Bang
-    Structural
-    Dereliction
-    Digging
-    Contraction
-    Weakening
-    Exchange
-    Laxator
     Functor
     CMap
     TermBase
@@ -41,8 +32,6 @@ Summary
     Abstraction
     Sampler
     Constraints
-    Renamed
-    Canonical
     AlphaEquation
 
 Axioms
@@ -105,13 +94,14 @@ from typing import (
 
 from discopy import cat, monoidal, cmap, hypergraph, messages
 from discopy.abc import (
-    BiclosedCategory, DaggerCategory, DaggerMonoidalCategory, LinearCategory,
-    MonoidalCategory)
+    BiclosedCategory, DaggerCategory, DaggerMonoidalCategory, MonoidalCategory)
 from discopy.testable import (
-    GENERATORS, Equation as AbstractEquation, Equivalence, Serialisable,
+    GENERATORS, Equation as AbstractEquation, Serialisable,
     Testable, TestableGeneric, axiom)
 from discopy.drawing import Drawing
-from discopy.cat import factory
+from discopy.cat import AlphaEquivalence, Renamed, factory
+# pylint: disable-next=unused-import  # still imported from this module
+from discopy.cat import Canonical  # noqa: F401
 from discopy.utils import (
     AxiomError,
     assert_isinstance,
@@ -175,6 +165,7 @@ class Ty(monoidal.Ty):
         return other.under(self)
 
     def __call__(self, arg):
+        # pylint: disable=signature-differs  # a lambda, with no offset
         if isinstance(arg, str):
             return self.constant_factory(arg, self)
         elif isinstance(arg, Callable):
@@ -211,10 +202,6 @@ class Ty(monoidal.Ty):
         return st.recursive(
             cls.generator_strategy(), exponentials, max_leaves=max_leaves)
 
-    def __repr__(self):
-        return factory_name(type(self))\
-            + f"({', '.join(map(repr, self.inside))})"
-
     def cast_wire(self, x: str | cat.Ob) -> cat.Ob:
         """
         Turn a constructor argument into an atom of the type: any monoidal
@@ -238,26 +225,6 @@ class Ty(monoidal.Ty):
         super().__setstate__(state)
         if self.generator_factory is monoidal.Wire:
             self.inside = tuple(map(self.cast_wire, self.inside))
-
-    def bang(self) -> Self:
-        """
-        The bang of a type, a single wire :class:`BangOb` holding it: the
-        bang is lax monoidal, ``!(x @ y)`` is one wire and not ``!x @ !y``.
-
-        Example
-        -------
-        >>> x, y = Ty('x'), Ty('y')
-        >>> assert x.bang() == Ty(BangOb(x)) != Ty(BangOb(x @ y))
-        >>> assert (x @ y).bang() != x.bang() @ y.bang()
-        >>> assert str(x.bang()) == "x.bang()"
-        >>> assert eval(str((x @ y).bang().bang())) == (x @ y).bang().bang()
-        """
-        return self.ar_bang_ob(self)
-
-    @classmethod
-    def ar_bang_ob(cls, arg: Ty) -> Self:
-        """ The type of one :attr:`bang_factory` wire holding ``arg``. """
-        return cls(cls.bang_factory(arg))
 
     @property
     def is_exp(self):
@@ -412,79 +379,11 @@ class Under(Exp):
         return f"({self.exponent} >> {self.base})"
 
 
-class BangOb(Wire):
-    """
-    The bang ``!x`` of a type ``x``, a wire of its own holding it, the way an
-    :class:`Exp` holds its base and exponent.
-
-    Parameters:
-        arg : The type to bang.
-
-    Example
-    -------
-    >>> from discopy import biclosed
-    >>> x, y = Ty('x'), Ty('y')
-    >>> assert Ty(BangOb(x @ y)) == (x @ y).bang()
-    >>> assert eval(repr(BangOb(x))) == BangOb(x)
-    >>> assert BangOb(x @ y).drawing_name == "!(x @ y)"
-    """
-    ob = Ty
-
-    def __init__(self, arg: Ty):
-        assert_isinstance(arg, self.ob)
-        self.arg = arg
-        super().__init__("")
-        del self.name
-
-    @cached_property
-    def name(self):  # pylint: disable=method-hidden  # deleted by __init__
-        "The name of a bang is its print, computed when first read."
-        return str(self)
-
-    def __eq__(self, other):
-        return isinstance(other, type(self)) and self.arg == other.arg
-
-    def __hash__(self):
-        return hash(repr(self))
-
-    def __str__(self):
-        arg = str(self.arg) if len(self.arg) == 1 else f"({self.arg})"
-        return arg + ".bang()"
-
-    @property
-    def drawing_name(self) -> str:
-        """ The label of a banged wire, e.g. ``!x`` or ``!(x @ y)``. """
-        arg = self.arg.to_drawing()
-        return "!" + (str(arg) if len(arg) == 1 else f"({arg})")
-
-    def atoms(self) -> list:
-        """ The atoms of a bang: those of the type it holds. """
-        return self.arg.atoms()
-
-    def __repr__(self):
-        return factory_name(type(self)) + f"({self.arg!r})"
-
-    def to_tree(self):
-        return {'factory': factory_name(type(self)),
-                'arg': self.arg.to_tree()}
-
-    @classmethod
-    def from_tree(cls, tree):
-        return cls(from_tree(tree['arg']))
-
-
-Ty.bang_factory = BangOb
-
-
 @factory
-class Diagram(monoidal.Diagram, LinearCategory):
+class Diagram(monoidal.Diagram, BiclosedCategory):
     """
     A biclosed diagram is a monoidal diagram
-    with :class:`Curry` and :class:`Eval` boxes. It is the free linear
-    category without symmetry, with :class:`Bang` bubbles and the
-    :class:`Dereliction`, :class:`Digging`, :class:`Contraction`,
-    :class:`Weakening`, :class:`Exchange` and :class:`Laxator` boxes, see
-    :class:`discopy.abc.LinearCategory`.
+    with :class:`Curry` and :class:`Eval` boxes.
 
     Parameters:
         inside(Layer) : The layers inside the diagram.
@@ -497,60 +396,8 @@ class Diagram(monoidal.Diagram, LinearCategory):
     coeval_factory: ClassVar[type["Coeval"]]
     sum_factory: ClassVar[type["Sum"]]
     functor_factory: ClassVar[type["Functor"]]
-    bang_factory: ClassVar[type["Bang"]]
-    dereliction_factory: ClassVar[type["Dereliction"]]
-    digging_factory: ClassVar[type["Digging"]]
-    contraction_factory: ClassVar[type["Contraction"]]
-    weakening_factory: ClassVar[type["Weakening"]]
-    exchange_factory: ClassVar[type["Exchange"]]
-    laxator_factory: ClassVar[type["Laxator"]]
 
     ob = Ty
-
-    def bang(self) -> Diagram:
-        """
-        Wrapper around :class:`Bang` called by :class:`Functor`: the bang of
-        a free diagram is a bubble, so it is a functor only up to the laws
-        the free category declares failing.
-
-        Example
-        -------
-        >>> x, y = Ty('x'), Ty('y')
-        >>> f = Box('f', x, y)
-        >>> assert f.bang() == Bang(f) and f.bang().dom == x.bang()
-        >>> assert Diagram.id(x).bang() != Diagram.id(x.bang())
-        """
-        return self.bang_factory(self)
-
-    @classmethod
-    def dereliction(cls, x: Ty) -> Dereliction:
-        """ Wrapper around :class:`Dereliction`. """
-        return cls.dereliction_factory(x)
-
-    @classmethod
-    def digging(cls, x: Ty) -> Digging:
-        """ Wrapper around :class:`Digging`. """
-        return cls.digging_factory(x)
-
-    @classmethod
-    def contraction(cls, x: Ty) -> Contraction:
-        """ Wrapper around :class:`Contraction`. """
-        return cls.contraction_factory(x)
-
-    @classmethod
-    def weakening(cls, x: Ty) -> Weakening:
-        """ Wrapper around :class:`Weakening`. """
-        return cls.weakening_factory(x)
-
-    @classmethod
-    def exchange(cls, x: Ty, y: Ty, is_dagger: bool = False) -> Exchange:
-        """ Wrapper around :class:`Exchange`. """
-        return cls.exchange_factory(x, y, is_dagger)
-
-    @classmethod
-    def laxator(cls, x: Ty | None = None, y: Ty | None = None) -> Laxator:
-        """ Wrapper around :class:`Laxator`. """
-        return cls.laxator_factory(x, y)
 
     def curry(self, n=1, left=True) -> Diagram:
         """
@@ -605,8 +452,6 @@ class Diagram(monoidal.Diagram, LinearCategory):
     def to_drawing(self):
         return monoidal.Diagram.to_drawing(self, functor_factory=Functor)
 
-    map_agreement = monoidal.Diagram.map_agreement.failing(
-        messages.MAP_OF_A_CURRY)
     dagger_involution = DaggerCategory.dagger_involution.failing(
         messages.CURRY_HAS_NO_DAGGER)
     dagger_involution_monoidal = DaggerCategory.dagger_involution.weaken(
@@ -846,292 +691,6 @@ class Bubble(monoidal.Bubble, Box):
     """
 
 
-class Bang(monoidal.Bubble, Box):
-    """
-    The bang ``!f : !x -> !y`` of a diagram ``f : x -> y``, a bubble the way
-    a :class:`Curry` is.
-
-    Parameters:
-        arg : The diagram to bang.
-
-    Example
-    -------
-    >>> from discopy import biclosed
-    >>> x, y = Ty('x'), Ty('y')
-    >>> f = Box('f', x, y)
-    >>> assert Bang(f).dom == x.bang() and Bang(f).cod == y.bang()
-    >>> assert eval(repr(Bang(f))) == Bang(f) and eval(str(Bang(f))) == Bang(f)
-    >>> print(Bang(f >> f[::-1]))
-    (f >> f[::-1]).bang()
-
-    The promotion of !L*, from ``!x -> y`` to ``!x -> !y``, is the digging
-    followed by the bang:
-
-    >>> g = Box('g', x.bang(), y)
-    >>> promotion = Digging(x) >> g.bang()
-    >>> assert promotion.dom == x.bang() and promotion.cod == y.bang()
-    """
-    serialised_attrs = ("*args", )
-
-    def __init__(self, arg: Diagram):
-        dom, cod = arg.dom.bang(), arg.cod.bang()
-        monoidal.Bubble.__init__(
-            self, arg, dom=dom, cod=cod, drawing_name="!")
-        Box.__init__(self, f"({arg}).bang()", dom, cod)
-
-    def __repr__(self):
-        return f"{factory_name(type(self))}({self.arg!r})"
-
-    def __str__(self):
-        return self.name
-
-    def to_tree(self):
-        return {'factory': factory_name(type(self)),
-                'arg': self.arg.to_tree()}
-
-    @classmethod
-    def from_tree(cls, tree):
-        return cls(from_tree(tree['arg']))
-
-    def dagger(self) -> Bang:
-        """ The dagger of a bang is the bang of the dagger. """
-        return type(self)(self.arg.dagger())
-
-
-class Structural(Box):
-    """
-    A structural box of a linear category, built from the types of its
-    :attr:`serialised_attrs` rather than a name and a boundary: its name is
-    the call on them, which is its string.
-    """
-    def __getnewargs__(self):
-        """ The arguments of the constructor. """
-        return tuple(getattr(self, attr) for attr in self.serialised_attrs)
-
-    def __repr__(self):
-        arguments = (
-            repr(value) for value in self.__getnewargs__()
-            if value is not None)
-        return f"{factory_name(type(self))}({', '.join(arguments)})"
-
-    def to_tree(self):
-        return {'factory': factory_name(type(self))} | {
-            attr: value.to_tree() if isinstance(value, Ty) else value
-            for attr, value in zip(
-                self.serialised_attrs, self.__getnewargs__())}
-
-    @classmethod
-    def from_tree(cls, tree):
-        return cls(**{
-            attr: from_tree(value) if isinstance(value, dict) else value
-            for attr, value in tree.items() if attr != "factory"})
-
-    def dagger(self):
-        """
-        A structural box has no dagger but for the exchange.
-
-        >>> Dereliction(Ty('x')).dagger()
-        Traceback (most recent call last):
-        ...
-        discopy.utils.AxiomError: Dereliction(x) has no dagger: ...
-        """
-        raise AxiomError(messages.BANG_HAS_NO_DAGGER.format(self))
-
-
-class Dereliction(Structural):
-    """
-    The dereliction ``!x -> x``, the counit of the bang and the rule of !L*
-    deriving ``Γ, !x, Δ ⊢ y`` from ``Γ, x, Δ ⊢ y``.
-
-    Parameters:
-        x : The type to derelict.
-
-    Example
-    -------
-    >>> x = Ty('x')
-    >>> assert Dereliction(x).dom == x.bang() and Dereliction(x).cod == x
-    """
-    serialised_attrs = ("x", )
-    drawing_name = "ε"
-
-    def __init__(self, x: Ty):
-        self.x = x
-        super().__init__(f"Dereliction({x})", x.bang(), x)
-
-    @classmethod
-    # pylint: disable-next=arguments-differ  # drawn with no boundary
-    def strategy(cls, *, types=None):
-        """
-        Generate the box at an atomic type.
-
-        Parameters:
-            types : The strategy to draw the types from, see
-                :meth:`atomic_strategy`.
-        """
-        return cls.atomic_strategy(types).map(cls)
-
-
-class Digging(Structural):
-    """
-    The digging ``!x -> !!x``, the comultiplication of the bang.
-
-    Parameters:
-        x : The type to dig.
-
-    Example
-    -------
-    >>> x = Ty('x')
-    >>> assert Digging(x).cod == x.bang().bang()
-    """
-    serialised_attrs = ("x", )
-    drawing_name = "δ"
-    strategy = classmethod(Dereliction.strategy.__func__)
-
-    def __init__(self, x: Ty):
-        self.x = x
-        super().__init__(f"Digging({x})", x.bang(), x.bang().bang())
-
-
-class Contraction(Structural):
-    """
-    The contraction ``!x -> !x @ !x``, the rule of !L* deriving
-    ``Γ, !x, Δ ⊢ y`` from ``Γ, !x, !x, Δ ⊢ y``.
-
-    Parameters:
-        x : The type to contract.
-
-    Example
-    -------
-    >>> x = Ty('x')
-    >>> assert Contraction(x).cod == x.bang() @ x.bang()
-    """
-    serialised_attrs = ("x", )
-    drawing_name = "Δ"
-    strategy = classmethod(Dereliction.strategy.__func__)
-
-    def __init__(self, x: Ty):
-        self.x = x
-        super().__init__(f"Contraction({x})", x.bang(), x.bang() @ x.bang())
-
-
-class Weakening(Structural):
-    """
-    The weakening ``!x -> Ty()``, the counit of the contraction. !L* is
-    relevant: it has no weakening, which an example of it never uses.
-
-    Parameters:
-        x : The type to weaken.
-
-    Example
-    -------
-    >>> x = Ty('x')
-    >>> assert Weakening(x).dom == x.bang() and not Weakening(x).cod
-    """
-    serialised_attrs = ("x", )
-    drawing_name = "e"
-    strategy = classmethod(Dereliction.strategy.__func__)
-
-    def __init__(self, x: Ty):
-        self.x = x
-        super().__init__(f"Weakening({x})", x.bang(), x[:0])
-
-
-class Exchange(Structural):
-    """
-    The exchange ``!x @ y -> y @ !x`` of a banged type with any type, and its
-    inverse ``y @ !x -> !x @ y`` when ``is_dagger``, the permutation rule of
-    !L*: it makes ``!x`` central rather than the category symmetric.
-
-    Parameters:
-        x : The type that is banged.
-        y : The type it is exchanged with.
-        is_dagger : Whether to take the inverse.
-
-    Example
-    -------
-    >>> x, y = Ty('x'), Ty('y')
-    >>> assert Exchange(x, y).dom == x.bang() @ y
-    >>> assert Exchange(x, y).dagger() == Exchange(x, y, True)
-    >>> assert Exchange(x, y, True).dom == y @ x.bang()
-    >>> assert eval(str(Exchange(x, y)[::-1])) == Exchange(x, y, True)
-    """
-    serialised_attrs = ("x", "y", "is_dagger")
-    drawing_name = "σ"
-
-    def __init__(self, x: Ty, y: Ty, is_dagger: bool = False):
-        self.x, self.y = x, y
-        dom, cod = x.bang() @ y, y @ x.bang()
-        super().__init__(f"Exchange({x}, {y})", *(
-            (cod, dom) if is_dagger else (dom, cod)), is_dagger=is_dagger)
-
-    def dagger(self) -> Exchange:
-        return type(self)(self.x, self.y, not self.is_dagger)
-
-    @classmethod
-    # pylint: disable-next=arguments-differ  # drawn with no boundary
-    def strategy(cls, *, types=None):
-        """
-        Generate the exchange of two atomic types, or its inverse.
-
-        Parameters:
-            types : The strategy to draw the types from, see
-                :meth:`atomic_strategy`.
-        """
-        from hypothesis import strategies as st
-
-        atoms = cls.atomic_strategy(types)
-        return st.builds(cls, atoms, atoms, st.booleans())
-
-
-class Laxator(Structural):
-    """
-    The laxator ``!x @ !y -> !(x @ y)`` of the bang, and its unit
-    ``Ty() -> !Ty()`` when given no type.
-
-    Parameters:
-        x : The type on the left.
-        y : The type on the right.
-
-    Example
-    -------
-    >>> from discopy import biclosed
-    >>> x, y = Ty('x'), Ty('y')
-    >>> assert Laxator(x, y).dom == x.bang() @ y.bang()
-    >>> assert Laxator(x, y).cod == (x @ y).bang()
-    >>> assert not Laxator().dom and Laxator().cod == Ty().bang()
-    >>> assert eval(repr(Laxator())) == Laxator()
-    """
-    serialised_attrs = ("x", "y")
-    drawing_name = "m"
-
-    def __init__(self, x: Ty | None = None, y: Ty | None = None):
-        if (x is None) != (y is None):
-            raise ValueError(messages.LAXATOR_ARITY.format((x, y)))
-        self.x, self.y = x, y
-        if x is None or y is None:
-            name, dom = "Laxator()", self.ob()
-            cod = Ty.bang(dom)
-        else:
-            name, dom = f"Laxator({x}, {y})", x.bang() @ y.bang()
-            cod = (x @ y).bang()
-        super().__init__(name, dom, cod)
-
-    @classmethod
-    # pylint: disable-next=arguments-differ  # drawn with no boundary
-    def strategy(cls, *, types=None):
-        """
-        Generate the laxator of two atomic types, or its unit.
-
-        Parameters:
-            types : The strategy to draw the types from, see
-                :meth:`atomic_strategy`.
-        """
-        from hypothesis import strategies as st
-
-        atoms = cls.atomic_strategy(types)
-        return st.one_of(st.just(cls()), st.builds(cls, atoms, atoms))
-
-
 Id = Diagram.id
 Diagram.box_factory = Box
 Diagram.curry_factory = Curry
@@ -1139,17 +698,6 @@ Diagram.eval_factory = Eval
 Diagram.coeval_factory = Coeval
 Diagram.sum_factory = Sum
 Diagram.bubble_factory = Bubble
-Diagram.bang_factory = Bang
-Diagram.dereliction_factory = Dereliction
-Diagram.digging_factory = Digging
-Diagram.contraction_factory = Contraction
-Diagram.weakening_factory = Weakening
-Diagram.exchange_factory = Exchange
-Diagram.laxator_factory = Laxator
-for law in sorted(
-        set(LinearCategory.axioms) - set(BiclosedCategory.axioms)):
-    setattr(Diagram, law, getattr(LinearCategory, law).failing(
-        messages.FREE_BANG))
 
 
 class Functor(monoidal.Functor):
@@ -1196,46 +744,7 @@ class Functor(monoidal.Functor):
     """
     dom = cod = Diagram
 
-    @property
-    def has_bang(self) -> bool:
-        """
-        Whether the codomain is a linear category whose objects are made of
-        biclosed wires, which a :class:`BangOb` and the structural boxes are
-        sent through: those of its generator, or the monoidal wires a
-        biclosed type casts to them, see :meth:`Ty.cast_wire`. Otherwise,
-        e.g. into :class:`discopy.tensor.Diagram`, they go through
-        ``ob_map`` and ``ar_map``.
-        """
-        ob = get_origin(self.cod.ob)
-        generator = getattr(ob, "generator_factory", object)
-        return issubclass(get_origin(self.cod), LinearCategory) and (
-            issubclass(generator, Wire)
-            or issubclass(ob, Ty) and generator is monoidal.Wire)
-
-    def map_bang(self, other):
-        """
-        The image of a :class:`BangOb`, a :class:`Bang` or a structural box
-        in a codomain with a bang, see :attr:`has_bang`.
-
-        Parameters:
-            other : The wire or box to map.
-        """
-        if isinstance(other, (BangOb, Bang)):
-            return self(other.arg).bang()
-        if isinstance(other, Laxator):
-            return self.cod.laxator() if other.x is None\
-                else self.cod.laxator(self(other.x), self(other.y))
-        if isinstance(other, Exchange):
-            return self.cod.exchange(
-                self(other.x), self(other.y), other.is_dagger)
-        method = getattr(self.cod, type(other).__name__.lower())
-        return method(self(other.x))
-
     def __call__(self, other):
-        if isinstance(other, (BangOb, Bang, Structural))\
-                and self.cod is not Drawing:
-            return self.map_bang(other) if self.has_bang\
-                else monoidal.Functor.__call__(self, other)
         if isinstance(other, TermBase) and self.cod is not Drawing:
             if issubclass(get_origin(self.cod), hypergraph.Hypergraph)\
                     and not isinstance(other, Constant):
@@ -1318,95 +827,6 @@ CMap = cmap.CMap[Diagram]
 Diagram.functor_factory = Functor
 
 
-class Renamed[factory](TestableGeneric, tuple):
-    """
-    Alpha-equivalent terms of the ``factory``: one shape generated under two
-    or more namings of its bound variables, see :meth:`TermBase.generate`.
-
-    Example
-    -------
-    >>> from hypothesis import find
-    >>> terms = find(
-    ...     Renamed[TermBase].strategy(), lambda terms: len(terms) == 3)
-    >>> assert terms[0].alpha_eq(*terms[1:])
-    """
-    @classmethod
-    def checked_params(cls) -> tuple:
-        """ None, a sort of premises being drawn over a category. """
-        return ()
-
-    @classmethod
-    def strategy(cls, **params) -> "st.SearchStrategy[Renamed]":
-        """
-        Generate a shape and at least two namings of it.
-
-        Parameters:
-            params : Passed to :meth:`TermBase.shapes`.
-        """
-        from hypothesis import strategies as st
-
-        category = cls.factory
-        return st.builds(
-            lambda shape, namings: cls(
-                category.generate(*shape, letters) for letters in namings),
-            category.shapes(**params),
-            st.lists(category.namings(), min_size=2, max_size=3))
-
-
-class Canonical[factory](TestableGeneric, tuple):
-    """
-    Two terms of the ``factory`` followed by their canonical forms: two
-    shapes of one type, the second the first's or another, each generated
-    under its own naming and then under the one naming ``"x"``, which names
-    every bound variable by its level, so that the two terms are
-    alpha-equivalent exactly when their canonical forms are equal. Where
-    :class:`Renamed` draws terms alpha-equivalent by construction, this
-    decides the alpha-equivalence of any pair, see
-    :meth:`TermBase.alpha_completeness`.
-
-    Example
-    -------
-    >>> from hypothesis import find
-    >>> first, second, *canonical = find(
-    ...     Canonical[TermBase].strategy(),
-    ...     lambda terms: terms[0] != terms[1] and terms[2] == terms[3])
-    >>> assert first.alpha_eq(second)
-    """
-    @classmethod
-    def checked_params(cls) -> tuple:
-        """ None, a sort of premises being drawn over a category. """
-        return ()
-
-    @classmethod
-    def build(cls, shape: tuple, others: list[int] | None,
-              namings: tuple[Sequence[str], Sequence[str]]) -> "Canonical":
-        """
-        The terms of a shape and of another, the same when ``others`` is
-        ``None``, under their namings and then under the canonical one.
-        """
-        cod, choices, types = shape
-        shapes = (choices, choices if others is None else others)
-        return cls(
-            cls.factory.generate(cod, each, types, letters)
-            for each, letters in zip(2 * shapes, (*namings, "x", "x")))
-
-    @classmethod
-    def strategy(cls, **params) -> "st.SearchStrategy[Canonical]":
-        """
-        Generate a shape, its choices again or others, and two namings.
-
-        Parameters:
-            params : Passed to :meth:`TermBase.shapes`.
-        """
-        from hypothesis import strategies as st
-
-        category = cls.factory
-        return st.builds(
-            cls.build, category.shapes(**params),
-            st.none() | category.choices(),
-            st.tuples(category.namings(), category.namings()))
-
-
 class Reducible[factory](TestableGeneric, tuple):
     """
     A term of the ``factory`` with free variables in place of constants, so
@@ -1467,7 +887,7 @@ class Normalising(Testable):
             for strategy in cls.reduction_strategies))
 
 
-class TermBase(Box, Equivalence):
+class TermBase(Box, AlphaEquivalence):
     """
     A term in the internal language of biclosed categories, an
     :class:`discopy.testable.Equivalence` up to the names of its bound
@@ -1546,99 +966,6 @@ class TermBase(Box, Equivalence):
         args = (other, self, left) if left else (self, other, left)
         return self.cod.application_factory(*args)
 
-    def alpha_eq(self, *others: Term) -> bool:
-        """
-        Whether the terms are all alpha-equivalent to this one, i.e. equal up
-        to the names of their bound variables, in one pass over the terms.
-
-        Free variables are compared by name and bound ones by the depth of
-        the binder they refer to, see :meth:`alpha_eq_under`.
-        Alpha-equivalent terms evaluate to the same diagram, the converse
-        does not hold.
-
-        Example
-        -------
-        >>> X, Y = Ty("X"), Ty("Y")
-        >>> f, x, y = (Y << X)("f"), Variable("x", X), Variable("y", X)
-        >>> assert X(lambda x: f(x)).alpha_eq(
-        ...     X(lambda y: f(y)), X(lambda z: f(z)))
-        >>> assert f(x).eval() == f(y).eval() and not f(x).alpha_eq(f(y))
-        >>> h = ((Y << X) << X)("h")
-        >>> assert X(lambda x: X(lambda y: h(x)(y))).alpha_eq(
-        ...     X(lambda y: X(lambda x: h(y)(x))))
-        >>> assert not X(lambda x: x).alpha_eq(Y(lambda y: y))
-        """
-        scopes = [{} for _ in (self, *others)]
-        return self.alpha_eq_under(scopes, list(others))
-
-    def alpha_eq_under(  # pylint: disable=unused-argument  # a constant
-            self, scopes: list[dict[Variable, int]], others: list[Term],
-            depth: int = 0) -> bool:
-        """
-        Whether the terms, this one and the ``others``, are alpha-equivalent
-        under a scope for each of them, mapping each variable bound above it
-        to the depth of its binder, i.e. its de Bruijn level, the same in
-        every term: the terms are alpha-equivalent when they are equal with
-        their bound variables read as levels, which is checked without
-        building anything. A :class:`Variable` compares its levels, itself
-        when its scope says nothing of it; a term that binds nothing and
-        refers to no binder, i.e. a :class:`Constant`, is alpha-equivalent
-        to its equals, reading neither ``scopes`` nor ``depth``; every
-        other term former recurses into its subterms, with the arguments
-        spelt out rather than unpacked, so that the recursion runs in
-        Python frames, as deep as the recursion limit allows, rather than
-        through C.
-
-        Entering a binder extends every scope in place with the variable it
-        binds at the current ``depth`` and leaving it restores them, so that
-        comparing the terms is one pass over them, linear in their size, and
-        the scopes read the same after the call.
-
-        Example
-        -------
-        >>> X = Ty("X")
-        >>> x, y, c = Variable("x", X), Variable("y", X), X("c")
-        >>> assert x.alpha_eq_under([{x: 0}, {y: 0}], [y])
-        >>> assert not x.alpha_eq_under([{x: 0}, {y: 1}], [y])
-        >>> assert not x.alpha_eq_under([{x: 0}, {}], [y])
-        >>> assert c.alpha_eq_under([{x: 0}, {}], [c])
-        >>> assert not c.alpha_eq_under([{}, {}], [X("d")])
-        """
-        return all(other == self for other in others)
-
-    @staticmethod
-    def alpha_eq_bound(scopes, bodies, variables, depth=0) -> bool:
-        """
-        Whether bodies are alpha-equivalent under their scopes extended with
-        the variables each one binds, read as the levels from ``depth`` on,
-        the scopes being restored on the way out.
-
-        Parameters:
-            scopes : The scope of each body.
-            bodies : The bodies, one per scope.
-            variables : The variables each body binds, in order.
-            depth : The level of the first variable bound.
-
-        Example
-        -------
-        >>> x, y = Ty("x"), Ty("y")
-        >>> f, v, w = (y << x)("f"), Variable("v", x), Variable("w", x)
-        >>> scopes = [{v: 0}, {}]
-        >>> assert TermBase.alpha_eq_bound(scopes, [f(v), f(w)], [[v], [w]])
-        >>> assert scopes == [{v: 0}, {}]
-        """
-        shadowed = [{x: scope[x] for x in bound if x in scope}
-                    for scope, bound in zip(scopes, variables)]
-        for scope, bound in zip(scopes, variables):
-            scope.update({x: depth + i for i, x in enumerate(bound)})
-        result = bodies[0].alpha_eq_under(
-            scopes, list(bodies[1:]), depth + len(variables[0]))
-        for scope, bound, levels in zip(scopes, variables, shadowed):
-            for x in bound:
-                del scope[x]
-            scope.update(levels)
-        return result
-
     @classmethod
     # pylint: disable-next=too-many-arguments,too-many-positional-arguments
     def generate(  # a shape, a naming and whether it takes constants
@@ -1668,13 +995,6 @@ class TermBase(Box, Equivalence):
             cls, iter(choices), types, letters, constants=constants).term(cod)
 
     @classmethod
-    def choices(cls) -> st.SearchStrategy[list[int]]:
-        """ Generate the choices of :meth:`generate`, one per node. """
-        from hypothesis import strategies as st
-
-        return st.lists(st.integers(min_value=0, max_value=11), max_size=12)
-
-    @classmethod
     def shapes(cls, *, types=None, cod=None) -> st.SearchStrategy[tuple]:
         """
         Generate the arguments of :meth:`generate` but its letters: a type,
@@ -1690,52 +1010,7 @@ class TermBase(Box, Equivalence):
             cls.choices(),
             st.lists(types, min_size=1, max_size=3))
 
-    @classmethod
-    def namings(cls) -> st.SearchStrategy[list[str]]:
-        """ Generate the letters naming the bound variables, one per level. """
-        from hypothesis import strategies as st
-
-        return st.lists(st.sampled_from("xyz"), min_size=1, max_size=3)
-
-    @classmethod
-    def strategy(cls, **params) -> st.SearchStrategy[Term]:
-        """
-        Generate terms, one :meth:`generate` call per shape and naming.
-
-        Parameters:
-            params : Passed to :meth:`shapes`.
-        """
-        from hypothesis import strategies as st
-
-        return st.builds(
-            lambda shape, letters: cls.generate(
-                shape[0], shape[1], shape[2], letters),
-            cls.shapes(**params), cls.namings())
-
-    @classmethod
-    def related(cls, **params) -> st.SearchStrategy[tuple]:
-        """
-        Generate a term, its canonical form and a second term of the same
-        type, the first again under another naming or another shape, see
-        :class:`Canonical`: the first two alpha-equivalent by construction,
-        the third alpha-equivalent to them or not.
-
-        Parameters:
-            params : Passed to :meth:`shapes`.
-        """
-        from hypothesis import strategies as st
-
-        return st.builds(
-            lambda terms: (terms[0], terms[2], terms[1]),
-            Canonical[cls].strategy(**params))  # ty: ignore[invalid-type-form]
-
-    serialisation = Serialisable.serialisation.failing(
-        "A term does not read back from its tree, see #692.")
-
-    @axiom
-    def alpha_renaming(cls, terms: Renamed[Self]) -> AbstractEquation:
-        """ A term is alpha-equivalent to its renamings, however many. """
-        return AlphaEquation(*terms)
+    strategy = classmethod(AlphaEquivalence.strategy.__func__)
 
     @axiom
     def alpha_application(cls, terms: Renamed[Self]) -> AbstractEquation:
@@ -1762,23 +1037,6 @@ class TermBase(Box, Equivalence):
             cls.ob.abstraction_factory(w, f(term)(w), False)
             for term in terms))
 
-    @axiom
-    def alpha_soundness(cls, terms: Renamed[Self]) -> AbstractEquation:
-        """ Alpha-equivalent terms evaluate to the same diagram. """
-        return Equation(*(term.eval() for term in terms))
-
-    @axiom
-    def alpha_completeness(cls, terms: Canonical[Self]) -> AbstractEquation:
-        """
-        Alpha-equivalence is decided by the canonical naming of the bound
-        variables: two terms are alpha-equivalent exactly when their
-        canonical forms are equal, see :class:`Canonical`. The other laws
-        hold of a relation that says yes too often; this one fails when
-        terms that are not alpha-equivalent are.
-        """
-        first, second, *canonical = terms
-        return Equation(first.alpha_eq(second), canonical[0] == canonical[1])
-
 
 class Constant(TermBase):
     """
@@ -1796,7 +1054,7 @@ class Constant(TermBase):
     serialised_attrs = ("name", "cod", "*", "is_dagger", "data")
 
     def __init__(self, name: str, cod: Ty, **kwargs):
-        super().__init__(name, dom=self.ob(), cod=cod, **kwargs)
+        super().__init__(name, dom=self.ob.id(cod.dom), cod=cod, **kwargs)
         self.freevars = []
 
     @classmethod
@@ -1860,37 +1118,8 @@ class Variable(TermBase):
         """ A variable prints as its bare name, it is its own atom. """
         return [self]
 
-    def alpha_eq_under(  # pylint: disable=unused-argument  # depth: binders
-            self, scopes, others, depth=0):
-        """ Variables alike by the level of their binder, by name if free. """
-        if any(type(other) is not type(self) for other in others):
-            return False
-        images = [scope.get(term, term)
-                  for scope, term in zip(scopes, (self, *others))]
-        return all(image == images[0] for image in images[1:])
-
-    @classmethod
-    def fresh(cls, name, cod, *terms):
-        """
-        A variable of a given type whose name is not free in any of the terms,
-        underscores being appended to the name until it is not.
-
-        Parameters:
-            name : The name to start from.
-            cod : The type of the variable.
-            terms : The terms in which the variable must not be free.
-
-        Example
-        -------
-        >>> x = Ty("x")
-        >>> assert Variable.fresh("v", x, Variable("v", x))\\
-        ...     == Variable("v_", x)
-        """
-        names = {
-            variable.name for term in terms for variable in term.freevars}
-        while name in names:
-            name += "_"
-        return cls(name, cod)
+    alpha_eq_under = cat.Variable.alpha_eq_under
+    fresh = classmethod(cat.Variable.fresh.__func__)
 
     __repr__ = Constant.__repr__
 
@@ -2306,10 +1535,10 @@ class Equation(monoidal.Equation):
     """ The :class:`monoidal.Equation` of biclosed diagrams. """
 
 
-class AlphaEquation(Equation):
+class AlphaEquation(cat.AlphaEquation, Equation):
     """
     An :class:`Equation` between terms which holds when they are
-    alpha-equivalent, see :meth:`TermBase.alpha_eq`.
+    alpha-equivalent, see :meth:`discopy.cat.AlphaEquivalence.alpha_eq`.
 
     Example
     -------
@@ -2318,9 +1547,6 @@ class AlphaEquation(Equation):
     >>> assert AlphaEquation(X(lambda x: f(x)), X(lambda y: f(y)))
     >>> assert not AlphaEquation(f(Variable("x", X)), f(Variable("y", X)))
     """
-    def __bool__(self):
-        term, *others = self.terms
-        return term.alpha_eq(*others)
 
 
 TermBase.equivalence_factory = AlphaEquation

@@ -208,12 +208,12 @@ import numpy as np
 from sympy import lambdify
 from sympy.core import Symbol
 from discopy import (
-    monoidal, symmetric, frobenius, tensor, hypergraph
+    feedback, monoidal, symmetric, frobenius, tensor, hypergraph
 )
 from discopy import stream as monoidal_stream
 from discopy.cat import factory, rsubs
 from discopy.frobenius import Dim
-from discopy.matrix import backend
+from discopy.matrix import backend, repr_nonfinite
 from discopy.optyx.utils.misc import hashable
 from discopy.utils import AxiomError, factory_name
 from discopy.quantum.gates import format_number
@@ -250,6 +250,9 @@ class PhotonNumberPreservation(Enum):
 
 class Ob(frobenius.Wire):
     """Basic object in an optyx Diagram: bit or mode"""
+
+
+HeadOb, TailOb = feedback.structural_wires(Ob)
 
 
 @factory
@@ -301,6 +304,20 @@ class Diagram(frobenius.Diagram):
 
     grad = tensor.Diagram.grad
     __pow__ = monoidal.Ty.__pow__
+
+    @classmethod
+    def cup_factory(cls, left: Ty, right: Ty) -> Spider:
+        """
+        The cup of an optyx type is its spider with two legs in, as in any
+        frobenius category. `frobenius.Diagram.caps` is the dagger of `cups`
+        and :meth:`trace` bends its wires with both, so the cap comes out as
+        the spider with two legs out and `cap_factory` is never reached.
+
+        >>> assert Diagram.cups(mode, mode) == Spider(2, 0, mode)
+        >>> assert Diagram.caps(bit, bit) == Spider(0, 2, bit)
+        """
+        left.assert_isadjoint(right)
+        return cls.spider_factory(2, 0, left)
 
     def conjugate(self) -> Diagram:
         """Conjugates every box in the diagram"""
@@ -803,7 +820,7 @@ class Box(frobenius.Box, Diagram):
         if self.is_dagger:
             return repr(self.dagger()) + ".dagger()"
         array = "" if self.array is None\
-            else f", array={self.array.tolist()!r}"
+            else f", array={repr_nonfinite(self.array.tolist())}"
         self_adjoint = ", is_dagger=None" if self.is_dagger is None else ""
         return super().__repr__()[:-1] + array + self_adjoint + ")"
 
@@ -1468,10 +1485,18 @@ class Feedback(monoidal.Bubble, Box):
     A feedback loop connecting the last `mem` outputs of `arg`
     back to its last `mem` inputs, one time step later.
 
-    The delay endofunctor is the identity, so `arg` goes from `dom @ mem`
+    The delay is real but left unwritten: the memory of `arg` is not typed
+    with :meth:`discopy.feedback.Wire.delay`, so `arg` goes from `dom @ mem`
     to `cod @ mem` and the result from `dom` to `cod`. It is drawn as `arg`
     with a feedback loop and composes with any other diagram; its stream
     semantics is given by :meth:`Diagram.unroll`.
+
+    A loop is therefore a delay line rather than a trace, and yanking
+    fails: the feedback of a swap waits one time step instead of being the
+    identity.
+
+    >>> wait = Diagram.swap(mode, mode).feedback()
+    >>> assert wait.unroll(1) != Diagram.id(mode ** 3)
 
     Parameters:
         arg : The diagram from `dom @ mem` to `cod @ mem` to feed back.

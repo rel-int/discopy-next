@@ -103,8 +103,6 @@ lambek = [
     "torch",
     "transformers",
 ]
-# the deprecated name of the lambek extra
-grammar = ["discopy[lambek]"]
 # discopy.optyx, under Apache-2.0: see discopy/optyx/LICENSE
 optyx = [
     "cotengra",
@@ -264,6 +262,7 @@ testpaths = [
     "discopy",
     "test/*.py",
     "test/*/*.py",
+    "test/lambek/*/*.py",
     "test/optyx/compiler/*.py",
 ]
 norecursedirs = [
