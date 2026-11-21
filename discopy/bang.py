@@ -198,8 +198,6 @@ class Diagram(monoidal.Diagram, LinearCategory):
         dom (Ty) : The domain of the diagram, i.e. its input.
         cod (Ty) : The codomain of the diagram, i.e. its output.
     """
-    box_factory: ClassVar[type["Box"]]
-    sum_factory: ClassVar[type["Sum"]]
     functor_factory: ClassVar[type["Functor"]]
     bang_factory: ClassVar[type["Bang"]]
     dereliction_factory: ClassVar[type["Dereliction"]]
