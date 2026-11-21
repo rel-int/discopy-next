@@ -652,7 +652,7 @@ def crossings(graph: dict, margin=.1) -> list[tuple[int, int]]:
     >>> from discopy.symmetric import Ty, Box, Swap
     >>> x = Ty('a')
     >>> f, g = Box('f', Ty(), x @ x), Box('g', x @ x, Ty())
-    >>> graph = layout(f >> Swap(x, x) >> g)
+    >>> graph = layout(f >> Swap(x, x) >> g, rounds=1)
     >>> crossings(graph), [o["tooltip"] for o in graph["objects"]
     ...                    if o["name"].startswith("x")]
     ([], ['swap'])
@@ -695,7 +695,7 @@ def layout(diagram, rounds=12) -> dict:
 
     Where two edges cross, see :func:`crossings`, they are cut there and
     joined by a swap, a node ``x`` with two ports above and two below, and
-    the diagram is laid out again, at most ``rounds`` times, so that its
+    the diagram is laid out again, ``rounds`` times at most, so that its
     picture crosses wires at swaps only. Raises :class:`ValueError` when
     edges still cross after the last round, and :class:`RuntimeError`
     when ``dot`` is not installed.
@@ -703,12 +703,17 @@ def layout(diagram, rounds=12) -> dict:
     if shutil.which("dot") is None:
         raise RuntimeError("Graphviz executable 'dot' was not found.")
     nodes, edges = wiring(diagram)
-    for _ in range(rounds):
+    for round_ in range(rounds + 1):
         graph = json.loads(subprocess.run(
             ["dot", "-Tjson"], input=to_dot(nodes, edges).encode(),
             capture_output=True, check=True).stdout)
+        pairs = crossings(graph)
+        if not pairs:
+            return graph
+        if round_ == rounds:
+            break
         cut = set()
-        for left, right in crossings(graph):
+        for left, right in pairs:
             if cut & {left, right}:
                 continue
             cut |= {left, right}
@@ -719,8 +724,6 @@ def layout(diagram, rounds=12) -> dict:
             edges[left] = (one, f"{swap}:d0:n", x)
             edges[right] = (three, f"{swap}:d1:n", y)
             edges += [(f"{swap}:c1:s", two, x), (f"{swap}:c0:s", four, y)]
-        if not cut:
-            return graph
     raise ValueError(f"Edges still cross after {rounds} rounds.")
 
 
