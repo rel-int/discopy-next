@@ -57,3 +57,8 @@ from discopy.version import (
 # Registering the name keeps those docstrings parseable by plain doctest;
 # acting on it is the job of `--skip-extra`, see test/plugin.py.
 doctest.register_optionflag("EXTRA")
+
+# `from discopy import *` leaves the builtin `sum` alone: the module of formal
+# sums is `discopy.sum`, imported by `discopy.cat`.
+__all__ = [
+    name for name in dir() if not name.startswith("_") and name != "sum"]
