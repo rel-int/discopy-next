@@ -946,12 +946,22 @@ class Nat(abc.Nat, Ty):  # ty: ignore[invalid-generic-class]
         return self.n * (1, )
 
     def tensor(self, *others: "Nat") -> "Nat":
-        for other in others:
-            if not isinstance(other, Ty):
-                return NotImplemented  # This allows whiskering on the left.
-            assert_isinstance(self, other.factory)
-            assert_isinstance(other, self.factory)
-        return self.factory(self.n + sum(other.n for other in others))
+        """
+        The sum of natural numbers, of the highest of their levels as the
+        tensor of types is, see :meth:`Ty.tensor`.
+
+        Example
+        -------
+        >>> from discopy import braided
+        >>> assert Nat(1) @ braided.Nat(2) == braided.Nat(3)
+        """
+        if any(not isinstance(other, Ty) for other in others):
+            return NotImplemented  # This allows whiskering on the left.
+        numbers = (self, *others)
+        level = highest(*dict.fromkeys(x.factory for x in numbers))
+        for number in numbers:
+            assert_isinstance(number, Nat)
+        return level(sum(number.n for number in numbers))
 
     then = tensor
 

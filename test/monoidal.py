@@ -1562,6 +1562,10 @@ def test_types_of_two_levels():
     assert braided.Box('f', u, u).dom is u
     assert markov.Copy(u).dom == markov.Ty('u') != u
     assert markov.Copy(symmetric.Nat(1)).dom == markov.Nat(1)
+    assert Nat(1) @ braided.Nat(2) == braided.Nat(3) == braided.Nat(2) @ Nat(1)
+    assert type(Nat(1) @ Nat(2)) is Nat
+    with raises(TypeError, match="one level above the others"):
+        markov.Nat(1) @ comarkov.Nat(1)
     assert markov.Ty('x') @ u == markov.Ty('x', 'u') == u[:0] @ markov.Ty(
         'x') @ u
     with raises(TypeError, match="one level above the others, got markov.Ty"):

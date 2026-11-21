@@ -488,8 +488,7 @@ def highest(*levels: type) -> type:
     The highest of the classes of some levels of the hierarchy, i.e. the
     one that subclasses the others: what is built from two levels is of the
     higher, e.g. the tensor of a monoidal and a braided type is braided and
-    the kappa of a body with a constant of a symmetric category may bind
-    its variables in any order.
+    a symmetric term applied to a monoidal one is a symmetric application.
 
     Example
     -------
