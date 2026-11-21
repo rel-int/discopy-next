@@ -56,3 +56,21 @@ def test_what_it_does_not_draw():
     with pytest.raises(NotImplementedError):
         PlanarMap.from_drawing(layout.to_drawing(
             pivotal.Cap(x, x.l) >> pivotal.Cup(x, x.l)))
+
+
+def test_dagger_reflects_tangents():
+    from discopy.drawing.backend import Backend
+    drawing = to_drawing(pivotal.Box('f', x, y).transpose())
+    dagger, height = drawing.dagger(), drawing.height
+
+    def controls(d, u, v):
+        return [tuple(round(c, 6) for c in p) for p in Backend.wire_controls(
+            u, v, d.positions[u], d.positions[v])]
+    reflected = {
+        frozenset((u.data.get("i"), v.data.get("i"))): [
+            (a, round(height - b, 6)) for a, b in controls(drawing, u, v)]
+        for u, v in drawing.edges if "wire" == u.kind == v.kind}
+    for u, v in dagger.edges:
+        if "wire" == u.kind == v.kind:
+            key = frozenset((u.data.get("i"), v.data.get("i")))
+            assert controls(dagger, u, v) == reflected[key][::-1]
