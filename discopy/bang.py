@@ -333,7 +333,7 @@ class Diagram(monoidal.Diagram, LinearCategory):
         discopy.utils.AxiomError: x is not banged: ...
         """
         if any(not 0 <= i < len(dom) for i in wiring):
-            raise ValueError(messages.WIRING_OUT_OF_RANGE.format(wiring, dom))
+            raise ValueError(messages.WIRING_OUT_OF_RANGE.format(dom, wiring))
         wires = [dom[i:i + 1] for i in range(len(dom))]
         counts = [wiring.count(i) for i in range(len(dom))]
         copies = cls.id(dom[:0]).tensor(*(
