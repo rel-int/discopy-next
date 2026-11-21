@@ -4,7 +4,7 @@
 >
 > Suggested first milestone: a functor from monoidal.Diagram to an OpenQP category, x-coordinates only, with a straightness and width cost, solved with cvxpy or OSQP, compared against the current drawing on the gallery examples. Design the interface so pivotal angles and rotation-system constraints plug in later.
 
-- [ ] discopy.drawing.layout: OpenQP, the category of open QPs over x-coordinates, with id, then, tensor
+- [x] discopy.drawing.layout: OpenQP, the category of open QPs over x-coordinates, with id, then, tensor
 - [ ] Diagram.draw(layout='qp'): the functor into OpenQP solved by OSQP, as a Drawing with waypoints
 - [ ] Tests: isotopy kept (no crossing, no wire through a box, boundary order), narrower than today on the gallery
 - [ ] Gallery comparison of today's layout against the QP layout, in the PR
