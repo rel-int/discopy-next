@@ -12,6 +12,6 @@
 >
 > Keep it small to review. When you're done, state the review cost (lines changed in existing files, lines in new files) and reply to this thread with the result.
 
-- [ ] docs/adr/: the format, an index in the docs
+- [WIP] @amp-T-0582bdb1-2026-11-21 10:19 docs/adr/: the format, an index in the docs
 - [ ] CONTRIBUTING.md: one ADR per design decision, in the same PR
 - [ ] Seed ADRs, each checked against the code and the PRs
