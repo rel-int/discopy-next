@@ -11,10 +11,11 @@ def test_structural_boxes():
 
 
 def test_LinearCategory_is_monoidal_not_biclosed():
-    from discopy import biclosed, rigid, tensor
+    from discopy import biclosed, compact, rigid, tensor
     from discopy.abc import LinearCategory
     assert issubclass(Diagram, LinearCategory)
-    for category in (biclosed.Diagram, rigid.Diagram, tensor.Diagram):
+    for category in (
+            biclosed.Diagram, compact.Diagram, rigid.Diagram, tensor.Diagram):
         assert not issubclass(category, LinearCategory)
         assert not hasattr(category, "bang")
 
@@ -117,6 +118,9 @@ def test_wiring():
     for wiring, dom in [([1, 0], x @ y), ([0, 0], x @ y), ([1], x @ y)]:
         with raises(AxiomError):
             Diagram.wiring(wiring, dom)
+    for wiring, dom in [([0, 2], x.bang() @ y), ([-1], x.bang())]:
+        with raises(ValueError):
+            Diagram.wiring(wiring, dom)
 
 
 def test_terms_share_banged_variables():
@@ -161,3 +165,19 @@ def test_a_term_with_no_box_is_a_bang_term():
         assert type(eval(str(term))) is Kappa and eval(str(term)) == term
     with raises(ValueError):
         (x @ y)(lambda a, b: b)
+
+
+def test_functor_bangs_wires_through_banged():
+    from discopy.abc import LinearCategory
+    x = Ty('x')
+
+    class Banged(Diagram):
+        @classmethod
+        def banged(cls, x):
+            return Ty('b') @ x
+
+    assert issubclass(Banged, LinearCategory)
+    F = Functor(ob_map={x: x}, ar_map={}, cod=Banged)
+    assert F(x.bang()) == Ty('b') @ x
+    with raises(ValueError):
+        Diagram.copy(x.bang(), -1)

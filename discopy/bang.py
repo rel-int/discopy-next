@@ -275,6 +275,10 @@ class Diagram(monoidal.Diagram, LinearCategory):
         >>> assert Diagram.copy(y.bang(), 3) == Contraction(y)\\
         ...     >> y.bang() @ Contraction(y)
         >>> assert Diagram.copy(y.bang(), 0) == Weakening(y)
+        >>> Diagram.copy(y.bang(), -1)
+        Traceback (most recent call last):
+        ...
+        ValueError: Expected a number of copies, got -1.
         >>> Diagram.copy(y)
         Traceback (most recent call last):
         ...
@@ -282,6 +286,8 @@ class Diagram(monoidal.Diagram, LinearCategory):
         """
         if len(x) != 1 or not isinstance(x.inside[0], BangOb):
             raise AxiomError(messages.NOT_BANGED.format(x))
+        if n < 0:
+            raise ValueError(messages.NEGATIVE_COPIES.format(n))
         arg = x.inside[0].arg
         if not n:
             return cls.weakening(arg)
@@ -329,6 +335,8 @@ class Diagram(monoidal.Diagram, LinearCategory):
         ...
         discopy.utils.AxiomError: x @ y is not banged: ...
         """
+        if any(not 0 <= i < len(dom) for i in wiring):
+            raise ValueError(messages.WIRING_OUT_OF_RANGE.format(wiring, dom))
         wires = [dom[i:i + 1] for i in range(len(dom))]
         banged = [isinstance(wire.inside[0], BangOb) for wire in wires]
         counts = [wiring.count(i) for i in range(len(dom))]
@@ -733,7 +741,9 @@ class Functor(monoidal.Functor):
         Parameters:
             other : The wire or box to map.
         """
-        if isinstance(other, (BangOb, Bang)):
+        if isinstance(other, BangOb):
+            return self.cod.banged(self(other.arg))
+        if isinstance(other, Bang):
             return self(other.arg).bang()
         if isinstance(other, Laxator):
             return self.cod.laxator() if other.x is None\
