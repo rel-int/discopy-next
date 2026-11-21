@@ -38,19 +38,23 @@ are then the two spiders of the ZW calculus, applied on every mode:
 - the **Z** spider copies each mode's photon number, `|n⟩ ↦ |n⟩|n⟩`, the
   paper's **basis copy** `eᵢ ↦ eᵢ ⊗ eᵢ`.
 
-Each reading is a lambda term of `discopy.closed`, where a type called on a
-function, `n(lambda x: ...)`, is an abstraction and a variable used twice is
-copied. A closed functor sends the term to tensors, and the copy is that of
-its codomain, a subclass of `tensor.Diagram` whose copy is an optyx diagram
-evaluated as a tensor. Words are vectors drawn at random with a
-fixed seed. Every reading is checked against the paper's formulas, written
-out independently with `numpy.einsum`.
+Each reading is a term of `discopy.bang`, the planar kappa calculus with a
+bang: a type called on a function, `N.bang()(lambda x: ...)`, binds `x`, and
+a variable of banged type `!A` used twice is copied by a `Contraction` and
+read by a `Dereliction`, the two rules of `!L*` that the readings use. A
+`bang.Functor` sends the term to tensors, with `!A` as the Fock space of `A`,
+the dereliction as `ε` and the contraction as an optyx diagram evaluated as
+a tensor. Words are vectors drawn at random with a fixed seed. Every reading
+is checked against the paper's formulas, written out independently with
+`numpy.einsum`.
 
 ```python {.marimo}
 import numpy as np
 
-from discopy import closed
-from discopy.tensor import Dim, Box, Diagram
+from discopy import bang, tensor
+from discopy.bang import (
+    Ty, Box, BangOb, Contraction, Dereliction, Exchange)
+from discopy.tensor import Dim
 from discopy.optyx.core import diagram as optyx
 from discopy.optyx.core.zw import W, ZBox
 ```
@@ -64,7 +68,6 @@ of spiders, one per mode, followed by the permutation that collects the
 first outputs of all modes, then the second outputs.
 
 ```python {.marimo}
-N = S = Dim(2)
 k = 1
 
 
@@ -84,14 +87,14 @@ def photon(A):
 def iota(A):
     array = np.zeros((size(A), 2 ** size(A)))
     array[range(size(A)), photon(A)] = 1
-    return Box("ι", A, fock(A), array.reshape(A.inside + (-1, )))
+    return tensor.Box("ι", A, fock(A), array.reshape(A.inside + (-1, )))
 
 
 def epsilon(A):
     array = np.zeros((2 ** size(A), size(A)))
     array[photon(A), range(size(A))] = 1
     array[0] = k
-    return Box("ε", fock(A), A, array.reshape((-1, ) + A.inside))
+    return tensor.Box("ε", fock(A), A, array.reshape((-1, ) + A.inside))
 
 
 def layer(A, spider):
@@ -103,85 +106,79 @@ def layer(A, spider):
 
 def delta(A, spider):
     array = layer(A, spider).to_tensor(input_dims=size(A) * [2]).eval().array
-    return Box(f"Δ({spider.name})", fock(A), fock(A) @ fock(A),
-               array.real.reshape(3 * (2 ** size(A), )))
-
-
-def contraction(A, spider):
-    """The copies of a vector of A, each derelicted: ι >> Δ >> ε @ ε."""
-    return iota(A) >> delta(A, spider) >> epsilon(A) @ epsilon(A)
+    return tensor.Box(f"Δ({spider.name})", fock(A), fock(A) @ fock(A),
+                      array.real.reshape(3 * (2 ** size(A), )))
 
 
 k_extension, basis_copy = W(2), ZBox(1, 2, lambda _: 1)
-layer(N, k_extension).draw(figsize=(4, 4))
+copies = {"k-extension": k_extension, "basis copy": basis_copy}
+layer(Dim(2), k_extension).draw(figsize=(4, 4))
 ```
 
-On the two modes of `N`, the W layer above is the k-extension and the Z
-layer below is the basis copy:
+On two modes, the W layer above is the k-extension and the Z layer below is
+the basis copy:
 
 ```python {.marimo}
-layer(N, basis_copy).draw(figsize=(4, 4))
+layer(Dim(2), basis_copy).draw(figsize=(4, 4))
 ```
 
 ```python {.marimo}
 _v = np.array([.3, .7])
-_state = Box("v", Dim(1), N, _v)
-_copied = {name: (_state >> contraction(N, spider)).eval().array
-           for name, spider in [("k", k_extension), ("basis", basis_copy)]}
-assert np.allclose(_copied["k"], np.outer(_v, [1, 1]) + np.outer([1, 1], _v))
-assert np.allclose(_copied["basis"], np.diag(_v))
+_state = tensor.Box("v", Dim(1), Dim(2), _v)
+_copied = {name: (_state >> iota(Dim(2)) >> delta(Dim(2), spider)
+                  >> epsilon(Dim(2)) @ epsilon(Dim(2))).eval().array
+           for name, spider in copies.items()}
+assert np.allclose(_copied["k-extension"],
+                   np.outer(_v, [1, 1]) + np.outer([1, 1], _v))
+assert np.allclose(_copied["basis copy"], np.diag(_v))
 assert np.allclose(
-    (_state >> iota(N) >> epsilon(N)).eval().array, _v), "ε ∘ ι = id"
+    (_state >> iota(Dim(2)) >> epsilon(Dim(2))).eval().array, _v), "ε ∘ ι = id"
 mo.md("W copies `v` to `v ⊗ k + k ⊗ v` and Z copies it to `Σᵢ vᵢ eᵢ ⊗ eᵢ`.")
 ```
 
 ## 2. The lexicon
 
-A word is a variable of a type built with `<<`, where `y << x` is the
-dimension `y @ x.l`. A function word is applied to its argument by a cup.
-A variable used twice is copied with the `copy` of the diagram class the
-term is evaluated in, so the two copies of the paper are two subclasses of
-`tensor.Diagram`. The diagram of a reading is then the paper's map, from its
-words to `S ⊗ S`, and its meaning is that map applied to the word states.
-Every `!` of the paper's types is a Fock space that a contraction copies and
-a dereliction `ε` reads; a `!` that is only derelicted contributes
-`ε ∘ ι = id`, so it is left out.
+A word is a box of `discopy.bang`. A function type of the paper is an atom,
+and the elimination rule of `!L*`, from `A ⊗ A\B` to `B`, is a box that
+contracts the argument with the first index of the function. A word whose
+type has a `!` outside outputs a banged wire, which a term may copy; a `!` on
+an argument is read by a dereliction before the argument is passed, and
+`ε ∘ ι = id`, so it is left out of the boxes.
 
-| word | type of §3.3 | here |
+| word | type of §3.3 | box here |
 |---|---|---|
-| John, Bill | `!N` | `N` |
-| likes | `!((!(!N\S))/N)` | `(S << N) << N`: object, then subject |
-| his | `(!(!N\N))/N` | `(N << N) << N`: possessed, then owner |
-| code | `N` | `N` |
-| does too | `(!(!N\S))\(!N\S)` | `(S << N) << (S << N)` |
+| John, Bill, Mary | `!N` | `John : 1 → !N` |
+| code, guitar | `N` | `code : 1 → N` |
+| sleeps, snores | `N\S` | `sleeps : 1 → VP` |
+| He | `!N\N` | `He : N → N` |
+| plays, likes | `!((!(!N\S))/N)` | `likes : 1 → !V` |
+| his | `(!(!N\N))/N` | `his : N → !H`, applied to the possessed |
+| does too | `(!(!N\S))\(!N\S)` | `does too : VP ⊗ N → S` |
+
+where `VP = !N\S`, `H = !N\N` and `V = (!VP)/N`, evaluated by
+`ev : N ⊗ VP → S`, `of : N ⊗ H → N` and `obj : N ⊗ V → !VP`. `and` puts two
+sentences side by side.
 
 ```python {.marimo}
-class KExtension(Diagram):
-    @classmethod
-    def copy(cls, x, n=2):
-        assert n == 2
-        return contraction(x, k_extension)
+N, S, VP, H, V = map(Ty, ("N", "S", "VP", "H", "V"))
+John, Bill, Mary = (Box(name, Ty(), N.bang()) for name in ("John", "Bill", "Mary"))
+code, guitar = Box("code", Ty(), N), Box("guitar", Ty(), N)
+sleeps, snores = Box("sleeps", Ty(), VP), Box("snores", Ty(), VP)
+plays, likes = Box("plays", Ty(), V.bang()), Box("likes", Ty(), V.bang())
+He, his, does_too = Box("He", N, N), Box("his", N, H.bang()), Box(
+    "does too", VP @ N, S)
+ev, of, obj = Box("ev", N @ VP, S), Box("of", N @ H, N), Box(
+    "obj", N @ V, VP.bang())
+and_ = Box("and", S @ S, S @ S)
 
 
-class BasisCopy(Diagram):
-    @classmethod
-    def copy(cls, x, n=2):
-        assert n == 2
-        return contraction(x, basis_copy)
-
-
-copies = {"k-extension": KExtension, "basis copy": BasisCopy}
-n, s = closed.Ty("N"), closed.Ty("S")
-VP = s << n
-types = {"John": n, "Bill": n, "Mary": n, "code": n, "guitar": n,
-         "sleeps": VP, "snores": VP, "He": n << n, "plays": VP << n,
-         "likes": VP << n, "his": (n << n) << n, "does too": VP << VP}
-John, Bill, Mary, code, guitar, sleeps, snores, He, plays, likes, his, \
-    does_too = (closed.Variable(name, typ) for name, typ in types.items())
+def der(term):
+    """The dereliction of a term of banged type, which reads it once."""
+    return Dereliction(term.cod.inside[0].arg)(term)
 ```
 
-The arrays `a` of the words are drawn with their arguments first, the order
-the formulas below use, and transposed into the order of their types.
+The arrays `a` of the words are drawn at random with their arguments first,
+and those of the elimination boxes are identities.
 
 ```python {.marimo}
 rng = np.random.default_rng(0)
@@ -189,23 +186,54 @@ shapes = {"N": (2, ), "VP": (2, 2), "He": (2, 2), "V": (2, 2, 2),
           "his": (2, 2, 2), "does too": (2, 2, 2, 2)}
 kinds = {"sleeps": "VP", "snores": "VP", "He": "He", "plays": "V",
          "likes": "V", "his": "his", "does too": "does too"}
-order = {"VP": (1, 0), "He": (1, 0), "V": (2, 1, 0), "his": (2, 1, 0),
-         "does too": (3, 2, 0, 1)}
-a = {name: rng.random(shapes[kinds.get(name, "N")]) for name in types}
+words = ("John", "Bill", "Mary", "code", "guitar", "sleeps", "snores", "He",
+         "plays", "likes", "his", "does too")
+a = {name: rng.random(shapes[kinds.get(name, "N")]) for name in words}
+_I = np.eye(2)
+a |= {"ev": np.einsum("nm,st->nmst", _I, _I),
+      "of": np.einsum("pq,rt->pqrt", _I, _I),
+      "obj": np.einsum("or,nm,st->ornsmt", _I, _I, _I),
+      "and": np.einsum("su,tv->stuv", _I, _I)}
+```
+
+A `bang.Functor` into `tensor.Diagram` sends `!A` to `F(A)`, a dereliction
+to `ε`, a contraction to `Δ` with the chosen spider, an exchange to a swap
+and a word to its array, followed by `ι` when its output is banged.
+
+```python {.marimo}
+dim = {N: Dim(2), S: Dim(2), VP: Dim(2, 2), H: Dim(2, 2), V: Dim(2, 2, 2)}
 
 
-def meaning(term, copy):
-    """
-    The map of a reading, sent by a closed functor into a diagram class that
-    chooses the copy, and applied to the states of its words.
-    """
-    functor = closed.Functor(ob_map={n: N, s: S}, ar_map={}, cod=copy)
-    states = [a[word.name].transpose(order.get(kinds.get(word.name), None))
-              for word in term.freevars]
-    words = Diagram.id(Dim(1)).tensor(*(
-        Box(word.name, Dim(1), Dim(*state.shape), state)
-        for word, state in zip(term.freevars, states)))
-    return words >> term.eval(functor)
+def ob(x):
+    wire, = x.inside
+    return fock(dim[wire.arg]) if isinstance(wire, BangOb) else dim[x]
+
+
+def dims(typ):
+    return Dim(1).tensor(*(ob(typ[i:i + 1]) for i in range(len(typ))))
+
+
+def ar(spider):
+    def image(box):
+        if isinstance(box, Dereliction):
+            return epsilon(dim[box.x])
+        if isinstance(box, Contraction):
+            return delta(dim[box.x], spider)
+        if isinstance(box, Exchange):
+            split = -1 if box.is_dagger else 1
+            return tensor.Diagram.swap(
+                dims(box.dom[:split]), dims(box.dom[split:]))
+        banged = isinstance(box.cod.inside[0], BangOb)
+        cod = dim[box.cod.inside[0].arg] if banged else dims(box.cod)
+        value = tensor.Box(box.name, dims(box.dom), cod, a[box.name])
+        return value >> iota(cod) if banged else value
+    return image
+
+
+def meaning(term, spider):
+    """The tensor of a reading, with contraction given by a spider."""
+    functor = bang.Functor(ob_map=ob, ar_map=ar(spider), cod=tensor.Diagram)
+    return term.eval(functor).eval().array
 ```
 
 ## 3. Anaphora: *John sleeps. He snores.*
@@ -216,33 +244,35 @@ k-extension the paper finds
 `sleeps(ε(John)) ⊗ snores(He(k)) + sleeps(ε(k)) ⊗ snores(He(John))`.
 
 ```python {.marimo}
-anaphora = closed.Tuple(sleeps(John), snores(He(John)))
-meaning(anaphora, KExtension).draw(figsize=(6, 6))
+anaphora = N.bang()(lambda john: and_(
+    ev(der(john), sleeps()), ev(He(der(john)), snores())))(John())
+anaphora.eval().draw(figsize=(6, 6))
 ```
 
 ```python {.marimo}
 ones = np.ones(2)
 _j, _sl, _sn, _he = a["John"], a["sleeps"], a["snores"], a["He"]
-_out = meaning(anaphora, KExtension).eval().array
-assert np.allclose(_out, np.outer(_j @ _sl, (ones @ _he) @ _sn)
+assert np.allclose(meaning(anaphora, k_extension),
+                   np.outer(_j @ _sl, (ones @ _he) @ _sn)
                    + np.outer(ones @ _sl, (_j @ _he) @ _sn))
-_out = meaning(anaphora, BasisCopy).eval().array
-assert np.allclose(_out, np.einsum("i,is,ij,jt->st", _j, _sl, _he, _sn))
+assert np.allclose(meaning(anaphora, basis_copy),
+                   np.einsum("i,is,ij,jt->st", _j, _sl, _he, _sn))
 mo.md("Both copies give the paper's map of §5.1.")
 ```
 
 ## 4. Ellipsis: *John plays guitar. Mary does too.*
 
-The verb phrase *plays guitar* is abstracted and used twice: one copy is
+The verb phrase *plays guitar* is bound and used twice: one copy is
 applied to *John*, the other goes through *does too* to *Mary* (figure 12).
 With k-extension the paper finds
 `pg(John) ⊗ does_too(k)(Mary) + k(John) ⊗ does_too(pg)(Mary)`, where
 `pg = plays(guitar)`.
 
 ```python {.marimo}
-ellipsis = VP(lambda vp: closed.Tuple(
-    vp(John), does_too(vp)(Mary)))(plays(guitar))
-meaning(ellipsis, KExtension).draw(figsize=(6, 6))
+ellipsis = VP.bang()(lambda vp: and_(
+    ev(der(John()), der(vp)), does_too(der(vp), der(Mary()))))(
+    obj(guitar(), der(plays())))
+ellipsis.eval().draw(figsize=(6, 6))
 ```
 
 ```python {.marimo}
@@ -259,10 +289,10 @@ def too(vp, subject):
     return np.einsum("m,ns,nsmt->t", subject, vp, _dt)
 
 
-assert np.allclose(meaning(ellipsis, KExtension).eval().array,
+assert np.allclose(meaning(ellipsis, k_extension),
                    np.outer(says(_pg, _j), too(K, _m))
                    + np.outer(says(K, _j), too(_pg, _m)))
-assert np.allclose(meaning(ellipsis, BasisCopy).eval().array, np.einsum(
+assert np.allclose(meaning(ellipsis, basis_copy), np.einsum(
     "n,ns,nsmt,m->st", _j, _pg, _dt, _m))
 mo.md("Both copies give the paper's map of §5.2.")
 ```
@@ -275,27 +305,33 @@ John's code* is used twice, once for *John* and once for *does too* and
 *Bill*.
 
 ```python {.marimo}
-strict = VP(lambda vp: closed.Tuple(vp(John), does_too(vp)(Bill)))(
-    likes(his(code)(John)))
+strict = N.bang()(lambda john: VP.bang()(lambda vp: and_(
+    ev(der(john), der(vp)), does_too(der(vp), der(Bill()))))(
+    obj(of(der(john), der(his(code()))), der(likes()))))(John())
 mo.md(f"`{strict}`")
 ```
 
 ```python {.marimo}
-meaning(strict, KExtension).draw(figsize=(8, 10))
+strict.eval().draw(figsize=(8, 10))
 ```
 
-**Sloppy** (figures 4 and 14): four contractions. *his code* is
-abstracted and used twice, and *John*, *Bill* and *likes* are each used
-twice, so each subject owns its own code.
+**Sloppy** (figures 4 and 14): four contractions. *his code* is bound and
+used twice, and *John*, *Bill* and *likes* are each used twice, so each
+subject owns its own code. The variables are bound in the order the body
+first uses them; it is planar, and the copies are brought where they are
+read by exchanges.
 
 ```python {.marimo}
-sloppy = (n << n)(lambda h: closed.Tuple(
-    likes(h(John))(John), does_too(likes(h(Bill)))(Bill)))(his(code))
+sloppy = (N.bang() @ H.bang() @ V.bang() @ N.bang())(
+    lambda john, h, verb, bill: and_(
+        ev(der(john), der(obj(of(der(john), der(h)), der(verb)))),
+        does_too(der(obj(of(der(bill), der(h)), der(verb))), der(bill))))(
+    John(), his(code()), likes(), Bill())
 mo.md(f"`{sloppy}`")
 ```
 
 ```python {.marimo}
-meaning(sloppy, KExtension).draw(figsize=(9, 12))
+sloppy.eval().draw(figsize=(9, 12))
 ```
 
 The same readings written with `einsum`, with `copy` the paper's `Δ` on the
@@ -331,11 +367,9 @@ def sloppy_formula(copy, dt=None):
                      J, B, H, L, np.eye(2), dt, np.eye(2))
 
 
-for _cls, _copy in [(KExtension, k_copy), (BasisCopy, b_copy)]:
-    assert np.allclose(meaning(strict, _cls).eval().array,
-                       strict_formula(_copy))
-    assert np.allclose(meaning(sloppy, _cls).eval().array,
-                       sloppy_formula(_copy))
+for _spider, _copy in [(k_extension, k_copy), (basis_copy, b_copy)]:
+    assert np.allclose(meaning(strict, _spider), strict_formula(_copy))
+    assert np.allclose(meaning(sloppy, _spider), sloppy_formula(_copy))
 mo.md("The terms and the formulas agree, for both copies.")
 ```
 
@@ -360,7 +394,7 @@ def vp_of(owner):
 
 
 _jo = a["John"]
-assert np.allclose(meaning(strict, KExtension).eval().array, sum(
+assert np.allclose(meaning(strict, k_extension), sum(
     np.outer(says(vp, subject), too(elided, a["Bill"]))
     for vp, subject, elided in [
         (vp_of(ones), _jo, K), (K, _jo, vp_of(ones)),
@@ -374,9 +408,8 @@ This is the claim of §5.3: the strict and the sloppy readings have
 different meanings, for either copy.
 
 ```python {.marimo}
-readings = {name: (meaning(strict, cls).eval().array.real,
-                   meaning(sloppy, cls).eval().array.real)
-            for name, cls in copies.items()}
+readings = {name: (meaning(strict, spider), meaning(sloppy, spider))
+            for name, spider in copies.items()}
 for _name, (_strict, _sloppy) in readings.items():
     assert not np.allclose(_strict, _sloppy), _name
 mo.md("\n".join(
