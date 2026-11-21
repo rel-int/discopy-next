@@ -9,6 +9,14 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Added
 
+- The notebook `docs/notebooks/optyx/strict_sloppy.md` reproduces §5 of
+  arXiv:2110.10641, the strict and sloppy readings of *John likes his code.
+  Bill does too.*, each reading a `closed` lambda term sent by a functor
+  into a subclass of `tensor.Diagram` whose `copy` is an optyx diagram, with
+  the Fock space of `!` as photons on modes. The paper's k-extension is the W node of
+  `discopy.optyx.core.zw` and its basis copy the Z spider; anaphora, ellipsis and both readings are checked against
+  the paper's formulas, and the two readings are shown to be two maps
+  ([next#674]).
 - The kappa calculus, the first-order half of the lambda calculus: each
   module below the closed categories has terms of its own, `Variable`,
   `Constant`, `Application` and `Kappa`, with `let` for the redex. In `cat`
@@ -760,6 +768,19 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Fixed
 
+- `closed.Abstraction.eval` curries its variable on the side that
+  `Application.eval` evaluates, so a β-redex and its reduct are sent to the
+  same morphism by a functor into a rigid category, e.g. tensors, where they
+  failed to compose or gave transposed results ([next#674], [next#676]).
+- The cup of an optyx type is its own spider with two legs in, and the cap
+  its dagger: `optyx.core.diagram.Diagram.cup_factory` and
+  `optyx.channel.Diagram.cup_factory` build them where both inherited
+  `frobenius.Cup`, which is not an optyx box, so `trace()` and every other
+  way of bending a wire raised `TypeError` ([next#681]).
+- `optyx.core.diagram.Feedback` no longer says its delay endofunctor is the
+  identity: it is a delay line, so feedback is not a trace and yanking fails
+  — the delay is real, it is only left unwritten on the memory type
+  ([next#681]).
 - `optyx.channel` types keep their delay through `single()` and `double()`:
   `qubit.delay().double()` is `(bit @ bit).delay()`, no longer `bit @ bit`
   at time step zero ([next#667]).
@@ -2471,8 +2492,11 @@ for the changelog of `1.2.1` and earlier.
 [next#665]: https://github.com/rel-int/discopy-next/pull/665
 [next#667]: https://github.com/rel-int/discopy-next/pull/667
 [next#672]: https://github.com/rel-int/discopy-next/pull/672
+[next#674]: https://github.com/rel-int/discopy-next/pull/674
 [next#675]: https://github.com/rel-int/discopy-next/pull/675
+[next#676]: https://github.com/rel-int/discopy-next/issues/676
 [next#679]: https://github.com/rel-int/discopy-next/pull/679
+[next#681]: https://github.com/rel-int/discopy-next/pull/681
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#44]: https://github.com/rel-int/optyx/pull/44

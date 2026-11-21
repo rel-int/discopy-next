@@ -305,6 +305,20 @@ class Diagram(frobenius.Diagram):
     grad = tensor.Diagram.grad
     __pow__ = monoidal.Ty.__pow__
 
+    @classmethod
+    def cup_factory(cls, left: Ty, right: Ty) -> Spider:
+        """
+        The cup of an optyx type is its spider with two legs in, as in any
+        frobenius category. `frobenius.Diagram.caps` is the dagger of `cups`
+        and :meth:`trace` bends its wires with both, so the cap comes out as
+        the spider with two legs out and `cap_factory` is never reached.
+
+        >>> assert Diagram.cups(mode, mode) == Spider(2, 0, mode)
+        >>> assert Diagram.caps(bit, bit) == Spider(0, 2, bit)
+        """
+        left.assert_isadjoint(right)
+        return cls.spider_factory(2, 0, left)
+
     def conjugate(self) -> Diagram:
         """Conjugates every box in the diagram"""
         return symmetric.Functor(
@@ -1471,10 +1485,18 @@ class Feedback(monoidal.Bubble, Box):
     A feedback loop connecting the last `mem` outputs of `arg`
     back to its last `mem` inputs, one time step later.
 
-    The delay endofunctor is the identity, so `arg` goes from `dom @ mem`
+    The delay is real but left unwritten: the memory of `arg` is not typed
+    with :meth:`discopy.feedback.Wire.delay`, so `arg` goes from `dom @ mem`
     to `cod @ mem` and the result from `dom` to `cod`. It is drawn as `arg`
     with a feedback loop and composes with any other diagram; its stream
     semantics is given by :meth:`Diagram.unroll`.
+
+    A loop is therefore a delay line rather than a trace, and yanking
+    fails: the feedback of a swap waits one time step instead of being the
+    identity.
+
+    >>> wait = Diagram.swap(mode, mode).feedback()
+    >>> assert wait.unroll(1) != Diagram.id(mode ** 3)
 
     Parameters:
         arg : The diagram from `dom @ mem` to `cod @ mem` to feed back.

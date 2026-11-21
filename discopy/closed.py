@@ -1211,9 +1211,9 @@ class Abstraction(TermBase, biclosed.Abstraction):
 
     def eval(self, functor=None, context=None):
         functor = functor or self.functor
-        body = self.body.eval(functor, [self.var] + self.freevars)
+        body = self.body.eval(functor, self.freevars + [self.var])
         return self.weaken(functor, context)\
-            >> body.curry(len(functor(self.var.cod)), left=False)
+            >> body.curry(len(functor(self.var.cod)))
 
     def occurrences(self, variable):
         return 0 if variable == self.var else self.body.occurrences(variable)

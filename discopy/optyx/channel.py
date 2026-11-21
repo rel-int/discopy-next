@@ -426,6 +426,18 @@ class Diagram(frobenius.Diagram):
     one_step = diagram.Diagram.one_step
     __pow__ = monoidal.Ty.__pow__
 
+    @classmethod
+    def cup_factory(cls, left: Ty, right: Ty) -> Spider:
+        """
+        The cup of a channel type is its spider with two legs in and the
+        cap its dagger, see :meth:`diagram.Diagram.cup_factory`.
+
+        >>> assert Diagram.cups(qubit, qubit) == Spider(2, 0, qubit)
+        >>> assert Diagram.caps(qmode, qmode) == Spider(0, 2, qmode)
+        """
+        left.assert_isadjoint(right)
+        return cls.spider_factory(2, 0, left)
+
     def feedback(self, dom=None, cod=None, mem=None,
                  state=None, effect=None) -> Diagram:
         """
@@ -1834,7 +1846,7 @@ class Channel(Diagram, frobenius.Box):
         )
 
 
-class Spider(frobenius.Spider, Channel):  # pragma: no cover
+class Spider(frobenius.Spider, Channel):
     """
     Spider as a channel.
     """
