@@ -11,12 +11,13 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 - The notebook `docs/notebooks/optyx/strict_sloppy.md` reproduces §5 of
   arXiv:2110.10641, the strict and sloppy readings of *John likes his code.
-  Bill does too.*, each reading a `closed` lambda term sent by a functor
-  into a subclass of `tensor.Diagram` whose `copy` is an optyx diagram, with
-  the Fock space of `!` as photons on modes. The paper's k-extension is the W node of
-  `discopy.optyx.core.zw` and its basis copy the Z spider; anaphora, ellipsis and both readings are checked against
+  Bill does too.*, each reading a kappa term of `discopy.bang` that copies
+  banged wires by `Contraction`, sent by a `bang.Functor` into
+  `tensor.Diagram` with the Fock space of `!` as photons on modes. The
+  paper's k-extension is the W node of `discopy.optyx.core.zw` and its basis
+  copy the Z spider; anaphora, ellipsis and both readings are checked against
   the paper's formulas, and the two readings are shown to be two maps
-  ([next#674]).
+  ([next#674], [next#691]).
 - The kappa calculus, the first-order half of the lambda calculus: each
   module below the closed categories has terms of its own, `Variable`,
   `Constant`, `Application` and `Kappa`, with `let` for the redex. In `cat`
@@ -2501,6 +2502,7 @@ for the changelog of `1.2.1` and earlier.
 [next#676]: https://github.com/rel-int/discopy-next/issues/676
 [next#681]: https://github.com/rel-int/discopy-next/pull/681
 [next#686]: https://github.com/rel-int/discopy-next/pull/686
+[next#691]: https://github.com/rel-int/discopy-next/pull/691
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#44]: https://github.com/rel-int/optyx/pull/44
