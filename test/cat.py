@@ -757,6 +757,10 @@ EXAMPLES = {  # a box of each constructor, from a class c, types x, y, data v
     "quantum.gates.Sqrt": "c(v, False, 1)",
     "quantum.zx.Spider": "c(1, 2, v)",
     "quantum.zx.Scalar": "c(v)",
+    "cpstar.Kraus": 'c("f", (k := sys.modules["discopy.frobenius"]).Box('
+    '"k", k.Ty("x"), k.Ty("y"), data=v))',
+    "cpstar.Doubled": 'c("f", (k := sys.modules["discopy.frobenius"]).Box('
+    '"k", k.Ty("x", "x"), k.Ty("y", "y"), data=v), x, y)',
 }
 
 
@@ -860,6 +864,7 @@ BROKEN = {
         "it has no stated rotation",
         "*.{Feedback,Trace}": "it raises for a rotation, as for a dagger",
         "quantum.zx.Scalar": "it takes no dom, cod or z",
+        "cpstar.{Kraus,Doubled}": "a channel has no stated rotation yet",
     },
     "subs": {
         "*.Spider quantum.zx.[XYZ]": "it keeps no n_legs_in or n_legs_out",
