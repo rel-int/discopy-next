@@ -82,6 +82,7 @@ DisCoPy documentation
     extra/blogs
     extra/papers
     extra/bibliography
+    adr/index
 
 Indices and tables
 ------------------
