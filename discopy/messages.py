@@ -241,6 +241,11 @@ LAYOUT_NOT_A_BOX = (
     "An open program lays out the drawing of one box, not of a bubble or "
     "a frame.")
 LAYOUT_INFEASIBLE = "The open program of this diagram is {}."
+PLANAR_NOT_PIVOTAL = (
+    "A planar layout draws boxes, cups and caps, not swaps or spiders.")
+PLANAR_LOOP = "A planar layout does not draw closed loops yet."
+PLANAR_START = (
+    "The monoidal layout this planar layout starts from is not valid.")
 STRETCH_LENGTHS = (
     "Give a scale for each gap between columns and between rows, and for "
     "the width and the height of each box.")
