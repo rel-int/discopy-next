@@ -1,7 +1,7 @@
 > let's also add a CLA or DCO for the future edits to all belong to the DisCoPy nonprofit?
 
 - [WIP] @T-ce1643ef-668f-47ac-ad0e-e53b1a0e00dd-2026-11-21 13:38 CLA.md: an individual agreement assigning each contribution to the DisCoPy association, with a licence back, a fallback licence where assignment fails, moral rights kept, an employer clause, and the association bound to keep it under an OSI licence
-- [ ] CONTRIBUTING.md: a 'Sign the CLA' section, how to sign, and that an agent's contributions are covered by the CLA of the human who runs it
+- [WIP] @T-ce1643ef-668f-47ac-ad0e-e53b1a0e00dd-2026-11-21 13:38 CONTRIBUTING.md: a 'Sign the CLA' section, how to sign, and that an agent's contributions are covered by the CLA of the human who runs it
 - [ ] docs/adr/0008: future contributions belong to the DisCoPy association, a CLA rather than a DCO
 - [ ] CHANGELOG.md: one Project bullet
 - [ ] toumix: the association's legal name, RNA number and registered address for CLA.md
