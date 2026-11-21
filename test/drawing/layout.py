@@ -60,3 +60,16 @@ def test_unit_on_the_nose():
 def test_one_box_at_a_time():
     with pytest.raises(NotImplementedError):
         OpenQP.from_drawing((Box('f', x, x) @ Box('g', x, x)).to_drawing())
+
+
+def test_dagger_reflects_waypoints():
+    drawing = to_drawing(Box('f', x, x @ x) >> Box('g', x @ x, x))
+    assert drawing.wire_nodes
+    assert drawing.dagger().dagger() == drawing
+
+
+def test_weights_are_not_negative():
+    qp = OpenQP.functor()(Box('f', x, x))
+    for weights in [dict(width=-1), dict(bend=-1), dict(square=-1)]:
+        with pytest.raises(ValueError):
+            qp.solve(**weights)

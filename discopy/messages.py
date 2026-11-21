@@ -241,6 +241,7 @@ LAYOUT_NOT_A_BOX = (
     "An open program lays out the drawing of one box, not of a bubble or "
     "a frame.")
 LAYOUT_INFEASIBLE = "The open program of this diagram is {}."
+LAYOUT_WEIGHTS = "The weights of a layout cannot be negative."
 PLANAR_NOT_PIVOTAL = (
     "A planar layout draws boxes, cups and caps, not swaps or spiders.")
 PLANAR_LOOP = "A planar layout does not draw closed loops yet."
