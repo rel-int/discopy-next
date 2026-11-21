@@ -59,9 +59,9 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
-from discopy import frobenius
-from discopy.cat import factory
-from discopy.utils import factory_name
+from discopy import cat, frobenius
+from discopy.cat import factory, rsubs
+from discopy.utils import factory_name, from_tree
 
 
 class Quantum(frobenius.Wire):
@@ -72,15 +72,29 @@ class Quantum(frobenius.Wire):
     Parameters:
         inside : An atomic type of the underlying category.
     """
-    def __init__(self, inside, **params):
+    def __init__(self, inside, *args, **params):
         self.inside = inside
-        super().__init__(str(inside), **params)
+        super().__init__(str(inside), *args, **params)
 
     def __repr__(self):
-        return f"{factory_name(type(self))}({self.inside!r})"
+        return super().__repr__().replace(
+            repr(self.name), repr(self.inside), 1)
 
     def __str__(self):
         return f"{type(self).__name__[0]}({self.inside})"
+
+    def to_tree(self) -> dict:
+        tree = super().to_tree()
+        if hasattr(self.inside, "to_tree"):
+            tree['inside'] = self.inside.to_tree()
+        return tree
+
+    @classmethod
+    def from_tree(cls, tree: dict) -> Quantum:
+        wire = super().from_tree(tree)
+        if 'inside' in tree:
+            wire.inside = from_tree(tree['inside'])
+        return wire
 
     @property
     def double(self):
@@ -178,7 +192,50 @@ class Diagram(frobenius.Diagram):
 
 
 class Box(frobenius.Box, Diagram):
-    """ A classical-quantum box, i.e. a generating channel. """
+    """
+    A classical-quantum box, i.e. a generating channel, equal to another
+    when its :attr:`serialised_attrs` are, and serialised by them.
+    """
+    def setoid(self):
+        return super().setoid() + tuple(
+            getattr(self, attr) for attr in self.serialised_attrs
+            if attr != "*")
+
+    @property
+    def maps(self) -> dict:
+        """ The arrows of the underlying category the box is given by. """
+        return {attr: getattr(self, attr) for attr in self.serialised_attrs
+                if isinstance(getattr(self, attr, None), cat.Arrow)}
+
+    @property
+    def free_symbols(self):
+        return super().free_symbols.union(
+            *(f.free_symbols for f in self.maps.values()))
+
+    def subs(self, *args) -> Box:
+        if not self.free_symbols:
+            return self
+        changes = {attr: f.subs(*args) for attr, f in self.maps.items()}
+        if "data" in self.serialised_attrs:
+            changes["data"] = rsubs(self.data, *args)
+        return self.rebuild(**changes)
+
+    def lambdify(self, *symbols, **kwargs):
+        if not self.free_symbols & set(symbols):
+            return lambda *xs: self
+        return lambda *xs: self.subs(list(zip(symbols, xs)))
+
+    def to_tree(self) -> dict:
+        return {"factory": factory_name(type(self)), **{
+            attr: value.to_tree() if hasattr(value, "to_tree") else value
+            for attr in self.serialised_attrs if attr != "*"
+            for value in [getattr(self, attr)]}}
+
+    @classmethod
+    def from_tree(cls, tree: dict) -> Box:
+        return cls(**{
+            attr: from_tree(tree[attr]) if isinstance(tree[attr], dict)
+            else tree[attr] for attr in cls.serialised_attrs if attr != "*"})
 
 
 class Kraus(Box):
@@ -192,18 +249,31 @@ class Kraus(Box):
         dom : The domain, quantum on ``kraus.dom`` by default.
         cod : The codomain, quantum on ``kraus.cod`` by default.
         env : The environment, empty by default.
+        is_dagger : Whether the channel is the dagger of the one ``kraus``
+            gives, from ``cod`` to ``dom``.
+
+    The dagger of a channel keeps its Kraus map, and its double is the
+    dagger of the double, as doubling is a dagger functor.
     """
+    serialised_attrs = ("name", "kraus", "dom", "cod", "*", "env",
+                        "is_dagger")
+
     def __init__(  # pylint: disable=too-many-arguments,R0917
-            self, name, kraus, dom=None, cod=None, env=None):
+            self, name, kraus, dom=None, cod=None, env=None,
+            is_dagger=False):
         unit = kraus.dom[:0]
         env = unit if env is None else env
-        dom = Q(*kraus.dom) if dom is None else dom
-        cod = Q(*kraus.cod[:len(kraus.cod) - len(env)]) if cod is None\
-            else cod
-        assert kraus.dom == dom.single(unit)
-        assert kraus.cod == cod.single(unit) @ env
+        source = Q(*kraus.dom)
+        target = Q(*kraus.cod[:len(kraus.cod) - len(env)])
+        if is_dagger:
+            source, target = target, source
+        dom = source if dom is None else dom
+        cod = target if cod is None else cod
+        source, target = (cod, dom) if is_dagger else (dom, cod)
+        assert kraus.dom == source.single(unit)
+        assert kraus.cod == target.single(unit) @ env
         self.kraus, self.env = kraus, env
-        super().__init__(name, dom, cod)
+        super().__init__(name, dom, cod, is_dagger=is_dagger)
 
     def double(self, category=frobenius.Diagram, conjugate=None):
         """
@@ -216,6 +286,8 @@ class Kraus(Box):
         sends to each wire doubled in place: on a single wire it is the
         identity.
         """
+        if self.is_dagger:
+            return self.dagger().double(category, conjugate).dagger()
         unit = self.kraus.dom[:0]
         single, env = self.cod.single(unit), self.env
         conjugate = conjugate or (lambda diagram: diagram.conjugate())
@@ -234,15 +306,19 @@ class Kraus(Box):
 
 class Doubled(Box):
     """
-    A channel given by its doubled map ``inside : dom.double -> cod.double``
-    in the underlying category, e.g. a density matrix.
+    A channel given by its doubled map ``doubled : dom.double ->
+    cod.double`` in the underlying category, e.g. a density matrix, or by
+    the dagger of that map when ``is_dagger``.
     """
-    def __init__(self, name, inside, dom, cod):
-        self.inside_map = inside
-        super().__init__(name, dom, cod)
+    serialised_attrs = ("name", "doubled", "dom", "cod", "*", "is_dagger")
+
+    def __init__(  # pylint: disable=too-many-arguments,R0917
+            self, name, doubled, dom, cod, is_dagger=False):
+        self.doubled = doubled
+        super().__init__(name, dom, cod, is_dagger=is_dagger)
 
     def double(self, category=frobenius.Diagram, conjugate=None):
-        return self.inside_map
+        return self.doubled.dagger() if self.is_dagger else self.doubled
 
 
 def Measure(x, category=frobenius.Diagram):  # pylint: disable=invalid-name
