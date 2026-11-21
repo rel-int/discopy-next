@@ -8,9 +8,8 @@ toumix, answering his own question "where does bang fit in the hierarchy? every 
 - [x] from `symmetric` up `Diagram.exchange` is the swap and the bang terms wire by a permutation
 - [x] at `markov` `Contraction(x)` is `Copy(x.bang())`, `Weakening(x)` is `Discard(x.bang())`, `Bang` is deterministic, and the bang terms are the markov terms
 - [x] a `Ty` of their own for `spacial`, `braided`, `symmetric`, `markov` and `comarkov` with a bang, once #679 merges: #679 is merged into this branch
-- [ ] the bang laws of each level in the property matrix, declared failing or holding
+- [ ] the property matrix: the bang laws of each level declared failing or holding, and bang.TermBase and the bang terms of each level enrolled (moved from #686)
 - [ ] `optyx.Term`, its tests and the `optyx/linear_logic` notebook unchanged and passing
 - [x] docs, CHANGELOG bullet and an ADR for where the bang lives
 - [ ] a banged wire has no adjoint: from `rigid` up `x.bang().l` raises; file it as an issue or give `BangOb` a winding
-- [ ] enrol bang.TermBase and the bang terms of each level in the property matrix (moved from #686)
-- [ ] drop the __call__ override of bang.Ty now that #679 gives each Ty a term_factory (moved from #686)
+- [x] drop the __call__ override of bang.Ty now that #679 gives each Ty a term_factory (moved from #686), done in 3d43a1322
