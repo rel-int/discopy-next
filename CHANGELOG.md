@@ -483,6 +483,15 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Changed
 
+- A functor from a symmetric category asks the level of its codomain rather
+  than its attributes: a permutation goes to one native box in a free
+  symmetric category, to the codomain's own `permutation` of the images of
+  the wires in any other `SymmetricCategory`, and swap by swap otherwise.
+  `stream.Stream` and `drawing.Drawing`, which had a swap without saying so,
+  are `SymmetricCategory`, and `Drawing.swap` draws one. The matrix then
+  checks `scalar_sliding` and `braid_naturality` on streams, up to the order
+  of their memory as `bifunctoriality` is ([next#514]).
+
 - The alpha-equivalence of terms is stated once, in `cat.AlphaEquivalence`,
   for the kappa and the lambda calculus: `alpha_eq` and its laws move there
   from `biclosed.TermBase`, which inherits them, with `Renamed` and
@@ -2393,6 +2402,7 @@ for the changelog of `1.2.1` and earlier.
 [next#508]: https://github.com/rel-int/discopy-next/pull/508
 [next#510]: https://github.com/rel-int/discopy-next/pull/510
 [next#511]: https://github.com/rel-int/discopy-next/pull/511
+[next#514]: https://github.com/rel-int/discopy-next/pull/514
 [next#515]: https://github.com/rel-int/discopy-next/pull/515
 [next#516]: https://github.com/rel-int/discopy-next/issues/516
 [next#517]: https://github.com/rel-int/discopy-next/pull/517

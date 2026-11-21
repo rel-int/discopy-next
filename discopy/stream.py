@@ -173,7 +173,8 @@ from dataclasses import dataclass
 from functools import cache
 
 from discopy import messages, symmetric, testable
-from discopy.abc import FeedbackCategory, NamedGeneric
+from discopy.abc import (
+    FeedbackCategory, NamedGeneric, SymmetricCategory)
 from discopy.testable import TestableGeneric
 from discopy.python import finset
 from discopy.utils import (
@@ -535,7 +536,8 @@ def up_to_memory(term: Stream):
 
 
 @dataclass
-class Stream[category](FeedbackCategory, TestableGeneric):
+class Stream[category](
+        FeedbackCategory, SymmetricCategory, TestableGeneric):
     """
     Monoidal streams over an underlying `category`.
 
@@ -596,7 +598,7 @@ class Stream[category](FeedbackCategory, TestableGeneric):
         The underlying category, so that the property matrix checks streams
         over it: a law is read up to :data:`STEPS` steps, see
         :meth:`equation_factory`, a boundary too, see :meth:`ob_equation`,
-        and the three laws whose sides feed back the same memory in another
+        and the five laws whose sides feed back the same memory in another
         order up to a permutation of it, see :func:`up_to_memory`
         (`#533 <https://github.com/rel-int/discopy-next/issues/533>`_).
         """
@@ -615,6 +617,9 @@ class Stream[category](FeedbackCategory, TestableGeneric):
     head, tail = Ty.head, Ty.tail
     sliding = FeedbackCategory.sliding.failing(messages.STREAM_SLIDING)
     bifunctoriality = FeedbackCategory.bifunctoriality.modulo(up_to_memory)
+    scalar_sliding = SymmetricCategory.scalar_sliding.modulo(up_to_memory)
+    braid_naturality = SymmetricCategory.braid_naturality.modulo(
+        up_to_memory)
     strength = FeedbackCategory.strength.modulo(up_to_memory)
     tightening = FeedbackCategory.tightening.modulo(up_to_memory)
 
