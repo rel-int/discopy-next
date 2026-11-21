@@ -5,4 +5,4 @@
 - [x] a Ty subclass in each module that shares one (spacial, braided, balanced, symmetric, comarkov, markov), the ob of its Diagram
 - [WIP] @T-0729b388-26a3-4a3d-ac11-e727fdb06d74-2026-11-21 11:41 each Ty points to the terms of its module: a type applied to a function is a kappa of its own level, and str_transparency is an equation between terms of that level again
 - [WIP] @T-0729b388-26a3-4a3d-ac11-e727fdb06d74-2026-11-21 11:41 the modules from biclosed up: their Ty subclasses the one of each level their Diagram subclasses
-- [ ] tests, docs and changelog; the term cells of the matrix under the explore profile
+- [WIP] @T-0729b388-26a3-4a3d-ac11-e727fdb06d74-2026-11-21 11:41 tests, docs and changelog; the term cells of the matrix under the explore profile
