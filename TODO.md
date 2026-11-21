@@ -1,4 +1,4 @@
 > cubic review of #686 (https://github.com/rel-int/discopy-next/pull/686#pullrequestreview-6005494127), eight comments: `Functor` maps a `BangOb` with `.bang()` rather than `LinearCategory.banged`; `Diagram.copy` returns the identity for a negative `n`; `Diagram.wiring` drops out-of-range indices; `test_LinearCategory_is_monoidal_not_biclosed` omits `compact`; the CHANGELOG says `to_channel` compiles every term; and three that need no change (`ar_map` as a function, the optyx term factory fixed in e6f63974d, the `Weakening` call in `test_from_callable`).
 
 - [x] Functor sends a BangOb through the codomain's banged, Diagram.copy rejects a negative n and Diagram.wiring an index out of range
-- [WIP] @T-25d9ffd9-a69f-4f39-9ac0-531d396eeae2-2026-11-21 13:32 test compact in the hierarchy test, and say in the CHANGELOG which boxes to_channel does not compile
+- [x] test compact in the hierarchy test, and say in the CHANGELOG which boxes to_channel does not compile
