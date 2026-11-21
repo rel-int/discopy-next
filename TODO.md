@@ -2,7 +2,7 @@
 
 toumix, answering his own question "where does bang fit in the hierarchy? every monoidal category could use it?". His rulings on the design ([#686](https://github.com/rel-int/discopy-next/pull/686#issuecomment-7062218939), 2026-11-21): build it as proposed; at `markov` the free comonad, with `Contraction` as `Copy(!x)`, `Weakening` as `Discard(!x)` and `Bang` boxes deterministic; its own PR, stacked on `amp/bang-module`. The points of #686's own TODO.md stay on #686.
 
-- [x] `bang.structural_wires`, `bang.structural_boxes` and `bang.linear_calculus` generate the `BangOb`, the structural boxes and the bang terms of a level, the way `feedback.structural_boxes` and `cat.kappa_calculus` do
+- [x] `bang.structural_wires` and `bang.structural_boxes` generate the `BangOb` and the structural boxes of a level, the way `feedback.structural_boxes` does; the bang terms come through `cat.kappa_calculus`, whose parents are now bang terms
 - [x] `bang.Diagram` a base of `spacial`, `braided`, `feedback` and `biclosed`, and `bang.Ty` a base of their types, so that every level above inherits a bang
 - [x] `Functor` of each level sends banged wires and boxes through the bang of its codomain, or through `ob_map` and `ar_map` when it has none
 - [x] from `symmetric` up `Diagram.exchange` is the swap and the bang terms wire by a permutation
