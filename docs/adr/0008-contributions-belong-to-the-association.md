@@ -13,12 +13,12 @@ belong to the DisCoPy nonprofit?". DisCoPy is a French nonprofit association.
 ## Decision
 
 Every contribution, from the first one a contributor submits after accepting the
-[CLA](../../CLA.md), is assigned to the DisCoPy association. If that assignment fails, the
+[CLA](https://github.com/rel-int/discopy-next/blob/main/CLA.md), is assigned to the DisCoPy association. If that assignment fails, the
 contribution is licensed to the association with the right to relicense. The association
 licenses each contribution back to its author and is bound to distribute it under an
 OSI-approved licence. A DCO is not enough: it certifies the right to submit, but the copyright
 stays with the author. An employer, university or funder with rights in a contribution signs the
-[entity agreement](../../CLA-entity.md). An agent's contributions are covered by the agreement of
+[entity agreement](https://github.com/rel-int/discopy-next/blob/main/CLA-entity.md). An agent's contributions are covered by the agreement of
 the human who runs it.
 
 ## Consequences
