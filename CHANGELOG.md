@@ -499,6 +499,10 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   the additive channels and the traced lenses, which `yanking` checks on
   either side: Reidemeister move 1 for both traces on a compact category
   ([next#458], [next#1]).
+- `docs/notebooks/optyx/feedforward_ep.md`, a photonic loop whose counts drive
+  a fast switch on the loop modes, sampled shot by shot and evaluated exactly,
+  with slow electronic units trained on it by equilibrium propagation
+  ([next#461]).
 
 ### Changed
 
@@ -2384,6 +2388,7 @@ for the changelog of `1.2.1` and earlier.
 [next#459]: https://github.com/rel-int/discopy-next/pull/459
 [next#445]: https://github.com/rel-int/discopy-next/issues/445
 [next#460]: https://github.com/rel-int/discopy-next/pull/460
+[next#461]: https://github.com/rel-int/discopy-next/pull/461
 [next#462]: https://github.com/rel-int/discopy-next/pull/462
 [next#463]: https://github.com/rel-int/discopy-next/issues/463
 [next#466]: https://github.com/rel-int/discopy-next/issues/466
