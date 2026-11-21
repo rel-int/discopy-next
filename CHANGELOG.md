@@ -96,16 +96,35 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   of the image and its mask together, then restyles the image alone (chalk,
   whiteboard, blur, JPEG); `draw(backend=...)` takes the backend to draw with
   ([next#573]).
-- `abc.LinearCategory`, a linear category (Bierman, TLCA 1995) without
-  symmetry: a comonad `bang` with `dereliction` and `digging`, lax monoidal
-  with a `laxator`, each `!x` a comonoid by `contraction` and `weakening`, and
-  an invertible `exchange` of `!x` with any object, its 28 laws as axioms.
-  `biclosed` is the free one: `BangOb`, the wire holding a type inside
-  `x.bang()`, `Bang`, the bubble `f.bang()`, and the boxes `Dereliction`,
-  `Digging`, `Contraction`, `Weakening`, `Exchange` and `Laxator`. A `Functor`
-  sends them through the `bang` and the structure of its codomain when its
-  types are biclosed, and through its `ob_map` and `ar_map` otherwise. The
-  laws are declared failing on the free category ([next#571]).
+- `abc.LinearCategory`, a linear category (Bierman, TLCA 1995) with neither
+  symmetry nor closure: a monoidal comonad `bang` with `dereliction` and
+  `digging`, lax monoidal with a `laxator`, each `!x` a comonoid by
+  `contraction` and `weakening`, and an invertible `exchange` of `!x` with
+  any object, its 28 laws as axioms.
+  `discopy.bang` is the free one, its own module above `monoidal`: `BangOb`,
+  the wire holding a type inside `x.bang()`, `Bang`, the bubble `f.bang()`,
+  and the boxes `Dereliction`, `Digging`, `Contraction`, `Weakening`,
+  `Exchange` and `Laxator`. A `Functor` sends them through the `bang` and the
+  structure of its codomain when it is a linear category, and through its
+  `ob_map` and `ar_map` otherwise, `f.bang()` as a box of its own.
+  `Diagram.copy` and `Diagram.discard` copy a banged wire by contraction
+  and discard it by weakening, and raise on any other type, and
+  `Diagram.wiring` copies and exchanges banged wires. `bang.TermBase`,
+  `Variable`, `Constant`, `Application` and `Kappa` are the kappa terms of
+  `monoidal` where a banged variable is shared by contraction and, unused,
+  discarded by weakening, a `bang.Ty` applied to a function is a
+  `bang.Kappa` through its `term_factory`, with a box or without, and a box
+  called on terms is its constant applied to them, e.g. `f.bang()(x)`. The laws are declared failing on the free category. `optyx.Term`, in
+  `optyx.term`, is a diagram of it on the dual-rail `qubit`, written with
+  `f.bang()` in the function syntax or as a kappa term of `bang`, and
+  `Term.to_channel` compiles it to an optical protocol, `!` as Fock space,
+  but for `Digging`, `Laxator` and boxes on more than one qubit:
+  a bang to the second quantisation of its unitary, the conjugate transpose
+  for a dagger, `Contraction` to the W node on each mode, `Weakening` to the
+  vacuum and `Dereliction` to heralding one photon. `optyx.term` has kappa
+  terms of its own, so a term with no box is an `optyx.Term` too. The notebook
+  `optyx/linear_logic` compiles `copy(!H(x))` with it to a Bell state
+  ([next#571], [next#686]).
 - `discopy.drawing.nicer`: nine hand features of a drawing, each a cost
   (wire length, bends, slope, aspect, asymmetry, whitespace, misalignment,
   label overlap, area), `hand_score` minus their weighted sum, with equal weights
@@ -2481,6 +2500,7 @@ for the changelog of `1.2.1` and earlier.
 [next#675]: https://github.com/rel-int/discopy-next/pull/675
 [next#676]: https://github.com/rel-int/discopy-next/issues/676
 [next#681]: https://github.com/rel-int/discopy-next/pull/681
+[next#686]: https://github.com/rel-int/discopy-next/pull/686
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#44]: https://github.com/rel-int/optyx/pull/44

@@ -13,6 +13,7 @@ from discopy import (
     braided,
     symmetric,
     biclosed,
+    bang,
     rigid,
     pivotal,
     ribbon,

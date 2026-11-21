@@ -46,6 +46,7 @@ DisCoPy documentation
     notebooks/optyx/what_is_a_channel
     notebooks/optyx/fixpoints
     notebooks/optyx/feed_forward_example
+    notebooks/optyx/linear_logic
     notebooks/optyx/compile_to_semm
     notebooks/optyx/optyx-vqe-experiment
     notebooks/optyx/bosonic-vqe-2
