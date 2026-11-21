@@ -4,8 +4,15 @@
 The free linear category, i.e. a monoidal category with a bang: a comonad
 ``!`` whose objects are comonoids, central and lax monoidal, see
 :class:`discopy.abc.LinearCategory`. It needs no symmetry and no closure,
-so it sits right above :mod:`discopy.monoidal`, the way :mod:`discopy.para`
-and :mod:`discopy.monad` sit beside the hierarchy.
+so it sits right above :mod:`discopy.monoidal`, and every level of the
+hierarchy above, from :mod:`~discopy.spacial`, :mod:`~discopy.braided`,
+:mod:`~discopy.feedback` and :mod:`~discopy.biclosed` up, is a linear
+category the way it is a feedback category: its diagrams have a bang, which
+nothing obliges a user to use. Each level has the :class:`Bang` and the
+structural boxes of its own, see :func:`structural_boxes`, and from
+:mod:`~discopy.symmetric` up the :class:`Exchange` is the swap, from
+:mod:`~discopy.markov` up the :class:`Contraction` and the
+:class:`Weakening` are the copy and the discard of a banged wire.
 
 Summary
 -------
@@ -61,7 +68,7 @@ the second quantisation of ``f``, see the notebook
 from __future__ import annotations
 
 from functools import cached_property
-from typing import Callable, ClassVar, Self
+from typing import ClassVar, Self
 
 from discopy import monoidal, messages
 from discopy.abc import LinearCategory, MonoidalCategory
@@ -78,29 +85,6 @@ class Ty(monoidal.Ty):
     :class:`BangOb`.
     """
     bang_factory: ClassVar[type[BangOb]]
-    term_factory: ClassVar[type["TermBase"]]
-
-    def __call__(self, function: Callable, offset: int | None = None):
-        """
-        The kappa abstraction of a Python function, a :class:`Kappa` of the
-        terms of its :attr:`term_factory`: a type with a bang binds its
-        variables in a linear category even when the body has no box, e.g.
-        weakens a banged variable it does not use.
-
-        Parameters:
-            function : The body, as a function of the variables.
-            offset : Passed to :class:`Kappa`.
-
-        Example
-        -------
-        >>> x = Ty('x')
-        >>> term = (x.bang() @ x)(lambda a, b: b)
-        >>> assert isinstance(term, Kappa)
-        >>> assert term.eval() == Weakening(x) @ x
-        >>> assert eval(str(term)) == term
-        """
-        return self.term_factory.kappa_factory.from_callable(
-            self, offset)(function)
 
     def bang(self) -> Self:
         """
@@ -136,10 +120,10 @@ class BangOb(monoidal.Wire):
     """
     ob = Ty
 
-    def __init__(self, arg: Ty):
+    def __init__(self, arg: Ty, **params):
         assert_isinstance(arg, self.ob)
         self.arg = arg
-        super().__init__("")
+        super().__init__("", **params)
         del self.name
 
     @cached_property
