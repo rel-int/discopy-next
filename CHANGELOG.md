@@ -1894,6 +1894,9 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Project
 
+- Contributions belong to the DisCoPy association: `CLA.md` assigns each one to it, with a
+  licence back and a fallback licence, `CLA-entity.md` lets an employer sign for its people, and
+  `CONTRIBUTING.md` says to sign before a first merge ([next#690]).
 - `test/drawing/vision.py::test_train_ocr_lowers_its_loss` seeds torch before it
   builds the `OCR` it trains: `train_ocr` seeds for its own shuffling, after a
   network it is given has drawn its weights, so the loss the training started
@@ -2481,6 +2484,7 @@ for the changelog of `1.2.1` and earlier.
 [next#675]: https://github.com/rel-int/discopy-next/pull/675
 [next#676]: https://github.com/rel-int/discopy-next/issues/676
 [next#681]: https://github.com/rel-int/discopy-next/pull/681
+[next#690]: https://github.com/rel-int/discopy-next/pull/690
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#44]: https://github.com/rel-int/optyx/pull/44
