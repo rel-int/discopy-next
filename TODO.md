@@ -7,3 +7,4 @@
 - [ ] toumix: the association's legal name, RNA number and registered address for CLA.md
 - [ ] toumix: assignment (as drafted) or a licence with the right to relicense
 - [ ] toumix: how to sign (CLA Assistant on the GitHub org, or a signed comment) and a lawyer's read of the French-law terms
+- [ ] CLA-entity.md: the entity agreement section 7 of CLA.md names, for an employer, university or funder
