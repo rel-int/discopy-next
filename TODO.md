@@ -5,5 +5,5 @@
 > > 3. discopy/drawing/backend.py:992 [P3] The waypoint branch ignores the frame-boundary zero-width rule that the branch below applies.
 
 - [x] drawing.py dagger maps wire nodes
-- [ ] layout.py solve rejects negative weights
+- [x] layout.py solve rejects negative weights
 - [ ] backend.py waypoint branch and frame boundaries
