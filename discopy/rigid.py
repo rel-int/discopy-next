@@ -385,6 +385,9 @@ class Nat(monoidal.Nat, Ty):
         return self
 
 
+Ty.nat_factory = Nat
+
+
 class Layer(monoidal.Layer):
     """
     A rigid layer is a monoidal layer that can be rotated.

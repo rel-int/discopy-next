@@ -21,6 +21,8 @@ X, Y, Z, W = Ty(x, x_), Ty(y, y_), Ty(z, z_), Ty(w, w_)
 f = Symmetric(X, Y, Box('f', x, y @ m), Box("f'", m @ y_, x_), m)
 g = Symmetric(Y, Z, Box('g', y, z @ n), Box("g'", n @ z_, y_), n)
 h = Symmetric(Z, W, Box('h', z, w @ k), Box("h'", k @ w_, z_), k)
+MARKOV = tuple(map(markov.Ty.cast_ty, (x, x_, y, y_, z, z_, w, w_)))
+MARKOV += tuple(Markov.ob(*MARKOV[i:i + 2]) for i in range(0, 8, 2))
 
 
 def equal(left, right):
@@ -61,12 +63,14 @@ def test_errors():
         Symmetric(IntTy[T](x, x_), Y, f.forward, f.backward, m)
     with raises(TypeError):
         Symmetric(X, Y, f.forward, f.backward, "m")
+    with raises(AxiomError):
+        f >> Markov.id(MARKOV[9])
     with raises(TypeError):
-        f >> Markov.id(Y)
-    with raises(TypeError):
-        f @ Markov.id(Y)
+        f @ Markov.id(MARKOV[9])
     with raises(TypeError):
         markov_lens() >> Symmetric.id(Y)
+    with raises(TypeError):
+        Markov(X, Y, markov.Box('get', x, y), markov.Box('put', x @ y_, x_))
     with raises(AxiomError):
         Symmetric(X, Y, Box('f', x, y @ m), Box("f'", m @ y_, x_), n)
     with raises(AxiomError):
@@ -74,7 +78,8 @@ def test_errors():
     with raises(AxiomError):
         g >> f
     with raises(AxiomError):
-        Markov(X, Y, markov.Box('get', x, y), markov.Box('put', x @ y_, x))
+        Markov(*MARKOV[8:10], markov.Box('get', x, y),
+               markov.Box('put', x @ y_, x))
 
 
 def test_category_axioms():
@@ -204,6 +209,7 @@ def test_trace_axioms():
 
 
 def markov_lens():
+    x, x_, y, y_, _, _, _, _, X, Y, _, _ = MARKOV
     get = markov.Box('get', x, y)
     put = markov.Box('put', x @ y_, x_)
     return Markov(X, Y, get, put)
@@ -214,6 +220,7 @@ def test_markov_axioms():
     The right unit law for `put` holds up to the naturality of discard,
     which the hypergraph does not decide, so it is checked on `get` only.
     """
+    x, x_, y, y_, z, z_, _, _, X, Y, Z, _ = MARKOV
     l = markov_lens()
     l_ = Markov(Y, Z, markov.Box('get_', y, z), markov.Box('put_', y @ z_, y_))
     assert (Markov.id(X) >> l).get == l.get
@@ -237,6 +244,7 @@ def test_markov_associativity():
     copies `y`. The hypergraph decides coassociativity but not naturality,
     so the right bracketing is compared with its copy pushed through `get`.
     """
+    x, _, y, y_, z, z_, w, w_, _, Y, Z, W = MARKOV
     l, copy = markov_lens(), markov.Diagram.copy
     l_ = Markov(Y, Z, markov.Box('get_', y, z), markov.Box('put_', y @ z_, y_))
     l__ = Markov(
@@ -260,6 +268,7 @@ def test_markov_without_copy():
 
 
 def test_markov_is_symmetric():
+    x, _, y, y_, _, _, _, _, _, Y, _, _ = MARKOV
     l = markov_lens()
     assert isinstance(l, Symmetric)
     assert l.residual == x and l.backward == l.put
@@ -354,7 +363,7 @@ def test_trace_takes_the_keyword_form():
 def prisms():
     a, a_, b, b_, c, c_, d, d_ = map(
         comarkov.Ty, ["a", "a'", "b", "b'", "c", "c'", "d", "d'"])
-    A, B, C, D = Ty(a, a_), Ty(b, b_), Ty(c, c_), Ty(d, d_)
+    A, B, C, D = map(Prism.ob, (a, b, c, d), (a_, b_, c_, d_))
     return (Prism(A, B, comarkov.Box('f', a, a_ @ b),
                   comarkov.Box("f'", b_, a_)),
             Prism(B, C, comarkov.Box('g', b, b_ @ c),

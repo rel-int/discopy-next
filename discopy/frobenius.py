@@ -127,7 +127,7 @@ HeadOb, TailOb = feedback.structural_wires(Wire)
 
 
 @factory
-class Ty(pivotal.Ty):
+class Ty(pivotal.Ty, markov.Ty, comarkov.Ty):
     """
     A frobenius type is a pivotal type with frobenius objects inside.
 
@@ -150,6 +150,9 @@ class Nat(rigid.Nat, Ty):
     """
 
     l = r = property(lambda self: self)
+
+
+Ty.nat_factory = Nat
 
 
 @factory
