@@ -25,6 +25,21 @@ dagger category that adds the invertibility of its arrows, which its dagger
 inverts; a :class:`DaggerMonoidalCategory` adds the monoidality of its
 dagger.
 
+Each axiom draws itself on the page of the class that states it, under
+"Axioms": its generic instance, see
+:meth:`discopy.testable.Declaration.generic`, is evaluated in the most
+general free category of diagrams that states it, with each compound operand
+in a dotted bracket, see :mod:`discopy.drawing.bracketing`, e.g. for
+:meth:`Category.associativity`:
+
+.. image:: /_static/bracketing/associativity.svg
+    :align: center
+
+An operation other than composition and tensor, e.g. the currying of a
+:class:`BiclosedCategory` or the bang of a :class:`LinearCategory`, draws its
+operand in a bracket labelled by it. No free category of diagrams is a
+groupoid, so :meth:`Groupoid.invertibility` is not drawn.
+
 Summary
 -------
 

@@ -35,6 +35,7 @@ the plane, and the backends that render them.
     discopy.drawing
     discopy.drawing.drawing
     discopy.drawing.backend
+    discopy.drawing.bracketing
     discopy.drawing.typst_ast
     discopy.drawing.widget
     discopy.drawing.nicer
