@@ -250,7 +250,7 @@ NOT_A_BLOCK = "Expected a block of variables next to the stack of {}, got {}."
 STATEMENTS_DO_NOT_COMMUTE = (
     "A statement binding several outputs or none stays in a normal form, "
     "and two of them do not commute.")
-NO_HIGHEST_LEVEL = "Expected terms of one level above the others, got {}."
+NO_HIGHEST_LEVEL = "Expected one level above the others, got {}."
 NOT_DISTINCT = "Expected distinct variables to bind in {}, got {}."
 NOT_FREE = "Expected distinct free variables of {}, got {}."
 NOT_THE_VARIABLE = "Expected the free variable of {}, with no stack, got {}."

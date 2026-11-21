@@ -184,6 +184,7 @@ from discopy.utils import (
     factory,
     factory_key,
     factory_name,
+    highest,
     from_tree,
     assert_isinstance,
     assert_iscomposable,
@@ -567,6 +568,9 @@ class Ty(cat.Ob, cat.FreeCategory, ColouredMonoid):
     The generators of a type as a free category, i.e. its wires, a
     :class:`cat.Ob` that :meth:`cast` embeds as a type of length one.
     """
+    nat_factory: ClassVar[type["Nat"]]
+    """ The natural numbers of the level, i.e. the :class:`Nat` of its
+    module, that of another level being read as one, see :meth:`cast_ty`. """
 
     @classmethod
     def typeparams(cls) -> tuple[type, type]:
@@ -648,10 +652,50 @@ class Ty(cat.Ob, cat.FreeCategory, ColouredMonoid):
         """ The empty type on a colour, with no colour by default. """
         return cls.ar(inside=(), dom=dom, cod=dom, _scan=False)
 
+    @classmethod
+    def cast_ty(cls, other):
+        """
+        A type of another level of the hierarchy read as one of this level:
+        the types of two levels with the same :attr:`generator_factory` are
+        lists of the same wires, so that it is the type with the same
+        wires, a natural number being read as one of this level, see
+        :attr:`nat_factory`. A type of a level above this one is one of this
+        level already, and anything else is unchanged.
+
+        Example
+        -------
+        >>> from discopy import braided, symmetric
+        >>> assert braided.Ty.cast_ty(Ty('x')) == braided.Ty('x')
+        >>> assert braided.Ty.cast_ty(Nat(2)) == braided.Nat(2)
+        >>> x = symmetric.Ty('x')
+        >>> assert braided.Ty.cast_ty(x) is x
+        >>> assert symmetric.Ty.cast_ty(Ty('x')) == Ty('x')
+        """
+        level = cls.nat_factory if isinstance(other, Nat) else cls
+        if isinstance(other, Ty) and not isinstance(other, level)\
+                and issubclass(
+                    other.generator_factory, level.generator_factory):
+            return level(inside=other.inside, dom=other.dom, cod=other.cod)
+        return other
+
     def tensor(self, *others: "Ty") -> Self:
-        if any(not isinstance(other, self.factory) for other in others):
+        """
+        The tensor of types, of the highest of their levels, see
+        :meth:`cast_ty`.
+
+        Example
+        -------
+        >>> from discopy import braided
+        >>> x, y = Ty('x'), braided.Ty('y')
+        >>> assert x @ y == braided.Ty('x', 'y') == y.cast_ty(x) @ y
+        """
+        if any(not isinstance(other, Ty) for other in others):
             return NotImplemented  # This allows whiskering on the left.
-        return cat.FreeCategory.then(self, *others)
+        types = (self, *others)
+        if any(type(other) is not type(self) for other in others):
+            level = highest(*dict.fromkeys(x.factory for x in types))
+            types = map(level.cast_ty, types)
+        return cat.FreeCategory.then(*types)
 
     then = tensor
 
@@ -725,25 +769,6 @@ class Ty(cat.Ob, cat.FreeCategory, ColouredMonoid):
             s = str(ob)
             parts.append(f'{name}("")' if s == '' else s)
         return ' @ '.join(parts)
-
-    def __call__(self, function: Callable, offset: int | None = None):
-        """
-        The kappa abstraction of a Python function from a variable for each
-        wire of the type to a term, see :class:`Kappa`, as a type of a
-        closed category applied to a function is a lambda abstraction.
-
-        Parameters:
-            function : The body, as a function of the variables.
-            offset : Passed to :class:`Kappa`.
-
-        Example
-        -------
-        >>> x, y = Ty('x'), Ty('y')
-        >>> f = Box('f', x @ y, x)
-        >>> term = (x @ y)(lambda a, b: Constant(f)(a, b))
-        >>> assert term.eval() == f
-        """
-        return Kappa.from_callable(self, offset)(function)
 
     def atoms(self) -> list[Ty]:
         """
@@ -921,12 +946,22 @@ class Nat(abc.Nat, Ty):  # ty: ignore[invalid-generic-class]
         return self.n * (1, )
 
     def tensor(self, *others: "Nat") -> "Nat":
-        for other in others:
-            if not isinstance(other, Ty):
-                return NotImplemented  # This allows whiskering on the left.
-            assert_isinstance(self, other.factory)
-            assert_isinstance(other, self.factory)
-        return self.factory(self.n + sum(other.n for other in others))
+        """
+        The sum of natural numbers, of the highest of their levels as the
+        tensor of types is, see :meth:`Ty.tensor`.
+
+        Example
+        -------
+        >>> from discopy import braided
+        >>> assert Nat(1) @ braided.Nat(2) == braided.Nat(3)
+        """
+        if any(not isinstance(other, Ty) for other in others):
+            return NotImplemented  # This allows whiskering on the left.
+        numbers = (self, *others)
+        level = highest(*dict.fromkeys(x.factory for x in numbers))
+        for number in numbers:
+            assert_isinstance(number, Nat)
+        return level(sum(number.n for number in numbers))
 
     then = tensor
 
@@ -966,6 +1001,9 @@ class Nat(abc.Nat, Ty):  # ty: ignore[invalid-generic-class]
     @classmethod
     def from_tree(cls, tree):
         return cls(tree['n'])
+
+
+Ty.nat_factory = Nat
 
 
 @factory
@@ -1233,10 +1271,16 @@ class Layer(cat.Box, ColouredMonoid):
         The canonical word of boxes and non-empty plumbing: either we
         append or we tensor with the last element. Plumbing that tensors
         into an identity, e.g. a spider with one leg on each side, leaves
-        its type behind, and any other diagram leaves the two apart.
+        its type behind, and any other diagram leaves the two apart. A
+        type of another level is read as one of the level of the boxes, see
+        :meth:`Ty.cast_ty`, e.g. when it was written while the two levels
+        shared their types.
         """
-        result = []
-        for value in (x for x in inside if not isinstance(x, Ty) or x):
+        result, inside = [], tuple(inside)
+        ob = next((x.ob for x in inside if isinstance(x, Box)), cls.ob)
+        for value in (
+                x for x in map(ob.cast_ty, inside)
+                if not isinstance(x, Ty) or x):
             if not result or not cls.is_plumbing_component(value)\
                     or not cls.is_plumbing_component(result[-1]):
                 result.append(value)
@@ -1456,6 +1500,8 @@ class Diagram(cat.Arrow, DaggerMonoidalCategory, RichDisplay):
             state |= {
                 'dom': state['_dom'], 'cod': state['_cod'],
                 'inside': tuple(state['_layers'])}
+        state |= {key: self.ob.cast_ty(state[key]) for key in (
+            "dom", "cod") if key in state}  # types shared between levels
         super().__setstate__(state)
 
     def __init__(
@@ -1467,6 +1513,21 @@ class Diagram(cat.Arrow, DaggerMonoidalCategory, RichDisplay):
                 if not layer.boxes:
                     raise ValueError(messages.LAYERS_MUST_HAVE_A_BOX)
         super().__init__(inside, dom, cod, _scan=_scan)
+
+    @classmethod
+    def cast_ob(cls, x):
+        """
+        Turn a boundary argument into a type of ``cls.ob``, a type of
+        another level being read as one of this level, see :meth:`Ty.cast_ty`.
+
+        Example
+        -------
+        >>> from discopy import braided
+        >>> x = Ty('x')
+        >>> assert braided.Braid(x, x).dom == braided.Ty('x', 'x')
+        """
+        return x if isinstance(x, cls.ob)\
+            else super().cast_ob(cls.ob.cast_ty(x))
 
     @classproperty
     # pylint: disable-next=no-self-argument  # a property of the class
@@ -2464,8 +2525,7 @@ class Box(cat.Box, Diagram):
     """
 
     def __init__(self, name: str, dom: Ty, cod: Ty, **params):
-        dom = dom if isinstance(dom, self.ob) else self.ob(dom)
-        cod = cod if isinstance(cod, self.ob) else self.ob(cod)
+        dom, cod = map(self.cast_ob, (dom, cod))
         if (dom.dom, dom.cod) != (cod.dom, cod.cod):
             raise AxiomError(messages.NOT_GLOBULAR.format(
                 dom.dom, dom.cod, cod.dom, cod.cod))
@@ -3554,7 +3614,7 @@ class Sampler:
 
 
 TermBase.functor, TermBase.sampler_factory = Functor.id(Diagram), Sampler
-Diagram.term_factory = TermBase
+Diagram.term_factory = Ty.term_factory = TermBase
 TermBase.variable_factory, TermBase.constant_factory = Variable, Constant
 TermBase.application_factory, TermBase.kappa_factory = Application, Kappa
 

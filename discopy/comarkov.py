@@ -12,6 +12,8 @@ Summary
     :nosignatures:
     :toctree:
 
+    Ty
+    Nat
     Layer
     Diagram
     Box
@@ -75,14 +77,27 @@ from typing import ClassVar
 
 from discopy import (
     symmetric, monoidal, feedback, cmap, hypergraph, messages, op)
-from discopy.abc import ComarkovCategory, MarkovCategory, Nat
+from discopy.abc import ComarkovCategory, MarkovCategory
 from discopy.cat import factory, kappa_calculus
 from discopy.feedback import (  # noqa: F401  pylint: disable=unused-import
-    Wire, Ty)
+    Wire)
 from discopy.python import finset
 from discopy.utils import (
     AxiomError, assert_isatomic, assert_iscomposable, factory_key,
     factory_name, from_tree)
+
+
+@factory
+class Ty(symmetric.Ty):
+    """ A comarkov type: applied to a function, a term of this module. """
+
+
+@factory
+class Nat(symmetric.Nat, Ty):
+    """ A natural number ``n`` seen as a comarkov type of length ``n``. """
+
+
+Ty.nat_factory = Nat
 
 
 class Layer(symmetric.Layer):
@@ -114,6 +129,7 @@ class Diagram(symmetric.Diagram, ComarkovCategory):
         dom (monoidal.Ty) : The domain of the diagram, i.e. its input.
         cod (monoidal.Ty) : The codomain of the diagram, i.e. its output.
     """
+    ob = Ty
     merge_factory: ClassVar[type["Merge"]]
     noise_factory: ClassVar[type["Noise"]]
     cofunction_factory: ClassVar[type["Cofunction"]]
@@ -243,7 +259,8 @@ class Cofunction(Box):
         return super().__new__(cls)
 
     def __init__(self, cod: monoidal.Ty, cofunc):
-        func = finset.Function(list(cofunc), Nat(len(cod)), Nat(len(cofunc)))
+        func = finset.Function(
+            list(cofunc), finset.Nat(len(cod)), finset.Nat(len(cofunc)))
         self.cofunc = op.Comarkov(func)  # ty: ignore[invalid-argument-type]
         dom = cod[:0].tensor(*(cod[i] for i in func))
         Box.__init__(self, f"Cofunction({list(func)})", dom, cod)
@@ -403,7 +420,8 @@ class Permutation(symmetric.Permutation, Box):
     """
     cofunc = property(lambda self: op.Comarkov(
         finset.Function(  # ty: ignore[invalid-argument-type]
-            list(self.perm.dagger()), Nat(len(self.cod)), Nat(len(self.dom)))))
+            list(self.perm.dagger()),
+            finset.Nat(len(self.cod)), finset.Nat(len(self.dom)))))
     fuse, tensor = Cofunction.fuse, Cofunction.tensor
 
 
@@ -572,7 +590,7 @@ class Functor(symmetric.Functor):
         if isinstance(other, Cofunction) and hasattr(
                 self.cod.ar, "cofunction_factory")\
                 and not isinstance(other, symmetric.Permutation):
-            sizes = [Nat(len(self(x))) for x in other.cod]
+            sizes = [finset.Nat(len(self(x))) for x in other.cod]
             return self.cod.ar.from_cofunction(finset.Function.function(
                 other.cofunc.inside, sizes).inside, self(other.cod))
         if isinstance(other, Cofunction) and hasattr(self.cod, "merge")\

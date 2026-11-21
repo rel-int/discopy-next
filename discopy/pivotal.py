@@ -145,6 +145,9 @@ class Nat(rigid.Nat, Ty):
     l = r = property(lambda self: self)
 
 
+Ty.nat_factory = Nat
+
+
 class Layer(rigid.Layer, feedback.Layer):
     """ A pivotal layer is a rigid layer that can be delayed. """
 
