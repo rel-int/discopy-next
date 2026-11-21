@@ -720,10 +720,10 @@ def layout(diagram, rounds=12) -> dict:
             swap = f"x{len(nodes)}"
             nodes.append(f'{swap} [tooltip="swap", '
                          f'label=<{port_table("", 2, 2, border=0)}>]')
-            (one, two, x), (three, four, y) = edges[left], edges[right]
-            edges[left] = (one, f"{swap}:d0:n", x)
-            edges[right] = (three, f"{swap}:d1:n", y)
-            edges += [(f"{swap}:c1:s", two, x), (f"{swap}:c0:s", four, y)]
+            edges += [(f"{swap}:c1:s", *edges[left][1:]),
+                      (f"{swap}:c0:s", *edges[right][1:])]
+            edges[left] = (edges[left][0], f"{swap}:d0:n", edges[left][2])
+            edges[right] = (edges[right][0], f"{swap}:d1:n", edges[right][2])
     raise ValueError(f"Edges still cross after {rounds} rounds.")
 
 
