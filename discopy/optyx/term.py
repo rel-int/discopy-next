@@ -36,6 +36,11 @@ Summary
     Weakening
     Exchange
     Laxator
+    TermBase
+    Variable
+    Constant
+    Application
+    Kappa
 
 Example
 -------
@@ -69,7 +74,7 @@ from __future__ import annotations
 import numpy as np
 
 from discopy import bang
-from discopy.cat import factory
+from discopy.cat import factory, kappa_calculus
 from discopy.optyx import channel, photonic
 from discopy.optyx.core import diagram, zw
 from discopy.optyx.utils.misc import hashable
@@ -150,11 +155,23 @@ class Box(bang.Box, Term):
         """ The setoid of a box, with its array as a hashable. """
         return super().setoid()[:-1] + (hashable(self.data), )
 
+    @property
+    def unitary(self) -> np.ndarray:
+        """
+        The unitary of one photon the box holds, its conjugate transpose
+        when the box is a dagger.
+
+        >>> U = Box("U", qubit, qubit, data=np.array([[1, 1j], [0, 1]]))
+        >>> assert np.allclose(U.dagger().unitary, [[1, 0], [-1j, 1]])
+        """
+        unitary = np.asarray(self.data)
+        return unitary.conj().T if self.is_dagger else unitary
+
     def to_channel(self) -> channel.Diagram:
         if self.dom != qubit or self.cod != qubit:
             raise NotImplementedError(
                 f"{self} has no image in optyx, only a box on one qubit has.")
-        gate = photonic.Gate(np.transpose(self.data), 2, 2, self.name)
+        gate = photonic.Gate(self.unitary.T, 2, 2, self.name)
         return photonic.DualRail(1) >> gate\
             >> Dereliction(qubit).to_channel()
 
@@ -184,7 +201,7 @@ class Bang(bang.Bang, Box):
                 "on one qubit has.")
         unitary = np.eye(2)
         for box in self.arg.boxes:
-            unitary = box.data @ unitary
+            unitary = box.unitary @ unitary
         return photonic.Gate(unitary.T, 2, 2, f"!{self.arg}")
 
 
@@ -268,3 +285,6 @@ Term.contraction_factory = Contraction
 Term.weakening_factory = Weakening
 Term.exchange_factory = Exchange
 Term.laxator_factory = Laxator
+
+TermBase, Variable, Constant, Application, Kappa = kappa_calculus(Term)
+Ty.term_factory = TermBase

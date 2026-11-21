@@ -118,8 +118,10 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   `optyx.term`, is a diagram of it on the dual-rail `qubit`, written with
   `f.bang()` in the function syntax or as a kappa term of `bang`, and
   `Term.to_channel` compiles it to an optical protocol, `!` as Fock space:
-  a bang to the second quantisation of its unitary, `Contraction` to the W node on each mode, `Weakening` to the
-  vacuum and `Dereliction` to heralding one photon. The notebook
+  a bang to the second quantisation of its unitary, the conjugate transpose
+  for a dagger, `Contraction` to the W node on each mode, `Weakening` to the
+  vacuum and `Dereliction` to heralding one photon. `optyx.term` has kappa
+  terms of its own, so a term with no box is an `optyx.Term` too. The notebook
   `optyx/linear_logic` compiles `copy(!H(x))` with it to a Bell state
   ([next#571], [next#686]).
 - `discopy.drawing.nicer`: nine hand features of a drawing, each a cost
