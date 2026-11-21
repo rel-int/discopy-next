@@ -241,6 +241,7 @@ LAYOUT_NOT_A_BOX = (
     "An open program lays out the drawing of one box, not of a bubble or "
     "a frame.")
 LAYOUT_INFEASIBLE = "The open program of this diagram is {}."
+LAYOUT_WEIGHTS = "The weights of a layout cannot be negative."
 STRETCH_LENGTHS = (
     "Give a scale for each gap between columns and between rows, and for "
     "the width and the height of each box.")

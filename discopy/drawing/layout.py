@@ -406,7 +406,9 @@ class OpenQP(MonoidalCategory[monoidal.Ty, "OpenQP"]):
             square : The weight of its square.
 
         Raises:
-            ValueError : When the solver finds no solution.
+            ValueError : When a weight is negative, which would make the
+                program non-convex or unbounded, or when the solver finds
+                no solution.
 
         >>> from discopy.monoidal import Ty, Box
         >>> x = Ty('x')
@@ -415,6 +417,8 @@ class OpenQP(MonoidalCategory[monoidal.Ty, "OpenQP"]):
         >>> drawing.width
         2.0
         """
+        if min(width, bend, square) < 0:
+            raise ValueError(messages.LAYOUT_WEIGHTS)
         import osqp
         from scipy import sparse
         n, m = self.size, len(self.bends)
