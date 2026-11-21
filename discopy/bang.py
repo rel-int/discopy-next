@@ -43,6 +43,16 @@ Summary
     Application
     Kappa
 
+.. admonition:: Functions
+
+    .. autosummary::
+        :template: function.rst
+        :nosignatures:
+        :toctree:
+
+        structural_boxes
+        structural_wires
+
 Example
 -------
 The translation of the non-linear term ``lambda x: (f(x), f(x))`` banged its

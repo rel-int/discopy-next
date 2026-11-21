@@ -2789,7 +2789,7 @@ def kappa_calculus(
     >>> print(term)
     (x @ y)(lambda x0, x1: let(Braid(x, y)(x0, x1), lambda x2, x3: f(x2, x3)))
     >>> assert isinstance(term, Kappa) and term.eval() == Braid(x, y) >> f
-    >>> assert Kappa.__mro__[2].__module__ == "discopy.monoidal"
+    >>> assert Kappa.__mro__[2].__module__ == "discopy.bang"
     """
     parents: list = list(dict.fromkeys(
         base.term_factory for base in diagram.__bases__

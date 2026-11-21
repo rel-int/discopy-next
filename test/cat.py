@@ -860,6 +860,9 @@ BROKEN = {
         "{tensor,quantum.circuit,quantum.zx}.Bubble":
         "it has no stated rotation",
         "*.{Feedback,Trace}": "it raises for a rotation, as for a dagger",
+        "{rigid,pivotal,ribbon,compact,frobenius}.{Bang,Dereliction,"
+        "Digging,Contraction,Weakening,"
+        "Exchange,Laxator}": "a banged wire has no adjoint",
         "quantum.zx.Scalar": "it takes no dom, cod or z",
     },
     "subs": {
