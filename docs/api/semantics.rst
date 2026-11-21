@@ -39,3 +39,4 @@ the plane, and the backends that render them.
     discopy.drawing.widget
     discopy.drawing.nicer
     discopy.drawing.layout
+    discopy.drawing.planar
