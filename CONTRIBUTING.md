@@ -55,6 +55,19 @@ are also optional dependencies (`pip install -e '.[quantum]'`). There is no `dev
 extra: the `test` extra bundles `quantum`, `lambek`, `optyx` and `notebooks` with the test
 tools, without egglog, ruff, ty or pytest-benchmark.
 
+## Sign the CLA
+
+Every contribution belongs to DisCoPy, the French nonprofit association that holds the project,
+so that it can keep the licence of the whole library consistent: you accept the
+[Contributor License Agreement](CLA.md) once, before your first pull request is merged, and it
+covers everything you submit afterwards. It assigns your copyright to the association, licenses
+it back to you, keeps your moral rights, and binds the association to distribute your work under
+an open-source licence. If your employer, university or a funder has rights in your work, it
+signs the [entity agreement](CLA-entity.md) for it first. Contributions an agent makes are
+covered by the agreement of the human who runs it. See
+[ADR 0008](docs/adr/0008-contributions-belong-to-the-association.md) for why it is a CLA and not
+a DCO.
+
 ## Run the unit tests
 
 After cloning the repository, you should check you haven't broken anything by running the test suite.
@@ -492,6 +505,7 @@ That is, we do our best to make sure that critical parts of the reasoning / impl
 
 We accept contributions from large language models so long as they are explicitly indicated as such and authored under a GitHub handle separate from the human who prompted them, so that authorship stays traceable.
 Each LLM handle is clearly linked to the one human who runs it, and that human must never publish under their own personal handle what should go through it instead: this way, a human can review their own agent's pull requests directly on GitHub without it looking like they are talking to themselves.
+That human signs the [CLA](#sign-the-cla) for what their agents submit.
 The resulting pull request needs to be approved by at least one human other than that prompter, in addition to any other review it requires.
 The [RULES.md](RULES.md) bind every agent working on a branch or pull request in this repo; they define the checkbox mutex and append-only shared-branch protocol.
 Use our [AGENTS.md](AGENTS.md) in your prompts so that the model has enough context to give quality results.
