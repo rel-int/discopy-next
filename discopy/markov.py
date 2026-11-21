@@ -1142,7 +1142,6 @@ class Application(TermBase, symmetric.Application):
             and func.body.count(func.head) == 1
 
 
-
 class Kappa(TermBase, symmetric.Kappa):
     """
     The abstraction of some ``variables`` in a ``body``, in any order and
