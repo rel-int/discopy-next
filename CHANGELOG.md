@@ -1926,23 +1926,20 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   current page's branch alone, and Read the Docs links to each notebook's
   source rather than running it, as a pull request's build does: the hosted
   site no longer shows the notebooks' outputs ([next#633]).
-- `proptest` groups a push to `main` by commit, as `build`, `benchmark`,
-  `lean` and `paper` do, and a scheduled or dispatched run by its own run id:
+- `proptest` groups a push to `main` by commit, as `build`, `benchmark`
+  and `lean` do, and a scheduled or dispatched run by its own run id:
   one group per ref keeps one running and one pending run, so a third merge
   cancelled the pending one before it ever reached a runner.
-  `.github/tests/workflows.py` checks every one of the five ([next#591]).
+  `.github/tests/workflows.py` checks every one of the four ([next#591]).
 - `benchmark/test_egraph.py` has the families `match`, the builder's matcher
   against the pure one on each trace, and `saturate`, `+` under
   associativity and commutativity on four to eight leaves on the builder,
   and on four and five by the pure rounds ([next#589]).
-- `paper/`, the source of the tool paper in Typst: `paper/transpile.py` writes
-  its LaTeX from the part of Typst it is written in, `paper/build.py` runs
-  its listings and draws each figure with the Typst and the TikZ backends,
-  `test/paper_build.py` checks both and the `paper` workflow uploads both
-  PDFs ([next#577]).
-- The sections of the tool paper on syntax, semantics and applications, with
-  what the draft leaves open said in place and grouped in its last section;
-  the tests that build the paper are marked `slow` ([next#581]).
+- The draft of the tool paper, with the transpiler that writes its LaTeX
+  from its Typst, the build that runs its listings and draws its figures
+  with the Typst and the TikZ backends, its tests and its `paper` workflow
+  ([next#577], [next#581]), moved to its author's folder on the wiki, where
+  it waits until it is a paper: `paper/` is gone ([next#597]).
 - `build`'s `test` job has a 40-minute backstop instead of 20, above the
   9.7-20.3 minutes it runs in on `main` rather than inside it: a job over
   `timeout-minutes` reports `cancelled`, so the six jobs it cut over five
@@ -2443,6 +2440,7 @@ for the changelog of `1.2.1` and earlier.
 [next#589]: https://github.com/rel-int/discopy-next/pull/589
 [next#591]: https://github.com/rel-int/discopy-next/pull/591
 [next#596]: https://github.com/rel-int/discopy-next/issues/596
+[next#597]: https://github.com/rel-int/discopy-next/pull/597
 [next#598]: https://github.com/rel-int/discopy-next/pull/598
 [next#601]: https://github.com/rel-int/discopy-next/pull/601
 [next#602]: https://github.com/rel-int/discopy-next/pull/602

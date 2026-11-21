@@ -56,7 +56,7 @@ def schedule(sha, run_id):
 
 
 @pytest.fixture(
-    params=["build", "benchmark", "lean", "paper", "proptest"])
+    params=["build", "benchmark", "lean", "proptest"])
 def concurrency(request):
     with open(GITHUB / "workflows" / f"{request.param}.yml") as file:
         return yaml.safe_load(file)["concurrency"]
