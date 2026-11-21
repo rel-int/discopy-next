@@ -54,13 +54,13 @@ s
 
 from __future__ import annotations
 
-from discopy import monoidal, cmap, hypergraph, messages
+from discopy import bang, monoidal, cmap, hypergraph, messages
 from discopy.abc import SpacialCategory
 from discopy.cat import factory, kappa_calculus
 
 
 @factory
-class Ty(monoidal.Ty):
+class Ty(bang.Ty):
     """ A spacial type: applied to a function, a term of this module. """
 
 
@@ -73,7 +73,7 @@ Ty.nat_factory = Nat
 
 
 @factory
-class Diagram(monoidal.Diagram, SpacialCategory):
+class Diagram(bang.Diagram, SpacialCategory):
     """
     A spacial diagram is a monoidal diagram whose scalars slide.
 
@@ -115,7 +115,7 @@ class Bubble(monoidal.Bubble, Box):
     """
 
 
-class Functor(monoidal.Functor):
+class Functor(bang.Functor):
     """
     A spacial functor is a monoidal functor between spacial categories.
 
@@ -134,6 +134,9 @@ class Equation(monoidal.Equation):
 
 
 Diagram.box_factory = Box
+BangOb = bang.structural_wires(Ty)
+Bang, Dereliction, Digging, Contraction, Weakening, Exchange, Laxator =\
+    bang.structural_boxes(Diagram, Box)
 Diagram.sum_factory = Sum
 Diagram.bubble_factory = Bubble
 Diagram.functor_factory = Functor

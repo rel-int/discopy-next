@@ -502,7 +502,7 @@ def test_term_copies_a_variable_used_twice():
     twice = Constant(Box('m', x @ x, y))(a, a)
     assert twice.freevars == [a] and twice.count(a) == 2
     assert twice.eval() == Copy(x) >> Box('m', x @ x, y)
-    with raises(ValueError, match="disjoint free variables"):
+    with raises(ValueError, match="banged variables to share"):
         symmetric.Constant(symmetric.Box('m', x @ x, y))(
             symmetric.Variable('a', x), symmetric.Variable('a', x))
 

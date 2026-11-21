@@ -66,6 +66,7 @@ from __future__ import annotations
 from copy import copy
 from dataclasses import dataclass
 
+from discopy import bang
 from discopy import (
     config, monoidal, braided, feedback, cmap, hypergraph, messages)
 from discopy.abc import BalancedCategory
@@ -154,6 +155,7 @@ class Nat(braided.Nat, feedback.Nat, Ty):
 
 
 Ty.nat_factory = Nat
+BangOb = bang.structural_wires(Ty)
 
 
 @factory
@@ -519,6 +521,8 @@ class DualRail(Functor):
 Feedback, Trace, FollowedBy, Head, Tail = feedback.structural_boxes(
     Diagram, Box)
 Diagram.box_factory = Box
+Bang, Dereliction, Digging, Contraction, Weakening, Exchange, Laxator =\
+    bang.structural_boxes(Diagram, Box)
 Diagram.functor_factory = Functor
 CMap = cmap.CMap[Diagram]
 Hypergraph = hypergraph.Hypergraph[Diagram]

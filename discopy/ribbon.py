@@ -92,6 +92,7 @@ cap becomes a ribbon folding back.
 
 from typing import ClassVar
 
+from discopy import bang
 from discopy import rigid, pivotal, balanced, feedback
 from discopy.abc import RibbonCategory
 from discopy.cat import factory
@@ -442,6 +443,8 @@ class DualRail(balanced.DualRail, Functor):
 Feedback, Trace, FollowedBy, Head, Tail = feedback.structural_boxes(
     Diagram, Box)
 Diagram.box_factory = Box
+Bang, Dereliction, Digging, Contraction, Weakening, Exchange, Laxator =\
+    bang.structural_boxes(Diagram, Box)
 Diagram.braid_factory, Diagram.functor_factory = Braid, Functor
 Diagram.cup_factory, Diagram.cap_factory = Cup, Cap
 Diagram.twist_factory = Twist

@@ -262,7 +262,7 @@ from __future__ import annotations
 from copy import copy
 from typing import ClassVar
 
-from discopy import monoidal, cmap, hypergraph, messages
+from discopy import bang, monoidal, cmap, hypergraph, messages
 from discopy.abc import (
     DaggerCategory, DaggerMonoidalCategory, FeedbackCategory, MonoidalCategory,
     TracedCategory)
@@ -477,7 +477,7 @@ Wire.head_factory, Wire.tail_factory = HeadOb, TailOb
 
 
 @factory
-class Ty(monoidal.Ty):
+class Ty(bang.Ty):
     """ A feedback type is a monoidal type with `delay`, `head` and `tail`. """
     generator_factory = Wire
 
@@ -524,7 +524,7 @@ class Layer(monoidal.Layer):
 
 
 @factory
-class Diagram(monoidal.Diagram, TracedCategory):
+class Diagram(bang.Diagram, TracedCategory):
     """
     A feedback diagram is a monoidal diagram with a :meth:`delay` endofunctor
     and a :meth:`feedback` operator, building :class:`Feedback` boxes over a
@@ -1217,7 +1217,7 @@ class Bubble(monoidal.Bubble, Box):
             else bubble
 
 
-class Functor(monoidal.Functor):
+class Functor(bang.Functor):
     """
     A feedback functor is a monoidal functor that preserves delay, feedback
     and traces.
@@ -1303,6 +1303,9 @@ class Functor(monoidal.Functor):
 CMap = cmap.CMap[Diagram]
 
 Diagram.box_factory = Box
+BangOb = bang.structural_wires(Ty)
+Bang, Dereliction, Digging, Contraction, Weakening, Exchange, Laxator =\
+    bang.structural_boxes(Diagram, Box)
 Diagram.functor_factory = Functor
 Diagram.feedback_factory = Feedback
 Diagram.trace_factory = Trace

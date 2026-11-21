@@ -97,6 +97,7 @@ from functools import cached_property, reduce
 from inspect import signature
 from typing import Callable, ClassVar, Dict, Self
 
+from discopy import bang
 from discopy import (
     monoidal, biclosed, markov, feedback, cmap, hypergraph, messages)
 from discopy.abc import (
@@ -340,6 +341,9 @@ class Unitype(Exp):
     @classmethod
     def from_tree(cls, tree):
         return cls(tree.get('time_step', 0), tree.get('is_constant', True))
+
+
+BangOb = bang.structural_wires(Ty)
 
 
 @factory
@@ -790,6 +794,8 @@ Feedback, Trace, FollowedBy, Head, Tail = feedback.structural_boxes(
 Feedback.is_linear = Head.is_linear = Tail.is_linear = property(
     lambda self: self.arg.is_linear)
 Diagram.box_factory = Box
+Bang, Dereliction, Digging, Laxator = bang.structural_boxes(
+    Diagram, Box, ("Bang", "Dereliction", "Digging", "Laxator"))
 Diagram.pack_factory = Pack
 Diagram.unpack_factory = Unpack
 Diagram.curry_factory = Curry

@@ -10,13 +10,49 @@ def test_structural_boxes():
     assert_structural_boxes(Diagram)
 
 
-def test_LinearCategory_is_monoidal_not_biclosed():
-    from discopy import biclosed, rigid, tensor
+def test_every_level_has_a_bang():
+    from discopy import monoidal, spacial, feedback, symmetric, markov
+    from discopy import frobenius, tensor
     from discopy.abc import LinearCategory
-    assert issubclass(Diagram, LinearCategory)
-    for category in (biclosed.Diagram, rigid.Diagram, tensor.Diagram):
-        assert not issubclass(category, LinearCategory)
-        assert not hasattr(category, "bang")
+    assert not issubclass(monoidal.Diagram, LinearCategory)
+    for level in (spacial, feedback, symmetric, markov, frobenius):
+        x = level.Ty('x')
+        f = level.Box('f', x, x)
+        assert isinstance(x.bang().inside[0], level.Ty.generator_factory)
+        assert isinstance(f.bang(), level.Box)
+        assert level.Functor({x: x @ x}, {})(f.bang().dom)\
+            == (x @ x).bang()
+    assert not markov.Functor({}, {}, cod=tensor.Diagram).has_bang
+
+
+def test_exchange_is_the_swap_from_symmetric_up():
+    from discopy import braided, symmetric, markov
+    x, y = braided.Ty('x'), braided.Ty('y')
+    assert isinstance(braided.Diagram.exchange(x, y), braided.Exchange)
+    for level in (symmetric, markov):
+        x, y = level.Ty('x'), level.Ty('y')
+        assert level.Diagram.exchange(x, y) == level.Swap(x.bang(), y)
+
+
+def test_markov_contraction_is_copy():
+    from discopy import markov
+    x = markov.Ty('x')
+    sample = markov.Box('sample', x, x, is_deterministic=False)
+    assert markov.Diagram.contraction(x) == markov.Diagram.copy(x.bang())
+    assert markov.Diagram.weakening(x) == markov.Diagram.discard(x.bang())
+    assert sample.bang().is_deterministic and not sample.is_deterministic
+
+
+def test_terms_share_banged_variables_at_every_level():
+    from discopy import braided, symmetric
+    for level in (braided, symmetric):
+        x, y = level.Ty('x'), level.Ty('y')
+        g = level.Box('g', x.bang() @ y @ x.bang(), y)
+        term = (x.bang() @ y)(lambda a, b: g(a, b, a))
+        assert isinstance(term, level.Kappa)
+        wiring = level.Diagram.contraction(x) @ y\
+            >> x.bang() @ level.Diagram.exchange(x, y)
+        assert term.eval() == wiring >> g
 
 
 def test_bang_is_one_wire_and_a_bubble():

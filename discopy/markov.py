@@ -101,6 +101,7 @@ from inspect import Parameter, Signature, signature
 from operator import index
 from typing import ClassVar, Self
 
+from discopy import bang
 from discopy import (
     cat, symmetric, monoidal, feedback, cmap, hypergraph, messages)
 from discopy.abc import ComarkovCategory, MarkovCategory
@@ -127,6 +128,7 @@ class Nat(symmetric.Nat, Ty):
 
 
 Ty.nat_factory = Nat
+BangOb = bang.structural_wires(Ty)
 
 
 class Layer(symmetric.Layer):
@@ -273,6 +275,40 @@ class Diagram(symmetric.Diagram, MarkovCategory):
         messages.MAP_HAS_NO_SPIDERS)
     str_transparency = monoidal.Diagram.str_transparency.failing(
         messages.STR_SPLITS_LAYERS)
+
+    @classmethod
+    def contraction(cls, x: Ty) -> Diagram:
+        """
+        The contraction of a banged type is its copy, so that copying is
+        natural on a banged box, which is deterministic, and not on a box
+        that samples.
+
+        Parameters:
+            x : The type to contract.
+
+        Example
+        -------
+        >>> x = Ty('x')
+        >>> assert Diagram.contraction(x) == Copy(x.bang())
+        >>> sample = Box('sample', x, x, is_deterministic=False)
+        >>> assert sample.bang().is_deterministic
+        """
+        return cls.copy(x.bang())
+
+    @classmethod
+    def weakening(cls, x: Ty) -> Diagram:
+        """
+        The weakening of a banged type is its discard.
+
+        Parameters:
+            x : The type to weaken.
+
+        Example
+        -------
+        >>> x = Ty('x')
+        >>> assert Diagram.weakening(x) == Discard(x.bang())
+        """
+        return cls.discard(x.bang())
 
     @classmethod
     def from_function(cls, func, dom: monoidal.Ty) -> Diagram:
@@ -968,6 +1004,8 @@ CMap = cmap.CMap[Diagram]
 Feedback, Trace, FollowedBy, Head, Tail = feedback.structural_boxes(
     Diagram, Box)
 Diagram.box_factory = Box
+Bang, Dereliction, Digging, Laxator = bang.structural_boxes(
+    Diagram, Box, ("Bang", "Dereliction", "Digging", "Laxator"))
 Diagram.functor_factory = Functor
 Hypergraph = hypergraph.Hypergraph[Diagram]
 Diagram.copy_factory = Copy
@@ -1103,15 +1141,6 @@ class Application(TermBase, symmetric.Application):
         return symmetric.Application.contractible(func, arg)\
             and func.body.count(func.head) == 1
 
-    def eval(self, functor=None):
-        functor = self.identity(functor)
-        left, _, right = self.func.context
-        stack = list(range(len(self.stack)))
-        before, _, after = self.context
-        source = before + stack + after
-        wiring = [source.index(wire)
-                  for wire in left + self.arg.freevars + stack + right]
-        return self.wire(functor, wiring, self.dom) >> super().eval(functor)
 
 
 class Kappa(TermBase, symmetric.Kappa):

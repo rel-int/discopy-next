@@ -75,6 +75,7 @@ from collections.abc import Sized
 from operator import index
 from typing import ClassVar
 
+from discopy import bang
 from discopy import (
     symmetric, monoidal, feedback, cmap, hypergraph, messages, op)
 from discopy.abc import ComarkovCategory, MarkovCategory
@@ -98,6 +99,7 @@ class Nat(symmetric.Nat, Ty):
 
 
 Ty.nat_factory = Nat
+BangOb = bang.structural_wires(Ty)
 
 
 class Layer(symmetric.Layer):
@@ -607,6 +609,10 @@ CMap = cmap.CMap[Diagram]
 Feedback, Trace, FollowedBy, Head, Tail = feedback.structural_boxes(
     Diagram, Box)
 Diagram.box_factory = Box
+Bang, Dereliction, Digging, Contraction, Weakening, Laxator =\
+    bang.structural_boxes(Diagram, Box, (
+        "Bang", "Dereliction", "Digging", "Contraction", "Weakening",
+        "Laxator"))
 Diagram.functor_factory = Functor
 Hypergraph = hypergraph.Hypergraph[Diagram]
 Diagram.merge_factory = Merge

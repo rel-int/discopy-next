@@ -70,7 +70,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import ClassVar
 
-from discopy import monoidal, messages
+from discopy import bang, monoidal, messages
 from discopy.abc import BraidedCategory, SpacialCategory
 from discopy.cat import factory, kappa_calculus
 from discopy.monoidal import Match
@@ -90,7 +90,7 @@ class Wire(monoidal.Wire):
 
 
 @factory
-class Ty(monoidal.Ty):
+class Ty(bang.Ty):
     """ A braided type: applied to a function, a term of this module. """
 
 
@@ -103,7 +103,7 @@ Ty.nat_factory = Nat
 
 
 @factory
-class Diagram(monoidal.Diagram, BraidedCategory):
+class Diagram(bang.Diagram, BraidedCategory):
     """
     A braided diagram is a monoidal diagram with :class:`Braid` boxes.
 
@@ -344,7 +344,7 @@ class Bubble(monoidal.Bubble, Box):
     """
 
 
-class Functor(monoidal.Functor):
+class Functor(bang.Functor):
     """
     A braided functor is a monoidal functor that preserves braids.
 
@@ -365,6 +365,9 @@ class Functor(monoidal.Functor):
 
 
 Diagram.box_factory = Box
+BangOb = bang.structural_wires(Ty)
+Bang, Dereliction, Digging, Contraction, Weakening, Exchange, Laxator =\
+    bang.structural_boxes(Diagram, Box)
 Diagram.braid_factory, Diagram.functor_factory = Braid, Functor
 Diagram.sum_factory = Sum
 Diagram.bubble_factory = Bubble

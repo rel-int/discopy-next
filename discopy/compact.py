@@ -68,6 +68,7 @@ from typing import ClassVar
 
 # pylint: disable=inconsistent-mro  # astroid misreads the MRO, C3 does not
 
+from discopy import bang
 from discopy import (
     symmetric, ribbon, pivotal, feedback, cmap, hypergraph, interaction,
     messages)
@@ -229,6 +230,10 @@ Id = Diagram.id
 Feedback, Trace, FollowedBy, Head, Tail = feedback.structural_boxes(
     Diagram, Box)
 Diagram.box_factory = Box
+Bang, Dereliction, Digging, Contraction, Weakening, Laxator =\
+    bang.structural_boxes(Diagram, Box, (
+        "Bang", "Dereliction", "Digging", "Contraction", "Weakening",
+        "Laxator"))
 Diagram.swap_factory = Swap
 Diagram.functor_factory = Functor
 Diagram.dual_rail_factory = DualRail

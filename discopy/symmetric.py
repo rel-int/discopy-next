@@ -123,6 +123,7 @@ from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from typing import ClassVar, Self
 
+from discopy import bang
 from discopy import (
     cat, monoidal, feedback, balanced, hypergraph, cmap, messages)
 from discopy.abc import (
@@ -153,6 +154,7 @@ class Nat(balanced.Nat, Ty):
 
 
 Ty.nat_factory = Nat
+BangOb = bang.structural_wires(Ty)
 
 
 class Layer(feedback.Layer):
@@ -479,6 +481,26 @@ class Diagram(balanced.Diagram, SymmetricCategory):
             tensor(left), head  # ty: ignore[invalid-argument-type]
         ) @ tensor(right) >> head @ cls.permutation(
             [x - 1 if x > i else x for x in xs[1:]], rest)
+
+    @classmethod
+    def exchange(cls, x: Ty, y: Ty, is_dagger: bool = False) -> Diagram:
+        """
+        The exchange of a banged type with any type is their swap, so that
+        the five laws of the exchange are instances of those of the swap,
+        see :class:`discopy.abc.LinearCategory`.
+
+        Parameters:
+            x : The type that is banged.
+            y : The type it is exchanged with.
+            is_dagger : Whether to take the inverse.
+
+        Example
+        -------
+        >>> x, y = Ty('x'), Ty('y')
+        >>> assert Diagram.exchange(x, y) == Swap(x.bang(), y)
+        >>> assert Diagram.exchange(x, y, True) == Swap(y, x.bang())
+        """
+        return cls.swap(y, x.bang()) if is_dagger else cls.swap(x.bang(), y)
 
     @classmethod
     def from_permutation(
@@ -991,6 +1013,10 @@ for level in (
 Feedback, Trace, FollowedBy, Head, Tail = feedback.structural_boxes(
     Diagram, Box)
 Diagram.box_factory = Box
+Bang, Dereliction, Digging, Contraction, Weakening, Laxator =\
+    bang.structural_boxes(Diagram, Box, (
+        "Bang", "Dereliction", "Digging", "Contraction", "Weakening",
+        "Laxator"))
 Diagram.functor_factory = Functor
 Diagram.dual_rail_factory = DualRail
 Hypergraph = hypergraph.Hypergraph[Diagram]
@@ -1059,21 +1085,6 @@ class TermBase(balanced.TermBase):  # ty: ignore[unsupported-base]
         """ A permutation is read as its inputs, in the order it gives. """
         return [arguments[i] for i in box.perm]\
             if isinstance(box, Permutation) else None
-
-    @staticmethod
-    def wire(functor, wiring: list[int], dom: Ty):
-        """
-        The image under a functor of the wiring from a type to its wires
-        at the given indices: that of their permutation in its domain, the
-        identity when nothing moves, so that a term evaluates wherever its
-        diagram does, e.g. to braids in a braided category.
-
-        Parameters:
-            functor : The functor to evaluate the permutation.
-            wiring : The index of the input each output reads.
-            dom : The type of the inputs.
-        """
-        return functor(functor.dom.from_permutation(wiring, dom))
 
     @axiom
     def normal_form_soundness(cls, term: Self) -> AbstractEquation:
