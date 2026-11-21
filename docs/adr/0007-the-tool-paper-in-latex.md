@@ -12,8 +12,7 @@ wiki: "it makes more sense to move the tool paper to the wiki for now".
 
 The paper's source is LaTeX, with no Typst source and no transpiler. Its figures are drawn by the
 library's TikZ backend alone. The library keeps its Typst backend, which the paper describes as a
-feature. The draft lives in its author's folder on the [wiki](https://github.com/rel-int/wiki),
-not in this repository.
+feature. The draft lives in its author's folder on the wiki, not in this repository.
 
 ## Consequences
 
