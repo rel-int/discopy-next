@@ -1021,14 +1021,14 @@ def structural_boxes(
     """
     parents = [base for base in diagram.__bases__ if issubclass(base, Diagram)]
     module, level = diagram.__module__, diagram.__module__.split('.')[-1]
-    result = []
-    for name in names:
-        attr, doc = STRUCTURAL_BOXES[name]
-        result.append(subclass(name, [
-            getattr(parent, attr) for parent in parents] + [box],
-            module, doc.format(level)))
-        setattr(diagram, attr, result[-1])
-    return tuple(result)
+    result = {
+        name: subclass(name, [
+            getattr(parent, STRUCTURAL_BOXES[name][0]) for parent in parents
+        ] + [box], module, STRUCTURAL_BOXES[name][1].format(level))
+        for name in names}
+    for name, cls in result.items():
+        setattr(diagram, STRUCTURAL_BOXES[name][0], cls)
+    return tuple(result.values())
 
 
 def structural_wires(ty: type) -> type:
