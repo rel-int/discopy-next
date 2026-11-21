@@ -1484,10 +1484,18 @@ class Feedback(monoidal.Bubble, Box):
     A feedback loop connecting the last `mem` outputs of `arg`
     back to its last `mem` inputs, one time step later.
 
-    The delay endofunctor is the identity, so `arg` goes from `dom @ mem`
+    The delay is real but left unwritten: the memory of `arg` is not typed
+    with :meth:`discopy.feedback.Ob.delay`, so `arg` goes from `dom @ mem`
     to `cod @ mem` and the result from `dom` to `cod`. It is drawn as `arg`
     with a feedback loop and composes with any other diagram; its stream
     semantics is given by :meth:`Diagram.unroll`.
+
+    A loop is therefore a delay line rather than a trace, and yanking
+    fails: the feedback of a swap waits one time step instead of being the
+    identity.
+
+    >>> wait = Diagram.swap(mode, mode).feedback()
+    >>> assert wait.unroll(1) != Diagram.id(mode ** 3)
 
     Parameters:
         arg : The diagram from `dom @ mem` to `cod @ mem` to feed back.
