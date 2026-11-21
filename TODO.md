@@ -6,4 +6,4 @@
 - [x] Descent from the monoidal layout: QP steps with the circle and the overlaps linearised, kept only when the drawing stays valid
 - [x] Drawing: rotated boxes (angle) and wires along tangents in every backend
 - [x] Tests and gallery pictures
-- [ ] CHANGELOG, docs, checks
+- [x] CHANGELOG, docs, checks
