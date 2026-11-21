@@ -1,9 +1,10 @@
 """
 DisCoPy's drawing modules: :mod:`discopy.drawing.drawing` is the category of
 drawings, i.e. labeled graphs embedded in the plane, onto which every diagram
-is sent by a functor; :mod:`discopy.drawing.backend` renders them with
-matplotlib, TikZ or Typst; :mod:`discopy.drawing.widget` shows them as
-interactive anywidget widgets in notebooks.
+is sent by a functor; :mod:`discopy.drawing.layout` lays a diagram out
+by another, into open quadratic programs; :mod:`discopy.drawing.backend`
+renders them with matplotlib, TikZ or Typst; :mod:`discopy.drawing.widget`
+shows them as interactive anywidget widgets in notebooks.
 """
 
 import os
