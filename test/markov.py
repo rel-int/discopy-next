@@ -122,7 +122,7 @@ def test_copy_serialisation():
     for box in (Copy(x), Copy(x, 3), Discard(x)):
         assert loads(dumps(box)) == box
     assert loads(dumps(Copy(x) >> Discard(x) @ x)) == Copy(x) >> Discard(x) @ x
-    assert repr(Copy(x, 3)) == "markov.Copy(feedback.Ty(feedback.Wire('x')), 3)"
+    assert repr(Copy(x, 3)) == "markov.Copy(markov.Ty(feedback.Wire('x')), 3)"
     tree = dumps(comarkov.Merge(x, 3)).replace("comarkov.Merge", "markov.Merge")
     with warns(DeprecationWarning):
         assert loads(tree) == comarkov.Merge(x, 3)
@@ -374,7 +374,7 @@ def test_Box_flags():
     assert Box('sample', p, x) != sample
     assert hash(sample) == hash(Box('sample', p, x, is_deterministic=False))
     assert repr(Box('f', p, x)) == "markov.Box('f', "\
-        "feedback.Ty(feedback.Wire('p')), feedback.Ty(feedback.Wire('x')))"
+        "markov.Ty(feedback.Wire('p')), markov.Ty(feedback.Wire('x')))"
     for box in (sample, condition, sample.dagger(), sample @ condition):
         assert eval(repr(box)) == box
         assert loads(dumps(box)) == box == pickle.loads(pickle.dumps(box))
@@ -502,7 +502,7 @@ def test_term_copies_a_variable_used_twice():
     twice = Constant(Box('m', x @ x, y))(a, a)
     assert twice.freevars == [a] and twice.count(a) == 2
     assert twice.eval() == Copy(x) >> Box('m', x @ x, y)
-    with raises(ValueError, match="disjoint free variables"):
+    with raises(ValueError, match="banged variables to share"):
         symmetric.Constant(symmetric.Box('m', x @ x, y))(
             symmetric.Variable('a', x), symmetric.Variable('a', x))
 
@@ -544,10 +544,14 @@ def test_term_kappa_discards_what_its_body_does_not_use():
     with raises(ValueError, match="distinct variables to bind in f.a."):
         Kappa((a, a), f(a))
     low = symmetric.Constant(symmetric.Box('f', x, y))
-    with raises(ValueError, match="distinct free variables"):
+    with raises(TypeError, match="Expected markov.Diagram"):
         (y @ x)(lambda b, a: low(a))
     assert type((y @ x)(lambda b, a: a)) is Kappa
-    assert type(x(lambda a: a)) is monoidal.Kappa
+    assert type(x(lambda a: a)) is Kappa
+    x, y = symmetric.Ty('x'), symmetric.Ty('y')
+    low = symmetric.Constant(symmetric.Box('f', x, y))
+    with raises(ValueError, match="distinct free variables"):
+        (y @ x)(lambda b, a: low(a))
 
 
 def test_term_substitute_under_a_kappa_of_no_variable():

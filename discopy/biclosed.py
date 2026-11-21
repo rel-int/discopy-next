@@ -92,7 +92,7 @@ from itertools import count
 from typing import (
     TYPE_CHECKING, Callable, ClassVar, Iterator, Self, Sequence)
 
-from discopy import cat, monoidal, cmap, hypergraph, messages
+from discopy import bang, cat, monoidal, cmap, hypergraph, messages
 from discopy.abc import (
     BiclosedCategory, DaggerCategory, DaggerMonoidalCategory, MonoidalCategory)
 from discopy.testable import (
@@ -117,7 +117,7 @@ if TYPE_CHECKING:
 
 
 @factory
-class Ty(monoidal.Ty):
+class Ty(bang.Ty):
     """
     A biclosed type is a monoidal type that can be exponentiated.
 
@@ -380,7 +380,7 @@ class Under(Exp):
 
 
 @factory
-class Diagram(monoidal.Diagram, BiclosedCategory):
+class Diagram(bang.Diagram, BiclosedCategory):
     """
     A biclosed diagram is a monoidal diagram
     with :class:`Curry` and :class:`Eval` boxes.
@@ -693,6 +693,9 @@ class Bubble(monoidal.Bubble, Box):
 
 Id = Diagram.id
 Diagram.box_factory = Box
+BangOb = bang.structural_wires(Ty)
+Bang, Dereliction, Digging, Contraction, Weakening, Exchange, Laxator =\
+    bang.structural_boxes(Diagram, Box)
 Diagram.curry_factory = Curry
 Diagram.eval_factory = Eval
 Diagram.coeval_factory = Coeval
@@ -700,7 +703,7 @@ Diagram.sum_factory = Sum
 Diagram.bubble_factory = Bubble
 
 
-class Functor(monoidal.Functor):
+class Functor(bang.Functor):
     """
     A biclosed functor is a monoidal functor
     that preserves evaluation and currying.

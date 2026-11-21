@@ -4,8 +4,15 @@
 The free linear category, i.e. a monoidal category with a bang: a comonad
 ``!`` whose objects are comonoids, central and lax monoidal, see
 :class:`discopy.abc.LinearCategory`. It needs no symmetry and no closure,
-so it sits right above :mod:`discopy.monoidal`, the way :mod:`discopy.para`
-and :mod:`discopy.monad` sit beside the hierarchy.
+so it sits right above :mod:`discopy.monoidal`, and every level of the
+hierarchy above, from :mod:`~discopy.spacial`, :mod:`~discopy.braided`,
+:mod:`~discopy.feedback` and :mod:`~discopy.biclosed` up, is a linear
+category the way it is a feedback category: its diagrams have a bang, which
+nothing obliges a user to use. Each level has the :class:`Bang` and the
+structural boxes of its own, see :func:`structural_boxes`, and from
+:mod:`~discopy.symmetric` up the :class:`Exchange` is the swap, from
+:mod:`~discopy.markov` up the :class:`Contraction` and the
+:class:`Weakening` are the copy and the discard of a banged wire.
 
 Summary
 -------
@@ -36,6 +43,16 @@ Summary
     Application
     Kappa
 
+.. admonition:: Functions
+
+    .. autosummary::
+        :template: function.rst
+        :nosignatures:
+        :toctree:
+
+        structural_boxes
+        structural_wires
+
 Example
 -------
 The translation of the non-linear term ``lambda x: (f(x), f(x))`` banged its
@@ -60,15 +77,15 @@ the second quantisation of ``f``, see the notebook
 
 from __future__ import annotations
 
-from functools import cached_property
-from typing import Callable, ClassVar, Self
+from typing import ClassVar, Self
 
 from discopy import monoidal, messages
 from discopy.abc import LinearCategory, MonoidalCategory
 from discopy.cat import factory
 from discopy.drawing import Drawing
 from discopy.utils import (
-    AxiomError, assert_isinstance, factory_name, from_tree, get_origin)
+    AxiomError, assert_isinstance, factory_name, from_tree, get_origin,
+    subclass)
 
 
 @factory
@@ -78,29 +95,6 @@ class Ty(monoidal.Ty):
     :class:`BangOb`.
     """
     bang_factory: ClassVar[type[BangOb]]
-    term_factory: ClassVar[type["TermBase"]]
-
-    def __call__(self, function: Callable, offset: int | None = None):
-        """
-        The kappa abstraction of a Python function, a :class:`Kappa` of the
-        terms of its :attr:`term_factory`: a type with a bang binds its
-        variables in a linear category even when the body has no box, e.g.
-        weakens a banged variable it does not use.
-
-        Parameters:
-            function : The body, as a function of the variables.
-            offset : Passed to :class:`Kappa`.
-
-        Example
-        -------
-        >>> x = Ty('x')
-        >>> term = (x.bang() @ x)(lambda a, b: b)
-        >>> assert isinstance(term, Kappa)
-        >>> assert term.eval() == Weakening(x) @ x
-        >>> assert eval(str(term)) == term
-        """
-        return self.term_factory.kappa_factory.from_callable(
-            self, offset)(function)
 
     def bang(self) -> Self:
         """
@@ -136,26 +130,26 @@ class BangOb(monoidal.Wire):
     """
     ob = Ty
 
-    def __init__(self, arg: Ty):
+    def __init__(self, arg: Ty, **params):
         assert_isinstance(arg, self.ob)
         self.arg = arg
-        super().__init__("")
-        del self.name
+        super().__init__("", **params)
 
-    @cached_property
-    def name(self):  # pylint: disable=method-hidden  # deleted by __init__
-        "The name of a bang is its print, computed when first read."
-        return str(self)
+    @property
+    def name(self) -> str:
+        """ The name of a bang is the bang of the name of its type. """
+        arg = str(self.arg) if len(self.arg) == 1 else f"({self.arg})"
+        return arg + ".bang()"
+
+    @name.setter
+    def name(self, _):
+        """ The name of a bang is read off its type, not set. """
 
     def __eq__(self, other):
-        return isinstance(other, type(self)) and self.arg == other.arg
+        return super().__eq__(other) and self.arg == other.arg
 
     def __hash__(self):
         return hash(repr(self))
-
-    def __str__(self):
-        arg = str(self.arg) if len(self.arg) == 1 else f"({self.arg})"
-        return arg + ".bang()"
 
     @property
     def drawing_name(self) -> str:
@@ -168,15 +162,20 @@ class BangOb(monoidal.Wire):
         return self.arg.atoms()
 
     def __repr__(self):
-        return factory_name(type(self)) + f"({self.arg!r})"
+        time_step = getattr(self, "repr_time_step", str)()
+        return factory_name(type(self)) + f"({self.arg!r}{time_step})"
 
     def to_tree(self):
+        time_step = getattr(self, "time_step", 0)
         return {'factory': factory_name(type(self)),
-                'arg': self.arg.to_tree()}
+                'arg': self.arg.to_tree()} | (
+                    {'time_step': time_step} if time_step else {})
 
     @classmethod
     def from_tree(cls, tree):
-        return cls(from_tree(tree['arg']))
+        return cls(from_tree(tree['arg']), **{
+            key: value for key, value in tree.items()
+            if key not in ('factory', 'arg')})
 
     def dagger(self) -> BangOb:
         """ A banged wire is its own dagger, as it has no colour. """
@@ -199,8 +198,6 @@ class Diagram(monoidal.Diagram, LinearCategory):
         dom (Ty) : The domain of the diagram, i.e. its input.
         cod (Ty) : The codomain of the diagram, i.e. its output.
     """
-    box_factory: ClassVar[type["Box"]]
-    sum_factory: ClassVar[type["Sum"]]
     functor_factory: ClassVar[type["Functor"]]
     bang_factory: ClassVar[type["Bang"]]
     dereliction_factory: ClassVar[type["Dereliction"]]
@@ -317,9 +314,9 @@ class Diagram(monoidal.Diagram, LinearCategory):
     def wiring(cls, wiring: list[int], dom: Ty) -> Diagram:
         """
         The wiring of a type to the wires at the given indices, where only a
-        banged wire is copied, discarded or moved: the copies of each banged
-        wire by :meth:`copy`, then the exchanges that bring each copy where
-        it is read. A wire that is not banged is read once and in order.
+        banged wire is copied or discarded: the copies of each wire by
+        :meth:`copy`, then the permutation that brings each copy where it is
+        read, see :meth:`from_permutation`.
 
         Parameters:
             wiring : The index of the input each output reads.
@@ -330,25 +327,48 @@ class Diagram(monoidal.Diagram, LinearCategory):
         >>> x, y = Ty('x'), Ty('y')
         >>> assert Diagram.wiring([0, 1, 0], x.bang() @ y)\\
         ...     == Contraction(x) @ y >> x.bang() @ Exchange(x, y)
-        >>> Diagram.wiring([1, 0], x @ y)
+        >>> Diagram.wiring([0, 0], x)
         Traceback (most recent call last):
         ...
-        discopy.utils.AxiomError: x @ y is not banged: ...
+        discopy.utils.AxiomError: x is not banged: ...
         """
         if any(not 0 <= i < len(dom) for i in wiring):
             raise ValueError(messages.WIRING_OUT_OF_RANGE.format(dom, wiring))
         wires = [dom[i:i + 1] for i in range(len(dom))]
-        banged = [isinstance(wire.inside[0], BangOb) for wire in wires]
         counts = [wiring.count(i) for i in range(len(dom))]
-        if any(n != 1 and not b for n, b in zip(counts, banged)):
-            raise AxiomError(messages.NOT_BANGED.format(dom))
-        result = cls.id(dom[:0]).tensor(*(
-            cls.copy(wire, n) if b else cls.id(wire)
-            for wire, n, b in zip(wires, counts, banged)))
-        targets = {i: [j for j, k in enumerate(wiring) if k == i]
-                   for i in range(len(dom))}
-        order = [j for i in range(len(dom)) for j in targets[i]]
-        types = [wires[wiring[j]] for j in order]
+        copies = cls.id(dom[:0]).tensor(*(
+            cls.id(wire) if n == 1 else cls.copy(wire, n)
+            for wire, n in zip(wires, counts)))
+        order = [j for i in range(len(dom))
+                 for j, k in enumerate(wiring) if k == i]
+        return copies >> cls.from_permutation(
+            [order.index(j) for j in range(len(wiring))], copies.cod)
+
+    @classmethod
+    def from_permutation(cls, perm: list[int], dom: Ty) -> Diagram:
+        """
+        The permutation of the wires of a type where only a banged wire
+        crosses another, by :class:`Exchange`: the wire of index ``perm[j]``
+        goes to ``j``. From :mod:`discopy.symmetric` up it is the
+        permutation of :meth:`discopy.symmetric.Diagram.from_permutation`.
+
+        Parameters:
+            perm : The index of the input each output reads.
+            dom : The type of the inputs.
+
+        Example
+        -------
+        >>> x, y = Ty('x'), Ty('y')
+        >>> assert Diagram.from_permutation([1, 0], y @ x.bang())\\
+        ...     == Exchange(x, y, True)
+        >>> Diagram.from_permutation([1, 0], x @ y)
+        Traceback (most recent call last):
+        ...
+        discopy.utils.AxiomError: x @ y is not banged: ...
+        """
+        order = [perm.index(i) for i in range(len(dom))]
+        types = [dom[i:i + 1] for i in range(len(dom))]
+        result = cls.id(dom)
         for _ in order:
             for i in range(len(order) - 1):
                 if order[i] < order[i + 1]:
@@ -728,10 +748,23 @@ class Functor(monoidal.Functor):
     @property
     def has_bang(self) -> bool:
         """
-        Whether the codomain is a linear category, which a :class:`BangOb`,
-        a :class:`Bang` and the structural boxes are sent through.
+        Whether the codomain has a bang of its own, which a :class:`BangOb`,
+        a :class:`Bang` and the structural boxes are sent through: a
+        linear category whose :attr:`Diagram.bang_factory` builds its own
+        arrows or whose :meth:`banged` is its own, rather than one that
+        inherits the bang of the free diagrams it is made of, e.g.
+        :class:`discopy.tensor.Diagram`.
+
+        Example
+        -------
+        >>> from discopy import symmetric, tensor
+        >>> assert symmetric.Functor({}, {}).has_bang
+        >>> assert not Functor({}, {}, cod=tensor.Diagram).has_bang
         """
-        return issubclass(get_origin(self.cod), LinearCategory)
+        cod = get_origin(self.cod)
+        return issubclass(cod, LinearCategory) and (
+            issubclass(cod.bang_factory, cod)
+            or cod.banged.__func__ is not LinearCategory.banged.__func__)
 
     def map_bang(self, other):
         """
@@ -795,7 +828,7 @@ class TermBase(monoidal.TermBase):
         The image under a functor of the wiring from a type to its wires at
         the given indices, see :meth:`Diagram.wiring`.
         """
-        return functor(Diagram.wiring(wiring, dom))
+        return functor(functor.dom.wiring(wiring, dom))
 
 
 class Variable(TermBase, monoidal.Variable):
@@ -888,8 +921,6 @@ class Kappa(TermBase, monoidal.Kappa):
     ValueError: Expected a block of variables next to the stack of f(b), \
 got a, b.
     """
-    above = None
-
     @staticmethod
     def used(variables, body) -> tuple:
         """ The variables the body uses, in the order they are bound. """
@@ -959,3 +990,78 @@ TermBase.functor = Functor.id(Diagram)
 TermBase.variable_factory, TermBase.constant_factory = Variable, Constant
 TermBase.application_factory, TermBase.kappa_factory = Application, Kappa
 Diagram.term_factory = Ty.term_factory = TermBase
+
+
+STRUCTURAL_BOXES = {
+    "Bang": ("bang_factory", "The bang of a {} diagram."),
+    "Dereliction": ("dereliction_factory", "The dereliction of {} diagrams."),
+    "Digging": ("digging_factory", "The digging of {} diagrams."),
+    "Contraction": ("contraction_factory", "The contraction of {} diagrams."),
+    "Weakening": ("weakening_factory", "The weakening of {} diagrams."),
+    "Exchange": ("exchange_factory", "The exchange of {} diagrams."),
+    "Laxator": ("laxator_factory", "The laxator of {} diagrams."),
+}
+
+
+def structural_boxes(
+        diagram: type, box: type, names: tuple[str, ...] = tuple(
+            STRUCTURAL_BOXES)) -> tuple[type, ...]:
+    """
+    The :class:`Bang` and the structural boxes of a level of the hierarchy,
+    generated rather than written by hand as
+    :func:`discopy.feedback.structural_boxes` generates its own: each
+    subclasses the one of every level ``diagram`` subclasses and ``box``,
+    lives in their module and is bound to the factory of ``diagram`` that
+    builds it. A level whose structure is not a box of its own, e.g. the
+    :class:`Exchange` that is the swap from :mod:`discopy.symmetric` up,
+    leaves it out of ``names``.
+
+    Parameters:
+        diagram : The diagram class of the level.
+        box : The box class of the level.
+        names : The boxes to generate, in the order they are returned.
+
+    Example
+    -------
+    >>> from discopy import braided, spacial
+    >>> assert issubclass(braided.Dereliction, Dereliction)
+    >>> assert issubclass(braided.Dereliction, braided.Box)
+    >>> assert braided.Diagram.dereliction_factory is braided.Dereliction
+    >>> assert repr(spacial.Bang).endswith("'discopy.spacial.Bang'>")
+    """
+    parents = [base for base in diagram.__bases__ if issubclass(base, Diagram)]
+    module, level = diagram.__module__, diagram.__module__.split('.')[-1]
+    result = {
+        name: subclass(name, [
+            getattr(parent, STRUCTURAL_BOXES[name][0]) for parent in parents
+        ] + [box], module, STRUCTURAL_BOXES[name][1].format(level))
+        for name in names}
+    for name, cls in result.items():
+        setattr(diagram, STRUCTURAL_BOXES[name][0], cls)
+    return tuple(result.values())
+
+
+def structural_wires(ty: type) -> type:
+    """
+    The :class:`BangOb` of a type class of a level of the hierarchy,
+    generated as :func:`structural_boxes` generates its boxes, so that the
+    bang of a type is a wire of its own level, e.g. one with a delay in
+    :mod:`discopy.feedback`, and bound to :attr:`Ty.bang_factory`.
+
+    Parameters:
+        ty : The type class of the level.
+
+    Example
+    -------
+    >>> from discopy import feedback
+    >>> x = feedback.Ty('x')
+    >>> assert isinstance(x.bang().inside[0], feedback.Wire)
+    >>> assert x.bang().delay() == x.bang().d != x.delay().bang()
+    """
+    parents = [base.bang_factory for base in ty.__bases__
+               if issubclass(base, Ty)]
+    module, level = ty.__module__, ty.__module__.split('.')[-1]
+    ty.bang_factory = subclass(
+        "BangOb", parents + [ty.generator_factory], module,
+        f"The bang of a {level} type, a {level} wire.")
+    return ty.bang_factory

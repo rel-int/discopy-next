@@ -69,6 +69,7 @@ from __future__ import annotations
 from copy import copy
 from typing import ClassVar
 
+from discopy import bang
 from discopy import cat, cmap, messages, rigid, feedback
 from discopy.abc import (
     DaggerCategory, DaggerMonoidalCategory, PivotalCategory, RigidCategory)
@@ -143,6 +144,10 @@ class Nat(rigid.Nat, Ty):
         The natural number.
     """
     l = r = property(lambda self: self)
+
+
+Ty.nat_factory = Nat
+BangOb = bang.structural_wires(Ty)
 
 
 class Layer(rigid.Layer, feedback.Layer):
@@ -370,6 +375,8 @@ class Functor(rigid.Functor, feedback.Functor):
 Feedback, Trace, FollowedBy, Head, Tail = feedback.structural_boxes(
     Diagram, Box)
 Diagram.box_factory = Box
+Bang, Dereliction, Digging, Contraction, Weakening, Exchange, Laxator =\
+    bang.structural_boxes(Diagram, Box)
 Diagram.functor_factory = Functor
 Diagram.cup_factory, Diagram.cap_factory = Cup, Cap
 Diagram.sum_factory = Sum

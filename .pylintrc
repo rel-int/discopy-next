@@ -40,7 +40,7 @@ fail-on=unused-import,
         possibly-unused-variable
 
 # Specify a score threshold under which the program will exit with error.
-fail-under=9.34
+fail-under=9.42
 
 # Interpret the stdin as a python script, whose filename needs to be passed as
 # the module_or_package argument.
@@ -411,11 +411,15 @@ confidence=HIGH,
 # no Warning level messages displayed, use "--disable=all --enable=classes
 # --disable=W".
 # The first eight messages below are pylint's defaults. Beyond them, the code
-# deliberately does not follow three: invalid-name, since mathematical names
+# deliberately does not follow four: invalid-name, since mathematical names
 # such as `f`, `x` or `Ty` are the convention; too-many-ancestors, since every
-# level of the hierarchy extends the levels above it; and cyclic-import, since
+# level of the hierarchy extends the levels above it; cyclic-import, since
 # the package imports every module, so the graph is cyclic by design and the
-# number of cycles pylint reports varies from one run to the next.
+# number of cycles pylint reports varies from one run to the next; and
+# inconsistent-mro, since Python refuses to create a class whose MRO is
+# inconsistent and the tests import every module, so each report is astroid
+# failing to infer a base of the diamond hierarchy, and which classes it
+# reports varies from one Python version and run to the next.
 disable=raw-checker-failed,
         bad-inline-option,
         locally-disabled,
@@ -425,7 +429,8 @@ disable=raw-checker-failed,
         deprecated-pragma,
         use-symbolic-message-instead,
         invalid-name,too-many-ancestors,
-        cyclic-import
+        cyclic-import,
+        inconsistent-mro
 
 # Enable the message, report, category or checker with the given id(s). You can
 # either give multiple identifier separated by comma (,) or put this option

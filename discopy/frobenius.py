@@ -87,6 +87,7 @@ from copy import copy
 from operator import index
 from typing import ClassVar, Self
 
+from discopy import bang
 from discopy import (
     monoidal, rigid, markov, comarkov, compact, pivotal, feedback, cmap,
     hypergraph, symmetric)
@@ -127,7 +128,7 @@ HeadOb, TailOb = feedback.structural_wires(Wire)
 
 
 @factory
-class Ty(pivotal.Ty):
+class Ty(pivotal.Ty, markov.Ty, comarkov.Ty):
     """
     A frobenius type is a pivotal type with frobenius objects inside.
 
@@ -150,6 +151,10 @@ class Nat(rigid.Nat, Ty):
     """
 
     l = r = property(lambda self: self)
+
+
+Ty.nat_factory = Nat
+BangOb = bang.structural_wires(Ty)
 
 
 @factory
@@ -1004,6 +1009,8 @@ CMap = cmap.CMap[Diagram]
 Feedback, Trace, FollowedBy, Head, Tail = feedback.structural_boxes(
     Diagram, Box)
 Diagram.box_factory = Box
+Bang, Dereliction, Digging, Laxator = bang.structural_boxes(
+    Diagram, Box, ("Bang", "Dereliction", "Digging", "Laxator"))
 Diagram.functor_factory = Functor
 Diagram.cup_factory, Diagram.cap_factory = Cup, Cap
 Diagram.swap_factory = Swap

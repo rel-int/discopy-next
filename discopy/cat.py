@@ -123,12 +123,11 @@ calculus.
 from __future__ import annotations
 
 from abc import abstractmethod
-from contextlib import suppress
 from functools import total_ordering, cached_property, reduce
 from inspect import signature
 from itertools import count
 from typing import (
-    Any, Callable, ClassVar, Iterator, Mapping, Iterable, Self, Sequence,
+    Any, Callable, ClassVar, Mapping, Iterable, Self, Sequence,
     TYPE_CHECKING)
 
 
@@ -196,15 +195,18 @@ class Ob(Serialisable["Ob"]):
         """ An object is its own atom, the generator its string names. """
         return [self]
 
-    def __call__(self, function: Callable) -> TermBase:
+    def __call__(
+            self, function: Callable, offset: int | None = None) -> TermBase:
         """
-        The kappa abstraction of a Python function from a variable of this
-        type to a term, see :class:`Kappa`, as a type of a closed category
+        The kappa abstraction of a Python function from a variable for each
+        wire of this type to a term, see :class:`Kappa`, of the module of
+        the type, see :attr:`term_factory`, as a type of a closed category
         applied to a function is a lambda abstraction, see
         :class:`discopy.biclosed.Ty`.
 
         Parameters:
-            function : The body, as a function of the variable.
+            function : The body, as a function of the variables.
+            offset : Passed to :class:`Kappa`.
 
         Example
         -------
@@ -213,7 +215,8 @@ class Ob(Serialisable["Ob"]):
         >>> assert x(lambda a: Constant(f)(Constant(f)(a))).eval()\\
         ...     == f >> f
         """
-        return Kappa.from_callable(self)(function)
+        return self.term_factory.kappa_factory.from_callable(
+            self, offset)(function)
 
     def __eq__(self, other):
         return isinstance(other, type(self)) and self.name == other.name
@@ -2029,7 +2032,7 @@ class TermBase(Serialisable, AlphaEquivalence):
         Terms are equal when they are built alike from equal parts, at
         whichever level of the hierarchy: the level of a term is that of
         the boxes of its constants, and a type applied to a Python function
-        is a kappa of the level of its body, see :meth:`highest`.
+        is a kappa of the module of the type, see :meth:`Ob.__call__`.
         """
         return (type(self).__name__, ) + self.parts
 
@@ -2121,30 +2124,10 @@ class TermBase(Serialisable, AlphaEquivalence):
         """ Draw the diagram of the term, see :meth:`eval`. """
         return self.eval().draw(**params)
 
-    @staticmethod
-    def highest(*levels: type[TermBase]) -> Callable[..., TermBase]:
-        """
-        The highest of the classes of terms of some levels of the hierarchy,
-        i.e. the one that subclasses the others: a term built from terms of
-        two levels is one of the higher, e.g. the kappa of a body with a
-        constant of a symmetric category may bind its variables in any
-        order.
-
-        Example
-        -------
-        >>> from discopy import monoidal
-        >>> assert TermBase.highest(Kappa, monoidal.Kappa) is monoidal.Kappa
-        """
-        for level in levels:
-            if all(issubclass(level, other) for other in levels):
-                return level
-        raise TypeError(messages.NO_HIGHEST_LEVEL.format(
-            ", ".join(map(factory_name, levels))))
-
     def __call__(self, *arguments: TermBase) -> TermBase:
         """ The term applied to each of the arguments in turn. """
         return reduce(
-            lambda func, arg: self.highest(
+            lambda func, arg: utils.highest(
                 func.application_factory, arg.application_factory)(func, arg),
             arguments, self)
 
@@ -2609,7 +2592,6 @@ class Kappa(TermBase):
     """
     serialised_attrs = ("variables", "body", "offset")
     offset: int
-    above: ClassVar[type[Kappa] | None] = None
 
     def __init__(self, variables: tuple[Variable, ...], body: TermBase,
                  offset: int | None = None):
@@ -2714,8 +2696,8 @@ class Kappa(TermBase):
                       ) -> Callable[[Callable], Kappa]:
         """
         The kappa of a Python function from a variable for each wire of
-        ``dom``, named after its parameters, to the body, at the level of
-        the body when it is higher, see :meth:`TermBase.highest`.
+        ``dom``, named after its parameters, to the body, whose constants
+        are boxes of the category of this level.
 
         Parameters:
             dom : The types of the variables.
@@ -2737,32 +2719,11 @@ class Kappa(TermBase):
                     f"Expected {len(wires)} variables, got {len(names)}")
             variables = tuple(map(cls.variable_factory, names, wires))
             body = function(*variables)
-            level = cls.highest(cls, body.kappa_factory)
-            try:
-                return level(variables, body, offset)
-            except ValueError:
-                for higher in level.levels(body):
-                    with suppress(ValueError):
-                        return higher(variables, body, offset)
-                raise
+            for constant in body.constants:
+                assert_isinstance(constant.box, cls.functor.cod)
+            return cls(variables, body, offset)
 
         return decorator
-
-    @classmethod
-    def levels(cls, body: TermBase) -> Iterator[type[Kappa]]:
-        """
-        The levels :attr:`above` this one where a body evaluates, lowest
-        first: those of a category that has the boxes of its constants. A
-        kappa that this level refuses is of the lowest that accepts it,
-        e.g. only a category with discards binds a variable its body does
-        not use.
-        """
-        level = cls.above
-        while level is not None and all(
-                issubclass(constant.box.ar, level.functor.cod)
-                for constant in body.constants):
-            yield level
-            level = level.above
 
 
 type Term = Variable | Constant | Application | Kappa
@@ -2828,7 +2789,7 @@ def kappa_calculus(
     >>> print(term)
     (x @ y)(lambda x0, x1: let(Braid(x, y)(x0, x1), lambda x2, x3: f(x2, x3)))
     >>> assert isinstance(term, Kappa) and term.eval() == Braid(x, y) >> f
-    >>> assert Kappa.__mro__[2].__module__ == "discopy.monoidal"
+    >>> assert Kappa.__mro__[2].__module__ == "discopy.bang"
     """
     parents: list = list(dict.fromkeys(
         base.term_factory for base in diagram.__bases__
@@ -2844,7 +2805,7 @@ def kappa_calculus(
             getattr(parent, attr) for parent in parents
         ], module, TERMS[name].format(level))
         setattr(base, attr, former)
-    base.kappa_factory.above, diagram.term_factory = None, base
+    diagram.term_factory = diagram.ob.term_factory = base
     return (base, base.variable_factory, base.constant_factory,
             base.application_factory, base.kappa_factory)
 
@@ -2867,7 +2828,7 @@ class AlphaEquation(AbstractEquation):
 
 
 TermBase.functor = Functor.id(Arrow)
-Arrow.term_factory = TermBase
+Arrow.term_factory = Ob.term_factory = TermBase
 TermBase.equivalence_factory = AlphaEquation
 TermBase.variable_factory, TermBase.constant_factory = Variable, Constant
 TermBase.application_factory, TermBase.kappa_factory = Application, Kappa

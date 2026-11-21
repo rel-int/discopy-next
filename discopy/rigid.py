@@ -165,6 +165,7 @@ from collections.abc import Callable
 
 from typing import Iterator, Self, ClassVar
 
+from discopy import bang
 from discopy import cat, monoidal, biclosed, messages
 from discopy.abc import (
     DaggerCategory, DaggerMonoidalCategory, Pregroup, RigidCategory)
@@ -383,6 +384,10 @@ class Nat(monoidal.Nat, Ty):
         >>> assert Nat(1).unwind() == Nat(1)
         """
         return self
+
+
+Ty.nat_factory = Nat
+BangOb = bang.structural_wires(Ty)
 
 
 class Layer(monoidal.Layer):
@@ -1154,6 +1159,8 @@ def to_rigid(self):
 biclosed.Diagram.to_rigid = to_rigid
 
 Diagram.box_factory = Box
+Bang, Dereliction, Digging, Contraction, Weakening, Exchange, Laxator =\
+    bang.structural_boxes(Diagram, Box)
 Diagram.cup_factory, Diagram.cap_factory, Diagram.sum_factory = Cup, Cap, Sum
 Diagram.bubble_factory = Bubble
 Diagram.functor_factory = Functor

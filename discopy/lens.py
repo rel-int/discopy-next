@@ -105,6 +105,8 @@ class Ty(interaction.Ty):
     >>> assert -(x @ y) == -x @ -y
     """
     natural = symmetric.Ty
+    positive: natural
+    negative: natural
     negatives = staticmethod(tuple)
 
 

@@ -11,6 +11,8 @@ Summary
     :nosignatures:
     :toctree:
 
+    Ty
+    Nat
     Permutation
     Layer
     Diagram
@@ -121,6 +123,7 @@ from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from typing import ClassVar, Self
 
+from discopy import bang
 from discopy import (
     cat, monoidal, feedback, balanced, hypergraph, cmap, messages)
 from discopy.abc import (
@@ -133,11 +136,25 @@ from discopy.testable import (
 from discopy.cat import let  # noqa: F401
 from discopy.cat import factory
 from discopy.feedback import (  # noqa: F401  pylint: disable=unused-import
-    Wire, Ty, Nat)
+    Wire)
 from discopy.python import finset
 from discopy.utils import (
     AxiomError, assert_iscomposable, assert_isinstance, classproperty,
     factory_key, factory_name, from_tree)
+
+
+@factory
+class Ty(balanced.Ty):
+    """ A symmetric type: applied to a function, a term of this module. """
+
+
+@factory
+class Nat(balanced.Nat, Ty):
+    """ A natural number ``n`` seen as a symmetric type of length ``n``. """
+
+
+Ty.nat_factory = Nat
+BangOb = bang.structural_wires(Ty)
 
 
 class Layer(feedback.Layer):
@@ -301,6 +318,7 @@ class Diagram(balanced.Diagram, SymmetricCategory):
     >>> Permutation.swap_factory = Transposition
     >>> assert Permutation.braid_factory is Transposition
     """
+    ob = Ty
     # A hypergraph is faithful from symmetric categories on.
     bifunctoriality = SymmetricCategory.bifunctoriality
     dagger_monoidality = DaggerMonoidalCategory.dagger_monoidality.failing(
@@ -439,7 +457,7 @@ class Diagram(balanced.Diagram, SymmetricCategory):
                    default is :code:`Nat(len(xs))`.
         """
 
-        types = Nat(len(xs)) if doms is None else doms
+        types = cls.ob.nat_factory(len(xs)) if doms is None else doms
         size = len(types)
         nat = types if isinstance(types, Nat) else next(iter(types), None)
         unit = type(nat)() if isinstance(nat, Nat)\
@@ -465,6 +483,26 @@ class Diagram(balanced.Diagram, SymmetricCategory):
             [x - 1 if x > i else x for x in xs[1:]], rest)
 
     @classmethod
+    def exchange(cls, x: Ty, y: Ty, is_dagger: bool = False) -> Diagram:
+        """
+        The exchange of a banged type with any type is their swap, so that
+        the five laws of the exchange are instances of those of the swap,
+        see :class:`discopy.abc.LinearCategory`.
+
+        Parameters:
+            x : The type that is banged.
+            y : The type it is exchanged with.
+            is_dagger : Whether to take the inverse.
+
+        Example
+        -------
+        >>> x, y = Ty('x'), Ty('y')
+        >>> assert Diagram.exchange(x, y) == Swap(x.bang(), y)
+        >>> assert Diagram.exchange(x, y, True) == Swap(y, x.bang())
+        """
+        return cls.swap(y, x.bang()) if is_dagger else cls.swap(x.bang(), y)
+
+    @classmethod
     def from_permutation(
             cls, perm: Sequence[int], dom: monoidal.Ty | None = None
     ) -> Diagram:
@@ -488,7 +526,7 @@ class Diagram(balanced.Diagram, SymmetricCategory):
         >>> assert Diagram.from_permutation(
         ...     [0, 1, 2], x @ y @ z) == Id(x @ y @ z)
         """
-        dom = Nat(len(perm)) if dom is None else dom
+        dom = cls.ob.nat_factory(len(perm)) if dom is None else dom
         perm = finset.Permutation(perm, len(dom))
         if perm.is_identity:
             return cls.id(dom)
@@ -975,6 +1013,10 @@ for level in (
 Feedback, Trace, FollowedBy, Head, Tail = feedback.structural_boxes(
     Diagram, Box)
 Diagram.box_factory = Box
+Bang, Dereliction, Digging, Contraction, Weakening, Laxator =\
+    bang.structural_boxes(Diagram, Box, (
+        "Bang", "Dereliction", "Digging", "Contraction", "Weakening",
+        "Laxator"))
 Diagram.functor_factory = Functor
 Diagram.dual_rail_factory = DualRail
 Hypergraph = hypergraph.Hypergraph[Diagram]
@@ -1043,21 +1085,6 @@ class TermBase(balanced.TermBase):  # ty: ignore[unsupported-base]
         """ A permutation is read as its inputs, in the order it gives. """
         return [arguments[i] for i in box.perm]\
             if isinstance(box, Permutation) else None
-
-    @staticmethod
-    def wire(functor, wiring: list[int], dom: Ty):
-        """
-        The image under a functor of the wiring from a type to its wires
-        at the given indices: that of their permutation in its domain, the
-        identity when nothing moves, so that a term evaluates wherever its
-        diagram does, e.g. to braids in a braided category.
-
-        Parameters:
-            functor : The functor to evaluate the permutation.
-            wiring : The index of the input each output reads.
-            dom : The type of the inputs.
-        """
-        return functor(functor.dom.from_permutation(wiring, dom))
 
     @axiom
     def normal_form_soundness(cls, term: Self) -> AbstractEquation:
@@ -1204,4 +1231,4 @@ class Sampler(monoidal.Sampler):
 TermBase.functor, TermBase.sampler_factory = Functor.id(Diagram), Sampler
 TermBase.variable_factory, TermBase.constant_factory = Variable, Constant
 TermBase.application_factory, TermBase.kappa_factory = Application, Kappa
-Diagram.term_factory, monoidal.Kappa.above = TermBase, Kappa
+Diagram.term_factory = Ty.term_factory = TermBase
