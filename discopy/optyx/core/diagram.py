@@ -309,8 +309,9 @@ class Diagram(frobenius.Diagram):
     def cup_factory(cls, left: Ty, right: Ty) -> Spider:
         """
         The cup of an optyx type is its spider with two legs in, as in any
-        frobenius category, and the cap its dagger. Every method that bends
-        a wire goes through them, :meth:`trace` included.
+        frobenius category. `frobenius.Diagram.caps` is the dagger of `cups`
+        and :meth:`trace` bends its wires with both, so the cap comes out as
+        the spider with two legs out and `cap_factory` is never reached.
 
         >>> assert Diagram.cups(mode, mode) == Spider(2, 0, mode)
         >>> assert Diagram.caps(bit, bit) == Spider(0, 2, bit)
@@ -1485,7 +1486,7 @@ class Feedback(monoidal.Bubble, Box):
     back to its last `mem` inputs, one time step later.
 
     The delay is real but left unwritten: the memory of `arg` is not typed
-    with :meth:`discopy.feedback.Ob.delay`, so `arg` goes from `dom @ mem`
+    with :meth:`discopy.feedback.Wire.delay`, so `arg` goes from `dom @ mem`
     to `cod @ mem` and the result from `dom` to `cod`. It is drawn as `arg`
     with a feedback loop and composes with any other diagram; its stream
     semantics is given by :meth:`Diagram.unroll`.
