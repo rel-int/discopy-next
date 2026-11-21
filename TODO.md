@@ -14,4 +14,4 @@
 
 - [x] docs/adr/: the format, an index in the docs
 - [x] CONTRIBUTING.md: one ADR per design decision, in the same PR
-- [WIP] @amp-T-0582bdb1-2026-11-21 10:20 Seed ADRs, each checked against the code and the PRs
+- [x] Seed ADRs, each checked against the code and the PRs
