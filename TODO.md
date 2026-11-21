@@ -6,4 +6,4 @@
 
 - [x] drawing.py dagger maps wire nodes
 - [x] layout.py solve rejects negative weights
-- [ ] backend.py waypoint branch and frame boundaries
+- [x] backend.py waypoint branch and frame boundaries
