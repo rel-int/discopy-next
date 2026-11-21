@@ -50,7 +50,9 @@ figure
 
 `samples(..., graphviz=True)` lays a diagram out by graphviz's `dot`
 instead: each box is an HTML table with one column per port, so each wire
-leaves its box where its port is, and the mask stays exact. With
+leaves its box where its port is, and the mask stays exact. Where `dot`
+crosses two wires, they are joined by an explicit swap and laid out again,
+so that the picture crosses wires at swaps only. With
 `graphs=True` the diagrams are named graphs (complete, star, cycle, cube,
 grid and tree), each edge oriented from its smaller vertex to its larger.
 It needs Graphviz installed, e.g. `apt install graphviz`, as the docs do.

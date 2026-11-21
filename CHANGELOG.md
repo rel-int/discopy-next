@@ -41,7 +41,10 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   `dot`, each box an HTML table with one column per port so that wires keep
   the port order, with exact masks, and `samples(graphs=True)`: named graphs
   (complete, star, cycle, cube, grid, tree) as oriented closed diagrams, with
-  `picture.to_dot`, `picture.layout` and `picture.graphs`; `render` and
+  `picture.wiring`, `picture.to_dot`, `picture.layout` and `picture.graphs`;
+  where `dot` crosses two edges, `layout` joins them by an explicit swap and
+  lays out again (`picture.crossings`), so that wires cross at swaps only;
+  `render` and
   `fits` take `graphviz` too. It needs Graphviz's `dot` installed, and
   `layout` raises `RuntimeError` without it ([next#678]).
 - `lambek.categorial.Parser`, the chart parser of the reproduction of Bobcat

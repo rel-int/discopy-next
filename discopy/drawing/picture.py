@@ -32,7 +32,11 @@ Summary
     diagrams
     render
     port_table
+    wiring
     to_dot
+    splines
+    crossings
+    intersections
     layout
     graphs
     augment
@@ -516,11 +520,11 @@ def fits(diagram, size=160, scale=24, margin=1, graphviz=False) -> bool:
     return extent + 2 * margin <= size / scale
 
 
-def port_table(name: str, dom: int, cod: int) -> str:
+def port_table(name: str, dom: int, cod: int, border=1) -> str:
     """
     The HTML table of a box for :func:`to_dot`: a bordered cell of its
     name, with a row of ``dom`` port columns above and ``cod`` below, each
-    port as wide as the others on its side.
+    port as wide as the others on its side, its border ``border`` wide.
 
     >>> print(port_table('f', 0, 1))  # doctest: +NORMALIZE_WHITESPACE
     <TABLE BORDER="0" CELLSPACING="0"><TR><TD BORDER="1" CELLPADDING="6"
@@ -534,14 +538,15 @@ def port_table(name: str, dom: int, cod: int) -> str:
                 f'<TD PORT="{side}{j}" BORDER="0" CELLPADDING="0" '
                 f'COLSPAN="{grid // arity}" WIDTH="{width // arity}" '
                 f'HEIGHT="0"></TD>' for j in range(arity)) + "</TR>")
-    rows.insert(bool(dom), f'<TR><TD BORDER="1" CELLPADDING="6" '
+    rows.insert(bool(dom), f'<TR><TD BORDER="{border}" CELLPADDING="6" '
                            f'COLSPAN="{grid}">{name}</TD></TR>')
     return '<TABLE BORDER="0" CELLSPACING="0">' + "".join(rows) + "</TABLE>"
 
 
-def to_dot(diagram) -> str:
+def wiring(diagram) -> tuple[list[str], list[tuple[str, str, str]]]:
     """
-    The DOT source of the hypergraph of a diagram, for :func:`layout`.
+    The node statements and the edges of the hypergraph of a diagram, for
+    :func:`to_dot`, each edge a triple ``(source, target, type)``.
 
     A box is an HTML table with one column per port, its domain above and
     its codomain below, each from left to right, so that each wire leaves
@@ -552,74 +557,179 @@ def to_dot(diagram) -> str:
 
     >>> from discopy.frobenius import Ty, Box
     >>> x = Ty('a')
-    >>> print(to_dot(Box('f', x, x @ x)))  # doctest: +ELLIPSIS
-    graph diagram {
-    ...
-      b0 [tooltip="f", label=<...>];
-    ...
-      b0:c0:s -- out0 [label="a"];
-      b0:c1:s -- out1 [label="a"];
-    }
+    >>> nodes, edges = wiring(Box('f', x, x @ x))
+    >>> for edge in edges:
+    ...     print(edge)
+    ('in0', 'b0:d0:n', 'a')
+    ('b0:c0:s', 'out0', 'a')
+    ('b0:c1:s', 'out1', 'a')
     """
     graph = diagram.to_hypergraph()
-    lines = ["graph diagram {",
-             "  graph [rankdir=TB, nodesep=.3, ranksep=.35];",
-             '  node [shape=plain, fontname="DejaVu Sans", fontsize=12];']
-    ends = defaultdict(list)
-
+    nodes, edges, ends = [], [], defaultdict(list)
     for side, wires in (("in", graph.dom_wires), ("out", graph.cod_wires)):
         for i, spider in enumerate(wires):
-            lines.append(f'  {side}{i} [shape=point, width=0, label=""];')
+            nodes.append(f'{side}{i} [shape=point, width=0, label=""]')
             ends[spider].append((side == "out", f"{side}{i}"))
         if len(wires) > 1:
-            lines.append("  { rank=" + ("min" if side == "in" else "max")
+            nodes.append("{ rank=" + ("min" if side == "in" else "max")
                          + "; " + " -- ".join(
                              f"{side}{i}" for i in range(len(wires)))
                          + " [style=invis]; }")
     for i, (box, (dom, cod)) in enumerate(
             zip(graph.boxes, graph.box_wires)):
-        label = html.escape(str(box.name))
-        lines.append(f'  b{i} [tooltip="{label}", '
-                     f'label=<{port_table(label, len(dom), len(cod))}>];')
+        name = html.escape(str(box.name))
+        nodes.append(f'b{i} [tooltip="{name}", '
+                     f'label=<{port_table(name, len(dom), len(cod))}>]')
         for j, spider in enumerate(dom):
             ends[spider].append((True, f"b{i}:d{j}:n"))
         for j, spider in enumerate(cod):
             ends[spider].append((False, f"b{i}:c{j}:s"))
     for spider, obj in enumerate(graph.spider_types):
         ends[spider].sort(key=lambda end: end[0])
-        pairs = [[end for _, end in ends[spider]]]\
-            if len(ends[spider]) == 2 else [
-                (f"s{spider}", end) if is_target else (end, f"s{spider}")
-                for is_target, end in ends[spider]]
         if len(ends[spider]) != 2:
-            lines.append(
-                f'  s{spider} [shape=point, width={2 * SPIDER / INCH}, '
-                'label=""];')
-        label = html.escape(str(obj))
-        lines += [f'  {" -- ".join(pair)} [label="{label}"];'
-                  for pair in pairs]
-    return "\n".join(lines + ["}"])
+            nodes.append(f's{spider} [shape=point, '
+                         f'width={2 * SPIDER / INCH}, label=""]')
+        edges += [(*pair, html.escape(str(obj))) for pair in (
+            [[end for _, end in ends[spider]]] if len(ends[spider]) == 2
+            else [(f"s{spider}", end) if is_target else (end, f"s{spider}")
+                  for is_target, end in ends[spider]])]
+    return nodes, edges
 
 
-def layout(diagram) -> dict:
+def to_dot(nodes: list[str], edges: list[tuple[str, str, str]]) -> str:
+    """
+    The DOT source of the node statements and edges of :func:`wiring`,
+    each edge with its index as ``id``, for :func:`layout`.
+
+    >>> from discopy.frobenius import Ty, Box
+    >>> print(to_dot(*wiring(Box('f', Ty('a'), Ty()))))  # doctest: +ELLIPSIS
+    graph diagram {
+    ...
+      b0 [tooltip="f", label=<...>];
+      in0 -- b0:d0:n [id="0", label="a"];
+    }
+    """
+    return "\n".join([
+        "graph diagram {",
+        "  graph [rankdir=TB, nodesep=.3, ranksep=.35];",
+        '  node [shape=plain, fontname="DejaVu Sans", fontsize=12];'] + [
+        f"  {node};" for node in nodes] + [
+        f'  {source} -- {target} [id="{i}", label="{label}"];'
+        for i, (source, target, label) in enumerate(edges)] + ["}"])
+
+
+def splines(graph: dict) -> dict[int, np.ndarray]:
+    """
+    The spline of each edge of a :func:`layout` by its ``id``, flattened
+    to a polyline of sixteen segments per cubic, in units of the picture,
+    from its source to its target.
+    """
+    steps = np.linspace(0, 1, 17)[1:, None]
+    result = {}
+    for edge in graph.get("edges", []):
+        if "id" not in edge:
+            continue
+        points = INCH / 72 * np.array([
+            [float(x) for x in point.split(",")]
+            for point in edge["pos"].split()
+            if not point.startswith(("s,", "e,"))])
+        flat = [points[:1]] + [
+            (1 - steps) ** 3 * a + 3 * (1 - steps) ** 2 * steps * b
+            + 3 * (1 - steps) * steps ** 2 * c + steps ** 3 * d
+            for a, b, c, d in (points[i:i + 4]
+                               for i in range(0, len(points) - 1, 3))]
+        result[int(edge["id"])] = np.concatenate(flat)
+    return result
+
+
+def crossings(graph: dict, margin=.1) -> list[tuple[int, int]]:
+    """
+    The pairs of edges of a :func:`layout` whose splines cross further
+    than ``margin`` units from their ends, by ``id``, the edge that comes
+    from the left first, i.e. with the direction of the other on its
+    right, as each runs from its source to its target.
+
+    >>> from discopy.symmetric import Ty, Box, Swap
+    >>> x = Ty('a')
+    >>> f, g = Box('f', Ty(), x @ x), Box('g', x @ x, Ty())
+    >>> graph = layout(f >> Swap(x, x) >> g)
+    >>> crossings(graph), [o["tooltip"] for o in graph["objects"]
+    ...                    if o["name"].startswith("x")]
+    ([], ['swap'])
+    """
+    lines, found = splines(graph), []
+    for i, j in ((i, j) for i in lines for j in lines if i < j):
+        ends = np.concatenate([lines[i][[0, -1]], lines[j][[0, -1]]])
+        for point, turn in intersections(lines[i], lines[j]):
+            if np.linalg.norm(ends - point, axis=1).min() > margin:
+                found.append((i, j) if turn < 0 else (j, i))
+                break
+    return found
+
+
+def intersections(p: np.ndarray, q: np.ndarray) -> list:
+    """
+    Each point where a segment of the polyline ``p`` meets one of ``q``,
+    with the cross product of their directions, negative when ``q`` comes
+    from the right of ``p`` as both run down.
+
+    >>> p, q = np.array([[0, 1], [1, -1]]), np.array([[1, 1], [0, -1]])
+    >>> [(point.tolist(), float(turn)) for point, turn in intersections(p, q)]
+    [([0.5, 0.0], -4.0)]
+    """
+    a, r = p[:-1, None], (p[1:] - p[:-1])[:, None]
+    b, s = q[None, :-1], (q[1:] - q[:-1])[None]
+    cross = r[..., 0] * s[..., 1] - r[..., 1] * s[..., 0]
+    with np.errstate(divide="ignore", invalid="ignore"):
+        t = ((b - a)[..., 0] * s[..., 1] - (b - a)[..., 1] * s[..., 0]) / cross
+        u = ((b - a)[..., 0] * r[..., 1] - (b - a)[..., 1] * r[..., 0]) / cross
+    return [(a[k, 0] + t[k, m] * r[k, 0], cross[k, m]) for k, m in zip(
+        *np.nonzero((t >= 0) & (t < 1) & (u >= 0) & (u < 1)))]
+
+
+def layout(diagram, rounds=12) -> dict:
     """
     The layout of a diagram by graphviz's ``dot``, as the JSON it writes:
-    the bounding box ``bb``, each node of :func:`to_dot` with its ``pos``,
+    the bounding box ``bb``, each node of :func:`wiring` with its ``pos``,
     ``width`` and ``height``, and each edge with the points of its spline.
-    Raises :class:`RuntimeError` when ``dot`` is not installed.
+
+    Where two edges cross, see :func:`crossings`, they are cut there and
+    joined by a swap, a node ``x`` with two ports above and two below, and
+    the diagram is laid out again, at most ``rounds`` times, so that its
+    picture crosses wires at swaps only. Raises :class:`ValueError` when
+    edges still cross after the last round, and :class:`RuntimeError`
+    when ``dot`` is not installed.
     """
     if shutil.which("dot") is None:
         raise RuntimeError("Graphviz executable 'dot' was not found.")
-    return json.loads(subprocess.run(
-        ["dot", "-Tjson"], input=to_dot(diagram).encode(),
-        capture_output=True, check=True).stdout)
+    nodes, edges = wiring(diagram)
+    for _ in range(rounds):
+        graph = json.loads(subprocess.run(
+            ["dot", "-Tjson"], input=to_dot(nodes, edges).encode(),
+            capture_output=True, check=True).stdout)
+        cut = set()
+        for left, right in crossings(graph):
+            if cut & {left, right}:
+                continue
+            cut |= {left, right}
+            swap = f"x{len(nodes)}"
+            nodes.append(f'{swap} [tooltip="swap", '
+                         f'label=<{port_table("", 2, 2, border=0)}>]')
+            (one, two, x), (three, four, y) = edges[left], edges[right]
+            edges[left] = (one, f"{swap}:d0:n", x)
+            edges[right] = (three, f"{swap}:d1:n", y)
+            edges += [(f"{swap}:c1:s", two, x), (f"{swap}:c0:s", four, y)]
+        if not cut:
+            return graph
+    raise ValueError(f"Edges still cross after {rounds} rounds.")
 
 
 def paint_layout(  # pylint: disable=too-many-locals  # one figure, as paint
         graph: dict, size, scale, mask, **params) -> np.ndarray:
     """
     The pixels of a :func:`layout`, see :func:`render`: a box is a
-    rectangle of its name with the name inside, a spider a dot and a wire
+    rectangle of its name with the name inside, a swap two wires that
+    cross from its ports above to its ports below, a spider a dot and a wire
     the spline of its edge, each in the colour of its label for a mask,
     by hand when ``xkcd`` is set, its strokes ``linewidth`` wide.
     """
@@ -649,6 +759,12 @@ def paint_layout(  # pylint: disable=too-many-locals  # one figure, as paint
                 "width", "height"))
             if name[0] == "s":
                 axis.add_patch(Circle((x, y), SPIDER, color=colour("spider")))
+            elif name[0] == "x":
+                for sign in (1, -1):
+                    axis.plot([x - sign * width / 4, x + sign * width / 4],
+                              [y + height / 2, y - height / 2],
+                              color=colour("swap"), linewidth=linewidth,
+                              solid_capstyle="butt")
             elif name[0] == "b":
                 label = html.unescape(node["tooltip"])
                 axis.add_patch(Rectangle(
@@ -839,9 +955,13 @@ def samples(module: str, seed=0, size=160, max_boxes=6, scales=(20, 28),
             return
         diagram = dress(diagram, rng, **{
             key: drawn.pop(key) for key in ("heights", "widths", "triangles")})
+        try:
+            graph = drawn.pop("graphviz") and layout(diagram)
+        except ValueError:
+            continue
         params = {"xkcd": drawn.pop("xkcd", False),
                   "wire_labels": drawn.pop("wire_labels"),
-                  "graphviz": drawn.pop("graphviz") and layout(diagram),
+                  "graphviz": graph,
                   "scale": rng.uniform(*scales),
                   "linewidth": rng.uniform(1, 2.5)}
         if text is not None:

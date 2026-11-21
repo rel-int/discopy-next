@@ -203,9 +203,6 @@ def test_graphviz_keeps_the_port_order():
 
 @needs_graphviz
 def test_graphviz_pictures_of_graphs_read_back():
-    """ Graphviz crosses wires without a swap, which the mask does not
-    label, so a graph whose wires cross is not read back: 38 of the first
-    40 from seed 3 are. """
     read_back = sum(equal(decode(mask, "symmetric"), diagram, "symmetric")
                     for diagram, _, mask in islice(samples(
                         "symmetric", seed=3, graphviz=True, graphs=True), 10))
@@ -218,3 +215,14 @@ def test_graphviz_lays_out_names_with_quotes_and_brackets():
     names = {node.get("tooltip") for node in picture.layout(
         frobenius.Box('f"<g>&', x, x))["objects"]}
     assert 'f&quot;&lt;g&gt;&amp;' in names
+
+
+@needs_graphviz
+def test_graphviz_crosses_wires_at_swaps():
+    cube = next(d for d in picture.graphs("symmetric", seed=0)
+                if len(d.boxes) - sum(map(bool, map(kind, d.boxes))) == 8)
+    graph = picture.layout(cube)
+    assert picture.crossings(graph) == []
+    assert any(node["name"][0] == "x" for node in graph["objects"])
+    mask = render(cube, 320, mask=True, scale=12, graphviz=graph)
+    assert equal(decode(mask, "symmetric"), cube, "symmetric")
