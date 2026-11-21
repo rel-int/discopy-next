@@ -305,6 +305,19 @@ class Diagram(frobenius.Diagram):
     grad = tensor.Diagram.grad
     __pow__ = monoidal.Ty.__pow__
 
+    @classmethod
+    def cup_factory(cls, left: Ty, right: Ty) -> Spider:
+        """
+        The cup of an optyx type is its spider with two legs in, as in any
+        frobenius category, and the cap its dagger. Every method that bends
+        a wire goes through them, :meth:`trace` included.
+
+        >>> assert Diagram.cups(mode, mode) == Spider(2, 0, mode)
+        >>> assert Diagram.caps(bit, bit) == Spider(0, 2, bit)
+        """
+        left.assert_isadjoint(right)
+        return cls.spider_factory(2, 0, left)
+
     def conjugate(self) -> Diagram:
         """Conjugates every box in the diagram"""
         return symmetric.Functor(
