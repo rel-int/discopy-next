@@ -121,7 +121,7 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   a bang to the second quantisation of its unitary, `Contraction` to the W node on each mode, `Weakening` to the
   vacuum and `Dereliction` to heralding one photon. The notebook
   `optyx/linear_logic` compiles `copy(!H(x))` with it to a Bell state
-  ([next#571]).
+  ([next#571], [next#686]).
 - `discopy.drawing.nicer`: nine hand features of a drawing, each a cost
   (wire length, bends, slope, aspect, asymmetry, whitespace, misalignment,
   label overlap, area), `hand_score` minus their weighted sum, with equal weights
@@ -2497,6 +2497,7 @@ for the changelog of `1.2.1` and earlier.
 [next#675]: https://github.com/rel-int/discopy-next/pull/675
 [next#676]: https://github.com/rel-int/discopy-next/issues/676
 [next#681]: https://github.com/rel-int/discopy-next/pull/681
+[next#686]: https://github.com/rel-int/discopy-next/pull/686
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#44]: https://github.com/rel-int/optyx/pull/44
