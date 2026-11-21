@@ -8,3 +8,4 @@
 - [ ] toumix: assignment (as drafted) or a licence with the right to relicense
 - [ ] toumix: how to sign (CLA Assistant on the GitHub org, or a signed comment) and a lawyer's read of the French-law terms
 - [x] CLA-entity.md: the entity agreement section 7 of CLA.md names, for an employer, university or funder
+- [ ] docs/adr/0008: status Accepted once toumix rules on the open points
