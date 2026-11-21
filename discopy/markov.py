@@ -15,6 +15,8 @@ Summary
     :nosignatures:
     :toctree:
 
+    Ty
+    Nat
     Layer
     Diagram
     Box
@@ -101,17 +103,30 @@ from typing import ClassVar, Self
 
 from discopy import (
     cat, symmetric, monoidal, feedback, cmap, hypergraph, messages)
-from discopy.abc import ComarkovCategory, MarkovCategory, Nat
+from discopy.abc import ComarkovCategory, MarkovCategory
 from discopy.testable import FUEL, Equation as AbstractEquation, axiom
 # pylint: disable-next=unused-import  # the redex a term prints as
 from discopy.cat import let  # noqa: F401
 from discopy.cat import factory
 from discopy.feedback import (  # noqa: F401  pylint: disable=unused-import
-    Wire, Ty)
+    Wire)
 from discopy.python import finset
 from discopy.utils import (
     AxiomError, assert_isatomic, assert_iscomposable, deprecated_alias,
     factory_key, factory_name, from_tree)
+
+
+@factory
+class Ty(symmetric.Ty):
+    """ A markov type: applied to a function, a term of this module. """
+
+
+@factory
+class Nat(symmetric.Nat, Ty):
+    """ A natural number ``n`` seen as a markov type of length ``n``. """
+
+
+Ty.nat_factory = Nat
 
 
 class Layer(symmetric.Layer):
@@ -183,6 +198,7 @@ class Diagram(symmetric.Diagram, MarkovCategory):
     .. image:: /_static/feedback/feedback-random-walk.svg
         :align: center
     """
+    ob = Ty
     copy_factory: ClassVar[type["Copy"]]
     discard_factory: ClassVar[type["Discard"]]
     function_factory: ClassVar[type["Function"]]
@@ -371,8 +387,8 @@ class Box(symmetric.Box, Diagram):
     >>> sample = Box('sample', p, x, is_deterministic=False)
     >>> assert sample != Box('sample', p, x)
     >>> sample
-    markov.Box('sample', feedback.Ty(feedback.Wire('p')), \
-feedback.Ty(feedback.Wire('x')), is_deterministic=False)
+    markov.Box('sample', markov.Ty(feedback.Wire('p')), \
+markov.Ty(feedback.Wire('x')), is_deterministic=False)
     >>> assert not sample.dagger().dagger().is_deterministic
 
     >>> f = Box('f', p, x)
@@ -536,7 +552,8 @@ class Function(Box):
         return super().__new__(cls)
 
     def __init__(self, dom: monoidal.Ty, func):
-        self.func = finset.Function(list(func), Nat(len(dom)), Nat(len(func)))
+        self.func = finset.Function(
+            list(func), finset.Nat(len(dom)), finset.Nat(len(func)))
         cod = dom[:0].tensor(*(dom[i] for i in self.func))
         Box.__init__(self, f"Function({list(self.func)})", dom, cod)
 
@@ -695,7 +712,7 @@ class Permutation(symmetric.Permutation, Box):
     >>> assert Swap(x, y) @ Copy(x) == Function(x @ y @ x, [1, 0, 2, 2])
     """
     func = property(lambda self: finset.Function(
-        list(self.perm), Nat(len(self.dom)), Nat(len(self.cod))))
+        list(self.perm), finset.Nat(len(self.dom)), finset.Nat(len(self.cod))))
     fuse, tensor = Function.fuse, Function.tensor
 
 
@@ -924,7 +941,7 @@ class Functor(symmetric.Functor):
         if isinstance(other, Function) and hasattr(
                 self.cod.ar, "function_factory")\
                 and not isinstance(other, symmetric.Permutation):
-            sizes = [Nat(len(self(x))) for x in other.dom]
+            sizes = [finset.Nat(len(self(x))) for x in other.dom]
             return self.cod.ar.from_function(finset.Function.function(
                 other.func, sizes).inside, self(other.dom))
         if isinstance(other, Function) and hasattr(self.cod, "copy")\
@@ -1163,4 +1180,4 @@ class Sampler(symmetric.Sampler):
 TermBase.functor, TermBase.sampler_factory = Functor.id(Diagram), Sampler
 TermBase.variable_factory, TermBase.constant_factory = Variable, Constant
 TermBase.application_factory, TermBase.kappa_factory = Application, Kappa
-Diagram.term_factory, symmetric.Kappa.above = TermBase, Kappa
+Diagram.term_factory = Ty.term_factory = TermBase

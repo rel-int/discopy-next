@@ -5,9 +5,9 @@ from discopy.balanced import *
 def test_repr():
     x = Ty('x')
     assert repr(Twist(Ty('x')))\
-        == "balanced.Twist(feedback.Ty(feedback.Wire('x')))"
+        == "balanced.Twist(balanced.Ty(feedback.Wire('x')))"
     assert repr(Twist(Ty('x')).dagger())\
-        == "balanced.Twist(feedback.Ty(feedback.Wire('x'))).dagger()"
+        == "balanced.Twist(balanced.Ty(feedback.Wire('x'))).dagger()"
 
 
 def test_double_rail():
@@ -127,6 +127,7 @@ def test_to_hypergraph():
             Braid(x, y), Twist(y), Twist(x), Braid(y, x))
     for representation in (Hypergraph, CMap):
         assert representation.twist(x).boxes == (Twist(x), )
+    x = symmetric.Ty('x')
     assert symmetric.Hypergraph.twist(x) == symmetric.Hypergraph.id(x)
     assert symmetric.CMap.twist(x) == symmetric.CMap.id(x)
 

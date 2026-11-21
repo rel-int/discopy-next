@@ -8,6 +8,7 @@ import pytest
 from pytest import raises
 
 from discopy.cat import *
+from discopy import utils
 from discopy.utils import AxiomError
 
 
@@ -1047,7 +1048,7 @@ def test_term_errors():
     with raises(ValueError):
         Kappa((a, ), f(a), 1)
     with raises(TypeError, match="one level above the others"):
-        TermBase.highest(Kappa, Application)
+        utils.highest(Kappa, Application)
     with raises(ValueError, match="Expected 1 variables, got 2"):
         x(lambda a, b: a)
     assert Kappa((a, ), f(a), 0) == Kappa((a, ), f(a))
@@ -1076,7 +1077,8 @@ def test_terms_of_a_level(level, structure):
     assert all(type(c) is module.Constant for c in term.constants)
     for copy in (pickle.loads(pickle.dumps(term)), loads(dumps(term))):
         assert type(copy) is module.Kappa and copy == term
-    assert type(x(lambda a: a)) is monoidal.Kappa
+    assert type(x(lambda a: a)) is module.Kappa
+    assert module.Ty.term_factory is module.TermBase
 
 
 @pytest.mark.parametrize("level", [
@@ -1096,7 +1098,7 @@ def test_term_without_a_box_reads_back(level):
         assert inhabits(equation, law.output({Self: module.TermBase}))
     read = eval(str(module.Kappa((a, ), a)), {'x': x})
     assert read == module.Kappa((a, ), a)
-    assert type(read).__module__ in ("discopy.cat", "discopy.monoidal")
+    assert type(read) is module.Kappa
 
 
 def test_terms_from_biclosed_up():

@@ -12,7 +12,7 @@ from discopy.utils import AxiomError, dumps, loads
 def test_Swap():
     x, y = Ty('x'), Ty('y')
     assert repr(Swap(x, y)) == "symmetric.Swap("\
-        "feedback.Ty(feedback.Wire('x')), feedback.Ty(feedback.Wire('y')))"
+        "symmetric.Ty(feedback.Wire('x')), symmetric.Ty(feedback.Wire('y')))"
     assert Swap(x, y).dagger() == Swap(y, x)
     with raises(ValueError):
         Swap(x ** 2, Ty())
@@ -639,9 +639,9 @@ def test_term_errors_and_levels():
     read = (y @ x)(lambda b, a: f(a, b))
     assert type(read) is Kappa and read == Kappa((b, a), f(a, b))
     low = monoidal.Constant(monoidal.Box('f', x @ y, x))
-    with raises(ValueError, match="block of variables"):
+    with raises(TypeError, match="Expected symmetric.Diagram"):
         (y @ x)(lambda b, a: low(a, b))
-    assert type(x(lambda a: a)) is monoidal.Kappa
+    assert type(x(lambda a: a)) is Kappa
     assert x(lambda a: a) == Kappa((a, ), a)
     assert type(f(a)) is Application and type(low(a)) is Application
     assert type(low(monoidal.Variable('a', x))) is monoidal.Application
@@ -669,3 +669,14 @@ def test_term_laws():
     sampler = Sampler(TermBase, iter([0, 1]), [x], "a")
     v, w = Variable('v', x), Variable('w', x)
     assert str(sampler.state(y, (v, w))) == "c0(w, v)"
+
+
+def test_permutation_of_natural_numbers_at_each_level():
+    from discopy import comarkov, compact, frobenius, markov
+    for module in (symmetric, markov, comarkov, compact, frobenius):
+        nat = module.Diagram.ob.nat_factory
+        assert isinstance(nat(2), module.Diagram.ob)
+        diagram = module.Diagram.permutation([1, 0])
+        assert diagram.dom == nat(2) == diagram.cod
+        assert diagram == module.Diagram.swap(nat(1), nat(1))
+        assert module.Diagram.from_permutation([1, 0]).dom == nat(2)

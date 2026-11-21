@@ -11,6 +11,8 @@ Summary
     :nosignatures:
     :toctree:
 
+    Ty
+    Nat
     Diagram
     Box
     Braid
@@ -68,7 +70,6 @@ from discopy import (
     config, monoidal, braided, feedback, cmap, hypergraph, messages)
 from discopy.abc import BalancedCategory
 from discopy.cat import factory, kappa_calculus
-from discopy.feedback import Ty
 from discopy.monoidal import Colour
 from discopy.utils import factory_name, assert_isatomic, from_tree
 
@@ -140,6 +141,19 @@ def double_rail(
             colour(ob) if callable(colour) else colour, width=width)
         rails += [left, right]
     return type(typ)(*rails)
+
+
+@factory
+class Ty(braided.Ty, feedback.Ty):
+    """ A balanced type: applied to a function, a term of this module. """
+
+
+@factory
+class Nat(braided.Nat, feedback.Nat, Ty):
+    """ A natural number ``n`` seen as a balanced type of length ``n``. """
+
+
+Ty.nat_factory = Nat
 
 
 @factory

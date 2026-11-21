@@ -483,6 +483,26 @@ def is_discopy_class(value) -> bool:
         or value.__module__.startswith("discopy."))
 
 
+def highest(*levels: type) -> type:
+    """
+    The highest of the classes of some levels of the hierarchy, i.e. the
+    one that subclasses the others: what is built from two levels is of the
+    higher, e.g. the tensor of a monoidal and a braided type is braided and
+    the kappa of a body with a constant of a symmetric category may bind
+    its variables in any order.
+
+    Example
+    -------
+    >>> from discopy import cat, monoidal
+    >>> assert highest(cat.Kappa, monoidal.Kappa) is monoidal.Kappa
+    """
+    for level in levels:
+        if all(issubclass(level, other) for other in levels):
+            return level
+    raise TypeError(messages.NO_HIGHEST_LEVEL.format(
+        ", ".join(map(factory_name, levels))))
+
+
 def factory_name(cls: type) -> str:
     """
     Returns a string describing a DisCoPy class.

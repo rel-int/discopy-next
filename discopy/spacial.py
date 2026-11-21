@@ -19,6 +19,8 @@ Summary
     :nosignatures:
     :toctree:
 
+    Ty
+    Nat
     Diagram
     Box
     Sum
@@ -55,7 +57,19 @@ from __future__ import annotations
 from discopy import monoidal, cmap, hypergraph, messages
 from discopy.abc import SpacialCategory
 from discopy.cat import factory, kappa_calculus
-from discopy.monoidal import Ty
+
+
+@factory
+class Ty(monoidal.Ty):
+    """ A spacial type: applied to a function, a term of this module. """
+
+
+@factory
+class Nat(monoidal.Nat, Ty):
+    """ A natural number ``n`` seen as a spacial type of length ``n``. """
+
+
+Ty.nat_factory = Nat
 
 
 @factory

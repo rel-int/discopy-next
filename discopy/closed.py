@@ -126,7 +126,7 @@ HeadOb, TailOb = feedback.structural_wires(Wire)
 
 
 @factory
-class Ty(biclosed.Ty, feedback.Ty):
+class Ty(biclosed.Ty, markov.Ty):
     """
     A closed type is a biclosed type in a symmetric category where left and
     right exponentials coincide, i.e. `X << Y == X ** Y == Y >> X`, and a
