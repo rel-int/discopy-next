@@ -274,6 +274,10 @@ class Diagram(monoidal.Diagram, LinearCategory):
         >>> assert Diagram.copy(y.bang(), 3) == Contraction(y)\\
         ...     >> y.bang() @ Contraction(y)
         >>> assert Diagram.copy(y.bang(), 0) == Weakening(y)
+        >>> Diagram.copy(y.bang(), -1)
+        Traceback (most recent call last):
+        ...
+        ValueError: Expected a number of copies, got -1.
         >>> Diagram.copy(y)
         Traceback (most recent call last):
         ...
@@ -281,6 +285,8 @@ class Diagram(monoidal.Diagram, LinearCategory):
         """
         if len(x) != 1 or not isinstance(x.inside[0], BangOb):
             raise AxiomError(messages.NOT_BANGED.format(x))
+        if n < 0:
+            raise ValueError(messages.NEGATIVE_COPIES.format(n))
         arg = x.inside[0].arg
         if not n:
             return cls.weakening(arg)
@@ -328,6 +334,8 @@ class Diagram(monoidal.Diagram, LinearCategory):
         ...
         discopy.utils.AxiomError: x is not banged: ...
         """
+        if any(not 0 <= i < len(dom) for i in wiring):
+            raise ValueError(messages.WIRING_OUT_OF_RANGE.format(wiring, dom))
         wires = [dom[i:i + 1] for i in range(len(dom))]
         counts = [wiring.count(i) for i in range(len(dom))]
         copies = cls.id(dom[:0]).tensor(*(
@@ -745,8 +753,9 @@ class Functor(monoidal.Functor):
         Whether the codomain has a bang of its own, which a :class:`BangOb`,
         a :class:`Bang` and the structural boxes are sent through: a
         linear category whose :attr:`Diagram.bang_factory` builds its own
-        arrows, rather than one that inherits the bang of the free diagrams
-        it is made of, e.g. :class:`discopy.tensor.Diagram`.
+        arrows or whose :meth:`banged` is its own, rather than one that
+        inherits the bang of the free diagrams it is made of, e.g.
+        :class:`discopy.tensor.Diagram`.
 
         Example
         -------
@@ -755,8 +764,9 @@ class Functor(monoidal.Functor):
         >>> assert not Functor({}, {}, cod=tensor.Diagram).has_bang
         """
         cod = get_origin(self.cod)
-        return issubclass(cod, LinearCategory)\
-            and issubclass(cod.bang_factory, cod)
+        return issubclass(cod, LinearCategory) and (
+            issubclass(cod.bang_factory, cod)
+            or cod.banged.__func__ is not LinearCategory.banged.__func__)
 
     def map_bang(self, other):
         """
@@ -766,7 +776,9 @@ class Functor(monoidal.Functor):
         Parameters:
             other : The wire or box to map.
         """
-        if isinstance(other, (BangOb, Bang)):
+        if isinstance(other, BangOb):
+            return self.cod.banged(self(other.arg))
+        if isinstance(other, Bang):
             return self(other.arg).bang()
         if isinstance(other, Laxator):
             return self.cod.laxator() if other.x is None\

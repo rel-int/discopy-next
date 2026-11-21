@@ -89,3 +89,24 @@ def test_kappa_weakening():
     vacuum, photon = photonic.Create(0, 0), photonic.Create(1, 0)
     assert np.allclose(amplitudes(vacuum @ photon >> channel), U[:, 0])
     assert np.allclose(amplitudes(photon @ photon >> channel), 0)
+
+
+def test_dagger():
+    identity = np.eye(2)
+    for term in [u >> u.dagger(), u.dagger() >> u]:
+        assert np.allclose(term.bang().to_channel().array, identity)
+    state = photonic.Create(1, 0)
+    assert np.allclose(amplitudes(
+        state >> u.dagger().bang().to_channel()
+        >> Dereliction(qubit).to_channel()), U.conj().T[:, 0])
+    zero = photonic.Create(1, 0) >> photonic.DualRail(1).dagger()
+    assert np.allclose(amplitudes(
+        zero >> u.dagger().to_channel()), U.conj().T[:, 0])
+
+
+def test_term_without_a_box():
+    term = qubit.bang()(lambda x: x)
+    assert isinstance(term.eval(), Term)
+    state = photonic.Create(1, 0)
+    assert np.allclose(
+        amplitudes(state >> term.eval().to_channel()), amplitudes(state))
