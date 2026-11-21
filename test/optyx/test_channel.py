@@ -6,7 +6,7 @@ from discopy.optyx.channel import (
     CQMap, Channel, Diagram, Encode, Measure, Observable, Permutation,
     bit, mode, qmode, qubit)
 from discopy import optyx
-from discopy.optyx import photonic
+from discopy.optyx import photonic, qubits
 from discopy.optyx.core import diagram, zw, zx
 from discopy import tensor
 import numpy as np
@@ -430,3 +430,20 @@ def test_subs_reaches_the_kraus_map_of_a_channel():
         assert np.allclose(
             result.double().to_tensor().eval().array,
             expected.double().to_tensor().eval().array)
+
+
+def test_a_channel_traces_through_its_own_cup():
+    """`trace` bends a wire, so it needs the cup and the cap of the channel
+    category rather than frobenius's, which is not a channel (next#661).
+    The partial traces of CNOT are read off its matrix."""
+    cnot = (qubits.Z(1, 2) @ qubit
+            >> qubit @ qubits.X(2, 1) @ qubits.Scalar(2 ** 0.5))
+    assert np.allclose(np.asarray(
+        cnot.trace().eval().tensor.array).reshape(2, 2), [[2, 0], [0, 0]])
+    assert np.allclose(np.asarray(
+        cnot.trace(left=True).eval().tensor.array).reshape(2, 2), np.ones(
+            (2, 2)))
+    snake = (Diagram.caps(qubit, qubit) @ qubit
+             >> qubit @ Diagram.cups(qubit, qubit))
+    assert np.allclose(np.asarray(
+        snake.eval().tensor.array).reshape(2, 2), np.eye(2))
