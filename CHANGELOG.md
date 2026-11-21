@@ -745,6 +745,15 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Fixed
 
+- The cup of an optyx type is its own spider with two legs in, and the cap
+  its dagger: `optyx.core.diagram.Diagram.cup_factory` and
+  `optyx.channel.Diagram.cup_factory` build them where both inherited
+  `frobenius.Cup`, which is not an optyx box, so `trace()` and every other
+  way of bending a wire raised `TypeError` ([next#681]).
+- `optyx.core.diagram.Feedback` no longer says its delay endofunctor is the
+  identity: it is a delay line, so feedback is not a trace and yanking fails
+  — the delay is real, it is only left unwritten on the memory type
+  ([next#681]).
 - `optyx.channel` types keep their delay through `single()` and `double()`:
   `qubit.delay().double()` is `(bit @ bit).delay()`, no longer `bit @ bit`
   at time step zero ([next#667]).
@@ -2457,6 +2466,7 @@ for the changelog of `1.2.1` and earlier.
 [next#667]: https://github.com/rel-int/discopy-next/pull/667
 [next#672]: https://github.com/rel-int/discopy-next/pull/672
 [next#675]: https://github.com/rel-int/discopy-next/pull/675
+[next#681]: https://github.com/rel-int/discopy-next/pull/681
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#44]: https://github.com/rel-int/optyx/pull/44
