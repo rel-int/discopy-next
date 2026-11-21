@@ -3,7 +3,7 @@
 > > let’s go pivotal it’s the one that exists nowhere else
 
 - [x] discopy.drawing.planar: a pivotal diagram as a planar map, boxes with a centre and a rotation, wires through free waypoints
-- [ ] Descent from the monoidal layout: QP steps with the circle and the overlaps linearised, kept only when the drawing stays valid
+- [x] Descent from the monoidal layout: QP steps with the circle and the overlaps linearised, kept only when the drawing stays valid
 - [ ] Drawing: rotated boxes (angle) and wires along tangents in every backend
 - [ ] Tests and gallery pictures
 - [ ] CHANGELOG, docs, checks
