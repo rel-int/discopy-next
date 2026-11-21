@@ -13,3 +13,4 @@ toumix, answering his own question "where does bang fit in the hierarchy? every 
 - [x] docs, CHANGELOG bullet and an ADR for where the bang lives
 - [ ] a banged wire has no adjoint: from `rigid` up `x.bang().l` raises; file it as an issue or give `BangOb` a winding
 - [ ] enrol bang.TermBase and the bang terms of each level in the property matrix (moved from #686)
+- [ ] drop the __call__ override of bang.Ty now that #679 gives each Ty a term_factory (moved from #686)
