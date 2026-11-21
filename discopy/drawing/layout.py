@@ -182,7 +182,8 @@ class OpenQP(MonoidalCategory[monoidal.Ty, "OpenQP"]):
                       (bottom, (((bands[i], 1.), ), margin)),
                       (cod_node, (((bottoms[i], 1.), ), 0))]
             edges += [(dom_node, top), (top, bottom), (bottom, cod_node)]
-            bends += [displacement(tops[i], bands[i]), displacement(bands[i], bottoms[i])]
+            bends += [displacement(tops[i], bands[i]),
+                      displacement(bands[i], bottoms[i])]
         if not dom:
             constraints.append((((right, 1.), (left, -1.)), 0))
         return OpenQP(dom, dom, size, tops, bottoms, left, right,
@@ -251,8 +252,8 @@ class OpenQP(MonoidalCategory[monoidal.Ty, "OpenQP"]):
             ends = (source, waypoint, port) if source.kind == "dom"\
                 else (port, waypoint, target)
             edges += list(zip(ends, ends[1:]))
-            bends.append(displacement(*(positions[node][0][0][0]
-                                for node in (ends[0], ends[2]))))
+            bends.append(displacement(*(
+                positions[node][0][0][0] for node in (ends[0], ends[2]))))
         constraints: list[tuple[Linear, float]] = [
             (((other_side, 1.), (side, -1.)), high.x - low.x),
             (((side, 1.), (left, -1.)), low.x),
