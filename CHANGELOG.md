@@ -9,6 +9,13 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Added
 
+- `discopy.drawing.planar`: a pivotal diagram drawn as a planar map with
+  a fixed rotation system, its boxes rotating and its wires free, up to
+  isotopy. A box has a centre and a rotation, cups and caps are turning
+  points of a wire, and each step of the descent from the monoidal layout
+  of `discopy.drawing.layout` is a quadratic program, kept only when the
+  drawing stays valid; `Drawing` draws a box rotated by its `angle` and a
+  wire along the `tangent` of a waypoint ([next#689]).
 - `discopy.drawing.layout`: a monoidal functor from diagrams to `OpenQP`,
   the category of open quadratic programs over the abscissas of a drawing,
   where composition identifies the boundary variables and adds the costs
@@ -2489,6 +2496,7 @@ for the changelog of `1.2.1` and earlier.
 [next#676]: https://github.com/rel-int/discopy-next/issues/676
 [next#681]: https://github.com/rel-int/discopy-next/pull/681
 [next#688]: https://github.com/rel-int/discopy-next/pull/688
+[next#689]: https://github.com/rel-int/discopy-next/pull/689
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#44]: https://github.com/rel-int/optyx/pull/44
