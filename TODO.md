@@ -8,4 +8,4 @@
 - [x] Diagram.draw(layout='qp'): the functor into OpenQP solved by OSQP, as a Drawing with waypoints
 - [x] Tests: isotopy kept (no crossing, no wire through a box, boundary order), narrower than today on the gallery
 - [x] Gallery comparison of today's layout against the QP layout, in the PR
-- [ ] CHANGELOG, docs, checks
+- [x] CHANGELOG, docs, checks
