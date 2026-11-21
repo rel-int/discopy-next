@@ -5,4 +5,4 @@
 > > **P2** Preserve the optyx category for terms without constants: `qubit.bang()(lambda x: x)` evaluates to a plain `bang.Diagram`, not an optyx `Term`, so `.to_channel()` raises `AttributeError`.
 
 - [x] a daggered box compiles to the conjugate transpose of its unitary, alone and under a bang
-- [WIP] @T-25d9ffd9-a69f-4f39-9ac0-531d396eeae2-2026-11-21 13:28 optyx terms of their own, so a box-free term evaluates to an optyx.Term
+- [x] optyx terms of their own, so a box-free term evaluates to an optyx.Term
