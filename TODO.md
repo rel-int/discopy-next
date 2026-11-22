@@ -1,0 +1,9 @@
+> ask, one 🚀: `frobenius.Wire` reads `z` modulo its windings, so `Wire('x', 1) == Wire('x', 0)` and the functor in the report terminates. reading 2 above.
+>
+> not taken: the constructor refuses a nonzero `z` (reading 1).
+>
+> default: reading 2. asked 2026-11-20, due 11-22: with no word an agent builds it then, and one word reverses it.
+
+- [ ] frobenius.Wire reads z modulo its windings, so a nonzero z normalises to zero
+- [ ] test/frobenius.py: the report's Functor term and Wire('x', 1).l.l, plus equality
+- [ ] one [Unreleased] bullet in CHANGELOG.md citing the PR, with its link definition
