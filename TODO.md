@@ -30,7 +30,7 @@
 > # 11. Path matrices add formally
 > ```
 
-- [WIP] @session_01C7YfAR6V7pj9o6FNkELjMG-2026-11-22 02:10 path.py:595 Sum.prob keeps Matrix.prob's with_perceval position and rejects it with a reason
+- [x] path.py:595 Sum.prob keeps Matrix.prob's with_perceval position and rejects it with a reason
 - [WIP] @session_01C7YfAR6V7pj9o6FNkELjMG-2026-11-22 02:10 path.py:570 say the sum is unhashable rather than inheriting a hash that raises
 - [WIP] @session_01C7YfAR6V7pj9o6FNkELjMG-2026-11-22 02:11 test_diagram.py:53 compare to_path() against the sum of the terms' path matrices
 - [WIP] @session_01C7YfAR6V7pj9o6FNkELjMG-2026-11-22 02:11 channel.py:1461 qualify the Sum reference as path.Sum
