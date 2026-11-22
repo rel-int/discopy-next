@@ -7,4 +7,4 @@
 - [x] Pin runs-on: ubuntu-24.04 on build.yml's test and docs jobs, the two that pass graphviz: 'true' to .github/actions/setup
 - [x] A test in .github/tests/workflows.py that keeps the pin: every job asking the setup action for Graphviz pins its image
 - [x] Run the .github gates: actionlint, pflake8 .github, .github/tests
-- [ ] Changelog bullet under Project citing this pull request
+- [x] Changelog bullet under Project citing this pull request
