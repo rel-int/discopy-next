@@ -102,7 +102,7 @@ def test_a_job_that_installs_graphviz_pins_its_image(build_jobs):
     not in the sources the Ubuntu 26.04 one ships, so a job that asks for it
     passed or failed by the image it landed on (#595)."""
     asks = [job for job in build_jobs.values() if any(
-        step.get("with", {}).get("graphviz") == "true"
+        str(step.get("with", {}).get("graphviz")).lower() == "true"
         for step in job["steps"])]
     assert len(asks) == 2
     assert all(job["runs-on"] != "ubuntu-latest" for job in asks)
