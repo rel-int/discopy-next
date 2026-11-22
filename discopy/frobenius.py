@@ -116,6 +116,10 @@ class Wire(pivotal.Wire):
     >>> assert x.l.l == x and Wire('y').l == Wire('y')
     >>> assert Wire('y', 1) == Wire('y') and Wire('y', 1).l.l == Wire('y')
     """
+    def __setstate__(self, state):
+        super().__setstate__(state)
+        self.z %= len(self.windings)
+
     def __init__(self, *args, **params):
         super().__init__(*args, **params)
         self.z %= len(self.windings)

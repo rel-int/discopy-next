@@ -774,9 +774,9 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 - `frobenius.Wire` reads its winding number modulo its one winding, i.e. as
   zero, since a self-dual object has nothing to wind around: `Wire('x', 1)` is
-  `Wire('x')`, `Wire('x', 1).l.l` is `Wire('x')` and a functor applied to a
-  hand-built wire with a nonzero `z` returns instead of recursing until the
-  stack runs out ([next#694]).
+  `Wire('x')`, whether it is built or unpickled, `Wire('x', 1).l.l` is
+  `Wire('x')` and a functor applied to a hand-built wire with a nonzero `z`
+  returns instead of recursing until the stack runs out ([next#694]).
 - `closed.Abstraction.eval` curries its variable on the side that
   `Application.eval` evaluates, so a β-redex and its reduct are sent to the
   same morphism by a functor into a rigid category, e.g. tensors, where they

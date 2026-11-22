@@ -16,7 +16,8 @@ and [#694](https://github.com/rel-int/discopy-next/pull/694) carried it out.
 A winding number is read modulo the windings of its level, so on a frobenius object, which has
 one, it is always zero: `Wire('x', 1) == Wire('x')`. A nonzero `z` on a self-dual wire is a
 number with a normal form, not a caller's mistake, and the normalisation happens in
-`frobenius.Wire.__init__`, where the object is built, rather than in the functor that trips on it.
+`frobenius.Wire.__init__` and `__setstate__`, where the object is built or restored, rather than
+in the functor that trips on it.
 
 ## Consequences
 

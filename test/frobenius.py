@@ -181,9 +181,16 @@ def test_Wire_adjoints():
 
 
 def test_Wire_modulo_windings():
+    from pickle import dumps as pickle_dumps, loads as pickle_loads
     x = Wire('x')
     assert Wire('x', 1) == Wire('x', -1) == x and Wire('x', 1).l.l == x
     assert Functor({Ty('x'): Ty('y')}, {})(Ty(Wire('x', 1))) == Ty('y')
+    wound = Wire('x')
+    wound.z = 1
+    assert pickle_loads(pickle_dumps(wound)) == x
+    old = Wire.__new__(Wire)
+    old.__setstate__({'name': 'x', '_z': 1, 'dom': None, 'cod': None})
+    assert old == x
 
 
 def test_feedback_is_the_trace():
