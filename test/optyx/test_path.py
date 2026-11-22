@@ -104,6 +104,14 @@ def test_zero_is_the_empty_sum():
     assert zero + selected_phase(2j) == Sum((selected_phase(2j), ), 1, 1)
 
 
+def test_a_sum_is_neither_a_unitary_nor_hashable():
+    a, b = selected_phase(2j), selected_phase(5j)
+    with pytest.raises(NotImplementedError, match="one unitary"):
+        (a + b).prob(2, with_perceval=True)
+    with pytest.raises(TypeError, match="unhashable"):
+        hash(a + b)
+
+
 def test_sum_of_different_photon_sectors_has_none_in_common():
     created = Matrix(np.ones((2, 2)), 1, 2, creations=(1, ))
     assert created.eval(1).cod != zw.Split(2).to_path().eval(1).cod
