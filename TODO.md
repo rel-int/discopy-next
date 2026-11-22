@@ -3,4 +3,4 @@
 > 1. discopy/optyx/core/path.py:577 (thread 4656363518)
 > [P2] Typed empty path sums lose their ring when serialized and loaded. `cat.Sum.to_tree` omits `dtype`, while the inherited loader invokes `Sum(..., dtype=None)`, so `Matrix[float].zero(1, 1)` round-trips as complex and is no longer equal; serialize and restore the dtype for empty sums.
 
-- [WIP] @session_01C7YfAR6V7pj9o6FNkELjMG-2026-11-22 03:12 path.py:577 the tree of a sum names its ring, so dumps and loads round-trip a typed empty one
+- [x] path.py:577 the tree of a sum names its ring, so dumps and loads round-trip a typed empty one
