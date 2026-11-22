@@ -22,5 +22,5 @@
 > ```
 
 - [WIP] @session_01C7YfAR6V7pj9o6FNkELjMG-2026-11-22 02:31 path.py:626 Sum.prob builds Probabilities from the dtype eval promoted to, not the first term's
-- [ ] path.py:582 the dtype is part of a sum's setoid, and of its repr so it reads back equal
+- [WIP] @session_01C7YfAR6V7pj9o6FNkELjMG-2026-11-22 02:31 path.py:582 the dtype is part of a sum's setoid, and of its repr so it reads back equal
 - [ ] the ADR status names #693 while it is open
