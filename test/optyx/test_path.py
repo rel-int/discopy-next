@@ -115,8 +115,27 @@ def test_a_sum_is_neither_a_unitary_nor_hashable():
 def test_sum_of_different_photon_sectors_has_none_in_common():
     created = Matrix(np.ones((2, 2)), 1, 2, creations=(1, ))
     assert created.eval(1).cod != zw.Split(2).to_path().eval(1).cod
-    with pytest.raises(AxiomError, match="parallel"):
+    with pytest.raises(AxiomError, match="same number of photons"):
         (created + zw.Split(2).to_path()).eval(1)
+
+
+def test_one_mode_out_hides_no_sector():
+    kept = Matrix(np.eye(1), 1, 1)
+    created = Matrix(np.ones((2, 1)), 1, 1, creations=(1, ))
+    assert (kept.net_photons, created.net_photons) == (0, 1)
+    assert kept.eval(1).cod == created.eval(1).cod == Nat(1)
+    with pytest.raises(AxiomError, match=r"same number of photons, got \[0, 1\]"):
+        (kept + created).eval(1)
+    assert np.allclose((kept + kept).eval(1).array, 2)
+
+
+def test_the_ring_of_a_sum_survives_every_operation():
+    zero = Matrix[float].zero(1, 1)
+    for sum_ in (zero.tensor(zero), zero.dagger(), zero + zero,
+                 zero.then(zero)):
+        assert sum_.terms == () and sum_.dtype is float
+    typed = Matrix[float]([1.], 1, 1)
+    assert (typed + typed).dtype is float
 
 
 def test_repr_of_a_sum_is_transparent():

@@ -128,7 +128,7 @@ We can define the number operator and compute its expectation.
 from __future__ import annotations
 
 from math import factorial
-from typing import TYPE_CHECKING, ClassVar
+from typing import TYPE_CHECKING, Callable, ClassVar
 from operator import index
 
 import numpy as np
@@ -137,7 +137,7 @@ from discopy import cat
 from discopy.abc import Nat
 from discopy.cat import assert_iscomposable
 from discopy.utils import (
-    factory, factory_key, factory_name, unbiased)
+    AxiomError, factory, factory_key, factory_name, unbiased)
 import discopy.matrix as underlying
 from discopy.tensor import Tensor
 from discopy.optyx.utils.misc import occupation_numbers, amplitudes_2_tensor
@@ -251,6 +251,14 @@ class Matrix(underlying.Matrix):
 
     def __add__(self, other: Matrix | Sum) -> Sum:
         return self.sum_factory((self, )) + other
+
+    @property
+    def net_photons(self) -> int:
+        """
+        The photons a matrix adds, its creations less its selections: it
+        sends the ``n``-photon sector to the ``n + net_photons`` one.
+        """
+        return sum(self.creations) - sum(self.selections)
 
     @property
     def umatrix(self) -> underlying.Matrix:
@@ -386,7 +394,7 @@ class Matrix(underlying.Matrix):
     ) -> Amplitudes:
         """Evaluates the :class:`Amplitudes` of a the QPath matrix"""
         dom_basis = occupation_numbers(n_photons, index(self.dom))
-        n_photons_out = n_photons - sum(self.selections) + sum(self.creations)
+        n_photons_out = n_photons + self.net_photons
         if n_photons_out < 0:
             raise ValueError("Expected a positive number of photons out.")
         cod_basis = occupation_numbers(n_photons_out, index(self.cod))
@@ -567,9 +575,21 @@ class Sum(cat.Sum):
     __hash__ = None
 
     def __init__(self, terms, dom=None, cod=None, dtype=None):
+        terms = tuple(terms)
+        self.dtype = terms[0].dtype if terms\
+            else complex if dtype is None else dtype
         super().__init__(terms, dom, cod)
-        shared = self.terms[0].dtype if self.terms else complex
-        self.dtype = shared if dtype is None else dtype
+
+    @property
+    def sum_factory(self) -> Callable[..., Sum]:
+        """
+        The factory a sum builds sums with, which fixes its ``dtype``, so
+        that the ring survives every operation of
+        :class:`discopy.cat.Sum` — ``dagger``, ``then``, ``tensor``,
+        ``subs`` — including the ones that leave no term to read it from.
+        """
+        return lambda terms, dom=None, cod=None: type(self)(
+            terms, dom, cod, self.dtype)
 
     def setoid(self):
         """
@@ -605,7 +625,20 @@ class Sum(cat.Sum):
     def eval(
         self, n_photons=0, permanent=npperm, as_tensor=False
     ) -> Amplitudes:
-        """ Adds the :class:`Amplitudes` of the terms on one photon sector. """
+        """
+        Adds the :class:`Amplitudes` of the terms on one photon sector.
+
+        The terms must send that sector to one sector, i.e. share their
+        :attr:`Matrix.net_photons`, or their amplitudes are indexed by
+        different occupation numbers: a sum of as many modes out as the
+        basis of either sector has elements would add them all the same,
+        one mode out being the case where every sector has one element.
+        """
+        sectors = {term.net_photons for term in self.terms}
+        if len(sectors) > 1:
+            raise AxiomError(
+                "Expected the terms of a sum to add the same number of "
+                f"photons, got {sorted(sectors)}.")
         terms = [term.eval(n_photons, permanent, as_tensor)
                  for term in self.terms]
         if terms:
@@ -694,4 +727,4 @@ class Probabilities(underlying.Matrix):
         )
 
 
-Matrix.sum_factory = Sum.sum_factory = Sum
+Matrix.sum_factory = Sum

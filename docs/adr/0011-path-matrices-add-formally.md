@@ -24,16 +24,22 @@ to zero.
 
 ## Consequences
 
-- `to_path` of a sum of diagrams is a `path.Sum`, not a `path.Matrix`: a caller reading `.array`
-  or `.creations` off it has to pick a photon sector with `eval` or `prob` first.
+- `to_path` of a sum of diagrams is a `path.Sum`, not a `path.Matrix`. A caller after a creation
+  profile reads it off `Sum.terms`, one `Matrix` each; `eval` and `prob` answer for a photon
+  sector, and what they return — `Amplitudes` and `Probabilities` — has no profile of its own
+  either, being indexed by occupation numbers rather than by modes.
 - Addition no longer claims that summing the matrices sums the maps, which only holds on the
   one-photon sector: `(Endo(2) + Endo(3j)).to_path().eval(2)` is `2² + (3j)²`, where collapsing
   to `Endo(2 + 3j)` gave `(2 + 3j)²`.
 - Two of the readings on #544 are ruled out: addition restricted to matching profiles, which
   says nothing about the general sum, and `to_path` refusing a `Sum`, which leaves `grad`
   unusable through `to_path`.
-- A sum whose terms change the photon number by different amounts has no sector in common, and
-  `eval` raises on it rather than reshaping.
+- A sum whose terms change the photon number by different amounts sends one sector to several, and
+  `eval` raises `AxiomError` on it rather than adding amplitudes indexed by different occupation
+  numbers: the shapes alone do not catch it, since one mode out has one element per sector.
+- A sum answers for one ring: the `dtype` of its terms, or, where there is no term, the one the
+  `Matrix` it came from named, carried through every operation and part of both its equality and
+  its representation.
 
 ## Status
 
