@@ -34,6 +34,6 @@
 - [WIP] @session_01C7YfAR6V7pj9o6FNkELjMG-2026-11-22 02:10 path.py:570 say the sum is unhashable rather than inheriting a hash that raises
 - [WIP] @session_01C7YfAR6V7pj9o6FNkELjMG-2026-11-22 02:11 test_diagram.py:53 compare to_path() against the sum of the terms' path matrices
 - [WIP] @session_01C7YfAR6V7pj9o6FNkELjMG-2026-11-22 02:11 channel.py:1461 qualify the Sum reference as path.Sum
-- [ ] test_path.py:100 check the empty sum's tensor shape, not a broadcast scalar
+- [WIP] @session_01C7YfAR6V7pj9o6FNkELjMG-2026-11-22 02:11 test_path.py:100 check the empty sum's tensor shape, not a broadcast scalar
 - [WIP] @session_01C7YfAR6V7pj9o6FNkELjMG-2026-11-22 02:10 path.py:562 carry the path matrix's dtype into its formal sums
 - [ ] the ADR heading reads 11, already fixed in 434097c9
