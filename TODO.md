@@ -11,4 +11,4 @@
 
 - [x] path.py:612 Sum.eval refuses terms that send a sector to different sectors, which one mode out hid
 - [x] path.py:601 the ring survives every operation of cat.Sum, not just the ones that leave a term
-- [WIP] @session_01C7YfAR6V7pj9o6FNkELjMG-2026-11-22 02:52 the ADR says where the creation profiles are: on the terms, not on what eval returns
+- [x] the ADR says where the creation profiles are: on the terms, not on what eval returns
