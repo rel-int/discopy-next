@@ -13,4 +13,4 @@
 >         self.z %= len(self.windings)
 > ```
 
-- [WIP] @session_01C7YfAR6V7pj9o6FNkELjMG-2026-11-22 01:36 frobenius.Wire.__setstate__ normalises z too, so an unpickled wire has no winding either
+- [x] frobenius.Wire.__setstate__ normalises z too, so an unpickled wire has no winding either
