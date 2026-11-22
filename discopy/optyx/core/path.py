@@ -137,7 +137,8 @@ from discopy import cat
 from discopy.abc import Nat
 from discopy.cat import assert_iscomposable
 from discopy.utils import (
-    AxiomError, factory, factory_key, factory_name, unbiased)
+    AxiomError, factory, factory_key, factory_name, resolve_factory,
+    unbiased)
 import discopy.matrix as underlying
 from discopy.tensor import Tensor
 from discopy.optyx.utils.misc import occupation_numbers, amplitudes_2_tensor
@@ -612,6 +613,17 @@ class Sum(cat.Sum):
         in its factory name, so that a sum reads back equal to itself.
         """
         return f"{self.name[:-1]}, dtype={factory_name(self.dtype)})"
+
+    def to_tree(self) -> dict:
+        """ The tree names the ``dtype`` too, as the representation does. """
+        return dict(super().to_tree(), dtype=factory_name(self.dtype))
+
+    @classmethod
+    def from_tree(cls, tree: dict) -> Sum:
+        """ Reads the ``dtype`` back, see :meth:`to_tree`. """
+        formal = super().from_tree(tree)
+        return cls(formal.terms, formal.dom, formal.cod,
+                   resolve_factory(tree["dtype"]))
 
     @unbiased
     def tensor(self, other: Matrix | Sum) -> Sum:

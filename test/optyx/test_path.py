@@ -7,7 +7,7 @@ from discopy.optyx import photonic, qmode
 from discopy.optyx.channel import Diagram
 from discopy.optyx.core import zw
 from discopy.optyx.core.path import Matrix, Sum, npperm
-from discopy.utils import AxiomError
+from discopy.utils import AxiomError, dumps, loads
 
 
 def beam_splitter():
@@ -142,6 +142,13 @@ def test_repr_of_a_sum_is_transparent():
     for matrix in (Matrix.zero(1, 1), Matrix[float].zero(1, 1),
                    selected_phase(2j) + selected_phase(5j)):
         assert eval(repr(matrix), Matrix.environment()) == matrix
+
+
+def test_the_tree_of_an_empty_sum_names_its_ring():
+    for matrix in (Matrix.zero(1, 1), Matrix[float].zero(1, 1)):
+        assert loads(dumps(matrix)) == matrix
+    with pytest.raises(ValueError, match="reshape"):
+        loads(dumps(selected_phase(2j)))  # a term's profile: next#696
 
 
 def test_a_sum_evaluates_over_the_ring_of_its_terms():
