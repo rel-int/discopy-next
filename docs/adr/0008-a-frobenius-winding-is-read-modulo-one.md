@@ -13,8 +13,9 @@ and [#694](https://github.com/rel-int/discopy-next/pull/694) carried it out.
 
 ## Decision
 
-A winding number is read modulo the windings of its level, so on a frobenius object, which has
-one, it is always zero: `Wire('x', 1) == Wire('x')`. A nonzero `z` on a self-dual wire is a
+A winding number on a frobenius object is read modulo its one winding, so it is always zero:
+`Wire('x', 1) == Wire('x')`. The rule is frobenius's own: `rigid` and `pivotal` keep the `z` they
+are given, and only `pivotal.Wire.l` reads it modulo two. A nonzero `z` on a self-dual wire is a
 number with a normal form, not a caller's mistake, and the normalisation happens in
 `frobenius.Wire.__init__` and `__setstate__`, where the object is built or restored, rather than
 in the functor that trips on it.
@@ -24,11 +25,12 @@ in the functor that trips on it.
 - `frobenius.Wire` accepts every `z` it accepted before and keeps none of them: `z` is not a
   distinguishing part of a frobenius object, and a caller who means to count windings wants a
   `rigid` or `pivotal` object.
-- `rigid.Functor.__call__` terminates on every frobenius wire, since no frobenius wire has a
-  nonzero `z` to recurse on.
+- `rigid.Functor.__call__` terminates on every frobenius wire: one that is built or restored has
+  `z == 0`, and `Wire.l` copies through `__setstate__`, so even a `z` assigned to an instance
+  after the fact is read as zero by the adjoint the functor recurses on.
 - Every level below frobenius has one winding too, so the same normalisation holds of
   `quantum.circuit.Wire`, `peirce.beta.Wire` and `optyx.channel.Ob`.
 
 ## Status
 
-Accepted, 2026-11-22.
+Accepted, 2026-11-22. #694, which carries it out, is open.
