@@ -4,6 +4,7 @@ from sympy import Expr
 from sympy.abc import x, y
 
 from discopy import optyx
+from discopy.utils import AxiomError
 from discopy.optyx.core import control, diagram, zw, zx
 from discopy.optyx.core.diagram import (
     Bit, Box, Diagram, DualRail, EmbeddingTensor, Mode, Permutation,
@@ -47,11 +48,16 @@ def test_spider_needs_input_dimensions():
         Spider(1, 2, mode).truncation()
 
 
-def test_sum_is_linear():
+def test_sum_is_linear_on_one_photon_only():
     terms = zw.Endo(2) + zw.Endo(3j)
-    assert terms.to_path() == zw.Endo(2 + 3j).to_path()
+    assert terms.to_path() == (
+        zw.Endo(2).to_path() + zw.Endo(3j).to_path())
+    assert np.allclose(terms.eval(1).array,
+                       zw.Endo(2 + 3j).to_path().eval(1).array)
     assert np.allclose(terms.eval(2).array, 2 ** 2 + 3j ** 2)
-    assert terms.conjugate().to_path() == zw.Endo(2 - 3j).to_path()
+    assert not np.allclose(terms.eval(2).array, (2 + 3j) ** 2)
+    assert terms.conjugate().to_path() == (
+        zw.Endo(2) + zw.Endo(-3j)).to_path()
 
 
 def test_sum_gradient_term_by_term():
@@ -205,3 +211,17 @@ def test_the_dagger_is_taken_by_the_backend_of_its_array():
         dagger = Box("f", bit, bit @ bit,
                      array=np.arange(8).reshape(2, 2, 2))[::-1].array
     assert isinstance(dagger, np.ndarray) and dagger[1, 0, 0] == 2
+
+
+def test_a_wire_bends_through_the_spider_with_two_legs():
+    """The cup and cap of an optyx type are its own spiders, so the snake
+    equations hold where they used to raise (next#661)."""
+    assert Diagram.cups(mode, mode) == Spider(2, 0, mode)
+    assert Diagram.caps(bit, bit) == Spider(0, 2, bit)
+    left = Diagram.caps(bit, bit) @ bit >> bit @ Diagram.cups(bit, bit)
+    right = bit @ Diagram.caps(bit, bit) >> Diagram.cups(bit, bit) @ bit
+    for snake in (left, right):
+        assert np.allclose(
+            snake.to_tensor().eval().array.reshape(2, 2), np.eye(2))
+    with pytest.raises(AxiomError, match="not adjoints"):
+        Diagram.cups(mode, bit)

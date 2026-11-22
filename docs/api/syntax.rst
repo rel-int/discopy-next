@@ -21,6 +21,7 @@ and the property tests that check their axioms.
     discopy.comarkov
     discopy.closed
     discopy.biclosed
+    discopy.bang
     discopy.rigid
     discopy.pivotal
     discopy.ribbon
