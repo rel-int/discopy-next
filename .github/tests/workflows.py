@@ -87,9 +87,25 @@ def test_a_scheduled_proptest_run_never_cancels_a_push():
 
 
 @pytest.fixture
-def build_test():
+def build_jobs():
     with open(GITHUB / "workflows" / "build.yml") as file:
-        return yaml.safe_load(file)["jobs"]["test"]
+        return yaml.safe_load(file)["jobs"]
+
+
+@pytest.fixture
+def build_test(build_jobs):
+    return build_jobs["test"]
+
+
+def test_a_job_that_installs_graphviz_pins_its_image(build_jobs):
+    """`ubuntu-latest` resolved to two images inside one run, and graphviz is
+    not in the sources the Ubuntu 26.04 one ships, so a job that asks for it
+    passed or failed by the image it landed on (#595)."""
+    asks = [job for job in build_jobs.values() if any(
+        step.get("with", {}).get("graphviz") == "true"
+        for step in job["steps"])]
+    assert len(asks) == 2
+    assert all(job["runs-on"] != "ubuntu-latest" for job in asks)
 
 
 def test_a_push_to_main_measures_every_python_of_its_matrix(build_test):
