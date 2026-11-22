@@ -4,6 +4,6 @@
 >
 > default: reading 2. asked 2026-11-20, due 11-22: with no word an agent builds it then, and one word reverses it.
 
-- [ ] frobenius.Wire reads z modulo its windings, so a nonzero z normalises to zero
+- [WIP] @session_01C7YfAR6V7pj9o6FNkELjMG-2026-11-22 01:21 frobenius.Wire reads z modulo its windings, so a nonzero z normalises to zero
 - [ ] test/frobenius.py: the report's Functor term and Wire('x', 1).l.l, plus equality
 - [ ] one [Unreleased] bullet in CHANGELOG.md citing the PR, with its link definition
