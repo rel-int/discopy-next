@@ -48,11 +48,15 @@ def test_spider_needs_input_dimensions():
         Spider(1, 2, mode).truncation()
 
 
-def test_sum_is_linear():
+def test_sum_is_linear_on_one_photon_only():
     terms = zw.Endo(2) + zw.Endo(3j)
-    assert terms.to_path() == zw.Endo(2 + 3j).to_path()
+    assert terms.to_path() == (zw.Endo(2) + zw.Endo(3j)).to_path()
+    assert np.allclose(terms.eval(1).array,
+                       zw.Endo(2 + 3j).to_path().eval(1).array)
     assert np.allclose(terms.eval(2).array, 2 ** 2 + 3j ** 2)
-    assert terms.conjugate().to_path() == zw.Endo(2 - 3j).to_path()
+    assert not np.allclose(terms.eval(2).array, (2 + 3j) ** 2)
+    assert terms.conjugate().to_path() == (
+        zw.Endo(2) + zw.Endo(-3j)).to_path()
 
 
 def test_sum_gradient_term_by_term():

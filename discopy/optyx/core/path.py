@@ -25,6 +25,7 @@ Classes
     :toctree:
 
     Matrix
+    Sum
     Amplitudes
     Probabilities
 
@@ -127,19 +128,21 @@ We can define the number operator and compute its expectation.
 from __future__ import annotations
 
 from math import factorial
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar
 from operator import index
 
 import numpy as np
-if TYPE_CHECKING:
-    import perceval as pcvl
 
+from discopy import cat
 from discopy.abc import Nat
 from discopy.cat import assert_iscomposable
-from discopy.utils import factory, unbiased
+from discopy.utils import factory, factory_key, unbiased
 import discopy.matrix as underlying
 from discopy.tensor import Tensor
 from discopy.optyx.utils.misc import occupation_numbers, amplitudes_2_tensor
+
+if TYPE_CHECKING:
+    import perceval as pcvl
 
 
 def npperm(matrix):
@@ -194,9 +197,14 @@ class Matrix(underlying.Matrix):
     >>> num_op = Split(2) >> Select() @ Id(1) >> Create() @ Id(1) >> Merge(2)
     >>> assert np.allclose(num_op.to_path().eval(4).array,
     ...                    matrix.eval(4).array)
+
+    Note
+    ----
+    Matrices add formally, see :class:`Sum`.
     """
 
     dtype = complex
+    sum_factory: ClassVar[type["Sum"]]
 
     def __new__(
         cls,
@@ -235,6 +243,14 @@ class Matrix(underlying.Matrix):
         return isinstance(other, self.ar) \
             and fields(self) == fields(other) and super().__eq__(other)
 
+    @classmethod
+    def zero(cls, dom: int | Nat, cod: int | Nat) -> Sum:
+        """The formal zero, i.e. the empty :class:`Sum`."""
+        return cls.sum_factory((), dom, cod)
+
+    def __add__(self, other: Matrix | Sum) -> Sum:
+        return self.sum_factory((self, )) + other
+
     @property
     def umatrix(self) -> underlying.Matrix:
         """
@@ -244,8 +260,10 @@ class Matrix(underlying.Matrix):
         return underlying.Matrix[self.dtype](self.array, self.udom, self.ucod)
 
     @unbiased
-    def then(self, other: Matrix) -> Matrix:
+    def then(self, other: Matrix | Sum) -> Matrix | Sum:
         """Sequential composition of QPath matrices"""
+        if isinstance(other, Sum):
+            return self.sum_factory((self, )).then(other)
         assert_iscomposable(self, other)
         M = underlying.Matrix[self.dtype]
         left, right = len(self.selections), len(other.creations)
@@ -269,8 +287,10 @@ class Matrix(underlying.Matrix):
         )
 
     @unbiased
-    def tensor(self, other: Matrix) -> Matrix:
+    def tensor(self, other: Matrix | Sum) -> Matrix | Sum:
         """Parallel composition of QPath matrices"""
+        if isinstance(other, Sum):
+            return self.sum_factory((self, )).tensor(other)
         M = underlying.Matrix[self.dtype]
         a, b = len(self.creations), len(other.creations)
         c, d = len(self.selections), len(other.selections)
@@ -508,6 +528,80 @@ class Matrix(underlying.Matrix):
         return np.allclose(np.eye(m.shape[0]), m.dot(m.conj().T))
 
 
+class Sum(cat.Sum):
+    """
+    A formal sum of :class:`Matrix` with the same number of modes in and out,
+    what :code:`to_path` sends a sum of diagrams to.
+
+    A sum of linear-optical maps with different creations and selections is in
+    general not one :class:`Matrix`, since a matrix with :code:`creations` has
+    more rows than modes in, so the sum stays formal until a number of photons
+    is chosen. On the :code:`n`-photon sector the terms are
+    :class:`Amplitudes`, matrices over the occupation numbers of :code:`n`
+    photons, and those do add however the terms create and select.
+
+    Parameters:
+        terms : The terms of the formal sum.
+        dom : The number of modes in, shared by the terms.
+        cod : The number of modes out, shared by the terms.
+
+    Example
+    -------
+    >>> array = np.array([[1, 1], [1, 0]])
+    >>> a = Matrix(array, 1, 1, creations=(1, ), selections=(1, ), scalar=2j)
+    >>> b = Matrix(array, 1, 1, creations=(1, ), selections=(1, ), scalar=5j)
+    >>> assert a.eval(2) + b.eval(2) == (a + b).eval(2)
+    >>> (a + b).eval(2)
+    Amplitudes([0.+14.j], dom=Nat(1), cod=Nat(1))
+
+    The empty sum is the zero of a homset, see :meth:`Matrix.zero`.
+
+    >>> Matrix.zero(1, 1).eval(2)
+    Amplitudes([0.+0.j], dom=Nat(1), cod=Nat(1))
+    """
+    ob, dtype = Nat, complex
+
+    def setoid(self):
+        """
+        A sum is faithfully described by its terms and its boundary, where
+        :meth:`discopy.cat.Sum.setoid` reads a singleton sum as its only
+        term: a :class:`Matrix` is not an arrow, so it has no setoid.
+        """
+        return (factory_key(type(self)), self.terms, self.dom, self.cod)
+
+    @unbiased
+    def tensor(self, other: Matrix | Sum) -> Sum:
+        """ The tensor of sums distributes over the sum. """
+        other = other if isinstance(other, Sum)\
+            else self.sum_factory((other, ))
+        return self.sum_factory(
+            tuple(f.tensor(g) for f in self.terms for g in other.terms),
+            self.dom @ other.dom, self.cod @ other.cod)
+
+    def eval(
+        self, n_photons=0, permanent=npperm, as_tensor=False
+    ) -> Amplitudes:
+        """ Adds the :class:`Amplitudes` of the terms on one photon sector. """
+        terms = [term.eval(n_photons, permanent, as_tensor)
+                 for term in self.terms]
+        if terms:
+            return sum(terms[1:], terms[0])
+        basis = [occupation_numbers(n_photons, index(boundary))
+                 for boundary in (self.dom, self.cod)]
+        array = np.zeros(tuple(map(len, basis)), dtype=self.dtype)
+        return amplitudes_2_tensor(array, *basis) if as_tensor\
+            else Amplitudes[self.dtype](array, *map(len, basis))
+
+    def prob(self, n_photons=0, permanent=npperm, as_tensor=False):
+        """ The Born rule of the amplitudes a sum evaluates to. """
+        amplitudes = self.eval(n_photons, permanent, as_tensor)
+        probabilities = np.abs(amplitudes.array) ** 2
+        if as_tensor:
+            return Tensor(probabilities, amplitudes.dom, amplitudes.cod)
+        return Probabilities[self.dtype](
+            probabilities, amplitudes.dom, amplitudes.cod)
+
+
 class Amplitudes(underlying.Matrix):
     """
     Operator on the Fock space represented as matrix over `occupation_numbers`.
@@ -561,3 +655,6 @@ class Probabilities(underlying.Matrix):
             dom=self.dom,
             cod=self.cod,
         )
+
+
+Matrix.sum_factory = Sum.sum_factory = Sum

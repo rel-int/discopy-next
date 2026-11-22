@@ -330,7 +330,8 @@ class Diagram(frobenius.Diagram):
 
     def to_path(self, dtype: type = complex):
         """Returns the :class:`Matrix` normal form
-        of a :class:`Diagram`.
+        of a :class:`Diagram`, or a formal
+        :class:`discopy.optyx.core.path.Sum` of them for a sum of diagrams.
         In other words, it is the underlying matrix
         representation of a :class:`path` and :class:`photonic` diagrams.
 
@@ -1043,21 +1044,15 @@ class Sum(symmetric.Sum, Box):
             self.dom, self.cod)
 
     def to_path(self, dtype: type = complex):
-        return sum(term.to_path(dtype) for term in self.terms)
+        return Diagram.to_path(self, dtype)
 
     def inflate(self, d):
         return Diagram.inflate(self, d)
 
     def eval(self, n_photons=0, permanent=None, dtype=complex):
-        """Evaluate the sum of diagrams."""
-        # we need to implement the proper sums of qpath diagrams
-        # this is only a temporary solution, so that the grad tests pass
-        if permanent is None:
-            permanent = path.npperm
-        return sum(
-            term.to_path(dtype).eval(n_photons, permanent)
-            for term in self.terms
-        )
+        """Evaluate the sum of diagrams on the ``n_photons`` sector."""
+        permanent = path.npperm if permanent is None else permanent
+        return self.to_path(dtype).eval(n_photons, permanent)
 
     def to_tensor(self, input_dims=None):
         if not self.terms:

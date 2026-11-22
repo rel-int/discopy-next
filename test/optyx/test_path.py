@@ -1,8 +1,13 @@
 import numpy as np
 import pytest
+import sympy
 
+from discopy.abc import Nat
+from discopy.optyx import photonic, qmode
+from discopy.optyx.channel import Diagram
 from discopy.optyx.core import zw
-from discopy.optyx.core.path import Matrix, npperm
+from discopy.optyx.core.path import Matrix, Sum, npperm
+from discopy.utils import AxiomError
 
 
 def beam_splitter():
@@ -70,3 +75,61 @@ def test_dilate_keeps_the_scalar_and_normalisation():
     for n_photons in range(3):
         assert np.allclose(matrix.dilate().eval(n_photons).array,
                            matrix.eval(n_photons).array)
+
+
+def selected_phase(scalar):
+    """A matrix whose profile makes it unaddable as an array, see #544."""
+    return Matrix(np.array([[1, 1], [1, 0]]), 1, 1,
+                  creations=(1, ), selections=(1, ), scalar=scalar)
+
+
+def test_amplitudes_of_a_sum_add():
+    a, b = selected_phase(2j), selected_phase(5j)
+    assert np.allclose(a.eval(2).array, 4j)
+    assert np.allclose(b.eval(2).array, 10j)
+    assert np.allclose((a + b).eval(2).array, 14j)
+    assert np.allclose((a + b).prob(2).array, abs(14j) ** 2)
+    assert np.allclose((a + b).prob(2, as_tensor=True).array,
+                       np.abs((a + b).eval(2, as_tensor=True).array) ** 2)
+
+
+def test_zero_is_the_empty_sum():
+    zero = Matrix.zero(1, 1)
+    assert zero.terms == () and (zero.dom, zero.cod) == (Nat(1), Nat(1))
+    assert np.allclose(zero.eval(2).array, [[0]])
+    assert np.allclose(zero.eval(2, as_tensor=True).array, 0)
+    assert zero + selected_phase(2j) == Sum((selected_phase(2j), ), 1, 1)
+
+
+def test_sum_of_different_photon_sectors_has_none_in_common():
+    created = Matrix(np.ones((2, 2)), 1, 2, creations=(1, ))
+    assert created.eval(1).cod != zw.Split(2).to_path().eval(1).cod
+    with pytest.raises(AxiomError, match="parallel"):
+        (created + zw.Split(2).to_path()).eval(1)
+
+
+def test_repr_of_a_sum_is_transparent():
+    for matrix in (Matrix.zero(1, 1), selected_phase(2j) + selected_phase(5j)):
+        assert eval(repr(matrix), Matrix.environment()) == matrix
+
+
+def test_sums_compose_and_tensor_termwise():
+    a, b = selected_phase(2j), selected_phase(5j)
+    assert (a + b).then(a) == a.then(a) + b.then(a) == a.then(a + b)
+    assert (a + b).tensor(a) == a.tensor(a) + b.tensor(a) == a.tensor(a + b)
+    assert (a + b).dagger() == a.dagger() + b.dagger()
+
+
+@pytest.mark.parametrize("diagram, expected", [
+    (lambda phase: phase, [[1]]),
+    (lambda phase: phase @ Diagram.id(qmode), [[1, 0], [0, 0]]),
+    (lambda phase: phase >> photonic.Phase(.2), [[np.exp(.4j * np.pi)]])])
+def test_grad_of_a_composite_phase(diagram, expected):
+    """The three cases of #544: the expected amplitudes on one photon are
+    those of the derivative of a phase, `2i pi n e^{2i pi psi n}`."""
+    psi = sympy.Symbol("psi")
+    amplitudes = diagram(photonic.Phase(psi)).grad(psi).subs(
+        (psi, .1)).to_path().eval(1)
+    assert np.allclose(
+        amplitudes.array,
+        2j * np.pi * np.exp(.2j * np.pi) * np.array(expected))
