@@ -784,6 +784,11 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   one matrix, which only agrees with the sum of the maps on the one-photon
   sector, and `optyx.core.diagram.Sum.eval` is that of its path sum rather
   than a sum over its terms ([next#693]).
+- `frobenius.Wire` reads its winding number modulo its one winding, i.e. as
+  zero, since a self-dual object has nothing to wind around: `Wire('x', 1)` is
+  `Wire('x')`, whether it is built or unpickled, `Wire('x', 1).l.l` is
+  `Wire('x')` and a functor applied to a hand-built wire with a nonzero `z`
+  returns instead of recursing until the stack runs out ([next#694]).
 - `closed.Abstraction.eval` curries its variable on the side that
   `Application.eval` evaluates, so a β-redex and its reduct are sent to the
   same morphism by a functor into a rigid category, e.g. tensors, where they
@@ -2520,6 +2525,7 @@ for the changelog of `1.2.1` and earlier.
 [next#686]: https://github.com/rel-int/discopy-next/pull/686
 [next#692]: https://github.com/rel-int/discopy-next/pull/692
 [next#693]: https://github.com/rel-int/discopy-next/pull/693
+[next#694]: https://github.com/rel-int/discopy-next/pull/694
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#44]: https://github.com/rel-int/optyx/pull/44
