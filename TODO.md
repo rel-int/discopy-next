@@ -9,4 +9,4 @@
 - [x] test the three cases of the report, the 4j + 10j == 14j cell and the repr roundtrip
 - [x] measure #252 (doubling a Sum evaluating to zero) against this change and report
 - [ ] CHANGELOG bullet with the PR number, and the gates of next-checks
-- [WIP] @session_01C7YfAR6V7pj9o6FNkELjMG-2026-11-22 01:35 an ADR for the ruling, CONTRIBUTING.md's "Record a design decision"
+- [x] an ADR for the ruling, CONTRIBUTING.md's "Record a design decision"
