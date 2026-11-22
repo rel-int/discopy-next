@@ -120,8 +120,18 @@ def test_sum_of_different_photon_sectors_has_none_in_common():
 
 
 def test_repr_of_a_sum_is_transparent():
-    for matrix in (Matrix.zero(1, 1), selected_phase(2j) + selected_phase(5j)):
+    for matrix in (Matrix.zero(1, 1), Matrix[float].zero(1, 1),
+                   selected_phase(2j) + selected_phase(5j)):
         assert eval(repr(matrix), Matrix.environment()) == matrix
+
+
+def test_a_sum_evaluates_over_the_ring_of_its_terms():
+    assert Matrix[float].zero(1, 1) != Matrix[complex].zero(1, 1)
+    assert Matrix[float].zero(1, 1).eval(1).dtype is float
+    mixed = Matrix[int](np.array([[1]]), 1, 1) \
+        + Matrix[complex](np.array([[.5 + 0j]]), 1, 1)
+    assert mixed.dtype is int and mixed.eval(1).dtype is complex
+    assert np.allclose(mixed.prob(1).array, abs(1.5) ** 2)
 
 
 def test_sums_compose_and_tensor_termwise():

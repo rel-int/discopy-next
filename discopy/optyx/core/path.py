@@ -136,7 +136,8 @@ import numpy as np
 from discopy import cat
 from discopy.abc import Nat
 from discopy.cat import assert_iscomposable
-from discopy.utils import factory, factory_key, unbiased
+from discopy.utils import (
+    factory, factory_key, factory_name, unbiased)
 import discopy.matrix as underlying
 from discopy.tensor import Tensor
 from discopy.optyx.utils.misc import occupation_numbers, amplitudes_2_tensor
@@ -578,8 +579,19 @@ class Sum(cat.Sum):
         matrix is not hashable either, so neither is a sum: ``__hash__`` is
         ``None`` rather than the :meth:`discopy.cat.Arrow.__hash__` that
         would raise on the terms.
+
+        The ``dtype`` is part of it, as it is of a matrix's own equality,
+        since two empty sums over different rings evaluate over those rings.
         """
-        return (factory_key(type(self)), self.terms, self.dom, self.cod)
+        return (factory_key(type(self)), self.terms,
+                self.dom, self.cod, self.dtype)
+
+    def __repr__(self):
+        """
+        The representation names the ``dtype``, which a matrix's own carries
+        in its factory name, so that a sum reads back equal to itself.
+        """
+        return f"{self.name[:-1]}, dtype={factory_name(self.dtype)})"
 
     @unbiased
     def tensor(self, other: Matrix | Sum) -> Sum:
@@ -623,7 +635,7 @@ class Sum(cat.Sum):
         probabilities = np.abs(amplitudes.array) ** 2
         if as_tensor:
             return Tensor(probabilities, amplitudes.dom, amplitudes.cod)
-        return Probabilities[self.dtype](
+        return Probabilities[amplitudes.dtype](
             probabilities, amplitudes.dom, amplitudes.cod)
 
 
