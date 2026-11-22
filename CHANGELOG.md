@@ -1925,6 +1925,11 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Project
 
+- `build`'s `test` and `docs` jobs, the two that install Graphviz, run on
+  `ubuntu-24.04`: `ubuntu-latest` resolved to two images inside one run and
+  graphviz is not in the sources the Ubuntu 26.04 one ships, so a job asking
+  for it passed or failed by the image it landed on. `.github/tests/workflows.py`
+  keeps the pin ([next#692]).
 - `test/drawing/vision.py::test_train_ocr_lowers_its_loss` seeds torch before it
   builds the `OCR` it trains: `train_ocr` seeds for its own shuffling, after a
   network it is given has drawn its weights, so the loss the training started
@@ -2513,6 +2518,7 @@ for the changelog of `1.2.1` and earlier.
 [next#676]: https://github.com/rel-int/discopy-next/issues/676
 [next#681]: https://github.com/rel-int/discopy-next/pull/681
 [next#686]: https://github.com/rel-int/discopy-next/pull/686
+[next#692]: https://github.com/rel-int/discopy-next/pull/692
 [next#693]: https://github.com/rel-int/discopy-next/pull/693
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
