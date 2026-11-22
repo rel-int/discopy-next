@@ -935,7 +935,7 @@ class Sum(Box):
             raise ValueError(messages.MISSING_TYPES_FOR_EMPTY_SUM)
         dom = terms[0].dom if dom is None else dom
         cod = terms[0].cod if cod is None else cod
-        unit = Sum((), dom, cod) if terms else None
+        unit = self.sum_factory((), dom, cod) if terms else None
         for arrow in terms:
             assert_isparallel(unit, arrow)  # ty: ignore[invalid-argument-type]
         self.terms = terms
