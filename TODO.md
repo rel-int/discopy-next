@@ -20,4 +20,4 @@
 
 - [x] CHANGELOG: say built or unpickled, not hand-built, since z assigned after the fact is not read again
 - [x] docs/adr/0008 Status: name #694, which carries it out, as the index asks until it merges
-- [WIP] @session_01C7YfAR6V7pj9o6FNkELjMG-2026-11-22 01:51 docs/adr/0008 Decision: scope the modulo rule to frobenius, which is where it is implemented
+- [x] docs/adr/0008 Decision: scope the modulo rule to frobenius, which is where it is implemented
