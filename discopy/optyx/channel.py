@@ -1458,8 +1458,8 @@ class Diagram(frobenius.Diagram):
 
     def to_path(self, dtype: type = complex):
         """Returns the :class:`Matrix` normal form
-        of a :class:`Diagram`, or a formal :class:`Sum` of them for a sum
-        of diagrams.
+        of a :class:`Diagram`, or a formal
+        :class:`discopy.optyx.core.path.Sum` of them for a sum of diagrams.
         In other words, it is the underlying matrix
         representation of a :class:`path` and :class:`photonic` diagrams."""
         assert self.is_pure, "Diagram must be pure to convert to path."

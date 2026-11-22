@@ -50,7 +50,8 @@ def test_spider_needs_input_dimensions():
 
 def test_sum_is_linear_on_one_photon_only():
     terms = zw.Endo(2) + zw.Endo(3j)
-    assert terms.to_path() == (zw.Endo(2) + zw.Endo(3j)).to_path()
+    assert terms.to_path() == (
+        zw.Endo(2).to_path() + zw.Endo(3j).to_path())
     assert np.allclose(terms.eval(1).array,
                        zw.Endo(2 + 3j).to_path().eval(1).array)
     assert np.allclose(terms.eval(2).array, 2 ** 2 + 3j ** 2)

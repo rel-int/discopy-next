@@ -245,8 +245,8 @@ class Matrix(underlying.Matrix):
 
     @classmethod
     def zero(cls, dom: int | Nat, cod: int | Nat) -> Sum:
-        """The formal zero, i.e. the empty :class:`Sum`."""
-        return cls.sum_factory((), dom, cod)
+        """The formal zero, i.e. the empty :class:`Sum` over ``cls.dtype``."""
+        return cls.sum_factory((), dom, cod, cls.dtype)
 
     def __add__(self, other: Matrix | Sum) -> Sum:
         return self.sum_factory((self, )) + other
@@ -544,6 +544,8 @@ class Sum(cat.Sum):
         terms : The terms of the formal sum.
         dom : The number of modes in, shared by the terms.
         cod : The number of modes out, shared by the terms.
+        dtype : The ring the entries live in, that of the terms by default,
+            which an empty sum takes from :meth:`Matrix.zero`.
 
     Example
     -------
@@ -558,14 +560,24 @@ class Sum(cat.Sum):
 
     >>> Matrix.zero(1, 1).eval(2)
     Amplitudes([0.+0.j], dom=Nat(1), cod=Nat(1))
+    >>> assert Matrix[float].zero(1, 1).dtype is float
     """
-    ob, dtype = Nat, complex
+    ob = Nat
+    __hash__ = None
+
+    def __init__(self, terms, dom=None, cod=None, dtype=None):
+        super().__init__(terms, dom, cod)
+        shared = self.terms[0].dtype if self.terms else complex
+        self.dtype = shared if dtype is None else dtype
 
     def setoid(self):
         """
         A sum is faithfully described by its terms and its boundary, where
         :meth:`discopy.cat.Sum.setoid` reads a singleton sum as its only
-        term: a :class:`Matrix` is not an arrow, so it has no setoid.
+        term: a :class:`Matrix` is not an arrow, so it has no setoid. A
+        matrix is not hashable either, so neither is a sum: ``__hash__`` is
+        ``None`` rather than the :meth:`discopy.cat.Arrow.__hash__` that
+        would raise on the terms.
         """
         return (factory_key(type(self)), self.terms, self.dom, self.cod)
 
@@ -592,8 +604,21 @@ class Sum(cat.Sum):
         return amplitudes_2_tensor(array, *basis) if as_tensor\
             else Amplitudes[self.dtype](array, *map(len, basis))
 
-    def prob(self, n_photons=0, permanent=npperm, as_tensor=False):
-        """ The Born rule of the amplitudes a sum evaluates to. """
+    def prob(
+        self,
+        n_photons=0,
+        permanent=npperm,
+        with_perceval=False,
+        as_tensor=False,
+    ) -> Probabilities:
+        """
+        The Born rule of the amplitudes a sum evaluates to, with the
+        signature of :meth:`Matrix.prob`. Perceval simulates one unitary,
+        which a formal sum of matrices is not, so ``with_perceval`` raises.
+        """
+        if with_perceval:
+            raise NotImplementedError(
+                "Perceval simulates one unitary, not a formal sum.")
         amplitudes = self.eval(n_photons, permanent, as_tensor)
         probabilities = np.abs(amplitudes.array) ** 2
         if as_tensor:

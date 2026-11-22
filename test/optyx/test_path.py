@@ -97,7 +97,10 @@ def test_zero_is_the_empty_sum():
     zero = Matrix.zero(1, 1)
     assert zero.terms == () and (zero.dom, zero.cod) == (Nat(1), Nat(1))
     assert np.allclose(zero.eval(2).array, [[0]])
-    assert np.allclose(zero.eval(2, as_tensor=True).array, 0)
+    tensor = zero.eval(2, as_tensor=True)
+    term = selected_phase(2j).eval(2, as_tensor=True)
+    assert (tensor.dom, tensor.cod) == (term.dom, term.cod)
+    assert np.allclose(tensor.array, np.zeros(term.array.shape))
     assert zero + selected_phase(2j) == Sum((selected_phase(2j), ), 1, 1)
 
 
