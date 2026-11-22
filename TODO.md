@@ -7,3 +7,4 @@
 - [x] frobenius.Wire reads z modulo its windings, so a nonzero z normalises to zero
 - [x] test/frobenius.py: the report's Functor term and Wire('x', 1).l.l, plus equality
 - [ ] one [Unreleased] bullet in CHANGELOG.md citing the PR, with its link definition
+- [WIP] @session_01C7YfAR6V7pj9o6FNkELjMG-2026-11-22 01:31 docs/adr/0008: the ruling that a nonzero z on a self-dual wire has a normal form
