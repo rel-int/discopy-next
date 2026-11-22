@@ -191,6 +191,8 @@ def test_Wire_modulo_windings():
     old = Wire.__new__(Wire)
     old.__setstate__({'name': 'x', '_z': 1, 'dom': None, 'cod': None})
     assert old == x
+    from discopy.utils import dumps, loads
+    assert loads(dumps(Ty(Wire('x', 1)))) == Ty('x')
 
 
 def test_feedback_is_the_trace():
