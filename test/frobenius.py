@@ -180,6 +180,12 @@ def test_Wire_adjoints():
     assert Wire('y').l == Wire('y').r == Wire('y')
 
 
+def test_Wire_modulo_windings():
+    x = Wire('x')
+    assert Wire('x', 1) == Wire('x', -1) == x and Wire('x', 1).l.l == x
+    assert Functor({Ty('x'): Ty('y')}, {})(Ty(Wire('x', 1))) == Ty('y')
+
+
 def test_feedback_is_the_trace():
     x = Ty('x')
     f = Box('f', x @ x, x @ x)
