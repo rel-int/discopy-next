@@ -540,7 +540,7 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   their types, and the four slowest cells of the property matrix,
   `interaction.Diagram[compact.Diagram]`'s `adjunction`,
   `transpose_contravariance`, `rotate_contravariance` and `pivotality`, go
-  from 123 to 36 seconds ([next#709]).
+  from about 123 to 36–54 seconds ([next#709]).
 - `lean/` is now `discolean/`, a Lake package built on Mathlib with one
   library, `DisCoLean` ([next#668]).
 - The alpha-equivalence of terms is stated once, in `cat.AlphaEquivalence`,
