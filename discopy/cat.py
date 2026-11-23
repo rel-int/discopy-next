@@ -2183,7 +2183,8 @@ class TermBase(Serialisable, AlphaEquivalence):
         ``v0`` or bound by a kappa, under fresh constants ``c0, c1, ...``,
         each one applied or the body of a statement. The variable bound at
         each level is named by the letter at that level, so that one
-        sequence of choices under two namings gives alpha-equivalent terms.
+        sequence of choices under two namings gives alpha-equivalent terms,
+        see :meth:`bound_name`.
 
         Parameters:
             cod : The codomain of the term.
@@ -2199,6 +2200,8 @@ class TermBase(Serialisable, AlphaEquivalence):
         x(lambda a0: let(c1(a0), lambda b1: c0(b1)))
         >>> print(TermBase.generate(y, [0, 1, 1], [x, y], "ab"))
         c0(v0)
+        >>> print(TermBase.generate(y, choices, [x, y], [None]))
+        x(lambda x0: let(c1(x0), lambda x0: c0(x0)))
         """
         left, fresh = iter(choices), count()
 
@@ -2217,16 +2220,50 @@ class TermBase(Serialisable, AlphaEquivalence):
             if kind == "apply":
                 return constant(typ, cod)(state(variable, typ, level))
             bound = cls.variable_factory(
-                f"{letters[level % len(letters)]}{level}", typ)
+                cls.bound_name(letters, level, variable), typ)
             return cls.kappa_factory(
                 (bound, ), state(bound, cod, level + 1))(
                     state(variable, typ, level))
 
         dom = choose(types)
         if choose((True, False)):
-            variable = cls.variable_factory(f"{letters[0]}0", dom)
+            variable = cls.variable_factory(cls.bound_name(letters, 0), dom)
             return cls.kappa_factory((variable, ), state(variable, cod, 1))
         return state(cls.variable_factory("v0", dom), cod, 0)
+
+    @staticmethod
+    def bound_name(letters: Sequence[str | None], level: int,
+                   shadowed: Variable | None = None) -> str:
+        """
+        The name of the variable bound at a level: its letter and the level,
+        or the name of the variable it ``shadowed`` when the letter is
+        ``None``, i.e. one the expression of its :func:`let` uses up, which
+        the body cannot see, so that the term is alpha-equivalent to the one
+        of any other letter.
+
+        Example
+        -------
+        >>> x = Variable('x0', Ob('x'))
+        >>> assert TermBase.bound_name("ab", 1, x) == "b1"
+        >>> assert TermBase.bound_name([None], 1, x) == "x0"
+        >>> assert TermBase.bound_name([None], 1) == "x1"
+        """
+        letter = letters[level % len(letters)]
+        if letter is None and shadowed is not None:
+            return shadowed.name
+        return f"{letter or 'x'}{level}"
+
+    @classmethod
+    def namings(cls) -> st.SearchStrategy[list[str | None]]:
+        """
+        Generate the letters naming the bound variables, one per level, or
+        ``None`` to shadow a variable, see :meth:`bound_name`: as often as
+        not, every variable that can shadow one does.
+        """
+        from hypothesis import strategies as st
+
+        return st.just([None]) | st.lists(
+            st.sampled_from(("x", "y", "z", None)), min_size=1, max_size=3)
 
     @classmethod
     def shapes(cls, *, types=None, cod=None) -> st.SearchStrategy[tuple]:
@@ -2466,12 +2503,14 @@ type y.
     def contractible(func: TermBase, arg: TermBase) -> bool:
         """
         Whether a function applied to an argument is a redex to contract:
-        the kappa of a variable of the type of the argument, binding none
-        of its free variables.
+        the kappa of a variable of the type of the argument, whose other
+        variables, still bound once it is substituted, capture none of the
+        free variables of the argument. The variable itself may be one of
+        them, which it shadows, e.g. in ``let(f(a), lambda a: g(a))``.
         """
         return isinstance(func, Kappa) and func.head is not None\
-            and func.head.cod == arg.cod\
-            and not set(func.variables).intersection(arg.freevars)
+            and func.head.cod == arg.cod and not set(func.variables)\
+            .difference([func.head]).intersection(arg.freevars)
 
     def normal_form(self):
         func, arg = self.func.normal_form(), self.arg.normal_form()

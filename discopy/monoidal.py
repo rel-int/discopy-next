@@ -3456,10 +3456,14 @@ class Sampler:
             f"c{next(self.counter)}", category.ob().tensor(*dom),
             category.ob().tensor(*cod)))
 
-    def bound(self, level: int, cod: Ty) -> cat.Variable:
-        """ The variable bound at a given level, named by its letter. """
+    def bound(self, level: int, cod: Ty,
+              shadowed: cat.Variable | None = None) -> cat.Variable:
+        """
+        The variable bound at a given level, named by its letter or after
+        the variable it shadows, see :meth:`discopy.cat.TermBase.bound_name`.
+        """
         return self.terms.variable_factory(
-            f"{self.letters[level % len(self.letters)]}{level}", cod)
+            self.terms.bound_name(self.letters, level, shadowed), cod)
 
     def shuffle(self, bound: tuple) -> tuple:
         """
@@ -3500,8 +3504,10 @@ class Sampler:
         left, middle, right = self.split(bound, 3)
         types = [
             self.choose(self.types) for _ in range(self.choose((1, 0, 2)))]
+        used_up = [x for x in dict.fromkeys(middle) if x not in left + right]
         variables = tuple(
-            self.bound(level + i, typ) for i, typ in enumerate(types))
+            self.bound(level + i, typ, next(iter(used_up[i:]), None))
+            for i, typ in enumerate(types))
         inside = self.shuffle(left + variables + right)
         expression = self.state(types[0], middle, level) if len(types) == 1\
             else self.spine(types, middle)
