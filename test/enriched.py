@@ -153,6 +153,22 @@ def test_to_channel_of_several_types():
             Lists([pair], dom, cod).to_channel()
 
 
+def test_extension_maps_objects_with_the_functor_of_diagrams():
+    a = monoidal.Ty('a')
+    F = Functor({a: 1}, {}, dom=Arrow[monoidal.Diagram, List],
+                cod=Matrix[int])
+    assert F(a @ a) == Nat(2)
+    assert F(Arrow[monoidal.Diagram, List].id(a @ a))\
+        == Matrix[int].id(2)
+
+
+def test_tensor_of_shorthand_boundaries():
+    Lists = Arrow[Function, List]
+    both = Lists.id(int) @ Lists.id(int)
+    assert both.dom == both.cod == Function.ob(int, int)
+    assert [function(1, 2) for function in both.inside] == [(1, 2)]
+
+
 def test_extension_of_diagrams_uses_their_functor():
     """
     With ``F(f) = [[2]]``, ``F(f >> f) = [[4]]``, so ``[f >> f]`` goes to

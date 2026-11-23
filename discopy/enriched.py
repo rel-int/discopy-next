@@ -118,7 +118,25 @@ class Arrow[category, monad](Category, TestableGeneric):
     monad: Monad
 
     def __init__(self, inside, dom, cod):
-        self.inside, self.dom, self.cod = inside, dom, cod
+        self.inside = inside
+        self.dom, self.cod = map(self.cast_ob, (dom, cod))
+
+    @classmethod
+    def cast_ob(cls, x):
+        """
+        Turn a boundary argument into an object of the category, as the
+        category casts it: its ``cast_ob`` for a free category, the
+        ``cast`` of its objects otherwise, e.g. a Python type into a list of
+        types for :class:`~discopy.python.function.Function`.
+
+        >>> from discopy.python import Function
+        >>> from discopy.kleisli.monad import List
+        >>> Arrow[Function, List].cast_ob(int)
+        monoidal.List[type](int)
+        """
+        if hasattr(cls.category, "cast_ob"):
+            return cls.category.cast_ob(x)
+        return cls.ob.cast(x)
 
     @classmethod
     def id(cls, dom) -> Arrow:
@@ -259,7 +277,7 @@ cat.Box('h', cat.Ob('x'), cat.Ob('x')))]
         if not issubclass(C, Function):
             raise TypeError(messages.TYPE_ERROR.format(
                 factory_name(Function), factory_name(C)))
-        dom, cod = map(C.ob.cast, (self.dom, self.cod))
+        dom, cod = self.dom, self.cod
         if len(dom) != 1 or len(cod) != 1:
             raise ValueError(messages.NOT_ONE_TYPE.format(dom, cod))
         X, Y = dom.inside[0], cod.inside[0]
@@ -312,11 +330,20 @@ class Functor(cat.Functor):
     >>> F(Arrow[cat.Arrow, List]([f, g, f >> g], x, x))
     Matrix[int]([1, 3, 2, 2], dom=Nat(2), cod=Nat(2))
     """
+    @property
+    def base(self) -> cat.Functor:
+        """
+        The functor ``F: C -> D`` that is extended, i.e. the
+        ``functor_factory`` of ``C`` with the same maps, which evaluates the
+        objects and the arrows inside.
+        """
+        C = self.dom.category
+        return C.functor_factory(self.ob_map, self.ar_map, dom=C, cod=self.cod)
+
     def __call__(self, other):
+        base = self.base
         if not isinstance(other, Arrow):
-            return super().__call__(other)
+            return base(other)
         monad, C = type(other).monad, type(other).category
-        base = C.functor_factory(
-            self.ob_map, self.ar_map, dom=C, cod=self.cod)
         algebra = self.cod.algebra(monad, base(other.dom), base(other.cod))
         return algebra(monad(Function(base, C, self.cod))(other.inside))
