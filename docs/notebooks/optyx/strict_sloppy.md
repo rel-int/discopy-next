@@ -21,129 +21,221 @@ McPheat, Wijnholds, Sadrzadeh, Correia and Toumi, *Anaphora and Ellipsis in
 Lambek Calculus with a Relevant Modality: Syntax and Semantics*
 ([arXiv:2110.10641](https://arxiv.org/abs/2110.10641)), derive the two
 readings in `!L*`, the Lambek calculus with a relevant modality `!` that
-allows contraction and permutation. They send `!A` to a Fock space `F(A)`,
-contraction to a comultiplication `Δ : F(A) → F(A) ⊗ F(A)`, and dereliction
-to `ε : F(A) → A`. They then show that the two readings are two different
-linear maps (§5.3).
+allows contraction and permutation. They send `!A` to the fermionic Fock
+space `F(A) = ⊕ₙ A^∧n` (§4.1), contraction to a comultiplication
+`Δ : F(A) → F(A) ⊗ F(A)` and dereliction to `ε : F(A) → A`. The canonical
+`Δ`, dual to the wedge product, is a `2ⁿ × 4ⁿ` matrix, so §5 replaces it
+with two copies of vectors: the **k-extension** `v ↦ v ⊗ k + k ⊗ v` and the
+**basis copy** `eᵢ ↦ eᵢ ⊗ eᵢ`. They then show that the two readings are two
+different linear maps (§5.3).
 
-This notebook reproduces §5 with `discopy.optyx`. A vector of `A` with basis
-`e₁, …, e_d` is a single photon spread over `d` modes, and the Fock space is
-those modes with at most one photon each, of dimension `2^d`. That is the
-dimension of the paper's fermionic Fock space. The paper's two copying maps
-are then the two spiders of the ZW calculus, applied on every mode:
+This notebook reproduces §5 with photons instead of fermions. A vector of
+`A`, with basis `e₁, …, e_d`, is one photon spread over `d` modes, and `!A`
+is the bosonic Fock space of those modes: any number of photons. The two
+copies are the two spiders of the ZW calculus, on every mode:
 
-- the **W** node splits a photon over two outputs, `|1⟩ ↦ |10⟩ + |01⟩`. On a
-  vector that is `v ↦ v ⊗ vac + vac ⊗ v`, the paper's **k-extension**
-  `v ↦ v ⊗ k + k ⊗ v` once `ε` reads the vacuum as `k`;
-- the **Z** spider copies each mode's photon number, `|n⟩ ↦ |n⟩|n⟩`, the
-  paper's **basis copy** `eᵢ ↦ eᵢ ⊗ eᵢ`.
+- the **W** node is the coproduct of the bosonic Fock space, dual to the
+  symmetric product: it sends one photon to `|10⟩ + |01⟩`, i.e. `v` to
+  `v ⊗ vac + vac ⊗ v`, which is the k-extension once the dereliction reads
+  the vacuum as `k`;
+- the **Z** spider copies the photon number of each mode, `|n⟩ ↦ |n⟩|n⟩`,
+  which is the basis copy.
+
+Fermions and bosons differ only on two particles or more: `eᵢ ∧ eᵢ = 0` and
+an exchange of two fermions costs a sign, neither of which a single photon
+sees. Every word below is one photon, and `ε` keeps exactly one photon, so
+no reading reaches two particles on a wire and the photonic and fermionic
+maps agree. The basis copy is not a coproduct of either Fock space; the
+paper brings it in as a choice, and so does this notebook.
 
 Each reading is a term of `discopy.bang`, the planar kappa calculus with a
 bang: a type called on a function, `N.bang()(lambda x: ...)`, binds `x`, and
 a variable of banged type `!A` used twice is copied by a `Contraction` and
-read by a `Dereliction`, the two rules of `!L*` that the readings use. A
-`bang.Functor` sends the term to tensors, with `!A` as the Fock space of `A`,
-the dereliction as `ε` and the contraction as an optyx diagram evaluated as
-a tensor. Words are vectors drawn at random with a fixed seed. Every reading
-is checked against the paper's formulas, written out independently with
-`numpy.einsum`.
+read by a `Dereliction`. A `bang.Functor` sends the term to an optyx diagram
+of photons, made of the boxes of `discopy.optyx.core.zw`: `Create`, `W` and
+its dagger, `Z` spiders, `Endo` for amplitudes and `Select`. That diagram is
+evaluated by optyx, and its amplitudes on one photon per output are the
+meaning of the reading. Words are vectors drawn at random with a fixed seed,
+and every reading is checked against the paper's formulas, written out
+independently with `numpy.einsum`.
 
 ```python {.marimo}
+import itertools
+
+import cotengra
 import numpy as np
 
-from discopy import bang, tensor
 from discopy.bang import (
     Ty, Box, BangOb, Contraction, Dereliction, Exchange)
-from discopy.tensor import Dim
-from discopy.optyx.core import diagram as optyx
-from discopy.optyx.core.zw import W, ZBox
+from discopy import bang
+from discopy.matrix import OptEinsum
+from discopy.optyx.core.diagram import Diagram, Mode
+from discopy.optyx.core.zw import W, ZBox, Create, Select, Endo
 ```
 
-## 1. Fock spaces and the two copies
+## 1. Words as photons
 
-`ι : A → F(A)` puts the photon of `eᵢ` on mode `i`, the first layer of the
-Fock space. `ε : F(A) → A` reads it back and sends the vacuum to
-`k = (1, …, 1)`, taking `k = 1` as the paper does in its §6. `Δ` is a layer
-of spiders, one per mode, followed by the permutation that collects the
-first outputs of all modes, then the second outputs.
+`Wn(n)` is the W node with `n` outputs, built from binary ones since W is
+coassociative, and `split(d, n)` splits each of `d` modes into `n` copies,
+grouped copy by copy. A word with array `a` from registers of `d₁, …, d_r`
+modes to a register of `d` modes is the diagram `gate(a, [d₁, …, d_r], d)`:
+each input register is split into one copy per index tuple, a Z spider on
+each tuple fuses its copies, so that it holds a photon exactly when every
+input has its photon on that tuple's modes, and the photon of each tuple
+is routed by W nodes, `Endo` amplitudes and W daggers to the output modes
+where `a` is nonzero. With no input, the tuple photon is created. With one
+input, it is a linear optical circuit.
 
 ```python {.marimo}
-k = 1
+def Wn(n):
+    return Diagram.id(Mode(1)) if n == 1 else W(2) >> Mode(1) @ Wn(n - 1)
 
 
-def size(A):
-    return int(np.prod(A.inside))
+def split(d, n):
+    return Diagram.tensor(*d * [Wn(n)]) >> Diagram.permutation(
+        [i * n + c for c in range(n) for i in range(d)], Mode(d * n))
 
 
-def fock(A):
-    return Dim(2 ** size(A))
+def gate(array, dims, cod):
+    """A multilinear map on one-photon registers, as a ZW diagram."""
+    array = np.asarray(array).reshape(tuple(dims) + (cod, ))
+    tuples = list(itertools.product(*map(range, dims)))
+    if dims:
+        wires, seen = [], [dict() for _ in dims]
+        offsets = np.cumsum([0] + [d * (len(tuples) // d) for d in dims])
+        for t in tuples:
+            for r, i in enumerate(t):
+                copy = seen[r][i] = seen[r].get(i, -1) + 1
+                wires.append(int(offsets[r]) + copy * dims[r] + i)
+        fuse = ZBox(len(dims), 1, lambda _: 1) if len(dims) > 1\
+            else Diagram.id(Mode(1))
+        tuple_modes = Diagram.tensor(*(
+            split(d, len(tuples) // d) for d in dims)) >> Diagram.permutation(
+            wires, Mode(len(wires))) >> Diagram.tensor(*len(tuples) * [fuse])
+    else:
+        tuple_modes = Create(1) >> Wn(len(tuples))
+    routes = [[k for k in range(cod) if array[t + (k, )]] for t in tuples]
+    route = Diagram.tensor(*(
+        Wn(len(ks)) >> Diagram.tensor(*(
+            Diagram.id(Mode(1)) if array[t + (k, )] == 1
+            else Endo(array[t + (k, )])
+            for k in ks)) if ks else Select(0)
+        for t, ks in zip(tuples, routes)))
+    ends = [(t, k) for t, ks in enumerate(routes) for k in ks]
+    fan = [sum(k in ks for ks in routes) for k in range(cod)]
+    merge = Diagram.permutation(
+        [ends.index((t, k)) for k in range(cod) for t in range(len(tuples))
+         if k in routes[t]], Mode(len(ends))) >> Diagram.tensor(*(
+            Wn(n).dagger() if n else Create(0) for n in fan))
+    return tuple_modes >> route >> merge
 
 
-def photon(A):
-    """The index in F(A) of one photon on each mode, mode 0 most significant."""
-    return [2 ** (size(A) - 1 - m) for m in range(size(A))]
+def amplitudes(diagram, cods):
+    """The amplitudes of one photon on each output register."""
+    array = diagram.to_tensor().eval(
+        contractor=OptEinsum(), optimize=cotengra.HyperOptimizer(
+            methods=["greedy"], max_repeats=16, minimize="size",
+            progbar=False)).array
+    result = np.zeros(cods)
+    for js in itertools.product(*map(range, cods)):
+        result[js] = array[sum(
+            (tuple(int(m == j) for m in range(c)) for c, j in zip(cods, js)),
+            ())].real
+    return result
+```
+
+```python {.marimo}
+_rng = np.random.default_rng(1)
+_v, _u = _rng.random(2), _rng.random(3)
+_M, _T = _rng.random((2, 3)), _rng.random((2, 3, 2))
+assert np.allclose(amplitudes(gate(_v, [], 2), [2]), _v)
+assert np.allclose(amplitudes(gate(_v, [], 2) >> gate(_M, [2], 3), [3]),
+                   _v @ _M)
+assert np.allclose(amplitudes(
+    gate(_v, [], 2) @ gate(_u, [], 3) >> gate(_T, [2, 3], 2), [2]),
+    np.einsum("i,j,ijk->k", _v, _u, _T))
+mo.md("A gate on photons computes its array, alone or applied to others.")
+```
+
+The gate of a word with one input of two modes, e.g. *He*, splits the photon
+of each mode towards the two outputs, weighs each path by its entry and
+merges the paths that end on the same mode:
+
+```python {.marimo}
+gate(np.array([[.1, .2], [.3, .4]]), [2], 2).draw(figsize=(6, 7))
+```
+
+## 2. Copy and dereliction
+
+`Δ` is a layer of spiders, one per mode, followed by the permutation that
+collects the first outputs, then the second. `ε : !A → A` reads a register
+back as one photon and the vacuum as `k = e₁ + … + e_d` (`k = 1`, as in §6
+of the paper): a Z spider on `|0⟩ + |1⟩` cuts each mode to at most one
+photon, W adds one photon to each mode with amplitude one, and a copy of the
+photon numbers, merged by W dagger and selected on one photon, keeps the
+terms with exactly one photon. Then `ε(vac) = k`, `ε(eᵢ) = eᵢ`, and `ε` is
+zero on two photons or more.
+
+```python {.marimo}
+def cut(d):
+    return Diagram.tensor(*d * [
+        Mode(1) @ ZBox(0, 1, [1, 1]) >> ZBox(2, 1, lambda _: 1)])
 
 
-def iota(A):
-    array = np.zeros((size(A), 2 ** size(A)))
-    array[range(size(A)), photon(A)] = 1
-    return tensor.Box("ι", A, fock(A), array.reshape(A.inside + (-1, )))
-
-
-def epsilon(A):
-    array = np.zeros((2 ** size(A), size(A)))
-    array[photon(A), range(size(A))] = 1
-    array[0] = k
-    return tensor.Box("ε", fock(A), A, array.reshape((-1, ) + A.inside))
-
-
-def layer(A, spider):
-    d = size(A)
-    return optyx.Diagram.tensor(*d * [spider]) >> optyx.Diagram.permutation(
+def layer(d, spider):
+    return Diagram.tensor(*d * [spider]) >> Diagram.permutation(
         [2 * m for m in range(d)] + [2 * m + 1 for m in range(d)],
-        optyx.Mode(2 * d))
+        Mode(2 * d))
 
 
-def delta(A, spider):
-    array = layer(A, spider).to_tensor(input_dims=size(A) * [2]).eval().array
-    return tensor.Box(f"Δ({spider.name})", fock(A), fock(A) @ fock(A),
-                      array.real.reshape(3 * (2 ** size(A), )))
+def epsilon(d):
+    add_one = Diagram.tensor(*d * [
+        Mode(1) @ ZBox(0, 1, [1, 1]) >> W(2).dagger()])
+    one_photon = layer(d, ZBox(1, 2, lambda _: 1)) >> Mode(d) @ (
+        Wn(d).dagger() >> Select(1))
+    return add_one >> cut(d) >> one_photon
 
 
 k_extension, basis_copy = W(2), ZBox(1, 2, lambda _: 1)
 copies = {"k-extension": k_extension, "basis copy": basis_copy}
-layer(Dim(2), k_extension).draw(figsize=(4, 4))
+layer(2, k_extension).draw(figsize=(4, 3))
 ```
 
-On two modes, the W layer above is the k-extension and the Z layer below is
-the basis copy:
+On the two modes of `N`, the W layer above is the k-extension, the Z layer
+below the basis copy, and last comes the dereliction:
 
 ```python {.marimo}
-layer(Dim(2), basis_copy).draw(figsize=(4, 4))
+layer(2, basis_copy).draw(figsize=(4, 3))
+```
+
+```python {.marimo}
+epsilon(2).draw(figsize=(8, 10))
 ```
 
 ```python {.marimo}
 _v = np.array([.3, .7])
-_state = tensor.Box("v", Dim(1), Dim(2), _v)
-_copied = {name: (_state >> iota(Dim(2)) >> delta(Dim(2), spider)
-                  >> epsilon(Dim(2)) @ epsilon(Dim(2))).eval().array
+_state = gate(_v, [], 2)
+assert np.allclose(amplitudes(Create(0, 0) >> epsilon(2), [2]), [1, 1])
+assert np.allclose(amplitudes(_state >> epsilon(2), [2]), _v)
+assert np.allclose(amplitudes(Create(1, 1) >> epsilon(2), [2]), 0)
+_copied = {name: amplitudes(_state >> layer(2, spider)
+                            >> epsilon(2) @ epsilon(2), [2, 2])
            for name, spider in copies.items()}
 assert np.allclose(_copied["k-extension"],
                    np.outer(_v, [1, 1]) + np.outer([1, 1], _v))
 assert np.allclose(_copied["basis copy"], np.diag(_v))
-assert np.allclose(
-    (_state >> iota(Dim(2)) >> epsilon(Dim(2))).eval().array, _v), "ε ∘ ι = id"
-mo.md("W copies `v` to `v ⊗ k + k ⊗ v` and Z copies it to `Σᵢ vᵢ eᵢ ⊗ eᵢ`.")
+mo.md("`ε` sends the vacuum to `k`, one photon to itself and two to zero; "
+      "W copies `v` to `v ⊗ k + k ⊗ v` and Z to `Σᵢ vᵢ eᵢ ⊗ eᵢ`.")
 ```
 
-## 2. The lexicon
+## 3. The lexicon
 
 A word is a box of `discopy.bang`. A function type of the paper is an atom,
 and the elimination rule of `!L*`, from `A ⊗ A\B` to `B`, is a box that
 contracts the argument with the first index of the function. A word whose
 type has a `!` outside outputs a banged wire, which a term may copy; a `!` on
 an argument is read by a dereliction before the argument is passed, and
-`ε ∘ ι = id`, so it is left out of the boxes.
+`ε` is the identity on one photon, so it is left out of the boxes.
 
 | word | type of §3.3 | box here |
 |---|---|---|
@@ -161,7 +253,8 @@ sentences side by side.
 
 ```python {.marimo}
 N, S, VP, H, V = map(Ty, ("N", "S", "VP", "H", "V"))
-John, Bill, Mary = (Box(name, Ty(), N.bang()) for name in ("John", "Bill", "Mary"))
+John, Bill, Mary = (Box(name, Ty(), N.bang()) for name in (
+    "John", "Bill", "Mary"))
 code, guitar = Box("code", Ty(), N), Box("guitar", Ty(), N)
 sleeps, snores = Box("sleeps", Ty(), VP), Box("snores", Ty(), VP)
 plays, likes = Box("plays", Ty(), V.bang()), Box("likes", Ty(), V.bang())
@@ -178,7 +271,7 @@ def der(term):
 ```
 
 The arrays `a` of the words are drawn at random with their arguments first,
-and those of the elimination boxes are identities.
+and those of the elimination boxes are Kronecker deltas.
 
 ```python {.marimo}
 rng = np.random.default_rng(0)
@@ -192,51 +285,61 @@ a = {name: rng.random(shapes[kinds.get(name, "N")]) for name in words}
 _I = np.eye(2)
 a |= {"ev": np.einsum("nm,st->nmst", _I, _I),
       "of": np.einsum("pq,rt->pqrt", _I, _I),
-      "obj": np.einsum("or,nm,st->ornsmt", _I, _I, _I),
-      "and": np.einsum("su,tv->stuv", _I, _I)}
+      "obj": np.einsum("or,nm,st->ornsmt", _I, _I, _I)}
 ```
 
-A `bang.Functor` into `tensor.Diagram` sends `!A` to `F(A)`, a dereliction
-to `ε`, a contraction to `Δ` with the chosen spider, an exchange to a swap
-and a word to its array, followed by `ι` when its output is banged.
+A `bang.Functor` into optyx diagrams sends an atom of dimension `d` and its
+bang to `d` modes, a dereliction to `ε`, a contraction to `Δ` with the
+chosen spider, an exchange to a permutation of modes, `and` to the identity
+and every other box to its gate, cut to at most one photon per mode.
 
 ```python {.marimo}
-dim = {N: Dim(2), S: Dim(2), VP: Dim(2, 2), H: Dim(2, 2), V: Dim(2, 2, 2)}
+size = {N: 2, S: 2, VP: 4, H: 4, V: 8}
+
+
+def modes(wire):
+    return size[wire.arg] if isinstance(wire, BangOb) else size[Ty(wire)]
 
 
 def ob(x):
-    wire, = x.inside
-    return fock(dim[wire.arg]) if isinstance(wire, BangOb) else dim[x]
-
-
-def dims(typ):
-    return Dim(1).tensor(*(ob(typ[i:i + 1]) for i in range(len(typ))))
+    return Mode(sum(map(modes, x.inside)))
 
 
 def ar(spider):
     def image(box):
         if isinstance(box, Dereliction):
-            return epsilon(dim[box.x])
+            return epsilon(size[box.x])
         if isinstance(box, Contraction):
-            return delta(dim[box.x], spider)
+            return layer(size[box.x], spider)
         if isinstance(box, Exchange):
-            split = -1 if box.is_dagger else 1
-            return tensor.Diagram.swap(
-                dims(box.dom[:split]), dims(box.dom[split:]))
-        banged = isinstance(box.cod.inside[0], BangOb)
-        cod = dim[box.cod.inside[0].arg] if banged else dims(box.cod)
-        value = tensor.Box(box.name, dims(box.dom), cod, a[box.name])
-        return value >> iota(cod) if banged else value
+            split_at = -1 if box.is_dagger else 1
+            x, y = len(ob(box.dom[:split_at])), len(ob(box.dom[split_at:]))
+            return Diagram.permutation(
+                list(range(x, x + y)) + list(range(x)), Mode(x + y))
+        if box == and_:
+            return Diagram.id(Mode(4))
+        cod = modes(box.cod.inside[0])
+        return gate(a[box.name], list(map(modes, box.dom.inside)), cod)\
+            >> cut(cod)
     return image
 
 
+computed = {}
+
+
 def meaning(term, spider):
-    """The tensor of a reading, with contraction given by a spider."""
-    functor = bang.Functor(ob_map=ob, ar_map=ar(spider), cod=tensor.Diagram)
-    return term.eval(functor).eval().array
+    """
+    The amplitudes of a reading, with contraction given by a spider,
+    computed once: contracting the photons of a reading takes a minute.
+    """
+    key = (str(term), spider.name)
+    if key not in computed:
+        functor = bang.Functor(ob_map=ob, ar_map=ar(spider), cod=Diagram)
+        computed[key] = amplitudes(term.eval(functor), (2, 2))
+    return computed[key]
 ```
 
-## 3. Anaphora: *John sleeps. He snores.*
+## 4. Anaphora: *John sleeps. He snores.*
 
 `John` is used twice, so it is copied: one copy is the subject of *sleeps*
 and the other goes through *He* to *snores* (figure 11 of the paper). With
@@ -260,7 +363,7 @@ assert np.allclose(meaning(anaphora, basis_copy),
 mo.md("Both copies give the paper's map of §5.1.")
 ```
 
-## 4. Ellipsis: *John plays guitar. Mary does too.*
+## 5. Ellipsis: *John plays guitar. Mary does too.*
 
 The verb phrase *plays guitar* is bound and used twice: one copy is
 applied to *John*, the other goes through *does too* to *Mary* (figure 12).
@@ -297,7 +400,7 @@ assert np.allclose(meaning(ellipsis, basis_copy), np.einsum(
 mo.md("Both copies give the paper's map of §5.2.")
 ```
 
-## 5. Anaphora with ellipsis: strict and sloppy
+## 6. Anaphora with ellipsis: strict and sloppy
 
 **Strict** (figures 3 and 13): two contractions. *John* is used twice, as
 the subject and as the owner in *his code*, and the verb phrase *likes
@@ -335,7 +438,7 @@ sloppy.eval().draw(figsize=(9, 12))
 ```
 
 The same readings written with `einsum`, with `copy` the paper's `Δ` on the
-vectors of `A` (`ε ⊗ ε ∘ Δ ∘ ι`) rather than on photons:
+vectors of `A`, i.e. `ε ⊗ ε ∘ Δ` on one photon:
 
 ```python {.marimo}
 def k_copy(v):

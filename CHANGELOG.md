@@ -11,13 +11,13 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 - The notebook `docs/notebooks/optyx/strict_sloppy.md` reproduces §5 of
   arXiv:2110.10641, the strict and sloppy readings of *John likes his code.
-  Bill does too.*, each reading a kappa term of `discopy.bang` that copies
-  banged wires by `Contraction`, sent by a `bang.Functor` into
-  `tensor.Diagram` with the Fock space of `!` as photons on modes. The
-  paper's k-extension is the W node of `discopy.optyx.core.zw` and its basis
-  copy the Z spider; anaphora, ellipsis and both readings are checked against
-  the paper's formulas, and the two readings are shown to be two maps
-  ([next#674], [next#691]).
+  Bill does too.*, with photons: each reading is a kappa term of
+  `discopy.bang`, sent by a `bang.Functor` to a diagram of
+  `discopy.optyx.core.zw` where a word vector is one photon over modes, `!`
+  the bosonic Fock space of those modes, the paper's k-extension the W node
+  and its basis copy the Z spider. Anaphora, ellipsis and both readings are
+  checked against the paper's formulas, and the two readings are shown to be
+  two maps ([next#674], [next#691]).
 - The kappa calculus, the first-order half of the lambda calculus: each
   module below the closed categories has terms of its own, `Variable`,
   `Constant`, `Application` and `Kappa`, with `let` for the redex. In `cat`
@@ -773,6 +773,9 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Fixed
 
+- A Z spider of `discopy.optyx.core.zw` with two inputs or more fed by a W
+  dagger no longer fails to truncate on the numpy integer its dimension was
+  ([next#691]).
 - `closed.Abstraction.eval` curries its variable on the side that
   `Application.eval` evaluates, so a β-redex and its reduct are sent to the
   same morphism by a functor into a rigid category, e.g. tensors, where they
