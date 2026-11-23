@@ -62,6 +62,8 @@ from discopy.utils import (
 if TYPE_CHECKING:
     import sympy
     import quimb.tensor
+    from discopy.kleisli.monad import Monad
+    from discopy.monad.algebra import Algebra
 
 
 @factory
@@ -529,6 +531,40 @@ and 'Matrix[int]'
         with backend() as np:
             return cls(np.zeros(
                 (index(dom), index(cod)), dtype=cls.dtype or int), dom, cod)
+
+    @classmethod
+    def algebra(cls, monad: Monad, dom: Nat | int, cod: Nat | int) -> Algebra:
+        """
+        The algebra of a monad on the matrices from ``dom`` to ``cod``, by
+        which a functor into matrices extends to the change of base of its
+        domain, see :class:`discopy.enriched.Functor`: the sum of a list of
+        matrices, for the :attr:`~discopy.kleisli.monad.List` monad.
+
+        Parameters:
+            monad : The monad, the list monad alone here.
+            dom : The domain of the matrices.
+            cod : The codomain of the matrices.
+
+        Raises:
+            TypeError : For any monad but the list monad.
+
+        Example
+        -------
+        >>> from discopy.kleisli.monad import List
+        >>> total = Matrix[int].algebra(List, 1, 2)
+        >>> total([Matrix([1, 0], 1, 2), Matrix([2, 3], 1, 2)])
+        Matrix[int]([3, 3], dom=Nat(1), cod=Nat(2))
+        >>> assert total([]) == Matrix[int].zero(1, 2)
+        """
+        # pylint: disable-next=import-outside-toplevel  # kleisli imports us
+        from discopy.kleisli.monad import List
+        # pylint: disable-next=import-outside-toplevel  # kleisli imports us
+        from discopy.monad import algebra
+        if monad != List:
+            raise TypeError(messages.NO_ALGEBRA.format(
+                factory_name(cls), monad))
+        return algebra.Algebra[List](  # ty: ignore[invalid-type-form]
+            "sum", cls, lambda matrices: sum(matrices, cls.zero(dom, cod)))
 
     @classmethod
     def swap(cls, left: Nat | int, right: Nat | int) -> Matrix:
