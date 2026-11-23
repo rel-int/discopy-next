@@ -20,13 +20,22 @@ Each module below `biclosed` has a `Ty` and a `Nat` of its own, the `ob` of its 
 subclass those of the levels its diagrams subclass. `Ty.term_factory` is the class of terms of
 the module, and a type applied to a function is a kappa of that class. From `biclosed` up, where a
 type applied to a function is a lambda abstraction, a `Ty` subclasses that of each level whose
-boxes its diagrams take: `closed.Ty` is a `markov.Ty`, `frobenius.Ty` a `markov.Ty` and a
-`comarkov.Ty`.
+boxes its diagrams take: `closed.Ty` is a `markov.Ty`, `ribbon.Ty` a `pivotal.Ty` and a
+`balanced.Ty`, `compact.Ty` a `ribbon.Ty` and a `symmetric.Ty`, `frobenius.Ty` a `compact.Ty`, a
+`markov.Ty` and a `comarkov.Ty`. Its `term_factory` is the one it inherits, e.g. the term of a
+compact diagram is a symmetric term.
 
 Types of two levels with the same class of wires are lists of the same wires. A type of another
 level is read as one of the level it meets, by `Ty.cast_ty`: at the boundary of a box or of a
-diagram, as the plumbing of a layer, and in a tensor of types, which is of the higher of the two
-levels. Nothing else converts: types of two levels are not equal.
+diagram, of a hypergraph or of a map, as the plumbing of a layer, and in a tensor of types, which
+is of the higher of the two levels. Nothing else converts: types of two levels are not equal.
+
+A term is of the level of its type, so it evaluates in the category of that level, and a box of a
+lower level is not an arrow there: a symmetric kappa binds its variables in any order, which a
+monoidal box has no swap for. A constant, an application and a kappa check the boxes of their
+parts when they are built, `TermBase.scan_constants`, and raise a `TypeError` on one of a lower
+level, where the term used to be built and to fail when evaluated
+([#684](https://github.com/rel-int/discopy-next/issues/684)).
 
 ## Consequences
 
@@ -37,9 +46,15 @@ levels. Nothing else converts: types of two levels are not equal.
   `lens.Markov.ob(x, y)`.
 - A tree or a pickle written with the shared types loads with those of its level.
 - A level needs its `Nat` to be found from its `Ty`, hence `Ty.nat_factory`.
-- `ribbon` and `compact` still share `pivotal.Ty`, which is neither a `balanced.Ty` nor a
-  `symmetric.Ty` ([#683](https://github.com/rel-int/discopy-next/issues/683)).
+- `ribbon` and `compact` shared `pivotal.Ty`, which is neither a `balanced.Ty` nor a
+  `symmetric.Ty`: they got their types in a second round
+  ([#683](https://github.com/rel-int/discopy-next/issues/683)), so that `pivotal.Ty('x')`,
+  `ribbon.Ty('x')` and `compact.Ty('x')` are three types.
+- A functor of a level below that of the types of a diagram still maps the types down and not
+  the boxes, as it did on `rigid` types before
+  ([#703](https://github.com/rel-int/discopy-next/issues/703)).
 
 ## Status
 
-Accepted, 2026-11-21, carried out by [#679](https://github.com/rel-int/discopy-next/pull/679).
+Accepted, 2026-11-21, extended to `ribbon` and `compact` on 2026-11-23, carried out by
+[#679](https://github.com/rel-int/discopy-next/pull/679).

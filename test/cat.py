@@ -1102,12 +1102,25 @@ def test_term_without_a_box_reads_back(level):
     assert type(read) is module.Kappa
 
 
-def test_terms_from_biclosed_up():
-    from discopy import biclosed, compact, symmetric
-    x = compact.Ty('x')
-    diagram = compact.Swap(x, x) >> compact.Box('f', x @ x, x)
+@pytest.mark.parametrize("level, below, structure", [
+    ("ribbon", "balanced", "Braid"), ("compact", "symmetric", "Swap")])
+def test_terms_from_biclosed_up(level, below, structure):
+    import importlib
+    from discopy import biclosed, pivotal
+    module, lower = map(importlib.import_module, (
+        f"discopy.{level}", f"discopy.{below}"))
+    x, old = module.Ty('x'), pivotal.Ty('x')
+    assert type(x) is module.Ty is module.Diagram.ob and x != old
+    assert isinstance(x, (pivotal.Ty, lower.Ty))
+    assert isinstance(module.Ty.nat_factory(2), (module.Ty, lower.Nat))
+    assert module.Ty.term_factory is lower.TermBase
+    box = module.Box('f', old @ old, old)
+    assert type(box.dom) is module.Ty and box.dom == x @ x == x @ old
+    assert type(box.to_hypergraph().dom) is type(box.to_map().dom) is module.Ty
+    diagram = getattr(module, structure)(x, x) >> box
     term = diagram.to_term()
-    assert type(term) is symmetric.Kappa and term.eval() == diagram
+    assert type(term) is lower.Kappa and term.category is module.Diagram
+    assert term.eval() == diagram
     assert type(x(lambda a: a)) is biclosed.Abstraction
 
 
