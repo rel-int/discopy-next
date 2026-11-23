@@ -12,7 +12,7 @@ from discopy.utils import AxiomError, dumps, loads
 def test_Swap():
     x, y = Ty('x'), Ty('y')
     assert repr(Swap(x, y)) == "symmetric.Swap("\
-        "feedback.Ty(feedback.Wire('x')), feedback.Ty(feedback.Wire('y')))"
+        "symmetric.Ty(feedback.Wire('x')), symmetric.Ty(feedback.Wire('y')))"
     assert Swap(x, y).dagger() == Swap(y, x)
     with raises(ValueError):
         Swap(x ** 2, Ty())
@@ -638,13 +638,36 @@ def test_term_errors_and_levels():
     assert Kappa((), f(a, b), 1).freevars == [a, b]
     read = (y @ x)(lambda b, a: f(a, b))
     assert type(read) is Kappa and read == Kappa((b, a), f(a, b))
-    low = monoidal.Constant(monoidal.Box('f', x @ y, x))
-    with raises(ValueError, match="block of variables"):
-        (y @ x)(lambda b, a: low(a, b))
-    assert type(x(lambda a: a)) is monoidal.Kappa
+    assert type(x(lambda a: a)) is Kappa
     assert x(lambda a: a) == Kappa((a, ), a)
-    assert type(f(a)) is Application and type(low(a)) is Application
-    assert type(low(monoidal.Variable('a', x))) is monoidal.Application
+    assert type(f(a)) is Application
+    assert type(f(monoidal.Variable('a', x))) is Application
+
+
+def test_term_refuses_a_box_of_a_lower_level_when_built():
+    from discopy import compact, markov
+    x, y = Ty('x'), Ty('y')
+    a, b = Variable('a', x), Variable('b', y)
+    box = monoidal.Box('f', x @ y, x)
+    low = monoidal.Constant(box)
+    planar = low(monoidal.Variable('a', x), monoidal.Variable('b', y))
+    assert type(planar) is monoidal.Application
+    for build in (
+            lambda: Constant(box), lambda: low(a), lambda: low(a, b),
+            lambda: Application(low, a), lambda: Kappa((), planar, 0),
+            lambda: (y @ x)(lambda b, a: low(a, b)),
+            lambda: markov.Constant(Box('f', x, x)),
+            lambda: Constant(Box('f', x, x))(markov.Variable('a', x))):
+        with raises(TypeError, match="Expected (symmetric|markov).Diagram"):
+            build()
+    high = Constant(compact.Box('f', compact.Ty('x'), compact.Ty('x')))
+    a = Variable('a', compact.Ty('x'))
+    term = Kappa((a, ), high(a))
+    assert term.category is compact.Diagram and term.eval() == high.box
+    lowest = monoidal.Kappa((monoidal.Variable('a', x), ), Constant(
+        Box('f', x, x))(monoidal.Variable('a', x)))
+    assert type(lowest.body) is Application and lowest.eval() == Box(
+        'f', x, x)
 
 
 def test_term_laws():
@@ -669,3 +692,14 @@ def test_term_laws():
     sampler = Sampler(TermBase, iter([0, 1]), [x], "a")
     v, w = Variable('v', x), Variable('w', x)
     assert str(sampler.state(y, (v, w))) == "c0(w, v)"
+
+
+def test_permutation_of_natural_numbers_at_each_level():
+    from discopy import comarkov, compact, frobenius, markov
+    for module in (symmetric, markov, comarkov, compact, frobenius):
+        nat = module.Diagram.ob.nat_factory
+        assert isinstance(nat(2), module.Diagram.ob)
+        diagram = module.Diagram.permutation([1, 0])
+        assert diagram.dom == nat(2) == diagram.cod
+        assert diagram == module.Diagram.swap(nat(1), nat(1))
+        assert module.Diagram.from_permutation([1, 0]).dom == nat(2)

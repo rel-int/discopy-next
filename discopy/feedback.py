@@ -513,6 +513,9 @@ class Nat(monoidal.Nat, Ty):
     """
 
 
+Ty.nat_factory = Nat
+
+
 class Layer(monoidal.Layer):
     """ A feedback layer is a monoidal layer with a `delay` method. """
     def delay(self, n_steps=1):
@@ -711,10 +714,10 @@ class Box(monoidal.Box, Diagram):
 
         Example
         -------
-        >>> from discopy.markov import Copy
-        >>> x = Ty('x')
+        >>> from discopy import markov
+        >>> x = markov.Ty('x')
         >>> assert Box('f', x, x).delay(42).time_step == 42
-        >>> copy = Copy(x).delay(42)
+        >>> copy = markov.Copy(x).delay(42)
         >>> assert copy.time_step is None and copy.dom == x.delay(42)
         """
         return None if hasattr(self, "__getnewargs__") else self._time_step

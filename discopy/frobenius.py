@@ -88,7 +88,7 @@ from operator import index
 from typing import ClassVar, Self
 
 from discopy import (
-    monoidal, rigid, markov, comarkov, compact, pivotal, feedback, cmap,
+    monoidal, markov, comarkov, compact, pivotal, feedback, cmap,
     hypergraph, symmetric)
 from discopy.abc import HypergraphCategory
 from discopy.cat import factory
@@ -140,9 +140,10 @@ HeadOb, TailOb = feedback.structural_wires(Wire)
 
 
 @factory
-class Ty(pivotal.Ty):
+class Ty(compact.Ty, markov.Ty, comarkov.Ty):
     """
-    A frobenius type is a pivotal type with frobenius objects inside.
+    A frobenius type is a compact type with frobenius objects inside, a
+    markov type and a comarkov one.
 
     Parameters:
         inside (frobenius.Wire) : The objects inside the type.
@@ -151,7 +152,7 @@ class Ty(pivotal.Ty):
 
 
 @factory
-class Nat(rigid.Nat, Ty):
+class Nat(compact.Nat, markov.Nat, comarkov.Nat, Ty):
     """
     A ``Nat`` is a natural number ``n`` seen as a frobenius type with
     unnamed objects.
@@ -163,6 +164,9 @@ class Nat(rigid.Nat, Ty):
     """
 
     l = r = property(lambda self: self)
+
+
+Ty.nat_factory = Nat
 
 
 @factory

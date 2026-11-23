@@ -12,6 +12,8 @@ Summary
     :toctree:
 
     Wire
+    Ty
+    Nat
     Diagram
     Box
     Braid
@@ -72,7 +74,7 @@ from discopy import monoidal, messages
 from discopy import sum as formal_sum
 from discopy.abc import BraidedCategory, SpacialCategory
 from discopy.cat import factory, kappa_calculus
-from discopy.monoidal import Ty, Match
+from discopy.monoidal import Match
 from discopy.utils import (
     assert_isatomic, AxiomError, BinaryBoxConstructor, deprecated_alias,
     factory_name, from_tree)
@@ -89,6 +91,19 @@ class Wire(monoidal.Wire):
 
 
 @factory
+class Ty(monoidal.Ty):
+    """ A braided type: applied to a function, a term of this module. """
+
+
+@factory
+class Nat(monoidal.Nat, Ty):
+    """ A natural number ``n`` seen as a braided type of length ``n``. """
+
+
+Ty.nat_factory = Nat
+
+
+@factory
 class Diagram(monoidal.Diagram, BraidedCategory):
     """
     A braided diagram is a monoidal diagram with :class:`Braid` boxes.
@@ -98,6 +113,7 @@ class Diagram(monoidal.Diagram, BraidedCategory):
         dom (monoidal.Ty) : The domain of the diagram, i.e. its input.
         cod (monoidal.Ty) : The codomain of the diagram, i.e. its output.
     """
+    ob = Ty
     braid_naturality = BraidedCategory.braid_naturality.failing(
         messages.NO_BRAID_GROUP)
     braid_then_inverse = BraidedCategory.braid_then_inverse.failing(
@@ -287,7 +303,8 @@ class Braid(BinaryBoxConstructor, Box):
         return cls(left, right, is_dagger=tree.get('is_dagger', False))
 
 
-def hexagon(cls: type, factory: Callable) -> Callable[[Ty, Ty], Diagram]:
+def hexagon(cls: type, factory: Callable
+            ) -> Callable[[monoidal.Ty, monoidal.Ty], Diagram]:
     """
     Take a ``factory`` for braids of atomic types and extend it recursively.
 
@@ -295,7 +312,7 @@ def hexagon(cls: type, factory: Callable) -> Callable[[Ty, Ty], Diagram]:
         cls : A diagram factory, e.g. :class:`Diagram`.
         factory : A factory for braids of atomic types, e.g. :class:`Braid`.
     """
-    def method(left: Ty, right: Ty) -> Diagram:
+    def method(left: monoidal.Ty, right: monoidal.Ty) -> Diagram:
         if len(left) == 0:
             return cls.id(right)
         if len(right) == 0:

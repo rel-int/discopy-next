@@ -11,6 +11,8 @@ Summary
     :nosignatures:
     :toctree:
 
+    Ty
+    Nat
     Diagram
     Box
     Cup
@@ -95,9 +97,20 @@ from typing import ClassVar
 from discopy import rigid, pivotal, balanced, feedback
 from discopy.abc import RibbonCategory
 from discopy.cat import factory
-from discopy.pivotal import (  # noqa: F401  pylint: disable=unused-import
-    Ty, Nat)
 from discopy.utils import from_tree
+
+
+@factory
+class Ty(pivotal.Ty, balanced.Ty):
+    """ A ribbon type, i.e. a pivotal type and a balanced one. """
+
+
+@factory
+class Nat(pivotal.Nat, balanced.Nat, Ty):
+    """ A natural number ``n`` seen as a ribbon type of length ``n``. """
+
+
+Ty.nat_factory = Nat
 
 
 @factory
@@ -107,9 +120,10 @@ class Diagram(pivotal.Diagram, balanced.Diagram, RibbonCategory):
 
     Parameters:
         inside(Layer) : The layers of the diagram.
-        dom (pivotal.Ty) : The domain of the diagram, i.e. its input.
-        cod (pivotal.Ty) : The codomain of the diagram, i.e. its output.
+        dom (Ty) : The domain of the diagram, i.e. its input.
+        cod (Ty) : The codomain of the diagram, i.e. its output.
     """
+    ob = Ty
     box_factory: ClassVar[type["Box"]]
     braid_factory: ClassVar[type["Braid"]]
     functor_factory: ClassVar[type["Functor"]]
@@ -188,8 +202,8 @@ class Box(pivotal.Box, balanced.Box, Diagram):
 
     Parameters:
         name (str) : The name of the box.
-        dom (pivotal.Ty) : The domain of the box, i.e. its input.
-        cod (pivotal.Ty) : The codomain of the box, i.e. its output.
+        dom (Ty) : The domain of the box, i.e. its input.
+        cod (Ty) : The codomain of the box, i.e. its output.
     """
 
 
@@ -198,8 +212,8 @@ class Cup(pivotal.Cup, Box):
     A ribbon cup is a pivotal cup in a ribbon diagram.
 
     Parameters:
-        left (pivotal.Ty) : The atomic type.
-        right (pivotal.Ty) : Its adjoint.
+        left (Ty) : The atomic type.
+        right (Ty) : Its adjoint.
     """
 
 
@@ -208,8 +222,8 @@ class Cap(pivotal.Cap, Box):
     A ribbon cap is a pivotal cap in a ribbon diagram.
 
     Parameters:
-        left (pivotal.Ty) : The atomic type.
-        right (pivotal.Ty) : Its adjoint.
+        left (Ty) : The atomic type.
+        right (Ty) : Its adjoint.
     """
 
 
@@ -218,8 +232,8 @@ class Braid(balanced.Braid, Box):
     A ribbon braid is a balanced braid in a ribbon diagram.
 
     Parameters:
-        left (pivotal.Ty) : The type on the top left and bottom right.
-        right (pivotal.Ty) : The type on the top right and bottom left.
+        left (Ty) : The type on the top left and bottom right.
+        right (Ty) : The type on the top right and bottom left.
         is_dagger (bool) : Braiding over or under.
     """
 
@@ -363,7 +377,7 @@ class Twist(balanced.Twist, Box):
     Balanced twist in a ribbon category.
 
     Parameters:
-        dom (pivotal.Ty) : The domain of the twist.
+        dom (Ty) : The domain of the twist.
         is_dagger (bool) : Whether this is the inverse twist.
     """
 
@@ -394,8 +408,8 @@ class Functor(pivotal.Functor, balanced.Functor):
     A ribbon functor is both a pivotal functor and a balanced functor.
 
     Parameters:
-        ob_map (Mapping[pivotal.Ty, pivotal.Ty]) :
-            Map from atomic :class:`pivotal.Ty` to :code:`cod.ob`.
+        ob_map (Mapping[Ty, Ty]) :
+            Map from atomic :class:`Ty` to :code:`cod.ob`.
         ar_map (Mapping[Box, Diagram]) : Map from :class:`Box` to :code:`cod`.
         cod (Category) : The codomain of the functor.
     """

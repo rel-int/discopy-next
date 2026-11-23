@@ -1547,3 +1547,36 @@ def test_laws():
     term = find(TermBase.strategy(), lambda term: term.stack and "let" in str(
         term))
     assert all(law(term) for law in laws)
+
+
+def test_types_of_two_levels():
+    from discopy import braided, comarkov, frobenius, markov
+    x, y, u = Ty('x'), braided.Ty('y'), symmetric.Ty('u')
+    assert x @ y == braided.Ty('x', 'y') == braided.Ty.cast_ty(x) @ y
+    assert y @ x == braided.Ty('y', 'x') and x @ x == Ty('x', 'x')
+    assert braided.Ty.cast_ty(Nat(2)) == braided.Nat(2)
+    assert braided.Ty.cast_ty(u) is u and braided.Ty.cast_ty('x') == 'x'
+    f = braided.Box('f', x, y @ x)
+    assert (f.dom, f.cod) == (braided.Ty('x'), braided.Ty('y', 'x'))
+    assert x @ f == braided.Ty('x') @ f and braided.Id(x).dom == f.dom
+    assert braided.Box('f', u, u).dom is u
+    assert markov.Copy(u).dom == markov.Ty('u') != u
+    assert markov.Copy(symmetric.Nat(1)).dom == markov.Nat(1)
+    assert Nat(1) @ braided.Nat(2) == braided.Nat(3) == braided.Nat(2) @ Nat(1)
+    assert type(Nat(1) @ Nat(2)) is Nat
+    with raises(TypeError, match="one level above the others"):
+        markov.Nat(1) @ comarkov.Nat(1)
+    assert markov.Ty('x') @ u == markov.Ty('x', 'u') == u[:0] @ markov.Ty(
+        'x') @ u
+    with raises(TypeError, match="one level above the others, got markov.Ty"):
+        markov.Ty('x') @ comarkov.Ty('y')
+    assert markov.Box('f', comarkov.Ty('x'), u).dom == markov.Ty('x')
+    for nat in (markov.Nat, comarkov.Nat):
+        assert isinstance(frobenius.Nat(2), nat)
+        assert frobenius.Nat(2) @ nat(1) == frobenius.Nat(3) == nat(
+            1) @ frobenius.Nat(2)
+        assert nat.cast_ty(frobenius.Nat(2)) == frobenius.Nat(2)
+    for mixed in (lambda: x @ u, lambda: u @ x, lambda: x @ Nat(1),
+                  lambda: Nat(1) @ x, lambda: symmetric.Box('f', x, x)):
+        with raises(TypeError):
+            mixed()

@@ -61,7 +61,7 @@ the second quantisation of ``f``, see the notebook
 from __future__ import annotations
 
 from functools import cached_property
-from typing import Callable, ClassVar, Self
+from typing import ClassVar, Self
 
 from discopy import monoidal, messages
 from discopy.abc import LinearCategory, MonoidalCategory
@@ -75,32 +75,21 @@ from discopy.utils import (
 class Ty(monoidal.Ty):
     """
     A type with a bang, a monoidal type whose wires may be
-    :class:`BangOb`.
+    :class:`BangOb`. Applied to a Python function it is a :class:`Kappa`
+    of the terms of its :attr:`term_factory`, which binds its variables in
+    a linear category even when the body has no box, e.g. weakens a banged
+    variable it does not use.
+
+    Example
+    -------
+    >>> x = Ty('x')
+    >>> term = (x.bang() @ x)(lambda a, b: b)
+    >>> assert isinstance(term, Kappa)
+    >>> assert term.eval() == Weakening(x) @ x
+    >>> assert eval(str(term)) == term
     """
     bang_factory: ClassVar[type[BangOb]]
     term_factory: ClassVar[type["TermBase"]]
-
-    def __call__(self, function: Callable, offset: int | None = None):
-        """
-        The kappa abstraction of a Python function, a :class:`Kappa` of the
-        terms of its :attr:`term_factory`: a type with a bang binds its
-        variables in a linear category even when the body has no box, e.g.
-        weakens a banged variable it does not use.
-
-        Parameters:
-            function : The body, as a function of the variables.
-            offset : Passed to :class:`Kappa`.
-
-        Example
-        -------
-        >>> x = Ty('x')
-        >>> term = (x.bang() @ x)(lambda a, b: b)
-        >>> assert isinstance(term, Kappa)
-        >>> assert term.eval() == Weakening(x) @ x
-        >>> assert eval(str(term)) == term
-        """
-        return self.term_factory.kappa_factory.from_callable(
-            self, offset)(function)
 
     def bang(self) -> Self:
         """
@@ -920,6 +909,7 @@ got a, b.
                  offset: int | None = None):
         # pylint: disable=super-init-not-called  # unused variables too
         assert_isinstance(body, monoidal.TermBase)
+        self.scan_constants(body)
         variables = tuple(variables)
         used = self.used(variables, body)
         start = self.start(variables, body, offset)

@@ -53,8 +53,12 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   modules that add no way to bind a variable, `spacial`, `braided`,
   `feedback`, `balanced` and `comarkov`, get terms of their own from
   `cat.kappa_calculus`, with their structural boxes as constants. A type
-  applied to a Python function is its kappa abstraction, and the laws are
-  cells of the property matrix ([next#658]).
+  applied to a Python function is its kappa abstraction, of the module of
+  the type, so that the string of a term reads back as a term of its own
+  class. A term over a box of a level below its own, e.g. a symmetric
+  application of a monoidal constant, raises a `TypeError` when it is
+  built, see `cat.TermBase.scan_constants`. The laws are cells of the
+  property matrix ([next#658], [next#679]).
 - `discopy.peirce.alpha` and `discopy.peirce.beta`: Peirce's existential
   graphs as diagrams with white and black regions, a cut where the colour
   changes. `~d`, `d & e`, `d | e`, `d.relative_sum(e)` and `d.par(e)` are
@@ -529,6 +533,22 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Changed
 
+- `spacial`, `braided`, `balanced`, `symmetric`, `markov`, `comarkov`,
+  `ribbon` and `compact` each have a `Ty` and a `Nat` of their own, where
+  they shared those of `monoidal`, of `feedback` or of `pivotal`:
+  `symmetric.Ty('x') != markov.Ty('x')`, and the repr of a type names its
+  module. `closed.Ty`, `ribbon.Ty`, `compact.Ty` and `frobenius.Ty` subclass
+  the types of the levels their diagrams subclass, and the natural numbers
+  of `interaction.Ty` are those of `ribbon`. A type of another level with
+  the same wires is read as one of the level it meets, see
+  `monoidal.Ty.cast_ty`: at the boundary of a box, of a diagram, of a
+  `Hypergraph` or of a `CMap`, in a layer, and in a tensor of types, which
+  is of the higher of the two levels, `utils.highest`. A tree or a pickle written with the shared types loads
+  with those of its level. `Ty.nat_factory` is the `Nat` of a level, so that
+  `Diagram.permutation` with no types is also defined on `compact` and
+  `frobenius` diagrams. Over Markov or comarkov diagrams a type of lenses is
+  `lens.Markov.ob` or `lens.Prism.ob`, i.e. `lens.Ty[markov.Ty]` or
+  `lens.Ty[comarkov.Ty]`, where `lens.Ty` alone was enough ([next#679]).
 - `lean/` is now `discolean/`, a Lake package built on Mathlib with one
   library, `DisCoLean` ([next#668]).
 - The alpha-equivalence of terms is stated once, in `cat.AlphaEquivalence`,
@@ -2570,6 +2590,7 @@ for the changelog of `1.2.1` and earlier.
 [next#674]: https://github.com/rel-int/discopy-next/pull/674
 [next#675]: https://github.com/rel-int/discopy-next/pull/675
 [next#676]: https://github.com/rel-int/discopy-next/issues/676
+[next#679]: https://github.com/rel-int/discopy-next/pull/679
 [next#681]: https://github.com/rel-int/discopy-next/pull/681
 [next#686]: https://github.com/rel-int/discopy-next/pull/686
 [next#692]: https://github.com/rel-int/discopy-next/pull/692

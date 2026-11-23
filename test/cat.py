@@ -8,6 +8,7 @@ import pytest
 from pytest import raises
 
 from discopy.cat import *
+from discopy import utils
 from discopy.sum import Sum
 from discopy.utils import AxiomError
 
@@ -1048,7 +1049,7 @@ def test_term_errors():
     with raises(ValueError):
         Kappa((a, ), f(a), 1)
     with raises(TypeError, match="one level above the others"):
-        TermBase.highest(Kappa, Application)
+        utils.highest(Kappa, Application)
     with raises(ValueError, match="Expected 1 variables, got 2"):
         x(lambda a, b: a)
     assert Kappa((a, ), f(a), 0) == Kappa((a, ), f(a))
@@ -1077,15 +1078,49 @@ def test_terms_of_a_level(level, structure):
     assert all(type(c) is module.Constant for c in term.constants)
     for copy in (pickle.loads(pickle.dumps(term)), loads(dumps(term))):
         assert type(copy) is module.Kappa and copy == term
-    assert type(x(lambda a: a)) is monoidal.Kappa
+    assert type(x(lambda a: a)) is module.Kappa
+    assert module.Ty.term_factory is module.TermBase
 
 
-def test_terms_from_biclosed_up():
-    from discopy import biclosed, compact, symmetric
-    x = compact.Ty('x')
-    diagram = compact.Swap(x, x) >> compact.Box('f', x @ x, x)
+@pytest.mark.parametrize("level", [
+    "cat", "monoidal", "spacial", "braided", "feedback", "balanced",
+    "comarkov", "symmetric", "markov"])
+def test_term_without_a_box_reads_back(level):
+    import importlib
+    from typing import Self
+    from discopy.testable import inhabits
+    module = importlib.import_module(f"discopy.{level}")
+    x = (module.Ob if level == "cat" else module.Ty)('x')
+    a = module.Variable('a', x)
+    law = module.TermBase.str_transparency
+    for term in (module.Kappa((a, ), a), a):
+        equation = law(term)
+        assert equation
+        assert inhabits(equation, law.output({Self: module.TermBase}))
+    read = eval(str(module.Kappa((a, ), a)), {'x': x})
+    assert read == module.Kappa((a, ), a)
+    assert type(read) is module.Kappa
+
+
+@pytest.mark.parametrize("level, below, structure", [
+    ("ribbon", "balanced", "Braid"), ("compact", "symmetric", "Swap")])
+def test_terms_from_biclosed_up(level, below, structure):
+    import importlib
+    from discopy import biclosed, pivotal
+    module, lower = map(importlib.import_module, (
+        f"discopy.{level}", f"discopy.{below}"))
+    x, old = module.Ty('x'), pivotal.Ty('x')
+    assert type(x) is module.Ty is module.Diagram.ob and x != old
+    assert isinstance(x, (pivotal.Ty, lower.Ty))
+    assert isinstance(module.Ty.nat_factory(2), (module.Ty, lower.Nat))
+    assert module.Ty.term_factory is lower.TermBase
+    box = module.Box('f', old @ old, old)
+    assert type(box.dom) is module.Ty and box.dom == x @ x == x @ old
+    assert type(box.to_hypergraph().dom) is type(box.to_map().dom) is module.Ty
+    diagram = getattr(module, structure)(x, x) >> box
     term = diagram.to_term()
-    assert type(term) is symmetric.Kappa and term.eval() == diagram
+    assert type(term) is lower.Kappa and term.category is module.Diagram
+    assert term.eval() == diagram
     assert type(x(lambda a: a)) is biclosed.Abstraction
 
 
