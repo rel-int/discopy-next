@@ -576,6 +576,48 @@ class MonoidalCategory[C0: ColouredMonoid, C1: MonoidalCategory](
         """ Preservation of identities by tensor. """
         return cls.equation_factory(cls.id(x) @ cls.id(y), cls.id(x @ y))
 
+    @axiom
+    def tensor_associativity[
+            A: Obj[C0], B: Obj[C0], C: Obj[C0], D: Obj[C0], U: Obj[C0],
+            V: Obj[C0]](
+            cls, f: Hom[C1, A, B], g: Hom[C1, C, D], h: Hom[C1, U, V]
+    ) -> Equation[Hom[C1, Tensor[A, C, U], Tensor[B, D, V]]]:
+        """ Associativity of the tensor of morphisms. """
+        return cls.equation_factory((f @ g) @ h, f @ (g @ h))
+
+    @axiom
+    def tensor_unit[A: Obj[C0], B: Obj[C0]](
+            cls, unit: Var[C0, Unit[C0]], f: Hom[C1, A, B]
+    ) -> Equation[Hom[C1, A, B]]:
+        """ The unit object is a unit for the tensor of morphisms. """
+        return cls.equation_factory(unit @ f, f, f @ unit)
+
+    @axiom
+    def left_whiskering[X: Obj[C0], A: Obj[C0], B: Obj[C0], C: Obj[C0]](
+            cls, x: Var[C0, X], f: Hom[C1, A, B], g: Hom[C1, B, C]
+    ) -> Equation[Hom[C1, Tensor[X, A], Tensor[X, C]]]:
+        """ Whiskering on the left is a functor. """
+        return cls.equation_factory(x @ (f >> g), x @ f >> x @ g)
+
+    @axiom
+    def right_whiskering[X: Obj[C0], A: Obj[C0], B: Obj[C0], C: Obj[C0]](
+            cls, x: Var[C0, X], f: Hom[C1, A, B], g: Hom[C1, B, C]
+    ) -> Equation[Hom[C1, Tensor[A, X], Tensor[C, X]]]:
+        """ Whiskering on the right is a functor. """
+        return cls.equation_factory((f >> g) @ x, f @ x >> g @ x)
+
+    @axiom
+    def tensor_whiskering[A: Obj[C0], B: Obj[C0], C: Obj[C0], D: Obj[C0]](
+            cls, f: Hom[C1, A, B], g: Hom[C1, C, D]
+    ) -> Equation[Hom[C1, Tensor[A, C], Tensor[B, D]]]:
+        """
+        The tensor of two morphisms is the first whiskered by the domain of
+        the second, then the second whiskered by the codomain of the first:
+        with the laws above, those of a strict premonoidal category, which
+        unlike :meth:`bifunctoriality` hold of :class:`discopy.monoidal`.
+        """
+        return cls.equation_factory(f @ g, f @ g.dom >> f.cod @ g)
+
     @rule
     def mix[A: Obj[C0], B: Obj[C0], C: Obj[C0], D: Obj[C0]](
             cls, f: Hom[C1, A, B], g: Hom[C1, C, D]
