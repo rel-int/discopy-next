@@ -6,4 +6,4 @@
 
 - [x] interaction.Ty.strategy draws each side with at most two generators
 - [x] changelog entry
-- [WIP] @T-27d1c1a7-2026-11-23 18:50 interaction.Diagram[symmetric.Diagram].dagger_contravariance fails at seed 0 now (seeds 1, 4 and 5 on main): file it, or declare it
+- [x] interaction.Diagram[symmetric.Diagram].dagger_contravariance fails at seed 0 now (seeds 1, 4 and 5 on main): file it, or declare it
