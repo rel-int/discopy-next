@@ -71,6 +71,7 @@ from collections.abc import Callable
 from typing import ClassVar
 
 from discopy import monoidal, messages
+from discopy import sum as formal_sum
 from discopy.abc import BraidedCategory, SpacialCategory
 from discopy.cat import factory, kappa_calculus
 from discopy.monoidal import Match
@@ -327,9 +328,9 @@ def hexagon(cls: type, factory: Callable
     return method
 
 
-class Sum(monoidal.Sum, Box):
+class Sum(formal_sum.Sum, Box):
     """
-    A braided sum is a monoidal sum and a braided box.
+    A braided sum is a :class:`sum.Sum <discopy.sum.Sum>` and a braided box.
 
     Parameters:
         terms (tuple[Diagram, ...]) : The terms of the formal sum.

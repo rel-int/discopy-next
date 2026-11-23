@@ -558,6 +558,8 @@ class Markov(Symmetric):
 
     unitality = Symmetric.unitality.failing(messages.LENS_NATURALITY)
     associativity = Symmetric.associativity.failing(messages.LENS_NATURALITY)
+    tensor_whiskering = Symmetric.tensor_whiskering.failing(
+        messages.LENS_NATURALITY)
     braid_naturality = Symmetric.braid_naturality.failing(
         messages.LENS_BRAID_NATURALITY)
 
@@ -839,6 +841,8 @@ class Prism(Symmetric):
 
     unitality = Symmetric.unitality.failing(messages.PRISM_NATURALITY)
     associativity = Symmetric.associativity.failing(
+        messages.PRISM_NATURALITY)
+    tensor_whiskering = Symmetric.tensor_whiskering.failing(
         messages.PRISM_NATURALITY)
     braid_naturality = Symmetric.braid_naturality.failing(
         messages.PRISM_BRAID_NATURALITY)

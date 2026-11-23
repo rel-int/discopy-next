@@ -55,6 +55,7 @@ s
 from __future__ import annotations
 
 from discopy import monoidal, cmap, hypergraph, messages
+from discopy import sum as formal_sum
 from discopy.abc import SpacialCategory
 from discopy.cat import factory, kappa_calculus
 
@@ -98,9 +99,9 @@ class Box(monoidal.Box, Diagram):
     """
 
 
-class Sum(monoidal.Sum, Box):
+class Sum(formal_sum.Sum, Box):
     """
-    A spacial sum is a monoidal sum and a spacial box.
+    A spacial sum is a :class:`sum.Sum <discopy.sum.Sum>` and a spacial box.
 
     Parameters:
         terms (tuple[Diagram, ...]) : The terms of the formal sum.
