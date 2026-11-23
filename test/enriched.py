@@ -6,6 +6,7 @@ from discopy import cat
 from discopy.enriched import Arrow, Functor
 from discopy.kleisli.monad import List, Maybe, Powerset, Subdistribution
 from discopy.matrix import Matrix
+from discopy import monoidal
 from discopy.monoidal import Box, Diagram, Ty
 from discopy.python import Function
 from discopy.sum import Sum
@@ -123,3 +124,26 @@ def test_to_channel_is_a_functor():
 def test_to_channel_of_another_category():
     with raises(TypeError):
         Sums([f], x, y).to_channel()
+
+
+def test_to_channel_of_several_types():
+    Lists = Arrow[Function, List]
+    pair = Function(lambda n: (n, n), int, (int, int))
+    for dom, cod in [((int, ), (int, int)), ((), (int, )), ((int, ), ())]:
+        with raises(ValueError):
+            Lists([pair], dom, cod).to_channel()
+
+
+def test_extension_of_diagrams_uses_their_functor():
+    """
+    With ``F(f) = [[2]]``, ``F(f >> f) = [[4]]``, so ``[f >> f]`` goes to
+    ``[[4]]`` and ``[f, f >> f]`` to ``[[2 + 4]] = [[6]]``.
+    """
+    a = monoidal.Ty('a')
+    u = monoidal.Box('u', a, a)
+    F = Functor({a: 1}, {u: [2]}, dom=Arrow[monoidal.Diagram, List],
+                cod=Matrix[int])
+    assert F(Arrow[monoidal.Diagram, List]([u >> u], a, a))\
+        == Matrix[int]([4], 1, 1)
+    assert F(Arrow[monoidal.Diagram, List]([u, u >> u], a, a))\
+        == Matrix[int]([6], 1, 1)

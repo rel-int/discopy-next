@@ -40,6 +40,7 @@ NOT_RIGID_ADJOINT = "{} is not the left adjoint of {}, maybe you meant to use"\
                     " a pivotal type rather than a rigid one?"
 MISSING_TYPES_FOR_EMPTY_SUM = "Empty sum needs a domain and codomain."
 NO_ALGEBRA = "The homs of {} are not algebras of the monad {}."
+NOT_ONE_TYPE = "A channel goes from one type to one type, got {} -> {}."
 MATRIX_REPEAT_ERROR = "The reflexive transitive closure is only defined for "\
                       "square boolean matrices."
 MATRIX_RESOLVENT_ERROR = "The resolvent is only defined for square matrices "\

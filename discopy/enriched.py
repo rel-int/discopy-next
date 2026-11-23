@@ -227,13 +227,18 @@ cat.Box('h', cat.Ob('x'), cat.Ob('x')))]
         """
         The channel ``X -> M(Y)`` of an arrow of the change of base of
         :class:`~discopy.python.function.Function`, from ``X`` to ``Y``,
-        i.e. each function evaluated at the input.
+        i.e. each function evaluated at the input, for one type ``X`` and
+        one type ``Y``.
 
         This is a functor into the Kleisli category, not a faithful one: a
         fair coin between the identity and ``not`` and one between the
         constants ``True`` and ``False`` give the same channel, though the
         function drawn by the first never gives the same output to both
         inputs and the one drawn by the second always does.
+
+        Raises:
+            TypeError : When the category is not that of Python functions.
+            ValueError : When the domain or codomain is not one type.
 
         Example
         -------
@@ -254,7 +259,10 @@ cat.Box('h', cat.Ob('x'), cat.Ob('x')))]
         if not issubclass(C, Function):
             raise TypeError(messages.TYPE_ERROR.format(
                 factory_name(Function), factory_name(C)))
-        X, Y = (C.ob.cast(x).inside[0] for x in (self.dom, self.cod))
+        dom, cod = map(C.ob.cast, (self.dom, self.cod))
+        if len(dom) != 1 or len(cod) != 1:
+            raise ValueError(messages.NOT_ONE_TYPE.format(dom, cod))
+        X, Y = dom.inside[0], cod.inside[0]
 
         def inside(x):
             return monad(Function(lambda f: f(x), C, Y))(self.inside)
@@ -277,7 +285,9 @@ class Functor(cat.Functor):
     A functor ``F: C -> D`` extended to the change of base of ``C`` along a
     monad ``M``, when the homs of ``D`` are algebras of ``M``: an arrow
     ``m`` from ``A`` to ``B`` goes to the structure of
-    ``D.algebra(M, F(A), F(B))`` applied to ``M(F)(m)``.
+    ``D.algebra(M, F(A), F(B))`` applied to ``M(F)(m)``, where ``F`` is the
+    ``functor_factory`` of ``C``, e.g. :class:`discopy.monoidal.Functor`
+    for :class:`discopy.monoidal.Diagram`.
 
     Parameters:
         ob_map : Mapping from the objects of ``C`` to those of ``D``.
@@ -305,8 +315,8 @@ class Functor(cat.Functor):
     def __call__(self, other):
         if not isinstance(other, Arrow):
             return super().__call__(other)
-        monad = type(other).monad
-        algebra = self.cod.algebra(monad, self(other.dom), self(other.cod))
-        image = monad(Function(
-            super().__call__, type(other).category, self.cod))(other.inside)
-        return algebra(image)
+        monad, C = type(other).monad, type(other).category
+        base = C.functor_factory(
+            self.ob_map, self.ar_map, dom=C, cod=self.cod)
+        algebra = self.cod.algebra(monad, base(other.dom), base(other.cod))
+        return algebra(monad(Function(base, C, self.cod))(other.inside))
