@@ -13,3 +13,4 @@ lambek
     pregroup
     dependency
     abstract
+    tokenise

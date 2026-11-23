@@ -105,6 +105,11 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   its first subword, and `lambek.neural.ChartClassifier` gives a supertag for
   each word and a label for each span. `transformers` joins the `lambek` extra
   ([next#604]).
+- `lambek.tokenise.tokenise` splits raw English text into sentences of words
+  as the Penn Treebank and CCGrebank write them, for the Bobcat parser: the
+  rule-based tokenizer and sentencizer of spaCy, with no model, keeping
+  hyphenated words whole and writing quotes and brackets as the treebank does.
+  `spacy` joins the `lambek` extra ([next#699]).
 - `drawing.picture.decode` and `read`: a picture's pixel classes back to
   its diagram. `regions` splits them into boxes, wires and labels, `attach`
   hangs each label on its wire, `refine` writes the names and types read
@@ -2571,6 +2576,7 @@ for the changelog of `1.2.1` and earlier.
 [next#693]: https://github.com/rel-int/discopy-next/pull/693
 [next#694]: https://github.com/rel-int/discopy-next/pull/694
 [next#698]: https://github.com/rel-int/discopy-next/pull/698
+[next#699]: https://github.com/rel-int/discopy-next/pull/699
 [next#702]: https://github.com/rel-int/discopy-next/pull/702
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
