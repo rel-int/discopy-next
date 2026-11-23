@@ -69,7 +69,7 @@ def test_corpus(law, thunk):
     arguments = {p.name: values[p.name] for p in law.parameters}
     environment, annotations = scope(law, values), law.annotations()
     for name, value in arguments.items():
-        assert inhabits(value, substitute(annotations[name], environment)),\
+        assert inhabits(value, substitute(annotations[name], environment)), \
             f"bad entry: {name} = {value!r} is not {annotations[name]}"
     try:
         verdict = law(**arguments)
