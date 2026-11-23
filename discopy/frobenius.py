@@ -152,7 +152,7 @@ class Ty(compact.Ty, markov.Ty, comarkov.Ty):
 
 
 @factory
-class Nat(compact.Nat, Ty):
+class Nat(compact.Nat, markov.Nat, comarkov.Nat, Ty):
     """
     A ``Nat`` is a natural number ``n`` seen as a frobenius type with
     unnamed objects.

@@ -1550,7 +1550,7 @@ def test_laws():
 
 
 def test_types_of_two_levels():
-    from discopy import braided, comarkov, markov
+    from discopy import braided, comarkov, frobenius, markov
     x, y, u = Ty('x'), braided.Ty('y'), symmetric.Ty('u')
     assert x @ y == braided.Ty('x', 'y') == braided.Ty.cast_ty(x) @ y
     assert y @ x == braided.Ty('y', 'x') and x @ x == Ty('x', 'x')
@@ -1570,6 +1570,12 @@ def test_types_of_two_levels():
         'x') @ u
     with raises(TypeError, match="one level above the others, got markov.Ty"):
         markov.Ty('x') @ comarkov.Ty('y')
+    assert markov.Box('f', comarkov.Ty('x'), u).dom == markov.Ty('x')
+    for nat in (markov.Nat, comarkov.Nat):
+        assert isinstance(frobenius.Nat(2), nat)
+        assert frobenius.Nat(2) @ nat(1) == frobenius.Nat(3) == nat(
+            1) @ frobenius.Nat(2)
+        assert nat.cast_ty(frobenius.Nat(2)) == frobenius.Nat(2)
     for mixed in (lambda: x @ u, lambda: u @ x, lambda: x @ Nat(1),
                   lambda: Nat(1) @ x, lambda: symmetric.Box('f', x, x)):
         with raises(TypeError):

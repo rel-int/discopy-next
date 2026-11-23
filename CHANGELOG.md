@@ -542,8 +542,8 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   with those of its level. `Ty.nat_factory` is the `Nat` of a level, so that
   `Diagram.permutation` with no types is also defined on `compact` and
   `frobenius` diagrams. Over Markov or comarkov diagrams a type of lenses is
-  `lens.Markov.ob` or `lens.Prism.ob`, i.e. `lens.Ty[markov.Ty]`, where
-  `lens.Ty` alone was enough ([next#679]).
+  `lens.Markov.ob` or `lens.Prism.ob`, i.e. `lens.Ty[markov.Ty]` or
+  `lens.Ty[comarkov.Ty]`, where `lens.Ty` alone was enough ([next#679]).
 - `lean/` is now `discolean/`, a Lake package built on Mathlib with one
   library, `DisCoLean` ([next#668]).
 - The alpha-equivalence of terms is stated once, in `cat.AlphaEquivalence`,
