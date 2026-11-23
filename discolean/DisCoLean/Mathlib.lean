@@ -1,5 +1,5 @@
 import Mathlib.CategoryTheory.Category.Basic
-import Discolean.ABC
+import DisCoLean.ABC
 
 /-!
 # Compiled categories are categories of Mathlib
@@ -9,7 +9,7 @@ objects: the morphisms from `A` to `B` are those with this boundary, and the
 laws of Mathlib are those compiled from `discopy.abc.Category`.
 -/
 
-namespace Discolean.ABC.Category
+namespace DisCoLean.ABC.Category
 
 universe u v
 
@@ -34,4 +34,4 @@ def toMathlib (C : Category Ob Hom) (laws : C.Laws) :
   assoc f g h := Subtype.ext <| laws.associativity _ _ _ _ f.1 g.1 h.1
     f.2.1 f.2.2 g.2.1 g.2.2 h.2.1 h.2.2
 
-end Discolean.ABC.Category
+end DisCoLean.ABC.Category

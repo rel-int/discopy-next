@@ -1,4 +1,4 @@
-import Discolean.Statements.Premonoidal
+import DisCoLean.Statements.Premonoidal
 
 /-!
 # DisCoPy diagrams are the arrows of the free premonoidal category

@@ -1,4 +1,4 @@
-import Discolean.EGraph.Freeze
+import DisCoLean.EGraph.Freeze
 
 /-!
 # Adding a box

@@ -1,4 +1,4 @@
-import Discolean.Premonoidal
+import DisCoLean.Premonoidal
 
 /-!
 # DisCoPy diagrams are the morphisms of the free premonoidal category

@@ -1,4 +1,4 @@
-import Discolean.Premonoidal.Basic
+import DisCoLean.Premonoidal.Basic
 
 /-!
 # Diagram(S), the diagrams of a monoidal signature

@@ -1,8 +1,8 @@
 import Lean
-import Discolean.Statements
+import DisCoLean.Statements
 
 /-!
-Fail unless every theorem of `Discolean/Statements.lean` and of its submodules rests on nothing but `propext`,
+Fail unless every theorem of `DisCoLean/Statements.lean` and of its submodules rests on nothing but `propext`,
 `Quot.sound` and `Classical.choice`: `sorry` is the axiom `sorryAx` and each
 `native_decide` an axiom of its own. Run it with `lake env lean Audit.lean`.
 -/
@@ -11,7 +11,7 @@ open Lean Elab Command in
 run_cmd do
   let env ← getEnv
   let modules := env.header.moduleNames.zipIdx.filterMap fun (name, index) =>
-    if (`Discolean.Statements).isPrefixOf name then some index else none
+    if (`DisCoLean.Statements).isPrefixOf name then some index else none
   let allowed := [``propext, ``Quot.sound, ``Classical.choice]
   let mut audited := #[]
   for (name, info) in env.constants.map₁.toList do

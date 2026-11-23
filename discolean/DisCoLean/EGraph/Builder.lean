@@ -1,6 +1,6 @@
 import Std.Data.HashMap
-import Discolean.EGraph.UnionFind
-import Discolean.EGraph.History
+import DisCoLean.EGraph.UnionFind
+import DisCoLean.EGraph.History
 
 /-!
 # The builder

@@ -11,7 +11,7 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 - `discopy.lean` compiles the categories of `discopy.abc` and their axioms to
   Lean structures, read off the declarations by introspection, into
-  `discolean/Discolean/ABC.lean`; `discolean/` proves a compiled category is a
+  `discolean/DisCoLean/ABC.lean`; `discolean/` proves a compiled category is a
   category of Mathlib and that strict premonoidal categories, Diagram(S)
   included, satisfy the laws of `monoidal.Diagram` ([next#668]).
 
@@ -73,7 +73,7 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   algebras on `range(n)` are its `group.Action`s ([next#134]).
 - `lambek.abstract`'s docs build an abstract categorial grammar from English to
   Lean: "DisCoPy diagrams are the arrows of the free premonoidal category"
-  prints the statement `discolean/Discolean/Statements/English.lean` proves ([next#622]).
+  prints the statement `discolean/DisCoLean/Statements/English.lean` proves ([next#622]).
 - Opt-in Triton forward and backward kernels for signed block peer
   reductions in `neural.geometric`, with PyTorch fallbacks for unsupported
   devices, dtypes and large blocks, and support for `torch.compile`
@@ -517,7 +517,7 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 ### Changed
 
 - `lean/` is now `discolean/`, a Lake package built on Mathlib with one
-  library, `Discolean` ([next#668]).
+  library, `DisCoLean` ([next#668]).
 - The alpha-equivalence of terms is stated once, in `cat.AlphaEquivalence`,
   for the kappa and the lambda calculus: `alpha_eq` and its laws move there
   from `biclosed.TermBase`, which inherits them, with `Renamed` and

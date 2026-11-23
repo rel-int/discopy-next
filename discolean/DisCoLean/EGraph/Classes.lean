@@ -1,4 +1,4 @@
-import Discolean.EGraph.Partition
+import DisCoLean.EGraph.Partition
 
 /-!
 # Lists of classes

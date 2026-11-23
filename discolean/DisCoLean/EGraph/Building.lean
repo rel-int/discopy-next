@@ -1,4 +1,4 @@
-import Discolean.EGraph.Add
+import DisCoLean.EGraph.Add
 
 /-!
 # A builder freezes into what its operations give in turn

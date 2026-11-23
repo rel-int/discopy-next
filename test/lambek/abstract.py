@@ -337,13 +337,13 @@ def test_normal_form_of_words():
 
 
 def test_english_to_lean():
-    "discolean/Discolean/Statements/English.lean proves what it prints."
+    "discolean/DisCoLean/Statements/English.lean proves what it prints."
     from discopy.lambek import abstract
     printed, = (
         example.want for example in doctest.DocTestParser().get_examples(
             abstract.__doc__)
         if "sentence(PREMONOIDAL)))())" in example.source)
-    lean = Path(__file__).parents[2] / "discolean" / "Discolean"\
+    lean = Path(__file__).parents[2] / "discolean" / "DisCoLean"\
         / "Statements" / "English.lean"
     text = lean.read_text(encoding="utf-8")
     _, statement = text.split("[DecidableEq S.Ob] :\n")

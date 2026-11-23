@@ -1,5 +1,5 @@
-import Discolean.Coherence
-import Discolean.Mathlib
+import DisCoLean.Coherence
+import DisCoLean.Mathlib
 
 /-!
 # What is proved of the categories compiled from `discopy.abc`
@@ -11,7 +11,7 @@ is the free model of the laws of `monoidal.Diagram`. `Audit.lean` covers this fi
 -/
 
 namespace Statements.Coherence
-open _root_.Premonoidal Discolean
+open _root_.Premonoidal DisCoLean
 
 /-- A compiled category with its laws is a category of Mathlib whose
 morphisms from `A` to `B` are those with this boundary.

@@ -1,4 +1,4 @@
-import Discolean.EGraph.Union
+import DisCoLean.EGraph.Union
 
 /-!
 # Rebuilding keeps the invariant

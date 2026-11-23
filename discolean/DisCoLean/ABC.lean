@@ -10,7 +10,7 @@ does not compile yet:
 - `FeedbackCategory`: it calls feedback with keywords ['mem']
 - `TracedCategory`: it extends FeedbackCategory
 - `BiclosedCategory`: it takes the length of a symbol
-- `LinearCategory`: it extends BiclosedCategory
+- `LinearCategory`: it slices a symbol
 - `RigidCategory`: it extends BiclosedCategory
 - `PivotalCategory`: it extends RigidCategory, TracedCategory
 - `SymmetricCategory`: N is not an object
@@ -24,7 +24,7 @@ does not compile yet:
 - `HypergraphCategory`: it extends CompactCategory, MarkovCategory, ComarkovCategory
 -/
 
-namespace Discolean.ABC
+namespace DisCoLean.ABC
 
 universe u v u' v'
 
@@ -293,4 +293,4 @@ structure PROB.Functor (cat : PROB Hom) (cat' : PROB Hom') extends toPRO : PRO.F
 def monoidal (cat : MonoidalCategory Ob Hom) : Prop :=
   cat.unitality ∧ cat.associativity ∧ cat.tensor_unitality ∧ cat.tensor_associativity ∧ cat.tensor_unit ∧ cat.left_whiskering ∧ cat.right_whiskering ∧ cat.tensor_whiskering
 
-end Discolean.ABC
+end DisCoLean.ABC

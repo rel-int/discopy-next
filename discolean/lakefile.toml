@@ -1,5 +1,5 @@
 name = "discolean"
-defaultTargets = ["Discolean", "oracle"]
+defaultTargets = ["DisCoLean", "oracle"]
 
 [[require]]
 name = "mathlib"
@@ -7,7 +7,7 @@ scope = "leanprover-community"
 rev = "v4.35.0"
 
 [[lean_lib]]
-name = "Discolean"
+name = "DisCoLean"
 
 [[lean_exe]]
 name = "oracle"

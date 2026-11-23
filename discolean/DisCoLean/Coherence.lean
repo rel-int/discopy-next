@@ -1,10 +1,10 @@
-import Discolean.ABC
-import Discolean.Premonoidal.Functor
+import DisCoLean.ABC
+import DisCoLean.Premonoidal.Functor
 
 /-!
 # The coherence of `discopy.monoidal`
 
-`Discolean.ABC.monoidal` is the theory of `monoidal.Diagram`: the laws of
+`DisCoLean.ABC.monoidal` is the theory of `monoidal.Diagram`: the laws of
 `abc.MonoidalCategory` but bifunctoriality, which the Python declares broken.
 Its models are the strict premonoidal categories: `toABC` makes a strict
 premonoidal category a model, with the tensor of two morphisms the first one
@@ -65,7 +65,7 @@ theorem tensorHom_assoc (f g h : C.Hom) :
 
 /-- A strict premonoidal category as an `abc.MonoidalCategory`, the tensor
 of morphisms `f ⋉ dom g` then `cod f ⋊ g`. -/
-def toABC : Discolean.ABC.MonoidalCategory C.Ob C.Hom where
+def toABC : DisCoLean.ABC.MonoidalCategory C.Ob C.Hom where
   dom := C.dom
   cod := C.cod
   id := C.id
@@ -82,7 +82,7 @@ def toABC : Discolean.ABC.MonoidalCategory C.Ob C.Hom where
     exact ⟨rfl, rfl⟩
 
 /-- A strict premonoidal category has the laws of `monoidal.Diagram`. -/
-theorem toABC_monoidal : Discolean.ABC.monoidal C.toABC := by
+theorem toABC_monoidal : DisCoLean.ABC.monoidal C.toABC := by
   refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
   · exact fun _ _ f _ _ => ⟨C.id_comp f, (C.comp_id f).symm⟩
   · exact fun _ _ _ _ f g h _ cod_f dom_g cod_g dom_h _ =>
@@ -108,7 +108,7 @@ theorem toABC_monoidal : Discolean.ABC.monoidal C.toABC := by
 
 end Premonoidal.StrictPremonoidal
 
-namespace Discolean.ABC.MonoidalCategory
+namespace DisCoLean.ABC.MonoidalCategory
 
 variable {Ob : Type u} {Hom : Type v} (M : MonoidalCategory Ob Hom)
 
@@ -191,23 +191,23 @@ def ofABC : Premonoidal.StrictPremonoidal.{u, v} where
 theorem tensorHom_ofABC (f g : Hom) : (ofABC laws).tensorHom f g = M.tensor f g :=
   (laws.2.2.2.2.2.2.2 _ _ _ _ f g rfl rfl rfl rfl).symm
 
-end Discolean.ABC.MonoidalCategory
+end DisCoLean.ABC.MonoidalCategory
 
 namespace Premonoidal.Diagram
 
-open Discolean.ABC
+open DisCoLean.ABC
 
 variable (S : Signature) [DecidableEq S.Ob]
 
 /-- Diagram(S) has the laws of `monoidal.Diagram`. -/
-theorem monoidal : Discolean.ABC.monoidal (premonoidal S).toABC :=
+theorem monoidal : DisCoLean.ABC.monoidal (premonoidal S).toABC :=
   (premonoidal S).toABC_monoidal
 
 variable {S} {Ob : Type u} {Hom : Type v} {M : MonoidalCategory Ob Hom}
 
 /-- A functor of `abc.MonoidalCategory` from Diagram(S) to a model is a
 strict premonoidal functor. -/
-def Functor.toPremonoidal (laws : Discolean.ABC.monoidal M)
+def Functor.toPremonoidal (laws : DisCoLean.ABC.monoidal M)
     (F : MonoidalCategory.Functor (premonoidal S).toABC M) :
     Premonoidal.Functor (premonoidal S) (MonoidalCategory.ofABC laws) where
   ob := F.ob
@@ -235,7 +235,7 @@ def Functor.toPremonoidal (laws : Discolean.ABC.monoidal M)
 theory of `monoidal.Diagram`. A functor of `abc.MonoidalCategory` to a model
 that sends each generating object and each box where given exists, and it
 is unique. -/
-theorem free (laws : Discolean.ABC.monoidal M) (ob : S.Ob → Ob) (ar : S.Box → Hom)
+theorem free (laws : DisCoLean.ABC.monoidal M) (ob : S.Ob → Ob) (ar : S.Box → Hom)
     (hdom : ∀ b, M.dom (ar b) = Lift.obs (MonoidalCategory.ofABC laws) ob (S.dom b))
     (hcod : ∀ b, M.cod (ar b) = Lift.obs (MonoidalCategory.ofABC laws) ob (S.cod b)) :
     ∃ F : MonoidalCategory.Functor (premonoidal S).toABC M,
