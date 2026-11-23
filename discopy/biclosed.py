@@ -93,6 +93,7 @@ from typing import (
     TYPE_CHECKING, Callable, ClassVar, Iterator, Self, Sequence)
 
 from discopy import cat, monoidal, cmap, hypergraph, messages
+from discopy import sum as formal_sum
 from discopy.abc import (
     BiclosedCategory, DaggerCategory, DaggerMonoidalCategory, MonoidalCategory)
 from discopy.testable import (
@@ -674,9 +675,9 @@ class Curry(monoidal.Bubble, Box):
         raise AxiomError(messages.CURRY_HAS_NO_DAGGER)
 
 
-class Sum(monoidal.Sum, Box):
+class Sum(formal_sum.Sum, Box):
     """
-    A biclosed sum is a monoidal sum and a biclosed box.
+    A biclosed sum is a :class:`sum.Sum <discopy.sum.Sum>` and a biclosed box.
 
     Parameters:
         terms (tuple[Diagram, ...]) : The terms of the formal sum.

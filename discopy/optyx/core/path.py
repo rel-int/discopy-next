@@ -133,7 +133,7 @@ from operator import index
 
 import numpy as np
 
-from discopy import cat
+from discopy import sum as formal_sum
 from discopy.abc import Nat
 from discopy.cat import assert_iscomposable
 from discopy.utils import (
@@ -538,7 +538,7 @@ class Matrix(underlying.Matrix):
         return np.allclose(np.eye(m.shape[0]), m.dot(m.conj().T))
 
 
-class Sum(cat.Sum):
+class Sum(formal_sum.Sum):
     """
     A formal sum of :class:`Matrix` with the same number of modes in and out,
     what :code:`to_path` sends a sum of diagrams to.
@@ -586,7 +586,7 @@ class Sum(cat.Sum):
         """
         The factory a sum builds sums with, which fixes its ``dtype``, so
         that the ring survives every operation of
-        :class:`discopy.cat.Sum` — ``dagger``, ``then``, ``tensor``,
+        :class:`discopy.sum.Sum` — ``dagger``, ``then``, ``tensor``,
         ``subs`` — including the ones that leave no term to read it from.
         """
         return lambda terms, dom=None, cod=None: type(self)(
@@ -595,7 +595,7 @@ class Sum(cat.Sum):
     def setoid(self):
         """
         A sum is faithfully described by its terms and its boundary, where
-        :meth:`discopy.cat.Sum.setoid` reads a singleton sum as its only
+        :meth:`discopy.sum.Sum.setoid` reads a singleton sum as its only
         term: a :class:`Matrix` is not an arrow, so it has no setoid. A
         matrix is not hashable either, so neither is a sum: ``__hash__`` is
         ``None`` rather than the :meth:`discopy.cat.Arrow.__hash__` that

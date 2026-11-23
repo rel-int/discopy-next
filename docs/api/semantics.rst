@@ -4,7 +4,7 @@ semantics
 DisCoPy's computational core: concrete categories (functions, matrices,
 tensors, constraint satisfaction problems, finite groups, representations of Hopf algebras)
 and constructions on categories (opposites, Kleisli categories of monads,
-streams, parametric maps, lenses, the Int-construction).
+streams, parametric maps, lenses, formal sums, the Int-construction).
 
 .. autosummary::
     :template: module.rst
@@ -22,6 +22,7 @@ streams, parametric maps, lenses, the Int-construction).
     discopy.stream
     discopy.op
     discopy.para
+    discopy.sum
     discopy.lens
     discopy.interaction
 
