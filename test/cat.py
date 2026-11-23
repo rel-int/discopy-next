@@ -1011,7 +1011,10 @@ def test_term_normal_form():
     assert x(lambda a: closed(f(a))).normal_form()\
         == x(lambda a: g(f(a)))
     assert g.expand() == y(lambda x: g(x)) and a.expand() == a
-    for term in (statement, closed, g, a, h(g(f(a)))):
+    k = Constant(Box('k', x, x))
+    shadowed = x(lambda a: let(k(a), lambda a: k(a)))
+    assert shadowed.normal_form() == x(lambda a: k(k(a)))
+    for term in (statement, closed, g, a, h(g(f(a))), shadowed):
         assert TermBase.normal_form_completeness(term)
         assert TermBase.eta(term) and TermBase.reading(term)
         assert loads(dumps(term)) == term
