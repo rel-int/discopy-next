@@ -74,4 +74,4 @@
 - [x] proptest/test_conftest.py: finite-support test with a small cap, not relying on both booleans (r4666065282, r4666065297)
 - [x] proptest.yml: PROPTEST_STOP from the first step of the job; workflows test covers a dispatch (r4666065254, r4666065246)
 - [x] Docs: half the time left, a best-effort deadline, one worker flag, dispatch in the changelog (r4666065304, r4666065316, r4666065329, r4666065338)
-- [WIP] @T-6d395818-2026-11-23 12:53 Decline -n auto on pull requests: -n logical everywhere is item 2 of the approved plan (r4666065346)
+- [x] Decline -n auto on pull requests: -n logical everywhere is item 2 of the approved plan (r4666065346)
