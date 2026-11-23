@@ -10,6 +10,7 @@ and the property tests that check their axioms.
 
     discopy.testable
     discopy.abc
+    discopy.lean
     discopy.cat
     discopy.monoidal
     discopy.spacial
