@@ -5,4 +5,4 @@
 - [ ] Rule on the fix, in the drawing thread's PR (#706): a layout keeping the boxes of each interchanger separated along one side, or a tween through an intermediate drawing
 - [ ] Wires: no two wire segments cross along a tween, and the order of wires around each box and along the boundary is kept
 - [ ] Model `to_drawing` of a whole diagram, and compose the steps of `Equation.path` into an isotopy between any two drawings of one diagram
-- [ ] Changelog entry
+- [x] Changelog entry

@@ -20,6 +20,10 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   `monoidal` evaluates to a diagram of its context, which a diagram with one
   output reads back from, box for box ([next#705]).
 
+- `discolean/` models the tween of `Drawing.interpolate` on two boxes: separated
+  along one side in both drawings they stay apart, and the straight-line tween
+  of an interchanger can overlap them, with a counterexample ([next#711]).
+
 - `abc.MonoidalCategory` states the laws of whiskering, `tensor_associativity`,
   `tensor_unit`, `left_whiskering`, `right_whiskering` and `tensor_whiskering`,
   those of a strict premonoidal category, `tensor_whiskering` broken on Markov
@@ -2590,6 +2594,7 @@ for the changelog of `1.2.1` and earlier.
 [next#702]: https://github.com/rel-int/discopy-next/pull/702
 [next#705]: https://github.com/rel-int/discopy-next/pull/705
 [next#708]: https://github.com/rel-int/discopy-next/pull/708
+[next#711]: https://github.com/rel-int/discopy-next/pull/711
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#44]: https://github.com/rel-int/optyx/pull/44
