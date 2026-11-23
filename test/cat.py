@@ -710,10 +710,10 @@ EXAMPLES = {  # a box of each constructor, from a class c, types x, y, data v
     "tensor.Box": 'c("f", x, y, [v] + [0] * 5)',
     "frobenius.Spider": "c(1, 2, x, data=v)",
     "frobenius.Cospan": "c(x @ y, [0, 0, 1], [1])",
-    "biclosed.Bang": "c(box(c, x, y, v))",
-    "biclosed.{Dereliction,Digging,Contraction,Weakening}": "c(x)",
-    "biclosed.Exchange": "c(x, y, True)",
-    "biclosed.Laxator": "c(x, y)",
+    "bang.Bang": "c(box(c, x, y, v))",
+    "bang.{Dereliction,Digging,Contraction,Weakening}": "c(x)",
+    "bang.Exchange": "c(x, y, True)",
+    "bang.Laxator": "c(x, y)",
     "biclosed.{Eval,Coeval}": "c(x << y)",
     "closed.{Eval,Coeval}": "c(x << y, time_step=1)",
     "{biclosed,closed}.Curry": "c(box(c, x @ y, x, v), 1, False)",
@@ -978,3 +978,138 @@ def test_Equation_tree():
         Equation.from_tree(Equation(f, f).to_tree() | {'symbols': [[1]]})
     with raises(TypeError, match="Expected str"):
         dumps(Equation(f, f, symbols=[1]))
+
+
+def test_term_sequence():
+    x, y, z = Ob('x'), Ob('y'), Ob('z')
+    f, g, h = Box('f', x, y), Box('g', y, z), Box('h', z, x)
+    term = (f >> g >> h).to_term()
+    assert str(term) == "x(lambda x0: h(g(f(x0))))"
+    assert term.eval() == f >> g >> h and term.dom == term.cod == x
+    assert term.constants == [Constant(h), Constant(g), Constant(f)]
+    assert Id(x).to_term() == x(lambda x0: x0)
+    assert Id(x).to_term().eval() == Id(x)
+    F = Functor({x: y, y: x, z: z}, {f: Box('g', y, x), g: Box('f', x, z)})
+    assert (f >> g).to_term().eval(F) == F(f >> g)
+    a = Variable('a', x)
+    assert a.dom == x and a.category is Arrow and not a.constants
+    assert Constant(f).dom == x and Constant(f)(a).dom == x
+
+
+def test_term_normal_form():
+    x, y, z = Ob('x'), Ob('y'), Ob('z')
+    f, g, h = (Constant(box) for box in (
+        Box('f', x, y), Box('g', y, z), Box('h', z, x)))
+    a = Variable('a', x)
+    statement = let(f(a), lambda b: let(g(b), lambda c: h(c)))
+    assert str(statement) == "let(f(a), lambda b: let(g(b), lambda c: h(c)))"
+    assert statement.normal_form() == h(g(f(a)))
+    assert statement.eval() == f.box >> g.box >> h.box
+    closed = y(lambda b: g(b))
+    assert closed.normal_form() == closed and closed.eval() == g.box
+    assert x(lambda a: closed(f(a))).normal_form()\
+        == x(lambda a: g(f(a)))
+    assert g.expand() == y(lambda x: g(x)) and a.expand() == a
+    for term in (statement, closed, g, a, h(g(f(a)))):
+        assert TermBase.normal_form_completeness(term)
+        assert TermBase.eta(term) and TermBase.reading(term)
+        assert loads(dumps(term)) == term
+        assert eval(repr(term), TermBase.environment()) == term
+
+
+def test_term_alpha_and_substitute():
+    x, y = Ob('x'), Ob('y')
+    f, a, b = Constant(Box('f', x, y)), Variable('a', x), Variable('b', x)
+    first, second = x(lambda a: f(a)), x(lambda b: f(b))
+    assert first != second and first.alpha_eq(second)
+    assert AlphaEquation(first, second) and not AlphaEquation(f(a), f(b))
+    assert not first.alpha_eq(f) and not f(a).alpha_eq(a)
+    assert not a.alpha_eq(f(a))
+    assert not let(a, lambda c: f(c)).alpha_eq(f(a))
+    assert f(a).substitute({a: b}) == f(b) and f.substitute({a: b}) == f
+    assert first.substitute({a: b}) == first
+    assert Variable.fresh("a", x, f(a)) == Variable("a_", x)
+
+
+def test_term_errors():
+    x, y = Ob('x'), Ob('y')
+    f, a = Constant(Box('f', x, y)), Variable('a', x)
+    with raises(ValueError, match="does not apply"):
+        f(f(a))
+    with raises(ValueError, match="does not apply"):
+        a(a)
+    with raises(ValueError, match="does not apply"):
+        f(f)
+    with raises(ValueError, match="free variable of f.a."):
+        Kappa((Variable('b', x), ), f(a))
+    with raises(ValueError, match="free variable of f"):
+        Kappa((), f)
+    with raises(ValueError):
+        Kappa((a, ), f(a), 1)
+    with raises(TypeError, match="one level above the others"):
+        TermBase.highest(Kappa, Application)
+    with raises(ValueError, match="Expected 1 variables, got 2"):
+        x(lambda a, b: a)
+    assert Kappa((a, ), f(a), 0) == Kappa((a, ), f(a))
+
+
+@pytest.mark.parametrize("level, structure", [
+    ("spacial", lambda module, x, y: module.Id(x @ y)),
+    ("feedback", lambda module, x, y: module.Id(x @ y)),
+    ("braided", lambda module, x, y: module.Braid(y, x)),
+    ("balanced", lambda module, x, y: module.Twist(x) @ y),
+    ("comarkov", lambda module, x, y: module.Merge(x) @ y)])
+def test_terms_of_a_level(level, structure):
+    import importlib
+    import pickle
+    from discopy import monoidal
+    module = importlib.import_module(f"discopy.{level}")
+    x, y = module.Ty('x'), module.Ty('y')
+    wiring = structure(module, x, y)
+    diagram = wiring >> module.Box('f', x @ y, x)
+    term = diagram.to_term()
+    assert type(term) is module.Kappa and term.category is module.Diagram
+    assert module.Diagram.term_factory is module.TermBase
+    assert issubclass(module.Kappa, monoidal.Kappa)
+    assert term.eval() == diagram
+    assert len(term.constants) == len(diagram.boxes)
+    assert all(type(c) is module.Constant for c in term.constants)
+    for copy in (pickle.loads(pickle.dumps(term)), loads(dumps(term))):
+        assert type(copy) is module.Kappa and copy == term
+    assert type(x(lambda a: a)) is monoidal.Kappa
+
+
+def test_terms_from_biclosed_up():
+    from discopy import biclosed, compact, symmetric
+    x = compact.Ty('x')
+    diagram = compact.Swap(x, x) >> compact.Box('f', x @ x, x)
+    term = diagram.to_term()
+    assert type(term) is symmetric.Kappa and term.eval() == diagram
+    assert type(x(lambda a: a)) is biclosed.Abstraction
+
+
+def test_term_laws():
+    from hypothesis import find
+    x, y = Ob('x'), Ob('y')
+    laws = (
+        TermBase.eta, TermBase.reading, TermBase.normal_form_soundness,
+        TermBase.normal_form_idempotence, TermBase.normal_form_completeness,
+        TermBase.repr_transparency, TermBase.str_transparency,
+        TermBase.serialisation)
+    shapes = [
+        [0, 0, 2, 1, 1, 1, 0, 1, 0], [0, 1, 1], [1, 0, 2, 0, 2, 1],
+        [0, 0, 1, 1, 2, 1], [1, 1, 2, 2, 0, 1, 1]]
+    for shape in shapes:
+        term = TermBase.generate(y, shape, [x, y], "ab")
+        assert all(law(term) for law in laws)
+        renamed = TermBase.generate(y, shape, [x, y], "c")
+        assert TermBase.alpha_renaming((term, renamed))
+        assert TermBase.alpha_soundness((term, renamed))
+    with raises(NotImplementedError):
+        AlphaEquivalence.shapes()
+    with raises(NotImplementedError):
+        AlphaEquivalence.generate(y, [], [x], "a")
+    first, second, _ = find(TermBase.related(), lambda terms: True)
+    assert first.alpha_eq(second)
+    assert Renamed[TermBase].checked_params() == ()
+    assert Canonical[TermBase].checked_params() == ()
