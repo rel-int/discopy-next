@@ -68,7 +68,7 @@ algorithms there is followed here, or the differential test says so.
 | [`Discolean/Premonoidal/Functor.lean`](Discolean/Premonoidal/Functor.lean) | strict premonoidal functors, the functor out of Diagram(S) and its uniqueness |
 | [`Discolean/Premonoidal/Oracle.lean`](Discolean/Premonoidal/Oracle.lean) | diagrams read and written as `Diagram.encode` does, for the oracle |
 | [`test_premonoidal.py`](test_premonoidal.py) | the differential test of diagrams against `monoidal.Diagram` |
-| [`Audit.lean`](Audit.lean) | fails on `sorry`, `native_decide` or an axiom beyond `propext`, `Quot.sound`, `Classical.choice` |
+| [`Audit.lean`](Audit.lean) | fails on `sorry`, `native_decide` or an axiom beyond `propext`, `Quot.sound`, `Classical.choice` in a theorem of `Discolean/Statements`, which restates the main ones; other files are not audited |
 | [`Oracle.lean`](Oracle.lean) | the `oracle` executable: one JSON case per line in, the model's answer out |
 | [`test_oracle.py`](test_oracle.py) | the differential test against the Python |
 

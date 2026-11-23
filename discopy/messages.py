@@ -187,6 +187,12 @@ BANG_HAS_NO_DAGGER = (
     "{} has no dagger: !L* has no rule from its codomain back to its domain.")
 LAXATOR_ARITY = (
     "A laxator takes two types, or none for the unit, got {}.")
+NOT_BANGED = (
+    "{} is not banged: only a type !x is copied by contraction and "
+    "discarded by weakening.")
+NEGATIVE_COPIES = "Expected a number of copies, got {}."
+WIRING_OUT_OF_RANGE = "Expected indices of the wires of {}, got {}."
+NOT_SHARED = "Expected banged variables to share, got {}."
 FREE_BANG = (
     "A free bang is a bubble and its structure boxes, which a hypergraph "
     "keeps as boxes: nothing cancels, merges or slides through them.")
@@ -242,3 +248,17 @@ LAYOUT_NOT_FEASIBLE = "This layout does not draw the same diagram."
 STRETCH_LENGTHS = (
     "Give a scale for each gap between columns and between rows, and for "
     "the width and the height of each box.")
+NOT_ONE_OUTPUT = "Expected exactly one output, got {}: a term has one."
+NOT_APPLICABLE = "{} of stack {} does not apply to {} of stack {} and type {}."
+NOT_A_BLOCK = "Expected a block of variables next to the stack of {}, got {}."
+STATEMENTS_DO_NOT_COMMUTE = (
+    "A statement binding several outputs or none stays in a normal form, "
+    "and two of them do not commute.")
+NO_HIGHEST_LEVEL = "Expected terms of one level above the others, got {}."
+NOT_DISTINCT = "Expected distinct variables to bind in {}, got {}."
+NOT_FREE = "Expected distinct free variables of {}, got {}."
+NOT_THE_VARIABLE = "Expected the free variable of {}, with no stack, got {}."
+NO_OFFSET = (
+    "Expected an offset for the abstraction of no variable in {}, which "
+    "has no stack to say where it stands.")
+WRONG_OFFSET = "Expected offset {} for the abstraction of {} in {}, got {}."

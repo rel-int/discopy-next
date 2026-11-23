@@ -9,7 +9,7 @@ on:
     - discopy/abc.py
     - discopy/lean.py
     - discopy/testable.py
-    - discopy/lambek/abstract.py
+    - discopy/lambek/abstract/**
     - discopy/egraph.py
     - benchmark/test_egraph.py
     - benchmark/config.py

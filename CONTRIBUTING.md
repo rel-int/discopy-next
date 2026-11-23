@@ -337,7 +337,7 @@ the number of cases per seed (2,000 by default) and `ORACLE_SEEDS` the seeds
 (`0` by default), e.g. `ORACLE_EXAMPLES=17000 ORACLE_SEEDS=0,1,2`. The `lean`
 GitHub workflow runs all four on `main` and on a pull request touching
 `discolean/`, `discopy/abc.py`, `discopy/lean.py`, `discopy/testable.py`,
-`discopy/lambek/abstract.py`, `discopy/egraph.py`, `discopy/monoidal.py`,
+`discopy/lambek/abstract/`, `discopy/egraph.py`, `discopy/monoidal.py`,
 `discopy/cat.py`, the traces of the benchmark with their loader
 `benchmark/test_egraph.py`, which the test replays, or what installs the
 environment.
@@ -426,6 +426,13 @@ Every user-facing change adds one bullet to the `[Unreleased]` section of
 the pull request as a reference link defined with the others at the bottom of the file:
 `[#N]` for discopy/discopy, `[next#N]` for rel-int/discopy-next. A merge conflict there resolves by hand to `main`'s
 file plus your own bullet(s), since git's union merge can bring back lines one side deleted.
+
+## Record a design decision
+
+A design decision, i.e. a ruling on how the library is shaped rather than a fix or a feature, gets
+one [architecture decision record](docs/adr/index.md) in `docs/adr/`, in the pull request that
+makes the change. The changelog says what changed; the record says why, and a decision that
+reverses it supersedes it with a new one.
 
 ## Release a version
 

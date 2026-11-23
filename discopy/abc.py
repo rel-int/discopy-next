@@ -1251,12 +1251,13 @@ class BiclosedCategory[
 
 
 class LinearCategory[
-        C0: ResiduatedMonoid, C1: LinearCategory](BiclosedCategory[C0, C1]):
+        C0: ColouredMonoid, C1: LinearCategory](MonoidalCategory[C0, C1]):
     """
-    A linear category is a :class:`BiclosedCategory` with a linear exponential
-    comonad :meth:`bang`, see :cite:t:`Bierman95`, here without symmetry: a
-    banged object is exchanged with any other, the rule of the Lambek
-    calculus with a relevant modality !L* of :cite:t:`KanovichEtAl16`.
+    A linear category is a :class:`MonoidalCategory` with a linear exponential
+    comonad :meth:`bang`, see :cite:t:`Bierman95`, here with neither symmetry
+    nor closure, which none of its laws uses: a banged object is exchanged
+    with any other, the rule of the Lambek calculus with a relevant modality
+    !L* of :cite:t:`KanovichEtAl16`. :mod:`discopy.bang` is the free one.
 
     * ``!`` is a comonad, with counit :meth:`dereliction` ``!x -> x`` and
       comultiplication :meth:`digging` ``!x -> !!x``,
