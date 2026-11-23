@@ -1176,6 +1176,7 @@ class Kappa(TermBase, balanced.Kappa):  # ty: ignore[unsupported-base]
                  offset: int | None = None):
         # pylint: disable=super-init-not-called  # no block of variables
         assert_isinstance(body, cat.TermBase)
+        self.scan_constants(body)
         self.variables, self.body = tuple(variables), body
         self.offset = self.start(self.variables, body, offset)
         self.freevars = [x for x in body.freevars if x not in self.variables]

@@ -3249,6 +3249,7 @@ type y.
         # pylint: disable=super-init-not-called  # a context is a list here
         assert_isinstance(func, TermBase)
         assert_isinstance(arg, TermBase)
+        self.scan_constants(func, arg)
         if arg.stack or func.offset is None\
                 or func.stack[:len(arg.cod)] != arg.cod:
             raise ValueError(messages.NOT_APPLICABLE.format(
@@ -3346,6 +3347,7 @@ f(c, b), which has no stack to say where it stands.
                  offset: int | None = None):
         # pylint: disable=super-init-not-called  # a context is a list here
         assert_isinstance(body, cat.TermBase)
+        self.scan_constants(body)
         variables = tuple(variables)
         start = self.start(variables, body, offset)
         stop = start + len(variables)

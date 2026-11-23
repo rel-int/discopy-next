@@ -2079,6 +2079,31 @@ class TermBase(Serialisable, AlphaEquivalence):
         # pylint: disable=unused-argument  # a constant has no variable
         return 0
 
+    def scan_constants(self, *parts: TermBase) -> None:
+        """
+        Raise unless the constants of the parts a term is built from are
+        boxes of the category of its level, see :attr:`functor`, where it
+        evaluates: e.g. a symmetric kappa binds its variables in any order,
+        which a monoidal box has no permutation for. A part of this level
+        or of one above it was scanned when it was built.
+
+        Example
+        -------
+        >>> from discopy import monoidal, symmetric
+        >>> x = symmetric.Ty('x')
+        >>> f = monoidal.Constant(monoidal.Box('f', x, x))
+        >>> f(symmetric.Variable('a', x))
+        Traceback (most recent call last):
+            ...
+        TypeError: Expected symmetric.Diagram, got monoidal.Box instead.
+        """
+        category = self.functor.cod
+        for part in parts:
+            if issubclass(part.functor.cod, category):
+                continue
+            for constant in part.constants:
+                assert_isinstance(constant.box, category)
+
     @property
     def context(self) -> tuple:
         """
@@ -2359,6 +2384,7 @@ class Constant(TermBase):
 
     def __init__(self, box: Box):
         assert_isinstance(box, Box)
+        assert_isinstance(box, self.functor.cod)
         self.box, self.freevars = box, []
         self.stack, self.cod = box.dom, box.cod
         self.offset = 0 if box.dom else None
@@ -2405,6 +2431,7 @@ type y.
     def __init__(self, func: TermBase, arg: TermBase):
         assert_isinstance(func, TermBase)
         assert_isinstance(arg, TermBase)
+        self.scan_constants(func, arg)
         if arg.stack or func.stack != arg.cod:
             raise ValueError(messages.NOT_APPLICABLE.format(
                 func, func.stack, arg, arg.stack, arg.cod))
@@ -2510,6 +2537,7 @@ class Kappa(TermBase):
     def __init__(self, variables: tuple[Variable, ...], body: TermBase,
                  offset: int | None = None):
         assert_isinstance(body, TermBase)
+        self.scan_constants(body)
         variables = tuple(variables)
         if body.stack or list(variables) != body.freevars or offset:
             raise ValueError(messages.NOT_THE_VARIABLE.format(
@@ -2610,8 +2638,7 @@ class Kappa(TermBase):
                       ) -> Callable[[Callable], Kappa]:
         """
         The kappa of a Python function from a variable for each wire of
-        ``dom``, named after its parameters, to the body, whose constants
-        are boxes of the category of this level.
+        ``dom``, named after its parameters, to the body.
 
         Parameters:
             dom : The types of the variables.
@@ -2632,10 +2659,7 @@ class Kappa(TermBase):
                 raise ValueError(
                     f"Expected {len(wires)} variables, got {len(names)}")
             variables = tuple(map(cls.variable_factory, names, wires))
-            body = function(*variables)
-            for constant in body.constants:
-                assert_isinstance(constant.box, cls.functor.cod)
-            return cls(variables, body, offset)
+            return cls(variables, function(*variables), offset)
 
         return decorator
 
