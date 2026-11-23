@@ -6,4 +6,4 @@
 
 - [x] path.Matrix.to_tree writes creations, selections, normalisation and scalar; from_tree reads them back
 - [x] test a dumps/loads cell beside test_repr_is_transparent, the report's own matrix among its cases
-- [ ] CHANGELOG bullet with the PR number, and the gates of next-checks
+- [x] CHANGELOG bullet with the PR number, and the gates of next-checks
