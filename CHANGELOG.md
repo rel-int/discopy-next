@@ -9,6 +9,20 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Added
 
+- `discopy.lean` compiles the categories of `discopy.abc` and their axioms to
+  Lean structures, read off the declarations by introspection, into
+  `discolean/DisCoLean/ABC.lean`; `discolean/` proves a compiled category is a
+  category of Mathlib and that strict premonoidal categories, Diagram(S)
+  included, satisfy the laws of `monoidal.Diagram` ([next#668]).
+
+- `abc.MonoidalCategory` states the laws of whiskering, `tensor_associativity`,
+  `tensor_unit`, `left_whiskering`, `right_whiskering` and `tensor_whiskering`,
+  those of a strict premonoidal category, `tensor_whiskering` broken on Markov
+  and Comarkov lenses and prisms, as is their unitality; `discopy.lean`
+  compiles a `Functor` of each class it compiles, its abstract methods and the objects it specialises its bases
+  to, e.g. `Nat` for `abc.PRO`, and `discolean/` proves the coherence of
+  `discopy.monoidal`:
+  Diagram(S) is the free model of the laws of `monoidal.Diagram` ([next#671]).
 - The notebook `docs/notebooks/optyx/strict_sloppy.md` reproduces §5 of
   arXiv:2110.10641, the strict and sloppy readings of *John likes his code.
   Bill does too.*, each reading a `closed` lambda term sent by a functor
@@ -58,7 +72,7 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   functions, `to_channel`. An `enriched.Functor` extends a functor `C -> D`
   along the classmethod `D.algebra(M, dom, cod)`, which `cat.Arrow` gives as
   the formal sum and `Matrix` as the sum for the new list monad
-  `kleisli.monad.List`, so a list of arrows goes to a `cat.Sum` ([next#134]).
+  `kleisli.monad.List`, so a list of arrows goes to a `sum.Sum` ([next#134]).
 - `monad.algebra.Algebra.product` and `Algebra.power`, the products of the
   Eilenberg-Moore category, `monad.algebra.Operation`, a value of `M(n)` acting
   on every algebra as a function `Aⁿ → A` that every homomorphism commutes
@@ -66,7 +80,7 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   algebras on `range(n)` are its `group.Action`s ([next#134]).
 - `lambek.abstract`'s docs build an abstract categorial grammar from English to
   Lean: "DisCoPy diagrams are the arrows of the free premonoidal category"
-  prints the statement `lean/Statements/English.lean` proves ([next#622]).
+  prints the statement `discolean/DisCoLean/Statements/English.lean` proves ([next#622]).
 - Opt-in Triton forward and backward kernels for signed block peer
   reductions in `neural.geometric`, with PyTorch fallbacks for unsupported
   devices, dtypes and large blocks, and support for `torch.compile`
@@ -509,6 +523,8 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Changed
 
+- `lean/` is now `discolean/`, a Lake package built on Mathlib with one
+  library, `DisCoLean` ([next#668]).
 - The alpha-equivalence of terms is stated once, in `cat.AlphaEquivalence`,
   for the kappa and the lambda calculus: `alpha_eq` and its laws move there
   from `biclosed.TermBase`, which inherits them, with `Renamed` and
@@ -763,6 +779,10 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 - Every `Ob` but `cat.Ob` is `Wire` ([#566]), and `PRO` is `Nat` ([#727]):
   the old names still work, with a `DeprecationWarning`.
+- `cat.Sum` and `monoidal.Sum` are `sum.Sum` and `sum.Sum[monoidal.Diagram]`:
+  the formal sums of the arrows of a category are one module, `discopy.sum`,
+  and `Sum[C]` is a box of `C`. The old names still work, with a
+  `DeprecationWarning`; the other levels follow ([next#10]).
 
 ### Removed
 
@@ -2287,6 +2307,7 @@ for the changelog of `1.2.1` and earlier.
 [#830]: https://github.com/discopy/discopy/pull/830
 [next#1]: https://github.com/rel-int/discopy-next/pull/1
 [next#9]: https://github.com/rel-int/discopy-next/issues/9
+[next#10]: https://github.com/rel-int/discopy-next/issues/10
 [next#16]: https://github.com/rel-int/discopy-next/issues/16
 [next#21]: https://github.com/rel-int/discopy-next/issues/21
 [next#31]: https://github.com/rel-int/discopy-next/issues/31
@@ -2524,6 +2545,8 @@ for the changelog of `1.2.1` and earlier.
 [next#658]: https://github.com/rel-int/discopy-next/pull/658
 [next#665]: https://github.com/rel-int/discopy-next/pull/665
 [next#667]: https://github.com/rel-int/discopy-next/pull/667
+[next#668]: https://github.com/rel-int/discopy-next/pull/668
+[next#671]: https://github.com/rel-int/discopy-next/pull/671
 [next#672]: https://github.com/rel-int/discopy-next/pull/672
 [next#674]: https://github.com/rel-int/discopy-next/pull/674
 [next#675]: https://github.com/rel-int/discopy-next/pull/675

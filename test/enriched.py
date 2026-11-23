@@ -8,6 +8,7 @@ from discopy.kleisli.monad import List, Maybe, Powerset, Subdistribution
 from discopy.matrix import Matrix
 from discopy.monoidal import Box, Diagram, Ty
 from discopy.python import Function
+from discopy.sum import Sum
 from discopy.utils import AxiomError
 
 x, y, z = map(cat.Ob, "xyz")
@@ -53,10 +54,10 @@ def test_Function_arrows_compose_pointwise():
 def test_extension_to_cat_is_the_sum():
     F = Functor(lambda x: x, lambda f: f, dom=Sums, cod=cat.Arrow)
     m, n = Sums([f, g], x, y), Sums([h, k], y, z)
-    assert F(m) == cat.Sum((f, g)) == f + g
+    assert F(m) == Sum((f, g)) == f + g
     assert F(Sums([], x, y)) == cat.Arrow.zero(x, y)
     assert F(m >> n) == F(m) >> F(n)\
-        == cat.Sum((f >> h, f >> k, g >> h, g >> k))
+        == Sum((f >> h, f >> k, g >> h, g >> k))
     assert F(Sums.id(x)) == cat.Id(x)
 
 

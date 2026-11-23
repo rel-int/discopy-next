@@ -54,10 +54,10 @@ from discopy.testable import Serialisable, TestableGeneric
 from discopy.cat import (
     factory,
     assert_iscomposable,
-    assert_isparallel,
 )
 from discopy.utils import (
-    assert_isinstance, factory_key, factory_name, from_tree, unbiased)
+    assert_isinstance, assert_isparallel, factory_key, factory_name,
+    from_tree, unbiased)
 
 if TYPE_CHECKING:
     import sympy
