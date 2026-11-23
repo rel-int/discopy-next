@@ -176,11 +176,13 @@ class Diagram(monoidal.Diagram, BraidedCategory):
         >>> assert bot_right.naturality(1, down=False) == top_left
         >>> assert bot_left.naturality(1, left=False, down=False) == top_right
 
-        Drawn with ``tween`` frames, the box slides through the braid, see
-        :meth:`discopy.drawing.Drawing.interpolate`:
+        Drawn with ``tween`` frames, a box slides through the braids, see
+        :meth:`discopy.drawing.Drawing.slide`:
 
-        >>> _ = top_right.to_gif(
-        ...     bot_left, tween=8, timestep=80, loop=True,
+        >>> g, w = Box('g', x, y @ z), Ty('w')
+        >>> source = w @ g >> Diagram.braid(w, y @ z)
+        >>> _ = source.to_gif(
+        ...     source.naturality(0), tween=12, timestep=80, loop=True,
         ...     doctest="docs/_static/braided/naturality.gif")
 
         .. image:: /_static/braided/naturality.gif

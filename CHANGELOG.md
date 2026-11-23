@@ -13,8 +13,12 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   one term to the next through their normal form, `Equation.to_gif` animates
   it, and `to_gif(..., tween=n)` moves each drawing to the next in `n` frames
   by `Drawing.interpolate`, which raises unless the two are one move apart:
-  an interchanger, or a box sliding through a braid or a swap by
-  `naturality`, where the crossing shrinks behind the box halfway. A gif
+  an interchanger, or a box sliding through the braids or swaps next to it
+  by `naturality` (`Drawing.slide`), where the crossings pass behind the box
+  halfway. Tweened, its port-to-port wires are vertical at both ends
+  (`draw(smooth_wires=True)`). Across an
+  interchanger the two boxes move apart (`Drawing.apart`), swap rows and move
+  back, so that they never overlap. A gif
   tweened so is an isotopy between the drawings. `Diagram.normalization`
   lists the steps `normal_form` takes ([next#706]).
 - `discopy.lean` compiles the categories of `discopy.abc` and their axioms to

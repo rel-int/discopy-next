@@ -298,6 +298,11 @@ def curve(a: Point, b: Point, steps: int = 8) -> list[tuple[Point, Point]]:
     return list(zip(points, points[1:]))
 
 
+def between(a: Point, b: Point, t: float) -> Point:
+    """ The point a fraction ``t`` of the way from ``a`` to ``b``. """
+    return Point(a.x + t * (b.x - a.x), a.y + t * (b.y - a.y))
+
+
 def meet(test, path: list, other: list) -> bool:
     """ Whether ``test`` holds of a segment of ``path`` and of ``other``. """
     return any(test(*p, *q) for p in path for q in other)
@@ -717,19 +722,15 @@ which to_drawing recomputes.
     def interpolate(self, other: Drawing, t: float) -> Drawing:
         """
         The drawing a fraction ``t`` of the way from ``self`` to ``other``,
-        each node at the barycentre of its two positions, when the drawings
-        are of diagrams one move apart: their nodes are equal once the
-        indices of two consecutive boxes are swapped and the labels of the
-        crossings, i.e. the boxes drawn as a braid or as wires, are forgotten.
+        when the drawings are of diagrams one interchanger apart: their plane
+        graphs are equal once the indices of two consecutive boxes are
+        swapped.
 
-        When their edges are equal too, the move is an interchanger and every
-        such drawing is of the same diagram: this is a planar isotopy, see
-        :meth:`discopy.monoidal.Equation.path`. Otherwise the edges may only
-        differ at two consecutive boxes, one of them a crossing, as when the
-        other slides through it by
-        :meth:`discopy.braided.Diagram.naturality`: the box moves along its
-        strand and the drawing takes the edges of ``other`` from ``t = .5``,
-        when the box meets the crossing.
+        This is a planar isotopy, see
+        :meth:`discopy.monoidal.Equation.path`: the two boxes move apart
+        (:meth:`apart`), swap their rows and move back, so they never
+        overlap. When the drawings are not an interchanger apart, this is
+        :meth:`slide`.
 
         Parameters:
             other : The drawing to move to.
@@ -753,76 +754,208 @@ which to_drawing recomputes.
         ...
         ValueError: These drawings are not of diagrams one move apart.
 
-        A box slides through a braid, which shrinks behind it halfway:
+        """
+        source = dict(zip(self.nodes, self.nodes))
+        edges = set(self.edges)
+        swaps = [{}] + [{j: j + 1, j + 1: j}
+                        for j in range(len(self.box_nodes) - 1)]
+        for swap in swaps:
+            mapping = {node: Node(node.kind, **dict(
+                node.data, j=swap[node.data["j"]]))
+                if node.data.get("j") in swap else node
+                for node in other.nodes}
+            if set(mapping.values()) == set(self.nodes) and edges == {
+                    (mapping[a], mapping[b]) for a, b in other.edges}:
+                break
+        else:
+            return self.slide(other, t)
+        start = dict(self.positions)
+        end = {mapping[node]: p for node, p in other.positions.items()}
+        stops = [start, end]
+        if swap:
+            left, right = sorted(swap, key=lambda j: (
+                self.centre(j).x + other.centre(swap[j]).x, j))
+            stops[1:1] = [dict(self.apart(left, right).positions), {
+                mapping[node]: p for node, p in other.apart(
+                    swap[left], swap[right]).positions.items()}]
+            stops = [stops[0]] + [stops[1]] * (stops[1] != stops[0])\
+                + [stops[2]] * (stops[2] != stops[3]) + [stops[3]]
+        phase = min(int(t * (len(stops) - 1)), len(stops) - 2)
+        s = t * (len(stops) - 1) - phase
+        return self.relabel_nodes(positions={
+            node: between(stops[phase][node], stops[phase + 1][node], s)
+            for node in source}).resized(self, other, t)
 
+    def slide(  # pylint: disable=too-many-locals  # its matching
+            self, other: Drawing, t: float) -> Drawing:
+        """
+        The drawing a fraction ``t`` of the way from ``self`` to ``other``
+        when a box slides through the crossings next to it, i.e. the boxes
+        drawn as a braid or as wires, as by
+        :meth:`discopy.braided.Diagram.naturality`. The crossings that move
+        shrink into the box until ``t = .5``, the drawing then takes the
+        edges of ``other`` and they grow out of the other side of the box,
+        while every other node moves in a straight line: halfway, they are
+        drawn inside the box, so that each strand that crosses it goes in at
+        one corner and out at the other, behind it.
+
+        Parameters:
+            other : The drawing to move to.
+            t : The fraction of the way, from ``0`` to ``1``.
+
+        Raises:
+            ValueError : When the drawings are not of the same boxes in the
+                same order, or differ beyond one box and the crossings that
+                touch it.
+
+        Example
+        -------
         >>> from discopy.braided import Ty, Box, Braid
         >>> x, y = Ty('x'), Ty('y')
         >>> f = Box('f', x, y)
         >>> a = (x @ f >> Braid(x, y)).to_drawing()
         >>> b = (Braid(x, x) >> f @ x).to_drawing()
-        >>> assert a.interpolate(b, 1) == b
-        >>> middle = a.interpolate(b, .5)
+        >>> assert a.slide(b, 0) == a and a.slide(b, 1) == b
+        >>> middle = a.slide(b, .5)
         >>> for node in middle.box_nodes: print(node, middle.positions[node])
         Node('box', box=Braid(x, x), j=0) Point(x=1.0, y=1.0)
         Node('box', box=f, j=1) Point(x=1.0, y=1.0)
         """
-        def crossings(drawing):
-            return {node.j for node in drawing.box_nodes
-                    if node.box.draw_as_braid or node.box.draw_as_wires}
+        ends = (self, other)
+        crossings = [{
+            node.j: (node.box, drawing.positions[node])
+            for node in drawing.box_nodes
+            if node.box.draw_as_braid or node.box.draw_as_wires}
+            for drawing in ends]
+        moving = [{j for j, crossing in mine.items()
+                   if crossing not in theirs.values()}
+                  for mine, theirs in (crossings, crossings[::-1])]
 
-        def forget(node, swap, forgotten):
-            data = dict(node.data)
-            if data.get("j") in forgotten:
-                data.pop("box", None)
-                data.pop("x", None)
-            if data.get("j") in swap:
-                data["j"] = swap[data["j"]]
-            return Node(node.kind, **data)
+        def key(node, k):
+            j, data = node.data.get("j"), dict(node.data)
+            if j in crossings[k]:
+                del data["j"]
+                return Node(node.kind, at=crossings[k][j][1], **data)
+            ranks = sorted(n.j for n in ends[k].box_nodes
+                           if n.j not in crossings[k])
+            return node if j is None else Node(
+                node.kind, **dict(data, j=ranks.index(j)))
 
-        source = {
-            node: forget(node, {}, crossings(self)) for node in self.nodes}
-        edges = {(source[a], source[b]) for a, b in self.edges}
-        swaps = [{}] + [{j: j + 1, j + 1: j}
-                        for j in range(len(self.box_nodes) - 1)]
-        for swap in swaps:
-            mapping = {node: forget(node, swap, crossings(other))
-                       for node in other.nodes}
-            other_edges = {(mapping[a], mapping[b]) for a, b in other.edges}
-            moving = set(swap) if set(swap) & crossings(self) else set()
-            if set(mapping.values()) == set(source.values()) and all(
-                    any(node.data.get("j") in moving for node in edge)
-                    for edge in edges ^ other_edges):
-                break
-        else:
+        labels = [{node: key(node, k) for node in drawing.nodes
+                   if node.data.get("j") not in moving[k]}
+                  for k, drawing in enumerate(ends)]
+        touched = {
+            labels[k][v].data.get("j") for k, drawing in enumerate(ends)
+            for edge in drawing.edges for u, v in (edge, edge[::-1])
+            if u.data.get("j") in moving[k] and v in labels[k]} - {None}
+        kept = [{(labels[k][a], labels[k][b]) for a, b in drawing.edges
+                 if a in labels[k] and b in labels[k]}
+                for k, drawing in enumerate(ends)]
+        if len(touched) != 1 or set(labels[0].values()) != set(
+                labels[1].values()) or not all(
+                    any(node.data.get("j") in touched for node in edge)
+                    for edge in kept[0] ^ kept[1]):
             raise ValueError(messages.NO_INTERPOLATION)
-        start = {source[node]: p for node, p in self.positions.items()}
-        end = {mapping[node]: p for node, p in other.positions.items()}
+        middle = {
+            labels[0][node]: between(p, other.positions[next(
+                n for n, label in labels[1].items()
+                if label == labels[0][node])], .5)
+            for node, p in self.positions.items() if node in labels[0]}
+        box = next(node for node, label in labels[0].items()
+                   if label.kind == "box" and label.data.get("j") in touched)
+        (left, low), (right, high) = self.relabel_nodes(positions={
+            node: middle[label] for node, label in labels[0].items()
+        }).rectangle(box.j)
+        k, s = (0, 2 * t) if t < .5 else (1, 2 - 2 * t)
+        drawing = ends[k]
+        group = [p for node, p in drawing.positions.items()
+                 if node.data.get("j") in moving[k]]
+        x0, x1 = min(p.x for p in group), max(p.x for p in group)
+        y0, y1 = min(p.y for p in group), max(p.y for p in group)
 
-        def between(a, b, s):
-            return {key: Point(a[key].x + s * (b[key].x - a[key].x),
-                               a[key].y + s * (b[key].y - a[key].y))
-                    for key in a}
+        def behind(p):
+            return Point(
+                left + (right - left) * (.1 + .8 * (p.x - x0) / (x1 - x0)),
+                low + (high - low) * (.1 + .8 * (p.y - y0) / (y1 - y0)))
 
-        if edges == other_edges:
-            base, labels, moved = self, source, between(start, end, t)
-        else:
-            middle = between(start, end, .5)
-            crossing, = moving & crossings(self)
-            box, centre = (
-                middle[next(key for key in middle if key.kind == "box"
-                            and key.data.get("j") == j)]
-                for j in (min(moving - {crossing}), crossing))
-            middle.update({key: Point(box.x + (p.x - centre.x) / 5,
-                                      box.y + (p.y - centre.y) / 5)
-                           for key, p in middle.items()
-                           if key.data.get("j") == crossing})
-            base, labels, moved = (
-                self, source, between(start, middle, 2 * t)) if t < .5\
-                else (other, mapping, between(middle, end, 2 * t - 1))
-        result = base.relabel_nodes(positions={
-            node: moved[labels[node]] for node in base.nodes})
-        result.width = self.width + t * (other.width - self.width)
-        result.height = self.height + t * (other.height - self.height)
+        return drawing.relabel_nodes(positions={
+            node: between(p, middle[labels[k][node]] if node in labels[k]
+                          else behind(p), s)
+            for node, p in drawing.positions.items()}).resized(self, other, t)
+
+    def resized(self, source: Drawing, target: Drawing, t: float) -> Drawing:
+        """
+        The drawing with the width and height a fraction ``t`` of the way from
+        those of ``source`` to those of ``target``, wide enough for its nodes,
+        see :meth:`interpolate`.
+
+        >>> from discopy.monoidal import Box
+        >>> f, g = Box('f', 'x', 'y').to_drawing(), Box('g', 'x', 'y')
+        >>> f.resized(f, g.to_drawing(), .5).width
+        1.0
+        """
+        self.width = max(source.width + t * (target.width - source.width),
+                         max((p.x for p in self.positions.values()),
+                             default=0) + .5)
+        self.height = source.height + t * (target.height - source.height)
+        return self
+
+    def centre(self, j: int) -> Point:
+        """
+        The centre of the rectangle of box ``j``, see :meth:`rectangle`.
+
+        >>> from discopy.monoidal import Box
+        >>> Box('f', 'x', 'y').to_drawing().centre(0)
+        Point(x=0.5, y=0.5)
+        """
+        (x0, y0), (x1, y1) = self.rectangle(j)
+        return Point((x0 + x1) / 2, (y0 + y1) / 2)
+
+    def rectangle(self, j: int) -> tuple[Point, Point]:
+        """
+        The bottom left and top right corners of box ``j``, as
+        :meth:`add_box_corners` draws them.
+
+        >>> from discopy.monoidal import Box
+        >>> Box('f', 'x', 'y').to_drawing().rectangle(0)
+        (Point(x=0.25, y=0.25), Point(x=0.75, y=0.75))
+        """
+        drawing = self.relabel_nodes()
+        drawing.add_box_corners()
+        return tuple(drawing.positions[Node(f"box-corner-{a}{a}", j=j)]
+                     for a in range(2))
+
+    def apart(self, left: int, right: int, gap: float = .5) -> Drawing:
+        """
+        The drawing with box ``right`` pushed right, if need be, until box
+        ``left`` is ``gap`` left of it, with every node on its rows right of
+        it. Along an interchanger, :meth:`interpolate` moves the two boxes
+        apart, swaps their rows and moves them back: while they swap, the
+        right edge of the one and the left edge of the other move linearly,
+        so they never overlap.
+
+        Parameters:
+            left : The index of the box to keep on the left.
+            right : The index of the box to push right.
+            gap : The space to leave between them.
+
+        Example
+        -------
+        >>> from discopy.monoidal import Ty, Box
+        >>> f, g = Box('f', Ty('x'), Ty()), Box('g', Ty(), Ty('x'))
+        >>> drawing = (f >> g).to_drawing().apart(1, 0)
+        >>> drawing.rectangle(1)[1].x + .5 == drawing.rectangle(0)[0].x
+        True
+        """
+        (edge, low), (_, high) = self.rectangle(right)
+        shift = self.rectangle(left)[1].x + gap - edge
+        if shift <= 0:
+            return self
+        result = self.relabel_nodes(positions={
+            node: p.shift(x=shift) for node, p in self.positions.items()
+            if low <= p.y <= high and p.x >= edge
+            or node.data.get("j") == right})
+        result.width = self.width + shift
         return result
 
     def wires(self) -> list[tuple[Node, Node]]:

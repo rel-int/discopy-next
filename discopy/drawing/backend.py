@@ -989,6 +989,14 @@ class Backend(ABC):
                 continue  # crossings are drawn on their own
             bend_out, bend_in = source.kind == "box", target.kind == "box"
             typ = getattr(source, 'x', None) or getattr(target, 'x', None)
+            if params.get("smooth_wires") and not (
+                    bend_out or bend_in or is_frame_boundary):
+                middle = (source_position[1] + target_position[1]) / 2
+                self.draw_bezier(
+                    [source_position, (source_position[0], middle),
+                     (target_position[0], middle), target_position],
+                    adaptive=self.on_neutral_canvas(typ))
+                continue
             self.draw_wire(
                 source_position, target_position, bend_out, bend_in,
                 linewidth=(0 if is_frame_boundary else None),

@@ -55,6 +55,10 @@ def draw(diagram, **params):
         Whether to draw type labels, default is :code:`False`.
     draw_box_labels : bool, optional
         Whether to draw box labels, default is :code:`True`.
+    smooth_wires : bool, optional
+        Whether to draw a wire between two ports vertical at both ends, as a
+        cubic Bezier, rather than bending into the lower one, default is
+        :code:`False`.
     aspect : string, optional
         Aspect ratio, one of :code:`['auto', 'equal']`.
     margins : tuple, optional
@@ -155,7 +159,8 @@ def to_gif(diagram, *diagrams, **params):  # pragma: no cover
         the drawing moves by :meth:`Drawing.interpolate`, so that the gif is
         an isotopy, e.g. along :meth:`discopy.monoidal.Equation.path`, and
         raises :code:`ValueError` when two consecutive diagrams are not one
-        move apart.
+        move apart. The wires between two ports are then drawn vertical at
+        both ends, i.e. with :code:`smooth_wires=True`.
     loop : bool, optional
         Whether to loop, default is :code:`False`
     params : any, optional
@@ -166,6 +171,7 @@ def to_gif(diagram, *diagrams, **params):  # pragma: no cover
     timestep = params.get("timestep", 500)
     loop = params.get("loop", False)
     tween = params.pop("tween", 1)
+    params.setdefault("smooth_wires", tween > 1)
     steps, frames = [d.to_drawing() for d in (diagram, ) + diagrams], []
     steps = tweened(steps, tween)
     if 'figsize' not in params:

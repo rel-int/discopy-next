@@ -1274,3 +1274,37 @@ def test_a_coloured_drawing_reads_back_from_its_repr():
     with raises(AssertionError):
         x = monoidal.Ty(monoidal.Wire("x"))
         eval(repr(f.to_drawing()))
+
+
+def test_interpolate_keeps_boxes_apart():
+    """
+    Across one interchanger no two boxes overlap, including the ones the
+    straight line drew through each other: found by discopy-lean.
+    """
+    x, unit = monoidal.Ty('x'), monoidal.Ty()
+    f, g = monoidal.Box('f', x, x ** 3), monoidal.Box('g', x ** 2, x)
+    e, s = monoidal.Box('e', x, unit), monoidal.Box('s', unit, x)
+    for source, target in [
+            (f @ x @ x >> x @ x @ x @ g, x @ g >> f @ x),
+            (e >> s, s @ x >> x @ e)]:
+        a, b = source.to_drawing(), target.to_drawing()
+        for k in range(41):
+            frame = a.interpolate(b, k / 40)
+            (x0, y0), (x1, y1) = frame.rectangle(0)
+            (u0, v0), (u1, v1) = frame.rectangle(1)
+            assert x1 <= u0 or u1 <= x0 or y1 <= v0 or v1 <= y0
+
+
+def test_slide_passes_behind_the_box():
+    from discopy import braided
+    x, y, z, w = map(braided.Ty, "xyzw")
+    f = braided.Box('f', x, y @ z)
+    source = w @ f >> braided.Diagram.braid(w, y @ z)
+    a, b = source.to_drawing(), source.naturality(0).to_drawing()
+    assert a.slide(b, 0) == a and a.slide(b, 1) == b
+    middle = a.slide(b, .5)
+    j, = (node.j for node in middle.box_nodes if node.box.name == "f")
+    (x0, y0), (x1, y1) = middle.rectangle(j)
+    assert all(x0 < p.x < x1 and y0 < p.y < y1
+               for node, p in middle.positions.items()
+               if node.data.get("j") not in (None, j))
