@@ -2176,7 +2176,7 @@ class TermBase(Serialisable, AlphaEquivalence):
 
     @classmethod
     def generate(cls, cod: Ob, choices: Sequence[int], types: Sequence[Ob],
-                 letters: Sequence[str]) -> TermBase:
+                 letters: Sequence[str | None]) -> TermBase:
         """
         Build a term of codomain ``cod`` from a sequence of ``choices``, one
         per node and leaves once it runs out: a variable, free and named
@@ -2190,7 +2190,8 @@ class TermBase(Serialisable, AlphaEquivalence):
             cod : The codomain of the term.
             choices : The choices, consumed one per node.
             types : The types the variables are drawn from.
-            letters : The letters naming the bound variables.
+            letters : The letters naming the bound variables, see
+                :meth:`bound_name`.
 
         Example
         -------
@@ -2251,7 +2252,7 @@ class TermBase(Serialisable, AlphaEquivalence):
         letter = letters[level % len(letters)]
         if letter is None and shadowed is not None:
             return shadowed.name
-        return f"{letter or 'x'}{level}"
+        return f"{'x' if letter is None else letter}{level}"
 
     @classmethod
     def namings(cls) -> st.SearchStrategy[list[str | None]]:

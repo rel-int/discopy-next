@@ -3045,7 +3045,7 @@ class TermBase(cat.TermBase):
     @classmethod
     # pylint: disable-next=too-many-arguments,too-many-positional-arguments
     def generate(cls, cod: Ty, choices: Sequence[int], types: Sequence[Ty],
-                 letters: Sequence[str]) -> cat.TermBase:
+                 letters: Sequence[str | None]) -> cat.TermBase:
         """
         Build a term of codomain ``cod`` from a sequence of ``choices``, as
         :meth:`discopy.biclosed.TermBase.generate` does: its inputs are
@@ -3441,7 +3441,7 @@ class Sampler:
     terms: type[TermBase]
     choices: Iterator[int]
     types: Sequence[Ty]
-    letters: Sequence[str]
+    letters: Sequence[str | None]
     counter: Iterator[int] = field(default_factory=count)
 
     def choose(self, options: Sequence):
