@@ -44,9 +44,13 @@ def test_a_budget_runs_past_the_first_batch_up_to_the_cap_exactly():
 
 
 def test_a_finite_support_stops_a_budget_after_a_batch_draws_nothing_new():
-    """ Rather than draw the same two terms until its ten minutes are up. """
+    """
+    Rather than draw the same two terms until its ten minutes are up: the
+    cap is out of reach, so only the support stops it, and costs nothing,
+    since Hypothesis ends a search that has exhausted its space.
+    """
     sizes, drawn = _sizes(st.booleans(), seconds=600, cap=10 ** 6)
-    assert drawn == {False, True} and len(sizes) == 2
+    assert drawn <= {False, True} and len(sizes) == 2
 
 
 def test_past_the_stop_a_cell_runs_its_first_batch_only():

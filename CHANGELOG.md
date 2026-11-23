@@ -1968,7 +1968,8 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 - The property matrix searches each cell for a time rather than a count of
   examples: `PROPTEST_SECONDS` caps `explore`'s thousand, and a push to `main`
-  runs one job at a second per cell, the nightly run four shards at five,
+  runs one job at a second per cell, the nightly run and a dispatch four
+  shards at five,
   merged by `python -m proptest.report`. `main`'s runs had been cancelled at
   30 minutes since the matrix grew past 2,900 cells, 4% of the way through
   ([next#702]).

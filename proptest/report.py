@@ -302,10 +302,21 @@ def merge(reports, baseline=None):
     >>> print("\\n".join(lines[1:]))
     1 cell(s) the baseline checked and this run did not:
       b: skipped
+
+    The slices partition the run, so a cell in two of them is a mistake in
+    how it was split, which no order of the reports can settle:
+
+    >>> merge([dumps([Cell("a", PASSED)]), dumps([Cell("a", SKIPPED)])])
+    Traceback (most recent call last):
+     ...
+    ValueError: cell(s) in more than one slice: ['a']
     """
     cells = tuple(sorted(
         (cell for report in reports for cell in loads(report)),
         key=lambda cell: cell.name))
+    if twice := sorted({a.name for a, b in zip(cells, cells[1:])
+                        if a.name == b.name}):
+        raise ValueError(f"cell(s) in more than one slice: {twice}")
     return cells, render(cells, baseline)
 
 

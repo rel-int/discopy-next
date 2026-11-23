@@ -229,11 +229,32 @@ def shard(nodeid, count):
     return zlib.crc32(nodeid.encode()) % count
 
 
+def slicing(option):
+    """
+    The index and the count of ``--proptest-shard I/N``, raising
+    :class:`pytest.UsageError` on anything but ``0 <= I < N``, which would
+    otherwise run no test and pass.
+
+    >>> slicing("1/4")
+    (1, 4)
+    >>> slicing("4/4")
+    Traceback (most recent call last):
+     ...
+    pytest.UsageError: --proptest-shard 4/4: not I/N with 0 <= I < N
+    """
+    index, _, count = option.partition("/")
+    if not (index.isdigit() and count.isdigit()
+            and int(index) < int(count)):
+        raise pytest.UsageError(
+            f"--proptest-shard {option}: not I/N with 0 <= I < N")
+    return int(index), int(count)
+
+
 def pytest_collection_modifyitems(config, items):
     """ Deselect the tests outside the slice ``--proptest-shard`` names. """
     if (option := config.getoption("--proptest-shard")) is None:
         return
-    index, count = map(int, option.split("/"))
+    index, count = slicing(option)
     slices = [shard(item.nodeid, count) for item in items]
     config.hook.pytest_deselected(items=[
         item for item, i in zip(items, slices) if i != index])

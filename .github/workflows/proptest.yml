@@ -51,6 +51,14 @@ jobs:
       HYPOTHESIS_GITHUB_REPOSITORY: rel-int/discopy-next
       SHARD: ${{ matrix.shard }}/${{ strategy.job-total }}
     steps:
+    - name: Set the deadline
+      # Past `PROPTEST_STOP` a cell runs the examples of a pull request only,
+      # so that a matrix that grows past its budget finishes rather than
+      # being cancelled: 22 minutes after the job starts, of its 30, which
+      # leaves setup out of the search and the uploads time to run. A cell
+      # already searching finishes its batch, so this is a target, not a
+      # guarantee.
+      run: echo "PROPTEST_STOP=$(( $(date +%s) + 22 * 60 ))" >> "$GITHUB_ENV"
     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       with:
         persist-credentials: false
@@ -92,14 +100,9 @@ jobs:
         workflow_conclusion: success
         if_no_artifact_found: warn
     - name: Run property tests
-      # Past `PROPTEST_STOP` a cell runs the examples of a pull request only,
-      # so that a matrix that grows past its budget finishes rather than
-      # being cancelled: 22 minutes after setup, of the job's 30.
-      #
       # `logical` is one worker per vCPU, where `auto` counts the cores: four
       # workers rather than two on `ubuntu-latest`.
       run: >-
-        PROPTEST_STOP=$(( $(date +%s) + 22 * 60 ))
         uv run pytest proptest/ -n logical -p no:benchmark -vrxX
         --hypothesis-show-statistics
         --proptest-shard="$SHARD"

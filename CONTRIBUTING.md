@@ -141,7 +141,8 @@ uv run pytest proptest/ -n auto -p no:benchmark -v
 
 The cells of the matrix are independent, so `-n auto`
 ([pytest-xdist](https://pytest-xdist.readthedocs.io)) runs them on all
-cores, with `-p no:benchmark` unloading the benchmark plugin that is
+cores (`-n logical` on every vCPU, which is what CI uses, where cores and
+vCPUs differ), with `-p no:benchmark` unloading the benchmark plugin that is
 incompatible with it; drop both to run serially, e.g. when debugging a
 single cell.
 
@@ -237,8 +238,8 @@ reading, and those are parametrised too.
 A profile's budget is a count of examples, and `explore`'s thousand on
 every cell of the matrix is some 33 hours. `PROPTEST_SECONDS` gives each
 cell a time instead, with the profile's count as a cap: the twenty examples
-of a pull request first, then batches of fresh ones sized to the time left,
-until the cell has spent its seconds, reached the cap, or drawn no new term
+of a pull request first, then batches of fresh ones sized to half the time
+left, until the cell has spent its seconds, reached the cap, or drawn no new term
 in a whole batch. Past the time `PROPTEST_STOP` (seconds since the epoch) a
 cell runs its first batch only. `--proptest-shard I/N` runs the `I`-th of
 `N` slices of the suite, by a hash of the node id, and
@@ -256,9 +257,10 @@ The `proptest` GitHub workflow runs this suite on every pull request, on
 `main`, nightly and on manual dispatch, with one worker per vCPU
 (`-n logical`): a pull request at `pr`'s twenty examples, a push to `main`
 at a second per cell, and the nightly run and a dispatch at five, over four
-shards that a last job merges. Each sets `PROPTEST_STOP` 22 minutes in, so
-a run that outgrows its 30 finishes with what a pull request checks rather
-than being cancelled. It carries the report
+shards that a last job merges. Each sets `PROPTEST_STOP` 22 minutes into
+its 30, so that a run that outgrows them falls back to what a pull request
+checks rather than being cancelled, unless a cell searching at the deadline
+takes the rest of the time on its own. It carries the report
 between runs as an artifact, and on narrower terms than the example database:
 a baseline is a claim about what `main` checks rather than a pile of examples
 any run may add to, so it is taken from a **successful** run **of `main`**

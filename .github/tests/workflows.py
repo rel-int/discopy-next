@@ -130,6 +130,7 @@ def test_only_a_deep_proptest_search_is_sharded():
     def shards(github):
         return ast.literal_eval(evaluate(strategy["matrix"]["shard"], github))
     assert shards(push("a")) == shards(pull_request("a")) == [0]
-    assert shards(schedule("a", 1)) == [0, 1, 2, 3]
+    dispatch = dict(schedule("a", 1), event_name="workflow_dispatch")
+    assert shards(schedule("a", 1)) == shards(dispatch) == [0, 1, 2, 3]
     assert strategy["fail-fast"] is False
     assert jobs["merge"]["needs"] == "proptest"
