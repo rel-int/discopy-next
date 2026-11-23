@@ -4,7 +4,7 @@ The rules of every enrolled category, see
 """
 
 import pytest
-from hypothesis import Phase, note
+from hypothesis import Phase, given, note, settings
 from hypothesis import strategies as st
 
 from discopy.testable import Rule, Testable, inhabits
@@ -30,7 +30,7 @@ def cells():
 
 @pytest.mark.cell
 @pytest.mark.parametrize("rule", cells())
-def test_rule(rule, drawn, search):
+def test_rule(rule, drawn):
     """
     Apply a rule to the premises it draws for a goal, a broken one up to
     its first counterexample, and check its conclusion against the type its
@@ -43,6 +43,8 @@ def test_rule(rule, drawn, search):
     ob = rule.category.typeparams()[0]
     objects = st.none() if ob is type(None) else ob.strategy()
 
+    @settings(phases=phases)
+    @given(data=st.data())
     def check(data):
         dom = data.draw(objects, label="dom")
         cod = data.draw(objects, label="cod")
@@ -54,4 +56,4 @@ def test_rule(rule, drawn, search):
         note(conclusion)
         assert inhabits(conclusion, rule.output(scope))
 
-    search(check, phases)
+    check()

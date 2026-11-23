@@ -170,7 +170,7 @@ def stopped(baseline, cells):
     return tuple(cell for cell in now if cell.outcome in STOPPED + (GONE, ))
 
 
-def render(cells, baseline=None, flag="--proptest-baseline"):
+def render(cells, baseline=None):
     """
     The lines the run prints about itself: the cells that cannot fail, and,
     against a baseline, the cells that stopped being checked. An empty
@@ -180,7 +180,7 @@ def render(cells, baseline=None, flag="--proptest-baseline"):
     ``baseline`` is :obj:`None` when the run was given no baseline and empty
     when it was given one with nothing in it, which is what an unreadable
     artifact comes to: the two read differently and only the first is the
-    reader's to fix, by passing ``flag``.
+    reader's to fix.
 
     >>> print("\\n".join(render([
     ...     Cell("cat.Arrow.identity_typing", PASSED, distinct=5, budget=100),
@@ -225,8 +225,8 @@ def render(cells, baseline=None, flag="--proptest-baseline"):
                 f"every one of the {len(passing)} passing cell(s) drew a "
                 "distinct term for each example it was given")
     if baseline is None:
-        lines.append(f"no baseline to compare against: "
-                     f"pass {flag} to name one")
+        lines.append("no baseline to compare against: "
+                     "pass --proptest-baseline to name one")
     elif not baseline:
         lines.append("the baseline names no cell to compare against")
     elif not (lost := stopped(baseline, cells)):
@@ -285,61 +285,3 @@ def loads(source):
              distinct=entry.get("distinct"), budget=entry.get("budget"))
         for name, entry in sorted(entries.items())
         if isinstance(entry, dict) and "outcome" in entry)
-
-
-def merge(reports, baseline=None):
-    """
-    The cells of a run split into slices, from the report of each slice,
-    and the lines they print against the baseline of the whole run: a slice
-    compared against the whole baseline would name every cell of the other
-    slices as gone.
-
-    >>> cells, lines = merge(
-    ...     [dumps([Cell("a", PASSED, 3, 3)]), dumps([Cell("b", SKIPPED)])],
-    ...     baseline=[Cell("a", PASSED), Cell("b", PASSED)])
-    >>> [cell.name for cell in cells]
-    ['a', 'b']
-    >>> print("\\n".join(lines[1:]))
-    1 cell(s) the baseline checked and this run did not:
-      b: skipped
-
-    The slices partition the run, so a cell in two of them is a mistake in
-    how it was split, which no order of the reports can settle:
-
-    >>> merge([dumps([Cell("a", PASSED)]), dumps([Cell("a", SKIPPED)])])
-    Traceback (most recent call last):
-     ...
-    ValueError: cell(s) in more than one slice: ['a']
-    """
-    cells = tuple(sorted(
-        (cell for report in reports for cell in loads(report)),
-        key=lambda cell: cell.name))
-    if twice := sorted({a.name for a, b in zip(cells, cells[1:])
-                        if a.name == b.name}):
-        raise ValueError(f"cell(s) in more than one slice: {twice}")
-    return cells, render(cells, baseline, flag="--baseline")
-
-
-if __name__ == "__main__":
-    import argparse
-    import pathlib
-
-    parser = argparse.ArgumentParser(
-        prog="python -m proptest.report",
-        description="Merge the reports of the slices of one run.")
-    parser.add_argument("reports", nargs="+", type=pathlib.Path)
-    parser.add_argument("--baseline", type=pathlib.Path)
-    parser.add_argument("--output", type=pathlib.Path, required=True)
-    args = parser.parse_args()
-    known = None
-    if args.baseline is not None:
-        try:
-            known = loads(args.baseline.read_text())
-        except (OSError, ValueError) as error:
-            known = ()
-            print(f"unreadable baseline {args.baseline}: {error}")
-    merged, lines = merge(
-        [path.read_text() for path in args.reports], known)
-    print("\n".join(lines))
-    args.output.parent.mkdir(parents=True, exist_ok=True)
-    args.output.write_text(dumps(merged))

@@ -50,8 +50,8 @@ def pull_request(sha):
             "event": {"pull_request": {"number": 1}}}
 
 
-def schedule(sha, run_id):
-    return {"workflow": "w", "event_name": "schedule", "sha": sha,
+def dispatch(sha, run_id):
+    return {"workflow": "w", "event_name": "workflow_dispatch", "sha": sha,
             "ref": "refs/heads/main", "run_id": run_id, "event": {}}
 
 
@@ -76,14 +76,14 @@ def test_a_pull_request_supersedes_its_own_runs(concurrency):
         == "True"
 
 
-def test_a_scheduled_proptest_run_never_cancels_a_push():
-    """`proptest` is the only workflow on a schedule and a dispatch, and both
-    fire on the commit a push already ran on."""
+def test_a_dispatched_proptest_run_never_cancels_a_push():
+    """`proptest` is the only workflow on a dispatch, which fires on the
+    commit a push already ran on."""
     with open(GITHUB / "workflows" / "proptest.yml") as file:
         group = yaml.safe_load(file)["concurrency"]["group"]
-    assert evaluate(group, schedule("a", 1)) != evaluate(group, push("a"))
-    assert evaluate(group, schedule("a", 1))\
-        != evaluate(group, schedule("a", 2))
+    assert evaluate(group, dispatch("a", 1)) != evaluate(group, push("a"))
+    assert evaluate(group, dispatch("a", 1))\
+        != evaluate(group, dispatch("a", 2))
 
 
 @pytest.fixture
@@ -116,25 +116,3 @@ def test_a_push_to_main_measures_every_python_of_its_matrix(build_test):
     assert len(versions(build_test, push("a"))) > 1
     assert build_test["strategy"].get("fail-fast") is False
     assert versions(build_test, pull_request("a")) == ["3.14"]
-
-
-def test_only_a_deep_proptest_search_is_sharded():
-    """A push searches each cell for a second in one job; the nightly run
-    and a dispatch search for five, which does not fit in one, so they
-    split the matrix over jobs whose failures do not cancel each other, and
-    `merge` alone compares and uploads the run as a whole."""
-    with open(GITHUB / "workflows" / "proptest.yml") as file:
-        jobs = yaml.safe_load(file)["jobs"]
-    strategy = jobs["proptest"]["strategy"]
-
-    def shards(github):
-        return ast.literal_eval(evaluate(strategy["matrix"]["shard"], github))
-    assert shards(push("a")) == shards(pull_request("a")) == [0]
-    dispatch = dict(schedule("a", 1), event_name="workflow_dispatch")
-    assert shards(schedule("a", 1)) == shards(dispatch) == [0, 1, 2, 3]
-    seconds = jobs["proptest"]["env"]["PROPTEST_SECONDS"]
-    assert [evaluate(seconds, github).strip() for github in (
-        pull_request("a"), push("a"), schedule("a", 1), dispatch)]\
-        == ["0", "1", "5", "5"]
-    assert strategy["fail-fast"] is False
-    assert jobs["merge"]["needs"] == "proptest"

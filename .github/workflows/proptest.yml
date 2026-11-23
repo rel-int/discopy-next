@@ -4,8 +4,6 @@ on:
   pull_request:
   push:
     branches: [main]
-  schedule:
-  - cron: "17 3 * * *"
   workflow_dispatch:
 
 permissions:
@@ -13,10 +11,9 @@ permissions:
   actions: read
 
 # Supersede a pull request's own runs, but let every commit on main keep the
-# run that proves it green: a main run is where the suite searches new
-# ground, and cancelling it throws that search away. A schedule and a
-# dispatch get a group each, since they share a commit with the push that
-# made it and would otherwise queue behind it.
+# run that proves it green and writes the baseline the next run compares
+# against. A dispatch gets a group of its own, since it shares a commit with
+# the push that made it and would otherwise queue behind it.
 concurrency:
   group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref
     || github.event_name == 'push' && github.sha || github.run_id }}
@@ -26,39 +23,18 @@ jobs:
   proptest:
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    strategy:
-      # A shard that fails must not cancel the search of the others.
-      fail-fast: false
-      matrix:
-        # The nightly run and a dispatch search deeper than a push, so they
-        # split the matrix over four jobs, which `merge` puts back together.
-        shard: ${{ fromJSON((github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && '[0, 1, 2, 3]' || '[0]') }}
     env:
-      # A pull request replays what the database remembers and generates a
-      # few examples on top, from a fixed seed so that a run draws the same
-      # examples every time; every other run searches new ground, for as
-      # long as `PROPTEST_SECONDS` gives each cell, up to the 1000 examples
-      # of `explore`: 3,565 cells at 1000 examples each is some 33 hours.
-      HYPOTHESIS_PROFILE: >-
-        ${{ github.event_name == 'pull_request' && 'pr' || 'explore' }}
-      PYTEST_ADDOPTS: >-
-        ${{ github.event_name == 'pull_request' && '--hypothesis-seed=0' || '' }}
-      PROPTEST_SECONDS: >-
-        ${{ github.event_name == 'pull_request' && '0'
-        || github.event_name == 'push' && '1' || '5' }}
+      # Every run replays what the database remembers and generates the few
+      # examples of a pull request on top, from a fixed seed so that a run
+      # draws the same examples every time. `explore`'s thousand examples on
+      # every cell of the matrix is some 33 hours, so no run searches deeper
+      # until the strategies draw better terms for less.
+      HYPOTHESIS_PROFILE: pr
+      PYTEST_ADDOPTS: --hypothesis-seed=0
       # The repository whose example database the `shared` profile replays:
       # this one, which uploads it below, rather than the default upstream.
       HYPOTHESIS_GITHUB_REPOSITORY: rel-int/discopy-next
-      SHARD: ${{ matrix.shard }}/${{ strategy.job-total }}
     steps:
-    - name: Set the deadline
-      # Past `PROPTEST_STOP` a cell runs the examples of a pull request only,
-      # so that a matrix that grows past its budget finishes rather than
-      # being cancelled: 22 minutes after the job starts, of its 30, which
-      # leaves setup out of the search and the uploads time to run. A cell
-      # already searching finishes its batch, so this is a target, not a
-      # guarantee.
-      run: echo "PROPTEST_STOP=$(( $(date +%s) + 22 * 60 ))" >> "$GITHUB_ENV"
     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       with:
         persist-credentials: false
@@ -87,10 +63,6 @@ jobs:
       # from. `success` because the upload below is `always()`: a run that died
       # mid-suite uploads a partial report, which stays available to look at
       # and must not be what the next run compares against.
-      #
-      # A shard holds a quarter of the cells and would name the rest as gone,
-      # so a sharded run compares in `merge` instead.
-      if: strategy.job-total == 1
       uses: dawidd6/action-download-artifact@27e4ae67c24b67d3b54bc6d6a45475be1e28031b # v26
       with:
         name: proptest-report
@@ -100,90 +72,27 @@ jobs:
         workflow_conclusion: success
         if_no_artifact_found: warn
     - name: Run property tests
-      # `logical` is one worker per vCPU, where `auto` counts the cores: four
-      # workers rather than two on `ubuntu-latest`.
-      run: >-
+      run:
         uv run pytest proptest/ -n logical -p no:benchmark -vrxX
         --hypothesis-show-statistics
-        --proptest-shard="$SHARD"
-        ${{ strategy.job-total == 1 && '--proptest-baseline=baseline/proptest-report.json' || '' }}
+        --proptest-baseline=baseline/proptest-report.json
         --proptest-report=report/proptest-report.json
     - name: Upload the report
       # Written whether the suite passed or not, and uploaded on the same
       # terms as the database below: a pull request reads the shared reading
       # and never rewrites it, since a branch that skips a cell would
-      # otherwise make the skip the baseline everyone compares against. A
-      # shard's goes to `merge` under a name of its own.
+      # otherwise make the skip the baseline everyone compares against.
       if: always() && github.event_name != 'pull_request'
-      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-      with:
-        name: >-
-          proptest-report${{ strategy.job-total > 1
-          && format('-shard-{0}', matrix.shard) || '' }}
-        path: report
-        retention-days: ${{ strategy.job-total > 1 && 1 || 90 }}
-    - name: Upload the example database
-      # A pull request reads the shared memory but never rewrites it: a
-      # branch fixing a bug would prune main's memory before it merges, and
-      # a fork could upload anything under the artifact's name.
-      if: always() && github.event_name != 'pull_request'
-      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-      with:
-        name: >-
-          hypothesis-example-db${{ strategy.job-total > 1
-          && format('-shard-{0}', matrix.shard) || '' }}
-        path: .hypothesis/examples
-        include-hidden-files: true
-        retention-days: ${{ strategy.job-total > 1 && 1 || 90 }}
-
-  merge:
-    # The report and the database of a sharded run, from those of its
-    # shards: the cells of the report are disjoint, and a database is a
-    # directory of one file per example, so either merges by union.
-    needs: proptest
-    if: >-
-      always()
-      && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      with:
-        persist-credentials: false
-    - name: Download the reports of the shards
-      uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-      with:
-        pattern: proptest-report-shard-*
-        path: shards
-    - name: Download the databases of the shards
-      uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-      with:
-        pattern: hypothesis-example-db-shard-*
-        path: .hypothesis/examples
-        merge-multiple: true
-    - name: Download the previous report
-      # As in the job above, which a sharded run does not compare in.
-      uses: dawidd6/action-download-artifact@27e4ae67c24b67d3b54bc6d6a45475be1e28031b # v26
-      with:
-        name: proptest-report
-        path: baseline
-        branch: main
-        search_artifacts: true
-        workflow_conclusion: success
-        if_no_artifact_found: warn
-    - name: Merge the reports
-      # Only the standard library: the runner's Python is enough.
-      run: >-
-        python3 -m proptest.report shards/*/proptest-report.json
-        --baseline=baseline/proptest-report.json
-        --output=report/proptest-report.json
-    - name: Upload the report
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
       with:
         name: proptest-report
         path: report
         retention-days: 90
     - name: Upload the example database
+      # A pull request reads the shared memory but never rewrites it: a
+      # branch fixing a bug would prune main's memory before it merges, and
+      # a fork could upload anything under the artifact's name.
+      if: always() && github.event_name != 'pull_request'
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
       with:
         name: hypothesis-example-db

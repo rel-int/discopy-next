@@ -1966,13 +1966,11 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Project
 
-- The property matrix searches each cell for a time rather than a count of
-  examples: `PROPTEST_SECONDS` caps `explore`'s thousand, and a push to `main`
-  runs one job at a second per cell, the nightly run and a dispatch four
-  shards at five,
-  merged by `python -m proptest.report`. `main`'s runs had been cancelled at
-  30 minutes since the matrix grew past 2,900 cells, 4% of the way through
-  ([next#702]).
+- The `proptest` workflow runs every cell at `pr`'s twenty examples under
+  `--hypothesis-seed=0` on `main` too, with one worker per vCPU, and no longer
+  runs nightly: `explore`'s thousand examples per cell had cancelled every run
+  of `main` at 30 minutes since the matrix grew past 2,900 cells, 4% of the
+  way through ([next#702]).
 - `build`'s `test` and `docs` jobs, the two that install Graphviz, run on
   `ubuntu-24.04`: `ubuntu-latest` resolved to two images inside one run and
   graphviz is not in the sources the Ubuntu 26.04 one ships, so a job asking

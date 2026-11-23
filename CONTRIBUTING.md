@@ -175,7 +175,8 @@ by default, `pr` for the small budget a pull request runs with, which CI
 runs under `--hypothesis-seed=0` so that it draws the same examples every
 time (the profile does not fix the seed itself: pass the flag locally too,
 and the database it replays still differs from CI's), and `explore` for
-the large one `main` and the nightly run search with. A fourth, `shared`,
+a large one to search with locally: a thousand examples on every cell of
+the matrix is some 33 hours. A fourth, `shared`,
 is `dev` reading the example database that the CI of the repository named
 by `HYPOTHESIS_GITHUB_REPOSITORY` uploads as a workflow artifact, through a
 `GITHUB_TOKEN`, so a failure found on that CI replays on your machine before
@@ -235,32 +236,9 @@ A test of the matrix carries `pytest.mark.cell`, which is what the report
 keys on: `proptest/test_report.py` holds the suite's unit tests of its own
 reading, and those are parametrised too.
 
-A profile's budget is a count of examples, and `explore`'s thousand on
-every cell of the matrix is some 33 hours. `PROPTEST_SECONDS` gives each
-cell a time instead, with the profile's count as a cap: the twenty examples
-of a pull request first, then batches of fresh ones sized to half the time
-left, until the cell has spent its seconds, reached the cap, or drawn no new term
-in a whole batch. Past the time `PROPTEST_STOP` (seconds since the epoch) a
-cell runs its first batch only. `--proptest-shard I/N` runs the `I`-th of
-`N` slices of the suite, by a hash of the node id, and
-`python -m proptest.report` merges the reports of the slices of one run:
-
-```shell
-HYPOTHESIS_PROFILE=explore PROPTEST_SECONDS=5 \
-    uv run pytest proptest/ -n logical -p no:benchmark \
-    --proptest-shard=0/4 --proptest-report=shards/0.json
-uv run python -m proptest.report shards/*.json --output=report.json \
-    --baseline=report/proptest-report.json
-```
-
 The `proptest` GitHub workflow runs this suite on every pull request, on
-`main`, nightly and on manual dispatch, with one worker per vCPU
-(`-n logical`): a pull request at `pr`'s twenty examples, a push to `main`
-at a second per cell, and the nightly run and a dispatch at five, over four
-shards that a last job merges. Each sets `PROPTEST_STOP` 22 minutes into
-its 30, so that a run that outgrows them falls back to what a pull request
-checks rather than being cancelled, unless a cell searching at the deadline
-takes the rest of the time on its own. It carries the report
+`main` and on manual dispatch, each at `pr`'s twenty examples under
+`--hypothesis-seed=0`, with one worker per vCPU. It carries the report
 between runs as an artifact, and on narrower terms than the example database:
 a baseline is a claim about what `main` checks rather than a pile of examples
 any run may add to, so it is taken from a **successful** run **of `main`**
