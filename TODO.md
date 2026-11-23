@@ -6,4 +6,4 @@
 - [x] pilot corpus for compact: about 20 terms, filed as #43
 - [x] pilot corpus for Int: about 20 terms, filed as #43
 - [x] measure: what the corpus finds that explore did not; file each counterexample as an issue and declare it failing
-- [ ] document the corpus and how to grow it in CONTRIBUTING.md, with a changelog entry
+- [x] document the corpus and how to grow it in CONTRIBUTING.md, with a changelog entry
