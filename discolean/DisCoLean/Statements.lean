@@ -4,6 +4,7 @@ import DisCoLean.Statements.English
 import DisCoLean.Statements.Coherence
 import DisCoLean.Statements.Terms
 import DisCoLean.Statements.Isotopy
+import DisCoLean.Statements.Drawing
 
 /-!
 # What is proved about the model of `discopy.egraph`

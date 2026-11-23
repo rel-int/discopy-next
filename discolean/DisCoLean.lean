@@ -1,5 +1,6 @@
 import DisCoLean.ABC
 import DisCoLean.Coherence
+import DisCoLean.Drawing
 import DisCoLean.EGraph
 import DisCoLean.Isotopy
 import DisCoLean.Mathlib

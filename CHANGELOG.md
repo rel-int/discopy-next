@@ -22,7 +22,9 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 - `discolean/` models the tween of `Drawing.interpolate` on two boxes: separated
   along one side in both drawings they stay apart, and the straight-line tween
-  of an interchanger can overlap them, with a counterexample ([next#711]).
+  of an interchanger can overlap them, with a counterexample; and the layered
+  drawing of a diagram, one strip per layer on a grid, is plane and a functor of
+  strict premonoidal categories ([next#711]).
 
 - `abc.MonoidalCategory` states the laws of whiskering, `tensor_associativity`,
   `tensor_unit`, `left_whiskering`, `right_whiskering` and `tensor_whiskering`,

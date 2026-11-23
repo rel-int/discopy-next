@@ -88,6 +88,26 @@ theorem stays_apart {b b' : Box m} {c c' : Box n} {t : ℚ}
   · exact .inr (.inr (.inl (below_lerp ht hb hc h.1 h.2)))
   · exact .inr (.inr (.inr (below_lerp ht hc hb h.1 h.2)))
 
+/-- A horizontal move keeps two boxes apart when it keeps the left-to-right
+order of boxes on one row: boxes on different rows stay on them, since their
+y does not move. These are the first and last phases of `interpolate` across
+an interchanger, the middle one being `stays_apart` on boxes left of each
+other. -/
+theorem slides_apart {b b' : Box m} {c c' : Box n} {t : ℚ}
+    (ht : 0 ≤ t ∧ t ≤ 1) (hb : b.half = b'.half) (hc : c.half = c'.half)
+    (hby : b.y = b'.y) (hcy : c.y = c'.y)
+    (h : LeftOf b c ∧ LeftOf b' c' ∨ LeftOf c b ∧ LeftOf c' b'
+      ∨ Below b c ∨ Below c b) :
+    Apart (b.lerp t b') (c.lerp t c') := by
+  apply stays_apart ht hb hc
+  rcases h with h | h | h | h
+  · exact .inl h
+  · exact .inr (.inl h)
+  · refine .inr (.inr (.inl ⟨h, ?_⟩))
+    unfold Below at h ⊢; rw [← hby, ← hcy, ← hb, ← hc]; exact h
+  · refine .inr (.inr (.inr ⟨h, ?_⟩))
+    unfold Below at h ⊢; rw [← hby, ← hcy, ← hb, ← hc]; exact h
+
 /-! ## The counterexample
 
 The nodes of each box are its box node, its `box_dom` then its `box_cod`

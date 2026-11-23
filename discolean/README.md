@@ -73,6 +73,8 @@ algorithms there is followed here, or the differential test says so.
 | [`DisCoLean/Statements/Terms.lean`](DisCoLean/Statements/Terms.lean) | what is proved of the terms, restated |
 | [`DisCoLean/Isotopy.lean`](DisCoLean/Isotopy.lean) | the tween of two drawings of two boxes, `Drawing.interpolate`: separated along one side in both, they stay apart, and a counterexample to the tween of every interchanger being a planar isotopy |
 | [`DisCoLean/Statements/Isotopy.lean`](DisCoLean/Statements/Isotopy.lean) | what is proved of the tween, restated |
+| [`DisCoLean/Drawing.lean`](DisCoLean/Drawing.lean) | the layered drawing of a diagram, one strip per layer on a grid: every strip is plane, and the drawing is a functor, composition stacking strips and whiskering adding wires |
+| [`DisCoLean/Statements/Drawing.lean`](DisCoLean/Statements/Drawing.lean) | what is proved of the layered drawing, restated |
 | [`Audit.lean`](Audit.lean) | fails on `sorry`, `native_decide` or an axiom beyond `propext`, `Quot.sound`, `Classical.choice` in a theorem of `DisCoLean/Statements`, which restates the main ones; other files are not audited |
 | [`Oracle.lean`](Oracle.lean) | the `oracle` executable: one JSON case per line in, the model's answer out |
 | [`test_oracle.py`](test_oracle.py) | the differential test against the Python |
