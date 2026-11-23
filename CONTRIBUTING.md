@@ -247,6 +247,41 @@ legitimately skips a cell cannot become the baseline that cell is missing
 from, and a run that died mid-suite stays available to look at without being
 compared against.
 
+### The corpus
+
+The strategies draw the terms their authors thought of. `proptest/corpus/`
+holds the ones they did not: terms written by hand or by a language model, e.g.
+boxes that share a name or carry `data`, bubbles, empty types, traces of
+several wires and feedback with a memory of several wires. A module there,
+one per module of `discopy`, defines `CORPUS`, mapping a category to the name
+of one of its laws and that to entries keyed by what each one probes. An entry
+is a thunk returning the arguments of the law by name, with the type variables
+its boundaries do not show, e.g. the memory `M` of a trace:
+
+```python
+CORPUS = {Diagram: {
+    "hypergraph_section": {
+        "a trace of two wires, right": lambda: {"f": k.trace(2)},
+    },
+}}
+```
+
+`proptest/test_corpus.py` replays every entry, with no search and no model
+call, so it runs the same on every pull request:
+
+```shell
+uv run pytest proptest/test_corpus.py -p no:benchmark
+```
+
+An entry whose arguments do not have the types the law asks for, or that the
+law assumes away, e.g. a non-identifier name for `str_transparency`, fails as
+a bad entry rather than a counterexample. To grow the corpus, give a model, or
+an agent session that opens a pull request, the signature of a law and its
+`Axiom.canonical` equation, and ask for arguments of shapes the strategy does
+not draw. An entry that refutes a law is filed as an issue and the law declared
+`failing`; a family of entries the strategy keeps missing becomes a rule or a
+strategy, so that Hypothesis draws and shrinks it itself.
+
 ## Run the benchmarks
 
 `benchmark/test_composition.py` reproduces the scaling experiments of
