@@ -40,6 +40,6 @@ docs/_static/*/_*.png
 benchmark-results/
 plans/
 .style-review/
-# Lake (build products of lean/)
-lean/.lake
+# Lake (build products and packages of discolean/)
+discolean/.lake
 wip/

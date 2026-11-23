@@ -18,6 +18,11 @@ Summary
     Sum
     Bubble
     Functor
+    TermBase
+    Variable
+    Constant
+    Application
+    Kappa
     Equation
 
 .. admonition:: Functions
@@ -64,8 +69,9 @@ from collections.abc import Callable
 from typing import ClassVar
 
 from discopy import monoidal, messages
+from discopy import sum as formal_sum
 from discopy.abc import BraidedCategory, SpacialCategory
-from discopy.cat import factory
+from discopy.cat import factory, kappa_calculus
 from discopy.monoidal import Ty, Match
 from discopy.utils import (
     assert_isatomic, AxiomError, BinaryBoxConstructor, deprecated_alias,
@@ -305,9 +311,9 @@ def hexagon(cls: type, factory: Callable) -> Callable[[Ty, Ty], Diagram]:
     return method
 
 
-class Sum(monoidal.Sum, Box):
+class Sum(formal_sum.Sum, Box):
     """
-    A braided sum is a monoidal sum and a braided box.
+    A braided sum is a :class:`sum.Sum <discopy.sum.Sum>` and a braided box.
 
     Parameters:
         terms (tuple[Diagram, ...]) : The terms of the formal sum.
@@ -354,3 +360,7 @@ class Equation(monoidal.Equation):
 
 
 __getattr__ = deprecated_alias(__name__, {"Ob": "Wire"})
+
+TermBase, Variable, Constant, Application, Kappa = kappa_calculus(
+    Diagram)
+Term = Variable | Constant | Application | Kappa

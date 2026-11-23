@@ -42,6 +42,11 @@ Summary
     Sum
     Bubble
     Functor
+    TermBase
+    Variable
+    Constant
+    Application
+    Kappa
 
 .. admonition:: Functions
 
@@ -258,15 +263,18 @@ from copy import copy
 from typing import ClassVar
 
 from discopy import monoidal, cmap, hypergraph, messages
+from discopy import sum as formal_sum
 from discopy.abc import (
     DaggerCategory, DaggerMonoidalCategory, FeedbackCategory, MonoidalCategory,
     TracedCategory)
 from discopy.config import BOX_DRAWING_ATTRIBUTES
 from discopy.monoidal import (  # noqa: F401  pylint: disable=unused-import
     Equation)
+from discopy.cat import kappa_calculus
 from discopy.utils import (
     deprecated_alias,
     factory, factory_name, assert_isinstance, AxiomError, from_tree,
+    subclass,
 )
 
 
@@ -1119,7 +1127,7 @@ class FollowedBy(Box):
                    tree.get('time_step', 0))
 
 
-class Sum(monoidal.Sum, Box):
+class Sum(formal_sum.Sum, Box):
     """
     A feedback sum is a sum of feedback diagrams, over which delay
     distributes.
@@ -1313,19 +1321,6 @@ STRUCTURAL_BOXES = {
 }
 
 
-def subclass(name: str, bases: list[type], module: str, doc: str) -> type:
-    """
-    The class ``name`` of ``module`` with the given bases, less those another
-    base subclasses, so that it prints, pickles and reads back from its tree
-    as a class written in that module would.
-    """
-    bases = tuple(dict.fromkeys(  # ty: ignore[invalid-assignment]
-        base for base in bases if not any(
-            other is not base and issubclass(other, base) for other in bases)))
-    return type(name, bases, {  # ty: ignore[invalid-argument-type]
-        "__module__": module, "__qualname__": name, "__doc__": doc})
-
-
 def structural_boxes(
         diagram: type, box: type) -> tuple[type, type, type, type, type]:
     """
@@ -1399,3 +1394,7 @@ __getattr__ = deprecated_alias(__name__, {
     "Copy": "discopy.markov.Copy",
     "Discard": "discopy.markov.Discard",
 })
+
+TermBase, Variable, Constant, Application, Kappa = kappa_calculus(
+    Diagram)
+Term = Variable | Constant | Application | Kappa

@@ -24,6 +24,11 @@ Summary
     Sum
     Bubble
     Functor
+    TermBase
+    Variable
+    Constant
+    Application
+    Kappa
     Equation
 
 Axioms
@@ -48,8 +53,9 @@ s
 from __future__ import annotations
 
 from discopy import monoidal, cmap, hypergraph, messages
+from discopy import sum as formal_sum
 from discopy.abc import SpacialCategory
-from discopy.cat import factory
+from discopy.cat import factory, kappa_calculus
 from discopy.monoidal import Ty
 
 
@@ -79,9 +85,9 @@ class Box(monoidal.Box, Diagram):
     """
 
 
-class Sum(monoidal.Sum, Box):
+class Sum(formal_sum.Sum, Box):
     """
-    A spacial sum is a monoidal sum and a spacial box.
+    A spacial sum is a :class:`sum.Sum <discopy.sum.Sum>` and a spacial box.
 
     Parameters:
         terms (tuple[Diagram, ...]) : The terms of the formal sum.
@@ -121,3 +127,7 @@ Diagram.functor_factory = Functor
 CMap = cmap.CMap[Diagram]
 Hypergraph = hypergraph.Hypergraph[Diagram]
 Id = Diagram.id
+
+TermBase, Variable, Constant, Application, Kappa = kappa_calculus(
+    Diagram)
+Term = Variable | Constant | Application | Kappa
