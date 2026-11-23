@@ -58,8 +58,9 @@ theorem normal_form_idempotence (e : Open S a b) :
 /-- `normal_form_completeness`: the normal form of the eta expansion of a
 term is the reading of its arrow, so two terms are equal up to beta and eta
 exactly when their arrows are.
-Rules out: a normal form that keeps a `let`, e.g. one whose variable shadows
-a free one, as the Python's does (`rel-int/discopy-next#704`). -/
+Rules out: a normal form that keeps a `let`. The model is nameless, so the
+shadowing that keeps one in the Python (`rel-int/discopy-next#704`) has no
+counterpart here. -/
 theorem normal_form_completeness (t : Closed S a b) (e e' : Open S a b) :
     t.expand.normalForm = t.toPath.read
     ∧ (e.normalForm = e'.normalForm ↔ e.toPath = e'.toPath) :=
