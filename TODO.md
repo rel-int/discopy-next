@@ -69,7 +69,7 @@
 > > 11. .github/workflows/proptest.yml:103 [cubic-dev-ai[bot]] thread-root-id=4666065346
 > > [P3] Pull-request runs now use `-n logical` instead of the previous `-n auto`, so their worker count and resource usage change despite the stated requirement that pull-request runs remain unchanged. Select `auto` for `pull_request` and `logical` only for the deeper searches.
 
-- [ ] proptest/report.py merge: reject a cell named by two slices (r4666065220)
+- [WIP] @T-6d395818-2026-11-23 12:53 proptest/report.py merge: reject a cell named by two slices (r4666065220)
 - [ ] proptest/conftest.py: --proptest-shard rejects a malformed or out-of-range I/N (r4666065265)
 - [ ] proptest/test_conftest.py: finite-support test with a small cap, not relying on both booleans (r4666065282, r4666065297)
 - [ ] proptest.yml: PROPTEST_STOP from the first step of the job; workflows test covers a dispatch (r4666065254, r4666065246)
