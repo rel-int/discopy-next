@@ -155,6 +155,8 @@ from discopy.utils import (  # noqa: F401
 if TYPE_CHECKING:
     import sympy
     from hypothesis import strategies as st
+    from discopy.kleisli.monad import Monad
+    from discopy.monad.algebra import Algebra
 
 dumps, loads = utils.dumps, utils.loads
 
@@ -599,6 +601,50 @@ class Arrow(FreeCategory, DaggerCategory, Serialisable["Arrow"]):
             cod : The codomain of the empty sum.
         """
         return cls.sum_factory((), dom, cod)
+
+    @classmethod
+    def algebra(cls, monad: Monad, dom: Ob, cod: Ob) -> Algebra:
+        """
+        The algebra of a monad on the arrows from ``dom`` to ``cod``, by which
+        a functor into arrows extends to the change of base of its domain,
+        see :class:`discopy.enriched.Functor`: the formal
+        :class:`~discopy.sum.Sum` of a list of arrows, for the
+        :attr:`~discopy.kleisli.monad.List` monad.
+
+        Parameters:
+            monad : The monad, the list monad alone here.
+            dom : The domain of the arrows.
+            cod : The codomain of the arrows.
+
+        Raises:
+            TypeError : For any monad but the list monad.
+
+        Example
+        -------
+        >>> from discopy.kleisli.monad import List
+        >>> x, y = Ob('x'), Ob('y')
+        >>> f, g = Box('f', x, y), Box('g', x, y)
+        >>> total = Arrow.algebra(List, x, y)
+        >>> assert total([f, g]) == f + g and total([]) == Arrow.zero(x, y)
+        >>> assert total.unitality(f) and total.associativity([[f], [], [g]])
+
+        The algebra is named by its homset, so that two homsets have two:
+
+        >>> total
+        monad.algebra.Algebra[List]('sum x -> y', cat.Arrow)
+        >>> assert total != Arrow.algebra(List, y, x)
+        """
+        # pylint: disable-next=import-outside-toplevel  # they import cat
+        from discopy.kleisli.monad import List
+        # pylint: disable-next=import-outside-toplevel  # they import cat
+        from discopy.monad import algebra
+        if monad != List:
+            raise TypeError(messages.NO_ALGEBRA.format(
+                factory_name(cls), monad))
+        dom, cod = map(cls.cast_ob, (dom, cod))
+        return algebra.Algebra[List](  # ty: ignore[invalid-type-form]
+            f"sum {dom} -> {cod}", cls,
+            lambda arrows: sum(arrows, cls.zero(dom, cod)))
 
     def bubble(self, *args, **kwargs) -> Bubble:
         """ Unary operator on homsets. """

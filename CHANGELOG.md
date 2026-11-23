@@ -66,6 +66,14 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   its dagger and in a `abc.SymmetricCategory` the swap the other way round,
   and `abc.DaggerMonoidalCategory`, the first class with both a dagger and a
   tensor ([next#485]).
+- `discopy.enriched`, the change of base of a category `C` along a monad `M`:
+  an `enriched.Arrow[C, M]` from `A` to `B` is an element of `M(C(A, B))`,
+  composed by pairing then composing, with `tensor`, a monoidal product only
+  when `M` is commutative (not for `List`, where interchange fails), and, for
+  `C` the Python functions, `to_channel`. An `enriched.Functor` extends a functor `C -> D`
+  along the classmethod `D.algebra(M, dom, cod)`, given for the new list monad
+  `kleisli.monad.List` by `cat.Arrow`, which sends a list of arrows to their
+  `sum.Sum`, and by `Matrix`, which adds the matrices ([next#134]).
 - `monad.algebra.Algebra.product` and `Algebra.power`, the products of the
   Eilenberg-Moore category, `monad.algebra.Operation`, a value of `M(n)` acting
   on every algebra as a function `Aⁿ → A` that every homomorphism commutes

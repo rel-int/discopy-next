@@ -18,6 +18,6 @@ token.
 from discopy.kleisli import (
     monad, channel, additive, multiplicative, token)
 from discopy.kleisli.monad import (
-    Monad, Maybe, Powerset, Subdistribution, Seed)
+    Monad, Maybe, List, Powerset, Subdistribution, Seed)
 from discopy.kleisli.channel import Channel
 from discopy.kleisli.token import Machine
