@@ -5,6 +5,7 @@ from pytest import raises
 from discopy import cat
 from discopy.enriched import Arrow, Functor
 from discopy.kleisli.monad import List, Maybe, Powerset, Subdistribution
+from discopy.abc import Nat
 from discopy.matrix import Matrix
 from discopy import monoidal
 from discopy.monoidal import Box, Diagram, Ty
@@ -96,6 +97,24 @@ def test_algebra_laws():
     assert total.unitality(two)
     assert total.associativity([[one, two], [], [two]])
     assert total([one, two, two]) == Matrix[int]([5], 1, 1)
+
+
+def test_algebras_of_two_homsets_differ():
+    """
+    A homomorphism of the algebra on ``1 -> 2`` does not compose with one of
+    the algebra on ``2 -> 1``, nor one on ``x -> y`` with one on ``y -> x``.
+    """
+    from discopy.monad.algebra import Homomorphism
+    for category, (a, b) in [(Matrix[int], (1, 2)), (cat.Arrow, (x, y))]:
+        left, right = (category.algebra(List, *ab) for ab in [(a, b), (b, a)])
+        assert left != right
+        assert left == category.algebra(List, a, b)
+        h = Homomorphism[List](lambda m: m, left, left)
+        k = Homomorphism[List](lambda m: m, right, right)
+        with raises(AxiomError):
+            h >> k
+    assert Matrix[int].algebra(List, 1, 2)\
+        == Matrix[int].algebra(List, Nat(1), Nat(2))
 
 
 def test_tensor_of_coins():

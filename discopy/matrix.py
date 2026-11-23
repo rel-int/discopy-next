@@ -555,6 +555,12 @@ and 'Matrix[int]'
         >>> total([Matrix([1, 0], 1, 2), Matrix([2, 3], 1, 2)])
         Matrix[int]([3, 3], dom=Nat(1), cod=Nat(2))
         >>> assert total([]) == Matrix[int].zero(1, 2)
+
+        The algebra is named by its homset, so that two homsets have two:
+
+        >>> total
+        monad.algebra.Algebra[List]('sum 1 -> 2', matrix.Matrix[int])
+        >>> assert total != Matrix[int].algebra(List, 2, 1)
         """
         # pylint: disable-next=import-outside-toplevel  # kleisli imports us
         from discopy.kleisli.monad import List
@@ -564,7 +570,8 @@ and 'Matrix[int]'
             raise TypeError(messages.NO_ALGEBRA.format(
                 factory_name(cls), monad))
         return algebra.Algebra[List](  # ty: ignore[invalid-type-form]
-            "sum", cls, lambda matrices: sum(matrices, cls.zero(dom, cod)))
+            f"sum {index(dom)} -> {index(cod)}", cls,
+            lambda matrices: sum(matrices, cls.zero(dom, cod)))
 
     @classmethod
     def swap(cls, left: Nat | int, right: Nat | int) -> Matrix:

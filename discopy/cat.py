@@ -627,6 +627,12 @@ class Arrow(FreeCategory, DaggerCategory, Serialisable["Arrow"]):
         >>> total = Arrow.algebra(List, x, y)
         >>> assert total([f, g]) == f + g and total([]) == Arrow.zero(x, y)
         >>> assert total.unitality(f) and total.associativity([[f], [], [g]])
+
+        The algebra is named by its homset, so that two homsets have two:
+
+        >>> total
+        monad.algebra.Algebra[List]('sum x -> y', cat.Arrow)
+        >>> assert total != Arrow.algebra(List, y, x)
         """
         # pylint: disable-next=import-outside-toplevel  # they import cat
         from discopy.kleisli.monad import List
@@ -635,8 +641,10 @@ class Arrow(FreeCategory, DaggerCategory, Serialisable["Arrow"]):
         if monad != List:
             raise TypeError(messages.NO_ALGEBRA.format(
                 factory_name(cls), monad))
+        dom, cod = map(cls.cast_ob, (dom, cod))
         return algebra.Algebra[List](  # ty: ignore[invalid-type-form]
-            "sum", cls, lambda arrows: sum(arrows, cls.zero(dom, cod)))
+            f"sum {dom} -> {cod}", cls,
+            lambda arrows: sum(arrows, cls.zero(dom, cod)))
 
     def bubble(self, *args, **kwargs) -> Bubble:
         """ Unary operator on homsets. """

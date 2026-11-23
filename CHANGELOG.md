@@ -70,9 +70,9 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   an `enriched.Arrow[C, M]` from `A` to `B` is an element of `M(C(A, B))`,
   composed by pairing then composing, with `tensor` and, for `C` the Python
   functions, `to_channel`. An `enriched.Functor` extends a functor `C -> D`
-  along the classmethod `D.algebra(M, dom, cod)`, which `cat.Arrow` gives as
-  the formal sum and `Matrix` as the sum for the new list monad
-  `kleisli.monad.List`, so a list of arrows goes to a `sum.Sum` ([next#134]).
+  along the classmethod `D.algebra(M, dom, cod)`, given for the new list monad
+  `kleisli.monad.List` by `cat.Arrow`, which sends a list of arrows to their
+  `sum.Sum`, and by `Matrix`, which adds the matrices ([next#134]).
 - `monad.algebra.Algebra.product` and `Algebra.power`, the products of the
   Eilenberg-Moore category, `monad.algebra.Operation`, a value of `M(n)` acting
   on every algebra as a function `Aⁿ → A` that every homomorphism commutes
