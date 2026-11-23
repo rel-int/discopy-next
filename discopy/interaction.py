@@ -360,6 +360,9 @@ class Diagram[natural](
         from discopy import compact, symmetric
         return (symmetric.Diagram, compact.Diagram)
 
+    dagger_contravariance = DaggerCategory.dagger_contravariance.failing(
+        messages.FEEDBACK_HAS_NO_DAGGER)
+
     ar = classproperty(lambda cls: cls)
     natural = ribbon.Diagram
 
