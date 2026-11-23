@@ -4,6 +4,6 @@
 >
 > *Bugs in a next repo*: no public name beyond the protocol it completes, no stated convention changed, no pick between readings. Taken without asking.
 
-- [WIP] @session_01C7YfAQoC5BzApnAQbMo3tH-2026-11-23 01:14 path.Matrix.to_tree writes creations, selections, normalisation and scalar; from_tree reads them back
+- [x] path.Matrix.to_tree writes creations, selections, normalisation and scalar; from_tree reads them back
 - [ ] test a dumps/loads cell beside test_repr_is_transparent, the report's own matrix among its cases
 - [ ] CHANGELOG bullet with the PR number, and the gates of next-checks
