@@ -71,6 +71,8 @@ algorithms there is followed here, or the differential test says so.
 | [`DisCoLean/Terms/Cat.lean`](DisCoLean/Terms/Cat.lean) | the terms of `cat`, nameless, and the five laws of `cat.TermBase` |
 | [`DisCoLean/Terms/Monoidal.lean`](DisCoLean/Terms/Monoidal.lean) | planar linear terms of `monoidal`, their diagrams and the reading of a diagram |
 | [`DisCoLean/Statements/Terms.lean`](DisCoLean/Statements/Terms.lean) | what is proved of the terms, restated |
+| [`DisCoLean/Isotopy.lean`](DisCoLean/Isotopy.lean) | the tween of two drawings of two boxes, `Drawing.interpolate`: separated along one side in both, they stay apart, and a counterexample to the tween of every interchanger being a planar isotopy |
+| [`DisCoLean/Statements/Isotopy.lean`](DisCoLean/Statements/Isotopy.lean) | what is proved of the tween, restated |
 | [`Audit.lean`](Audit.lean) | fails on `sorry`, `native_decide` or an axiom beyond `propext`, `Quot.sound`, `Classical.choice` in a theorem of `DisCoLean/Statements`, which restates the main ones; other files are not audited |
 | [`Oracle.lean`](Oracle.lean) | the `oracle` executable: one JSON case per line in, the model's answer out |
 | [`test_oracle.py`](test_oracle.py) | the differential test against the Python |
