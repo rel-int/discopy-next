@@ -141,7 +141,8 @@ uv run pytest proptest/ -n auto -p no:benchmark -v
 
 The cells of the matrix are independent, so `-n auto`
 ([pytest-xdist](https://pytest-xdist.readthedocs.io)) runs them on all
-cores, with `-p no:benchmark` unloading the benchmark plugin that is
+cores (`-n logical` on every vCPU, which is what CI uses, where cores and
+vCPUs differ), with `-p no:benchmark` unloading the benchmark plugin that is
 incompatible with it; drop both to run serially, e.g. when debugging a
 single cell.
 
@@ -174,7 +175,8 @@ by default, `pr` for the small budget a pull request runs with, which CI
 runs under `--hypothesis-seed=0` so that it draws the same examples every
 time (the profile does not fix the seed itself: pass the flag locally too,
 and the database it replays still differs from CI's), and `explore` for
-the large one `main` and the nightly run search with. A fourth, `shared`,
+a large one to search with locally: a thousand examples on every cell of
+the matrix is some 33 hours. A fourth, `shared`,
 is `dev` reading the example database that the CI of the repository named
 by `HYPOTHESIS_GITHUB_REPOSITORY` uploads as a workflow artifact, through a
 `GITHUB_TOKEN`, so a failure found on that CI replays on your machine before
@@ -235,7 +237,8 @@ keys on: `proptest/test_report.py` holds the suite's unit tests of its own
 reading, and those are parametrised too.
 
 The `proptest` GitHub workflow runs this suite on every pull request, on
-`main`, nightly and on manual dispatch. It carries the report
+`main` and on manual dispatch, each at `pr`'s twenty examples under
+`--hypothesis-seed=0`, with one worker per vCPU. It carries the report
 between runs as an artifact, and on narrower terms than the example database:
 a baseline is a claim about what `main` checks rather than a pile of examples
 any run may add to, so it is taken from a **successful** run **of `main`**
