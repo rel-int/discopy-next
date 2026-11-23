@@ -9,7 +9,7 @@
 > 3. Pushes to `main`: one job, B ≈ 1 s, a fresh seed.
 > 4. Nightly run: 4 jobs sharded by a hash of the cell name, B ≈ 5 s, then one job merging the reports and the example databases.
 
-- [WIP] @T-6d395818-2026-11-23 12:37 Time budget: a cell runs the pr budget, then fresh batches until PROPTEST_SECONDS or max_examples, and the report records the examples it ran
+- [x] Time budget: a cell runs the pr budget, then fresh batches until PROPTEST_SECONDS or max_examples, and the report records the examples it ran
 - [ ] proptest workflow: -n logical, a push to main runs one job at B ~ 1 s with a fresh seed
 - [ ] proptest workflow: the nightly and a dispatch run 4 shards at B ~ 5 s, merged by one job into the report and the example database
 - [ ] Docs: CONTRIBUTING.md's Run the property tests, and a changelog entry
