@@ -23,6 +23,17 @@ def test_repr_is_transparent():
     assert eval(repr(matrix), Matrix.environment()) == matrix
 
 
+def test_the_tree_of_a_matrix_names_its_whole_profile():
+    """Every field the repr names travels through the tree, see #696."""
+    matrix = Matrix(np.eye(3), 2, 2, creations=(1, ), selections=(2, ),
+                    normalisation=.5, scalar=2j)
+    assert sorted(matrix.to_tree()) == [
+        'array', 'cod', 'creations', 'dom', 'factory', 'normalisation',
+        'scalar', 'selections']
+    assert loads(dumps(matrix)) == matrix
+    assert loads(dumps(Matrix[float]([[1.]], 1, 1))).dtype is float
+
+
 @pytest.mark.parametrize("field", [
     {"creations": (2, )}, {"selections": (2, )},
     {"normalisation": 2}, {"scalar": 2}])
@@ -145,10 +156,9 @@ def test_repr_of_a_sum_is_transparent():
 
 
 def test_the_tree_of_an_empty_sum_names_its_ring():
-    for matrix in (Matrix.zero(1, 1), Matrix[float].zero(1, 1)):
+    for matrix in (Matrix.zero(1, 1), Matrix[float].zero(1, 1),
+                   selected_phase(2j) + selected_phase(5j)):
         assert loads(dumps(matrix)) == matrix
-    with pytest.raises(ValueError, match="reshape"):
-        loads(dumps(selected_phase(2j)))  # a term's profile: next#696
 
 
 def test_a_sum_evaluates_over_the_ring_of_its_terms():
