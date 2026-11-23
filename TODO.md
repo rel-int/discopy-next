@@ -7,4 +7,4 @@
 - [x] ribbon and compact each get a Ty and a Nat of their own, subclassing those of the levels their diagrams subclass; frobenius.Ty is a compact.Ty (#683)
 - [x] a kappa over a constant of another level raises when it is built, stated once for every level (#684)
 - [x] tests, the trees and pickles written with pivotal.Ty, docs/adr/0008 and the changelog
-- [ ] the paper draft on rel-int/wiki#195 follows: terms of each module, no discopy.kappa
+- [x] the paper draft on rel-int/wiki#195 follows: terms of each module, no discopy.kappa
