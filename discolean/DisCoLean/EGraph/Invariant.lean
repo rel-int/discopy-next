@@ -1,4 +1,4 @@
-import Discolean.EGraph.Builder
+import DisCoLean.EGraph.Builder
 
 /-!
 # The invariant of the builder

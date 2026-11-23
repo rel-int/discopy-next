@@ -1,4 +1,4 @@
-import Discolean.EGraph.Rebuild
+import DisCoLean.EGraph.Rebuild
 
 /-!
 # Histories

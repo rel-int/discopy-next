@@ -1,10 +1,10 @@
-import Discolean.ABC
-import Discolean.Premonoidal.Diagram
+import DisCoLean.ABC
+import DisCoLean.Premonoidal.Diagram
 
 /-!
 # The coherence of `discopy.monoidal`
 
-`Discolean.ABC.monoidal` is the theory of `monoidal.Diagram`: the laws of
+`DisCoLean.ABC.monoidal` is the theory of `monoidal.Diagram`: the laws of
 `abc.MonoidalCategory` but bifunctoriality, which the Python declares broken.
 A strict premonoidal category is a model of it, with the tensor of two
 morphisms the first one first, and so is Diagram(S), the free strict
@@ -19,7 +19,7 @@ namespace Premonoidal.StrictPremonoidal
 
 /-- A strict premonoidal category as an `abc.MonoidalCategory`, the tensor
 of morphisms `f ⋉ dom g` then `cod f ⋊ g`. -/
-def toABC (C : StrictPremonoidal) : Discolean.ABC.MonoidalCategory C.Ob C.Hom where
+def toABC (C : StrictPremonoidal) : DisCoLean.ABC.MonoidalCategory C.Ob C.Hom where
   dom := C.dom
   cod := C.cod
   id := C.id
@@ -39,7 +39,7 @@ def toABC (C : StrictPremonoidal) : Discolean.ABC.MonoidalCategory C.Ob C.Hom wh
     · rw [C.cod_comp _ _ h, C.cod_whiskerLeft, cod_f, cod_g]
 
 /-- A strict premonoidal category has the laws of `monoidal.Diagram`. -/
-theorem toABC_monoidal (C : StrictPremonoidal) : Discolean.ABC.monoidal C.toABC := by
+theorem toABC_monoidal (C : StrictPremonoidal) : DisCoLean.ABC.monoidal C.toABC := by
   refine ⟨?_, ?_, ?_⟩
   · exact fun _ _ f _ _ => ⟨C.id_comp f, (C.comp_id f).symm⟩
   · exact fun _ _ _ _ f g h _ cod_f dom_g cod_g dom_h _ =>
@@ -56,7 +56,7 @@ namespace Premonoidal.Diagram
 
 /-- Diagram(S) has the laws of `monoidal.Diagram`. -/
 theorem monoidal (S : Signature) [DecidableEq S.Ob] :
-    Discolean.ABC.monoidal (premonoidal S).toABC :=
+    DisCoLean.ABC.monoidal (premonoidal S).toABC :=
   (premonoidal S).toABC_monoidal
 
 end Premonoidal.Diagram

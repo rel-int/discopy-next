@@ -1,4 +1,4 @@
-import Discolean.EGraph.Drain
+import DisCoLean.EGraph.Drain
 
 /-!
 # Freezing

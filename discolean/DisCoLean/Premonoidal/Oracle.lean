@@ -1,5 +1,5 @@
 import Lean.Data.Json
-import Discolean.Premonoidal.Functor
+import DisCoLean.Premonoidal.Functor
 
 /-!
 The model of diagrams as an oracle: a case names an operation and its

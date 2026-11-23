@@ -1,4 +1,4 @@
-import Discolean.EGraph.Graph
+import DisCoLean.EGraph.Graph
 
 /-!
 # Rebuilding

@@ -1,11 +1,11 @@
 import Lean.Data.Json
-import Discolean.EGraph
-import Discolean.Premonoidal.Oracle
+import DisCoLean.EGraph
+import DisCoLean.Premonoidal.Oracle
 
 /-!
 The model as an executable: one JSON case per line on the standard input and
 what the model gives for it on the standard output. A case with `op` is an
-operation on diagrams, see `Discolean/Premonoidal/Oracle.lean`. A case with `pairs` is a
+operation on diagrams, see `DisCoLean/Premonoidal/Oracle.lean`. A case with `pairs` is a
 partition, `{"spiders": 4, "pairs": [[3, 1], [1, 2]]}` giving
 `{"partition": [0, 1, 1, 1]}`. Any other is a history: `nodes`, each
 `[head, det, inputs, outputs]`, the `classes` of the spiders and `operations`,

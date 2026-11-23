@@ -1,4 +1,4 @@
-import Discolean.EGraph.Invariant
+import DisCoLean.EGraph.Invariant
 
 /-!
 # The hash-cons between two methods

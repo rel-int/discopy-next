@@ -1,4 +1,4 @@
-import Discolean.EGraph.Link
+import DisCoLean.EGraph.Link
 
 /-!
 # Union keeps the invariant

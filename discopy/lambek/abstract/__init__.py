@@ -262,7 +262,7 @@ That statement does not elaborate: ``discolean/`` has no ``StrictMonoidal``,
 and its ``not_monoidal`` says why, two boxes side by side are two diagrams, as
 the tensor of diagrams does the first one first. DisCoPy diagrams are the
 arrows of the free *premonoidal* category, which
-``discolean/Discolean/Statements/English.lean`` proves in the words the
+``discolean/DisCoLean/Statements/English.lean`` proves in the words the
 grammar prints:
 
 >>> print(*words(english(sentence(PREMONOIDAL)))()([]))

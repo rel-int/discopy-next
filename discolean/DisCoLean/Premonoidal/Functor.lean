@@ -1,4 +1,4 @@
-import Discolean.Premonoidal.Diagram
+import DisCoLean.Premonoidal.Diagram
 
 /-!
 # Diagram(S) is the free strict premonoidal category

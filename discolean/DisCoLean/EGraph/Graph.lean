@@ -1,4 +1,4 @@
-import Discolean.EGraph.Classes
+import DisCoLean.EGraph.Classes
 
 /-!
 # The pure e-graph

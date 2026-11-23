@@ -471,7 +471,7 @@ def generate() -> str:
     translates, in order, and of the :data:`THEORIES`, listing the classes it
     does not translate with the reason, a class whose base it does not
     translate included. Run ``python -m discopy.lean`` to print it, as
-    ``discolean/Discolean/ABC.lean`` is.
+    ``discolean/DisCoLean/ABC.lean`` is.
     """
     compiled, skipped, parts = set(), [], []
     for cls in vars(abc).values():
@@ -503,10 +503,10 @@ def generate() -> str:
         " not",
         "compile yet:",
         "", *skipped, "-/", "",
-        "namespace Discolean.ABC", "",
+        "namespace DisCoLean.ABC", "",
         "universe u v", "",
         "variable {Ob : Type u} {Hom : Type v}", "",
-        *parts, "end Discolean.ABC", ""])
+        *parts, "end DisCoLean.ABC", ""])
 
 
 if __name__ == "__main__":

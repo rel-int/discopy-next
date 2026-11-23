@@ -1,4 +1,4 @@
-import Discolean.EGraph.Place
+import DisCoLean.EGraph.Place
 
 /-!
 # A class joins another

@@ -1,4 +1,4 @@
-import Discolean.EGraph.Hashed
+import DisCoLean.EGraph.Hashed
 
 /-!
 # Placing a node
