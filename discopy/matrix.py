@@ -559,7 +559,7 @@ and 'Matrix[int]'
         The algebra is named by its homset, so that two homsets have two:
 
         >>> total
-        monad.algebra.Algebra[List]('sum 1 -> 2', matrix.Matrix[int])
+        monad.algebra.Algebra[List]('sum Nat(1) -> Nat(2)', matrix.Matrix[int])
         >>> assert total != Matrix[int].algebra(List, 2, 1)
         """
         # pylint: disable-next=import-outside-toplevel  # kleisli imports us
@@ -569,8 +569,9 @@ and 'Matrix[int]'
         if monad != List:
             raise TypeError(messages.NO_ALGEBRA.format(
                 factory_name(cls), monad))
+        dom, cod = map(cls.ob.cast, (dom, cod))
         return algebra.Algebra[List](  # ty: ignore[invalid-type-form]
-            f"sum {index(dom)} -> {index(cod)}", cls,
+            f"sum {dom} -> {cod}", cls,
             lambda matrices: sum(matrices, cls.zero(dom, cod)))
 
     @classmethod

@@ -7,6 +7,7 @@ from discopy.enriched import Arrow, Functor
 from discopy.kleisli.monad import List, Maybe, Powerset, Subdistribution
 from discopy.abc import Nat
 from discopy.matrix import Matrix
+from discopy.tensor import Dim, Tensor
 from discopy import monoidal
 from discopy.monoidal import Box, Diagram, Ty
 from discopy.python import Function
@@ -105,7 +106,8 @@ def test_algebras_of_two_homsets_differ():
     the algebra on ``2 -> 1``, nor one on ``x -> y`` with one on ``y -> x``.
     """
     from discopy.monad.algebra import Homomorphism
-    for category, (a, b) in [(Matrix[int], (1, 2)), (cat.Arrow, (x, y))]:
+    for category, (a, b) in [(Matrix[int], (1, 2)), (cat.Arrow, (x, y)),
+                             (Tensor[int], (Dim(1), Dim(2)))]:
         left, right = (category.algebra(List, *ab) for ab in [(a, b), (b, a)])
         assert left != right
         assert left == category.algebra(List, a, b)
@@ -115,6 +117,14 @@ def test_algebras_of_two_homsets_differ():
             h >> k
     assert Matrix[int].algebra(List, 1, 2)\
         == Matrix[int].algebra(List, Nat(1), Nat(2))
+
+
+def test_algebra_of_tensors_adds_them():
+    total = Tensor[int].algebra(List, Dim(1), Dim(2))
+    assert total([Tensor[int]([1, 0], Dim(1), Dim(2)),
+                  Tensor[int]([2, 3], Dim(1), Dim(2))])\
+        == Tensor[int]([3, 3], Dim(1), Dim(2))
+    assert total([]) == Tensor[int].zero(Dim(1), Dim(2))
 
 
 def test_tensor_of_coins():
