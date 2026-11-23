@@ -773,9 +773,9 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Fixed
 
-- A Z spider of `discopy.optyx.core.zw` with two inputs or more fed by a W
-  dagger no longer fails to truncate on the numpy integer its dimension was
-  ([next#691]).
+- `ZBox.truncation` of `discopy.optyx.core.zw` accepts a dimension given as
+  a NumPy integer, e.g. the output of a W dagger, so a Z spider with two
+  inputs or more no longer fails to truncate after one ([next#691]).
 - `closed.Abstraction.eval` curries its variable on the side that
   `Application.eval` evaluates, so a β-redex and its reduct are sent to the
   same morphism by a functor into a rigid category, e.g. tensors, where they
