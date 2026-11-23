@@ -116,3 +116,20 @@ def test_a_push_to_main_measures_every_python_of_its_matrix(build_test):
     assert len(versions(build_test, push("a"))) > 1
     assert build_test["strategy"].get("fail-fast") is False
     assert versions(build_test, pull_request("a")) == ["3.14"]
+
+
+def test_only_a_deep_proptest_search_is_sharded():
+    """A push searches each cell for a second in one job; the nightly run
+    and a dispatch search for five, which does not fit in one, so they
+    split the matrix over jobs whose failures do not cancel each other, and
+    `merge` alone compares and uploads the run as a whole."""
+    with open(GITHUB / "workflows" / "proptest.yml") as file:
+        jobs = yaml.safe_load(file)["jobs"]
+    strategy = jobs["proptest"]["strategy"]
+
+    def shards(github):
+        return ast.literal_eval(evaluate(strategy["matrix"]["shard"], github))
+    assert shards(push("a")) == shards(pull_request("a")) == [0]
+    assert shards(schedule("a", 1)) == [0, 1, 2, 3]
+    assert strategy["fail-fast"] is False
+    assert jobs["merge"]["needs"] == "proptest"

@@ -285,3 +285,50 @@ def loads(source):
              distinct=entry.get("distinct"), budget=entry.get("budget"))
         for name, entry in sorted(entries.items())
         if isinstance(entry, dict) and "outcome" in entry)
+
+
+def merge(reports, baseline=None):
+    """
+    The cells of a run split into slices, from the report of each slice,
+    and the lines they print against the baseline of the whole run: a slice
+    compared against the whole baseline would name every cell of the other
+    slices as gone.
+
+    >>> cells, lines = merge(
+    ...     [dumps([Cell("a", PASSED, 3, 3)]), dumps([Cell("b", SKIPPED)])],
+    ...     baseline=[Cell("a", PASSED), Cell("b", PASSED)])
+    >>> [cell.name for cell in cells]
+    ['a', 'b']
+    >>> print("\\n".join(lines[1:]))
+    1 cell(s) the baseline checked and this run did not:
+      b: skipped
+    """
+    cells = tuple(sorted(
+        (cell for report in reports for cell in loads(report)),
+        key=lambda cell: cell.name))
+    return cells, render(cells, baseline)
+
+
+if __name__ == "__main__":
+    import argparse
+    import pathlib
+
+    parser = argparse.ArgumentParser(
+        prog="python -m proptest.report",
+        description="Merge the reports of the slices of one run.")
+    parser.add_argument("reports", nargs="+", type=pathlib.Path)
+    parser.add_argument("--baseline", type=pathlib.Path)
+    parser.add_argument("--output", type=pathlib.Path, required=True)
+    args = parser.parse_args()
+    known = None
+    if args.baseline is not None:
+        try:
+            known = loads(args.baseline.read_text())
+        except (OSError, ValueError) as error:
+            known = ()
+            print(f"unreadable baseline {args.baseline}: {error}")
+    merged, lines = merge(
+        [path.read_text() for path in args.reports], known)
+    print("\n".join(lines))
+    args.output.parent.mkdir(parents=True, exist_ok=True)
+    args.output.write_text(dumps(merged))
