@@ -6,4 +6,4 @@
 
 - [WIP] @T-16592c89-2026-11-23 11:20 discopy.lambek.tokenise: spaCy's rule-based English tokenizer and sentencizer, lazily imported, with the CCGrebank/PTB differences handled
 - [WIP] @T-16592c89-2026-11-23 11:20 spacy in the lambek extra, uv.lock
-- [ ] tests that skip without spaCy, docs and changelog
+- [WIP] @T-16592c89-2026-11-23 11:20 tests that skip without spaCy, docs and changelog
