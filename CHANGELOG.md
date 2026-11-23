@@ -21,6 +21,11 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   category of Mathlib and that strict premonoidal categories, Diagram(S)
   included, satisfy the laws of `monoidal.Diagram` ([next#668]).
 
+- `discolean/` models the terms of `cat` and `monoidal`: the five laws of
+  `cat.TermBase` are proved on nameless terms, and a planar linear term of
+  `monoidal` evaluates to a diagram of its context, which a diagram with one
+  output reads back from, box for box ([next#705]).
+
 - `abc.MonoidalCategory` states the laws of whiskering, `tensor_associativity`,
   `tensor_unit`, `left_whiskering`, `right_whiskering` and `tensor_whiskering`,
   those of a strict premonoidal category, `tensor_whiskering` broken on Markov
@@ -810,6 +815,11 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   `Diagram.to_tensor`, now unit-tested ([next#249]).
 
 ### Fixed
+
+- `cat.TermBase.normal_form` contracts a `let` whose variable has the name of
+  a variable its expression uses, e.g. `let(f(a), lambda a: g(a))`, and the
+  property matrix draws such terms: a naming of the kappa terms may reuse a
+  name its expression uses up ([next#708]).
 
 - `optyx.core.path.Matrix` survives `dumps` and `loads`: its tree names
   `creations`, `selections`, `normalisation` and `scalar` beside the array,
@@ -2584,7 +2594,9 @@ for the changelog of `1.2.1` and earlier.
 [next#698]: https://github.com/rel-int/discopy-next/pull/698
 [next#699]: https://github.com/rel-int/discopy-next/pull/699
 [next#702]: https://github.com/rel-int/discopy-next/pull/702
+[next#705]: https://github.com/rel-int/discopy-next/pull/705
 [next#706]: https://github.com/rel-int/discopy-next/pull/706
+[next#708]: https://github.com/rel-int/discopy-next/pull/708
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#44]: https://github.com/rel-int/optyx/pull/44
