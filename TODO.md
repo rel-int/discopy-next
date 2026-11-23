@@ -5,5 +5,5 @@
 - [x] pilot corpus for symmetric, written by this Amp session: about 20 terms aimed at shapes the strategies miss
 - [x] pilot corpus for compact: about 20 terms, filed as #43
 - [x] pilot corpus for Int: about 20 terms, filed as #43
-- [ ] measure: what the corpus finds that explore did not; file each counterexample as an issue and declare it failing
+- [x] measure: what the corpus finds that explore did not; file each counterexample as an issue and declare it failing
 - [ ] document the corpus and how to grow it in CONTRIBUTING.md, with a changelog entry
