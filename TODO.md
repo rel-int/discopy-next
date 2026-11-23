@@ -70,7 +70,7 @@
 > > [P3] Pull-request runs now use `-n logical` instead of the previous `-n auto`, so their worker count and resource usage change despite the stated requirement that pull-request runs remain unchanged. Select `auto` for `pull_request` and `logical` only for the deeper searches.
 
 - [x] proptest/report.py merge: reject a cell named by two slices (r4666065220)
-- [WIP] @T-6d395818-2026-11-23 12:53 proptest/conftest.py: --proptest-shard rejects a malformed or out-of-range I/N (r4666065265)
+- [x] proptest/conftest.py: --proptest-shard rejects a malformed or out-of-range I/N (r4666065265)
 - [WIP] @T-6d395818-2026-11-23 12:53 proptest/test_conftest.py: finite-support test with a small cap, not relying on both booleans (r4666065282, r4666065297)
 - [WIP] @T-6d395818-2026-11-23 12:53 proptest.yml: PROPTEST_STOP from the first step of the job; workflows test covers a dispatch (r4666065254, r4666065246)
 - [WIP] @T-6d395818-2026-11-23 12:53 Docs: half the time left, a best-effort deadline, one worker flag, dispatch in the changelog (r4666065304, r4666065316, r4666065329, r4666065338)
