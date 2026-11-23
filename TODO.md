@@ -4,7 +4,7 @@
 > > 2) can we find a way to raise the error at construction time instead?
 > > 3) edit the draft accordingly
 
-- [ ] ribbon and compact each get a Ty and a Nat of their own, subclassing those of the levels their diagrams subclass; frobenius.Ty is a compact.Ty (#683)
+- [WIP] @T-0729b388-26a3-4a3d-ac11-e727fdb06d74-2026-11-23 17:05 ribbon and compact each get a Ty and a Nat of their own, subclassing those of the levels their diagrams subclass; frobenius.Ty is a compact.Ty (#683)
 - [ ] a kappa over a constant of another level raises when it is built, stated once for every level (#684)
 - [ ] tests, the trees and pickles written with pivotal.Ty, docs/adr/0008 and the changelog
 - [ ] the paper draft on rel-int/wiki#195 follows: terms of each module, no discopy.kappa
