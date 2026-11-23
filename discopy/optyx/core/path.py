@@ -378,15 +378,20 @@ class Matrix(underlying.Matrix):
         constructor turns into the shape of the array together with the
         creations and the selections, so ``super().from_tree`` would
         reshape the underlying array into the modes alone.
+
+        Each field of the profile falls back to the default the
+        constructor gives it, so a tree written before they travelled —
+        which is one with no creation and no selection, the only kind that
+        could be read back at all — still loads.
         """
         return cls(
             tree['array'],
             from_tree(tree['dom']),
             from_tree(tree['cod']),
-            tuple(tree['creations']),
-            tuple(tree['selections']),
-            tree['normalisation'],
-            tree['scalar'])
+            tuple(tree.get('creations', ())),
+            tuple(tree.get('selections', ())),
+            tree.get('normalisation', 1),
+            tree.get('scalar', 1))
 
     def dilate(self) -> Matrix:
         """

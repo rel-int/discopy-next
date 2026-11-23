@@ -7,7 +7,7 @@ from discopy.optyx import photonic, qmode
 from discopy.optyx.channel import Diagram
 from discopy.optyx.core import zw
 from discopy.optyx.core.path import Matrix, Sum, npperm
-from discopy.utils import AxiomError, dumps, loads
+from discopy.utils import AxiomError, dumps, from_tree, loads
 
 
 def beam_splitter():
@@ -32,6 +32,14 @@ def test_the_tree_of_a_matrix_names_its_whole_profile():
         'scalar', 'selections']
     assert loads(dumps(matrix)) == matrix
     assert loads(dumps(Matrix[float]([[1.]], 1, 1))).dtype is float
+
+
+def test_a_tree_written_before_the_profile_travelled_still_loads():
+    """The profile falls back to the constructor's defaults, see #696."""
+    plain = Matrix(np.array([[1]]), 1, 1)
+    tree = {key: value for key, value in plain.to_tree().items()
+            if key in ('factory', 'array', 'dom', 'cod')}
+    assert from_tree(tree) == plain
 
 
 @pytest.mark.parametrize("field", [
