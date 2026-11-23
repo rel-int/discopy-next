@@ -4,8 +4,7 @@ The property matrix: every law of every enrolled category, see
 """
 
 import pytest
-from hypothesis import Phase, given, note, settings
-from hypothesis import strategies as st
+from hypothesis import Phase, note
 
 from discopy.testable import Testable, inhabits, position
 from discopy.utils import factory_name
@@ -32,7 +31,7 @@ def cells():
 
 @pytest.mark.cell
 @pytest.mark.parametrize("law", cells())
-def test_axiom(law, drawn):
+def test_axiom(law, drawn, search):
     """
     Check a law against generated arguments, a broken one up to its first
     counterexample, which :meth:`discopy.testable.Axiom.falsify` shrinks on
@@ -42,8 +41,6 @@ def test_axiom(law, drawn):
     phases = (Phase.explicit, Phase.reuse, Phase.generate)\
         if law.broken else tuple(Phase)
 
-    @settings(phases=phases)
-    @given(data=st.data())
     def check(data):
         scope, arguments = data.draw(
             law.sequents(**law.params), label=law.name)
@@ -53,7 +50,7 @@ def test_axiom(law, drawn):
         assert inhabits(verdict, law.output(scope))
         assert verdict
 
-    check()
+    search(check, phases)
 
 
 @pytest.mark.parametrize(

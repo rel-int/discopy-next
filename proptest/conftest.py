@@ -5,7 +5,9 @@ property suite, see the documentation of :mod:`discopy.testable` and of
 ``HYPOTHESIS_PROFILE``: ``dev`` by default, ``fast`` to develop with —
 derandomized, one cell per declaration of a law — ``pr`` for the small
 budget of a pull request and ``explore`` for the large one of ``main``
-and the nightly run.
+and the nightly run. ``PROPTEST_SECONDS`` turns a profile's budget into a
+cap and gives each cell that many seconds instead, see :func:`search`, and
+``--proptest-shard`` runs one of several disjoint slices of the suite.
 
 Under ``CI`` a registered profile inherits Hypothesis's ``ci`` defaults,
 ``derandomize=True`` and hence ``database=None``, so both are explicit.
@@ -13,9 +15,12 @@ Under ``CI`` a registered profile inherits Hypothesis's ``ci`` defaults,
 
 import os
 import pathlib
+import time
+import zlib
 
 import pytest
-from hypothesis import HealthCheck, settings
+from hypothesis import HealthCheck, given, settings
+from hypothesis import strategies as st
 from hypothesis.database import (
     DirectoryBasedExampleDatabase, GitHubArtifactDatabase,
     MultiplexedDatabase, ReadOnlyDatabase)
@@ -42,7 +47,14 @@ search and is meant to outlive one example.
 
 PROFILE = os.environ.get("HYPOTHESIS_PROFILE", "dev")
 
-settings.register_profile("pr", max_examples=20, **COMMON)
+FIRST = 20
+"""
+The examples of a pull request, and the first batch of a cell searching
+under a time budget, so that a run on a budget checks at least what a pull
+request does.
+"""
+
+settings.register_profile("pr", max_examples=FIRST, **COMMON)
 settings.register_profile("explore", max_examples=1000, **COMMON)
 settings.register_profile("dev", max_examples=100, **COMMON)
 settings.register_profile("fast", max_examples=100, **dict(
@@ -112,11 +124,66 @@ def drawn(record_property):
     terms = set()
     yield terms
     record_property(DISTINCT, len(terms))
-    record_property(BUDGET, settings().max_examples)
+
+
+SECONDS = float(os.environ.get("PROPTEST_SECONDS", "0"))
+"""
+The seconds each cell searches for, or ``0`` to search for exactly the
+examples of the profile, as a pull request does.
+"""
+
+STOP = float(os.environ.get("PROPTEST_STOP", "inf"))
+"""
+The time, in seconds since the epoch, after which a cell runs its first
+batch only, so that a matrix that grows past what its job has time for
+finishes with what a pull request checks rather than being cancelled.
+"""
+
+
+def batches(body, phases, drawn, seconds=SECONDS, stop=STOP, cap=None):
+    """
+    Run the body of a cell against :func:`hypothesis.strategies.data`, in
+    batches, and yield the examples of each batch once it has run.
+
+    Without ``seconds`` that is one search of ``cap`` examples, which is the
+    profile's unless given. With them, ``cap`` is a cap: a first batch of
+    :data:`FIRST` examples, then batches of fresh ones sized to half the
+    time left, until the cell has spent its seconds, reached the cap, drawn
+    no new term in a whole batch, which is a finite support exhausted, or
+    passed the time ``stop``. Each batch is a search of its own, with a
+    fresh seed unless ``--hypothesis-seed`` fixes one, which a run on a
+    budget does not.
+    """
+    cap = settings().max_examples if cap is None else cap
+    batch, ran = (min(cap, FIRST) if seconds else cap), 0
+    start = time.monotonic()
+    while batch:
+        terms = len(drawn)
+        settings(phases=phases, max_examples=batch)(
+            given(data=st.data())(body))()
+        ran += batch
+        yield batch
+        spent = time.monotonic() - start
+        if spent >= seconds or time.time() >= stop or len(drawn) == terms:
+            return
+        batch = min(cap - ran, int(
+            (seconds - spent) * ran / max(spent, 1e-3) / 2) or 1)
+
+
+@pytest.fixture
+def search(drawn, record_property):
+    """
+    Run the body of a cell in :func:`batches`, and record the examples it
+    ran as the cell's budget: those of the batches that ran, when one of
+    them fails.
+    """
+    examples = []
+    yield lambda body, phases: examples.extend(batches(body, phases, drawn))
+    record_property(BUDGET, sum(examples))
 
 
 DISTINCT, BUDGET = "proptest-distinct", "proptest-budget"
-"""The names :func:`drawn` records its two numbers under."""
+"""The names :func:`drawn` and :func:`search` record their numbers under."""
 
 
 def cell_name(nodeid):
@@ -144,6 +211,32 @@ def pytest_addoption(parser):
         "--proptest-baseline", metavar="PATH", default=None,
         help="compare this run against the report at PATH, naming the cells "
              "it checked and this run did not")
+    group.addoption(
+        "--proptest-shard", metavar="I/N", default=None,
+        help="run the I-th of N disjoint slices of the suite, counting from 0")
+
+
+def shard(nodeid, count):
+    """
+    The slice a test belongs to, of ``count``: a hash of its node id rather
+    than its position, so that a test stays in its slice as others come and
+    go, and the slices partition the suite.
+
+    >>> shard("proptest/test_axioms.py::test_axiom[cat.Arrow.unitality]", 4)
+    3
+    """
+    return zlib.crc32(nodeid.encode()) % count
+
+
+def pytest_collection_modifyitems(config, items):
+    """ Deselect the tests outside the slice ``--proptest-shard`` names. """
+    if (option := config.getoption("--proptest-shard")) is None:
+        return
+    index, count = map(int, option.split("/"))
+    slices = [shard(item.nodeid, count) for item in items]
+    config.hook.pytest_deselected(items=[
+        item for item, i in zip(items, slices) if i != index])
+    items[:] = [item for item, i in zip(items, slices) if i == index]
 
 
 def pytest_runtest_logreport(report):
