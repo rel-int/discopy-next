@@ -14,6 +14,20 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   `discolean/DisCoLean/ABC.lean`; `discolean/` proves a compiled category is a
   category of Mathlib and that strict premonoidal categories, Diagram(S)
   included, satisfy the laws of `monoidal.Diagram` ([next#668]).
+
+- `discolean/` models the terms of `cat` and `monoidal`: the five laws of
+  `cat.TermBase` are proved on nameless terms, and a planar linear term of
+  `monoidal` evaluates to a diagram of its context, which a diagram with one
+  output reads back from, box for box ([next#705]).
+
+- `abc.MonoidalCategory` states the laws of whiskering, `tensor_associativity`,
+  `tensor_unit`, `left_whiskering`, `right_whiskering` and `tensor_whiskering`,
+  those of a strict premonoidal category, `tensor_whiskering` broken on Markov
+  and Comarkov lenses and prisms, as is their unitality; `discopy.lean`
+  compiles a `Functor` of each class it compiles, its abstract methods and the objects it specialises its bases
+  to, e.g. `Nat` for `abc.PRO`, and `discolean/` proves the coherence of
+  `discopy.monoidal`:
+  Diagram(S) is the free model of the laws of `monoidal.Diagram` ([next#671]).
 - The notebook `docs/notebooks/optyx/strict_sloppy.md` reproduces §5 of
   arXiv:2110.10641, the strict and sloppy readings of *John likes his code.
   Bill does too.*, each reading a `closed` lambda term sent by a functor
@@ -57,6 +71,14 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   its dagger and in a `abc.SymmetricCategory` the swap the other way round,
   and `abc.DaggerMonoidalCategory`, the first class with both a dagger and a
   tensor ([next#485]).
+- `discopy.enriched`, the change of base of a category `C` along a monad `M`:
+  an `enriched.Arrow[C, M]` from `A` to `B` is an element of `M(C(A, B))`,
+  composed by pairing then composing, with `tensor`, a monoidal product only
+  when `M` is commutative (not for `List`, where interchange fails), and, for
+  `C` the Python functions, `to_channel`. An `enriched.Functor` extends a functor `C -> D`
+  along the classmethod `D.algebra(M, dom, cod)`, given for the new list monad
+  `kleisli.monad.List` by `cat.Arrow`, which sends a list of arrows to their
+  `sum.Sum`, and by `Matrix`, which adds the matrices ([next#134]).
 - `monad.algebra.Algebra.product` and `Algebra.power`, the products of the
   Eilenberg-Moore category, `monad.algebra.Operation`, a value of `M(n)` acting
   on every algebra as a function `Aⁿ → A` that every homomorphism commutes
@@ -88,6 +110,11 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   its first subword, and `lambek.neural.ChartClassifier` gives a supertag for
   each word and a label for each span. `transformers` joins the `lambek` extra
   ([next#604]).
+- `lambek.tokenise.tokenise` splits raw English text into sentences of words
+  as the Penn Treebank and CCGrebank write them, for the Bobcat parser: the
+  rule-based tokenizer and sentencizer of spaCy, with no model, keeping
+  hyphenated words whole and writing quotes and brackets as the treebank does.
+  `spacy` joins the `lambek` extra ([next#699]).
 - `drawing.picture.decode` and `read`: a picture's pixel classes back to
   its diagram. `regions` splits them into boxes, wires and labels, `attach`
   hangs each label on its wire, `refine` writes the names and types read
@@ -516,6 +543,13 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
   checks `scalar_sliding` and `braid_naturality` on streams, up to the order
   of their memory as `bifunctoriality` is ([next#514]).
 
+- `interaction.Ty.strategy` draws each side of an integer type with at most
+  two generators, enough to tell the conventions of cups and caps apart: the
+  terms of the laws on integer diagrams grow with the square of the width of
+  their types, and the four slowest cells of the property matrix,
+  `interaction.Diagram[compact.Diagram]`'s `adjunction`,
+  `transpose_contravariance`, `rotate_contravariance` and `pivotality`, go
+  from about 123 to 36–54 seconds ([next#709]).
 - `lean/` is now `discolean/`, a Lake package built on Mathlib with one
   library, `DisCoLean` ([next#668]).
 - The alpha-equivalence of terms is stated once, in `cat.AlphaEquivalence`,
@@ -792,6 +826,19 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Fixed
 
+- `cat.TermBase.normal_form` contracts a `let` whose variable has the name of
+  a variable its expression uses, e.g. `let(f(a), lambda a: g(a))`, and the
+  property matrix draws such terms: a naming of the kappa terms may reuse a
+  name its expression uses up ([next#708]).
+
+- `optyx.core.path.Matrix` survives `dumps` and `loads`: its tree names
+  `creations`, `selections`, `normalisation` and `scalar` beside the array,
+  and `from_tree` reads `dom` and `cod` as the mode counts they are. It
+  inherited `matrix.Matrix.to_tree`, which writes the array, `dom` and `cod`
+  alone, so a matrix with a creation or a selection raised on the array's
+  shape, the array being the underlying one, and a matrix without came back
+  as a different map with its normalisation and its scalar lost. A
+  `path.Sum` of such terms is fixed with them ([next#698]).
 - `optyx.core.path.Matrix` adds formally: `Matrix.sum_factory` is the new
   `path.Sum`, `Matrix.zero` is the empty sum and `Sum.eval(n_photons)` adds
   the terms' `Amplitudes` on one photon sector, where they add however the
@@ -1950,6 +1997,11 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Project
 
+- The `proptest` workflow runs every cell at `pr`'s twenty examples under
+  `--hypothesis-seed=0` on `main` too, with one worker per vCPU, and no longer
+  runs nightly: `explore`'s thousand examples per cell had cancelled every run
+  of `main` at 30 minutes since the matrix grew past 2,900 cells, 4% of the
+  way through ([next#702]).
 - `build`'s `test` and `docs` jobs, the two that install Graphviz, run on
   `ubuntu-24.04`: `ubuntu-latest` resolved to two images inside one run and
   graphviz is not in the sources the Ubuntu 26.04 one ships, so a job asking
@@ -2540,6 +2592,7 @@ for the changelog of `1.2.1` and earlier.
 [next#665]: https://github.com/rel-int/discopy-next/pull/665
 [next#667]: https://github.com/rel-int/discopy-next/pull/667
 [next#668]: https://github.com/rel-int/discopy-next/pull/668
+[next#671]: https://github.com/rel-int/discopy-next/pull/671
 [next#672]: https://github.com/rel-int/discopy-next/pull/672
 [next#674]: https://github.com/rel-int/discopy-next/pull/674
 [next#675]: https://github.com/rel-int/discopy-next/pull/675
@@ -2549,6 +2602,12 @@ for the changelog of `1.2.1` and earlier.
 [next#692]: https://github.com/rel-int/discopy-next/pull/692
 [next#693]: https://github.com/rel-int/discopy-next/pull/693
 [next#694]: https://github.com/rel-int/discopy-next/pull/694
+[next#698]: https://github.com/rel-int/discopy-next/pull/698
+[next#699]: https://github.com/rel-int/discopy-next/pull/699
+[next#702]: https://github.com/rel-int/discopy-next/pull/702
+[next#705]: https://github.com/rel-int/discopy-next/pull/705
+[next#708]: https://github.com/rel-int/discopy-next/pull/708
+[next#709]: https://github.com/rel-int/discopy-next/pull/709
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#44]: https://github.com/rel-int/optyx/pull/44

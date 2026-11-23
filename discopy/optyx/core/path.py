@@ -137,8 +137,8 @@ from discopy import sum as formal_sum
 from discopy.abc import Nat
 from discopy.cat import assert_iscomposable
 from discopy.utils import (
-    AxiomError, factory, factory_key, factory_name, resolve_factory,
-    unbiased)
+    AxiomError, factory, factory_key, factory_name, from_tree,
+    resolve_factory, unbiased)
 import discopy.matrix as underlying
 from discopy.tensor import Tensor
 from discopy.optyx.utils.misc import occupation_numbers, amplitudes_2_tensor
@@ -345,6 +345,53 @@ class Matrix(underlying.Matrix):
             + f", normalisation={self.normalisation}"
             + f", scalar={self.scalar})"
         )
+
+    def to_tree(self) -> dict:
+        """
+        The tree names the whole profile, as the representation does.
+
+        The ``array`` a matrix writes is its underlying one, with
+        ``len(creations)`` rows and ``len(selections)`` columns more than
+        its ``dom`` and ``cod``, so a tree without them cannot be read
+        back at all, see :meth:`from_tree`.
+
+        Example
+        -------
+        >>> from discopy.utils import dumps, loads
+        >>> matrix = Matrix(np.array([[1, 1], [1, 0]]), 1, 1,
+        ...                 creations=(1,), selections=(1,), scalar=2j)
+        >>> assert loads(dumps(matrix)) == matrix
+        """
+        return dict(
+            super().to_tree(),
+            creations=self.creations,
+            selections=self.selections,
+            normalisation=self.normalisation,
+            scalar=self.scalar)
+
+    @classmethod
+    def from_tree(cls, tree: dict) -> Matrix:
+        """
+        Reads the whole profile back, see :meth:`to_tree`.
+
+        The ``dom`` and ``cod`` of the tree are mode counts, which the
+        constructor turns into the shape of the array together with the
+        creations and the selections, so ``super().from_tree`` would
+        reshape the underlying array into the modes alone.
+
+        Each field of the profile falls back to the default the
+        constructor gives it, so a tree written before they travelled —
+        which is one with no creation and no selection, the only kind that
+        could be read back at all — still loads.
+        """
+        return cls(
+            tree['array'],
+            from_tree(tree['dom']),
+            from_tree(tree['cod']),
+            tuple(tree.get('creations', ())),
+            tuple(tree.get('selections', ())),
+            tree.get('normalisation', 1),
+            tree.get('scalar', 1))
 
     def dilate(self) -> Matrix:
         """

@@ -7,7 +7,7 @@ from discopy.optyx import photonic, qmode
 from discopy.optyx.channel import Diagram
 from discopy.optyx.core import zw
 from discopy.optyx.core.path import Matrix, Sum, npperm
-from discopy.utils import AxiomError, dumps, loads
+from discopy.utils import AxiomError, dumps, from_tree, loads
 
 
 def beam_splitter():
@@ -21,6 +21,25 @@ def beam_splitter():
 def test_repr_is_transparent():
     matrix = Matrix(np.eye(3), 2, 2, creations=(1, ), selections=(2, ))
     assert eval(repr(matrix), Matrix.environment()) == matrix
+
+
+def test_the_tree_of_a_matrix_names_its_whole_profile():
+    """Every field the repr names travels through the tree, see #696."""
+    matrix = Matrix(np.eye(3), 2, 2, creations=(1, ), selections=(2, ),
+                    normalisation=.5, scalar=2j)
+    assert sorted(matrix.to_tree()) == [
+        'array', 'cod', 'creations', 'dom', 'factory', 'normalisation',
+        'scalar', 'selections']
+    assert loads(dumps(matrix)) == matrix
+    assert loads(dumps(Matrix[float]([[1.]], 1, 1))).dtype is float
+
+
+def test_a_tree_written_before_the_profile_travelled_still_loads():
+    """The profile falls back to the constructor's defaults, see #696."""
+    plain = Matrix(np.array([[1]]), 1, 1)
+    tree = {key: value for key, value in plain.to_tree().items()
+            if key in ('factory', 'array', 'dom', 'cod')}
+    assert from_tree(tree) == plain
 
 
 @pytest.mark.parametrize("field", [
@@ -145,10 +164,9 @@ def test_repr_of_a_sum_is_transparent():
 
 
 def test_the_tree_of_an_empty_sum_names_its_ring():
-    for matrix in (Matrix.zero(1, 1), Matrix[float].zero(1, 1)):
+    for matrix in (Matrix.zero(1, 1), Matrix[float].zero(1, 1),
+                   selected_phase(2j) + selected_phase(5j)):
         assert loads(dumps(matrix)) == matrix
-    with pytest.raises(ValueError, match="reshape"):
-        loads(dumps(selected_phase(2j)))  # a term's profile: next#696
 
 
 def test_a_sum_evaluates_over_the_ring_of_its_terms():

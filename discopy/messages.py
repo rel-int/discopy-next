@@ -39,6 +39,8 @@ NOT_MAPPING_OR_CALLABLE = "Expected a Mapping or a Callable, got {!r}."
 NOT_RIGID_ADJOINT = "{} is not the left adjoint of {}, maybe you meant to use"\
                     " a pivotal type rather than a rigid one?"
 MISSING_TYPES_FOR_EMPTY_SUM = "Empty sum needs a domain and codomain."
+NO_ALGEBRA = "The homs of {} are not algebras of the monad {}."
+NOT_ONE_TYPE = "A channel goes from one type to one type, got {} -> {}."
 MATRIX_REPEAT_ERROR = "The reflexive transitive closure is only defined for "\
                       "square boolean matrices."
 MATRIX_RESOLVENT_ERROR = "The resolvent is only defined for square matrices "\
@@ -99,15 +101,17 @@ PARA_CURRY_COPAR = (
     "A closed category cannot curry a map with coparameters {}, as its "
     "exponential would swallow them.")
 LENS_NATURALITY = (
-    "A Markov lens is a unit and associative only up to the naturality of "
-    "copy and discard, which a hypergraph does not decide.")
+    "A Markov lens is a unit and associative, and its tensor the composite "
+    "of its whiskerings, only up to the naturality of copy and discard, "
+    "which a hypergraph does not decide.")
 LENS_BRAID_NATURALITY = (
     "A Markov braid copies its input for its put, so a Markov lens is "
     "natural in it only up to the naturality of copy, which a hypergraph "
     "does not decide.")
 PRISM_NATURALITY = (
-    "A prism is a unit and associative only up to the naturality of merge "
-    "and noise, which a hypergraph does not decide.")
+    "A prism is a unit and associative, and its tensor the composite of its "
+    "whiskerings, only up to the naturality of merge and noise, which a "
+    "hypergraph does not decide.")
 PRISM_BRAID_NATURALITY = (
     "A prism braid merges its build with its residual, so a prism is "
     "natural in it only up to the naturality of merge, which a hypergraph "
