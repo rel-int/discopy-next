@@ -4,6 +4,6 @@
 >
 > If it already accepts raw text, make no PR and just report how it tokenises.
 
-- [ ] discopy.lambek.tokenise: spaCy's rule-based English tokenizer and sentencizer, lazily imported, with the CCGrebank/PTB differences handled
+- [WIP] @T-16592c89-2026-11-23 11:20 discopy.lambek.tokenise: spaCy's rule-based English tokenizer and sentencizer, lazily imported, with the CCGrebank/PTB differences handled
 - [ ] spacy in the lambek extra, uv.lock
 - [ ] tests that skip without spaCy, docs and changelog
