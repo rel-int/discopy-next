@@ -1,11 +1,13 @@
 import DisCoLean.Terms
 
 /-!
-# What is proved of the terms of `discopy.cat`
+# What is proved of the terms of `discopy.cat` and `discopy.monoidal`
 
-The model is the kappa calculus of `discopy.cat.TermBase`, nameless since a
+The model of `discopy.cat.TermBase` is its kappa calculus, nameless since a
 context has one variable: `Open S a b` is `x : a ⊢ e : b`, `Closed S a b` is
-`⊢ e : a → b`. The definitions are restated by `rfl` and each theorem names
+`⊢ e : a → b`. That of `discopy.monoidal.TermBase` is its planar linear
+kappa calculus on boxes of one output, for terms with no stack: `Open S Γ b`
+is `Γ ⊢ e : b`, nameless too, a variable being where it stands in `Γ`. The definitions are restated by `rfl` and each theorem names
 one broken implementation it rules out. `Audit.lean` covers this file. The
 model is not linked to the Python by a test: it mirrors `discopy/cat.py`.
 -/
@@ -57,7 +59,7 @@ theorem normal_form_idempotence (e : Open S a b) :
 term is the reading of its arrow, so two terms are equal up to beta and eta
 exactly when their arrows are.
 Rules out: a normal form that keeps a `let`, e.g. one whose variable shadows
-a free one, as the Python's does. -/
+a free one, as the Python's does (`rel-int/discopy-next#704`). -/
 theorem normal_form_completeness (t : Closed S a b) (e e' : Open S a b) :
     t.expand.normalForm = t.toPath.read
     ∧ (e.normalForm = e'.normalForm ↔ e.toPath = e'.toPath) :=
@@ -85,3 +87,47 @@ theorem eval_factors (C : _root_.Premonoidal.Category) (ob : S.Ob → C.Ob)
     e.eval_normalForm C ob ar hdom hcod⟩
 
 end Statements.Terms
+
+namespace Statements.Terms.Monoidal
+open _root_.Terms.Monoidal _root_.Premonoidal
+
+variable {S : _root_.Terms.Monoidal.Signature} [DecidableEq S.Ob]
+
+/-! ## Definitions: planar linear terms -/
+
+/-- A variable is an identity, a call evaluates its arguments, the last one
+first, then its box, and `let x = e in body` evaluates `e` where `x` stands,
+between the wires of `Γ₁` and `Γ₂`, then the body. -/
+theorem eval_def (x : S.Ob) (f : S.Box) (args : Args S Γ (S.dom f))
+    (e : Open S Δ a) (body : Open S (Γ₁ ++ [a] ++ Γ₂) b)
+    (e' : Open S Γ a) (rest : Args S Γ' Δ) :
+    (Open.var x).eval = Diagram.id [x]
+    ∧ (Open.call f args).eval = args.eval.comp (Diagram.box (S := S.diagrams) f)
+    ∧ (Open.letIn (Γ₁ := Γ₁) (Γ₂ := Γ₂) e body).eval
+      = (Diagram.whiskerLeft Γ₁ (e.eval.whiskerRight Γ₂)).comp body.eval
+    ∧ (Args.nil : Args S [] []).eval = Diagram.id []
+    ∧ (Args.cons e' rest).eval
+      = (Diagram.whiskerLeft Γ rest.eval).comp (e'.eval.whiskerRight Δ) :=
+  ⟨rfl, rfl, rfl, rfl, rfl⟩
+
+/-! ## Theorems -/
+
+/-- A term `Γ ⊢ e : b` evaluates to a diagram from `Γ` to `b`.
+Rules out: a `let` that puts the context of its expression right of the
+context of its body. -/
+theorem boundary (e : Open S Γ b) : e.eval.dom = Γ ∧ e.eval.cod = [b] := e.boundary
+
+/-- `eta`, for a constant: a box applied to a variable for each of its inputs
+evaluates to the box.
+Rules out: arguments evaluated with their contexts in the reverse order. -/
+theorem eta (f : S.Box) :
+    (Open.call f (vars (S := S) (S.dom f))).eval = Diagram.box (S := S.diagrams) f :=
+  eval_call_vars f
+
+/-- `reading`: a diagram with one output reads as a term that evaluates back
+to it, box for box.
+Rules out: a reading that binds the outputs of a box at the wrong offset. -/
+theorem reading (d : Diagram S.diagrams) (h : d.cod = [b]) : (toTerm d h).eval = d :=
+  eval_toTerm d h
+
+end Statements.Terms.Monoidal

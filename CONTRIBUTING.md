@@ -312,8 +312,8 @@ the important regressions and speedups.
 package built on [Mathlib](https://github.com/leanprover-community/mathlib4),
 its library `DisCoLean` holding the categories of `discopy.abc` compiled to
 Lean, a model of `egraph.partition`, the pure `EGraph` (`merge`, `add`,
-`rebuild`) and the `Builder`, and one of the diagrams of `monoidal.Diagram`,
-with theorems proved on each, see its [README](discolean/README.md). It needs
+`rebuild`) and the `Builder`, one of the diagrams of `monoidal.Diagram`, and
+one of the terms of `cat` and `monoidal`, with theorems proved on each, see its [README](discolean/README.md). It needs
 the Lean of `discolean/lean-toolchain`, which is that of the Mathlib it
 requires, and lives outside the Python package, outside the wheel and outside
 `testpaths`, so run it explicitly:
