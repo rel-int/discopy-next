@@ -4,3 +4,4 @@ import DisCoLean.EGraph
 import DisCoLean.Mathlib
 import DisCoLean.Premonoidal
 import DisCoLean.Statements
+import DisCoLean.Terms

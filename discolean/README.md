@@ -6,7 +6,7 @@
 compiled to Lean, the proof that diagrams are the arrows of the free category
 with each structure, one module of DisCoPy at a time, and the models of the
 algorithms of [`discopy/egraph.py`](../discopy/egraph.py), linked to the Python
-by a differential test.
+by a differential test, and the terms of `cat` and `monoidal`.
 
 ## The categories of `discopy.abc`
 
@@ -68,6 +68,9 @@ algorithms there is followed here, or the differential test says so.
 | [`DisCoLean/Premonoidal/Functor.lean`](DisCoLean/Premonoidal/Functor.lean) | strict premonoidal functors, the functor out of Diagram(S) and its uniqueness |
 | [`DisCoLean/Premonoidal/Oracle.lean`](DisCoLean/Premonoidal/Oracle.lean) | diagrams read and written as `Diagram.encode` does, for the oracle |
 | [`test_premonoidal.py`](test_premonoidal.py) | the differential test of diagrams against `monoidal.Diagram` |
+| [`DisCoLean/Terms/Cat.lean`](DisCoLean/Terms/Cat.lean) | the terms of `cat`, nameless, and the five laws of `cat.TermBase` |
+| [`DisCoLean/Terms/Monoidal.lean`](DisCoLean/Terms/Monoidal.lean) | planar linear terms of `monoidal`, their diagrams and the reading of a diagram |
+| [`DisCoLean/Statements/Terms.lean`](DisCoLean/Statements/Terms.lean) | what is proved of the terms, restated |
 | [`Audit.lean`](Audit.lean) | fails on `sorry`, `native_decide` or an axiom beyond `propext`, `Quot.sound`, `Classical.choice` in a theorem of `DisCoLean/Statements`, which restates the main ones; other files are not audited |
 | [`Oracle.lean`](Oracle.lean) | the `oracle` executable: one JSON case per line in, the model's answer out |
 | [`test_oracle.py`](test_oracle.py) | the differential test against the Python |
@@ -123,6 +126,33 @@ model mirrors
 - No colours: types are lists of wires, the free monoid, where a coloured
   `Ty` is a path and its tensor is partial.
 - `Sum`, `Bubble` and the subclasses of `Diagram` are not modelled.
+
+## Terms are diagrams
+
+[`DisCoLean/Statements/Terms.lean`](DisCoLean/Statements/Terms.lean) models the
+kappa calculus of [`cat.TermBase`](../discopy/cat.py) and the planar linear one
+of [`monoidal.TermBase`](../discopy/monoidal.py), as of `b66485d`. Nothing links
+the model to the Python but its definitions: there is no differential test.
+
+- Terms are nameless and indexed by their boundary: in `cat` a context has
+  one variable, so that `Open S a b` is `x : a ⊢ e : b`; in `monoidal` a
+  variable is where it stands in the context, `Open S Γ b` is `Γ ⊢ e : b`.
+  Alpha-equivalent terms are equal and substitution captures nothing, where
+  the Python names its variables (which is how `rel-int/discopy-next#704`
+  showed up).
+- In `cat`, the five laws of `cat.TermBase` are proved: `eta`,
+  `normal_form_soundness`, `normal_form_idempotence`,
+  `normal_form_completeness` and `reading`. Evaluation into any category
+  factors through the free one, so beta reduction is sound under every
+  functor.
+- In `monoidal`, only terms with no stack and boxes with one output: a term
+  evaluates into Diagram(S) of the premonoidal model, its arguments the last
+  one first as the Python does, from its context to its output, eta holds for
+  a box, and a diagram with one output reads as a term that evaluates back
+  to it, box for box. The reading gives a `let` to every box, the last one
+  included, where the Python gives none to the last. No normal form, no
+  kappa with a stack or offset, no boxes of several outputs, and none of
+  `symmetric` or `markov`.
 
 How to build and run it is in
 [CONTRIBUTING.md](../CONTRIBUTING.md#run-the-lean-proofs).
