@@ -810,6 +810,11 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Fixed
 
+- `cat.TermBase.normal_form` contracts a `let` whose variable has the name of
+  one its expression uses, e.g. `let(f(a), lambda a: g(a))`, and the property
+  matrix draws such terms: a naming of the kappa terms may reuse a name its
+  expression uses up ([next#708]).
+
 - `optyx.core.path.Matrix` survives `dumps` and `loads`: its tree names
   `creations`, `selections`, `normalisation` and `scalar` beside the array,
   and `from_tree` reads `dom` and `cod` as the mode counts they are. It
@@ -2584,6 +2589,7 @@ for the changelog of `1.2.1` and earlier.
 [next#699]: https://github.com/rel-int/discopy-next/pull/699
 [next#702]: https://github.com/rel-int/discopy-next/pull/702
 [next#705]: https://github.com/rel-int/discopy-next/pull/705
+[next#708]: https://github.com/rel-int/discopy-next/pull/708
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#44]: https://github.com/rel-int/optyx/pull/44
