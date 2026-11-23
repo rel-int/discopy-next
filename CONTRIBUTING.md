@@ -234,8 +234,31 @@ A test of the matrix carries `pytest.mark.cell`, which is what the report
 keys on: `proptest/test_report.py` holds the suite's unit tests of its own
 reading, and those are parametrised too.
 
+A profile's budget is a count of examples, and `explore`'s thousand on
+every cell of the matrix is some 33 hours. `PROPTEST_SECONDS` gives each
+cell a time instead, with the profile's count as a cap: the twenty examples
+of a pull request first, then batches of fresh ones sized to the time left,
+until the cell has spent its seconds, reached the cap, or drawn no new term
+in a whole batch. Past the time `PROPTEST_STOP` (seconds since the epoch) a
+cell runs its first batch only. `--proptest-shard I/N` runs the `I`-th of
+`N` slices of the suite, by a hash of the node id, and
+`python -m proptest.report` merges the reports of the slices of one run:
+
+```shell
+HYPOTHESIS_PROFILE=explore PROPTEST_SECONDS=5 \
+    uv run pytest proptest/ -n logical -p no:benchmark \
+    --proptest-shard=0/4 --proptest-report=shards/0.json
+uv run python -m proptest.report shards/*.json --output=report.json \
+    --baseline=report/proptest-report.json
+```
+
 The `proptest` GitHub workflow runs this suite on every pull request, on
-`main`, nightly and on manual dispatch. It carries the report
+`main`, nightly and on manual dispatch, with one worker per vCPU
+(`-n logical`): a pull request at `pr`'s twenty examples, a push to `main`
+at a second per cell, and the nightly run and a dispatch at five, over four
+shards that a last job merges. Each sets `PROPTEST_STOP` 22 minutes in, so
+a run that outgrows its 30 finishes with what a pull request checks rather
+than being cancelled. It carries the report
 between runs as an artifact, and on narrower terms than the example database:
 a baseline is a claim about what `main` checks rather than a pile of examples
 any run may add to, so it is taken from a **successful** run **of `main`**

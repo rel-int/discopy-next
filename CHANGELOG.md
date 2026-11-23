@@ -1966,6 +1966,12 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Project
 
+- The property matrix searches each cell for a time rather than a count of
+  examples: `PROPTEST_SECONDS` caps `explore`'s thousand, and a push to `main`
+  runs one job at a second per cell, the nightly run four shards at five,
+  merged by `python -m proptest.report`. `main`'s runs had been cancelled at
+  30 minutes since the matrix grew past 2,900 cells, 4% of the way through
+  ([next#702]).
 - `build`'s `test` and `docs` jobs, the two that install Graphviz, run on
   `ubuntu-24.04`: `ubuntu-latest` resolved to two images inside one run and
   graphviz is not in the sources the Ubuntu 26.04 one ships, so a job asking
@@ -2566,6 +2572,7 @@ for the changelog of `1.2.1` and earlier.
 [next#693]: https://github.com/rel-int/discopy-next/pull/693
 [next#694]: https://github.com/rel-int/discopy-next/pull/694
 [next#698]: https://github.com/rel-int/discopy-next/pull/698
+[next#702]: https://github.com/rel-int/discopy-next/pull/702
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#44]: https://github.com/rel-int/optyx/pull/44

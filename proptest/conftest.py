@@ -173,9 +173,10 @@ def batches(body, phases, drawn, seconds=SECONDS, stop=STOP, cap=None):
 @pytest.fixture
 def search(drawn, record_property):
     """
-    Run the body of a cell in :func:`batches`, and record the examples it
-    ran as the cell's budget: those of the batches that ran, when one of
-    them fails.
+    Run the body of a cell in :func:`batches`, and record the examples of
+    the batches that passed as the cell's budget, which is what the report
+    reads of a passing cell: a failing one counts none of the batch that
+    failed.
     """
     examples = []
     yield lambda body, phases: examples.extend(batches(body, phases, drawn))
