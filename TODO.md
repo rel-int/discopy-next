@@ -12,4 +12,4 @@
 - [x] Time budget: a cell runs the pr budget, then fresh batches until PROPTEST_SECONDS or max_examples, and the report records the examples it ran
 - [x] proptest workflow: -n logical, a push to main runs one job at B ~ 1 s with a fresh seed
 - [x] proptest workflow: the nightly and a dispatch run 4 shards at B ~ 5 s, merged by one job into the report and the example database
-- [WIP] @T-6d395818-2026-11-23 12:43 Docs: CONTRIBUTING.md's Run the property tests, and a changelog entry
+- [x] Docs: CONTRIBUTING.md's Run the property tests, and a changelog entry
