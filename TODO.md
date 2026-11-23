@@ -5,4 +5,4 @@
 > > can we make it genuinely photonic?
 
 - [x] send every word, copy and dereliction to a ZW diagram of photons, !A the bosonic Fock space, and check the readings against the paper's formulas
-- [WIP] @T-01a1fa54-2026-11-23 13:11 say where bosons and fermions differ and why the readings do not see it
+- [x] say where bosons and fermions differ and why the readings do not see it
