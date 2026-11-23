@@ -8,19 +8,22 @@ name of one of its laws, and that to entries keyed by what each one probes. An
 entry is a thunk returning the arguments of the law by name, with the value
 of each type variable its arguments do not show on their boundary, e.g. the
 memory ``M`` of a trace. The other variables are read off the domain and
-codomain of the morphisms, and every argument must then have the type its
-premise asks for, as :func:`discopy.testable.inhabits` says. An entry that
+codomain of the morphisms, a variable of sort ``Atom`` must be one wire, and
+every argument must then have the type its premise asks for, as
+:func:`discopy.testable.inhabits` says. An entry that
 fails this check is a bad entry, not a counterexample to the law.
 """
 
 import importlib
+import inspect
 import pkgutil
 from typing import TypeVar, get_args, get_origin
 
 import pytest
 from hypothesis.errors import UnsatisfiedAssumption
 
-from discopy.testable import AxiomFailure, Hom, Var, inhabits, substitute
+from discopy.testable import (
+    Atom, AxiomFailure, Hom, Var, inhabits, substitute)
 from discopy.utils import factory_name
 
 import proptest.corpus
@@ -68,6 +71,10 @@ def test_corpus(law, thunk):
     values = thunk()
     arguments = {p.name: values[p.name] for p in law.parameters}
     environment, annotations = scope(law, values), law.annotations()
+    for variable in inspect.unwrap(law.function).__type_params__:
+        if get_origin(variable.__bound__) is Atom:
+            assert len(environment[variable]) == 1, f"bad entry: "\
+                f"{variable.__name__} = {environment[variable]!r} is no atom"
     for name, value in arguments.items():
         assert inhabits(value, substitute(annotations[name], environment)), \
             f"bad entry: {name} = {value!r} is not {annotations[name]}"

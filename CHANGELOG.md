@@ -1979,8 +1979,8 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 - `proptest/test_corpus.py` replays a committed corpus of terms written by hand
   or by a language model, `proptest/corpus/`, against the laws of the property
   matrix, deterministically and offline, with a first corpus for
-  `symmetric.Diagram`: shapes the strategies never draw, e.g. boxes that share
-  a name or carry `data`, bubbles, empty types and multi-wire feedback. A pilot
+  `symmetric.Diagram`: shapes the strategies draw rarely or never, e.g. boxes
+  that share a name or carry `data`, bubbles and multi-wire feedback. A pilot
   on `symmetric`, `compact` and `Int` found no counterexample beyond those
   already declared ([next#707]).
 - The `proptest` workflow runs every cell at `pr`'s twenty examples under

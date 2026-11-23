@@ -1,8 +1,8 @@
 """
 The corpus of :class:`discopy.symmetric.Diagram`, aimed at what its strategy
-never draws: boxes that share a name, carry ``data`` or ``is_dagger``, names
-that are not identifiers, bubbles, empty and long types, scalars, traces of
-several wires and feedback with a memory of several wires or delays.
+draws rarely or never: boxes that share a name, carry ``data`` or
+``is_dagger``, names that are not identifiers, bubbles, long types, traces of
+several wires and feedback with a memory of several wires.
 """
 
 from discopy.symmetric import Box, Diagram, Swap, Ty
@@ -43,12 +43,6 @@ CORPUS = {Diagram: {
     "braid_naturality": {
         "same name, other type": lambda: {"f": f, "g": g},
         "a state and ten wires": lambda: {"f": state, "g": permutation},
-    },
-    "hexagon_left": {
-        "empty in the middle": lambda: {"x": x @ y, "y": e, "z": long},
-    },
-    "yanking": {
-        "an empty type": lambda: {"x": e},
     },
     "hypergraph_composition": {
         "same name, other type": lambda: {"f": f, "g": Box("f", y, x)},

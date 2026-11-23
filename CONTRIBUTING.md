@@ -250,15 +250,20 @@ compared against.
 ### The corpus
 
 The strategies draw the terms their authors thought of. `proptest/corpus/`
-holds the ones they did not: terms written by hand or by a language model, e.g.
-boxes that share a name or carry `data`, bubbles, empty types, traces of
-several wires and feedback with a memory of several wires. A module there,
+holds terms they draw rarely or never, written by hand or by a language model,
+e.g. boxes that share a name or carry `data`, bubbles, traces of several wires
+and feedback with a memory of several wires. A module there,
 one per module of `discopy`, defines `CORPUS`, mapping a category to the name
 of one of its laws and that to entries keyed by what each one probes. An entry
 is a thunk returning the arguments of the law by name, with the type variables
-its boundaries do not show, e.g. the memory `M` of a trace:
+its boundaries do not show, e.g. the memory `M` of a trace; a variable of
+sort `Atom` must be one wire:
 
 ```python
+from discopy.symmetric import Box, Diagram, Ty
+
+k = Box("k", Ty("x", "y", "z"), Ty("x", "y", "z"))
+
 CORPUS = {Diagram: {
     "hypergraph_section": {
         "a trace of two wires, right": lambda: {"f": k.trace(2)},
