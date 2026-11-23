@@ -28,9 +28,9 @@ taken 2026-11-23 with no word from USER:
 >    the list case needs one. Default: add `List` to `kleisli.monad` in this
 >    slice, beside the monads already there.
 
-- [ ] `kleisli.monad.List`
-- [ ] `D.algebra(M, dom, cod)` on `cat.Arrow` (the sum, `cat.Sum`) and `matrix.Matrix`
-- [ ] `discopy/enriched.py`: `Arrow[category, monad]` with `id`, `then` and `tensor`, `to_channel`, `Functor` extending a functor along `D.algebra`
-- [ ] `test/enriched.py`, with values derived by hand
-- [ ] docs: `docs/api/semantics.rst`, `discopy/__init__.py`, `CHANGELOG.md`
-- [ ] checks: pytest, pflake8, pylint, ruff, ty
+- [x] `kleisli.monad.List`
+- [x] `D.algebra(M, dom, cod)` on `cat.Arrow` (the sum, `cat.Sum`) and `matrix.Matrix`
+- [x] `discopy/enriched.py`: `Arrow[category, monad]` with `id`, `then` and `tensor`, `to_channel`, `Functor` extending a functor along `D.algebra`
+- [x] `test/enriched.py`, with values derived by hand
+- [x] docs: `docs/api/semantics.rst`, `discopy/__init__.py`, `CHANGELOG.md`
+- [x] checks: pytest, pflake8, pylint, ruff, ty
