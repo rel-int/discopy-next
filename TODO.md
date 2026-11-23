@@ -4,4 +4,4 @@
 
 - [x] Generators: a naming of the kappa terms may reuse names, so that a let shadows a variable its expression uses up, in cat and in the samplers of monoidal, symmetric and markov; show the matrix catches #704 without the fix
 - [x] Fix #704: Application.contractible only refuses the redex when a variable left bound would capture a free variable of the argument, with a regression test
-- [WIP] @T-abb0224c-2026-11-23 18:38 Checks and changelog
+- [x] Checks and changelog
