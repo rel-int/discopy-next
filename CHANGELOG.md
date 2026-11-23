@@ -534,6 +534,13 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Changed
 
+- `interaction.Ty.strategy` draws each side of an integer type with at most
+  two generators, enough to tell the conventions of cups and caps apart: the
+  terms of the laws on integer diagrams grow with the square of the width of
+  their types, and the four slowest cells of the property matrix,
+  `interaction.Diagram[compact.Diagram]`'s `adjunction`,
+  `transpose_contravariance`, `rotate_contravariance` and `pivotality`, go
+  from 123 to 36 seconds ([next#703]).
 - `lean/` is now `discolean/`, a Lake package built on Mathlib with one
   library, `DisCoLean` ([next#668]).
 - The alpha-equivalence of terms is stated once, in `cat.AlphaEquivalence`,
@@ -2583,6 +2590,7 @@ for the changelog of `1.2.1` and earlier.
 [next#698]: https://github.com/rel-int/discopy-next/pull/698
 [next#699]: https://github.com/rel-int/discopy-next/pull/699
 [next#702]: https://github.com/rel-int/discopy-next/pull/702
+[next#703]: https://github.com/rel-int/discopy-next/pull/703
 [next#705]: https://github.com/rel-int/discopy-next/pull/705
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
