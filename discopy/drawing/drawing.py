@@ -717,19 +717,26 @@ which to_drawing recomputes.
     def interpolate(self, other: Drawing, t: float) -> Drawing:
         """
         The drawing a fraction ``t`` of the way from ``self`` to ``other``,
-        each node at the barycentre of its two positions. When the drawings
-        are of one diagram up to an interchanger, i.e. their plane graphs are
-        equal once the indices of two consecutive boxes are swapped, every
+        each node at the barycentre of its two positions, when the drawings
+        are of diagrams one move apart: their nodes are equal once the
+        indices of two consecutive boxes are swapped and the labels of the
+        crossings, i.e. the boxes drawn as a braid or as wires, are forgotten.
+
+        When their edges are equal too, the move is an interchanger and every
         such drawing is of the same diagram: this is a planar isotopy, see
-        :meth:`discopy.monoidal.Equation.path`.
+        :meth:`discopy.monoidal.Equation.path`. Otherwise the edges may only
+        differ at two consecutive boxes, one of them a crossing, as when the
+        other slides through it by
+        :meth:`discopy.braided.Diagram.naturality`: the box moves along its
+        strand and the drawing takes the edges of ``other`` from ``t = .5``,
+        when the box meets the crossing.
 
         Parameters:
             other : The drawing to move to.
             t : The fraction of the way, from ``0`` to ``1``.
 
         Raises:
-            ValueError : When no swap of two consecutive boxes makes the
-                plane graphs of the drawings equal.
+            ValueError : When the drawings are not one move apart.
 
         Example
         -------
@@ -744,26 +751,76 @@ which to_drawing recomputes.
         >>> a.interpolate(f.to_drawing(), .5)
         Traceback (most recent call last):
         ...
-        ValueError: These drawings are not of one diagram up to swapping \
-two boxes.
+        ValueError: These drawings are not of diagrams one move apart.
+
+        A box slides through a braid, which shrinks behind it halfway:
+
+        >>> from discopy.braided import Ty, Box, Braid
+        >>> x, y = Ty('x'), Ty('y')
+        >>> f = Box('f', x, y)
+        >>> a = (x @ f >> Braid(x, y)).to_drawing()
+        >>> b = (Braid(x, x) >> f @ x).to_drawing()
+        >>> assert a.interpolate(b, 1) == b
+        >>> middle = a.interpolate(b, .5)
+        >>> for node in middle.box_nodes: print(node, middle.positions[node])
+        Node('box', box=Braid(x, x), j=0) Point(x=1.0, y=1.0)
+        Node('box', box=f, j=1) Point(x=1.0, y=1.0)
         """
+        def crossings(drawing):
+            return {node.j for node in drawing.box_nodes
+                    if node.box.draw_as_braid or node.box.draw_as_wires}
+
+        def forget(node, swap, forgotten):
+            data = dict(node.data)
+            if data.get("j") in forgotten:
+                data.pop("box", None)
+                data.pop("x", None)
+            if data.get("j") in swap:
+                data["j"] = swap[data["j"]]
+            return Node(node.kind, **data)
+
+        source = {
+            node: forget(node, {}, crossings(self)) for node in self.nodes}
+        edges = {(source[a], source[b]) for a, b in self.edges}
         swaps = [{}] + [{j: j + 1, j + 1: j}
                         for j in range(len(self.box_nodes) - 1)]
         for swap in swaps:
-            mapping = {node: Node(node.kind, **dict(node.data, j=swap[node.j]))
-                       if node.data.get("j") in swap else node
+            mapping = {node: forget(node, swap, crossings(other))
                        for node in other.nodes}
-            graph = nx.relabel_nodes(other.graph, mapping)
-            if set(graph.nodes) == set(self.nodes)\
-                    and set(graph.edges) == set(self.edges):
+            other_edges = {(mapping[a], mapping[b]) for a, b in other.edges}
+            moving = set(swap) if set(swap) & crossings(self) else set()
+            if set(mapping.values()) == set(source.values()) and all(
+                    any(node.data.get("j") in moving for node in edge)
+                    for edge in edges ^ other_edges):
                 break
         else:
             raise ValueError(messages.NO_INTERPOLATION)
-        target = {mapping[node]: p for node, p in other.positions.items()}
-        result = self.relabel_nodes(positions={
-            node: Point(p.x + t * (target[node].x - p.x),
-                        p.y + t * (target[node].y - p.y))
-            for node, p in self.positions.items()})
+        start = {source[node]: p for node, p in self.positions.items()}
+        end = {mapping[node]: p for node, p in other.positions.items()}
+
+        def between(a, b, s):
+            return {key: Point(a[key].x + s * (b[key].x - a[key].x),
+                               a[key].y + s * (b[key].y - a[key].y))
+                    for key in a}
+
+        if edges == other_edges:
+            base, labels, moved = self, source, between(start, end, t)
+        else:
+            middle = between(start, end, .5)
+            crossing, = moving & crossings(self)
+            box, centre = (
+                middle[next(key for key in middle if key.kind == "box"
+                            and key.data.get("j") == j)]
+                for j in (min(moving - {crossing}), crossing))
+            middle.update({key: Point(box.x + (p.x - centre.x) / 5,
+                                      box.y + (p.y - centre.y) / 5)
+                           for key, p in middle.items()
+                           if key.data.get("j") == crossing})
+            base, labels, moved = (
+                self, source, between(start, middle, 2 * t)) if t < .5\
+                else (other, mapping, between(middle, end, 2 * t - 1))
+        result = base.relabel_nodes(positions={
+            node: moved[labels[node]] for node in base.nodes})
         result.width = self.width + t * (other.width - self.width)
         result.height = self.height + t * (other.height - self.height)
         return result

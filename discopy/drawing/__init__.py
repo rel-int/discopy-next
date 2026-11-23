@@ -152,8 +152,10 @@ def to_gif(diagram, *diagrams, **params):  # pragma: no cover
         Time step in milliseconds, default is :code:`500`.
     tween : int, optional
         Frames per step, default is :code:`1`: from each diagram to the next
-        the drawing moves by :meth:`Drawing.interpolate`, or cuts to the next
-        when it cannot, e.g. along :meth:`discopy.monoidal.Equation.path`.
+        the drawing moves by :meth:`Drawing.interpolate`, so that the gif is
+        an isotopy, e.g. along :meth:`discopy.monoidal.Equation.path`, and
+        raises :code:`ValueError` when two consecutive diagrams are not one
+        move apart.
     loop : bool, optional
         Whether to loop, default is :code:`False`
     params : any, optional
@@ -204,24 +206,21 @@ def to_gif(diagram, *diagrams, **params):  # pragma: no cover
 def tweened(steps: list[Drawing], tween: int) -> list[Drawing]:
     """
     The drawings with ``tween - 1`` more between each one and the next, see
-    :meth:`Drawing.interpolate`, none where it cannot interpolate.
+    :meth:`Drawing.interpolate`.
 
     Example
     -------
     >>> from discopy.monoidal import Ty, Box
     >>> x = Ty('x')
     >>> f, g = Box('f', x, x), Box('g', x, x)
-    >>> steps = [d.to_drawing() for d in (f @ x >> x @ g, x @ g >> f @ x, f)]
-    >>> assert len(tweened(steps, 4)) == 1 + 4 + 1
+    >>> steps = [d.to_drawing() for d in (f @ x >> x @ g, x @ g >> f @ x)]
+    >>> assert len(tweened(steps, 4)) == 1 + 4
+    >>> assert len(tweened(steps + [f.to_drawing()], 1)) == 3
     """
     result = steps[:1]
     for before, after in zip(steps, steps[1:]):
-        try:
-            result += [before.interpolate(after, k / tween)
-                       for k in range(1, tween)]
-        except ValueError:
-            pass
-        result.append(after)
+        result += [before.interpolate(after, k / tween)
+                   for k in range(1, tween)] + [after]
     return result
 
 

@@ -12,9 +12,11 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 - Planar isotopy as a gif: `monoidal.Equation.path` is the rewrite steps from
   one term to the next through their normal form, `Equation.to_gif` animates
   it, and `to_gif(..., tween=n)` moves each drawing to the next in `n` frames
-  by `Drawing.interpolate`, whenever the two are of one diagram up to an
-  interchanger. `Diagram.normalization` lists the steps `normal_form` takes
-  ([next#706]).
+  by `Drawing.interpolate`, which raises unless the two are one move apart:
+  an interchanger, or a box sliding through a braid or a swap by
+  `naturality`, where the crossing shrinks behind the box halfway. A gif
+  tweened so is an isotopy between the drawings. `Diagram.normalization`
+  lists the steps `normal_form` takes ([next#706]).
 - `discopy.lean` compiles the categories of `discopy.abc` and their axioms to
   Lean structures, read off the declarations by introspection, into
   `discolean/DisCoLean/ABC.lean`; `discolean/` proves a compiled category is a
