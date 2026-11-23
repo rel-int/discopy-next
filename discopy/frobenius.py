@@ -103,14 +103,27 @@ class Wire(pivotal.Wire):
     A frobenius object is a self-dual pivotal object: its adjoints are the
     object itself the other way round, from its codomain to its domain.
 
+    It has one winding, so its winding number is read modulo one, i.e. it is
+    always zero.
+
     Parameters:
         name : The name of the object.
+        z : The winding number, zero up to its one winding.
 
     >>> from discopy.monoidal import Colour
     >>> x = Wire('x', dom=Colour('a'), cod=Colour('b'))
     >>> assert x.l == x.r and (x.l.dom, x.l.cod) == (x.cod, x.dom)
     >>> assert x.l.l == x and Wire('y').l == Wire('y')
+    >>> assert Wire('y', 1) == Wire('y') and Wire('y', 1).l.l == Wire('y')
     """
+    def __setstate__(self, state):
+        super().__setstate__(state)
+        self.z %= len(self.windings)
+
+    def __init__(self, *args, **params):
+        super().__init__(*args, **params)
+        self.z %= len(self.windings)
+
     @property
     def l(self) -> Self:
         """ The object the other way round, from its codomain to its domain.

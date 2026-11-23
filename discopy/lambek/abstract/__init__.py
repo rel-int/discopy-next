@@ -201,10 +201,10 @@ adjoint of a forgetful functor, rather than an adjective on a noun:
 DisCoPy diagrams are the arrows of the free monoidal category
 
 The Lean side is Montague's, with Lean as its logic: ``e`` a Lean term, ``t``
-a Lean proposition and ``k`` a Lean structure, the model of ``lean/``. A noun
-phrase is a quantifier, *the free* ``k`` *category* is ``Diagram.k S`` and it
-contributes its universal property, *the arrows of* ``C`` are ``C.Hom`` and
-*are* is an equation:
+a Lean proposition and ``k`` a Lean structure, the model of ``discolean/``.
+A noun phrase is a quantifier, *the free* ``k`` *category* is ``Diagram.k S``
+and it contributes its universal property, *the arrows of* ``C`` are
+``C.Hom`` and *are* is an equation:
 
 >>> k = Ty("k")
 >>> StrictMonoidal, StrictPremonoidal = k("StrictMonoidal"), k(
@@ -258,11 +258,12 @@ evaluating the lambdas as it goes:
     (∀ x, F.ob [x] = G.ob [x]) →
     (∀ b, F.map (Diagram.box b) = G.map (Diagram.box b)) → F = G
 
-That statement does not elaborate: ``lean/`` has no ``StrictMonoidal``, and its
-``not_monoidal`` says why, two boxes side by side are two diagrams, as the
-tensor of diagrams does the first one first. DisCoPy diagrams are the arrows
-of the free *premonoidal* category, which ``lean/Statements/English.lean``
-proves in the words the grammar prints:
+That statement does not elaborate: ``discolean/`` has no ``StrictMonoidal``,
+and its ``not_monoidal`` says why, two boxes side by side are two diagrams, as
+the tensor of diagrams does the first one first. DisCoPy diagrams are the
+arrows of the free *premonoidal* category, which
+``discolean/DisCoLean/Statements/English.lean`` proves in the words the
+grammar prints:
 
 >>> print(*words(english(sentence(PREMONOIDAL)))()([]))
 DisCoPy diagrams are the arrows of the free premonoidal category

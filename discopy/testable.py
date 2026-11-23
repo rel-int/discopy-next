@@ -533,7 +533,7 @@ class Bang[Coarse, Object](Constructor):
     :class:`Delay` reads the delay, so that a category whose bang is the
     identity reads each object as its own bang.
 
-    >>> from discopy.biclosed import Ty, Diagram
+    >>> from discopy.bang import Ty, Diagram
     >>> assert Bang[Diagram, Ty('x')] == Ty('x').bang()
     """
     @staticmethod
