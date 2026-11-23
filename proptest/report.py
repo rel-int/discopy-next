@@ -170,7 +170,7 @@ def stopped(baseline, cells):
     return tuple(cell for cell in now if cell.outcome in STOPPED + (GONE, ))
 
 
-def render(cells, baseline=None):
+def render(cells, baseline=None, flag="--proptest-baseline"):
     """
     The lines the run prints about itself: the cells that cannot fail, and,
     against a baseline, the cells that stopped being checked. An empty
@@ -180,7 +180,7 @@ def render(cells, baseline=None):
     ``baseline`` is :obj:`None` when the run was given no baseline and empty
     when it was given one with nothing in it, which is what an unreadable
     artifact comes to: the two read differently and only the first is the
-    reader's to fix.
+    reader's to fix, by passing ``flag``.
 
     >>> print("\\n".join(render([
     ...     Cell("cat.Arrow.identity_typing", PASSED, distinct=5, budget=100),
@@ -225,8 +225,8 @@ def render(cells, baseline=None):
                 f"every one of the {len(passing)} passing cell(s) drew a "
                 "distinct term for each example it was given")
     if baseline is None:
-        lines.append("no baseline to compare against: "
-                     "pass --proptest-baseline to name one")
+        lines.append(f"no baseline to compare against: "
+                     f"pass {flag} to name one")
     elif not baseline:
         lines.append("the baseline names no cell to compare against")
     elif not (lost := stopped(baseline, cells)):
@@ -317,7 +317,7 @@ def merge(reports, baseline=None):
     if twice := sorted({a.name for a, b in zip(cells, cells[1:])
                         if a.name == b.name}):
         raise ValueError(f"cell(s) in more than one slice: {twice}")
-    return cells, render(cells, baseline)
+    return cells, render(cells, baseline, flag="--baseline")
 
 
 if __name__ == "__main__":
