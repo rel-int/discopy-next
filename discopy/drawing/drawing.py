@@ -714,6 +714,60 @@ which to_drawing recomputes.
             raise ValueError(messages.LAYOUT_NOT_FEASIBLE)
         return result
 
+    def interpolate(self, other: Drawing, t: float) -> Drawing:
+        """
+        The drawing a fraction ``t`` of the way from ``self`` to ``other``,
+        each node at the barycentre of its two positions. When the drawings
+        are of one diagram up to an interchanger, i.e. their plane graphs are
+        equal once the indices of two consecutive boxes are swapped, every
+        such drawing is of the same diagram: this is a planar isotopy, see
+        :meth:`discopy.monoidal.Equation.path`.
+
+        Parameters:
+            other : The drawing to move to.
+            t : The fraction of the way, from ``0`` to ``1``.
+
+        Raises:
+            ValueError : When no swap of two consecutive boxes makes the
+                plane graphs of the drawings equal.
+
+        Example
+        -------
+        >>> from discopy.monoidal import Ty, Box
+        >>> x = Ty('x')
+        >>> f, g = Box('f', x, x), Box('g', x, x)
+        >>> a, b = (f @ x >> x @ g).to_drawing(), (x @ g >> f @ x).to_drawing()
+        >>> assert a.interpolate(b, 0) == a
+        >>> box = Node("box", box=f, j=0)
+        >>> a.interpolate(b, .5).positions[box]
+        Point(x=0.5, y=1.0)
+        >>> a.interpolate(f.to_drawing(), .5)
+        Traceback (most recent call last):
+        ...
+        ValueError: These drawings are not of one diagram up to swapping \
+two boxes.
+        """
+        swaps = [{}] + [{j: j + 1, j + 1: j}
+                        for j in range(len(self.box_nodes) - 1)]
+        for swap in swaps:
+            mapping = {node: Node(node.kind, **dict(node.data, j=swap[node.j]))
+                       if node.data.get("j") in swap else node
+                       for node in other.nodes}
+            graph = nx.relabel_nodes(other.graph, mapping)
+            if set(graph.nodes) == set(self.nodes)\
+                    and set(graph.edges) == set(self.edges):
+                break
+        else:
+            raise ValueError(messages.NO_INTERPOLATION)
+        target = {mapping[node]: p for node, p in other.positions.items()}
+        result = self.relabel_nodes(positions={
+            node: Point(p.x + t * (target[node].x - p.x),
+                        p.y + t * (target[node].y - p.y))
+            for node, p in self.positions.items()})
+        result.width = self.width + t * (other.width - self.width)
+        result.height = self.height + t * (other.height - self.height)
+        return result
+
     def wires(self) -> list[tuple[Node, Node]]:
         """
         The edges of a drawing that are wires, i.e. not ending at a box node.

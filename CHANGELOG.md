@@ -9,6 +9,12 @@ Changes since [`1.2.2`](https://github.com/discopy/discopy/releases/tag/1.2.2).
 
 ### Added
 
+- Planar isotopy as a gif: `monoidal.Equation.path` is the rewrite steps from
+  one term to the next through their normal form, `Equation.to_gif` animates
+  it, and `to_gif(..., tween=n)` moves each drawing to the next in `n` frames
+  by `Drawing.interpolate`, whenever the two are of one diagram up to an
+  interchanger. `Diagram.normalization` lists the steps `normal_form` takes
+  ([next#706]).
 - `discopy.lean` compiles the categories of `discopy.abc` and their axioms to
   Lean structures, read off the declarations by introspection, into
   `discolean/DisCoLean/ABC.lean`; `discolean/` proves a compiled category is a
@@ -2578,6 +2584,7 @@ for the changelog of `1.2.1` and earlier.
 [next#698]: https://github.com/rel-int/discopy-next/pull/698
 [next#699]: https://github.com/rel-int/discopy-next/pull/699
 [next#702]: https://github.com/rel-int/discopy-next/pull/702
+[next#706]: https://github.com/rel-int/discopy-next/pull/706
 [optyx#16]: https://github.com/rel-int/optyx/pull/16
 [optyx#29]: https://github.com/rel-int/optyx/pull/29
 [optyx#44]: https://github.com/rel-int/optyx/pull/44

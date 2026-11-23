@@ -2388,8 +2388,26 @@ let(e(x2), lambda: h(x1), offset=1)))
             Whenever ``normalize`` yields the same rewrite steps twice, e.g.
             the diagram is not boundary-connected.
         """
+        return self.normalization(normalize, **params)[-1]
+
+    def normalization(
+            self, normalize: Callable | None = None, **params
+            ) -> "list[Diagram]":
+        """
+        The diagram then each step of its normalisation, the last being its
+        :meth:`normal_form`, with the same parameters and exceptions.
+
+        Example
+        -------
+        >>> x = Ty('x')
+        >>> f, g = Box('f', x, x), Box('g', x, x)
+        >>> for step in (f @ x >> x @ g >> f @ x).normalization():
+        ...     print(step)
+        f @ x >> x @ g >> f @ x
+        f @ x >> f @ x >> x @ g
+        """
         normalize = type(self).normalize if normalize is None else normalize
-        cache = set()
+        steps, cache = [], set()
         for diagram in itertools.chain([self], normalize(self, **params)):
             if str(diagram) in cache:
                 exception = NotImplementedError(
@@ -2397,7 +2415,8 @@ let(e(x2), lambda: h(x1), offset=1)))
                 exception.last_step = diagram
                 raise exception
             cache.add(str(diagram))
-        return diagram
+            steps.append(diagram)
+        return steps
 
     @classmethod
     def from_tree(cls, tree):
@@ -2904,6 +2923,72 @@ class Equation(cat.Equation, RichDisplay):
         for symbol, term in zip(self.symbols, self.terms[1:]):
             result = result.add(term.to_drawing(), symbol, self.space)
         return result
+
+    def path(self, **params) -> list[Diagram]:
+        """
+        The rewrite steps from the first term to each next one, through their
+        normal form: the :meth:`Diagram.normalization` of the one, then that
+        of the other backwards. In :mod:`discopy.monoidal` each step is an
+        interchanger, so drawing it is a planar isotopy, see :meth:`to_gif`.
+
+        Parameters:
+            params : Passed to :meth:`Diagram.normalization`.
+
+        Raises:
+            AxiomError : When two consecutive terms have different normal
+                forms.
+
+        Example
+        -------
+        >>> x = Ty('x')
+        >>> f, g, h = Box('f', x, x), Box('g', x @ x, x), Box('h', x, x @ x)
+        >>> source = f @ x @ x >> x @ g >> x @ h
+        >>> target = x @ g >> x @ h >> f @ x @ x
+        >>> for step in Equation(source, target).path(): print(step)
+        f @ x @ x >> x @ g >> x @ h
+        x @ g >> f @ x >> x @ h
+        x @ g >> x @ h >> f @ x @ x
+        >>> Equation(f, g).path()
+        Traceback (most recent call last):
+        ...
+        discopy.utils.AxiomError: f and g have different normal forms: \
+f and g.
+        """
+        first, *others = self.terms
+        result = first.normalization(**params)
+        for term in others:
+            steps = term.normalization(**params)
+            if steps[-1] != result[-1]:
+                raise AxiomError(messages.NOT_ISOTOPIC.format(
+                    result[0], term, result[-1], steps[-1]))
+            result += steps[-2::-1]
+        return result
+
+    def to_gif(self, **params):
+        """
+        Animate the :meth:`path` from the first term to each next one, see
+        :func:`discopy.drawing.to_gif`.
+
+        Parameters:
+            params : Passed to :func:`discopy.drawing.to_gif`, except
+                ``left`` passed to :meth:`path`.
+
+        Example
+        -------
+        >>> x = Ty('x')
+        >>> f, g, h = Box('f', x, x), Box('g', x @ x, x), Box('h', x, x @ x)
+        >>> source = f @ x @ x >> x @ g >> x @ h
+        >>> target = x @ g >> x @ h >> f @ x @ x
+        >>> _ = Equation(source, target).to_gif(
+        ...     tween=8, timestep=80, loop=True,
+        ...     doctest="docs/_static/monoidal/planar-isotopy.gif")
+
+        .. image:: /_static/monoidal/planar-isotopy.gif
+            :align: center
+        """
+        path = self.path(**{
+            key: params.pop(key) for key in ["left"] if key in params})
+        return path[0].to_gif(*path[1:], **params)
 
     def draw(self, path=None, **params):
         """

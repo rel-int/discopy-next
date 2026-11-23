@@ -150,6 +150,10 @@ def to_gif(diagram, *diagrams, **params):  # pragma: no cover
         Where to save the image, if :code:`None` the gif is only embedded.
     timestep : int, optional
         Time step in milliseconds, default is :code:`500`.
+    tween : int, optional
+        Frames per step, default is :code:`1`: from each diagram to the next
+        the drawing moves by :meth:`Drawing.interpolate`, or cuts to the next
+        when it cannot, e.g. along :meth:`discopy.monoidal.Equation.path`.
     loop : bool, optional
         Whether to loop, default is :code:`False`
     params : any, optional
@@ -159,7 +163,9 @@ def to_gif(diagram, *diagrams, **params):  # pragma: no cover
         params.pop("path", None), params.pop("doctest", None))
     timestep = params.get("timestep", 500)
     loop = params.get("loop", False)
+    tween = params.pop("tween", 1)
     steps, frames = [d.to_drawing() for d in (diagram, ) + diagrams], []
+    steps = tweened(steps, tween)
     if 'figsize' not in params:
         params['figsize'] = tuple(
             max(getattr(step, attr) for step in steps)
@@ -193,6 +199,30 @@ def to_gif(diagram, *diagrams, **params):  # pragma: no cover
         return HTML(image)
     except ImportError:
         return image
+
+
+def tweened(steps: list[Drawing], tween: int) -> list[Drawing]:
+    """
+    The drawings with ``tween - 1`` more between each one and the next, see
+    :meth:`Drawing.interpolate`, none where it cannot interpolate.
+
+    Example
+    -------
+    >>> from discopy.monoidal import Ty, Box
+    >>> x = Ty('x')
+    >>> f, g = Box('f', x, x), Box('g', x, x)
+    >>> steps = [d.to_drawing() for d in (f @ x >> x @ g, x @ g >> f @ x, f)]
+    >>> assert len(tweened(steps, 4)) == 1 + 4 + 1
+    """
+    result = steps[:1]
+    for before, after in zip(steps, steps[1:]):
+        try:
+            result += [before.interpolate(after, k / tween)
+                       for k in range(1, tween)]
+        except ValueError:
+            pass
+        result.append(after)
+    return result
 
 
 def spiral(n_cups):
